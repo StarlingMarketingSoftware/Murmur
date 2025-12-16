@@ -3,7 +3,6 @@
 import { FC, Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { GoogleMap, useJsApiLoader, MarkerF, OverlayView } from '@react-google-maps/api';
 import { ContactWithName } from '@/types/contact';
-import { useGeocodeContacts } from '@/hooks/queryHooks/useContacts';
 import {
 	generateMapTooltipIconUrl,
 	calculateTooltipWidth,
@@ -220,11 +219,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const [hoveredMarkerId, setHoveredMarkerId] = useState<number | null>(null);
 	const [map, setMap] = useState<google.maps.Map | null>(null);
 	const [selectedStateKey, setSelectedStateKey] = useState<string | null>(null);
-	// Local state for newly geocoded coordinates (updates before query refetch)
-	const [geocodedCoords, setGeocodedCoords] = useState<
-		Map<number, { lat: number; lng: number }>
-	>(new Map());
-	const geocodedIdsRef = useRef<Set<number>>(new Set());
 	// Timeout ref for auto-hiding research panel
 	const researchPanelTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 	const stateLayerRef = useRef<google.maps.Data | null>(null);
@@ -363,76 +357,21 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '',
 	});
 
-	const { mutate: geocodeContacts, isPending: isGeocoding } = useGeocodeContacts({
-		suppressToasts: true,
-	});
-
-	// Handle geocode results - wrapped in a callback so we can call mutate with onSuccess
-	const handleGeocode = useCallback(
-		(contactIds: number[]) => {
-			geocodeContacts(contactIds, {
-				onSuccess: (data) => {
-					// Update local state immediately with geocoded coordinates
-					if (data.geocoded && data.geocoded.length > 0) {
-						setGeocodedCoords((prev) => {
-							const newMap = new Map(prev);
-							for (const item of data.geocoded) {
-								newMap.set(item.id, { lat: item.latitude, lng: item.longitude });
-								geocodedIdsRef.current.add(item.id);
-							}
-							return newMap;
-						});
-					}
-					// Mark failed geocodes so we don't retry them
-					if (data.errors && data.errors.length > 0) {
-						for (const err of data.errors) {
-							geocodedIdsRef.current.add(err.id);
-						}
-					}
-				},
-			});
-		},
-		[geocodeContacts]
-	);
-
-	// Find contacts that need geocoding (have address info but no coordinates)
-	const contactsNeedingGeocode = useMemo(() => {
-		return contacts.filter(
-			(contact) =>
-				(contact.latitude == null || contact.longitude == null) &&
-				(contact.city || contact.state || contact.address) &&
-				!geocodedIdsRef.current.has(contact.id)
-		);
-	}, [contacts]);
-
-	// Trigger geocoding for contacts without coordinates
-	useEffect(() => {
-		if (contactsNeedingGeocode.length > 0 && !isGeocoding) {
-			// Geocode up to 25 contacts at a time
-			const idsToGeocode = contactsNeedingGeocode.slice(0, 25).map((c) => c.id);
-			handleGeocode(idsToGeocode);
-		}
-	}, [contactsNeedingGeocode, isGeocoding, handleGeocode]);
-
-	// Filter contacts that have valid coordinates (from DB or freshly geocoded)
+	// Filter contacts that have valid coordinates from the database
 	const contactsWithCoords = useMemo(() => {
 		return contacts.filter((contact) => {
-			// Check if contact has coordinates from DB
-			const hasDbCoords =
+			return (
 				contact.latitude != null &&
 				contact.longitude != null &&
 				!isNaN(contact.latitude) &&
-				!isNaN(contact.longitude);
-			// Check if we have freshly geocoded coordinates
-			const hasGeocodedCoords = geocodedCoords.has(contact.id);
-			return hasDbCoords || hasGeocodedCoords;
+				!isNaN(contact.longitude)
+			);
 		});
-	}, [contacts, geocodedCoords]);
+	}, [contacts]);
 
-	// Helper to get coordinates for a contact (DB or geocoded)
+	// Helper to get coordinates for a contact
 	const getContactCoords = useCallback(
 		(contact: ContactWithName): { lat: number; lng: number } | null => {
-			// Prefer DB coordinates
 			if (
 				contact.latitude != null &&
 				contact.longitude != null &&
@@ -441,10 +380,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			) {
 				return { lat: contact.latitude, lng: contact.longitude };
 			}
-			// Fall back to geocoded coordinates
-			return geocodedCoords.get(contact.id) || null;
+			return null;
 		},
-		[geocodedCoords]
+		[]
 	);
 
 	// Track if we've done the initial bounds fit
@@ -996,13 +934,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				</OverlayView>
 			)}
 
-			{/* Geocoding indicator */}
-			{isGeocoding && contactsNeedingGeocode.length > 0 && (
-				<div className="absolute bottom-2 left-2 bg-white/90 px-3 py-1.5 rounded-full shadow-md text-xs text-gray-600 flex items-center gap-2">
-					<div className="animate-spin h-3 w-3 border-2 border-gray-400 border-t-transparent rounded-full" />
-					Locating contacts...
-				</div>
-			)}
 		</GoogleMap>
 	);
 };
