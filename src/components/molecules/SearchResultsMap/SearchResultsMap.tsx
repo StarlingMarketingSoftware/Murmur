@@ -311,68 +311,12 @@ const bboxFromPolygon = (polygon: ClippingPolygon): BoundingBox | null => {
 	return { minLat, maxLat, minLng, maxLng };
 };
 
-const geoJsonRingToClippingRing = (ring: unknown): ClippingRing => {
-	if (!Array.isArray(ring)) return [];
-	const coords: ClippingRing = [];
-	for (const pt of ring) {
-		if (!Array.isArray(pt) || pt.length < 2) continue;
-		const lng = Number(pt[0]);
-		const lat = Number(pt[1]);
-		if (!Number.isFinite(lng) || !Number.isFinite(lat)) continue;
-		coords.push([lng, lat]);
-	}
-	if (coords.length < 3) return [];
-	return closeRing(coords);
-};
-
-const geoJsonPolygonToClippingPolygon = (coords: unknown): ClippingPolygon => {
-	if (!Array.isArray(coords)) return [];
-	return (coords as unknown[])
-		.map((ring) => geoJsonRingToClippingRing(ring))
-		.filter((ring) => ring.length >= 4);
-};
-
-const prepareLandPolygonsFromGeoJson = (geojson: unknown): PreparedClippingPolygon[] => {
-	if (!geojson || typeof geojson !== 'object') return [];
-	const anyGeo = geojson as { features?: unknown[] };
-	const features = Array.isArray(anyGeo.features) ? anyGeo.features : [];
-
-	const prepared: PreparedClippingPolygon[] = [];
-	for (const feature of features) {
-		const geom = (feature as { geometry?: { type?: string; coordinates?: unknown } })?.geometry;
-		const type = geom?.type;
-		const coordinates = geom?.coordinates;
-
-		if (type === 'Polygon') {
-			const polygon = geoJsonPolygonToClippingPolygon(coordinates);
-			if (!polygon.length) continue;
-			const bbox = bboxFromPolygon(polygon);
-			if (!bbox) continue;
-			prepared.push({ polygon, bbox });
-			continue;
-		}
-
-		if (type === 'MultiPolygon') {
-			if (!Array.isArray(coordinates)) continue;
-			for (const polyCoords of coordinates) {
-				const polygon = geoJsonPolygonToClippingPolygon(polyCoords);
-				if (!polygon.length) continue;
-				const bbox = bboxFromPolygon(polygon);
-				if (!bbox) continue;
-				prepared.push({ polygon, bbox });
-			}
-		}
-	}
-
-	return prepared;
-};
-
-const isPointOnLand = (
+const isPointInUSA = (
 	lat: number,
 	lng: number,
-	preparedLandPolygons: PreparedClippingPolygon[]
+	preparedStatePolygons: PreparedClippingPolygon[]
 ): boolean => {
-	for (const { bbox, polygon } of preparedLandPolygons) {
+	for (const { bbox, polygon } of preparedStatePolygons) {
 		if (!isLatLngInBbox(lat, lng, bbox)) continue;
 		if (pointInClippingPolygon([lng, lat], polygon)) return true;
 	}
@@ -612,8 +556,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const resultsSelectionSignatureRef = useRef<string>('');
 	const backgroundDotsLayerRef = useRef<google.maps.Data | null>(null);
 	const lastBackgroundDotsKeyRef = useRef<string>('');
-	const landPolygonsRef = useRef<PreparedClippingPolygon[] | null>(null);
-	const landPolygonsLoadStartedRef = useRef(false);
+	const usStatesPolygonsRef = useRef<PreparedClippingPolygon[] | null>(null);
 	const selectedStateKeyRef = useRef<string | null>(null);
 	const onStateSelectRef = useRef<SearchResultsMapProps['onStateSelect'] | null>(null);
 	const [isStateLayerReady, setIsStateLayerReady] = useState(false);
@@ -681,6 +624,21 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		});
 
 		dataLayer.loadGeoJson(STATE_GEOJSON_URL, { idPropertyName: 'NAME' }, () => {
+			// Prepare state polygons for background dots point-in-polygon checks
+			const prepared: PreparedClippingPolygon[] = [];
+			dataLayer.forEach((feature) => {
+				const geometry = feature.getGeometry();
+				if (!geometry) return;
+				const mp = geometryToClippingMultiPolygon(geometry);
+				if (!mp) return;
+				for (const poly of mp) {
+					const bbox = bboxFromPolygon(poly);
+					if (bbox) {
+						prepared.push({ polygon: poly, bbox });
+					}
+				}
+			});
+			usStatesPolygonsRef.current = prepared.length ? prepared : null;
 			setIsStateLayerReady(true);
 		});
 
@@ -860,9 +818,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		if (!mapInstance) return;
 		const layer = backgroundDotsLayerRef.current;
 		if (!layer) return;
-		const land = landPolygonsRef.current;
-		// Don't render any background dots until we can guarantee they land on land (no ocean/lakes).
-		if (!land || land.length === 0) return;
+		const usStates = usStatesPolygonsRef.current;
+		// Don't render any background dots until we have US state polygons (ensures dots only in USA).
+		if (!usStates || usStates.length === 0) return;
 
 		const bounds = mapInstance.getBounds();
 		if (!bounds) return;
@@ -913,8 +871,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			// Avoid extreme latitudes where the map projection behaves oddly.
 			const clampedLat = clamp(lat, -85, 85);
 
-			// Only show "establishment-like" filler points on land.
-			if (!isPointOnLand(clampedLat, lng, land)) continue;
+			// Only show dots within the United States (using state polygons as land mask).
+			if (!isPointInUSA(clampedLat, lng, usStates)) continue;
 
 			if (selection) {
 				// Quick bbox reject so we only do point-in-polygon work near the selected region.
@@ -958,41 +916,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		};
 	}, [map]);
 
-	// Load a lightweight global land mask (Natural Earth 110m) to avoid placing background dots in water.
-	// This is local (public/) so it doesn't hit any third-party APIs or quotas.
+	// Trigger background dots update when US state polygons become available
 	useEffect(() => {
-		if (!map) return;
-		if (landPolygonsRef.current || landPolygonsLoadStartedRef.current) return;
-		landPolygonsLoadStartedRef.current = true;
-
-		let cancelled = false;
-		const run = async () => {
-			try {
-				const res = await fetch('/geo/ne_110m_land.geojson');
-				if (!res.ok) {
-					throw new Error(`Failed to load land mask: ${res.status} ${res.statusText}`);
-				}
-				const geojson = (await res.json()) as unknown;
-				const prepared = prepareLandPolygonsFromGeoJson(geojson);
-				if (cancelled) return;
-				landPolygonsRef.current = prepared.length ? prepared : null;
-				if (!prepared.length) {
-					console.warn('Land mask loaded but contained no valid polygons');
-				}
-				// Rebuild dots now that we can filter out water.
-				updateBackgroundDots(map);
-			} catch (err) {
-				if (cancelled) return;
-				console.error('Failed to load land mask for background dots', err);
-				landPolygonsRef.current = null;
-			}
-		};
-
-		void run();
-		return () => {
-			cancelled = true;
-		};
-	}, [map, updateBackgroundDots]);
+		if (!map || !isStateLayerReady) return;
+		updateBackgroundDots(map);
+	}, [map, isStateLayerReady, updateBackgroundDots]);
 
 	useEffect(() => {
 		if (!map) return;
