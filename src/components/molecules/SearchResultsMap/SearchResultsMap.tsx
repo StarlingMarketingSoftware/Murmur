@@ -14,6 +14,107 @@ import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 
 type LatLngLiteral = { lat: number; lng: number };
 
+type ClippingCoord = [number, number]; // [lng, lat]
+type ClippingRing = ClippingCoord[];
+type ClippingPolygon = ClippingRing[];
+type ClippingMultiPolygon = ClippingPolygon[];
+
+const closeRing = (ring: ClippingRing): ClippingRing => {
+	if (ring.length === 0) return ring;
+	const first = ring[0];
+	const last = ring[ring.length - 1];
+	if (first[0] === last[0] && first[1] === last[1]) return ring;
+	return [...ring, first];
+};
+
+const absRingArea = (ring: ClippingRing): number => {
+	if (ring.length < 3) return 0;
+	let area2 = 0;
+	for (let i = 0; i < ring.length; i++) {
+		const [x1, y1] = ring[i];
+		const [x2, y2] = ring[(i + 1) % ring.length];
+		area2 += x1 * y2 - x2 * y1;
+	}
+	return Math.abs(area2 / 2);
+};
+
+const createOutlinePolygonsFromMultiPolygon = (
+	multiPolygon: ClippingMultiPolygon,
+	options: Pick<
+		google.maps.PolygonOptions,
+		'strokeColor' | 'strokeOpacity' | 'strokeWeight' | 'zIndex'
+	>
+): google.maps.Polygon[] => {
+	const polygons: google.maps.Polygon[] = [];
+	for (const clippingPolygon of multiPolygon) {
+		if (!clippingPolygon?.length) continue;
+
+		const outerRing = clippingPolygon.reduce<ClippingRing | null>((best, ring) => {
+			if (!ring?.length) return best;
+			if (!best) return ring;
+			return absRingArea(ring) > absRingArea(best) ? ring : best;
+		}, null);
+
+		if (!outerRing) continue;
+
+		const path = outerRing
+			.filter(([lng, lat]) => Number.isFinite(lng) && Number.isFinite(lat))
+			.map(([lng, lat]) => ({ lat, lng }));
+
+		if (path.length < 3) continue;
+
+		polygons.push(
+			new google.maps.Polygon({
+				paths: path,
+				clickable: false,
+				fillOpacity: 0,
+				strokeColor: options.strokeColor,
+				strokeOpacity: options.strokeOpacity ?? 1,
+				strokeWeight: options.strokeWeight ?? 2,
+				zIndex: options.zIndex,
+			})
+		);
+	}
+	return polygons;
+};
+
+const linearRingToClippingRing = (linearRing: google.maps.Data.LinearRing): ClippingRing => {
+	const coords = linearRing
+		.getArray()
+		.map((latLng): ClippingCoord => [latLng.lng(), latLng.lat()])
+		.filter(([lng, lat]) => Number.isFinite(lng) && Number.isFinite(lat));
+
+	// Polygon-clipping expects valid rings; skip obviously invalid ones.
+	if (coords.length < 3) return [];
+	return closeRing(coords);
+};
+
+const polygonToClippingPolygon = (polygon: google.maps.Data.Polygon): ClippingPolygon => {
+	const rings = polygon
+		.getArray()
+		.map((ring) => linearRingToClippingRing(ring))
+		.filter((ring) => ring.length >= 4);
+	return rings;
+};
+
+const geometryToClippingMultiPolygon = (
+	geometry: google.maps.Data.Geometry
+): ClippingMultiPolygon | null => {
+	const type = geometry.getType();
+	if (type === 'Polygon') {
+		const poly = polygonToClippingPolygon(geometry as google.maps.Data.Polygon);
+		return poly.length ? [poly] : null;
+	}
+	if (type === 'MultiPolygon') {
+		const polys = (geometry as google.maps.Data.MultiPolygon)
+			.getArray()
+			.map((poly) => polygonToClippingPolygon(poly))
+			.filter((poly) => poly.length);
+		return polys.length ? polys : null;
+	}
+	return null;
+};
+
 const coerceFiniteNumber = (value: unknown): number | null => {
 	if (value == null) return null;
 	if (typeof value === 'number') return Number.isFinite(value) ? value : null;
@@ -239,6 +340,18 @@ const mapOptions: google.maps.MapOptions = {
 	fullscreenControl: false,
 	gestureHandling: 'greedy',
 	styles: [
+		// Hide Google's default state/province border lines so our custom outline is the only
+		// prominent border. (When state interactions are enabled, we draw borders via GeoJSON.)
+		{
+			featureType: 'administrative.province',
+			elementType: 'geometry.stroke',
+			stylers: [{ visibility: 'off' }],
+		},
+		{
+			featureType: 'administrative.province',
+			elementType: 'geometry.fill',
+			stylers: [{ visibility: 'off' }],
+		},
 		{
 			featureType: 'poi',
 			elementType: 'labels',
@@ -281,6 +394,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	// Timeout ref for auto-hiding research panel
 	const researchPanelTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 	const stateLayerRef = useRef<google.maps.Data | null>(null);
+	const resultsOutlinePolygonsRef = useRef<google.maps.Polygon[]>([]);
+	const searchedStateOutlinePolygonsRef = useRef<google.maps.Polygon[]>([]);
 	const selectedStateKeyRef = useRef<string | null>(null);
 	const onStateSelectRef = useRef<SearchResultsMapProps['onStateSelect'] | null>(null);
 	const [isStateLayerReady, setIsStateLayerReady] = useState(false);
@@ -308,23 +423,59 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		};
 	}, []);
 
-	// Load US state shapes and handle hover/click highlighting for this Search view
+	const clearResultsOutline = useCallback(() => {
+		for (const polygon of resultsOutlinePolygonsRef.current) {
+			polygon.setMap(null);
+		}
+		resultsOutlinePolygonsRef.current = [];
+	}, []);
+
+	const clearSearchedStateOutline = useCallback(() => {
+		for (const polygon of searchedStateOutlinePolygonsRef.current) {
+			polygon.setMap(null);
+		}
+		searchedStateOutlinePolygonsRef.current = [];
+	}, []);
+
+	// Load US state shapes (used for outline + optional hover/click interactions)
 	useEffect(() => {
-		if (!map || !enableStateInteractions) return;
+		if (!map) return;
+
+		// Reset any previous layer on map instance changes
+		if (stateLayerRef.current) {
+			stateLayerRef.current.setMap(null);
+			stateLayerRef.current = null;
+		}
 
 		const dataLayer = new google.maps.Data({ map });
 		stateLayerRef.current = dataLayer;
-		setIsStateLayerReady(true);
+		setIsStateLayerReady(false);
 
 		dataLayer.setStyle({
 			fillOpacity: 0,
-			strokeColor: STATE_BORDER_COLOR,
-			strokeOpacity: 0.7,
-			strokeWeight: 0.6,
+			strokeOpacity: 0,
+			strokeWeight: 0,
+			clickable: false,
 			zIndex: 0,
 		});
 
-		dataLayer.loadGeoJson(STATE_GEOJSON_URL, { idPropertyName: 'NAME' });
+		dataLayer.loadGeoJson(STATE_GEOJSON_URL, { idPropertyName: 'NAME' }, () => {
+			setIsStateLayerReady(true);
+		});
+
+		return () => {
+			dataLayer.setMap(null);
+			stateLayerRef.current = null;
+			setIsStateLayerReady(false);
+			clearResultsOutline();
+			clearSearchedStateOutline();
+		};
+	}, [map, clearResultsOutline, clearSearchedStateOutline]);
+
+	// Add/remove hover/click highlighting for states (only when enabled)
+	useEffect(() => {
+		const dataLayer = stateLayerRef.current;
+		if (!map || !dataLayer || !enableStateInteractions || !isStateLayerReady) return;
 
 		const mouseoverListener = dataLayer.addListener(
 			'mouseover',
@@ -371,18 +522,25 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			mouseoverListener.remove();
 			mouseoutListener.remove();
 			clickListener.remove();
-			dataLayer.setMap(null);
-			stateLayerRef.current = null;
-			setIsStateLayerReady(false);
-			setSelectedStateKey(null);
 		};
-	}, [map, enableStateInteractions]);
+	}, [map, enableStateInteractions, isStateLayerReady]);
 
 	// Update stroke styling when the selected state changes
 	useEffect(() => {
-		if (!enableStateInteractions || !isStateLayerReady) return;
 		const dataLayer = stateLayerRef.current;
-		if (!dataLayer) return;
+		if (!dataLayer || !isStateLayerReady) return;
+
+		// Keep the layer invisible unless state interactions are enabled.
+		if (!enableStateInteractions) {
+			dataLayer.setStyle({
+				fillOpacity: 0,
+				strokeOpacity: 0,
+				strokeWeight: 0,
+				clickable: false,
+				zIndex: 0,
+			});
+			return;
+		}
 
 		dataLayer.setStyle((feature) => {
 			const featureKey = normalizeStateKey(
@@ -391,6 +549,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			const isSelected = featureKey && featureKey === selectedStateKey;
 			return {
 				fillOpacity: 0,
+				clickable: true,
 				strokeColor: isSelected ? '#000000' : STATE_BORDER_COLOR,
 				strokeOpacity: isSelected ? 1 : 0.7,
 				strokeWeight: isSelected ? 2 : 0.6,
@@ -449,11 +608,172 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		return { contactsWithCoords, coordsByContactId };
 	}, [contacts]);
 
+	// State keys represented by the *visible* results on the map (only contacts with coords).
+	const resultStateKeys = useMemo(() => {
+		const keys = new Set<string>();
+		for (const contact of contactsWithCoords) {
+			const key = normalizeStateKey(contact.state ?? null);
+			if (key) keys.add(key);
+		}
+		return Array.from(keys).sort();
+	}, [contactsWithCoords]);
+
+	const lockedStateKey = useMemo(
+		() => normalizeStateKey(lockedStateName ?? null),
+		[lockedStateName]
+	);
+
+	const resultStateKeysSignature = useMemo(() => resultStateKeys.join('|'), [resultStateKeys]);
+
 	// Helper to get coordinates for a contact (stable + already-parsed)
 	const getContactCoords = useCallback(
 		(contact: ContactWithName): LatLngLiteral | null => coordsByContactId.get(contact.id) ?? null,
 		[coordsByContactId]
 	);
+
+	// Draw a gray outline around the *group of states* that have results.
+	// This uses the state polygons we load via the Data layer and unions them so the outline is one shape.
+	useEffect(() => {
+		if (!map || !isStateLayerReady) return;
+
+		// Clear if no result states
+		if (!resultStateKeysSignature) {
+			clearResultsOutline();
+			return;
+		}
+
+		const dataLayer = stateLayerRef.current;
+		if (!dataLayer) return;
+
+		let cancelled = false;
+
+		const run = async () => {
+			// Collect the state geometries we need
+			const wanted = new Set(resultStateKeys);
+			const stateMultiPolygons: ClippingMultiPolygon[] = [];
+
+			dataLayer.forEach((feature) => {
+				const featureKey = normalizeStateKey(
+					(feature.getProperty('NAME') as string) || (feature.getId() as string)
+				);
+				if (!featureKey || !wanted.has(featureKey)) return;
+				const geometry = feature.getGeometry();
+				if (!geometry) return;
+				const mp = geometryToClippingMultiPolygon(geometry);
+				if (mp) stateMultiPolygons.push(mp);
+			});
+
+			// If we couldn't resolve any polygons, nothing to outline.
+			if (stateMultiPolygons.length === 0) {
+				clearResultsOutline();
+				return;
+			}
+
+			// Union all selected state polygons into one (or multiple if disjoint) outline.
+			let unioned: ClippingMultiPolygon | null = null;
+			try {
+				const { default: polygonClipping } = await import('polygon-clipping');
+				unioned = polygonClipping.union(...stateMultiPolygons);
+			} catch (err) {
+				console.error('Failed to build state outline union; falling back to per-state outline', err);
+			}
+
+			if (cancelled) return;
+
+			// Clear the previous outline polygons
+			clearResultsOutline();
+
+			const multiPolygonsToRender: ClippingMultiPolygon =
+				unioned && Array.isArray(unioned) && unioned.length
+					? unioned
+					: stateMultiPolygons.flat();
+
+			const polygonsToDraw = createOutlinePolygonsFromMultiPolygon(multiPolygonsToRender, {
+				strokeColor: '#6B7280',
+				strokeOpacity: 1,
+				strokeWeight: 2,
+				zIndex: 1,
+			});
+
+			for (const polygon of polygonsToDraw) polygon.setMap(map);
+			resultsOutlinePolygonsRef.current = polygonsToDraw;
+		};
+
+		void run();
+
+		return () => {
+			cancelled = true;
+		};
+	}, [
+		map,
+		isStateLayerReady,
+		resultStateKeys,
+		resultStateKeysSignature,
+		clearResultsOutline,
+	]);
+
+	// Draw a black outline around the searched/locked state (even when state interactions are off).
+	// When state interactions are enabled, the Data layer already renders the selected state border.
+	useEffect(() => {
+		if (!map || !isStateLayerReady) return;
+
+		if (enableStateInteractions) {
+			clearSearchedStateOutline();
+			return;
+		}
+
+		if (!lockedStateKey) {
+			clearSearchedStateOutline();
+			return;
+		}
+
+		const dataLayer = stateLayerRef.current;
+		if (!dataLayer) return;
+
+		let cancelled = false;
+
+		const run = () => {
+			let found: ClippingMultiPolygon | null = null;
+
+			dataLayer.forEach((feature) => {
+				if (found) return;
+				const featureKey = normalizeStateKey(
+					(feature.getProperty('NAME') as string) || (feature.getId() as string)
+				);
+				if (!featureKey || featureKey !== lockedStateKey) return;
+				const geometry = feature.getGeometry();
+				if (!geometry) return;
+				found = geometryToClippingMultiPolygon(geometry);
+			});
+
+			if (cancelled) return;
+
+			clearSearchedStateOutline();
+			if (!found) return;
+
+			const polygonsToDraw = createOutlinePolygonsFromMultiPolygon(found, {
+				strokeColor: '#000000',
+				strokeOpacity: 1,
+				strokeWeight: 3,
+				zIndex: 2,
+			});
+
+			for (const polygon of polygonsToDraw) polygon.setMap(map);
+			searchedStateOutlinePolygonsRef.current = polygonsToDraw;
+		};
+
+		run();
+
+		return () => {
+			cancelled = true;
+		};
+	}, [
+		map,
+		isStateLayerReady,
+		lockedStateKey,
+		enableStateInteractions,
+		clearSearchedStateOutline,
+	]);
 
 	// Track if we've done the initial bounds fit
 	const hasFitBoundsRef = useRef(false);
@@ -524,11 +844,13 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	);
 
 	const onUnmount = useCallback(() => {
+		clearResultsOutline();
+		clearSearchedStateOutline();
 		setMap(null);
 		hasFitBoundsRef.current = false;
 		lastContactsCountRef.current = 0;
 		lastFirstContactIdRef.current = null;
-	}, []);
+	}, [clearResultsOutline, clearSearchedStateOutline]);
 
 	// Fit bounds when contacts with coordinates change
 	useEffect(() => {
