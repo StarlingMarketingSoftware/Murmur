@@ -277,6 +277,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const [hoveredMarkerId, setHoveredMarkerId] = useState<number | null>(null);
 	const [map, setMap] = useState<google.maps.Map | null>(null);
 	const [selectedStateKey, setSelectedStateKey] = useState<string | null>(null);
+	const [zoomLevel, setZoomLevel] = useState(4); // Default zoom level
 	// Timeout ref for auto-hiding research panel
 	const researchPanelTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 	const stateLayerRef = useRef<google.maps.Data | null>(null);
@@ -503,6 +504,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		(mapInstance: google.maps.Map) => {
 			setMap(mapInstance);
 
+			// Listen for zoom changes
+			mapInstance.addListener('zoom_changed', () => {
+				const newZoom = mapInstance.getZoom();
+				if (newZoom !== undefined) {
+					setZoomLevel(newZoom);
+				}
+			});
+
 			// Fit bounds on initial load if we have contacts
 			if (contactsWithCoords.length > 0) {
 				fitMapToBounds(mapInstance, contactsWithCoords);
@@ -564,6 +573,22 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		onToggleSelection?.(contact.id);
 	};
 
+	// Calculate marker scale based on zoom level
+	// At zoom 4 (zoomed out): scale 4, at zoom 14 (zoomed in): scale 12
+	const markerScale = useMemo(() => {
+		const minZoom = 4;
+		const maxZoom = 14;
+		const minScale = 4;
+		const maxScale = 12;
+		const clampedZoom = Math.max(minZoom, Math.min(maxZoom, zoomLevel));
+		const t = (clampedZoom - minZoom) / (maxZoom - minZoom);
+		return minScale + t * (maxScale - minScale);
+	}, [zoomLevel]);
+
+	const strokeWeight = useMemo(() => {
+		return 1.5 + (markerScale - 4) * 0.2; // Scale stroke proportionally
+	}, [markerScale]);
+
 	// Default red dot marker
 	const defaultMarkerIcon = useMemo(() => {
 		if (!isLoaded) return undefined;
@@ -572,10 +597,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			fillColor: '#D21E1F',
 			fillOpacity: 1,
 			strokeColor: '#FFFFFF',
-			strokeWeight: 3,
-			scale: 8,
+			strokeWeight: strokeWeight,
+			scale: markerScale,
 		};
-	}, [isLoaded]);
+	}, [isLoaded, markerScale, strokeWeight]);
 
 	// Selected green dot marker
 	const selectedMarkerIcon = useMemo(() => {
@@ -585,10 +610,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			fillColor: '#0E8530',
 			fillOpacity: 1,
 			strokeColor: '#FFFFFF',
-			strokeWeight: 3,
-			scale: 8,
+			strokeWeight: strokeWeight,
+			scale: markerScale,
 		};
-	}, [isLoaded]);
+	}, [isLoaded, markerScale, strokeWeight]);
 
 	// Invisible larger marker for hover hit area
 	const invisibleHitAreaIcon = useMemo(() => {
@@ -599,9 +624,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			fillOpacity: 0,
 			strokeColor: 'transparent',
 			strokeWeight: 0,
-			scale: 16, // Larger than visible dot (8) for easier hover
+			scale: markerScale * 2, // Larger than visible dot for easier hover
 		};
-	}, [isLoaded]);
+	}, [isLoaded, markerScale]);
 
 	// Generate hover tooltip icon with contact name and company
 	const getHoverMarkerIcon = useCallback(
