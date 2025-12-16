@@ -25,6 +25,10 @@ export type ProductionContactRow = {
 	companyType?: string;
 	companyIndustry?: string;
 	companyPostalCode?: string;
+	latitude?: string;
+	longitude?: string;
+	Latitude?: string;
+	Longitude?: string;
 
 	// Allow for any additional Excel columns that might exist
 	[key: string]: string | undefined;
@@ -76,6 +80,8 @@ async function importProductionContacts() {
 					companyType: row.companyType || null,
 					companyIndustry: row.companyIndustry || null,
 					companyPostalCode: row.companyPostalCode || null,
+					latitude: (row.latitude || row.Latitude) ? parseFloat(row.latitude || row.Latitude || '0') || null : null,
+					longitude: (row.longitude || row.Longitude) ? parseFloat(row.longitude || row.Longitude || '0') || null : null,
 					emailValidationStatus: EmailVerificationStatus.valid,
 					hasVectorEmbedding: true,
 				};

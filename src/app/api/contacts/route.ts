@@ -2276,6 +2276,16 @@ export async function GET(req: NextRequest) {
 									.filter(Boolean)
 							: [];
 
+					// Extract coordinates from ES metadata (stored as coordinates: { lat, lon })
+					const coords = md.coordinates as
+						| { lat?: number; lon?: number }
+						| null
+						| undefined;
+					const latitude =
+						coords?.lat != null && Number.isFinite(coords.lat) ? coords.lat : null;
+					const longitude =
+						coords?.lon != null && Number.isFinite(coords.lon) ? coords.lon : null;
+
 					return {
 						id: Number.isFinite(parsedId)
 							? parsedId
@@ -2303,8 +2313,8 @@ export async function GET(req: NextRequest) {
 						companyPostalCode: null,
 						companyKeywords: toArray(md.companyKeywords),
 						companyIndustry: (md.companyIndustry as string) ?? null,
-						latitude: null,
-						longitude: null,
+						latitude,
+						longitude,
 						isPrivate: false,
 						hasVectorEmbedding: true,
 						userContactListCount: 0,

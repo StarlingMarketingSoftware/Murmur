@@ -427,6 +427,7 @@ export const searchSimilarContacts = async (
 			'companyKeywords',
 			'companyIndustry',
 			'location',
+			'coordinates',
 		],
 		_source: false,
 	});
@@ -515,9 +516,6 @@ export const searchSimilarContacts = async (
 
 	const processedHits = processResultsWithLocationBoost(results.hits.hits);
 
-	// Debug log to see what's coming from Elasticsearch
-	console.log('First hit fields:', JSON.stringify(results.hits.hits[0]?.fields, null, 2));
-
 	return {
 		matches: processedHits.map((hit) => ({
 			id: hit._id,
@@ -542,6 +540,7 @@ export const searchSimilarContacts = async (
 				companyKeywords: hit.fields?.companyKeywords?.[0],
 				companyIndustry: hit.fields?.companyIndustry?.[0],
 				location: hit.fields?.location?.[0],
+				coordinates: hit.fields?.coordinates?.[0] || null,
 			},
 		})),
 		totalFound: processedHits.length,
@@ -603,6 +602,7 @@ export const searchContactsByLocation = async (
 			'companyKeywords',
 			'companyIndustry',
 			'location',
+			'coordinates',
 		],
 		_source: false,
 	});
@@ -631,6 +631,7 @@ export const searchContactsByLocation = async (
 				companyIndustry: hit.fields?.companyIndustry?.[0],
 				companyFoundedYear: hit.fields?.companyFoundedYear?.[0],
 				location: hit.fields?.location?.[0],
+				coordinates: hit.fields?.coordinates?.[0] || null,
 			},
 		})),
 		totalFound: results.hits.hits.length,

@@ -12,6 +12,64 @@ import {
 } from '@/components/atoms/_svg/MapTooltipIcon';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 
+type LatLngLiteral = { lat: number; lng: number };
+
+const coerceFiniteNumber = (value: unknown): number | null => {
+	if (value == null) return null;
+	if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+	if (typeof value === 'string') {
+		const trimmed = value.trim();
+		if (!trimmed) return null;
+		// Handle common "decimal comma" formats (e.g. "39,1234")
+		const normalized =
+			trimmed.includes(',') && !trimmed.includes('.') ? trimmed.replace(',', '.') : trimmed;
+		const n = Number(normalized);
+		return Number.isFinite(n) ? n : null;
+	}
+
+	// Prisma can sometimes surface numeric-like objects; Number(...) is a safe coercion attempt.
+	const n = Number((value as { valueOf?: () => unknown })?.valueOf?.() ?? value);
+	return Number.isFinite(n) ? n : null;
+};
+
+const getLatLngFromContact = (contact: ContactWithName): LatLngLiteral | null => {
+	const anyContact = contact as unknown as Record<string, unknown>;
+	const lat = coerceFiniteNumber(
+		anyContact.latitude ?? anyContact.lat ?? anyContact.Latitude ?? anyContact.LATITUDE
+	);
+	const lng = coerceFiniteNumber(
+		anyContact.longitude ??
+			anyContact.lng ??
+			anyContact.lon ??
+			anyContact.Longitude ??
+			anyContact.LONGITUDE
+	);
+
+	if (lat == null || lng == null) return null;
+	// Defensive sanity bounds: Google Maps won't render invalid ranges reliably.
+	if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
+	return { lat, lng };
+};
+
+const coordinateKey = (coords: LatLngLiteral) =>
+	`${coords.lat.toFixed(5)},${coords.lng.toFixed(5)}`;
+
+// Deterministic "spiderfy" offset for exact/near-exact duplicate coordinates so markers don't fully overlap.
+const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5)); // ~2.399963...
+const DUPLICATE_JITTER_BASE_DEG = 0.0015; // ~167m latitude; visible at mid zoom levels
+const jitterDuplicateCoords = (base: LatLngLiteral, index: number): LatLngLiteral => {
+	const angle = index * GOLDEN_ANGLE;
+	const radius = DUPLICATE_JITTER_BASE_DEG * Math.sqrt(index);
+	const dx = radius * Math.cos(angle);
+	const dy = radius * Math.sin(angle);
+	const latRad = (base.lat * Math.PI) / 180;
+	const lngScale = Math.max(0.2, Math.cos(latRad));
+	return {
+		lat: base.lat + dy,
+		lng: base.lng + dx / lngScale,
+	};
+};
+
 // State badge colors matching dashboard
 const stateBadgeColorMap: Record<string, string> = {
 	AL: '#E57373',
@@ -357,38 +415,51 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '',
 	});
 
-	// Filter contacts that have valid coordinates from the database
-	const contactsWithCoords = useMemo(() => {
-		return contacts.filter((contact) => {
-			return (
-				contact.latitude != null &&
-				contact.longitude != null &&
-				!isNaN(contact.latitude) &&
-				!isNaN(contact.longitude)
-			);
-		});
+	// Compute valid coords once and keep a per-contact lookup for stable rendering.
+	// Also apply a small deterministic offset for duplicate coordinate groups so every result is visible.
+	const { contactsWithCoords, coordsByContactId } = useMemo(() => {
+		const coordsByContactId = new Map<number, LatLngLiteral>();
+		const contactsWithCoords: ContactWithName[] = [];
+		const groups = new Map<string, number[]>();
+
+		for (const contact of contacts) {
+			const coords = getLatLngFromContact(contact);
+			if (!coords) continue;
+			coordsByContactId.set(contact.id, coords);
+			contactsWithCoords.push(contact);
+			const key = coordinateKey(coords);
+			const existing = groups.get(key);
+			if (existing) existing.push(contact.id);
+			else groups.set(key, [contact.id]);
+		}
+
+		// Offset duplicates (keep the smallest id at the true coordinate for accuracy)
+		for (const ids of groups.values()) {
+			if (ids.length <= 1) continue;
+			ids.sort((a, b) => a - b);
+			for (let i = 1; i < ids.length; i++) {
+				const id = ids[i];
+				const base = coordsByContactId.get(id);
+				if (!base) continue;
+				coordsByContactId.set(id, jitterDuplicateCoords(base, i));
+			}
+		}
+
+		return { contactsWithCoords, coordsByContactId };
 	}, [contacts]);
 
-	// Helper to get coordinates for a contact
+	// Helper to get coordinates for a contact (stable + already-parsed)
 	const getContactCoords = useCallback(
-		(contact: ContactWithName): { lat: number; lng: number } | null => {
-			if (
-				contact.latitude != null &&
-				contact.longitude != null &&
-				!isNaN(contact.latitude) &&
-				!isNaN(contact.longitude)
-			) {
-				return { lat: contact.latitude, lng: contact.longitude };
-			}
-			return null;
-		},
-		[]
+		(contact: ContactWithName): LatLngLiteral | null => coordsByContactId.get(contact.id) ?? null,
+		[coordsByContactId]
 	);
 
 	// Track if we've done the initial bounds fit
 	const hasFitBoundsRef = useRef(false);
 	// Track the last contacts count to detect when results change
 	const lastContactsCountRef = useRef(0);
+	// Track first contact ID to detect when search results have changed
+	const lastFirstContactIdRef = useRef<number | null>(null);
 
 	// Helper to fit map bounds with padding
 	const fitMapToBounds = useCallback(
@@ -437,6 +508,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				fitMapToBounds(mapInstance, contactsWithCoords);
 				hasFitBoundsRef.current = true;
 				lastContactsCountRef.current = contactsWithCoords.length;
+				lastFirstContactIdRef.current = contactsWithCoords[0]?.id ?? null;
 			}
 		},
 		[contactsWithCoords, fitMapToBounds]
@@ -446,18 +518,25 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		setMap(null);
 		hasFitBoundsRef.current = false;
 		lastContactsCountRef.current = 0;
+		lastFirstContactIdRef.current = null;
 	}, []);
 
 	// Fit bounds when contacts with coordinates change
 	useEffect(() => {
 		if (!map || contactsWithCoords.length === 0) return;
 
+		// Check if this is a new set of search results by comparing the first contact ID
+		const currentFirstId = contactsWithCoords[0]?.id ?? null;
+		const isNewSearch = currentFirstId !== lastFirstContactIdRef.current;
+
 		// Fit bounds if:
 		// 1. We haven't fit bounds yet (initial load after geocoding)
-		// 2. The number of contacts with coords has increased (more were geocoded)
-		// 3. The contacts list changed significantly (new search)
+		// 2. This is a completely new search (first contact ID changed)
+		// 3. The number of contacts with coords has increased (more were geocoded)
+		// 4. The contacts list changed significantly (new search)
 		const shouldFitBounds =
 			!hasFitBoundsRef.current ||
+			isNewSearch ||
 			contactsWithCoords.length > lastContactsCountRef.current ||
 			Math.abs(contactsWithCoords.length - lastContactsCountRef.current) > 5;
 
@@ -465,19 +544,18 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			fitMapToBounds(map, contactsWithCoords);
 			hasFitBoundsRef.current = true;
 			lastContactsCountRef.current = contactsWithCoords.length;
+			lastFirstContactIdRef.current = currentFirstId;
 		}
 	}, [map, contactsWithCoords, fitMapToBounds]);
 
-	// Reset bounds tracking when contacts prop changes significantly (new search)
+	// Reset bounds tracking when contacts prop is empty (preparing for new search)
 	useEffect(() => {
-		const previousCount = lastContactsCountRef.current;
-
-		// If the contact IDs are completely different, reset the tracking
-		if (previousCount > 0 && contactsWithCoords.length === 0) {
+		if (contacts.length === 0) {
 			hasFitBoundsRef.current = false;
 			lastContactsCountRef.current = 0;
+			lastFirstContactIdRef.current = null;
 		}
-	}, [contacts, contactsWithCoords.length]);
+	}, [contacts]);
 
 	const handleMarkerClick = (contact: ContactWithName) => {
 		setSelectedMarker(contact);
