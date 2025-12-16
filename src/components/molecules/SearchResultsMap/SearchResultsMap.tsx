@@ -19,6 +19,9 @@ type ClippingRing = ClippingCoord[];
 type ClippingPolygon = ClippingRing[];
 type ClippingMultiPolygon = ClippingPolygon[];
 
+type BoundingBox = { minLat: number; maxLat: number; minLng: number; maxLng: number };
+type PreparedClippingPolygon = { polygon: ClippingPolygon; bbox: BoundingBox };
+
 const closeRing = (ring: ClippingRing): ClippingRing => {
 	if (ring.length === 0) return ring;
 	const first = ring[0];
@@ -169,6 +172,211 @@ const jitterDuplicateCoords = (base: LatLngLiteral, index: number): LatLngLitera
 		lat: base.lat + dy,
 		lng: base.lng + dx / lngScale,
 	};
+};
+
+const MAX_BACKGROUND_DOTS_PER_VIEW = 500;
+
+const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n));
+
+const hashStringToUint32 = (str: string): number => {
+	// FNV-1a 32-bit
+	let h = 2166136261;
+	for (let i = 0; i < str.length; i++) {
+		h ^= str.charCodeAt(i);
+		h = Math.imul(h, 16777619);
+	}
+	return h >>> 0;
+};
+
+const mulberry32 = (seed: number) => {
+	let t = seed >>> 0;
+	return () => {
+		t += 0x6d2b79f5;
+		let x = t;
+		x = Math.imul(x ^ (x >>> 15), x | 1);
+		x ^= x + Math.imul(x ^ (x >>> 7), x | 61);
+		return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
+	};
+};
+
+const getBackgroundDotsTargetCount = (zoom: number): number => {
+	// Decrease density as you zoom in so the map doesn't feel cluttered.
+	if (zoom <= 4) return 500;
+	if (zoom <= 5) return 460;
+	if (zoom <= 6) return 400;
+	if (zoom <= 7) return 330;
+	if (zoom <= 8) return 270;
+	if (zoom <= 9) return 210;
+	if (zoom <= 10) return 160;
+	if (zoom <= 11) return 130;
+	if (zoom <= 12) return 110;
+	if (zoom <= 13) return 90;
+	return 80;
+};
+
+const getBackgroundDotsQuantizationDeg = (zoom: number): number => {
+	// Controls when we regenerate dots as the viewport changes.
+	if (zoom <= 4) return 0.75;
+	if (zoom <= 6) return 0.4;
+	if (zoom <= 8) return 0.22;
+	if (zoom <= 10) return 0.12;
+	if (zoom <= 12) return 0.08;
+	return 0.05;
+};
+
+const bboxFromMultiPolygon = (multiPolygon: ClippingMultiPolygon): BoundingBox | null => {
+	let minLat = Infinity;
+	let maxLat = -Infinity;
+	let minLng = Infinity;
+	let maxLng = -Infinity;
+	for (const poly of multiPolygon) {
+		for (const ring of poly) {
+			for (const [lng, lat] of ring) {
+				if (!Number.isFinite(lng) || !Number.isFinite(lat)) continue;
+				minLat = Math.min(minLat, lat);
+				maxLat = Math.max(maxLat, lat);
+				minLng = Math.min(minLng, lng);
+				maxLng = Math.max(maxLng, lng);
+			}
+		}
+	}
+	if (!Number.isFinite(minLat) || !Number.isFinite(maxLat) || !Number.isFinite(minLng) || !Number.isFinite(maxLng)) {
+		return null;
+	}
+	return { minLat, maxLat, minLng, maxLng };
+};
+
+const isLatLngInBbox = (lat: number, lng: number, bbox: BoundingBox): boolean =>
+	lat >= bbox.minLat && lat <= bbox.maxLat && lng >= bbox.minLng && lng <= bbox.maxLng;
+
+const pointInRing = (point: ClippingCoord, ring: ClippingRing): boolean => {
+	const [x, y] = point;
+	let inside = false;
+	for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+		const [xi, yi] = ring[i];
+		const [xj, yj] = ring[j];
+		const intersects =
+			(yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi + 0.0) + xi;
+		if (intersects) inside = !inside;
+	}
+	return inside;
+};
+
+const pointInClippingPolygon = (point: ClippingCoord, polygon: ClippingPolygon): boolean => {
+	if (!polygon?.length) return false;
+	const outerRing = polygon.reduce<ClippingRing | null>((best, ring) => {
+		if (!ring?.length) return best;
+		if (!best) return ring;
+		return absRingArea(ring) > absRingArea(best) ? ring : best;
+	}, null);
+	if (!outerRing) return false;
+	if (!pointInRing(point, outerRing)) return false;
+	// Treat all other rings as holes.
+	for (const ring of polygon) {
+		if (ring === outerRing) continue;
+		if (ring?.length && pointInRing(point, ring)) return false;
+	}
+	return true;
+};
+
+const pointInMultiPolygon = (point: ClippingCoord, multiPolygon: ClippingMultiPolygon): boolean => {
+	for (const polygon of multiPolygon) {
+		if (pointInClippingPolygon(point, polygon)) return true;
+	}
+	return false;
+};
+
+const bboxFromPolygon = (polygon: ClippingPolygon): BoundingBox | null => {
+	let minLat = Infinity;
+	let maxLat = -Infinity;
+	let minLng = Infinity;
+	let maxLng = -Infinity;
+	for (const ring of polygon) {
+		for (const [lng, lat] of ring) {
+			if (!Number.isFinite(lng) || !Number.isFinite(lat)) continue;
+			minLat = Math.min(minLat, lat);
+			maxLat = Math.max(maxLat, lat);
+			minLng = Math.min(minLng, lng);
+			maxLng = Math.max(maxLng, lng);
+		}
+	}
+	if (
+		!Number.isFinite(minLat) ||
+		!Number.isFinite(maxLat) ||
+		!Number.isFinite(minLng) ||
+		!Number.isFinite(maxLng)
+	) {
+		return null;
+	}
+	return { minLat, maxLat, minLng, maxLng };
+};
+
+const geoJsonRingToClippingRing = (ring: unknown): ClippingRing => {
+	if (!Array.isArray(ring)) return [];
+	const coords: ClippingRing = [];
+	for (const pt of ring) {
+		if (!Array.isArray(pt) || pt.length < 2) continue;
+		const lng = Number(pt[0]);
+		const lat = Number(pt[1]);
+		if (!Number.isFinite(lng) || !Number.isFinite(lat)) continue;
+		coords.push([lng, lat]);
+	}
+	if (coords.length < 3) return [];
+	return closeRing(coords);
+};
+
+const geoJsonPolygonToClippingPolygon = (coords: unknown): ClippingPolygon => {
+	if (!Array.isArray(coords)) return [];
+	return (coords as unknown[])
+		.map((ring) => geoJsonRingToClippingRing(ring))
+		.filter((ring) => ring.length >= 4);
+};
+
+const prepareLandPolygonsFromGeoJson = (geojson: unknown): PreparedClippingPolygon[] => {
+	if (!geojson || typeof geojson !== 'object') return [];
+	const anyGeo = geojson as { features?: unknown[] };
+	const features = Array.isArray(anyGeo.features) ? anyGeo.features : [];
+
+	const prepared: PreparedClippingPolygon[] = [];
+	for (const feature of features) {
+		const geom = (feature as { geometry?: { type?: string; coordinates?: unknown } })?.geometry;
+		const type = geom?.type;
+		const coordinates = geom?.coordinates;
+
+		if (type === 'Polygon') {
+			const polygon = geoJsonPolygonToClippingPolygon(coordinates);
+			if (!polygon.length) continue;
+			const bbox = bboxFromPolygon(polygon);
+			if (!bbox) continue;
+			prepared.push({ polygon, bbox });
+			continue;
+		}
+
+		if (type === 'MultiPolygon') {
+			if (!Array.isArray(coordinates)) continue;
+			for (const polyCoords of coordinates) {
+				const polygon = geoJsonPolygonToClippingPolygon(polyCoords);
+				if (!polygon.length) continue;
+				const bbox = bboxFromPolygon(polygon);
+				if (!bbox) continue;
+				prepared.push({ polygon, bbox });
+			}
+		}
+	}
+
+	return prepared;
+};
+
+const isPointOnLand = (
+	lat: number,
+	lng: number,
+	preparedLandPolygons: PreparedClippingPolygon[]
+): boolean => {
+	for (const { bbox, polygon } of preparedLandPolygons) {
+		if (!isLatLngInBbox(lat, lng, bbox)) continue;
+		if (pointInClippingPolygon([lng, lat], polygon)) return true;
+	}
+	return false;
 };
 
 // State badge colors matching dashboard
@@ -399,6 +607,13 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const stateLayerRef = useRef<google.maps.Data | null>(null);
 	const resultsOutlinePolygonsRef = useRef<google.maps.Polygon[]>([]);
 	const searchedStateOutlinePolygonsRef = useRef<google.maps.Polygon[]>([]);
+	const resultsSelectionMultiPolygonRef = useRef<ClippingMultiPolygon | null>(null);
+	const resultsSelectionBboxRef = useRef<BoundingBox | null>(null);
+	const resultsSelectionSignatureRef = useRef<string>('');
+	const backgroundDotsLayerRef = useRef<google.maps.Data | null>(null);
+	const lastBackgroundDotsKeyRef = useRef<string>('');
+	const landPolygonsRef = useRef<PreparedClippingPolygon[] | null>(null);
+	const landPolygonsLoadStartedRef = useRef(false);
 	const selectedStateKeyRef = useRef<string | null>(null);
 	const onStateSelectRef = useRef<SearchResultsMapProps['onStateSelect'] | null>(null);
 	const [isStateLayerReady, setIsStateLayerReady] = useState(false);
@@ -431,6 +646,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			polygon.setMap(null);
 		}
 		resultsOutlinePolygonsRef.current = [];
+		resultsSelectionMultiPolygonRef.current = null;
+		resultsSelectionBboxRef.current = null;
+		resultsSelectionSignatureRef.current = '';
 	}, []);
 
 	const clearSearchedStateOutline = useCallback(() => {
@@ -628,11 +846,163 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 	const resultStateKeysSignature = useMemo(() => resultStateKeys.join('|'), [resultStateKeys]);
 
+	useEffect(() => {
+		resultsSelectionSignatureRef.current = resultStateKeysSignature;
+	}, [resultStateKeysSignature]);
+
 	// Helper to get coordinates for a contact (stable + already-parsed)
 	const getContactCoords = useCallback(
 		(contact: ContactWithName): LatLngLiteral | null => coordsByContactId.get(contact.id) ?? null,
 		[coordsByContactId]
 	);
+
+	const updateBackgroundDots = useCallback((mapInstance: google.maps.Map | null) => {
+		if (!mapInstance) return;
+		const layer = backgroundDotsLayerRef.current;
+		if (!layer) return;
+		const land = landPolygonsRef.current;
+		// Don't render any background dots until we can guarantee they land on land (no ocean/lakes).
+		if (!land || land.length === 0) return;
+
+		const bounds = mapInstance.getBounds();
+		if (!bounds) return;
+		const sw = bounds.getSouthWest();
+		const ne = bounds.getNorthEast();
+		const south = sw.lat();
+		const west = sw.lng();
+		const north = ne.lat();
+		const east = ne.lng();
+
+		// Skip in the unlikely case the viewport crosses the antimeridian (not relevant for our UI).
+		if (east < west) return;
+
+		const zoom = Math.round(mapInstance.getZoom() ?? 4);
+		const quant = getBackgroundDotsQuantizationDeg(zoom);
+
+		const qSouth = Math.round(south / quant);
+		const qWest = Math.round(west / quant);
+		const qNorth = Math.round(north / quant);
+		const qEast = Math.round(east / quant);
+
+		const selectionSig = resultsSelectionSignatureRef.current;
+		const viewportKey = `${zoom}|${qSouth}|${qWest}|${qNorth}|${qEast}|${selectionSig}`;
+		if (viewportKey === lastBackgroundDotsKeyRef.current) return;
+		lastBackgroundDotsKeyRef.current = viewportKey;
+
+		// Clear existing dot features.
+		layer.forEach((feature) => layer.remove(feature));
+
+		const targetCount = Math.min(
+			MAX_BACKGROUND_DOTS_PER_VIEW,
+			Math.max(40, getBackgroundDotsTargetCount(zoom))
+		);
+
+		const selection = resultsSelectionMultiPolygonRef.current;
+		const selectionBbox = resultsSelectionBboxRef.current;
+
+		const rand = mulberry32(hashStringToUint32(viewportKey));
+		const points: LatLngLiteral[] = [];
+		const maxAttempts = Math.max(1000, targetCount * 25);
+		let attempts = 0;
+
+		while (points.length < targetCount && attempts < maxAttempts) {
+			attempts++;
+			const lat = south + rand() * (north - south);
+			const lng = west + rand() * (east - west);
+
+			// Avoid extreme latitudes where the map projection behaves oddly.
+			const clampedLat = clamp(lat, -85, 85);
+
+			// Only show "establishment-like" filler points on land.
+			if (!isPointOnLand(clampedLat, lng, land)) continue;
+
+			if (selection) {
+				// Quick bbox reject so we only do point-in-polygon work near the selected region.
+				if (!selectionBbox || isLatLngInBbox(clampedLat, lng, selectionBbox)) {
+					if (pointInMultiPolygon([lng, clampedLat], selection)) {
+						continue; // inside the selected region -> skip (we only want outside)
+					}
+				}
+			}
+
+			points.push({ lat: clampedLat, lng });
+		}
+
+		for (const pt of points) {
+			layer.add(
+				new google.maps.Data.Feature({
+					geometry: new google.maps.Data.Point(pt),
+				})
+			);
+		}
+	}, []);
+
+	// Background dots layer (non-interactive) to avoid the map feeling empty outside the selected region.
+	useEffect(() => {
+		if (!map) return;
+
+		// Reset any previous layer on map instance changes
+		if (backgroundDotsLayerRef.current) {
+			backgroundDotsLayerRef.current.setMap(null);
+			backgroundDotsLayerRef.current = null;
+		}
+
+		const layer = new google.maps.Data({ map });
+		backgroundDotsLayerRef.current = layer;
+		lastBackgroundDotsKeyRef.current = '';
+
+		return () => {
+			layer.setMap(null);
+			backgroundDotsLayerRef.current = null;
+			lastBackgroundDotsKeyRef.current = '';
+		};
+	}, [map]);
+
+	// Load a lightweight global land mask (Natural Earth 110m) to avoid placing background dots in water.
+	// This is local (public/) so it doesn't hit any third-party APIs or quotas.
+	useEffect(() => {
+		if (!map) return;
+		if (landPolygonsRef.current || landPolygonsLoadStartedRef.current) return;
+		landPolygonsLoadStartedRef.current = true;
+
+		let cancelled = false;
+		const run = async () => {
+			try {
+				const res = await fetch('/geo/ne_110m_land.geojson');
+				if (!res.ok) {
+					throw new Error(`Failed to load land mask: ${res.status} ${res.statusText}`);
+				}
+				const geojson = (await res.json()) as unknown;
+				const prepared = prepareLandPolygonsFromGeoJson(geojson);
+				if (cancelled) return;
+				landPolygonsRef.current = prepared.length ? prepared : null;
+				if (!prepared.length) {
+					console.warn('Land mask loaded but contained no valid polygons');
+				}
+				// Rebuild dots now that we can filter out water.
+				updateBackgroundDots(map);
+			} catch (err) {
+				if (cancelled) return;
+				console.error('Failed to load land mask for background dots', err);
+				landPolygonsRef.current = null;
+			}
+		};
+
+		void run();
+		return () => {
+			cancelled = true;
+		};
+	}, [map, updateBackgroundDots]);
+
+	useEffect(() => {
+		if (!map) return;
+		const listener = map.addListener('idle', () => updateBackgroundDots(map));
+		// Initial fill
+		updateBackgroundDots(map);
+		return () => {
+			listener.remove();
+		};
+	}, [map, updateBackgroundDots]);
 
 	// Draw a gray outline around the *group of states* that have results.
 	// This uses the state polygons we load via the Data layer and unions them so the outline is one shape.
@@ -700,6 +1070,13 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 			for (const polygon of polygonsToDraw) polygon.setMap(map);
 			resultsOutlinePolygonsRef.current = polygonsToDraw;
+
+			// Store the selected region (used to exclude background dots inside the outline).
+			resultsSelectionMultiPolygonRef.current = multiPolygonsToRender;
+			resultsSelectionBboxRef.current = bboxFromMultiPolygon(multiPolygonsToRender);
+
+			// Refresh background dots now that the selected region is known.
+			updateBackgroundDots(map);
 		};
 
 		void run();
@@ -960,6 +1337,30 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			scale: markerScale * 2, // Larger than visible dot for easier hover
 		};
 	}, [isLoaded, markerScale]);
+
+	// Background gray dot icon (same design as result dots, lower emphasis)
+	const backgroundDotIcon = useMemo(() => {
+		if (!isLoaded) return undefined;
+		return {
+			path: google.maps.SymbolPath.CIRCLE,
+			fillColor: '#9CA3AF',
+			fillOpacity: 0.55,
+			strokeColor: '#FFFFFF',
+			strokeWeight: Math.max(1, strokeWeight * 0.85),
+			scale: markerScale * 0.78,
+		};
+	}, [isLoaded, markerScale, strokeWeight]);
+
+	// Keep the background dots styled appropriately as zoom changes.
+	useEffect(() => {
+		const layer = backgroundDotsLayerRef.current;
+		if (!layer || !backgroundDotIcon) return;
+		layer.setStyle({
+			clickable: false,
+			zIndex: 0,
+			icon: backgroundDotIcon,
+		});
+	}, [backgroundDotIcon]);
 
 	// Generate hover tooltip icon with contact name and company
 	const getHoverMarkerIcon = useCallback(
