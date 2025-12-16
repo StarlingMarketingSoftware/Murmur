@@ -702,7 +702,6 @@ const DashboardContent = () => {
 		hasSearched,
 		handleResetSearch,
 		handleSelectAll,
-		isAllSelected,
 		setHoveredContact,
 		hoveredContact,
 		isMapView,
