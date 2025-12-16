@@ -174,8 +174,6 @@ const jitterDuplicateCoords = (base: LatLngLiteral, index: number): LatLngLitera
 	};
 };
 
-const MAX_BACKGROUND_DOTS_PER_VIEW = 500;
-
 const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n));
 
 const hashStringToUint32 = (str: string): number => {
@@ -199,19 +197,28 @@ const mulberry32 = (seed: number) => {
 	};
 };
 
-const getBackgroundDotsTargetCount = (zoom: number): number => {
-	// Decrease density as you zoom in so the map doesn't feel cluttered.
-	if (zoom <= 4) return 500;
-	if (zoom <= 5) return 460;
-	if (zoom <= 6) return 400;
-	if (zoom <= 7) return 330;
-	if (zoom <= 8) return 270;
-	if (zoom <= 9) return 210;
-	if (zoom <= 10) return 160;
-	if (zoom <= 11) return 130;
-	if (zoom <= 12) return 110;
-	if (zoom <= 13) return 90;
-	return 80;
+// Calculate background dot count based on viewport area to maintain consistent visual density.
+// This ensures dots don't become denser when zooming in.
+const BACKGROUND_DOTS_DENSITY = 0.55; // dots per square degree at baseline
+const BACKGROUND_DOTS_MIN = 8;
+const BACKGROUND_DOTS_MAX = 500;
+
+const getBackgroundDotsTargetCount = (
+	viewportArea: number,
+	zoom: number
+): number => {
+	// Base count from area (larger viewport = more dots, smaller = fewer)
+	let count = viewportArea * BACKGROUND_DOTS_DENSITY;
+
+	// Apply a zoom-based reduction factor so very zoomed-in views don't feel cluttered
+	// even with area-based scaling. This mimics how real establishments are distributed.
+	if (zoom >= 10) {
+		count *= 0.6;
+	} else if (zoom >= 8) {
+		count *= 0.8;
+	}
+
+	return Math.min(BACKGROUND_DOTS_MAX, Math.max(BACKGROUND_DOTS_MIN, Math.round(count)));
 };
 
 const getBackgroundDotsQuantizationDeg = (zoom: number): number => {
@@ -850,10 +857,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		// Clear existing dot features.
 		layer.forEach((feature) => layer.remove(feature));
 
-		const targetCount = Math.min(
-			MAX_BACKGROUND_DOTS_PER_VIEW,
-			Math.max(40, getBackgroundDotsTargetCount(zoom))
-		);
+		// Calculate viewport area in square degrees for density-based dot count
+		const latSpan = north - south;
+		const lngSpan = east - west;
+		const viewportArea = latSpan * lngSpan;
+
+		const targetCount = getBackgroundDotsTargetCount(viewportArea, zoom);
 
 		const selection = resultsSelectionMultiPolygonRef.current;
 		const selectionBbox = resultsSelectionBboxRef.current;
