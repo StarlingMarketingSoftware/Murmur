@@ -154,6 +154,98 @@ const STATE_NAME_TO_CANONICAL = US_STATE_METADATA.reduce<Record<string, string>>
 	{}
 );
 
+const STATE_NAME_TO_ABBR = US_STATE_METADATA.reduce<Record<string, string>>(
+	(acc, state) => {
+		acc[state.name.toLowerCase()] = state.abbr;
+		return acc;
+	},
+	{}
+);
+
+const ALL_STATE_ABBRS: string[] = US_STATE_METADATA.map((s) => s.abbr);
+
+// Approximate "nearby states" based on state borders (land + commonly accepted water borders)
+const US_STATE_NEIGHBORS: Record<string, readonly string[]> = {
+	AL: ['FL', 'GA', 'TN', 'MS'],
+	AK: [],
+	AZ: ['CA', 'NV', 'UT', 'NM'],
+	AR: ['MO', 'TN', 'MS', 'LA', 'TX', 'OK'],
+	CA: ['OR', 'NV', 'AZ'],
+	CO: ['WY', 'NE', 'KS', 'OK', 'NM', 'UT'],
+	CT: ['NY', 'MA', 'RI'],
+	DE: ['MD', 'PA', 'NJ'],
+	DC: ['MD', 'VA'],
+	FL: ['AL', 'GA'],
+	GA: ['FL', 'AL', 'TN', 'NC', 'SC'],
+	HI: [],
+	ID: ['WA', 'OR', 'NV', 'UT', 'WY', 'MT'],
+	IL: ['WI', 'IA', 'MO', 'KY', 'IN'],
+	IN: ['MI', 'OH', 'KY', 'IL'],
+	IA: ['MN', 'WI', 'IL', 'MO', 'NE', 'SD'],
+	KS: ['NE', 'MO', 'OK', 'CO'],
+	KY: ['IL', 'IN', 'OH', 'WV', 'VA', 'TN', 'MO'],
+	LA: ['TX', 'AR', 'MS'],
+	ME: ['NH'],
+	MD: ['VA', 'WV', 'PA', 'DE', 'DC'],
+	MA: ['RI', 'CT', 'NY', 'VT', 'NH'],
+	MI: ['WI', 'IN', 'OH'],
+	MN: ['ND', 'SD', 'IA', 'WI'],
+	MS: ['LA', 'AR', 'TN', 'AL'],
+	MO: ['IA', 'IL', 'KY', 'TN', 'AR', 'OK', 'KS', 'NE'],
+	MT: ['ID', 'WY', 'SD', 'ND'],
+	NE: ['SD', 'IA', 'MO', 'KS', 'CO', 'WY'],
+	NV: ['OR', 'ID', 'UT', 'AZ', 'CA'],
+	NH: ['ME', 'MA', 'VT'],
+	NJ: ['NY', 'PA', 'DE'],
+	NM: ['AZ', 'CO', 'OK', 'TX'],
+	NY: ['PA', 'NJ', 'CT', 'MA', 'VT'],
+	NC: ['VA', 'TN', 'GA', 'SC'],
+	ND: ['MN', 'SD', 'MT'],
+	OH: ['MI', 'IN', 'KY', 'WV', 'PA'],
+	OK: ['KS', 'MO', 'AR', 'TX', 'NM', 'CO'],
+	OR: ['WA', 'ID', 'NV', 'CA'],
+	PA: ['NY', 'NJ', 'DE', 'MD', 'WV', 'OH'],
+	RI: ['CT', 'MA'],
+	SC: ['NC', 'GA'],
+	SD: ['ND', 'MN', 'IA', 'NE', 'WY', 'MT'],
+	TN: ['KY', 'VA', 'NC', 'GA', 'AL', 'MS', 'AR', 'MO'],
+	TX: ['NM', 'OK', 'AR', 'LA'],
+	UT: ['ID', 'WY', 'CO', 'AZ', 'NV'],
+	VT: ['NY', 'MA', 'NH'],
+	VA: ['NC', 'TN', 'KY', 'WV', 'MD', 'DC'],
+	WA: ['ID', 'OR'],
+	WV: ['OH', 'PA', 'MD', 'VA', 'KY'],
+	WI: ['MI', 'MN', 'IA', 'IL'],
+	WY: ['MT', 'SD', 'NE', 'CO', 'UT', 'ID'],
+};
+
+const buildStateDistanceMap = (startAbbr: string): Map<string, number> => {
+	const start = startAbbr.toUpperCase();
+	const distances = new Map<string, number>();
+
+	if (!ALL_STATE_ABBRS.includes(start)) {
+		return distances;
+	}
+
+	const queue: string[] = [start];
+	distances.set(start, 0);
+
+	while (queue.length > 0) {
+		const current = queue.shift();
+		if (!current) break;
+		const currentDistance = distances.get(current) ?? 0;
+		const neighbors = US_STATE_NEIGHBORS[current] ?? [];
+		for (const neighbor of neighbors) {
+			const n = neighbor.toUpperCase();
+			if (distances.has(n)) continue;
+			distances.set(n, currentDistance + 1);
+			queue.push(n);
+		}
+	}
+
+	return distances;
+};
+
 const STATE_FUZZY_MAX_DISTANCE = 2;
 const STATE_FUZZY_MIN_LENGTH = 5;
 
@@ -239,6 +331,18 @@ const detectStateFromValue = (value: string | null | undefined): string | null =
 	}
 	const fuzzy = detectStateByFuzzyMatch(cleaned);
 	return fuzzy ?? null;
+};
+
+const normalizeStateAbbrFromValue = (value: string | null | undefined): string | null => {
+	const canonical = detectStateFromValue(value);
+	if (!canonical) return null;
+	return STATE_NAME_TO_ABBR[canonical.toLowerCase()] ?? null;
+};
+
+const getStateSynonymsForAbbr = (abbr: string): string[] => {
+	const upper = abbr.toUpperCase();
+	const name = STATE_ABBR_TO_NAME[upper];
+	return name ? [name, upper] : [upper];
 };
 
 const normalizeCountryValue = (value: string | null | undefined): string | null => {
@@ -450,8 +554,11 @@ export async function GET(req: NextRequest) {
 			? (queryJson.restOfQuery ?? '').trim()
 			: '';
 		const shouldFilterBookingTitles = bookingTitlePrefix.length > 0;
+		const requestedLimit = Math.max(1, Math.min(limit ?? VECTOR_SEARCH_LIMIT_DEFAULT, 500));
 		const effectiveLocationStrategy = isPromotionSearch
 			? 'broad'
+			: queryJson?.state && requestedLimit >= 500
+			? 'flexible'
 			: queryJson?.state
 			? 'strict'
 			: 'flexible';
@@ -1612,13 +1719,14 @@ export async function GET(req: NextRequest) {
 			};
 
 			const baseWhere: Prisma.ContactWhereInput = {
-				id: addedContactIds.length > 0 ? { notIn: addedContactIds } : undefined,
 				emailValidationStatus: verificationStatus
 					? {
 							equals: verificationStatus,
 					  }
 					: undefined,
 			};
+			const usedExclusion: Prisma.ContactWhereInput =
+				addedContactIds.length > 0 ? { id: { notIn: addedContactIds } } : {};
 			// Enforce strict state matching when a state is present in the query
 			const stateStrictAnd: Prisma.ContactWhereInput[] = [];
 			if (forceStateAny && forceStateAny.length > 0) {
@@ -1652,6 +1760,7 @@ export async function GET(req: NextRequest) {
 				where: {
 					AND: [
 						baseWhere,
+						usedExclusion,
 						...stateStrictAnd,
 						...cityStrictAnd,
 						{
@@ -1666,34 +1775,156 @@ export async function GET(req: NextRequest) {
 				take: finalLimit,
 			});
 
-			// If we didn't hit the limit, fill with broader radio-related signals
 			const results = primary;
-			if (results.length < finalLimit) {
-				const filler = await prisma.contact.findMany({
-					where: {
-						AND: [
-							baseWhere,
-							...stateStrictAnd,
-							...cityStrictAnd,
-							{
-								OR: [
-									{ headline: { mode: 'insensitive', contains: 'radio' } },
-									{ companyIndustry: { mode: 'insensitive', contains: 'radio' } },
-									{ metadata: { mode: 'insensitive', contains: 'radio' } },
-								],
-							},
-						],
-					},
-					orderBy: [{ state: 'asc' }, { city: 'asc' }, { company: 'asc' }],
-					take: finalLimit - results.length,
-				});
-				// Deduplicate by id
-				const seen = new Set(results.map((c) => c.id));
-				for (const c of filler) {
+			const seen = new Set(results.map((c) => c.id));
+			const addUnique = (items: typeof primary) => {
+				for (const c of items) {
 					if (seen.has(c.id)) continue;
 					results.push(c);
 					seen.add(c.id);
 					if (results.length >= finalLimit) break;
+				}
+			};
+			const buildExclusionWhere = (): Prisma.ContactWhereInput => {
+				const excluded = new Set<number>([...addedContactIds, ...Array.from(seen)]);
+				return excluded.size > 0 ? { id: { notIn: Array.from(excluded) } } : {};
+			};
+			const buildStateOr = (abbrs: string[]): Prisma.ContactWhereInput | null => {
+				if (!abbrs || abbrs.length === 0) return null;
+				const values = new Set<string>();
+				for (const abbr of abbrs) {
+					for (const v of getStateSynonymsForAbbr(abbr)) values.add(v);
+				}
+				if (values.size === 0) return null;
+				return {
+					OR: Array.from(values).map((v) => ({
+						state: { equals: v, mode: 'insensitive' },
+					})),
+				};
+			};
+
+			const targetStateAbbr =
+				normalizeStateAbbrFromValue(queryJson.state) ||
+				(forceStateAny && forceStateAny.length > 0
+					? normalizeStateAbbrFromValue(forceStateAny[0])
+					: null);
+			const stateRings: string[][] = targetStateAbbr
+				? (() => {
+						const dist = buildStateDistanceMap(targetStateAbbr);
+						const ringMap = new Map<number, string[]>();
+						for (const abbr of ALL_STATE_ABBRS) {
+							const d = dist.get(abbr);
+							const key = d == null ? 999 : d;
+							const arr = ringMap.get(key) ?? [];
+							arr.push(abbr);
+							ringMap.set(key, arr);
+						}
+						return Array.from(ringMap.entries())
+							.sort((a, b) => a[0] - b[0])
+							.map(([, abbrs]) => abbrs.sort());
+				  })()
+				: [ALL_STATE_ABBRS.slice().sort()];
+
+			const radioStationOr: Prisma.ContactWhereInput = {
+				OR: [
+					{ title: radioTitleWhere },
+					{ company: { mode: 'insensitive', contains: 'radio station' } },
+				],
+			};
+
+			// If city was specified, first fill with other Radio Stations in the same state (other cities)
+			if (results.length < finalLimit && targetStateAbbr && cityStrictAnd.length > 0) {
+				const stateOr = buildStateOr([targetStateAbbr]);
+				const whereAnd: Prisma.ContactWhereInput[] = [
+					baseWhere,
+					buildExclusionWhere(),
+					radioStationOr,
+				];
+				if (stateOr) whereAnd.push(stateOr);
+				const inState = await prisma.contact.findMany({
+					where: { AND: whereAnd },
+					orderBy: [{ state: 'asc' }, { city: 'asc' }, { company: 'asc' }],
+					take: finalLimit - results.length,
+				});
+				addUnique(inState);
+			}
+
+			// Then fill with radio stations in nearby states until we hit the limit
+			if (results.length < finalLimit) {
+				if (targetStateAbbr) {
+					for (
+						let ringIdx = 1;
+						ringIdx < stateRings.length && results.length < finalLimit;
+						ringIdx++
+					) {
+						const ring = stateRings[ringIdx] ?? [];
+						if (ring.length === 0) continue;
+						const stateOr = buildStateOr(ring);
+						const whereAnd: Prisma.ContactWhereInput[] = [
+							baseWhere,
+							buildExclusionWhere(),
+							radioStationOr,
+						];
+						if (stateOr) whereAnd.push(stateOr);
+						const filler = await prisma.contact.findMany({
+							where: { AND: whereAnd },
+							orderBy: [{ state: 'asc' }, { city: 'asc' }, { company: 'asc' }],
+							take: finalLimit - results.length,
+						});
+						addUnique(filler);
+					}
+				} else {
+					const filler = await prisma.contact.findMany({
+						where: {
+							AND: [baseWhere, buildExclusionWhere(), radioStationOr],
+						},
+						orderBy: [{ state: 'asc' }, { city: 'asc' }, { company: 'asc' }],
+						take: finalLimit - results.length,
+					});
+					addUnique(filler);
+				}
+			}
+
+			// Finally, if we still didn't hit the limit, fill with broader radio-related signals (still proximity-ordered)
+			if (results.length < finalLimit) {
+				const broadRadioOr: Prisma.ContactWhereInput = {
+					OR: [
+						{ headline: { mode: 'insensitive', contains: 'radio' } },
+						{ companyIndustry: { mode: 'insensitive', contains: 'radio' } },
+						{ metadata: { mode: 'insensitive', contains: 'radio' } },
+					],
+				};
+				if (targetStateAbbr) {
+					for (
+						let ringIdx = 0;
+						ringIdx < stateRings.length && results.length < finalLimit;
+						ringIdx++
+					) {
+						const ring = stateRings[ringIdx] ?? [];
+						if (ring.length === 0) continue;
+						const stateOr = buildStateOr(ring);
+						const whereAnd: Prisma.ContactWhereInput[] = [
+							baseWhere,
+							buildExclusionWhere(),
+							broadRadioOr,
+						];
+						if (stateOr) whereAnd.push(stateOr);
+						const filler = await prisma.contact.findMany({
+							where: { AND: whereAnd },
+							orderBy: [{ state: 'asc' }, { city: 'asc' }, { company: 'asc' }],
+							take: finalLimit - results.length,
+						});
+						addUnique(filler);
+					}
+				} else {
+					const filler = await prisma.contact.findMany({
+						where: {
+							AND: [baseWhere, buildExclusionWhere(), broadRadioOr],
+						},
+						orderBy: [{ state: 'asc' }, { city: 'asc' }, { company: 'asc' }],
+						take: finalLimit - results.length,
+					});
+					addUnique(filler);
 				}
 			}
 
@@ -1858,10 +2089,6 @@ export async function GET(req: NextRequest) {
 				console.error('Error getting post training profile:', error);
 				postTrainingProfile = { active: false, excludeTerms: [], demoteTerms: [] };
 			}
-			const requestedLimit = Math.max(
-				1,
-				Math.min(limit ?? VECTOR_SEARCH_LIMIT_DEFAULT, 500)
-			);
 			const effectiveVectorLimit = postTrainingProfile.requirePositive
 				? Math.min(Math.max(requestedLimit + 20, Math.ceil(requestedLimit * 1.2)), 200)
 				: requestedLimit;
@@ -2038,6 +2265,19 @@ export async function GET(req: NextRequest) {
 			const vectorSearchContactIds = esMatches
 				.map((match) => Number(match.metadata.contactId ?? match.id))
 				.filter((n) => Number.isFinite(n));
+			const esRankByContactId = new Map<number, number>();
+			for (let i = 0; i < esMatches.length; i++) {
+				const match = esMatches[i] as unknown as {
+					id: string;
+					score?: number;
+					metadata?: Record<string, unknown>;
+				};
+				const md = (match?.metadata || {}) as Record<string, unknown>;
+				const idNum = Number(md.contactId ?? match.id);
+				if (!Number.isFinite(idNum)) continue;
+				if (!esRankByContactId.has(idNum)) esRankByContactId.set(idNum, i);
+			}
+			const addedContactIdsSet = new Set(addedContactIds);
 
 			// const vectorSearchContactEmails = vectorSearchResults.matches.map(
 			// 	(match) => match.metadata.email
@@ -2100,8 +2340,96 @@ export async function GET(req: NextRequest) {
 				});
 			}
 
+			// Re-order (and partially fill) results to match Elasticsearch relevance order
+			// so the UI can show "most relevant first" consistently.
+			if (esMatches && esMatches.length > 0) {
+				const idToContact = new Map<number, Contact>();
+				for (const c of contacts) idToContact.set(c.id, c);
+
+				const toArray = (val: unknown): string[] =>
+					Array.isArray(val)
+						? val.map((v) => String(v)).filter(Boolean)
+						: val
+						? String(val)
+								.split(',')
+								.map((s) => s.trim())
+								.filter(Boolean)
+						: [];
+
+				const ordered: Contact[] = [];
+				for (const match of esMatches as Array<{
+					id: string;
+					metadata: Record<string, unknown>;
+				}>) {
+					const md: Record<string, unknown> = match.metadata || {};
+					const parsedId = Number(md.contactId ?? match.id);
+					if (!Number.isFinite(parsedId)) continue;
+					if (addedContactIdsSet.has(parsedId)) continue;
+
+					const existing = idToContact.get(parsedId);
+					if (existing) {
+						ordered.push(existing);
+						continue;
+					}
+
+					// Build a minimal fallback contact from ES metadata when local DB doesn't have it
+					const coords = md.coordinates as
+						| { lat?: number; lon?: number }
+						| null
+						| undefined;
+					const latitude =
+						coords?.lat != null && Number.isFinite(coords.lat) ? coords.lat : null;
+					const longitude =
+						coords?.lon != null && Number.isFinite(coords.lon) ? coords.lon : null;
+
+					ordered.push({
+						id: parsedId,
+						apolloPersonId: null,
+						firstName: (md.firstName as string) ?? null,
+						lastName: (md.lastName as string) ?? null,
+						email: (md.email as string) ?? '',
+						company: (md.company as string) ?? null,
+						city: (md.city as string) ?? null,
+						state: (md.state as string) ?? null,
+						country: (md.country as string) ?? null,
+						address: (md.address as string) ?? null,
+						phone: null,
+						website: (md.website as string) ?? null,
+						title: (md.title as string) ?? null,
+						headline: (md.headline as string) ?? null,
+						linkedInUrl: null,
+						photoUrl: null,
+						metadata: (md.metadata as string) ?? null,
+						companyLinkedInUrl: null,
+						companyFoundedYear: (md.companyFoundedYear as string) ?? null,
+						companyType: (md.companyType as string) ?? null,
+						companyTechStack: toArray(md.companyTechStack),
+						companyPostalCode: null,
+						companyKeywords: toArray(md.companyKeywords),
+						companyIndustry: (md.companyIndustry as string) ?? null,
+						latitude,
+						longitude,
+						isPrivate: false,
+						hasVectorEmbedding: true,
+						userContactListCount: 0,
+						manualDeselections: 0,
+						lastResearchedDate: null,
+						emailValidationStatus: 'valid',
+						emailValidationSubStatus: null,
+						emailValidatedAt: null,
+						createdAt: new Date().toISOString() as unknown as Date,
+						updatedAt: new Date().toISOString() as unknown as Date,
+						userId: null,
+						contactListId: null,
+					} as Contact);
+				}
+
+				contacts = ordered.length > 0 ? ordered : contacts;
+			}
+
 			// Defensive strict-location enforcement for vector results
 			if (
+				effectiveLocationStrategy === 'strict' &&
 				(forceCityExactCity || (forceCityAny && forceCityAny.length > 0)) &&
 				(queryJson.state || forceStateAny)
 			) {
@@ -2261,6 +2589,45 @@ export async function GET(req: NextRequest) {
 				contacts = filterContactsByTitlePrefix(contacts, bookingTitlePrefix);
 			}
 
+			// If a state is present and we're returning the full 500-result list,
+			// keep in-state results first, then nearby states, then farther ones.
+			if (contacts.length > 1 && requestedLimit >= 500) {
+				const targetStateAbbr =
+					normalizeStateAbbrFromValue(queryJson.state) ||
+					(forceStateAny && forceStateAny.length > 0
+						? normalizeStateAbbrFromValue(forceStateAny[0])
+						: null);
+				if (targetStateAbbr) {
+					const distanceMap = buildStateDistanceMap(targetStateAbbr);
+					const targetCityLc = (forceCityExactCity || queryJson.city || '')
+						.trim()
+						.toLowerCase();
+					contacts = contacts
+						.map((c, idx) => {
+							const stateAbbr = normalizeStateAbbrFromValue(c.state);
+							const distance = stateAbbr
+								? distanceMap.get(stateAbbr) ?? Number.POSITIVE_INFINITY
+								: Number.POSITIVE_INFINITY;
+							const cityTier =
+								targetCityLc.length > 0 &&
+								(c.city || '').trim().toLowerCase() === targetCityLc
+									? 0
+									: targetCityLc.length > 0
+									? 1
+									: 0;
+							const rank = esRankByContactId.get(c.id) ?? idx;
+							return { c, distance, cityTier, rank, idx };
+						})
+						.sort((a, b) => {
+							if (a.distance !== b.distance) return a.distance - b.distance;
+							if (a.cityTier !== b.cityTier) return a.cityTier - b.cityTier;
+							if (a.rank !== b.rank) return a.rank - b.rank;
+							return a.idx - b.idx;
+						})
+						.map((x) => x.c);
+				}
+			}
+
 			// Fallback: if local Postgres doesn't have these contacts, return minimal data from Elasticsearch directly
 			if (!contacts || contacts.length === 0) {
 				const fallbackContacts = esMatches.map((match) => {
@@ -2334,10 +2701,10 @@ export async function GET(req: NextRequest) {
 					? filterContactsByTitlePrefix(fallbackContacts, bookingTitlePrefix)
 					: fallbackContacts;
 
-				return apiResponse(filteredFallbackContacts.slice(0, limit));
+				return apiResponse(filteredFallbackContacts.slice(0, requestedLimit));
 			}
 
-			return apiResponse(contacts.slice(0, limit));
+			return apiResponse(contacts.slice(0, requestedLimit));
 		} else {
 			// Use regular search if vector search is not enabled
 			contacts = await substringSearch();
