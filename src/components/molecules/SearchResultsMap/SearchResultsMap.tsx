@@ -3,16 +3,10 @@
 import { FC, Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { GoogleMap, useJsApiLoader, MarkerF, OverlayView } from '@react-google-maps/api';
 import { ContactWithName } from '@/types/contact';
-import {
-	generateMapTooltipIconUrl,
-	calculateTooltipWidth,
-	MAP_TOOLTIP_HEIGHT,
-	MAP_TOOLTIP_ANCHOR_X,
-	MAP_TOOLTIP_ANCHOR_Y,
-} from '@/components/atoms/_svg/MapTooltipIcon';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 
 type LatLngLiteral = { lat: number; lng: number };
+type MarkerHoverMeta = { clientX: number; clientY: number };
 
 type ClippingCoord = [number, number]; // [lng, lat]
 type ClippingRing = ClippingCoord[];
@@ -81,7 +75,9 @@ const createOutlinePolygonsFromMultiPolygon = (
 	return polygons;
 };
 
-const linearRingToClippingRing = (linearRing: google.maps.Data.LinearRing): ClippingRing => {
+const linearRingToClippingRing = (
+	linearRing: google.maps.Data.LinearRing
+): ClippingRing => {
 	const coords = linearRing
 		.getArray()
 		.map((latLng): ClippingCoord => [latLng.lng(), latLng.lat()])
@@ -126,7 +122,9 @@ const coerceFiniteNumber = (value: unknown): number | null => {
 		if (!trimmed) return null;
 		// Handle common "decimal comma" formats (e.g. "39,1234")
 		const normalized =
-			trimmed.includes(',') && !trimmed.includes('.') ? trimmed.replace(',', '.') : trimmed;
+			trimmed.includes(',') && !trimmed.includes('.')
+				? trimmed.replace(',', '.')
+				: trimmed;
 		const n = Number(normalized);
 		return Number.isFinite(n) ? n : null;
 	}
@@ -203,10 +201,7 @@ const BACKGROUND_DOTS_DENSITY = 0.55; // dots per square degree at baseline
 const BACKGROUND_DOTS_MIN = 8;
 const BACKGROUND_DOTS_MAX = 500;
 
-const getBackgroundDotsTargetCount = (
-	viewportArea: number,
-	zoom: number
-): number => {
+const getBackgroundDotsTargetCount = (viewportArea: number, zoom: number): number => {
 	// Base count from area (larger viewport = more dots, smaller = fewer)
 	let count = viewportArea * BACKGROUND_DOTS_DENSITY;
 
@@ -247,7 +242,12 @@ const bboxFromMultiPolygon = (multiPolygon: ClippingMultiPolygon): BoundingBox |
 			}
 		}
 	}
-	if (!Number.isFinite(minLat) || !Number.isFinite(maxLat) || !Number.isFinite(minLng) || !Number.isFinite(maxLng)) {
+	if (
+		!Number.isFinite(minLat) ||
+		!Number.isFinite(maxLat) ||
+		!Number.isFinite(minLng) ||
+		!Number.isFinite(maxLng)
+	) {
 		return null;
 	}
 	return { minLat, maxLat, minLng, maxLng };
@@ -263,13 +263,16 @@ const pointInRing = (point: ClippingCoord, ring: ClippingRing): boolean => {
 		const [xi, yi] = ring[i];
 		const [xj, yj] = ring[j];
 		const intersects =
-			(yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi + 0.0) + xi;
+			yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi + 0.0) + xi;
 		if (intersects) inside = !inside;
 	}
 	return inside;
 };
 
-const pointInClippingPolygon = (point: ClippingCoord, polygon: ClippingPolygon): boolean => {
+const pointInClippingPolygon = (
+	point: ClippingCoord,
+	polygon: ClippingPolygon
+): boolean => {
 	if (!polygon?.length) return false;
 	const outerRing = polygon.reduce<ClippingRing | null>((best, ring) => {
 		if (!ring?.length) return best;
@@ -286,7 +289,10 @@ const pointInClippingPolygon = (point: ClippingCoord, polygon: ClippingPolygon):
 	return true;
 };
 
-const pointInMultiPolygon = (point: ClippingCoord, multiPolygon: ClippingMultiPolygon): boolean => {
+const pointInMultiPolygon = (
+	point: ClippingCoord,
+	multiPolygon: ClippingMultiPolygon
+): boolean => {
 	for (const polygon of multiPolygon) {
 		if (pointInClippingPolygon(point, polygon)) return true;
 	}
@@ -475,6 +481,7 @@ interface SearchResultsMapProps {
 	contacts: ContactWithName[];
 	selectedContacts: number[];
 	onMarkerClick?: (contact: ContactWithName) => void;
+	onMarkerHover?: (contact: ContactWithName | null, meta?: MarkerHoverMeta) => void;
 	onToggleSelection?: (contactId: number) => void;
 	onStateSelect?: (stateName: string) => void;
 	enableStateInteractions?: boolean;
@@ -542,6 +549,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	contacts,
 	selectedContacts,
 	onMarkerClick,
+	onMarkerHover,
 	onToggleSelection,
 	onStateSelect,
 	enableStateInteractions,
@@ -550,6 +558,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 }) => {
 	const [selectedMarker, setSelectedMarker] = useState<ContactWithName | null>(null);
 	const [hoveredMarkerId, setHoveredMarkerId] = useState<number | null>(null);
+	const hoveredMarkerIdRef = useRef<number | null>(null);
 	const [map, setMap] = useState<google.maps.Map | null>(null);
 	const [selectedStateKey, setSelectedStateKey] = useState<string | null>(null);
 	const [zoomLevel, setZoomLevel] = useState(4); // Default zoom level
@@ -566,6 +575,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const usStatesPolygonsRef = useRef<PreparedClippingPolygon[] | null>(null);
 	const selectedStateKeyRef = useRef<string | null>(null);
 	const onStateSelectRef = useRef<SearchResultsMapProps['onStateSelect'] | null>(null);
+	const isLoadingRef = useRef<boolean>(false);
 	const [isStateLayerReady, setIsStateLayerReady] = useState(false);
 
 	useEffect(() => {
@@ -575,6 +585,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	useEffect(() => {
 		onStateSelectRef.current = onStateSelect ?? null;
 	}, [onStateSelect]);
+
+	useEffect(() => {
+		isLoadingRef.current = isLoading ?? false;
+	}, [isLoading]);
 
 	useEffect(() => {
 		if (lockedStateName === undefined) return;
@@ -809,7 +823,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		[lockedStateName]
 	);
 
-	const resultStateKeysSignature = useMemo(() => resultStateKeys.join('|'), [resultStateKeys]);
+	const resultStateKeysSignature = useMemo(
+		() => resultStateKeys.join('|'),
+		[resultStateKeys]
+	);
 
 	useEffect(() => {
 		resultsSelectionSignatureRef.current = resultStateKeysSignature;
@@ -817,96 +834,108 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 	// Helper to get coordinates for a contact (stable + already-parsed)
 	const getContactCoords = useCallback(
-		(contact: ContactWithName): LatLngLiteral | null => coordsByContactId.get(contact.id) ?? null,
+		(contact: ContactWithName): LatLngLiteral | null =>
+			coordsByContactId.get(contact.id) ?? null,
 		[coordsByContactId]
 	);
 
-	const updateBackgroundDots = useCallback((mapInstance: google.maps.Map | null) => {
-		if (!mapInstance) return;
-		const layer = backgroundDotsLayerRef.current;
-		if (!layer) return;
-		const usStates = usStatesPolygonsRef.current;
-		// Don't render any background dots until we have US state polygons (ensures dots only in USA).
-		if (!usStates || usStates.length === 0) return;
+	const updateBackgroundDots = useCallback(
+		(mapInstance: google.maps.Map | null, loading?: boolean) => {
+			if (!mapInstance) return;
+			const layer = backgroundDotsLayerRef.current;
+			if (!layer) return;
 
-		const bounds = mapInstance.getBounds();
-		if (!bounds) return;
-		const sw = bounds.getSouthWest();
-		const ne = bounds.getNorthEast();
-		const south = sw.lat();
-		const west = sw.lng();
-		const north = ne.lat();
-		const east = ne.lng();
-
-		// Skip in the unlikely case the viewport crosses the antimeridian (not relevant for our UI).
-		if (east < west) return;
-
-		const zoom = Math.round(mapInstance.getZoom() ?? 4);
-		const quant = getBackgroundDotsQuantizationDeg(zoom);
-
-		const qSouth = Math.round(south / quant);
-		const qWest = Math.round(west / quant);
-		const qNorth = Math.round(north / quant);
-		const qEast = Math.round(east / quant);
-
-		const selectionSig = resultsSelectionSignatureRef.current;
-		const viewportKey = `${zoom}|${qSouth}|${qWest}|${qNorth}|${qEast}|${selectionSig}`;
-		if (viewportKey === lastBackgroundDotsKeyRef.current) return;
-		lastBackgroundDotsKeyRef.current = viewportKey;
-
-		// Clear existing dot features.
-		layer.forEach((feature) => layer.remove(feature));
-
-		// Calculate viewport area in square degrees for density-based dot count
-		const latSpan = north - south;
-		const lngSpan = east - west;
-		const viewportArea = latSpan * lngSpan;
-
-		const targetCount = getBackgroundDotsTargetCount(viewportArea, zoom);
-
-		const selection = resultsSelectionMultiPolygonRef.current;
-		const selectionBbox = resultsSelectionBboxRef.current;
-
-		const rand = mulberry32(hashStringToUint32(viewportKey));
-		const points: LatLngLiteral[] = [];
-		const maxAttempts = Math.max(1000, targetCount * 25);
-		let attempts = 0;
-
-		while (points.length < targetCount && attempts < maxAttempts) {
-			attempts++;
-			const lat = south + rand() * (north - south);
-			const lng = west + rand() * (east - west);
-
-			// Avoid extreme latitudes where the map projection behaves oddly.
-			const clampedLat = clamp(lat, -85, 85);
-
-			// Only show dots within the United States (using state polygons as land mask).
-			if (!isPointInUSA(clampedLat, lng, usStates)) continue;
-
-			// Alaska is huge but sparsely populated - reduce dot density there by ~70%
-			const isInAlaska = clampedLat > 51 && lng < -130;
-			if (isInAlaska && rand() < 0.7) continue;
-
-			if (selection) {
-				// Quick bbox reject so we only do point-in-polygon work near the selected region.
-				if (!selectionBbox || isLatLngInBbox(clampedLat, lng, selectionBbox)) {
-					if (pointInMultiPolygon([lng, clampedLat], selection)) {
-						continue; // inside the selected region -> skip (we only want outside)
-					}
-				}
+			// Clear background dots while loading to avoid visual clutter
+			if (loading) {
+				layer.forEach((feature) => layer.remove(feature));
+				lastBackgroundDotsKeyRef.current = '';
+				return;
 			}
 
-			points.push({ lat: clampedLat, lng });
-		}
+			const usStates = usStatesPolygonsRef.current;
+			// Don't render any background dots until we have US state polygons (ensures dots only in USA).
+			if (!usStates || usStates.length === 0) return;
 
-		for (const pt of points) {
-			layer.add(
-				new google.maps.Data.Feature({
-					geometry: new google.maps.Data.Point(pt),
-				})
-			);
-		}
-	}, []);
+			const bounds = mapInstance.getBounds();
+			if (!bounds) return;
+			const sw = bounds.getSouthWest();
+			const ne = bounds.getNorthEast();
+			const south = sw.lat();
+			const west = sw.lng();
+			const north = ne.lat();
+			const east = ne.lng();
+
+			// Skip in the unlikely case the viewport crosses the antimeridian (not relevant for our UI).
+			if (east < west) return;
+
+			const zoom = Math.round(mapInstance.getZoom() ?? 4);
+			const quant = getBackgroundDotsQuantizationDeg(zoom);
+
+			const qSouth = Math.round(south / quant);
+			const qWest = Math.round(west / quant);
+			const qNorth = Math.round(north / quant);
+			const qEast = Math.round(east / quant);
+
+			const selectionSig = resultsSelectionSignatureRef.current;
+			const viewportKey = `${zoom}|${qSouth}|${qWest}|${qNorth}|${qEast}|${selectionSig}`;
+			if (viewportKey === lastBackgroundDotsKeyRef.current) return;
+			lastBackgroundDotsKeyRef.current = viewportKey;
+
+			// Clear existing dot features.
+			layer.forEach((feature) => layer.remove(feature));
+
+			// Calculate viewport area in square degrees for density-based dot count
+			const latSpan = north - south;
+			const lngSpan = east - west;
+			const viewportArea = latSpan * lngSpan;
+
+			const targetCount = getBackgroundDotsTargetCount(viewportArea, zoom);
+
+			const selection = resultsSelectionMultiPolygonRef.current;
+			const selectionBbox = resultsSelectionBboxRef.current;
+
+			const rand = mulberry32(hashStringToUint32(viewportKey));
+			const points: LatLngLiteral[] = [];
+			const maxAttempts = Math.max(1000, targetCount * 25);
+			let attempts = 0;
+
+			while (points.length < targetCount && attempts < maxAttempts) {
+				attempts++;
+				const lat = south + rand() * (north - south);
+				const lng = west + rand() * (east - west);
+
+				// Avoid extreme latitudes where the map projection behaves oddly.
+				const clampedLat = clamp(lat, -85, 85);
+
+				// Only show dots within the United States (using state polygons as land mask).
+				if (!isPointInUSA(clampedLat, lng, usStates)) continue;
+
+				// Alaska is huge but sparsely populated - reduce dot density there by ~70%
+				const isInAlaska = clampedLat > 51 && lng < -130;
+				if (isInAlaska && rand() < 0.7) continue;
+
+				if (selection) {
+					// Quick bbox reject so we only do point-in-polygon work near the selected region.
+					if (!selectionBbox || isLatLngInBbox(clampedLat, lng, selectionBbox)) {
+						if (pointInMultiPolygon([lng, clampedLat], selection)) {
+							continue; // inside the selected region -> skip (we only want outside)
+						}
+					}
+				}
+
+				points.push({ lat: clampedLat, lng });
+			}
+
+			for (const pt of points) {
+				layer.add(
+					new google.maps.Data.Feature({
+						geometry: new google.maps.Data.Point(pt),
+					})
+				);
+			}
+		},
+		[]
+	);
 
 	// Background dots layer (non-interactive) to avoid the map feeling empty outside the selected region.
 	useEffect(() => {
@@ -929,17 +958,19 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		};
 	}, [map]);
 
-	// Trigger background dots update when US state polygons become available
+	// Trigger background dots update when US state polygons become available or loading state changes
 	useEffect(() => {
 		if (!map || !isStateLayerReady) return;
-		updateBackgroundDots(map);
-	}, [map, isStateLayerReady, updateBackgroundDots]);
+		updateBackgroundDots(map, isLoading);
+	}, [map, isStateLayerReady, isLoading, updateBackgroundDots]);
 
 	useEffect(() => {
 		if (!map) return;
-		const listener = map.addListener('idle', () => updateBackgroundDots(map));
+		const listener = map.addListener('idle', () =>
+			updateBackgroundDots(map, isLoadingRef.current)
+		);
 		// Initial fill
-		updateBackgroundDots(map);
+		updateBackgroundDots(map, isLoadingRef.current);
 		return () => {
 			listener.remove();
 		};
@@ -989,7 +1020,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				const { default: polygonClipping } = await import('polygon-clipping');
 				unioned = polygonClipping.union(...stateMultiPolygons);
 			} catch (err) {
-				console.error('Failed to build state outline union; falling back to per-state outline', err);
+				console.error(
+					'Failed to build state outline union; falling back to per-state outline',
+					err
+				);
 			}
 
 			if (cancelled) return;
@@ -1002,12 +1036,15 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					? unioned
 					: stateMultiPolygons.flat();
 
-			const polygonsToDraw = createOutlinePolygonsFromMultiPolygon(multiPolygonsToRender, {
-				strokeColor: '#6B7280',
-				strokeOpacity: 1,
-				strokeWeight: 2,
-				zIndex: 1,
-			});
+			const polygonsToDraw = createOutlinePolygonsFromMultiPolygon(
+				multiPolygonsToRender,
+				{
+					strokeColor: '#6B7280',
+					strokeOpacity: 1,
+					strokeWeight: 2,
+					zIndex: 1,
+				}
+			);
 
 			for (const polygon of polygonsToDraw) polygon.setMap(map);
 			resultsOutlinePolygonsRef.current = polygonsToDraw;
@@ -1017,7 +1054,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			resultsSelectionBboxRef.current = bboxFromMultiPolygon(multiPolygonsToRender);
 
 			// Refresh background dots now that the selected region is known.
-			updateBackgroundDots(map);
+			updateBackgroundDots(map, isLoadingRef.current);
 		};
 
 		void run();
@@ -1032,6 +1069,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		resultStateKeys,
 		resultStateKeysSignature,
 		clearResultsOutline,
+		updateBackgroundDots,
 	]);
 
 	// Draw a black outline around the searched/locked state (even when state interactions are off).
@@ -1110,6 +1148,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const lastContactsCountRef = useRef(0);
 	// Track first contact ID to detect when search results have changed
 	const lastFirstContactIdRef = useRef<number | null>(null);
+	// Track last locked state to detect new searches
+	const lastLockedStateKeyRef = useRef<string | null>(null);
 
 	// Helper to fit map bounds with padding
 	const fitMapToBounds = useCallback(
@@ -1149,28 +1189,66 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		[getContactCoords]
 	);
 
-	const onLoad = useCallback(
-		(mapInstance: google.maps.Map) => {
-			setMap(mapInstance);
+	// Helper to fit map to a state's bounds
+	const fitMapToState = useCallback((mapInstance: google.maps.Map, stateKey: string) => {
+		const dataLayer = stateLayerRef.current;
+		if (!dataLayer) return false;
 
-			// Listen for zoom changes
-			mapInstance.addListener('zoom_changed', () => {
-				const newZoom = mapInstance.getZoom();
-				if (newZoom !== undefined) {
-					setZoomLevel(newZoom);
-				}
+		let stateBounds: google.maps.LatLngBounds | null = null;
+
+		dataLayer.forEach((feature) => {
+			if (stateBounds) return; // Already found
+			const featureKey = normalizeStateKey(
+				(feature.getProperty('NAME') as string) || (feature.getId() as string)
+			);
+			if (!featureKey || featureKey !== stateKey) return;
+
+			const geometry = feature.getGeometry();
+			if (!geometry) return;
+
+			stateBounds = new google.maps.LatLngBounds();
+			geometry.forEachLatLng((latLng) => {
+				stateBounds!.extend(latLng);
 			});
+		});
 
-			// Fit bounds on initial load if we have contacts
-			if (contactsWithCoords.length > 0) {
-				fitMapToBounds(mapInstance, contactsWithCoords);
-				hasFitBoundsRef.current = true;
-				lastContactsCountRef.current = contactsWithCoords.length;
-				lastFirstContactIdRef.current = contactsWithCoords[0]?.id ?? null;
+		if (!stateBounds) return false;
+
+		// Fit to state bounds with padding for a comfortable zoomed view
+		mapInstance.fitBounds(stateBounds, {
+			top: 100,
+			right: 100,
+			bottom: 100,
+			left: 100,
+		});
+
+		// Ensure we don't zoom in too much (especially for small states like DC, RI)
+		const listener = google.maps.event.addListener(mapInstance, 'idle', () => {
+			const currentZoom = mapInstance.getZoom();
+			if (currentZoom && currentZoom > 8) {
+				mapInstance.setZoom(8);
 			}
-		},
-		[contactsWithCoords, fitMapToBounds]
-	);
+			google.maps.event.removeListener(listener);
+		});
+
+		return true;
+	}, []);
+
+	const onLoad = useCallback((mapInstance: google.maps.Map) => {
+		setMap(mapInstance);
+
+		// Listen for zoom changes
+		mapInstance.addListener('zoom_changed', () => {
+			const newZoom = mapInstance.getZoom();
+			if (newZoom !== undefined) {
+				setZoomLevel(newZoom);
+			}
+		});
+
+		// Note: Initial bounds fitting is handled by the useEffect that watches contactsWithCoords
+		// and lockedStateKey. This ensures we wait for the state layer to be ready before
+		// fitting to state bounds.
+	}, []);
 
 	const onUnmount = useCallback(() => {
 		clearResultsOutline();
@@ -1179,6 +1257,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		hasFitBoundsRef.current = false;
 		lastContactsCountRef.current = 0;
 		lastFirstContactIdRef.current = null;
+		lastLockedStateKeyRef.current = null;
 	}, [clearResultsOutline, clearSearchedStateOutline]);
 
 	// Fit bounds when contacts with coordinates change
@@ -1189,6 +1268,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		const currentFirstId = contactsWithCoords[0]?.id ?? null;
 		const isNewSearch = currentFirstId !== lastFirstContactIdRef.current;
 
+		// Check if the locked state changed (indicating a new search in a different state)
+		const isNewStateSearch = lockedStateKey !== lastLockedStateKeyRef.current;
+
 		// Fit bounds if:
 		// 1. We haven't fit bounds yet (initial load after geocoding)
 		// 2. This is a completely new search (first contact ID changed)
@@ -1197,16 +1279,39 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		const shouldFitBounds =
 			!hasFitBoundsRef.current ||
 			isNewSearch ||
+			isNewStateSearch ||
 			contactsWithCoords.length > lastContactsCountRef.current ||
 			Math.abs(contactsWithCoords.length - lastContactsCountRef.current) > 5;
 
 		if (shouldFitBounds) {
-			fitMapToBounds(map, contactsWithCoords);
+			// If there's a locked state (searched state) and this is a new search or new state,
+			// zoom to that state first for a better initial view
+			if (
+				lockedStateKey &&
+				isStateLayerReady &&
+				(isNewSearch || isNewStateSearch || !hasFitBoundsRef.current)
+			) {
+				const didFitToState = fitMapToState(map, lockedStateKey);
+				if (!didFitToState) {
+					// Fallback to fitting to contacts if state geometry not found
+					fitMapToBounds(map, contactsWithCoords);
+				}
+			} else {
+				fitMapToBounds(map, contactsWithCoords);
+			}
 			hasFitBoundsRef.current = true;
 			lastContactsCountRef.current = contactsWithCoords.length;
 			lastFirstContactIdRef.current = currentFirstId;
+			lastLockedStateKeyRef.current = lockedStateKey;
 		}
-	}, [map, contactsWithCoords, fitMapToBounds]);
+	}, [
+		map,
+		contactsWithCoords,
+		fitMapToBounds,
+		fitMapToState,
+		lockedStateKey,
+		isStateLayerReady,
+	]);
 
 	// Reset bounds tracking when contacts prop is empty (preparing for new search)
 	useEffect(() => {
@@ -1214,11 +1319,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			hasFitBoundsRef.current = false;
 			lastContactsCountRef.current = 0;
 			lastFirstContactIdRef.current = null;
+			lastLockedStateKeyRef.current = null;
 		}
 	}, [contacts]);
 
 	const handleMarkerClick = (contact: ContactWithName) => {
-		setSelectedMarker(contact);
 		onMarkerClick?.(contact);
 		// Toggle selection when clicking on a marker
 		onToggleSelection?.(contact.id);
@@ -1266,6 +1371,31 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		};
 	}, [isLoaded, markerScale, strokeWeight]);
 
+	// Slightly larger icons when hovered (no text tooltip)
+	const hoveredDefaultMarkerIcon = useMemo(() => {
+		if (!isLoaded) return undefined;
+		return {
+			path: google.maps.SymbolPath.CIRCLE,
+			fillColor: '#D21E1F',
+			fillOpacity: 1,
+			strokeColor: '#FFFFFF',
+			strokeWeight: strokeWeight + 0.4,
+			scale: markerScale * 1.18,
+		};
+	}, [isLoaded, markerScale, strokeWeight]);
+
+	const hoveredSelectedMarkerIcon = useMemo(() => {
+		if (!isLoaded) return undefined;
+		return {
+			path: google.maps.SymbolPath.CIRCLE,
+			fillColor: '#0E8530',
+			fillOpacity: 1,
+			strokeColor: '#FFFFFF',
+			strokeWeight: strokeWeight + 0.4,
+			scale: markerScale * 1.18,
+		};
+	}, [isLoaded, markerScale, strokeWeight]);
+
 	// Invisible larger marker for hover hit area
 	const invisibleHitAreaIcon = useMemo(() => {
 		if (!isLoaded) return undefined;
@@ -1302,28 +1432,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			icon: backgroundDotIcon,
 		});
 	}, [backgroundDotIcon]);
-
-	// Generate hover tooltip icon with contact name and company
-	const getHoverMarkerIcon = useCallback(
-		(contact: ContactWithName) => {
-			if (!isLoaded) return undefined;
-
-			// Get name - use firstName/lastName, fall back to name field
-			const name =
-				`${contact.firstName || ''} ${contact.lastName || ''}`.trim() ||
-				contact.name ||
-				'';
-			const company = contact.company || '';
-			const width = calculateTooltipWidth(name, company);
-
-			return {
-				url: generateMapTooltipIconUrl(name, company),
-				scaledSize: new google.maps.Size(width, MAP_TOOLTIP_HEIGHT),
-				anchor: new google.maps.Point(MAP_TOOLTIP_ANCHOR_X, MAP_TOOLTIP_ANCHOR_Y),
-			};
-		},
-		[isLoaded]
-	);
 
 	// Compute initial center based on contacts (if available)
 	// Must be before early returns to satisfy React hooks rules
@@ -1381,48 +1489,70 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			options={mapOptions}
 			onClick={() => setSelectedMarker(null)}
 		>
-			{contactsWithCoords.map((contact) => {
-				const coords = getContactCoords(contact);
-				if (!coords) return null;
-				const isHovered = hoveredMarkerId === contact.id;
-				const isSelected = selectedContacts.includes(contact.id);
-				return (
-					<Fragment key={contact.id}>
-						{/* Invisible larger hit area for hover detection - this controls all hover state */}
-						<MarkerF
-							position={coords}
-							icon={invisibleHitAreaIcon}
-							onMouseOver={() => setHoveredMarkerId(contact.id)}
-							onMouseOut={() => setHoveredMarkerId(null)}
-							onClick={() => handleMarkerClick(contact)}
-							clickable={true}
-							zIndex={3}
-						/>
-						{/* Dot marker - only when NOT hovered, green if selected, red if not */}
-						{!isHovered && (
+			{/* Only render markers when not loading */}
+			{!isLoading &&
+				contactsWithCoords.map((contact) => {
+					const coords = getContactCoords(contact);
+					if (!coords) return null;
+					const isHovered = hoveredMarkerId === contact.id;
+					const isSelected = selectedContacts.includes(contact.id);
+					const dotIcon = isSelected
+						? isHovered
+							? hoveredSelectedMarkerIcon
+							: selectedMarkerIcon
+						: isHovered
+						? hoveredDefaultMarkerIcon
+						: defaultMarkerIcon;
+					return (
+						<Fragment key={contact.id}>
+							{/* Invisible larger hit area for hover detection - this controls all hover state */}
 							<MarkerF
 								position={coords}
+								icon={invisibleHitAreaIcon}
+								onMouseOver={(e) => {
+									hoveredMarkerIdRef.current = contact.id;
+									setHoveredMarkerId(contact.id);
+									const domEvent = e?.domEvent as MouseEvent | TouchEvent | undefined;
+									let meta: MarkerHoverMeta | undefined;
+									if (domEvent && 'clientX' in domEvent && 'clientY' in domEvent) {
+										meta = { clientX: domEvent.clientX, clientY: domEvent.clientY };
+									} else if (
+										domEvent &&
+										'touches' in domEvent &&
+										domEvent.touches &&
+										domEvent.touches.length > 0
+									) {
+										meta = {
+											clientX: domEvent.touches[0].clientX,
+											clientY: domEvent.touches[0].clientY,
+										};
+									}
+									onMarkerHover?.(contact, meta);
+								}}
+								onMouseOut={() => {
+									setHoveredMarkerId((prev) => (prev === contact.id ? null : prev));
+									if (hoveredMarkerIdRef.current === contact.id) {
+										hoveredMarkerIdRef.current = null;
+										onMarkerHover?.(null);
+									}
+								}}
 								onClick={() => handleMarkerClick(contact)}
-								icon={isSelected ? selectedMarkerIcon : defaultMarkerIcon}
-								clickable={false}
-								zIndex={1}
+								clickable={true}
+								zIndex={3}
 							/>
-						)}
-						{/* Hover tooltip - only when hovered */}
-						{isHovered && (
+							{/* Dot marker (slightly larger on hover) */}
 							<MarkerF
 								position={coords}
-								onClick={() => handleMarkerClick(contact)}
-								icon={getHoverMarkerIcon(contact)}
+								icon={dotIcon}
 								clickable={false}
-								zIndex={2}
+								zIndex={isHovered ? 2 : 1}
 							/>
-						)}
-					</Fragment>
-				);
-			})}
+						</Fragment>
+					);
+				})}
 
-			{selectedMarker && selectedMarkerCoords && (
+			{/* Only show selected marker overlay when not loading */}
+			{!isLoading && selectedMarker && selectedMarkerCoords && (
 				<OverlayView
 					position={selectedMarkerCoords}
 					mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
@@ -1711,7 +1841,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					</div>
 				</OverlayView>
 			)}
-
 		</GoogleMap>
 	);
 };
