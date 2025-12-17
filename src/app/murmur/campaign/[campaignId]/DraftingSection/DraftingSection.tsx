@@ -57,7 +57,7 @@ import { getStateAbbreviation } from '@/utils/string';
 import { stateBadgeColorMap } from '@/constants/ui';
 import { useGemini } from '@/hooks/useGemini';
 import { useOpenRouter } from '@/hooks/useOpenRouter';
-import { GEMINI_FULL_AI_PROMPT, GEMINI_HYBRID_PROMPT, OPENROUTER_DRAFTING_MODELS } from '@/constants/ai';
+import { FULL_AI_DRAFTING_SYSTEM_PROMPT, GEMINI_HYBRID_PROMPT, OPENROUTER_DRAFTING_MODELS } from '@/constants/ai';
 import { Contact, Identity } from '@prisma/client';
 import BottomHomeIcon from '@/components/atoms/_svg/BottomHomeIcon';
 import BottomArrowIcon from '@/components/atoms/_svg/BottomArrowIcon';
@@ -771,7 +771,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 							campaign.fullAiPrompt?.trim() ??
 							'') || 'Generate an outreach email.';
 
-					const populatedSystemPrompt = GEMINI_FULL_AI_PROMPT.replace(
+					const populatedSystemPrompt = FULL_AI_DRAFTING_SYSTEM_PROMPT.replace(
 						'{recipient_first_name}',
 						contact.firstName || ''
 					).replace('{company}', contact.company || '');

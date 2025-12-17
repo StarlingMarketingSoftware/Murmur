@@ -1,6 +1,6 @@
 import { MistralToneAgentType, PerplexityModel } from '@/types';
 
-export const GEMINI_FULL_AI_PROMPT = `
+export const FULL_AI_DRAFTING_SYSTEM_PROMPT = `
 INSTRUCTIONS FOR EMAIL CONTENT:
 
 You are a musician. A professional musician. You have a lot of experience and you know what you're doing. 

@@ -9,7 +9,7 @@ import { DraftEmailResponse } from '@/hooks/usePerplexity';
 import { useGemini } from '@/hooks/useGemini';
 import { useOpenRouter } from '@/hooks/useOpenRouter';
 import {
-	GEMINI_FULL_AI_PROMPT,
+	FULL_AI_DRAFTING_SYSTEM_PROMPT,
 	GEMINI_HYBRID_PROMPT,
 	GEMINI_MODEL_OPTIONS,
 	OPENROUTER_DRAFTING_MODELS,
@@ -612,7 +612,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		// Use provided model or default to first in the rotation
 		const selectedModel = model || OPENROUTER_DRAFTING_MODELS[0];
 
-		const populatedSystemPrompt = GEMINI_FULL_AI_PROMPT.replace(
+		const populatedSystemPrompt = FULL_AI_DRAFTING_SYSTEM_PROMPT.replace(
 			'{recipient_first_name}',
 			recipient.firstName || ''
 		).replace('{company}', recipient.company || '');
