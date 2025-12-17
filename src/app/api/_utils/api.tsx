@@ -102,7 +102,7 @@ export const handleApiError = (error: Error | unknown): NextResponse => {
 	if (error instanceof Error) {
 		// Normalize AbortError (e.g., fetch aborted due to timeout) to 504
 		if (error.name === 'AbortError') {
-			return apiGatewayTimeout('Gemini request timed out');
+			return apiGatewayTimeout('Upstream request timed out');
 		}
 		return apiServerError(error.message);
 	}

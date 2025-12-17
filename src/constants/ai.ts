@@ -175,6 +175,16 @@ export const GEMINI_MODEL_OPTIONS = {
 	gemini3Pro: 'gemini-3-pro-preview',
 } as const;
 
+// OpenRouter models for Full AI drafting - shuffled round-robin during batch generation
+export const OPENROUTER_DRAFTING_MODELS = [
+	'x-ai/grok-4.1-fast',
+	'qwen/qwen3-235b-a22b-2507',
+	'x-ai/grok-4.1-fast',
+	'deepseek/deepseek-v3.2',
+] as const;
+
+export type OpenRouterDraftingModel = (typeof OPENROUTER_DRAFTING_MODELS)[number];
+
 export type GeminiModel =
 	(typeof GEMINI_MODEL_OPTIONS)[keyof typeof GEMINI_MODEL_OPTIONS];
 

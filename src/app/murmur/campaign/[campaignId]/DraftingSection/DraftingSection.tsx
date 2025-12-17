@@ -56,7 +56,8 @@ import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 import { getStateAbbreviation } from '@/utils/string';
 import { stateBadgeColorMap } from '@/constants/ui';
 import { useGemini } from '@/hooks/useGemini';
-import { GEMINI_FULL_AI_PROMPT, GEMINI_HYBRID_PROMPT } from '@/constants/ai';
+import { useOpenRouter } from '@/hooks/useOpenRouter';
+import { GEMINI_FULL_AI_PROMPT, GEMINI_HYBRID_PROMPT, OPENROUTER_DRAFTING_MODELS } from '@/constants/ai';
 import { Contact, Identity } from '@prisma/client';
 import BottomHomeIcon from '@/components/atoms/_svg/BottomHomeIcon';
 import BottomArrowIcon from '@/components/atoms/_svg/BottomArrowIcon';
@@ -722,8 +723,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		[updateEmail]
 	);
 
-	// Gemini hook for regenerating drafts
+	// Gemini hook for regenerating drafts (used for Hybrid mode)
 	const { mutateAsync: callGemini } = useGemini({ suppressToasts: true });
+	// OpenRouter hook for regenerating drafts (used for Full AI mode)
+	const { mutateAsync: callOpenRouter } = useOpenRouter({ suppressToasts: true });
 
 	// Helper to determine drafting mode from form blocks
 	const getDraftingModeFromBlocks = useCallback(() => {
@@ -755,10 +758,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			const values = form.getValues();
 
 			try {
-				let geminiResponse: string;
+				let aiResponse: string;
 
 				if (draftingMode === DraftingMode.ai) {
-					// Full AI mode - use the full_automated block prompt
+					// Full AI mode - use OpenRouter with a random model from the pool
 					const fullAutomatedBlock = values.hybridBlockPrompts?.find(
 						(block: HybridBlockPrompt) => block.type === 'full_automated'
 					);
@@ -790,10 +793,20 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 						'metadata',
 					])}\n\nUser Goal: ${fullAiPrompt}`;
 
-					geminiResponse = await callGemini({
-						model: 'gemini-3-pro-preview',
+					// Pick a random model for regeneration
+					const selectedModel = OPENROUTER_DRAFTING_MODELS[Math.floor(Math.random() * OPENROUTER_DRAFTING_MODELS.length)];
+					console.log('[Regenerate] Using OpenRouter model:', selectedModel);
+
+					aiResponse = await callOpenRouter({
+						model: selectedModel,
 						prompt: populatedSystemPrompt,
 						content: userPrompt,
+						debug: {
+							contactId: contact.id,
+							contactEmail: contact.email,
+							campaignId: campaign.id,
+							source: 'regenerate',
+						},
 					});
 				} else if (draftingMode === DraftingMode.hybrid) {
 					const hybridBlocks = values.hybridBlockPrompts?.filter(
@@ -833,7 +846,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 						hybridBlocks
 					)}`;
 
-					geminiResponse = await callGemini({
+					aiResponse = await callGemini({
 						model: 'gemini-3-pro-preview',
 						prompt: GEMINI_HYBRID_PROMPT,
 						content: geminiPrompt,
@@ -844,10 +857,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 					return null;
 				}
 
-				// Parse the Gemini response
+				// Parse the AI response
 				let parsed: { subject: string; message: string };
 				try {
-					let cleanedResponse = geminiResponse;
+					let cleanedResponse = aiResponse;
 					cleanedResponse = cleanedResponse
 						.replace(/^```(?:json)?\s*/i, '')
 						.replace(/\s*```$/i, '');
@@ -864,12 +877,12 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 						throw new Error('Missing required fields');
 					}
 				} catch {
-					const subjectMatch = geminiResponse.match(/subject["']?\s*:\s*["']([^"']+)["']/i);
-					const messageMatch = geminiResponse.match(/message["']?\s*:\s*["']([\s\S]*?)["']\s*[,}]/i);
+					const subjectMatch = aiResponse.match(/subject["']?\s*:\s*["']([^"']+)["']/i);
+					const messageMatch = aiResponse.match(/message["']?\s*:\s*["']([\s\S]*?)["']\s*[,}]/i);
 					
 					parsed = {
 						subject: subjectMatch?.[1] || draft.subject || 'Re: Your inquiry',
-						message: messageMatch?.[1] || geminiResponse,
+						message: messageMatch?.[1] || aiResponse,
 					};
 				}
 

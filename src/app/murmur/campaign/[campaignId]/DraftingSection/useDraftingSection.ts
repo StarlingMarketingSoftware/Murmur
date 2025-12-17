@@ -7,10 +7,12 @@ import { useEditUser } from '@/hooks/queryHooks/useUsers';
 import { useMe } from '@/hooks/useMe';
 import { DraftEmailResponse } from '@/hooks/usePerplexity';
 import { useGemini } from '@/hooks/useGemini';
+import { useOpenRouter } from '@/hooks/useOpenRouter';
 import {
 	GEMINI_FULL_AI_PROMPT,
 	GEMINI_HYBRID_PROMPT,
 	GEMINI_MODEL_OPTIONS,
+	OPENROUTER_DRAFTING_MODELS,
 } from '@/constants/ai';
 import {
 	CampaignWithRelations,
@@ -340,6 +342,14 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		suppressToasts: true,
 	});
 
+	// OpenRouter for Full AI mode drafting
+	const {
+		isPending: isPendingCallOpenRouter,
+		mutateAsync: callOpenRouter,
+	} = useOpenRouter({
+		suppressToasts: true,
+	});
+
 	const { mutateAsync: editUser } = useEditUser({ suppressToasts: true });
 
 	const { mutateAsync: saveCampaign } = useEditCampaign({ suppressToasts: true });
@@ -379,7 +389,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 
 	const draftingMode = getDraftingModeBasedOnBlocks();
 
-	const isPendingGeneration = isPendingCallGemini || isPendingCreateEmail;
+	const isPendingGeneration = isPendingCallGemini || isPendingCallOpenRouter || isPendingCreateEmail;
 
 	let dataDraftEmail: TestDraftEmail = {
 		subject: '',
@@ -590,12 +600,17 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		prompt: string,
 		toneAgentType: MistralToneAgentType,
 		paragraphs: number,
-		signal?: AbortSignal
+		signal?: AbortSignal,
+		model?: string,
+		draftIndex?: number
 	): Promise<DraftEmailResponse> => {
 		if (!campaign.identity) {
 			toast.error('Campaign identity is required');
 			throw new Error('Campaign identity is required');
 		}
+
+		// Use provided model or default to first in the rotation
+		const selectedModel = model || OPENROUTER_DRAFTING_MODELS[0];
 
 		const populatedSystemPrompt = GEMINI_FULL_AI_PROMPT.replace(
 			'{recipient_first_name}',
@@ -621,21 +636,31 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 
 		// Debug logging for Full AI path
 		console.log(
-			`[Full AI] Starting generation for contact: ${recipient.id} (${recipient.email})`
+			`[Full AI] Starting generation${
+				typeof draftIndex === 'number' ? ` (draft #${draftIndex})` : ''
+			} for contact: ${recipient.id} (${recipient.email}) using model: ${selectedModel}`
 		);
-		console.log('[Full AI] Populated System Prompt:', populatedSystemPrompt);
-		console.log('[Full AI] User Prompt:', userPrompt);
+		console.log(
+			`[Full AI] Prompt sizes: systemChars=${populatedSystemPrompt.length} userChars=${userPrompt.length}`
+		);
 
-		let geminiResponse: string;
+		let openRouterResponse: string;
 		try {
-			geminiResponse = await callGemini({
-				model: 'gemini-3-pro-preview',
-				prompt: populatedSystemPrompt, // Use the new, populated prompt
+			openRouterResponse = await callOpenRouter({
+				model: selectedModel,
+				prompt: populatedSystemPrompt,
 				content: userPrompt,
 				signal,
+				debug: {
+					draftIndex,
+					contactId: recipient.id,
+					contactEmail: recipient.email,
+					campaignId: campaign.id,
+					source: 'full-ai',
+				},
 			});
 		} catch (error) {
-			console.error('[Full AI] Gemini call failed:', error);
+			console.error(`[Full AI] OpenRouter call failed (model: ${selectedModel}):`, error);
 			if (error instanceof Error && error.message.includes('cancelled')) {
 				throw error;
 			}
@@ -646,13 +671,13 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			);
 		}
 
-		console.log('[Full AI] Gemini response preview:', geminiResponse);
+		console.log(`[Full AI] OpenRouter response preview (model: ${selectedModel}):`, openRouterResponse);
 
-		// Parse Gemini response directly (no Mistral processing)
-		let geminiParsed: DraftEmailResponse;
+		// Parse OpenRouter response
+		let parsedResponse: DraftEmailResponse;
 		try {
 			// Robust JSON parsing: handle markdown blocks, extra text, etc.
-			let cleanedResponse = geminiResponse;
+			let cleanedResponse = openRouterResponse;
 
 			// Remove markdown code blocks if present
 			cleanedResponse = cleanedResponse
@@ -672,45 +697,45 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 				'[Full AI] Attempting to parse cleaned JSON:',
 				cleanedResponse.substring(0, 200)
 			);
-			geminiParsed = JSON.parse(cleanedResponse);
+			parsedResponse = JSON.parse(cleanedResponse);
 
 			// Validate the parsed object has required fields
-			if (!geminiParsed.message || !geminiParsed.subject) {
+			if (!parsedResponse.message || !parsedResponse.subject) {
 				throw new Error('Parsed JSON missing required fields (message or subject)');
 			}
 
-			console.log('[Full AI] Successfully parsed Gemini response');
+			console.log(`[Full AI] Successfully parsed response from ${selectedModel}`);
 		} catch (e) {
-			console.error('[Full AI] Gemini JSON parse failed:', e);
-			console.error('[Full AI] Failed response was:', geminiResponse);
+			console.error('[Full AI] JSON parse failed:', e);
+			console.error('[Full AI] Failed response was:', openRouterResponse);
 
 			// Better fallback: try to extract subject and message as plain text
-			const fallbackSubject = extractGeminiField(geminiResponse, 'subject');
-			const fallbackMessage = extractGeminiField(geminiResponse, 'message');
+			const fallbackSubject = extractGeminiField(openRouterResponse, 'subject');
+			const fallbackMessage = extractGeminiField(openRouterResponse, 'message');
 
 			if (fallbackMessage) {
-				geminiParsed = {
+				parsedResponse = {
 					subject: fallbackSubject || `Email regarding ${recipient.company || 'your inquiry'}`,
 					message: fallbackMessage,
 				};
 				console.log('[Full AI] Extracted from relaxed parser fallback');
 			} else {
-				// Last resort: use the Gemini response as message and generate a subject
-				geminiParsed = {
+				// Last resort: use the response as message and generate a subject
+				parsedResponse = {
 					subject: fallbackSubject || `Email regarding ${recipient.company || 'your inquiry'}`,
-					message: geminiResponse,
+					message: openRouterResponse,
 				};
-				console.log('[Full AI] Using Gemini response as fallback');
+				console.log('[Full AI] Using raw response as fallback');
 			}
 		}
 
-		if (!geminiParsed.message || !geminiParsed.subject) {
-			throw new Error('No message or subject generated by Gemini');
+		if (!parsedResponse.message || !parsedResponse.subject) {
+			throw new Error('No message or subject generated');
 		}
 
 		return {
-			subject: removeEmDashes(geminiParsed.subject),
-			message: removeEmDashes(geminiParsed.message),
+			subject: removeEmDashes(parsedResponse.subject),
+			message: removeEmDashes(parsedResponse.message),
 		};
 	};
 
@@ -1318,7 +1343,9 @@ The improved prompt should result in more personalized, engaging, and effective 
 			const fullAiPromptForScore = fullAutomatedBlockForScore?.value?.trim() || '';
 
 			if (fullAiPromptForScore) {
-				await scoreFullAutomatedPrompt(fullAiPromptForScore);
+				// Don't block test generation on scoring; run in background.
+				console.log('[Test Generation] Scoring Full AI prompt in background (Gemini)…');
+				scoreFullAutomatedPrompt(fullAiPromptForScore);
 			} else {
 				setPromptQualityScore(null);
 				setPromptQualityLabel(null);
@@ -1358,7 +1385,10 @@ The improved prompt should result in more personalized, engaging, and effective 
 				if (draftingMode === DraftingMode.ai) {
 					const fullAiPrompt = fullAutomatedBlock?.value || '';
 
+					// Pick a random model for test generation to preview variety
+					const testModel = OPENROUTER_DRAFTING_MODELS[Math.floor(Math.random() * OPENROUTER_DRAFTING_MODELS.length)];
 					console.log('[Test Generation] Using Full AI mode with prompt:', fullAiPrompt);
+					console.log('[Test Generation] Using model:', testModel);
 
 					if (!fullAiPrompt || fullAiPrompt.trim() === '') {
 						throw new Error('Automated prompt cannot be empty');
@@ -1368,7 +1398,10 @@ The improved prompt should result in more personalized, engaging, and effective 
 						contacts[0],
 						fullAiPrompt,
 						values.draftingTone,
-						values.paragraphs
+						values.paragraphs,
+						undefined,
+						testModel,
+						1
 					);
 				} else if (draftingMode === DraftingMode.hybrid) {
 					// For regular hybrid blocks
@@ -1465,11 +1498,15 @@ The improved prompt should result in more personalized, engaging, and effective 
 
 	const generateBatchPromises = (
 		batchToProcess: Contact[],
-		controller: AbortController
+		controller: AbortController,
+		startIndex: number = 0
 	) => {
 		const values = getValues();
 
-		return batchToProcess.map(async (recipient: Contact) => {
+		return batchToProcess.map(async (recipient: Contact, batchIndex: number) => {
+			// Round-robin model selection based on overall position in generation
+			const overallIndex = startIndex + batchIndex;
+			const draftIndex = overallIndex + 1;
 			const MAX_RETRIES = 5;
 			let lastError: Error | null = null;
 
@@ -1479,6 +1516,12 @@ The improved prompt should result in more personalized, engaging, and effective 
 				retryCount++
 			) {
 				try {
+					// For Full AI mode, rotate models across drafts and (if needed) across retries.
+					const attemptModel =
+						OPENROUTER_DRAFTING_MODELS[
+							(overallIndex + retryCount) % OPENROUTER_DRAFTING_MODELS.length
+						];
+
 					// Exponential backoff: 0ms, 1s, 2s, 4s
 					if (retryCount > 0) {
 						const delay = Math.pow(2, retryCount - 1) * 1000;
@@ -1498,12 +1541,21 @@ The improved prompt should result in more personalized, engaging, and effective 
 							throw new Error('Automated prompt cannot be empty');
 						}
 
+						console.log(
+							`[Batch][Full AI] draft#${draftIndex} attempt ${
+								retryCount + 1
+							}/${MAX_RETRIES + 1} contactId=${recipient.id} email=${
+								recipient.email
+							} model=${attemptModel}`
+						);
 						parsedDraft = await draftAiEmail(
 							recipient,
 							fullAiPrompt,
 							values.draftingTone,
 							values.paragraphs,
-							controller.signal
+							controller.signal,
+							attemptModel,
+							draftIndex
 						);
 					} else if (draftingMode === DraftingMode.hybrid) {
 						// Filter out any full_automated blocks for hybrid processing
@@ -1547,6 +1599,11 @@ The improved prompt should result in more personalized, engaging, and effective 
 							status: 'draft' as EmailStatus,
 							contactId: recipient.id,
 						});
+						if (draftingMode === DraftingMode.ai) {
+							console.log(
+								`[Batch][Full AI] Saved draft#${draftIndex} contactId=${recipient.id} email=${recipient.email} model=${attemptModel}`
+							);
+						}
 						// Hide live preview as soon as this draft is written
 						hideLivePreview();
 						// Immediately reflect in UI
@@ -1639,6 +1696,13 @@ The improved prompt should result in more personalized, engaging, and effective 
 				? contacts.filter((c: ContactWithName) => selectedIds.includes(c.id))
 				: contacts;
 
+		if (draftingMode === DraftingMode.ai) {
+			console.log(
+				'[Batch][Full AI] OpenRouter model rotation order:',
+				OPENROUTER_DRAFTING_MODELS
+			);
+		}
+
 		try {
 			// show preview surface while generation is running
 			setIsLivePreviewVisible(true);
@@ -1664,7 +1728,7 @@ The improved prompt should result in more personalized, engaging, and effective 
 				);
 
 				const currentBatchPromises: Promise<BatchGenerationResult>[] =
-					generateBatchPromises(batch, controller);
+					generateBatchPromises(batch, controller, i);
 
 				const batchResults = await Promise.allSettled(currentBatchPromises);
 
@@ -1765,7 +1829,9 @@ The improved prompt should result in more personalized, engaging, and effective 
 				return;
 			}
 
-			await scoreFullAutomatedPrompt(fullAiPrompt);
+			// Don't block batch generation on scoring; run in background.
+			console.log('[Batch][Full AI] Scoring prompt in background (Gemini)…');
+			scoreFullAutomatedPrompt(fullAiPrompt);
 		} else if (draftingMode === DraftingMode.hybrid) {
 			if (!hybridBlocks || hybridBlocks.length === 0) {
 				toast.error('Please set up your email template on the Testing tab first.');

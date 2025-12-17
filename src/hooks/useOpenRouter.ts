@@ -44,6 +44,7 @@ export const useOpenRouter = (options: CustomMutationOptions = {}) => {
 				throw new Error(errorMsg);
 			}
 			const res = await response.json();
+			console.log('[OpenRouter] Model:', data.model);
 			console.log('[OpenRouter] Response type:', typeof res);
 			console.log(
 				'[OpenRouter] Response preview:',
