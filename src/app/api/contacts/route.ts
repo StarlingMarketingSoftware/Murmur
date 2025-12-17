@@ -1760,8 +1760,13 @@ export async function GET(req: NextRequest) {
 						})),
 					});
 				} else if (queryJson.state) {
+					const canon = detectStateFromValue(queryJson.state) || queryJson.state;
+					const abbr = STATE_NAME_TO_ABBR[String(canon).toLowerCase()];
+					const statesToMatch = [canon, abbr].filter(Boolean).map(String);
 					stateStrictAnd.push({
-						state: { equals: queryJson.state, mode: 'insensitive' },
+						OR: statesToMatch.map((s) => ({
+							state: { equals: s, mode: 'insensitive' },
+						})),
 					});
 				}
 
@@ -1779,33 +1784,70 @@ export async function GET(req: NextRequest) {
 					});
 				}
 
+				const extractStateLabelAfterCoffeePrefix = (
+					title: string | null | undefined
+				): string | null => {
+					if (!title) return null;
+					const trimmed = title.trim();
+					const m = /^coffee shops?\b(.*)$/i.exec(trimmed);
+					if (!m) return null;
+					let rest = m[1].trim();
+					// Remove common separators right after prefix
+					rest = rest.replace(/^[-–—:|,()\[\]]+/, '').trim();
+					// Collapse repeated whitespace
+					rest = rest.replace(/\s+/g, ' ').trim();
+					if (!rest) return null;
+					return rest;
+				};
+
+				const titleStateCanonical = (title: string | null | undefined): string | null => {
+					const label = extractStateLabelAfterCoffeePrefix(title);
+					if (!label) return null;
+					return detectStateFromValue(label);
+				};
+
+				const COFFEE_TERMS = [
+					'coffee',
+					'coffee shop',
+					'coffee shops',
+					'cafe',
+					'café',
+					'espresso',
+					'roaster',
+					'roastery',
+				];
+
+				const coffeeBroadOr: Prisma.ContactWhereInput = {
+					OR: COFFEE_TERMS.flatMap((t) => [
+						{ title: { mode: 'insensitive', contains: t } },
+						{ company: { mode: 'insensitive', contains: t } },
+						{ companyIndustry: { mode: 'insensitive', contains: t } },
+						{ website: { mode: 'insensitive', contains: t } },
+						{ metadata: { mode: 'insensitive', contains: t } },
+					]),
+				};
+
+				let candidates: Contact[] = [];
+				const seenIds = new Set<number>();
+				const addUnique = (items: Contact[]) => {
+					for (const c of items) {
+						if (seenIds.has(c.id)) continue;
+						candidates.push(c);
+						seenIds.add(c.id);
+					}
+				};
+				const buildSeenExclusion = (): Prisma.ContactWhereInput =>
+					seenIds.size > 0 ? { id: { notIn: Array.from(seenIds) } } : {};
+
 				// If a state is present, prefer exact state-label titles: "Coffee Shops <STATE or ABBR>"
 				if (queryJson.state && queryJson.state.trim().length > 0) {
 					const canonicalState = detectStateFromValue(queryJson.state) || queryJson.state;
-					const targetAbbr = US_STATE_METADATA.find(
-						(s) => s.name.toLowerCase() === canonicalState.toLowerCase()
-					)?.abbr;
+					const targetAbbr = STATE_NAME_TO_ABBR[String(canonicalState).toLowerCase()];
 					const targetLabels = new Set(
 						[targetAbbr, canonicalState]
 							.filter(Boolean)
 							.map((s) => String(s).toLowerCase())
 					);
-
-					const extractStateLabelAfterCoffeePrefix = (
-						title: string | null | undefined
-					): string | null => {
-						if (!title) return null;
-						const trimmed = title.trim();
-						const m = /^coffee shops?\b(.*)$/i.exec(trimmed);
-						if (!m) return null;
-						let rest = m[1].trim();
-						// Remove common separators right after prefix
-						rest = rest.replace(/^[-–—:|,()\[\]]+/, '').trim();
-						// Collapse repeated whitespace
-						rest = rest.replace(/\s+/g, ' ').trim();
-						if (!rest) return null;
-						return rest;
-					};
 
 					const coffeeTitleStartsWith = await prisma.contact.findMany({
 						where: {
@@ -1826,45 +1868,161 @@ export async function GET(req: NextRequest) {
 						return targetLabels.has(canon.toLowerCase());
 					});
 
-					if (preferredByStateLabel.length > 0) {
-						return apiResponse(preferredByStateLabel.slice(0, finalLimit));
-					}
+					addUnique(preferredByStateLabel);
 				}
 
-				const COFFEE_TERMS = [
-					'coffee',
-					'coffee shop',
-					'coffee shops',
-					'cafe',
-					'café',
-					'espresso',
-					'roaster',
-					'roastery',
-				];
-
-				const results = await prisma.contact.findMany({
+				const primary = await prisma.contact.findMany({
 					where: {
 						AND: [
 							baseWhere,
 							...stateStrictAnd,
 							...cityStrictAnd,
-							{
-								OR: COFFEE_TERMS.flatMap((t) => [
-									{ title: { mode: 'insensitive', contains: t } },
-									{ company: { mode: 'insensitive', contains: t } },
-									{ companyIndustry: { mode: 'insensitive', contains: t } },
-									{ website: { mode: 'insensitive', contains: t } },
-									{ metadata: { mode: 'insensitive', contains: t } },
-								]),
-							},
+							coffeeBroadOr,
 						],
 					},
 					orderBy: [{ state: 'asc' }, { city: 'asc' }, { company: 'asc' }],
 					take: fetchTake,
 				});
+				addUnique(primary);
+
+				// If we're under limit and have a target state, pad with nearby states (same strategy as radio stations).
+				if (candidates.length < finalLimit) {
+					const targetStateAbbr =
+						normalizeStateAbbrFromValue(queryJson.state) ||
+						(forceStateAny && forceStateAny.length > 0
+							? normalizeStateAbbrFromValue(forceStateAny[0])
+							: null);
+					if (targetStateAbbr) {
+						const buildStateOr = (abbrs: string[]): Prisma.ContactWhereInput | null => {
+							if (!abbrs || abbrs.length === 0) return null;
+							const values = new Set<string>();
+							for (const abbr of abbrs) {
+								for (const v of getStateSynonymsForAbbr(abbr)) values.add(v);
+							}
+							if (values.size === 0) return null;
+							return {
+								OR: Array.from(values).map((v) => ({
+									state: { equals: v, mode: 'insensitive' },
+								})),
+							};
+						};
+
+						const stateRings: string[][] = (() => {
+							const dist = buildStateDistanceMap(targetStateAbbr);
+							const ringMap = new Map<number, string[]>();
+							for (const abbr of ALL_STATE_ABBRS) {
+								const d = dist.get(abbr);
+								const key = d == null ? 999 : d;
+								const arr = ringMap.get(key) ?? [];
+								arr.push(abbr);
+								ringMap.set(key, arr);
+							}
+							return Array.from(ringMap.entries())
+								.sort((a, b) => a[0] - b[0])
+								.map(([, abbrs]) => abbrs.sort());
+						})();
+
+						const coffeeTitleStartsWithOr: Prisma.ContactWhereInput = {
+							OR: [
+								{ title: { mode: 'insensitive', startsWith: 'Coffee Shops' } },
+								{ title: { mode: 'insensitive', startsWith: 'Coffee Shop' } },
+							],
+						};
+
+						// If city was specified strictly, first fill with other coffee shops in the same state (other cities).
+						if (candidates.length < finalLimit && cityStrictAnd.length > 0) {
+							const stateOr = buildStateOr([targetStateAbbr]);
+							if (stateOr) {
+								const inStateTitle = await prisma.contact.findMany({
+									where: {
+										AND: [
+											baseWhere,
+											buildSeenExclusion(),
+											stateOr,
+											coffeeTitleStartsWithOr,
+										],
+									},
+									orderBy: [{ state: 'asc' }, { city: 'asc' }, { company: 'asc' }],
+									take: finalLimit - candidates.length,
+								});
+								addUnique(inStateTitle);
+
+								if (candidates.length < finalLimit) {
+									const inStateBroad = await prisma.contact.findMany({
+										where: {
+											AND: [
+												baseWhere,
+												buildSeenExclusion(),
+												stateOr,
+												coffeeBroadOr,
+											],
+										},
+										orderBy: [{ state: 'asc' }, { city: 'asc' }, { company: 'asc' }],
+										take: finalLimit - candidates.length,
+									});
+									addUnique(inStateBroad);
+								}
+							}
+						}
+
+						// Then fill with nearby states until we hit the limit (proximity-ordered).
+						if (candidates.length < finalLimit) {
+							for (
+								let ringIdx = 1;
+								ringIdx < stateRings.length && candidates.length < finalLimit;
+								ringIdx++
+							) {
+								const ring = stateRings[ringIdx] ?? [];
+								if (ring.length === 0) continue;
+								const stateOr = buildStateOr(ring);
+								if (!stateOr) continue;
+								const filler = await prisma.contact.findMany({
+									where: {
+										AND: [
+											baseWhere,
+											buildSeenExclusion(),
+											stateOr,
+											coffeeTitleStartsWithOr,
+										],
+									},
+									orderBy: [{ state: 'asc' }, { city: 'asc' }, { company: 'asc' }],
+									take: finalLimit - candidates.length,
+								});
+								addUnique(filler);
+							}
+						}
+
+						// Finally, if still under limit, widen to broader coffee signals in nearby states.
+						if (candidates.length < finalLimit) {
+							for (
+								let ringIdx = 1;
+								ringIdx < stateRings.length && candidates.length < finalLimit;
+								ringIdx++
+							) {
+								const ring = stateRings[ringIdx] ?? [];
+								if (ring.length === 0) continue;
+								const stateOr = buildStateOr(ring);
+								if (!stateOr) continue;
+								const filler = await prisma.contact.findMany({
+									where: {
+										AND: [
+											baseWhere,
+											buildSeenExclusion(),
+											stateOr,
+											coffeeBroadOr,
+										],
+									},
+									orderBy: [{ state: 'asc' }, { city: 'asc' }, { company: 'asc' }],
+									take: finalLimit - candidates.length,
+								});
+								addUnique(filler);
+							}
+						}
+					}
+				}
 
 				// Prefer records explicitly labeled as "Coffee Shops" in title
-				if (results.length > 0 || !useVectorSearch) {
+				if (candidates.length > 0 || !useVectorSearch) {
 					const scoreCoffeeTitle = (title: string | null | undefined): number => {
 						const t = (title || '').trim().toLowerCase();
 						let s = 0;
@@ -1874,10 +2032,51 @@ export async function GET(req: NextRequest) {
 						if (t.includes('coffee shop')) s += 1;
 						return s;
 					};
-					const prioritized = results
-						.slice()
-						.sort((a, b) => scoreCoffeeTitle(b.title) - scoreCoffeeTitle(a.title));
-					return apiResponse(prioritized.slice(0, finalLimit));
+
+					const targetStateAbbrForSort =
+						normalizeStateAbbrFromValue(queryJson.state) ||
+						(forceStateAny && forceStateAny.length > 0
+							? normalizeStateAbbrFromValue(forceStateAny[0])
+							: null);
+					const distanceMap = targetStateAbbrForSort
+						? buildStateDistanceMap(targetStateAbbrForSort)
+						: null;
+					const targetCityLc = normalizeSearchText(forceCityExactCity || queryJson.city || '');
+
+					const scored = candidates.map((c) => {
+						const titleCanon = titleStateCanonical(c.title);
+						const stateAbbrForDistance =
+							normalizeStateAbbrFromValue(c.state) ||
+							(titleCanon ? normalizeStateAbbrFromValue(titleCanon) : null);
+						const distance =
+							distanceMap && stateAbbrForDistance
+								? distanceMap.get(stateAbbrForDistance) ?? Number.POSITIVE_INFINITY
+								: Number.POSITIVE_INFINITY;
+						const cityMatch =
+							targetCityLc.length > 0 &&
+							normalizeSearchText(c.city) === targetCityLc;
+						return {
+							contact: c,
+							distance,
+							cityMatch,
+							coffeeTitleScore: scoreCoffeeTitle(c.title),
+						};
+					});
+
+					scored.sort((a, b) => {
+						// Prefer closer states (in-state, then neighbors, then farther)
+						if (a.distance !== b.distance) return a.distance - b.distance;
+						// Prefer explicit Coffee Shops title labeling
+						if (a.coffeeTitleScore !== b.coffeeTitleScore) {
+							return b.coffeeTitleScore - a.coffeeTitleScore;
+						}
+						// Prefer exact city matches (if applicable)
+						if (a.cityMatch !== b.cityMatch) return a.cityMatch ? -1 : 1;
+						// Stable-ish fallback
+						return (a.contact.company || '').localeCompare(b.contact.company || '');
+					});
+
+					return apiResponse(scored.map((x) => x.contact).slice(0, finalLimit));
 				}
 				// If still empty and vector requested, let vector path try below
 			}
