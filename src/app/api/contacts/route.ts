@@ -84,6 +84,77 @@ const filterContactsByTitlePrefix = <T extends { title?: string | null }>(
 	);
 };
 
+const normalizeSearchText = (value: string | null | undefined): string =>
+	(value ?? '').toLowerCase().replace(/\s+/g, ' ').trim();
+
+// Heuristic: used to de-prioritize obvious universities/colleges in "Music Venues" searches.
+const contactLooksLikeHigherEducation = (contact: Contact): boolean => {
+	const company = normalizeSearchText(contact.company);
+	const website = normalizeSearchText(contact.website);
+	const industry = normalizeSearchText(contact.companyIndustry);
+	const type = normalizeSearchText(contact.companyType);
+	const keywordBlob = (contact.companyKeywords ?? [])
+		.map((k) => normalizeSearchText(k))
+		.filter(Boolean)
+		.join(' ');
+
+	// Strong signal: .edu domain
+	if (website.includes('.edu')) return true;
+
+	// Strong signal: org name contains education terms
+	if (/\b(university|college|community college|school|academy|campus)\b/.test(company)) {
+		return true;
+	}
+
+	// Softer signals from Apollo-derived fields
+	if (
+		/\bhigher education\b|\beducation management\b|\bprimary\/secondary education\b|\be-?learning\b/.test(
+			industry
+		)
+	) {
+		return true;
+	}
+	if (/\b(university|college|education)\b/.test(type)) return true;
+	if (/\b(university|college|higher education|student)\b/.test(keywordBlob)) return true;
+
+	return false;
+};
+
+// Higher score = more likely to be a real venue (club/theater/music hall/etc.).
+const contactMusicVenueRelevanceScore = (contact: Contact): number => {
+	const company = normalizeSearchText(contact.company);
+	const title = normalizeSearchText(contact.title);
+	const headline = normalizeSearchText(contact.headline);
+	const industry = normalizeSearchText(contact.companyIndustry);
+	const type = normalizeSearchText(contact.companyType);
+	const website = normalizeSearchText(contact.website);
+	const metadata = normalizeSearchText(contact.metadata);
+	const keywordBlob = (contact.companyKeywords ?? [])
+		.map((k) => normalizeSearchText(k))
+		.filter(Boolean)
+		.join(' ');
+
+	const blob = `${company} ${title} ${headline} ${industry} ${type} ${website} ${metadata} ${keywordBlob}`.trim();
+	if (!blob) return 0;
+
+	let score = 0;
+	if (/\bmusic venues?\b/.test(blob)) score += 12;
+	if (/\blive music\b/.test(blob)) score += 10;
+	if (/\bconcerts?\b|\bgigs?\b|\bshows?\b/.test(blob)) score += 6;
+	if (
+		/\b(venue|music hall|auditorium|amphitheat(?:er|re)|arena|pavilion|theat(?:er|re)|performing arts|arts (?:center|centre)|stage|ballroom|opera|symphony)\b/.test(
+			blob
+		)
+	) {
+		score += 6;
+	}
+	if (/\b(night ?club|club)\b/.test(blob)) score += 4;
+	if (/\b(bar|pub|tavern|saloon|lounge|brewery|taproom)\b/.test(blob)) score += 3;
+	if (/\b(cafe|café|coffee)\b/.test(blob)) score += 2;
+	if (website && !website.includes('.edu')) score += 1;
+	return score;
+};
+
 const US_STATE_METADATA = [
 	{ abbr: 'AL', name: 'Alabama' },
 	{ abbr: 'AK', name: 'Alaska' },
@@ -595,7 +666,9 @@ export async function GET(req: NextRequest) {
 					1,
 					Math.min(limit ?? VECTOR_SEARCH_LIMIT_DEFAULT, 500)
 				);
-				const fetchTake = Math.min(finalLimit * 4, 500);
+				// Pull a much larger candidate set so we can fill with real venues
+				// before showing universities/colleges.
+				const fetchTake = Math.min(finalLimit * 10, 2000);
 
 				const baseWhere: Prisma.ContactWhereInput = {
 					id: addedContactIds.length > 0 ? { notIn: addedContactIds } : undefined,
@@ -615,8 +688,13 @@ export async function GET(req: NextRequest) {
 						})),
 					});
 				} else if (queryJson.state) {
+					const canon = detectStateFromValue(queryJson.state) || queryJson.state;
+					const abbr = STATE_NAME_TO_ABBR[String(canon).toLowerCase()];
+					const statesToMatch = [canon, abbr].filter(Boolean).map(String);
 					stateStrictAnd.push({
-						state: { equals: queryJson.state, mode: 'insensitive' },
+						OR: statesToMatch.map((s) => ({
+							state: { equals: s, mode: 'insensitive' },
+						})),
 					});
 				}
 
@@ -634,168 +712,252 @@ export async function GET(req: NextRequest) {
 					});
 				}
 
-				const results = await prisma.contact.findMany({
-					where: {
-						AND: [
-							baseWhere,
-							...stateStrictAnd,
-							...cityStrictAnd,
-							{ title: { mode: 'insensitive', startsWith: 'Music Venues' } },
-						],
-					},
-					orderBy: [{ state: 'asc' }, { city: 'asc' }, { company: 'asc' }],
-					take: fetchTake,
-				});
-
-				// Prioritize exact state-label titles: "Music Venues <STATE or ABBR>"
-				const STATE_NAMES = [
-					'Alabama',
-					'Alaska',
-					'Arizona',
-					'Arkansas',
-					'California',
-					'Colorado',
-					'Connecticut',
-					'Delaware',
-					'Florida',
-					'Georgia',
-					'Hawaii',
-					'Idaho',
-					'Illinois',
-					'Indiana',
-					'Iowa',
-					'Kansas',
-					'Kentucky',
-					'Louisiana',
-					'Maine',
-					'Maryland',
-					'Massachusetts',
-					'Michigan',
-					'Minnesota',
-					'Mississippi',
-					'Missouri',
-					'Montana',
-					'Nebraska',
-					'Nevada',
-					'New Hampshire',
-					'New Jersey',
-					'New Mexico',
-					'New York',
-					'North Carolina',
-					'North Dakota',
-					'Ohio',
-					'Oklahoma',
-					'Oregon',
-					'Pennsylvania',
-					'Rhode Island',
-					'South Carolina',
-					'South Dakota',
-					'Tennessee',
-					'Texas',
-					'Utah',
-					'Vermont',
-					'Virginia',
-					'Washington',
-					'West Virginia',
-					'Wisconsin',
-					'Wyoming',
-					'District of Columbia',
-				];
-				const STATE_ABBRS = [
-					'AL',
-					'AK',
-					'AZ',
-					'AR',
-					'CA',
-					'CO',
-					'CT',
-					'DE',
-					'FL',
-					'GA',
-					'HI',
-					'ID',
-					'IL',
-					'IN',
-					'IA',
-					'KS',
-					'KY',
-					'LA',
-					'ME',
-					'MD',
-					'MA',
-					'MI',
-					'MN',
-					'MS',
-					'MO',
-					'MT',
-					'NE',
-					'NV',
-					'NH',
-					'NJ',
-					'NM',
-					'NY',
-					'NC',
-					'ND',
-					'OH',
-					'OK',
-					'OR',
-					'PA',
-					'RI',
-					'SC',
-					'SD',
-					'TN',
-					'TX',
-					'UT',
-					'VT',
-					'VA',
-					'WA',
-					'WV',
-					'WI',
-					'WY',
-					'DC',
-				];
-				const STATE_NAME_SET = new Set(STATE_NAMES.map((s) => s.toLowerCase()));
-				const STATE_ABBR_SET = new Set(STATE_ABBRS);
-
-				const isStateLabelAfterPrefix = (title: string | null | undefined): boolean => {
-					if (!title) return false;
+				const extractStateLabelAfterMusicPrefix = (
+					title: string | null | undefined
+				): string | null => {
+					if (!title) return null;
 					const trimmed = title.trim();
-					const m = /^music venues\b(.*)$/i.exec(trimmed);
-					if (!m) return false;
+					const m = /^music venues?\b(.*)$/i.exec(trimmed);
+					if (!m) return null;
 					let rest = m[1].trim();
 					// Remove common separators right after prefix
 					rest = rest.replace(/^[-–—:|,()\[\]]+/, '').trim();
 					// Collapse repeated whitespace
 					rest = rest.replace(/\s+/g, ' ').trim();
-					if (!rest) return false;
-					// Match exact state label
-					if (STATE_NAME_SET.has(rest.toLowerCase())) return true;
-					if (STATE_ABBR_SET.has(rest.toUpperCase())) return true;
-					return false;
+					if (!rest) return null;
+					return rest;
 				};
 
-				const prioritized = results.sort((a, b) => {
-					const targetCityLc = (forceCityExactCity || queryJson.city || '')
-						.trim()
-						.toLowerCase();
-					const aCityMatch =
-						targetCityLc.length > 0 &&
-						(a.city || '').trim().toLowerCase() === targetCityLc;
-					const bCityMatch =
-						targetCityLc.length > 0 &&
-						(b.city || '').trim().toLowerCase() === targetCityLc;
-					// First, prioritize exact city matches (e.g., "New York")
-					if (aCityMatch && !bCityMatch) return -1;
-					if (!aCityMatch && bCityMatch) return 1;
+				const titleStateCanonical = (title: string | null | undefined): string | null => {
+					const label = extractStateLabelAfterMusicPrefix(title);
+					if (!label) return null;
+					return detectStateFromValue(label);
+				};
 
-					const aStateTitle = isStateLabelAfterPrefix(a.title);
-					const bStateTitle = isStateLabelAfterPrefix(b.title);
-					if (aStateTitle && !bStateTitle) return -1;
-					if (!aStateTitle && bStateTitle) return 1;
-					return 0;
+				// Build target state canonical set (if a state is present)
+				const targetStatesCanonical: string[] = (() => {
+					const candidates: string[] = [];
+					if (forceStateAny && forceStateAny.length > 0) {
+						for (const s of forceStateAny) {
+							const canon = detectStateFromValue(s);
+							if (canon) candidates.push(canon);
+						}
+					} else if (queryJson.state) {
+						const canon = detectStateFromValue(queryJson.state);
+						if (canon) candidates.push(canon);
+					}
+					return Array.from(new Set(candidates));
+				})();
+				const targetStateSetLc = new Set(targetStatesCanonical.map((s) => s.toLowerCase()));
+
+				// Exact state-label titles we want to prioritize heavily (e.g. "Music Venues Pennsylvania")
+				const exactTitleLcSet = new Set<string>();
+				for (const canon of targetStatesCanonical) {
+					exactTitleLcSet.add(normalizeSearchText(`Music Venues ${canon}`));
+					const abbr = STATE_NAME_TO_ABBR[canon.toLowerCase()];
+					if (abbr) exactTitleLcSet.add(normalizeSearchText(`Music Venues ${abbr}`));
+				}
+
+				// Query exact state-label titles first so we don't miss them due to pagination.
+				const exactTitleOr: Prisma.ContactWhereInput[] = [];
+				for (const canon of targetStatesCanonical) {
+					exactTitleOr.push({
+						title: { equals: `Music Venues ${canon}`, mode: 'insensitive' },
+					});
+					const abbr = STATE_NAME_TO_ABBR[canon.toLowerCase()];
+					if (abbr) {
+						exactTitleOr.push({
+							title: { equals: `Music Venues ${abbr}`, mode: 'insensitive' },
+						});
+					}
+				}
+
+				const exactTitleResults =
+					exactTitleOr.length > 0
+						? await prisma.contact.findMany({
+								where: {
+									AND: [baseWhere, ...cityStrictAnd, { OR: exactTitleOr }],
+								},
+								orderBy: [{ state: 'asc' }, { city: 'asc' }, { company: 'asc' }],
+								take: fetchTake,
+						  })
+						: [];
+
+				let candidates: Contact[] = exactTitleResults.slice();
+
+				if (candidates.length < fetchTake) {
+					const prefixResults = await prisma.contact.findMany({
+						where: {
+							AND: [
+								baseWhere,
+								...stateStrictAnd,
+								...cityStrictAnd,
+								{ title: { mode: 'insensitive', startsWith: 'Music Venues' } },
+							],
+						},
+						orderBy: [{ state: 'asc' }, { city: 'asc' }, { company: 'asc' }],
+						take: fetchTake,
+					});
+					candidates = candidates.concat(prefixResults);
+				}
+
+				// If the state-specific "Music Venues" bucket is sparse, fill with other venue-like
+				// organizations in the same state before ever showing higher-ed.
+				if (targetStateSetLc.size > 0 && candidates.length < finalLimit) {
+					const existingIds = candidates.map((c) => c.id);
+					const VENUE_TERMS = [
+						'live music',
+						'music venue',
+						'concert',
+						'venue',
+						'music hall',
+						'theater',
+						'theatre',
+						'performing arts',
+						'auditorium',
+						'amphitheater',
+						'amphitheatre',
+						'arena',
+						'club',
+						'nightclub',
+						'bar',
+						'pub',
+						'tavern',
+						'lounge',
+						'brewery',
+						'taproom',
+					];
+
+					const filler = await prisma.contact.findMany({
+						where: {
+							AND: [
+								baseWhere,
+								...stateStrictAnd,
+								...cityStrictAnd,
+								{ id: existingIds.length > 0 ? { notIn: existingIds } : undefined },
+								{
+									NOT: {
+										OR: [
+											{ company: { mode: 'insensitive', contains: 'university' } },
+											{ company: { mode: 'insensitive', contains: 'college' } },
+											{ website: { mode: 'insensitive', contains: '.edu' } },
+										],
+									},
+								},
+								{
+									OR: VENUE_TERMS.flatMap((t) => [
+										{ company: { mode: 'insensitive', contains: t } },
+										{ title: { mode: 'insensitive', contains: t } },
+										{ headline: { mode: 'insensitive', contains: t } },
+										{ companyIndustry: { mode: 'insensitive', contains: t } },
+										{ companyType: { mode: 'insensitive', contains: t } },
+										{ website: { mode: 'insensitive', contains: t } },
+										{ metadata: { mode: 'insensitive', contains: t } },
+									]),
+								},
+							],
+						},
+						orderBy: [{ city: 'asc' }, { company: 'asc' }],
+						take: Math.min(fetchTake, 4000),
+					});
+
+					candidates = candidates.concat(filler);
+				}
+
+				// Dedupe and (if a target state exists) keep only results in the requested state.
+				{
+					const seen = new Set<number>();
+					candidates = candidates.filter((c) => {
+						if (seen.has(c.id)) return false;
+						seen.add(c.id);
+						if (targetStateSetLc.size === 0) return true;
+						const stateCanon = detectStateFromValue(c.state);
+						if (stateCanon && targetStateSetLc.has(stateCanon.toLowerCase())) return true;
+						const titleCanon = titleStateCanonical(c.title);
+						if (titleCanon && targetStateSetLc.has(titleCanon.toLowerCase())) return true;
+						const titleLc = normalizeSearchText(c.title);
+						return exactTitleLcSet.has(titleLc);
+					});
+				}
+
+				// Fallback: if we somehow filtered everything out, fall back to the original strict-state query.
+				if (candidates.length === 0) {
+					candidates = await prisma.contact.findMany({
+						where: {
+							AND: [
+								baseWhere,
+								...stateStrictAnd,
+								...cityStrictAnd,
+								{ title: { mode: 'insensitive', startsWith: 'Music Venues' } },
+							],
+						},
+						orderBy: [{ state: 'asc' }, { city: 'asc' }, { company: 'asc' }],
+						take: fetchTake,
+					});
+				}
+
+				// Prefer actual venues over universities/colleges for "Music Venues" searches.
+				const higherEdCache = new Map<number, boolean>();
+				const isHigherEd = (c: Contact): boolean => {
+					if (higherEdCache.has(c.id)) return higherEdCache.get(c.id)!;
+					const v = contactLooksLikeHigherEducation(c);
+					higherEdCache.set(c.id, v);
+					return v;
+				};
+
+				const venueScoreCache = new Map<number, number>();
+				const venueScore = (c: Contact): number => {
+					if (venueScoreCache.has(c.id)) return venueScoreCache.get(c.id)!;
+					const v = contactMusicVenueRelevanceScore(c);
+					venueScoreCache.set(c.id, v);
+					return v;
+				};
+
+				const targetCityLc = normalizeSearchText(forceCityExactCity || queryJson.city || '');
+
+				const scored = candidates.map((c) => {
+					const titleLc = normalizeSearchText(c.title);
+					const exactTitle = exactTitleLcSet.size > 0 && exactTitleLcSet.has(titleLc);
+					const titleCanon = titleStateCanonical(c.title);
+					const matchesTargetStateTitle =
+						titleCanon && targetStateSetLc.size > 0
+							? targetStateSetLc.has(titleCanon.toLowerCase())
+							: false;
+					const cityMatch =
+						targetCityLc.length > 0 && normalizeSearchText(c.city) === targetCityLc;
+					const higherEd = isHigherEd(c);
+					return {
+						contact: c,
+						exactTitle,
+						matchesTargetStateTitle,
+						cityMatch,
+						higherEd,
+						venueScore: venueScore(c),
+					};
 				});
 
-				return apiResponse(prioritized.slice(0, finalLimit));
+				scored.sort((a, b) => {
+					if (a.exactTitle !== b.exactTitle) return a.exactTitle ? -1 : 1;
+					if (a.matchesTargetStateTitle !== b.matchesTargetStateTitle) {
+						return a.matchesTargetStateTitle ? -1 : 1;
+					}
+					// Prefer non-higher-ed results
+					if (a.higherEd !== b.higherEd) return a.higherEd ? 1 : -1;
+					// Prefer contacts that look more like real venues
+					if (a.venueScore !== b.venueScore) return b.venueScore - a.venueScore;
+					// Prefer exact city matches (if applicable)
+					if (a.cityMatch !== b.cityMatch) return a.cityMatch ? -1 : 1;
+					// Stable-ish fallback
+					return (a.contact.company || '').localeCompare(b.contact.company || '');
+				});
+
+				// Always put higher-ed at the bottom (as a last-resort filler).
+				const ordered = scored
+					.filter((x) => !x.higherEd)
+					.concat(scored.filter((x) => x.higherEd))
+					.map((x) => x.contact);
+
+				return apiResponse(ordered.slice(0, finalLimit));
 			}
 		}
 
