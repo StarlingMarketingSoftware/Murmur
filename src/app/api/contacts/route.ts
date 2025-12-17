@@ -1730,17 +1730,24 @@ export async function GET(req: NextRequest) {
 				});
 			}
 
+			const beverageStartsWithOr: Prisma.ContactWhereInput = {
+				OR: beveragePrefixes.map((p) => ({
+					title: { mode: 'insensitive', startsWith: p },
+				})),
+			};
+			const beverageContainsOr: Prisma.ContactWhereInput = {
+				OR: beveragePrefixes.map((p) => ({
+					title: { mode: 'insensitive', contains: p },
+				})),
+			};
+
 			const primary = await prisma.contact.findMany({
 				where: {
 					AND: [
 						baseWhere,
 						...stateStrictAnd,
 						...cityStrictAnd,
-						{
-							OR: beveragePrefixes.map((p) => ({
-								title: { mode: 'insensitive', startsWith: p },
-							})),
-						},
+						beverageStartsWithOr,
 					],
 				},
 				orderBy: [{ state: 'asc' }, { city: 'asc' }, { company: 'asc' }],
@@ -1748,29 +1755,176 @@ export async function GET(req: NextRequest) {
 			});
 
 			const results = primary.slice();
+			const seen = new Set(results.map((c) => c.id));
+			const addUnique = (items: typeof primary) => {
+				for (const c of items) {
+					if (seen.has(c.id)) continue;
+					results.push(c);
+					seen.add(c.id);
+					if (results.length >= finalLimit) break;
+				}
+			};
+			const buildSeenExclusion = (): Prisma.ContactWhereInput =>
+				seen.size > 0 ? { id: { notIn: Array.from(seen) } } : {};
+
+			// First, if we're under limit, allow contains-based fill within the strict location.
 			if (results.length < finalLimit) {
-				const filler = await prisma.contact.findMany({
+				const fillerSameLocation = await prisma.contact.findMany({
 					where: {
 						AND: [
 							baseWhere,
+							buildSeenExclusion(),
 							...stateStrictAnd,
 							...cityStrictAnd,
-							{
-								OR: beveragePrefixes.map((p) => ({
-									title: { mode: 'insensitive', contains: p },
-								})),
-							},
+							beverageContainsOr,
 						],
 					},
 					orderBy: [{ state: 'asc' }, { city: 'asc' }, { company: 'asc' }],
 					take: finalLimit - results.length,
 				});
-				const seen = new Set(results.map((c) => c.id));
-				for (const c of filler) {
-					if (seen.has(c.id)) continue;
-					results.push(c);
-					seen.add(c.id);
-					if (results.length >= finalLimit) break;
+				addUnique(fillerSameLocation);
+			}
+
+			// If we have a target state, we can pad with nearby states (same strategy as radio station filling).
+			const targetStateAbbr =
+				normalizeStateAbbrFromValue(queryJson.state) ||
+				(forceStateAny && forceStateAny.length > 0
+					? normalizeStateAbbrFromValue(forceStateAny[0])
+					: null);
+			const buildStateOr = (abbrs: string[]): Prisma.ContactWhereInput | null => {
+				if (!abbrs || abbrs.length === 0) return null;
+				const values = new Set<string>();
+				for (const abbr of abbrs) {
+					for (const v of getStateSynonymsForAbbr(abbr)) values.add(v);
+				}
+				if (values.size === 0) return null;
+				return {
+					OR: Array.from(values).map((v) => ({
+						state: { equals: v, mode: 'insensitive' },
+					})),
+				};
+			};
+			const stateRings: string[][] = targetStateAbbr
+				? (() => {
+						const dist = buildStateDistanceMap(targetStateAbbr);
+						const ringMap = new Map<number, string[]>();
+						for (const abbr of ALL_STATE_ABBRS) {
+							const d = dist.get(abbr);
+							const key = d == null ? 999 : d;
+							const arr = ringMap.get(key) ?? [];
+							arr.push(abbr);
+							ringMap.set(key, arr);
+						}
+						return Array.from(ringMap.entries())
+							.sort((a, b) => a[0] - b[0])
+							.map(([, abbrs]) => abbrs.sort());
+				  })()
+				: [];
+
+			// If city was specified, first fill with other beverage venues in the same state (other cities)
+			if (results.length < finalLimit && targetStateAbbr && cityStrictAnd.length > 0) {
+				const stateOr = buildStateOr([targetStateAbbr]);
+				if (stateOr) {
+					const inStateStartsWith = await prisma.contact.findMany({
+						where: {
+							AND: [
+								baseWhere,
+								buildSeenExclusion(),
+								stateOr,
+								beverageStartsWithOr,
+							],
+						},
+						orderBy: [{ state: 'asc' }, { city: 'asc' }, { company: 'asc' }],
+						take: finalLimit - results.length,
+					});
+					addUnique(inStateStartsWith);
+
+					if (results.length < finalLimit) {
+						const inStateContains = await prisma.contact.findMany({
+							where: {
+								AND: [
+									baseWhere,
+									buildSeenExclusion(),
+									stateOr,
+									beverageContainsOr,
+								],
+							},
+							orderBy: [{ state: 'asc' }, { city: 'asc' }, { company: 'asc' }],
+							take: finalLimit - results.length,
+						});
+						addUnique(inStateContains);
+					}
+				}
+			}
+
+			// Then fill with nearby states until we hit the limit (proximity-ordered).
+			if (results.length < finalLimit && targetStateAbbr) {
+				for (
+					let ringIdx = 1;
+					ringIdx < stateRings.length && results.length < finalLimit;
+					ringIdx++
+				) {
+					const ring = stateRings[ringIdx] ?? [];
+					if (ring.length === 0) continue;
+					const stateOr = buildStateOr(ring);
+					if (!stateOr) continue;
+					const filler = await prisma.contact.findMany({
+						where: {
+							AND: [
+								baseWhere,
+								buildSeenExclusion(),
+								stateOr,
+								beverageStartsWithOr,
+							],
+						},
+						orderBy: [{ state: 'asc' }, { city: 'asc' }, { company: 'asc' }],
+						take: finalLimit - results.length,
+					});
+					addUnique(filler);
+				}
+			}
+
+			// Finally, if still under limit, widen to contains-based matches in nearby states (still proximity-ordered).
+			if (results.length < finalLimit) {
+				if (targetStateAbbr) {
+					for (
+						let ringIdx = 1;
+						ringIdx < stateRings.length && results.length < finalLimit;
+						ringIdx++
+					) {
+						const ring = stateRings[ringIdx] ?? [];
+						if (ring.length === 0) continue;
+						const stateOr = buildStateOr(ring);
+						if (!stateOr) continue;
+						const filler = await prisma.contact.findMany({
+							where: {
+								AND: [
+									baseWhere,
+									buildSeenExclusion(),
+									stateOr,
+									beverageContainsOr,
+								],
+							},
+							orderBy: [{ state: 'asc' }, { city: 'asc' }, { company: 'asc' }],
+							take: finalLimit - results.length,
+						});
+						addUnique(filler);
+					}
+				} else {
+					const filler = await prisma.contact.findMany({
+						where: {
+							AND: [
+								baseWhere,
+								buildSeenExclusion(),
+								...stateStrictAnd,
+								...cityStrictAnd,
+								beverageContainsOr,
+							],
+						},
+						orderBy: [{ state: 'asc' }, { city: 'asc' }, { company: 'asc' }],
+						take: finalLimit - results.length,
+					});
+					addUnique(filler);
 				}
 			}
 
