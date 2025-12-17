@@ -1025,8 +1025,13 @@ export async function GET(req: NextRequest) {
 						})),
 					});
 				} else if (queryJson.state) {
+					const canon = detectStateFromValue(queryJson.state) || queryJson.state;
+					const abbr = STATE_NAME_TO_ABBR[String(canon).toLowerCase()];
+					const statesToMatch = [canon, abbr].filter(Boolean).map(String);
 					stateStrictAnd.push({
-						state: { equals: queryJson.state, mode: 'insensitive' },
+						OR: statesToMatch.map((s) => ({
+							state: { equals: s, mode: 'insensitive' },
+						})),
 					});
 				}
 
@@ -1331,6 +1336,157 @@ export async function GET(req: NextRequest) {
 					}
 				}
 
+				// If we're still under the requested limit and we have a target state, pad with nearby
+				// states (same strategy as radio station proximity filling).
+				if (results.length < finalLimit) {
+					const targetStateAbbr =
+						normalizeStateAbbrFromValue(queryJson.state) ||
+						(forceStateAny && forceStateAny.length > 0
+							? normalizeStateAbbrFromValue(forceStateAny[0])
+							: null);
+					if (targetStateAbbr) {
+						const seen = new Set(results.map((c) => c.id));
+						const addUnique = (items: typeof results) => {
+							for (const c of items) {
+								if (seen.has(c.id)) continue;
+								results.push(c);
+								seen.add(c.id);
+								if (results.length >= finalLimit) break;
+							}
+						};
+						const buildSeenExclusion = (): Prisma.ContactWhereInput =>
+							seen.size > 0 ? { id: { notIn: Array.from(seen) } } : {};
+						const buildStateOr = (abbrs: string[]): Prisma.ContactWhereInput | null => {
+							if (!abbrs || abbrs.length === 0) return null;
+							const values = new Set<string>();
+							for (const abbr of abbrs) {
+								for (const v of getStateSynonymsForAbbr(abbr)) values.add(v);
+							}
+							if (values.size === 0) return null;
+							return {
+								OR: Array.from(values).map((v) => ({
+									state: { equals: v, mode: 'insensitive' },
+								})),
+							};
+						};
+
+						const stateRings: string[][] = (() => {
+							const dist = buildStateDistanceMap(targetStateAbbr);
+							const ringMap = new Map<number, string[]>();
+							for (const abbr of ALL_STATE_ABBRS) {
+								const d = dist.get(abbr);
+								const key = d == null ? 999 : d;
+								const arr = ringMap.get(key) ?? [];
+								arr.push(abbr);
+								ringMap.set(key, arr);
+							}
+							return Array.from(ringMap.entries())
+								.sort((a, b) => a[0] - b[0])
+								.map(([, abbrs]) => abbrs.sort());
+						})();
+
+						const restaurantsStartsWithOr: Prisma.ContactWhereInput = {
+							OR: [
+								{ title: { mode: 'insensitive', startsWith: 'Restaurants' } },
+								{ title: { mode: 'insensitive', startsWith: 'Restaurant' } },
+							],
+						};
+						const restaurantsContainsOr: Prisma.ContactWhereInput = {
+							OR: [{ title: { mode: 'insensitive', contains: 'restaurant' } }],
+						};
+
+						// If city was specified, first fill with other restaurants in the same state (other cities).
+						if (results.length < finalLimit && cityStrictAnd.length > 0) {
+							const stateOr = buildStateOr([targetStateAbbr]);
+							if (stateOr) {
+								const inStateStartsWith = await prisma.contact.findMany({
+									where: {
+										AND: [
+											baseWhere,
+											buildSeenExclusion(),
+											stateOr,
+											restaurantsStartsWithOr,
+										],
+									},
+									orderBy: [{ state: 'asc' }, { city: 'asc' }, { company: 'asc' }],
+									take: finalLimit - results.length,
+								});
+								addUnique(inStateStartsWith);
+
+								if (results.length < finalLimit) {
+									const inStateContains = await prisma.contact.findMany({
+										where: {
+											AND: [
+												baseWhere,
+												buildSeenExclusion(),
+												stateOr,
+												restaurantsContainsOr,
+											],
+										},
+										orderBy: [{ state: 'asc' }, { city: 'asc' }, { company: 'asc' }],
+										take: finalLimit - results.length,
+									});
+									addUnique(inStateContains);
+								}
+							}
+						}
+
+						// Then fill with nearby states until we hit the limit (proximity-ordered).
+						if (results.length < finalLimit) {
+							for (
+								let ringIdx = 1;
+								ringIdx < stateRings.length && results.length < finalLimit;
+								ringIdx++
+							) {
+								const ring = stateRings[ringIdx] ?? [];
+								if (ring.length === 0) continue;
+								const stateOr = buildStateOr(ring);
+								if (!stateOr) continue;
+								const filler = await prisma.contact.findMany({
+									where: {
+										AND: [
+											baseWhere,
+											buildSeenExclusion(),
+											stateOr,
+											restaurantsStartsWithOr,
+										],
+									},
+									orderBy: [{ state: 'asc' }, { city: 'asc' }, { company: 'asc' }],
+									take: finalLimit - results.length,
+								});
+								addUnique(filler);
+							}
+						}
+
+						// Finally, if still under limit, widen to contains-based matches in nearby states.
+						if (results.length < finalLimit) {
+							for (
+								let ringIdx = 1;
+								ringIdx < stateRings.length && results.length < finalLimit;
+								ringIdx++
+							) {
+								const ring = stateRings[ringIdx] ?? [];
+								if (ring.length === 0) continue;
+								const stateOr = buildStateOr(ring);
+								if (!stateOr) continue;
+								const filler = await prisma.contact.findMany({
+									where: {
+										AND: [
+											baseWhere,
+											buildSeenExclusion(),
+											stateOr,
+											restaurantsContainsOr,
+										],
+									},
+									orderBy: [{ state: 'asc' }, { city: 'asc' }, { company: 'asc' }],
+									take: finalLimit - results.length,
+								});
+								addUnique(filler);
+							}
+						}
+					}
+				}
+
 				// Prioritize exact state-label titles: "Restaurants <STATE or ABBR>"
 				const STATE_NAMES = [
 					'Alabama',
@@ -1492,28 +1648,63 @@ export async function GET(req: NextRequest) {
 				const targetStateSetLc = new Set(
 					targetStatesCanonical.map((s) => s.toLowerCase())
 				);
+				const targetStateAbbr =
+					normalizeStateAbbrFromValue(queryJson.state) ||
+					(forceStateAny && forceStateAny.length > 0
+						? normalizeStateAbbrFromValue(forceStateAny[0])
+						: null);
+				const distanceMap = targetStateAbbr ? buildStateDistanceMap(targetStateAbbr) : null;
 
 				// If nothing matched at all, fall through to downstream booking/vector logic
 				if (results.length === 0) {
 					// no early return
 				} else {
 					const prioritized = results.sort((a, b) => {
-						// 1) Prefer titles of the form "Restaurants <STATE or ABBR>"
-						const aStateCanonical = extractStateLabelAfterPrefix(a.title);
-						const bStateCanonical = extractStateLabelAfterPrefix(b.title);
-						const aHasStateLabel = !!aStateCanonical;
-						const bHasStateLabel = !!bStateCanonical;
-						if (aHasStateLabel && !bHasStateLabel) return -1;
-						if (!aHasStateLabel && bHasStateLabel) return 1;
-						// When both have state labels and a target state is known, prefer matches
-						if (aHasStateLabel && bHasStateLabel && targetStateSetLc.size > 0) {
-							const aMatchesTarget = targetStateSetLc.has(aStateCanonical!.toLowerCase());
-							const bMatchesTarget = targetStateSetLc.has(bStateCanonical!.toLowerCase());
-							if (aMatchesTarget && !bMatchesTarget) return -1;
-							if (!aMatchesTarget && bMatchesTarget) return 1;
+						const aStateCanonicalFromTitle = extractStateLabelAfterPrefix(a.title);
+						const bStateCanonicalFromTitle = extractStateLabelAfterPrefix(b.title);
+						const aStateCanonical =
+							aStateCanonicalFromTitle || detectStateFromValue(a.state) || null;
+						const bStateCanonical =
+							bStateCanonicalFromTitle || detectStateFromValue(b.state) || null;
+
+						// 1) Prefer matches to the requested state (when known)
+						const aMatchesTarget =
+							targetStateSetLc.size > 0 && aStateCanonical
+								? targetStateSetLc.has(aStateCanonical.toLowerCase())
+								: false;
+						const bMatchesTarget =
+							targetStateSetLc.size > 0 && bStateCanonical
+								? targetStateSetLc.has(bStateCanonical.toLowerCase())
+								: false;
+						if (aMatchesTarget && !bMatchesTarget) return -1;
+						if (!aMatchesTarget && bMatchesTarget) return 1;
+
+						// 2) Prefer closer states (in-state, then neighbors, then farther)
+						if (distanceMap) {
+							const aAbbr =
+								normalizeStateAbbrFromValue(a.state) ||
+								(aStateCanonical ? normalizeStateAbbrFromValue(aStateCanonical) : null);
+							const bAbbr =
+								normalizeStateAbbrFromValue(b.state) ||
+								(bStateCanonical ? normalizeStateAbbrFromValue(bStateCanonical) : null);
+							const aDistance =
+								aAbbr != null
+									? distanceMap.get(aAbbr) ?? Number.POSITIVE_INFINITY
+									: Number.POSITIVE_INFINITY;
+							const bDistance =
+								bAbbr != null
+									? distanceMap.get(bAbbr) ?? Number.POSITIVE_INFINITY
+									: Number.POSITIVE_INFINITY;
+							if (aDistance !== bDistance) return aDistance - bDistance;
 						}
 
-						// 2) Then prioritize exact city matches if a target city is known
+						// 3) Prefer titles of the form "Restaurants <STATE or ABBR>"
+						const aHasStateLabel = !!aStateCanonicalFromTitle;
+						const bHasStateLabel = !!bStateCanonicalFromTitle;
+						if (aHasStateLabel && !bHasStateLabel) return -1;
+						if (!aHasStateLabel && bHasStateLabel) return 1;
+
+						// 4) Then prioritize exact city matches if a target city is known
 						const targetCityLc = (forceCityExactCity || queryJson.city || '')
 							.trim()
 							.toLowerCase();
@@ -1527,7 +1718,7 @@ export async function GET(req: NextRequest) {
 						if (aCityMatch && !bCityMatch) return -1;
 						if (!aCityMatch && bCityMatch) return 1;
 
-						// 3) Fallback: simple presence of a state label after prefix
+						// 5) Fallback: simple presence of a state label after prefix
 						const aStateTitle = isStateLabelAfterPrefix(a.title);
 						const bStateTitle = isStateLabelAfterPrefix(b.title);
 						if (aStateTitle && !bStateTitle) return -1;
