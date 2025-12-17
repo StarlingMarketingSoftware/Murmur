@@ -349,7 +349,7 @@ const stableViewportSampleContacts = (
 
 	// Otherwise, include one per cell, then allocate remaining slots proportionally to cell density.
 	const picked: ContactWithName[] = cells.map((cell) => cell.items[0]!.contact);
-	let remainingSlots = slots - picked.length;
+	const remainingSlots = slots - picked.length;
 	if (remainingSlots <= 0) return picked;
 
 	const totalRemaining = cells.reduce((sum, cell) => sum + Math.max(0, cell.items.length - 1), 0);
@@ -364,7 +364,7 @@ const stableViewportSampleContacts = (
 		return { key: cell.key, items: cell.items, base, frac, remaining, tie };
 	});
 
-	let used = allocs.reduce((sum, a) => sum + a.base, 0);
+	const used = allocs.reduce((sum, a) => sum + a.base, 0);
 	let remainder = Math.max(0, remainingSlots - used);
 
 	allocs.sort((a, b) => {

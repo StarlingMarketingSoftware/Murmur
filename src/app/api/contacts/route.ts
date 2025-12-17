@@ -1934,7 +1934,7 @@ export async function GET(req: NextRequest) {
 					]),
 				};
 
-				let candidates: Contact[] = [];
+				const candidates: Contact[] = [];
 				const seenIds = new Set<number>();
 				const addUnique = (items: Contact[]) => {
 					for (const c of items) {
