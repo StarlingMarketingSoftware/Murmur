@@ -545,6 +545,11 @@ export async function GET(req: NextRequest) {
 				normalized
 			);
 		})();
+		// Detect wedding planner queries - more lenient matching for wedding-related contacts
+		const isWeddingPlannerQuery = (() => {
+			const normalized = rawQueryForParsing.toLowerCase();
+			return /\bwedding\s*(planner|coordinator|organizer|consultant)?s?\b/i.test(normalized);
+		})();
 		const parentheticalLocation = extractParentheticalLocation(rawQueryForParsing);
 		if (parentheticalLocation && !locationFilter) {
 			locationFilter = parentheticalLocation.originalText;
@@ -2422,6 +2427,229 @@ export async function GET(req: NextRequest) {
 
 			// Do not apply booking title-prefix filtering here; this flow enforces the
 			// beverage categories directly.
+			return apiResponse(results.slice(0, finalLimit));
+		}
+
+		// Special-case: Wedding planner searches - more lenient matching for wedding-related contacts
+		if (isWeddingPlannerQuery) {
+			const finalLimit = Math.max(1, Math.min(limit ?? VECTOR_SEARCH_LIMIT_DEFAULT, 500));
+
+			// Aggregator sites to exclude
+			const excludedDomains = [
+				'weddingwire',
+				'theknot',
+				'wedding.com',
+				'zola.com',
+				'bridebook',
+				'hitched',
+			];
+
+			const baseWhere: Prisma.ContactWhereInput = {
+				id: addedContactIds.length > 0 ? { notIn: addedContactIds } : undefined,
+				emailValidationStatus: verificationStatus
+					? { equals: verificationStatus }
+					: undefined,
+				// Exclude aggregator sites
+				AND: excludedDomains.map((domain) => ({
+					NOT: {
+						OR: [
+							{ website: { contains: domain, mode: 'insensitive' } },
+							{ company: { contains: domain, mode: 'insensitive' } },
+							{ email: { contains: domain, mode: 'insensitive' } },
+						],
+					},
+				})),
+			};
+
+			// State matching - lenient, not strict
+			const stateAnd: Prisma.ContactWhereInput[] = [];
+			if (forceStateAny && forceStateAny.length > 0) {
+				stateAnd.push({
+					OR: forceStateAny.map((s) => ({
+						state: { equals: s, mode: 'insensitive' },
+					})),
+				});
+			} else if (queryJson.state) {
+				const canon = detectStateFromValue(queryJson.state) || queryJson.state;
+				const abbr = STATE_NAME_TO_ABBR[String(canon).toLowerCase()];
+				const statesToMatch = [canon, abbr].filter(Boolean).map(String);
+				stateAnd.push({
+					OR: statesToMatch.map((s) => ({
+						state: { equals: s, mode: 'insensitive' },
+					})),
+				});
+			}
+
+			// City matching - only if explicitly specified
+			const cityAnd: Prisma.ContactWhereInput[] = [];
+			if (forceCityExactCity) {
+				cityAnd.push({
+					city: { equals: forceCityExactCity, mode: 'insensitive' },
+				});
+			} else if (forceCityAny && forceCityAny.length > 0) {
+				cityAnd.push({
+					OR: forceCityAny.map((c) => ({
+						city: { equals: c, mode: 'insensitive' },
+					})),
+				});
+			}
+
+			// Wedding-related search terms - filter for contacts with "wedding" in relevant fields
+			const weddingTermsOr: Prisma.ContactWhereInput = {
+				OR: [
+					{ title: { contains: 'wedding', mode: 'insensitive' } },
+					{ company: { contains: 'wedding', mode: 'insensitive' } },
+					{ headline: { contains: 'wedding', mode: 'insensitive' } },
+					{ metadata: { contains: 'wedding', mode: 'insensitive' } },
+					{ companyIndustry: { contains: 'wedding', mode: 'insensitive' } },
+					// Also include "bridal" as a related term
+					{ title: { contains: 'bridal', mode: 'insensitive' } },
+					{ company: { contains: 'bridal', mode: 'insensitive' } },
+					{ headline: { contains: 'bridal', mode: 'insensitive' } },
+					{ companyIndustry: { contains: 'bridal', mode: 'insensitive' } },
+					// Event planner/coordinator that might do weddings
+					{ title: { contains: 'event planner', mode: 'insensitive' } },
+					{ title: { contains: 'event coordinator', mode: 'insensitive' } },
+				],
+			};
+
+			// Relevance scoring function - higher score = more relevant to "wedding planner"
+			const scoreWeddingRelevance = (c: Contact): number => {
+				let score = 0;
+				const title = (c.title || '').toLowerCase();
+				const company = (c.company || '').toLowerCase();
+				const headline = (c.headline || '').toLowerCase();
+				const industry = (c.companyIndustry || '').toLowerCase();
+				const metadata = (c.metadata || '').toLowerCase();
+
+				// Highest priority: exact "wedding planner" or "wedding coordinator" in title
+				if (/wedding\s*(planner|coordinator|organizer|consultant)/i.test(title)) {
+					score += 100;
+				}
+				// High priority: "wedding planner" in company name
+				if (/wedding\s*(planner|coordinator|organizer|consultant)/i.test(company)) {
+					score += 80;
+				}
+				// High priority: "wedding planner" in headline
+				if (/wedding\s*(planner|coordinator|organizer|consultant)/i.test(headline)) {
+					score += 70;
+				}
+				// Medium priority: "wedding" in title without planner
+				if (title.includes('wedding') && score < 100) {
+					score += 50;
+				}
+				// Medium priority: "bridal" terms
+				if (title.includes('bridal') || company.includes('bridal')) {
+					score += 45;
+				}
+				// Medium priority: "wedding" in company name
+				if (company.includes('wedding') && score < 80) {
+					score += 40;
+				}
+				// Lower priority: "wedding" in industry/metadata
+				if (industry.includes('wedding') || industry.includes('bridal')) {
+					score += 30;
+				}
+				if (metadata.includes('wedding') || metadata.includes('bridal')) {
+					score += 20;
+				}
+				// Lower priority: general event planners (might do weddings)
+				if (
+					/event\s*(planner|coordinator|organizer)/i.test(title) ||
+					/event\s*(planner|coordinator|organizer)/i.test(company)
+				) {
+					score += 15;
+				}
+
+				return score;
+			};
+
+			const results: Contact[] = [];
+			const seen = new Set<number>();
+			const addUnique = (items: Contact[]) => {
+				for (const c of items) {
+					if (seen.has(c.id)) continue;
+					results.push(c);
+					seen.add(c.id);
+				}
+			};
+			const buildSeenExclusion = (): Prisma.ContactWhereInput =>
+				seen.size > 0 ? { id: { notIn: Array.from(seen) } } : {};
+
+			// First: find all wedding-related contacts in the target state/city
+			const primaryResults = await prisma.contact.findMany({
+				where: {
+					AND: [baseWhere, ...stateAnd, ...cityAnd, weddingTermsOr],
+				},
+				take: finalLimit * 3, // Fetch more to allow for sorting
+			});
+			addUnique(primaryResults);
+
+			// If city was specified but we have few results, expand to rest of state
+			if (results.length < finalLimit && cityAnd.length > 0 && stateAnd.length > 0) {
+				const stateWideResults = await prisma.contact.findMany({
+					where: {
+						AND: [baseWhere, buildSeenExclusion(), ...stateAnd, weddingTermsOr],
+					},
+					take: finalLimit * 2,
+				});
+				addUnique(stateWideResults);
+			}
+
+			// If still under limit and we have a target state, fill from nearby states
+			const targetStateAbbr =
+				normalizeStateAbbrFromValue(queryJson.state) ||
+				(forceStateAny && forceStateAny.length > 0
+					? normalizeStateAbbrFromValue(forceStateAny[0])
+					: null);
+
+			if (results.length < finalLimit && targetStateAbbr) {
+				const dist = buildStateDistanceMap(targetStateAbbr);
+				const ringMap = new Map<number, string[]>();
+				for (const abbr of ALL_STATE_ABBRS) {
+					const d = dist.get(abbr);
+					const key = d == null ? 999 : d;
+					const arr = ringMap.get(key) ?? [];
+					arr.push(abbr);
+					ringMap.set(key, arr);
+				}
+				const stateRings = Array.from(ringMap.entries())
+					.sort((a, b) => a[0] - b[0])
+					.map(([, abbrs]) => abbrs.sort());
+
+				for (
+					let ringIdx = 1;
+					ringIdx < stateRings.length && results.length < finalLimit;
+					ringIdx++
+				) {
+					const ring = stateRings[ringIdx] ?? [];
+					if (ring.length === 0) continue;
+
+					const stateValues = new Set<string>();
+					for (const abbr of ring) {
+						for (const v of getStateSynonymsForAbbr(abbr)) stateValues.add(v);
+					}
+					if (stateValues.size === 0) continue;
+
+					const nearbyStateOr: Prisma.ContactWhereInput = {
+						OR: Array.from(stateValues).map((v) => ({
+							state: { equals: v, mode: 'insensitive' },
+						})),
+					};
+
+					const nearbyResults = await prisma.contact.findMany({
+						where: {
+							AND: [baseWhere, buildSeenExclusion(), nearbyStateOr, weddingTermsOr],
+						},
+						take: finalLimit - results.length,
+					});
+					addUnique(nearbyResults);
+				}
+			}
+
+			// Sort results by wedding relevance score (highest first)
+			results.sort((a, b) => scoreWeddingRelevance(b) - scoreWeddingRelevance(a));
+
 			return apiResponse(results.slice(0, finalLimit));
 		}
 
