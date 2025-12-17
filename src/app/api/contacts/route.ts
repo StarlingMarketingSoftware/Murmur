@@ -1062,6 +1062,108 @@ export async function GET(req: NextRequest) {
 					take: fetchTake,
 				});
 
+				// If we're under the requested limit and we have a target state, pad with nearby
+				// states (same strategy as radio station proximity filling).
+				if (results.length < finalLimit) {
+					const targetStateAbbr =
+						normalizeStateAbbrFromValue(queryJson.state) ||
+						(forceStateAny && forceStateAny.length > 0
+							? normalizeStateAbbrFromValue(forceStateAny[0])
+							: null);
+					if (targetStateAbbr) {
+						const seen = new Set(results.map((c) => c.id));
+						const addUnique = (items: typeof results) => {
+							for (const c of items) {
+								if (seen.has(c.id)) continue;
+								results.push(c);
+								seen.add(c.id);
+								if (results.length >= finalLimit) break;
+							}
+						};
+						const buildSeenExclusion = (): Prisma.ContactWhereInput =>
+							seen.size > 0 ? { id: { notIn: Array.from(seen) } } : {};
+						const buildStateOr = (abbrs: string[]): Prisma.ContactWhereInput | null => {
+							if (!abbrs || abbrs.length === 0) return null;
+							const values = new Set<string>();
+							for (const abbr of abbrs) {
+								for (const v of getStateSynonymsForAbbr(abbr)) values.add(v);
+							}
+							if (values.size === 0) return null;
+							return {
+								OR: Array.from(values).map((v) => ({
+									state: { equals: v, mode: 'insensitive' },
+								})),
+							};
+						};
+
+						const stateRings: string[][] = (() => {
+							const dist = buildStateDistanceMap(targetStateAbbr);
+							const ringMap = new Map<number, string[]>();
+							for (const abbr of ALL_STATE_ABBRS) {
+								const d = dist.get(abbr);
+								const key = d == null ? 999 : d;
+								const arr = ringMap.get(key) ?? [];
+								arr.push(abbr);
+								ringMap.set(key, arr);
+							}
+							return Array.from(ringMap.entries())
+								.sort((a, b) => a[0] - b[0])
+								.map(([, abbrs]) => abbrs.sort());
+						})();
+
+						const festivalsStartsWith: Prisma.ContactWhereInput = {
+							title: { mode: 'insensitive', startsWith: 'Music Festivals' },
+						};
+
+						// If city was specified, first fill with other festivals in the same state (other cities).
+						if (results.length < finalLimit && cityStrictAnd.length > 0) {
+							const stateOr = buildStateOr([targetStateAbbr]);
+							if (stateOr) {
+								const inState = await prisma.contact.findMany({
+									where: {
+										AND: [
+											baseWhere,
+											buildSeenExclusion(),
+											stateOr,
+											festivalsStartsWith,
+										],
+									},
+									orderBy: [{ state: 'asc' }, { city: 'asc' }, { company: 'asc' }],
+									take: finalLimit - results.length,
+								});
+								addUnique(inState);
+							}
+						}
+
+						// Then fill with nearby states until we hit the limit (proximity-ordered).
+						if (results.length < finalLimit) {
+							for (
+								let ringIdx = 1;
+								ringIdx < stateRings.length && results.length < finalLimit;
+								ringIdx++
+							) {
+								const ring = stateRings[ringIdx] ?? [];
+								if (ring.length === 0) continue;
+								const stateOr = buildStateOr(ring);
+								if (!stateOr) continue;
+								const filler = await prisma.contact.findMany({
+									where: {
+										AND: [
+											baseWhere,
+											buildSeenExclusion(),
+											stateOr,
+											festivalsStartsWith,
+										],
+									},
+									orderBy: [{ state: 'asc' }, { city: 'asc' }, { company: 'asc' }],
+									take: finalLimit - results.length,
+								});
+								addUnique(filler);
+							}
+						}
+					}
+				}
+
 				// Prioritize exact state-label titles: "Music Festivals <STATE or ABBR>"
 				const STATE_NAMES = [
 					'Alabama',
