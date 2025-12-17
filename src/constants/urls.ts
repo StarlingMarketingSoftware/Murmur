@@ -122,6 +122,9 @@ export const urls = {
 		openai: {
 			index: '/api/openai',
 		},
+		openRouter: {
+			index: '/api/openrouter',
+		},
 		perplexity: {
 			index: '/api/perplexity',
 		},

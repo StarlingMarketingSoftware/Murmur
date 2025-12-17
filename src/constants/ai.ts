@@ -1,6 +1,6 @@
 import { MistralToneAgentType, PerplexityModel } from '@/types';
 
-export const GEMINI_FULL_AI_PROMPT = `
+export const FULL_AI_DRAFTING_SYSTEM_PROMPT = `
 INSTRUCTIONS FOR EMAIL CONTENT:
 
 You are a musician. A professional musician. You have a lot of experience and you know what you're doing. 
@@ -174,6 +174,16 @@ export const GEMINI_MODEL_OPTIONS = {
 	gemini25Pro: 'gemini-2.5-pro-preview-05-06',
 	gemini3Pro: 'gemini-3-pro-preview',
 } as const;
+
+// OpenRouter models for Full AI drafting - shuffled round-robin during batch generation
+export const OPENROUTER_DRAFTING_MODELS = [
+	'x-ai/grok-4.1-fast',
+	'qwen/qwen3-235b-a22b-2507',
+	'x-ai/grok-4.1-fast',
+	'deepseek/deepseek-v3.2',
+] as const;
+
+export type OpenRouterDraftingModel = (typeof OPENROUTER_DRAFTING_MODELS)[number];
 
 export type GeminiModel =
 	(typeof GEMINI_MODEL_OPTIONS)[keyof typeof GEMINI_MODEL_OPTIONS];
