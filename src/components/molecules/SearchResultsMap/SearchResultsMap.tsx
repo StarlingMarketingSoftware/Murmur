@@ -195,11 +195,15 @@ const mulberry32 = (seed: number) => {
 	};
 };
 
+// Hard cap for total dots rendered in the viewport (contacts + background dots).
+// Rendering more than this tends to overload many machines at low zoom levels.
+const MAX_TOTAL_DOTS = 500;
+
 // Calculate background dot count based on viewport area to maintain consistent visual density.
 // This ensures dots don't become denser when zooming in.
 const BACKGROUND_DOTS_DENSITY = 0.55; // dots per square degree at baseline
 const BACKGROUND_DOTS_MIN = 8;
-const BACKGROUND_DOTS_MAX = 500;
+const BACKGROUND_DOTS_MAX = MAX_TOTAL_DOTS;
 
 const getBackgroundDotsTargetCount = (viewportArea: number, zoom: number): number => {
 	// Base count from area (larger viewport = more dots, smaller = fewer)
@@ -255,6 +259,137 @@ const bboxFromMultiPolygon = (multiPolygon: ClippingMultiPolygon): BoundingBox |
 
 const isLatLngInBbox = (lat: number, lng: number, bbox: BoundingBox): boolean =>
 	lat >= bbox.minLat && lat <= bbox.maxLat && lng >= bbox.minLng && lng <= bbox.maxLng;
+
+type ScoredContact = { contact: ContactWithName; score: number };
+
+const stableViewportSampleContacts = (
+	contacts: ContactWithName[],
+	getCoords: (contact: ContactWithName) => LatLngLiteral | null,
+	viewportBbox: BoundingBox,
+	slots: number,
+	seed: string
+): ContactWithName[] => {
+	if (slots <= 0 || contacts.length === 0) return [];
+	if (contacts.length <= slots) return contacts;
+
+	const latSpan = viewportBbox.maxLat - viewportBbox.minLat;
+	const lngSpan = viewportBbox.maxLng - viewportBbox.minLng;
+	if (!Number.isFinite(latSpan) || !Number.isFinite(lngSpan) || latSpan <= 0 || lngSpan <= 0) {
+		// Fallback: deterministic sample by hash order.
+		return contacts
+			.map((contact) => ({
+				contact,
+				score: hashStringToUint32(`${seed}|${contact.id}`),
+			}))
+			.sort((a, b) => a.score - b.score)
+			.slice(0, slots)
+			.map((x) => x.contact);
+	}
+
+	// Bin into a viewport grid and sample per-cell so spatial density is preserved.
+	const grid = Math.max(8, Math.min(64, Math.round(Math.sqrt(slots) * 1.15)));
+	const latStep = latSpan / grid;
+	const lngStep = lngSpan / grid;
+	if (!Number.isFinite(latStep) || !Number.isFinite(lngStep) || latStep <= 0 || lngStep <= 0) {
+		return contacts
+			.map((contact) => ({
+				contact,
+				score: hashStringToUint32(`${seed}|${contact.id}`),
+			}))
+			.sort((a, b) => a.score - b.score)
+			.slice(0, slots)
+			.map((x) => x.contact);
+	}
+
+	const cellMap = new Map<string, ScoredContact[]>();
+	for (const contact of contacts) {
+		const coords = getCoords(contact);
+		if (!coords) continue;
+		if (!isLatLngInBbox(coords.lat, coords.lng, viewportBbox)) continue;
+
+		const x = clamp(
+			Math.floor((coords.lng - viewportBbox.minLng) / lngStep),
+			0,
+			grid - 1
+		);
+		const y = clamp(
+			Math.floor((coords.lat - viewportBbox.minLat) / latStep),
+			0,
+			grid - 1
+		);
+		const key = `${x},${y}`;
+		const score = hashStringToUint32(`${seed}|${contact.id}`);
+		const existing = cellMap.get(key);
+		if (existing) existing.push({ contact, score });
+		else cellMap.set(key, [{ contact, score }]);
+	}
+
+	const cells = Array.from(cellMap.entries()).map(([key, items]) => {
+		items.sort((a, b) => a.score - b.score);
+		return { key, items, weight: items.length };
+	});
+	if (cells.length === 0) return [];
+
+	// If we have more non-empty cells than slots, select which cells to represent using
+	// weighted sampling (cells with more contacts are more likely to be shown).
+	if (cells.length >= slots) {
+		const cellChoices = cells
+			.map((cell) => {
+				const u = (hashStringToUint32(`${seed}|cell|${cell.key}`) + 1) / 4294967296;
+				const w = Math.max(1, cell.weight);
+				// Efraimidis-Spirakis weighted sampling key: log(u)/w (higher is better).
+				const cellScore = Math.log(u) / w;
+				return { ...cell, cellScore };
+			})
+			.sort((a, b) => b.cellScore - a.cellScore)
+			.slice(0, slots);
+
+		return cellChoices.map((cell) => cell.items[0]!.contact);
+	}
+
+	// Otherwise, include one per cell, then allocate remaining slots proportionally to cell density.
+	const picked: ContactWithName[] = cells.map((cell) => cell.items[0]!.contact);
+	const remainingSlots = slots - picked.length;
+	if (remainingSlots <= 0) return picked;
+
+	const totalRemaining = cells.reduce((sum, cell) => sum + Math.max(0, cell.items.length - 1), 0);
+	if (totalRemaining <= 0) return picked;
+
+	const allocs = cells.map((cell) => {
+		const remaining = Math.max(0, cell.items.length - 1);
+		const exact = (remainingSlots * remaining) / totalRemaining;
+		const base = Math.min(remaining, Math.floor(exact));
+		const frac = exact - base;
+		const tie = hashStringToUint32(`${seed}|rem|${cell.key}`);
+		return { key: cell.key, items: cell.items, base, frac, remaining, tie };
+	});
+
+	const used = allocs.reduce((sum, a) => sum + a.base, 0);
+	let remainder = Math.max(0, remainingSlots - used);
+
+	allocs.sort((a, b) => {
+		if (b.frac !== a.frac) return b.frac - a.frac;
+		return a.tie - b.tie;
+	});
+
+	for (let i = 0; i < allocs.length && remainder > 0; i++) {
+		const a = allocs[i];
+		if (a.base < a.remaining) {
+			a.base += 1;
+			remainder--;
+		}
+	}
+
+	for (const a of allocs) {
+		const take = Math.min(a.base, a.remaining);
+		for (let i = 1; i <= take; i++) {
+			const item = a.items[i];
+			if (item) picked.push(item.contact);
+		}
+	}
+
+	return picked.slice(0, slots);
+};
 
 const pointInRing = (point: ClippingCoord, ring: ClippingRing): boolean => {
 	const [x, y] = point;
@@ -562,6 +697,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const [map, setMap] = useState<google.maps.Map | null>(null);
 	const [selectedStateKey, setSelectedStateKey] = useState<string | null>(null);
 	const [zoomLevel, setZoomLevel] = useState(4); // Default zoom level
+	const [visibleContacts, setVisibleContacts] = useState<ContactWithName[]>([]);
 	// Timeout ref for auto-hiding research panel
 	const researchPanelTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 	const stateLayerRef = useRef<google.maps.Data | null>(null);
@@ -572,6 +708,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const resultsSelectionSignatureRef = useRef<string>('');
 	const backgroundDotsLayerRef = useRef<google.maps.Data | null>(null);
 	const lastBackgroundDotsKeyRef = useRef<string>('');
+	const backgroundDotsBudgetRef = useRef<number>(MAX_TOTAL_DOTS);
+	const lastVisibleContactsKeyRef = useRef<string>('');
 	const usStatesPolygonsRef = useRef<PreparedClippingPolygon[] | null>(null);
 	const selectedStateKeyRef = useRef<string | null>(null);
 	const onStateSelectRef = useRef<SearchResultsMapProps['onStateSelect'] | null>(null);
@@ -589,6 +727,17 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	useEffect(() => {
 		isLoadingRef.current = isLoading ?? false;
 	}, [isLoading]);
+
+	// If a hovered marker is removed due to viewport sampling, clear hover state
+	// to avoid the UI getting "stuck" on a now-nonexistent marker.
+	useEffect(() => {
+		if (hoveredMarkerId == null) return;
+		const stillVisible = visibleContacts.some((c) => c.id === hoveredMarkerId);
+		if (stillVisible) return;
+		setHoveredMarkerId(null);
+		hoveredMarkerIdRef.current = null;
+		onMarkerHover?.(null);
+	}, [visibleContacts, hoveredMarkerId, onMarkerHover]);
 
 	useEffect(() => {
 		if (lockedStateName === undefined) return;
@@ -840,7 +989,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	);
 
 	const updateBackgroundDots = useCallback(
-		(mapInstance: google.maps.Map | null, loading?: boolean) => {
+		(
+			mapInstance: google.maps.Map | null,
+			loading?: boolean,
+			maxDotsInViewport: number = MAX_TOTAL_DOTS
+		) => {
 			if (!mapInstance) return;
 			const layer = backgroundDotsLayerRef.current;
 			if (!layer) return;
@@ -877,7 +1030,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			const qEast = Math.round(east / quant);
 
 			const selectionSig = resultsSelectionSignatureRef.current;
-			const viewportKey = `${zoom}|${qSouth}|${qWest}|${qNorth}|${qEast}|${selectionSig}`;
+			const maxAllowed = Math.max(
+				0,
+				Math.min(MAX_TOTAL_DOTS, Math.floor(Number(maxDotsInViewport) || 0))
+			);
+			const viewportKey = `${zoom}|${qSouth}|${qWest}|${qNorth}|${qEast}|${selectionSig}|bg:${maxAllowed}`;
 			if (viewportKey === lastBackgroundDotsKeyRef.current) return;
 			lastBackgroundDotsKeyRef.current = viewportKey;
 
@@ -889,7 +1046,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			const lngSpan = east - west;
 			const viewportArea = latSpan * lngSpan;
 
-			const targetCount = getBackgroundDotsTargetCount(viewportArea, zoom);
+			const targetCount = Math.min(
+				getBackgroundDotsTargetCount(viewportArea, zoom),
+				maxAllowed
+			);
+			if (targetCount <= 0) return;
 
 			const selection = resultsSelectionMultiPolygonRef.current;
 			const selectionBbox = resultsSelectionBboxRef.current;
@@ -937,6 +1098,92 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		[]
 	);
 
+	// Recompute which contact markers are rendered in the current viewport, and
+	// budget background dots so the combined total stays under MAX_TOTAL_DOTS.
+	const recomputeViewportDots = useCallback(
+		(mapInstance: google.maps.Map | null, loading?: boolean) => {
+			if (!mapInstance) return;
+
+			const bounds = mapInstance.getBounds();
+			if (!bounds) return;
+
+			const sw = bounds.getSouthWest();
+			const ne = bounds.getNorthEast();
+			const south = sw.lat();
+			const west = sw.lng();
+			const north = ne.lat();
+			const east = ne.lng();
+
+			// Skip in the unlikely case the viewport crosses the antimeridian (not relevant for our UI).
+			if (east < west) return;
+
+			const zoom = Math.round(mapInstance.getZoom() ?? 4);
+			const quant = getBackgroundDotsQuantizationDeg(zoom);
+			const qSouth = Math.round(south / quant);
+			const qWest = Math.round(west / quant);
+			const qNorth = Math.round(north / quant);
+			const qEast = Math.round(east / quant);
+			const seed = `${zoom}|${qSouth}|${qWest}|${qNorth}|${qEast}`;
+
+			const viewportBbox: BoundingBox = { minLat: south, maxLat: north, minLng: west, maxLng: east };
+
+			// Determine which contacts are currently in the viewport.
+			const inBounds: ContactWithName[] = [];
+			for (const contact of contactsWithCoords) {
+				const coords = getContactCoords(contact);
+				if (!coords) continue;
+				if (!isLatLngInBbox(coords.lat, coords.lng, viewportBbox)) continue;
+				inBounds.push(contact);
+			}
+
+			const selectedSet = new Set<number>(selectedContacts);
+			const selectedInBounds: ContactWithName[] = [];
+			const unselectedInBounds: ContactWithName[] = [];
+			for (const contact of inBounds) {
+				if (selectedSet.has(contact.id)) selectedInBounds.push(contact);
+				else unselectedInBounds.push(contact);
+			}
+
+			let nextVisibleContacts: ContactWithName[] = [];
+			if (inBounds.length <= MAX_TOTAL_DOTS) {
+				nextVisibleContacts = inBounds;
+			} else if (selectedInBounds.length >= MAX_TOTAL_DOTS) {
+				// Extremely rare: more than MAX_TOTAL_DOTS selected contacts are in view.
+				nextVisibleContacts = stableViewportSampleContacts(
+					selectedInBounds,
+					getContactCoords,
+					viewportBbox,
+					MAX_TOTAL_DOTS,
+					`${seed}|selected`
+				);
+			} else {
+				const slots = MAX_TOTAL_DOTS - selectedInBounds.length;
+				const sampled = stableViewportSampleContacts(
+					unselectedInBounds,
+					getContactCoords,
+					viewportBbox,
+					slots,
+					seed
+				);
+				nextVisibleContacts = [...selectedInBounds, ...sampled];
+			}
+
+			// Stabilize ordering to reduce marker churn in @react-google-maps/api.
+			nextVisibleContacts.sort((a, b) => a.id - b.id);
+
+			const nextKey = nextVisibleContacts.map((c) => c.id).join(',');
+			if (nextKey !== lastVisibleContactsKeyRef.current) {
+				lastVisibleContactsKeyRef.current = nextKey;
+				setVisibleContacts(nextVisibleContacts);
+			}
+
+			const backgroundBudget = Math.max(0, MAX_TOTAL_DOTS - nextVisibleContacts.length);
+			backgroundDotsBudgetRef.current = backgroundBudget;
+			updateBackgroundDots(mapInstance, loading, backgroundBudget);
+		},
+		[contactsWithCoords, getContactCoords, selectedContacts, updateBackgroundDots]
+	);
+
 	// Background dots layer (non-interactive) to avoid the map feeling empty outside the selected region.
 	useEffect(() => {
 		if (!map) return;
@@ -960,21 +1207,21 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 	// Trigger background dots update when US state polygons become available or loading state changes
 	useEffect(() => {
-		if (!map || !isStateLayerReady) return;
-		updateBackgroundDots(map, isLoading);
-	}, [map, isStateLayerReady, isLoading, updateBackgroundDots]);
+		if (!map) return;
+		recomputeViewportDots(map, isLoading);
+	}, [map, isStateLayerReady, isLoading, recomputeViewportDots]);
 
 	useEffect(() => {
 		if (!map) return;
 		const listener = map.addListener('idle', () =>
-			updateBackgroundDots(map, isLoadingRef.current)
+			recomputeViewportDots(map, isLoadingRef.current)
 		);
 		// Initial fill
-		updateBackgroundDots(map, isLoadingRef.current);
+		recomputeViewportDots(map, isLoadingRef.current);
 		return () => {
 			listener.remove();
 		};
-	}, [map, updateBackgroundDots]);
+	}, [map, recomputeViewportDots]);
 
 	// Draw a gray outline around the *group of states* that have results.
 	// This uses the state polygons we load via the Data layer and unions them so the outline is one shape.
@@ -1054,7 +1301,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			resultsSelectionBboxRef.current = bboxFromMultiPolygon(multiPolygonsToRender);
 
 			// Refresh background dots now that the selected region is known.
-			updateBackgroundDots(map, isLoadingRef.current);
+			updateBackgroundDots(map, isLoadingRef.current, backgroundDotsBudgetRef.current);
 		};
 
 		void run();
@@ -1491,7 +1738,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		>
 			{/* Only render markers when not loading */}
 			{!isLoading &&
-				contactsWithCoords.map((contact) => {
+				visibleContacts.map((contact) => {
 					const coords = getContactCoords(contact);
 					if (!coords) return null;
 					const isHovered = hoveredMarkerId === contact.id;
