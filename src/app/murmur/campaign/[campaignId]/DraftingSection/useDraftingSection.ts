@@ -373,6 +373,10 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	const draftCredits = user?.draftCredits;
 	const signatureText =
 		form.watch('signature') || `Thank you,\n${campaign.identity?.name || ''}`;
+	// Full Auto: allow drafts even when user hasn't entered any custom prompt.
+	// We still pass a sensible default "User Goal" to the model so it produces useful output.
+	const DEFAULT_FULL_AI_PROMPT =
+		'Compose a professional booking pitch email to this venue. Introduce me/my band using the provided sender profile, reference the venue naturally, and ask about availability for a show. Keep the tone warm, clear, and brief.';
 
 	const getDraftingModeBasedOnBlocks = useCallback(() => {
 		const blocks = form.getValues('hybridBlockPrompts');
@@ -420,13 +424,6 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		const hasFullAutomatedBlock = values.hybridBlockPrompts?.some(
 			(block) => block.type === 'full_automated'
 		);
-		const fullAutomatedBlock = values.hybridBlockPrompts?.find(
-			(block) => block.type === 'full_automated'
-		);
-
-		const isFullAutomatedEmpty =
-			hasFullAutomatedBlock &&
-			(!fullAutomatedBlock?.value || fullAutomatedBlock.value === '');
 
 		const hasNoBlocks =
 			!values.hybridBlockPrompts || values.hybridBlockPrompts.length === 0;
@@ -450,10 +447,19 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			}
 		}
 
+		// Full Auto prompt is optional: a blank prompt should still allow drafting.
+		// If the Full Auto block is present, we consider drafting "configured" as long
+		// as we're not currently generating and we have contacts.
+		if (hasFullAutomatedBlock) {
+			return (
+				hasNoBlocks ||
+				generationProgress > -1 ||
+				contacts?.length === 0 ||
+				isPendingGeneration
+			);
+		}
+
 		const hasAIBlocks = values.hybridBlockPrompts?.some((block) => {
-			if (block.type === 'full_automated') {
-				return block.value && block.value.trim() !== '';
-			}
 			if (block.type !== HybridBlock.text) {
 				return true;
 			}
@@ -461,7 +467,6 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		});
 
 		return (
-			isFullAutomatedEmpty ||
 			hasNoBlocks ||
 			!hasAIBlocks ||
 			generationProgress > -1 ||
@@ -475,16 +480,14 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		const hasFullAutomatedBlock = values.hybridBlockPrompts?.some(
 			(block) => block.type === 'full_automated'
 		);
-		const fullAutomatedBlock = values.hybridBlockPrompts?.find(
-			(block) => block.type === 'full_automated'
-		);
-
-		const isFullAutomatedEmpty =
-			hasFullAutomatedBlock &&
-			(!fullAutomatedBlock?.value || fullAutomatedBlock.value === '');
 
 		const hasNoBlocks =
 			!values.hybridBlockPrompts || values.hybridBlockPrompts.length === 0;
+
+		// Full Auto prompt is optional: presence of the Full Auto block is enough.
+		if (hasFullAutomatedBlock) {
+			return !hasNoBlocks;
+		}
 
 		// Check if we're in handwritten mode (only text blocks)
 		const isOnlyTextBlocks = values.hybridBlockPrompts?.every(
@@ -504,9 +507,6 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		}
 
 		const hasAIBlocks = values.hybridBlockPrompts?.some((block) => {
-			if (block.type === 'full_automated') {
-				return block.value && block.value.trim() !== '';
-			}
 			if (block.type !== HybridBlock.text) {
 				return true;
 			}
@@ -514,7 +514,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		});
 
 		// Content is ready if we have blocks with content
-		return !isFullAutomatedEmpty && !hasNoBlocks && hasAIBlocks;
+		return !hasNoBlocks && hasAIBlocks;
 	}, [form]);
 
 	// FUNCTIONS
@@ -1413,16 +1413,16 @@ The improved prompt should result in more personalized, engaging, and effective 
 				console.log('[Test Generation] Mode:', draftingMode);
 
 				if (draftingMode === DraftingMode.ai) {
-					const fullAiPrompt = fullAutomatedBlock?.value || '';
+					const fullAiPromptRaw = fullAutomatedBlock?.value || '';
+					const fullAiPrompt = fullAiPromptRaw.trim() || DEFAULT_FULL_AI_PROMPT;
 
 					// Pick a random model for test generation to preview variety
 					const testModel = OPENROUTER_DRAFTING_MODELS[Math.floor(Math.random() * OPENROUTER_DRAFTING_MODELS.length)];
-					console.log('[Test Generation] Using Full AI mode with prompt:', fullAiPrompt);
+					console.log(
+						'[Test Generation] Using Full AI mode with prompt:',
+						fullAiPromptRaw.trim() ? fullAiPromptRaw : '(default prompt)'
+					);
 					console.log('[Test Generation] Using model:', testModel);
-
-					if (!fullAiPrompt || fullAiPrompt.trim() === '') {
-						throw new Error('Automated prompt cannot be empty');
-					}
 
 					parsedRes = await draftAiEmail(
 						contacts[0],
@@ -1565,11 +1565,8 @@ The improved prompt should result in more personalized, engaging, and effective 
 					);
 
 					if (draftingMode === DraftingMode.ai) {
-						const fullAiPrompt = fullAutomatedBlock?.value || '';
-
-						if (!fullAiPrompt || fullAiPrompt.trim() === '') {
-							throw new Error('Automated prompt cannot be empty');
-						}
+						const fullAiPromptRaw = fullAutomatedBlock?.value || '';
+						const fullAiPrompt = fullAiPromptRaw.trim() || DEFAULT_FULL_AI_PROMPT;
 
 						console.log(
 							`[Batch][Full AI] draft#${draftIndex} attempt ${
@@ -1854,14 +1851,17 @@ The improved prompt should result in more personalized, engaging, and effective 
 		if (draftingMode === DraftingMode.ai) {
 			const fullAiPromptRaw = fullAutomatedBlock?.value || '';
 			const fullAiPrompt = fullAiPromptRaw.trim();
-			if (!fullAiPrompt) {
-				toast.error('Please set up your email template on the Testing tab first.');
-				return;
-			}
 
 			// Don't block batch generation on scoring; run in background.
-			console.log('[Batch][Full AI] Scoring prompt in background (Gemini)…');
-			scoreFullAutomatedPrompt(fullAiPrompt);
+			if (fullAiPrompt) {
+				console.log('[Batch][Full AI] Scoring prompt in background (Gemini)…');
+				scoreFullAutomatedPrompt(fullAiPrompt);
+			} else {
+				// If no custom instructions are provided, we still allow drafting using a default prompt.
+				setPromptQualityScore(null);
+				setPromptQualityLabel(null);
+				setPromptSuggestions([]);
+			}
 		} else if (draftingMode === DraftingMode.hybrid) {
 			if (!hybridBlocks || hybridBlocks.length === 0) {
 				toast.error('Please set up your email template on the Testing tab first.');
