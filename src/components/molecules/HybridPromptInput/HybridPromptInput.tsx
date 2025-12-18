@@ -20,7 +20,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { Button } from '@/components/ui/button';
 import { X } from 'lucide-react';
 import { DraftingFormValues } from '@/app/murmur/campaign/[campaignId]/DraftingSection/useDraftingSection';
-import { HybridBlock } from '@prisma/client';
+import { HybridBlock, Identity } from '@prisma/client';
 import { HybridPromptInputProps, useHybridPromptInput } from './useHybridPromptInput';
 import { cn } from '@/utils';
 import React, {
@@ -1002,6 +1002,8 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		onUpscalePrompt,
 		isUpscalingPrompt,
 		onFocusChange,
+		identity,
+		onIdentityUpdate,
 	} = useHybridPromptInput(props);
 
 	const {
@@ -1202,6 +1204,166 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 
 	// Track which tab is active: 'main' (the normal Writing view) or 'profile'
 	const [activeTab, setActiveTab] = useState<'main' | 'profile'>('main');
+
+	// Track which profile box is expanded (null = none expanded)
+	const [expandedProfileBox, setExpandedProfileBox] = useState<string | null>(null);
+
+	type IdentityProfileFields = Identity & {
+		genre?: string | null;
+		area?: string | null;
+		bandName?: string | null;
+		bio?: string | null;
+	};
+	const identityProfile = identity as IdentityProfileFields | null | undefined;
+
+	// Profile field values - initialized from identity
+	const [profileFields, setProfileFields] = useState({
+		name: identityProfile?.name || '',
+		genre: identityProfile?.genre || '',
+		area: identityProfile?.area || '',
+		band: identityProfile?.bandName || '',
+		bio: identityProfile?.bio || '',
+		links: identityProfile?.website || '',
+	});
+
+	// Sync profileFields when identity changes
+	useEffect(() => {
+		if (identityProfile) {
+			setProfileFields({
+				name: identityProfile.name || '',
+				genre: identityProfile.genre || '',
+				area: identityProfile.area || '',
+				band: identityProfile.bandName || '',
+				bio: identityProfile.bio || '',
+				links: identityProfile.website || '',
+			});
+		}
+	}, [identityProfile]);
+
+	type ProfileField = 'name' | 'genre' | 'area' | 'band' | 'bio' | 'links';
+
+	const normalizeNullable = (value: string | null | undefined) => {
+		const trimmed = (value ?? '').trim();
+		return trimmed === '' ? null : trimmed;
+	};
+
+	const lastProfileSaveRef = useRef<{ key: string; at: number } | null>(null);
+	const shouldSkipDuplicateProfileSave = (key: string) => {
+		const now = Date.now();
+		const last = lastProfileSaveRef.current;
+		// Prevent double-save when an input unmounts (blur + explicit save)
+		if (last?.key === key && now - last.at < 800) return true;
+		lastProfileSaveRef.current = { key, at: now };
+		return false;
+	};
+
+	// Handle saving a profile field
+	const saveProfileField = (field: ProfileField) => {
+		if (!onIdentityUpdate || !identityProfile) return;
+
+		// Name is required on Identity. If empty, skip saving.
+		if (field === 'name') {
+			const next = profileFields.name.trim();
+			const prev = identityProfile.name.trim();
+			if (!next || next === prev) return;
+			if (shouldSkipDuplicateProfileSave(`name:${next}`)) return;
+			onIdentityUpdate({ name: next });
+			return;
+		}
+
+		const next = normalizeNullable(profileFields[field]);
+		const prev = (() => {
+			switch (field) {
+				case 'genre':
+					return normalizeNullable(identityProfile.genre);
+				case 'area':
+					return normalizeNullable(identityProfile.area);
+				case 'band':
+					return normalizeNullable(identityProfile.bandName);
+				case 'bio':
+					return normalizeNullable(identityProfile.bio);
+				case 'links':
+					return normalizeNullable(identityProfile.website);
+			}
+		})();
+
+		if (next === prev) return;
+		if (shouldSkipDuplicateProfileSave(`${field}:${next ?? ''}`)) return;
+
+		switch (field) {
+			case 'genre':
+				onIdentityUpdate({ genre: next });
+				return;
+			case 'area':
+				onIdentityUpdate({ area: next });
+				return;
+			case 'band':
+				onIdentityUpdate({ bandName: next });
+				return;
+			case 'bio':
+				onIdentityUpdate({ bio: next });
+				return;
+			case 'links':
+				onIdentityUpdate({ website: next });
+				return;
+		}
+	};
+
+	const PROFILE_FIELD_ORDER: ProfileField[] = ['name', 'genre', 'area', 'band', 'bio', 'links'];
+
+	const handleProfileFieldEnter = (field: ProfileField) => {
+		// Don't allow Enter to advance if Name is empty (Identity.name is required)
+		if (field === 'name' && profileFields.name.trim() === '') return;
+
+		saveProfileField(field);
+
+		const idx = PROFILE_FIELD_ORDER.indexOf(field);
+		const nextField = idx >= 0 ? PROFILE_FIELD_ORDER[idx + 1] : null;
+
+		setExpandedProfileBox(nextField ?? null);
+	};
+
+	const getProfileHeaderBg = (field: ProfileField) => {
+		if (expandedProfileBox === field) return '#E0E0E0';
+		return profileFields[field].trim() ? '#94DB96' : '#E0E0E0';
+	};
+
+	const getProfileHeaderText = (
+		field: ProfileField,
+		labelWhenEmpty: string,
+		labelWhenExpanded: string
+	) => {
+		if (expandedProfileBox === field) return labelWhenExpanded;
+		return profileFields[field].trim() || labelWhenEmpty;
+	};
+
+	// Handle saving a profile field on blur
+	const handleProfileFieldBlur = (field: ProfileField) => {
+		saveProfileField(field);
+	};
+
+	// Handle toggling a profile box - saves the current field if collapsing
+	const handleProfileBoxToggle = (box: ProfileField) => {
+		// If we're collapsing the currently expanded box, save its value first
+		if (expandedProfileBox === box) {
+			saveProfileField(box);
+			setExpandedProfileBox(null);
+		} else {
+			// If we're switching to a new box and there's a previously expanded one, save it first
+			if (expandedProfileBox) {
+				saveProfileField(expandedProfileBox as ProfileField);
+			}
+			setExpandedProfileBox(box);
+		}
+	};
+
+	// Save any expanded profile field when switching away from profile tab
+	useEffect(() => {
+		if (activeTab !== 'profile' && expandedProfileBox) {
+			saveProfileField(expandedProfileBox as ProfileField);
+			setExpandedProfileBox(null);
+		}
+	}, [activeTab]);
 
 	// Track focus state for the entire prompt input area
 	const focusTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -1708,40 +1870,200 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 									{activeTab === 'profile' && (
 										<div className="pt-[20px] max-[480px]:pt-[8px] pr-3 pb-3 pl-3 flex flex-col gap-[18px] items-center flex-1">
 											<div
-												className="w-[468px] h-[34px] flex items-center px-3 font-inter text-[14px] font-semibold rounded-[8px] border-[3px] border-black"
-												style={{ backgroundColor: '#E0E0E0' }}
+												className={cn(
+													"w-[468px] flex flex-col rounded-[8px] border-[3px] border-black cursor-pointer overflow-hidden",
+													expandedProfileBox === 'name' ? 'h-[68px]' : 'h-[34px]'
+												)}
+												onClick={() => handleProfileBoxToggle('name')}
 											>
-												Name
+												<div
+													className="h-[34px] flex items-center px-3 font-inter text-[14px] font-semibold truncate"
+													style={{ backgroundColor: getProfileHeaderBg('name') }}
+												>
+													{getProfileHeaderText('name', 'Name', 'Enter your Name')}
+												</div>
+												{expandedProfileBox === 'name' && (
+													<input
+														type="text"
+														className="h-[34px] bg-white px-3 font-inter text-[14px] outline-none border-0"
+														value={profileFields.name}
+														onChange={(e) => setProfileFields({ ...profileFields, name: e.target.value })}
+														onBlur={() => handleProfileFieldBlur('name')}
+														onKeyDown={(e) => {
+															if (e.key === 'Enter') {
+																e.preventDefault();
+																handleProfileFieldEnter('name');
+															}
+														}}
+														onClick={(e) => e.stopPropagation()}
+														placeholder=""
+														autoFocus
+													/>
+												)}
 											</div>
 											<div
-												className="w-[468px] h-[34px] flex items-center px-3 font-inter text-[14px] font-semibold rounded-[8px] border-[3px] border-black"
-												style={{ backgroundColor: '#E0E0E0' }}
+												className={cn(
+													"w-[468px] flex flex-col rounded-[8px] border-[3px] border-black cursor-pointer overflow-hidden",
+													expandedProfileBox === 'genre' ? 'h-[68px]' : 'h-[34px]'
+												)}
+												onClick={() => handleProfileBoxToggle('genre')}
 											>
-												Genre
+												<div
+													className="h-[34px] flex items-center px-3 font-inter text-[14px] font-semibold truncate"
+													style={{ backgroundColor: getProfileHeaderBg('genre') }}
+												>
+													{getProfileHeaderText('genre', 'Genre', 'Enter your Genre')}
+												</div>
+												{expandedProfileBox === 'genre' && (
+													<input
+														type="text"
+														className="h-[34px] bg-white px-3 font-inter text-[14px] outline-none border-0"
+														value={profileFields.genre}
+														onChange={(e) => setProfileFields({ ...profileFields, genre: e.target.value })}
+														onBlur={() => handleProfileFieldBlur('genre')}
+														onKeyDown={(e) => {
+															if (e.key === 'Enter') {
+																e.preventDefault();
+																handleProfileFieldEnter('genre');
+															}
+														}}
+														onClick={(e) => e.stopPropagation()}
+														placeholder=""
+														autoFocus
+													/>
+												)}
 											</div>
 											<div
-												className="w-[468px] h-[34px] flex items-center px-3 font-inter text-[14px] font-semibold rounded-[8px] border-[3px] border-black"
-												style={{ backgroundColor: '#E0E0E0' }}
+												className={cn(
+													"w-[468px] flex flex-col rounded-[8px] border-[3px] border-black cursor-pointer overflow-hidden",
+													expandedProfileBox === 'area' ? 'h-[68px]' : 'h-[34px]'
+												)}
+												onClick={() => handleProfileBoxToggle('area')}
 											>
-												Area
+												<div
+													className="h-[34px] flex items-center px-3 font-inter text-[14px] font-semibold truncate"
+													style={{ backgroundColor: getProfileHeaderBg('area') }}
+												>
+													{getProfileHeaderText('area', 'Area', 'Enter your Area')}
+												</div>
+												{expandedProfileBox === 'area' && (
+													<input
+														type="text"
+														className="h-[34px] bg-white px-3 font-inter text-[14px] outline-none border-0"
+														value={profileFields.area}
+														onChange={(e) => setProfileFields({ ...profileFields, area: e.target.value })}
+														onBlur={() => handleProfileFieldBlur('area')}
+														onKeyDown={(e) => {
+															if (e.key === 'Enter') {
+																e.preventDefault();
+																handleProfileFieldEnter('area');
+															}
+														}}
+														onClick={(e) => e.stopPropagation()}
+														placeholder=""
+														autoFocus
+													/>
+												)}
 											</div>
 											<div
-												className="w-[468px] h-[34px] flex items-center px-3 font-inter text-[14px] font-semibold rounded-[8px] border-[3px] border-black"
-												style={{ backgroundColor: '#E0E0E0' }}
+												className={cn(
+													"w-[468px] flex flex-col rounded-[8px] border-[3px] border-black cursor-pointer overflow-hidden",
+													expandedProfileBox === 'band' ? 'h-[68px]' : 'h-[34px]'
+												)}
+												onClick={() => handleProfileBoxToggle('band')}
 											>
-												Band/Artist Name
+												<div
+													className="h-[34px] flex items-center px-3 font-inter text-[14px] font-semibold truncate"
+													style={{ backgroundColor: getProfileHeaderBg('band') }}
+												>
+													{getProfileHeaderText(
+														'band',
+														'Band/Artist Name',
+														'Enter your Band/Artist Name'
+													)}
+												</div>
+												{expandedProfileBox === 'band' && (
+													<input
+														type="text"
+														className="h-[34px] bg-white px-3 font-inter text-[14px] outline-none border-0"
+														value={profileFields.band}
+														onChange={(e) => setProfileFields({ ...profileFields, band: e.target.value })}
+														onBlur={() => handleProfileFieldBlur('band')}
+														onKeyDown={(e) => {
+															if (e.key === 'Enter') {
+																e.preventDefault();
+																handleProfileFieldEnter('band');
+															}
+														}}
+														onClick={(e) => e.stopPropagation()}
+														placeholder=""
+														autoFocus
+													/>
+												)}
 											</div>
 											<div
-												className="w-[468px] h-[34px] flex items-center px-3 font-inter text-[14px] font-semibold rounded-[8px] border-[3px] border-black"
-												style={{ backgroundColor: '#E0E0E0' }}
+												className={cn(
+													"w-[468px] flex flex-col rounded-[8px] border-[3px] border-black cursor-pointer overflow-hidden",
+													expandedProfileBox === 'bio' ? 'h-[68px]' : 'h-[34px]'
+												)}
+												onClick={() => handleProfileBoxToggle('bio')}
 											>
-												Bio
+												<div
+													className="h-[34px] flex items-center px-3 font-inter text-[14px] font-semibold truncate"
+													style={{ backgroundColor: getProfileHeaderBg('bio') }}
+												>
+													{getProfileHeaderText('bio', 'Bio', 'Enter your Bio')}
+												</div>
+												{expandedProfileBox === 'bio' && (
+													<input
+														type="text"
+														className="h-[34px] bg-white px-3 font-inter text-[14px] outline-none border-0"
+														value={profileFields.bio}
+														onChange={(e) => setProfileFields({ ...profileFields, bio: e.target.value })}
+														onBlur={() => handleProfileFieldBlur('bio')}
+														onKeyDown={(e) => {
+															if (e.key === 'Enter') {
+																e.preventDefault();
+																handleProfileFieldEnter('bio');
+															}
+														}}
+														onClick={(e) => e.stopPropagation()}
+														placeholder=""
+														autoFocus
+													/>
+												)}
 											</div>
 											<div
-												className="w-[468px] h-[34px] flex items-center px-3 font-inter text-[14px] font-semibold rounded-[8px] border-[3px] border-black"
-												style={{ backgroundColor: '#E0E0E0' }}
+												className={cn(
+													"w-[468px] flex flex-col rounded-[8px] border-[3px] border-black cursor-pointer overflow-hidden",
+													expandedProfileBox === 'links' ? 'h-[68px]' : 'h-[34px]'
+												)}
+												onClick={() => handleProfileBoxToggle('links')}
 											>
-												Links
+												<div
+													className="h-[34px] flex items-center px-3 font-inter text-[14px] font-semibold truncate"
+													style={{ backgroundColor: getProfileHeaderBg('links') }}
+												>
+													{getProfileHeaderText('links', 'Links', 'Enter your Links')}
+												</div>
+												{expandedProfileBox === 'links' && (
+													<input
+														type="text"
+														className="h-[34px] bg-white px-3 font-inter text-[14px] outline-none border-0"
+														value={profileFields.links}
+														onChange={(e) => setProfileFields({ ...profileFields, links: e.target.value })}
+														onBlur={() => handleProfileFieldBlur('links')}
+														onKeyDown={(e) => {
+															if (e.key === 'Enter') {
+																e.preventDefault();
+																handleProfileFieldEnter('links');
+															}
+														}}
+														onClick={(e) => e.stopPropagation()}
+														placeholder=""
+														autoFocus
+													/>
+												)}
 											</div>
 										</div>
 									)}

@@ -23,6 +23,7 @@ import { DraftedEmails } from './EmailGeneration/DraftedEmails/DraftedEmails';
 import { EmailWithRelations, StripeSubscriptionStatus } from '@/types';
 import { useSendMailgunMessage } from '@/hooks/queryHooks/useMailgun';
 import { useEditUser } from '@/hooks/queryHooks/useUsers';
+import { useEditIdentity } from '@/hooks/queryHooks/useIdentities';
 import { useMe } from '@/hooks/useMe';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -146,6 +147,23 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	});
 	const { mutateAsync: updateEmail } = useEditEmail({ suppressToasts: true });
 	const { mutateAsync: editUser } = useEditUser({ suppressToasts: true });
+	const { mutateAsync: editIdentity } = useEditIdentity({ suppressToasts: true });
+
+	// Handle identity field updates from the profile tab
+	const handleIdentityUpdate = useCallback(
+		async (data: Parameters<typeof editIdentity>[0]['data']) => {
+			if (!campaign?.identity?.id) return;
+			try {
+				await editIdentity({ id: campaign.identity.id, data });
+				// Invalidate campaign query to refresh identity data
+				queryClient.invalidateQueries({ queryKey: ['campaigns'] });
+			} catch (error) {
+				toast.error('Failed to save profile changes.');
+				console.error('Failed to update identity:', error);
+			}
+		},
+		[campaign?.identity?.id, editIdentity, queryClient]
+	);
 
 	const router = useRouter();
 	const isMobile = useIsMobile();
@@ -2856,6 +2874,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													isUpscalingPrompt={isUpscalingPrompt}
 													onFocusChange={handlePromptInputFocusChange}
 													hideDraftButton={true}
+													identity={campaign?.identity}
+													onIdentityUpdate={handleIdentityUpdate}
 												/>
 											</div>
 										</div>
@@ -2981,6 +3001,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											onFocusChange={handlePromptInputFocusChange}
 											isNarrowestDesktop={isNarrowestDesktop}
 											hideDraftButton={isNarrowestDesktop}
+											identity={campaign?.identity}
+											onIdentityUpdate={handleIdentityUpdate}
 										/>
 										{/* Draft button with arrows at narrowest breakpoint */}
 										{isNarrowestDesktop && !isPendingGeneration && (
