@@ -35,7 +35,6 @@ import React, {
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { TestPreviewPanel } from '../TestPreviewPanel/TestPreviewPanel';
 import TinyPlusIcon from '@/components/atoms/_svg/TinyPlusIcon';
-import UpscaleIcon from '@/components/atoms/_svg/UpscaleIcon';
 import { DraggableHighlight } from '../DragAndDrop/DraggableHighlight';
 import DraggableBox from '@/app/murmur/campaign/[campaignId]/DraftingSection/EmailGeneration/DraggableBox';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
@@ -59,8 +58,14 @@ interface SortableAIBlockProps {
 	showTestPreview?: boolean;
 	testMessage?: string | null;
 	onGetSuggestions?: (prompt: string) => Promise<void>;
-	onUpscalePrompt?: () => Promise<void>;
-	isUpscalingPrompt?: boolean;
+	profileFields?: {
+		name: string;
+		genre: string;
+		area: string;
+		band: string;
+		bio: string;
+		links: string;
+	} | null;
 }
 
 const SortableAIBlock = ({
@@ -73,8 +78,7 @@ const SortableAIBlock = ({
 	trackFocusedField,
 	showTestPreview,
 	onGetSuggestions,
-	onUpscalePrompt,
-	isUpscalingPrompt,
+	profileFields,
 }: SortableAIBlockProps) => {
 	const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
 		useSortable({ id });
@@ -130,6 +134,130 @@ const SortableAIBlock = ({
 
 	// Mobile detection for conditional placeholder shortening
 	const isMobile = useIsMobile();
+
+	type ProfileFields = {
+		name: string;
+		genre: string;
+		area: string;
+		band: string;
+		bio: string;
+		links: string;
+	};
+
+	type ProfileChipItem = {
+		key: string;
+		text: string;
+		bgClass: string;
+		isEmpty: boolean;
+	};
+
+	const profileChipItems = useMemo<ProfileChipItem[]>(() => {
+		if (!isFullAutomatedBlock) return [];
+		const pf: ProfileFields = {
+			name: profileFields?.name ?? '',
+			genre: profileFields?.genre ?? '',
+			area: profileFields?.area ?? '',
+			band: profileFields?.band ?? '',
+			bio: profileFields?.bio ?? '',
+			links: profileFields?.links ?? '',
+		};
+
+		const truncate = (value: string, max: number) => {
+			const v = value.trim();
+			if (v.length <= max) return v;
+			return v.slice(0, Math.max(0, max - 1)).trimEnd() + '…';
+		};
+
+		const chips: ProfileChipItem[] = [];
+
+		const name = pf.name.trim();
+		const genre = pf.genre.trim();
+		const area = pf.area.trim();
+		const band = pf.band.trim();
+		const bio = pf.bio.trim();
+		const linksRaw = pf.links.trim();
+
+		chips.push({
+			key: 'profile-name',
+			text: name ? `Nme. ${truncate(name, 28)}` : 'Nme.',
+			bgClass: 'bg-[#DADAFC]',
+			isEmpty: !name,
+		});
+		chips.push({
+			key: 'profile-genre',
+			text: genre ? `Gnre. ${truncate(genre, 22)}` : 'Gnre.',
+			bgClass: 'bg-[#DADAFC]',
+			isEmpty: !genre,
+		});
+		chips.push({
+			key: 'profile-area',
+			text: area ? `Area. ${truncate(area, 30)}` : 'Area.',
+			bgClass: 'bg-[#DADAFC]',
+			isEmpty: !area,
+		});
+		chips.push({
+			key: 'profile-band',
+			text: band ? `Artst Nme. ${truncate(band, 30)}` : 'Artst Nme.',
+			bgClass: 'bg-[#CFF5F5]',
+			isEmpty: !band,
+		});
+		chips.push({
+			key: 'profile-bio',
+			text: bio ? `Bio. “${truncate(bio, 48)}”` : 'Bio.',
+			bgClass: 'bg-[#CFF5F5]',
+			isEmpty: !bio,
+		});
+
+		const links = linksRaw
+			.split(/\r?\n|,/g)
+			.map((s) => s.trim())
+			.filter(Boolean);
+
+		if (links.length === 0) {
+			chips.push({
+				key: 'profile-link-0',
+				text: 'Link.',
+				bgClass: 'bg-[#C7F2C9]',
+				isEmpty: true,
+			});
+		} else {
+			for (let i = 0; i < links.length; i++) {
+				const link = links[i];
+				chips.push({
+					key: `profile-link-${i}`,
+					text: `Link. ${truncate(link, 42)}`,
+					bgClass: 'bg-[#C7F2C9]',
+					isEmpty: false,
+				});
+			}
+		}
+
+		return chips;
+	}, [isFullAutomatedBlock, profileFields]);
+
+	const profileChipsRef = useRef<HTMLDivElement | null>(null);
+	const [profileChipsHeight, setProfileChipsHeight] = useState(0);
+
+	useLayoutEffect(() => {
+		if (!isFullAutomatedBlock) {
+			setProfileChipsHeight(0);
+			return;
+		}
+
+		const el = profileChipsRef.current;
+		if (!el) return;
+
+		const update = () => {
+			setProfileChipsHeight(el.offsetHeight || 0);
+		};
+
+		update();
+
+		if (typeof ResizeObserver === 'undefined') return;
+		const ro = new ResizeObserver(() => update());
+		ro.observe(el);
+		return () => ro.disconnect();
+	}, [isFullAutomatedBlock, profileChipItems]);
 
 	// Get the border color for the block
 	const getBorderColor = () => {
@@ -773,8 +901,34 @@ const SortableAIBlock = ({
 										return (
 											<>
 												<div className={isFullAutomatedBlock ? 'relative' : ''}>
+													{isFullAutomatedBlock && (
+														<div
+															ref={profileChipsRef}
+															className="absolute left-0 right-0 top-0 z-20 pointer-events-none flex flex-wrap gap-1 p-1 pr-10"
+														>
+															{profileChipItems.map((chip) => (
+																<span
+																	key={chip.key}
+																	className={cn(
+																		'inline-flex items-center rounded-[6px] px-2 py-[1px] font-inter font-normal text-[12px] leading-[14px] max-[480px]:text-[10px] max-[480px]:leading-[12px] text-black max-w-full whitespace-nowrap',
+																		chip.bgClass,
+																		chip.isEmpty && 'opacity-50'
+																	)}
+																>
+																	{chip.text}
+																</span>
+															))}
+														</div>
+													)}
 													{showCustomPlaceholder && (
-														<div className="absolute inset-0 pointer-events-none py-2 pr-10 text-[#505050] text-base md:text-sm max-[480px]:text-[10px] z-10">
+														<div
+															className="absolute inset-0 pointer-events-none py-2 pr-10 text-[#505050] text-base md:text-sm max-[480px]:text-[10px] z-10"
+															style={
+																profileChipsHeight > 0
+																	? { paddingTop: profileChipsHeight + 6 }
+																	: undefined
+															}
+														>
 															<p>Type anything you want to include</p>
 														</div>
 													)}
@@ -797,6 +951,11 @@ const SortableAIBlock = ({
 																	'bg-white',
 																	'min-h-[115px] w-full pl-0 pr-4 resize-none overflow-hidden [field-sizing:fixed]'
 																)}
+																style={
+																	profileChipsHeight > 0
+																		? { paddingTop: profileChipsHeight + 6 }
+																		: undefined
+																}
 																{...fieldProps}
 																onInput={(e: React.FormEvent<HTMLTextAreaElement>) => {
 																	const target = e.currentTarget;
@@ -867,34 +1026,6 @@ const SortableAIBlock = ({
 														/>
 													)}
 												</div>
-												{/* Gray bottom section for Full Auto block */}
-												{isFullAutomatedBlock && (
-													<div className="w-[calc(100%+32px)] -mx-4 h-[35px] bg-[#F5F5F5] -mb-4 flex items-center">
-														<button
-															type="button"
-															onClick={() => {
-																const currentValue = form.getValues(`hybridBlockPrompts.${fieldIndex}.value`) || '';
-																onGetSuggestions?.(currentValue);
-															}}
-															className="w-[115px] h-[20px] ml-[15px] bg-[#D7F0FF] border-2 border-black rounded-[5px] text-[11px] font-inter font-semibold cursor-pointer"
-														>
-															Get Suggestions
-														</button>
-														<button
-															type="button"
-															onClick={() => {
-																if (!isUpscalingPrompt) {
-																	onUpscalePrompt?.();
-																}
-															}}
-															disabled={isUpscalingPrompt}
-															className="w-[73px] h-[20px] ml-[6px] bg-[#D7F0FF] border-2 border-black rounded-[5px] text-[11px] font-inter font-semibold flex items-center justify-center gap-[2px] cursor-pointer"
-														>
-															<span>Upscale</span>
-															<UpscaleIcon width="12" height="12" />
-														</button>
-													</div>
-												)}
 											</>
 										);
 									})()
@@ -999,8 +1130,6 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		contact,
 		onGoToDrafting,
 		onGetSuggestions,
-		onUpscalePrompt,
-		isUpscalingPrompt,
 		onFocusChange,
 		identity,
 		onIdentityUpdate,
@@ -2272,8 +2401,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																		showTestPreview={showTestPreview}
 																		testMessage={testMessage}
 																		onGetSuggestions={onGetSuggestions}
-																		onUpscalePrompt={onUpscalePrompt}
-																		isUpscalingPrompt={isUpscalingPrompt}
+																		profileFields={profileFields}
 																	/>
 																</div>
 																{/* Plus button under hybrid blocks */}
