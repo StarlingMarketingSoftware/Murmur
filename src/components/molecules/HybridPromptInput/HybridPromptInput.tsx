@@ -1707,7 +1707,12 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 									{/* Profile Tab Content */}
 									{activeTab === 'profile' && (
 										<div className="pt-[20px] max-[480px]:pt-[8px] pr-3 pb-3 pl-3 flex flex-col gap-4 items-center flex-1">
-											{/* Empty Profile tab - ready for your design */}
+											<div
+												className="w-[468px] h-[34px] flex items-center px-3 font-inter text-[14px] font-semibold rounded-[8px] border-[3px] border-black"
+												style={{ backgroundColor: '#E0E0E0' }}
+											>
+												Name
+											</div>
 										</div>
 									)}
 									{/* Main Content area */}
