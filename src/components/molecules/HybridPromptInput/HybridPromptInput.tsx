@@ -235,30 +235,6 @@ const SortableAIBlock = ({
 		return chips;
 	}, [isFullAutomatedBlock, profileFields]);
 
-	const profileChipsRef = useRef<HTMLDivElement | null>(null);
-	const [profileChipsHeight, setProfileChipsHeight] = useState(0);
-
-	useLayoutEffect(() => {
-		if (!isFullAutomatedBlock) {
-			setProfileChipsHeight(0);
-			return;
-		}
-
-		const el = profileChipsRef.current;
-		if (!el) return;
-
-		const update = () => {
-			setProfileChipsHeight(el.offsetHeight || 0);
-		};
-
-		update();
-
-		if (typeof ResizeObserver === 'undefined') return;
-		const ro = new ResizeObserver(() => update());
-		ro.observe(el);
-		return () => ro.disconnect();
-	}, [isFullAutomatedBlock, profileChipItems]);
-
 	// Get the border color for the block
 	const getBorderColor = () => {
 		if (isIntroductionBlock) return '#6673FF';
@@ -888,147 +864,23 @@ const SortableAIBlock = ({
 								{isFullAutomatedBlock && (
 									<div className="w-[calc(100%+32px)] -mx-4 h-[1px] bg-[#51A2E4] mb-2" />
 								)}
-								{isTextBlock || isFullAutomatedBlock ? (
-									(() => {
-										const fieldProps = form.register(
-											`hybridBlockPrompts.${fieldIndex}.value`
-										);
-										const fieldValue = form.watch(
-											`hybridBlockPrompts.${fieldIndex}.value`
-										);
-										const showCustomPlaceholder = isFullAutomatedBlock && !fieldValue;
-
-										return (
-											<>
-												<div className={isFullAutomatedBlock ? 'relative' : ''}>
-													{isFullAutomatedBlock && (
-														<div
-															ref={profileChipsRef}
-															className="absolute left-0 right-0 top-0 z-20 pointer-events-none flex flex-wrap gap-1 p-1 pr-10"
-														>
-															{profileChipItems.map((chip) => (
-																<span
-																	key={chip.key}
-																	className={cn(
-																		'inline-flex items-center rounded-[6px] px-2 py-[1px] font-inter font-normal text-[12px] leading-[14px] max-[480px]:text-[10px] max-[480px]:leading-[12px] text-black max-w-full whitespace-nowrap',
-																		chip.bgClass,
-																		chip.isEmpty && 'opacity-50'
-																	)}
-																>
-																	{chip.text}
-																</span>
-															))}
-														</div>
+								{isFullAutomatedBlock ? (
+									<div className="min-h-[60px] w-full bg-white p-1 pr-4">
+										<div className="flex flex-wrap gap-1">
+											{profileChipItems.map((chip) => (
+												<span
+													key={chip.key}
+													className={cn(
+														'inline-flex items-center rounded-[6px] px-2 py-[1px] font-inter font-normal text-[12px] leading-[14px] max-[480px]:text-[10px] max-[480px]:leading-[12px] text-black max-w-full whitespace-nowrap',
+														chip.bgClass,
+														chip.isEmpty && 'opacity-50'
 													)}
-													{showCustomPlaceholder && (
-														<div
-															className="absolute inset-0 pointer-events-none py-2 pr-10 text-[#505050] text-base md:text-sm max-[480px]:text-[10px] z-10"
-															style={
-																profileChipsHeight > 0
-																	? { paddingTop: profileChipsHeight + 6 }
-																	: undefined
-															}
-														>
-															<p>Type anything you want to include</p>
-														</div>
-													)}
-													{isFullAutomatedBlock ? (
-														<CustomScrollbar
-															style={{ height: '115px' }}
-															thumbWidth={2}
-															thumbColor="#000000"
-															trackColor="transparent"
-															offsetRight={2}
-															className="w-full"
-															contentClassName="hide-native-scrollbar"
-															lockHorizontalScroll
-														>
-															<Textarea
-																placeholder=""
-																onClick={(e) => e.stopPropagation()}
-																className={cn(
-																	'border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 max-w-full min-w-0 max-[480px]:placeholder:text-[10px]',
-																	'bg-white',
-																	'min-h-[115px] w-full pl-0 pr-4 resize-none overflow-hidden [field-sizing:fixed]'
-																)}
-																style={
-																	profileChipsHeight > 0
-																		? { paddingTop: profileChipsHeight + 6 }
-																		: undefined
-																}
-																{...fieldProps}
-																onInput={(e: React.FormEvent<HTMLTextAreaElement>) => {
-																	const target = e.currentTarget;
-																	target.style.height = 'auto';
-																	target.style.height = target.scrollHeight + 'px';
-																}}
-																onFocus={(e) => {
-																	trackFocusedField?.(
-																		`hybridBlockPrompts.${fieldIndex}.value`,
-																		e.target as HTMLTextAreaElement
-																	);
-																}}
-																ref={(el) => {
-																	fieldProps.ref(el);
-																	if (el) {
-																		el.style.height = 'auto';
-																		el.style.height =
-																			Math.max(115, el.scrollHeight) + 'px';
-																	}
-																}}
-															/>
-														</CustomScrollbar>
-													) : (
-														<Textarea
-															placeholder={
-																'placeholder' in block
-																	? (block as { placeholder?: string }).placeholder || ''
-																	: ''
-															}
-															onClick={(e) => e.stopPropagation()}
-															className={cn(
-																'border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 max-w-full min-w-0 max-[480px]:placeholder:text-[10px]',
-																isIntroductionBlock
-																	? '!bg-[#DADAFC] [&]:!bg-[#DADAFC]'
-																	: 'bg-white',
-																shouldShowRedStyling
-																	? 'placeholder:text-[#A20000]'
-																	: '',
-																(isIntroductionBlock ||
-																	isResearchBlock ||
-																	isActionBlock) &&
-																	'font-inter placeholder:italic placeholder:text-[#5d5d5d]'
-															)}
-															style={
-																isIntroductionBlock
-																	? { backgroundColor: '#DADAFC' }
-																	: undefined
-															}
-															{...fieldProps}
-															onFocus={(e) => {
-																trackFocusedField?.(
-																	`hybridBlockPrompts.${fieldIndex}.value`,
-																	e.target as HTMLTextAreaElement
-																);
-															}}
-															onBlur={(e) => {
-																if (isTextBlock) {
-																	setHasBeenTouched(true);
-																}
-																fieldProps.onBlur(e);
-															}}
-															onChange={(e) => {
-																if (isTextBlock && e.target.value) {
-																	setHasBeenTouched(true);
-																}
-																fieldProps.onChange(e);
-															}}
-														/>
-													)}
-												</div>
-											</>
-										);
-									})()
+												>
+													{chip.text}
+												</span>
+											))}
+										</div>
+									</div>
 								) : (
 									// For other blocks, show input always but disabled until Advanced is clicked
 									<>
@@ -1336,6 +1188,34 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 
 	// Track if user has ever left the profile tab (to show red for incomplete fields after returning)
 	const [hasLeftProfileTab, setHasLeftProfileTab] = useState(false);
+
+	// Full Auto: custom instructions controls the Full Auto prompt value
+	const [isCustomInstructionsOpen, setIsCustomInstructionsOpen] = useState(false);
+	const customInstructionsRef = useRef<HTMLTextAreaElement | null>(null);
+	const customInstructionsContainerRef = useRef<HTMLDivElement | null>(null);
+	useEffect(() => {
+		if (!isCustomInstructionsOpen) return;
+		requestAnimationFrame(() => customInstructionsRef.current?.focus());
+	}, [isCustomInstructionsOpen]);
+	useEffect(() => {
+		if (selectedModeKey !== 'full') setIsCustomInstructionsOpen(false);
+	}, [selectedModeKey]);
+	useEffect(() => {
+		if (!isCustomInstructionsOpen) return;
+
+		const handlePointerDown = (event: PointerEvent) => {
+			const target = event.target as Node | null;
+			const container = customInstructionsContainerRef.current;
+			if (!target || !container) return;
+			if (container.contains(target)) return;
+			setIsCustomInstructionsOpen(false);
+		};
+
+		document.addEventListener('pointerdown', handlePointerDown);
+		return () => {
+			document.removeEventListener('pointerdown', handlePointerDown);
+		};
+	}, [isCustomInstructionsOpen]);
 
 	// Track which profile box is expanded (null = none expanded)
 	const [expandedProfileBox, setExpandedProfileBox] = useState<string | null>(null);
@@ -2381,6 +2261,8 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 															field.type === HybridBlock.introduction ||
 															field.type === HybridBlock.research ||
 															field.type === HybridBlock.action;
+														const isFullAutomatedField =
+															field.type === HybridBlock.full_automated;
 														const hasImmediateTextBlock =
 															fields[index + 1]?.type === HybridBlock.text;
 
@@ -2404,6 +2286,97 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																		profileFields={profileFields}
 																	/>
 																</div>
+																{/* Custom Instructions row (Full Auto only) */}
+																{isFullAutomatedField &&
+																	(() => {
+																		const fieldProps = form.register(
+																			`hybridBlockPrompts.${index}.value`
+																		);
+
+																		return (
+																			<div
+																				className={cn(
+																					showTestPreview
+																						? 'w-[426px] max-[480px]:w-[89.33vw]'
+																						: 'w-[89.33vw] max-w-[475px]',
+																					'-mt-2'
+																				)}
+																			>
+																				<div
+																					ref={customInstructionsContainerRef}
+																					className="rounded-[10px] border-2 border-[#7D7D7D] overflow-hidden"
+																				>
+																					<button
+																						type="button"
+																						onClick={() => {
+																							if (!isCustomInstructionsOpen) {
+																								setIsCustomInstructionsOpen(true);
+																								return;
+																							}
+																							customInstructionsRef.current?.focus();
+																						}}
+																						className="w-full h-[27px] bg-transparent flex items-center justify-start gap-2 px-4 text-[#7D7D7D] font-inter font-normal text-[14px] leading-none max-[480px]:text-[12px]"
+																						aria-label="Custom Instructions"
+																						aria-expanded={isCustomInstructionsOpen}
+																						aria-controls={`custom-instructions-${field.id}`}
+																					>
+																						<span aria-hidden="true">+</span>
+																						<span>Custom Instructions</span>
+																					</button>
+																					<div
+																						id={`custom-instructions-${field.id}`}
+																						className={cn(
+																							isCustomInstructionsOpen ? '' : 'hidden',
+																							'border-t-2 border-[#7D7D7D] bg-white'
+																						)}
+																					>
+																						<CustomScrollbar
+																							style={{ height: '115px' }}
+																							thumbWidth={2}
+																							thumbColor="#000000"
+																							trackColor="transparent"
+																							offsetRight={2}
+																							className="w-full"
+																							contentClassName="hide-native-scrollbar"
+																							lockHorizontalScroll
+																						>
+																							<Textarea
+																								placeholder="Type anything you want to include"
+																								className={cn(
+																									'border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 max-w-full min-w-0',
+																									'bg-white',
+																									'min-h-[115px] w-full px-4 py-2 resize-none overflow-hidden [field-sizing:fixed] max-[480px]:text-[10px]'
+																								)}
+																								{...fieldProps}
+																								onInput={(e: React.FormEvent<HTMLTextAreaElement>) => {
+																									const target = e.currentTarget;
+																									target.style.height = 'auto';
+																									target.style.height =
+																										target.scrollHeight + 'px';
+																								}}
+																								onFocus={(e) => {
+																									trackFocusedField?.(
+																										`hybridBlockPrompts.${index}.value`,
+																										e.target as HTMLTextAreaElement
+																									);
+																								}}
+																								ref={(el) => {
+																									fieldProps.ref(el);
+																									customInstructionsRef.current = el;
+																									if (el) {
+																										el.style.height = 'auto';
+																										el.style.height =
+																											Math.max(115, el.scrollHeight) +
+																											'px';
+																									}
+																								}}
+																							/>
+																						</CustomScrollbar>
+																					</div>
+																				</div>
+																			</div>
+																		);
+																	})()}
 																{/* Plus button under hybrid blocks */}
 																{isHybridBlock && !hasImmediateTextBlock && (
 																	<div
