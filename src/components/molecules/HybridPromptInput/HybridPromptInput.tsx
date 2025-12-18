@@ -1207,6 +1207,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 
 	// Track which profile box is expanded (null = none expanded)
 	const [expandedProfileBox, setExpandedProfileBox] = useState<string | null>(null);
+	const expandedProfileBoxRef = useRef<HTMLDivElement>(null);
 
 	type IdentityProfileFields = Identity & {
 		genre?: string | null;
@@ -1308,6 +1309,28 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 				return;
 		}
 	};
+
+	// Close the expanded profile field when clicking away
+	const saveProfileFieldRef = useRef(saveProfileField);
+	saveProfileFieldRef.current = saveProfileField;
+	useEffect(() => {
+		if (activeTab !== 'profile' || !expandedProfileBox) return;
+
+		const handlePointerDown = (event: PointerEvent) => {
+			const target = event.target as Node | null;
+			const container = expandedProfileBoxRef.current;
+			if (!target || !container) return;
+			if (container.contains(target)) return;
+
+			saveProfileFieldRef.current(expandedProfileBox as ProfileField);
+			setExpandedProfileBox(null);
+		};
+
+		document.addEventListener('pointerdown', handlePointerDown);
+		return () => {
+			document.removeEventListener('pointerdown', handlePointerDown);
+		};
+	}, [activeTab, expandedProfileBox]);
 
 	const PROFILE_FIELD_ORDER: ProfileField[] = ['name', 'genre', 'area', 'band', 'bio', 'links'];
 
@@ -1870,6 +1893,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 									{activeTab === 'profile' && (
 										<div className="pt-[20px] max-[480px]:pt-[8px] pr-3 pb-3 pl-3 flex flex-col gap-[18px] items-center flex-1">
 											<div
+												ref={expandedProfileBox === 'name' ? expandedProfileBoxRef : undefined}
 												className={cn(
 													"w-[468px] flex flex-col rounded-[8px] border-[3px] border-black cursor-pointer overflow-hidden",
 													expandedProfileBox === 'name' ? 'h-[68px]' : 'h-[34px]'
@@ -1902,6 +1926,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 												)}
 											</div>
 											<div
+												ref={expandedProfileBox === 'genre' ? expandedProfileBoxRef : undefined}
 												className={cn(
 													"w-[468px] flex flex-col rounded-[8px] border-[3px] border-black cursor-pointer overflow-hidden",
 													expandedProfileBox === 'genre' ? 'h-[68px]' : 'h-[34px]'
@@ -1934,6 +1959,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 												)}
 											</div>
 											<div
+												ref={expandedProfileBox === 'area' ? expandedProfileBoxRef : undefined}
 												className={cn(
 													"w-[468px] flex flex-col rounded-[8px] border-[3px] border-black cursor-pointer overflow-hidden",
 													expandedProfileBox === 'area' ? 'h-[68px]' : 'h-[34px]'
@@ -1966,6 +1992,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 												)}
 											</div>
 											<div
+												ref={expandedProfileBox === 'band' ? expandedProfileBoxRef : undefined}
 												className={cn(
 													"w-[468px] flex flex-col rounded-[8px] border-[3px] border-black cursor-pointer overflow-hidden",
 													expandedProfileBox === 'band' ? 'h-[68px]' : 'h-[34px]'
@@ -2002,6 +2029,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 												)}
 											</div>
 											<div
+												ref={expandedProfileBox === 'bio' ? expandedProfileBoxRef : undefined}
 												className={cn(
 													"w-[468px] flex flex-col rounded-[8px] border-[3px] border-black cursor-pointer overflow-hidden",
 													expandedProfileBox === 'bio' ? 'h-[68px]' : 'h-[34px]'
@@ -2034,6 +2062,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 												)}
 											</div>
 											<div
+												ref={expandedProfileBox === 'links' ? expandedProfileBoxRef : undefined}
 												className={cn(
 													"w-[468px] flex flex-col rounded-[8px] border-[3px] border-black cursor-pointer overflow-hidden",
 													expandedProfileBox === 'links' ? 'h-[68px]' : 'h-[34px]'
