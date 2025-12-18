@@ -23,6 +23,7 @@ import { DraftedEmails } from './EmailGeneration/DraftedEmails/DraftedEmails';
 import { EmailWithRelations, StripeSubscriptionStatus } from '@/types';
 import { useSendMailgunMessage } from '@/hooks/queryHooks/useMailgun';
 import { useEditUser } from '@/hooks/queryHooks/useUsers';
+import { useEditIdentity } from '@/hooks/queryHooks/useIdentities';
 import { useMe } from '@/hooks/useMe';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -64,6 +65,13 @@ import BottomArrowIcon from '@/components/atoms/_svg/BottomArrowIcon';
 import BottomFolderIcon from '@/components/atoms/_svg/BottomFolderIcon';
 import LeftArrow from '@/components/atoms/_svg/LeftArrow';
 import RightArrow from '@/components/atoms/_svg/RightArrow';
+
+type IdentityProfileFields = Identity & {
+	genre?: string | null;
+	area?: string | null;
+	bandName?: string | null;
+	bio?: string | null;
+};
 
 const DEFAULT_STATE_SUGGESTIONS = [
 	{
@@ -146,6 +154,23 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	});
 	const { mutateAsync: updateEmail } = useEditEmail({ suppressToasts: true });
 	const { mutateAsync: editUser } = useEditUser({ suppressToasts: true });
+	const { mutateAsync: editIdentity } = useEditIdentity({ suppressToasts: true });
+
+	// Handle identity field updates from the profile tab
+	const handleIdentityUpdate = useCallback(
+		async (data: Parameters<typeof editIdentity>[0]['data']) => {
+			if (!campaign?.identity?.id) return;
+			try {
+				await editIdentity({ id: campaign.identity.id, data });
+				// Invalidate campaign query to refresh identity data
+				queryClient.invalidateQueries({ queryKey: ['campaigns'] });
+			} catch (error) {
+				toast.error('Failed to save profile changes.');
+				console.error('Failed to update identity:', error);
+			}
+		},
+		[campaign?.identity?.id, editIdentity, queryClient]
+	);
 
 	const router = useRouter();
 	const isMobile = useIsMobile();
@@ -776,10 +801,20 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 						contact.firstName || ''
 					).replace('{company}', contact.company || '');
 
-					const userPrompt = `Sender information\n: ${stringifyJsonSubset<Identity>(
-						campaign.identity,
-						['name', 'website']
-					)}\n\nRecipient information: ${stringifyJsonSubset<Contact>(contact as Contact, [
+					const identityProfile = campaign.identity as IdentityProfileFields;
+					const senderProfile = {
+						name: identityProfile.name,
+						bandName: identityProfile.bandName ?? undefined,
+						genre: identityProfile.genre ?? undefined,
+						area: identityProfile.area ?? undefined,
+						bio: identityProfile.bio ?? undefined,
+						website: identityProfile.website ?? undefined,
+					};
+
+					const userPrompt = `Sender information (user profile):\n${stringifyJsonSubset(
+						senderProfile,
+						['name', 'bandName', 'genre', 'area', 'bio', 'website']
+					)}\n\nRecipient information:\n${stringifyJsonSubset<Contact>(contact as Contact, [
 						'lastName',
 						'firstName',
 						'email',
@@ -791,7 +826,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 						'website',
 						'phone',
 						'metadata',
-					])}\n\nUser Goal: ${fullAiPrompt}`;
+					])}\n\nUser Goal:\n${fullAiPrompt}`;
 
 					// Pick a random model for regeneration
 					const selectedModel = OPENROUTER_DRAFTING_MODELS[Math.floor(Math.random() * OPENROUTER_DRAFTING_MODELS.length)];
@@ -831,8 +866,22 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 						'metadata',
 					]);
 
-					const stringifiedSender = stringifyJsonSubset<Identity>(campaign.identity, [
+					const identityProfile = campaign.identity as IdentityProfileFields;
+					const senderProfile = {
+						name: identityProfile.name,
+						bandName: identityProfile.bandName ?? undefined,
+						genre: identityProfile.genre ?? undefined,
+						area: identityProfile.area ?? undefined,
+						bio: identityProfile.bio ?? undefined,
+						website: identityProfile.website ?? undefined,
+					};
+
+					const stringifiedSender = stringifyJsonSubset(senderProfile, [
 						'name',
+						'bandName',
+						'genre',
+						'area',
+						'bio',
 						'website',
 					]);
 
@@ -2856,6 +2905,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													isUpscalingPrompt={isUpscalingPrompt}
 													onFocusChange={handlePromptInputFocusChange}
 													hideDraftButton={true}
+													identity={campaign?.identity}
+													onIdentityUpdate={handleIdentityUpdate}
 												/>
 											</div>
 										</div>
@@ -2981,6 +3032,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											onFocusChange={handlePromptInputFocusChange}
 											isNarrowestDesktop={isNarrowestDesktop}
 											hideDraftButton={isNarrowestDesktop}
+											identity={campaign?.identity}
+											onIdentityUpdate={handleIdentityUpdate}
 										/>
 										{/* Draft button with arrows at narrowest breakpoint */}
 										{isNarrowestDesktop && !isPendingGeneration && (

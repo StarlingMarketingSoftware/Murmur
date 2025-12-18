@@ -15,7 +15,11 @@ import { ApiRouteParams } from '@/types';
 const updateIdentitySchema = z.object({
 	name: z.string().min(1).optional(),
 	email: z.string().email().optional(),
-	website: z.string().optional(),
+	website: z.string().nullable().optional(),
+	genre: z.string().nullable().optional(),
+	area: z.string().nullable().optional(),
+	bandName: z.string().nullable().optional(),
+	bio: z.string().nullable().optional(),
 });
 
 export type PatchIdentityData = z.infer<typeof updateIdentitySchema>;
@@ -58,6 +62,7 @@ export async function PATCH(req: NextRequest, { params }: { params: ApiRoutePara
 		const updatedIdentity = await prisma.identity.update({
 			where: {
 				id: Number(id),
+				userId,
 			},
 			data: validatedData.data,
 		});
