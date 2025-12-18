@@ -768,13 +768,13 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 	const searchInfo = useMemo(() => parseSearchFromCampaign(campaign), [campaign]);
 
 	const { data: drafts } = useGetEmails({
-		filters: { campaignId: campaign?.id?.toString() },
+		filters: { campaignId: campaign?.id },
 		enabled: !!campaign?.id,
 	});
 
 	const { data: sentEmails } = useGetEmails({
 		filters: {
-			campaignId: campaign?.id?.toString(),
+			campaignId: campaign?.id,
 			status: EmailStatus.sent,
 		},
 		enabled: !!campaign?.id,

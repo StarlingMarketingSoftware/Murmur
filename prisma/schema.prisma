@@ -180,6 +180,10 @@ model Identity {
   name      String
   website   String?
   email     String
+  genre     String?
+  area      String?
+  bandName  String?
+  bio       String?
   userId    String
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt

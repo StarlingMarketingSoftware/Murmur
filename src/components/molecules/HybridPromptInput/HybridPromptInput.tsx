@@ -20,7 +20,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { Button } from '@/components/ui/button';
 import { X } from 'lucide-react';
 import { DraftingFormValues } from '@/app/murmur/campaign/[campaignId]/DraftingSection/useDraftingSection';
-import { HybridBlock } from '@prisma/client';
+import { HybridBlock, Identity } from '@prisma/client';
 import { HybridPromptInputProps, useHybridPromptInput } from './useHybridPromptInput';
 import { cn } from '@/utils';
 import React, {
@@ -1002,6 +1002,8 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		onUpscalePrompt,
 		isUpscalingPrompt,
 		onFocusChange,
+		identity,
+		onIdentityUpdate,
 	} = useHybridPromptInput(props);
 
 	const {
@@ -1199,6 +1201,192 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 	const headerSectionRef = useRef<HTMLDivElement>(null);
 	const modeDividerRef = useRef<HTMLDivElement>(null);
 	const [overlayTopPx, setOverlayTopPx] = useState<number | null>(null);
+
+	// Track which tab is active: 'main' (the normal Writing view) or 'profile'
+	const [activeTab, setActiveTab] = useState<'main' | 'profile'>('main');
+
+	// Track which profile box is expanded (null = none expanded)
+	const [expandedProfileBox, setExpandedProfileBox] = useState<string | null>(null);
+	const expandedProfileBoxRef = useRef<HTMLDivElement>(null);
+
+	type IdentityProfileFields = Identity & {
+		genre?: string | null;
+		area?: string | null;
+		bandName?: string | null;
+		bio?: string | null;
+	};
+	const identityProfile = identity as IdentityProfileFields | null | undefined;
+
+	// Profile field values - initialized from identity
+	const [profileFields, setProfileFields] = useState({
+		name: identityProfile?.name || '',
+		genre: identityProfile?.genre || '',
+		area: identityProfile?.area || '',
+		band: identityProfile?.bandName || '',
+		bio: identityProfile?.bio || '',
+		links: identityProfile?.website || '',
+	});
+
+	// Sync profileFields when identity changes
+	useEffect(() => {
+		if (identityProfile) {
+			setProfileFields({
+				name: identityProfile.name || '',
+				genre: identityProfile.genre || '',
+				area: identityProfile.area || '',
+				band: identityProfile.bandName || '',
+				bio: identityProfile.bio || '',
+				links: identityProfile.website || '',
+			});
+		}
+	}, [identityProfile]);
+
+	type ProfileField = 'name' | 'genre' | 'area' | 'band' | 'bio' | 'links';
+
+	const normalizeNullable = (value: string | null | undefined) => {
+		const trimmed = (value ?? '').trim();
+		return trimmed === '' ? null : trimmed;
+	};
+
+	const lastProfileSaveRef = useRef<{ key: string; at: number } | null>(null);
+	const shouldSkipDuplicateProfileSave = (key: string) => {
+		const now = Date.now();
+		const last = lastProfileSaveRef.current;
+		// Prevent double-save when an input unmounts (blur + explicit save)
+		if (last?.key === key && now - last.at < 800) return true;
+		lastProfileSaveRef.current = { key, at: now };
+		return false;
+	};
+
+	// Handle saving a profile field
+	const saveProfileField = (field: ProfileField) => {
+		if (!onIdentityUpdate || !identityProfile) return;
+
+		// Name is required on Identity. If empty, skip saving.
+		if (field === 'name') {
+			const next = profileFields.name.trim();
+			const prev = identityProfile.name.trim();
+			if (!next || next === prev) return;
+			if (shouldSkipDuplicateProfileSave(`name:${next}`)) return;
+			onIdentityUpdate({ name: next });
+			return;
+		}
+
+		const next = normalizeNullable(profileFields[field]);
+		const prev = (() => {
+			switch (field) {
+				case 'genre':
+					return normalizeNullable(identityProfile.genre);
+				case 'area':
+					return normalizeNullable(identityProfile.area);
+				case 'band':
+					return normalizeNullable(identityProfile.bandName);
+				case 'bio':
+					return normalizeNullable(identityProfile.bio);
+				case 'links':
+					return normalizeNullable(identityProfile.website);
+			}
+		})();
+
+		if (next === prev) return;
+		if (shouldSkipDuplicateProfileSave(`${field}:${next ?? ''}`)) return;
+
+		switch (field) {
+			case 'genre':
+				onIdentityUpdate({ genre: next });
+				return;
+			case 'area':
+				onIdentityUpdate({ area: next });
+				return;
+			case 'band':
+				onIdentityUpdate({ bandName: next });
+				return;
+			case 'bio':
+				onIdentityUpdate({ bio: next });
+				return;
+			case 'links':
+				onIdentityUpdate({ website: next });
+				return;
+		}
+	};
+
+	// Close the expanded profile field when clicking away
+	const saveProfileFieldRef = useRef(saveProfileField);
+	saveProfileFieldRef.current = saveProfileField;
+	useEffect(() => {
+		if (activeTab !== 'profile' || !expandedProfileBox) return;
+
+		const handlePointerDown = (event: PointerEvent) => {
+			const target = event.target as Node | null;
+			const container = expandedProfileBoxRef.current;
+			if (!target || !container) return;
+			if (container.contains(target)) return;
+
+			saveProfileFieldRef.current(expandedProfileBox as ProfileField);
+			setExpandedProfileBox(null);
+		};
+
+		document.addEventListener('pointerdown', handlePointerDown);
+		return () => {
+			document.removeEventListener('pointerdown', handlePointerDown);
+		};
+	}, [activeTab, expandedProfileBox]);
+
+	const PROFILE_FIELD_ORDER: ProfileField[] = ['name', 'genre', 'area', 'band', 'bio', 'links'];
+
+	const handleProfileFieldEnter = (field: ProfileField) => {
+		// Don't allow Enter to advance if Name is empty (Identity.name is required)
+		if (field === 'name' && profileFields.name.trim() === '') return;
+
+		saveProfileField(field);
+
+		const idx = PROFILE_FIELD_ORDER.indexOf(field);
+		const nextField = idx >= 0 ? PROFILE_FIELD_ORDER[idx + 1] : null;
+
+		setExpandedProfileBox(nextField ?? null);
+	};
+
+	const getProfileHeaderBg = (field: ProfileField) => {
+		if (expandedProfileBox === field) return '#E0E0E0';
+		return profileFields[field].trim() ? '#94DB96' : '#E0E0E0';
+	};
+
+	const getProfileHeaderText = (
+		field: ProfileField,
+		labelWhenEmpty: string,
+		labelWhenExpanded: string
+	) => {
+		if (expandedProfileBox === field) return labelWhenExpanded;
+		return profileFields[field].trim() || labelWhenEmpty;
+	};
+
+	// Handle saving a profile field on blur
+	const handleProfileFieldBlur = (field: ProfileField) => {
+		saveProfileField(field);
+	};
+
+	// Handle toggling a profile box - saves the current field if collapsing
+	const handleProfileBoxToggle = (box: ProfileField) => {
+		// If we're collapsing the currently expanded box, save its value first
+		if (expandedProfileBox === box) {
+			saveProfileField(box);
+			setExpandedProfileBox(null);
+		} else {
+			// If we're switching to a new box and there's a previously expanded one, save it first
+			if (expandedProfileBox) {
+				saveProfileField(expandedProfileBox as ProfileField);
+			}
+			setExpandedProfileBox(box);
+		}
+	};
+
+	// Save any expanded profile field when switching away from profile tab
+	useEffect(() => {
+		if (activeTab !== 'profile' && expandedProfileBox) {
+			saveProfileField(expandedProfileBox as ProfileField);
+			setExpandedProfileBox(null);
+		}
+	}, [activeTab]);
 
 	// Track focus state for the entire prompt input area
 	const focusTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -1457,7 +1645,27 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 									{/* Removed explicit drag bar; header below acts as the drag handle */}
 									{/* Subject header inside the box */}
 									<div ref={headerSectionRef} className={cn('pt-0 pb-0')}>
-										<div className={!compactLeftOnly ? 'bg-white' : ''}>
+										<div className={cn(!compactLeftOnly ? 'bg-white' : '', 'relative h-[40px]')}>
+											{/* Left 152px gray background */}
+											{!compactLeftOnly && (
+												<div
+													className="absolute left-0 top-0 h-full w-[152px] bg-[#f8f8f8] z-0"
+													style={{ pointerEvents: 'none' }}
+												/>
+											)}
+											{/* Profile label centered in the 152px gray area - clickable to switch tabs */}
+											{!compactLeftOnly && (
+												<button
+													type="button"
+													onClick={() => setActiveTab('profile')}
+													className={cn(
+														"absolute left-0 top-0 h-full w-[152px] flex items-center justify-center font-inter font-semibold text-[11.7px] max-[480px]:text-[14px] z-30 cursor-pointer border-0 bg-transparent transition-colors",
+														activeTab === 'profile' ? 'text-black bg-[#e8e8e8] hover:bg-[#e8e8e8]' : 'text-black hover:bg-[#eeeeee]'
+													)}
+												>
+													Profile
+												</button>
+											)}
 											<div
 												className={cn(
 													'h-[40px] flex items-center relative z-20',
@@ -1466,22 +1674,26 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 												data-left-drag-handle
 												data-root-drag-handle
 											>
-												<span
-													className={cn(
-														'font-inter font-semibold text-[17px] max-[480px]:text-[20px] mr-[56px] max-[480px]:mr-[22px] text-black'
-													)}
-												>
-													Mode
-												</span>
+												{compactLeftOnly && (
+													<span
+														className={cn(
+															'font-inter font-semibold text-[11.7px] max-[480px]:text-[14px] ml-[8px] mr-[112px] max-[480px]:mr-[22px] text-black relative z-10'
+														)}
+													>
+														Profile
+													</span>
+												)}
+												{/* Spacer to keep toggles in position */}
+												{!compactLeftOnly && <div className="w-[152px] shrink-0" />}
 												<div
 													ref={modeContainerRef}
-													className="relative flex items-center gap-[67px] max-[480px]:gap-0 max-[480px]:justify-between max-[480px]:ml-[2px] flex-1 max-[480px]:w-auto max-[480px]:pr-[4.4vw]"
+													className="relative flex items-center gap-[67px] max-[480px]:gap-0 max-[480px]:justify-between ml-[24px] max-[480px]:ml-[2px] flex-1 max-[480px]:w-auto max-[480px]:pr-[4.4vw]"
 												>
 													<DndContext
 														onDragEnd={handleHighlightDragEnd}
 														modifiers={[restrictToHorizontalAxisAndBounds]}
 													>
-														{selectedModeKey !== 'none' && (
+														{selectedModeKey !== 'none' && activeTab !== 'profile' && (
 															<DraggableHighlight
 																style={highlightStyle}
 																isInitialRender={isInitialRender}
@@ -1495,14 +1707,16 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														type="button"
 														className={cn(
 															'!p-0 h-fit !m-0 text-[11.7px] max-[480px]:text-[14px] font-inter font-semibold bg-transparent z-20',
-															selectedModeKey !== 'none' &&
-																form
+															activeTab === 'profile'
+																? 'text-[#AFAFAF]'
+																: selectedModeKey !== 'none' &&
+																  form
 																	.getValues('hybridBlockPrompts')
 																	?.some((b) => b.type === HybridBlock.full_automated)
 																? 'text-black'
 																: 'text-[#AFAFAF] hover:text-[#8F8F8F]'
 														)}
-														onClick={switchToFull}
+														onClick={() => { setActiveTab('main'); switchToFull(); }}
 													>
 														Full Auto
 													</Button>
@@ -1512,15 +1726,17 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														type="button"
 														className={cn(
 															'!p-0 h-fit !m-0 text-[11.7px] max-[480px]:text-[14px] font-inter font-semibold bg-transparent z-20',
-															selectedModeKey !== 'none' &&
-																(form.getValues('hybridBlockPrompts')?.length || 0) > 0 &&
-																form
+															activeTab === 'profile'
+																? 'text-[#AFAFAF]'
+																: selectedModeKey !== 'none' &&
+																  (form.getValues('hybridBlockPrompts')?.length || 0) > 0 &&
+																  form
 																	.getValues('hybridBlockPrompts')
 																	?.every((b) => b.type === HybridBlock.text)
 																? 'text-black'
 																: 'text-[#AFAFAF] hover:text-[#8F8F8F]'
 														)}
-														onClick={switchToManual}
+														onClick={() => { setActiveTab('main'); switchToManual(); }}
 													>
 														Manual
 													</Button>
@@ -1530,17 +1746,19 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														type="button"
 														className={cn(
 															'!p-0 h-fit !m-0 text-[11.7px] max-[480px]:text-[14px] font-inter font-semibold bg-transparent z-20',
-															selectedModeKey !== 'none' &&
-																!form
+															activeTab === 'profile'
+																? 'text-[#AFAFAF]'
+																: selectedModeKey !== 'none' &&
+																  !form
 																	.getValues('hybridBlockPrompts')
 																	?.some((b) => b.type === HybridBlock.full_automated) &&
-																!form
+																  !form
 																	.getValues('hybridBlockPrompts')
 																	?.every((b) => b.type === HybridBlock.text)
 																? 'text-black'
 																: 'text-[#AFAFAF] hover:text-[#8F8F8F]'
 														)}
-														onClick={switchToHybrid}
+														onClick={() => { setActiveTab('main'); switchToHybrid(); }}
 													>
 														Hybrid
 													</Button>
@@ -1562,124 +1780,334 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 												</>
 											)}
 										</div>
-										<div className="flex flex-col items-center pt-[20px]">
-											<FormField
-												control={form.control}
-												name="subject"
-												rules={{ required: form.watch('isAiSubject') }}
-												render={({ field }) => (
-													<FormItem
-														className={cn(
-															showTestPreview
-																? 'w-[426px] max-[480px]:w-[89.33vw]'
-																: 'w-[89.33vw] max-w-[475px]',
-															// Remove default margin to control spacing to content below
-															'mb-0'
-														)}
-													>
-														<FormControl>
-															<div
-																className={cn(
-																	'flex items-center h-[31px] max-[480px]:h-[24px] rounded-[8px] border-2 border-black overflow-hidden subject-bar',
-																	form.watch('isAiSubject') ? 'bg-[#F1F1F1]' : 'bg-white'
-																)}
-															>
+										{activeTab !== 'profile' && (
+											<div className="flex flex-col items-center pt-[20px]">
+												<FormField
+													control={form.control}
+													name="subject"
+													rules={{ required: form.watch('isAiSubject') }}
+													render={({ field }) => (
+														<FormItem
+															className={cn(
+																showTestPreview
+																	? 'w-[426px] max-[480px]:w-[89.33vw]'
+																	: 'w-[89.33vw] max-w-[475px]',
+																// Remove default margin to control spacing to content below
+																'mb-0'
+															)}
+														>
+															<FormControl>
 																<div
 																	className={cn(
-																		'pl-2 flex items-center h-full shrink-0 w-[120px]',
-																		'bg-white'
+																		'flex items-center h-[31px] max-[480px]:h-[24px] rounded-[8px] border-2 border-black overflow-hidden subject-bar',
+																		form.watch('isAiSubject') ? 'bg-[#F1F1F1]' : 'bg-white'
 																	)}
 																>
-																	<span className="font-inter font-semibold text-[17px] max-[480px]:text-[12px] whitespace-nowrap text-black subject-label">
-																		{form.watch('isAiSubject')
-																			? 'Auto Subject'
-																			: 'Subject'}
-																	</span>
-																</div>
-
-																<button
-																	type="button"
-																	onClick={() => {
-																		if (!isHandwrittenMode) {
-																			const newValue = !form.watch('isAiSubject');
-																			form.setValue('isAiSubject', newValue);
-																			if (newValue) {
-																				form.setValue('subject', '');
-																			}
-																		}
-																	}}
-																	disabled={isHandwrittenMode}
-																	className={cn(
-																		'relative h-full flex items-center text-[12px] font-inter font-normal transition-colors shrink-0 subject-toggle',
-																		form.watch('isAiSubject')
-																			? 'w-auto px-3 justify-center bg-[#5dab68] text-white'
-																			: 'w-[100px] px-2 justify-center text-black bg-[#DADAFC] hover:bg-[#C4C4F5] active:bg-[#B0B0E8] -translate-x-[30px]',
-																		isHandwrittenMode && 'opacity-50 cursor-not-allowed'
-																	)}
-																>
-																	<span className="absolute left-0 h-full border-l border-black"></span>
-																	<span>
-																		{form.watch('isAiSubject') ? 'on' : 'Auto off'}
-																	</span>
-																	<span className="absolute right-0 h-full border-r border-black"></span>
-																</button>
-
-																<div className={cn('flex-grow h-full', 'bg-white')}>
-																	<Input
-																		{...field}
+																	<div
 																		className={cn(
-																			'w-full h-full !bg-transparent pl-4 pr-3 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 max-[480px]:placeholder:text-[10px] max-[480px]:!transition-none max-[480px]:!duration-0',
-																			form.watch('isAiSubject')
-																				? '!text-[#969696] placeholder:!text-[#969696]'
-																				: shouldShowSubjectRedStyling
-																				? '!text-[#A20000] placeholder:!text-[#A20000]'
-																				: '!text-black placeholder:!text-black',
-																			!form.watch('isAiSubject') && 'max-[480px]:pl-2'
+																			'pl-2 flex items-center h-full shrink-0 w-[120px]',
+																			'bg-white'
 																		)}
-																		placeholder={
+																	>
+																		<span className="font-inter font-semibold text-[17px] max-[480px]:text-[12px] whitespace-nowrap text-black subject-label">
+																			{form.watch('isAiSubject')
+																				? 'Auto Subject'
+																				: 'Subject'}
+																		</span>
+																	</div>
+
+																	<button
+																		type="button"
+																		onClick={() => {
+																			if (!isHandwrittenMode) {
+																				const newValue = !form.watch('isAiSubject');
+																				form.setValue('isAiSubject', newValue);
+																				if (newValue) {
+																					form.setValue('subject', '');
+																				}
+																			}
+																		}}
+																		disabled={isHandwrittenMode}
+																		className={cn(
+																			'relative h-full flex items-center text-[12px] font-inter font-normal transition-colors shrink-0 subject-toggle',
 																			form.watch('isAiSubject')
-																				? 'Automated Subject Line'
-																				: 'Write your subject here. *required'
-																		}
-																		disabled={form.watch('isAiSubject')}
-																		onFocus={(e) =>
-																			!form.watch('isAiSubject') &&
-																			trackFocusedField?.('subject', e.target)
-																		}
-																		onBlur={() => {
-																			if (!form.watch('isAiSubject')) {
-																				setHasSubjectBeenTouched(true);
+																				? 'w-auto px-3 justify-center bg-[#5dab68] text-white'
+																				: 'w-[100px] px-2 justify-center text-black bg-[#DADAFC] hover:bg-[#C4C4F5] active:bg-[#B0B0E8] -translate-x-[30px]',
+																			isHandwrittenMode && 'opacity-50 cursor-not-allowed'
+																		)}
+																	>
+																		<span className="absolute left-0 h-full border-l border-black"></span>
+																		<span>
+																			{form.watch('isAiSubject') ? 'on' : 'Auto off'}
+																		</span>
+																		<span className="absolute right-0 h-full border-r border-black"></span>
+																	</button>
+
+																	<div className={cn('flex-grow h-full', 'bg-white')}>
+																		<Input
+																			{...field}
+																			className={cn(
+																				'w-full h-full !bg-transparent pl-4 pr-3 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 max-[480px]:placeholder:text-[10px] max-[480px]:!transition-none max-[480px]:!duration-0',
+																				form.watch('isAiSubject')
+																					? '!text-[#969696] placeholder:!text-[#969696]'
+																					: shouldShowSubjectRedStyling
+																					? '!text-[#A20000] placeholder:!text-[#A20000]'
+																					: '!text-black placeholder:!text-black',
+																				!form.watch('isAiSubject') && 'max-[480px]:pl-2'
+																			)}
+																			placeholder={
+																				form.watch('isAiSubject')
+																					? 'Automated Subject Line'
+																					: 'Write your subject here. *required'
 																			}
-																			field.onBlur();
-																		}}
-																		onChange={(e) => {
-																			if (!form.watch('isAiSubject') && e.target.value) {
-																				setHasSubjectBeenTouched(true);
+																			disabled={form.watch('isAiSubject')}
+																			onFocus={(e) =>
+																				!form.watch('isAiSubject') &&
+																				trackFocusedField?.('subject', e.target)
 																			}
-																			field.onChange(e);
-																		}}
-																	/>
+																			onBlur={() => {
+																				if (!form.watch('isAiSubject')) {
+																					setHasSubjectBeenTouched(true);
+																				}
+																				field.onBlur();
+																			}}
+																			onChange={(e) => {
+																				if (!form.watch('isAiSubject') && e.target.value) {
+																					setHasSubjectBeenTouched(true);
+																				}
+																				field.onChange(e);
+																			}}
+																		/>
+																	</div>
 																</div>
-															</div>
-														</FormControl>
-														<FormMessage />
-													</FormItem>
-												)}
-											/>
-										</div>
+															</FormControl>
+															<FormMessage />
+														</FormItem>
+													)}
+												/>
+											</div>
+										)}
 									</div>
-									<div className="flex-1 flex flex-col" data-hpi-content>
-										{/* Content area */}
-										<div className="pt-[20px] max-[480px]:pt-[8px] pr-3 pb-3 pl-3 flex flex-col gap-4 items-center flex-1">
-											{fields.length === 0 && (
-												<span className="text-gray-300 font-primary text-[12px]">
-													Add blocks here to build your prompt...
-												</span>
-											)}
-											<SortableContext
-												items={fields.map((f) => f.id)}
-												strategy={verticalListSortingStrategy}
+								<div className="flex-1 flex flex-col" data-hpi-content>
+									{/* Profile Tab Content */}
+									{activeTab === 'profile' && (
+										<div className="pt-[20px] max-[480px]:pt-[8px] pr-3 pb-3 pl-3 flex flex-col gap-[18px] items-center flex-1">
+											<div
+												ref={expandedProfileBox === 'name' ? expandedProfileBoxRef : undefined}
+												className={cn(
+													"w-[468px] flex flex-col rounded-[8px] border-[3px] border-black cursor-pointer overflow-hidden",
+													expandedProfileBox === 'name' ? 'h-[68px]' : 'h-[34px]'
+												)}
+												onClick={() => handleProfileBoxToggle('name')}
 											>
+												<div
+													className="h-[34px] flex items-center px-3 font-inter text-[14px] font-semibold truncate"
+													style={{ backgroundColor: getProfileHeaderBg('name') }}
+												>
+													{getProfileHeaderText('name', 'Name', 'Enter your Name')}
+												</div>
+												{expandedProfileBox === 'name' && (
+													<input
+														type="text"
+														className="h-[34px] bg-white px-3 font-inter text-[14px] outline-none border-0"
+														value={profileFields.name}
+														onChange={(e) => setProfileFields({ ...profileFields, name: e.target.value })}
+														onBlur={() => handleProfileFieldBlur('name')}
+														onKeyDown={(e) => {
+															if (e.key === 'Enter') {
+																e.preventDefault();
+																handleProfileFieldEnter('name');
+															}
+														}}
+														onClick={(e) => e.stopPropagation()}
+														placeholder=""
+														autoFocus
+													/>
+												)}
+											</div>
+											<div
+												ref={expandedProfileBox === 'genre' ? expandedProfileBoxRef : undefined}
+												className={cn(
+													"w-[468px] flex flex-col rounded-[8px] border-[3px] border-black cursor-pointer overflow-hidden",
+													expandedProfileBox === 'genre' ? 'h-[68px]' : 'h-[34px]'
+												)}
+												onClick={() => handleProfileBoxToggle('genre')}
+											>
+												<div
+													className="h-[34px] flex items-center px-3 font-inter text-[14px] font-semibold truncate"
+													style={{ backgroundColor: getProfileHeaderBg('genre') }}
+												>
+													{getProfileHeaderText('genre', 'Genre', 'Enter your Genre')}
+												</div>
+												{expandedProfileBox === 'genre' && (
+													<input
+														type="text"
+														className="h-[34px] bg-white px-3 font-inter text-[14px] outline-none border-0"
+														value={profileFields.genre}
+														onChange={(e) => setProfileFields({ ...profileFields, genre: e.target.value })}
+														onBlur={() => handleProfileFieldBlur('genre')}
+														onKeyDown={(e) => {
+															if (e.key === 'Enter') {
+																e.preventDefault();
+																handleProfileFieldEnter('genre');
+															}
+														}}
+														onClick={(e) => e.stopPropagation()}
+														placeholder=""
+														autoFocus
+													/>
+												)}
+											</div>
+											<div
+												ref={expandedProfileBox === 'area' ? expandedProfileBoxRef : undefined}
+												className={cn(
+													"w-[468px] flex flex-col rounded-[8px] border-[3px] border-black cursor-pointer overflow-hidden",
+													expandedProfileBox === 'area' ? 'h-[68px]' : 'h-[34px]'
+												)}
+												onClick={() => handleProfileBoxToggle('area')}
+											>
+												<div
+													className="h-[34px] flex items-center px-3 font-inter text-[14px] font-semibold truncate"
+													style={{ backgroundColor: getProfileHeaderBg('area') }}
+												>
+													{getProfileHeaderText('area', 'Area', 'Enter your Area')}
+												</div>
+												{expandedProfileBox === 'area' && (
+													<input
+														type="text"
+														className="h-[34px] bg-white px-3 font-inter text-[14px] outline-none border-0"
+														value={profileFields.area}
+														onChange={(e) => setProfileFields({ ...profileFields, area: e.target.value })}
+														onBlur={() => handleProfileFieldBlur('area')}
+														onKeyDown={(e) => {
+															if (e.key === 'Enter') {
+																e.preventDefault();
+																handleProfileFieldEnter('area');
+															}
+														}}
+														onClick={(e) => e.stopPropagation()}
+														placeholder=""
+														autoFocus
+													/>
+												)}
+											</div>
+											<div
+												ref={expandedProfileBox === 'band' ? expandedProfileBoxRef : undefined}
+												className={cn(
+													"w-[468px] flex flex-col rounded-[8px] border-[3px] border-black cursor-pointer overflow-hidden",
+													expandedProfileBox === 'band' ? 'h-[68px]' : 'h-[34px]'
+												)}
+												onClick={() => handleProfileBoxToggle('band')}
+											>
+												<div
+													className="h-[34px] flex items-center px-3 font-inter text-[14px] font-semibold truncate"
+													style={{ backgroundColor: getProfileHeaderBg('band') }}
+												>
+													{getProfileHeaderText(
+														'band',
+														'Band/Artist Name',
+														'Enter your Band/Artist Name'
+													)}
+												</div>
+												{expandedProfileBox === 'band' && (
+													<input
+														type="text"
+														className="h-[34px] bg-white px-3 font-inter text-[14px] outline-none border-0"
+														value={profileFields.band}
+														onChange={(e) => setProfileFields({ ...profileFields, band: e.target.value })}
+														onBlur={() => handleProfileFieldBlur('band')}
+														onKeyDown={(e) => {
+															if (e.key === 'Enter') {
+																e.preventDefault();
+																handleProfileFieldEnter('band');
+															}
+														}}
+														onClick={(e) => e.stopPropagation()}
+														placeholder=""
+														autoFocus
+													/>
+												)}
+											</div>
+											<div
+												ref={expandedProfileBox === 'bio' ? expandedProfileBoxRef : undefined}
+												className={cn(
+													"w-[468px] flex flex-col rounded-[8px] border-[3px] border-black cursor-pointer overflow-hidden",
+													expandedProfileBox === 'bio' ? 'h-[68px]' : 'h-[34px]'
+												)}
+												onClick={() => handleProfileBoxToggle('bio')}
+											>
+												<div
+													className="h-[34px] flex items-center px-3 font-inter text-[14px] font-semibold truncate"
+													style={{ backgroundColor: getProfileHeaderBg('bio') }}
+												>
+													{getProfileHeaderText('bio', 'Bio', 'Enter your Bio')}
+												</div>
+												{expandedProfileBox === 'bio' && (
+													<input
+														type="text"
+														className="h-[34px] bg-white px-3 font-inter text-[14px] outline-none border-0"
+														value={profileFields.bio}
+														onChange={(e) => setProfileFields({ ...profileFields, bio: e.target.value })}
+														onBlur={() => handleProfileFieldBlur('bio')}
+														onKeyDown={(e) => {
+															if (e.key === 'Enter') {
+																e.preventDefault();
+																handleProfileFieldEnter('bio');
+															}
+														}}
+														onClick={(e) => e.stopPropagation()}
+														placeholder=""
+														autoFocus
+													/>
+												)}
+											</div>
+											<div
+												ref={expandedProfileBox === 'links' ? expandedProfileBoxRef : undefined}
+												className={cn(
+													"w-[468px] flex flex-col rounded-[8px] border-[3px] border-black cursor-pointer overflow-hidden",
+													expandedProfileBox === 'links' ? 'h-[68px]' : 'h-[34px]'
+												)}
+												onClick={() => handleProfileBoxToggle('links')}
+											>
+												<div
+													className="h-[34px] flex items-center px-3 font-inter text-[14px] font-semibold truncate"
+													style={{ backgroundColor: getProfileHeaderBg('links') }}
+												>
+													{getProfileHeaderText('links', 'Links', 'Enter your Links')}
+												</div>
+												{expandedProfileBox === 'links' && (
+													<input
+														type="text"
+														className="h-[34px] bg-white px-3 font-inter text-[14px] outline-none border-0"
+														value={profileFields.links}
+														onChange={(e) => setProfileFields({ ...profileFields, links: e.target.value })}
+														onBlur={() => handleProfileFieldBlur('links')}
+														onKeyDown={(e) => {
+															if (e.key === 'Enter') {
+																e.preventDefault();
+																handleProfileFieldEnter('links');
+															}
+														}}
+														onClick={(e) => e.stopPropagation()}
+														placeholder=""
+														autoFocus
+													/>
+												)}
+											</div>
+										</div>
+									)}
+									{/* Main Content area */}
+									{activeTab === 'main' && (
+									<div className="pt-[20px] max-[480px]:pt-[8px] pr-3 pb-3 pl-3 flex flex-col gap-4 items-center flex-1">
+										{fields.length === 0 && (
+											<span className="text-gray-300 font-primary text-[12px]">
+												Add blocks here to build your prompt...
+											</span>
+										)}
+										<SortableContext
+											items={fields.map((f) => f.id)}
+											strategy={verticalListSortingStrategy}
+										>
 												{(() => {
 													const orderedHybridTypes = [
 														HybridBlock.introduction,
@@ -1871,10 +2299,11 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 												})()}
 											</SortableContext>
 										</div>
+									)}
 									</div>
 
 									{/* In Test Preview, keep Signature inside the left panel so it doesn't float */}
-									{showTestPreview && (
+									{showTestPreview && activeTab !== 'profile' && (
 										<div className={cn('px-3 pb-0 pt-0 flex justify-center mt-auto')}>
 											<FormField
 												control={form.control}
@@ -1920,44 +2349,46 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 							{/* Bottom-anchored footer with Signature and Test */}
 							<div className="flex flex-col items-center mt-auto w-full" data-hpi-footer>
 								{/* Signature Block - always visible; positioned above Test with fixed gap */}
-								<FormField
-									control={form.control}
-									name="signature"
-									render={({ field }) => (
-										<FormItem className={cn(!compactLeftOnly ? 'mb-[23px]' : 'mb-[9px]')}>
-											<div
-												className={cn(
-													'min-h-[57px] border-2 border-gray-400 rounded-md bg-white px-4 py-2',
-													'w-[89.33vw] max-w-[475px]'
-												)}
-												data-hpi-signature-card
-											>
-												<FormLabel className="text-base font-semibold font-secondary">
-													Signature
-												</FormLabel>
-												<FormControl>
-													<Textarea
-														placeholder="Enter your signature..."
-														className="border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 mt-1 p-0 resize-none overflow-hidden bg-white max-[480px]:text-[10px] signature-textarea"
-														style={{
-															fontFamily: form.watch('font') || 'Arial',
-														}}
-														onInput={(e: React.FormEvent<HTMLTextAreaElement>) => {
-															const target = e.currentTarget;
-															target.style.height = 'auto';
-															target.style.height = target.scrollHeight + 'px';
-														}}
-														{...field}
-													/>
-												</FormControl>
-											</div>
-											<FormMessage />
-										</FormItem>
-									)}
-								/>
+								{activeTab !== 'profile' && (
+									<FormField
+										control={form.control}
+										name="signature"
+										render={({ field }) => (
+											<FormItem className={cn(!compactLeftOnly ? 'mb-[23px]' : 'mb-[9px]')}>
+												<div
+													className={cn(
+														'min-h-[57px] border-2 border-gray-400 rounded-md bg-white px-4 py-2',
+														'w-[89.33vw] max-w-[475px]'
+													)}
+													data-hpi-signature-card
+												>
+													<FormLabel className="text-base font-semibold font-secondary">
+														Signature
+													</FormLabel>
+													<FormControl>
+														<Textarea
+															placeholder="Enter your signature..."
+															className="border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 mt-1 p-0 resize-none overflow-hidden bg-white max-[480px]:text-[10px] signature-textarea"
+															style={{
+																fontFamily: form.watch('font') || 'Arial',
+															}}
+															onInput={(e: React.FormEvent<HTMLTextAreaElement>) => {
+																const target = e.currentTarget;
+																target.style.height = 'auto';
+																target.style.height = target.scrollHeight + 'px';
+															}}
+															{...field}
+														/>
+													</FormControl>
+												</div>
+												<FormMessage />
+											</FormItem>
+										)}
+									/>
+								)}
 
-								{/* Test button and notices (hidden in compact mode) */}
-								{compactLeftOnly ? null : (
+								{/* Test button and notices (hidden in compact mode and profile tab) */}
+								{compactLeftOnly || activeTab === 'profile' ? null : (
 									<>
 										<div
 											className={cn(

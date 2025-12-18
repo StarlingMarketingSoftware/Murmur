@@ -3,8 +3,9 @@ import { DragEndEvent } from '@dnd-kit/core';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { DraftingFormValues } from '@/app/murmur/campaign/[campaignId]/DraftingSection/useDraftingSection';
-import { HybridBlock } from '@prisma/client';
+import { HybridBlock, Identity } from '@prisma/client';
 import { ContactWithName } from '@/types/contact';
+import { PatchIdentityData } from '@/app/api/identities/[id]/route';
 
 export const ORDERED_BLOCKS = [
 	HybridBlock.introduction,
@@ -116,6 +117,14 @@ export interface HybridPromptInputProps {
 	 * Optional: hides the internal draft button (for when it's rendered externally).
 	 */
 	hideDraftButton?: boolean;
+	/**
+	 * Optional: the identity associated with the campaign for profile tab.
+	 */
+	identity?: Identity | null;
+	/**
+	 * Optional: callback to update identity fields from the profile tab.
+	 */
+	onIdentityUpdate?: (data: PatchIdentityData) => void;
 }
 
 export const useHybridPromptInput = (props: HybridPromptInputProps) => {
@@ -133,6 +142,8 @@ export const useHybridPromptInput = (props: HybridPromptInputProps) => {
 		onUpscalePrompt,
 		isUpscalingPrompt,
 		onFocusChange,
+		identity,
+		onIdentityUpdate,
 	} = props;
 
 	/* HOOKS */
@@ -504,5 +515,7 @@ export const useHybridPromptInput = (props: HybridPromptInputProps) => {
 		onUpscalePrompt,
 		isUpscalingPrompt,
 		onFocusChange,
+		identity,
+		onIdentityUpdate,
 	};
 };
