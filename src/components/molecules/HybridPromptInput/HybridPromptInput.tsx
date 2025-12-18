@@ -1475,7 +1475,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 													onClick={() => setActiveTab('profile')}
 													className={cn(
 														"absolute left-0 top-0 h-full w-[152px] flex items-center justify-center font-inter font-semibold text-[11.7px] max-[480px]:text-[14px] z-30 cursor-pointer border-0 bg-transparent transition-colors",
-														activeTab === 'profile' ? 'text-black bg-[#e8e8e8]' : 'text-black hover:bg-[#eeeeee]'
+														activeTab === 'profile' ? 'text-black bg-[#e8e8e8] hover:bg-[#e8e8e8]' : 'text-black hover:bg-[#eeeeee]'
 													)}
 												>
 													Profile
@@ -1706,12 +1706,42 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 								<div className="flex-1 flex flex-col" data-hpi-content>
 									{/* Profile Tab Content */}
 									{activeTab === 'profile' && (
-										<div className="pt-[20px] max-[480px]:pt-[8px] pr-3 pb-3 pl-3 flex flex-col gap-4 items-center flex-1">
+										<div className="pt-[20px] max-[480px]:pt-[8px] pr-3 pb-3 pl-3 flex flex-col gap-[18px] items-center flex-1">
 											<div
 												className="w-[468px] h-[34px] flex items-center px-3 font-inter text-[14px] font-semibold rounded-[8px] border-[3px] border-black"
 												style={{ backgroundColor: '#E0E0E0' }}
 											>
 												Name
+											</div>
+											<div
+												className="w-[468px] h-[34px] flex items-center px-3 font-inter text-[14px] font-semibold rounded-[8px] border-[3px] border-black"
+												style={{ backgroundColor: '#E0E0E0' }}
+											>
+												Genre
+											</div>
+											<div
+												className="w-[468px] h-[34px] flex items-center px-3 font-inter text-[14px] font-semibold rounded-[8px] border-[3px] border-black"
+												style={{ backgroundColor: '#E0E0E0' }}
+											>
+												Area
+											</div>
+											<div
+												className="w-[468px] h-[34px] flex items-center px-3 font-inter text-[14px] font-semibold rounded-[8px] border-[3px] border-black"
+												style={{ backgroundColor: '#E0E0E0' }}
+											>
+												Band/Artist Name
+											</div>
+											<div
+												className="w-[468px] h-[34px] flex items-center px-3 font-inter text-[14px] font-semibold rounded-[8px] border-[3px] border-black"
+												style={{ backgroundColor: '#E0E0E0' }}
+											>
+												Bio
+											</div>
+											<div
+												className="w-[468px] h-[34px] flex items-center px-3 font-inter text-[14px] font-semibold rounded-[8px] border-[3px] border-black"
+												style={{ backgroundColor: '#E0E0E0' }}
+											>
+												Links
 											</div>
 										</div>
 									)}
