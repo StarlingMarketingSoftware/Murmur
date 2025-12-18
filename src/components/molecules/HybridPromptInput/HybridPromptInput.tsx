@@ -1200,6 +1200,9 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 	const modeDividerRef = useRef<HTMLDivElement>(null);
 	const [overlayTopPx, setOverlayTopPx] = useState<number | null>(null);
 
+	// Track which tab is active: 'main' (the normal Writing view) or 'profile'
+	const [activeTab, setActiveTab] = useState<'main' | 'profile'>('main');
+
 	// Track focus state for the entire prompt input area
 	const focusTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 	const handleContainerFocus = () => {
@@ -1465,13 +1468,18 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 													style={{ pointerEvents: 'none' }}
 												/>
 											)}
-											{/* Profile label centered in the 152px gray area */}
+											{/* Profile label centered in the 152px gray area - clickable to switch tabs */}
 											{!compactLeftOnly && (
-												<span
-													className="absolute left-0 top-0 h-full w-[152px] flex items-center justify-center font-inter font-semibold text-[11.7px] max-[480px]:text-[14px] text-black z-10"
+												<button
+													type="button"
+													onClick={() => setActiveTab('profile')}
+													className={cn(
+														"absolute left-0 top-0 h-full w-[152px] flex items-center justify-center font-inter font-semibold text-[11.7px] max-[480px]:text-[14px] z-30 cursor-pointer border-0 bg-transparent transition-colors",
+														activeTab === 'profile' ? 'text-black bg-[#e8e8e8]' : 'text-black hover:bg-[#eeeeee]'
+													)}
 												>
 													Profile
-												</span>
+												</button>
 											)}
 											<div
 												className={cn(
@@ -1500,7 +1508,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														onDragEnd={handleHighlightDragEnd}
 														modifiers={[restrictToHorizontalAxisAndBounds]}
 													>
-														{selectedModeKey !== 'none' && (
+														{selectedModeKey !== 'none' && activeTab !== 'profile' && (
 															<DraggableHighlight
 																style={highlightStyle}
 																isInitialRender={isInitialRender}
@@ -1514,14 +1522,16 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														type="button"
 														className={cn(
 															'!p-0 h-fit !m-0 text-[11.7px] max-[480px]:text-[14px] font-inter font-semibold bg-transparent z-20',
-															selectedModeKey !== 'none' &&
-																form
+															activeTab === 'profile'
+																? 'text-[#AFAFAF]'
+																: selectedModeKey !== 'none' &&
+																  form
 																	.getValues('hybridBlockPrompts')
 																	?.some((b) => b.type === HybridBlock.full_automated)
 																? 'text-black'
 																: 'text-[#AFAFAF] hover:text-[#8F8F8F]'
 														)}
-														onClick={switchToFull}
+														onClick={() => { setActiveTab('main'); switchToFull(); }}
 													>
 														Full Auto
 													</Button>
@@ -1531,15 +1541,17 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														type="button"
 														className={cn(
 															'!p-0 h-fit !m-0 text-[11.7px] max-[480px]:text-[14px] font-inter font-semibold bg-transparent z-20',
-															selectedModeKey !== 'none' &&
-																(form.getValues('hybridBlockPrompts')?.length || 0) > 0 &&
-																form
+															activeTab === 'profile'
+																? 'text-[#AFAFAF]'
+																: selectedModeKey !== 'none' &&
+																  (form.getValues('hybridBlockPrompts')?.length || 0) > 0 &&
+																  form
 																	.getValues('hybridBlockPrompts')
 																	?.every((b) => b.type === HybridBlock.text)
 																? 'text-black'
 																: 'text-[#AFAFAF] hover:text-[#8F8F8F]'
 														)}
-														onClick={switchToManual}
+														onClick={() => { setActiveTab('main'); switchToManual(); }}
 													>
 														Manual
 													</Button>
@@ -1549,17 +1561,19 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														type="button"
 														className={cn(
 															'!p-0 h-fit !m-0 text-[11.7px] max-[480px]:text-[14px] font-inter font-semibold bg-transparent z-20',
-															selectedModeKey !== 'none' &&
-																!form
+															activeTab === 'profile'
+																? 'text-[#AFAFAF]'
+																: selectedModeKey !== 'none' &&
+																  !form
 																	.getValues('hybridBlockPrompts')
 																	?.some((b) => b.type === HybridBlock.full_automated) &&
-																!form
+																  !form
 																	.getValues('hybridBlockPrompts')
 																	?.every((b) => b.type === HybridBlock.text)
 																? 'text-black'
 																: 'text-[#AFAFAF] hover:text-[#8F8F8F]'
 														)}
-														onClick={switchToHybrid}
+														onClick={() => { setActiveTab('main'); switchToHybrid(); }}
 													>
 														Hybrid
 													</Button>
@@ -1581,124 +1595,133 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 												</>
 											)}
 										</div>
-										<div className="flex flex-col items-center pt-[20px]">
-											<FormField
-												control={form.control}
-												name="subject"
-												rules={{ required: form.watch('isAiSubject') }}
-												render={({ field }) => (
-													<FormItem
-														className={cn(
-															showTestPreview
-																? 'w-[426px] max-[480px]:w-[89.33vw]'
-																: 'w-[89.33vw] max-w-[475px]',
-															// Remove default margin to control spacing to content below
-															'mb-0'
-														)}
-													>
-														<FormControl>
-															<div
-																className={cn(
-																	'flex items-center h-[31px] max-[480px]:h-[24px] rounded-[8px] border-2 border-black overflow-hidden subject-bar',
-																	form.watch('isAiSubject') ? 'bg-[#F1F1F1]' : 'bg-white'
-																)}
-															>
+										{activeTab !== 'profile' && (
+											<div className="flex flex-col items-center pt-[20px]">
+												<FormField
+													control={form.control}
+													name="subject"
+													rules={{ required: form.watch('isAiSubject') }}
+													render={({ field }) => (
+														<FormItem
+															className={cn(
+																showTestPreview
+																	? 'w-[426px] max-[480px]:w-[89.33vw]'
+																	: 'w-[89.33vw] max-w-[475px]',
+																// Remove default margin to control spacing to content below
+																'mb-0'
+															)}
+														>
+															<FormControl>
 																<div
 																	className={cn(
-																		'pl-2 flex items-center h-full shrink-0 w-[120px]',
-																		'bg-white'
+																		'flex items-center h-[31px] max-[480px]:h-[24px] rounded-[8px] border-2 border-black overflow-hidden subject-bar',
+																		form.watch('isAiSubject') ? 'bg-[#F1F1F1]' : 'bg-white'
 																	)}
 																>
-																	<span className="font-inter font-semibold text-[17px] max-[480px]:text-[12px] whitespace-nowrap text-black subject-label">
-																		{form.watch('isAiSubject')
-																			? 'Auto Subject'
-																			: 'Subject'}
-																	</span>
-																</div>
-
-																<button
-																	type="button"
-																	onClick={() => {
-																		if (!isHandwrittenMode) {
-																			const newValue = !form.watch('isAiSubject');
-																			form.setValue('isAiSubject', newValue);
-																			if (newValue) {
-																				form.setValue('subject', '');
-																			}
-																		}
-																	}}
-																	disabled={isHandwrittenMode}
-																	className={cn(
-																		'relative h-full flex items-center text-[12px] font-inter font-normal transition-colors shrink-0 subject-toggle',
-																		form.watch('isAiSubject')
-																			? 'w-auto px-3 justify-center bg-[#5dab68] text-white'
-																			: 'w-[100px] px-2 justify-center text-black bg-[#DADAFC] hover:bg-[#C4C4F5] active:bg-[#B0B0E8] -translate-x-[30px]',
-																		isHandwrittenMode && 'opacity-50 cursor-not-allowed'
-																	)}
-																>
-																	<span className="absolute left-0 h-full border-l border-black"></span>
-																	<span>
-																		{form.watch('isAiSubject') ? 'on' : 'Auto off'}
-																	</span>
-																	<span className="absolute right-0 h-full border-r border-black"></span>
-																</button>
-
-																<div className={cn('flex-grow h-full', 'bg-white')}>
-																	<Input
-																		{...field}
+																	<div
 																		className={cn(
-																			'w-full h-full !bg-transparent pl-4 pr-3 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 max-[480px]:placeholder:text-[10px] max-[480px]:!transition-none max-[480px]:!duration-0',
-																			form.watch('isAiSubject')
-																				? '!text-[#969696] placeholder:!text-[#969696]'
-																				: shouldShowSubjectRedStyling
-																				? '!text-[#A20000] placeholder:!text-[#A20000]'
-																				: '!text-black placeholder:!text-black',
-																			!form.watch('isAiSubject') && 'max-[480px]:pl-2'
+																			'pl-2 flex items-center h-full shrink-0 w-[120px]',
+																			'bg-white'
 																		)}
-																		placeholder={
+																	>
+																		<span className="font-inter font-semibold text-[17px] max-[480px]:text-[12px] whitespace-nowrap text-black subject-label">
+																			{form.watch('isAiSubject')
+																				? 'Auto Subject'
+																				: 'Subject'}
+																		</span>
+																	</div>
+
+																	<button
+																		type="button"
+																		onClick={() => {
+																			if (!isHandwrittenMode) {
+																				const newValue = !form.watch('isAiSubject');
+																				form.setValue('isAiSubject', newValue);
+																				if (newValue) {
+																					form.setValue('subject', '');
+																				}
+																			}
+																		}}
+																		disabled={isHandwrittenMode}
+																		className={cn(
+																			'relative h-full flex items-center text-[12px] font-inter font-normal transition-colors shrink-0 subject-toggle',
 																			form.watch('isAiSubject')
-																				? 'Automated Subject Line'
-																				: 'Write your subject here. *required'
-																		}
-																		disabled={form.watch('isAiSubject')}
-																		onFocus={(e) =>
-																			!form.watch('isAiSubject') &&
-																			trackFocusedField?.('subject', e.target)
-																		}
-																		onBlur={() => {
-																			if (!form.watch('isAiSubject')) {
-																				setHasSubjectBeenTouched(true);
+																				? 'w-auto px-3 justify-center bg-[#5dab68] text-white'
+																				: 'w-[100px] px-2 justify-center text-black bg-[#DADAFC] hover:bg-[#C4C4F5] active:bg-[#B0B0E8] -translate-x-[30px]',
+																			isHandwrittenMode && 'opacity-50 cursor-not-allowed'
+																		)}
+																	>
+																		<span className="absolute left-0 h-full border-l border-black"></span>
+																		<span>
+																			{form.watch('isAiSubject') ? 'on' : 'Auto off'}
+																		</span>
+																		<span className="absolute right-0 h-full border-r border-black"></span>
+																	</button>
+
+																	<div className={cn('flex-grow h-full', 'bg-white')}>
+																		<Input
+																			{...field}
+																			className={cn(
+																				'w-full h-full !bg-transparent pl-4 pr-3 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 max-[480px]:placeholder:text-[10px] max-[480px]:!transition-none max-[480px]:!duration-0',
+																				form.watch('isAiSubject')
+																					? '!text-[#969696] placeholder:!text-[#969696]'
+																					: shouldShowSubjectRedStyling
+																					? '!text-[#A20000] placeholder:!text-[#A20000]'
+																					: '!text-black placeholder:!text-black',
+																				!form.watch('isAiSubject') && 'max-[480px]:pl-2'
+																			)}
+																			placeholder={
+																				form.watch('isAiSubject')
+																					? 'Automated Subject Line'
+																					: 'Write your subject here. *required'
 																			}
-																			field.onBlur();
-																		}}
-																		onChange={(e) => {
-																			if (!form.watch('isAiSubject') && e.target.value) {
-																				setHasSubjectBeenTouched(true);
+																			disabled={form.watch('isAiSubject')}
+																			onFocus={(e) =>
+																				!form.watch('isAiSubject') &&
+																				trackFocusedField?.('subject', e.target)
 																			}
-																			field.onChange(e);
-																		}}
-																	/>
+																			onBlur={() => {
+																				if (!form.watch('isAiSubject')) {
+																					setHasSubjectBeenTouched(true);
+																				}
+																				field.onBlur();
+																			}}
+																			onChange={(e) => {
+																				if (!form.watch('isAiSubject') && e.target.value) {
+																					setHasSubjectBeenTouched(true);
+																				}
+																				field.onChange(e);
+																			}}
+																		/>
+																	</div>
 																</div>
-															</div>
-														</FormControl>
-														<FormMessage />
-													</FormItem>
-												)}
-											/>
-										</div>
+															</FormControl>
+															<FormMessage />
+														</FormItem>
+													)}
+												/>
+											</div>
+										)}
 									</div>
-									<div className="flex-1 flex flex-col" data-hpi-content>
-										{/* Content area */}
+								<div className="flex-1 flex flex-col" data-hpi-content>
+									{/* Profile Tab Content */}
+									{activeTab === 'profile' && (
 										<div className="pt-[20px] max-[480px]:pt-[8px] pr-3 pb-3 pl-3 flex flex-col gap-4 items-center flex-1">
-											{fields.length === 0 && (
-												<span className="text-gray-300 font-primary text-[12px]">
-													Add blocks here to build your prompt...
-												</span>
-											)}
-											<SortableContext
-												items={fields.map((f) => f.id)}
-												strategy={verticalListSortingStrategy}
-											>
+											{/* Empty Profile tab - ready for your design */}
+										</div>
+									)}
+									{/* Main Content area */}
+									{activeTab === 'main' && (
+									<div className="pt-[20px] max-[480px]:pt-[8px] pr-3 pb-3 pl-3 flex flex-col gap-4 items-center flex-1">
+										{fields.length === 0 && (
+											<span className="text-gray-300 font-primary text-[12px]">
+												Add blocks here to build your prompt...
+											</span>
+										)}
+										<SortableContext
+											items={fields.map((f) => f.id)}
+											strategy={verticalListSortingStrategy}
+										>
 												{(() => {
 													const orderedHybridTypes = [
 														HybridBlock.introduction,
@@ -1890,10 +1913,11 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 												})()}
 											</SortableContext>
 										</div>
+									)}
 									</div>
 
 									{/* In Test Preview, keep Signature inside the left panel so it doesn't float */}
-									{showTestPreview && (
+									{showTestPreview && activeTab !== 'profile' && (
 										<div className={cn('px-3 pb-0 pt-0 flex justify-center mt-auto')}>
 											<FormField
 												control={form.control}
@@ -1939,41 +1963,43 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 							{/* Bottom-anchored footer with Signature and Test */}
 							<div className="flex flex-col items-center mt-auto w-full" data-hpi-footer>
 								{/* Signature Block - always visible; positioned above Test with fixed gap */}
-								<FormField
-									control={form.control}
-									name="signature"
-									render={({ field }) => (
-										<FormItem className={cn(!compactLeftOnly ? 'mb-[23px]' : 'mb-[9px]')}>
-											<div
-												className={cn(
-													'min-h-[57px] border-2 border-gray-400 rounded-md bg-white px-4 py-2',
-													'w-[89.33vw] max-w-[475px]'
-												)}
-												data-hpi-signature-card
-											>
-												<FormLabel className="text-base font-semibold font-secondary">
-													Signature
-												</FormLabel>
-												<FormControl>
-													<Textarea
-														placeholder="Enter your signature..."
-														className="border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 mt-1 p-0 resize-none overflow-hidden bg-white max-[480px]:text-[10px] signature-textarea"
-														style={{
-															fontFamily: form.watch('font') || 'Arial',
-														}}
-														onInput={(e: React.FormEvent<HTMLTextAreaElement>) => {
-															const target = e.currentTarget;
-															target.style.height = 'auto';
-															target.style.height = target.scrollHeight + 'px';
-														}}
-														{...field}
-													/>
-												</FormControl>
-											</div>
-											<FormMessage />
-										</FormItem>
-									)}
-								/>
+								{activeTab !== 'profile' && (
+									<FormField
+										control={form.control}
+										name="signature"
+										render={({ field }) => (
+											<FormItem className={cn(!compactLeftOnly ? 'mb-[23px]' : 'mb-[9px]')}>
+												<div
+													className={cn(
+														'min-h-[57px] border-2 border-gray-400 rounded-md bg-white px-4 py-2',
+														'w-[89.33vw] max-w-[475px]'
+													)}
+													data-hpi-signature-card
+												>
+													<FormLabel className="text-base font-semibold font-secondary">
+														Signature
+													</FormLabel>
+													<FormControl>
+														<Textarea
+															placeholder="Enter your signature..."
+															className="border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 mt-1 p-0 resize-none overflow-hidden bg-white max-[480px]:text-[10px] signature-textarea"
+															style={{
+																fontFamily: form.watch('font') || 'Arial',
+															}}
+															onInput={(e: React.FormEvent<HTMLTextAreaElement>) => {
+																const target = e.currentTarget;
+																target.style.height = 'auto';
+																target.style.height = target.scrollHeight + 'px';
+															}}
+															{...field}
+														/>
+													</FormControl>
+												</div>
+												<FormMessage />
+											</FormItem>
+										)}
+									/>
+								)}
 
 								{/* Test button and notices (hidden in compact mode) */}
 								{compactLeftOnly ? null : (
