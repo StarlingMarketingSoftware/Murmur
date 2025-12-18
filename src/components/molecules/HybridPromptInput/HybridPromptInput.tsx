@@ -1457,7 +1457,22 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 									{/* Removed explicit drag bar; header below acts as the drag handle */}
 									{/* Subject header inside the box */}
 									<div ref={headerSectionRef} className={cn('pt-0 pb-0')}>
-										<div className={!compactLeftOnly ? 'bg-white' : ''}>
+										<div className={cn(!compactLeftOnly ? 'bg-white' : '', 'relative h-[40px]')}>
+											{/* Left 152px gray background */}
+											{!compactLeftOnly && (
+												<div
+													className="absolute left-0 top-0 h-full w-[152px] bg-[#f8f8f8] z-0"
+													style={{ pointerEvents: 'none' }}
+												/>
+											)}
+											{/* Profile label centered in the 152px gray area */}
+											{!compactLeftOnly && (
+												<span
+													className="absolute left-0 top-0 h-full w-[152px] flex items-center justify-center font-inter font-semibold text-[11.7px] max-[480px]:text-[14px] text-black z-10"
+												>
+													Profile
+												</span>
+											)}
 											<div
 												className={cn(
 													'h-[40px] flex items-center relative z-20',
@@ -1466,16 +1481,20 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 												data-left-drag-handle
 												data-root-drag-handle
 											>
-												<span
-													className={cn(
-														'font-inter font-semibold text-[17px] max-[480px]:text-[20px] mr-[56px] max-[480px]:mr-[22px] text-black'
-													)}
-												>
-													Mode
-												</span>
+												{compactLeftOnly && (
+													<span
+														className={cn(
+															'font-inter font-semibold text-[11.7px] max-[480px]:text-[14px] ml-[8px] mr-[112px] max-[480px]:mr-[22px] text-black relative z-10'
+														)}
+													>
+														Profile
+													</span>
+												)}
+												{/* Spacer to keep toggles in position */}
+												{!compactLeftOnly && <div className="w-[152px] shrink-0" />}
 												<div
 													ref={modeContainerRef}
-													className="relative flex items-center gap-[67px] max-[480px]:gap-0 max-[480px]:justify-between max-[480px]:ml-[2px] flex-1 max-[480px]:w-auto max-[480px]:pr-[4.4vw]"
+													className="relative flex items-center gap-[67px] max-[480px]:gap-0 max-[480px]:justify-between ml-[24px] max-[480px]:ml-[2px] flex-1 max-[480px]:w-auto max-[480px]:pr-[4.4vw]"
 												>
 													<DndContext
 														onDragEnd={handleHighlightDragEnd}
