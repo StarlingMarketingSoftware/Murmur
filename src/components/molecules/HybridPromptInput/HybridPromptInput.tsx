@@ -1205,6 +1205,9 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 	// Track which tab is active: 'main' (the normal Writing view) or 'profile'
 	const [activeTab, setActiveTab] = useState<'main' | 'profile'>('main');
 
+	// Track if user has ever left the profile tab (to show red for incomplete fields after returning)
+	const [hasLeftProfileTab, setHasLeftProfileTab] = useState(false);
+
 	// Track which profile box is expanded (null = none expanded)
 	const [expandedProfileBox, setExpandedProfileBox] = useState<string | null>(null);
 	const expandedProfileBoxRef = useRef<HTMLDivElement>(null);
@@ -1348,7 +1351,9 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 
 	const getProfileHeaderBg = (field: ProfileField) => {
 		if (expandedProfileBox === field) return '#E0E0E0';
-		return profileFields[field].trim() ? '#94DB96' : '#E0E0E0';
+		if (profileFields[field].trim()) return '#94DB96';
+		// Show red only if user has left the profile tab before
+		return hasLeftProfileTab ? '#E47979' : '#E0E0E0';
 	};
 
 	const getProfileHeaderText = (
@@ -1656,6 +1661,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 											{/* Profile label centered in the 152px gray area - clickable to switch tabs */}
 											{!compactLeftOnly && (() => {
 												const isProfileIncomplete = !profileFields.name.trim() || !profileFields.genre.trim() || !profileFields.area.trim() || !profileFields.bio.trim();
+												const showRedWarning = hasLeftProfileTab && isProfileIncomplete;
 												return (
 													<button
 														type="button"
@@ -1664,7 +1670,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 															"absolute left-0 top-0 h-full w-[152px] flex items-center justify-center font-inter font-semibold text-[11.7px] max-[480px]:text-[14px] z-30 cursor-pointer bg-transparent transition-colors",
 															activeTab === 'profile'
 																? 'text-black bg-[#94DB96] hover:bg-[#94DB96] border-r border-r-black border-t-0 border-b-0 border-l-0'
-																: isProfileIncomplete
+																: showRedWarning
 																	? 'text-black bg-[#E47979] hover:bg-[#E47979] border-r border-r-black border-t-0 border-b-0 border-l-0'
 																	: 'text-black hover:bg-[#eeeeee] border-0'
 														)}
@@ -1723,7 +1729,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																? 'text-black'
 																: 'text-[#AFAFAF] hover:text-[#8F8F8F]'
 														)}
-														onClick={() => { setActiveTab('main'); switchToFull(); }}
+														onClick={() => { setActiveTab('main'); setHasLeftProfileTab(true); switchToFull(); }}
 													>
 														Full Auto
 													</Button>
@@ -1743,7 +1749,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																? 'text-black'
 																: 'text-[#AFAFAF] hover:text-[#8F8F8F]'
 														)}
-														onClick={() => { setActiveTab('main'); switchToManual(); }}
+														onClick={() => { setActiveTab('main'); setHasLeftProfileTab(true); switchToManual(); }}
 													>
 														Manual
 													</Button>
@@ -1765,7 +1771,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																? 'text-black'
 																: 'text-[#AFAFAF] hover:text-[#8F8F8F]'
 														)}
-														onClick={() => { setActiveTab('main'); switchToHybrid(); }}
+														onClick={() => { setActiveTab('main'); setHasLeftProfileTab(true); switchToHybrid(); }}
 													>
 														Hybrid
 													</Button>
