@@ -66,6 +66,13 @@ import BottomFolderIcon from '@/components/atoms/_svg/BottomFolderIcon';
 import LeftArrow from '@/components/atoms/_svg/LeftArrow';
 import RightArrow from '@/components/atoms/_svg/RightArrow';
 
+type IdentityProfileFields = Identity & {
+	genre?: string | null;
+	area?: string | null;
+	bandName?: string | null;
+	bio?: string | null;
+};
+
 const DEFAULT_STATE_SUGGESTIONS = [
 	{
 		label: 'New York',
@@ -794,10 +801,20 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 						contact.firstName || ''
 					).replace('{company}', contact.company || '');
 
-					const userPrompt = `Sender information\n: ${stringifyJsonSubset<Identity>(
-						campaign.identity,
-						['name', 'website']
-					)}\n\nRecipient information: ${stringifyJsonSubset<Contact>(contact as Contact, [
+					const identityProfile = campaign.identity as IdentityProfileFields;
+					const senderProfile = {
+						name: identityProfile.name,
+						bandName: identityProfile.bandName ?? undefined,
+						genre: identityProfile.genre ?? undefined,
+						area: identityProfile.area ?? undefined,
+						bio: identityProfile.bio ?? undefined,
+						website: identityProfile.website ?? undefined,
+					};
+
+					const userPrompt = `Sender information (user profile):\n${stringifyJsonSubset(
+						senderProfile,
+						['name', 'bandName', 'genre', 'area', 'bio', 'website']
+					)}\n\nRecipient information:\n${stringifyJsonSubset<Contact>(contact as Contact, [
 						'lastName',
 						'firstName',
 						'email',
@@ -809,7 +826,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 						'website',
 						'phone',
 						'metadata',
-					])}\n\nUser Goal: ${fullAiPrompt}`;
+					])}\n\nUser Goal:\n${fullAiPrompt}`;
 
 					// Pick a random model for regeneration
 					const selectedModel = OPENROUTER_DRAFTING_MODELS[Math.floor(Math.random() * OPENROUTER_DRAFTING_MODELS.length)];
@@ -849,8 +866,22 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 						'metadata',
 					]);
 
-					const stringifiedSender = stringifyJsonSubset<Identity>(campaign.identity, [
+					const identityProfile = campaign.identity as IdentityProfileFields;
+					const senderProfile = {
+						name: identityProfile.name,
+						bandName: identityProfile.bandName ?? undefined,
+						genre: identityProfile.genre ?? undefined,
+						area: identityProfile.area ?? undefined,
+						bio: identityProfile.bio ?? undefined,
+						website: identityProfile.website ?? undefined,
+					};
+
+					const stringifiedSender = stringifyJsonSubset(senderProfile, [
 						'name',
+						'bandName',
+						'genre',
+						'area',
+						'bio',
 						'website',
 					]);
 

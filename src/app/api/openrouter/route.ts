@@ -5,9 +5,13 @@ import {
 	handleApiError,
 } from '@/app/api/_utils';
 import { fetchOpenRouter } from '@/app/api/_utils/openrouter';
+import { OPENROUTER_DRAFTING_MODELS } from '@/constants/ai';
 import { auth } from '@clerk/nextjs/server';
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
+
+const ALLOWED_OPENROUTER_DRAFTING_MODELS = new Set<string>(OPENROUTER_DRAFTING_MODELS);
+const DEFAULT_OPENROUTER_DRAFTING_MODEL = OPENROUTER_DRAFTING_MODELS[0];
 
 const postOpenRouterSchema = z.object({
 	model: z.string().min(1),
@@ -41,7 +45,7 @@ export async function POST(request: NextRequest) {
 		if (!validatedData.success) {
 			return apiBadRequest(validatedData.error);
 		}
-		const { prompt, model, content, debug } = validatedData.data;
+		const { prompt, model: requestedModel, content, debug } = validatedData.data;
 
 		const requestId = `${Date.now().toString(36)}-${Math.random()
 			.toString(36)
@@ -54,6 +58,16 @@ export async function POST(request: NextRequest) {
 			debug?.source ? `source=${debug.source}` : null,
 		].filter(Boolean);
 		const label = labelParts.length ? ` ${labelParts.join(' ')}` : '';
+
+		// Drafting is Grok-only; ignore/override any other requested model.
+		const model = ALLOWED_OPENROUTER_DRAFTING_MODELS.has(requestedModel)
+			? requestedModel
+			: DEFAULT_OPENROUTER_DRAFTING_MODEL;
+		if (model !== requestedModel) {
+			console.warn(
+				`[OpenRouter][${requestId}] overriding requestedModel=${requestedModel} → model=${model}${label}`
+			);
+		}
 
 		// Give slower models more time.
 		const isSlowModel =

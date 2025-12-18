@@ -1,4 +1,4 @@
-import { MistralToneAgentType, PerplexityModel } from '@/types';
+import type { MistralToneAgentType, PerplexityModel } from '@/types';
 
 export const FULL_AI_DRAFTING_SYSTEM_PROMPT = `
 INSTRUCTIONS FOR EMAIL CONTENT:
@@ -11,6 +11,17 @@ Speak in more of a calm, professional, and friendly tone. Avoid being too casual
 Start with either "Hi All," "Hi Everyone," or if it's available in the data, "Hi {recipient_first_name}," or even "Hi Everyone at {company},"
 
 Then introduce yourself and your band. 
+
+You will be given structured input in the user message with these sections:
+- Sender information (your profile): user-entered fields such as name, band/artist name, genre, area, bio, and website (when provided).
+- Recipient information: details about who you are writing to, including any metadata about the venue/company.
+- User Goal: what the user wants this email to accomplish.
+
+Treat Sender information as ground-truth facts. Do NOT invent missing sender details.
+If provided, use these fields naturally when you introduce yourself:
+- genre = exactly what the user entered as their genre
+- area = exactly what the user entered as the area/location they are in
+- bio = exactly what the user entered as their bio
 
 Then proceed to demonstate in a friendly and professional manner, demonstating that you know about the venue from information in {metadata} demonstating that you have deep knowledge of their establishment.
 Be more freindly in how you mention {metadata} so it doesn't sound like you're reading from a script. Don't get overly specific with the facts you include. Just mention the venue name and that you've heard of them.
@@ -179,13 +190,8 @@ export const GEMINI_MODEL_OPTIONS = {
 	gemini3Pro: 'gemini-3-pro-preview',
 } as const;
 
-// OpenRouter models for Full AI drafting - shuffled round-robin during batch generation
-export const OPENROUTER_DRAFTING_MODELS = [
-	'x-ai/grok-4.1-fast',
-	'qwen/qwen3-235b-a22b-2507',
-	'x-ai/grok-4.1-fast',
-	'deepseek/deepseek-v3.2',
-] as const;
+// OpenRouter model(s) for Full AI drafting
+export const OPENROUTER_DRAFTING_MODELS = ['x-ai/grok-4.1-fast'] as const;
 
 export type OpenRouterDraftingModel = (typeof OPENROUTER_DRAFTING_MODELS)[number];
 

@@ -112,6 +112,13 @@ export type HybridBlockPrompt = {
 	isCollapsed?: boolean;
 };
 
+type IdentityProfileFields = Identity & {
+	genre?: string | null;
+	area?: string | null;
+	bandName?: string | null;
+	bio?: string | null;
+};
+
 export type HybridBlockPrompts = {
 	availableBlocks: HybridBlock[];
 	blocks: HybridBlockPrompt[];
@@ -617,10 +624,20 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			recipient.firstName || ''
 		).replace('{company}', recipient.company || '');
 
-		const userPrompt = `Sender information\n: ${stringifyJsonSubset<Identity>(
-			campaign.identity,
-			['name', 'website']
-		)}\n\nRecipient information: ${stringifyJsonSubset<Contact>(recipient, [
+		const identityProfile = campaign.identity as IdentityProfileFields;
+		const senderProfile = {
+			name: identityProfile.name,
+			bandName: identityProfile.bandName ?? undefined,
+			genre: identityProfile.genre ?? undefined,
+			area: identityProfile.area ?? undefined,
+			bio: identityProfile.bio ?? undefined,
+			website: identityProfile.website ?? undefined,
+		};
+
+		const userPrompt = `Sender information (user profile):\n${stringifyJsonSubset(
+			senderProfile,
+			['name', 'bandName', 'genre', 'area', 'bio', 'website']
+		)}\n\nRecipient information:\n${stringifyJsonSubset<Contact>(recipient, [
 			'lastName',
 			'firstName',
 			'email',
@@ -632,7 +649,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			'website',
 			'phone',
 			'metadata',
-		])}\n\nUser Goal: ${prompt}`;
+		])}\n\nUser Goal:\n${prompt}`;
 
 		// Debug logging for Full AI path
 		console.log(
@@ -762,8 +779,21 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			toast.error('Campaign identity is required');
 			throw new Error('Campaign identity is required');
 		}
-		const stringifiedSender = stringifyJsonSubset<Identity>(campaign.identity, [
+		const identityProfile = campaign.identity as IdentityProfileFields;
+		const senderProfile = {
+			name: identityProfile.name,
+			bandName: identityProfile.bandName ?? undefined,
+			genre: identityProfile.genre ?? undefined,
+			area: identityProfile.area ?? undefined,
+			bio: identityProfile.bio ?? undefined,
+			website: identityProfile.website ?? undefined,
+		};
+		const stringifiedSender = stringifyJsonSubset(senderProfile, [
 			'name',
+			'bandName',
+			'genre',
+			'area',
+			'bio',
 			'website',
 		]);
 		const stringifiedHybridBlocks = generateEmailTemplateFromBlocks(hybridBlocks);
