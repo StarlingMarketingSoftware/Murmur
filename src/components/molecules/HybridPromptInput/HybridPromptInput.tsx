@@ -2001,8 +2001,8 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 									/>
 								)}
 
-								{/* Test button and notices (hidden in compact mode) */}
-								{compactLeftOnly ? null : (
+								{/* Test button and notices (hidden in compact mode and profile tab) */}
+								{compactLeftOnly || activeTab === 'profile' ? null : (
 									<>
 										<div
 											className={cn(
