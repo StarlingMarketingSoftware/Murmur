@@ -1654,18 +1654,25 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 												/>
 											)}
 											{/* Profile label centered in the 152px gray area - clickable to switch tabs */}
-											{!compactLeftOnly && (
-												<button
-													type="button"
-													onClick={() => setActiveTab('profile')}
-													className={cn(
-														"absolute left-0 top-0 h-full w-[152px] flex items-center justify-center font-inter font-semibold text-[11.7px] max-[480px]:text-[14px] z-30 cursor-pointer border-0 bg-transparent transition-colors",
-														activeTab === 'profile' ? 'text-black bg-[#e8e8e8] hover:bg-[#e8e8e8]' : 'text-black hover:bg-[#eeeeee]'
-													)}
-												>
-													Profile
-												</button>
-											)}
+											{!compactLeftOnly && (() => {
+												const isProfileIncomplete = !profileFields.name.trim() || !profileFields.genre.trim() || !profileFields.area.trim() || !profileFields.bio.trim();
+												return (
+													<button
+														type="button"
+														onClick={() => setActiveTab('profile')}
+														className={cn(
+															"absolute left-0 top-0 h-full w-[152px] flex items-center justify-center font-inter font-semibold text-[11.7px] max-[480px]:text-[14px] z-30 cursor-pointer bg-transparent transition-colors",
+															activeTab === 'profile'
+																? 'text-black bg-[#94DB96] hover:bg-[#94DB96] border-r border-r-black border-t-0 border-b-0 border-l-0'
+																: isProfileIncomplete
+																	? 'text-black bg-[#E47979] hover:bg-[#E47979] border-r border-r-black border-t-0 border-b-0 border-l-0'
+																	: 'text-black hover:bg-[#eeeeee] border-0'
+														)}
+													>
+														Profile
+													</button>
+												);
+											})()}
 											<div
 												className={cn(
 													'h-[40px] flex items-center relative z-20',
