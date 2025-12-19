@@ -434,11 +434,11 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 					width: '100%',
 					height: '100%',
 					border: isContacts
-						? '2px solid #000000'
+						? '3px solid #000000'
 						: isDrafts
 						? '3px solid #000000'
 						: isSent
-						? '2px solid #19670F'
+						? '3px solid #19670F'
 						: '2px solid #ABABAB',
 					borderRadius: '8px',
 					position: 'relative',

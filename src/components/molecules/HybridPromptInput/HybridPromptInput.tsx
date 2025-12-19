@@ -1635,7 +1635,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 							className={`${
 								compactLeftOnly
 									? 'flex-col'
-									: 'w-[96.27vw] max-w-[499px] min-h-[703px] transition flex mx-auto flex-col border-[3px] border-black rounded-md bg-[#A6E2A8]'
+									: 'w-[96.27vw] max-w-[499px] h-[703px] transition flex mx-auto flex-col border-[3px] border-black rounded-[8px] bg-[#A6E2A8]'
 							} relative overflow-visible`}
 							style={!compactLeftOnly ? { backgroundColor: '#A6E2A8' } : undefined}
 							data-campaign-main-box={compactLeftOnly ? undefined : 'writing'}
@@ -1671,7 +1671,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 								dragHandleSelector="[data-left-drag-handle]"
 								enabled={false}
 								onDropOver={() => {}}
-								className="relative z-10"
+								className="relative z-10 flex flex-col flex-1 min-h-0"
 							>
 								<div
 									className={cn(
@@ -1684,7 +1684,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 									data-hpi-left-panel
 								>
 									{!compactLeftOnly && (
-										<div className="w-full h-[22px] border-b-[2px] border-black flex items-center px-[9px] bg-white rounded-t-[calc(0.375rem-3px)]">
+										<div className="w-full h-[22px] border-b-[2px] border-black flex items-center px-[9px] bg-white rounded-t-[5px]">
 											<span className="font-inter font-bold text-[12px] leading-none text-black">
 												Writing
 											</span>
@@ -1944,7 +1944,10 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 											</div>
 										)}
 									</div>
-								<div className="flex-1 flex flex-col" data-hpi-content>
+								<div
+									className="flex-1 min-h-0 flex flex-col overflow-y-auto hide-native-scrollbar"
+									data-hpi-content
+								>
 									{/* Profile Tab Content */}
 									{activeTab === 'profile' && (
 										<div className="pt-[20px] max-[480px]:pt-[8px] pr-3 pb-3 pl-3 flex flex-col gap-[18px] items-center flex-1">
@@ -2558,7 +2561,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 												</div>
 											)}
 											<div className="w-full h-[2px] bg-black" />
-											<div className="w-full h-[41px] flex items-center justify-center bg-white rounded-b-[calc(0.375rem-3px)]">
+											<div className="w-full h-[41px] flex items-center justify-center bg-white rounded-b-[5px]">
 												<Button
 													type="button"
 													onClick={() => {

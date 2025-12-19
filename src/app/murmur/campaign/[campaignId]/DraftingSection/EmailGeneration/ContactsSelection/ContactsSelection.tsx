@@ -1,6 +1,7 @@
 'use client';
 
 import { FC, useMemo, useState, useRef, useEffect } from 'react';
+import { gsap } from 'gsap';
 import { useRouter } from 'next/navigation';
 import { ContactsSelectionProps, useContactsSelection } from './useContactsSelection';
 import { cn } from '@/utils';
@@ -99,6 +100,8 @@ export const MiniSearchBar: FC<{
 	borderRadius,
 }) => {
 	const containerRef = useRef<HTMLDivElement>(null);
+	const activeSectionIndicatorRef = useRef<HTMLDivElement | null>(null);
+	const prevActiveSectionForIndicatorRef = useRef<'why' | 'what' | 'where' | null>(null);
 
 	// Handle clicks outside to deselect active section
 	useEffect(() => {
@@ -114,8 +117,91 @@ export const MiniSearchBar: FC<{
 		}
 	}, [activeSection, setActiveSection]);
 
+	// Animate the active section "pill" sliding between tabs (Why/What/Where) – match dashboard behavior
+	useEffect(() => {
+		const indicator = activeSectionIndicatorRef.current;
+		if (!indicator) return;
+
+		const xPercentForSection = (section: 'why' | 'what' | 'where') => {
+			switch (section) {
+				case 'why':
+					return 0;
+				case 'what':
+					return 100;
+				case 'where':
+					return 200;
+				default:
+					return 0;
+			}
+		};
+
+		// Hide when no active section (default state shows dividers)
+		if (!activeSection) {
+			gsap.to(indicator, {
+				opacity: 0,
+				duration: 0.15,
+				ease: 'power2.out',
+				overwrite: 'auto',
+			});
+			prevActiveSectionForIndicatorRef.current = null;
+			return;
+		}
+
+		const nextXPercent = xPercentForSection(activeSection);
+		const prevSection = prevActiveSectionForIndicatorRef.current;
+
+		// On first open, snap to position (no slide), then fade in
+		if (!prevSection) {
+			gsap.set(indicator, { xPercent: nextXPercent });
+			gsap.to(indicator, {
+				opacity: 1,
+				duration: 0.15,
+				ease: 'power2.out',
+				overwrite: 'auto',
+			});
+			prevActiveSectionForIndicatorRef.current = activeSection;
+			return;
+		}
+
+		// Between tabs, slide with requested timing/ease (width/height remain constant)
+		gsap.to(indicator, {
+			xPercent: nextXPercent,
+			duration: 0.6,
+			ease: 'power2.out',
+			overwrite: 'auto',
+		});
+		gsap.to(indicator, {
+			opacity: 1,
+			duration: 0.15,
+			ease: 'power2.out',
+			overwrite: 'auto',
+		});
+
+		prevActiveSectionForIndicatorRef.current = activeSection;
+	}, [activeSection]);
+
 	// Use compact layout for side panel (44px height)
 	const isCompact = height === '44px';
+
+	// Dropdown: keep fixed position (like "Why") and cross-fade between sections
+	const dropdownEase = 'cubic-bezier(0.22, 1, 0.36, 1)';
+	const dropdownTransition = `height 0.6s ${dropdownEase}`;
+	const dropdownFadeTransition = `opacity 0.35s ${dropdownEase}`;
+
+	const dropdownHeight =
+		activeSection === 'why'
+			? 173
+			: activeSection === 'what'
+				? whyValue === '[Promotion]'
+					? 92
+					: 404
+				: activeSection === 'where'
+					? 300
+					: 0;
+
+	// Keep the dropdown anchored where "Why" is
+	const dropdownLeft = '25px';
+	const dropdownTransform = 'translateX(0)';
 
 	return (
 		<div
@@ -134,45 +220,34 @@ export const MiniSearchBar: FC<{
 				{/* Sections container - matches dashboard styling */}
 				<div
 					className={cn(
-						'relative ml-[3px] rounded-[6px] flex-1 h-[50px] font-secondary',
+						'relative ml-[3px] rounded-[6px] flex-1 h-[50px] font-secondary flex items-center',
 						activeSection
 							? 'bg-[#EFEFEF] border border-transparent'
 							: 'bg-white border border-black'
 					)}
 					style={isCompact ? { height: '38px' } : undefined}
 				>
-					{/* Vertical dividers */}
+					{/* Sliding active tab indicator */}
 					<div
-						className={cn(
-							'absolute left-[33%] top-0 bottom-0 w-[2px] bg-black/10',
-							activeSection && 'hidden'
-						)}
-					/>
-					<div
-						className={cn(
-							'absolute left-[66%] top-0 bottom-0 w-[2px] bg-black/10',
-							activeSection && 'hidden'
-						)}
+						ref={activeSectionIndicatorRef}
+						className="absolute top-0 left-0 h-full w-1/3 bg-white border border-black rounded-[6px] pointer-events-none z-10"
+						style={{ opacity: 0, willChange: 'transform' }}
 					/>
 
 					{/* Kind/Why section */}
 					<div
 						className={cn(
-							'absolute left-0 top-[-1px] cursor-pointer border',
+							'relative h-full cursor-pointer border flex-1 min-w-0',
 							activeSection === 'why'
-								? 'bg-white border-black z-30 rounded-[6px]'
+								? 'bg-transparent border-transparent rounded-[6px]'
 								: `border-transparent ${
 										activeSection ? 'hover:bg-[#F9F9F9]' : 'hover:bg-black/5'
 								  } rounded-l-[6px]`
 						)}
-						style={{
-							width: activeSection === 'why' ? 'calc(33% + 2px)' : '33%',
-							height: isCompact ? '38px' : '50px',
-						}}
 						onClick={() => setActiveSection(activeSection === 'why' ? null : 'why')}
 					>
 						<div
-							className="absolute left-[16px] font-bold text-black leading-none"
+							className="absolute left-[16px] font-bold text-black leading-none z-20"
 							style={{
 								top: isCompact ? '6px' : '8px',
 								fontSize: isCompact ? '13px' : '18px',
@@ -181,7 +256,7 @@ export const MiniSearchBar: FC<{
 							Why
 						</div>
 						<div
-							className="absolute left-[16px] right-[8px]"
+							className="absolute left-[16px] right-[8px] z-20"
 							style={{ top: isCompact ? '22px' : '30px' }}
 						>
 							<div
@@ -200,24 +275,27 @@ export const MiniSearchBar: FC<{
 						</div>
 					</div>
 
+					<div
+						className={cn(
+							'w-[2px] h-full bg-black/10 flex-shrink-0',
+							activeSection && 'hidden'
+						)}
+					/>
+
 					{/* Who/What section */}
 					<div
 						className={cn(
-							'absolute left-[33%] top-[-1px] cursor-pointer border',
+							'relative h-full cursor-pointer border flex-1 min-w-0 overflow-hidden',
 							activeSection === 'what'
-								? 'bg-white border-black z-30 rounded-[6px]'
+								? 'bg-transparent border-transparent rounded-[6px]'
 								: `border-transparent ${
 										activeSection ? 'hover:bg-[#F9F9F9]' : 'hover:bg-black/5'
 								  }`
 						)}
-						style={{
-							width: activeSection === 'what' ? 'calc(33% + 2px)' : '33%',
-							height: isCompact ? '38px' : '50px',
-						}}
 						onClick={() => setActiveSection('what')}
 					>
 						<div
-							className="absolute left-[16px] font-bold text-black leading-none"
+							className="absolute left-[16px] font-bold text-black leading-none z-20"
 							style={{
 								top: isCompact ? '6px' : '8px',
 								fontSize: isCompact ? '13px' : '18px',
@@ -226,7 +304,7 @@ export const MiniSearchBar: FC<{
 							What
 						</div>
 						<div
-							className="absolute left-[16px] right-[8px]"
+							className="absolute left-[16px] right-[8px] z-20"
 							style={{ top: isCompact ? '22px' : '30px' }}
 						>
 							{activeSection === 'what' ? (
@@ -241,7 +319,7 @@ export const MiniSearchBar: FC<{
 										}
 									}}
 									onFocus={(e) => e.target.select()}
-									className="w-full font-semibold text-black bg-transparent outline-none border-none"
+									className="w-full font-semibold text-black bg-transparent outline-none border-none relative z-20"
 									style={{
 										fontSize: isCompact ? '9px' : '11px',
 										lineHeight: '12px',
@@ -256,7 +334,7 @@ export const MiniSearchBar: FC<{
 								/>
 							) : (
 								<div
-									className="font-semibold whitespace-nowrap hover:text-black/60 transition-colors"
+									className="font-semibold whitespace-nowrap hover:text-black/60 transition-colors relative z-20"
 									style={{
 										fontSize: isCompact ? '9px' : '11px',
 										lineHeight: '12px',
@@ -273,24 +351,27 @@ export const MiniSearchBar: FC<{
 						</div>
 					</div>
 
+					<div
+						className={cn(
+							'w-[2px] h-full bg-black/10 flex-shrink-0',
+							activeSection && 'hidden'
+						)}
+					/>
+
 					{/* Where section */}
 					<div
 						className={cn(
-							'absolute left-[66%] top-[-1px] cursor-pointer border',
+							'relative h-full cursor-pointer border flex-1 min-w-0 overflow-hidden',
 							activeSection === 'where'
-								? 'bg-white border-black z-30 rounded-[6px]'
+								? 'bg-transparent border-transparent rounded-[6px]'
 								: `border-transparent ${
 										activeSection ? 'hover:bg-[#F9F9F9]' : 'hover:bg-black/5'
 								  } rounded-r-[6px]`
 						)}
-						style={{
-							width: activeSection === 'where' ? 'calc(34% + 2px)' : '34%',
-							height: isCompact ? '38px' : '50px',
-						}}
 						onClick={() => setActiveSection('where')}
 					>
 						<div
-							className="absolute left-[16px] font-bold text-black leading-none"
+							className="absolute left-[16px] font-bold text-black leading-none z-20"
 							style={{
 								top: isCompact ? '6px' : '8px',
 								fontSize: isCompact ? '13px' : '18px',
@@ -299,7 +380,7 @@ export const MiniSearchBar: FC<{
 							Where
 						</div>
 						<div
-							className="absolute left-[16px] right-[8px]"
+							className="absolute left-[16px] right-[8px] z-20"
 							style={{ top: isCompact ? '22px' : '30px' }}
 						>
 							{activeSection === 'where' ? (
@@ -314,7 +395,7 @@ export const MiniSearchBar: FC<{
 										}
 									}}
 									onFocus={(e) => e.target.select()}
-									className="w-full font-semibold text-black bg-transparent outline-none border-none"
+									className="w-full font-semibold text-black bg-transparent outline-none border-none relative z-20"
 									style={{
 										fontSize: isCompact ? '9px' : '11px',
 										lineHeight: '12px',
@@ -329,7 +410,7 @@ export const MiniSearchBar: FC<{
 								/>
 							) : (
 								<div
-									className="font-semibold whitespace-nowrap hover:text-black/60 transition-colors"
+									className="font-semibold whitespace-nowrap hover:text-black/60 transition-colors relative z-20"
 									style={{
 										fontSize: isCompact ? '9px' : '11px',
 										lineHeight: '12px',
@@ -383,357 +464,367 @@ export const MiniSearchBar: FC<{
 				</button>
 			</div>
 
-			{/* Dropdowns */}
-			{/* Why dropdown */}
-			{activeSection === 'why' && (
+			{/* Dropdowns (animated like dashboard) */}
+			{activeSection && (
 				<div
-					className="absolute flex flex-col items-center justify-start gap-[12px] bg-[#D8E5FB] rounded-[16px] border-2 border-black z-[110]"
+					className="absolute bg-[#D8E5FB] rounded-[16px] border-2 border-black z-[110] overflow-hidden"
 					style={{
 						top: 'calc(100% + 10px)',
-						left: '25px',
-						padding: '12px 0',
+						left: dropdownLeft,
+						transform: dropdownTransform,
+						height: dropdownHeight,
 						width: 'min(439px, calc(100% - 50px))',
+						transition: dropdownTransition,
+						willChange: 'height',
 					}}
 				>
+					{/* Why dropdown */}
 					<div
-						className="h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex items-center px-[15px] cursor-pointer transition-colors duration-200"
-						style={{ width: 'min(415px, calc(100% - 24px))' }}
-						onClick={() => {
-							setWhyValue('[Booking]');
-							setActiveSection('what');
+						className="absolute inset-0"
+						style={{
+							opacity: activeSection === 'why' ? 1 : 0,
+							pointerEvents: activeSection === 'why' ? 'auto' : 'none',
+							transition: dropdownFadeTransition,
+							willChange: 'opacity',
 						}}
 					>
-						<div className="w-[38px] h-[38px] bg-[#9DCBFF] rounded-[8px] flex-shrink-0 flex items-center justify-center">
-							<BookingIcon />
-						</div>
-						<div className="ml-[12px] flex flex-col">
-							<div className="text-[20px] font-medium leading-none text-black font-inter">
-								Booking
+						<div className="flex flex-col items-center justify-start gap-[12px] w-full h-full py-[12px]">
+							<div
+								className="h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+								style={{ width: 'min(415px, calc(100% - 24px))' }}
+								onClick={() => {
+									setWhyValue('[Booking]');
+									setActiveSection('what');
+								}}
+							>
+								<div className="w-[38px] h-[38px] bg-[#9DCBFF] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+									<BookingIcon />
+								</div>
+								<div className="ml-[12px] flex flex-col">
+									<div className="text-[20px] font-medium leading-none text-black font-inter">
+										Booking
+									</div>
+									<div className="text-[12px] leading-tight text-black mt-[4px] max-w-[300px]">
+										contact venues, restaurants and more, to book shows
+									</div>
+								</div>
 							</div>
-							<div className="text-[12px] leading-tight text-black mt-[4px] max-w-[300px]">
-								contact venues, restaurants and more, to book shows
+							<div
+								className="h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+								style={{ width: 'min(415px, calc(100% - 24px))' }}
+								onClick={() => {
+									setWhyValue('[Promotion]');
+									setActiveSection('what');
+								}}
+							>
+								<div className="w-[38px] h-[38px] bg-[#7AD47A] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+									<PromotionIcon />
+								</div>
+								<div className="ml-[12px] flex flex-col">
+									<div className="text-[20px] font-medium leading-none text-black font-inter">
+										Promotion
+									</div>
+									<div className="text-[12px] leading-tight text-black mt-[4px] max-w-[300px]">
+										reach out to radio stations, playlists, and more
+									</div>
+								</div>
 							</div>
 						</div>
 					</div>
+
+					{/* What dropdown */}
 					<div
-						className="h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex items-center px-[15px] cursor-pointer transition-colors duration-200"
-						style={{ width: 'min(415px, calc(100% - 24px))' }}
-						onClick={() => {
-							setWhyValue('[Promotion]');
-							setActiveSection('what');
+						className="absolute inset-0"
+						style={{
+							opacity: activeSection === 'what' ? 1 : 0,
+							pointerEvents: activeSection === 'what' ? 'auto' : 'none',
+							transition: dropdownFadeTransition,
+							willChange: 'opacity',
 						}}
 					>
-						<div className="w-[38px] h-[38px] bg-[#7AD47A] rounded-[8px] flex-shrink-0 flex items-center justify-center">
-							<PromotionIcon />
-						</div>
-						<div className="ml-[12px] flex flex-col">
-							<div className="text-[20px] font-medium leading-none text-black font-inter">
-								Promotion
-							</div>
-							<div className="text-[12px] leading-tight text-black mt-[4px] max-w-[300px]">
-								reach out to radio stations, playlists, and more
-							</div>
-						</div>
-					</div>
-				</div>
-			)}
-
-			{/* What dropdown - Promotion */}
-			{activeSection === 'what' && whyValue === '[Promotion]' && (
-				<div
-					className="absolute flex flex-col items-center justify-start gap-[10px] bg-[#D8E5FB] rounded-[16px] border-2 border-black z-[110]"
-					style={{
-						top: 'calc(100% + 10px)',
-						left: '25px',
-						padding: '12px 0',
-						width: 'min(439px, calc(100% - 50px))',
-					}}
-				>
-					<div
-						className="h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
-						style={{ width: 'min(415px, calc(100% - 24px))' }}
-						onClick={() => {
-							setWhatValue('Radio Stations');
-							setActiveSection('where');
-						}}
-					>
-						<div className="w-[38px] h-[38px] bg-[#56DA73] rounded-[8px] flex-shrink-0 flex items-center justify-center">
-							<RadioStationsIcon />
-						</div>
-						<div className="ml-[12px] flex flex-col">
-							<div className="text-[20px] font-medium leading-none text-black font-inter">
-								Radio Stations
-							</div>
-							<div className="text-[12px] leading-tight text-black mt-[4px]">
-								Reach out to radio stations
-							</div>
-						</div>
-					</div>
-				</div>
-			)}
-
-			{/* What dropdown - Booking */}
-			{activeSection === 'what' && whyValue !== '[Promotion]' && (
-				<div
-					id="contacts-what-dropdown"
-					className="absolute h-[404px] bg-[#D8E5FB] rounded-[16px] border-2 border-black z-[110]"
-					style={{
-						top: 'calc(100% + 10px)',
-						left: '25px',
-						width: 'min(439px, calc(100% - 50px))',
-					}}
-				>
-					<style jsx global>{`
-						#contacts-what-dropdown .scrollbar-hide,
-						#contacts-what-dropdown [data-scrollbar-content] {
-							scrollbar-width: none !important;
-							-ms-overflow-style: none !important;
-						}
-						#contacts-what-dropdown .scrollbar-hide::-webkit-scrollbar,
-						#contacts-what-dropdown [data-scrollbar-content]::-webkit-scrollbar {
-							display: none !important;
-							width: 0 !important;
-							height: 0 !important;
-						}
-					`}</style>
-					<CustomScrollbar
-						className="w-full h-full scrollbar-hide"
-						contentClassName="flex flex-col items-center gap-[10px] py-[12px] scrollbar-hide"
-						thumbWidth={2}
-						thumbColor="#000000"
-						trackColor="transparent"
-						offsetRight={-5}
-					>
-						<div
-							className="h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
-							style={{ width: 'min(415px, calc(100% - 24px))' }}
-							onClick={() => {
-								setWhatValue('Music Venues');
-								setActiveSection('where');
-							}}
-						>
-							<div className="w-[38px] h-[38px] bg-[#71C9FD] rounded-[8px] flex-shrink-0 flex items-center justify-center">
-								<MusicVenuesIcon />
-							</div>
-							<div className="ml-[12px] flex flex-col">
-								<div className="text-[20px] font-medium leading-none text-black font-inter">
-									Music Venues
-								</div>
-								<div className="text-[12px] leading-tight text-black mt-[4px]">
-									Reach talent buyers for live shows
-								</div>
-							</div>
-						</div>
-						<div
-							className="h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
-							style={{ width: 'min(415px, calc(100% - 24px))' }}
-							onClick={() => {
-								setWhatValue('Wine, Beer, and Spirits');
-								setActiveSection('where');
-							}}
-						>
-							<div className="w-[38px] h-[38px] bg-[#80AAFF] rounded-[8px] flex-shrink-0 flex items-center justify-center">
-								<WineBeerSpiritsIcon />
-							</div>
-							<div className="ml-[12px] flex flex-col">
-								<div className="text-[20px] font-medium leading-none text-black font-inter">
-									Wine, Beer, and Spirits
-								</div>
-								<div className="text-[12px] leading-tight text-black mt-[4px]">
-									Pitch your act for seasonal events
-								</div>
-							</div>
-						</div>
-						<div
-							className="h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
-							style={{ width: 'min(415px, calc(100% - 24px))' }}
-							onClick={() => {
-								setWhatValue('Restaurants');
-								setActiveSection('where');
-							}}
-						>
-							<div className="w-[38px] h-[38px] bg-[#77DD91] rounded-[8px] flex-shrink-0 flex items-center justify-center">
-								<RestaurantsIcon />
-							</div>
-							<div className="ml-[12px] flex flex-col">
-								<div className="text-[20px] font-medium leading-none text-black font-inter">
-									Restaurants
-								</div>
-								<div className="text-[12px] leading-tight text-black mt-[4px]">
-									Land steady dinner and brunch gigs
-								</div>
-							</div>
-						</div>
-						<div
-							className="h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
-							style={{ width: 'min(415px, calc(100% - 24px))' }}
-							onClick={() => {
-								setWhatValue('Coffee Shops');
-								setActiveSection('where');
-							}}
-						>
-							<div className="w-[38px] h-[38px] bg-[#A9DE78] rounded-[8px] flex-shrink-0 flex items-center justify-center">
-								<CoffeeShopsIcon />
-							</div>
-							<div className="ml-[12px] flex flex-col">
-								<div className="text-[20px] font-medium leading-none text-black font-inter">
-									Coffee Shops
-								</div>
-								<div className="text-[12px] leading-tight text-black mt-[4px]">
-									Book intimate daytime performances
-								</div>
-							</div>
-						</div>
-						<div
-							className="h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
-							style={{ width: 'min(415px, calc(100% - 24px))' }}
-							onClick={() => {
-								setWhatValue('Wedding Planners');
-								setActiveSection('where');
-							}}
-						>
-							<div className="w-[38px] h-[38px] bg-[#EED56E] rounded-[8px] flex-shrink-0 flex items-center justify-center">
-								<WeddingPlannersIcon />
-							</div>
-							<div className="ml-[12px] flex flex-col">
-								<div className="text-[20px] font-medium leading-none text-black font-inter">
-									Wedding Planners
-								</div>
-								<div className="text-[12px] leading-tight text-black mt-[4px]">
-									Get hired for ceremonies & receptions
-								</div>
-							</div>
-						</div>
-						<div
-							className="h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
-							style={{ width: 'min(415px, calc(100% - 24px))' }}
-							onClick={() => {
-								setWhatValue('Festivals');
-								setActiveSection('where');
-							}}
-						>
-							<div className="w-[38px] h-[38px] bg-[#80AAFF] rounded-[8px] flex-shrink-0 flex items-center justify-center">
-								<FestivalsIcon />
-							</div>
-							<div className="ml-[12px] flex flex-col">
-								<div className="text-[20px] font-medium leading-none text-black font-inter">
-									Festivals
-								</div>
-								<div className="text-[12px] leading-tight text-black mt-[4px]">
-									Pitch your act for seasonal events
-								</div>
-							</div>
-						</div>
-					</CustomScrollbar>
-				</div>
-			)}
-
-			{/* Where dropdown */}
-			{activeSection === 'where' && (
-				<div
-					id="contacts-where-dropdown"
-					className="absolute h-[300px] bg-[#D8E5FB] rounded-[16px] border-2 border-black z-[110]"
-					style={{
-						top: 'calc(100% + 10px)',
-						left: '25px',
-						width: 'min(439px, calc(100% - 50px))',
-					}}
-				>
-					<style jsx global>{`
-						#contacts-where-dropdown .scrollbar-hide,
-						#contacts-where-dropdown [data-scrollbar-content] {
-							scrollbar-width: none !important;
-							-ms-overflow-style: none !important;
-						}
-						#contacts-where-dropdown .scrollbar-hide::-webkit-scrollbar,
-						#contacts-where-dropdown [data-scrollbar-content]::-webkit-scrollbar {
-							display: none !important;
-							width: 0 !important;
-							height: 0 !important;
-						}
-					`}</style>
-					{whereValue.length >= 1 ? (
-						<CustomScrollbar
-							className="w-full h-full scrollbar-hide"
-							contentClassName="flex flex-col items-center justify-start gap-[12px] py-4 scrollbar-hide"
-							thumbWidth={2}
-							thumbColor="#000000"
-							trackColor="transparent"
-							offsetRight={-5}
-						>
-							{isLoadingLocations || debouncedWhereValue !== whereValue ? (
-								<div className="flex items-center justify-center h-full">
-									<div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900"></div>
-								</div>
-							) : locationResults && locationResults.length > 0 ? (
-								locationResults.map((loc, idx) => {
-									const { icon, backgroundColor } = getCityIconProps(loc.city, loc.state);
-									return (
-										<div
-											key={`${loc.city}-${loc.state}-${idx}`}
-											className="min-h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
-											style={{ width: 'min(415px, calc(100% - 24px))' }}
-											onClick={() => {
-												setWhereValue(loc.label);
-												setActiveSection(null);
-											}}
-										>
-											<div
-												className="w-[38px] h-[38px] rounded-[8px] flex-shrink-0 flex items-center justify-center"
-												style={{ backgroundColor }}
-											>
-												{icon}
-											</div>
-											<div className="ml-[12px] flex flex-col">
-												<div className="text-[20px] font-medium leading-none text-black font-inter">
-													{loc.label}
-												</div>
-												<div className="text-[12px] leading-tight text-black mt-[4px]">
-													Search contacts in {loc.city || loc.state}
-												</div>
-											</div>
+						{/* Promotion */}
+						{whyValue === '[Promotion]' ? (
+							<div className="flex flex-col items-center justify-start gap-[10px] w-full h-full py-[12px]">
+								<div
+									className="h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+									style={{ width: 'min(415px, calc(100% - 24px))' }}
+									onClick={() => {
+										setWhatValue('Radio Stations');
+										setActiveSection('where');
+									}}
+								>
+									<div className="w-[38px] h-[38px] bg-[#56DA73] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+										<RadioStationsIcon />
+									</div>
+									<div className="ml-[12px] flex flex-col">
+										<div className="text-[20px] font-medium leading-none text-black font-inter">
+											Radio Stations
 										</div>
-									);
-								})
-							) : (
-								<div className="text-black font-medium font-secondary py-4">
-									No locations found
+										<div className="text-[12px] leading-tight text-black mt-[4px]">
+											Reach out to radio stations
+										</div>
+									</div>
 								</div>
-							)}
-						</CustomScrollbar>
-					) : (
-						<div className="flex flex-col items-center justify-start gap-[12px] w-full h-full py-4">
-							{DEFAULT_STATE_SUGGESTIONS.map(({ label, description }) => {
-								const { icon, backgroundColor } = getCityIconProps('', label);
-								return (
+							</div>
+						) : (
+							<div id="contacts-what-dropdown" className="w-full h-full">
+								<style jsx global>{`
+									#contacts-what-dropdown .scrollbar-hide,
+									#contacts-what-dropdown [data-scrollbar-content] {
+										scrollbar-width: none !important;
+										-ms-overflow-style: none !important;
+									}
+									#contacts-what-dropdown .scrollbar-hide::-webkit-scrollbar,
+									#contacts-what-dropdown [data-scrollbar-content]::-webkit-scrollbar {
+										display: none !important;
+										width: 0 !important;
+										height: 0 !important;
+									}
+								`}</style>
+								<CustomScrollbar
+									className="w-full h-full scrollbar-hide"
+									contentClassName="flex flex-col items-center gap-[10px] py-[12px] scrollbar-hide"
+									thumbWidth={2}
+									thumbColor="#000000"
+									trackColor="transparent"
+									offsetRight={-5}
+								>
 									<div
-										key={label}
 										className="h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
 										style={{ width: 'min(415px, calc(100% - 24px))' }}
 										onClick={() => {
-											setWhereValue(label);
-											setActiveSection(null);
+											setWhatValue('Music Venues');
+											setActiveSection('where');
 										}}
 									>
-										<div
-											className="w-[38px] h-[38px] rounded-[8px] flex-shrink-0 flex items-center justify-center"
-											style={{ backgroundColor }}
-										>
-											{icon}
+										<div className="w-[38px] h-[38px] bg-[#71C9FD] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+											<MusicVenuesIcon />
 										</div>
 										<div className="ml-[12px] flex flex-col">
 											<div className="text-[20px] font-medium leading-none text-black font-inter">
-												{label}
+												Music Venues
 											</div>
 											<div className="text-[12px] leading-tight text-black mt-[4px]">
-												{description}
+												Reach talent buyers for live shows
 											</div>
 										</div>
 									</div>
-								);
-							})}
+									<div
+										className="h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+										style={{ width: 'min(415px, calc(100% - 24px))' }}
+										onClick={() => {
+											setWhatValue('Wine, Beer, and Spirits');
+											setActiveSection('where');
+										}}
+									>
+										<div className="w-[38px] h-[38px] bg-[#80AAFF] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+											<WineBeerSpiritsIcon />
+										</div>
+										<div className="ml-[12px] flex flex-col">
+											<div className="text-[20px] font-medium leading-none text-black font-inter">
+												Wine, Beer, and Spirits
+											</div>
+											<div className="text-[12px] leading-tight text-black mt-[4px]">
+												Pitch your act for seasonal events
+											</div>
+										</div>
+									</div>
+									<div
+										className="h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+										style={{ width: 'min(415px, calc(100% - 24px))' }}
+										onClick={() => {
+											setWhatValue('Restaurants');
+											setActiveSection('where');
+										}}
+									>
+										<div className="w-[38px] h-[38px] bg-[#77DD91] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+											<RestaurantsIcon />
+										</div>
+										<div className="ml-[12px] flex flex-col">
+											<div className="text-[20px] font-medium leading-none text-black font-inter">
+												Restaurants
+											</div>
+											<div className="text-[12px] leading-tight text-black mt-[4px]">
+												Land steady dinner and brunch gigs
+											</div>
+										</div>
+									</div>
+									<div
+										className="h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+										style={{ width: 'min(415px, calc(100% - 24px))' }}
+										onClick={() => {
+											setWhatValue('Coffee Shops');
+											setActiveSection('where');
+										}}
+									>
+										<div className="w-[38px] h-[38px] bg-[#A9DE78] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+											<CoffeeShopsIcon />
+										</div>
+										<div className="ml-[12px] flex flex-col">
+											<div className="text-[20px] font-medium leading-none text-black font-inter">
+												Coffee Shops
+											</div>
+											<div className="text-[12px] leading-tight text-black mt-[4px]">
+												Book intimate daytime performances
+											</div>
+										</div>
+									</div>
+									<div
+										className="h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+										style={{ width: 'min(415px, calc(100% - 24px))' }}
+										onClick={() => {
+											setWhatValue('Wedding Planners');
+											setActiveSection('where');
+										}}
+									>
+										<div className="w-[38px] h-[38px] bg-[#EED56E] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+											<WeddingPlannersIcon />
+										</div>
+										<div className="ml-[12px] flex flex-col">
+											<div className="text-[20px] font-medium leading-none text-black font-inter">
+												Wedding Planners
+											</div>
+											<div className="text-[12px] leading-tight text-black mt-[4px]">
+												Get hired for ceremonies & receptions
+											</div>
+										</div>
+									</div>
+									<div
+										className="h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+										style={{ width: 'min(415px, calc(100% - 24px))' }}
+										onClick={() => {
+											setWhatValue('Festivals');
+											setActiveSection('where');
+										}}
+									>
+										<div className="w-[38px] h-[38px] bg-[#80AAFF] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+											<FestivalsIcon />
+										</div>
+										<div className="ml-[12px] flex flex-col">
+											<div className="text-[20px] font-medium leading-none text-black font-inter">
+												Festivals
+											</div>
+											<div className="text-[12px] leading-tight text-black mt-[4px]">
+												Pitch your act for seasonal events
+											</div>
+										</div>
+									</div>
+								</CustomScrollbar>
+							</div>
+						)}
+					</div>
+
+					{/* Where dropdown */}
+					<div
+						className="absolute inset-0"
+						style={{
+							opacity: activeSection === 'where' ? 1 : 0,
+							pointerEvents: activeSection === 'where' ? 'auto' : 'none',
+							transition: dropdownFadeTransition,
+							willChange: 'opacity',
+						}}
+					>
+						<div id="contacts-where-dropdown" className="w-full h-full">
+							<style jsx global>{`
+								#contacts-where-dropdown .scrollbar-hide,
+								#contacts-where-dropdown [data-scrollbar-content] {
+									scrollbar-width: none !important;
+									-ms-overflow-style: none !important;
+								}
+								#contacts-where-dropdown .scrollbar-hide::-webkit-scrollbar,
+								#contacts-where-dropdown [data-scrollbar-content]::-webkit-scrollbar {
+									display: none !important;
+									width: 0 !important;
+									height: 0 !important;
+								}
+							`}</style>
+							{whereValue.length >= 1 ? (
+								<CustomScrollbar
+									className="w-full h-full scrollbar-hide"
+									contentClassName="flex flex-col items-center justify-start gap-[12px] py-4 scrollbar-hide"
+									thumbWidth={2}
+									thumbColor="#000000"
+									trackColor="transparent"
+									offsetRight={-5}
+								>
+									{isLoadingLocations || debouncedWhereValue !== whereValue ? (
+										<div className="flex items-center justify-center h-full">
+											<div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900"></div>
+										</div>
+									) : locationResults && locationResults.length > 0 ? (
+										locationResults.map((loc, idx) => {
+											const { icon, backgroundColor } = getCityIconProps(
+												loc.city,
+												loc.state
+											);
+											return (
+												<div
+													key={`${loc.city}-${loc.state}-${idx}`}
+													className="min-h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+													style={{ width: 'min(415px, calc(100% - 24px))' }}
+													onClick={() => {
+														setWhereValue(loc.label);
+														setActiveSection(null);
+													}}
+												>
+													<div
+														className="w-[38px] h-[38px] rounded-[8px] flex-shrink-0 flex items-center justify-center"
+														style={{ backgroundColor }}
+													>
+														{icon}
+													</div>
+													<div className="ml-[12px] flex flex-col">
+														<div className="text-[20px] font-medium leading-none text-black font-inter">
+															{loc.label}
+														</div>
+														<div className="text-[12px] leading-tight text-black mt-[4px]">
+															Search contacts in {loc.city || loc.state}
+														</div>
+													</div>
+												</div>
+											);
+										})
+									) : (
+										<div className="text-black font-medium font-secondary py-4">
+											No locations found
+										</div>
+									)}
+								</CustomScrollbar>
+							) : (
+								<div className="flex flex-col items-center justify-start gap-[12px] w-full h-full py-4">
+									{DEFAULT_STATE_SUGGESTIONS.map(({ label, description }) => {
+										const { icon, backgroundColor } = getCityIconProps('', label);
+										return (
+											<div
+												key={label}
+												className="h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+												style={{ width: 'min(415px, calc(100% - 24px))' }}
+												onClick={() => {
+													setWhereValue(label);
+													setActiveSection(null);
+												}}
+											>
+												<div
+													className="w-[38px] h-[38px] rounded-[8px] flex-shrink-0 flex items-center justify-center"
+													style={{ backgroundColor }}
+												>
+													{icon}
+												</div>
+												<div className="ml-[12px] flex flex-col">
+													<div className="text-[20px] font-medium leading-none text-black font-inter">
+														{label}
+													</div>
+													<div className="text-[12px] leading-tight text-black mt-[4px]">
+														{description}
+													</div>
+												</div>
+											</div>
+										);
+									})}
+								</div>
+							)}
 						</div>
-					)}
+					</div>
 				</div>
 			)}
 		</div>
