@@ -3423,7 +3423,12 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											)}
 											{/* Bottom Panels: Contacts, Sent, and Inbox - centered relative to container - hidden at narrowest breakpoint */}
 											{!isNarrowestDesktop && (
-												<div className="mt-[35px] flex justify-center gap-[15px]">
+												<div
+													className={cn(
+														draftEmails.length === 0 ? 'mt-[91px]' : 'mt-[35px]',
+														'flex justify-center gap-[15px]'
+													)}
+												>
 													<ContactsExpandedList
 														contacts={contactsAvailableForDrafting}
 														width={232}
@@ -3601,7 +3606,12 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 
 										{/* Bottom Panels: Contacts, Sent, and Inbox - hidden at narrowest breakpoint */}
 										{!isNarrowestDesktop && (
-											<div className="mt-[35px] flex justify-center gap-[15px]">
+											<div
+												className={cn(
+													draftEmails.length === 0 ? 'mt-[91px]' : 'mt-[35px]',
+													'flex justify-center gap-[15px]'
+												)}
+											>
 												<ContactsExpandedList
 													contacts={contactsAvailableForDrafting}
 													width={232}
