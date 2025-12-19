@@ -93,6 +93,7 @@ const DEFAULT_STATE_SUGGESTIONS = [
 
 interface ExtendedDraftingSectionProps extends DraftingSectionProps {
 	onOpenIdentityDialog?: () => void;
+	autoOpenProfileTabWhenIncomplete?: boolean;
 }
 
 export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
@@ -2907,6 +2908,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													hideDraftButton={true}
 													identity={campaign?.identity}
 													onIdentityUpdate={handleIdentityUpdate}
+													autoOpenProfileTabWhenIncomplete={
+														props.autoOpenProfileTabWhenIncomplete
+													}
 												/>
 											</div>
 										</div>
@@ -3034,6 +3038,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											hideDraftButton={isNarrowestDesktop}
 											identity={campaign?.identity}
 											onIdentityUpdate={handleIdentityUpdate}
+											autoOpenProfileTabWhenIncomplete={
+												props.autoOpenProfileTabWhenIncomplete
+											}
 										/>
 										{/* Draft button with arrows at narrowest breakpoint */}
 										{isNarrowestDesktop && !isPendingGeneration && (

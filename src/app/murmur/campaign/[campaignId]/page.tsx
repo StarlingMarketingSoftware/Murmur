@@ -10,13 +10,16 @@ import { urls } from '@/constants/urls';
 import Link from 'next/link';
 import { cn } from '@/utils';
 import { useIsMobile } from '@/hooks/useIsMobile';
+import { useMe } from '@/hooks/useMe';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import LeftArrow from '@/components/atoms/_svg/LeftArrow';
 import RightArrow from '@/components/atoms/_svg/RightArrow';
 import nextDynamic from 'next/dynamic';
 import { CampaignHeaderBox } from '@/components/molecules/CampaignHeaderBox/CampaignHeaderBox';
+import { useEditCampaign } from '@/hooks/queryHooks/useCampaigns';
 import { useGetContacts } from '@/hooks/queryHooks/useContacts';
 import { useGetEmails } from '@/hooks/queryHooks/useEmails';
+import { useCreateIdentity, useGetIdentities } from '@/hooks/queryHooks/useIdentities';
 import { EmailStatus } from '@/constants/prismaEnums';
 
 type ViewType = 'search' | 'contacts' | 'testing' | 'drafting' | 'sent' | 'inbox' | 'all';
@@ -62,10 +65,91 @@ const Murmur = () => {
 
 	const searchParams = useSearchParams();
 	const silentLoad = searchParams.get('silent') === '1';
+	const originParam = searchParams.get('origin');
+	const cameFromSearch = originParam === 'search';
 	const tabParam = searchParams.get('tab');
 	const [identityDialogOrigin, setIdentityDialogOrigin] = useState<'campaign' | 'search'>(
-		silentLoad ? 'search' : 'campaign'
+		cameFromSearch ? 'search' : 'campaign'
 	);
+
+	const { user, isPendingUser, isLoaded } = useMe();
+	const { data: identities, isPending: isPendingIdentities } = useGetIdentities({});
+	const { mutateAsync: editCampaign } = useEditCampaign({ suppressToasts: true });
+	const { mutateAsync: createIdentity } = useCreateIdentity({ suppressToasts: true });
+	const autoEnsureIdentityOnceRef = useRef(false);
+
+	// If we landed here without an identity:
+	// - Normal flow: force the IdentityDialog (existing behavior)
+	// - Search -> campaign flow: silently create/assign an identity so Profile tab can populate it
+	useEffect(() => {
+		if (!campaign) return;
+		if (campaign.identityId) return;
+
+		if (!cameFromSearch) {
+			setIsIdentityDialogOpen(true);
+			return;
+		}
+
+		if (autoEnsureIdentityOnceRef.current) return;
+		if (isPendingIdentities) return;
+
+		const existingIdentityId = identities?.[0]?.id;
+		const needsCreate = !existingIdentityId;
+		if (needsCreate) {
+			// Wait for auth + user record, otherwise we can't create an identity.
+			if (!isLoaded || isPendingUser) return;
+			// If we still can't access a user email, fall back to the dialog to avoid a dead-end.
+			if (!user?.email) {
+				autoEnsureIdentityOnceRef.current = true;
+				setIdentityDialogOrigin('search');
+				setIsIdentityDialogOpen(true);
+				return;
+			}
+		}
+
+		autoEnsureIdentityOnceRef.current = true;
+
+		(async () => {
+			try {
+				const identityIdToAssign = existingIdentityId
+					? existingIdentityId
+					: (
+							await createIdentity({
+								name:
+									`${user?.firstName ?? ''} ${user?.lastName ?? ''}`.trim() ||
+									user?.email ||
+									'New Profile',
+								email: user?.replyToEmail ?? user?.email ?? '',
+							})
+					  )?.id;
+
+				if (!identityIdToAssign) {
+					throw new Error('Failed to determine identityId for campaign');
+				}
+
+				await editCampaign({
+					id: campaign.id,
+					data: { identityId: identityIdToAssign },
+				});
+			} catch (error) {
+				console.error('Failed to auto-assign identity for campaign:', error);
+				// Fallback: allow the existing IdentityDialog flow so the user isn't blocked
+				setIdentityDialogOrigin('search');
+				setIsIdentityDialogOpen(true);
+			}
+		})();
+	}, [
+		campaign,
+		cameFromSearch,
+		identities,
+		isPendingIdentities,
+		isLoaded,
+		isPendingUser,
+		user,
+		createIdentity,
+		editCampaign,
+		setIsIdentityDialogOpen,
+	]);
 	
 	// Determine initial view based on tab query parameter
 	const getInitialView = (): ViewType => {
@@ -493,10 +577,18 @@ const Murmur = () => {
 				{shouldHideContent && (
 					<div
 						className={cn(
-							'fixed inset-0 z-40 pointer-events-none',
+							'fixed inset-0 z-40 pointer-events-none flex items-center justify-center',
 							isMobile ? 'bg-white' : 'bg-background'
 						)}
-					/>
+					>
+						{cameFromSearch && !campaign.identityId && !isIdentityDialogOpen ? (
+							<div className="text-center">
+								<p className="font-inter text-[14px] text-[#3b3b3b]">
+									Setting up your profile…
+								</p>
+							</div>
+						) : null}
+					</div>
 				)}
 				<div
 					className={cn(
@@ -658,6 +750,9 @@ const Murmur = () => {
 												<DraftingSection
 													campaign={campaign}
 													view={previousView}
+													autoOpenProfileTabWhenIncomplete={
+														cameFromSearch || previousView === 'search'
+													}
 													goToDrafting={() => setActiveView('drafting')}
 													goToAll={() => setActiveView('all')}
 													goToWriting={() => setActiveView('testing')}
@@ -694,6 +789,9 @@ const Murmur = () => {
 											<DraftingSection
 												campaign={campaign}
 												view={activeView}
+												autoOpenProfileTabWhenIncomplete={
+													cameFromSearch || previousView === 'search'
+												}
 												goToDrafting={() => setActiveView('drafting')}
 												goToAll={() => setActiveView('all')}
 												goToWriting={() => setActiveView('testing')}

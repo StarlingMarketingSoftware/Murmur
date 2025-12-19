@@ -1184,7 +1184,21 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 	const [overlayTopPx, setOverlayTopPx] = useState<number | null>(null);
 
 	// Track which tab is active: 'main' (the normal Writing view) or 'profile'
-	const [activeTab, setActiveTab] = useState<'main' | 'profile'>('main');
+	const [activeTab, setActiveTab] = useState<'main' | 'profile'>(() => {
+		if (!props.autoOpenProfileTabWhenIncomplete) return 'main';
+		const id = identity as {
+			name?: string | null;
+			genre?: string | null;
+			area?: string | null;
+			bio?: string | null;
+		} | null | undefined;
+		const isIncomplete =
+			!(id?.name ?? '').trim() ||
+			!(id?.genre ?? '').trim() ||
+			!(id?.area ?? '').trim() ||
+			!(id?.bio ?? '').trim();
+		return isIncomplete ? 'profile' : 'main';
+	});
 
 	// Track if user has ever left the profile tab (to show red for incomplete fields after returning)
 	const [hasLeftProfileTab, setHasLeftProfileTab] = useState(false);
@@ -1252,6 +1266,26 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 			});
 		}
 	}, [identityProfile]);
+
+	const didAutoOpenProfileTabRef = useRef(false);
+	const isKeyProfileIncomplete = useMemo(() => {
+		return (
+			!profileFields.name.trim() ||
+			!profileFields.genre.trim() ||
+			!profileFields.area.trim() ||
+			!profileFields.bio.trim()
+		);
+	}, [profileFields.name, profileFields.genre, profileFields.area, profileFields.bio]);
+
+	// If requested by the parent, automatically route the user into the Profile tab
+	// when key profile fields are still missing.
+	useEffect(() => {
+		if (!props.autoOpenProfileTabWhenIncomplete) return;
+		if (!isKeyProfileIncomplete) return;
+		if (didAutoOpenProfileTabRef.current) return;
+		setActiveTab('profile');
+		didAutoOpenProfileTabRef.current = true;
+	}, [props.autoOpenProfileTabWhenIncomplete, isKeyProfileIncomplete]);
 
 	type ProfileField = 'name' | 'genre' | 'area' | 'band' | 'bio' | 'links';
 
