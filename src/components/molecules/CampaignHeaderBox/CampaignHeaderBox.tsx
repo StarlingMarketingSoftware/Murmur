@@ -88,7 +88,7 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 	return (
 		<div
 			className={cn(
-				'bg-white border-[2px] border-black rounded-[8px] flex flex-col px-3 pt-0 pb-1 box-border',
+				'bg-white border-[2px] border-black rounded-[8px] flex flex-col px-3 pt-0 pb-2 box-border',
 				fullWidth && 'w-[96.27vw] max-w-[499px]',
 				className
 			)}
@@ -143,7 +143,13 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 			<div className="flex-1" />
 
 			{/* To/From Row */}
-			<div className={cn('flex items-center text-[11px] flex-shrink-0', fullWidth && 'gap-[20px]')}>
+			<div
+				aria-hidden="true"
+				className={cn(
+					'flex items-center text-[11px] flex-shrink-0 invisible pointer-events-none',
+					fullWidth && 'gap-[20px]'
+				)}
+			>
 				{/* To section */}
 				<div className={cn('flex items-center gap-1', !fullWidth && 'w-1/2')}>
 					<Link

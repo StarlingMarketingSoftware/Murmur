@@ -125,6 +125,11 @@ export interface HybridPromptInputProps {
 	 * Optional: callback to update identity fields from the profile tab.
 	 */
 	onIdentityUpdate?: (data: PatchIdentityData) => void;
+	/**
+	 * Optional: when true, the component will automatically switch to the Profile tab
+	 * if key profile fields are incomplete.
+	 */
+	autoOpenProfileTabWhenIncomplete?: boolean;
 }
 
 export const useHybridPromptInput = (props: HybridPromptInputProps) => {

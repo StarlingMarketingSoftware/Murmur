@@ -139,7 +139,7 @@ export const CampaignHeaderBoxSkeleton: FC = () => {
 		<div
 			className={cn(
 				'bg-white border-[2px] border-black rounded-[8px]',
-				'flex flex-col px-3 pt-0 pb-1 box-border',
+				'flex flex-col px-3 pt-0 pb-2 box-border',
 				'animate-pulse'
 			)}
 			style={{
