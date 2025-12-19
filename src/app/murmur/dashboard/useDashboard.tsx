@@ -307,7 +307,7 @@ export const useDashboard = () => {
 			});
 
 			if (campaign) {
-				startTransition(`${urls.murmur.campaign.detail(campaign.id)}?silent=1`);
+				startTransition(`${urls.murmur.campaign.detail(campaign.id)}?silent=1&origin=search`);
 			}
 		} else if (currentTab === 'list') {
 			if (selectedContactListRows.length === 0) {

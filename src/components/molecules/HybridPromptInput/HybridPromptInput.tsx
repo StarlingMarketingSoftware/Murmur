@@ -35,7 +35,6 @@ import React, {
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { TestPreviewPanel } from '../TestPreviewPanel/TestPreviewPanel';
 import TinyPlusIcon from '@/components/atoms/_svg/TinyPlusIcon';
-import UpscaleIcon from '@/components/atoms/_svg/UpscaleIcon';
 import { DraggableHighlight } from '../DragAndDrop/DraggableHighlight';
 import DraggableBox from '@/app/murmur/campaign/[campaignId]/DraftingSection/EmailGeneration/DraggableBox';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
@@ -59,8 +58,14 @@ interface SortableAIBlockProps {
 	showTestPreview?: boolean;
 	testMessage?: string | null;
 	onGetSuggestions?: (prompt: string) => Promise<void>;
-	onUpscalePrompt?: () => Promise<void>;
-	isUpscalingPrompt?: boolean;
+	profileFields?: {
+		name: string;
+		genre: string;
+		area: string;
+		band: string;
+		bio: string;
+		links: string;
+	} | null;
 }
 
 const SortableAIBlock = ({
@@ -73,8 +78,7 @@ const SortableAIBlock = ({
 	trackFocusedField,
 	showTestPreview,
 	onGetSuggestions,
-	onUpscalePrompt,
-	isUpscalingPrompt,
+	profileFields,
 }: SortableAIBlockProps) => {
 	const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
 		useSortable({ id });
@@ -130,6 +134,106 @@ const SortableAIBlock = ({
 
 	// Mobile detection for conditional placeholder shortening
 	const isMobile = useIsMobile();
+
+	type ProfileFields = {
+		name: string;
+		genre: string;
+		area: string;
+		band: string;
+		bio: string;
+		links: string;
+	};
+
+	type ProfileChipItem = {
+		key: string;
+		text: string;
+		bgClass: string;
+		isEmpty: boolean;
+	};
+
+	const profileChipItems = useMemo<ProfileChipItem[]>(() => {
+		if (!isFullAutomatedBlock) return [];
+		const pf: ProfileFields = {
+			name: profileFields?.name ?? '',
+			genre: profileFields?.genre ?? '',
+			area: profileFields?.area ?? '',
+			band: profileFields?.band ?? '',
+			bio: profileFields?.bio ?? '',
+			links: profileFields?.links ?? '',
+		};
+
+		const truncate = (value: string, max: number) => {
+			const v = value.trim();
+			if (v.length <= max) return v;
+			return v.slice(0, Math.max(0, max - 1)).trimEnd() + '…';
+		};
+
+		const chips: ProfileChipItem[] = [];
+
+		const name = pf.name.trim();
+		const genre = pf.genre.trim();
+		const area = pf.area.trim();
+		const band = pf.band.trim();
+		const bio = pf.bio.trim();
+		const linksRaw = pf.links.trim();
+
+		chips.push({
+			key: 'profile-name',
+			text: name ? `Nme. ${truncate(name, 28)}` : 'Nme.',
+			bgClass: 'bg-[#DADAFC]',
+			isEmpty: !name,
+		});
+		chips.push({
+			key: 'profile-genre',
+			text: genre ? `Gnre. ${truncate(genre, 22)}` : 'Gnre.',
+			bgClass: 'bg-[#DADAFC]',
+			isEmpty: !genre,
+		});
+		chips.push({
+			key: 'profile-area',
+			text: area ? `Area. ${truncate(area, 30)}` : 'Area.',
+			bgClass: 'bg-[#DADAFC]',
+			isEmpty: !area,
+		});
+		chips.push({
+			key: 'profile-band',
+			text: band ? `Artst Nme. ${truncate(band, 30)}` : 'Artst Nme.',
+			bgClass: 'bg-[#CFF5F5]',
+			isEmpty: !band,
+		});
+		chips.push({
+			key: 'profile-bio',
+			text: bio ? `Bio. “${truncate(bio, 48)}”` : 'Bio.',
+			bgClass: 'bg-[#CFF5F5]',
+			isEmpty: !bio,
+		});
+
+		const links = linksRaw
+			.split(/\r?\n|,/g)
+			.map((s) => s.trim())
+			.filter(Boolean);
+
+		if (links.length === 0) {
+			chips.push({
+				key: 'profile-link-0',
+				text: 'Link.',
+				bgClass: 'bg-[#C7F2C9]',
+				isEmpty: true,
+			});
+		} else {
+			for (let i = 0; i < links.length; i++) {
+				const link = links[i];
+				chips.push({
+					key: `profile-link-${i}`,
+					text: `Link. ${truncate(link, 42)}`,
+					bgClass: 'bg-[#C7F2C9]',
+					isEmpty: false,
+				});
+			}
+		}
+
+		return chips;
+	}, [isFullAutomatedBlock, profileFields]);
 
 	// Get the border color for the block
 	const getBorderColor = () => {
@@ -760,144 +864,23 @@ const SortableAIBlock = ({
 								{isFullAutomatedBlock && (
 									<div className="w-[calc(100%+32px)] -mx-4 h-[1px] bg-[#51A2E4] mb-2" />
 								)}
-								{isTextBlock || isFullAutomatedBlock ? (
-									(() => {
-										const fieldProps = form.register(
-											`hybridBlockPrompts.${fieldIndex}.value`
-										);
-										const fieldValue = form.watch(
-											`hybridBlockPrompts.${fieldIndex}.value`
-										);
-										const showCustomPlaceholder = isFullAutomatedBlock && !fieldValue;
-
-										return (
-											<>
-												<div className={isFullAutomatedBlock ? 'relative' : ''}>
-													{showCustomPlaceholder && (
-														<div className="absolute inset-0 pointer-events-none py-2 pr-10 text-[#505050] text-base md:text-sm max-[480px]:text-[10px] z-10">
-															<p>Type anything you want to include</p>
-														</div>
+								{isFullAutomatedBlock ? (
+									<div className="min-h-[60px] w-full bg-white p-1 pr-4">
+										<div className="flex flex-wrap gap-1">
+											{profileChipItems.map((chip) => (
+												<span
+													key={chip.key}
+													className={cn(
+														'inline-flex items-center rounded-[6px] px-2 py-[1px] font-inter font-normal text-[12px] leading-[14px] max-[480px]:text-[10px] max-[480px]:leading-[12px] text-black max-w-full whitespace-nowrap',
+														chip.bgClass,
+														chip.isEmpty && 'opacity-50'
 													)}
-													{isFullAutomatedBlock ? (
-														<CustomScrollbar
-															style={{ height: '115px' }}
-															thumbWidth={2}
-															thumbColor="#000000"
-															trackColor="transparent"
-															offsetRight={2}
-															className="w-full"
-															contentClassName="hide-native-scrollbar"
-															lockHorizontalScroll
-														>
-															<Textarea
-																placeholder=""
-																onClick={(e) => e.stopPropagation()}
-																className={cn(
-																	'border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 max-w-full min-w-0 max-[480px]:placeholder:text-[10px]',
-																	'bg-white',
-																	'min-h-[115px] w-full pl-0 pr-4 resize-none overflow-hidden [field-sizing:fixed]'
-																)}
-																{...fieldProps}
-																onInput={(e: React.FormEvent<HTMLTextAreaElement>) => {
-																	const target = e.currentTarget;
-																	target.style.height = 'auto';
-																	target.style.height = target.scrollHeight + 'px';
-																}}
-																onFocus={(e) => {
-																	trackFocusedField?.(
-																		`hybridBlockPrompts.${fieldIndex}.value`,
-																		e.target as HTMLTextAreaElement
-																	);
-																}}
-																ref={(el) => {
-																	fieldProps.ref(el);
-																	if (el) {
-																		el.style.height = 'auto';
-																		el.style.height =
-																			Math.max(115, el.scrollHeight) + 'px';
-																	}
-																}}
-															/>
-														</CustomScrollbar>
-													) : (
-														<Textarea
-															placeholder={
-																'placeholder' in block
-																	? (block as { placeholder?: string }).placeholder || ''
-																	: ''
-															}
-															onClick={(e) => e.stopPropagation()}
-															className={cn(
-																'border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 max-w-full min-w-0 max-[480px]:placeholder:text-[10px]',
-																isIntroductionBlock
-																	? '!bg-[#DADAFC] [&]:!bg-[#DADAFC]'
-																	: 'bg-white',
-																shouldShowRedStyling
-																	? 'placeholder:text-[#A20000]'
-																	: '',
-																(isIntroductionBlock ||
-																	isResearchBlock ||
-																	isActionBlock) &&
-																	'font-inter placeholder:italic placeholder:text-[#5d5d5d]'
-															)}
-															style={
-																isIntroductionBlock
-																	? { backgroundColor: '#DADAFC' }
-																	: undefined
-															}
-															{...fieldProps}
-															onFocus={(e) => {
-																trackFocusedField?.(
-																	`hybridBlockPrompts.${fieldIndex}.value`,
-																	e.target as HTMLTextAreaElement
-																);
-															}}
-															onBlur={(e) => {
-																if (isTextBlock) {
-																	setHasBeenTouched(true);
-																}
-																fieldProps.onBlur(e);
-															}}
-															onChange={(e) => {
-																if (isTextBlock && e.target.value) {
-																	setHasBeenTouched(true);
-																}
-																fieldProps.onChange(e);
-															}}
-														/>
-													)}
-												</div>
-												{/* Gray bottom section for Full Auto block */}
-												{isFullAutomatedBlock && (
-													<div className="w-[calc(100%+32px)] -mx-4 h-[35px] bg-[#F5F5F5] -mb-4 flex items-center">
-														<button
-															type="button"
-															onClick={() => {
-																const currentValue = form.getValues(`hybridBlockPrompts.${fieldIndex}.value`) || '';
-																onGetSuggestions?.(currentValue);
-															}}
-															className="w-[115px] h-[20px] ml-[15px] bg-[#D7F0FF] border-2 border-black rounded-[5px] text-[11px] font-inter font-semibold cursor-pointer"
-														>
-															Get Suggestions
-														</button>
-														<button
-															type="button"
-															onClick={() => {
-																if (!isUpscalingPrompt) {
-																	onUpscalePrompt?.();
-																}
-															}}
-															disabled={isUpscalingPrompt}
-															className="w-[73px] h-[20px] ml-[6px] bg-[#D7F0FF] border-2 border-black rounded-[5px] text-[11px] font-inter font-semibold flex items-center justify-center gap-[2px] cursor-pointer"
-														>
-															<span>Upscale</span>
-															<UpscaleIcon width="12" height="12" />
-														</button>
-													</div>
-												)}
-											</>
-										);
-									})()
+												>
+													{chip.text}
+												</span>
+											))}
+										</div>
+									</div>
 								) : (
 									// For other blocks, show input always but disabled until Advanced is clicked
 									<>
@@ -999,8 +982,6 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		contact,
 		onGoToDrafting,
 		onGetSuggestions,
-		onUpscalePrompt,
-		isUpscalingPrompt,
 		onFocusChange,
 		identity,
 		onIdentityUpdate,
@@ -1203,7 +1184,52 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 	const [overlayTopPx, setOverlayTopPx] = useState<number | null>(null);
 
 	// Track which tab is active: 'main' (the normal Writing view) or 'profile'
-	const [activeTab, setActiveTab] = useState<'main' | 'profile'>('main');
+	const [activeTab, setActiveTab] = useState<'main' | 'profile'>(() => {
+		if (!props.autoOpenProfileTabWhenIncomplete) return 'main';
+		const id = identity as {
+			name?: string | null;
+			genre?: string | null;
+			area?: string | null;
+			bio?: string | null;
+		} | null | undefined;
+		const isIncomplete =
+			!(id?.name ?? '').trim() ||
+			!(id?.genre ?? '').trim() ||
+			!(id?.area ?? '').trim() ||
+			!(id?.bio ?? '').trim();
+		return isIncomplete ? 'profile' : 'main';
+	});
+
+	// Track if user has ever left the profile tab (to show red for incomplete fields after returning)
+	const [hasLeftProfileTab, setHasLeftProfileTab] = useState(false);
+
+	// Full Auto: custom instructions controls the Full Auto prompt value
+	const [isCustomInstructionsOpen, setIsCustomInstructionsOpen] = useState(false);
+	const customInstructionsRef = useRef<HTMLTextAreaElement | null>(null);
+	const customInstructionsContainerRef = useRef<HTMLDivElement | null>(null);
+	useEffect(() => {
+		if (!isCustomInstructionsOpen) return;
+		requestAnimationFrame(() => customInstructionsRef.current?.focus());
+	}, [isCustomInstructionsOpen]);
+	useEffect(() => {
+		if (selectedModeKey !== 'full') setIsCustomInstructionsOpen(false);
+	}, [selectedModeKey]);
+	useEffect(() => {
+		if (!isCustomInstructionsOpen) return;
+
+		const handlePointerDown = (event: PointerEvent) => {
+			const target = event.target as Node | null;
+			const container = customInstructionsContainerRef.current;
+			if (!target || !container) return;
+			if (container.contains(target)) return;
+			setIsCustomInstructionsOpen(false);
+		};
+
+		document.addEventListener('pointerdown', handlePointerDown);
+		return () => {
+			document.removeEventListener('pointerdown', handlePointerDown);
+		};
+	}, [isCustomInstructionsOpen]);
 
 	// Track which profile box is expanded (null = none expanded)
 	const [expandedProfileBox, setExpandedProfileBox] = useState<string | null>(null);
@@ -1240,6 +1266,26 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 			});
 		}
 	}, [identityProfile]);
+
+	const didAutoOpenProfileTabRef = useRef(false);
+	const isKeyProfileIncomplete = useMemo(() => {
+		return (
+			!profileFields.name.trim() ||
+			!profileFields.genre.trim() ||
+			!profileFields.area.trim() ||
+			!profileFields.bio.trim()
+		);
+	}, [profileFields.name, profileFields.genre, profileFields.area, profileFields.bio]);
+
+	// If requested by the parent, automatically route the user into the Profile tab
+	// when key profile fields are still missing.
+	useEffect(() => {
+		if (!props.autoOpenProfileTabWhenIncomplete) return;
+		if (!isKeyProfileIncomplete) return;
+		if (didAutoOpenProfileTabRef.current) return;
+		setActiveTab('profile');
+		didAutoOpenProfileTabRef.current = true;
+	}, [props.autoOpenProfileTabWhenIncomplete, isKeyProfileIncomplete]);
 
 	type ProfileField = 'name' | 'genre' | 'area' | 'band' | 'bio' | 'links';
 
@@ -1348,7 +1394,9 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 
 	const getProfileHeaderBg = (field: ProfileField) => {
 		if (expandedProfileBox === field) return '#E0E0E0';
-		return profileFields[field].trim() ? '#94DB96' : '#E0E0E0';
+		if (profileFields[field].trim()) return '#94DB96';
+		// Show red only if user has left the profile tab before
+		return hasLeftProfileTab ? '#E47979' : '#E0E0E0';
 	};
 
 	const getProfileHeaderText = (
@@ -1654,18 +1702,26 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 												/>
 											)}
 											{/* Profile label centered in the 152px gray area - clickable to switch tabs */}
-											{!compactLeftOnly && (
-												<button
-													type="button"
-													onClick={() => setActiveTab('profile')}
-													className={cn(
-														"absolute left-0 top-0 h-full w-[152px] flex items-center justify-center font-inter font-semibold text-[11.7px] max-[480px]:text-[14px] z-30 cursor-pointer border-0 bg-transparent transition-colors",
-														activeTab === 'profile' ? 'text-black bg-[#e8e8e8] hover:bg-[#e8e8e8]' : 'text-black hover:bg-[#eeeeee]'
-													)}
-												>
-													Profile
-												</button>
-											)}
+											{!compactLeftOnly && (() => {
+												const isProfileIncomplete = !profileFields.name.trim() || !profileFields.genre.trim() || !profileFields.area.trim() || !profileFields.bio.trim();
+												const showRedWarning = hasLeftProfileTab && isProfileIncomplete;
+												return (
+													<button
+														type="button"
+														onClick={() => setActiveTab('profile')}
+														className={cn(
+															"absolute left-0 top-0 h-full w-[152px] flex items-center justify-center font-inter font-semibold text-[11.7px] max-[480px]:text-[14px] z-30 cursor-pointer bg-transparent transition-colors",
+															activeTab === 'profile'
+																? 'text-black bg-[#94DB96] hover:bg-[#94DB96] border-r border-r-black border-t-0 border-b-0 border-l-0'
+																: showRedWarning
+																	? 'text-black bg-[#E47979] hover:bg-[#E47979] border-r border-r-black border-t-0 border-b-0 border-l-0'
+																	: 'text-black hover:bg-[#eeeeee] border-0'
+														)}
+													>
+														Profile
+													</button>
+												);
+											})()}
 											<div
 												className={cn(
 													'h-[40px] flex items-center relative z-20',
@@ -1716,7 +1772,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																? 'text-black'
 																: 'text-[#AFAFAF] hover:text-[#8F8F8F]'
 														)}
-														onClick={() => { setActiveTab('main'); switchToFull(); }}
+														onClick={() => { setActiveTab('main'); setHasLeftProfileTab(true); switchToFull(); }}
 													>
 														Full Auto
 													</Button>
@@ -1736,7 +1792,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																? 'text-black'
 																: 'text-[#AFAFAF] hover:text-[#8F8F8F]'
 														)}
-														onClick={() => { setActiveTab('main'); switchToManual(); }}
+														onClick={() => { setActiveTab('main'); setHasLeftProfileTab(true); switchToManual(); }}
 													>
 														Manual
 													</Button>
@@ -1758,7 +1814,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																? 'text-black'
 																: 'text-[#AFAFAF] hover:text-[#8F8F8F]'
 														)}
-														onClick={() => { setActiveTab('main'); switchToHybrid(); }}
+														onClick={() => { setActiveTab('main'); setHasLeftProfileTab(true); switchToHybrid(); }}
 													>
 														Hybrid
 													</Button>
@@ -2239,6 +2295,8 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 															field.type === HybridBlock.introduction ||
 															field.type === HybridBlock.research ||
 															field.type === HybridBlock.action;
+														const isFullAutomatedField =
+															field.type === HybridBlock.full_automated;
 														const hasImmediateTextBlock =
 															fields[index + 1]?.type === HybridBlock.text;
 
@@ -2259,10 +2317,100 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																		showTestPreview={showTestPreview}
 																		testMessage={testMessage}
 																		onGetSuggestions={onGetSuggestions}
-																		onUpscalePrompt={onUpscalePrompt}
-																		isUpscalingPrompt={isUpscalingPrompt}
+																		profileFields={profileFields}
 																	/>
 																</div>
+																{/* Custom Instructions row (Full Auto only) */}
+																{isFullAutomatedField &&
+																	(() => {
+																		const fieldProps = form.register(
+																			`hybridBlockPrompts.${index}.value`
+																		);
+
+																		return (
+																			<div
+																				className={cn(
+																					showTestPreview
+																						? 'w-[426px] max-[480px]:w-[89.33vw]'
+																						: 'w-[89.33vw] max-w-[475px]',
+																					'-mt-2'
+																				)}
+																			>
+																				<div
+																					ref={customInstructionsContainerRef}
+																					className="rounded-[10px] border-2 border-[#7D7D7D] overflow-hidden"
+																				>
+																					<button
+																						type="button"
+																						onClick={() => {
+																							if (!isCustomInstructionsOpen) {
+																								setIsCustomInstructionsOpen(true);
+																								return;
+																							}
+																							customInstructionsRef.current?.focus();
+																						}}
+																						className="w-full h-[27px] bg-transparent flex items-center justify-start gap-2 px-4 text-[#7D7D7D] font-inter font-normal text-[14px] leading-none max-[480px]:text-[12px]"
+																						aria-label="Custom Instructions"
+																						aria-expanded={isCustomInstructionsOpen}
+																						aria-controls={`custom-instructions-${field.id}`}
+																					>
+																						<span aria-hidden="true">+</span>
+																						<span>Custom Instructions</span>
+																					</button>
+																					<div
+																						id={`custom-instructions-${field.id}`}
+																						className={cn(
+																							isCustomInstructionsOpen ? '' : 'hidden',
+																							'border-t-2 border-[#7D7D7D] bg-white'
+																						)}
+																					>
+																						<CustomScrollbar
+																							style={{ height: '115px' }}
+																							thumbWidth={2}
+																							thumbColor="#000000"
+																							trackColor="transparent"
+																							offsetRight={2}
+																							className="w-full"
+																							contentClassName="hide-native-scrollbar"
+																							lockHorizontalScroll
+																						>
+																							<Textarea
+																								placeholder="Type anything you want to include"
+																								className={cn(
+																									'border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 max-w-full min-w-0',
+																									'bg-white',
+																									'min-h-[115px] w-full px-4 py-2 resize-none overflow-hidden [field-sizing:fixed] max-[480px]:text-[10px]'
+																								)}
+																								{...fieldProps}
+																								onInput={(e: React.FormEvent<HTMLTextAreaElement>) => {
+																									const target = e.currentTarget;
+																									target.style.height = 'auto';
+																									target.style.height =
+																										target.scrollHeight + 'px';
+																								}}
+																								onFocus={(e) => {
+																									trackFocusedField?.(
+																										`hybridBlockPrompts.${index}.value`,
+																										e.target as HTMLTextAreaElement
+																									);
+																								}}
+																								ref={(el) => {
+																									fieldProps.ref(el);
+																									customInstructionsRef.current = el;
+																									if (el) {
+																										el.style.height = 'auto';
+																										el.style.height =
+																											Math.max(115, el.scrollHeight) +
+																											'px';
+																									}
+																								}}
+																							/>
+																						</CustomScrollbar>
+																					</div>
+																				</div>
+																			</div>
+																		);
+																	})()}
 																{/* Plus button under hybrid blocks */}
 																{isHybridBlock && !hasImmediateTextBlock && (
 																	<div
