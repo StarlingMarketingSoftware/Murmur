@@ -2495,7 +2495,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											: 'calc(50% + 250px + 32px)',
 									// Counter-animate when transitioning in to keep research panel stable
 									...(isTransitioningIn && ['testing', 'contacts', 'drafting', 'sent'].includes(view) ? {
-										animation: 'researchPanelStable 280ms ease-out forwards',
+										animation: 'researchPanelStable 180ms ease-out forwards',
 									} : {}),
 								}}
 							>

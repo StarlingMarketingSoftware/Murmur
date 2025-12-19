@@ -160,7 +160,8 @@ const DashboardContent = () => {
 		const dropdownEase = 'cubic-bezier(0.22, 1, 0.36, 1)';
 		const dropdownTransition =
 			`left 0.6s ${dropdownEase}, height 0.6s ${dropdownEase}`;
-		const dropdownFadeTransition = `opacity 0.6s ${dropdownEase}`;
+		// Slightly faster than the pill, per UX request.
+		const dropdownFadeTransition = `opacity 0.35s ${dropdownEase}`;
 
 		const dropdownHeight =
 			activeSection === 'why'
