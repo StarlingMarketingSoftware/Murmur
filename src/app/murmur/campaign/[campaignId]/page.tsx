@@ -24,8 +24,8 @@ import { EmailStatus } from '@/constants/prismaEnums';
 
 type ViewType = 'search' | 'contacts' | 'testing' | 'drafting' | 'sent' | 'inbox' | 'all';
 
-// Transition duration in ms - kept short for that premium, snappy feel
-const TRANSITION_DURATION = 280;
+// Transition duration in ms - fast enough to feel instant, still smooth
+const TRANSITION_DURATION = 180;
 
 // Dynamically import heavy components to reduce initial bundle size and prevent Vercel timeout
 const DraftingSection = nextDynamic(
@@ -728,7 +728,7 @@ const Murmur = () => {
 
 					<div className="mt-6 flex justify-center">
 						{/* Crossfade transition container */}
-						<div className="relative w-full">
+						<div className="relative w-full isolate">
 							{/* Determine if both views share the same research panel position */}
 							{(() => {
 								const standardPositionTabs: ViewType[] = ['testing', 'contacts', 'drafting', 'sent'];
@@ -738,13 +738,41 @@ const Murmur = () => {
 								
 								return (
 									<>
-										{/* Previous view - fading out */}
+										{/* Current view - always visible (avoid the "white flash" between tabs) */}
+										<div className="relative w-full" style={{ zIndex: 1 }}>
+											<DraftingSection
+												campaign={campaign}
+												view={activeView}
+												autoOpenProfileTabWhenIncomplete={
+													cameFromSearch || previousView === 'search'
+												}
+												goToDrafting={() => setActiveView('drafting')}
+												goToAll={() => setActiveView('all')}
+												goToWriting={() => setActiveView('testing')}
+												onGoToSearch={() => setActiveView('search')}
+												goToContacts={() => setActiveView('contacts')}
+												goToInbox={() => setActiveView('inbox')}
+												goToSent={() => setActiveView('sent')}
+												onOpenIdentityDialog={() => {
+													setIdentityDialogOrigin('campaign');
+													setIsIdentityDialogOpen(true);
+												}}
+												goToPreviousTab={goToPreviousTab}
+												goToNextTab={goToNextTab}
+												hideHeaderBox={isNarrowestDesktop && !isMobile}
+												isTransitioningIn={bothSharePosition ?? undefined}
+											/>
+										</div>
+
+										{/* Previous view - fades out above the current view */}
 										{isTransitioning && previousView && (
 											<div
-												className="absolute inset-0 w-full"
+												className="absolute inset-0 w-full pointer-events-none"
+												aria-hidden="true"
 												style={{
 													animation: `viewFadeOut ${TRANSITION_DURATION}ms ease-out forwards`,
-													zIndex: 1,
+													zIndex: 2,
+													willChange: 'opacity',
 												}}
 											>
 												<DraftingSection
@@ -771,44 +799,6 @@ const Murmur = () => {
 												/>
 											</div>
 										)}
-										
-										{/* Current view - fading in (skip fade when research panel should stay stable) */}
-										<div
-											className="w-full"
-											style={{
-												// When both views share the research panel position, use a different animation
-												// that doesn't fade the whole container - only fade in non-research content
-												animation: isTransitioning
-													? bothSharePosition
-														? `viewFadeInStableResearch ${TRANSITION_DURATION}ms ease-out forwards`
-														: `viewFadeIn ${TRANSITION_DURATION}ms ease-out forwards`
-													: undefined,
-												zIndex: 2,
-											}}
-										>
-											<DraftingSection
-												campaign={campaign}
-												view={activeView}
-												autoOpenProfileTabWhenIncomplete={
-													cameFromSearch || previousView === 'search'
-												}
-												goToDrafting={() => setActiveView('drafting')}
-												goToAll={() => setActiveView('all')}
-												goToWriting={() => setActiveView('testing')}
-												onGoToSearch={() => setActiveView('search')}
-												goToContacts={() => setActiveView('contacts')}
-												goToInbox={() => setActiveView('inbox')}
-												goToSent={() => setActiveView('sent')}
-												onOpenIdentityDialog={() => {
-													setIdentityDialogOrigin('campaign');
-													setIsIdentityDialogOpen(true);
-												}}
-												goToPreviousTab={goToPreviousTab}
-												goToNextTab={goToNextTab}
-												hideHeaderBox={isNarrowestDesktop && !isMobile}
-												isTransitioningIn={bothSharePosition ?? undefined}
-											/>
-										</div>
 									</>
 								);
 							})()}
@@ -854,7 +844,7 @@ const Murmur = () => {
 						
 						/* Fade in non-research-panel content when transitioning */
 						.view-fade-in-content > *:not([data-research-panel-container]) {
-							animation: viewFadeIn 280ms ease-out forwards;
+							animation: viewFadeIn ${TRANSITION_DURATION}ms ease-out forwards;
 						}
 						
 						/* Mobile styles below */

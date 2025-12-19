@@ -154,17 +154,70 @@ const DashboardContent = () => {
 	);
 
 	const renderDesktopSearchDropdowns = () => {
+		if (!activeSection) return null;
+
+		// Match the active-section pill timing (0.6s) and easing.
+		const dropdownEase = 'cubic-bezier(0.22, 1, 0.36, 1)';
+		const dropdownTransition =
+			`left 0.6s ${dropdownEase}, height 0.6s ${dropdownEase}`;
+		// Slightly faster than the pill, per UX request.
+		const dropdownFadeTransition = `opacity 0.35s ${dropdownEase}`;
+
+		const dropdownHeight =
+			activeSection === 'why'
+				? 173
+				: activeSection === 'what'
+					? whyValue === '[Promotion]'
+						? 92
+						: 404
+					: 370;
+
+		const dropdownLeft = isMapView
+			? activeSection === 'why'
+				? 'calc(50% - 220px)'
+				: activeSection === 'what'
+					? 'calc(50% - 60px)'
+					: 'calc(50% - 120px)'
+			: activeSection === 'why'
+				? 4
+				: activeSection === 'what'
+					? 176
+					: 98;
+
 		const dropdownContent = (
-			<>
-				{activeSection === 'why' && (
-					<div
-						className="search-dropdown-menu hidden md:flex flex-col items-center justify-center gap-[12px] w-[439px] h-[173px] bg-[#D8E5FB] rounded-[16px] border-2 border-black z-[110]"
-						style={
-							isMapView
-								? { position: 'fixed', top: '118px', left: 'calc(50% - 220px)' }
-								: { position: 'absolute', top: 'calc(100% + 10px)', left: '4px' }
-						}
-					>
+			<div
+				className="search-dropdown-menu hidden md:block w-[439px] bg-[#D8E5FB] rounded-[16px] border-2 border-black z-[110] relative overflow-hidden"
+				style={
+					isMapView
+						? {
+								position: 'fixed',
+								top: '118px',
+								left: dropdownLeft,
+								height: dropdownHeight,
+								transition: dropdownTransition,
+								willChange: 'left, height',
+						  }
+						: {
+								position: 'absolute',
+								top: 'calc(100% + 10px)',
+								left: dropdownLeft,
+								height: dropdownHeight,
+								transition: dropdownTransition,
+								willChange: 'left, height',
+						  }
+				}
+			>
+				{/* Cross-fade the inner content so height changes don't "lift" it. */}
+				<div
+					className="absolute inset-0"
+					style={{
+						opacity: activeSection === 'why' ? 1 : 0,
+						pointerEvents: activeSection === 'why' ? 'auto' : 'none',
+						transition: dropdownFadeTransition,
+						willChange: 'opacity',
+					}}
+				>
+					<div className="flex flex-col items-center justify-start gap-[12px] w-full h-full py-[12px]">
 						<div
 							className="w-[410px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex items-center px-[15px] cursor-pointer transition-colors duration-200"
 							onClick={() => {
@@ -205,204 +258,191 @@ const DashboardContent = () => {
 							</div>
 						</div>
 					</div>
-				)}
-				{activeSection === 'what' && whyValue === '[Promotion]' && (
-					<div
-						className="search-dropdown-menu hidden md:flex flex-col items-center justify-center gap-[10px] w-[439px] h-[92px] bg-[#D8E5FB] rounded-[16px] border-2 border-black z-[110]"
-						style={
-							isMapView
-								? { position: 'fixed', top: '118px', left: 'calc(50% - 60px)' }
-								: { position: 'absolute', top: 'calc(100% + 10px)', left: '176px' }
-						}
-					>
-						<div
-							className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
-							onClick={() => {
-								setWhatValue('Radio Stations');
-								setActiveSection('where');
-							}}
-						>
-							<div className="w-[38px] h-[38px] bg-[#56DA73] rounded-[8px] flex-shrink-0 flex items-center justify-center">
-								<RadioStationsIcon />
-							</div>
-							<div className="ml-[12px] flex flex-col">
-								<div className="text-[20px] font-medium leading-none text-black font-inter">
-									Radio Stations
+				</div>
+
+				<div
+					className="absolute inset-0"
+					style={{
+						opacity: activeSection === 'what' ? 1 : 0,
+						pointerEvents: activeSection === 'what' ? 'auto' : 'none',
+						transition: dropdownFadeTransition,
+						willChange: 'opacity',
+					}}
+				>
+					{/* What dropdown - Promotion */}
+					{whyValue === '[Promotion]' ? (
+						<div className="flex flex-col items-center justify-start gap-[10px] w-full h-full py-[12px]">
+							<div
+								className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+								onClick={() => {
+									setWhatValue('Radio Stations');
+									setActiveSection('where');
+								}}
+							>
+								<div className="w-[38px] h-[38px] bg-[#56DA73] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+									<RadioStationsIcon />
 								</div>
-								<div className="text-[12px] leading-tight text-black mt-[4px]">
-									Reach out to radio stations
+								<div className="ml-[12px] flex flex-col">
+									<div className="text-[20px] font-medium leading-none text-black font-inter">
+										Radio Stations
+									</div>
+									<div className="text-[12px] leading-tight text-black mt-[4px]">
+										Reach out to radio stations
+									</div>
 								</div>
 							</div>
 						</div>
-					</div>
-				)}
-				{activeSection === 'what' && whyValue !== '[Promotion]' && (
-					<div
-						id="what-dropdown-container"
-						className="search-dropdown-menu hidden md:block w-[439px] h-[404px] bg-[#D8E5FB] rounded-[16px] border-2 border-black z-[110]"
-						style={
-							isMapView
-								? { position: 'fixed', top: '118px', left: 'calc(50% - 60px)' }
-								: { position: 'absolute', top: 'calc(100% + 10px)', left: '176px' }
-						}
-					>
-						<style jsx global>{`
-							#what-dropdown-container .scrollbar-hide {
-								scrollbar-width: none !important;
-								scrollbar-color: transparent transparent !important;
-								-ms-overflow-style: none !important;
-							}
-							#what-dropdown-container .scrollbar-hide::-webkit-scrollbar {
-								display: none !important;
-								width: 0 !important;
-								height: 0 !important;
-							}
-						`}</style>
-						<CustomScrollbar
-							className="w-full h-full"
-							contentClassName="flex flex-col items-center gap-[10px] py-[12px]"
-							thumbWidth={2}
-							thumbColor="#000000"
-							trackColor="transparent"
-							offsetRight={-5}
-						>
-							<div
-								className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
-								onClick={() => {
-									setWhatValue('Music Venues');
-									setActiveSection('where');
-								}}
+					) : (
+						<div id="what-dropdown-container" className="w-full h-full">
+							<style jsx global>{`
+								#what-dropdown-container .scrollbar-hide {
+									scrollbar-width: none !important;
+									scrollbar-color: transparent transparent !important;
+									-ms-overflow-style: none !important;
+								}
+								#what-dropdown-container .scrollbar-hide::-webkit-scrollbar {
+									display: none !important;
+									width: 0 !important;
+									height: 0 !important;
+								}
+							`}</style>
+							<CustomScrollbar
+								className="w-full h-full"
+								contentClassName="flex flex-col items-center gap-[10px] py-[12px]"
+								thumbWidth={2}
+								thumbColor="#000000"
+								trackColor="transparent"
+								offsetRight={-5}
 							>
-								<div className="w-[38px] h-[38px] bg-[#71C9FD] rounded-[8px] flex-shrink-0 flex items-center justify-center">
-									<MusicVenuesIcon />
-								</div>
-								<div className="ml-[12px] flex flex-col">
-									<div className="text-[20px] font-medium leading-none text-black font-inter">
-										Music Venues
+								<div
+									className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+									onClick={() => {
+										setWhatValue('Music Venues');
+										setActiveSection('where');
+									}}
+								>
+									<div className="w-[38px] h-[38px] bg-[#71C9FD] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+										<MusicVenuesIcon />
 									</div>
-									<div className="text-[12px] leading-tight text-black mt-[4px]">
-										Reach talent buyers for live shows
-									</div>
-								</div>
-							</div>
-							<div
-								className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
-								onClick={() => {
-									setWhatValue('Wine, Beer, and Spirits');
-									setActiveSection('where');
-								}}
-							>
-								<div className="w-[38px] h-[38px] bg-[#80AAFF] rounded-[8px] flex-shrink-0 flex items-center justify-center">
-									<WineBeerSpiritsIcon />
-								</div>
-								<div className="ml-[12px] flex flex-col">
-									<div className="text-[20px] font-medium leading-none text-black font-inter">
-										Wine, Beer, and Spirits
-									</div>
-									<div className="text-[12px] leading-tight text-black mt-[4px]">
-										Pitch your act for seasonal events
+									<div className="ml-[12px] flex flex-col">
+										<div className="text-[20px] font-medium leading-none text-black font-inter">
+											Music Venues
+										</div>
+										<div className="text-[12px] leading-tight text-black mt-[4px]">
+											Reach talent buyers for live shows
+										</div>
 									</div>
 								</div>
-							</div>
-							<div
-								className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
-								onClick={() => {
-									setWhatValue('Restaurants');
-									setActiveSection('where');
-								}}
-							>
-								<div className="w-[38px] h-[38px] bg-[#77DD91] rounded-[8px] flex-shrink-0 flex items-center justify-center">
-									<RestaurantsIcon />
-								</div>
-								<div className="ml-[12px] flex flex-col">
-									<div className="text-[20px] font-medium leading-none text-black font-inter">
-										Restaurants
+								<div
+									className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+									onClick={() => {
+										setWhatValue('Wine, Beer, and Spirits');
+										setActiveSection('where');
+									}}
+								>
+									<div className="w-[38px] h-[38px] bg-[#80AAFF] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+										<WineBeerSpiritsIcon />
 									</div>
-									<div className="text-[12px] leading-tight text-black mt-[4px]">
-										Land steady dinner and brunch gigs
-									</div>
-								</div>
-							</div>
-							<div
-								className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
-								onClick={() => {
-									setWhatValue('Coffee Shops');
-									setActiveSection('where');
-								}}
-							>
-								<div className="w-[38px] h-[38px] bg-[#A9DE78] rounded-[8px] flex-shrink-0 flex items-center justify-center">
-									<CoffeeShopsIcon />
-								</div>
-								<div className="ml-[12px] flex flex-col">
-									<div className="text-[20px] font-medium leading-none text-black font-inter">
-										Coffee Shops
-									</div>
-									<div className="text-[12px] leading-tight text-black mt-[4px]">
-										Book intimate daytime performances
+									<div className="ml-[12px] flex flex-col">
+										<div className="text-[20px] font-medium leading-none text-black font-inter">
+											Wine, Beer, and Spirits
+										</div>
+										<div className="text-[12px] leading-tight text-black mt-[4px]">
+											Pitch your act for seasonal events
+										</div>
 									</div>
 								</div>
-							</div>
-							<div
-								className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
-								onClick={() => {
-									setWhatValue('Wedding Planners');
-									setActiveSection('where');
-								}}
-							>
-								<div className="w-[38px] h-[38px] bg-[#EED56E] rounded-[8px] flex-shrink-0 flex items-center justify-center">
-									<WeddingPlannersIcon />
-								</div>
-								<div className="ml-[12px] flex flex-col">
-									<div className="text-[20px] font-medium leading-none text-black font-inter">
-										Wedding Planners
+								<div
+									className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+									onClick={() => {
+										setWhatValue('Restaurants');
+										setActiveSection('where');
+									}}
+								>
+									<div className="w-[38px] h-[38px] bg-[#77DD91] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+										<RestaurantsIcon />
 									</div>
-									<div className="text-[12px] leading-tight text-black mt-[4px]">
-										Get hired for ceremonies & receptions
-									</div>
-								</div>
-							</div>
-							<div
-								className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
-								onClick={() => {
-									setWhatValue('Festivals');
-									setActiveSection('where');
-								}}
-							>
-								<div className="w-[38px] h-[38px] bg-[#80AAFF] rounded-[8px] flex-shrink-0 flex items-center justify-center">
-									<FestivalsIcon />
-								</div>
-								<div className="ml-[12px] flex flex-col">
-									<div className="text-[20px] font-medium leading-none text-black font-inter">
-										Festivals
-									</div>
-									<div className="text-[12px] leading-tight text-black mt-[4px]">
-										Pitch your act for seasonal events
+									<div className="ml-[12px] flex flex-col">
+										<div className="text-[20px] font-medium leading-none text-black font-inter">
+											Restaurants
+										</div>
+										<div className="text-[12px] leading-tight text-black mt-[4px]">
+											Land steady dinner and brunch gigs
+										</div>
 									</div>
 								</div>
-							</div>
-						</CustomScrollbar>
-					</div>
-				)}
-				{activeSection === 'where' && (
-					<div
-						id="where-dropdown-container"
-						className={`search-dropdown-menu hidden md:block w-[439px] h-[370px] bg-[#D8E5FB] rounded-[16px] border-2 border-black z-[110]`}
-						style={
-							isMapView
-								? {
-										position: 'fixed',
-										top: '118px',
-										left: 'calc(50% - 120px)',
-										overflow: 'visible',
-								  }
-								: {
-										position: 'absolute',
-										top: 'calc(100% + 10px)',
-										left: '98px',
-										overflow: 'visible',
-								  }
-						}
-					>
+								<div
+									className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+									onClick={() => {
+										setWhatValue('Coffee Shops');
+										setActiveSection('where');
+									}}
+								>
+									<div className="w-[38px] h-[38px] bg-[#A9DE78] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+										<CoffeeShopsIcon />
+									</div>
+									<div className="ml-[12px] flex flex-col">
+										<div className="text-[20px] font-medium leading-none text-black font-inter">
+											Coffee Shops
+										</div>
+										<div className="text-[12px] leading-tight text-black mt-[4px]">
+											Book intimate daytime performances
+										</div>
+									</div>
+								</div>
+								<div
+									className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+									onClick={() => {
+										setWhatValue('Wedding Planners');
+										setActiveSection('where');
+									}}
+								>
+									<div className="w-[38px] h-[38px] bg-[#EED56E] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+										<WeddingPlannersIcon />
+									</div>
+									<div className="ml-[12px] flex flex-col">
+										<div className="text-[20px] font-medium leading-none text-black font-inter">
+											Wedding Planners
+										</div>
+										<div className="text-[12px] leading-tight text-black mt-[4px]">
+											Get hired for ceremonies & receptions
+										</div>
+									</div>
+								</div>
+								<div
+									className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+									onClick={() => {
+										setWhatValue('Festivals');
+										setActiveSection('where');
+									}}
+								>
+									<div className="w-[38px] h-[38px] bg-[#80AAFF] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+										<FestivalsIcon />
+									</div>
+									<div className="ml-[12px] flex flex-col">
+										<div className="text-[20px] font-medium leading-none text-black font-inter">
+											Festivals
+										</div>
+										<div className="text-[12px] leading-tight text-black mt-[4px]">
+											Pitch your act for seasonal events
+										</div>
+									</div>
+								</div>
+							</CustomScrollbar>
+						</div>
+					)}
+				</div>
+
+				<div
+					className="absolute inset-0"
+					style={{
+						opacity: activeSection === 'where' ? 1 : 0,
+						pointerEvents: activeSection === 'where' ? 'auto' : 'none',
+						transition: dropdownFadeTransition,
+						willChange: 'opacity',
+					}}
+				>
+					<div id="where-dropdown-container" className="w-full h-full">
 						<style jsx global>{`
 							#where-dropdown-container .scrollbar-hide {
 								scrollbar-width: none !important;
@@ -469,7 +509,7 @@ const DashboardContent = () => {
 								)}
 							</CustomScrollbar>
 						) : (
-							<div className="flex flex-col items-center justify-center gap-[20px] w-full h-full">
+							<div className="flex flex-col items-center justify-start gap-[20px] w-full h-full py-4">
 								<div
 									className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
 									onClick={() => {
@@ -532,8 +572,8 @@ const DashboardContent = () => {
 							</div>
 						)}
 					</div>
-				)}
-			</>
+				</div>
+			</div>
 		);
 
 		// When in map view, render dropdowns via portal to escape the stacking context

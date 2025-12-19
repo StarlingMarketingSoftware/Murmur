@@ -1069,6 +1069,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const [isLoadingLocation] = useState(false);
 	const whatInputRef = useRef<HTMLInputElement>(null);
 	const whereInputRef = useRef<HTMLInputElement>(null);
+	const searchActiveSectionIndicatorRef = useRef<HTMLDivElement | null>(null);
+	const prevSearchActiveSectionForIndicatorRef = useRef<'why' | 'what' | 'where' | null>(
+		null
+	);
 
 	const debouncedWhereValue = useDebounce(searchWhereValue, 300);
 	const { data: locationResults, isLoading: isLoadingLocations } = useGetLocations(
@@ -1116,6 +1120,69 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		} else if (searchActiveSection === 'where' && whereInputRef.current) {
 			whereInputRef.current.focus();
 		}
+	}, [searchActiveSection]);
+
+	// Animate the active section "pill" sliding between tabs (Why/What/Where) – match dashboard behavior
+	useEffect(() => {
+		const indicator = searchActiveSectionIndicatorRef.current;
+		if (!indicator) return;
+
+		const xPercentForSection = (section: 'why' | 'what' | 'where') => {
+			switch (section) {
+				case 'why':
+					return 0;
+				case 'what':
+					return 100;
+				case 'where':
+					return 200;
+				default:
+					return 0;
+			}
+		};
+
+		// Hide when no active section
+		if (!searchActiveSection) {
+			gsap.to(indicator, {
+				opacity: 0,
+				duration: 0.15,
+				ease: 'power2.out',
+				overwrite: 'auto',
+			});
+			prevSearchActiveSectionForIndicatorRef.current = null;
+			return;
+		}
+
+		const nextXPercent = xPercentForSection(searchActiveSection);
+		const prevSection = prevSearchActiveSectionForIndicatorRef.current;
+
+		// On first open, snap to position (no slide), then fade in
+		if (!prevSection) {
+			gsap.set(indicator, { xPercent: nextXPercent });
+			gsap.to(indicator, {
+				opacity: 1,
+				duration: 0.15,
+				ease: 'power2.out',
+				overwrite: 'auto',
+			});
+			prevSearchActiveSectionForIndicatorRef.current = searchActiveSection;
+			return;
+		}
+
+		// Between tabs, slide with requested timing/ease (width/height remain constant)
+		gsap.to(indicator, {
+			xPercent: nextXPercent,
+			duration: 0.6,
+			ease: 'power2.out',
+			overwrite: 'auto',
+		});
+		gsap.to(indicator, {
+			opacity: 1,
+			duration: 0.15,
+			ease: 'power2.out',
+			overwrite: 'auto',
+		});
+
+		prevSearchActiveSectionForIndicatorRef.current = searchActiveSection;
 	}, [searchActiveSection]);
 
 	// Search tab type and state
@@ -1594,13 +1661,56 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 
 	// Render search dropdowns for the mini searchbar
 	const renderSearchDropdowns = () => {
-		const dropdownContent = (
-			<>
-				{searchActiveSection === 'why' && (
-					<div
-						className="campaign-search-dropdown-menu flex flex-col items-center justify-center gap-[12px] w-[439px] h-[173px] bg-[#D8E5FB] rounded-[16px] border-2 border-black z-[120]"
-						style={{ position: 'absolute', top: '75px', left: 'calc(50% - 220px)' }}
-					>
+		if (!searchActiveSection) return null;
+
+		// Match the dashboard pill/dropdown timing and easing.
+		const dropdownEase = 'cubic-bezier(0.22, 1, 0.36, 1)';
+		const dropdownTransition = `left 0.6s ${dropdownEase}, height 0.6s ${dropdownEase}`;
+		// Slightly faster than the pill (matches dashboard).
+		const dropdownFadeTransition = `opacity 0.35s ${dropdownEase}`;
+
+		const dropdownHeight =
+			searchActiveSection === 'why'
+				? 173
+				: searchActiveSection === 'what'
+					? searchWhyValue === '[Promotion]'
+						? 92
+						: 404
+					: 370;
+
+		// At the narrow search layout (498px map box), keep the dropdown fully inside the frame.
+		// Otherwise, match the dashboard's subtle horizontal shift between sections.
+		const dropdownLeft = isSearchTabNarrow
+			? 'calc(50% - 220px)'
+			: searchActiveSection === 'why'
+				? 'calc(50% - 220px)'
+				: searchActiveSection === 'what'
+					? 'calc(50% - 60px)'
+					: 'calc(50% - 120px)';
+
+		return (
+			<div
+				className="campaign-search-dropdown-menu w-[439px] bg-[#D8E5FB] rounded-[16px] border-2 border-black z-[120] relative overflow-hidden"
+				style={{
+					position: 'absolute',
+					top: '75px',
+					left: dropdownLeft,
+					height: dropdownHeight,
+					transition: dropdownTransition,
+					willChange: 'left, height',
+				}}
+			>
+				{/* Cross-fade the inner content so height changes don't "lift" it. */}
+				<div
+					className="absolute inset-0"
+					style={{
+						opacity: searchActiveSection === 'why' ? 1 : 0,
+						pointerEvents: searchActiveSection === 'why' ? 'auto' : 'none',
+						transition: dropdownFadeTransition,
+						willChange: 'opacity',
+					}}
+				>
+					<div className="flex flex-col items-center justify-start gap-[12px] w-full h-full py-[12px]">
 						<div
 							className="w-[410px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex items-center px-[15px] cursor-pointer transition-colors duration-200"
 							onClick={() => {
@@ -1635,193 +1745,196 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 									Promotion
 								</div>
 								<div className="text-[12px] leading-tight text-black mt-[4px] max-w-[300px]">
-									reach out to radio stations, playlists, and more to get your music
-									played
+									reach out to radio stations, playlists, and more to get your music played
 								</div>
 							</div>
 						</div>
 					</div>
-				)}
-				{searchActiveSection === 'what' && searchWhyValue === '[Promotion]' && (
-					<div
-						className="campaign-search-dropdown-menu flex flex-col items-center justify-center gap-[10px] w-[439px] h-[92px] bg-[#D8E5FB] rounded-[16px] border-2 border-black z-[120]"
-						style={{ position: 'absolute', top: '75px', left: 'calc(50% - 120px)' }}
-					>
-						<div
-							className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
-							onClick={() => {
-								setSearchWhatValue('Radio Stations');
-								setSearchActiveSection('where');
-							}}
-						>
-							<div className="w-[38px] h-[38px] bg-[#56DA73] rounded-[8px] flex-shrink-0 flex items-center justify-center">
-								<RadioStationsIcon />
-							</div>
-							<div className="ml-[12px] flex flex-col">
-								<div className="text-[20px] font-medium leading-none text-black font-inter">
-									Radio Stations
+				</div>
+
+				<div
+					className="absolute inset-0"
+					style={{
+						opacity: searchActiveSection === 'what' ? 1 : 0,
+						pointerEvents: searchActiveSection === 'what' ? 'auto' : 'none',
+						transition: dropdownFadeTransition,
+						willChange: 'opacity',
+					}}
+				>
+					{/* What dropdown - Promotion */}
+					{searchWhyValue === '[Promotion]' ? (
+						<div className="flex flex-col items-center justify-start gap-[10px] w-full h-full py-[12px]">
+							<div
+								className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+								onClick={() => {
+									setSearchWhatValue('Radio Stations');
+									setSearchActiveSection('where');
+								}}
+							>
+								<div className="w-[38px] h-[38px] bg-[#56DA73] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+									<RadioStationsIcon />
 								</div>
-								<div className="text-[12px] leading-tight text-black mt-[4px]">
-									Reach out to radio stations
+								<div className="ml-[12px] flex flex-col">
+									<div className="text-[20px] font-medium leading-none text-black font-inter">
+										Radio Stations
+									</div>
+									<div className="text-[12px] leading-tight text-black mt-[4px]">
+										Reach out to radio stations
+									</div>
 								</div>
 							</div>
 						</div>
-					</div>
-				)}
-				{searchActiveSection === 'what' && searchWhyValue !== '[Promotion]' && (
-					<div
-						id="campaign-what-dropdown-container"
-						className="campaign-search-dropdown-menu w-[439px] h-[404px] bg-[#D8E5FB] rounded-[16px] border-2 border-black z-[120]"
-						style={{ position: 'absolute', top: '75px', left: 'calc(50% - 120px)' }}
-					>
-						<style jsx global>{`
-							#campaign-what-dropdown-container .scrollbar-hide {
-								scrollbar-width: none !important;
-								scrollbar-color: transparent transparent !important;
-								-ms-overflow-style: none !important;
-							}
-							#campaign-what-dropdown-container .scrollbar-hide::-webkit-scrollbar {
-								display: none !important;
-								width: 0 !important;
-								height: 0 !important;
-							}
-						`}</style>
-						<CustomScrollbar
-							className="w-full h-full"
-							contentClassName="flex flex-col items-center gap-[10px] py-[12px]"
-							thumbWidth={2}
-							thumbColor="#000000"
-							trackColor="transparent"
-							offsetRight={-5}
-						>
-							<div
-								className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
-								onClick={() => {
-									setSearchWhatValue('Music Venues');
-									setSearchActiveSection('where');
-								}}
+					) : (
+						<div id="campaign-what-dropdown-container" className="w-full h-full">
+							<style jsx global>{`
+								#campaign-what-dropdown-container .scrollbar-hide {
+									scrollbar-width: none !important;
+									scrollbar-color: transparent transparent !important;
+									-ms-overflow-style: none !important;
+								}
+								#campaign-what-dropdown-container .scrollbar-hide::-webkit-scrollbar {
+									display: none !important;
+									width: 0 !important;
+									height: 0 !important;
+								}
+							`}</style>
+							<CustomScrollbar
+								className="w-full h-full"
+								contentClassName="flex flex-col items-center gap-[10px] py-[12px]"
+								thumbWidth={2}
+								thumbColor="#000000"
+								trackColor="transparent"
+								offsetRight={-5}
 							>
-								<div className="w-[38px] h-[38px] bg-[#71C9FD] rounded-[8px] flex-shrink-0 flex items-center justify-center">
-									<MusicVenuesIcon />
-								</div>
-								<div className="ml-[12px] flex flex-col">
-									<div className="text-[20px] font-medium leading-none text-black font-inter">
-										Music Venues
+								<div
+									className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+									onClick={() => {
+										setSearchWhatValue('Music Venues');
+										setSearchActiveSection('where');
+									}}
+								>
+									<div className="w-[38px] h-[38px] bg-[#71C9FD] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+										<MusicVenuesIcon />
 									</div>
-									<div className="text-[12px] leading-tight text-black mt-[4px]">
-										Reach talent buyers for live shows
-									</div>
-								</div>
-							</div>
-							<div
-								className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
-								onClick={() => {
-									setSearchWhatValue('Wine, Beer, Spirits');
-									setSearchActiveSection('where');
-								}}
-							>
-								<div className="w-[38px] h-[38px] bg-[#80AAFF] rounded-[8px] flex-shrink-0 flex items-center justify-center">
-									<WineBeerSpiritsIcon />
-								</div>
-								<div className="ml-[12px] flex flex-col">
-									<div className="text-[20px] font-medium leading-none text-black font-inter">
-										Wine, Beer, Spirits
-									</div>
-									<div className="text-[12px] leading-tight text-black mt-[4px]">
-										Pitch your act for seasonal events
+									<div className="ml-[12px] flex flex-col">
+										<div className="text-[20px] font-medium leading-none text-black font-inter">
+											Music Venues
+										</div>
+										<div className="text-[12px] leading-tight text-black mt-[4px]">
+											Reach talent buyers for live shows
+										</div>
 									</div>
 								</div>
-							</div>
-							<div
-								className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
-								onClick={() => {
-									setSearchWhatValue('Restaurants');
-									setSearchActiveSection('where');
-								}}
-							>
-								<div className="w-[38px] h-[38px] bg-[#77DD91] rounded-[8px] flex-shrink-0 flex items-center justify-center">
-									<RestaurantsIcon />
-								</div>
-								<div className="ml-[12px] flex flex-col">
-									<div className="text-[20px] font-medium leading-none text-black font-inter">
-										Restaurants
+								<div
+									className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+									onClick={() => {
+										setSearchWhatValue('Wine, Beer, Spirits');
+										setSearchActiveSection('where');
+									}}
+								>
+									<div className="w-[38px] h-[38px] bg-[#80AAFF] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+										<WineBeerSpiritsIcon />
 									</div>
-									<div className="text-[12px] leading-tight text-black mt-[4px]">
-										Land steady dinner and brunch gigs
-									</div>
-								</div>
-							</div>
-							<div
-								className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
-								onClick={() => {
-									setSearchWhatValue('Coffee Shops');
-									setSearchActiveSection('where');
-								}}
-							>
-								<div className="w-[38px] h-[38px] bg-[#A9DE78] rounded-[8px] flex-shrink-0 flex items-center justify-center">
-									<CoffeeShopsIcon />
-								</div>
-								<div className="ml-[12px] flex flex-col">
-									<div className="text-[20px] font-medium leading-none text-black font-inter">
-										Coffee Shops
-									</div>
-									<div className="text-[12px] leading-tight text-black mt-[4px]">
-										Book intimate daytime performances
+									<div className="ml-[12px] flex flex-col">
+										<div className="text-[20px] font-medium leading-none text-black font-inter">
+											Wine, Beer, Spirits
+										</div>
+										<div className="text-[12px] leading-tight text-black mt-[4px]">
+											Pitch your act for seasonal events
+										</div>
 									</div>
 								</div>
-							</div>
-							<div
-								className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
-								onClick={() => {
-									setSearchWhatValue('Wedding Planners');
-									setSearchActiveSection('where');
-								}}
-							>
-								<div className="w-[38px] h-[38px] bg-[#EED56E] rounded-[8px] flex-shrink-0 flex items-center justify-center">
-									<WeddingPlannersIcon />
-								</div>
-								<div className="ml-[12px] flex flex-col">
-									<div className="text-[20px] font-medium leading-none text-black font-inter">
-										Wedding Planners
+								<div
+									className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+									onClick={() => {
+										setSearchWhatValue('Restaurants');
+										setSearchActiveSection('where');
+									}}
+								>
+									<div className="w-[38px] h-[38px] bg-[#77DD91] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+										<RestaurantsIcon />
 									</div>
-									<div className="text-[12px] leading-tight text-black mt-[4px]">
-										Get hired for ceremonies & receptions
-									</div>
-								</div>
-							</div>
-							<div
-								className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
-								onClick={() => {
-									setSearchWhatValue('Festivals');
-									setSearchActiveSection('where');
-								}}
-							>
-								<div className="w-[38px] h-[38px] bg-[#80AAFF] rounded-[8px] flex-shrink-0 flex items-center justify-center">
-									<FestivalsIcon />
-								</div>
-								<div className="ml-[12px] flex flex-col">
-									<div className="text-[20px] font-medium leading-none text-black font-inter">
-										Festivals
-									</div>
-									<div className="text-[12px] leading-tight text-black mt-[4px]">
-										Pitch your act for seasonal events
+									<div className="ml-[12px] flex flex-col">
+										<div className="text-[20px] font-medium leading-none text-black font-inter">
+											Restaurants
+										</div>
+										<div className="text-[12px] leading-tight text-black mt-[4px]">
+											Land steady dinner and brunch gigs
+										</div>
 									</div>
 								</div>
-							</div>
-						</CustomScrollbar>
-					</div>
-				)}
-				{searchActiveSection === 'where' && (
-					<div
-						id="campaign-where-dropdown-container"
-						className="campaign-search-dropdown-menu w-[439px] h-[370px] bg-[#D8E5FB] rounded-[16px] border-2 border-black z-[120]"
-						style={{
-							position: 'absolute',
-							top: '75px',
-							left: 'calc(50% - 120px)',
-							overflow: 'visible',
-						}}
-					>
+								<div
+									className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+									onClick={() => {
+										setSearchWhatValue('Coffee Shops');
+										setSearchActiveSection('where');
+									}}
+								>
+									<div className="w-[38px] h-[38px] bg-[#A9DE78] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+										<CoffeeShopsIcon />
+									</div>
+									<div className="ml-[12px] flex flex-col">
+										<div className="text-[20px] font-medium leading-none text-black font-inter">
+											Coffee Shops
+										</div>
+										<div className="text-[12px] leading-tight text-black mt-[4px]">
+											Book intimate daytime performances
+										</div>
+									</div>
+								</div>
+								<div
+									className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+									onClick={() => {
+										setSearchWhatValue('Wedding Planners');
+										setSearchActiveSection('where');
+									}}
+								>
+									<div className="w-[38px] h-[38px] bg-[#EED56E] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+										<WeddingPlannersIcon />
+									</div>
+									<div className="ml-[12px] flex flex-col">
+										<div className="text-[20px] font-medium leading-none text-black font-inter">
+											Wedding Planners
+										</div>
+										<div className="text-[12px] leading-tight text-black mt-[4px]">
+											Get hired for ceremonies & receptions
+										</div>
+									</div>
+								</div>
+								<div
+									className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+									onClick={() => {
+										setSearchWhatValue('Festivals');
+										setSearchActiveSection('where');
+									}}
+								>
+									<div className="w-[38px] h-[38px] bg-[#80AAFF] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+										<FestivalsIcon />
+									</div>
+									<div className="ml-[12px] flex flex-col">
+										<div className="text-[20px] font-medium leading-none text-black font-inter">
+											Festivals
+										</div>
+										<div className="text-[12px] leading-tight text-black mt-[4px]">
+											Pitch your act for seasonal events
+										</div>
+									</div>
+								</div>
+							</CustomScrollbar>
+						</div>
+					)}
+				</div>
+
+				<div
+					className="absolute inset-0"
+					style={{
+						opacity: searchActiveSection === 'where' ? 1 : 0,
+						pointerEvents: searchActiveSection === 'where' ? 'auto' : 'none',
+						transition: dropdownFadeTransition,
+						willChange: 'opacity',
+					}}
+				>
+					<div id="campaign-where-dropdown-container" className="w-full h-full">
 						<style jsx global>{`
 							#campaign-where-dropdown-container .scrollbar-hide {
 								scrollbar-width: none !important;
@@ -1851,10 +1964,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 									</div>
 								) : locationResults && locationResults.length > 0 ? (
 									locationResults.map((loc, idx) => {
-										const { icon, backgroundColor } = getCityIconProps(
-											loc.city,
-											loc.state
-										);
+										const { icon, backgroundColor } = getCityIconProps(loc.city, loc.state);
 										return (
 											<div
 												key={`${loc.city}-${loc.state}-${idx}`}
@@ -1882,9 +1992,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										);
 									})
 								) : (
-									<div className="text-black font-medium font-secondary">
-										No locations found
-									</div>
+									<div className="text-black font-medium font-secondary">No locations found</div>
 								)}
 							</CustomScrollbar>
 						) : (
@@ -1912,9 +2020,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													: 'text-transparent'
 											}`}
 										>
-											{isLoadingLocation
-												? 'Locating...'
-												: userLocationName || 'Placeholder'}
+											{isLoadingLocation ? 'Locating...' : userLocationName || 'Placeholder'}
 										</div>
 									</div>
 								</div>
@@ -1951,12 +2057,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 							</div>
 						)}
 					</div>
-				)}
-			</>
+				</div>
+			</div>
 		);
-
-		// Render dropdowns directly (not via portal) so they scroll with the page
-		return dropdownContent;
 	};
 
 	return (
@@ -2495,7 +2598,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											: 'calc(50% + 250px + 32px)',
 									// Counter-animate when transitioning in to keep research panel stable
 									...(isTransitioningIn && ['testing', 'contacts', 'drafting', 'sent'].includes(view) ? {
-										animation: 'researchPanelStable 280ms ease-out forwards',
+										animation: 'researchPanelStable 180ms ease-out forwards',
 									} : {}),
 								}}
 							>
@@ -3423,7 +3526,12 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											)}
 											{/* Bottom Panels: Contacts, Sent, and Inbox - centered relative to container - hidden at narrowest breakpoint */}
 											{!isNarrowestDesktop && (
-												<div className="mt-[35px] flex justify-center gap-[15px]">
+												<div
+													className={cn(
+														draftEmails.length === 0 ? 'mt-[91px]' : 'mt-[35px]',
+														'flex justify-center gap-[15px]'
+													)}
+												>
 													<ContactsExpandedList
 														contacts={contactsAvailableForDrafting}
 														width={232}
@@ -3601,7 +3709,12 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 
 										{/* Bottom Panels: Contacts, Sent, and Inbox - hidden at narrowest breakpoint */}
 										{!isNarrowestDesktop && (
-											<div className="mt-[35px] flex justify-center gap-[15px]">
+											<div
+												className={cn(
+													draftEmails.length === 0 ? 'mt-[91px]' : 'mt-[35px]',
+													'flex justify-center gap-[15px]'
+												)}
+											>
 												<ContactsExpandedList
 													contacts={contactsAvailableForDrafting}
 													width={232}
@@ -4632,6 +4745,12 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														height: '38px',
 													}}
 												>
+													{/* Sliding active section indicator (matches dashboard) */}
+													<div
+														ref={searchActiveSectionIndicatorRef}
+														className="absolute top-0 left-0 h-full w-1/3 bg-white border border-black rounded-[6px] pointer-events-none z-0"
+														style={{ opacity: 0, willChange: 'transform' }}
+													/>
 													{/* Why pill (Booking/Promotion) */}
 													<div
 														className={`campaign-mini-search-section-why flex-1 flex items-center justify-start border-r border-transparent ${
@@ -4639,15 +4758,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														} h-full min-w-0 relative pl-[16px] pr-1 cursor-pointer`}
 														onClick={() => setSearchActiveSection('why')}
 													>
-														{searchActiveSection === 'why' && (
-															<div
-																className="absolute -left-[1px] -top-[1px] border border-black bg-white rounded-[6px] z-0"
-																style={{
-																	width: 'calc(100% + 2px)',
-																	height: 'calc(100% + 2px)',
-																}}
-															/>
-														)}
 														<div className="w-full h-full flex items-center text-left text-[13px] font-bold font-secondary truncate p-0 relative z-10">
 															{searchWhyValue
 																? searchWhyValue.replace(/[\[\]]/g, '')
@@ -4660,15 +4770,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 															!searchActiveSection ? 'group-hover:border-black/10' : ''
 														} h-full min-w-0 relative pl-[16px] pr-1`}
 													>
-														{searchActiveSection === 'what' && (
-															<div
-																className="absolute -left-[1px] -top-[1px] border border-black bg-white rounded-[6px] z-0"
-																style={{
-																	width: 'calc(100% + 2px)',
-																	height: 'calc(100% + 2px)',
-																}}
-															/>
-														)}
 														<input
 															ref={whatInputRef}
 															value={searchWhatValue}
@@ -4690,15 +4791,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													</div>
 													{/* Where pill */}
 													<div className="campaign-mini-search-section-where flex-1 flex items-center justify-end h-full min-w-0 relative pr-[12px] pl-[16px]">
-														{searchActiveSection === 'where' && (
-															<div
-																className="absolute -left-[1px] -top-[1px] border border-black bg-white rounded-[6px] z-0"
-																style={{
-																	width: 'calc(100% + 2px)',
-																	height: 'calc(100% + 2px)',
-																}}
-															/>
-														)}
 														<input
 															ref={whereInputRef}
 															value={searchWhereValue}
