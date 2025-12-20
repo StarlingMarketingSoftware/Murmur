@@ -191,11 +191,15 @@ const DashboardContent = () => {
 					isMapView
 						? {
 								position: 'fixed',
-								top: '118px',
+								// In map view, the mini search bar is overlaid on the map,
+								// so the dropdown should anchor just below it.
+								top: '74px',
 								left: dropdownLeft,
 								height: dropdownHeight,
 								transition: dropdownTransition,
 								willChange: 'left, height',
+								// Ensure dropdown appears above the overlaid search bar.
+								zIndex: 140,
 						  }
 						: {
 								position: 'absolute',
@@ -2045,8 +2049,10 @@ const DashboardContent = () => {
 				{hasSearched &&
 					!isLoadingContacts &&
 					!isRefetchingContacts &&
-					activeTab === 'search' && (
-						<div
+					activeTab === 'search' &&
+					(() => {
+						const searchBar = (
+							<div
 					className={`results-search-bar-wrapper w-full max-w-[650px] mx-auto px-4 ${
 							// When the horizontal research strip is active (sm–lg desktop),
 							// hide the mini search bar + helper text so the strip owns this area.
@@ -2056,19 +2062,17 @@ const DashboardContent = () => {
 								isMapView
 									? {
 											position: 'fixed',
-											top: '36px',
+											// Overlay directly on the map (no header band).
+											top: '14px',
 											left: '50%',
 											transform: 'translateX(-50%)',
-											zIndex: 110,
-											backgroundColor: '#AFD6EF',
-											height: '84px',
-											display: 'flex',
-											alignItems: 'center',
-											justifyContent: 'center',
-											width: '100%',
-											maxWidth: '100%',
-											borderBottom: '1px solid black',
-											padding: '0 16px',
+											zIndex: 120,
+											// Leave room for the floating close button on the left.
+											width: 'min(650px, calc(100vw - 120px))',
+											maxWidth: '650px',
+											padding: 0,
+											backgroundColor: 'transparent',
+											borderBottom: 'none',
 									  }
 									: undefined
 							}
@@ -2353,7 +2357,16 @@ const DashboardContent = () => {
 								</div>
 							)}
 						</div>
-					)}
+						);
+
+						// In map view, the map itself is rendered via a portal to <body>.
+						// Portal the mini search bar too so it reliably stacks above the map,
+						// regardless of any parent stacking contexts/transforms.
+						if (isMapView && typeof window !== 'undefined') {
+							return createPortal(searchBar, document.body);
+						}
+						return searchBar;
+					})()}
 
 				{activeSearchQuery && activeTab === 'search' && (
 					<>
@@ -2395,105 +2408,57 @@ const DashboardContent = () => {
 											{typeof window !== 'undefined' &&
 												createPortal(
 													<>
-														{/* Header bar at very top of page */}
-														<div
+														{/* Floating close button (no header band) */}
+														<button
+															type="button"
+															onClick={handleCloseMapView}
+															aria-label="Close map view"
 															style={{
 																position: 'fixed',
-																top: '0px',
-																left: '0px',
-																right: '0px',
-																height: '36px',
-																backgroundColor: 'white',
-																zIndex: 100,
-																borderBottom: '1px solid black',
+																top: '14px',
+																left: '14px',
+																zIndex: 130,
+																width: '38px',
+																height: '38px',
+																borderRadius: '10px',
+																border: '2px solid #000000',
+																backgroundColor: 'rgba(255,255,255,0.92)',
 																display: 'flex',
 																alignItems: 'center',
-																justifyContent: 'space-between',
+																justifyContent: 'center',
+																cursor: 'pointer',
+																boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
+																backdropFilter: 'blur(6px)',
 															}}
 														>
 															<span
 																style={{
-																	marginLeft: '10px',
-																	fontFamily:
-																		'var(--font-secondary), Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
-																	fontSize: '13px',
-																	fontWeight: 600,
-																	lineHeight: '1',
+																	fontSize: '20px',
+																	lineHeight: 1,
+																	fontWeight: 500,
+																	color: '#000000',
 																}}
 															>
-																Search
+																×
 															</span>
-															<button
-																type="button"
-																onClick={handleCloseMapView}
-																style={{
-																	marginRight: '10px',
-																	display: 'flex',
-																	alignItems: 'center',
-																	gap: '6px',
-																	cursor: 'pointer',
-																	background: 'transparent',
-																	border: 'none',
-																	padding: 0,
-																}}
-															>
-																<span
-																	style={{
-																		fontFamily:
-																			'var(--font-secondary), Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
-																		fontSize: '13px',
-																		fontWeight: 500,
-																		lineHeight: '1',
-																		color: '#C4C4C4',
-																	}}
-																>
-																	Close
-																</span>
-																<svg
-																	width="20"
-																	height="17"
-																	viewBox="0 0 20 17"
-																	fill="none"
-																	xmlns="http://www.w3.org/2000/svg"
-																	aria-hidden="true"
-																>
-																	<path
-																		d="M10.8728 6.59376C10.8728 6.8389 11.1054 7.03761 11.3922 7.0376L16.0664 7.03745C16.3532 7.03744 16.5857 6.83872 16.5857 6.59358C16.5857 6.34845 16.3532 6.14974 16.0663 6.14975L11.9115 6.14988L11.9114 2.59904C11.9114 2.35391 11.6789 2.1552 11.392 2.15521C11.1052 2.15522 10.8727 2.35394 10.8727 2.59908L10.8728 6.59376ZM18.7402 0.313477L18.373 -0.000363988L11.0249 6.2799L11.3922 6.59375L11.7594 6.90759L19.1075 0.627317L18.7402 0.313477Z"
-																		fill="black"
-																	/>
-																	<path
-																		d="M11.3922 9.30322C11.1054 9.30321 10.8728 9.50192 10.8728 9.74706L10.8727 13.7417C10.8727 13.9869 11.1052 14.1856 11.392 14.1856C11.6789 14.1856 11.9114 13.9869 11.9114 13.7418L11.9115 10.1909L16.0663 10.1911C16.3532 10.1911 16.5857 9.99237 16.5857 9.74724C16.5857 9.5021 16.3532 9.30338 16.0664 9.30337L11.3922 9.30322ZM18.7402 16.0273L19.1075 15.7135L11.7594 9.43323L11.3922 9.74708L11.0249 10.0609L18.373 16.3412L18.7402 16.0273Z"
-																		fill="black"
-																	/>
-																	<path
-																		d="M8.23459 9.74706C8.23459 9.50192 8.00206 9.30321 7.71523 9.30322L3.04106 9.30337C2.75423 9.30338 2.52172 9.5021 2.52172 9.74724C2.52173 9.99237 2.75426 10.1911 3.04109 10.1911L7.1959 10.1909L7.19602 13.7418C7.19602 13.9869 7.42855 14.1856 7.71538 14.1856C8.00221 14.1856 8.23473 13.9869 8.23472 13.7417L8.23459 9.74706ZM0.367188 16.0273L0.734434 16.3412L8.08249 10.0609L7.71524 9.74708L7.348 9.43323L-5.94929e-05 15.7135L0.367188 16.0273Z"
-																		fill="black"
-																	/>
-																	<path
-																		d="M7.71523 7.0376C8.00206 7.03761 8.23459 6.8389 8.23459 6.59376L8.23472 2.59908C8.23473 2.35394 8.00221 2.15522 7.71538 2.15521C7.42855 2.1552 7.19602 2.35391 7.19602 2.59904L7.1959 6.14988L3.04109 6.14975C2.75426 6.14974 2.52173 6.34845 2.52172 6.59358C2.52172 6.83872 2.75423 7.03744 3.04106 7.03745L7.71523 7.0376ZM0.367188 0.313477L-5.94929e-05 0.627317L7.348 6.90759L7.71524 6.59375L8.08249 6.2799L0.734434 -0.000363988L0.367188 0.313477Z"
-																		fill="black"
-																	/>
-																</svg>
-															</button>
-														</div>
-														{/* Console loader overlay - positioned below header where search bar would be */}
+														</button>
+														{/* Console loader overlay - centered over the map (no blue header strip) */}
 														{(isSearchPending ||
 															isLoadingContacts ||
 															isRefetchingContacts) && (
 															<div
 																style={{
 																	position: 'fixed',
-																	top: '36px',
-																	left: '0px',
-																	right: '0px',
-																	height: '84px',
-																	backgroundColor: '#AFD6EF',
-																	zIndex: 101,
+																	top: '64px',
+																	left: '50%',
+																	transform: 'translateX(-50%)',
+																	width: 'min(800px, calc(100vw - 24px))',
+																	zIndex: 125,
 																	display: 'flex',
 																	alignItems: 'center',
 																	justifyContent: 'center',
-																	borderBottom: '1px solid black',
 																	overflow: 'hidden',
+																	pointerEvents: 'none',
 																}}
 															>
 																<ConsoleLoader
@@ -2502,23 +2467,11 @@ const DashboardContent = () => {
 																/>
 															</div>
 														)}
-														{/* Background fill for map area only (below header/search bar) */}
-														<div
-															style={{
-																position: 'fixed',
-																top: '120px',
-																left: 0,
-																right: 0,
-																bottom: 0,
-																backgroundColor: '#AFD6EF',
-																zIndex: 98,
-															}}
-														/>
 													{/* Map container */}
 													<div
 														style={{
 															position: 'fixed',
-															top: '120px',
+															top: '9px',
 															left: '9px',
 															right: '9px',
 															bottom: '9px',
