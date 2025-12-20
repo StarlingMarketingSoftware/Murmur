@@ -2206,6 +2206,12 @@ body {
 	min-width: 499px !important;
 	max-width: 499px !important;
 	position: relative;
+	/* Prevent the mini searchbar "shrink" animation when toggling map/table view */
+	transition: none !important;
+}
+
+.results-search-input-group .search-wave-container::before {
+	transition: none !important;
 }
 
 /* Dashboard map-open view: compact the results mini searchbar width */

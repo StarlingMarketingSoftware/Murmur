@@ -103,6 +103,39 @@ const extractWhatFromSearchQuery = (query: string): string | null => {
 	return s || null;
 };
 
+const extractWhereFromSearchQuery = (query: string): string | null => {
+	// Typical formats:
+	// - "[Promotion] Radio Stations (Maine)"
+	// - "[Booking] Music Venues (Portland, ME)"
+	// Also support legacy "in" format: "[Booking] X in Y"
+	if (!query) return null;
+	const s = query.trim();
+	if (!s) return null;
+
+	// Prefer a trailing "(...)" (our canonical format)
+	const parenMatch = s.match(/\(([^)]+)\)\s*$/);
+	const parenValue = parenMatch?.[1]?.trim();
+	if (parenValue) return parenValue;
+
+	// Fallback: "... in <where>"
+	const inMatch = s.match(/\s+in\s+(.+)$/i);
+	const inValue = inMatch?.[1]?.trim();
+	return inValue || null;
+};
+
+const extractWhyFromSearchQuery = (query: string): string | null => {
+	// Typical formats:
+	// - "[Promotion] ..."
+	// - "[Booking] ..."
+	if (!query) return null;
+	const s = query.trim();
+	if (!s) return null;
+
+	const m = s.match(/^\[([^\]]+)\]/);
+	const tag = m?.[1]?.trim();
+	return tag ? `[${tag}]` : null;
+};
+
 const MAP_RESULTS_SEARCH_TRAY_WHAT_ICON_BY_LABEL: Record<
 	string,
 	{ backgroundColor: string; Icon: () => ReactNode }
@@ -354,7 +387,9 @@ const DashboardContent = () => {
 								className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
 								onClick={() => {
 									setWhatValue('Radio Stations');
-									setActiveSection('where');
+									// On the results screen, changing "What" should immediately re-search
+									// without auto-advancing the UI to the "Where" (state) step.
+									setActiveSection(isMapView ? null : 'where');
 								}}
 							>
 								<div className="w-[38px] h-[38px] bg-[#56DA73] rounded-[8px] flex-shrink-0 flex items-center justify-center">
@@ -396,7 +431,9 @@ const DashboardContent = () => {
 									className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
 									onClick={() => {
 										setWhatValue('Music Venues');
-										setActiveSection('where');
+										// On the results screen, changing "What" should immediately re-search
+										// without auto-advancing the UI to the "Where" (state) step.
+										setActiveSection(isMapView ? null : 'where');
 									}}
 								>
 									<div className="w-[38px] h-[38px] bg-[#71C9FD] rounded-[8px] flex-shrink-0 flex items-center justify-center">
@@ -415,7 +452,9 @@ const DashboardContent = () => {
 									className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
 									onClick={() => {
 										setWhatValue('Wine, Beer, and Spirits');
-										setActiveSection('where');
+										// On the results screen, changing "What" should immediately re-search
+										// without auto-advancing the UI to the "Where" (state) step.
+										setActiveSection(isMapView ? null : 'where');
 									}}
 								>
 									<div className="w-[38px] h-[38px] bg-[#80AAFF] rounded-[8px] flex-shrink-0 flex items-center justify-center">
@@ -434,7 +473,9 @@ const DashboardContent = () => {
 									className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
 									onClick={() => {
 										setWhatValue('Restaurants');
-										setActiveSection('where');
+										// On the results screen, changing "What" should immediately re-search
+										// without auto-advancing the UI to the "Where" (state) step.
+										setActiveSection(isMapView ? null : 'where');
 									}}
 								>
 									<div className="w-[38px] h-[38px] bg-[#77DD91] rounded-[8px] flex-shrink-0 flex items-center justify-center">
@@ -453,7 +494,9 @@ const DashboardContent = () => {
 									className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
 									onClick={() => {
 										setWhatValue('Coffee Shops');
-										setActiveSection('where');
+										// On the results screen, changing "What" should immediately re-search
+										// without auto-advancing the UI to the "Where" (state) step.
+										setActiveSection(isMapView ? null : 'where');
 									}}
 								>
 									<div className="w-[38px] h-[38px] bg-[#A9DE78] rounded-[8px] flex-shrink-0 flex items-center justify-center">
@@ -472,7 +515,9 @@ const DashboardContent = () => {
 									className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
 									onClick={() => {
 										setWhatValue('Wedding Planners');
-										setActiveSection('where');
+										// On the results screen, changing "What" should immediately re-search
+										// without auto-advancing the UI to the "Where" (state) step.
+										setActiveSection(isMapView ? null : 'where');
 									}}
 								>
 									<div className="w-[38px] h-[38px] bg-[#EED56E] rounded-[8px] flex-shrink-0 flex items-center justify-center">
@@ -491,7 +536,9 @@ const DashboardContent = () => {
 									className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
 									onClick={() => {
 										setWhatValue('Festivals');
-										setActiveSection('where');
+										// On the results screen, changing "What" should immediately re-search
+										// without auto-advancing the UI to the "Where" (state) step.
+										setActiveSection(isMapView ? null : 'where');
 									}}
 								>
 									<div className="w-[38px] h-[38px] bg-[#80AAFF] rounded-[8px] flex-shrink-0 flex items-center justify-center">
@@ -1193,6 +1240,88 @@ const DashboardContent = () => {
 			form.setValue('searchText', combinedSearch);
 		}
 	}, [whyValue, whatValue, whereValue, form]);
+
+	// Map view (results): automatically re-run the search when "What" or "Where" changes.
+	// Intentionally do NOT auto-search on "Why"-only edits.
+	const mapAutoSearchPayload = useMemo(
+		() => JSON.stringify({ what: whatValue.trim(), where: whereValue.trim() }),
+		[whatValue, whereValue]
+	);
+	const debouncedMapAutoSearchPayload = useDebounce(mapAutoSearchPayload, 650);
+	const lastMapAutoSearchPayloadRef = useRef<string | null>(null);
+
+	useEffect(() => {
+		// Reset when leaving results/map view
+		if (!hasSearched || !isMapView) {
+			lastMapAutoSearchPayloadRef.current = null;
+			return;
+		}
+
+		// Prime the baseline payload so "Why" changes alone don't trigger a search.
+		if (lastMapAutoSearchPayloadRef.current == null) {
+			lastMapAutoSearchPayloadRef.current = debouncedMapAutoSearchPayload;
+			return;
+		}
+
+		// Only respond to debounced changes in What/Where.
+		if (lastMapAutoSearchPayloadRef.current === debouncedMapAutoSearchPayload) return;
+
+		let parsed: { what: string; where: string } | null = null;
+		try {
+			parsed = JSON.parse(debouncedMapAutoSearchPayload) as { what: string; where: string };
+		} catch {
+			// Should never happen, but don't break the page if it does.
+			return;
+		}
+
+		const typedWhat = (parsed.what || '').trim();
+		const typedWhereRaw = (parsed.where || '').trim();
+		const typedWhere = typedWhereRaw.replace(/^\(|\)$/g, '').trim();
+
+		// If the segmented inputs aren't initialized (e.g. user searched via raw text),
+		// infer missing pieces from the last executed query so edits behave intuitively.
+		const inferredWhy = extractWhyFromSearchQuery(activeSearchQuery) || '';
+		const inferredWhat = extractWhatFromSearchQuery(activeSearchQuery) || '';
+		const inferredWhere = extractWhereFromSearchQuery(activeSearchQuery) || '';
+
+		const effectiveWhy = (whyValue || inferredWhy).trim();
+		const effectiveWhat = (typedWhat || inferredWhat).trim();
+		const effectiveWhere = (typedWhere || inferredWhere).trim();
+
+		// Auto-search only when "What" is meaningful. ("Where" can be left unchanged.)
+		if (!effectiveWhat) return;
+
+		const formattedWhere = effectiveWhere ? `(${effectiveWhere})` : '';
+		const combinedSearch = [effectiveWhy, effectiveWhat, formattedWhere]
+			.filter(Boolean)
+			.join(' ')
+			.trim();
+
+		// If the debounced What/Where already match the active query, just update the baseline.
+		if (combinedSearch === activeSearchQuery) {
+			lastMapAutoSearchPayloadRef.current = debouncedMapAutoSearchPayload;
+			return;
+		}
+
+		// Don't auto-trigger auth flows; only run if already signed in.
+		if (!isSignedIn) return;
+
+		lastMapAutoSearchPayloadRef.current = debouncedMapAutoSearchPayload;
+		form.setValue('searchText', combinedSearch, {
+			shouldValidate: false,
+			shouldDirty: true,
+		});
+		form.handleSubmit(onSubmit)();
+	}, [
+		activeSearchQuery,
+		debouncedMapAutoSearchPayload,
+		form,
+		hasSearched,
+		isMapView,
+		isSignedIn,
+		onSubmit,
+		whyValue,
+	]);
 
 	// Check for pending search from contacts page searchbar
 	useEffect(() => {
