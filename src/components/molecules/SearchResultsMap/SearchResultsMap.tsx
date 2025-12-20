@@ -638,8 +638,8 @@ const defaultCenter = {
 };
 
 const mapOptions: google.maps.MapOptions = {
-	disableDefaultUI: false,
-	zoomControl: true,
+	disableDefaultUI: true,
+	zoomControl: false,
 	streetViewControl: false,
 	mapTypeControl: false,
 	fullscreenControl: false,
