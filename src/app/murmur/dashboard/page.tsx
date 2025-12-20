@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { gsap } from 'gsap';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { createPortal, flushSync } from 'react-dom';
@@ -103,6 +103,60 @@ const extractWhatFromSearchQuery = (query: string): string | null => {
 	return s || null;
 };
 
+const MAP_RESULTS_SEARCH_TRAY_WHAT_ICON_BY_LABEL: Record<
+	string,
+	{ backgroundColor: string; Icon: () => ReactNode }
+> = {
+	'Radio Stations': { backgroundColor: '#56DA73', Icon: RadioStationsIcon },
+	'Music Venues': { backgroundColor: '#71C9FD', Icon: MusicVenuesIcon },
+	'Wine, Beer, and Spirits': { backgroundColor: '#80AAFF', Icon: WineBeerSpiritsIcon },
+	Restaurants: { backgroundColor: '#77DD91', Icon: RestaurantsIcon },
+	'Coffee Shops': { backgroundColor: '#A9DE78', Icon: CoffeeShopsIcon },
+	'Wedding Planners': { backgroundColor: '#EED56E', Icon: WeddingPlannersIcon },
+	Festivals: { backgroundColor: '#80AAFF', Icon: FestivalsIcon },
+};
+
+const MAP_RESULTS_SEARCH_TRAY = {
+	containerWidth: 189,
+	containerHeight: 52,
+	containerRadius: 6,
+	itemSize: 43,
+	itemRadius: 12,
+	itemGap: 12,
+	gapToSearchBar: 43,
+	borderWidth: 3,
+	borderColor: '#000000',
+	backgroundColor: 'rgba(255, 255, 255, 0.9)',
+	nearMeBackgroundColor: '#D0E6FF',
+	whyBackgroundColors: {
+		booking: '#9DCBFF',
+		promotion: '#7AD47A',
+	},
+	whatIconByLabel: MAP_RESULTS_SEARCH_TRAY_WHAT_ICON_BY_LABEL,
+} as const;
+
+const SearchTrayIconTile = ({
+	backgroundColor,
+	children,
+}: {
+	backgroundColor: string;
+	children: ReactNode;
+}) => {
+	return (
+		<div
+			className="flex items-center justify-center flex-shrink-0"
+			style={{
+				width: `${MAP_RESULTS_SEARCH_TRAY.itemSize}px`,
+				height: `${MAP_RESULTS_SEARCH_TRAY.itemSize}px`,
+				backgroundColor,
+				borderRadius: `${MAP_RESULTS_SEARCH_TRAY.itemRadius}px`,
+			}}
+		>
+			{children}
+		</div>
+	);
+};
+
 const DashboardContent = () => {
 	const { isSignedIn, openSignIn } = useClerk();
 	const searchParams = useSearchParams();
@@ -127,6 +181,7 @@ const DashboardContent = () => {
 	const [whyValue, setWhyValue] = useState('');
 	const [whatValue, setWhatValue] = useState('');
 	const [whereValue, setWhereValue] = useState('');
+	const [isNearMeLocation, setIsNearMeLocation] = useState(false);
 	const hasWhereValue = whereValue.trim().length > 0;
 	const isPromotion = whyValue === '[Promotion]';
 	const [activeSection, setActiveSection] = useState<'why' | 'what' | 'where' | null>(
@@ -505,6 +560,7 @@ const DashboardContent = () => {
 												className="w-[415px] min-h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200 mb-2"
 												onClick={() => {
 													setWhereValue(loc.label);
+													setIsNearMeLocation(false);
 													setActiveSection(null);
 												}}
 											>
@@ -538,6 +594,7 @@ const DashboardContent = () => {
 									onClick={() => {
 										if (userLocationName && !isLoadingLocation) {
 											setWhereValue(userLocationName);
+											setIsNearMeLocation(true);
 											setActiveSection(null);
 										}
 									}}
@@ -571,6 +628,7 @@ const DashboardContent = () => {
 												className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
 												onClick={() => {
 													setWhereValue(label);
+													setIsNearMeLocation(false);
 													setActiveSection(null);
 												}}
 											>
@@ -1176,7 +1234,10 @@ const DashboardContent = () => {
 			// Set the values
 			if (parsedWhy) setWhyValue(parsedWhy);
 			if (parsedWhat) setWhatValue(parsedWhat);
-			if (parsedWhere) setWhereValue(parsedWhere);
+			if (parsedWhere) {
+				setWhereValue(parsedWhere);
+				setIsNearMeLocation(false);
+			}
 
 			// Set the form value and submit after a short delay to allow state to update
 			setTimeout(() => {
@@ -1292,6 +1353,7 @@ const DashboardContent = () => {
 		setWhyValue('');
 		setWhatValue('');
 		setWhereValue('');
+		setIsNearMeLocation(false);
 		setActiveSection(null);
 	};
 
@@ -1658,7 +1720,10 @@ const DashboardContent = () => {
 																						ref={whereInputRef}
 																						type="text"
 																						value={whereValue}
-																						onChange={(e) => setWhereValue(e.target.value)}
+																						onChange={(e) => {
+																							setWhereValue(e.target.value);
+																							setIsNearMeLocation(false);
+																						}}
 																						onKeyDown={(e) => {
 																							if (e.key === 'Enter') {
 																								e.preventDefault();
@@ -1689,7 +1754,10 @@ const DashboardContent = () => {
 																									ref={whereInputRef}
 																									type="text"
 																									value={whereValue}
-																									onChange={(e) => setWhereValue(e.target.value)}
+																									onChange={(e) => {
+																										setWhereValue(e.target.value);
+																										setIsNearMeLocation(false);
+																									}}
 																									onKeyDown={(e) => {
 																										if (e.key === 'Enter') {
 																											e.preventDefault();
@@ -2076,6 +2144,55 @@ const DashboardContent = () => {
 					!isRefetchingContacts &&
 					activeTab === 'search' &&
 					(() => {
+						const trayWhy = isPromotion
+							? {
+									backgroundColor: MAP_RESULTS_SEARCH_TRAY.whyBackgroundColors.promotion,
+									icon: <PromotionIcon />,
+							  }
+							: {
+									backgroundColor: MAP_RESULTS_SEARCH_TRAY.whyBackgroundColors.booking,
+									icon: <BookingIcon />,
+							  };
+
+						const normalizedWhatKey = whatValue.trim();
+						const whatCfg = MAP_RESULTS_SEARCH_TRAY.whatIconByLabel[normalizedWhatKey];
+						const TrayWhatIcon = whatCfg?.Icon || (isPromotion ? RadioStationsIcon : MusicVenuesIcon);
+						const trayWhat = {
+							backgroundColor:
+								whatCfg?.backgroundColor ||
+								(isPromotion
+									? MAP_RESULTS_SEARCH_TRAY.whatIconByLabel['Radio Stations'].backgroundColor
+									: MAP_RESULTS_SEARCH_TRAY.whatIconByLabel['Music Venues'].backgroundColor),
+							icon: <TrayWhatIcon />,
+						};
+
+						const whereCandidate = (whereValue || userLocationName || '').trim();
+						const [whereCity, whereState] = (() => {
+							if (!whereCandidate) return ['', ''];
+							if (whereCandidate.includes(',')) {
+								const parts = whereCandidate.split(',');
+								const city = (parts[0] || '').trim();
+								const state = parts.slice(1).join(',').trim();
+								return [city, state];
+							}
+							return ['', whereCandidate];
+						})();
+						const whereIconProps =
+							!isNearMeLocation && whereState
+								? getCityIconProps(whereCity, whereState)
+								: null;
+						const trayWhere = isNearMeLocation
+							? {
+									backgroundColor: MAP_RESULTS_SEARCH_TRAY.nearMeBackgroundColor,
+									icon: <NearMeIcon />,
+							  }
+							: {
+									backgroundColor:
+										whereIconProps?.backgroundColor ||
+										MAP_RESULTS_SEARCH_TRAY.nearMeBackgroundColor,
+									icon: whereIconProps?.icon || <NearMeIcon />,
+							  };
+
 						const searchBar = (
 							<div
 					className={`results-search-bar-wrapper w-full max-w-[650px] mx-auto px-4 ${
@@ -2103,6 +2220,41 @@ const DashboardContent = () => {
 									: undefined
 							}
 						>
+							{/* Map view: show the 189x52 icon tray to the left of the search bar */}
+							{isMapView && (
+								<div
+									aria-hidden="true"
+									className="hidden lg:flex items-center justify-between"
+									style={{
+										position: 'absolute',
+										// Map is inset 9px from the viewport; "25px from map top" => 34px viewport.
+										// Search bar wrapper sits at 33px viewport, so this becomes 1px inside the wrapper.
+										top: '1px',
+										left: `-${
+											MAP_RESULTS_SEARCH_TRAY.containerWidth +
+											MAP_RESULTS_SEARCH_TRAY.gapToSearchBar
+										}px`,
+										width: `${MAP_RESULTS_SEARCH_TRAY.containerWidth}px`,
+										height: `${MAP_RESULTS_SEARCH_TRAY.containerHeight}px`,
+										backgroundColor: MAP_RESULTS_SEARCH_TRAY.backgroundColor,
+										border: `${MAP_RESULTS_SEARCH_TRAY.borderWidth}px solid ${MAP_RESULTS_SEARCH_TRAY.borderColor}`,
+										borderRadius: `${MAP_RESULTS_SEARCH_TRAY.containerRadius}px`,
+										paddingLeft: '6px',
+										paddingRight: '6px',
+										pointerEvents: 'none',
+									}}
+								>
+									<SearchTrayIconTile backgroundColor={trayWhy.backgroundColor}>
+										{trayWhy.icon}
+									</SearchTrayIconTile>
+									<SearchTrayIconTile backgroundColor={trayWhat.backgroundColor}>
+										{trayWhat.icon}
+									</SearchTrayIconTile>
+									<SearchTrayIconTile backgroundColor={trayWhere.backgroundColor}>
+										{trayWhere.icon}
+									</SearchTrayIconTile>
+								</div>
+							)}
 							<div
 								className={`results-search-bar-inner ${
 									hoveredContact && !isMapView ? 'invisible' : ''
@@ -2283,7 +2435,10 @@ const DashboardContent = () => {
 																			)}
 																			<input
 																				value={whereValue}
-																				onChange={(e) => setWhereValue(e.target.value)}
+																				onChange={(e) => {
+																					setWhereValue(e.target.value);
+																					setIsNearMeLocation(false);
+																				}}
 																				className="w-full h-full text-left bg-transparent border-none outline-none text-[13px] font-bold font-secondary overflow-hidden placeholder:text-gray-400 p-0 focus:ring-0 cursor-pointer relative z-10"
 																				style={{
 																					maskImage: 'linear-gradient(to right, black 75%, transparent 100%)',
@@ -2593,18 +2748,20 @@ const DashboardContent = () => {
 															) &&
 																!isNarrowestDesktop && (
 																	<div
-																		className="absolute top-[10px] right-[10px] rounded-[12px] shadow-lg flex flex-col"
+																		className="absolute top-[97px] right-[10px] rounded-[12px] flex flex-col"
 																		style={{
 																			width: '433px',
-																			height: '870px',
-																			maxHeight: 'calc(100% - 20px)',
-																			backgroundColor: '#AFD6EF',
+																			height: '800px',
+																			maxHeight: 'calc(100% - 117px)',
+																			backgroundColor: 'rgba(175, 214, 239, 0.8)',
 																			border: '3px solid #143883',
 																			overflow: 'hidden',
 																		}}
 																	>
 																		{/* Header area for right-hand panel (same color as panel) */}
-																		<div className="w-full h-[49px] flex-shrink-0 bg-[#AFD6EF] flex items-center justify-center px-4 relative">
+																		<div
+																			className="w-full h-[49px] flex-shrink-0 flex items-center justify-center px-4 relative"
+																		>
 																			{/* Map label button in top-left of panel header */}
 																			<button
 																				type="button"
