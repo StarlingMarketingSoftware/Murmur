@@ -2208,6 +2208,14 @@ body {
 	position: relative;
 }
 
+/* Dashboard map-open view: compact the results mini searchbar width */
+body.murmur-page.murmur-map-view .results-search-input,
+body.murmur-page.murmur-map-view .results-search-input-group .search-wave-container {
+	width: min(440px, calc(100vw - 120px)) !important;
+	min-width: min(440px, calc(100vw - 120px)) !important;
+	max-width: min(440px, calc(100vw - 120px)) !important;
+}
+
 /* Mobile portrait: ensure the results search bar fits within the viewport */
 @media (max-width: 640px) and (orientation: portrait) {
 	/* Make form a single full-width column */

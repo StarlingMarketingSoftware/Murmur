@@ -2088,13 +2088,14 @@ const DashboardContent = () => {
 									? {
 											position: 'fixed',
 											// Overlay directly on the map (no header band).
-											top: '14px',
+											// Map container is inset 9px from viewport; place bar 24px below map top.
+											top: '33px',
 											left: '50%',
 											transform: 'translateX(-50%)',
 											zIndex: 120,
 											// Leave room for the floating close button on the left.
-											width: 'min(650px, calc(100vw - 120px))',
-											maxWidth: '650px',
+											width: 'min(440px, calc(100vw - 120px))',
+											maxWidth: '440px',
 											padding: 0,
 											backgroundColor: 'transparent',
 											borderBottom: 'none',
@@ -2149,7 +2150,9 @@ const DashboardContent = () => {
 																}`}
 															>
 																<Input
-																	className={`search-wave-input results-search-input !h-[49px] !border-[3px] !focus-visible:ring-0 !focus-visible:ring-offset-0 !focus:ring-0 !focus:ring-offset-0 !ring-0 !outline-none !accent-transparent !border-black !pr-[60px] ${
+																	className={`search-wave-input results-search-input !h-[49px] !border-[3px] !focus-visible:ring-0 !focus-visible:ring-offset-0 !focus:ring-0 !focus:ring-offset-0 !ring-0 !outline-none !accent-transparent !border-black ${
+																		isMapView ? '!pr-[12px]' : '!pr-[60px]'
+																	} ${
 																		activeSection ? '!bg-[#F3F3F3]' : '!bg-white'
 																	} ${
 																		field.value === activeSearchQuery &&
@@ -2177,7 +2180,9 @@ const DashboardContent = () => {
 																				: 'bg-white border border-black'
 																		}`}
 																		style={{
-																			width: 'calc(100% - 66px)',
+																			width: isMapView
+																				? 'calc(100% - 12px)'
+																				: 'calc(100% - 66px)',
 																			height: '38px',
 																		}}
 																	>
@@ -2245,18 +2250,35 @@ const DashboardContent = () => {
 																				}}
 																			/>
 																		</div>
-																		<div className="flex-1 flex items-center justify-end h-full min-w-0 relative pr-[29px] pl-[16px] mini-search-section-where">
+																		<div
+																			className={`flex-1 flex items-center justify-end h-full min-w-0 relative ${
+																				isMapView ? 'pr-[12px]' : 'pr-[29px]'
+																			} pl-[16px] mini-search-section-where`}
+																		>
 																			{activeSection === 'where' && (
 																				<div
-																					className="absolute -left-[1px] -top-[1px] border border-black bg-white rounded-[6px] z-0"
-																					style={{
-																						width: '143px',
-																						height: '38px',
-																						borderTopLeftRadius: '6px',
-																						borderBottomLeftRadius: '6px',
-																						borderTopRightRadius: '6px',
-																						borderBottomRightRadius: '6px',
-																					}}
+																					className="absolute -top-[1px] border border-black bg-white rounded-[6px] z-0"
+																					style={
+																						isMapView
+																							? {
+																									left: '-1px',
+																									right: '-1px',
+																									height: '38px',
+																									borderTopLeftRadius: '6px',
+																									borderBottomLeftRadius: '6px',
+																									borderTopRightRadius: '6px',
+																									borderBottomRightRadius: '6px',
+																							  }
+																							: {
+																									left: '-1px',
+																									width: '143px',
+																									height: '38px',
+																									borderTopLeftRadius: '6px',
+																									borderBottomLeftRadius: '6px',
+																									borderTopRightRadius: '6px',
+																									borderBottomRightRadius: '6px',
+																							  }
+																					}
 																				/>
 																			)}
 																			<input
@@ -2284,27 +2306,32 @@ const DashboardContent = () => {
 																		</div>
 																	</div>
 																)}
-																<button
-																	type="submit"
-																	className="absolute right-[6px] top-1/2 -translate-y-1/2 flex items-center justify-center transition-colors cursor-pointer z-20 hover:bg-[#a3d9a5]"
-																	style={{
-																		width: '48px',
-																		height: '37px',
-																		backgroundColor: '#B8E4BE',
-																		border: '1px solid #5DAB68',
-																		borderTopRightRadius: '6px',
-																		borderBottomRightRadius: '6px',
-																		borderTopLeftRadius: '0',
-																		borderBottomLeftRadius: '0',
-																	}}
-																	aria-label="Search"
-																>
-																	<div
-																		style={{ transform: 'scale(0.75)', display: 'flex' }}
+																{!isMapView && (
+																	<button
+																		type="submit"
+																		className="absolute right-[6px] top-1/2 -translate-y-1/2 flex items-center justify-center transition-colors cursor-pointer z-20 hover:bg-[#a3d9a5]"
+																		style={{
+																			width: '48px',
+																			height: '37px',
+																			backgroundColor: '#B8E4BE',
+																			border: '1px solid #5DAB68',
+																			borderTopRightRadius: '6px',
+																			borderBottomRightRadius: '6px',
+																			borderTopLeftRadius: '0',
+																			borderBottomLeftRadius: '0',
+																		}}
+																		aria-label="Search"
 																	>
-																		<SearchIconDesktop />
-																	</div>
-																</button>
+																		<div
+																			style={{
+																				transform: 'scale(0.75)',
+																				display: 'flex',
+																			}}
+																		>
+																			<SearchIconDesktop />
+																		</div>
+																	</button>
+																)}
 															</div>
 															{renderDesktopSearchDropdowns()}
 														</div>
