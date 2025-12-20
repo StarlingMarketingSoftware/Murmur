@@ -1190,6 +1190,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		id: string;
 		label: string;
 		query: string;
+		what: string;
 		selectedContacts: number[];
 	};
 	const [searchTabs, setSearchTabs] = useState<SearchTab[]>([]);
@@ -1282,7 +1283,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		// If we're on an empty search tab (no query yet), update it instead of creating new
 		if (activeSearchTab && !activeSearchTab.query) {
 			setSearchTabs((tabs) =>
-				tabs.map((tab) => (tab.id === activeSearchTabId ? { ...tab, label, query } : tab))
+				tabs.map((tab) =>
+					tab.id === activeSearchTabId ? { ...tab, label, query, what: searchWhatValue } : tab
+				)
 			);
 		} else {
 			// Create a new tab
@@ -1290,6 +1293,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 				id: `search-${Date.now()}`,
 				label,
 				query,
+				what: searchWhatValue,
 				selectedContacts: [],
 			};
 			setSearchTabs((tabs) => [...tabs, newTab]);
@@ -1342,6 +1346,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			id: `search-${Date.now()}`,
 			label,
 			query,
+			what,
 			selectedContacts: [],
 		};
 
@@ -4689,6 +4694,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													id: `search-${Date.now()}`,
 													label: 'New Search',
 													query: '',
+													what: '',
 													selectedContacts: [],
 												};
 												setSearchTabs((tabs) => [...tabs, newTab]);
@@ -4856,6 +4862,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														? searchResultsSelectedContacts
 														: searchTabSelectedContacts
 												}
+												searchWhat={activeSearchTabId !== null ? activeSearchTab?.what : undefined}
 												onMarkerHover={handleResearchContactHover}
 												onToggleSelection={(contactId) => {
 													if (activeSearchTabId !== null) {

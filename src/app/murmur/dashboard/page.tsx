@@ -84,6 +84,25 @@ const extractStateAbbrFromSearchQuery = (query: string): string | null => {
 	return /^[A-Z]{2}$/.test(abbr) ? abbr : null;
 };
 
+const extractWhatFromSearchQuery = (query: string): string | null => {
+	// Typical formats:
+	// - "[Promotion] Radio Stations (Maine)"
+	// - "[Booking] Music Venues (Portland, ME)"
+	// Also support the legacy "in" format used by some deep links: "[Booking] X in Y"
+	if (!query) return null;
+	let s = query.trim();
+	if (!s) return null;
+
+	// Remove leading "[...]" (Why)
+	s = s.replace(/^\[[^\]]+\]\s*/i, '');
+	// Remove trailing "(...)" (Where)
+	s = s.replace(/\s*\([^)]*\)\s*$/, '');
+	// Remove trailing " in ..." if present
+	s = s.replace(/\s+in\s+.+$/i, '').trim();
+
+	return s || null;
+};
+
 const DashboardContent = () => {
 	const { isSignedIn, openSignIn } = useClerk();
 	const searchParams = useSearchParams();
@@ -890,6 +909,12 @@ const DashboardContent = () => {
 
 	const searchedStateAbbr = useMemo(
 		() => extractStateAbbrFromSearchQuery(activeSearchQuery),
+		[activeSearchQuery]
+	);
+
+	// Use the "What" from the last executed search (activeSearchQuery), not the live dropdown value.
+	const searchedWhat = useMemo(
+		() => extractWhatFromSearchQuery(activeSearchQuery),
 		[activeSearchQuery]
 	);
 
@@ -2485,6 +2510,7 @@ const DashboardContent = () => {
 															<SearchResultsMap
 																contacts={contacts || []}
 																selectedContacts={selectedContacts}
+																searchWhat={searchedWhat}
 																onMarkerHover={handleMapMarkerHover}
 																lockedStateName={searchedStateAbbr}
 																isLoading={isSearchPending || isLoadingContacts || isRefetchingContacts}

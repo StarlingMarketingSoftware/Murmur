@@ -615,6 +615,8 @@ const parseMetadataSections = (
 interface SearchResultsMapProps {
 	contacts: ContactWithName[];
 	selectedContacts: number[];
+	/** Used to color the default (unselected) result dots by the active "What" search value. */
+	searchWhat?: string | null;
 	onMarkerClick?: (contact: ContactWithName) => void;
 	onMarkerHover?: (contact: ContactWithName | null, meta?: MarkerHoverMeta) => void;
 	onToggleSelection?: (contactId: number) => void;
@@ -673,6 +675,107 @@ const STATE_HIGHLIGHT_COLOR = '#5DAB68';
 const STATE_HIGHLIGHT_OPACITY = 0.68;
 const STATE_BORDER_COLOR = '#CFD8DC';
 
+// Marker dot colors by search "What" value (dashboard/drafting search).
+const DEFAULT_RESULT_DOT_COLOR = '#D21E1F';
+const RESULT_DOT_ZOOM_MIN = 4;
+const RESULT_DOT_ZOOM_MAX = 14;
+const RESULT_DOT_SCALE_MIN = 3;
+const RESULT_DOT_SCALE_MAX = 11;
+// Stroke weight should be thinner when zoomed out and approach ~3px when zoomed in.
+const RESULT_DOT_STROKE_WEIGHT_MIN_PX = 1.5;
+const RESULT_DOT_STROKE_WEIGHT_MAX_PX = 3;
+const RESULT_DOT_STROKE_COLOR_DEFAULT = '#FFFFFF';
+const RESULT_DOT_STROKE_COLOR_SELECTED = '#15C948';
+const normalizeWhatKey = (value: string): string =>
+	value
+		.trim()
+		.toLowerCase()
+		.replace(/&/g, 'and')
+		.replace(/[^a-z0-9]+/g, ' ')
+		.trim()
+		.replace(/\s+/g, ' ');
+
+const WHAT_TO_RESULT_DOT_COLOR: Record<string, string> = {
+	[normalizeWhatKey('Venues')]: '#00CBFB',
+	[normalizeWhatKey('Music Venues')]: '#00CBFB',
+	[normalizeWhatKey('Festivals')]: '#2D27DC',
+	[normalizeWhatKey('Music Festivals')]: '#2D27DC',
+	[normalizeWhatKey('Restaurants')]: '#1EA300',
+	[normalizeWhatKey('Coffee Shops')]: '#AAD402',
+	[normalizeWhatKey('Wedding Planners')]: '#EFB121',
+	[normalizeWhatKey('Wine Beer and spirits')]: '#981AEC',
+	[normalizeWhatKey('Wine, Beer, and Spirits')]: '#981AEC',
+	[normalizeWhatKey('Wine, Beer, Spirits')]: '#981AEC',
+};
+
+const getResultDotColorForWhat = (searchWhat?: string | null): string => {
+	if (!searchWhat) return DEFAULT_RESULT_DOT_COLOR;
+	const key = normalizeWhatKey(searchWhat);
+	return WHAT_TO_RESULT_DOT_COLOR[key] ?? DEFAULT_RESULT_DOT_COLOR;
+};
+
+const getResultDotTForZoom = (zoom: number): number => {
+	const clampedZoom = clamp(zoom, RESULT_DOT_ZOOM_MIN, RESULT_DOT_ZOOM_MAX);
+	return (clampedZoom - RESULT_DOT_ZOOM_MIN) / (RESULT_DOT_ZOOM_MAX - RESULT_DOT_ZOOM_MIN);
+};
+
+const getResultDotScaleForZoom = (zoom: number): number => {
+	const t = getResultDotTForZoom(zoom);
+	return RESULT_DOT_SCALE_MIN + t * (RESULT_DOT_SCALE_MAX - RESULT_DOT_SCALE_MIN);
+};
+
+const getResultDotStrokeWeightForZoom = (zoom: number): number => {
+	const t = getResultDotTForZoom(zoom);
+	return (
+		RESULT_DOT_STROKE_WEIGHT_MIN_PX +
+		t * (RESULT_DOT_STROKE_WEIGHT_MAX_PX - RESULT_DOT_STROKE_WEIGHT_MIN_PX)
+	);
+};
+
+// When a search/locked state is active, de-emphasize out-of-state markers by making them
+// look like they'd be at 50% opacity on a white background (but keep fillOpacity=1).
+const OUTSIDE_LOCKED_STATE_WASHOUT_TO_WHITE = 0.5;
+
+type RgbColor = { r: number; g: number; b: number };
+
+const parseHexColor = (hex: string): RgbColor | null => {
+	const trimmed = hex.trim();
+	if (!trimmed.startsWith('#')) return null;
+	const raw = trimmed.slice(1);
+	const isShort = raw.length === 3;
+	const isLong = raw.length === 6;
+	if (!isShort && !isLong) return null;
+
+	const expand = (c: string) => `${c}${c}`;
+	const rHex = isShort ? expand(raw[0]!) : raw.slice(0, 2);
+	const gHex = isShort ? expand(raw[1]!) : raw.slice(2, 4);
+	const bHex = isShort ? expand(raw[2]!) : raw.slice(4, 6);
+
+	const r = Number.parseInt(rHex, 16);
+	const g = Number.parseInt(gHex, 16);
+	const b = Number.parseInt(bHex, 16);
+	if (!Number.isFinite(r) || !Number.isFinite(g) || !Number.isFinite(b)) return null;
+	return { r, g, b };
+};
+
+const toHexByte = (n: number): string => {
+	const clamped = clamp(Math.round(n), 0, 255);
+	return clamped.toString(16).padStart(2, '0').toUpperCase();
+};
+
+const washOutHexColor = (hex: string, mixToWhite: number): string => {
+	const rgb = parseHexColor(hex);
+	if (!rgb) return hex;
+	const t = clamp(mixToWhite, 0, 1);
+
+	// Blend toward white → lighter and less saturated (pastel).
+	const r = rgb.r + (255 - rgb.r) * t;
+	const g = rgb.g + (255 - rgb.g) * t;
+	const b = rgb.b + (255 - rgb.b) * t;
+
+	return `#${toHexByte(r)}${toHexByte(g)}${toHexByte(b)}`;
+};
+
 const normalizeStateKey = (state?: string | null): string | null => {
 	if (!state) return null;
 	const abbr = getStateAbbreviation(state);
@@ -683,6 +786,7 @@ const normalizeStateKey = (state?: string | null): string | null => {
 export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	contacts,
 	selectedContacts,
+	searchWhat,
 	onMarkerClick,
 	onMarkerHover,
 	onToggleSelection,
@@ -703,6 +807,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const stateLayerRef = useRef<google.maps.Data | null>(null);
 	const resultsOutlinePolygonsRef = useRef<google.maps.Polygon[]>([]);
 	const searchedStateOutlinePolygonsRef = useRef<google.maps.Polygon[]>([]);
+	const lockedStateSelectionMultiPolygonRef = useRef<ClippingMultiPolygon | null>(null);
+	const lockedStateSelectionBboxRef = useRef<BoundingBox | null>(null);
+	const lockedStateSelectionKeyRef = useRef<string | null>(null);
 	const resultsSelectionMultiPolygonRef = useRef<ClippingMultiPolygon | null>(null);
 	const resultsSelectionBboxRef = useRef<BoundingBox | null>(null);
 	const resultsSelectionSignatureRef = useRef<string>('');
@@ -972,6 +1079,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		[lockedStateName]
 	);
 
+	const isCoordsInLockedState = useCallback((coords: LatLngLiteral): boolean => {
+		const selection = lockedStateSelectionMultiPolygonRef.current;
+		if (!selection) return true; // no locked state selection -> treat as "in state"
+		const bbox = lockedStateSelectionBboxRef.current;
+		if (bbox && !isLatLngInBbox(coords.lat, coords.lng, bbox)) return false;
+		return pointInMultiPolygon([coords.lng, coords.lat], selection);
+	}, []);
+
 	const resultStateKeysSignature = useMemo(
 		() => resultStateKeys.join('|'),
 		[resultStateKeys]
@@ -1117,13 +1232,15 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			// Skip in the unlikely case the viewport crosses the antimeridian (not relevant for our UI).
 			if (east < west) return;
 
-			const zoom = Math.round(mapInstance.getZoom() ?? 4);
-			const quant = getBackgroundDotsQuantizationDeg(zoom);
+			const zoomRaw = mapInstance.getZoom() ?? 4;
+			// Keep the seed quantized so marker sampling stays stable while panning/zooming.
+			const zoomKey = Math.round(zoomRaw);
+			const quant = getBackgroundDotsQuantizationDeg(zoomKey);
 			const qSouth = Math.round(south / quant);
 			const qWest = Math.round(west / quant);
 			const qNorth = Math.round(north / quant);
 			const qEast = Math.round(east / quant);
-			const seed = `${zoom}|${qSouth}|${qWest}|${qNorth}|${qEast}`;
+			const seed = `${zoomKey}|${qSouth}|${qWest}|${qNorth}|${qEast}`;
 
 			const viewportBbox: BoundingBox = { minLat: south, maxLat: north, minLng: west, maxLng: east };
 
@@ -1144,29 +1261,112 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				else unselectedInBounds.push(contact);
 			}
 
-			let nextVisibleContacts: ContactWithName[] = [];
-			if (inBounds.length <= MAX_TOTAL_DOTS) {
-				nextVisibleContacts = inBounds;
-			} else if (selectedInBounds.length >= MAX_TOTAL_DOTS) {
-				// Extremely rare: more than MAX_TOTAL_DOTS selected contacts are in view.
-				nextVisibleContacts = stableViewportSampleContacts(
+			// Build a stable "candidate pool" larger than what we render, then pick a
+			// non-overlapping subset so dots never visually stack on top of each other.
+			const POOL_FACTOR = 4;
+			const poolSlots = MAX_TOTAL_DOTS * POOL_FACTOR;
+			let pool: ContactWithName[] = [];
+			if (inBounds.length <= poolSlots) {
+				pool = inBounds;
+			} else if (selectedInBounds.length >= poolSlots) {
+				pool = stableViewportSampleContacts(
 					selectedInBounds,
 					getContactCoords,
 					viewportBbox,
-					MAX_TOTAL_DOTS,
-					`${seed}|selected`
+					poolSlots,
+					`${seed}|pool:selected`
 				);
 			} else {
-				const slots = MAX_TOTAL_DOTS - selectedInBounds.length;
+				const slots = poolSlots - selectedInBounds.length;
 				const sampled = stableViewportSampleContacts(
 					unselectedInBounds,
 					getContactCoords,
 					viewportBbox,
 					slots,
-					seed
+					`${seed}|pool`
 				);
-				nextVisibleContacts = [...selectedInBounds, ...sampled];
+				pool = [...selectedInBounds, ...sampled];
 			}
+
+			// Compute marker size at this zoom so we can enforce min spacing in screen pixels.
+			// Note: Google Maps can report fractional zoom; use the raw value for accurate scaling.
+			const markerScale = getResultDotScaleForZoom(zoomRaw);
+			const strokeWeight = getResultDotStrokeWeightForZoom(zoomRaw);
+			// Ensure *hovered* dots also won't overlap.
+			const minSeparationPx =
+				2 * (markerScale * 1.18) + strokeWeight + 1.5;
+			const minSeparationSq = minSeparationPx * minSeparationPx;
+			const worldSize = 256 * Math.pow(2, zoomRaw);
+
+			type Candidate = {
+				contact: ContactWithName;
+				x: number;
+				y: number;
+				isSelected: boolean;
+				key: number;
+			};
+
+			const candidates: Candidate[] = [];
+			for (const contact of pool) {
+				const coords = getContactCoords(contact);
+				if (!coords) continue;
+				// Web Mercator world pixel coords at the current zoom.
+				const latClamped = clamp(coords.lat, -85, 85);
+				const siny = Math.sin((latClamped * Math.PI) / 180);
+				const x = ((coords.lng + 180) / 360) * worldSize;
+				const y =
+					(0.5 -
+						Math.log((1 + siny) / (1 - siny)) / (4 * Math.PI)) *
+					worldSize;
+				candidates.push({
+					contact,
+					x,
+					y,
+					isSelected: selectedSet.has(contact.id),
+					key: hashStringToUint32(`${seed}|${contact.id}`),
+				});
+			}
+
+			// Stable ordering with selected contacts first.
+			candidates.sort((a, b) => {
+				if (a.isSelected !== b.isSelected) return a.isSelected ? -1 : 1;
+				return a.key - b.key;
+			});
+
+			// Poisson-disc style selection using a grid acceleration structure.
+			const cellSize = Math.max(6, minSeparationPx); // avoid tiny/degenerate cells
+			const grid = new Map<string, Array<{ x: number; y: number }>>();
+			const picked: ContactWithName[] = [];
+
+			const hasNeighborWithin = (cx: number, cy: number, x: number, y: number): boolean => {
+				for (let dx = -1; dx <= 1; dx++) {
+					for (let dy = -1; dy <= 1; dy++) {
+						const arr = grid.get(`${cx + dx},${cy + dy}`);
+						if (!arr) continue;
+						for (const p of arr) {
+							const ddx = x - p.x;
+							const ddy = y - p.y;
+							if (ddx * ddx + ddy * ddy < minSeparationSq) return true;
+						}
+					}
+				}
+				return false;
+			};
+
+			for (const c of candidates) {
+				if (picked.length >= MAX_TOTAL_DOTS) break;
+				const cx = Math.floor(c.x / cellSize);
+				const cy = Math.floor(c.y / cellSize);
+				if (hasNeighborWithin(cx, cy, c.x, c.y)) continue;
+
+				picked.push(c.contact);
+				const k = `${cx},${cy}`;
+				const arr = grid.get(k);
+				if (arr) arr.push({ x: c.x, y: c.y });
+				else grid.set(k, [{ x: c.x, y: c.y }]);
+			}
+
+			const nextVisibleContacts: ContactWithName[] = picked;
 
 			// Stabilize ordering to reduce marker churn in @react-google-maps/api.
 			nextVisibleContacts.sort((a, b) => a.id - b.id);
@@ -1286,7 +1486,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			const polygonsToDraw = createOutlinePolygonsFromMultiPolygon(
 				multiPolygonsToRender,
 				{
-					strokeColor: '#6B7280',
+					strokeColor: '#1277E1',
 					strokeOpacity: 1,
 					strokeWeight: 2,
 					zIndex: 1,
@@ -1327,16 +1527,17 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		// Clear while loading
 		if (isLoading) {
 			clearSearchedStateOutline();
-			return;
-		}
-
-		if (enableStateInteractions) {
-			clearSearchedStateOutline();
+			lockedStateSelectionMultiPolygonRef.current = null;
+			lockedStateSelectionBboxRef.current = null;
+			lockedStateSelectionKeyRef.current = null;
 			return;
 		}
 
 		if (!lockedStateKey) {
 			clearSearchedStateOutline();
+			lockedStateSelectionMultiPolygonRef.current = null;
+			lockedStateSelectionBboxRef.current = null;
+			lockedStateSelectionKeyRef.current = null;
 			return;
 		}
 
@@ -1361,8 +1562,13 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 			if (cancelled) return;
 
+			// Store polygon selection for marker "inside/outside" styling (even if we don't draw the outline).
+			lockedStateSelectionMultiPolygonRef.current = found;
+			lockedStateSelectionBboxRef.current = found ? bboxFromMultiPolygon(found) : null;
+			lockedStateSelectionKeyRef.current = lockedStateKey;
+
 			clearSearchedStateOutline();
-			if (!found) return;
+			if (enableStateInteractions || !found) return;
 
 			const polygonsToDraw = createOutlinePolygonsFromMultiPolygon(found, {
 				strokeColor: '#000000',
@@ -1500,6 +1706,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const onUnmount = useCallback(() => {
 		clearResultsOutline();
 		clearSearchedStateOutline();
+		lockedStateSelectionMultiPolygonRef.current = null;
+		lockedStateSelectionBboxRef.current = null;
+		lockedStateSelectionKeyRef.current = null;
 		setMap(null);
 		hasFitBoundsRef.current = false;
 		lastContactsCountRef.current = 0;
@@ -1577,71 +1786,126 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	};
 
 	// Calculate marker scale based on zoom level
-	// At zoom 4 (zoomed out): scale 4, at zoom 14 (zoomed in): scale 12
+	// At zoom 4 (zoomed out): scale ~3, at zoom 14 (zoomed in): scale ~11
 	const markerScale = useMemo(() => {
-		const minZoom = 4;
-		const maxZoom = 14;
-		const minScale = 4;
-		const maxScale = 12;
-		const clampedZoom = Math.max(minZoom, Math.min(maxZoom, zoomLevel));
-		const t = (clampedZoom - minZoom) / (maxZoom - minZoom);
-		return minScale + t * (maxScale - minScale);
+		return getResultDotScaleForZoom(zoomLevel);
 	}, [zoomLevel]);
 
 	const strokeWeight = useMemo(() => {
-		return 1.5 + (markerScale - 4) * 0.2; // Scale stroke proportionally
-	}, [markerScale]);
+		return getResultDotStrokeWeightForZoom(zoomLevel);
+	}, [zoomLevel]);
+
+	const defaultDotFillColor = useMemo(() => {
+		return getResultDotColorForWhat(searchWhat);
+	}, [searchWhat]);
+
+	const outsideDefaultDotFillColor = useMemo(
+		() =>
+			washOutHexColor(
+				defaultDotFillColor,
+				OUTSIDE_LOCKED_STATE_WASHOUT_TO_WHITE
+			),
+		[defaultDotFillColor]
+	);
 
 	// Default red dot marker
 	const defaultMarkerIcon = useMemo(() => {
 		if (!isLoaded) return undefined;
 		return {
 			path: google.maps.SymbolPath.CIRCLE,
-			fillColor: '#D21E1F',
+			fillColor: defaultDotFillColor,
 			fillOpacity: 1,
-			strokeColor: '#FFFFFF',
+			strokeColor: RESULT_DOT_STROKE_COLOR_DEFAULT,
 			strokeWeight: strokeWeight,
 			scale: markerScale,
 		};
-	}, [isLoaded, markerScale, strokeWeight]);
+	}, [isLoaded, markerScale, strokeWeight, defaultDotFillColor]);
 
-	// Selected green dot marker
+	const defaultMarkerIconOutside = useMemo(() => {
+		if (!isLoaded) return undefined;
+		return {
+			path: google.maps.SymbolPath.CIRCLE,
+			fillColor: outsideDefaultDotFillColor,
+			fillOpacity: 1,
+			strokeColor: RESULT_DOT_STROKE_COLOR_DEFAULT,
+			strokeWeight: strokeWeight,
+			scale: markerScale,
+		};
+	}, [isLoaded, markerScale, strokeWeight, outsideDefaultDotFillColor]);
+
+	// Selected dot marker (same fill, different stroke)
 	const selectedMarkerIcon = useMemo(() => {
 		if (!isLoaded) return undefined;
 		return {
 			path: google.maps.SymbolPath.CIRCLE,
-			fillColor: '#0E8530',
+			fillColor: defaultDotFillColor,
 			fillOpacity: 1,
-			strokeColor: '#FFFFFF',
+			strokeColor: RESULT_DOT_STROKE_COLOR_SELECTED,
 			strokeWeight: strokeWeight,
 			scale: markerScale,
 		};
-	}, [isLoaded, markerScale, strokeWeight]);
+	}, [isLoaded, markerScale, strokeWeight, defaultDotFillColor]);
+
+	const selectedMarkerIconOutside = useMemo(() => {
+		if (!isLoaded) return undefined;
+		return {
+			path: google.maps.SymbolPath.CIRCLE,
+			fillColor: outsideDefaultDotFillColor,
+			fillOpacity: 1,
+			strokeColor: RESULT_DOT_STROKE_COLOR_SELECTED,
+			strokeWeight: strokeWeight,
+			scale: markerScale,
+		};
+	}, [isLoaded, markerScale, strokeWeight, outsideDefaultDotFillColor]);
 
 	// Slightly larger icons when hovered (no text tooltip)
 	const hoveredDefaultMarkerIcon = useMemo(() => {
 		if (!isLoaded) return undefined;
 		return {
 			path: google.maps.SymbolPath.CIRCLE,
-			fillColor: '#D21E1F',
+			fillColor: defaultDotFillColor,
 			fillOpacity: 1,
-			strokeColor: '#FFFFFF',
-			strokeWeight: strokeWeight + 0.4,
+			strokeColor: RESULT_DOT_STROKE_COLOR_DEFAULT,
+			strokeWeight: strokeWeight,
 			scale: markerScale * 1.18,
 		};
-	}, [isLoaded, markerScale, strokeWeight]);
+	}, [isLoaded, markerScale, strokeWeight, defaultDotFillColor]);
+
+	const hoveredDefaultMarkerIconOutside = useMemo(() => {
+		if (!isLoaded) return undefined;
+		return {
+			path: google.maps.SymbolPath.CIRCLE,
+			fillColor: outsideDefaultDotFillColor,
+			fillOpacity: 1,
+			strokeColor: RESULT_DOT_STROKE_COLOR_DEFAULT,
+			strokeWeight: strokeWeight,
+			scale: markerScale * 1.18,
+		};
+	}, [isLoaded, markerScale, strokeWeight, outsideDefaultDotFillColor]);
 
 	const hoveredSelectedMarkerIcon = useMemo(() => {
 		if (!isLoaded) return undefined;
 		return {
 			path: google.maps.SymbolPath.CIRCLE,
-			fillColor: '#0E8530',
+			fillColor: defaultDotFillColor,
 			fillOpacity: 1,
-			strokeColor: '#FFFFFF',
-			strokeWeight: strokeWeight + 0.4,
+			strokeColor: RESULT_DOT_STROKE_COLOR_SELECTED,
+			strokeWeight: strokeWeight,
 			scale: markerScale * 1.18,
 		};
-	}, [isLoaded, markerScale, strokeWeight]);
+	}, [isLoaded, markerScale, strokeWeight, defaultDotFillColor]);
+
+	const hoveredSelectedMarkerIconOutside = useMemo(() => {
+		if (!isLoaded) return undefined;
+		return {
+			path: google.maps.SymbolPath.CIRCLE,
+			fillColor: outsideDefaultDotFillColor,
+			fillOpacity: 1,
+			strokeColor: RESULT_DOT_STROKE_COLOR_SELECTED,
+			strokeWeight: strokeWeight,
+			scale: markerScale * 1.18,
+		};
+	}, [isLoaded, markerScale, strokeWeight, outsideDefaultDotFillColor]);
 
 	// Invisible larger marker for hover hit area
 	const invisibleHitAreaIcon = useMemo(() => {
@@ -1663,7 +1927,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			path: google.maps.SymbolPath.CIRCLE,
 			fillColor: '#9CA3AF',
 			fillOpacity: 0.55,
-			strokeColor: '#FFFFFF',
+			strokeColor: RESULT_DOT_STROKE_COLOR_DEFAULT,
 			strokeWeight: Math.max(1, strokeWeight * 0.85),
 			scale: markerScale * 0.78,
 		};
@@ -1743,13 +2007,26 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					if (!coords) return null;
 					const isHovered = hoveredMarkerId === contact.id;
 					const isSelected = selectedContacts.includes(contact.id);
+					const hasLockedStateSelection =
+						lockedStateKey && lockedStateSelectionKeyRef.current === lockedStateKey;
+					const isOutsideLockedState = hasLockedStateSelection
+						? !isCoordsInLockedState(coords)
+						: false;
 					const dotIcon = isSelected
 						? isHovered
-							? hoveredSelectedMarkerIcon
-							: selectedMarkerIcon
+							? isOutsideLockedState
+								? hoveredSelectedMarkerIconOutside
+								: hoveredSelectedMarkerIcon
+							: isOutsideLockedState
+								? selectedMarkerIconOutside
+								: selectedMarkerIcon
 						: isHovered
-						? hoveredDefaultMarkerIcon
-						: defaultMarkerIcon;
+							? isOutsideLockedState
+								? hoveredDefaultMarkerIconOutside
+								: hoveredDefaultMarkerIcon
+							: isOutsideLockedState
+								? defaultMarkerIconOutside
+								: defaultMarkerIcon;
 					return (
 						<Fragment key={contact.id}>
 							{/* Invisible larger hit area for hover detection - this controls all hover state */}
