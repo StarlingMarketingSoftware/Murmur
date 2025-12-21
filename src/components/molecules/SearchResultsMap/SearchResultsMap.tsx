@@ -6,10 +6,10 @@ import { ContactWithName } from '@/types/contact';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 import {
 	calculateTooltipWidth,
+	calculateTooltipHeight,
+	calculateTooltipAnchorY,
 	generateMapTooltipIconUrl,
 	MAP_TOOLTIP_ANCHOR_X,
-	MAP_TOOLTIP_ANCHOR_Y,
-	MAP_TOOLTIP_HEIGHT,
 } from '@/components/atoms/_svg/MapTooltipIcon';
 
 type LatLngLiteral = { lat: number; lng: number };
@@ -721,6 +721,28 @@ const WHAT_TO_RESULT_DOT_COLOR: Record<string, string> = {
 	[normalizeWhatKey('Wine Beer and spirits')]: '#981AEC',
 	[normalizeWhatKey('Wine, Beer, and Spirits')]: '#981AEC',
 	[normalizeWhatKey('Wine, Beer, Spirits')]: '#981AEC',
+};
+
+// Hover tooltip (SVG bubble) fill colors by search "What" value.
+// These are intentionally allowed to differ from the dot colors.
+const WHAT_TO_HOVER_TOOLTIP_FILL_COLOR: Record<string, string> = {
+	// Music venues should be a lighter blue on hover.
+	[normalizeWhatKey('Venues')]: '#71C9FD',
+	[normalizeWhatKey('Music Venues')]: '#71C9FD',
+
+	// Wine/beer/spirits should be periwinkle on hover.
+	[normalizeWhatKey('Wine, Beer, and Spirits')]: '#80AAFF',
+	[normalizeWhatKey('Wine, Beer, Spirits')]: '#80AAFF',
+	[normalizeWhatKey('Wine Beer and Spirits')]: '#80AAFF',
+	[normalizeWhatKey('Wine Beer Spirits')]: '#80AAFF',
+	// Defensive: handle a misspelling we've seen in copy.
+	[normalizeWhatKey('Wine, Beer, and Spiriti')]: '#80AAFF',
+	[normalizeWhatKey('Wine Beer and Spiriti')]: '#80AAFF',
+	[normalizeWhatKey('Wine Beer Spiriti')]: '#80AAFF',
+
+	// Keep existing behavior for festivals.
+	[normalizeWhatKey('Festivals')]: '#80AAFF',
+	[normalizeWhatKey('Music Festivals')]: '#80AAFF',
 };
 
 const getResultDotColorForWhat = (searchWhat?: string | null): string => {
@@ -2052,13 +2074,18 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 								// Even if the marker dot is "washed out" outside the locked/selected state,
 								// keep the hover tooltip using the base search color so it consistently
 								// communicates the search category.
-								const tooltipFillColor = defaultDotFillColor;
+								const normalizedWhat = searchWhat ? normalizeWhatKey(searchWhat) : null;
+								const tooltipFillColor = normalizedWhat
+									? WHAT_TO_HOVER_TOOLTIP_FILL_COLOR[normalizedWhat] ?? defaultDotFillColor
+									: defaultDotFillColor;
 								const width = calculateTooltipWidth(
 									nameForTooltip,
 									companyForTooltip,
 									titleForTooltip,
 									searchWhat
 								);
+								const height = calculateTooltipHeight(nameForTooltip, companyForTooltip);
+								const anchorY = calculateTooltipAnchorY(nameForTooltip, companyForTooltip);
 								return {
 									url: generateMapTooltipIconUrl(
 										nameForTooltip,
@@ -2068,7 +2095,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 										searchWhat
 									),
 									width,
-									height: MAP_TOOLTIP_HEIGHT,
+									height,
+									anchorY,
 								};
 							})()
 						: null;
@@ -2100,7 +2128,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 									getPixelPositionOffset={() => ({
 										x: -MAP_TOOLTIP_ANCHOR_X,
 										// Align the tooltip tip to the marker's LatLng pixel point.
-										y: -MAP_TOOLTIP_ANCHOR_Y,
+										y: -hoverTooltip.anchorY,
 									})}
 								>
 									<div

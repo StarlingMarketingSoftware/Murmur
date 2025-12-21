@@ -10,16 +10,20 @@ const isValidHexColor = (value: string): boolean => {
 // Tooltip sizing (in SVG user units / CSS px)
 const MIN_TOOLTIP_INNER_WIDTH = 140;
 const MAX_TOOLTIP_INNER_WIDTH = 350;
-const TOOLTIP_TEXT_X = 18; // aligns with <text x="..."> (excluding stroke padding offset)
-const TOOLTIP_TEXT_RIGHT_PADDING = 16;
+const TOOLTIP_TEXT_X = 12; // aligns with <text x="..."> (excluding stroke padding offset)
+const TOOLTIP_TEXT_RIGHT_PADDING = 10;
 const TITLE_BAND_HEIGHT = 16;
 const TITLE_BAND_BOTTOM_PADDING = 8;
 
+// Body content area heights (before title band)
+const BODY_CONTENT_HEIGHT_TWO_LINES = 46; // For name + company
+const BODY_CONTENT_HEIGHT_ONE_LINE = 28; // For company only (no name)
+
 // Category icon sizing inside the hover tooltip (square slot).
-const TOOLTIP_CATEGORY_ICON_SIZE = 14;
-const TOOLTIP_CATEGORY_ICON_GAP = 4;
+const TOOLTIP_CATEGORY_ICON_SIZE = 20;
+const TOOLTIP_CATEGORY_ICON_GAP = 8;
 // Small tweak so the icon visually aligns with text baselines.
-const TOOLTIP_CATEGORY_ICON_BASELINE_OFFSET = 1;
+const TOOLTIP_CATEGORY_ICON_BASELINE_OFFSET = 5;
 
 // Convert React-style SVG attrs (camelCase) to SVG/XML attrs (kebab-case).
 // The tooltip is rendered via `data:image/svg+xml`, which is parsed as XML.
@@ -78,7 +82,7 @@ const calculateTooltipInnerWidth = (
 		? measureTextWidthPx(secondary, '13px Arial, sans-serif') ?? secondary.length * 6.7
 		: 0;
 	const titleMeasured = title
-		? measureTextWidthPx(title, '14px Arial, sans-serif') ?? title.length * 7.2
+		? measureTextWidthPx(title, '11px Arial, sans-serif') ?? title.length * 5.5
 		: 0;
 
 	// Compute required widths per line: left inset + (optional icon slot) + measured text + right padding.
@@ -129,14 +133,11 @@ export const generateMapTooltipSvg = (
 	const categoryIconSlotExtra = showCategoryIcon
 		? TOOLTIP_CATEGORY_ICON_SIZE + TOOLTIP_CATEGORY_ICON_GAP
 		: 0;
-	const categoryIconPlacement: 'primary' | 'secondary' | null = showCategoryIcon
-		? hasName && hasCompany
-			? 'secondary'
-			: 'primary'
-		: null;
+	// Always place category icon on the primary (name) line when showing
+	const categoryIconPlacement: 'primary' | null = showCategoryIcon ? 'primary' : null;
 
 	const primaryLineExtra = categoryIconPlacement === 'primary' ? categoryIconSlotExtra : 0;
-	const secondaryLineExtra = categoryIconPlacement === 'secondary' ? categoryIconSlotExtra : 0;
+	const secondaryLineExtra = 0;
 
 	const primaryText = escapeSvgText(primaryTextRaw);
 	const secondaryText = secondaryTextRaw ? escapeSvgText(secondaryTextRaw) : '';
@@ -153,13 +154,17 @@ export const generateMapTooltipSvg = (
 	const svgWidth = innerWidth + strokePadding * 2;
 
 	// Overall tooltip geometry (without stroke padding offset)
-	const bodyBottomY = 46 + TITLE_BAND_HEIGHT + TITLE_BAND_BOTTOM_PADDING;
+	// Use shorter height when there's only one line of text (company only, no name)
+	const bodyContentHeight = secondaryText
+		? BODY_CONTENT_HEIGHT_TWO_LINES
+		: BODY_CONTENT_HEIGHT_ONE_LINE;
+	const bodyBottomY = bodyContentHeight + TITLE_BAND_HEIGHT + TITLE_BAND_BOTTOM_PADDING;
 	const pointerHeight = 10;
 	const tooltipHeight = bodyBottomY + pointerHeight;
 	const svgHeight = tooltipHeight + strokePadding;
 
-	// If only one line of text, center it vertically
-	const primaryY = secondaryText ? 18 : 27;
+	// If only one line of text, center it vertically in the content area
+	const primaryY = secondaryText ? 18 : bodyContentHeight / 2 + 5;
 	const titleBandTopY = bodyBottomY - TITLE_BAND_BOTTOM_PADDING - TITLE_BAND_HEIGHT;
 	const titleY = titleBandTopY + 12;
 
@@ -174,16 +179,11 @@ export const generateMapTooltipSvg = (
 	const primaryTextX = TOOLTIP_TEXT_X + offsetX;
 	const secondaryTextX = TOOLTIP_TEXT_X + offsetX;
 
-	// Place the icon to the right of the relevant text line.
+	// Place the icon to the right of the primary (name) text line.
 	const primaryMeasuredForIcon =
 		categoryIconPlacement === 'primary'
 			? (measureTextWidthPx(primaryTextRaw, 'bold 14px Arial, sans-serif') ??
 				primaryTextRaw.length * 7.6)
-			: 0;
-	const secondaryMeasuredForIcon =
-		categoryIconPlacement === 'secondary'
-			? (measureTextWidthPx(secondaryTextRaw, '13px Arial, sans-serif') ??
-				secondaryTextRaw.length * 6.7)
 			: 0;
 
 	const maxIconX =
@@ -192,14 +192,8 @@ export const generateMapTooltipSvg = (
 		categoryIconPlacement === 'primary'
 			? Math.min(primaryTextX + primaryMeasuredForIcon + TOOLTIP_CATEGORY_ICON_GAP, maxIconX)
 			: 0;
-	const secondaryIconX =
-		categoryIconPlacement === 'secondary'
-			? Math.min(secondaryTextX + secondaryMeasuredForIcon + TOOLTIP_CATEGORY_ICON_GAP, maxIconX)
-			: 0;
 	const categoryIconPrimaryY =
 		primaryBaselineY - TOOLTIP_CATEGORY_ICON_SIZE + TOOLTIP_CATEGORY_ICON_BASELINE_OFFSET;
-	const categoryIconSecondaryY =
-		secondaryBaselineY - TOOLTIP_CATEGORY_ICON_SIZE + TOOLTIP_CATEGORY_ICON_BASELINE_OFFSET;
 
 	const renderCategoryIcon = (x: number, y: number): string => {
 		if (!categoryIconSpec || !showCategoryIcon) return '';
@@ -228,13 +222,8 @@ ${normalized}
   <line x1="${offsetX}" y1="${titleBandTopY + TITLE_BAND_HEIGHT + offsetY}" x2="${innerWidth + offsetX}" y2="${titleBandTopY + TITLE_BAND_HEIGHT + offsetY}" stroke="black" stroke-width="2"/>
   <text x="${primaryTextX}" y="${primaryBaselineY}" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="${textFill}">${primaryText}</text>
   ${categoryIconPlacement === 'primary' ? renderCategoryIcon(primaryIconX, categoryIconPrimaryY) : ''}
-  ${
-		secondaryText
-			? `<text x="${secondaryTextX}" y="${secondaryBaselineY}" font-family="Arial, sans-serif" font-size="13" fill="${textFill}">${secondaryText}</text>
-  ${categoryIconPlacement === 'secondary' ? renderCategoryIcon(secondaryIconX, categoryIconSecondaryY) : ''}`
-			: ''
-	}
-  ${titleText ? `<text x="${TOOLTIP_TEXT_X + offsetX}" y="${titleBaselineY}" font-family="Arial, sans-serif" font-size="14" fill="black">${titleText}</text>` : ''}
+  ${secondaryText ? `<text x="${secondaryTextX}" y="${secondaryBaselineY}" font-family="Arial, sans-serif" font-size="13" fill="${textFill}">${secondaryText}</text>` : ''}
+  ${titleText ? `<text x="${innerWidth / 2 + offsetX}" y="${titleBaselineY}" font-family="Arial, sans-serif" font-size="11" fill="black" text-anchor="middle">${titleText}</text>` : ''}
 </g>
 <path d="${bubblePathD}" fill="none" stroke="black" stroke-width="2"/>
 </svg>`;
@@ -282,8 +271,9 @@ export const calculateTooltipWidth = (
 	const categoryIconSlotExtra = showCategoryIcon
 		? TOOLTIP_CATEGORY_ICON_SIZE + TOOLTIP_CATEGORY_ICON_GAP
 		: 0;
-	const primaryLineExtra = showCategoryIcon && !hasName ? categoryIconSlotExtra : 0;
-	const secondaryLineExtra = showCategoryIcon && hasName && hasCompany ? categoryIconSlotExtra : 0;
+	// Always place category icon on the primary (name) line
+	const primaryLineExtra = showCategoryIcon ? categoryIconSlotExtra : 0;
+	const secondaryLineExtra = 0;
 
 	const innerWidth = calculateTooltipInnerWidth(primaryText, secondaryText, trimmedTitle, {
 		primary: primaryLineExtra,
@@ -292,10 +282,35 @@ export const calculateTooltipWidth = (
 	return innerWidth + STROKE_PADDING * 2;
 };
 
-// Fixed height (includes stroke padding)
-export const MAP_TOOLTIP_HEIGHT = 80 + STROKE_PADDING;
+// Calculate height based on whether there's one or two lines of text
+export const calculateTooltipHeight = (name: string, company: string): number => {
+	const trimmedName = (name ?? '').trim();
+	const trimmedCompany = (company ?? '').trim();
+	const hasName = trimmedName.length > 0;
+	const hasCompany = trimmedCompany.length > 0;
+
+	// Secondary text only shows when we have both name and company
+	const hasSecondaryText = hasName && hasCompany;
+	const bodyContentHeight = hasSecondaryText
+		? BODY_CONTENT_HEIGHT_TWO_LINES
+		: BODY_CONTENT_HEIGHT_ONE_LINE;
+	const bodyBottomY = bodyContentHeight + TITLE_BAND_HEIGHT + TITLE_BAND_BOTTOM_PADDING;
+	const pointerHeight = 10;
+	const tooltipHeight = bodyBottomY + pointerHeight;
+	return tooltipHeight + STROKE_PADDING;
+};
+
+// Fixed height for two-line tooltips (legacy constant for backwards compatibility)
+export const MAP_TOOLTIP_HEIGHT = BODY_CONTENT_HEIGHT_TWO_LINES + TITLE_BAND_HEIGHT + TITLE_BAND_BOTTOM_PADDING + 10 + STROKE_PADDING;
 
 // Anchor point (pointer tip position, adjusted for stroke padding)
 export const MAP_TOOLTIP_ANCHOR_X = 23.5 + STROKE_PADDING;
-export const MAP_TOOLTIP_ANCHOR_Y = 80 + STROKE_PADDING;
+
+// Calculate anchor Y based on tooltip height
+export const calculateTooltipAnchorY = (name: string, company: string): number => {
+	return calculateTooltipHeight(name, company);
+};
+
+// Legacy constant for backwards compatibility
+export const MAP_TOOLTIP_ANCHOR_Y = MAP_TOOLTIP_HEIGHT;
 
