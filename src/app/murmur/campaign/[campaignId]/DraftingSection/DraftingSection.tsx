@@ -4875,6 +4875,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														? searchResultsSelectedContacts
 														: searchTabSelectedContacts
 												}
+												searchQuery={activeSearchTabId !== null ? activeCampaignSearchQuery : undefined}
 												searchWhat={activeSearchTabId !== null ? activeSearchTab?.what : undefined}
 												onMarkerHover={handleResearchContactHover}
 												onToggleSelection={(contactId) => {

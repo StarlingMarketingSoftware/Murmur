@@ -4,6 +4,7 @@ import { FC, Fragment, useCallback, useEffect, useMemo, useRef, useState } from 
 import { GoogleMap, useJsApiLoader, MarkerF, OverlayView, OverlayViewF } from '@react-google-maps/api';
 import { ContactWithName } from '@/types/contact';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
+import { useGetContacts } from '@/hooks/queryHooks/useContacts';
 import {
 	calculateTooltipWidth,
 	calculateTooltipHeight,
@@ -622,6 +623,8 @@ const parseMetadataSections = (
 interface SearchResultsMapProps {
 	contacts: ContactWithName[];
 	selectedContacts: number[];
+	/** Full search query string (e.g. "[Booking] Music Venues (Portland, ME)") */
+	searchQuery?: string | null;
 	/** Used to color the default (unselected) result dots by the active "What" search value. */
 	searchWhat?: string | null;
 	onMarkerClick?: (contact: ContactWithName) => void;
@@ -704,8 +707,59 @@ const MARKER_DOT_Z_INDEX = 1;
 // Minimum zoom level required to trigger hover tooltips and research highlights on markers.
 // Below this zoom level, markers are too dense and small for hover interactions to be useful.
 const HOVER_INTERACTION_MIN_ZOOM = 8;
+// Booking searches: when zoomed in enough, show additional nearby booking categories as extra markers.
+const BOOKING_EXTRA_MARKERS_MIN_ZOOM = 12;
+// Keep extra markers capped so map remains responsive.
+const BOOKING_EXTRA_MARKERS_MAX_DOTS = 160;
 // Zoom level at which the map switches to satellite/hybrid view for better detail
 const SATELLITE_VIEW_MIN_ZOOM = 14;
+
+const BOOKING_EXTRA_TITLE_PREFIXES = [
+	'Music Venues',
+	'Coffee Shops',
+	'Restaurants',
+	'Music Festivals',
+	'Breweries',
+	'Wineries',
+	'Wedding Planners',
+	'Wedding Venues',
+	// Also supported by the booking search backend; include if present.
+	'Distilleries',
+	'Cideries',
+] as const;
+
+const startsWithCaseInsensitive = (value: string | null | undefined, prefix: string): boolean => {
+	if (!value) return false;
+	const p = prefix.trim().toLowerCase();
+	if (!p) return false;
+	return value.trim().toLowerCase().startsWith(p);
+};
+
+const getBookingTitlePrefixFromContactTitle = (title: string | null | undefined): string | null => {
+	if (!title) return null;
+	for (const prefix of BOOKING_EXTRA_TITLE_PREFIXES) {
+		if (startsWithCaseInsensitive(title, prefix)) return prefix;
+	}
+	return null;
+};
+
+const isBookingSearchQuery = (query: string | null | undefined): boolean =>
+	(query ?? '').trim().toLowerCase().startsWith('[booking]');
+
+const extractWhereFromSearchQuery = (query: string | null | undefined): string | null => {
+	// Typical formats:
+	// - "[Booking] Music Venues (Portland, ME)"
+	// - "[Promotion] Radio Stations (Maine)"
+	// Also support "... in <where>"
+	if (!query) return null;
+	const s = query.trim();
+	if (!s) return null;
+	const parenMatch = s.match(/\(([^)]+)\)\s*$/);
+	const parenValue = parenMatch?.[1]?.trim();
+	if (parenValue) return parenValue;
+	const inMatch = s.match(/\s+in\s+(.+)$/i);
+	return inMatch?.[1]?.trim() || null;
+};
 const normalizeWhatKey = (value: string): string =>
 	value
 		.trim()
@@ -726,6 +780,13 @@ const WHAT_TO_RESULT_DOT_COLOR: Record<string, string> = {
 	[normalizeWhatKey('Wine Beer and spirits')]: '#981AEC',
 	[normalizeWhatKey('Wine, Beer, and Spirits')]: '#981AEC',
 	[normalizeWhatKey('Wine, Beer, Spirits')]: '#981AEC',
+	// Booking extras: map alcohol-related categories to the Wine/Beer/Spirits palette.
+	[normalizeWhatKey('Breweries')]: '#981AEC',
+	[normalizeWhatKey('Wineries')]: '#981AEC',
+	[normalizeWhatKey('Distilleries')]: '#981AEC',
+	[normalizeWhatKey('Cideries')]: '#981AEC',
+	// Booking extras: show wedding venues with the same palette as wedding planners.
+	[normalizeWhatKey('Wedding Venues')]: '#D6990A',
 };
 
 // Hover tooltip (SVG bubble) fill colors by search "What" value.
@@ -828,6 +889,7 @@ const normalizeStateKey = (state?: string | null): string | null => {
 export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	contacts,
 	selectedContacts,
+	searchQuery,
 	searchWhat,
 	onMarkerClick,
 	onMarkerHover,
@@ -847,6 +909,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const [selectedStateKey, setSelectedStateKey] = useState<string | null>(null);
 	const [zoomLevel, setZoomLevel] = useState(4); // Default zoom level
 	const [visibleContacts, setVisibleContacts] = useState<ContactWithName[]>([]);
+	const [bookingExtraVisibleContacts, setBookingExtraVisibleContacts] = useState<ContactWithName[]>(
+		[]
+	);
+	const lastBookingExtraVisibleContactsKeyRef = useRef<string>('');
 	// Timeout ref for auto-hiding research panel
 	const researchPanelTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 	// Small delay when moving between marker layers (prevents hover flicker)
@@ -869,6 +935,104 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const onStateSelectRef = useRef<SearchResultsMapProps['onStateSelect'] | null>(null);
 	const isLoadingRef = useRef<boolean>(false);
 	const [isStateLayerReady, setIsStateLayerReady] = useState(false);
+	const baseContactIdSet = useMemo(
+		() => new Set<number>(contacts.map((c) => c.id)),
+		[contacts]
+	);
+
+	const isBookingSearch = useMemo(() => isBookingSearchQuery(searchQuery), [searchQuery]);
+	const bookingExtraWhere = useMemo(() => {
+		const fromQuery = extractWhereFromSearchQuery(searchQuery);
+		if (fromQuery && fromQuery.trim().length > 0) return fromQuery.trim();
+		const fromLocked = (lockedStateName ?? '').trim();
+		return fromLocked.length > 0 ? fromLocked : null;
+	}, [searchQuery, lockedStateName]);
+
+	// Intentionally omit the "What" portion so the contacts API returns its default booking title prefixes.
+	const bookingExtraQuery = useMemo(() => {
+		if (!isBookingSearch) return null;
+		const where = (bookingExtraWhere ?? '').trim();
+		if (!where) return null;
+		return `[Booking] (${where})`;
+	}, [isBookingSearch, bookingExtraWhere]);
+
+	const bookingExtraFilters = useMemo(() => {
+		if (!bookingExtraQuery) return undefined;
+		return { query: bookingExtraQuery, limit: 500, useVectorSearch: false };
+	}, [bookingExtraQuery]);
+
+	// Enable once per-query when the user has zoomed in enough, so we don't refetch repeatedly
+	// as they pan/zoom around the threshold.
+	const [bookingExtrasQueryEnabled, setBookingExtrasQueryEnabled] = useState(false);
+	useEffect(() => {
+		setBookingExtrasQueryEnabled(false);
+		// Also clear any previously-visible extra markers to avoid stale overlays during search transitions.
+		lastBookingExtraVisibleContactsKeyRef.current = '';
+		setBookingExtraVisibleContacts([]);
+	}, [bookingExtraQuery]);
+	useEffect(() => {
+		if (!bookingExtraFilters) return;
+		if (zoomLevel < BOOKING_EXTRA_MARKERS_MIN_ZOOM) return;
+		setBookingExtrasQueryEnabled(true);
+	}, [bookingExtraFilters, zoomLevel]);
+
+	const shouldFetchBookingExtras = Boolean(bookingExtraFilters) && bookingExtrasQueryEnabled;
+	const { data: bookingExtraRawContacts } = useGetContacts({
+		filters: bookingExtraFilters,
+		enabled: shouldFetchBookingExtras,
+	});
+
+	const bookingExtraContacts = useMemo(() => {
+		if (!bookingExtraRawContacts || bookingExtraRawContacts.length === 0) return [];
+		const currentWhatKey = searchWhat ? normalizeWhatKey(searchWhat) : null;
+		return bookingExtraRawContacts.filter((c) => {
+			// Never duplicate primary result markers.
+			if (baseContactIdSet.has(c.id)) return false;
+			const prefix = getBookingTitlePrefixFromContactTitle(c.title);
+			if (!prefix) return false;
+			// Only show *additional* categories beyond the primary "What" when one is set.
+			if (currentWhatKey && normalizeWhatKey(prefix) === currentWhatKey) return false;
+			return true;
+		});
+	}, [bookingExtraRawContacts, baseContactIdSet, searchWhat]);
+
+	const { contactsWithCoords: bookingExtraContactsWithCoords, coordsByContactId: bookingExtraCoordsByContactId } =
+		useMemo(() => {
+			const coordsByContactId = new Map<number, LatLngLiteral>();
+			const contactsWithCoords: ContactWithName[] = [];
+			const groups = new Map<string, number[]>();
+
+			for (const contact of bookingExtraContacts) {
+				const coords = getLatLngFromContact(contact);
+				if (!coords) continue;
+				coordsByContactId.set(contact.id, coords);
+				contactsWithCoords.push(contact);
+				const key = coordinateKey(coords);
+				const existing = groups.get(key);
+				if (existing) existing.push(contact.id);
+				else groups.set(key, [contact.id]);
+			}
+
+			// Offset duplicates (keep the smallest id at the true coordinate for accuracy)
+			for (const ids of groups.values()) {
+				if (ids.length <= 1) continue;
+				ids.sort((a, b) => a - b);
+				for (let i = 1; i < ids.length; i++) {
+					const id = ids[i];
+					const base = coordsByContactId.get(id);
+					if (!base) continue;
+					coordsByContactId.set(id, jitterDuplicateCoords(base, i));
+				}
+			}
+
+			return { contactsWithCoords, coordsByContactId };
+		}, [bookingExtraContacts]);
+
+	const getBookingExtraContactCoords = useCallback(
+		(contact: ContactWithName): LatLngLiteral | null =>
+			bookingExtraCoordsByContactId.get(contact.id) ?? null,
+		[bookingExtraCoordsByContactId]
+	);
 
 	useEffect(() => {
 		selectedStateKeyRef.current = selectedStateKey;
@@ -886,7 +1050,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	// to avoid the UI getting "stuck" on a now-nonexistent marker.
 	useEffect(() => {
 		if (hoveredMarkerId == null) return;
-		const stillVisible = visibleContacts.some((c) => c.id === hoveredMarkerId);
+		const stillVisible =
+			visibleContacts.some((c) => c.id === hoveredMarkerId) ||
+			bookingExtraVisibleContacts.some((c) => c.id === hoveredMarkerId);
 		if (stillVisible) return;
 		if (hoverClearTimeoutRef.current) {
 			clearTimeout(hoverClearTimeoutRef.current);
@@ -895,7 +1061,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		setHoveredMarkerId(null);
 		hoveredMarkerIdRef.current = null;
 		onMarkerHover?.(null);
-	}, [visibleContacts, hoveredMarkerId, onMarkerHover]);
+	}, [visibleContacts, bookingExtraVisibleContacts, hoveredMarkerId, onMarkerHover]);
 
 	// Clear hover state when zooming out past the minimum threshold
 	useEffect(() => {
@@ -1364,11 +1530,119 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				setVisibleContacts(nextVisibleContacts);
 			}
 
-			const backgroundBudget = Math.max(0, MAX_TOTAL_DOTS - nextVisibleContacts.length);
+			// Booking zoom-in extras: render additional booking categories at high zoom without
+			// exceeding MAX_TOTAL_DOTS total markers.
+			const shouldShowBookingExtras =
+				isBookingSearch &&
+				zoomRaw >= BOOKING_EXTRA_MARKERS_MIN_ZOOM &&
+				bookingExtraContactsWithCoords.length > 0;
+			let nextBookingExtraVisible: ContactWithName[] = [];
+			if (shouldShowBookingExtras) {
+				const remainingBudget = Math.max(0, MAX_TOTAL_DOTS - nextVisibleContacts.length);
+				const maxExtraDots = Math.min(BOOKING_EXTRA_MARKERS_MAX_DOTS, remainingBudget);
+				if (maxExtraDots > 0) {
+					const extraInBounds: ContactWithName[] = [];
+					for (const contact of bookingExtraContactsWithCoords) {
+						const coords = getBookingExtraContactCoords(contact);
+						if (!coords) continue;
+						if (!isLatLngInBbox(coords.lat, coords.lng, viewportBbox)) continue;
+						extraInBounds.push(contact);
+					}
+
+					// Use the same sampling + non-overlap strategy as primary markers.
+					const POOL_FACTOR = 4;
+					const poolSlots = maxExtraDots * POOL_FACTOR;
+					let pool: ContactWithName[] = [];
+					if (extraInBounds.length <= poolSlots) {
+						pool = extraInBounds;
+					} else {
+						pool = stableViewportSampleContacts(
+							extraInBounds,
+							getBookingExtraContactCoords,
+							viewportBbox,
+							poolSlots,
+							`${seed}|bookingExtra|pool`
+						);
+					}
+
+					type Candidate = { contact: ContactWithName; x: number; y: number; key: number };
+					const candidates: Candidate[] = [];
+					for (const contact of pool) {
+						const coords = getBookingExtraContactCoords(contact);
+						if (!coords) continue;
+						const latClamped = clamp(coords.lat, -85, 85);
+						const siny = Math.sin((latClamped * Math.PI) / 180);
+						const x = ((coords.lng + 180) / 360) * worldSize;
+						const y =
+							(0.5 -
+								Math.log((1 + siny) / (1 - siny)) / (4 * Math.PI)) *
+							worldSize;
+						candidates.push({
+							contact,
+							x,
+							y,
+							key: hashStringToUint32(`${seed}|bookingExtra|${contact.id}`),
+						});
+					}
+
+					// Stable ordering.
+					candidates.sort((a, b) => a.key - b.key);
+
+					const cellSize = Math.max(6, minSeparationPx);
+					const grid = new Map<string, Array<{ x: number; y: number }>>();
+					const pickedExtra: ContactWithName[] = [];
+					const hasNeighborWithin = (cx: number, cy: number, x: number, y: number): boolean => {
+						for (let dx = -1; dx <= 1; dx++) {
+							for (let dy = -1; dy <= 1; dy++) {
+								const arr = grid.get(`${cx + dx},${cy + dy}`);
+								if (!arr) continue;
+								for (const p of arr) {
+									const ddx = x - p.x;
+									const ddy = y - p.y;
+									if (ddx * ddx + ddy * ddy < minSeparationSq) return true;
+								}
+							}
+						}
+						return false;
+					};
+
+					for (const c of candidates) {
+						if (pickedExtra.length >= maxExtraDots) break;
+						const cx = Math.floor(c.x / cellSize);
+						const cy = Math.floor(c.y / cellSize);
+						if (hasNeighborWithin(cx, cy, c.x, c.y)) continue;
+						pickedExtra.push(c.contact);
+						const k = `${cx},${cy}`;
+						const arr = grid.get(k);
+						if (arr) arr.push({ x: c.x, y: c.y });
+						else grid.set(k, [{ x: c.x, y: c.y }]);
+					}
+
+					nextBookingExtraVisible = pickedExtra;
+					nextBookingExtraVisible.sort((a, b) => a.id - b.id);
+				}
+			}
+
+			const nextExtraKey = nextBookingExtraVisible.map((c) => c.id).join(',');
+			if (nextExtraKey !== lastBookingExtraVisibleContactsKeyRef.current) {
+				lastBookingExtraVisibleContactsKeyRef.current = nextExtraKey;
+				setBookingExtraVisibleContacts(nextBookingExtraVisible);
+			}
+
+			const totalRendered = nextVisibleContacts.length + nextBookingExtraVisible.length;
+			const backgroundBudget = Math.max(0, MAX_TOTAL_DOTS - totalRendered);
 			backgroundDotsBudgetRef.current = backgroundBudget;
 			updateBackgroundDots(mapInstance, loading, backgroundBudget);
 		},
-		[contactsWithCoords, getContactCoords, selectedContacts, updateBackgroundDots]
+		[
+			contactsWithCoords,
+			getContactCoords,
+			selectedContacts,
+			updateBackgroundDots,
+			isBookingSearch,
+			bookingExtraContactsWithCoords,
+			getBookingExtraContactCoords,
+		]
 	);
 
 	// Background dots layer (non-interactive) to avoid the map feeling empty outside the selected region.
@@ -1768,8 +2042,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 	const handleMarkerClick = (contact: ContactWithName) => {
 		onMarkerClick?.(contact);
-		// Toggle selection when clicking on a marker
-		onToggleSelection?.(contact.id);
+		// Toggle selection when clicking on a marker (only for primary result set)
+		if (baseContactIdSet.has(contact.id)) {
+			onToggleSelection?.(contact.id);
+		}
 	};
 
 	const handleMarkerMouseOver = useCallback(
@@ -2011,6 +2287,135 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			onClick={() => setSelectedMarker(null)}
 		>
 			{/* Only render markers when not loading */}
+			{!isLoading &&
+				bookingExtraVisibleContacts.map((contact) => {
+					const coords = getBookingExtraContactCoords(contact);
+					if (!coords) return null;
+					const isHovered = hoveredMarkerId === contact.id;
+					const isSelected = selectedContacts.includes(contact.id);
+					const hasLockedStateSelection =
+						lockedStateKey && lockedStateSelectionKeyRef.current === lockedStateKey;
+					const isOutsideLockedState = hasLockedStateSelection
+						? !isCoordsInLockedState(coords)
+						: false;
+
+					const whatForMarker = getBookingTitlePrefixFromContactTitle(contact.title) ?? null;
+					const dotFillColor = getResultDotColorForWhat(whatForMarker);
+					const dotFillColorOutside = washOutHexColor(
+						dotFillColor,
+						OUTSIDE_LOCKED_STATE_WASHOUT_TO_WHITE
+					);
+					const dotIcon: google.maps.Symbol = {
+						path: google.maps.SymbolPath.CIRCLE,
+						scale: markerScale,
+						fillColor: isOutsideLockedState ? dotFillColorOutside : dotFillColor,
+						fillOpacity: 1,
+						strokeColor: isSelected
+							? RESULT_DOT_STROKE_COLOR_SELECTED
+							: RESULT_DOT_STROKE_COLOR_DEFAULT,
+						strokeWeight,
+					};
+
+					// Show tooltip if hovered or if this marker is fading out
+					const isFading = fadingTooltipId === contact.id;
+					const shouldShowTooltip = isHovered || isFading;
+					const hoverTooltip = shouldShowTooltip
+						? (() => {
+								const fullName = `${contact.firstName || ''} ${
+									contact.lastName || ''
+								}`.trim();
+								const nameForTooltip = fullName || contact.name || '';
+								const companyForTooltip = contact.company || '';
+								const titleForTooltip = (contact.title || contact.headline || '').trim();
+								const normalizedWhat = whatForMarker ? normalizeWhatKey(whatForMarker) : null;
+								const tooltipFillColor = normalizedWhat
+									? WHAT_TO_HOVER_TOOLTIP_FILL_COLOR[normalizedWhat] ?? dotFillColor
+									: dotFillColor;
+								const width = calculateTooltipWidth(
+									nameForTooltip,
+									companyForTooltip,
+									titleForTooltip,
+									whatForMarker
+								);
+								const height = calculateTooltipHeight(nameForTooltip, companyForTooltip);
+								const anchorY = calculateTooltipAnchorY(nameForTooltip, companyForTooltip);
+								return {
+									url: generateMapTooltipIconUrl(
+										nameForTooltip,
+										companyForTooltip,
+										titleForTooltip,
+										tooltipFillColor,
+										whatForMarker
+									),
+									width,
+									height,
+									anchorY,
+								};
+							})()
+						: null;
+
+					return (
+						<Fragment key={`bookingExtra-${contact.id}`}>
+							{/* Lower z-index hit area so primary markers win when overlapping */}
+							<MarkerF
+								position={coords}
+								icon={invisibleHitAreaIcon}
+								onMouseOver={(e) => handleMarkerMouseOver(contact, e)}
+								onMouseOut={() => handleMarkerMouseOut(contact.id)}
+								onClick={() => handleMarkerClick(contact)}
+								clickable={true}
+								zIndex={0}
+							/>
+							<MarkerF
+								position={coords}
+								icon={dotIcon}
+								clickable={false}
+								zIndex={-1}
+							/>
+							{shouldShowTooltip && hoverTooltip && (
+								<OverlayViewF
+									position={coords}
+									mapPaneName={OverlayView.FLOAT_PANE}
+									zIndex={HOVER_TOOLTIP_Z_INDEX}
+									getPixelPositionOffset={() => ({
+										x: -MAP_TOOLTIP_ANCHOR_X,
+										y: -hoverTooltip.anchorY,
+									})}
+								>
+									<div
+										style={{
+											width: `${hoverTooltip.width}px`,
+											height: `${hoverTooltip.height + hoverLeaveBufferPx}px`,
+											pointerEvents: isHovered ? 'auto' : 'none',
+											display: 'flex',
+											flexDirection: 'column',
+										}}
+										onMouseEnter={() => handleMarkerMouseOver(contact)}
+										onMouseLeave={() => handleMarkerMouseOut(contact.id)}
+										onClick={() => handleMarkerClick(contact)}
+									>
+										<div
+											style={{
+												width: '100%',
+												height: `${hoverTooltip.height}px`,
+												opacity: isHovered ? 1 : 0,
+												transition: 'opacity 150ms ease-in-out',
+												flexShrink: 0,
+											}}
+										>
+											<img
+												src={hoverTooltip.url}
+												alt=""
+												draggable={false}
+												style={{ width: '100%', height: '100%', display: 'block' }}
+											/>
+										</div>
+									</div>
+								</OverlayViewF>
+							)}
+						</Fragment>
+					);
+				})}
 			{!isLoading &&
 				visibleContacts.map((contact) => {
 					const coords = getContactCoords(contact);

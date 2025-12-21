@@ -2811,6 +2811,7 @@ const DashboardContent = () => {
 															<SearchResultsMap
 																contacts={contacts || []}
 																selectedContacts={selectedContacts}
+																searchQuery={activeSearchQuery}
 																searchWhat={searchedWhat}
 																onMarkerHover={handleMapMarkerHover}
 																lockedStateName={searchedStateAbbr}

@@ -348,10 +348,16 @@ const WHAT_TO_TOOLTIP_CATEGORY_ICON: Record<string, TooltipCategoryIconSpec> = {
 	[normalizeWhatKey('Festivals')]: FESTIVALS_ICON,
 	[normalizeWhatKey('Music Festivals')]: FESTIVALS_ICON,
 	[normalizeWhatKey('Wedding Planners')]: WEDDING_PLANNERS_ICON,
+	[normalizeWhatKey('Wedding Venues')]: WEDDING_PLANNERS_ICON,
 	[normalizeWhatKey('Wine, Beer, and Spirits')]: WINE_BEER_SPIRITS_ICON,
 	[normalizeWhatKey('Wine, Beer, Spirits')]: WINE_BEER_SPIRITS_ICON,
 	[normalizeWhatKey('Wine Beer and Spirits')]: WINE_BEER_SPIRITS_ICON,
 	[normalizeWhatKey('Wine Beer Spirits')]: WINE_BEER_SPIRITS_ICON,
+	// Booking extras: treat these as wine/beer/spirits for icon purposes.
+	[normalizeWhatKey('Breweries')]: WINE_BEER_SPIRITS_ICON,
+	[normalizeWhatKey('Wineries')]: WINE_BEER_SPIRITS_ICON,
+	[normalizeWhatKey('Distilleries')]: WINE_BEER_SPIRITS_ICON,
+	[normalizeWhatKey('Cideries')]: WINE_BEER_SPIRITS_ICON,
 	[normalizeWhatKey('Radio Stations')]: RADIO_STATIONS_ICON,
 };
 
