@@ -1977,6 +1977,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												onClick={() => {
 													setSearchWhereValue(loc.label);
 													setSearchActiveSection(null);
+													// Trigger search after a short delay to allow state to update
+													setTimeout(() => handleCampaignSearch(), 0);
 												}}
 											>
 												<div
@@ -2008,6 +2010,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										if (userLocationName && !isLoadingLocation) {
 											setSearchWhereValue(userLocationName);
 											setSearchActiveSection(null);
+											// Trigger search after a short delay to allow state to update
+											setTimeout(() => handleCampaignSearch(), 0);
 										}
 									}}
 								>
@@ -2039,6 +2043,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												onClick={() => {
 													setSearchWhereValue(label);
 													setSearchActiveSection(null);
+													// Trigger search after a short delay to allow state to update
+													setTimeout(() => handleCampaignSearch(), 0);
 												}}
 											>
 												<div
@@ -4801,6 +4807,13 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 															ref={whereInputRef}
 															value={searchWhereValue}
 															onChange={(e) => setSearchWhereValue(e.target.value)}
+															onKeyDown={(e) => {
+																if (e.key === 'Enter') {
+																	e.preventDefault();
+																	setSearchActiveSection(null);
+																	handleCampaignSearch();
+																}
+															}}
 															className="w-full h-full text-left bg-transparent border-none outline-none text-[13px] font-bold font-secondary placeholder:text-gray-400 p-0 focus:ring-0 cursor-pointer relative z-10"
 															style={{
 																maskImage:
@@ -4898,8 +4911,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												}}
 												enableStateInteractions
 												onStateSelect={(stateName) => {
-													setSearchActiveSection('why');
+													setSearchActiveSection(null);
 													setSearchWhereValue(stateName);
+													// Trigger search after a short delay to allow state to update
+													setTimeout(() => handleCampaignSearch(), 0);
 												}}
 												lockedStateName={searchWhereValue}
 											/>

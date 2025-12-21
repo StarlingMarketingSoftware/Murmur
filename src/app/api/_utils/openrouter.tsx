@@ -63,7 +63,6 @@ export const fetchOpenRouter = async (
 			typeof contentValue === 'object' &&
 			typeof (contentValue as any).text === 'string'
 		) {
-			// Some providers return a single content-part object
 			messageText = (contentValue as any).text;
 		} else if (
 			contentValue &&
@@ -87,10 +86,8 @@ export const fetchOpenRouter = async (
 				messageText = joined;
 			}
 		} else if (typeof choice0?.text === 'string' && choice0.text.trim().length > 0) {
-			// Some providers use `text` instead of chat message content
 			messageText = choice0.text;
 		} else if (typeof res?.output_text === 'string' && res.output_text.trim().length > 0) {
-			// Fallback for alternative schemas
 			messageText = res.output_text;
 		}
 
@@ -101,7 +98,6 @@ export const fetchOpenRouter = async (
 				choice0?.finish_reason_detail ||
 				choice0?.finishReasonDetail;
 
-			// Log a small, non-content summary so we can debug provider quirks without dumping full text.
 			console.error('[OpenRouter] Unexpected response shape:', {
 				model,
 				status: response.status,

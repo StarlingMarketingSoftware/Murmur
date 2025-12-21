@@ -701,6 +701,9 @@ const RESULT_DOT_STROKE_COLOR_SELECTED = '#15C948';
 const HOVER_TOOLTIP_Z_INDEX = 1_000_000;
 const MARKER_HIT_AREA_Z_INDEX = 2;
 const MARKER_DOT_Z_INDEX = 1;
+// Minimum zoom level required to trigger hover tooltips and research highlights on markers.
+// Below this zoom level, markers are too dense and small for hover interactions to be useful.
+const HOVER_INTERACTION_MIN_ZOOM = 8;
 const normalizeWhatKey = (value: string): string =>
 	value
 		.trim()
@@ -835,6 +838,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const [selectedMarker, setSelectedMarker] = useState<ContactWithName | null>(null);
 	const [hoveredMarkerId, setHoveredMarkerId] = useState<number | null>(null);
 	const hoveredMarkerIdRef = useRef<number | null>(null);
+	// Track tooltip that is fading out (for smooth transition)
+	const [fadingTooltipId, setFadingTooltipId] = useState<number | null>(null);
+	const fadingTooltipTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 	const [map, setMap] = useState<google.maps.Map | null>(null);
 	const [selectedStateKey, setSelectedStateKey] = useState<string | null>(null);
 	const [zoomLevel, setZoomLevel] = useState(4); // Default zoom level
@@ -888,6 +894,24 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		hoveredMarkerIdRef.current = null;
 		onMarkerHover?.(null);
 	}, [visibleContacts, hoveredMarkerId, onMarkerHover]);
+
+	// Clear hover state when zooming out past the minimum threshold
+	useEffect(() => {
+		if (zoomLevel >= HOVER_INTERACTION_MIN_ZOOM) return;
+		if (hoveredMarkerId == null) return;
+		if (hoverClearTimeoutRef.current) {
+			clearTimeout(hoverClearTimeoutRef.current);
+			hoverClearTimeoutRef.current = null;
+		}
+		if (fadingTooltipTimeoutRef.current) {
+			clearTimeout(fadingTooltipTimeoutRef.current);
+			fadingTooltipTimeoutRef.current = null;
+		}
+		setHoveredMarkerId(null);
+		setFadingTooltipId(null);
+		hoveredMarkerIdRef.current = null;
+		onMarkerHover?.(null);
+	}, [zoomLevel, hoveredMarkerId, onMarkerHover]);
 
 	useEffect(() => {
 		if (lockedStateName === undefined) return;
@@ -1155,106 +1179,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			loading?: boolean,
 			maxDotsInViewport: number = MAX_TOTAL_DOTS
 		) => {
-			if (!mapInstance) return;
-			const layer = backgroundDotsLayerRef.current;
-			if (!layer) return;
-
-			// Clear background dots while loading to avoid visual clutter
-			if (loading) {
-				layer.forEach((feature) => layer.remove(feature));
-				lastBackgroundDotsKeyRef.current = '';
-				return;
-			}
-
-			const usStates = usStatesPolygonsRef.current;
-			// Don't render any background dots until we have US state polygons (ensures dots only in USA).
-			if (!usStates || usStates.length === 0) return;
-
-			const bounds = mapInstance.getBounds();
-			if (!bounds) return;
-			const sw = bounds.getSouthWest();
-			const ne = bounds.getNorthEast();
-			const south = sw.lat();
-			const west = sw.lng();
-			const north = ne.lat();
-			const east = ne.lng();
-
-			// Skip in the unlikely case the viewport crosses the antimeridian (not relevant for our UI).
-			if (east < west) return;
-
-			const zoom = Math.round(mapInstance.getZoom() ?? 4);
-			const quant = getBackgroundDotsQuantizationDeg(zoom);
-
-			const qSouth = Math.round(south / quant);
-			const qWest = Math.round(west / quant);
-			const qNorth = Math.round(north / quant);
-			const qEast = Math.round(east / quant);
-
-			const selectionSig = resultsSelectionSignatureRef.current;
-			const maxAllowed = Math.max(
-				0,
-				Math.min(MAX_TOTAL_DOTS, Math.floor(Number(maxDotsInViewport) || 0))
-			);
-			const viewportKey = `${zoom}|${qSouth}|${qWest}|${qNorth}|${qEast}|${selectionSig}|bg:${maxAllowed}`;
-			if (viewportKey === lastBackgroundDotsKeyRef.current) return;
-			lastBackgroundDotsKeyRef.current = viewportKey;
-
-			// Clear existing dot features.
-			layer.forEach((feature) => layer.remove(feature));
-
-			// Calculate viewport area in square degrees for density-based dot count
-			const latSpan = north - south;
-			const lngSpan = east - west;
-			const viewportArea = latSpan * lngSpan;
-
-			const targetCount = Math.min(
-				getBackgroundDotsTargetCount(viewportArea, zoom),
-				maxAllowed
-			);
-			if (targetCount <= 0) return;
-
-			const selection = resultsSelectionMultiPolygonRef.current;
-			const selectionBbox = resultsSelectionBboxRef.current;
-
-			const rand = mulberry32(hashStringToUint32(viewportKey));
-			const points: LatLngLiteral[] = [];
-			const maxAttempts = Math.max(1000, targetCount * 25);
-			let attempts = 0;
-
-			while (points.length < targetCount && attempts < maxAttempts) {
-				attempts++;
-				const lat = south + rand() * (north - south);
-				const lng = west + rand() * (east - west);
-
-				// Avoid extreme latitudes where the map projection behaves oddly.
-				const clampedLat = clamp(lat, -85, 85);
-
-				// Only show dots within the United States (using state polygons as land mask).
-				if (!isPointInUSA(clampedLat, lng, usStates)) continue;
-
-				// Alaska is huge but sparsely populated - reduce dot density there by ~70%
-				const isInAlaska = clampedLat > 51 && lng < -130;
-				if (isInAlaska && rand() < 0.7) continue;
-
-				if (selection) {
-					// Quick bbox reject so we only do point-in-polygon work near the selected region.
-					if (!selectionBbox || isLatLngInBbox(clampedLat, lng, selectionBbox)) {
-						if (pointInMultiPolygon([lng, clampedLat], selection)) {
-							continue; // inside the selected region -> skip (we only want outside)
-						}
-					}
-				}
-
-				points.push({ lat: clampedLat, lng });
-			}
-
-			for (const pt of points) {
-				layer.add(
-					new google.maps.Data.Feature({
-						geometry: new google.maps.Data.Point(pt),
-					})
-				);
-			}
+			// Background dots have been disabled - no longer rendering fake gray dots
+			void mapInstance;
+			void loading;
+			void maxDotsInViewport;
 		},
 		[]
 	);
@@ -1833,10 +1761,19 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 	const handleMarkerMouseOver = useCallback(
 		(contact: ContactWithName, e?: google.maps.MapMouseEvent) => {
+			// Don't trigger hover interactions until sufficiently zoomed in
+			if (zoomLevel < HOVER_INTERACTION_MIN_ZOOM) return;
+
 			if (hoverClearTimeoutRef.current) {
 				clearTimeout(hoverClearTimeoutRef.current);
 				hoverClearTimeoutRef.current = null;
 			}
+			// Clear any fading tooltip when hovering a new marker
+			if (fadingTooltipTimeoutRef.current) {
+				clearTimeout(fadingTooltipTimeoutRef.current);
+				fadingTooltipTimeoutRef.current = null;
+			}
+			setFadingTooltipId(null);
 
 			hoveredMarkerIdRef.current = contact.id;
 			setHoveredMarkerId(contact.id);
@@ -1859,7 +1796,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 			onMarkerHover?.(contact, meta);
 		},
-		[onMarkerHover]
+		[onMarkerHover, zoomLevel]
 	);
 
 	const handleMarkerMouseOut = useCallback(
@@ -1870,8 +1807,17 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			hoverClearTimeoutRef.current = setTimeout(() => {
 				if (hoveredMarkerIdRef.current !== contactId) return;
 				hoveredMarkerIdRef.current = null;
+				// Start fade-out: set the fading tooltip to the current one
+				setFadingTooltipId(contactId);
 				setHoveredMarkerId(null);
 				onMarkerHover?.(null);
+				// Clear fading tooltip after transition completes (150ms matches CSS)
+				if (fadingTooltipTimeoutRef.current) {
+					clearTimeout(fadingTooltipTimeoutRef.current);
+				}
+				fadingTooltipTimeoutRef.current = setTimeout(() => {
+					setFadingTooltipId(null);
+				}, 150);
 			}, 60);
 		},
 		[onMarkerHover]
@@ -1950,7 +1896,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		};
 	}, [isLoaded, markerScale, strokeWeight, outsideDefaultDotFillColor]);
 
-	// Invisible larger marker for hover hit area
+	// Invisible marker for hover hit area - same size as visible dot for enter trigger.
+	// The larger leave area is provided by the tooltip overlay's extended bounds below.
 	const invisibleHitAreaIcon = useMemo(() => {
 		if (!isLoaded) return undefined;
 		return {
@@ -1959,9 +1906,16 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			fillOpacity: 0,
 			strokeColor: 'transparent',
 			strokeWeight: 0,
-			scale: markerScale * 2, // Larger than visible dot for easier hover
+			scale: markerScale, // Same size as visible dot for precise enter detection
 		};
 	}, [isLoaded, markerScale]);
+
+	// Larger leave buffer zone - how much extra padding below the tooltip for hysteresis
+	const hoverLeaveBufferPx = useMemo(() => {
+		// The buffer should be roughly the size the hit area used to be (2x marker)
+		// This prevents flicker when moving off the marker
+		return markerScale * 2;
+	}, [markerScale]);
 
 	// Background gray dot icon (same design as result dots, lower emphasis)
 	const backgroundDotIcon = useMemo(() => {
@@ -2063,7 +2017,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 							? defaultMarkerIconOutside
 							: defaultMarkerIcon;
 
-					const hoverTooltip = isHovered
+					// Show tooltip if hovered or if this marker is fading out
+					const isFading = fadingTooltipId === contact.id;
+					const shouldShowTooltip = isHovered || isFading;
+					const hoverTooltip = shouldShowTooltip
 						? (() => {
 								const fullName = `${contact.firstName || ''} ${
 									contact.lastName || ''
@@ -2120,7 +2077,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 								zIndex={MARKER_DOT_Z_INDEX}
 							/>
 							{/* Hover SVG tooltip (rendered as an overlay so it's always above markers) */}
-							{isHovered && hoverTooltip && (
+							{shouldShowTooltip && hoverTooltip && (
 								<OverlayViewF
 									position={coords}
 									mapPaneName={OverlayView.FLOAT_PANE}
@@ -2131,22 +2088,38 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 										y: -hoverTooltip.anchorY,
 									})}
 								>
+									{/* Outer wrapper extends below tooltip for larger leave area (hysteresis) */}
 									<div
 										style={{
 											width: `${hoverTooltip.width}px`,
-											height: `${hoverTooltip.height}px`,
-											pointerEvents: 'auto',
+											// Extend height to include buffer below for easier hover exit
+											height: `${hoverTooltip.height + hoverLeaveBufferPx}px`,
+											pointerEvents: isHovered ? 'auto' : 'none',
+											// Use flex to keep content at top, buffer at bottom
+											display: 'flex',
+											flexDirection: 'column',
 										}}
 										onMouseEnter={() => handleMarkerMouseOver(contact)}
 										onMouseLeave={() => handleMarkerMouseOut(contact.id)}
 										onClick={() => handleMarkerClick(contact)}
 									>
-										<img
-											src={hoverTooltip.url}
-											alt=""
-											draggable={false}
-											style={{ width: '100%', height: '100%', display: 'block' }}
-										/>
+										<div
+											style={{
+												width: '100%',
+												height: `${hoverTooltip.height}px`,
+												opacity: isHovered ? 1 : 0,
+												transition: 'opacity 150ms ease-in-out',
+												flexShrink: 0,
+											}}
+										>
+											<img
+												src={hoverTooltip.url}
+												alt=""
+												draggable={false}
+												style={{ width: '100%', height: '100%', display: 'block' }}
+											/>
+										</div>
+										{/* Invisible buffer zone below tooltip for hysteresis */}
 									</div>
 								</OverlayViewF>
 							)}

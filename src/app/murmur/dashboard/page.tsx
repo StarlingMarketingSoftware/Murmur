@@ -260,6 +260,53 @@ const DashboardContent = () => {
 		'state'
 	);
 
+	// Helper to trigger search with a specific "where" value (called when clicking state from dropdown)
+	const triggerSearchWithWhere = (newWhereValue: string, isNearMe = false) => {
+		// Update the state values
+		setWhereValue(newWhereValue);
+		setIsNearMeLocation(isNearMe);
+		setActiveSection(null);
+
+		// Build the combined search query with the new where value
+		const formattedWhere = newWhereValue.trim() ? `(${newWhereValue.trim()})` : '';
+		const combinedSearch = [whyValue, whatValue, formattedWhere]
+			.filter(Boolean)
+			.join(' ')
+			.trim();
+
+		// Set form value and submit (we need to do this in a setTimeout to allow state to settle)
+		setTimeout(() => {
+			if (combinedSearch && form && onSubmit) {
+				form.setValue('searchText', combinedSearch, {
+					shouldValidate: false,
+					shouldDirty: true,
+				});
+				form.handleSubmit(onSubmit)();
+			}
+		}, 0);
+	};
+
+	// Helper to trigger search with current input values (called on Enter key in "Where" input)
+	const triggerSearchWithCurrentValues = () => {
+		setActiveSection(null);
+
+		// Build the combined search query
+		const formattedWhere = whereValue.trim() ? `(${whereValue.trim()})` : '';
+		const combinedSearch = [whyValue, whatValue, formattedWhere]
+			.filter(Boolean)
+			.join(' ')
+			.trim();
+
+		// Set form value and submit
+		if (combinedSearch && form && onSubmit) {
+			form.setValue('searchText', combinedSearch, {
+				shouldValidate: false,
+				shouldDirty: true,
+			});
+			form.handleSubmit(onSubmit)();
+		}
+	};
+
 	const renderDesktopSearchDropdowns = () => {
 		if (!activeSection) return null;
 
@@ -606,9 +653,7 @@ const DashboardContent = () => {
 												key={`${loc.city}-${loc.state}-${idx}`}
 												className="w-[415px] min-h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200 mb-2"
 												onClick={() => {
-													setWhereValue(loc.label);
-													setIsNearMeLocation(false);
-													setActiveSection(null);
+													triggerSearchWithWhere(loc.label, false);
 												}}
 											>
 												<div
@@ -640,9 +685,7 @@ const DashboardContent = () => {
 									className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
 									onClick={() => {
 										if (userLocationName && !isLoadingLocation) {
-											setWhereValue(userLocationName);
-											setIsNearMeLocation(true);
-											setActiveSection(null);
+											triggerSearchWithWhere(userLocationName, true);
 										}
 									}}
 								>
@@ -674,9 +717,7 @@ const DashboardContent = () => {
 												key={label}
 												className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
 												onClick={() => {
-													setWhereValue(label);
-													setIsNearMeLocation(false);
-													setActiveSection(null);
+													triggerSearchWithWhere(label, false);
 												}}
 											>
 												<div
@@ -1208,11 +1249,12 @@ const DashboardContent = () => {
 		}
 	}, [whyValue, whatValue, whereValue, form]);
 
-	// Map view (results): automatically re-run the search when "What" or "Where" changes.
+	// Map view (results): automatically re-run the search when "What" changes.
 	// Intentionally do NOT auto-search on "Why"-only edits.
+	// "Where" changes do NOT auto-search; user must click a state from dropdown or press Enter.
 	const mapAutoSearchPayload = useMemo(
-		() => JSON.stringify({ what: whatValue.trim(), where: whereValue.trim() }),
-		[whatValue, whereValue]
+		() => JSON.stringify({ what: whatValue.trim() }),
+		[whatValue]
 	);
 	const debouncedMapAutoSearchPayload = useDebounce(mapAutoSearchPayload, 650);
 	const lastMapAutoSearchPayloadRef = useRef<string | null>(null);
@@ -1230,20 +1272,18 @@ const DashboardContent = () => {
 			return;
 		}
 
-		// Only respond to debounced changes in What/Where.
+		// Only respond to debounced changes in What.
 		if (lastMapAutoSearchPayloadRef.current === debouncedMapAutoSearchPayload) return;
 
-		let parsed: { what: string; where: string } | null = null;
+		let parsed: { what: string } | null = null;
 		try {
-			parsed = JSON.parse(debouncedMapAutoSearchPayload) as { what: string; where: string };
+			parsed = JSON.parse(debouncedMapAutoSearchPayload) as { what: string };
 		} catch {
 			// Should never happen, but don't break the page if it does.
 			return;
 		}
 
 		const typedWhat = (parsed.what || '').trim();
-		const typedWhereRaw = (parsed.where || '').trim();
-		const typedWhere = typedWhereRaw.replace(/^\(|\)$/g, '').trim();
 
 		// If the segmented inputs aren't initialized (e.g. user searched via raw text),
 		// infer missing pieces from the last executed query so edits behave intuitively.
@@ -1253,7 +1293,8 @@ const DashboardContent = () => {
 
 		const effectiveWhy = (whyValue || inferredWhy).trim();
 		const effectiveWhat = (typedWhat || inferredWhat).trim();
-		const effectiveWhere = (typedWhere || inferredWhere).trim();
+		// Use current whereValue for auto-search, but changes to it won't trigger auto-search
+		const effectiveWhere = (whereValue || inferredWhere).trim();
 
 		// Auto-search only when "What" is meaningful. ("Where" can be left unchanged.)
 		if (!effectiveWhat) return;
@@ -1287,6 +1328,7 @@ const DashboardContent = () => {
 		isMapView,
 		isSignedIn,
 		onSubmit,
+		whereValue,
 		whyValue,
 	]);
 
@@ -1823,7 +1865,7 @@ const DashboardContent = () => {
 																						onKeyDown={(e) => {
 																							if (e.key === 'Enter') {
 																								e.preventDefault();
-																								setActiveSection(null);
+																								triggerSearchWithCurrentValues();
 																							}
 																						}}
 																					className="absolute z-20 left-[24px] right-[8px] top-1/2 -translate-y-1/2 w-auto font-bold text-black text-[14px] bg-transparent outline-none border-none leading-none placeholder:text-black"
@@ -1857,7 +1899,7 @@ const DashboardContent = () => {
 																									onKeyDown={(e) => {
 																										if (e.key === 'Enter') {
 																											e.preventDefault();
-																											setActiveSection(null);
+																											triggerSearchWithCurrentValues();
 																										}
 																									}}
 																								className="z-20 flex-1 font-semibold text-black text-[12px] bg-transparent outline-none border-none"
@@ -2534,6 +2576,12 @@ const DashboardContent = () => {
 																				onChange={(e) => {
 																					setWhereValue(e.target.value);
 																					setIsNearMeLocation(false);
+																				}}
+																				onKeyDown={(e) => {
+																					if (e.key === 'Enter') {
+																						e.preventDefault();
+																						triggerSearchWithCurrentValues();
+																					}
 																				}}
 																				className="w-full h-full text-left bg-transparent border-none outline-none text-[13px] font-bold font-secondary overflow-hidden placeholder:text-gray-400 p-0 focus:ring-0 cursor-pointer relative z-10"
 																				style={{
