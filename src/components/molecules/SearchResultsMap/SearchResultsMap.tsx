@@ -637,8 +637,6 @@ const defaultCenter = {
 	lng: -98.5795,
 };
 
-// Prevent zooming out beyond roughly a "full US" view.
-// (Zoom 3 is country-level; zoom 2 starts showing most of North America.)
 const MAP_MIN_ZOOM = 4;
 
 const mapOptions: google.maps.MapOptions = {
