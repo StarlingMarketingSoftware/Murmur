@@ -22,6 +22,7 @@ import { WeddingPlannersIcon } from '@/components/atoms/_svg/WeddingPlannersIcon
 import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
 import { RadioStationsIcon } from '@/components/atoms/_svg/RadioStationsIcon';
 import { NearMeIcon } from '@/components/atoms/_svg/NearMeIcon';
+import HomeIcon from '@/components/atoms/_svg/HomeIcon';
 import { getCityIconProps } from '@/utils/cityIcons';
 import { Typography } from '@/components/ui/typography';
 import { Input } from '@/components/ui/input';
@@ -1086,6 +1087,10 @@ const DashboardContent = () => {
 		if (isTabSwitchAnimatingRef.current) return;
 
 		gsap.set(pill, {
+			// GSAP can parse an existing `translateY(-50%)` as a pixel `y` value (e.g. -8.5px),
+			// and then *also* apply `yPercent: -50`, effectively doubling the vertical offset.
+			// Explicitly zero out `y` so `yPercent` is the only centering mechanism.
+			y: 0,
 			yPercent: -50,
 			x: getTabPillXFor(activeTab),
 			backgroundColor: TAB_PILL_COLORS[activeTab],
@@ -2646,6 +2651,40 @@ const DashboardContent = () => {
 									)}
 								</Form>
 							</div>
+							{isMapView && (
+								<button
+									type="button"
+									onClick={handleCloseMapView}
+									aria-label="Home"
+									className="flex items-center justify-center cursor-pointer"
+									style={{
+										position: 'absolute',
+										// Map is inset 9px from the viewport; "25px from map top" => 34px viewport.
+										// Search bar wrapper sits at 33px viewport, so this becomes 1px inside the wrapper.
+										top: '1px',
+										// "179px to the right of the searchbar" => from wrapper's right edge.
+										left: 'calc(100% + 179px)',
+										width: '53px',
+										height: '53px',
+										borderRadius: '9px',
+										backgroundColor: '#D6D6D6',
+										border: '3px solid #000000',
+										padding: '2px',
+									}}
+								>
+									<div
+										className="flex items-center justify-center"
+										style={{
+											width: '43px',
+											height: '43px',
+											borderRadius: '9px',
+											backgroundColor: '#EAEAEA',
+										}}
+									>
+										<HomeIcon width={28} height={24} />
+									</div>
+								</button>
+							)}
 							{hoveredContact && !isMobile && !isMapView && (
 								<div className="absolute inset-0 z-[90] pointer-events-none bg-white hidden xl:flex items-start justify-center">
 									<div className="w-full max-w-[1132px] mx-auto px-4 py-3 text-center">
