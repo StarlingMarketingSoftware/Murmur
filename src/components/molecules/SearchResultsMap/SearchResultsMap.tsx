@@ -2048,14 +2048,21 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 								}`.trim();
 								const nameForTooltip = fullName || contact.name || '';
 								const companyForTooltip = contact.company || '';
-								const tooltipFillColor = isOutsideLockedState
-									? outsideDefaultDotFillColor
-									: defaultDotFillColor;
-								const width = calculateTooltipWidth(nameForTooltip, companyForTooltip);
+								const titleForTooltip = (contact.title || contact.headline || '').trim();
+								// Even if the marker dot is "washed out" outside the locked/selected state,
+								// keep the hover tooltip using the base search color so it consistently
+								// communicates the search category.
+								const tooltipFillColor = defaultDotFillColor;
+								const width = calculateTooltipWidth(
+									nameForTooltip,
+									companyForTooltip,
+									titleForTooltip
+								);
 								return {
 									url: generateMapTooltipIconUrl(
 										nameForTooltip,
 										companyForTooltip,
+										titleForTooltip,
 										tooltipFillColor
 									),
 									width,
