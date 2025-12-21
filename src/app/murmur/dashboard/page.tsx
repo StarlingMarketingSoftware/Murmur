@@ -1372,7 +1372,7 @@ const DashboardContent = () => {
 		}
 	}, [activeSection]);
 
-	// Animate the active section "pill" sliding between tabs (Why/What/Where)
+	//animation between the sections of the search bar
 	useEffect(() => {
 		const indicator = activeSectionIndicatorRef.current;
 		if (!indicator) return;

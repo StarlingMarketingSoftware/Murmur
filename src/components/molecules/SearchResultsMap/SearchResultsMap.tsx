@@ -1,9 +1,16 @@
 'use client';
 
 import { FC, Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { GoogleMap, useJsApiLoader, MarkerF, OverlayView } from '@react-google-maps/api';
+import { GoogleMap, useJsApiLoader, MarkerF, OverlayView, OverlayViewF } from '@react-google-maps/api';
 import { ContactWithName } from '@/types/contact';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
+import {
+	calculateTooltipWidth,
+	generateMapTooltipIconUrl,
+	MAP_TOOLTIP_ANCHOR_X,
+	MAP_TOOLTIP_ANCHOR_Y,
+	MAP_TOOLTIP_HEIGHT,
+} from '@/components/atoms/_svg/MapTooltipIcon';
 
 type LatLngLiteral = { lat: number; lng: number };
 type MarkerHoverMeta = { clientX: number; clientY: number };
@@ -689,6 +696,11 @@ const RESULT_DOT_STROKE_WEIGHT_MIN_PX = 1.5;
 const RESULT_DOT_STROKE_WEIGHT_MAX_PX = 3;
 const RESULT_DOT_STROKE_COLOR_DEFAULT = '#FFFFFF';
 const RESULT_DOT_STROKE_COLOR_SELECTED = '#15C948';
+
+// Keep hover tooltip above all map markers so it never gets covered.
+const HOVER_TOOLTIP_Z_INDEX = 1_000_000;
+const MARKER_HIT_AREA_Z_INDEX = 2;
+const MARKER_DOT_Z_INDEX = 1;
 const normalizeWhatKey = (value: string): string =>
 	value
 		.trim()
@@ -807,6 +819,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const [visibleContacts, setVisibleContacts] = useState<ContactWithName[]>([]);
 	// Timeout ref for auto-hiding research panel
 	const researchPanelTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+	// Small delay when moving between marker layers (prevents hover flicker)
+	const hoverClearTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 	const stateLayerRef = useRef<google.maps.Data | null>(null);
 	const resultsOutlinePolygonsRef = useRef<google.maps.Polygon[]>([]);
 	const searchedStateOutlinePolygonsRef = useRef<google.maps.Polygon[]>([]);
@@ -844,6 +858,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		if (hoveredMarkerId == null) return;
 		const stillVisible = visibleContacts.some((c) => c.id === hoveredMarkerId);
 		if (stillVisible) return;
+		if (hoverClearTimeoutRef.current) {
+			clearTimeout(hoverClearTimeoutRef.current);
+			hoverClearTimeoutRef.current = null;
+		}
 		setHoveredMarkerId(null);
 		hoveredMarkerIdRef.current = null;
 		onMarkerHover?.(null);
@@ -860,6 +878,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		return () => {
 			if (researchPanelTimeoutRef.current) {
 				clearTimeout(researchPanelTimeoutRef.current);
+			}
+			if (hoverClearTimeoutRef.current) {
+				clearTimeout(hoverClearTimeoutRef.current);
 			}
 		};
 	}, []);
@@ -1788,6 +1809,52 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		onToggleSelection?.(contact.id);
 	};
 
+	const handleMarkerMouseOver = useCallback(
+		(contact: ContactWithName, e?: google.maps.MapMouseEvent) => {
+			if (hoverClearTimeoutRef.current) {
+				clearTimeout(hoverClearTimeoutRef.current);
+				hoverClearTimeoutRef.current = null;
+			}
+
+			hoveredMarkerIdRef.current = contact.id;
+			setHoveredMarkerId(contact.id);
+
+			const domEvent = e?.domEvent as MouseEvent | TouchEvent | undefined;
+			let meta: MarkerHoverMeta | undefined;
+			if (domEvent && 'clientX' in domEvent && 'clientY' in domEvent) {
+				meta = { clientX: domEvent.clientX, clientY: domEvent.clientY };
+			} else if (
+				domEvent &&
+				'touches' in domEvent &&
+				domEvent.touches &&
+				domEvent.touches.length > 0
+			) {
+				meta = {
+					clientX: domEvent.touches[0].clientX,
+					clientY: domEvent.touches[0].clientY,
+				};
+			}
+
+			onMarkerHover?.(contact, meta);
+		},
+		[onMarkerHover]
+	);
+
+	const handleMarkerMouseOut = useCallback(
+		(contactId: number) => {
+			if (hoverClearTimeoutRef.current) {
+				clearTimeout(hoverClearTimeoutRef.current);
+			}
+			hoverClearTimeoutRef.current = setTimeout(() => {
+				if (hoveredMarkerIdRef.current !== contactId) return;
+				hoveredMarkerIdRef.current = null;
+				setHoveredMarkerId(null);
+				onMarkerHover?.(null);
+			}, 60);
+		},
+		[onMarkerHover]
+	);
+
 	// Calculate marker scale based on zoom level
 	// At zoom 4 (zoomed out): scale ~3, at zoom 14 (zoomed in): scale ~11
 	const markerScale = useMemo(() => {
@@ -1858,55 +1925,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			strokeColor: RESULT_DOT_STROKE_COLOR_SELECTED,
 			strokeWeight: strokeWeight,
 			scale: markerScale,
-		};
-	}, [isLoaded, markerScale, strokeWeight, outsideDefaultDotFillColor]);
-
-	// Slightly larger icons when hovered (no text tooltip)
-	const hoveredDefaultMarkerIcon = useMemo(() => {
-		if (!isLoaded) return undefined;
-		return {
-			path: google.maps.SymbolPath.CIRCLE,
-			fillColor: defaultDotFillColor,
-			fillOpacity: 1,
-			strokeColor: RESULT_DOT_STROKE_COLOR_DEFAULT,
-			strokeWeight: strokeWeight,
-			scale: markerScale * 1.18,
-		};
-	}, [isLoaded, markerScale, strokeWeight, defaultDotFillColor]);
-
-	const hoveredDefaultMarkerIconOutside = useMemo(() => {
-		if (!isLoaded) return undefined;
-		return {
-			path: google.maps.SymbolPath.CIRCLE,
-			fillColor: outsideDefaultDotFillColor,
-			fillOpacity: 1,
-			strokeColor: RESULT_DOT_STROKE_COLOR_DEFAULT,
-			strokeWeight: strokeWeight,
-			scale: markerScale * 1.18,
-		};
-	}, [isLoaded, markerScale, strokeWeight, outsideDefaultDotFillColor]);
-
-	const hoveredSelectedMarkerIcon = useMemo(() => {
-		if (!isLoaded) return undefined;
-		return {
-			path: google.maps.SymbolPath.CIRCLE,
-			fillColor: defaultDotFillColor,
-			fillOpacity: 1,
-			strokeColor: RESULT_DOT_STROKE_COLOR_SELECTED,
-			strokeWeight: strokeWeight,
-			scale: markerScale * 1.18,
-		};
-	}, [isLoaded, markerScale, strokeWeight, defaultDotFillColor]);
-
-	const hoveredSelectedMarkerIconOutside = useMemo(() => {
-		if (!isLoaded) return undefined;
-		return {
-			path: google.maps.SymbolPath.CIRCLE,
-			fillColor: outsideDefaultDotFillColor,
-			fillOpacity: 1,
-			strokeColor: RESULT_DOT_STROKE_COLOR_SELECTED,
-			strokeWeight: strokeWeight,
-			scale: markerScale * 1.18,
 		};
 	}, [isLoaded, markerScale, strokeWeight, outsideDefaultDotFillColor]);
 
@@ -2016,64 +2034,78 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						? !isCoordsInLockedState(coords)
 						: false;
 					const dotIcon = isSelected
-						? isHovered
-							? isOutsideLockedState
-								? hoveredSelectedMarkerIconOutside
-								: hoveredSelectedMarkerIcon
-							: isOutsideLockedState
-								? selectedMarkerIconOutside
-								: selectedMarkerIcon
-						: isHovered
-							? isOutsideLockedState
-								? hoveredDefaultMarkerIconOutside
-								: hoveredDefaultMarkerIcon
-							: isOutsideLockedState
-								? defaultMarkerIconOutside
-								: defaultMarkerIcon;
+						? isOutsideLockedState
+							? selectedMarkerIconOutside
+							: selectedMarkerIcon
+						: isOutsideLockedState
+							? defaultMarkerIconOutside
+							: defaultMarkerIcon;
+
+					const hoverTooltip = isHovered
+						? (() => {
+								const fullName = `${contact.firstName || ''} ${
+									contact.lastName || ''
+								}`.trim();
+								const nameForTooltip = fullName || contact.name || '';
+								const companyForTooltip = contact.company || '';
+								const width = calculateTooltipWidth(nameForTooltip, companyForTooltip);
+								return {
+									url: generateMapTooltipIconUrl(nameForTooltip, companyForTooltip),
+									width,
+									height: MAP_TOOLTIP_HEIGHT,
+								};
+							})()
+						: null;
 					return (
 						<Fragment key={contact.id}>
 							{/* Invisible larger hit area for hover detection - this controls all hover state */}
 							<MarkerF
 								position={coords}
 								icon={invisibleHitAreaIcon}
-								onMouseOver={(e) => {
-									hoveredMarkerIdRef.current = contact.id;
-									setHoveredMarkerId(contact.id);
-									const domEvent = e?.domEvent as MouseEvent | TouchEvent | undefined;
-									let meta: MarkerHoverMeta | undefined;
-									if (domEvent && 'clientX' in domEvent && 'clientY' in domEvent) {
-										meta = { clientX: domEvent.clientX, clientY: domEvent.clientY };
-									} else if (
-										domEvent &&
-										'touches' in domEvent &&
-										domEvent.touches &&
-										domEvent.touches.length > 0
-									) {
-										meta = {
-											clientX: domEvent.touches[0].clientX,
-											clientY: domEvent.touches[0].clientY,
-										};
-									}
-									onMarkerHover?.(contact, meta);
-								}}
-								onMouseOut={() => {
-									setHoveredMarkerId((prev) => (prev === contact.id ? null : prev));
-									if (hoveredMarkerIdRef.current === contact.id) {
-										hoveredMarkerIdRef.current = null;
-										onMarkerHover?.(null);
-									}
-								}}
+								onMouseOver={(e) => handleMarkerMouseOver(contact, e)}
+								onMouseOut={() => handleMarkerMouseOut(contact.id)}
 								onClick={() => handleMarkerClick(contact)}
 								clickable={true}
-								zIndex={3}
+								zIndex={MARKER_HIT_AREA_Z_INDEX}
 							/>
-							{/* Dot marker (slightly larger on hover) */}
+							{/* Dot marker (fixed size; hover shows SVG tooltip instead of scaling) */}
 							<MarkerF
 								position={coords}
 								icon={dotIcon}
 								clickable={false}
-								zIndex={isHovered ? 2 : 1}
+								zIndex={MARKER_DOT_Z_INDEX}
 							/>
+							{/* Hover SVG tooltip (rendered as an overlay so it's always above markers) */}
+							{isHovered && hoverTooltip && (
+								<OverlayViewF
+									position={coords}
+									mapPaneName={OverlayView.FLOAT_PANE}
+									zIndex={HOVER_TOOLTIP_Z_INDEX}
+									getPixelPositionOffset={() => ({
+										x: -MAP_TOOLTIP_ANCHOR_X,
+										// Align the tooltip tip to the marker's LatLng pixel point.
+										y: -MAP_TOOLTIP_ANCHOR_Y,
+									})}
+								>
+									<div
+										style={{
+											width: `${hoverTooltip.width}px`,
+											height: `${hoverTooltip.height}px`,
+											pointerEvents: 'auto',
+										}}
+										onMouseEnter={() => handleMarkerMouseOver(contact)}
+										onMouseLeave={() => handleMarkerMouseOut(contact.id)}
+										onClick={() => handleMarkerClick(contact)}
+									>
+										<img
+											src={hoverTooltip.url}
+											alt=""
+											draggable={false}
+											style={{ width: '100%', height: '100%', display: 'block' }}
+										/>
+									</div>
+								</OverlayViewF>
+							)}
 						</Fragment>
 					);
 				})}
