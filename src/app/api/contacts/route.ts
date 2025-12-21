@@ -138,21 +138,161 @@ const contactMusicVenueRelevanceScore = (contact: Contact): number => {
 	if (!blob) return 0;
 
 	let score = 0;
+
+	// Music-specific signals
 	if (/\bmusic venues?\b/.test(blob)) score += 12;
 	if (/\blive music\b/.test(blob)) score += 10;
 	if (/\bconcerts?\b|\bgigs?\b|\bshows?\b/.test(blob)) score += 6;
-	if (
-		/\b(venue|music hall|auditorium|amphitheat(?:er|re)|arena|pavilion|theat(?:er|re)|performing arts|arts (?:center|centre)|stage|ballroom|opera|symphony)\b/.test(
+
+	// Dedicated venue signals (theaters/halls/etc.)
+	// NOTE: Avoid matching "venues" (plural) so we don't boost everything just because the list title is
+	// "Music Venues <State>".
+	const hasStrongDedicatedVenueTerms =
+		/\b(music hall|concert hall|auditorium|amphitheat(?:er|re)|arena|pavilion|theat(?:er|re)|performing arts|arts (?:center|centre)|coliseum|stadium|opera|symphony|cabaret)\b/.test(
 			blob
-		)
-	) {
-		score += 6;
+		);
+	const hasSoftEventSpaceTerms =
+		/\b(venue|event (?:center|centre)|event space|banquet hall|ballroom|stage)\b/.test(
+			blob
+		);
+
+	if (hasStrongDedicatedVenueTerms) score += 10;
+	else if (hasSoftEventSpaceTerms) score += 4;
+
+	// Avoid generic "club" to prevent false positives like "wine club", "golf club", etc.
+	const hasClubTerms = /\b(night ?club|jazz club|music club)\b/.test(blob);
+	if (hasClubTerms) score += 6;
+
+	// Hospitality terms that often indicate "not a dedicated music venue".
+	// These places can still host live music, but in "Music Venues" searches we want them lower
+	// than actual venues.
+	const hasBarTerms =
+		/\b(bars?|pubs?|taverns?|saloons?|lounges?|cocktails?|speakeas(?:y|ies)|cantinas?)\b/.test(
+			blob
+		);
+	const hasBreweryTerms =
+		/\b(brewery|breweries|brewing|taprooms?|taphouses?|tap ?houses?|brewpubs?|microbrewery|microbreweries|alehouses?|beer gardens?|cideries?|cidery|meader(?:y|ies)|distiller(?:y|ies))\b/.test(
+			blob
+		);
+	const hasWineryTerms =
+		/\b(wineries?|vineyards?|vintners?|wine ?bars?|wine tasting|tasting rooms?|wine (?:cellar|cellars))\b/.test(
+			blob
+		);
+	const hasCafeTerms =
+		/\b(cafe|cafes|café|cafés|coffee|coffee ?houses?|espresso|roastery|roasteries|tea ?houses?)\b/.test(
+			blob
+		);
+	const hasRestaurantTerms =
+		/\b(restaurants?|bistros?|grills?|eatery|eateries|diners?|kitchens?|pizzerias?|pizza|bbq|steakhouses?)\b/.test(
+			blob
+		);
+
+	const hospitalityPenalty =
+		(hasCafeTerms ? 14 : 0) +
+		(hasWineryTerms ? 22 : 0) +
+		(hasBreweryTerms ? 22 : 0) +
+		(hasBarTerms ? 12 : 0) +
+		(hasRestaurantTerms ? 8 : 0);
+	if (hospitalityPenalty > 0) {
+		// If it already looks like a dedicated venue, apply a smaller penalty.
+		// BUT: wineries/breweries/distilleries should still be pushed down in "Music Venues"
+		// searches even if they mention an event space.
+		const divisor =
+			(hasStrongDedicatedVenueTerms || hasClubTerms) && !(hasBreweryTerms || hasWineryTerms)
+				? 2
+				: 1;
+		score -= Math.ceil(hospitalityPenalty / divisor);
 	}
-	if (/\b(night ?club|club)\b/.test(blob)) score += 4;
-	if (/\b(bar|pub|tavern|saloon|lounge|brewery|taproom)\b/.test(blob)) score += 3;
-	if (/\b(cafe|café|coffee)\b/.test(blob)) score += 2;
+
 	if (website && !website.includes('.edu')) score += 1;
 	return score;
+};
+
+// For "Music Venues" searches, treat obvious cafes/bars/breweries as "hospitality-only"
+// unless there are also strong dedicated-venue signals.
+const contactLooksLikeHospitalityOnlyForMusicVenueSearch = (contact: Contact): boolean => {
+	const company = normalizeSearchText(contact.company);
+	const title = normalizeSearchText(contact.title);
+	const headline = normalizeSearchText(contact.headline);
+	const industry = normalizeSearchText(contact.companyIndustry);
+	const type = normalizeSearchText(contact.companyType);
+	const website = normalizeSearchText(contact.website);
+	const metadata = normalizeSearchText(contact.metadata);
+	const keywordBlob = (contact.companyKeywords ?? [])
+		.map((k) => normalizeSearchText(k))
+		.filter(Boolean)
+		.join(' ');
+
+	const blob = `${company} ${title} ${headline} ${industry} ${type} ${website} ${metadata} ${keywordBlob}`.trim();
+	if (!blob) return false;
+
+	const hasStrongDedicatedVenueTerms =
+		/\b(music hall|concert hall|auditorium|amphitheat(?:er|re)|arena|pavilion|theat(?:er|re)|performing arts|arts (?:center|centre)|coliseum|stadium|opera|symphony|cabaret)\b/.test(
+			blob
+		);
+	// Avoid generic "club" to prevent false positives like "wine club", "golf club", etc.
+	const hasClubTerms = /\b(night ?club|jazz club|music club)\b/.test(blob);
+
+	const hasBarTerms =
+		/\b(bars?|pubs?|taverns?|saloons?|lounges?|cocktails?|speakeas(?:y|ies)|cantinas?)\b/.test(
+			blob
+		);
+	const hasBreweryTerms =
+		/\b(brewery|breweries|brewing|taprooms?|taphouses?|tap ?houses?|brewpubs?|microbrewery|microbreweries|alehouses?|beer gardens?|cideries?|cidery|meader(?:y|ies)|distiller(?:y|ies))\b/.test(
+			blob
+		);
+	const hasWineryTerms =
+		/\b(wineries?|vineyards?|vintners?|wine ?bars?|wine tasting|tasting rooms?|wine (?:cellar|cellars))\b/.test(
+			blob
+		);
+	const hasCafeTerms =
+		/\b(cafe|cafes|café|cafés|coffee|coffee ?houses?|espresso|roastery|roasteries|tea ?houses?)\b/.test(
+			blob
+		);
+	const hasRestaurantTerms =
+		/\b(restaurants?|bistros?|grills?|eatery|eateries|diners?|kitchens?|pizzerias?|pizza|bbq|steakhouses?)\b/.test(
+			blob
+		);
+
+	const hasHospitalityTerms =
+		hasBarTerms || hasBreweryTerms || hasWineryTerms || hasCafeTerms || hasRestaurantTerms;
+
+	if (!hasHospitalityTerms) return false;
+	// Always treat wineries/breweries/distilleries as "hospitality-only" for Music Venues searches,
+	// so they don't dominate the top of the list.
+	if (hasBreweryTerms || hasWineryTerms) return true;
+	if (hasStrongDedicatedVenueTerms || hasClubTerms) return false;
+	return true;
+};
+
+// A stricter tag to push breweries/wineries/distilleries below other "hospitality-only" results
+// for Music Venue searches.
+const contactLooksLikeWineryOrBreweryForMusicVenueSearch = (contact: Contact): boolean => {
+	const company = normalizeSearchText(contact.company);
+	const title = normalizeSearchText(contact.title);
+	const headline = normalizeSearchText(contact.headline);
+	const industry = normalizeSearchText(contact.companyIndustry);
+	const type = normalizeSearchText(contact.companyType);
+	const website = normalizeSearchText(contact.website);
+	const metadata = normalizeSearchText(contact.metadata);
+	const keywordBlob = (contact.companyKeywords ?? [])
+		.map((k) => normalizeSearchText(k))
+		.filter(Boolean)
+		.join(' ');
+
+	const blob = `${company} ${title} ${headline} ${industry} ${type} ${website} ${metadata} ${keywordBlob}`.trim();
+	if (!blob) return false;
+
+	const hasBreweryTerms =
+		/\b(brewery|breweries|brewing|taprooms?|taphouses?|tap ?houses?|brewpubs?|microbrewery|microbreweries|alehouses?|beer gardens?|cideries?|cidery|meader(?:y|ies)|distiller(?:y|ies))\b/.test(
+			blob
+		);
+	const hasWineryTerms =
+		/\b(wineries?|vineyards?|vintners?|wine ?bars?|wine tasting|tasting rooms?|wine (?:cellar|cellars))\b/.test(
+			blob
+		);
+
+	return hasBreweryTerms || hasWineryTerms;
 };
 
 const US_STATE_METADATA = [
@@ -943,6 +1083,22 @@ export async function GET(req: NextRequest) {
 					return v;
 				};
 
+				const hospitalityOnlyCache = new Map<number, boolean>();
+				const hospitalityOnly = (c: Contact): boolean => {
+					if (hospitalityOnlyCache.has(c.id)) return hospitalityOnlyCache.get(c.id)!;
+					const v = contactLooksLikeHospitalityOnlyForMusicVenueSearch(c);
+					hospitalityOnlyCache.set(c.id, v);
+					return v;
+				};
+
+				const wineryOrBreweryCache = new Map<number, boolean>();
+				const wineryOrBrewery = (c: Contact): boolean => {
+					if (wineryOrBreweryCache.has(c.id)) return wineryOrBreweryCache.get(c.id)!;
+					const v = contactLooksLikeWineryOrBreweryForMusicVenueSearch(c);
+					wineryOrBreweryCache.set(c.id, v);
+					return v;
+				};
+
 				const targetCityLc = normalizeSearchText(forceCityExactCity || queryJson.city || '');
 				const distanceMap = targetStateAbbr ? buildStateDistanceMap(targetStateAbbr) : null;
 
@@ -971,6 +1127,8 @@ export async function GET(req: NextRequest) {
 						cityMatch,
 						higherEd,
 						distance,
+						hospitalityOnly: hospitalityOnly(c),
+						wineryOrBrewery: wineryOrBrewery(c),
 						venueScore: venueScore(c),
 					};
 				});
@@ -993,8 +1151,15 @@ export async function GET(req: NextRequest) {
 				});
 
 				// Always put higher-ed at the bottom (as a last-resort filler).
+				// Also push obvious cafes/bars/breweries below dedicated venues.
 				const ordered = scored
-					.filter((x) => !x.higherEd)
+					.filter((x) => !x.higherEd && !x.hospitalityOnly)
+					.concat(
+						scored.filter(
+							(x) => !x.higherEd && x.hospitalityOnly && !x.wineryOrBrewery
+						)
+					)
+					.concat(scored.filter((x) => !x.higherEd && x.wineryOrBrewery))
 					.concat(scored.filter((x) => x.higherEd))
 					.map((x) => x.contact);
 
