@@ -704,6 +704,8 @@ const MARKER_DOT_Z_INDEX = 1;
 // Minimum zoom level required to trigger hover tooltips and research highlights on markers.
 // Below this zoom level, markers are too dense and small for hover interactions to be useful.
 const HOVER_INTERACTION_MIN_ZOOM = 8;
+// Zoom level at which the map switches to satellite/hybrid view for better detail
+const SATELLITE_VIEW_MIN_ZOOM = 14;
 const normalizeWhatKey = (value: string): string =>
 	value
 		.trim()
@@ -912,6 +914,17 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		hoveredMarkerIdRef.current = null;
 		onMarkerHover?.(null);
 	}, [zoomLevel, hoveredMarkerId, onMarkerHover]);
+
+	// Switch to satellite/hybrid view when zoomed in close enough for street-level detail
+	useEffect(() => {
+		if (!map) return;
+		const shouldUseSatellite = zoomLevel >= SATELLITE_VIEW_MIN_ZOOM;
+		const currentMapType = map.getMapTypeId();
+		const targetMapType = shouldUseSatellite ? 'hybrid' : 'roadmap';
+		if (currentMapType !== targetMapType) {
+			map.setMapTypeId(targetMapType);
+		}
+	}, [map, zoomLevel]);
 
 	useEffect(() => {
 		if (lockedStateName === undefined) return;
