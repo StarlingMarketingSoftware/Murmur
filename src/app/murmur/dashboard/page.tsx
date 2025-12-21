@@ -431,27 +431,6 @@ const DashboardContent = () => {
 								<div
 									className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
 									onClick={() => {
-										setWhatValue('Music Venues');
-										// On the results screen, changing "What" should immediately re-search
-										// without auto-advancing the UI to the "Where" (state) step.
-										setActiveSection(isMapView ? null : 'where');
-									}}
-								>
-									<div className="w-[38px] h-[38px] bg-[#71C9FD] rounded-[8px] flex-shrink-0 flex items-center justify-center">
-										<MusicVenuesIcon />
-									</div>
-									<div className="ml-[12px] flex flex-col">
-										<div className="text-[20px] font-medium leading-none text-black font-inter">
-											Music Venues
-										</div>
-										<div className="text-[12px] leading-tight text-black mt-[4px]">
-											Reach talent buyers for live shows
-										</div>
-									</div>
-								</div>
-								<div
-									className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
-									onClick={() => {
 										setWhatValue('Wine, Beer, and Spirits');
 										// On the results screen, changing "What" should immediately re-search
 										// without auto-advancing the UI to the "Where" (state) step.
@@ -467,27 +446,6 @@ const DashboardContent = () => {
 										</div>
 										<div className="text-[12px] leading-tight text-black mt-[4px]">
 											Pitch your act for seasonal events
-										</div>
-									</div>
-								</div>
-								<div
-									className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
-									onClick={() => {
-										setWhatValue('Restaurants');
-										// On the results screen, changing "What" should immediately re-search
-										// without auto-advancing the UI to the "Where" (state) step.
-										setActiveSection(isMapView ? null : 'where');
-									}}
-								>
-									<div className="w-[38px] h-[38px] bg-[#77DD91] rounded-[8px] flex-shrink-0 flex items-center justify-center">
-										<RestaurantsIcon />
-									</div>
-									<div className="ml-[12px] flex flex-col">
-										<div className="text-[20px] font-medium leading-none text-black font-inter">
-											Restaurants
-										</div>
-										<div className="text-[12px] leading-tight text-black mt-[4px]">
-											Land steady dinner and brunch gigs
 										</div>
 									</div>
 								</div>
@@ -515,21 +473,21 @@ const DashboardContent = () => {
 								<div
 									className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
 									onClick={() => {
-										setWhatValue('Wedding Planners');
+										setWhatValue('Restaurants');
 										// On the results screen, changing "What" should immediately re-search
 										// without auto-advancing the UI to the "Where" (state) step.
 										setActiveSection(isMapView ? null : 'where');
 									}}
 								>
-									<div className="w-[38px] h-[38px] bg-[#EED56E] rounded-[8px] flex-shrink-0 flex items-center justify-center">
-										<WeddingPlannersIcon />
+									<div className="w-[38px] h-[38px] bg-[#77DD91] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+										<RestaurantsIcon />
 									</div>
 									<div className="ml-[12px] flex flex-col">
 										<div className="text-[20px] font-medium leading-none text-black font-inter">
-											Wedding Planners
+											Restaurants
 										</div>
 										<div className="text-[12px] leading-tight text-black mt-[4px]">
-											Get hired for ceremonies & receptions
+											Land steady dinner and brunch gigs
 										</div>
 									</div>
 								</div>
@@ -551,6 +509,48 @@ const DashboardContent = () => {
 										</div>
 										<div className="text-[12px] leading-tight text-black mt-[4px]">
 											Pitch your act for seasonal events
+										</div>
+									</div>
+								</div>
+								<div
+									className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+									onClick={() => {
+										setWhatValue('Wedding Planners');
+										// On the results screen, changing "What" should immediately re-search
+										// without auto-advancing the UI to the "Where" (state) step.
+										setActiveSection(isMapView ? null : 'where');
+									}}
+								>
+									<div className="w-[38px] h-[38px] bg-[#EED56E] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+										<WeddingPlannersIcon />
+									</div>
+									<div className="ml-[12px] flex flex-col">
+										<div className="text-[20px] font-medium leading-none text-black font-inter">
+											Wedding Planners
+										</div>
+										<div className="text-[12px] leading-tight text-black mt-[4px]">
+											Get hired for ceremonies & receptions
+										</div>
+									</div>
+								</div>
+								<div
+									className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+									onClick={() => {
+										setWhatValue('Music Venues');
+										// On the results screen, changing "What" should immediately re-search
+										// without auto-advancing the UI to the "Where" (state) step.
+										setActiveSection(isMapView ? null : 'where');
+									}}
+								>
+									<div className="w-[38px] h-[38px] bg-[#71C9FD] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+										<MusicVenuesIcon />
+									</div>
+									<div className="ml-[12px] flex flex-col">
+										<div className="text-[20px] font-medium leading-none text-black font-inter">
+											Music Venues
+										</div>
+										<div className="text-[12px] leading-tight text-black mt-[4px]">
+											Reach talent buyers for live shows
 										</div>
 									</div>
 								</div>
