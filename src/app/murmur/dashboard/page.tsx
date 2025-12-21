@@ -883,47 +883,80 @@ const DashboardContent = () => {
 	// showing all results. Clicking an out-of-state marker adds it to this panel list.
 	const [mapPanelExtraContactIds, setMapPanelExtraContactIds] = useState<number[]>([]);
 	const mapViewContainerRef = useRef<HTMLDivElement | null>(null);
-	const [mapResearchPanelSide, setMapResearchPanelSide] = useState<'left' | 'right'>('right');
-	const MAP_RESEARCH_PANEL_FADE_MS = 170;
+	const [hoveredMapMarkerContact, setHoveredMapMarkerContact] = useState<ContactWithName | null>(
+		null
+	);
+	const isMapResultsLoading = isSearchPending || isLoadingContacts || isRefetchingContacts;
+	// Map hover research overlay behavior:
+	// - Hold briefly after hover ends (prevents flicker)
+	// - Then fade out quickly
+	const MAP_RESEARCH_PANEL_HOLD_MS = 250;
+	const MAP_RESEARCH_PANEL_FADE_MS = 120;
 	const [mapResearchPanelContact, setMapResearchPanelContact] =
 		useState<ContactWithName | null>(null);
 	const [isMapResearchPanelVisible, setIsMapResearchPanelVisible] = useState(false);
+	const mapResearchPanelCloseDelayTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 	const mapResearchPanelUnmountTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-	const mapResearchPanelShowRafRef = useRef<number | null>(null);
 	const mapResearchPanelContactRef = useRef<ContactWithName | null>(null);
 	useEffect(() => {
 		setMapPanelExtraContactIds([]);
 	}, [activeSearchQuery]);
 
-	// Cleanup animation timers on unmount
+	// Cleanup timers on unmount
 	useEffect(() => {
 		return () => {
+			if (mapResearchPanelCloseDelayTimeoutRef.current) {
+				clearTimeout(mapResearchPanelCloseDelayTimeoutRef.current);
+				mapResearchPanelCloseDelayTimeoutRef.current = null;
+			}
 			if (mapResearchPanelUnmountTimeoutRef.current) {
 				clearTimeout(mapResearchPanelUnmountTimeoutRef.current);
 				mapResearchPanelUnmountTimeoutRef.current = null;
 			}
-			if (mapResearchPanelShowRafRef.current != null) {
-				cancelAnimationFrame(mapResearchPanelShowRafRef.current);
-				mapResearchPanelShowRafRef.current = null;
-			}
 		};
 	}, []);
 
-	// Fade the map research panel in/out instead of abruptly mounting/unmounting.
+	// Ensure marker-hover research never "sticks" and apply hold+fade behavior.
 	useEffect(() => {
-		if (!isMapView) {
+		// Reset everything when leaving map view or while results are loading.
+		if (!isMapView || isMapResultsLoading) {
+			setHoveredMapMarkerContact(null);
 			setIsMapResearchPanelVisible(false);
 			setMapResearchPanelContact(null);
 			mapResearchPanelContactRef.current = null;
-			setMapResearchPanelSide('right');
+			if (mapResearchPanelCloseDelayTimeoutRef.current) {
+				clearTimeout(mapResearchPanelCloseDelayTimeoutRef.current);
+				mapResearchPanelCloseDelayTimeoutRef.current = null;
+			}
+			if (mapResearchPanelUnmountTimeoutRef.current) {
+				clearTimeout(mapResearchPanelUnmountTimeoutRef.current);
+				mapResearchPanelUnmountTimeoutRef.current = null;
+			}
 			return;
 		}
 
-		const isMapLoading = isSearchPending || isLoadingContacts || isRefetchingContacts;
+		// Hovering a marker: show immediately (with snappy fade-in on first mount).
+		if (hoveredMapMarkerContact) {
+			if (mapResearchPanelCloseDelayTimeoutRef.current) {
+				clearTimeout(mapResearchPanelCloseDelayTimeoutRef.current);
+				mapResearchPanelCloseDelayTimeoutRef.current = null;
+			}
+			if (mapResearchPanelUnmountTimeoutRef.current) {
+				clearTimeout(mapResearchPanelUnmountTimeoutRef.current);
+				mapResearchPanelUnmountTimeoutRef.current = null;
+			}
+			setMapResearchPanelContact(hoveredMapMarkerContact);
+			mapResearchPanelContactRef.current = hoveredMapMarkerContact;
+			setIsMapResearchPanelVisible(true);
+			return;
+		}
 
-		// Hide during loading
-		if (isMapLoading) {
-			if (!mapResearchPanelContactRef.current) return;
+		// No hovered marker: hold for ~1s, then fade out quickly and unmount.
+		if (!mapResearchPanelContactRef.current) return;
+		if (mapResearchPanelCloseDelayTimeoutRef.current) return;
+
+		mapResearchPanelCloseDelayTimeoutRef.current = setTimeout(() => {
+			mapResearchPanelCloseDelayTimeoutRef.current = null;
 			setIsMapResearchPanelVisible(false);
 			if (mapResearchPanelUnmountTimeoutRef.current) {
 				clearTimeout(mapResearchPanelUnmountTimeoutRef.current);
@@ -931,85 +964,15 @@ const DashboardContent = () => {
 			mapResearchPanelUnmountTimeoutRef.current = setTimeout(() => {
 				setMapResearchPanelContact(null);
 				mapResearchPanelContactRef.current = null;
-				setMapResearchPanelSide('right');
 			}, MAP_RESEARCH_PANEL_FADE_MS);
-			return;
-		}
-
-		if (hoveredContact) {
-			// Cancel any pending unmount so we can keep the panel visible.
-			if (mapResearchPanelUnmountTimeoutRef.current) {
-				clearTimeout(mapResearchPanelUnmountTimeoutRef.current);
-				mapResearchPanelUnmountTimeoutRef.current = null;
-			}
-			if (mapResearchPanelShowRafRef.current != null) {
-				cancelAnimationFrame(mapResearchPanelShowRafRef.current);
-				mapResearchPanelShowRafRef.current = null;
-			}
-
-			const wasClosed = mapResearchPanelContactRef.current == null;
-			setMapResearchPanelContact(hoveredContact);
-			mapResearchPanelContactRef.current = hoveredContact;
-
-			if (wasClosed) {
-				// Mount at opacity 0, then fade in on next frame.
-				setIsMapResearchPanelVisible(false);
-				mapResearchPanelShowRafRef.current = requestAnimationFrame(() => {
-					setIsMapResearchPanelVisible(true);
-				});
-			} else {
-				setIsMapResearchPanelVisible(true);
-			}
-			return;
-		}
-
-		// No hovered contact: fade out, then unmount.
-		if (!mapResearchPanelContactRef.current) return;
-		setIsMapResearchPanelVisible(false);
-		if (mapResearchPanelUnmountTimeoutRef.current) {
-			clearTimeout(mapResearchPanelUnmountTimeoutRef.current);
-		}
-		mapResearchPanelUnmountTimeoutRef.current = setTimeout(() => {
-			setMapResearchPanelContact(null);
-			mapResearchPanelContactRef.current = null;
-			setMapResearchPanelSide('right');
-		}, MAP_RESEARCH_PANEL_FADE_MS);
-	}, [hoveredContact, isMapView, isSearchPending, isLoadingContacts, isRefetchingContacts]);
+		}, MAP_RESEARCH_PANEL_HOLD_MS);
+	}, [hoveredMapMarkerContact, isMapView, isMapResultsLoading]);
 
 	const handleMapMarkerHover = useCallback(
-		(contact: ContactWithName | null, meta?: { clientX: number; clientY: number }) => {
-			setHoveredContact(contact);
-
-			// Default back to the right side whenever hover ends or we can't compute geometry.
-			// NOTE: Don't reset the side immediately on hover end; we fade out first.
-			if (!contact) {
-				return;
-			}
-			if (!meta) {
-				setMapResearchPanelSide('right');
-				return;
-			}
-
-			const container = mapViewContainerRef.current;
-			if (!container) {
-				setMapResearchPanelSide('right');
-				return;
-			}
-
-			const rect = container.getBoundingClientRect();
-			const x = meta.clientX - rect.left;
-
-			// Keep in sync with the panel's rendered styles below.
-			const PANEL_WIDTH_PX = 310;
-			const PANEL_RIGHT_OFFSET_PX = 460;
-			const PANEL_LEFT_X = rect.width - PANEL_RIGHT_OFFSET_PX - PANEL_WIDTH_PX;
-			const PANEL_RIGHT_X = rect.width - PANEL_RIGHT_OFFSET_PX;
-			const PADDING_PX = 26; // give the dot a little breathing room
-
-			const overlapsRightPanelZone = x >= PANEL_LEFT_X - PADDING_PX && x <= PANEL_RIGHT_X + PADDING_PX;
-			setMapResearchPanelSide(overlapsRightPanelZone ? 'left' : 'right');
+		(contact: ContactWithName | null) => {
+			setHoveredMapMarkerContact(contact);
 		},
-		[setHoveredContact]
+		[]
 	);
 
 	const searchedStateAbbr = useMemo(
@@ -2861,8 +2824,13 @@ const DashboardContent = () => {
 																			width: '433px',
 																			height: '800px',
 																			maxHeight: 'calc(100% - 117px)',
-																			backgroundColor: 'rgba(175, 214, 239, 0.8)',
-																			border: '3px solid #143883',
+																			backgroundColor:
+																				mapResearchPanelContact && isMapResearchPanelVisible
+																				? '#D8E5FB'
+																				: 'rgba(175, 214, 239, 0.8)',
+																			border: mapResearchPanelContact && isMapResearchPanelVisible
+																				? '3px solid #000000'
+																				: '3px solid #143883',
 																			overflow: 'hidden',
 																		}}
 																	>
@@ -2952,12 +2920,10 @@ const DashboardContent = () => {
 																							}
 																						}}
 																						onMouseEnter={() => {
-																							setMapResearchPanelSide('right');
 																							setHoveredContact(contact);
 																						}}
 																						onMouseLeave={() => {
 																							setHoveredContact(null);
-																							setMapResearchPanelSide('right');
 																						}}
 																					>
 																						{/* Centered used contact dot */}
@@ -3158,311 +3124,27 @@ const DashboardContent = () => {
 																				/>
 																			</Button>
 																		</div>
-																	</div>
-																)}
-																{mapResearchPanelContact &&
-																	(() => {
-																		const hoveredContact = mapResearchPanelContact!;
-																		const parseMetadataSections = (
-																			metadata: string | null | undefined
-																		) => {
-																			if (!metadata) return {};
-
-																			const allSections: Record<string, string> = {};
-																			const regex =
-																				/\[(\d+)\]\s*([\s\S]*?)(?=\[\d+\]|$)/g;
-																			let match;
-																			while ((match = regex.exec(metadata)) !== null) {
-																				const sectionNum = match[1];
-																				const content = match[2].trim();
-																				allSections[sectionNum] = content;
-																			}
-
-																			const sections: Record<string, string> = {};
-																			let expectedNum = 1;
-
-																			while (allSections[String(expectedNum)]) {
-																				const content = allSections[String(expectedNum)];
-																				const meaningfulContent = content
-																					.replace(/[.\s,;:!?'"()\-–—]/g, '')
-																					.trim();
-
-																				if (meaningfulContent.length < 5) {
-																					break;
-																				}
-
-																				sections[String(expectedNum)] = content;
-																				expectedNum++;
-																			}
-
-																			if (Object.keys(sections).length < 3) {
-																				return {};
-																			}
-
-																			return sections;
-																		};
-																		const metadataSections = parseMetadataSections(
-																			hoveredContact?.metadata
-																		);
-
-																		const hasAnyParsedSections =
-																			Object.keys(metadataSections).length > 0;
-																		const numSections =
-																			Object.keys(metadataSections).length;
-																		// Slightly larger: header(22) + contact(34) + divider(1) + sections(50 each) + summary(125) + padding
-																		const containerHeight = hasAnyParsedSections
-																			? `${22 + 34 + 1 + numSections * 52 + 130 + 10}px`
-																			: '340px';
-
-																		return (
+																		{mapResearchPanelContact && (
 																			<div
-																				className="absolute rounded-[8px] shadow-lg flex flex-col"
+																				className="absolute inset-0 z-50"
 																				style={{
-																					top: '68px',
-																					...(mapResearchPanelSide === 'left'
-																						? { left: '10px' }
-																						: { right: '460px' }),
-																					width: '310px',
-																					height: containerHeight,
-																					maxHeight: 'calc(100% - 20px)',
-																					backgroundColor: 'rgba(216, 229, 251, 0.8)',
-																					border: '2px solid #143883',
-																					overflow: 'hidden',
+																					backgroundColor: '#D8E5FB',
 																					opacity: isMapResearchPanelVisible ? 1 : 0,
-																					transition: `opacity ${MAP_RESEARCH_PANEL_FADE_MS}ms ease-in-out`,
+																					transition: `opacity ${MAP_RESEARCH_PANEL_FADE_MS}ms ease-out`,
 																					pointerEvents: isMapResearchPanelVisible ? 'auto' : 'none',
 																				}}
 																			>
-																				{/* Header */}
-																				<div
-																					className="absolute top-0 left-0 w-full flex items-center px-[12px]"
-																					style={{
-																						height: '22px',
-																						backgroundColor: 'transparent',
-																					}}
-																				>
-																					<span className="font-secondary font-bold text-[12px] leading-none text-black">
-																						Research
-																					</span>
-																				</div>
-																				<div
-																					className="absolute left-0 w-full bg-black z-10"
-																					style={{ top: '22px', height: '1px' }}
+																				<ContactResearchPanel
+																					contact={mapResearchPanelContact}
+																					className="!block !border-0 !bg-transparent !rounded-none"
+																					style={{ width: '100%', height: '100%' }}
+																					// Tune box width for the 433px side panel
+																					boxWidth={405}
 																				/>
-																				{/* Contact info bar */}
-																				<div
-																					className="absolute left-0 w-full bg-[#FFFFFF]"
-																					style={{ top: '23px', height: '34px' }}
-																				>
-																					<div className="w-full h-full px-[12px] flex items-center justify-between overflow-hidden">
-																						<div className="flex flex-col justify-center min-w-0 flex-1 pr-2">
-																							<div className="font-inter font-bold text-[13px] leading-none truncate text-black">
-																								{(() => {
-																									const fullName = `${
-																										hoveredContact.firstName || ''
-																									} ${
-																										hoveredContact.lastName || ''
-																									}`.trim();
-																									return (
-																										fullName ||
-																										hoveredContact.name ||
-																										hoveredContact.company ||
-																										'Unknown'
-																									);
-																								})()}
-																							</div>
-																							{(() => {
-																								const fullName = `${
-																									hoveredContact.firstName || ''
-																								} ${
-																									hoveredContact.lastName || ''
-																								}`.trim();
-																								const hasName =
-																									fullName.length > 0 ||
-																									(hoveredContact.name &&
-																										hoveredContact.name.length > 0);
-																								if (!hasName || !hoveredContact.company)
-																									return null;
-																								return (
-																									<div className="text-[10px] leading-tight truncate text-black/70 mt-[1px]">
-																										{hoveredContact.company}
-																									</div>
-																								);
-																							})()}
-																						</div>
-																						<div className="flex items-center gap-1 flex-shrink-0">
-																							{(() => {
-																								const stateAbbr =
-																									getStateAbbreviation(
-																										hoveredContact.state || ''
-																									) || '';
-																								if (
-																									stateAbbr &&
-																									stateBadgeColorMap[stateAbbr]
-																								) {
-																									return (
-																										<span
-																											className="inline-flex items-center justify-center h-[15px] px-[5px] rounded-[3px] border border-black text-[10px] font-bold leading-none"
-																											style={{
-																												backgroundColor:
-																													stateBadgeColorMap[stateAbbr],
-																											}}
-																										>
-																											{stateAbbr}
-																										</span>
-																									);
-																								}
-																								return null;
-																							})()}
-																							{(hoveredContact.title ||
-																								hoveredContact.headline) && (
-																								<div className="px-[5px] py-[2px] rounded-[5px] bg-[#E8EFFF] border border-black max-w-[90px] truncate">
-																									<span className="text-[9px] leading-none text-black block truncate">
-																										{hoveredContact.title ||
-																											hoveredContact.headline}
-																									</span>
-																								</div>
-																							)}
-																						</div>
-																					</div>
-																				</div>
-																				<div
-																					className="absolute left-0 w-full bg-black z-10"
-																					style={{ top: '57px', height: '1px' }}
-																				/>
-																				{/* Research result boxes */}
-																				{(() => {
-																					const boxConfigs = [
-																						{ key: '1', color: '#158BCF' },
-																						{ key: '2', color: '#43AEEC' },
-																						{ key: '3', color: '#7CC9F6' },
-																						{ key: '4', color: '#AADAF6' },
-																						{ key: '5', color: '#D7F0FF' },
-																					];
-
-																					const visibleBoxes = boxConfigs.filter(
-																						(config) => metadataSections[config.key]
-																					);
-
-																					return visibleBoxes.map((config, index) => (
-																						<div
-																							key={config.key}
-																							className="absolute"
-																							style={{
-																								top: `${64 + index * 52}px`,
-																								left: '50%',
-																								transform: 'translateX(-50%)',
-																								width: '292px',
-																								height: '44px',
-																								backgroundColor: config.color,
-																								border: '1px solid #000000',
-																								borderRadius: '6px',
-																							}}
-																						>
-																							<div
-																								className="absolute font-inter font-bold"
-																								style={{
-																									top: '4px',
-																									left: '6px',
-																									fontSize: '10px',
-																									color: '#000000',
-																								}}
-																							>
-																								[{config.key}]
-																							</div>
-																							<div
-																								className="absolute overflow-hidden"
-																								style={{
-																									top: '50%',
-																									transform: 'translateY(-50%)',
-																									right: '6px',
-																									width: '262px',
-																									height: '34px',
-																									backgroundColor: '#FFFFFF',
-																									border: '1px solid #000000',
-																									borderRadius: '5px',
-																								}}
-																							>
-																								<div className="w-full h-full px-[6px] flex items-center overflow-hidden">
-																									<div
-																										className="w-full text-[10px] leading-[1.25] text-black font-inter"
-																										style={{
-																											display: '-webkit-box',
-																											WebkitLineClamp: 2,
-																											WebkitBoxOrient: 'vertical',
-																											overflow: 'hidden',
-																										}}
-																									>
-																										{metadataSections[config.key]}
-																									</div>
-																								</div>
-																							</div>
-																						</div>
-																					));
-																				})()}
-																				{/* Summary box at bottom */}
-																				<div
-																					id="map-research-summary-box"
-																					className="absolute"
-																					style={{
-																						bottom: '6px',
-																						left: '50%',
-																						transform: 'translateX(-50%)',
-																						width: '292px',
-																						height: hasAnyParsedSections
-																							? '120px'
-																							: '265px',
-																						backgroundColor: hasAnyParsedSections
-																							? '#E9F7FF'
-																							: '#158BCF',
-																						border: '1px solid #000000',
-																						borderRadius: '6px',
-																					}}
-																				>
-																					<style>{`
-					#map-research-summary-box *::-webkit-scrollbar {
-						display: none !important;
-						width: 0 !important;
-						height: 0 !important;
-						background: transparent !important;
-					}
-					#map-research-summary-box * {
-						scrollbar-width: none !important;
-						-ms-overflow-style: none !important;
-					}
-				`}</style>
-																					<div
-																						className="absolute overflow-hidden"
-																						style={{
-																							top: '50%',
-																							left: '50%',
-																							transform: 'translate(-50%, -50%)',
-																							width: '282px',
-																							height: hasAnyParsedSections
-																								? '110px'
-																								: '255px',
-																							backgroundColor: '#FFFFFF',
-																							border: '1px solid #000000',
-																							borderRadius: '5px',
-																						}}
-																					>
-																						{hoveredContact?.metadata ? (
-																							<div className="w-full h-full p-2 overflow-hidden">
-																								<div
-																									className="text-[11px] leading-[1.4] text-black font-inter font-normal whitespace-pre-wrap overflow-y-scroll h-full"
-																									style={{
-																										wordBreak: 'break-word',
-																									}}
-																								>
-																									{hoveredContact.metadata}
-																								</div>
-																							</div>
-																						) : null}
-																					</div>
-																				</div>
 																			</div>
-																		);
-																	})()}
+																		)}
+																	</div>
+																)}
 																{/* Create Campaign button overlaid on map - only show when not loading */}
 																{/* Hidden below xl (1280px) to prevent overlap with right panel */}
 																{!isMobile &&
