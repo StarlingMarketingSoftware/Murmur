@@ -2783,40 +2783,6 @@ const DashboardContent = () => {
 											{typeof window !== 'undefined' &&
 												createPortal(
 													<>
-														{/* Floating close button (no header band) */}
-														<button
-															type="button"
-															onClick={handleCloseMapView}
-															aria-label="Close map view"
-															style={{
-																position: 'fixed',
-																top: '14px',
-																left: '14px',
-																zIndex: 130,
-																width: '38px',
-																height: '38px',
-																borderRadius: '10px',
-																border: '2px solid #000000',
-																backgroundColor: 'rgba(255,255,255,0.92)',
-																display: 'flex',
-																alignItems: 'center',
-																justifyContent: 'center',
-																cursor: 'pointer',
-																boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
-																backdropFilter: 'blur(6px)',
-															}}
-														>
-															<span
-																style={{
-																	fontSize: '20px',
-																	lineHeight: 1,
-																	fontWeight: 500,
-																	color: '#000000',
-																}}
-															>
-																×
-															</span>
-														</button>
 														{/* Console loader overlay - centered over the map (no blue header strip) */}
 														{(isSearchPending ||
 															isLoadingContacts ||
