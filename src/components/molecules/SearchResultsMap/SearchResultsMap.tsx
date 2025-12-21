@@ -716,8 +716,8 @@ const WHAT_TO_RESULT_DOT_COLOR: Record<string, string> = {
 	[normalizeWhatKey('Festivals')]: '#2D27DC',
 	[normalizeWhatKey('Music Festivals')]: '#2D27DC',
 	[normalizeWhatKey('Restaurants')]: '#1EA300',
-	[normalizeWhatKey('Coffee Shops')]: '#AAD402',
-	[normalizeWhatKey('Wedding Planners')]: '#EFB121',
+	[normalizeWhatKey('Coffee Shops')]: '#8BD003',
+	[normalizeWhatKey('Wedding Planners')]: '#D6990A',
 	[normalizeWhatKey('Wine Beer and spirits')]: '#981AEC',
 	[normalizeWhatKey('Wine, Beer, and Spirits')]: '#981AEC',
 	[normalizeWhatKey('Wine, Beer, Spirits')]: '#981AEC',
@@ -2048,9 +2048,16 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 								}`.trim();
 								const nameForTooltip = fullName || contact.name || '';
 								const companyForTooltip = contact.company || '';
+								const tooltipFillColor = isOutsideLockedState
+									? outsideDefaultDotFillColor
+									: defaultDotFillColor;
 								const width = calculateTooltipWidth(nameForTooltip, companyForTooltip);
 								return {
-									url: generateMapTooltipIconUrl(nameForTooltip, companyForTooltip),
+									url: generateMapTooltipIconUrl(
+										nameForTooltip,
+										companyForTooltip,
+										tooltipFillColor
+									),
 									width,
 									height: MAP_TOOLTIP_HEIGHT,
 								};

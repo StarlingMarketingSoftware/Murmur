@@ -1,5 +1,16 @@
+const DEFAULT_TOOLTIP_FILL_COLOR = '#0E8530';
+
+const isValidHexColor = (value: string): boolean => {
+	const trimmed = value.trim();
+	return /^#[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$/.test(trimmed);
+};
+
 // Generates a map marker hover tooltip SVG with contact name and company
-export const generateMapTooltipSvg = (name: string, company: string): string => {
+export const generateMapTooltipSvg = (
+	name: string,
+	company: string,
+	fillColor: string = DEFAULT_TOOLTIP_FILL_COLOR
+): string => {
 	// Escape special characters for SVG/XML
 	const escapeSvgText = (text: string) =>
 		text
@@ -8,6 +19,9 @@ export const generateMapTooltipSvg = (name: string, company: string): string => 
 			.replace(/>/g, '&gt;')
 			.replace(/"/g, '&quot;')
 			.replace(/'/g, '&apos;');
+
+	const safeFillColor = isValidHexColor(fillColor) ? fillColor.trim() : DEFAULT_TOOLTIP_FILL_COLOR;
+	const textFill = 'white';
 
 	const hasName = name && name.trim().length > 0;
 	const hasCompany = company && company.trim().length > 0;
@@ -35,15 +49,21 @@ export const generateMapTooltipSvg = (name: string, company: string): string => 
 	const offsetY = strokePadding;
 
 	return `<svg width="${svgWidth}" height="${svgHeight}" viewBox="0 0 ${svgWidth} ${svgHeight}" fill="none" xmlns="http://www.w3.org/2000/svg">
-<path d="M${innerWidth - 8 + offsetX} ${offsetY}C${innerWidth - 3.582 + offsetX} ${offsetY} ${innerWidth + offsetX} ${3.58172 + offsetY} ${innerWidth + offsetX} ${8 + offsetY}V${38 + offsetY}C${innerWidth + offsetX} ${42.4183 + offsetY} ${innerWidth - 3.582 + offsetX} ${46 + offsetY} ${innerWidth - 8 + offsetX} ${46 + offsetY}H${35.4326 + offsetX}L${23.5 + offsetX} ${56 + offsetY}L${11.5674 + offsetX} ${46 + offsetY}H${8 + offsetX}C${3.58172 + offsetX} ${46 + offsetY} ${offsetX} ${42.4183 + offsetY} ${offsetX} ${38 + offsetY}V${8 + offsetY}C${offsetX} ${3.58172 + offsetY} ${3.58172 + offsetX} ${offsetY} ${8 + offsetX} ${offsetY}H${innerWidth - 8 + offsetX}Z" fill="#0E8530" stroke="black" stroke-width="2"/>
-<text x="${18 + offsetX}" y="${primaryY + offsetY}" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="white">${primaryText}</text>
-${secondaryText ? `<text x="${18 + offsetX}" y="${36 + offsetY}" font-family="Arial, sans-serif" font-size="13" fill="white">${secondaryText}</text>` : ''}
+<path d="M${innerWidth - 8 + offsetX} ${offsetY}C${innerWidth - 3.582 + offsetX} ${offsetY} ${innerWidth + offsetX} ${3.58172 + offsetY} ${innerWidth + offsetX} ${8 + offsetY}V${38 + offsetY}C${innerWidth + offsetX} ${42.4183 + offsetY} ${innerWidth - 3.582 + offsetX} ${46 + offsetY} ${innerWidth - 8 + offsetX} ${46 + offsetY}H${35.4326 + offsetX}L${23.5 + offsetX} ${56 + offsetY}L${11.5674 + offsetX} ${46 + offsetY}H${8 + offsetX}C${3.58172 + offsetX} ${46 + offsetY} ${offsetX} ${42.4183 + offsetY} ${offsetX} ${38 + offsetY}V${8 + offsetY}C${offsetX} ${3.58172 + offsetY} ${3.58172 + offsetX} ${offsetY} ${8 + offsetX} ${offsetY}H${innerWidth - 8 + offsetX}Z" fill="${safeFillColor}" stroke="black" stroke-width="2"/>
+<text x="${18 + offsetX}" y="${primaryY + offsetY}" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="${textFill}">${primaryText}</text>
+${secondaryText ? `<text x="${18 + offsetX}" y="${36 + offsetY}" font-family="Arial, sans-serif" font-size="13" fill="${textFill}">${secondaryText}</text>` : ''}
 </svg>`;
 };
 
 // Generate data URL for use in Google Maps markers
-export const generateMapTooltipIconUrl = (name: string, company: string): string => {
-	return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(generateMapTooltipSvg(name, company))}`;
+export const generateMapTooltipIconUrl = (
+	name: string,
+	company: string,
+	fillColor?: string
+): string => {
+	return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(
+		generateMapTooltipSvg(name, company, fillColor ?? DEFAULT_TOOLTIP_FILL_COLOR)
+	)}`;
 };
 
 // Stroke padding added to SVG dimensions
