@@ -644,7 +644,7 @@ const defaultCenter = {
 	lng: -98.5795,
 };
 
-const MAP_MIN_ZOOM = 4;
+const MAP_MIN_ZOOM = 5;
 
 const mapOptions: google.maps.MapOptions = {
 	disableDefaultUI: true,

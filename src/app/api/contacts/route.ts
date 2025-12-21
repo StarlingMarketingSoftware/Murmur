@@ -87,6 +87,253 @@ const filterContactsByTitlePrefix = <T extends { title?: string | null }>(
 const normalizeSearchText = (value: string | null | undefined): string =>
 	(value ?? '').toLowerCase().replace(/\s+/g, ' ').trim();
 
+// Coffee-shop search refinements:
+// - Filter out obvious non-coffee businesses that match "coffee" loosely (e.g., "Coffee Marketing Agency")
+// - Demote marketing-oriented roles so "Coffee Shops" searches skew toward operators/owners
+const queryMentionsCoffeeTerms = (rawQuery: string | null | undefined): boolean => {
+	const q = normalizeSearchText(rawQuery);
+	if (!q) return false;
+	// Prefer simple containment (robust to punctuation and unicode), and keep it conservative.
+	if (q.includes('coffee')) return true;
+	if (q.includes('café')) return true;
+	if (q.includes('espresso')) return true;
+	if (q.includes('roaster') || q.includes('roastery')) return true;
+	// "cafe" but avoid matching inside unrelated words like "cafeteria"
+	if (/(^|[^a-z])cafe(s)?([^a-z]|$)/.test(q)) return true;
+	return false;
+};
+
+const COFFEE_MARKETING_INTENT_TERMS = [
+	'marketing',
+	'advertising',
+	'brand',
+	'branding',
+	'communications',
+	'public relations',
+	'social media',
+	'content',
+	'seo',
+	'sem',
+] as const;
+
+const coffeeQueryWantsMarketing = (rawQuery: string | null | undefined): boolean => {
+	const q = normalizeSearchText(rawQuery);
+	if (!q) return false;
+	return COFFEE_MARKETING_INTENT_TERMS.some((t) => q.includes(t));
+};
+
+const contactHasStrongCoffeeBusinessSignals = (contact: Contact): boolean => {
+	const company = normalizeSearchText(contact.company);
+	const title = normalizeSearchText(contact.title);
+	const headline = normalizeSearchText(contact.headline);
+	const industry = normalizeSearchText(contact.companyIndustry);
+	const website = normalizeSearchText(contact.website);
+	const metadata = normalizeSearchText(contact.metadata);
+	const keywordBlob = (contact.companyKeywords ?? [])
+		.map((k) => normalizeSearchText(k))
+		.filter(Boolean)
+		.join(' ');
+
+	// IMPORTANT: titles like "Coffee Shops <State>" are list labels in this dataset and can be wrong.
+	// For "is this really a coffee business?" checks, we avoid letting that list-label title alone
+	// count as a strong coffee signal (otherwise a mislabeled radio station slips through).
+	const titleIsCoffeeShopsList = /^coffee shops?\b/.test(title);
+
+	const otherBlob = `${company} ${industry} ${website} ${metadata} ${keywordBlob}`.trim();
+	const titleHeadline = `${title} ${headline}`.trim();
+	if (!otherBlob && !titleHeadline) return false;
+
+	// Strong, coffee-specific terms (prefer non-title fields first)
+	const hasStrongCoffeeInOtherFields =
+		/\bcoffee\s*shop(s)?\b/.test(otherBlob) ||
+		/(^|[^a-z])cafe(s)?([^a-z]|$)/.test(otherBlob) ||
+		otherBlob.includes('café') ||
+		/\bespresso\b/.test(otherBlob) ||
+		/\broaster(y)?\b/.test(otherBlob) ||
+		/\bbarista\b/.test(otherBlob) ||
+		/\bcoffee\s*house(s)?\b/.test(otherBlob) ||
+		/\bcoffeehouse(s)?\b/.test(otherBlob);
+	if (hasStrongCoffeeInOtherFields) return true;
+
+	// Allow operational coffee signals in titles/headlines, but NOT the generic list-label
+	// "Coffee Shops <State>".
+	if (!titleIsCoffeeShopsList) {
+		const hasOperationalCoffeeInTitleHeadline =
+			/(^|[^a-z])cafe(s)?([^a-z]|$)/.test(titleHeadline) ||
+			titleHeadline.includes('café') ||
+			/\bbarista\b/.test(titleHeadline) ||
+			/\bespresso\b/.test(titleHeadline) ||
+			/\broaster(y)?\b/.test(titleHeadline) ||
+			/\bcoffee\s*house(s)?\b/.test(titleHeadline) ||
+			/\bcoffeehouse(s)?\b/.test(titleHeadline) ||
+			// "coffee shop manager" etc (singular) should count; plural list labels are handled above.
+			/\bcoffee\s*shop\b/.test(titleHeadline);
+		if (hasOperationalCoffeeInTitleHeadline) return true;
+	}
+
+	// Softer: company mentions coffee + other hospitality/coffee-adjacent context
+	const companyMentionsCoffee = /\bcoffee\b/.test(company) || company.includes('café');
+	if (!companyMentionsCoffee) return false;
+
+	const hospitalityContext = `${company} ${industry} ${keywordBlob} ${metadata} ${website}`.trim();
+	if (/\b(hospitality|restaurant|food|food service|food & beverage)\b/.test(hospitalityContext))
+		return true;
+	if (/\b(menu|order|pickup|takeout|delivery)\b/.test(hospitalityContext)) return true;
+	if (/\b(beer|bar|bakery|brunch|breakfast|tea)\b/.test(company)) return true;
+
+	return false;
+};
+
+const contactLooksLikeRadioStation = (contact: Contact): boolean => {
+	const company = normalizeSearchText(contact.company);
+	const title = normalizeSearchText(contact.title);
+	const headline = normalizeSearchText(contact.headline);
+	const industry = normalizeSearchText(contact.companyIndustry);
+	const website = normalizeSearchText(contact.website);
+	const metadata = normalizeSearchText(contact.metadata);
+	const keywordBlob = (contact.companyKeywords ?? [])
+		.map((k) => normalizeSearchText(k))
+		.filter(Boolean)
+		.join(' ');
+	const blob = `${company} ${title} ${headline} ${industry} ${website} ${metadata} ${keywordBlob}`.trim();
+	if (!blob) return false;
+
+	// Explicit radio-station language (covers "College Radio New York")
+	const hasRadioWords =
+		/\b(college\s+radio|public\s+radio|community\s+radio|radio\s+station|radio|broadcast|broadcasting)\b/.test(
+			blob
+		) ||
+		// "FM" appears commonly in call signs, and is rare for coffee shops.
+		/(^|[^a-z])f\.?m\.?([^a-z]|$)/.test(blob) ||
+		// Industry signal from Apollo/ES
+		/\b(broadcast\s+media|radio)\b/.test(industry) ||
+		// Network signal
+		/\bnpr\b/.test(blob);
+
+	// US call-sign pattern (e.g., WEOS, WVCR-FM)
+	const rawCompanyTitle = `${contact.company ?? ''} ${contact.title ?? ''}`.trim();
+	const rawCompanyTitleUc = rawCompanyTitle.toUpperCase();
+	const hasUsCallSign = /\b[WK][A-Z]{2,3}(-FM|-AM)?\b/.test(rawCompanyTitleUc);
+
+	return hasRadioWords || hasUsCallSign;
+};
+
+const contactLooksLikeCoffeeMarketingRole = (contact: Contact): boolean => {
+	const title = normalizeSearchText(contact.title);
+	const headline = normalizeSearchText(contact.headline);
+	const blob = `${title} ${headline}`.trim();
+	if (!blob) return false;
+	return COFFEE_MARKETING_INTENT_TERMS.some((t) => blob.includes(t));
+};
+
+const contactLooksLikeNonCoffeeBusinessForCoffeeSearch = (
+	contact: Contact,
+	allowMarketing: boolean
+): boolean => {
+	const title = normalizeSearchText(contact.title);
+	const headline = normalizeSearchText(contact.headline);
+	const industry = normalizeSearchText(contact.companyIndustry);
+	const company = normalizeSearchText(contact.company);
+
+	// Exclude radio stations from coffee searches (unless there are strong coffee-business signals).
+	// This removes "College Radio <State>" lists and call-sign entries like "WVCR-FM".
+	if (contactLooksLikeRadioStation(contact) && !contactHasStrongCoffeeBusinessSignals(contact)) {
+		return true;
+	}
+
+	// "Jazz Cafe" is a music venue term, not a coffee shop
+	const blob = `${title} ${company} ${headline} ${industry}`.trim();
+	if (/\bjazz cafe\b/i.test(blob)) return true;
+
+	// If the title explicitly mentions coffee shop terms, it's likely a coffee business
+	if (
+		/\bcoffee\s*shop/i.test(title) ||
+		/\bcafe\b/i.test(title) ||
+		title.includes('café') ||
+		/\bbarista\b/i.test(title) ||
+		/\bcoffee\s*house/i.test(title) ||
+		/\bcoffeehouse\b/i.test(title)
+	) {
+		return false;
+	}
+
+	// Exception for role-based negatives: if the company name clearly indicates a cafe/coffee shop,
+	// don't exclude it outright (we'll demote marketing roles later).
+	const companyLooksLikeCafeOrCoffeeShop =
+		/\bcoffee\s*shop(s)?\b/i.test(company) ||
+		/(^|[^a-z])cafe(s)?([^a-z]|$)/i.test(company) ||
+		company.includes('café') ||
+		/\bcoffee\s*house(s)?\b/i.test(company) ||
+		/\bcoffeehouse(s)?\b/i.test(company);
+
+	// Titles/industries/company terms that indicate the contact is NOT a coffee shop
+	// even if "coffee" appears somewhere in the record.
+	const NON_COFFEE_CONTEXT_TERMS: string[] = [
+		// Marketing/agency noise (most common for false positives)
+		'marketing',
+		'advertising',
+		'agency',
+		'digital innovation',
+		// Corporate/tech noise
+		'materials manager',
+		'senior director',
+		'software engineer',
+		'developer',
+		'consultant',
+		'account executive',
+		'sales manager',
+		'project manager',
+		'product manager',
+		'data analyst',
+		'financial',
+		'accountant',
+		'attorney',
+		'lawyer',
+		'legal',
+		'insurance',
+		'real estate',
+		'recruiting',
+		'hr manager',
+		'human resources',
+		'tech',
+		'technology',
+		'it manager',
+		// Entertainment venue noise (e.g., movie theaters)
+		'theater',
+		'theatre',
+		'cinema',
+		'movie',
+		'film',
+		'box office',
+		'screening',
+	];
+
+	const contextBlob = `${title} ${headline} ${industry} ${company}`.trim();
+	for (const term of NON_COFFEE_CONTEXT_TERMS) {
+		// If the query explicitly asks for marketing, don't treat marketing terms as disqualifying.
+		if (allowMarketing && COFFEE_MARKETING_INTENT_TERMS.includes(term as any)) continue;
+		if (contextBlob.includes(term)) {
+			// Allow obvious cafes/coffee shops through; role demotion will handle ordering.
+			if (companyLooksLikeCafeOrCoffeeShop) return false;
+			return true;
+		}
+	}
+
+	// If the industry is clearly coffee/restaurant/food service/hospitality, it's likely a coffee business.
+	// NOTE: This check runs AFTER the non-coffee term screen so "Director of Marketing" doesn't slip
+	// through just because the industry is "hospitality".
+	if (
+		/\bcoffee\b/i.test(industry) ||
+		/\bfood\s*(service|&\s*beverage)/i.test(industry) ||
+		/\brestaurant/i.test(industry) ||
+		/\bhospitality/i.test(industry)
+	) {
+		return false;
+	}
+
+	return false;
+};
+
 // Heuristic: used to de-prioritize obvious universities/colleges in "Music Venues" searches.
 const contactLooksLikeHigherEducation = (contact: Contact): boolean => {
 	const company = normalizeSearchText(contact.company);
@@ -160,7 +407,8 @@ const contactMusicVenueRelevanceScore = (contact: Contact): number => {
 	else if (hasSoftEventSpaceTerms) score += 4;
 
 	// Avoid generic "club" to prevent false positives like "wine club", "golf club", etc.
-	const hasClubTerms = /\b(night ?club|jazz club|music club)\b/.test(blob);
+	// "jazz cafe" is a music venue, not a coffee shop.
+	const hasClubTerms = /\b(night ?club|jazz club|music club|jazz cafe)\b/.test(blob);
 	if (hasClubTerms) score += 6;
 
 	// Hospitality terms that often indicate "not a dedicated music venue".
@@ -231,7 +479,8 @@ const contactLooksLikeHospitalityOnlyForMusicVenueSearch = (contact: Contact): b
 			blob
 		);
 	// Avoid generic "club" to prevent false positives like "wine club", "golf club", etc.
-	const hasClubTerms = /\b(night ?club|jazz club|music club)\b/.test(blob);
+	// "jazz cafe" is a music venue, not a coffee shop.
+	const hasClubTerms = /\b(night ?club|jazz club|music club|jazz cafe)\b/.test(blob);
 
 	const hasBarTerms =
 		/\b(bars?|pubs?|taverns?|saloons?|lounges?|cocktails?|speakeas(?:y|ies)|cantinas?)\b/.test(
@@ -245,7 +494,10 @@ const contactLooksLikeHospitalityOnlyForMusicVenueSearch = (contact: Contact): b
 		/\b(wineries?|vineyards?|vintners?|wine ?bars?|wine tasting|tasting rooms?|wine (?:cellar|cellars))\b/.test(
 			blob
 		);
+	// Exclude "jazz cafe" from cafe terms - it's a music venue, not a coffee shop
+	const hasJazzCafe = /\bjazz cafe\b/.test(blob);
 	const hasCafeTerms =
+		!hasJazzCafe &&
 		/\b(cafe|cafes|café|cafés|coffee|coffee ?houses?|espresso|roastery|roasteries|tea ?houses?)\b/.test(
 			blob
 		);
@@ -2013,6 +2265,7 @@ export async function GET(req: NextRequest) {
 					Math.min(limit ?? VECTOR_SEARCH_LIMIT_DEFAULT, 500)
 				);
 				const fetchTake = Math.min(finalLimit * 6, 800);
+				const allowMarketing = coffeeQueryWantsMarketing(rawQueryForParsing);
 
 				const baseWhere: Prisma.ContactWhereInput = {
 					id: addedContactIds.length > 0 ? { notIn: addedContactIds } : undefined,
@@ -2315,7 +2568,13 @@ export async function GET(req: NextRequest) {
 						: null;
 					const targetCityLc = normalizeSearchText(forceCityExactCity || queryJson.city || '');
 
-					const scored = candidates.map((c) => {
+					// Filter out contacts that look like non-coffee businesses
+					// (e.g., marketing agencies, tech companies with "coffee" in name)
+					const filteredCandidates = candidates.filter(
+						(c) => !contactLooksLikeNonCoffeeBusinessForCoffeeSearch(c, allowMarketing)
+					);
+
+					const scored = filteredCandidates.map((c) => {
 						const titleCanon = titleStateCanonical(c.title);
 						const stateAbbrForDistance =
 							normalizeStateAbbrFromValue(c.state) ||
@@ -2332,6 +2591,8 @@ export async function GET(req: NextRequest) {
 							distance,
 							cityMatch,
 							coffeeTitleScore: scoreCoffeeTitle(c.title),
+							marketingPenalty:
+								!allowMarketing && contactLooksLikeCoffeeMarketingRole(c) ? 1 : 0,
 						};
 					});
 
@@ -2344,6 +2605,10 @@ export async function GET(req: NextRequest) {
 						}
 						// Prefer exact city matches (if applicable)
 						if (a.cityMatch !== b.cityMatch) return a.cityMatch ? -1 : 1;
+						// Demote marketing-oriented roles for coffee searches
+						if (a.marketingPenalty !== b.marketingPenalty) {
+							return a.marketingPenalty - b.marketingPenalty;
+						}
 						// Stable-ish fallback
 						return (a.contact.company || '').localeCompare(b.contact.company || '');
 					});
@@ -3651,7 +3916,7 @@ export async function GET(req: NextRequest) {
 						userContactListCount: 0,
 						manualDeselections: 0,
 						lastResearchedDate: null,
-						emailValidationStatus: 'valid',
+						emailValidationStatus: EmailVerificationStatus.valid,
 						emailValidationSubStatus: null,
 						emailValidatedAt: null,
 						createdAt: new Date().toISOString() as unknown as Date,
@@ -3826,8 +4091,22 @@ export async function GET(req: NextRequest) {
 				contacts = filterContactsByTitlePrefix(contacts, bookingTitlePrefix);
 			}
 
+			const coffeeRefineActive = queryMentionsCoffeeTerms(rawQueryForParsing);
+			const coffeeAllowMarketing = coffeeRefineActive
+				? coffeeQueryWantsMarketing(rawQueryForParsing)
+				: false;
+
+			// Coffee Shops refinement for vector results: remove obvious non-coffee hits (e.g., theaters, agencies)
+			// and push marketing roles down without disturbing state-distance ordering too much.
+			if (coffeeRefineActive && contacts.length > 0) {
+				contacts = contacts.filter(
+					(c) => !contactLooksLikeNonCoffeeBusinessForCoffeeSearch(c, coffeeAllowMarketing)
+				);
+			}
+
 			// If a state is present and we're returning the full 500-result list,
 			// keep in-state results first, then nearby states, then farther ones.
+			let didStateDistanceSort = false;
 			if (contacts.length > 1 && requestedLimit >= 500) {
 				const targetStateAbbr =
 					normalizeStateAbbrFromValue(queryJson.state) ||
@@ -3835,6 +4114,7 @@ export async function GET(req: NextRequest) {
 						? normalizeStateAbbrFromValue(forceStateAny[0])
 						: null);
 				if (targetStateAbbr) {
+					didStateDistanceSort = true;
 					const distanceMap = buildStateDistanceMap(targetStateAbbr);
 					const targetCityLc = (forceCityExactCity || queryJson.city || '')
 						.trim()
@@ -3852,7 +4132,14 @@ export async function GET(req: NextRequest) {
 									: targetCityLc.length > 0
 									? 1
 									: 0;
-							const rank = esRankByContactId.get(c.id) ?? idx;
+							const baseRank = esRankByContactId.get(c.id) ?? idx;
+							const marketingPenalty =
+								coffeeRefineActive &&
+								!coffeeAllowMarketing &&
+								contactLooksLikeCoffeeMarketingRole(c)
+									? 1_000_000
+									: 0;
+							const rank = baseRank + marketingPenalty;
 							return { c, distance, cityTier, rank, idx };
 						})
 						.sort((a, b) => {
@@ -3863,6 +4150,17 @@ export async function GET(req: NextRequest) {
 						})
 						.map((x) => x.c);
 				}
+			}
+
+			// If we did NOT apply the distance sort, we can safely demote marketing roles
+			// by stable partition while preserving ES relevance order.
+			if (coffeeRefineActive && !coffeeAllowMarketing && contacts.length > 1 && !didStateDistanceSort) {
+				const nonMarketing = contacts.filter((c) => !contactLooksLikeCoffeeMarketingRole(c));
+				const marketing = contacts.filter((c) => contactLooksLikeCoffeeMarketingRole(c));
+				contacts =
+					nonMarketing.length >= requestedLimit
+						? nonMarketing
+						: [...nonMarketing, ...marketing];
 			}
 
 			// Fallback: if local Postgres doesn't have these contacts, return minimal data from Elasticsearch directly
@@ -3924,7 +4222,7 @@ export async function GET(req: NextRequest) {
 						userContactListCount: 0,
 						manualDeselections: 0,
 						lastResearchedDate: null,
-						emailValidationStatus: 'valid',
+						emailValidationStatus: EmailVerificationStatus.valid,
 						emailValidationSubStatus: null,
 						emailValidatedAt: null,
 						createdAt: new Date().toISOString() as unknown as Date,
@@ -3938,7 +4236,27 @@ export async function GET(req: NextRequest) {
 					? filterContactsByTitlePrefix(fallbackContacts, bookingTitlePrefix)
 					: fallbackContacts;
 
-				return apiResponse(filteredFallbackContacts.slice(0, requestedLimit));
+				let refinedFallback = filteredFallbackContacts;
+				if (queryMentionsCoffeeTerms(rawQueryForParsing) && refinedFallback.length > 0) {
+					const allowMarketing = coffeeQueryWantsMarketing(rawQueryForParsing);
+					refinedFallback = refinedFallback.filter(
+						(c) => !contactLooksLikeNonCoffeeBusinessForCoffeeSearch(c, allowMarketing)
+					);
+					if (!allowMarketing && refinedFallback.length > 1) {
+						const nonMarketing = refinedFallback.filter(
+							(c) => !contactLooksLikeCoffeeMarketingRole(c)
+						);
+						const marketing = refinedFallback.filter((c) =>
+							contactLooksLikeCoffeeMarketingRole(c)
+						);
+						refinedFallback =
+							nonMarketing.length >= requestedLimit
+								? nonMarketing
+								: [...nonMarketing, ...marketing];
+					}
+				}
+
+				return apiResponse(refinedFallback.slice(0, requestedLimit));
 			}
 
 			return apiResponse(contacts.slice(0, requestedLimit));
