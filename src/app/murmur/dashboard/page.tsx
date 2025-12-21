@@ -29,7 +29,6 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormField, FormItem, FormLabel } from '@/components/ui/form';
 import CustomTable from '@/components/molecules/CustomTable/CustomTable';
-import ConsoleLoader from '@/components/atoms/ConsoleLoader/ConsoleLoader';
 import { Card, CardContent } from '@/components/ui/card';
 
 import { useClerk } from '@clerk/nextjs';
@@ -2783,31 +2782,6 @@ const DashboardContent = () => {
 											{typeof window !== 'undefined' &&
 												createPortal(
 													<>
-														{/* Console loader overlay - centered over the map (no blue header strip) */}
-														{(isSearchPending ||
-															isLoadingContacts ||
-															isRefetchingContacts) && (
-															<div
-																style={{
-																	position: 'fixed',
-																	top: '64px',
-																	left: '50%',
-																	transform: 'translateX(-50%)',
-																	width: 'min(800px, calc(100vw - 24px))',
-																	zIndex: 125,
-																	display: 'flex',
-																	alignItems: 'center',
-																	justifyContent: 'center',
-																	overflow: 'hidden',
-																	pointerEvents: 'none',
-																}}
-															>
-																<ConsoleLoader
-																	searchQuery={activeSearchQuery}
-																	className="w-full max-w-[800px] scale-[0.65] origin-center"
-																/>
-															</div>
-														)}
 													{/* Map container */}
 													<div
 														style={{

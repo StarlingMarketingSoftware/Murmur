@@ -637,6 +637,10 @@ const defaultCenter = {
 	lng: -98.5795,
 };
 
+// Prevent zooming out beyond roughly a "full US" view.
+// (Zoom 3 is country-level; zoom 2 starts showing most of North America.)
+const MAP_MIN_ZOOM = 4;
+
 const mapOptions: google.maps.MapOptions = {
 	disableDefaultUI: true,
 	zoomControl: false,
@@ -644,6 +648,7 @@ const mapOptions: google.maps.MapOptions = {
 	mapTypeControl: false,
 	fullscreenControl: false,
 	gestureHandling: 'greedy',
+	minZoom: MAP_MIN_ZOOM,
 	styles: [
 		// Hide Google's default state/province border lines so our custom outline is the only
 		// prominent border. (When state interactions are enabled, we draw borders via GeoJSON.)
