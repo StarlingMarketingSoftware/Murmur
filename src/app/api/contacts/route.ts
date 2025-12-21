@@ -1784,7 +1784,7 @@ export async function GET(req: NextRequest) {
 						})),
 					});
 				}
-
+				
 				const results = await prisma.contact.findMany({
 					where: {
 						AND: [
@@ -1797,7 +1797,7 @@ export async function GET(req: NextRequest) {
 					orderBy: [{ state: 'asc' }, { city: 'asc' }, { company: 'asc' }],
 					take: fetchTake,
 				});
-
+				
 				// If not enough exact "Restaurants" prefix matches, try broader title-based fallbacks
 				if (results.length < finalLimit) {
 					const filler = await prisma.contact.findMany({
@@ -1860,6 +1860,90 @@ export async function GET(req: NextRequest) {
 					}
 				}
 
+				// Helper to check if a contact looks like a non-restaurant (tech, university, executive at non-food company)
+				const contactLooksLikeNonRestaurant = (contact: Contact): boolean => {
+					const company = (contact.company || '').toLowerCase();
+					const title = (contact.title || '').toLowerCase();
+					const headline = (contact.headline || '').toLowerCase();
+					const industry = (contact.companyIndustry || '').toLowerCase();
+
+					// Exclude universities/colleges (unless they have a restaurant-specific title)
+					const universityPattern = /\b(university|college|school|academy|institute)\b/i;
+					if (universityPattern.test(company)) {
+						// Allow if title clearly indicates restaurant role
+						if (!/\b(chef|cook|restaurant|dining|food service|catering)\b/i.test(title)) {
+							return true;
+						}
+					}
+
+					// Exclude tech/executive roles at non-food companies
+					const techExecutiveRoles = /\b(cto|ceo|cfo|coo|cmo|vp|vice president|director|founder|co-founder|engineer|developer|software|product manager|data scientist)\b/i;
+					if (techExecutiveRoles.test(title) || techExecutiveRoles.test(headline)) {
+						// Only exclude if company doesn't look like a restaurant
+						const restaurantCompanyPattern = /\b(restaurant|grill|bistro|kitchen|eatery|diner|pizzeria|steakhouse|tavern|trattoria|dining|food|catering)\b/i;
+						if (!restaurantCompanyPattern.test(company) && !restaurantCompanyPattern.test(industry)) {
+							return true;
+						}
+					}
+
+					// Exclude obvious tech/media companies
+					const nonRestaurantCompany = /\b(software|tech|technology|media|marketing|agency|consulting|solutions|platform|app|digital|analytics)\b/i;
+					if (nonRestaurantCompany.test(company) && !/\b(restaurant|food|dining)\b/i.test(company)) {
+						return true;
+					}
+
+					return false;
+				};
+
+				// Before going to nearby states, try to find more restaurant-related contacts in the target state
+				// by checking companyIndustry, companyKeywords, and other fields
+				if (results.length < finalLimit) {
+					const seen = new Set(results.map((c) => c.id));
+					const restaurantIndustryFiller = await prisma.contact.findMany({
+						where: {
+							AND: [
+								baseWhere,
+								...stateStrictAnd,
+								...cityStrictAnd,
+								{ id: { notIn: Array.from(seen) } },
+								{
+									OR: [
+										// Industry-based matches
+										{ companyIndustry: { contains: 'restaurant', mode: 'insensitive' } },
+										{ companyIndustry: { contains: 'food service', mode: 'insensitive' } },
+										{ companyIndustry: { contains: 'food & beverage', mode: 'insensitive' } },
+										{ companyIndustry: { contains: 'hospitality', mode: 'insensitive' } },
+										{ companyIndustry: { contains: 'dining', mode: 'insensitive' } },
+										// Company name patterns
+										{ company: { contains: 'restaurant', mode: 'insensitive' } },
+										{ company: { contains: 'grill', mode: 'insensitive' } },
+										{ company: { contains: 'bistro', mode: 'insensitive' } },
+										{ company: { contains: 'kitchen', mode: 'insensitive' } },
+										{ company: { contains: 'eatery', mode: 'insensitive' } },
+										{ company: { contains: 'diner', mode: 'insensitive' } },
+										{ company: { contains: 'pizzeria', mode: 'insensitive' } },
+										{ company: { contains: 'steakhouse', mode: 'insensitive' } },
+										{ company: { contains: 'cafe', mode: 'insensitive' } },
+										{ company: { contains: 'tavern', mode: 'insensitive' } },
+										{ company: { contains: 'trattoria', mode: 'insensitive' } },
+									],
+								},
+							],
+						},
+						orderBy: [{ state: 'asc' }, { city: 'asc' }, { company: 'asc' }],
+						take: (finalLimit - results.length) * 2, // Fetch extra to account for filtering
+					});
+					
+					for (const c of restaurantIndustryFiller) {
+						if (seen.has(c.id)) continue;
+						if (contactLooksLikeNonRestaurant(c)) continue; // Filter out non-restaurants
+						results.push(c);
+						seen.add(c.id);
+						if (results.length >= finalLimit) break;
+					}
+					
+				}
+
 				// If we're still under the requested limit and we have a target state, pad with nearby
 				// states (same strategy as radio station proximity filling).
 				if (results.length < finalLimit) {
@@ -1873,6 +1957,8 @@ export async function GET(req: NextRequest) {
 						const addUnique = (items: typeof results) => {
 							for (const c of items) {
 								if (seen.has(c.id)) continue;
+								// Filter out non-restaurant contacts
+								if (contactLooksLikeNonRestaurant(c)) continue;
 								results.push(c);
 								seen.add(c.id);
 								if (results.length >= finalLimit) break;
@@ -2247,6 +2333,40 @@ export async function GET(req: NextRequest) {
 						const bStateTitle = isStateLabelAfterPrefix(b.title);
 						if (aStateTitle && !bStateTitle) return -1;
 						if (!aStateTitle && bStateTitle) return 1;
+
+						// 6) Demote cafe matches - cafes are more coffee-focused than restaurant-focused
+						const cafePattern = /(^|[^a-z])caf[eé]($|[^a-z])/i;
+						const aIsCafe =
+							cafePattern.test(a.company || '') ||
+							cafePattern.test(a.title || '');
+						const bIsCafe =
+							cafePattern.test(b.company || '') ||
+							cafePattern.test(b.title || '');
+						if (!aIsCafe && bIsCafe) return -1;
+						if (aIsCafe && !bIsCafe) return 1;
+
+						// 7) Demote hotel matches - hotels are lodging-focused, not restaurant-focused
+						const hotelPattern = /\b(hotel|motel|inn|lodge|resort|suites)\b/i;
+						const aIsHotel =
+							hotelPattern.test(a.company || '') ||
+							hotelPattern.test(a.title || '');
+						const bIsHotel =
+							hotelPattern.test(b.company || '') ||
+							hotelPattern.test(b.title || '');
+						if (!aIsHotel && bIsHotel) return -1;
+						if (aIsHotel && !bIsHotel) return 1;
+
+						// 8) Demote music venue matches - these belong in music venue searches
+						const musicVenuePattern = /\b(music hall|concert hall|amphitheat(?:er|re)|arena|pavilion|auditorium|theat(?:er|re)|performing arts|coliseum|stadium|opera|symphony|night ?club|jazz club|live music|music venue)\b/i;
+						const aIsMusicVenue =
+							musicVenuePattern.test(a.company || '') ||
+							musicVenuePattern.test(a.title || '');
+						const bIsMusicVenue =
+							musicVenuePattern.test(b.company || '') ||
+							musicVenuePattern.test(b.title || '');
+						if (!aIsMusicVenue && bIsMusicVenue) return -1;
+						if (aIsMusicVenue && !bIsMusicVenue) return 1;
+
 						return 0;
 					});
 
@@ -3109,7 +3229,7 @@ export async function GET(req: NextRequest) {
 					state: { equals: queryJson.state, mode: 'insensitive' },
 				});
 			}
-
+			
 			// Strict city matching when present
 			const cityStrictAnd: Prisma.ContactWhereInput[] = [];
 			if (forceCityExactCity) {
@@ -3157,7 +3277,7 @@ export async function GET(req: NextRequest) {
 				orderBy: [{ state: 'asc' }, { city: 'asc' }, { company: 'asc' }],
 				take: finalLimit,
 			});
-
+			
 			// Optional: if under limit, allow contains-based fill (still title-focused)
 			const results = primary;
 			if (results.length < finalLimit) {
@@ -3189,7 +3309,7 @@ export async function GET(req: NextRequest) {
 			const filteredResults = shouldFilterBookingTitles
 				? filterContactsByTitlePrefix(results, bookingTitlePrefix)
 				: results;
-
+			
 			// Reorder to put exact city matches first when a target city is known
 			const targetCityLc = (forceCityExactCity || queryJson.city || '')
 				.trim()
