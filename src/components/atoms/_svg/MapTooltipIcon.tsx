@@ -1,3 +1,5 @@
+import { getTooltipCategoryIconSpec } from './mapTooltipCategoryIcons';
+
 const DEFAULT_TOOLTIP_FILL_COLOR = '#0E8530';
 
 const isValidHexColor = (value: string): boolean => {
@@ -12,6 +14,24 @@ const TOOLTIP_TEXT_X = 18; // aligns with <text x="..."> (excluding stroke paddi
 const TOOLTIP_TEXT_RIGHT_PADDING = 16;
 const TITLE_BAND_HEIGHT = 16;
 const TITLE_BAND_BOTTOM_PADDING = 8;
+
+// Category icon sizing inside the hover tooltip (square slot).
+const TOOLTIP_CATEGORY_ICON_SIZE = 14;
+const TOOLTIP_CATEGORY_ICON_GAP = 4;
+// Small tweak so the icon visually aligns with text baselines.
+const TOOLTIP_CATEGORY_ICON_BASELINE_OFFSET = 1;
+
+// Convert React-style SVG attrs (camelCase) to SVG/XML attrs (kebab-case).
+// The tooltip is rendered via `data:image/svg+xml`, which is parsed as XML.
+const normalizeInlineSvgMarkupForXml = (markup: string): string =>
+	markup
+		.replaceAll('strokeWidth', 'stroke-width')
+		.replaceAll('strokeLinecap', 'stroke-linecap')
+		.replaceAll('strokeLinejoin', 'stroke-linejoin')
+		.replaceAll('fillRule', 'fill-rule')
+		.replaceAll('clipRule', 'clip-rule')
+		.replaceAll('stopColor', 'stop-color')
+		.replaceAll('stopOpacity', 'stop-opacity');
 
 let measurementContext: CanvasRenderingContext2D | null = null;
 const getMeasurementContext = (): CanvasRenderingContext2D | null => {
@@ -31,14 +51,25 @@ const measureTextWidthPx = (text: string, font: string): number | null => {
 
 const clamp = (value: number, min: number, max: number): number => Math.max(min, Math.min(max, value));
 
+type TooltipLineExtras = {
+	primary?: number;
+	secondary?: number;
+	title?: number;
+};
+
 const calculateTooltipInnerWidth = (
 	primaryText: string,
 	secondaryText: string,
-	titleText: string
+	titleText: string,
+	lineExtras: TooltipLineExtras = {}
 ): number => {
 	const primary = primaryText.trim();
 	const secondary = secondaryText.trim();
 	const title = titleText.trim();
+
+	const primaryExtra = lineExtras.primary ?? 0;
+	const secondaryExtra = lineExtras.secondary ?? 0;
+	const titleExtra = lineExtras.title ?? 0;
 
 	// Use Canvas text measurement in the browser for a tighter fit.
 	const primaryMeasured =
@@ -50,9 +81,14 @@ const calculateTooltipInnerWidth = (
 		? measureTextWidthPx(title, '14px Arial, sans-serif') ?? title.length * 7.2
 		: 0;
 
-	const maxTextWidth = Math.max(primaryMeasured, secondaryMeasured, titleMeasured);
-	// Add left inset (text x) + right padding so the bubble "hugs" the text.
-	const innerWidth = Math.ceil(maxTextWidth + TOOLTIP_TEXT_X + TOOLTIP_TEXT_RIGHT_PADDING);
+	// Compute required widths per line: left inset + (optional icon slot) + measured text + right padding.
+	const primaryRequired = primaryMeasured + TOOLTIP_TEXT_X + primaryExtra;
+	const secondaryRequired = secondary ? secondaryMeasured + TOOLTIP_TEXT_X + secondaryExtra : 0;
+	const titleRequired = title ? titleMeasured + TOOLTIP_TEXT_X + titleExtra : 0;
+
+	const maxRequired = Math.max(primaryRequired, secondaryRequired, titleRequired);
+	// Add right padding so the bubble "hugs" the content.
+	const innerWidth = Math.ceil(maxRequired + TOOLTIP_TEXT_RIGHT_PADDING);
 	return clamp(innerWidth, MIN_TOOLTIP_INNER_WIDTH, MAX_TOOLTIP_INNER_WIDTH);
 };
 
@@ -61,7 +97,8 @@ export const generateMapTooltipSvg = (
 	name: string,
 	company: string,
 	title: string,
-	fillColor: string = DEFAULT_TOOLTIP_FILL_COLOR
+	fillColor: string = DEFAULT_TOOLTIP_FILL_COLOR,
+	searchWhat?: string | null
 ): string => {
 	// Escape special characters for SVG/XML
 	const escapeSvgText = (text: string) =>
@@ -86,12 +123,30 @@ export const generateMapTooltipSvg = (
 	const secondaryTextRaw = hasName && hasCompany ? trimmedCompany : '';
 	const titleTextRaw = (title ?? '').trim();
 
+	// Category icon comes from the "What" search category (when available).
+	const categoryIconSpec = getTooltipCategoryIconSpec(searchWhat);
+	const showCategoryIcon = Boolean(categoryIconSpec && hasCompany);
+	const categoryIconSlotExtra = showCategoryIcon
+		? TOOLTIP_CATEGORY_ICON_SIZE + TOOLTIP_CATEGORY_ICON_GAP
+		: 0;
+	const categoryIconPlacement: 'primary' | 'secondary' | null = showCategoryIcon
+		? hasName && hasCompany
+			? 'secondary'
+			: 'primary'
+		: null;
+
+	const primaryLineExtra = categoryIconPlacement === 'primary' ? categoryIconSlotExtra : 0;
+	const secondaryLineExtra = categoryIconPlacement === 'secondary' ? categoryIconSlotExtra : 0;
+
 	const primaryText = escapeSvgText(primaryTextRaw);
 	const secondaryText = secondaryTextRaw ? escapeSvgText(secondaryTextRaw) : '';
 	const titleText = titleTextRaw ? escapeSvgText(titleTextRaw) : '';
 
 	// Calculate width based on actual measured text width (tight fit)
-	const innerWidth = calculateTooltipInnerWidth(primaryTextRaw, secondaryTextRaw, titleTextRaw);
+	const innerWidth = calculateTooltipInnerWidth(primaryTextRaw, secondaryTextRaw, titleTextRaw, {
+		primary: primaryLineExtra,
+		secondary: secondaryLineExtra,
+	});
 
 	// Add padding for stroke (2px stroke = 1px on each side)
 	const strokePadding = 2;
@@ -112,6 +167,48 @@ export const generateMapTooltipSvg = (
 	const offsetX = strokePadding;
 	const offsetY = strokePadding;
 
+	const primaryBaselineY = primaryY + offsetY;
+	const secondaryBaselineY = 36 + offsetY;
+	const titleBaselineY = titleY + offsetY;
+
+	const primaryTextX = TOOLTIP_TEXT_X + offsetX;
+	const secondaryTextX = TOOLTIP_TEXT_X + offsetX;
+
+	// Place the icon to the right of the relevant text line.
+	const primaryMeasuredForIcon =
+		categoryIconPlacement === 'primary'
+			? (measureTextWidthPx(primaryTextRaw, 'bold 14px Arial, sans-serif') ??
+				primaryTextRaw.length * 7.6)
+			: 0;
+	const secondaryMeasuredForIcon =
+		categoryIconPlacement === 'secondary'
+			? (measureTextWidthPx(secondaryTextRaw, '13px Arial, sans-serif') ??
+				secondaryTextRaw.length * 6.7)
+			: 0;
+
+	const maxIconX =
+		innerWidth + offsetX - TOOLTIP_TEXT_RIGHT_PADDING - TOOLTIP_CATEGORY_ICON_SIZE;
+	const primaryIconX =
+		categoryIconPlacement === 'primary'
+			? Math.min(primaryTextX + primaryMeasuredForIcon + TOOLTIP_CATEGORY_ICON_GAP, maxIconX)
+			: 0;
+	const secondaryIconX =
+		categoryIconPlacement === 'secondary'
+			? Math.min(secondaryTextX + secondaryMeasuredForIcon + TOOLTIP_CATEGORY_ICON_GAP, maxIconX)
+			: 0;
+	const categoryIconPrimaryY =
+		primaryBaselineY - TOOLTIP_CATEGORY_ICON_SIZE + TOOLTIP_CATEGORY_ICON_BASELINE_OFFSET;
+	const categoryIconSecondaryY =
+		secondaryBaselineY - TOOLTIP_CATEGORY_ICON_SIZE + TOOLTIP_CATEGORY_ICON_BASELINE_OFFSET;
+
+	const renderCategoryIcon = (x: number, y: number): string => {
+		if (!categoryIconSpec || !showCategoryIcon) return '';
+		const normalized = normalizeInlineSvgMarkupForXml(categoryIconSpec.content);
+		return `<svg x="${x}" y="${y}" width="${TOOLTIP_CATEGORY_ICON_SIZE}" height="${TOOLTIP_CATEGORY_ICON_SIZE}" viewBox="${categoryIconSpec.viewBox}" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
+${normalized}
+</svg>`;
+	};
+
 	const bodyCornerRadius = 8;
 	const bodyCornerStartY = bodyBottomY - bodyCornerRadius;
 	const pointerTipY = bodyBottomY + pointerHeight;
@@ -129,9 +226,15 @@ export const generateMapTooltipSvg = (
   <rect x="${offsetX}" y="${titleBandTopY + offsetY}" width="${innerWidth}" height="${TITLE_BAND_HEIGHT}" fill="#E8EFFF"/>
   <line x1="${offsetX}" y1="${titleBandTopY + offsetY}" x2="${innerWidth + offsetX}" y2="${titleBandTopY + offsetY}" stroke="black" stroke-width="2"/>
   <line x1="${offsetX}" y1="${titleBandTopY + TITLE_BAND_HEIGHT + offsetY}" x2="${innerWidth + offsetX}" y2="${titleBandTopY + TITLE_BAND_HEIGHT + offsetY}" stroke="black" stroke-width="2"/>
-  <text x="${TOOLTIP_TEXT_X + offsetX}" y="${primaryY + offsetY}" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="${textFill}">${primaryText}</text>
-  ${secondaryText ? `<text x="${TOOLTIP_TEXT_X + offsetX}" y="${36 + offsetY}" font-family="Arial, sans-serif" font-size="13" fill="${textFill}">${secondaryText}</text>` : ''}
-  ${titleText ? `<text x="${TOOLTIP_TEXT_X + offsetX}" y="${titleY + offsetY}" font-family="Arial, sans-serif" font-size="14" fill="black">${titleText}</text>` : ''}
+  <text x="${primaryTextX}" y="${primaryBaselineY}" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="${textFill}">${primaryText}</text>
+  ${categoryIconPlacement === 'primary' ? renderCategoryIcon(primaryIconX, categoryIconPrimaryY) : ''}
+  ${
+		secondaryText
+			? `<text x="${secondaryTextX}" y="${secondaryBaselineY}" font-family="Arial, sans-serif" font-size="13" fill="${textFill}">${secondaryText}</text>
+  ${categoryIconPlacement === 'secondary' ? renderCategoryIcon(secondaryIconX, categoryIconSecondaryY) : ''}`
+			: ''
+	}
+  ${titleText ? `<text x="${TOOLTIP_TEXT_X + offsetX}" y="${titleBaselineY}" font-family="Arial, sans-serif" font-size="14" fill="black">${titleText}</text>` : ''}
 </g>
 <path d="${bubblePathD}" fill="none" stroke="black" stroke-width="2"/>
 </svg>`;
@@ -142,10 +245,17 @@ export const generateMapTooltipIconUrl = (
 	name: string,
 	company: string,
 	title: string,
-	fillColor?: string
+	fillColor?: string,
+	searchWhat?: string | null
 ): string => {
 	return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(
-		generateMapTooltipSvg(name, company, title, fillColor ?? DEFAULT_TOOLTIP_FILL_COLOR)
+		generateMapTooltipSvg(
+			name,
+			company,
+			title,
+			fillColor ?? DEFAULT_TOOLTIP_FILL_COLOR,
+			searchWhat
+		)
 	)}`;
 };
 
@@ -153,7 +263,12 @@ export const generateMapTooltipIconUrl = (
 const STROKE_PADDING = 2;
 
 // Calculate width based on text (for Google Maps sizing)
-export const calculateTooltipWidth = (name: string, company: string, title: string): number => {
+export const calculateTooltipWidth = (
+	name: string,
+	company: string,
+	title: string,
+	searchWhat?: string | null
+): number => {
 	const trimmedName = (name ?? '').trim();
 	const trimmedCompany = (company ?? '').trim();
 	const trimmedTitle = (title ?? '').trim();
@@ -163,7 +278,17 @@ export const calculateTooltipWidth = (name: string, company: string, title: stri
 	const primaryText = hasName ? trimmedName : hasCompany ? trimmedCompany : 'Unknown';
 	const secondaryText = hasName && hasCompany ? trimmedCompany : '';
 
-	const innerWidth = calculateTooltipInnerWidth(primaryText, secondaryText, trimmedTitle);
+	const showCategoryIcon = Boolean(getTooltipCategoryIconSpec(searchWhat) && hasCompany);
+	const categoryIconSlotExtra = showCategoryIcon
+		? TOOLTIP_CATEGORY_ICON_SIZE + TOOLTIP_CATEGORY_ICON_GAP
+		: 0;
+	const primaryLineExtra = showCategoryIcon && !hasName ? categoryIconSlotExtra : 0;
+	const secondaryLineExtra = showCategoryIcon && hasName && hasCompany ? categoryIconSlotExtra : 0;
+
+	const innerWidth = calculateTooltipInnerWidth(primaryText, secondaryText, trimmedTitle, {
+		primary: primaryLineExtra,
+		secondary: secondaryLineExtra,
+	});
 	return innerWidth + STROKE_PADDING * 2;
 };
 

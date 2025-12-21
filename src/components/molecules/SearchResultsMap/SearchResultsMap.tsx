@@ -2056,14 +2056,16 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 								const width = calculateTooltipWidth(
 									nameForTooltip,
 									companyForTooltip,
-									titleForTooltip
+									titleForTooltip,
+									searchWhat
 								);
 								return {
 									url: generateMapTooltipIconUrl(
 										nameForTooltip,
 										companyForTooltip,
 										titleForTooltip,
-										tooltipFillColor
+										tooltipFillColor,
+										searchWhat
 									),
 									width,
 									height: MAP_TOOLTIP_HEIGHT,
