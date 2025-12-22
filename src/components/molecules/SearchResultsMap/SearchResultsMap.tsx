@@ -606,6 +606,8 @@ interface SearchResultsMapProps {
 	searchQuery?: string | null;
 	/** Used to color the default (unselected) result dots by the active "What" search value. */
 	searchWhat?: string | null;
+	/** When set, shows a persistent outline of the selected search area. */
+	selectedAreaBounds?: MapSelectionBounds | null;
 	/** Map interaction mode controlled by the dashboard (grab = pan/zoom, select = draw rectangle). */
 	activeTool?: 'select' | 'grab';
 	/** Called when the user completes a rectangle selection (south/west/north/east). */
@@ -889,6 +891,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	selectedContacts,
 	searchQuery,
 	searchWhat,
+	selectedAreaBounds,
 	activeTool,
 	onAreaSelect,
 	onMarkerClick,
@@ -928,6 +931,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const selectionStartLatLngRef = useRef<LatLngLiteral | null>(null);
 	const selectionStartClientRef = useRef<{ x: number; y: number } | null>(null);
 	const selectionRectRef = useRef<google.maps.Rectangle | null>(null);
+	const selectedAreaRectRef = useRef<google.maps.Rectangle | null>(null);
 	// Timeout ref for auto-hiding research panel
 	const researchPanelTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 	// Small delay when moving between marker layers (prevents hover flicker)
@@ -1003,6 +1007,49 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		return rect;
 	}, [map]);
 
+	// Persist and display the last selected area (black outline) so it's clear what the current
+	// map-scoped search is using.
+	useEffect(() => {
+		// Hide the persisted rectangle while actively drawing a new one to avoid overlap/confusion.
+		if (isAreaSelecting) {
+			if (selectedAreaRectRef.current) {
+				selectedAreaRectRef.current.setMap(null);
+			}
+			return;
+		}
+
+		if (!map || !selectedAreaBounds) {
+			if (selectedAreaRectRef.current) {
+				selectedAreaRectRef.current.setMap(null);
+				selectedAreaRectRef.current = null;
+			}
+			return;
+		}
+
+		const { south, west, north, east } = selectedAreaBounds;
+		if (![south, west, north, east].every((n) => typeof n === 'number' && Number.isFinite(n))) {
+			return;
+		}
+
+		const rect =
+			selectedAreaRectRef.current ??
+			new google.maps.Rectangle({
+				map,
+				clickable: false,
+				draggable: false,
+				editable: false,
+				strokeColor: '#000000',
+				strokeOpacity: 1,
+				strokeWeight: 3,
+				fillOpacity: 0,
+				zIndex: 1_900_000,
+			});
+
+		rect.setMap(map);
+		rect.setBounds({ south, west, north, east });
+		selectedAreaRectRef.current = rect;
+	}, [map, selectedAreaBounds, isAreaSelecting]);
+
 	// Cancel selection if the tool changes or the map unmounts.
 	useEffect(() => {
 		if (!areaSelectionEnabled && isAreaSelecting) {
@@ -1016,6 +1063,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			if (selectionRectRef.current) {
 				selectionRectRef.current.setMap(null);
 				selectionRectRef.current = null;
+			}
+			if (selectedAreaRectRef.current) {
+				selectedAreaRectRef.current.setMap(null);
+				selectedAreaRectRef.current = null;
 			}
 		};
 	}, []);

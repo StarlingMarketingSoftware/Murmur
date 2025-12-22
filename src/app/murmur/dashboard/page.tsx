@@ -2981,6 +2981,16 @@ const DashboardContent = () => {
 																selectedContacts={selectedContacts}
 																searchQuery={activeSearchQuery}
 																searchWhat={searchedWhat}
+																selectedAreaBounds={
+																	mapBboxFilter
+																		? {
+																				south: mapBboxFilter.south,
+																				west: mapBboxFilter.west,
+																				north: mapBboxFilter.north,
+																				east: mapBboxFilter.east,
+																			}
+																		: null
+																}
 																activeTool={activeMapTool}
 																onAreaSelect={(bounds) => {
 																	// Run a new search scoped to the drawn rectangle.
@@ -2989,6 +2999,9 @@ const DashboardContent = () => {
 																		...bounds,
 																		titlePrefix: searchedWhat ?? null,
 																	});
+																	// After selecting an area, immediately switch back to Grab mode
+																	// so the user can pan/zoom without extra clicks.
+																	setActiveMapTool('grab');
 																}}
 																onMarkerHover={handleMapMarkerHover}
 																lockedStateName={searchedStateAbbrForMap}
