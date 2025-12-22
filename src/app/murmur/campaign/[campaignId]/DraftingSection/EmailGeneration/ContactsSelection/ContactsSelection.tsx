@@ -593,26 +593,6 @@ export const MiniSearchBar: FC<{
 										className="h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
 										style={{ width: 'min(415px, calc(100% - 24px))' }}
 										onClick={() => {
-											setWhatValue('Music Venues');
-											setActiveSection('where');
-										}}
-									>
-										<div className="w-[38px] h-[38px] bg-[#71C9FD] rounded-[8px] flex-shrink-0 flex items-center justify-center">
-											<MusicVenuesIcon />
-										</div>
-										<div className="ml-[12px] flex flex-col">
-											<div className="text-[20px] font-medium leading-none text-black font-inter">
-												Music Venues
-											</div>
-											<div className="text-[12px] leading-tight text-black mt-[4px]">
-												Reach talent buyers for live shows
-											</div>
-										</div>
-									</div>
-									<div
-										className="h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
-										style={{ width: 'min(415px, calc(100% - 24px))' }}
-										onClick={() => {
 											setWhatValue('Wine, Beer, and Spirits');
 											setActiveSection('where');
 										}}
@@ -626,26 +606,6 @@ export const MiniSearchBar: FC<{
 											</div>
 											<div className="text-[12px] leading-tight text-black mt-[4px]">
 												Pitch your act for seasonal events
-											</div>
-										</div>
-									</div>
-									<div
-										className="h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
-										style={{ width: 'min(415px, calc(100% - 24px))' }}
-										onClick={() => {
-											setWhatValue('Restaurants');
-											setActiveSection('where');
-										}}
-									>
-										<div className="w-[38px] h-[38px] bg-[#77DD91] rounded-[8px] flex-shrink-0 flex items-center justify-center">
-											<RestaurantsIcon />
-										</div>
-										<div className="ml-[12px] flex flex-col">
-											<div className="text-[20px] font-medium leading-none text-black font-inter">
-												Restaurants
-											</div>
-											<div className="text-[12px] leading-tight text-black mt-[4px]">
-												Land steady dinner and brunch gigs
 											</div>
 										</div>
 									</div>
@@ -673,19 +633,19 @@ export const MiniSearchBar: FC<{
 										className="h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
 										style={{ width: 'min(415px, calc(100% - 24px))' }}
 										onClick={() => {
-											setWhatValue('Wedding Planners');
+											setWhatValue('Restaurants');
 											setActiveSection('where');
 										}}
 									>
-										<div className="w-[38px] h-[38px] bg-[#EED56E] rounded-[8px] flex-shrink-0 flex items-center justify-center">
-											<WeddingPlannersIcon />
+										<div className="w-[38px] h-[38px] bg-[#77DD91] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+											<RestaurantsIcon />
 										</div>
 										<div className="ml-[12px] flex flex-col">
 											<div className="text-[20px] font-medium leading-none text-black font-inter">
-												Wedding Planners
+												Restaurants
 											</div>
 											<div className="text-[12px] leading-tight text-black mt-[4px]">
-												Get hired for ceremonies & receptions
+												Land steady dinner and brunch gigs
 											</div>
 										</div>
 									</div>
@@ -706,6 +666,46 @@ export const MiniSearchBar: FC<{
 											</div>
 											<div className="text-[12px] leading-tight text-black mt-[4px]">
 												Pitch your act for seasonal events
+											</div>
+										</div>
+									</div>
+									<div
+										className="h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+										style={{ width: 'min(415px, calc(100% - 24px))' }}
+										onClick={() => {
+											setWhatValue('Wedding Planners');
+											setActiveSection('where');
+										}}
+									>
+										<div className="w-[38px] h-[38px] bg-[#EED56E] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+											<WeddingPlannersIcon />
+										</div>
+										<div className="ml-[12px] flex flex-col">
+											<div className="text-[20px] font-medium leading-none text-black font-inter">
+												Wedding Planners
+											</div>
+											<div className="text-[12px] leading-tight text-black mt-[4px]">
+												Get hired for ceremonies & receptions
+											</div>
+										</div>
+									</div>
+									<div
+										className="h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+										style={{ width: 'min(415px, calc(100% - 24px))' }}
+										onClick={() => {
+											setWhatValue('Music Venues');
+											setActiveSection('where');
+										}}
+									>
+										<div className="w-[38px] h-[38px] bg-[#71C9FD] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+											<MusicVenuesIcon />
+										</div>
+										<div className="ml-[12px] flex flex-col">
+											<div className="text-[20px] font-medium leading-none text-black font-inter">
+												Music Venues
+											</div>
+											<div className="text-[12px] leading-tight text-black mt-[4px]">
+												Reach talent buyers for live shows
 											</div>
 										</div>
 									</div>
