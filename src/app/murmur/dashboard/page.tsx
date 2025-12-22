@@ -3247,7 +3247,7 @@ const DashboardContent = () => {
 																				}}
 																			>
 																				<span className="relative z-20">
-																					Add to Campaign
+																					Create Campaign
 																				</span>
 																				<div
 																					className="absolute inset-y-0 right-0 w-[65px] z-20 flex items-center justify-center bg-[#74D178] cursor-pointer"
@@ -3635,7 +3635,7 @@ const DashboardContent = () => {
 															handleCreateCampaign();
 														}}
 													>
-														<span className="relative z-20">Add to Campaign</span>
+														<span className="relative z-20">Create Campaign</span>
 														<div
 															className="absolute inset-y-0 right-0 w-[65px] z-20 flex items-center justify-center bg-[#74D178] cursor-pointer"
 															onClick={(e) => {
@@ -3670,7 +3670,7 @@ const DashboardContent = () => {
 															className="w-full h-[54px] min-h-[54px] !rounded-none !bg-[#5dab68] hover:!bg-[#4e9b5d] !text-white border border-[#000000] transition-colors !opacity-100 disabled:!opacity-100"
 															disabled={selectedContacts.length === 0}
 														>
-															Add to Campaign
+															Create Campaign
 														</Button>
 													</div>,
 													document.body
