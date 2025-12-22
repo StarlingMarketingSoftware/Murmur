@@ -136,6 +136,76 @@ const extractWhyFromSearchQuery = (query: string): string | null => {
 	return tag ? `[${tag}]` : null;
 };
 
+const hasAtLeast3ParsedResearchSections = (metadata: string | null | undefined): boolean => {
+	if (!metadata) return false;
+
+	// Extract all [n] sections first.
+	const allSections: Record<string, string> = {};
+	const regex = /\[(\d+)\]\s*([\s\S]*?)(?=\[\d+\]|$)/g;
+	let match: RegExpExecArray | null;
+	while ((match = regex.exec(metadata)) !== null) {
+		const sectionNum = match[1];
+		const content = match[2]?.trim() ?? '';
+		allSections[sectionNum] = content;
+	}
+
+	// Count sequential sections starting from [1] with meaningful content.
+	let expectedNum = 1;
+	let validCount = 0;
+	while (allSections[String(expectedNum)]) {
+		const content = allSections[String(expectedNum)] ?? '';
+		const meaningfulContent = content.replace(/[.\s,;:!?'"()\-–—]/g, '').trim();
+		if (meaningfulContent.length < 5) break;
+		validCount++;
+		expectedNum++;
+	}
+
+	return validCount >= 3;
+};
+
+const estimateWrappedLineCount = (text: string, charsPerLine: number): number => {
+	if (!text) return 0;
+	const lines = text.split(/\r?\n/);
+	let total = 0;
+	for (const rawLine of lines) {
+		const line = rawLine.trim();
+		if (!line) {
+			total += 1;
+			continue;
+		}
+		total += Math.max(1, Math.ceil(line.length / charsPerLine));
+	}
+	return total;
+};
+
+const clampNumber = (n: number, min: number, max: number): number => {
+	return Math.min(max, Math.max(min, n));
+};
+
+/**
+ * For the map hover "Research" overlay, collapse the right-side panel height when the research
+ * is *unparsed summary-only* and short (roughly a single paragraph), to avoid large empty space.
+ */
+const getCompactMapResearchPanelHeightPx = (metadata: string): number | null => {
+	const text = metadata.trim();
+	if (!text) return null;
+
+	// Heuristic tuned to the map panel widths (boxWidth={405}) and 15px text at 1.5 line-height.
+	const approxLines = estimateWrappedLineCount(text, 52);
+
+	// If the unparsed text is long, keep the full panel height for readability.
+	if (approxLines > 12) return null;
+
+	// ContactResearchPanel summary-only (with a fixed height prop) effectively needs:
+	// height ≈ (lines * lineHeight) + chrome/padding.
+	const LINE_HEIGHT_PX = 23; // 15px * 1.5 ≈ 22.5
+	const BASE_OVERHEAD_PX = 130;
+	const rawHeight = Math.ceil(approxLines * LINE_HEIGHT_PX + BASE_OVERHEAD_PX);
+
+	// Cap to the panel's natural unparsed height so it never feels cramped or oversized.
+	return clampNumber(rawHeight, 310, 423);
+};
+
 const MAP_RESULTS_SEARCH_TRAY_WHAT_ICON_BY_LABEL: Record<
 	string,
 	{ backgroundColor: string; Icon: () => ReactNode }
@@ -1024,6 +1094,13 @@ const DashboardContent = () => {
 		},
 		[]
 	);
+
+	const mapResearchPanelCompactHeightPx = useMemo(() => {
+		const metadata = mapResearchPanelContact?.metadata;
+		if (!metadata || metadata.trim().length === 0) return null;
+		if (hasAtLeast3ParsedResearchSections(metadata)) return null;
+		return getCompactMapResearchPanelHeightPx(metadata);
+	}, [mapResearchPanelContact?.metadata]);
 
 	const searchedStateAbbr = useMemo(
 		() => extractStateAbbrFromSearchQuery(activeSearchQuery),
@@ -2892,7 +2969,9 @@ const DashboardContent = () => {
 																		className="absolute top-[97px] right-[10px] rounded-[12px] flex flex-col"
 																		style={{
 																			width: '433px',
-																			height: '800px',
+																			height: mapResearchPanelContact && mapResearchPanelCompactHeightPx
+																				? mapResearchPanelCompactHeightPx
+																				: 800,
 																			maxHeight: 'calc(100% - 117px)',
 																			backgroundColor:
 																				mapResearchPanelContact && isMapResearchPanelVisible
@@ -3210,6 +3289,7 @@ const DashboardContent = () => {
 																					style={{ width: '100%', height: '100%' }}
 																					// Tune box width for the 433px side panel
 																					boxWidth={405}
+																					height={mapResearchPanelCompactHeightPx ?? undefined}
 																				/>
 																			</div>
 																		)}
