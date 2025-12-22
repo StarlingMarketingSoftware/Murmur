@@ -23,6 +23,7 @@ import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
 import { RadioStationsIcon } from '@/components/atoms/_svg/RadioStationsIcon';
 import { NearMeIcon } from '@/components/atoms/_svg/NearMeIcon';
 import HomeIcon from '@/components/atoms/_svg/HomeIcon';
+import GrabIcon from '@/components/atoms/svg/GrabIcon';
 import { getCityIconProps } from '@/utils/cityIcons';
 import { Typography } from '@/components/ui/typography';
 import { Input } from '@/components/ui/input';
@@ -997,16 +998,21 @@ const DashboardContent = () => {
 		setIsMapView,
 		isSearchPending,
 		usedContactIdsSet,
+		mapBboxFilter,
+		setMapBboxFilter,
 	} = useDashboard();
 
 	// Map-side panel should default to only the searched state, while the map itself keeps
 	// showing all results. Clicking an out-of-state marker adds it to this panel list.
 	const [mapPanelExtraContactIds, setMapPanelExtraContactIds] = useState<number[]>([]);
 	const mapViewContainerRef = useRef<HTMLDivElement | null>(null);
+	const [activeMapTool, setActiveMapTool] = useState<'select' | 'grab'>('grab');
 	const [hoveredMapMarkerContact, setHoveredMapMarkerContact] = useState<ContactWithName | null>(
 		null
 	);
 	const isMapResultsLoading = isSearchPending || isLoadingContacts || isRefetchingContacts;
+	const hasNoSearchResults =
+		hasSearched && !isMapResultsLoading && (contacts?.length ?? 0) === 0;
 	// Map hover research overlay behavior:
 	// - Hold briefly after hover ends (prevents flicker)
 	// - Then fade out quickly
@@ -1106,6 +1112,9 @@ const DashboardContent = () => {
 		() => extractStateAbbrFromSearchQuery(activeSearchQuery),
 		[activeSearchQuery]
 	);
+	// When a map rectangle selection is active, we treat results as already scoped to that area,
+	// so we should not "lock" behavior to the original searched state.
+	const searchedStateAbbrForMap = mapBboxFilter ? null : searchedStateAbbr;
 
 	// Use the "What" from the last executed search (activeSearchQuery), not the live dropdown value.
 	const searchedWhat = useMemo(
@@ -1115,11 +1124,11 @@ const DashboardContent = () => {
 
 	const mapPanelContacts = useMemo(() => {
 		const allContacts = contacts || [];
-		if (!searchedStateAbbr) return allContacts;
+		if (!searchedStateAbbrForMap) return allContacts;
 
 		const inState = allContacts.filter((contact) => {
 			const contactStateAbbr = getStateAbbreviation(contact.state || '').trim().toUpperCase();
-			return contactStateAbbr === searchedStateAbbr;
+			return contactStateAbbr === searchedStateAbbrForMap;
 		});
 
 		if (mapPanelExtraContactIds.length === 0) return inState;
@@ -1132,7 +1141,7 @@ const DashboardContent = () => {
 			.filter((c): c is NonNullable<typeof c> => Boolean(c));
 
 		return [...inState, ...extras];
-	}, [contacts, mapPanelExtraContactIds, searchedStateAbbr]);
+	}, [contacts, mapPanelExtraContactIds, searchedStateAbbrForMap]);
 
 	// Check if all panel contacts are selected (for map view "Select all" button)
 	const isAllPanelContactsSelected = useMemo(() => {
@@ -2748,38 +2757,110 @@ const DashboardContent = () => {
 								</Form>
 							</div>
 							{isMapView && (
-								<button
-									type="button"
-									onClick={handleCloseMapView}
-									aria-label="Home"
-									className="flex items-center justify-center cursor-pointer"
-									style={{
-										position: 'absolute',
-										// Map is inset 9px from the viewport; "25px from map top" => 34px viewport.
-										// Search bar wrapper sits at 33px viewport, so this becomes 1px inside the wrapper.
-										top: '1px',
-										// "179px to the right of the searchbar" => from wrapper's right edge.
-										left: 'calc(100% + 179px)',
-										width: '53px',
-										height: '53px',
-										borderRadius: '9px',
-										backgroundColor: '#D6D6D6',
-										border: '3px solid #000000',
-										padding: '2px',
-									}}
-								>
+								<>
+									{/* Box to the left of the Home button */}
 									<div
-										className="flex items-center justify-center"
+										className="flex items-center justify-center gap-[20px]"
 										style={{
-											width: '43px',
-											height: '43px',
-											borderRadius: '9px',
-											backgroundColor: '#EAEAEA',
+											position: 'absolute',
+											// Map is inset 9px from the viewport; "25px from map top" => 34px viewport.
+											// Search bar wrapper sits at 33px viewport, so this becomes 1px inside the wrapper.
+											top: '1px',
+											// Home button is at: calc(100% + 179px). This box should be 10px to its left.
+											left: 'calc(100% + 179px - 143px)', // 133px width + 10px gap
+											width: '133px',
+											height: '53px',
+											borderRadius: '6px',
+											backgroundColor: 'rgba(255, 255, 255, 0.9)', // #FFFFFF @ 90%
+											border: '3px solid #000000',
 										}}
 									>
-										<HomeIcon width={28} height={24} />
+										<button
+											type="button"
+											onClick={() => setActiveMapTool('select')}
+											aria-label="Select tool"
+											aria-pressed={activeMapTool === 'select'}
+											className="flex items-center justify-center"
+											style={{
+												width: '44px',
+												height: '44px',
+												borderRadius: '9px',
+												backgroundColor:
+													activeMapTool === 'select'
+														? '#4CDE71'
+														: 'rgba(153, 153, 153, 0.3)', // #999999 @ 30%
+												cursor: 'pointer',
+												padding: 0,
+												border: 'none',
+											}}
+										>
+											<div
+												aria-hidden="true"
+												style={{
+													width: '25px',
+													height: '25px',
+													backgroundColor:
+														activeMapTool === 'select' ? '#FFFFFF' : 'transparent',
+													border: '2px solid #000000',
+													boxSizing: 'border-box',
+												}}
+											/>
+										</button>
+										<button
+											type="button"
+											onClick={() => setActiveMapTool('grab')}
+											aria-label="Grab tool"
+											aria-pressed={activeMapTool === 'grab'}
+											className="flex items-center justify-center"
+											style={{
+												width: '44px',
+												height: '44px',
+												borderRadius: '9px',
+												backgroundColor:
+													activeMapTool === 'grab'
+														? '#4CDE71'
+														: 'rgba(153, 153, 153, 0.3)', // #999999 @ 30%
+												cursor: 'pointer',
+												padding: 0,
+												border: 'none',
+											}}
+										>
+											<GrabIcon innerFill={activeMapTool === 'grab' ? '#FFFFFF' : '#DCDFDD'} />
+										</button>
 									</div>
-								</button>
+									<button
+										type="button"
+										onClick={handleCloseMapView}
+										aria-label="Home"
+										className="flex items-center justify-center cursor-pointer"
+										style={{
+											position: 'absolute',
+											// Map is inset 9px from the viewport; "25px from map top" => 34px viewport.
+											// Search bar wrapper sits at 33px viewport, so this becomes 1px inside the wrapper.
+											top: '1px',
+											// "179px to the right of the searchbar" => from wrapper's right edge.
+											left: 'calc(100% + 179px)',
+											width: '53px',
+											height: '53px',
+											borderRadius: '9px',
+											backgroundColor: '#D6D6D6',
+											border: '3px solid #000000',
+											padding: '2px',
+										}}
+									>
+										<div
+											className="flex items-center justify-center"
+											style={{
+												width: '43px',
+												height: '43px',
+												borderRadius: '9px',
+												backgroundColor: '#EAEAEA',
+											}}
+										>
+											<HomeIcon width={28} height={24} />
+										</div>
+									</button>
+								</>
 							)}
 							{hoveredContact && !isMobile && !isMapView && (
 								<div className="absolute inset-0 z-[90] pointer-events-none bg-white hidden xl:flex items-start justify-center">
@@ -2870,7 +2951,8 @@ const DashboardContent = () => {
 						) : isSearchPending ||
 						  isLoadingContacts ||
 						  isRefetchingContacts ||
-						  (contacts && contacts.length > 0) ? (
+						  (contacts && contacts.length > 0) ||
+						  (isMapView && hasNoSearchResults) ? (
 							<div className="flex justify-center w-full px-0 sm:px-4 relative">
 								<div className="w-full max-w-full results-appear results-align">
 									{isMapView ? (
@@ -2899,8 +2981,30 @@ const DashboardContent = () => {
 																selectedContacts={selectedContacts}
 																searchQuery={activeSearchQuery}
 																searchWhat={searchedWhat}
+																selectedAreaBounds={
+																	mapBboxFilter
+																		? {
+																				south: mapBboxFilter.south,
+																				west: mapBboxFilter.west,
+																				north: mapBboxFilter.north,
+																				east: mapBboxFilter.east,
+																			}
+																		: null
+																}
+																activeTool={activeMapTool}
+																onAreaSelect={(bounds) => {
+																	// Run a new search scoped to the drawn rectangle.
+																	// We use the "What" from the last executed search so results stay in-category.
+																	setMapBboxFilter({
+																		...bounds,
+																		titlePrefix: searchedWhat ?? null,
+																	});
+																	// After selecting an area, immediately switch back to Grab mode
+																	// so the user can pan/zoom without extra clicks.
+																	setActiveMapTool('grab');
+																}}
 																onMarkerHover={handleMapMarkerHover}
-																lockedStateName={searchedStateAbbr}
+																lockedStateName={searchedStateAbbrForMap}
 																onStateSelect={(stateName) => {
 																	const nextState = (stateName || '').trim();
 																	if (!nextState) return;
@@ -2917,13 +3021,13 @@ const DashboardContent = () => {
 																onMarkerClick={(contact) => {
 																	// If the marker is outside the searched state, include it in the
 																	// right-hand map panel list (without changing what the map shows).
-																	if (!searchedStateAbbr) return;
+																	if (!searchedStateAbbrForMap) return;
 																	const contactStateAbbr = getStateAbbreviation(
 																		contact.state || ''
 																	)
 																		.trim()
 																		.toUpperCase();
-																	if (contactStateAbbr === searchedStateAbbr) return;
+																	if (contactStateAbbr === searchedStateAbbrForMap) return;
 																	setMapPanelExtraContactIds((prev) =>
 																		prev.includes(contact.id) ? prev : [...prev, contact.id]
 																	);
@@ -2958,13 +3062,60 @@ const DashboardContent = () => {
 																	setTimeout(() => tryScroll(0), 0);
 																}}
 															/>
+															{hasNoSearchResults && (
+																<div className="absolute inset-0 z-[120] flex items-start justify-center pt-[120px] pointer-events-none">
+																	<div
+																		className="pointer-events-auto flex flex-col items-center justify-center text-center"
+																		style={{
+																			width: 517,
+																			height: 174,
+																			borderRadius: 8,
+																			backgroundColor: 'rgba(106, 180, 227, 0.8)', // #6AB4E3 @ 80%
+																			border: '3px solid #143883',
+																		}}
+																	>
+																		<div
+																			className="flex flex-col items-center justify-center gap-[16px]"
+																			style={{ width: 496 }}
+																		>
+																			<div
+																				className="flex items-center justify-center text-center bg-white"
+																				style={{
+																					width: 496,
+																					height: 58,
+																					borderRadius: 8,
+																					border: '2px solid #101010',
+																				}}
+																			>
+																				<span className="font-secondary font-bold text-[18px] leading-none text-black">
+																					Keep Exploring
+																				</span>
+																			</div>
+																			<div
+																				className="flex items-center justify-center text-center bg-white px-6"
+																				style={{
+																					width: 496,
+																					height: 58,
+																					borderRadius: 8,
+																					border: '2px solid #101010',
+																				}}
+																			>
+																				<span className="font-secondary font-bold text-[16px] leading-tight text-black">
+																					Try a new search term to find contacts in this area
+																				</span>
+																			</div>
+																		</div>
+																	</div>
+																</div>
+															)}
 															{/* Search Results overlay box on the right side - hidden while loading and at narrowest breakpoint */}
 															{!(
 																isSearchPending ||
 																isLoadingContacts ||
 																isRefetchingContacts
 															) &&
-																!isNarrowestDesktop && (
+																!isNarrowestDesktop &&
+																!hasNoSearchResults && (
 																	<div
 																		className="absolute top-[97px] right-[10px] rounded-[12px] flex flex-col"
 																		style={{
@@ -3302,7 +3453,8 @@ const DashboardContent = () => {
 																		isSearchPending ||
 																		isLoadingContacts ||
 																		isRefetchingContacts
-																	) && (
+																	) &&
+																	!hasNoSearchResults && (
 																		<div className="absolute bottom-[10px] left-[10px] right-[10px] hidden xl:flex justify-center">
 																			<Button
 																				isLoading={
@@ -3353,7 +3505,8 @@ const DashboardContent = () => {
 																	isSearchPending ||
 																	isLoadingContacts ||
 																	isRefetchingContacts
-																) && (
+																) &&
+																!hasNoSearchResults && (
 																	<div
 																		className="absolute left-[10px] right-[10px] bottom-[10px] rounded-[12px] shadow-lg flex flex-col"
 																		style={{

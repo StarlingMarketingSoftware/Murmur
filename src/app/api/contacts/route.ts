@@ -55,6 +55,13 @@ const contactFilterSchema = z.object({
 	useVectorSearch: z.boolean().optional(),
 	location: z.string().optional(),
 	excludeUsedContacts: z.boolean().optional(),
+	// Optional bounding-box override (used by map rectangle selection).
+	// When present, the API will return contacts inside this box, optionally filtered by `bboxTitlePrefix`.
+	bboxSouth: z.coerce.number().optional(),
+	bboxWest: z.coerce.number().optional(),
+	bboxNorth: z.coerce.number().optional(),
+	bboxEast: z.coerce.number().optional(),
+	bboxTitlePrefix: z.string().optional(),
 });
 
 export type ContactFilterData = z.infer<typeof contactFilterSchema>;
@@ -912,8 +919,94 @@ export async function GET(req: NextRequest) {
 			useVectorSearch,
 			location,
 			excludeUsedContacts,
+			bboxSouth,
+			bboxWest,
+			bboxNorth,
+			bboxEast,
+			bboxTitlePrefix,
 		} = validatedFilters.data;
 		let locationFilter = location ?? null;
+
+		// --- Bounding-box override (map rectangle selection) ---
+		// When bbox params are present, we bypass the complex LLM/vector search flow and
+		// return contacts within the selected box. This keeps the UI snappy for map-based
+		// exploration while preserving the main search behavior when no bbox is provided.
+		const hasBboxFilter =
+			[bboxSouth, bboxWest, bboxNorth, bboxEast].every(
+				(n) => typeof n === 'number' && Number.isFinite(n)
+			) && bboxSouth != null;
+		if (hasBboxFilter) {
+			const clamp = (n: number, min: number, max: number) =>
+				Math.max(min, Math.min(max, n));
+			const minLat = clamp(Math.min(bboxSouth!, bboxNorth!), -90, 90);
+			const maxLat = clamp(Math.max(bboxSouth!, bboxNorth!), -90, 90);
+			const minLng = clamp(Math.min(bboxWest!, bboxEast!), -180, 180);
+			const maxLng = clamp(Math.max(bboxWest!, bboxEast!), -180, 180);
+
+			// We currently do not support antimeridian-crossing viewports.
+			if (maxLng < minLng) {
+				return apiBadRequest('Invalid bounds');
+			}
+
+			// Derive the category/title prefix from the request (explicit param wins),
+			// or infer it from the structured dashboard query (e.g. "[Booking] Music Venues (Maine)").
+			const inferTitlePrefixFromQuery = (q: string | null | undefined): string => {
+				const s = (q ?? '').trim();
+				if (!s) return '';
+				return (
+					s
+						.replace(/^\[[^\]]+\]\s*/i, '') // strip leading [Why]
+						.replace(/\s*\([^)]*\)\s*$/i, '') // strip trailing (Where)
+						.replace(/\s+in\s+.+$/i, '') // legacy "... in <where>"
+						.trim() || ''
+				);
+			};
+			const titlePrefix =
+				(bboxTitlePrefix ?? '').trim() || inferTitlePrefixFromQuery(query);
+
+			// Respect "exclude used contacts" (contacts already in any of the user's lists).
+			let addedContactIds: number[] = [];
+			if (excludeUsedContacts) {
+				const userContactLists = await prisma.userContactList.findMany({
+					where: { userId },
+					select: {
+						contacts: {
+							select: { id: true },
+						},
+					},
+				});
+				addedContactIds = userContactLists.flatMap((list) => list.contacts.map((c) => c.id));
+			}
+
+			const requestedLimit = Math.max(
+				1,
+				Math.min(limit ?? VECTOR_SEARCH_LIMIT_DEFAULT, 2000)
+			);
+
+			const where: Prisma.ContactWhereInput = {
+				latitude: { gte: minLat, lte: maxLat },
+				longitude: { gte: minLng, lte: maxLng },
+				id: excludeUsedContacts && addedContactIds.length > 0 ? { notIn: addedContactIds } : undefined,
+				emailValidationStatus: verificationStatus ? { equals: verificationStatus } : undefined,
+				...(titlePrefix
+					? {
+							title: {
+								not: null,
+								startsWith: titlePrefix,
+								mode: 'insensitive',
+							},
+					  }
+					: {}),
+			};
+
+			const contacts = await prisma.contact.findMany({
+				where,
+				take: requestedLimit,
+				orderBy: [{ id: 'asc' }],
+			});
+
+			return apiResponse(contacts);
+		}
 
 		let locationResponse: string | null = null;
 		const rawQuery = query || '';
