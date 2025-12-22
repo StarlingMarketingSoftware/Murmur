@@ -791,6 +791,8 @@ const RESULT_DOT_SCALE_MAX = 11;
 // Overlay pins look too small when zoomed out; keep their circle readable without
 // overpowering the search tray/category icons.
 const MIN_OVERLAY_PIN_CIRCLE_DIAMETER_PX = 16;
+// CSS transition duration for smooth overlay pin scaling during zoom.
+const OVERLAY_PIN_SCALE_TRANSITION_MS = 120;
 // Stroke weight should be thinner when zoomed out and approach ~3px when zoomed in.
 const RESULT_DOT_STROKE_WEIGHT_MIN_PX = 1.5;
 const RESULT_DOT_STROKE_WEIGHT_MAX_PX = 3;
@@ -1033,9 +1035,13 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const [selectedStateKey, setSelectedStateKey] = useState<string | null>(null);
 	const [zoomLevel, setZoomLevel] = useState(4); // Default zoom level
 	const [visibleContacts, setVisibleContacts] = useState<ContactWithName[]>([]);
+	// Keep a "sticky" set of currently-rendered marker ids so zooming can rescale existing markers
+	// and only introduce *new* markers, instead of re-sampling a totally different set each time.
+	const visibleContactIdSetRef = useRef<Set<number>>(new Set());
 	const [bookingExtraVisibleContacts, setBookingExtraVisibleContacts] = useState<ContactWithName[]>(
 		[]
 	);
+	const bookingExtraVisibleIdSetRef = useRef<Set<number>>(new Set());
 	const lastBookingExtraVisibleContactsKeyRef = useRef<string>('');
 	const lastBookingExtraFetchKeyRef = useRef<string>('');
 	const [bookingExtraFetchBbox, setBookingExtraFetchBbox] = useState<BoundingBox | null>(null);
@@ -1082,6 +1088,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 	const isBookingSearch = useMemo(() => isBookingSearchQuery(searchQuery), [searchQuery]);
 	const isPromotionSearch = useMemo(() => isPromotionSearchQuery(searchQuery), [searchQuery]);
+	useEffect(() => {
+		visibleContactIdSetRef.current = new Set(visibleContacts.map((c) => c.id));
+	}, [visibleContacts]);
+	useEffect(() => {
+		bookingExtraVisibleIdSetRef.current = new Set(bookingExtraVisibleContacts.map((c) => c.id));
+	}, [bookingExtraVisibleContacts]);
 	// When hovering a booking "extra" marker, highlight all other visible extra markers
 	// of the same booking category (e.g. hover a festival → highlight all festivals in view).
 	const hoveredBookingExtraCategory = useMemo(() => {
@@ -2056,13 +2068,16 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				!!lockedStateSelectionMultiPolygonRef.current;
 
 			const selectedSet = new Set<number>(selectedContacts);
-			const selectedInBounds: ContactWithName[] = [];
-			const inLockedUnselectedInBounds: ContactWithName[] = [];
-			const outLockedUnselectedInBounds: ContactWithName[] = [];
-			const unselectedInBounds: ContactWithName[] = [];
+			const priorityIdSet = new Set<number>(selectedSet);
+			for (const id of visibleContactIdSetRef.current) priorityIdSet.add(id);
+
+			const priorityInBounds: ContactWithName[] = [];
+			const inLockedUnpriorityInBounds: ContactWithName[] = [];
+			const outLockedUnpriorityInBounds: ContactWithName[] = [];
+			const unpriorityInBounds: ContactWithName[] = [];
 			for (const contact of inBounds) {
-				if (selectedSet.has(contact.id)) {
-					selectedInBounds.push(contact);
+				if (priorityIdSet.has(contact.id)) {
+					priorityInBounds.push(contact);
 					continue;
 				}
 
@@ -2071,26 +2086,26 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					// and only fall back to polygon containment when state is missing/unknown.
 					const contactStateKey = normalizeStateKey(contact.state ?? null);
 					if (contactStateKey) {
-						if (contactStateKey === lockedStateKey) inLockedUnselectedInBounds.push(contact);
-						else outLockedUnselectedInBounds.push(contact);
+						if (contactStateKey === lockedStateKey) inLockedUnpriorityInBounds.push(contact);
+						else outLockedUnpriorityInBounds.push(contact);
 						continue;
 					}
 
 					const coords = getContactCoords(contact);
-					if (coords && isCoordsInLockedState(coords)) inLockedUnselectedInBounds.push(contact);
-					else outLockedUnselectedInBounds.push(contact);
+					if (coords && isCoordsInLockedState(coords)) inLockedUnpriorityInBounds.push(contact);
+					else outLockedUnpriorityInBounds.push(contact);
 					continue;
 				}
 
-				unselectedInBounds.push(contact);
+				unpriorityInBounds.push(contact);
 			}
 
 			// When zoomed out, avoid placing locked-state dots directly on top of the state border stroke
 			// by deprioritizing points that are too close to the boundary.
 			const shouldInsetLockedStateMarkers = hasLockedStateSelection && zoomRaw <= 6;
 			let lockedEdgeIdSet: Set<number> | null = null;
-			let inLockedUnselectedSafe: ContactWithName[] = inLockedUnselectedInBounds;
-			let inLockedUnselectedEdge: ContactWithName[] = [];
+			let inLockedUnprioritySafe: ContactWithName[] = inLockedUnpriorityInBounds;
+			let inLockedUnpriorityEdge: ContactWithName[] = [];
 
 			if (shouldInsetLockedStateMarkers) {
 				const selection = lockedStateSelectionMultiPolygonRef.current;
@@ -2101,7 +2116,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						const borderInsetPx = markerScale + 1.5 + 1;
 						const safe: ContactWithName[] = [];
 						const edge: ContactWithName[] = [];
-						for (const contact of inLockedUnselectedInBounds) {
+						for (const contact of inLockedUnpriorityInBounds) {
 							const coords = getContactCoords(contact);
 							if (!coords) continue;
 							const wp = latLngToWorldPixel(coords, worldSize);
@@ -2115,8 +2130,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 							else safe.push(contact);
 						}
 
-						inLockedUnselectedSafe = safe;
-						inLockedUnselectedEdge = edge;
+						inLockedUnprioritySafe = safe;
+						inLockedUnpriorityEdge = edge;
 						lockedEdgeIdSet = edge.length > 0 ? new Set(edge.map((c) => c.id)) : null;
 					}
 				}
@@ -2134,28 +2149,28 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				pool = [];
 			} else if (inBounds.length <= poolSlots) {
 				pool = inBounds;
-			} else if (selectedInBounds.length >= poolSlots) {
+			} else if (priorityInBounds.length >= poolSlots) {
 				pool = stableViewportSampleContacts(
-					selectedInBounds,
+					priorityInBounds,
 					getContactCoords,
 					viewportBbox,
 					poolSlots,
-					`${seed}|pool:selected`
+					`${seed}|pool:priority`
 				);
 			} else {
-				const remainingSlots = poolSlots - selectedInBounds.length;
+				const remainingSlots = poolSlots - priorityInBounds.length;
 				if (hasLockedStateSelection) {
 					const share = getLockedStateMarkerShareForZoom(zoomRaw);
 					const desiredLockedSlots = Math.round(remainingSlots * share);
-					const lockedSlots = Math.min(inLockedUnselectedInBounds.length, desiredLockedSlots);
+					const lockedSlots = Math.min(inLockedUnpriorityInBounds.length, desiredLockedSlots);
 					let outsideSlots = remainingSlots - lockedSlots;
 					const lockedSamplingBbox = lockedStateSelectionBboxRef.current ?? viewportBbox;
 
 					const sampleLockedUnselected = (slots: number): ContactWithName[] => {
 						if (slots <= 0) return [];
-						if (!shouldInsetLockedStateMarkers || inLockedUnselectedEdge.length === 0) {
+						if (!shouldInsetLockedStateMarkers || inLockedUnpriorityEdge.length === 0) {
 							return stableViewportSampleContacts(
-								inLockedUnselectedInBounds,
+								inLockedUnpriorityInBounds,
 								getContactCoords,
 								lockedSamplingBbox,
 								slots,
@@ -2163,12 +2178,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 							);
 						}
 
-						const primarySlots = Math.min(inLockedUnselectedSafe.length, slots);
+						const primarySlots = Math.min(inLockedUnprioritySafe.length, slots);
 						const edgeSlots = Math.max(0, slots - primarySlots);
 						const sampledSafe =
 							primarySlots > 0
 								? stableViewportSampleContacts(
-										inLockedUnselectedSafe,
+										inLockedUnprioritySafe,
 										getContactCoords,
 										lockedSamplingBbox,
 										primarySlots,
@@ -2178,7 +2193,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						const sampledEdge =
 							edgeSlots > 0
 								? stableViewportSampleContacts(
-										inLockedUnselectedEdge,
+										inLockedUnpriorityEdge,
 										getContactCoords,
 										lockedSamplingBbox,
 										edgeSlots,
@@ -2191,47 +2206,47 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 					// If there aren't enough "outside" contacts to fill the remainder,
 					// reallocate the unused slots back to the locked state.
-					const outsideAvailable = outLockedUnselectedInBounds.length;
+					const outsideAvailable = outLockedUnpriorityInBounds.length;
 					if (outsideAvailable < outsideSlots) {
 						const unused = outsideSlots - outsideAvailable;
 						outsideSlots = outsideAvailable;
 						// NOTE: This may exceed desiredLockedSlots, but it's fine — we prefer
 						// more in-locked candidates when zoomed out.
 						const additionalLockedSlots = Math.min(
-							inLockedUnselectedInBounds.length - lockedSlots,
+							inLockedUnpriorityInBounds.length - lockedSlots,
 							unused
 						);
 						const finalLockedSlots = lockedSlots + Math.max(0, additionalLockedSlots);
 
 						const sampledLocked = sampleLockedUnselected(finalLockedSlots);
 						const sampledOutside = stableViewportSampleContacts(
-							outLockedUnselectedInBounds,
+							outLockedUnpriorityInBounds,
 							getContactCoords,
 							viewportBbox,
 							outsideSlots,
 							`${seed}|pool:out`
 						);
-						pool = [...selectedInBounds, ...sampledLocked, ...sampledOutside];
+						pool = [...priorityInBounds, ...sampledLocked, ...sampledOutside];
 					} else {
 						const sampledLocked = sampleLockedUnselected(lockedSlots);
 						const sampledOutside = stableViewportSampleContacts(
-							outLockedUnselectedInBounds,
+							outLockedUnpriorityInBounds,
 							getContactCoords,
 							viewportBbox,
 							outsideSlots,
 							`${seed}|pool:out`
 						);
-						pool = [...selectedInBounds, ...sampledLocked, ...sampledOutside];
+						pool = [...priorityInBounds, ...sampledLocked, ...sampledOutside];
 					}
 				} else {
 					const sampled = stableViewportSampleContacts(
-						unselectedInBounds,
+						unpriorityInBounds,
 						getContactCoords,
 						viewportBbox,
 						remainingSlots,
 						`${seed}|pool`
 					);
-					pool = [...selectedInBounds, ...sampled];
+					pool = [...priorityInBounds, ...sampled];
 				}
 			}
 
@@ -2240,6 +2255,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				x: number;
 				y: number;
 				isSelected: boolean;
+				isPriority: boolean;
 				isInLockedState: boolean;
 				isNearLockedBorder: boolean;
 				key: number;
@@ -2260,23 +2276,28 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					x,
 					y,
 					isSelected: selectedSet.has(contact.id),
+					isPriority: priorityIdSet.has(contact.id),
 					isInLockedState,
 					isNearLockedBorder: !!lockedEdgeIdSet && lockedEdgeIdSet.has(contact.id),
 					key: hashStringToUint32(`${seed}|${contact.id}`),
 				});
 			}
 
-			const selectedCandidates: Candidate[] = [];
+			const priorityCandidates: Candidate[] = [];
 			const inLockedCandidates: Candidate[] = [];
 			const outLockedCandidates: Candidate[] = [];
 			for (const c of candidates) {
-				if (c.isSelected) selectedCandidates.push(c);
+				if (c.isPriority) priorityCandidates.push(c);
 				else if (c.isInLockedState) inLockedCandidates.push(c);
 				else outLockedCandidates.push(c);
 			}
 
-			// Stable ordering (we handle "selected first" by splitting arrays).
-			selectedCandidates.sort((a, b) => a.key - b.key);
+			// Stable ordering (we handle "priority first" by splitting arrays).
+			// Within priority, keep explicit selections first, then stable by id.
+			priorityCandidates.sort((a, b) => {
+				if (a.isSelected !== b.isSelected) return a.isSelected ? -1 : 1;
+				return a.contact.id - b.contact.id;
+			});
 			inLockedCandidates.sort((a, b) => {
 				if (shouldInsetLockedStateMarkers && a.isNearLockedBorder !== b.isNearLockedBorder) {
 					return a.isNearLockedBorder ? 1 : -1;
@@ -2325,8 +2346,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				}
 			};
 
-			// Always keep explicitly selected markers visible first.
-			pickFromCandidates(selectedCandidates, maxPrimaryDots);
+			// Keep already-visible markers (plus any explicitly selected ones) stable while zooming:
+			// rescale what’s already there, then add more markers as density allows.
+			pickFromCandidates(priorityCandidates, maxPrimaryDots);
 
 			// Then pick unselected markers, biasing toward the searched/locked state when zoomed out.
 			const remainingBudget = maxPrimaryDots - picked.length;
@@ -2383,11 +2405,13 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					}
 
 					// Always prefer explicitly selected extra markers (so they don't disappear due to sampling).
-					const selectedExtraInBounds: ContactWithName[] = [];
-					const unselectedExtraInBounds: ContactWithName[] = [];
+					const priorityExtraIdSet = new Set<number>(selectedSet);
+					for (const id of bookingExtraVisibleIdSetRef.current) priorityExtraIdSet.add(id);
+					const priorityExtraInBounds: ContactWithName[] = [];
+					const unpriorityExtraInBounds: ContactWithName[] = [];
 					for (const contact of extraInBounds) {
-						if (selectedSet.has(contact.id)) selectedExtraInBounds.push(contact);
-						else unselectedExtraInBounds.push(contact);
+						if (priorityExtraIdSet.has(contact.id)) priorityExtraInBounds.push(contact);
+						else unpriorityExtraInBounds.push(contact);
 					}
 
 					// Use the same sampling + non-overlap strategy as primary markers.
@@ -2396,30 +2420,37 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					let pool: ContactWithName[] = [];
 					if (extraInBounds.length <= poolSlots) {
 						pool = extraInBounds;
-					} else if (selectedExtraInBounds.length >= poolSlots) {
+					} else if (priorityExtraInBounds.length >= poolSlots) {
 						pool = stableViewportSampleContacts(
-							selectedExtraInBounds,
+							priorityExtraInBounds,
 							getBookingExtraContactCoords,
 							viewportBbox,
 							poolSlots,
-							`${seed}|bookingExtra|pool:selected`
+							`${seed}|bookingExtra|pool:priority`
 						);
 					} else {
-						const remainingSlots = Math.max(0, poolSlots - selectedExtraInBounds.length);
-						const sampledUnselected =
-							unselectedExtraInBounds.length <= remainingSlots
-								? unselectedExtraInBounds
+						const remainingSlots = Math.max(0, poolSlots - priorityExtraInBounds.length);
+						const sampledOther =
+							unpriorityExtraInBounds.length <= remainingSlots
+								? unpriorityExtraInBounds
 								: stableViewportSampleContacts(
-										unselectedExtraInBounds,
+										unpriorityExtraInBounds,
 										getBookingExtraContactCoords,
 										viewportBbox,
 										remainingSlots,
-										`${seed}|bookingExtra|pool:unselected`
+										`${seed}|bookingExtra|pool:other`
 									);
-						pool = [...selectedExtraInBounds, ...sampledUnselected];
+						pool = [...priorityExtraInBounds, ...sampledOther];
 					}
 
-					type Candidate = { contact: ContactWithName; x: number; y: number; key: number };
+					type Candidate = {
+						contact: ContactWithName;
+						x: number;
+						y: number;
+						key: number;
+						isSelected: boolean;
+						isPriority: boolean;
+					};
 					const candidates: Candidate[] = [];
 					for (const contact of pool) {
 						const coords = getBookingExtraContactCoords(contact);
@@ -2436,6 +2467,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 							x,
 							y,
 							key: hashStringToUint32(`${seed}|bookingExtra|${contact.id}`),
+							isSelected: selectedSet.has(contact.id),
+							isPriority: priorityExtraIdSet.has(contact.id),
 						});
 					}
 
@@ -2460,12 +2493,17 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						return false;
 					};
 
-					const selectedCandidates: Candidate[] = [];
-					const unselectedCandidates: Candidate[] = [];
+					const priorityCandidates: Candidate[] = [];
+					const otherCandidates: Candidate[] = [];
 					for (const c of candidates) {
-						if (selectedSet.has(c.contact.id)) selectedCandidates.push(c);
-						else unselectedCandidates.push(c);
+						if (c.isPriority) priorityCandidates.push(c);
+						else otherCandidates.push(c);
 					}
+
+					priorityCandidates.sort((a, b) => {
+						if (a.isSelected !== b.isSelected) return a.isSelected ? -1 : 1;
+						return a.contact.id - b.contact.id;
+					});
 
 					const pickFromCandidates = (cands: Candidate[], maxToPick: number) => {
 						if (maxToPick <= 0) return;
@@ -2484,9 +2522,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						}
 					};
 
-					// Always keep selected extras visible first.
-					pickFromCandidates(selectedCandidates, maxExtraDots);
-					pickFromCandidates(unselectedCandidates, maxExtraDots - pickedExtra.length);
+					// Keep already-visible/selected extras stable, then add more if we have budget.
+					pickFromCandidates(priorityCandidates, maxExtraDots);
+					pickFromCandidates(otherCandidates, maxExtraDots - pickedExtra.length);
 
 					nextBookingExtraVisible = pickedExtra;
 					nextBookingExtraVisible.sort((a, b) => a.id - b.id);
@@ -3353,12 +3391,40 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 								// Keep in-state promotion markers behaving like primary dots; out-of-state pins sit behind.
 								zIndex={shouldUseOverlayPinStyle ? 0 : MARKER_HIT_AREA_Z_INDEX}
 							/>
-							<MarkerF
-								position={coords}
-								icon={shouldUseOverlayPinStyle ? pinIcon : dotIcon}
-								clickable={false}
-								zIndex={shouldUseOverlayPinStyle ? -1 : MARKER_DOT_Z_INDEX}
-							/>
+							{/* Non-pin markers use MarkerF for consistency */}
+							{!shouldUseOverlayPinStyle && (
+								<MarkerF
+									position={coords}
+									icon={dotIcon}
+									clickable={false}
+									zIndex={MARKER_DOT_Z_INDEX}
+								/>
+							)}
+							{/* Pin markers use OverlayViewF with CSS transform for smooth zoom scaling */}
+							{shouldUseOverlayPinStyle && (
+								<OverlayViewF
+									position={coords}
+									mapPaneName={OverlayView.OVERLAY_LAYER}
+									getPixelPositionOffset={() => ({
+										x: -MAP_MARKER_PIN_CIRCLE_CENTER_X,
+										y: -MAP_MARKER_PIN_CIRCLE_CENTER_Y,
+									})}
+								>
+									<img
+										src={getMarkerPinUrl(pinFillColor, pinStrokeColor, whatForMarker)}
+										alt=""
+										draggable={false}
+										style={{
+											width: MAP_MARKER_PIN_VIEWBOX_WIDTH,
+											height: MAP_MARKER_PIN_VIEWBOX_HEIGHT,
+											pointerEvents: 'none',
+											transform: `scale(${markerPinScaleFactor})`,
+											transformOrigin: `${MAP_MARKER_PIN_CIRCLE_CENTER_X}px ${MAP_MARKER_PIN_CIRCLE_CENTER_Y}px`,
+											transition: `transform ${OVERLAY_PIN_SCALE_TRANSITION_MS}ms ease-out`,
+										}}
+									/>
+								</OverlayViewF>
+							)}
 							{shouldShowTooltip && hoverTooltip && (
 								<OverlayViewF
 									position={coords}
@@ -3432,13 +3498,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						: isCategoryHovered
 							? BOOKING_EXTRA_PIN_HOVER_STROKE_COLOR
 							: RESULT_DOT_STROKE_COLOR_DEFAULT;
-					const pinIcon = getMarkerPinIcon(
-						pinFillColor,
-						chromeColor,
-						whatForMarker,
-						isCategoryHovered ? BOOKING_EXTRA_PIN_HOVER_SCALE : 1,
-						chromeColor
-					);
 
 					// Show tooltip if hovered or if this marker is fading out
 					const isFading = fadingTooltipId === contact.id;
@@ -3478,6 +3537,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 							})()
 						: null;
 
+					// Calculate effective scale multiplier for hover effect
+					const pinScaleMultiplier = isCategoryHovered ? BOOKING_EXTRA_PIN_HOVER_SCALE : 1;
+					const effectivePinScaleFactor = markerPinScaleFactor * pinScaleMultiplier;
+
 					return (
 						<Fragment key={`bookingExtra-${contact.id}`}>
 							{/* Lower z-index hit area so primary markers win when overlapping */}
@@ -3490,12 +3553,29 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 								clickable={true}
 								zIndex={0}
 							/>
-							<MarkerF
+							{/* Pin markers use OverlayViewF with CSS transform for smooth zoom scaling */}
+							<OverlayViewF
 								position={coords}
-								icon={pinIcon}
-								clickable={false}
-								zIndex={-1}
-							/>
+								mapPaneName={OverlayView.OVERLAY_LAYER}
+								getPixelPositionOffset={() => ({
+									x: -MAP_MARKER_PIN_CIRCLE_CENTER_X,
+									y: -MAP_MARKER_PIN_CIRCLE_CENTER_Y,
+								})}
+							>
+								<img
+									src={getMarkerPinUrl(pinFillColor, chromeColor, whatForMarker, chromeColor)}
+									alt=""
+									draggable={false}
+									style={{
+										width: MAP_MARKER_PIN_VIEWBOX_WIDTH,
+										height: MAP_MARKER_PIN_VIEWBOX_HEIGHT,
+										pointerEvents: 'none',
+										transform: `scale(${effectivePinScaleFactor})`,
+										transformOrigin: `${MAP_MARKER_PIN_CIRCLE_CENTER_X}px ${MAP_MARKER_PIN_CIRCLE_CENTER_Y}px`,
+										transition: `transform ${OVERLAY_PIN_SCALE_TRANSITION_MS}ms ease-out`,
+									}}
+								/>
+							</OverlayViewF>
 							{shouldShowTooltip && hoverTooltip && (
 								<OverlayViewF
 									position={coords}
