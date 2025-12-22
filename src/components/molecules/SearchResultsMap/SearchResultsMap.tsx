@@ -633,6 +633,8 @@ const defaultCenter = {
 };
 
 const MAP_MIN_ZOOM = 5;
+// Dashboard UX: allow state hover highlight one zoom step past minZoom.
+const STATE_HOVER_HIGHLIGHT_MAX_ZOOM = MAP_MIN_ZOOM + 1;
 
 const mapOptions: google.maps.MapOptions = {
 	disableDefaultUI: true,
@@ -641,6 +643,8 @@ const mapOptions: google.maps.MapOptions = {
 	mapTypeControl: false,
 	fullscreenControl: false,
 	gestureHandling: 'greedy',
+	// Enable finer scroll-wheel zoom steps (more "in-between" zoom levels).
+	isFractionalZoomEnabled: true,
 	minZoom: MAP_MIN_ZOOM,
 	styles: [
 		// Hide Google's default state/province border lines so our custom outline is the only
@@ -702,7 +706,8 @@ const MARKER_DOT_Z_INDEX = 1;
 // Below this zoom level, markers are too dense and small for hover interactions to be useful.
 const HOVER_INTERACTION_MIN_ZOOM = 8;
 // Booking searches: when zoomed in enough, show additional nearby booking categories as extra markers.
-const BOOKING_EXTRA_MARKERS_MIN_ZOOM = 10;
+// Lower this a bit so overlay pins are visible sooner when zoomed out.
+const BOOKING_EXTRA_MARKERS_MIN_ZOOM = 8;
 // Keep extra markers capped so map remains responsive.
 const BOOKING_EXTRA_MARKERS_MAX_DOTS = 160;
 // Promotion searches: show state-wide radio list pins as overlay markers.
@@ -710,8 +715,6 @@ const BOOKING_EXTRA_MARKERS_MAX_DOTS = 160;
 const PROMOTION_OVERLAY_MARKERS_MIN_ZOOM = 4;
 // Defensive cap; expected to be ~2 per state.
 const PROMOTION_OVERLAY_MARKERS_MAX_PINS = 220;
-// Zoom level at which the map switches to satellite/hybrid view for better detail
-const SATELLITE_VIEW_MIN_ZOOM = 14;
 
 const BOOKING_EXTRA_TITLE_PREFIXES = [
 	'Music Venues',
@@ -1491,17 +1494,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		onMarkerHover?.(null);
 	}, [zoomLevel, hoveredMarkerId, onMarkerHover]);
 
-	// Switch to satellite/hybrid view when zoomed in close enough for street-level detail
-	useEffect(() => {
-		if (!map) return;
-		const shouldUseSatellite = zoomLevel >= SATELLITE_VIEW_MIN_ZOOM;
-		const currentMapType = map.getMapTypeId();
-		const targetMapType = shouldUseSatellite ? 'hybrid' : 'roadmap';
-		if (currentMapType !== targetMapType) {
-			map.setMapTypeId(targetMapType);
-		}
-	}, [map, zoomLevel]);
-
 	useEffect(() => {
 		if (lockedStateName === undefined) return;
 		const nextKey = normalizeStateKey(lockedStateName);
@@ -1588,7 +1580,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	}, [map, clearResultsOutline, clearSearchedStateOutline]);
 
 	// Add/remove hover highlight and optional click-to-select for states.
-	// Hover highlight is intentionally only enabled at the minimum zoom (fully zoomed out).
+	// Hover highlight: on dashboard, allow one zoom step past minZoom.
 	useEffect(() => {
 		const dataLayer = stateLayerRef.current;
 		if (!map || !dataLayer || !isStateLayerReady) return;
@@ -1596,14 +1588,23 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		const loading = isLoading ?? false;
 		// "Fully zoomed out" means at the minimum zoom allowed by the map.
 		const isFullyZoomedOut = !loading && zoomLevel <= MAP_MIN_ZOOM + 0.001;
+		// Keep campaign behavior strict (minZoom only) while loosening dashboard by +1.
+		const stateHoverMaxZoom = enableStateInteractions ? MAP_MIN_ZOOM : STATE_HOVER_HIGHLIGHT_MAX_ZOOM;
+		const isWithinStateHoverZoom = !loading && zoomLevel <= stateHoverMaxZoom + 0.001;
 		const hasStateInteractivity = !!enableStateInteractions || !!onStateSelect;
+		// When the dashboard "select" tool is active, the user is drawing a box. Disable any
+		// state hover/click interactivity so it doesn't distract or accidentally trigger selection.
+		const isSelectToolActive = activeTool === 'select';
 
-		// Hover highlight should only exist at the minimum zoom and only when states are actionable.
-		const shouldEnableHoverHighlight = isFullyZoomedOut && hasStateInteractivity;
+		// Hover highlight should only exist at low zoom and only when states are actionable.
+		const shouldEnableHoverHighlight =
+			isWithinStateHoverZoom && hasStateInteractivity && !isSelectToolActive;
 		// Click-to-select states:
 		// - Campaign page (enableStateInteractions): always clickable
 		// - Dashboard map view (no enableStateInteractions): clickable only when fully zoomed out
-		const shouldEnableClickSelect = !!enableStateInteractions || (!!onStateSelect && isFullyZoomedOut);
+		const shouldEnableClickSelect =
+			!isSelectToolActive &&
+			(!!enableStateInteractions || (!!onStateSelect && isFullyZoomedOut));
 
 		if (!shouldEnableHoverHighlight && !shouldEnableClickSelect) return;
 
@@ -1617,7 +1618,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				(event: google.maps.Data.MouseEvent) => {
 					// Defensive: if zoom changed mid-hover, don't apply the fill.
 					const currentZoom = map.getZoom() ?? zoomLevel;
-					if (currentZoom > MAP_MIN_ZOOM + 0.001) return;
+					if (currentZoom > stateHoverMaxZoom + 0.001) return;
 					if (isLoadingRef.current) return;
 
 					const hoveredKey = normalizeStateKey(
@@ -1671,7 +1672,15 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				dataLayer.revertStyle();
 			}
 		};
-	}, [map, enableStateInteractions, isStateLayerReady, zoomLevel, isLoading, onStateSelect]);
+	}, [
+		map,
+		activeTool,
+		enableStateInteractions,
+		isStateLayerReady,
+		zoomLevel,
+		isLoading,
+		onStateSelect,
+	]);
 
 	// When state interactions are off, show subtle divider lines at low zoom (US-wide view).
 	useEffect(() => {
@@ -1680,8 +1689,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		if (enableStateInteractions) return;
 
 		const loading = isLoading ?? false;
-		const isFullyZoomedOut = !loading && zoomLevel <= MAP_MIN_ZOOM + 0.001;
+		const isWithinStateHoverZoom = !loading && zoomLevel <= STATE_HOVER_HIGHLIGHT_MAX_ZOOM + 0.001;
 		const shouldShowZoomedOutDividers = zoomLevel <= STATE_DIVIDER_LINES_MAX_ZOOM;
+		const isSelectToolActive = activeTool === 'select';
 		dataLayer.setStyle(
 			shouldShowZoomedOutDividers
 				? {
@@ -1689,8 +1699,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						strokeColor: STATE_DIVIDER_LINES_COLOR,
 						strokeOpacity: STATE_DIVIDER_LINES_STROKE_OPACITY,
 						strokeWeight: STATE_DIVIDER_LINES_STROKE_WEIGHT,
-						// Enable hover only at the map's minimum zoom.
-						clickable: isFullyZoomedOut && !!onStateSelect,
+						// Enable hover at low zoom (minZoom..minZoom+1) on the dashboard.
+						clickable: !isSelectToolActive && isWithinStateHoverZoom && !!onStateSelect,
 						zIndex: 0,
 					}
 				: {
@@ -1701,7 +1711,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						zIndex: 0,
 					}
 		);
-	}, [enableStateInteractions, isStateLayerReady, zoomLevel, isLoading, onStateSelect]);
+	}, [activeTool, enableStateInteractions, isStateLayerReady, zoomLevel, isLoading, onStateSelect]);
 
 	// When state interactions are on, render the state borders + selected-state outline.
 	useEffect(() => {
@@ -1709,6 +1719,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		if (!dataLayer || !isStateLayerReady) return;
 		if (!enableStateInteractions) return;
 
+		const isSelectToolActive = activeTool === 'select';
 		dataLayer.setStyle((feature) => {
 			const featureKey = normalizeStateKey(
 				(feature.getProperty('NAME') as string) || (feature.getId() as string)
@@ -1716,14 +1727,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			const isSelected = featureKey && featureKey === selectedStateKey;
 			return {
 				fillOpacity: 0,
-				clickable: true,
+				clickable: !isSelectToolActive,
 				strokeColor: isSelected ? '#000000' : STATE_BORDER_COLOR,
 				strokeOpacity: isSelected ? 1 : 0.7,
 				strokeWeight: isSelected ? 2 : 0.6,
 				zIndex: 0,
 			};
 		});
-	}, [selectedStateKey, enableStateInteractions, isStateLayerReady]);
+	}, [activeTool, selectedStateKey, enableStateInteractions, isStateLayerReady]);
 
 	const handleResearchPanelMouseEnter = useCallback(() => {
 		if (researchPanelTimeoutRef.current) {
