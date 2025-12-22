@@ -2,6 +2,7 @@ import { getTooltipCategoryIconSpec } from './mapTooltipCategoryIcons';
 
 const DEFAULT_PIN_FILL_COLOR = '#D21E1F';
 const DEFAULT_PIN_STROKE_COLOR = '#FFFFFF';
+const DEFAULT_PIN_BASE_COLOR = '#FFFFFF';
 
 export const MAP_MARKER_PIN_VIEWBOX_WIDTH = 39;
 export const MAP_MARKER_PIN_VIEWBOX_HEIGHT = 44;
@@ -33,12 +34,14 @@ const normalizeInlineSvgMarkupForXml = (markup: string): string =>
 export const generateMapMarkerPinSvg = (
 	fillColor: string = DEFAULT_PIN_FILL_COLOR,
 	strokeColor: string = DEFAULT_PIN_STROKE_COLOR,
-	searchWhat?: string | null
+	searchWhat?: string | null,
+	baseColor: string = DEFAULT_PIN_BASE_COLOR
 ): string => {
 	const safeFillColor = isValidHexColor(fillColor) ? fillColor.trim() : DEFAULT_PIN_FILL_COLOR;
 	const safeStrokeColor = isValidHexColor(strokeColor)
 		? strokeColor.trim()
 		: DEFAULT_PIN_STROKE_COLOR;
+	const safeBaseColor = isValidHexColor(baseColor) ? baseColor.trim() : DEFAULT_PIN_BASE_COLOR;
 
 	const categoryIconSpec = getTooltipCategoryIconSpec(searchWhat);
 	const showCategoryIcon = Boolean(categoryIconSpec);
@@ -59,8 +62,8 @@ ${normalized}
 				})()
 			: '';
 
-	// NOTE: The marker color is controlled by the center circle fill (rect). The rest of the
-	// SVG (base + stroke) stays as-designed.
+	// NOTE: The marker color is controlled by the center circle fill (rect). The base "tail" and
+	// circle stroke can be customized via `baseColor` / `strokeColor`.
 	return `<svg width="39" height="44" viewBox="0 0 39 44" fill="none" xmlns="http://www.w3.org/2000/svg">
 <defs>
   <clipPath id="${markerCircleClipId}">
@@ -69,7 +72,7 @@ ${normalized}
 	}"/>
   </clipPath>
 </defs>
-<path d="M30 34C30 38.4183 17.5 46 18.5 43.5C21 45.5 9 38.4183 9 34C9 29.5817 13.701 26 19.5 26C25.299 26 30 29.5817 30 34Z" fill="white"/>
+<path d="M30 34C30 38.4183 17.5 46 18.5 43.5C21 45.5 9 38.4183 9 34C9 29.5817 13.701 26 19.5 26C25.299 26 30 29.5817 30 34Z" fill="${safeBaseColor}"/>
 <rect x="1.5" y="1.5" width="36" height="36" rx="18" fill="${safeFillColor}" stroke="${safeStrokeColor}" stroke-width="3"/>
 ${categoryIcon ? `\n${categoryIcon}\n` : ''}
 </svg>`;
@@ -78,13 +81,15 @@ ${categoryIcon ? `\n${categoryIcon}\n` : ''}
 export const generateMapMarkerPinIconUrl = (
 	fillColor?: string,
 	strokeColor?: string,
-	searchWhat?: string | null
+	searchWhat?: string | null,
+	baseColor?: string
 ): string => {
 	return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(
 		generateMapMarkerPinSvg(
 			fillColor ?? DEFAULT_PIN_FILL_COLOR,
 			strokeColor ?? DEFAULT_PIN_STROKE_COLOR,
-			searchWhat
+			searchWhat,
+			baseColor ?? DEFAULT_PIN_BASE_COLOR
 		)
 	)}`;
 };

@@ -1005,6 +1005,10 @@ const DashboardContent = () => {
 	// Map-side panel should default to only the searched state, while the map itself keeps
 	// showing all results. Clicking an out-of-state marker adds it to this panel list.
 	const [mapPanelExtraContactIds, setMapPanelExtraContactIds] = useState<number[]>([]);
+	// Booking zoom-in "extra" pins come from the map-overlay endpoint and are not part of the
+	// primary `contacts` list. Keep a local cache so selected/clicked overlay pins can appear
+	// as rows in the map side panel.
+	const [mapPanelExtraContacts, setMapPanelExtraContacts] = useState<ContactWithName[]>([]);
 	const mapViewContainerRef = useRef<HTMLDivElement | null>(null);
 	const [activeMapTool, setActiveMapTool] = useState<'select' | 'grab'>('grab');
 	const [hoveredMapMarkerContact, setHoveredMapMarkerContact] = useState<ContactWithName | null>(
@@ -1026,6 +1030,7 @@ const DashboardContent = () => {
 	const mapResearchPanelContactRef = useRef<ContactWithName | null>(null);
 	useEffect(() => {
 		setMapPanelExtraContactIds([]);
+		setMapPanelExtraContacts([]);
 	}, [activeSearchQuery]);
 
 	// Cleanup timers on unmount
@@ -1122,26 +1127,37 @@ const DashboardContent = () => {
 		[activeSearchQuery]
 	);
 
+	const baseContactIdSet = useMemo(
+		() => new Set<number>((contacts || []).map((c) => c.id)),
+		[contacts]
+	);
+
 	const mapPanelContacts = useMemo(() => {
 		const allContacts = contacts || [];
-		if (!searchedStateAbbrForMap) return allContacts;
+		const baseList = !searchedStateAbbrForMap
+			? allContacts
+			: allContacts.filter((contact) => {
+					const contactStateAbbr = getStateAbbreviation(contact.state || '').trim().toUpperCase();
+					return contactStateAbbr === searchedStateAbbrForMap;
+				});
 
-		const inState = allContacts.filter((contact) => {
-			const contactStateAbbr = getStateAbbreviation(contact.state || '').trim().toUpperCase();
-			return contactStateAbbr === searchedStateAbbrForMap;
-		});
+		if (mapPanelExtraContactIds.length === 0) return baseList;
 
-		if (mapPanelExtraContactIds.length === 0) return inState;
+		// Allow panel to render contacts that aren't in the base results (e.g. booking overlay pins).
+		const byId = new Map<number, ContactWithName>();
+		for (const c of allContacts) byId.set(c.id, c);
+		for (const c of mapPanelExtraContacts) {
+			if (!byId.has(c.id)) byId.set(c.id, c);
+		}
 
-		const byId = new Map(allContacts.map((c) => [c.id, c]));
-		const inStateIds = new Set(inState.map((c) => c.id));
+		const baseIds = new Set(baseList.map((c) => c.id));
 		const extras = mapPanelExtraContactIds
-			.filter((id) => !inStateIds.has(id))
+			.filter((id) => !baseIds.has(id))
 			.map((id) => byId.get(id))
 			.filter((c): c is NonNullable<typeof c> => Boolean(c));
 
-		return [...inState, ...extras];
-	}, [contacts, mapPanelExtraContactIds, searchedStateAbbrForMap]);
+		return [...baseList, ...extras];
+	}, [contacts, mapPanelExtraContactIds, mapPanelExtraContacts, searchedStateAbbrForMap]);
 
 	// Check if all panel contacts are selected (for map view "Select all" button)
 	const isAllPanelContactsSelected = useMemo(() => {
@@ -3019,12 +3035,25 @@ const DashboardContent = () => {
 																}}
 																isLoading={isSearchPending || isLoadingContacts || isRefetchingContacts}
 																onMarkerClick={(contact) => {
+																	// Ensure map-only overlay markers (e.g. Booking extra pins) can show up as
+																	// rows in the right-hand panel when selected/clicked.
+																	const isInBaseResults = baseContactIdSet.has(contact.id);
+																	if (!isInBaseResults) {
+																		setMapPanelExtraContacts((prev) =>
+																			prev.some((c) => c.id === contact.id)
+																				? prev
+																				: [contact, ...prev]
+																		);
+																		setMapPanelExtraContactIds((prev) =>
+																			prev.includes(contact.id) ? prev : [...prev, contact.id]
+																		);
+																		return;
+																	}
+
 																	// If the marker is outside the searched state, include it in the
 																	// right-hand map panel list (without changing what the map shows).
 																	if (!searchedStateAbbrForMap) return;
-																	const contactStateAbbr = getStateAbbreviation(
-																		contact.state || ''
-																	)
+																	const contactStateAbbr = getStateAbbreviation(contact.state || '')
 																		.trim()
 																		.toUpperCase();
 																	if (contactStateAbbr === searchedStateAbbrForMap) return;

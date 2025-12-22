@@ -796,6 +796,9 @@ const RESULT_DOT_STROKE_WEIGHT_MIN_PX = 1.5;
 const RESULT_DOT_STROKE_WEIGHT_MAX_PX = 3;
 const RESULT_DOT_STROKE_COLOR_DEFAULT = '#FFFFFF';
 const RESULT_DOT_STROKE_COLOR_SELECTED = '#15C948';
+// Booking "extra" pin markers: on hover, slightly enlarge and switch the white ring to black.
+const BOOKING_EXTRA_PIN_HOVER_SCALE = 1.12;
+const BOOKING_EXTRA_PIN_HOVER_STROKE_COLOR = '#000000';
 
 // Keep hover tooltip above all map markers so it never gets covered.
 const HOVER_TOOLTIP_Z_INDEX = 1_000_000;
@@ -1079,6 +1082,15 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 	const isBookingSearch = useMemo(() => isBookingSearchQuery(searchQuery), [searchQuery]);
 	const isPromotionSearch = useMemo(() => isPromotionSearchQuery(searchQuery), [searchQuery]);
+	// When hovering a booking "extra" marker, highlight all other visible extra markers
+	// of the same booking category (e.g. hover a festival → highlight all festivals in view).
+	const hoveredBookingExtraCategory = useMemo(() => {
+		if (!isBookingSearch) return null;
+		if (hoveredMarkerId == null) return null;
+		const hovered = bookingExtraVisibleContacts.find((c) => c.id === hoveredMarkerId);
+		if (!hovered) return null;
+		return getBookingTitlePrefixFromContactTitle(hovered.title);
+	}, [isBookingSearch, hoveredMarkerId, bookingExtraVisibleContacts]);
 	useEffect(() => {
 		// Reset the overlay fetch window and any visible extra markers on search transitions.
 		lastBookingExtraFetchKeyRef.current = '';
@@ -2370,20 +2382,41 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						extraInBounds.push(contact);
 					}
 
+					// Always prefer explicitly selected extra markers (so they don't disappear due to sampling).
+					const selectedExtraInBounds: ContactWithName[] = [];
+					const unselectedExtraInBounds: ContactWithName[] = [];
+					for (const contact of extraInBounds) {
+						if (selectedSet.has(contact.id)) selectedExtraInBounds.push(contact);
+						else unselectedExtraInBounds.push(contact);
+					}
+
 					// Use the same sampling + non-overlap strategy as primary markers.
 					const POOL_FACTOR = 4;
 					const poolSlots = maxExtraDots * POOL_FACTOR;
 					let pool: ContactWithName[] = [];
 					if (extraInBounds.length <= poolSlots) {
 						pool = extraInBounds;
-					} else {
+					} else if (selectedExtraInBounds.length >= poolSlots) {
 						pool = stableViewportSampleContacts(
-							extraInBounds,
+							selectedExtraInBounds,
 							getBookingExtraContactCoords,
 							viewportBbox,
 							poolSlots,
-							`${seed}|bookingExtra|pool`
+							`${seed}|bookingExtra|pool:selected`
 						);
+					} else {
+						const remainingSlots = Math.max(0, poolSlots - selectedExtraInBounds.length);
+						const sampledUnselected =
+							unselectedExtraInBounds.length <= remainingSlots
+								? unselectedExtraInBounds
+								: stableViewportSampleContacts(
+										unselectedExtraInBounds,
+										getBookingExtraContactCoords,
+										viewportBbox,
+										remainingSlots,
+										`${seed}|bookingExtra|pool:unselected`
+									);
+						pool = [...selectedExtraInBounds, ...sampledUnselected];
 					}
 
 					type Candidate = { contact: ContactWithName; x: number; y: number; key: number };
@@ -2427,17 +2460,33 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						return false;
 					};
 
+					const selectedCandidates: Candidate[] = [];
+					const unselectedCandidates: Candidate[] = [];
 					for (const c of candidates) {
-						if (pickedExtra.length >= maxExtraDots) break;
-						const cx = Math.floor(c.x / cellSize);
-						const cy = Math.floor(c.y / cellSize);
-						if (hasNeighborWithin(cx, cy, c.x, c.y)) continue;
-						pickedExtra.push(c.contact);
-						const k = `${cx},${cy}`;
-						const arr = grid.get(k);
-						if (arr) arr.push({ x: c.x, y: c.y });
-						else grid.set(k, [{ x: c.x, y: c.y }]);
+						if (selectedSet.has(c.contact.id)) selectedCandidates.push(c);
+						else unselectedCandidates.push(c);
 					}
+
+					const pickFromCandidates = (cands: Candidate[], maxToPick: number) => {
+						if (maxToPick <= 0) return;
+						for (const c of cands) {
+							if (pickedExtra.length >= maxExtraDots) break;
+							if (maxToPick <= 0) break;
+							const cx = Math.floor(c.x / cellSize);
+							const cy = Math.floor(c.y / cellSize);
+							if (hasNeighborWithin(cx, cy, c.x, c.y)) continue;
+							pickedExtra.push(c.contact);
+							maxToPick -= 1;
+							const k = `${cx},${cy}`;
+							const arr = grid.get(k);
+							if (arr) arr.push({ x: c.x, y: c.y });
+							else grid.set(k, [{ x: c.x, y: c.y }]);
+						}
+					};
+
+					// Always keep selected extras visible first.
+					pickFromCandidates(selectedCandidates, maxExtraDots);
+					pickFromCandidates(unselectedCandidates, maxExtraDots - pickedExtra.length);
 
 					nextBookingExtraVisible = pickedExtra;
 					nextBookingExtraVisible.sort((a, b) => a.id - b.id);
@@ -2887,8 +2936,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 	const handleMarkerClick = (contact: ContactWithName) => {
 		onMarkerClick?.(contact);
-		// Toggle selection when clicking on a marker (only for primary result set)
-		if (baseContactIdSet.has(contact.id)) {
+		// Toggle selection when clicking on a marker.
+		// - Always allow selection toggling for primary result set.
+		// - In Booking mode, also allow toggling on the zoom-in "extra" pins (even though they
+		//   come from the map-overlay endpoint rather than the primary results list).
+		const isPrimaryResult = baseContactIdSet.has(contact.id);
+		const isBookingExtraResult =
+			isBookingSearch && bookingExtraVisibleContacts.some((c) => c.id === contact.id);
+		if (isPrimaryResult || isBookingExtraResult) {
 			onToggleSelection?.(contact.id);
 		}
 	};
@@ -2992,11 +3047,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 	const markerPinUrlCacheRef = useRef<Map<string, string>>(new Map());
 	const getMarkerPinUrl = useCallback(
-		(fillColor: string, strokeColor: string, searchWhat?: string | null): string => {
-			const key = `${fillColor}|${strokeColor}|${searchWhat ?? ''}`;
+		(fillColor: string, strokeColor: string, searchWhat?: string | null, baseColor?: string): string => {
+			const key = `${fillColor}|${strokeColor}|${searchWhat ?? ''}|${baseColor ?? ''}`;
 			const cached = markerPinUrlCacheRef.current.get(key);
 			if (cached) return cached;
-			const url = generateMapMarkerPinIconUrl(fillColor, strokeColor, searchWhat);
+			const url = generateMapMarkerPinIconUrl(fillColor, strokeColor, searchWhat, baseColor);
 			markerPinUrlCacheRef.current.set(key, url);
 			return url;
 		},
@@ -3004,15 +3059,23 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	);
 
 	const getMarkerPinIcon = useCallback(
-		(fillColor: string, strokeColor: string, searchWhat?: string | null): google.maps.Icon | undefined => {
+		(
+			fillColor: string,
+			strokeColor: string,
+			searchWhat?: string | null,
+			scaleMultiplier: number = 1,
+			baseColor: string = RESULT_DOT_STROKE_COLOR_DEFAULT
+		): google.maps.Icon | undefined => {
 			if (!isLoaded) return undefined;
 			const metrics = markerPinMetrics;
 			if (!metrics) return undefined;
 
+			const safeScale = Number.isFinite(scaleMultiplier) && scaleMultiplier > 0 ? scaleMultiplier : 1;
+
 			return {
-				url: getMarkerPinUrl(fillColor, strokeColor, searchWhat),
-				scaledSize: new google.maps.Size(metrics.width, metrics.height),
-				anchor: new google.maps.Point(metrics.anchorX, metrics.anchorY),
+				url: getMarkerPinUrl(fillColor, strokeColor, searchWhat, baseColor),
+				scaledSize: new google.maps.Size(metrics.width * safeScale, metrics.height * safeScale),
+				anchor: new google.maps.Point(metrics.anchorX * safeScale, metrics.anchorY * safeScale),
 			};
 		},
 		[getMarkerPinUrl, isLoaded, markerPinMetrics]
@@ -3353,16 +3416,29 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						: false;
 
 					const whatForMarker = getBookingTitlePrefixFromContactTitle(contact.title) ?? null;
+					const isCategoryHovered = Boolean(
+						hoveredBookingExtraCategory && whatForMarker === hoveredBookingExtraCategory
+					);
 					const dotFillColor = getResultDotColorForWhat(whatForMarker);
 					const dotFillColorOutside = washOutHexColor(
 						dotFillColor,
 						OUTSIDE_LOCKED_STATE_WASHOUT_TO_WHITE
 					);
 					const pinFillColor = isOutsideLockedState ? dotFillColorOutside : dotFillColor;
-					const pinStrokeColor = isSelected
+					// "Chrome" = the stroke ring + the base tail. Default = white, hover = black, selected = green.
+					// Selected always wins so we never end up with a "selected but black" marker.
+					const chromeColor = isSelected
 						? RESULT_DOT_STROKE_COLOR_SELECTED
-						: RESULT_DOT_STROKE_COLOR_DEFAULT;
-					const pinIcon = getMarkerPinIcon(pinFillColor, pinStrokeColor, whatForMarker);
+						: isCategoryHovered
+							? BOOKING_EXTRA_PIN_HOVER_STROKE_COLOR
+							: RESULT_DOT_STROKE_COLOR_DEFAULT;
+					const pinIcon = getMarkerPinIcon(
+						pinFillColor,
+						chromeColor,
+						whatForMarker,
+						isCategoryHovered ? BOOKING_EXTRA_PIN_HOVER_SCALE : 1,
+						chromeColor
+					);
 
 					// Show tooltip if hovered or if this marker is fading out
 					const isFading = fadingTooltipId === contact.id;

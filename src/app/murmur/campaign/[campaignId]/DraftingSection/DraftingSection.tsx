@@ -1192,6 +1192,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		query: string;
 		what: string;
 		selectedContacts: number[];
+		/** Contacts added via map interactions that aren't part of the base search results list. */
+		extraContacts: ContactWithName[];
 	};
 	const [searchTabs, setSearchTabs] = useState<SearchTab[]>([]);
 	const [activeSearchTabId, setActiveSearchTabId] = useState<string | null>(null);
@@ -1251,6 +1253,68 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 
 	const isSearching = isLoadingSearchResults || isRefetchingSearchResults;
 
+	// Campaign Search Results panel needs to include contacts that come from map-only overlay markers
+	// (e.g. Booking extra pins). Those contacts are not part of `searchResults`, so we keep a per-tab
+	// `extraContacts` list and render a merged list in the panel.
+	const baseSearchResultsIdSet = useMemo(
+		() => new Set<number>((searchResults ?? []).map((c) => c.id)),
+		[searchResults]
+	);
+
+	const searchResultsForPanel = useMemo(() => {
+		const base = searchResults ?? [];
+		const extras = activeSearchTab?.extraContacts ?? [];
+		if (extras.length === 0) return base;
+		const dedupedExtras: ContactWithName[] = [];
+		for (const c of extras) {
+			if (!baseSearchResultsIdSet.has(c.id)) dedupedExtras.push(c);
+		}
+		// Show map-added contacts first so the user immediately sees them in the list.
+		return [...dedupedExtras, ...base];
+	}, [searchResults, activeSearchTab, baseSearchResultsIdSet]);
+
+	const searchResultsForPanelIds = useMemo(
+		() => searchResultsForPanel.map((c) => c.id),
+		[searchResultsForPanel]
+	);
+
+	const searchResultsSelectedIdSet = useMemo(
+		() => new Set<number>(searchResultsSelectedContacts),
+		[searchResultsSelectedContacts]
+	);
+
+	const selectedSearchResultsCount = useMemo(() => {
+		let count = 0;
+		for (const id of searchResultsForPanelIds) {
+			if (searchResultsSelectedIdSet.has(id)) count += 1;
+		}
+		return count;
+	}, [searchResultsForPanelIds, searchResultsSelectedIdSet]);
+
+	const areAllSearchResultsSelected = useMemo(() => {
+		if (searchResultsForPanelIds.length === 0) return false;
+		for (const id of searchResultsForPanelIds) {
+			if (!searchResultsSelectedIdSet.has(id)) return false;
+		}
+		return true;
+	}, [searchResultsForPanelIds, searchResultsSelectedIdSet]);
+
+	const addContactToActiveSearchTabResults = useCallback(
+		(contact: ContactWithName) => {
+			if (!activeSearchTabId) return;
+			setSearchTabs((tabs) =>
+				tabs.map((tab) => {
+					if (tab.id !== activeSearchTabId) return tab;
+					const extras = tab.extraContacts ?? [];
+					if (extras.some((c) => c.id === contact.id)) return tab;
+					// Prepend so the newly selected contact is visible immediately.
+					return { ...tab, extraContacts: [contact, ...extras] };
+				})
+			);
+		},
+		[activeSearchTabId]
+	);
+
 	// Hook for adding contacts to the campaign's user contact list
 	const { mutateAsync: editUserContactList, isPending: isAddingToCampaign } =
 		useEditUserContactList({
@@ -1295,6 +1359,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 				query,
 				what: searchWhatValue,
 				selectedContacts: [],
+				extraContacts: [],
 			};
 			setSearchTabs((tabs) => [...tabs, newTab]);
 			setActiveSearchTabId(newTab.id);
@@ -1348,6 +1413,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			query,
 			what,
 			selectedContacts: [],
+			extraContacts: [],
 		};
 
 		setSearchTabs((tabs) => [...tabs, newTab]);
@@ -2652,8 +2718,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 							hasCampaignSearched &&
 							!isSearching &&
 							!isSearchTabNarrow &&
-							searchResults &&
-							searchResults.length > 0 && (
+							searchResultsForPanel.length > 0 && (
 								<div
 									className="absolute hidden xl:block"
 									style={{
@@ -2679,27 +2744,22 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										>
 											<div className="flex flex-col">
 												<span className="font-inter text-[11px] text-black text-center">
-													{searchResultsSelectedContacts.length} selected
+													{selectedSearchResultsCount} selected
 												</span>
 												<button
 													type="button"
 													onClick={() => {
-														if (
-															searchResultsSelectedContacts.length ===
-															searchResults.length
-														) {
+														if (areAllSearchResultsSelected) {
 															setSearchResultsSelectedContacts([]);
 														} else {
 															setSearchResultsSelectedContacts(
-																searchResults.map((c) => c.id)
+																searchResultsForPanelIds
 															);
 														}
 													}}
 													className="font-secondary text-[11px] font-medium text-black hover:underline text-right pr-1"
 												>
-													{searchResultsSelectedContacts.length === searchResults.length
-														? 'Deselect all'
-														: 'Select all'}
+													{areAllSearchResultsSelected ? 'Deselect all' : 'Select all'}
 												</button>
 											</div>
 										</div>
@@ -2715,7 +2775,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										>
 											{/* Contact list */}
 											<div className="space-y-[7px]">
-												{searchResults.map((contact) => {
+												{searchResultsForPanel.map((contact) => {
 													const isSelected = searchResultsSelectedContacts.includes(
 														contact.id
 													);
@@ -2896,13 +2956,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													<button
 														type="button"
 														onClick={() => {
-															if (
-																searchResultsSelectedContacts.length !==
-																searchResults.length
-															) {
-																setSearchResultsSelectedContacts(
-																	searchResults.map((c) => c.id)
-																);
+															if (!areAllSearchResultsSelected) {
+																setSearchResultsSelectedContacts(searchResultsForPanelIds);
 															}
 														}}
 														className="w-[50px] bg-[#7AD47A] hover:bg-[#6AC46A] text-black font-inter text-[13px] flex items-center justify-center transition-colors"
@@ -4334,7 +4389,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												}}
 											>
 												{/* Show search results table when search has been performed, otherwise show research panel */}
-												{hasCampaignSearched && !isSearching && searchResults && searchResults.length > 0 ? (
+												{hasCampaignSearched && !isSearching && searchResultsForPanel.length > 0 ? (
 													<div
 														className="bg-[#D8E5FB] border-[3px] border-[#143883] rounded-[7px] overflow-hidden flex flex-col"
 														style={{
@@ -4353,27 +4408,22 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																</span>
 																<div className="flex flex-col items-end">
 																	<span className="font-inter text-[11px] text-black">
-																		{searchResultsSelectedContacts.length} selected
+																		{selectedSearchResultsCount} selected
 																	</span>
 																	<button
 																		type="button"
 																		onClick={() => {
-																			if (
-																				searchResultsSelectedContacts.length ===
-																				searchResults.length
-																			) {
+																		if (areAllSearchResultsSelected) {
 																				setSearchResultsSelectedContacts([]);
 																			} else {
 																				setSearchResultsSelectedContacts(
-																					searchResults.map((c) => c.id)
+																				searchResultsForPanelIds
 																				);
 																			}
 																		}}
 																		className="font-secondary text-[11px] font-medium text-black hover:underline"
 																	>
-																		{searchResultsSelectedContacts.length === searchResults.length
-																			? 'Deselect all'
-																			: 'Select all'}
+																	{areAllSearchResultsSelected ? 'Deselect all' : 'Select all'}
 																	</button>
 																</div>
 															</div>
@@ -4389,7 +4439,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 															disableOverflowClass
 														>
 															<div className="space-y-[7px]">
-																{searchResults.map((contact) => {
+																{searchResultsForPanel.map((contact) => {
 																	const isSelected = searchResultsSelectedContacts.includes(
 																		contact.id
 																	);
@@ -4568,13 +4618,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																	<button
 																		type="button"
 																		onClick={() => {
-																			if (
-																				searchResultsSelectedContacts.length !==
-																				searchResults.length
-																			) {
-																				setSearchResultsSelectedContacts(
-																					searchResults.map((c) => c.id)
-																				);
+																			if (!areAllSearchResultsSelected) {
+																				setSearchResultsSelectedContacts(searchResultsForPanelIds);
 																			}
 																		}}
 																		className="w-[50px] bg-[#7AD47A] hover:bg-[#6AC46A] text-black font-inter text-[13px] flex items-center justify-center transition-colors"
@@ -4702,6 +4747,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													query: '',
 													what: '',
 													selectedContacts: [],
+													extraContacts: [],
 												};
 												setSearchTabs((tabs) => [...tabs, newTab]);
 												setActiveSearchTabId(newTab.id);
@@ -4893,6 +4939,27 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																contactId,
 															]);
 														}
+
+														// Mirror dashboard UX: when selecting from the map, scroll the contact into view
+														// in the Search Results panel so the user immediately sees it.
+														if (typeof document !== 'undefined') {
+															const tryScroll = (attempt = 0) => {
+																const contactElement = document.querySelector(
+																	`[data-contact-id="${contactId}"]`
+																);
+																if (contactElement) {
+																	contactElement.scrollIntoView({
+																		behavior: 'smooth',
+																		block: 'center',
+																	});
+																	return;
+																}
+																if (attempt < 10) {
+																	setTimeout(() => tryScroll(attempt + 1), 50);
+																}
+															};
+															setTimeout(() => tryScroll(0), 0);
+														}
 													} else {
 														// Handle selection for campaign contacts
 														if (searchTabSelectedContacts.includes(contactId)) {
@@ -4909,6 +4976,12 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												}}
 												onMarkerClick={(contact) => {
 													handleResearchContactClick(contact);
+													// Booking extra/overlay markers can be selected from the map but are not part of the
+													// base `searchResults` list. Add them to the active tab's results list so they
+													// appear in the Search Results panel.
+													if (activeSearchTabId !== null && !baseSearchResultsIdSet.has(contact.id)) {
+														addContactToActiveSearchTabResults(contact);
+													}
 												}}
 												enableStateInteractions
 												onStateSelect={(stateName) => {
@@ -4980,14 +5053,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 									<button
 										type="button"
 										onClick={() => {
-											if (
-												searchResults &&
-												searchResultsSelectedContacts.length !==
-												searchResults.length
-											) {
-												setSearchResultsSelectedContacts(
-													searchResults.map((c) => c.id)
-												);
+											if (searchResultsForPanelIds.length > 0 && !areAllSearchResultsSelected) {
+												setSearchResultsSelectedContacts(searchResultsForPanelIds);
 											}
 										}}
 										className="w-[50px] bg-[#43AEEC] hover:bg-[#3A9AD9] text-black font-inter text-[13px] flex items-center justify-center transition-colors"
@@ -5012,7 +5079,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 							{isNarrowestDesktop && (
 								<div className="mt-[70px] w-full flex justify-center">
 									{/* At narrowest breakpoint (< 952px) with search results, show search results table */}
-									{hasCampaignSearched && !isSearching && searchResults && searchResults.length > 0 ? (
+									{hasCampaignSearched && !isSearching && searchResultsForPanel.length > 0 ? (
 										<div
 											className="bg-[#D8E5FB] border-[3px] border-[#143883] rounded-[7px] overflow-hidden flex flex-col"
 											style={{
@@ -5031,27 +5098,22 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													</span>
 													<div className="flex flex-col items-end">
 														<span className="font-inter text-[11px] text-black">
-															{searchResultsSelectedContacts.length} selected
+															{selectedSearchResultsCount} selected
 														</span>
 														<button
 															type="button"
 															onClick={() => {
-																if (
-																	searchResultsSelectedContacts.length ===
-																	searchResults.length
-																) {
+																if (areAllSearchResultsSelected) {
 																	setSearchResultsSelectedContacts([]);
 																} else {
 																	setSearchResultsSelectedContacts(
-																		searchResults.map((c) => c.id)
+																		searchResultsForPanelIds
 																	);
 																}
 															}}
 															className="font-secondary text-[11px] font-medium text-black hover:underline"
 														>
-															{searchResultsSelectedContacts.length === searchResults.length
-																? 'Deselect all'
-																: 'Select all'}
+															{areAllSearchResultsSelected ? 'Deselect all' : 'Select all'}
 														</button>
 													</div>
 												</div>
@@ -5067,7 +5129,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												disableOverflowClass
 											>
 												<div className="space-y-[7px]">
-													{searchResults.map((contact) => {
+													{searchResultsForPanel.map((contact) => {
 														const isSelected = searchResultsSelectedContacts.includes(
 															contact.id
 														);
