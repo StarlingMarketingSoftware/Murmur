@@ -813,8 +813,8 @@ const BOOKING_EXTRA_MARKERS_MIN_ZOOM = 8;
 // Keep extra markers capped so map remains responsive.
 const BOOKING_EXTRA_MARKERS_MAX_DOTS = 160;
 // Promotion searches: show state-wide radio list pins as overlay markers.
-// These are intentionally available at low zoom so all states can be visible together.
-const PROMOTION_OVERLAY_MARKERS_MIN_ZOOM = 4;
+// Match booking's zoom threshold for consistent UX across modes.
+const PROMOTION_OVERLAY_MARKERS_MIN_ZOOM = 8;
 // Defensive cap; expected to be ~2 per state.
 const PROMOTION_OVERLAY_MARKERS_MAX_PINS = 220;
 
@@ -2613,8 +2613,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	useEffect(() => {
 		if (!map || !isStateLayerReady) return;
 
+		// Hide state outlines when using rectangle selection (selectedAreaBounds is set)
 		// Clear outlines while loading or if no result states
-		if (isLoading || !resultStateKeysSignature) {
+		if (isLoading || !resultStateKeysSignature || selectedAreaBounds) {
 			clearResultsOutline();
 			return;
 		}
@@ -2702,6 +2703,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		resultStateKeysSignature,
 		clearResultsOutline,
 		updateBackgroundDots,
+		selectedAreaBounds,
 	]);
 
 	// Draw a black outline around the searched/locked state (even when state interactions are off).
