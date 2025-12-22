@@ -390,6 +390,105 @@ const stableViewportSampleContacts = (
 	return picked.slice(0, slots);
 };
 
+type WorldSegment = {
+	ax: number;
+	ay: number;
+	bx: number;
+	by: number;
+	minX: number;
+	maxX: number;
+	minY: number;
+	maxY: number;
+};
+
+const latLngToWorldPixel = (coords: LatLngLiteral, worldSize: number): { x: number; y: number } => {
+	// Web Mercator world pixel coords at the current zoom.
+	const latClamped = clamp(coords.lat, -85, 85);
+	const siny = Math.sin((latClamped * Math.PI) / 180);
+	const x = ((coords.lng + 180) / 360) * worldSize;
+	const y = (0.5 - Math.log((1 + siny) / (1 - siny)) / (4 * Math.PI)) * worldSize;
+	return { x, y };
+};
+
+const distancePointToSegmentSq = (
+	px: number,
+	py: number,
+	ax: number,
+	ay: number,
+	bx: number,
+	by: number
+): number => {
+	const abx = bx - ax;
+	const aby = by - ay;
+	const apx = px - ax;
+	const apy = py - ay;
+	const denom = abx * abx + aby * aby;
+	if (denom <= 0) return apx * apx + apy * apy;
+	let t = (apx * abx + apy * aby) / denom;
+	t = clamp(t, 0, 1);
+	const cx = ax + t * abx;
+	const cy = ay + t * aby;
+	const dx = px - cx;
+	const dy = py - cy;
+	return dx * dx + dy * dy;
+};
+
+const buildOuterRingWorldSegments = (
+	multiPolygon: ClippingMultiPolygon,
+	worldSize: number
+): WorldSegment[] => {
+	const segments: WorldSegment[] = [];
+	for (const polygon of multiPolygon) {
+		if (!polygon?.length) continue;
+		const outerRing = polygon.reduce<ClippingRing | null>((best, ring) => {
+			if (!ring?.length) return best;
+			if (!best) return ring;
+			return absRingArea(ring) > absRingArea(best) ? ring : best;
+		}, null);
+		if (!outerRing || outerRing.length < 2) continue;
+
+		for (let i = 0; i < outerRing.length - 1; i++) {
+			const a = outerRing[i];
+			const b = outerRing[i + 1];
+			if (!a || !b) continue;
+			const [lngA, latA] = a;
+			const [lngB, latB] = b;
+			if (!Number.isFinite(lngA) || !Number.isFinite(latA) || !Number.isFinite(lngB) || !Number.isFinite(latB))
+				continue;
+			const wa = latLngToWorldPixel({ lat: latA, lng: lngA }, worldSize);
+			const wb = latLngToWorldPixel({ lat: latB, lng: lngB }, worldSize);
+			segments.push({
+				ax: wa.x,
+				ay: wa.y,
+				bx: wb.x,
+				by: wb.y,
+				minX: Math.min(wa.x, wb.x),
+				maxX: Math.max(wa.x, wb.x),
+				minY: Math.min(wa.y, wb.y),
+				maxY: Math.max(wa.y, wb.y),
+			});
+		}
+	}
+	return segments;
+};
+
+const isWorldPointNearSegments = (
+	x: number,
+	y: number,
+	segments: WorldSegment[],
+	thresholdPx: number
+): boolean => {
+	const t = Math.max(0, thresholdPx);
+	const tSq = t * t;
+	for (const s of segments) {
+		// Cheap bbox reject (expanded by threshold).
+		if (x < s.minX - t || x > s.maxX + t || y < s.minY - t || y > s.maxY + t) continue;
+		const dSq = distancePointToSegmentSq(x, y, s.ax, s.ay, s.bx, s.by);
+		if (dSq < tSq) return true;
+	}
+	return false;
+};
+
 const pointInRing = (point: ClippingCoord, ring: ClippingRing): boolean => {
 	const [x, y] = point;
 	let inside = false;
@@ -835,6 +934,24 @@ const getResultDotStrokeWeightForZoom = (zoom: number): number => {
 	return (
 		RESULT_DOT_STROKE_WEIGHT_MIN_PX +
 		t * (RESULT_DOT_STROKE_WEIGHT_MAX_PX - RESULT_DOT_STROKE_WEIGHT_MIN_PX)
+	);
+};
+
+// When very zoomed out, we want the searched/locked state to visually "win" so the user
+// can understand where the bulk of results are. As you zoom in, we ease back toward a
+// more natural distribution.
+const LOCKED_STATE_MARKER_BIAS_ZOOM_START = RESULT_DOT_ZOOM_MIN; // 4
+const LOCKED_STATE_MARKER_BIAS_ZOOM_END = STATE_DIVIDER_LINES_MAX_ZOOM; // 8
+const LOCKED_STATE_MARKER_BIAS_SHARE_MAX = 0.92; // at zoom ~4
+const LOCKED_STATE_MARKER_BIAS_SHARE_MIN = 0.6; // by zoom ~8
+
+const getLockedStateMarkerShareForZoom = (zoom: number): number => {
+	const denom = LOCKED_STATE_MARKER_BIAS_ZOOM_END - LOCKED_STATE_MARKER_BIAS_ZOOM_START;
+	if (!Number.isFinite(denom) || denom <= 0) return LOCKED_STATE_MARKER_BIAS_SHARE_MIN;
+	const t = clamp((zoom - LOCKED_STATE_MARKER_BIAS_ZOOM_START) / denom, 0, 1);
+	return (
+		LOCKED_STATE_MARKER_BIAS_SHARE_MAX +
+		t * (LOCKED_STATE_MARKER_BIAS_SHARE_MIN - LOCKED_STATE_MARKER_BIAS_SHARE_MAX)
 	);
 };
 
@@ -1859,6 +1976,15 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			if (east < west) return;
 
 			const zoomRaw = mapInstance.getZoom() ?? 4;
+			// Compute marker size at this zoom so we can enforce min spacing in screen pixels.
+			// Note: Google Maps can report fractional zoom; use the raw value for accurate scaling.
+			const markerScale = getResultDotScaleForZoom(zoomRaw);
+			const dotStrokeWeight = getResultDotStrokeWeightForZoom(zoomRaw);
+			// Ensure *hovered* dots also won't overlap.
+			const minSeparationPx = 2 * (markerScale * 1.18) + dotStrokeWeight + 1.5;
+			const minSeparationSq = minSeparationPx * minSeparationPx;
+			const worldSize = 256 * Math.pow(2, zoomRaw);
+
 			// Keep the seed quantized so marker sampling stays stable while panning/zooming.
 			const zoomKey = Math.round(zoomRaw);
 			const quant = getBackgroundDotsQuantizationDeg(zoomKey);
@@ -1916,12 +2042,76 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				inBounds.push(contact);
 			}
 
+			const hasLockedStateSelection =
+				!!lockedStateKey &&
+				lockedStateSelectionKeyRef.current === lockedStateKey &&
+				!!lockedStateSelectionMultiPolygonRef.current;
+
 			const selectedSet = new Set<number>(selectedContacts);
 			const selectedInBounds: ContactWithName[] = [];
+			const inLockedUnselectedInBounds: ContactWithName[] = [];
+			const outLockedUnselectedInBounds: ContactWithName[] = [];
 			const unselectedInBounds: ContactWithName[] = [];
 			for (const contact of inBounds) {
-				if (selectedSet.has(contact.id)) selectedInBounds.push(contact);
-				else unselectedInBounds.push(contact);
+				if (selectedSet.has(contact.id)) {
+					selectedInBounds.push(contact);
+					continue;
+				}
+
+				if (hasLockedStateSelection) {
+					// Prefer the contact's state field for inside/outside classification (cheap),
+					// and only fall back to polygon containment when state is missing/unknown.
+					const contactStateKey = normalizeStateKey(contact.state ?? null);
+					if (contactStateKey) {
+						if (contactStateKey === lockedStateKey) inLockedUnselectedInBounds.push(contact);
+						else outLockedUnselectedInBounds.push(contact);
+						continue;
+					}
+
+					const coords = getContactCoords(contact);
+					if (coords && isCoordsInLockedState(coords)) inLockedUnselectedInBounds.push(contact);
+					else outLockedUnselectedInBounds.push(contact);
+					continue;
+				}
+
+				unselectedInBounds.push(contact);
+			}
+
+			// When zoomed out, avoid placing locked-state dots directly on top of the state border stroke
+			// by deprioritizing points that are too close to the boundary.
+			const shouldInsetLockedStateMarkers = hasLockedStateSelection && zoomRaw <= 6;
+			let lockedEdgeIdSet: Set<number> | null = null;
+			let inLockedUnselectedSafe: ContactWithName[] = inLockedUnselectedInBounds;
+			let inLockedUnselectedEdge: ContactWithName[] = [];
+
+			if (shouldInsetLockedStateMarkers) {
+				const selection = lockedStateSelectionMultiPolygonRef.current;
+				if (selection) {
+					const borderSegments = buildOuterRingWorldSegments(selection, worldSize);
+					if (borderSegments.length > 0) {
+						// Inset in screen pixels: marker radius + ~half border stroke + a little padding.
+						const borderInsetPx = markerScale + 1.5 + 1;
+						const safe: ContactWithName[] = [];
+						const edge: ContactWithName[] = [];
+						for (const contact of inLockedUnselectedInBounds) {
+							const coords = getContactCoords(contact);
+							if (!coords) continue;
+							const wp = latLngToWorldPixel(coords, worldSize);
+							const isNearBorder = isWorldPointNearSegments(
+								wp.x,
+								wp.y,
+								borderSegments,
+								borderInsetPx
+							);
+							if (isNearBorder) edge.push(contact);
+							else safe.push(contact);
+						}
+
+						inLockedUnselectedSafe = safe;
+						inLockedUnselectedEdge = edge;
+						lockedEdgeIdSet = edge.length > 0 ? new Set(edge.map((c) => c.id)) : null;
+					}
+				}
 			}
 
 			// Reserve budget for promotion overlay pins so they always render.
@@ -1945,32 +2135,105 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					`${seed}|pool:selected`
 				);
 			} else {
-				const slots = poolSlots - selectedInBounds.length;
-				const sampled = stableViewportSampleContacts(
-					unselectedInBounds,
-					getContactCoords,
-					viewportBbox,
-					slots,
-					`${seed}|pool`
-				);
-				pool = [...selectedInBounds, ...sampled];
-			}
+				const remainingSlots = poolSlots - selectedInBounds.length;
+				if (hasLockedStateSelection) {
+					const share = getLockedStateMarkerShareForZoom(zoomRaw);
+					const desiredLockedSlots = Math.round(remainingSlots * share);
+					const lockedSlots = Math.min(inLockedUnselectedInBounds.length, desiredLockedSlots);
+					let outsideSlots = remainingSlots - lockedSlots;
+					const lockedSamplingBbox = lockedStateSelectionBboxRef.current ?? viewportBbox;
 
-			// Compute marker size at this zoom so we can enforce min spacing in screen pixels.
-			// Note: Google Maps can report fractional zoom; use the raw value for accurate scaling.
-			const markerScale = getResultDotScaleForZoom(zoomRaw);
-			const strokeWeight = getResultDotStrokeWeightForZoom(zoomRaw);
-			// Ensure *hovered* dots also won't overlap.
-			const minSeparationPx =
-				2 * (markerScale * 1.18) + strokeWeight + 1.5;
-			const minSeparationSq = minSeparationPx * minSeparationPx;
-			const worldSize = 256 * Math.pow(2, zoomRaw);
+					const sampleLockedUnselected = (slots: number): ContactWithName[] => {
+						if (slots <= 0) return [];
+						if (!shouldInsetLockedStateMarkers || inLockedUnselectedEdge.length === 0) {
+							return stableViewportSampleContacts(
+								inLockedUnselectedInBounds,
+								getContactCoords,
+								lockedSamplingBbox,
+								slots,
+								`${seed}|pool:locked`
+							);
+						}
+
+						const primarySlots = Math.min(inLockedUnselectedSafe.length, slots);
+						const edgeSlots = Math.max(0, slots - primarySlots);
+						const sampledSafe =
+							primarySlots > 0
+								? stableViewportSampleContacts(
+										inLockedUnselectedSafe,
+										getContactCoords,
+										lockedSamplingBbox,
+										primarySlots,
+										`${seed}|pool:locked:safe`
+									)
+								: [];
+						const sampledEdge =
+							edgeSlots > 0
+								? stableViewportSampleContacts(
+										inLockedUnselectedEdge,
+										getContactCoords,
+										lockedSamplingBbox,
+										edgeSlots,
+										`${seed}|pool:locked:edge`
+									)
+								: [];
+
+						return [...sampledSafe, ...sampledEdge];
+					};
+
+					// If there aren't enough "outside" contacts to fill the remainder,
+					// reallocate the unused slots back to the locked state.
+					const outsideAvailable = outLockedUnselectedInBounds.length;
+					if (outsideAvailable < outsideSlots) {
+						const unused = outsideSlots - outsideAvailable;
+						outsideSlots = outsideAvailable;
+						// NOTE: This may exceed desiredLockedSlots, but it's fine — we prefer
+						// more in-locked candidates when zoomed out.
+						const additionalLockedSlots = Math.min(
+							inLockedUnselectedInBounds.length - lockedSlots,
+							unused
+						);
+						const finalLockedSlots = lockedSlots + Math.max(0, additionalLockedSlots);
+
+						const sampledLocked = sampleLockedUnselected(finalLockedSlots);
+						const sampledOutside = stableViewportSampleContacts(
+							outLockedUnselectedInBounds,
+							getContactCoords,
+							viewportBbox,
+							outsideSlots,
+							`${seed}|pool:out`
+						);
+						pool = [...selectedInBounds, ...sampledLocked, ...sampledOutside];
+					} else {
+						const sampledLocked = sampleLockedUnselected(lockedSlots);
+						const sampledOutside = stableViewportSampleContacts(
+							outLockedUnselectedInBounds,
+							getContactCoords,
+							viewportBbox,
+							outsideSlots,
+							`${seed}|pool:out`
+						);
+						pool = [...selectedInBounds, ...sampledLocked, ...sampledOutside];
+					}
+				} else {
+					const sampled = stableViewportSampleContacts(
+						unselectedInBounds,
+						getContactCoords,
+						viewportBbox,
+						remainingSlots,
+						`${seed}|pool`
+					);
+					pool = [...selectedInBounds, ...sampled];
+				}
+			}
 
 			type Candidate = {
 				contact: ContactWithName;
 				x: number;
 				y: number;
 				isSelected: boolean;
+				isInLockedState: boolean;
+				isNearLockedBorder: boolean;
 				key: number;
 			};
 
@@ -1978,33 +2241,47 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			for (const contact of pool) {
 				const coords = getContactCoords(contact);
 				if (!coords) continue;
-				// Web Mercator world pixel coords at the current zoom.
-				const latClamped = clamp(coords.lat, -85, 85);
-				const siny = Math.sin((latClamped * Math.PI) / 180);
-				const x = ((coords.lng + 180) / 360) * worldSize;
-				const y =
-					(0.5 -
-						Math.log((1 + siny) / (1 - siny)) / (4 * Math.PI)) *
-					worldSize;
+				const { x, y } = latLngToWorldPixel(coords, worldSize);
+				let isInLockedState = true;
+				if (hasLockedStateSelection) {
+					const contactStateKey = normalizeStateKey(contact.state ?? null);
+					isInLockedState = contactStateKey ? contactStateKey === lockedStateKey : isCoordsInLockedState(coords);
+				}
 				candidates.push({
 					contact,
 					x,
 					y,
 					isSelected: selectedSet.has(contact.id),
+					isInLockedState,
+					isNearLockedBorder: !!lockedEdgeIdSet && lockedEdgeIdSet.has(contact.id),
 					key: hashStringToUint32(`${seed}|${contact.id}`),
 				});
 			}
 
-			// Stable ordering with selected contacts first.
-			candidates.sort((a, b) => {
-				if (a.isSelected !== b.isSelected) return a.isSelected ? -1 : 1;
+			const selectedCandidates: Candidate[] = [];
+			const inLockedCandidates: Candidate[] = [];
+			const outLockedCandidates: Candidate[] = [];
+			for (const c of candidates) {
+				if (c.isSelected) selectedCandidates.push(c);
+				else if (c.isInLockedState) inLockedCandidates.push(c);
+				else outLockedCandidates.push(c);
+			}
+
+			// Stable ordering (we handle "selected first" by splitting arrays).
+			selectedCandidates.sort((a, b) => a.key - b.key);
+			inLockedCandidates.sort((a, b) => {
+				if (shouldInsetLockedStateMarkers && a.isNearLockedBorder !== b.isNearLockedBorder) {
+					return a.isNearLockedBorder ? 1 : -1;
+				}
 				return a.key - b.key;
 			});
+			outLockedCandidates.sort((a, b) => a.key - b.key);
 
 			// Poisson-disc style selection using a grid acceleration structure.
 			const cellSize = Math.max(6, minSeparationPx); // avoid tiny/degenerate cells
 			const grid = new Map<string, Array<{ x: number; y: number }>>();
 			const picked: ContactWithName[] = [];
+			let pickedInLockedStateCount = 0;
 
 			const hasNeighborWithin = (cx: number, cy: number, x: number, y: number): boolean => {
 				for (let dx = -1; dx <= 1; dx++) {
@@ -2021,17 +2298,47 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				return false;
 			};
 
-			for (const c of candidates) {
-				if (picked.length >= maxPrimaryDots) break;
-				const cx = Math.floor(c.x / cellSize);
-				const cy = Math.floor(c.y / cellSize);
-				if (hasNeighborWithin(cx, cy, c.x, c.y)) continue;
+			const pickFromCandidates = (cands: Candidate[], maxToPick: number) => {
+				if (maxToPick <= 0) return;
+				for (const c of cands) {
+					if (picked.length >= maxPrimaryDots) break;
+					if (maxToPick <= 0) break;
+					const cx = Math.floor(c.x / cellSize);
+					const cy = Math.floor(c.y / cellSize);
+					if (hasNeighborWithin(cx, cy, c.x, c.y)) continue;
 
-				picked.push(c.contact);
-				const k = `${cx},${cy}`;
-				const arr = grid.get(k);
-				if (arr) arr.push({ x: c.x, y: c.y });
-				else grid.set(k, [{ x: c.x, y: c.y }]);
+					picked.push(c.contact);
+					if (c.isInLockedState) pickedInLockedStateCount += 1;
+					maxToPick -= 1;
+					const k = `${cx},${cy}`;
+					const arr = grid.get(k);
+					if (arr) arr.push({ x: c.x, y: c.y });
+					else grid.set(k, [{ x: c.x, y: c.y }]);
+				}
+			};
+
+			// Always keep explicitly selected markers visible first.
+			pickFromCandidates(selectedCandidates, maxPrimaryDots);
+
+			// Then pick unselected markers, biasing toward the searched/locked state when zoomed out.
+			const remainingBudget = maxPrimaryDots - picked.length;
+			if (remainingBudget > 0) {
+				if (hasLockedStateSelection) {
+					const share = getLockedStateMarkerShareForZoom(zoomRaw);
+					const inLockedBudget = Math.round(remainingBudget * share);
+					let outLockedBudget = remainingBudget - inLockedBudget;
+
+					const shouldHardCapOutside = zoomRaw <= 6;
+					pickFromCandidates(inLockedCandidates, inLockedBudget);
+					if (shouldHardCapOutside) {
+						// Ensure the locked state visually "wins" when zoomed out.
+						outLockedBudget = Math.min(outLockedBudget, pickedInLockedStateCount);
+					}
+					pickFromCandidates(outLockedCandidates, outLockedBudget);
+				} else {
+					// Default behavior: just keep a stable Poisson-disc subset.
+					pickFromCandidates(inLockedCandidates, remainingBudget);
+				}
 			}
 
 			const nextVisibleContacts: ContactWithName[] = picked;
@@ -2156,6 +2463,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			contactsWithCoords,
 			getContactCoords,
 			selectedContacts,
+			lockedStateKey,
+			isCoordsInLockedState,
 			updateBackgroundDots,
 			isBookingSearch,
 			bookingExtraContactsWithCoords,
@@ -2323,6 +2632,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			lockedStateSelectionMultiPolygonRef.current = null;
 			lockedStateSelectionBboxRef.current = null;
 			lockedStateSelectionKeyRef.current = null;
+			recomputeViewportDots(map, isLoadingRef.current);
 			return;
 		}
 
@@ -2331,6 +2641,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			lockedStateSelectionMultiPolygonRef.current = null;
 			lockedStateSelectionBboxRef.current = null;
 			lockedStateSelectionKeyRef.current = null;
+			recomputeViewportDots(map, isLoadingRef.current);
 			return;
 		}
 
@@ -2359,6 +2670,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			lockedStateSelectionMultiPolygonRef.current = found;
 			lockedStateSelectionBboxRef.current = found ? bboxFromMultiPolygon(found) : null;
 			lockedStateSelectionKeyRef.current = lockedStateKey;
+			// The locked-state polygon is stored in refs (no rerender) — force a marker recompute
+			// so low-zoom bias toward the locked state applies immediately.
+			recomputeViewportDots(map, isLoadingRef.current);
 
 			clearSearchedStateOutline();
 			if (enableStateInteractions || !found) return;
@@ -2386,6 +2700,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		lockedStateKey,
 		enableStateInteractions,
 		clearSearchedStateOutline,
+		recomputeViewportDots,
 	]);
 
 	// Track if we've done the initial bounds fit
