@@ -798,6 +798,8 @@ const RESULT_DOT_STROKE_WEIGHT_MIN_PX = 1.5;
 const RESULT_DOT_STROKE_WEIGHT_MAX_PX = 3;
 const RESULT_DOT_STROKE_COLOR_DEFAULT = '#FFFFFF';
 const RESULT_DOT_STROKE_COLOR_SELECTED = '#15C948';
+// Fill color for the hover tooltip SVG when the contact is selected.
+const TOOLTIP_FILL_COLOR_SELECTED = '#258530';
 // Booking "extra" pin markers: on hover, slightly enlarge and switch the white ring to black.
 const BOOKING_EXTRA_PIN_HOVER_SCALE = 1.12;
 const BOOKING_EXTRA_PIN_HOVER_STROKE_COLOR = '#000000';
@@ -3355,9 +3357,13 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 								const companyForTooltip = contact.company || '';
 								const titleForTooltip = (contact.title || contact.headline || '').trim();
 								const normalizedWhat = whatForMarker ? normalizeWhatKey(whatForMarker) : null;
-								const tooltipFillColor = normalizedWhat
+								const baseTooltipFillColor = normalizedWhat
 									? WHAT_TO_HOVER_TOOLTIP_FILL_COLOR[normalizedWhat] ?? dotFillColor
 									: dotFillColor;
+								// Use selected color when contact is selected.
+								const tooltipFillColor = isSelected
+									? TOOLTIP_FILL_COLOR_SELECTED
+									: baseTooltipFillColor;
 								const width = calculateTooltipWidth(
 									nameForTooltip,
 									companyForTooltip,
@@ -3513,9 +3519,13 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 								const companyForTooltip = contact.company || '';
 								const titleForTooltip = (contact.title || contact.headline || '').trim();
 								const normalizedWhat = whatForMarker ? normalizeWhatKey(whatForMarker) : null;
-								const tooltipFillColor = normalizedWhat
+								const baseTooltipFillColor = normalizedWhat
 									? WHAT_TO_HOVER_TOOLTIP_FILL_COLOR[normalizedWhat] ?? dotFillColor
 									: dotFillColor;
+								// Use selected color when contact is selected.
+								const tooltipFillColor = isSelected
+									? TOOLTIP_FILL_COLOR_SELECTED
+									: baseTooltipFillColor;
 								const width = calculateTooltipWidth(
 									nameForTooltip,
 									companyForTooltip,
@@ -3656,9 +3666,13 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 								// keep the hover tooltip using the base search color so it consistently
 								// communicates the search category.
 								const normalizedWhat = searchWhat ? normalizeWhatKey(searchWhat) : null;
-								const tooltipFillColor = normalizedWhat
+								const baseTooltipFillColor = normalizedWhat
 									? WHAT_TO_HOVER_TOOLTIP_FILL_COLOR[normalizedWhat] ?? defaultDotFillColor
 									: defaultDotFillColor;
+								// Use selected color when contact is selected.
+								const tooltipFillColor = isSelected
+									? TOOLTIP_FILL_COLOR_SELECTED
+									: baseTooltipFillColor;
 								const width = calculateTooltipWidth(
 									nameForTooltip,
 									companyForTooltip,
