@@ -32,6 +32,8 @@ type ClippingMultiPolygon = ClippingPolygon[];
 type BoundingBox = { minLat: number; maxLat: number; minLng: number; maxLng: number };
 type PreparedClippingPolygon = { polygon: ClippingPolygon; bbox: BoundingBox };
 
+type MapSelectionBounds = { south: number; west: number; north: number; east: number };
+
 const closeRing = (ring: ClippingRing): ClippingRing => {
 	if (ring.length === 0) return ring;
 	const first = ring[0];
@@ -189,6 +191,19 @@ const jitterDuplicateCoords = (base: LatLngLiteral, index: number): LatLngLitera
 };
 
 const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n));
+
+const getClientPointFromDomEvent = (domEvent: unknown): { x: number; y: number } | null => {
+	const ev = domEvent as Partial<MouseEvent & TouchEvent & PointerEvent> | null;
+	if (!ev) return null;
+	if (typeof (ev as MouseEvent).clientX === 'number' && typeof (ev as MouseEvent).clientY === 'number') {
+		return { x: (ev as MouseEvent).clientX, y: (ev as MouseEvent).clientY };
+	}
+	const touches = (ev as TouchEvent).touches;
+	if (touches && touches.length > 0) {
+		return { x: touches[0].clientX, y: touches[0].clientY };
+	}
+	return null;
+};
 
 const hashStringToUint32 = (str: string): number => {
 	// FNV-1a 32-bit
@@ -591,6 +606,10 @@ interface SearchResultsMapProps {
 	searchQuery?: string | null;
 	/** Used to color the default (unselected) result dots by the active "What" search value. */
 	searchWhat?: string | null;
+	/** Map interaction mode controlled by the dashboard (grab = pan/zoom, select = draw rectangle). */
+	activeTool?: 'select' | 'grab';
+	/** Called when the user completes a rectangle selection (south/west/north/east). */
+	onAreaSelect?: (bounds: MapSelectionBounds) => void;
 	onMarkerClick?: (contact: ContactWithName) => void;
 	onMarkerHover?: (contact: ContactWithName | null, meta?: MarkerHoverMeta) => void;
 	onToggleSelection?: (contactId: number) => void;
@@ -870,6 +889,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	selectedContacts,
 	searchQuery,
 	searchWhat,
+	activeTool,
+	onAreaSelect,
 	onMarkerClick,
 	onMarkerHover,
 	onToggleSelection,
@@ -902,6 +923,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const [promotionOverlayFetchBbox, setPromotionOverlayFetchBbox] = useState<BoundingBox | null>(
 		null
 	);
+	// Rectangle selection state (dashboard map select tool)
+	const [isAreaSelecting, setIsAreaSelecting] = useState(false);
+	const selectionStartLatLngRef = useRef<LatLngLiteral | null>(null);
+	const selectionStartClientRef = useRef<{ x: number; y: number } | null>(null);
+	const selectionRectRef = useRef<google.maps.Rectangle | null>(null);
 	// Timeout ref for auto-hiding research panel
 	const researchPanelTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 	// Small delay when moving between marker layers (prevents hover flicker)
@@ -942,6 +968,163 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		lastPromotionOverlayVisibleContactsKeyRef.current = '';
 		setPromotionOverlayVisibleContacts([]);
 	}, [searchQuery]);
+
+	const areaSelectionEnabled = useMemo(
+		() => activeTool === 'select' && typeof onAreaSelect === 'function',
+		[activeTool, onAreaSelect]
+	);
+
+	const clearSelectionRect = useCallback(() => {
+		if (selectionRectRef.current) {
+			selectionRectRef.current.setMap(null);
+			selectionRectRef.current = null;
+		}
+		selectionStartLatLngRef.current = null;
+		selectionStartClientRef.current = null;
+		setIsAreaSelecting(false);
+	}, []);
+
+	const ensureSelectionRect = useCallback((): google.maps.Rectangle | null => {
+		if (!map) return null;
+		if (selectionRectRef.current) return selectionRectRef.current;
+		const rect = new google.maps.Rectangle({
+			map,
+			clickable: false,
+			draggable: false,
+			editable: false,
+			strokeColor: '#143883',
+			strokeOpacity: 1,
+			strokeWeight: 2,
+			fillColor: '#143883',
+			fillOpacity: 0.08,
+			zIndex: 2_000_000,
+		});
+		selectionRectRef.current = rect;
+		return rect;
+	}, [map]);
+
+	// Cancel selection if the tool changes or the map unmounts.
+	useEffect(() => {
+		if (!areaSelectionEnabled && isAreaSelecting) {
+			clearSelectionRect();
+		}
+	}, [areaSelectionEnabled, isAreaSelecting, clearSelectionRect]);
+
+	useEffect(() => {
+		return () => {
+			// Defensive cleanup on unmount.
+			if (selectionRectRef.current) {
+				selectionRectRef.current.setMap(null);
+				selectionRectRef.current = null;
+			}
+		};
+	}, []);
+
+	// ESC cancels an in-progress selection.
+	useEffect(() => {
+		if (!isAreaSelecting) return;
+		const onKeyDown = (e: KeyboardEvent) => {
+			if (e.key === 'Escape') {
+				clearSelectionRect();
+			}
+		};
+		window.addEventListener('keydown', onKeyDown);
+		return () => window.removeEventListener('keydown', onKeyDown);
+	}, [isAreaSelecting, clearSelectionRect]);
+
+	// If the user releases the mouse outside the map, ensure we don't get "stuck" selecting.
+	useEffect(() => {
+		if (!isAreaSelecting) return;
+		// Defer so the map's own mouseup handler can run first.
+		const onWindowMouseUp = () => setTimeout(() => clearSelectionRect(), 0);
+		window.addEventListener('mouseup', onWindowMouseUp);
+		return () => window.removeEventListener('mouseup', onWindowMouseUp);
+	}, [isAreaSelecting, clearSelectionRect]);
+
+	const mapOptionsForTool: google.maps.MapOptions = useMemo(() => {
+		const tool = activeTool ?? 'grab';
+		return {
+			...mapOptions,
+			// When selecting, disable drag-to-pan so click-drag can be used to draw the box.
+			draggable: tool === 'grab',
+			draggableCursor: tool === 'select' ? 'crosshair' : 'grab',
+			draggingCursor: tool === 'select' ? 'crosshair' : 'grabbing',
+		};
+	}, [activeTool]);
+
+	const handleMapMouseDown = useCallback(
+		(e: google.maps.MapMouseEvent) => {
+			if (!areaSelectionEnabled) return;
+			if (!e.latLng) return;
+
+			// Only left-click starts a selection.
+			const domEv = e.domEvent as MouseEvent | undefined;
+			if (domEv && typeof domEv.button === 'number' && domEv.button !== 0) return;
+
+			const start = e.latLng.toJSON();
+			selectionStartLatLngRef.current = start;
+			selectionStartClientRef.current = getClientPointFromDomEvent(e.domEvent);
+			setIsAreaSelecting(true);
+
+			const rect = ensureSelectionRect();
+			rect?.setBounds({
+				south: start.lat,
+				west: start.lng,
+				north: start.lat,
+				east: start.lng,
+			});
+		},
+		[areaSelectionEnabled, ensureSelectionRect]
+	);
+
+	const handleMapMouseMove = useCallback(
+		(e: google.maps.MapMouseEvent) => {
+			if (!isAreaSelecting) return;
+			const start = selectionStartLatLngRef.current;
+			if (!start) return;
+			if (!e.latLng) return;
+			const current = e.latLng.toJSON();
+			const rect = ensureSelectionRect();
+			rect?.setBounds({
+				south: Math.min(start.lat, current.lat),
+				west: Math.min(start.lng, current.lng),
+				north: Math.max(start.lat, current.lat),
+				east: Math.max(start.lng, current.lng),
+			});
+		},
+		[isAreaSelecting, ensureSelectionRect]
+	);
+
+	const handleMapMouseUp = useCallback(
+		(e: google.maps.MapMouseEvent) => {
+			if (!isAreaSelecting) return;
+			const start = selectionStartLatLngRef.current;
+			if (!start) {
+				clearSelectionRect();
+				return;
+			}
+			const end = e.latLng ? e.latLng.toJSON() : start;
+
+			// Ignore tiny "click" selections (treat as cancel).
+			const startClient = selectionStartClientRef.current;
+			const endClient = getClientPointFromDomEvent(e.domEvent);
+			const dx = startClient && endClient ? Math.abs(endClient.x - startClient.x) : 0;
+			const dy = startClient && endClient ? Math.abs(endClient.y - startClient.y) : 0;
+			const movedEnough = dx >= 6 || dy >= 6;
+
+			clearSelectionRect();
+
+			if (!movedEnough) return;
+
+			onAreaSelect?.({
+				south: Math.min(start.lat, end.lat),
+				west: Math.min(start.lng, end.lng),
+				north: Math.max(start.lat, end.lat),
+				east: Math.max(start.lng, end.lng),
+			});
+		},
+		[isAreaSelecting, clearSelectionRect, onAreaSelect]
+	);
 
 	const updateBookingExtraFetchBbox = useCallback(
 		(mapInstance: google.maps.Map | null) => {
@@ -2636,8 +2819,16 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			zoom={contactsWithCoords.length > 0 ? 10 : 4}
 			onLoad={onLoad}
 			onUnmount={onUnmount}
-			options={mapOptions}
-			onClick={() => setSelectedMarker(null)}
+			options={mapOptionsForTool}
+			onClick={() => {
+				// In select mode, a click-drag is used for box selection.
+				// Avoid clearing marker state on clicks that are part of drawing.
+				if (areaSelectionEnabled) return;
+				setSelectedMarker(null);
+			}}
+			onMouseDown={handleMapMouseDown}
+			onMouseMove={handleMapMouseMove}
+			onMouseUp={handleMapMouseUp}
 		>
 			{/* Only render markers when not loading */}
 			{!isLoading &&

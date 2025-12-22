@@ -998,12 +998,15 @@ const DashboardContent = () => {
 		setIsMapView,
 		isSearchPending,
 		usedContactIdsSet,
+		mapBboxFilter,
+		setMapBboxFilter,
 	} = useDashboard();
 
 	// Map-side panel should default to only the searched state, while the map itself keeps
 	// showing all results. Clicking an out-of-state marker adds it to this panel list.
 	const [mapPanelExtraContactIds, setMapPanelExtraContactIds] = useState<number[]>([]);
 	const mapViewContainerRef = useRef<HTMLDivElement | null>(null);
+	const [activeMapTool, setActiveMapTool] = useState<'select' | 'grab'>('grab');
 	const [hoveredMapMarkerContact, setHoveredMapMarkerContact] = useState<ContactWithName | null>(
 		null
 	);
@@ -1109,6 +1112,9 @@ const DashboardContent = () => {
 		() => extractStateAbbrFromSearchQuery(activeSearchQuery),
 		[activeSearchQuery]
 	);
+	// When a map rectangle selection is active, we treat results as already scoped to that area,
+	// so we should not "lock" behavior to the original searched state.
+	const searchedStateAbbrForMap = mapBboxFilter ? null : searchedStateAbbr;
 
 	// Use the "What" from the last executed search (activeSearchQuery), not the live dropdown value.
 	const searchedWhat = useMemo(
@@ -1118,11 +1124,11 @@ const DashboardContent = () => {
 
 	const mapPanelContacts = useMemo(() => {
 		const allContacts = contacts || [];
-		if (!searchedStateAbbr) return allContacts;
+		if (!searchedStateAbbrForMap) return allContacts;
 
 		const inState = allContacts.filter((contact) => {
 			const contactStateAbbr = getStateAbbreviation(contact.state || '').trim().toUpperCase();
-			return contactStateAbbr === searchedStateAbbr;
+			return contactStateAbbr === searchedStateAbbrForMap;
 		});
 
 		if (mapPanelExtraContactIds.length === 0) return inState;
@@ -1135,7 +1141,7 @@ const DashboardContent = () => {
 			.filter((c): c is NonNullable<typeof c> => Boolean(c));
 
 		return [...inState, ...extras];
-	}, [contacts, mapPanelExtraContactIds, searchedStateAbbr]);
+	}, [contacts, mapPanelExtraContactIds, searchedStateAbbrForMap]);
 
 	// Check if all panel contacts are selected (for map view "Select all" button)
 	const isAllPanelContactsSelected = useMemo(() => {
@@ -2754,7 +2760,6 @@ const DashboardContent = () => {
 								<>
 									{/* Box to the left of the Home button */}
 									<div
-										aria-hidden="true"
 										className="flex items-center justify-center gap-[20px]"
 										style={{
 											position: 'absolute',
@@ -2770,15 +2775,23 @@ const DashboardContent = () => {
 											border: '3px solid #000000',
 										}}
 									>
-										<div
+										<button
+											type="button"
+											onClick={() => setActiveMapTool('select')}
+											aria-label="Select tool"
+											aria-pressed={activeMapTool === 'select'}
+											className="flex items-center justify-center"
 											style={{
 												width: '44px',
 												height: '44px',
 												borderRadius: '9px',
-												backgroundColor: 'rgba(153, 153, 153, 0.3)', // #999999 @ 30%
-												display: 'flex',
-												alignItems: 'center',
-												justifyContent: 'center',
+												backgroundColor:
+													activeMapTool === 'select'
+														? '#4CDE71'
+														: 'rgba(153, 153, 153, 0.3)', // #999999 @ 30%
+												cursor: 'pointer',
+												padding: 0,
+												border: 'none',
 											}}
 										>
 											<div
@@ -2786,25 +2799,34 @@ const DashboardContent = () => {
 												style={{
 													width: '25px',
 													height: '25px',
-													backgroundColor: '#F1F1F1',
+													backgroundColor:
+														activeMapTool === 'select' ? '#FFFFFF' : 'transparent',
 													border: '2px solid #000000',
 													boxSizing: 'border-box',
 												}}
 											/>
-										</div>
-										<div
+										</button>
+										<button
+											type="button"
+											onClick={() => setActiveMapTool('grab')}
+											aria-label="Grab tool"
+											aria-pressed={activeMapTool === 'grab'}
+											className="flex items-center justify-center"
 											style={{
 												width: '44px',
 												height: '44px',
 												borderRadius: '9px',
-												backgroundColor: 'rgba(153, 153, 153, 0.3)', // #999999 @ 30%
-												display: 'flex',
-												alignItems: 'center',
-												justifyContent: 'center',
+												backgroundColor:
+													activeMapTool === 'grab'
+														? '#4CDE71'
+														: 'rgba(153, 153, 153, 0.3)', // #999999 @ 30%
+												cursor: 'pointer',
+												padding: 0,
+												border: 'none',
 											}}
 										>
-											<GrabIcon />
-										</div>
+											<GrabIcon innerFill={activeMapTool === 'grab' ? '#FFFFFF' : '#DCDFDD'} />
+										</button>
 									</div>
 									<button
 										type="button"
@@ -2959,8 +2981,17 @@ const DashboardContent = () => {
 																selectedContacts={selectedContacts}
 																searchQuery={activeSearchQuery}
 																searchWhat={searchedWhat}
+																activeTool={activeMapTool}
+																onAreaSelect={(bounds) => {
+																	// Run a new search scoped to the drawn rectangle.
+																	// We use the "What" from the last executed search so results stay in-category.
+																	setMapBboxFilter({
+																		...bounds,
+																		titlePrefix: searchedWhat ?? null,
+																	});
+																}}
 																onMarkerHover={handleMapMarkerHover}
-																lockedStateName={searchedStateAbbr}
+																lockedStateName={searchedStateAbbrForMap}
 																onStateSelect={(stateName) => {
 																	const nextState = (stateName || '').trim();
 																	if (!nextState) return;
@@ -2977,13 +3008,13 @@ const DashboardContent = () => {
 																onMarkerClick={(contact) => {
 																	// If the marker is outside the searched state, include it in the
 																	// right-hand map panel list (without changing what the map shows).
-																	if (!searchedStateAbbr) return;
+																	if (!searchedStateAbbrForMap) return;
 																	const contactStateAbbr = getStateAbbreviation(
 																		contact.state || ''
 																	)
 																		.trim()
 																		.toUpperCase();
-																	if (contactStateAbbr === searchedStateAbbr) return;
+																	if (contactStateAbbr === searchedStateAbbrForMap) return;
 																	setMapPanelExtraContactIds((prev) =>
 																		prev.includes(contact.id) ? prev : [...prev, contact.id]
 																	);
