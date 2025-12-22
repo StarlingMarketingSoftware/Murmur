@@ -261,15 +261,24 @@ const DashboardContent = () => {
 	);
 
 	// Helper to trigger search with a specific "where" value (called when clicking state from dropdown)
-	const triggerSearchWithWhere = (newWhereValue: string, isNearMe = false) => {
+	const triggerSearchWithWhere = (
+		newWhereValue: string,
+		isNearMe = false,
+		base?: { why?: string; what?: string }
+	) => {
+		const baseWhy = base?.why ?? whyValue;
+		const baseWhat = base?.what ?? whatValue;
+
 		// Update the state values
+		if (base?.why !== undefined && base.why !== whyValue) setWhyValue(base.why);
+		if (base?.what !== undefined && base.what !== whatValue) setWhatValue(base.what);
 		setWhereValue(newWhereValue);
 		setIsNearMeLocation(isNearMe);
 		setActiveSection(null);
 
 		// Build the combined search query with the new where value
 		const formattedWhere = newWhereValue.trim() ? `(${newWhereValue.trim()})` : '';
-		const combinedSearch = [whyValue, whatValue, formattedWhere]
+		const combinedSearch = [baseWhy, baseWhat, formattedWhere]
 			.filter(Boolean)
 			.join(' ')
 			.trim();
@@ -2815,6 +2824,18 @@ const DashboardContent = () => {
 																searchWhat={searchedWhat}
 																onMarkerHover={handleMapMarkerHover}
 																lockedStateName={searchedStateAbbr}
+																onStateSelect={(stateName) => {
+																	const nextState = (stateName || '').trim();
+																	if (!nextState) return;
+
+																	// Keep the last executed Why/What (the map is showing results for this query),
+																	// and only swap the state for the next search.
+																	const baseWhy =
+																		(extractWhyFromSearchQuery(activeSearchQuery) || whyValue).trim();
+																	const baseWhat =
+																		(extractWhatFromSearchQuery(activeSearchQuery) || whatValue).trim();
+																	triggerSearchWithWhere(nextState, false, { why: baseWhy, what: baseWhat });
+																}}
 																isLoading={isSearchPending || isLoadingContacts || isRefetchingContacts}
 																onMarkerClick={(contact) => {
 																	// If the marker is outside the searched state, include it in the

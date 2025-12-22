@@ -651,6 +651,12 @@ const STATE_GEOJSON_URL = 'https://storage.googleapis.com/mapsdevsite/json/state
 const STATE_HIGHLIGHT_COLOR = '#5DAB68';
 const STATE_HIGHLIGHT_OPACITY = 0.68;
 const STATE_BORDER_COLOR = '#CFD8DC';
+// When zoomed out to a US-wide view, show subtle state divider lines (like Zillow).
+// Keep these behind the blue/black search-area outlines.
+const STATE_DIVIDER_LINES_MAX_ZOOM = 8;
+const STATE_DIVIDER_LINES_COLOR = '#90A4AE';
+const STATE_DIVIDER_LINES_STROKE_OPACITY = 1;
+const STATE_DIVIDER_LINES_STROKE_WEIGHT = 1.7;
 
 // Marker dot colors by search "What" value (dashboard/drafting search).
 const DEFAULT_RESULT_DOT_COLOR = '#D21E1F';
@@ -1347,75 +1353,127 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		};
 	}, [map, clearResultsOutline, clearSearchedStateOutline]);
 
-	// Add/remove hover/click highlighting for states (only when enabled)
+	// Add/remove hover highlight and optional click-to-select for states.
+	// Hover highlight is intentionally only enabled at the minimum zoom (fully zoomed out).
 	useEffect(() => {
 		const dataLayer = stateLayerRef.current;
-		if (!map || !dataLayer || !enableStateInteractions || !isStateLayerReady) return;
+		if (!map || !dataLayer || !isStateLayerReady) return;
 
-		const mouseoverListener = dataLayer.addListener(
-			'mouseover',
-			(event: google.maps.Data.MouseEvent) => {
-				const hoveredKey = normalizeStateKey(
-					(event.feature.getProperty('NAME') as string) ||
-						(event.feature.getId() as string)
-				);
-				if (hoveredKey && hoveredKey === selectedStateKeyRef.current) {
-					return;
+		const loading = isLoading ?? false;
+		// "Fully zoomed out" means at the minimum zoom allowed by the map.
+		const isFullyZoomedOut = !loading && zoomLevel <= MAP_MIN_ZOOM + 0.001;
+		const hasStateInteractivity = !!enableStateInteractions || !!onStateSelect;
+
+		// Hover highlight should only exist at the minimum zoom and only when states are actionable.
+		const shouldEnableHoverHighlight = isFullyZoomedOut && hasStateInteractivity;
+		// Click-to-select states:
+		// - Campaign page (enableStateInteractions): always clickable
+		// - Dashboard map view (no enableStateInteractions): clickable only when fully zoomed out
+		const shouldEnableClickSelect = !!enableStateInteractions || (!!onStateSelect && isFullyZoomedOut);
+
+		if (!shouldEnableHoverHighlight && !shouldEnableClickSelect) return;
+
+		let mouseoverListener: google.maps.MapsEventListener | null = null;
+		let mouseoutListener: google.maps.MapsEventListener | null = null;
+		let clickListener: google.maps.MapsEventListener | null = null;
+
+		if (shouldEnableHoverHighlight) {
+			mouseoverListener = dataLayer.addListener(
+				'mouseover',
+				(event: google.maps.Data.MouseEvent) => {
+					// Defensive: if zoom changed mid-hover, don't apply the fill.
+					const currentZoom = map.getZoom() ?? zoomLevel;
+					if (currentZoom > MAP_MIN_ZOOM + 0.001) return;
+					if (isLoadingRef.current) return;
+
+					const hoveredKey = normalizeStateKey(
+						(event.feature.getProperty('NAME') as string) ||
+							(event.feature.getId() as string)
+					);
+					if (hoveredKey && hoveredKey === selectedStateKeyRef.current) {
+						return;
+					}
+					dataLayer.overrideStyle(event.feature, {
+						fillColor: STATE_HIGHLIGHT_COLOR,
+						fillOpacity: STATE_HIGHLIGHT_OPACITY,
+						strokeColor: STATE_HIGHLIGHT_COLOR,
+						strokeOpacity: 1,
+						strokeWeight: 1.2,
+					});
 				}
-				dataLayer.overrideStyle(event.feature, {
-					fillColor: STATE_HIGHLIGHT_COLOR,
-					fillOpacity: STATE_HIGHLIGHT_OPACITY,
-					strokeColor: STATE_HIGHLIGHT_COLOR,
-					strokeOpacity: 1,
-					strokeWeight: 1.2,
-				});
-			}
-		);
+			);
 
-		const mouseoutListener = dataLayer.addListener(
-			'mouseout',
-			(event: google.maps.Data.MouseEvent) => {
-				dataLayer.revertStyle(event.feature);
-			}
-		);
-
-		const clickListener = dataLayer.addListener(
-			'click',
-			(event: google.maps.Data.MouseEvent) => {
-				const stateName = (event.feature.getProperty('NAME') as string) || '';
-				const normalizedKey =
-					normalizeStateKey(stateName) ||
-					normalizeStateKey((event.feature.getId() as string) || undefined);
-				setSelectedStateKey(normalizedKey);
-				if (stateName) {
-					onStateSelectRef.current?.(stateName);
+			mouseoutListener = dataLayer.addListener(
+				'mouseout',
+				(event: google.maps.Data.MouseEvent) => {
+					dataLayer.revertStyle(event.feature);
 				}
-			}
-		);
+			);
+		}
+
+		if (shouldEnableClickSelect) {
+			clickListener = dataLayer.addListener(
+				'click',
+				(event: google.maps.Data.MouseEvent) => {
+					const stateName = (event.feature.getProperty('NAME') as string) || '';
+					const normalizedKey =
+						normalizeStateKey(stateName) ||
+						normalizeStateKey((event.feature.getId() as string) || undefined);
+					setSelectedStateKey(normalizedKey);
+					if (stateName) {
+						onStateSelectRef.current?.(stateName);
+					}
+				}
+			);
+		}
 
 		return () => {
-			mouseoverListener.remove();
-			mouseoutListener.remove();
-			clickListener.remove();
-		};
-	}, [map, enableStateInteractions, isStateLayerReady]);
+			mouseoverListener?.remove();
+			mouseoutListener?.remove();
+			clickListener?.remove();
 
-	// Update stroke styling when the selected state changes
+			// If the user zoomed in while hovering, ensure we clear any lingering fill override.
+			if (shouldEnableHoverHighlight) {
+				dataLayer.revertStyle();
+			}
+		};
+	}, [map, enableStateInteractions, isStateLayerReady, zoomLevel, isLoading, onStateSelect]);
+
+	// When state interactions are off, show subtle divider lines at low zoom (US-wide view).
 	useEffect(() => {
 		const dataLayer = stateLayerRef.current;
 		if (!dataLayer || !isStateLayerReady) return;
+		if (enableStateInteractions) return;
 
-		// Keep the layer invisible unless state interactions are enabled.
-		if (!enableStateInteractions) {
-			dataLayer.setStyle({
-				fillOpacity: 0,
-				strokeOpacity: 0,
-				strokeWeight: 0,
-				clickable: false,
-				zIndex: 0,
-			});
-			return;
-		}
+		const loading = isLoading ?? false;
+		const isFullyZoomedOut = !loading && zoomLevel <= MAP_MIN_ZOOM + 0.001;
+		const shouldShowZoomedOutDividers = zoomLevel <= STATE_DIVIDER_LINES_MAX_ZOOM;
+		dataLayer.setStyle(
+			shouldShowZoomedOutDividers
+				? {
+						fillOpacity: 0,
+						strokeColor: STATE_DIVIDER_LINES_COLOR,
+						strokeOpacity: STATE_DIVIDER_LINES_STROKE_OPACITY,
+						strokeWeight: STATE_DIVIDER_LINES_STROKE_WEIGHT,
+						// Enable hover only at the map's minimum zoom.
+						clickable: isFullyZoomedOut && !!onStateSelect,
+						zIndex: 0,
+					}
+				: {
+						fillOpacity: 0,
+						strokeOpacity: 0,
+						strokeWeight: 0,
+						clickable: false,
+						zIndex: 0,
+					}
+		);
+	}, [enableStateInteractions, isStateLayerReady, zoomLevel, isLoading, onStateSelect]);
+
+	// When state interactions are on, render the state borders + selected-state outline.
+	useEffect(() => {
+		const dataLayer = stateLayerRef.current;
+		if (!dataLayer || !isStateLayerReady) return;
+		if (!enableStateInteractions) return;
 
 		dataLayer.setStyle((feature) => {
 			const featureKey = normalizeStateKey(
@@ -1877,6 +1935,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		backgroundDotsLayerRef.current = layer;
 		lastBackgroundDotsKeyRef.current = '';
 
+		// Ensure state divider lines render above the background dots layer.
+		// (Data layers are stacked by attach order; the dots layer is created later.)
+		const stateLayer = stateLayerRef.current;
+		if (stateLayer) {
+			stateLayer.setMap(null);
+			stateLayer.setMap(map);
+		}
+
 		return () => {
 			layer.setMap(null);
 			backgroundDotsLayerRef.current = null;
@@ -2171,6 +2237,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 	const onLoad = useCallback((mapInstance: google.maps.Map) => {
 		setMap(mapInstance);
+		// Initialize zoomLevel immediately so styling reflects the real zoom on first render.
+		setZoomLevel(mapInstance.getZoom() ?? 4);
 
 		// Listen for zoom changes
 		mapInstance.addListener('zoom_changed', () => {
@@ -2510,7 +2578,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		if (!layer || !backgroundDotIcon) return;
 		layer.setStyle({
 			clickable: false,
-			zIndex: 0,
+			zIndex: -1,
 			icon: backgroundDotIcon,
 		});
 	}, [backgroundDotIcon]);
