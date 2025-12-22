@@ -1007,6 +1007,8 @@ const DashboardContent = () => {
 		null
 	);
 	const isMapResultsLoading = isSearchPending || isLoadingContacts || isRefetchingContacts;
+	const hasNoSearchResults =
+		hasSearched && !isMapResultsLoading && (contacts?.length ?? 0) === 0;
 	// Map hover research overlay behavior:
 	// - Hold briefly after hover ends (prevents flicker)
 	// - Then fade out quickly
@@ -2870,7 +2872,8 @@ const DashboardContent = () => {
 						) : isSearchPending ||
 						  isLoadingContacts ||
 						  isRefetchingContacts ||
-						  (contacts && contacts.length > 0) ? (
+						  (contacts && contacts.length > 0) ||
+						  (isMapView && hasNoSearchResults) ? (
 							<div className="flex justify-center w-full px-0 sm:px-4 relative">
 								<div className="w-full max-w-full results-appear results-align">
 									{isMapView ? (
@@ -2958,13 +2961,60 @@ const DashboardContent = () => {
 																	setTimeout(() => tryScroll(0), 0);
 																}}
 															/>
+															{hasNoSearchResults && (
+																<div className="absolute inset-0 z-[120] flex items-start justify-center pt-[120px] pointer-events-none">
+																	<div
+																		className="pointer-events-auto flex flex-col items-center justify-center text-center"
+																		style={{
+																			width: 517,
+																			height: 174,
+																			borderRadius: 8,
+																			backgroundColor: 'rgba(106, 180, 227, 0.8)', // #6AB4E3 @ 80%
+																			border: '3px solid #143883',
+																		}}
+																	>
+																		<div
+																			className="flex flex-col items-center justify-center gap-[16px]"
+																			style={{ width: 496 }}
+																		>
+																			<div
+																				className="flex items-center justify-center text-center bg-white"
+																				style={{
+																					width: 496,
+																					height: 58,
+																					borderRadius: 8,
+																					border: '2px solid #101010',
+																				}}
+																			>
+																				<span className="font-secondary font-bold text-[18px] leading-none text-black">
+																					Keep Exploring
+																				</span>
+																			</div>
+																			<div
+																				className="flex items-center justify-center text-center bg-white px-6"
+																				style={{
+																					width: 496,
+																					height: 58,
+																					borderRadius: 8,
+																					border: '2px solid #101010',
+																				}}
+																			>
+																				<span className="font-secondary font-bold text-[16px] leading-tight text-black">
+																					Try a new search term to find contacts in this area
+																				</span>
+																			</div>
+																		</div>
+																	</div>
+																</div>
+															)}
 															{/* Search Results overlay box on the right side - hidden while loading and at narrowest breakpoint */}
 															{!(
 																isSearchPending ||
 																isLoadingContacts ||
 																isRefetchingContacts
 															) &&
-																!isNarrowestDesktop && (
+																!isNarrowestDesktop &&
+																!hasNoSearchResults && (
 																	<div
 																		className="absolute top-[97px] right-[10px] rounded-[12px] flex flex-col"
 																		style={{
@@ -3302,7 +3352,8 @@ const DashboardContent = () => {
 																		isSearchPending ||
 																		isLoadingContacts ||
 																		isRefetchingContacts
-																	) && (
+																	) &&
+																	!hasNoSearchResults && (
 																		<div className="absolute bottom-[10px] left-[10px] right-[10px] hidden xl:flex justify-center">
 																			<Button
 																				isLoading={
@@ -3353,7 +3404,8 @@ const DashboardContent = () => {
 																	isSearchPending ||
 																	isLoadingContacts ||
 																	isRefetchingContacts
-																) && (
+																) &&
+																!hasNoSearchResults && (
 																	<div
 																		className="absolute left-[10px] right-[10px] bottom-[10px] rounded-[12px] shadow-lg flex flex-col"
 																		style={{
