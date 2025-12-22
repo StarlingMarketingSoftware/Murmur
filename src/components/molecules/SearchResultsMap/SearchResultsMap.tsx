@@ -804,8 +804,6 @@ const MARKER_DOT_Z_INDEX = 1;
 // Minimum zoom level required to trigger hover tooltips and research highlights on markers.
 // Below this zoom level, markers are too dense and small for hover interactions to be useful.
 const HOVER_INTERACTION_MIN_ZOOM = 8;
-// Booking searches: when zoomed in enough, show additional nearby booking categories as extra markers.
-// Lower this a bit so overlay pins are visible sooner when zoomed out.
 const BOOKING_EXTRA_MARKERS_MIN_ZOOM = 8;
 // Keep extra markers capped so map remains responsive.
 const BOOKING_EXTRA_MARKERS_MAX_DOTS = 160;
@@ -1703,8 +1701,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		if (!map || !dataLayer || !isStateLayerReady) return;
 
 		const loading = isLoading ?? false;
-		// "Fully zoomed out" means at the minimum zoom allowed by the map.
-		const isFullyZoomedOut = !loading && zoomLevel <= MAP_MIN_ZOOM + 0.001;
 		// Keep campaign behavior strict (minZoom only) while loosening dashboard by +1.
 		const stateHoverMaxZoom = enableStateInteractions ? MAP_MIN_ZOOM : STATE_HOVER_HIGHLIGHT_MAX_ZOOM;
 		const isWithinStateHoverZoom = !loading && zoomLevel <= stateHoverMaxZoom + 0.001;
@@ -1718,10 +1714,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			isWithinStateHoverZoom && hasStateInteractivity && !isSelectToolActive;
 		// Click-to-select states:
 		// - Campaign page (enableStateInteractions): always clickable
-		// - Dashboard map view (no enableStateInteractions): clickable only when fully zoomed out
+		// - Dashboard map view (no enableStateInteractions): clickable anywhere the hover highlight is shown
 		const shouldEnableClickSelect =
 			!isSelectToolActive &&
-			(!!enableStateInteractions || (!!onStateSelect && isFullyZoomedOut));
+			(!!enableStateInteractions || (!!onStateSelect && isWithinStateHoverZoom));
 
 		if (!shouldEnableHoverHighlight && !shouldEnableClickSelect) return;
 

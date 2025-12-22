@@ -1833,25 +1833,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 								<div
 									className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
 									onClick={() => {
-										setSearchWhatValue('Coffee Shops');
-										setSearchActiveSection('where');
-									}}
-								>
-									<div className="w-[38px] h-[38px] bg-[#A9DE78] rounded-[8px] flex-shrink-0 flex items-center justify-center">
-										<CoffeeShopsIcon />
-									</div>
-									<div className="ml-[12px] flex flex-col">
-										<div className="text-[20px] font-medium leading-none text-black font-inter">
-											Coffee Shops
-										</div>
-										<div className="text-[12px] leading-tight text-black mt-[4px]">
-											Book intimate daytime performances
-										</div>
-									</div>
-								</div>
-								<div
-									className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
-									onClick={() => {
 										setSearchWhatValue('Restaurants');
 										setSearchActiveSection('where');
 									}}
@@ -1865,6 +1846,25 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										</div>
 										<div className="text-[12px] leading-tight text-black mt-[4px]">
 											Land steady dinner and brunch gigs
+										</div>
+									</div>
+								</div>
+								<div
+									className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+									onClick={() => {
+										setSearchWhatValue('Coffee Shops');
+										setSearchActiveSection('where');
+									}}
+								>
+									<div className="w-[38px] h-[38px] bg-[#A9DE78] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+										<CoffeeShopsIcon />
+									</div>
+									<div className="ml-[12px] flex flex-col">
+										<div className="text-[20px] font-medium leading-none text-black font-inter">
+											Coffee Shops
+										</div>
+										<div className="text-[12px] leading-tight text-black mt-[4px]">
+											Book intimate daytime performances
 										</div>
 									</div>
 								</div>
