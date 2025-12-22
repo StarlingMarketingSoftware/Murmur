@@ -716,7 +716,7 @@ const MARKER_DOT_Z_INDEX = 1;
 // Below this zoom level, markers are too dense and small for hover interactions to be useful.
 const HOVER_INTERACTION_MIN_ZOOM = 8;
 // Booking searches: when zoomed in enough, show additional nearby booking categories as extra markers.
-const BOOKING_EXTRA_MARKERS_MIN_ZOOM = 11;
+const BOOKING_EXTRA_MARKERS_MIN_ZOOM = 10;
 // Keep extra markers capped so map remains responsive.
 const BOOKING_EXTRA_MARKERS_MAX_DOTS = 160;
 // Zoom level at which the map switches to satellite/hybrid view for better detail
