@@ -71,6 +71,9 @@ export const urls = {
 		},
 		contacts: {
 			index: '/api/contacts',
+			mapOverlay: {
+				index: '/api/contacts/map-overlay',
+			},
 			locations: {
 				index: '/api/contacts/locations',
 			},

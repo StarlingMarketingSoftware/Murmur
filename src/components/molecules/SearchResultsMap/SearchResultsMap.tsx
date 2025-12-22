@@ -4,7 +4,7 @@ import { FC, Fragment, useCallback, useEffect, useMemo, useRef, useState } from 
 import { GoogleMap, useJsApiLoader, MarkerF, OverlayView, OverlayViewF } from '@react-google-maps/api';
 import { ContactWithName } from '@/types/contact';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
-import { useGetContacts } from '@/hooks/queryHooks/useContacts';
+import { useGetContactsMapOverlay } from '@/hooks/queryHooks/useContacts';
 import {
 	calculateTooltipWidth,
 	calculateTooltipHeight,
@@ -12,6 +12,14 @@ import {
 	generateMapTooltipIconUrl,
 	MAP_TOOLTIP_ANCHOR_X,
 } from '@/components/atoms/_svg/MapTooltipIcon';
+import {
+	generateMapMarkerPinIconUrl,
+	MAP_MARKER_PIN_CIRCLE_CENTER_X,
+	MAP_MARKER_PIN_CIRCLE_CENTER_Y,
+	MAP_MARKER_PIN_CIRCLE_DIAMETER,
+	MAP_MARKER_PIN_VIEWBOX_HEIGHT,
+	MAP_MARKER_PIN_VIEWBOX_WIDTH,
+} from '@/components/atoms/_svg/MapMarkerPinIcon';
 
 type LatLngLiteral = { lat: number; lng: number };
 type MarkerHoverMeta = { clientX: number; clientY: number };
@@ -708,7 +716,7 @@ const MARKER_DOT_Z_INDEX = 1;
 // Below this zoom level, markers are too dense and small for hover interactions to be useful.
 const HOVER_INTERACTION_MIN_ZOOM = 8;
 // Booking searches: when zoomed in enough, show additional nearby booking categories as extra markers.
-const BOOKING_EXTRA_MARKERS_MIN_ZOOM = 12;
+const BOOKING_EXTRA_MARKERS_MIN_ZOOM = 11;
 // Keep extra markers capped so map remains responsive.
 const BOOKING_EXTRA_MARKERS_MAX_DOTS = 160;
 // Zoom level at which the map switches to satellite/hybrid view for better detail
@@ -745,21 +753,6 @@ const getBookingTitlePrefixFromContactTitle = (title: string | null | undefined)
 
 const isBookingSearchQuery = (query: string | null | undefined): boolean =>
 	(query ?? '').trim().toLowerCase().startsWith('[booking]');
-
-const extractWhereFromSearchQuery = (query: string | null | undefined): string | null => {
-	// Typical formats:
-	// - "[Booking] Music Venues (Portland, ME)"
-	// - "[Promotion] Radio Stations (Maine)"
-	// Also support "... in <where>"
-	if (!query) return null;
-	const s = query.trim();
-	if (!s) return null;
-	const parenMatch = s.match(/\(([^)]+)\)\s*$/);
-	const parenValue = parenMatch?.[1]?.trim();
-	if (parenValue) return parenValue;
-	const inMatch = s.match(/\s+in\s+(.+)$/i);
-	return inMatch?.[1]?.trim() || null;
-};
 const normalizeWhatKey = (value: string): string =>
 	value
 		.trim()
@@ -913,6 +906,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		[]
 	);
 	const lastBookingExtraVisibleContactsKeyRef = useRef<string>('');
+	const lastBookingExtraFetchKeyRef = useRef<string>('');
+	const [bookingExtraFetchBbox, setBookingExtraFetchBbox] = useState<BoundingBox | null>(null);
 	// Timeout ref for auto-hiding research panel
 	const researchPanelTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 	// Small delay when moving between marker layers (prevents hover flicker)
@@ -941,60 +936,106 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	);
 
 	const isBookingSearch = useMemo(() => isBookingSearchQuery(searchQuery), [searchQuery]);
-	const bookingExtraWhere = useMemo(() => {
-		const fromQuery = extractWhereFromSearchQuery(searchQuery);
-		if (fromQuery && fromQuery.trim().length > 0) return fromQuery.trim();
-		const fromLocked = (lockedStateName ?? '').trim();
-		return fromLocked.length > 0 ? fromLocked : null;
-	}, [searchQuery, lockedStateName]);
-
-	// Intentionally omit the "What" portion so the contacts API returns its default booking title prefixes.
-	const bookingExtraQuery = useMemo(() => {
-		if (!isBookingSearch) return null;
-		const where = (bookingExtraWhere ?? '').trim();
-		if (!where) return null;
-		return `[Booking] (${where})`;
-	}, [isBookingSearch, bookingExtraWhere]);
-
-	const bookingExtraFilters = useMemo(() => {
-		if (!bookingExtraQuery) return undefined;
-		return { query: bookingExtraQuery, limit: 500, useVectorSearch: false };
-	}, [bookingExtraQuery]);
-
-	// Enable once per-query when the user has zoomed in enough, so we don't refetch repeatedly
-	// as they pan/zoom around the threshold.
-	const [bookingExtrasQueryEnabled, setBookingExtrasQueryEnabled] = useState(false);
 	useEffect(() => {
-		setBookingExtrasQueryEnabled(false);
-		// Also clear any previously-visible extra markers to avoid stale overlays during search transitions.
+		// Reset the overlay fetch window and any visible extra markers on search transitions.
+		lastBookingExtraFetchKeyRef.current = '';
+		setBookingExtraFetchBbox(null);
 		lastBookingExtraVisibleContactsKeyRef.current = '';
 		setBookingExtraVisibleContacts([]);
-	}, [bookingExtraQuery]);
-	useEffect(() => {
-		if (!bookingExtraFilters) return;
-		if (zoomLevel < BOOKING_EXTRA_MARKERS_MIN_ZOOM) return;
-		setBookingExtrasQueryEnabled(true);
-	}, [bookingExtraFilters, zoomLevel]);
+	}, [searchQuery]);
 
-	const shouldFetchBookingExtras = Boolean(bookingExtraFilters) && bookingExtrasQueryEnabled;
-	const { data: bookingExtraRawContacts } = useGetContacts({
-		filters: bookingExtraFilters,
-		enabled: shouldFetchBookingExtras,
+	const updateBookingExtraFetchBbox = useCallback(
+		(mapInstance: google.maps.Map | null) => {
+			if (!mapInstance) return;
+
+			// Only run for booking-mode searches, and only once the user is zoomed in.
+			if (!isBookingSearch) {
+				if (lastBookingExtraFetchKeyRef.current !== '') {
+					lastBookingExtraFetchKeyRef.current = '';
+					setBookingExtraFetchBbox(null);
+				}
+				return;
+			}
+
+			const zoomRaw = mapInstance.getZoom() ?? 4;
+			if (zoomRaw < BOOKING_EXTRA_MARKERS_MIN_ZOOM) {
+				if (lastBookingExtraFetchKeyRef.current !== '') {
+					lastBookingExtraFetchKeyRef.current = '';
+					setBookingExtraFetchBbox(null);
+				}
+				return;
+			}
+
+			const bounds = mapInstance.getBounds();
+			if (!bounds) return;
+
+			const sw = bounds.getSouthWest();
+			const ne = bounds.getNorthEast();
+			const south = sw.lat();
+			const west = sw.lng();
+			const north = ne.lat();
+			const east = ne.lng();
+
+			// Skip antimeridian-crossing viewports (not relevant for our UI).
+			if (east < west) return;
+
+			// Pad the fetch bounds so panning within the current view doesn't immediately require refetching.
+			const latSpan = north - south;
+			const lngSpan = east - west;
+			const padLat = latSpan * 0.35;
+			const padLng = lngSpan * 0.35;
+
+			const paddedSouth = clamp(south - padLat, -90, 90);
+			const paddedWest = clamp(west - padLng, -180, 180);
+			const paddedNorth = clamp(north + padLat, -90, 90);
+			const paddedEast = clamp(east + padLng, -180, 180);
+
+			// Quantize the fetch window so we don't refetch on tiny pans/zooms.
+			const zoomKey = Math.round(zoomRaw);
+			const quant = getBackgroundDotsQuantizationDeg(zoomKey);
+			const qSouth = Math.floor(paddedSouth / quant) * quant;
+			const qWest = Math.floor(paddedWest / quant) * quant;
+			const qNorth = Math.ceil(paddedNorth / quant) * quant;
+			const qEast = Math.ceil(paddedEast / quant) * quant;
+
+			const nextKey = `${zoomKey}|${qSouth.toFixed(4)}|${qWest.toFixed(4)}|${qNorth.toFixed(
+				4
+			)}|${qEast.toFixed(4)}`;
+
+			if (nextKey === lastBookingExtraFetchKeyRef.current) return;
+			lastBookingExtraFetchKeyRef.current = nextKey;
+			setBookingExtraFetchBbox({ minLat: qSouth, minLng: qWest, maxLat: qNorth, maxLng: qEast });
+		},
+		[isBookingSearch]
+	);
+
+	const bookingExtraOverlayFilters = useMemo(() => {
+		if (!bookingExtraFetchBbox) return undefined;
+		return {
+			mode: 'booking' as const,
+			south: bookingExtraFetchBbox.minLat,
+			west: bookingExtraFetchBbox.minLng,
+			north: bookingExtraFetchBbox.maxLat,
+			east: bookingExtraFetchBbox.maxLng,
+			limit: 1200,
+		};
+	}, [bookingExtraFetchBbox]);
+
+	const { data: bookingExtraRawContacts } = useGetContactsMapOverlay({
+		filters: bookingExtraOverlayFilters,
+		enabled: Boolean(bookingExtraOverlayFilters),
 	});
 
 	const bookingExtraContacts = useMemo(() => {
 		if (!bookingExtraRawContacts || bookingExtraRawContacts.length === 0) return [];
-		const currentWhatKey = searchWhat ? normalizeWhatKey(searchWhat) : null;
 		return bookingExtraRawContacts.filter((c) => {
 			// Never duplicate primary result markers.
 			if (baseContactIdSet.has(c.id)) return false;
 			const prefix = getBookingTitlePrefixFromContactTitle(c.title);
 			if (!prefix) return false;
-			// Only show *additional* categories beyond the primary "What" when one is set.
-			if (currentWhatKey && normalizeWhatKey(prefix) === currentWhatKey) return false;
 			return true;
 		});
-	}, [bookingExtraRawContacts, baseContactIdSet, searchWhat]);
+	}, [bookingExtraRawContacts, baseContactIdSet]);
 
 	const { contactsWithCoords: bookingExtraContactsWithCoords, coordsByContactId: bookingExtraCoordsByContactId } =
 		useMemo(() => {
@@ -1674,15 +1715,17 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 	useEffect(() => {
 		if (!map) return;
-		const listener = map.addListener('idle', () =>
-			recomputeViewportDots(map, isLoadingRef.current)
-		);
+		const onIdle = () => {
+			updateBookingExtraFetchBbox(map);
+			recomputeViewportDots(map, isLoadingRef.current);
+		};
+		const listener = map.addListener('idle', onIdle);
 		// Initial fill
-		recomputeViewportDots(map, isLoadingRef.current);
+		onIdle();
 		return () => {
 			listener.remove();
 		};
-	}, [map, recomputeViewportDots]);
+	}, [map, recomputeViewportDots, updateBookingExtraFetchBbox]);
 
 	// Draw a gray outline around the *group of states* that have results.
 	// This uses the state polygons we load via the Data layer and unions them so the outline is one shape.
@@ -2122,6 +2165,49 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		return getResultDotStrokeWeightForZoom(zoomLevel);
 	}, [zoomLevel]);
 
+	// Marker pin (SVG) sizing: scale so the 36px circle area matches our dot diameter (2*markerScale).
+	const markerPinScaleFactor = useMemo(() => {
+		return (markerScale * 2) / MAP_MARKER_PIN_CIRCLE_DIAMETER;
+	}, [markerScale]);
+
+	const markerPinMetrics = useMemo(() => {
+		if (!isLoaded) return null;
+		const width = MAP_MARKER_PIN_VIEWBOX_WIDTH * markerPinScaleFactor;
+		const height = MAP_MARKER_PIN_VIEWBOX_HEIGHT * markerPinScaleFactor;
+		// Keep the marker positioned like our previous dot markers: anchor on the circle center.
+		const anchorX = MAP_MARKER_PIN_CIRCLE_CENTER_X * markerPinScaleFactor;
+		const anchorY = MAP_MARKER_PIN_CIRCLE_CENTER_Y * markerPinScaleFactor;
+		return { width, height, anchorX, anchorY };
+	}, [isLoaded, markerPinScaleFactor]);
+
+	const markerPinUrlCacheRef = useRef<Map<string, string>>(new Map());
+	const getMarkerPinUrl = useCallback(
+		(fillColor: string, strokeColor: string, searchWhat?: string | null): string => {
+			const key = `${fillColor}|${strokeColor}|${searchWhat ?? ''}`;
+			const cached = markerPinUrlCacheRef.current.get(key);
+			if (cached) return cached;
+			const url = generateMapMarkerPinIconUrl(fillColor, strokeColor, searchWhat);
+			markerPinUrlCacheRef.current.set(key, url);
+			return url;
+		},
+		[]
+	);
+
+	const getMarkerPinIcon = useCallback(
+		(fillColor: string, strokeColor: string, searchWhat?: string | null): google.maps.Icon | undefined => {
+			if (!isLoaded) return undefined;
+			const metrics = markerPinMetrics;
+			if (!metrics) return undefined;
+
+			return {
+				url: getMarkerPinUrl(fillColor, strokeColor, searchWhat),
+				scaledSize: new google.maps.Size(metrics.width, metrics.height),
+				anchor: new google.maps.Point(metrics.anchorX, metrics.anchorY),
+			};
+		},
+		[getMarkerPinUrl, isLoaded, markerPinMetrics]
+	);
+
 	const defaultDotFillColor = useMemo(() => {
 		return getResultDotColorForWhat(searchWhat);
 	}, [searchWhat]);
@@ -2305,16 +2391,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						dotFillColor,
 						OUTSIDE_LOCKED_STATE_WASHOUT_TO_WHITE
 					);
-					const dotIcon: google.maps.Symbol = {
-						path: google.maps.SymbolPath.CIRCLE,
-						scale: markerScale,
-						fillColor: isOutsideLockedState ? dotFillColorOutside : dotFillColor,
-						fillOpacity: 1,
-						strokeColor: isSelected
-							? RESULT_DOT_STROKE_COLOR_SELECTED
-							: RESULT_DOT_STROKE_COLOR_DEFAULT,
-						strokeWeight,
-					};
+					const pinFillColor = isOutsideLockedState ? dotFillColorOutside : dotFillColor;
+					const pinStrokeColor = isSelected
+						? RESULT_DOT_STROKE_COLOR_SELECTED
+						: RESULT_DOT_STROKE_COLOR_DEFAULT;
+					const pinIcon = getMarkerPinIcon(pinFillColor, pinStrokeColor, whatForMarker);
 
 					// Show tooltip if hovered or if this marker is fading out
 					const isFading = fadingTooltipId === contact.id;
@@ -2368,7 +2449,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 							/>
 							<MarkerF
 								position={coords}
-								icon={dotIcon}
+								icon={pinIcon}
 								clickable={false}
 								zIndex={-1}
 							/>

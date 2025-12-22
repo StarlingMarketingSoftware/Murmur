@@ -356,6 +356,55 @@ export const useGetLocations = (query: string, mode?: 'state' | 'state-first') =
 	});
 };
 
+export type ContactsMapOverlayMode = 'booking';
+
+export interface ContactsMapOverlayFilters {
+	mode?: ContactsMapOverlayMode;
+	south: number;
+	west: number;
+	north: number;
+	east: number;
+	limit?: number;
+}
+
+export const useGetContactsMapOverlay = (options: {
+	filters?: ContactsMapOverlayFilters;
+	enabled?: boolean;
+}) => {
+	return useQuery<ContactWithName[]>({
+		queryKey: [...QUERY_KEYS.list(), 'map-overlay', options.filters],
+		queryFn: async ({ signal }) => {
+			if (!options.filters) return [];
+			const url = appendQueryParamsToUrl(urls.api.contacts.mapOverlay.index, options.filters);
+			const response = await _fetch(url, undefined, undefined, {
+				signal,
+				timeout: 15000,
+			});
+
+			if (!response.ok) {
+				let errorMessage = 'Failed to fetch map overlay contacts';
+				try {
+					const errorData = await response.json();
+					errorMessage = errorData.error || errorMessage;
+				} catch {
+					try {
+						const textError = await response.text();
+						errorMessage = textError || `HTTP ${response.status} error`;
+					} catch {
+						errorMessage = `HTTP ${response.status} error`;
+					}
+				}
+				throw new Error(errorMessage);
+			}
+
+			return response.json() as Promise<ContactWithName[]>;
+		},
+		enabled: (options.enabled ?? true) && Boolean(options.filters),
+		staleTime: 1000 * 60 * 5, // 5 minutes
+		gcTime: 1000 * 60 * 30, // Keep in cache for 30 minutes
+	});
+};
+
 export interface GeocodeContactsResult {
 	message: string;
 	processed: number;
