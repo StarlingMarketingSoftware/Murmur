@@ -373,13 +373,16 @@ const DashboardContent = () => {
 
 	// Narrowest desktop detection (< 952px) - single column layout for map view
 	const [isNarrowestDesktop, setIsNarrowestDesktop] = useState(false);
+	const [isXlDesktop, setIsXlDesktop] = useState(false);
 
 	// Detect narrow desktop breakpoint
 	useEffect(() => {
 		if (typeof window === 'undefined') return;
 
 		const handleResize = () => {
-			setIsNarrowestDesktop(window.innerWidth < 952);
+			const width = window.innerWidth;
+			setIsNarrowestDesktop(width < 952);
+			setIsXlDesktop(width >= 1280);
 		};
 
 		handleResize();
@@ -1079,6 +1082,60 @@ const DashboardContent = () => {
 	const isMapResultsLoading = isSearchPending || isLoadingContacts || isRefetchingContacts;
 	const hasNoSearchResults =
 		hasSearched && !isMapResultsLoading && (contacts?.length ?? 0) === 0;
+
+	// In XL desktop map view, we render two "Create Campaign" CTAs (side panel + map overlay).
+	// Only show one at a time based on cursor location:
+	// - Cursor over right side panel -> show panel CTA
+	// - Cursor in bottom half of page -> show bottom CTA
+	const [isPointerInMapSidePanel, setIsPointerInMapSidePanel] = useState(false);
+	const [isPointerInMapBottomHalf, setIsPointerInMapBottomHalf] = useState(false);
+
+	const shouldUseDynamicMapCreateCampaignCta =
+		isMapView &&
+		!isMobile &&
+		isXlDesktop &&
+		!isMapResultsLoading &&
+		!hasNoSearchResults &&
+		!isNarrowestDesktop;
+
+	const mapCreateCampaignCtaLocation: 'panel' | 'bottom' | 'none' =
+		!shouldUseDynamicMapCreateCampaignCta
+			? 'panel'
+			: isPointerInMapSidePanel
+				? 'panel'
+				: isPointerInMapBottomHalf
+					? 'bottom'
+					: 'none';
+
+	const isMapPanelCreateCampaignVisible =
+		!shouldUseDynamicMapCreateCampaignCta || mapCreateCampaignCtaLocation === 'panel';
+	const isMapBottomCreateCampaignVisible =
+		!shouldUseDynamicMapCreateCampaignCta || mapCreateCampaignCtaLocation === 'bottom';
+
+	useEffect(() => {
+		if (typeof window === 'undefined') return;
+
+		// Reset when dynamic behavior is not active (prevents "stale" cursor state).
+		if (!shouldUseDynamicMapCreateCampaignCta) {
+			setIsPointerInMapSidePanel(false);
+			setIsPointerInMapBottomHalf(false);
+			return;
+		}
+
+		// Default to showing the bottom CTA until we observe the current cursor position.
+		setIsPointerInMapSidePanel(false);
+		setIsPointerInMapBottomHalf(true);
+
+		const handleMouseMove = (e: MouseEvent) => {
+			const nextIsBottomHalf = e.clientY >= window.innerHeight / 2;
+			setIsPointerInMapBottomHalf((prev) =>
+				prev === nextIsBottomHalf ? prev : nextIsBottomHalf
+			);
+		};
+
+		window.addEventListener('mousemove', handleMouseMove, { passive: true });
+		return () => window.removeEventListener('mousemove', handleMouseMove);
+	}, [shouldUseDynamicMapCreateCampaignCta]);
 	// Map hover research overlay behavior:
 	// - Hold briefly after hover ends (prevents flicker)
 	// - Then fade out quickly
@@ -3213,6 +3270,14 @@ const DashboardContent = () => {
 																!hasNoSearchResults && (
 																	<div
 																		className="absolute top-[97px] right-[10px] rounded-[12px] flex flex-col"
+																		onMouseEnter={() => {
+																			if (!shouldUseDynamicMapCreateCampaignCta) return;
+																			setIsPointerInMapSidePanel(true);
+																		}}
+																		onMouseLeave={() => {
+																			if (!shouldUseDynamicMapCreateCampaignCta) return;
+																			setIsPointerInMapSidePanel(false);
+																		}}
 																		style={{
 																			width: '433px',
 																			height: mapResearchPanelContact && mapResearchPanelCompactHeightPx
@@ -3478,47 +3543,57 @@ const DashboardContent = () => {
 																				);
 																			})}
 																		</CustomScrollbar>
-																		<div className="flex-shrink-0 w-full px-[10px] pb-[10px]">
-																			<Button
-																				isLoading={
-																					isPendingCreateCampaign ||
-																					isPendingBatchUpdateContacts
-																				}
-																				variant="primary-light"
-																				bold
-																				className={`relative w-full h-[39px] !bg-[#5DAB68] hover:!bg-[#4e9b5d] !text-white border border-[#000000] overflow-hidden ${
-																					selectedContacts.length === 0
-																						? 'opacity-[0.62]'
-																						: 'opacity-100'
-																				}`}
-																				style={
-																					selectedContacts.length === 0
-																						? { height: '39px', filter: 'grayscale(100%)' }
-																						: { height: '39px' }
-																				}
-																				onClick={() => {
-																					if (selectedContacts.length === 0) return;
-																					handleCreateCampaign();
-																				}}
-																			>
-																				<span className="relative z-20">Create Campaign</span>
-																				<div
-																					className="absolute inset-y-0 right-0 w-[65px] z-20 flex items-center justify-center bg-[#74D178] cursor-pointer"
-																					onClick={(e) => {
-																						e.stopPropagation();
-																						handleSelectAll(mapPanelContacts);
+																		{isMapPanelCreateCampaignVisible && (
+																			<div className="flex-shrink-0 w-full px-[10px] pb-[10px]">
+																				<Button
+																					disabled={
+																						isPendingCreateCampaign ||
+																						isPendingBatchUpdateContacts
+																					}
+																					variant="primary-light"
+																					bold
+																					className={`relative w-full h-[39px] !bg-[#5DAB68] hover:!bg-[#4e9b5d] !text-white border border-[#000000] overflow-hidden ${
+																						selectedContacts.length === 0
+																							? 'opacity-[0.62]'
+																							: 'opacity-100'
+																					}`}
+																					style={
+																						selectedContacts.length === 0
+																							? {
+																									height: '39px',
+																									filter: 'grayscale(100%)',
+																								}
+																							: { height: '39px' }
+																					}
+																					onClick={() => {
+																						if (selectedContacts.length === 0) return;
+																						handleCreateCampaign();
 																					}}
 																				>
-																					<span className="text-black text-[14px] font-medium">
-																						All
+																					<span
+																						className="relative z-20"
+																						style={{ fontFamily: 'Inter, sans-serif', fontWeight: 700 }}
+																					>
+																						Create Campaign
 																					</span>
-																				</div>
-																				<span
-																					aria-hidden="true"
-																					className="pointer-events-none absolute inset-y-0 right-[65px] w-[2px] bg-[#349A37] z-10"
-																				/>
-																			</Button>
-																		</div>
+																					<div
+																						className="absolute inset-y-0 right-0 w-[65px] z-20 flex items-center justify-center bg-[#74D178] cursor-pointer"
+																						onClick={(e) => {
+																							e.stopPropagation();
+																							handleSelectAll(mapPanelContacts);
+																						}}
+																					>
+																						<span className="text-black text-[14px] font-medium">
+																							All
+																						</span>
+																					</div>
+																					<span
+																						aria-hidden="true"
+																						className="pointer-events-none absolute inset-y-0 right-[65px] w-[2px] bg-[#349A37] z-10"
+																					/>
+																				</Button>
+																			</div>
+																		)}
 																		{mapResearchPanelContact && (
 																			<div
 																				className="absolute inset-0 z-50"
@@ -3560,9 +3635,16 @@ const DashboardContent = () => {
 																		isRefetchingContacts
 																	) &&
 																	!hasNoSearchResults && (
-																		<div className="absolute bottom-[10px] left-[10px] right-[10px] hidden xl:flex justify-center">
+																		<div
+																			className={`absolute bottom-[10px] left-[10px] right-[10px] hidden xl:flex justify-center transition-opacity duration-150 ${
+																				isMapBottomCreateCampaignVisible
+																					? 'opacity-100'
+																					: 'opacity-0 pointer-events-none'
+																			}`}
+																			aria-hidden={!isMapBottomCreateCampaignVisible}
+																		>
 																			<Button
-																				isLoading={
+																				disabled={
 																					isPendingCreateCampaign ||
 																					isPendingBatchUpdateContacts
 																				}
@@ -3582,8 +3664,9 @@ const DashboardContent = () => {
 																					if (selectedContacts.length === 0) return;
 																					handleCreateCampaign();
 																				}}
+																				tabIndex={isMapBottomCreateCampaignVisible ? 0 : -1}
 																			>
-																				<span className="relative z-20">
+																				<span className="relative z-20" style={{ fontFamily: 'Inter, sans-serif', fontWeight: 700 }}>
 																					Create Campaign
 																				</span>
 																				<div
@@ -3816,7 +3899,7 @@ const DashboardContent = () => {
 																</CustomScrollbar>
 																<div className="flex-shrink-0 w-full px-[10px] pb-[10px]">
 																	<Button
-																		isLoading={
+																		disabled={
 																			isPendingCreateCampaign ||
 																			isPendingBatchUpdateContacts
 																		}
@@ -3837,7 +3920,7 @@ const DashboardContent = () => {
 																			handleCreateCampaign();
 																		}}
 																	>
-																		<span className="relative z-20">Create Campaign</span>
+																		<span className="relative z-20" style={{ fontFamily: 'Inter, sans-serif', fontWeight: 700 }}>Create Campaign</span>
 																		<div
 																			className="absolute inset-y-0 right-0 w-[65px] z-20 flex items-center justify-center bg-[#74D178] cursor-pointer"
 																			onClick={(e) => {
@@ -3926,7 +4009,8 @@ const DashboardContent = () => {
 																				? 'rgba(0, 0, 0, 0.4)'
 																				: '#000000',
 																		fontSize: '13px',
-																		fontWeight: 500,
+																		fontWeight: 700,
+																		fontFamily: 'Inter, sans-serif',
 																		borderRadius: '8px',
 																		lineHeight: 'normal',
 																		display: 'flex',
@@ -3973,7 +4057,7 @@ const DashboardContent = () => {
 															handleCreateCampaign();
 														}}
 													>
-														<span className="relative z-20">Create Campaign</span>
+														<span className="relative z-20" style={{ fontFamily: 'Inter, sans-serif', fontWeight: 700 }}>Create Campaign</span>
 														<div
 															className="absolute inset-y-0 right-0 w-[65px] z-20 flex items-center justify-center bg-[#74D178] cursor-pointer"
 															onClick={(e) => {
@@ -4008,7 +4092,7 @@ const DashboardContent = () => {
 															className="w-full h-[54px] min-h-[54px] !rounded-none !bg-[#5dab68] hover:!bg-[#4e9b5d] !text-white border border-[#000000] transition-colors !opacity-100 disabled:!opacity-100"
 															disabled={selectedContacts.length === 0}
 														>
-															Create Campaign
+															<span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 700 }}>Create Campaign</span>
 														</Button>
 													</div>,
 													document.body
