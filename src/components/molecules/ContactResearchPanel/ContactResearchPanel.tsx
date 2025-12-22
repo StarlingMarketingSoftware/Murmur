@@ -27,6 +27,26 @@ export interface ContactResearchPanelProps {
 	 */
 	height?: string | number;
 	/**
+	 * In fixed-height mode (when `height` is provided), controls the vertical spacing increment
+	 * between parsed bullet boxes. Defaults to 52 (legacy compact spacing).
+	 */
+	fixedHeightBoxSpacingPx?: number;
+	/**
+	 * In fixed-height mode (when `height` is provided), overrides the parsed bullet outer box height.
+	 * Defaults to 44 (legacy compact bullet height).
+	 */
+	fixedHeightBulletOuterHeightPx?: number;
+	/**
+	 * In fixed-height mode (when `height` is provided), overrides the parsed bullet inner white box height.
+	 * Defaults to 36 (legacy compact bullet inner height).
+	 */
+	fixedHeightBulletInnerHeightPx?: number;
+	/**
+	 * When showing parsed bullets + the bottom summary in fixed-height mode, allow the summary box
+	 * to expand to fill the remaining available height (useful when the outer `height` is computed dynamically).
+	 */
+	expandSummaryToFillHeight?: boolean;
+	/**
 	 * Width override for the panel and inner content boxes. Defaults to 360px for inner boxes, 375px for outer.
 	 */
 	boxWidth?: number;
@@ -90,6 +110,10 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 	hideAllText = false,
 	hideSummaryIfBullets = false,
 	height,
+	fixedHeightBoxSpacingPx,
+	fixedHeightBulletOuterHeightPx,
+	fixedHeightBulletInnerHeightPx,
+	expandSummaryToFillHeight = false,
 	boxWidth = 360,
 	width,
 	compactHeader = false,
@@ -123,12 +147,74 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 	// When loading (no contact), show 3 placeholder boxes
 	const displaySectionsCount = isLoading ? 3 : parsedSectionsCount;
 
+	const fixedHeightBoxSpacing = fixedHeightBoxSpacingPx ?? 52;
+	const fixedHeightBulletOuterHeight = fixedHeightBulletOuterHeightPx ?? 44;
+	const fixedHeightBulletInnerHeight = fixedHeightBulletInnerHeightPx ?? 36;
+
 	// Expanded box dimensions
 	const expandedOuterHeight = 161;
 	const expandedInnerHeight = 123;
-	const normalOuterHeight = height ? 44 : 52;
-	const normalInnerHeight = height ? 36 : 43;
+	const normalOuterHeight = height ? fixedHeightBulletOuterHeight : 52;
+	const normalInnerHeight = height ? fixedHeightBulletInnerHeight : 43;
 	const expansionDiff = expandedOuterHeight - normalOuterHeight; // 109px difference
+
+	// Content start position used by the fixed-height layout math.
+	// Compact: header (19) + gap (6) + contact box (40) + gap (4) = 69
+	// Non-compact: header + divider (2) + contact bar (40) + divider (1) = headerHeight + 43
+	const fixedHeightContentStartTop = compactHeader ? headerHeight + 50 : headerHeight + 43;
+
+	// In parsed + summary mode, the summary box is pinned to the bottom with a fixed inset.
+	const parsedSummaryBottomInsetPx = 14;
+	const parsedSummaryMinOuterHeightPx = 197;
+	const parsedSummaryInnerOverheadPx = 15; // 197 outer -> 182 inner in legacy layout
+
+	const parsedSummaryOuterHeightPx = useMemo(() => {
+		if (shouldHideSummary) return null;
+		if (!(hasAnyParsedSections || isLoading)) return null;
+		if (!height) return parsedSummaryMinOuterHeightPx;
+		if (!expandSummaryToFillHeight) return parsedSummaryMinOuterHeightPx;
+
+		const numericHeight =
+			typeof height === 'number' ? height : parseInt(String(height), 10) || 0;
+
+		// Mirrors `contentHeight` inside the bullets `if (height)` branch.
+		let bulletContentHeight = 6;
+		for (let i = 0; i < displaySectionsCount; i++) {
+			const key = String(i + 1);
+			const isExp = expandedBox === key;
+			bulletContentHeight += isExp ? expandedOuterHeight + 13 : fixedHeightBoxSpacing;
+		}
+		bulletContentHeight += 10;
+
+		const computed =
+			numericHeight -
+			fixedHeightContentStartTop -
+			bulletContentHeight -
+			parsedSummaryBottomInsetPx;
+
+		return Math.max(parsedSummaryMinOuterHeightPx, computed);
+	}, [
+		shouldHideSummary,
+		hasAnyParsedSections,
+		isLoading,
+		height,
+		expandSummaryToFillHeight,
+		displaySectionsCount,
+		expandedBox,
+		expandedOuterHeight,
+		fixedHeightBoxSpacing,
+		fixedHeightContentStartTop,
+	]);
+
+	const parsedSummaryInnerHeightPx = parsedSummaryOuterHeightPx
+		? Math.max(0, parsedSummaryOuterHeightPx - parsedSummaryInnerOverheadPx)
+		: null;
+
+	const fixedHeightSummaryReservedBottomPx =
+		!shouldHideSummary && (hasAnyParsedSections || isLoading)
+			? (parsedSummaryOuterHeightPx ?? parsedSummaryMinOuterHeightPx) +
+			  parsedSummaryBottomInsetPx
+			: 0;
 
 	// Calculate container height accounting for expansion
 	const baseContainerHeight = height
@@ -374,8 +460,8 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 					? boxConfigs.slice(0, 3)
 					: boxConfigs.filter((config) => metadataSections[config.key]);
 
-				// Compact mode spacing for All tab (when height is passed)
-				const boxSpacing = height ? 52 : 65;
+				// Fixed-height mode spacing (used by map panel + compact layouts)
+				const boxSpacing = height ? fixedHeightBoxSpacing : 65;
 
 				// Calculate cumulative top position accounting for expanded boxes
 				const getBoxTop = (index: number) => {
@@ -490,9 +576,13 @@ top: isExpanded ? '28px' : '50%',
 				const contentStartTop = compactHeader ? headerHeight + 50 : headerHeight + 43;
 
 				if (height) {
+					// When the summary box is pinned to the bottom (parsed bullets present or loading placeholders),
+					// reserve that space so the bullet scroll area doesn't sit underneath it.
+					const summaryReservedBottomPx = fixedHeightSummaryReservedBottomPx;
+
 					// Calculate if content fits without scrolling
 					const numericHeight = typeof height === 'number' ? height : parseInt(String(height), 10) || 400;
-					const availableHeight = numericHeight - contentStartTop;
+					const availableHeight = numericHeight - contentStartTop - summaryReservedBottomPx;
 					// Calculate content height accounting for any expanded box
 					let contentHeight = 6;
 					for (let i = 0; i < visibleBoxes.length; i++) {
@@ -533,6 +623,7 @@ top: isExpanded ? '28px' : '50%',
 							className="absolute w-full left-0 bottom-0"
 							style={{
 								top: `${contentStartTop}px`, // Below header/contact info
+								bottom: `${summaryReservedBottomPx}px`,
 							}}
 						>
 							<style>{`
@@ -684,8 +775,8 @@ top: isExpanded ? '28px' : '50%',
 						width: `${boxWidth}px`,
 						// When height is fixed and only showing summary (no bullet points):
 						// Calculate height: container - top offset (75px) - bottom margin (8px)
-						height: hasAnyParsedSections || isLoading 
-							? '197px' 
+						height: hasAnyParsedSections || isLoading
+							? (parsedSummaryOuterHeightPx ?? parsedSummaryMinOuterHeightPx)
 							: height 
 								? typeof height === 'number'
 									? `${height - (headerHeight + 50 + 6) - 8}px`
@@ -728,7 +819,7 @@ top: isExpanded ? '28px' : '50%',
 							// Summary box height = height - (headerHeight + 50 + 6) - 8 = height - headerHeight - 64
 							// Inner height = summary height - 18 = height - headerHeight - 82
 							height: hasAnyParsedSections || isLoading
-								? '182px'
+								? (parsedSummaryInnerHeightPx ?? (parsedSummaryMinOuterHeightPx - parsedSummaryInnerOverheadPx))
 								: height
 									? typeof height === 'number'
 										? `${height - headerHeight - 82}px`

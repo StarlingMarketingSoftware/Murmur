@@ -137,8 +137,8 @@ const extractWhyFromSearchQuery = (query: string): string | null => {
 	return tag ? `[${tag}]` : null;
 };
 
-const hasAtLeast3ParsedResearchSections = (metadata: string | null | undefined): boolean => {
-	if (!metadata) return false;
+const countParsedResearchSections = (metadata: string | null | undefined): number => {
+	if (!metadata) return 0;
 
 	// Extract all [n] sections first.
 	const allSections: Record<string, string> = {};
@@ -161,7 +161,7 @@ const hasAtLeast3ParsedResearchSections = (metadata: string | null | undefined):
 		expectedNum++;
 	}
 
-	return validCount >= 3;
+	return validCount;
 };
 
 const estimateWrappedLineCount = (text: string, charsPerLine: number): number => {
@@ -205,6 +205,68 @@ const getCompactMapResearchPanelHeightPx = (metadata: string): number | null => 
 
 	// Cap to the panel's natural unparsed height so it never feels cramped or oversized.
 	return clampNumber(rawHeight, 310, 423);
+};
+
+const MAP_RESEARCH_PANEL_FIXED_HEIGHT_BULLET_SPACING_PX = 73;
+const MAP_RESEARCH_PANEL_FIXED_HEIGHT_BULLET_OUTER_HEIGHT_PX = 59;
+const MAP_RESEARCH_PANEL_FIXED_HEIGHT_BULLET_INNER_HEIGHT_PX = 50;
+
+/**
+ * For parsed bullets + summary (bottom box) in the map panel, grow the summary box height
+ * with longer metadata so more text is visible without scrolling.
+ *
+ * Tuned to ContactResearchPanel's 15px text at 1.5 line-height and p-3 padding.
+ */
+const getMapPanelParsedSummaryBoxHeightPx = (metadata: string): number => {
+	const text = metadata.trim();
+	if (!text) return 197;
+
+	const approxLines = estimateWrappedLineCount(text, 52);
+	const targetLines = clampNumber(approxLines, 6, 12);
+
+	// Inner white box: (lines * lineHeight) + padding; outer adds a fixed chrome overhead.
+	const LINE_HEIGHT_PX = 23;
+	const INNER_PADDING_PX = 24; // p-3 top+bottom
+	const OUTER_OVERHEAD_PX = 15; // legacy: 197 outer -> 182 inner
+	const inner = Math.ceil(targetLines * LINE_HEIGHT_PX + INNER_PADDING_PX);
+	const outer = inner + OUTER_OVERHEAD_PX;
+
+	return clampNumber(outer, 197, 315);
+};
+
+/**
+ * For the map hover "Research" overlay, compute a compact height when the research panel is
+ * showing parsed bullets *and* the bottom summary box (to remove the large empty gap between them).
+ *
+ * NOTE: This is tuned to the `ContactResearchPanel` compact sizing that kicks in when a fixed
+ * `height` prop is provided (smaller bullets/spacing).
+ */
+const getCompactMapResearchPanelHeightPxForParsed = (metadata: string): number | null => {
+	const parsedCountRaw = countParsedResearchSections(metadata);
+	if (parsedCountRaw < 3) return null;
+
+	// `ContactResearchPanel` renders at most [1]-[5]
+	const parsedCount = clampNumber(parsedCountRaw, 3, 5);
+
+	// These constants mirror `ContactResearchPanel`'s non-compact header + compact (fixed height) bullets.
+	const HEADER_HEIGHT_PX = 24;
+	const CONTENT_START_TOP_PX = HEADER_HEIGHT_PX + 43; // header + divider + contact bar + divider
+	const BULLET_SPACING_PX = MAP_RESEARCH_PANEL_FIXED_HEIGHT_BULLET_SPACING_PX;
+	const SUMMARY_HEIGHT_PX = getMapPanelParsedSummaryBoxHeightPx(metadata);
+	const SUMMARY_BOTTOM_INSET_PX = 14;
+	// Mirrors `ContactResearchPanel`'s content height estimation for bullets in fixed-height mode.
+	// (See `contentHeight` inside the panel's `if (height)` branch.)
+	const BULLET_CONTENT_TOP_PADDING_PX = 6;
+	const BULLET_CONTENT_BOTTOM_PADDING_PX = 10;
+
+	const bulletContentHeightPx =
+		BULLET_CONTENT_TOP_PADDING_PX +
+		parsedCount * BULLET_SPACING_PX +
+		BULLET_CONTENT_BOTTOM_PADDING_PX;
+	const heightPx =
+		CONTENT_START_TOP_PX + bulletContentHeightPx + SUMMARY_HEIGHT_PX + SUMMARY_BOTTOM_INSET_PX;
+
+	return Math.ceil(heightPx);
 };
 
 const MAP_RESULTS_SEARCH_TRAY_WHAT_ICON_BY_LABEL: Record<
@@ -1109,7 +1171,11 @@ const DashboardContent = () => {
 	const mapResearchPanelCompactHeightPx = useMemo(() => {
 		const metadata = mapResearchPanelContact?.metadata;
 		if (!metadata || metadata.trim().length === 0) return null;
-		if (hasAtLeast3ParsedResearchSections(metadata)) return null;
+		// Prefer a compact height for parsed bullets + summary (removes the big dead space gap).
+		const parsedHeight = getCompactMapResearchPanelHeightPxForParsed(metadata);
+		if (parsedHeight) return parsedHeight;
+
+		// Fallback: only compact summary-only research when it is short enough.
 		return getCompactMapResearchPanelHeightPx(metadata);
 	}, [mapResearchPanelContact?.metadata]);
 
@@ -3470,6 +3536,16 @@ const DashboardContent = () => {
 																					// Tune box width for the 433px side panel
 																					boxWidth={405}
 																					height={mapResearchPanelCompactHeightPx ?? undefined}
+																					fixedHeightBoxSpacingPx={
+																						MAP_RESEARCH_PANEL_FIXED_HEIGHT_BULLET_SPACING_PX
+																					}
+																					fixedHeightBulletOuterHeightPx={
+																						MAP_RESEARCH_PANEL_FIXED_HEIGHT_BULLET_OUTER_HEIGHT_PX
+																					}
+																					fixedHeightBulletInnerHeightPx={
+																						MAP_RESEARCH_PANEL_FIXED_HEIGHT_BULLET_INNER_HEIGHT_PX
+																					}
+																					expandSummaryToFillHeight
 																				/>
 																			</div>
 																		)}
