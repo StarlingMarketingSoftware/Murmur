@@ -1190,6 +1190,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		id: string;
 		label: string;
 		query: string;
+		what: string;
 		selectedContacts: number[];
 	};
 	const [searchTabs, setSearchTabs] = useState<SearchTab[]>([]);
@@ -1282,7 +1283,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		// If we're on an empty search tab (no query yet), update it instead of creating new
 		if (activeSearchTab && !activeSearchTab.query) {
 			setSearchTabs((tabs) =>
-				tabs.map((tab) => (tab.id === activeSearchTabId ? { ...tab, label, query } : tab))
+				tabs.map((tab) =>
+					tab.id === activeSearchTabId ? { ...tab, label, query, what: searchWhatValue } : tab
+				)
 			);
 		} else {
 			// Create a new tab
@@ -1290,6 +1293,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 				id: `search-${Date.now()}`,
 				label,
 				query,
+				what: searchWhatValue,
 				selectedContacts: [],
 			};
 			setSearchTabs((tabs) => [...tabs, newTab]);
@@ -1342,6 +1346,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			id: `search-${Date.now()}`,
 			label,
 			query,
+			what,
 			selectedContacts: [],
 		};
 
@@ -1809,25 +1814,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 								<div
 									className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
 									onClick={() => {
-										setSearchWhatValue('Music Venues');
-										setSearchActiveSection('where');
-									}}
-								>
-									<div className="w-[38px] h-[38px] bg-[#71C9FD] rounded-[8px] flex-shrink-0 flex items-center justify-center">
-										<MusicVenuesIcon />
-									</div>
-									<div className="ml-[12px] flex flex-col">
-										<div className="text-[20px] font-medium leading-none text-black font-inter">
-											Music Venues
-										</div>
-										<div className="text-[12px] leading-tight text-black mt-[4px]">
-											Reach talent buyers for live shows
-										</div>
-									</div>
-								</div>
-								<div
-									className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
-									onClick={() => {
 										setSearchWhatValue('Wine, Beer, Spirits');
 										setSearchActiveSection('where');
 									}}
@@ -1841,25 +1827,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										</div>
 										<div className="text-[12px] leading-tight text-black mt-[4px]">
 											Pitch your act for seasonal events
-										</div>
-									</div>
-								</div>
-								<div
-									className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
-									onClick={() => {
-										setSearchWhatValue('Restaurants');
-										setSearchActiveSection('where');
-									}}
-								>
-									<div className="w-[38px] h-[38px] bg-[#77DD91] rounded-[8px] flex-shrink-0 flex items-center justify-center">
-										<RestaurantsIcon />
-									</div>
-									<div className="ml-[12px] flex flex-col">
-										<div className="text-[20px] font-medium leading-none text-black font-inter">
-											Restaurants
-										</div>
-										<div className="text-[12px] leading-tight text-black mt-[4px]">
-											Land steady dinner and brunch gigs
 										</div>
 									</div>
 								</div>
@@ -1885,19 +1852,19 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 								<div
 									className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
 									onClick={() => {
-										setSearchWhatValue('Wedding Planners');
+										setSearchWhatValue('Restaurants');
 										setSearchActiveSection('where');
 									}}
 								>
-									<div className="w-[38px] h-[38px] bg-[#EED56E] rounded-[8px] flex-shrink-0 flex items-center justify-center">
-										<WeddingPlannersIcon />
+									<div className="w-[38px] h-[38px] bg-[#77DD91] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+										<RestaurantsIcon />
 									</div>
 									<div className="ml-[12px] flex flex-col">
 										<div className="text-[20px] font-medium leading-none text-black font-inter">
-											Wedding Planners
+											Restaurants
 										</div>
 										<div className="text-[12px] leading-tight text-black mt-[4px]">
-											Get hired for ceremonies & receptions
+											Land steady dinner and brunch gigs
 										</div>
 									</div>
 								</div>
@@ -1917,6 +1884,44 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										</div>
 										<div className="text-[12px] leading-tight text-black mt-[4px]">
 											Pitch your act for seasonal events
+										</div>
+									</div>
+								</div>
+								<div
+									className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+									onClick={() => {
+										setSearchWhatValue('Wedding Planners');
+										setSearchActiveSection('where');
+									}}
+								>
+									<div className="w-[38px] h-[38px] bg-[#EED56E] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+										<WeddingPlannersIcon />
+									</div>
+									<div className="ml-[12px] flex flex-col">
+										<div className="text-[20px] font-medium leading-none text-black font-inter">
+											Wedding Planners
+										</div>
+										<div className="text-[12px] leading-tight text-black mt-[4px]">
+											Get hired for ceremonies & receptions
+										</div>
+									</div>
+								</div>
+								<div
+									className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+									onClick={() => {
+										setSearchWhatValue('Music Venues');
+										setSearchActiveSection('where');
+									}}
+								>
+									<div className="w-[38px] h-[38px] bg-[#71C9FD] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+										<MusicVenuesIcon />
+									</div>
+									<div className="ml-[12px] flex flex-col">
+										<div className="text-[20px] font-medium leading-none text-black font-inter">
+											Music Venues
+										</div>
+										<div className="text-[12px] leading-tight text-black mt-[4px]">
+											Reach talent buyers for live shows
 										</div>
 									</div>
 								</div>
@@ -1972,6 +1977,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												onClick={() => {
 													setSearchWhereValue(loc.label);
 													setSearchActiveSection(null);
+													// Trigger search after a short delay to allow state to update
+													setTimeout(() => handleCampaignSearch(), 0);
 												}}
 											>
 												<div
@@ -2003,6 +2010,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										if (userLocationName && !isLoadingLocation) {
 											setSearchWhereValue(userLocationName);
 											setSearchActiveSection(null);
+											// Trigger search after a short delay to allow state to update
+											setTimeout(() => handleCampaignSearch(), 0);
 										}
 									}}
 								>
@@ -2034,6 +2043,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												onClick={() => {
 													setSearchWhereValue(label);
 													setSearchActiveSection(null);
+													// Trigger search after a short delay to allow state to update
+													setTimeout(() => handleCampaignSearch(), 0);
 												}}
 											>
 												<div
@@ -4689,6 +4700,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													id: `search-${Date.now()}`,
 													label: 'New Search',
 													query: '',
+													what: '',
 													selectedContacts: [],
 												};
 												setSearchTabs((tabs) => [...tabs, newTab]);
@@ -4795,6 +4807,13 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 															ref={whereInputRef}
 															value={searchWhereValue}
 															onChange={(e) => setSearchWhereValue(e.target.value)}
+															onKeyDown={(e) => {
+																if (e.key === 'Enter') {
+																	e.preventDefault();
+																	setSearchActiveSection(null);
+																	handleCampaignSearch();
+																}
+															}}
 															className="w-full h-full text-left bg-transparent border-none outline-none text-[13px] font-bold font-secondary placeholder:text-gray-400 p-0 focus:ring-0 cursor-pointer relative z-10"
 															style={{
 																maskImage:
@@ -4856,6 +4875,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														? searchResultsSelectedContacts
 														: searchTabSelectedContacts
 												}
+												searchQuery={activeSearchTabId !== null ? activeCampaignSearchQuery : undefined}
+												searchWhat={activeSearchTabId !== null ? activeSearchTab?.what : undefined}
 												onMarkerHover={handleResearchContactHover}
 												onToggleSelection={(contactId) => {
 													if (activeSearchTabId !== null) {
@@ -4891,8 +4912,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												}}
 												enableStateInteractions
 												onStateSelect={(stateName) => {
-													setSearchActiveSection('why');
+													setSearchActiveSection(null);
 													setSearchWhereValue(stateName);
+													// Trigger search after a short delay to allow state to update
+													setTimeout(() => handleCampaignSearch(), 0);
 												}}
 												lockedStateName={searchWhereValue}
 											/>

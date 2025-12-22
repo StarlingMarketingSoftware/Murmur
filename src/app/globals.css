@@ -2206,6 +2206,20 @@ body {
 	min-width: 499px !important;
 	max-width: 499px !important;
 	position: relative;
+	/* Prevent the mini searchbar "shrink" animation when toggling map/table view */
+	transition: none !important;
+}
+
+.results-search-input-group .search-wave-container::before {
+	transition: none !important;
+}
+
+/* Dashboard map-open view: compact the results mini searchbar width */
+body.murmur-page.murmur-map-view .results-search-input,
+body.murmur-page.murmur-map-view .results-search-input-group .search-wave-container {
+	width: min(440px, calc(100vw - 120px)) !important;
+	min-width: min(440px, calc(100vw - 120px)) !important;
+	max-width: min(440px, calc(100vw - 120px)) !important;
 }
 
 /* Mobile portrait: ensure the results search bar fits within the viewport */
@@ -3841,16 +3855,11 @@ body.murmur-page.murmur-campaign {
 }
 
 /* Full-width background for murmur dashboard map view.
-   Uses a vertical gradient so the top 36px (map header) stay white,
-   and everything below is the AFD6EF blue. */
+   Applied to both html and body to prevent any white gaps/stripes
+   behind the fixed-position map portal. */
+html:has(body.murmur-page.murmur-map-view),
 body.murmur-page.murmur-map-view {
-	background: linear-gradient(
-		to bottom,
-		#ffffff 0,
-		#ffffff 36px,
-		#afd6ef 36px,
-		#afd6ef 100%
-	);
+	background: #afd6ef;
 }
 
 /* Move Clerk user button below the map view header */

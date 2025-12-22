@@ -1,9 +1,25 @@
 'use client';
 
 import { FC, Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { GoogleMap, useJsApiLoader, MarkerF, OverlayView } from '@react-google-maps/api';
+import { GoogleMap, useJsApiLoader, MarkerF, OverlayView, OverlayViewF } from '@react-google-maps/api';
 import { ContactWithName } from '@/types/contact';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
+import { useGetContactsMapOverlay } from '@/hooks/queryHooks/useContacts';
+import {
+	calculateTooltipWidth,
+	calculateTooltipHeight,
+	calculateTooltipAnchorY,
+	generateMapTooltipIconUrl,
+	MAP_TOOLTIP_ANCHOR_X,
+} from '@/components/atoms/_svg/MapTooltipIcon';
+import {
+	generateMapMarkerPinIconUrl,
+	MAP_MARKER_PIN_CIRCLE_CENTER_X,
+	MAP_MARKER_PIN_CIRCLE_CENTER_Y,
+	MAP_MARKER_PIN_CIRCLE_DIAMETER,
+	MAP_MARKER_PIN_VIEWBOX_HEIGHT,
+	MAP_MARKER_PIN_VIEWBOX_WIDTH,
+} from '@/components/atoms/_svg/MapMarkerPinIcon';
 
 type LatLngLiteral = { lat: number; lng: number };
 type MarkerHoverMeta = { clientX: number; clientY: number };
@@ -184,41 +200,9 @@ const hashStringToUint32 = (str: string): number => {
 	return h >>> 0;
 };
 
-const mulberry32 = (seed: number) => {
-	let t = seed >>> 0;
-	return () => {
-		t += 0x6d2b79f5;
-		let x = t;
-		x = Math.imul(x ^ (x >>> 15), x | 1);
-		x ^= x + Math.imul(x ^ (x >>> 7), x | 61);
-		return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
-	};
-};
-
 // Hard cap for total dots rendered in the viewport (contacts + background dots).
 // Rendering more than this tends to overload many machines at low zoom levels.
 const MAX_TOTAL_DOTS = 500;
-
-// Calculate background dot count based on viewport area to maintain consistent visual density.
-// This ensures dots don't become denser when zooming in.
-const BACKGROUND_DOTS_DENSITY = 0.55; // dots per square degree at baseline
-const BACKGROUND_DOTS_MIN = 8;
-const BACKGROUND_DOTS_MAX = MAX_TOTAL_DOTS;
-
-const getBackgroundDotsTargetCount = (viewportArea: number, zoom: number): number => {
-	// Base count from area (larger viewport = more dots, smaller = fewer)
-	let count = viewportArea * BACKGROUND_DOTS_DENSITY;
-
-	// Apply a zoom-based reduction factor so very zoomed-in views don't feel cluttered
-	// even with area-based scaling. This mimics how real establishments are distributed.
-	if (zoom >= 10) {
-		count *= 0.6;
-	} else if (zoom >= 8) {
-		count *= 0.8;
-	}
-
-	return Math.min(BACKGROUND_DOTS_MAX, Math.max(BACKGROUND_DOTS_MIN, Math.round(count)));
-};
 
 const getBackgroundDotsQuantizationDeg = (zoom: number): number => {
 	// Controls when we regenerate dots as the viewport changes.
@@ -459,18 +443,6 @@ const bboxFromPolygon = (polygon: ClippingPolygon): BoundingBox | null => {
 	return { minLat, maxLat, minLng, maxLng };
 };
 
-const isPointInUSA = (
-	lat: number,
-	lng: number,
-	preparedStatePolygons: PreparedClippingPolygon[]
-): boolean => {
-	for (const { bbox, polygon } of preparedStatePolygons) {
-		if (!isLatLngInBbox(lat, lng, bbox)) continue;
-		if (pointInClippingPolygon([lng, lat], polygon)) return true;
-	}
-	return false;
-};
-
 // State badge colors matching dashboard
 const stateBadgeColorMap: Record<string, string> = {
 	AL: '#E57373',
@@ -615,6 +587,10 @@ const parseMetadataSections = (
 interface SearchResultsMapProps {
 	contacts: ContactWithName[];
 	selectedContacts: number[];
+	/** Full search query string (e.g. "[Booking] Music Venues (Portland, ME)") */
+	searchQuery?: string | null;
+	/** Used to color the default (unselected) result dots by the active "What" search value. */
+	searchWhat?: string | null;
 	onMarkerClick?: (contact: ContactWithName) => void;
 	onMarkerHover?: (contact: ContactWithName | null, meta?: MarkerHoverMeta) => void;
 	onToggleSelection?: (contactId: number) => void;
@@ -635,13 +611,16 @@ const defaultCenter = {
 	lng: -98.5795,
 };
 
+const MAP_MIN_ZOOM = 5;
+
 const mapOptions: google.maps.MapOptions = {
-	disableDefaultUI: false,
-	zoomControl: true,
+	disableDefaultUI: true,
+	zoomControl: false,
 	streetViewControl: false,
 	mapTypeControl: false,
 	fullscreenControl: false,
 	gestureHandling: 'greedy',
+	minZoom: MAP_MIN_ZOOM,
 	styles: [
 		// Hide Google's default state/province border lines so our custom outline is the only
 		// prominent border. (When state interactions are enabled, we draw borders via GeoJSON.)
@@ -672,6 +651,212 @@ const STATE_GEOJSON_URL = 'https://storage.googleapis.com/mapsdevsite/json/state
 const STATE_HIGHLIGHT_COLOR = '#5DAB68';
 const STATE_HIGHLIGHT_OPACITY = 0.68;
 const STATE_BORDER_COLOR = '#CFD8DC';
+// When zoomed out to a US-wide view, show subtle state divider lines (like Zillow).
+// Keep these behind the blue/black search-area outlines.
+const STATE_DIVIDER_LINES_MAX_ZOOM = 8;
+const STATE_DIVIDER_LINES_COLOR = '#90A4AE';
+const STATE_DIVIDER_LINES_STROKE_OPACITY = 1;
+const STATE_DIVIDER_LINES_STROKE_WEIGHT = 1.7;
+
+// Marker dot colors by search "What" value (dashboard/drafting search).
+const DEFAULT_RESULT_DOT_COLOR = '#D21E1F';
+const RESULT_DOT_ZOOM_MIN = 4;
+const RESULT_DOT_ZOOM_MAX = 14;
+const RESULT_DOT_SCALE_MIN = 3;
+const RESULT_DOT_SCALE_MAX = 11;
+// Overlay pins look too small when zoomed out; keep their circle readable without
+// overpowering the search tray/category icons.
+const MIN_OVERLAY_PIN_CIRCLE_DIAMETER_PX = 16;
+// Stroke weight should be thinner when zoomed out and approach ~3px when zoomed in.
+const RESULT_DOT_STROKE_WEIGHT_MIN_PX = 1.5;
+const RESULT_DOT_STROKE_WEIGHT_MAX_PX = 3;
+const RESULT_DOT_STROKE_COLOR_DEFAULT = '#FFFFFF';
+const RESULT_DOT_STROKE_COLOR_SELECTED = '#15C948';
+
+// Keep hover tooltip above all map markers so it never gets covered.
+const HOVER_TOOLTIP_Z_INDEX = 1_000_000;
+const MARKER_HIT_AREA_Z_INDEX = 2;
+const MARKER_DOT_Z_INDEX = 1;
+// Minimum zoom level required to trigger hover tooltips and research highlights on markers.
+// Below this zoom level, markers are too dense and small for hover interactions to be useful.
+const HOVER_INTERACTION_MIN_ZOOM = 8;
+// Booking searches: when zoomed in enough, show additional nearby booking categories as extra markers.
+const BOOKING_EXTRA_MARKERS_MIN_ZOOM = 10;
+// Keep extra markers capped so map remains responsive.
+const BOOKING_EXTRA_MARKERS_MAX_DOTS = 160;
+// Promotion searches: show state-wide radio list pins as overlay markers.
+// These are intentionally available at low zoom so all states can be visible together.
+const PROMOTION_OVERLAY_MARKERS_MIN_ZOOM = 4;
+// Defensive cap; expected to be ~2 per state.
+const PROMOTION_OVERLAY_MARKERS_MAX_PINS = 220;
+// Zoom level at which the map switches to satellite/hybrid view for better detail
+const SATELLITE_VIEW_MIN_ZOOM = 14;
+
+const BOOKING_EXTRA_TITLE_PREFIXES = [
+	'Music Venues',
+	'Coffee Shops',
+	'Restaurants',
+	'Music Festivals',
+	'Breweries',
+	'Wineries',
+	'Wedding Planners',
+	'Wedding Venues',
+	// Also supported by the booking search backend; include if present.
+	'Distilleries',
+	'Cideries',
+] as const;
+
+const PROMOTION_OVERLAY_TITLE_PREFIXES = ['Radio Stations', 'College Radio'] as const;
+
+const startsWithCaseInsensitive = (value: string | null | undefined, prefix: string): boolean => {
+	if (!value) return false;
+	const p = prefix.trim().toLowerCase();
+	if (!p) return false;
+	return value.trim().toLowerCase().startsWith(p);
+};
+
+const getBookingTitlePrefixFromContactTitle = (title: string | null | undefined): string | null => {
+	if (!title) return null;
+	for (const prefix of BOOKING_EXTRA_TITLE_PREFIXES) {
+		if (startsWithCaseInsensitive(title, prefix)) return prefix;
+	}
+	return null;
+};
+
+const isPromotionOverlayListTitle = (title: string | null | undefined): boolean => {
+	if (!title) return false;
+	return PROMOTION_OVERLAY_TITLE_PREFIXES.some((p) => startsWithCaseInsensitive(title, p));
+};
+
+// Promotion overlay pins should use the Radio Stations visual language (icon + color).
+const getPromotionOverlayWhatFromContactTitle = (title: string | null | undefined): string | null =>
+	isPromotionOverlayListTitle(title) ? 'Radio Stations' : null;
+
+const isBookingSearchQuery = (query: string | null | undefined): boolean =>
+	(query ?? '').trim().toLowerCase().startsWith('[booking]');
+const isPromotionSearchQuery = (query: string | null | undefined): boolean =>
+	(query ?? '').trim().toLowerCase().startsWith('[promotion]');
+const normalizeWhatKey = (value: string): string =>
+	value
+		.trim()
+		.toLowerCase()
+		.replace(/&/g, 'and')
+		.replace(/[^a-z0-9]+/g, ' ')
+		.trim()
+		.replace(/\s+/g, ' ');
+
+const WHAT_TO_RESULT_DOT_COLOR: Record<string, string> = {
+	[normalizeWhatKey('Radio Stations')]: '#56DA73',
+	[normalizeWhatKey('Venues')]: '#00CBFB',
+	[normalizeWhatKey('Music Venues')]: '#00CBFB',
+	[normalizeWhatKey('Festivals')]: '#2D27DC',
+	[normalizeWhatKey('Music Festivals')]: '#2D27DC',
+	[normalizeWhatKey('Restaurants')]: '#1EA300',
+	[normalizeWhatKey('Coffee Shops')]: '#8BD003',
+	[normalizeWhatKey('Wedding Planners')]: '#D6990A',
+	[normalizeWhatKey('Wine Beer and spirits')]: '#981AEC',
+	[normalizeWhatKey('Wine, Beer, and Spirits')]: '#981AEC',
+	[normalizeWhatKey('Wine, Beer, Spirits')]: '#981AEC',
+	// Booking extras: map alcohol-related categories to the Wine/Beer/Spirits palette.
+	[normalizeWhatKey('Breweries')]: '#981AEC',
+	[normalizeWhatKey('Wineries')]: '#981AEC',
+	[normalizeWhatKey('Distilleries')]: '#981AEC',
+	[normalizeWhatKey('Cideries')]: '#981AEC',
+	// Booking extras: show wedding venues with the same palette as wedding planners.
+	[normalizeWhatKey('Wedding Venues')]: '#D6990A',
+};
+
+// Hover tooltip (SVG bubble) fill colors by search "What" value.
+// These are intentionally allowed to differ from the dot colors.
+const WHAT_TO_HOVER_TOOLTIP_FILL_COLOR: Record<string, string> = {
+	// Promotion: match the search tray palette.
+	[normalizeWhatKey('Radio Stations')]: '#56DA73',
+	// Music venues should be a lighter blue on hover.
+	[normalizeWhatKey('Venues')]: '#71C9FD',
+	[normalizeWhatKey('Music Venues')]: '#71C9FD',
+
+	// Wine/beer/spirits should be periwinkle on hover.
+	[normalizeWhatKey('Wine, Beer, and Spirits')]: '#80AAFF',
+	[normalizeWhatKey('Wine, Beer, Spirits')]: '#80AAFF',
+	[normalizeWhatKey('Wine Beer and Spirits')]: '#80AAFF',
+	[normalizeWhatKey('Wine Beer Spirits')]: '#80AAFF',
+	// Defensive: handle a misspelling we've seen in copy.
+	[normalizeWhatKey('Wine, Beer, and Spiriti')]: '#80AAFF',
+	[normalizeWhatKey('Wine Beer and Spiriti')]: '#80AAFF',
+	[normalizeWhatKey('Wine Beer Spiriti')]: '#80AAFF',
+
+	// Keep existing behavior for festivals.
+	[normalizeWhatKey('Festivals')]: '#80AAFF',
+	[normalizeWhatKey('Music Festivals')]: '#80AAFF',
+};
+
+const getResultDotColorForWhat = (searchWhat?: string | null): string => {
+	if (!searchWhat) return DEFAULT_RESULT_DOT_COLOR;
+	const key = normalizeWhatKey(searchWhat);
+	return WHAT_TO_RESULT_DOT_COLOR[key] ?? DEFAULT_RESULT_DOT_COLOR;
+};
+
+const getResultDotTForZoom = (zoom: number): number => {
+	const clampedZoom = clamp(zoom, RESULT_DOT_ZOOM_MIN, RESULT_DOT_ZOOM_MAX);
+	return (clampedZoom - RESULT_DOT_ZOOM_MIN) / (RESULT_DOT_ZOOM_MAX - RESULT_DOT_ZOOM_MIN);
+};
+
+const getResultDotScaleForZoom = (zoom: number): number => {
+	const t = getResultDotTForZoom(zoom);
+	return RESULT_DOT_SCALE_MIN + t * (RESULT_DOT_SCALE_MAX - RESULT_DOT_SCALE_MIN);
+};
+
+const getResultDotStrokeWeightForZoom = (zoom: number): number => {
+	const t = getResultDotTForZoom(zoom);
+	return (
+		RESULT_DOT_STROKE_WEIGHT_MIN_PX +
+		t * (RESULT_DOT_STROKE_WEIGHT_MAX_PX - RESULT_DOT_STROKE_WEIGHT_MIN_PX)
+	);
+};
+
+// When a search/locked state is active, de-emphasize out-of-state markers by making them
+// look like they'd be at 50% opacity on a white background (but keep fillOpacity=1).
+const OUTSIDE_LOCKED_STATE_WASHOUT_TO_WHITE = 0.5;
+
+type RgbColor = { r: number; g: number; b: number };
+
+const parseHexColor = (hex: string): RgbColor | null => {
+	const trimmed = hex.trim();
+	if (!trimmed.startsWith('#')) return null;
+	const raw = trimmed.slice(1);
+	const isShort = raw.length === 3;
+	const isLong = raw.length === 6;
+	if (!isShort && !isLong) return null;
+
+	const expand = (c: string) => `${c}${c}`;
+	const rHex = isShort ? expand(raw[0]!) : raw.slice(0, 2);
+	const gHex = isShort ? expand(raw[1]!) : raw.slice(2, 4);
+	const bHex = isShort ? expand(raw[2]!) : raw.slice(4, 6);
+
+	const r = Number.parseInt(rHex, 16);
+	const g = Number.parseInt(gHex, 16);
+	const b = Number.parseInt(bHex, 16);
+	if (!Number.isFinite(r) || !Number.isFinite(g) || !Number.isFinite(b)) return null;
+	return { r, g, b };
+};
+
+const toHexByte = (n: number): string => {
+	const clamped = clamp(Math.round(n), 0, 255);
+	return clamped.toString(16).padStart(2, '0').toUpperCase();
+};
+
+const washOutHexColor = (hex: string, mixToWhite: number): string => {
+	const rgb = parseHexColor(hex);
+	if (!rgb) return hex;
+	const t = clamp(mixToWhite, 0, 1);
+
+	// Blend toward white → lighter and less saturated (pastel).
+	const r = rgb.r + (255 - rgb.r) * t;
+	const g = rgb.g + (255 - rgb.g) * t;
+	const b = rgb.b + (255 - rgb.b) * t;
+
+	return `#${toHexByte(r)}${toHexByte(g)}${toHexByte(b)}`;
+};
 
 const normalizeStateKey = (state?: string | null): string | null => {
 	if (!state) return null;
@@ -683,6 +868,8 @@ const normalizeStateKey = (state?: string | null): string | null => {
 export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	contacts,
 	selectedContacts,
+	searchQuery,
+	searchWhat,
 	onMarkerClick,
 	onMarkerHover,
 	onToggleSelection,
@@ -694,15 +881,37 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const [selectedMarker, setSelectedMarker] = useState<ContactWithName | null>(null);
 	const [hoveredMarkerId, setHoveredMarkerId] = useState<number | null>(null);
 	const hoveredMarkerIdRef = useRef<number | null>(null);
+	// Track tooltip that is fading out (for smooth transition)
+	const [fadingTooltipId, setFadingTooltipId] = useState<number | null>(null);
+	const fadingTooltipTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 	const [map, setMap] = useState<google.maps.Map | null>(null);
 	const [selectedStateKey, setSelectedStateKey] = useState<string | null>(null);
 	const [zoomLevel, setZoomLevel] = useState(4); // Default zoom level
 	const [visibleContacts, setVisibleContacts] = useState<ContactWithName[]>([]);
+	const [bookingExtraVisibleContacts, setBookingExtraVisibleContacts] = useState<ContactWithName[]>(
+		[]
+	);
+	const lastBookingExtraVisibleContactsKeyRef = useRef<string>('');
+	const lastBookingExtraFetchKeyRef = useRef<string>('');
+	const [bookingExtraFetchBbox, setBookingExtraFetchBbox] = useState<BoundingBox | null>(null);
+	const [promotionOverlayVisibleContacts, setPromotionOverlayVisibleContacts] = useState<
+		ContactWithName[]
+	>([]);
+	const lastPromotionOverlayVisibleContactsKeyRef = useRef<string>('');
+	const lastPromotionOverlayFetchKeyRef = useRef<string>('');
+	const [promotionOverlayFetchBbox, setPromotionOverlayFetchBbox] = useState<BoundingBox | null>(
+		null
+	);
 	// Timeout ref for auto-hiding research panel
 	const researchPanelTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+	// Small delay when moving between marker layers (prevents hover flicker)
+	const hoverClearTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 	const stateLayerRef = useRef<google.maps.Data | null>(null);
 	const resultsOutlinePolygonsRef = useRef<google.maps.Polygon[]>([]);
 	const searchedStateOutlinePolygonsRef = useRef<google.maps.Polygon[]>([]);
+	const lockedStateSelectionMultiPolygonRef = useRef<ClippingMultiPolygon | null>(null);
+	const lockedStateSelectionBboxRef = useRef<BoundingBox | null>(null);
+	const lockedStateSelectionKeyRef = useRef<string | null>(null);
 	const resultsSelectionMultiPolygonRef = useRef<ClippingMultiPolygon | null>(null);
 	const resultsSelectionBboxRef = useRef<BoundingBox | null>(null);
 	const resultsSelectionSignatureRef = useRef<string>('');
@@ -715,6 +924,284 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const onStateSelectRef = useRef<SearchResultsMapProps['onStateSelect'] | null>(null);
 	const isLoadingRef = useRef<boolean>(false);
 	const [isStateLayerReady, setIsStateLayerReady] = useState(false);
+	const baseContactIdSet = useMemo(
+		() => new Set<number>(contacts.map((c) => c.id)),
+		[contacts]
+	);
+
+	const isBookingSearch = useMemo(() => isBookingSearchQuery(searchQuery), [searchQuery]);
+	const isPromotionSearch = useMemo(() => isPromotionSearchQuery(searchQuery), [searchQuery]);
+	useEffect(() => {
+		// Reset the overlay fetch window and any visible extra markers on search transitions.
+		lastBookingExtraFetchKeyRef.current = '';
+		setBookingExtraFetchBbox(null);
+		lastBookingExtraVisibleContactsKeyRef.current = '';
+		setBookingExtraVisibleContacts([]);
+		lastPromotionOverlayFetchKeyRef.current = '';
+		setPromotionOverlayFetchBbox(null);
+		lastPromotionOverlayVisibleContactsKeyRef.current = '';
+		setPromotionOverlayVisibleContacts([]);
+	}, [searchQuery]);
+
+	const updateBookingExtraFetchBbox = useCallback(
+		(mapInstance: google.maps.Map | null) => {
+			if (!mapInstance) return;
+
+			// Only run for booking-mode searches, and only once the user is zoomed in.
+			if (!isBookingSearch) {
+				if (lastBookingExtraFetchKeyRef.current !== '') {
+					lastBookingExtraFetchKeyRef.current = '';
+					setBookingExtraFetchBbox(null);
+				}
+				return;
+			}
+
+			const zoomRaw = mapInstance.getZoom() ?? 4;
+			if (zoomRaw < BOOKING_EXTRA_MARKERS_MIN_ZOOM) {
+				if (lastBookingExtraFetchKeyRef.current !== '') {
+					lastBookingExtraFetchKeyRef.current = '';
+					setBookingExtraFetchBbox(null);
+				}
+				return;
+			}
+
+			const bounds = mapInstance.getBounds();
+			if (!bounds) return;
+
+			const sw = bounds.getSouthWest();
+			const ne = bounds.getNorthEast();
+			const south = sw.lat();
+			const west = sw.lng();
+			const north = ne.lat();
+			const east = ne.lng();
+
+			// Skip antimeridian-crossing viewports (not relevant for our UI).
+			if (east < west) return;
+
+			// Pad the fetch bounds so panning within the current view doesn't immediately require refetching.
+			const latSpan = north - south;
+			const lngSpan = east - west;
+			const padLat = latSpan * 0.35;
+			const padLng = lngSpan * 0.35;
+
+			const paddedSouth = clamp(south - padLat, -90, 90);
+			const paddedWest = clamp(west - padLng, -180, 180);
+			const paddedNorth = clamp(north + padLat, -90, 90);
+			const paddedEast = clamp(east + padLng, -180, 180);
+
+			// Quantize the fetch window so we don't refetch on tiny pans/zooms.
+			const zoomKey = Math.round(zoomRaw);
+			const quant = getBackgroundDotsQuantizationDeg(zoomKey);
+			const qSouth = Math.floor(paddedSouth / quant) * quant;
+			const qWest = Math.floor(paddedWest / quant) * quant;
+			const qNorth = Math.ceil(paddedNorth / quant) * quant;
+			const qEast = Math.ceil(paddedEast / quant) * quant;
+
+			const nextKey = `${zoomKey}|${qSouth.toFixed(4)}|${qWest.toFixed(4)}|${qNorth.toFixed(
+				4
+			)}|${qEast.toFixed(4)}`;
+
+			if (nextKey === lastBookingExtraFetchKeyRef.current) return;
+			lastBookingExtraFetchKeyRef.current = nextKey;
+			setBookingExtraFetchBbox({ minLat: qSouth, minLng: qWest, maxLat: qNorth, maxLng: qEast });
+		},
+		[isBookingSearch]
+	);
+
+	const updatePromotionOverlayFetchBbox = useCallback(
+		(mapInstance: google.maps.Map | null) => {
+			if (!mapInstance) return;
+
+			// Only run for promotion-mode searches.
+			if (!isPromotionSearch) {
+				if (lastPromotionOverlayFetchKeyRef.current !== '') {
+					lastPromotionOverlayFetchKeyRef.current = '';
+					setPromotionOverlayFetchBbox(null);
+				}
+				return;
+			}
+
+			const zoomRaw = mapInstance.getZoom() ?? 4;
+			if (zoomRaw < PROMOTION_OVERLAY_MARKERS_MIN_ZOOM) {
+				if (lastPromotionOverlayFetchKeyRef.current !== '') {
+					lastPromotionOverlayFetchKeyRef.current = '';
+					setPromotionOverlayFetchBbox(null);
+				}
+				return;
+			}
+
+			const bounds = mapInstance.getBounds();
+			if (!bounds) return;
+
+			const sw = bounds.getSouthWest();
+			const ne = bounds.getNorthEast();
+			const south = sw.lat();
+			const west = sw.lng();
+			const north = ne.lat();
+			const east = ne.lng();
+
+			// Skip antimeridian-crossing viewports (not relevant for our UI).
+			if (east < west) return;
+
+			// Light padding to avoid refetching on small pans.
+			const latSpan = north - south;
+			const lngSpan = east - west;
+			const padLat = latSpan * 0.1;
+			const padLng = lngSpan * 0.1;
+
+			const paddedSouth = clamp(south - padLat, -90, 90);
+			const paddedWest = clamp(west - padLng, -180, 180);
+			const paddedNorth = clamp(north + padLat, -90, 90);
+			const paddedEast = clamp(east + padLng, -180, 180);
+
+			// Quantize the fetch window so we don't refetch on tiny pans/zooms.
+			const zoomKey = Math.round(zoomRaw);
+			const quant = getBackgroundDotsQuantizationDeg(zoomKey);
+			const qSouth = Math.floor(paddedSouth / quant) * quant;
+			const qWest = Math.floor(paddedWest / quant) * quant;
+			const qNorth = Math.ceil(paddedNorth / quant) * quant;
+			const qEast = Math.ceil(paddedEast / quant) * quant;
+
+			const nextKey = `${zoomKey}|${qSouth.toFixed(4)}|${qWest.toFixed(4)}|${qNorth.toFixed(
+				4
+			)}|${qEast.toFixed(4)}`;
+			if (nextKey === lastPromotionOverlayFetchKeyRef.current) return;
+			lastPromotionOverlayFetchKeyRef.current = nextKey;
+			setPromotionOverlayFetchBbox({ minLat: qSouth, minLng: qWest, maxLat: qNorth, maxLng: qEast });
+		},
+		[isPromotionSearch]
+	);
+
+	const bookingExtraOverlayFilters = useMemo(() => {
+		if (!bookingExtraFetchBbox) return undefined;
+		return {
+			mode: 'booking' as const,
+			south: bookingExtraFetchBbox.minLat,
+			west: bookingExtraFetchBbox.minLng,
+			north: bookingExtraFetchBbox.maxLat,
+			east: bookingExtraFetchBbox.maxLng,
+			limit: 1200,
+		};
+	}, [bookingExtraFetchBbox]);
+
+	const { data: bookingExtraRawContacts } = useGetContactsMapOverlay({
+		filters: bookingExtraOverlayFilters,
+		enabled: Boolean(bookingExtraOverlayFilters),
+	});
+
+	const promotionOverlayFilters = useMemo(() => {
+		if (!promotionOverlayFetchBbox) return undefined;
+		return {
+			mode: 'promotion' as const,
+			south: promotionOverlayFetchBbox.minLat,
+			west: promotionOverlayFetchBbox.minLng,
+			north: promotionOverlayFetchBbox.maxLat,
+			east: promotionOverlayFetchBbox.maxLng,
+			limit: 1200,
+		};
+	}, [promotionOverlayFetchBbox]);
+
+	const { data: promotionOverlayRawContacts } = useGetContactsMapOverlay({
+		filters: promotionOverlayFilters,
+		enabled: Boolean(promotionOverlayFilters),
+	});
+
+	const bookingExtraContacts = useMemo(() => {
+		if (!bookingExtraRawContacts || bookingExtraRawContacts.length === 0) return [];
+		return bookingExtraRawContacts.filter((c) => {
+			// Never duplicate primary result markers.
+			if (baseContactIdSet.has(c.id)) return false;
+			const prefix = getBookingTitlePrefixFromContactTitle(c.title);
+			if (!prefix) return false;
+			return true;
+		});
+	}, [bookingExtraRawContacts, baseContactIdSet]);
+
+	const promotionOverlayContacts = useMemo(() => {
+		if (!promotionOverlayRawContacts || promotionOverlayRawContacts.length === 0) return [];
+		return promotionOverlayRawContacts.filter((c) => {
+			// Client-side safety: only keep state-wide list titles.
+			return isPromotionOverlayListTitle(c.title);
+		});
+	}, [promotionOverlayRawContacts]);
+
+	const { contactsWithCoords: bookingExtraContactsWithCoords, coordsByContactId: bookingExtraCoordsByContactId } =
+		useMemo(() => {
+			const coordsByContactId = new Map<number, LatLngLiteral>();
+			const contactsWithCoords: ContactWithName[] = [];
+			const groups = new Map<string, number[]>();
+
+			for (const contact of bookingExtraContacts) {
+				const coords = getLatLngFromContact(contact);
+				if (!coords) continue;
+				coordsByContactId.set(contact.id, coords);
+				contactsWithCoords.push(contact);
+				const key = coordinateKey(coords);
+				const existing = groups.get(key);
+				if (existing) existing.push(contact.id);
+				else groups.set(key, [contact.id]);
+			}
+
+			// Offset duplicates (keep the smallest id at the true coordinate for accuracy)
+			for (const ids of groups.values()) {
+				if (ids.length <= 1) continue;
+				ids.sort((a, b) => a - b);
+				for (let i = 1; i < ids.length; i++) {
+					const id = ids[i];
+					const base = coordsByContactId.get(id);
+					if (!base) continue;
+					coordsByContactId.set(id, jitterDuplicateCoords(base, i));
+				}
+			}
+
+			return { contactsWithCoords, coordsByContactId };
+		}, [bookingExtraContacts]);
+
+	const {
+		contactsWithCoords: promotionOverlayContactsWithCoords,
+		coordsByContactId: promotionOverlayCoordsByContactId,
+	} = useMemo(() => {
+		const coordsByContactId = new Map<number, LatLngLiteral>();
+		const contactsWithCoords: ContactWithName[] = [];
+		const groups = new Map<string, number[]>();
+
+		for (const contact of promotionOverlayContacts) {
+			const coords = getLatLngFromContact(contact);
+			if (!coords) continue;
+			coordsByContactId.set(contact.id, coords);
+			contactsWithCoords.push(contact);
+			const key = coordinateKey(coords);
+			const existing = groups.get(key);
+			if (existing) existing.push(contact.id);
+			else groups.set(key, [contact.id]);
+		}
+
+		// Offset duplicates (keep the smallest id at the true coordinate for accuracy)
+		for (const ids of groups.values()) {
+			if (ids.length <= 1) continue;
+			ids.sort((a, b) => a - b);
+			for (let i = 1; i < ids.length; i++) {
+				const id = ids[i];
+				const base = coordsByContactId.get(id);
+				if (!base) continue;
+				coordsByContactId.set(id, jitterDuplicateCoords(base, i));
+			}
+		}
+
+		return { contactsWithCoords, coordsByContactId };
+	}, [promotionOverlayContacts]);
+
+	const getBookingExtraContactCoords = useCallback(
+		(contact: ContactWithName): LatLngLiteral | null =>
+			bookingExtraCoordsByContactId.get(contact.id) ?? null,
+		[bookingExtraCoordsByContactId]
+	);
+
+	const getPromotionOverlayContactCoords = useCallback(
+		(contact: ContactWithName): LatLngLiteral | null =>
+			promotionOverlayCoordsByContactId.get(contact.id) ?? null,
+		[promotionOverlayCoordsByContactId]
+	);
 
 	useEffect(() => {
 		selectedStateKeyRef.current = selectedStateKey;
@@ -732,12 +1219,54 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	// to avoid the UI getting "stuck" on a now-nonexistent marker.
 	useEffect(() => {
 		if (hoveredMarkerId == null) return;
-		const stillVisible = visibleContacts.some((c) => c.id === hoveredMarkerId);
+		const stillVisible =
+			visibleContacts.some((c) => c.id === hoveredMarkerId) ||
+			bookingExtraVisibleContacts.some((c) => c.id === hoveredMarkerId) ||
+			promotionOverlayVisibleContacts.some((c) => c.id === hoveredMarkerId);
 		if (stillVisible) return;
+		if (hoverClearTimeoutRef.current) {
+			clearTimeout(hoverClearTimeoutRef.current);
+			hoverClearTimeoutRef.current = null;
+		}
 		setHoveredMarkerId(null);
 		hoveredMarkerIdRef.current = null;
 		onMarkerHover?.(null);
-	}, [visibleContacts, hoveredMarkerId, onMarkerHover]);
+	}, [
+		visibleContacts,
+		bookingExtraVisibleContacts,
+		promotionOverlayVisibleContacts,
+		hoveredMarkerId,
+		onMarkerHover,
+	]);
+
+	// Clear hover state when zooming out past the minimum threshold
+	useEffect(() => {
+		if (zoomLevel >= HOVER_INTERACTION_MIN_ZOOM) return;
+		if (hoveredMarkerId == null) return;
+		if (hoverClearTimeoutRef.current) {
+			clearTimeout(hoverClearTimeoutRef.current);
+			hoverClearTimeoutRef.current = null;
+		}
+		if (fadingTooltipTimeoutRef.current) {
+			clearTimeout(fadingTooltipTimeoutRef.current);
+			fadingTooltipTimeoutRef.current = null;
+		}
+		setHoveredMarkerId(null);
+		setFadingTooltipId(null);
+		hoveredMarkerIdRef.current = null;
+		onMarkerHover?.(null);
+	}, [zoomLevel, hoveredMarkerId, onMarkerHover]);
+
+	// Switch to satellite/hybrid view when zoomed in close enough for street-level detail
+	useEffect(() => {
+		if (!map) return;
+		const shouldUseSatellite = zoomLevel >= SATELLITE_VIEW_MIN_ZOOM;
+		const currentMapType = map.getMapTypeId();
+		const targetMapType = shouldUseSatellite ? 'hybrid' : 'roadmap';
+		if (currentMapType !== targetMapType) {
+			map.setMapTypeId(targetMapType);
+		}
+	}, [map, zoomLevel]);
 
 	useEffect(() => {
 		if (lockedStateName === undefined) return;
@@ -750,6 +1279,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		return () => {
 			if (researchPanelTimeoutRef.current) {
 				clearTimeout(researchPanelTimeoutRef.current);
+			}
+			if (hoverClearTimeoutRef.current) {
+				clearTimeout(hoverClearTimeoutRef.current);
 			}
 		};
 	}, []);
@@ -821,75 +1353,127 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		};
 	}, [map, clearResultsOutline, clearSearchedStateOutline]);
 
-	// Add/remove hover/click highlighting for states (only when enabled)
+	// Add/remove hover highlight and optional click-to-select for states.
+	// Hover highlight is intentionally only enabled at the minimum zoom (fully zoomed out).
 	useEffect(() => {
 		const dataLayer = stateLayerRef.current;
-		if (!map || !dataLayer || !enableStateInteractions || !isStateLayerReady) return;
+		if (!map || !dataLayer || !isStateLayerReady) return;
 
-		const mouseoverListener = dataLayer.addListener(
-			'mouseover',
-			(event: google.maps.Data.MouseEvent) => {
-				const hoveredKey = normalizeStateKey(
-					(event.feature.getProperty('NAME') as string) ||
-						(event.feature.getId() as string)
-				);
-				if (hoveredKey && hoveredKey === selectedStateKeyRef.current) {
-					return;
+		const loading = isLoading ?? false;
+		// "Fully zoomed out" means at the minimum zoom allowed by the map.
+		const isFullyZoomedOut = !loading && zoomLevel <= MAP_MIN_ZOOM + 0.001;
+		const hasStateInteractivity = !!enableStateInteractions || !!onStateSelect;
+
+		// Hover highlight should only exist at the minimum zoom and only when states are actionable.
+		const shouldEnableHoverHighlight = isFullyZoomedOut && hasStateInteractivity;
+		// Click-to-select states:
+		// - Campaign page (enableStateInteractions): always clickable
+		// - Dashboard map view (no enableStateInteractions): clickable only when fully zoomed out
+		const shouldEnableClickSelect = !!enableStateInteractions || (!!onStateSelect && isFullyZoomedOut);
+
+		if (!shouldEnableHoverHighlight && !shouldEnableClickSelect) return;
+
+		let mouseoverListener: google.maps.MapsEventListener | null = null;
+		let mouseoutListener: google.maps.MapsEventListener | null = null;
+		let clickListener: google.maps.MapsEventListener | null = null;
+
+		if (shouldEnableHoverHighlight) {
+			mouseoverListener = dataLayer.addListener(
+				'mouseover',
+				(event: google.maps.Data.MouseEvent) => {
+					// Defensive: if zoom changed mid-hover, don't apply the fill.
+					const currentZoom = map.getZoom() ?? zoomLevel;
+					if (currentZoom > MAP_MIN_ZOOM + 0.001) return;
+					if (isLoadingRef.current) return;
+
+					const hoveredKey = normalizeStateKey(
+						(event.feature.getProperty('NAME') as string) ||
+							(event.feature.getId() as string)
+					);
+					if (hoveredKey && hoveredKey === selectedStateKeyRef.current) {
+						return;
+					}
+					dataLayer.overrideStyle(event.feature, {
+						fillColor: STATE_HIGHLIGHT_COLOR,
+						fillOpacity: STATE_HIGHLIGHT_OPACITY,
+						strokeColor: STATE_HIGHLIGHT_COLOR,
+						strokeOpacity: 1,
+						strokeWeight: 1.2,
+					});
 				}
-				dataLayer.overrideStyle(event.feature, {
-					fillColor: STATE_HIGHLIGHT_COLOR,
-					fillOpacity: STATE_HIGHLIGHT_OPACITY,
-					strokeColor: STATE_HIGHLIGHT_COLOR,
-					strokeOpacity: 1,
-					strokeWeight: 1.2,
-				});
-			}
-		);
+			);
 
-		const mouseoutListener = dataLayer.addListener(
-			'mouseout',
-			(event: google.maps.Data.MouseEvent) => {
-				dataLayer.revertStyle(event.feature);
-			}
-		);
-
-		const clickListener = dataLayer.addListener(
-			'click',
-			(event: google.maps.Data.MouseEvent) => {
-				const stateName = (event.feature.getProperty('NAME') as string) || '';
-				const normalizedKey =
-					normalizeStateKey(stateName) ||
-					normalizeStateKey((event.feature.getId() as string) || undefined);
-				setSelectedStateKey(normalizedKey);
-				if (stateName) {
-					onStateSelectRef.current?.(stateName);
+			mouseoutListener = dataLayer.addListener(
+				'mouseout',
+				(event: google.maps.Data.MouseEvent) => {
+					dataLayer.revertStyle(event.feature);
 				}
-			}
-		);
+			);
+		}
+
+		if (shouldEnableClickSelect) {
+			clickListener = dataLayer.addListener(
+				'click',
+				(event: google.maps.Data.MouseEvent) => {
+					const stateName = (event.feature.getProperty('NAME') as string) || '';
+					const normalizedKey =
+						normalizeStateKey(stateName) ||
+						normalizeStateKey((event.feature.getId() as string) || undefined);
+					setSelectedStateKey(normalizedKey);
+					if (stateName) {
+						onStateSelectRef.current?.(stateName);
+					}
+				}
+			);
+		}
 
 		return () => {
-			mouseoverListener.remove();
-			mouseoutListener.remove();
-			clickListener.remove();
-		};
-	}, [map, enableStateInteractions, isStateLayerReady]);
+			mouseoverListener?.remove();
+			mouseoutListener?.remove();
+			clickListener?.remove();
 
-	// Update stroke styling when the selected state changes
+			// If the user zoomed in while hovering, ensure we clear any lingering fill override.
+			if (shouldEnableHoverHighlight) {
+				dataLayer.revertStyle();
+			}
+		};
+	}, [map, enableStateInteractions, isStateLayerReady, zoomLevel, isLoading, onStateSelect]);
+
+	// When state interactions are off, show subtle divider lines at low zoom (US-wide view).
 	useEffect(() => {
 		const dataLayer = stateLayerRef.current;
 		if (!dataLayer || !isStateLayerReady) return;
+		if (enableStateInteractions) return;
 
-		// Keep the layer invisible unless state interactions are enabled.
-		if (!enableStateInteractions) {
-			dataLayer.setStyle({
-				fillOpacity: 0,
-				strokeOpacity: 0,
-				strokeWeight: 0,
-				clickable: false,
-				zIndex: 0,
-			});
-			return;
-		}
+		const loading = isLoading ?? false;
+		const isFullyZoomedOut = !loading && zoomLevel <= MAP_MIN_ZOOM + 0.001;
+		const shouldShowZoomedOutDividers = zoomLevel <= STATE_DIVIDER_LINES_MAX_ZOOM;
+		dataLayer.setStyle(
+			shouldShowZoomedOutDividers
+				? {
+						fillOpacity: 0,
+						strokeColor: STATE_DIVIDER_LINES_COLOR,
+						strokeOpacity: STATE_DIVIDER_LINES_STROKE_OPACITY,
+						strokeWeight: STATE_DIVIDER_LINES_STROKE_WEIGHT,
+						// Enable hover only at the map's minimum zoom.
+						clickable: isFullyZoomedOut && !!onStateSelect,
+						zIndex: 0,
+					}
+				: {
+						fillOpacity: 0,
+						strokeOpacity: 0,
+						strokeWeight: 0,
+						clickable: false,
+						zIndex: 0,
+					}
+		);
+	}, [enableStateInteractions, isStateLayerReady, zoomLevel, isLoading, onStateSelect]);
+
+	// When state interactions are on, render the state borders + selected-state outline.
+	useEffect(() => {
+		const dataLayer = stateLayerRef.current;
+		if (!dataLayer || !isStateLayerReady) return;
+		if (!enableStateInteractions) return;
 
 		dataLayer.setStyle((feature) => {
 			const featureKey = normalizeStateKey(
@@ -972,6 +1556,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		[lockedStateName]
 	);
 
+	const isCoordsInLockedState = useCallback((coords: LatLngLiteral): boolean => {
+		const selection = lockedStateSelectionMultiPolygonRef.current;
+		if (!selection) return true; // no locked state selection -> treat as "in state"
+		const bbox = lockedStateSelectionBboxRef.current;
+		if (bbox && !isLatLngInBbox(coords.lat, coords.lng, bbox)) return false;
+		return pointInMultiPolygon([coords.lng, coords.lat], selection);
+	}, []);
+
 	const resultStateKeysSignature = useMemo(
 		() => resultStateKeys.join('|'),
 		[resultStateKeys]
@@ -994,106 +1586,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			loading?: boolean,
 			maxDotsInViewport: number = MAX_TOTAL_DOTS
 		) => {
-			if (!mapInstance) return;
-			const layer = backgroundDotsLayerRef.current;
-			if (!layer) return;
-
-			// Clear background dots while loading to avoid visual clutter
-			if (loading) {
-				layer.forEach((feature) => layer.remove(feature));
-				lastBackgroundDotsKeyRef.current = '';
-				return;
-			}
-
-			const usStates = usStatesPolygonsRef.current;
-			// Don't render any background dots until we have US state polygons (ensures dots only in USA).
-			if (!usStates || usStates.length === 0) return;
-
-			const bounds = mapInstance.getBounds();
-			if (!bounds) return;
-			const sw = bounds.getSouthWest();
-			const ne = bounds.getNorthEast();
-			const south = sw.lat();
-			const west = sw.lng();
-			const north = ne.lat();
-			const east = ne.lng();
-
-			// Skip in the unlikely case the viewport crosses the antimeridian (not relevant for our UI).
-			if (east < west) return;
-
-			const zoom = Math.round(mapInstance.getZoom() ?? 4);
-			const quant = getBackgroundDotsQuantizationDeg(zoom);
-
-			const qSouth = Math.round(south / quant);
-			const qWest = Math.round(west / quant);
-			const qNorth = Math.round(north / quant);
-			const qEast = Math.round(east / quant);
-
-			const selectionSig = resultsSelectionSignatureRef.current;
-			const maxAllowed = Math.max(
-				0,
-				Math.min(MAX_TOTAL_DOTS, Math.floor(Number(maxDotsInViewport) || 0))
-			);
-			const viewportKey = `${zoom}|${qSouth}|${qWest}|${qNorth}|${qEast}|${selectionSig}|bg:${maxAllowed}`;
-			if (viewportKey === lastBackgroundDotsKeyRef.current) return;
-			lastBackgroundDotsKeyRef.current = viewportKey;
-
-			// Clear existing dot features.
-			layer.forEach((feature) => layer.remove(feature));
-
-			// Calculate viewport area in square degrees for density-based dot count
-			const latSpan = north - south;
-			const lngSpan = east - west;
-			const viewportArea = latSpan * lngSpan;
-
-			const targetCount = Math.min(
-				getBackgroundDotsTargetCount(viewportArea, zoom),
-				maxAllowed
-			);
-			if (targetCount <= 0) return;
-
-			const selection = resultsSelectionMultiPolygonRef.current;
-			const selectionBbox = resultsSelectionBboxRef.current;
-
-			const rand = mulberry32(hashStringToUint32(viewportKey));
-			const points: LatLngLiteral[] = [];
-			const maxAttempts = Math.max(1000, targetCount * 25);
-			let attempts = 0;
-
-			while (points.length < targetCount && attempts < maxAttempts) {
-				attempts++;
-				const lat = south + rand() * (north - south);
-				const lng = west + rand() * (east - west);
-
-				// Avoid extreme latitudes where the map projection behaves oddly.
-				const clampedLat = clamp(lat, -85, 85);
-
-				// Only show dots within the United States (using state polygons as land mask).
-				if (!isPointInUSA(clampedLat, lng, usStates)) continue;
-
-				// Alaska is huge but sparsely populated - reduce dot density there by ~70%
-				const isInAlaska = clampedLat > 51 && lng < -130;
-				if (isInAlaska && rand() < 0.7) continue;
-
-				if (selection) {
-					// Quick bbox reject so we only do point-in-polygon work near the selected region.
-					if (!selectionBbox || isLatLngInBbox(clampedLat, lng, selectionBbox)) {
-						if (pointInMultiPolygon([lng, clampedLat], selection)) {
-							continue; // inside the selected region -> skip (we only want outside)
-						}
-					}
-				}
-
-				points.push({ lat: clampedLat, lng });
-			}
-
-			for (const pt of points) {
-				layer.add(
-					new google.maps.Data.Feature({
-						geometry: new google.maps.Data.Point(pt),
-					})
-				);
-			}
+			// Background dots have been disabled - no longer rendering fake gray dots
+			void mapInstance;
+			void loading;
+			void maxDotsInViewport;
 		},
 		[]
 	);
@@ -1117,19 +1613,58 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			// Skip in the unlikely case the viewport crosses the antimeridian (not relevant for our UI).
 			if (east < west) return;
 
-			const zoom = Math.round(mapInstance.getZoom() ?? 4);
-			const quant = getBackgroundDotsQuantizationDeg(zoom);
+			const zoomRaw = mapInstance.getZoom() ?? 4;
+			// Keep the seed quantized so marker sampling stays stable while panning/zooming.
+			const zoomKey = Math.round(zoomRaw);
+			const quant = getBackgroundDotsQuantizationDeg(zoomKey);
 			const qSouth = Math.round(south / quant);
 			const qWest = Math.round(west / quant);
 			const qNorth = Math.round(north / quant);
 			const qEast = Math.round(east / quant);
-			const seed = `${zoom}|${qSouth}|${qWest}|${qNorth}|${qEast}`;
+			const seed = `${zoomKey}|${qSouth}|${qWest}|${qNorth}|${qEast}`;
 
 			const viewportBbox: BoundingBox = { minLat: south, maxLat: north, minLng: west, maxLng: east };
+
+			// Promotion overlay pins: state-wide "Radio Stations <State>" / "College Radio <State>"
+			// lists should all be visible together at low zoom.
+			const shouldShowPromotionOverlay =
+				isPromotionSearch &&
+				zoomRaw >= PROMOTION_OVERLAY_MARKERS_MIN_ZOOM &&
+				promotionOverlayContactsWithCoords.length > 0;
+			let nextPromotionOverlayVisible: ContactWithName[] = [];
+			if (shouldShowPromotionOverlay) {
+				const promoInBounds: ContactWithName[] = [];
+				for (const contact of promotionOverlayContactsWithCoords) {
+					const coords = getPromotionOverlayContactCoords(contact);
+					if (!coords) continue;
+					if (!isLatLngInBbox(coords.lat, coords.lng, viewportBbox)) continue;
+					promoInBounds.push(contact);
+				}
+				// Keep ordering stable.
+				promoInBounds.sort((a, b) => a.id - b.id);
+				// Defensive cap (we expect far fewer than this).
+				nextPromotionOverlayVisible =
+					promoInBounds.length > PROMOTION_OVERLAY_MARKERS_MAX_PINS
+						? promoInBounds.slice(0, PROMOTION_OVERLAY_MARKERS_MAX_PINS)
+						: promoInBounds;
+			}
+
+			const nextPromotionKey = nextPromotionOverlayVisible.map((c) => c.id).join(',');
+			if (nextPromotionKey !== lastPromotionOverlayVisibleContactsKeyRef.current) {
+				lastPromotionOverlayVisibleContactsKeyRef.current = nextPromotionKey;
+				setPromotionOverlayVisibleContacts(nextPromotionOverlayVisible);
+			}
+
+			const promotionOverlayIdSet =
+				nextPromotionOverlayVisible.length > 0
+					? new Set<number>(nextPromotionOverlayVisible.map((c) => c.id))
+					: null;
 
 			// Determine which contacts are currently in the viewport.
 			const inBounds: ContactWithName[] = [];
 			for (const contact of contactsWithCoords) {
+				// If this contact is rendered as a promotion overlay pin, don't duplicate it as a dot.
+				if (promotionOverlayIdSet?.has(contact.id)) continue;
 				const coords = getContactCoords(contact);
 				if (!coords) continue;
 				if (!isLatLngInBbox(coords.lat, coords.lng, viewportBbox)) continue;
@@ -1144,29 +1679,117 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				else unselectedInBounds.push(contact);
 			}
 
-			let nextVisibleContacts: ContactWithName[] = [];
-			if (inBounds.length <= MAX_TOTAL_DOTS) {
-				nextVisibleContacts = inBounds;
-			} else if (selectedInBounds.length >= MAX_TOTAL_DOTS) {
-				// Extremely rare: more than MAX_TOTAL_DOTS selected contacts are in view.
-				nextVisibleContacts = stableViewportSampleContacts(
+			// Reserve budget for promotion overlay pins so they always render.
+			const maxPrimaryDots = Math.max(0, MAX_TOTAL_DOTS - nextPromotionOverlayVisible.length);
+
+			// Build a stable "candidate pool" larger than what we render, then pick a
+			// non-overlapping subset so dots never visually stack on top of each other.
+			const POOL_FACTOR = 4;
+			const poolSlots = maxPrimaryDots * POOL_FACTOR;
+			let pool: ContactWithName[] = [];
+			if (poolSlots <= 0) {
+				pool = [];
+			} else if (inBounds.length <= poolSlots) {
+				pool = inBounds;
+			} else if (selectedInBounds.length >= poolSlots) {
+				pool = stableViewportSampleContacts(
 					selectedInBounds,
 					getContactCoords,
 					viewportBbox,
-					MAX_TOTAL_DOTS,
-					`${seed}|selected`
+					poolSlots,
+					`${seed}|pool:selected`
 				);
 			} else {
-				const slots = MAX_TOTAL_DOTS - selectedInBounds.length;
+				const slots = poolSlots - selectedInBounds.length;
 				const sampled = stableViewportSampleContacts(
 					unselectedInBounds,
 					getContactCoords,
 					viewportBbox,
 					slots,
-					seed
+					`${seed}|pool`
 				);
-				nextVisibleContacts = [...selectedInBounds, ...sampled];
+				pool = [...selectedInBounds, ...sampled];
 			}
+
+			// Compute marker size at this zoom so we can enforce min spacing in screen pixels.
+			// Note: Google Maps can report fractional zoom; use the raw value for accurate scaling.
+			const markerScale = getResultDotScaleForZoom(zoomRaw);
+			const strokeWeight = getResultDotStrokeWeightForZoom(zoomRaw);
+			// Ensure *hovered* dots also won't overlap.
+			const minSeparationPx =
+				2 * (markerScale * 1.18) + strokeWeight + 1.5;
+			const minSeparationSq = minSeparationPx * minSeparationPx;
+			const worldSize = 256 * Math.pow(2, zoomRaw);
+
+			type Candidate = {
+				contact: ContactWithName;
+				x: number;
+				y: number;
+				isSelected: boolean;
+				key: number;
+			};
+
+			const candidates: Candidate[] = [];
+			for (const contact of pool) {
+				const coords = getContactCoords(contact);
+				if (!coords) continue;
+				// Web Mercator world pixel coords at the current zoom.
+				const latClamped = clamp(coords.lat, -85, 85);
+				const siny = Math.sin((latClamped * Math.PI) / 180);
+				const x = ((coords.lng + 180) / 360) * worldSize;
+				const y =
+					(0.5 -
+						Math.log((1 + siny) / (1 - siny)) / (4 * Math.PI)) *
+					worldSize;
+				candidates.push({
+					contact,
+					x,
+					y,
+					isSelected: selectedSet.has(contact.id),
+					key: hashStringToUint32(`${seed}|${contact.id}`),
+				});
+			}
+
+			// Stable ordering with selected contacts first.
+			candidates.sort((a, b) => {
+				if (a.isSelected !== b.isSelected) return a.isSelected ? -1 : 1;
+				return a.key - b.key;
+			});
+
+			// Poisson-disc style selection using a grid acceleration structure.
+			const cellSize = Math.max(6, minSeparationPx); // avoid tiny/degenerate cells
+			const grid = new Map<string, Array<{ x: number; y: number }>>();
+			const picked: ContactWithName[] = [];
+
+			const hasNeighborWithin = (cx: number, cy: number, x: number, y: number): boolean => {
+				for (let dx = -1; dx <= 1; dx++) {
+					for (let dy = -1; dy <= 1; dy++) {
+						const arr = grid.get(`${cx + dx},${cy + dy}`);
+						if (!arr) continue;
+						for (const p of arr) {
+							const ddx = x - p.x;
+							const ddy = y - p.y;
+							if (ddx * ddx + ddy * ddy < minSeparationSq) return true;
+						}
+					}
+				}
+				return false;
+			};
+
+			for (const c of candidates) {
+				if (picked.length >= maxPrimaryDots) break;
+				const cx = Math.floor(c.x / cellSize);
+				const cy = Math.floor(c.y / cellSize);
+				if (hasNeighborWithin(cx, cy, c.x, c.y)) continue;
+
+				picked.push(c.contact);
+				const k = `${cx},${cy}`;
+				const arr = grid.get(k);
+				if (arr) arr.push({ x: c.x, y: c.y });
+				else grid.set(k, [{ x: c.x, y: c.y }]);
+			}
+
+			const nextVisibleContacts: ContactWithName[] = picked;
 
 			// Stabilize ordering to reduce marker churn in @react-google-maps/api.
 			nextVisibleContacts.sort((a, b) => a.id - b.id);
@@ -1177,11 +1800,125 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				setVisibleContacts(nextVisibleContacts);
 			}
 
-			const backgroundBudget = Math.max(0, MAX_TOTAL_DOTS - nextVisibleContacts.length);
+			// Booking zoom-in extras: render additional booking categories at high zoom without
+			// exceeding MAX_TOTAL_DOTS total markers.
+			const shouldShowBookingExtras =
+				isBookingSearch &&
+				zoomRaw >= BOOKING_EXTRA_MARKERS_MIN_ZOOM &&
+				bookingExtraContactsWithCoords.length > 0;
+			let nextBookingExtraVisible: ContactWithName[] = [];
+			if (shouldShowBookingExtras) {
+				const remainingBudget = Math.max(
+					0,
+					MAX_TOTAL_DOTS - nextPromotionOverlayVisible.length - nextVisibleContacts.length
+				);
+				const maxExtraDots = Math.min(BOOKING_EXTRA_MARKERS_MAX_DOTS, remainingBudget);
+				if (maxExtraDots > 0) {
+					const extraInBounds: ContactWithName[] = [];
+					for (const contact of bookingExtraContactsWithCoords) {
+						const coords = getBookingExtraContactCoords(contact);
+						if (!coords) continue;
+						if (!isLatLngInBbox(coords.lat, coords.lng, viewportBbox)) continue;
+						extraInBounds.push(contact);
+					}
+
+					// Use the same sampling + non-overlap strategy as primary markers.
+					const POOL_FACTOR = 4;
+					const poolSlots = maxExtraDots * POOL_FACTOR;
+					let pool: ContactWithName[] = [];
+					if (extraInBounds.length <= poolSlots) {
+						pool = extraInBounds;
+					} else {
+						pool = stableViewportSampleContacts(
+							extraInBounds,
+							getBookingExtraContactCoords,
+							viewportBbox,
+							poolSlots,
+							`${seed}|bookingExtra|pool`
+						);
+					}
+
+					type Candidate = { contact: ContactWithName; x: number; y: number; key: number };
+					const candidates: Candidate[] = [];
+					for (const contact of pool) {
+						const coords = getBookingExtraContactCoords(contact);
+						if (!coords) continue;
+						const latClamped = clamp(coords.lat, -85, 85);
+						const siny = Math.sin((latClamped * Math.PI) / 180);
+						const x = ((coords.lng + 180) / 360) * worldSize;
+						const y =
+							(0.5 -
+								Math.log((1 + siny) / (1 - siny)) / (4 * Math.PI)) *
+							worldSize;
+						candidates.push({
+							contact,
+							x,
+							y,
+							key: hashStringToUint32(`${seed}|bookingExtra|${contact.id}`),
+						});
+					}
+
+					// Stable ordering.
+					candidates.sort((a, b) => a.key - b.key);
+
+					const cellSize = Math.max(6, minSeparationPx);
+					const grid = new Map<string, Array<{ x: number; y: number }>>();
+					const pickedExtra: ContactWithName[] = [];
+					const hasNeighborWithin = (cx: number, cy: number, x: number, y: number): boolean => {
+						for (let dx = -1; dx <= 1; dx++) {
+							for (let dy = -1; dy <= 1; dy++) {
+								const arr = grid.get(`${cx + dx},${cy + dy}`);
+								if (!arr) continue;
+								for (const p of arr) {
+									const ddx = x - p.x;
+									const ddy = y - p.y;
+									if (ddx * ddx + ddy * ddy < minSeparationSq) return true;
+								}
+							}
+						}
+						return false;
+					};
+
+					for (const c of candidates) {
+						if (pickedExtra.length >= maxExtraDots) break;
+						const cx = Math.floor(c.x / cellSize);
+						const cy = Math.floor(c.y / cellSize);
+						if (hasNeighborWithin(cx, cy, c.x, c.y)) continue;
+						pickedExtra.push(c.contact);
+						const k = `${cx},${cy}`;
+						const arr = grid.get(k);
+						if (arr) arr.push({ x: c.x, y: c.y });
+						else grid.set(k, [{ x: c.x, y: c.y }]);
+					}
+
+					nextBookingExtraVisible = pickedExtra;
+					nextBookingExtraVisible.sort((a, b) => a.id - b.id);
+				}
+			}
+
+			const nextExtraKey = nextBookingExtraVisible.map((c) => c.id).join(',');
+			if (nextExtraKey !== lastBookingExtraVisibleContactsKeyRef.current) {
+				lastBookingExtraVisibleContactsKeyRef.current = nextExtraKey;
+				setBookingExtraVisibleContacts(nextBookingExtraVisible);
+			}
+
+			const totalRendered = nextVisibleContacts.length + nextBookingExtraVisible.length;
+			const backgroundBudget = Math.max(0, MAX_TOTAL_DOTS - totalRendered);
 			backgroundDotsBudgetRef.current = backgroundBudget;
 			updateBackgroundDots(mapInstance, loading, backgroundBudget);
 		},
-		[contactsWithCoords, getContactCoords, selectedContacts, updateBackgroundDots]
+		[
+			contactsWithCoords,
+			getContactCoords,
+			selectedContacts,
+			updateBackgroundDots,
+			isBookingSearch,
+			bookingExtraContactsWithCoords,
+			getBookingExtraContactCoords,
+			isPromotionSearch,
+			promotionOverlayContactsWithCoords,
+			getPromotionOverlayContactCoords,
+		]
 	);
 
 	// Background dots layer (non-interactive) to avoid the map feeling empty outside the selected region.
@@ -1198,6 +1935,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		backgroundDotsLayerRef.current = layer;
 		lastBackgroundDotsKeyRef.current = '';
 
+		// Ensure state divider lines render above the background dots layer.
+		// (Data layers are stacked by attach order; the dots layer is created later.)
+		const stateLayer = stateLayerRef.current;
+		if (stateLayer) {
+			stateLayer.setMap(null);
+			stateLayer.setMap(map);
+		}
+
 		return () => {
 			layer.setMap(null);
 			backgroundDotsLayerRef.current = null;
@@ -1213,15 +1958,18 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 	useEffect(() => {
 		if (!map) return;
-		const listener = map.addListener('idle', () =>
-			recomputeViewportDots(map, isLoadingRef.current)
-		);
+		const onIdle = () => {
+			updateBookingExtraFetchBbox(map);
+			updatePromotionOverlayFetchBbox(map);
+			recomputeViewportDots(map, isLoadingRef.current);
+		};
+		const listener = map.addListener('idle', onIdle);
 		// Initial fill
-		recomputeViewportDots(map, isLoadingRef.current);
+		onIdle();
 		return () => {
 			listener.remove();
 		};
-	}, [map, recomputeViewportDots]);
+	}, [map, recomputeViewportDots, updateBookingExtraFetchBbox, updatePromotionOverlayFetchBbox]);
 
 	// Draw a gray outline around the *group of states* that have results.
 	// This uses the state polygons we load via the Data layer and unions them so the outline is one shape.
@@ -1286,7 +2034,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			const polygonsToDraw = createOutlinePolygonsFromMultiPolygon(
 				multiPolygonsToRender,
 				{
-					strokeColor: '#6B7280',
+					strokeColor: '#1277E1',
 					strokeOpacity: 1,
 					strokeWeight: 2,
 					zIndex: 1,
@@ -1327,16 +2075,17 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		// Clear while loading
 		if (isLoading) {
 			clearSearchedStateOutline();
-			return;
-		}
-
-		if (enableStateInteractions) {
-			clearSearchedStateOutline();
+			lockedStateSelectionMultiPolygonRef.current = null;
+			lockedStateSelectionBboxRef.current = null;
+			lockedStateSelectionKeyRef.current = null;
 			return;
 		}
 
 		if (!lockedStateKey) {
 			clearSearchedStateOutline();
+			lockedStateSelectionMultiPolygonRef.current = null;
+			lockedStateSelectionBboxRef.current = null;
+			lockedStateSelectionKeyRef.current = null;
 			return;
 		}
 
@@ -1361,8 +2110,13 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 			if (cancelled) return;
 
+			// Store polygon selection for marker "inside/outside" styling (even if we don't draw the outline).
+			lockedStateSelectionMultiPolygonRef.current = found;
+			lockedStateSelectionBboxRef.current = found ? bboxFromMultiPolygon(found) : null;
+			lockedStateSelectionKeyRef.current = lockedStateKey;
+
 			clearSearchedStateOutline();
-			if (!found) return;
+			if (enableStateInteractions || !found) return;
 
 			const polygonsToDraw = createOutlinePolygonsFromMultiPolygon(found, {
 				strokeColor: '#000000',
@@ -1483,6 +2237,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 	const onLoad = useCallback((mapInstance: google.maps.Map) => {
 		setMap(mapInstance);
+		// Initialize zoomLevel immediately so styling reflects the real zoom on first render.
+		setZoomLevel(mapInstance.getZoom() ?? 4);
 
 		// Listen for zoom changes
 		mapInstance.addListener('zoom_changed', () => {
@@ -1500,6 +2256,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const onUnmount = useCallback(() => {
 		clearResultsOutline();
 		clearSearchedStateOutline();
+		lockedStateSelectionMultiPolygonRef.current = null;
+		lockedStateSelectionBboxRef.current = null;
+		lockedStateSelectionKeyRef.current = null;
 		setMap(null);
 		hasFitBoundsRef.current = false;
 		lastContactsCountRef.current = 0;
@@ -1572,78 +2331,202 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 	const handleMarkerClick = (contact: ContactWithName) => {
 		onMarkerClick?.(contact);
-		// Toggle selection when clicking on a marker
-		onToggleSelection?.(contact.id);
+		// Toggle selection when clicking on a marker (only for primary result set)
+		if (baseContactIdSet.has(contact.id)) {
+			onToggleSelection?.(contact.id);
+		}
 	};
 
+	const handleMarkerMouseOver = useCallback(
+		(contact: ContactWithName, e?: google.maps.MapMouseEvent) => {
+			// Don't trigger hover interactions until sufficiently zoomed in
+			if (zoomLevel < HOVER_INTERACTION_MIN_ZOOM) return;
+
+			if (hoverClearTimeoutRef.current) {
+				clearTimeout(hoverClearTimeoutRef.current);
+				hoverClearTimeoutRef.current = null;
+			}
+			// Clear any fading tooltip when hovering a new marker
+			if (fadingTooltipTimeoutRef.current) {
+				clearTimeout(fadingTooltipTimeoutRef.current);
+				fadingTooltipTimeoutRef.current = null;
+			}
+			setFadingTooltipId(null);
+
+			hoveredMarkerIdRef.current = contact.id;
+			setHoveredMarkerId(contact.id);
+
+			const domEvent = e?.domEvent as MouseEvent | TouchEvent | undefined;
+			let meta: MarkerHoverMeta | undefined;
+			if (domEvent && 'clientX' in domEvent && 'clientY' in domEvent) {
+				meta = { clientX: domEvent.clientX, clientY: domEvent.clientY };
+			} else if (
+				domEvent &&
+				'touches' in domEvent &&
+				domEvent.touches &&
+				domEvent.touches.length > 0
+			) {
+				meta = {
+					clientX: domEvent.touches[0].clientX,
+					clientY: domEvent.touches[0].clientY,
+				};
+			}
+
+			onMarkerHover?.(contact, meta);
+		},
+		[onMarkerHover, zoomLevel]
+	);
+
+	const handleMarkerMouseOut = useCallback(
+		(contactId: number) => {
+			if (hoverClearTimeoutRef.current) {
+				clearTimeout(hoverClearTimeoutRef.current);
+			}
+			hoverClearTimeoutRef.current = setTimeout(() => {
+				if (hoveredMarkerIdRef.current !== contactId) return;
+				hoveredMarkerIdRef.current = null;
+				// Start fade-out: set the fading tooltip to the current one
+				setFadingTooltipId(contactId);
+				setHoveredMarkerId(null);
+				onMarkerHover?.(null);
+				// Clear fading tooltip after transition completes (150ms matches CSS)
+				if (fadingTooltipTimeoutRef.current) {
+					clearTimeout(fadingTooltipTimeoutRef.current);
+				}
+				fadingTooltipTimeoutRef.current = setTimeout(() => {
+					setFadingTooltipId(null);
+				}, 150);
+			}, 60);
+		},
+		[onMarkerHover]
+	);
+
 	// Calculate marker scale based on zoom level
-	// At zoom 4 (zoomed out): scale 4, at zoom 14 (zoomed in): scale 12
+	// At zoom 4 (zoomed out): scale ~3, at zoom 14 (zoomed in): scale ~11
 	const markerScale = useMemo(() => {
-		const minZoom = 4;
-		const maxZoom = 14;
-		const minScale = 4;
-		const maxScale = 12;
-		const clampedZoom = Math.max(minZoom, Math.min(maxZoom, zoomLevel));
-		const t = (clampedZoom - minZoom) / (maxZoom - minZoom);
-		return minScale + t * (maxScale - minScale);
+		return getResultDotScaleForZoom(zoomLevel);
 	}, [zoomLevel]);
 
 	const strokeWeight = useMemo(() => {
-		return 1.5 + (markerScale - 4) * 0.2; // Scale stroke proportionally
+		return getResultDotStrokeWeightForZoom(zoomLevel);
+	}, [zoomLevel]);
+
+	// Marker pin (SVG) sizing: scale so the 36px circle area matches our dot diameter (2*markerScale),
+	// but clamp to a minimum so pins remain readable at low zoom.
+	const markerPinCircleDiameterPx = useMemo(() => {
+		return Math.max(markerScale * 2, MIN_OVERLAY_PIN_CIRCLE_DIAMETER_PX);
 	}, [markerScale]);
+
+	const markerPinCircleRadiusPx = useMemo(() => markerPinCircleDiameterPx / 2, [markerPinCircleDiameterPx]);
+
+	// Scale factor for the full SVG viewbox.
+	const markerPinScaleFactor = useMemo(() => {
+		return markerPinCircleDiameterPx / MAP_MARKER_PIN_CIRCLE_DIAMETER;
+	}, [markerPinCircleDiameterPx]);
+
+	const markerPinMetrics = useMemo(() => {
+		if (!isLoaded) return null;
+		const width = MAP_MARKER_PIN_VIEWBOX_WIDTH * markerPinScaleFactor;
+		const height = MAP_MARKER_PIN_VIEWBOX_HEIGHT * markerPinScaleFactor;
+		// Keep the marker positioned like our previous dot markers: anchor on the circle center.
+		const anchorX = MAP_MARKER_PIN_CIRCLE_CENTER_X * markerPinScaleFactor;
+		const anchorY = MAP_MARKER_PIN_CIRCLE_CENTER_Y * markerPinScaleFactor;
+		return { width, height, anchorX, anchorY };
+	}, [isLoaded, markerPinScaleFactor]);
+
+	const markerPinUrlCacheRef = useRef<Map<string, string>>(new Map());
+	const getMarkerPinUrl = useCallback(
+		(fillColor: string, strokeColor: string, searchWhat?: string | null): string => {
+			const key = `${fillColor}|${strokeColor}|${searchWhat ?? ''}`;
+			const cached = markerPinUrlCacheRef.current.get(key);
+			if (cached) return cached;
+			const url = generateMapMarkerPinIconUrl(fillColor, strokeColor, searchWhat);
+			markerPinUrlCacheRef.current.set(key, url);
+			return url;
+		},
+		[]
+	);
+
+	const getMarkerPinIcon = useCallback(
+		(fillColor: string, strokeColor: string, searchWhat?: string | null): google.maps.Icon | undefined => {
+			if (!isLoaded) return undefined;
+			const metrics = markerPinMetrics;
+			if (!metrics) return undefined;
+
+			return {
+				url: getMarkerPinUrl(fillColor, strokeColor, searchWhat),
+				scaledSize: new google.maps.Size(metrics.width, metrics.height),
+				anchor: new google.maps.Point(metrics.anchorX, metrics.anchorY),
+			};
+		},
+		[getMarkerPinUrl, isLoaded, markerPinMetrics]
+	);
+
+	const defaultDotFillColor = useMemo(() => {
+		return getResultDotColorForWhat(searchWhat);
+	}, [searchWhat]);
+
+	const outsideDefaultDotFillColor = useMemo(
+		() =>
+			washOutHexColor(
+				defaultDotFillColor,
+				OUTSIDE_LOCKED_STATE_WASHOUT_TO_WHITE
+			),
+		[defaultDotFillColor]
+	);
 
 	// Default red dot marker
 	const defaultMarkerIcon = useMemo(() => {
 		if (!isLoaded) return undefined;
 		return {
 			path: google.maps.SymbolPath.CIRCLE,
-			fillColor: '#D21E1F',
+			fillColor: defaultDotFillColor,
 			fillOpacity: 1,
-			strokeColor: '#FFFFFF',
+			strokeColor: RESULT_DOT_STROKE_COLOR_DEFAULT,
 			strokeWeight: strokeWeight,
 			scale: markerScale,
 		};
-	}, [isLoaded, markerScale, strokeWeight]);
+	}, [isLoaded, markerScale, strokeWeight, defaultDotFillColor]);
 
-	// Selected green dot marker
+	const defaultMarkerIconOutside = useMemo(() => {
+		if (!isLoaded) return undefined;
+		return {
+			path: google.maps.SymbolPath.CIRCLE,
+			fillColor: outsideDefaultDotFillColor,
+			fillOpacity: 1,
+			strokeColor: RESULT_DOT_STROKE_COLOR_DEFAULT,
+			strokeWeight: strokeWeight,
+			scale: markerScale,
+		};
+	}, [isLoaded, markerScale, strokeWeight, outsideDefaultDotFillColor]);
+
+	// Selected dot marker (same fill, different stroke)
 	const selectedMarkerIcon = useMemo(() => {
 		if (!isLoaded) return undefined;
 		return {
 			path: google.maps.SymbolPath.CIRCLE,
-			fillColor: '#0E8530',
+			fillColor: defaultDotFillColor,
 			fillOpacity: 1,
-			strokeColor: '#FFFFFF',
+			strokeColor: RESULT_DOT_STROKE_COLOR_SELECTED,
 			strokeWeight: strokeWeight,
 			scale: markerScale,
 		};
-	}, [isLoaded, markerScale, strokeWeight]);
+	}, [isLoaded, markerScale, strokeWeight, defaultDotFillColor]);
 
-	// Slightly larger icons when hovered (no text tooltip)
-	const hoveredDefaultMarkerIcon = useMemo(() => {
+	const selectedMarkerIconOutside = useMemo(() => {
 		if (!isLoaded) return undefined;
 		return {
 			path: google.maps.SymbolPath.CIRCLE,
-			fillColor: '#D21E1F',
+			fillColor: outsideDefaultDotFillColor,
 			fillOpacity: 1,
-			strokeColor: '#FFFFFF',
-			strokeWeight: strokeWeight + 0.4,
-			scale: markerScale * 1.18,
+			strokeColor: RESULT_DOT_STROKE_COLOR_SELECTED,
+			strokeWeight: strokeWeight,
+			scale: markerScale,
 		};
-	}, [isLoaded, markerScale, strokeWeight]);
+	}, [isLoaded, markerScale, strokeWeight, outsideDefaultDotFillColor]);
 
-	const hoveredSelectedMarkerIcon = useMemo(() => {
-		if (!isLoaded) return undefined;
-		return {
-			path: google.maps.SymbolPath.CIRCLE,
-			fillColor: '#0E8530',
-			fillOpacity: 1,
-			strokeColor: '#FFFFFF',
-			strokeWeight: strokeWeight + 0.4,
-			scale: markerScale * 1.18,
-		};
-	}, [isLoaded, markerScale, strokeWeight]);
-
-	// Invisible larger marker for hover hit area
+	// Invisible marker for hover hit area - same size as visible dot for enter trigger.
+	// The larger leave area is provided by the tooltip overlay's extended bounds below.
 	const invisibleHitAreaIcon = useMemo(() => {
 		if (!isLoaded) return undefined;
 		return {
@@ -1652,9 +2535,29 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			fillOpacity: 0,
 			strokeColor: 'transparent',
 			strokeWeight: 0,
-			scale: markerScale * 2, // Larger than visible dot for easier hover
+			scale: markerScale, // Same size as visible dot for precise enter detection
 		};
 	}, [isLoaded, markerScale]);
+
+	// Invisible hit area sized to match the pin circle (pins are clamped larger at low zoom).
+	const invisiblePinHitAreaIcon = useMemo(() => {
+		if (!isLoaded) return undefined;
+		return {
+			path: google.maps.SymbolPath.CIRCLE,
+			fillColor: 'transparent',
+			fillOpacity: 0,
+			strokeColor: 'transparent',
+			strokeWeight: 0,
+			scale: markerPinCircleRadiusPx,
+		};
+	}, [isLoaded, markerPinCircleRadiusPx]);
+
+	// Larger leave buffer zone - how much extra padding below the tooltip for hysteresis
+	const hoverLeaveBufferPx = useMemo(() => {
+		// The buffer should be roughly the size the hit area used to be (2x marker)
+		// This prevents flicker when moving off the marker
+		return markerScale * 2;
+	}, [markerScale]);
 
 	// Background gray dot icon (same design as result dots, lower emphasis)
 	const backgroundDotIcon = useMemo(() => {
@@ -1663,7 +2566,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			path: google.maps.SymbolPath.CIRCLE,
 			fillColor: '#9CA3AF',
 			fillOpacity: 0.55,
-			strokeColor: '#FFFFFF',
+			strokeColor: RESULT_DOT_STROKE_COLOR_DEFAULT,
 			strokeWeight: Math.max(1, strokeWeight * 0.85),
 			scale: markerScale * 0.78,
 		};
@@ -1675,7 +2578,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		if (!layer || !backgroundDotIcon) return;
 		layer.setStyle({
 			clickable: false,
-			zIndex: 0,
+			zIndex: -1,
 			icon: backgroundDotIcon,
 		});
 	}, [backgroundDotIcon]);
@@ -1738,62 +2641,390 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		>
 			{/* Only render markers when not loading */}
 			{!isLoading &&
+				promotionOverlayVisibleContacts.map((contact) => {
+					const coords = getPromotionOverlayContactCoords(contact);
+					if (!coords) return null;
+					const isHovered = hoveredMarkerId === contact.id;
+					const isSelected = selectedContacts.includes(contact.id);
+					const hasLockedStateSelection =
+						lockedStateKey && lockedStateSelectionKeyRef.current === lockedStateKey;
+					const isOutsideLockedState = hasLockedStateSelection
+						? !isCoordsInLockedState(coords)
+						: false;
+					// In promotion mode, keep markers *inside* the searched/locked state as regular dots.
+					// Only render the overlay "pin" UI for contacts outside the searched area.
+					const shouldUseOverlayPinStyle = !hasLockedStateSelection || isOutsideLockedState;
+
+					const whatForMarker = getPromotionOverlayWhatFromContactTitle(contact.title) ?? null;
+					const dotFillColor = getResultDotColorForWhat(whatForMarker);
+					const dotFillColorOutside = washOutHexColor(
+						dotFillColor,
+						OUTSIDE_LOCKED_STATE_WASHOUT_TO_WHITE
+					);
+					const pinFillColor = isOutsideLockedState ? dotFillColorOutside : dotFillColor;
+					const pinStrokeColor = isSelected
+						? RESULT_DOT_STROKE_COLOR_SELECTED
+						: RESULT_DOT_STROKE_COLOR_DEFAULT;
+					const pinIcon = getMarkerPinIcon(pinFillColor, pinStrokeColor, whatForMarker);
+
+					const dotIcon =
+						isSelected
+							? isOutsideLockedState
+								? selectedMarkerIconOutside
+								: selectedMarkerIcon
+							: isOutsideLockedState
+								? defaultMarkerIconOutside
+								: defaultMarkerIcon;
+
+					// Show tooltip if hovered or if this marker is fading out
+					const isFading = fadingTooltipId === contact.id;
+					const shouldShowTooltip = isHovered || isFading;
+					const hoverTooltip = shouldShowTooltip
+						? (() => {
+								const fullName = `${contact.firstName || ''} ${
+									contact.lastName || ''
+								}`.trim();
+								const nameForTooltip = fullName || contact.name || '';
+								const companyForTooltip = contact.company || '';
+								const titleForTooltip = (contact.title || contact.headline || '').trim();
+								const normalizedWhat = whatForMarker ? normalizeWhatKey(whatForMarker) : null;
+								const tooltipFillColor = normalizedWhat
+									? WHAT_TO_HOVER_TOOLTIP_FILL_COLOR[normalizedWhat] ?? dotFillColor
+									: dotFillColor;
+								const width = calculateTooltipWidth(
+									nameForTooltip,
+									companyForTooltip,
+									titleForTooltip,
+									whatForMarker
+								);
+								const height = calculateTooltipHeight(nameForTooltip, companyForTooltip);
+								const anchorY = calculateTooltipAnchorY(nameForTooltip, companyForTooltip);
+								return {
+									url: generateMapTooltipIconUrl(
+										nameForTooltip,
+										companyForTooltip,
+										titleForTooltip,
+										tooltipFillColor,
+										whatForMarker
+									),
+									width,
+									height,
+									anchorY,
+								};
+							})()
+						: null;
+
+					return (
+						<Fragment key={`promotionOverlay-${contact.id}`}>
+							<MarkerF
+								position={coords}
+								icon={shouldUseOverlayPinStyle ? invisiblePinHitAreaIcon : invisibleHitAreaIcon}
+								onMouseOver={(e) => handleMarkerMouseOver(contact, e)}
+								onMouseOut={() => handleMarkerMouseOut(contact.id)}
+								onClick={() => handleMarkerClick(contact)}
+								clickable={true}
+								// Keep in-state promotion markers behaving like primary dots; out-of-state pins sit behind.
+								zIndex={shouldUseOverlayPinStyle ? 0 : MARKER_HIT_AREA_Z_INDEX}
+							/>
+							<MarkerF
+								position={coords}
+								icon={shouldUseOverlayPinStyle ? pinIcon : dotIcon}
+								clickable={false}
+								zIndex={shouldUseOverlayPinStyle ? -1 : MARKER_DOT_Z_INDEX}
+							/>
+							{shouldShowTooltip && hoverTooltip && (
+								<OverlayViewF
+									position={coords}
+									mapPaneName={OverlayView.FLOAT_PANE}
+									zIndex={HOVER_TOOLTIP_Z_INDEX}
+									getPixelPositionOffset={() => ({
+										x: -MAP_TOOLTIP_ANCHOR_X,
+										y: -hoverTooltip.anchorY,
+									})}
+								>
+									<div
+										style={{
+											width: `${hoverTooltip.width}px`,
+											height: `${hoverTooltip.height + hoverLeaveBufferPx}px`,
+											pointerEvents: isHovered ? 'auto' : 'none',
+											display: 'flex',
+											flexDirection: 'column',
+										}}
+										onMouseEnter={() => handleMarkerMouseOver(contact)}
+										onMouseLeave={() => handleMarkerMouseOut(contact.id)}
+										onClick={() => handleMarkerClick(contact)}
+									>
+										<div
+											style={{
+												width: '100%',
+												height: `${hoverTooltip.height}px`,
+												opacity: isHovered ? 1 : 0,
+												transition: 'opacity 150ms ease-in-out',
+												flexShrink: 0,
+											}}
+										>
+											<img
+												src={hoverTooltip.url}
+												alt=""
+												draggable={false}
+												style={{ width: '100%', height: '100%', display: 'block' }}
+											/>
+										</div>
+									</div>
+								</OverlayViewF>
+							)}
+						</Fragment>
+					);
+				})}
+			{!isLoading &&
+				bookingExtraVisibleContacts.map((contact) => {
+					const coords = getBookingExtraContactCoords(contact);
+					if (!coords) return null;
+					const isHovered = hoveredMarkerId === contact.id;
+					const isSelected = selectedContacts.includes(contact.id);
+					const hasLockedStateSelection =
+						lockedStateKey && lockedStateSelectionKeyRef.current === lockedStateKey;
+					const isOutsideLockedState = hasLockedStateSelection
+						? !isCoordsInLockedState(coords)
+						: false;
+
+					const whatForMarker = getBookingTitlePrefixFromContactTitle(contact.title) ?? null;
+					const dotFillColor = getResultDotColorForWhat(whatForMarker);
+					const dotFillColorOutside = washOutHexColor(
+						dotFillColor,
+						OUTSIDE_LOCKED_STATE_WASHOUT_TO_WHITE
+					);
+					const pinFillColor = isOutsideLockedState ? dotFillColorOutside : dotFillColor;
+					const pinStrokeColor = isSelected
+						? RESULT_DOT_STROKE_COLOR_SELECTED
+						: RESULT_DOT_STROKE_COLOR_DEFAULT;
+					const pinIcon = getMarkerPinIcon(pinFillColor, pinStrokeColor, whatForMarker);
+
+					// Show tooltip if hovered or if this marker is fading out
+					const isFading = fadingTooltipId === contact.id;
+					const shouldShowTooltip = isHovered || isFading;
+					const hoverTooltip = shouldShowTooltip
+						? (() => {
+								const fullName = `${contact.firstName || ''} ${
+									contact.lastName || ''
+								}`.trim();
+								const nameForTooltip = fullName || contact.name || '';
+								const companyForTooltip = contact.company || '';
+								const titleForTooltip = (contact.title || contact.headline || '').trim();
+								const normalizedWhat = whatForMarker ? normalizeWhatKey(whatForMarker) : null;
+								const tooltipFillColor = normalizedWhat
+									? WHAT_TO_HOVER_TOOLTIP_FILL_COLOR[normalizedWhat] ?? dotFillColor
+									: dotFillColor;
+								const width = calculateTooltipWidth(
+									nameForTooltip,
+									companyForTooltip,
+									titleForTooltip,
+									whatForMarker
+								);
+								const height = calculateTooltipHeight(nameForTooltip, companyForTooltip);
+								const anchorY = calculateTooltipAnchorY(nameForTooltip, companyForTooltip);
+								return {
+									url: generateMapTooltipIconUrl(
+										nameForTooltip,
+										companyForTooltip,
+										titleForTooltip,
+										tooltipFillColor,
+										whatForMarker
+									),
+									width,
+									height,
+									anchorY,
+								};
+							})()
+						: null;
+
+					return (
+						<Fragment key={`bookingExtra-${contact.id}`}>
+							{/* Lower z-index hit area so primary markers win when overlapping */}
+							<MarkerF
+								position={coords}
+								icon={invisiblePinHitAreaIcon}
+								onMouseOver={(e) => handleMarkerMouseOver(contact, e)}
+								onMouseOut={() => handleMarkerMouseOut(contact.id)}
+								onClick={() => handleMarkerClick(contact)}
+								clickable={true}
+								zIndex={0}
+							/>
+							<MarkerF
+								position={coords}
+								icon={pinIcon}
+								clickable={false}
+								zIndex={-1}
+							/>
+							{shouldShowTooltip && hoverTooltip && (
+								<OverlayViewF
+									position={coords}
+									mapPaneName={OverlayView.FLOAT_PANE}
+									zIndex={HOVER_TOOLTIP_Z_INDEX}
+									getPixelPositionOffset={() => ({
+										x: -MAP_TOOLTIP_ANCHOR_X,
+										y: -hoverTooltip.anchorY,
+									})}
+								>
+									<div
+										style={{
+											width: `${hoverTooltip.width}px`,
+											height: `${hoverTooltip.height + hoverLeaveBufferPx}px`,
+											pointerEvents: isHovered ? 'auto' : 'none',
+											display: 'flex',
+											flexDirection: 'column',
+										}}
+										onMouseEnter={() => handleMarkerMouseOver(contact)}
+										onMouseLeave={() => handleMarkerMouseOut(contact.id)}
+										onClick={() => handleMarkerClick(contact)}
+									>
+										<div
+											style={{
+												width: '100%',
+												height: `${hoverTooltip.height}px`,
+												opacity: isHovered ? 1 : 0,
+												transition: 'opacity 150ms ease-in-out',
+												flexShrink: 0,
+											}}
+										>
+											<img
+												src={hoverTooltip.url}
+												alt=""
+												draggable={false}
+												style={{ width: '100%', height: '100%', display: 'block' }}
+											/>
+										</div>
+									</div>
+								</OverlayViewF>
+							)}
+						</Fragment>
+					);
+				})}
+			{!isLoading &&
 				visibleContacts.map((contact) => {
 					const coords = getContactCoords(contact);
 					if (!coords) return null;
 					const isHovered = hoveredMarkerId === contact.id;
 					const isSelected = selectedContacts.includes(contact.id);
+					const hasLockedStateSelection =
+						lockedStateKey && lockedStateSelectionKeyRef.current === lockedStateKey;
+					const isOutsideLockedState = hasLockedStateSelection
+						? !isCoordsInLockedState(coords)
+						: false;
 					const dotIcon = isSelected
-						? isHovered
-							? hoveredSelectedMarkerIcon
+						? isOutsideLockedState
+							? selectedMarkerIconOutside
 							: selectedMarkerIcon
-						: isHovered
-						? hoveredDefaultMarkerIcon
-						: defaultMarkerIcon;
+						: isOutsideLockedState
+							? defaultMarkerIconOutside
+							: defaultMarkerIcon;
+
+					// Show tooltip if hovered or if this marker is fading out
+					const isFading = fadingTooltipId === contact.id;
+					const shouldShowTooltip = isHovered || isFading;
+					const hoverTooltip = shouldShowTooltip
+						? (() => {
+								const fullName = `${contact.firstName || ''} ${
+									contact.lastName || ''
+								}`.trim();
+								const nameForTooltip = fullName || contact.name || '';
+								const companyForTooltip = contact.company || '';
+								const titleForTooltip = (contact.title || contact.headline || '').trim();
+								// Even if the marker dot is "washed out" outside the locked/selected state,
+								// keep the hover tooltip using the base search color so it consistently
+								// communicates the search category.
+								const normalizedWhat = searchWhat ? normalizeWhatKey(searchWhat) : null;
+								const tooltipFillColor = normalizedWhat
+									? WHAT_TO_HOVER_TOOLTIP_FILL_COLOR[normalizedWhat] ?? defaultDotFillColor
+									: defaultDotFillColor;
+								const width = calculateTooltipWidth(
+									nameForTooltip,
+									companyForTooltip,
+									titleForTooltip,
+									searchWhat
+								);
+								const height = calculateTooltipHeight(nameForTooltip, companyForTooltip);
+								const anchorY = calculateTooltipAnchorY(nameForTooltip, companyForTooltip);
+								return {
+									url: generateMapTooltipIconUrl(
+										nameForTooltip,
+										companyForTooltip,
+										titleForTooltip,
+										tooltipFillColor,
+										searchWhat
+									),
+									width,
+									height,
+									anchorY,
+								};
+							})()
+						: null;
 					return (
 						<Fragment key={contact.id}>
 							{/* Invisible larger hit area for hover detection - this controls all hover state */}
 							<MarkerF
 								position={coords}
 								icon={invisibleHitAreaIcon}
-								onMouseOver={(e) => {
-									hoveredMarkerIdRef.current = contact.id;
-									setHoveredMarkerId(contact.id);
-									const domEvent = e?.domEvent as MouseEvent | TouchEvent | undefined;
-									let meta: MarkerHoverMeta | undefined;
-									if (domEvent && 'clientX' in domEvent && 'clientY' in domEvent) {
-										meta = { clientX: domEvent.clientX, clientY: domEvent.clientY };
-									} else if (
-										domEvent &&
-										'touches' in domEvent &&
-										domEvent.touches &&
-										domEvent.touches.length > 0
-									) {
-										meta = {
-											clientX: domEvent.touches[0].clientX,
-											clientY: domEvent.touches[0].clientY,
-										};
-									}
-									onMarkerHover?.(contact, meta);
-								}}
-								onMouseOut={() => {
-									setHoveredMarkerId((prev) => (prev === contact.id ? null : prev));
-									if (hoveredMarkerIdRef.current === contact.id) {
-										hoveredMarkerIdRef.current = null;
-										onMarkerHover?.(null);
-									}
-								}}
+								onMouseOver={(e) => handleMarkerMouseOver(contact, e)}
+								onMouseOut={() => handleMarkerMouseOut(contact.id)}
 								onClick={() => handleMarkerClick(contact)}
 								clickable={true}
-								zIndex={3}
+								zIndex={MARKER_HIT_AREA_Z_INDEX}
 							/>
-							{/* Dot marker (slightly larger on hover) */}
+							{/* Dot marker (fixed size; hover shows SVG tooltip instead of scaling) */}
 							<MarkerF
 								position={coords}
 								icon={dotIcon}
 								clickable={false}
-								zIndex={isHovered ? 2 : 1}
+								zIndex={MARKER_DOT_Z_INDEX}
 							/>
+							{/* Hover SVG tooltip (rendered as an overlay so it's always above markers) */}
+							{shouldShowTooltip && hoverTooltip && (
+								<OverlayViewF
+									position={coords}
+									mapPaneName={OverlayView.FLOAT_PANE}
+									zIndex={HOVER_TOOLTIP_Z_INDEX}
+									getPixelPositionOffset={() => ({
+										x: -MAP_TOOLTIP_ANCHOR_X,
+										// Align the tooltip tip to the marker's LatLng pixel point.
+										y: -hoverTooltip.anchorY,
+									})}
+								>
+									{/* Outer wrapper extends below tooltip for larger leave area (hysteresis) */}
+									<div
+										style={{
+											width: `${hoverTooltip.width}px`,
+											// Extend height to include buffer below for easier hover exit
+											height: `${hoverTooltip.height + hoverLeaveBufferPx}px`,
+											pointerEvents: isHovered ? 'auto' : 'none',
+											// Use flex to keep content at top, buffer at bottom
+											display: 'flex',
+											flexDirection: 'column',
+										}}
+										onMouseEnter={() => handleMarkerMouseOver(contact)}
+										onMouseLeave={() => handleMarkerMouseOut(contact.id)}
+										onClick={() => handleMarkerClick(contact)}
+									>
+										<div
+											style={{
+												width: '100%',
+												height: `${hoverTooltip.height}px`,
+												opacity: isHovered ? 1 : 0,
+												transition: 'opacity 150ms ease-in-out',
+												flexShrink: 0,
+											}}
+										>
+											<img
+												src={hoverTooltip.url}
+												alt=""
+												draggable={false}
+												style={{ width: '100%', height: '100%', display: 'block' }}
+											/>
+										</div>
+										{/* Invisible buffer zone below tooltip for hysteresis */}
+									</div>
+								</OverlayViewF>
+							)}
 						</Fragment>
 					);
 				})}

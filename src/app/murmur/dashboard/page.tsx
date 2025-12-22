@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { gsap } from 'gsap';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { createPortal, flushSync } from 'react-dom';
@@ -22,13 +22,13 @@ import { WeddingPlannersIcon } from '@/components/atoms/_svg/WeddingPlannersIcon
 import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
 import { RadioStationsIcon } from '@/components/atoms/_svg/RadioStationsIcon';
 import { NearMeIcon } from '@/components/atoms/_svg/NearMeIcon';
+import HomeIcon from '@/components/atoms/_svg/HomeIcon';
 import { getCityIconProps } from '@/utils/cityIcons';
 import { Typography } from '@/components/ui/typography';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormField, FormItem, FormLabel } from '@/components/ui/form';
 import CustomTable from '@/components/molecules/CustomTable/CustomTable';
-import ConsoleLoader from '@/components/atoms/ConsoleLoader/ConsoleLoader';
 import { Card, CardContent } from '@/components/ui/card';
 
 import { useClerk } from '@clerk/nextjs';
@@ -84,6 +84,182 @@ const extractStateAbbrFromSearchQuery = (query: string): string | null => {
 	return /^[A-Z]{2}$/.test(abbr) ? abbr : null;
 };
 
+const extractWhatFromSearchQuery = (query: string): string | null => {
+	// Typical formats:
+	// - "[Promotion] Radio Stations (Maine)"
+	// - "[Booking] Music Venues (Portland, ME)"
+	// Also support the legacy "in" format used by some deep links: "[Booking] X in Y"
+	if (!query) return null;
+	let s = query.trim();
+	if (!s) return null;
+
+	// Remove leading "[...]" (Why)
+	s = s.replace(/^\[[^\]]+\]\s*/i, '');
+	// Remove trailing "(...)" (Where)
+	s = s.replace(/\s*\([^)]*\)\s*$/, '');
+	// Remove trailing " in ..." if present
+	s = s.replace(/\s+in\s+.+$/i, '').trim();
+
+	return s || null;
+};
+
+const extractWhereFromSearchQuery = (query: string): string | null => {
+	// Typical formats:
+	// - "[Promotion] Radio Stations (Maine)"
+	// - "[Booking] Music Venues (Portland, ME)"
+	// Also support legacy "in" format: "[Booking] X in Y"
+	if (!query) return null;
+	const s = query.trim();
+	if (!s) return null;
+
+	// Prefer a trailing "(...)" (our canonical format)
+	const parenMatch = s.match(/\(([^)]+)\)\s*$/);
+	const parenValue = parenMatch?.[1]?.trim();
+	if (parenValue) return parenValue;
+
+	// Fallback: "... in <where>"
+	const inMatch = s.match(/\s+in\s+(.+)$/i);
+	const inValue = inMatch?.[1]?.trim();
+	return inValue || null;
+};
+
+const extractWhyFromSearchQuery = (query: string): string | null => {
+	// Typical formats:
+	// - "[Promotion] ..."
+	// - "[Booking] ..."
+	if (!query) return null;
+	const s = query.trim();
+	if (!s) return null;
+
+	const m = s.match(/^\[([^\]]+)\]/);
+	const tag = m?.[1]?.trim();
+	return tag ? `[${tag}]` : null;
+};
+
+const hasAtLeast3ParsedResearchSections = (metadata: string | null | undefined): boolean => {
+	if (!metadata) return false;
+
+	// Extract all [n] sections first.
+	const allSections: Record<string, string> = {};
+	const regex = /\[(\d+)\]\s*([\s\S]*?)(?=\[\d+\]|$)/g;
+	let match: RegExpExecArray | null;
+	while ((match = regex.exec(metadata)) !== null) {
+		const sectionNum = match[1];
+		const content = match[2]?.trim() ?? '';
+		allSections[sectionNum] = content;
+	}
+
+	// Count sequential sections starting from [1] with meaningful content.
+	let expectedNum = 1;
+	let validCount = 0;
+	while (allSections[String(expectedNum)]) {
+		const content = allSections[String(expectedNum)] ?? '';
+		const meaningfulContent = content.replace(/[.\s,;:!?'"()\-–—]/g, '').trim();
+		if (meaningfulContent.length < 5) break;
+		validCount++;
+		expectedNum++;
+	}
+
+	return validCount >= 3;
+};
+
+const estimateWrappedLineCount = (text: string, charsPerLine: number): number => {
+	if (!text) return 0;
+	const lines = text.split(/\r?\n/);
+	let total = 0;
+	for (const rawLine of lines) {
+		const line = rawLine.trim();
+		if (!line) {
+			total += 1;
+			continue;
+		}
+		total += Math.max(1, Math.ceil(line.length / charsPerLine));
+	}
+	return total;
+};
+
+const clampNumber = (n: number, min: number, max: number): number => {
+	return Math.min(max, Math.max(min, n));
+};
+
+/**
+ * For the map hover "Research" overlay, collapse the right-side panel height when the research
+ * is *unparsed summary-only* and short (roughly a single paragraph), to avoid large empty space.
+ */
+const getCompactMapResearchPanelHeightPx = (metadata: string): number | null => {
+	const text = metadata.trim();
+	if (!text) return null;
+
+	// Heuristic tuned to the map panel widths (boxWidth={405}) and 15px text at 1.5 line-height.
+	const approxLines = estimateWrappedLineCount(text, 52);
+
+	// If the unparsed text is long, keep the full panel height for readability.
+	if (approxLines > 12) return null;
+
+	// ContactResearchPanel summary-only (with a fixed height prop) effectively needs:
+	// height ≈ (lines * lineHeight) + chrome/padding.
+	const LINE_HEIGHT_PX = 23; // 15px * 1.5 ≈ 22.5
+	const BASE_OVERHEAD_PX = 130;
+	const rawHeight = Math.ceil(approxLines * LINE_HEIGHT_PX + BASE_OVERHEAD_PX);
+
+	// Cap to the panel's natural unparsed height so it never feels cramped or oversized.
+	return clampNumber(rawHeight, 310, 423);
+};
+
+const MAP_RESULTS_SEARCH_TRAY_WHAT_ICON_BY_LABEL: Record<
+	string,
+	{ backgroundColor: string; Icon: () => ReactNode }
+> = {
+	'Radio Stations': { backgroundColor: '#56DA73', Icon: RadioStationsIcon },
+	'Music Venues': { backgroundColor: '#71C9FD', Icon: MusicVenuesIcon },
+	'Wine, Beer, and Spirits': { backgroundColor: '#80AAFF', Icon: WineBeerSpiritsIcon },
+	Restaurants: { backgroundColor: '#77DD91', Icon: RestaurantsIcon },
+	'Coffee Shops': { backgroundColor: '#A9DE78', Icon: CoffeeShopsIcon },
+	'Wedding Planners': { backgroundColor: '#EED56E', Icon: WeddingPlannersIcon },
+	Festivals: { backgroundColor: '#80AAFF', Icon: FestivalsIcon },
+};
+
+const MAP_RESULTS_SEARCH_TRAY = {
+	containerWidth: 189,
+	containerHeight: 52,
+	containerRadius: 6,
+	itemSize: 43,
+	itemRadius: 12,
+	itemGap: 12,
+	gapToSearchBar: 43,
+	borderWidth: 3,
+	borderColor: '#000000',
+	backgroundColor: 'rgba(255, 255, 255, 0.9)',
+	nearMeBackgroundColor: '#D0E6FF',
+	whyBackgroundColors: {
+		booking: '#9DCBFF',
+		promotion: '#7AD47A',
+	},
+	whatIconByLabel: MAP_RESULTS_SEARCH_TRAY_WHAT_ICON_BY_LABEL,
+} as const;
+
+const SearchTrayIconTile = ({
+	backgroundColor,
+	children,
+}: {
+	backgroundColor: string;
+	children: ReactNode;
+}) => {
+	return (
+		<div
+			className="flex items-center justify-center flex-shrink-0"
+			style={{
+				width: `${MAP_RESULTS_SEARCH_TRAY.itemSize}px`,
+				height: `${MAP_RESULTS_SEARCH_TRAY.itemSize}px`,
+				backgroundColor,
+				borderRadius: `${MAP_RESULTS_SEARCH_TRAY.itemRadius}px`,
+			}}
+		>
+			{children}
+		</div>
+	);
+};
+
 const DashboardContent = () => {
 	const { isSignedIn, openSignIn } = useClerk();
 	const searchParams = useSearchParams();
@@ -108,6 +284,7 @@ const DashboardContent = () => {
 	const [whyValue, setWhyValue] = useState('');
 	const [whatValue, setWhatValue] = useState('');
 	const [whereValue, setWhereValue] = useState('');
+	const [isNearMeLocation, setIsNearMeLocation] = useState(false);
 	const hasWhereValue = whereValue.trim().length > 0;
 	const isPromotion = whyValue === '[Promotion]';
 	const [activeSection, setActiveSection] = useState<'why' | 'what' | 'where' | null>(
@@ -153,6 +330,62 @@ const DashboardContent = () => {
 		'state'
 	);
 
+	// Helper to trigger search with a specific "where" value (called when clicking state from dropdown)
+	const triggerSearchWithWhere = (
+		newWhereValue: string,
+		isNearMe = false,
+		base?: { why?: string; what?: string }
+	) => {
+		const baseWhy = base?.why ?? whyValue;
+		const baseWhat = base?.what ?? whatValue;
+
+		// Update the state values
+		if (base?.why !== undefined && base.why !== whyValue) setWhyValue(base.why);
+		if (base?.what !== undefined && base.what !== whatValue) setWhatValue(base.what);
+		setWhereValue(newWhereValue);
+		setIsNearMeLocation(isNearMe);
+		setActiveSection(null);
+
+		// Build the combined search query with the new where value
+		const formattedWhere = newWhereValue.trim() ? `(${newWhereValue.trim()})` : '';
+		const combinedSearch = [baseWhy, baseWhat, formattedWhere]
+			.filter(Boolean)
+			.join(' ')
+			.trim();
+
+		// Set form value and submit (we need to do this in a setTimeout to allow state to settle)
+		setTimeout(() => {
+			if (combinedSearch && form && onSubmit) {
+				form.setValue('searchText', combinedSearch, {
+					shouldValidate: false,
+					shouldDirty: true,
+				});
+				form.handleSubmit(onSubmit)();
+			}
+		}, 0);
+	};
+
+	// Helper to trigger search with current input values (called on Enter key in "Where" input)
+	const triggerSearchWithCurrentValues = () => {
+		setActiveSection(null);
+
+		// Build the combined search query
+		const formattedWhere = whereValue.trim() ? `(${whereValue.trim()})` : '';
+		const combinedSearch = [whyValue, whatValue, formattedWhere]
+			.filter(Boolean)
+			.join(' ')
+			.trim();
+
+		// Set form value and submit
+		if (combinedSearch && form && onSubmit) {
+			form.setValue('searchText', combinedSearch, {
+				shouldValidate: false,
+				shouldDirty: true,
+			});
+			form.handleSubmit(onSubmit)();
+		}
+	};
+
 	const renderDesktopSearchDropdowns = () => {
 		if (!activeSection) return null;
 
@@ -191,11 +424,15 @@ const DashboardContent = () => {
 					isMapView
 						? {
 								position: 'fixed',
-								top: '118px',
+								// In map view, the mini search bar is overlaid on the map,
+								// so the dropdown should anchor just below it.
+								top: '74px',
 								left: dropdownLeft,
 								height: dropdownHeight,
 								transition: dropdownTransition,
 								willChange: 'left, height',
+								// Ensure dropdown appears above the overlaid search bar.
+								zIndex: 140,
 						  }
 						: {
 								position: 'absolute',
@@ -276,7 +513,9 @@ const DashboardContent = () => {
 								className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
 								onClick={() => {
 									setWhatValue('Radio Stations');
-									setActiveSection('where');
+									// On the results screen, changing "What" should immediately re-search
+									// without auto-advancing the UI to the "Where" (state) step.
+									setActiveSection(isMapView ? null : 'where');
 								}}
 							>
 								<div className="w-[38px] h-[38px] bg-[#56DA73] rounded-[8px] flex-shrink-0 flex items-center justify-center">
@@ -317,27 +556,10 @@ const DashboardContent = () => {
 								<div
 									className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
 									onClick={() => {
-										setWhatValue('Music Venues');
-										setActiveSection('where');
-									}}
-								>
-									<div className="w-[38px] h-[38px] bg-[#71C9FD] rounded-[8px] flex-shrink-0 flex items-center justify-center">
-										<MusicVenuesIcon />
-									</div>
-									<div className="ml-[12px] flex flex-col">
-										<div className="text-[20px] font-medium leading-none text-black font-inter">
-											Music Venues
-										</div>
-										<div className="text-[12px] leading-tight text-black mt-[4px]">
-											Reach talent buyers for live shows
-										</div>
-									</div>
-								</div>
-								<div
-									className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
-									onClick={() => {
 										setWhatValue('Wine, Beer, and Spirits');
-										setActiveSection('where');
+										// On the results screen, changing "What" should immediately re-search
+										// without auto-advancing the UI to the "Where" (state) step.
+										setActiveSection(isMapView ? null : 'where');
 									}}
 								>
 									<div className="w-[38px] h-[38px] bg-[#80AAFF] rounded-[8px] flex-shrink-0 flex items-center justify-center">
@@ -355,27 +577,10 @@ const DashboardContent = () => {
 								<div
 									className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
 									onClick={() => {
-										setWhatValue('Restaurants');
-										setActiveSection('where');
-									}}
-								>
-									<div className="w-[38px] h-[38px] bg-[#77DD91] rounded-[8px] flex-shrink-0 flex items-center justify-center">
-										<RestaurantsIcon />
-									</div>
-									<div className="ml-[12px] flex flex-col">
-										<div className="text-[20px] font-medium leading-none text-black font-inter">
-											Restaurants
-										</div>
-										<div className="text-[12px] leading-tight text-black mt-[4px]">
-											Land steady dinner and brunch gigs
-										</div>
-									</div>
-								</div>
-								<div
-									className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
-									onClick={() => {
 										setWhatValue('Coffee Shops');
-										setActiveSection('where');
+										// On the results screen, changing "What" should immediately re-search
+										// without auto-advancing the UI to the "Where" (state) step.
+										setActiveSection(isMapView ? null : 'where');
 									}}
 								>
 									<div className="w-[38px] h-[38px] bg-[#A9DE78] rounded-[8px] flex-shrink-0 flex items-center justify-center">
@@ -393,8 +598,52 @@ const DashboardContent = () => {
 								<div
 									className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
 									onClick={() => {
+										setWhatValue('Restaurants');
+										// On the results screen, changing "What" should immediately re-search
+										// without auto-advancing the UI to the "Where" (state) step.
+										setActiveSection(isMapView ? null : 'where');
+									}}
+								>
+									<div className="w-[38px] h-[38px] bg-[#77DD91] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+										<RestaurantsIcon />
+									</div>
+									<div className="ml-[12px] flex flex-col">
+										<div className="text-[20px] font-medium leading-none text-black font-inter">
+											Restaurants
+										</div>
+										<div className="text-[12px] leading-tight text-black mt-[4px]">
+											Land steady dinner and brunch gigs
+										</div>
+									</div>
+								</div>
+								<div
+									className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+									onClick={() => {
+										setWhatValue('Festivals');
+										// On the results screen, changing "What" should immediately re-search
+										// without auto-advancing the UI to the "Where" (state) step.
+										setActiveSection(isMapView ? null : 'where');
+									}}
+								>
+									<div className="w-[38px] h-[38px] bg-[#80AAFF] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+										<FestivalsIcon />
+									</div>
+									<div className="ml-[12px] flex flex-col">
+										<div className="text-[20px] font-medium leading-none text-black font-inter">
+											Festivals
+										</div>
+										<div className="text-[12px] leading-tight text-black mt-[4px]">
+											Pitch your act for seasonal events
+										</div>
+									</div>
+								</div>
+								<div
+									className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+									onClick={() => {
 										setWhatValue('Wedding Planners');
-										setActiveSection('where');
+										// On the results screen, changing "What" should immediately re-search
+										// without auto-advancing the UI to the "Where" (state) step.
+										setActiveSection(isMapView ? null : 'where');
 									}}
 								>
 									<div className="w-[38px] h-[38px] bg-[#EED56E] rounded-[8px] flex-shrink-0 flex items-center justify-center">
@@ -412,19 +661,21 @@ const DashboardContent = () => {
 								<div
 									className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
 									onClick={() => {
-										setWhatValue('Festivals');
-										setActiveSection('where');
+										setWhatValue('Music Venues');
+										// On the results screen, changing "What" should immediately re-search
+										// without auto-advancing the UI to the "Where" (state) step.
+										setActiveSection(isMapView ? null : 'where');
 									}}
 								>
-									<div className="w-[38px] h-[38px] bg-[#80AAFF] rounded-[8px] flex-shrink-0 flex items-center justify-center">
-										<FestivalsIcon />
+									<div className="w-[38px] h-[38px] bg-[#71C9FD] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+										<MusicVenuesIcon />
 									</div>
 									<div className="ml-[12px] flex flex-col">
 										<div className="text-[20px] font-medium leading-none text-black font-inter">
-											Festivals
+											Music Venues
 										</div>
 										<div className="text-[12px] leading-tight text-black mt-[4px]">
-											Pitch your act for seasonal events
+											Reach talent buyers for live shows
 										</div>
 									</div>
 								</div>
@@ -481,8 +732,7 @@ const DashboardContent = () => {
 												key={`${loc.city}-${loc.state}-${idx}`}
 												className="w-[415px] min-h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200 mb-2"
 												onClick={() => {
-													setWhereValue(loc.label);
-													setActiveSection(null);
+													triggerSearchWithWhere(loc.label, false);
 												}}
 											>
 												<div
@@ -514,8 +764,7 @@ const DashboardContent = () => {
 									className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
 									onClick={() => {
 										if (userLocationName && !isLoadingLocation) {
-											setWhereValue(userLocationName);
-											setActiveSection(null);
+											triggerSearchWithWhere(userLocationName, true);
 										}
 									}}
 								>
@@ -547,8 +796,7 @@ const DashboardContent = () => {
 												key={label}
 												className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
 												onClick={() => {
-													setWhereValue(label);
-													setActiveSection(null);
+													triggerSearchWithWhere(label, false);
 												}}
 											>
 												<div
@@ -755,47 +1003,80 @@ const DashboardContent = () => {
 	// showing all results. Clicking an out-of-state marker adds it to this panel list.
 	const [mapPanelExtraContactIds, setMapPanelExtraContactIds] = useState<number[]>([]);
 	const mapViewContainerRef = useRef<HTMLDivElement | null>(null);
-	const [mapResearchPanelSide, setMapResearchPanelSide] = useState<'left' | 'right'>('right');
-	const MAP_RESEARCH_PANEL_FADE_MS = 170;
+	const [hoveredMapMarkerContact, setHoveredMapMarkerContact] = useState<ContactWithName | null>(
+		null
+	);
+	const isMapResultsLoading = isSearchPending || isLoadingContacts || isRefetchingContacts;
+	// Map hover research overlay behavior:
+	// - Hold briefly after hover ends (prevents flicker)
+	// - Then fade out quickly
+	const MAP_RESEARCH_PANEL_HOLD_MS = 250;
+	const MAP_RESEARCH_PANEL_FADE_MS = 120;
 	const [mapResearchPanelContact, setMapResearchPanelContact] =
 		useState<ContactWithName | null>(null);
 	const [isMapResearchPanelVisible, setIsMapResearchPanelVisible] = useState(false);
+	const mapResearchPanelCloseDelayTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 	const mapResearchPanelUnmountTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-	const mapResearchPanelShowRafRef = useRef<number | null>(null);
 	const mapResearchPanelContactRef = useRef<ContactWithName | null>(null);
 	useEffect(() => {
 		setMapPanelExtraContactIds([]);
 	}, [activeSearchQuery]);
 
-	// Cleanup animation timers on unmount
+	// Cleanup timers on unmount
 	useEffect(() => {
 		return () => {
+			if (mapResearchPanelCloseDelayTimeoutRef.current) {
+				clearTimeout(mapResearchPanelCloseDelayTimeoutRef.current);
+				mapResearchPanelCloseDelayTimeoutRef.current = null;
+			}
 			if (mapResearchPanelUnmountTimeoutRef.current) {
 				clearTimeout(mapResearchPanelUnmountTimeoutRef.current);
 				mapResearchPanelUnmountTimeoutRef.current = null;
 			}
-			if (mapResearchPanelShowRafRef.current != null) {
-				cancelAnimationFrame(mapResearchPanelShowRafRef.current);
-				mapResearchPanelShowRafRef.current = null;
-			}
 		};
 	}, []);
 
-	// Fade the map research panel in/out instead of abruptly mounting/unmounting.
+	// Ensure marker-hover research never "sticks" and apply hold+fade behavior.
 	useEffect(() => {
-		if (!isMapView) {
+		// Reset everything when leaving map view or while results are loading.
+		if (!isMapView || isMapResultsLoading) {
+			setHoveredMapMarkerContact(null);
 			setIsMapResearchPanelVisible(false);
 			setMapResearchPanelContact(null);
 			mapResearchPanelContactRef.current = null;
-			setMapResearchPanelSide('right');
+			if (mapResearchPanelCloseDelayTimeoutRef.current) {
+				clearTimeout(mapResearchPanelCloseDelayTimeoutRef.current);
+				mapResearchPanelCloseDelayTimeoutRef.current = null;
+			}
+			if (mapResearchPanelUnmountTimeoutRef.current) {
+				clearTimeout(mapResearchPanelUnmountTimeoutRef.current);
+				mapResearchPanelUnmountTimeoutRef.current = null;
+			}
 			return;
 		}
 
-		const isMapLoading = isSearchPending || isLoadingContacts || isRefetchingContacts;
+		// Hovering a marker: show immediately (with snappy fade-in on first mount).
+		if (hoveredMapMarkerContact) {
+			if (mapResearchPanelCloseDelayTimeoutRef.current) {
+				clearTimeout(mapResearchPanelCloseDelayTimeoutRef.current);
+				mapResearchPanelCloseDelayTimeoutRef.current = null;
+			}
+			if (mapResearchPanelUnmountTimeoutRef.current) {
+				clearTimeout(mapResearchPanelUnmountTimeoutRef.current);
+				mapResearchPanelUnmountTimeoutRef.current = null;
+			}
+			setMapResearchPanelContact(hoveredMapMarkerContact);
+			mapResearchPanelContactRef.current = hoveredMapMarkerContact;
+			setIsMapResearchPanelVisible(true);
+			return;
+		}
 
-		// Hide during loading
-		if (isMapLoading) {
-			if (!mapResearchPanelContactRef.current) return;
+		// No hovered marker: hold for ~1s, then fade out quickly and unmount.
+		if (!mapResearchPanelContactRef.current) return;
+		if (mapResearchPanelCloseDelayTimeoutRef.current) return;
+
+		mapResearchPanelCloseDelayTimeoutRef.current = setTimeout(() => {
+			mapResearchPanelCloseDelayTimeoutRef.current = null;
 			setIsMapResearchPanelVisible(false);
 			if (mapResearchPanelUnmountTimeoutRef.current) {
 				clearTimeout(mapResearchPanelUnmountTimeoutRef.current);
@@ -803,89 +1084,32 @@ const DashboardContent = () => {
 			mapResearchPanelUnmountTimeoutRef.current = setTimeout(() => {
 				setMapResearchPanelContact(null);
 				mapResearchPanelContactRef.current = null;
-				setMapResearchPanelSide('right');
 			}, MAP_RESEARCH_PANEL_FADE_MS);
-			return;
-		}
-
-		if (hoveredContact) {
-			// Cancel any pending unmount so we can keep the panel visible.
-			if (mapResearchPanelUnmountTimeoutRef.current) {
-				clearTimeout(mapResearchPanelUnmountTimeoutRef.current);
-				mapResearchPanelUnmountTimeoutRef.current = null;
-			}
-			if (mapResearchPanelShowRafRef.current != null) {
-				cancelAnimationFrame(mapResearchPanelShowRafRef.current);
-				mapResearchPanelShowRafRef.current = null;
-			}
-
-			const wasClosed = mapResearchPanelContactRef.current == null;
-			setMapResearchPanelContact(hoveredContact);
-			mapResearchPanelContactRef.current = hoveredContact;
-
-			if (wasClosed) {
-				// Mount at opacity 0, then fade in on next frame.
-				setIsMapResearchPanelVisible(false);
-				mapResearchPanelShowRafRef.current = requestAnimationFrame(() => {
-					setIsMapResearchPanelVisible(true);
-				});
-			} else {
-				setIsMapResearchPanelVisible(true);
-			}
-			return;
-		}
-
-		// No hovered contact: fade out, then unmount.
-		if (!mapResearchPanelContactRef.current) return;
-		setIsMapResearchPanelVisible(false);
-		if (mapResearchPanelUnmountTimeoutRef.current) {
-			clearTimeout(mapResearchPanelUnmountTimeoutRef.current);
-		}
-		mapResearchPanelUnmountTimeoutRef.current = setTimeout(() => {
-			setMapResearchPanelContact(null);
-			mapResearchPanelContactRef.current = null;
-			setMapResearchPanelSide('right');
-		}, MAP_RESEARCH_PANEL_FADE_MS);
-	}, [hoveredContact, isMapView, isSearchPending, isLoadingContacts, isRefetchingContacts]);
+		}, MAP_RESEARCH_PANEL_HOLD_MS);
+	}, [hoveredMapMarkerContact, isMapView, isMapResultsLoading]);
 
 	const handleMapMarkerHover = useCallback(
-		(contact: ContactWithName | null, meta?: { clientX: number; clientY: number }) => {
-			setHoveredContact(contact);
-
-			// Default back to the right side whenever hover ends or we can't compute geometry.
-			// NOTE: Don't reset the side immediately on hover end; we fade out first.
-			if (!contact) {
-				return;
-			}
-			if (!meta) {
-				setMapResearchPanelSide('right');
-				return;
-			}
-
-			const container = mapViewContainerRef.current;
-			if (!container) {
-				setMapResearchPanelSide('right');
-				return;
-			}
-
-			const rect = container.getBoundingClientRect();
-			const x = meta.clientX - rect.left;
-
-			// Keep in sync with the panel's rendered styles below.
-			const PANEL_WIDTH_PX = 310;
-			const PANEL_RIGHT_OFFSET_PX = 460;
-			const PANEL_LEFT_X = rect.width - PANEL_RIGHT_OFFSET_PX - PANEL_WIDTH_PX;
-			const PANEL_RIGHT_X = rect.width - PANEL_RIGHT_OFFSET_PX;
-			const PADDING_PX = 26; // give the dot a little breathing room
-
-			const overlapsRightPanelZone = x >= PANEL_LEFT_X - PADDING_PX && x <= PANEL_RIGHT_X + PADDING_PX;
-			setMapResearchPanelSide(overlapsRightPanelZone ? 'left' : 'right');
+		(contact: ContactWithName | null) => {
+			setHoveredMapMarkerContact(contact);
 		},
-		[setHoveredContact]
+		[]
 	);
+
+	const mapResearchPanelCompactHeightPx = useMemo(() => {
+		const metadata = mapResearchPanelContact?.metadata;
+		if (!metadata || metadata.trim().length === 0) return null;
+		if (hasAtLeast3ParsedResearchSections(metadata)) return null;
+		return getCompactMapResearchPanelHeightPx(metadata);
+	}, [mapResearchPanelContact?.metadata]);
 
 	const searchedStateAbbr = useMemo(
 		() => extractStateAbbrFromSearchQuery(activeSearchQuery),
+		[activeSearchQuery]
+	);
+
+	// Use the "What" from the last executed search (activeSearchQuery), not the live dropdown value.
+	const searchedWhat = useMemo(
+		() => extractWhatFromSearchQuery(activeSearchQuery),
 		[activeSearchQuery]
 	);
 
@@ -952,6 +1176,10 @@ const DashboardContent = () => {
 		if (isTabSwitchAnimatingRef.current) return;
 
 		gsap.set(pill, {
+			// GSAP can parse an existing `translateY(-50%)` as a pixel `y` value (e.g. -8.5px),
+			// and then *also* apply `yPercent: -50`, effectively doubling the vertical offset.
+			// Explicitly zero out `y` so `yPercent` is the only centering mechanism.
+			y: 0,
 			yPercent: -50,
 			x: getTabPillXFor(activeTab),
 			backgroundColor: TAB_PILL_COLORS[activeTab],
@@ -1107,6 +1335,89 @@ const DashboardContent = () => {
 		}
 	}, [whyValue, whatValue, whereValue, form]);
 
+	// Map view (results): automatically re-run the search when "What" changes.
+	// Intentionally do NOT auto-search on "Why"-only edits.
+	// "Where" changes do NOT auto-search; user must click a state from dropdown or press Enter.
+	const mapAutoSearchPayload = useMemo(
+		() => JSON.stringify({ what: whatValue.trim() }),
+		[whatValue]
+	);
+	const debouncedMapAutoSearchPayload = useDebounce(mapAutoSearchPayload, 650);
+	const lastMapAutoSearchPayloadRef = useRef<string | null>(null);
+
+	useEffect(() => {
+		// Reset when leaving results/map view
+		if (!hasSearched || !isMapView) {
+			lastMapAutoSearchPayloadRef.current = null;
+			return;
+		}
+
+		// Prime the baseline payload so "Why" changes alone don't trigger a search.
+		if (lastMapAutoSearchPayloadRef.current == null) {
+			lastMapAutoSearchPayloadRef.current = debouncedMapAutoSearchPayload;
+			return;
+		}
+
+		// Only respond to debounced changes in What.
+		if (lastMapAutoSearchPayloadRef.current === debouncedMapAutoSearchPayload) return;
+
+		let parsed: { what: string } | null = null;
+		try {
+			parsed = JSON.parse(debouncedMapAutoSearchPayload) as { what: string };
+		} catch {
+			// Should never happen, but don't break the page if it does.
+			return;
+		}
+
+		const typedWhat = (parsed.what || '').trim();
+
+		// If the segmented inputs aren't initialized (e.g. user searched via raw text),
+		// infer missing pieces from the last executed query so edits behave intuitively.
+		const inferredWhy = extractWhyFromSearchQuery(activeSearchQuery) || '';
+		const inferredWhat = extractWhatFromSearchQuery(activeSearchQuery) || '';
+		const inferredWhere = extractWhereFromSearchQuery(activeSearchQuery) || '';
+
+		const effectiveWhy = (whyValue || inferredWhy).trim();
+		const effectiveWhat = (typedWhat || inferredWhat).trim();
+		// Use current whereValue for auto-search, but changes to it won't trigger auto-search
+		const effectiveWhere = (whereValue || inferredWhere).trim();
+
+		// Auto-search only when "What" is meaningful. ("Where" can be left unchanged.)
+		if (!effectiveWhat) return;
+
+		const formattedWhere = effectiveWhere ? `(${effectiveWhere})` : '';
+		const combinedSearch = [effectiveWhy, effectiveWhat, formattedWhere]
+			.filter(Boolean)
+			.join(' ')
+			.trim();
+
+		// If the debounced What/Where already match the active query, just update the baseline.
+		if (combinedSearch === activeSearchQuery) {
+			lastMapAutoSearchPayloadRef.current = debouncedMapAutoSearchPayload;
+			return;
+		}
+
+		// Don't auto-trigger auth flows; only run if already signed in.
+		if (!isSignedIn) return;
+
+		lastMapAutoSearchPayloadRef.current = debouncedMapAutoSearchPayload;
+		form.setValue('searchText', combinedSearch, {
+			shouldValidate: false,
+			shouldDirty: true,
+		});
+		form.handleSubmit(onSubmit)();
+	}, [
+		activeSearchQuery,
+		debouncedMapAutoSearchPayload,
+		form,
+		hasSearched,
+		isMapView,
+		isSignedIn,
+		onSubmit,
+		whereValue,
+		whyValue,
+	]);
+
 	// Check for pending search from contacts page searchbar
 	useEffect(() => {
 		const pendingSearch = sessionStorage.getItem('murmur_pending_search');
@@ -1147,7 +1458,10 @@ const DashboardContent = () => {
 			// Set the values
 			if (parsedWhy) setWhyValue(parsedWhy);
 			if (parsedWhat) setWhatValue(parsedWhat);
-			if (parsedWhere) setWhereValue(parsedWhere);
+			if (parsedWhere) {
+				setWhereValue(parsedWhere);
+				setIsNearMeLocation(false);
+			}
 
 			// Set the form value and submit after a short delay to allow state to update
 			setTimeout(() => {
@@ -1186,7 +1500,7 @@ const DashboardContent = () => {
 		}
 	}, [activeSection]);
 
-	// Animate the active section "pill" sliding between tabs (Why/What/Where)
+	//animation between the sections of the search bar
 	useEffect(() => {
 		const indicator = activeSectionIndicatorRef.current;
 		if (!indicator) return;
@@ -1263,6 +1577,7 @@ const DashboardContent = () => {
 		setWhyValue('');
 		setWhatValue('');
 		setWhereValue('');
+		setIsNearMeLocation(false);
 		setActiveSection(null);
 	};
 
@@ -1629,11 +1944,14 @@ const DashboardContent = () => {
 																						ref={whereInputRef}
 																						type="text"
 																						value={whereValue}
-																						onChange={(e) => setWhereValue(e.target.value)}
+																						onChange={(e) => {
+																							setWhereValue(e.target.value);
+																							setIsNearMeLocation(false);
+																						}}
 																						onKeyDown={(e) => {
 																							if (e.key === 'Enter') {
 																								e.preventDefault();
-																								setActiveSection(null);
+																								triggerSearchWithCurrentValues();
 																							}
 																						}}
 																					className="absolute z-20 left-[24px] right-[8px] top-1/2 -translate-y-1/2 w-auto font-bold text-black text-[14px] bg-transparent outline-none border-none leading-none placeholder:text-black"
@@ -1660,11 +1978,14 @@ const DashboardContent = () => {
 																									ref={whereInputRef}
 																									type="text"
 																									value={whereValue}
-																									onChange={(e) => setWhereValue(e.target.value)}
+																									onChange={(e) => {
+																										setWhereValue(e.target.value);
+																										setIsNearMeLocation(false);
+																									}}
 																									onKeyDown={(e) => {
 																										if (e.key === 'Enter') {
 																											e.preventDefault();
-																											setActiveSection(null);
+																											triggerSearchWithCurrentValues();
 																										}
 																									}}
 																								className="z-20 flex-1 font-semibold text-black text-[12px] bg-transparent outline-none border-none"
@@ -2045,8 +2366,59 @@ const DashboardContent = () => {
 				{hasSearched &&
 					!isLoadingContacts &&
 					!isRefetchingContacts &&
-					activeTab === 'search' && (
-						<div
+					activeTab === 'search' &&
+					(() => {
+						const trayWhy = isPromotion
+							? {
+									backgroundColor: MAP_RESULTS_SEARCH_TRAY.whyBackgroundColors.promotion,
+									icon: <PromotionIcon />,
+							  }
+							: {
+									backgroundColor: MAP_RESULTS_SEARCH_TRAY.whyBackgroundColors.booking,
+									icon: <BookingIcon />,
+							  };
+
+						const normalizedWhatKey = whatValue.trim();
+						const whatCfg = MAP_RESULTS_SEARCH_TRAY.whatIconByLabel[normalizedWhatKey];
+						const TrayWhatIcon = whatCfg?.Icon || (isPromotion ? RadioStationsIcon : MusicVenuesIcon);
+						const trayWhat = {
+							backgroundColor:
+								whatCfg?.backgroundColor ||
+								(isPromotion
+									? MAP_RESULTS_SEARCH_TRAY.whatIconByLabel['Radio Stations'].backgroundColor
+									: MAP_RESULTS_SEARCH_TRAY.whatIconByLabel['Music Venues'].backgroundColor),
+							icon: <TrayWhatIcon />,
+						};
+
+						const whereCandidate = (whereValue || userLocationName || '').trim();
+						const [whereCity, whereState] = (() => {
+							if (!whereCandidate) return ['', ''];
+							if (whereCandidate.includes(',')) {
+								const parts = whereCandidate.split(',');
+								const city = (parts[0] || '').trim();
+								const state = parts.slice(1).join(',').trim();
+								return [city, state];
+							}
+							return ['', whereCandidate];
+						})();
+						const whereIconProps =
+							!isNearMeLocation && whereState
+								? getCityIconProps(whereCity, whereState)
+								: null;
+						const trayWhere = isNearMeLocation
+							? {
+									backgroundColor: MAP_RESULTS_SEARCH_TRAY.nearMeBackgroundColor,
+									icon: <NearMeIcon />,
+							  }
+							: {
+									backgroundColor:
+										whereIconProps?.backgroundColor ||
+										MAP_RESULTS_SEARCH_TRAY.nearMeBackgroundColor,
+									icon: whereIconProps?.icon || <NearMeIcon />,
+							  };
+
+						const searchBar = (
+							<div
 					className={`results-search-bar-wrapper w-full max-w-[650px] mx-auto px-4 ${
 							// When the horizontal research strip is active (sm–lg desktop),
 							// hide the mini search bar + helper text so the strip owns this area.
@@ -2056,23 +2428,57 @@ const DashboardContent = () => {
 								isMapView
 									? {
 											position: 'fixed',
-											top: '36px',
+											// Overlay directly on the map (no header band).
+											// Map container is inset 9px from viewport; place bar 24px below map top.
+											top: '33px',
 											left: '50%',
 											transform: 'translateX(-50%)',
-											zIndex: 110,
-											backgroundColor: '#AFD6EF',
-											height: '84px',
-											display: 'flex',
-											alignItems: 'center',
-											justifyContent: 'center',
-											width: '100%',
-											maxWidth: '100%',
-											borderBottom: '1px solid black',
-											padding: '0 16px',
+											zIndex: 120,
+											// Leave room for the floating close button on the left.
+											width: 'min(440px, calc(100vw - 120px))',
+											maxWidth: '440px',
+											padding: 0,
+											backgroundColor: 'transparent',
+											borderBottom: 'none',
 									  }
 									: undefined
 							}
 						>
+							{/* Map view: show the 189x52 icon tray to the left of the search bar */}
+							{isMapView && (
+								<div
+									aria-hidden="true"
+									className="hidden lg:flex items-center justify-between"
+									style={{
+										position: 'absolute',
+										// Map is inset 9px from the viewport; "25px from map top" => 34px viewport.
+										// Search bar wrapper sits at 33px viewport, so this becomes 1px inside the wrapper.
+										top: '1px',
+										left: `-${
+											MAP_RESULTS_SEARCH_TRAY.containerWidth +
+											MAP_RESULTS_SEARCH_TRAY.gapToSearchBar
+										}px`,
+										width: `${MAP_RESULTS_SEARCH_TRAY.containerWidth}px`,
+										height: `${MAP_RESULTS_SEARCH_TRAY.containerHeight}px`,
+										backgroundColor: MAP_RESULTS_SEARCH_TRAY.backgroundColor,
+										border: `${MAP_RESULTS_SEARCH_TRAY.borderWidth}px solid ${MAP_RESULTS_SEARCH_TRAY.borderColor}`,
+										borderRadius: `${MAP_RESULTS_SEARCH_TRAY.containerRadius}px`,
+										paddingLeft: '6px',
+										paddingRight: '6px',
+										pointerEvents: 'none',
+									}}
+								>
+									<SearchTrayIconTile backgroundColor={trayWhy.backgroundColor}>
+										{trayWhy.icon}
+									</SearchTrayIconTile>
+									<SearchTrayIconTile backgroundColor={trayWhat.backgroundColor}>
+										{trayWhat.icon}
+									</SearchTrayIconTile>
+									<SearchTrayIconTile backgroundColor={trayWhere.backgroundColor}>
+										{trayWhere.icon}
+									</SearchTrayIconTile>
+								</div>
+							)}
 							<div
 								className={`results-search-bar-inner ${
 									hoveredContact && !isMapView ? 'invisible' : ''
@@ -2120,7 +2526,9 @@ const DashboardContent = () => {
 																}`}
 															>
 																<Input
-																	className={`search-wave-input results-search-input !h-[49px] !border-[3px] !focus-visible:ring-0 !focus-visible:ring-offset-0 !focus:ring-0 !focus:ring-offset-0 !ring-0 !outline-none !accent-transparent !border-black !pr-[60px] ${
+																	className={`search-wave-input results-search-input !h-[49px] !border-[3px] !focus-visible:ring-0 !focus-visible:ring-offset-0 !focus:ring-0 !focus:ring-offset-0 !ring-0 !outline-none !accent-transparent !border-black ${
+																		isMapView ? '!pr-[12px]' : '!pr-[60px]'
+																	} ${
 																		activeSection ? '!bg-[#F3F3F3]' : '!bg-white'
 																	} ${
 																		field.value === activeSearchQuery &&
@@ -2148,7 +2556,9 @@ const DashboardContent = () => {
 																				: 'bg-white border border-black'
 																		}`}
 																		style={{
-																			width: 'calc(100% - 66px)',
+																			width: isMapView
+																				? 'calc(100% - 12px)'
+																				: 'calc(100% - 66px)',
 																			height: '38px',
 																		}}
 																	>
@@ -2216,23 +2626,49 @@ const DashboardContent = () => {
 																				}}
 																			/>
 																		</div>
-																		<div className="flex-1 flex items-center justify-end h-full min-w-0 relative pr-[29px] pl-[16px] mini-search-section-where">
+																		<div
+																			className={`flex-1 flex items-center justify-end h-full min-w-0 relative ${
+																				isMapView ? 'pr-[12px]' : 'pr-[29px]'
+																			} pl-[16px] mini-search-section-where`}
+																		>
 																			{activeSection === 'where' && (
 																				<div
-																					className="absolute -left-[1px] -top-[1px] border border-black bg-white rounded-[6px] z-0"
-																					style={{
-																						width: '143px',
-																						height: '38px',
-																						borderTopLeftRadius: '6px',
-																						borderBottomLeftRadius: '6px',
-																						borderTopRightRadius: '6px',
-																						borderBottomRightRadius: '6px',
-																					}}
+																					className="absolute -top-[1px] border border-black bg-white rounded-[6px] z-0"
+																					style={
+																						isMapView
+																							? {
+																									left: '-1px',
+																									right: '-1px',
+																									height: '38px',
+																									borderTopLeftRadius: '6px',
+																									borderBottomLeftRadius: '6px',
+																									borderTopRightRadius: '6px',
+																									borderBottomRightRadius: '6px',
+																							  }
+																							: {
+																									left: '-1px',
+																									width: '143px',
+																									height: '38px',
+																									borderTopLeftRadius: '6px',
+																									borderBottomLeftRadius: '6px',
+																									borderTopRightRadius: '6px',
+																									borderBottomRightRadius: '6px',
+																							  }
+																					}
 																				/>
 																			)}
 																			<input
 																				value={whereValue}
-																				onChange={(e) => setWhereValue(e.target.value)}
+																				onChange={(e) => {
+																					setWhereValue(e.target.value);
+																					setIsNearMeLocation(false);
+																				}}
+																				onKeyDown={(e) => {
+																					if (e.key === 'Enter') {
+																						e.preventDefault();
+																						triggerSearchWithCurrentValues();
+																					}
+																				}}
 																				className="w-full h-full text-left bg-transparent border-none outline-none text-[13px] font-bold font-secondary overflow-hidden placeholder:text-gray-400 p-0 focus:ring-0 cursor-pointer relative z-10"
 																				style={{
 																					maskImage: 'linear-gradient(to right, black 75%, transparent 100%)',
@@ -2255,27 +2691,32 @@ const DashboardContent = () => {
 																		</div>
 																	</div>
 																)}
-																<button
-																	type="submit"
-																	className="absolute right-[6px] top-1/2 -translate-y-1/2 flex items-center justify-center transition-colors cursor-pointer z-20 hover:bg-[#a3d9a5]"
-																	style={{
-																		width: '48px',
-																		height: '37px',
-																		backgroundColor: '#B8E4BE',
-																		border: '1px solid #5DAB68',
-																		borderTopRightRadius: '6px',
-																		borderBottomRightRadius: '6px',
-																		borderTopLeftRadius: '0',
-																		borderBottomLeftRadius: '0',
-																	}}
-																	aria-label="Search"
-																>
-																	<div
-																		style={{ transform: 'scale(0.75)', display: 'flex' }}
+																{!isMapView && (
+																	<button
+																		type="submit"
+																		className="absolute right-[6px] top-1/2 -translate-y-1/2 flex items-center justify-center transition-colors cursor-pointer z-20 hover:bg-[#a3d9a5]"
+																		style={{
+																			width: '48px',
+																			height: '37px',
+																			backgroundColor: '#B8E4BE',
+																			border: '1px solid #5DAB68',
+																			borderTopRightRadius: '6px',
+																			borderBottomRightRadius: '6px',
+																			borderTopLeftRadius: '0',
+																			borderBottomLeftRadius: '0',
+																		}}
+																		aria-label="Search"
 																	>
-																		<SearchIconDesktop />
-																	</div>
-																</button>
+																		<div
+																			style={{
+																				transform: 'scale(0.75)',
+																				display: 'flex',
+																			}}
+																		>
+																			<SearchIconDesktop />
+																		</div>
+																	</button>
+																)}
 															</div>
 															{renderDesktopSearchDropdowns()}
 														</div>
@@ -2306,6 +2747,40 @@ const DashboardContent = () => {
 									)}
 								</Form>
 							</div>
+							{isMapView && (
+								<button
+									type="button"
+									onClick={handleCloseMapView}
+									aria-label="Home"
+									className="flex items-center justify-center cursor-pointer"
+									style={{
+										position: 'absolute',
+										// Map is inset 9px from the viewport; "25px from map top" => 34px viewport.
+										// Search bar wrapper sits at 33px viewport, so this becomes 1px inside the wrapper.
+										top: '1px',
+										// "179px to the right of the searchbar" => from wrapper's right edge.
+										left: 'calc(100% + 179px)',
+										width: '53px',
+										height: '53px',
+										borderRadius: '9px',
+										backgroundColor: '#D6D6D6',
+										border: '3px solid #000000',
+										padding: '2px',
+									}}
+								>
+									<div
+										className="flex items-center justify-center"
+										style={{
+											width: '43px',
+											height: '43px',
+											borderRadius: '9px',
+											backgroundColor: '#EAEAEA',
+										}}
+									>
+										<HomeIcon width={28} height={24} />
+									</div>
+								</button>
+							)}
 							{hoveredContact && !isMobile && !isMapView && (
 								<div className="absolute inset-0 z-[90] pointer-events-none bg-white hidden xl:flex items-start justify-center">
 									<div className="w-full max-w-[1132px] mx-auto px-4 py-3 text-center">
@@ -2353,7 +2828,16 @@ const DashboardContent = () => {
 								</div>
 							)}
 						</div>
-					)}
+						);
+
+						// In map view, the map itself is rendered via a portal to <body>.
+						// Portal the mini search bar too so it reliably stacks above the map,
+						// regardless of any parent stacking contexts/transforms.
+						if (isMapView && typeof window !== 'undefined') {
+							return createPortal(searchBar, document.body);
+						}
+						return searchBar;
+					})()}
 
 				{activeSearchQuery && activeTab === 'search' && (
 					<>
@@ -2395,130 +2879,11 @@ const DashboardContent = () => {
 											{typeof window !== 'undefined' &&
 												createPortal(
 													<>
-														{/* Header bar at very top of page */}
-														<div
-															style={{
-																position: 'fixed',
-																top: '0px',
-																left: '0px',
-																right: '0px',
-																height: '36px',
-																backgroundColor: 'white',
-																zIndex: 100,
-																borderBottom: '1px solid black',
-																display: 'flex',
-																alignItems: 'center',
-																justifyContent: 'space-between',
-															}}
-														>
-															<span
-																style={{
-																	marginLeft: '10px',
-																	fontFamily:
-																		'var(--font-secondary), Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
-																	fontSize: '13px',
-																	fontWeight: 600,
-																	lineHeight: '1',
-																}}
-															>
-																Search
-															</span>
-															<button
-																type="button"
-																onClick={handleCloseMapView}
-																style={{
-																	marginRight: '10px',
-																	display: 'flex',
-																	alignItems: 'center',
-																	gap: '6px',
-																	cursor: 'pointer',
-																	background: 'transparent',
-																	border: 'none',
-																	padding: 0,
-																}}
-															>
-																<span
-																	style={{
-																		fontFamily:
-																			'var(--font-secondary), Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
-																		fontSize: '13px',
-																		fontWeight: 500,
-																		lineHeight: '1',
-																		color: '#C4C4C4',
-																	}}
-																>
-																	Close
-																</span>
-																<svg
-																	width="20"
-																	height="17"
-																	viewBox="0 0 20 17"
-																	fill="none"
-																	xmlns="http://www.w3.org/2000/svg"
-																	aria-hidden="true"
-																>
-																	<path
-																		d="M10.8728 6.59376C10.8728 6.8389 11.1054 7.03761 11.3922 7.0376L16.0664 7.03745C16.3532 7.03744 16.5857 6.83872 16.5857 6.59358C16.5857 6.34845 16.3532 6.14974 16.0663 6.14975L11.9115 6.14988L11.9114 2.59904C11.9114 2.35391 11.6789 2.1552 11.392 2.15521C11.1052 2.15522 10.8727 2.35394 10.8727 2.59908L10.8728 6.59376ZM18.7402 0.313477L18.373 -0.000363988L11.0249 6.2799L11.3922 6.59375L11.7594 6.90759L19.1075 0.627317L18.7402 0.313477Z"
-																		fill="black"
-																	/>
-																	<path
-																		d="M11.3922 9.30322C11.1054 9.30321 10.8728 9.50192 10.8728 9.74706L10.8727 13.7417C10.8727 13.9869 11.1052 14.1856 11.392 14.1856C11.6789 14.1856 11.9114 13.9869 11.9114 13.7418L11.9115 10.1909L16.0663 10.1911C16.3532 10.1911 16.5857 9.99237 16.5857 9.74724C16.5857 9.5021 16.3532 9.30338 16.0664 9.30337L11.3922 9.30322ZM18.7402 16.0273L19.1075 15.7135L11.7594 9.43323L11.3922 9.74708L11.0249 10.0609L18.373 16.3412L18.7402 16.0273Z"
-																		fill="black"
-																	/>
-																	<path
-																		d="M8.23459 9.74706C8.23459 9.50192 8.00206 9.30321 7.71523 9.30322L3.04106 9.30337C2.75423 9.30338 2.52172 9.5021 2.52172 9.74724C2.52173 9.99237 2.75426 10.1911 3.04109 10.1911L7.1959 10.1909L7.19602 13.7418C7.19602 13.9869 7.42855 14.1856 7.71538 14.1856C8.00221 14.1856 8.23473 13.9869 8.23472 13.7417L8.23459 9.74706ZM0.367188 16.0273L0.734434 16.3412L8.08249 10.0609L7.71524 9.74708L7.348 9.43323L-5.94929e-05 15.7135L0.367188 16.0273Z"
-																		fill="black"
-																	/>
-																	<path
-																		d="M7.71523 7.0376C8.00206 7.03761 8.23459 6.8389 8.23459 6.59376L8.23472 2.59908C8.23473 2.35394 8.00221 2.15522 7.71538 2.15521C7.42855 2.1552 7.19602 2.35391 7.19602 2.59904L7.1959 6.14988L3.04109 6.14975C2.75426 6.14974 2.52173 6.34845 2.52172 6.59358C2.52172 6.83872 2.75423 7.03744 3.04106 7.03745L7.71523 7.0376ZM0.367188 0.313477L-5.94929e-05 0.627317L7.348 6.90759L7.71524 6.59375L8.08249 6.2799L0.734434 -0.000363988L0.367188 0.313477Z"
-																		fill="black"
-																	/>
-																</svg>
-															</button>
-														</div>
-														{/* Console loader overlay - positioned below header where search bar would be */}
-														{(isSearchPending ||
-															isLoadingContacts ||
-															isRefetchingContacts) && (
-															<div
-																style={{
-																	position: 'fixed',
-																	top: '36px',
-																	left: '0px',
-																	right: '0px',
-																	height: '84px',
-																	backgroundColor: '#AFD6EF',
-																	zIndex: 101,
-																	display: 'flex',
-																	alignItems: 'center',
-																	justifyContent: 'center',
-																	borderBottom: '1px solid black',
-																	overflow: 'hidden',
-																}}
-															>
-																<ConsoleLoader
-																	searchQuery={activeSearchQuery}
-																	className="w-full max-w-[800px] scale-[0.65] origin-center"
-																/>
-															</div>
-														)}
-														{/* Background fill for map area only (below header/search bar) */}
-														<div
-															style={{
-																position: 'fixed',
-																top: '120px',
-																left: 0,
-																right: 0,
-																bottom: 0,
-																backgroundColor: '#AFD6EF',
-																zIndex: 98,
-															}}
-														/>
 													{/* Map container */}
 													<div
 														style={{
 															position: 'fixed',
-															top: '120px',
+															top: '9px',
 															left: '9px',
 															right: '9px',
 															bottom: '9px',
@@ -2532,8 +2897,22 @@ const DashboardContent = () => {
 															<SearchResultsMap
 																contacts={contacts || []}
 																selectedContacts={selectedContacts}
+																searchQuery={activeSearchQuery}
+																searchWhat={searchedWhat}
 																onMarkerHover={handleMapMarkerHover}
 																lockedStateName={searchedStateAbbr}
+																onStateSelect={(stateName) => {
+																	const nextState = (stateName || '').trim();
+																	if (!nextState) return;
+
+																	// Keep the last executed Why/What (the map is showing results for this query),
+																	// and only swap the state for the next search.
+																	const baseWhy =
+																		(extractWhyFromSearchQuery(activeSearchQuery) || whyValue).trim();
+																	const baseWhat =
+																		(extractWhatFromSearchQuery(activeSearchQuery) || whatValue).trim();
+																	triggerSearchWithWhere(nextState, false, { why: baseWhy, what: baseWhat });
+																}}
 																isLoading={isSearchPending || isLoadingContacts || isRefetchingContacts}
 																onMarkerClick={(contact) => {
 																	// If the marker is outside the searched state, include it in the
@@ -2587,18 +2966,27 @@ const DashboardContent = () => {
 															) &&
 																!isNarrowestDesktop && (
 																	<div
-																		className="absolute top-[10px] right-[10px] rounded-[12px] shadow-lg flex flex-col"
+																		className="absolute top-[97px] right-[10px] rounded-[12px] flex flex-col"
 																		style={{
 																			width: '433px',
-																			height: '870px',
-																			maxHeight: 'calc(100% - 20px)',
-																			backgroundColor: '#AFD6EF',
-																			border: '3px solid #143883',
+																			height: mapResearchPanelContact && mapResearchPanelCompactHeightPx
+																				? mapResearchPanelCompactHeightPx
+																				: 800,
+																			maxHeight: 'calc(100% - 117px)',
+																			backgroundColor:
+																				mapResearchPanelContact && isMapResearchPanelVisible
+																				? '#D8E5FB'
+																				: 'rgba(175, 214, 239, 0.8)',
+																			border: mapResearchPanelContact && isMapResearchPanelVisible
+																				? '3px solid #000000'
+																				: '3px solid #143883',
 																			overflow: 'hidden',
 																		}}
 																	>
 																		{/* Header area for right-hand panel (same color as panel) */}
-																		<div className="w-full h-[49px] flex-shrink-0 bg-[#AFD6EF] flex items-center justify-center px-4 relative">
+																		<div
+																			className="w-full h-[49px] flex-shrink-0 flex items-center justify-center px-4 relative"
+																		>
 																			{/* Map label button in top-left of panel header */}
 																			<button
 																				type="button"
@@ -2681,12 +3069,10 @@ const DashboardContent = () => {
 																							}
 																						}}
 																						onMouseEnter={() => {
-																							setMapResearchPanelSide('right');
 																							setHoveredContact(contact);
 																						}}
 																						onMouseLeave={() => {
 																							setHoveredContact(null);
-																							setMapResearchPanelSide('right');
 																						}}
 																					>
 																						{/* Centered used contact dot */}
@@ -2887,311 +3273,28 @@ const DashboardContent = () => {
 																				/>
 																			</Button>
 																		</div>
-																	</div>
-																)}
-																{mapResearchPanelContact &&
-																	(() => {
-																		const hoveredContact = mapResearchPanelContact!;
-																		const parseMetadataSections = (
-																			metadata: string | null | undefined
-																		) => {
-																			if (!metadata) return {};
-
-																			const allSections: Record<string, string> = {};
-																			const regex =
-																				/\[(\d+)\]\s*([\s\S]*?)(?=\[\d+\]|$)/g;
-																			let match;
-																			while ((match = regex.exec(metadata)) !== null) {
-																				const sectionNum = match[1];
-																				const content = match[2].trim();
-																				allSections[sectionNum] = content;
-																			}
-
-																			const sections: Record<string, string> = {};
-																			let expectedNum = 1;
-
-																			while (allSections[String(expectedNum)]) {
-																				const content = allSections[String(expectedNum)];
-																				const meaningfulContent = content
-																					.replace(/[.\s,;:!?'"()\-–—]/g, '')
-																					.trim();
-
-																				if (meaningfulContent.length < 5) {
-																					break;
-																				}
-
-																				sections[String(expectedNum)] = content;
-																				expectedNum++;
-																			}
-
-																			if (Object.keys(sections).length < 3) {
-																				return {};
-																			}
-
-																			return sections;
-																		};
-																		const metadataSections = parseMetadataSections(
-																			hoveredContact?.metadata
-																		);
-
-																		const hasAnyParsedSections =
-																			Object.keys(metadataSections).length > 0;
-																		const numSections =
-																			Object.keys(metadataSections).length;
-																		// Slightly larger: header(22) + contact(34) + divider(1) + sections(50 each) + summary(125) + padding
-																		const containerHeight = hasAnyParsedSections
-																			? `${22 + 34 + 1 + numSections * 52 + 130 + 10}px`
-																			: '340px';
-
-																		return (
+																		{mapResearchPanelContact && (
 																			<div
-																				className="absolute rounded-[8px] shadow-lg flex flex-col"
+																				className="absolute inset-0 z-50"
 																				style={{
-																					top: '68px',
-																					...(mapResearchPanelSide === 'left'
-																						? { left: '10px' }
-																						: { right: '460px' }),
-																					width: '310px',
-																					height: containerHeight,
-																					maxHeight: 'calc(100% - 20px)',
-																					backgroundColor: 'rgba(216, 229, 251, 0.8)',
-																					border: '2px solid #143883',
-																					overflow: 'hidden',
+																					backgroundColor: '#D8E5FB',
 																					opacity: isMapResearchPanelVisible ? 1 : 0,
-																					transition: `opacity ${MAP_RESEARCH_PANEL_FADE_MS}ms ease-in-out`,
+																					transition: `opacity ${MAP_RESEARCH_PANEL_FADE_MS}ms ease-out`,
 																					pointerEvents: isMapResearchPanelVisible ? 'auto' : 'none',
 																				}}
 																			>
-																				{/* Header */}
-																				<div
-																					className="absolute top-0 left-0 w-full flex items-center px-[12px]"
-																					style={{
-																						height: '22px',
-																						backgroundColor: 'transparent',
-																					}}
-																				>
-																					<span className="font-secondary font-bold text-[12px] leading-none text-black">
-																						Research
-																					</span>
-																				</div>
-																				<div
-																					className="absolute left-0 w-full bg-black z-10"
-																					style={{ top: '22px', height: '1px' }}
+																				<ContactResearchPanel
+																					contact={mapResearchPanelContact}
+																					className="!block !border-0 !bg-transparent !rounded-none"
+																					style={{ width: '100%', height: '100%' }}
+																					// Tune box width for the 433px side panel
+																					boxWidth={405}
+																					height={mapResearchPanelCompactHeightPx ?? undefined}
 																				/>
-																				{/* Contact info bar */}
-																				<div
-																					className="absolute left-0 w-full bg-[#FFFFFF]"
-																					style={{ top: '23px', height: '34px' }}
-																				>
-																					<div className="w-full h-full px-[12px] flex items-center justify-between overflow-hidden">
-																						<div className="flex flex-col justify-center min-w-0 flex-1 pr-2">
-																							<div className="font-inter font-bold text-[13px] leading-none truncate text-black">
-																								{(() => {
-																									const fullName = `${
-																										hoveredContact.firstName || ''
-																									} ${
-																										hoveredContact.lastName || ''
-																									}`.trim();
-																									return (
-																										fullName ||
-																										hoveredContact.name ||
-																										hoveredContact.company ||
-																										'Unknown'
-																									);
-																								})()}
-																							</div>
-																							{(() => {
-																								const fullName = `${
-																									hoveredContact.firstName || ''
-																								} ${
-																									hoveredContact.lastName || ''
-																								}`.trim();
-																								const hasName =
-																									fullName.length > 0 ||
-																									(hoveredContact.name &&
-																										hoveredContact.name.length > 0);
-																								if (!hasName || !hoveredContact.company)
-																									return null;
-																								return (
-																									<div className="text-[10px] leading-tight truncate text-black/70 mt-[1px]">
-																										{hoveredContact.company}
-																									</div>
-																								);
-																							})()}
-																						</div>
-																						<div className="flex items-center gap-1 flex-shrink-0">
-																							{(() => {
-																								const stateAbbr =
-																									getStateAbbreviation(
-																										hoveredContact.state || ''
-																									) || '';
-																								if (
-																									stateAbbr &&
-																									stateBadgeColorMap[stateAbbr]
-																								) {
-																									return (
-																										<span
-																											className="inline-flex items-center justify-center h-[15px] px-[5px] rounded-[3px] border border-black text-[10px] font-bold leading-none"
-																											style={{
-																												backgroundColor:
-																													stateBadgeColorMap[stateAbbr],
-																											}}
-																										>
-																											{stateAbbr}
-																										</span>
-																									);
-																								}
-																								return null;
-																							})()}
-																							{(hoveredContact.title ||
-																								hoveredContact.headline) && (
-																								<div className="px-[5px] py-[2px] rounded-[5px] bg-[#E8EFFF] border border-black max-w-[90px] truncate">
-																									<span className="text-[9px] leading-none text-black block truncate">
-																										{hoveredContact.title ||
-																											hoveredContact.headline}
-																									</span>
-																								</div>
-																							)}
-																						</div>
-																					</div>
-																				</div>
-																				<div
-																					className="absolute left-0 w-full bg-black z-10"
-																					style={{ top: '57px', height: '1px' }}
-																				/>
-																				{/* Research result boxes */}
-																				{(() => {
-																					const boxConfigs = [
-																						{ key: '1', color: '#158BCF' },
-																						{ key: '2', color: '#43AEEC' },
-																						{ key: '3', color: '#7CC9F6' },
-																						{ key: '4', color: '#AADAF6' },
-																						{ key: '5', color: '#D7F0FF' },
-																					];
-
-																					const visibleBoxes = boxConfigs.filter(
-																						(config) => metadataSections[config.key]
-																					);
-
-																					return visibleBoxes.map((config, index) => (
-																						<div
-																							key={config.key}
-																							className="absolute"
-																							style={{
-																								top: `${64 + index * 52}px`,
-																								left: '50%',
-																								transform: 'translateX(-50%)',
-																								width: '292px',
-																								height: '44px',
-																								backgroundColor: config.color,
-																								border: '1px solid #000000',
-																								borderRadius: '6px',
-																							}}
-																						>
-																							<div
-																								className="absolute font-inter font-bold"
-																								style={{
-																									top: '4px',
-																									left: '6px',
-																									fontSize: '10px',
-																									color: '#000000',
-																								}}
-																							>
-																								[{config.key}]
-																							</div>
-																							<div
-																								className="absolute overflow-hidden"
-																								style={{
-																									top: '50%',
-																									transform: 'translateY(-50%)',
-																									right: '6px',
-																									width: '262px',
-																									height: '34px',
-																									backgroundColor: '#FFFFFF',
-																									border: '1px solid #000000',
-																									borderRadius: '5px',
-																								}}
-																							>
-																								<div className="w-full h-full px-[6px] flex items-center overflow-hidden">
-																									<div
-																										className="w-full text-[10px] leading-[1.25] text-black font-inter"
-																										style={{
-																											display: '-webkit-box',
-																											WebkitLineClamp: 2,
-																											WebkitBoxOrient: 'vertical',
-																											overflow: 'hidden',
-																										}}
-																									>
-																										{metadataSections[config.key]}
-																									</div>
-																								</div>
-																							</div>
-																						</div>
-																					));
-																				})()}
-																				{/* Summary box at bottom */}
-																				<div
-																					id="map-research-summary-box"
-																					className="absolute"
-																					style={{
-																						bottom: '6px',
-																						left: '50%',
-																						transform: 'translateX(-50%)',
-																						width: '292px',
-																						height: hasAnyParsedSections
-																							? '120px'
-																							: '265px',
-																						backgroundColor: hasAnyParsedSections
-																							? '#E9F7FF'
-																							: '#158BCF',
-																						border: '1px solid #000000',
-																						borderRadius: '6px',
-																					}}
-																				>
-																					<style>{`
-					#map-research-summary-box *::-webkit-scrollbar {
-						display: none !important;
-						width: 0 !important;
-						height: 0 !important;
-						background: transparent !important;
-					}
-					#map-research-summary-box * {
-						scrollbar-width: none !important;
-						-ms-overflow-style: none !important;
-					}
-				`}</style>
-																					<div
-																						className="absolute overflow-hidden"
-																						style={{
-																							top: '50%',
-																							left: '50%',
-																							transform: 'translate(-50%, -50%)',
-																							width: '282px',
-																							height: hasAnyParsedSections
-																								? '110px'
-																								: '255px',
-																							backgroundColor: '#FFFFFF',
-																							border: '1px solid #000000',
-																							borderRadius: '5px',
-																						}}
-																					>
-																						{hoveredContact?.metadata ? (
-																							<div className="w-full h-full p-2 overflow-hidden">
-																								<div
-																									className="text-[11px] leading-[1.4] text-black font-inter font-normal whitespace-pre-wrap overflow-y-scroll h-full"
-																									style={{
-																										wordBreak: 'break-word',
-																									}}
-																								>
-																									{hoveredContact.metadata}
-																								</div>
-																							</div>
-																						) : null}
-																					</div>
-																				</div>
 																			</div>
-																		);
-																	})()}
+																		)}
+																	</div>
+																)}
 																{/* Create Campaign button overlaid on map - only show when not loading */}
 																{/* Hidden below xl (1280px) to prevent overlap with right panel */}
 																{!isMobile &&
@@ -3224,7 +3327,7 @@ const DashboardContent = () => {
 																				}}
 																			>
 																				<span className="relative z-20">
-																					Add to Campaign
+																					Create Campaign
 																				</span>
 																				<div
 																					className="absolute inset-y-0 right-0 w-[65px] z-20 flex items-center justify-center bg-[#74D178] cursor-pointer"
@@ -3612,7 +3715,7 @@ const DashboardContent = () => {
 															handleCreateCampaign();
 														}}
 													>
-														<span className="relative z-20">Add to Campaign</span>
+														<span className="relative z-20">Create Campaign</span>
 														<div
 															className="absolute inset-y-0 right-0 w-[65px] z-20 flex items-center justify-center bg-[#74D178] cursor-pointer"
 															onClick={(e) => {
@@ -3647,7 +3750,7 @@ const DashboardContent = () => {
 															className="w-full h-[54px] min-h-[54px] !rounded-none !bg-[#5dab68] hover:!bg-[#4e9b5d] !text-white border border-[#000000] transition-colors !opacity-100 disabled:!opacity-100"
 															disabled={selectedContacts.length === 0}
 														>
-															Add to Campaign
+															Create Campaign
 														</Button>
 													</div>,
 													document.body
