@@ -85,6 +85,14 @@ export const useDashboard = () => {
 	const [isAllSelected, setIsAllSelected] = useState(false);
 	const [activeSearchQuery, setActiveSearchQuery] = useState('');
 	const [activeExcludeUsedContacts, setActiveExcludeUsedContacts] = useState(false);
+	// Optional map-driven bounding box filter (rectangle selection tool in map view).
+	const [mapBboxFilter, setMapBboxFilter] = useState<{
+		south: number;
+		west: number;
+		north: number;
+		east: number;
+		titlePrefix?: string | null;
+	} | null>(null);
 	const [currentTab, setCurrentTab] = useState<TabValue>('search');
 	const [limit, setLimit] = useState(500);
 	const [apolloContacts, setApolloContacts] = useState<ContactWithName[]>([]);
@@ -111,6 +119,11 @@ export const useDashboard = () => {
 			useVectorSearch: true,
 			limit,
 			excludeUsedContacts: activeExcludeUsedContacts,
+			bboxSouth: mapBboxFilter?.south,
+			bboxWest: mapBboxFilter?.west,
+			bboxNorth: mapBboxFilter?.north,
+			bboxEast: mapBboxFilter?.east,
+			bboxTitlePrefix: mapBboxFilter?.titlePrefix ?? undefined,
 		},
 		enabled: hasSearched && !!activeSearchQuery && activeSearchQuery.trim().length > 0,
 	});
@@ -207,6 +220,8 @@ export const useDashboard = () => {
 
 		// Set search pending immediately for instant UI feedback
 		setIsSearchPending(true);
+		// New searches clear any prior map selection box filter.
+		setMapBboxFilter(null);
 		// Update search parameters
 		setActiveSearchQuery(data.searchText);
 		setActiveExcludeUsedContacts(data.excludeUsedContacts ?? false);
@@ -218,6 +233,7 @@ export const useDashboard = () => {
 	const handleResetSearch = () => {
 		setHasSearched(false);
 		setActiveSearchQuery('');
+		setMapBboxFilter(null);
 		form.reset();
 	};
 
@@ -770,5 +786,7 @@ export const useDashboard = () => {
 		isMapView,
 		setIsMapView,
 		isSearchPending,
+		mapBboxFilter,
+		setMapBboxFilter,
 	};
 };
