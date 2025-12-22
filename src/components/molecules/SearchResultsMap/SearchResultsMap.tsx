@@ -1794,6 +1794,28 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						normalizeStateKey(stateName) ||
 						normalizeStateKey((event.feature.getId() as string) || undefined);
 					setSelectedStateKey(normalizedKey);
+
+					// Immediately focus the map on the clicked state so the viewport doesn't
+					// jump back to a US-wide view while the next state search loads.
+					const geometry = event.feature.getGeometry();
+					if (map && geometry) {
+						const bounds = new google.maps.LatLngBounds();
+						geometry.forEachLatLng((latLng) => {
+							bounds.extend(latLng);
+						});
+						map.fitBounds(bounds, {
+							top: 100,
+							right: 100,
+							bottom: 100,
+							left: 100,
+						});
+						google.maps.event.addListenerOnce(map, 'idle', () => {
+							const currentZoom = map.getZoom();
+							if (currentZoom && currentZoom > 8) {
+								map.setZoom(8);
+							}
+						});
+					}
 					if (stateName) {
 						onStateSelectRef.current?.(stateName);
 					}
@@ -2913,9 +2935,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		lastLockedStateKeyRef.current = null;
 	}, [clearResultsOutline, clearSearchedStateOutline]);
 
-	// Fit bounds when contacts with coordinates change
+	// Fit bounds when contacts with coordinates change (or when the locked state changes).
+	// Important: we still want to zoom to the locked state even if 0 contacts are geocoded yet.
 	useEffect(() => {
-		if (!map || contactsWithCoords.length === 0) return;
+		if (!map) return;
 
 		// Check if this is a new set of search results by comparing the first contact ID
 		const currentFirstId = contactsWithCoords[0]?.id ?? null;
@@ -2936,27 +2959,28 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			contactsWithCoords.length > lastContactsCountRef.current ||
 			Math.abs(contactsWithCoords.length - lastContactsCountRef.current) > 5;
 
-		if (shouldFitBounds) {
-			// If there's a locked state (searched state) and this is a new search or new state,
-			// zoom to that state first for a better initial view
-			if (
-				lockedStateKey &&
-				isStateLayerReady &&
-				(isNewSearch || isNewStateSearch || !hasFitBoundsRef.current)
-			) {
-				const didFitToState = fitMapToState(map, lockedStateKey);
-				if (!didFitToState) {
-					// Fallback to fitting to contacts if state geometry not found
-					fitMapToBounds(map, contactsWithCoords);
-				}
-			} else {
+		if (!shouldFitBounds) return;
+
+		// If there's a locked state (searched state) and this is a new search or new state,
+		// zoom to that state first for a better initial view (works even with 0 geocoded contacts).
+		if (
+			lockedStateKey &&
+			isStateLayerReady &&
+			(isNewSearch || isNewStateSearch || !hasFitBoundsRef.current)
+		) {
+			const didFitToState = fitMapToState(map, lockedStateKey);
+			if (!didFitToState && contactsWithCoords.length > 0) {
+				// Fallback to fitting to contacts if state geometry not found
 				fitMapToBounds(map, contactsWithCoords);
 			}
-			hasFitBoundsRef.current = true;
-			lastContactsCountRef.current = contactsWithCoords.length;
-			lastFirstContactIdRef.current = currentFirstId;
-			lastLockedStateKeyRef.current = lockedStateKey;
+		} else if (contactsWithCoords.length > 0) {
+			fitMapToBounds(map, contactsWithCoords);
 		}
+
+		hasFitBoundsRef.current = true;
+		lastContactsCountRef.current = contactsWithCoords.length;
+		lastFirstContactIdRef.current = currentFirstId;
+		lastLockedStateKeyRef.current = lockedStateKey;
 	}, [
 		map,
 		contactsWithCoords,
@@ -3244,33 +3268,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		});
 	}, [backgroundDotIcon]);
 
-	// Compute initial center based on contacts (if available)
-	// Must be before early returns to satisfy React hooks rules
-	const initialCenter = useMemo(() => {
-		if (contactsWithCoords.length === 0) return defaultCenter;
-
-		// Calculate centroid of all contact coordinates
-		let sumLat = 0;
-		let sumLng = 0;
-		let count = 0;
-
-		contactsWithCoords.forEach((contact) => {
-			const coords = getContactCoords(contact);
-			if (coords) {
-				sumLat += coords.lat;
-				sumLng += coords.lng;
-				count++;
-			}
-		});
-
-		if (count === 0) return defaultCenter;
-
-		return {
-			lat: sumLat / count,
-			lng: sumLng / count,
-		};
-	}, [contactsWithCoords, getContactCoords]);
-
 	if (loadError) {
 		return (
 			<div className="w-full h-full flex items-center justify-center bg-gray-100 rounded-lg">
@@ -3293,8 +3290,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	return (
 		<GoogleMap
 			mapContainerStyle={mapContainerStyle}
-			center={initialCenter}
-			zoom={contactsWithCoords.length > 0 ? 10 : 4}
+			// Keep these stable so the map doesn't jump back to a US-wide view
+			// when `contacts` temporarily empties during a new search fetch.
+			center={defaultCenter}
+			zoom={MAP_MIN_ZOOM}
 			onLoad={onLoad}
 			onUnmount={onUnmount}
 			options={mapOptionsForTool}

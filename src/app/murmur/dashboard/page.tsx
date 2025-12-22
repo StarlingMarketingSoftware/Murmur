@@ -2512,9 +2512,10 @@ const DashboardContent = () => {
 					)}
 
 				{hasSearched &&
-					!isLoadingContacts &&
-					!isRefetchingContacts &&
 					activeTab === 'search' &&
+					// In map view, keep the tray UI mounted during loading so the page
+					// doesn't "blank out" between state searches.
+					(isMapView || (!isLoadingContacts && !isRefetchingContacts)) &&
 					(() => {
 						const trayWhy = isPromotion
 							? {
@@ -3260,14 +3261,9 @@ const DashboardContent = () => {
 																	</div>
 																</div>
 															)}
-															{/* Search Results overlay box on the right side - hidden while loading and at narrowest breakpoint */}
-															{!(
-																isSearchPending ||
-																isLoadingContacts ||
-																isRefetchingContacts
-															) &&
-																!isNarrowestDesktop &&
-																!hasNoSearchResults && (
+															{/* Search Results overlay box on the right side - keep mounted during loading
+															    so the UI doesn't disappear between state searches. */}
+															{!isNarrowestDesktop && !hasNoSearchResults && (
 																	<div
 																		className="absolute top-[97px] right-[10px] rounded-[12px] flex flex-col"
 																		onMouseEnter={() => {
@@ -3320,6 +3316,11 @@ const DashboardContent = () => {
 																			</button>
 																			<span className="font-inter text-[13px] font-medium text-black relative -translate-y-[2px]">
 																				{selectedContacts.length} selected
+																				{isMapResultsLoading && (
+																					<span className="ml-2 text-[12px] text-black/60">
+																						loading…
+																					</span>
+																				)}
 																			</span>
 																			<button
 																				type="button"
@@ -3688,13 +3689,8 @@ const DashboardContent = () => {
 																		</div>
 																	)}
 															{/* Single column search results panel overlay at bottom - narrowest breakpoint (< 952px) */}
-															{isNarrowestDesktop &&
-																!(
-																	isSearchPending ||
-																	isLoadingContacts ||
-																	isRefetchingContacts
-																) &&
-																!hasNoSearchResults && (
+															{/* Keep mounted during loading so UI doesn't disappear between state searches. */}
+															{isNarrowestDesktop && !hasNoSearchResults && (
 																	<div
 																		className="absolute left-[10px] right-[10px] bottom-[10px] rounded-[12px] shadow-lg flex flex-col"
 																		style={{
@@ -3729,6 +3725,11 @@ const DashboardContent = () => {
 																	</button>
 																	<span className="font-inter text-[13px] font-medium text-black">
 																		{selectedContacts.length} selected
+																		{isMapResultsLoading && (
+																			<span className="ml-2 text-[12px] text-black/60">
+																				loading…
+																			</span>
+																		)}
 																	</span>
 																	<button
 																		type="button"

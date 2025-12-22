@@ -56,6 +56,8 @@ export const useGetContacts = (options: ContactQueryOptions) => {
 			return response.json() as Promise<ContactWithName[]>;
 		},
 		enabled: options.enabled === undefined ? true : options.enabled,
+		// Keep previous results visible while a new search fetches (prevents UI + map flicker).
+		placeholderData: keepPreviousData,
 		gcTime: 1000 * 60 * 10, // Keep in cache for 10 minutes
 	});
 };
