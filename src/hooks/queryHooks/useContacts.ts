@@ -356,9 +356,10 @@ export const useGetLocations = (query: string, mode?: 'state' | 'state-first') =
 	});
 };
 
-export type ContactsMapOverlayMode = 'booking';
+export type ContactsMapOverlayMode = 'booking' | 'promotion';
 
-export interface ContactsMapOverlayFilters {
+export interface ContactsMapOverlayFilters
+	extends Record<string, string[] | number[] | string | number | boolean | undefined> {
 	mode?: ContactsMapOverlayMode;
 	south: number;
 	west: number;

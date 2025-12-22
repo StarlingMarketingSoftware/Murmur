@@ -200,41 +200,9 @@ const hashStringToUint32 = (str: string): number => {
 	return h >>> 0;
 };
 
-const mulberry32 = (seed: number) => {
-	let t = seed >>> 0;
-	return () => {
-		t += 0x6d2b79f5;
-		let x = t;
-		x = Math.imul(x ^ (x >>> 15), x | 1);
-		x ^= x + Math.imul(x ^ (x >>> 7), x | 61);
-		return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
-	};
-};
-
 // Hard cap for total dots rendered in the viewport (contacts + background dots).
 // Rendering more than this tends to overload many machines at low zoom levels.
 const MAX_TOTAL_DOTS = 500;
-
-// Calculate background dot count based on viewport area to maintain consistent visual density.
-// This ensures dots don't become denser when zooming in.
-const BACKGROUND_DOTS_DENSITY = 0.55; // dots per square degree at baseline
-const BACKGROUND_DOTS_MIN = 8;
-const BACKGROUND_DOTS_MAX = MAX_TOTAL_DOTS;
-
-const getBackgroundDotsTargetCount = (viewportArea: number, zoom: number): number => {
-	// Base count from area (larger viewport = more dots, smaller = fewer)
-	let count = viewportArea * BACKGROUND_DOTS_DENSITY;
-
-	// Apply a zoom-based reduction factor so very zoomed-in views don't feel cluttered
-	// even with area-based scaling. This mimics how real establishments are distributed.
-	if (zoom >= 10) {
-		count *= 0.6;
-	} else if (zoom >= 8) {
-		count *= 0.8;
-	}
-
-	return Math.min(BACKGROUND_DOTS_MAX, Math.max(BACKGROUND_DOTS_MIN, Math.round(count)));
-};
 
 const getBackgroundDotsQuantizationDeg = (zoom: number): number => {
 	// Controls when we regenerate dots as the viewport changes.
@@ -475,18 +443,6 @@ const bboxFromPolygon = (polygon: ClippingPolygon): BoundingBox | null => {
 	return { minLat, maxLat, minLng, maxLng };
 };
 
-const isPointInUSA = (
-	lat: number,
-	lng: number,
-	preparedStatePolygons: PreparedClippingPolygon[]
-): boolean => {
-	for (const { bbox, polygon } of preparedStatePolygons) {
-		if (!isLatLngInBbox(lat, lng, bbox)) continue;
-		if (pointInClippingPolygon([lng, lat], polygon)) return true;
-	}
-	return false;
-};
-
 // State badge colors matching dashboard
 const stateBadgeColorMap: Record<string, string> = {
 	AL: '#E57373',
@@ -702,6 +658,9 @@ const RESULT_DOT_ZOOM_MIN = 4;
 const RESULT_DOT_ZOOM_MAX = 14;
 const RESULT_DOT_SCALE_MIN = 3;
 const RESULT_DOT_SCALE_MAX = 11;
+// Overlay pins look too small when zoomed out; keep their circle readable without
+// overpowering the search tray/category icons.
+const MIN_OVERLAY_PIN_CIRCLE_DIAMETER_PX = 16;
 // Stroke weight should be thinner when zoomed out and approach ~3px when zoomed in.
 const RESULT_DOT_STROKE_WEIGHT_MIN_PX = 1.5;
 const RESULT_DOT_STROKE_WEIGHT_MAX_PX = 3;
@@ -719,6 +678,11 @@ const HOVER_INTERACTION_MIN_ZOOM = 8;
 const BOOKING_EXTRA_MARKERS_MIN_ZOOM = 10;
 // Keep extra markers capped so map remains responsive.
 const BOOKING_EXTRA_MARKERS_MAX_DOTS = 160;
+// Promotion searches: show state-wide radio list pins as overlay markers.
+// These are intentionally available at low zoom so all states can be visible together.
+const PROMOTION_OVERLAY_MARKERS_MIN_ZOOM = 4;
+// Defensive cap; expected to be ~2 per state.
+const PROMOTION_OVERLAY_MARKERS_MAX_PINS = 220;
 // Zoom level at which the map switches to satellite/hybrid view for better detail
 const SATELLITE_VIEW_MIN_ZOOM = 14;
 
@@ -736,6 +700,8 @@ const BOOKING_EXTRA_TITLE_PREFIXES = [
 	'Cideries',
 ] as const;
 
+const PROMOTION_OVERLAY_TITLE_PREFIXES = ['Radio Stations', 'College Radio'] as const;
+
 const startsWithCaseInsensitive = (value: string | null | undefined, prefix: string): boolean => {
 	if (!value) return false;
 	const p = prefix.trim().toLowerCase();
@@ -751,8 +717,19 @@ const getBookingTitlePrefixFromContactTitle = (title: string | null | undefined)
 	return null;
 };
 
+const isPromotionOverlayListTitle = (title: string | null | undefined): boolean => {
+	if (!title) return false;
+	return PROMOTION_OVERLAY_TITLE_PREFIXES.some((p) => startsWithCaseInsensitive(title, p));
+};
+
+// Promotion overlay pins should use the Radio Stations visual language (icon + color).
+const getPromotionOverlayWhatFromContactTitle = (title: string | null | undefined): string | null =>
+	isPromotionOverlayListTitle(title) ? 'Radio Stations' : null;
+
 const isBookingSearchQuery = (query: string | null | undefined): boolean =>
 	(query ?? '').trim().toLowerCase().startsWith('[booking]');
+const isPromotionSearchQuery = (query: string | null | undefined): boolean =>
+	(query ?? '').trim().toLowerCase().startsWith('[promotion]');
 const normalizeWhatKey = (value: string): string =>
 	value
 		.trim()
@@ -763,6 +740,7 @@ const normalizeWhatKey = (value: string): string =>
 		.replace(/\s+/g, ' ');
 
 const WHAT_TO_RESULT_DOT_COLOR: Record<string, string> = {
+	[normalizeWhatKey('Radio Stations')]: '#56DA73',
 	[normalizeWhatKey('Venues')]: '#00CBFB',
 	[normalizeWhatKey('Music Venues')]: '#00CBFB',
 	[normalizeWhatKey('Festivals')]: '#2D27DC',
@@ -785,6 +763,8 @@ const WHAT_TO_RESULT_DOT_COLOR: Record<string, string> = {
 // Hover tooltip (SVG bubble) fill colors by search "What" value.
 // These are intentionally allowed to differ from the dot colors.
 const WHAT_TO_HOVER_TOOLTIP_FILL_COLOR: Record<string, string> = {
+	// Promotion: match the search tray palette.
+	[normalizeWhatKey('Radio Stations')]: '#56DA73',
 	// Music venues should be a lighter blue on hover.
 	[normalizeWhatKey('Venues')]: '#71C9FD',
 	[normalizeWhatKey('Music Venues')]: '#71C9FD',
@@ -908,6 +888,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const lastBookingExtraVisibleContactsKeyRef = useRef<string>('');
 	const lastBookingExtraFetchKeyRef = useRef<string>('');
 	const [bookingExtraFetchBbox, setBookingExtraFetchBbox] = useState<BoundingBox | null>(null);
+	const [promotionOverlayVisibleContacts, setPromotionOverlayVisibleContacts] = useState<
+		ContactWithName[]
+	>([]);
+	const lastPromotionOverlayVisibleContactsKeyRef = useRef<string>('');
+	const lastPromotionOverlayFetchKeyRef = useRef<string>('');
+	const [promotionOverlayFetchBbox, setPromotionOverlayFetchBbox] = useState<BoundingBox | null>(
+		null
+	);
 	// Timeout ref for auto-hiding research panel
 	const researchPanelTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 	// Small delay when moving between marker layers (prevents hover flicker)
@@ -936,12 +924,17 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	);
 
 	const isBookingSearch = useMemo(() => isBookingSearchQuery(searchQuery), [searchQuery]);
+	const isPromotionSearch = useMemo(() => isPromotionSearchQuery(searchQuery), [searchQuery]);
 	useEffect(() => {
 		// Reset the overlay fetch window and any visible extra markers on search transitions.
 		lastBookingExtraFetchKeyRef.current = '';
 		setBookingExtraFetchBbox(null);
 		lastBookingExtraVisibleContactsKeyRef.current = '';
 		setBookingExtraVisibleContacts([]);
+		lastPromotionOverlayFetchKeyRef.current = '';
+		setPromotionOverlayFetchBbox(null);
+		lastPromotionOverlayVisibleContactsKeyRef.current = '';
+		setPromotionOverlayVisibleContacts([]);
 	}, [searchQuery]);
 
 	const updateBookingExtraFetchBbox = useCallback(
@@ -1009,6 +1002,70 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		[isBookingSearch]
 	);
 
+	const updatePromotionOverlayFetchBbox = useCallback(
+		(mapInstance: google.maps.Map | null) => {
+			if (!mapInstance) return;
+
+			// Only run for promotion-mode searches.
+			if (!isPromotionSearch) {
+				if (lastPromotionOverlayFetchKeyRef.current !== '') {
+					lastPromotionOverlayFetchKeyRef.current = '';
+					setPromotionOverlayFetchBbox(null);
+				}
+				return;
+			}
+
+			const zoomRaw = mapInstance.getZoom() ?? 4;
+			if (zoomRaw < PROMOTION_OVERLAY_MARKERS_MIN_ZOOM) {
+				if (lastPromotionOverlayFetchKeyRef.current !== '') {
+					lastPromotionOverlayFetchKeyRef.current = '';
+					setPromotionOverlayFetchBbox(null);
+				}
+				return;
+			}
+
+			const bounds = mapInstance.getBounds();
+			if (!bounds) return;
+
+			const sw = bounds.getSouthWest();
+			const ne = bounds.getNorthEast();
+			const south = sw.lat();
+			const west = sw.lng();
+			const north = ne.lat();
+			const east = ne.lng();
+
+			// Skip antimeridian-crossing viewports (not relevant for our UI).
+			if (east < west) return;
+
+			// Light padding to avoid refetching on small pans.
+			const latSpan = north - south;
+			const lngSpan = east - west;
+			const padLat = latSpan * 0.1;
+			const padLng = lngSpan * 0.1;
+
+			const paddedSouth = clamp(south - padLat, -90, 90);
+			const paddedWest = clamp(west - padLng, -180, 180);
+			const paddedNorth = clamp(north + padLat, -90, 90);
+			const paddedEast = clamp(east + padLng, -180, 180);
+
+			// Quantize the fetch window so we don't refetch on tiny pans/zooms.
+			const zoomKey = Math.round(zoomRaw);
+			const quant = getBackgroundDotsQuantizationDeg(zoomKey);
+			const qSouth = Math.floor(paddedSouth / quant) * quant;
+			const qWest = Math.floor(paddedWest / quant) * quant;
+			const qNorth = Math.ceil(paddedNorth / quant) * quant;
+			const qEast = Math.ceil(paddedEast / quant) * quant;
+
+			const nextKey = `${zoomKey}|${qSouth.toFixed(4)}|${qWest.toFixed(4)}|${qNorth.toFixed(
+				4
+			)}|${qEast.toFixed(4)}`;
+			if (nextKey === lastPromotionOverlayFetchKeyRef.current) return;
+			lastPromotionOverlayFetchKeyRef.current = nextKey;
+			setPromotionOverlayFetchBbox({ minLat: qSouth, minLng: qWest, maxLat: qNorth, maxLng: qEast });
+		},
+		[isPromotionSearch]
+	);
+
 	const bookingExtraOverlayFilters = useMemo(() => {
 		if (!bookingExtraFetchBbox) return undefined;
 		return {
@@ -1026,6 +1083,23 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		enabled: Boolean(bookingExtraOverlayFilters),
 	});
 
+	const promotionOverlayFilters = useMemo(() => {
+		if (!promotionOverlayFetchBbox) return undefined;
+		return {
+			mode: 'promotion' as const,
+			south: promotionOverlayFetchBbox.minLat,
+			west: promotionOverlayFetchBbox.minLng,
+			north: promotionOverlayFetchBbox.maxLat,
+			east: promotionOverlayFetchBbox.maxLng,
+			limit: 1200,
+		};
+	}, [promotionOverlayFetchBbox]);
+
+	const { data: promotionOverlayRawContacts } = useGetContactsMapOverlay({
+		filters: promotionOverlayFilters,
+		enabled: Boolean(promotionOverlayFilters),
+	});
+
 	const bookingExtraContacts = useMemo(() => {
 		if (!bookingExtraRawContacts || bookingExtraRawContacts.length === 0) return [];
 		return bookingExtraRawContacts.filter((c) => {
@@ -1036,6 +1110,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			return true;
 		});
 	}, [bookingExtraRawContacts, baseContactIdSet]);
+
+	const promotionOverlayContacts = useMemo(() => {
+		if (!promotionOverlayRawContacts || promotionOverlayRawContacts.length === 0) return [];
+		return promotionOverlayRawContacts.filter((c) => {
+			// Client-side safety: only keep state-wide list titles.
+			return isPromotionOverlayListTitle(c.title);
+		});
+	}, [promotionOverlayRawContacts]);
 
 	const { contactsWithCoords: bookingExtraContactsWithCoords, coordsByContactId: bookingExtraCoordsByContactId } =
 		useMemo(() => {
@@ -1069,10 +1151,50 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			return { contactsWithCoords, coordsByContactId };
 		}, [bookingExtraContacts]);
 
+	const {
+		contactsWithCoords: promotionOverlayContactsWithCoords,
+		coordsByContactId: promotionOverlayCoordsByContactId,
+	} = useMemo(() => {
+		const coordsByContactId = new Map<number, LatLngLiteral>();
+		const contactsWithCoords: ContactWithName[] = [];
+		const groups = new Map<string, number[]>();
+
+		for (const contact of promotionOverlayContacts) {
+			const coords = getLatLngFromContact(contact);
+			if (!coords) continue;
+			coordsByContactId.set(contact.id, coords);
+			contactsWithCoords.push(contact);
+			const key = coordinateKey(coords);
+			const existing = groups.get(key);
+			if (existing) existing.push(contact.id);
+			else groups.set(key, [contact.id]);
+		}
+
+		// Offset duplicates (keep the smallest id at the true coordinate for accuracy)
+		for (const ids of groups.values()) {
+			if (ids.length <= 1) continue;
+			ids.sort((a, b) => a - b);
+			for (let i = 1; i < ids.length; i++) {
+				const id = ids[i];
+				const base = coordsByContactId.get(id);
+				if (!base) continue;
+				coordsByContactId.set(id, jitterDuplicateCoords(base, i));
+			}
+		}
+
+		return { contactsWithCoords, coordsByContactId };
+	}, [promotionOverlayContacts]);
+
 	const getBookingExtraContactCoords = useCallback(
 		(contact: ContactWithName): LatLngLiteral | null =>
 			bookingExtraCoordsByContactId.get(contact.id) ?? null,
 		[bookingExtraCoordsByContactId]
+	);
+
+	const getPromotionOverlayContactCoords = useCallback(
+		(contact: ContactWithName): LatLngLiteral | null =>
+			promotionOverlayCoordsByContactId.get(contact.id) ?? null,
+		[promotionOverlayCoordsByContactId]
 	);
 
 	useEffect(() => {
@@ -1093,7 +1215,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		if (hoveredMarkerId == null) return;
 		const stillVisible =
 			visibleContacts.some((c) => c.id === hoveredMarkerId) ||
-			bookingExtraVisibleContacts.some((c) => c.id === hoveredMarkerId);
+			bookingExtraVisibleContacts.some((c) => c.id === hoveredMarkerId) ||
+			promotionOverlayVisibleContacts.some((c) => c.id === hoveredMarkerId);
 		if (stillVisible) return;
 		if (hoverClearTimeoutRef.current) {
 			clearTimeout(hoverClearTimeoutRef.current);
@@ -1102,7 +1225,13 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		setHoveredMarkerId(null);
 		hoveredMarkerIdRef.current = null;
 		onMarkerHover?.(null);
-	}, [visibleContacts, bookingExtraVisibleContacts, hoveredMarkerId, onMarkerHover]);
+	}, [
+		visibleContacts,
+		bookingExtraVisibleContacts,
+		promotionOverlayVisibleContacts,
+		hoveredMarkerId,
+		onMarkerHover,
+	]);
 
 	// Clear hover state when zooming out past the minimum threshold
 	useEffect(() => {
@@ -1438,9 +1567,46 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 			const viewportBbox: BoundingBox = { minLat: south, maxLat: north, minLng: west, maxLng: east };
 
+			// Promotion overlay pins: state-wide "Radio Stations <State>" / "College Radio <State>"
+			// lists should all be visible together at low zoom.
+			const shouldShowPromotionOverlay =
+				isPromotionSearch &&
+				zoomRaw >= PROMOTION_OVERLAY_MARKERS_MIN_ZOOM &&
+				promotionOverlayContactsWithCoords.length > 0;
+			let nextPromotionOverlayVisible: ContactWithName[] = [];
+			if (shouldShowPromotionOverlay) {
+				const promoInBounds: ContactWithName[] = [];
+				for (const contact of promotionOverlayContactsWithCoords) {
+					const coords = getPromotionOverlayContactCoords(contact);
+					if (!coords) continue;
+					if (!isLatLngInBbox(coords.lat, coords.lng, viewportBbox)) continue;
+					promoInBounds.push(contact);
+				}
+				// Keep ordering stable.
+				promoInBounds.sort((a, b) => a.id - b.id);
+				// Defensive cap (we expect far fewer than this).
+				nextPromotionOverlayVisible =
+					promoInBounds.length > PROMOTION_OVERLAY_MARKERS_MAX_PINS
+						? promoInBounds.slice(0, PROMOTION_OVERLAY_MARKERS_MAX_PINS)
+						: promoInBounds;
+			}
+
+			const nextPromotionKey = nextPromotionOverlayVisible.map((c) => c.id).join(',');
+			if (nextPromotionKey !== lastPromotionOverlayVisibleContactsKeyRef.current) {
+				lastPromotionOverlayVisibleContactsKeyRef.current = nextPromotionKey;
+				setPromotionOverlayVisibleContacts(nextPromotionOverlayVisible);
+			}
+
+			const promotionOverlayIdSet =
+				nextPromotionOverlayVisible.length > 0
+					? new Set<number>(nextPromotionOverlayVisible.map((c) => c.id))
+					: null;
+
 			// Determine which contacts are currently in the viewport.
 			const inBounds: ContactWithName[] = [];
 			for (const contact of contactsWithCoords) {
+				// If this contact is rendered as a promotion overlay pin, don't duplicate it as a dot.
+				if (promotionOverlayIdSet?.has(contact.id)) continue;
 				const coords = getContactCoords(contact);
 				if (!coords) continue;
 				if (!isLatLngInBbox(coords.lat, coords.lng, viewportBbox)) continue;
@@ -1455,12 +1621,17 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				else unselectedInBounds.push(contact);
 			}
 
+			// Reserve budget for promotion overlay pins so they always render.
+			const maxPrimaryDots = Math.max(0, MAX_TOTAL_DOTS - nextPromotionOverlayVisible.length);
+
 			// Build a stable "candidate pool" larger than what we render, then pick a
 			// non-overlapping subset so dots never visually stack on top of each other.
 			const POOL_FACTOR = 4;
-			const poolSlots = MAX_TOTAL_DOTS * POOL_FACTOR;
+			const poolSlots = maxPrimaryDots * POOL_FACTOR;
 			let pool: ContactWithName[] = [];
-			if (inBounds.length <= poolSlots) {
+			if (poolSlots <= 0) {
+				pool = [];
+			} else if (inBounds.length <= poolSlots) {
 				pool = inBounds;
 			} else if (selectedInBounds.length >= poolSlots) {
 				pool = stableViewportSampleContacts(
@@ -1548,7 +1719,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			};
 
 			for (const c of candidates) {
-				if (picked.length >= MAX_TOTAL_DOTS) break;
+				if (picked.length >= maxPrimaryDots) break;
 				const cx = Math.floor(c.x / cellSize);
 				const cy = Math.floor(c.y / cellSize);
 				if (hasNeighborWithin(cx, cy, c.x, c.y)) continue;
@@ -1579,7 +1750,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				bookingExtraContactsWithCoords.length > 0;
 			let nextBookingExtraVisible: ContactWithName[] = [];
 			if (shouldShowBookingExtras) {
-				const remainingBudget = Math.max(0, MAX_TOTAL_DOTS - nextVisibleContacts.length);
+				const remainingBudget = Math.max(
+					0,
+					MAX_TOTAL_DOTS - nextPromotionOverlayVisible.length - nextVisibleContacts.length
+				);
 				const maxExtraDots = Math.min(BOOKING_EXTRA_MARKERS_MAX_DOTS, remainingBudget);
 				if (maxExtraDots > 0) {
 					const extraInBounds: ContactWithName[] = [];
@@ -1683,6 +1857,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			isBookingSearch,
 			bookingExtraContactsWithCoords,
 			getBookingExtraContactCoords,
+			isPromotionSearch,
+			promotionOverlayContactsWithCoords,
+			getPromotionOverlayContactCoords,
 		]
 	);
 
@@ -1717,6 +1894,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		if (!map) return;
 		const onIdle = () => {
 			updateBookingExtraFetchBbox(map);
+			updatePromotionOverlayFetchBbox(map);
 			recomputeViewportDots(map, isLoadingRef.current);
 		};
 		const listener = map.addListener('idle', onIdle);
@@ -1725,7 +1903,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		return () => {
 			listener.remove();
 		};
-	}, [map, recomputeViewportDots, updateBookingExtraFetchBbox]);
+	}, [map, recomputeViewportDots, updateBookingExtraFetchBbox, updatePromotionOverlayFetchBbox]);
 
 	// Draw a gray outline around the *group of states* that have results.
 	// This uses the state polygons we load via the Data layer and unions them so the outline is one shape.
@@ -2165,10 +2343,18 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		return getResultDotStrokeWeightForZoom(zoomLevel);
 	}, [zoomLevel]);
 
-	// Marker pin (SVG) sizing: scale so the 36px circle area matches our dot diameter (2*markerScale).
-	const markerPinScaleFactor = useMemo(() => {
-		return (markerScale * 2) / MAP_MARKER_PIN_CIRCLE_DIAMETER;
+	// Marker pin (SVG) sizing: scale so the 36px circle area matches our dot diameter (2*markerScale),
+	// but clamp to a minimum so pins remain readable at low zoom.
+	const markerPinCircleDiameterPx = useMemo(() => {
+		return Math.max(markerScale * 2, MIN_OVERLAY_PIN_CIRCLE_DIAMETER_PX);
 	}, [markerScale]);
+
+	const markerPinCircleRadiusPx = useMemo(() => markerPinCircleDiameterPx / 2, [markerPinCircleDiameterPx]);
+
+	// Scale factor for the full SVG viewbox.
+	const markerPinScaleFactor = useMemo(() => {
+		return markerPinCircleDiameterPx / MAP_MARKER_PIN_CIRCLE_DIAMETER;
+	}, [markerPinCircleDiameterPx]);
 
 	const markerPinMetrics = useMemo(() => {
 		if (!isLoaded) return null;
@@ -2285,6 +2471,19 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		};
 	}, [isLoaded, markerScale]);
 
+	// Invisible hit area sized to match the pin circle (pins are clamped larger at low zoom).
+	const invisiblePinHitAreaIcon = useMemo(() => {
+		if (!isLoaded) return undefined;
+		return {
+			path: google.maps.SymbolPath.CIRCLE,
+			fillColor: 'transparent',
+			fillOpacity: 0,
+			strokeColor: 'transparent',
+			strokeWeight: 0,
+			scale: markerPinCircleRadiusPx,
+		};
+	}, [isLoaded, markerPinCircleRadiusPx]);
+
 	// Larger leave buffer zone - how much extra padding below the tooltip for hysteresis
 	const hoverLeaveBufferPx = useMemo(() => {
 		// The buffer should be roughly the size the hit area used to be (2x marker)
@@ -2374,6 +2573,142 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		>
 			{/* Only render markers when not loading */}
 			{!isLoading &&
+				promotionOverlayVisibleContacts.map((contact) => {
+					const coords = getPromotionOverlayContactCoords(contact);
+					if (!coords) return null;
+					const isHovered = hoveredMarkerId === contact.id;
+					const isSelected = selectedContacts.includes(contact.id);
+					const hasLockedStateSelection =
+						lockedStateKey && lockedStateSelectionKeyRef.current === lockedStateKey;
+					const isOutsideLockedState = hasLockedStateSelection
+						? !isCoordsInLockedState(coords)
+						: false;
+					// In promotion mode, keep markers *inside* the searched/locked state as regular dots.
+					// Only render the overlay "pin" UI for contacts outside the searched area.
+					const shouldUseOverlayPinStyle = !hasLockedStateSelection || isOutsideLockedState;
+
+					const whatForMarker = getPromotionOverlayWhatFromContactTitle(contact.title) ?? null;
+					const dotFillColor = getResultDotColorForWhat(whatForMarker);
+					const dotFillColorOutside = washOutHexColor(
+						dotFillColor,
+						OUTSIDE_LOCKED_STATE_WASHOUT_TO_WHITE
+					);
+					const pinFillColor = isOutsideLockedState ? dotFillColorOutside : dotFillColor;
+					const pinStrokeColor = isSelected
+						? RESULT_DOT_STROKE_COLOR_SELECTED
+						: RESULT_DOT_STROKE_COLOR_DEFAULT;
+					const pinIcon = getMarkerPinIcon(pinFillColor, pinStrokeColor, whatForMarker);
+
+					const dotIcon =
+						isSelected
+							? isOutsideLockedState
+								? selectedMarkerIconOutside
+								: selectedMarkerIcon
+							: isOutsideLockedState
+								? defaultMarkerIconOutside
+								: defaultMarkerIcon;
+
+					// Show tooltip if hovered or if this marker is fading out
+					const isFading = fadingTooltipId === contact.id;
+					const shouldShowTooltip = isHovered || isFading;
+					const hoverTooltip = shouldShowTooltip
+						? (() => {
+								const fullName = `${contact.firstName || ''} ${
+									contact.lastName || ''
+								}`.trim();
+								const nameForTooltip = fullName || contact.name || '';
+								const companyForTooltip = contact.company || '';
+								const titleForTooltip = (contact.title || contact.headline || '').trim();
+								const normalizedWhat = whatForMarker ? normalizeWhatKey(whatForMarker) : null;
+								const tooltipFillColor = normalizedWhat
+									? WHAT_TO_HOVER_TOOLTIP_FILL_COLOR[normalizedWhat] ?? dotFillColor
+									: dotFillColor;
+								const width = calculateTooltipWidth(
+									nameForTooltip,
+									companyForTooltip,
+									titleForTooltip,
+									whatForMarker
+								);
+								const height = calculateTooltipHeight(nameForTooltip, companyForTooltip);
+								const anchorY = calculateTooltipAnchorY(nameForTooltip, companyForTooltip);
+								return {
+									url: generateMapTooltipIconUrl(
+										nameForTooltip,
+										companyForTooltip,
+										titleForTooltip,
+										tooltipFillColor,
+										whatForMarker
+									),
+									width,
+									height,
+									anchorY,
+								};
+							})()
+						: null;
+
+					return (
+						<Fragment key={`promotionOverlay-${contact.id}`}>
+							<MarkerF
+								position={coords}
+								icon={shouldUseOverlayPinStyle ? invisiblePinHitAreaIcon : invisibleHitAreaIcon}
+								onMouseOver={(e) => handleMarkerMouseOver(contact, e)}
+								onMouseOut={() => handleMarkerMouseOut(contact.id)}
+								onClick={() => handleMarkerClick(contact)}
+								clickable={true}
+								// Keep in-state promotion markers behaving like primary dots; out-of-state pins sit behind.
+								zIndex={shouldUseOverlayPinStyle ? 0 : MARKER_HIT_AREA_Z_INDEX}
+							/>
+							<MarkerF
+								position={coords}
+								icon={shouldUseOverlayPinStyle ? pinIcon : dotIcon}
+								clickable={false}
+								zIndex={shouldUseOverlayPinStyle ? -1 : MARKER_DOT_Z_INDEX}
+							/>
+							{shouldShowTooltip && hoverTooltip && (
+								<OverlayViewF
+									position={coords}
+									mapPaneName={OverlayView.FLOAT_PANE}
+									zIndex={HOVER_TOOLTIP_Z_INDEX}
+									getPixelPositionOffset={() => ({
+										x: -MAP_TOOLTIP_ANCHOR_X,
+										y: -hoverTooltip.anchorY,
+									})}
+								>
+									<div
+										style={{
+											width: `${hoverTooltip.width}px`,
+											height: `${hoverTooltip.height + hoverLeaveBufferPx}px`,
+											pointerEvents: isHovered ? 'auto' : 'none',
+											display: 'flex',
+											flexDirection: 'column',
+										}}
+										onMouseEnter={() => handleMarkerMouseOver(contact)}
+										onMouseLeave={() => handleMarkerMouseOut(contact.id)}
+										onClick={() => handleMarkerClick(contact)}
+									>
+										<div
+											style={{
+												width: '100%',
+												height: `${hoverTooltip.height}px`,
+												opacity: isHovered ? 1 : 0,
+												transition: 'opacity 150ms ease-in-out',
+												flexShrink: 0,
+											}}
+										>
+											<img
+												src={hoverTooltip.url}
+												alt=""
+												draggable={false}
+												style={{ width: '100%', height: '100%', display: 'block' }}
+											/>
+										</div>
+									</div>
+								</OverlayViewF>
+							)}
+						</Fragment>
+					);
+				})}
+			{!isLoading &&
 				bookingExtraVisibleContacts.map((contact) => {
 					const coords = getBookingExtraContactCoords(contact);
 					if (!coords) return null;
@@ -2440,7 +2775,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 							{/* Lower z-index hit area so primary markers win when overlapping */}
 							<MarkerF
 								position={coords}
-								icon={invisibleHitAreaIcon}
+								icon={invisiblePinHitAreaIcon}
 								onMouseOver={(e) => handleMarkerMouseOver(contact, e)}
 								onMouseOut={() => handleMarkerMouseOut(contact.id)}
 								onClick={() => handleMarkerClick(contact)}

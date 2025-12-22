@@ -15,7 +15,7 @@ import { StripeSubscriptionStatus } from '@/types';
 export const maxDuration = 60;
 
 const mapOverlaySchema = z.object({
-	mode: z.enum(['booking']).optional().default('booking'),
+	mode: z.enum(['booking', 'promotion']).optional().default('booking'),
 	south: z.coerce.number(),
 	west: z.coerce.number(),
 	north: z.coerce.number(),
@@ -36,14 +36,22 @@ const BOOKING_TITLE_PREFIXES = [
 	'Wedding Venues',
 ] as const;
 
+const PROMOTION_TITLE_PREFIXES = [
+	'Radio Stations',
+	'College Radio',
+] as const;
+
 const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n));
 
 const DEFAULT_LIMIT = 1200;
 const MAX_LIMIT = 2000;
 
 // Guard rails: prevent accidentally querying an entire region at once.
-const MAX_LAT_SPAN_DEG = 12;
-const MAX_LNG_SPAN_DEG = 12;
+const MAX_LAT_SPAN_DEG_BOOKING = 12;
+const MAX_LNG_SPAN_DEG_BOOKING = 12;
+// Promotion overlays are small (state-level list pins) and should work at wide zoom levels.
+const MAX_LAT_SPAN_DEG_PROMOTION = 180;
+const MAX_LNG_SPAN_DEG_PROMOTION = 360;
 
 export async function GET(req: NextRequest) {
 	try {
@@ -90,7 +98,9 @@ export async function GET(req: NextRequest) {
 
 		const latSpan = maxLat - minLat;
 		const lngSpan = maxLng - minLng;
-		if (latSpan > MAX_LAT_SPAN_DEG || lngSpan > MAX_LNG_SPAN_DEG) {
+		const maxLatSpan = mode === 'promotion' ? MAX_LAT_SPAN_DEG_PROMOTION : MAX_LAT_SPAN_DEG_BOOKING;
+		const maxLngSpan = mode === 'promotion' ? MAX_LNG_SPAN_DEG_PROMOTION : MAX_LNG_SPAN_DEG_BOOKING;
+		if (latSpan > maxLatSpan || lngSpan > maxLngSpan) {
 			return apiBadRequest('Viewport too large; zoom in to load overlay markers');
 		}
 
@@ -109,6 +119,18 @@ export async function GET(req: NextRequest) {
 					{ title: { not: null } },
 					{
 						OR: BOOKING_TITLE_PREFIXES.map((p) => ({
+							title: { mode: 'insensitive', startsWith: p },
+						})),
+					},
+				],
+			};
+		} else if (mode === 'promotion') {
+			where = {
+				AND: [
+					bboxWhere,
+					{ title: { not: null } },
+					{
+						OR: PROMOTION_TITLE_PREFIXES.map((p) => ({
 							title: { mode: 'insensitive', startsWith: p },
 						})),
 					},
