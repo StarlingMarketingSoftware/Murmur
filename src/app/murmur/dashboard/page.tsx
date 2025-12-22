@@ -23,6 +23,7 @@ import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
 import { RadioStationsIcon } from '@/components/atoms/_svg/RadioStationsIcon';
 import { NearMeIcon } from '@/components/atoms/_svg/NearMeIcon';
 import HomeIcon from '@/components/atoms/_svg/HomeIcon';
+import GrabIcon from '@/components/atoms/svg/GrabIcon';
 import { getCityIconProps } from '@/utils/cityIcons';
 import { Typography } from '@/components/ui/typography';
 import { Input } from '@/components/ui/input';
@@ -2750,38 +2751,94 @@ const DashboardContent = () => {
 								</Form>
 							</div>
 							{isMapView && (
-								<button
-									type="button"
-									onClick={handleCloseMapView}
-									aria-label="Home"
-									className="flex items-center justify-center cursor-pointer"
-									style={{
-										position: 'absolute',
-										// Map is inset 9px from the viewport; "25px from map top" => 34px viewport.
-										// Search bar wrapper sits at 33px viewport, so this becomes 1px inside the wrapper.
-										top: '1px',
-										// "179px to the right of the searchbar" => from wrapper's right edge.
-										left: 'calc(100% + 179px)',
-										width: '53px',
-										height: '53px',
-										borderRadius: '9px',
-										backgroundColor: '#D6D6D6',
-										border: '3px solid #000000',
-										padding: '2px',
-									}}
-								>
+								<>
+									{/* Box to the left of the Home button */}
 									<div
-										className="flex items-center justify-center"
+										aria-hidden="true"
+										className="flex items-center justify-center gap-[20px]"
 										style={{
-											width: '43px',
-											height: '43px',
-											borderRadius: '9px',
-											backgroundColor: '#EAEAEA',
+											position: 'absolute',
+											// Map is inset 9px from the viewport; "25px from map top" => 34px viewport.
+											// Search bar wrapper sits at 33px viewport, so this becomes 1px inside the wrapper.
+											top: '1px',
+											// Home button is at: calc(100% + 179px). This box should be 10px to its left.
+											left: 'calc(100% + 179px - 143px)', // 133px width + 10px gap
+											width: '133px',
+											height: '53px',
+											borderRadius: '6px',
+											backgroundColor: 'rgba(255, 255, 255, 0.9)', // #FFFFFF @ 90%
+											border: '3px solid #000000',
 										}}
 									>
-										<HomeIcon width={28} height={24} />
+										<div
+											style={{
+												width: '44px',
+												height: '44px',
+												borderRadius: '9px',
+												backgroundColor: 'rgba(153, 153, 153, 0.3)', // #999999 @ 30%
+												display: 'flex',
+												alignItems: 'center',
+												justifyContent: 'center',
+											}}
+										>
+											<div
+												aria-hidden="true"
+												style={{
+													width: '25px',
+													height: '25px',
+													backgroundColor: '#F1F1F1',
+													border: '2px solid #000000',
+													boxSizing: 'border-box',
+												}}
+											/>
+										</div>
+										<div
+											style={{
+												width: '44px',
+												height: '44px',
+												borderRadius: '9px',
+												backgroundColor: 'rgba(153, 153, 153, 0.3)', // #999999 @ 30%
+												display: 'flex',
+												alignItems: 'center',
+												justifyContent: 'center',
+											}}
+										>
+											<GrabIcon />
+										</div>
 									</div>
-								</button>
+									<button
+										type="button"
+										onClick={handleCloseMapView}
+										aria-label="Home"
+										className="flex items-center justify-center cursor-pointer"
+										style={{
+											position: 'absolute',
+											// Map is inset 9px from the viewport; "25px from map top" => 34px viewport.
+											// Search bar wrapper sits at 33px viewport, so this becomes 1px inside the wrapper.
+											top: '1px',
+											// "179px to the right of the searchbar" => from wrapper's right edge.
+											left: 'calc(100% + 179px)',
+											width: '53px',
+											height: '53px',
+											borderRadius: '9px',
+											backgroundColor: '#D6D6D6',
+											border: '3px solid #000000',
+											padding: '2px',
+										}}
+									>
+										<div
+											className="flex items-center justify-center"
+											style={{
+												width: '43px',
+												height: '43px',
+												borderRadius: '9px',
+												backgroundColor: '#EAEAEA',
+											}}
+										>
+											<HomeIcon width={28} height={24} />
+										</div>
+									</button>
+								</>
 							)}
 							{hoveredContact && !isMobile && !isMapView && (
 								<div className="absolute inset-0 z-[90] pointer-events-none bg-white hidden xl:flex items-start justify-center">
