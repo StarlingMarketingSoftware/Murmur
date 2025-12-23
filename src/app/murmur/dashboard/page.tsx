@@ -23,6 +23,7 @@ import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
 import { RadioStationsIcon } from '@/components/atoms/_svg/RadioStationsIcon';
 import { NearMeIcon } from '@/components/atoms/_svg/NearMeIcon';
 import HomeIcon from '@/components/atoms/_svg/HomeIcon';
+import HomeExpandedIcon from '@/components/atoms/_svg/HomeExpandedIcon';
 import GrabIcon from '@/components/atoms/svg/GrabIcon';
 import { getCityIconProps } from '@/utils/cityIcons';
 import { Typography } from '@/components/ui/typography';
@@ -3008,7 +3009,7 @@ const DashboardContent = () => {
 										type="button"
 										onClick={handleCloseMapView}
 										aria-label="Home"
-										className="flex items-center justify-center cursor-pointer"
+										className="group flex items-center justify-center cursor-pointer w-[53px] hover:w-[158px]"
 										style={{
 											position: 'absolute',
 											// Map is inset 9px from the viewport; "25px from map top" => 34px viewport.
@@ -3016,7 +3017,6 @@ const DashboardContent = () => {
 											top: '1px',
 											// "179px to the right of the searchbar" => from wrapper's right edge.
 											left: 'calc(100% + 179px)',
-											width: '53px',
 											height: '53px',
 											borderRadius: '9px',
 											backgroundColor: '#D6D6D6',
@@ -3025,15 +3025,19 @@ const DashboardContent = () => {
 										}}
 									>
 										<div
-											className="flex items-center justify-center"
+											className="flex items-center justify-center w-[43px] group-hover:w-[146px]"
 											style={{
-												width: '43px',
 												height: '43px',
 												borderRadius: '9px',
 												backgroundColor: '#EAEAEA',
 											}}
 										>
-											<HomeIcon width={28} height={24} />
+											{/* Default: show house icon */}
+											<span className="group-hover:hidden">
+												<HomeIcon width={28} height={24} />
+											</span>
+											{/* Hover: show "Home" text SVG */}
+											<HomeExpandedIcon className="hidden group-hover:block" />
 										</div>
 									</button>
 								</>
