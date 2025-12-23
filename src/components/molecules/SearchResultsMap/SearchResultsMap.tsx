@@ -890,6 +890,32 @@ const normalizeWhatKey = (value: string): string =>
 		.trim()
 		.replace(/\s+/g, ' ');
 
+// Booking overlay "alcohol" subcategories should be treated as part of the broader
+// "Wine, Beer, and Spirits" search "What" (even though the overlay titles are
+// "Wineries <state>", "Breweries <state>", etc).
+const WINE_BEER_SPIRITS_WHAT_KEY = normalizeWhatKey('Wine, Beer, and Spirits');
+const WINE_BEER_SPIRITS_BOOKING_PREFIX_KEYS = new Set<string>([
+	normalizeWhatKey('Wineries'),
+	normalizeWhatKey('Breweries'),
+	normalizeWhatKey('Distilleries'),
+	normalizeWhatKey('Cideries'),
+]);
+
+const bookingTitlePrefixMatchesSearchWhatKey = (
+	prefix: string,
+	normalizedSearchWhatKey: string
+): boolean => {
+	const prefixKey = normalizeWhatKey(prefix);
+	if (prefixKey === normalizedSearchWhatKey) return true;
+	if (
+		normalizedSearchWhatKey === WINE_BEER_SPIRITS_WHAT_KEY &&
+		WINE_BEER_SPIRITS_BOOKING_PREFIX_KEYS.has(prefixKey)
+	) {
+		return true;
+	}
+	return false;
+};
+
 const WHAT_TO_RESULT_DOT_COLOR: Record<string, string> = {
 	[normalizeWhatKey('Radio Stations')]: '#56DA73',
 	[normalizeWhatKey('Venues')]: '#00CBFB',
@@ -1153,7 +1179,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			for (const contact of bookingExtraVisibleContacts) {
 				const prefix = getBookingTitlePrefixFromContactTitle(contact.title);
 				if (!prefix) continue;
-				if (normalizeWhatKey(prefix) !== normalizedSearchWhatKey) continue;
+				if (!bookingTitlePrefixMatchesSearchWhatKey(prefix, normalizedSearchWhatKey)) continue;
 				byId.set(contact.id, contact);
 			}
 		}
@@ -2089,7 +2115,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				for (const contact of bookingExtraVisibleContacts) {
 					const prefix = getBookingTitlePrefixFromContactTitle(contact.title);
 					if (!prefix) continue;
-					if (normalizeWhatKey(prefix) !== normalizedSearchWhat) continue;
+					if (!bookingTitlePrefixMatchesSearchWhatKey(prefix, normalizedSearchWhat)) continue;
 					const coords = bookingExtraCoordsByContactId.get(contact.id) ?? null;
 					if (!isCoordsInBounds(coords)) continue;
 					selectedIds.add(contact.id);
