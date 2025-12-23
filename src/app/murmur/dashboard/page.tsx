@@ -42,6 +42,7 @@ import { getStateAbbreviation } from '@/utils/string';
 import { stateBadgeColorMap } from '@/constants/ui';
 import SearchResultsMap from '@/components/molecules/SearchResultsMap/SearchResultsMap';
 import { ContactWithName } from '@/types/contact';
+import { MapResultsPanelSkeleton } from '@/components/molecules/MapResultsPanelSkeleton/MapResultsPanelSkeleton';
 import {
 	ContactResearchPanel,
 	ContactResearchHorizontalStrip,
@@ -3317,16 +3318,16 @@ const DashboardContent = () => {
 																			</button>
 																			<span className="font-inter text-[13px] font-medium text-black relative -translate-y-[2px]">
 																				{selectedContacts.length} selected
-																				{isMapResultsLoading && (
-																					<span className="ml-2 text-[12px] text-black/60">
-																						loading…
-																					</span>
-																				)}
 																			</span>
 																			<button
 																				type="button"
 																				onClick={() => handleSelectAll(mapPanelContacts)}
-																				className="font-secondary text-[12px] font-medium text-black hover:underline absolute right-[10px] top-1/2 translate-y-[4px]"
+																				disabled={isMapResultsLoading}
+																				className={`font-secondary text-[12px] font-medium text-black absolute right-[10px] top-1/2 translate-y-[4px] ${
+																					isMapResultsLoading
+																						? 'opacity-60 pointer-events-none'
+																						: 'hover:underline'
+																				}`}
 																			>
 																				{isAllPanelContactsSelected ? 'Deselect All' : 'Select all'}
 																			</button>
@@ -3340,7 +3341,13 @@ const DashboardContent = () => {
 																			offsetRight={-6}
 																			disableOverflowClass
 																		>
-																			{mapPanelContacts.map((contact) => {
+																			{isMapResultsLoading ? (
+																				<MapResultsPanelSkeleton
+																					variant="desktop"
+																					rows={Math.max(mapPanelContacts.length, 14)}
+																				/>
+																			) : (
+																				mapPanelContacts.map((contact) => {
 																				const isSelected = selectedContacts.includes(
 																					contact.id
 																				);
@@ -3543,9 +3550,10 @@ const DashboardContent = () => {
 																						)}
 																					</div>
 																				);
-																			})}
+																				})
+																			)}
 																		</CustomScrollbar>
-																		{isMapPanelCreateCampaignVisible && (
+																		{!isMapResultsLoading && isMapPanelCreateCampaignVisible && (
 																			<div className="flex-shrink-0 w-full px-[10px] pb-[10px]">
 																				<Button
 																					disabled={
@@ -3726,16 +3734,16 @@ const DashboardContent = () => {
 																	</button>
 																	<span className="font-inter text-[13px] font-medium text-black">
 																		{selectedContacts.length} selected
-																		{isMapResultsLoading && (
-																			<span className="ml-2 text-[12px] text-black/60">
-																				loading…
-																			</span>
-																		)}
 																	</span>
 																	<button
 																		type="button"
 																		onClick={() => handleSelectAll(mapPanelContacts)}
-																		className="font-secondary text-[12px] font-medium text-black hover:underline absolute right-[10px] top-1/2 -translate-y-1/2"
+																		disabled={isMapResultsLoading}
+																		className={`font-secondary text-[12px] font-medium text-black absolute right-[10px] top-1/2 -translate-y-1/2 ${
+																			isMapResultsLoading
+																				? 'opacity-60 pointer-events-none'
+																				: 'hover:underline'
+																		}`}
 																	>
 																		{isAllPanelContactsSelected ? 'Deselect All' : 'Select all'}
 																	</button>
@@ -3749,7 +3757,13 @@ const DashboardContent = () => {
 																	offsetRight={-6}
 																	disableOverflowClass
 																>
-																	{mapPanelContacts.map((contact) => {
+																	{isMapResultsLoading ? (
+																		<MapResultsPanelSkeleton
+																			variant="narrow"
+																			rows={Math.max(mapPanelContacts.length, 8)}
+																		/>
+																	) : (
+																		mapPanelContacts.map((contact) => {
 																		const isSelected = selectedContacts.includes(
 																			contact.id
 																		);
@@ -3897,49 +3911,52 @@ const DashboardContent = () => {
 																				</div>
 																			</div>
 																		);
-																	})}
+																		})
+																	)}
 																</CustomScrollbar>
-																<div className="flex-shrink-0 w-full px-[10px] pb-[10px]">
-																	<Button
-																		disabled={
-																			isPendingCreateCampaign ||
-																			isPendingBatchUpdateContacts
-																		}
-																		variant="primary-light"
-																		bold
-																		className={`relative w-full h-[39px] !bg-[#5DAB68] hover:!bg-[#4e9b5d] !text-white border border-[#000000] overflow-hidden ${
-																			selectedContacts.length === 0
-																				? 'opacity-[0.62]'
-																				: 'opacity-100'
-																		}`}
-																		style={
-																			selectedContacts.length === 0
-																				? { height: '39px', filter: 'grayscale(100%)' }
-																				: { height: '39px' }
-																		}
-																		onClick={() => {
-																			if (selectedContacts.length === 0) return;
-																			handleCreateCampaign();
-																		}}
-																	>
-																		<span className="relative z-20" style={{ fontFamily: 'Inter, sans-serif', fontWeight: 700 }}>Create Campaign</span>
-																		<div
-																			className="absolute inset-y-0 right-0 w-[65px] z-20 flex items-center justify-center bg-[#74D178] cursor-pointer"
-																			onClick={(e) => {
-																				e.stopPropagation();
-																				handleSelectAll(mapPanelContacts);
+																{!isMapResultsLoading && (
+																	<div className="flex-shrink-0 w-full px-[10px] pb-[10px]">
+																		<Button
+																			disabled={
+																				isPendingCreateCampaign ||
+																				isPendingBatchUpdateContacts
+																			}
+																			variant="primary-light"
+																			bold
+																			className={`relative w-full h-[39px] !bg-[#5DAB68] hover:!bg-[#4e9b5d] !text-white border border-[#000000] overflow-hidden ${
+																				selectedContacts.length === 0
+																					? 'opacity-[0.62]'
+																					: 'opacity-100'
+																			}`}
+																			style={
+																				selectedContacts.length === 0
+																					? { height: '39px', filter: 'grayscale(100%)' }
+																					: { height: '39px' }
+																			}
+																			onClick={() => {
+																				if (selectedContacts.length === 0) return;
+																				handleCreateCampaign();
 																			}}
 																		>
-																			<span className="text-black text-[14px] font-medium">
-																				All
-																			</span>
+																			<span className="relative z-20" style={{ fontFamily: 'Inter, sans-serif', fontWeight: 700 }}>Create Campaign</span>
+																			<div
+																				className="absolute inset-y-0 right-0 w-[65px] z-20 flex items-center justify-center bg-[#74D178] cursor-pointer"
+																				onClick={(e) => {
+																					e.stopPropagation();
+																					handleSelectAll(mapPanelContacts);
+																				}}
+																			>
+																				<span className="text-black text-[14px] font-medium">
+																					All
+																				</span>
+																			</div>
+																			<span
+																				aria-hidden="true"
+																				className="pointer-events-none absolute inset-y-0 right-[65px] w-[2px] bg-[#349A37] z-10"
+																			/>
+																			</Button>
 																		</div>
-																		<span
-																			aria-hidden="true"
-																			className="pointer-events-none absolute inset-y-0 right-[65px] w-[2px] bg-[#349A37] z-10"
-																		/>
-																		</Button>
-																	</div>
+																)}
 																</div>
 															)}
 														</div>
