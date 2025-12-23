@@ -527,7 +527,8 @@ const DashboardContent = () => {
 								position: 'fixed',
 								// In map view, the mini search bar is overlaid on the map,
 								// so the dropdown should anchor just below it.
-								top: '74px',
+								// Search bar is fixed at 33px and the input is 49px tall; add a small gap.
+								top: '92px',
 								left: dropdownLeft,
 								height: dropdownHeight,
 								transition: dropdownTransition,

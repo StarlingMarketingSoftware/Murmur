@@ -4,8 +4,6 @@ export interface UsStateCentroid {
 	centroid: { lat: number; lng: number };
 }
 
-// Approximate geographic centroids for the 50 US states.
-// Source values are commonly used state centroid approximations (sufficient for "nearest states" sorting).
 export const US_STATES: UsStateCentroid[] = [
 	{ name: 'Alabama', abbr: 'AL', centroid: { lat: 32.806671, lng: -86.79113 } },
 	{ name: 'Alaska', abbr: 'AK', centroid: { lat: 61.370716, lng: -152.404419 } },
