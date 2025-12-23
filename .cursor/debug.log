@@ -1,2 +1,0 @@
-{"location":"useDashboard.tsx:loadingEffect","message":"Loading state check","data":{"isLoadingContacts":false,"isRefetchingContacts":false,"isSearchPending":false,"contactsCount":0},"timestamp":1766447879294,"sessionId":"debug-session","hypothesisId":"H4"}
-{"location":"useDashboard.tsx:loadingEffect","message":"Loading state check","data":{"isLoadingContacts":false,"isRefetchingContacts":false,"isSearchPending":false,"contactsCount":0},"timestamp":1766447879305,"sessionId":"debug-session","hypothesisId":"H4"}
