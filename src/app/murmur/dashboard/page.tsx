@@ -419,16 +419,17 @@ const DashboardContent = () => {
 			.join(' ')
 			.trim();
 
-		// Set form value and submit (we need to do this in a setTimeout to allow state to settle)
-		setTimeout(() => {
-			if (combinedSearch && form && onSubmit) {
-				form.setValue('searchText', combinedSearch, {
-					shouldValidate: false,
-					shouldDirty: true,
-				});
-				form.handleSubmit(onSubmit)();
-			}
-		}, 0);
+		// Trigger the search immediately (no setTimeout) to avoid race conditions
+		// when user interacts with the map during zoom animation.
+		if (combinedSearch && onSubmit) {
+			// Update form value for display consistency
+			form.setValue('searchText', combinedSearch, {
+				shouldValidate: false,
+				shouldDirty: true,
+			});
+			// Call onSubmit directly with the search data
+			onSubmit({ searchText: combinedSearch, excludeUsedContacts: form.getValues('excludeUsedContacts') ?? false });
+		}
 	};
 
 	// Helper to trigger search with current input values (called on Enter key in "Where" input)

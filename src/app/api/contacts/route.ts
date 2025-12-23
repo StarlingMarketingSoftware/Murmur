@@ -961,8 +961,22 @@ export async function GET(req: NextRequest) {
 						.trim() || ''
 				);
 			};
-			const titlePrefix =
-				(bboxTitlePrefix ?? '').trim() || inferTitlePrefixFromQuery(query);
+			/**
+			 * Map user-facing "What" labels to the DB title prefixes used for filtering.
+			 * This is especially important for bbox (rectangle selection) searches, which
+			 * intentionally bypass the richer query parsing/vector flow.
+			 */
+			const normalizeBboxTitlePrefix = (value: string): string => {
+				const trimmed = value.trim();
+				if (!trimmed) return '';
+				// The UI "What" is "Festivals", but contacts are stored as "Music Festivals ...".
+				// Treat "Festival(s)" as an alias so rectangle selection behaves like normal search.
+				if (/^festivals?$/i.test(trimmed)) return 'Music Festivals';
+				return trimmed;
+			};
+			const titlePrefix = normalizeBboxTitlePrefix(
+				(bboxTitlePrefix ?? '').trim() || inferTitlePrefixFromQuery(query)
+			);
 
 			// Respect "exclude used contacts" (contacts already in any of the user's lists).
 			let addedContactIds: number[] = [];

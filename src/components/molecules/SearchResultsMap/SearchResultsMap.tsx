@@ -1795,8 +1795,16 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						normalizeStateKey((event.feature.getId() as string) || undefined);
 					setSelectedStateKey(normalizedKey);
 
-					// Immediately focus the map on the clicked state so the viewport doesn't
+					// IMPORTANT: Trigger the search FIRST, before any map animation.
+					// This ensures the search starts immediately regardless of whether
+					// the user interrupts the zoom animation by interacting with the map.
+					if (stateName) {
+						onStateSelectRef.current?.(stateName);
+					}
+
+					// Then focus the map on the clicked state so the viewport doesn't
 					// jump back to a US-wide view while the next state search loads.
+					// If the user interrupts this animation, the search will still complete.
 					const geometry = event.feature.getGeometry();
 					if (map && geometry) {
 						const bounds = new google.maps.LatLngBounds();
@@ -1815,9 +1823,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 								map.setZoom(8);
 							}
 						});
-					}
-					if (stateName) {
-						onStateSelectRef.current?.(stateName);
 					}
 				}
 			);
@@ -3101,16 +3106,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		return markerPinCircleDiameterPx / MAP_MARKER_PIN_CIRCLE_DIAMETER;
 	}, [markerPinCircleDiameterPx]);
 
-	const markerPinMetrics = useMemo(() => {
-		if (!isLoaded) return null;
-		const width = MAP_MARKER_PIN_VIEWBOX_WIDTH * markerPinScaleFactor;
-		const height = MAP_MARKER_PIN_VIEWBOX_HEIGHT * markerPinScaleFactor;
-		// Keep the marker positioned like our previous dot markers: anchor on the circle center.
-		const anchorX = MAP_MARKER_PIN_CIRCLE_CENTER_X * markerPinScaleFactor;
-		const anchorY = MAP_MARKER_PIN_CIRCLE_CENTER_Y * markerPinScaleFactor;
-		return { width, height, anchorX, anchorY };
-	}, [isLoaded, markerPinScaleFactor]);
-
 	const markerPinUrlCacheRef = useRef<Map<string, string>>(new Map());
 	const getMarkerPinUrl = useCallback(
 		(fillColor: string, strokeColor: string, searchWhat?: string | null, baseColor?: string): string => {
@@ -3122,29 +3117,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			return url;
 		},
 		[]
-	);
-
-	const getMarkerPinIcon = useCallback(
-		(
-			fillColor: string,
-			strokeColor: string,
-			searchWhat?: string | null,
-			scaleMultiplier: number = 1,
-			baseColor: string = RESULT_DOT_STROKE_COLOR_DEFAULT
-		): google.maps.Icon | undefined => {
-			if (!isLoaded) return undefined;
-			const metrics = markerPinMetrics;
-			if (!metrics) return undefined;
-
-			const safeScale = Number.isFinite(scaleMultiplier) && scaleMultiplier > 0 ? scaleMultiplier : 1;
-
-			return {
-				url: getMarkerPinUrl(fillColor, strokeColor, searchWhat, baseColor),
-				scaledSize: new google.maps.Size(metrics.width * safeScale, metrics.height * safeScale),
-				anchor: new google.maps.Point(metrics.anchorX * safeScale, metrics.anchorY * safeScale),
-			};
-		},
-		[getMarkerPinUrl, isLoaded, markerPinMetrics]
 	);
 
 	const defaultDotFillColor = useMemo(() => {
@@ -3333,7 +3305,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					const pinStrokeColor = isSelected
 						? RESULT_DOT_STROKE_COLOR_SELECTED
 						: RESULT_DOT_STROKE_COLOR_DEFAULT;
-					const pinIcon = getMarkerPinIcon(pinFillColor, pinStrokeColor, whatForMarker);
 
 					const dotIcon =
 						isSelected
