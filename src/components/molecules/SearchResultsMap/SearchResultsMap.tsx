@@ -722,6 +722,12 @@ interface SearchResultsMapProps {
 	activeTool?: 'select' | 'grab';
 	/** Called when the user completes a rectangle selection (south/west/north/east). */
 	onAreaSelect?: (bounds: MapSelectionBounds, payload?: AreaSelectPayload) => void;
+	/**
+	 * Called whenever the currently-visible booking/promotion overlay pins that match the active
+	 * `searchWhat` category change (used to keep the right-side results panel feeling interactive
+	 * as the user pans/zooms, Zillow-style).
+	 */
+	onVisibleOverlayContactsChange?: (contacts: ContactWithName[]) => void;
 	onMarkerClick?: (contact: ContactWithName) => void;
 	onMarkerHover?: (contact: ContactWithName | null, meta?: MarkerHoverMeta) => void;
 	onToggleSelection?: (contactId: number) => void;
@@ -1031,6 +1037,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	selectedAreaBounds,
 	activeTool,
 	onAreaSelect,
+	onVisibleOverlayContactsChange,
 	onMarkerClick,
 	onMarkerHover,
 	onToggleSelection,
@@ -1129,6 +1136,58 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		lastPromotionOverlayVisibleContactsKeyRef.current = '';
 		setPromotionOverlayVisibleContacts([]);
 	}, [searchQuery]);
+
+	const normalizedSearchWhatKey = useMemo(
+		() => (searchWhat ? normalizeWhatKey(searchWhat) : null),
+		[searchWhat]
+	);
+
+	// Booking/promotion overlay pins can contain multiple "What" categories at once; only surface
+	// the ones that match the active search "What" in the dashboard's right-hand panel.
+	const visibleOverlayContactsMatchingWhat = useMemo(() => {
+		if (!normalizedSearchWhatKey) return [];
+
+		const byId = new Map<number, ContactWithName>();
+
+		if (isBookingSearch && bookingExtraVisibleContacts.length > 0) {
+			for (const contact of bookingExtraVisibleContacts) {
+				const prefix = getBookingTitlePrefixFromContactTitle(contact.title);
+				if (!prefix) continue;
+				if (normalizeWhatKey(prefix) !== normalizedSearchWhatKey) continue;
+				byId.set(contact.id, contact);
+			}
+		}
+
+		if (isPromotionSearch && promotionOverlayVisibleContacts.length > 0) {
+			for (const contact of promotionOverlayVisibleContacts) {
+				const title = contact.title ?? '';
+				const matchedPrefix =
+					PROMOTION_OVERLAY_TITLE_PREFIXES.find((p) => startsWithCaseInsensitive(title, p)) ??
+					null;
+				if (!matchedPrefix) continue;
+				if (normalizeWhatKey(matchedPrefix) !== normalizedSearchWhatKey) continue;
+				byId.set(contact.id, contact);
+			}
+		}
+
+		const list = Array.from(byId.values());
+		list.sort((a, b) => a.id - b.id);
+		return list;
+	}, [
+		normalizedSearchWhatKey,
+		isBookingSearch,
+		bookingExtraVisibleContacts,
+		isPromotionSearch,
+		promotionOverlayVisibleContacts,
+	]);
+
+	const lastReportedVisibleOverlayKeyRef = useRef<string | null>(null);
+	useEffect(() => {
+		const idsKey = visibleOverlayContactsMatchingWhat.map((c) => c.id).join(',');
+		if (idsKey === lastReportedVisibleOverlayKeyRef.current) return;
+		lastReportedVisibleOverlayKeyRef.current = idsKey;
+		onVisibleOverlayContactsChange?.(visibleOverlayContactsMatchingWhat);
+	}, [onVisibleOverlayContactsChange, visibleOverlayContactsMatchingWhat]);
 
 	const areaSelectionEnabled = useMemo(
 		() => activeTool === 'select' && typeof onAreaSelect === 'function',
