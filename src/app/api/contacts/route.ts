@@ -961,8 +961,22 @@ export async function GET(req: NextRequest) {
 						.trim() || ''
 				);
 			};
-			const titlePrefix =
-				(bboxTitlePrefix ?? '').trim() || inferTitlePrefixFromQuery(query);
+			/**
+			 * Map user-facing "What" labels to the DB title prefixes used for filtering.
+			 * This is especially important for bbox (rectangle selection) searches, which
+			 * intentionally bypass the richer query parsing/vector flow.
+			 */
+			const normalizeBboxTitlePrefix = (value: string): string => {
+				const trimmed = value.trim();
+				if (!trimmed) return '';
+				// The UI "What" is "Festivals", but contacts are stored as "Music Festivals ...".
+				// Treat "Festival(s)" as an alias so rectangle selection behaves like normal search.
+				if (/^festivals?$/i.test(trimmed)) return 'Music Festivals';
+				return trimmed;
+			};
+			const titlePrefix = normalizeBboxTitlePrefix(
+				(bboxTitlePrefix ?? '').trim() || inferTitlePrefixFromQuery(query)
+			);
 
 			// Respect "exclude used contacts" (contacts already in any of the user's lists).
 			let addedContactIds: number[] = [];
@@ -1516,9 +1530,12 @@ export async function GET(req: NextRequest) {
 		{
 			const mentionsFestivals = /\bfestivals?\b/i.test(rawQueryForParsing);
 			if (mentionsFestivals) {
+				// Festivals are often sparsely populated; avoid "jumping" across the map to
+				// distant states just to hit the global 500-result cap.
+				const FESTIVALS_LIMIT_CAP = 300;
 				const finalLimit = Math.max(
 					1,
-					Math.min(limit ?? VECTOR_SEARCH_LIMIT_DEFAULT, 500)
+					Math.min(limit ?? VECTOR_SEARCH_LIMIT_DEFAULT, FESTIVALS_LIMIT_CAP)
 				);
 				const fetchTake = Math.min(finalLimit * 4, 500);
 
@@ -1611,20 +1628,12 @@ export async function GET(req: NextRequest) {
 							};
 						};
 
-						const stateRings: string[][] = (() => {
-							const dist = buildStateDistanceMap(targetStateAbbr);
-							const ringMap = new Map<number, string[]>();
-							for (const abbr of ALL_STATE_ABBRS) {
-								const d = dist.get(abbr);
-								const key = d == null ? 999 : d;
-								const arr = ringMap.get(key) ?? [];
-								arr.push(abbr);
-								ringMap.set(key, arr);
-							}
-							return Array.from(ringMap.entries())
-								.sort((a, b) => a[0] - b[0])
-								.map(([, abbrs]) => abbrs.sort());
-						})();
+						// "Surrounding states" = bordering states only (distance 1).
+						// This prevents cases like including Washington for Montana while Idaho is empty.
+						const neighboringStates = (US_STATE_NEIGHBORS[targetStateAbbr] ?? [])
+							.slice()
+							.map((s) => s.toUpperCase())
+							.sort();
 
 						const festivalsStartsWith: Prisma.ContactWhereInput = {
 							title: { mode: 'insensitive', startsWith: 'Music Festivals' },
@@ -1650,17 +1659,10 @@ export async function GET(req: NextRequest) {
 							}
 						}
 
-						// Then fill with nearby states until we hit the limit (proximity-ordered).
-						if (results.length < finalLimit) {
-							for (
-								let ringIdx = 1;
-								ringIdx < stateRings.length && results.length < finalLimit;
-								ringIdx++
-							) {
-								const ring = stateRings[ringIdx] ?? [];
-								if (ring.length === 0) continue;
-								const stateOr = buildStateOr(ring);
-								if (!stateOr) continue;
+						// Then fill with surrounding states (bordering) only.
+						if (results.length < finalLimit && neighboringStates.length > 0) {
+							const stateOr = buildStateOr(neighboringStates);
+							if (stateOr) {
 								const filler = await prisma.contact.findMany({
 									where: {
 										AND: [

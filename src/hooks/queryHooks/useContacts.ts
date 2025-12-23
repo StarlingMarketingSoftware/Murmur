@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CustomMutationOptions, CustomQueryOptions } from '@/types';
 import { toast } from 'sonner';
 import { ContactFilterData, PostContactData } from '@/app/api/contacts/route';
@@ -56,6 +56,8 @@ export const useGetContacts = (options: ContactQueryOptions) => {
 			return response.json() as Promise<ContactWithName[]>;
 		},
 		enabled: options.enabled === undefined ? true : options.enabled,
+		// Keep previous results visible while a new search fetches (prevents UI + map flicker).
+		placeholderData: keepPreviousData,
 		gcTime: 1000 * 60 * 10, // Keep in cache for 10 minutes
 	});
 };
@@ -401,6 +403,9 @@ export const useGetContactsMapOverlay = (options: {
 			return response.json() as Promise<ContactWithName[]>;
 		},
 		enabled: (options.enabled ?? true) && Boolean(options.filters),
+		// Prevent marker flicker when the bbox/zoom changes by keeping the previous
+		// overlay results visible while the next window refetches.
+		placeholderData: keepPreviousData,
 		staleTime: 1000 * 60 * 5, // 5 minutes
 		gcTime: 1000 * 60 * 30, // Keep in cache for 30 minutes
 	});

@@ -47,8 +47,10 @@ const DEFAULT_LIMIT = 1200;
 const MAX_LIMIT = 2000;
 
 // Guard rails: prevent accidentally querying an entire region at once.
-const MAX_LAT_SPAN_DEG_BOOKING = 12;
-const MAX_LNG_SPAN_DEG_BOOKING = 12;
+// Booking overlays are denser than promotion overlays, but we still want pins to be visible
+// a couple zoom levels earlier (especially on wide screens). Keep this conservative.
+const MAX_LAT_SPAN_DEG_BOOKING = 24;
+const MAX_LNG_SPAN_DEG_BOOKING = 24;
 // Promotion overlays are small (state-level list pins) and should work at wide zoom levels.
 const MAX_LAT_SPAN_DEG_PROMOTION = 180;
 const MAX_LNG_SPAN_DEG_PROMOTION = 360;
