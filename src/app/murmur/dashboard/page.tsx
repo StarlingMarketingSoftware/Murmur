@@ -1388,7 +1388,12 @@ const DashboardContent = () => {
 			out.push(c);
 		};
 
-		// Visible overlay pins (matching "What") first so the panel feels reactive as you pan/zoom.
+		// Always pin selected contacts to the top so they don't "sink" as the viewport-driven list changes.
+		for (const id of selectedContacts) {
+			push(byId.get(id));
+		}
+
+		// Visible overlay pins (matching "What") next so the panel feels reactive as you pan/zoom.
 		for (const c of mapPanelVisibleOverlayContacts) {
 			push(byId.get(c.id) ?? c);
 		}
@@ -1405,6 +1410,7 @@ const DashboardContent = () => {
 		mapPanelExtraContactIds,
 		mapPanelExtraContacts,
 		mapPanelVisibleOverlayContacts,
+		selectedContacts,
 		searchedStateAbbrForMap,
 	]);
 
