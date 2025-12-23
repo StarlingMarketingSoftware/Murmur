@@ -1100,8 +1100,6 @@ const DashboardContent = () => {
 		setIsMapView,
 		isSearchPending,
 		usedContactIdsSet,
-		mapBboxFilter,
-		setMapBboxFilter,
 	} = useDashboard();
 
 	// Map-side panel should default to only the searched state, while the map itself keeps
@@ -1277,9 +1275,8 @@ const DashboardContent = () => {
 		() => extractStateAbbrFromSearchQuery(activeSearchQuery),
 		[activeSearchQuery]
 	);
-	// When a map rectangle selection is active, we treat results as already scoped to that area,
-	// so we should not "lock" behavior to the original searched state.
-	const searchedStateAbbrForMap = mapBboxFilter ? null : searchedStateAbbr;
+	// Keep the map side panel defaulted to the searched state (markers outside can still be added as extras).
+	const searchedStateAbbrForMap = searchedStateAbbr;
 
 	// Use the "What" from the last executed search (activeSearchQuery), not the live dropdown value.
 	const searchedWhat = useMemo(
@@ -3177,28 +3174,70 @@ const DashboardContent = () => {
 																selectedContacts={selectedContacts}
 																searchQuery={activeSearchQuery}
 																searchWhat={searchedWhat}
-																selectedAreaBounds={
-																	mapBboxFilter
-																		? {
-																				south: mapBboxFilter.south,
-																				west: mapBboxFilter.west,
-																				north: mapBboxFilter.north,
-																				east: mapBboxFilter.east,
-																			}
-																		: null
-																}
 																activeTool={activeMapTool}
-																onAreaSelect={(bounds) => {
-																	// Run a new search scoped to the drawn rectangle.
-																	// We use the "What" from the last executed search so results stay in-category.
-																	setMapBboxFilter({
-																		...bounds,
-																		titlePrefix: searchedWhat ?? null,
-																	});
-																	// After selecting an area, immediately switch back to Grab mode
-																	// so the user can pan/zoom without extra clicks.
-																	setActiveMapTool('grab');
-																}}
+																	onAreaSelect={(bounds, payload) => {
+																		const ids = payload?.contactIds ?? [];
+																		const extraContacts = payload?.extraContacts ?? [];
+
+																		if (ids.length > 0) {
+																			setSelectedContacts((prev) => {
+																				const next = new Set(prev);
+																				for (const id of ids) next.add(id);
+																				return Array.from(next);
+																			});
+																		}
+
+																		// Ensure overlay-only contacts (booking/promotion map overlays) can appear
+																		// as rows in the right-hand panel.
+																		if (extraContacts.length > 0) {
+																			setMapPanelExtraContacts((prev) => {
+																				const byId = new Map<number, ContactWithName>();
+																				for (const c of prev) byId.set(c.id, c);
+																				for (const c of extraContacts) {
+																					if (!byId.has(c.id)) byId.set(c.id, c);
+																				}
+																				return Array.from(byId.values());
+																			});
+																		}
+
+																		// If selected contacts are outside the searched state (or are overlay-only),
+																		// include them in the panel list so the user sees what was selected.
+																		if (ids.length > 0) {
+																			const nextExtraIds: number[] = [];
+																			const byId = new Map<number, ContactWithName>();
+																			for (const c of contacts || []) byId.set(c.id, c);
+
+																			for (const id of ids) {
+																				if (!baseContactIdSet.has(id)) {
+																					nextExtraIds.push(id);
+																					continue;
+																				}
+																				if (!searchedStateAbbrForMap) continue;
+																				const c = byId.get(id);
+																				if (!c) continue;
+																				const contactStateAbbr = getStateAbbreviation(c.state || '')
+																					.trim()
+																					.toUpperCase();
+																				if (contactStateAbbr && contactStateAbbr !== searchedStateAbbrForMap) {
+																					nextExtraIds.push(id);
+																				}
+																			}
+
+																			for (const c of extraContacts) nextExtraIds.push(c.id);
+
+																			if (nextExtraIds.length > 0) {
+																				setMapPanelExtraContactIds((prev) => {
+																					const next = new Set(prev);
+																					for (const id of nextExtraIds) next.add(id);
+																					return Array.from(next);
+																				});
+																			}
+																		}
+
+																		// After selecting an area, immediately switch back to Grab mode
+																		// so the user can pan/zoom without extra clicks.
+																		setActiveMapTool('grab');
+																	}}
 																onMarkerHover={handleMapMarkerHover}
 																lockedStateName={searchedStateAbbrForMap}
 																onStateSelect={(stateName) => {

@@ -33,6 +33,15 @@ type BoundingBox = { minLat: number; maxLat: number; minLng: number; maxLng: num
 type PreparedClippingPolygon = { polygon: ClippingPolygon; bbox: BoundingBox };
 
 type MapSelectionBounds = { south: number; west: number; north: number; east: number };
+type AreaSelectPayload = {
+	/** Contact ids inside the rectangle selection (primary results + matching overlay markers). */
+	contactIds: number[];
+	/**
+	 * Overlay contacts (not part of the primary `contacts` prop) that were selected, so the
+	 * parent can render them in a side panel list.
+	 */
+	extraContacts: ContactWithName[];
+};
 
 const closeRing = (ring: ClippingRing): ClippingRing => {
 	if (ring.length === 0) return ring;
@@ -710,7 +719,7 @@ interface SearchResultsMapProps {
 	/** Map interaction mode controlled by the dashboard (grab = pan/zoom, select = draw rectangle). */
 	activeTool?: 'select' | 'grab';
 	/** Called when the user completes a rectangle selection (south/west/north/east). */
-	onAreaSelect?: (bounds: MapSelectionBounds) => void;
+	onAreaSelect?: (bounds: MapSelectionBounds, payload?: AreaSelectPayload) => void;
 	onMarkerClick?: (contact: ContactWithName) => void;
 	onMarkerHover?: (contact: ContactWithName | null, meta?: MarkerHoverMeta) => void;
 	onToggleSelection?: (contactId: number) => void;
@@ -1288,37 +1297,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			});
 		},
 		[isAreaSelecting, ensureSelectionRect]
-	);
-
-	const handleMapMouseUp = useCallback(
-		(e: google.maps.MapMouseEvent) => {
-			if (!isAreaSelecting) return;
-			const start = selectionStartLatLngRef.current;
-			if (!start) {
-				clearSelectionRect();
-				return;
-			}
-			const end = e.latLng ? e.latLng.toJSON() : start;
-
-			// Ignore tiny "click" selections (treat as cancel).
-			const startClient = selectionStartClientRef.current;
-			const endClient = getClientPointFromDomEvent(e.domEvent);
-			const dx = startClient && endClient ? Math.abs(endClient.x - startClient.x) : 0;
-			const dy = startClient && endClient ? Math.abs(endClient.y - startClient.y) : 0;
-			const movedEnough = dx >= 6 || dy >= 6;
-
-			clearSelectionRect();
-
-			if (!movedEnough) return;
-
-			onAreaSelect?.({
-				south: Math.min(start.lat, end.lat),
-				west: Math.min(start.lng, end.lng),
-				north: Math.max(start.lat, end.lat),
-				east: Math.max(start.lng, end.lng),
-			});
-		},
-		[isAreaSelecting, clearSelectionRect, onAreaSelect]
 	);
 
 	const updateBookingExtraFetchBbox = useCallback(
@@ -1989,6 +1967,111 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		(contact: ContactWithName): LatLngLiteral | null =>
 			coordsByContactId.get(contact.id) ?? null,
 		[coordsByContactId]
+	);
+
+	const handleMapMouseUp = useCallback(
+		(e: google.maps.MapMouseEvent) => {
+			if (!isAreaSelecting) return;
+			const start = selectionStartLatLngRef.current;
+			if (!start) {
+				clearSelectionRect();
+				return;
+			}
+			const end = e.latLng ? e.latLng.toJSON() : start;
+
+			// Ignore tiny "click" selections (treat as cancel).
+			const startClient = selectionStartClientRef.current;
+			const endClient = getClientPointFromDomEvent(e.domEvent);
+			const dx = startClient && endClient ? Math.abs(endClient.x - startClient.x) : 0;
+			const dy = startClient && endClient ? Math.abs(endClient.y - startClient.y) : 0;
+			const movedEnough = dx >= 6 || dy >= 6;
+
+			clearSelectionRect();
+
+			if (!movedEnough) return;
+
+			const bounds: MapSelectionBounds = {
+				south: Math.min(start.lat, end.lat),
+				west: Math.min(start.lng, end.lng),
+				north: Math.max(start.lat, end.lat),
+				east: Math.max(start.lng, end.lng),
+			};
+
+			const isCoordsInBounds = (coords: LatLngLiteral | null | undefined): boolean => {
+				if (!coords) return false;
+				return (
+					coords.lat >= bounds.south &&
+					coords.lat <= bounds.north &&
+					coords.lng >= bounds.west &&
+					coords.lng <= bounds.east
+				);
+			};
+
+			// Build a selection payload so the dashboard can select contacts without triggering a new search.
+			const selectedIds = new Set<number>();
+			for (const contact of contactsWithCoords) {
+				const coords = coordsByContactId.get(contact.id) ?? null;
+				if (!isCoordsInBounds(coords)) continue;
+				selectedIds.add(contact.id);
+			}
+
+			const normalizedSearchWhat = searchWhat ? normalizeWhatKey(searchWhat) : null;
+
+			const extraContactsById = new Map<number, ContactWithName>();
+
+			// Include booking overlay pins only when they match the active "What" (category) and are visible.
+			if (isBookingSearch && normalizedSearchWhat && bookingExtraVisibleContacts.length > 0) {
+				for (const contact of bookingExtraVisibleContacts) {
+					const prefix = getBookingTitlePrefixFromContactTitle(contact.title);
+					if (!prefix) continue;
+					if (normalizeWhatKey(prefix) !== normalizedSearchWhat) continue;
+					const coords = bookingExtraCoordsByContactId.get(contact.id) ?? null;
+					if (!isCoordsInBounds(coords)) continue;
+					selectedIds.add(contact.id);
+					if (!baseContactIdSet.has(contact.id)) {
+						extraContactsById.set(contact.id, contact);
+					}
+				}
+			}
+
+			// Include promotion overlay pins only when they match the active "What" (category) and are visible.
+			if (isPromotionSearch && normalizedSearchWhat && promotionOverlayVisibleContacts.length > 0) {
+				for (const contact of promotionOverlayVisibleContacts) {
+					const title = contact.title ?? '';
+					const matchedPrefix =
+						PROMOTION_OVERLAY_TITLE_PREFIXES.find((p) => startsWithCaseInsensitive(title, p)) ??
+						null;
+					if (!matchedPrefix) continue;
+					if (normalizeWhatKey(matchedPrefix) !== normalizedSearchWhat) continue;
+					const coords = promotionOverlayCoordsByContactId.get(contact.id) ?? null;
+					if (!isCoordsInBounds(coords)) continue;
+					selectedIds.add(contact.id);
+					if (!baseContactIdSet.has(contact.id)) {
+						extraContactsById.set(contact.id, contact);
+					}
+				}
+			}
+
+			onAreaSelect?.(bounds, {
+				contactIds: Array.from(selectedIds),
+				extraContacts: Array.from(extraContactsById.values()),
+			});
+		},
+		[
+			isAreaSelecting,
+			clearSelectionRect,
+			onAreaSelect,
+			contactsWithCoords,
+			coordsByContactId,
+			searchWhat,
+			isBookingSearch,
+			bookingExtraVisibleContacts,
+			bookingExtraCoordsByContactId,
+			isPromotionSearch,
+			promotionOverlayVisibleContacts,
+			promotionOverlayCoordsByContactId,
+			baseContactIdSet,
+		]
 	);
 
 	const updateBackgroundDots = useCallback(
