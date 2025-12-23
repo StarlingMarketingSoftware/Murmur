@@ -43,6 +43,7 @@ import { stateBadgeColorMap } from '@/constants/ui';
 import SearchResultsMap from '@/components/molecules/SearchResultsMap/SearchResultsMap';
 import { ContactWithName } from '@/types/contact';
 import { MapResultsPanelSkeleton } from '@/components/molecules/MapResultsPanelSkeleton/MapResultsPanelSkeleton';
+import { getNearestUsStateNames, normalizeUsStateName } from '@/utils/usStates';
 import {
 	ContactResearchPanel,
 	ContactResearchHorizontalStrip,
@@ -485,6 +486,38 @@ const DashboardContent = () => {
 					? 176
 					: 98;
 
+		// Map-view UX: if the user already has an exact state selected, show that state first,
+		// then append the 4 nearest states (by centroid distance) underneath.
+		const canonicalWhereState = normalizeUsStateName(whereValue);
+		const shouldSuggestNearbyStates =
+			activeSection === 'where' &&
+			isMapView &&
+			!!canonicalWhereState &&
+			!!locationResults &&
+			locationResults.length === 1 &&
+			normalizeUsStateName(locationResults[0]?.label) === canonicalWhereState;
+
+		const whereDropdownLocations =
+			shouldSuggestNearbyStates && canonicalWhereState && locationResults
+				? (() => {
+						const nearby = getNearestUsStateNames(canonicalWhereState, 4).map((name) => ({
+							city: '',
+							state: name,
+							label: name,
+						}));
+
+						const combined = [...locationResults, ...nearby];
+						const seen = new Set<string>();
+						return combined.filter((loc) => {
+							const key = (loc.label || '').trim().toLowerCase();
+							if (!key) return false;
+							if (seen.has(key)) return false;
+							seen.add(key);
+							return true;
+						});
+				  })()
+				: locationResults;
+
 		const dropdownContent = (
 			<div
 				className="search-dropdown-menu hidden md:block w-[439px] bg-[#D8E5FB] rounded-[16px] border-2 border-black z-[110] relative overflow-hidden"
@@ -789,8 +822,8 @@ const DashboardContent = () => {
 									<div className="flex items-center justify-center h-full">
 										<div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900"></div>
 									</div>
-								) : locationResults && locationResults.length > 0 ? (
-									locationResults.map((loc, idx) => {
+								) : whereDropdownLocations && whereDropdownLocations.length > 0 ? (
+									whereDropdownLocations.map((loc, idx) => {
 										const { icon, backgroundColor } = getCityIconProps(
 											loc.city,
 											loc.state
