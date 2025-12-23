@@ -137,8 +137,8 @@ const extractWhyFromSearchQuery = (query: string): string | null => {
 	return tag ? `[${tag}]` : null;
 };
 
-const hasAtLeast3ParsedResearchSections = (metadata: string | null | undefined): boolean => {
-	if (!metadata) return false;
+const countParsedResearchSections = (metadata: string | null | undefined): number => {
+	if (!metadata) return 0;
 
 	// Extract all [n] sections first.
 	const allSections: Record<string, string> = {};
@@ -161,7 +161,7 @@ const hasAtLeast3ParsedResearchSections = (metadata: string | null | undefined):
 		expectedNum++;
 	}
 
-	return validCount >= 3;
+	return validCount;
 };
 
 const estimateWrappedLineCount = (text: string, charsPerLine: number): number => {
@@ -205,6 +205,68 @@ const getCompactMapResearchPanelHeightPx = (metadata: string): number | null => 
 
 	// Cap to the panel's natural unparsed height so it never feels cramped or oversized.
 	return clampNumber(rawHeight, 310, 423);
+};
+
+const MAP_RESEARCH_PANEL_FIXED_HEIGHT_BULLET_SPACING_PX = 73;
+const MAP_RESEARCH_PANEL_FIXED_HEIGHT_BULLET_OUTER_HEIGHT_PX = 59;
+const MAP_RESEARCH_PANEL_FIXED_HEIGHT_BULLET_INNER_HEIGHT_PX = 50;
+
+/**
+ * For parsed bullets + summary (bottom box) in the map panel, grow the summary box height
+ * with longer metadata so more text is visible without scrolling.
+ *
+ * Tuned to ContactResearchPanel's 15px text at 1.5 line-height and p-3 padding.
+ */
+const getMapPanelParsedSummaryBoxHeightPx = (metadata: string): number => {
+	const text = metadata.trim();
+	if (!text) return 197;
+
+	const approxLines = estimateWrappedLineCount(text, 52);
+	const targetLines = clampNumber(approxLines, 6, 12);
+
+	// Inner white box: (lines * lineHeight) + padding; outer adds a fixed chrome overhead.
+	const LINE_HEIGHT_PX = 23;
+	const INNER_PADDING_PX = 24; // p-3 top+bottom
+	const OUTER_OVERHEAD_PX = 15; // legacy: 197 outer -> 182 inner
+	const inner = Math.ceil(targetLines * LINE_HEIGHT_PX + INNER_PADDING_PX);
+	const outer = inner + OUTER_OVERHEAD_PX;
+
+	return clampNumber(outer, 197, 315);
+};
+
+/**
+ * For the map hover "Research" overlay, compute a compact height when the research panel is
+ * showing parsed bullets *and* the bottom summary box (to remove the large empty gap between them).
+ *
+ * NOTE: This is tuned to the `ContactResearchPanel` compact sizing that kicks in when a fixed
+ * `height` prop is provided (smaller bullets/spacing).
+ */
+const getCompactMapResearchPanelHeightPxForParsed = (metadata: string): number | null => {
+	const parsedCountRaw = countParsedResearchSections(metadata);
+	if (parsedCountRaw < 3) return null;
+
+	// `ContactResearchPanel` renders at most [1]-[5]
+	const parsedCount = clampNumber(parsedCountRaw, 3, 5);
+
+	// These constants mirror `ContactResearchPanel`'s non-compact header + compact (fixed height) bullets.
+	const HEADER_HEIGHT_PX = 24;
+	const CONTENT_START_TOP_PX = HEADER_HEIGHT_PX + 43; // header + divider + contact bar + divider
+	const BULLET_SPACING_PX = MAP_RESEARCH_PANEL_FIXED_HEIGHT_BULLET_SPACING_PX;
+	const SUMMARY_HEIGHT_PX = getMapPanelParsedSummaryBoxHeightPx(metadata);
+	const SUMMARY_BOTTOM_INSET_PX = 14;
+	// Mirrors `ContactResearchPanel`'s content height estimation for bullets in fixed-height mode.
+	// (See `contentHeight` inside the panel's `if (height)` branch.)
+	const BULLET_CONTENT_TOP_PADDING_PX = 6;
+	const BULLET_CONTENT_BOTTOM_PADDING_PX = 10;
+
+	const bulletContentHeightPx =
+		BULLET_CONTENT_TOP_PADDING_PX +
+		parsedCount * BULLET_SPACING_PX +
+		BULLET_CONTENT_BOTTOM_PADDING_PX;
+	const heightPx =
+		CONTENT_START_TOP_PX + bulletContentHeightPx + SUMMARY_HEIGHT_PX + SUMMARY_BOTTOM_INSET_PX;
+
+	return Math.ceil(heightPx);
 };
 
 const MAP_RESULTS_SEARCH_TRAY_WHAT_ICON_BY_LABEL: Record<
@@ -311,13 +373,16 @@ const DashboardContent = () => {
 
 	// Narrowest desktop detection (< 952px) - single column layout for map view
 	const [isNarrowestDesktop, setIsNarrowestDesktop] = useState(false);
+	const [isXlDesktop, setIsXlDesktop] = useState(false);
 
 	// Detect narrow desktop breakpoint
 	useEffect(() => {
 		if (typeof window === 'undefined') return;
 
 		const handleResize = () => {
-			setIsNarrowestDesktop(window.innerWidth < 952);
+			const width = window.innerWidth;
+			setIsNarrowestDesktop(width < 952);
+			setIsXlDesktop(width >= 1280);
 		};
 
 		handleResize();
@@ -354,16 +419,17 @@ const DashboardContent = () => {
 			.join(' ')
 			.trim();
 
-		// Set form value and submit (we need to do this in a setTimeout to allow state to settle)
-		setTimeout(() => {
-			if (combinedSearch && form && onSubmit) {
-				form.setValue('searchText', combinedSearch, {
-					shouldValidate: false,
-					shouldDirty: true,
-				});
-				form.handleSubmit(onSubmit)();
-			}
-		}, 0);
+		// Trigger the search immediately (no setTimeout) to avoid race conditions
+		// when user interacts with the map during zoom animation.
+		if (combinedSearch && onSubmit) {
+			// Update form value for display consistency
+			form.setValue('searchText', combinedSearch, {
+				shouldValidate: false,
+				shouldDirty: true,
+			});
+			// Call onSubmit directly with the search data
+			onSubmit({ searchText: combinedSearch, excludeUsedContacts: form.getValues('excludeUsedContacts') ?? false });
+		}
 	};
 
 	// Helper to trigger search with current input values (called on Enter key in "Where" input)
@@ -578,27 +644,6 @@ const DashboardContent = () => {
 								<div
 									className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
 									onClick={() => {
-										setWhatValue('Coffee Shops');
-										// On the results screen, changing "What" should immediately re-search
-										// without auto-advancing the UI to the "Where" (state) step.
-										setActiveSection(isMapView ? null : 'where');
-									}}
-								>
-									<div className="w-[38px] h-[38px] bg-[#A9DE78] rounded-[8px] flex-shrink-0 flex items-center justify-center">
-										<CoffeeShopsIcon />
-									</div>
-									<div className="ml-[12px] flex flex-col">
-										<div className="text-[20px] font-medium leading-none text-black font-inter">
-											Coffee Shops
-										</div>
-										<div className="text-[12px] leading-tight text-black mt-[4px]">
-											Book intimate daytime performances
-										</div>
-									</div>
-								</div>
-								<div
-									className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
-									onClick={() => {
 										setWhatValue('Restaurants');
 										// On the results screen, changing "What" should immediately re-search
 										// without auto-advancing the UI to the "Where" (state) step.
@@ -614,6 +659,27 @@ const DashboardContent = () => {
 										</div>
 										<div className="text-[12px] leading-tight text-black mt-[4px]">
 											Land steady dinner and brunch gigs
+										</div>
+									</div>
+								</div>
+								<div
+									className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+									onClick={() => {
+										setWhatValue('Coffee Shops');
+										// On the results screen, changing "What" should immediately re-search
+										// without auto-advancing the UI to the "Where" (state) step.
+										setActiveSection(isMapView ? null : 'where');
+									}}
+								>
+									<div className="w-[38px] h-[38px] bg-[#A9DE78] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+										<CoffeeShopsIcon />
+									</div>
+									<div className="ml-[12px] flex flex-col">
+										<div className="text-[20px] font-medium leading-none text-black font-inter">
+											Coffee Shops
+										</div>
+										<div className="text-[12px] leading-tight text-black mt-[4px]">
+											Book intimate daytime performances
 										</div>
 									</div>
 								</div>
@@ -1005,6 +1071,10 @@ const DashboardContent = () => {
 	// Map-side panel should default to only the searched state, while the map itself keeps
 	// showing all results. Clicking an out-of-state marker adds it to this panel list.
 	const [mapPanelExtraContactIds, setMapPanelExtraContactIds] = useState<number[]>([]);
+	// Booking zoom-in "extra" pins come from the map-overlay endpoint and are not part of the
+	// primary `contacts` list. Keep a local cache so selected/clicked overlay pins can appear
+	// as rows in the map side panel.
+	const [mapPanelExtraContacts, setMapPanelExtraContacts] = useState<ContactWithName[]>([]);
 	const mapViewContainerRef = useRef<HTMLDivElement | null>(null);
 	const [activeMapTool, setActiveMapTool] = useState<'select' | 'grab'>('grab');
 	const [hoveredMapMarkerContact, setHoveredMapMarkerContact] = useState<ContactWithName | null>(
@@ -1013,6 +1083,60 @@ const DashboardContent = () => {
 	const isMapResultsLoading = isSearchPending || isLoadingContacts || isRefetchingContacts;
 	const hasNoSearchResults =
 		hasSearched && !isMapResultsLoading && (contacts?.length ?? 0) === 0;
+
+	// In XL desktop map view, we render two "Create Campaign" CTAs (side panel + map overlay).
+	// Only show one at a time based on cursor location:
+	// - Cursor over right side panel -> show panel CTA
+	// - Cursor in bottom half of page -> show bottom CTA
+	const [isPointerInMapSidePanel, setIsPointerInMapSidePanel] = useState(false);
+	const [isPointerInMapBottomHalf, setIsPointerInMapBottomHalf] = useState(false);
+
+	const shouldUseDynamicMapCreateCampaignCta =
+		isMapView &&
+		!isMobile &&
+		isXlDesktop &&
+		!isMapResultsLoading &&
+		!hasNoSearchResults &&
+		!isNarrowestDesktop;
+
+	const mapCreateCampaignCtaLocation: 'panel' | 'bottom' | 'none' =
+		!shouldUseDynamicMapCreateCampaignCta
+			? 'panel'
+			: isPointerInMapSidePanel
+				? 'panel'
+				: isPointerInMapBottomHalf
+					? 'bottom'
+					: 'none';
+
+	const isMapPanelCreateCampaignVisible =
+		!shouldUseDynamicMapCreateCampaignCta || mapCreateCampaignCtaLocation === 'panel';
+	const isMapBottomCreateCampaignVisible =
+		!shouldUseDynamicMapCreateCampaignCta || mapCreateCampaignCtaLocation === 'bottom';
+
+	useEffect(() => {
+		if (typeof window === 'undefined') return;
+
+		// Reset when dynamic behavior is not active (prevents "stale" cursor state).
+		if (!shouldUseDynamicMapCreateCampaignCta) {
+			setIsPointerInMapSidePanel(false);
+			setIsPointerInMapBottomHalf(false);
+			return;
+		}
+
+		// Default to showing the bottom CTA until we observe the current cursor position.
+		setIsPointerInMapSidePanel(false);
+		setIsPointerInMapBottomHalf(true);
+
+		const handleMouseMove = (e: MouseEvent) => {
+			const nextIsBottomHalf = e.clientY >= window.innerHeight / 2;
+			setIsPointerInMapBottomHalf((prev) =>
+				prev === nextIsBottomHalf ? prev : nextIsBottomHalf
+			);
+		};
+
+		window.addEventListener('mousemove', handleMouseMove, { passive: true });
+		return () => window.removeEventListener('mousemove', handleMouseMove);
+	}, [shouldUseDynamicMapCreateCampaignCta]);
 	// Map hover research overlay behavior:
 	// - Hold briefly after hover ends (prevents flicker)
 	// - Then fade out quickly
@@ -1026,6 +1150,7 @@ const DashboardContent = () => {
 	const mapResearchPanelContactRef = useRef<ContactWithName | null>(null);
 	useEffect(() => {
 		setMapPanelExtraContactIds([]);
+		setMapPanelExtraContacts([]);
 	}, [activeSearchQuery]);
 
 	// Cleanup timers on unmount
@@ -1104,7 +1229,11 @@ const DashboardContent = () => {
 	const mapResearchPanelCompactHeightPx = useMemo(() => {
 		const metadata = mapResearchPanelContact?.metadata;
 		if (!metadata || metadata.trim().length === 0) return null;
-		if (hasAtLeast3ParsedResearchSections(metadata)) return null;
+		// Prefer a compact height for parsed bullets + summary (removes the big dead space gap).
+		const parsedHeight = getCompactMapResearchPanelHeightPxForParsed(metadata);
+		if (parsedHeight) return parsedHeight;
+
+		// Fallback: only compact summary-only research when it is short enough.
 		return getCompactMapResearchPanelHeightPx(metadata);
 	}, [mapResearchPanelContact?.metadata]);
 
@@ -1122,26 +1251,37 @@ const DashboardContent = () => {
 		[activeSearchQuery]
 	);
 
+	const baseContactIdSet = useMemo(
+		() => new Set<number>((contacts || []).map((c) => c.id)),
+		[contacts]
+	);
+
 	const mapPanelContacts = useMemo(() => {
 		const allContacts = contacts || [];
-		if (!searchedStateAbbrForMap) return allContacts;
+		const baseList = !searchedStateAbbrForMap
+			? allContacts
+			: allContacts.filter((contact) => {
+					const contactStateAbbr = getStateAbbreviation(contact.state || '').trim().toUpperCase();
+					return contactStateAbbr === searchedStateAbbrForMap;
+				});
 
-		const inState = allContacts.filter((contact) => {
-			const contactStateAbbr = getStateAbbreviation(contact.state || '').trim().toUpperCase();
-			return contactStateAbbr === searchedStateAbbrForMap;
-		});
+		if (mapPanelExtraContactIds.length === 0) return baseList;
 
-		if (mapPanelExtraContactIds.length === 0) return inState;
+		// Allow panel to render contacts that aren't in the base results (e.g. booking overlay pins).
+		const byId = new Map<number, ContactWithName>();
+		for (const c of allContacts) byId.set(c.id, c);
+		for (const c of mapPanelExtraContacts) {
+			if (!byId.has(c.id)) byId.set(c.id, c);
+		}
 
-		const byId = new Map(allContacts.map((c) => [c.id, c]));
-		const inStateIds = new Set(inState.map((c) => c.id));
+		const baseIds = new Set(baseList.map((c) => c.id));
 		const extras = mapPanelExtraContactIds
-			.filter((id) => !inStateIds.has(id))
+			.filter((id) => !baseIds.has(id))
 			.map((id) => byId.get(id))
 			.filter((c): c is NonNullable<typeof c> => Boolean(c));
 
-		return [...inState, ...extras];
-	}, [contacts, mapPanelExtraContactIds, searchedStateAbbrForMap]);
+		return [...baseList, ...extras];
+	}, [contacts, mapPanelExtraContactIds, mapPanelExtraContacts, searchedStateAbbrForMap]);
 
 	// Check if all panel contacts are selected (for map view "Select all" button)
 	const isAllPanelContactsSelected = useMemo(() => {
@@ -2373,9 +2513,10 @@ const DashboardContent = () => {
 					)}
 
 				{hasSearched &&
-					!isLoadingContacts &&
-					!isRefetchingContacts &&
 					activeTab === 'search' &&
+					// In map view, keep the tray UI mounted during loading so the page
+					// doesn't "blank out" between state searches.
+					(isMapView || (!isLoadingContacts && !isRefetchingContacts)) &&
 					(() => {
 						const trayWhy = isPromotion
 							? {
@@ -3019,12 +3160,25 @@ const DashboardContent = () => {
 																}}
 																isLoading={isSearchPending || isLoadingContacts || isRefetchingContacts}
 																onMarkerClick={(contact) => {
+																	// Ensure map-only overlay markers (e.g. Booking extra pins) can show up as
+																	// rows in the right-hand panel when selected/clicked.
+																	const isInBaseResults = baseContactIdSet.has(contact.id);
+																	if (!isInBaseResults) {
+																		setMapPanelExtraContacts((prev) =>
+																			prev.some((c) => c.id === contact.id)
+																				? prev
+																				: [contact, ...prev]
+																		);
+																		setMapPanelExtraContactIds((prev) =>
+																			prev.includes(contact.id) ? prev : [...prev, contact.id]
+																		);
+																		return;
+																	}
+
 																	// If the marker is outside the searched state, include it in the
 																	// right-hand map panel list (without changing what the map shows).
 																	if (!searchedStateAbbrForMap) return;
-																	const contactStateAbbr = getStateAbbreviation(
-																		contact.state || ''
-																	)
+																	const contactStateAbbr = getStateAbbreviation(contact.state || '')
 																		.trim()
 																		.toUpperCase();
 																	if (contactStateAbbr === searchedStateAbbrForMap) return;
@@ -3108,16 +3262,19 @@ const DashboardContent = () => {
 																	</div>
 																</div>
 															)}
-															{/* Search Results overlay box on the right side - hidden while loading and at narrowest breakpoint */}
-															{!(
-																isSearchPending ||
-																isLoadingContacts ||
-																isRefetchingContacts
-															) &&
-																!isNarrowestDesktop &&
-																!hasNoSearchResults && (
+															{/* Search Results overlay box on the right side - keep mounted during loading
+															    so the UI doesn't disappear between state searches. */}
+															{!isNarrowestDesktop && !hasNoSearchResults && (
 																	<div
 																		className="absolute top-[97px] right-[10px] rounded-[12px] flex flex-col"
+																		onMouseEnter={() => {
+																			if (!shouldUseDynamicMapCreateCampaignCta) return;
+																			setIsPointerInMapSidePanel(true);
+																		}}
+																		onMouseLeave={() => {
+																			if (!shouldUseDynamicMapCreateCampaignCta) return;
+																			setIsPointerInMapSidePanel(false);
+																		}}
 																		style={{
 																			width: '433px',
 																			height: mapResearchPanelContact && mapResearchPanelCompactHeightPx
@@ -3160,6 +3317,11 @@ const DashboardContent = () => {
 																			</button>
 																			<span className="font-inter text-[13px] font-medium text-black relative -translate-y-[2px]">
 																				{selectedContacts.length} selected
+																				{isMapResultsLoading && (
+																					<span className="ml-2 text-[12px] text-black/60">
+																						loading…
+																					</span>
+																				)}
 																			</span>
 																			<button
 																				type="button"
@@ -3383,47 +3545,57 @@ const DashboardContent = () => {
 																				);
 																			})}
 																		</CustomScrollbar>
-																		<div className="flex-shrink-0 w-full px-[10px] pb-[10px]">
-																			<Button
-																				isLoading={
-																					isPendingCreateCampaign ||
-																					isPendingBatchUpdateContacts
-																				}
-																				variant="primary-light"
-																				bold
-																				className={`relative w-full h-[39px] !bg-[#5DAB68] hover:!bg-[#4e9b5d] !text-white border border-[#000000] overflow-hidden ${
-																					selectedContacts.length === 0
-																						? 'opacity-[0.62]'
-																						: 'opacity-100'
-																				}`}
-																				style={
-																					selectedContacts.length === 0
-																						? { height: '39px', filter: 'grayscale(100%)' }
-																						: { height: '39px' }
-																				}
-																				onClick={() => {
-																					if (selectedContacts.length === 0) return;
-																					handleCreateCampaign();
-																				}}
-																			>
-																				<span className="relative z-20">Create Campaign</span>
-																				<div
-																					className="absolute inset-y-0 right-0 w-[65px] z-20 flex items-center justify-center bg-[#74D178] cursor-pointer"
-																					onClick={(e) => {
-																						e.stopPropagation();
-																						handleSelectAll(mapPanelContacts);
+																		{isMapPanelCreateCampaignVisible && (
+																			<div className="flex-shrink-0 w-full px-[10px] pb-[10px]">
+																				<Button
+																					disabled={
+																						isPendingCreateCampaign ||
+																						isPendingBatchUpdateContacts
+																					}
+																					variant="primary-light"
+																					bold
+																					className={`relative w-full h-[39px] !bg-[#5DAB68] hover:!bg-[#4e9b5d] !text-white border border-[#000000] overflow-hidden ${
+																						selectedContacts.length === 0
+																							? 'opacity-[0.62]'
+																							: 'opacity-100'
+																					}`}
+																					style={
+																						selectedContacts.length === 0
+																							? {
+																									height: '39px',
+																									filter: 'grayscale(100%)',
+																								}
+																							: { height: '39px' }
+																					}
+																					onClick={() => {
+																						if (selectedContacts.length === 0) return;
+																						handleCreateCampaign();
 																					}}
 																				>
-																					<span className="text-black text-[14px] font-medium">
-																						All
+																					<span
+																						className="relative z-20"
+																						style={{ fontFamily: 'Inter, sans-serif', fontWeight: 700 }}
+																					>
+																						Create Campaign
 																					</span>
-																				</div>
-																				<span
-																					aria-hidden="true"
-																					className="pointer-events-none absolute inset-y-0 right-[65px] w-[2px] bg-[#349A37] z-10"
-																				/>
-																			</Button>
-																		</div>
+																					<div
+																						className="absolute inset-y-0 right-0 w-[65px] z-20 flex items-center justify-center bg-[#74D178] cursor-pointer"
+																						onClick={(e) => {
+																							e.stopPropagation();
+																							handleSelectAll(mapPanelContacts);
+																						}}
+																					>
+																						<span className="text-black text-[14px] font-medium">
+																							All
+																						</span>
+																					</div>
+																					<span
+																						aria-hidden="true"
+																						className="pointer-events-none absolute inset-y-0 right-[65px] w-[2px] bg-[#349A37] z-10"
+																					/>
+																				</Button>
+																			</div>
+																		)}
 																		{mapResearchPanelContact && (
 																			<div
 																				className="absolute inset-0 z-50"
@@ -3441,6 +3613,16 @@ const DashboardContent = () => {
 																					// Tune box width for the 433px side panel
 																					boxWidth={405}
 																					height={mapResearchPanelCompactHeightPx ?? undefined}
+																					fixedHeightBoxSpacingPx={
+																						MAP_RESEARCH_PANEL_FIXED_HEIGHT_BULLET_SPACING_PX
+																					}
+																					fixedHeightBulletOuterHeightPx={
+																						MAP_RESEARCH_PANEL_FIXED_HEIGHT_BULLET_OUTER_HEIGHT_PX
+																					}
+																					fixedHeightBulletInnerHeightPx={
+																						MAP_RESEARCH_PANEL_FIXED_HEIGHT_BULLET_INNER_HEIGHT_PX
+																					}
+																					expandSummaryToFillHeight
 																				/>
 																			</div>
 																		)}
@@ -3455,9 +3637,16 @@ const DashboardContent = () => {
 																		isRefetchingContacts
 																	) &&
 																	!hasNoSearchResults && (
-																		<div className="absolute bottom-[10px] left-[10px] right-[10px] hidden xl:flex justify-center">
+																		<div
+																			className={`absolute bottom-[10px] left-[10px] right-[10px] hidden xl:flex justify-center transition-opacity duration-150 ${
+																				isMapBottomCreateCampaignVisible
+																					? 'opacity-100'
+																					: 'opacity-0 pointer-events-none'
+																			}`}
+																			aria-hidden={!isMapBottomCreateCampaignVisible}
+																		>
 																			<Button
-																				isLoading={
+																				disabled={
 																					isPendingCreateCampaign ||
 																					isPendingBatchUpdateContacts
 																				}
@@ -3477,8 +3666,9 @@ const DashboardContent = () => {
 																					if (selectedContacts.length === 0) return;
 																					handleCreateCampaign();
 																				}}
+																				tabIndex={isMapBottomCreateCampaignVisible ? 0 : -1}
 																			>
-																				<span className="relative z-20">
+																				<span className="relative z-20" style={{ fontFamily: 'Inter, sans-serif', fontWeight: 700 }}>
 																					Create Campaign
 																				</span>
 																				<div
@@ -3500,13 +3690,8 @@ const DashboardContent = () => {
 																		</div>
 																	)}
 															{/* Single column search results panel overlay at bottom - narrowest breakpoint (< 952px) */}
-															{isNarrowestDesktop &&
-																!(
-																	isSearchPending ||
-																	isLoadingContacts ||
-																	isRefetchingContacts
-																) &&
-																!hasNoSearchResults && (
+															{/* Keep mounted during loading so UI doesn't disappear between state searches. */}
+															{isNarrowestDesktop && !hasNoSearchResults && (
 																	<div
 																		className="absolute left-[10px] right-[10px] bottom-[10px] rounded-[12px] shadow-lg flex flex-col"
 																		style={{
@@ -3541,6 +3726,11 @@ const DashboardContent = () => {
 																	</button>
 																	<span className="font-inter text-[13px] font-medium text-black">
 																		{selectedContacts.length} selected
+																		{isMapResultsLoading && (
+																			<span className="ml-2 text-[12px] text-black/60">
+																				loading…
+																			</span>
+																		)}
 																	</span>
 																	<button
 																		type="button"
@@ -3711,7 +3901,7 @@ const DashboardContent = () => {
 																</CustomScrollbar>
 																<div className="flex-shrink-0 w-full px-[10px] pb-[10px]">
 																	<Button
-																		isLoading={
+																		disabled={
 																			isPendingCreateCampaign ||
 																			isPendingBatchUpdateContacts
 																		}
@@ -3732,7 +3922,7 @@ const DashboardContent = () => {
 																			handleCreateCampaign();
 																		}}
 																	>
-																		<span className="relative z-20">Create Campaign</span>
+																		<span className="relative z-20" style={{ fontFamily: 'Inter, sans-serif', fontWeight: 700 }}>Create Campaign</span>
 																		<div
 																			className="absolute inset-y-0 right-0 w-[65px] z-20 flex items-center justify-center bg-[#74D178] cursor-pointer"
 																			onClick={(e) => {
@@ -3821,7 +4011,8 @@ const DashboardContent = () => {
 																				? 'rgba(0, 0, 0, 0.4)'
 																				: '#000000',
 																		fontSize: '13px',
-																		fontWeight: 500,
+																		fontWeight: 700,
+																		fontFamily: 'Inter, sans-serif',
 																		borderRadius: '8px',
 																		lineHeight: 'normal',
 																		display: 'flex',
@@ -3868,7 +4059,7 @@ const DashboardContent = () => {
 															handleCreateCampaign();
 														}}
 													>
-														<span className="relative z-20">Create Campaign</span>
+														<span className="relative z-20" style={{ fontFamily: 'Inter, sans-serif', fontWeight: 700 }}>Create Campaign</span>
 														<div
 															className="absolute inset-y-0 right-0 w-[65px] z-20 flex items-center justify-center bg-[#74D178] cursor-pointer"
 															onClick={(e) => {
@@ -3903,7 +4094,7 @@ const DashboardContent = () => {
 															className="w-full h-[54px] min-h-[54px] !rounded-none !bg-[#5dab68] hover:!bg-[#4e9b5d] !text-white border border-[#000000] transition-colors !opacity-100 disabled:!opacity-100"
 															disabled={selectedContacts.length === 0}
 														>
-															Create Campaign
+															<span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 700 }}>Create Campaign</span>
 														</Button>
 													</div>,
 													document.body

@@ -5,7 +5,9 @@ export const FestivalsIcon = () => {
 		<svg
 			width="24"
 			height="24"
-			viewBox="0 0 24 24"
+			// Add a touch of padding so the icon doesn't render flush to the SVG bounds
+			// (some browsers will visually clip paths that sit right on the edge).
+			viewBox="-0.5 -0.5 25 25"
 			fill="none"
 			xmlns="http://www.w3.org/2000/svg"
 		>
