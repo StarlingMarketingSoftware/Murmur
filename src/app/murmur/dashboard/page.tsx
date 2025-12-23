@@ -23,6 +23,7 @@ import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
 import { RadioStationsIcon } from '@/components/atoms/_svg/RadioStationsIcon';
 import { NearMeIcon } from '@/components/atoms/_svg/NearMeIcon';
 import HomeIcon from '@/components/atoms/_svg/HomeIcon';
+import HomeExpandedIcon from '@/components/atoms/_svg/HomeExpandedIcon';
 import GrabIcon from '@/components/atoms/svg/GrabIcon';
 import { getCityIconProps } from '@/utils/cityIcons';
 import { Typography } from '@/components/ui/typography';
@@ -42,6 +43,8 @@ import { getStateAbbreviation } from '@/utils/string';
 import { stateBadgeColorMap } from '@/constants/ui';
 import SearchResultsMap from '@/components/molecules/SearchResultsMap/SearchResultsMap';
 import { ContactWithName } from '@/types/contact';
+import { MapResultsPanelSkeleton } from '@/components/molecules/MapResultsPanelSkeleton/MapResultsPanelSkeleton';
+import { getNearestUsStateNames, normalizeUsStateName } from '@/utils/usStates';
 import {
 	ContactResearchPanel,
 	ContactResearchHorizontalStrip,
@@ -484,6 +487,38 @@ const DashboardContent = () => {
 					? 176
 					: 98;
 
+		// Map-view UX: if the user already has an exact state selected, show that state first,
+		// then append the 4 nearest states (by centroid distance) underneath.
+		const canonicalWhereState = normalizeUsStateName(whereValue);
+		const shouldSuggestNearbyStates =
+			activeSection === 'where' &&
+			isMapView &&
+			!!canonicalWhereState &&
+			!!locationResults &&
+			locationResults.length === 1 &&
+			normalizeUsStateName(locationResults[0]?.label) === canonicalWhereState;
+
+		const whereDropdownLocations =
+			shouldSuggestNearbyStates && canonicalWhereState && locationResults
+				? (() => {
+						const nearby = getNearestUsStateNames(canonicalWhereState, 4).map((name) => ({
+							city: '',
+							state: name,
+							label: name,
+						}));
+
+						const combined = [...locationResults, ...nearby];
+						const seen = new Set<string>();
+						return combined.filter((loc) => {
+							const key = (loc.label || '').trim().toLowerCase();
+							if (!key) return false;
+							if (seen.has(key)) return false;
+							seen.add(key);
+							return true;
+						});
+				  })()
+				: locationResults;
+
 		const dropdownContent = (
 			<div
 				className="search-dropdown-menu hidden md:block w-[439px] bg-[#D8E5FB] rounded-[16px] border-2 border-black z-[110] relative overflow-hidden"
@@ -493,7 +528,8 @@ const DashboardContent = () => {
 								position: 'fixed',
 								// In map view, the mini search bar is overlaid on the map,
 								// so the dropdown should anchor just below it.
-								top: '74px',
+								// Search bar is fixed at 33px and the input is 49px tall; add a small gap.
+								top: '92px',
 								left: dropdownLeft,
 								height: dropdownHeight,
 								transition: dropdownTransition,
@@ -788,8 +824,8 @@ const DashboardContent = () => {
 									<div className="flex items-center justify-center h-full">
 										<div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900"></div>
 									</div>
-								) : locationResults && locationResults.length > 0 ? (
-									locationResults.map((loc, idx) => {
+								) : whereDropdownLocations && whereDropdownLocations.length > 0 ? (
+									whereDropdownLocations.map((loc, idx) => {
 										const { icon, backgroundColor } = getCityIconProps(
 											loc.city,
 											loc.state
@@ -2901,7 +2937,7 @@ const DashboardContent = () => {
 								<>
 									{/* Box to the left of the Home button */}
 									<div
-										className="flex items-center justify-center gap-[20px]"
+										className="group relative h-[53px] hover:h-[82px]"
 										style={{
 											position: 'absolute',
 											// Map is inset 9px from the viewport; "25px from map top" => 34px viewport.
@@ -2910,70 +2946,86 @@ const DashboardContent = () => {
 											// Home button is at: calc(100% + 179px). This box should be 10px to its left.
 											left: 'calc(100% + 179px - 143px)', // 133px width + 10px gap
 											width: '133px',
-											height: '53px',
 											borderRadius: '6px',
 											backgroundColor: 'rgba(255, 255, 255, 0.9)', // #FFFFFF @ 90%
 											border: '3px solid #000000',
 										}}
 									>
-										<button
-											type="button"
-											onClick={() => setActiveMapTool('select')}
-											aria-label="Select tool"
-											aria-pressed={activeMapTool === 'select'}
-											className="flex items-center justify-center"
-											style={{
-												width: '44px',
-												height: '44px',
-												borderRadius: '9px',
-												backgroundColor:
-													activeMapTool === 'select'
-														? '#4CDE71'
-														: 'rgba(153, 153, 153, 0.3)', // #999999 @ 30%
-												cursor: 'pointer',
-												padding: 0,
-												border: 'none',
-											}}
-										>
-											<div
-												aria-hidden="true"
-												style={{
-													width: '25px',
-													height: '25px',
-													backgroundColor:
-														activeMapTool === 'select' ? '#FFFFFF' : 'transparent',
-													border: '2px solid #000000',
-													boxSizing: 'border-box',
-												}}
-											/>
-										</button>
-										<button
-											type="button"
-											onClick={() => setActiveMapTool('grab')}
-											aria-label="Grab tool"
-											aria-pressed={activeMapTool === 'grab'}
-											className="flex items-center justify-center"
-											style={{
-												width: '44px',
-												height: '44px',
-												borderRadius: '9px',
-												backgroundColor:
-													activeMapTool === 'grab'
-														? '#4CDE71'
-														: 'rgba(153, 153, 153, 0.3)', // #999999 @ 30%
-												cursor: 'pointer',
-												padding: 0,
-												border: 'none',
-											}}
-										>
-											<GrabIcon innerFill={activeMapTool === 'grab' ? '#FFFFFF' : '#DCDFDD'} />
-										</button>
+										{/* Keep the buttons pinned to the collapsed center so expanding height doesn't move them */}
+										<div className="absolute left-1/2 top-[24px] -translate-x-1/2 -translate-y-1/2 flex items-center justify-center gap-[20px]">
+											<div className="relative">
+												<button
+													type="button"
+													onClick={() => setActiveMapTool('select')}
+													aria-label="Select tool"
+													aria-pressed={activeMapTool === 'select'}
+													className="flex items-center justify-center"
+													style={{
+														width: '44px',
+														height: '44px',
+														borderRadius: '9px',
+														backgroundColor:
+															activeMapTool === 'select'
+																? '#4CDE71'
+																: 'rgba(153, 153, 153, 0.3)', // #999999 @ 30%
+														cursor: 'pointer',
+														padding: 0,
+														border: 'none',
+													}}
+												>
+													<div
+														aria-hidden="true"
+														style={{
+															width: '25px',
+															height: '25px',
+															backgroundColor:
+																activeMapTool === 'select' ? '#FFFFFF' : 'transparent',
+															border: '2px solid #000000',
+															boxSizing: 'border-box',
+														}}
+													/>
+												</button>
+												{activeMapTool === 'select' && (
+													<div className="pointer-events-none absolute left-1/2 top-[52px] -translate-x-1/2 opacity-0 group-hover:opacity-100 font-inter text-[16px] font-semibold leading-none text-black select-none whitespace-nowrap">
+														Select
+													</div>
+												)}
+											</div>
+											<div className="relative">
+												<button
+													type="button"
+													onClick={() => setActiveMapTool('grab')}
+													aria-label="Grab tool"
+													aria-pressed={activeMapTool === 'grab'}
+													className="flex items-center justify-center"
+													style={{
+														width: '44px',
+														height: '44px',
+														borderRadius: '9px',
+														backgroundColor:
+															activeMapTool === 'grab'
+																? '#4CDE71'
+																: 'rgba(153, 153, 153, 0.3)', // #999999 @ 30%
+														cursor: 'pointer',
+														padding: 0,
+														border: 'none',
+													}}
+												>
+													<GrabIcon innerFill={activeMapTool === 'grab' ? '#FFFFFF' : '#DCDFDD'} />
+												</button>
+												{activeMapTool === 'grab' && (
+													<div className="pointer-events-none absolute left-1/2 top-[52px] -translate-x-1/2 opacity-0 group-hover:opacity-100 font-inter text-[16px] font-semibold leading-none text-black select-none whitespace-nowrap">
+														Grab
+													</div>
+												)}
+											</div>
+										</div>
 									</div>
 									<button
 										type="button"
 										onClick={handleCloseMapView}
 										aria-label="Home"
-										className="flex items-center justify-center cursor-pointer"
+										className="group flex items-center justify-center cursor-pointer w-[53px] hover:w-[158px]"
 										style={{
 											position: 'absolute',
 											// Map is inset 9px from the viewport; "25px from map top" => 34px viewport.
@@ -2981,7 +3033,6 @@ const DashboardContent = () => {
 											top: '1px',
 											// "179px to the right of the searchbar" => from wrapper's right edge.
 											left: 'calc(100% + 179px)',
-											width: '53px',
 											height: '53px',
 											borderRadius: '9px',
 											backgroundColor: '#D6D6D6',
@@ -2990,15 +3041,19 @@ const DashboardContent = () => {
 										}}
 									>
 										<div
-											className="flex items-center justify-center"
+											className="flex items-center justify-center w-[43px] group-hover:w-[146px]"
 											style={{
-												width: '43px',
 												height: '43px',
 												borderRadius: '9px',
 												backgroundColor: '#EAEAEA',
 											}}
 										>
-											<HomeIcon width={28} height={24} />
+											{/* Default: show house icon */}
+											<span className="group-hover:hidden">
+												<HomeIcon width={28} height={24} />
+											</span>
+											{/* Hover: show "Home" text SVG */}
+											<HomeExpandedIcon className="hidden group-hover:block" />
 										</div>
 									</button>
 								</>
@@ -3317,16 +3372,16 @@ const DashboardContent = () => {
 																			</button>
 																			<span className="font-inter text-[13px] font-medium text-black relative -translate-y-[2px]">
 																				{selectedContacts.length} selected
-																				{isMapResultsLoading && (
-																					<span className="ml-2 text-[12px] text-black/60">
-																						loading…
-																					</span>
-																				)}
 																			</span>
 																			<button
 																				type="button"
 																				onClick={() => handleSelectAll(mapPanelContacts)}
-																				className="font-secondary text-[12px] font-medium text-black hover:underline absolute right-[10px] top-1/2 translate-y-[4px]"
+																				disabled={isMapResultsLoading}
+																				className={`font-secondary text-[12px] font-medium text-black absolute right-[10px] top-1/2 translate-y-[4px] ${
+																					isMapResultsLoading
+																						? 'opacity-60 pointer-events-none'
+																						: 'hover:underline'
+																				}`}
 																			>
 																				{isAllPanelContactsSelected ? 'Deselect All' : 'Select all'}
 																			</button>
@@ -3340,7 +3395,13 @@ const DashboardContent = () => {
 																			offsetRight={-6}
 																			disableOverflowClass
 																		>
-																			{mapPanelContacts.map((contact) => {
+																			{isMapResultsLoading ? (
+																				<MapResultsPanelSkeleton
+																					variant="desktop"
+																					rows={Math.max(mapPanelContacts.length, 14)}
+																				/>
+																			) : (
+																				mapPanelContacts.map((contact) => {
 																				const isSelected = selectedContacts.includes(
 																					contact.id
 																				);
@@ -3543,9 +3604,10 @@ const DashboardContent = () => {
 																						)}
 																					</div>
 																				);
-																			})}
+																				})
+																			)}
 																		</CustomScrollbar>
-																		{isMapPanelCreateCampaignVisible && (
+																		{!isMapResultsLoading && isMapPanelCreateCampaignVisible && (
 																			<div className="flex-shrink-0 w-full px-[10px] pb-[10px]">
 																				<Button
 																					disabled={
@@ -3726,16 +3788,16 @@ const DashboardContent = () => {
 																	</button>
 																	<span className="font-inter text-[13px] font-medium text-black">
 																		{selectedContacts.length} selected
-																		{isMapResultsLoading && (
-																			<span className="ml-2 text-[12px] text-black/60">
-																				loading…
-																			</span>
-																		)}
 																	</span>
 																	<button
 																		type="button"
 																		onClick={() => handleSelectAll(mapPanelContacts)}
-																		className="font-secondary text-[12px] font-medium text-black hover:underline absolute right-[10px] top-1/2 -translate-y-1/2"
+																		disabled={isMapResultsLoading}
+																		className={`font-secondary text-[12px] font-medium text-black absolute right-[10px] top-1/2 -translate-y-1/2 ${
+																			isMapResultsLoading
+																				? 'opacity-60 pointer-events-none'
+																				: 'hover:underline'
+																		}`}
 																	>
 																		{isAllPanelContactsSelected ? 'Deselect All' : 'Select all'}
 																	</button>
@@ -3749,7 +3811,13 @@ const DashboardContent = () => {
 																	offsetRight={-6}
 																	disableOverflowClass
 																>
-																	{mapPanelContacts.map((contact) => {
+																	{isMapResultsLoading ? (
+																		<MapResultsPanelSkeleton
+																			variant="narrow"
+																			rows={Math.max(mapPanelContacts.length, 8)}
+																		/>
+																	) : (
+																		mapPanelContacts.map((contact) => {
 																		const isSelected = selectedContacts.includes(
 																			contact.id
 																		);
@@ -3897,49 +3965,52 @@ const DashboardContent = () => {
 																				</div>
 																			</div>
 																		);
-																	})}
+																		})
+																	)}
 																</CustomScrollbar>
-																<div className="flex-shrink-0 w-full px-[10px] pb-[10px]">
-																	<Button
-																		disabled={
-																			isPendingCreateCampaign ||
-																			isPendingBatchUpdateContacts
-																		}
-																		variant="primary-light"
-																		bold
-																		className={`relative w-full h-[39px] !bg-[#5DAB68] hover:!bg-[#4e9b5d] !text-white border border-[#000000] overflow-hidden ${
-																			selectedContacts.length === 0
-																				? 'opacity-[0.62]'
-																				: 'opacity-100'
-																		}`}
-																		style={
-																			selectedContacts.length === 0
-																				? { height: '39px', filter: 'grayscale(100%)' }
-																				: { height: '39px' }
-																		}
-																		onClick={() => {
-																			if (selectedContacts.length === 0) return;
-																			handleCreateCampaign();
-																		}}
-																	>
-																		<span className="relative z-20" style={{ fontFamily: 'Inter, sans-serif', fontWeight: 700 }}>Create Campaign</span>
-																		<div
-																			className="absolute inset-y-0 right-0 w-[65px] z-20 flex items-center justify-center bg-[#74D178] cursor-pointer"
-																			onClick={(e) => {
-																				e.stopPropagation();
-																				handleSelectAll(mapPanelContacts);
+																{!isMapResultsLoading && (
+																	<div className="flex-shrink-0 w-full px-[10px] pb-[10px]">
+																		<Button
+																			disabled={
+																				isPendingCreateCampaign ||
+																				isPendingBatchUpdateContacts
+																			}
+																			variant="primary-light"
+																			bold
+																			className={`relative w-full h-[39px] !bg-[#5DAB68] hover:!bg-[#4e9b5d] !text-white border border-[#000000] overflow-hidden ${
+																				selectedContacts.length === 0
+																					? 'opacity-[0.62]'
+																					: 'opacity-100'
+																			}`}
+																			style={
+																				selectedContacts.length === 0
+																					? { height: '39px', filter: 'grayscale(100%)' }
+																					: { height: '39px' }
+																			}
+																			onClick={() => {
+																				if (selectedContacts.length === 0) return;
+																				handleCreateCampaign();
 																			}}
 																		>
-																			<span className="text-black text-[14px] font-medium">
-																				All
-																			</span>
+																			<span className="relative z-20" style={{ fontFamily: 'Inter, sans-serif', fontWeight: 700 }}>Create Campaign</span>
+																			<div
+																				className="absolute inset-y-0 right-0 w-[65px] z-20 flex items-center justify-center bg-[#74D178] cursor-pointer"
+																				onClick={(e) => {
+																					e.stopPropagation();
+																					handleSelectAll(mapPanelContacts);
+																				}}
+																			>
+																				<span className="text-black text-[14px] font-medium">
+																					All
+																				</span>
+																			</div>
+																			<span
+																				aria-hidden="true"
+																				className="pointer-events-none absolute inset-y-0 right-[65px] w-[2px] bg-[#349A37] z-10"
+																			/>
+																			</Button>
 																		</div>
-																		<span
-																			aria-hidden="true"
-																			className="pointer-events-none absolute inset-y-0 right-[65px] w-[2px] bg-[#349A37] z-10"
-																		/>
-																		</Button>
-																	</div>
+																)}
 																</div>
 															)}
 														</div>
