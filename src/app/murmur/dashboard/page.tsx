@@ -1114,9 +1114,18 @@ const DashboardContent = () => {
 	const [hoveredMapMarkerContact, setHoveredMapMarkerContact] = useState<ContactWithName | null>(
 		null
 	);
+	// When hovering a row in the map side panel, highlight/show the corresponding marker on the map.
+	const [hoveredMapPanelContactId, setHoveredMapPanelContactId] = useState<number | null>(null);
 	const isMapResultsLoading = isSearchPending || isLoadingContacts || isRefetchingContacts;
 	const hasNoSearchResults =
 		hasSearched && !isMapResultsLoading && (contacts?.length ?? 0) === 0;
+
+	useEffect(() => {
+		// Prevent stale hover state when leaving map view or while results are transitioning.
+		if (!isMapView || isMapResultsLoading) {
+			setHoveredMapPanelContactId(null);
+		}
+	}, [isMapResultsLoading, isMapView]);
 
 	// In XL desktop map view, we render two "Create Campaign" CTAs (side panel + map overlay).
 	// Only show one at a time based on cursor location:
@@ -3172,6 +3181,7 @@ const DashboardContent = () => {
 															<SearchResultsMap
 																contacts={contacts || []}
 																selectedContacts={selectedContacts}
+																externallyHoveredContactId={hoveredMapPanelContactId}
 																searchQuery={activeSearchQuery}
 																searchWhat={searchedWhat}
 																activeTool={activeMapTool}
@@ -3444,6 +3454,7 @@ const DashboardContent = () => {
 																				const isSelected = selectedContacts.includes(
 																					contact.id
 																				);
+																				const isHovered = hoveredMapPanelContactId === contact.id;
 																				const isUsed = usedContactIdsSet.has(contact.id);
 																				const firstName = contact.firstName || '';
 																				const lastName = contact.lastName || '';
@@ -3463,9 +3474,14 @@ const DashboardContent = () => {
 																						data-contact-id={contact.id}
 																						className="cursor-pointer transition-colors grid grid-cols-2 grid-rows-2 w-full h-[49px] overflow-hidden rounded-[8px] border-2 border-black select-none relative"
 																						style={{
+																							// Hover should be a subtle darken, not "selected" blue.
 																							backgroundColor: isSelected
-																								? '#C9EAFF'
-																								: '#FFFFFF',
+																								? isHovered
+																									? '#BFE3FF'
+																									: '#C9EAFF'
+																								: isHovered
+																									? '#F3F4F6'
+																									: '#FFFFFF',
 																						}}
 																						onClick={() => {
 																							if (isSelected) {
@@ -3481,12 +3497,12 @@ const DashboardContent = () => {
 																								]);
 																							}
 																						}}
-																						onMouseEnter={() => {
-																							setHoveredContact(contact);
-																						}}
-																						onMouseLeave={() => {
-																							setHoveredContact(null);
-																						}}
+																						onMouseEnter={() => setHoveredMapPanelContactId(contact.id)}
+																						onMouseLeave={() =>
+																							setHoveredMapPanelContactId((prev) =>
+																								prev === contact.id ? null : prev
+																							)
+																						}
 																					>
 																						{/* Centered used contact dot */}
 																						{fullName && isUsed && (
@@ -3860,6 +3876,7 @@ const DashboardContent = () => {
 																		const isSelected = selectedContacts.includes(
 																			contact.id
 																		);
+																		const isHovered = hoveredMapPanelContactId === contact.id;
 																		const isUsed = usedContactIdsSet.has(contact.id);
 																		const firstName = contact.firstName || '';
 																		const lastName = contact.lastName || '';
@@ -3879,9 +3896,14 @@ const DashboardContent = () => {
 																				data-contact-id={contact.id}
 																				className="cursor-pointer transition-colors flex w-full h-[49px] overflow-hidden rounded-[8px] border-2 border-black select-none relative"
 																				style={{
+																					// Hover should be a subtle darken, not "selected" blue.
 																					backgroundColor: isSelected
-																						? '#C9EAFF'
-																						: '#FFFFFF',
+																						? isHovered
+																							? '#BFE3FF'
+																							: '#C9EAFF'
+																						: isHovered
+																							? '#F3F4F6'
+																							: '#FFFFFF',
 																				}}
 																				onClick={() => {
 																					if (isSelected) {
@@ -3897,10 +3919,12 @@ const DashboardContent = () => {
 																						]);
 																					}
 																				}}
-																				onMouseEnter={() =>
-																					setHoveredContact(contact)
+																				onMouseEnter={() => setHoveredMapPanelContactId(contact.id)}
+																				onMouseLeave={() =>
+																					setHoveredMapPanelContactId((prev) =>
+																						prev === contact.id ? null : prev
+																					)
 																				}
-																				onMouseLeave={() => setHoveredContact(null)}
 																			>
 																				{/* Left side - Name/Company and Location */}
 																				<div className="flex-1 min-w-0 flex flex-col justify-center pl-3 pr-2">
