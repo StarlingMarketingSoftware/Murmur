@@ -44,7 +44,7 @@ import { stateBadgeColorMap } from '@/constants/ui';
 import SearchResultsMap from '@/components/molecules/SearchResultsMap/SearchResultsMap';
 import { ContactWithName } from '@/types/contact';
 import { MapResultsPanelSkeleton } from '@/components/molecules/MapResultsPanelSkeleton/MapResultsPanelSkeleton';
-import { getNearestUsStateNames, normalizeUsStateName } from '@/utils/usStates';
+import { buildAllUsStateNames, getNearestUsStateNames, normalizeUsStateName } from '@/utils/usStates';
 import {
 	ContactResearchPanel,
 	ContactResearchHorizontalStrip,
@@ -498,26 +498,21 @@ const DashboardContent = () => {
 			locationResults.length === 1 &&
 			normalizeUsStateName(locationResults[0]?.label) === canonicalWhereState;
 
-		const whereDropdownLocations =
-			shouldSuggestNearbyStates && canonicalWhereState && locationResults
-				? (() => {
-						const nearby = getNearestUsStateNames(canonicalWhereState, 4).map((name) => ({
-							city: '',
-							state: name,
-							label: name,
-						}));
+		const whereDropdownLocations = (() => {
+			const preferredStateNames =
+				shouldSuggestNearbyStates && canonicalWhereState && locationResults
+					? [
+							...locationResults.map((loc) => loc?.label || loc?.state),
+							...getNearestUsStateNames(canonicalWhereState, 4),
+					  ]
+					: (locationResults ?? []).map((loc) => loc?.label || loc?.state);
 
-						const combined = [...locationResults, ...nearby];
-						const seen = new Set<string>();
-						return combined.filter((loc) => {
-							const key = (loc.label || '').trim().toLowerCase();
-							if (!key) return false;
-							if (seen.has(key)) return false;
-							seen.add(key);
-							return true;
-						});
-				  })()
-				: locationResults;
+			return buildAllUsStateNames(preferredStateNames).map((name) => ({
+				city: '',
+				state: name,
+				label: name,
+			}));
+		})();
 
 		const dropdownContent = (
 			<div
@@ -862,7 +857,14 @@ const DashboardContent = () => {
 								)}
 							</CustomScrollbar>
 						) : (
-							<div className="flex flex-col items-center justify-start gap-[20px] w-full h-full py-4">
+							<CustomScrollbar
+								className="w-full h-full"
+								contentClassName="flex flex-col items-center justify-start gap-[20px] py-4"
+								thumbWidth={2}
+								thumbColor="#000000"
+								trackColor="transparent"
+								offsetRight={-5}
+							>
 								<div
 									className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
 									onClick={() => {
@@ -891,6 +893,7 @@ const DashboardContent = () => {
 										</div>
 									</div>
 								</div>
+
 								{DEFAULT_STATE_SUGGESTIONS.map(
 									({ label, promotionDescription, generalDescription }) => {
 										const { icon, backgroundColor } = getCityIconProps('', label);
@@ -920,7 +923,41 @@ const DashboardContent = () => {
 										);
 									}
 								)}
-							</div>
+
+								{(() => {
+									const defaultNames = DEFAULT_STATE_SUGGESTIONS.map((s) => s.label);
+									const defaultSet = new Set(defaultNames.map((s) => s.toLowerCase()));
+									return buildAllUsStateNames(defaultNames)
+										.filter((name) => !defaultSet.has(name.toLowerCase()))
+										.map((stateName) => {
+											const { icon, backgroundColor } = getCityIconProps('', stateName);
+											return (
+												<div
+													key={stateName}
+													className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+													onClick={() => {
+														triggerSearchWithWhere(stateName, false);
+													}}
+												>
+													<div
+														className="w-[38px] h-[38px] rounded-[8px] flex-shrink-0 flex items-center justify-center"
+														style={{ backgroundColor }}
+													>
+														{icon}
+													</div>
+													<div className="ml-[12px] flex flex-col">
+														<div className="text-[20px] font-medium leading-none text-black font-inter">
+															{stateName}
+														</div>
+														<div className="text-[12px] leading-tight text-black mt-[4px]">
+															Search contacts in {stateName}
+														</div>
+													</div>
+												</div>
+											);
+										});
+								})()}
+							</CustomScrollbar>
 						)}
 					</div>
 				</div>

@@ -52,4 +52,31 @@ export const getNearestUsStateNames = (
 		.map((x) => x.name);
 };
 
+export const getAllUsStateNames = (): string[] => US_STATES.map((s) => s.name);
+
+/**
+ * Returns an ordered list of canonical US state names where:
+ * - The provided `preferred` states appear first (in their original order)
+ * - The remaining states are appended (ensuring all 50 states are present)
+ * - Duplicates are removed (case-insensitive, normalized via `normalizeUsStateName`)
+ */
+export const buildAllUsStateNames = (preferred: Array<string | null | undefined> = []): string[] => {
+	const seen = new Set<string>();
+	const out: string[] = [];
+
+	const pushCanonical = (value: string | null | undefined) => {
+		const canonical = normalizeUsStateName(value);
+		if (!canonical) return;
+		const key = canonical.toLowerCase();
+		if (seen.has(key)) return;
+		seen.add(key);
+		out.push(canonical);
+	};
+
+	for (const p of preferred) pushCanonical(p);
+	for (const name of getAllUsStateNames()) pushCanonical(name);
+
+	return out;
+};
+
 
