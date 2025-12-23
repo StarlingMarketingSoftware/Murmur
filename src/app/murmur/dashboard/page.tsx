@@ -1170,6 +1170,10 @@ const DashboardContent = () => {
 	// primary `contacts` list. Keep a local cache so selected/clicked overlay pins can appear
 	// as rows in the map side panel.
 	const [mapPanelExtraContacts, setMapPanelExtraContacts] = useState<ContactWithName[]>([]);
+	// Live (viewport-driven) overlay pins that match the active "What" (Zillow-style panel updates).
+	const [mapPanelVisibleOverlayContacts, setMapPanelVisibleOverlayContacts] = useState<
+		ContactWithName[]
+	>([]);
 	const mapViewContainerRef = useRef<HTMLDivElement | null>(null);
 	const [activeMapTool, setActiveMapTool] = useState<'select' | 'grab'>('grab');
 	const [hoveredMapMarkerContact, setHoveredMapMarkerContact] = useState<ContactWithName | null>(
@@ -1188,10 +1192,6 @@ const DashboardContent = () => {
 		}
 	}, [isMapResultsLoading, isMapView]);
 
-	// In XL desktop map view, we render two "Create Campaign" CTAs (side panel + map overlay).
-	// Only show one at a time based on cursor location:
-	// - Cursor over right side panel -> show panel CTA
-	// - Cursor in bottom half of page -> show bottom CTA
 	const [isPointerInMapSidePanel, setIsPointerInMapSidePanel] = useState(false);
 	const [isPointerInMapBottomHalf, setIsPointerInMapBottomHalf] = useState(false);
 
@@ -1255,6 +1255,7 @@ const DashboardContent = () => {
 	useEffect(() => {
 		setMapPanelExtraContactIds([]);
 		setMapPanelExtraContacts([]);
+		setMapPanelVisibleOverlayContacts([]);
 	}, [activeSearchQuery]);
 
 	// Cleanup timers on unmount
@@ -1368,23 +1369,94 @@ const DashboardContent = () => {
 					return contactStateAbbr === searchedStateAbbrForMap;
 				});
 
-		if (mapPanelExtraContactIds.length === 0) return baseList;
-
 		// Allow panel to render contacts that aren't in the base results (e.g. booking overlay pins).
 		const byId = new Map<number, ContactWithName>();
 		for (const c of allContacts) byId.set(c.id, c);
 		for (const c of mapPanelExtraContacts) {
 			if (!byId.has(c.id)) byId.set(c.id, c);
 		}
+		for (const c of mapPanelVisibleOverlayContacts) {
+			if (!byId.has(c.id)) byId.set(c.id, c);
+		}
 
-		const baseIds = new Set(baseList.map((c) => c.id));
-		const extras = mapPanelExtraContactIds
-			.filter((id) => !baseIds.has(id))
-			.map((id) => byId.get(id))
-			.filter((c): c is NonNullable<typeof c> => Boolean(c));
+		const out: ContactWithName[] = [];
+		const seen = new Set<number>();
+		const push = (c: ContactWithName | null | undefined) => {
+			if (!c) return;
+			if (seen.has(c.id)) return;
+			seen.add(c.id);
+			out.push(c);
+		};
 
-		return [...baseList, ...extras];
-	}, [contacts, mapPanelExtraContactIds, mapPanelExtraContacts, searchedStateAbbrForMap]);
+		// Always pin selected contacts to the top so they don't "sink" as the viewport-driven list changes.
+		for (const id of selectedContacts) {
+			push(byId.get(id));
+		}
+
+		// Visible overlay pins (matching "What") next so the panel feels reactive as you pan/zoom.
+		for (const c of mapPanelVisibleOverlayContacts) {
+			push(byId.get(c.id) ?? c);
+		}
+
+		// Base searched-state list next.
+		for (const c of baseList) push(c);
+
+		// Sticky extras last (clicked/selected out-of-state + overlay-only contacts).
+		for (const id of mapPanelExtraContactIds) push(byId.get(id));
+
+		return out;
+	}, [
+		contacts,
+		mapPanelExtraContactIds,
+		mapPanelExtraContacts,
+		mapPanelVisibleOverlayContacts,
+		selectedContacts,
+		searchedStateAbbrForMap,
+	]);
+
+	useEffect(() => {
+		// If the user selects contacts that are outside the searched state (or overlay-only),
+		// pin them into the right-hand panel list so they don't disappear when the viewport changes.
+		if (!isMapView) return;
+		if (selectedContacts.length === 0) return;
+
+		const allContacts = contacts || [];
+		const byId = new Map<number, ContactWithName>();
+		for (const c of allContacts) byId.set(c.id, c);
+		for (const c of mapPanelExtraContacts) {
+			if (!byId.has(c.id)) byId.set(c.id, c);
+		}
+
+		const idsToPin: number[] = [];
+		for (const id of selectedContacts) {
+			// Overlay-only (not in base results)
+			if (!baseContactIdSet.has(id)) {
+				idsToPin.push(id);
+				continue;
+			}
+
+			// Out-of-state (relative to the searched/locked state)
+			if (!searchedStateAbbrForMap) continue;
+			const c = byId.get(id);
+			if (!c) continue;
+			const contactStateAbbr = getStateAbbreviation(c.state || '').trim().toUpperCase();
+			if (contactStateAbbr && contactStateAbbr !== searchedStateAbbrForMap) {
+				idsToPin.push(id);
+			}
+		}
+
+		if (idsToPin.length === 0) return;
+		setMapPanelExtraContactIds((prev) => {
+			const next = new Set(prev);
+			let changed = false;
+			for (const id of idsToPin) {
+				if (next.has(id)) continue;
+				next.add(id);
+				changed = true;
+			}
+			return changed ? Array.from(next) : prev;
+		});
+	}, [isMapView, selectedContacts, contacts, mapPanelExtraContacts, baseContactIdSet, searchedStateAbbrForMap]);
 
 	// Check if all panel contacts are selected (for map view "Select all" button)
 	const isAllPanelContactsSelected = useMemo(() => {
@@ -1548,8 +1620,6 @@ const DashboardContent = () => {
 		}
 	};
 
-	// When a contact is hovered on non‑mobile in table view, we switch
-	// from the mini search bar to the horizontal research strip.
 	const showHorizontalResearchStrip =
 		isMobile === false && !!hoveredContact && !isMapView;
 
@@ -1841,8 +1911,6 @@ const DashboardContent = () => {
 		handleEnhancedResetSearch();
 	};
 
-	// Apply full-width background for map view using body class,
-	// so the search bar and other content stay above it.
 	useEffect(() => {
 		if (typeof document === 'undefined') return;
 
@@ -2617,8 +2685,6 @@ const DashboardContent = () => {
 
 				{hasSearched &&
 					activeTab === 'search' &&
-					// In map view, keep the tray UI mounted during loading so the page
-					// doesn't "blank out" between state searches.
 					(isMapView || (!isLoadingContacts && !isRefetchingContacts)) &&
 					(() => {
 						const trayWhy = isPromotion
@@ -3245,6 +3311,22 @@ const DashboardContent = () => {
 																externallyHoveredContactId={hoveredMapPanelContactId}
 																searchQuery={activeSearchQuery}
 																searchWhat={searchedWhat}
+																onVisibleOverlayContactsChange={(overlayContacts) => {
+																	setMapPanelVisibleOverlayContacts(overlayContacts);
+
+																	// Cache overlay-only contacts so if the user selects one, it can remain
+																	// renderable in the side panel even after panning away.
+																	if (overlayContacts.length > 0) {
+																		setMapPanelExtraContacts((prev) => {
+																			const byId = new Map<number, ContactWithName>();
+																			for (const c of prev) byId.set(c.id, c);
+																			for (const c of overlayContacts) {
+																				if (!byId.has(c.id)) byId.set(c.id, c);
+																			}
+																			return Array.from(byId.values());
+																		});
+																	}
+																}}
 																activeTool={activeMapTool}
 																	onAreaSelect={(bounds, payload) => {
 																		const ids = payload?.contactIds ?? [];

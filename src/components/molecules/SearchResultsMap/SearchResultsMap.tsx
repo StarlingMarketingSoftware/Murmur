@@ -722,6 +722,12 @@ interface SearchResultsMapProps {
 	activeTool?: 'select' | 'grab';
 	/** Called when the user completes a rectangle selection (south/west/north/east). */
 	onAreaSelect?: (bounds: MapSelectionBounds, payload?: AreaSelectPayload) => void;
+	/**
+	 * Called whenever the currently-visible booking/promotion overlay pins that match the active
+	 * `searchWhat` category change (used to keep the right-side results panel feeling interactive
+	 * as the user pans/zooms, Zillow-style).
+	 */
+	onVisibleOverlayContactsChange?: (contacts: ContactWithName[]) => void;
 	onMarkerClick?: (contact: ContactWithName) => void;
 	onMarkerHover?: (contact: ContactWithName | null, meta?: MarkerHoverMeta) => void;
 	onToggleSelection?: (contactId: number) => void;
@@ -884,6 +890,32 @@ const normalizeWhatKey = (value: string): string =>
 		.trim()
 		.replace(/\s+/g, ' ');
 
+// Booking overlay "alcohol" subcategories should be treated as part of the broader
+// "Wine, Beer, and Spirits" search "What" (even though the overlay titles are
+// "Wineries <state>", "Breweries <state>", etc).
+const WINE_BEER_SPIRITS_WHAT_KEY = normalizeWhatKey('Wine, Beer, and Spirits');
+const WINE_BEER_SPIRITS_BOOKING_PREFIX_KEYS = new Set<string>([
+	normalizeWhatKey('Wineries'),
+	normalizeWhatKey('Breweries'),
+	normalizeWhatKey('Distilleries'),
+	normalizeWhatKey('Cideries'),
+]);
+
+const bookingTitlePrefixMatchesSearchWhatKey = (
+	prefix: string,
+	normalizedSearchWhatKey: string
+): boolean => {
+	const prefixKey = normalizeWhatKey(prefix);
+	if (prefixKey === normalizedSearchWhatKey) return true;
+	if (
+		normalizedSearchWhatKey === WINE_BEER_SPIRITS_WHAT_KEY &&
+		WINE_BEER_SPIRITS_BOOKING_PREFIX_KEYS.has(prefixKey)
+	) {
+		return true;
+	}
+	return false;
+};
+
 const WHAT_TO_RESULT_DOT_COLOR: Record<string, string> = {
 	[normalizeWhatKey('Radio Stations')]: '#56DA73',
 	[normalizeWhatKey('Venues')]: '#00CBFB',
@@ -1031,6 +1063,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	selectedAreaBounds,
 	activeTool,
 	onAreaSelect,
+	onVisibleOverlayContactsChange,
 	onMarkerClick,
 	onMarkerHover,
 	onToggleSelection,
@@ -1129,6 +1162,58 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		lastPromotionOverlayVisibleContactsKeyRef.current = '';
 		setPromotionOverlayVisibleContacts([]);
 	}, [searchQuery]);
+
+	const normalizedSearchWhatKey = useMemo(
+		() => (searchWhat ? normalizeWhatKey(searchWhat) : null),
+		[searchWhat]
+	);
+
+	// Booking/promotion overlay pins can contain multiple "What" categories at once; only surface
+	// the ones that match the active search "What" in the dashboard's right-hand panel.
+	const visibleOverlayContactsMatchingWhat = useMemo(() => {
+		if (!normalizedSearchWhatKey) return [];
+
+		const byId = new Map<number, ContactWithName>();
+
+		if (isBookingSearch && bookingExtraVisibleContacts.length > 0) {
+			for (const contact of bookingExtraVisibleContacts) {
+				const prefix = getBookingTitlePrefixFromContactTitle(contact.title);
+				if (!prefix) continue;
+				if (!bookingTitlePrefixMatchesSearchWhatKey(prefix, normalizedSearchWhatKey)) continue;
+				byId.set(contact.id, contact);
+			}
+		}
+
+		if (isPromotionSearch && promotionOverlayVisibleContacts.length > 0) {
+			for (const contact of promotionOverlayVisibleContacts) {
+				const title = contact.title ?? '';
+				const matchedPrefix =
+					PROMOTION_OVERLAY_TITLE_PREFIXES.find((p) => startsWithCaseInsensitive(title, p)) ??
+					null;
+				if (!matchedPrefix) continue;
+				if (normalizeWhatKey(matchedPrefix) !== normalizedSearchWhatKey) continue;
+				byId.set(contact.id, contact);
+			}
+		}
+
+		const list = Array.from(byId.values());
+		list.sort((a, b) => a.id - b.id);
+		return list;
+	}, [
+		normalizedSearchWhatKey,
+		isBookingSearch,
+		bookingExtraVisibleContacts,
+		isPromotionSearch,
+		promotionOverlayVisibleContacts,
+	]);
+
+	const lastReportedVisibleOverlayKeyRef = useRef<string | null>(null);
+	useEffect(() => {
+		const idsKey = visibleOverlayContactsMatchingWhat.map((c) => c.id).join(',');
+		if (idsKey === lastReportedVisibleOverlayKeyRef.current) return;
+		lastReportedVisibleOverlayKeyRef.current = idsKey;
+		onVisibleOverlayContactsChange?.(visibleOverlayContactsMatchingWhat);
+	}, [onVisibleOverlayContactsChange, visibleOverlayContactsMatchingWhat]);
 
 	const areaSelectionEnabled = useMemo(
 		() => activeTool === 'select' && typeof onAreaSelect === 'function',
@@ -2030,7 +2115,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				for (const contact of bookingExtraVisibleContacts) {
 					const prefix = getBookingTitlePrefixFromContactTitle(contact.title);
 					if (!prefix) continue;
-					if (normalizeWhatKey(prefix) !== normalizedSearchWhat) continue;
+					if (!bookingTitlePrefixMatchesSearchWhatKey(prefix, normalizedSearchWhat)) continue;
 					const coords = bookingExtraCoordsByContactId.get(contact.id) ?? null;
 					if (!isCoordsInBounds(coords)) continue;
 					selectedIds.add(contact.id);
