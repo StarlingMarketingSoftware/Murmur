@@ -488,7 +488,7 @@ const DashboardContent = () => {
 					: 98;
 
 		// Map-view UX: if the user already has an exact state selected, show that state first,
-		// then append the 4 nearest states (by centroid distance) underneath.
+		// then the 4 nearest states (by centroid distance), then continue with the full 50-state list.
 		const canonicalWhereState = normalizeUsStateName(whereValue);
 		const shouldSuggestNearbyStates =
 			activeSection === 'where' &&
@@ -498,7 +498,12 @@ const DashboardContent = () => {
 			locationResults.length === 1 &&
 			normalizeUsStateName(locationResults[0]?.label) === canonicalWhereState;
 
-		const whereDropdownLocations = (() => {
+		const whereSuggestedStateNames =
+			shouldSuggestNearbyStates && canonicalWhereState
+				? [canonicalWhereState, ...getNearestUsStateNames(canonicalWhereState, 4)]
+				: [];
+
+		const whereDropdownStateNames = (() => {
 			const preferredStateNames =
 				shouldSuggestNearbyStates && canonicalWhereState && locationResults
 					? [
@@ -507,12 +512,27 @@ const DashboardContent = () => {
 					  ]
 					: (locationResults ?? []).map((loc) => loc?.label || loc?.state);
 
-			return buildAllUsStateNames(preferredStateNames).map((name) => ({
-				city: '',
-				state: name,
-				label: name,
-			}));
+			return buildAllUsStateNames(preferredStateNames);
 		})();
+
+		const whereDropdownLocations = whereDropdownStateNames.map((name) => ({
+			city: '',
+			state: name,
+			label: name,
+		}));
+
+		const whereSuggestedLocations = whereSuggestedStateNames.map((name) => ({
+			city: '',
+			state: name,
+			label: name,
+		}));
+
+		// Full canonical 50-state list (alphabetical) used for the "All states" portion.
+		const whereAllStateLocations = buildAllUsStateNames().map((name) => ({
+			city: '',
+			state: name,
+			label: name,
+		}));
 
 		const dropdownContent = (
 			<div
@@ -820,14 +840,18 @@ const DashboardContent = () => {
 										<div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900"></div>
 									</div>
 								) : whereDropdownLocations && whereDropdownLocations.length > 0 ? (
-									whereDropdownLocations.map((loc, idx) => {
+									(
+										shouldSuggestNearbyStates && whereSuggestedLocations.length > 0
+											? [...whereSuggestedLocations, ...whereAllStateLocations]
+											: whereDropdownLocations
+									).map((loc, idx) => {
 										const { icon, backgroundColor } = getCityIconProps(
 											loc.city,
 											loc.state
 										);
 										return (
 											<div
-												key={`${loc.city}-${loc.state}-${idx}`}
+												key={`${loc.city}-${loc.state}-${loc.label}-${idx}`}
 												className="w-[415px] min-h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200 mb-2"
 												onClick={() => {
 													triggerSearchWithWhere(loc.label, false);
