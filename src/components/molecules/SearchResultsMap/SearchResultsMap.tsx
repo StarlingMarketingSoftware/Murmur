@@ -33,6 +33,15 @@ type BoundingBox = { minLat: number; maxLat: number; minLng: number; maxLng: num
 type PreparedClippingPolygon = { polygon: ClippingPolygon; bbox: BoundingBox };
 
 type MapSelectionBounds = { south: number; west: number; north: number; east: number };
+type AreaSelectPayload = {
+	/** Contact ids inside the rectangle selection (primary results + matching overlay markers). */
+	contactIds: number[];
+	/**
+	 * Overlay contacts (not part of the primary `contacts` prop) that were selected, so the
+	 * parent can render them in a side panel list.
+	 */
+	extraContacts: ContactWithName[];
+};
 
 const closeRing = (ring: ClippingRing): ClippingRing => {
 	if (ring.length === 0) return ring;
@@ -701,6 +710,8 @@ const parseMetadataSections = (
 interface SearchResultsMapProps {
 	contacts: ContactWithName[];
 	selectedContacts: number[];
+	/** When set, highlights the corresponding marker as hovered (e.g. hovering a row in the map results panel). */
+	externallyHoveredContactId?: number | null;
 	/** Full search query string (e.g. "[Booking] Music Venues (Portland, ME)") */
 	searchQuery?: string | null;
 	/** Used to color the default (unselected) result dots by the active "What" search value. */
@@ -710,7 +721,7 @@ interface SearchResultsMapProps {
 	/** Map interaction mode controlled by the dashboard (grab = pan/zoom, select = draw rectangle). */
 	activeTool?: 'select' | 'grab';
 	/** Called when the user completes a rectangle selection (south/west/north/east). */
-	onAreaSelect?: (bounds: MapSelectionBounds) => void;
+	onAreaSelect?: (bounds: MapSelectionBounds, payload?: AreaSelectPayload) => void;
 	onMarkerClick?: (contact: ContactWithName) => void;
 	onMarkerHover?: (contact: ContactWithName | null, meta?: MarkerHoverMeta) => void;
 	onToggleSelection?: (contactId: number) => void;
@@ -1014,6 +1025,7 @@ const normalizeStateKey = (state?: string | null): string | null => {
 export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	contacts,
 	selectedContacts,
+	externallyHoveredContactId,
 	searchQuery,
 	searchWhat,
 	selectedAreaBounds,
@@ -1030,6 +1042,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const [selectedMarker, setSelectedMarker] = useState<ContactWithName | null>(null);
 	const [hoveredMarkerId, setHoveredMarkerId] = useState<number | null>(null);
 	const hoveredMarkerIdRef = useRef<number | null>(null);
+	const hoverSourceRef = useRef<'map' | 'external' | null>(null);
 	// Track tooltip that is fading out (for smooth transition)
 	const [fadingTooltipId, setFadingTooltipId] = useState<number | null>(null);
 	const fadingTooltipTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -1288,37 +1301,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			});
 		},
 		[isAreaSelecting, ensureSelectionRect]
-	);
-
-	const handleMapMouseUp = useCallback(
-		(e: google.maps.MapMouseEvent) => {
-			if (!isAreaSelecting) return;
-			const start = selectionStartLatLngRef.current;
-			if (!start) {
-				clearSelectionRect();
-				return;
-			}
-			const end = e.latLng ? e.latLng.toJSON() : start;
-
-			// Ignore tiny "click" selections (treat as cancel).
-			const startClient = selectionStartClientRef.current;
-			const endClient = getClientPointFromDomEvent(e.domEvent);
-			const dx = startClient && endClient ? Math.abs(endClient.x - startClient.x) : 0;
-			const dy = startClient && endClient ? Math.abs(endClient.y - startClient.y) : 0;
-			const movedEnough = dx >= 6 || dy >= 6;
-
-			clearSelectionRect();
-
-			if (!movedEnough) return;
-
-			onAreaSelect?.({
-				south: Math.min(start.lat, end.lat),
-				west: Math.min(start.lng, end.lng),
-				north: Math.max(start.lat, end.lat),
-				east: Math.max(start.lng, end.lng),
-			});
-		},
-		[isAreaSelecting, clearSelectionRect, onAreaSelect]
 	);
 
 	const updateBookingExtraFetchBbox = useCallback(
@@ -1608,6 +1590,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		}
 		setHoveredMarkerId(null);
 		hoveredMarkerIdRef.current = null;
+		hoverSourceRef.current = null;
 		onMarkerHover?.(null);
 	}, [
 		visibleContacts,
@@ -1632,6 +1615,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		setHoveredMarkerId(null);
 		setFadingTooltipId(null);
 		hoveredMarkerIdRef.current = null;
+		hoverSourceRef.current = null;
 		onMarkerHover?.(null);
 	}, [zoomLevel, hoveredMarkerId, onMarkerHover]);
 
@@ -1991,6 +1975,111 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		[coordsByContactId]
 	);
 
+	const handleMapMouseUp = useCallback(
+		(e: google.maps.MapMouseEvent) => {
+			if (!isAreaSelecting) return;
+			const start = selectionStartLatLngRef.current;
+			if (!start) {
+				clearSelectionRect();
+				return;
+			}
+			const end = e.latLng ? e.latLng.toJSON() : start;
+
+			// Ignore tiny "click" selections (treat as cancel).
+			const startClient = selectionStartClientRef.current;
+			const endClient = getClientPointFromDomEvent(e.domEvent);
+			const dx = startClient && endClient ? Math.abs(endClient.x - startClient.x) : 0;
+			const dy = startClient && endClient ? Math.abs(endClient.y - startClient.y) : 0;
+			const movedEnough = dx >= 6 || dy >= 6;
+
+			clearSelectionRect();
+
+			if (!movedEnough) return;
+
+			const bounds: MapSelectionBounds = {
+				south: Math.min(start.lat, end.lat),
+				west: Math.min(start.lng, end.lng),
+				north: Math.max(start.lat, end.lat),
+				east: Math.max(start.lng, end.lng),
+			};
+
+			const isCoordsInBounds = (coords: LatLngLiteral | null | undefined): boolean => {
+				if (!coords) return false;
+				return (
+					coords.lat >= bounds.south &&
+					coords.lat <= bounds.north &&
+					coords.lng >= bounds.west &&
+					coords.lng <= bounds.east
+				);
+			};
+
+			// Build a selection payload so the dashboard can select contacts without triggering a new search.
+			const selectedIds = new Set<number>();
+			for (const contact of contactsWithCoords) {
+				const coords = coordsByContactId.get(contact.id) ?? null;
+				if (!isCoordsInBounds(coords)) continue;
+				selectedIds.add(contact.id);
+			}
+
+			const normalizedSearchWhat = searchWhat ? normalizeWhatKey(searchWhat) : null;
+
+			const extraContactsById = new Map<number, ContactWithName>();
+
+			// Include booking overlay pins only when they match the active "What" (category) and are visible.
+			if (isBookingSearch && normalizedSearchWhat && bookingExtraVisibleContacts.length > 0) {
+				for (const contact of bookingExtraVisibleContacts) {
+					const prefix = getBookingTitlePrefixFromContactTitle(contact.title);
+					if (!prefix) continue;
+					if (normalizeWhatKey(prefix) !== normalizedSearchWhat) continue;
+					const coords = bookingExtraCoordsByContactId.get(contact.id) ?? null;
+					if (!isCoordsInBounds(coords)) continue;
+					selectedIds.add(contact.id);
+					if (!baseContactIdSet.has(contact.id)) {
+						extraContactsById.set(contact.id, contact);
+					}
+				}
+			}
+
+			// Include promotion overlay pins only when they match the active "What" (category) and are visible.
+			if (isPromotionSearch && normalizedSearchWhat && promotionOverlayVisibleContacts.length > 0) {
+				for (const contact of promotionOverlayVisibleContacts) {
+					const title = contact.title ?? '';
+					const matchedPrefix =
+						PROMOTION_OVERLAY_TITLE_PREFIXES.find((p) => startsWithCaseInsensitive(title, p)) ??
+						null;
+					if (!matchedPrefix) continue;
+					if (normalizeWhatKey(matchedPrefix) !== normalizedSearchWhat) continue;
+					const coords = promotionOverlayCoordsByContactId.get(contact.id) ?? null;
+					if (!isCoordsInBounds(coords)) continue;
+					selectedIds.add(contact.id);
+					if (!baseContactIdSet.has(contact.id)) {
+						extraContactsById.set(contact.id, contact);
+					}
+				}
+			}
+
+			onAreaSelect?.(bounds, {
+				contactIds: Array.from(selectedIds),
+				extraContacts: Array.from(extraContactsById.values()),
+			});
+		},
+		[
+			isAreaSelecting,
+			clearSelectionRect,
+			onAreaSelect,
+			contactsWithCoords,
+			coordsByContactId,
+			searchWhat,
+			isBookingSearch,
+			bookingExtraVisibleContacts,
+			bookingExtraCoordsByContactId,
+			isPromotionSearch,
+			promotionOverlayVisibleContacts,
+			promotionOverlayCoordsByContactId,
+			baseContactIdSet,
+		]
+	);
+
 	const updateBackgroundDots = useCallback(
 		(
 			mapInstance: google.maps.Map | null,
@@ -2097,7 +2186,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				!!lockedStateSelectionMultiPolygonRef.current;
 
 			const selectedSet = new Set<number>(selectedContacts);
+			const hoveredId = hoveredMarkerIdRef.current;
 			const priorityIdSet = new Set<number>(selectedSet);
+			if (hoveredId != null) priorityIdSet.add(hoveredId);
 			for (const id of visibleContactIdSetRef.current) priorityIdSet.add(id);
 
 			const priorityInBounds: ContactWithName[] = [];
@@ -2284,6 +2375,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				x: number;
 				y: number;
 				isSelected: boolean;
+				isHovered: boolean;
 				isPriority: boolean;
 				isInLockedState: boolean;
 				isNearLockedBorder: boolean;
@@ -2305,6 +2397,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					x,
 					y,
 					isSelected: selectedSet.has(contact.id),
+					isHovered: hoveredId != null && contact.id === hoveredId,
 					isPriority: priorityIdSet.has(contact.id),
 					isInLockedState,
 					isNearLockedBorder: !!lockedEdgeIdSet && lockedEdgeIdSet.has(contact.id),
@@ -2322,8 +2415,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			}
 
 			// Stable ordering (we handle "priority first" by splitting arrays).
-			// Within priority, keep explicit selections first, then stable by id.
+			// Within priority, keep hovered first, then explicit selections, then stable by id.
 			priorityCandidates.sort((a, b) => {
+				if (a.isHovered !== b.isHovered) return a.isHovered ? -1 : 1;
 				if (a.isSelected !== b.isSelected) return a.isSelected ? -1 : 1;
 				return a.contact.id - b.contact.id;
 			});
@@ -2435,6 +2529,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 					// Always prefer explicitly selected extra markers (so they don't disappear due to sampling).
 					const priorityExtraIdSet = new Set<number>(selectedSet);
+					if (hoveredId != null) priorityExtraIdSet.add(hoveredId);
 					for (const id of bookingExtraVisibleIdSetRef.current) priorityExtraIdSet.add(id);
 					const priorityExtraInBounds: ContactWithName[] = [];
 					const unpriorityExtraInBounds: ContactWithName[] = [];
@@ -2530,6 +2625,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					}
 
 					priorityCandidates.sort((a, b) => {
+						const aHovered = hoveredId != null && a.contact.id === hoveredId;
+						const bHovered = hoveredId != null && b.contact.id === hoveredId;
+						if (aHovered !== bHovered) return aHovered ? -1 : 1;
 						if (a.isSelected !== b.isSelected) return a.isSelected ? -1 : 1;
 						return a.contact.id - b.contact.id;
 					});
@@ -3024,6 +3122,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			// Don't trigger hover interactions until sufficiently zoomed in
 			if (zoomLevel < HOVER_INTERACTION_MIN_ZOOM) return;
 
+			hoverSourceRef.current = 'map';
 			if (hoverClearTimeoutRef.current) {
 				clearTimeout(hoverClearTimeoutRef.current);
 				hoverClearTimeoutRef.current = null;
@@ -3067,6 +3166,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			hoverClearTimeoutRef.current = setTimeout(() => {
 				if (hoveredMarkerIdRef.current !== contactId) return;
 				hoveredMarkerIdRef.current = null;
+				hoverSourceRef.current = null;
 				// Start fade-out: set the fading tooltip to the current one
 				setFadingTooltipId(contactId);
 				setHoveredMarkerId(null);
@@ -3082,6 +3182,77 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		},
 		[onMarkerHover]
 	);
+
+	// Allow the parent (map results panel) to drive marker hover state without triggering
+	// `onMarkerHover` (which is reserved for true map interactions).
+	useEffect(() => {
+		// Keep behavior consistent with map hover: don't show hover tooltips when too zoomed out.
+		if (zoomLevel < HOVER_INTERACTION_MIN_ZOOM) {
+			if (hoverSourceRef.current !== 'external') return;
+			const prevId = hoveredMarkerIdRef.current;
+			hoverSourceRef.current = null;
+			hoveredMarkerIdRef.current = null;
+			setHoveredMarkerId(null);
+			if (prevId != null) {
+				setFadingTooltipId(prevId);
+				if (fadingTooltipTimeoutRef.current) clearTimeout(fadingTooltipTimeoutRef.current);
+				fadingTooltipTimeoutRef.current = setTimeout(() => setFadingTooltipId(null), 150);
+			} else {
+				setFadingTooltipId(null);
+			}
+			return;
+		}
+
+		const nextId = externallyHoveredContactId ?? null;
+
+		// If the map is actively hovering something, don't override it from the panel.
+		if (hoverSourceRef.current === 'map') return;
+
+		if (nextId == null) {
+			if (hoverSourceRef.current !== 'external') return;
+			const prevId = hoveredMarkerIdRef.current;
+			if (hoverClearTimeoutRef.current) {
+				clearTimeout(hoverClearTimeoutRef.current);
+				hoverClearTimeoutRef.current = null;
+			}
+			hoverSourceRef.current = null;
+			hoveredMarkerIdRef.current = null;
+			setHoveredMarkerId(null);
+			if (prevId != null) {
+				setFadingTooltipId(prevId);
+				if (fadingTooltipTimeoutRef.current) clearTimeout(fadingTooltipTimeoutRef.current);
+				fadingTooltipTimeoutRef.current = setTimeout(() => setFadingTooltipId(null), 150);
+			} else {
+				setFadingTooltipId(null);
+			}
+			return;
+		}
+
+		// No-op if already externally hovering this id.
+		if (hoverSourceRef.current === 'external' && hoveredMarkerIdRef.current === nextId) return;
+
+		if (hoverClearTimeoutRef.current) {
+			clearTimeout(hoverClearTimeoutRef.current);
+			hoverClearTimeoutRef.current = null;
+		}
+		if (fadingTooltipTimeoutRef.current) {
+			clearTimeout(fadingTooltipTimeoutRef.current);
+			fadingTooltipTimeoutRef.current = null;
+		}
+		setFadingTooltipId(null);
+		hoverSourceRef.current = 'external';
+		hoveredMarkerIdRef.current = nextId;
+		setHoveredMarkerId(nextId);
+		// If the hovered contact isn't currently rendered due to sampling, recompute the viewport
+		// so the hovered marker can be included (if it is in-bounds).
+		if (
+			map &&
+			!visibleContactIdSetRef.current.has(nextId) &&
+			!bookingExtraVisibleIdSetRef.current.has(nextId)
+		) {
+			recomputeViewportDots(map, isLoadingRef.current);
+		}
+	}, [externallyHoveredContactId, map, recomputeViewportDots, zoomLevel]);
 
 	// Calculate marker scale based on zoom level
 	// At zoom 4 (zoomed out): scale ~3, at zoom 14 (zoomed in): scale ~11

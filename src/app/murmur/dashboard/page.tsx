@@ -44,7 +44,7 @@ import { stateBadgeColorMap } from '@/constants/ui';
 import SearchResultsMap from '@/components/molecules/SearchResultsMap/SearchResultsMap';
 import { ContactWithName } from '@/types/contact';
 import { MapResultsPanelSkeleton } from '@/components/molecules/MapResultsPanelSkeleton/MapResultsPanelSkeleton';
-import { getNearestUsStateNames, normalizeUsStateName } from '@/utils/usStates';
+import { buildAllUsStateNames, getNearestUsStateNames, normalizeUsStateName } from '@/utils/usStates';
 import {
 	ContactResearchPanel,
 	ContactResearchHorizontalStrip,
@@ -488,7 +488,7 @@ const DashboardContent = () => {
 					: 98;
 
 		// Map-view UX: if the user already has an exact state selected, show that state first,
-		// then append the 4 nearest states (by centroid distance) underneath.
+		// then the 4 nearest states (by centroid distance), then continue with the full 50-state list.
 		const canonicalWhereState = normalizeUsStateName(whereValue);
 		const shouldSuggestNearbyStates =
 			activeSection === 'where' &&
@@ -498,26 +498,41 @@ const DashboardContent = () => {
 			locationResults.length === 1 &&
 			normalizeUsStateName(locationResults[0]?.label) === canonicalWhereState;
 
-		const whereDropdownLocations =
-			shouldSuggestNearbyStates && canonicalWhereState && locationResults
-				? (() => {
-						const nearby = getNearestUsStateNames(canonicalWhereState, 4).map((name) => ({
-							city: '',
-							state: name,
-							label: name,
-						}));
+		const whereSuggestedStateNames =
+			shouldSuggestNearbyStates && canonicalWhereState
+				? [canonicalWhereState, ...getNearestUsStateNames(canonicalWhereState, 4)]
+				: [];
 
-						const combined = [...locationResults, ...nearby];
-						const seen = new Set<string>();
-						return combined.filter((loc) => {
-							const key = (loc.label || '').trim().toLowerCase();
-							if (!key) return false;
-							if (seen.has(key)) return false;
-							seen.add(key);
-							return true;
-						});
-				  })()
-				: locationResults;
+		const whereDropdownStateNames = (() => {
+			const preferredStateNames =
+				shouldSuggestNearbyStates && canonicalWhereState && locationResults
+					? [
+							...locationResults.map((loc) => loc?.label || loc?.state),
+							...getNearestUsStateNames(canonicalWhereState, 4),
+					  ]
+					: (locationResults ?? []).map((loc) => loc?.label || loc?.state);
+
+			return buildAllUsStateNames(preferredStateNames);
+		})();
+
+		const whereDropdownLocations = whereDropdownStateNames.map((name) => ({
+			city: '',
+			state: name,
+			label: name,
+		}));
+
+		const whereSuggestedLocations = whereSuggestedStateNames.map((name) => ({
+			city: '',
+			state: name,
+			label: name,
+		}));
+
+		// Full canonical 50-state list (alphabetical) used for the "All states" portion.
+		const whereAllStateLocations = buildAllUsStateNames().map((name) => ({
+			city: '',
+			state: name,
+			label: name,
+		}));
 
 		const dropdownContent = (
 			<div
@@ -825,14 +840,18 @@ const DashboardContent = () => {
 										<div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900"></div>
 									</div>
 								) : whereDropdownLocations && whereDropdownLocations.length > 0 ? (
-									whereDropdownLocations.map((loc, idx) => {
+									(
+										shouldSuggestNearbyStates && whereSuggestedLocations.length > 0
+											? [...whereSuggestedLocations, ...whereAllStateLocations]
+											: whereDropdownLocations
+									).map((loc, idx) => {
 										const { icon, backgroundColor } = getCityIconProps(
 											loc.city,
 											loc.state
 										);
 										return (
 											<div
-												key={`${loc.city}-${loc.state}-${idx}`}
+												key={`${loc.city}-${loc.state}-${loc.label}-${idx}`}
 												className="w-[415px] min-h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200 mb-2"
 												onClick={() => {
 													triggerSearchWithWhere(loc.label, false);
@@ -862,7 +881,14 @@ const DashboardContent = () => {
 								)}
 							</CustomScrollbar>
 						) : (
-							<div className="flex flex-col items-center justify-start gap-[20px] w-full h-full py-4">
+							<CustomScrollbar
+								className="w-full h-full"
+								contentClassName="flex flex-col items-center justify-start gap-[20px] py-4"
+								thumbWidth={2}
+								thumbColor="#000000"
+								trackColor="transparent"
+								offsetRight={-5}
+							>
 								<div
 									className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
 									onClick={() => {
@@ -891,6 +917,7 @@ const DashboardContent = () => {
 										</div>
 									</div>
 								</div>
+
 								{DEFAULT_STATE_SUGGESTIONS.map(
 									({ label, promotionDescription, generalDescription }) => {
 										const { icon, backgroundColor } = getCityIconProps('', label);
@@ -920,7 +947,41 @@ const DashboardContent = () => {
 										);
 									}
 								)}
-							</div>
+
+								{(() => {
+									const defaultNames = DEFAULT_STATE_SUGGESTIONS.map((s) => s.label);
+									const defaultSet = new Set(defaultNames.map((s) => s.toLowerCase()));
+									return buildAllUsStateNames(defaultNames)
+										.filter((name) => !defaultSet.has(name.toLowerCase()))
+										.map((stateName) => {
+											const { icon, backgroundColor } = getCityIconProps('', stateName);
+											return (
+												<div
+													key={stateName}
+													className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+													onClick={() => {
+														triggerSearchWithWhere(stateName, false);
+													}}
+												>
+													<div
+														className="w-[38px] h-[38px] rounded-[8px] flex-shrink-0 flex items-center justify-center"
+														style={{ backgroundColor }}
+													>
+														{icon}
+													</div>
+													<div className="ml-[12px] flex flex-col">
+														<div className="text-[20px] font-medium leading-none text-black font-inter">
+															{stateName}
+														</div>
+														<div className="text-[12px] leading-tight text-black mt-[4px]">
+															Search contacts in {stateName}
+														</div>
+													</div>
+												</div>
+											);
+										});
+								})()}
+							</CustomScrollbar>
 						)}
 					</div>
 				</div>
@@ -1100,8 +1161,6 @@ const DashboardContent = () => {
 		setIsMapView,
 		isSearchPending,
 		usedContactIdsSet,
-		mapBboxFilter,
-		setMapBboxFilter,
 	} = useDashboard();
 
 	// Map-side panel should default to only the searched state, while the map itself keeps
@@ -1116,9 +1175,18 @@ const DashboardContent = () => {
 	const [hoveredMapMarkerContact, setHoveredMapMarkerContact] = useState<ContactWithName | null>(
 		null
 	);
+	// When hovering a row in the map side panel, highlight/show the corresponding marker on the map.
+	const [hoveredMapPanelContactId, setHoveredMapPanelContactId] = useState<number | null>(null);
 	const isMapResultsLoading = isSearchPending || isLoadingContacts || isRefetchingContacts;
 	const hasNoSearchResults =
 		hasSearched && !isMapResultsLoading && (contacts?.length ?? 0) === 0;
+
+	useEffect(() => {
+		// Prevent stale hover state when leaving map view or while results are transitioning.
+		if (!isMapView || isMapResultsLoading) {
+			setHoveredMapPanelContactId(null);
+		}
+	}, [isMapResultsLoading, isMapView]);
 
 	// In XL desktop map view, we render two "Create Campaign" CTAs (side panel + map overlay).
 	// Only show one at a time based on cursor location:
@@ -1277,9 +1345,8 @@ const DashboardContent = () => {
 		() => extractStateAbbrFromSearchQuery(activeSearchQuery),
 		[activeSearchQuery]
 	);
-	// When a map rectangle selection is active, we treat results as already scoped to that area,
-	// so we should not "lock" behavior to the original searched state.
-	const searchedStateAbbrForMap = mapBboxFilter ? null : searchedStateAbbr;
+	// Keep the map side panel defaulted to the searched state (markers outside can still be added as extras).
+	const searchedStateAbbrForMap = searchedStateAbbr;
 
 	// Use the "What" from the last executed search (activeSearchQuery), not the live dropdown value.
 	const searchedWhat = useMemo(
@@ -3175,30 +3242,73 @@ const DashboardContent = () => {
 															<SearchResultsMap
 																contacts={contacts || []}
 																selectedContacts={selectedContacts}
+																externallyHoveredContactId={hoveredMapPanelContactId}
 																searchQuery={activeSearchQuery}
 																searchWhat={searchedWhat}
-																selectedAreaBounds={
-																	mapBboxFilter
-																		? {
-																				south: mapBboxFilter.south,
-																				west: mapBboxFilter.west,
-																				north: mapBboxFilter.north,
-																				east: mapBboxFilter.east,
-																			}
-																		: null
-																}
 																activeTool={activeMapTool}
-																onAreaSelect={(bounds) => {
-																	// Run a new search scoped to the drawn rectangle.
-																	// We use the "What" from the last executed search so results stay in-category.
-																	setMapBboxFilter({
-																		...bounds,
-																		titlePrefix: searchedWhat ?? null,
-																	});
-																	// After selecting an area, immediately switch back to Grab mode
-																	// so the user can pan/zoom without extra clicks.
-																	setActiveMapTool('grab');
-																}}
+																	onAreaSelect={(bounds, payload) => {
+																		const ids = payload?.contactIds ?? [];
+																		const extraContacts = payload?.extraContacts ?? [];
+
+																		if (ids.length > 0) {
+																			setSelectedContacts((prev) => {
+																				const next = new Set(prev);
+																				for (const id of ids) next.add(id);
+																				return Array.from(next);
+																			});
+																		}
+
+																		// Ensure overlay-only contacts (booking/promotion map overlays) can appear
+																		// as rows in the right-hand panel.
+																		if (extraContacts.length > 0) {
+																			setMapPanelExtraContacts((prev) => {
+																				const byId = new Map<number, ContactWithName>();
+																				for (const c of prev) byId.set(c.id, c);
+																				for (const c of extraContacts) {
+																					if (!byId.has(c.id)) byId.set(c.id, c);
+																				}
+																				return Array.from(byId.values());
+																			});
+																		}
+
+																		// If selected contacts are outside the searched state (or are overlay-only),
+																		// include them in the panel list so the user sees what was selected.
+																		if (ids.length > 0) {
+																			const nextExtraIds: number[] = [];
+																			const byId = new Map<number, ContactWithName>();
+																			for (const c of contacts || []) byId.set(c.id, c);
+
+																			for (const id of ids) {
+																				if (!baseContactIdSet.has(id)) {
+																					nextExtraIds.push(id);
+																					continue;
+																				}
+																				if (!searchedStateAbbrForMap) continue;
+																				const c = byId.get(id);
+																				if (!c) continue;
+																				const contactStateAbbr = getStateAbbreviation(c.state || '')
+																					.trim()
+																					.toUpperCase();
+																				if (contactStateAbbr && contactStateAbbr !== searchedStateAbbrForMap) {
+																					nextExtraIds.push(id);
+																				}
+																			}
+
+																			for (const c of extraContacts) nextExtraIds.push(c.id);
+
+																			if (nextExtraIds.length > 0) {
+																				setMapPanelExtraContactIds((prev) => {
+																					const next = new Set(prev);
+																					for (const id of nextExtraIds) next.add(id);
+																					return Array.from(next);
+																				});
+																			}
+																		}
+
+																		// After selecting an area, immediately switch back to Grab mode
+																		// so the user can pan/zoom without extra clicks.
+																		setActiveMapTool('grab');
+																	}}
 																onMarkerHover={handleMapMarkerHover}
 																lockedStateName={searchedStateAbbrForMap}
 																onStateSelect={(stateName) => {
@@ -3405,6 +3515,7 @@ const DashboardContent = () => {
 																				const isSelected = selectedContacts.includes(
 																					contact.id
 																				);
+																				const isHovered = hoveredMapPanelContactId === contact.id;
 																				const isUsed = usedContactIdsSet.has(contact.id);
 																				const firstName = contact.firstName || '';
 																				const lastName = contact.lastName || '';
@@ -3424,9 +3535,14 @@ const DashboardContent = () => {
 																						data-contact-id={contact.id}
 																						className="cursor-pointer transition-colors grid grid-cols-2 grid-rows-2 w-full h-[49px] overflow-hidden rounded-[8px] border-2 border-black select-none relative"
 																						style={{
+																							// Hover should be a subtle darken, not "selected" blue.
 																							backgroundColor: isSelected
-																								? '#C9EAFF'
-																								: '#FFFFFF',
+																								? isHovered
+																									? '#BFE3FF'
+																									: '#C9EAFF'
+																								: isHovered
+																									? '#F3F4F6'
+																									: '#FFFFFF',
 																						}}
 																						onClick={() => {
 																							if (isSelected) {
@@ -3442,12 +3558,12 @@ const DashboardContent = () => {
 																								]);
 																							}
 																						}}
-																						onMouseEnter={() => {
-																							setHoveredContact(contact);
-																						}}
-																						onMouseLeave={() => {
-																							setHoveredContact(null);
-																						}}
+																						onMouseEnter={() => setHoveredMapPanelContactId(contact.id)}
+																						onMouseLeave={() =>
+																							setHoveredMapPanelContactId((prev) =>
+																								prev === contact.id ? null : prev
+																							)
+																						}
 																					>
 																						{/* Centered used contact dot */}
 																						{fullName && isUsed && (
@@ -3821,6 +3937,7 @@ const DashboardContent = () => {
 																		const isSelected = selectedContacts.includes(
 																			contact.id
 																		);
+																		const isHovered = hoveredMapPanelContactId === contact.id;
 																		const isUsed = usedContactIdsSet.has(contact.id);
 																		const firstName = contact.firstName || '';
 																		const lastName = contact.lastName || '';
@@ -3840,9 +3957,14 @@ const DashboardContent = () => {
 																				data-contact-id={contact.id}
 																				className="cursor-pointer transition-colors flex w-full h-[49px] overflow-hidden rounded-[8px] border-2 border-black select-none relative"
 																				style={{
+																					// Hover should be a subtle darken, not "selected" blue.
 																					backgroundColor: isSelected
-																						? '#C9EAFF'
-																						: '#FFFFFF',
+																						? isHovered
+																							? '#BFE3FF'
+																							: '#C9EAFF'
+																						: isHovered
+																							? '#F3F4F6'
+																							: '#FFFFFF',
 																				}}
 																				onClick={() => {
 																					if (isSelected) {
@@ -3858,10 +3980,12 @@ const DashboardContent = () => {
 																						]);
 																					}
 																				}}
-																				onMouseEnter={() =>
-																					setHoveredContact(contact)
+																				onMouseEnter={() => setHoveredMapPanelContactId(contact.id)}
+																				onMouseLeave={() =>
+																					setHoveredMapPanelContactId((prev) =>
+																						prev === contact.id ? null : prev
+																					)
 																				}
-																				onMouseLeave={() => setHoveredContact(null)}
 																			>
 																				{/* Left side - Name/Company and Location */}
 																				<div className="flex-1 min-w-0 flex flex-col justify-center pl-3 pr-2">
