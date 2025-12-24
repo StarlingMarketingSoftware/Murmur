@@ -1136,6 +1136,9 @@ const DashboardContent = () => {
 	const whereInputRef = useRef<HTMLInputElement>(null);
 	const activeSectionIndicatorRef = useRef<HTMLDivElement>(null);
 	const prevActiveSectionForIndicatorRef = useRef<'why' | 'what' | 'where' | null>(null);
+	// Mini search bar (map view results) indicator refs
+	const miniActiveSectionIndicatorRef = useRef<HTMLDivElement>(null);
+	const prevMiniActiveSectionRef = useRef<'why' | 'what' | 'where' | null>(null);
 	const {
 		form,
 		onSubmit,
@@ -1827,6 +1830,9 @@ const DashboardContent = () => {
 		const indicator = activeSectionIndicatorRef.current;
 		if (!indicator) return;
 
+		// Prevent overlapping tweens when the user clicks quickly
+		gsap.killTweensOf(indicator);
+
 		const xPercentForSection = (section: 'why' | 'what' | 'where') => {
 			switch (section) {
 				case 'why':
@@ -1840,6 +1846,18 @@ const DashboardContent = () => {
 			}
 		};
 
+		const transformOriginForSection = (section: 'why' | 'what' | 'where') => {
+			switch (section) {
+				case 'why':
+					return 'left center';
+				case 'where':
+					return 'right center';
+				case 'what':
+				default:
+					return 'center center';
+			}
+		};
+
 		// Hide when no active section (default state shows dividers)
 		if (!activeSection) {
 			gsap.to(indicator, {
@@ -1848,6 +1866,7 @@ const DashboardContent = () => {
 				ease: 'power2.out',
 				overwrite: 'auto',
 			});
+			gsap.set(indicator, { scaleX: 1, transformOrigin: 'center center' });
 			prevActiveSectionForIndicatorRef.current = null;
 			return;
 		}
@@ -1855,12 +1874,22 @@ const DashboardContent = () => {
 		const nextXPercent = xPercentForSection(activeSection);
 		const prevSection = prevActiveSectionForIndicatorRef.current;
 
-		// On first open, snap to position (no slide), then fade in
+		// On first open (empty -> selected), animate a "shrink" into the selected segment
+		// so it feels consistent with the tab switching motion.
 		if (!prevSection) {
-			gsap.set(indicator, { xPercent: nextXPercent });
-			gsap.to(indicator, {
+			const origin = transformOriginForSection(activeSection);
+
+			// Start as a full-width highlight (scaleX: 3 because the indicator is 1/3 width),
+			// then shrink toward the selected segment's side/center.
+			gsap.set(indicator, {
+				xPercent: nextXPercent,
 				opacity: 1,
-				duration: 0.15,
+				scaleX: 3,
+				transformOrigin: origin,
+			});
+			gsap.to(indicator, {
+				scaleX: 1,
+				duration: 0.6,
 				ease: 'power2.out',
 				overwrite: 'auto',
 			});
@@ -1869,6 +1898,7 @@ const DashboardContent = () => {
 		}
 
 		// Between tabs, slide with requested timing/ease (width/height remain constant)
+		gsap.set(indicator, { scaleX: 1, transformOrigin: 'center center' });
 		gsap.to(indicator, {
 			xPercent: nextXPercent,
 			duration: 0.6,
@@ -1883,6 +1913,96 @@ const DashboardContent = () => {
 		});
 
 		prevActiveSectionForIndicatorRef.current = activeSection;
+	}, [activeSection]);
+
+	// Animation for the mini search bar (map view results) pill indicator
+	useEffect(() => {
+		const indicator = miniActiveSectionIndicatorRef.current;
+		if (!indicator) return;
+
+		// Prevent overlapping tweens when the user clicks quickly
+		gsap.killTweensOf(indicator);
+
+		// xPercent shifts by the indicator's own width (which is 1/3 of the container)
+		const xPercentForSection = (section: 'why' | 'what' | 'where') => {
+			switch (section) {
+				case 'why':
+					return 0;
+				case 'what':
+					return 100;
+				case 'where':
+					return 200;
+				default:
+					return 0;
+			}
+		};
+
+		const transformOriginForSection = (section: 'why' | 'what' | 'where') => {
+			switch (section) {
+				case 'why':
+					return 'left center';
+				case 'where':
+					return 'right center';
+				case 'what':
+				default:
+					return 'center center';
+			}
+		};
+
+		// Hide when no active section (default state shows dividers)
+		if (!activeSection) {
+			gsap.to(indicator, {
+				opacity: 0,
+				duration: 0.15,
+				ease: 'power2.out',
+				overwrite: 'auto',
+			});
+			gsap.set(indicator, { scaleX: 1, transformOrigin: 'center center' });
+			prevMiniActiveSectionRef.current = null;
+			return;
+		}
+
+		const nextXPercent = xPercentForSection(activeSection);
+		const prevSection = prevMiniActiveSectionRef.current;
+
+		// On first open (empty -> selected), animate a "shrink" into the selected segment
+		if (!prevSection) {
+			const origin = transformOriginForSection(activeSection);
+
+			// Start as a full-width highlight (scaleX: 3 because the indicator is 1/3 width),
+			// then shrink toward the selected segment's side/center.
+			gsap.set(indicator, {
+				xPercent: nextXPercent,
+				opacity: 1,
+				scaleX: 3,
+				transformOrigin: origin,
+			});
+			gsap.to(indicator, {
+				scaleX: 1,
+				duration: 0.6,
+				ease: 'power2.out',
+				overwrite: 'auto',
+			});
+			prevMiniActiveSectionRef.current = activeSection;
+			return;
+		}
+
+		// Between tabs, slide with requested timing/ease (width/height remain constant)
+		gsap.set(indicator, { scaleX: 1, transformOrigin: 'center center' });
+		gsap.to(indicator, {
+			xPercent: nextXPercent,
+			duration: 0.6,
+			ease: 'power2.out',
+			overwrite: 'auto',
+		});
+		gsap.to(indicator, {
+			opacity: 1,
+			duration: 0.15,
+			ease: 'power2.out',
+			overwrite: 'auto',
+		});
+
+		prevMiniActiveSectionRef.current = activeSection;
 	}, [activeSection]);
 
 	useEffect(() => {
@@ -2881,6 +3001,12 @@ const DashboardContent = () => {
 																			height: '38px',
 																		}}
 																	>
+																		{/* Sliding active section indicator for mini search bar */}
+																		<div
+																			ref={miniActiveSectionIndicatorRef}
+																			className="absolute top-0 left-0 h-full w-1/3 bg-white border border-black rounded-[6px] pointer-events-none z-0"
+																			style={{ opacity: 0, willChange: 'transform' }}
+																		/>
 																		<div
 																			className={`flex-1 flex items-center justify-start border-r border-transparent ${
 																				!activeSection
@@ -2889,17 +3015,6 @@ const DashboardContent = () => {
 																			} h-full min-w-0 relative pl-[16px] pr-1 mini-search-section-why`}
 																			onClick={() => setActiveSection('why')}
 																		>
-																			{activeSection === 'why' && (
-																				<div
-																					className="absolute -left-[1px] -top-[1px] border border-black bg-white rounded-[6px] z-0"
-																					style={{
-																						width: '117px',
-																						height: '38px',
-																						borderTopLeftRadius: '6px',
-																						borderBottomLeftRadius: '6px',
-																					}}
-																				/>
-																			)}
 																			<div className="w-full h-full flex items-center text-left text-[13px] font-bold font-secondary truncate p-0 relative z-10 cursor-pointer">
 																				{whyValue
 																					? whyValue.replace(/[\[\]]/g, '')
@@ -2912,20 +3027,8 @@ const DashboardContent = () => {
 																					? 'group-hover:border-black/10'
 																					: ''
 																			} h-full min-w-0 relative pl-[16px] pr-1 mini-search-section-what`}
+																			onClick={() => setActiveSection('what')}
 																		>
-																			{activeSection === 'what' && (
-																				<div
-																					className="absolute -left-[1px] -top-[1px] border border-black bg-white rounded-[6px] z-0"
-																					style={{
-																						width: '144px',
-																						height: '38px',
-																						borderTopLeftRadius: '6px',
-																						borderBottomLeftRadius: '6px',
-																						borderTopRightRadius: '6px',
-																						borderBottomRightRadius: '6px',
-																					}}
-																				/>
-																			)}
 																			<input
 																				value={whatValue}
 																				onChange={(e) => setWhatValue(e.target.value)}
@@ -2949,33 +3052,8 @@ const DashboardContent = () => {
 																			className={`flex-1 flex items-center justify-end h-full min-w-0 relative ${
 																				isMapView ? 'pr-[12px]' : 'pr-[29px]'
 																			} pl-[16px] mini-search-section-where`}
+																			onClick={() => setActiveSection('where')}
 																		>
-																			{activeSection === 'where' && (
-																				<div
-																					className="absolute -top-[1px] border border-black bg-white rounded-[6px] z-0"
-																					style={
-																						isMapView
-																							? {
-																									left: '-1px',
-																									right: '-1px',
-																									height: '38px',
-																									borderTopLeftRadius: '6px',
-																									borderBottomLeftRadius: '6px',
-																									borderTopRightRadius: '6px',
-																									borderBottomRightRadius: '6px',
-																							  }
-																							: {
-																									left: '-1px',
-																									width: '143px',
-																									height: '38px',
-																									borderTopLeftRadius: '6px',
-																									borderBottomLeftRadius: '6px',
-																									borderTopRightRadius: '6px',
-																									borderBottomRightRadius: '6px',
-																							  }
-																					}
-																				/>
-																			)}
 																			<input
 																				value={whereValue}
 																				onChange={(e) => {
