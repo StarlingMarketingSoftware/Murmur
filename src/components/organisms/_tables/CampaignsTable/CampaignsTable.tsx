@@ -318,7 +318,7 @@ export const CampaignsTable: FC = () => {
 							// Desktop mode: normal table with delete column
 							<CustomTable
 								variant="secondary"
-								containerClassName={`border-none rounded-[8px] my-campaigns-table !bg-[#EDEDED] !mx-auto !p-0 ${
+								containerClassName={`border-none rounded-[8px] my-campaigns-table !bg-[#EDEDED] !mx-auto !p-[6px] ${
 									isNarrowDesktop ? 'narrow-desktop-table' : '!w-[891px]'
 								}`}
 								headerClassName="[&_tr]:!bg-white [&_th]:!bg-white [&_th]:!border-0 [&_th]:!h-[28px] [&_tr]:!h-[28px] [&_th:first-child]:rounded-tl-[4px] [&_th:last-child]:rounded-tr-[4px]"
