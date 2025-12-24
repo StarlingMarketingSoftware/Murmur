@@ -122,6 +122,9 @@ export const MiniSearchBar: FC<{
 		const indicator = activeSectionIndicatorRef.current;
 		if (!indicator) return;
 
+		// Prevent overlapping tweens when the user clicks quickly
+		gsap.killTweensOf(indicator);
+
 		const xPercentForSection = (section: 'why' | 'what' | 'where') => {
 			switch (section) {
 				case 'why':
@@ -135,6 +138,18 @@ export const MiniSearchBar: FC<{
 			}
 		};
 
+		const transformOriginForSection = (section: 'why' | 'what' | 'where') => {
+			switch (section) {
+				case 'why':
+					return 'left center';
+				case 'where':
+					return 'right center';
+				case 'what':
+				default:
+					return 'center center';
+			}
+		};
+
 		// Hide when no active section (default state shows dividers)
 		if (!activeSection) {
 			gsap.to(indicator, {
@@ -143,6 +158,7 @@ export const MiniSearchBar: FC<{
 				ease: 'power2.out',
 				overwrite: 'auto',
 			});
+			gsap.set(indicator, { scaleX: 1, transformOrigin: 'center center' });
 			prevActiveSectionForIndicatorRef.current = null;
 			return;
 		}
@@ -150,12 +166,22 @@ export const MiniSearchBar: FC<{
 		const nextXPercent = xPercentForSection(activeSection);
 		const prevSection = prevActiveSectionForIndicatorRef.current;
 
-		// On first open, snap to position (no slide), then fade in
+		// On first open (empty -> selected), animate a "shrink" into the selected segment
+		// so it feels consistent with the tab switching motion.
 		if (!prevSection) {
-			gsap.set(indicator, { xPercent: nextXPercent });
-			gsap.to(indicator, {
+			const origin = transformOriginForSection(activeSection);
+
+			// Start as a full-width highlight (scaleX: 3 because the indicator is 1/3 width),
+			// then shrink toward the selected segment's side/center.
+			gsap.set(indicator, {
+				xPercent: nextXPercent,
 				opacity: 1,
-				duration: 0.15,
+				scaleX: 3,
+				transformOrigin: origin,
+			});
+			gsap.to(indicator, {
+				scaleX: 1,
+				duration: 0.6,
 				ease: 'power2.out',
 				overwrite: 'auto',
 			});
