@@ -1127,6 +1127,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		const indicator = searchActiveSectionIndicatorRef.current;
 		if (!indicator) return;
 
+		// Prevent overlapping tweens when the user clicks quickly
+		gsap.killTweensOf(indicator);
+
 		const xPercentForSection = (section: 'why' | 'what' | 'where') => {
 			switch (section) {
 				case 'why':
@@ -1140,6 +1143,18 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			}
 		};
 
+		const transformOriginForSection = (section: 'why' | 'what' | 'where') => {
+			switch (section) {
+				case 'why':
+					return 'left center';
+				case 'where':
+					return 'right center';
+				case 'what':
+				default:
+					return 'center center';
+			}
+		};
+
 		// Hide when no active section
 		if (!searchActiveSection) {
 			gsap.to(indicator, {
@@ -1148,6 +1163,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 				ease: 'power2.out',
 				overwrite: 'auto',
 			});
+			gsap.set(indicator, { scaleX: 1, transformOrigin: 'center center' });
 			prevSearchActiveSectionForIndicatorRef.current = null;
 			return;
 		}
@@ -1155,12 +1171,22 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		const nextXPercent = xPercentForSection(searchActiveSection);
 		const prevSection = prevSearchActiveSectionForIndicatorRef.current;
 
-		// On first open, snap to position (no slide), then fade in
+		// On first open (empty -> selected), animate a "shrink" into the selected segment
+		// so it feels consistent with the tab switching motion.
 		if (!prevSection) {
-			gsap.set(indicator, { xPercent: nextXPercent });
-			gsap.to(indicator, {
+			const origin = transformOriginForSection(searchActiveSection);
+
+			// Start as a full-width highlight (scaleX: 3 because the indicator is 1/3 width),
+			// then shrink toward the selected segment's side/center.
+			gsap.set(indicator, {
+				xPercent: nextXPercent,
 				opacity: 1,
-				duration: 0.15,
+				scaleX: 3,
+				transformOrigin: origin,
+			});
+			gsap.to(indicator, {
+				scaleX: 1,
+				duration: 0.6,
 				ease: 'power2.out',
 				overwrite: 'auto',
 			});
