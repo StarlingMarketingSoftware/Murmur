@@ -424,41 +424,79 @@ export const TestPreviewPanel: FC<TestPreviewPanelProps> = ({
 
 					{/* Subject box - 354x46px, 6px below the second divider */}
 					<div
-						className="bg-white border-2 border-black rounded-[4px] flex items-center px-3 mx-auto"
+						className={cn(
+							'bg-white border-2 border-black rounded-[4px] flex items-center px-3 mx-auto',
+							isLoading ? 'select-none' : ''
+						)}
 						style={{
 							width: '354px',
 							height: '46px',
 							marginTop: '6px',
 						}}
 					>
-						<span className="font-inter font-bold text-[14px] text-black truncate">
-							{typedSubject}
-						</span>
+						{isLoading ? (
+							<div
+								aria-hidden="true"
+								className="h-[14px] w-[68%] rounded-[3px] bg-[#E6E6E6] animate-pulse"
+							/>
+						) : (
+							<span className="font-inter font-bold text-[14px] text-black truncate">
+								{typedSubject}
+							</span>
+						)}
 					</div>
 
 					{/* Email body box - 355x504px, 4px below the subject box */}
 					<div
 						ref={boxRef}
-						className="bg-white border-2 border-black rounded-[4px] mx-auto overflow-hidden relative"
+						className={cn(
+							'bg-white border-2 border-black rounded-[4px] mx-auto overflow-hidden relative',
+							isLoading ? 'select-none' : ''
+						)}
 						style={{
 							width: '355px',
 							height: '504px',
 							marginTop: '4px',
 						}}
 					>
-						<CustomScrollbar
-							className="h-full test-preview-panel-content"
-							thumbColor="#000000"
-							trackColor="transparent"
-							thumbWidth={2}
-							offsetRight={-5}
-						>
-							<div ref={contentRef} className="max-w-none text-[14px] p-4">
-								<div className="whitespace-pre-wrap leading-[1.6]" style={{ fontFamily }}>
-									{typedBody}
+						{isLoading ? (
+							<div aria-hidden="true" className="h-full w-full p-4 select-none">
+								<div className="space-y-3 animate-pulse">
+									<div className="h-[10px] w-11/12 rounded-[3px] bg-[#E6E6E6]" />
+									<div className="h-[10px] w-10/12 rounded-[3px] bg-[#E6E6E6]" />
+									<div className="h-[10px] w-9/12 rounded-[3px] bg-[#E6E6E6]" />
+									<div className="h-[10px] w-10/12 rounded-[3px] bg-[#E6E6E6]" />
+									<div className="h-[10px] w-8/12 rounded-[3px] bg-[#E6E6E6]" />
+									<div className="h-[10px] w-11/12 rounded-[3px] bg-[#E6E6E6]" />
+									<div className="h-[10px] w-9/12 rounded-[3px] bg-[#E6E6E6]" />
+									<div className="h-[10px] w-10/12 rounded-[3px] bg-[#E6E6E6]" />
+									<div className="h-[10px] w-7/12 rounded-[3px] bg-[#E6E6E6]" />
+									<div className="h-[10px] w-11/12 rounded-[3px] bg-[#E6E6E6]" />
+									<div className="h-[10px] w-10/12 rounded-[3px] bg-[#E6E6E6]" />
+									<div className="h-[10px] w-9/12 rounded-[3px] bg-[#E6E6E6]" />
+									<div className="h-[10px] w-8/12 rounded-[3px] bg-[#E6E6E6]" />
+									<div className="h-[10px] w-10/12 rounded-[3px] bg-[#E6E6E6]" />
+									<div className="h-[10px] w-6/12 rounded-[3px] bg-[#E6E6E6]" />
 								</div>
 							</div>
-						</CustomScrollbar>
+						) : (
+							<CustomScrollbar
+								className="h-full test-preview-panel-content"
+								thumbColor="#000000"
+								trackColor="transparent"
+								thumbWidth={2}
+								offsetRight={-5}
+							>
+								<div ref={contentRef} className="max-w-none text-[14px] p-4">
+									<div
+										className="whitespace-pre-wrap leading-[1.6]"
+										style={{ fontFamily }}
+									>
+										{typedBody}
+									</div>
+								</div>
+							</CustomScrollbar>
+						)}
 					</div>
 
 					{/* Test Again button - 355x28px, 10px below the email body box */}
