@@ -1370,17 +1370,14 @@ The improved prompt should result in more personalized, engaging, and effective 
 			const fullAutomatedBlockForScore = values.hybridBlockPrompts?.find(
 				(block) => block.type === HybridBlock.full_automated
 			);
-			const fullAiPromptForScore = fullAutomatedBlockForScore?.value?.trim() || '';
+			// If the user hasn't entered custom instructions, we still score the default
+			// prompt (since that's what we actually send to the model).
+			const fullAiPromptForScore =
+				fullAutomatedBlockForScore?.value?.trim() || DEFAULT_FULL_AI_PROMPT;
 
-			if (fullAiPromptForScore) {
-				// Don't block test generation on scoring; run in background.
-				console.log('[Test Generation] Scoring Full AI prompt in background (Gemini)…');
-				scoreFullAutomatedPrompt(fullAiPromptForScore);
-			} else {
-				setPromptQualityScore(null);
-				setPromptQualityLabel(null);
-				setPromptSuggestions([]);
-			}
+			// Don't block test generation on scoring; run in background.
+			console.log('[Test Generation] Scoring Full AI prompt in background (Gemini)…');
+			scoreFullAutomatedPrompt(fullAiPromptForScore);
 		} else {
 			setPromptQualityScore(null);
 			setPromptQualityLabel(null);

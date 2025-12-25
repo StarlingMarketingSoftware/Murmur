@@ -998,16 +998,66 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const handlePromptInputFocusChange = useCallback((isFocused: boolean) => {
 		if (isFocused) {
 			setIsPromptInputFocused(true);
-		} else {
-			setTimeout(() => {
-				const activeElement = document.activeElement;
-				if (suggestionBoxRef.current?.contains(activeElement)) {
-					return;
-				}
-				setIsPromptInputFocused(false);
-			}, 50);
+			return;
 		}
-	}, []);
+		
+		// Delay closing so the user can move the mouse from the writing box into the suggestion box
+		// without it unmounting mid-flight.
+		setTimeout(() => {
+			// While a test is generating, keep the suggestion box visible.
+			if (isTest) {
+				setIsPromptInputFocused(true);
+				return;
+			}
+
+			const activeElement = document.activeElement as HTMLElement | null;
+			const promptInputContainer = document.querySelector(
+				'[data-hpi-container]'
+			) as HTMLElement | null;
+
+			const isHoveringPrompt = Boolean(promptInputContainer?.matches(':hover'));
+			const isHoveringSuggestion = Boolean(suggestionBoxRef.current?.matches(':hover'));
+
+			const isFocusInPrompt = Boolean(promptInputContainer?.contains(activeElement));
+			const isFocusInSuggestion = Boolean(suggestionBoxRef.current?.contains(activeElement));
+
+			if (
+				isHoveringPrompt ||
+				isHoveringSuggestion ||
+				isFocusInPrompt ||
+				isFocusInSuggestion
+			) {
+				return;
+			}
+
+			setIsPromptInputFocused(false);
+		}, 200);
+	}, [isTest]);
+
+	// When scoring results arrive (or a new test run starts), automatically surface the suggestion box
+	// so the user sees it without needing to focus an input field.
+	useEffect(() => {
+		if (view !== 'testing') return;
+		if (!isTest) return;
+		setIsPromptInputFocused(true);
+	}, [view, isTest]);
+
+	useEffect(() => {
+		if (view !== 'testing') return;
+		const hasAnySuggestions = (promptSuggestions?.length || 0) > 0;
+		if (!hasAnySuggestions && promptQualityScore == null) return;
+		setIsPromptInputFocused(true);
+	}, [view, promptQualityScore, promptSuggestions]);
+
+	const hasSuggestionBoxContent = Boolean(
+		isTest ||
+			clampedPromptScore != null ||
+			suggestionText1 ||
+			suggestionText2 ||
+			suggestionText3 ||
+			isUpscalingPrompt ||
+			hasPreviousPrompt
+	);
 
 	const handleGetSuggestions = useCallback(
 		async (text: string) => {
@@ -2325,10 +2375,12 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 
 									{view === 'testing' &&
 										isPromptInputFocused &&
-										(suggestionText1 || suggestionText2) && (
+										hasSuggestionBoxContent && (
 											<div
 												ref={suggestionBoxRef}
 												tabIndex={-1}
+												onMouseEnter={() => handlePromptInputFocusChange(true)}
+												onMouseLeave={() => handlePromptInputFocusChange(false)}
 												onBlur={(e) => {
 													// Check if focus is moving outside the suggestion box and prompt input
 													const relatedTarget = e.relatedTarget as HTMLElement | null;
@@ -2339,7 +2391,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														!suggestionBoxRef.current?.contains(relatedTarget) &&
 														!promptInputContainer?.contains(relatedTarget)
 													) {
-														setIsPromptInputFocused(false);
+														handlePromptInputFocusChange(false);
 													}
 												}}
 												style={{

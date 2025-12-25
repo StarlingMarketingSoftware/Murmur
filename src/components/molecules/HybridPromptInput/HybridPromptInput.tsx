@@ -1439,6 +1439,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 	// Track focus state for the entire prompt input area
 	const focusTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 	const handleContainerFocus = () => {
+		if (activeTab !== 'main') return;
 		if (focusTimeoutRef.current) {
 			clearTimeout(focusTimeoutRef.current);
 			focusTimeoutRef.current = null;
@@ -1446,10 +1447,25 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		onFocusChange?.(true);
 	};
 	const handleContainerBlur = () => {
+		if (activeTab !== 'main') return;
 		// Use a small timeout to check if focus moved to another element within the container
 		focusTimeoutRef.current = setTimeout(() => {
 			onFocusChange?.(false);
 		}, 100);
+	};
+
+	// Desktop hover should also show the suggestions box (previously it required focus in an input)
+	const handleContainerMouseEnter = () => {
+		if (activeTab !== 'main') return;
+		if (focusTimeoutRef.current) {
+			clearTimeout(focusTimeoutRef.current);
+			focusTimeoutRef.current = null;
+		}
+		onFocusChange?.(true);
+	};
+	const handleContainerMouseLeave = () => {
+		if (activeTab !== 'main') return;
+		onFocusChange?.(false);
 	};
 
 	const [highlightStyle, setHighlightStyle] = useState({
@@ -1642,6 +1658,8 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 							data-hpi-container
 							onFocus={handleContainerFocus}
 							onBlur={handleContainerBlur}
+							onMouseEnter={handleContainerMouseEnter}
+							onMouseLeave={handleContainerMouseLeave}
 						>
 							{/* Mobile-only gradient background overlay starting under Mode divider */}
 							{isMobile && !showTestPreview && overlayTopPx !== null && (
