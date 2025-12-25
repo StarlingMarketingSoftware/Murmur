@@ -1,6 +1,15 @@
 'use client';
 
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import {
+	Suspense,
+	useCallback,
+	useEffect,
+	useLayoutEffect,
+	useMemo,
+	useRef,
+	useState,
+	type ReactNode,
+} from 'react';
 import { gsap } from 'gsap';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { createPortal, flushSync } from 'react-dom';
@@ -269,6 +278,35 @@ const getCompactMapResearchPanelHeightPxForParsed = (metadata: string): number |
 	const heightPx =
 		CONTENT_START_TOP_PX + bulletContentHeightPx + SUMMARY_HEIGHT_PX + SUMMARY_BOTTOM_INSET_PX;
 
+	return Math.ceil(heightPx);
+};
+
+/**
+ * For the map hover "Research" overlay, compute a compact height when showing parsed bullets
+ * but intentionally hiding the bottom summary box (used on very short viewports).
+ */
+const getCompactMapResearchPanelHeightPxForParsedWithoutSummary = (
+	metadata: string
+): number | null => {
+	const parsedCountRaw = countParsedResearchSections(metadata);
+	if (parsedCountRaw < 3) return null;
+
+	// `ContactResearchPanel` renders at most [1]-[5]
+	const parsedCount = clampNumber(parsedCountRaw, 3, 5);
+
+	// Mirrors `ContactResearchPanel`'s non-compact header sizing.
+	const HEADER_HEIGHT_PX = 24;
+	const CONTENT_START_TOP_PX = HEADER_HEIGHT_PX + 43; // header + divider + contact bar + divider
+	const BULLET_SPACING_PX = MAP_RESEARCH_PANEL_FIXED_HEIGHT_BULLET_SPACING_PX;
+	const BULLET_CONTENT_TOP_PADDING_PX = 6;
+	const BULLET_CONTENT_BOTTOM_PADDING_PX = 10;
+
+	const bulletContentHeightPx =
+		BULLET_CONTENT_TOP_PADDING_PX +
+		parsedCount * BULLET_SPACING_PX +
+		BULLET_CONTENT_BOTTOM_PADDING_PX;
+
+	const heightPx = CONTENT_START_TOP_PX + bulletContentHeightPx;
 	return Math.ceil(heightPx);
 };
 
@@ -1178,6 +1216,8 @@ const DashboardContent = () => {
 		ContactWithName[]
 	>([]);
 	const mapViewContainerRef = useRef<HTMLDivElement | null>(null);
+	const mapSidePanelRef = useRef<HTMLDivElement | null>(null);
+	const [mapSidePanelClientHeightPx, setMapSidePanelClientHeightPx] = useState<number | null>(null);
 	const [activeMapTool, setActiveMapTool] = useState<'select' | 'grab'>('grab');
 	const [hoveredMapMarkerContact, setHoveredMapMarkerContact] = useState<ContactWithName | null>(
 		null
@@ -1187,6 +1227,30 @@ const DashboardContent = () => {
 	const isMapResultsLoading = isSearchPending || isLoadingContacts || isRefetchingContacts;
 	const hasNoSearchResults =
 		hasSearched && !isMapResultsLoading && (contacts?.length ?? 0) === 0;
+
+	// Keep `ContactResearchPanel`'s fixed-height layout math aligned with the *actual* rendered
+	// height of the map side panel (which is clamped via CSS `maxHeight` on short viewports).
+	useLayoutEffect(() => {
+		if (!isMapView || isNarrowestDesktop || hasNoSearchResults) {
+			setMapSidePanelClientHeightPx(null);
+			return;
+		}
+
+		const el = mapSidePanelRef.current;
+		if (!el) return;
+
+		const update = () => {
+			const next = el.clientHeight || 0;
+			setMapSidePanelClientHeightPx((prev) => (prev === next ? prev : next));
+		};
+
+		update();
+
+		if (typeof ResizeObserver === 'undefined') return;
+		const ro = new ResizeObserver(() => update());
+		ro.observe(el);
+		return () => ro.disconnect();
+	}, [isMapView, isNarrowestDesktop, hasNoSearchResults]);
 
 	useEffect(() => {
 		// Prevent stale hover state when leaving map view or while results are transitioning.
@@ -1344,6 +1408,60 @@ const DashboardContent = () => {
 		// Fallback: only compact summary-only research when it is short enough.
 		return getCompactMapResearchPanelHeightPx(metadata);
 	}, [mapResearchPanelContact?.metadata]);
+
+	// On very short viewports, 4+ parsed bullets + even a compressed summary won't fit.
+	// In that case, hide the summary so the bullets remain fully visible (no collision/cutoff).
+	const shouldHideMapResearchSummaryIfCrowded = useMemo(() => {
+		const metadata = mapResearchPanelContact?.metadata;
+		if (!metadata || metadata.trim().length === 0) return false;
+		const parsedCountRaw = countParsedResearchSections(metadata);
+		if (parsedCountRaw < 4) return false;
+
+		const panelHeightPx = mapSidePanelClientHeightPx ?? mapResearchPanelCompactHeightPx;
+		if (!panelHeightPx) return false;
+
+		// Mirrors `ContactResearchPanel` fixed-height sizing math for the map overlay (non-compact header).
+		const HEADER_HEIGHT_PX = 24;
+		const CONTENT_START_TOP_PX = HEADER_HEIGHT_PX + 43;
+		const BULLET_CONTENT_TOP_PADDING_PX = 6;
+		const BULLET_CONTENT_BOTTOM_PADDING_PX = 10;
+		const SUMMARY_BOTTOM_INSET_PX = 14;
+		const SUMMARY_MIN_COMPRESSED_OUTER_HEIGHT_PX = 120; // keep in sync with ContactResearchPanel
+
+		const bulletContentHeightPx =
+			BULLET_CONTENT_TOP_PADDING_PX +
+			parsedCountRaw * MAP_RESEARCH_PANEL_FIXED_HEIGHT_BULLET_SPACING_PX +
+			BULLET_CONTENT_BOTTOM_PADDING_PX;
+
+		const requiredHeightPx =
+			CONTENT_START_TOP_PX +
+			bulletContentHeightPx +
+			SUMMARY_MIN_COMPRESSED_OUTER_HEIGHT_PX +
+			SUMMARY_BOTTOM_INSET_PX;
+
+		return panelHeightPx < requiredHeightPx;
+	}, [
+		mapResearchPanelContact?.metadata,
+		mapSidePanelClientHeightPx,
+		mapResearchPanelCompactHeightPx,
+	]);
+
+	const mapResearchPanelOverlayHeightPx = useMemo(() => {
+		const metadata = mapResearchPanelContact?.metadata;
+		if (!metadata || metadata.trim().length === 0) return null;
+
+		// When we hide the summary due to crowding, also shrink the panel height so we don't
+		// leave a big empty region where the summary would have been.
+		if (shouldHideMapResearchSummaryIfCrowded) {
+			return getCompactMapResearchPanelHeightPxForParsedWithoutSummary(metadata);
+		}
+
+		return mapResearchPanelCompactHeightPx;
+	}, [
+		mapResearchPanelContact?.metadata,
+		shouldHideMapResearchSummaryIfCrowded,
+		mapResearchPanelCompactHeightPx,
+	]);
 
 	const searchedStateAbbr = useMemo(
 		() => extractStateAbbrFromSearchQuery(activeSearchQuery),
@@ -3591,6 +3709,7 @@ const DashboardContent = () => {
 															    so the UI doesn't disappear between state searches. */}
 															{!isNarrowestDesktop && !hasNoSearchResults && (
 																	<div
+																		ref={mapSidePanelRef}
 																		className="absolute top-[97px] right-[10px] rounded-[12px] flex flex-col"
 																		onMouseEnter={() => {
 																			if (!shouldUseDynamicMapCreateCampaignCta) return;
@@ -3602,9 +3721,10 @@ const DashboardContent = () => {
 																		}}
 																		style={{
 																			width: '433px',
-																			height: mapResearchPanelContact && mapResearchPanelCompactHeightPx
-																				? mapResearchPanelCompactHeightPx
-																				: 800,
+																			height:
+																				mapResearchPanelContact && mapResearchPanelOverlayHeightPx
+																					? mapResearchPanelOverlayHeightPx
+																					: 800,
 																			maxHeight: 'calc(100% - 117px)',
 																			backgroundColor:
 																				mapResearchPanelContact && isMapResearchPanelVisible
@@ -3950,7 +4070,13 @@ const DashboardContent = () => {
 																					style={{ width: '100%', height: '100%' }}
 																					// Tune box width for the 433px side panel
 																					boxWidth={405}
-																					height={mapResearchPanelCompactHeightPx ?? undefined}
+																					hideSummaryIfBullets={shouldHideMapResearchSummaryIfCrowded}
+																					height={
+																						mapSidePanelClientHeightPx ??
+																						mapResearchPanelOverlayHeightPx ??
+																						mapResearchPanelCompactHeightPx ??
+																						undefined
+																					}
 																					fixedHeightBoxSpacingPx={
 																						MAP_RESEARCH_PANEL_FIXED_HEIGHT_BULLET_SPACING_PX
 																					}

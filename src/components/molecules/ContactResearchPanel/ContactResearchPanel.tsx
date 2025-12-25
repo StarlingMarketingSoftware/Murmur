@@ -166,6 +166,10 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 	// In parsed + summary mode, the summary box is pinned to the bottom with a fixed inset.
 	const parsedSummaryBottomInsetPx = 14;
 	const parsedSummaryMinOuterHeightPx = 197;
+	// When the panel itself is height-constrained (e.g. short viewport in map view),
+	// allow the bottom summary box to shrink below the legacy minimum so it doesn't
+	// overlap/cut off parsed bullet boxes. The text inside remains scrollable.
+	const parsedSummaryMinCompressedOuterHeightPx = 120;
 	const parsedSummaryInnerOverheadPx = 15; // 197 outer -> 182 inner in legacy layout
 
 	const parsedSummaryOuterHeightPx = useMemo(() => {
@@ -192,7 +196,13 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 			bulletContentHeight -
 			parsedSummaryBottomInsetPx;
 
-		return Math.max(parsedSummaryMinOuterHeightPx, computed);
+		// If we're constrained, let the summary shrink (down to a smaller minimum) so
+		// the bullet list above stays fully visible.
+		const minOuterHeight =
+			computed < parsedSummaryMinOuterHeightPx
+				? parsedSummaryMinCompressedOuterHeightPx
+				: parsedSummaryMinOuterHeightPx;
+		return Math.max(minOuterHeight, computed);
 	}, [
 		shouldHideSummary,
 		hasAnyParsedSections,
