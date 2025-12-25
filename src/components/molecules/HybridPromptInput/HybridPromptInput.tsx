@@ -80,8 +80,9 @@ const SortableAIBlock = ({
 	onGetSuggestions,
 	profileFields,
 }: SortableAIBlockProps) => {
+	const isFullAutomatedBlock = block.value === HybridBlock.full_automated;
 	const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
-		useSortable({ id });
+		useSortable({ id, disabled: isFullAutomatedBlock });
 	const form = useFormContext<DraftingFormValues>();
 	// Track if the text field has been touched (user has interacted with it)
 	const [hasBeenTouched, setHasBeenTouched] = useState(false);
@@ -108,7 +109,6 @@ const SortableAIBlock = ({
 	};
 
 	const isTextBlock = block.value === HybridBlock.text;
-	const isFullAutomatedBlock = block.value === HybridBlock.full_automated;
 	const isIntroductionBlock = block.value === HybridBlock.introduction;
 	const isResearchBlock = block.value === HybridBlock.research;
 	const isActionBlock = block.value === HybridBlock.action;
@@ -337,32 +337,38 @@ const SortableAIBlock = ({
 				)}
 			>
 				{/* Drag handle */}
-				<div
-					{...attributes}
-					{...listeners}
-					data-drag-handle
-					className={cn(
-						'absolute top-0 left-0 cursor-move z-[1]',
-						isTextBlock
-							? showTestPreview
-								? 'h-[44px] w-[80px]'
-								: 'h-[80px] w-[90px]'
-							: isCompactBlock
-							? showTestPreview
-								? `${
-										isAdvancedEnabled ? 'h-[78px]' : 'h-[31px] max-[480px]:h-[24px]'
-								  } w-[80px]`
-								: `${
-										isAdvancedEnabled ? 'h-[78px]' : 'h-[31px] max-[480px]:h-[24px]'
-								  } w-[90px]`
-							: 'h-12',
-						isFullAutomatedBlock
-							? 'w-[172px]'
-							: !isCompactBlock && !isFullAutomatedBlock
-							? 'w-full'
-							: ''
-					)}
-				/>
+				{!isFullAutomatedBlock && (
+					<div
+						{...attributes}
+						{...listeners}
+						data-drag-handle
+						className={cn(
+							'absolute top-0 left-0 cursor-move z-[1]',
+							isTextBlock
+								? showTestPreview
+									? 'h-[44px] w-[80px]'
+									: 'h-[80px] w-[90px]'
+								: isCompactBlock
+								? showTestPreview
+									? `${
+											isAdvancedEnabled
+												? 'h-[78px]'
+												: 'h-[31px] max-[480px]:h-[24px]'
+									  } w-[80px]`
+									: `${
+											isAdvancedEnabled
+												? 'h-[78px]'
+												: 'h-[31px] max-[480px]:h-[24px]'
+									  } w-[90px]`
+								: 'h-12',
+							isFullAutomatedBlock
+								? 'w-[172px]'
+								: !isCompactBlock && !isFullAutomatedBlock
+								? 'w-full'
+								: ''
+						)}
+					/>
+				)}
 				{/* Block content container */}
 				<div
 					className={cn(
