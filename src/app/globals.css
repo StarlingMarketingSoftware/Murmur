@@ -5431,3 +5431,29 @@ body.murmur-mobile .search-input-icon-btn {
 	}
 }
 
+/* Sonner Toast Close Button Styles */
+[data-sonner-toast] [data-close-button] {
+	position: absolute !important;
+	top: 50% !important;
+	right: 12px !important;
+	left: auto !important;
+	transform: translateY(-50%) !important;
+	background: transparent !important;
+	border: none !important;
+	width: 14px !important;
+	height: 14px !important;
+	padding: 0 !important;
+	cursor: pointer !important;
+}
+
+[data-sonner-toast] [data-close-button] svg {
+	width: 14px !important;
+	height: 14px !important;
+	stroke: #A20000 !important;
+	stroke-width: 1.5px !important;
+}
+
+[data-sonner-toast] [data-close-button]:hover {
+	background: transparent !important;
+}
+
