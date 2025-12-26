@@ -9,7 +9,7 @@ import { DraftEmailResponse } from '@/hooks/usePerplexity';
 import { useGemini } from '@/hooks/useGemini';
 import { useOpenRouter } from '@/hooks/useOpenRouter';
 import {
-	FULL_AI_DRAFTING_SYSTEM_PROMPT,
+	getRandomDraftingSystemPrompt,
 	GEMINI_HYBRID_PROMPT,
 	GEMINI_MODEL_OPTIONS,
 	OPENROUTER_DRAFTING_MODELS,
@@ -619,7 +619,9 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		// Use provided model or default to first in the rotation
 		const selectedModel = model || OPENROUTER_DRAFTING_MODELS[0];
 
-		const populatedSystemPrompt = FULL_AI_DRAFTING_SYSTEM_PROMPT.replace(
+		// Get a random system prompt from the rotation
+		const { prompt: selectedSystemPrompt, promptIndex } = getRandomDraftingSystemPrompt();
+		const populatedSystemPrompt = selectedSystemPrompt.replace(
 			'{recipient_first_name}',
 			recipient.firstName || ''
 		).replace('{company}', recipient.company || '');
@@ -655,7 +657,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		console.log(
 			`[Full AI] Starting generation${
 				typeof draftIndex === 'number' ? ` (draft #${draftIndex})` : ''
-			} for contact: ${recipient.id} (${recipient.email}) using model: ${selectedModel}`
+			} for contact: ${recipient.id} (${recipient.email}) using model: ${selectedModel} prompt: #${promptIndex}`
 		);
 		console.log(
 			`[Full AI] Prompt sizes: systemChars=${populatedSystemPrompt.length} userChars=${userPrompt.length}`
@@ -670,8 +672,10 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 				signal,
 				debug: {
 					draftIndex,
+					promptIndex,
 					contactId: recipient.id,
 					contactEmail: recipient.email,
+					contactCompany: recipient.company || undefined,
 					campaignId: campaign.id,
 					source: 'full-ai',
 				},
@@ -688,7 +692,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			);
 		}
 
-		console.log(`[Full AI] OpenRouter response preview (model: ${selectedModel}):`, openRouterResponse);
+		console.log(`[Full AI] OpenRouter response preview (model: ${selectedModel}, prompt: #${promptIndex}):`, openRouterResponse);
 
 		// Parse OpenRouter response
 		let parsedResponse: DraftEmailResponse;
@@ -721,7 +725,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 				throw new Error('Parsed JSON missing required fields (message or subject)');
 			}
 
-			console.log(`[Full AI] Successfully parsed response from ${selectedModel}`);
+			console.log(`[Full AI] Successfully parsed response from ${selectedModel} (prompt: #${promptIndex})`);
 		} catch (e) {
 			console.error('[Full AI] JSON parse failed:', e);
 			console.error('[Full AI] Failed response was:', openRouterResponse);

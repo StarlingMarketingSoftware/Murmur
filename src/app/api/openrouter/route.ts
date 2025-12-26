@@ -22,8 +22,10 @@ const postOpenRouterSchema = z.object({
 			draftIndex: z.number().int().positive().optional(),
 			contactId: z.number().int().optional(),
 			contactEmail: z.string().optional(),
+			contactCompany: z.string().optional(),
 			campaignId: z.number().int().optional(),
 			source: z.string().optional(),
+			promptIndex: z.number().int().positive().optional(),
 		})
 		.optional(),
 });
@@ -52,14 +54,16 @@ export async function POST(request: NextRequest) {
 			.slice(2, 8)}`;
 		const labelParts = [
 			typeof debug?.draftIndex === 'number' ? `draft#${debug.draftIndex}` : null,
+			typeof debug?.promptIndex === 'number' ? `prompt#${debug.promptIndex}` : null,
 			typeof debug?.campaignId === 'number' ? `campaign=${debug.campaignId}` : null,
 			typeof debug?.contactId === 'number' ? `contactId=${debug.contactId}` : null,
 			debug?.contactEmail ? `email=${debug.contactEmail}` : null,
+			debug?.contactCompany ? `company=${debug.contactCompany}` : null,
 			debug?.source ? `source=${debug.source}` : null,
 		].filter(Boolean);
 		const label = labelParts.length ? ` ${labelParts.join(' ')}` : '';
 
-		// Drafting is Grok-only; ignore/override any other requested model.
+		// Drafting is restricted to our allowlisted model rotation; ignore/override any other requested model.
 		const model = ALLOWED_OPENROUTER_DRAFTING_MODELS.has(requestedModel)
 			? requestedModel
 			: DEFAULT_OPENROUTER_DRAFTING_MODEL;
@@ -74,6 +78,7 @@ export async function POST(request: NextRequest) {
 			model.includes('gpt') ||
 			model.includes('deepseek') ||
 			model.includes('qwen') ||
+			model.includes('claude') ||
 			model.includes('235b') ||
 			model.includes('70b') ||
 			model.includes('gemini') ||
