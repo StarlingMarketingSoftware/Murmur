@@ -2,7 +2,7 @@ export const fetchOpenRouter = async (
 	model: string,
 	prompt: string,
 	content: string,
-	options?: { timeoutMs?: number }
+	options?: { timeoutMs?: number; temperature?: number }
 ): Promise<string> => {
 	const controller = new AbortController();
 	const timeoutMs = options?.timeoutMs ?? 30000; // 30s default timeout for OpenRouter
@@ -11,6 +11,18 @@ export const fetchOpenRouter = async (
 	if (!apiKey) {
 		throw new Error('OPENROUTER_API_KEY environment variable is not set');
 	}
+
+	const DEFAULT_TEMPERATURE = 0.8;
+	const rawTemperature =
+		typeof options?.temperature === 'number'
+			? options.temperature
+			: process.env.OPENROUTER_TEMPERATURE
+			? Number(process.env.OPENROUTER_TEMPERATURE)
+			: DEFAULT_TEMPERATURE;
+	const temperature = Number.isFinite(rawTemperature)
+		? Math.max(0, Math.min(2, rawTemperature))
+		: DEFAULT_TEMPERATURE;
+
 	try {
 		const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
 			method: 'POST',
@@ -21,7 +33,7 @@ export const fetchOpenRouter = async (
 			body: JSON.stringify({
 				model,
 				stream: false,
-				temperature: 0.7,
+				temperature,
 				top_p: 0.95,
 				max_tokens: 1200,
 				messages: [
