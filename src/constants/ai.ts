@@ -333,7 +333,6 @@ export const OPENROUTER_DRAFTING_MODELS = [
 	'deepseek/deepseek-v3.2',
 	'google/gemini-3-flash-preview',
 	'deepseek/deepseek-v3.2',
-	'qwen/qwen-2.5-7b-instruct',
 	'x-ai/grok-4.1-fast',
 ] as const;
 
