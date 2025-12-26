@@ -1,5 +1,50 @@
 import type { MistralToneAgentType, PerplexityModel } from '@/types';
 
+/**
+ * Phrases you want to de-rank (discourage) across ALL AI-generated drafts.
+ *
+ * - Keep phrases in the exact surface form you want to avoid (matching is "verbatim", case-insensitive).
+ * - These are applied as extra instructions appended to the prompts below (Full AI, Hybrid, Mistral).
+ */
+export const DRAFTING_DERANK_PHRASES: string[] = [
+	"I hope this email finds you well",
+	"I've been following",
+	"non-pretentious",
+];
+
+type DraftingPromptFilterMode = 'freeform' | 'templated';
+
+const normalizeDraftingPhraseList = (phrases: readonly string[]): string[] => {
+	return phrases.map((p) => p.trim()).filter(Boolean);
+};
+
+const buildDerankPhrasesPromptBlock = (
+	phrases: readonly string[],
+	mode: DraftingPromptFilterMode
+): string => {
+	const normalized = normalizeDraftingPhraseList(phrases);
+	if (normalized.length === 0) return '';
+
+	const list = normalized.map((p) => `- "${p.replace(/"/g, '\\"')}"`).join('\n');
+
+	const templateSafetyNote =
+		mode === 'templated'
+			? `\n\nImportant: If the email template includes "Exact text {{textX}}" blocks, DO NOT change that exact text even if it contains a discouraged phrase. Apply this rule only to model-generated placeholder sections.\n`
+			: '\n';
+
+	return `\n\nPHRASE AVOIDANCE (GLOBAL):\nAvoid using these phrases verbatim in the subject or message (case-insensitive). If you need similar meaning, rephrase.\n${list}${templateSafetyNote}`;
+};
+
+export const applyDraftingOutputPhraseFilters = (
+	prompt: string,
+	options?: { phrases?: readonly string[]; mode?: DraftingPromptFilterMode }
+): string => {
+	const phrases = options?.phrases ?? DRAFTING_DERANK_PHRASES;
+	const mode = options?.mode ?? 'freeform';
+	const block = buildDerankPhrasesPromptBlock(phrases, mode);
+	return block ? `${prompt}${block}` : prompt;
+};
+
 // System Prompt #1 - Original
 export const FULL_AI_DRAFTING_SYSTEM_PROMPT_1 = `
 INSTRUCTIONS FOR EMAIL CONTENT:
@@ -10,7 +55,7 @@ TRY NOT TO MAKE THE EMAIL TOO LONG.
 
 Start with either "Hi All," "Hi Everyone," or if it's available in the data, "Hi {recipient_first_name}," or even "Hi Everyone at {company},"
 
-Then introduce yourself and your band. 
+Then introduce yourself and your band. More like "My name is" rather than "I am" 
 
 Then proceed to demonstate in a friendly and professional manner, demonstating that you know about the venue from information in {metadata} demonstating that you have deep knowledge of their establishment.
 Make this paragraph the shortest one. Perhaps just a sentence.
@@ -181,7 +226,7 @@ EMAIL MUST BE 2 PARAGRAPHS LONG
 
 Start with either "Hi All," "Hi Everyone," 
 
-Then introduce yourself and your band. MAKE THIS PART PRETTY DETAILED FROM SENDER INFORMATION. THIS IS THE LONGER PARAGRAPH.
+Then introduce yourself and your band. More like "My name is" rather than "I am." MAKE THIS PART PRETTY DETAILED FROM SENDER INFORMATION. THIS IS THE LONGER PARAGRAPH.
 
 THEN FOR THE SECOND PARAGRAPH, MAKE A SLIGHTLY REFERNCE TO THE {METADATA} AND THEN ASK ABOUT BOOKING ALL IN ONE SENCENCE.
  
@@ -233,10 +278,10 @@ EMAIL MUST BE 2 PARAGRAPHS LONG
 Start with either "Hi All," "Hi Everyone," or if it's available in the data, "Hi {recipient_first_name}," or even "Hi Everyone at {company},"
 
 FIRST PARAGPRAH: 
-JUST ONE SENCTENCE SAYING WHO YOU ARE AND WHAT YOU DO.
+JUST ONE SENCTENCE SAYING WHO YOU ARE AND WHAT YOU DO. More like "My name is" rather than "I am."
 
 SECOND PARAGRAPH:
-GO DEEPER IN TO [IDENTITY] SNEDER INFORMATION AND THEN GO DEEP INTO THE {METADATA}.
+GO DEEPER IN TO [IDENTITY] SNEDER INFORMATION AND THEN GO DEEP INTO THE {METADATA}. 
 This paragraph should be the longer one, but it shouldn't be excessive. 
 
 
@@ -337,7 +382,7 @@ You are an expericed professional musician. Think of yourself as a professional 
 DO NOT INCLUDE AN EMAIL SIGNATURE.
 MAKE THIS ONE PARAGRAPH LONG.
 
-Start with either "Hi All," "Hi Everyone," or if it's available in the data, "Hi {recipient_first_name}," or even "Hi Everyone at {company},"
+Start with either "Hello," THEN MAKE SURE THERE'S A PARAGRAPH BREAK AFTER THE FIRST LINE.
 
 Then introduce yourself and your band. 
  
@@ -510,15 +555,19 @@ Do not include any other text or explanation outside the JSON object.`;
 
 // System Prompt #12
 export const FULL_AI_DRAFTING_SYSTEM_PROMPT_12 = `
-INSTRUCTIONS FOR EMAIL CONTENT:
-
 You are an expericed professional musician. Think of yourself as a professional musician. You have a lot of experience and you know what you're doing.
 DO NOT INCLUDE AN EMAIL SIGNATURE.
-TRY NOT TO MAKE THE EMAIL TOO LONG.
+MAKE SURE THE 3RD PARAGRAPH IS A VERY SHORT SENTENCE. 
 
 Start with something like "Hi"
 
 Then introduce yourself and your band. 
+
+Then proceed to demonstate in a friendly and professional manner, demonstating that you know about the venue from information in {metadata} demonstating that you have deep knowledge of their establishment.
+Be more freindly in how you mention {metadata} so it doesn't sound like you're reading from a script. Don't get overly specific with the facts you include. Just mention the venue name and that you've heard of them.
+
+Following that, inquire about the venue's availability for a show. Don't be too pushy or salesy. Just ask in a friendly and professional manner.
+Also this last part shouldn't be super long
  
 You will be given structured input in the user message with these sections:
 - Sender information (your profile): user-entered fields such as name, band/artist name, genre, area, bio, and website (when provided).
@@ -531,11 +580,7 @@ If provided, use these fields naturally when you introduce yourself:
 - area = exactly what the user entered as the area/location they are in
 - bio = you can't invent facts, but if the bio is excessively long, you can shorten it to a few sentences.
 
-Then proceed to demonstate in a friendly and professional manner, demonstating that you know about the venue from information in {metadata} demonstating that you have deep knowledge of their establishment.
-Be more freindly in how you mention {metadata} so it doesn't sound like you're reading from a script. Don't get overly specific with the facts you include. Just mention the venue name and that you've heard of them.
 
-Following that, inquire about the venue's availability for a show. Don't be too pushy or salesy. Just ask in a friendly and professional manner.
-Also this last part shouldn't be super long
 
 FORMATTING INSTRUCTIONS:
 1. Ensure that there is a line break between each paragraph.
@@ -576,16 +621,20 @@ export const FULL_AI_DRAFTING_SYSTEM_PROMPTS = [
 // Helper function to get a random drafting system prompt with its index for logging
 export const getRandomDraftingSystemPrompt = (): { prompt: string; promptIndex: number } => {
 	const promptIndex = Math.floor(Math.random() * FULL_AI_DRAFTING_SYSTEM_PROMPTS.length);
+	const basePrompt = FULL_AI_DRAFTING_SYSTEM_PROMPTS[promptIndex];
 	return {
-		prompt: FULL_AI_DRAFTING_SYSTEM_PROMPTS[promptIndex],
+		prompt: applyDraftingOutputPhraseFilters(basePrompt, { mode: 'freeform' }),
 		promptIndex: promptIndex + 1, // 1-indexed for logging (Prompt #1, #2, etc.)
 	};
 };
 
 // Backwards compatibility - alias to prompt #1
-export const FULL_AI_DRAFTING_SYSTEM_PROMPT = FULL_AI_DRAFTING_SYSTEM_PROMPT_1;
+export const FULL_AI_DRAFTING_SYSTEM_PROMPT = applyDraftingOutputPhraseFilters(
+	FULL_AI_DRAFTING_SYSTEM_PROMPT_1,
+	{ mode: 'freeform' }
+);
 
-export const GEMINI_HYBRID_PROMPT = `
+const GEMINI_HYBRID_PROMPT_BASE = `
 You are a musician. Your goal is to get yourself booked for a show by writing an email. Do not make up any information about your own identity, as that will be provided to you. Furthermore, never compose a signature.
 Speak in a conversational and relaxed tone, but avoid being too casual or salesy.
 
@@ -624,6 +673,10 @@ Example response format:
 Do not include any other text or explanation outside the JSON object.
 `;
 
+export const GEMINI_HYBRID_PROMPT = applyDraftingOutputPhraseFilters(GEMINI_HYBRID_PROMPT_BASE, {
+	mode: 'templated',
+});
+
 const MISTRAL_FORMATTING_INSTRUCTIONS = `
 1. !IMPORTANT! Ensure that there is a line break character "\n" between each paragraph. Even after the first line, which is just a short greeting, there should be a line break character "\n". 
 2. Do not include a line break before the first line of text. 
@@ -631,7 +684,7 @@ const MISTRAL_FORMATTING_INSTRUCTIONS = `
 3. Do not add any space or tab before the first letter of each paragraph.`;
 
 export const getMistralTonePrompt = (tone: MistralToneAgentType): string => {
-	return `I will send an email message in plain text format. 
+	const base = `I will send an email message in plain text format. 
 
 	Perform the following tasks to the message:
 	1. !IMPORTANT! ${MISTRAL_TONE_PROMPTS[tone]}
@@ -654,13 +707,14 @@ Please return your response in JSON with the following format. Do not include an
   "message": "cleanedMessageInPlainTextFormat"
 }
 `;
+	return applyDraftingOutputPhraseFilters(base, { mode: 'freeform' });
 };
 
 export const getMistralHybridPrompt = (
 	emailTemplate: string,
 	blockPrompts: string
 ): string => {
-	return `
+	const base = `
 
 I will provide an email that was generated from a template that includes pre-written text that is specified in {{text}} blocks as well as AI placeholders that may include {{introduction}} {{research}} and {{call-to-action}}. When you revise the email, only revise the sections generated from the placeholders. DO NOT change the content specified in the {{text}} blocks. Each placeholder may have specific instructions attached to them. Each text block will have exact text associated with it.Please make sure to follow the instructions for each placeholder, and keep the exact text for each text block.
 
@@ -695,10 +749,11 @@ ${emailTemplate}
 
 ${blockPrompts}
 `;
+	return applyDraftingOutputPhraseFilters(base, { mode: 'templated' });
 };
 
 export const getMistralParagraphPrompt = (numberOfParagraphs: number): string => {
-	return `I will send a message in plain text format, including the line break character "\n". 
+	const base = `I will send a message in plain text format, including the line break character "\n". 
 
 Perform the following task the text message:
 1. ${MISTRAL_PARAGRAPH_PROMPTS[numberOfParagraphs]}
@@ -708,6 +763,7 @@ ${MISTRAL_FORMATTING_INSTRUCTIONS}
 
 Return the updated message in plain text format, using the line break character "\n", without any additional text or explanation.
 `;
+	return applyDraftingOutputPhraseFilters(base, { mode: 'freeform' });
 };
 
 export const OPEN_AI_MODEL_OPTIONS = {
