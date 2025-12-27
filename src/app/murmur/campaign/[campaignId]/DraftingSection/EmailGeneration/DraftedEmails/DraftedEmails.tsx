@@ -24,6 +24,7 @@ import { useGetUsedContactIds } from '@/hooks/queryHooks/useContacts';
 import LeftArrow from '@/components/atoms/_svg/LeftArrow';
 import RightArrow from '@/components/atoms/_svg/RightArrow';
 import { useIsMobile } from '@/hooks/useIsMobile';
+import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 
 interface ScrollableTextareaProps
 	extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
@@ -881,16 +882,24 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 						{/* Message editor - plain text or HTML view for links */}
 						<div className="flex justify-center flex-1" style={{ padding: isMobile ? '0 8px' : undefined }}>
 							<div
-								className="bg-white border-2 border-black rounded-[4px] overflow-hidden"
+								className="bg-white border-2 border-black rounded-[4px] overflow-visible draft-review-box"
 								style={{ width: isMobile ? '100%' : '470px', height: hasStatusBar ? '516px' : '572px', flex: isMobile ? 1 : undefined }}
 							>
 								{/* Check if original message has links - if so, show HTML view for proper link display */}
 								{selectedDraft?.message && /<a\s+[^>]*href=/i.test(selectedDraft.message) ? (
-									<div 
-										className="w-full h-full p-3 text-sm overflow-y-auto draft-review-content"
-										style={{ wordBreak: 'break-word' }}
-										dangerouslySetInnerHTML={{ __html: selectedDraft.message }}
-									/>
+									<CustomScrollbar
+										className="w-full h-full"
+										thumbWidth={2}
+										thumbColor="#000000"
+										offsetRight={-6}
+										lockHorizontalScroll
+									>
+										<div 
+											className="p-3 text-sm draft-review-content"
+											style={{ wordBreak: 'break-word' }}
+											dangerouslySetInnerHTML={{ __html: selectedDraft.message }}
+										/>
+									</CustomScrollbar>
 								) : (
 									<ScrollableTextarea
 										value={editedMessage}
