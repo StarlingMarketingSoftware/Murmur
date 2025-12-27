@@ -59,6 +59,12 @@ export const DraftPreviewBox: FC<DraftPreviewBoxProps> = ({
 		[overridePlainMessage, draft.message]
 	);
 
+	// Check if message contains anchor tags - if so, render as HTML to show links
+	const hasLinks = useMemo(
+		() => /<a\s+[^>]*href=/i.test(draft.message || ''),
+		[draft.message]
+	);
+
 	const stateAbbr = useMemo(() => {
 		if (!contact?.state) return '';
 		return getStateAbbreviation(contact.state) || '';
@@ -158,9 +164,17 @@ export const DraftPreviewBox: FC<DraftPreviewBoxProps> = ({
 						className="overflow-hidden"
 					>
 						<div className="h-full overflow-hidden">
-							<div className="p-3 whitespace-pre-wrap text-[12px] leading-[1.5] overflow-y-auto">
-								{plainMessage || 'No content'}
-							</div>
+							{hasLinks ? (
+								<div 
+									className="p-3 text-[12px] leading-[1.5] overflow-y-auto h-full draft-preview-content"
+									style={{ wordBreak: 'break-word' }}
+									dangerouslySetInnerHTML={{ __html: draft.message || 'No content' }}
+								/>
+							) : (
+								<div className="p-3 whitespace-pre-wrap text-[12px] leading-[1.5] overflow-y-auto">
+									{plainMessage || 'No content'}
+								</div>
+							)}
 						</div>
 					</div>
 				</div>

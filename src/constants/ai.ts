@@ -832,3 +832,58 @@ export const MISTRAL_PARAGRAPH_AGENT_KEYS = [
 ] as const;
 
 export const MISTRAL_HYBRID_AGENT_KEYS = ['hybrid'] as const;
+
+/**
+ * Website link phrases that can be inserted after paragraphs when identity.website is available.
+ * These are inserted during the post-AI assembly process, not by the AI itself.
+ */
+export const WEBSITE_LINK_PHRASES = [
+	"Here's a link where you can see more:",
+] as const;
+
+/**
+ * Inserts a website link phrase after a random paragraph (1st, 2nd, or 3rd) in the email body.
+ * This is a post-processing step that happens after AI generation but before HTML conversion.
+ * 
+ * @param message - The plain text email message with \n\n paragraph separators
+ * @param websiteUrl - The URL to link to (identity.website)
+ * @returns The message with the website link phrase inserted
+ */
+export const insertWebsiteLinkPhrase = (message: string, websiteUrl: string): string => {
+	if (!websiteUrl || !message) {
+		return message;
+	}
+
+	// Normalize the website URL - add https:// if no protocol is present
+	let normalizedUrl = websiteUrl.trim();
+	if (!normalizedUrl.match(/^https?:\/\//i)) {
+		normalizedUrl = `https://${normalizedUrl}`;
+	}
+
+	// Split the message into paragraphs (separated by double newlines)
+	const paragraphs = message.split(/\n\n+/);
+	
+	// If the message has fewer than 2 paragraphs, don't insert the link
+	// (we need at least a greeting + body)
+	if (paragraphs.length < 2) {
+		return message;
+	}
+
+	// Randomly choose to insert after paragraph 1, 2, or 3 (0-indexed: 0, 1, or 2)
+	// But cap at the number of available paragraphs (minus 1 to leave room for closing)
+	const maxInsertPosition = Math.min(3, paragraphs.length - 1);
+	const insertPosition = Math.floor(Math.random() * maxInsertPosition) + 1; // 1, 2, or 3 (skip greeting at 0)
+
+	// Pick a random phrase from our options
+	const phrase = WEBSITE_LINK_PHRASES[Math.floor(Math.random() * WEBSITE_LINK_PHRASES.length)];
+
+	// Create the website link paragraph with HTML anchor
+	// Using inline style to ensure the link is properly styled
+	const websiteLinkParagraph = `${phrase} <a href="${normalizedUrl}" style="color: #0066cc; text-decoration: underline;">Website</a>`;
+
+	// Insert the link paragraph after the chosen position
+	paragraphs.splice(insertPosition + 1, 0, websiteLinkParagraph);
+
+	// Rejoin with double newlines
+	return paragraphs.join('\n\n');
+};

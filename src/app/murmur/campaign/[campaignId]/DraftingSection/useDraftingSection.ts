@@ -13,6 +13,7 @@ import {
 	GEMINI_HYBRID_PROMPT,
 	GEMINI_MODEL_OPTIONS,
 	OPENROUTER_DRAFTING_MODELS,
+	insertWebsiteLinkPhrase,
 } from '@/constants/ai';
 import {
 	CampaignWithRelations,
@@ -1472,8 +1473,15 @@ The improved prompt should result in more personalized, engaging, and effective 
 					const finalSubject = values.isAiSubject
 						? parsedRes.subject
 						: values.subject || parsedRes.subject;
+					
+					// Insert website link phrase if identity has a website
+					let processedMessage = parsedRes.message;
+					if (campaign.identity?.website) {
+						processedMessage = insertWebsiteLinkPhrase(processedMessage, campaign.identity.website);
+					}
+					
 					// Prepend subject line in Inter bold to the message
-					const messageWithSubject = `<span style="font-family: Inter; font-weight: bold;">${finalSubject}</span><br><br>${parsedRes.message}`;
+					const messageWithSubject = `<span style="font-family: Inter; font-weight: bold;">${finalSubject}</span><br><br>${processedMessage}`;
 					await saveTestEmail({
 						id: campaign.id,
 						data: {
@@ -1609,10 +1617,16 @@ The improved prompt should result in more personalized, engaging, and effective 
 					}
 
 					if (parsedDraft) {
+						// Insert website link phrase if identity has a website
+						let processedMessage = parsedDraft.message;
+						if (campaign.identity?.website) {
+							processedMessage = insertWebsiteLinkPhrase(processedMessage, campaign.identity.website);
+						}
+						
 						// Start live preview streaming for this recipient
 						startLivePreviewStreaming(
 							recipient.id,
-							parsedDraft.message,
+							processedMessage,
 							parsedDraft.subject
 						);
 						if (!isAiSubject) {
@@ -1622,7 +1636,7 @@ The improved prompt should result in more personalized, engaging, and effective 
 						await createEmail({
 							subject: parsedDraft.subject,
 							message: convertAiResponseToRichTextEmail(
-								parsedDraft.message,
+								processedMessage,
 								values.font,
 								signatureText || null
 							),
