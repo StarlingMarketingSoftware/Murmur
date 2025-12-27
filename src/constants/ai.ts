@@ -56,6 +56,21 @@ export const DRAFTING_DERANK_PHRASES: string[] = [
 	"create something expressive and engaging",
 	"a focused environment for live performance",
 	"dig",
+	"been involved in",
+	"Given your space's connection",
+	"I'd be thrilled to bring my energy",
+	"I'm excited to share my sound",
+	"I'm looking forward to the opportunity",
+	"I'm excited to be a part of",
+	"I'm excited to bring my energy",
+	"I'm excited to bring my sound",
+	"I'm excited to be a part of",
+	"I'm excited to bring my energy",
+	"opportunity to connect.",
+	"Connect",
+	"artistic environment",
+	"versatile",
+	"I am contacting you",
 ];
 
 //banned words
