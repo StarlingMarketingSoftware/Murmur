@@ -28,6 +28,7 @@ import {
 	generatePromptsFromBlocks,
 	stringifyJsonSubset,
 	removeEmDashes,
+	stripEmailSignatureFromAiMessage,
 } from '@/utils';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Contact, HybridBlock, Identity, Signature } from '@prisma/client';
@@ -777,9 +778,15 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			throw new Error('No message or subject generated');
 		}
 
+		const cleanedSubject = removeEmDashes(parsedResponse.subject);
+		const cleanedMessage = stripEmailSignatureFromAiMessage(removeEmDashes(parsedResponse.message), {
+			senderName: identityProfile.name,
+			senderBandName: identityProfile.bandName ?? null,
+		});
+
 		return {
-			subject: removeEmDashes(parsedResponse.subject),
-			message: removeEmDashes(parsedResponse.message),
+			subject: cleanedSubject,
+			message: cleanedMessage,
 		};
 	};
 
@@ -900,11 +907,16 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			}
 		}
 
+		const cleanedMessageNoSignature = stripEmailSignatureFromAiMessage(cleanedMessage, {
+			senderName: identityProfile.name,
+			senderBandName: identityProfile.bandName ?? null,
+		});
+
 		return {
 			subject: isAiSubject
 				? removeEmDashes(geminiParsed.subject)
 				: form.getValues('subject'),
-			message: cleanedMessage,
+			message: cleanedMessageNoSignature,
 		};
 	};
 

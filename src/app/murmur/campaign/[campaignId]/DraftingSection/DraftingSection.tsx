@@ -14,6 +14,7 @@ import {
 	generateEmailTemplateFromBlocks,
 	generatePromptsFromBlocks,
 	removeEmDashes,
+	stripEmailSignatureFromAiMessage,
 	convertAiResponseToRichTextEmail,
 	convertHtmlToPlainText,
 } from '@/utils';
@@ -951,11 +952,15 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 
 				const cleanedSubject = removeEmDashes(parsed.subject);
 				const cleanedMessageText = removeEmDashes(parsed.message);
+				const cleanedMessageNoSignature = stripEmailSignatureFromAiMessage(cleanedMessageText, {
+					senderName: campaign.identity?.name ?? null,
+					senderBandName: campaign.identity?.bandName ?? null,
+				});
 
 				const signatureText = values.signature || `Thank you,\n${campaign.identity?.name || ''}`;
 				const font = values.font || 'Arial';
 
-				let processedMessageText = cleanedMessageText;
+				let processedMessageText = cleanedMessageNoSignature;
 				if (campaign.identity?.website) {
 					processedMessageText = insertWebsiteLinkPhrase(
 						processedMessageText,

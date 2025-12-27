@@ -55,6 +55,7 @@ export const DRAFTING_DERANK_PHRASES: string[] = [
 	"curated atmosphere",
 	"create something expressive and engaging",
 	"a focused environment for live performance",
+	"dig",
 ];
 
 //banned words
@@ -81,6 +82,15 @@ const buildNoSenderWebsiteUrlPromptBlock = (mode: DraftingPromptFilterMode): str
 			: '\n';
 
 	return `\n\nWEBSITE (GLOBAL):\nIf the sender profile includes a "website" value, never include that sender website URL/domain verbatim in the subject or message.\n- Do not paste the sender website as a link (no http/https/www; do not print the sender domain).\n- If you want to reference it, say "my website" without a URL.\n${templateSafetyNote}`;
+};
+
+const buildNoSignaturePromptBlock = (mode: DraftingPromptFilterMode): string => {
+	const templateSafetyNote =
+		mode === 'templated'
+			? `\n\nImportant: If the email template includes "Exact text {{textX}}" blocks that contain a sign-off or signature, copy that exact text verbatim. Otherwise, do NOT add any sign-off/signature content in model-generated placeholder sections.\n`
+			: '\n';
+
+	return `\n\nNO SIGNATURE (GLOBAL - STRICT):\nDo NOT include an email signature or sign-off in the subject or message.\n- Do not add closing lines like "Best,", "Thanks,", "Sincerely,", "Cheers,", etc.\n- Do not add your name, band name, title, phone number, email address, website, socials/handles, or any contact block at the end.\n- End the email immediately after the final content paragraph.\n${templateSafetyNote}`;
 };
 
 const buildDerankPhrasesPromptBlock = (
@@ -132,6 +142,7 @@ export const applyDraftingOutputPhraseFilters = (
 	const blocks = [
 		buildBannedPhrasesPromptBlock(bannedPhrases, mode),
 		buildDerankPhrasesPromptBlock(phrases, mode),
+		buildNoSignaturePromptBlock(mode),
 		buildNoSenderWebsiteUrlPromptBlock(mode),
 	]
 		.filter(Boolean)
@@ -593,9 +604,9 @@ Do not include any other text or explanation outside the JSON object.`;
 // System Prompt #11
 export const FULL_AI_DRAFTING_SYSTEM_PROMPT_11 = `
 INSTRUCTIONS FOR EMAIL CONTENT:
+DO NOT INCLUDE AN EMAIL SIGNATURE.
 
 You are an expericed professional musician. Think of yourself as a professional musician. You have a lot of experience and you know what you're doing.
-DO NOT INCLUDE AN EMAIL SIGNATURE.
 KEEP IT A BREIF PROFESSIONAL EMAIL.
 
 Start with either "Hi All," "Hi Everyone," or if it's available in the data, "Hi {recipient_first_name}," or even "Hi Everyone at {company},"
@@ -603,12 +614,6 @@ Start with either "Hi All," "Hi Everyone," or if it's available in the data, "Hi
 Give a clear introduction as to who you are, but maybe this time don't start immediately with the name, but go into the project from [identity] sender information and then second sentence get to the name.
 
 Make this next paragraph go into {metadata} for the company you're writing to and really write with the intent to book a show.
-
-Treat Sender information as ground-truth facts. Do NOT invent missing sender details.
-If provided, use these fields naturally when you introduce yourself:
-- genre = exactly what the user entered as their genre
-- area = exactly what the user entered as the area/location they are in
-- bio = you can't invent facts, but if the bio is excessively long, you can shorten it to a few sentences.
 
 FORMATTING INSTRUCTIONS:
 1. Ensure that there is a line break between each paragraph.
