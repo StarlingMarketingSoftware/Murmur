@@ -1,15 +1,38 @@
 import type { MistralToneAgentType, PerplexityModel } from '@/types';
 
-/**
- * Phrases you want to de-rank (discourage) across ALL AI-generated drafts.
- *
- * - Keep phrases in the exact surface form you want to avoid (matching is "verbatim", case-insensitive).
- * - These are applied as extra instructions appended to the prompts below (Full AI, Hybrid, Mistral).
- */
+//deranked phrases
 export const DRAFTING_DERANK_PHRASES: string[] = [
 	"I hope this email finds you well",
 	"I've been following",
 	"non-pretentious",
+	"was struck by its emphasis",
+	"caught my eye",
+	"perfect fit",
+	"relaxed, sustainable environment",
+	"acoustic-leaning performances",
+	"I'd be happy to discuss possibilities further",
+	"exciting creative force",
+	"unique sound",
+	"great fit for your crowd",
+	"discuss the possibility of working together",
+	"I've heard great things about",
+	"lively atmosphere",
+	"creating a vibrant, creative experience",
+	"I've heard great things about the energy",
+	"very adaptable and would be a great fit",
+	"vibrant energy and unique harmony",
+	"elegant outdoor tasting areas",
+];
+
+//banned words
+export const DRAFTING_BANNED_PHRASES: string[] = [
+	"fuck",
+	"shit",
+	"ass",
+	"bitch",
+	"cunt",
+	"fuck you",
+	"kill yourself",
 ];
 
 type DraftingPromptFilterMode = 'freeform' | 'templated';
@@ -44,14 +67,37 @@ const buildDerankPhrasesPromptBlock = (
 	return `\n\nPHRASE AVOIDANCE (GLOBAL):\nAvoid using these phrases verbatim in the subject or message (case-insensitive). If you need similar meaning, rephrase.\n${list}${templateSafetyNote}`;
 };
 
+const buildBannedPhrasesPromptBlock = (
+	phrases: readonly string[],
+	mode: DraftingPromptFilterMode
+): string => {
+	const normalized = normalizeDraftingPhraseList(phrases);
+	if (normalized.length === 0) return '';
+
+	const list = normalized.map((p) => `- "${p.replace(/"/g, '\\"')}"`).join('\n');
+
+	const templateSafetyNote =
+		mode === 'templated'
+			? `\n\nImportant: If the email template includes "Exact text {{textX}}" blocks, DO NOT change that exact text even if it contains a banned word/phrase. Apply this rule only to model-generated placeholder sections.\n`
+			: '\n';
+
+	return `\n\nBANNED WORDS/PHRASES (GLOBAL - STRICT):\nDo NOT use any of the following words or phrases under ANY circumstances (case-insensitive). Do not attempt to rephrase - use completely different wording instead.\n${list}${templateSafetyNote}`;
+};
+
 export const applyDraftingOutputPhraseFilters = (
 	prompt: string,
-	options?: { phrases?: readonly string[]; mode?: DraftingPromptFilterMode }
+	options?: {
+		phrases?: readonly string[];
+		bannedPhrases?: readonly string[];
+		mode?: DraftingPromptFilterMode;
+	}
 ): string => {
 	const phrases = options?.phrases ?? DRAFTING_DERANK_PHRASES;
+	const bannedPhrases = options?.bannedPhrases ?? DRAFTING_BANNED_PHRASES;
 	const mode = options?.mode ?? 'freeform';
 
 	const blocks = [
+		buildBannedPhrasesPromptBlock(bannedPhrases, mode),
 		buildDerankPhrasesPromptBlock(phrases, mode),
 		buildNoSenderWebsiteUrlPromptBlock(mode),
 	]
@@ -163,7 +209,8 @@ TRY NOT TO BE TOO LONG. STAY CONCISE. FIND A WAY TO COMPRESS THE INFORMATION.
 
  start with either "Hello All," "Hello Everyone," or if it's available in the data, "Hello {recipient_first_name}," or even "Hello Everyone at {company},"
 
- go into detail about yourself from [identity] sender information including your genre, area, and bio. then go into detail about the venue from {metadata} and how you've heard of them.
+Start with something like "This is [identity]" 
+go into detail about yourself from [identity] sender information including your genre, area, and bio. then go into detail about the venue from {metadata} and how you've heard of them.
 Really keep it short and sweet, they don't have all day to read your eamil.
 
 Treat Sender information as ground-truth facts. Do NOT invent missing sender details.
@@ -200,6 +247,7 @@ DO NOT INCLUDE AN EMAIL SIGNATURE.
 AIM FOR THIS TO BE 2 PARAGRAPHS LONG.
 
 Start with either "Hi All," "Hi Everyone," or if it's available in the data, "Hi {recipient_first_name}," or even "Hi Everyone at {company},"
+MAKE SURE THERE'S A PARAGRAPH BREAK AFTER THE FIRST LINE.
 
 INTRODUCE SENDER INFORMATION FROM [IDENTITY]. Keep the bio short and concise. Include the name, genre, area, and bio. 
 
@@ -242,6 +290,7 @@ EMAIL MUST BE 2 PARAGRAPHS LONG
 
 Start with either "Hi All," "Hi Everyone," 
 
+Start here with something like "I'm reaching out to inquire about booking a show at {metadata}."
 Then introduce yourself and your band. More like "My name is" rather than "I am." MAKE THIS PART PRETTY DETAILED FROM SENDER INFORMATION. THIS IS THE LONGER PARAGRAPH.
 
 THEN FOR THE SECOND PARAGRAPH, MAKE A SLIGHTLY REFERNCE TO THE {METADATA} AND THEN ASK ABOUT BOOKING ALL IN ONE SENCENCE.
@@ -294,7 +343,7 @@ EMAIL MUST BE 2 PARAGRAPHS LONG
 Start with either "Hi All," "Hi Everyone," or if it's available in the data, "Hi {recipient_first_name}," or even "Hi Everyone at {company},"
 
 FIRST PARAGPRAH: 
-JUST ONE SENCTENCE SAYING WHO YOU ARE AND WHAT YOU DO. More like "My name is" rather than "I am."
+JUST ONE SENCTENCE SAYING WHO YOU ARE AND WHAT YOU DO. More like "My name is" rather than "I am." and "I'm reaching out to book" etc...
 
 SECOND PARAGRAPH:
 GO DEEPER IN TO [IDENTITY] SNEDER INFORMATION AND THEN GO DEEP INTO THE {METADATA}. 
@@ -400,31 +449,11 @@ MAKE THIS ONE PARAGRAPH LONG.
 
 Start with either "Hello," THEN MAKE SURE THERE'S A PARAGRAPH BREAK AFTER THE FIRST LINE.
 
-Then introduce yourself and your band. 
- 
-You will be given structured input in the user message with these sections:
-- Sender information (your profile): user-entered fields such as name, band/artist name, genre, area, bio, and website (when provided).
-- Recipient information: details about who you are writing to, including any metadata about the venue/company.
-- User Goal: what the user wants this email to accomplish.
+PARAGRAPH 1:
+Start with going into the {metadata} on the company you're writing to in a casual and friendly manner.
 
-Treat Sender information as ground-truth facts. Do NOT invent missing sender details.
-If provided, use these fields naturally when you introduce yourself:
-- genre = exactly what the user entered as their genre
-- area = exactly what the user entered as the area/location they are in
-- bio = you can't invent facts, but if the bio is excessively long, you can shorten it to a few sentences.
-
-Then proceed to demonstate in a friendly and professional manner, demonstating that you know about the venue from information in {metadata} demonstating that you have deep knowledge of their establishment.
-Be more freindly in how you mention {metadata} so it doesn't sound like you're reading from a script. Don't get overly specific with the facts you include. Just mention the venue name and that you've heard of them.
-
-Following that, inquire about the venue's availability for a show. Don't be too pushy or salesy. Just ask in a friendly and professional manner.
-Also this last part shouldn't be super long
-
-FORMATTING INSTRUCTIONS:
-1. Ensure that there is a line break between each paragraph.
-2. Do not include a line break before the first line of text.
-3. At the end of the first line (the short greeting), use a comma. For example: "Hi,"
-4. Do not add any space or tab before the first letter of each paragraph.
-5. DO NOT INCLUDE AN EMAIL SIGNATURE.
+PARAGRAPH 2:
+Go into detail about yourself from [identity] sender information including your genre, area, and bio.
 
 OUTPUT FORMAT:
 Return your response as a valid JSON object with exactly two fields:
@@ -491,8 +520,8 @@ You're one of the best musicians in the world. and now you're sat down to send a
 Start with either "Hi All," "Hi Everyone," or if it's available in the data, "Hi {recipient_first_name}," or even "Hi Everyone at {company},"
 
 FIRST PARAGRAPH:
-make this only one sentence. Start it with a hook from sender information. just find something that sounds casual and natural.
-This one should sbe shorter than you think it should be. Try to be slightly casual and friendly.
+make this only one sentence. Start it with a hook from {metadata}. just find something that sounds casual and natural.
+This one should shorter than you think it should be. Try to be slightly casual and friendly.
 
 SECOND PARAGRAPH:
 go into detail about yourself from [identity] sender information including your genre, area, and bio.
