@@ -34,6 +34,27 @@ export const DRAFTING_DERANK_PHRASES: string[] = [
 	"creative and versatile musical expression",
 	"afternoon activations or evening showcases",
 	"diverse genre influences",
+	"versatile and creative",
+	"vibrant",
+	"known for versatile, genre-blending performances",
+	"I've noticed your involvement in community events",
+	"which could pair well with",
+	"Are you considering live music for upcoming evenings?",
+	"relaxed, listening-oriented setting",
+	"natural crossover",
+	"blend other genres",
+	"listening-oriented",
+	"could be a nice fit",
+	"I'm reaching out to book a performance",
+	"I would love to explore the possibility",
+	"I wanted to see if you have any upcoming availability",
+	"which I think would pair well with the atmosphere",
+	"point of connection",
+	"truly values",
+	"daytime activation",
+	"curated atmosphere",
+	"create something expressive and engaging",
+	"a focused environment for live performance",
 ];
 
 //banned words
@@ -214,12 +235,11 @@ Do not include any other text or explanation outside the JSON object.`;
 
 // System Prompt #3
 export const FULL_AI_DRAFTING_SYSTEM_PROMPT_3 = `
-INSTRUCTIONS FOR EMAIL CONTENT:
-
 ENSURE THIS EMAIL IS 1 PARAGRAPH LONG.
 TRY NOT TO BE TOO LONG. STAY CONCISE. FIND A WAY TO COMPRESS THE INFORMATION.
 
  start with either "Hello All," "Hello Everyone," or if it's available in the data, "Hello {recipient_first_name}," or even "Hello Everyone at {company},"
+ MAKE SURE THERE'S A PARAGRAPH BREAK AFTER THE FIRST LINE.
 
 Start with something like "This is [identity]" 
 go into detail about yourself from [identity] sender information including your genre, area, and bio. then go into detail about the venue from {metadata} and how you've heard of them.
