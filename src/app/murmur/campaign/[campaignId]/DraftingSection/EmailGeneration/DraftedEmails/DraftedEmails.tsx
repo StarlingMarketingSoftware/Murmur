@@ -24,7 +24,7 @@ import { useGetUsedContactIds } from '@/hooks/queryHooks/useContacts';
 import LeftArrow from '@/components/atoms/_svg/LeftArrow';
 import RightArrow from '@/components/atoms/_svg/RightArrow';
 import { useIsMobile } from '@/hooks/useIsMobile';
-import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
+import RichTextEditor from '@/components/molecules/RichTextEditor/RichTextEditor';
 
 interface ScrollableTextareaProps
 	extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
@@ -879,27 +879,23 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 							/>
 						</div>
 
-						{/* Message editor - plain text or HTML view for links */}
+						{/* Message editor - rich text for links, plain textarea otherwise */}
 						<div className="flex justify-center flex-1" style={{ padding: isMobile ? '0 8px' : undefined }}>
 							<div
 								className="bg-white border-2 border-black rounded-[4px] overflow-visible draft-review-box"
 								style={{ width: isMobile ? '100%' : '470px', height: hasStatusBar ? '516px' : '572px', flex: isMobile ? 1 : undefined }}
 							>
-								{/* Check if original message has links - if so, show HTML view for proper link display */}
+								{/* Check if original message has links - if so, use RichTextEditor for proper link editing */}
 								{selectedDraft?.message && /<a\s+[^>]*href=/i.test(selectedDraft.message) ? (
-									<CustomScrollbar
-										className="w-full h-full"
-										thumbWidth={2}
-										thumbColor="#000000"
-										offsetRight={-6}
-										lockHorizontalScroll
-									>
-										<div 
-											className="p-3 text-sm draft-review-content"
-											style={{ wordBreak: 'break-word' }}
-											dangerouslySetInnerHTML={{ __html: selectedDraft.message }}
+									<div className="w-full h-full overflow-auto [&_.ProseMirror]:min-h-full [&_.ProseMirror]:border-0 [&_.ProseMirror]:bg-transparent [&_.ProseMirror]:focus:ring-0 [&_.ProseMirror]:focus:outline-none">
+										<RichTextEditor
+											value={editedMessage}
+											onChange={setEditedMessage}
+											hideMenuBar
+											className="w-full h-full border-0 bg-transparent !min-h-0 text-sm"
+											placeholder="Type your message here..."
 										/>
-									</CustomScrollbar>
+									</div>
 								) : (
 									<ScrollableTextarea
 										value={editedMessage}
