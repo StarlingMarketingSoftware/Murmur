@@ -858,6 +858,13 @@ export const WEBSITE_LINK_PHRASES = [
 	"Here's a link to my site:",
 	"Here's a link to see more:",
 	"You can find more about me here:",
+	"To see more:",
+	"You can find more on my site:",
+	"To see more of my work:",
+	"If you're interested in seeing more info:",
+	"My site is in the following link:",
+	"See more here:",
+	"See more of my work here:",
 ] as const;
 
 /**
