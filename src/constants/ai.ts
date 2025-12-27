@@ -18,6 +18,15 @@ const normalizeDraftingPhraseList = (phrases: readonly string[]): string[] => {
 	return phrases.map((p) => p.trim()).filter(Boolean);
 };
 
+const buildNoSenderWebsiteUrlPromptBlock = (mode: DraftingPromptFilterMode): string => {
+	const templateSafetyNote =
+		mode === 'templated'
+			? `\n\nImportant: If the email template includes "Exact text {{textX}}" blocks, DO NOT change that exact text even if it contains a website. Apply this rule only to model-generated placeholder sections.\n`
+			: '\n';
+
+	return `\n\nWEBSITE (GLOBAL):\nIf the sender profile includes a "website" value, never include that sender website URL/domain verbatim in the subject or message.\n- Do not paste the sender website as a link (no http/https/www; do not print the sender domain).\n- If you want to reference it, say "my website" without a URL.\n${templateSafetyNote}`;
+};
+
 const buildDerankPhrasesPromptBlock = (
 	phrases: readonly string[],
 	mode: DraftingPromptFilterMode
@@ -41,8 +50,15 @@ export const applyDraftingOutputPhraseFilters = (
 ): string => {
 	const phrases = options?.phrases ?? DRAFTING_DERANK_PHRASES;
 	const mode = options?.mode ?? 'freeform';
-	const block = buildDerankPhrasesPromptBlock(phrases, mode);
-	return block ? `${prompt}${block}` : prompt;
+
+	const blocks = [
+		buildDerankPhrasesPromptBlock(phrases, mode),
+		buildNoSenderWebsiteUrlPromptBlock(mode),
+	]
+		.filter(Boolean)
+		.join('');
+
+	return blocks ? `${prompt}${blocks}` : prompt;
 };
 
 // System Prompt #1 - Original
@@ -839,6 +855,9 @@ export const MISTRAL_HYBRID_AGENT_KEYS = ['hybrid'] as const;
  */
 export const WEBSITE_LINK_PHRASES = [
 	"Here's a link where you can see more:",
+	"Here's a link to my site:",
+	"Here's a link to see more:",
+	"You can find more about me here:",
 ] as const;
 
 /**
@@ -854,19 +873,65 @@ export const insertWebsiteLinkPhrase = (message: string, websiteUrl: string): st
 		return message;
 	}
 
+	const hasAnyAnchor = /<a\s+[^>]*href=/i.test(message);
+
 	// Normalize the website URL - add https:// if no protocol is present
 	let normalizedUrl = websiteUrl.trim();
 	if (!normalizedUrl.match(/^https?:\/\//i)) {
 		normalizedUrl = `https://${normalizedUrl}`;
 	}
 
+	// META RULE: prevent the raw sender website URL from appearing in the message text.
+	// We add the website back in a standardized, non-URL-visible way via the anchor below.
+	const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+	const stripRawWebsiteUrlFromText = (text: string, url: string) => {
+		try {
+			const parsed = new URL(url);
+			const hostWithoutWww = parsed.host.replace(/^www\./i, '');
+			const pathname =
+				parsed.pathname && parsed.pathname !== '/' ? parsed.pathname.replace(/\/+$/, '') : '';
+
+			// If the user provided a path (e.g. bandcamp.com/myartist), match that path too.
+			const hostPlusOptionalPath = `${escapeRegExp(hostWithoutWww)}${
+				pathname ? escapeRegExp(pathname) : ''
+			}`;
+
+			// Match common URL renderings, but avoid matching inside email addresses (the "@" guard).
+			const urlRegex = new RegExp(
+				`(^|[^\\w@])((?:https?:\\/\\/)?(?:www\\.)?${hostPlusOptionalPath}(?:[/?#][^\\s]*)?)`,
+				'gi'
+			);
+
+			let next = text.replace(urlRegex, (_match, prefix: string) => `${prefix}my website`);
+			// De-dupe accidental repeats (e.g. "my website my website")
+			next = next.replace(/\bmy website\b(?:\s+my website\b)+/gi, 'my website');
+			return next;
+		} catch {
+			// If parsing fails, fall back to a conservative substring replacement
+			const raw = url.trim();
+			if (!raw) return text;
+			const rawNoProtocol = raw.replace(/^https?:\/\//i, '');
+			const candidates = [raw, rawNoProtocol].filter(Boolean);
+			let next = text;
+			for (const candidate of candidates) {
+				const re = new RegExp(`(^|[^\\w@])(${escapeRegExp(candidate)})`, 'gi');
+				next = next.replace(re, (_match, prefix: string) => `${prefix}my website`);
+			}
+			return next;
+		}
+	};
+
+	const cleanedMessage = hasAnyAnchor
+		? message
+		: stripRawWebsiteUrlFromText(message, normalizedUrl);
+
 	// Split the message into paragraphs (separated by double newlines)
-	const paragraphs = message.split(/\n\n+/);
+	const paragraphs = cleanedMessage.split(/\n\n+/);
 	
 	// If the message has fewer than 2 paragraphs, don't insert the link
 	// (we need at least a greeting + body)
 	if (paragraphs.length < 2) {
-		return message;
+		return cleanedMessage;
 	}
 
 	// Randomly choose to insert after paragraph 1, 2, or 3 (0-indexed: 0, 1, or 2)
