@@ -22,6 +22,18 @@ export const DRAFTING_DERANK_PHRASES: string[] = [
 	"very adaptable and would be a great fit",
 	"vibrant energy and unique harmony",
 	"elegant outdoor tasting areas",
+	"fantastic hub for creative crossover",
+	"acoustic-leaning set",
+	"complement your service",
+	"the campus's industry traffic",
+	"wonderful setting",
+	"fitting the right music to a space",
+	"integrate community activations",
+	"vibrant, multi-arts environment",
+	"fantastic model",
+	"creative and versatile musical expression",
+	"afternoon activations or evening showcases",
+	"diverse genre influences",
 ];
 
 //banned words

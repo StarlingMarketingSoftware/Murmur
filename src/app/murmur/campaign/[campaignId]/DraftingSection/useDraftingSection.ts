@@ -223,10 +223,10 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		useState(false);
 	const [generationProgress, setGenerationProgress] = useState(-1);
 	const [isTest, setIsTest] = useState<boolean>(false);
+	const [isBatchGenerating, setIsBatchGenerating] = useState(false);
 	const [promptQualityScore, setPromptQualityScore] = useState<number | null>(null);
 	const [promptQualityLabel, setPromptQualityLabel] = useState<string | null>(null);
 	const [promptSuggestions, setPromptSuggestions] = useState<string[]>([]);
-	const [abortController, setAbortController] = useState<AbortController | null>(null);
 	const [isFirstLoad, setIsFirstLoad] = useState(true);
 	const [activeTab, setActiveTab] = useState<'test' | 'placeholders'>('test');
 	const [isUpscalingPrompt, setIsUpscalingPrompt] = useState(false);
@@ -235,6 +235,8 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	const draftingRef = useRef<HTMLDivElement>(null);
 	const emailStructureRef = useRef<HTMLDivElement>(null);
 
+	const isBatchGeneratingRef = useRef(false);
+	const abortControllerRef = useRef<AbortController | null>(null);
 	const isGenerationCancelledRef = useRef(false);
 	const lastFocusedFieldRef = useRef<{
 		name: string;
@@ -401,7 +403,12 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 
 	const draftingMode = getDraftingModeBasedOnBlocks();
 
-	const isPendingGeneration = isPendingCallGemini || isPendingCallOpenRouter || isPendingCreateEmail;
+	const isPendingGeneration =
+		isBatchGenerating ||
+		generationProgress > -1 ||
+		isPendingCallGemini ||
+		isPendingCallOpenRouter ||
+		isPendingCreateEmail;
 
 	let dataDraftEmail: TestDraftEmail = {
 		subject: '',
@@ -539,30 +546,45 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	};
 
 	const batchGenerateHandWrittenDrafts = async (selectedIds?: number[]) => {
-		const generatedEmails: GeneratedEmail[] = [];
-
-		if (!contacts || contacts.length === 0) {
-			toast.error('No contacts available to generate emails.');
-			return generatedEmails;
+		if (isBatchGeneratingRef.current) {
+			console.warn('[Batch] Handwritten generation already in progress; ignoring request.');
+			return [];
 		}
 
-		const targets =
-			selectedIds && selectedIds.length > 0
-				? contacts.filter((c: ContactWithName) => selectedIds.includes(c.id))
-				: contacts;
+		isBatchGeneratingRef.current = true;
+		setIsBatchGenerating(true);
 
-		targets.forEach((contact: ContactWithName) => {
-			generatedEmails.push(generateHandwrittenDraft(contact));
-		});
+		const generatedEmails: GeneratedEmail[] = [];
 
-		await createEmail(generatedEmails);
+		try {
+			if (!contacts || contacts.length === 0) {
+				toast.error('No contacts available to generate emails.');
+				return generatedEmails;
+			}
 
-		// Invalidate emails query to refresh the drafts list
-		queryClient.invalidateQueries({
-			queryKey: ['emails', { campaignId: campaign.id }],
-		});
+			const targets =
+				selectedIds && selectedIds.length > 0
+					? contacts.filter((c: ContactWithName) => selectedIds.includes(c.id))
+					: contacts;
 
-		toast.success('All handwritten drafts generated successfully!');
+			targets.forEach((contact: ContactWithName) => {
+				generatedEmails.push(generateHandwrittenDraft(contact));
+			});
+
+			await createEmail(generatedEmails);
+
+			// Invalidate emails query to refresh the drafts list
+			queryClient.invalidateQueries({
+				queryKey: ['emails', { campaignId: campaign.id }],
+			});
+
+			toast.success('All handwritten drafts generated successfully!');
+
+			return generatedEmails;
+		} finally {
+			isBatchGeneratingRef.current = false;
+			setIsBatchGenerating(false);
+		}
 	};
 
 	const generateHandwrittenDraft = (contact: ContactWithName): GeneratedEmail => {
@@ -1331,9 +1353,10 @@ The improved prompt should result in more personalized, engaging, and effective 
 	const cancelGeneration = () => {
 		isGenerationCancelledRef.current = true;
 		setGenerationProgress(-1);
-		if (abortController) {
-			abortController.abort();
-			setAbortController(null);
+		const controller = abortControllerRef.current;
+		if (controller) {
+			controller.abort();
+			abortControllerRef.current = null;
 		}
 		hideLivePreview();
 	};
@@ -1712,43 +1735,51 @@ The improved prompt should result in more personalized, engaging, and effective 
 	};
 
 	const batchGenerateFullAiDrafts = async (selectedIds?: number[]) => {
+		if (isBatchGeneratingRef.current) {
+			console.warn('[Batch] Full AI generation already in progress; ignoring request.');
+			return;
+		}
+
+		isBatchGeneratingRef.current = true;
+		setIsBatchGenerating(true);
+
 		let remainingCredits = draftCredits || 0;
 
 		const controller = new AbortController();
-		setAbortController(controller);
+		abortControllerRef.current = controller;
 
 		const BATCH_SIZE = 3;
 		let successfulEmails = 0;
 		let stoppedDueToCredits = false;
 
-		if (!contacts || contacts.length === 0) {
-			toast.error('No contacts available to generate emails.');
-			return;
-		}
-
-		const paragraphs = form.getValues('paragraphs');
-		const creditCost = paragraphs <= 3 ? 1 : 1.5;
-
-		if (!draftCredits || draftCredits < creditCost) {
-			setIsOpenUpgradeSubscriptionDrawer(true);
-			return;
-		}
-
-		isGenerationCancelledRef.current = false;
-		setGenerationProgress(0);
-		const targets =
-			selectedIds && selectedIds.length > 0
-				? contacts.filter((c: ContactWithName) => selectedIds.includes(c.id))
-				: contacts;
-
-		if (draftingMode === DraftingMode.ai) {
-			console.log(
-				'[Batch][Full AI] OpenRouter model rotation order:',
-				OPENROUTER_DRAFTING_MODELS
-			);
-		}
-
 		try {
+			if (!contacts || contacts.length === 0) {
+				toast.error('No contacts available to generate emails.');
+				return;
+			}
+
+			const paragraphs = form.getValues('paragraphs');
+			const creditCost = paragraphs <= 3 ? 1 : 1.5;
+
+			if (!draftCredits || draftCredits < creditCost) {
+				setIsOpenUpgradeSubscriptionDrawer(true);
+				return;
+			}
+
+			isGenerationCancelledRef.current = false;
+			setGenerationProgress(0);
+			const targets =
+				selectedIds && selectedIds.length > 0
+					? contacts.filter((c: ContactWithName) => selectedIds.includes(c.id))
+					: contacts;
+
+			if (draftingMode === DraftingMode.ai) {
+				console.log(
+					'[Batch][Full AI] OpenRouter model rotation order:',
+					OPENROUTER_DRAFTING_MODELS
+				);
+			}
+
 			// show preview surface while generation is running
 			setIsLivePreviewVisible(true);
 			setLivePreviewMessage('Drafting...');
@@ -1789,7 +1820,7 @@ The improved prompt should result in more personalized, engaging, and effective 
 				}
 
 				// Check if we've run out of credits after processing this batch
-				if (remainingCredits < creditCost && successfulEmails < contacts.length) {
+				if (remainingCredits < creditCost && successfulEmails < targets.length) {
 					stoppedDueToCredits = true;
 					setIsOpenUpgradeSubscriptionDrawer(true);
 					cancelGeneration();
@@ -1839,10 +1870,12 @@ The improved prompt should result in more personalized, engaging, and effective 
 				toast.error('An error occurred during email generation.');
 			}
 		} finally {
-			setAbortController(null);
+			abortControllerRef.current = null;
 			setGenerationProgress(-1);
 			// Hide live preview after completion so the DraftPreviewBox disappears promptly
 			hideLivePreview();
+			isBatchGeneratingRef.current = false;
+			setIsBatchGenerating(false);
 		}
 	};
 
@@ -2037,15 +2070,15 @@ The improved prompt should result in more personalized, engaging, and effective 
 
 	useEffect(() => {
 		return () => {
-			if (abortController) {
-				abortController.abort();
+			const controller = abortControllerRef.current;
+			if (controller) {
+				controller.abort();
 			}
 			if (livePreviewTimerRef.current) {
 				clearInterval(livePreviewTimerRef.current);
 				livePreviewTimerRef.current = null;
 			}
 		};
-		/* eslint-disable-next-line react-hooks/exhaustive-deps */
 	}, []);
 
 	const trackFocusedField = useCallback(
