@@ -7,6 +7,7 @@ import { ContactWithName } from '@/types/contact';
 import { convertHtmlToPlainText } from '@/utils';
 import { getStateAbbreviation } from '@/utils/string';
 import { stateBadgeColorMap } from '@/constants/ui';
+import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 
 interface DraftPreviewBoxProps {
 	draft: { contactId: number; message?: string; subject?: string };
@@ -152,31 +153,36 @@ export const DraftPreviewBox: FC<DraftPreviewBoxProps> = ({
 						</div>
 					</div>
 
-					{/* Draft body box */}
-					<div
-						style={{
-							width: '366px',
-							height: '390px',
-							border: '2px solid #000000',
-							borderRadius: '8px',
-							backgroundColor: 'white',
-						}}
-						className="overflow-hidden"
+				{/* Draft body box */}
+				<div
+					style={{
+						width: '366px',
+						height: '390px',
+						border: '2px solid #000000',
+						borderRadius: '8px',
+						backgroundColor: 'white',
+					}}
+					className="overflow-hidden"
+				>
+					<CustomScrollbar
+						className="h-full"
+						thumbWidth={2}
+						thumbColor="#000000"
+						offsetRight={2}
 					>
-						<div className="h-full overflow-hidden">
-							{hasLinks ? (
-								<div 
-									className="p-3 text-[12px] leading-[1.5] overflow-y-auto h-full draft-preview-content"
-									style={{ wordBreak: 'break-word' }}
-									dangerouslySetInnerHTML={{ __html: draft.message || 'No content' }}
-								/>
-							) : (
-								<div className="p-3 whitespace-pre-wrap text-[12px] leading-[1.5] overflow-y-auto">
-									{plainMessage || 'No content'}
-								</div>
-							)}
-						</div>
-					</div>
+						{hasLinks ? (
+							<div 
+								className="p-3 text-[12px] leading-[1.5] draft-preview-content"
+								style={{ wordBreak: 'break-word' }}
+								dangerouslySetInnerHTML={{ __html: draft.message || 'No content' }}
+							/>
+						) : (
+							<div className="p-3 whitespace-pre-wrap text-[12px] leading-[1.5]">
+								{plainMessage || 'No content'}
+							</div>
+						)}
+					</CustomScrollbar>
+				</div>
 				</div>
 			</div>
 		</div>

@@ -25,6 +25,7 @@ import LeftArrow from '@/components/atoms/_svg/LeftArrow';
 import RightArrow from '@/components/atoms/_svg/RightArrow';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import RichTextEditor from '@/components/molecules/RichTextEditor/RichTextEditor';
+import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 
 interface ScrollableTextareaProps
 	extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
@@ -887,7 +888,13 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 							>
 								{/* Check if original message has links - if so, use RichTextEditor for proper link editing */}
 								{selectedDraft?.message && /<a\s+[^>]*href=/i.test(selectedDraft.message) ? (
-									<div className="w-full h-full overflow-auto [&_.ProseMirror]:min-h-full [&_.ProseMirror]:border-0 [&_.ProseMirror]:bg-transparent [&_.ProseMirror]:focus:ring-0 [&_.ProseMirror]:focus:outline-none">
+									<CustomScrollbar
+										className="w-full h-full"
+										thumbWidth={2}
+										thumbColor="#000000"
+										offsetRight={-6}
+										contentClassName="[&_.ProseMirror]:min-h-full [&_.ProseMirror]:border-0 [&_.ProseMirror]:bg-transparent [&_.ProseMirror]:focus:ring-0 [&_.ProseMirror]:focus:outline-none"
+									>
 										<RichTextEditor
 											value={editedMessage}
 											onChange={setEditedMessage}
@@ -895,7 +902,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 											className="w-full h-full border-0 bg-transparent !min-h-0 text-sm"
 											placeholder="Type your message here..."
 										/>
-									</div>
+									</CustomScrollbar>
 								) : (
 									<ScrollableTextarea
 										value={editedMessage}
@@ -904,7 +911,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 										placeholder="Type your message here..."
 										thumbWidth={2}
 										thumbColor="#000000"
-										trackOffset={4}
+										trackOffset={-6}
 									/>
 								)}
 							</div>
