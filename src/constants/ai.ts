@@ -1,88 +1,90 @@
 import type { MistralToneAgentType, PerplexityModel } from '@/types';
 
-//deranked phrases
-export const DRAFTING_DERANK_PHRASES: string[] = [
+// Tier 1: 100% included | Tier 2: 50% sampled | Tier 3: 25% sampled
+export const DERANK_TIER_1_CRITICAL: readonly string[] = [
 	"I hope this email finds you well",
 	"I've been following",
+	"I've heard great things about",
+	"I am contacting you",
+	"I'm excited to share my sound",
+	"I'm excited to be a part of",
+	"I'm excited to bring my energy",
+	"I'd be thrilled to bring my energy",
+	"I'm looking forward to the opportunity",
+	"I would love to explore the possibility",
+	"I'd be happy to discuss possibilities further",
+	"discuss the possibility of working together",
+	"I am writing to inquire if there might be any availability",
+	"I am writing to see if you might have any openings",
+	"I am currently exploring opportunities",
+] as const;
+
+export const DERANK_TIER_2_IMPORTANT: readonly string[] = [
+	"perfect fit",
+	"great fit for your crowd",
+	"could be a nice fit",
+	"very adaptable and would be a great fit",
+	"aligns well with my shows",
+	"unique sound",
+	"vibrant",
+	"versatile",
+	"versatile and creative",
+	"lively atmosphere",
+	"curated atmosphere",
+	"artistic environment",
+	"wonderful setting",
+	"high-level musicianship",
+	"polished yet soulful sound",
+	"engaging live presentations",
+	"I have spent years honing my craft",
+	"built a dedicated following",
+	"really cool vibes",
+	"a great environment for the type of music I play",
+	"natural crossover",
+	"bridges the gap",
+	"a staple",
+	"fantastic model",
+] as const;
+
+export const DERANK_TIER_3_SITUATIONAL: readonly string[] = [
+	"relaxed, sustainable environment",
+	"acoustic-leaning performances",
+	"acoustic-leaning set",
+	"elegant outdoor tasting areas",
+	"fantastic hub for creative crossover",
+	"vibrant, multi-arts environment",
+	"relaxed, listening-oriented setting",
+	"listening-oriented",
+	"afternoon activations or evening showcases",
+	"daytime activation",
+	"integrate community activations",
+	"fitting the right music to a space",
+	"a focused environment for live performance",
+	"the campus's industry traffic",
+	"serves as a dedicated hub",
+	"exciting creative force",
+	"vibrant energy and unique harmony",
+	"creating a vibrant, creative experience",
+	"I've heard great things about the energy",
+	"create something expressive and engaging",
+	"complement your service",
+	"the wonderful community work you do",
 	"non-pretentious",
 	"was struck by its emphasis",
 	"caught my eye",
-	"perfect fit",
-	"relaxed, sustainable environment",
-	"acoustic-leaning performances",
-	"I'd be happy to discuss possibilities further",
-	"exciting creative force",
-	"unique sound",
-	"great fit for your crowd",
-	"discuss the possibility of working together",
-	"I've heard great things about",
-	"lively atmosphere",
-	"creating a vibrant, creative experience",
-	"I've heard great things about the energy",
-	"very adaptable and would be a great fit",
-	"vibrant energy and unique harmony",
-	"elegant outdoor tasting areas",
-	"fantastic hub for creative crossover",
-	"acoustic-leaning set",
-	"complement your service",
-	"the campus's industry traffic",
-	"wonderful setting",
-	"fitting the right music to a space",
-	"integrate community activations",
-	"vibrant, multi-arts environment",
-	"fantastic model",
-	"creative and versatile musical expression",
-	"afternoon activations or evening showcases",
-	"diverse genre influences",
-	"versatile and creative",
-	"vibrant",
 	"known for versatile, genre-blending performances",
 	"I've noticed your involvement in community events",
 	"which could pair well with",
-	"Are you considering live music for upcoming evenings?",
-	"relaxed, listening-oriented setting",
-	"natural crossover",
-	"blend other genres",
-	"listening-oriented",
-	"could be a nice fit",
-	"I'm reaching out to book a performance",
-	"I would love to explore the possibility",
-	"I wanted to see if you have any upcoming availability",
 	"which I think would pair well with the atmosphere",
-	"point of connection",
-	"truly values",
-	"daytime activation",
-	"curated atmosphere",
-	"create something expressive and engaging",
-	"a focused environment for live performance",
-	"dig",
-	"been involved in",
-	"Given your space's connection",
-	"I'd be thrilled to bring my energy",
-	"I'm excited to share my sound",
-	"I'm looking forward to the opportunity",
-	"I'm excited to be a part of",
-	"I'm excited to bring my energy",
-	"I'm excited to bring my sound",
-	"I'm excited to be a part of",
-	"I'm excited to bring my energy",
-	"opportunity to connect.",
-	"Connect",
-	"artistic environment",
-	"versatile",
-	"I am contacting you",
-	"a staple",
-	"bridges the gap",
+	"Are you considering live music for upcoming evenings?",
+	"blend other genres",
+	"diverse genre influences",
+	"creative and versatile musical expression",
+	"pulls from a range of influences",
 	"seems like an excellent dedicated venue for concerts and ticketed events",
 	"I appreciate the clarity around your policies",
 	"which helps artists plan effectively",
-	"I am currently exploring opportunities",
-	"I have spent years honing my craft",
-	"serves as a dedicated hub",
-	"a great environment for the type of music I play",
 	"I would love to contribute to one of your early-evening sessions",
-	"the wonderful community work you do",
-	"aligns well with my shows",
 	"I am comfortable navigating professional environments where technical skill and stage presence are equally important",
 	"I am interested in how my style might work within your program",
 	"Your focus on master-classes and artist networking is impressive",
@@ -91,19 +93,62 @@ export const DRAFTING_DERANK_PHRASES: string[] = [
 	"I would be interested in learning more about how we might work together",
 	"Given the strong scene you have built",
 	"I am interested in how my style might complement your current programming",
-	"pulls from a range of influences",
 	"create engaging and melodic songs that are built for a live audience",
-	"built a dedicated following",
-	"bring my performance to new markets",
-	"engaging live presentations",
-	"high-level musicianship",
-	"polished yet soulful sound",
 	"translates well to both intimate sessions and larger stages",
 	"brings a contemporary sound that I believe would resonate with your local audience",
 	"I have been active in the music scene for some time",
-	"I am writing to inquire if there might be any availability",
+	"point of connection",
+	"truly values",
+	"dig",
+	"been involved in",
+	"Given your space's connection",
+	"opportunity to connect.",
+	"Connect",
+	"bring my performance to new markets",
+	"I'm reaching out to book a performance",
+	"I wanted to see if you have any upcoming availability",
 	"Please let me know if you have any space",
-	"I am writing to see if you might have any openings",
+] as const;
+
+export type DerankTierConfig = {
+	tier1Percentage: number;
+	tier2Percentage: number;
+	tier3Percentage: number;
+};
+
+export const DEFAULT_DERANK_TIER_CONFIG: DerankTierConfig = {
+	tier1Percentage: 100,
+	tier2Percentage: 50,
+	tier3Percentage: 25,
+};
+
+const sampleArray = <T>(array: readonly T[], percentage: number): T[] => {
+	if (percentage >= 100) return [...array];
+	if (percentage <= 0) return [];
+	
+	const count = Math.ceil(array.length * (percentage / 100));
+	const shuffled = [...array].sort(() => Math.random() - 0.5);
+	return shuffled.slice(0, count);
+};
+
+export const getTieredDerankPhrases = (config?: Partial<DerankTierConfig>): string[] => {
+	const { tier1Percentage, tier2Percentage, tier3Percentage } = {
+		...DEFAULT_DERANK_TIER_CONFIG,
+		...config,
+	};
+	
+	return [
+		...sampleArray(DERANK_TIER_1_CRITICAL, tier1Percentage),
+		...sampleArray(DERANK_TIER_2_IMPORTANT, tier2Percentage),
+		...sampleArray(DERANK_TIER_3_SITUATIONAL, tier3Percentage),
+	];
+};
+
+/** @deprecated Use getTieredDerankPhrases() instead */
+export const DRAFTING_DERANK_PHRASES: string[] = [
+	...DERANK_TIER_1_CRITICAL,
+	...DERANK_TIER_2_IMPORTANT,
+	...DERANK_TIER_3_SITUATIONAL,
 ];
 
 //banned words
@@ -179,11 +224,12 @@ export const applyDraftingOutputPhraseFilters = (
 	prompt: string,
 	options?: {
 		phrases?: readonly string[];
+		tierConfig?: Partial<DerankTierConfig>;
 		bannedPhrases?: readonly string[];
 		mode?: DraftingPromptFilterMode;
 	}
 ): string => {
-	const phrases = options?.phrases ?? DRAFTING_DERANK_PHRASES;
+	const phrases = options?.phrases ?? getTieredDerankPhrases(options?.tierConfig);
 	const bannedPhrases = options?.bannedPhrases ?? DRAFTING_BANNED_PHRASES;
 	const mode = options?.mode ?? 'freeform';
 
