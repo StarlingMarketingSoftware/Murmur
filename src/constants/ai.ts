@@ -531,10 +531,12 @@ MAKE THIS ONE 3 PARAGRAPHS LONG
 Start with either "Hello {company},"
 
 FIRST PARAGRAPH:
-You want to go through the identity information really give yourself a clean and concise introduction as a professional musician.
+You want to go through the identity information really give yourself a clean and concise introduction as a professional musician. 
+TRY NOT TO OVER-DO IT AND DON'T MAKE ANYTHING UP THAT ISN'T PROVIDED.
 
 SECOND PARAGRAPH: 
-Go in on {metadata} and really demonstate that you know about them and have deep knowledge of their establishment. Be causal and not a know it all.
+Go in on {metadata} and really demonstate that you know about them and have deep knowledge of their establishment. Be causal and not a know it all. 
+AVOID BEING OVERLY DETAILED AND VERBOSE, JUST BE CALM.
 
 THIRD PARAGRAPH:
 Inquire about the venue's availability for a show. Do this in one sentence.
@@ -590,7 +592,9 @@ PARAGRAPH 1:
 Start with going into the {metadata} on the company you're writing to in a casual and friendly manner.
 
 PARAGRAPH 2:
+You can start with something like, "To intorudce myself,"
 Go into detail about yourself from [identity] sender information including your genre, area, and bio.
+IF INFO INS'T PROVIDED, DO NOT MAKE UP ANYTHING. 
 
 OUTPUT FORMAT:
 Return your response as a valid JSON object with exactly two fields:
