@@ -168,6 +168,35 @@ const normalizeDraftingPhraseList = (phrases: readonly string[]): string[] => {
 	return phrases.map((p) => p.trim()).filter(Boolean);
 };
 
+/** Prevents hallucination of missing sender identity fields (per-field + collective override). */
+const buildNoHallucinatedSenderIdentityPromptBlock = (
+	mode: DraftingPromptFilterMode
+): string => {
+	const templateSafetyNote =
+		mode === 'templated'
+			? `\n\nImportant: If the email template includes "Exact text {{textX}}" blocks, DO NOT change that exact text. Apply the conditional identity rules below only to model-generated placeholder sections.\n`
+			: '\n';
+
+	return `\n\nSENDER IDENTITY (GLOBAL - CONDITIONAL OVERRIDE):
+A sender field is considered "empty" if it is missing from the sender profile OR it is an empty string.
+Before writing, inspect the sender profile (the section labeled "Sender information" or "**SENDER**").
+
+PER-FIELD RULES (apply individually for each empty field):
+- IF "bandName" is empty: Do NOT invent a band name, artist name, project name, stage name, group name, duo/trio/quartet, or member names. Do not imply you are part of a named act.
+- IF "genre" is empty: Do NOT state or imply a specific genre, subgenre, sound descriptors, mood tags, instrumentation style, or similar-artist comparisons.
+- IF "area" is empty: Do NOT claim a home base, city, region, state, country, touring territory, or local scene affiliation.
+- IF "bio" is empty: Do NOT fabricate a backstory, years active, album/EP/single releases, accolades, press quotes, audience size, past venues, collaborations, or any career history.
+
+COLLECTIVE OVERRIDE (applies when ALL of bandName, genre, area, bio are empty):
+In addition to the per-field rules above, when the sender profile has NONE of those four fields:
+- Write from a single-person perspective ("I", "my") rather than plural ("we", "our").
+- Keep the introduction minimal and generic; you may only use the sender "name" field if it is provided.
+- Do not reference "the band", "my group", "our project", or any language implying multiple members.
+
+If a field IS provided, you may use that value exactly as written—never embellish beyond what is stated.
+${templateSafetyNote}`;
+};
+
 const buildNoSenderWebsiteUrlPromptBlock = (mode: DraftingPromptFilterMode): string => {
 	const templateSafetyNote =
 		mode === 'templated'
@@ -236,6 +265,7 @@ export const applyDraftingOutputPhraseFilters = (
 	const blocks = [
 		buildBannedPhrasesPromptBlock(bannedPhrases, mode),
 		buildDerankPhrasesPromptBlock(phrases, mode),
+		buildNoHallucinatedSenderIdentityPromptBlock(mode),
 		buildNoSignaturePromptBlock(mode),
 		buildNoSenderWebsiteUrlPromptBlock(mode),
 	]
@@ -485,8 +515,7 @@ JUST ONE SENCTENCE SAYING WHO YOU ARE AND WHAT YOU DO. More like "My name is" ra
 SECOND PARAGRAPH:
 GO DEEPER IN TO [IDENTITY] SNEDER INFORMATION AND THEN GO DEEP INTO THE {METADATA}. 
 This paragraph should be the longer one, but it shouldn't be excessive. 
-
-
+DON'T MAKE UP SHIT THAT ISN'T PROVIDED
 
 Treat Sender information as ground-truth facts. Do NOT invent missing sender details.
 If provided, use these fields naturally when you introduce yourself:
@@ -710,6 +739,7 @@ KEEP IT A BREIF PROFESSIONAL EMAIL.
 Start with either "Hi All," "Hi Everyone," or if it's available in the data, "Hi {recipient_first_name}," or even "Hi Everyone at {company},"
 
 Give a clear introduction as to who you are, but maybe this time don't start immediately with the name, but go into the project from [identity] sender information and then second sentence get to the name.
+DON'T MAKE UP SHIT THAT ISN'T PROVIDED.
 
 Make this next paragraph go into {metadata} for the company you're writing to and really write with the intent to book a show.
 
@@ -958,9 +988,10 @@ export const GEMINI_MODEL_OPTIONS = {
 export const OPENROUTER_DRAFTING_MODELS = [
 	'google/gemini-3-flash-preview',
 	'deepseek/deepseek-v3.2',
-	'google/gemini-3-flash-preview',
-	'deepseek/deepseek-v3.2',
 	'x-ai/grok-4.1-fast',
+	'anthropic/claude-sonnet-4.5',
+	'meta-llama/llama-4-maverick',
+	'openai/gpt-5.2',
 ] as const;
 
 export type OpenRouterDraftingModel = (typeof OPENROUTER_DRAFTING_MODELS)[number];
