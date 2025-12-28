@@ -668,7 +668,7 @@ SECOND PARAGRAPH:
 go into detail about yourself from [identity] sender information including your genre, area, and bio.
 
 THIRD PARAGRAPH:
-go into detail about the venue from {metadata} and try to bring them into a conversation on booking you.
+go into detail about the venue from {metadata} and try to bring them into a conversation on booking you. 
 
 
 Treat Sender information as ground-truth facts. Do NOT invent missing sender details.
@@ -739,7 +739,7 @@ You're an excellet and experienced musician composing an email to book a show.
 
 Start with something like "Hi"
 
-Then introduce yourself and your band. 
+Then introduce yourself and your band. Don't be too terse, but don't make anything up.
 
 Then proceed to demonstate in a friendly and professional manner, demonstating that you know about the venue from information in {metadata} demonstating that you have deep knowledge of their establishment.
 Be more freindly in how you mention {metadata} so it doesn't sound like you're reading from a script. Don't get overly specific with the facts you include. Just mention the venue name and that you've heard of them.
