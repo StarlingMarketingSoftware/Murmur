@@ -3119,6 +3119,33 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 												</div>
 											</div>
 										)}
+										{/* Full Auto: Generate Test button sits in the empty green space (desktop) */}
+										{selectedModeKey === 'full' && !showTestPreview && !compactLeftOnly && (
+											<div className="flex-1 w-full flex items-center justify-center max-[480px]:hidden">
+												<Button
+													type="button"
+													onClick={() => {
+														if (isMobile) {
+															setShowTestPreview?.(true);
+														} else {
+															onTestPreviewToggle?.(true);
+														}
+														handleGenerateTestDrafts?.();
+														setHasAttemptedTest(true);
+													}}
+													disabled={isGenerationDisabled?.()}
+													className={cn(
+														'h-[28px] w-[232px] bg-[#DBF3DC] text-black font-inter font-normal text-[17px] leading-none rounded-[4px] cursor-pointer flex items-center justify-center p-0 border-0',
+														'transition-colors hover:bg-[#D6EED7] active:bg-[#D1E9D2]',
+														isGenerationDisabled?.()
+															? 'opacity-50 cursor-not-allowed'
+															: 'opacity-100'
+													)}
+												>
+													{isPendingGeneration && isTest ? 'Testing...' : 'Generate Test'}
+												</Button>
+											</div>
+										)}
 										</div>
 									)}
 									</div>
@@ -3211,51 +3238,54 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 								{/* Test button and notices (hidden in compact mode and profile tab) */}
 								{compactLeftOnly || activeTab === 'profile' ? null : (
 									<>
-										<div
-											className={cn(
-												'w-full flex flex-col items-center',
-												'max-[480px]:hidden'
-											)}
-										>
-											{hasEmptyTextBlocks && (
-												<div
-													className={cn(
-														hasTouchedEmptyTextBlocks || hasAttemptedTest
-															? 'text-destructive'
-															: 'text-black',
-														'text-sm font-medium mb-2',
-														'w-[93.7vw] max-w-[475px]'
-													)}
-												>
-													Fill in all text blocks in order to compose an email.
+										{/* Desktop (manual/hybrid): bottom bar Generate Test button */}
+										{selectedModeKey !== 'full' && (
+											<div
+												className={cn(
+													'w-full flex flex-col items-center',
+													'max-[480px]:hidden'
+												)}
+											>
+												{hasEmptyTextBlocks && (
+													<div
+														className={cn(
+															hasTouchedEmptyTextBlocks || hasAttemptedTest
+																? 'text-destructive'
+																: 'text-black',
+															'text-sm font-medium mb-2',
+															'w-[93.7vw] max-w-[475px]'
+														)}
+													>
+														Fill in all text blocks in order to compose an email.
+													</div>
+												)}
+												<div className="w-full h-[2px] bg-black" />
+												<div className="w-full h-[41px] flex items-center justify-center bg-white rounded-b-[5px]">
+													<Button
+														type="button"
+														onClick={() => {
+															if (isMobile) {
+																setShowTestPreview?.(true);
+															} else {
+																onTestPreviewToggle?.(true);
+															}
+															handleGenerateTestDrafts?.();
+															setHasAttemptedTest(true);
+														}}
+														disabled={isGenerationDisabled?.()}
+														className={cn(
+															'h-[28px] bg-white border-[3px] border-[#349A37] text-black font-inter font-normal text-[17px] leading-none rounded-[4px] cursor-pointer flex items-center justify-center transition-all hover:bg-primary/20 active:bg-primary/20 p-0',
+															'w-[93.7vw] max-w-[475px]',
+															isGenerationDisabled?.()
+																? 'opacity-50 cursor-not-allowed'
+																: 'opacity-100'
+														)}
+													>
+														{isPendingGeneration && isTest ? 'Testing...' : 'Generate Test'}
+													</Button>
 												</div>
-											)}
-											<div className="w-full h-[2px] bg-black" />
-											<div className="w-full h-[41px] flex items-center justify-center bg-white rounded-b-[5px]">
-												<Button
-													type="button"
-													onClick={() => {
-														if (isMobile) {
-															setShowTestPreview?.(true);
-														} else {
-															onTestPreviewToggle?.(true);
-														}
-														handleGenerateTestDrafts?.();
-														setHasAttemptedTest(true);
-													}}
-													disabled={isGenerationDisabled?.()}
-													className={cn(
-														'h-[28px] bg-white border-[3px] border-[#349A37] text-black font-inter font-normal text-[17px] leading-none rounded-[4px] cursor-pointer flex items-center justify-center transition-all hover:bg-primary/20 active:bg-primary/20 p-0',
-														'w-[93.7vw] max-w-[475px]',
-														isGenerationDisabled?.()
-															? 'opacity-50 cursor-not-allowed'
-															: 'opacity-100'
-													)}
-												>
-													{isPendingGeneration && isTest ? 'Testing...' : 'Generate Test'}
-												</Button>
 											</div>
-										</div>
+										)}
 
 										{/* Mobile sticky Test button at page bottom */}
 										{!showTestPreview && (
