@@ -3092,12 +3092,39 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 													});
 												})()}
 											</SortableContext>
+										{/* Auto mode: Signature indicator sits directly under the Full Auto Body block */}
+										{selectedModeKey === 'full' && (
+											<div
+												className={cn(
+													showTestPreview
+														? 'w-[426px] max-[480px]:w-[89.33vw]'
+														: 'w-[89.33vw] max-w-[468px]'
+												)}
+												data-hpi-signature-auto
+											>
+												<div className="flex items-center gap-2">
+													<div
+														className={cn(
+															'flex items-center justify-center h-[31px] max-[480px]:h-[24px] rounded-[8px] border-2 border-black overflow-hidden w-[122px]'
+														)}
+														style={{ backgroundColor: '#E0E0E0' }}
+													>
+														<span className="font-inter font-medium text-[18px] max-[480px]:text-[12px] whitespace-nowrap text-black">
+															Signature
+														</span>
+													</div>
+													<span className="font-inter font-normal text-[13px] text-[#000000]">
+														Auto
+													</span>
+												</div>
+											</div>
+										)}
 										</div>
 									)}
 									</div>
 
 									{/* In Test Preview, keep Signature inside the left panel so it doesn't float */}
-									{showTestPreview && activeTab !== 'profile' && (
+									{showTestPreview && activeTab !== 'profile' && selectedModeKey !== 'full' && (
 										<div className={cn('px-3 pb-0 pt-0 flex justify-center mt-auto')}>
 											<FormField
 												control={form.control}
@@ -3142,8 +3169,8 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 
 							{/* Bottom-anchored footer with Signature and Test */}
 							<div className="flex flex-col items-center mt-auto w-full" data-hpi-footer>
-								{/* Signature Block - always visible; positioned above Test with fixed gap */}
-								{activeTab !== 'profile' && (
+								{/* Signature Block (manual/hybrid only) - positioned above Test with fixed gap */}
+								{activeTab !== 'profile' && !showTestPreview && selectedModeKey !== 'full' && (
 									<FormField
 										control={form.control}
 										name="signature"
