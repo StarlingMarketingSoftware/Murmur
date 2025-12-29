@@ -339,6 +339,32 @@ const Murmur = () => {
 	// or while the full-screen User Settings dialog is open. This prevents any visual "glimpses" and
 	// ensures a premium, smooth transition with no scale effects.
 	const shouldHideContent = isIdentityDialogOpen || !campaign.identityId;
+
+	// Writing + Contacts + Drafts + Sent + Inbox + All tab vertical alignment:
+	// Place the top of the main content box exactly 159px from the top of the page
+	// (only in the standard desktop header layout).
+	//
+	// Notes:
+	// - The campaign header row is a fixed 50px tall.
+	// - DraftingSection contains a small 4px spacer div at the very top (mb-[4px]).
+	// - The default content spacing below the header is mt-6 (24px).
+	const WRITING_BOX_TOP_PX = 159;
+	const CAMPAIGN_HEADER_HEIGHT_PX = 50;
+	const DRAFTING_SECTION_TOP_SPACER_PX = 4;
+	const DEFAULT_CONTENT_TOP_MARGIN_PX = 24;
+	const writingContentTopMarginPx =
+		WRITING_BOX_TOP_PX - CAMPAIGN_HEADER_HEIGHT_PX - DRAFTING_SECTION_TOP_SPACER_PX; // 105px
+	const writingTabShiftPx = writingContentTopMarginPx - DEFAULT_CONTENT_TOP_MARGIN_PX; // 81px
+	const shouldApplyWritingTopShift =
+		(activeView === 'testing' ||
+			activeView === 'contacts' ||
+			activeView === 'drafting' ||
+			activeView === 'sent' ||
+			activeView === 'inbox' ||
+			activeView === 'all') &&
+		!isMobile &&
+		!isNarrowestDesktop;
+	const fixedNavArrowsTopPx = 467 + (shouldApplyWritingTopShift ? writingTabShiftPx : 0);
 	return (
 		<div className="min-h-screen">
 			{/* Left navigation arrow - absolute position (hidden in narrow desktop + testing) */}
@@ -349,7 +375,7 @@ const Murmur = () => {
 					className="absolute z-50 bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity"
 					style={{
 						left: '33px',
-						top: '467px',
+						top: `${fixedNavArrowsTopPx}px`,
 					}}
 					aria-label="Previous tab"
 				>
@@ -365,7 +391,7 @@ const Murmur = () => {
 					className="absolute z-50 bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity"
 					style={{
 						right: '33px',
-						top: '467px',
+						top: `${fixedNavArrowsTopPx}px`,
 					}}
 					aria-label="Next tab"
 				>
@@ -726,7 +752,14 @@ const Murmur = () => {
 						</div>
 					)}
 
-					<div className="mt-6 flex justify-center">
+					<div
+						className={cn('flex justify-center', !shouldApplyWritingTopShift && 'mt-6')}
+						style={
+							shouldApplyWritingTopShift
+								? { marginTop: `${writingContentTopMarginPx}px` }
+								: undefined
+						}
+					>
 						{/* Crossfade transition container */}
 						<div className="relative w-full isolate">
 							{/* Determine if both views share the same research panel position */}
@@ -1251,7 +1284,11 @@ const Murmur = () => {
 
 			{/* Right side panel - hidden on mobile, when width < 1522px, on search tab when width < 1796px, on all tab when width <= 1665px, or on inbox tab when width < 1681px */}
 			{!isMobile && !hideRightPanel && !(activeView === 'search' && hideRightPanelOnSearch) && !(activeView === 'all' && hideRightPanelOnAll) && !(activeView === 'inbox' && hideRightPanelOnInbox) && (
-				<CampaignRightPanel view={activeView} onTabChange={setActiveView} />
+				<CampaignRightPanel
+					view={activeView}
+					onTabChange={setActiveView}
+					className={shouldApplyWritingTopShift ? 'translate-y-[81px]' : undefined}
+				/>
 			)}
 
 			{/* Mobile bottom navigation panel */}
