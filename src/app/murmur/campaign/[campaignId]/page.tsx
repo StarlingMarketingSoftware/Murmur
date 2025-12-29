@@ -22,7 +22,7 @@ import { useGetEmails } from '@/hooks/queryHooks/useEmails';
 import { useCreateIdentity, useGetIdentities } from '@/hooks/queryHooks/useIdentities';
 import { EmailStatus } from '@/constants/prismaEnums';
 
-type ViewType = 'search' | 'contacts' | 'testing' | 'drafting' | 'sent' | 'inbox' | 'all';
+type ViewType = 'contacts' | 'testing' | 'drafting' | 'sent' | 'inbox' | 'all';
 
 // Transition duration in ms - fast enough to feel instant, still smooth
 const TRANSITION_DURATION = 180;
@@ -157,7 +157,9 @@ const Murmur = () => {
 		if (tabParam === 'contacts') return 'contacts';
 		if (tabParam === 'drafting') return 'drafting';
 		if (tabParam === 'sent') return 'sent';
-		if (tabParam === 'search') return 'search';
+		// Legacy/deeplink support: the campaign no longer has an in-page Search tab.
+		// If someone lands on ?tab=search, fall back to Contacts.
+		if (tabParam === 'search') return 'contacts';
 		if (tabParam === 'all') return 'all';
 		return 'testing';
 	};
@@ -205,16 +207,12 @@ const Murmur = () => {
 	const [isNarrowestDesktop, setIsNarrowestDesktop] = useState(false);
 	// Hide right panel when arrows would overlap with it (below 1522px)
 	const [hideRightPanel, setHideRightPanel] = useState(false);
-	// Hide right panel on search tab at wider breakpoint (below 1796px)
-	const [hideRightPanelOnSearch, setHideRightPanelOnSearch] = useState(false);
 	// Hide right panel on all tab at breakpoint (below 1665px)
 	const [hideRightPanelOnAll, setHideRightPanelOnAll] = useState(false);
 	// Hide right panel on inbox tab at breakpoint (below 1681px)
 	const [hideRightPanelOnInbox, setHideRightPanelOnInbox] = useState(false);
 	// Hide arrows when they would overlap with content boxes (below 1317px)
 	const [hideArrowsAtBreakpoint, setHideArrowsAtBreakpoint] = useState(false);
-	// Hide arrows on search tab at wider breakpoint (below 1557px)
-	const [hideArrowsOnSearch, setHideArrowsOnSearch] = useState(false);
 	// Hide arrows on all tab at breakpoint (at or below 1396px)
 	const [hideArrowsOnAll, setHideArrowsOnAll] = useState(false);
 	// Hide arrows on inbox tab at breakpoint (below 1476px)
@@ -226,11 +224,9 @@ const Murmur = () => {
 			setIsNarrowDesktop(width >= 952 && width < 1280);
 			setIsNarrowestDesktop(width < 952);
 			setHideRightPanel(width < 1522);
-			setHideRightPanelOnSearch(width < 1796);
 			setHideRightPanelOnAll(width <= 1665);
 			setHideRightPanelOnInbox(width < 1681);
 			setHideArrowsAtBreakpoint(width < 1317);
-			setHideArrowsOnSearch(width < 1557);
 			setHideArrowsOnAll(width <= 1396);
 			setHideArrowsOnInbox(width < 1476);
 		};
@@ -259,19 +255,16 @@ const Murmur = () => {
 
 	// Hide fixed arrows when in narrow desktop + testing view (arrows show next to draft button instead)
 	// or when width < 1317px to prevent overlap with content boxes
-	// or when on search tab and width < 1557px
 	// or when on all tab and width <= 1396px
 	// or when on inbox tab and width < 1476px
 	const hideFixedArrows =
 		(activeView === 'testing' && isNarrowDesktop) ||
 		hideArrowsAtBreakpoint ||
-		(activeView === 'search' && hideArrowsOnSearch) ||
 		(activeView === 'all' && hideArrowsOnAll) ||
 		(activeView === 'inbox' && hideArrowsOnInbox);
 
 	// Tab navigation order
-	const tabOrder: Array<'search' | 'contacts' | 'testing' | 'drafting' | 'sent' | 'inbox' | 'all'> = [
-		'search',
+	const tabOrder: ViewType[] = [
 		'contacts',
 		'testing',
 		'drafting',
@@ -440,18 +433,6 @@ const Murmur = () => {
 
 					{/* View tabs - centered in header (hidden at narrowest breakpoint and on mobile) */}
 					<div className={cn("flex gap-12 mobile-landscape-hide", (isMobile || isNarrowestDesktop) && "hidden")}>
-						<button
-							type="button"
-							className={cn(
-								'font-inter text-[17px] font-medium max-[480px]:text-[12px] leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
-								activeView === 'search'
-									? 'text-black'
-									: 'text-[#6B6B6B] hover:text-black'
-							)}
-							onClick={() => setActiveView('search')}
-						>
-							Search
-						</button>
 						<button
 							type="button"
 							className={cn(
@@ -668,18 +649,6 @@ const Murmur = () => {
 									type="button"
 									className={cn(
 										'font-inter text-[14px] font-medium leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
-										activeView === 'search'
-											? 'text-black'
-											: 'text-[#6B6B6B] hover:text-black'
-									)}
-									onClick={() => setActiveView('search')}
-								>
-									Search
-								</button>
-								<button
-									type="button"
-									className={cn(
-										'font-inter text-[14px] font-medium leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
 										activeView === 'contacts'
 											? 'text-black'
 											: 'text-[#6B6B6B] hover:text-black'
@@ -776,13 +745,15 @@ const Murmur = () => {
 											<DraftingSection
 												campaign={campaign}
 												view={activeView}
-												autoOpenProfileTabWhenIncomplete={
-													cameFromSearch || previousView === 'search'
-												}
+												autoOpenProfileTabWhenIncomplete={cameFromSearch}
 												goToDrafting={() => setActiveView('drafting')}
 												goToAll={() => setActiveView('all')}
 												goToWriting={() => setActiveView('testing')}
-												onGoToSearch={() => setActiveView('search')}
+												onGoToSearch={() => {
+													if (typeof window !== 'undefined') {
+														window.location.assign(urls.murmur.dashboard.index);
+													}
+												}}
 												goToContacts={() => setActiveView('contacts')}
 												goToInbox={() => setActiveView('inbox')}
 												goToSent={() => setActiveView('sent')}
@@ -811,13 +782,15 @@ const Murmur = () => {
 												<DraftingSection
 													campaign={campaign}
 													view={previousView}
-													autoOpenProfileTabWhenIncomplete={
-														cameFromSearch || previousView === 'search'
-													}
+													autoOpenProfileTabWhenIncomplete={cameFromSearch}
 													goToDrafting={() => setActiveView('drafting')}
 													goToAll={() => setActiveView('all')}
 													goToWriting={() => setActiveView('testing')}
-													onGoToSearch={() => setActiveView('search')}
+													onGoToSearch={() => {
+														if (typeof window !== 'undefined') {
+															window.location.assign(urls.murmur.dashboard.index);
+														}
+													}}
 													goToContacts={() => setActiveView('contacts')}
 													goToInbox={() => setActiveView('inbox')}
 													goToSent={() => setActiveView('sent')}
@@ -1282,8 +1255,8 @@ const Murmur = () => {
 				</div>
 			</div>
 
-			{/* Right side panel - hidden on mobile, when width < 1522px, on search tab when width < 1796px, on all tab when width <= 1665px, or on inbox tab when width < 1681px */}
-			{!isMobile && !hideRightPanel && !(activeView === 'search' && hideRightPanelOnSearch) && !(activeView === 'all' && hideRightPanelOnAll) && !(activeView === 'inbox' && hideRightPanelOnInbox) && (
+			{/* Right side panel - hidden on mobile, when width < 1522px, on all tab when width <= 1665px, or on inbox tab when width < 1681px */}
+			{!isMobile && !hideRightPanel && !(activeView === 'all' && hideRightPanelOnAll) && !(activeView === 'inbox' && hideRightPanelOnInbox) && (
 				<CampaignRightPanel
 					view={activeView}
 					onTabChange={setActiveView}

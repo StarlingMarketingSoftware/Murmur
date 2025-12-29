@@ -7,6 +7,7 @@ interface DraggableHighlightProps {
 	isInitialRender: boolean;
 	mode?: 'full' | 'hybrid' | 'manual';
 	disabled?: boolean;
+	onSelectMode?: (mode: 'full' | 'hybrid' | 'manual') => void;
 }
 
 export const DraggableHighlight = ({
@@ -14,6 +15,7 @@ export const DraggableHighlight = ({
 	isInitialRender,
 	mode = 'full',
 	disabled = false,
+	onSelectMode,
 }: DraggableHighlightProps) => {
 	const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
 		id: 'mode-highlight',
@@ -48,8 +50,12 @@ export const DraggableHighlight = ({
 			style={combinedStyle}
 			{...(!disabled ? listeners : {})}
 			{...(!disabled ? attributes : {})}
+			onClick={(e) => {
+				e.stopPropagation();
+				onSelectMode?.(mode);
+			}}
 			className={`absolute top-1/2 -translate-y-1/2 z-10 rounded-[8px] ${
-				disabled ? 'cursor-default' : isDragging ? 'cursor-grabbing' : 'cursor-grab'
+				disabled ? 'cursor-pointer' : isDragging ? 'cursor-grabbing' : 'cursor-pointer'
 			}`}
 		>
 			<div

@@ -7,7 +7,7 @@ import {
 } from '@/components/ui/form';
 import { Textarea } from '@/components/ui/textarea';
 import { useFormContext } from 'react-hook-form';
-import { DndContext, closestCenter } from '@dnd-kit/core';
+import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { Droppable } from '../DragAndDrop/Droppable';
 import { Typography } from '@/components/ui/typography';
 import { Input } from '@/components/ui/input';
@@ -70,6 +70,7 @@ interface SortableAIBlockProps {
 		bio: string;
 		links: string;
 	} | null;
+	onGoToProfileTab?: () => void;
 	isDragDisabled?: boolean;
 }
 
@@ -84,6 +85,7 @@ const SortableAIBlock = ({
 	showTestPreview,
 	onGetSuggestions,
 	profileFields,
+	onGoToProfileTab,
 	isDragDisabled = false,
 }: SortableAIBlockProps) => {
 	const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
@@ -1085,7 +1087,23 @@ const SortableAIBlock = ({
 									<div className="min-h-[60px] w-full px-1 pb-1">
 										<div className="w-full bg-[#58A6E5] rounded-b-[6px] p-2 flex justify-center">
 											<div className="w-[448px] max-w-full flex flex-col items-start">
-												<div className="w-full h-[104px] bg-white rounded-[8px] border border-black px-2 pt-1 pb-2 overflow-y-auto overflow-x-hidden hide-native-scrollbar">
+												<div
+													className="w-full h-[104px] bg-white rounded-[8px] border border-black px-2 pt-1 pb-2 overflow-y-auto overflow-x-hidden hide-native-scrollbar cursor-pointer"
+													role="button"
+													tabIndex={0}
+													aria-label="Open Profile"
+													onClick={(e) => {
+														e.stopPropagation();
+														onGoToProfileTab?.();
+													}}
+													onKeyDown={(e) => {
+														if (e.key === 'Enter' || e.key === ' ') {
+															e.preventDefault();
+															e.stopPropagation();
+															onGoToProfileTab?.();
+														}
+													}}
+												>
 													<div className="font-inter font-normal text-[13px] leading-[16px] text-black mb-[7px]">
 														Profile
 													</div>
@@ -2045,6 +2063,27 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		{ key: 'links', label: 'Links' },
 	] as const;
 
+	// Bio completion rule:
+	// - Until 7 words: always prompt for a fuller bio
+	// - At 7+ words: require a complete sentence (has sentence punctuation)
+	const bioWordCount = useMemo(() => {
+		const trimmed = profileFields.bio.trim();
+		if (!trimmed) return 0;
+		return trimmed.split(/\s+/).filter(Boolean).length;
+	}, [profileFields.bio]);
+	const bioHasSentencePunctuation = useMemo(() => {
+		const trimmed = profileFields.bio.trim();
+		if (!trimmed) return false;
+		// Accept punctuation anywhere so users don't need to end with a period.
+		// Also accept the unicode ellipsis character.
+		return /[.!?…]/.test(trimmed);
+	}, [profileFields.bio]);
+	const isBioIncomplete = useMemo(() => {
+		if (bioWordCount === 0) return true;
+		if (bioWordCount < 7) return true;
+		return !bioHasSentencePunctuation;
+	}, [bioHasSentencePunctuation, bioWordCount]);
+
 	const filledProfileFieldCount = useMemo(() => {
 		const values = [
 			profileFields.name,
@@ -2065,9 +2104,16 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 	]);
 
 	const sequentialFilledProfileFieldCount = useMemo(() => {
+		const isComplete = (key: (typeof PROFILE_PROGRESS_SEQUENCE)[number]['key']) => {
+			const trimmed = profileFields[key].trim();
+			if (!trimmed) return false;
+			if (key === 'bio') return !isBioIncomplete;
+			return true;
+		};
+
 		let count = 0;
 		for (const step of PROFILE_PROGRESS_SEQUENCE) {
-			if (profileFields[step.key].trim()) count += 1;
+			if (isComplete(step.key)) count += 1;
 			else break;
 		}
 		return count;
@@ -2078,12 +2124,18 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		profileFields.band,
 		profileFields.bio,
 		profileFields.links,
+		isBioIncomplete,
 	]);
 
 	const nextProfileFieldToFill = useMemo(() => {
-		return (
-			PROFILE_PROGRESS_SEQUENCE.find((step) => !profileFields[step.key].trim()) ?? null
-		);
+		const isComplete = (key: (typeof PROFILE_PROGRESS_SEQUENCE)[number]['key']) => {
+			const trimmed = profileFields[key].trim();
+			if (!trimmed) return false;
+			if (key === 'bio') return !isBioIncomplete;
+			return true;
+		};
+
+		return PROFILE_PROGRESS_SEQUENCE.find((step) => !isComplete(step.key)) ?? null;
 	}, [
 		profileFields.name,
 		profileFields.genre,
@@ -2091,6 +2143,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		profileFields.band,
 		profileFields.bio,
 		profileFields.links,
+		isBioIncomplete,
 	]);
 
 	const profileSuggestionScore = useMemo(() => {
@@ -2116,11 +2169,21 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		if (filledProfileFieldCount === 0) return 'Get Started';
 
 		// Weighting is ordered: always prompt for the first missing field in UI order.
-		if (nextProfileFieldToFill) return `Add your ${nextProfileFieldToFill.label}`;
+		if (nextProfileFieldToFill) {
+			// Custom copy for the Area step once Name + Genre are complete.
+			if (nextProfileFieldToFill.key === 'area' && sequentialFilledProfileFieldCount >= 2) {
+				return 'Where are you Based?';
+			}
+			// Bio guidance: keep prompting until it's 7+ words AND a full sentence.
+			if (nextProfileFieldToFill.key === 'bio') {
+				return 'Write a Full Bio';
+			}
+			return `Add your ${nextProfileFieldToFill.label}`;
+		}
 
 		// All fields filled.
 		return 'Excellent';
-	}, [filledProfileFieldCount, nextProfileFieldToFill]);
+	}, [filledProfileFieldCount, nextProfileFieldToFill, sequentialFilledProfileFieldCount]);
 
 	const profileSuggestionDisplayLabel =
 		profileSuggestionScore === 0
@@ -2428,6 +2491,10 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 				: prev;
 		});
 
+		// Dragging a mode should behave like clicking the mode buttons: show the writing tab.
+		setActiveTab('main');
+		setHasLeftProfileTab(true);
+
 		if (closest.mode === 'full') {
 			switchToFull();
 		} else if (closest.mode === 'hybrid') {
@@ -2438,6 +2505,11 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 	};
 
 	const isMobile = useIsMobile();
+	const modeHighlightSensors = useSensors(
+		useSensor(PointerSensor, {
+			activationConstraint: { distance: 8 },
+		})
+	);
 
 	// In Hybrid mode, the "+ Text" buttons intentionally sit slightly outside the main box.
 	// The scroll container (`overflow-y-auto`) will clip horizontal overflow, so we add a
@@ -2619,6 +2691,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 													<DndContext
 														onDragEnd={handleHighlightDragEnd}
 														modifiers={[restrictToHorizontalAxisAndBounds]}
+														sensors={modeHighlightSensors}
 													>
 														{selectedModeKey !== 'none' && (
 															<DraggableHighlight
@@ -2626,6 +2699,14 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																isInitialRender={isInitialRender}
 																mode={selectedModeKey as 'full' | 'hybrid' | 'manual'}
 															disabled={isHybridModeSelected}
+															onSelectMode={() => {
+																// Clicking the pill should behave like selecting that mode tab.
+																// Avoid re-running switch logic (which can overwrite in-progress edits).
+																if (activeTab !== 'main') {
+																	setActiveTab('main');
+																	setHasLeftProfileTab(true);
+																}
+															}}
 															/>
 														)}
 													</DndContext>
@@ -2812,8 +2893,19 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 												</div>
 											</div>
 											{/* Blue fill starts under the second divider */}
-											<div className="flex-1 bg-[#58A6E5]">
-												<div className="pt-[54px] pr-3 pb-3 pl-3 flex flex-col gap-[18px] items-center">
+											<div className="flex-1 bg-[#58A6E5] relative flex flex-col">
+												{/* Top-right indicator line (15x2px) */}
+												<button
+													type="button"
+													aria-label="Back to Auto"
+													onClick={() => {
+														setActiveTab('main');
+														setHasLeftProfileTab(true);
+														switchToFull();
+													}}
+													className="absolute top-[14px] right-[14px] w-[15px] h-[2px] bg-black cursor-pointer p-0 border-0 focus:outline-none"
+												/>
+												<div className="pt-[54px] pr-3 pb-0 pl-3 flex flex-col gap-[18px] items-center flex-1">
 											<div
 												ref={expandedProfileBox === 'name' ? expandedProfileBoxRef : undefined}
 												className={cn(
@@ -3017,6 +3109,18 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 												)}
 											</div>
 												</div>
+												<div className="absolute left-0 right-0 bottom-[139px] flex justify-center">
+													<button
+														type="button"
+														onClick={() => {
+															setActiveTab('main');
+															setHasLeftProfileTab(true);
+														}}
+														className="w-[136px] h-[26px] rounded-[6px] bg-[#C8C8C8] text-white font-inter font-medium text-[15px] leading-none flex items-center justify-center cursor-pointer"
+													>
+														back to writing
+													</button>
+												</div>
 											</div>
 										</div>
 									)}
@@ -3191,6 +3295,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																		testMessage={testMessage}
 																		onGetSuggestions={onGetSuggestions}
 																		profileFields={profileFields}
+																		onGoToProfileTab={() => setActiveTab('profile')}
 																		isDragDisabled={isHybridModeSelected}
 																	/>
 																</div>
