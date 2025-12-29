@@ -287,7 +287,7 @@ Start with either "Hi All," "Hi Everyone," or if it's available in the data, "Hi
 Then introduce yourself and your band. More like "My name is" rather than "I am" 
 
 Then proceed to demonstate in a friendly and professional manner, demonstating that you know about the venue from information in {metadata} demonstating that you have deep knowledge of their establishment.
-Make this paragraph the shortest one. Perhaps just a sentence.
+Make this paragraph the shortest one. Perhaps just a sentence. when booking reference the bookingFor value and if it's a season, reference the season.
 
 Following that for the third paragraph, inquire about availability for a show. But also seek to include more {metadata} in doing so.
  
@@ -343,7 +343,7 @@ Second paragraph:
 one sentence about the venue from {metadata} that feels incredibly casual
 
 Third paragraph:
-reference the venue from {metadata} and how you've heard of them. Aoid knowing too much about the venue.
+reference the venue from {metadata} and how you've heard of them. Aoid knowing too much about the venue. when booking reference the bookingFor value and if it's a season, reference the season.
 Inquire about the venue's availability for a show. Don't be too pushy or salesy. Just ask in a friendly and professional manner.
 Also this last part shouldn't be super long
 
@@ -377,7 +377,7 @@ TRY NOT TO BE TOO LONG. STAY CONCISE. FIND A WAY TO COMPRESS THE INFORMATION.
 
 Start with something like "This is [identity]" 
 go into detail about yourself from [identity] sender information including your genre, area, and bio. then go into detail about the venue from {metadata} and how you've heard of them.
-Really keep it short and sweet, they don't have all day to read your eamil.
+Really keep it short and sweet, they don't have all day to read your eamil. when booking reference the bookingFor value and if it's a season, reference the season.
 
 Treat Sender information as ground-truth facts. Do NOT invent missing sender details.
 If provided, use these fields naturally when you introduce yourself:
@@ -421,7 +421,7 @@ Then proceed to demonstate in a friendly and professional manner, demonstating t
 Be more freindly in how you mention {metadata} so it doesn't sound like you're reading from a script. Don't get overly specific with the facts you include. Just mention the venue name and that you've heard of them.
 
 Following that, inquire about the venue's availability for a show. Don't be too pushy or salesy. Just ask in a friendly and professional manner.
-Also this last part shouldn't be super long
+Also this last part shouldn't be super long. when booking reference the bookingFor value and if it's a season, reference the season.
 
 Now as a meta-rule, I'd love for you to be a little bit more random each time you compose an email. Don't always use the same exact wording.
 Sometimes an email can be just one paragraph, and a lot of times it can be two paragraphs, but it should feel more sporadic.
@@ -476,7 +476,7 @@ Then proceed to demonstate in a friendly and professional manner, demonstating t
 Be more freindly in how you mention {metadata} so it doesn't sound like you're reading from a script. Don't get overly specific with the facts you include. Just mention the venue name and that you've heard of them.
 
 Following that, inquire about the venue's availability for a show. Don't be too pushy or salesy. Just ask in a friendly and professional manner.
-Also this last part shouldn't be super long
+Also this last part shouldn't be super long. when booking reference the bookingFor value and if it's a season, reference the season.	
 
 FORMATTING INSTRUCTIONS:
 1. Ensure that there is a line break between each paragraph.
@@ -512,9 +512,9 @@ FIRST PARAGPRAH:
 JUST ONE SENCTENCE SAYING WHO YOU ARE AND WHAT YOU DO. More like "My name is" rather than "I am." and "I'm reaching out to book" etc...
 
 SECOND PARAGRAPH:
-GO DEEPER IN TO [IDENTITY] SNEDER INFORMATION AND THEN GO DEEP INTO THE {METADATA}. 
+GO DEEPER IN TO [IDENTITY] SNEDER INFORMATION AND THEN GO DEEP INTO THE {METADATA}. when booking reference the bookingFor value and if it's a season, reference the season.
 This paragraph should be the longer one, but it shouldn't be excessive. 
-DON'T MAKE UP SHIT THAT ISN'T PROVIDED
+DON'T MAKE UP SHIT THAT ISN'T PROVIDED. 
 
 Treat Sender information as ground-truth facts. Do NOT invent missing sender details.
 If provided, use these fields naturally when you introduce yourself:
@@ -525,7 +525,7 @@ If provided, use these fields naturally when you introduce yourself:
 Then proceed to demonstate in a friendly and professional manner, demonstating that you know about the venue from information in {metadata} demonstating that you have deep knowledge of their establishment.
 Be more freindly in how you mention {metadata} so it doesn't sound like you're reading from a script. Don't get overly specific with the facts you include. Just mention the venue name and that you've heard of them.
 
-Following that, inquire about the venue's availability for a show. Don't be too pushy or salesy. Just ask in a friendly and professional manner.
+Following that, inquire about the venue's availability for a show. when booking reference the bookingFor value and if it's a season, reference the season. Don't be too pushy or salesy. Just ask in a friendly and professional manner. 
 Also this last part shouldn't be super long
 
 FORMATTING INSTRUCTIONS:
@@ -567,7 +567,7 @@ Go in on {metadata} and really demonstate that you know about them and have deep
 AVOID BEING OVERLY DETAILED AND VERBOSE, JUST BE CALM.
 
 THIRD PARAGRAPH:
-Inquire about the venue's availability for a show. Do this in one sentence.
+Inquire about the venue's availability for a show. Do this in one sentence. when booking reference the bookingFor value and if it's a season, reference the season.
  
 You will be given structured input in the user message with these sections:
 - Sender information (your profile): user-entered fields such as name, band/artist name, genre, area, bio, and website (when provided).
@@ -621,7 +621,7 @@ Start with going into the {metadata} on the company you're writing to in a casua
 
 PARAGRAPH 2:
 You can start with something like, "To intorudce myself,"
-Go into detail about yourself from [identity] sender information including your genre, area, and bio.
+Go into detail about yourself from [identity] sender information including your genre, area, and bio. when booking reference the bookingFor value and if it's a season, reference the season.
 IF INFO INS'T PROVIDED, DO NOT MAKE UP ANYTHING. 
 
 OUTPUT FORMAT:
@@ -659,7 +659,7 @@ If provided, use these fields naturally when you introduce yourself:
 Then proceed to demonstate in a friendly and professional manner, demonstating that you know about the venue from information in {metadata} demonstating that you have deep knowledge of their establishment.
 Be more freindly in how you mention {metadata} so it doesn't sound like you're reading from a script. Don't get overly specific with the facts you include. Just mention the venue name and that you've heard of them.
 
-Following that, inquire about the venue's availability for a show. Don't be too pushy or salesy. Just ask in a friendly and professional manner.
+Following that, inquire about the venue's availability for a show. Don't be too pushy or salesy. Just ask in a friendly and professional manner. when booking reference the bookingFor value and if it's a season, reference the season.
 Also this last part shouldn't be super long
 
 FORMATTING INSTRUCTIONS:
@@ -696,7 +696,7 @@ SECOND PARAGRAPH:
 go into detail about yourself from [identity] sender information including your genre, area, and bio.
 
 THIRD PARAGRAPH:
-go into detail about the venue from {metadata} and try to bring them into a conversation on booking you. 
+go into detail about the venue from {metadata} and try to bring them into a conversation on booking you. when booking reference the bookingFor value and if it's a season, reference the season.
 
 
 Treat Sender information as ground-truth facts. Do NOT invent missing sender details.
@@ -740,7 +740,7 @@ Start with either "Hi All," "Hi Everyone," or if it's available in the data, "Hi
 Give a clear introduction as to who you are, but maybe this time don't start immediately with the name, but go into the project from [identity] sender information and then second sentence get to the name.
 DON'T MAKE UP SHIT THAT ISN'T PROVIDED.
 
-Make this next paragraph go into {metadata} for the company you're writing to and really write with the intent to book a show.
+Make this next paragraph go into {metadata} for the company you're writing to and really write with the intent to book a show. when booking reference the bookingFor value and if it's a season, reference the season.
 
 FORMATTING INSTRUCTIONS:
 1. Ensure that there is a line break between each paragraph.

@@ -99,7 +99,13 @@ const SortableAIBlock = ({
 	type BookingForTab = 'Anytime' | 'Season' | 'Calendar';
 	type BookingForSeason = 'Spring' | 'Summer' | 'Fall' | 'Winter';
 	const [isBookingForOpen, setIsBookingForOpen] = useState(false);
-	const [bookingForValue, setBookingForValue] = useState<string>('Anytime');
+	const bookingForValue = form.watch('bookingFor') || 'Anytime';
+	const setBookingForValue = useCallback(
+		(value: string) => {
+			form.setValue('bookingFor', value);
+		},
+		[form]
+	);
 	const [bookingForTab, setBookingForTab] = useState<BookingForTab>('Anytime');
 	const [bookingForSeason, setBookingForSeason] = useState<BookingForSeason>('Spring');
 	const [bookingForCalendarBaseMonth, setBookingForCalendarBaseMonth] = useState<Date>(() => {

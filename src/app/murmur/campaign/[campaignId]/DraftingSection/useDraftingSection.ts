@@ -172,6 +172,7 @@ export const draftingFormSchema = z.object({
 	isAiSubject: z.boolean().default(true),
 	subject: z.string().default(''),
 	fullAiPrompt: z.string().default(''),
+	bookingFor: z.string().default('Anytime'),
 	hybridPrompt: z.string().default(''),
 	hybridAvailableBlocks: z.array(z.nativeEnum(HybridBlock)),
 	hybridBlockPrompts: z.array(
@@ -311,6 +312,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			isAiSubject: true,
 			subject: '',
 			fullAiPrompt: '',
+			bookingFor: 'Anytime',
 			hybridPrompt: 'Generate a professional email based on the template below.',
 			hybridAvailableBlocks: [
 				HybridBlock.full_automated,
@@ -660,6 +662,12 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			website: identityProfile.website ?? undefined,
 		};
 
+		const bookingForNormalized = (form.getValues('bookingFor') ?? '').trim();
+		const bookingForContext =
+			bookingForNormalized && bookingForNormalized !== 'Anytime'
+				? `\n\nBooking For:\n${bookingForNormalized}`
+				: '';
+
 		const userPrompt = `Sender information (user profile):\n${stringifyJsonSubset(
 			senderProfile,
 			['name', 'bandName', 'genre', 'area', 'bio', 'website']
@@ -675,7 +683,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			'website',
 			'phone',
 			'metadata',
-		])}\n\nUser Goal:\n${prompt}`;
+		])}${bookingForContext}\n\nUser Goal:\n${prompt}`;
 
 		// Debug logging for Full AI path
 		console.log(
@@ -2037,6 +2045,7 @@ The improved prompt should result in more personalized, engaging, and effective 
 				isAiSubject: campaign.isAiSubject ?? true,
 				subject: campaign.subject ?? '',
 				fullAiPrompt: campaign.fullAiPrompt ?? '',
+				bookingFor: 'Anytime',
 				hybridPrompt:
 					campaign.hybridPrompt ??
 					'Generate a professional email based on the template below.',
