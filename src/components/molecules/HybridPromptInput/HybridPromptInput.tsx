@@ -91,6 +91,15 @@ const SortableAIBlock = ({
 	const [isCustomInstructionsOpen, setIsCustomInstructionsOpen] = useState(false);
 	const customInstructionsRef = useRef<HTMLTextAreaElement | null>(null);
 	const customInstructionsContainerRef = useRef<HTMLDivElement | null>(null);
+	// Full Auto: Booking For dropdown
+	type BookingForTab = 'Anytime' | 'Season' | 'Calendar';
+	type BookingForSeason = 'Spring' | 'Summer' | 'Fall' | 'Winter';
+	type BookingForValue = 'Anytime' | BookingForSeason | 'Calendar';
+	const [isBookingForOpen, setIsBookingForOpen] = useState(false);
+	const [bookingForValue, setBookingForValue] = useState<BookingForValue>('Anytime');
+	const [bookingForTab, setBookingForTab] = useState<BookingForTab>('Anytime');
+	const [bookingForSeason, setBookingForSeason] = useState<BookingForSeason>('Spring');
+	const bookingForContainerRef = useRef<HTMLDivElement | null>(null);
 	// Power mode from form (shared with MiniEmailStructure)
 	const selectedPowerMode = form.watch('powerMode') || 'normal';
 	const setSelectedPowerMode = (mode: 'normal' | 'high') => {
@@ -127,6 +136,24 @@ const SortableAIBlock = ({
 			document.removeEventListener('pointerdown', handlePointerDown);
 		};
 	}, [isCustomInstructionsOpen]);
+
+	// Close Booking For dropdown when clicking away
+	useEffect(() => {
+		if (!isBookingForOpen) return;
+
+		const handlePointerDown = (event: PointerEvent) => {
+			const target = event.target as Node | null;
+			const container = bookingForContainerRef.current;
+			if (!target || !container) return;
+			if (container.contains(target)) return;
+			setIsBookingForOpen(false);
+		};
+
+		document.addEventListener('pointerdown', handlePointerDown);
+		return () => {
+			document.removeEventListener('pointerdown', handlePointerDown);
+		};
+	}, [isBookingForOpen]);
 
 	const style = {
 		transform: CSS.Transform.toString(transform),
@@ -314,7 +341,8 @@ const SortableAIBlock = ({
 					: 'other'
 			}
 			className={cn(
-				'relative rounded-md overflow-hidden',
+				'relative rounded-md',
+				isFullAutomatedBlock ? 'overflow-visible' : 'overflow-hidden',
 				isIntroductionBlock && 'border-2 border-[#6673FF] bg-background',
 				isResearchBlock && 'border-2 border-[#1010E7] bg-background',
 				isActionBlock && 'border-2 border-[#0E0E7F] bg-background',
@@ -932,8 +960,155 @@ const SortableAIBlock = ({
 													</div>
 												</div>
 
-												{/* Booking For box (203 x 28px) */}
-												<div className="mt-[10px] w-[203px] h-[28px] bg-white rounded-[8px] border-2 border-black" />
+												{/* Booking For box (203 x 28px) + dropdown */}
+												<div ref={bookingForContainerRef} className="relative mt-[10px]">
+													<button
+														type="button"
+														onClick={() => {
+															if (isBookingForOpen) {
+																setIsBookingForOpen(false);
+																return;
+															}
+
+															const isSeasonSelection =
+																bookingForValue === 'Spring' ||
+																bookingForValue === 'Summer' ||
+																bookingForValue === 'Fall' ||
+																bookingForValue === 'Winter';
+
+															if (isSeasonSelection) {
+																setBookingForSeason(bookingForValue);
+																setBookingForTab('Season');
+															} else if (bookingForValue === 'Calendar') {
+																setBookingForTab('Calendar');
+															} else {
+																setBookingForTab('Anytime');
+															}
+
+															setIsBookingForOpen(true);
+														}}
+														className="w-[203px] h-[28px] bg-white rounded-[8px] border-2 border-black flex items-center justify-between px-4"
+														aria-haspopup="dialog"
+														aria-expanded={isBookingForOpen}
+													>
+														<span className="font-inter font-normal text-[14px] leading-[14px] text-black">
+															Booking For
+														</span>
+														<span className="font-inter font-bold text-[14px] leading-[14px] text-black mr-1">
+															{bookingForValue}
+														</span>
+													</button>
+
+													{isBookingForOpen && (
+														<div
+															className={cn(
+																'absolute left-0 top-full mt-[6px] z-30',
+																'w-[317px] rounded-[6px]',
+																bookingForTab === 'Season'
+																	? bookingForSeason === 'Spring'
+																		? 'bg-[#9BD2FF]'
+																		: bookingForSeason === 'Summer'
+																			? 'bg-[#7ADF85]'
+																			: bookingForSeason === 'Fall'
+																				? 'bg-[#D77C2C]'
+																				: 'bg-[#1960AC]'
+																	: 'bg-[#F5F5F5]',
+																'border-2 border-black',
+																'flex flex-col overflow-hidden',
+																bookingForTab === 'Season' ? 'h-[151px]' : 'h-[46px]'
+															)}
+															role="dialog"
+															aria-label="Booking For"
+														>
+															<div className="relative h-[46px]">
+																{bookingForTab === 'Season' && (
+																	<div
+																		aria-hidden="true"
+																		className="pointer-events-none absolute inset-0 flex items-center justify-center"
+																	>
+																		<div className="w-[284px] h-[32px] bg-[#E2E2E2] opacity-30 rounded-[6px]" />
+																	</div>
+																)}
+
+																<div className="relative z-[1] h-full flex items-center justify-center">
+																	<div className="w-[284px] grid grid-cols-3 items-center gap-[8px]">
+																		{(['Anytime', 'Season', 'Calendar'] as const).map(
+																			(opt) => {
+																				const isSelected = bookingForTab === opt;
+																				return (
+																					<button
+																						key={opt}
+																						type="button"
+																						onClick={() => {
+																							if (opt === 'Season') {
+																								setBookingForTab('Season');
+																								return;
+																							}
+
+																							if (opt === 'Anytime') {
+																								setBookingForValue('Anytime');
+																								setBookingForTab('Anytime');
+																								setIsBookingForOpen(false);
+																								return;
+																							}
+
+																							// Calendar
+																							setBookingForValue('Calendar');
+																							setBookingForTab('Calendar');
+																							setIsBookingForOpen(false);
+																						}}
+																						className={cn(
+																							'h-[28px] w-[81px] rounded-[6px] font-inter text-[14px] leading-[14px] text-black',
+																							'flex items-center justify-center text-center justify-self-center',
+																							isSelected
+																								? opt === 'Season'
+																									? 'bg-[#F5F5F5] font-semibold'
+																									: 'bg-[#C2C2C2] font-semibold'
+																								: 'bg-transparent font-normal hover:bg-black/5'
+																						)}
+																						role="button"
+																						aria-pressed={isSelected}
+																					>
+																						{opt}
+																					</button>
+																				);
+																			}
+																		)}
+																	</div>
+																</div>
+															</div>
+
+															{bookingForTab === 'Season' && (
+																<div className="flex-1 flex flex-col items-center justify-center gap-[10px] pb-[10px]">
+																	{(['Spring', 'Summer', 'Fall', 'Winter'] as const).map(
+																		(season) => {
+																			const isSelectedSeason = bookingForSeason === season;
+																			return (
+																				<button
+																					key={season}
+																					type="button"
+																					onClick={() => {
+																						setBookingForSeason(season);
+																						setBookingForValue(season);
+																						setIsBookingForOpen(false);
+																					}}
+																					className={cn(
+																						'font-inter text-[14px] leading-[16px]',
+																						isSelectedSeason
+																							? 'font-semibold text-white'
+																							: 'font-normal text-black opacity-90 hover:opacity-100'
+																					)}
+																				>
+																					{season}
+																				</button>
+																			);
+																		}
+																	)}
+																</div>
+															)}
+														</div>
+													)}
+												</div>
 
 												{/* Custom Instructions (expands in-place to match Profile width) */}
 												<div
