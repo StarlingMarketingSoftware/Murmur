@@ -4199,6 +4199,36 @@ body,
 	-ms-overflow-style: none !important;
 }
 
+/* --- Draft Review Box Custom Scrollbar --- */
+.draft-review-box .scrollbar-hide {
+	height: 100% !important;
+	overflow-y: auto !important;
+	overflow-x: hidden !important;
+	scrollbar-width: none !important;
+	-ms-overflow-style: none !important;
+}
+
+.draft-review-box .scrollbar-hide::-webkit-scrollbar {
+	display: none !important;
+	width: 0 !important;
+	height: 0 !important;
+}
+
+/* Force hide webkit scrollbar in draft review box */
+.draft-review-box::-webkit-scrollbar,
+.draft-review-box *::-webkit-scrollbar {
+	display: none !important;
+	width: 0 !important;
+	height: 0 !important;
+}
+
+.draft-review-box,
+.draft-review-box * {
+	scrollbar-width: none !important;
+	-ms-overflow-style: none !important;
+}
+/* -------------------------------------- */
+
 /* Fix for TestPreviewPanel border rendering */
 [data-test-preview-panel] {
 	/* Force proper rendering with hardware acceleration */

@@ -8,6 +8,7 @@ import TextAlign from '@tiptap/extension-text-align';
 import Underline from '@tiptap/extension-underline';
 import FontFamily from '@tiptap/extension-font-family';
 import Placeholder from '@tiptap/extension-placeholder';
+import Link from '@tiptap/extension-link';
 import { FC, useEffect } from 'react';
 import { cn } from '@/utils';
 import { Node } from '@tiptap/core';
@@ -142,6 +143,15 @@ const RichTextEditor: FC<RichTextEditorProps> = ({
 			Placeholder.configure({
 				placeholder: placeholder || 'Start typing...',
 				emptyEditorClass: 'is-editor-empty',
+			}),
+			Link.configure({
+				openOnClick: true,
+				autolink: true,
+				HTMLAttributes: {
+					class: 'text-blue-600 underline cursor-pointer',
+					target: '_blank',
+					rel: 'noopener noreferrer',
+				},
 			}),
 			Div,
 		],
