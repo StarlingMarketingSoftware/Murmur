@@ -111,10 +111,22 @@ const SortableAIBlock = ({
 	const bookingForContainerRef = useRef<HTMLDivElement | null>(null);
 	const bookingForButtonRef = useRef<HTMLButtonElement | null>(null);
 	const bookingForDropdownRef = useRef<HTMLDivElement | null>(null);
+	const bookingForCloseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const [bookingForDropdownPosition, setBookingForDropdownPosition] = useState<{
 		top: number;
 		left: number;
 	} | null>(null);
+	const clearBookingForCloseTimeout = useCallback(() => {
+		if (bookingForCloseTimeoutRef.current == null) return;
+		clearTimeout(bookingForCloseTimeoutRef.current);
+		bookingForCloseTimeoutRef.current = null;
+	}, []);
+	const scheduleBookingForCloseTimeout = useCallback(() => {
+		clearBookingForCloseTimeout();
+		bookingForCloseTimeoutRef.current = setTimeout(() => {
+			setIsBookingForOpen(false);
+		}, 1000);
+	}, [clearBookingForCloseTimeout]);
 	// Used to nudge the internal 3-way tab strip inside the Calendar dropdown so it aligns
 	// with where the strip sits in the narrower Anytime/Season dropdown.
 	const [bookingForTabStripLeft, setBookingForTabStripLeft] = useState<number | null>(null);
@@ -229,6 +241,7 @@ const SortableAIBlock = ({
 
 			if (container?.contains(target)) return;
 			if (dropdown?.contains(target)) return;
+			clearBookingForCloseTimeout();
 			setIsBookingForOpen(false);
 		};
 
@@ -236,14 +249,29 @@ const SortableAIBlock = ({
 		return () => {
 			document.removeEventListener('pointerdown', handlePointerDown);
 		};
-	}, [isBookingForOpen]);
+	}, [clearBookingForCloseTimeout, isBookingForOpen]);
 
 	useEffect(() => {
 		if (!isBookingForOpen) {
+			clearBookingForCloseTimeout();
 			setBookingForDropdownPosition(null);
 			setBookingForTabStripLeft(null);
 		}
-	}, [isBookingForOpen]);
+	}, [clearBookingForCloseTimeout, isBookingForOpen]);
+
+	useEffect(() => {
+		return () => clearBookingForCloseTimeout();
+	}, [clearBookingForCloseTimeout]);
+
+	// Prevent navigating the calendar into months that are entirely in the past.
+	useEffect(() => {
+		if (!isBookingForOpen) return;
+		if (bookingForTab !== 'Calendar') return;
+
+		const now = new Date();
+		const minBaseMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+		setBookingForCalendarBaseMonth((prev) => (prev.getTime() < minBaseMonth.getTime() ? minBaseMonth : prev));
+	}, [isBookingForOpen, bookingForTab]);
 
 	useLayoutEffect(() => {
 		if (!isBookingForOpen) return;
@@ -1075,6 +1103,7 @@ const SortableAIBlock = ({
 														ref={bookingForButtonRef}
 														type="button"
 														onClick={() => {
+															clearBookingForCloseTimeout();
 															if (isBookingForOpen) {
 																setIsBookingForOpen(false);
 																return;
@@ -1139,7 +1168,8 @@ const SortableAIBlock = ({
 																	'border-2 border-black',
 																	'flex flex-col overflow-hidden'
 																)}
-																onMouseLeave={() => setIsBookingForOpen(false)}
+																onMouseEnter={clearBookingForCloseTimeout}
+																onMouseLeave={scheduleBookingForCloseTimeout}
 																role="dialog"
 																aria-label="Booking For"
 															>
@@ -1251,6 +1281,11 @@ const SortableAIBlock = ({
 																			{/* Top row */}
 																			<div className="w-full flex items-center justify-center gap-[24px]">
 																				{(() => {
+																					const now = new Date();
+																					const minBaseMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+																					const isPrevDisabled =
+																						bookingForCalendarBaseMonth.getTime() <= minBaseMonth.getTime();
+
 																					const currentMonth = new Intl.DateTimeFormat(undefined, {
 																						month: 'long',
 																					}).format(bookingForCalendarBaseMonth);
@@ -1267,15 +1302,22 @@ const SortableAIBlock = ({
 																						<div className="w-full flex items-center justify-center gap-[12px]">
 																							<button
 																								type="button"
+																								disabled={isPrevDisabled}
 																								onClick={() => {
 																									setBookingForCalendarBaseMonth((prev) => {
-																										return new Date(prev.getFullYear(), prev.getMonth() - 1, 1);
+																										const next = new Date(prev.getFullYear(), prev.getMonth() - 1, 1);
+																										return next.getTime() < minBaseMonth.getTime() ? prev : next;
 																									});
 																								}}
-																								className="shrink-0 bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity"
+																								className="shrink-0 bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity disabled:cursor-not-allowed disabled:hover:opacity-100"
 																								aria-label="Previous month"
 																							>
-																								<LeftArrow width={8} height={16} color="#000000" opacity={1} />
+																								<LeftArrow
+																									width={8}
+																									height={16}
+																									color={isPrevDisabled ? '#A0A0A0' : '#000000'}
+																									opacity={isPrevDisabled ? 0.6 : 1}
+																								/>
 																							</button>
 
 																							<div className="flex items-center justify-center gap-[24px]">
@@ -1460,7 +1502,7 @@ const SortableAIBlock = ({
 																											<button
 																												key={idx}
 																												className={cn(
-																													'relative w-full h-full flex items-center justify-center',
+																													'relative w-full h-full flex items-center justify-center group',
 																													'bg-transparent border-0 p-0',
 																													isPast ? 'cursor-not-allowed' : 'cursor-pointer'
 																												)}
@@ -1489,7 +1531,12 @@ const SortableAIBlock = ({
 																												<div
 																													className={cn(
 																														'relative z-[1] w-[34px] h-[34px] rounded-full flex items-center justify-center',
+																														'border border-transparent transition-colors',
 																														'font-inter text-[16px] leading-[16px]',
+																														!isPast &&
+																															!isStartSelected &&
+																															!isEndSelected &&
+																															'group-hover:border-black',
 																														(isStartSelected || isEndSelected) &&
 																															'bg-black text-white',
 																														isEndSelected &&
