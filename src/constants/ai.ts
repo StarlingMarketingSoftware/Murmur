@@ -158,7 +158,6 @@ export const DRAFTING_BANNED_PHRASES: string[] = [
 	"ass",
 	"bitch",
 	"cunt",
-	"fuck you",
 	"kill yourself",
 ];
 
@@ -769,7 +768,8 @@ You're an excellet and experienced musician composing an email to book a show.
 
 Start with something like "Hi"
 
-Then introduce yourself and your band. Don't be too terse, but don't make anything up.
+Then introduce yourself and your band. Don't be too terse, but don't make anything up. 
+Try not to start with things like "I am" but instead more like "My name is"
 
 Then proceed to demonstate in a friendly and professional manner, demonstating that you know about the venue from information in {metadata} demonstating that you have deep knowledge of their establishment.
 Be more freindly in how you mention {metadata} so it doesn't sound like you're reading from a script. Don't get overly specific with the facts you include. Just mention the venue name and that you've heard of them.

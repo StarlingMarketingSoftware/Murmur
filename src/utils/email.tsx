@@ -47,7 +47,7 @@ export const stripEmailSignatureFromAiMessage = (
 	if (!message) return message;
 
 	// Normalize line breaks and some common HTML break artifacts (models sometimes output these).
-	let text = message
+	const text = message
 		.replace(/\r\n/g, '\n')
 		.replace(/\r/g, '\n')
 		.replace(/<br\s*\/?>/gi, '\n')
