@@ -1115,14 +1115,20 @@ const SortableAIBlock = ({
 																bookingForValue === 'Fall' ||
 																bookingForValue === 'Winter';
 
-															if (isSeasonSelection) {
+															// Prefer the last selected tab when reopening the dropdown.
+															// This lets Calendar keep the previous "Booking For" label until a date is selected.
+															if (bookingForTab === 'Calendar') {
+																setBookingForTab('Calendar');
+															} else if (bookingForTab === 'Season') {
+																if (isSeasonSelection) {
+																	setBookingForSeason(bookingForValue as BookingForSeason);
+																}
+																setBookingForTab('Season');
+															} else if (bookingForCalendarStartDate != null) {
+																setBookingForTab('Calendar');
+															} else if (isSeasonSelection) {
 																setBookingForSeason(bookingForValue as BookingForSeason);
 																setBookingForTab('Season');
-															} else if (
-																bookingForValue === 'Calendar' ||
-																bookingForCalendarStartDate != null
-															) {
-																setBookingForTab('Calendar');
 															} else {
 																setBookingForTab('Anytime');
 															}
@@ -1219,9 +1225,6 @@ const SortableAIBlock = ({
 																								}
 
 																								// Calendar
-																								if (bookingForCalendarStartDate == null) {
-																									setBookingForValue('Calendar');
-																								}
 																								setBookingForTab('Calendar');
 																							}}
 																							className={cn(
