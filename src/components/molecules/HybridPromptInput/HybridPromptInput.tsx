@@ -30,8 +30,10 @@ import React, {
 	useRef,
 	useEffect,
 	useMemo,
+	useCallback,
 	useLayoutEffect,
 } from 'react';
+import { createPortal } from 'react-dom';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { TestPreviewPanel } from '../TestPreviewPanel/TestPreviewPanel';
 import TinyPlusIcon from '@/components/atoms/_svg/TinyPlusIcon';
@@ -100,6 +102,76 @@ const SortableAIBlock = ({
 	const [bookingForTab, setBookingForTab] = useState<BookingForTab>('Anytime');
 	const [bookingForSeason, setBookingForSeason] = useState<BookingForSeason>('Spring');
 	const bookingForContainerRef = useRef<HTMLDivElement | null>(null);
+	const bookingForButtonRef = useRef<HTMLButtonElement | null>(null);
+	const bookingForDropdownRef = useRef<HTMLDivElement | null>(null);
+	const [bookingForDropdownPosition, setBookingForDropdownPosition] = useState<{
+		top: number;
+		left: number;
+	} | null>(null);
+	// Used to nudge the internal 3-way tab strip inside the Calendar dropdown so it aligns
+	// with where the strip sits in the narrower Anytime/Season dropdown.
+	const [bookingForTabStripLeft, setBookingForTabStripLeft] = useState<number | null>(null);
+	const bookingForDropdownSize = useMemo(() => {
+		if (bookingForTab === 'Calendar') return { width: 829, height: 468 };
+		if (bookingForTab === 'Season') return { width: 317, height: 151 };
+		return { width: 317, height: 46 };
+	}, [bookingForTab]);
+	const updateBookingForDropdownPosition = useCallback(() => {
+		if (typeof window === 'undefined') return;
+		const anchor = bookingForButtonRef.current;
+		if (!anchor) return;
+
+		const rect = anchor.getBoundingClientRect();
+		const margin = 6;
+		const viewportPadding = 8;
+		const offsetX = 85;
+		const offsetY = 45;
+		const calendarNudgeX = 100;
+
+		let left =
+			bookingForTab === 'Calendar'
+				? (window.innerWidth - bookingForDropdownSize.width) / 2 + calendarNudgeX
+				: rect.left + offsetX;
+		let top = rect.bottom + margin + offsetY;
+
+		const maxLeft = Math.max(viewportPadding, window.innerWidth - bookingForDropdownSize.width - viewportPadding);
+		left = Math.min(Math.max(left, viewportPadding), maxLeft);
+
+		// In Calendar mode, the dropdown is much wider and centered, which makes the internal
+		// tab strip appear to "jump" horizontally vs. Anytime/Season. Compute a Calendar-only
+		// left padding so the strip sits in the same global X position as the narrow dropdown.
+		if (bookingForTab === 'Calendar') {
+			const tabStripWidth = 284;
+			const narrowDropdownWidth = 317;
+			const tabStripLeftInNarrowDropdown = (narrowDropdownWidth - tabStripWidth) / 2; // 16.5
+			const desiredTabStripLeftGlobal = rect.left + offsetX + tabStripLeftInNarrowDropdown;
+			let tabStripLeftInDropdown = desiredTabStripLeftGlobal - left;
+
+			// Keep it within the Calendar dropdown bounds.
+			const tabStripPadding = 8;
+			const minTabStripLeft = tabStripPadding;
+			const maxTabStripLeft = Math.max(
+				minTabStripLeft,
+				bookingForDropdownSize.width - tabStripWidth - tabStripPadding
+			);
+			tabStripLeftInDropdown = Math.min(Math.max(tabStripLeftInDropdown, minTabStripLeft), maxTabStripLeft);
+
+			setBookingForTabStripLeft(Math.round(tabStripLeftInDropdown));
+		} else {
+			setBookingForTabStripLeft(null);
+		}
+
+		const wouldOverflowBottom = top + bookingForDropdownSize.height > window.innerHeight - viewportPadding;
+		const canOpenAbove = rect.top - margin - bookingForDropdownSize.height >= viewportPadding;
+		if (wouldOverflowBottom && canOpenAbove) {
+			top = rect.top - margin - bookingForDropdownSize.height - offsetY;
+		}
+
+		setBookingForDropdownPosition({
+			top: Math.round(top),
+			left: Math.round(left),
+		});
+	}, [bookingForDropdownSize.height, bookingForDropdownSize.width, bookingForTab]);
 	// Power mode from form (shared with MiniEmailStructure)
 	const selectedPowerMode = form.watch('powerMode') || 'normal';
 	const setSelectedPowerMode = (mode: 'normal' | 'high') => {
@@ -143,9 +215,13 @@ const SortableAIBlock = ({
 
 		const handlePointerDown = (event: PointerEvent) => {
 			const target = event.target as Node | null;
+			if (!target) return;
+
 			const container = bookingForContainerRef.current;
-			if (!target || !container) return;
-			if (container.contains(target)) return;
+			const dropdown = bookingForDropdownRef.current;
+
+			if (container?.contains(target)) return;
+			if (dropdown?.contains(target)) return;
 			setIsBookingForOpen(false);
 		};
 
@@ -154,6 +230,32 @@ const SortableAIBlock = ({
 			document.removeEventListener('pointerdown', handlePointerDown);
 		};
 	}, [isBookingForOpen]);
+
+	useEffect(() => {
+		if (!isBookingForOpen) {
+			setBookingForDropdownPosition(null);
+			setBookingForTabStripLeft(null);
+		}
+	}, [isBookingForOpen]);
+
+	useLayoutEffect(() => {
+		if (!isBookingForOpen) return;
+		updateBookingForDropdownPosition();
+	}, [isBookingForOpen, bookingForTab, updateBookingForDropdownPosition]);
+
+	useEffect(() => {
+		if (!isBookingForOpen) return;
+		if (typeof window === 'undefined') return;
+
+		const handle = () => updateBookingForDropdownPosition();
+		window.addEventListener('resize', handle);
+		// capture=true so we also reposition when any scrollable ancestor scrolls
+		window.addEventListener('scroll', handle, true);
+		return () => {
+			window.removeEventListener('resize', handle);
+			window.removeEventListener('scroll', handle, true);
+		};
+	}, [isBookingForOpen, updateBookingForDropdownPosition]);
 
 	const style = {
 		transform: CSS.Transform.toString(transform),
@@ -963,6 +1065,7 @@ const SortableAIBlock = ({
 												{/* Booking For box (203 x 28px) + dropdown */}
 												<div ref={bookingForContainerRef} className="relative mt-[10px]">
 													<button
+														ref={bookingForButtonRef}
 														type="button"
 														onClick={() => {
 															if (isBookingForOpen) {
@@ -999,115 +1102,141 @@ const SortableAIBlock = ({
 														</span>
 													</button>
 
-													{isBookingForOpen && (
-														<div
-															className={cn(
-																'absolute left-0 top-full mt-[6px] z-30',
-																'w-[317px] rounded-[6px]',
-																bookingForTab === 'Season'
-																	? bookingForSeason === 'Spring'
-																		? 'bg-[#9BD2FF]'
-																		: bookingForSeason === 'Summer'
-																			? 'bg-[#7ADF85]'
-																			: bookingForSeason === 'Fall'
-																				? 'bg-[#D77C2C]'
-																				: 'bg-[#1960AC]'
-																	: 'bg-[#F5F5F5]',
-																'border-2 border-black',
-																'flex flex-col overflow-hidden',
-																bookingForTab === 'Season' ? 'h-[151px]' : 'h-[46px]'
-															)}
-															role="dialog"
-															aria-label="Booking For"
-														>
-															<div className="relative h-[46px]">
-																{bookingForTab === 'Season' && (
-																	<div
-																		aria-hidden="true"
-																		className="pointer-events-none absolute inset-0 flex items-center justify-center"
-																	>
-																		<div className="w-[284px] h-[32px] bg-[#E2E2E2] opacity-30 rounded-[6px]" />
-																	</div>
+													{isBookingForOpen &&
+														bookingForDropdownPosition &&
+														typeof document !== 'undefined' &&
+														createPortal(
+															<div
+																ref={bookingForDropdownRef}
+																style={{
+																	position: 'fixed',
+																	top: bookingForDropdownPosition.top,
+																	left: bookingForDropdownPosition.left,
+																	width: bookingForDropdownSize.width,
+																	height: bookingForDropdownSize.height,
+																}}
+																className={cn(
+																	'z-[9999] rounded-[6px]',
+																	bookingForTab === 'Season'
+																		? bookingForSeason === 'Spring'
+																			? 'bg-[#9BD2FF]'
+																			: bookingForSeason === 'Summer'
+																				? 'bg-[#7ADF85]'
+																				: bookingForSeason === 'Fall'
+																					? 'bg-[#D77C2C]'
+																					: 'bg-[#1960AC]'
+																		: 'bg-[#F5F5F5]',
+																	'border-2 border-black',
+																	'flex flex-col overflow-hidden'
 																)}
+																onMouseLeave={() => setIsBookingForOpen(false)}
+																role="dialog"
+																aria-label="Booking For"
+															>
+																<div className="relative h-[46px]">
+																	{bookingForTab === 'Season' && (
+																		<div
+																			aria-hidden="true"
+																			className="pointer-events-none absolute inset-0 flex items-center justify-center"
+																		>
+																			<div className="w-[284px] h-[32px] bg-[#E2E2E2] opacity-30 rounded-[6px]" />
+																		</div>
+																	)}
 
-																<div className="relative z-[1] h-full flex items-center justify-center">
-																	<div className="w-[284px] grid grid-cols-3 items-center gap-[8px]">
-																		{(['Anytime', 'Season', 'Calendar'] as const).map(
-																			(opt) => {
-																				const isSelected = bookingForTab === opt;
+																	<div
+																		className={cn(
+																			'relative z-[1] h-full flex items-center',
+																			bookingForTab === 'Calendar' && bookingForTabStripLeft != null
+																				? 'justify-start'
+																				: 'justify-center'
+																		)}
+																		style={
+																			bookingForTab === 'Calendar' && bookingForTabStripLeft != null
+																				? { paddingLeft: bookingForTabStripLeft }
+																				: undefined
+																		}
+																	>
+																		<div className="w-[284px] grid grid-cols-3 items-center gap-[8px]">
+																			{(['Anytime', 'Season', 'Calendar'] as const).map(
+																				(opt) => {
+																					const isSelected = bookingForTab === opt;
+																					return (
+																						<button
+																							key={opt}
+																							type="button"
+																							onClick={() => {
+																								if (opt === 'Season') {
+																									setBookingForTab('Season');
+																									return;
+																								}
+
+																								if (opt === 'Anytime') {
+																									setBookingForValue('Anytime');
+																									setBookingForTab('Anytime');
+																									return;
+																								}
+
+																								// Calendar
+																								setBookingForValue('Calendar');
+																								setBookingForTab('Calendar');
+																							}}
+																							className={cn(
+																								'h-[28px] w-[81px] rounded-[6px] font-inter text-[14px] leading-[14px] text-black',
+																								'flex items-center justify-center text-center justify-self-center',
+																								isSelected
+																									? opt === 'Season'
+																										? 'bg-[#F5F5F5] font-semibold'
+																										: 'bg-[#C2C2C2] font-semibold'
+																									: 'bg-transparent font-normal hover:bg-black/5'
+																							)}
+																							role="button"
+																							aria-pressed={isSelected}
+																						>
+																							{opt}
+																						</button>
+																					);
+																				}
+																			)}
+																		</div>
+																	</div>
+																</div>
+
+																{bookingForTab === 'Season' && (
+																	<div className="flex-1 flex flex-col items-center justify-center gap-[10px] pb-[10px]">
+																		{(['Spring', 'Summer', 'Fall', 'Winter'] as const).map(
+																			(season) => {
+																				const isSelectedSeason = bookingForSeason === season;
 																				return (
 																					<button
-																						key={opt}
+																						key={season}
 																						type="button"
 																						onClick={() => {
-																							if (opt === 'Season') {
-																								setBookingForTab('Season');
-																								return;
-																							}
-
-																							if (opt === 'Anytime') {
-																								setBookingForValue('Anytime');
-																								setBookingForTab('Anytime');
-																								setIsBookingForOpen(false);
-																								return;
-																							}
-
-																							// Calendar
-																							setBookingForValue('Calendar');
-																							setBookingForTab('Calendar');
-																							setIsBookingForOpen(false);
+																							setBookingForSeason(season);
+																							setBookingForValue(season);
 																						}}
 																						className={cn(
-																							'h-[28px] w-[81px] rounded-[6px] font-inter text-[14px] leading-[14px] text-black',
-																							'flex items-center justify-center text-center justify-self-center',
-																							isSelected
-																								? opt === 'Season'
-																									? 'bg-[#F5F5F5] font-semibold'
-																									: 'bg-[#C2C2C2] font-semibold'
-																								: 'bg-transparent font-normal hover:bg-black/5'
+																							'font-inter text-[14px] leading-[16px]',
+																							isSelectedSeason
+																								? 'font-semibold text-white'
+																								: 'font-normal text-black opacity-90 hover:opacity-100'
 																						)}
-																						role="button"
-																						aria-pressed={isSelected}
 																					>
-																						{opt}
+																						{season}
 																					</button>
 																				);
 																			}
 																		)}
 																	</div>
-																</div>
-															</div>
+																)}
 
-															{bookingForTab === 'Season' && (
-																<div className="flex-1 flex flex-col items-center justify-center gap-[10px] pb-[10px]">
-																	{(['Spring', 'Summer', 'Fall', 'Winter'] as const).map(
-																		(season) => {
-																			const isSelectedSeason = bookingForSeason === season;
-																			return (
-																				<button
-																					key={season}
-																					type="button"
-																					onClick={() => {
-																						setBookingForSeason(season);
-																						setBookingForValue(season);
-																						setIsBookingForOpen(false);
-																					}}
-																					className={cn(
-																						'font-inter text-[14px] leading-[16px]',
-																						isSelectedSeason
-																							? 'font-semibold text-white'
-																							: 'font-normal text-black opacity-90 hover:opacity-100'
-																					)}
-																				>
-																					{season}
-																				</button>
-																			);
-																		}
-																	)}
-																</div>
-															)}
-														</div>
-													)}
+																{bookingForTab === 'Calendar' && (
+																	<div className="flex-1 w-full p-[14px]">
+																		<div className="w-full h-full rounded-[6px] bg-[#E2E2E2] opacity-30" />
+																	</div>
+																)}
+															</div>,
+															document.body
+														)}
 												</div>
 
 												{/* Custom Instructions (expands in-place to match Profile width) */}
