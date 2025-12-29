@@ -751,12 +751,12 @@ const SortableAIBlock = ({
 									<div className="w-[calc(100%+32px)] -mx-4 h-[29px] bg-[#B9DAF5] -mt-0 flex items-stretch">
 										{/* Full Auto label section */}
 										<div className="flex-1 flex items-center pl-[16px]">
-											<Typography
-												variant="h4"
-												className="font-inter font-semibold text-[17px] text-[#000000]"
-											>
-												Full Auto
-											</Typography>
+										<Typography
+											variant="h4"
+											className="font-inter font-semibold text-[17px] text-[#000000]"
+										>
+											Auto
+										</Typography>
 										</div>
 										{/* Divider - black when Normal Power selected */}
 										<div
@@ -1635,7 +1635,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 							className={`${
 								compactLeftOnly
 									? 'flex-col'
-									: 'w-[96.27vw] max-w-[499px] h-[703px] transition flex mx-auto flex-col border-[3px] border-black rounded-[8px] bg-[#A6E2A8]'
+									: 'w-[96.27vw] max-w-[499px] h-[703px] transition flex mx-auto flex-col border-[3px] border-transparent rounded-[8px] bg-[#A6E2A8]'
 							} relative overflow-visible`}
 							style={!compactLeftOnly ? { backgroundColor: '#A6E2A8' } : undefined}
 							data-campaign-main-box={compactLeftOnly ? undefined : 'writing'}
@@ -1643,6 +1643,13 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 							onFocus={handleContainerFocus}
 							onBlur={handleContainerBlur}
 						>
+							{/* Border overlay to ensure crisp, unbroken stroke at rounded corners */}
+							{!compactLeftOnly && (
+								<div
+									aria-hidden="true"
+									className="pointer-events-none absolute -inset-[3px] z-[60] rounded-[8px] border-[3px] border-black"
+								/>
+							)}
 							{/* Mobile-only gradient background overlay starting under Mode divider */}
 							{isMobile && !showTestPreview && overlayTopPx !== null && (
 								<div
@@ -1683,25 +1690,18 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 									)}
 									data-hpi-left-panel
 								>
-									{!compactLeftOnly && (
-										<div className="w-full h-[22px] border-b-[2px] border-black flex items-center px-[9px] bg-white rounded-t-[5px]">
-											<span className="font-inter font-bold text-[12px] leading-none text-black">
-												Writing
-											</span>
-										</div>
-									)}
 									{/* Removed explicit drag bar; header below acts as the drag handle */}
 									{/* Subject header inside the box */}
 									<div ref={headerSectionRef} className={cn('pt-0 pb-0')}>
-										<div className={cn(!compactLeftOnly ? 'bg-white' : '', 'relative h-[40px]')}>
-											{/* Left 152px gray background */}
+										<div className={cn(!compactLeftOnly ? 'bg-white' : '', 'relative h-[31px]')}>
+											{/* Left 130px gray background */}
 											{!compactLeftOnly && (
 												<div
-													className="absolute left-0 top-0 h-full w-[152px] bg-[#f8f8f8] z-0"
+													className="absolute left-0 top-0 h-full w-[130px] bg-[#f8f8f8] z-0"
 													style={{ pointerEvents: 'none' }}
 												/>
 											)}
-											{/* Profile label centered in the 152px gray area - clickable to switch tabs */}
+											{/* Profile label centered in the 130px gray area - clickable to switch tabs */}
 											{!compactLeftOnly && (() => {
 												const isProfileIncomplete = !profileFields.name.trim() || !profileFields.genre.trim() || !profileFields.area.trim() || !profileFields.bio.trim();
 												const showRedWarning = hasLeftProfileTab && isProfileIncomplete;
@@ -1710,12 +1710,12 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														type="button"
 														onClick={() => setActiveTab('profile')}
 														className={cn(
-															"absolute left-0 top-0 h-full w-[152px] flex items-center justify-center font-inter font-semibold text-[11.7px] max-[480px]:text-[14px] z-30 cursor-pointer bg-transparent transition-colors",
+															"absolute left-0 top-0 h-full w-[130px] flex items-center justify-center font-inter font-semibold text-[13px] max-[480px]:text-[14px] z-30 cursor-pointer bg-transparent transition-colors border-r-[3px] border-r-black border-t-0 border-b-0 border-l-0",
 															activeTab === 'profile'
-																? 'text-black bg-[#94DB96] hover:bg-[#94DB96] border-r border-r-black border-t-0 border-b-0 border-l-0'
+																? 'text-black bg-[#A6E2A8] hover:bg-[#A6E2A8]'
 																: showRedWarning
-																	? 'text-black bg-[#E47979] hover:bg-[#E47979] border-r border-r-black border-t-0 border-b-0 border-l-0'
-																	: 'text-black hover:bg-[#eeeeee] border-0'
+																	? 'text-black bg-[#E47979] hover:bg-[#E47979]'
+																	: 'text-black hover:bg-[#eeeeee]'
 														)}
 													>
 														Profile
@@ -1724,7 +1724,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 											})()}
 											<div
 												className={cn(
-													'h-[40px] flex items-center relative z-20',
+													'h-[31px] flex items-center relative z-20',
 													'w-[93.7vw] max-w-[475px] mx-auto pl-[8px] max-[480px]:pl-[6px]'
 												)}
 												data-left-drag-handle
@@ -1733,23 +1733,23 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 												{compactLeftOnly && (
 													<span
 														className={cn(
-															'font-inter font-semibold text-[11.7px] max-[480px]:text-[14px] ml-[8px] mr-[112px] max-[480px]:mr-[22px] text-black relative z-10'
+															'font-inter font-semibold text-[13px] max-[480px]:text-[14px] ml-[8px] mr-[112px] max-[480px]:mr-[22px] text-black relative z-10'
 														)}
 													>
 														Profile
 													</span>
 												)}
 												{/* Spacer to keep toggles in position */}
-												{!compactLeftOnly && <div className="w-[152px] shrink-0" />}
+												{!compactLeftOnly && <div className="w-[130px] shrink-0" />}
 												<div
 													ref={modeContainerRef}
-													className="relative flex items-center gap-[67px] max-[480px]:gap-0 max-[480px]:justify-between ml-[24px] max-[480px]:ml-[2px] flex-1 max-[480px]:w-auto max-[480px]:pr-[4.4vw]"
+													className="relative flex items-center gap-[78px] max-[480px]:gap-0 max-[480px]:justify-between ml-[42px] max-[480px]:ml-[2px] flex-1 max-[480px]:w-auto max-[480px]:pr-[4.4vw]"
 												>
 													<DndContext
 														onDragEnd={handleHighlightDragEnd}
 														modifiers={[restrictToHorizontalAxisAndBounds]}
 													>
-														{selectedModeKey !== 'none' && activeTab !== 'profile' && (
+														{selectedModeKey !== 'none' && (
 															<DraggableHighlight
 																style={highlightStyle}
 																isInitialRender={isInitialRender}
@@ -1761,37 +1761,16 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														ref={fullModeButtonRef}
 														variant="ghost"
 														type="button"
-														className={cn(
-															'!p-0 h-fit !m-0 text-[11.7px] max-[480px]:text-[14px] font-inter font-semibold bg-transparent z-20',
-															activeTab === 'profile'
-																? 'text-[#AFAFAF]'
-																: selectedModeKey !== 'none' &&
-																  form
-																	.getValues('hybridBlockPrompts')
-																	?.some((b) => b.type === HybridBlock.full_automated)
-																? 'text-black'
-																: 'text-[#AFAFAF] hover:text-[#8F8F8F]'
-														)}
+														className="!p-0 h-fit !m-0 text-[13px] max-[480px]:text-[14px] font-inter font-semibold bg-transparent z-20 text-black"
 														onClick={() => { setActiveTab('main'); setHasLeftProfileTab(true); switchToFull(); }}
 													>
-														Full Auto
-													</Button>
+												Auto
+												</Button>
 													<Button
 														ref={manualModeButtonRef}
 														variant="ghost"
 														type="button"
-														className={cn(
-															'!p-0 h-fit !m-0 text-[11.7px] max-[480px]:text-[14px] font-inter font-semibold bg-transparent z-20',
-															activeTab === 'profile'
-																? 'text-[#AFAFAF]'
-																: selectedModeKey !== 'none' &&
-																  (form.getValues('hybridBlockPrompts')?.length || 0) > 0 &&
-																  form
-																	.getValues('hybridBlockPrompts')
-																	?.every((b) => b.type === HybridBlock.text)
-																? 'text-black'
-																: 'text-[#AFAFAF] hover:text-[#8F8F8F]'
-														)}
+														className="!p-0 h-fit !m-0 text-[13px] max-[480px]:text-[14px] font-inter font-semibold bg-transparent z-20 text-black"
 														onClick={() => { setActiveTab('main'); setHasLeftProfileTab(true); switchToManual(); }}
 													>
 														Manual
@@ -1800,20 +1779,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														ref={hybridModeButtonRef}
 														variant="ghost"
 														type="button"
-														className={cn(
-															'!p-0 h-fit !m-0 text-[11.7px] max-[480px]:text-[14px] font-inter font-semibold bg-transparent z-20',
-															activeTab === 'profile'
-																? 'text-[#AFAFAF]'
-																: selectedModeKey !== 'none' &&
-																  !form
-																	.getValues('hybridBlockPrompts')
-																	?.some((b) => b.type === HybridBlock.full_automated) &&
-																  !form
-																	.getValues('hybridBlockPrompts')
-																	?.every((b) => b.type === HybridBlock.text)
-																? 'text-black'
-																: 'text-[#AFAFAF] hover:text-[#8F8F8F]'
-														)}
+														className="!p-0 h-fit !m-0 text-[13px] max-[480px]:text-[14px] font-inter font-semibold bg-transparent z-20 text-black"
 														onClick={() => { setActiveTab('main'); setHasLeftProfileTab(true); switchToHybrid(); }}
 													>
 														Hybrid
@@ -1823,12 +1789,12 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 											{compactLeftOnly ? null : (
 												<>
 													{showTestPreview && (
-														<div className="w-full border-b-[2px] border-black -mx-[18px]" />
+														<div className="w-full border-b-[3px] border-black -mx-[18px]" />
 													)}
 													<div
 														ref={modeDividerRef}
 														className={cn(
-															'w-full border-b-[2px] border-black',
+															'w-full border-b-[3px] border-black',
 															showTestPreview && 'hidden'
 														)}
 													/>
@@ -1837,7 +1803,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 											)}
 										</div>
 										{activeTab !== 'profile' && (
-											<div className="flex flex-col items-center pt-[20px]">
+											<div className="flex flex-col items-center pt-[10px] max-[480px]:pt-[8px]">
 												<FormField
 													control={form.control}
 													name="subject"
