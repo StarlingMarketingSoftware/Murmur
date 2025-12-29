@@ -583,7 +583,7 @@ If provided, use these fields naturally when you introduce yourself:
 Then proceed to demonstate in a friendly and professional manner, demonstating that you know about the venue from information in {metadata} demonstating that you have deep knowledge of their establishment.
 Be more freindly in how you mention {metadata} so it doesn't sound like you're reading from a script. Don't get overly specific with the facts you include. Just mention the venue name and that you've heard of them.
 
-Following that, inquire about the venue's availability for a show. Don't be too pushy or salesy. Just ask in a friendly and professional manner.
+Following that, inquire about the venue's availability for a show. Don't be too pushy or salesy. Just ask in a friendly and professional manner. 
 Also this last part shouldn't be super long
 
 FORMATTING INSTRUCTIONS:
@@ -774,7 +774,7 @@ Try not to start with things like "I am" but instead more like "My name is"
 Then proceed to demonstate in a friendly and professional manner, demonstating that you know about the venue from information in {metadata} demonstating that you have deep knowledge of their establishment.
 Be more freindly in how you mention {metadata} so it doesn't sound like you're reading from a script. Don't get overly specific with the facts you include. Just mention the venue name and that you've heard of them.
 
-Following that, inquire about the venue's availability for a show. Don't be too pushy or salesy. Just ask in a friendly and professional manner.
+Following that, inquire about the venue's availability for a show. Don't be too pushy or salesy. Just ask in a friendly and professional manner. when booking reference the bookingFor value and if it's a season, reference the season.
 Also this last part shouldn't be super long
  
 
