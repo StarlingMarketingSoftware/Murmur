@@ -2035,6 +2035,102 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		}
 	}, [identityProfile]);
 
+	// Profile score bar (weighted by UI order; more rules will follow)
+	const PROFILE_PROGRESS_SEQUENCE = [
+		{ key: 'name', label: 'Name' },
+		{ key: 'genre', label: 'Genre' },
+		{ key: 'area', label: 'Area' },
+		{ key: 'band', label: 'Band/Artist Name' },
+		{ key: 'bio', label: 'Bio' },
+		{ key: 'links', label: 'Links' },
+	] as const;
+
+	const filledProfileFieldCount = useMemo(() => {
+		const values = [
+			profileFields.name,
+			profileFields.genre,
+			profileFields.area,
+			profileFields.band,
+			profileFields.bio,
+			profileFields.links,
+		];
+		return values.reduce((count, v) => count + (v.trim() ? 1 : 0), 0);
+	}, [
+		profileFields.name,
+		profileFields.genre,
+		profileFields.area,
+		profileFields.band,
+		profileFields.bio,
+		profileFields.links,
+	]);
+
+	const sequentialFilledProfileFieldCount = useMemo(() => {
+		let count = 0;
+		for (const step of PROFILE_PROGRESS_SEQUENCE) {
+			if (profileFields[step.key].trim()) count += 1;
+			else break;
+		}
+		return count;
+	}, [
+		profileFields.name,
+		profileFields.genre,
+		profileFields.area,
+		profileFields.band,
+		profileFields.bio,
+		profileFields.links,
+	]);
+
+	const nextProfileFieldToFill = useMemo(() => {
+		return (
+			PROFILE_PROGRESS_SEQUENCE.find((step) => !profileFields[step.key].trim()) ?? null
+		);
+	}, [
+		profileFields.name,
+		profileFields.genre,
+		profileFields.area,
+		profileFields.band,
+		profileFields.bio,
+		profileFields.links,
+	]);
+
+	const profileSuggestionScore = useMemo(() => {
+		// Completion mapping (weighted by order / consecutive fill):
+		// 0 -> 0
+		// 1 -> 50
+		// 2 -> 60
+		// 3 -> 70
+		// 4 -> 80
+		// 5 -> 90
+		// 6 -> 100
+		if (sequentialFilledProfileFieldCount <= 0) return 0;
+		if (sequentialFilledProfileFieldCount === 1) return 50;
+		if (sequentialFilledProfileFieldCount === 2) return 60;
+		if (sequentialFilledProfileFieldCount === 3) return 70;
+		if (sequentialFilledProfileFieldCount === 4) return 80;
+		if (sequentialFilledProfileFieldCount === 5) return 90;
+		return 100;
+	}, [sequentialFilledProfileFieldCount]);
+
+	const profileSuggestionLabel = useMemo(() => {
+		// If the user hasn't started anything, keep the friendly default.
+		if (filledProfileFieldCount === 0) return 'Get Started';
+
+		// Weighting is ordered: always prompt for the first missing field in UI order.
+		if (nextProfileFieldToFill) return `Add your ${nextProfileFieldToFill.label}`;
+
+		// All fields filled.
+		return 'Excellent';
+	}, [filledProfileFieldCount, nextProfileFieldToFill]);
+
+	const profileSuggestionDisplayLabel =
+		profileSuggestionScore === 0
+			? profileSuggestionLabel
+			: `${profileSuggestionScore} - ${profileSuggestionLabel}`;
+	const profileSuggestionFillPercent = Math.max(
+		0,
+		Math.min(100, Math.round(profileSuggestionScore))
+	);
+
 	const didAutoOpenProfileTabRef = useRef(false);
 	const isKeyProfileIncomplete = useMemo(() => {
 		return (
@@ -2351,7 +2447,8 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 
 	// Mobile-only: measure to start overlay exactly at the big divider line under Mode
 	useLayoutEffect(() => {
-		if (!isMobile || showTestPreview) {
+		// Only show the green drafting gradient on the main Writing tab
+		if (!isMobile || showTestPreview || activeTab !== 'main') {
 			setOverlayTopPx(null);
 			return;
 		}
@@ -2387,7 +2484,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 			window.removeEventListener('resize', recalc);
 			window.removeEventListener('orientationchange', recalc);
 		};
-	}, [isMobile, showTestPreview, fields.length, selectedModeKey]);
+	}, [activeTab, isMobile, showTestPreview, fields.length, selectedModeKey]);
 	return (
 		<div
 			className={cn(
@@ -2425,7 +2522,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 								/>
 							)}
 							{/* Mobile-only gradient background overlay starting under Mode divider */}
-							{isMobile && !showTestPreview && overlayTopPx !== null && (
+							{isMobile && activeTab === 'main' && !showTestPreview && overlayTopPx !== null && (
 								<div
 									style={{
 										position: 'absolute',
@@ -2697,7 +2794,26 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 								>
 									{/* Profile Tab Content */}
 									{activeTab === 'profile' && (
-										<div className="pt-[20px] max-[480px]:pt-[8px] pr-3 pb-3 pl-3 flex flex-col gap-[18px] items-center flex-1">
+										<div className="w-full flex flex-col flex-1">
+											{/* Empty header row + divider (matches mock): 32px below the main header */}
+											<div className="w-full h-[32px] bg-[#E7F3E8] border-b-[3px] border-black shrink-0 flex items-center justify-center">
+												<div className="w-[468px] max-w-full flex items-center gap-[24px] px-4">
+													{/* Progress track */}
+													<div className="relative w-[223px] h-[12px] bg-white border-2 border-black rounded-[8px] overflow-hidden">
+														<div
+															className="absolute left-0 top-0 bottom-0 bg-[#36B24A] rounded-full transition-[width] duration-200"
+															style={{ width: `${profileSuggestionFillPercent}%` }}
+														/>
+													</div>
+													{/* Score label */}
+													<span className="font-inter font-medium text-[17px] leading-none text-black whitespace-nowrap">
+														{profileSuggestionDisplayLabel}
+													</span>
+												</div>
+											</div>
+											{/* Blue fill starts under the second divider */}
+											<div className="flex-1 bg-[#58A6E5]">
+												<div className="pt-[54px] pr-3 pb-3 pl-3 flex flex-col gap-[18px] items-center">
 											<div
 												ref={expandedProfileBox === 'name' ? expandedProfileBoxRef : undefined}
 												className={cn(
@@ -2899,6 +3015,8 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														autoFocus
 													/>
 												)}
+											</div>
+												</div>
 											</div>
 										</div>
 									)}
@@ -3254,8 +3372,8 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 									/>
 								)}
 
-								{/* Test button and notices (hidden in compact mode and profile tab) */}
-								{compactLeftOnly || activeTab === 'profile' ? null : (
+								{/* Test button and notices (hidden in compact mode, profile tab, and Manual mode) */}
+								{compactLeftOnly || activeTab === 'profile' || selectedModeKey === 'manual' ? null : (
 									<>
 										{/* Desktop (manual/hybrid): bottom bar Generate Test button */}
 										{selectedModeKey !== 'full' && (
