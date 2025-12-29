@@ -291,11 +291,13 @@ const SortableAIBlock = ({
 				isResearchBlock && 'border-2 border-[#1010E7] bg-background',
 				isActionBlock && 'border-2 border-[#0E0E7F] bg-background',
 				isTextBlock && 'border-[3px] border-[#187124] bg-background',
-				!isIntroductionBlock &&
-					!isResearchBlock &&
-					!isActionBlock &&
-					!isTextBlock &&
-					'border-2 border-gray-300 bg-background',
+			!isIntroductionBlock &&
+				!isResearchBlock &&
+				!isActionBlock &&
+				!isTextBlock &&
+				!isFullAutomatedBlock &&
+				'border-2 border-gray-300 bg-background',
+			isFullAutomatedBlock && 'border border-gray-300 bg-[#51A2E4]',
 			isTextBlock
 				? showTestPreview
 					? 'w-[426px] max-[480px]:w-[89.33vw] min-h-[44px]'
@@ -312,8 +314,8 @@ const SortableAIBlock = ({
 						  }`
 					: isFullAutomatedBlock
 					? showTestPreview
-						? 'w-[426px] max-[480px]:w-[89.33vw]'
-						: 'w-[89.33vw] max-w-[475px]'
+						? 'w-[426px] h-[233px] max-[480px]:w-[89.33vw]'
+						: 'w-[468px] h-[233px] max-[480px]:w-[89.33vw]'
 					: showTestPreview
 					? 'w-[426px] max-[480px]:w-[89.33vw]'
 					: 'w-[89.33vw] max-w-[475px]',
@@ -338,11 +340,12 @@ const SortableAIBlock = ({
 			>
 				{/* Drag handle */}
 				<div
-					{...attributes}
-					{...listeners}
+					{...(isFullAutomatedBlock ? {} : attributes)}
+					{...(isFullAutomatedBlock ? {} : listeners)}
 					data-drag-handle
 					className={cn(
-						'absolute top-0 left-0 cursor-move z-[1]',
+						'absolute top-0 left-0 z-[1]',
+						isFullAutomatedBlock ? 'cursor-default' : 'cursor-move',
 						isTextBlock
 							? showTestPreview
 								? 'h-[44px] w-[80px]'
@@ -374,7 +377,7 @@ const SortableAIBlock = ({
 								? 'p-0 h-full'
 								: 'p-2 h-full max-[480px]:py-[2px]'
 							: isFullAutomatedBlock
-							? 'pl-4 pr-0 pt-0 pb-4'
+							? 'p-0'
 							: isTextBlock
 							? 'px-4 pt-2 pb-4'
 							: 'p-4'
@@ -748,81 +751,94 @@ const SortableAIBlock = ({
 								{!isTextBlock && !isFullAutomatedBlock && <></>}
 								{/* Header background fill for Full Auto box */}
 								{isFullAutomatedBlock && (
-									<div className="w-[calc(100%+32px)] -mx-4 h-[29px] bg-[#B9DAF5] -mt-0 flex items-stretch">
-										{/* Full Auto label section */}
-										<div className="flex-1 flex items-center pl-[16px]">
-										<Typography
-											variant="h4"
-											className="font-inter font-semibold text-[17px] text-[#000000]"
-										>
-											Auto
-										</Typography>
+									<div className="w-full px-1 pt-1 pb-1">
+										<div className="rounded-t-[6px] overflow-hidden">
+											<div className="h-[27px] bg-[#B9DAF5] flex items-stretch">
+												{/* Full Auto label section */}
+												<div className="flex-1 flex items-center pl-[16px]">
+													<Typography
+														variant="h4"
+														className="font-inter font-semibold text-[17px] text-[#000000]"
+													>
+														Body
+													</Typography>
+												</div>
+												{/* Divider - black when Normal Power selected */}
+												<div
+													className={cn(
+														'w-[1px] flex-shrink-0 transition-colors',
+														selectedPowerMode === 'normal'
+															? 'bg-[#000000]'
+															: 'bg-[#51A2E4]'
+													)}
+												/>
+												{/* Normal Power section */}
+												<button
+													type="button"
+													onClick={() => setSelectedPowerMode('normal')}
+													className={cn(
+														'w-[101px] flex items-center justify-center cursor-pointer border-0 p-0 m-0 transition-colors flex-shrink-0 outline-none focus:outline-none',
+														selectedPowerMode === 'normal'
+															? 'bg-[#8DBFE8]'
+															: 'bg-transparent'
+													)}
+												>
+													<span
+														className={cn(
+															'font-inter font-normal italic text-[14px] transition-colors',
+															selectedPowerMode === 'normal'
+																? 'text-[#000000]'
+																: 'text-[#9E9E9E]'
+														)}
+													>
+														Normal Power
+													</span>
+												</button>
+												{/* Divider - black when either Normal Power or High selected */}
+												<div
+													className={cn(
+														'w-[1px] flex-shrink-0 transition-colors',
+														selectedPowerMode === 'normal' ||
+															selectedPowerMode === 'high'
+															? 'bg-[#000000]'
+															: 'bg-[#51A2E4]'
+													)}
+												/>
+												{/* High section */}
+												<button
+													type="button"
+													onClick={() => setSelectedPowerMode('high')}
+													className={cn(
+														'w-[46px] flex items-center justify-center cursor-pointer border-0 p-0 m-0 transition-colors flex-shrink-0 outline-none focus:outline-none',
+														selectedPowerMode === 'high'
+															? 'bg-[#8DBFE8]'
+															: 'bg-transparent'
+													)}
+												>
+													<span
+														className={cn(
+															'font-inter font-normal italic text-[14px] transition-colors',
+															selectedPowerMode === 'high'
+																? 'text-[#000000]'
+																: 'text-[#9E9E9E]'
+														)}
+													>
+														High
+													</span>
+												</button>
+												{/* Divider - black when High selected */}
+												<div
+													className={cn(
+														'w-[1px] flex-shrink-0 transition-colors',
+														selectedPowerMode === 'high'
+															? 'bg-[#000000]'
+															: 'bg-[#51A2E4]'
+													)}
+												/>
+												{/* Right empty section */}
+												<div className="w-[31px] flex-shrink-0" />
+											</div>
 										</div>
-										{/* Divider - black when Normal Power selected */}
-										<div
-											className={cn(
-												'w-[1px] flex-shrink-0 transition-colors',
-												selectedPowerMode === 'normal' ? 'bg-[#000000]' : 'bg-[#51A2E4]'
-											)}
-										/>
-										{/* Normal Power section */}
-										<button
-											type="button"
-											onClick={() => setSelectedPowerMode('normal')}
-											className={cn(
-												'w-[101px] flex items-center justify-center cursor-pointer border-0 p-0 m-0 transition-colors flex-shrink-0 outline-none focus:outline-none',
-												selectedPowerMode === 'normal' ? 'bg-[#8DBFE8]' : 'bg-transparent'
-											)}
-										>
-											<span
-												className={cn(
-													'font-inter font-normal italic text-[14px] transition-colors',
-													selectedPowerMode === 'normal'
-														? 'text-[#000000]'
-														: 'text-[#9E9E9E]'
-												)}
-											>
-												Normal Power
-											</span>
-										</button>
-										{/* Divider - black when either Normal Power or High selected */}
-										<div
-											className={cn(
-												'w-[1px] flex-shrink-0 transition-colors',
-												selectedPowerMode === 'normal' || selectedPowerMode === 'high'
-													? 'bg-[#000000]'
-													: 'bg-[#51A2E4]'
-											)}
-										/>
-										{/* High section */}
-										<button
-											type="button"
-											onClick={() => setSelectedPowerMode('high')}
-											className={cn(
-												'w-[46px] flex items-center justify-center cursor-pointer border-0 p-0 m-0 transition-colors flex-shrink-0 outline-none focus:outline-none',
-												selectedPowerMode === 'high' ? 'bg-[#8DBFE8]' : 'bg-transparent'
-											)}
-										>
-											<span
-												className={cn(
-													'font-inter font-normal italic text-[14px] transition-colors',
-													selectedPowerMode === 'high'
-														? 'text-[#000000]'
-														: 'text-[#9E9E9E]'
-												)}
-											>
-												High
-											</span>
-										</button>
-										{/* Divider - black when High selected */}
-										<div
-											className={cn(
-												'w-[1px] flex-shrink-0 transition-colors',
-												selectedPowerMode === 'high' ? 'bg-[#000000]' : 'bg-[#51A2E4]'
-											)}
-										/>
-										{/* Right empty section */}
-										<div className="w-[31px] flex-shrink-0" />
 									</div>
 								)}
 								{!isFullAutomatedBlock && (
@@ -860,25 +876,36 @@ const SortableAIBlock = ({
 										)}
 									</div>
 								)}
-								{/* Horizontal divider for Full Auto box */}
-								{isFullAutomatedBlock && (
-									<div className="w-[calc(100%+32px)] -mx-4 h-[1px] bg-[#51A2E4] mb-2" />
-								)}
 								{isFullAutomatedBlock ? (
-									<div className="min-h-[60px] w-full bg-white p-1 pr-4">
-										<div className="flex flex-wrap gap-1">
-											{profileChipItems.map((chip) => (
-												<span
-													key={chip.key}
-													className={cn(
-														'inline-flex items-center rounded-[6px] px-2 py-[1px] font-inter font-normal text-[12px] leading-[14px] max-[480px]:text-[10px] max-[480px]:leading-[12px] text-black max-w-full whitespace-nowrap',
-														chip.bgClass,
-														chip.isEmpty && 'opacity-50'
-													)}
-												>
-													{chip.text}
-												</span>
-											))}
+									<div className="min-h-[60px] w-full px-1 pb-1">
+										<div className="w-full bg-[#58A6E5] rounded-b-[6px] p-2 flex justify-center">
+											<div className="w-[448px] max-w-full flex flex-col items-start">
+												<div className="w-full h-[104px] bg-white rounded-[8px] border border-black px-2 pt-1 pb-2 overflow-y-auto overflow-x-hidden hide-native-scrollbar">
+													<div className="font-inter font-normal text-[13px] leading-[16px] text-black mb-[7px]">
+														Profile
+													</div>
+													<div className="flex flex-wrap gap-x-[6px] gap-y-[10px] content-start">
+														{profileChipItems.map((chip) => (
+															<span
+																key={chip.key}
+																className={cn(
+																	'inline-flex items-center rounded-[5px] px-[5px] py-[0.5px] font-inter font-normal text-[10px] leading-[12px] max-[480px]:text-[8px] max-[480px]:leading-[10px] text-black max-w-full whitespace-nowrap',
+																	chip.bgClass,
+																	chip.isEmpty && 'opacity-50'
+																)}
+															>
+																{chip.text}
+															</span>
+														))}
+													</div>
+												</div>
+
+												{/* Booking For box (203 x 28px) */}
+												<div className="mt-[10px] w-[203px] h-[28px] bg-white rounded-[8px] border-2 border-black" />
+
+												{/* Custom Instructions box (157 x 22px) */}
+												<div className="mt-[14px] w-[157px] h-[22px] bg-[#95CFFF] rounded-[8px] border-2 border-black" />
+											</div>
 										</div>
 									</div>
 								) : (
@@ -1710,7 +1737,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														type="button"
 														onClick={() => setActiveTab('profile')}
 														className={cn(
-															"absolute left-0 top-0 h-full w-[130px] flex items-center justify-center font-inter font-semibold text-[13px] max-[480px]:text-[14px] z-30 cursor-pointer bg-transparent transition-colors border-r-[3px] border-r-black border-t-0 border-b-0 border-l-0",
+															"absolute left-0 -top-[3px] h-[calc(100%+3px)] w-[130px] flex items-center justify-center font-inter font-semibold text-[13px] max-[480px]:text-[14px] z-30 cursor-pointer bg-transparent transition-colors border-r-[3px] border-r-black border-t-0 border-b-0 border-l-0",
 															activeTab === 'profile'
 																? 'text-black bg-[#A6E2A8] hover:bg-[#A6E2A8]'
 																: showRedWarning
@@ -1803,7 +1830,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 											)}
 										</div>
 										{activeTab !== 'profile' && (
-											<div className="flex flex-col items-center pt-[10px] max-[480px]:pt-[8px]">
+											<div className="flex flex-col items-center pt-[38px] max-[480px]:pt-[38px]">
 												<FormField
 													control={form.control}
 													name="subject"
@@ -1813,95 +1840,98 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 															className={cn(
 																showTestPreview
 																	? 'w-[426px] max-[480px]:w-[89.33vw]'
-																	: 'w-[89.33vw] max-w-[475px]',
+																	: 'w-[89.33vw] max-w-[468px]',
 																// Remove default margin to control spacing to content below
 																'mb-0'
 															)}
 														>
 															<FormControl>
-																<div
-																	className={cn(
-																		'flex items-center h-[31px] max-[480px]:h-[24px] rounded-[8px] border-2 border-black overflow-hidden subject-bar',
-																		form.watch('isAiSubject') ? 'bg-[#F1F1F1]' : 'bg-white'
-																	)}
-																>
+																{form.watch('isAiSubject') ? (
+																	// Compact 110px bar when auto mode is on
+																	<div className="flex items-center gap-2">
+																		<div
+																			className={cn(
+																				'flex items-center justify-center h-[31px] max-[480px]:h-[24px] rounded-[8px] border-2 border-black overflow-hidden subject-bar w-[110px]'
+																			)}
+																			style={{ backgroundColor: '#E0E0E0' }}
+																		>
+																			<span className="font-inter font-medium text-[18px] max-[480px]:text-[12px] whitespace-nowrap text-black subject-label">
+																				Subject
+																			</span>
+																		</div>
+																		<span className="font-inter font-normal text-[13px] text-[#000000]">
+																			Auto
+																		</span>
+																	</div>
+																) : (
+																	// Full bar when auto mode is off
 																	<div
 																		className={cn(
-																			'pl-2 flex items-center h-full shrink-0 w-[120px]',
-																			'bg-white'
+																			'flex items-center h-[31px] max-[480px]:h-[24px] rounded-[8px] border-2 border-black overflow-hidden subject-bar bg-white'
 																		)}
 																	>
-																		<span className="font-inter font-semibold text-[17px] max-[480px]:text-[12px] whitespace-nowrap text-black subject-label">
-																			{form.watch('isAiSubject')
-																				? 'Auto Subject'
-																				: 'Subject'}
-																		</span>
-																	</div>
-
-																	<button
-																		type="button"
-																		onClick={() => {
-																			if (!isHandwrittenMode) {
-																				const newValue = !form.watch('isAiSubject');
-																				form.setValue('isAiSubject', newValue);
-																				if (newValue) {
-																					form.setValue('subject', '');
-																				}
-																			}
-																		}}
-																		disabled={isHandwrittenMode}
-																		className={cn(
-																			'relative h-full flex items-center text-[12px] font-inter font-normal transition-colors shrink-0 subject-toggle',
-																			form.watch('isAiSubject')
-																				? 'w-auto px-3 justify-center bg-[#5dab68] text-white'
-																				: 'w-[100px] px-2 justify-center text-black bg-[#DADAFC] hover:bg-[#C4C4F5] active:bg-[#B0B0E8] -translate-x-[30px]',
-																			isHandwrittenMode && 'opacity-50 cursor-not-allowed'
-																		)}
-																	>
-																		<span className="absolute left-0 h-full border-l border-black"></span>
-																		<span>
-																			{form.watch('isAiSubject') ? 'on' : 'Auto off'}
-																		</span>
-																		<span className="absolute right-0 h-full border-r border-black"></span>
-																	</button>
-
-																	<div className={cn('flex-grow h-full', 'bg-white')}>
-																		<Input
-																			{...field}
+																		<div
 																			className={cn(
-																				'w-full h-full !bg-transparent pl-4 pr-3 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 max-[480px]:placeholder:text-[10px] max-[480px]:!transition-none max-[480px]:!duration-0',
-																				form.watch('isAiSubject')
-																					? '!text-[#969696] placeholder:!text-[#969696]'
-																					: shouldShowSubjectRedStyling
-																					? '!text-[#A20000] placeholder:!text-[#A20000]'
-																					: '!text-black placeholder:!text-black',
-																				!form.watch('isAiSubject') && 'max-[480px]:pl-2'
+																				'pl-2 flex items-center h-full shrink-0 w-[120px]',
+																				'bg-white'
 																			)}
-																			placeholder={
-																				form.watch('isAiSubject')
-																					? 'Automated Subject Line'
-																					: 'Write your subject here. *required'
-																			}
-																			disabled={form.watch('isAiSubject')}
-																			onFocus={(e) =>
-																				!form.watch('isAiSubject') &&
-																				trackFocusedField?.('subject', e.target)
-																			}
-																			onBlur={() => {
-																				if (!form.watch('isAiSubject')) {
-																					setHasSubjectBeenTouched(true);
+																		>
+																			<span className="font-inter font-semibold text-[17px] max-[480px]:text-[12px] whitespace-nowrap text-black subject-label">
+																				Subject
+																			</span>
+																		</div>
+
+																		<button
+																			type="button"
+																			onClick={() => {
+																				if (!isHandwrittenMode) {
+																					const newValue = !form.watch('isAiSubject');
+																					form.setValue('isAiSubject', newValue);
+																					if (newValue) {
+																						form.setValue('subject', '');
+																					}
 																				}
-																				field.onBlur();
 																			}}
-																			onChange={(e) => {
-																				if (!form.watch('isAiSubject') && e.target.value) {
-																					setHasSubjectBeenTouched(true);
+																			disabled={isHandwrittenMode}
+																			className={cn(
+																				'relative h-full flex items-center text-[12px] font-inter font-normal transition-colors shrink-0 subject-toggle',
+																				'w-[100px] px-2 justify-center text-black bg-[#DADAFC] hover:bg-[#C4C4F5] active:bg-[#B0B0E8] -translate-x-[30px]',
+																				isHandwrittenMode && 'opacity-50 cursor-not-allowed'
+																			)}
+																		>
+																			<span className="absolute left-0 h-full border-l border-black"></span>
+																			<span>Auto off</span>
+																			<span className="absolute right-0 h-full border-r border-black"></span>
+																		</button>
+
+																		<div className={cn('flex-grow h-full', 'bg-white')}>
+																			<Input
+																				{...field}
+																				className={cn(
+																					'w-full h-full !bg-transparent pl-4 pr-3 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 max-[480px]:placeholder:text-[10px] max-[480px]:!transition-none max-[480px]:!duration-0',
+																					shouldShowSubjectRedStyling
+																						? '!text-[#A20000] placeholder:!text-[#A20000]'
+																						: '!text-black placeholder:!text-black',
+																					'max-[480px]:pl-2'
+																				)}
+																				placeholder="Write your subject here. *required"
+																				onFocus={(e) =>
+																					trackFocusedField?.('subject', e.target)
 																				}
-																				field.onChange(e);
-																			}}
-																		/>
+																				onBlur={() => {
+																					setHasSubjectBeenTouched(true);
+																					field.onBlur();
+																				}}
+																				onChange={(e) => {
+																					if (e.target.value) {
+																						setHasSubjectBeenTouched(true);
+																					}
+																					field.onChange(e);
+																				}}
+																			/>
+																		</div>
 																	</div>
-																</div>
+																)}
 															</FormControl>
 															<FormMessage />
 														</FormItem>
