@@ -96,6 +96,20 @@ export const DraftPreviewExpandedList: FC<DraftPreviewExpandedListProps> = ({
 		return convertHtmlToPlainText(fallbackDraft?.message || '');
 	}, [useLive, livePreview?.message, fallbackDraft?.message]);
 
+	// Check if message contains anchor tags - if so, render as HTML to show links
+	const hasLinks = useMemo(() => {
+		const messageToCheck = useLive ? livePreview?.message : fallbackDraft?.message;
+		return /<a\s+[^>]*href=/i.test(messageToCheck || '');
+	}, [useLive, livePreview?.message, fallbackDraft?.message]);
+
+	// Get raw HTML message for rendering when links are present
+	const rawHtmlMessage = useMemo(() => {
+		if (useLive) {
+			return livePreview?.message || '';
+		}
+		return fallbackDraft?.message || '';
+	}, [useLive, livePreview?.message, fallbackDraft?.message]);
+
 	const subjectLine = useMemo(() => {
 		if (useLive) {
 			return livePreview?.subject || '';
@@ -281,9 +295,17 @@ export const DraftPreviewExpandedList: FC<DraftPreviewExpandedListProps> = ({
 						alwaysShow
 						lockHorizontalScroll
 					>
-						<div className="p-3 whitespace-pre-wrap text-[11px] leading-[1.4]">
-							{plainMessage || 'No content'}
-						</div>
+						{hasLinks ? (
+							<div 
+								className="p-3 text-[11px] leading-[1.4] draft-preview-content"
+								style={{ wordBreak: 'break-word' }}
+								dangerouslySetInnerHTML={{ __html: rawHtmlMessage || 'No content' }}
+							/>
+						) : (
+							<div className="p-3 whitespace-pre-wrap text-[11px] leading-[1.4]">
+								{plainMessage || 'No content'}
+							</div>
+						)}
 					</CustomScrollbar>
 				)}
 				</div>

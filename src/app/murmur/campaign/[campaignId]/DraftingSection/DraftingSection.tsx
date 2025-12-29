@@ -8,7 +8,16 @@ import { HybridPromptInput } from '@/components/molecules/HybridPromptInput/Hybr
 import { UpgradeSubscriptionDrawer } from '@/components/atoms/UpgradeSubscriptionDrawer/UpgradeSubscriptionDrawer';
 // EmailGeneration kept available but not used in current view
 // import { EmailGeneration } from './EmailGeneration/EmailGeneration';
-import { cn, stringifyJsonSubset, generateEmailTemplateFromBlocks, generatePromptsFromBlocks, removeEmDashes, convertAiResponseToRichTextEmail } from '@/utils';
+import {
+	cn,
+	stringifyJsonSubset,
+	generateEmailTemplateFromBlocks,
+	generatePromptsFromBlocks,
+	removeEmDashes,
+	stripEmailSignatureFromAiMessage,
+	convertAiResponseToRichTextEmail,
+	convertHtmlToPlainText,
+} from '@/utils';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { useDebounce } from '@/hooks/useDebounce';
 import DraftingStatusPanel from '@/app/murmur/campaign/[campaignId]/DraftingSection/Testing/DraftingStatusPanel';
@@ -58,7 +67,12 @@ import { getStateAbbreviation } from '@/utils/string';
 import { stateBadgeColorMap } from '@/constants/ui';
 import { useGemini } from '@/hooks/useGemini';
 import { useOpenRouter } from '@/hooks/useOpenRouter';
-import { FULL_AI_DRAFTING_SYSTEM_PROMPT, GEMINI_HYBRID_PROMPT, OPENROUTER_DRAFTING_MODELS } from '@/constants/ai';
+import {
+	FULL_AI_DRAFTING_SYSTEM_PROMPT,
+	GEMINI_HYBRID_PROMPT,
+	OPENROUTER_DRAFTING_MODELS,
+	insertWebsiteLinkPhrase,
+} from '@/constants/ai';
 import { Contact, Identity } from '@prisma/client';
 import BottomHomeIcon from '@/components/atoms/_svg/BottomHomeIcon';
 import BottomArrowIcon from '@/components/atoms/_svg/BottomArrowIcon';
@@ -938,12 +952,24 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 
 				const cleanedSubject = removeEmDashes(parsed.subject);
 				const cleanedMessageText = removeEmDashes(parsed.message);
+				const cleanedMessageNoSignature = stripEmailSignatureFromAiMessage(cleanedMessageText, {
+					senderName: campaign.identity?.name ?? null,
+					senderBandName: campaign.identity?.bandName ?? null,
+				});
 
 				const signatureText = values.signature || `Thank you,\n${campaign.identity?.name || ''}`;
 				const font = values.font || 'Arial';
 
+				let processedMessageText = cleanedMessageNoSignature;
+				if (campaign.identity?.website) {
+					processedMessageText = insertWebsiteLinkPhrase(
+						processedMessageText,
+						campaign.identity.website
+					);
+				}
+
 				const richTextMessage = convertAiResponseToRichTextEmail(
-					cleanedMessageText,
+					processedMessageText,
 					font,
 					signatureText
 				);
@@ -959,8 +985,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 				queryClient.invalidateQueries({ queryKey: ['emails'] });
 
 				toast.success('Draft regenerated successfully');
-				const messageWithSignature = `${cleanedMessageText}\n\n${signatureText}`;
-				return { subject: cleanedSubject, message: messageWithSignature };
+				const messageForUi = convertHtmlToPlainText(richTextMessage);
+				return { subject: cleanedSubject, message: messageForUi };
 			} catch (error) {
 				console.error('[Regenerate] Error:', error);
 				toast.error('Failed to regenerate draft');

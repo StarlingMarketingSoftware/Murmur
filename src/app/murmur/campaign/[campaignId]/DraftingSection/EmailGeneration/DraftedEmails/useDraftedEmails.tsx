@@ -14,6 +14,9 @@ const plainTextToHtml = (text: string) =>
 		})
 		.join('');
 
+// Check if HTML contains hyperlinks
+const hasHyperlinks = (html: string) => /<a\s+[^>]*href=/i.test(html);
+
 export interface DraftedEmailsProps {
 	contacts: ContactWithName[];
 	selectedDraftIds: Set<number>;
@@ -130,8 +133,13 @@ export const useDraftedEmails = (props: DraftedEmailsProps) => {
 		// Double click - open editor (legacy behavior)
 		setSelectedDraft(draft);
 		setEditedSubject(draft.subject || '');
-		const plainMessage = convertHtmlToPlainText(draft.message);
-		setEditedMessage(plainMessage);
+		// Preserve HTML for drafts with links, otherwise convert to plain text
+		if (hasHyperlinks(draft.message)) {
+			setEditedMessage(draft.message);
+		} else {
+			const plainMessage = convertHtmlToPlainText(draft.message);
+			setEditedMessage(plainMessage);
+		}
 	};
 
 	const handleSelectAllDrafts = (targetDrafts?: EmailWithRelations[]) => {
@@ -177,12 +185,15 @@ export const useDraftedEmails = (props: DraftedEmailsProps) => {
 		}
 
 		const nextSubject = selectedDraft.subject || '';
-		const plainMessage = convertHtmlToPlainText(selectedDraft.message);
+		// Preserve HTML for drafts with links, otherwise convert to plain text
+		const messageContent = hasHyperlinks(selectedDraft.message)
+			? selectedDraft.message
+			: convertHtmlToPlainText(selectedDraft.message);
 		setEditedSubject(nextSubject);
-		setEditedMessage(plainMessage);
+		setEditedMessage(messageContent);
 		lastSavedValuesRef.current = {
 			subject: nextSubject,
-			message: plainMessage,
+			message: messageContent,
 		};
 	}, [selectedDraft]);
 
@@ -195,7 +206,11 @@ export const useDraftedEmails = (props: DraftedEmailsProps) => {
 			if (!selectedDraft) return;
 
 			try {
-				const htmlMessage = plainTextToHtml(messageToSave);
+				// If message already contains HTML (has links), use it directly
+				// Otherwise, convert plain text to HTML
+				const htmlMessage = hasHyperlinks(messageToSave)
+					? messageToSave
+					: plainTextToHtml(messageToSave);
 				await updateEmail({
 					id: selectedDraft.id.toString(),
 					data: {
