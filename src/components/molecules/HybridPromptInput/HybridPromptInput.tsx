@@ -70,6 +70,7 @@ interface SortableAIBlockProps {
 		bio: string;
 		links: string;
 	} | null;
+	isDragDisabled?: boolean;
 }
 
 const SortableAIBlock = ({
@@ -83,9 +84,10 @@ const SortableAIBlock = ({
 	showTestPreview,
 	onGetSuggestions,
 	profileFields,
+	isDragDisabled = false,
 }: SortableAIBlockProps) => {
 	const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
-		useSortable({ id });
+		useSortable({ id, disabled: isDragDisabled });
 	const form = useFormContext<DraftingFormValues>();
 	// Track if the text field has been touched (user has interacted with it)
 	const [hasBeenTouched, setHasBeenTouched] = useState(false);
@@ -543,12 +545,12 @@ const SortableAIBlock = ({
 			>
 				{/* Drag handle */}
 				<div
-					{...(isFullAutomatedBlock ? {} : attributes)}
-					{...(isFullAutomatedBlock ? {} : listeners)}
+					{...(!isFullAutomatedBlock && !isDragDisabled ? attributes : {})}
+					{...(!isFullAutomatedBlock && !isDragDisabled ? listeners : {})}
 					data-drag-handle
 					className={cn(
 						'absolute top-0 left-0 z-[1]',
-						isFullAutomatedBlock ? 'cursor-default' : 'cursor-move',
+						isFullAutomatedBlock || isDragDisabled ? 'cursor-default' : 'cursor-move',
 						isTextBlock
 							? showTestPreview
 								? 'h-[44px] w-[80px]'
@@ -1871,6 +1873,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 				: 'hybrid',
 		[modeOverride, isFullSelected, isManualSelected]
 	);
+	const isHybridModeSelected = selectedModeKey === 'hybrid';
 
 	const switchToFull = () => {
 		const current: {
@@ -2340,6 +2343,12 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 
 	const isMobile = useIsMobile();
 
+	// In Hybrid mode, the "+ Text" buttons intentionally sit slightly outside the main box.
+	// The scroll container (`overflow-y-auto`) will clip horizontal overflow, so we add a
+	// Hybrid-only right gutter to the scroll container so those buttons remain visible.
+	const shouldEnableHybridPlusGutter =
+		!compactLeftOnly && activeTab === 'main' && selectedModeKey === 'hybrid' && !showTestPreview;
+
 	// Mobile-only: measure to start overlay exactly at the big divider line under Mode
 	useLayoutEffect(() => {
 		if (!isMobile || showTestPreview) {
@@ -2401,7 +2410,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 								compactLeftOnly
 									? 'flex-col'
 									: 'w-[96.27vw] max-w-[499px] h-[703px] transition flex mx-auto flex-col border-[3px] border-transparent rounded-[8px] bg-[#A6E2A8]'
-							} relative overflow-visible`}
+							} relative overflow-visible isolate`}
 							style={!compactLeftOnly ? { backgroundColor: '#A6E2A8' } : undefined}
 							data-campaign-main-box={compactLeftOnly ? undefined : 'writing'}
 							data-hpi-container
@@ -2427,7 +2436,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 										background:
 											'linear-gradient(to bottom, rgba(222,242,225,0.71) 0%, rgba(222,242,225,0.5) 40%, rgba(222,242,225,0.25) 80%, rgba(222,242,225,0.15) 100%)',
 										pointerEvents: 'none',
-										zIndex: 0,
+										zIndex: -1,
 										// Square off the top corners so the fill meets the border flush on mobile
 										borderTopLeftRadius: 0,
 										borderTopRightRadius: 0,
@@ -2443,7 +2452,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 								dragHandleSelector="[data-left-drag-handle]"
 								enabled={false}
 								onDropOver={() => {}}
-								className="relative z-10 flex flex-col flex-1 min-h-0"
+								className="relative flex flex-col flex-1 min-h-0"
 							>
 								<div
 									className={cn(
@@ -2451,7 +2460,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 										compactLeftOnly
 											? 'w-[350px]'
 											: 'w-full min-h-0 pt-0 max-[480px]:pt-[1px] px-0 pb-0 flex-1',
-										'relative z-10'
+										'relative'
 									)}
 									data-hpi-left-panel
 								>
@@ -2519,6 +2528,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																style={highlightStyle}
 																isInitialRender={isInitialRender}
 																mode={selectedModeKey as 'full' | 'hybrid' | 'manual'}
+															disabled={isHybridModeSelected}
 															/>
 														)}
 													</DndContext>
@@ -2679,7 +2689,10 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 										)}
 									</div>
 								<div
-									className="flex-1 min-h-0 flex flex-col overflow-y-auto hide-native-scrollbar"
+									className={cn(
+										'flex-1 min-h-0 flex flex-col overflow-y-auto hide-native-scrollbar',
+										shouldEnableHybridPlusGutter && 'w-[calc(100%_+_90px)] -mr-[90px]'
+									)}
 									data-hpi-content
 								>
 									{/* Profile Tab Content */}
@@ -2891,7 +2904,12 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 									)}
 									{/* Main Content area */}
 									{activeTab === 'main' && (
-									<div className="pt-[20px] max-[480px]:pt-[8px] pr-3 pb-3 pl-3 flex flex-col gap-4 items-center flex-1">
+									<div
+										className={cn(
+											'pt-[20px] max-[480px]:pt-[8px] pr-3 pb-3 pl-3 flex flex-col gap-4 items-center flex-1',
+											shouldEnableHybridPlusGutter && 'w-[calc(100%_-_90px)]'
+										)}
+									>
 										{fields.length === 0 && (
 											<span className="text-gray-300 font-primary text-[12px]">
 												Add blocks here to build your prompt...
@@ -3055,13 +3073,14 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																		testMessage={testMessage}
 																		onGetSuggestions={onGetSuggestions}
 																		profileFields={profileFields}
+																		isDragDisabled={isHybridModeSelected}
 																	/>
 																</div>
 																{/* Plus button under hybrid blocks */}
 																{isHybridBlock && !hasImmediateTextBlock && (
 																	<div
 																		className={cn(
-																			'flex relative z-30',
+																			'flex relative z-[70]',
 																			showTestPreview
 																				? 'justify-start w-full'
 																				: 'justify-end -mr-[85px] w-[93.7vw] max-w-[475px] max-[480px]:-mr-[2vw]'

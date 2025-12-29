@@ -6,15 +6,18 @@ interface DraggableHighlightProps {
 	style: React.CSSProperties;
 	isInitialRender: boolean;
 	mode?: 'full' | 'hybrid' | 'manual';
+	disabled?: boolean;
 }
 
 export const DraggableHighlight = ({
 	style,
 	isInitialRender,
 	mode = 'full',
+	disabled = false,
 }: DraggableHighlightProps) => {
 	const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
 		id: 'mode-highlight',
+		disabled,
 	});
 
 	const combinedStyle = {
@@ -43,10 +46,10 @@ export const DraggableHighlight = ({
 		<div
 			ref={setNodeRef}
 			style={combinedStyle}
-			{...listeners}
-			{...attributes}
+			{...(!disabled ? listeners : {})}
+			{...(!disabled ? attributes : {})}
 			className={`absolute top-1/2 -translate-y-1/2 z-10 rounded-[8px] ${
-				isDragging ? 'cursor-grabbing' : 'cursor-grab'
+				disabled ? 'cursor-default' : isDragging ? 'cursor-grabbing' : 'cursor-grab'
 			}`}
 		>
 			<div
