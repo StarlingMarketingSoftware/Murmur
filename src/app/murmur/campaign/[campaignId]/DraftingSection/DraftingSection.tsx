@@ -2379,13 +2379,12 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												onMouseLeave={() => setIsSuggestionBoxHovered(false)}
 												style={{
 													width: '405px',
-													height: '319px',
+													height: '348px',
 													position: 'absolute',
 													top: '115px',
 													left: '-15px',
 													zIndex: 10,
-													background:
-														'linear-gradient(to bottom, #FFFFFF 28px, #D6EFD7 28px)',
+													backgroundColor: '#D6EEEF',
 													border: '2px solid #000000',
 													borderRadius: '7px',
 													overflow: 'hidden',
@@ -2407,51 +2406,39 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												<div
 													style={{
 														position: 'absolute',
-														top: '34px',
+														top: '26px',
 														left: '50%',
 														transform: 'translateX(-50%)',
 														width: '369px',
-														height: '44px',
+														height: '25px',
 														backgroundColor: '#FFFFFF',
 														border: '2px solid #000000',
-														borderRadius: '7px',
+														borderRadius: '5px',
+														boxSizing: 'border-box',
+														display: 'flex',
+														alignItems: 'center',
+														gap: '10px',
+														paddingLeft: '8px',
+														paddingRight: '8px',
 													}}
 												>
-													{/* Score label */}
+													{/* Progress bar (223 x 12) */}
 													<div
 														style={{
-															position: 'absolute',
-															top: '6px',
-															left: '10px',
-															fontFamily: 'Inter, system-ui, sans-serif',
-															fontWeight: 700,
-															fontSize: '12px',
-															lineHeight: '14px',
-															color: '#000000',
-														}}
-													>
-														{promptScoreDisplayLabel}
-													</div>
-													{/* Small box inside (progress track) */}
-													<div
-														style={{
-															position: 'absolute',
-															bottom: '3px',
-															left: '4px',
 															width: '223px',
 															height: '12px',
 															backgroundColor: '#FFFFFF',
 															border: '2px solid #000000',
 															borderRadius: '8px',
 															overflow: 'hidden',
+															flexShrink: 0,
+															boxSizing: 'border-box',
+															position: 'relative',
 														}}
 													>
 														<div
 															style={{
-																position: 'absolute',
-																top: 0,
-																bottom: 0,
-																left: 0,
+																height: '100%',
 																borderRadius: '999px',
 																backgroundColor: '#36B24A',
 																width: `${promptScoreFillPercent}%`,
@@ -2459,6 +2446,24 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																transition: 'width 250ms ease-out',
 															}}
 														/>
+													</div>
+													{/* Rating label */}
+													<div
+														style={{
+															fontFamily: 'Inter, system-ui, sans-serif',
+															fontWeight: 700,
+															fontSize: '12px',
+															lineHeight: '14px',
+															color: '#000000',
+															whiteSpace: 'nowrap',
+															overflow: 'hidden',
+															textOverflow: 'ellipsis',
+															flex: 1,
+															minWidth: 0,
+															textAlign: 'right',
+														}}
+													>
+														{promptScoreDisplayLabel}
 													</div>
 												</div>
 												{/* Small box below the first inner box */}
@@ -2470,7 +2475,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													}}
 													style={{
 														position: 'absolute',
-														top: '83px',
+														top: '61px',
 														left: '22px',
 														width: '39px',
 														height: '32px',
@@ -2481,7 +2486,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														alignItems: 'center',
 														justifyContent: 'center',
 														cursor: hasPreviousPrompt ? 'pointer' : 'not-allowed',
-														opacity: hasPreviousPrompt ? 1 : 0.5,
 													}}
 												>
 													<UndoIcon width="24" height="24" />
@@ -2495,9 +2499,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													}}
 													style={{
 														position: 'absolute',
-														top: '83px',
+														top: '61px',
 														left: '66px',
-														width: '196px',
+														width: '233px',
 														height: '32px',
 														backgroundColor: '#D7F0FF',
 														border: '2px solid #000000',
@@ -2519,7 +2523,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 															lineHeight: '1',
 														}}
 													>
-														{isUpscalingPrompt ? 'Upscaling...' : 'Upscale Prompt'}
+														{isUpscalingPrompt ? 'Upscaling...' : 'Upscale Instructions'}
 													</span>
 													<div style={{ flexShrink: 0 }}>
 														<UpscaleIcon width="24" height="24" />
@@ -2529,22 +2533,22 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												<div
 													style={{
 														position: 'absolute',
-														top: '123px', // 83px + 32px + 8px
+														top: '147px', // bottom-aligned: 348 - 17 - (56*3 + 8*2) = 147
 														left: '50%',
 														transform: 'translateX(-50%)',
 														width: '362px',
 														height: '56px',
-														backgroundColor: '#A6E0B4',
+														backgroundColor: '#A6DDE0',
 														border: '2px solid #000000',
 														borderRadius: '8px',
 													}}
 												>
 													{/* Section indicator */}
 													<div
-														className="absolute font-inter font-bold"
+														className="absolute font-inter font-bold tabular-nums"
 														style={{
 															top: '4.5px',
-															left: '8px',
+															left: '5px',
 															fontSize: '11.5px',
 															color: '#000000',
 														}}
@@ -2590,22 +2594,22 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												<div
 													style={{
 														position: 'absolute',
-														top: '187px', // 123px + 56px + 8px
+														top: '211px', // 147px + 56px + 8px
 														left: '50%',
 														transform: 'translateX(-50%)',
 														width: '362px',
 														height: '56px',
-														backgroundColor: '#5BCB75',
+														backgroundColor: '#5BB9CB',
 														border: '2px solid #000000',
 														borderRadius: '8px',
 													}}
 												>
 													{/* Section indicator */}
 													<div
-														className="absolute font-inter font-bold"
+														className="absolute font-inter font-bold tabular-nums"
 														style={{
 															top: '4.5px',
-															left: '8px',
+															left: '5px',
 															fontSize: '11.5px',
 															color: '#000000',
 														}}
@@ -2651,22 +2655,22 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												<div
 													style={{
 														position: 'absolute',
-														top: '251px', // 187px + 56px + 8px
+														top: '275px', // 211px + 56px + 8px
 														left: '50%',
 														transform: 'translateX(-50%)',
 														width: '362px',
 														height: '56px',
-														backgroundColor: '#359D4D',
+														backgroundColor: '#35859D',
 														border: '2px solid #000000',
 														borderRadius: '8px',
 													}}
 												>
 													{/* Section indicator */}
 													<div
-														className="absolute font-inter font-bold"
+														className="absolute font-inter font-bold tabular-nums"
 														style={{
 															top: '4.5px',
-															left: '8px',
+															left: '5px',
 															fontSize: '11.5px',
 															color: '#000000',
 														}}
@@ -5766,8 +5770,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											style={{
 												width: '330px',
 												height: '347px',
-												background:
-													'linear-gradient(to bottom, #FFFFFF 28px, #D6EFD7 28px)',
+												backgroundColor: '#D6EEEF',
 												border: '3px solid #000000',
 												borderRadius: '7px',
 												position: 'relative',
@@ -5788,49 +5791,38 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											<div
 												style={{
 													position: 'absolute',
-													top: '34px',
+													top: '26px',
 													left: '50%',
 													transform: 'translateX(-50%)',
 													width: '322px',
-													height: '44px',
+													height: '25px',
 													backgroundColor: '#FFFFFF',
 													border: '2px solid #000000',
-													borderRadius: '7px',
+													borderRadius: '5px',
+													boxSizing: 'border-box',
+													display: 'flex',
+													alignItems: 'center',
+													gap: '10px',
+													paddingLeft: '8px',
+													paddingRight: '8px',
 												}}
 											>
 												<div
 													style={{
-														position: 'absolute',
-														top: '6px',
-														left: '10px',
-														fontFamily: 'Inter, system-ui, sans-serif',
-														fontWeight: 700,
-														fontSize: '12px',
-														lineHeight: '14px',
-														color: '#000000',
-													}}
-												>
-													{promptScoreDisplayLabel}
-												</div>
-												<div
-													style={{
-														position: 'absolute',
-														bottom: '3px',
-														left: '4px',
 														width: '223px',
 														height: '12px',
 														backgroundColor: '#FFFFFF',
 														border: '2px solid #000000',
 														borderRadius: '8px',
 														overflow: 'hidden',
+														flexShrink: 0,
+														boxSizing: 'border-box',
+														position: 'relative',
 													}}
 												>
 													<div
 														style={{
-															position: 'absolute',
-															top: 0,
-															bottom: 0,
-															left: 0,
+															height: '100%',
 															borderRadius: '999px',
 															backgroundColor: '#36B24A',
 															width: `${promptScoreFillPercent}%`,
@@ -5838,6 +5830,23 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 															transition: 'width 250ms ease-out',
 														}}
 													/>
+												</div>
+												<div
+													style={{
+														fontFamily: 'Inter, system-ui, sans-serif',
+														fontWeight: 700,
+														fontSize: '12px',
+														lineHeight: '14px',
+														color: '#000000',
+														whiteSpace: 'nowrap',
+														overflow: 'hidden',
+														textOverflow: 'ellipsis',
+														flex: 1,
+														minWidth: 0,
+														textAlign: 'right',
+													}}
+												>
+													{promptScoreDisplayLabel}
 												</div>
 											</div>
 											<div
@@ -5848,7 +5857,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												}}
 												style={{
 													position: 'absolute',
-													top: '83px',
+													top: '61px',
 													left: '6px',
 													width: '39px',
 													height: '32px',
@@ -5859,7 +5868,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													alignItems: 'center',
 													justifyContent: 'center',
 													cursor: hasPreviousPrompt ? 'pointer' : 'not-allowed',
-													opacity: hasPreviousPrompt ? 1 : 0.5,
 												}}
 											>
 												{clampedPromptScore != null && <UndoIcon width="24" height="24" />}
@@ -5872,9 +5880,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												}}
 												style={{
 													position: 'absolute',
-													top: '83px',
+													top: '61px',
 													left: '50px',
-													width: '155px',
+													width: '233px',
 													height: '32px',
 													backgroundColor: '#D7F0FF',
 													border: '2px solid #000000',
@@ -5898,7 +5906,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																lineHeight: '1',
 															}}
 														>
-															{isUpscalingPrompt ? 'Upscaling...' : 'Upscale Prompt'}
+															{isUpscalingPrompt ? 'Upscaling...' : 'Upscale Instructions'}
 														</span>
 														<div style={{ flexShrink: 0 }}>
 															<UpscaleIcon width="20" height="20" />
@@ -5910,22 +5918,22 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											<div
 												style={{
 													position: 'absolute',
-													top: '123px',
+													top: '176px',
 													left: '50%',
 													transform: 'translateX(-50%)',
 													width: '315px',
 													height: '46px',
-													backgroundColor: '#A6E0B4',
+													backgroundColor: '#A6DDE0',
 													border: '2px solid #000000',
 													borderRadius: '8px',
 													overflow: 'hidden',
 												}}
 											>
 												<div
-													className="absolute font-inter font-bold"
+													className="absolute font-inter font-bold tabular-nums"
 													style={{
 														top: '4.5px',
-														left: '8px',
+														left: '5px',
 														fontSize: '11.5px',
 														color: '#000000',
 													}}
@@ -5941,7 +5949,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														right: '6px',
 														width: '260px',
 														height: '39px',
-														backgroundColor: clampedPromptScore == null ? '#A6E0B4' : '#FFFFFF',
+														backgroundColor: clampedPromptScore == null ? '#A6DDE0' : '#FFFFFF',
 														border: '2px solid #000000',
 														borderRadius: '8px',
 														display: 'flex',
@@ -5973,22 +5981,22 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											<div
 												style={{
 													position: 'absolute',
-													top: '187px',
+													top: '230px',
 													left: '50%',
 													transform: 'translateX(-50%)',
 													width: '315px',
 													height: '46px',
-													backgroundColor: '#5BCB75',
+													backgroundColor: '#5BB9CB',
 													border: '2px solid #000000',
 													borderRadius: '8px',
 													overflow: 'hidden',
 												}}
 											>
 												<div
-													className="absolute font-inter font-bold"
+													className="absolute font-inter font-bold tabular-nums"
 													style={{
 														top: '4.5px',
-														left: '8px',
+														left: '5px',
 														fontSize: '11.5px',
 														color: '#000000',
 													}}
@@ -6004,7 +6012,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														right: '6px',
 														width: '260px',
 														height: '39px',
-														backgroundColor: clampedPromptScore == null ? '#5BCB75' : '#FFFFFF',
+														backgroundColor: clampedPromptScore == null ? '#5BB9CB' : '#FFFFFF',
 														border: '2px solid #000000',
 														borderRadius: '8px',
 														display: 'flex',
@@ -6036,22 +6044,22 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											<div
 												style={{
 													position: 'absolute',
-													top: '251px',
+													top: '284px',
 													left: '50%',
 													transform: 'translateX(-50%)',
 													width: '315px',
 													height: '46px',
-													backgroundColor: '#359D4D',
+													backgroundColor: '#35859D',
 													border: '2px solid #000000',
 													borderRadius: '8px',
 													overflow: 'hidden',
 												}}
 											>
 												<div
-													className="absolute font-inter font-bold"
+													className="absolute font-inter font-bold tabular-nums"
 													style={{
 														top: '4.5px',
-														left: '8px',
+														left: '5px',
 														fontSize: '11.5px',
 														color: '#000000',
 													}}
@@ -6067,7 +6075,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														right: '6px',
 														width: '260px',
 														height: '39px',
-														backgroundColor: clampedPromptScore == null ? '#359D4D' : '#FFFFFF',
+														backgroundColor: clampedPromptScore == null ? '#35859D' : '#FFFFFF',
 														border: '2px solid #000000',
 														borderRadius: '8px',
 														display: 'flex',
@@ -6412,8 +6420,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											style={{
 												width: '330px',
 												height: '347px',
-												background:
-													'linear-gradient(to bottom, #FFFFFF 28px, #D6EFD7 28px)',
+												backgroundColor: '#D6EEEF',
 												border: '3px solid #000000',
 												borderRadius: '7px',
 												position: 'relative',
@@ -6435,51 +6442,38 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											<div
 												style={{
 													position: 'absolute',
-													top: '34px',
+													top: '26px',
 													left: '50%',
 													transform: 'translateX(-50%)',
 													width: '322px',
-													height: '44px',
+													height: '25px',
 													backgroundColor: '#FFFFFF',
 													border: '2px solid #000000',
-													borderRadius: '7px',
+													borderRadius: '5px',
+													boxSizing: 'border-box',
+													display: 'flex',
+													alignItems: 'center',
+													gap: '10px',
+													paddingLeft: '8px',
+													paddingRight: '8px',
 												}}
 											>
-												{/* Score label */}
 												<div
 													style={{
-														position: 'absolute',
-														top: '6px',
-														left: '10px',
-														fontFamily: 'Inter, system-ui, sans-serif',
-														fontWeight: 700,
-														fontSize: '12px',
-														lineHeight: '14px',
-														color: '#000000',
-													}}
-												>
-													{promptScoreDisplayLabel}
-												</div>
-												{/* Small box inside (progress track) */}
-												<div
-													style={{
-														position: 'absolute',
-														bottom: '3px',
-														left: '4px',
 														width: '223px',
 														height: '12px',
 														backgroundColor: '#FFFFFF',
 														border: '2px solid #000000',
 														borderRadius: '8px',
 														overflow: 'hidden',
+														flexShrink: 0,
+														boxSizing: 'border-box',
+														position: 'relative',
 													}}
 												>
 													<div
 														style={{
-															position: 'absolute',
-															top: 0,
-															bottom: 0,
-															left: 0,
+															height: '100%',
 															borderRadius: '999px',
 															backgroundColor: '#36B24A',
 															width: `${promptScoreFillPercent}%`,
@@ -6487,6 +6481,23 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 															transition: 'width 250ms ease-out',
 														}}
 													/>
+												</div>
+												<div
+													style={{
+														fontFamily: 'Inter, system-ui, sans-serif',
+														fontWeight: 700,
+														fontSize: '12px',
+														lineHeight: '14px',
+														color: '#000000',
+														whiteSpace: 'nowrap',
+														overflow: 'hidden',
+														textOverflow: 'ellipsis',
+														flex: 1,
+														minWidth: 0,
+														textAlign: 'right',
+													}}
+												>
+													{promptScoreDisplayLabel}
 												</div>
 											</div>
 											{/* Undo button */}
@@ -6498,7 +6509,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												}}
 												style={{
 													position: 'absolute',
-													top: '83px',
+													top: '61px',
 													left: '6px',
 													width: '39px',
 													height: '32px',
@@ -6509,7 +6520,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													alignItems: 'center',
 													justifyContent: 'center',
 													cursor: hasPreviousPrompt ? 'pointer' : 'not-allowed',
-													opacity: hasPreviousPrompt ? 1 : 0.5,
 												}}
 											>
 												{clampedPromptScore != null && <UndoIcon width="24" height="24" />}
@@ -6523,9 +6533,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												}}
 												style={{
 													position: 'absolute',
-													top: '83px',
+													top: '61px',
 													left: '50px',
-													width: '155px',
+													width: '233px',
 													height: '32px',
 													backgroundColor: '#D7F0FF',
 													border: '2px solid #000000',
@@ -6549,7 +6559,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																lineHeight: '1',
 															}}
 														>
-															{isUpscalingPrompt ? 'Upscaling...' : 'Upscale Prompt'}
+															{isUpscalingPrompt ? 'Upscaling...' : 'Upscale Instructions'}
 														</span>
 														<div style={{ flexShrink: 0 }}>
 															<UpscaleIcon width="20" height="20" />
@@ -6561,22 +6571,22 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											<div
 												style={{
 													position: 'absolute',
-													top: '123px',
+													top: '176px',
 													left: '50%',
 													transform: 'translateX(-50%)',
 													width: '315px',
 													height: '46px',
-													backgroundColor: '#A6E0B4',
+													backgroundColor: '#A6DDE0',
 													border: '2px solid #000000',
 													borderRadius: '8px',
 													overflow: 'hidden',
 												}}
 											>
 												<div
-													className="absolute font-inter font-bold"
+													className="absolute font-inter font-bold tabular-nums"
 													style={{
 														top: '4.5px',
-														left: '8px',
+														left: '5px',
 														fontSize: '11.5px',
 														color: '#000000',
 													}}
@@ -6592,7 +6602,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														right: '6px',
 														width: '260px',
 														height: '39px',
-														backgroundColor: clampedPromptScore == null ? '#A6E0B4' : '#FFFFFF',
+														backgroundColor: clampedPromptScore == null ? '#A6DDE0' : '#FFFFFF',
 														border: '2px solid #000000',
 														borderRadius: '8px',
 														display: 'flex',
@@ -6624,22 +6634,22 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											<div
 												style={{
 													position: 'absolute',
-													top: '187px',
+													top: '230px',
 													left: '50%',
 													transform: 'translateX(-50%)',
 													width: '315px',
 													height: '46px',
-													backgroundColor: '#5BCB75',
+													backgroundColor: '#5BB9CB',
 													border: '2px solid #000000',
 													borderRadius: '8px',
 													overflow: 'hidden',
 												}}
 											>
 												<div
-													className="absolute font-inter font-bold"
+													className="absolute font-inter font-bold tabular-nums"
 													style={{
 														top: '4.5px',
-														left: '8px',
+														left: '5px',
 														fontSize: '11.5px',
 														color: '#000000',
 													}}
@@ -6655,7 +6665,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														right: '6px',
 														width: '260px',
 														height: '39px',
-														backgroundColor: clampedPromptScore == null ? '#5BCB75' : '#FFFFFF',
+														backgroundColor: clampedPromptScore == null ? '#5BB9CB' : '#FFFFFF',
 														border: '2px solid #000000',
 														borderRadius: '8px',
 														display: 'flex',
@@ -6687,22 +6697,22 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											<div
 												style={{
 													position: 'absolute',
-													top: '251px',
+													top: '284px',
 													left: '50%',
 													transform: 'translateX(-50%)',
 													width: '315px',
 													height: '46px',
-													backgroundColor: '#359D4D',
+													backgroundColor: '#35859D',
 													border: '2px solid #000000',
 													borderRadius: '8px',
 													overflow: 'hidden',
 												}}
 											>
 												<div
-													className="absolute font-inter font-bold"
+													className="absolute font-inter font-bold tabular-nums"
 													style={{
 														top: '4.5px',
-														left: '8px',
+														left: '5px',
 														fontSize: '11.5px',
 														color: '#000000',
 													}}
@@ -6718,7 +6728,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														right: '6px',
 														width: '260px',
 														height: '39px',
-														backgroundColor: clampedPromptScore == null ? '#359D4D' : '#FFFFFF',
+														backgroundColor: clampedPromptScore == null ? '#35859D' : '#FFFFFF',
 														border: '2px solid #000000',
 														borderRadius: '8px',
 														display: 'flex',
