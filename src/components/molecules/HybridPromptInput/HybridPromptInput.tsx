@@ -332,7 +332,7 @@ const SortableAIBlock = ({
 	const isTextBlock = block.value === HybridBlock.text;
 	const isFullAutomatedBlock = block.value === HybridBlock.full_automated;
 	const isIntroductionBlock = block.value === HybridBlock.introduction;
-	const isResearchBlock = block.value === HybridBlock.research;c
+	const isResearchBlock = block.value === HybridBlock.research;
 	const isActionBlock = block.value === HybridBlock.action;
 	const isHybridBlock = isIntroductionBlock || isResearchBlock || isActionBlock;
 	const isCompactBlock =
@@ -340,7 +340,7 @@ const SortableAIBlock = ({
 		block.value === HybridBlock.research ||
 		block.value === HybridBlock.action ||
 		block.value === HybridBlock.text;
-
+ 
 	// Detect if the Manual tab is selected (all blocks are Text)
 	const isManualModeSelected =
 		(form.getValues('hybridBlockPrompts')?.length || 0) > 0 &&
@@ -1726,9 +1726,9 @@ const SortableAIBlock = ({
 																	/>
 																</div>
 																{/* Prompt rating + Upscale controls (same wiring as Writing tab) */}
-																<div className="h-[22px] bg-white px-3 flex items-start gap-[6px]">
+																<div className="h-[23px] bg-white px-3 flex items-start gap-[6px]">
 																	{/* Score (159 x 20) */}
-																	<div className="w-[159px] h-[20px] box-border bg-white border-2 border-black rounded-[8px] flex items-center gap-[6px] px-[6px]">
+																	<div className="w-[159px] h-[20px] box-border bg-[#D7F0FF] border-2 border-black rounded-[8px] flex items-center gap-[6px] px-[6px]">
 																		<div className="w-[92px] h-[12px] box-border bg-white border-2 border-black rounded-[8px] overflow-hidden shrink-0">
 																			<div
 																				className="h-full bg-[#36B24A] rounded-full transition-[width] duration-200"
@@ -1750,10 +1750,10 @@ const SortableAIBlock = ({
 																		}}
 																		disabled={!hasPreviousPrompt}
 																		className={cn(
-																			'w-[20px] h-[20px] box-border rounded-[6px] border-2 border-black bg-[#C2C2C2] flex items-center justify-center p-0',
+																			'w-[20px] h-[20px] box-border rounded-[6px] border-2 border-black bg-[#D7F0FF] flex items-center justify-center p-0',
 																			hasPreviousPrompt
 																				? 'cursor-pointer hover:brightness-[0.98] active:brightness-[0.95]'
-																				: 'cursor-not-allowed opacity-50'
+																				: 'cursor-not-allowed'
 																		)}
 																		aria-label="Undo Upscale"
 																	>
@@ -3381,7 +3381,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 															fields[index + 1]?.type === HybridBlock.text;
 
 														return (
-															<Fragment key={field.id}>
+															<Fragment key={isFullAutomatedField ? 'full_automated' : field.id}>
 																<div
 																	className={cn(index === 0 && '-mt-2 max-[480px]:mt-0')}
 																>
