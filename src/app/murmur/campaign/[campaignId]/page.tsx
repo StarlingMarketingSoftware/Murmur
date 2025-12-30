@@ -433,8 +433,14 @@ const Murmur = () => {
 					</Link>
 
 					{/* View tabs - centered in header (hidden at narrowest breakpoint and on mobile) */}
-					<div className={cn("flex gap-12 mobile-landscape-hide", (isMobile || isNarrowestDesktop) && "hidden")}>
-						<button
+					<div
+						className={cn(
+							'absolute inset-0 flex items-center justify-center pointer-events-none mobile-landscape-hide',
+							(isMobile || isNarrowestDesktop) && 'hidden'
+						)}
+					>
+						<div className="flex gap-12 pointer-events-auto">
+							<button
 							type="button"
 							className={cn(
 								'font-inter text-[17px] font-medium max-[480px]:text-[12px] leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
@@ -445,8 +451,8 @@ const Murmur = () => {
 							onClick={() => setActiveView('contacts')}
 						>
 							Contacts
-						</button>
-						<button
+							</button>
+							<button
 							type="button"
 							className={cn(
 								'font-inter text-[17px] font-medium max-[480px]:text-[12px] leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
@@ -457,8 +463,8 @@ const Murmur = () => {
 							onClick={() => setActiveView('testing')}
 						>
 							Writing
-						</button>
-						<button
+							</button>
+							<button
 							type="button"
 							aria-label="All"
 							title="All"
@@ -477,8 +483,8 @@ const Murmur = () => {
 								height={14}
 								className="block translate-y-[1px]"
 							/>
-						</button>
-						<button
+							</button>
+							<button
 							type="button"
 							className={cn(
 								'font-inter text-[17px] font-medium max-[480px]:text-[12px] leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
@@ -489,9 +495,9 @@ const Murmur = () => {
 							onClick={() => setActiveView('drafting')}
 						>
 							Drafts
-						</button>
-						<div className="relative group">
-							<button
+							</button>
+							<div className="relative group">
+								<button
 								type="button"
 								className={cn(
 									'font-inter text-[17px] font-medium max-[480px]:text-[12px] leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
@@ -502,9 +508,9 @@ const Murmur = () => {
 								onClick={() => setActiveView('inbox')}
 							>
 								Inbox
-							</button>
-							{/* Hover bridge: keeps the "Sent" bubble open while moving the cursor down */}
-							<span
+								</button>
+								{/* Hover bridge: keeps the "Sent" bubble open while moving the cursor down */}
+								<span
 								aria-hidden="true"
 								className={cn(
 									'absolute left-1/2 -translate-x-1/2 top-full z-40',
@@ -513,7 +519,7 @@ const Murmur = () => {
 									'bg-transparent cursor-pointer'
 								)}
 							/>
-							<button
+								<button
 								type="button"
 								aria-label="Sent"
 								title="Sent"
@@ -529,7 +535,8 @@ const Murmur = () => {
 								)}
 							>
 								Sent
-							</button>
+								</button>
+							</div>
 						</div>
 					</div>
 
