@@ -50,7 +50,10 @@ import {
 	ContactResearchHorizontalStrip,
 } from '@/components/molecules/ContactResearchPanel/ContactResearchPanel';
 import { CampaignsInboxView } from '@/components/molecules/CampaignsInboxView/CampaignsInboxView';
-import { useGetCampaigns } from '@/hooks/queryHooks/useCampaigns';
+import { useGetCampaign, useGetCampaigns } from '@/hooks/queryHooks/useCampaigns';
+import { useEditUserContactList } from '@/hooks/queryHooks/useUserContactLists';
+import { useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 
 const DEFAULT_STATE_SUGGESTIONS = [
 	{
@@ -334,6 +337,15 @@ const DashboardContent = () => {
 	const isMobile = useIsMobile();
 	const { data: campaigns } = useGetCampaigns();
 	const hasCampaigns = campaigns && campaigns.length > 0;
+	const queryClient = useQueryClient();
+
+	// If we navigated here from a campaign, enable "Add to Campaign" mode.
+	const fromCampaignIdParam = searchParams.get('fromCampaignId')?.trim() || '';
+	const isAddToCampaignMode = Boolean(fromCampaignIdParam);
+	const { data: fromCampaign, isPending: isPendingFromCampaign } = useGetCampaign(fromCampaignIdParam);
+	const addToCampaignUserContactListId = fromCampaign?.userContactLists?.[0]?.id;
+	const { mutateAsync: editUserContactList, isPending: isPendingAddToCampaign } =
+		useEditUserContactList({ suppressToasts: true });
 
 	// Add body class when on mobile with empty dashboard to hide global Clerk button
 	useEffect(() => {
@@ -1165,6 +1177,73 @@ const DashboardContent = () => {
 		isSearchPending,
 		usedContactIdsSet,
 	} = useDashboard();
+
+	const handleAddSelectedToCampaign = useCallback(async () => {
+		if (!isAddToCampaignMode) return;
+
+		if (selectedContacts.length === 0) {
+			toast.error('Please select contacts to add');
+			return;
+		}
+
+		if (isPendingFromCampaign) {
+			toast('Loading campaign…');
+			return;
+		}
+
+		if (!addToCampaignUserContactListId) {
+			toast.error('Campaign has no contact list');
+			return;
+		}
+
+		try {
+			await editUserContactList({
+				id: addToCampaignUserContactListId,
+				data: {
+					contactOperation: {
+						action: 'connect',
+						contactIds: selectedContacts,
+					},
+				},
+			});
+
+			const addedCount = selectedContacts.length;
+			setSelectedContacts([]);
+
+			// Keep caches consistent (mirrors in-campaign behavior)
+			// Await invalidations to ensure cache is properly cleared before navigation
+			await Promise.all([
+				queryClient.invalidateQueries({ queryKey: ['campaigns'] }),
+				queryClient.invalidateQueries({ queryKey: ['contacts'] }),
+				queryClient.invalidateQueries({ queryKey: ['userContactLists'] }),
+			]);
+
+			toast.success(
+				`${addedCount} contact${addedCount === 1 ? '' : 's'} added to campaign!`
+			);
+
+			// Return to the campaign page we came from
+			router.push(`${urls.murmur.campaign.detail(fromCampaignIdParam)}?origin=search`);
+		} catch (error) {
+			console.error('Error adding contacts to campaign:', error);
+			toast.error('Failed to add contacts to campaign');
+		}
+	}, [
+		fromCampaignIdParam,
+		addToCampaignUserContactListId,
+		editUserContactList,
+		isAddToCampaignMode,
+		queryClient,
+		router,
+		selectedContacts,
+		setSelectedContacts,
+	]);
+
+	const primaryCtaLabel = isAddToCampaignMode ? 'Add to Campaign' : 'Create Campaign';
+	const primaryCtaPending = isAddToCampaignMode
+		? isPendingAddToCampaign || isPendingFromCampaign
+		: isPendingCreateCampaign || isPendingBatchUpdateContacts;
+	const handlePrimaryCta = isAddToCampaignMode ? handleAddSelectedToCampaign : handleCreateCampaign;
 
 	// Map-side panel should default to only the searched state, while the map itself keeps
 	// showing all results. Clicking an out-of-state marker adds it to this panel list.
@@ -3886,10 +3965,7 @@ const DashboardContent = () => {
 																		{!isMapResultsLoading && isMapPanelCreateCampaignVisible && (
 																			<div className="flex-shrink-0 w-full px-[10px] pb-[10px]">
 																				<Button
-																					disabled={
-																						isPendingCreateCampaign ||
-																						isPendingBatchUpdateContacts
-																					}
+																					disabled={primaryCtaPending}
 																					variant="primary-light"
 																					bold
 																					className={`relative w-full h-[39px] !bg-[#5DAB68] hover:!bg-[#4e9b5d] !text-white border border-[#000000] overflow-hidden ${
@@ -3907,14 +3983,14 @@ const DashboardContent = () => {
 																					}
 																					onClick={() => {
 																						if (selectedContacts.length === 0) return;
-																						handleCreateCampaign();
+																						handlePrimaryCta();
 																					}}
 																				>
 																					<span
 																						className="relative z-20"
 																						style={{ fontFamily: 'Inter, sans-serif', fontWeight: 700 }}
 																					>
-																						Create Campaign
+																						{primaryCtaLabel}
 																					</span>
 																					<div
 																						className="absolute inset-y-0 right-0 w-[65px] z-20 flex items-center justify-center bg-[#74D178] cursor-pointer"
@@ -3984,10 +4060,7 @@ const DashboardContent = () => {
 																			aria-hidden={!isMapBottomCreateCampaignVisible}
 																		>
 																			<Button
-																				disabled={
-																					isPendingCreateCampaign ||
-																					isPendingBatchUpdateContacts
-																				}
+																				disabled={primaryCtaPending}
 																				variant="primary-light"
 																				bold
 																				className={`relative w-full max-w-[420px] h-[39px] !bg-[#5DAB68] hover:!bg-[#4e9b5d] !text-white border border-[#000000] overflow-hidden ${
@@ -4002,12 +4075,12 @@ const DashboardContent = () => {
 																				}
 																				onClick={() => {
 																					if (selectedContacts.length === 0) return;
-																					handleCreateCampaign();
+																					handlePrimaryCta();
 																				}}
 																				tabIndex={isMapBottomCreateCampaignVisible ? 0 : -1}
 																			>
 																				<span className="relative z-20" style={{ fontFamily: 'Inter, sans-serif', fontWeight: 700 }}>
-																					Create Campaign
+																					{primaryCtaLabel}
 																				</span>
 																				<div
 																					className="absolute inset-y-0 right-0 w-[65px] z-20 flex items-center justify-center bg-[#74D178] cursor-pointer"
@@ -4255,10 +4328,7 @@ const DashboardContent = () => {
 																{!isMapResultsLoading && (
 																	<div className="flex-shrink-0 w-full px-[10px] pb-[10px]">
 																		<Button
-																			disabled={
-																				isPendingCreateCampaign ||
-																				isPendingBatchUpdateContacts
-																			}
+																			disabled={primaryCtaPending}
 																			variant="primary-light"
 																			bold
 																			className={`relative w-full h-[39px] !bg-[#5DAB68] hover:!bg-[#4e9b5d] !text-white border border-[#000000] overflow-hidden ${
@@ -4273,10 +4343,12 @@ const DashboardContent = () => {
 																			}
 																			onClick={() => {
 																				if (selectedContacts.length === 0) return;
-																				handleCreateCampaign();
+																				handlePrimaryCta();
 																			}}
 																		>
-																			<span className="relative z-20" style={{ fontFamily: 'Inter, sans-serif', fontWeight: 700 }}>Create Campaign</span>
+																			<span className="relative z-20" style={{ fontFamily: 'Inter, sans-serif', fontWeight: 700 }}>
+																				{primaryCtaLabel}
+																			</span>
 																			<div
 																				className="absolute inset-y-0 right-0 w-[65px] z-20 flex items-center justify-center bg-[#74D178] cursor-pointer"
 																				onClick={(e) => {
@@ -4350,19 +4422,19 @@ const DashboardContent = () => {
 															!isMobile ? (
 																<button
 																	type="button"
-																	onClick={handleCreateCampaign}
-																	disabled={selectedContacts.length === 0}
+																	onClick={handlePrimaryCta}
+																	disabled={selectedContacts.length === 0 || primaryCtaPending}
 																	className="font-secondary"
 																	style={{
 																		width: '127px',
 																		height: '31px',
 																		background:
-																			selectedContacts.length === 0
+																			selectedContacts.length === 0 || primaryCtaPending
 																				? 'rgba(93, 171, 104, 0.1)'
 																				: '#B8E4BE',
 																		border: '2px solid #000000',
 																		color:
-																			selectedContacts.length === 0
+																			selectedContacts.length === 0 || primaryCtaPending
 																				? 'rgba(0, 0, 0, 0.4)'
 																				: '#000000',
 																		fontSize: '13px',
@@ -4377,13 +4449,13 @@ const DashboardContent = () => {
 																		textAlign: 'center',
 																		whiteSpace: 'nowrap',
 																		cursor:
-																			selectedContacts.length === 0
+																			selectedContacts.length === 0 || primaryCtaPending
 																				? 'default'
 																				: 'pointer',
-																		opacity: selectedContacts.length === 0 ? 0.6 : 1,
+																		opacity: selectedContacts.length === 0 || primaryCtaPending ? 0.6 : 1,
 																	}}
 																>
-																	Create Campaign
+																	{primaryCtaLabel}
 																</button>
 															) : null
 														}
@@ -4403,18 +4475,18 @@ const DashboardContent = () => {
 											{!isMobile && (
 												<div className="flex items-center justify-center w-full search-results-cta-wrapper">
 													<Button
-														isLoading={
-															isPendingCreateCampaign || isPendingBatchUpdateContacts
-														}
+														isLoading={primaryCtaPending}
 														variant="primary-light"
 														bold
 														className="relative w-full max-w-[984px] h-[39px] mx-auto mt-[20px] !bg-[#5DAB68] hover:!bg-[#4e9b5d] !text-white border border-[#000000] overflow-hidden"
 														onClick={() => {
 															if (selectedContacts.length === 0) return;
-															handleCreateCampaign();
+															handlePrimaryCta();
 														}}
 													>
-														<span className="relative z-20" style={{ fontFamily: 'Inter, sans-serif', fontWeight: 700 }}>Create Campaign</span>
+														<span className="relative z-20" style={{ fontFamily: 'Inter, sans-serif', fontWeight: 700 }}>
+															{primaryCtaLabel}
+														</span>
 														<div
 															className="absolute inset-y-0 right-0 w-[65px] z-20 flex items-center justify-center bg-[#74D178] cursor-pointer"
 															onClick={(e) => {
@@ -4440,16 +4512,16 @@ const DashboardContent = () => {
 												createPortal(
 													<div className="mobile-sticky-cta">
 														<Button
-															onClick={handleCreateCampaign}
-															isLoading={
-																isPendingCreateCampaign || isPendingBatchUpdateContacts
-															}
+															onClick={handlePrimaryCta}
+															isLoading={primaryCtaPending}
 															variant="primary-light"
 															bold
 															className="w-full h-[54px] min-h-[54px] !rounded-none !bg-[#5dab68] hover:!bg-[#4e9b5d] !text-white border border-[#000000] transition-colors !opacity-100 disabled:!opacity-100"
-															disabled={selectedContacts.length === 0}
+															disabled={selectedContacts.length === 0 || primaryCtaPending}
 														>
-															<span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 700 }}>Create Campaign</span>
+															<span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 700 }}>
+																{primaryCtaLabel}
+															</span>
 														</Button>
 													</div>,
 													document.body

@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 
 import { useCampaignDetail } from './useCampaignDetail';
 import { CampaignPageSkeleton } from '@/components/molecules/CampaignPageSkeleton/CampaignPageSkeleton';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { urls } from '@/constants/urls';
 import Link from 'next/link';
 import { cn } from '@/utils';
@@ -24,6 +24,7 @@ import { useGetContacts } from '@/hooks/queryHooks/useContacts';
 import { useGetEmails } from '@/hooks/queryHooks/useEmails';
 import { useCreateIdentity, useGetIdentities } from '@/hooks/queryHooks/useIdentities';
 import { EmailStatus } from '@/constants/prismaEnums';
+import { useQueryClient } from '@tanstack/react-query';
 
 type ViewType = 'contacts' | 'testing' | 'drafting' | 'sent' | 'inbox' | 'all';
 
@@ -64,6 +65,7 @@ const Murmur = () => {
 	}, []);
 	const { campaign, isPendingCampaign, setIsIdentityDialogOpen, isIdentityDialogOpen } =
 		useCampaignDetail();
+	const router = useRouter();
 	const isMobile = useIsMobile();
 
 	const searchParams = useSearchParams();
@@ -80,6 +82,22 @@ const Murmur = () => {
 	const { mutateAsync: editCampaign } = useEditCampaign({ suppressToasts: true });
 	const { mutateAsync: createIdentity } = useCreateIdentity({ suppressToasts: true });
 	const autoEnsureIdentityOnceRef = useRef(false);
+	const queryClient = useQueryClient();
+	const hasRefetchedContactsRef = useRef(false);
+
+	// Refetch contacts when returning from map search (origin=search) to ensure newly added contacts are shown
+	useEffect(() => {
+		if (cameFromSearch && campaign && !hasRefetchedContactsRef.current) {
+			hasRefetchedContactsRef.current = true;
+			// Invalidate all contacts and userContactLists queries to force fresh data
+			// This marks queries as stale so they refetch when accessed
+			queryClient.invalidateQueries({ queryKey: ['contacts'] });
+			queryClient.invalidateQueries({ queryKey: ['userContactLists'] });
+			// Also immediately refetch any active queries
+			queryClient.refetchQueries({ queryKey: ['contacts'], type: 'active' });
+			queryClient.refetchQueries({ queryKey: ['userContactLists'], type: 'active' });
+		}
+	}, [cameFromSearch, campaign, queryClient]);
 
 	// If we landed here without an identity:
 	// - Normal flow: force the IdentityDialog (existing behavior)
@@ -324,6 +342,18 @@ const Murmur = () => {
 		}
 	};
 
+	const handleOpenDashboardSearchForCampaign = useCallback(() => {
+		if (!campaign) return;
+
+		const searchName = campaign?.userContactLists?.[0]?.name || campaign?.name || '';
+		const pendingSearch = searchName ? `[Booking] ${searchName}`.trim() : '';
+		if (pendingSearch && typeof window !== 'undefined') {
+			sessionStorage.setItem('murmur_pending_search', pendingSearch);
+		}
+
+		router.push(`${urls.murmur.dashboard.index}?fromCampaignId=${campaign.id}`);
+	}, [campaign, router]);
+
 	if (isPendingCampaign || !campaign) {
 		return silentLoad ? null : <CampaignPageSkeleton />;
 	}
@@ -398,12 +428,15 @@ const Murmur = () => {
 			{/* Desktop top box (477 x 42, 1px stroke #929292, 10px radius) */}
 			{!isMobile && !isNarrowestDesktop && (
 				<div
-					aria-hidden="true"
 					data-slot="campaign-top-box-wrapper"
 					className="absolute inset-x-0 top-16 flex justify-center pointer-events-none"
 				>
-					<div
+					<button
+						type="button"
 						data-slot="campaign-top-box"
+						aria-label="Open dashboard search for this campaign"
+						title="Search for more contacts"
+						onClick={handleOpenDashboardSearchForCampaign}
 						className="group relative pointer-events-auto w-[477px] max-w-[calc(100vw-32px)] h-[42px] box-border border border-[#929292] hover:border-black hover:border-2 rounded-[10px] overflow-hidden transition-[color,border-color,border-width] duration-150"
 					>
 						<SearchMap
@@ -420,7 +453,7 @@ const Murmur = () => {
 						<div className="absolute right-3 top-1/2 -translate-y-1/2 flex z-10 text-[#929292] group-hover:text-black transition-colors duration-150">
 							<SearchIconDesktop stroke="currentColor" />
 						</div>
-					</div>
+					</button>
 				</div>
 			)}
 
