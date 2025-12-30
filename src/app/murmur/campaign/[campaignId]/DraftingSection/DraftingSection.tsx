@@ -2529,6 +2529,20 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														<UpscaleIcon width="24" height="24" />
 													</div>
 												</div>
+												<div
+													style={{
+														position: 'absolute',
+														top: '110px',
+														left: '22px',
+														fontFamily: 'Inter, system-ui, sans-serif',
+														fontWeight: 500,
+														fontSize: '17px',
+														lineHeight: '20px',
+														color: '#000000',
+													}}
+												>
+													Custom Instructions
+												</div>
 												{/* Box below the two small boxes */}
 												<div
 													style={{
@@ -5914,6 +5928,20 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													</>
 												)}
 											</div>
+											<div
+												style={{
+													position: 'absolute',
+													top: '139px',
+													left: '8px',
+													fontFamily: 'Inter, system-ui, sans-serif',
+													fontWeight: 500,
+													fontSize: '17px',
+													lineHeight: '20px',
+													color: '#000000',
+												}}
+											>
+												Custom Instructions
+											</div>
 											{/* Suggestion 1 */}
 											<div
 												style={{
@@ -6566,6 +6594,20 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														</div>
 													</>
 												)}
+											</div>
+											<div
+												style={{
+													position: 'absolute',
+													top: '139px',
+													left: '8px',
+													fontFamily: 'Inter, system-ui, sans-serif',
+													fontWeight: 500,
+													fontSize: '17px',
+													lineHeight: '20px',
+													color: '#000000',
+												}}
+											>
+												Custom Instructions
 											</div>
 											{/* Suggestion 1 */}
 											<div
