@@ -15,6 +15,8 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import LeftArrow from '@/components/atoms/_svg/LeftArrow';
 import RightArrow from '@/components/atoms/_svg/RightArrow';
 import BottomArrowIcon from '@/components/atoms/_svg/BottomArrowIcon';
+import { SearchIconDesktop } from '@/components/atoms/_svg/SearchIconDesktop';
+import SearchMap from '@/components/atoms/_svg/SearchMap';
 import nextDynamic from 'next/dynamic';
 import { CampaignHeaderBox } from '@/components/molecules/CampaignHeaderBox/CampaignHeaderBox';
 import { useEditCampaign } from '@/hooks/queryHooks/useCampaigns';
@@ -360,7 +362,7 @@ const Murmur = () => {
 		!isNarrowestDesktop;
 	const fixedNavArrowsTopPx = 467 + (shouldApplyWritingTopShift ? writingTabShiftPx : 0);
 	return (
-		<div className="min-h-screen">
+		<div className="min-h-screen relative">
 			{/* Left navigation arrow - absolute position (hidden in narrow desktop + testing) */}
 			{!hideFixedArrows && (
 				<button
@@ -391,6 +393,35 @@ const Murmur = () => {
 				>
 					<RightArrow />
 				</button>
+			)}
+
+			{/* Desktop top box (477 x 42, 1px stroke #929292, 10px radius) */}
+			{!isMobile && !isNarrowestDesktop && (
+				<div
+					aria-hidden="true"
+					data-slot="campaign-top-box-wrapper"
+					className="absolute inset-x-0 top-16 flex justify-center pointer-events-none"
+				>
+					<div
+						data-slot="campaign-top-box"
+						className="group relative pointer-events-auto w-[477px] max-w-[calc(100vw-32px)] h-[42px] box-border border border-[#929292] hover:border-black hover:border-2 rounded-[10px] overflow-hidden transition-[color,border-color,border-width] duration-150"
+					>
+						<SearchMap
+							aria-hidden="true"
+							width="100%"
+							height="100%"
+							viewBox="1 1 475.184 39.877"
+							preserveAspectRatio="none"
+							rectStroke="none"
+							rectStrokeWidth={0}
+							rectRx={10}
+							className="absolute inset-0 w-full h-full opacity-40 group-hover:opacity-100 transition-opacity duration-150"
+						/>
+						<div className="absolute right-3 top-1/2 -translate-y-1/2 flex z-10 text-[#929292] group-hover:text-black transition-colors duration-150">
+							<SearchIconDesktop stroke="currentColor" />
+						</div>
+					</div>
+				</div>
 			)}
 
 			{/* Header row with Back to Home link, centered tabs, and Clerk icon (from layout) */}
@@ -439,7 +470,7 @@ const Murmur = () => {
 							(isMobile || isNarrowestDesktop) && 'hidden'
 						)}
 					>
-						<div className="flex gap-12 pointer-events-auto">
+						<div className="pointer-events-auto grid w-[524px] max-w-full grid-cols-5 items-center justify-items-center">
 							<button
 							type="button"
 							className={cn(
@@ -677,7 +708,7 @@ const Murmur = () => {
 					{/* View tabs - shown below header box at narrowest breakpoint (< 952px) */}
 					{!isMobile && isNarrowestDesktop && (
 						<div className="flex justify-center mb-4">
-							<div className="flex gap-6">
+							<div className="grid w-[524px] max-w-full grid-cols-5 items-center justify-items-center">
 								<button
 									type="button"
 									className={cn(
