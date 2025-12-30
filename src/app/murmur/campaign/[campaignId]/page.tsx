@@ -14,6 +14,7 @@ import { useMe } from '@/hooks/useMe';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import LeftArrow from '@/components/atoms/_svg/LeftArrow';
 import RightArrow from '@/components/atoms/_svg/RightArrow';
+import BottomArrowIcon from '@/components/atoms/_svg/BottomArrowIcon';
 import nextDynamic from 'next/dynamic';
 import { CampaignHeaderBox } from '@/components/molecules/CampaignHeaderBox/CampaignHeaderBox';
 import { useEditCampaign } from '@/hooks/queryHooks/useCampaigns';
@@ -256,25 +257,25 @@ const Murmur = () => {
 	// Hide fixed arrows when in narrow desktop + testing view (arrows show next to draft button instead)
 	// or when width < 1317px to prevent overlap with content boxes
 	// or when on all tab and width <= 1396px
-	// or when on inbox tab and width < 1476px
+	// or when on inbox/sent tab and width < 1476px
 	const hideFixedArrows =
 		(activeView === 'testing' && isNarrowDesktop) ||
 		hideArrowsAtBreakpoint ||
 		(activeView === 'all' && hideArrowsOnAll) ||
-		(activeView === 'inbox' && hideArrowsOnInbox);
+		((activeView === 'inbox' || activeView === 'sent') && hideArrowsOnInbox);
 
 	// Tab navigation order
 	const tabOrder: ViewType[] = [
 		'contacts',
 		'testing',
-		'drafting',
-		'sent',
-		'inbox',
 		'all',
+		'drafting',
+		'inbox',
 	];
+	const getTabOrderView = (view: ViewType): ViewType => (view === 'sent' ? 'inbox' : view);
 
 	const goToPreviousTab = () => {
-		const currentIndex = tabOrder.indexOf(activeView);
+		const currentIndex = tabOrder.indexOf(getTabOrderView(activeView));
 		if (currentIndex > 0) {
 			setActiveView(tabOrder[currentIndex - 1]);
 		} else {
@@ -284,7 +285,7 @@ const Murmur = () => {
 	};
 
 	const goToNextTab = () => {
-		const currentIndex = tabOrder.indexOf(activeView);
+		const currentIndex = tabOrder.indexOf(getTabOrderView(activeView));
 		if (currentIndex < tabOrder.length - 1) {
 			setActiveView(tabOrder[currentIndex + 1]);
 		} else {
@@ -459,6 +460,26 @@ const Murmur = () => {
 						</button>
 						<button
 							type="button"
+							aria-label="All"
+							title="All"
+							className={cn(
+								'font-inter text-[17px] font-medium max-[480px]:text-[12px] leading-none bg-transparent p-0 m-0 border-0 cursor-pointer inline-flex items-center justify-center',
+								activeView === 'all'
+									? 'text-black'
+									: 'text-[#6B6B6B] hover:text-black'
+							)}
+							onClick={() => setActiveView('all')}
+						>
+							<BottomArrowIcon
+								aria-hidden="true"
+								focusable="false"
+								width={20}
+								height={14}
+								className="block translate-y-[1px]"
+							/>
+						</button>
+						<button
+							type="button"
 							className={cn(
 								'font-inter text-[17px] font-medium max-[480px]:text-[12px] leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
 								activeView === 'drafting'
@@ -469,42 +490,47 @@ const Murmur = () => {
 						>
 							Drafts
 						</button>
-						<button
-							type="button"
-							className={cn(
-								'font-inter text-[17px] font-medium max-[480px]:text-[12px] leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
-								activeView === 'sent'
-									? 'text-black'
-									: 'text-[#6B6B6B] hover:text-black'
-							)}
-							onClick={() => setActiveView('sent')}
-						>
-							Sent
-						</button>
-						<button
-							type="button"
-							className={cn(
-								'font-inter text-[17px] font-medium max-[480px]:text-[12px] leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
-								activeView === 'inbox'
-									? 'text-black'
-									: 'text-[#6B6B6B] hover:text-black'
-							)}
-							onClick={() => setActiveView('inbox')}
-						>
-							Inbox
-						</button>
-						<button
-							type="button"
-							className={cn(
-								'font-inter text-[17px] font-medium max-[480px]:text-[12px] leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
-								activeView === 'all'
-									? 'text-black'
-									: 'text-[#6B6B6B] hover:text-black'
-							)}
-							onClick={() => setActiveView('all')}
-						>
-							All
-						</button>
+						<div className="relative group">
+							<button
+								type="button"
+								className={cn(
+									'font-inter text-[17px] font-medium max-[480px]:text-[12px] leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
+									activeView === 'inbox'
+										? 'text-black'
+										: 'text-[#6B6B6B] hover:text-black'
+								)}
+								onClick={() => setActiveView('inbox')}
+							>
+								Inbox
+							</button>
+							{/* Hover bridge: keeps the "Sent" bubble open while moving the cursor down */}
+							<span
+								aria-hidden="true"
+								className={cn(
+									'absolute left-1/2 -translate-x-1/2 top-full z-40',
+									'hidden group-hover:block group-focus-within:block',
+									'w-[110px] h-[56px]',
+									'bg-transparent cursor-pointer'
+								)}
+							/>
+							<button
+								type="button"
+								aria-label="Sent"
+								title="Sent"
+								onClick={() => setActiveView('sent')}
+								className={cn(
+									'absolute left-1/2 -translate-x-1/2 top-full mt-[6px] z-50',
+									'hidden group-hover:flex group-focus-within:flex',
+									'w-[54px] h-[27px] rounded-[8px]',
+									'bg-[#E4EBE6]/90',
+									'items-center justify-center',
+									'font-inter text-[17px] font-medium',
+									activeView === 'sent' ? 'text-black' : 'text-[#929292]'
+								)}
+							>
+								Sent
+							</button>
+						</div>
 					</div>
 
 				{/* Mobile header - campaign title and tabs */}
@@ -671,6 +697,26 @@ const Murmur = () => {
 								</button>
 								<button
 									type="button"
+									aria-label="All"
+									title="All"
+									className={cn(
+										'font-inter text-[14px] font-medium leading-none bg-transparent p-0 m-0 border-0 cursor-pointer inline-flex items-center justify-center',
+										activeView === 'all'
+											? 'text-black'
+											: 'text-[#6B6B6B] hover:text-black'
+									)}
+									onClick={() => setActiveView('all')}
+								>
+									<BottomArrowIcon
+										aria-hidden="true"
+										focusable="false"
+										width={18}
+										height={12}
+										className="block translate-y-[1px]"
+									/>
+								</button>
+								<button
+									type="button"
 									className={cn(
 										'font-inter text-[14px] font-medium leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
 										activeView === 'drafting'
@@ -681,42 +727,47 @@ const Murmur = () => {
 								>
 									Drafts
 								</button>
-								<button
-									type="button"
-									className={cn(
-										'font-inter text-[14px] font-medium leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
-										activeView === 'sent'
-											? 'text-black'
-											: 'text-[#6B6B6B] hover:text-black'
-									)}
-									onClick={() => setActiveView('sent')}
-								>
-									Sent
-								</button>
-								<button
-									type="button"
-									className={cn(
-										'font-inter text-[14px] font-medium leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
-										activeView === 'inbox'
-											? 'text-black'
-											: 'text-[#6B6B6B] hover:text-black'
-									)}
-									onClick={() => setActiveView('inbox')}
-								>
-									Inbox
-								</button>
-								<button
-									type="button"
-									className={cn(
-										'font-inter text-[14px] font-medium leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
-										activeView === 'all'
-											? 'text-black'
-											: 'text-[#6B6B6B] hover:text-black'
-									)}
-									onClick={() => setActiveView('all')}
-								>
-									All
-								</button>
+								<div className="relative group">
+									<button
+										type="button"
+										className={cn(
+											'font-inter text-[14px] font-medium leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
+											activeView === 'inbox'
+												? 'text-black'
+												: 'text-[#6B6B6B] hover:text-black'
+										)}
+										onClick={() => setActiveView('inbox')}
+									>
+										Inbox
+									</button>
+									{/* Hover bridge: keeps the "Sent" bubble open while moving the cursor down */}
+									<span
+										aria-hidden="true"
+										className={cn(
+											'absolute left-1/2 -translate-x-1/2 top-full z-40',
+											'hidden group-hover:block group-focus-within:block',
+											'w-[110px] h-[56px]',
+											'bg-transparent cursor-pointer'
+										)}
+									/>
+									<button
+										type="button"
+										aria-label="Sent"
+										title="Sent"
+										onClick={() => setActiveView('sent')}
+										className={cn(
+											'absolute left-1/2 -translate-x-1/2 top-full mt-[6px] z-50',
+											'hidden group-hover:flex group-focus-within:flex',
+											'w-[54px] h-[27px] rounded-[8px]',
+											'bg-[#E4EBE6]/90',
+											'items-center justify-center',
+											'font-inter text-[17px] font-medium',
+											activeView === 'sent' ? 'text-black' : 'text-[#929292]'
+										)}
+									>
+										Sent
+									</button>
+								</div>
 							</div>
 						</div>
 					)}
