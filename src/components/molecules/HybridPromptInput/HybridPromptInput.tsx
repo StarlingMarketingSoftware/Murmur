@@ -1182,57 +1182,58 @@ const SortableAIBlock = ({
 													</div>
 												</div>
 
-												{/* Booking For box (203 x 28px) + dropdown */}
-												<div ref={bookingForContainerRef} className="relative mt-[10px]">
-													<button
-														ref={bookingForButtonRef}
-														type="button"
-														onClick={() => {
-															clearBookingForCloseTimeout();
-															if (isBookingForOpen) {
-																setIsBookingForOpen(false);
-																return;
-															}
-
-															const isSeasonSelection =
-																bookingForValue === 'Spring' ||
-																bookingForValue === 'Summer' ||
-																bookingForValue === 'Fall' ||
-																bookingForValue === 'Winter';
-
-															// Prefer the last selected tab when reopening the dropdown.
-															// This lets Calendar keep the previous "Booking For" label until a date is selected.
-															if (bookingForTab === 'Calendar') {
-																setBookingForTab('Calendar');
-															} else if (bookingForTab === 'Season') {
-																if (isSeasonSelection) {
-																	setBookingForSeason(bookingForValue as BookingForSeason);
+												{/* Booking For box (203 x 28px) + dropdown - rendered before Custom Instructions when closed */}
+												{!isCustomInstructionsOpen && (
+													<div ref={bookingForContainerRef} className="relative mt-[10px]">
+														<button
+															ref={bookingForButtonRef}
+															type="button"
+															onClick={() => {
+																clearBookingForCloseTimeout();
+																if (isBookingForOpen) {
+																	setIsBookingForOpen(false);
+																	return;
 																}
-																setBookingForTab('Season');
-															} else if (bookingForCalendarStartDate != null) {
-																setBookingForTab('Calendar');
-															} else if (isSeasonSelection) {
-																setBookingForSeason(bookingForValue as BookingForSeason);
-																setBookingForTab('Season');
-															} else {
-																setBookingForTab('Anytime');
-															}
 
-															setIsBookingForOpen(true);
-														}}
-														className="min-w-[203px] h-[28px] bg-white rounded-[8px] border-2 border-black inline-flex items-center justify-between gap-2 px-4 whitespace-nowrap"
-														aria-haspopup="dialog"
-														aria-expanded={isBookingForOpen}
-													>
-														<span className="font-inter font-normal text-[14px] leading-[14px] text-black whitespace-nowrap">
-															Booking For
-														</span>
-														<span className="font-inter font-bold text-[14px] leading-[14px] text-black mr-1 whitespace-nowrap">
-															{bookingForValue}
-														</span>
-													</button>
+																const isSeasonSelection =
+																	bookingForValue === 'Spring' ||
+																	bookingForValue === 'Summer' ||
+																	bookingForValue === 'Fall' ||
+																	bookingForValue === 'Winter';
 
-													{isBookingForOpen &&
+																// Prefer the last selected tab when reopening the dropdown.
+																// This lets Calendar keep the previous "Booking For" label until a date is selected.
+																if (bookingForTab === 'Calendar') {
+																	setBookingForTab('Calendar');
+																} else if (bookingForTab === 'Season') {
+																	if (isSeasonSelection) {
+																		setBookingForSeason(bookingForValue as BookingForSeason);
+																	}
+																	setBookingForTab('Season');
+																} else if (bookingForCalendarStartDate != null) {
+																	setBookingForTab('Calendar');
+																} else if (isSeasonSelection) {
+																	setBookingForSeason(bookingForValue as BookingForSeason);
+																	setBookingForTab('Season');
+																} else {
+																	setBookingForTab('Anytime');
+																}
+
+																setIsBookingForOpen(true);
+															}}
+															className="min-w-[203px] h-[28px] bg-white rounded-[8px] border-2 border-black inline-flex items-center justify-between gap-2 px-4 whitespace-nowrap"
+															aria-haspopup="dialog"
+															aria-expanded={isBookingForOpen}
+														>
+															<span className="font-inter font-normal text-[14px] leading-[14px] text-black whitespace-nowrap">
+																Booking For
+															</span>
+															<span className="font-inter font-bold text-[14px] leading-[14px] text-black mr-1 whitespace-nowrap">
+																{bookingForValue}
+															</span>
+														</button>
+
+														{isBookingForOpen &&
 														bookingForDropdownPosition &&
 														typeof document !== 'undefined' &&
 														createPortal(
@@ -1665,7 +1666,8 @@ const SortableAIBlock = ({
 															</div>,
 															document.body
 														)}
-												</div>
+													</div>
+												)}
 
 												{/* Custom Instructions (expands in-place to match Profile width) */}
 												<div
@@ -1825,6 +1827,483 @@ const SortableAIBlock = ({
 														);
 													})()}
 												</div>
+
+												{/* Booking For box - rendered AFTER Custom Instructions when it's open */}
+												{isCustomInstructionsOpen && (
+													<div ref={bookingForContainerRef} className="relative mt-[10px]">
+														<button
+															ref={bookingForButtonRef}
+															type="button"
+															onClick={() => {
+																clearBookingForCloseTimeout();
+																if (isBookingForOpen) {
+																	setIsBookingForOpen(false);
+																	return;
+																}
+
+																const isSeasonSelection =
+																	bookingForValue === 'Spring' ||
+																	bookingForValue === 'Summer' ||
+																	bookingForValue === 'Fall' ||
+																	bookingForValue === 'Winter';
+
+																if (bookingForTab === 'Calendar') {
+																	setBookingForTab('Calendar');
+																} else if (bookingForTab === 'Season') {
+																	if (isSeasonSelection) {
+																		setBookingForSeason(bookingForValue as BookingForSeason);
+																	}
+																	setBookingForTab('Season');
+																} else if (bookingForCalendarStartDate != null) {
+																	setBookingForTab('Calendar');
+																} else if (isSeasonSelection) {
+																	setBookingForSeason(bookingForValue as BookingForSeason);
+																	setBookingForTab('Season');
+																} else {
+																	setBookingForTab('Anytime');
+																}
+
+																setIsBookingForOpen(true);
+															}}
+															className="min-w-[203px] h-[28px] bg-white rounded-[8px] border-2 border-black inline-flex items-center justify-between gap-2 px-4 whitespace-nowrap"
+															aria-haspopup="dialog"
+															aria-expanded={isBookingForOpen}
+														>
+															<span className="font-inter font-normal text-[14px] leading-[14px] text-black whitespace-nowrap">
+																Booking For
+															</span>
+															<span className="font-inter font-bold text-[14px] leading-[14px] text-black mr-1 whitespace-nowrap">
+																{bookingForValue}
+															</span>
+														</button>
+
+														{isBookingForOpen &&
+															bookingForDropdownPosition &&
+															typeof document !== 'undefined' &&
+															createPortal(
+																<div
+																	ref={bookingForDropdownRef}
+																	style={{
+																		position: 'fixed',
+																		top: bookingForDropdownPosition.top,
+																		left: bookingForDropdownPosition.left,
+																		width: bookingForDropdownSize.width,
+																		height: bookingForDropdownSize.height,
+																	}}
+																	className={cn(
+																		'z-[9999] rounded-[6px]',
+																		bookingForTab === 'Season'
+																			? bookingForSeason === 'Spring'
+																				? 'bg-[#9BD2FF]'
+																				: bookingForSeason === 'Summer'
+																					? 'bg-[#7ADF85]'
+																					: bookingForSeason === 'Fall'
+																						? 'bg-[#D77C2C]'
+																						: 'bg-[#1960AC]'
+																			: 'bg-[#F5F5F5]',
+																		'border-2 border-black',
+																		'flex flex-col overflow-hidden'
+																	)}
+																	onMouseEnter={clearBookingForCloseTimeout}
+																	onMouseLeave={scheduleBookingForCloseTimeout}
+																	role="dialog"
+																	aria-label="Booking For"
+																>
+																	<div className="relative h-[46px]">
+																		{bookingForTab === 'Season' && (
+																			<div
+																				aria-hidden="true"
+																				className="pointer-events-none absolute inset-0 flex items-center justify-center"
+																			>
+																				<div className="w-[284px] h-[32px] bg-[#E2E2E2] opacity-30 rounded-[6px]" />
+																			</div>
+																		)}
+
+																		<div
+																			className={cn(
+																				'relative z-[1] h-full flex items-center',
+																				bookingForTab === 'Calendar' && bookingForTabStripLeft != null
+																					? 'justify-start'
+																					: 'justify-center'
+																			)}
+																			style={
+																				bookingForTab === 'Calendar' && bookingForTabStripLeft != null
+																					? { paddingLeft: bookingForTabStripLeft }
+																					: undefined
+																			}
+																		>
+																			<div className="w-[284px] grid grid-cols-3 items-center gap-[8px]">
+																				{(['Anytime', 'Season', 'Calendar'] as const).map(
+																					(opt) => {
+																						const isSelected = bookingForTab === opt;
+																						return (
+																							<button
+																								key={opt}
+																								type="button"
+																								onClick={() => {
+																									if (opt === 'Season') {
+																										setBookingForTab('Season');
+																										return;
+																									}
+
+																									if (opt === 'Anytime') {
+																										setBookingForValue('Anytime');
+																										setBookingForCalendarStartDate(null);
+																										setBookingForCalendarEndDate(null);
+																										setBookingForTab('Anytime');
+																										return;
+																									}
+
+																									setBookingForTab('Calendar');
+																								}}
+																								className={cn(
+																									'h-[28px] w-[81px] rounded-[6px] font-inter text-[14px] leading-[14px] text-black',
+																									'flex items-center justify-center text-center justify-self-center',
+																									isSelected
+																										? opt === 'Season'
+																											? 'bg-[#F5F5F5] font-semibold'
+																											: 'bg-[#C2C2C2] font-semibold'
+																										: 'bg-transparent font-normal hover:bg-black/5'
+																								)}
+																								role="button"
+																								aria-pressed={isSelected}
+																							>
+																								{opt}
+																							</button>
+																						);
+																					}
+																				)}
+																			</div>
+																		</div>
+																	</div>
+
+																	{bookingForTab === 'Season' && (
+																		<div className="flex-1 flex flex-col items-center justify-center gap-[10px] pb-[10px]">
+																			{(['Spring', 'Summer', 'Fall', 'Winter'] as const).map(
+																				(season) => {
+																					const isSelectedSeason = bookingForSeason === season;
+																					return (
+																						<button
+																							key={season}
+																							type="button"
+																							onClick={() => {
+																								setBookingForSeason(season);
+																								setBookingForValue(season);
+																								setBookingForCalendarStartDate(null);
+																								setBookingForCalendarEndDate(null);
+																							}}
+																							className={cn(
+																								'font-inter text-[14px] leading-[16px]',
+																								isSelectedSeason
+																									? 'font-semibold text-white'
+																									: 'font-normal text-black opacity-90 hover:opacity-100'
+																							)}
+																						>
+																							{season}
+																						</button>
+																					);
+																				}
+																			)}
+																		</div>
+																	)}
+
+																	{bookingForTab === 'Calendar' && (
+																		<div className="flex-1 w-full p-[14px]">
+																			<div className="w-full h-full flex flex-col gap-[16px]">
+																				<div className="w-full flex items-center justify-center gap-[24px]">
+																					{(() => {
+																						const now = new Date();
+																						const minBaseMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+																						const isPrevDisabled =
+																							bookingForCalendarBaseMonth.getTime() <= minBaseMonth.getTime();
+
+																						const currentMonth = new Intl.DateTimeFormat(undefined, {
+																							month: 'long',
+																						}).format(bookingForCalendarBaseMonth);
+																						const nextMonthDate = new Date(
+																							bookingForCalendarBaseMonth.getFullYear(),
+																							bookingForCalendarBaseMonth.getMonth() + 1,
+																							1
+																						);
+																						const nextMonth = new Intl.DateTimeFormat(undefined, {
+																							month: 'long',
+																						}).format(nextMonthDate);
+
+																						return (
+																							<div className="w-full flex items-center justify-center gap-[12px]">
+																								<button
+																									type="button"
+																									disabled={isPrevDisabled}
+																									onClick={() => {
+																										setBookingForCalendarBaseMonth((prev) => {
+																											const next = new Date(prev.getFullYear(), prev.getMonth() - 1, 1);
+																											return next.getTime() < minBaseMonth.getTime() ? prev : next;
+																										});
+																									}}
+																									className="shrink-0 bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity disabled:cursor-not-allowed disabled:hover:opacity-100"
+																									aria-label="Previous month"
+																								>
+																									<LeftArrow
+																										width={8}
+																										height={16}
+																										color={isPrevDisabled ? '#A0A0A0' : '#000000'}
+																										opacity={isPrevDisabled ? 0.6 : 1}
+																									/>
+																								</button>
+
+																								<div className="flex items-center justify-center gap-[24px]">
+																									<div className="w-[364px] h-[42px] rounded-[8px] bg-[#E2E2E2] flex items-center px-[18px]">
+																										<span className="font-inter font-semibold text-[16px] leading-[16px] text-black">
+																											{currentMonth}
+																										</span>
+																									</div>
+																									<div className="w-[364px] h-[42px] rounded-[8px] bg-[#E2E2E2] flex items-center px-[18px]">
+																										<span className="font-inter font-semibold text-[16px] leading-[16px] text-black">
+																											{nextMonth}
+																										</span>
+																									</div>
+																								</div>
+
+																								<button
+																									type="button"
+																									onClick={() => {
+																										setBookingForCalendarBaseMonth((prev) => {
+																											return new Date(prev.getFullYear(), prev.getMonth() + 1, 1);
+																										});
+																									}}
+																									className="shrink-0 bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity"
+																									aria-label="Next month"
+																								>
+																									<RightArrow width={8} height={16} color="#000000" opacity={1} />
+																								</button>
+																							</div>
+																						);
+																					})()}
+																				</div>
+
+																				<div className="w-full flex items-center justify-center gap-[24px]">
+																					{(() => {
+																						const now = new Date();
+																						const today = new Date(
+																							now.getFullYear(),
+																							now.getMonth(),
+																							now.getDate()
+																						);
+
+																						const weekDays = ['S', 'M', 'T', 'W', 'T', 'F', 'S'] as const;
+
+																						const formatMonthDay = (date: Date) => {
+																							return new Intl.DateTimeFormat('en-US', {
+																								month: 'short',
+																								day: 'numeric',
+																							}).format(date);
+																						};
+
+																						const handleSelectCalendarDate = (date: Date) => {
+																							if (date.getTime() < today.getTime()) return;
+
+																							if (
+																								bookingForCalendarStartDate == null ||
+																								bookingForCalendarEndDate != null
+																							) {
+																								setBookingForCalendarStartDate(date);
+																								setBookingForCalendarEndDate(null);
+																								setBookingForValue(formatMonthDay(date));
+																								return;
+																							}
+
+																							const start = bookingForCalendarStartDate;
+																							if (date.getTime() < start.getTime()) {
+																								setBookingForCalendarStartDate(date);
+																								setBookingForCalendarEndDate(start);
+																								setBookingForValue(`${formatMonthDay(date)} - ${formatMonthDay(start)}`);
+																								return;
+																							}
+
+																							setBookingForCalendarEndDate(date);
+																							if (date.getTime() === start.getTime()) {
+																								setBookingForValue(formatMonthDay(start));
+																							} else {
+																								setBookingForValue(`${formatMonthDay(start)} - ${formatMonthDay(date)}`);
+																							}
+																						};
+
+																						const renderMonthGrid = (monthDate: Date) => {
+																							const year = monthDate.getFullYear();
+																							const month = monthDate.getMonth();
+																							const firstDayOfWeek = new Date(year, month, 1).getDay();
+																							const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+																							const cells = Array.from({ length: 42 }, (_, idx) => {
+																								const dayNumber = idx - firstDayOfWeek + 1;
+																								if (dayNumber < 1 || dayNumber > daysInMonth) return null;
+																								return new Date(year, month, dayNumber);
+																							});
+
+																							return (
+																								<div className="w-[364px] h-[312px] rounded-[8px] bg-[#E2E2E2] p-[18px] flex flex-col">
+																									<div className="grid grid-cols-7 text-center">
+																										{weekDays.map((d) => (
+																											<div
+																												key={d}
+																												className="font-inter font-medium text-[12px] leading-[12px] text-black/35"
+																											>
+																												{d}
+																											</div>
+																										))}
+																									</div>
+
+																									<div className="mt-[18px] grid grid-cols-7 grid-rows-6 flex-1">
+																										{cells.map((cellDate, idx) => {
+																											if (!cellDate) {
+																												return <div key={idx} aria-hidden="true" />;
+																											}
+
+																											const cellDayStart = new Date(
+																												cellDate.getFullYear(),
+																												cellDate.getMonth(),
+																												cellDate.getDate()
+																											);
+																											const isPast = cellDayStart.getTime() < today.getTime();
+
+																											const hasRange =
+																												bookingForCalendarStartDate != null &&
+																												bookingForCalendarEndDate != null &&
+																												bookingForCalendarStartDate.getTime() !==
+																													bookingForCalendarEndDate.getTime();
+																											const rangeStart = bookingForCalendarStartDate;
+																											const rangeEnd = bookingForCalendarEndDate;
+
+																											const isStartSelected =
+																												rangeStart != null &&
+																												cellDayStart.getTime() === rangeStart.getTime();
+																											const isEndSelected =
+																												rangeEnd != null &&
+																												cellDayStart.getTime() === rangeEnd.getTime();
+
+																											const isInRange =
+																												hasRange &&
+																												rangeStart != null &&
+																												rangeEnd != null &&
+																												cellDayStart.getTime() > rangeStart.getTime() &&
+																												cellDayStart.getTime() < rangeEnd.getTime();
+
+																											const isInRangeInclusive =
+																												hasRange &&
+																												rangeStart != null &&
+																												rangeEnd != null &&
+																												cellDayStart.getTime() >= rangeStart.getTime() &&
+																												cellDayStart.getTime() <= rangeEnd.getTime();
+
+																											const prevDay = new Date(
+																												cellDayStart.getFullYear(),
+																												cellDayStart.getMonth(),
+																												cellDayStart.getDate() - 1
+																											);
+																											const nextDay = new Date(
+																												cellDayStart.getFullYear(),
+																												cellDayStart.getMonth(),
+																												cellDayStart.getDate() + 1
+																											);
+																											const prevInRange =
+																												isInRangeInclusive &&
+																												rangeStart != null &&
+																												rangeEnd != null &&
+																												prevDay.getTime() >= rangeStart.getTime() &&
+																												prevDay.getTime() <= rangeEnd.getTime();
+																											const nextInRange =
+																												isInRangeInclusive &&
+																												rangeStart != null &&
+																												rangeEnd != null &&
+																												nextDay.getTime() >= rangeStart.getTime() &&
+																												nextDay.getTime() <= rangeEnd.getTime();
+
+																											const isRowStart = idx % 7 === 0;
+																											const isRowEnd = idx % 7 === 6;
+																											const isRangeLeftCap =
+																												isInRangeInclusive && (isRowStart || !prevInRange);
+																											const isRangeRightCap =
+																												isInRangeInclusive && (isRowEnd || !nextInRange);
+
+																											return (
+																												<button
+																													key={idx}
+																													className={cn(
+																														'relative w-full h-full flex items-center justify-center group',
+																														'bg-transparent border-0 p-0',
+																														isPast ? 'cursor-not-allowed' : 'cursor-pointer'
+																													)}
+																													type="button"
+																													disabled={isPast}
+																													onClick={() => handleSelectCalendarDate(cellDayStart)}
+																													aria-label={new Intl.DateTimeFormat('en-US', {
+																														month: 'long',
+																														day: 'numeric',
+																														year: 'numeric',
+																													}).format(cellDayStart)}
+																												>
+																													{isInRangeInclusive && (
+																														<div
+																															aria-hidden="true"
+																															className={cn(
+																																'absolute left-0 right-0 top-1/2 -translate-y-1/2 h-[34px] bg-white/55',
+																																isRangeLeftCap && 'rounded-l-full',
+																																isRangeRightCap && 'rounded-r-full'
+																															)}
+																														/>
+																													)}
+
+																													<div
+																														className={cn(
+																															'relative z-[1] w-[34px] h-[34px] rounded-full flex items-center justify-center',
+																															'border border-transparent transition-colors',
+																															'font-inter text-[16px] leading-[16px]',
+																															!isPast &&
+																																!isStartSelected &&
+																																!isEndSelected &&
+																																'group-hover:border-black',
+																															(isStartSelected || isEndSelected) &&
+																																'bg-black text-white',
+																															isEndSelected &&
+																																hasRange &&
+																																'ring-2 ring-white ring-offset-2 ring-offset-black',
+																															!isStartSelected &&
+																																!isEndSelected &&
+																																(isInRange ? 'text-black' : isPast ? 'text-black/25' : 'text-black')
+																														)}
+																													>
+																														{cellDate.getDate()}
+																													</div>
+																												</button>
+																											);
+																										})}
+																									</div>
+																								</div>
+																							);
+																						};
+
+																						const nextMonthBase = new Date(
+																							bookingForCalendarBaseMonth.getFullYear(),
+																							bookingForCalendarBaseMonth.getMonth() + 1,
+																							1
+																						);
+
+																						return (
+																							<>
+																								{renderMonthGrid(bookingForCalendarBaseMonth)}
+																								{renderMonthGrid(nextMonthBase)}
+																							</>
+																						);
+																					})()}
+																				</div>
+																			</div>
+																		</div>
+																	)}
+																</div>,
+																document.body
+															)}
+													</div>
+												)}
 											</div>
 										</div>
 									</div>
