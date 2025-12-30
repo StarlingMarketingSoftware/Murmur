@@ -39,6 +39,8 @@ import { TestPreviewPanel } from '../TestPreviewPanel/TestPreviewPanel';
 import TinyPlusIcon from '@/components/atoms/_svg/TinyPlusIcon';
 import LeftArrow from '@/components/atoms/_svg/LeftArrow';
 import RightArrow from '@/components/atoms/_svg/RightArrow';
+import UndoIcon from '@/components/atoms/_svg/UndoIcon';
+import UpscaleIcon from '@/components/atoms/_svg/UpscaleIcon';
 import { DraggableHighlight } from '../DragAndDrop/DraggableHighlight';
 import DraggableBox from '@/app/murmur/campaign/[campaignId]/DraftingSection/EmailGeneration/DraggableBox';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
@@ -62,6 +64,18 @@ interface SortableAIBlockProps {
 	showTestPreview?: boolean;
 	testMessage?: string | null;
 	onGetSuggestions?: (prompt: string) => Promise<void>;
+	/**
+	 * Full Auto: prompt score meter (display only).
+	 */
+	promptQualityScore?: number | null;
+	promptQualityLabel?: string | null;
+	/**
+	 * Full Auto: prompt upscaling controls.
+	 */
+	onUpscalePrompt?: () => Promise<void>;
+	isUpscalingPrompt?: boolean;
+	hasPreviousPrompt?: boolean;
+	onUndoUpscalePrompt?: () => void;
 	profileFields?: {
 		name: string;
 		genre: string;
@@ -84,6 +98,12 @@ const SortableAIBlock = ({
 	trackFocusedField,
 	showTestPreview,
 	onGetSuggestions,
+	promptQualityScore,
+	promptQualityLabel,
+	onUpscalePrompt,
+	isUpscalingPrompt,
+	hasPreviousPrompt,
+	onUndoUpscalePrompt,
 	profileFields,
 	onGoToProfileTab,
 	isDragDisabled = false,
@@ -312,7 +332,7 @@ const SortableAIBlock = ({
 	const isTextBlock = block.value === HybridBlock.text;
 	const isFullAutomatedBlock = block.value === HybridBlock.full_automated;
 	const isIntroductionBlock = block.value === HybridBlock.introduction;
-	const isResearchBlock = block.value === HybridBlock.research;
+	const isResearchBlock = block.value === HybridBlock.research;c
 	const isActionBlock = block.value === HybridBlock.action;
 	const isHybridBlock = isIntroductionBlock || isResearchBlock || isActionBlock;
 	const isCompactBlock =
@@ -436,6 +456,24 @@ const SortableAIBlock = ({
 
 		return chips;
 	}, [isFullAutomatedBlock, profileFields]);
+
+	// Full Auto: prompt score meter helpers (display only)
+	const clampedPromptScore = useMemo(() => {
+		if (typeof promptQualityScore !== 'number') return null;
+		return Math.max(60, Math.min(100, Math.round(promptQualityScore)));
+	}, [promptQualityScore]);
+
+	const promptScoreLabel = useMemo(() => {
+		if (clampedPromptScore == null) return null;
+		const label = (promptQualityLabel ?? '').trim();
+		if (label) return label;
+		if (clampedPromptScore >= 90) return 'Excellent';
+		if (clampedPromptScore >= 80) return 'Great';
+		if (clampedPromptScore >= 70) return 'Good';
+		return 'Fair';
+	}, [clampedPromptScore, promptQualityLabel]);
+
+	const promptScoreFillPercent = clampedPromptScore == null ? 0 : clampedPromptScore;
 
 	// Get the border color for the block
 	const getBorderColor = () => {
@@ -1641,7 +1679,7 @@ const SortableAIBlock = ({
 														return (
 															<div
 																className={cn(
-																	'w-full h-[85px] rounded-[8px] border-2 border-black overflow-hidden',
+																	'w-full rounded-[8px] border-2 border-black overflow-hidden',
 																	'flex flex-col bg-[#95CFFF]'
 																)}
 																aria-label="Custom Instructions"
@@ -1663,7 +1701,7 @@ const SortableAIBlock = ({
 																		<span className="text-[14px] leading-none">−</span>
 																	</button>
 																</div>
-																<div className="flex-1 border-t-2 border-black bg-white">
+																<div className="h-[72px] border-t-2 border-black bg-white">
 																	<Textarea
 																		placeholder="Type anything you want to include"
 																		className={cn(
@@ -1686,6 +1724,65 @@ const SortableAIBlock = ({
 																			customInstructionsRef.current = el;
 																		}}
 																	/>
+																</div>
+																{/* Prompt rating + Upscale controls (same wiring as Writing tab) */}
+																<div className="h-[22px] bg-white px-3 flex items-start gap-[6px]">
+																	{/* Score (159 x 20) */}
+																	<div className="w-[159px] h-[20px] box-border bg-white border-2 border-black rounded-[8px] flex items-center gap-[6px] px-[6px]">
+																		<div className="w-[92px] h-[12px] box-border bg-white border-2 border-black rounded-[8px] overflow-hidden shrink-0">
+																			<div
+																				className="h-full bg-[#36B24A] rounded-full transition-[width] duration-200"
+																				style={{ width: `${promptScoreFillPercent}%` }}
+																			/>
+																		</div>
+																		<span className="font-inter font-semibold text-[12px] leading-none text-black truncate">
+																			{promptScoreLabel ?? ''}
+																		</span>
+																	</div>
+
+																	{/* Undo (20 x 20) */}
+																	<button
+																		type="button"
+																		onClick={(e) => {
+																			e.stopPropagation();
+																			if (!hasPreviousPrompt) return;
+																			onUndoUpscalePrompt?.();
+																		}}
+																		disabled={!hasPreviousPrompt}
+																		className={cn(
+																			'w-[20px] h-[20px] box-border rounded-[6px] border-2 border-black bg-[#C2C2C2] flex items-center justify-center p-0',
+																			hasPreviousPrompt
+																				? 'cursor-pointer hover:brightness-[0.98] active:brightness-[0.95]'
+																				: 'cursor-not-allowed opacity-50'
+																		)}
+																		aria-label="Undo Upscale"
+																	>
+																		<UndoIcon width="14" height="14" />
+																	</button>
+
+																	{/* Upscale (73 x 20) */}
+																	<button
+																		type="button"
+																		onClick={(e) => {
+																			e.stopPropagation();
+																			if (!onUpscalePrompt) return;
+																			if (isUpscalingPrompt) return;
+																			void onUpscalePrompt();
+																		}}
+																		disabled={!onUpscalePrompt || Boolean(isUpscalingPrompt)}
+																		className={cn(
+																			'w-[73px] h-[20px] box-border rounded-[8px] border-2 border-black bg-[#D7F0FF] flex items-center justify-between gap-[4px] px-[4px] py-0',
+																			isUpscalingPrompt
+																				? 'cursor-wait opacity-80'
+																				: 'cursor-pointer hover:brightness-[0.98] active:brightness-[0.95]'
+																		)}
+																		aria-label="Upscale Prompt"
+																	>
+																		<span className="font-inter font-semibold text-[11px] leading-none text-black whitespace-nowrap">
+																			{isUpscalingPrompt ? '...' : 'Upscale'}
+																		</span>
+																		<UpscaleIcon width="14" height="14" />
+																	</button>
 																</div>
 															</div>
 														);
@@ -1795,6 +1892,12 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		contact,
 		onGoToDrafting,
 		onGetSuggestions,
+		onUpscalePrompt,
+		isUpscalingPrompt,
+		promptQualityScore,
+		promptQualityLabel,
+		hasPreviousPrompt,
+		onUndoUpscalePrompt,
 		onFocusChange,
 		identity,
 		onIdentityUpdate,
@@ -3294,6 +3397,12 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																		showTestPreview={showTestPreview}
 																		testMessage={testMessage}
 																		onGetSuggestions={onGetSuggestions}
+																		promptQualityScore={promptQualityScore}
+																		promptQualityLabel={promptQualityLabel}
+																		onUpscalePrompt={onUpscalePrompt}
+																		isUpscalingPrompt={isUpscalingPrompt}
+																		hasPreviousPrompt={hasPreviousPrompt}
+																		onUndoUpscalePrompt={onUndoUpscalePrompt}
 																		profileFields={profileFields}
 																		onGoToProfileTab={() => setActiveTab('profile')}
 																		isDragDisabled={isHybridModeSelected}

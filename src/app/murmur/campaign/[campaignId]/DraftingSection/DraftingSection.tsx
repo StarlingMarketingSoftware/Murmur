@@ -3125,6 +3125,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													onGetSuggestions={handleGetSuggestions}
 													onUpscalePrompt={upscalePrompt}
 													isUpscalingPrompt={isUpscalingPrompt}
+													promptQualityScore={promptQualityScore}
+													promptQualityLabel={promptQualityLabel}
+													hasPreviousPrompt={hasPreviousPrompt}
+													onUndoUpscalePrompt={undoUpscalePrompt}
 													onFocusChange={handlePromptInputFocusChange}
 													hideDraftButton={true}
 													identity={campaign?.identity}
@@ -3254,6 +3258,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											onGetSuggestions={handleGetSuggestions}
 											onUpscalePrompt={upscalePrompt}
 											isUpscalingPrompt={isUpscalingPrompt}
+											promptQualityScore={promptQualityScore}
+											promptQualityLabel={promptQualityLabel}
+											hasPreviousPrompt={hasPreviousPrompt}
+											onUndoUpscalePrompt={undoUpscalePrompt}
 											onFocusChange={handlePromptInputFocusChange}
 											isNarrowestDesktop={isNarrowestDesktop}
 											hideDraftButton={isNarrowestDesktop}

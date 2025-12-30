@@ -102,6 +102,24 @@ export interface HybridPromptInputProps {
 	 */
 	isUpscalingPrompt?: boolean;
 	/**
+	 * Optional: the current prompt quality score (0-100) for Full Auto prompts.
+	 * Used to render the rating meter UI.
+	 */
+	promptQualityScore?: number | null;
+	/**
+	 * Optional: the label associated with the prompt quality score (e.g. "Good").
+	 * Used to render the rating meter UI.
+	 */
+	promptQualityLabel?: string | null;
+	/**
+	 * Optional: indicates if there is a previous prompt value available for undoing an upscale.
+	 */
+	hasPreviousPrompt?: boolean;
+	/**
+	 * Optional: invoked when the user clicks the Undo button for an upscaled prompt.
+	 */
+	onUndoUpscalePrompt?: () => void;
+	/**
 	 * Optional: invoked when focus state changes within the prompt input area.
 	 */
 	onFocusChange?: (isFocused: boolean) => void;
@@ -146,6 +164,10 @@ export const useHybridPromptInput = (props: HybridPromptInputProps) => {
 		onGetSuggestions,
 		onUpscalePrompt,
 		isUpscalingPrompt,
+		promptQualityScore,
+		promptQualityLabel,
+		hasPreviousPrompt,
+		onUndoUpscalePrompt,
 		onFocusChange,
 		identity,
 		onIdentityUpdate,
@@ -519,6 +541,10 @@ export const useHybridPromptInput = (props: HybridPromptInputProps) => {
 		onGetSuggestions,
 		onUpscalePrompt,
 		isUpscalingPrompt,
+		promptQualityScore,
+		promptQualityLabel,
+		hasPreviousPrompt,
+		onUndoUpscalePrompt,
 		onFocusChange,
 		identity,
 		onIdentityUpdate,
