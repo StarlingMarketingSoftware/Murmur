@@ -1330,18 +1330,33 @@ Each suggestion MUST be a single, complete sentence (no bullet points) and shoul
 		setIsUpscalingPrompt(true);
 
 		try {
-			const upscaleSystemPrompt = `You are an expert at improving email prompts. Your task is to take a user's prompt for generating outreach emails and make it significantly better.
+			const upscaleSystemPrompt = `You are an expert at refining custom instructions for an AI email generator.
 
-INSTRUCTIONS:
-1. You're a musicians trying to get yourself booked for a show by writing an email.
-2. The output should be the improved prompt ONLY - no explanations, no JSON, no markdown
+CONTEXT:
+- The user is a musician trying to book shows at venues
+- The AI already handles the main email generation (intro, research on venue, call to action)
+- These "Custom Instructions" are ADDITIONAL guidance to fine-tune the AI's output
+- They are NOT the full email prompt - just small tweaks and preferences
 
-The improved prompt should result in more personalized, engaging, and effective emails.`;
+YOUR TASK:
+Improve the user's custom instructions by making them clearer, more specific, and more effective.
+
+RULES:
+1. Keep it SHORT - these are supplementary instructions, not a full prompt
+2. Focus on tone, style preferences, specific things to mention/avoid
+3. Do NOT write full email templates or lengthy instructions
+4. Output the improved instructions ONLY - no explanations, no JSON, no markdown
+5. If the input is already good, make only minor refinements
+
+EXAMPLES OF GOOD CUSTOM INSTRUCTIONS:
+- "Keep tone casual but professional. Mention we're touring through their area in March."
+- "Emphasize our draw numbers. Don't mention other venues by name."
+- "Be direct and concise. We prefer Tuesday-Thursday shows."`;
 
 			const response = await callGeminiForScoring({
 				model: GEMINI_MODEL_OPTIONS.gemini25Flash,
 				prompt: upscaleSystemPrompt,
-				content: `Current prompt to improve:\n\n${currentPrompt}`,
+				content: `User's custom instructions to improve:\n\n${currentPrompt}`,
 			});
 
 			// Clean the response - remove any markdown or extra formatting
@@ -1352,26 +1367,29 @@ The improved prompt should result in more personalized, engaging, and effective 
 				.replace(/^```(?:\w+)?\s*/i, '')
 				.replace(/\s*```$/i, '');
 
-			if (improvedPrompt && improvedPrompt.length > currentPrompt.length * 0.5) {
-				// Update the full_automated block with the improved prompt
-				const updatedBlocks = blocks.map((block) => {
-					if (block.type === 'full_automated') {
-						return { ...block, value: improvedPrompt };
-					}
-					return block;
-				});
+			// For custom instructions, just check we got a reasonable response (at least 10 chars)
+			// Shorter can be valid since we're refining, not expanding
+			if (improvedPrompt && improvedPrompt.length >= 10) {
+				// Find the index of the full_automated block and update its value directly
+				// Using the specific field path ensures the registered input syncs properly
+				const fullAutomatedIndex = blocks.findIndex((b) => b.type === 'full_automated');
+				if (fullAutomatedIndex !== -1) {
+					form.setValue(
+						`hybridBlockPrompts.${fullAutomatedIndex}.value` as const,
+						improvedPrompt,
+						{
+							shouldDirty: true,
+							shouldValidate: true,
+						}
+					);
+				}
 
-				form.setValue('hybridBlockPrompts', updatedBlocks, {
-					shouldDirty: true,
-					shouldValidate: true,
-				});
-
-				toast.success('Prompt upscaled successfully!');
+				toast.success('Instructions refined!');
 
 				// Re-score the new prompt
 				await scoreFullAutomatedPrompt(improvedPrompt);
 			} else {
-				toast.error('Failed to generate an improved prompt. Please try again.');
+				toast.error('Failed to refine instructions. Please try again.');
 			}
 		} catch (error) {
 			console.error('[Upscale Prompt] Error:', error);
@@ -1391,17 +1409,19 @@ The improved prompt should result in more personalized, engaging, and effective 
 		}
 
 		const blocks = form.getValues('hybridBlockPrompts');
-		const updatedBlocks = blocks.map((block) => {
-			if (block.type === 'full_automated') {
-				return { ...block, value: previousPromptValue };
-			}
-			return block;
-		});
-
-		form.setValue('hybridBlockPrompts', updatedBlocks, {
-			shouldDirty: true,
-			shouldValidate: true,
-		});
+		// Find the index of the full_automated block and update its value directly
+		// Using the specific field path ensures the registered input syncs properly
+		const fullAutomatedIndex = blocks.findIndex((b) => b.type === 'full_automated');
+		if (fullAutomatedIndex !== -1) {
+			form.setValue(
+				`hybridBlockPrompts.${fullAutomatedIndex}.value` as const,
+				previousPromptValue,
+				{
+					shouldDirty: true,
+					shouldValidate: true,
+				}
+			);
+		}
 
 		// Re-score the restored prompt
 		scoreFullAutomatedPrompt(previousPromptValue);
