@@ -124,6 +124,15 @@ export interface HybridPromptInputProps {
 	 */
 	onFocusChange?: (isFocused: boolean) => void;
 	/**
+	 * Optional: invoked when hover state changes within the prompt input area.
+	 */
+	onHoverChange?: (isHovered: boolean) => void;
+	/**
+	 * Optional: invoked when the Full Auto "Custom Instructions" expander opens/closes.
+	 * Used by parents to conditionally show the suggestions panel.
+	 */
+	onCustomInstructionsOpenChange?: (isOpen: boolean) => void;
+	/**
 	 * Optional: indicates narrow desktop mode (1024px-1279px) for responsive layout adjustments.
 	 */
 	isNarrowDesktop?: boolean;
@@ -169,6 +178,8 @@ export const useHybridPromptInput = (props: HybridPromptInputProps) => {
 		hasPreviousPrompt,
 		onUndoUpscalePrompt,
 		onFocusChange,
+		onHoverChange,
+		onCustomInstructionsOpenChange,
 		identity,
 		onIdentityUpdate,
 	} = props;
@@ -546,6 +557,8 @@ export const useHybridPromptInput = (props: HybridPromptInputProps) => {
 		hasPreviousPrompt,
 		onUndoUpscalePrompt,
 		onFocusChange,
+		onHoverChange,
+		onCustomInstructionsOpenChange,
 		identity,
 		onIdentityUpdate,
 	};

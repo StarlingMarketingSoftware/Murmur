@@ -1017,23 +1017,39 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const suggestionText2 = promptSuggestions?.[1] || '';
 	const suggestionText3 = promptSuggestions?.[2] || '';
 
-	// Track if the HybridPromptInput is focused to show/hide suggestions box
-	const [isPromptInputFocused, setIsPromptInputFocused] = useState(false);
-	const suggestionBoxRef = useRef<HTMLDivElement>(null);
-	
-	const handlePromptInputFocusChange = useCallback((isFocused: boolean) => {
-		if (isFocused) {
-			setIsPromptInputFocused(true);
-		} else {
-			setTimeout(() => {
-				const activeElement = document.activeElement;
-				if (suggestionBoxRef.current?.contains(activeElement)) {
-					return;
-				}
-				setIsPromptInputFocused(false);
-			}, 50);
-		}
+	// Show the suggestions box only when:
+	// - Custom Instructions is open, AND
+	// - the user is hovering the HybridPromptInput area.
+	const [isPromptInputHovered, setIsPromptInputHovered] = useState(false);
+	const [isCustomInstructionsOpen, setIsCustomInstructionsOpen] = useState(false);
+	const [isSuggestionBoxHovered, setIsSuggestionBoxHovered] = useState(false);
+	const suggestionHoverLeaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+	const clearSuggestionHoverLeaveTimeout = useCallback(() => {
+		if (!suggestionHoverLeaveTimeoutRef.current) return;
+		clearTimeout(suggestionHoverLeaveTimeoutRef.current);
+		suggestionHoverLeaveTimeoutRef.current = null;
 	}, []);
+
+	// Small delay prevents the Suggestions box from disappearing while moving the mouse
+	// across the gap between the Writing box and the Suggestions box.
+	const handlePromptInputHoverChange = useCallback(
+		(isHovered: boolean) => {
+			clearSuggestionHoverLeaveTimeout();
+			if (isHovered) {
+				setIsPromptInputHovered(true);
+				return;
+			}
+			suggestionHoverLeaveTimeoutRef.current = setTimeout(() => {
+				setIsPromptInputHovered(false);
+			}, 900);
+		},
+		[clearSuggestionHoverLeaveTimeout]
+	);
+
+	useEffect(() => {
+		return () => clearSuggestionHoverLeaveTimeout();
+	}, [clearSuggestionHoverLeaveTimeout]);
 
 	const handleGetSuggestions = useCallback(
 		async (text: string) => {
@@ -2352,24 +2368,15 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										))}
 
 									{view === 'testing' &&
-										isPromptInputFocused &&
+										(isPromptInputHovered || isSuggestionBoxHovered) &&
+										isCustomInstructionsOpen &&
 										(suggestionText1 || suggestionText2) && (
 											<div
-												ref={suggestionBoxRef}
-												tabIndex={-1}
-												onBlur={(e) => {
-													// Check if focus is moving outside the suggestion box and prompt input
-													const relatedTarget = e.relatedTarget as HTMLElement | null;
-													const promptInputContainer = document.querySelector(
-														'[data-hpi-container]'
-													);
-													if (
-														!suggestionBoxRef.current?.contains(relatedTarget) &&
-														!promptInputContainer?.contains(relatedTarget)
-													) {
-														setIsPromptInputFocused(false);
-													}
+												onMouseEnter={() => {
+													clearSuggestionHoverLeaveTimeout();
+													setIsSuggestionBoxHovered(true);
 												}}
+												onMouseLeave={() => setIsSuggestionBoxHovered(false)}
 												style={{
 													width: '405px',
 													height: '319px',
@@ -3131,7 +3138,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													promptQualityLabel={promptQualityLabel}
 													hasPreviousPrompt={hasPreviousPrompt}
 													onUndoUpscalePrompt={undoUpscalePrompt}
-													onFocusChange={handlePromptInputFocusChange}
+													onHoverChange={handlePromptInputHoverChange}
+													onCustomInstructionsOpenChange={setIsCustomInstructionsOpen}
 													hideDraftButton={true}
 													identity={campaign?.identity}
 													onIdentityUpdate={handleIdentityUpdate}
@@ -3264,7 +3272,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											promptQualityLabel={promptQualityLabel}
 											hasPreviousPrompt={hasPreviousPrompt}
 											onUndoUpscalePrompt={undoUpscalePrompt}
-											onFocusChange={handlePromptInputFocusChange}
+											onHoverChange={handlePromptInputHoverChange}
+											onCustomInstructionsOpenChange={setIsCustomInstructionsOpen}
 											isNarrowestDesktop={isNarrowestDesktop}
 											hideDraftButton={isNarrowestDesktop}
 											identity={campaign?.identity}

@@ -76,6 +76,10 @@ interface SortableAIBlockProps {
 	isUpscalingPrompt?: boolean;
 	hasPreviousPrompt?: boolean;
 	onUndoUpscalePrompt?: () => void;
+	/**
+	 * Full Auto: notify parent when Custom Instructions expander opens/closes.
+	 */
+	onCustomInstructionsOpenChange?: (isOpen: boolean) => void;
 	profileFields?: {
 		name: string;
 		genre: string;
@@ -104,6 +108,7 @@ const SortableAIBlock = ({
 	isUpscalingPrompt,
 	hasPreviousPrompt,
 	onUndoUpscalePrompt,
+	onCustomInstructionsOpenChange,
 	profileFields,
 	onGoToProfileTab,
 	isDragDisabled = false,
@@ -117,6 +122,8 @@ const SortableAIBlock = ({
 	const [isAdvancedEnabled, setIsAdvancedEnabled] = useState(false);
 	// Full Auto: custom instructions expander (stored in hybridBlockPrompts[fieldIndex].value)
 	const [isCustomInstructionsOpen, setIsCustomInstructionsOpen] = useState(false);
+	// Used by effects below (declared early to avoid TDZ issues)
+	const isFullAutomatedBlock = block.value === HybridBlock.full_automated;
 	const customInstructionsRef = useRef<HTMLTextAreaElement | null>(null);
 	const customInstructionsContainerRef = useRef<HTMLDivElement | null>(null);
 	// Full Auto: Booking For dropdown
@@ -240,6 +247,20 @@ const SortableAIBlock = ({
 		requestAnimationFrame(() => customInstructionsRef.current?.focus());
 	}, [isCustomInstructionsOpen]);
 
+	// Notify parent when Custom Instructions opens/closes (Full Auto only)
+	useEffect(() => {
+		if (!isFullAutomatedBlock) return;
+		onCustomInstructionsOpenChange?.(isCustomInstructionsOpen);
+	}, [isCustomInstructionsOpen, isFullAutomatedBlock, onCustomInstructionsOpenChange]);
+
+	// Ensure parent state resets when this block unmounts (e.g. mode switch)
+	useEffect(() => {
+		if (!isFullAutomatedBlock) return;
+		return () => {
+			onCustomInstructionsOpenChange?.(false);
+		};
+	}, [isFullAutomatedBlock, onCustomInstructionsOpenChange]);
+
 	// Close Custom Instructions when clicking away
 	useEffect(() => {
 		if (!isCustomInstructionsOpen) return;
@@ -330,7 +351,6 @@ const SortableAIBlock = ({
 	};
 
 	const isTextBlock = block.value === HybridBlock.text;
-	const isFullAutomatedBlock = block.value === HybridBlock.full_automated;
 	const isIntroductionBlock = block.value === HybridBlock.introduction;
 	const isResearchBlock = block.value === HybridBlock.research;
 	const isActionBlock = block.value === HybridBlock.action;
@@ -1916,6 +1936,8 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		hasPreviousPrompt,
 		onUndoUpscalePrompt,
 		onFocusChange,
+		onHoverChange,
+		onCustomInstructionsOpenChange,
 		identity,
 		onIdentityUpdate,
 	} = useHybridPromptInput(props);
@@ -2705,6 +2727,8 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 							data-hpi-container
 							onFocus={handleContainerFocus}
 							onBlur={handleContainerBlur}
+							onMouseEnter={() => onHoverChange?.(true)}
+							onMouseLeave={() => onHoverChange?.(false)}
 						>
 							{/* Border overlay to ensure crisp, unbroken stroke at rounded corners */}
 							{!compactLeftOnly && (
@@ -3420,6 +3444,11 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																		isUpscalingPrompt={isUpscalingPrompt}
 																		hasPreviousPrompt={hasPreviousPrompt}
 																		onUndoUpscalePrompt={onUndoUpscalePrompt}
+																		onCustomInstructionsOpenChange={
+																			field.type === HybridBlock.full_automated
+																				? onCustomInstructionsOpenChange
+																				: undefined
+																		}
 																		profileFields={profileFields}
 																		onGoToProfileTab={() => setActiveTab('profile')}
 																		isDragDisabled={isHybridModeSelected}
