@@ -1008,7 +1008,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 
 	const clampedPromptScore =
 		typeof promptQualityScore === 'number'
-			? Math.max(60, Math.min(100, Math.round(promptQualityScore)))
+			? Math.max(70, Math.min(98, Math.round(promptQualityScore)))
 			: null;
 
 	const promptScoreFillPercent = clampedPromptScore == null ? 0 : clampedPromptScore;
@@ -1057,13 +1057,15 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			? ''
 			: `${clampedPromptScore} - ${
 					promptQualityLabel ||
-					(clampedPromptScore >= 90
+					(clampedPromptScore >= 97
+						? 'Exceptional'
+						: clampedPromptScore >= 91
 						? 'Excellent'
-						: clampedPromptScore >= 80
+						: clampedPromptScore >= 83
 						? 'Great'
-						: clampedPromptScore >= 70
+						: clampedPromptScore >= 75
 						? 'Good'
-						: 'Fair')
+						: 'Keep Going')
 			  }`;
 
 	const [contactsTabSelectedIds, setContactsTabSelectedIds] = useState<Set<number>>(

@@ -460,17 +460,18 @@ const SortableAIBlock = ({
 	// Full Auto: prompt score meter helpers (display only)
 	const clampedPromptScore = useMemo(() => {
 		if (typeof promptQualityScore !== 'number') return null;
-		return Math.max(60, Math.min(100, Math.round(promptQualityScore)));
+		return Math.max(70, Math.min(98, Math.round(promptQualityScore)));
 	}, [promptQualityScore]);
 
 	const promptScoreLabel = useMemo(() => {
 		if (clampedPromptScore == null) return null;
 		const label = (promptQualityLabel ?? '').trim();
 		if (label) return label;
-		if (clampedPromptScore >= 90) return 'Excellent';
-		if (clampedPromptScore >= 80) return 'Great';
-		if (clampedPromptScore >= 70) return 'Good';
-		return 'Fair';
+		if (clampedPromptScore >= 97) return 'Exceptional';
+		if (clampedPromptScore >= 91) return 'Excellent';
+		if (clampedPromptScore >= 83) return 'Great';
+		if (clampedPromptScore >= 75) return 'Good';
+		return 'Keep Going';
 	}, [clampedPromptScore, promptQualityLabel]);
 
 	const promptScoreFillPercent = clampedPromptScore == null ? 0 : clampedPromptScore;
@@ -1713,6 +1714,22 @@ const SortableAIBlock = ({
 																		)}
 																		{...fieldProps}
 																		onClick={(e) => e.stopPropagation()}
+																		onKeyDown={async (e) => {
+																			// Enter should score the prompt, Shift+Enter should insert a newline.
+																			if (e.key !== 'Enter') return;
+																			if (e.shiftKey) return;
+																			// Avoid interfering with IME composition confirmation.
+																			// (Some browsers also expose this as `e.nativeEvent.isComposing`.)
+																			// @ts-expect-error - React KeyboardEvent doesn't always expose isComposing in types
+																			if (e.isComposing || (e.nativeEvent as any)?.isComposing) return;
+
+																			e.preventDefault();
+																			e.stopPropagation();
+
+																			const currentValue =
+																				form.getValues(`hybridBlockPrompts.${fieldIndex}.value`) || '';
+																			await onGetSuggestions?.(currentValue);
+																		}}
 																		onFocus={(e) => {
 																			trackFocusedField?.(
 																				`hybridBlockPrompts.${fieldIndex}.value`,
@@ -1735,8 +1752,8 @@ const SortableAIBlock = ({
 																				style={{ width: `${promptScoreFillPercent}%` }}
 																			/>
 																		</div>
-																		<span className="font-inter font-semibold text-[12px] leading-none text-black truncate">
-																			{promptScoreLabel ?? ''}
+																		<span className="font-inter font-semibold text-[12px] leading-none text-black flex-1 text-center tabular-nums truncate">
+																			{clampedPromptScore ?? ''}
 																		</span>
 																	</div>
 

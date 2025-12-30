@@ -355,6 +355,12 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		suppressToasts: true,
 	});
 
+	// Separate Gemini mutation for prompt scoring / suggestions so it doesn't disable
+	// "Generate Test" while the user is evaluating their prompt.
+	const { mutateAsync: callGeminiForScoring } = useGemini({
+		suppressToasts: true,
+	});
+
 	// OpenRouter for Full AI mode drafting
 	const {
 		isPending: isPendingCallOpenRouter,
@@ -943,26 +949,49 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 				GEMINI_MODEL_OPTIONS.gemini25Flash ||
 				GEMINI_MODEL_OPTIONS.gemini2Flash;
 
-			const scoringPrompt = `You are evaluating the quality of a musician's email-writing prompt that will be used to generate outreach emails to venues and promoters.
+			const scoringPrompt = `You are evaluating the quality of a musician's email-writing PROMPT that will be used to generate outreach emails to venues and promoters.
 
-Analyze the PROMPT text below and assign a single numeric quality score between 60 and 100 inclusive, where:
-- 60–69 = Keep Going
-- 70–79 = Good
-- 80–89 = Great
-- 90–100 = Excellent
+Return a single integer score between 70 and 98 inclusive. This scale intentionally skews high:
+- 70–74 = Keep Going
+- 75–82 = Good
+- 83–90 = Great
+- 91–96 = Excellent
+- 97–98 = Exceptional
 
-			Look for specific details like, do they have specifics about themselves? Did the artist add an EPK?
-			Judge by how many details they have about themselves. 
+BIAS / CALIBRATION:
+- Start from a default baseline of 88 for a typical usable prompt and adjust up/down.
+- This prompt is supplementary “custom instructions” (not the drafting system prompt). Optimize for simple, short add-ons.
+- Default to high scores unless the prompt is extremely empty/vague (e.g., literally “hello”).
+- Do NOT punish brevity. A single great descriptive sentence can be 97–98.
 
-			Return ONLY a valid JSON object with this exact shape and no extra commentary or formatting:
-			{"score": 75, "label": "Good", "suggestion1": "First one-sentence suggestion to improve the prompt.", "suggestion2": "Second one-sentence suggestion to improve the prompt.", "suggestion3": "Third one-sentence suggestion to improve the prompt."}
-			DON'T USE THE WORD "AI" IN THE SUGGESTIONS.
-			Each suggestion MUST be a single, complete sentence (no bullet points) and should be as specific and actionable as possible. Each suggestion should be unique and different from the others.`;
+
+SCORING PRIORITIES (MOST IMPORTANT FIRST):
+1) Descriptive language: reward vivid, specific ADJECTIVES/ADVERBS that shape tone, vibe, and style (e.g., warm, concise, energetic, moody, intimate, high-energy, cinematic).
+2) Useful constraints: clear tone, length, structure, and CTA expectations.
+3) Context & fit: anything that helps match the venue/promoter and the artist honestly.
+
+IMPORTANT RULES:
+- Do NOT reward length. A single concise, highly descriptive sentence can absolutely score 97–98.
+- Prefer adjective-rich specificity over noun lists. Proper nouns and generic nouns add little unless paired with strong descriptors.
+- Be comfortable giving very high scores when the prompt is brief but vivid and directive.
+
+Return ONLY a valid JSON object with this exact shape and no extra commentary or formatting:
+{"score": 88, "label": "Great", "suggestion1": "First one-sentence suggestion to improve the prompt.", "suggestion2": "Second one-sentence suggestion to improve the prompt.", "suggestion3": "Third one-sentence suggestion to improve the prompt."}
+DON'T USE THE WORD "AI" IN THE SUGGESTIONS.
+SUGGESTION STYLE (VERY IMPORTANT):
+- Suggestions are *add-on instructions* the user could paste directly into their custom instructions.
+- Keep each suggestion SHORT: one line, no bullets, no paragraphing, ideally 6–14 words.
+- Prefer patterns like:
+  - Try phrasing: "…"
+  - Add detail about X (…)
+  - Specify tone/length/structure (…)
+- Optimize for wording improvements (“try this phrasing”) or missing specifics (“be more detailed about X”), not rewriting the whole prompt.
+Each suggestion MUST be a single sentence (no bullet points), specific, and actionable. Each suggestion should be unique and different from the others.`;
 
 			const scoringContent = `PROMPT:\n${trimmed}`;
 
 			try {
-				const raw = await callGemini({
+				const raw = await callGeminiForScoring({
 					model: scoringModel,
 					prompt: scoringPrompt,
 					content: scoringContent,
@@ -1004,9 +1033,9 @@ Analyze the PROMPT text below and assign a single numeric quality score between 
 					rawScore = Number.isFinite(numeric) ? numeric : null;
 				}
 
-				// Fallback: pull first 60–100-ish number out of the text
+				// Fallback: pull first 70–100-ish number out of the text
 				if (rawScore === null) {
-					const match = cleaned.match(/\b(6[0-9]|7[0-9]|8[0-9]|9[0-9]|100)\b/);
+					const match = cleaned.match(/\b(7[0-9]|8[0-9]|9[0-9]|100)\b/);
 					if (match) {
 						rawScore = Number(match[0]);
 					}
@@ -1020,8 +1049,17 @@ Analyze the PROMPT text below and assign a single numeric quality score between 
 					return;
 				}
 
+				const MIN_PROMPT_SCORE = 70;
+				const MAX_PROMPT_SCORE = 98;
+
 				let score = Math.round(rawScore);
-				score = Math.max(60, Math.min(100, score));
+				score = Math.max(MIN_PROMPT_SCORE, Math.min(MAX_PROMPT_SCORE, score));
+
+				// Skew higher while preserving endpoints (70 stays 70, 98 stays 98).
+				const t = (score - MIN_PROMPT_SCORE) / (MAX_PROMPT_SCORE - MIN_PROMPT_SCORE); // 0..1
+				const skewed = Math.pow(t, 0.55); // lower exponent skews upward more
+				score = Math.round(MIN_PROMPT_SCORE + skewed * (MAX_PROMPT_SCORE - MIN_PROMPT_SCORE));
+				score = Math.max(MIN_PROMPT_SCORE, Math.min(MAX_PROMPT_SCORE, score));
 
 				const labelFromModel =
 					typeof parsed.label === 'string' && parsed.label.trim().length > 0
@@ -1029,13 +1067,15 @@ Analyze the PROMPT text below and assign a single numeric quality score between 
 						: undefined;
 
 				const fallbackLabel =
-					score >= 90
+					score >= 97
+						? 'Exceptional'
+						: score >= 91
 						? 'Excellent'
-						: score >= 80
+						: score >= 83
 						? 'Great'
-						: score >= 70
+						: score >= 75
 						? 'Good'
-						: 'Fair';
+						: 'Keep Going';
 
 				// Extract up to three suggestions from the model response
 				const rawSuggestions: string[] = [];
@@ -1091,7 +1131,7 @@ Analyze the PROMPT text below and assign a single numeric quality score between 
 				setPromptSuggestions([]);
 			}
 		},
-		[callGemini]
+		[callGeminiForScoring]
 	);
 
 	/**
@@ -1139,7 +1179,7 @@ Each suggestion MUST be a single, complete sentence (no bullet points) and shoul
 			const scoringContent = `EMAIL TEXT:\n${trimmed}`;
 
 			try {
-				const raw = await callGemini({
+				const raw = await callGeminiForScoring({
 					model: scoringModel,
 					prompt: critiquePrompt,
 					content: scoringContent,
@@ -1268,7 +1308,7 @@ Each suggestion MUST be a single, complete sentence (no bullet points) and shoul
 				setPromptSuggestions([]);
 			}
 		},
-		[callGemini]
+		[callGeminiForScoring]
 	);
 
 	/**
@@ -1298,7 +1338,7 @@ INSTRUCTIONS:
 
 The improved prompt should result in more personalized, engaging, and effective emails.`;
 
-			const response = await callGemini({
+			const response = await callGeminiForScoring({
 				model: GEMINI_MODEL_OPTIONS.gemini25Flash,
 				prompt: upscaleSystemPrompt,
 				content: `Current prompt to improve:\n\n${currentPrompt}`,
@@ -1339,7 +1379,7 @@ The improved prompt should result in more personalized, engaging, and effective 
 		} finally {
 			setIsUpscalingPrompt(false);
 		}
-	}, [callGemini, form, scoreFullAutomatedPrompt]);
+	}, [callGeminiForScoring, form, scoreFullAutomatedPrompt]);
 
 	/**
 	 * Undo the upscaled prompt by restoring the previous value.
