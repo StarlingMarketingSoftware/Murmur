@@ -437,7 +437,7 @@ const Murmur = () => {
 						aria-label="Open dashboard search for this campaign"
 						title="Search for more contacts"
 						onClick={handleOpenDashboardSearchForCampaign}
-						className="group relative pointer-events-auto w-[477px] max-w-[calc(100vw-32px)] h-[42px] box-border border border-[#929292] hover:border-black hover:border-2 rounded-[10px] overflow-hidden transition-[color,border-color,border-width] duration-150"
+						className="group relative pointer-events-auto w-[477px] max-w-[calc(100vw-32px)] h-[42px] box-border border border-[#929292] hover:border-black hover:border-2 rounded-[10px] overflow-hidden transition-[color,border-color,border-width] duration-150 cursor-pointer"
 					>
 						<SearchMap
 							aria-hidden="true"
