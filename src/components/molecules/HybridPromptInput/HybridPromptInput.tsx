@@ -2529,6 +2529,10 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		hasSubjectBeenTouched &&
 		(!subjectValue || subjectValue.trim() === '');
 
+	// Signature auto/manual mode toggle (local state for Full Auto mode)
+	const [isAutoSignature, setIsAutoSignature] = useState(true);
+	const [manualSignatureValue, setManualSignatureValue] = useState('');
+
 	const isHandwrittenMode =
 		(form.getValues('hybridBlockPrompts')?.length || 0) > 0 &&
 		form.getValues('hybridBlockPrompts').every((b) => b.type === HybridBlock.text);
@@ -4097,7 +4101,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 									</div>
 								<div
 									className={cn(
-										'flex-1 min-h-0 flex flex-col overflow-y-auto hide-native-scrollbar',
+										'flex-1 min-h-0 flex flex-col overflow-y-auto hide-native-scrollbar relative',
 										shouldEnableHybridPlusGutter && 'w-[calc(100%_+_90px)] -mr-[90px]'
 									)}
 									data-hpi-content
@@ -5266,30 +5270,130 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 												className={cn(
 													showTestPreview
 														? 'w-[426px] max-[480px]:w-[89.33vw]'
-														: 'w-[89.33vw] max-w-[468px]'
+														: 'w-[89.33vw] max-w-[467px]',
+													'h-[97px] flex flex-col'
 												)}
 												data-hpi-signature-auto
 											>
-												<div className="flex items-center gap-2">
+												{isAutoSignature ? (
+													<div className="group/signature relative h-[31px]">
+														{/* Collapsed state - shown by default, hidden on hover */}
+														<div className="flex items-center gap-2 group-hover/signature:hidden">
+															<div
+																className={cn(
+																	'flex items-center justify-center h-[31px] max-[480px]:h-[24px] rounded-[8px] border-2 border-black overflow-hidden w-[122px]'
+																)}
+																style={{ backgroundColor: '#E0E0E0' }}
+															>
+																<span className="font-inter font-medium text-[18px] max-[480px]:text-[12px] whitespace-nowrap text-black">
+																	Signature
+																</span>
+															</div>
+															<span className="font-inter font-normal text-[13px] text-[#000000]">
+																Auto
+															</span>
+														</div>
+														{/* Expanded state - hidden by default, shown on hover */}
+														<div
+															className={cn(
+																'hidden group-hover/signature:flex items-center h-[31px] max-[480px]:h-[24px] rounded-[8px] border-2 border-black overflow-hidden bg-white w-full'
+															)}
+														>
+															<div
+																className={cn(
+																	'pl-2 flex items-center h-full shrink-0 w-[140px]',
+																	'bg-[#E0E0E0]'
+																)}
+															>
+																<span className="font-inter font-semibold text-[17px] max-[480px]:text-[12px] whitespace-nowrap text-black">
+																	Auto Signature
+																</span>
+															</div>
+
+															<button
+																type="button"
+																onClick={() => setIsAutoSignature(false)}
+																className={cn(
+																	'relative h-full flex items-center text-[12px] font-inter font-normal transition-colors shrink-0',
+																	'w-[47px] px-2 justify-center text-black bg-[#4ADE80] hover:bg-[#3ECC72] active:bg-[#32BA64]'
+																)}
+															>
+																<span className="absolute left-0 h-full border-l border-black"></span>
+																<span>on</span>
+																<span className="absolute right-0 h-full border-r border-black"></span>
+															</button>
+
+															<div className={cn('flex-grow h-full', 'bg-white')}>
+																<Input
+																	className={cn(
+																		'w-full h-full !bg-transparent pl-4 pr-3 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 max-[480px]:placeholder:text-[10px] max-[480px]:!transition-none max-[480px]:!duration-0',
+																		'!text-black placeholder:!text-[#9E9E9E]',
+																		'max-[480px]:pl-2'
+																	)}
+																	placeholder="Write manual Signature here"
+																/>
+															</div>
+														</div>
+													</div>
+												) : (
+													/* Manual signature mode: 467x97px box with header and text area */
 													<div
 														className={cn(
-															'flex items-center justify-center h-[31px] max-[480px]:h-[24px] rounded-[8px] border-2 border-black overflow-hidden w-[122px]'
+															'w-full h-[97px] rounded-[8px] border-2 border-black overflow-hidden flex flex-col'
 														)}
-														style={{ backgroundColor: '#E0E0E0' }}
 													>
-														<span className="font-inter font-medium text-[18px] max-[480px]:text-[12px] whitespace-nowrap text-black">
-															Signature
-														</span>
+														{/* Header row */}
+														<div className="flex items-center h-[31px] shrink-0 bg-[#E0E0E0]">
+															<div
+																className={cn(
+																	'pl-2 flex items-center h-full shrink-0 w-[100px]',
+																	'bg-[#E0E0E0]'
+																)}
+															>
+																<span className="font-inter font-semibold text-[17px] max-[480px]:text-[12px] whitespace-nowrap text-black">
+																	Signature
+																</span>
+															</div>
+
+															<button
+																type="button"
+																onClick={() => {
+																	setIsAutoSignature(true);
+																	setManualSignatureValue('');
+																}}
+																className={cn(
+																	'relative h-full flex items-center text-[12px] font-inter font-normal transition-colors shrink-0',
+																	'w-[70px] px-2 justify-center text-black bg-[#C3BCBC] hover:bg-[#B5AEAE] active:bg-[#A7A0A0]'
+																)}
+															>
+																<span className="absolute left-0 h-full border-l border-black"></span>
+																<span>Auto off</span>
+																<span className="absolute right-0 h-full border-r border-black"></span>
+															</button>
+
+															<div className="flex-grow h-full bg-[#E0E0E0]" />
+														</div>
+														{/* Divider line */}
+														<div className="w-full h-[1px] bg-black shrink-0" />
+														{/* Text entry area */}
+														<div className="flex-1 bg-white">
+															<Textarea
+																value={manualSignatureValue}
+																onChange={(e) => setManualSignatureValue(e.target.value)}
+																className={cn(
+																	'w-full h-full !bg-transparent px-3 py-2 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 resize-none',
+																	'!text-black placeholder:!text-[#9E9E9E] font-inter text-[14px]'
+																)}
+																placeholder="Enter your signature..."
+															/>
+														</div>
 													</div>
-													<span className="font-inter font-normal text-[13px] text-[#000000]">
-														Auto
-													</span>
-												</div>
+												)}
 											</div>
 										)}
 										{/* Full Auto: Generate Test button sits in the empty green space (desktop) */}
 										{selectedModeKey === 'full' && !showTestPreview && !compactLeftOnly && (
-											<div className="flex-1 w-full flex items-center justify-center max-[480px]:hidden">
+											<div className="absolute bottom-[194px] left-0 right-0 w-full flex items-center justify-center max-[480px]:hidden">
 												<Button
 													type="button"
 													onClick={() => {
