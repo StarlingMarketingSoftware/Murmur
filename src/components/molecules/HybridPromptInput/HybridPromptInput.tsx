@@ -2744,6 +2744,14 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 	const [manualSelectedTextColor, setManualSelectedTextColor] = useState<string | null>(null);
 	const [manualSelectedBgColor, setManualSelectedBgColor] = useState<string | null>(null);
 
+	// Manual mode link popover state
+	const [isLinkPopoverOpen, setIsLinkPopoverOpen] = useState(false);
+	const linkPopoverRef = useRef<HTMLDivElement>(null);
+	const [linkText, setLinkText] = useState('');
+	const [linkUrl, setLinkUrl] = useState('');
+	const [savedRange, setSavedRange] = useState<Range | null>(null);
+	const [linkPopoverPosition, setLinkPopoverPosition] = useState<{ top: number; left: number } | null>(null);
+
 	// Manual mode body editor ref (contentEditable)
 	const manualBodyEditorRef = useRef<HTMLDivElement>(null);
 	const manualBodyInitializedRef = useRef(false);
@@ -2849,6 +2857,176 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		},
 		[form, updateActiveFormatting]
 	);
+
+	// Open link popover and save the current selection
+	const openLinkPopover = useCallback(() => {
+		const editor = manualBodyEditorRef.current;
+		if (!editor) return;
+
+		// Focus the editor first to ensure we can get/create a selection
+		editor.focus();
+
+		let selection = window.getSelection();
+		let range: Range;
+
+		// If no selection or selection not in editor, create one at the end
+		if (!selection || selection.rangeCount === 0 || !editor.contains(selection.anchorNode)) {
+			range = document.createRange();
+			range.selectNodeContents(editor);
+			range.collapse(false); // Collapse to end
+			selection = window.getSelection();
+			if (selection) {
+				selection.removeAllRanges();
+				selection.addRange(range);
+			}
+		} else {
+			range = selection.getRangeAt(0);
+		}
+
+		// Save the current range
+		setSavedRange(range.cloneRange());
+
+		// Get the selected text
+		const selectedText = selection?.toString() || '';
+		setLinkText(selectedText);
+		setLinkUrl('');
+
+		// Calculate position for the popover (at cursor position)
+		const rect = range.getBoundingClientRect();
+		const editorRect = editor.getBoundingClientRect();
+		
+		// Position popover below the selection (with fallback if rect is zero)
+		const popoverTop = rect.height > 0 ? rect.bottom - editorRect.top + 8 : 40;
+		const popoverLeft = rect.width > 0 || rect.left > 0 ? Math.max(0, rect.left - editorRect.left) : 0;
+		
+		setLinkPopoverPosition({
+			top: popoverTop,
+			left: Math.min(popoverLeft, 150),
+		});
+
+		// Close other dropdowns
+		setIsFontDropdownOpen(false);
+		setIsFontSizeDropdownOpen(false);
+		setIsColorPickerOpen(false);
+
+		setIsLinkPopoverOpen(true);
+	}, []);
+
+	// Apply the link to the saved selection
+	const applyLink = useCallback(() => {
+		const editor = manualBodyEditorRef.current;
+		if (!editor || !linkUrl.trim()) return;
+
+		// Normalize the URL
+		const normalizedUrl = linkUrl.startsWith('http://') || linkUrl.startsWith('https://') 
+			? linkUrl 
+			: `https://${linkUrl}`;
+
+		// Determine the text to display (use URL if no text provided)
+		const displayText = linkText.trim() || normalizedUrl;
+
+		editor.focus();
+
+		// Restore the saved selection if we have one
+		if (savedRange) {
+			const selection = window.getSelection();
+			if (selection) {
+				selection.removeAllRanges();
+				selection.addRange(savedRange);
+			}
+		}
+
+		const selection = window.getSelection();
+		if (selection && selection.rangeCount > 0) {
+			const range = selection.getRangeAt(0);
+			const selectedContent = selection.toString();
+			
+			// Delete current selection content if any
+			if (selectedContent) {
+				range.deleteContents();
+			}
+			
+			// Create and insert the link element
+			const linkElement = document.createElement('a');
+			linkElement.href = normalizedUrl;
+			linkElement.textContent = displayText;
+			linkElement.target = '_blank';
+			linkElement.rel = 'noopener noreferrer';
+			linkElement.style.color = '#0066cc';
+			linkElement.style.textDecoration = 'underline';
+			range.insertNode(linkElement);
+			
+			// Move cursor after the link
+			range.setStartAfter(linkElement);
+			range.setEndAfter(linkElement);
+			selection.removeAllRanges();
+			selection.addRange(range);
+		} else {
+			// No selection - append at end
+			const linkElement = document.createElement('a');
+			linkElement.href = normalizedUrl;
+			linkElement.textContent = displayText;
+			linkElement.target = '_blank';
+			linkElement.rel = 'noopener noreferrer';
+			linkElement.style.color = '#0066cc';
+			linkElement.style.textDecoration = 'underline';
+			editor.appendChild(linkElement);
+		}
+
+		// Sync back to form
+		const html = editor.innerHTML || '';
+		form.setValue('hybridBlockPrompts.0.value', html, { shouldDirty: true });
+
+		// Reset and close popover
+		setLinkText('');
+		setLinkUrl('');
+		setSavedRange(null);
+		setLinkPopoverPosition(null);
+		setIsLinkPopoverOpen(false);
+	}, [form, linkText, linkUrl, savedRange]);
+
+	// Close link popover when clicking outside
+	useEffect(() => {
+		if (!isLinkPopoverOpen) return;
+		
+		const handleClickOutside = (e: MouseEvent) => {
+			if (linkPopoverRef.current && !linkPopoverRef.current.contains(e.target as Node)) {
+				setIsLinkPopoverOpen(false);
+				setLinkText('');
+				setLinkUrl('');
+				setSavedRange(null);
+				setLinkPopoverPosition(null);
+			}
+		};
+		
+		const handleKeyDown = (e: KeyboardEvent) => {
+			if (e.key === 'Escape') {
+				setIsLinkPopoverOpen(false);
+				setLinkText('');
+				setLinkUrl('');
+				setSavedRange(null);
+				setLinkPopoverPosition(null);
+			}
+		};
+		
+		document.addEventListener('mousedown', handleClickOutside);
+		document.addEventListener('keydown', handleKeyDown);
+		return () => {
+			document.removeEventListener('mousedown', handleClickOutside);
+			document.removeEventListener('keydown', handleKeyDown);
+		};
+	}, [isLinkPopoverOpen]);
+
+	// Close link popover when leaving manual mode
+	useEffect(() => {
+		if (selectedModeKey !== 'manual') {
+			setIsLinkPopoverOpen(false);
+			setLinkText('');
+			setLinkUrl('');
+			setSavedRange(null);
+			setLinkPopoverPosition(null);
+		}
+	}, [selectedModeKey]);
 	
 	// Close font dropdown when clicking outside
 	useEffect(() => {
@@ -4121,6 +4299,14 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														[data-hpi-manual-body-editor] li {
 															margin: 0.125rem 0;
 														}
+														[data-hpi-manual-body-editor] a {
+															color: #0066cc;
+															text-decoration: underline;
+															cursor: pointer;
+														}
+														[data-hpi-manual-body-editor] a:hover {
+															color: #0052a3;
+														}
 													`}</style>
 													<div
 														ref={manualBodyEditorRef}
@@ -4150,7 +4336,74 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 															const html = manualBodyEditorRef.current?.innerHTML || '';
 															form.setValue('hybridBlockPrompts.0.value', html, { shouldDirty: true });
 														}}
+														onClick={(e) => {
+															// Allow clicking links with Ctrl/Cmd key
+															const target = e.target as HTMLElement;
+															if (target.tagName === 'A' && (e.ctrlKey || e.metaKey)) {
+																e.preventDefault();
+																const href = target.getAttribute('href');
+																if (href) {
+																	window.open(href, '_blank', 'noopener,noreferrer');
+																}
+															}
+														}}
 													/>
+													
+													{/* Link popover */}
+													{isLinkPopoverOpen && linkPopoverPosition && (
+														<div
+															ref={linkPopoverRef}
+															className="absolute z-[9999] bg-[#E0E0E0] rounded-[8px] p-3 w-[280px]"
+															style={{
+																top: linkPopoverPosition.top,
+																left: Math.min(linkPopoverPosition.left, 150),
+															}}
+														>
+															<div className="flex items-center gap-2">
+																{/* Input fields column */}
+																<div className="flex-1 flex flex-col gap-2">
+																	{/* Text input */}
+																	<input
+																		type="text"
+																		value={linkText}
+																		onChange={(e) => setLinkText(e.target.value)}
+																		placeholder="Text"
+																		className="w-full px-2 py-1.5 text-sm bg-white border border-gray-300 rounded focus:outline-none focus:border-gray-400 font-inter"
+																	/>
+																	
+																	{/* URL input */}
+																	<input
+																		type="text"
+																		value={linkUrl}
+																		onChange={(e) => setLinkUrl(e.target.value)}
+																		placeholder="Type or paste a link"
+																		className="w-full px-2 py-1.5 text-sm bg-white border border-gray-300 rounded focus:outline-none focus:border-gray-400 font-inter"
+																		onKeyDown={(e) => {
+																			if (e.key === 'Enter') {
+																				e.preventDefault();
+																				applyLink();
+																			}
+																		}}
+																	/>
+																</div>
+																
+																{/* Apply button - vertically centered on the right */}
+																<button
+																	type="button"
+																	onClick={applyLink}
+																	disabled={!linkUrl.trim()}
+																	className={cn(
+																		"px-3 py-1.5 text-sm font-inter font-medium rounded transition-colors self-center",
+																		linkUrl.trim()
+																			? "text-gray-700 hover:bg-gray-100 cursor-pointer"
+																			: "text-gray-400 cursor-not-allowed"
+																	)}
+																>
+																	Apply
+																</button>
+															</div>
+														</div>
+													)}
 												</div>
 
 												{/* Bottom action box */}
@@ -4528,11 +4781,22 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 													)}
 												</div>
 
-												{/* Link icon */}
-												<div className="absolute left-[299px] top-1/2 -translate-y-1/2 flex items-center justify-center">
+												{/* Link icon button */}
+												<button
+													type="button"
+													onMouseDown={(e) => e.preventDefault()}
+													onClick={openLinkPopover}
+													className={cn(
+														"absolute left-[295px] top-[4px] w-[24px] h-[24px] flex items-center justify-center cursor-pointer transition-all rounded-[4px]",
+														isLinkPopoverOpen
+															? "bg-[#B8C8E0]"
+															: "hover:bg-[#C5D3E8]"
+													)}
+													aria-label="Insert link"
+												>
 													<svg
-														width={20}
-														height={20}
+														width={18}
+														height={18}
 														viewBox="0 0 23 23"
 														fill="none"
 														xmlns="http://www.w3.org/2000/svg"
@@ -4550,7 +4814,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 															fill="#231815"
 														/>
 													</svg>
-												</div>
+												</button>
 
 												{/* Third divider (102px from right edge) */}
 												<div
