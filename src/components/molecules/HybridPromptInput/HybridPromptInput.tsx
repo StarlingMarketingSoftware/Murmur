@@ -12,6 +12,13 @@ import { Droppable } from '../DragAndDrop/Droppable';
 import { Typography } from '@/components/ui/typography';
 import { Input } from '@/components/ui/input';
 import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from '@/components/ui/select';
+import {
 	SortableContext,
 	useSortable,
 	verticalListSortingStrategy,
@@ -23,6 +30,7 @@ import { DraftingFormValues } from '@/app/murmur/campaign/[campaignId]/DraftingS
 import { HybridBlock, Identity } from '@prisma/client';
 import { HybridPromptInputProps, useHybridPromptInput } from './useHybridPromptInput';
 import { cn } from '@/utils';
+import { DEFAULT_FONT, FONT_OPTIONS } from '@/constants/ui';
 import React, {
 	useState,
 	FC,
@@ -41,6 +49,7 @@ import LeftArrow from '@/components/atoms/_svg/LeftArrow';
 import RightArrow from '@/components/atoms/_svg/RightArrow';
 import UndoIcon from '@/components/atoms/_svg/UndoIcon';
 import UpscaleIcon from '@/components/atoms/_svg/UpscaleIcon';
+import FontDropdownArrow from '@/components/atoms/_svg/FontDropdownArrow';
 import { DraggableHighlight } from '../DragAndDrop/DraggableHighlight';
 import DraggableBox from '@/app/murmur/campaign/[campaignId]/DraftingSection/EmailGeneration/DraggableBox';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
@@ -2643,6 +2652,22 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 	const headerSectionRef = useRef<HTMLDivElement>(null);
 	const modeDividerRef = useRef<HTMLDivElement>(null);
 	const [overlayTopPx, setOverlayTopPx] = useState<number | null>(null);
+	
+	// Custom font dropdown state (to avoid Radix positioning issues with zoom)
+	const [isFontDropdownOpen, setIsFontDropdownOpen] = useState(false);
+	const fontDropdownRef = useRef<HTMLDivElement>(null);
+	
+	// Close font dropdown when clicking outside
+	useEffect(() => {
+		if (!isFontDropdownOpen) return;
+		const handleClickOutside = (e: MouseEvent) => {
+			if (fontDropdownRef.current && !fontDropdownRef.current.contains(e.target as Node)) {
+				setIsFontDropdownOpen(false);
+			}
+		};
+		document.addEventListener('mousedown', handleClickOutside);
+		return () => document.removeEventListener('mousedown', handleClickOutside);
+	}, [isFontDropdownOpen]);
 
 	// Track which tab is active: 'main' (the normal Writing view) or 'profile'
 	const [activeTab, setActiveTab] = useState<'main' | 'profile'>(() => {
@@ -3784,9 +3809,10 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 										{selectedModeKey === 'manual' && (
 											<div
 												className={cn(
-													'w-[468px] h-[623px] bg-white border-[3px] border-[#0B5C0D] rounded-[8px] overflow-hidden flex flex-col',
+													'w-[468px] h-[623px] bg-white border-[3px] border-[#0B5C0D] rounded-[8px] flex flex-col',
 													'max-[480px]:w-[89.33vw]'
 												)}
+												style={{ overflow: 'visible' }}
 												data-hpi-manual-entry
 											>
 												{/* Subject (inside the unified manual box) */}
@@ -3847,7 +3873,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 												</div>
 
 												{/* Body (single editor for Manual - no separate signature) */}
-												<div className="flex-1 bg-white px-3 py-2">
+												<div className="flex-1 min-h-0 bg-white px-3 py-2 relative">
 													{(() => {
 														const bodyFieldProps = form.register('hybridBlockPrompts.0.value');
 														return (
@@ -3855,8 +3881,8 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																{...bodyFieldProps}
 																placeholder=""
 																className={cn(
-																	'h-full w-full resize-none border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0',
-																	'bg-white p-0 font-inter text-[14px] leading-[18px] text-black',
+																	'absolute inset-0 resize-none border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0',
+																	'bg-white px-3 py-2 font-inter text-[14px] leading-[18px] text-black',
 																	'overflow-y-auto'
 																)}
 																style={{
@@ -3874,6 +3900,140 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 															/>
 														);
 													})()}
+												</div>
+
+												{/* Bottom action box */}
+												<div className="flex justify-center mb-[18px] flex-shrink-0 overflow-visible">
+											<div
+												className="w-[430px] h-[32px] rounded-[16px] bg-[#DDE6F5] relative flex items-center overflow-visible"
+												style={{ backgroundColor: '#DDE6F5' }}
+											>
+												{/* Left section (Font) - custom dropdown to avoid Radix zoom issues */}
+												<div 
+													ref={fontDropdownRef}
+													className="w-[109px] h-full flex items-center pl-[16px] pr-0 relative"
+												>
+													{/* Custom font trigger button */}
+													<button
+														type="button"
+														onClick={() => setIsFontDropdownOpen(!isFontDropdownOpen)}
+														className={cn(
+															'w-full h-full flex items-center',
+															'bg-transparent border-0 shadow-none rounded-none',
+															'px-0 py-0 relative cursor-pointer',
+															'font-inter font-normal text-[14px] leading-none text-black',
+															'hover:bg-transparent focus:bg-transparent focus:outline-none'
+														)}
+														style={{
+															fontFamily: form.watch('font') || DEFAULT_FONT,
+														}}
+														aria-label="Font"
+														aria-expanded={isFontDropdownOpen}
+													>
+	<div
+		className="flex-1 flex items-center justify-center min-w-0 overflow-hidden pr-[24px] whitespace-nowrap text-center"
+		style={{
+			maskImage: 'linear-gradient(to right, black 50%, transparent 85%)',
+			WebkitMaskImage: 'linear-gradient(to right, black 50%, transparent 85%)',
+		}}
+	>
+		<span>
+			{(() => {
+				const currentFont = form.watch('font') || DEFAULT_FONT;
+				if (currentFont === 'Arial') return 'Sans Serif';
+				if (currentFont === 'serif') return 'Serif';
+				if (currentFont === 'Courier New') return 'Fixed Width';
+				if (currentFont === 'Arial Black') return 'Wide';
+				if (currentFont === 'Arial Narrow') return 'Narrow';
+				return currentFont;
+			})()}
+		</span>
+	</div>
+														<FontDropdownArrow className="!block pointer-events-none absolute right-[7px] bottom-[11px] !w-[8px] !h-[5px]" />
+													</button>
+													
+													{/* Custom dropdown menu */}
+													{isFontDropdownOpen && (
+														<div
+															id="font-dropdown-scroll-wrapper"
+															className={cn(
+																'absolute w-[119px] overflow-visible',
+																'rounded-[8px] bg-[#E0E0E0]',
+																'z-[9999]'
+															)}
+															style={{
+																left: '0px',
+																bottom: 'calc(100% + 8px)',
+																height: '161px',
+															}}
+														>
+															<style>{`
+																#font-dropdown-scroll-wrapper *::-webkit-scrollbar {
+																	display: none !important;
+																	width: 0 !important;
+																	height: 0 !important;
+																	background: transparent !important;
+																}
+																#font-dropdown-scroll-wrapper * {
+																	-ms-overflow-style: none !important;
+																	scrollbar-width: none !important;
+																}
+															`}</style>
+															<CustomScrollbar
+																className="w-full h-full"
+																thumbColor="#000000"
+																thumbWidth={2}
+																offsetRight={-6}
+															>
+																{FONT_OPTIONS.map((font) => {
+																	const label =
+																		font === 'Arial'
+																			? 'Sans Serif'
+																			: font === 'serif'
+																			? 'Serif'
+																			: font === 'Courier New'
+																			? 'Fixed Width'
+																			: font === 'Arial Black'
+																			? 'Wide'
+																			: font === 'Arial Narrow'
+																			? 'Narrow'
+																			: font;
+																	const isSelected = (form.watch('font') || DEFAULT_FONT) === font;
+																	return (
+																		<button
+																			key={font}
+																			type="button"
+																			onClick={() => {
+																				form.setValue('font', font as DraftingFormValues['font'], {
+																					shouldDirty: true,
+																				});
+																				setIsFontDropdownOpen(false);
+																			}}
+																			className={cn(
+																				'w-full px-2 py-1.5 text-left text-[12px] leading-none',
+																				'hover:bg-gray-300 cursor-pointer',
+																				isSelected && 'bg-gray-300/60'
+																			)}
+																			style={{ fontFamily: font }}
+																		>
+																			<span>{label}</span>
+																		</button>
+																	);
+																})}
+															</CustomScrollbar>
+														</div>
+													)}
+												</div>
+
+												{/* Divider (109px from left, 23px tall) */}
+												<div
+													aria-hidden="true"
+													className="absolute left-[109px] top-1/2 -translate-y-1/2 w-[2px] h-[23px] bg-black"
+												/>
+
+												{/* Right section (reserved for future controls) */}
+												<div className="flex-1 h-full" />
+											</div>
 												</div>
 
 											</div>
