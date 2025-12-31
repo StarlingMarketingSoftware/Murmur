@@ -2513,6 +2513,28 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		[modeOverride, isFullSelected, isManualSelected]
 	);
 	const isHybridModeSelected = selectedModeKey === 'hybrid';
+	const isManualModeSelected = selectedModeKey === 'manual';
+
+	// Manual tab redesign assumes a single unified body editor. If multiple manual Text blocks exist,
+	// collapse them into one so the editor can display/edit everything.
+	useEffect(() => {
+		if (!isManualModeSelected) return;
+		const blocks = form.getValues('hybridBlockPrompts') || [];
+		if (blocks.length <= 1) return;
+		if (!blocks.every((b) => b.type === HybridBlock.text)) return;
+
+		const combined = blocks
+			.map((b) => (b.value ?? '').toString())
+			.map((v) => v.trimEnd())
+			.filter((v) => v.length > 0)
+			.join('\n\n');
+
+		form.setValue(
+			'hybridBlockPrompts',
+			[{ id: 'text-0', type: HybridBlock.text, value: combined }],
+			{ shouldDirty: true }
+		);
+	}, [form, isManualModeSelected]);
 
 	const switchToFull = () => {
 		const current: {
@@ -2581,6 +2603,10 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 	};
 
 	const switchToManual = () => {
+		// Manual mode uses a unified editor; close any open Test Preview UI.
+		setShowTestPreview?.(false);
+		onTestPreviewToggle?.(false);
+
 		const current: {
 			id: string;
 			type: HybridBlock;
@@ -3378,7 +3404,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 												</>
 											)}
 										</div>
-										{activeTab !== 'profile' && (
+										{activeTab !== 'profile' && selectedModeKey !== 'manual' && (
 											<div className="flex flex-col items-center pt-[38px] max-[480px]:pt-[38px]">
 												<FormField
 													control={form.control}
@@ -3755,6 +3781,88 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 											shouldEnableHybridPlusGutter && 'w-[calc(100%_-_90px)]'
 										)}
 									>
+										{selectedModeKey === 'manual' && (
+											<div
+												className={cn(
+													'w-[468px] h-[623px] bg-white border-[3px] border-black rounded-[8px] overflow-hidden flex flex-col',
+													'max-[480px]:w-[89.33vw]'
+												)}
+												data-hpi-manual-entry
+											>
+												{/* Subject (inside the unified manual box) */}
+												<div className="h-[44px] flex items-center gap-3 px-3 border-b-[3px] border-black bg-white">
+													<span className="font-inter font-semibold text-[17px] max-[480px]:text-[12px] whitespace-nowrap text-black">
+														Subject
+													</span>
+													<FormField
+														control={form.control}
+														name="subject"
+														rules={{ required: form.watch('isAiSubject') }}
+														render={({ field }) => (
+															<FormItem className="flex-1 h-full">
+																<FormControl>
+																	<Input
+																		{...field}
+																		className={cn(
+																			'h-full w-full border-0 rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 !bg-transparent px-0',
+																			shouldShowSubjectRedStyling
+																				? '!text-[#A20000] placeholder:!text-[#A20000]'
+																				: '!text-black placeholder:!text-black'
+																		)}
+																		placeholder="Write your subject here"
+																		onFocus={(e) =>
+																			trackFocusedField?.('subject', e.target)
+																		}
+																		onBlur={() => {
+																			setHasSubjectBeenTouched(true);
+																			field.onBlur();
+																		}}
+																		onChange={(e) => {
+																			if (e.target.value) setHasSubjectBeenTouched(true);
+																			field.onChange(e);
+																		}}
+																	/>
+																</FormControl>
+															</FormItem>
+														)}
+													/>
+												</div>
+
+												{/* Body (single editor for Manual - no separate signature) */}
+												<div className="flex-1 bg-white px-3 py-2">
+													{(() => {
+														const bodyFieldProps = form.register('hybridBlockPrompts.0.value');
+														return (
+															<Textarea
+																{...bodyFieldProps}
+																placeholder=""
+																className={cn(
+																	'h-full w-full resize-none border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0',
+																	'bg-white p-0 font-inter text-[14px] leading-[18px] text-black',
+																	'overflow-y-auto'
+																)}
+																style={{
+																	fontFamily: form.watch('font') || 'Arial',
+																}}
+																onFocus={(e) =>
+																	trackFocusedField?.('hybridBlockPrompts.0.value', e.target)
+																}
+																onBlur={(e) => {
+																	bodyFieldProps.onBlur(e);
+																}}
+																onChange={(e) => {
+																	bodyFieldProps.onChange(e);
+																}}
+															/>
+														);
+													})()}
+												</div>
+
+											</div>
+										)}
+
+										{selectedModeKey !== 'manual' && (
+											<>
 										{fields.length === 0 && (
 											<span className="text-gray-300 font-primary text-[12px]">
 												Add blocks here to build your prompt...
@@ -4022,6 +4130,8 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 												</Button>
 											</div>
 										)}
+											</>
+										)}
 										</div>
 									)}
 									</div>
@@ -4073,7 +4183,10 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 							{/* Bottom-anchored footer with Signature and Test */}
 							<div className="flex flex-col items-center mt-auto w-full" data-hpi-footer>
 								{/* Signature Block (manual/hybrid only) - positioned above Test with fixed gap */}
-								{activeTab !== 'profile' && !showTestPreview && selectedModeKey !== 'full' && (
+								{activeTab !== 'profile' &&
+									!showTestPreview &&
+									selectedModeKey !== 'full' &&
+									selectedModeKey !== 'manual' && (
 									<FormField
 										control={form.control}
 										name="signature"
