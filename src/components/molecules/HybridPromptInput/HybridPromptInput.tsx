@@ -12,13 +12,6 @@ import { Droppable } from '../DragAndDrop/Droppable';
 import { Typography } from '@/components/ui/typography';
 import { Input } from '@/components/ui/input';
 import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
-} from '@/components/ui/select';
-import {
 	SortableContext,
 	useSortable,
 	verticalListSortingStrategy,
@@ -56,7 +49,6 @@ import ItalicIcon from '@/components/atoms/_svg/ItalicIcon';
 import UnderlineIcon from '@/components/atoms/_svg/UnderlineIcon';
 import BulletListIcon from '@/components/atoms/_svg/BulletListIcon';
 import TextColorIcon from '@/components/atoms/_svg/TextColorIcon';
-import LinkIcon from '@/components/atoms/_svg/LinkIcon';
 import { DraggableHighlight } from '../DragAndDrop/DraggableHighlight';
 import DraggableBox from '@/app/murmur/campaign/[campaignId]/DraftingSection/EmailGeneration/DraggableBox';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
@@ -187,7 +179,6 @@ const SortableAIBlock = ({
 	showTestPreview,
 	onGetSuggestions,
 	promptQualityScore,
-	promptQualityLabel,
 	onUpscalePrompt,
 	isUpscalingPrompt,
 	hasPreviousPrompt,
@@ -566,17 +557,6 @@ const SortableAIBlock = ({
 		if (typeof promptQualityScore !== 'number') return null;
 		return Math.max(70, Math.min(98, Math.round(promptQualityScore)));
 	}, [promptQualityScore]);
-
-	const promptScoreLabel = useMemo(() => {
-		if (clampedPromptScore == null) return null;
-		const label = (promptQualityLabel ?? '').trim();
-		if (label) return label;
-		if (clampedPromptScore >= 97) return 'Exceptional';
-		if (clampedPromptScore >= 91) return 'Excellent';
-		if (clampedPromptScore >= 83) return 'Great';
-		if (clampedPromptScore >= 75) return 'Good';
-		return 'Keep Going';
-	}, [clampedPromptScore, promptQualityLabel]);
 
 	const promptScoreFillPercent = clampedPromptScore == null ? 0 : clampedPromptScore;
 
@@ -4491,18 +4471,16 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 															const html = sanitizeBannedFillIns(rawHtml);
 															// Update the editor if content was sanitized
 															if (html !== rawHtml && manualBodyEditorRef.current) {
-																// Save cursor position
+															manualBodyEditorRef.current.innerHTML = html;
+															// Try to restore cursor (simplified - goes to end if complex)
+															try {
 																const selection = window.getSelection();
-																const cursorOffset = selection?.focusOffset || 0;
-																manualBodyEditorRef.current.innerHTML = html;
-																// Try to restore cursor (simplified - goes to end if complex)
-																try {
-																	const range = document.createRange();
-																	range.selectNodeContents(manualBodyEditorRef.current);
-																	range.collapse(false);
-																	selection?.removeAllRanges();
-																	selection?.addRange(range);
-																} catch {}
+																const range = document.createRange();
+																range.selectNodeContents(manualBodyEditorRef.current);
+																range.collapse(false);
+																selection?.removeAllRanges();
+																selection?.addRange(range);
+															} catch {}
 															}
 															form.setValue('hybridBlockPrompts.0.value', html, { shouldDirty: true });
 														}}
