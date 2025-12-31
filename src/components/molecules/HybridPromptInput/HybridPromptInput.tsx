@@ -60,6 +60,74 @@ import LinkIcon from '@/components/atoms/_svg/LinkIcon';
 import { DraggableHighlight } from '../DragAndDrop/DraggableHighlight';
 import DraggableBox from '@/app/murmur/campaign/[campaignId]/DraftingSection/EmailGeneration/DraggableBox';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
+
+const MANUAL_EDITOR_COLOR_SWATCHES = [
+	'#000000',
+	'#444444',
+	'#666666',
+	'#999999',
+	'#B7B7B7',
+	'#CCCCCC',
+	'#EEEEEE',
+	'#FFFFFF',
+	'#FF0000',
+	'#FF9900',
+	'#FFFF00',
+	'#00FF00',
+	'#00FFFF',
+	'#0000FF',
+	'#9900FF',
+	'#FF00FF',
+	'#F4CCCC',
+	'#FCE5CD',
+	'#FFF2CC',
+	'#D9EAD3',
+	'#D0E0E3',
+	'#CFE2F3',
+	'#D9D2E9',
+	'#EAD1DC',
+	'#EA9999',
+	'#F9CB9C',
+	'#FFE599',
+	'#B6D7A8',
+	'#A2C4C9',
+	'#9FC5E8',
+	'#B4A7D6',
+	'#D5A6BD',
+	'#E06666',
+	'#F6B26B',
+	'#FFD966',
+	'#93C47D',
+	'#76A5AF',
+	'#6FA8DC',
+	'#8E7CC3',
+	'#C27BA0',
+	'#CC0000',
+	'#E69138',
+	'#F1C232',
+	'#6AA84F',
+	'#45818E',
+	'#3D85C6',
+	'#674EA7',
+	'#A64D79',
+	'#990000',
+	'#B45F06',
+	'#BF9000',
+	'#38761D',
+	'#134F5C',
+	'#0B5394',
+	'#351C75',
+	'#741B47',
+	'#660000',
+	'#783F04',
+	'#7F6000',
+	'#274E13',
+	'#0C343D',
+	'#073763',
+	'#20124D',
+	'#4C1130',
+] as const;
+
 interface SortableAIBlockProps {
 	block: {
 		value: HybridBlock;
@@ -2669,6 +2737,12 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 	const fontSizeDropdownRef = useRef<HTMLDivElement>(null);
 	const FONT_SIZE_OPTIONS = [8, 9, 10, 11, 12, 14, 16, 18, 20, 22, 24, 36] as const;
 	const DEFAULT_FONT_SIZE = 12;
+	
+	// Manual mode color picker dropdown state
+	const [isColorPickerOpen, setIsColorPickerOpen] = useState(false);
+	const colorPickerRef = useRef<HTMLDivElement>(null);
+	const [manualSelectedTextColor, setManualSelectedTextColor] = useState<string | null>(null);
+	const [manualSelectedBgColor, setManualSelectedBgColor] = useState<string | null>(null);
 
 	// Manual mode body editor ref (contentEditable)
 	const manualBodyEditorRef = useRef<HTMLDivElement>(null);
@@ -2738,6 +2812,43 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 	},
 		[form, updateActiveFormatting]
 	);
+
+	const applyManualColor = useCallback(
+		(command: 'foreColor' | 'hiliteColor', color: string) => {
+			const editor = manualBodyEditorRef.current;
+			if (!editor) return;
+
+			// Focus the editor to ensure selection is active
+			editor.focus();
+
+			// Prefer CSS spans over <font> tags when supported
+			try {
+				document.execCommand('styleWithCSS', false, 'true');
+			} catch {
+				// ignore (not supported everywhere)
+			}
+
+			if (command === 'hiliteColor') {
+				setManualSelectedBgColor(color);
+				const ok = document.execCommand('hiliteColor', false, color);
+				if (!ok) {
+					// Some browsers use backColor instead
+					document.execCommand('backColor', false, color);
+				}
+			} else {
+				setManualSelectedTextColor(color);
+				document.execCommand('foreColor', false, color);
+			}
+
+			// Update active formatting state
+			updateActiveFormatting();
+
+			// Sync back to form after applying color
+			const html = editor.innerHTML || '';
+			form.setValue('hybridBlockPrompts.0.value', html, { shouldDirty: true });
+		},
+		[form, updateActiveFormatting]
+	);
 	
 	// Close font dropdown when clicking outside
 	useEffect(() => {
@@ -2762,6 +2873,33 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		document.addEventListener('mousedown', handleClickOutside);
 		return () => document.removeEventListener('mousedown', handleClickOutside);
 	}, [isFontSizeDropdownOpen]);
+
+	// Close color picker when leaving manual mode
+	useEffect(() => {
+		if (selectedModeKey !== 'manual') setIsColorPickerOpen(false);
+	}, [selectedModeKey]);
+	
+	// Close color picker when clicking outside / pressing Escape
+	useEffect(() => {
+		if (!isColorPickerOpen) return;
+		
+		const handleClickOutside = (e: MouseEvent) => {
+			if (colorPickerRef.current && !colorPickerRef.current.contains(e.target as Node)) {
+				setIsColorPickerOpen(false);
+			}
+		};
+		
+		const handleKeyDown = (e: KeyboardEvent) => {
+			if (e.key === 'Escape') setIsColorPickerOpen(false);
+		};
+		
+		document.addEventListener('mousedown', handleClickOutside);
+		document.addEventListener('keydown', handleKeyDown);
+		return () => {
+			document.removeEventListener('mousedown', handleClickOutside);
+			document.removeEventListener('keydown', handleKeyDown);
+		};
+	}, [isColorPickerOpen]);
 
 	// Track which tab is active: 'main' (the normal Writing view) or 'profile'
 	const [activeTab, setActiveTab] = useState<'main' | 'profile'>(() => {
@@ -4297,9 +4435,97 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 													<BulletListIcon width={15} height={11} />
 												</button>
 
-												{/* Text color icon */}
-												<div className="absolute left-[268px] top-[10px] flex items-center justify-center">
-													<TextColorIcon width={11} height={14} />
+												{/* Text + background color picker */}
+												<div
+													ref={colorPickerRef}
+													className="absolute left-[260px] top-[4px] w-[32px] h-[24px] flex items-center justify-center"
+												>
+													<button
+														type="button"
+														onMouseDown={(e) => e.preventDefault()}
+														onClick={() => {
+															// avoid overlapping dropdowns
+															setIsFontDropdownOpen(false);
+															setIsFontSizeDropdownOpen(false);
+															setIsColorPickerOpen((v) => !v);
+														}}
+														className={cn(
+															"w-[24px] h-[24px] flex items-center justify-center cursor-pointer transition-all rounded-[4px]",
+															isColorPickerOpen ? "bg-[#B8C8E0]" : "hover:bg-[#C5D3E8]"
+														)}
+														aria-label="Text & background color"
+														aria-expanded={isColorPickerOpen}
+													>
+														<TextColorIcon width={11} height={14} />
+													</button>
+
+													{isColorPickerOpen && (
+														<div className="absolute bottom-[calc(100%+8px)] left-1/2 -translate-x-1/2 z-[9999]">
+															<div className="flex gap-6 rounded-[8px] bg-[#E0E0E0] p-3">
+																<div className="min-w-[150px]">
+																	<div className="mb-2 text-[12px] font-inter font-medium text-black/80">
+																		Background color
+																	</div>
+																	<div className="grid grid-cols-8 gap-[4px]">
+																		{MANUAL_EDITOR_COLOR_SWATCHES.map((color) => (
+																			(() => {
+																				const isSelected =
+																					(manualSelectedBgColor ?? '').toLowerCase() ===
+																					color.toLowerCase();
+																				return (
+																			<button
+																				key={`hpi-bg-${color}`}
+																				type="button"
+																				onMouseDown={(e) => e.preventDefault()}
+																				onClick={() => applyManualColor('hiliteColor', color)}
+																				className={cn(
+																					"w-[14px] h-[14px] rounded-[2px] border border-black/10 hover:outline hover:outline-2 hover:outline-black/20",
+																					isSelected &&
+																						"ring-2 ring-black ring-offset-1 ring-offset-white border-transparent"
+																				)}
+																				style={{ backgroundColor: color }}
+																				aria-label={`Background ${color}`}
+																				aria-pressed={isSelected}
+																			/>
+																				);
+																			})()
+																		))}
+																	</div>
+																</div>
+
+																<div className="min-w-[150px]">
+																	<div className="mb-2 text-[12px] font-inter font-medium text-black/80">
+																		Text color
+																	</div>
+																	<div className="grid grid-cols-8 gap-[4px]">
+																		{MANUAL_EDITOR_COLOR_SWATCHES.map((color) => (
+																			(() => {
+																				const isSelected =
+																					(manualSelectedTextColor ?? '').toLowerCase() ===
+																					color.toLowerCase();
+																				return (
+																			<button
+																				key={`hpi-text-${color}`}
+																				type="button"
+																				onMouseDown={(e) => e.preventDefault()}
+																				onClick={() => applyManualColor('foreColor', color)}
+																				className={cn(
+																					"w-[14px] h-[14px] rounded-[2px] border border-black/10 hover:outline hover:outline-2 hover:outline-black/20",
+																					isSelected &&
+																						"ring-2 ring-black ring-offset-1 ring-offset-white border-transparent"
+																				)}
+																				style={{ backgroundColor: color }}
+																				aria-label={`Text ${color}`}
+																				aria-pressed={isSelected}
+																			/>
+																				);
+																			})()
+																		))}
+																	</div>
+																</div>
+															</div>
+														</div>
+													)}
 												</div>
 
 												{/* Link icon */}
