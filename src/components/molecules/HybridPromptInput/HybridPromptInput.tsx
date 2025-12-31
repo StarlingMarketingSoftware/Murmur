@@ -2744,6 +2744,11 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 	const [manualSelectedTextColor, setManualSelectedTextColor] = useState<string | null>(null);
 	const [manualSelectedBgColor, setManualSelectedBgColor] = useState<string | null>(null);
 
+	// Fill-ins dropdown state
+	const [isFillInsDropdownOpen, setIsFillInsDropdownOpen] = useState(false);
+	const fillInsDropdownRef = useRef<HTMLDivElement>(null);
+	const FILL_IN_OPTIONS = ['Company', 'State', 'City'] as const;
+
 	// Manual mode link popover state
 	const [isLinkPopoverOpen, setIsLinkPopoverOpen] = useState(false);
 	const linkPopoverRef = useRef<HTMLDivElement>(null);
@@ -2857,6 +2862,56 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		},
 		[form, updateActiveFormatting]
 	);
+
+	// Insert a fill-in placeholder at cursor position
+	const insertFillIn = useCallback(
+		(fillInType: 'Company' | 'State' | 'City') => {
+			const editor = manualBodyEditorRef.current;
+			if (!editor) return;
+
+			// Focus the editor to ensure we have a selection
+			editor.focus();
+
+			const selection = window.getSelection();
+			let range: Range;
+
+			// If no selection or not in editor, insert at end
+			if (!selection || selection.rangeCount === 0 || !editor.contains(selection.anchorNode)) {
+				range = document.createRange();
+				range.selectNodeContents(editor);
+				range.collapse(false); // Collapse to end
+				if (selection) {
+					selection.removeAllRanges();
+					selection.addRange(range);
+				}
+			} else {
+				range = selection.getRangeAt(0);
+			}
+
+			// Insert a styled box span with the fill-in placeholder
+			const fillInHtml = `<span contenteditable="false" data-fill-in="${fillInType}" style="display: inline-block; background-color: #E8EFFF; color: #000000; padding: 2px 8px; border-radius: 6px; border: 1px solid #000000; font-size: 12px; font-family: Inter, sans-serif; font-weight: 500; margin: 0 2px; user-select: all; vertical-align: baseline;">${fillInType}</span>`;
+			document.execCommand('insertHTML', false, fillInHtml);
+
+			// Sync back to form
+			const html = editor.innerHTML || '';
+			form.setValue('hybridBlockPrompts.0.value', html, { shouldDirty: true });
+
+			// Close the dropdown
+			setIsFillInsDropdownOpen(false);
+		},
+		[form]
+	);
+
+	// Sanitize manual editor content to remove banned fill-ins ({{email}}, {{phone}})
+	const sanitizeBannedFillIns = useCallback((html: string): string => {
+		// Remove {{email}} and {{phone}} patterns (case insensitive)
+		// This handles both plain text typed by user and any styled spans with these data attributes
+		let sanitized = html.replace(/\{\{email\}\}/gi, '');
+		sanitized = sanitized.replace(/\{\{phone\}\}/gi, '');
+		// Also remove any styled fill-in spans with banned types
+		sanitized = sanitized.replace(/<span[^>]*data-fill-in="(email|phone)"[^>]*>[^<]*<\/span>/gi, '');
+		return sanitized;
+	}, []);
 
 	// Open link popover and save the current selection
 	const openLinkPopover = useCallback(() => {
@@ -3078,6 +3133,28 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 			document.removeEventListener('keydown', handleKeyDown);
 		};
 	}, [isColorPickerOpen]);
+
+	// Close fill-ins dropdown when clicking outside / pressing Escape
+	useEffect(() => {
+		if (!isFillInsDropdownOpen) return;
+		
+		const handleClickOutside = (e: MouseEvent) => {
+			if (fillInsDropdownRef.current && !fillInsDropdownRef.current.contains(e.target as Node)) {
+				setIsFillInsDropdownOpen(false);
+			}
+		};
+		
+		const handleKeyDown = (e: KeyboardEvent) => {
+			if (e.key === 'Escape') setIsFillInsDropdownOpen(false);
+		};
+		
+		document.addEventListener('mousedown', handleClickOutside);
+		document.addEventListener('keydown', handleKeyDown);
+		return () => {
+			document.removeEventListener('mousedown', handleClickOutside);
+			document.removeEventListener('keydown', handleKeyDown);
+		};
+	}, [isFillInsDropdownOpen]);
 
 	// Track which tab is active: 'main' (the normal Writing view) or 'profile'
 	const [activeTab, setActiveTab] = useState<'main' | 'profile'>(() => {
@@ -3857,21 +3934,89 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														>
 															<FormControl>
 																{form.watch('isAiSubject') ? (
-																	// Compact 110px bar when auto mode is on
-																	<div className="flex items-center gap-2">
-																		<div
-																			className={cn(
-																				'flex items-center justify-center h-[31px] max-[480px]:h-[24px] rounded-[8px] border-2 border-black overflow-hidden subject-bar w-[110px]'
-																			)}
-																			style={{ backgroundColor: '#E0E0E0' }}
-																		>
-																			<span className="font-inter font-medium text-[18px] max-[480px]:text-[12px] whitespace-nowrap text-black subject-label">
-																				Subject
+																	// Compact bar that expands to full width on hover when auto mode is on
+																	<div className="group/subject relative">
+																		{/* Collapsed state - shown by default, hidden on hover */}
+																		<div className="flex items-center gap-2 group-hover/subject:hidden">
+																			<div
+																				className={cn(
+																					'flex items-center justify-center h-[31px] max-[480px]:h-[24px] rounded-[8px] border-2 border-black overflow-hidden subject-bar w-[110px]'
+																				)}
+																				style={{ backgroundColor: '#E0E0E0' }}
+																			>
+																				<span className="font-inter font-medium text-[18px] max-[480px]:text-[12px] whitespace-nowrap text-black subject-label">
+																					Subject
+																				</span>
+																			</div>
+																			<span className="font-inter font-normal text-[13px] text-[#000000]">
+																				Auto
 																			</span>
 																		</div>
-																		<span className="font-inter font-normal text-[13px] text-[#000000]">
-																			Auto
-																		</span>
+																		{/* Expanded state - hidden by default, shown on hover */}
+																		<div
+																			className={cn(
+																				'hidden group-hover/subject:flex items-center h-[31px] max-[480px]:h-[24px] rounded-[8px] border-2 border-black overflow-hidden subject-bar bg-white w-full'
+																			)}
+																		>
+																			<div
+																				className={cn(
+																					'pl-2 flex items-center h-full shrink-0 w-[130px]',
+																					'bg-[#E0E0E0]'
+																				)}
+																			>
+																				<span className="font-inter font-semibold text-[17px] max-[480px]:text-[12px] whitespace-nowrap text-black subject-label">
+																					Auto Subject
+																				</span>
+																			</div>
+
+																			<button
+																				type="button"
+																				onClick={() => {
+																					if (!isHandwrittenMode) {
+																						const newValue = !form.watch('isAiSubject');
+																						form.setValue('isAiSubject', newValue);
+																						if (newValue) {
+																							form.setValue('subject', '');
+																						}
+																					}
+																				}}
+																				disabled={isHandwrittenMode}
+																				className={cn(
+																					'relative h-full flex items-center text-[12px] font-inter font-normal transition-colors shrink-0 subject-toggle',
+																					'w-[47px] px-2 justify-center text-black bg-[#4ADE80] hover:bg-[#3ECC72] active:bg-[#32BA64]',
+																					isHandwrittenMode && 'opacity-50 cursor-not-allowed'
+																				)}
+																			>
+																				<span className="absolute left-0 h-full border-l border-black"></span>
+																				<span>on</span>
+																				<span className="absolute right-0 h-full border-r border-black"></span>
+																			</button>
+
+																			<div className={cn('flex-grow h-full', 'bg-white')}>
+																				<Input
+																					{...field}
+																					className={cn(
+																						'w-full h-full !bg-transparent pl-4 pr-3 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 max-[480px]:placeholder:text-[10px] max-[480px]:!transition-none max-[480px]:!duration-0',
+																						'!text-black placeholder:!text-[#9E9E9E]',
+																						'max-[480px]:pl-2'
+																					)}
+																					placeholder="Write manual subject here"
+																					onFocus={(e) =>
+																						trackFocusedField?.('subject', e.target)
+																					}
+																					onBlur={() => {
+																						setHasSubjectBeenTouched(true);
+																						field.onBlur();
+																					}}
+																					onChange={(e) => {
+																						if (e.target.value) {
+																							setHasSubjectBeenTouched(true);
+																						}
+																						field.onChange(e);
+																					}}
+																				/>
+																			</div>
+																		</div>
 																	</div>
 																) : (
 																	// Full bar when auto mode is off
@@ -3914,15 +4059,15 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																			<span className="absolute right-0 h-full border-r border-black"></span>
 																		</button>
 
-																		<div className={cn('flex-grow h-full', 'bg-white')}>
+																		<div className={cn('flex-grow h-full -ml-[24px]', 'bg-white')}>
 																			<Input
 																				{...field}
 																				className={cn(
-																					'w-full h-full !bg-transparent pl-4 pr-3 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 max-[480px]:placeholder:text-[10px] max-[480px]:!transition-none max-[480px]:!duration-0',
+																					'w-full h-full !bg-transparent pl-2 pr-3 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 max-[480px]:placeholder:text-[10px] max-[480px]:!transition-none max-[480px]:!duration-0',
 																					shouldShowSubjectRedStyling
 																						? '!text-[#A20000] placeholder:!text-[#A20000]'
 																						: '!text-black placeholder:!text-black',
-																					'max-[480px]:pl-2'
+																					'max-[480px]:pl-1'
 																				)}
 																				placeholder="Write your subject here. *required"
 																				onFocus={(e) =>
@@ -4327,13 +4472,34 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 															trackFocusedField?.('hybridBlockPrompts.0.value', e.target as unknown as HTMLTextAreaElement)
 														}
 														onBlur={() => {
-															// Sync contentEditable HTML back to form
-															const html = manualBodyEditorRef.current?.innerHTML || '';
+															// Sync contentEditable HTML back to form (with banned fill-ins removed)
+															const rawHtml = manualBodyEditorRef.current?.innerHTML || '';
+															const html = sanitizeBannedFillIns(rawHtml);
+															// Update the editor if content was sanitized
+															if (html !== rawHtml && manualBodyEditorRef.current) {
+																manualBodyEditorRef.current.innerHTML = html;
+															}
 															form.setValue('hybridBlockPrompts.0.value', html, { shouldDirty: true });
 														}}
 														onInput={() => {
-															// Sync contentEditable HTML to form on every input
-															const html = manualBodyEditorRef.current?.innerHTML || '';
+															// Sync contentEditable HTML to form on every input (with banned fill-ins removed)
+															const rawHtml = manualBodyEditorRef.current?.innerHTML || '';
+															const html = sanitizeBannedFillIns(rawHtml);
+															// Update the editor if content was sanitized
+															if (html !== rawHtml && manualBodyEditorRef.current) {
+																// Save cursor position
+																const selection = window.getSelection();
+																const cursorOffset = selection?.focusOffset || 0;
+																manualBodyEditorRef.current.innerHTML = html;
+																// Try to restore cursor (simplified - goes to end if complex)
+																try {
+																	const range = document.createRange();
+																	range.selectNodeContents(manualBodyEditorRef.current);
+																	range.collapse(false);
+																	selection?.removeAllRanges();
+																	selection?.addRange(range);
+																} catch {}
+															}
 															form.setValue('hybridBlockPrompts.0.value', html, { shouldDirty: true });
 														}}
 														onClick={(e) => {
@@ -4823,11 +4989,55 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 												/>
 
 												{/* Fill-ins section */}
-												<div className="absolute right-[30px] top-1/2 -translate-y-1/2 flex items-center cursor-pointer">
-													<span className="font-inter font-medium text-[14px] leading-none text-black">
-														Fill-ins
-													</span>
-													<FontDropdownArrow className="!block pointer-events-none ml-[6px] !w-[8px] !h-[5px] relative top-[3px]" />
+												<div
+													ref={fillInsDropdownRef}
+													className="absolute right-[30px] top-0 h-full flex items-center"
+												>
+													<button
+														type="button"
+														onMouseDown={(e) => e.preventDefault()}
+														onClick={() => {
+															// Close other dropdowns
+															setIsFontDropdownOpen(false);
+															setIsFontSizeDropdownOpen(false);
+															setIsColorPickerOpen(false);
+															setIsFillInsDropdownOpen(!isFillInsDropdownOpen);
+														}}
+														className="flex items-center cursor-pointer bg-transparent border-0 p-0"
+														aria-label="Fill-ins"
+														aria-expanded={isFillInsDropdownOpen}
+													>
+														<span className="font-inter font-medium text-[14px] leading-none text-black">
+															Fill-ins
+														</span>
+														<FontDropdownArrow className="!block pointer-events-none ml-[6px] !w-[8px] !h-[5px] relative top-[3px]" />
+													</button>
+
+													{/* Fill-ins dropdown menu */}
+													{isFillInsDropdownOpen && (
+														<div
+															className={cn(
+																'absolute bottom-[calc(100%+8px)] left-1/2 -translate-x-1/2 z-[9999]',
+																'rounded-[8px] bg-[#E0E0E0] py-1 min-w-[100px] shadow-md'
+															)}
+														>
+															{FILL_IN_OPTIONS.map((option) => (
+																<button
+																	key={option}
+																	type="button"
+																	onMouseDown={(e) => e.preventDefault()}
+																	onClick={() => insertFillIn(option)}
+																	className={cn(
+																		'w-full px-3 py-2 text-left text-[13px] font-inter',
+																		'hover:bg-gray-300 cursor-pointer',
+																		'text-black'
+																	)}
+																>
+																	{option}
+																</button>
+															))}
+														</div>
+													)}
 												</div>
 											</div>
 												</div>
