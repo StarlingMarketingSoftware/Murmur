@@ -2664,6 +2664,81 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 	const [isFontDropdownOpen, setIsFontDropdownOpen] = useState(false);
 	const fontDropdownRef = useRef<HTMLDivElement>(null);
 	
+	// Custom font size dropdown state
+	const [isFontSizeDropdownOpen, setIsFontSizeDropdownOpen] = useState(false);
+	const fontSizeDropdownRef = useRef<HTMLDivElement>(null);
+	const FONT_SIZE_OPTIONS = [8, 9, 10, 11, 12, 14, 16, 18, 20, 22, 24, 36] as const;
+	const DEFAULT_FONT_SIZE = 12;
+
+	// Manual mode body editor ref (contentEditable)
+	const manualBodyEditorRef = useRef<HTMLDivElement>(null);
+	const manualBodyInitializedRef = useRef(false);
+
+	// Track active formatting state
+	const [activeFormatting, setActiveFormatting] = useState({
+		bold: false,
+		italic: false,
+		underline: false,
+		bulletList: false,
+	});
+
+	// Check current formatting state at selection
+	const updateActiveFormatting = useCallback(() => {
+		setActiveFormatting({
+			bold: document.queryCommandState('bold'),
+			italic: document.queryCommandState('italic'),
+			underline: document.queryCommandState('underline'),
+			bulletList: document.queryCommandState('insertUnorderedList'),
+		});
+	}, []);
+
+	// Listen for selection changes to update formatting state
+	useEffect(() => {
+		if (selectedModeKey !== 'manual') return;
+		
+		const handleSelectionChange = () => {
+			updateActiveFormatting();
+		};
+		
+		document.addEventListener('selectionchange', handleSelectionChange);
+		return () => document.removeEventListener('selectionchange', handleSelectionChange);
+	}, [selectedModeKey, updateActiveFormatting]);
+
+	// Initialize the contentEditable with form value (only once when entering manual mode)
+	useEffect(() => {
+		if (selectedModeKey === 'manual' && manualBodyEditorRef.current && !manualBodyInitializedRef.current) {
+			const currentValue = form.getValues('hybridBlockPrompts.0.value') || '';
+			manualBodyEditorRef.current.innerHTML = currentValue;
+			manualBodyInitializedRef.current = true;
+		}
+		// Reset initialization flag when leaving manual mode
+		if (selectedModeKey !== 'manual') {
+			manualBodyInitializedRef.current = false;
+		}
+	}, [selectedModeKey, form]);
+
+	// Apply formatting to the manual mode body editor
+	const applyManualFormatting = useCallback(
+		(command: 'bold' | 'italic' | 'underline' | 'insertUnorderedList') => {
+		const editor = manualBodyEditorRef.current;
+		if (!editor) return;
+		
+		// Focus the editor to ensure selection is active
+		editor.focus();
+		
+		// Apply the formatting command
+		document.execCommand(command, false);
+		
+		// Update active formatting state
+		updateActiveFormatting();
+		
+		// Sync back to form after applying formatting
+		const html = editor.innerHTML || '';
+		form.setValue('hybridBlockPrompts.0.value', html, { shouldDirty: true });
+	},
+		[form, updateActiveFormatting]
+	);
+	
 	// Close font dropdown when clicking outside
 	useEffect(() => {
 		if (!isFontDropdownOpen) return;
@@ -2675,6 +2750,18 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		document.addEventListener('mousedown', handleClickOutside);
 		return () => document.removeEventListener('mousedown', handleClickOutside);
 	}, [isFontDropdownOpen]);
+	
+	// Close font size dropdown when clicking outside
+	useEffect(() => {
+		if (!isFontSizeDropdownOpen) return;
+		const handleClickOutside = (e: MouseEvent) => {
+			if (fontSizeDropdownRef.current && !fontSizeDropdownRef.current.contains(e.target as Node)) {
+				setIsFontSizeDropdownOpen(false);
+			}
+		};
+		document.addEventListener('mousedown', handleClickOutside);
+		return () => document.removeEventListener('mousedown', handleClickOutside);
+	}, [isFontSizeDropdownOpen]);
 
 	// Track which tab is active: 'main' (the normal Writing view) or 'profile'
 	const [activeTab, setActiveTab] = useState<'main' | 'profile'>(() => {
@@ -3881,32 +3968,51 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 
 												{/* Body (single editor for Manual - no separate signature) */}
 												<div className="flex-1 min-h-0 bg-white px-3 py-2 relative">
-													{(() => {
-														const bodyFieldProps = form.register('hybridBlockPrompts.0.value');
-														return (
-															<Textarea
-																{...bodyFieldProps}
-																placeholder=""
-																className={cn(
-																	'absolute inset-0 resize-none border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0',
-																	'bg-white px-3 py-2 font-inter text-[14px] leading-[18px] text-black',
-																	'overflow-y-auto'
-																)}
-																style={{
-																	fontFamily: form.watch('font') || 'Arial',
-																}}
-																onFocus={(e) =>
-																	trackFocusedField?.('hybridBlockPrompts.0.value', e.target)
-																}
-																onBlur={(e) => {
-																	bodyFieldProps.onBlur(e);
-																}}
-																onChange={(e) => {
-																	bodyFieldProps.onChange(e);
-																}}
-															/>
-														);
-													})()}
+													{/* Tailwind preflight strips list markers; re-enable bullets/numbering inside the manual editor */}
+													<style>{`
+														[data-hpi-manual-body-editor] ul {
+															list-style: disc;
+															padding-left: 1.25rem;
+															margin: 0.5rem 0;
+														}
+														[data-hpi-manual-body-editor] ol {
+															list-style: decimal;
+															padding-left: 1.25rem;
+															margin: 0.5rem 0;
+														}
+														[data-hpi-manual-body-editor] li {
+															margin: 0.125rem 0;
+														}
+													`}</style>
+													<div
+														ref={manualBodyEditorRef}
+														contentEditable
+														suppressContentEditableWarning
+														data-hpi-manual-body-editor
+														className={cn(
+															'absolute inset-0 resize-none border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 outline-none',
+															'bg-white px-3 py-2 font-inter text-black',
+															'overflow-y-auto'
+														)}
+														style={{
+															fontFamily: form.watch('font') || 'Arial',
+															fontSize: `${form.watch('fontSize') || DEFAULT_FONT_SIZE}px`,
+															lineHeight: '1.4',
+														}}
+														onFocus={(e) =>
+															trackFocusedField?.('hybridBlockPrompts.0.value', e.target as unknown as HTMLTextAreaElement)
+														}
+														onBlur={() => {
+															// Sync contentEditable HTML back to form
+															const html = manualBodyEditorRef.current?.innerHTML || '';
+															form.setValue('hybridBlockPrompts.0.value', html, { shouldDirty: true });
+														}}
+														onInput={() => {
+															// Sync contentEditable HTML to form on every input
+															const html = manualBodyEditorRef.current?.innerHTML || '';
+															form.setValue('hybridBlockPrompts.0.value', html, { shouldDirty: true });
+														}}
+													/>
 												</div>
 
 												{/* Bottom action box */}
@@ -4038,13 +4144,88 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 													className="absolute left-[109px] top-1/2 -translate-y-1/2 w-[2px] h-[23px] bg-black"
 												/>
 
-												{/* Font size icon */}
-												<div className="absolute left-[119px] top-1/2 -translate-y-1/2 flex items-center justify-center">
-													<FontSizeIcon width={12} height={12} />
+												{/* Font size dropdown */}
+												<div 
+													ref={fontSizeDropdownRef}
+													className="absolute left-[111px] top-0 bottom-0 w-[40px] flex items-center justify-center"
+												>
+													<button
+														type="button"
+														onClick={() => setIsFontSizeDropdownOpen(!isFontSizeDropdownOpen)}
+														className={cn(
+															'w-full h-full flex items-center justify-center gap-[5px]',
+															'bg-transparent border-0 shadow-none rounded-none',
+															'px-0 py-0 cursor-pointer',
+															'hover:bg-transparent focus:bg-transparent focus:outline-none'
+														)}
+														aria-label="Font Size"
+														aria-expanded={isFontSizeDropdownOpen}
+													>
+														<FontSizeIcon width={12} height={12} />
+														<FontDropdownArrow className="!block pointer-events-none !w-[8px] !h-[5px] relative top-[1px]" />
+													</button>
+													
+													{/* Font size dropdown menu */}
+													{isFontSizeDropdownOpen && (
+														<div
+															id="font-size-dropdown-scroll-wrapper"
+															className={cn(
+																'absolute w-[50px] overflow-visible',
+																'rounded-[8px] bg-[#E0E0E0]',
+																'z-[9999]'
+															)}
+															style={{
+																left: '50%',
+																transform: 'translateX(-50%)',
+																bottom: 'calc(100% + 8px)',
+																height: '161px',
+															}}
+														>
+															<style>{`
+																#font-size-dropdown-scroll-wrapper *::-webkit-scrollbar {
+																	display: none !important;
+																	width: 0 !important;
+																	height: 0 !important;
+																	background: transparent !important;
+																}
+																#font-size-dropdown-scroll-wrapper * {
+																	-ms-overflow-style: none !important;
+																	scrollbar-width: none !important;
+																}
+															`}</style>
+															<CustomScrollbar
+																className="w-full h-full"
+																thumbColor="#000000"
+																thumbWidth={2}
+																offsetRight={-6}
+															>
+																{FONT_SIZE_OPTIONS.map((size) => {
+																	const currentSize = form.watch('fontSize') || DEFAULT_FONT_SIZE;
+																	const isSelected = currentSize === size;
+																	return (
+																		<button
+																			key={size}
+																			type="button"
+																			onClick={() => {
+																				form.setValue('fontSize', size, {
+																					shouldDirty: true,
+																				});
+																				setIsFontSizeDropdownOpen(false);
+																			}}
+																			className={cn(
+																				'w-full px-2 py-1.5 text-center text-[12px] leading-none',
+																				'hover:bg-gray-300 cursor-pointer',
+																				isSelected && 'bg-gray-300/60 font-semibold'
+																			)}
+																		>
+																			<span>{size}</span>
+																		</button>
+																	);
+																})}
+															</CustomScrollbar>
+														</div>
+													)}
 												</div>
-
-												{/* Font size dropdown arrow */}
-												<FontDropdownArrow className="!block pointer-events-none absolute left-[136px] bottom-[11px] !w-[8px] !h-[5px]" />
 
 												{/* Second divider */}
 												<div
@@ -4053,24 +4234,68 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 												/>
 
 												{/* Bold icon */}
-												<div className="absolute left-[163px] top-[10px] flex items-center justify-center">
+												<button
+													type="button"
+													onMouseDown={(e) => e.preventDefault()}
+													onClick={() => applyManualFormatting('bold')}
+													className={cn(
+														"absolute left-[159px] top-[4px] w-[24px] h-[24px] flex items-center justify-center cursor-pointer transition-all rounded-[4px]",
+														activeFormatting.bold
+															? "bg-[#B8C8E0]"
+															: "hover:bg-[#C5D3E8]"
+													)}
+													aria-label="Bold"
+												>
 													<BoldIcon width={8} height={11} />
-												</div>
+												</button>
 
 												{/* Italic icon */}
-												<div className="absolute left-[189px] top-[10px] flex items-center justify-center">
+												<button
+													type="button"
+													onMouseDown={(e) => e.preventDefault()}
+													onClick={() => applyManualFormatting('italic')}
+													className={cn(
+														"absolute left-[183px] top-[4px] w-[24px] h-[24px] flex items-center justify-center cursor-pointer transition-all rounded-[4px]",
+														activeFormatting.italic
+															? "bg-[#B8C8E0]"
+															: "hover:bg-[#C5D3E8]"
+													)}
+													aria-label="Italic"
+												>
 													<ItalicIcon width={4} height={11} />
-												</div>
+												</button>
 
 												{/* Underline icon - top aligned with B/I, underline extends below */}
-												<div className="absolute left-[206px] top-[10px] flex items-center justify-center">
+												<button
+													type="button"
+													onMouseDown={(e) => e.preventDefault()}
+													onClick={() => applyManualFormatting('underline')}
+													className={cn(
+														"absolute left-[207px] top-[4px] w-[24px] h-[24px] flex items-center justify-center cursor-pointer transition-all rounded-[4px]",
+														activeFormatting.underline
+															? "bg-[#B8C8E0]"
+															: "hover:bg-[#C5D3E8]"
+													)}
+													aria-label="Underline"
+												>
 													<UnderlineIcon width={11} height={14} />
-												</div>
+												</button>
 
 												{/* Bullet list icon */}
-												<div className="absolute left-[240px] top-[10px] flex items-center justify-center">
+												<button
+													type="button"
+													onMouseDown={(e) => e.preventDefault()}
+													onClick={() => applyManualFormatting('insertUnorderedList')}
+													className={cn(
+														"absolute left-[236px] top-[4px] w-[24px] h-[24px] flex items-center justify-center cursor-pointer transition-all rounded-[4px]",
+														activeFormatting.bulletList
+															? "bg-[#B8C8E0]"
+															: "hover:bg-[#C5D3E8]"
+													)}
+													aria-label="Bullet list"
+												>
 													<BulletListIcon width={15} height={11} />
-												</div>
+												</button>
 
 												{/* Text color icon */}
 												<div className="absolute left-[268px] top-[10px] flex items-center justify-center">
