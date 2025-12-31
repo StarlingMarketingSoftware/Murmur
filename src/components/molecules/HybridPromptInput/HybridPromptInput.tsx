@@ -3784,34 +3784,48 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 										{selectedModeKey === 'manual' && (
 											<div
 												className={cn(
-													'w-[468px] h-[623px] bg-white border-[3px] border-black rounded-[8px] overflow-hidden flex flex-col',
+													'w-[468px] h-[623px] bg-white border-[3px] border-[#0B5C0D] rounded-[8px] overflow-hidden flex flex-col',
 													'max-[480px]:w-[89.33vw]'
 												)}
 												data-hpi-manual-entry
 											>
 												{/* Subject (inside the unified manual box) */}
-												<div className="h-[44px] flex items-center gap-3 px-3 border-b-[3px] border-black bg-white">
-													<span className="font-inter font-semibold text-[17px] max-[480px]:text-[12px] whitespace-nowrap text-black">
-														Subject
-													</span>
+												<div className="min-h-[39px] flex items-start px-3 py-2 bg-white cursor-text">
 													<FormField
 														control={form.control}
 														name="subject"
 														rules={{ required: form.watch('isAiSubject') }}
 														render={({ field }) => (
-															<FormItem className="flex-1 h-full">
+															<FormItem className="flex-1 mb-0">
 																<FormControl>
-																	<Input
+																	<Textarea
 																		{...field}
 																		className={cn(
-																			'h-full w-full border-0 rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 !bg-transparent px-0',
+																			// Auto-expanding textarea for subject (up to 4 lines)
+																			'w-full border-0 rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 !bg-transparent p-0 min-h-[20px] leading-[20px] resize-none overflow-hidden',
+																			// Subject spec: Inter semi-bold, 16px (placeholder + typed text).
+																			'font-inter font-semibold text-[16px] md:text-[16px] placeholder:font-semibold placeholder:text-[16px] placeholder:opacity-100',
 																			shouldShowSubjectRedStyling
-																				? '!text-[#A20000] placeholder:!text-[#A20000]'
-																				: '!text-black placeholder:!text-black'
+																				? '!text-[#A20000] placeholder:text-[#A20000] focus:placeholder:text-[#A20000]'
+																				: '!text-black placeholder:text-black focus:placeholder:text-gray-400'
 																		)}
-																		placeholder="Write your subject here"
+																		style={{ maxHeight: '80px' }} // 4 lines max (20px * 4)
+																		placeholder="Subject"
+																		rows={1}
+																		onInput={(e: React.FormEvent<HTMLTextAreaElement>) => {
+																			const target = e.currentTarget;
+																			target.style.height = 'auto';
+																			// Limit to 4 lines (80px)
+																			target.style.height = Math.min(target.scrollHeight, 80) + 'px';
+																		}}
+																		onKeyDown={(e) => {
+																			// Prevent Enter from creating new lines (email subjects don't support newlines)
+																			if (e.key === 'Enter') {
+																				e.preventDefault();
+																			}
+																		}}
 																		onFocus={(e) =>
-																			trackFocusedField?.('subject', e.target)
+																			trackFocusedField?.('subject', e.target as HTMLTextAreaElement)
 																		}
 																		onBlur={() => {
 																			setHasSubjectBeenTouched(true);
@@ -3826,6 +3840,10 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 															</FormItem>
 														)}
 													/>
+												</div>
+												{/* Subject divider line (full width) */}
+												<div className="px-0 bg-white">
+													<div className="w-full h-[2px] bg-[#AFAFAF]" />
 												</div>
 
 												{/* Body (single editor for Manual - no separate signature) */}
