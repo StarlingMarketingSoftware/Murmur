@@ -50,6 +50,13 @@ import RightArrow from '@/components/atoms/_svg/RightArrow';
 import UndoIcon from '@/components/atoms/_svg/UndoIcon';
 import UpscaleIcon from '@/components/atoms/_svg/UpscaleIcon';
 import FontDropdownArrow from '@/components/atoms/_svg/FontDropdownArrow';
+import FontSizeIcon from '@/components/atoms/_svg/FontSizeIcon';
+import BoldIcon from '@/components/atoms/_svg/BoldIcon';
+import ItalicIcon from '@/components/atoms/_svg/ItalicIcon';
+import UnderlineIcon from '@/components/atoms/_svg/UnderlineIcon';
+import BulletListIcon from '@/components/atoms/_svg/BulletListIcon';
+import TextColorIcon from '@/components/atoms/_svg/TextColorIcon';
+import LinkIcon from '@/components/atoms/_svg/LinkIcon';
 import { DraggableHighlight } from '../DragAndDrop/DraggableHighlight';
 import DraggableBox from '@/app/murmur/campaign/[campaignId]/DraftingSection/EmailGeneration/DraggableBox';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
@@ -4029,6 +4036,75 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 												<div
 													aria-hidden="true"
 													className="absolute left-[109px] top-1/2 -translate-y-1/2 w-[2px] h-[23px] bg-black"
+												/>
+
+												{/* Font size icon */}
+												<div className="absolute left-[119px] top-1/2 -translate-y-1/2 flex items-center justify-center">
+													<FontSizeIcon width={12} height={12} />
+												</div>
+
+												{/* Font size dropdown arrow */}
+												<FontDropdownArrow className="!block pointer-events-none absolute left-[136px] bottom-[11px] !w-[8px] !h-[5px]" />
+
+												{/* Second divider */}
+												<div
+													aria-hidden="true"
+													className="absolute left-[151px] top-1/2 -translate-y-1/2 w-px h-[23px] bg-black"
+												/>
+
+												{/* Bold icon */}
+												<div className="absolute left-[163px] top-[10px] flex items-center justify-center">
+													<BoldIcon width={8} height={11} />
+												</div>
+
+												{/* Italic icon */}
+												<div className="absolute left-[189px] top-[10px] flex items-center justify-center">
+													<ItalicIcon width={4} height={11} />
+												</div>
+
+												{/* Underline icon - top aligned with B/I, underline extends below */}
+												<div className="absolute left-[206px] top-[10px] flex items-center justify-center">
+													<UnderlineIcon width={11} height={14} />
+												</div>
+
+												{/* Bullet list icon */}
+												<div className="absolute left-[240px] top-[10px] flex items-center justify-center">
+													<BulletListIcon width={15} height={11} />
+												</div>
+
+												{/* Text color icon */}
+												<div className="absolute left-[268px] top-[10px] flex items-center justify-center">
+													<TextColorIcon width={11} height={14} />
+												</div>
+
+												{/* Link icon */}
+												<div className="absolute left-[299px] top-1/2 -translate-y-1/2 flex items-center justify-center">
+													<svg
+														width={20}
+														height={20}
+														viewBox="0 0 23 23"
+														fill="none"
+														xmlns="http://www.w3.org/2000/svg"
+													>
+														<path
+															d="M3.0751 14.325C2.3251 13.575 1.8001 12.45 1.8001 11.25C1.8001 10.05 2.2501 8.99996 3.0751 8.17496C3.9001 7.34996 4.9501 6.89996 6.1501 6.89996H9.0001C9.3001 6.89996 9.5251 7.12497 9.5251 7.42497C9.5251 7.72497 9.30011 7.94996 9.00011 7.94996L6.1501 7.94997C5.2501 7.94997 4.5001 8.24996 3.8251 8.92496C3.1501 9.59996 2.8501 10.35 2.8501 11.25C2.8501 13.05 4.3501 14.55 6.0751 14.475H8.9251C9.2251 14.475 9.4501 14.7 9.4501 15C9.4501 15.3 9.22511 15.525 8.92511 15.525L6.0751 15.525C4.9501 15.6 3.9001 15.15 3.0751 14.325Z"
+															fill="#231815"
+														/>
+														<path
+															d="M13.3503 15.45C13.2753 15.375 13.1253 15.225 13.1253 15.075C13.1253 14.775 13.3503 14.55 13.6503 14.55L16.5003 14.55C18.3003 14.55 19.7253 13.125 19.7253 11.325C19.7253 9.52499 18.3003 8.09999 16.5003 8.09999L13.6503 8.09999C13.3503 8.09999 13.1253 7.87499 13.1253 7.57499C13.1253 7.27499 13.3503 7.04999 13.6503 7.04999L16.5003 7.04999C18.9003 7.04999 20.7753 8.92499 20.7753 11.325C20.7753 13.725 18.9003 15.6 16.5003 15.6H13.6503C13.5003 15.6 13.4253 15.525 13.3503 15.45Z"
+															fill="#231815"
+														/>
+														<path
+															d="M5.70029 11.7C5.62529 11.625 5.47529 11.475 5.47529 11.325C5.47529 11.025 5.70029 10.8 6.00029 10.8L16.3503 10.8C16.6503 10.8 16.8753 11.025 16.8753 11.325C16.8753 11.625 16.6503 11.85 16.3503 11.85L6.00029 11.85C6.00029 11.85 5.85029 11.85 5.70029 11.7Z"
+															fill="#231815"
+														/>
+													</svg>
+												</div>
+
+												{/* Third divider (102px from right edge) */}
+												<div
+													aria-hidden="true"
+													className="absolute right-[102px] top-1/2 -translate-y-1/2 w-px h-[23px] bg-black"
 												/>
 
 												{/* Right section (reserved for future controls) */}
