@@ -4107,8 +4107,13 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 													className="absolute right-[102px] top-1/2 -translate-y-1/2 w-px h-[23px] bg-black"
 												/>
 
-												{/* Right section (reserved for future controls) */}
-												<div className="flex-1 h-full" />
+												{/* Fill-ins section */}
+												<div className="absolute right-[30px] top-1/2 -translate-y-1/2 flex items-center cursor-pointer">
+													<span className="font-inter font-medium text-[14px] leading-none text-black">
+														Fill-ins
+													</span>
+													<FontDropdownArrow className="!block pointer-events-none ml-[6px] !w-[8px] !h-[5px] relative top-[3px]" />
+												</div>
 											</div>
 												</div>
 
