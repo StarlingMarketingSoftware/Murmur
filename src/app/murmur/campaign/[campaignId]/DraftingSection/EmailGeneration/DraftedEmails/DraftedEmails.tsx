@@ -26,9 +26,10 @@ import RightArrow from '@/components/atoms/_svg/RightArrow';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import RichTextEditor from '@/components/molecules/RichTextEditor/RichTextEditor';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
-import { isRestaurantTitle, isCoffeeShopTitle } from '@/utils/restaurantTitle';
+import { isRestaurantTitle, isCoffeeShopTitle, isMusicVenueTitle } from '@/utils/restaurantTitle';
 import { RestaurantsIcon } from '@/components/atoms/_svg/RestaurantsIcon';
 import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
+import { MusicVenuesIcon } from '@/components/atoms/_svg/MusicVenuesIcon';
 
 interface ScrollableTextareaProps
 	extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
@@ -555,7 +556,9 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 											? '#C3FBD1'
 											: isCoffeeShopTitle(contactTitle)
 												? '#D6F1BD'
-												: '#E8EFFF',
+												: isMusicVenueTitle(contactTitle)
+													? '#B7E5FF'
+													: '#E8EFFF',
 									}}
 								>
 									{isRestaurantTitle(contactTitle) && (
@@ -564,13 +567,18 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 									{isCoffeeShopTitle(contactTitle) && (
 										<CoffeeShopsIcon size={7} />
 									)}
+									{isMusicVenueTitle(contactTitle) && (
+										<MusicVenuesIcon size={12} className="flex-shrink-0" />
+									)}
 									<ScrollableText
 										text={
 											isRestaurantTitle(contactTitle)
 												? 'Restaurant'
 												: isCoffeeShopTitle(contactTitle)
 													? 'Coffee Shop'
-													: contactTitle
+													: isMusicVenueTitle(contactTitle)
+														? 'Music Venue'
+														: contactTitle
 										}
 										className="text-[11px] font-inter text-black leading-none w-full"
 									/>
@@ -1355,7 +1363,9 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 														? '#C3FBD1'
 														: isCoffeeShopTitle(contactTitle)
 															? '#D6F1BD'
-															: '#E8EFFF',
+															: isMusicVenueTitle(contactTitle)
+																? '#B7E5FF'
+																: '#E8EFFF',
 												}}
 											>
 												{isRestaurantTitle(contactTitle) && (
@@ -1364,13 +1374,18 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 												{isCoffeeShopTitle(contactTitle) && (
 													<CoffeeShopsIcon size={8} />
 												)}
+												{isMusicVenueTitle(contactTitle) && (
+													<MusicVenuesIcon size={14} className="flex-shrink-0" />
+												)}
 												<ScrollableText
 													text={
 														isRestaurantTitle(contactTitle)
 															? 'Restaurant'
 															: isCoffeeShopTitle(contactTitle)
 																? 'Coffee Shop'
-																: contactTitle
+																: isMusicVenueTitle(contactTitle)
+																	? 'Music Venue'
+																	: contactTitle
 													}
 													className="text-[10px] text-black leading-none"
 													scrollPixelsPerSecond={60}

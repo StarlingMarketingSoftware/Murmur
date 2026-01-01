@@ -15,9 +15,10 @@ import {
 	stateBadgeColorMap,
 } from '@/constants/ui';
 import { useGetUsedContactIds } from '@/hooks/queryHooks/useContacts';
-import { isRestaurantTitle, isCoffeeShopTitle } from '@/utils/restaurantTitle';
+import { isRestaurantTitle, isCoffeeShopTitle, isMusicVenueTitle } from '@/utils/restaurantTitle';
 import { RestaurantsIcon } from '@/components/atoms/_svg/RestaurantsIcon';
 import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
+import { MusicVenuesIcon } from '@/components/atoms/_svg/MusicVenuesIcon';
 
 export interface SentExpandedListProps {
 	sent: EmailWithRelations[];
@@ -396,7 +397,9 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 														? '#C3FBD1'
 														: isCoffeeShopTitle(contactTitle)
 															? '#D6F1BD'
-															: '#E8EFFF',
+															: isMusicVenueTitle(contactTitle)
+																? '#B7E5FF'
+																: '#E8EFFF',
 												}}
 											>
 												{isRestaurantTitle(contactTitle) && (
@@ -405,13 +408,18 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 												{isCoffeeShopTitle(contactTitle) && (
 													<CoffeeShopsIcon size={5} />
 												)}
+												{isMusicVenueTitle(contactTitle) && (
+													<MusicVenuesIcon size={isBottomView ? 7 : isAllTab ? 10 : 8} className="flex-shrink-0" />
+												)}
 												{isBottomView ? (
 													<span className="text-[7px] text-black leading-none truncate">
 														{isRestaurantTitle(contactTitle)
 															? 'Restaurant'
 															: isCoffeeShopTitle(contactTitle)
 																? 'Coffee Shop'
-																: contactTitle}
+																: isMusicVenueTitle(contactTitle)
+																	? 'Music Venue'
+																	: contactTitle}
 													</span>
 												) : (
 													<ScrollableText
@@ -420,7 +428,9 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 																? 'Restaurant'
 																: isCoffeeShopTitle(contactTitle)
 																	? 'Coffee Shop'
-																	: contactTitle
+																	: isMusicVenueTitle(contactTitle)
+																		? 'Music Venue'
+																		: contactTitle
 														}
 														className="text-[8px] text-black leading-none px-1"
 													/>

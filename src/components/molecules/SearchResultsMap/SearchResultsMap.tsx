@@ -22,7 +22,8 @@ import {
 } from '@/components/atoms/_svg/MapMarkerPinIcon';
 import { RestaurantsIcon } from '@/components/atoms/_svg/RestaurantsIcon';
 import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
-import { isRestaurantTitle, isCoffeeShopTitle } from '@/utils/restaurantTitle';
+import { MusicVenuesIcon } from '@/components/atoms/_svg/MusicVenuesIcon';
+import { isRestaurantTitle, isCoffeeShopTitle, isMusicVenueTitle } from '@/utils/restaurantTitle';
 
 type LatLngLiteral = { lat: number; lng: number };
 type MarkerHoverMeta = { clientX: number; clientY: number };
@@ -1170,6 +1171,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		() => (searchWhat ? normalizeWhatKey(searchWhat) : null),
 		[searchWhat]
 	);
+
+	// Check if the current search is for a specific category (to apply labels to all results)
+	const searchWhatLower = searchWhat?.toLowerCase() || '';
+	const isMusicVenuesSearch = searchWhatLower.includes('music venue') || searchWhatLower.includes('venues');
+	const isRestaurantsSearch = searchWhatLower.includes('restaurant');
+	const isCoffeeShopsSearch = searchWhatLower.includes('coffee shop') || searchWhatLower.includes('coffee shops');
 
 	// Booking/promotion overlay pins can contain multiple "What" categories at once; only surface
 	// the ones that match the active search "What" in the dashboard's right-hand panel.
@@ -3108,9 +3115,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			}
 		});
 
-		// Note: Initial bounds fitting is handled by the useEffect that watches contactsWithCoords
-		// and lockedStateKey. This ensures we wait for the state layer to be ready before
-		// fitting to state bounds.
 	}, []);
 
 	const onUnmount = useCallback(() => {
@@ -4095,10 +4099,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 												</span>
 											)}
 										</div>
-										{(selectedMarker.title || selectedMarker.headline) && (() => {
+										{(selectedMarker.title || selectedMarker.headline || isMusicVenuesSearch || isRestaurantsSearch || isCoffeeShopsSearch) && (() => {
 											const titleText = selectedMarker.title || selectedMarker.headline || '';
-											const isRestaurant = isRestaurantTitle(titleText);
-											const isCoffeeShop = isCoffeeShopTitle(titleText);
+											const isRestaurant = isRestaurantsSearch || isRestaurantTitle(titleText);
+											const isCoffeeShop = isCoffeeShopsSearch || isCoffeeShopTitle(titleText);
+											const isMusicVenue = isMusicVenuesSearch || isMusicVenueTitle(titleText);
 											return (
 												<div
 													className="px-1.5 py-[1px] rounded-[6px] border border-black max-w-full flex items-center gap-1"
@@ -4107,7 +4112,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 															? '#C3FBD1'
 															: isCoffeeShop
 																? '#D6F1BD'
-																: '#E8EFFF',
+																: isMusicVenue
+																	? '#B7E5FF'
+																	: '#E8EFFF',
 													}}
 												>
 													{isRestaurant && (
@@ -4116,8 +4123,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 													{isCoffeeShop && (
 														<CoffeeShopsIcon size={6} />
 													)}
+													{isMusicVenue && (
+														<MusicVenuesIcon size={10} className="flex-shrink-0" />
+													)}
 													<span className="text-[9px] leading-none text-black block truncate">
-														{isRestaurant ? 'Restaurant' : isCoffeeShop ? 'Coffee Shop' : titleText}
+														{isRestaurant ? 'Restaurant' : isCoffeeShop ? 'Coffee Shop' : isMusicVenue ? 'Music Venue' : titleText}
 													</span>
 												</div>
 											);

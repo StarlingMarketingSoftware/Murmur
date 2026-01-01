@@ -15,9 +15,10 @@ import {
 } from '@/constants/ui';
 import { useGetInboundEmails } from '@/hooks/queryHooks/useInboundEmails';
 import type { InboundEmailWithRelations } from '@/types';
-import { isRestaurantTitle, isCoffeeShopTitle } from '@/utils/restaurantTitle';
+import { isRestaurantTitle, isCoffeeShopTitle, isMusicVenueTitle } from '@/utils/restaurantTitle';
 import { RestaurantsIcon } from '@/components/atoms/_svg/RestaurantsIcon';
 import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
+import { MusicVenuesIcon } from '@/components/atoms/_svg/MusicVenuesIcon';
 
 export interface InboxExpandedListProps {
 	contacts: ContactWithName[];
@@ -356,7 +357,9 @@ export const InboxExpandedList: FC<InboxExpandedListProps> = ({
 														? '#C3FBD1'
 														: isCoffeeShopTitle(contact.headline)
 															? '#D6F1BD'
-															: '#E8EFFF',
+															: isMusicVenueTitle(contact.headline)
+																? '#B7E5FF'
+																: '#E8EFFF',
 												}}
 											>
 												{isRestaurantTitle(contact.headline) && (
@@ -365,13 +368,18 @@ export const InboxExpandedList: FC<InboxExpandedListProps> = ({
 												{isCoffeeShopTitle(contact.headline) && (
 													<CoffeeShopsIcon size={5} />
 												)}
+												{isMusicVenueTitle(contact.headline) && (
+													<MusicVenuesIcon size={isBottomView ? 7 : 8} className="flex-shrink-0" />
+												)}
 												{isBottomView ? (
 													<span className="text-[7px] text-black leading-none truncate">
 														{isRestaurantTitle(contact.headline)
 															? 'Restaurant'
 															: isCoffeeShopTitle(contact.headline)
 																? 'Coffee Shop'
-																: contact.headline}
+																: isMusicVenueTitle(contact.headline)
+																	? 'Music Venue'
+																	: contact.headline}
 													</span>
 												) : (
 													<ScrollableText
@@ -380,7 +388,9 @@ export const InboxExpandedList: FC<InboxExpandedListProps> = ({
 																? 'Restaurant'
 																: isCoffeeShopTitle(contact.headline)
 																	? 'Coffee Shop'
-																	: contact.headline
+																	: isMusicVenueTitle(contact.headline)
+																		? 'Music Venue'
+																		: contact.headline
 														}
 														className="text-[8px] text-black leading-none px-1"
 													/>

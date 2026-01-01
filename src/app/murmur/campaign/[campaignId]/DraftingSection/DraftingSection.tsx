@@ -79,7 +79,7 @@ import BottomArrowIcon from '@/components/atoms/_svg/BottomArrowIcon';
 import BottomFolderIcon from '@/components/atoms/_svg/BottomFolderIcon';
 import LeftArrow from '@/components/atoms/_svg/LeftArrow';
 import RightArrow from '@/components/atoms/_svg/RightArrow';
-import { isRestaurantTitle, isCoffeeShopTitle } from '@/utils/restaurantTitle';
+import { isRestaurantTitle, isCoffeeShopTitle, isMusicVenueTitle } from '@/utils/restaurantTitle';
 
 type IdentityProfileFields = Identity & {
 	genre?: string | null;
@@ -2910,7 +2910,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																						? '#C3FBD1'
 																						: isCoffeeShopTitle(headline)
 																							? '#D6F1BD'
-																							: '#E8EFFF',
+																							: isMusicVenueTitle(headline)
+																								? '#B7E5FF'
+																								: '#E8EFFF',
 																				}}
 																			>
 																				{isRestaurantTitle(headline) && (
@@ -2919,12 +2921,17 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																				{isCoffeeShopTitle(headline) && (
 																					<CoffeeShopsIcon size={7} />
 																				)}
+																				{isMusicVenueTitle(headline) && (
+																					<MusicVenuesIcon size={12} className="flex-shrink-0" />
+																				)}
 																				<span className="text-[10px] text-black leading-none truncate">
 																					{isRestaurantTitle(headline)
 																						? 'Restaurant'
 																						: isCoffeeShopTitle(headline)
 																							? 'Coffee Shop'
-																							: headline}
+																							: isMusicVenueTitle(headline)
+																								? 'Music Venue'
+																								: headline}
 																				</span>
 																			</div>
 																		) : (
@@ -2983,7 +2990,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																						? '#C3FBD1'
 																						: isCoffeeShopTitle(headline)
 																							? '#D6F1BD'
-																							: '#E8EFFF',
+																							: isMusicVenueTitle(headline)
+																								? '#B7E5FF'
+																								: '#E8EFFF',
 																				}}
 																			>
 																				{isRestaurantTitle(headline) && (
@@ -2992,12 +3001,17 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																				{isCoffeeShopTitle(headline) && (
 																					<CoffeeShopsIcon size={7} />
 																				)}
+																				{isMusicVenueTitle(headline) && (
+																					<MusicVenuesIcon size={12} className="flex-shrink-0" />
+																				)}
 																				<span className="text-[10px] text-black leading-none truncate">
 																					{isRestaurantTitle(headline)
 																						? 'Restaurant'
 																						: isCoffeeShopTitle(headline)
 																							? 'Coffee Shop'
-																							: headline}
+																							: isMusicVenueTitle(headline)
+																								? 'Music Venue'
+																								: headline}
 																				</span>
 																			</div>
 																		) : (
@@ -4622,7 +4636,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																										? '#C3FBD1'
 																										: isCoffeeShopTitle(headline)
 																											? '#D6F1BD'
-																											: '#E8EFFF',
+																											: isMusicVenueTitle(headline)
+																												? '#B7E5FF'
+																												: '#E8EFFF',
 																								}}
 																							>
 																								{isRestaurantTitle(headline) && (
@@ -4631,12 +4647,17 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																								{isCoffeeShopTitle(headline) && (
 																									<CoffeeShopsIcon size={7} />
 																								)}
+																								{isMusicVenueTitle(headline) && (
+																									<MusicVenuesIcon size={12} className="flex-shrink-0" />
+																								)}
 																								<span className="text-[10px] text-black leading-none truncate">
 																									{isRestaurantTitle(headline)
 																										? 'Restaurant'
 																										: isCoffeeShopTitle(headline)
 																											? 'Coffee Shop'
-																											: headline}
+																											: isMusicVenueTitle(headline)
+																												? 'Music Venue'
+																												: headline}
 																								</span>
 																							</div>
 																						) : (
@@ -4695,7 +4716,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																										? '#C3FBD1'
 																										: isCoffeeShopTitle(headline)
 																											? '#D6F1BD'
-																											: '#E8EFFF',
+																											: isMusicVenueTitle(headline)
+																												? '#B7E5FF'
+																												: '#E8EFFF',
 																								}}
 																							>
 																								{isRestaurantTitle(headline) && (
@@ -4704,12 +4727,17 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																								{isCoffeeShopTitle(headline) && (
 																									<CoffeeShopsIcon size={7} />
 																								)}
+																								{isMusicVenueTitle(headline) && (
+																									<MusicVenuesIcon size={12} className="flex-shrink-0" />
+																								)}
 																								<span className="text-[10px] text-black leading-none truncate">
 																									{isRestaurantTitle(headline)
 																										? 'Restaurant'
 																										: isCoffeeShopTitle(headline)
 																											? 'Coffee Shop'
-																											: headline}
+																											: isMusicVenueTitle(headline)
+																												? 'Music Venue'
+																												: headline}
 																								</span>
 																							</div>
 																						) : (
@@ -5350,7 +5378,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																							? '#C3FBD1'
 																							: isCoffeeShopTitle(headline)
 																								? '#D6F1BD'
-																								: '#E8EFFF',
+																								: isMusicVenueTitle(headline)
+																									? '#B7E5FF'
+																									: '#E8EFFF',
 																					}}
 																				>
 																					{isRestaurantTitle(headline) && (
@@ -5359,12 +5389,17 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																					{isCoffeeShopTitle(headline) && (
 																						<CoffeeShopsIcon size={7} />
 																					)}
+																					{isMusicVenueTitle(headline) && (
+																						<MusicVenuesIcon size={12} className="flex-shrink-0" />
+																					)}
 																					<span className="text-[10px] text-black leading-none truncate">
 																						{isRestaurantTitle(headline)
 																							? 'Restaurant'
 																							: isCoffeeShopTitle(headline)
 																								? 'Coffee Shop'
-																								: headline}
+																								: isMusicVenueTitle(headline)
+																									? 'Music Venue'
+																									: headline}
 																					</span>
 																				</div>
 																			) : (
@@ -5423,7 +5458,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																							? '#C3FBD1'
 																							: isCoffeeShopTitle(headline)
 																								? '#D6F1BD'
-																								: '#E8EFFF',
+																								: isMusicVenueTitle(headline)
+																									? '#B7E5FF'
+																									: '#E8EFFF',
 																					}}
 																				>
 																					{isRestaurantTitle(headline) && (
@@ -5432,12 +5469,17 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																					{isCoffeeShopTitle(headline) && (
 																						<CoffeeShopsIcon size={7} />
 																					)}
+																					{isMusicVenueTitle(headline) && (
+																						<MusicVenuesIcon size={12} className="flex-shrink-0" />
+																					)}
 																					<span className="text-[10px] text-black leading-none truncate">
 																						{isRestaurantTitle(headline)
 																							? 'Restaurant'
 																							: isCoffeeShopTitle(headline)
 																								? 'Coffee Shop'
-																								: headline}
+																								: isMusicVenueTitle(headline)
+																									? 'Music Venue'
+																									: headline}
 																					</span>
 																				</div>
 																			) : (

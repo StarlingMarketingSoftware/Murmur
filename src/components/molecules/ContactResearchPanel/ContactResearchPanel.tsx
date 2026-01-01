@@ -3,9 +3,10 @@ import { ContactWithName } from '@/types/contact';
 import { getStateAbbreviation } from '@/utils/string';
 import { stateBadgeColorMap } from '@/constants/ui';
 import { cn } from '@/utils';
-import { isRestaurantTitle, isCoffeeShopTitle } from '@/utils/restaurantTitle';
+import { isRestaurantTitle, isCoffeeShopTitle, isMusicVenueTitle } from '@/utils/restaurantTitle';
 import { RestaurantsIcon } from '@/components/atoms/_svg/RestaurantsIcon';
 import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
+import { MusicVenuesIcon } from '@/components/atoms/_svg/MusicVenuesIcon';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 import ResearchMap from '@/components/atoms/_svg/ResearchMap';
 import ResearchChevron from '@/components/atoms/_svg/ResearchChevron';
@@ -988,7 +989,9 @@ export const ContactResearchHorizontalStrip: FC<
 								? '#C3FBD1'
 								: isCoffeeShopTitle(contact.title)
 									? '#D6F1BD'
-									: '#E8EFFF',
+									: isMusicVenueTitle(contact.title)
+										? '#B7E5FF'
+										: '#E8EFFF',
 						}}
 					>
 						{isRestaurantTitle(contact.title) && (
@@ -997,12 +1000,17 @@ export const ContactResearchHorizontalStrip: FC<
 						{isCoffeeShopTitle(contact.title) && (
 							<CoffeeShopsIcon size={7} />
 						)}
+						{isMusicVenueTitle(contact.title) && (
+							<MusicVenuesIcon size={12} className="flex-shrink-0" />
+						)}
 						<span className="text-[10px] leading-none text-black block truncate">
 							{isRestaurantTitle(contact.title)
 								? 'Restaurant'
 								: isCoffeeShopTitle(contact.title)
 									? 'Coffee Shop'
-									: contact.title}
+									: isMusicVenueTitle(contact.title)
+										? 'Music Venue'
+										: contact.title}
 						</span>
 					</div>
 				)}

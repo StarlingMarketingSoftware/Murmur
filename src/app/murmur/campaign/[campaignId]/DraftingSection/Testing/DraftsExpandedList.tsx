@@ -25,9 +25,10 @@ import {
 	canadianProvinceNames,
 	stateBadgeColorMap,
 } from '@/constants/ui';
-import { isRestaurantTitle, isCoffeeShopTitle } from '@/utils/restaurantTitle';
+import { isRestaurantTitle, isCoffeeShopTitle, isMusicVenueTitle } from '@/utils/restaurantTitle';
 import { RestaurantsIcon } from '@/components/atoms/_svg/RestaurantsIcon';
 import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
+import { MusicVenuesIcon } from '@/components/atoms/_svg/MusicVenuesIcon';
 
 export interface DraftsExpandedListProps {
 	drafts: EmailWithRelations[];
@@ -605,7 +606,9 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 													? '#C3FBD1'
 													: isCoffeeShopTitle(contactTitle)
 														? '#D6F1BD'
-														: '#E8EFFF',
+														: isMusicVenueTitle(contactTitle)
+															? '#B7E5FF'
+															: '#E8EFFF',
 											}}
 										>
 											{isRestaurantTitle(contactTitle) && (
@@ -614,13 +617,18 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 											{isCoffeeShopTitle(contactTitle) && (
 												<CoffeeShopsIcon size={6} />
 											)}
+											{isMusicVenueTitle(contactTitle) && (
+												<MusicVenuesIcon size={isBottomView ? 7 : isAllTab ? 10 : 14} className="flex-shrink-0" />
+											)}
 											{isBottomView ? (
 												<span className="text-[7px] text-black leading-none truncate">
 													{isRestaurantTitle(contactTitle)
 														? 'Restaurant'
 														: isCoffeeShopTitle(contactTitle)
 															? 'Coffee Shop'
-															: contactTitle}
+															: isMusicVenueTitle(contactTitle)
+																? 'Music Venue'
+																: contactTitle}
 												</span>
 											) : (
 												<ScrollableText
@@ -629,7 +637,9 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 															? 'Restaurant'
 															: isCoffeeShopTitle(contactTitle)
 																? 'Coffee Shop'
-																: contactTitle
+																: isMusicVenueTitle(contactTitle)
+																	? 'Music Venue'
+																	: contactTitle
 													}
 													className="text-[11px] text-black leading-none px-1"
 												/>

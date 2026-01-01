@@ -23,9 +23,10 @@ import {
 } from '@/app/murmur/campaign/[campaignId]/DraftingSection/EmailGeneration/ContactsSelection/ContactsSelection';
 import { useDebounce } from '@/hooks/useDebounce';
 import { urls } from '@/constants/urls';
-import { isRestaurantTitle, isCoffeeShopTitle } from '@/utils/restaurantTitle';
+import { isRestaurantTitle, isCoffeeShopTitle, isMusicVenueTitle } from '@/utils/restaurantTitle';
 import { RestaurantsIcon } from '@/components/atoms/_svg/RestaurantsIcon';
 import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
+import { MusicVenuesIcon } from '@/components/atoms/_svg/MusicVenuesIcon';
 
 export interface ContactsExpandedListProps {
 	contacts: ContactWithName[];
@@ -397,7 +398,9 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 																		? '#C3FBD1'
 																		: isCoffeeShopTitle(contactTitle)
 																			? '#D6F1BD'
-																			: '#E8EFFF',
+																			: isMusicVenueTitle(contactTitle)
+																				? '#B7E5FF'
+																				: '#E8EFFF',
 																}}
 															>
 																{isRestaurantTitle(contactTitle) && (
@@ -406,12 +409,17 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 																{isCoffeeShopTitle(contactTitle) && (
 																	<CoffeeShopsIcon size={4} />
 																)}
+																{isMusicVenueTitle(contactTitle) && (
+																	<MusicVenuesIcon size={7} className="flex-shrink-0" />
+																)}
 																<span className="text-[7px] text-black leading-none truncate">
 																	{isRestaurantTitle(contactTitle)
 																		? 'Restaurant'
 																		: isCoffeeShopTitle(contactTitle)
 																			? 'Coffee Shop'
-																			: contactTitle}
+																			: isMusicVenueTitle(contactTitle)
+																				? 'Music Venue'
+																				: contactTitle}
 																</span>
 															</div>
 														) : null}
@@ -511,7 +519,9 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 																		? '#C3FBD1'
 																		: isCoffeeShopTitle(contactTitle)
 																			? '#D6F1BD'
-																			: '#E8EFFF',
+																			: isMusicVenueTitle(contactTitle)
+																				? '#B7E5FF'
+																				: '#E8EFFF',
 																}}
 															>
 																{isRestaurantTitle(contactTitle) && (
@@ -520,12 +530,17 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 																{isCoffeeShopTitle(contactTitle) && (
 																	<CoffeeShopsIcon size={4} />
 																)}
+																{isMusicVenueTitle(contactTitle) && (
+																	<MusicVenuesIcon size={7} className="flex-shrink-0" />
+																)}
 																<span className="text-[7px] text-black leading-none truncate">
 																	{isRestaurantTitle(contactTitle)
 																		? 'Restaurant'
 																		: isCoffeeShopTitle(contactTitle)
 																			? 'Coffee Shop'
-																			: contactTitle}
+																			: isMusicVenueTitle(contactTitle)
+																				? 'Music Venue'
+																				: contactTitle}
 																</span>
 															</div>
 														)}
@@ -603,7 +618,9 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 																? '#C3FBD1'
 																: isCoffeeShopTitle(contactTitle)
 																	? '#D6F1BD'
-																	: '#E8EFFF',
+																	: isMusicVenueTitle(contactTitle)
+																		? '#B7E5FF'
+																		: '#E8EFFF',
 														}}
 													>
 														{isRestaurantTitle(contactTitle) && (
@@ -612,13 +629,18 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 														{isCoffeeShopTitle(contactTitle) && (
 															<CoffeeShopsIcon size={7} />
 														)}
+														{isMusicVenueTitle(contactTitle) && (
+															<MusicVenuesIcon size={12} className="flex-shrink-0" />
+														)}
 														<ScrollableText
 															text={
 																isRestaurantTitle(contactTitle)
 																	? 'Restaurant'
 																	: isCoffeeShopTitle(contactTitle)
 																		? 'Coffee Shop'
-																		: contactTitle
+																		: isMusicVenueTitle(contactTitle)
+																			? 'Music Venue'
+																			: contactTitle
 															}
 															className="text-[10px] text-black leading-none"
 															scrollPixelsPerSecond={60}
@@ -734,7 +756,9 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 																	? '#C3FBD1'
 																	: isCoffeeShopTitle(contactTitle)
 																		? '#D6F1BD'
-																		: '#E8EFFF',
+																		: isMusicVenueTitle(contactTitle)
+																			? '#B7E5FF'
+																			: '#E8EFFF',
 															}}
 														>
 															{isRestaurantTitle(contactTitle) && (
@@ -743,13 +767,18 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 															{isCoffeeShopTitle(contactTitle) && (
 																<CoffeeShopsIcon size={7} />
 															)}
+															{isMusicVenueTitle(contactTitle) && (
+																<MusicVenuesIcon size={12} className="flex-shrink-0" />
+															)}
 															<ScrollableText
 																text={
 																	isRestaurantTitle(contactTitle)
 																		? 'Restaurant'
 																		: isCoffeeShopTitle(contactTitle)
 																			? 'Coffee Shop'
-																			: contactTitle
+																			: isMusicVenueTitle(contactTitle)
+																				? 'Music Venue'
+																				: contactTitle
 																}
 																className="text-[10px] text-black leading-none"
 															/>

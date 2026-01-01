@@ -18,7 +18,7 @@ import { MusicVenuesIcon } from '@/components/atoms/_svg/MusicVenuesIcon';
 import { WineBeerSpiritsIcon } from '@/components/atoms/_svg/WineBeerSpiritsIcon';
 import { FestivalsIcon } from '@/components/atoms/_svg/FestivalsIcon';
 import { RestaurantsIcon } from '@/components/atoms/_svg/RestaurantsIcon';
-import { isRestaurantTitle, isCoffeeShopTitle } from '@/utils/restaurantTitle';
+import { isRestaurantTitle, isCoffeeShopTitle, isMusicVenueTitle } from '@/utils/restaurantTitle';
 import { WeddingPlannersIcon } from '@/components/atoms/_svg/WeddingPlannersIcon';
 import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
 import { RadioStationsIcon } from '@/components/atoms/_svg/RadioStationsIcon';
@@ -1484,6 +1484,12 @@ const DashboardContent = () => {
 		() => extractWhatFromSearchQuery(activeSearchQuery),
 		[activeSearchQuery]
 	);
+
+	// Check if the current executed search is for a specific category (to apply labels to all results)
+	const searchWhatLower = searchedWhat?.toLowerCase() || '';
+	const isMusicVenuesSearch = searchWhatLower.includes('music venue') || searchWhatLower.includes('venues');
+	const isRestaurantsSearch = searchWhatLower.includes('restaurant');
+	const isCoffeeShopsSearch = searchWhatLower.includes('coffee shop') || searchWhatLower.includes('coffee shops');
 
 	const baseContactIdSet = useMemo(
 		() => new Set<number>((contacts || []).map((c) => c.id)),
@@ -3892,29 +3898,36 @@ const DashboardContent = () => {
 																								</div>
 																								{/* Top Right - Title/Headline */}
 																								<div className="pr-2 pl-1 flex items-center h-[23px]">
-																									{headline ? (
+																									{(headline || isMusicVenuesSearch || isRestaurantsSearch || isCoffeeShopsSearch) ? (
 																										<div
 																											className="h-[17px] rounded-[6px] px-2 flex items-center gap-1 w-full border border-black overflow-hidden"
 																											style={{
-																												backgroundColor: isRestaurantTitle(headline)
+																												backgroundColor: (isRestaurantsSearch || isRestaurantTitle(headline))
 																													? '#C3FBD1'
-																													: isCoffeeShopTitle(headline)
+																													: (isCoffeeShopsSearch || isCoffeeShopTitle(headline))
 																														? '#D6F1BD'
-																														: '#E8EFFF',
+																														: (isMusicVenuesSearch || isMusicVenueTitle(headline))
+																															? '#B7E5FF'
+																															: '#E8EFFF',
 																											}}
 																										>
-																											{isRestaurantTitle(headline) && (
+																											{(isRestaurantsSearch || isRestaurantTitle(headline)) && (
 																												<RestaurantsIcon size={12} className="flex-shrink-0" />
 																											)}
-																											{isCoffeeShopTitle(headline) && (
+																											{(isCoffeeShopsSearch || isCoffeeShopTitle(headline)) && (
 																												<CoffeeShopsIcon size={7} />
 																											)}
+																											{(isMusicVenuesSearch || isMusicVenueTitle(headline)) && (
+																												<MusicVenuesIcon size={12} className="flex-shrink-0" />
+																											)}
 																											<span className="text-[10px] text-black leading-none truncate">
-																												{isRestaurantTitle(headline)
+																												{(isRestaurantsSearch || isRestaurantTitle(headline))
 																													? 'Restaurant'
-																													: isCoffeeShopTitle(headline)
+																													: (isCoffeeShopsSearch || isCoffeeShopTitle(headline))
 																														? 'Coffee Shop'
-																														: headline}
+																														: (isMusicVenuesSearch || isMusicVenueTitle(headline))
+																															? 'Music Venue'
+																															: headline}
 																											</span>
 																										</div>
 																									) : (
@@ -3988,29 +4001,36 @@ const DashboardContent = () => {
 																								</div>
 																								{/* Top Right - Title/Headline */}
 																								<div className="pr-2 pl-1 flex items-center h-[23px]">
-																									{headline ? (
+																									{(headline || isMusicVenuesSearch || isRestaurantsSearch || isCoffeeShopsSearch) ? (
 																										<div
 																											className="h-[17px] rounded-[6px] px-2 flex items-center gap-1 w-full border border-black overflow-hidden"
 																											style={{
-																												backgroundColor: isRestaurantTitle(headline)
+																												backgroundColor: (isRestaurantsSearch || isRestaurantTitle(headline))
 																													? '#C3FBD1'
-																													: isCoffeeShopTitle(headline)
+																													: (isCoffeeShopsSearch || isCoffeeShopTitle(headline))
 																														? '#D6F1BD'
-																														: '#E8EFFF',
+																														: (isMusicVenuesSearch || isMusicVenueTitle(headline))
+																															? '#B7E5FF'
+																															: '#E8EFFF',
 																											}}
 																										>
-																											{isRestaurantTitle(headline) && (
+																											{(isRestaurantsSearch || isRestaurantTitle(headline)) && (
 																												<RestaurantsIcon size={12} className="flex-shrink-0" />
 																											)}
-																											{isCoffeeShopTitle(headline) && (
+																											{(isCoffeeShopsSearch || isCoffeeShopTitle(headline)) && (
 																												<CoffeeShopsIcon size={7} />
 																											)}
+																											{(isMusicVenuesSearch || isMusicVenueTitle(headline)) && (
+																												<MusicVenuesIcon size={12} className="flex-shrink-0" />
+																											)}
 																											<span className="text-[10px] text-black leading-none truncate">
-																												{isRestaurantTitle(headline)
+																												{(isRestaurantsSearch || isRestaurantTitle(headline))
 																													? 'Restaurant'
-																													: isCoffeeShopTitle(headline)
+																													: (isCoffeeShopsSearch || isCoffeeShopTitle(headline))
 																														? 'Coffee Shop'
-																														: headline}
+																														: (isMusicVenuesSearch || isMusicVenueTitle(headline))
+																															? 'Music Venue'
+																															: headline}
 																											</span>
 																										</div>
 																									) : (

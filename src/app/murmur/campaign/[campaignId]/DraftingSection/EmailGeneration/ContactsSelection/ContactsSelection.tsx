@@ -35,7 +35,7 @@ import { RadioStationsIcon } from '@/components/atoms/_svg/RadioStationsIcon';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 import { getCityIconProps } from '@/utils/cityIcons';
 import { urls } from '@/constants/urls';
-import { isRestaurantTitle, isCoffeeShopTitle } from '@/utils/restaurantTitle';
+import { isRestaurantTitle, isCoffeeShopTitle, isMusicVenueTitle } from '@/utils/restaurantTitle';
 
 const DEFAULT_STATE_SUGGESTIONS = [
 	{ label: 'New York', description: 'contact venues, restaurants and more' },
@@ -1112,7 +1112,9 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 																? '#C3FBD1'
 																: isCoffeeShopTitle(contactTitle)
 																	? '#D6F1BD'
-																	: '#E8EFFF',
+																	: isMusicVenueTitle(contactTitle)
+																		? '#B7E5FF'
+																		: '#E8EFFF',
 														}}
 													>
 														{isRestaurantTitle(contactTitle) && (
@@ -1121,13 +1123,18 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 														{isCoffeeShopTitle(contactTitle) && (
 															<CoffeeShopsIcon size={8} />
 														)}
+														{isMusicVenueTitle(contactTitle) && (
+															<MusicVenuesIcon size={14} className="flex-shrink-0" />
+														)}
 														<ScrollableText
 															text={
 																isRestaurantTitle(contactTitle)
 																	? 'Restaurant'
 																	: isCoffeeShopTitle(contactTitle)
 																		? 'Coffee Shop'
-																		: contactTitle
+																		: isMusicVenueTitle(contactTitle)
+																			? 'Music Venue'
+																			: contactTitle
 															}
 															className="text-[10px] text-black leading-none"
 															scrollPixelsPerSecond={60}
@@ -1248,7 +1255,9 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 																	? '#C3FBD1'
 																	: isCoffeeShopTitle(contactTitle)
 																		? '#D6F1BD'
-																		: '#E8EFFF',
+																		: isMusicVenueTitle(contactTitle)
+																			? '#B7E5FF'
+																			: '#E8EFFF',
 															}}
 														>
 															{isRestaurantTitle(contactTitle) && (
@@ -1257,13 +1266,18 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 															{isCoffeeShopTitle(contactTitle) && (
 																<CoffeeShopsIcon size={8} />
 															)}
+															{isMusicVenueTitle(contactTitle) && (
+																<MusicVenuesIcon size={14} className="flex-shrink-0" />
+															)}
 															<ScrollableText
 																text={
 																	isRestaurantTitle(contactTitle)
 																		? 'Restaurant'
 																		: isCoffeeShopTitle(contactTitle)
 																			? 'Coffee Shop'
-																			: contactTitle
+																			: isMusicVenueTitle(contactTitle)
+																				? 'Music Venue'
+																				: contactTitle
 																}
 																className="text-[10px] text-black leading-none"
 																scrollPixelsPerSecond={60}

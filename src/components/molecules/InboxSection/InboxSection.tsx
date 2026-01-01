@@ -14,9 +14,10 @@ import type { ContactWithName } from '@/types/contact';
 import { getStateAbbreviation } from '@/utils/string';
 import { stateBadgeColorMap } from '@/constants/ui';
 import { urls } from '@/constants/urls';
-import { isRestaurantTitle, isCoffeeShopTitle } from '@/utils/restaurantTitle';
+import { isRestaurantTitle, isCoffeeShopTitle, isMusicVenueTitle } from '@/utils/restaurantTitle';
 import { RestaurantsIcon } from '@/components/atoms/_svg/RestaurantsIcon';
 import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
+import { MusicVenuesIcon } from '@/components/atoms/_svg/MusicVenuesIcon';
 
 /**
  * Strip quoted reply content from email body (e.g., "On Thu, Nov 27, 2025 at 2:36 AM ... wrote:")
@@ -1650,7 +1651,9 @@ export const InboxSection: FC<InboxSectionProps> = ({
 																		? '#C3FBD1'
 																		: isCoffeeShopTitle(headline)
 																			? '#D6F1BD'
-																			: '#E8EFFF',
+																			: isMusicVenueTitle(headline)
+																				? '#B7E5FF'
+																				: '#E8EFFF',
 																}}
 															>
 																{isRestaurantTitle(headline) && (
@@ -1659,12 +1662,17 @@ export const InboxSection: FC<InboxSectionProps> = ({
 																{isCoffeeShopTitle(headline) && (
 																	<CoffeeShopsIcon size={6} />
 																)}
+																{isMusicVenueTitle(headline) && (
+																	<MusicVenuesIcon size={10} className="flex-shrink-0" />
+																)}
 																<span className="text-[9px] text-black leading-none truncate">
 																	{isRestaurantTitle(headline)
 																		? 'Restaurant'
 																		: isCoffeeShopTitle(headline)
 																			? 'Coffee Shop'
-																			: headline}
+																			: isMusicVenueTitle(headline)
+																				? 'Music Venue'
+																				: headline}
 																</span>
 															</div>
 														)}
@@ -1706,7 +1714,9 @@ export const InboxSection: FC<InboxSectionProps> = ({
 																		? '#C3FBD1'
 																		: isCoffeeShopTitle(headline)
 																			? '#D6F1BD'
-																			: '#E8EFFF',
+																			: isMusicVenueTitle(headline)
+																				? '#B7E5FF'
+																				: '#E8EFFF',
 																}}
 															>
 																{isRestaurantTitle(headline) && (
@@ -1715,12 +1725,17 @@ export const InboxSection: FC<InboxSectionProps> = ({
 																{isCoffeeShopTitle(headline) && (
 																	<CoffeeShopsIcon size={8} />
 																)}
+																{isMusicVenueTitle(headline) && (
+																	<MusicVenuesIcon size={14} className="flex-shrink-0" />
+																)}
 																<span className="text-[10px] text-black leading-none truncate">
 																	{isRestaurantTitle(headline)
 																		? 'Restaurant'
 																		: isCoffeeShopTitle(headline)
 																			? 'Coffee Shop'
-																			: headline}
+																			: isMusicVenueTitle(headline)
+																				? 'Music Venue'
+																				: headline}
 																</span>
 															</div>
 														)}
