@@ -35,7 +35,7 @@ import { RadioStationsIcon } from '@/components/atoms/_svg/RadioStationsIcon';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 import { getCityIconProps } from '@/utils/cityIcons';
 import { urls } from '@/constants/urls';
-import { isRestaurantTitle, isCoffeeShopTitle, isMusicVenueTitle, isMusicFestivalTitle } from '@/utils/restaurantTitle';
+import { isRestaurantTitle, isCoffeeShopTitle, isMusicVenueTitle, isMusicFestivalTitle, isWeddingPlannerTitle, isWeddingVenueTitle } from '@/utils/restaurantTitle';
 
 const DEFAULT_STATE_SUGGESTIONS = [
 	{ label: 'New York', description: 'contact venues, restaurants and more' },
@@ -705,7 +705,7 @@ export const MiniSearchBar: FC<{
 										}}
 									>
 										<div className="w-[38px] h-[38px] bg-[#EED56E] rounded-[8px] flex-shrink-0 flex items-center justify-center">
-											<WeddingPlannersIcon />
+											<WeddingPlannersIcon size={22} />
 										</div>
 										<div className="ml-[12px] flex flex-col">
 											<div className="text-[20px] font-medium leading-none text-black font-inter">
@@ -1116,7 +1116,9 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 																		? '#B7E5FF'
 																		: isMusicFestivalTitle(contactTitle)
 																			? '#C1D6FF'
-																			: '#E8EFFF',
+																			: (isWeddingPlannerTitle(contactTitle) || isWeddingVenueTitle(contactTitle))
+																				? '#FFF2BC'
+																				: '#E8EFFF',
 														}}
 													>
 														{isRestaurantTitle(contactTitle) && (
@@ -1131,6 +1133,9 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 														{isMusicFestivalTitle(contactTitle) && (
 															<FestivalsIcon size={14} className="flex-shrink-0" />
 														)}
+														{(isWeddingPlannerTitle(contactTitle) || isWeddingVenueTitle(contactTitle)) && (
+															<WeddingPlannersIcon size={14} />
+														)}
 														<ScrollableText
 															text={
 																isRestaurantTitle(contactTitle)
@@ -1141,7 +1146,11 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 																			? 'Music Venue'
 																			: isMusicFestivalTitle(contactTitle)
 																				? 'Music Festival'
-																				: contactTitle
+																				: isWeddingPlannerTitle(contactTitle)
+																					? 'Wedding Planner'
+																					: isWeddingVenueTitle(contactTitle)
+																						? 'Wedding Venue'
+																						: contactTitle
 															}
 															className="text-[10px] text-black leading-none"
 															scrollPixelsPerSecond={60}
@@ -1266,7 +1275,9 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 																			? '#B7E5FF'
 																			: isMusicFestivalTitle(contactTitle)
 																				? '#C1D6FF'
-																				: '#E8EFFF',
+																				: (isWeddingPlannerTitle(contactTitle) || isWeddingVenueTitle(contactTitle))
+																					? '#FFF2BC'
+																					: '#E8EFFF',
 															}}
 														>
 															{isRestaurantTitle(contactTitle) && (
@@ -1281,6 +1292,9 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 															{isMusicFestivalTitle(contactTitle) && (
 																<FestivalsIcon size={14} className="flex-shrink-0" />
 															)}
+															{(isWeddingPlannerTitle(contactTitle) || isWeddingVenueTitle(contactTitle)) && (
+																<WeddingPlannersIcon size={14} />
+															)}
 															<ScrollableText
 																text={
 																	isRestaurantTitle(contactTitle)
@@ -1291,7 +1305,11 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 																				? 'Music Venue'
 																				: isMusicFestivalTitle(contactTitle)
 																					? 'Music Festival'
-																					: contactTitle
+																					: isWeddingPlannerTitle(contactTitle)
+																						? 'Wedding Planner'
+																						: isWeddingVenueTitle(contactTitle)
+																							? 'Wedding Venue'
+																							: contactTitle
 																}
 																className="text-[10px] text-black leading-none"
 																scrollPixelsPerSecond={60}

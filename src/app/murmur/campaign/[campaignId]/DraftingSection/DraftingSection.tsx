@@ -79,7 +79,7 @@ import BottomArrowIcon from '@/components/atoms/_svg/BottomArrowIcon';
 import BottomFolderIcon from '@/components/atoms/_svg/BottomFolderIcon';
 import LeftArrow from '@/components/atoms/_svg/LeftArrow';
 import RightArrow from '@/components/atoms/_svg/RightArrow';
-import { isRestaurantTitle, isCoffeeShopTitle, isMusicVenueTitle, isMusicFestivalTitle } from '@/utils/restaurantTitle';
+import { isRestaurantTitle, isCoffeeShopTitle, isMusicVenueTitle, isMusicFestivalTitle, isWeddingPlannerTitle, isWeddingVenueTitle } from '@/utils/restaurantTitle';
 
 type IdentityProfileFields = Identity & {
 	genre?: string | null;
@@ -2032,7 +2032,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 									}}
 								>
 									<div className="w-[38px] h-[38px] bg-[#EED56E] rounded-[8px] flex-shrink-0 flex items-center justify-center">
-										<WeddingPlannersIcon />
+										<WeddingPlannersIcon size={22} />
 									</div>
 									<div className="ml-[12px] flex flex-col">
 										<div className="text-[20px] font-medium leading-none text-black font-inter">
@@ -2914,7 +2914,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																								? '#B7E5FF'
 																								: isMusicFestivalTitle(headline)
 																									? '#C1D6FF'
-																									: '#E8EFFF',
+																									: (isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline))
+																										? '#FFF2BC'
+																										: '#E8EFFF',
 																				}}
 																			>
 																				{isRestaurantTitle(headline) && (
@@ -2929,6 +2931,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																				{isMusicFestivalTitle(headline) && (
 																					<FestivalsIcon size={12} className="flex-shrink-0" />
 																				)}
+																				{(isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline)) && (
+																					<WeddingPlannersIcon size={12} />
+																				)}
 																				<span className="text-[10px] text-black leading-none truncate">
 																					{isRestaurantTitle(headline)
 																						? 'Restaurant'
@@ -2938,7 +2943,11 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																								? 'Music Venue'
 																								: isMusicFestivalTitle(headline)
 																									? 'Music Festival'
-																									: headline}
+																									: isWeddingPlannerTitle(headline)
+																										? 'Wedding Planner'
+																										: isWeddingVenueTitle(headline)
+																											? 'Wedding Venue'
+																											: headline}
 																				</span>
 																			</div>
 																		) : (
@@ -3001,7 +3010,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																								? '#B7E5FF'
 																								: isMusicFestivalTitle(headline)
 																									? '#C1D6FF'
-																									: '#E8EFFF',
+																									: (isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline))
+																										? '#FFF2BC'
+																										: '#E8EFFF',
 																				}}
 																			>
 																				{isRestaurantTitle(headline) && (
@@ -3016,6 +3027,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																				{isMusicFestivalTitle(headline) && (
 																					<FestivalsIcon size={12} className="flex-shrink-0" />
 																				)}
+																				{(isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline)) && (
+																					<WeddingPlannersIcon size={12} />
+																				)}
 																				<span className="text-[10px] text-black leading-none truncate">
 																					{isRestaurantTitle(headline)
 																						? 'Restaurant'
@@ -3025,7 +3039,11 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																								? 'Music Venue'
 																								: isMusicFestivalTitle(headline)
 																									? 'Music Festival'
-																									: headline}
+																									: isWeddingPlannerTitle(headline)
+																										? 'Wedding Planner'
+																										: isWeddingVenueTitle(headline)
+																											? 'Wedding Venue'
+																											: headline}
 																				</span>
 																			</div>
 																		) : (
@@ -4654,7 +4672,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																												? '#B7E5FF'
 																												: isMusicFestivalTitle(headline)
 																													? '#C1D6FF'
-																													: '#E8EFFF',
+																													: (isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline))
+																														? '#FFF2BC'
+																														: '#E8EFFF',
 																								}}
 																							>
 																								{isRestaurantTitle(headline) && (
@@ -4669,6 +4689,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																								{isMusicFestivalTitle(headline) && (
 																									<FestivalsIcon size={12} className="flex-shrink-0" />
 																								)}
+{(isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline)) && (
+																								<WeddingPlannersIcon size={12} />
+																							)}
 																								<span className="text-[10px] text-black leading-none truncate">
 																									{isRestaurantTitle(headline)
 																										? 'Restaurant'
@@ -4678,7 +4701,11 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																												? 'Music Venue'
 																												: isMusicFestivalTitle(headline)
 																													? 'Music Festival'
-																													: headline}
+																													: isWeddingPlannerTitle(headline)
+																														? 'Wedding Planner'
+																														: isWeddingVenueTitle(headline)
+																															? 'Wedding Venue'
+																															: headline}
 																								</span>
 																							</div>
 																						) : (
@@ -4741,7 +4768,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																												? '#B7E5FF'
 																												: isMusicFestivalTitle(headline)
 																													? '#C1D6FF'
-																													: '#E8EFFF',
+																													: (isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline))
+																														? '#FFF2BC'
+																														: '#E8EFFF',
 																								}}
 																							>
 																								{isRestaurantTitle(headline) && (
@@ -4756,6 +4785,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																								{isMusicFestivalTitle(headline) && (
 																									<FestivalsIcon size={12} className="flex-shrink-0" />
 																								)}
+{(isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline)) && (
+																								<WeddingPlannersIcon size={12} />
+																							)}
 																								<span className="text-[10px] text-black leading-none truncate">
 																									{isRestaurantTitle(headline)
 																										? 'Restaurant'
@@ -4765,7 +4797,11 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																												? 'Music Venue'
 																												: isMusicFestivalTitle(headline)
 																													? 'Music Festival'
-																													: headline}
+																													: isWeddingPlannerTitle(headline)
+																														? 'Wedding Planner'
+																														: isWeddingVenueTitle(headline)
+																															? 'Wedding Venue'
+																															: headline}
 																								</span>
 																							</div>
 																						) : (
@@ -5410,7 +5446,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																									? '#B7E5FF'
 																									: isMusicFestivalTitle(headline)
 																										? '#C1D6FF'
-																										: '#E8EFFF',
+																										: (isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline))
+																											? '#FFF2BC'
+																											: '#E8EFFF',
 																					}}
 																				>
 																					{isRestaurantTitle(headline) && (
@@ -5425,6 +5463,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																					{isMusicFestivalTitle(headline) && (
 																						<FestivalsIcon size={12} className="flex-shrink-0" />
 																					)}
+{(isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline)) && (
+																								<WeddingPlannersIcon size={12} />
+																							)}
 																					<span className="text-[10px] text-black leading-none truncate">
 																						{isRestaurantTitle(headline)
 																							? 'Restaurant'
@@ -5434,7 +5475,11 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																									? 'Music Venue'
 																									: isMusicFestivalTitle(headline)
 																										? 'Music Festival'
-																										: headline}
+																										: isWeddingPlannerTitle(headline)
+																											? 'Wedding Planner'
+																											: isWeddingVenueTitle(headline)
+																												? 'Wedding Venue'
+																												: headline}
 																					</span>
 																				</div>
 																			) : (
@@ -5495,7 +5540,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																								? '#D6F1BD'
 																								: isMusicVenueTitle(headline)
 																									? '#B7E5FF'
-																									: '#E8EFFF',
+																									: (isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline))
+																										? '#FFF2BC'
+																										: '#E8EFFF',
 																					}}
 																				>
 																					{isRestaurantTitle(headline) && (
@@ -5507,6 +5554,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																					{isMusicVenueTitle(headline) && (
 																						<MusicVenuesIcon size={12} className="flex-shrink-0" />
 																					)}
+{(isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline)) && (
+																								<WeddingPlannersIcon size={12} />
+																							)}
 																					<span className="text-[10px] text-black leading-none truncate">
 																						{isRestaurantTitle(headline)
 																							? 'Restaurant'
@@ -5514,7 +5564,11 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																								? 'Coffee Shop'
 																								: isMusicVenueTitle(headline)
 																									? 'Music Venue'
-																									: headline}
+																									: isWeddingPlannerTitle(headline)
+																										? 'Wedding Planner'
+																										: isWeddingVenueTitle(headline)
+																											? 'Wedding Venue'
+																											: headline}
 																					</span>
 																				</div>
 																			) : (

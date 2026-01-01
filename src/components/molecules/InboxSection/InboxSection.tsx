@@ -14,7 +14,8 @@ import type { ContactWithName } from '@/types/contact';
 import { getStateAbbreviation } from '@/utils/string';
 import { stateBadgeColorMap } from '@/constants/ui';
 import { urls } from '@/constants/urls';
-import { isRestaurantTitle, isCoffeeShopTitle, isMusicVenueTitle } from '@/utils/restaurantTitle';
+import { isRestaurantTitle, isCoffeeShopTitle, isMusicVenueTitle, isWeddingPlannerTitle, isWeddingVenueTitle } from '@/utils/restaurantTitle';
+import { WeddingPlannersIcon } from '@/components/atoms/_svg/WeddingPlannersIcon';
 import { RestaurantsIcon } from '@/components/atoms/_svg/RestaurantsIcon';
 import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
 import { MusicVenuesIcon } from '@/components/atoms/_svg/MusicVenuesIcon';
@@ -1653,7 +1654,9 @@ export const InboxSection: FC<InboxSectionProps> = ({
 																			? '#D6F1BD'
 																			: isMusicVenueTitle(headline)
 																				? '#B7E5FF'
-																				: '#E8EFFF',
+																				: (isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline))
+																					? '#FFF2BC'
+																					: '#E8EFFF',
 																}}
 															>
 																{isRestaurantTitle(headline) && (
@@ -1665,6 +1668,9 @@ export const InboxSection: FC<InboxSectionProps> = ({
 																{isMusicVenueTitle(headline) && (
 																	<MusicVenuesIcon size={10} className="flex-shrink-0" />
 																)}
+																{(isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline)) && (
+																	<WeddingPlannersIcon size={10} />
+																)}
 																<span className="text-[9px] text-black leading-none truncate">
 																	{isRestaurantTitle(headline)
 																		? 'Restaurant'
@@ -1672,7 +1678,11 @@ export const InboxSection: FC<InboxSectionProps> = ({
 																			? 'Coffee Shop'
 																			: isMusicVenueTitle(headline)
 																				? 'Music Venue'
-																				: headline}
+																				: isWeddingPlannerTitle(headline)
+																					? 'Wedding Planner'
+																					: isWeddingVenueTitle(headline)
+																						? 'Wedding Venue'
+																						: headline}
 																</span>
 															</div>
 														)}
@@ -1716,7 +1726,9 @@ export const InboxSection: FC<InboxSectionProps> = ({
 																			? '#D6F1BD'
 																			: isMusicVenueTitle(headline)
 																				? '#B7E5FF'
-																				: '#E8EFFF',
+																				: (isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline))
+																					? '#FFF2BC'
+																					: '#E8EFFF',
 																}}
 															>
 																{isRestaurantTitle(headline) && (
@@ -1728,6 +1740,9 @@ export const InboxSection: FC<InboxSectionProps> = ({
 																{isMusicVenueTitle(headline) && (
 																	<MusicVenuesIcon size={14} className="flex-shrink-0" />
 																)}
+																{(isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline)) && (
+																	<WeddingPlannersIcon size={14} />
+																)}
 																<span className="text-[10px] text-black leading-none truncate">
 																	{isRestaurantTitle(headline)
 																		? 'Restaurant'
@@ -1735,7 +1750,11 @@ export const InboxSection: FC<InboxSectionProps> = ({
 																			? 'Coffee Shop'
 																			: isMusicVenueTitle(headline)
 																				? 'Music Venue'
-																				: headline}
+																				: isWeddingPlannerTitle(headline)
+																					? 'Wedding Planner'
+																					: isWeddingVenueTitle(headline)
+																						? 'Wedding Venue'
+																						: headline}
 																</span>
 															</div>
 														)}

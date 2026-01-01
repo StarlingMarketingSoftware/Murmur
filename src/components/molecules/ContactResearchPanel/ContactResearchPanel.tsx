@@ -3,7 +3,8 @@ import { ContactWithName } from '@/types/contact';
 import { getStateAbbreviation } from '@/utils/string';
 import { stateBadgeColorMap } from '@/constants/ui';
 import { cn } from '@/utils';
-import { isRestaurantTitle, isCoffeeShopTitle, isMusicVenueTitle } from '@/utils/restaurantTitle';
+import { isRestaurantTitle, isCoffeeShopTitle, isMusicVenueTitle, isWeddingPlannerTitle, isWeddingVenueTitle } from '@/utils/restaurantTitle';
+import { WeddingPlannersIcon } from '@/components/atoms/_svg/WeddingPlannersIcon';
 import { RestaurantsIcon } from '@/components/atoms/_svg/RestaurantsIcon';
 import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
 import { MusicVenuesIcon } from '@/components/atoms/_svg/MusicVenuesIcon';
@@ -991,7 +992,9 @@ export const ContactResearchHorizontalStrip: FC<
 									? '#D6F1BD'
 									: isMusicVenueTitle(contact.title)
 										? '#B7E5FF'
-										: '#E8EFFF',
+										: (isWeddingPlannerTitle(contact.title) || isWeddingVenueTitle(contact.title))
+											? '#FFF2BC'
+											: '#E8EFFF',
 						}}
 					>
 						{isRestaurantTitle(contact.title) && (
@@ -1003,6 +1006,9 @@ export const ContactResearchHorizontalStrip: FC<
 						{isMusicVenueTitle(contact.title) && (
 							<MusicVenuesIcon size={12} className="flex-shrink-0" />
 						)}
+						{(isWeddingPlannerTitle(contact.title) || isWeddingVenueTitle(contact.title)) && (
+							<WeddingPlannersIcon size={12} />
+						)}
 						<span className="text-[10px] leading-none text-black block truncate">
 							{isRestaurantTitle(contact.title)
 								? 'Restaurant'
@@ -1010,7 +1016,11 @@ export const ContactResearchHorizontalStrip: FC<
 									? 'Coffee Shop'
 									: isMusicVenueTitle(contact.title)
 										? 'Music Venue'
-										: contact.title}
+										: isWeddingPlannerTitle(contact.title)
+											? 'Wedding Planner'
+											: isWeddingVenueTitle(contact.title)
+												? 'Wedding Venue'
+												: contact.title}
 						</span>
 					</div>
 				)}

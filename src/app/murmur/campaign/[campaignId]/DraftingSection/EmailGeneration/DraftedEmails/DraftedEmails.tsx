@@ -26,7 +26,8 @@ import RightArrow from '@/components/atoms/_svg/RightArrow';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import RichTextEditor from '@/components/molecules/RichTextEditor/RichTextEditor';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
-import { isRestaurantTitle, isCoffeeShopTitle, isMusicVenueTitle, isMusicFestivalTitle } from '@/utils/restaurantTitle';
+import { isRestaurantTitle, isCoffeeShopTitle, isMusicVenueTitle, isMusicFestivalTitle, isWeddingPlannerTitle, isWeddingVenueTitle } from '@/utils/restaurantTitle';
+import { WeddingPlannersIcon } from '@/components/atoms/_svg/WeddingPlannersIcon';
 import { RestaurantsIcon } from '@/components/atoms/_svg/RestaurantsIcon';
 import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
 import { FestivalsIcon } from '@/components/atoms/_svg/FestivalsIcon';
@@ -561,7 +562,9 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 													? '#B7E5FF'
 													: isMusicFestivalTitle(contactTitle)
 														? '#C1D6FF'
-														: '#E8EFFF',
+														: (isWeddingPlannerTitle(contactTitle) || isWeddingVenueTitle(contactTitle))
+															? '#FFF2BC'
+															: '#E8EFFF',
 									}}
 								>
 									{isRestaurantTitle(contactTitle) && (
@@ -576,6 +579,9 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 									{isMusicFestivalTitle(contactTitle) && (
 										<FestivalsIcon size={12} className="flex-shrink-0" />
 									)}
+									{(isWeddingPlannerTitle(contactTitle) || isWeddingVenueTitle(contactTitle)) && (
+										<WeddingPlannersIcon size={12} />
+									)}
 									<ScrollableText
 										text={
 											isRestaurantTitle(contactTitle)
@@ -586,7 +592,11 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 														? 'Music Venue'
 														: isMusicFestivalTitle(contactTitle)
 															? 'Music Festival'
-															: contactTitle
+															: isWeddingPlannerTitle(contactTitle)
+																? 'Wedding Planner'
+																: isWeddingVenueTitle(contactTitle)
+																	? 'Wedding Venue'
+																	: contactTitle
 										}
 										className="text-[11px] font-inter text-black leading-none w-full"
 									/>
@@ -1375,7 +1385,9 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 																? '#B7E5FF'
 																: isMusicFestivalTitle(contactTitle)
 																	? '#C1D6FF'
-																	: '#E8EFFF',
+																	: (isWeddingPlannerTitle(contactTitle) || isWeddingVenueTitle(contactTitle))
+																		? '#FFF2BC'
+																		: '#E8EFFF',
 												}}
 											>
 												{isRestaurantTitle(contactTitle) && (
@@ -1390,6 +1402,9 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 												{isMusicFestivalTitle(contactTitle) && (
 													<FestivalsIcon size={14} className="flex-shrink-0" />
 												)}
+												{(isWeddingPlannerTitle(contactTitle) || isWeddingVenueTitle(contactTitle)) && (
+													<WeddingPlannersIcon size={14} />
+												)}
 												<ScrollableText
 													text={
 														isRestaurantTitle(contactTitle)
@@ -1400,7 +1415,11 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 																	? 'Music Venue'
 																	: isMusicFestivalTitle(contactTitle)
 																		? 'Music Festival'
-																		: contactTitle
+																		: isWeddingPlannerTitle(contactTitle)
+																			? 'Wedding Planner'
+																			: isWeddingVenueTitle(contactTitle)
+																				? 'Wedding Venue'
+																				: contactTitle
 													}
 													className="text-[10px] text-black leading-none"
 													scrollPixelsPerSecond={60}

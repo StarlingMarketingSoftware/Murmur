@@ -18,7 +18,7 @@ import { MusicVenuesIcon } from '@/components/atoms/_svg/MusicVenuesIcon';
 import { WineBeerSpiritsIcon } from '@/components/atoms/_svg/WineBeerSpiritsIcon';
 import { FestivalsIcon } from '@/components/atoms/_svg/FestivalsIcon';
 import { RestaurantsIcon } from '@/components/atoms/_svg/RestaurantsIcon';
-import { isRestaurantTitle, isCoffeeShopTitle, isMusicVenueTitle, isMusicFestivalTitle } from '@/utils/restaurantTitle';
+import { isRestaurantTitle, isCoffeeShopTitle, isMusicVenueTitle, isMusicFestivalTitle, isWeddingPlannerTitle, isWeddingVenueTitle } from '@/utils/restaurantTitle';
 import { WeddingPlannersIcon } from '@/components/atoms/_svg/WeddingPlannersIcon';
 import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
 import { RadioStationsIcon } from '@/components/atoms/_svg/RadioStationsIcon';
@@ -778,7 +778,7 @@ const DashboardContent = () => {
 									}}
 								>
 									<div className="w-[38px] h-[38px] bg-[#EED56E] rounded-[8px] flex-shrink-0 flex items-center justify-center">
-										<WeddingPlannersIcon />
+										<WeddingPlannersIcon size={22} />
 									</div>
 									<div className="ml-[12px] flex flex-col">
 										<div className="text-[20px] font-medium leading-none text-black font-inter">
@@ -1491,6 +1491,7 @@ const DashboardContent = () => {
 	const isRestaurantsSearch = searchWhatLower.includes('restaurant');
 	const isCoffeeShopsSearch = searchWhatLower.includes('coffee shop') || searchWhatLower.includes('coffee shops');
 	const isMusicFestivalsSearch = searchWhatLower.includes('music festival') || searchWhatLower.includes('festivals');
+	const isWeddingPlannersSearch = searchWhatLower.includes('wedding planner');
 
 	const baseContactIdSet = useMemo(
 		() => new Set<number>((contacts || []).map((c) => c.id)),
@@ -3899,7 +3900,7 @@ const DashboardContent = () => {
 																								</div>
 																								{/* Top Right - Title/Headline */}
 																								<div className="pr-2 pl-1 flex items-center h-[23px]">
-																									{(headline || isMusicVenuesSearch || isRestaurantsSearch || isCoffeeShopsSearch || isMusicFestivalsSearch) ? (
+																									{(headline || isMusicVenuesSearch || isRestaurantsSearch || isCoffeeShopsSearch || isMusicFestivalsSearch || isWeddingPlannersSearch) ? (
 																										<div
 																											className="h-[17px] rounded-[6px] px-2 flex items-center gap-1 w-full border border-black overflow-hidden"
 																											style={{
@@ -3911,7 +3912,9 @@ const DashboardContent = () => {
 																															? '#B7E5FF'
 																															: (isMusicFestivalsSearch || isMusicFestivalTitle(headline))
 																																? '#C1D6FF'
-																																: '#E8EFFF',
+																																: (isWeddingPlannersSearch || isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline))
+																																	? '#FFF2BC'
+																																	: '#E8EFFF',
 																											}}
 																										>
 																											{(isRestaurantsSearch || isRestaurantTitle(headline)) && (
@@ -3926,6 +3929,9 @@ const DashboardContent = () => {
 																											{(isMusicFestivalsSearch || isMusicFestivalTitle(headline)) && (
 																												<FestivalsIcon size={12} className="flex-shrink-0" />
 																											)}
+																											{(isWeddingPlannersSearch || isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline)) && (
+																												<WeddingPlannersIcon size={12} />
+																											)}
 																											<span className="text-[10px] text-black leading-none truncate">
 																												{(isRestaurantsSearch || isRestaurantTitle(headline))
 																													? 'Restaurant'
@@ -3935,7 +3941,11 @@ const DashboardContent = () => {
 																															? 'Music Venue'
 																															: (isMusicFestivalsSearch || isMusicFestivalTitle(headline))
 																																? 'Music Festival'
-																																: headline}
+																																: isWeddingVenueTitle(headline)
+																																	? 'Wedding Venue'
+																																	: (isWeddingPlannersSearch || isWeddingPlannerTitle(headline))
+																																		? 'Wedding Planner'
+																																		: headline}
 																											</span>
 																										</div>
 																									) : (
@@ -4009,7 +4019,7 @@ const DashboardContent = () => {
 																								</div>
 																								{/* Top Right - Title/Headline */}
 																								<div className="pr-2 pl-1 flex items-center h-[23px]">
-																									{(headline || isMusicVenuesSearch || isRestaurantsSearch || isCoffeeShopsSearch || isMusicFestivalsSearch) ? (
+																									{(headline || isMusicVenuesSearch || isRestaurantsSearch || isCoffeeShopsSearch || isMusicFestivalsSearch || isWeddingPlannersSearch) ? (
 																										<div
 																											className="h-[17px] rounded-[6px] px-2 flex items-center gap-1 w-full border border-black overflow-hidden"
 																											style={{
@@ -4021,7 +4031,9 @@ const DashboardContent = () => {
 																															? '#B7E5FF'
 																															: (isMusicFestivalsSearch || isMusicFestivalTitle(headline))
 																																? '#C1D6FF'
-																																: '#E8EFFF',
+																																: (isWeddingPlannersSearch || isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline))
+																																	? '#FFF2BC'
+																																	: '#E8EFFF',
 																											}}
 																										>
 																											{(isRestaurantsSearch || isRestaurantTitle(headline)) && (
@@ -4036,6 +4048,9 @@ const DashboardContent = () => {
 																											{(isMusicFestivalsSearch || isMusicFestivalTitle(headline)) && (
 																												<FestivalsIcon size={12} className="flex-shrink-0" />
 																											)}
+																											{(isWeddingPlannersSearch || isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline)) && (
+																												<WeddingPlannersIcon size={12} />
+																											)}
 																											<span className="text-[10px] text-black leading-none truncate">
 																												{(isRestaurantsSearch || isRestaurantTitle(headline))
 																													? 'Restaurant'
@@ -4045,7 +4060,11 @@ const DashboardContent = () => {
 																															? 'Music Venue'
 																															: (isMusicFestivalsSearch || isMusicFestivalTitle(headline))
 																																? 'Music Festival'
-																																: headline}
+																																: isWeddingVenueTitle(headline)
+																																	? 'Wedding Venue'
+																																	: (isWeddingPlannersSearch || isWeddingPlannerTitle(headline))
+																																		? 'Wedding Planner'
+																																		: headline}
 																											</span>
 																										</div>
 																									) : (

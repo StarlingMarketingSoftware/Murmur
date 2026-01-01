@@ -26,3 +26,17 @@ export const isMusicFestivalTitle = (title: string): boolean => {
 	return /^music\s*festivals?\s/i.test(title.trim());
 };
 
+/**
+ * Check if a title matches "Wedding Planners <state>" or "Wedding Planner <state>" pattern
+ */
+export const isWeddingPlannerTitle = (title: string): boolean => {
+	return /^wedding\s*planners?\s/i.test(title.trim());
+};
+
+/**
+ * Check if a title matches "Wedding Venues <state>" or "Wedding Venue <state>" pattern
+ */
+export const isWeddingVenueTitle = (title: string): boolean => {
+	return /^wedding\s*venues?\s/i.test(title.trim());
+};
+

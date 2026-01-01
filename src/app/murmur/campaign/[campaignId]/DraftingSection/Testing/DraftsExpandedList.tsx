@@ -25,7 +25,8 @@ import {
 	canadianProvinceNames,
 	stateBadgeColorMap,
 } from '@/constants/ui';
-import { isRestaurantTitle, isCoffeeShopTitle, isMusicVenueTitle, isMusicFestivalTitle } from '@/utils/restaurantTitle';
+import { isRestaurantTitle, isCoffeeShopTitle, isMusicVenueTitle, isMusicFestivalTitle, isWeddingPlannerTitle, isWeddingVenueTitle } from '@/utils/restaurantTitle';
+import { WeddingPlannersIcon } from '@/components/atoms/_svg/WeddingPlannersIcon';
 import { RestaurantsIcon } from '@/components/atoms/_svg/RestaurantsIcon';
 import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
 import { FestivalsIcon } from '@/components/atoms/_svg/FestivalsIcon';
@@ -611,7 +612,9 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 															? '#B7E5FF'
 															: isMusicFestivalTitle(contactTitle)
 																? '#C1D6FF'
-																: '#E8EFFF',
+																: (isWeddingPlannerTitle(contactTitle) || isWeddingVenueTitle(contactTitle))
+																	? '#FFF2BC'
+																	: '#E8EFFF',
 											}}
 										>
 											{isRestaurantTitle(contactTitle) && (
@@ -626,6 +629,9 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 											{isMusicFestivalTitle(contactTitle) && (
 												<FestivalsIcon size={isBottomView ? 7 : isAllTab ? 10 : 14} className="flex-shrink-0" />
 											)}
+											{(isWeddingPlannerTitle(contactTitle) || isWeddingVenueTitle(contactTitle)) && (
+												<WeddingPlannersIcon size={isBottomView ? 7 : isAllTab ? 10 : 14} />
+											)}
 											{isBottomView ? (
 												<span className="text-[7px] text-black leading-none truncate">
 													{isRestaurantTitle(contactTitle)
@@ -636,7 +642,11 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 																? 'Music Venue'
 																: isMusicFestivalTitle(contactTitle)
 																	? 'Music Festival'
-																	: contactTitle}
+																	: isWeddingPlannerTitle(contactTitle)
+																		? 'Wedding Planner'
+																		: isWeddingVenueTitle(contactTitle)
+																			? 'Wedding Venue'
+																			: contactTitle}
 												</span>
 											) : (
 												<ScrollableText
@@ -649,7 +659,11 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 																	? 'Music Venue'
 																	: isMusicFestivalTitle(contactTitle)
 																		? 'Music Festival'
-																		: contactTitle
+																		: isWeddingPlannerTitle(contactTitle)
+																			? 'Wedding Planner'
+																			: isWeddingVenueTitle(contactTitle)
+																				? 'Wedding Venue'
+																				: contactTitle
 													}
 													className="text-[11px] text-black leading-none px-1"
 												/>

@@ -23,7 +23,8 @@ import {
 } from '@/app/murmur/campaign/[campaignId]/DraftingSection/EmailGeneration/ContactsSelection/ContactsSelection';
 import { useDebounce } from '@/hooks/useDebounce';
 import { urls } from '@/constants/urls';
-import { isRestaurantTitle, isCoffeeShopTitle, isMusicVenueTitle, isMusicFestivalTitle } from '@/utils/restaurantTitle';
+import { isRestaurantTitle, isCoffeeShopTitle, isMusicVenueTitle, isMusicFestivalTitle, isWeddingPlannerTitle, isWeddingVenueTitle } from '@/utils/restaurantTitle';
+import { WeddingPlannersIcon } from '@/components/atoms/_svg/WeddingPlannersIcon';
 import { RestaurantsIcon } from '@/components/atoms/_svg/RestaurantsIcon';
 import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
 import { FestivalsIcon } from '@/components/atoms/_svg/FestivalsIcon';
@@ -403,7 +404,9 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 																				? '#B7E5FF'
 																				: isMusicFestivalTitle(contactTitle)
 																					? '#C1D6FF'
-																					: '#E8EFFF',
+																					: (isWeddingPlannerTitle(contactTitle) || isWeddingVenueTitle(contactTitle))
+																						? '#FFF2BC'
+																						: '#E8EFFF',
 																}}
 															>
 																{isRestaurantTitle(contactTitle) && (
@@ -418,6 +421,9 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 																{isMusicFestivalTitle(contactTitle) && (
 																	<FestivalsIcon size={7} className="flex-shrink-0" />
 																)}
+																{(isWeddingPlannerTitle(contactTitle) || isWeddingVenueTitle(contactTitle)) && (
+																	<WeddingPlannersIcon size={7} />
+																)}
 																<span className="text-[7px] text-black leading-none truncate">
 																	{isRestaurantTitle(contactTitle)
 																		? 'Restaurant'
@@ -427,7 +433,11 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 																				? 'Music Venue'
 																				: isMusicFestivalTitle(contactTitle)
 																					? 'Music Festival'
-																					: contactTitle}
+																					: isWeddingPlannerTitle(contactTitle)
+																						? 'Wedding Planner'
+																						: isWeddingVenueTitle(contactTitle)
+																							? 'Wedding Venue'
+																							: contactTitle}
 																</span>
 															</div>
 														) : null}
@@ -531,7 +541,9 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 																				? '#B7E5FF'
 																				: isMusicFestivalTitle(contactTitle)
 																					? '#C1D6FF'
-																					: '#E8EFFF',
+																					: (isWeddingPlannerTitle(contactTitle) || isWeddingVenueTitle(contactTitle))
+																						? '#FFF2BC'
+																						: '#E8EFFF',
 																}}
 															>
 																{isRestaurantTitle(contactTitle) && (
@@ -546,6 +558,9 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 																{isMusicFestivalTitle(contactTitle) && (
 																	<FestivalsIcon size={7} className="flex-shrink-0" />
 																)}
+																{(isWeddingPlannerTitle(contactTitle) || isWeddingVenueTitle(contactTitle)) && (
+																	<WeddingPlannersIcon size={7} />
+																)}
 																<span className="text-[7px] text-black leading-none truncate">
 																	{isRestaurantTitle(contactTitle)
 																		? 'Restaurant'
@@ -555,7 +570,11 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 																				? 'Music Venue'
 																				: isMusicFestivalTitle(contactTitle)
 																					? 'Music Festival'
-																					: contactTitle}
+																					: isWeddingPlannerTitle(contactTitle)
+																						? 'Wedding Planner'
+																						: isWeddingVenueTitle(contactTitle)
+																							? 'Wedding Venue'
+																							: contactTitle}
 																</span>
 															</div>
 														)}
@@ -637,7 +656,9 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 																		? '#B7E5FF'
 																		: isMusicFestivalTitle(contactTitle)
 																			? '#C1D6FF'
-																			: '#E8EFFF',
+																			: (isWeddingPlannerTitle(contactTitle) || isWeddingVenueTitle(contactTitle))
+																				? '#FFF2BC'
+																				: '#E8EFFF',
 														}}
 													>
 														{isRestaurantTitle(contactTitle) && (
@@ -652,6 +673,9 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 														{isMusicFestivalTitle(contactTitle) && (
 															<FestivalsIcon size={12} className="flex-shrink-0" />
 														)}
+														{(isWeddingPlannerTitle(contactTitle) || isWeddingVenueTitle(contactTitle)) && (
+															<WeddingPlannersIcon size={12} />
+														)}
 														<ScrollableText
 															text={
 																isRestaurantTitle(contactTitle)
@@ -662,7 +686,11 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 																			? 'Music Venue'
 																			: isMusicFestivalTitle(contactTitle)
 																				? 'Music Festival'
-																				: contactTitle
+																				: isWeddingPlannerTitle(contactTitle)
+																					? 'Wedding Planner'
+																					: isWeddingVenueTitle(contactTitle)
+																						? 'Wedding Venue'
+																						: contactTitle
 															}
 															className="text-[10px] text-black leading-none"
 															scrollPixelsPerSecond={60}
@@ -782,7 +810,9 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 																			? '#B7E5FF'
 																			: isMusicFestivalTitle(contactTitle)
 																				? '#C1D6FF'
-																				: '#E8EFFF',
+																				: (isWeddingPlannerTitle(contactTitle) || isWeddingVenueTitle(contactTitle))
+																					? '#FFF2BC'
+																					: '#E8EFFF',
 															}}
 														>
 															{isRestaurantTitle(contactTitle) && (
@@ -797,6 +827,9 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 															{isMusicFestivalTitle(contactTitle) && (
 																<FestivalsIcon size={12} className="flex-shrink-0" />
 															)}
+															{(isWeddingPlannerTitle(contactTitle) || isWeddingVenueTitle(contactTitle)) && (
+																<WeddingPlannersIcon size={12} />
+															)}
 															<ScrollableText
 																text={
 																	isRestaurantTitle(contactTitle)
@@ -807,7 +840,11 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 																				? 'Music Venue'
 																				: isMusicFestivalTitle(contactTitle)
 																					? 'Music Festival'
-																					: contactTitle
+																					: isWeddingPlannerTitle(contactTitle)
+																						? 'Wedding Planner'
+																						: isWeddingVenueTitle(contactTitle)
+																							? 'Wedding Venue'
+																							: contactTitle
 																}
 																className="text-[10px] text-black leading-none"
 															/>
