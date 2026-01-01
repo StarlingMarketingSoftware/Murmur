@@ -517,15 +517,11 @@ const contactLooksLikeHospitalityOnlyForMusicVenueSearch = (contact: Contact): b
 		hasBarTerms || hasBreweryTerms || hasWineryTerms || hasCafeTerms || hasRestaurantTerms;
 
 	if (!hasHospitalityTerms) return false;
-	// Always treat wineries/breweries/distilleries as "hospitality-only" for Music Venues searches,
-	// so they don't dominate the top of the list.
 	if (hasBreweryTerms || hasWineryTerms) return true;
 	if (hasStrongDedicatedVenueTerms || hasClubTerms) return false;
 	return true;
 };
 
-// A stricter tag to push breweries/wineries/distilleries below other "hospitality-only" results
-// for Music Venue searches.
 const contactLooksLikeWineryOrBreweryForMusicVenueSearch = (contact: Contact): boolean => {
 	const company = normalizeSearchText(contact.company);
 	const title = normalizeSearchText(contact.title);
@@ -2162,8 +2158,7 @@ export async function GET(req: NextRequest) {
 								addUnique(filler);
 							}
 						}
-
-						// Finally, if still under limit, widen to contains-based matches in nearby states.
+						
 						if (results.length < finalLimit) {
 							for (
 								let ringIdx = 1;
@@ -3094,16 +3089,29 @@ export async function GET(req: NextRequest) {
 				emailValidationStatus: verificationStatus
 					? { equals: verificationStatus }
 					: undefined,
-				// Exclude aggregator sites
-				AND: excludedDomains.map((domain) => ({
-					NOT: {
-						OR: [
-							{ website: { contains: domain, mode: 'insensitive' } },
-							{ company: { contains: domain, mode: 'insensitive' } },
-							{ email: { contains: domain, mode: 'insensitive' } },
-						],
+				// Exclude aggregator sites and restaurants
+				AND: [
+					...excludedDomains.map(
+						(domain): Prisma.ContactWhereInput => ({
+							NOT: {
+								OR: [
+									{ website: { contains: domain, mode: 'insensitive' } },
+									{ company: { contains: domain, mode: 'insensitive' } },
+									{ email: { contains: domain, mode: 'insensitive' } },
+								],
+							},
+						})
+					),
+					// Exclude restaurants from wedding planner searches
+					{
+						NOT: {
+							OR: [
+								{ title: { startsWith: 'Restaurants', mode: 'insensitive' } },
+								{ title: { startsWith: 'Restaurant ', mode: 'insensitive' } },
+							],
+						},
 					},
-				})),
+				],
 			};
 
 			// State matching - lenient, not strict
