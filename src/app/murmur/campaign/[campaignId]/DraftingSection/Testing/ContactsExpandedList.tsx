@@ -23,8 +23,9 @@ import {
 } from '@/app/murmur/campaign/[campaignId]/DraftingSection/EmailGeneration/ContactsSelection/ContactsSelection';
 import { useDebounce } from '@/hooks/useDebounce';
 import { urls } from '@/constants/urls';
-import { isRestaurantTitle } from '@/utils/restaurantTitle';
+import { isRestaurantTitle, isCoffeeShopTitle } from '@/utils/restaurantTitle';
 import { RestaurantsIcon } from '@/components/atoms/_svg/RestaurantsIcon';
+import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
 
 export interface ContactsExpandedListProps {
 	contacts: ContactWithName[];
@@ -392,14 +393,25 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 															<div
 																className="h-[10px] rounded-[3px] px-1 flex items-center gap-0.5 max-w-full border border-black overflow-hidden"
 																style={{
-																	backgroundColor: isRestaurantTitle(contactTitle) ? '#C3FBD1' : '#E8EFFF',
+																	backgroundColor: isRestaurantTitle(contactTitle)
+																		? '#C3FBD1'
+																		: isCoffeeShopTitle(contactTitle)
+																			? '#D6F1BD'
+																			: '#E8EFFF',
 																}}
 															>
 																{isRestaurantTitle(contactTitle) && (
 																	<RestaurantsIcon size={7} />
 																)}
+																{isCoffeeShopTitle(contactTitle) && (
+																	<CoffeeShopsIcon size={4} />
+																)}
 																<span className="text-[7px] text-black leading-none truncate">
-																	{isRestaurantTitle(contactTitle) ? 'Restaurant' : contactTitle}
+																	{isRestaurantTitle(contactTitle)
+																		? 'Restaurant'
+																		: isCoffeeShopTitle(contactTitle)
+																			? 'Coffee Shop'
+																			: contactTitle}
 																</span>
 															</div>
 														) : null}
@@ -495,14 +507,25 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 															<div
 																className="h-[10px] rounded-[3px] px-1 flex items-center gap-0.5 max-w-full border border-black overflow-hidden"
 																style={{
-																	backgroundColor: isRestaurantTitle(contactTitle) ? '#C3FBD1' : '#E8EFFF',
+																	backgroundColor: isRestaurantTitle(contactTitle)
+																		? '#C3FBD1'
+																		: isCoffeeShopTitle(contactTitle)
+																			? '#D6F1BD'
+																			: '#E8EFFF',
 																}}
 															>
 																{isRestaurantTitle(contactTitle) && (
 																	<RestaurantsIcon size={7} />
 																)}
+																{isCoffeeShopTitle(contactTitle) && (
+																	<CoffeeShopsIcon size={4} />
+																)}
 																<span className="text-[7px] text-black leading-none truncate">
-																	{isRestaurantTitle(contactTitle) ? 'Restaurant' : contactTitle}
+																	{isRestaurantTitle(contactTitle)
+																		? 'Restaurant'
+																		: isCoffeeShopTitle(contactTitle)
+																			? 'Coffee Shop'
+																			: contactTitle}
 																</span>
 															</div>
 														)}
@@ -576,14 +599,27 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 													<div
 														className="h-[17px] rounded-[6px] px-2 flex items-center gap-1 w-full border border-black overflow-hidden"
 														style={{
-															backgroundColor: isRestaurantTitle(contactTitle) ? '#C3FBD1' : '#E8EFFF',
+															backgroundColor: isRestaurantTitle(contactTitle)
+																? '#C3FBD1'
+																: isCoffeeShopTitle(contactTitle)
+																	? '#D6F1BD'
+																	: '#E8EFFF',
 														}}
 													>
 														{isRestaurantTitle(contactTitle) && (
 															<RestaurantsIcon size={12} />
 														)}
+														{isCoffeeShopTitle(contactTitle) && (
+															<CoffeeShopsIcon size={7} />
+														)}
 														<ScrollableText
-															text={isRestaurantTitle(contactTitle) ? 'Restaurant' : contactTitle}
+															text={
+																isRestaurantTitle(contactTitle)
+																	? 'Restaurant'
+																	: isCoffeeShopTitle(contactTitle)
+																		? 'Coffee Shop'
+																		: contactTitle
+															}
 															className="text-[10px] text-black leading-none"
 															scrollPixelsPerSecond={60}
 														/>
@@ -694,14 +730,27 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 														<div
 															className="h-[17px] rounded-[6px] px-2 flex items-center gap-1 w-full border border-black overflow-hidden"
 															style={{
-																backgroundColor: isRestaurantTitle(contactTitle) ? '#C3FBD1' : '#E8EFFF',
+																backgroundColor: isRestaurantTitle(contactTitle)
+																	? '#C3FBD1'
+																	: isCoffeeShopTitle(contactTitle)
+																		? '#D6F1BD'
+																		: '#E8EFFF',
 															}}
 														>
 															{isRestaurantTitle(contactTitle) && (
 																<RestaurantsIcon size={12} />
 															)}
+															{isCoffeeShopTitle(contactTitle) && (
+																<CoffeeShopsIcon size={7} />
+															)}
 															<ScrollableText
-																text={isRestaurantTitle(contactTitle) ? 'Restaurant' : contactTitle}
+																text={
+																	isRestaurantTitle(contactTitle)
+																		? 'Restaurant'
+																		: isCoffeeShopTitle(contactTitle)
+																			? 'Coffee Shop'
+																			: contactTitle
+																}
 																className="text-[10px] text-black leading-none"
 															/>
 														</div>

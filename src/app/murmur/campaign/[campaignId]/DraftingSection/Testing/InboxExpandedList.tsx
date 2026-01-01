@@ -15,8 +15,9 @@ import {
 } from '@/constants/ui';
 import { useGetInboundEmails } from '@/hooks/queryHooks/useInboundEmails';
 import type { InboundEmailWithRelations } from '@/types';
-import { isRestaurantTitle } from '@/utils/restaurantTitle';
+import { isRestaurantTitle, isCoffeeShopTitle } from '@/utils/restaurantTitle';
 import { RestaurantsIcon } from '@/components/atoms/_svg/RestaurantsIcon';
+import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
 
 export interface InboxExpandedListProps {
 	contacts: ContactWithName[];
@@ -351,19 +352,36 @@ export const InboxExpandedList: FC<InboxExpandedListProps> = ({
 														: "w-[110px] h-[10px] rounded-[3.71px] justify-center"
 												)}
 												style={{
-													backgroundColor: isRestaurantTitle(contact.headline) ? '#C3FBD1' : '#E8EFFF',
+													backgroundColor: isRestaurantTitle(contact.headline)
+														? '#C3FBD1'
+														: isCoffeeShopTitle(contact.headline)
+															? '#D6F1BD'
+															: '#E8EFFF',
 												}}
 											>
 												{isRestaurantTitle(contact.headline) && (
 													<RestaurantsIcon size={isBottomView ? 7 : 8} />
 												)}
+												{isCoffeeShopTitle(contact.headline) && (
+													<CoffeeShopsIcon size={5} />
+												)}
 												{isBottomView ? (
 													<span className="text-[7px] text-black leading-none truncate">
-														{isRestaurantTitle(contact.headline) ? 'Restaurant' : contact.headline}
+														{isRestaurantTitle(contact.headline)
+															? 'Restaurant'
+															: isCoffeeShopTitle(contact.headline)
+																? 'Coffee Shop'
+																: contact.headline}
 													</span>
 												) : (
 													<ScrollableText
-														text={isRestaurantTitle(contact.headline) ? 'Restaurant' : contact.headline}
+														text={
+															isRestaurantTitle(contact.headline)
+																? 'Restaurant'
+																: isCoffeeShopTitle(contact.headline)
+																	? 'Coffee Shop'
+																	: contact.headline
+														}
 														className="text-[8px] text-black leading-none px-1"
 													/>
 												)}

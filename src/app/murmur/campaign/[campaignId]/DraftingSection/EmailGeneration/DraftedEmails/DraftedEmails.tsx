@@ -26,8 +26,9 @@ import RightArrow from '@/components/atoms/_svg/RightArrow';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import RichTextEditor from '@/components/molecules/RichTextEditor/RichTextEditor';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
-import { isRestaurantTitle } from '@/utils/restaurantTitle';
+import { isRestaurantTitle, isCoffeeShopTitle } from '@/utils/restaurantTitle';
 import { RestaurantsIcon } from '@/components/atoms/_svg/RestaurantsIcon';
+import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
 
 interface ScrollableTextareaProps
 	extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
@@ -550,14 +551,27 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 									style={{
 										width: '152px',
 										height: '18px',
-										backgroundColor: isRestaurantTitle(contactTitle) ? '#C3FBD1' : '#E8EFFF',
+										backgroundColor: isRestaurantTitle(contactTitle)
+											? '#C3FBD1'
+											: isCoffeeShopTitle(contactTitle)
+												? '#D6F1BD'
+												: '#E8EFFF',
 									}}
 								>
 									{isRestaurantTitle(contactTitle) && (
 										<RestaurantsIcon size={12} />
 									)}
+									{isCoffeeShopTitle(contactTitle) && (
+										<CoffeeShopsIcon size={7} />
+									)}
 									<ScrollableText
-										text={isRestaurantTitle(contactTitle) ? 'Restaurant' : contactTitle}
+										text={
+											isRestaurantTitle(contactTitle)
+												? 'Restaurant'
+												: isCoffeeShopTitle(contactTitle)
+													? 'Coffee Shop'
+													: contactTitle
+										}
 										className="text-[11px] font-inter text-black leading-none w-full"
 									/>
 								</div>
@@ -1337,14 +1351,27 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 											<div
 												className="h-[21px] w-[240px] rounded-[6px] px-2 flex items-center gap-1 border border-black overflow-hidden"
 												style={{
-													backgroundColor: isRestaurantTitle(contactTitle) ? '#C3FBD1' : '#E8EFFF',
+													backgroundColor: isRestaurantTitle(contactTitle)
+														? '#C3FBD1'
+														: isCoffeeShopTitle(contactTitle)
+															? '#D6F1BD'
+															: '#E8EFFF',
 												}}
 											>
 												{isRestaurantTitle(contactTitle) && (
 													<RestaurantsIcon size={14} />
 												)}
+												{isCoffeeShopTitle(contactTitle) && (
+													<CoffeeShopsIcon size={8} />
+												)}
 												<ScrollableText
-													text={isRestaurantTitle(contactTitle) ? 'Restaurant' : contactTitle}
+													text={
+														isRestaurantTitle(contactTitle)
+															? 'Restaurant'
+															: isCoffeeShopTitle(contactTitle)
+																? 'Coffee Shop'
+																: contactTitle
+													}
 													className="text-[10px] text-black leading-none"
 													scrollPixelsPerSecond={60}
 												/>

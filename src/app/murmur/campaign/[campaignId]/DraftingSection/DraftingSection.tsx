@@ -79,7 +79,7 @@ import BottomArrowIcon from '@/components/atoms/_svg/BottomArrowIcon';
 import BottomFolderIcon from '@/components/atoms/_svg/BottomFolderIcon';
 import LeftArrow from '@/components/atoms/_svg/LeftArrow';
 import RightArrow from '@/components/atoms/_svg/RightArrow';
-import { isRestaurantTitle } from '@/utils/restaurantTitle';
+import { isRestaurantTitle, isCoffeeShopTitle } from '@/utils/restaurantTitle';
 
 type IdentityProfileFields = Identity & {
 	genre?: string | null;
@@ -2906,14 +2906,25 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																			<div
 																				className="h-[17px] rounded-[6px] px-2 flex items-center gap-1 w-full border border-black overflow-hidden"
 																				style={{
-																					backgroundColor: isRestaurantTitle(headline) ? '#C3FBD1' : '#E8EFFF',
+																					backgroundColor: isRestaurantTitle(headline)
+																						? '#C3FBD1'
+																						: isCoffeeShopTitle(headline)
+																							? '#D6F1BD'
+																							: '#E8EFFF',
 																				}}
 																			>
 																				{isRestaurantTitle(headline) && (
 																					<RestaurantsIcon size={12} />
 																				)}
+																				{isCoffeeShopTitle(headline) && (
+																					<CoffeeShopsIcon size={7} />
+																				)}
 																				<span className="text-[10px] text-black leading-none truncate">
-																					{isRestaurantTitle(headline) ? 'Restaurant' : headline}
+																					{isRestaurantTitle(headline)
+																						? 'Restaurant'
+																						: isCoffeeShopTitle(headline)
+																							? 'Coffee Shop'
+																							: headline}
 																				</span>
 																			</div>
 																		) : (
@@ -2968,14 +2979,25 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																			<div
 																				className="h-[17px] rounded-[6px] px-2 flex items-center gap-1 w-full border border-black overflow-hidden"
 																				style={{
-																					backgroundColor: isRestaurantTitle(headline) ? '#C3FBD1' : '#E8EFFF',
+																					backgroundColor: isRestaurantTitle(headline)
+																						? '#C3FBD1'
+																						: isCoffeeShopTitle(headline)
+																							? '#D6F1BD'
+																							: '#E8EFFF',
 																				}}
 																			>
 																				{isRestaurantTitle(headline) && (
 																					<RestaurantsIcon size={12} />
 																				)}
+																				{isCoffeeShopTitle(headline) && (
+																					<CoffeeShopsIcon size={7} />
+																				)}
 																				<span className="text-[10px] text-black leading-none truncate">
-																					{isRestaurantTitle(headline) ? 'Restaurant' : headline}
+																					{isRestaurantTitle(headline)
+																						? 'Restaurant'
+																						: isCoffeeShopTitle(headline)
+																							? 'Coffee Shop'
+																							: headline}
 																				</span>
 																			</div>
 																		) : (
@@ -4596,14 +4618,25 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																							<div
 																								className="h-[17px] rounded-[6px] px-2 flex items-center gap-1 w-full border border-black overflow-hidden"
 																								style={{
-																									backgroundColor: isRestaurantTitle(headline) ? '#C3FBD1' : '#E8EFFF',
+																									backgroundColor: isRestaurantTitle(headline)
+																										? '#C3FBD1'
+																										: isCoffeeShopTitle(headline)
+																											? '#D6F1BD'
+																											: '#E8EFFF',
 																								}}
 																							>
 																								{isRestaurantTitle(headline) && (
 																									<RestaurantsIcon size={12} />
 																								)}
+																								{isCoffeeShopTitle(headline) && (
+																									<CoffeeShopsIcon size={7} />
+																								)}
 																								<span className="text-[10px] text-black leading-none truncate">
-																									{isRestaurantTitle(headline) ? 'Restaurant' : headline}
+																									{isRestaurantTitle(headline)
+																										? 'Restaurant'
+																										: isCoffeeShopTitle(headline)
+																											? 'Coffee Shop'
+																											: headline}
 																								</span>
 																							</div>
 																						) : (
@@ -4658,14 +4691,25 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																							<div
 																								className="h-[17px] rounded-[6px] px-2 flex items-center gap-1 w-full border border-black overflow-hidden"
 																								style={{
-																									backgroundColor: isRestaurantTitle(headline) ? '#C3FBD1' : '#E8EFFF',
+																									backgroundColor: isRestaurantTitle(headline)
+																										? '#C3FBD1'
+																										: isCoffeeShopTitle(headline)
+																											? '#D6F1BD'
+																											: '#E8EFFF',
 																								}}
 																							>
 																								{isRestaurantTitle(headline) && (
 																									<RestaurantsIcon size={12} />
 																								)}
+																								{isCoffeeShopTitle(headline) && (
+																									<CoffeeShopsIcon size={7} />
+																								)}
 																								<span className="text-[10px] text-black leading-none truncate">
-																									{isRestaurantTitle(headline) ? 'Restaurant' : headline}
+																									{isRestaurantTitle(headline)
+																										? 'Restaurant'
+																										: isCoffeeShopTitle(headline)
+																											? 'Coffee Shop'
+																											: headline}
 																								</span>
 																							</div>
 																						) : (
@@ -5302,14 +5346,25 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																				<div
 																					className="h-[17px] rounded-[6px] px-2 flex items-center gap-1 w-full border border-black overflow-hidden"
 																					style={{
-																						backgroundColor: isRestaurantTitle(headline) ? '#C3FBD1' : '#E8EFFF',
+																						backgroundColor: isRestaurantTitle(headline)
+																							? '#C3FBD1'
+																							: isCoffeeShopTitle(headline)
+																								? '#D6F1BD'
+																								: '#E8EFFF',
 																					}}
 																				>
 																					{isRestaurantTitle(headline) && (
 																						<RestaurantsIcon size={12} />
 																					)}
+																					{isCoffeeShopTitle(headline) && (
+																						<CoffeeShopsIcon size={7} />
+																					)}
 																					<span className="text-[10px] text-black leading-none truncate">
-																						{isRestaurantTitle(headline) ? 'Restaurant' : headline}
+																						{isRestaurantTitle(headline)
+																							? 'Restaurant'
+																							: isCoffeeShopTitle(headline)
+																								? 'Coffee Shop'
+																								: headline}
 																					</span>
 																				</div>
 																			) : (
@@ -5364,14 +5419,25 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																				<div
 																					className="h-[17px] rounded-[6px] px-2 flex items-center gap-1 w-full border border-black overflow-hidden"
 																					style={{
-																						backgroundColor: isRestaurantTitle(headline) ? '#C3FBD1' : '#E8EFFF',
+																						backgroundColor: isRestaurantTitle(headline)
+																							? '#C3FBD1'
+																							: isCoffeeShopTitle(headline)
+																								? '#D6F1BD'
+																								: '#E8EFFF',
 																					}}
 																				>
 																					{isRestaurantTitle(headline) && (
 																						<RestaurantsIcon size={12} />
 																					)}
+																					{isCoffeeShopTitle(headline) && (
+																						<CoffeeShopsIcon size={7} />
+																					)}
 																					<span className="text-[10px] text-black leading-none truncate">
-																						{isRestaurantTitle(headline) ? 'Restaurant' : headline}
+																						{isRestaurantTitle(headline)
+																							? 'Restaurant'
+																							: isCoffeeShopTitle(headline)
+																								? 'Coffee Shop'
+																								: headline}
 																					</span>
 																				</div>
 																			) : (

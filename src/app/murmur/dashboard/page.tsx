@@ -18,7 +18,7 @@ import { MusicVenuesIcon } from '@/components/atoms/_svg/MusicVenuesIcon';
 import { WineBeerSpiritsIcon } from '@/components/atoms/_svg/WineBeerSpiritsIcon';
 import { FestivalsIcon } from '@/components/atoms/_svg/FestivalsIcon';
 import { RestaurantsIcon } from '@/components/atoms/_svg/RestaurantsIcon';
-import { isRestaurantTitle } from '@/utils/restaurantTitle';
+import { isRestaurantTitle, isCoffeeShopTitle } from '@/utils/restaurantTitle';
 import { WeddingPlannersIcon } from '@/components/atoms/_svg/WeddingPlannersIcon';
 import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
 import { RadioStationsIcon } from '@/components/atoms/_svg/RadioStationsIcon';
@@ -1166,6 +1166,14 @@ const DashboardContent = () => {
 		return /^restaurants?$/i.test(whatValue.trim());
 	}, [whatValue]);
 
+	// Check if this is a coffee shop search - if so, all contacts should get the coffee shop label
+	const isCoffeeShopSearch = useMemo(() => {
+		return /^coffee\s*shops?$/i.test(whatValue.trim());
+	}, [whatValue]);
+
+	// Combined flag for searches that should force-apply the derived title to all contacts
+	const shouldForceApplyDerivedTitle = isRestaurantSearch || isCoffeeShopSearch;
+
 	const {
 		form,
 		onSubmit,
@@ -1191,7 +1199,7 @@ const DashboardContent = () => {
 		setIsMapView,
 		isSearchPending,
 		usedContactIdsSet,
-	} = useDashboard({ derivedTitle: derivedContactTitle, forceApplyDerivedTitle: isRestaurantSearch });
+	} = useDashboard({ derivedTitle: derivedContactTitle, forceApplyDerivedTitle: shouldForceApplyDerivedTitle });
 
 	// Batch update for assigning titles to contacts without one
 	const { mutateAsync: batchUpdateContacts } = useBatchUpdateContacts({ suppressToasts: true });
@@ -1216,11 +1224,11 @@ const DashboardContent = () => {
 
 		try {
 			// If we have a derived title, update contacts before adding them
-			// For restaurant searches, update ALL contacts; otherwise only those without a title
+			// For restaurant/coffee shop searches, update ALL contacts; otherwise only those without a title
 			if (derivedContactTitle && contacts) {
 				const contactsToUpdate = contacts.filter(
 					(c) => selectedContacts.includes(c.id) && 
-						(isRestaurantSearch || (!c.title && !c.headline))
+						(shouldForceApplyDerivedTitle || (!c.title && !c.headline))
 				);
 				if (contactsToUpdate.length > 0) {
 					await batchUpdateContacts({
@@ -1272,7 +1280,7 @@ const DashboardContent = () => {
 		editUserContactList,
 		isAddToCampaignMode,
 		isPendingFromCampaign,
-		isRestaurantSearch,
+		shouldForceApplyDerivedTitle,
 		queryClient,
 		router,
 		selectedContacts,
@@ -3802,12 +3810,12 @@ const DashboardContent = () => {
 																					contact.name ||
 																					`${firstName} ${lastName}`.trim();
 																				const company = contact.company || '';
-																				// For restaurant searches, always use the search-derived headline
+																				// For restaurant/coffee shop searches, always use the search-derived headline
 																				// Otherwise, use contact's headline or fall back to search What + Where
 																				const searchDerivedHeadline = whatValue && whereValue ? `${whatValue} ${whereValue}` : whatValue || '';
-																				const isRestaurantSearch = /^restaurants?$/i.test(whatValue.trim());
+																				const isSpecialCategorySearch = /^restaurants?$/i.test(whatValue.trim()) || /^coffee\s*shops?$/i.test(whatValue.trim());
 																				const contactHeadline = contact.headline || contact.title || '';
-																				const headline = isRestaurantSearch ? searchDerivedHeadline : (contactHeadline || searchDerivedHeadline);
+																				const headline = isSpecialCategorySearch ? searchDerivedHeadline : (contactHeadline || searchDerivedHeadline);
 																				const stateAbbr =
 																					getStateAbbreviation(contact.state || '') || '';
 																				const city = contact.city || '';
@@ -3888,14 +3896,25 @@ const DashboardContent = () => {
 																										<div
 																											className="h-[17px] rounded-[6px] px-2 flex items-center gap-1 w-full border border-black overflow-hidden"
 																											style={{
-																												backgroundColor: isRestaurantTitle(headline) ? '#C3FBD1' : '#E8EFFF',
+																												backgroundColor: isRestaurantTitle(headline)
+																													? '#C3FBD1'
+																													: isCoffeeShopTitle(headline)
+																														? '#D6F1BD'
+																														: '#E8EFFF',
 																											}}
 																										>
 																											{isRestaurantTitle(headline) && (
 																												<RestaurantsIcon size={12} className="flex-shrink-0" />
 																											)}
+																											{isCoffeeShopTitle(headline) && (
+																												<CoffeeShopsIcon size={7} />
+																											)}
 																											<span className="text-[10px] text-black leading-none truncate">
-																												{isRestaurantTitle(headline) ? 'Restaurant' : headline}
+																												{isRestaurantTitle(headline)
+																													? 'Restaurant'
+																													: isCoffeeShopTitle(headline)
+																														? 'Coffee Shop'
+																														: headline}
 																											</span>
 																										</div>
 																									) : (
@@ -3973,14 +3992,25 @@ const DashboardContent = () => {
 																										<div
 																											className="h-[17px] rounded-[6px] px-2 flex items-center gap-1 w-full border border-black overflow-hidden"
 																											style={{
-																												backgroundColor: isRestaurantTitle(headline) ? '#C3FBD1' : '#E8EFFF',
+																												backgroundColor: isRestaurantTitle(headline)
+																													? '#C3FBD1'
+																													: isCoffeeShopTitle(headline)
+																														? '#D6F1BD'
+																														: '#E8EFFF',
 																											}}
 																										>
 																											{isRestaurantTitle(headline) && (
 																												<RestaurantsIcon size={12} className="flex-shrink-0" />
 																											)}
+																											{isCoffeeShopTitle(headline) && (
+																												<CoffeeShopsIcon size={7} />
+																											)}
 																											<span className="text-[10px] text-black leading-none truncate">
-																												{isRestaurantTitle(headline) ? 'Restaurant' : headline}
+																												{isRestaurantTitle(headline)
+																													? 'Restaurant'
+																													: isCoffeeShopTitle(headline)
+																														? 'Coffee Shop'
+																														: headline}
 																											</span>
 																										</div>
 																									) : (

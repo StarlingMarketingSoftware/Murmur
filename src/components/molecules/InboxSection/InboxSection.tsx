@@ -14,8 +14,9 @@ import type { ContactWithName } from '@/types/contact';
 import { getStateAbbreviation } from '@/utils/string';
 import { stateBadgeColorMap } from '@/constants/ui';
 import { urls } from '@/constants/urls';
-import { isRestaurantTitle } from '@/utils/restaurantTitle';
+import { isRestaurantTitle, isCoffeeShopTitle } from '@/utils/restaurantTitle';
 import { RestaurantsIcon } from '@/components/atoms/_svg/RestaurantsIcon';
+import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
 
 /**
  * Strip quoted reply content from email body (e.g., "On Thu, Nov 27, 2025 at 2:36 AM ... wrote:")
@@ -1645,14 +1646,25 @@ export const InboxSection: FC<InboxSectionProps> = ({
 															<div
 																className="h-[16px] max-w-[140px] rounded-[4px] px-1.5 flex items-center gap-0.5 border border-black overflow-hidden flex-shrink-0"
 																style={{
-																	backgroundColor: isRestaurantTitle(headline) ? '#C3FBD1' : '#E8EFFF',
+																	backgroundColor: isRestaurantTitle(headline)
+																		? '#C3FBD1'
+																		: isCoffeeShopTitle(headline)
+																			? '#D6F1BD'
+																			: '#E8EFFF',
 																}}
 															>
 																{isRestaurantTitle(headline) && (
 																	<RestaurantsIcon size={10} />
 																)}
+																{isCoffeeShopTitle(headline) && (
+																	<CoffeeShopsIcon size={6} />
+																)}
 																<span className="text-[9px] text-black leading-none truncate">
-																	{isRestaurantTitle(headline) ? 'Restaurant' : headline}
+																	{isRestaurantTitle(headline)
+																		? 'Restaurant'
+																		: isCoffeeShopTitle(headline)
+																			? 'Coffee Shop'
+																			: headline}
 																</span>
 															</div>
 														)}
@@ -1690,14 +1702,25 @@ export const InboxSection: FC<InboxSectionProps> = ({
 															<div
 																className="h-[21px] max-w-[160px] rounded-[6px] px-2 flex items-center gap-1 border border-black overflow-hidden flex-shrink-0"
 																style={{
-																	backgroundColor: isRestaurantTitle(headline) ? '#C3FBD1' : '#E8EFFF',
+																	backgroundColor: isRestaurantTitle(headline)
+																		? '#C3FBD1'
+																		: isCoffeeShopTitle(headline)
+																			? '#D6F1BD'
+																			: '#E8EFFF',
 																}}
 															>
 																{isRestaurantTitle(headline) && (
 																	<RestaurantsIcon size={14} />
 																)}
+																{isCoffeeShopTitle(headline) && (
+																	<CoffeeShopsIcon size={8} />
+																)}
 																<span className="text-[10px] text-black leading-none truncate">
-																	{isRestaurantTitle(headline) ? 'Restaurant' : headline}
+																	{isRestaurantTitle(headline)
+																		? 'Restaurant'
+																		: isCoffeeShopTitle(headline)
+																			? 'Coffee Shop'
+																			: headline}
 																</span>
 															</div>
 														)}

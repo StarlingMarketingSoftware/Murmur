@@ -21,7 +21,8 @@ import {
 	MAP_MARKER_PIN_VIEWBOX_WIDTH,
 } from '@/components/atoms/_svg/MapMarkerPinIcon';
 import { RestaurantsIcon } from '@/components/atoms/_svg/RestaurantsIcon';
-import { isRestaurantTitle } from '@/utils/restaurantTitle';
+import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
+import { isRestaurantTitle, isCoffeeShopTitle } from '@/utils/restaurantTitle';
 
 type LatLngLiteral = { lat: number; lng: number };
 type MarkerHoverMeta = { clientX: number; clientY: number };
@@ -4097,18 +4098,26 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 										{(selectedMarker.title || selectedMarker.headline) && (() => {
 											const titleText = selectedMarker.title || selectedMarker.headline || '';
 											const isRestaurant = isRestaurantTitle(titleText);
+											const isCoffeeShop = isCoffeeShopTitle(titleText);
 											return (
 												<div
 													className="px-1.5 py-[1px] rounded-[6px] border border-black max-w-full flex items-center gap-1"
 													style={{
-														backgroundColor: isRestaurant ? '#C3FBD1' : '#E8EFFF',
+														backgroundColor: isRestaurant
+															? '#C3FBD1'
+															: isCoffeeShop
+																? '#D6F1BD'
+																: '#E8EFFF',
 													}}
 												>
 													{isRestaurant && (
 														<RestaurantsIcon size={10} className="flex-shrink-0" />
 													)}
+													{isCoffeeShop && (
+														<CoffeeShopsIcon size={6} />
+													)}
 													<span className="text-[9px] leading-none text-black block truncate">
-														{isRestaurant ? 'Restaurant' : titleText}
+														{isRestaurant ? 'Restaurant' : isCoffeeShop ? 'Coffee Shop' : titleText}
 													</span>
 												</div>
 											);

@@ -25,8 +25,9 @@ import {
 	canadianProvinceNames,
 	stateBadgeColorMap,
 } from '@/constants/ui';
-import { isRestaurantTitle } from '@/utils/restaurantTitle';
+import { isRestaurantTitle, isCoffeeShopTitle } from '@/utils/restaurantTitle';
 import { RestaurantsIcon } from '@/components/atoms/_svg/RestaurantsIcon';
+import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
 
 export interface DraftsExpandedListProps {
 	drafts: EmailWithRelations[];
@@ -600,19 +601,36 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 													: 'w-[169px] h-[21px] rounded-[5px] justify-center'
 											)}
 											style={{
-												backgroundColor: isRestaurantTitle(contactTitle) ? '#C3FBD1' : '#E8EFFF',
+												backgroundColor: isRestaurantTitle(contactTitle)
+													? '#C3FBD1'
+													: isCoffeeShopTitle(contactTitle)
+														? '#D6F1BD'
+														: '#E8EFFF',
 											}}
 										>
 											{isRestaurantTitle(contactTitle) && (
 												<RestaurantsIcon size={isBottomView ? 7 : isAllTab ? 10 : 14} />
 											)}
+											{isCoffeeShopTitle(contactTitle) && (
+												<CoffeeShopsIcon size={6} />
+											)}
 											{isBottomView ? (
 												<span className="text-[7px] text-black leading-none truncate">
-													{isRestaurantTitle(contactTitle) ? 'Restaurant' : contactTitle}
+													{isRestaurantTitle(contactTitle)
+														? 'Restaurant'
+														: isCoffeeShopTitle(contactTitle)
+															? 'Coffee Shop'
+															: contactTitle}
 												</span>
 											) : (
 												<ScrollableText
-													text={isRestaurantTitle(contactTitle) ? 'Restaurant' : contactTitle}
+													text={
+														isRestaurantTitle(contactTitle)
+															? 'Restaurant'
+															: isCoffeeShopTitle(contactTitle)
+																? 'Coffee Shop'
+																: contactTitle
+													}
 													className="text-[11px] text-black leading-none px-1"
 												/>
 											)}

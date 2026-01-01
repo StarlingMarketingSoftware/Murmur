@@ -13,8 +13,9 @@ import {
 import { useGetUsedContactIds } from '@/hooks/queryHooks/useContacts';
 import { ContactWithName } from '@/types/contact';
 import { useIsMobile } from '@/hooks/useIsMobile';
-import { isRestaurantTitle } from '@/utils/restaurantTitle';
+import { isRestaurantTitle, isCoffeeShopTitle } from '@/utils/restaurantTitle';
 import { RestaurantsIcon } from '@/components/atoms/_svg/RestaurantsIcon';
+import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
 
 interface SentEmailsProps {
 	emails: EmailWithRelations[];
@@ -143,14 +144,27 @@ export const SentEmails: FC<SentEmailsProps> = ({
 											isMobile ? "h-[17px] max-w-[140px]" : "h-[21px] w-[240px]"
 										)}
 										style={{
-											backgroundColor: isRestaurantTitle(contactTitle) ? '#C3FBD1' : '#E8EFFF',
+											backgroundColor: isRestaurantTitle(contactTitle)
+												? '#C3FBD1'
+												: isCoffeeShopTitle(contactTitle)
+													? '#D6F1BD'
+													: '#E8EFFF',
 										}}
 									>
 										{isRestaurantTitle(contactTitle) && (
 											<RestaurantsIcon size={isMobile ? 10 : 14} />
 										)}
+										{isCoffeeShopTitle(contactTitle) && (
+											<CoffeeShopsIcon size={8} />
+										)}
 										<ScrollableText
-											text={isRestaurantTitle(contactTitle) ? 'Restaurant' : contactTitle}
+											text={
+												isRestaurantTitle(contactTitle)
+													? 'Restaurant'
+													: isCoffeeShopTitle(contactTitle)
+														? 'Coffee Shop'
+														: contactTitle
+											}
 											className={cn(
 												"text-black leading-none",
 												isMobile ? "text-[9px]" : "text-[10px]"

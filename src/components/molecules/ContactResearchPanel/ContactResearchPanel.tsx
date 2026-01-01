@@ -3,8 +3,9 @@ import { ContactWithName } from '@/types/contact';
 import { getStateAbbreviation } from '@/utils/string';
 import { stateBadgeColorMap } from '@/constants/ui';
 import { cn } from '@/utils';
-import { isRestaurantTitle } from '@/utils/restaurantTitle';
+import { isRestaurantTitle, isCoffeeShopTitle } from '@/utils/restaurantTitle';
 import { RestaurantsIcon } from '@/components/atoms/_svg/RestaurantsIcon';
+import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 import ResearchMap from '@/components/atoms/_svg/ResearchMap';
 import ResearchChevron from '@/components/atoms/_svg/ResearchChevron';
@@ -983,14 +984,25 @@ export const ContactResearchHorizontalStrip: FC<
 					<div
 						className="max-w-[160px] px-2 py-[2px] rounded-[8px] border border-black flex items-center gap-1"
 						style={{
-							backgroundColor: isRestaurantTitle(contact.title) ? '#C3FBD1' : '#E8EFFF',
+							backgroundColor: isRestaurantTitle(contact.title)
+								? '#C3FBD1'
+								: isCoffeeShopTitle(contact.title)
+									? '#D6F1BD'
+									: '#E8EFFF',
 						}}
 					>
 						{isRestaurantTitle(contact.title) && (
 							<RestaurantsIcon size={12} className="flex-shrink-0" />
 						)}
+						{isCoffeeShopTitle(contact.title) && (
+							<CoffeeShopsIcon size={7} />
+						)}
 						<span className="text-[10px] leading-none text-black block truncate">
-							{isRestaurantTitle(contact.title) ? 'Restaurant' : contact.title}
+							{isRestaurantTitle(contact.title)
+								? 'Restaurant'
+								: isCoffeeShopTitle(contact.title)
+									? 'Coffee Shop'
+									: contact.title}
 						</span>
 					</div>
 				)}
