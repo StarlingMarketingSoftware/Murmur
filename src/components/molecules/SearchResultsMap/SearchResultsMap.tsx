@@ -4122,7 +4122,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 																: isMusicVenue
 																	? '#B7E5FF'
 																	: (isWeddingPlanner || isWeddingVenue)
-																		? '#FFF2BC'
+																		? '#FFF8DC'
 																		: isWineBeerSpirits
 																			? '#BFC4FF'
 																			: '#E8EFFF',

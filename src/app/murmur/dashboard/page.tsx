@@ -1496,6 +1496,11 @@ const DashboardContent = () => {
 	const [mapPanelVisibleOverlayContacts, setMapPanelVisibleOverlayContacts] = useState<
 		ContactWithName[]
 	>([]);
+	// Sticky (per-selected-contact) search-derived headline so selected items keep their
+	// category identity (e.g. Wedding Planner) across subsequent searches in the same map session.
+	const [selectedContactStickyHeadlineById, setSelectedContactStickyHeadlineById] = useState<
+		Record<number, string>
+	>({});
 	const mapViewContainerRef = useRef<HTMLDivElement | null>(null);
 	const [activeMapTool, setActiveMapTool] = useState<'select' | 'grab'>('grab');
 	const [hoveredMapMarkerContact, setHoveredMapMarkerContact] = useState<ContactWithName | null>(
@@ -1690,11 +1695,113 @@ const DashboardContent = () => {
 
 	// Check if the current executed search is for a specific category (to apply labels to all results)
 	const searchWhatLower = searchedWhat?.toLowerCase() || '';
-	const isMusicVenuesSearch = searchWhatLower.includes('music venue') || searchWhatLower.includes('venues');
+	// Treat "Venues" as shorthand for "Music Venues" but avoid matching "Wedding Venues", etc.
+	const isMusicVenuesSearch =
+		searchWhatLower.includes('music venue') || /^venues?$/.test(searchWhatLower.trim());
 	const isRestaurantsSearch = searchWhatLower.includes('restaurant');
 	const isCoffeeShopsSearch = searchWhatLower.includes('coffee shop') || searchWhatLower.includes('coffee shops');
-	const isMusicFestivalsSearch = searchWhatLower.includes('music festival') || searchWhatLower.includes('festivals');
+	// Treat "Festivals" as shorthand for "Music Festivals" but avoid matching "Beer Festivals", etc.
+	const isMusicFestivalsSearch =
+		searchWhatLower.includes('music festival') || /^festivals?$/.test(searchWhatLower.trim());
 	const isWeddingPlannersSearch = searchWhatLower.includes('wedding planner');
+
+	const searchedWhere = useMemo(
+		() => extractWhereFromSearchQuery(activeSearchQuery),
+		[activeSearchQuery]
+	);
+
+	// For category-style searches, keep a sticky per-selected-contact headline so selected items
+	// retain their category identity when the user runs another search in the same map session.
+	const stickyCategoryHeadlineForCurrentSearch = useMemo(() => {
+		const rawWhat = (searchedWhat || '').trim();
+		const rawWhere = (searchedWhere || '').trim();
+		if (!rawWhat && !rawWhere) return '';
+
+		const canonicalWhat = isRestaurantsSearch
+			? 'Restaurants'
+			: isCoffeeShopsSearch
+				? 'Coffee Shops'
+				: isMusicVenuesSearch
+					? 'Music Venues'
+					: isMusicFestivalsSearch
+						? 'Music Festivals'
+						: isWeddingPlannersSearch
+							? 'Wedding Planners'
+							: rawWhat;
+
+		return [canonicalWhat, rawWhere].filter(Boolean).join(' ').trim();
+	}, [
+		isCoffeeShopsSearch,
+		isMusicFestivalsSearch,
+		isMusicVenuesSearch,
+		isRestaurantsSearch,
+		isWeddingPlannersSearch,
+		searchedWhat,
+		searchedWhere,
+	]);
+
+	const shouldPersistSelectedCategoryIdentity = useMemo(() => {
+		const headline = stickyCategoryHeadlineForCurrentSearch;
+		if (!headline) return false;
+		return (
+			isRestaurantTitle(headline) ||
+			isCoffeeShopTitle(headline) ||
+			isMusicVenueTitle(headline) ||
+			isMusicFestivalTitle(headline) ||
+			isWeddingPlannerTitle(headline) ||
+			isWeddingVenueTitle(headline) ||
+			isWineBeerSpiritsTitle(headline)
+		);
+	}, [stickyCategoryHeadlineForCurrentSearch]);
+
+	const prevSelectedContactsForStickyRef = useRef<number[]>(selectedContacts);
+	useEffect(() => {
+		const prevSelected = prevSelectedContactsForStickyRef.current;
+		const prevSelectedSet = new Set<number>(prevSelected);
+		const nextSelectedSet = new Set<number>(selectedContacts);
+
+		const addedIds: number[] = [];
+		for (const id of selectedContacts) {
+			if (!prevSelectedSet.has(id)) addedIds.push(id);
+		}
+
+		prevSelectedContactsForStickyRef.current = selectedContacts;
+
+		setSelectedContactStickyHeadlineById((prev) => {
+			if (selectedContacts.length === 0) {
+				return Object.keys(prev).length === 0 ? prev : {};
+			}
+
+			let changed = false;
+			const next: Record<number, string> = {};
+
+			// Keep existing sticky headlines for still-selected contacts.
+			for (const [idStr, stickyHeadline] of Object.entries(prev)) {
+				const id = Number(idStr);
+				if (!Number.isFinite(id)) continue;
+				if (!nextSelectedSet.has(id)) {
+					changed = true;
+					continue;
+				}
+				next[id] = stickyHeadline;
+			}
+
+			// For category searches, assign the current category headline to contacts that were just selected.
+			if (
+				addedIds.length > 0 &&
+				shouldPersistSelectedCategoryIdentity &&
+				stickyCategoryHeadlineForCurrentSearch
+			) {
+				for (const id of addedIds) {
+					if (next[id]) continue;
+					next[id] = stickyCategoryHeadlineForCurrentSearch;
+					changed = true;
+				}
+			}
+
+			return changed ? next : prev;
+		});
+	}, [selectedContacts, shouldPersistSelectedCategoryIdentity, stickyCategoryHeadlineForCurrentSearch]);
 
 	const baseContactIdSet = useMemo(
 		() => new Set<number>((contacts || []).map((c) => c.id)),
@@ -3658,7 +3765,7 @@ const DashboardContent = () => {
 																: isMusicFestivalTitle(hoveredContact.title || '')
 																	? '#C1D6FF'
 																	: (isWeddingPlannerTitle(hoveredContact.title || '') || isWeddingVenueTitle(hoveredContact.title || ''))
-																		? '#FFF2BC'
+																		? '#FFF8DC'
 																		: isWineBeerSpiritsTitle(hoveredContact.title || '')
 																			? '#BFC4FF'
 																			: '#E8EFFF',
@@ -4113,10 +4220,22 @@ const DashboardContent = () => {
 																				const company = contact.company || '';
 																				// For restaurant/coffee shop searches, always use the search-derived headline
 																				// Otherwise, use contact's headline or fall back to search What + Where
-																				const searchDerivedHeadline = whatValue && whereValue ? `${whatValue} ${whereValue}` : whatValue || '';
-																				const isSpecialCategorySearch = /^restaurants?$/i.test(whatValue.trim()) || /^coffee\s*shops?$/i.test(whatValue.trim());
+																				const searchDerivedHeadline =
+																					whatValue && whereValue
+																						? `${whatValue} ${whereValue}`
+																						: whatValue || '';
+																				const isSpecialCategorySearch =
+																					/^restaurants?$/i.test(whatValue.trim()) ||
+																					/^coffee\s*shops?$/i.test(whatValue.trim());
 																				const contactHeadline = contact.headline || contact.title || '';
-																				const headline = isSpecialCategorySearch && isInBaseResults ? searchDerivedHeadline : (contactHeadline || searchDerivedHeadline);
+																				const computedHeadline =
+																					isSpecialCategorySearch && isInBaseResults
+																						? searchDerivedHeadline
+																						: contactHeadline || searchDerivedHeadline;
+																				const stickyHeadline =
+																					selectedContactStickyHeadlineById[contact.id] || '';
+																				const headline =
+																					isSelected && stickyHeadline ? stickyHeadline : computedHeadline;
 																				const isRestaurantsSearchForContact = isRestaurantsSearch && isInBaseResults;
 																				const isCoffeeShopsSearchForContact = isCoffeeShopsSearch && isInBaseResults;
 																				const isMusicVenuesSearchForContact = isMusicVenuesSearch && isInBaseResults;
@@ -4143,9 +4262,11 @@ const DashboardContent = () => {
 																											? isHovered ? '#C5E8FF' : '#D7F0FF'
 																											: (isMusicFestivalsSearchForContact || isMusicFestivalTitle(headline))
 																												? isHovered ? '#ADD4FF' : '#BFDCFF'
-																												: isWineBeerSpiritsTitle(headline)
-																													? isHovered ? '#C8CBFF' : '#DADDFF'
-																													: isHovered ? '#BFE3FF' : '#C9EAFF'
+																												: (isWeddingPlannersSearchForContact || isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline))
+																													? isHovered ? '#F5EDCE' : '#FFF8DC'
+																													: isWineBeerSpiritsTitle(headline)
+																														? isHovered ? '#C8CBFF' : '#DADDFF'
+																														: isHovered ? '#BFE3FF' : '#C9EAFF'
 																								: isHovered
 																									? '#F3F4F6'
 																									: '#FFFFFF',
@@ -4220,7 +4341,7 @@ const DashboardContent = () => {
 																															: (isMusicFestivalsSearchForContact || isMusicFestivalTitle(headline))
 																																? '#C1D6FF'
 																																: (isWeddingPlannersSearchForContact || isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline))
-																																	? '#FFF2BC'
+																																	? '#FFF8DC'
 																																	: isWineBeerSpiritsTitle(headline)
 																																		? '#BFC4FF'
 																																		: '#E8EFFF',
@@ -4346,7 +4467,7 @@ const DashboardContent = () => {
 																															: (isMusicFestivalsSearchForContact || isMusicFestivalTitle(headline))
 																																? '#C1D6FF'
 																																: (isWeddingPlannersSearchForContact || isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline))
-																																	? '#FFF2BC'
+																																	? '#FFF8DC'
 																																	: isWineBeerSpiritsTitle(headline)
 																																		? '#BFC4FF'
 																																		: '#E8EFFF',
@@ -4646,10 +4767,20 @@ const DashboardContent = () => {
 																		const company = contact.company || '';
 																		// For restaurant searches, always use the search-derived headline
 																		// Otherwise, use contact's headline or fall back to search What + Where
-																		const searchDerivedHeadline = whatValue && whereValue ? `${whatValue} ${whereValue}` : whatValue || '';
+																		const searchDerivedHeadline =
+																			whatValue && whereValue
+																				? `${whatValue} ${whereValue}`
+																				: whatValue || '';
 																		const isRestaurantSearch = /^restaurants?$/i.test(whatValue.trim());
 																		const contactHeadline = contact.headline || contact.title || '';
-																		const headline = isRestaurantSearch && isInBaseResults ? searchDerivedHeadline : (contactHeadline || searchDerivedHeadline);
+																		const computedHeadline =
+																			isRestaurantSearch && isInBaseResults
+																				? searchDerivedHeadline
+																				: contactHeadline || searchDerivedHeadline;
+																		const stickyHeadline =
+																			selectedContactStickyHeadlineById[contact.id] || '';
+																		const headline =
+																			isSelected && stickyHeadline ? stickyHeadline : computedHeadline;
 																		const isRestaurantsSearchForContact = isRestaurantsSearch && isInBaseResults;
 																		const isCoffeeShopsSearchForContact = isCoffeeShopsSearch && isInBaseResults;
 																		const isMusicVenuesSearchForContact = isMusicVenuesSearch && isInBaseResults;
@@ -4676,9 +4807,11 @@ const DashboardContent = () => {
 																									? isHovered ? '#C5E8FF' : '#D7F0FF'
 																									: (isMusicFestivalsSearchForContact || isMusicFestivalTitle(headline))
 																										? isHovered ? '#ADD4FF' : '#BFDCFF'
-																										: isWineBeerSpiritsTitle(headline)
-																											? isHovered ? '#C8CBFF' : '#DADDFF'
-																											: isHovered ? '#BFE3FF' : '#C9EAFF'
+																										: (isWeddingPlannersSearchForContact || isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline))
+																											? isHovered ? '#F5EDCE' : '#FFF8DC'
+																											: isWineBeerSpiritsTitle(headline)
+																												? isHovered ? '#C8CBFF' : '#DADDFF'
+																												: isHovered ? '#BFE3FF' : '#C9EAFF'
 																						: isHovered
 																							? '#F3F4F6'
 																							: '#FFFFFF',
@@ -4779,7 +4912,7 @@ const DashboardContent = () => {
 																											: (isMusicFestivalsSearchForContact || isMusicFestivalTitle(headline))
 																												? '#C1D6FF'
 																												: (isWeddingPlannersSearchForContact || isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline))
-																													? '#FFF2BC'
+																													? '#FFF8DC'
 																													: isWineBeerSpiritsTitle(headline)
 																														? '#BFC4FF'
 																														: '#E8EFFF',
