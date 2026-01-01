@@ -2250,6 +2250,12 @@ const DashboardContent = () => {
 		setHoveredContact(null);
 		// Reset search completely to return to default dashboard
 		handleEnhancedResetSearch();
+
+		// If we entered the dashboard from a campaign (add-to-campaign mode), the "Home" button
+		// should take the user back to the *regular* dashboard (no campaign-search context).
+		if (isAddToCampaignMode) {
+			router.replace(urls.murmur.dashboard.index, { scroll: false });
+		}
 	};
 
 	useEffect(() => {
