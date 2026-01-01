@@ -40,7 +40,15 @@ const formSchema = z.object({
 
 type FormData = z.infer<typeof formSchema>;
 
-export const useDashboard = () => {
+interface UseDashboardOptions {
+	/** Derived title to assign to contacts without a title when creating a campaign */
+	derivedTitle?: string;
+	/** If true, the derived title applies to ALL contacts (e.g., for restaurant searches) */
+	forceApplyDerivedTitle?: boolean;
+}
+
+export const useDashboard = (options: UseDashboardOptions = {}) => {
+	const { derivedTitle, forceApplyDerivedTitle = false } = options;
 	/* UI */
 	const [hasSearched, setHasSearched] = useState(false);
 
@@ -286,14 +294,41 @@ export const useDashboard = () => {
 			(contact) => !selectedContacts.includes(contact.id)
 		);
 
-		const updates = deselectedContacts.map((contact) => ({
-			id: contact.id,
-			data: {
-				manualDeselections: contact.manualDeselections + 1,
-			},
-		}));
+		// Build updates: increment deselections for deselected contacts,
+		// and assign derived title to selected contacts without a title
+		const updates: Array<{ id: number; data: Record<string, unknown> }> = [];
+		
+		for (const contact of deselectedContacts) {
+			updates.push({
+				id: contact.id,
+				data: {
+					manualDeselections: contact.manualDeselections + 1,
+				},
+			});
+		}
 
-		await batchUpdateContacts({ updates });
+		// If we have a derived title, update selected contacts
+		// For restaurant searches (forceApplyDerivedTitle), update ALL selected contacts
+		// Otherwise, only update contacts that don't have a title
+		if (derivedTitle) {
+			const contactsToUpdate = contacts.filter(
+				(contact) =>
+					selectedContacts.includes(contact.id) &&
+					(forceApplyDerivedTitle || (!contact.title && !contact.headline))
+			);
+			for (const contact of contactsToUpdate) {
+				updates.push({
+					id: contact.id,
+					data: {
+						title: derivedTitle,
+					},
+				});
+			}
+		}
+
+		if (updates.length > 0) {
+			await batchUpdateContacts({ updates });
+		}
 
 		const generateCampaignName = (searchQuery: string): string => {
 			let cleanedQuery = searchQuery.replace(/^\[(booking|promotion)\]\s*/i, '');

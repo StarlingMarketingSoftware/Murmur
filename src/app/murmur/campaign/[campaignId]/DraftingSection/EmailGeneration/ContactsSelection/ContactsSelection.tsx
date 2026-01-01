@@ -35,6 +35,7 @@ import { RadioStationsIcon } from '@/components/atoms/_svg/RadioStationsIcon';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 import { getCityIconProps } from '@/utils/cityIcons';
 import { urls } from '@/constants/urls';
+import { isRestaurantTitle } from '@/utils/restaurantTitle';
 
 const DEFAULT_STATE_SUGGESTIONS = [
 	{ label: 'New York', description: 'contact venues, restaurants and more' },
@@ -1104,9 +1105,17 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 											{/* Top Right - Title */}
 											<div className="pr-1 pl-0 flex items-center h-[24px] justify-end">
 												{contactTitle ? (
-													<div className="h-[21px] w-[240px] rounded-[6px] px-2 flex items-center bg-[#E8EFFF] border border-black overflow-hidden">
+													<div
+														className="h-[21px] w-[240px] rounded-[6px] px-2 flex items-center gap-1 border border-black overflow-hidden"
+														style={{
+															backgroundColor: isRestaurantTitle(contactTitle) ? '#C3FBD1' : '#E8EFFF',
+														}}
+													>
+														{isRestaurantTitle(contactTitle) && (
+															<RestaurantsIcon size={14} />
+														)}
 														<ScrollableText
-															text={contactTitle}
+															text={isRestaurantTitle(contactTitle) ? 'Restaurant' : contactTitle}
 															className="text-[10px] text-black leading-none"
 															scrollPixelsPerSecond={60}
 														/>
@@ -1219,9 +1228,17 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 												<>
 													{/* Top Right - Title */}
 													<div className="pr-1 pl-0 flex items-center h-[24px] justify-end">
-														<div className="h-[21px] w-[240px] rounded-[6px] px-2 flex items-center bg-[#E8EFFF] border border-black overflow-hidden">
+														<div
+															className="h-[21px] w-[240px] rounded-[6px] px-2 flex items-center gap-1 border border-black overflow-hidden"
+															style={{
+																backgroundColor: isRestaurantTitle(contactTitle) ? '#C3FBD1' : '#E8EFFF',
+															}}
+														>
+															{isRestaurantTitle(contactTitle) && (
+																<RestaurantsIcon size={14} />
+															)}
 															<ScrollableText
-																text={contactTitle}
+																text={isRestaurantTitle(contactTitle) ? 'Restaurant' : contactTitle}
 																className="text-[10px] text-black leading-none"
 																scrollPixelsPerSecond={60}
 															/>

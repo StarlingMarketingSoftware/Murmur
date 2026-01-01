@@ -26,6 +26,8 @@ import RightArrow from '@/components/atoms/_svg/RightArrow';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import RichTextEditor from '@/components/molecules/RichTextEditor/RichTextEditor';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
+import { isRestaurantTitle } from '@/utils/restaurantTitle';
+import { RestaurantsIcon } from '@/components/atoms/_svg/RestaurantsIcon';
 
 interface ScrollableTextareaProps
 	extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
@@ -544,11 +546,18 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 							</div>
 							{contactTitle ? (
 								<div
-									className="rounded-[6px] border border-black bg-[#E8EFFF] px-2 flex items-center justify-start"
-									style={{ width: '152px', height: '18px' }}
+									className="rounded-[6px] border border-black px-2 flex items-center gap-1 justify-start"
+									style={{
+										width: '152px',
+										height: '18px',
+										backgroundColor: isRestaurantTitle(contactTitle) ? '#C3FBD1' : '#E8EFFF',
+									}}
 								>
+									{isRestaurantTitle(contactTitle) && (
+										<RestaurantsIcon size={12} />
+									)}
 									<ScrollableText
-										text={contactTitle}
+										text={isRestaurantTitle(contactTitle) ? 'Restaurant' : contactTitle}
 										className="text-[11px] font-inter text-black leading-none w-full"
 									/>
 								</div>
@@ -1325,9 +1334,17 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 										style={{ right: isSelected ? '9px' : '4px' }}
 									>
 										{contactTitle ? (
-											<div className="h-[21px] w-[240px] rounded-[6px] px-2 flex items-center bg-[#E8EFFF] border border-black overflow-hidden">
+											<div
+												className="h-[21px] w-[240px] rounded-[6px] px-2 flex items-center gap-1 border border-black overflow-hidden"
+												style={{
+													backgroundColor: isRestaurantTitle(contactTitle) ? '#C3FBD1' : '#E8EFFF',
+												}}
+											>
+												{isRestaurantTitle(contactTitle) && (
+													<RestaurantsIcon size={14} />
+												)}
 												<ScrollableText
-													text={contactTitle}
+													text={isRestaurantTitle(contactTitle) ? 'Restaurant' : contactTitle}
 													className="text-[10px] text-black leading-none"
 													scrollPixelsPerSecond={60}
 												/>

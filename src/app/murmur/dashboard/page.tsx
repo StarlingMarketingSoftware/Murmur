@@ -18,6 +18,7 @@ import { MusicVenuesIcon } from '@/components/atoms/_svg/MusicVenuesIcon';
 import { WineBeerSpiritsIcon } from '@/components/atoms/_svg/WineBeerSpiritsIcon';
 import { FestivalsIcon } from '@/components/atoms/_svg/FestivalsIcon';
 import { RestaurantsIcon } from '@/components/atoms/_svg/RestaurantsIcon';
+import { isRestaurantTitle } from '@/utils/restaurantTitle';
 import { WeddingPlannersIcon } from '@/components/atoms/_svg/WeddingPlannersIcon';
 import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
 import { RadioStationsIcon } from '@/components/atoms/_svg/RadioStationsIcon';
@@ -36,7 +37,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { useClerk } from '@clerk/nextjs';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { useDebounce } from '@/hooks/useDebounce';
-import { useGetLocations } from '@/hooks/queryHooks/useContacts';
+import { useGetLocations, useBatchUpdateContacts } from '@/hooks/queryHooks/useContacts';
 import { useMe } from '@/hooks/useMe';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 import { getStateAbbreviation } from '@/utils/string';
@@ -1151,6 +1152,20 @@ const DashboardContent = () => {
 	// Mini search bar (map view results) indicator refs
 	const miniActiveSectionIndicatorRef = useRef<HTMLDivElement>(null);
 	const prevMiniActiveSectionRef = useRef<'why' | 'what' | 'where' | null>(null);
+	// Derive title for contacts without one (e.g., "Restaurants New York")
+	const derivedContactTitle = useMemo(() => {
+		if (!whatValue) return undefined;
+		if (whereValue) {
+			return `${whatValue} ${whereValue}`;
+		}
+		return whatValue;
+	}, [whatValue, whereValue]);
+
+	// Check if this is a restaurant search - if so, all contacts should get the restaurant label
+	const isRestaurantSearch = useMemo(() => {
+		return /^restaurants?$/i.test(whatValue.trim());
+	}, [whatValue]);
+
 	const {
 		form,
 		onSubmit,
@@ -1176,7 +1191,10 @@ const DashboardContent = () => {
 		setIsMapView,
 		isSearchPending,
 		usedContactIdsSet,
-	} = useDashboard();
+	} = useDashboard({ derivedTitle: derivedContactTitle, forceApplyDerivedTitle: isRestaurantSearch });
+
+	// Batch update for assigning titles to contacts without one
+	const { mutateAsync: batchUpdateContacts } = useBatchUpdateContacts({ suppressToasts: true });
 
 	const handleAddSelectedToCampaign = useCallback(async () => {
 		if (!isAddToCampaignMode) return;
@@ -1197,6 +1215,23 @@ const DashboardContent = () => {
 		}
 
 		try {
+			// If we have a derived title, update contacts before adding them
+			// For restaurant searches, update ALL contacts; otherwise only those without a title
+			if (derivedContactTitle && contacts) {
+				const contactsToUpdate = contacts.filter(
+					(c) => selectedContacts.includes(c.id) && 
+						(isRestaurantSearch || (!c.title && !c.headline))
+				);
+				if (contactsToUpdate.length > 0) {
+					await batchUpdateContacts({
+						updates: contactsToUpdate.map((c) => ({
+							id: c.id,
+							data: { title: derivedContactTitle },
+						})),
+					});
+				}
+			}
+
 			await editUserContactList({
 				id: addToCampaignUserContactListId,
 				data: {
@@ -1231,8 +1266,13 @@ const DashboardContent = () => {
 	}, [
 		fromCampaignIdParam,
 		addToCampaignUserContactListId,
+		batchUpdateContacts,
+		contacts,
+		derivedContactTitle,
 		editUserContactList,
 		isAddToCampaignMode,
+		isPendingFromCampaign,
+		isRestaurantSearch,
 		queryClient,
 		router,
 		selectedContacts,
@@ -3227,15 +3267,15 @@ const DashboardContent = () => {
 								<>
 									{/* Box to the left of the Home button */}
 									<div
-										className="group relative h-[53px] hover:h-[82px]"
+										className="group relative h-[52px] hover:h-[80px]"
 										style={{
 											position: 'absolute',
 											// Map is inset 9px from the viewport; "25px from map top" => 34px viewport.
 											// Search bar wrapper sits at 33px viewport, so this becomes 1px inside the wrapper.
 											top: '1px',
 											// Home button is at: calc(100% + 179px). This box should be 10px to its left.
-											left: 'calc(100% + 179px - 143px)', // 133px width + 10px gap
-											width: '133px',
+											left: 'calc(100% + 179px - 140px)', // 130px width + 10px gap
+											width: '130px',
 											borderRadius: '6px',
 											backgroundColor: 'rgba(255, 255, 255, 0.9)', // #FFFFFF @ 90%
 											border: '3px solid #000000',
@@ -3251,8 +3291,8 @@ const DashboardContent = () => {
 													aria-pressed={activeMapTool === 'select'}
 													className="flex items-center justify-center"
 													style={{
-														width: '44px',
-														height: '44px',
+														width: '43px',
+														height: '43px',
 														borderRadius: '9px',
 														backgroundColor:
 															activeMapTool === 'select'
@@ -3266,8 +3306,8 @@ const DashboardContent = () => {
 													<div
 														aria-hidden="true"
 														style={{
-															width: '25px',
-															height: '25px',
+															width: '24px',
+															height: '24px',
 															backgroundColor:
 																activeMapTool === 'select' ? '#FFFFFF' : 'transparent',
 															border: '2px solid #000000',
@@ -3276,7 +3316,7 @@ const DashboardContent = () => {
 													/>
 												</button>
 												{activeMapTool === 'select' && (
-													<div className="pointer-events-none absolute left-1/2 top-[52px] -translate-x-1/2 opacity-0 group-hover:opacity-100 font-inter text-[16px] font-semibold leading-none text-black select-none whitespace-nowrap">
+													<div className="pointer-events-none absolute left-1/2 top-[51px] -translate-x-1/2 opacity-0 group-hover:opacity-100 font-inter text-[16px] font-semibold leading-none text-black select-none whitespace-nowrap">
 														Select
 													</div>
 												)}
@@ -3289,8 +3329,8 @@ const DashboardContent = () => {
 													aria-pressed={activeMapTool === 'grab'}
 													className="flex items-center justify-center"
 													style={{
-														width: '44px',
-														height: '44px',
+														width: '43px',
+														height: '43px',
 														borderRadius: '9px',
 														backgroundColor:
 															activeMapTool === 'grab'
@@ -3304,7 +3344,7 @@ const DashboardContent = () => {
 													<GrabIcon innerFill={activeMapTool === 'grab' ? '#FFFFFF' : '#DCDFDD'} />
 												</button>
 												{activeMapTool === 'grab' && (
-													<div className="pointer-events-none absolute left-1/2 top-[52px] -translate-x-1/2 opacity-0 group-hover:opacity-100 font-inter text-[16px] font-semibold leading-none text-black select-none whitespace-nowrap">
+													<div className="pointer-events-none absolute left-1/2 top-[51px] -translate-x-1/2 opacity-0 group-hover:opacity-100 font-inter text-[16px] font-semibold leading-none text-black select-none whitespace-nowrap">
 														Grab
 													</div>
 												)}
@@ -3315,7 +3355,7 @@ const DashboardContent = () => {
 										type="button"
 										onClick={handleCloseMapView}
 										aria-label="Home"
-										className="group flex items-center justify-center cursor-pointer w-[53px] hover:w-[158px]"
+										className="group flex items-center justify-center cursor-pointer w-[52px] hover:w-[155px]"
 										style={{
 											position: 'absolute',
 											// Map is inset 9px from the viewport; "25px from map top" => 34px viewport.
@@ -3323,7 +3363,7 @@ const DashboardContent = () => {
 											top: '1px',
 											// "179px to the right of the searchbar" => from wrapper's right edge.
 											left: 'calc(100% + 179px)',
-											height: '53px',
+											height: '52px',
 											borderRadius: '9px',
 											backgroundColor: '#D6D6D6',
 											border: '3px solid #000000',
@@ -3331,9 +3371,9 @@ const DashboardContent = () => {
 										}}
 									>
 										<div
-											className="flex items-center justify-center w-[43px] group-hover:w-[146px]"
+											className="flex items-center justify-center w-[42px] group-hover:w-[143px]"
 											style={{
-												height: '43px',
+												height: '42px',
 												borderRadius: '9px',
 												backgroundColor: '#EAEAEA',
 											}}
@@ -3762,8 +3802,12 @@ const DashboardContent = () => {
 																					contact.name ||
 																					`${firstName} ${lastName}`.trim();
 																				const company = contact.company || '';
-																				const headline =
-																					contact.headline || contact.title || '';
+																				// For restaurant searches, always use the search-derived headline
+																				// Otherwise, use contact's headline or fall back to search What + Where
+																				const searchDerivedHeadline = whatValue && whereValue ? `${whatValue} ${whereValue}` : whatValue || '';
+																				const isRestaurantSearch = /^restaurants?$/i.test(whatValue.trim());
+																				const contactHeadline = contact.headline || contact.title || '';
+																				const headline = isRestaurantSearch ? searchDerivedHeadline : (contactHeadline || searchDerivedHeadline);
 																				const stateAbbr =
 																					getStateAbbreviation(contact.state || '') || '';
 																				const city = contact.city || '';
@@ -3841,9 +3885,17 @@ const DashboardContent = () => {
 																								{/* Top Right - Title/Headline */}
 																								<div className="pr-2 pl-1 flex items-center h-[23px]">
 																									{headline ? (
-																										<div className="h-[17px] rounded-[6px] px-2 flex items-center w-full bg-[#E8EFFF] border border-black overflow-hidden">
+																										<div
+																											className="h-[17px] rounded-[6px] px-2 flex items-center gap-1 w-full border border-black overflow-hidden"
+																											style={{
+																												backgroundColor: isRestaurantTitle(headline) ? '#C3FBD1' : '#E8EFFF',
+																											}}
+																										>
+																											{isRestaurantTitle(headline) && (
+																												<RestaurantsIcon size={12} className="flex-shrink-0" />
+																											)}
 																											<span className="text-[10px] text-black leading-none truncate">
-																												{headline}
+																												{isRestaurantTitle(headline) ? 'Restaurant' : headline}
 																											</span>
 																										</div>
 																									) : (
@@ -3918,9 +3970,17 @@ const DashboardContent = () => {
 																								{/* Top Right - Title/Headline */}
 																								<div className="pr-2 pl-1 flex items-center h-[23px]">
 																									{headline ? (
-																										<div className="h-[17px] rounded-[6px] px-2 flex items-center w-full bg-[#E8EFFF] border border-black overflow-hidden">
+																										<div
+																											className="h-[17px] rounded-[6px] px-2 flex items-center gap-1 w-full border border-black overflow-hidden"
+																											style={{
+																												backgroundColor: isRestaurantTitle(headline) ? '#C3FBD1' : '#E8EFFF',
+																											}}
+																										>
+																											{isRestaurantTitle(headline) && (
+																												<RestaurantsIcon size={12} className="flex-shrink-0" />
+																											)}
 																											<span className="text-[10px] text-black leading-none truncate">
-																												{headline}
+																												{isRestaurantTitle(headline) ? 'Restaurant' : headline}
 																											</span>
 																										</div>
 																									) : (
@@ -4178,8 +4238,12 @@ const DashboardContent = () => {
 																			contact.name ||
 																			`${firstName} ${lastName}`.trim();
 																		const company = contact.company || '';
-																		const headline =
-																			contact.headline || contact.title || '';
+																		// For restaurant searches, always use the search-derived headline
+																		// Otherwise, use contact's headline or fall back to search What + Where
+																		const searchDerivedHeadline = whatValue && whereValue ? `${whatValue} ${whereValue}` : whatValue || '';
+																		const isRestaurantSearch = /^restaurants?$/i.test(whatValue.trim());
+																		const contactHeadline = contact.headline || contact.title || '';
+																		const headline = isRestaurantSearch ? searchDerivedHeadline : (contactHeadline || searchDerivedHeadline);
 																		const stateAbbr =
 																			getStateAbbreviation(contact.state || '') || '';
 																		const city = contact.city || '';

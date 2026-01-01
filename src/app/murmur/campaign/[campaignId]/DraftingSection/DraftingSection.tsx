@@ -79,6 +79,7 @@ import BottomArrowIcon from '@/components/atoms/_svg/BottomArrowIcon';
 import BottomFolderIcon from '@/components/atoms/_svg/BottomFolderIcon';
 import LeftArrow from '@/components/atoms/_svg/LeftArrow';
 import RightArrow from '@/components/atoms/_svg/RightArrow';
+import { isRestaurantTitle } from '@/utils/restaurantTitle';
 
 type IdentityProfileFields = Identity & {
 	genre?: string | null;
@@ -2902,9 +2903,17 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																	{/* Top Right - Title/Headline */}
 																	<div className="pr-2 pl-1 flex items-center h-[23px]">
 																		{headline ? (
-																			<div className="h-[17px] rounded-[6px] px-2 flex items-center w-full bg-[#E8EFFF] border border-black overflow-hidden">
+																			<div
+																				className="h-[17px] rounded-[6px] px-2 flex items-center gap-1 w-full border border-black overflow-hidden"
+																				style={{
+																					backgroundColor: isRestaurantTitle(headline) ? '#C3FBD1' : '#E8EFFF',
+																				}}
+																			>
+																				{isRestaurantTitle(headline) && (
+																					<RestaurantsIcon size={12} />
+																				)}
 																				<span className="text-[10px] text-black leading-none truncate">
-																					{headline}
+																					{isRestaurantTitle(headline) ? 'Restaurant' : headline}
 																				</span>
 																			</div>
 																		) : (
@@ -2956,9 +2965,17 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																	{/* Top Right - Title/Headline */}
 																	<div className="pr-2 pl-1 flex items-center h-[23px]">
 																		{headline ? (
-																			<div className="h-[17px] rounded-[6px] px-2 flex items-center w-full bg-[#E8EFFF] border border-black overflow-hidden">
+																			<div
+																				className="h-[17px] rounded-[6px] px-2 flex items-center gap-1 w-full border border-black overflow-hidden"
+																				style={{
+																					backgroundColor: isRestaurantTitle(headline) ? '#C3FBD1' : '#E8EFFF',
+																				}}
+																			>
+																				{isRestaurantTitle(headline) && (
+																					<RestaurantsIcon size={12} />
+																				)}
 																				<span className="text-[10px] text-black leading-none truncate">
-																					{headline}
+																					{isRestaurantTitle(headline) ? 'Restaurant' : headline}
 																				</span>
 																			</div>
 																		) : (
@@ -4576,9 +4593,17 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																					{/* Top Right - Title/Headline */}
 																					<div className="pr-2 pl-1 flex items-center h-[23px]">
 																						{headline ? (
-																							<div className="h-[17px] rounded-[6px] px-2 flex items-center w-full bg-[#E8EFFF] border border-black overflow-hidden">
+																							<div
+																								className="h-[17px] rounded-[6px] px-2 flex items-center gap-1 w-full border border-black overflow-hidden"
+																								style={{
+																									backgroundColor: isRestaurantTitle(headline) ? '#C3FBD1' : '#E8EFFF',
+																								}}
+																							>
+																								{isRestaurantTitle(headline) && (
+																									<RestaurantsIcon size={12} />
+																								)}
 																								<span className="text-[10px] text-black leading-none truncate">
-																									{headline}
+																									{isRestaurantTitle(headline) ? 'Restaurant' : headline}
 																								</span>
 																							</div>
 																						) : (
@@ -4630,9 +4655,17 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																					{/* Top Right - Title/Headline */}
 																					<div className="pr-2 pl-1 flex items-center h-[23px]">
 																						{headline ? (
-																							<div className="h-[17px] rounded-[6px] px-2 flex items-center w-full bg-[#E8EFFF] border border-black overflow-hidden">
+																							<div
+																								className="h-[17px] rounded-[6px] px-2 flex items-center gap-1 w-full border border-black overflow-hidden"
+																								style={{
+																									backgroundColor: isRestaurantTitle(headline) ? '#C3FBD1' : '#E8EFFF',
+																								}}
+																							>
+																								{isRestaurantTitle(headline) && (
+																									<RestaurantsIcon size={12} />
+																								)}
 																								<span className="text-[10px] text-black leading-none truncate">
-																									{headline}
+																									{isRestaurantTitle(headline) ? 'Restaurant' : headline}
 																								</span>
 																							</div>
 																						) : (
@@ -5266,9 +5299,17 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																		{/* Top Right - Title/Headline */}
 																		<div className="pr-2 pl-1 flex items-center h-[23px]">
 																			{headline ? (
-																				<div className="h-[17px] rounded-[6px] px-2 flex items-center w-full bg-[#E8EFFF] border border-black overflow-hidden">
+																				<div
+																					className="h-[17px] rounded-[6px] px-2 flex items-center gap-1 w-full border border-black overflow-hidden"
+																					style={{
+																						backgroundColor: isRestaurantTitle(headline) ? '#C3FBD1' : '#E8EFFF',
+																					}}
+																				>
+																					{isRestaurantTitle(headline) && (
+																						<RestaurantsIcon size={12} />
+																					)}
 																					<span className="text-[10px] text-black leading-none truncate">
-																						{headline}
+																						{isRestaurantTitle(headline) ? 'Restaurant' : headline}
 																					</span>
 																				</div>
 																			) : (
@@ -5320,9 +5361,17 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																		{/* Top Right - Title/Headline */}
 																		<div className="pr-2 pl-1 flex items-center h-[23px]">
 																			{headline ? (
-																				<div className="h-[17px] rounded-[6px] px-2 flex items-center w-full bg-[#E8EFFF] border border-black overflow-hidden">
+																				<div
+																					className="h-[17px] rounded-[6px] px-2 flex items-center gap-1 w-full border border-black overflow-hidden"
+																					style={{
+																						backgroundColor: isRestaurantTitle(headline) ? '#C3FBD1' : '#E8EFFF',
+																					}}
+																				>
+																					{isRestaurantTitle(headline) && (
+																						<RestaurantsIcon size={12} />
+																					)}
 																					<span className="text-[10px] text-black leading-none truncate">
-																						{headline}
+																						{isRestaurantTitle(headline) ? 'Restaurant' : headline}
 																					</span>
 																				</div>
 																			) : (

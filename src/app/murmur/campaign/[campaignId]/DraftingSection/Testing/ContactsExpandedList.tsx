@@ -23,6 +23,8 @@ import {
 } from '@/app/murmur/campaign/[campaignId]/DraftingSection/EmailGeneration/ContactsSelection/ContactsSelection';
 import { useDebounce } from '@/hooks/useDebounce';
 import { urls } from '@/constants/urls';
+import { isRestaurantTitle } from '@/utils/restaurantTitle';
+import { RestaurantsIcon } from '@/components/atoms/_svg/RestaurantsIcon';
 
 export interface ContactsExpandedListProps {
 	contacts: ContactWithName[];
@@ -387,9 +389,17 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 													{/* Top Right - Title */}
 													<div className="pr-1.5 pl-0.5 flex items-center justify-start h-[12px]">
 														{contactTitle ? (
-															<div className="h-[10px] rounded-[3px] px-1 flex items-center max-w-full bg-[#E8EFFF] border border-black overflow-hidden">
+															<div
+																className="h-[10px] rounded-[3px] px-1 flex items-center gap-0.5 max-w-full border border-black overflow-hidden"
+																style={{
+																	backgroundColor: isRestaurantTitle(contactTitle) ? '#C3FBD1' : '#E8EFFF',
+																}}
+															>
+																{isRestaurantTitle(contactTitle) && (
+																	<RestaurantsIcon size={7} />
+																)}
 																<span className="text-[7px] text-black leading-none truncate">
-																	{contactTitle}
+																	{isRestaurantTitle(contactTitle) ? 'Restaurant' : contactTitle}
 																</span>
 															</div>
 														) : null}
@@ -482,9 +492,17 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 													{/* Right column spans both rows for title + location stacked */}
 													<div className="pr-1.5 pl-0.5 row-span-2 flex flex-col justify-center gap-0.5 overflow-hidden">
 														{contactTitle && (
-															<div className="h-[10px] rounded-[3px] px-1 flex items-center max-w-full bg-[#E8EFFF] border border-black overflow-hidden">
+															<div
+																className="h-[10px] rounded-[3px] px-1 flex items-center gap-0.5 max-w-full border border-black overflow-hidden"
+																style={{
+																	backgroundColor: isRestaurantTitle(contactTitle) ? '#C3FBD1' : '#E8EFFF',
+																}}
+															>
+																{isRestaurantTitle(contactTitle) && (
+																	<RestaurantsIcon size={7} />
+																)}
 																<span className="text-[7px] text-black leading-none truncate">
-																	{contactTitle}
+																	{isRestaurantTitle(contactTitle) ? 'Restaurant' : contactTitle}
 																</span>
 															</div>
 														)}
@@ -555,9 +573,17 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 											</div>
 											<div className="pr-2 pl-1 flex items-center h-[23px]">
 												{contactTitle ? (
-													<div className="h-[17px] rounded-[6px] px-2 flex items-center w-full bg-[#E8EFFF] border border-black overflow-hidden">
+													<div
+														className="h-[17px] rounded-[6px] px-2 flex items-center gap-1 w-full border border-black overflow-hidden"
+														style={{
+															backgroundColor: isRestaurantTitle(contactTitle) ? '#C3FBD1' : '#E8EFFF',
+														}}
+													>
+														{isRestaurantTitle(contactTitle) && (
+															<RestaurantsIcon size={12} />
+														)}
 														<ScrollableText
-															text={contactTitle}
+															text={isRestaurantTitle(contactTitle) ? 'Restaurant' : contactTitle}
 															className="text-[10px] text-black leading-none"
 															scrollPixelsPerSecond={60}
 														/>
@@ -665,9 +691,17 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 												<>
 													{/* Top Right - Title */}
 													<div className="pr-2 pl-1 flex items-center h-[23px]">
-														<div className="h-[17px] rounded-[6px] px-2 flex items-center w-full bg-[#E8EFFF] border border-black overflow-hidden">
+														<div
+															className="h-[17px] rounded-[6px] px-2 flex items-center gap-1 w-full border border-black overflow-hidden"
+															style={{
+																backgroundColor: isRestaurantTitle(contactTitle) ? '#C3FBD1' : '#E8EFFF',
+															}}
+														>
+															{isRestaurantTitle(contactTitle) && (
+																<RestaurantsIcon size={12} />
+															)}
 															<ScrollableText
-																text={contactTitle}
+																text={isRestaurantTitle(contactTitle) ? 'Restaurant' : contactTitle}
 																className="text-[10px] text-black leading-none"
 															/>
 														</div>

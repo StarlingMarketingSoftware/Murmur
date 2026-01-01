@@ -15,6 +15,8 @@ import {
 } from '@/constants/ui';
 import { useGetInboundEmails } from '@/hooks/queryHooks/useInboundEmails';
 import type { InboundEmailWithRelations } from '@/types';
+import { isRestaurantTitle } from '@/utils/restaurantTitle';
+import { RestaurantsIcon } from '@/components/atoms/_svg/RestaurantsIcon';
 
 export interface InboxExpandedListProps {
 	contacts: ContactWithName[];
@@ -341,19 +343,27 @@ export const InboxExpandedList: FC<InboxExpandedListProps> = ({
 									)}>
 										{/* Title row - on top */}
 										{contact?.headline ? (
-											<div className={cn(
-												"bg-[#E8EFFF] border border-black overflow-hidden flex items-center",
-												isBottomView
-													? "h-[10px] rounded-[3px] px-1 w-full"
-													: "w-[110px] h-[10px] rounded-[3.71px] justify-center"
-											)}>
+											<div
+												className={cn(
+													"border border-black overflow-hidden flex items-center gap-0.5",
+													isBottomView
+														? "h-[10px] rounded-[3px] px-1 w-full"
+														: "w-[110px] h-[10px] rounded-[3.71px] justify-center"
+												)}
+												style={{
+													backgroundColor: isRestaurantTitle(contact.headline) ? '#C3FBD1' : '#E8EFFF',
+												}}
+											>
+												{isRestaurantTitle(contact.headline) && (
+													<RestaurantsIcon size={isBottomView ? 7 : 8} />
+												)}
 												{isBottomView ? (
 													<span className="text-[7px] text-black leading-none truncate">
-														{contact.headline}
+														{isRestaurantTitle(contact.headline) ? 'Restaurant' : contact.headline}
 													</span>
 												) : (
 													<ScrollableText
-														text={contact.headline}
+														text={isRestaurantTitle(contact.headline) ? 'Restaurant' : contact.headline}
 														className="text-[8px] text-black leading-none px-1"
 													/>
 												)}
