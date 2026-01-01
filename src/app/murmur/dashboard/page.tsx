@@ -1574,11 +1574,22 @@ const DashboardContent = () => {
 	const mapResearchPanelCloseDelayTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 	const mapResearchPanelUnmountTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 	const mapResearchPanelContactRef = useRef<ContactWithName | null>(null);
+	// When the executed search changes, reset map-panel "extras" for the new search,
+	// but keep any currently-selected contacts so selection can persist across searches
+	// within the same map session.
+	const prevActiveSearchQueryForMapPanelRef = useRef<string>(activeSearchQuery);
 	useEffect(() => {
+		if (prevActiveSearchQueryForMapPanelRef.current === activeSearchQuery) return;
+		prevActiveSearchQueryForMapPanelRef.current = activeSearchQuery;
+
 		setMapPanelExtraContactIds([]);
-		setMapPanelExtraContacts([]);
 		setMapPanelVisibleOverlayContacts([]);
-	}, [activeSearchQuery]);
+		setMapPanelExtraContacts((prev) => {
+			if (selectedContacts.length === 0) return [];
+			const selectedSet = new Set<number>(selectedContacts);
+			return prev.filter((c) => selectedSet.has(c.id));
+		});
+	}, [activeSearchQuery, selectedContacts]);
 
 	// Cleanup timers on unmount
 	useEffect(() => {
@@ -1689,6 +1700,27 @@ const DashboardContent = () => {
 		() => new Set<number>((contacts || []).map((c) => c.id)),
 		[contacts]
 	);
+
+	// Cache selected contacts as full objects so they can remain pinned/visible in the map side
+	// panel even after running another search (when `contacts` changes).
+	useEffect(() => {
+		if (!isMapView) return;
+		if (!contacts || contacts.length === 0) return;
+		if (selectedContacts.length === 0) return;
+
+		const selectedSet = new Set<number>(selectedContacts);
+		setMapPanelExtraContacts((prev) => {
+			const cachedIds = new Set<number>(prev.map((c) => c.id));
+			const toAdd: ContactWithName[] = [];
+			for (const c of contacts) {
+				if (selectedSet.has(c.id) && !cachedIds.has(c.id)) {
+					toAdd.push(c);
+				}
+			}
+			if (toAdd.length === 0) return prev;
+			return [...toAdd, ...prev];
+		});
+	}, [isMapView, contacts, selectedContacts]);
 
 	const mapPanelContacts = useMemo(() => {
 		const allContacts = contacts || [];
@@ -3889,16 +3921,34 @@ const DashboardContent = () => {
 																	);
 																}}
 																onToggleSelection={(contactId) => {
-																	if (selectedContacts.includes(contactId)) {
-																		setSelectedContacts(
-																			selectedContacts.filter((id) => id !== contactId)
+																	const wasSelected = selectedContacts.includes(contactId);
+
+																	// Ensure the selected contact stays renderable in the side panel across
+																	// subsequent searches by caching the full object.
+																	if (!wasSelected) {
+																		const fromBase = (contacts || []).find((c) => c.id === contactId);
+																		const fromOverlay = mapPanelVisibleOverlayContacts.find(
+																			(c) => c.id === contactId
 																		);
-																	} else {
-																		setSelectedContacts([
-																			...selectedContacts,
-																			contactId,
-																		]);
+																		const fromExtra = mapPanelExtraContacts.find(
+																			(c) => c.id === contactId
+																		);
+																		const selectedContact = fromBase ?? fromOverlay ?? fromExtra;
+																		if (selectedContact) {
+																			setMapPanelExtraContacts((prev) =>
+																				prev.some((c) => c.id === contactId)
+																					? prev
+																					: [selectedContact, ...prev]
+																			);
+																		}
 																	}
+
+																	setSelectedContacts((prev) => {
+																		if (prev.includes(contactId)) {
+																			return prev.filter((id) => id !== contactId);
+																		}
+																		return [...prev, contactId];
+																	});
 																	// Scroll to the contact in the side panel
 																	const tryScroll = (attempt = 0) => {
 																		const contactElement = document.querySelector(

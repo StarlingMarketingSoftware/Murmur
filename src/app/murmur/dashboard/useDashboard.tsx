@@ -146,17 +146,16 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 	}, [isLoadingContacts, isRefetchingContacts, isSearchPending]);
 
 	useEffect(() => {
-		if (contacts) {
-			setSelectedContacts([]);
-		}
-	}, [contacts]);
-
-	useEffect(() => {
-		if (contacts && selectedContacts.length > 0) {
-			setIsAllSelected(selectedContacts.length === contacts.length);
-		} else {
+		if (!contacts || contacts.length === 0) {
 			setIsAllSelected(false);
+			return;
 		}
+
+		// `selectedContacts` may include contacts from prior searches (map flow). "All selected"
+		// should mean "all current results are selected", not "selected count equals results count".
+		const selectedSet = new Set<number>(selectedContacts);
+		const allSelected = contacts.every((c) => selectedSet.has(c.id));
+		setIsAllSelected(allSelected);
 	}, [selectedContacts, contacts]);
 
 	useEffect(() => {
@@ -242,6 +241,10 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 		setHasSearched(false);
 		setActiveSearchQuery('');
 		setMapBboxFilter(null);
+		// Reset selection when leaving the search/results flow (fresh dashboard start should not
+		// carry over prior selections).
+		setSelectedContacts([]);
+		setIsAllSelected(false);
 		form.reset();
 	};
 
