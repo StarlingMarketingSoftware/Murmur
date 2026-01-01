@@ -15,12 +15,13 @@ import {
 } from '@/constants/ui';
 import { useGetInboundEmails } from '@/hooks/queryHooks/useInboundEmails';
 import type { InboundEmailWithRelations } from '@/types';
-import { isRestaurantTitle, isCoffeeShopTitle, isMusicVenueTitle, isMusicFestivalTitle, isWeddingPlannerTitle, isWeddingVenueTitle } from '@/utils/restaurantTitle';
+import { isRestaurantTitle, isCoffeeShopTitle, isMusicVenueTitle, isMusicFestivalTitle, isWeddingPlannerTitle, isWeddingVenueTitle, isWineBeerSpiritsTitle, getWineBeerSpiritsLabel } from '@/utils/restaurantTitle';
 import { WeddingPlannersIcon } from '@/components/atoms/_svg/WeddingPlannersIcon';
 import { RestaurantsIcon } from '@/components/atoms/_svg/RestaurantsIcon';
 import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
 import { FestivalsIcon } from '@/components/atoms/_svg/FestivalsIcon';
 import { MusicVenuesIcon } from '@/components/atoms/_svg/MusicVenuesIcon';
+import { WineBeerSpiritsIcon } from '@/components/atoms/_svg/WineBeerSpiritsIcon';
 
 export interface InboxExpandedListProps {
 	contacts: ContactWithName[];
@@ -365,7 +366,9 @@ export const InboxExpandedList: FC<InboxExpandedListProps> = ({
 																	? '#C1D6FF'
 																	: (isWeddingPlannerTitle(contact.headline) || isWeddingVenueTitle(contact.headline))
 																		? '#FFF2BC'
-																		: '#E8EFFF',
+																		: isWineBeerSpiritsTitle(contact.headline)
+																			? '#BFC4FF'
+																			: '#E8EFFF',
 												}}
 											>
 												{isRestaurantTitle(contact.headline) && (
@@ -383,6 +386,9 @@ export const InboxExpandedList: FC<InboxExpandedListProps> = ({
 												{(isWeddingPlannerTitle(contact.headline) || isWeddingVenueTitle(contact.headline)) && (
 													<WeddingPlannersIcon size={isBottomView ? 7 : 8} />
 												)}
+												{isWineBeerSpiritsTitle(contact.headline) && (
+													<WineBeerSpiritsIcon size={isBottomView ? 7 : 8} className="flex-shrink-0" />
+												)}
 												{isBottomView ? (
 													<span className="text-[7px] text-black leading-none truncate">
 														{isRestaurantTitle(contact.headline)
@@ -397,7 +403,9 @@ export const InboxExpandedList: FC<InboxExpandedListProps> = ({
 																			? 'Wedding Planner'
 																			: isWeddingVenueTitle(contact.headline)
 																				? 'Wedding Venue'
-																				: contact.headline}
+																				: isWineBeerSpiritsTitle(contact.headline)
+																					? getWineBeerSpiritsLabel(contact.headline)
+																					: contact.headline}
 													</span>
 												) : (
 													<ScrollableText
@@ -414,7 +422,9 @@ export const InboxExpandedList: FC<InboxExpandedListProps> = ({
 																				? 'Wedding Planner'
 																				: isWeddingVenueTitle(contact.headline)
 																					? 'Wedding Venue'
-																					: contact.headline
+																					: isWineBeerSpiritsTitle(contact.headline)
+																						? getWineBeerSpiritsLabel(contact.headline) ?? contact.headline
+																						: contact.headline
 														}
 														className="text-[8px] text-black leading-none px-1"
 													/>

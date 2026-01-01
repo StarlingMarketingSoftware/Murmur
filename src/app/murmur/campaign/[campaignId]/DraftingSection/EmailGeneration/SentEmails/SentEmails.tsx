@@ -13,12 +13,13 @@ import {
 import { useGetUsedContactIds } from '@/hooks/queryHooks/useContacts';
 import { ContactWithName } from '@/types/contact';
 import { useIsMobile } from '@/hooks/useIsMobile';
-import { isRestaurantTitle, isCoffeeShopTitle, isMusicVenueTitle, isMusicFestivalTitle, isWeddingPlannerTitle, isWeddingVenueTitle } from '@/utils/restaurantTitle';
+import { isRestaurantTitle, isCoffeeShopTitle, isMusicVenueTitle, isMusicFestivalTitle, isWeddingPlannerTitle, isWeddingVenueTitle, isWineBeerSpiritsTitle, getWineBeerSpiritsLabel } from '@/utils/restaurantTitle';
 import { WeddingPlannersIcon } from '@/components/atoms/_svg/WeddingPlannersIcon';
 import { RestaurantsIcon } from '@/components/atoms/_svg/RestaurantsIcon';
 import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
 import { FestivalsIcon } from '@/components/atoms/_svg/FestivalsIcon';
 import { MusicVenuesIcon } from '@/components/atoms/_svg/MusicVenuesIcon';
+import { WineBeerSpiritsIcon } from '@/components/atoms/_svg/WineBeerSpiritsIcon';
 
 interface SentEmailsProps {
 	emails: EmailWithRelations[];
@@ -157,7 +158,9 @@ export const SentEmails: FC<SentEmailsProps> = ({
 															? '#C1D6FF'
 															: (isWeddingPlannerTitle(contactTitle) || isWeddingVenueTitle(contactTitle))
 																? '#FFF2BC'
-																: '#E8EFFF',
+																: isWineBeerSpiritsTitle(contactTitle)
+																	? '#BFC4FF'
+																	: '#E8EFFF',
 										}}
 									>
 										{isRestaurantTitle(contactTitle) && (
@@ -175,6 +178,9 @@ export const SentEmails: FC<SentEmailsProps> = ({
 										{(isWeddingPlannerTitle(contactTitle) || isWeddingVenueTitle(contactTitle)) && (
 											<WeddingPlannersIcon size={14} />
 										)}
+										{isWineBeerSpiritsTitle(contactTitle) && (
+											<WineBeerSpiritsIcon size={isMobile ? 10 : 14} className="flex-shrink-0" />
+										)}
 										<ScrollableText
 											text={
 												isRestaurantTitle(contactTitle)
@@ -189,7 +195,9 @@ export const SentEmails: FC<SentEmailsProps> = ({
 																	? 'Wedding Planner'
 																	: isWeddingVenueTitle(contactTitle)
 																		? 'Wedding Venue'
-																		: contactTitle
+																		: isWineBeerSpiritsTitle(contactTitle)
+																			? getWineBeerSpiritsLabel(contactTitle) ?? contactTitle
+																			: contactTitle
 											}
 											className={cn(
 												"text-black leading-none",

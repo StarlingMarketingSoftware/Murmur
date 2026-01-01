@@ -40,3 +40,49 @@ export const isWeddingVenueTitle = (title: string): boolean => {
 	return /^wedding\s*venues?\s/i.test(title.trim());
 };
 
+/**
+ * Check if a title matches "Wineries <state>" or "Winery <state>" pattern
+ */
+export const isWineryTitle = (title: string): boolean => {
+	return /^winer(y|ies)\s/i.test(title.trim());
+};
+
+/**
+ * Check if a title matches "Breweries <state>" or "Brewery <state>" pattern
+ */
+export const isBreweryTitle = (title: string): boolean => {
+	return /^brewer(y|ies)\s/i.test(title.trim());
+};
+
+/**
+ * Check if a title matches "Distilleries <state>" or "Distillery <state>" pattern
+ */
+export const isDistilleryTitle = (title: string): boolean => {
+	return /^distiller(y|ies)\s/i.test(title.trim());
+};
+
+/**
+ * Check if a title matches "Cideries <state>" or "Cidery <state>" pattern
+ */
+export const isCideryTitle = (title: string): boolean => {
+	return /^cider(y|ies)\s/i.test(title.trim());
+};
+
+/**
+ * Check if a title matches any wine/beer/spirits category
+ */
+export const isWineBeerSpiritsTitle = (title: string): boolean => {
+	return isWineryTitle(title) || isBreweryTitle(title) || isDistilleryTitle(title) || isCideryTitle(title);
+};
+
+/**
+ * Get the display label for wine/beer/spirits categories
+ */
+export const getWineBeerSpiritsLabel = (title: string): string | null => {
+	if (isWineryTitle(title)) return 'Winery';
+	if (isBreweryTitle(title)) return 'Brewery';
+	if (isDistilleryTitle(title)) return 'Distillery';
+	if (isCideryTitle(title)) return 'Cidery';
+	return null;
+};
+

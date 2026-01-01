@@ -25,12 +25,13 @@ import {
 	canadianProvinceNames,
 	stateBadgeColorMap,
 } from '@/constants/ui';
-import { isRestaurantTitle, isCoffeeShopTitle, isMusicVenueTitle, isMusicFestivalTitle, isWeddingPlannerTitle, isWeddingVenueTitle } from '@/utils/restaurantTitle';
+import { isRestaurantTitle, isCoffeeShopTitle, isMusicVenueTitle, isMusicFestivalTitle, isWeddingPlannerTitle, isWeddingVenueTitle, isWineBeerSpiritsTitle, getWineBeerSpiritsLabel } from '@/utils/restaurantTitle';
 import { WeddingPlannersIcon } from '@/components/atoms/_svg/WeddingPlannersIcon';
 import { RestaurantsIcon } from '@/components/atoms/_svg/RestaurantsIcon';
 import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
 import { FestivalsIcon } from '@/components/atoms/_svg/FestivalsIcon';
 import { MusicVenuesIcon } from '@/components/atoms/_svg/MusicVenuesIcon';
+import { WineBeerSpiritsIcon } from '@/components/atoms/_svg/WineBeerSpiritsIcon';
 
 export interface DraftsExpandedListProps {
 	drafts: EmailWithRelations[];
@@ -614,7 +615,9 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 																? '#C1D6FF'
 																: (isWeddingPlannerTitle(contactTitle) || isWeddingVenueTitle(contactTitle))
 																	? '#FFF2BC'
-																	: '#E8EFFF',
+																	: isWineBeerSpiritsTitle(contactTitle)
+																		? '#BFC4FF'
+																		: '#E8EFFF',
 											}}
 										>
 											{isRestaurantTitle(contactTitle) && (
@@ -632,6 +635,9 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 											{(isWeddingPlannerTitle(contactTitle) || isWeddingVenueTitle(contactTitle)) && (
 												<WeddingPlannersIcon size={isBottomView ? 7 : isAllTab ? 10 : 14} />
 											)}
+											{isWineBeerSpiritsTitle(contactTitle) && (
+												<WineBeerSpiritsIcon size={isBottomView ? 7 : isAllTab ? 10 : 14} className="flex-shrink-0" />
+											)}
 											{isBottomView ? (
 												<span className="text-[7px] text-black leading-none truncate">
 													{isRestaurantTitle(contactTitle)
@@ -646,7 +652,9 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 																		? 'Wedding Planner'
 																		: isWeddingVenueTitle(contactTitle)
 																			? 'Wedding Venue'
-																			: contactTitle}
+																			: isWineBeerSpiritsTitle(contactTitle)
+																				? getWineBeerSpiritsLabel(contactTitle)
+																				: contactTitle}
 												</span>
 											) : (
 												<ScrollableText
@@ -663,7 +671,9 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 																			? 'Wedding Planner'
 																			: isWeddingVenueTitle(contactTitle)
 																				? 'Wedding Venue'
-																				: contactTitle
+																				: isWineBeerSpiritsTitle(contactTitle)
+																					? getWineBeerSpiritsLabel(contactTitle) ?? contactTitle
+																					: contactTitle
 													}
 													className="text-[11px] text-black leading-none px-1"
 												/>

@@ -23,12 +23,13 @@ import {
 } from '@/app/murmur/campaign/[campaignId]/DraftingSection/EmailGeneration/ContactsSelection/ContactsSelection';
 import { useDebounce } from '@/hooks/useDebounce';
 import { urls } from '@/constants/urls';
-import { isRestaurantTitle, isCoffeeShopTitle, isMusicVenueTitle, isMusicFestivalTitle, isWeddingPlannerTitle, isWeddingVenueTitle } from '@/utils/restaurantTitle';
+import { isRestaurantTitle, isCoffeeShopTitle, isMusicVenueTitle, isMusicFestivalTitle, isWeddingPlannerTitle, isWeddingVenueTitle, isWineBeerSpiritsTitle, getWineBeerSpiritsLabel } from '@/utils/restaurantTitle';
 import { WeddingPlannersIcon } from '@/components/atoms/_svg/WeddingPlannersIcon';
 import { RestaurantsIcon } from '@/components/atoms/_svg/RestaurantsIcon';
 import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
 import { FestivalsIcon } from '@/components/atoms/_svg/FestivalsIcon';
 import { MusicVenuesIcon } from '@/components/atoms/_svg/MusicVenuesIcon';
+import { WineBeerSpiritsIcon } from '@/components/atoms/_svg/WineBeerSpiritsIcon';
 
 export interface ContactsExpandedListProps {
 	contacts: ContactWithName[];
@@ -543,7 +544,9 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 																					? '#C1D6FF'
 																					: (isWeddingPlannerTitle(contactTitle) || isWeddingVenueTitle(contactTitle))
 																						? '#FFF2BC'
-																						: '#E8EFFF',
+																						: isWineBeerSpiritsTitle(contactTitle)
+																							? '#BFC4FF'
+																							: '#E8EFFF',
 																}}
 															>
 																{isRestaurantTitle(contactTitle) && (
@@ -561,6 +564,9 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 																{(isWeddingPlannerTitle(contactTitle) || isWeddingVenueTitle(contactTitle)) && (
 																	<WeddingPlannersIcon size={7} />
 																)}
+																{isWineBeerSpiritsTitle(contactTitle) && (
+																	<WineBeerSpiritsIcon size={7} className="flex-shrink-0" />
+																)}
 																<span className="text-[7px] text-black leading-none truncate">
 																	{isRestaurantTitle(contactTitle)
 																		? 'Restaurant'
@@ -574,7 +580,9 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 																						? 'Wedding Planner'
 																						: isWeddingVenueTitle(contactTitle)
 																							? 'Wedding Venue'
-																							: contactTitle}
+																							: isWineBeerSpiritsTitle(contactTitle)
+																								? getWineBeerSpiritsLabel(contactTitle)
+																								: contactTitle}
 																</span>
 															</div>
 														)}

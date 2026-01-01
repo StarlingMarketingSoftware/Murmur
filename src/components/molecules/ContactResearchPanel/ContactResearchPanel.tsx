@@ -3,11 +3,12 @@ import { ContactWithName } from '@/types/contact';
 import { getStateAbbreviation } from '@/utils/string';
 import { stateBadgeColorMap } from '@/constants/ui';
 import { cn } from '@/utils';
-import { isRestaurantTitle, isCoffeeShopTitle, isMusicVenueTitle, isWeddingPlannerTitle, isWeddingVenueTitle } from '@/utils/restaurantTitle';
+import { isRestaurantTitle, isCoffeeShopTitle, isMusicVenueTitle, isWeddingPlannerTitle, isWeddingVenueTitle, isWineBeerSpiritsTitle, getWineBeerSpiritsLabel } from '@/utils/restaurantTitle';
 import { WeddingPlannersIcon } from '@/components/atoms/_svg/WeddingPlannersIcon';
 import { RestaurantsIcon } from '@/components/atoms/_svg/RestaurantsIcon';
 import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
 import { MusicVenuesIcon } from '@/components/atoms/_svg/MusicVenuesIcon';
+import { WineBeerSpiritsIcon } from '@/components/atoms/_svg/WineBeerSpiritsIcon';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 import ResearchMap from '@/components/atoms/_svg/ResearchMap';
 import ResearchChevron from '@/components/atoms/_svg/ResearchChevron';
@@ -994,7 +995,9 @@ export const ContactResearchHorizontalStrip: FC<
 										? '#B7E5FF'
 										: (isWeddingPlannerTitle(contact.title) || isWeddingVenueTitle(contact.title))
 											? '#FFF2BC'
-											: '#E8EFFF',
+											: isWineBeerSpiritsTitle(contact.title)
+												? '#BFC4FF'
+												: '#E8EFFF',
 						}}
 					>
 						{isRestaurantTitle(contact.title) && (
@@ -1009,6 +1012,9 @@ export const ContactResearchHorizontalStrip: FC<
 						{(isWeddingPlannerTitle(contact.title) || isWeddingVenueTitle(contact.title)) && (
 							<WeddingPlannersIcon size={12} />
 						)}
+						{isWineBeerSpiritsTitle(contact.title) && (
+							<WineBeerSpiritsIcon size={12} className="flex-shrink-0" />
+						)}
 						<span className="text-[10px] leading-none text-black block truncate">
 							{isRestaurantTitle(contact.title)
 								? 'Restaurant'
@@ -1020,7 +1026,9 @@ export const ContactResearchHorizontalStrip: FC<
 											? 'Wedding Planner'
 											: isWeddingVenueTitle(contact.title)
 												? 'Wedding Venue'
-												: contact.title}
+												: isWineBeerSpiritsTitle(contact.title)
+													? getWineBeerSpiritsLabel(contact.title)
+													: contact.title}
 						</span>
 					</div>
 				)}

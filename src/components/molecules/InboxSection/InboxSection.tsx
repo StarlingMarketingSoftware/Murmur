@@ -14,11 +14,12 @@ import type { ContactWithName } from '@/types/contact';
 import { getStateAbbreviation } from '@/utils/string';
 import { stateBadgeColorMap } from '@/constants/ui';
 import { urls } from '@/constants/urls';
-import { isRestaurantTitle, isCoffeeShopTitle, isMusicVenueTitle, isWeddingPlannerTitle, isWeddingVenueTitle } from '@/utils/restaurantTitle';
+import { isRestaurantTitle, isCoffeeShopTitle, isMusicVenueTitle, isWeddingPlannerTitle, isWeddingVenueTitle, isWineBeerSpiritsTitle, getWineBeerSpiritsLabel } from '@/utils/restaurantTitle';
 import { WeddingPlannersIcon } from '@/components/atoms/_svg/WeddingPlannersIcon';
 import { RestaurantsIcon } from '@/components/atoms/_svg/RestaurantsIcon';
 import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
 import { MusicVenuesIcon } from '@/components/atoms/_svg/MusicVenuesIcon';
+import { WineBeerSpiritsIcon } from '@/components/atoms/_svg/WineBeerSpiritsIcon';
 
 /**
  * Strip quoted reply content from email body (e.g., "On Thu, Nov 27, 2025 at 2:36 AM ... wrote:")
@@ -1656,7 +1657,9 @@ export const InboxSection: FC<InboxSectionProps> = ({
 																				? '#B7E5FF'
 																				: (isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline))
 																					? '#FFF2BC'
-																					: '#E8EFFF',
+																					: isWineBeerSpiritsTitle(headline)
+																						? '#BFC4FF'
+																						: '#E8EFFF',
 																}}
 															>
 																{isRestaurantTitle(headline) && (
@@ -1671,6 +1674,9 @@ export const InboxSection: FC<InboxSectionProps> = ({
 																{(isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline)) && (
 																	<WeddingPlannersIcon size={10} />
 																)}
+																{isWineBeerSpiritsTitle(headline) && (
+																	<WineBeerSpiritsIcon size={10} className="flex-shrink-0" />
+																)}
 																<span className="text-[9px] text-black leading-none truncate">
 																	{isRestaurantTitle(headline)
 																		? 'Restaurant'
@@ -1682,7 +1688,9 @@ export const InboxSection: FC<InboxSectionProps> = ({
 																					? 'Wedding Planner'
 																					: isWeddingVenueTitle(headline)
 																						? 'Wedding Venue'
-																						: headline}
+																						: isWineBeerSpiritsTitle(headline)
+																							? getWineBeerSpiritsLabel(headline)
+																							: headline}
 																</span>
 															</div>
 														)}
@@ -1728,7 +1736,9 @@ export const InboxSection: FC<InboxSectionProps> = ({
 																				? '#B7E5FF'
 																				: (isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline))
 																					? '#FFF2BC'
-																					: '#E8EFFF',
+																					: isWineBeerSpiritsTitle(headline)
+																						? '#BFC4FF'
+																						: '#E8EFFF',
 																}}
 															>
 																{isRestaurantTitle(headline) && (
@@ -1743,6 +1753,9 @@ export const InboxSection: FC<InboxSectionProps> = ({
 																{(isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline)) && (
 																	<WeddingPlannersIcon size={14} />
 																)}
+																{isWineBeerSpiritsTitle(headline) && (
+																	<WineBeerSpiritsIcon size={14} className="flex-shrink-0" />
+																)}
 																<span className="text-[10px] text-black leading-none truncate">
 																	{isRestaurantTitle(headline)
 																		? 'Restaurant'
@@ -1754,7 +1767,9 @@ export const InboxSection: FC<InboxSectionProps> = ({
 																					? 'Wedding Planner'
 																					: isWeddingVenueTitle(headline)
 																						? 'Wedding Venue'
-																						: headline}
+																						: isWineBeerSpiritsTitle(headline)
+																							? getWineBeerSpiritsLabel(headline)
+																							: headline}
 																</span>
 															</div>
 														)}

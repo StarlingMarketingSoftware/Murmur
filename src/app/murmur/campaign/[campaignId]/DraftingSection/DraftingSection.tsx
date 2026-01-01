@@ -79,7 +79,7 @@ import BottomArrowIcon from '@/components/atoms/_svg/BottomArrowIcon';
 import BottomFolderIcon from '@/components/atoms/_svg/BottomFolderIcon';
 import LeftArrow from '@/components/atoms/_svg/LeftArrow';
 import RightArrow from '@/components/atoms/_svg/RightArrow';
-import { isRestaurantTitle, isCoffeeShopTitle, isMusicVenueTitle, isMusicFestivalTitle, isWeddingPlannerTitle, isWeddingVenueTitle } from '@/utils/restaurantTitle';
+import { isRestaurantTitle, isCoffeeShopTitle, isMusicVenueTitle, isMusicFestivalTitle, isWeddingPlannerTitle, isWeddingVenueTitle, isWineBeerSpiritsTitle, getWineBeerSpiritsLabel } from '@/utils/restaurantTitle';
 
 type IdentityProfileFields = Identity & {
 	genre?: string | null;
@@ -2916,7 +2916,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																									? '#C1D6FF'
 																									: (isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline))
 																										? '#FFF2BC'
-																										: '#E8EFFF',
+																										: isWineBeerSpiritsTitle(headline)
+																											? '#BFC4FF'
+																											: '#E8EFFF',
 																				}}
 																			>
 																				{isRestaurantTitle(headline) && (
@@ -2934,6 +2936,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																				{(isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline)) && (
 																					<WeddingPlannersIcon size={12} />
 																				)}
+																				{isWineBeerSpiritsTitle(headline) && (
+																					<WineBeerSpiritsIcon size={12} className="flex-shrink-0" />
+																				)}
 																				<span className="text-[10px] text-black leading-none truncate">
 																					{isRestaurantTitle(headline)
 																						? 'Restaurant'
@@ -2947,7 +2952,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																										? 'Wedding Planner'
 																										: isWeddingVenueTitle(headline)
 																											? 'Wedding Venue'
-																											: headline}
+																											: isWineBeerSpiritsTitle(headline)
+																												? getWineBeerSpiritsLabel(headline)
+																												: headline}
 																				</span>
 																			</div>
 																		) : (

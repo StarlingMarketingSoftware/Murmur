@@ -23,8 +23,9 @@ import {
 import { RestaurantsIcon } from '@/components/atoms/_svg/RestaurantsIcon';
 import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
 import { MusicVenuesIcon } from '@/components/atoms/_svg/MusicVenuesIcon';
-import { isRestaurantTitle, isCoffeeShopTitle, isMusicVenueTitle, isWeddingPlannerTitle, isWeddingVenueTitle } from '@/utils/restaurantTitle';
+import { isRestaurantTitle, isCoffeeShopTitle, isMusicVenueTitle, isWeddingPlannerTitle, isWeddingVenueTitle, isWineBeerSpiritsTitle, getWineBeerSpiritsLabel } from '@/utils/restaurantTitle';
 import { WeddingPlannersIcon } from '@/components/atoms/_svg/WeddingPlannersIcon';
+import { WineBeerSpiritsIcon } from '@/components/atoms/_svg/WineBeerSpiritsIcon';
 
 type LatLngLiteral = { lat: number; lng: number };
 type MarkerHoverMeta = { clientX: number; clientY: number };
@@ -4108,6 +4109,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 											const isMusicVenue = isMusicVenuesSearch || isMusicVenueTitle(titleText);
 											const isWeddingPlanner = isWeddingPlannersSearch || isWeddingPlannerTitle(titleText);
 											const isWeddingVenue = isWeddingVenueTitle(titleText);
+											const isWineBeerSpirits = isWineBeerSpiritsTitle(titleText);
+											const wineBeerSpiritsLabel = getWineBeerSpiritsLabel(titleText);
 											return (
 												<div
 													className="px-1.5 py-[1px] rounded-[6px] border border-black max-w-full flex items-center gap-1"
@@ -4120,7 +4123,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 																	? '#B7E5FF'
 																	: (isWeddingPlanner || isWeddingVenue)
 																		? '#FFF2BC'
-																		: '#E8EFFF',
+																		: isWineBeerSpirits
+																			? '#BFC4FF'
+																			: '#E8EFFF',
 													}}
 												>
 													{isRestaurant && (
@@ -4135,8 +4140,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 													{(isWeddingPlanner || isWeddingVenue) && (
 														<WeddingPlannersIcon size={10} />
 													)}
+													{isWineBeerSpirits && (
+														<WineBeerSpiritsIcon size={10} className="flex-shrink-0" />
+													)}
 													<span className="text-[9px] leading-none text-black block truncate">
-														{isRestaurant ? 'Restaurant' : isCoffeeShop ? 'Coffee Shop' : isMusicVenue ? 'Music Venue' : isWeddingVenue ? 'Wedding Venue' : isWeddingPlanner ? 'Wedding Planner' : titleText}
+														{isRestaurant ? 'Restaurant' : isCoffeeShop ? 'Coffee Shop' : isMusicVenue ? 'Music Venue' : isWeddingVenue ? 'Wedding Venue' : isWeddingPlanner ? 'Wedding Planner' : isWineBeerSpirits ? wineBeerSpiritsLabel : titleText}
 													</span>
 												</div>
 											);

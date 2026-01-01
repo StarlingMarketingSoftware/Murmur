@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { FC, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { gsap } from 'gsap';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { createPortal, flushSync } from 'react-dom';
@@ -18,7 +18,7 @@ import { MusicVenuesIcon } from '@/components/atoms/_svg/MusicVenuesIcon';
 import { WineBeerSpiritsIcon } from '@/components/atoms/_svg/WineBeerSpiritsIcon';
 import { FestivalsIcon } from '@/components/atoms/_svg/FestivalsIcon';
 import { RestaurantsIcon } from '@/components/atoms/_svg/RestaurantsIcon';
-import { isRestaurantTitle, isCoffeeShopTitle, isMusicVenueTitle, isMusicFestivalTitle, isWeddingPlannerTitle, isWeddingVenueTitle } from '@/utils/restaurantTitle';
+import { isRestaurantTitle, isCoffeeShopTitle, isMusicVenueTitle, isMusicFestivalTitle, isWeddingPlannerTitle, isWeddingVenueTitle, isWineBeerSpiritsTitle, getWineBeerSpiritsLabel } from '@/utils/restaurantTitle';
 import { WeddingPlannersIcon } from '@/components/atoms/_svg/WeddingPlannersIcon';
 import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
 import { RadioStationsIcon } from '@/components/atoms/_svg/RadioStationsIcon';
@@ -278,7 +278,7 @@ const getCompactMapResearchPanelHeightPxForParsed = (metadata: string): number |
 
 const MAP_RESULTS_SEARCH_TRAY_WHAT_ICON_BY_LABEL: Record<
 	string,
-	{ backgroundColor: string; Icon: () => ReactNode }
+	{ backgroundColor: string; Icon: FC<{ size?: number; className?: string }> }
 > = {
 	'Radio Stations': { backgroundColor: '#56DA73', Icon: RadioStationsIcon },
 	'Music Venues': { backgroundColor: '#71C9FD', Icon: MusicVenuesIcon },
@@ -3417,14 +3417,58 @@ const DashboardContent = () => {
 										</div>
 										<div className="mt-1 w-full flex justify-center">
 											<div
-												className="inline-flex items-center justify-center h-[19px] rounded-[8px] px-2 whitespace-nowrap"
+												className="inline-flex items-center justify-center h-[19px] rounded-[8px] px-2 gap-1 whitespace-nowrap"
 												style={{
-													backgroundColor: '#E8EFFF',
+													backgroundColor: isRestaurantTitle(hoveredContact.title || '')
+														? '#C3FBD1'
+														: isCoffeeShopTitle(hoveredContact.title || '')
+															? '#D6F1BD'
+															: isMusicVenueTitle(hoveredContact.title || '')
+																? '#B7E5FF'
+																: isMusicFestivalTitle(hoveredContact.title || '')
+																	? '#C1D6FF'
+																	: (isWeddingPlannerTitle(hoveredContact.title || '') || isWeddingVenueTitle(hoveredContact.title || ''))
+																		? '#FFF2BC'
+																		: isWineBeerSpiritsTitle(hoveredContact.title || '')
+																			? '#BFC4FF'
+																			: '#E8EFFF',
 													border: '0.7px solid #000000',
 												}}
 											>
+												{isRestaurantTitle(hoveredContact.title || '') && (
+													<RestaurantsIcon size={12} className="flex-shrink-0" />
+												)}
+												{isCoffeeShopTitle(hoveredContact.title || '') && (
+													<CoffeeShopsIcon size={7} />
+												)}
+												{isMusicVenueTitle(hoveredContact.title || '') && (
+													<MusicVenuesIcon size={12} className="flex-shrink-0" />
+												)}
+												{isMusicFestivalTitle(hoveredContact.title || '') && (
+													<FestivalsIcon size={12} className="flex-shrink-0" />
+												)}
+												{(isWeddingPlannerTitle(hoveredContact.title || '') || isWeddingVenueTitle(hoveredContact.title || '')) && (
+													<WeddingPlannersIcon size={12} />
+												)}
+												{isWineBeerSpiritsTitle(hoveredContact.title || '') && (
+													<WineBeerSpiritsIcon size={12} className="flex-shrink-0" />
+												)}
 												<span className="text-[14px] leading-none font-secondary font-medium">
-													{hoveredContact.title || '—'}
+													{isRestaurantTitle(hoveredContact.title || '')
+														? 'Restaurant'
+														: isCoffeeShopTitle(hoveredContact.title || '')
+															? 'Coffee Shop'
+															: isMusicVenueTitle(hoveredContact.title || '')
+																? 'Music Venue'
+																: isMusicFestivalTitle(hoveredContact.title || '')
+																	? 'Music Festival'
+																	: isWeddingVenueTitle(hoveredContact.title || '')
+																		? 'Wedding Venue'
+																		: isWeddingPlannerTitle(hoveredContact.title || '')
+																			? 'Wedding Planner'
+																			: isWineBeerSpiritsTitle(hoveredContact.title || '')
+																				? getWineBeerSpiritsLabel(hoveredContact.title || '')
+																				: (hoveredContact.title || '—')}
 												</span>
 											</div>
 										</div>
@@ -3914,7 +3958,9 @@ const DashboardContent = () => {
 																																? '#C1D6FF'
 																																: (isWeddingPlannersSearch || isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline))
 																																	? '#FFF2BC'
-																																	: '#E8EFFF',
+																																	: isWineBeerSpiritsTitle(headline)
+																																		? '#BFC4FF'
+																																		: '#E8EFFF',
 																											}}
 																										>
 																											{(isRestaurantsSearch || isRestaurantTitle(headline)) && (
@@ -3932,6 +3978,9 @@ const DashboardContent = () => {
 																											{(isWeddingPlannersSearch || isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline)) && (
 																												<WeddingPlannersIcon size={12} />
 																											)}
+																											{isWineBeerSpiritsTitle(headline) && (
+																												<WineBeerSpiritsIcon size={12} className="flex-shrink-0" />
+																											)}
 																											<span className="text-[10px] text-black leading-none truncate">
 																												{(isRestaurantsSearch || isRestaurantTitle(headline))
 																													? 'Restaurant'
@@ -3945,7 +3994,9 @@ const DashboardContent = () => {
 																																	? 'Wedding Venue'
 																																	: (isWeddingPlannersSearch || isWeddingPlannerTitle(headline))
 																																		? 'Wedding Planner'
-																																		: headline}
+																																		: isWineBeerSpiritsTitle(headline)
+																																			? getWineBeerSpiritsLabel(headline)
+																																			: headline}
 																											</span>
 																										</div>
 																									) : (
@@ -4033,7 +4084,9 @@ const DashboardContent = () => {
 																																? '#C1D6FF'
 																																: (isWeddingPlannersSearch || isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline))
 																																	? '#FFF2BC'
-																																	: '#E8EFFF',
+																																	: isWineBeerSpiritsTitle(headline)
+																																		? '#BFC4FF'
+																																		: '#E8EFFF',
 																											}}
 																										>
 																											{(isRestaurantsSearch || isRestaurantTitle(headline)) && (
@@ -4051,6 +4104,9 @@ const DashboardContent = () => {
 																											{(isWeddingPlannersSearch || isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline)) && (
 																												<WeddingPlannersIcon size={12} />
 																											)}
+																											{isWineBeerSpiritsTitle(headline) && (
+																												<WineBeerSpiritsIcon size={12} className="flex-shrink-0" />
+																											)}
 																											<span className="text-[10px] text-black leading-none truncate">
 																												{(isRestaurantsSearch || isRestaurantTitle(headline))
 																													? 'Restaurant'
@@ -4064,7 +4120,9 @@ const DashboardContent = () => {
 																																	? 'Wedding Venue'
 																																	: (isWeddingPlannersSearch || isWeddingPlannerTitle(headline))
 																																		? 'Wedding Planner'
-																																		: headline}
+																																		: isWineBeerSpiritsTitle(headline)
+																																			? getWineBeerSpiritsLabel(headline)
+																																			: headline}
 																											</span>
 																										</div>
 																									) : (
@@ -4430,17 +4488,61 @@ const DashboardContent = () => {
 																				<div className="flex-shrink-0 flex flex-col justify-center pr-2" style={{ width: '240px' }}>
 																					{headline ? (
 																						<div
-																							className="overflow-hidden flex items-center px-2"
+																							className="overflow-hidden flex items-center px-2 gap-1"
 																							style={{
 																								width: '230px',
 																								height: '19px',
-																								backgroundColor: '#E8EFFF',
+																								backgroundColor: (isRestaurantsSearch || isRestaurantTitle(headline))
+																									? '#C3FBD1'
+																									: (isCoffeeShopsSearch || isCoffeeShopTitle(headline))
+																										? '#D6F1BD'
+																										: (isMusicVenuesSearch || isMusicVenueTitle(headline))
+																											? '#B7E5FF'
+																											: (isMusicFestivalsSearch || isMusicFestivalTitle(headline))
+																												? '#C1D6FF'
+																												: (isWeddingPlannersSearch || isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline))
+																													? '#FFF2BC'
+																													: isWineBeerSpiritsTitle(headline)
+																														? '#BFC4FF'
+																														: '#E8EFFF',
 																								border: '0.7px solid #000000',
 																								borderRadius: '8px',
 																							}}
 																						>
+																							{(isRestaurantsSearch || isRestaurantTitle(headline)) && (
+																								<RestaurantsIcon size={12} className="flex-shrink-0" />
+																							)}
+																							{(isCoffeeShopsSearch || isCoffeeShopTitle(headline)) && (
+																								<CoffeeShopsIcon size={7} />
+																							)}
+																							{(isMusicVenuesSearch || isMusicVenueTitle(headline)) && (
+																								<MusicVenuesIcon size={12} className="flex-shrink-0" />
+																							)}
+																							{(isMusicFestivalsSearch || isMusicFestivalTitle(headline)) && (
+																								<FestivalsIcon size={12} className="flex-shrink-0" />
+																							)}
+																							{(isWeddingPlannersSearch || isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline)) && (
+																								<WeddingPlannersIcon size={12} />
+																							)}
+																							{isWineBeerSpiritsTitle(headline) && (
+																								<WineBeerSpiritsIcon size={12} className="flex-shrink-0" />
+																							)}
 																							<span className="text-[14px] text-black leading-none truncate">
-																								{headline}
+																								{(isRestaurantsSearch || isRestaurantTitle(headline))
+																									? 'Restaurant'
+																									: (isCoffeeShopsSearch || isCoffeeShopTitle(headline))
+																										? 'Coffee Shop'
+																										: (isMusicVenuesSearch || isMusicVenueTitle(headline))
+																											? 'Music Venue'
+																											: (isMusicFestivalsSearch || isMusicFestivalTitle(headline))
+																												? 'Music Festival'
+																												: isWeddingVenueTitle(headline)
+																													? 'Wedding Venue'
+																													: (isWeddingPlannersSearch || isWeddingPlannerTitle(headline))
+																														? 'Wedding Planner'
+																														: isWineBeerSpiritsTitle(headline)
+																															? getWineBeerSpiritsLabel(headline)
+																															: headline}
 																							</span>
 																						</div>
 																					) : null}

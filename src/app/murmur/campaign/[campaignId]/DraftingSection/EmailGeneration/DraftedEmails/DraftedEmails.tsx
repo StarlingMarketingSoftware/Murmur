@@ -26,12 +26,13 @@ import RightArrow from '@/components/atoms/_svg/RightArrow';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import RichTextEditor from '@/components/molecules/RichTextEditor/RichTextEditor';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
-import { isRestaurantTitle, isCoffeeShopTitle, isMusicVenueTitle, isMusicFestivalTitle, isWeddingPlannerTitle, isWeddingVenueTitle } from '@/utils/restaurantTitle';
+import { isRestaurantTitle, isCoffeeShopTitle, isMusicVenueTitle, isMusicFestivalTitle, isWeddingPlannerTitle, isWeddingVenueTitle, isWineBeerSpiritsTitle, getWineBeerSpiritsLabel } from '@/utils/restaurantTitle';
 import { WeddingPlannersIcon } from '@/components/atoms/_svg/WeddingPlannersIcon';
 import { RestaurantsIcon } from '@/components/atoms/_svg/RestaurantsIcon';
 import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
 import { FestivalsIcon } from '@/components/atoms/_svg/FestivalsIcon';
 import { MusicVenuesIcon } from '@/components/atoms/_svg/MusicVenuesIcon';
+import { WineBeerSpiritsIcon } from '@/components/atoms/_svg/WineBeerSpiritsIcon';
 
 interface ScrollableTextareaProps
 	extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
@@ -564,7 +565,9 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 														? '#C1D6FF'
 														: (isWeddingPlannerTitle(contactTitle) || isWeddingVenueTitle(contactTitle))
 															? '#FFF2BC'
-															: '#E8EFFF',
+															: isWineBeerSpiritsTitle(contactTitle)
+																? '#BFC4FF'
+																: '#E8EFFF',
 									}}
 								>
 									{isRestaurantTitle(contactTitle) && (
@@ -582,6 +585,9 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 									{(isWeddingPlannerTitle(contactTitle) || isWeddingVenueTitle(contactTitle)) && (
 										<WeddingPlannersIcon size={12} />
 									)}
+									{isWineBeerSpiritsTitle(contactTitle) && (
+										<WineBeerSpiritsIcon size={12} className="flex-shrink-0" />
+									)}
 									<ScrollableText
 										text={
 											isRestaurantTitle(contactTitle)
@@ -596,7 +602,9 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 																? 'Wedding Planner'
 																: isWeddingVenueTitle(contactTitle)
 																	? 'Wedding Venue'
-																	: contactTitle
+																	: isWineBeerSpiritsTitle(contactTitle)
+																		? getWineBeerSpiritsLabel(contactTitle) ?? contactTitle
+																		: contactTitle
 										}
 										className="text-[11px] font-inter text-black leading-none w-full"
 									/>

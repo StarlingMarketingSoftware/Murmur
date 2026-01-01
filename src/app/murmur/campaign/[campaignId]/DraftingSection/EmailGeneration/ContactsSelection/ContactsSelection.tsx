@@ -35,7 +35,7 @@ import { RadioStationsIcon } from '@/components/atoms/_svg/RadioStationsIcon';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 import { getCityIconProps } from '@/utils/cityIcons';
 import { urls } from '@/constants/urls';
-import { isRestaurantTitle, isCoffeeShopTitle, isMusicVenueTitle, isMusicFestivalTitle, isWeddingPlannerTitle, isWeddingVenueTitle } from '@/utils/restaurantTitle';
+import { isRestaurantTitle, isCoffeeShopTitle, isMusicVenueTitle, isMusicFestivalTitle, isWeddingPlannerTitle, isWeddingVenueTitle, isWineBeerSpiritsTitle, getWineBeerSpiritsLabel } from '@/utils/restaurantTitle';
 
 const DEFAULT_STATE_SUGGESTIONS = [
 	{ label: 'New York', description: 'contact venues, restaurants and more' },
@@ -1118,7 +1118,9 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 																			? '#C1D6FF'
 																			: (isWeddingPlannerTitle(contactTitle) || isWeddingVenueTitle(contactTitle))
 																				? '#FFF2BC'
-																				: '#E8EFFF',
+																				: isWineBeerSpiritsTitle(contactTitle)
+																					? '#BFC4FF'
+																					: '#E8EFFF',
 														}}
 													>
 														{isRestaurantTitle(contactTitle) && (
@@ -1136,6 +1138,9 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 														{(isWeddingPlannerTitle(contactTitle) || isWeddingVenueTitle(contactTitle)) && (
 															<WeddingPlannersIcon size={14} />
 														)}
+														{isWineBeerSpiritsTitle(contactTitle) && (
+															<WineBeerSpiritsIcon size={14} className="flex-shrink-0" />
+														)}
 														<ScrollableText
 															text={
 																isRestaurantTitle(contactTitle)
@@ -1150,7 +1155,9 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 																					? 'Wedding Planner'
 																					: isWeddingVenueTitle(contactTitle)
 																						? 'Wedding Venue'
-																						: contactTitle
+																						: isWineBeerSpiritsTitle(contactTitle)
+																							? getWineBeerSpiritsLabel(contactTitle) ?? contactTitle
+																							: contactTitle
 															}
 															className="text-[10px] text-black leading-none"
 															scrollPixelsPerSecond={60}
@@ -1277,7 +1284,9 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 																				? '#C1D6FF'
 																				: (isWeddingPlannerTitle(contactTitle) || isWeddingVenueTitle(contactTitle))
 																					? '#FFF2BC'
-																					: '#E8EFFF',
+																					: isWineBeerSpiritsTitle(contactTitle)
+																						? '#BFC4FF'
+																						: '#E8EFFF',
 															}}
 														>
 															{isRestaurantTitle(contactTitle) && (
@@ -1295,6 +1304,9 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 															{(isWeddingPlannerTitle(contactTitle) || isWeddingVenueTitle(contactTitle)) && (
 																<WeddingPlannersIcon size={14} />
 															)}
+															{isWineBeerSpiritsTitle(contactTitle) && (
+																<WineBeerSpiritsIcon size={14} className="flex-shrink-0" />
+															)}
 															<ScrollableText
 																text={
 																	isRestaurantTitle(contactTitle)
@@ -1309,7 +1321,9 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 																						? 'Wedding Planner'
 																						: isWeddingVenueTitle(contactTitle)
 																							? 'Wedding Venue'
-																							: contactTitle
+																							: isWineBeerSpiritsTitle(contactTitle)
+																								? getWineBeerSpiritsLabel(contactTitle) ?? contactTitle
+																								: contactTitle
 																}
 																className="text-[10px] text-black leading-none"
 																scrollPixelsPerSecond={60}
