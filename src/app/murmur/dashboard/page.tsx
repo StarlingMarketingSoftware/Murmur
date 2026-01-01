@@ -3876,13 +3876,22 @@ const DashboardContent = () => {
 																					<div
 																						key={contact.id}
 																						data-contact-id={contact.id}
-																						className="cursor-pointer transition-colors grid grid-cols-2 grid-rows-2 w-full h-[49px] overflow-hidden rounded-[8px] border-2 border-black select-none relative"
+																						className="cursor-pointer transition-colors grid grid-cols-2 grid-rows-2 w-full h-[49px] overflow-hidden rounded-[8px] border-[3px] border-[#ABABAB] select-none relative"
 																						style={{
 																							// Hover should be a subtle darken, not "selected" blue.
+																							// Category-specific selection colors.
 																							backgroundColor: isSelected
-																								? isHovered
-																									? '#BFE3FF'
-																									: '#C9EAFF'
+																								? (isRestaurantsSearch || isRestaurantTitle(headline))
+																									? isHovered ? '#C5F5D1' : '#D7FFE1'
+																									: (isCoffeeShopsSearch || isCoffeeShopTitle(headline))
+																										? isHovered ? '#DDF4CC' : '#EDFEDC'
+																										: (isMusicVenuesSearch || isMusicVenueTitle(headline))
+																											? isHovered ? '#C5E8FF' : '#D7F0FF'
+																											: (isMusicFestivalsSearch || isMusicFestivalTitle(headline))
+																												? isHovered ? '#ADD4FF' : '#BFDCFF'
+																												: isWineBeerSpiritsTitle(headline)
+																													? isHovered ? '#C8CBFF' : '#DADDFF'
+																													: isHovered ? '#BFE3FF' : '#C9EAFF'
 																								: isHovered
 																									? '#F3F4F6'
 																									: '#FFFFFF',
@@ -4394,13 +4403,22 @@ const DashboardContent = () => {
 																			<div
 																				key={contact.id}
 																				data-contact-id={contact.id}
-																				className="cursor-pointer transition-colors flex w-full h-[49px] overflow-hidden rounded-[8px] border-2 border-black select-none relative"
+																				className="cursor-pointer transition-colors flex w-full h-[49px] overflow-hidden rounded-[8px] border-[3px] border-[#ABABAB] select-none relative"
 																				style={{
 																					// Hover should be a subtle darken, not "selected" blue.
+																					// Category-specific selection colors.
 																					backgroundColor: isSelected
-																						? isHovered
-																							? '#BFE3FF'
-																							: '#C9EAFF'
+																						? (isRestaurantsSearch || isRestaurantTitle(headline))
+																							? isHovered ? '#C5F5D1' : '#D7FFE1'
+																							: (isCoffeeShopsSearch || isCoffeeShopTitle(headline))
+																								? isHovered ? '#DDF4CC' : '#EDFEDC'
+																								: (isMusicVenuesSearch || isMusicVenueTitle(headline))
+																									? isHovered ? '#C5E8FF' : '#D7F0FF'
+																									: (isMusicFestivalsSearch || isMusicFestivalTitle(headline))
+																										? isHovered ? '#ADD4FF' : '#BFDCFF'
+																										: isWineBeerSpiritsTitle(headline)
+																											? isHovered ? '#C8CBFF' : '#DADDFF'
+																											: isHovered ? '#BFE3FF' : '#C9EAFF'
 																						: isHovered
 																							? '#F3F4F6'
 																							: '#FFFFFF',
