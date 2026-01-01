@@ -143,7 +143,7 @@ const contactHasStrongCoffeeBusinessSignals = (contact: Contact): boolean => {
 
 	// IMPORTANT: titles like "Coffee Shops <State>" are list labels in this dataset and can be wrong.
 	// For "is this really a coffee business?" checks, we avoid letting that list-label title alone
-	// count as a strong coffee signal (otherwise a mislabeled radio station slips through).
+	// count as a strong coffee signal. Note: radio stations are now hard-excluded from coffee searches.
 	const titleIsCoffeeShopsList = /^coffee shops?\b/.test(title);
 
 	const otherBlob = `${company} ${industry} ${website} ${metadata} ${keywordBlob}`.trim();
@@ -242,9 +242,9 @@ const contactLooksLikeNonCoffeeBusinessForCoffeeSearch = (
 	const industry = normalizeSearchText(contact.companyIndustry);
 	const company = normalizeSearchText(contact.company);
 
-	// Exclude radio stations from coffee searches (unless there are strong coffee-business signals).
+	// Hard exclude radio stations from coffee searches - no exceptions.
 	// This removes "College Radio <State>" lists and call-sign entries like "WVCR-FM".
-	if (contactLooksLikeRadioStation(contact) && !contactHasStrongCoffeeBusinessSignals(contact)) {
+	if (contactLooksLikeRadioStation(contact)) {
 		return true;
 	}
 
