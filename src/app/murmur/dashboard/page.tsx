@@ -3856,6 +3856,7 @@ const DashboardContent = () => {
 																				);
 																				const isHovered = hoveredMapPanelContactId === contact.id;
 																				const isUsed = usedContactIdsSet.has(contact.id);
+																				const isInBaseResults = baseContactIdSet.has(contact.id);
 																				const firstName = contact.firstName || '';
 																				const lastName = contact.lastName || '';
 																				const fullName =
@@ -3867,7 +3868,12 @@ const DashboardContent = () => {
 																				const searchDerivedHeadline = whatValue && whereValue ? `${whatValue} ${whereValue}` : whatValue || '';
 																				const isSpecialCategorySearch = /^restaurants?$/i.test(whatValue.trim()) || /^coffee\s*shops?$/i.test(whatValue.trim());
 																				const contactHeadline = contact.headline || contact.title || '';
-																				const headline = isSpecialCategorySearch ? searchDerivedHeadline : (contactHeadline || searchDerivedHeadline);
+																				const headline = isSpecialCategorySearch && isInBaseResults ? searchDerivedHeadline : (contactHeadline || searchDerivedHeadline);
+																				const isRestaurantsSearchForContact = isRestaurantsSearch && isInBaseResults;
+																				const isCoffeeShopsSearchForContact = isCoffeeShopsSearch && isInBaseResults;
+																				const isMusicVenuesSearchForContact = isMusicVenuesSearch && isInBaseResults;
+																				const isMusicFestivalsSearchForContact = isMusicFestivalsSearch && isInBaseResults;
+																				const isWeddingPlannersSearchForContact = isWeddingPlannersSearch && isInBaseResults;
 																				const stateAbbr =
 																					getStateAbbreviation(contact.state || '') || '';
 																				const city = contact.city || '';
@@ -3881,13 +3887,13 @@ const DashboardContent = () => {
 																							// Hover should be a subtle darken, not "selected" blue.
 																							// Category-specific selection colors.
 																							backgroundColor: isSelected
-																								? (isRestaurantsSearch || isRestaurantTitle(headline))
+																								? (isRestaurantsSearchForContact || isRestaurantTitle(headline))
 																									? isHovered ? '#C5F5D1' : '#D7FFE1'
-																									: (isCoffeeShopsSearch || isCoffeeShopTitle(headline))
+																									: (isCoffeeShopsSearchForContact || isCoffeeShopTitle(headline))
 																										? isHovered ? '#DDF4CC' : '#EDFEDC'
-																										: (isMusicVenuesSearch || isMusicVenueTitle(headline))
+																										: (isMusicVenuesSearchForContact || isMusicVenueTitle(headline))
 																											? isHovered ? '#C5E8FF' : '#D7F0FF'
-																											: (isMusicFestivalsSearch || isMusicFestivalTitle(headline))
+																											: (isMusicFestivalsSearchForContact || isMusicFestivalTitle(headline))
 																												? isHovered ? '#ADD4FF' : '#BFDCFF'
 																												: isWineBeerSpiritsTitle(headline)
 																													? isHovered ? '#C8CBFF' : '#DADDFF'
@@ -3953,55 +3959,55 @@ const DashboardContent = () => {
 																								</div>
 																								{/* Top Right - Title/Headline */}
 																								<div className="pr-2 pl-1 flex items-center h-[23px]">
-																									{(headline || isMusicVenuesSearch || isRestaurantsSearch || isCoffeeShopsSearch || isMusicFestivalsSearch || isWeddingPlannersSearch) ? (
+																									{(headline || isMusicVenuesSearchForContact || isRestaurantsSearchForContact || isCoffeeShopsSearchForContact || isMusicFestivalsSearchForContact || isWeddingPlannersSearchForContact) ? (
 																										<div
 																											className="h-[17px] rounded-[6px] px-2 flex items-center gap-1 w-full border border-black overflow-hidden"
 																											style={{
-																												backgroundColor: (isRestaurantsSearch || isRestaurantTitle(headline))
+																												backgroundColor: (isRestaurantsSearchForContact || isRestaurantTitle(headline))
 																													? '#C3FBD1'
-																													: (isCoffeeShopsSearch || isCoffeeShopTitle(headline))
+																													: (isCoffeeShopsSearchForContact || isCoffeeShopTitle(headline))
 																														? '#D6F1BD'
-																														: (isMusicVenuesSearch || isMusicVenueTitle(headline))
+																														: (isMusicVenuesSearchForContact || isMusicVenueTitle(headline))
 																															? '#B7E5FF'
-																															: (isMusicFestivalsSearch || isMusicFestivalTitle(headline))
+																															: (isMusicFestivalsSearchForContact || isMusicFestivalTitle(headline))
 																																? '#C1D6FF'
-																																: (isWeddingPlannersSearch || isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline))
+																																: (isWeddingPlannersSearchForContact || isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline))
 																																	? '#FFF2BC'
 																																	: isWineBeerSpiritsTitle(headline)
 																																		? '#BFC4FF'
 																																		: '#E8EFFF',
 																											}}
 																										>
-																											{(isRestaurantsSearch || isRestaurantTitle(headline)) && (
+																											{(isRestaurantsSearchForContact || isRestaurantTitle(headline)) && (
 																												<RestaurantsIcon size={12} className="flex-shrink-0" />
 																											)}
-																											{(isCoffeeShopsSearch || isCoffeeShopTitle(headline)) && (
+																											{(isCoffeeShopsSearchForContact || isCoffeeShopTitle(headline)) && (
 																												<CoffeeShopsIcon size={7} />
 																											)}
-																											{(isMusicVenuesSearch || isMusicVenueTitle(headline)) && (
+																											{(isMusicVenuesSearchForContact || isMusicVenueTitle(headline)) && (
 																												<MusicVenuesIcon size={12} className="flex-shrink-0" />
 																											)}
-																											{(isMusicFestivalsSearch || isMusicFestivalTitle(headline)) && (
+																											{(isMusicFestivalsSearchForContact || isMusicFestivalTitle(headline)) && (
 																												<FestivalsIcon size={12} className="flex-shrink-0" />
 																											)}
-																											{(isWeddingPlannersSearch || isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline)) && (
+																											{(isWeddingPlannersSearchForContact || isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline)) && (
 																												<WeddingPlannersIcon size={12} />
 																											)}
 																											{isWineBeerSpiritsTitle(headline) && (
 																												<WineBeerSpiritsIcon size={12} className="flex-shrink-0" />
 																											)}
 																											<span className="text-[10px] text-black leading-none truncate">
-																												{(isRestaurantsSearch || isRestaurantTitle(headline))
+																												{(isRestaurantsSearchForContact || isRestaurantTitle(headline))
 																													? 'Restaurant'
-																													: (isCoffeeShopsSearch || isCoffeeShopTitle(headline))
+																													: (isCoffeeShopsSearchForContact || isCoffeeShopTitle(headline))
 																														? 'Coffee Shop'
-																														: (isMusicVenuesSearch || isMusicVenueTitle(headline))
+																														: (isMusicVenuesSearchForContact || isMusicVenueTitle(headline))
 																															? 'Music Venue'
-																															: (isMusicFestivalsSearch || isMusicFestivalTitle(headline))
+																															: (isMusicFestivalsSearchForContact || isMusicFestivalTitle(headline))
 																																? 'Music Festival'
 																																: isWeddingVenueTitle(headline)
 																																	? 'Wedding Venue'
-																																	: (isWeddingPlannersSearch || isWeddingPlannerTitle(headline))
+																																	: (isWeddingPlannersSearchForContact || isWeddingPlannerTitle(headline))
 																																		? 'Wedding Planner'
 																																		: isWineBeerSpiritsTitle(headline)
 																																			? getWineBeerSpiritsLabel(headline)
@@ -4079,55 +4085,55 @@ const DashboardContent = () => {
 																								</div>
 																								{/* Top Right - Title/Headline */}
 																								<div className="pr-2 pl-1 flex items-center h-[23px]">
-																									{(headline || isMusicVenuesSearch || isRestaurantsSearch || isCoffeeShopsSearch || isMusicFestivalsSearch || isWeddingPlannersSearch) ? (
+																									{(headline || isMusicVenuesSearchForContact || isRestaurantsSearchForContact || isCoffeeShopsSearchForContact || isMusicFestivalsSearchForContact || isWeddingPlannersSearchForContact) ? (
 																										<div
 																											className="h-[17px] rounded-[6px] px-2 flex items-center gap-1 w-full border border-black overflow-hidden"
 																											style={{
-																												backgroundColor: (isRestaurantsSearch || isRestaurantTitle(headline))
+																												backgroundColor: (isRestaurantsSearchForContact || isRestaurantTitle(headline))
 																													? '#C3FBD1'
-																													: (isCoffeeShopsSearch || isCoffeeShopTitle(headline))
+																													: (isCoffeeShopsSearchForContact || isCoffeeShopTitle(headline))
 																														? '#D6F1BD'
-																														: (isMusicVenuesSearch || isMusicVenueTitle(headline))
+																														: (isMusicVenuesSearchForContact || isMusicVenueTitle(headline))
 																															? '#B7E5FF'
-																															: (isMusicFestivalsSearch || isMusicFestivalTitle(headline))
+																															: (isMusicFestivalsSearchForContact || isMusicFestivalTitle(headline))
 																																? '#C1D6FF'
-																																: (isWeddingPlannersSearch || isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline))
+																																: (isWeddingPlannersSearchForContact || isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline))
 																																	? '#FFF2BC'
 																																	: isWineBeerSpiritsTitle(headline)
 																																		? '#BFC4FF'
 																																		: '#E8EFFF',
 																											}}
 																										>
-																											{(isRestaurantsSearch || isRestaurantTitle(headline)) && (
+																											{(isRestaurantsSearchForContact || isRestaurantTitle(headline)) && (
 																												<RestaurantsIcon size={12} className="flex-shrink-0" />
 																											)}
-																											{(isCoffeeShopsSearch || isCoffeeShopTitle(headline)) && (
+																											{(isCoffeeShopsSearchForContact || isCoffeeShopTitle(headline)) && (
 																												<CoffeeShopsIcon size={7} />
 																											)}
-																											{(isMusicVenuesSearch || isMusicVenueTitle(headline)) && (
+																											{(isMusicVenuesSearchForContact || isMusicVenueTitle(headline)) && (
 																												<MusicVenuesIcon size={12} className="flex-shrink-0" />
 																											)}
-																											{(isMusicFestivalsSearch || isMusicFestivalTitle(headline)) && (
+																											{(isMusicFestivalsSearchForContact || isMusicFestivalTitle(headline)) && (
 																												<FestivalsIcon size={12} className="flex-shrink-0" />
 																											)}
-																											{(isWeddingPlannersSearch || isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline)) && (
+																											{(isWeddingPlannersSearchForContact || isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline)) && (
 																												<WeddingPlannersIcon size={12} />
 																											)}
 																											{isWineBeerSpiritsTitle(headline) && (
 																												<WineBeerSpiritsIcon size={12} className="flex-shrink-0" />
 																											)}
 																											<span className="text-[10px] text-black leading-none truncate">
-																												{(isRestaurantsSearch || isRestaurantTitle(headline))
+																												{(isRestaurantsSearchForContact || isRestaurantTitle(headline))
 																													? 'Restaurant'
-																													: (isCoffeeShopsSearch || isCoffeeShopTitle(headline))
+																													: (isCoffeeShopsSearchForContact || isCoffeeShopTitle(headline))
 																														? 'Coffee Shop'
-																														: (isMusicVenuesSearch || isMusicVenueTitle(headline))
+																														: (isMusicVenuesSearchForContact || isMusicVenueTitle(headline))
 																															? 'Music Venue'
-																															: (isMusicFestivalsSearch || isMusicFestivalTitle(headline))
+																															: (isMusicFestivalsSearchForContact || isMusicFestivalTitle(headline))
 																																? 'Music Festival'
 																																: isWeddingVenueTitle(headline)
 																																	? 'Wedding Venue'
-																																	: (isWeddingPlannersSearch || isWeddingPlannerTitle(headline))
+																																	: (isWeddingPlannersSearchForContact || isWeddingPlannerTitle(headline))
 																																		? 'Wedding Planner'
 																																		: isWineBeerSpiritsTitle(headline)
 																																			? getWineBeerSpiritsLabel(headline)
@@ -4383,6 +4389,7 @@ const DashboardContent = () => {
 																		);
 																		const isHovered = hoveredMapPanelContactId === contact.id;
 																		const isUsed = usedContactIdsSet.has(contact.id);
+																		const isInBaseResults = baseContactIdSet.has(contact.id);
 																		const firstName = contact.firstName || '';
 																		const lastName = contact.lastName || '';
 																		const fullName =
@@ -4394,7 +4401,12 @@ const DashboardContent = () => {
 																		const searchDerivedHeadline = whatValue && whereValue ? `${whatValue} ${whereValue}` : whatValue || '';
 																		const isRestaurantSearch = /^restaurants?$/i.test(whatValue.trim());
 																		const contactHeadline = contact.headline || contact.title || '';
-																		const headline = isRestaurantSearch ? searchDerivedHeadline : (contactHeadline || searchDerivedHeadline);
+																		const headline = isRestaurantSearch && isInBaseResults ? searchDerivedHeadline : (contactHeadline || searchDerivedHeadline);
+																		const isRestaurantsSearchForContact = isRestaurantsSearch && isInBaseResults;
+																		const isCoffeeShopsSearchForContact = isCoffeeShopsSearch && isInBaseResults;
+																		const isMusicVenuesSearchForContact = isMusicVenuesSearch && isInBaseResults;
+																		const isMusicFestivalsSearchForContact = isMusicFestivalsSearch && isInBaseResults;
+																		const isWeddingPlannersSearchForContact = isWeddingPlannersSearch && isInBaseResults;
 																		const stateAbbr =
 																			getStateAbbreviation(contact.state || '') || '';
 																		const city = contact.city || '';
@@ -4408,13 +4420,13 @@ const DashboardContent = () => {
 																					// Hover should be a subtle darken, not "selected" blue.
 																					// Category-specific selection colors.
 																					backgroundColor: isSelected
-																						? (isRestaurantsSearch || isRestaurantTitle(headline))
+																						? (isRestaurantsSearchForContact || isRestaurantTitle(headline))
 																							? isHovered ? '#C5F5D1' : '#D7FFE1'
-																							: (isCoffeeShopsSearch || isCoffeeShopTitle(headline))
+																							: (isCoffeeShopsSearchForContact || isCoffeeShopTitle(headline))
 																								? isHovered ? '#DDF4CC' : '#EDFEDC'
-																								: (isMusicVenuesSearch || isMusicVenueTitle(headline))
+																								: (isMusicVenuesSearchForContact || isMusicVenueTitle(headline))
 																									? isHovered ? '#C5E8FF' : '#D7F0FF'
-																									: (isMusicFestivalsSearch || isMusicFestivalTitle(headline))
+																									: (isMusicFestivalsSearchForContact || isMusicFestivalTitle(headline))
 																										? isHovered ? '#ADD4FF' : '#BFDCFF'
 																										: isWineBeerSpiritsTitle(headline)
 																											? isHovered ? '#C8CBFF' : '#DADDFF'
@@ -4510,15 +4522,15 @@ const DashboardContent = () => {
 																							style={{
 																								width: '230px',
 																								height: '19px',
-																								backgroundColor: (isRestaurantsSearch || isRestaurantTitle(headline))
+																								backgroundColor: (isRestaurantsSearchForContact || isRestaurantTitle(headline))
 																									? '#C3FBD1'
-																									: (isCoffeeShopsSearch || isCoffeeShopTitle(headline))
+																									: (isCoffeeShopsSearchForContact || isCoffeeShopTitle(headline))
 																										? '#D6F1BD'
-																										: (isMusicVenuesSearch || isMusicVenueTitle(headline))
+																										: (isMusicVenuesSearchForContact || isMusicVenueTitle(headline))
 																											? '#B7E5FF'
-																											: (isMusicFestivalsSearch || isMusicFestivalTitle(headline))
+																											: (isMusicFestivalsSearchForContact || isMusicFestivalTitle(headline))
 																												? '#C1D6FF'
-																												: (isWeddingPlannersSearch || isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline))
+																												: (isWeddingPlannersSearchForContact || isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline))
 																													? '#FFF2BC'
 																													: isWineBeerSpiritsTitle(headline)
 																														? '#BFC4FF'
@@ -4527,36 +4539,36 @@ const DashboardContent = () => {
 																								borderRadius: '8px',
 																							}}
 																						>
-																							{(isRestaurantsSearch || isRestaurantTitle(headline)) && (
+																							{(isRestaurantsSearchForContact || isRestaurantTitle(headline)) && (
 																								<RestaurantsIcon size={12} className="flex-shrink-0" />
 																							)}
-																							{(isCoffeeShopsSearch || isCoffeeShopTitle(headline)) && (
+																							{(isCoffeeShopsSearchForContact || isCoffeeShopTitle(headline)) && (
 																								<CoffeeShopsIcon size={7} />
 																							)}
-																							{(isMusicVenuesSearch || isMusicVenueTitle(headline)) && (
+																							{(isMusicVenuesSearchForContact || isMusicVenueTitle(headline)) && (
 																								<MusicVenuesIcon size={12} className="flex-shrink-0" />
 																							)}
-																							{(isMusicFestivalsSearch || isMusicFestivalTitle(headline)) && (
+																							{(isMusicFestivalsSearchForContact || isMusicFestivalTitle(headline)) && (
 																								<FestivalsIcon size={12} className="flex-shrink-0" />
 																							)}
-																							{(isWeddingPlannersSearch || isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline)) && (
+																							{(isWeddingPlannersSearchForContact || isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline)) && (
 																								<WeddingPlannersIcon size={12} />
 																							)}
 																							{isWineBeerSpiritsTitle(headline) && (
 																								<WineBeerSpiritsIcon size={12} className="flex-shrink-0" />
 																							)}
 																							<span className="text-[14px] text-black leading-none truncate">
-																								{(isRestaurantsSearch || isRestaurantTitle(headline))
+																								{(isRestaurantsSearchForContact || isRestaurantTitle(headline))
 																									? 'Restaurant'
-																									: (isCoffeeShopsSearch || isCoffeeShopTitle(headline))
+																									: (isCoffeeShopsSearchForContact || isCoffeeShopTitle(headline))
 																										? 'Coffee Shop'
-																										: (isMusicVenuesSearch || isMusicVenueTitle(headline))
+																										: (isMusicVenuesSearchForContact || isMusicVenueTitle(headline))
 																											? 'Music Venue'
-																											: (isMusicFestivalsSearch || isMusicFestivalTitle(headline))
+																											: (isMusicFestivalsSearchForContact || isMusicFestivalTitle(headline))
 																												? 'Music Festival'
 																												: isWeddingVenueTitle(headline)
 																													? 'Wedding Venue'
-																													: (isWeddingPlannersSearch || isWeddingPlannerTitle(headline))
+																													: (isWeddingPlannersSearchForContact || isWeddingPlannerTitle(headline))
 																														? 'Wedding Planner'
 																														: isWineBeerSpiritsTitle(headline)
 																															? getWineBeerSpiritsLabel(headline)
