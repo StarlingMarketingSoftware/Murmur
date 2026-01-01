@@ -343,6 +343,10 @@ const DashboardContent = () => {
 	// If we navigated here from a campaign, enable "Add to Campaign" mode.
 	const fromCampaignIdParam = searchParams.get('fromCampaignId')?.trim() || '';
 	const isAddToCampaignMode = Boolean(fromCampaignIdParam);
+	// Persisted (URL) search + view state for the normal dashboard flow so refresh keeps the user
+	// in the same results view (map/table) instead of resetting back to the initial search screen.
+	const dashboardViewParam = searchParams.get('view')?.trim() || '';
+	const dashboardSearchParam = searchParams.get('search')?.trim() || '';
 	// Persisted (URL) search + view state for the "from campaign" flow so refresh keeps the user
 	// in the correct results view without affecting the normal dashboard entry.
 	const fromCampaignViewParam = searchParams.get('fromCampaignView')?.trim() || '';
@@ -1205,6 +1209,57 @@ const DashboardContent = () => {
 		usedContactIdsSet,
 	} = useDashboard({ derivedTitle: derivedContactTitle, forceApplyDerivedTitle: shouldForceApplyDerivedTitle });
 
+	// If we refreshed while in the normal dashboard results view, restore the results by re-running
+	// the last executed search stored in the URL. We intentionally do not auto-trigger auth flows.
+	const hasHydratedDashboardUrlRef = useRef(false);
+	useEffect(() => {
+		if (isAddToCampaignMode) return;
+		if (hasHydratedDashboardUrlRef.current) return;
+		if (!dashboardSearchParam) return;
+		// Don't auto-trigger auth flows; only run if already signed in.
+		if (!isSignedIn) return;
+
+		// If we already have results, don't re-run the hydration search.
+		if (hasSearched && activeSearchQuery.trim().length > 0) {
+			hasHydratedDashboardUrlRef.current = true;
+			return;
+		}
+
+		hasHydratedDashboardUrlRef.current = true;
+
+		// Keep the segmented UI in sync with the restored query (best-effort).
+		const inferredWhy = extractWhyFromSearchQuery(dashboardSearchParam) || '';
+		const inferredWhat = extractWhatFromSearchQuery(dashboardSearchParam) || '';
+		const inferredWhere = extractWhereFromSearchQuery(dashboardSearchParam) || '';
+		if (inferredWhy) setWhyValue(inferredWhy);
+		if (inferredWhat) setWhatValue(inferredWhat);
+		if (inferredWhere) {
+			setWhereValue(inferredWhere);
+			setIsNearMeLocation(false);
+		}
+
+		// Submit after a short delay to allow state to update.
+		setTimeout(() => {
+			form.setValue('searchText', dashboardSearchParam);
+			form.handleSubmit(onSubmit)();
+
+			// Restore table view if that was the last view stored in the URL.
+			if (dashboardViewParam === 'table') {
+				setTimeout(() => setIsMapView(false), 0);
+			}
+		}, 100);
+	}, [
+		activeSearchQuery,
+		dashboardSearchParam,
+		dashboardViewParam,
+		form,
+		hasSearched,
+		isAddToCampaignMode,
+		isSignedIn,
+		onSubmit,
+		setIsMapView,
+	]);
+
 	// If we refreshed while in the "from campaign" map view, restore the map results view by
 	// re-running the last executed search stored in the URL. This is gated to `fromCampaignId`
 	// so the main dashboard flow is unchanged.
@@ -1256,6 +1311,57 @@ const DashboardContent = () => {
 		onSubmit,
 		setIsMapView,
 	]);
+
+	// Mirror the current results view + search query into the URL so browser refresh keeps you
+	// in the same place (normal dashboard flow).
+	useEffect(() => {
+		if (isAddToCampaignMode) return;
+		if (!hasSearched) return;
+		if (!activeSearchQuery || activeSearchQuery.trim().length === 0) return;
+
+		const desiredView = isMapView ? 'map' : 'table';
+		const currentView = dashboardViewParam;
+		const currentSearch = dashboardSearchParam;
+
+		if (currentView === desiredView && currentSearch === activeSearchQuery) return;
+
+		const params = new URLSearchParams(searchParams.toString());
+		params.set('view', desiredView);
+		params.set('search', activeSearchQuery);
+		router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+	}, [
+		activeSearchQuery,
+		dashboardSearchParam,
+		dashboardViewParam,
+		hasSearched,
+		isAddToCampaignMode,
+		isMapView,
+		pathname,
+		router,
+		searchParams,
+	]);
+
+	// When leaving the results view, clear the persisted normal-dashboard search/view params
+	// so we don't unexpectedly re-hydrate a stale search after the user has reset.
+	const prevHasSearchedRef = useRef(hasSearched);
+	useEffect(() => {
+		const prev = prevHasSearchedRef.current;
+		prevHasSearchedRef.current = hasSearched;
+
+		if (isAddToCampaignMode) return;
+		if (!prev || hasSearched) return;
+
+		const params = new URLSearchParams(searchParams.toString());
+		const had =
+			params.get('view') !== null ||
+			params.get('search') !== null;
+		if (!had) return;
+
+		params.delete('view');
+		params.delete('search');
+		const qs = params.toString();
+		router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+	}, [hasSearched, isAddToCampaignMode, pathname, router, searchParams]);
 
 	// When in "from campaign" mode, mirror the current results view + search query into the URL
 	// so browser refresh keeps you in the same place. This is intentionally gated to avoid
