@@ -343,6 +343,10 @@ const DashboardContent = () => {
 	// If we navigated here from a campaign, enable "Add to Campaign" mode.
 	const fromCampaignIdParam = searchParams.get('fromCampaignId')?.trim() || '';
 	const isAddToCampaignMode = Boolean(fromCampaignIdParam);
+	// Persisted (URL) search + view state for the "from campaign" flow so refresh keeps the user
+	// in the correct results view without affecting the normal dashboard entry.
+	const fromCampaignViewParam = searchParams.get('fromCampaignView')?.trim() || '';
+	const fromCampaignSearchParam = searchParams.get('fromCampaignSearch')?.trim() || '';
 	const { data: fromCampaign, isPending: isPendingFromCampaign } = useGetCampaign(fromCampaignIdParam);
 	const addToCampaignUserContactListId = fromCampaign?.userContactLists?.[0]?.id;
 	const { mutateAsync: editUserContactList, isPending: isPendingAddToCampaign } =
@@ -1200,6 +1204,88 @@ const DashboardContent = () => {
 		isSearchPending,
 		usedContactIdsSet,
 	} = useDashboard({ derivedTitle: derivedContactTitle, forceApplyDerivedTitle: shouldForceApplyDerivedTitle });
+
+	// If we refreshed while in the "from campaign" map view, restore the map results view by
+	// re-running the last executed search stored in the URL. This is gated to `fromCampaignId`
+	// so the main dashboard flow is unchanged.
+	const hasHydratedFromCampaignUrlRef = useRef(false);
+	useEffect(() => {
+		if (!isAddToCampaignMode) return;
+		if (hasHydratedFromCampaignUrlRef.current) return;
+		if (!fromCampaignSearchParam) return;
+		// Don't auto-trigger auth flows; only run if already signed in.
+		if (!isSignedIn) return;
+
+		// If we already have results, don't re-run the hydration search.
+		if (hasSearched && activeSearchQuery.trim().length > 0) {
+			hasHydratedFromCampaignUrlRef.current = true;
+			return;
+		}
+
+		hasHydratedFromCampaignUrlRef.current = true;
+
+		// Keep the segmented UI in sync with the restored query (best-effort).
+		const inferredWhy = extractWhyFromSearchQuery(fromCampaignSearchParam) || '';
+		const inferredWhat = extractWhatFromSearchQuery(fromCampaignSearchParam) || '';
+		const inferredWhere = extractWhereFromSearchQuery(fromCampaignSearchParam) || '';
+		if (inferredWhy) setWhyValue(inferredWhy);
+		if (inferredWhat) setWhatValue(inferredWhat);
+		if (inferredWhere) {
+			setWhereValue(inferredWhere);
+			setIsNearMeLocation(false);
+		}
+
+		// Submit after a short delay to allow state to update.
+		setTimeout(() => {
+			form.setValue('searchText', fromCampaignSearchParam);
+			form.handleSubmit(onSubmit)();
+
+			// Restore table view if that was the last view stored in the URL.
+			if (fromCampaignViewParam === 'table') {
+				setTimeout(() => setIsMapView(false), 0);
+			}
+		}, 100);
+	}, [
+		activeSearchQuery,
+		form,
+		fromCampaignSearchParam,
+		fromCampaignViewParam,
+		hasSearched,
+		isAddToCampaignMode,
+		isSignedIn,
+		onSubmit,
+		setIsMapView,
+	]);
+
+	// When in "from campaign" mode, mirror the current results view + search query into the URL
+	// so browser refresh keeps you in the same place. This is intentionally gated to avoid
+	// changing behavior for the normal dashboard entry.
+	useEffect(() => {
+		if (!isAddToCampaignMode) return;
+		if (!hasSearched) return;
+		if (!activeSearchQuery || activeSearchQuery.trim().length === 0) return;
+
+		const desiredView = isMapView ? 'map' : 'table';
+		const currentView = fromCampaignViewParam;
+		const currentSearch = fromCampaignSearchParam;
+
+		if (currentView === desiredView && currentSearch === activeSearchQuery) return;
+
+		const params = new URLSearchParams(searchParams.toString());
+		params.set('fromCampaignView', desiredView);
+		params.set('fromCampaignSearch', activeSearchQuery);
+		router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+	}, [
+		activeSearchQuery,
+		fromCampaignSearchParam,
+		fromCampaignViewParam,
+		hasSearched,
+		isAddToCampaignMode,
+		isMapView,
+		pathname,
+		router,
+		searchParams,
+	]);
 
 	// Batch update for assigning titles to contacts without one
 	const { mutateAsync: batchUpdateContacts } = useBatchUpdateContacts({ suppressToasts: true });
