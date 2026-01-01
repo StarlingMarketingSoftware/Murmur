@@ -19,3 +19,10 @@ export const isMusicVenueTitle = (title: string): boolean => {
 	return /^music\s*venues?\s/i.test(title.trim());
 };
 
+/**
+ * Check if a title matches "Music Festivals <state>" or "Music Festival <state>" pattern
+ */
+export const isMusicFestivalTitle = (title: string): boolean => {
+	return /^music\s*festivals?\s/i.test(title.trim());
+};
+

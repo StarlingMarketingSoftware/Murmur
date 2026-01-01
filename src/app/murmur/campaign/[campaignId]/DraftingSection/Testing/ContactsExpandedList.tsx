@@ -23,9 +23,10 @@ import {
 } from '@/app/murmur/campaign/[campaignId]/DraftingSection/EmailGeneration/ContactsSelection/ContactsSelection';
 import { useDebounce } from '@/hooks/useDebounce';
 import { urls } from '@/constants/urls';
-import { isRestaurantTitle, isCoffeeShopTitle, isMusicVenueTitle } from '@/utils/restaurantTitle';
+import { isRestaurantTitle, isCoffeeShopTitle, isMusicVenueTitle, isMusicFestivalTitle } from '@/utils/restaurantTitle';
 import { RestaurantsIcon } from '@/components/atoms/_svg/RestaurantsIcon';
 import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
+import { FestivalsIcon } from '@/components/atoms/_svg/FestivalsIcon';
 import { MusicVenuesIcon } from '@/components/atoms/_svg/MusicVenuesIcon';
 
 export interface ContactsExpandedListProps {
@@ -400,7 +401,9 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 																			? '#D6F1BD'
 																			: isMusicVenueTitle(contactTitle)
 																				? '#B7E5FF'
-																				: '#E8EFFF',
+																				: isMusicFestivalTitle(contactTitle)
+																					? '#C1D6FF'
+																					: '#E8EFFF',
 																}}
 															>
 																{isRestaurantTitle(contactTitle) && (
@@ -412,6 +415,9 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 																{isMusicVenueTitle(contactTitle) && (
 																	<MusicVenuesIcon size={7} className="flex-shrink-0" />
 																)}
+																{isMusicFestivalTitle(contactTitle) && (
+																	<FestivalsIcon size={7} className="flex-shrink-0" />
+																)}
 																<span className="text-[7px] text-black leading-none truncate">
 																	{isRestaurantTitle(contactTitle)
 																		? 'Restaurant'
@@ -419,7 +425,9 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 																			? 'Coffee Shop'
 																			: isMusicVenueTitle(contactTitle)
 																				? 'Music Venue'
-																				: contactTitle}
+																				: isMusicFestivalTitle(contactTitle)
+																					? 'Music Festival'
+																					: contactTitle}
 																</span>
 															</div>
 														) : null}
@@ -521,7 +529,9 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 																			? '#D6F1BD'
 																			: isMusicVenueTitle(contactTitle)
 																				? '#B7E5FF'
-																				: '#E8EFFF',
+																				: isMusicFestivalTitle(contactTitle)
+																					? '#C1D6FF'
+																					: '#E8EFFF',
 																}}
 															>
 																{isRestaurantTitle(contactTitle) && (
@@ -533,6 +543,9 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 																{isMusicVenueTitle(contactTitle) && (
 																	<MusicVenuesIcon size={7} className="flex-shrink-0" />
 																)}
+																{isMusicFestivalTitle(contactTitle) && (
+																	<FestivalsIcon size={7} className="flex-shrink-0" />
+																)}
 																<span className="text-[7px] text-black leading-none truncate">
 																	{isRestaurantTitle(contactTitle)
 																		? 'Restaurant'
@@ -540,7 +553,9 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 																			? 'Coffee Shop'
 																			: isMusicVenueTitle(contactTitle)
 																				? 'Music Venue'
-																				: contactTitle}
+																				: isMusicFestivalTitle(contactTitle)
+																					? 'Music Festival'
+																					: contactTitle}
 																</span>
 															</div>
 														)}
@@ -620,7 +635,9 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 																	? '#D6F1BD'
 																	: isMusicVenueTitle(contactTitle)
 																		? '#B7E5FF'
-																		: '#E8EFFF',
+																		: isMusicFestivalTitle(contactTitle)
+																			? '#C1D6FF'
+																			: '#E8EFFF',
 														}}
 													>
 														{isRestaurantTitle(contactTitle) && (
@@ -632,6 +649,9 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 														{isMusicVenueTitle(contactTitle) && (
 															<MusicVenuesIcon size={12} className="flex-shrink-0" />
 														)}
+														{isMusicFestivalTitle(contactTitle) && (
+															<FestivalsIcon size={12} className="flex-shrink-0" />
+														)}
 														<ScrollableText
 															text={
 																isRestaurantTitle(contactTitle)
@@ -640,7 +660,9 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 																		? 'Coffee Shop'
 																		: isMusicVenueTitle(contactTitle)
 																			? 'Music Venue'
-																			: contactTitle
+																			: isMusicFestivalTitle(contactTitle)
+																				? 'Music Festival'
+																				: contactTitle
 															}
 															className="text-[10px] text-black leading-none"
 															scrollPixelsPerSecond={60}
@@ -758,7 +780,9 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 																		? '#D6F1BD'
 																		: isMusicVenueTitle(contactTitle)
 																			? '#B7E5FF'
-																			: '#E8EFFF',
+																			: isMusicFestivalTitle(contactTitle)
+																				? '#C1D6FF'
+																				: '#E8EFFF',
 															}}
 														>
 															{isRestaurantTitle(contactTitle) && (
@@ -770,6 +794,9 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 															{isMusicVenueTitle(contactTitle) && (
 																<MusicVenuesIcon size={12} className="flex-shrink-0" />
 															)}
+															{isMusicFestivalTitle(contactTitle) && (
+																<FestivalsIcon size={12} className="flex-shrink-0" />
+															)}
 															<ScrollableText
 																text={
 																	isRestaurantTitle(contactTitle)
@@ -778,7 +805,9 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 																			? 'Coffee Shop'
 																			: isMusicVenueTitle(contactTitle)
 																				? 'Music Venue'
-																				: contactTitle
+																				: isMusicFestivalTitle(contactTitle)
+																					? 'Music Festival'
+																					: contactTitle
 																}
 																className="text-[10px] text-black leading-none"
 															/>

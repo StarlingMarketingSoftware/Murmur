@@ -13,9 +13,10 @@ import {
 import { useGetUsedContactIds } from '@/hooks/queryHooks/useContacts';
 import { ContactWithName } from '@/types/contact';
 import { useIsMobile } from '@/hooks/useIsMobile';
-import { isRestaurantTitle, isCoffeeShopTitle, isMusicVenueTitle } from '@/utils/restaurantTitle';
+import { isRestaurantTitle, isCoffeeShopTitle, isMusicVenueTitle, isMusicFestivalTitle } from '@/utils/restaurantTitle';
 import { RestaurantsIcon } from '@/components/atoms/_svg/RestaurantsIcon';
 import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
+import { FestivalsIcon } from '@/components/atoms/_svg/FestivalsIcon';
 import { MusicVenuesIcon } from '@/components/atoms/_svg/MusicVenuesIcon';
 
 interface SentEmailsProps {
@@ -151,7 +152,9 @@ export const SentEmails: FC<SentEmailsProps> = ({
 													? '#D6F1BD'
 													: isMusicVenueTitle(contactTitle)
 														? '#B7E5FF'
-														: '#E8EFFF',
+														: isMusicFestivalTitle(contactTitle)
+															? '#C1D6FF'
+															: '#E8EFFF',
 										}}
 									>
 										{isRestaurantTitle(contactTitle) && (
@@ -163,6 +166,9 @@ export const SentEmails: FC<SentEmailsProps> = ({
 										{isMusicVenueTitle(contactTitle) && (
 											<MusicVenuesIcon size={isMobile ? 10 : 14} className="flex-shrink-0" />
 										)}
+										{isMusicFestivalTitle(contactTitle) && (
+											<FestivalsIcon size={isMobile ? 10 : 14} className="flex-shrink-0" />
+										)}
 										<ScrollableText
 											text={
 												isRestaurantTitle(contactTitle)
@@ -171,7 +177,9 @@ export const SentEmails: FC<SentEmailsProps> = ({
 														? 'Coffee Shop'
 														: isMusicVenueTitle(contactTitle)
 															? 'Music Venue'
-															: contactTitle
+															: isMusicFestivalTitle(contactTitle)
+																? 'Music Festival'
+																: contactTitle
 											}
 											className={cn(
 												"text-black leading-none",

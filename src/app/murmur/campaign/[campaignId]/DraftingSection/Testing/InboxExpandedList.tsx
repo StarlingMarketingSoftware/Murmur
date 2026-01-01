@@ -15,9 +15,10 @@ import {
 } from '@/constants/ui';
 import { useGetInboundEmails } from '@/hooks/queryHooks/useInboundEmails';
 import type { InboundEmailWithRelations } from '@/types';
-import { isRestaurantTitle, isCoffeeShopTitle, isMusicVenueTitle } from '@/utils/restaurantTitle';
+import { isRestaurantTitle, isCoffeeShopTitle, isMusicVenueTitle, isMusicFestivalTitle } from '@/utils/restaurantTitle';
 import { RestaurantsIcon } from '@/components/atoms/_svg/RestaurantsIcon';
 import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
+import { FestivalsIcon } from '@/components/atoms/_svg/FestivalsIcon';
 import { MusicVenuesIcon } from '@/components/atoms/_svg/MusicVenuesIcon';
 
 export interface InboxExpandedListProps {
@@ -359,7 +360,9 @@ export const InboxExpandedList: FC<InboxExpandedListProps> = ({
 															? '#D6F1BD'
 															: isMusicVenueTitle(contact.headline)
 																? '#B7E5FF'
-																: '#E8EFFF',
+																: isMusicFestivalTitle(contact.headline)
+																	? '#C1D6FF'
+																	: '#E8EFFF',
 												}}
 											>
 												{isRestaurantTitle(contact.headline) && (
@@ -371,6 +374,9 @@ export const InboxExpandedList: FC<InboxExpandedListProps> = ({
 												{isMusicVenueTitle(contact.headline) && (
 													<MusicVenuesIcon size={isBottomView ? 7 : 8} className="flex-shrink-0" />
 												)}
+												{isMusicFestivalTitle(contact.headline) && (
+													<FestivalsIcon size={isBottomView ? 7 : 8} className="flex-shrink-0" />
+												)}
 												{isBottomView ? (
 													<span className="text-[7px] text-black leading-none truncate">
 														{isRestaurantTitle(contact.headline)
@@ -379,7 +385,9 @@ export const InboxExpandedList: FC<InboxExpandedListProps> = ({
 																? 'Coffee Shop'
 																: isMusicVenueTitle(contact.headline)
 																	? 'Music Venue'
-																	: contact.headline}
+																	: isMusicFestivalTitle(contact.headline)
+																		? 'Music Festival'
+																		: contact.headline}
 													</span>
 												) : (
 													<ScrollableText
@@ -390,7 +398,9 @@ export const InboxExpandedList: FC<InboxExpandedListProps> = ({
 																	? 'Coffee Shop'
 																	: isMusicVenueTitle(contact.headline)
 																		? 'Music Venue'
-																		: contact.headline
+																		: isMusicFestivalTitle(contact.headline)
+																			? 'Music Festival'
+																			: contact.headline
 														}
 														className="text-[8px] text-black leading-none px-1"
 													/>

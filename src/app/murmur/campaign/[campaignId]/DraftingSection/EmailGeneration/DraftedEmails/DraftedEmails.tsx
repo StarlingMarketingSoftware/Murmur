@@ -26,9 +26,10 @@ import RightArrow from '@/components/atoms/_svg/RightArrow';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import RichTextEditor from '@/components/molecules/RichTextEditor/RichTextEditor';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
-import { isRestaurantTitle, isCoffeeShopTitle, isMusicVenueTitle } from '@/utils/restaurantTitle';
+import { isRestaurantTitle, isCoffeeShopTitle, isMusicVenueTitle, isMusicFestivalTitle } from '@/utils/restaurantTitle';
 import { RestaurantsIcon } from '@/components/atoms/_svg/RestaurantsIcon';
 import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
+import { FestivalsIcon } from '@/components/atoms/_svg/FestivalsIcon';
 import { MusicVenuesIcon } from '@/components/atoms/_svg/MusicVenuesIcon';
 
 interface ScrollableTextareaProps
@@ -558,7 +559,9 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 												? '#D6F1BD'
 												: isMusicVenueTitle(contactTitle)
 													? '#B7E5FF'
-													: '#E8EFFF',
+													: isMusicFestivalTitle(contactTitle)
+														? '#C1D6FF'
+														: '#E8EFFF',
 									}}
 								>
 									{isRestaurantTitle(contactTitle) && (
@@ -570,6 +573,9 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 									{isMusicVenueTitle(contactTitle) && (
 										<MusicVenuesIcon size={12} className="flex-shrink-0" />
 									)}
+									{isMusicFestivalTitle(contactTitle) && (
+										<FestivalsIcon size={12} className="flex-shrink-0" />
+									)}
 									<ScrollableText
 										text={
 											isRestaurantTitle(contactTitle)
@@ -578,7 +584,9 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 													? 'Coffee Shop'
 													: isMusicVenueTitle(contactTitle)
 														? 'Music Venue'
-														: contactTitle
+														: isMusicFestivalTitle(contactTitle)
+															? 'Music Festival'
+															: contactTitle
 										}
 										className="text-[11px] font-inter text-black leading-none w-full"
 									/>
@@ -1365,7 +1373,9 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 															? '#D6F1BD'
 															: isMusicVenueTitle(contactTitle)
 																? '#B7E5FF'
-																: '#E8EFFF',
+																: isMusicFestivalTitle(contactTitle)
+																	? '#C1D6FF'
+																	: '#E8EFFF',
 												}}
 											>
 												{isRestaurantTitle(contactTitle) && (
@@ -1377,6 +1387,9 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 												{isMusicVenueTitle(contactTitle) && (
 													<MusicVenuesIcon size={14} className="flex-shrink-0" />
 												)}
+												{isMusicFestivalTitle(contactTitle) && (
+													<FestivalsIcon size={14} className="flex-shrink-0" />
+												)}
 												<ScrollableText
 													text={
 														isRestaurantTitle(contactTitle)
@@ -1385,7 +1398,9 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 																? 'Coffee Shop'
 																: isMusicVenueTitle(contactTitle)
 																	? 'Music Venue'
-																	: contactTitle
+																	: isMusicFestivalTitle(contactTitle)
+																		? 'Music Festival'
+																		: contactTitle
 													}
 													className="text-[10px] text-black leading-none"
 													scrollPixelsPerSecond={60}

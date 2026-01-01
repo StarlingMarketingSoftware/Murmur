@@ -1,15 +1,21 @@
-import React from 'react';
+import React, { FC } from 'react';
 
-export const FestivalsIcon = () => {
+interface FestivalsIconProps {
+	size?: number;
+	className?: string;
+}
+
+export const FestivalsIcon: FC<FestivalsIconProps> = ({ size, className }) => {
 	return (
 		<svg
-			width="24"
-			height="24"
+			width={size ?? 24}
+			height={size ?? 24}
 			// Add a touch of padding so the icon doesn't render flush to the SVG bounds
 			// (some browsers will visually clip paths that sit right on the edge).
 			viewBox="-0.5 -0.5 25 25"
 			fill="none"
 			xmlns="http://www.w3.org/2000/svg"
+			className={className}
 		>
 			<path
 				d="M11.875 0.851074C13.075 3.04159 15.2041 5.42616 18.0322 7.54834C19.687 8.79004 21.4097 9.80918 23.0869 10.5854H23.584V23.3159H0.371094V10.8071H0.364258C0.36658 10.8063 0.368771 10.8051 0.371094 10.8042V10.5854H0.931641C2.65851 9.88693 4.43844 8.89225 6.12402 7.62744C8.93736 5.51635 10.9375 3.0689 11.875 0.851074Z"
