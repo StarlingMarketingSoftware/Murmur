@@ -111,7 +111,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const {
 		view = 'testing',
 		goToDrafting,
-		goToAll,
+		// eslint-disable-next-line @typescript-eslint/no-unused-vars
+		goToAll: _goToAll,
 		goToWriting,
 		onOpenIdentityDialog,
 		onGoToSearch,
@@ -184,7 +185,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		[campaign?.identity?.id, editIdentity, queryClient]
 	);
 
-	const router = useRouter();
+	// eslint-disable-next-line @typescript-eslint/no-unused-vars
+	const _router = useRouter();
 	const isMobile = useIsMobile();
 	const [isClient, setIsClient] = useState(false);
 	useEffect(() => setIsClient(true), []);

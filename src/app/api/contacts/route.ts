@@ -129,7 +129,8 @@ const coffeeQueryWantsMarketing = (rawQuery: string | null | undefined): boolean
 	return COFFEE_MARKETING_INTENT_TERMS.some((t) => q.includes(t));
 };
 
-const contactHasStrongCoffeeBusinessSignals = (contact: Contact): boolean => {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const _contactHasStrongCoffeeBusinessSignals = (contact: Contact): boolean => {
 	const company = normalizeSearchText(contact.company);
 	const title = normalizeSearchText(contact.title);
 	const headline = normalizeSearchText(contact.headline);
