@@ -3816,7 +3816,8 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 									{/* Removed explicit drag bar; header below acts as the drag handle */}
 									{/* Subject header inside the box */}
 									<div ref={headerSectionRef} className={cn('pt-0 pb-0')}>
-										<div className={cn(!compactLeftOnly ? 'bg-white' : '', 'relative h-[31px]')}>
+										<div className={cn(!compactLeftOnly ? 'bg-white' : '', 'relative')}>
+											<div className="relative h-[31px]">
 											{/* Left 130px gray background */}
 											{!compactLeftOnly && (
 												<div
@@ -3920,6 +3921,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														Hybrid
 													</Button>
 												</div>
+											</div>
 											</div>
 											{compactLeftOnly ? null : (
 												<>
