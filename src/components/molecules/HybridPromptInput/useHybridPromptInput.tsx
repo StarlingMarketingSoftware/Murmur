@@ -510,13 +510,15 @@ export const useHybridPromptInput = (props: HybridPromptInputProps) => {
 	// Do not auto-open the Test Preview when a prior testMessage exists.
 	// Users can explicitly open it via the Test button.
 
-	const handleAddTextBlockAt = (index: number) => {
-		const newTextId = `text-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+	const handleAddTextBlockAt = (index: number, explicitId?: string) => {
+		const newTextId =
+			explicitId ?? `text-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 		insert(index + 1, {
 			id: newTextId,
 			type: HybridBlock.text,
 			value: '',
 		});
+		return newTextId;
 	};
 
 	const handleToggleCollapse = (id: string) => {

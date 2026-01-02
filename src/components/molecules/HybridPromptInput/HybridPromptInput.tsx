@@ -2603,6 +2603,53 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 	const isHybridModeSelected = selectedModeKey === 'hybrid';
 	const isManualModeSelected = selectedModeKey === 'manual';
 
+	type HybridStructureSelection =
+		| { kind: 'none' }
+		| { kind: 'subject' }
+		| { kind: 'signature' }
+		| { kind: 'block'; blockId: string };
+
+	const [hybridStructureSelection, setHybridStructureSelection] =
+		useState<HybridStructureSelection>({ kind: 'none' });
+
+	// Reset hybrid-only UI when switching modes
+	useEffect(() => {
+		if (selectedModeKey !== 'hybrid') {
+			setHybridStructureSelection({ kind: 'none' });
+		}
+	}, [selectedModeKey]);
+
+	// If the selected block disappears, clear selection
+	useEffect(() => {
+		if (hybridStructureSelection.kind !== 'block') return;
+		const exists = fields.some((f) => f.id === hybridStructureSelection.blockId);
+		if (!exists) setHybridStructureSelection({ kind: 'none' });
+	}, [fields, hybridStructureSelection]);
+
+	const getHybridStructureLabel = useCallback((type: HybridBlock) => {
+		switch (type) {
+			case HybridBlock.introduction:
+				return 'Intro';
+			case HybridBlock.research:
+				return 'Research';
+			case HybridBlock.action:
+				return 'Call to Action';
+			case HybridBlock.text:
+				return 'Text';
+			default:
+				return 'Block';
+		}
+	}, []);
+
+	const handleHybridStructureAddTextAfterIndex = useCallback(
+		(afterIndex: number) => {
+			if (afterIndex < 0 || afterIndex >= fields.length) return;
+			const newId = handleAddTextBlockAt(afterIndex);
+			setHybridStructureSelection({ kind: 'block', blockId: newId });
+		},
+		[fields.length, handleAddTextBlockAt]
+	);
+
 	// Manual tab redesign assumes a single unified body editor. If multiple manual Text blocks exist,
 	// collapse them into one so the editor can display/edit everything.
 	useEffect(() => {
@@ -3939,7 +3986,9 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 												</>
 											)}
 										</div>
-										{activeTab !== 'profile' && selectedModeKey !== 'manual' && (
+										{activeTab !== 'profile' &&
+											selectedModeKey !== 'manual' &&
+											selectedModeKey !== 'hybrid' && (
 											<div className="flex flex-col items-center pt-[38px] max-[480px]:pt-[38px]">
 												<FormField
 													control={form.control}
@@ -5068,7 +5117,413 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 											</div>
 										)}
 
-										{selectedModeKey !== 'manual' && (
+										{selectedModeKey === 'hybrid' && (
+											<div className="w-full flex flex-col items-center gap-3">
+												{/* Hybrid (compressed) structure box */}
+												<div
+													className={cn(
+														'w-[448px] max-w-[89.33vw] min-h-[230px] rounded-[8px] border-2 border-black bg-[#8989E1] flex flex-col',
+														// Left inset is 10px as requested; right inset is tuned so a 429px hover width fits cleanly.
+														'pl-[10px] pr-[5px] py-[14px]'
+													)}
+													style={{ backgroundColor: '#8989E1' }}
+													data-hpi-hybrid-structure
+												>
+													{/* Subject (matches Auto-tab toggle behavior) */}
+													{(() => {
+														const isAiSubjectLocal = form.watch('isAiSubject');
+														const subjectText = form.watch('subject') || '';
+
+														const toggleAiSubject = () => {
+															const next = !form.getValues('isAiSubject');
+															form.setValue('isAiSubject', next, { shouldDirty: true });
+															// When turning Auto back on, clear manual subject (matches Auto tab behavior)
+															if (next) form.setValue('subject', '', { shouldDirty: true });
+														};
+
+														// Auto ON: compact by default, expands on hover.
+														// Auto OFF: stays expanded so the user can type.
+														return (
+															<div
+																className={cn(
+																	'relative group/hybrid-subject transition-none',
+																	isAiSubjectLocal ? 'w-[150px] hover:w-[429px]' : 'w-[429px]'
+																)}
+															>
+																{/* Collapsed pill (Auto ON only) */}
+																{isAiSubjectLocal && (
+																	<button
+																		type="button"
+																		className={cn(
+																			'w-[150px] h-[28px] rounded-[8px] border-[3px] border-black bg-[#E0E0E0]',
+																			'flex items-center justify-start px-3',
+																			'font-inter font-medium text-[14px] text-black',
+																			'group-hover/hybrid-subject:hidden'
+																		)}
+																		aria-label="Subject"
+																	>
+																		Subject
+																	</button>
+																)}
+
+																{/* Expanded bar (Auto ON on hover; Auto OFF always) */}
+																<div
+																	className={cn(
+																		'items-center h-[28px] rounded-[8px] border-2 border-black overflow-hidden bg-white w-full',
+																		isAiSubjectLocal
+																			? 'hidden group-hover/hybrid-subject:flex'
+																			: 'flex'
+																	)}
+																>
+																	{/* Left label */}
+																	<div
+																		className={cn(
+																			'pl-2 flex items-center h-full shrink-0',
+																			isAiSubjectLocal ? 'w-[130px] bg-[#E0E0E0]' : 'w-[110px] bg-white'
+																		)}
+																	>
+																		<span className="font-inter font-semibold text-[14px] whitespace-nowrap text-black">
+																			{isAiSubjectLocal ? 'Auto Subject' : 'Subject'}
+																		</span>
+																	</div>
+
+																	{/* Toggle */}
+																	<button
+																		type="button"
+																		onClick={toggleAiSubject}
+																		className={cn(
+																			'relative h-full flex items-center text-[12px] font-inter font-normal shrink-0',
+																			isAiSubjectLocal
+																				? 'w-[47px] px-2 justify-center text-black bg-[#4ADE80]'
+																				: 'w-[80px] px-2 justify-center text-black bg-[#DADAFC]'
+																		)}
+																		aria-pressed={isAiSubjectLocal}
+																		aria-label={isAiSubjectLocal ? 'Auto on' : 'Auto off'}
+																	>
+																		<span className="absolute left-0 h-full border-l border-black" />
+																		<span>{isAiSubjectLocal ? 'on' : 'Auto off'}</span>
+																		<span className="absolute right-0 h-full border-r border-black" />
+																	</button>
+
+																	{/* Input */}
+																	<div className={cn('flex-grow h-full', 'bg-white')}>
+																		<Input
+																			value={subjectText}
+																			onChange={(e) => {
+																				if (e.target.value) setHasSubjectBeenTouched(true);
+																				form.setValue('subject', e.target.value, { shouldDirty: true });
+																			}}
+																			onFocus={(e) => trackFocusedField?.('subject', e.target)}
+																			onBlur={() => setHasSubjectBeenTouched(true)}
+																			disabled={isAiSubjectLocal}
+																			className={cn(
+																				'w-full h-full !bg-transparent pl-3 pr-3 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0',
+																				shouldShowSubjectRedStyling
+																					? '!text-[#A20000] placeholder:!text-[#A20000]'
+																					: '!text-black placeholder:!text-[#9E9E9E]',
+																				isAiSubjectLocal && 'cursor-not-allowed'
+																			)}
+																			placeholder={
+																				isAiSubjectLocal
+																					? 'Write manual subject here'
+																					: 'Write your subject here. *required'
+																			}
+																		/>
+																	</div>
+																</div>
+															</div>
+														);
+													})()}
+
+													{(() => {
+														const introId = HybridBlock.introduction as unknown as string;
+														const researchId = HybridBlock.research as unknown as string;
+														const actionId = HybridBlock.action as unknown as string;
+
+														const isSelected = (id: string) =>
+															hybridStructureSelection.kind === 'block' &&
+															hybridStructureSelection.blockId === id;
+
+														const openOrCreateTextAfter = (coreType: HybridBlock) => {
+															const coreIndex = fields.findIndex((f) => f.type === coreType);
+															if (coreIndex === -1) return;
+															const next = fields[coreIndex + 1];
+															if (next?.type === HybridBlock.text) {
+																setHybridStructureSelection({
+																	kind: 'block',
+																	blockId: next.id,
+																});
+																return;
+															}
+															const newId = handleAddTextBlockAt(coreIndex);
+															setHybridStructureSelection({ kind: 'block', blockId: newId });
+														};
+
+														const getImmediateTextAfter = (coreType: HybridBlock) => {
+															const coreIndex = fields.findIndex((f) => f.type === coreType);
+															if (coreIndex === -1) return null;
+															const next = fields[coreIndex + 1];
+															return next?.type === HybridBlock.text ? next : null;
+														};
+
+														const introText = getImmediateTextAfter(HybridBlock.introduction);
+														const researchText = getImmediateTextAfter(HybridBlock.research);
+														const actionText = getImmediateTextAfter(HybridBlock.action);
+
+														const AddTextGap = ({
+															height,
+															onClick,
+														}: {
+															height: number;
+															onClick: () => void;
+														}) => (
+															<div
+																className="group relative w-full overflow-visible"
+																style={{ height }}
+															>
+																<button
+																	type="button"
+																	onClick={onClick}
+																	className={cn(
+																		// Place the button 17px to the right of the 150px pill:
+																		// pillWidth (150) + gap (17) = 167px
+																		'absolute left-[167px] top-1/2 -translate-y-1/2',
+																		'w-[57px] h-[22px] rounded-[4px] border border-[#0B741A] bg-[#9EDDB6]',
+																		'flex items-center justify-center gap-[5px] box-border',
+																		'opacity-0 pointer-events-none',
+																		'group-hover:opacity-100 group-hover:pointer-events-auto',
+																		'transition-opacity duration-150',
+																		'font-inter font-medium text-[12px] leading-none text-black'
+																	)}
+																	aria-label="Add Text"
+																>
+																	<span className="text-[14px] leading-none">+</span>
+																	<span className="leading-none">Text</span>
+																</button>
+															</div>
+														);
+
+														const TextPill = ({ id }: { id: string }) => (
+															<button
+																type="button"
+																onClick={() =>
+																	setHybridStructureSelection({ kind: 'block', blockId: id })
+																}
+																className={cn(
+																	'w-[150px] hover:w-[429px] transition-none h-[28px] rounded-[8px] border-[3px] bg-[#A6E2A8] border-[#0B741A]',
+																	'flex items-center justify-start px-3',
+																	'font-inter font-medium text-[14px] text-black',
+																	isSelected(id) &&
+																		'ring-2 ring-black ring-offset-2 ring-offset-[#8989E1]'
+																)}
+															>
+																Text
+															</button>
+														);
+
+														return (
+															<div className="w-full flex flex-col items-start">
+																{/* Subject -> Intro gap: 17px (no +Text) */}
+																<div className="h-[17px]" />
+
+																{/* Intro */}
+																<button
+																	type="button"
+																	onClick={() =>
+																		setHybridStructureSelection({ kind: 'block', blockId: introId })
+																	}
+																	className={cn(
+																		'w-[150px] hover:w-[429px] transition-none h-[28px] rounded-[8px] border-[3px] bg-[#DADAFC] border-[#6673FF]',
+																		'flex items-center justify-start px-3',
+																		'font-inter font-medium text-[14px] text-black',
+																		isSelected(introId) &&
+																			'ring-2 ring-black ring-offset-2 ring-offset-[#8989E1]'
+																	)}
+																>
+																	Intro
+																</button>
+
+																{/* Intro -> Research slot */}
+																{introText ? (
+																	<>
+																		<div className="h-[12px]" />
+																		<TextPill id={introText.id} />
+																		<div className="h-[12px]" />
+																	</>
+																) : (
+																	<AddTextGap
+																		height={12}
+																		onClick={() =>
+																			openOrCreateTextAfter(HybridBlock.introduction)
+																		}
+																	/>
+																)}
+
+																{/* Research */}
+																<button
+																	type="button"
+																	onClick={() =>
+																		setHybridStructureSelection({
+																			kind: 'block',
+																			blockId: researchId,
+																		})
+																	}
+																	className={cn(
+																		'w-[150px] hover:w-[429px] transition-none h-[28px] rounded-[8px] border-[3px] bg-[#C7C7FF] border-[#1010E7]',
+																		'flex items-center justify-start px-3',
+																		'font-inter font-medium text-[14px] text-black',
+																		isSelected(researchId) &&
+																			'ring-2 ring-black ring-offset-2 ring-offset-[#8989E1]'
+																	)}
+																>
+																	Research
+																</button>
+
+																{/* Research -> CTA slot */}
+																{researchText ? (
+																	<>
+																		<div className="h-[12px]" />
+																		<TextPill id={researchText.id} />
+																		<div className="h-[12px]" />
+																	</>
+																) : (
+																	<AddTextGap
+																		height={12}
+																		onClick={() => openOrCreateTextAfter(HybridBlock.research)}
+																	/>
+																)}
+
+																{/* Call to Action */}
+																<button
+																	type="button"
+																	onClick={() =>
+																		setHybridStructureSelection({
+																			kind: 'block',
+																			blockId: actionId,
+																		})
+																	}
+																	className={cn(
+																		'w-[150px] hover:w-[429px] transition-none h-[28px] rounded-[8px] border-[3px] bg-[#A0A0D5] border-[#0E0E7F]',
+																		'flex items-center justify-start px-3',
+																		'font-inter font-medium text-[14px] text-black',
+																		isSelected(actionId) &&
+																			'ring-2 ring-black ring-offset-2 ring-offset-[#8989E1]'
+																	)}
+																>
+																	Call to Action
+																</button>
+
+																{/* CTA -> Signature slot */}
+																{actionText ? (
+																	<>
+																		<div className="h-[15px]" />
+																		<TextPill id={actionText.id} />
+																		<div className="h-[15px]" />
+																	</>
+																) : (
+																	<AddTextGap
+																		height={15}
+																		onClick={() => openOrCreateTextAfter(HybridBlock.action)}
+																	/>
+																)}
+															</div>
+														);
+													})()}
+
+													{/* Signature pill */}
+													<button
+														type="button"
+														onClick={() => setHybridStructureSelection({ kind: 'signature' })}
+														className={cn(
+															'w-[150px] hover:w-[429px] transition-none h-[28px] rounded-[8px] border-[3px] border-black bg-[#E0E0E0]',
+															'flex items-center justify-start px-3',
+															'font-inter font-medium text-[14px] text-black',
+															hybridStructureSelection.kind === 'signature' &&
+																'ring-2 ring-black ring-offset-2 ring-offset-[#8989E1]'
+														)}
+													>
+														Signature
+													</button>
+												</div>
+
+												{/* Hybrid editor panel (opens when a pill is selected) */}
+												{hybridStructureSelection.kind !== 'none' &&
+													hybridStructureSelection.kind !== 'subject' && (
+													<div
+														className={cn(
+															'w-[448px] max-w-[89.33vw] rounded-[8px] border-2 border-black bg-white',
+															'px-4 py-3'
+														)}
+														data-hpi-hybrid-structure-editor
+													>
+														{(() => {
+															if (hybridStructureSelection.kind === 'signature') {
+																const fieldProps = form.register('signature');
+																return (
+																	<div className="flex flex-col gap-2">
+																		<span className="font-inter font-semibold text-[14px] text-black">
+																			Signature
+																		</span>
+																		<Textarea
+																			placeholder="Enter your signature..."
+																			className={cn(
+																				'min-h-[90px] border-2 border-black rounded-[8px] bg-white',
+																				'font-inter text-[14px] text-black'
+																			)}
+																			{...fieldProps}
+																		/>
+																	</div>
+																);
+															}
+
+															if (hybridStructureSelection.kind === 'block') {
+																const idx = fields.findIndex(
+																	(f) => f.id === hybridStructureSelection.blockId
+																);
+																if (idx === -1) return null;
+																const field = fields[idx];
+																const fieldProps = form.register(
+																	`hybridBlockPrompts.${idx}.value`
+																);
+																const meta = getBlock(field.type as HybridBlock);
+																const label = getHybridStructureLabel(field.type as HybridBlock);
+
+																return (
+																	<div className="flex flex-col gap-2">
+																		<span className="font-inter font-semibold text-[14px] text-black">
+																			{label}
+																		</span>
+																		{field.type === HybridBlock.text ? (
+																			<Textarea
+																				placeholder={meta.placeholder || ''}
+																				className={cn(
+																					'min-h-[120px] border-2 border-black rounded-[8px] bg-white',
+																					'font-inter text-[14px] text-black'
+																				)}
+																				{...fieldProps}
+																			/>
+																		) : (
+																			<Input
+																				placeholder={meta.placeholder || ''}
+																				className={cn(
+																					'h-[34px] border-2 border-black rounded-[8px] bg-white',
+																					'font-inter text-[14px] text-black'
+																				)}
+																				{...fieldProps}
+																			/>
+																		)}
+																	</div>
+																);
+															}
+
+															return null;
+														})()}
+													</div>
+												)}
+											</div>
+										)}
+
+										{selectedModeKey !== 'manual' && selectedModeKey !== 'hybrid' && (
 											<>
 										{fields.length === 0 && (
 											<span className="text-gray-300 font-primary text-[12px]">
@@ -5096,7 +5551,8 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 															.map((f) => f.type)
 													);
 
-													const shouldShowPlaceholders = selectedModeKey === 'hybrid';
+													// Placeholders are only relevant in Hybrid mode; this list is rendered only in non-hybrid modes.
+													const shouldShowPlaceholders = false;
 													const missingHybridTypes = shouldShowPlaceholders
 														? orderedHybridTypes.filter((t) => !presentHybridTypes.has(t))
 														: [];
@@ -5152,7 +5608,6 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 													}
 
 													const renderHybridPlaceholder = (type: HybridBlock) => {
-														if (selectedModeKey !== 'hybrid') return null;
 														const label =
 															type === HybridBlock.introduction
 																? 'Intro'
@@ -5499,6 +5954,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 								{activeTab !== 'profile' &&
 									!showTestPreview &&
 									selectedModeKey !== 'full' &&
+									selectedModeKey !== 'hybrid' &&
 									selectedModeKey !== 'manual' && (
 									<FormField
 										control={form.control}
