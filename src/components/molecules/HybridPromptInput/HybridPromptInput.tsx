@@ -2521,6 +2521,18 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 	const [isAutoSignature, setIsAutoSignature] = useState(true);
 	const [manualSignatureValue, setManualSignatureValue] = useState('');
 
+	// Track if Custom Instructions is open (for adjusting Generate Test button position)
+	const [isLocalCustomInstructionsOpen, setIsLocalCustomInstructionsOpen] = useState(false);
+
+	// Wrap the parent callback to also update local state
+	const handleCustomInstructionsOpenChange = useCallback(
+		(isOpen: boolean) => {
+			setIsLocalCustomInstructionsOpen(isOpen);
+			onCustomInstructionsOpenChange?.(isOpen);
+		},
+		[onCustomInstructionsOpenChange]
+	);
+
 	const isHandwrittenMode =
 		(form.getValues('hybridBlockPrompts')?.length || 0) > 0 &&
 		form.getValues('hybridBlockPrompts').every((b) => b.type === HybridBlock.text);
@@ -5226,7 +5238,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																		onUndoUpscalePrompt={onUndoUpscalePrompt}
 																		onCustomInstructionsOpenChange={
 																			field.type === HybridBlock.full_automated
-																				? onCustomInstructionsOpenChange
+																				? handleCustomInstructionsOpenChange
 																				: undefined
 																		}
 																		profileFields={profileFields}
@@ -5400,7 +5412,10 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 										)}
 										{/* Full Auto: Generate Test button sits in the empty green space (desktop) */}
 										{selectedModeKey === 'full' && !showTestPreview && !compactLeftOnly && (
-											<div className="absolute bottom-[194px] left-0 right-0 w-full flex items-center justify-center max-[480px]:hidden">
+											<div className={cn(
+												'absolute left-0 right-0 w-full flex items-center justify-center max-[480px]:hidden',
+												isLocalCustomInstructionsOpen ? 'bottom-[124px]' : 'bottom-[194px]'
+											)}>
 												<Button
 													type="button"
 													data-hover-description="This will show you a test draft, given all of what you provided"
