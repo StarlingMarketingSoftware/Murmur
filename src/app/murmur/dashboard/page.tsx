@@ -3324,16 +3324,18 @@ const DashboardContent = () => {
 							  };
 
 						const normalizedWhatKey = whatValue.trim();
-						const whatCfg = MAP_RESULTS_SEARCH_TRAY.whatIconByLabel[normalizedWhatKey];
-						const TrayWhatIcon = whatCfg?.Icon || (isPromotion ? RadioStationsIcon : MusicVenuesIcon);
+						// If the segmented "What" state isn't populated (e.g. the user searched via raw text),
+						// fall back to the last executed query so the tray doesn't "jump" to a default icon.
+						const searchedWhatKey = (searchedWhat || '').trim();
+						const effectiveWhatKeyForTray = normalizedWhatKey || searchedWhatKey;
+						const whatCfg = MAP_RESULTS_SEARCH_TRAY.whatIconByLabel[effectiveWhatKeyForTray];
+						const TrayWhatIcon = whatCfg?.Icon || MusicVenuesIcon;
 						const trayWhatIconSize =
-							normalizedWhatKey === 'Wine, Beer, and Spirits' ? 22 : undefined;
+							effectiveWhatKeyForTray === 'Wine, Beer, and Spirits' ? 22 : undefined;
 						const trayWhat = {
 							backgroundColor:
 								whatCfg?.backgroundColor ||
-								(isPromotion
-									? MAP_RESULTS_SEARCH_TRAY.whatIconByLabel['Radio Stations'].backgroundColor
-									: MAP_RESULTS_SEARCH_TRAY.whatIconByLabel['Music Venues'].backgroundColor),
+								MAP_RESULTS_SEARCH_TRAY.whatIconByLabel['Music Venues'].backgroundColor,
 							icon: <TrayWhatIcon size={trayWhatIconSize} />,
 						};
 
@@ -3455,6 +3457,7 @@ const DashboardContent = () => {
 														onClick={() => {
 															setWhyValue('[Promotion]');
 															setIsWhyDropdownOpen(false);
+															setIsWhatDropdownOpen(true);
 														}}
 													>
 														<div
@@ -3484,6 +3487,7 @@ const DashboardContent = () => {
 														onClick={() => {
 															setWhyValue('[Booking]');
 															setIsWhyDropdownOpen(false);
+															setIsWhatDropdownOpen(true);
 														}}
 													>
 														<div
@@ -3526,7 +3530,7 @@ const DashboardContent = () => {
 												className="absolute top-[calc(100%+8px)] left-0 border-[3px] border-black rounded-[12px] z-50"
 												style={{
 													width: '249px',
-													height: '277px',
+													height: isPromotion ? '66px' : '277px',
 													backgroundColor: 'rgba(216, 229, 251, 0.9)',
 												}}
 											>
@@ -3542,191 +3546,255 @@ const DashboardContent = () => {
 														height: 0 !important;
 													}
 												`}</style>
-												<CustomScrollbar
-													className="h-full"
-													contentClassName="flex flex-col items-center gap-[10px] py-[10px] pl-[6px] pr-[26px] -mr-[20px]"
-													thumbWidth={2}
-													thumbColor="#000000"
-													offsetRight={-5}
-													lockHorizontalScroll
-												>
-													{/* 1. Wine, Beer, and Spirits option */}
-													<div
-														role="option"
-														aria-selected={whatValue === 'Wine, Beer, and Spirits'}
-														className="flex items-center gap-3 cursor-pointer bg-white rounded-[8px] hover:bg-gray-50 transition-colors flex-shrink-0"
-														style={{
-															width: '237px',
-															height: '46px',
-															paddingLeft: '4px',
-															paddingRight: '12px',
-														}}
-														onClick={() => {
-															setWhatValue('Wine, Beer, and Spirits');
-															setIsWhatDropdownOpen(false);
-														}}
-													>
+												{isPromotion ? (
+													/* Promotion: only Radio Stations - centered in compact container */
+													<div className="flex items-center justify-center h-full w-full">
 														<div
-															className="flex items-center justify-center flex-shrink-0"
+															role="option"
+															aria-selected={whatValue === 'Radio Stations'}
+															className="flex items-center gap-3 cursor-pointer bg-white rounded-[8px] hover:bg-gray-50 transition-colors flex-shrink-0"
 															style={{
-																width: '38px',
-																height: '38px',
-																backgroundColor: MAP_RESULTS_SEARCH_TRAY.whatIconByLabel['Wine, Beer, and Spirits'].backgroundColor,
-																borderRadius: '10px',
+																width: '237px',
+																height: '46px',
+																paddingLeft: '4px',
+																paddingRight: '12px',
+															}}
+															onClick={() => {
+																setWhatValue('Radio Stations');
+																setIsWhatDropdownOpen(false);
 															}}
 														>
-															<WineBeerSpiritsIcon size={22} />
+															<div
+																className="flex items-center justify-center flex-shrink-0"
+																style={{
+																	width: '38px',
+																	height: '38px',
+																	backgroundColor:
+																		MAP_RESULTS_SEARCH_TRAY.whatIconByLabel['Radio Stations']
+																			.backgroundColor,
+																	borderRadius: '10px',
+																}}
+															>
+																<RadioStationsIcon />
+															</div>
+															<span className="text-[15px] font-medium text-black font-inter">
+																Radio Stations
+															</span>
 														</div>
-														<span className="text-[15px] font-medium text-black font-inter flex-1 min-w-0 truncate">
-															Wine, Beer, and Spirits
-														</span>
 													</div>
-													{/* 2. Restaurants option */}
-													<div
-														role="option"
-														aria-selected={whatValue === 'Restaurants'}
-														className="flex items-center gap-3 cursor-pointer bg-white rounded-[8px] hover:bg-gray-50 transition-colors flex-shrink-0"
-														style={{
-															width: '237px',
-															height: '46px',
-															paddingLeft: '4px',
-															paddingRight: '12px',
-														}}
-														onClick={() => {
-															setWhatValue('Restaurants');
-															setIsWhatDropdownOpen(false);
-														}}
+												) : (
+													<CustomScrollbar
+														className="h-full"
+														contentClassName="flex flex-col items-center gap-[10px] py-[10px] pl-[6px] pr-[26px] -mr-[20px]"
+														thumbWidth={2}
+														thumbColor="#000000"
+														offsetRight={-5}
+														lockHorizontalScroll
 													>
-														<div
-															className="flex items-center justify-center flex-shrink-0"
-															style={{
-																width: '38px',
-																height: '38px',
-																backgroundColor: MAP_RESULTS_SEARCH_TRAY.whatIconByLabel['Restaurants'].backgroundColor,
-																borderRadius: '10px',
-															}}
-														>
-															<RestaurantsIcon />
-														</div>
-														<span className="text-[15px] font-medium text-black font-inter">Restaurants</span>
-													</div>
-													{/* 3. Coffee Shops option */}
-													<div
-														role="option"
-														aria-selected={whatValue === 'Coffee Shops'}
-														className="flex items-center gap-3 cursor-pointer bg-white rounded-[8px] hover:bg-gray-50 transition-colors flex-shrink-0"
-														style={{
-															width: '237px',
-															height: '46px',
-															paddingLeft: '4px',
-															paddingRight: '12px',
-														}}
-														onClick={() => {
-															setWhatValue('Coffee Shops');
-															setIsWhatDropdownOpen(false);
-														}}
-													>
-														<div
-															className="flex items-center justify-center flex-shrink-0"
-															style={{
-																width: '38px',
-																height: '38px',
-																backgroundColor: MAP_RESULTS_SEARCH_TRAY.whatIconByLabel['Coffee Shops'].backgroundColor,
-																borderRadius: '10px',
-															}}
-														>
-															<CoffeeShopsIcon />
-														</div>
-														<span className="text-[15px] font-medium text-black font-inter">Coffee Shops</span>
-													</div>
-													{/* 4. Festivals option */}
-													<div
-														role="option"
-														aria-selected={whatValue === 'Festivals'}
-														className="flex items-center gap-3 cursor-pointer bg-white rounded-[8px] hover:bg-gray-50 transition-colors flex-shrink-0"
-														style={{
-															width: '237px',
-															height: '46px',
-															paddingLeft: '4px',
-															paddingRight: '12px',
-														}}
-														onClick={() => {
-															setWhatValue('Festivals');
-															setIsWhatDropdownOpen(false);
-														}}
-													>
-														<div
-															className="flex items-center justify-center flex-shrink-0"
-															style={{
-																width: '38px',
-																height: '38px',
-																backgroundColor: MAP_RESULTS_SEARCH_TRAY.whatIconByLabel['Festivals'].backgroundColor,
-																borderRadius: '10px',
-															}}
-														>
-															<FestivalsIcon />
-														</div>
-														<span className="text-[15px] font-medium text-black font-inter">Festivals</span>
-													</div>
-													{/* 5. Wedding Planners option */}
-													<div
-														role="option"
-														aria-selected={whatValue === 'Wedding Planners'}
-														className="flex items-center gap-3 cursor-pointer bg-white rounded-[8px] hover:bg-gray-50 transition-colors flex-shrink-0"
-														style={{
-															width: '237px',
-															height: '46px',
-															paddingLeft: '4px',
-															paddingRight: '12px',
-														}}
-														onClick={() => {
-															setWhatValue('Wedding Planners');
-															setIsWhatDropdownOpen(false);
-														}}
-													>
-														<div
-															className="flex items-center justify-center flex-shrink-0"
-															style={{
-																width: '38px',
-																height: '38px',
-																backgroundColor: MAP_RESULTS_SEARCH_TRAY.whatIconByLabel['Wedding Planners'].backgroundColor,
-																borderRadius: '10px',
-															}}
-														>
-															<WeddingPlannersIcon />
-														</div>
-														<span className="text-[15px] font-medium text-black font-inter">Wedding Planners</span>
-													</div>
-													{/* 6. Music Venues option */}
-													<div
-														role="option"
-														aria-selected={whatValue === 'Music Venues'}
-														className="flex items-center gap-3 cursor-pointer bg-white rounded-[8px] hover:bg-gray-50 transition-colors flex-shrink-0"
-														style={{
-															width: '237px',
-															height: '46px',
-															paddingLeft: '4px',
-															paddingRight: '12px',
-														}}
-														onClick={() => {
-															setWhatValue('Music Venues');
-															setIsWhatDropdownOpen(false);
-														}}
-													>
-														<div
-															className="flex items-center justify-center flex-shrink-0"
-															style={{
-																width: '38px',
-																height: '38px',
-																backgroundColor: MAP_RESULTS_SEARCH_TRAY.whatIconByLabel['Music Venues'].backgroundColor,
-																borderRadius: '10px',
-															}}
-														>
-															<MusicVenuesIcon />
-														</div>
-														<span className="text-[15px] font-medium text-black font-inter">Music Venues</span>
-													</div>
-												</CustomScrollbar>
+														<>
+															{/* 1. Wine, Beer, and Spirits option */}
+															<div
+																role="option"
+																aria-selected={whatValue === 'Wine, Beer, and Spirits'}
+																className="flex items-center gap-3 cursor-pointer bg-white rounded-[8px] hover:bg-gray-50 transition-colors flex-shrink-0"
+																style={{
+																	width: '237px',
+																	height: '46px',
+																	paddingLeft: '4px',
+																	paddingRight: '12px',
+																}}
+																onClick={() => {
+																	setWhatValue('Wine, Beer, and Spirits');
+																	setIsWhatDropdownOpen(false);
+																}}
+															>
+																<div
+																	className="flex items-center justify-center flex-shrink-0"
+																	style={{
+																		width: '38px',
+																		height: '38px',
+																		backgroundColor:
+																			MAP_RESULTS_SEARCH_TRAY.whatIconByLabel[
+																				'Wine, Beer, and Spirits'
+																			].backgroundColor,
+																		borderRadius: '10px',
+																	}}
+																>
+																	<WineBeerSpiritsIcon size={22} />
+																</div>
+																<span className="text-[15px] font-medium text-black font-inter flex-1 min-w-0 truncate">
+																	Wine, Beer, and Spirits
+																</span>
+															</div>
+															{/* 2. Restaurants option */}
+															<div
+																role="option"
+																aria-selected={whatValue === 'Restaurants'}
+																className="flex items-center gap-3 cursor-pointer bg-white rounded-[8px] hover:bg-gray-50 transition-colors flex-shrink-0"
+																style={{
+																	width: '237px',
+																	height: '46px',
+																	paddingLeft: '4px',
+																	paddingRight: '12px',
+																}}
+																onClick={() => {
+																	setWhatValue('Restaurants');
+																	setIsWhatDropdownOpen(false);
+																}}
+															>
+																<div
+																	className="flex items-center justify-center flex-shrink-0"
+																	style={{
+																		width: '38px',
+																		height: '38px',
+																		backgroundColor:
+																			MAP_RESULTS_SEARCH_TRAY.whatIconByLabel['Restaurants']
+																				.backgroundColor,
+																		borderRadius: '10px',
+																	}}
+																>
+																	<RestaurantsIcon />
+																</div>
+																<span className="text-[15px] font-medium text-black font-inter">
+																	Restaurants
+																</span>
+															</div>
+															{/* 3. Coffee Shops option */}
+															<div
+																role="option"
+																aria-selected={whatValue === 'Coffee Shops'}
+																className="flex items-center gap-3 cursor-pointer bg-white rounded-[8px] hover:bg-gray-50 transition-colors flex-shrink-0"
+																style={{
+																	width: '237px',
+																	height: '46px',
+																	paddingLeft: '4px',
+																	paddingRight: '12px',
+																}}
+																onClick={() => {
+																	setWhatValue('Coffee Shops');
+																	setIsWhatDropdownOpen(false);
+																}}
+															>
+																<div
+																	className="flex items-center justify-center flex-shrink-0"
+																	style={{
+																		width: '38px',
+																		height: '38px',
+																		backgroundColor:
+																			MAP_RESULTS_SEARCH_TRAY.whatIconByLabel['Coffee Shops']
+																				.backgroundColor,
+																		borderRadius: '10px',
+																	}}
+																>
+																	<CoffeeShopsIcon />
+																</div>
+																<span className="text-[15px] font-medium text-black font-inter">
+																	Coffee Shops
+																</span>
+															</div>
+															{/* 4. Festivals option */}
+															<div
+																role="option"
+																aria-selected={whatValue === 'Festivals'}
+																className="flex items-center gap-3 cursor-pointer bg-white rounded-[8px] hover:bg-gray-50 transition-colors flex-shrink-0"
+																style={{
+																	width: '237px',
+																	height: '46px',
+																	paddingLeft: '4px',
+																	paddingRight: '12px',
+																}}
+																onClick={() => {
+																	setWhatValue('Festivals');
+																	setIsWhatDropdownOpen(false);
+																}}
+															>
+																<div
+																	className="flex items-center justify-center flex-shrink-0"
+																	style={{
+																		width: '38px',
+																		height: '38px',
+																		backgroundColor:
+																			MAP_RESULTS_SEARCH_TRAY.whatIconByLabel['Festivals']
+																				.backgroundColor,
+																		borderRadius: '10px',
+																	}}
+																>
+																	<FestivalsIcon />
+																</div>
+																<span className="text-[15px] font-medium text-black font-inter">
+																	Festivals
+																</span>
+															</div>
+															{/* 5. Wedding Planners option */}
+															<div
+																role="option"
+																aria-selected={whatValue === 'Wedding Planners'}
+																className="flex items-center gap-3 cursor-pointer bg-white rounded-[8px] hover:bg-gray-50 transition-colors flex-shrink-0"
+																style={{
+																	width: '237px',
+																	height: '46px',
+																	paddingLeft: '4px',
+																	paddingRight: '12px',
+																}}
+																onClick={() => {
+																	setWhatValue('Wedding Planners');
+																	setIsWhatDropdownOpen(false);
+																}}
+															>
+																<div
+																	className="flex items-center justify-center flex-shrink-0"
+																	style={{
+																		width: '38px',
+																		height: '38px',
+																		backgroundColor:
+																			MAP_RESULTS_SEARCH_TRAY.whatIconByLabel[
+																				'Wedding Planners'
+																			].backgroundColor,
+																		borderRadius: '10px',
+																	}}
+																>
+																	<WeddingPlannersIcon />
+																</div>
+																<span className="text-[15px] font-medium text-black font-inter">
+																	Wedding Planners
+																</span>
+															</div>
+															{/* 6. Music Venues option */}
+															<div
+																role="option"
+																aria-selected={whatValue === 'Music Venues'}
+																className="flex items-center gap-3 cursor-pointer bg-white rounded-[8px] hover:bg-gray-50 transition-colors flex-shrink-0"
+																style={{
+																	width: '237px',
+																	height: '46px',
+																	paddingLeft: '4px',
+																	paddingRight: '12px',
+																}}
+																onClick={() => {
+																	setWhatValue('Music Venues');
+																	setIsWhatDropdownOpen(false);
+																}}
+															>
+																<div
+																	className="flex items-center justify-center flex-shrink-0"
+																	style={{
+																		width: '38px',
+																		height: '38px',
+																		backgroundColor:
+																			MAP_RESULTS_SEARCH_TRAY.whatIconByLabel['Music Venues']
+																				.backgroundColor,
+																		borderRadius: '10px',
+																	}}
+																>
+																	<MusicVenuesIcon />
+																</div>
+																<span className="text-[15px] font-medium text-black font-inter">
+																	Music Venues
+																</span>
+															</div>
+														</>
+													</CustomScrollbar>
+												)}
 											</div>
 										)}
 									</div>
