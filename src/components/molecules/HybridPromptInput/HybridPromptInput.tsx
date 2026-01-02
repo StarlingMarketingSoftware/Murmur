@@ -5430,25 +5430,122 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														);
 													})()}
 
-													{/* Signature pill */}
-													<button
-														type="button"
-														onClick={() => setHybridStructureSelection({ kind: 'signature' })}
-														className={cn(
-															'w-[150px] hover:w-[429px] transition-none h-[28px] rounded-[8px] border-[3px] border-black bg-[#E0E0E0]',
-															'flex items-center justify-start px-3',
-															'font-inter font-medium text-[14px] text-black',
-															hybridStructureSelection.kind === 'signature' &&
-																'ring-2 ring-black ring-offset-2 ring-offset-[#8989E1]'
-														)}
-													>
-														Signature
-													</button>
+													{/* Signature (matches Auto-tab signature behavior) */}
+													{(() => {
+														// Auto ON: compact pill by default, expands on hover.
+														// Auto OFF: stays expanded and reveals textarea (expands downward).
+														return (
+															<div
+																className={cn(
+																	'relative group/hybrid-signature transition-none',
+																	isAutoSignature ? 'w-[150px] hover:w-[429px]' : 'w-[429px]'
+																)}
+															>
+																{isAutoSignature ? (
+																	<>
+																		{/* Collapsed pill (shown by default, hidden on hover) */}
+																		<div className="group-hover/hybrid-signature:hidden">
+																			<div
+																				className={cn(
+																					'w-[150px] h-[28px] rounded-[8px] border-[3px] border-black bg-[#E0E0E0]',
+																					'flex items-center justify-start px-3',
+																					'font-inter font-medium text-[14px] text-black'
+																				)}
+																				aria-label="Signature"
+																			>
+																				Signature
+																			</div>
+																		</div>
+
+																		{/* Expanded bar (shown on hover) */}
+																		<div className="hidden group-hover/hybrid-signature:flex items-center h-[28px] rounded-[8px] border-2 border-black overflow-hidden bg-white w-full">
+																			<div className="pl-2 flex items-center h-full shrink-0 w-[140px] bg-[#E0E0E0]">
+																				<span className="font-inter font-semibold text-[14px] whitespace-nowrap text-black">
+																					Auto Signature
+																				</span>
+																			</div>
+																			<button
+																				type="button"
+																				data-hover-description="click to disable automatic drafting for this and write your own"
+																				onClick={() => setIsAutoSignature(false)}
+																				className={cn(
+																					'relative h-full flex items-center text-[12px] font-inter font-normal shrink-0',
+																					'w-[47px] px-2 justify-center text-black bg-[#4ADE80]'
+																				)}
+																				aria-label="Auto Signature on"
+																			>
+																				<span className="absolute left-0 h-full border-l border-black" />
+																				<span>on</span>
+																				<span className="absolute right-0 h-full border-r border-black" />
+																			</button>
+																			<div className="flex-grow h-full bg-white">
+																				<Input
+																					className={cn(
+																						'w-full h-full !bg-transparent pl-3 pr-3 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0',
+																						'!text-black placeholder:!text-[#9E9E9E]',
+																						'cursor-not-allowed'
+																					)}
+																					placeholder="Write manual Signature here"
+																					disabled
+																				/>
+																			</div>
+																		</div>
+																	</>
+																) : (
+																	/* Manual signature mode: expanded downward with textarea */
+																	<div className="w-full rounded-[8px] border-2 border-black overflow-hidden flex flex-col bg-white">
+																		{/* Header row */}
+																		<div className="flex items-center h-[28px] shrink-0 bg-[#E0E0E0]">
+																			<div className="pl-2 flex items-center h-full shrink-0 w-[110px] bg-[#E0E0E0]">
+																				<span className="font-inter font-semibold text-[14px] whitespace-nowrap text-black">
+																					Signature
+																				</span>
+																			</div>
+																			<button
+																				type="button"
+																				data-hover-description="Turn back on automated drafting for here"
+																				onClick={() => {
+																					setIsAutoSignature(true);
+																					setManualSignatureValue('');
+																				}}
+																				className={cn(
+																					'relative h-full flex items-center text-[12px] font-inter font-normal shrink-0',
+																					'w-[80px] px-2 justify-center text-black bg-[#C3BCBC]'
+																				)}
+																				aria-label="Auto Signature off"
+																			>
+																				<span className="absolute left-0 h-full border-l border-black" />
+																				<span>Auto off</span>
+																				<span className="absolute right-0 h-full border-r border-black" />
+																			</button>
+																			<div className="flex-grow h-full bg-[#E0E0E0]" />
+																		</div>
+																		{/* Divider */}
+																		<div className="w-full h-[1px] bg-black shrink-0" />
+																		{/* Text entry */}
+																		<div className="bg-white">
+																			<Textarea
+																				value={manualSignatureValue}
+																				onChange={(e) => setManualSignatureValue(e.target.value)}
+																				className={cn(
+																					'w-full !bg-transparent px-3 py-2 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 resize-none',
+																					'!text-black placeholder:!text-[#9E9E9E] font-inter text-[14px]'
+																				)}
+																				style={{ height: 66 }}
+																				placeholder="Enter your signature..."
+																			/>
+																		</div>
+																	</div>
+																)}
+															</div>
+														);
+													})()}
 												</div>
 
 												{/* Hybrid editor panel (opens when a pill is selected) */}
 												{hybridStructureSelection.kind !== 'none' &&
-													hybridStructureSelection.kind !== 'subject' && (
+													hybridStructureSelection.kind !== 'subject' &&
+													hybridStructureSelection.kind !== 'signature' && (
 													<div
 														className={cn(
 															'w-[448px] max-w-[89.33vw] rounded-[8px] border-2 border-black bg-white',
@@ -5457,25 +5554,6 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														data-hpi-hybrid-structure-editor
 													>
 														{(() => {
-															if (hybridStructureSelection.kind === 'signature') {
-																const fieldProps = form.register('signature');
-																return (
-																	<div className="flex flex-col gap-2">
-																		<span className="font-inter font-semibold text-[14px] text-black">
-																			Signature
-																		</span>
-																		<Textarea
-																			placeholder="Enter your signature..."
-																			className={cn(
-																				'min-h-[90px] border-2 border-black rounded-[8px] bg-white',
-																				'font-inter text-[14px] text-black'
-																			)}
-																			{...fieldProps}
-																		/>
-																	</div>
-																);
-															}
-
 															if (hybridStructureSelection.kind === 'block') {
 																const idx = fields.findIndex(
 																	(f) => f.id === hybridStructureSelection.blockId
