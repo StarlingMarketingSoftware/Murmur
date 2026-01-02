@@ -181,6 +181,9 @@ const getLatLngFromContact = (contact: ContactWithName): LatLngLiteral | null =>
 	);
 
 	if (lat == null || lng == null) return null;
+	// Treat (0,0) as "unknown" coordinates (common placeholder) to avoid the map jumping to Africa.
+	// This product is US-focused; a true (0,0) contact would be in the Gulf of Guinea.
+	if (Math.abs(lat) < 1e-9 && Math.abs(lng) < 1e-9) return null;
 	// Defensive sanity bounds: Google Maps won't render invalid ranges reliably.
 	if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
 	return { lat, lng };
@@ -3021,6 +3024,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const lastFirstContactIdRef = useRef<number | null>(null);
 	// Track last locked state to detect new searches
 	const lastLockedStateKeyRef = useRef<string | null>(null);
+	// Track whether we've successfully fit to the locked state for the current key.
+	// This prevents a race where we fit to contacts before the state GeoJSON layer is ready,
+	// and then never zoom to the intended state once the layer finishes loading.
+	const lastFitToLockedStateKeyRef = useRef<string | null>(null);
 
 	// Helper to fit map bounds with padding
 	const fitMapToBounds = useCallback(
@@ -3131,6 +3138,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		lastContactsCountRef.current = 0;
 		lastFirstContactIdRef.current = null;
 		lastLockedStateKeyRef.current = null;
+		lastFitToLockedStateKeyRef.current = null;
 	}, [clearResultsOutline, clearSearchedStateOutline]);
 
 	// Fit bounds when contacts with coordinates change (or when the locked state changes).
@@ -3138,12 +3146,23 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	useEffect(() => {
 		if (!map) return;
 
+		// If no locked state is active, allow the next locked-state search to refit to its state.
+		if (!lockedStateKey) {
+			lastFitToLockedStateKeyRef.current = null;
+		}
+
 		// Check if this is a new set of search results by comparing the first contact ID
 		const currentFirstId = contactsWithCoords[0]?.id ?? null;
 		const isNewSearch = currentFirstId !== lastFirstContactIdRef.current;
 
 		// Check if the locked state changed (indicating a new search in a different state)
 		const isNewStateSearch = lockedStateKey !== lastLockedStateKeyRef.current;
+
+		const hasFitLockedStateForKey =
+			!!lockedStateKey && lastFitToLockedStateKeyRef.current === lockedStateKey;
+		// Even if we've already fit to contacts, we still want to zoom to the locked state
+		// once the state layer finishes loading (prevents "random" fallback viewports).
+		const shouldFitLockedState = !!lockedStateKey && isStateLayerReady && !hasFitLockedStateForKey;
 
 		// Fit bounds if:
 		// 1. We haven't fit bounds yet (initial load after geocoding)
@@ -3157,16 +3176,19 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			contactsWithCoords.length > lastContactsCountRef.current ||
 			Math.abs(contactsWithCoords.length - lastContactsCountRef.current) > 5;
 
-		if (!shouldFitBounds) return;
+		if (!shouldFitBounds && !shouldFitLockedState) return;
 
 		// If there's a locked state (searched state) and this is a new search or new state,
 		// zoom to that state first for a better initial view (works even with 0 geocoded contacts).
 		if (
 			lockedStateKey &&
 			isStateLayerReady &&
-			(isNewSearch || isNewStateSearch || !hasFitBoundsRef.current)
+			(isNewSearch || isNewStateSearch || !hasFitBoundsRef.current || shouldFitLockedState)
 		) {
 			const didFitToState = fitMapToState(map, lockedStateKey);
+			if (didFitToState) {
+				lastFitToLockedStateKeyRef.current = lockedStateKey;
+			}
 			if (!didFitToState && contactsWithCoords.length > 0) {
 				// Fallback to fitting to contacts if state geometry not found
 				fitMapToBounds(map, contactsWithCoords);
