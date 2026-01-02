@@ -3837,7 +3837,7 @@ const DashboardContent = () => {
 												aria-label="Search location options"
 												className="absolute top-[calc(100%+8px)] right-0 border-[3px] border-black rounded-[12px] z-50"
 												style={{
-													width: '249px',
+													width: '206px',
 													height: '277px',
 													backgroundColor: 'rgba(216, 229, 251, 0.9)',
 												}}
@@ -3871,7 +3871,7 @@ const DashboardContent = () => {
 																aria-selected={whereValue === stateName}
 																className="flex items-center gap-3 cursor-pointer bg-white rounded-[8px] hover:bg-gray-50 transition-colors flex-shrink-0"
 																style={{
-																	width: '237px',
+																	width: '194px',
 																	height: '46px',
 																	paddingLeft: '4px',
 																	paddingRight: '12px',
