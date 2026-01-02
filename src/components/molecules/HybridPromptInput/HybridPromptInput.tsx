@@ -49,6 +49,7 @@ import ItalicIcon from '@/components/atoms/_svg/ItalicIcon';
 import UnderlineIcon from '@/components/atoms/_svg/UnderlineIcon';
 import BulletListIcon from '@/components/atoms/_svg/BulletListIcon';
 import TextColorIcon from '@/components/atoms/_svg/TextColorIcon';
+import CloseIcon from '@/components/atoms/_svg/CloseIcon';
 import { DraggableHighlight } from '../DragAndDrop/DraggableHighlight';
 import DraggableBox from '@/app/murmur/campaign/[campaignId]/DraftingSection/EmailGeneration/DraggableBox';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
@@ -2611,11 +2612,13 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 
 	const [hybridStructureSelection, setHybridStructureSelection] =
 		useState<HybridStructureSelection>({ kind: 'none' });
+	const [expandedHybridTextBlockId, setExpandedHybridTextBlockId] = useState<string | null>(null);
 
 	// Reset hybrid-only UI when switching modes
 	useEffect(() => {
 		if (selectedModeKey !== 'hybrid') {
 			setHybridStructureSelection({ kind: 'none' });
+			setExpandedHybridTextBlockId(null);
 		}
 	}, [selectedModeKey]);
 
@@ -2625,6 +2628,13 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		const exists = fields.some((f) => f.id === hybridStructureSelection.blockId);
 		if (!exists) setHybridStructureSelection({ kind: 'none' });
 	}, [fields, hybridStructureSelection]);
+
+	// If an expanded text block disappears, collapse it
+	useEffect(() => {
+		if (!expandedHybridTextBlockId) return;
+		const exists = fields.some((f) => f.id === expandedHybridTextBlockId);
+		if (!exists) setExpandedHybridTextBlockId(null);
+	}, [expandedHybridTextBlockId, fields]);
 
 	const getHybridStructureLabel = useCallback((type: HybridBlock) => {
 		switch (type) {
@@ -5253,10 +5263,12 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																	kind: 'block',
 																	blockId: next.id,
 																});
+																setExpandedHybridTextBlockId(next.id);
 																return;
 															}
 															const newId = handleAddTextBlockAt(coreIndex);
 															setHybridStructureSelection({ kind: 'block', blockId: newId });
+															setExpandedHybridTextBlockId(newId);
 														};
 
 														const getImmediateTextAfter = (coreType: HybridBlock) => {
@@ -5303,23 +5315,167 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 															</div>
 														);
 
-														const TextPill = ({ id }: { id: string }) => (
-															<button
-																type="button"
-																onClick={() =>
-																	setHybridStructureSelection({ kind: 'block', blockId: id })
-																}
-																className={cn(
-																	'w-[150px] hover:w-[429px] transition-none h-[28px] rounded-[8px] border-[3px] bg-[#A6E2A8] border-[#0B741A]',
-																	'flex items-center justify-start px-3',
-																	'font-inter font-medium text-[14px] text-black',
-																	isSelected(id) &&
-																		'ring-2 ring-black ring-offset-2 ring-offset-[#8989E1]'
-																)}
-															>
-																Text
-															</button>
-														);
+														const TextPill = ({ id }: { id: string }) => {
+															const isOpen = expandedHybridTextBlockId === id;
+															const idx = fields.findIndex((f) => f.id === id);
+															const fieldProps =
+																idx >= 0 ? form.register(`hybridBlockPrompts.${idx}.value`) : null;
+
+															if (!isOpen) {
+																return (
+																	<div
+																		role="button"
+																		tabIndex={0}
+																		onClick={() => {
+																			setHybridStructureSelection({ kind: 'block', blockId: id });
+																			setExpandedHybridTextBlockId(id);
+																		}}
+																		onKeyDown={(e) => {
+																			if (e.key === 'Enter' || e.key === ' ') {
+																				e.preventDefault();
+																				setHybridStructureSelection({
+																					kind: 'block',
+																					blockId: id,
+																				});
+																				setExpandedHybridTextBlockId(id);
+																			}
+																		}}
+																		// Keep a full-width hover hitbox so collapsing while the cursor is
+																		// still in the "expanded" hover area doesn't cause the pill to snap shut.
+																		className={cn(
+																			'relative w-[429px] h-[28px] group/hybrid-structure-text-pill cursor-pointer select-none'
+																		)}
+																	>
+																		<div
+																			className={cn(
+																				'absolute left-0 top-0 h-[28px]',
+																				'w-[150px] group-hover/hybrid-structure-text-pill:w-[429px] transition-none',
+																				'rounded-[8px] border-[3px] bg-[#A6E2A8] border-[#0B741A]',
+																				'flex items-center justify-start px-3',
+																				'font-inter font-medium text-[14px] text-black'
+																			)}
+																		>
+																			<span className="pr-[56px]">Text</span>
+																			<div className="hidden group-hover/hybrid-structure-text-pill:flex items-center gap-[8px] absolute right-[8px] top-1/2 -translate-y-1/2">
+																				<button
+																					type="button"
+																					onClick={(e) => {
+																						e.stopPropagation();
+																						setExpandedHybridTextBlockId(null);
+																						handleRemoveBlock(id);
+																					}}
+																					className="h-[18px] w-[18px] flex items-center justify-center bg-transparent border-0 p-0 text-black"
+																					aria-label="Delete Text block"
+																				>
+																					<CloseIcon width={7} height={7} />
+																				</button>
+																				<button
+																					type="button"
+																					onClick={(e) => {
+																						e.stopPropagation();
+																						setHybridStructureSelection({
+																							kind: 'block',
+																							blockId: id,
+																						});
+																						setExpandedHybridTextBlockId(id);
+																					}}
+																					className="h-[18px] w-[18px] flex items-center justify-center bg-transparent border-0 p-0"
+																					aria-label="Expand Text block"
+																				>
+																					<svg
+																						width="7"
+																						height="5"
+																						viewBox="0 0 7 5"
+																						fill="none"
+																						xmlns="http://www.w3.org/2000/svg"
+																					>
+																						<path
+																							d="M0.796875 0.796875L3.12021 3.34412L5.44355 0.796875"
+																							stroke="black"
+																							strokeWidth="1.59374"
+																							strokeLinecap="round"
+																							strokeLinejoin="round"
+																						/>
+																					</svg>
+																				</button>
+																			</div>
+																		</div>
+																	</div>
+																);
+															}
+
+															return (
+																<div
+																	className={cn(
+																		'relative group/hybrid-structure-text-open',
+																		'w-[429px] rounded-[8px] border-[3px] border-[#0B741A] overflow-hidden bg-[#A6E2A8]'
+																	)}
+																>
+																	{/* Header row */}
+																	<div
+																		role="button"
+																		tabIndex={0}
+																		onClick={() => setExpandedHybridTextBlockId(null)}
+																		onKeyDown={(e) => {
+																			if (e.key === 'Enter' || e.key === ' ') {
+																				e.preventDefault();
+																				setExpandedHybridTextBlockId(null);
+																			}
+																		}}
+																		className="h-[28px] flex items-center justify-between px-3 relative cursor-pointer select-none"
+																		aria-label="Collapse Text"
+																	>
+																		<span className="font-inter font-medium text-[14px] text-black">
+																			Text
+																		</span>
+																		<div className="hidden group-hover/hybrid-structure-text-open:flex items-center gap-[8px] absolute right-[8px] top-1/2 -translate-y-1/2">
+																			<button
+																				type="button"
+																				onClick={(e) => {
+																					e.stopPropagation();
+																					setExpandedHybridTextBlockId(null);
+																					handleRemoveBlock(id);
+																				}}
+																				className="h-[18px] w-[18px] flex items-center justify-center bg-transparent border-0 p-0 text-black"
+																				aria-label="Delete Text block"
+																			>
+																				<CloseIcon width={7} height={7} />
+																			</button>
+																			<button
+																				type="button"
+																				onClick={(e) => {
+																					e.stopPropagation();
+																					setExpandedHybridTextBlockId(null);
+																				}}
+																				className="h-[18px] w-[18px] flex items-center justify-center bg-transparent border-0 p-0"
+																				aria-label="Collapse Text block"
+																			>
+																				<span
+																					aria-hidden="true"
+																					className="block w-[12px] h-[2px] bg-black rounded-[1px]"
+																				/>
+																			</button>
+																		</div>
+																	</div>
+																	{/* Divider */}
+																	<div className="h-[2px] bg-black" />
+																	{/* Text area (limited height) */}
+																	<div className="bg-white">
+																		<Textarea
+																			placeholder="Type anything you want to include"
+																			className={cn(
+																				'h-[72px] w-full border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0',
+																				'bg-white',
+																				'px-3 py-2 resize-none overflow-y-auto',
+																				'font-inter text-[12px] leading-[14px] text-black'
+																			)}
+																			onClick={(e) => e.stopPropagation()}
+																			{...(fieldProps ?? {})}
+																		/>
+																	</div>
+																</div>
+															);
+														};
 
 														return (
 															<div className="w-full flex flex-col items-start">
@@ -5543,9 +5699,14 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 												</div>
 
 												{/* Hybrid editor panel (opens when a pill is selected) */}
-												{hybridStructureSelection.kind !== 'none' &&
-													hybridStructureSelection.kind !== 'subject' &&
-													hybridStructureSelection.kind !== 'signature' && (
+												{hybridStructureSelection.kind === 'block' &&
+													(() => {
+														const idx = fields.findIndex(
+															(f) => f.id === hybridStructureSelection.blockId
+														);
+														if (idx === -1) return false;
+														return fields[idx].type !== HybridBlock.text;
+													})() && (
 													<div
 														className={cn(
 															'w-[448px] max-w-[89.33vw] rounded-[8px] border-2 border-black bg-white',
