@@ -192,6 +192,9 @@ const Murmur = () => {
 	
 	// State for top campaigns dropdown
 	const [showTopCampaignsDropdown, setShowTopCampaignsDropdown] = useState(false);
+	
+	// State for right box icon selection ('info' or 'circle')
+	const [selectedRightBoxIcon, setSelectedRightBoxIcon] = useState<'info' | 'circle'>('info');
 	const topCampaignsDropdownRef = useRef<HTMLDivElement>(null);
 	const topCampaignsFolderButtonRef = useRef<HTMLButtonElement>(null);
 	
@@ -530,9 +533,43 @@ const Murmur = () => {
 						{/* Right box - 105 x 42px, 36px to the right of search box */}
 						<div
 							data-slot="campaign-right-box"
-							className="pointer-events-auto absolute left-full top-0 ml-[36px] w-[105px] h-[42px] box-border border border-[#929292] rounded-[10px] overflow-hidden opacity-40"
+							className="pointer-events-auto absolute left-full top-0 ml-[36px] w-[105px] h-[42px] box-border border border-[#929292] rounded-[10px] overflow-hidden flex items-center justify-center gap-[14px]"
 						>
-							{/* SVG icons will go here */}
+							{/* Left icon - italic "i" in circle */}
+							<button
+								type="button"
+								onClick={() => setSelectedRightBoxIcon('info')}
+								className={cn(
+									"w-[35px] h-[35px] flex items-center justify-center bg-transparent border rounded-[8px] cursor-pointer transition-all",
+									selectedRightBoxIcon === 'info'
+										? "border-[#929292]"
+										: "border-transparent"
+								)}
+								aria-label="Info"
+							>
+								<svg width="13" height="13" viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg">
+									<g opacity="0.4">
+										<path d="M6.22656 0.25C9.53383 0.250077 12.2029 2.85379 12.2031 6.05078C12.2031 9.24793 9.53396 11.8525 6.22656 11.8525C2.9191 11.8525 0.25 9.24798 0.25 6.05078C0.250198 2.85375 2.91922 0.25 6.22656 0.25Z" stroke="black" strokeWidth="0.5"/>
+										<path d="M8.05656 2.82696C7.8419 2.82696 7.68856 2.75796 7.59656 2.61996C7.53523 2.54329 7.50456 2.44363 7.50456 2.32096C7.50456 2.07563 7.61956 1.87629 7.84956 1.72296C8.01823 1.63096 8.17156 1.58496 8.30956 1.58496C8.53956 1.58496 8.70056 1.65396 8.79256 1.79196C8.8539 1.86863 8.88456 1.96829 8.88456 2.09096C8.88456 2.33629 8.7619 2.53563 8.51656 2.68896C8.37856 2.78096 8.22523 2.82696 8.05656 2.82696ZM4.05456 11.682C3.90123 11.682 3.7709 11.6513 3.66356 11.59C3.57156 11.5286 3.52556 11.4136 3.52556 11.245C3.52556 11.0303 3.57923 10.7773 3.68656 10.486C3.80923 10.1946 3.93956 9.90329 4.07756 9.61196C4.2309 9.32063 4.3459 9.08296 4.42256 8.89896C4.5299 8.68429 4.66023 8.40829 4.81356 8.07096C4.98223 7.71829 5.13556 7.38863 5.27356 7.08196C5.4269 6.75996 5.53423 6.53763 5.59556 6.41496C5.3809 6.64496 5.12023 6.93629 4.81356 7.28896C4.52223 7.62629 4.24623 7.95596 3.98556 8.27796C3.7249 8.59996 3.52556 8.85296 3.38756 9.03696C3.34156 9.09829 3.30323 9.12896 3.27256 9.12896C3.2419 9.12896 3.22656 9.09063 3.22656 9.01396C3.22656 8.89129 3.2649 8.77629 3.34156 8.66896C3.6329 8.30096 3.9549 7.88696 4.30756 7.42696C4.67556 6.96696 5.00523 6.54529 5.29656 6.16196C5.5879 5.76329 5.7719 5.50263 5.84856 5.37996C6.01723 5.34929 6.26256 5.30329 6.58456 5.24196C6.9219 5.18063 7.1519 5.09629 7.27456 4.98896C7.32056 4.94296 7.36656 4.91996 7.41256 4.91996C7.44323 4.91996 7.45856 4.95063 7.45856 5.01196C7.4739 5.05796 7.45856 5.11163 7.41256 5.17296C7.32056 5.28029 7.15956 5.54096 6.92956 5.95496C6.69956 6.36896 6.45423 6.82896 6.19356 7.33496C5.94823 7.82563 5.71823 8.27029 5.50356 8.66896C5.2889 9.08296 5.1049 9.48163 4.95156 9.86496C4.79823 10.2483 4.72156 10.5243 4.72156 10.693C4.72156 10.9076 4.8289 11.015 5.04356 11.015C5.2429 11.015 5.4959 10.8923 5.80256 10.647C6.12456 10.4016 6.44656 10.1103 6.76856 9.77296C7.09056 9.42029 7.37423 9.09829 7.61956 8.80696C7.69623 8.71496 7.78823 8.60763 7.89556 8.48496C8.01823 8.34696 8.0949 8.26263 8.12556 8.23196C8.15623 8.26263 8.17156 8.31629 8.17156 8.39296C8.15623 8.50029 8.1179 8.60763 8.05656 8.71496C7.99523 8.80696 7.9339 8.89129 7.87256 8.96796C7.55056 9.36663 7.1979 9.78063 6.81456 10.21C6.43123 10.624 6.00956 10.9766 5.54956 11.268C5.08956 11.544 4.59123 11.682 4.05456 11.682Z" fill="black"/>
+									</g>
+								</svg>
+							</button>
+							{/* Right icon - empty circle */}
+							<button
+								type="button"
+								onClick={() => setSelectedRightBoxIcon('circle')}
+								className={cn(
+									"w-[35px] h-[35px] flex items-center justify-center bg-transparent border rounded-[8px] cursor-pointer transition-all",
+									selectedRightBoxIcon === 'circle'
+										? "border-[#929292]"
+										: "border-transparent"
+								)}
+								aria-label="Circle"
+							>
+								<svg width="13" height="13" viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg" opacity="0.4">
+									<path d="M6.22656 0.25C9.53383 0.250077 12.2029 2.85379 12.2031 6.05078C12.2031 9.24793 9.53396 11.8525 6.22656 11.8525C2.9191 11.8525 0.25 9.24798 0.25 6.05078C0.250198 2.85375 2.91922 0.25 6.22656 0.25Z" stroke="black" strokeWidth="0.5"/>
+								</svg>
+							</button>
 						</div>
 					</div>
 				</div>
