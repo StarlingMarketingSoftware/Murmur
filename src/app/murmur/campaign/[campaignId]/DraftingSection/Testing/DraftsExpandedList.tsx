@@ -387,6 +387,7 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 				height: `${height}px`,
 				background: `linear-gradient(to bottom, #ffffff ${whiteSectionHeight}px, #FFDC9E ${whiteSectionHeight}px)`,
 			}}
+			data-hover-description="Drafts: Emails you’ve generated but haven’t sent yet. Select drafts to preview or send."
 			role="region"
 			aria-label="Expanded drafts preview"
 		>

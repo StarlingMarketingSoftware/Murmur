@@ -1252,6 +1252,7 @@ const SortableAIBlock = ({
 														<button
 															ref={bookingForButtonRef}
 															type="button"
+															data-hover-description="What timeframe are you booking in. There's a calendar in there as well as picking seasons"
 															onClick={() => {
 																clearBookingForCloseTimeout();
 																if (isBookingForOpen) {
@@ -1429,10 +1430,10 @@ const SortableAIBlock = ({
 																)}
 
 																{bookingForTab === 'Calendar' && (
-																	<div className="flex-1 w-full p-[14px]">
+																	<div className="flex-1 w-full p-[14px]" data-hover-description="Pick a date range that you want to book within. This will be included in the drafting">
 																		<div className="w-full h-full flex flex-col gap-[16px]">
 																			{/* Top row */}
-																			<div className="w-full flex items-center justify-center gap-[24px]">
+																			<div className="w-full flex items-center justify-center gap-[24px]" data-hover-description-suppress="true">
 																				{(() => {
 																					const now = new Date();
 																					const minBaseMonth = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -1456,6 +1457,7 @@ const SortableAIBlock = ({
 																							<button
 																								type="button"
 																								disabled={isPrevDisabled}
+																								data-hover-description-suppress="true"
 																								onClick={() => {
 																									setBookingForCalendarBaseMonth((prev) => {
 																										const next = new Date(prev.getFullYear(), prev.getMonth() - 1, 1);
@@ -1474,12 +1476,12 @@ const SortableAIBlock = ({
 																							</button>
 
 																							<div className="flex items-center justify-center gap-[24px]">
-																								<div className="w-[364px] h-[42px] rounded-[8px] bg-[#E2E2E2] flex items-center px-[18px]">
+																								<div className="w-[364px] h-[42px] rounded-[8px] bg-[#E2E2E2] flex items-center px-[18px]" data-hover-description-suppress="true">
 																									<span className="font-inter font-semibold text-[16px] leading-[16px] text-black">
 																										{currentMonth}
 																									</span>
 																								</div>
-																								<div className="w-[364px] h-[42px] rounded-[8px] bg-[#E2E2E2] flex items-center px-[18px]">
+																								<div className="w-[364px] h-[42px] rounded-[8px] bg-[#E2E2E2] flex items-center px-[18px]" data-hover-description-suppress="true">
 																									<span className="font-inter font-semibold text-[16px] leading-[16px] text-black">
 																										{nextMonth}
 																									</span>
@@ -1488,6 +1490,7 @@ const SortableAIBlock = ({
 
 																							<button
 																								type="button"
+																								data-hover-description-suppress="true"
 																								onClick={() => {
 																									setBookingForCalendarBaseMonth((prev) => {
 																										return new Date(prev.getFullYear(), prev.getMonth() + 1, 1);
@@ -1504,7 +1507,7 @@ const SortableAIBlock = ({
 																			</div>
 
 																			{/* Bottom row */}
-																			<div className="w-full flex items-center justify-center gap-[24px]">
+																			<div className="w-full flex items-center justify-center gap-[24px]" data-hover-description-suppress="true">
 																				{(() => {
 																					const now = new Date();
 																					const today = new Date(
@@ -1567,7 +1570,7 @@ const SortableAIBlock = ({
 																						});
 
 																						return (
-																							<div className="w-[364px] h-[312px] rounded-[8px] bg-[#E2E2E2] p-[18px] flex flex-col">
+																							<div className="w-[364px] h-[312px] rounded-[8px] bg-[#E2E2E2] p-[18px] flex flex-col" data-hover-description-suppress="true">
 																								<div className="grid grid-cols-7 text-center">
 																									{weekDays.map((d) => (
 																										<div
@@ -1661,6 +1664,7 @@ const SortableAIBlock = ({
 																												)}
 																												type="button"
 																												disabled={isPast}
+																												data-hover-description-suppress="true"
 																												onClick={() => handleSelectCalendarDate(cellDayStart)}
 																												aria-label={new Intl.DateTimeFormat('en-US', {
 																													month: 'long',
@@ -1898,6 +1902,7 @@ const SortableAIBlock = ({
 														<button
 															ref={bookingForButtonRef}
 															type="button"
+															data-hover-description="What timeframe are you booking in. There's a calendar in there as well as picking seasons"
 															onClick={() => {
 																clearBookingForCloseTimeout();
 																if (isBookingForOpen) {
@@ -2072,9 +2077,9 @@ const SortableAIBlock = ({
 																	)}
 
 																	{bookingForTab === 'Calendar' && (
-																		<div className="flex-1 w-full p-[14px]">
+																		<div className="flex-1 w-full p-[14px]" data-hover-description="Pick a date range that you want to book within. This will be included in the drafting">
 																			<div className="w-full h-full flex flex-col gap-[16px]">
-																				<div className="w-full flex items-center justify-center gap-[24px]">
+																				<div className="w-full flex items-center justify-center gap-[24px]" data-hover-description-suppress="true">
 																					{(() => {
 																						const now = new Date();
 																						const minBaseMonth = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -2098,6 +2103,7 @@ const SortableAIBlock = ({
 																								<button
 																									type="button"
 																									disabled={isPrevDisabled}
+																									data-hover-description-suppress="true"
 																									onClick={() => {
 																										setBookingForCalendarBaseMonth((prev) => {
 																											const next = new Date(prev.getFullYear(), prev.getMonth() - 1, 1);
@@ -2116,12 +2122,12 @@ const SortableAIBlock = ({
 																								</button>
 
 																								<div className="flex items-center justify-center gap-[24px]">
-																									<div className="w-[364px] h-[42px] rounded-[8px] bg-[#E2E2E2] flex items-center px-[18px]">
+																									<div className="w-[364px] h-[42px] rounded-[8px] bg-[#E2E2E2] flex items-center px-[18px]" data-hover-description-suppress="true">
 																										<span className="font-inter font-semibold text-[16px] leading-[16px] text-black">
 																											{currentMonth}
 																										</span>
 																									</div>
-																									<div className="w-[364px] h-[42px] rounded-[8px] bg-[#E2E2E2] flex items-center px-[18px]">
+																									<div className="w-[364px] h-[42px] rounded-[8px] bg-[#E2E2E2] flex items-center px-[18px]" data-hover-description-suppress="true">
 																										<span className="font-inter font-semibold text-[16px] leading-[16px] text-black">
 																											{nextMonth}
 																										</span>
@@ -2130,6 +2136,7 @@ const SortableAIBlock = ({
 
 																								<button
 																									type="button"
+																									data-hover-description-suppress="true"
 																									onClick={() => {
 																										setBookingForCalendarBaseMonth((prev) => {
 																											return new Date(prev.getFullYear(), prev.getMonth() + 1, 1);
@@ -2145,7 +2152,7 @@ const SortableAIBlock = ({
 																					})()}
 																				</div>
 
-																				<div className="w-full flex items-center justify-center gap-[24px]">
+																				<div className="w-full flex items-center justify-center gap-[24px]" data-hover-description-suppress="true">
 																					{(() => {
 																						const now = new Date();
 																						const today = new Date(
@@ -2205,7 +2212,7 @@ const SortableAIBlock = ({
 																							});
 
 																							return (
-																								<div className="w-[364px] h-[312px] rounded-[8px] bg-[#E2E2E2] p-[18px] flex flex-col">
+																								<div className="w-[364px] h-[312px] rounded-[8px] bg-[#E2E2E2] p-[18px] flex flex-col" data-hover-description-suppress="true">
 																									<div className="grid grid-cols-7 text-center">
 																										{weekDays.map((d) => (
 																											<div
@@ -2299,6 +2306,7 @@ const SortableAIBlock = ({
 																													)}
 																													type="button"
 																													disabled={isPast}
+																													data-hover-description-suppress="true"
 																													onClick={() => handleSelectCalendarDate(cellDayStart)}
 																													aria-label={new Intl.DateTimeFormat('en-US', {
 																														month: 'long',
@@ -3700,6 +3708,20 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 			window.removeEventListener('orientationchange', recalc);
 		};
 	}, [activeTab, isMobile, showTestPreview, fields.length, selectedModeKey]);
+
+	const hoverDescription = useMemo(() => {
+		if (activeTab === 'profile') {
+			return 'This is where you provide context that will feed into creating the best possible drafts.';
+		}
+		if (selectedModeKey === 'manual') {
+			return 'In Manual Mode, you can fully customize and write your own emails to send out';
+		}
+		if (selectedModeKey === 'hybrid') {
+			return 'This is where we can mix automated text with your own manually written text for the best of both worlds';
+		}
+		return 'Writing: Build your email (subject + blocks + signature), then generate drafts for selected contacts.';
+	}, [activeTab, selectedModeKey]);
+
 	return (
 		<div
 			className={cn(
@@ -3725,6 +3747,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 							} relative overflow-visible isolate`}
 							style={!compactLeftOnly ? { backgroundColor: '#A6E2A8' } : undefined}
 							data-campaign-main-box={compactLeftOnly ? undefined : 'writing'}
+							data-hover-description={hoverDescription}
 							data-hpi-container
 							onFocus={handleContainerFocus}
 							onBlur={handleContainerBlur}
@@ -3796,6 +3819,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 												return (
 													<button
 														type="button"
+														data-hover-description="Add information about yourself so you can pitch well to the contacts you're reaching out to"
 														onClick={() => setActiveTab('profile')}
 														className={cn(
 															"absolute left-0 -top-[3px] h-[calc(100%+3px)] w-[130px] flex items-center justify-center font-inter font-semibold text-[13px] max-[480px]:text-[14px] z-30 cursor-pointer bg-transparent transition-colors border-r-[3px] border-r-black border-t-0 border-b-0 border-l-0",
@@ -3832,6 +3856,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 												<div
 													ref={modeContainerRef}
 													className="relative flex items-center gap-[78px] max-[480px]:gap-0 max-[480px]:justify-between ml-[42px] max-[480px]:ml-[2px] flex-1 max-[480px]:w-auto max-[480px]:pr-[4.4vw]"
+													data-hover-description-suppress="true"
 												>
 													<DndContext
 														onDragEnd={handleHighlightDragEnd}
@@ -3955,6 +3980,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 
 																			<button
 																				type="button"
+																				data-hover-description="click to disable automatic drafting for this and write your own"
 																				onClick={() => {
 																					if (!isHandwrittenMode) {
 																						const newValue = !form.watch('isAiSubject');
@@ -4022,6 +4048,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 
 																		<button
 																			type="button"
+																			data-hover-description="Turn back on automated drafting for here"
 																			onClick={() => {
 																				if (!isHandwrittenMode) {
 																					const newValue = !form.watch('isAiSubject');
@@ -5290,6 +5317,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 
 															<button
 																type="button"
+																data-hover-description="click to disable automatic drafting for this and write your own"
 																onClick={() => setIsAutoSignature(false)}
 																className={cn(
 																	'relative h-full flex items-center text-[12px] font-inter font-normal transition-colors shrink-0',
@@ -5335,6 +5363,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 
 															<button
 																type="button"
+																data-hover-description="Turn back on automated drafting for here"
 																onClick={() => {
 																	setIsAutoSignature(true);
 																	setManualSignatureValue('');
@@ -5374,6 +5403,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 											<div className="absolute bottom-[194px] left-0 right-0 w-full flex items-center justify-center max-[480px]:hidden">
 												<Button
 													type="button"
+													data-hover-description="This will show you a test draft, given all of what you provided"
 													onClick={() => {
 														if (isMobile) {
 															setShowTestPreview?.(true);
@@ -5518,6 +5548,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 												<div className="w-full h-[41px] flex items-center justify-center bg-white rounded-b-[5px]">
 													<Button
 														type="button"
+														data-hover-description="This will show you a test draft, given all of what you provided"
 														onClick={() => {
 															if (isMobile) {
 																setShowTestPreview?.(true);
@@ -5549,6 +5580,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 													<div className="flex w-full">
 														<Button
 															type="button"
+															data-hover-description="This will show you a test draft, given all of what you provided"
 															onClick={() => {
 																setShowTestPreview?.(true);
 																handleGenerateTestDrafts?.();
@@ -5674,6 +5706,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 										{/* Right section "All" button */}
 										<button
 											type="button"
+											data-hover-description="See all the tabs here"
 											className="absolute right-[3px] top-[3px] bottom-[3px] w-[62px] bg-[#74D178] rounded-r-[1px] flex items-center justify-center font-inter font-normal text-[17px] text-black hover:bg-[#65C269] cursor-pointer border-0 border-l-[2px] border-[#349A37] z-10"
 											onClick={() => {
 												onSelectAllContacts?.();

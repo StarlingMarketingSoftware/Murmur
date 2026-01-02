@@ -253,6 +253,7 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 				height: containerHeight,
 				...style,
 			}}
+			data-hover-description="Research: Background info and notes for the selected contact."
 		>
 			{/* Header background bar */}
 			<div
@@ -1045,6 +1046,7 @@ export const ContactResearchHorizontalStrip: FC<
 				className
 			)}
 			style={style}
+			data-hover-description="Research: Background info and notes for the selected contact."
 		>
 			{/* CSS for responsive line clamp on bullet text */}
 			<style>{`

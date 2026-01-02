@@ -377,8 +377,11 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 		const tabNavGap = '29px';
 		const tabNavMiddleWidth = '691px';
 
-		return (
-			<div className={cn("flex flex-col items-center", isMobile && "w-full px-1")}>
+			return (
+			<div
+				className={cn("flex flex-col items-center", isMobile && "w-full px-1")}
+				data-hover-description="Revise your draft here. Type out your revisions. Approve and Reject Drafts"
+			>
 				<div style={{ 
 					width: isMobile ? 'calc(100vw - 8px)' : '499px', 
 					height: isMobile ? 'calc(100dvh - 160px)' : '703px', 
@@ -942,16 +945,18 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 							<div
 								className="bg-white border-2 border-black rounded-[4px] overflow-visible draft-review-box"
 								style={{ width: isMobile ? '100%' : '470px', height: hasStatusBar ? '516px' : '572px', flex: isMobile ? 1 : undefined }}
+								data-hover-description="Revise your draft here. Type out your revisions. Approve and Reject Drafts"
 							>
 								{/* Check if original message has links - if so, use RichTextEditor for proper link editing */}
 								{selectedDraft?.message && /<a\s+[^>]*href=/i.test(selectedDraft.message) ? (
-									<CustomScrollbar
-										className="w-full h-full"
-										thumbWidth={2}
-										thumbColor="#000000"
-										offsetRight={-6}
-										contentClassName="[&_.ProseMirror]:min-h-full [&_.ProseMirror]:border-0 [&_.ProseMirror]:bg-transparent [&_.ProseMirror]:focus:ring-0 [&_.ProseMirror]:focus:outline-none"
-									>
+									<div data-hover-description="Revise your draft here. Type out your revisions. Approve and Reject Drafts" className="w-full h-full">
+										<CustomScrollbar
+											className="w-full h-full"
+											thumbWidth={2}
+											thumbColor="#000000"
+											offsetRight={-6}
+											contentClassName="[&_.ProseMirror]:min-h-full [&_.ProseMirror]:border-0 [&_.ProseMirror]:bg-transparent [&_.ProseMirror]:focus:ring-0 [&_.ProseMirror]:focus:outline-none"
+										>
 										<RichTextEditor
 											value={editedMessage}
 											onChange={setEditedMessage}
@@ -959,17 +964,19 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 											className="w-full h-full border-0 bg-transparent !min-h-0 text-sm"
 											placeholder="Type your message here..."
 										/>
-									</CustomScrollbar>
+										</CustomScrollbar>
+									</div>
 								) : (
-									<ScrollableTextarea
-										value={editedMessage}
-										onChange={(e) => setEditedMessage(e.target.value)}
-										className="w-full h-full p-3 text-sm resize-none focus:outline-none focus:ring-0 bg-transparent border-0 whitespace-pre-wrap"
-										placeholder="Type your message here..."
-										thumbWidth={2}
-										thumbColor="#000000"
-										trackOffset={-6}
-									/>
+								<ScrollableTextarea
+									value={editedMessage}
+									onChange={(e) => setEditedMessage(e.target.value)}
+									className="w-full h-full p-3 text-sm resize-none focus:outline-none focus:ring-0 bg-transparent border-0 whitespace-pre-wrap"
+									placeholder="Type your message here..."
+									thumbWidth={2}
+									thumbColor="#000000"
+									trackOffset={-6}
+									data-hover-description="Revise your draft here. Type out your revisions. Approve and Reject Drafts"
+								/>
 								)}
 							</div>
 						</div>
@@ -1055,6 +1062,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 							borderBottomLeftRadius: '8px',
 							backgroundColor: '#D5FFCB',
 						}}
+						data-hover-description="Approve you draft. This draft turned out good"
 						onClick={() => {
 							if (selectedDraft) {
 								const isCurrentlyApproved = props.approvedDraftIds?.has(selectedDraft.id) ?? false;
@@ -1081,6 +1089,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 							height: isMobile ? '36px' : '40px',
 							backgroundColor: '#FFDC9E',
 						}}
+						data-hover-description="Regenerate will rewrite the email you have open automatically so that you can get a better result"
 						onClick={handleRegenerate}
 						disabled={isRegenerating || !onRegenerateDraft}
 					>
@@ -1104,6 +1113,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 							borderBottomRightRadius: '8px',
 							backgroundColor: '#E17272',
 						}}
+						data-hover-description="Reject this contact. This isn't deleting it, but putting it into a rejection folder for you to review"
 						onClick={() => {
 							if (selectedDraft) {
 								const isCurrentlyRejected = props.rejectedDraftIds?.has(selectedDraft.id) ?? false;
@@ -1236,6 +1246,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 												  )
 										)}
 										style={!isSelected && isMobile ? { width: mobileEmailRowWidth } : !isSelected ? { width: '489px' } : undefined}
+										data-hover-description="Click to open and review"
 									onMouseDown={(e) => {
 										// Prevent text selection on shift-click
 										if (e.shiftKey) {

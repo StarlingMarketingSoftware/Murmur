@@ -225,6 +225,7 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 				height: `${height}px`,
 				background: `linear-gradient(to bottom, #ffffff ${whiteSectionHeight}px, #5AB477 ${whiteSectionHeight}px)`,
 			}}
+			data-hover-description="Sent: Emails that have already been sent for this campaign."
 			role="region"
 			aria-label="Expanded sent preview"
 		>

@@ -28,6 +28,7 @@ import { useGetEmails } from '@/hooks/queryHooks/useEmails';
 import { useCreateIdentity, useGetIdentities } from '@/hooks/queryHooks/useIdentities';
 import { EmailStatus } from '@/constants/prismaEnums';
 import { useQueryClient } from '@tanstack/react-query';
+import { HoverDescriptionProvider } from '@/contexts/HoverDescriptionContext';
 
 type ViewType = 'contacts' | 'testing' | 'drafting' | 'sent' | 'inbox' | 'all';
 
@@ -425,7 +426,8 @@ const Murmur = () => {
 		!isNarrowestDesktop;
 	const fixedNavArrowsTopPx = 467 + (shouldApplyWritingTopShift ? writingTabShiftPx : 0);
 	return (
-		<div className="min-h-screen relative">
+		<HoverDescriptionProvider enabled={selectedRightBoxIcon === 'info'}>
+			<div className="min-h-screen relative">
 			{/* Left navigation arrow - absolute position (hidden in narrow desktop + testing) */}
 			{!hideFixedArrows && (
 				<button
@@ -484,6 +486,7 @@ const Murmur = () => {
 							</button>
 							<button
 								type="button"
+								data-hover-description="Back to Home Button"
 								onClick={() => {
 									if (typeof window !== 'undefined') {
 										window.location.assign(urls.murmur.dashboard.index);
@@ -512,6 +515,7 @@ const Murmur = () => {
 							data-slot="campaign-top-box"
 							aria-label="Open dashboard search for this campaign"
 							title="Search for more contacts"
+							data-hover-description="Hop back in to the map, Add some more contacts to your campaign"
 							onClick={handleOpenDashboardSearchForCampaign}
 							className="group relative pointer-events-auto w-[477px] max-w-[calc(100vw-32px)] h-[42px] box-border border border-[#929292] hover:border-black hover:border-2 rounded-[10px] overflow-hidden transition-[color,border-color,border-width] duration-150 cursor-pointer"
 						>
@@ -545,7 +549,7 @@ const Murmur = () => {
 										? "border-[#929292]"
 										: "border-transparent"
 								)}
-								aria-label="Info"
+								aria-label="Turn info on"
 							>
 								<svg width="13" height="13" viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg">
 									<g opacity="0.4">
@@ -564,7 +568,7 @@ const Murmur = () => {
 										? "border-[#929292]"
 										: "border-transparent"
 								)}
-								aria-label="Circle"
+								aria-label="Turn info off"
 							>
 								<svg width="13" height="13" viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg" opacity="0.4">
 									<path d="M6.22656 0.25C9.53383 0.250077 12.2029 2.85379 12.2031 6.05078C12.2031 9.24793 9.53396 11.8525 6.22656 11.8525C2.9191 11.8525 0.25 9.24798 0.25 6.05078C0.250198 2.85375 2.91922 0.25 6.22656 0.25Z" stroke="black" strokeWidth="0.5"/>
@@ -621,7 +625,10 @@ const Murmur = () => {
 							(isMobile || isNarrowestDesktop) && 'hidden'
 						)}
 					>
-						<div className="pointer-events-auto grid w-[524px] max-w-full grid-cols-5 items-center justify-items-center">
+						<div
+							className="pointer-events-auto grid w-[524px] max-w-full grid-cols-5 items-center justify-items-center"
+							data-hover-description-suppress="true"
+						>
 							<button
 							type="button"
 							className={cn(
@@ -859,7 +866,10 @@ const Murmur = () => {
 					{/* View tabs - shown below header box at narrowest breakpoint (< 952px) */}
 					{!isMobile && isNarrowestDesktop && (
 						<div className="flex justify-center mb-4">
-							<div className="grid w-[524px] max-w-full grid-cols-5 items-center justify-items-center">
+						<div
+							className="grid w-[524px] max-w-full grid-cols-5 items-center justify-items-center"
+							data-hover-description-suppress="true"
+						>
 								<button
 									type="button"
 									className={cn(
@@ -1528,7 +1538,8 @@ const Murmur = () => {
 					</button>
 				</div>
 			)}
-		</div>
+			</div>
+		</HoverDescriptionProvider>
 	);
 };
 

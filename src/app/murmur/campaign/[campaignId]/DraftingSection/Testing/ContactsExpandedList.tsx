@@ -220,6 +220,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 					typeof resolvedHeight === 'number' ? `${resolvedHeight}px` : resolvedHeight,
 				background: `linear-gradient(to bottom, #ffffff ${whiteSectionHeight}px, #EB8586 ${whiteSectionHeight}px)`,
 			}}
+			data-hover-description="Contacts: This box displays all of the contacts in your campaign. Select contacts to generate drafts."
 			role="region"
 			aria-label="Expanded contacts preview"
 		>

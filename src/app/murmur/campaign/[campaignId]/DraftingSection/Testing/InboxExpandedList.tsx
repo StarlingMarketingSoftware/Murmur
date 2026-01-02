@@ -244,6 +244,7 @@ export const InboxExpandedList: FC<InboxExpandedListProps> = ({
 				height: `${height}px`,
 				background: `linear-gradient(to bottom, #ffffff ${whiteSectionHeight}px, #5EB6D6 ${whiteSectionHeight}px)`,
 			}}
+			data-hover-description="Inbox: Replies and inbound messages from contacts in this campaign."
 			role="region"
 			aria-label="Expanded inbox preview"
 		>

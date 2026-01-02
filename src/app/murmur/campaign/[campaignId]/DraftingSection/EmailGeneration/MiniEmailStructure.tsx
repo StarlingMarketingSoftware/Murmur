@@ -574,6 +574,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 		<div
 			ref={rootRef}
 			data-mini-email-hide-text={hideAllText ? 'true' : 'false'}
+			data-hover-description="Email structure: Configure your subject, blocks, and signature (used when generating drafts)."
 			style={{
 				cursor: hideAllText ? 'default' : 'auto',
 				width: fullWidthMobile ? '100%' : '376px',

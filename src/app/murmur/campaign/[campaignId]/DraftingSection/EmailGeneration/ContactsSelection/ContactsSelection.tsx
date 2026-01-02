@@ -235,6 +235,7 @@ export const MiniSearchBar: FC<{
 			className="relative mx-auto"
 			ref={containerRef}
 			style={{ width: width ?? 'min(489px, 100%)' }}
+			data-hover-description="Search: refine the contacts in this campaign (Why / What / Where)."
 		>
 			<div
 				className="bg-white rounded-[8px] border-2 border-black flex items-center relative w-full"
