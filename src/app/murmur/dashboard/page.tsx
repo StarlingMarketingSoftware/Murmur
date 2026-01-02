@@ -4247,11 +4247,11 @@ const DashboardContent = () => {
 											}}
 										>
 											{/* Default: show house icon */}
-											<span className="group-hover:hidden">
-												<HomeIcon width={28} height={24} />
+											<span className="group-hover:hidden flex items-center justify-center">
+												<HomeIcon width={20} height={17} />
 											</span>
 											{/* Hover: show "Home" text SVG */}
-											<HomeExpandedIcon className="hidden group-hover:block" />
+											<HomeExpandedIcon className="hidden group-hover:block" width={80} height={21} />
 										</div>
 									</button>
 								</>

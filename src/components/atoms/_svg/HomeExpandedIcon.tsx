@@ -15,6 +15,8 @@ const HomeExpandedIcon: FC<HomeExpandedIconProps> = (props) => {
 			fill="none"
 			xmlns="http://www.w3.org/2000/svg"
 			className={className}
+			// Prevent anti-aliased edges from being clipped when paths sit flush to the viewBox.
+			style={{ overflow: 'visible' }}
 		>
 			<path
 				d="M0 26.5167V0H3.21138V11.8092H17.3494V0H20.5608V26.511H17.3494V14.6505H3.21138V26.511H0V26.5167Z"
