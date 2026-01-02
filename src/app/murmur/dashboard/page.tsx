@@ -1554,14 +1554,26 @@ const DashboardContent = () => {
 	>({});
 	const mapViewContainerRef = useRef<HTMLDivElement | null>(null);
 	const [activeMapTool, setActiveMapTool] = useState<'select' | 'grab'>('grab');
+	const [selectAllInViewNonce, setSelectAllInViewNonce] = useState(0);
 	const [hoveredMapMarkerContact, setHoveredMapMarkerContact] = useState<ContactWithName | null>(
 		null
 	);
 	// When hovering a row in the map side panel, highlight/show the corresponding marker on the map.
 	const [hoveredMapPanelContactId, setHoveredMapPanelContactId] = useState<number | null>(null);
 	const isMapResultsLoading = isSearchPending || isLoadingContacts || isRefetchingContacts;
+	const isSelectMapToolActive = activeMapTool === 'select';
+	const isGrabMapToolActive = activeMapTool === 'grab';
 	const hasNoSearchResults =
 		hasSearched && !isMapResultsLoading && (contacts?.length ?? 0) === 0;
+
+	const handleSelectMapToolClick = useCallback(() => {
+		// First click: activate Select tool. Second click (while active): select all visible.
+		if (!isSelectMapToolActive) {
+			setActiveMapTool('select');
+			return;
+		}
+		setSelectAllInViewNonce((n) => n + 1);
+	}, [isSelectMapToolActive]);
 
 	useEffect(() => {
 		// Prevent stale hover state when leaving map view or while results are transitioning.
@@ -4137,86 +4149,231 @@ const DashboardContent = () => {
 									<div
 										className="group relative h-[52px] hover:h-[80px]"
 										style={{
+											...(() => {
+												const buttonSize = 43;
+												const gap = isSelectMapToolActive ? 8 : 20;
+												// Existing collapsed design: 2 buttons + 20px gap inside a 130px wrapper.
+												// That leaves ~12px padding on each side (24px total).
+												const horizontalPadding = 24;
+												const innerWidth = isSelectMapToolActive
+													? buttonSize * 3 + gap * 2
+													: buttonSize * 2 + gap;
+												const wrapperWidth = innerWidth + horizontalPadding;
+												const gapToHomeButton = 10;
+												return {
+													width: `${wrapperWidth}px`,
+													left: `calc(100% + 179px - ${wrapperWidth + gapToHomeButton}px)`,
+												};
+											})(),
 											position: 'absolute',
 											// Map is inset 9px from the viewport; "25px from map top" => 34px viewport.
 											// Search bar wrapper sits at 33px viewport, so this becomes 1px inside the wrapper.
 											top: '1px',
 											// Home button is at: calc(100% + 179px). This box should be 10px to its left.
-											left: 'calc(100% + 179px - 140px)', // 130px width + 10px gap
-											width: '130px',
 											borderRadius: '6px',
 											backgroundColor: 'rgba(255, 255, 255, 0.9)', // #FFFFFF @ 90%
 											border: '3px solid #000000',
 										}}
 									>
 										{/* Keep the buttons pinned to the collapsed center so expanding height doesn't move them */}
-										<div className="absolute left-1/2 top-[24px] -translate-x-1/2 -translate-y-1/2 flex items-center justify-center gap-[20px]">
-											<div className="relative">
-												<button
-													type="button"
-													onClick={() => setActiveMapTool('select')}
-													aria-label="Select tool"
-													aria-pressed={activeMapTool === 'select'}
-													className="flex items-center justify-center"
-													style={{
-														width: '43px',
-														height: '43px',
-														borderRadius: '9px',
-														backgroundColor:
-															activeMapTool === 'select'
-																? '#4CDE71'
-																: 'rgba(153, 153, 153, 0.3)', // #999999 @ 30%
-														cursor: 'pointer',
-														padding: 0,
-														border: 'none',
-													}}
-												>
-													<div
-														aria-hidden="true"
-														style={{
-															width: '24px',
-															height: '24px',
-															backgroundColor:
-																activeMapTool === 'select' ? '#FFFFFF' : 'transparent',
-															border: '2px solid #000000',
-															boxSizing: 'border-box',
-														}}
-													/>
-												</button>
-												{activeMapTool === 'select' && (
-													<div className="pointer-events-none absolute left-1/2 top-[51px] -translate-x-1/2 opacity-0 group-hover:opacity-100 font-inter text-[16px] font-semibold leading-none text-black select-none whitespace-nowrap">
-														Select
+										<div
+											className={`absolute left-1/2 top-[24px] -translate-x-1/2 -translate-y-1/2 flex items-center justify-center ${
+												isSelectMapToolActive ? 'gap-[8px]' : 'gap-[20px]'
+											}`}
+										>
+											{isSelectMapToolActive ? (
+												<>
+													{/* Left: active "What" category icon from the current search */}
+													<div className="relative">
+														<div
+															aria-label={`Active category: ${effectiveWhatKeyForTray || 'Music Venues'}`}
+															className="flex items-center justify-center"
+															style={{
+																width: '43px',
+																height: '43px',
+																borderRadius: '9px',
+																backgroundColor: trayWhat.backgroundColor,
+															}}
+														>
+															<TrayWhatIcon size={trayWhatIconSize} />
+														</div>
 													</div>
-												)}
-											</div>
-											<div className="relative">
-												<button
-													type="button"
-													onClick={() => setActiveMapTool('grab')}
-													aria-label="Grab tool"
-													aria-pressed={activeMapTool === 'grab'}
-													className="flex items-center justify-center"
-													style={{
-														width: '43px',
-														height: '43px',
-														borderRadius: '9px',
-														backgroundColor:
-															activeMapTool === 'grab'
-																? '#4CDE71'
-																: 'rgba(153, 153, 153, 0.3)', // #999999 @ 30%
-														cursor: 'pointer',
-														padding: 0,
-														border: 'none',
-													}}
-												>
-													<GrabIcon innerFill={activeMapTool === 'grab' ? '#FFFFFF' : '#DCDFDD'} />
-												</button>
-												{activeMapTool === 'grab' && (
-													<div className="pointer-events-none absolute left-1/2 top-[51px] -translate-x-1/2 opacity-0 group-hover:opacity-100 font-inter text-[16px] font-semibold leading-none text-black select-none whitespace-nowrap">
-														Grab
+
+													{/* Center: Select tool */}
+													<div className="relative">
+														<button
+															type="button"
+															onClick={handleSelectMapToolClick}
+															aria-label="Select tool"
+															aria-pressed={isSelectMapToolActive}
+															className="flex items-center justify-center font-inter text-[16px] font-semibold leading-none text-black"
+															style={{
+																width: '43px',
+																height: '43px',
+																borderRadius: '9px',
+																backgroundColor:
+																	isSelectMapToolActive
+																		? '#999999'
+																		: 'rgba(153, 153, 153, 0.3)', // #999999 @ 30%
+																cursor: 'pointer',
+																padding: 0,
+																border: 'none',
+															}}
+														>
+															<div
+																aria-hidden="true"
+																style={{
+																	width: '24px',
+																	height: '24px',
+																	backgroundColor:
+																		isSelectMapToolActive ? '#999999' : 'transparent',
+																	border: '2px solid #000000',
+																	boxSizing: 'border-box',
+																	display: 'flex',
+																	alignItems: 'center',
+																	justifyContent: 'center',
+																}}
+															>
+																{isSelectMapToolActive && (
+																	<span
+																		className="font-inter"
+																		style={{
+																			fontSize: '8px',
+																			fontWeight: 500,
+																			color: '#000000',
+																			lineHeight: 1,
+																		}}
+																	>
+																		All
+																	</span>
+																)}
+															</div>
+														</button>
+														{isSelectMapToolActive && (
+															<div className="pointer-events-none absolute left-1/2 top-[51px] -translate-x-1/2 opacity-0 group-hover:opacity-100 font-inter text-[16px] font-semibold leading-none text-black select-none whitespace-nowrap">
+																Select
+															</div>
+														)}
 													</div>
-												)}
-											</div>
+
+													{/* Right: Grab tool */}
+													<div className="relative">
+														<button
+															type="button"
+															onClick={() => setActiveMapTool('grab')}
+															aria-label="Grab tool"
+															aria-pressed={isGrabMapToolActive}
+															className="flex items-center justify-center"
+															style={{
+																width: '43px',
+																height: '43px',
+																borderRadius: '9px',
+																backgroundColor:
+																	isGrabMapToolActive
+																		? '#4CDE71'
+																		: '#999999',
+																cursor: 'pointer',
+																padding: 0,
+																border: 'none',
+															}}
+														>
+															<GrabIcon
+																innerFill="#FFFFFF"
+															/>
+														</button>
+													</div>
+												</>
+											) : (
+												<>
+													<div className="relative">
+														<button
+															type="button"
+															onClick={handleSelectMapToolClick}
+															aria-label="Select tool"
+															aria-pressed={isSelectMapToolActive}
+															className="flex items-center justify-center"
+															style={{
+																width: '43px',
+																height: '43px',
+																borderRadius: '9px',
+																backgroundColor:
+																	isSelectMapToolActive
+																		? '#999999'
+																		: 'rgba(153, 153, 153, 0.3)', // #999999 @ 30%
+																cursor: 'pointer',
+																padding: 0,
+																border: 'none',
+															}}
+														>
+															<div
+																aria-hidden="true"
+																style={{
+																	width: '24px',
+																	height: '24px',
+																	backgroundColor:
+																		isSelectMapToolActive
+																			? '#999999'
+																			: 'transparent',
+																	border: '2px solid #000000',
+																	boxSizing: 'border-box',
+																	display: 'flex',
+																	alignItems: 'center',
+																	justifyContent: 'center',
+																}}
+															>
+																{isSelectMapToolActive && (
+																	<span
+																		className="font-inter"
+																		style={{
+																			fontSize: '8px',
+																			fontWeight: 500,
+																			color: '#000000',
+																			lineHeight: 1,
+																		}}
+																	>
+																		All
+																	</span>
+																)}
+															</div>
+														</button>
+														{isSelectMapToolActive && (
+															<div className="pointer-events-none absolute left-1/2 top-[51px] -translate-x-1/2 opacity-0 group-hover:opacity-100 font-inter text-[16px] font-semibold leading-none text-black select-none whitespace-nowrap">
+																Select
+															</div>
+														)}
+													</div>
+													<div className="relative">
+														<button
+															type="button"
+															onClick={() => setActiveMapTool('grab')}
+															aria-label="Grab tool"
+															aria-pressed={isGrabMapToolActive}
+															className="flex items-center justify-center"
+															style={{
+																width: '43px',
+																height: '43px',
+																borderRadius: '9px',
+																backgroundColor:
+																	isGrabMapToolActive
+																		? '#4CDE71'
+																		: '#999999',
+																cursor: 'pointer',
+																padding: 0,
+																border: 'none',
+															}}
+														>
+															<GrabIcon
+																innerFill="#FFFFFF"
+															/>
+														</button>
+														{isGrabMapToolActive && (
+															<div className="pointer-events-none absolute left-1/2 top-[51px] -translate-x-1/2 opacity-0 group-hover:opacity-100 font-inter text-[16px] font-semibold leading-none text-black select-none whitespace-nowrap">
+																Grab
+															</div>
+														)}
+													</div>
+												</>
+											)}
 										</div>
 									</div>
 									<button
@@ -4420,6 +4577,7 @@ const DashboardContent = () => {
 																externallyHoveredContactId={hoveredMapPanelContactId}
 																searchQuery={activeSearchQuery}
 																searchWhat={searchedWhat}
+																selectAllInViewNonce={selectAllInViewNonce}
 																onVisibleOverlayContactsChange={(overlayContacts) => {
 																	setMapPanelVisibleOverlayContacts(overlayContacts);
 

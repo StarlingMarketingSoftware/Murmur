@@ -729,6 +729,11 @@ interface SearchResultsMapProps {
 	selectedAreaBounds?: MapSelectionBounds | null;
 	/** Map interaction mode controlled by the dashboard (grab = pan/zoom, select = draw rectangle). */
 	activeTool?: 'select' | 'grab';
+	/**
+	 * When incremented, selects all currently-visible markers within the current map viewport
+	 * that match the active search category (including visible overlay pins).
+	 */
+	selectAllInViewNonce?: number;
 	/** Called when the user completes a rectangle selection (south/west/north/east). */
 	onAreaSelect?: (bounds: MapSelectionBounds, payload?: AreaSelectPayload) => void;
 	/**
@@ -1071,6 +1076,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	searchWhat,
 	selectedAreaBounds,
 	activeTool,
+	selectAllInViewNonce,
 	onAreaSelect,
 	onVisibleOverlayContactsChange,
 	onMarkerClick,
@@ -1116,6 +1122,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const selectionStartClientRef = useRef<{ x: number; y: number } | null>(null);
 	const selectionRectRef = useRef<google.maps.Rectangle | null>(null);
 	const selectedAreaRectRef = useRef<google.maps.Rectangle | null>(null);
+	const lastSelectAllInViewNonceRef = useRef<number>(0);
 	// Timeout ref for auto-hiding research panel
 	const researchPanelTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 	// Small delay when moving between marker layers (prevents hover flicker)
@@ -2180,6 +2187,88 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			baseContactIdSet,
 		]
 	);
+
+	// Dashboard UX: "All" button selects all markers currently visible in the viewport that
+	// match the active search category (including overlay pins when visible).
+	useEffect(() => {
+		if (!selectAllInViewNonce) return;
+		if (selectAllInViewNonce === lastSelectAllInViewNonceRef.current) return;
+		if (!map) return;
+		if (typeof onAreaSelect !== 'function') return;
+
+		const viewportBounds = map.getBounds();
+		if (!viewportBounds) return;
+		const sw = viewportBounds.getSouthWest();
+		const ne = viewportBounds.getNorthEast();
+		const west = sw.lng();
+		const east = ne.lng();
+
+		// Skip in the unlikely case the viewport crosses the antimeridian (not relevant for our UI).
+		if (east < west) return;
+
+		const bounds: MapSelectionBounds = {
+			south: sw.lat(),
+			west,
+			north: ne.lat(),
+			east,
+		};
+
+		const selectedIds = new Set<number>();
+
+		// Base results: only select dots currently rendered in the viewport.
+		for (const contact of visibleContacts) selectedIds.add(contact.id);
+
+		const normalizedSearchWhat = searchWhat ? normalizeWhatKey(searchWhat) : null;
+		const extraContactsById = new Map<number, ContactWithName>();
+
+		// Booking overlay pins: select only the visible pins that match the active category.
+		if (isBookingSearch && normalizedSearchWhat && bookingExtraVisibleContacts.length > 0) {
+			for (const contact of bookingExtraVisibleContacts) {
+				const prefix = getBookingTitlePrefixFromContactTitle(contact.title);
+				if (!prefix) continue;
+				if (!bookingTitlePrefixMatchesSearchWhatKey(prefix, normalizedSearchWhat)) continue;
+				selectedIds.add(contact.id);
+				if (!baseContactIdSet.has(contact.id)) {
+					extraContactsById.set(contact.id, contact);
+				}
+			}
+		}
+
+		// Promotion overlay pins: select only the visible pins that match the active category.
+		if (isPromotionSearch && normalizedSearchWhat && promotionOverlayVisibleContacts.length > 0) {
+			for (const contact of promotionOverlayVisibleContacts) {
+				const title = contact.title ?? '';
+				const matchedPrefix =
+					PROMOTION_OVERLAY_TITLE_PREFIXES.find((p) => startsWithCaseInsensitive(title, p)) ??
+					null;
+				if (!matchedPrefix) continue;
+				if (normalizeWhatKey(matchedPrefix) !== normalizedSearchWhat) continue;
+				selectedIds.add(contact.id);
+				if (!baseContactIdSet.has(contact.id)) {
+					extraContactsById.set(contact.id, contact);
+				}
+			}
+		}
+
+		onAreaSelect(bounds, {
+			contactIds: Array.from(selectedIds),
+			extraContacts: Array.from(extraContactsById.values()),
+		});
+
+		// Ensure this runs once per dashboard click, even as viewport-driven state changes.
+		lastSelectAllInViewNonceRef.current = selectAllInViewNonce;
+	}, [
+		selectAllInViewNonce,
+		map,
+		onAreaSelect,
+		visibleContacts,
+		searchWhat,
+		isBookingSearch,
+		bookingExtraVisibleContacts,
+		isPromotionSearch,
+		promotionOverlayVisibleContacts,
+		baseContactIdSet,
+	]);
 
 	const updateBackgroundDots = useCallback(
 		(
