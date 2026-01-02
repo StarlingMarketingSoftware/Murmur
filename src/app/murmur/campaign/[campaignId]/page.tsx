@@ -17,7 +17,10 @@ import RightArrow from '@/components/atoms/_svg/RightArrow';
 import BottomArrowIcon from '@/components/atoms/_svg/BottomArrowIcon';
 import { SearchIconDesktop } from '@/components/atoms/_svg/SearchIconDesktop';
 import SearchMap from '@/components/atoms/_svg/SearchMap';
+import BottomFolderIcon from '@/components/atoms/_svg/BottomFolderIcon';
+import BottomHomeIcon from '@/components/atoms/_svg/BottomHomeIcon';
 import nextDynamic from 'next/dynamic';
+import { CampaignsTable } from '@/components/organisms/_tables/CampaignsTable/CampaignsTable';
 import { CampaignHeaderBox } from '@/components/molecules/CampaignHeaderBox/CampaignHeaderBox';
 import { useEditCampaign } from '@/hooks/queryHooks/useCampaigns';
 import { useGetContacts } from '@/hooks/queryHooks/useContacts';
@@ -186,6 +189,33 @@ const Murmur = () => {
 	};
 	
 	const [activeView, setActiveViewInternal] = useState<ViewType>(getInitialView());
+	
+	// State for top campaigns dropdown
+	const [showTopCampaignsDropdown, setShowTopCampaignsDropdown] = useState(false);
+	const topCampaignsDropdownRef = useRef<HTMLDivElement>(null);
+	const topCampaignsFolderButtonRef = useRef<HTMLButtonElement>(null);
+	
+	// Close dropdown when clicking outside (but not on the folder button itself)
+	useEffect(() => {
+		if (!showTopCampaignsDropdown) return;
+		
+		const handleClickOutside = (event: MouseEvent) => {
+			const target = event.target as Node;
+			// Don't close if clicking on the folder button (let the toggle handle it)
+			if (topCampaignsFolderButtonRef.current?.contains(target)) {
+				return;
+			}
+			if (
+				topCampaignsDropdownRef.current &&
+				!topCampaignsDropdownRef.current.contains(target)
+			) {
+				setShowTopCampaignsDropdown(false);
+			}
+		};
+		
+		document.addEventListener('mousedown', handleClickOutside);
+		return () => document.removeEventListener('mousedown', handleClickOutside);
+	}, [showTopCampaignsDropdown]);
 	
 	// Track previous view for crossfade transitions
 	const [previousView, setPreviousView] = useState<ViewType | null>(null);
@@ -431,29 +461,80 @@ const Murmur = () => {
 					data-slot="campaign-top-box-wrapper"
 					className="absolute inset-x-0 top-16 flex justify-center pointer-events-none"
 				>
-					<button
-						type="button"
-						data-slot="campaign-top-box"
-						aria-label="Open dashboard search for this campaign"
-						title="Search for more contacts"
-						onClick={handleOpenDashboardSearchForCampaign}
-						className="group relative pointer-events-auto w-[477px] max-w-[calc(100vw-32px)] h-[42px] box-border border border-[#929292] hover:border-black hover:border-2 rounded-[10px] overflow-hidden transition-[color,border-color,border-width] duration-150 cursor-pointer"
-					>
-						<SearchMap
-							aria-hidden="true"
-							width="100%"
-							height="100%"
-							viewBox="1 1 475.184 39.877"
-							preserveAspectRatio="none"
-							rectStroke="none"
-							rectStrokeWidth={0}
-							rectRx={10}
-							className="absolute inset-0 w-full h-full opacity-40 group-hover:opacity-100 transition-opacity duration-150"
-						/>
-						<div className="absolute right-3 top-1/2 -translate-y-1/2 flex z-10 text-[#929292] group-hover:text-black transition-colors duration-150">
-							<SearchIconDesktop stroke="currentColor" />
+					<div className="relative">
+						{/* Left box - 124 x 42px, 30px to the left of search box */}
+						<div
+							data-slot="campaign-left-box"
+							className="pointer-events-auto absolute right-full top-0 mr-[30px] w-[124px] h-[42px] box-border border border-[#929292] rounded-[10px] overflow-hidden flex items-center justify-center gap-[33px]"
+						>
+							<button
+								ref={topCampaignsFolderButtonRef}
+								type="button"
+								onClick={() => setShowTopCampaignsDropdown((prev) => !prev)}
+								className={cn(
+									"flex items-center justify-center bg-transparent border-0 p-0 cursor-pointer transition-opacity",
+									showTopCampaignsDropdown ? "opacity-100" : "opacity-40 hover:opacity-100"
+								)}
+								aria-label="Toggle campaigns dropdown"
+							>
+								<BottomFolderIcon width={30} height={15} className="text-black" />
+							</button>
+							<button
+								type="button"
+								onClick={() => {
+									if (typeof window !== 'undefined') {
+										window.location.assign(urls.murmur.dashboard.index);
+									}
+								}}
+								className="flex items-center justify-center bg-transparent border-0 p-0 cursor-pointer transition-opacity opacity-40 hover:opacity-100 active:opacity-100"
+								aria-label="Go to dashboard"
+							>
+								<BottomHomeIcon width={20} height={19} className="text-black" />
+							</button>
 						</div>
-					</button>
+						{/* Campaigns dropdown positioned below the left box, left-aligned with content */}
+						{showTopCampaignsDropdown && (
+							<div
+								ref={topCampaignsDropdownRef}
+								data-slot="campaign-top-dropdown"
+								className="pointer-events-auto fixed top-[116px] left-[300px] z-[60]"
+							>
+								<div className="bg-[#EDEDED] rounded-[12px] overflow-hidden w-[891px] h-[242px] border-2 border-[#8C8C8C]">
+									<CampaignsTable />
+								</div>
+							</div>
+						)}
+						<button
+							type="button"
+							data-slot="campaign-top-box"
+							aria-label="Open dashboard search for this campaign"
+							title="Search for more contacts"
+							onClick={handleOpenDashboardSearchForCampaign}
+							className="group relative pointer-events-auto w-[477px] max-w-[calc(100vw-32px)] h-[42px] box-border border border-[#929292] hover:border-black hover:border-2 rounded-[10px] overflow-hidden transition-[color,border-color,border-width] duration-150 cursor-pointer"
+						>
+							<SearchMap
+								aria-hidden="true"
+								width="100%"
+								height="100%"
+								viewBox="1 1 475.184 39.877"
+								preserveAspectRatio="none"
+								rectStroke="none"
+								rectStrokeWidth={0}
+								rectRx={10}
+								className="absolute inset-0 w-full h-full opacity-40 group-hover:opacity-100 transition-opacity duration-150"
+							/>
+							<div className="absolute right-3 top-1/2 -translate-y-1/2 flex z-10 text-[#929292] group-hover:text-black transition-colors duration-150">
+								<SearchIconDesktop stroke="currentColor" />
+							</div>
+						</button>
+						{/* Right box - 105 x 42px, 36px to the right of search box */}
+						<div
+							data-slot="campaign-right-box"
+							className="pointer-events-auto absolute left-full top-0 ml-[36px] w-[105px] h-[42px] box-border border border-[#929292] rounded-[10px] overflow-hidden opacity-40"
+						>
+							{/* SVG icons will go here */}
+						</div>
+					</div>
 				</div>
 			)}
 
