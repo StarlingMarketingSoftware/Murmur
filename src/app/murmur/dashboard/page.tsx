@@ -375,6 +375,8 @@ const DashboardContent = () => {
 	const whyDropdownRef = useRef<HTMLDivElement>(null);
 	const [isWhatDropdownOpen, setIsWhatDropdownOpen] = useState(false);
 	const whatDropdownRef = useRef<HTMLDivElement>(null);
+	const [isWhereDropdownOpen, setIsWhereDropdownOpen] = useState(false);
+	const whereDropdownRef = useRef<HTMLDivElement>(null);
 	const [isNearMeLocation, setIsNearMeLocation] = useState(false);
 	const hasWhereValue = whereValue.trim().length > 0;
 	const isPromotion = whyValue === '[Promotion]';
@@ -411,6 +413,21 @@ const DashboardContent = () => {
 			document.removeEventListener('mousedown', handleClickOutside);
 		};
 	}, [isWhatDropdownOpen]);
+
+	// Close where dropdown when clicking outside
+	useEffect(() => {
+		const handleClickOutside = (event: MouseEvent) => {
+			if (whereDropdownRef.current && !whereDropdownRef.current.contains(event.target as Node)) {
+				setIsWhereDropdownOpen(false);
+			}
+		};
+		if (isWhereDropdownOpen) {
+			document.addEventListener('mousedown', handleClickOutside);
+		}
+		return () => {
+			document.removeEventListener('mousedown', handleClickOutside);
+		};
+	}, [isWhereDropdownOpen]);
 	const initialTabFromQuery = searchParams.get('tab') === 'inbox' ? 'inbox' : 'search';
 	const [activeTab, setActiveTab] = useState<'search' | 'inbox'>(initialTabFromQuery);
 	const inboxView = activeTab === 'inbox';
@@ -3798,9 +3815,94 @@ const DashboardContent = () => {
 											</div>
 										)}
 									</div>
-									<SearchTrayIconTile backgroundColor={trayWhere.backgroundColor}>
-										{trayWhere.icon}
-									</SearchTrayIconTile>
+									{/* Third icon (Where) - clickable with dropdown */}
+									<div ref={whereDropdownRef} className="relative">
+										<button
+											type="button"
+											className="cursor-pointer border-none bg-transparent p-0"
+											onClick={() => setIsWhereDropdownOpen(!isWhereDropdownOpen)}
+											aria-label={`${whereValue || 'Location'} search location`}
+											aria-expanded={isWhereDropdownOpen}
+											aria-haspopup="listbox"
+										>
+											<SearchTrayIconTile backgroundColor={trayWhere.backgroundColor}>
+												{trayWhere.icon}
+											</SearchTrayIconTile>
+										</button>
+										{/* Where dropdown */}
+										{isWhereDropdownOpen && (
+											<div
+												id="map-search-tray-where-dropdown-container"
+												role="listbox"
+												aria-label="Search location options"
+												className="absolute top-[calc(100%+8px)] right-0 border-[3px] border-black rounded-[12px] z-50"
+												style={{
+													width: '249px',
+													height: '277px',
+													backgroundColor: 'rgba(216, 229, 251, 0.9)',
+												}}
+											>
+												<style jsx global>{`
+													#map-search-tray-where-dropdown-container .scrollbar-hide {
+														scrollbar-width: none !important;
+														scrollbar-color: transparent transparent !important;
+														-ms-overflow-style: none !important;
+													}
+													#map-search-tray-where-dropdown-container .scrollbar-hide::-webkit-scrollbar {
+														display: none !important;
+														width: 0 !important;
+														height: 0 !important;
+													}
+												`}</style>
+												<CustomScrollbar
+													className="h-full"
+													contentClassName="flex flex-col items-center gap-[10px] py-[10px] pl-[6px] pr-[26px] -mr-[20px]"
+													thumbWidth={2}
+													thumbColor="#000000"
+													offsetRight={-5}
+													lockHorizontalScroll
+												>
+													{buildAllUsStateNames().map((stateName) => {
+														const { icon, backgroundColor } = getCityIconProps('', stateName);
+														return (
+															<div
+																key={stateName}
+																role="option"
+																aria-selected={whereValue === stateName}
+																className="flex items-center gap-3 cursor-pointer bg-white rounded-[8px] hover:bg-gray-50 transition-colors flex-shrink-0"
+																style={{
+																	width: '237px',
+																	height: '46px',
+																	paddingLeft: '4px',
+																	paddingRight: '12px',
+																}}
+																onClick={() => {
+																	setIsWhereDropdownOpen(false);
+																	setIsNearMeLocation(false);
+																	triggerSearchWithWhere(stateName, false);
+																}}
+															>
+																<div
+																	className="flex items-center justify-center flex-shrink-0"
+																	style={{
+																		width: '38px',
+																		height: '38px',
+																		backgroundColor,
+																		borderRadius: '10px',
+																	}}
+																>
+																	{icon}
+																</div>
+																<span className="text-[15px] font-medium text-black font-inter">
+																	{stateName}
+																</span>
+															</div>
+														);
+													})}
+												</CustomScrollbar>
+											</div>
+										)}
+									</div>
 								</div>
 							)}
 							<div
