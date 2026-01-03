@@ -140,14 +140,56 @@ export const FullAutoBodyBlock: FC<FullAutoBodyBlockProps> = ({
 		const rect = anchor.getBoundingClientRect();
 		const margin = 6;
 		const viewportPadding = 8;
-		const offsetX = 85;
-		const offsetY = 45;
+		// MiniEmailStructure usage: dropdown looked slightly too far right + a touch too high.
+		// Nudge it left/down so it sits more naturally under the trigger.
+		const offsetX = 65;
+		const offsetY = 55;
 		const calendarNudgeX = 100;
 
-		let left =
-			bookingForTab === 'Calendar'
-				? (window.innerWidth - bookingForDropdownSize.width) / 2 + calendarNudgeX
-				: rect.left + offsetX;
+		// For Calendar, we want the internal Anytime/Season/Calendar tab strip to line up
+		// with where it sits in the narrow dropdown (Anytime/Season). If we keep the
+		// Calendar dropdown fully centered, the strip can end up clamped too far right
+		// when the trigger is on the left (MiniEmailStructure), so we shift the whole
+		// dropdown left/right as needed to preserve alignment (within the viewport).
+		let left: number;
+		if (bookingForTab === 'Calendar') {
+			const tabStripWidth = 284;
+			const narrowDropdownWidth = 317;
+			const tabStripPadding = 8;
+			const minTabStripLeft = tabStripPadding;
+			const maxTabStripLeft = Math.max(
+				minTabStripLeft,
+				bookingForDropdownSize.width - tabStripWidth - tabStripPadding
+			);
+
+			const tabStripLeftInNarrowDropdown = (narrowDropdownWidth - tabStripWidth) / 2; // 16.5
+			const desiredTabStripLeftGlobal = rect.left + offsetX + tabStripLeftInNarrowDropdown;
+
+			// The tab strip can align iff:
+			//   desiredTabStripLeftGlobal ∈ [left + minTabStripLeft, left + maxTabStripLeft]
+			// ⇒ left ∈ [desired - maxTabStripLeft, desired - minTabStripLeft]
+			const minLeftForAlignment = desiredTabStripLeftGlobal - maxTabStripLeft;
+			const maxLeftForAlignment = desiredTabStripLeftGlobal - minTabStripLeft;
+
+			const viewportMaxLeft = Math.max(
+				viewportPadding,
+				window.innerWidth - bookingForDropdownSize.width - viewportPadding
+			);
+
+			// Prefer centered, then clamp into the intersection of (alignment range ∩ viewport range).
+			const preferredLeft =
+				(window.innerWidth - bookingForDropdownSize.width) / 2 + calendarNudgeX;
+			const minLeft = Math.max(viewportPadding, minLeftForAlignment);
+			const maxLeft = Math.min(viewportMaxLeft, maxLeftForAlignment);
+			if (minLeft <= maxLeft) {
+				left = Math.min(Math.max(preferredLeft, minLeft), maxLeft);
+			} else {
+				// Fallback: viewport-constrained center.
+				left = Math.min(Math.max(preferredLeft, viewportPadding), viewportMaxLeft);
+			}
+		} else {
+			left = rect.left + offsetX;
+		}
 		let top = rect.bottom + margin + offsetY;
 
 		const maxLeft = Math.max(
