@@ -425,16 +425,64 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 											}
 											return null;
 										})()}
-										{!isLoading && (contact?.title || contact?.headline) && (
-											<div className="px-2 py-[2px] rounded-[8px] bg-[#E8EFFF] border border-black max-w-full truncate">
-												<span
-													className="text-[10px] leading-none text-black block truncate"
-													style={hideAllText ? { color: 'transparent' } : undefined}
+										{(() => {
+											if (isLoading) return null;
+											const titleToShow = contact?.title || contact?.headline;
+											if (!titleToShow) return null;
+
+											return (
+												<div
+													className="px-2 py-[2px] rounded-[8px] border border-black max-w-full flex items-center gap-1"
+													style={{
+														backgroundColor: isRestaurantTitle(titleToShow)
+															? '#C3FBD1'
+															: isCoffeeShopTitle(titleToShow)
+																? '#D6F1BD'
+																: isMusicVenueTitle(titleToShow)
+																	? '#B7E5FF'
+																	: (isWeddingPlannerTitle(titleToShow) || isWeddingVenueTitle(titleToShow))
+																		? '#FFF2BC'
+																		: isWineBeerSpiritsTitle(titleToShow)
+																			? '#BFC4FF'
+																			: '#E8EFFF',
+													}}
 												>
-													{contact?.title || contact?.headline}
-												</span>
-											</div>
-										)}
+													{isRestaurantTitle(titleToShow) && (
+														<RestaurantsIcon size={10} className="flex-shrink-0" />
+													)}
+													{isCoffeeShopTitle(titleToShow) && (
+														<CoffeeShopsIcon size={6} className="flex-shrink-0" />
+													)}
+													{isMusicVenueTitle(titleToShow) && (
+														<MusicVenuesIcon size={10} className="flex-shrink-0" />
+													)}
+													{(isWeddingPlannerTitle(titleToShow) || isWeddingVenueTitle(titleToShow)) && (
+														<WeddingPlannersIcon size={10} className="flex-shrink-0" />
+													)}
+													{isWineBeerSpiritsTitle(titleToShow) && (
+														<WineBeerSpiritsIcon size={10} className="flex-shrink-0" />
+													)}
+													<span
+														className="text-[10px] leading-none text-black block truncate"
+														style={hideAllText ? { color: 'transparent' } : undefined}
+													>
+														{isRestaurantTitle(titleToShow)
+															? 'Restaurant'
+															: isCoffeeShopTitle(titleToShow)
+																? 'Coffee Shop'
+																: isMusicVenueTitle(titleToShow)
+																	? 'Music Venue'
+																	: isWeddingPlannerTitle(titleToShow)
+																		? 'Wedding Planner'
+																		: isWeddingVenueTitle(titleToShow)
+																			? 'Wedding Venue'
+																			: isWineBeerSpiritsTitle(titleToShow)
+																				? getWineBeerSpiritsLabel(titleToShow)
+																				: titleToShow}
+													</span>
+												</div>
+											);
+										})()}
 									</div>
 								</div>
 							</div>

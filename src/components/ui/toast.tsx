@@ -19,14 +19,11 @@ export function Toaster() {
 			toastOptions={{
 				duration: 2000,
 				classNames: {
-					// Hide the left icon slot entirely (prevents the "extra X" on the left).
 					icon: 'hidden',
-					// Make the close icon sit on the right side of the toast.
 					toast: 'group relative',
 					closeButton:
 						'!left-auto !right-4 !top-1/2 !-translate-y-1/2 !translate-x-0 !transform !border-0 !bg-transparent !p-0 !h-4 !w-4 !rounded-none !text-inherit',
 				},
-				// Ensure we override Sonner's default styles (it applies a shadow + 1px border by default).
 				style: {
 					boxShadow: 'none',
 					borderRadius: 8,
