@@ -1046,7 +1046,15 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 					) : undefined
 				}
 			>
-				<div className={cn("overflow-visible w-full flex flex-col items-center", isMobile ? "gap-2" : "gap-4")}>
+				<div
+					className={cn(
+						"overflow-visible w-full flex flex-col items-center",
+						isMobile ? "gap-2" : "gap-4"
+					)}
+					onMouseLeave={() => {
+						onContactHover?.(null);
+					}}
+				>
 					{contacts.map((contact) => {
 						const isUsedContact = usedContactIdsSet.has(contact.id);
 						// Mobile-specific width values (using CSS calc for responsive sizing)
@@ -1055,9 +1063,11 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 						<div
 							key={contact.id}
 							className={cn(
-								'cursor-pointer transition-colors grid grid-cols-2 grid-rows-2 h-[52px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white select-none row-hover-scroll relative',
+								'cursor-pointer grid grid-cols-2 grid-rows-2 h-[52px] overflow-hidden rounded-[8px] border-2 border-[#000000] select-none row-hover-scroll relative',
 								!isMobile && 'w-[489px]',
-								selectedContactIds.has(contact.id) ? 'bg-[#EAAEAE]' : ''
+								selectedContactIds.has(contact.id)
+									? 'bg-[#EAAEAE]'
+									: 'bg-white hover:bg-[#F5DADA]'
 							)}
 							style={isMobile ? { width: mobileContactRowWidth } : undefined}
 							onMouseDown={(e) => {
@@ -1068,9 +1078,6 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 							}}
 							onMouseEnter={() => {
 								onContactHover?.(contact);
-							}}
-							onMouseLeave={() => {
-								onContactHover?.(null);
 							}}
 							onClick={(e) => {
 								handleContactSelection(contact.id, e);

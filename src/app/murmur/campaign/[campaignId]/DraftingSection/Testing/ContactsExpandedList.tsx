@@ -313,6 +313,9 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 					'relative flex-1 flex flex-col min-h-0',
 					isBottomView ? 'px-[2px] pt-0 pb-0' : 'pb-2 pt-2'
 				)}
+				onMouseLeave={() => {
+					onContactHover?.(null);
+				}}
 			>
 				{/* Scrollable list */}
 				<CustomScrollbar
@@ -346,11 +349,11 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 								<div
 									key={contact.id}
 							className={cn(
-								'cursor-pointer transition-colors overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white select-none relative grid grid-cols-2 grid-rows-2',
+								'cursor-pointer overflow-hidden rounded-[8px] border-2 border-[#000000] select-none relative grid grid-cols-2 grid-rows-2',
 								isBottomView
 									? 'w-[224px] h-[28px]'
 									: 'max-[480px]:w-[96.27vw] h-[49px] max-[480px]:h-[50px]',
-								isSelected && 'bg-[#EAAEAE]'
+								isSelected ? 'bg-[#EAAEAE]' : 'bg-white hover:bg-[#F5DADA]'
 							)}
 									style={!isBottomView ? { width: `${innerWidth}px` } : undefined}
 									onMouseDown={(e) => {
@@ -358,9 +361,6 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 									}}
 									onMouseEnter={() => {
 										onContactHover?.(contact);
-									}}
-									onMouseLeave={() => {
-										onContactHover?.(null);
 									}}
 									onClick={(e) => {
 										handleContactClick(contact, e);

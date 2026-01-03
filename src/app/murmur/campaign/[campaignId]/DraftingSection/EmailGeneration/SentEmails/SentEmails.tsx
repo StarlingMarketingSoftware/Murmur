@@ -72,7 +72,12 @@ export const SentEmails: FC<SentEmailsProps> = ({
 			goToSearch={goToSearch}
 			isMobile={isMobile}
 		>
-			<div className="overflow-visible w-full flex flex-col gap-2 items-center">
+			<div
+				className="overflow-visible w-full flex flex-col gap-2 items-center"
+				onMouseLeave={() => {
+					onContactHover?.(null);
+				}}
+			>
 				{emails.map((email) => {
 					const contact = email.contact;
 					const contactName = contact
@@ -109,9 +114,6 @@ export const SentEmails: FC<SentEmailsProps> = ({
 								if (contactForResearch) {
 									onContactHover?.(contactForResearch);
 								}
-							}}
-							onMouseLeave={() => {
-								onContactHover?.(null);
 							}}
 							onClick={() => {
 								if (contactForResearch) {

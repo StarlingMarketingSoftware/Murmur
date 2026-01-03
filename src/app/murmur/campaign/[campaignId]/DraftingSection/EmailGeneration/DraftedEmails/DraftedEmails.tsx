@@ -1180,7 +1180,12 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 				isMobile={isMobile}
 			>
 				<>
-					<div className="overflow-visible w-full flex flex-col items-center">
+					<div
+						className="overflow-visible w-full flex flex-col items-center"
+						onMouseLeave={() => {
+							onContactHover?.(null);
+						}}
+					>
 						{filteredDrafts.map((draft, idx) => {
 							const contact = contacts?.find((c) => c.id === draft.contactId);
 							const contactName = contact
@@ -1257,9 +1262,6 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 										if (contact) {
 											onContactHover?.(contact);
 										}
-									}}
-									onMouseLeave={() => {
-										onContactHover?.(null);
 									}}
 									onClick={() => {
 										handleDraftDoubleClick(draft);
