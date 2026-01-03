@@ -190,7 +190,10 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 			} catch {
 				// Ignore sessionStorage errors (e.g., disabled storage)
 			}
-			router.push(urls.murmur.dashboard.index);
+			const dashboardUrl = campaign?.id
+				? `${urls.murmur.dashboard.index}?fromCampaignId=${campaign.id}`
+				: urls.murmur.dashboard.index;
+			router.push(dashboardUrl);
 		}
 	};
 

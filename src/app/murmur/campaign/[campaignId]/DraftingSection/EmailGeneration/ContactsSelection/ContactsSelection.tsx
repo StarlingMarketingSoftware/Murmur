@@ -943,9 +943,17 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 
 		if (searchQuery) {
 			// Store the search query in sessionStorage for the dashboard to pick up
-			sessionStorage.setItem('murmur_pending_search', searchQuery);
-			// Navigate to the dashboard
-			router.push(urls.murmur.dashboard.index);
+			try {
+				sessionStorage.setItem('murmur_pending_search', searchQuery);
+			} catch {
+				// Ignore sessionStorage errors (e.g., disabled storage)
+			}
+
+			// Navigate to the campaign-scoped dashboard search/map view when possible
+			const dashboardUrl = campaign?.id
+				? `${urls.murmur.dashboard.index}?fromCampaignId=${campaign.id}`
+				: urls.murmur.dashboard.index;
+			router.push(dashboardUrl);
 		}
 	};
 

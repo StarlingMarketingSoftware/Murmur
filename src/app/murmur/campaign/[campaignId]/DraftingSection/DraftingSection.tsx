@@ -64,6 +64,7 @@ import { getCityIconProps } from '@/utils/cityIcons';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 import { getStateAbbreviation } from '@/utils/string';
 import { stateBadgeColorMap } from '@/constants/ui';
+import { urls } from '@/constants/urls';
 import { useGemini } from '@/hooks/useGemini';
 import { useOpenRouter } from '@/hooks/useOpenRouter';
 import {
@@ -185,8 +186,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		[campaign?.identity?.id, editIdentity, queryClient]
 	);
 
-	// eslint-disable-next-line @typescript-eslint/no-unused-vars
-	const _router = useRouter();
+	const router = useRouter();
 	const isMobile = useIsMobile();
 	const [isClient, setIsClient] = useState(false);
 	useEffect(() => setIsClient(true), []);
@@ -1384,53 +1384,43 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		what: string;
 		where: string;
 	}) => {
-		// Sync the Search tab's mini searchbar state so the UI reflects the query
-		if (why) {
-			setSearchWhyValue(why);
-		}
-		setSearchWhatValue(what);
-		setSearchWhereValue(where);
+		const trimmedWhy = (why ?? '').trim();
+		const trimmedWhat = (what ?? '').trim();
+		const trimmedWhere = (where ?? '').trim();
 
-		const parts: string[] = [];
-		if (what) parts.push(what);
-		if (where) parts.push(where);
-		const query = parts.join(' ');
-
-		if (!query.trim()) {
+		// Match the top campaign search button behavior: route to dashboard map view in
+		// "from campaign" mode, and pass the query via sessionStorage.
+		if (!trimmedWhat && !trimmedWhere) {
 			toast.error('Please enter what you want to search for');
 			return;
 		}
 
-		// Build a label for the tab
-		const labelParts: string[] = [];
-		if (where) {
-			const stateAbbrev =
-				where.length === 2 ? where.toUpperCase() : where.split(',')[0]?.trim() || where;
-			labelParts.push(stateAbbrev);
+		let searchQuery = '';
+		if (trimmedWhy) {
+			searchQuery += `${trimmedWhy} `;
 		}
-		if (what) {
-			labelParts.push(what);
+		if (trimmedWhat) {
+			searchQuery += trimmedWhat;
 		}
-		const label = labelParts.join(' - ') || query;
-
-		// Create a new search tab
-		const newTab: SearchTab = {
-			id: `search-${Date.now()}`,
-			label,
-			query,
-			what,
-			selectedContacts: [],
-			extraContacts: [],
-		};
-
-		setSearchTabs((tabs) => [...tabs, newTab]);
-		setActiveSearchTabId(newTab.id);
-		setSearchActiveSection(null);
-
-		// Ask the parent page to switch to the Search tab, if supported
-		if (onGoToSearch) {
-			onGoToSearch();
+		if (trimmedWhere) {
+			searchQuery += ` in ${trimmedWhere}`;
 		}
+		searchQuery = searchQuery.trim();
+
+		if (searchQuery) {
+			try {
+				if (typeof window !== 'undefined') {
+					sessionStorage.setItem('murmur_pending_search', searchQuery);
+				}
+			} catch {
+				// Ignore sessionStorage errors (e.g., disabled storage)
+			}
+		}
+
+		const dashboardUrl = campaign?.id
+			? `${urls.murmur.dashboard.index}?fromCampaignId=${campaign.id}`
+			: urls.murmur.dashboard.index;
+		router.push(dashboardUrl);
 	};
 
 	// Handler for adding selected search results to campaign
