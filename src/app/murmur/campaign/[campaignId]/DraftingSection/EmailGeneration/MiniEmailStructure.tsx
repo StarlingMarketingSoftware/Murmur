@@ -590,7 +590,6 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 		<div
 			ref={rootRef}
 			data-mini-email-hide-text={hideAllText ? 'true' : 'false'}
-			data-hover-description="Email structure: Configure your subject, blocks, and signature (used when generating drafts)."
 			style={{
 				cursor: hideAllText ? 'default' : 'auto',
 				width: fullWidthMobile ? '100%' : '376px',
@@ -605,28 +604,6 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 				overflow: 'visible',
 			}}
 		>
-			{onOpenWriting && (
-				<div
-					className="absolute z-20 flex items-center gap-[12px] cursor-pointer"
-					style={{ top: 2, right: 4 }}
-					onClick={onOpenWriting}
-					role="button"
-					tabIndex={0}
-					onKeyDown={(e) => {
-						if (e.key === 'Enter' || e.key === ' ') {
-							e.preventDefault();
-							onOpenWriting();
-						}
-					}}
-				>
-					<span className="text-[10px] font-medium leading-none text-[#B3B3B3] font-inter">
-						Open
-					</span>
-					<div style={{ marginTop: '1px' }}>
-						<OpenIcon />
-					</div>
-				</div>
-			)}
 			{hideAllText && (
 				<style jsx global>{`
 					[data-mini-email-hide-text='true'],
@@ -709,16 +686,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 				>
 					<div className="px-0 pb-3 max-[480px]:pb-2">
 						{/* Mode */}
-						<div className="w-full bg-white rounded-t-[5px] relative overflow-hidden">
-							{/* Top chrome spacer with divider to keep the Mode row clear */}
-							<div
-								className="h-[15px] w-full border-b border-black bg-[#F8F8F8] flex items-center pl-2"
-								style={{ borderTopLeftRadius: '5px', borderTopRightRadius: '5px' }}
-							>
-								<span className="font-inter font-semibold text-[9px] leading-none text-black">
-									Writing
-								</span>
-							</div>
+						<div className="w-full bg-white rounded-t-[5px] relative overflow-hidden h-[31px]">
 							{/* Inline step indicator for mobile landscape */}
 							{isMobileLandscape && (
 								<div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 text-[12px] leading-none font-inter font-medium text-black">
@@ -738,17 +706,20 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 									</svg>
 								</div>
 							)}
-							<div className="flex items-center gap-4 mb-1 w-[95%] mx-auto mt-1">
-								<span className="font-inter font-semibold text-[13px]">Mode</span>
-								<div ref={modeContainerRef} className="relative flex items-center gap-6 ml-2">
+							<div className="flex items-center gap-4 w-[95%] mx-auto h-full">
+								<span className="font-inter font-semibold text-[13px]">Profile</span>
 								<div
-									className="absolute top-1/2 -translate-y-1/2 z-10 pointer-events-none"
-									style={{
-										left: highlightStyle.left,
-										transition: isInitialRender ? 'none' : 'left 0.25s ease-in-out',
-										opacity: highlightStyle.opacity,
-									}}
+									ref={modeContainerRef}
+									className="relative grid flex-1 grid-cols-3 items-center max-w-[300px]"
 								>
+									<div
+										className="absolute top-1/2 -translate-y-1/2 z-10 pointer-events-none"
+										style={{
+											left: highlightStyle.left,
+											transition: isInitialRender ? 'none' : 'left 0.25s ease-in-out',
+											opacity: highlightStyle.opacity,
+										}}
+									>
 										<div
 											style={{
 												width: '80.38px',
@@ -763,7 +734,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 										ref={aiButtonRef}
 										type="button"
 										className={cn(
-											'text-[11px] font-inter font-semibold px-3 py-0.5 rounded-md cursor-pointer text-center relative z-20',
+											'text-[11px] font-inter font-semibold px-3 py-0.5 rounded-md cursor-pointer text-center relative z-20 justify-self-center',
 											draftingMode === 'ai'
 												? 'text-black'
 												: 'text-[#6B6B6B] hover:text-black'
@@ -776,7 +747,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 										ref={handwrittenButtonRef}
 										type="button"
 										className={cn(
-											'text-[11px] font-inter font-semibold px-3 py-0.5 rounded-md cursor-pointer text-center relative z-20',
+											'text-[11px] font-inter font-semibold px-3 py-0.5 rounded-md cursor-pointer text-center relative z-20 justify-self-center',
 											draftingMode === 'handwritten'
 												? 'text-black'
 												: 'text-[#6B6B6B] hover:text-black'
@@ -789,7 +760,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 										ref={hybridButtonRef}
 										type="button"
 										className={cn(
-											'text-[11px] font-inter font-semibold px-3 py-0.5 rounded-md cursor-pointer text-center relative z-20',
+											'text-[11px] font-inter font-semibold px-3 py-0.5 rounded-md cursor-pointer text-center relative z-20 justify-self-center',
 											draftingMode === 'hybrid'
 												? 'text-black'
 												: 'text-[#6B6B6B] hover:text-black'
@@ -800,8 +771,8 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 									</button>
 								</div>
 							</div>
-							<div className="h-[1px] bg-black w-full mt-[2px]" />
 						</div>
+						<div className="h-[1px] bg-black w-full" />
 
 						{/* Auto Subject */}
 						<div className="mt-[9px] mb-3 w-[95%] max-[480px]:w-[89.33vw] mx-auto">
@@ -840,7 +811,6 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 										<button
 											type="button"
 											aria-pressed={isAiSubject}
-											data-hover-description="click to disable automatic drafting for this and write your own"
 											onClick={toggleSubject}
 											className={cn(
 												'relative h-full flex items-center text-[10px] font-inter font-normal transition-colors shrink-0 subject-toggle',
@@ -885,7 +855,6 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 									<button
 										type="button"
 										aria-pressed={isAiSubject}
-										data-hover-description="Turn back on automated drafting for here"
 										onClick={toggleSubject}
 										className={cn(
 											'relative h-full flex items-center text-[10px] font-inter font-normal transition-colors shrink-0 subject-toggle',
@@ -1423,7 +1392,6 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 													</div>
 													<button
 														type="button"
-														data-hover-description="click to disable automatic drafting for this and write your own"
 														onClick={() => {
 															setIsAutoSignature(false);
 															// Start manual editing from the current signature value.
@@ -1468,7 +1436,6 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 													</div>
 													<button
 														type="button"
-														data-hover-description="Turn back on automated drafting for here"
 														onClick={() => {
 															setIsAutoSignature(true);
 															setManualSignatureValue('');
@@ -1563,7 +1530,6 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 												</div>
 												<button
 													type="button"
-													data-hover-description="click to disable automatic drafting for this and write your own"
 													onClick={() => {
 														setIsAutoSignature(false);
 														// Start manual editing from the current signature value.
@@ -1608,7 +1574,6 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 												</div>
 												<button
 													type="button"
-													data-hover-description="Turn back on automated drafting for here"
 													onClick={() => {
 														setIsAutoSignature(true);
 														setManualSignatureValue('');
@@ -1696,7 +1661,6 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 											</div>
 											<button
 												type="button"
-												data-hover-description="click to disable automatic drafting for this and write your own"
 												onClick={() => {
 													setIsAutoSignature(false);
 													// Start manual editing from the current signature value.
@@ -1741,7 +1705,6 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 											</div>
 											<button
 												type="button"
-												data-hover-description="Turn back on automated drafting for here"
 												onClick={() => {
 													setIsAutoSignature(true);
 													setManualSignatureValue('');
@@ -1830,7 +1793,6 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 										</div>
 										<button
 											type="button"
-											data-hover-description="click to disable automatic drafting for this and write your own"
 											onClick={() => {
 												setIsAutoSignature(false);
 												// Start manual editing from the current signature value.
@@ -1875,7 +1837,6 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 										</div>
 										<button
 											type="button"
-											data-hover-description="Turn back on automated drafting for here"
 											onClick={() => {
 												setIsAutoSignature(true);
 												setManualSignatureValue('');
