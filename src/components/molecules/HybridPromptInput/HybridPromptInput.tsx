@@ -5706,6 +5706,36 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																		<span className="pr-3 group-hover/hybrid-core:pr-[130px]">
 																			{label}
 																		</span>
+																		{/* Expand chevron (matches Text pill) */}
+																		<div className="hidden group-hover/hybrid-core:flex items-center absolute right-[8px] top-1/2 -translate-y-1/2 z-10">
+																			<button
+																				type="button"
+																				onClick={(e) => {
+																					e.stopPropagation();
+																					setHybridStructureSelection({ kind: 'block', blockId: id });
+																					setExpandedHybridTextBlockId(null);
+																					setExpandedHybridCoreBlockId(id);
+																				}}
+																				className="h-[18px] w-[18px] flex items-center justify-center bg-transparent border-0 p-0"
+																				aria-label={`Expand ${label}`}
+																			>
+																				<svg
+																					width="7"
+																					height="5"
+																					viewBox="0 0 7 5"
+																					fill="none"
+																					xmlns="http://www.w3.org/2000/svg"
+																				>
+																					<path
+																						d="M0.796875 0.796875L3.12021 3.34412L5.44355 0.796875"
+																						stroke="black"
+																						strokeWidth="1.59374"
+																						strokeLinecap="round"
+																						strokeLinejoin="round"
+																					/>
+																				</svg>
+																			</button>
+																		</div>
 																		{/* Advanced chrome (hover-only) */}
 																		<div className="hidden group-hover/hybrid-core:block absolute inset-0 pointer-events-none">
 																			<div className="absolute top-0 bottom-0 w-px bg-black right-[32px]" />
@@ -5986,6 +6016,35 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														);
 													})()}
 												</div>
+
+												{/* Hybrid: Generate Test button (Auto-tab style) — 26px below the main box (desktop) */}
+												{!showTestPreview && !compactLeftOnly && (
+													<div className="mt-[26px] w-[448px] max-w-[89.33vw] flex items-center justify-center max-[480px]:hidden">
+														<Button
+															type="button"
+															data-hover-description="This will show you a test draft, given all of what you provided"
+															onClick={() => {
+																if (isMobile) {
+																	setShowTestPreview?.(true);
+																} else {
+																	onTestPreviewToggle?.(true);
+																}
+																handleGenerateTestDrafts?.();
+																setHasAttemptedTest(true);
+															}}
+															disabled={isGenerationDisabled?.()}
+															className={cn(
+																'h-[28px] w-[232px] bg-[#DBF3DC] text-black font-inter font-normal text-[17px] leading-none rounded-[4px] cursor-pointer flex items-center justify-center p-0 border-0',
+																'transition-colors hover:bg-[#D6EED7] active:bg-[#D1E9D2]',
+																isGenerationDisabled?.()
+																	? 'opacity-50 cursor-not-allowed'
+																	: 'opacity-100'
+															)}
+														>
+															{isPendingGeneration && isTest ? 'Testing...' : 'Generate Test'}
+														</Button>
+													</div>
+												)}
 
 												{/* Hybrid editor panel (legacy): hidden for Intro/Research/CTA/Text (now inline-expanded) */}
 												{hybridStructureSelection.kind === 'block' &&
@@ -6532,7 +6591,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 								{compactLeftOnly || activeTab === 'profile' || selectedModeKey === 'manual' ? null : (
 									<>
 										{/* Desktop (manual/hybrid): bottom bar Generate Test button */}
-										{selectedModeKey !== 'full' && (
+										{selectedModeKey !== 'full' && selectedModeKey !== 'hybrid' && (
 											<div
 												className={cn(
 													'w-full flex flex-col items-center',
