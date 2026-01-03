@@ -17,6 +17,10 @@ import { HybridBlock } from '@prisma/client';
 import { cn } from '@/utils';
 import TinyPlusIcon from '@/components/atoms/_svg/TinyPlusIcon';
 import CloseButtonIcon from '@/components/atoms/_svg/CloseButtonIcon';
+import {
+	FullAutoBodyBlock,
+	type FullAutoProfileFields,
+} from '@/components/molecules/HybridPromptInput/FullAutoBodyBlock';
 
 interface MiniEmailStructureProps {
 	form: UseFormReturn<DraftingFormValues>;
@@ -40,6 +44,8 @@ interface MiniEmailStructureProps {
 	height?: number | string;
 	/** Optional callback to open the Writing tab (shows Open control when provided) */
 	onOpenWriting?: () => void;
+	/** Full Auto: profile chips (matches HybridPromptInput "Body" block) */
+	profileFields?: FullAutoProfileFields | null;
 }
 
 export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
@@ -57,20 +63,27 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 	hideAllText,
 	height,
 	onOpenWriting,
+	profileFields,
 }) => {
 	const watchedHybridBlocks = form.watch('hybridBlockPrompts');
 	const hybridBlocks = useMemo(() => watchedHybridBlocks || [], [watchedHybridBlocks]);
 	const isAiSubject = form.watch('isAiSubject');
 	const signature = form.watch('signature') || '';
 
+	// Signature: Auto/Manual toggle (mirrors HybridPromptInput "Auto" tab behavior)
+	// Auto ON: compact pill by default, expands on hover.
+	// Auto OFF: expanded box with textarea.
+	const [isAutoSignature, setIsAutoSignature] = useState(true);
+	const [manualSignatureValue, setManualSignatureValue] = useState('');
+	const autoSignatureValueRef = useRef<string>(signature);
+
+	useEffect(() => {
+		// Keep a fresh baseline "auto" signature while Auto is enabled (e.g., identity name updates).
+		if (isAutoSignature) autoSignatureValueRef.current = signature;
+	}, [isAutoSignature, signature]);
+
 	// Track which blocks are expanded
 	const [expandedBlocks, setExpandedBlocks] = useState<Set<string>>(new Set());
-
-	// Power mode from form (shared with HybridPromptInput)
-	const selectedPowerMode = form.watch('powerMode') || 'normal';
-	const setSelectedPowerMode = (mode: 'normal' | 'high') => {
-		form.setValue('powerMode', mode, { shouldDirty: true });
-	};
 
 	const buttonContainerRef = useRef<HTMLDivElement>(null);
 	const rootRef = useRef<HTMLDivElement>(null);
@@ -382,7 +395,10 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 	};
 
 	const toggleSubject = () => {
-		form.setValue('isAiSubject', !isAiSubject, { shouldDirty: true });
+		const next = !form.getValues('isAiSubject');
+		form.setValue('isAiSubject', next, { shouldDirty: true });
+		// When turning Auto back on, clear the manual subject (matches HybridPromptInput Auto tab behavior)
+		if (next) form.setValue('subject', '', { shouldDirty: true });
 	};
 
 	const updateBlockValue = (id: string, value: string) => {
@@ -686,8 +702,9 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 				<div
 					ref={buttonContainerRef}
 					className={cn(
-						'overflow-visible',
-						isMobilePortrait || isMobileLandscape ? '' : 'flex-1'
+						isMobilePortrait || isMobileLandscape
+							? 'overflow-visible'
+							: 'flex-1 min-h-0 overflow-y-auto overflow-x-hidden'
 					)}
 				>
 					<div className="px-0 pb-3 max-[480px]:pb-2">
@@ -788,57 +805,115 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 
 						{/* Auto Subject */}
 						<div className="mt-[9px] mb-3 w-[95%] max-[480px]:w-[89.33vw] mx-auto">
-							<div
-								className={cn(
-									'flex items-center h-[25px] rounded-[8px] border-2 border-black overflow-hidden',
-									isAiSubject ? 'bg-[#E0E0E0]' : 'bg-white'
-								)}
-							>
-								<div className="pl-2 flex items-center h-full shrink-0 w-[105px] bg-transparent">
-									<span className="font-inter font-semibold text-[13px] max-[480px]:text-[11px] whitespace-nowrap text-black">
-										{isAiSubject ? 'Auto Subject' : 'Subject'}
-									</span>
+							{isAiSubject ? (
+								// Compact bar (default) that expands to full width on hover when Auto Subject is on
+								<div className="group/subject relative">
+									{/* Collapsed state - shown by default, hidden on hover */}
+									<div className="flex items-center gap-2 group-hover/subject:hidden">
+										<div
+											className={cn(
+												'flex items-center justify-center h-[29px] max-[480px]:h-[24px] rounded-[8px] border-2 border-black overflow-hidden subject-bar w-[94px]'
+											)}
+											style={{ backgroundColor: '#E0E0E0' }}
+										>
+											<span className="font-inter font-medium text-[13px] max-[480px]:text-[11px] whitespace-nowrap text-black subject-label">
+												Subject
+											</span>
+										</div>
+										<span className="font-inter font-normal text-[10px] text-[#000000]">
+											Auto
+										</span>
+									</div>
+
+									{/* Expanded state - hidden by default, shown on hover */}
+									<div
+										className={cn(
+											'hidden group-hover/subject:flex items-center h-[29px] max-[480px]:h-[24px] rounded-[8px] border-2 border-black overflow-hidden subject-bar bg-white w-full'
+										)}
+									>
+										<div className={cn('pl-2 flex items-center h-full shrink-0 w-[110px] bg-[#E0E0E0]')}>
+											<span className="font-inter font-semibold text-[13px] max-[480px]:text-[11px] whitespace-nowrap text-black subject-label">
+												Auto Subject
+											</span>
+										</div>
+
+										<button
+											type="button"
+											aria-pressed={isAiSubject}
+											data-hover-description="click to disable automatic drafting for this and write your own"
+											onClick={toggleSubject}
+											className={cn(
+												'relative h-full flex items-center text-[10px] font-inter font-normal transition-colors shrink-0 subject-toggle',
+												'w-[47px] px-2 justify-center text-black bg-[#4ADE80] hover:bg-[#3ECC72] active:bg-[#32BA64]'
+											)}
+										>
+											<span className="absolute left-0 h-full border-l border-black"></span>
+											<span>on</span>
+											<span className="absolute right-0 h-full border-r border-black"></span>
+										</button>
+
+										<div className={cn('flex-grow h-full', 'bg-white')}>
+											<input
+												type="text"
+												className={cn(
+													'w-full h-full !bg-transparent pl-3 pr-3 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 outline-none max-[480px]:placeholder:text-[8px]',
+													'!text-[#6B6B6B] italic cursor-not-allowed'
+												)}
+												placeholder="Write manual subject here"
+												disabled={true}
+												value={form.watch('subject') || ''}
+												onChange={(e) =>
+													form.setValue('subject', e.target.value, { shouldDirty: true })
+												}
+											/>
+										</div>
+									</div>
 								</div>
-								<button
-									type="button"
-									aria-pressed={isAiSubject}
-									className={cn(
-										'relative h-full flex items-center text-[10px] font-inter font-normal shrink-0',
-										isAiSubject
-											? 'w-auto px-2 justify-center bg-[#5dab68] text-white cursor-pointer'
-											: 'w-[80px] px-2 justify-center text-black bg-[#DADAFC] cursor-pointer -translate-x-[16px]'
-									)}
-									onClick={toggleSubject}
-								>
-									<span className="absolute left-0 h-full border-l border-black"></span>
-									{isAiSubject ? 'on' : 'Auto off'}
-									<span className="absolute right-0 h-full border-r border-black"></span>
-								</button>
+							) : (
+								// Full bar when Auto Subject is off
 								<div
 									className={cn(
-										'flex-grow h-full flex items-center px-2',
-										'bg-transparent'
+										'flex items-center h-[29px] max-[480px]:h-[24px] rounded-[8px] border-2 border-black overflow-hidden subject-bar bg-white'
 									)}
 								>
-									<input
-										type="text"
+									<div className={cn('pl-2 flex items-center h-full shrink-0 w-[96px] bg-white')}>
+										<span className="font-inter font-semibold text-[13px] max-[480px]:text-[11px] whitespace-nowrap text-black subject-label">
+											Subject
+										</span>
+									</div>
+
+									<button
+										type="button"
+										aria-pressed={isAiSubject}
+										data-hover-description="Turn back on automated drafting for here"
+										onClick={toggleSubject}
 										className={cn(
-											'w-full text-[12px] leading-tight outline-none focus:outline-none bg-transparent max-[480px]:placeholder:text-[8px]',
-											isAiSubject
-												? 'text-[#6B6B6B] italic cursor-not-allowed'
-												: 'text-black'
+											'relative h-full flex items-center text-[10px] font-inter font-normal transition-colors shrink-0 subject-toggle',
+											'w-[80px] px-2 justify-center text-black bg-[#DADAFC] hover:bg-[#C4C4F5] active:bg-[#B0B0E8]'
 										)}
-										placeholder={
-											isAiSubject ? 'Automated Subject Line' : 'Type subject...'
-										}
-										disabled={isAiSubject}
-										value={form.watch('subject') || ''}
-										onChange={(e) =>
-											form.setValue('subject', e.target.value, { shouldDirty: true })
-										}
-									/>
+									>
+										<span className="absolute left-0 h-full border-l border-black"></span>
+										<span>Auto off</span>
+										<span className="absolute right-0 h-full border-r border-black"></span>
+									</button>
+
+									<div className={cn('flex-grow h-full', 'bg-white')}>
+										<input
+											type="text"
+											className={cn(
+												'w-full h-full !bg-transparent pl-2 pr-3 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 outline-none max-[480px]:placeholder:text-[8px]',
+												'!text-black placeholder:!text-black'
+											)}
+											placeholder="Type subject..."
+											disabled={false}
+											value={form.watch('subject') || ''}
+											onChange={(e) =>
+												form.setValue('subject', e.target.value, { shouldDirty: true })
+											}
+										/>
+									</div>
 								</div>
-							</div>
+							)}
 						</div>
 
 						{/* Blocks list - overflow visible to show buttons outside */}
@@ -1127,6 +1202,27 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 										);
 									}
 
+									// Full Auto (Auto mode): reuse the exact "Body" block UI from HybridPromptInput
+									if (b.type === 'full_automated') {
+										return (
+											<Fragment key={b.id}>
+												<FullAutoBodyBlock
+													form={form}
+													fieldIndex={Math.max(
+														0,
+														hybridBlocks.findIndex((blk) => blk.id === b.id)
+													)}
+													profileFields={profileFields}
+													className={cn(
+														draftingMode === 'hybrid'
+															? 'w-[93%] ml-[2.5%]'
+															: 'w-[95%] max-[480px]:w-[89.33vw] mx-auto'
+													)}
+												/>
+											</Fragment>
+										);
+									}
+
 									// Default rendering for non-hybrid or non-text blocks
 									return (
 										<Fragment key={b.id}>
@@ -1136,8 +1232,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 													draftingMode === 'hybrid'
 														? 'w-[93%] ml-[2.5%]'
 														: 'w-[95%] max-[480px]:w-[89.33vw] mx-auto',
-													b.type === 'full_automated' && 'mini-full-auto-card',
-													b.type !== 'full_automated' && 'px-2 py-1'
+													'px-2 py-1'
 												)}
 												style={{
 													borderColor:
@@ -1145,172 +1240,48 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 															draftingMode === 'hybrid') &&
 														b.type === 'text'
 															? '#53A25D'
-															: b.type === 'full_automated'
-															? '#51A2E4'
 															: '#000000',
 												}}
 											>
-												{b.type === 'full_automated' ? (
-													<>
-														{/* Full Auto Header with Power Mode toggles */}
-														<div className="w-full h-[22px] bg-[#B9DAF5] flex items-stretch">
-															{/* Full Auto label section */}
-															<div className="flex-1 flex items-center pl-[8px]">
-																<span className="font-inter font-semibold text-[12px] text-[#000000]">
-																	Full Auto
-																</span>
-															</div>
-															{/* Divider - black when Normal Power selected */}
-															<div
-																className={cn(
-																	'w-[1px] flex-shrink-0 transition-colors',
-																	selectedPowerMode === 'normal'
-																		? 'bg-[#000000]'
-																		: 'bg-[#51A2E4]'
-																)}
-															/>
-															{/* Normal Power section */}
-															<button
-																type="button"
-																onClick={() => setSelectedPowerMode('normal')}
-																className={cn(
-																	'w-[76px] flex items-center justify-center cursor-pointer border-0 p-0 m-0 transition-colors flex-shrink-0 outline-none focus:outline-none',
-																	selectedPowerMode === 'normal'
-																		? 'bg-[#8DBFE8]'
-																		: 'bg-transparent'
-																)}
-															>
-																<span
-																	className={cn(
-																		'font-inter font-normal italic text-[10px] transition-colors',
-																		selectedPowerMode === 'normal'
-																			? 'text-[#000000]'
-																			: 'text-[#9E9E9E]'
-																	)}
-																>
-																	Normal Power
-																</span>
-															</button>
-															{/* Divider - black when either Normal Power or High selected */}
-															<div
-																className={cn(
-																	'w-[1px] flex-shrink-0 transition-colors',
-																	selectedPowerMode === 'normal' ||
-																		selectedPowerMode === 'high'
-																		? 'bg-[#000000]'
-																		: 'bg-[#51A2E4]'
-																)}
-															/>
-															{/* High section */}
-															<button
-																type="button"
-																onClick={() => setSelectedPowerMode('high')}
-																className={cn(
-																	'w-[34px] flex items-center justify-center cursor-pointer border-0 p-0 m-0 transition-colors flex-shrink-0 outline-none focus:outline-none',
-																	selectedPowerMode === 'high'
-																		? 'bg-[#8DBFE8]'
-																		: 'bg-transparent'
-																)}
-															>
-																<span
-																	className={cn(
-																		'font-inter font-normal italic text-[10px] transition-colors',
-																		selectedPowerMode === 'high'
-																			? 'text-[#000000]'
-																			: 'text-[#9E9E9E]'
-																	)}
-																>
-																	High
-																</span>
-															</button>
-															{/* Divider - black when High selected */}
-															<div
-																className={cn(
-																	'w-[1px] flex-shrink-0 transition-colors',
-																	selectedPowerMode === 'high'
-																		? 'bg-[#000000]'
-																		: 'bg-[#51A2E4]'
-																)}
-															/>
-															{/* Right empty section */}
-															<div className="w-[16px] flex-shrink-0" />
+												<>
+													<div className="flex items-center justify-between">
+														<div className="flex items-center gap-2">
+															<span className="font-inter text-[12px] font-semibold text-black">
+																{blockLabel(b.type as HybridBlock)}
+															</span>
 														</div>
-														{/* Horizontal divider under header */}
-														<div className="w-full h-[1px] bg-[#51A2E4]" />
-														{/* Content area */}
-														<div className="px-2 py-1">
-															<div className="relative">
-																{!b.value && (
-																	<div className="absolute inset-0 pointer-events-none py-2 pr-2 text-[#505050] text-[12px] max-[480px]:text-[10px] mini-full-auto-placeholder">
-																		<div className="space-y-2">
-																			<div>
-																				<p>Type anything you want to include</p>
-																			</div>
-																		</div>
-																	</div>
-																)}
-																<textarea
-																	className={cn(
-																		'border-0 outline-none ring-0 focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 w-full max-w-full min-w-0',
-																		'h-[70px] py-2 pr-2 px-0 resize-none',
-																		'bg-white text-[12px] leading-[16px]',
-																		'mini-full-auto-textarea'
-																	)}
-																	placeholder=""
-																	value={b.value || ''}
-																	onChange={(e) => updateBlockValue(b.id, e.target.value)}
-																/>
-															</div>
-														</div>
-													</>
-												) : (
-													<>
-														<div className="flex items-center justify-between">
-															<div className="flex items-center gap-2">
-																<span
-																	className={cn(
-																		'font-inter text-[12px] font-semibold text-black',
-																		(b.type as HybridBlock) === 'full_automated' &&
-																			'whitespace-nowrap'
-																	)}
-																>
-																	{blockLabel(b.type as HybridBlock)}
+														<div className="flex items-center gap-2">
+															{blockHint(b.type as HybridBlock) && (
+																<span className="text-[10px] italic text-[#5d5d5d]">
+																	{blockHint(b.type as HybridBlock)}
 																</span>
-															</div>
-															<div className="flex items-center gap-2">
-																{blockHint(b.type as HybridBlock) && (
-																	<span className="text-[10px] italic text-[#5d5d5d]">
-																		{blockHint(b.type as HybridBlock)}
-																	</span>
+															)}
+															{draftingMode !== 'hybrid' &&
+																!(
+																	draftingMode === 'handwritten' && b.type === 'text'
+																) && (
+																	<button
+																		type="button"
+																		className="text-[12px] text-[#b30000] hover:text-red-600"
+																		onClick={() => removeBlock(b.id)}
+																		aria-label="Remove block"
+																	>
+																		×
+																	</button>
 																)}
-																{(b.type as HybridBlock) !== 'full_automated' &&
-																	draftingMode !== 'hybrid' &&
-																	!(
-																		draftingMode === 'handwritten' && b.type === 'text'
-																	) && (
-																		<button
-																			type="button"
-																			className="text-[12px] text-[#b30000] hover:text-red-600"
-																			onClick={() => removeBlock(b.id)}
-																			aria-label="Remove block"
-																		>
-																			×
-																		</button>
-																	)}
-															</div>
 														</div>
-														<textarea
-															className="w-full mt-1 text-[11px] leading-[14px] rounded-[6px] p-1 resize-none h-[52px] outline-none focus:outline-none max-[480px]:placeholder:text-[8px]"
-															placeholder={
-																b.type === 'text'
-																	? 'Write the exact text you want in your email here. *required'
-																	: 'Type here to specify further, e.g., "I am ... and I lead ..."'
-															}
-															value={b.value || ''}
-															onChange={(e) => updateBlockValue(b.id, e.target.value)}
-														/>
-													</>
-												)}
+													</div>
+													<textarea
+														className="w-full mt-1 text-[11px] leading-[14px] rounded-[6px] p-1 resize-none h-[52px] outline-none focus:outline-none max-[480px]:placeholder:text-[8px]"
+														placeholder={
+															b.type === 'text'
+																? 'Write the exact text you want in your email here. *required'
+																: 'Type here to specify further, e.g., "I am ... and I lead ..."'
+														}
+														value={b.value || ''}
+														onChange={(e) => updateBlockValue(b.id, e.target.value)}
+													/>
+												</>
 											</div>
 										</Fragment>
 									);
@@ -1418,22 +1389,123 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 							style={{ display: isMobileLandscape ? 'block' : undefined }}
 						>
 							{draftingMode === 'hybrid' ? (
-								<div className="w-[95%] max-[480px]:w-[89.33vw] mx-auto flex items-center justify-between">
-									<div
-										className="flex-1 mr-2 h-[30px] px-2 flex items-center gap-2 rounded-[8px] border-2 bg-white"
-										style={{ borderColor: '#969696' }}
-									>
-										<div className="font-inter text-[12px] font-semibold text-black shrink-0">
-											Signature
-										</div>
-										{!isCompactSignature && (
-											<input
-												type="text"
-												className="flex-1 text-[12px] outline-none focus:outline-none bg-transparent signature-textarea"
-												placeholder="Your signature..."
-												value={signature}
-												onChange={(e) => updateSignature(e.target.value)}
-											/>
+								<div className="w-[95%] max-[480px]:w-[89.33vw] mx-auto flex items-start justify-between">
+									<div className="flex-1 mr-2">
+										{isAutoSignature ? (
+											<div className="group/signature relative w-full">
+												{/* Collapsed state - shown by default, hidden on hover */}
+												<div className="flex items-center gap-2 group-hover/signature:hidden">
+													<div
+														className={cn(
+															'flex items-center justify-center h-[29px] max-[480px]:h-[24px] rounded-[8px] border-2 border-black overflow-hidden w-[105px]'
+														)}
+														style={{ backgroundColor: '#E0E0E0' }}
+													>
+														<span className="font-inter font-medium text-[13px] max-[480px]:text-[11px] whitespace-nowrap text-black">
+															Signature
+														</span>
+													</div>
+													<span className="font-inter font-normal text-[10px] text-[#000000]">
+														Auto
+													</span>
+												</div>
+
+												{/* Expanded state - hidden by default, shown on hover */}
+												<div
+													className={cn(
+														'hidden group-hover/signature:flex items-center h-[29px] max-[480px]:h-[24px] rounded-[8px] border-2 border-black overflow-hidden bg-white w-full'
+													)}
+												>
+													<div className="pl-2 flex items-center h-full shrink-0 w-[118px] bg-[#E0E0E0]">
+														<span className="font-inter font-semibold text-[13px] max-[480px]:text-[11px] whitespace-nowrap text-black">
+															Auto Signature
+														</span>
+													</div>
+													<button
+														type="button"
+														data-hover-description="click to disable automatic drafting for this and write your own"
+														onClick={() => {
+															setIsAutoSignature(false);
+															// Start manual editing from the current signature value.
+															setManualSignatureValue(signature);
+															updateSignature(signature);
+														}}
+														className={cn(
+															'relative h-full flex items-center text-[10px] font-inter font-normal transition-colors shrink-0',
+															'w-[47px] px-2 justify-center text-black bg-[#4ADE80] hover:bg-[#3ECC72] active:bg-[#32BA64]'
+														)}
+														aria-label="Auto Signature on"
+													>
+														<span className="absolute left-0 h-full border-l border-black"></span>
+														<span>on</span>
+														<span className="absolute right-0 h-full border-r border-black"></span>
+													</button>
+													<div className={cn('flex-grow h-full', 'bg-white')}>
+														<input
+															type="text"
+															className={cn(
+																'w-full h-full !bg-transparent pl-3 pr-3 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 outline-none',
+																'!text-black placeholder:!text-[#9E9E9E]',
+																'cursor-not-allowed'
+															)}
+															placeholder="Write manual Signature here"
+															value={signature}
+															disabled
+															readOnly
+														/>
+													</div>
+												</div>
+											</div>
+										) : (
+											/* Manual signature mode: expanded downward with textarea */
+											<div className="w-full rounded-[8px] border-2 border-black overflow-hidden flex flex-col bg-white">
+												{/* Header row */}
+												<div className="flex items-center h-[29px] shrink-0 bg-[#E0E0E0]">
+													<div className="pl-2 flex items-center h-full shrink-0 w-[105px] bg-[#E0E0E0]">
+														<span className="font-inter font-semibold text-[13px] max-[480px]:text-[11px] whitespace-nowrap text-black">
+															Signature
+														</span>
+													</div>
+													<button
+														type="button"
+														data-hover-description="Turn back on automated drafting for here"
+														onClick={() => {
+															setIsAutoSignature(true);
+															setManualSignatureValue('');
+															updateSignature(autoSignatureValueRef.current);
+														}}
+														className={cn(
+															'relative h-full flex items-center text-[10px] font-inter font-normal transition-colors shrink-0',
+															'w-[80px] px-2 justify-center text-black bg-[#C3BCBC] hover:bg-[#B5AEAE] active:bg-[#A7A0A0]'
+														)}
+														aria-label="Auto Signature off"
+													>
+														<span className="absolute left-0 h-full border-l border-black"></span>
+														<span>Auto off</span>
+														<span className="absolute right-0 h-full border-r border-black"></span>
+													</button>
+													<div className="flex-grow h-full bg-[#E0E0E0]" />
+												</div>
+												{/* Divider line */}
+												<div className="w-full h-[1px] bg-black shrink-0" />
+												{/* Text entry area */}
+												<div className="bg-white">
+													<textarea
+														value={manualSignatureValue}
+														onChange={(e) => {
+															setManualSignatureValue(e.target.value);
+															updateSignature(e.target.value);
+														}}
+														className={cn(
+															'w-full !bg-transparent px-3 py-2 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 resize-none outline-none',
+															'signature-textarea',
+															'!text-black placeholder:!text-[#9E9E9E] font-inter text-[12px]'
+														)}
+														style={{ height: 66 }}
+														placeholder="Enter your signature..."
+													/>
+												</div>
+											</div>
 										)}
 									</div>
 									<button
@@ -1458,18 +1530,123 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 									</button>
 								</div>
 							) : (
-								<div
-									className="px-2 py-2 w-[95%] max-[480px]:w-[89.33vw] mx-auto rounded-[8px] border-2 bg-white"
-									style={{ borderColor: '#969696' }}
-								>
-									<div className="font-inter text-[12px] font-semibold text-black mb-1 pl-1">
-										Signature
-									</div>
-									<textarea
-										className="w-full text-[12px] leading-[16px] rounded-[6px] pl-1 pr-1 pt-1 pb-1 resize-none outline-none focus:outline-none h-[48px] signature-textarea"
-										value={signature}
-										onChange={(e) => updateSignature(e.target.value)}
-									/>
+								<div className="w-[95%] max-[480px]:w-[89.33vw] mx-auto">
+									{isAutoSignature ? (
+										<div className="group/signature relative w-full">
+											{/* Collapsed state - shown by default, hidden on hover */}
+											<div className="flex items-center gap-2 group-hover/signature:hidden">
+												<div
+													className={cn(
+														'flex items-center justify-center h-[29px] max-[480px]:h-[24px] rounded-[8px] border-2 border-black overflow-hidden w-[105px]'
+													)}
+													style={{ backgroundColor: '#E0E0E0' }}
+												>
+													<span className="font-inter font-medium text-[13px] max-[480px]:text-[11px] whitespace-nowrap text-black">
+														Signature
+													</span>
+												</div>
+												<span className="font-inter font-normal text-[10px] text-[#000000]">
+													Auto
+												</span>
+											</div>
+
+											{/* Expanded state - hidden by default, shown on hover */}
+											<div
+												className={cn(
+													'hidden group-hover/signature:flex items-center h-[29px] max-[480px]:h-[24px] rounded-[8px] border-2 border-black overflow-hidden bg-white w-full'
+												)}
+											>
+												<div className="pl-2 flex items-center h-full shrink-0 w-[118px] bg-[#E0E0E0]">
+													<span className="font-inter font-semibold text-[13px] max-[480px]:text-[11px] whitespace-nowrap text-black">
+														Auto Signature
+													</span>
+												</div>
+												<button
+													type="button"
+													data-hover-description="click to disable automatic drafting for this and write your own"
+													onClick={() => {
+														setIsAutoSignature(false);
+														// Start manual editing from the current signature value.
+														setManualSignatureValue(signature);
+														updateSignature(signature);
+													}}
+													className={cn(
+														'relative h-full flex items-center text-[10px] font-inter font-normal transition-colors shrink-0',
+														'w-[47px] px-2 justify-center text-black bg-[#4ADE80] hover:bg-[#3ECC72] active:bg-[#32BA64]'
+													)}
+													aria-label="Auto Signature on"
+												>
+													<span className="absolute left-0 h-full border-l border-black"></span>
+													<span>on</span>
+													<span className="absolute right-0 h-full border-r border-black"></span>
+												</button>
+												<div className={cn('flex-grow h-full', 'bg-white')}>
+													<input
+														type="text"
+														className={cn(
+															'w-full h-full !bg-transparent pl-3 pr-3 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 outline-none',
+															'!text-black placeholder:!text-[#9E9E9E]',
+															'cursor-not-allowed'
+														)}
+														placeholder="Write manual Signature here"
+														value={signature}
+														disabled
+														readOnly
+													/>
+												</div>
+											</div>
+										</div>
+									) : (
+										/* Manual signature mode: expanded downward with textarea */
+										<div className="w-full rounded-[8px] border-2 border-black overflow-hidden flex flex-col bg-white">
+											{/* Header row */}
+											<div className="flex items-center h-[29px] shrink-0 bg-[#E0E0E0]">
+												<div className="pl-2 flex items-center h-full shrink-0 w-[105px] bg-[#E0E0E0]">
+													<span className="font-inter font-semibold text-[13px] max-[480px]:text-[11px] whitespace-nowrap text-black">
+														Signature
+													</span>
+												</div>
+												<button
+													type="button"
+													data-hover-description="Turn back on automated drafting for here"
+													onClick={() => {
+														setIsAutoSignature(true);
+														setManualSignatureValue('');
+														updateSignature(autoSignatureValueRef.current);
+													}}
+													className={cn(
+														'relative h-full flex items-center text-[10px] font-inter font-normal transition-colors shrink-0',
+														'w-[80px] px-2 justify-center text-black bg-[#C3BCBC] hover:bg-[#B5AEAE] active:bg-[#A7A0A0]'
+													)}
+													aria-label="Auto Signature off"
+												>
+													<span className="absolute left-0 h-full border-l border-black"></span>
+													<span>Auto off</span>
+													<span className="absolute right-0 h-full border-r border-black"></span>
+												</button>
+												<div className="flex-grow h-full bg-[#E0E0E0]" />
+											</div>
+											{/* Divider line */}
+											<div className="w-full h-[1px] bg-black shrink-0" />
+											{/* Text entry area */}
+											<div className="bg-white">
+												<textarea
+													value={manualSignatureValue}
+													onChange={(e) => {
+														setManualSignatureValue(e.target.value);
+														updateSignature(e.target.value);
+													}}
+													className={cn(
+														'w-full !bg-transparent px-3 py-2 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 resize-none outline-none',
+														'signature-textarea',
+														'!text-black placeholder:!text-[#9E9E9E] font-inter text-[12px]'
+													)}
+													style={{ height: 66 }}
+													placeholder="Enter your signature..."
+												/>
+											</div>
+										</div>
+									)}
 								</div>
 							)}
 						</div>
@@ -1485,22 +1662,123 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 					style={{ display: isMobileLandscape ? 'none' : undefined }}
 				>
 					{draftingMode === 'hybrid' ? (
-						<div className="w-[95%] mx-auto flex items-center justify-between">
-							<div
-								className="flex-1 mr-2 h-[30px] px-2 flex items-center gap-2 rounded-[8px] border-2 bg-white"
-								style={{ borderColor: '#969696' }}
-							>
-								<div className="font-inter text-[12px] font-semibold text-black shrink-0">
-									Signature
-								</div>
-								{!isCompactSignature && (
-									<input
-										type="text"
-										className="flex-1 text-[12px] outline-none focus:outline-none bg-transparent signature-textarea"
-										placeholder="Your signature..."
-										value={signature}
-										onChange={(e) => updateSignature(e.target.value)}
-									/>
+						<div className="w-[95%] mx-auto flex items-start justify-between">
+							<div className="flex-1 mr-2">
+								{isAutoSignature ? (
+									<div className="group/signature relative w-full">
+										{/* Collapsed state - shown by default, hidden on hover */}
+										<div className="flex items-center gap-2 group-hover/signature:hidden">
+											<div
+												className={cn(
+													'flex items-center justify-center h-[29px] rounded-[8px] border-2 border-black overflow-hidden w-[105px]'
+												)}
+												style={{ backgroundColor: '#E0E0E0' }}
+											>
+												<span className="font-inter font-medium text-[13px] whitespace-nowrap text-black">
+													Signature
+												</span>
+											</div>
+											<span className="font-inter font-normal text-[10px] text-[#000000]">
+												Auto
+											</span>
+										</div>
+
+										{/* Expanded state - hidden by default, shown on hover */}
+										<div
+											className={cn(
+												'hidden group-hover/signature:flex items-center h-[29px] rounded-[8px] border-2 border-black overflow-hidden bg-white w-full'
+											)}
+										>
+											<div className="pl-2 flex items-center h-full shrink-0 w-[118px] bg-[#E0E0E0]">
+												<span className="font-inter font-semibold text-[13px] whitespace-nowrap text-black">
+													Auto Signature
+												</span>
+											</div>
+											<button
+												type="button"
+												data-hover-description="click to disable automatic drafting for this and write your own"
+												onClick={() => {
+													setIsAutoSignature(false);
+													// Start manual editing from the current signature value.
+													setManualSignatureValue(signature);
+													updateSignature(signature);
+												}}
+												className={cn(
+													'relative h-full flex items-center text-[10px] font-inter font-normal transition-colors shrink-0',
+													'w-[47px] px-2 justify-center text-black bg-[#4ADE80] hover:bg-[#3ECC72] active:bg-[#32BA64]'
+												)}
+												aria-label="Auto Signature on"
+											>
+												<span className="absolute left-0 h-full border-l border-black"></span>
+												<span>on</span>
+												<span className="absolute right-0 h-full border-r border-black"></span>
+											</button>
+											<div className={cn('flex-grow h-full', 'bg-white')}>
+												<input
+													type="text"
+													className={cn(
+														'w-full h-full !bg-transparent pl-3 pr-3 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 outline-none',
+														'!text-black placeholder:!text-[#9E9E9E]',
+														'cursor-not-allowed'
+													)}
+													placeholder="Write manual Signature here"
+													value={signature}
+													disabled
+													readOnly
+												/>
+											</div>
+										</div>
+									</div>
+								) : (
+									/* Manual signature mode: expanded downward with textarea */
+									<div className="w-full rounded-[8px] border-2 border-black overflow-hidden flex flex-col bg-white">
+										{/* Header row */}
+										<div className="flex items-center h-[29px] shrink-0 bg-[#E0E0E0]">
+											<div className="pl-2 flex items-center h-full shrink-0 w-[105px] bg-[#E0E0E0]">
+												<span className="font-inter font-semibold text-[13px] whitespace-nowrap text-black">
+													Signature
+												</span>
+											</div>
+											<button
+												type="button"
+												data-hover-description="Turn back on automated drafting for here"
+												onClick={() => {
+													setIsAutoSignature(true);
+													setManualSignatureValue('');
+													updateSignature(autoSignatureValueRef.current);
+												}}
+												className={cn(
+													'relative h-full flex items-center text-[10px] font-inter font-normal transition-colors shrink-0',
+													'w-[80px] px-2 justify-center text-black bg-[#C3BCBC] hover:bg-[#B5AEAE] active:bg-[#A7A0A0]'
+												)}
+												aria-label="Auto Signature off"
+											>
+												<span className="absolute left-0 h-full border-l border-black"></span>
+												<span>Auto off</span>
+												<span className="absolute right-0 h-full border-r border-black"></span>
+											</button>
+											<div className="flex-grow h-full bg-[#E0E0E0]" />
+										</div>
+										{/* Divider line */}
+										<div className="w-full h-[1px] bg-black shrink-0" />
+										{/* Text entry area */}
+										<div className="bg-white">
+											<textarea
+												value={manualSignatureValue}
+												onChange={(e) => {
+													setManualSignatureValue(e.target.value);
+													updateSignature(e.target.value);
+												}}
+												className={cn(
+													'w-full !bg-transparent px-3 py-2 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 resize-none outline-none',
+													'signature-textarea',
+													'!text-black placeholder:!text-[#9E9E9E] font-inter text-[12px]'
+												)}
+												style={{ height: 66 }}
+												placeholder="Enter your signature..."
+											/>
+										</div>
+									</div>
 								)}
 							</div>
 							<button
@@ -1521,18 +1799,121 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 							</button>
 						</div>
 					) : (
-						<div
-							className="px-2 w-[95%] max-[480px]:w-[89.33vw] mx-auto rounded-[8px] border-2 bg-white flex items-start gap-2"
-							style={{ borderColor: '#969696', height: '56px' }}
-						>
-							<div className="font-inter text-[12px] font-semibold text-black shrink-0 pt-2 pl-1">
-								Signature
-							</div>
-							<textarea
-								className="flex-1 text-[12px] rounded-[6px] pt-2 pr-1 pb-1 resize-none outline-none focus:outline-none h-full bg-transparent signature-textarea"
-								value={signature}
-								onChange={(e) => updateSignature(e.target.value)}
-							/>
+						<div className="w-[95%] mx-auto">
+							{isAutoSignature ? (
+								<div className="group/signature relative w-full">
+									{/* Collapsed state - shown by default, hidden on hover */}
+									<div className="flex items-center gap-2 group-hover/signature:hidden">
+										<div
+											className={cn(
+												'flex items-center justify-center h-[29px] rounded-[8px] border-2 border-black overflow-hidden w-[105px]'
+											)}
+											style={{ backgroundColor: '#E0E0E0' }}
+										>
+											<span className="font-inter font-medium text-[13px] whitespace-nowrap text-black">
+												Signature
+											</span>
+										</div>
+										<span className="font-inter font-normal text-[10px] text-[#000000]">Auto</span>
+									</div>
+
+									{/* Expanded state - hidden by default, shown on hover */}
+									<div
+										className={cn(
+											'hidden group-hover/signature:flex items-center h-[29px] rounded-[8px] border-2 border-black overflow-hidden bg-white w-full'
+										)}
+									>
+										<div className="pl-2 flex items-center h-full shrink-0 w-[118px] bg-[#E0E0E0]">
+											<span className="font-inter font-semibold text-[13px] whitespace-nowrap text-black">
+												Auto Signature
+											</span>
+										</div>
+										<button
+											type="button"
+											data-hover-description="click to disable automatic drafting for this and write your own"
+											onClick={() => {
+												setIsAutoSignature(false);
+												// Start manual editing from the current signature value.
+												setManualSignatureValue(signature);
+												updateSignature(signature);
+											}}
+											className={cn(
+												'relative h-full flex items-center text-[10px] font-inter font-normal transition-colors shrink-0',
+												'w-[47px] px-2 justify-center text-black bg-[#4ADE80] hover:bg-[#3ECC72] active:bg-[#32BA64]'
+											)}
+											aria-label="Auto Signature on"
+										>
+											<span className="absolute left-0 h-full border-l border-black"></span>
+											<span>on</span>
+											<span className="absolute right-0 h-full border-r border-black"></span>
+										</button>
+										<div className={cn('flex-grow h-full', 'bg-white')}>
+											<input
+												type="text"
+												className={cn(
+													'w-full h-full !bg-transparent pl-3 pr-3 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 outline-none',
+													'!text-black placeholder:!text-[#9E9E9E]',
+													'cursor-not-allowed'
+												)}
+												placeholder="Write manual Signature here"
+												value={signature}
+												disabled
+												readOnly
+											/>
+										</div>
+									</div>
+								</div>
+							) : (
+								/* Manual signature mode: expanded downward with textarea */
+								<div className="w-full rounded-[8px] border-2 border-black overflow-hidden flex flex-col bg-white">
+									{/* Header row */}
+									<div className="flex items-center h-[29px] shrink-0 bg-[#E0E0E0]">
+										<div className="pl-2 flex items-center h-full shrink-0 w-[105px] bg-[#E0E0E0]">
+											<span className="font-inter font-semibold text-[13px] whitespace-nowrap text-black">
+												Signature
+											</span>
+										</div>
+										<button
+											type="button"
+											data-hover-description="Turn back on automated drafting for here"
+											onClick={() => {
+												setIsAutoSignature(true);
+												setManualSignatureValue('');
+												updateSignature(autoSignatureValueRef.current);
+											}}
+											className={cn(
+												'relative h-full flex items-center text-[10px] font-inter font-normal transition-colors shrink-0',
+												'w-[80px] px-2 justify-center text-black bg-[#C3BCBC] hover:bg-[#B5AEAE] active:bg-[#A7A0A0]'
+											)}
+											aria-label="Auto Signature off"
+										>
+											<span className="absolute left-0 h-full border-l border-black"></span>
+											<span>Auto off</span>
+											<span className="absolute right-0 h-full border-r border-black"></span>
+										</button>
+										<div className="flex-grow h-full bg-[#E0E0E0]" />
+									</div>
+									{/* Divider line */}
+									<div className="w-full h-[1px] bg-black shrink-0" />
+									{/* Text entry area */}
+									<div className="bg-white">
+										<textarea
+											value={manualSignatureValue}
+											onChange={(e) => {
+												setManualSignatureValue(e.target.value);
+												updateSignature(e.target.value);
+											}}
+											className={cn(
+												'w-full !bg-transparent px-3 py-2 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 resize-none outline-none',
+												'signature-textarea',
+												'!text-black placeholder:!text-[#9E9E9E] font-inter text-[12px]'
+											)}
+											style={{ height: 66 }}
+											placeholder="Enter your signature..."
+										/>
+									</div>
+								</div>
+							)}
 						</div>
 					)}
 				</div>

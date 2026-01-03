@@ -266,7 +266,10 @@ const SortableAIBlock = ({
 				: rect.left + offsetX;
 		let top = rect.bottom + margin + offsetY;
 
-		const maxLeft = Math.max(viewportPadding, window.innerWidth - bookingForDropdownSize.width - viewportPadding);
+		const maxLeft = Math.max(
+			viewportPadding,
+			window.innerWidth - bookingForDropdownSize.width - viewportPadding
+		);
 		left = Math.min(Math.max(left, viewportPadding), maxLeft);
 
 		// In Calendar mode, the dropdown is much wider and centered, which makes the internal
@@ -286,14 +289,18 @@ const SortableAIBlock = ({
 				minTabStripLeft,
 				bookingForDropdownSize.width - tabStripWidth - tabStripPadding
 			);
-			tabStripLeftInDropdown = Math.min(Math.max(tabStripLeftInDropdown, minTabStripLeft), maxTabStripLeft);
+			tabStripLeftInDropdown = Math.min(
+				Math.max(tabStripLeftInDropdown, minTabStripLeft),
+				maxTabStripLeft
+			);
 
 			setBookingForTabStripLeft(Math.round(tabStripLeftInDropdown));
 		} else {
 			setBookingForTabStripLeft(null);
 		}
 
-		const wouldOverflowBottom = top + bookingForDropdownSize.height > window.innerHeight - viewportPadding;
+		const wouldOverflowBottom =
+			top + bookingForDropdownSize.height > window.innerHeight - viewportPadding;
 		const canOpenAbove = rect.top - margin - bookingForDropdownSize.height >= viewportPadding;
 		if (wouldOverflowBottom && canOpenAbove) {
 			top = rect.top - margin - bookingForDropdownSize.height - offsetY;
@@ -397,7 +404,9 @@ const SortableAIBlock = ({
 
 		const now = new Date();
 		const minBaseMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-		setBookingForCalendarBaseMonth((prev) => (prev.getTime() < minBaseMonth.getTime() ? minBaseMonth : prev));
+		setBookingForCalendarBaseMonth((prev) =>
+			prev.getTime() < minBaseMonth.getTime() ? minBaseMonth : prev
+		);
 	}, [isBookingForOpen, bookingForTab]);
 
 	useLayoutEffect(() => {

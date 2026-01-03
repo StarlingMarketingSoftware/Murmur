@@ -186,6 +186,20 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		[campaign?.identity?.id, editIdentity, queryClient]
 	);
 
+	// Full Auto "Body" block profile chips (shared with HybridPromptInput)
+	const miniProfileFields = useMemo(() => {
+		const identityProfile = campaign?.identity as IdentityProfileFields | undefined | null;
+		if (!identityProfile) return null;
+		return {
+			name: identityProfile.name ?? '',
+			genre: identityProfile.genre ?? '',
+			area: identityProfile.area ?? '',
+			band: identityProfile.bandName ?? '',
+			bio: identityProfile.bio ?? '',
+			links: identityProfile.website ?? '',
+		};
+	}, [campaign?.identity]);
+
 	const router = useRouter();
 	const isMobile = useIsMobile();
 	const [isClient, setIsClient] = useState(false);
@@ -228,44 +242,14 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		return () => window.removeEventListener('resize', checkBreakpoints);
 	}, []);
 
-	// --- Pinned left panel height transition (ContactsExpandedList <-> MiniEmailStructure) ---
+	// --- Pinned left panel (ContactsExpandedList <-> MiniEmailStructure) ---
+	// We intentionally render the correct panel immediately (no height-morph animation),
+	// because the panel heights are now kept in sync across tabs.
 	type PinnedLeftPanelVariant = 'contacts' | 'mini';
-
-	const pinnedLeftPanelTargetVariant: PinnedLeftPanelVariant = useMemo(() => {
+	const pinnedLeftPanelVariant: PinnedLeftPanelVariant = useMemo(() => {
 		if (view === 'testing' || view === 'search') return 'contacts';
 		return 'mini';
 	}, [view]);
-
-	// The pinned left panel is sometimes conditionally removed (breakpoints, other tabs).
-	// Track mounts so we don't "animate in" from stale state when it re-appears.
-	const pinnedLeftPanelWasMountedRef = useRef(false);
-	const pinnedLeftPanelTransitionIdRef = useRef(0);
-
-	const pinnedLeftPanelRenderedVariantRef = useRef<PinnedLeftPanelVariant>(
-		pinnedLeftPanelTargetVariant
-	);
-	const [pinnedLeftPanelRenderedVariant, setPinnedLeftPanelRenderedVariant] =
-		useState<PinnedLeftPanelVariant>(pinnedLeftPanelTargetVariant);
-
-	const pinnedLeftPanelOuterRef = useRef<HTMLDivElement | null>(null);
-	const pinnedLeftPanelContentRef = useRef<HTMLDivElement | null>(null);
-	const pinnedLeftPanelGhostRef = useRef<HTMLDivElement | null>(null);
-
-	const PINNED_LEFT_PANEL_HEIGHT_PX: Record<PinnedLeftPanelVariant, number> = {
-		contacts: 557,
-		mini: 373,
-	};
-
-	// Match the visible box styling so the ghost frame doesn't "snap" away.
-	// ContactsExpandedList: rounded-md (~6px) + 1px border
-	// MiniEmailStructure: 8px radius + 3px border
-	const PINNED_LEFT_PANEL_VISUAL: Record<
-		PinnedLeftPanelVariant,
-		{ borderWidthPx: number; radiusPx: number }
-	> = {
-		contacts: { borderWidthPx: 1, radiusPx: 6 },
-		mini: { borderWidthPx: 3, radiusPx: 8 },
-	};
 
 	// Mirror the exact render conditions for the absolute pinned left column and for this shell.
 	// We only animate when the shell is actually rendered.
@@ -280,167 +264,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		!(view === 'search' && isSearchTabNarrow) &&
 		!(view === 'inbox' && isInboxTabStacked);
 
-	const shouldRenderAnimatedPinnedLeftPanelShell =
-		shouldRenderAbsolutePinnedLeftColumn && view !== 'inbox' && !isDraftPreviewOpen;
-
-	useLayoutEffect(() => {
-		if (typeof window === 'undefined') return;
-
-		// If the shell isn't rendered right now, keep state in sync and mark "not mounted".
-		if (!shouldRenderAnimatedPinnedLeftPanelShell) {
-			pinnedLeftPanelWasMountedRef.current = false;
-			if (pinnedLeftPanelRenderedVariantRef.current !== pinnedLeftPanelTargetVariant) {
-				pinnedLeftPanelRenderedVariantRef.current = pinnedLeftPanelTargetVariant;
-				setPinnedLeftPanelRenderedVariant(pinnedLeftPanelTargetVariant);
-			}
-			return;
-		}
-
-		const outer = pinnedLeftPanelOuterRef.current;
-		const content = pinnedLeftPanelContentRef.current;
-		const ghost = pinnedLeftPanelGhostRef.current;
-
-		if (!outer || !content || !ghost) {
-			pinnedLeftPanelWasMountedRef.current = false;
-			if (pinnedLeftPanelRenderedVariantRef.current !== pinnedLeftPanelTargetVariant) {
-				pinnedLeftPanelRenderedVariantRef.current = pinnedLeftPanelTargetVariant;
-				setPinnedLeftPanelRenderedVariant(pinnedLeftPanelTargetVariant);
-			}
-			return;
-		}
-
-		// First mount (or remount after breakpoint): hard sync, no transition.
-		if (!pinnedLeftPanelWasMountedRef.current) {
-			pinnedLeftPanelWasMountedRef.current = true;
-			gsap.killTweensOf([outer, content, ghost]);
-			gsap.set(ghost, { opacity: 0 });
-			gsap.set(content, { opacity: 1, clearProps: 'pointerEvents' });
-			gsap.set(outer, { clearProps: 'height' });
-
-			if (pinnedLeftPanelRenderedVariantRef.current !== pinnedLeftPanelTargetVariant) {
-				pinnedLeftPanelRenderedVariantRef.current = pinnedLeftPanelTargetVariant;
-				setPinnedLeftPanelRenderedVariant(pinnedLeftPanelTargetVariant);
-			}
-			return;
-		}
-
-		const currentVariant = pinnedLeftPanelRenderedVariantRef.current;
-		if (currentVariant === pinnedLeftPanelTargetVariant) {
-			// If a previous transition was interrupted, snap back to a stable state.
-			gsap.killTweensOf([outer, content, ghost]);
-			gsap.set(ghost, { opacity: 0 });
-			gsap.set(content, {
-				opacity: 1,
-				clearProps: 'pointerEvents,height,maskImage,WebkitMaskImage',
-			});
-			gsap.set(outer, { overflow: 'visible', clearProps: 'height,borderRadius' });
-			return;
-		}
-
-		const transitionId = ++pinnedLeftPanelTransitionIdRef.current;
-
-		gsap.killTweensOf([outer, content, ghost]);
-
-		const fadeSeconds = 0.22;
-		const resizeSeconds = 0.22;
-		const toHeight = PINNED_LEFT_PANEL_HEIGHT_PX[pinnedLeftPanelTargetVariant];
-		const fromHeight =
-			outer.getBoundingClientRect().height || PINNED_LEFT_PANEL_HEIGHT_PX[currentVariant];
-
-		const tweenTo = (target: gsap.TweenTarget, vars: gsap.TweenVars) =>
-			new Promise<void>((resolve) => {
-				gsap.to(target, { ...vars, onComplete: resolve });
-			});
-
-		const nextFrame = () =>
-			new Promise<void>((resolve) => {
-				requestAnimationFrame(() => resolve());
-			});
-
-		(async () => {
-			// 1) Panel A fades out
-			gsap.set(ghost, { opacity: 0 });
-			gsap.set(content, { pointerEvents: 'none' });
-			await tweenTo(content, {
-				opacity: 0,
-				duration: fadeSeconds,
-				ease: 'power1.out',
-			});
-			if (pinnedLeftPanelTransitionIdRef.current !== transitionId) return;
-
-			// Swap to Panel B (kept mostly hidden) so the resize can "reveal" it.
-			pinnedLeftPanelRenderedVariantRef.current = pinnedLeftPanelTargetVariant;
-			setPinnedLeftPanelRenderedVariant(pinnedLeftPanelTargetVariant);
-			await nextFrame();
-			if (pinnedLeftPanelTransitionIdRef.current !== transitionId) return;
-
-			// 2) Ghost box animates height (fixed top, same X) while revealing Panel B inside.
-			const revealOpacity = 0.72;
-			const fadeMask =
-				'linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,1) 88%, rgba(0,0,0,0) 100%)';
-
-			const fromVisual = PINNED_LEFT_PANEL_VISUAL[currentVariant];
-			const toVisual = PINNED_LEFT_PANEL_VISUAL[pinnedLeftPanelTargetVariant];
-
-			gsap.set(ghost, {
-				opacity: 1,
-				borderWidth: `${fromVisual.borderWidthPx}px`,
-				borderRadius: `${fromVisual.radiusPx}px`,
-			});
-			gsap.set(outer, {
-				height: fromHeight,
-				overflow: 'hidden',
-				borderRadius: `${fromVisual.radiusPx}px`,
-			});
-			gsap.set(content, {
-				opacity: 0,
-				height: '100%',
-				maskImage: fadeMask,
-				WebkitMaskImage: fadeMask,
-			});
-
-			await Promise.all([
-				tweenTo(outer, {
-					height: toHeight,
-					borderRadius: `${toVisual.radiusPx}px`,
-					duration: resizeSeconds,
-					ease: 'power2.inOut',
-				}),
-				tweenTo(ghost, {
-					borderWidth: `${toVisual.borderWidthPx}px`,
-					borderRadius: `${toVisual.radiusPx}px`,
-					duration: resizeSeconds,
-					ease: 'power2.inOut',
-				}),
-				tweenTo(content, {
-					opacity: revealOpacity,
-					duration: resizeSeconds,
-					ease: 'power1.out',
-				}),
-			]);
-			if (pinnedLeftPanelTransitionIdRef.current !== transitionId) return;
-
-			// Prep stable state *under the ghost* so nothing pops right at the end.
-			// (At this point the box has reached its final height, so un-clipping is safe.)
-			gsap.set(outer, { overflow: 'visible' });
-			gsap.set(content, { maskImage: 'none', WebkitMaskImage: 'none', height: 'auto' });
-
-			// 3) Ghost fades away, Panel B finishes fading in.
-			await Promise.all([
-				tweenTo(ghost, { opacity: 0, duration: fadeSeconds * 1.35, ease: 'power2.out' }),
-				tweenTo(content, { opacity: 1, duration: fadeSeconds * 1.35, ease: 'power2.out' }),
-			]);
-			if (pinnedLeftPanelTransitionIdRef.current !== transitionId) return;
-
-			// Keep the wrapper height as-is to avoid any end-of-transition layout snap.
-			gsap.set(content, { clearProps: 'pointerEvents' });
-		})();
-
-		return () => {
-			pinnedLeftPanelTransitionIdRef.current++;
-			gsap.killTweensOf([outer, content, ghost]);
-		};
-	}, [pinnedLeftPanelTargetVariant, shouldRenderAnimatedPinnedLeftPanelShell]);
+	// (No pinned-left-panel morph animation)
 
 	// --- Main box morph transition (Contacts/Writing/Drafts/Sent <-> Search/Inbox) ---
 	type CampaignMainBoxKey = 'writing' | 'contacts' | 'drafts' | 'sent' | 'search' | 'inbox';
@@ -2233,35 +2057,13 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											</div>
 										) : (
 											<div
-												ref={pinnedLeftPanelOuterRef}
 												style={{
 													width: '375px',
 													overflow: 'visible',
 													position: 'relative',
 												}}
 											>
-												{/* Ghost box: visible only during the height morph */}
-												<div
-													ref={pinnedLeftPanelGhostRef}
-													aria-hidden="true"
-													style={{
-														position: 'absolute',
-														inset: 0,
-														border: '3px solid #000000',
-														borderRadius: '8px',
-														background: 'rgba(255, 255, 255, 0.18)',
-														backdropFilter: 'blur(1.5px)',
-														WebkitBackdropFilter: 'blur(1.5px)',
-														opacity: 0,
-														pointerEvents: 'none',
-														zIndex: 2,
-													}}
-												/>
-												<div
-													ref={pinnedLeftPanelContentRef}
-													style={{ position: 'relative', zIndex: 1 }}
-												>
-													{pinnedLeftPanelRenderedVariant === 'contacts' ? (
+												{pinnedLeftPanelVariant === 'contacts' ? (
 														<ContactsExpandedList
 															contacts={contactsAvailableForDrafting}
 															campaign={campaign}
@@ -2288,6 +2090,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													) : (
 														<MiniEmailStructure
 															form={form}
+															profileFields={miniProfileFields}
 															onDraft={() =>
 																handleGenerateDrafts(
 																	contactsAvailableForDrafting.map((c) => c.id)
@@ -2303,6 +2106,11 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 															hideFooter
 															fullWidthMobile
 															hideAddTextButtons
+															// Match the Writing tab contacts list height (557px) so the left panel stays consistent.
+															// Applies on tabs where this pinned panel renders the MiniEmailStructure (Contacts + Drafts).
+															height={
+																view === 'contacts' || view === 'drafting' ? 557 : undefined
+															}
 															hideAllText={
 																// Hide all structure text to show chrome-only skeleton:
 																// - When the Drafts tab has no drafts
@@ -2316,7 +2124,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 															onOpenWriting={goToWriting}
 														/>
 													)}
-												</div>
 											</div>
 										))}
 
@@ -3588,6 +3395,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													<div style={{ width: '330px' }}>
 														<MiniEmailStructure
 															form={form}
+															profileFields={miniProfileFields}
 															onDraft={() =>
 																handleGenerateDrafts(
 																	contactsAvailableForDrafting.map((c) => c.id)
@@ -3887,6 +3695,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												<div style={{ width: '489px' }}>
 													<MiniEmailStructure
 														form={form}
+														profileFields={miniProfileFields}
 														onDraft={() =>
 															handleGenerateDrafts(
 																contactsAvailableForDrafting.map((c) => c.id)
@@ -3996,6 +3805,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												<div style={{ width: '330px' }}>
 													<MiniEmailStructure
 														form={form}
+														profileFields={miniProfileFields}
 														onDraft={() =>
 															handleGenerateDrafts(
 																contactsAvailableForDrafting.map((c) => c.id)
@@ -4274,6 +4084,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												<div style={{ width: '489px' }}>
 													<MiniEmailStructure
 														form={form}
+														profileFields={miniProfileFields}
 														onDraft={() =>
 															handleGenerateDrafts(
 																contactsAvailableForDrafting.map((c) => c.id)
@@ -4336,6 +4147,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												<div style={{ width: '330px' }}>
 													<MiniEmailStructure
 														form={form}
+														profileFields={miniProfileFields}
 														onDraft={() =>
 															handleGenerateDrafts(
 																contactsAvailableForDrafting.map((c) => c.id)
@@ -4443,6 +4255,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												<div style={{ width: '489px' }}>
 													<MiniEmailStructure
 														form={form}
+														profileFields={miniProfileFields}
 														onDraft={() =>
 															handleGenerateDrafts(
 																contactsAvailableForDrafting.map((c) => c.id)
@@ -5868,6 +5681,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											<div style={{ position: 'relative', zIndex: 20 }}>
 												<MiniEmailStructure
 													form={form}
+													profileFields={miniProfileFields}
 													onDraft={() =>
 														handleGenerateDrafts(
 															contactsAvailableForDrafting.map((c) => c.id)
@@ -6584,6 +6398,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											<div style={{ position: 'relative', zIndex: 20 }}>
 												<MiniEmailStructure
 													form={form}
+													profileFields={miniProfileFields}
 													onDraft={() =>
 														handleGenerateDrafts(
 															contactsAvailableForDrafting.map((c) => c.id)

@@ -56,6 +56,30 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 	// Live preview props passed from parent
 	const { isLivePreviewVisible, livePreviewContactId, livePreviewMessage } = props;
 
+	// Full Auto "Body" block profile chips (matches HybridPromptInput)
+	const miniProfileFields = useMemo(() => {
+		const identity = (campaign as any)?.identity as
+			| {
+					name?: string | null;
+					genre?: string | null;
+					area?: string | null;
+					bandName?: string | null;
+					bio?: string | null;
+					website?: string | null;
+			  }
+			| null
+			| undefined;
+		if (!identity) return null;
+		return {
+			name: identity.name ?? '',
+			genre: identity.genre ?? '',
+			area: identity.area ?? '',
+			band: identity.bandName ?? '',
+			bio: identity.bio ?? '',
+			links: identity.website ?? '',
+		};
+	}, [campaign]);
+
 	const isMobile = useIsMobile();
 	const isDraftPreviewOpen = Boolean(selectedDraft);
 
@@ -418,6 +442,7 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 											) : (
 												<MiniEmailStructure
 													form={form}
+													profileFields={miniProfileFields}
 													onDraft={handleDraftButtonClick}
 													isDraftDisabled={
 														isGenerationDisabled() || selectedContactIds.size === 0
