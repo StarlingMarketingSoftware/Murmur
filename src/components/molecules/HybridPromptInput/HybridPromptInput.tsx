@@ -4878,7 +4878,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 												{/* Divider (109px from left, 23px tall) */}
 												<div
 													aria-hidden="true"
-													className="absolute left-[109px] top-1/2 -translate-y-1/2 w-[2px] h-[23px] bg-black"
+													className="absolute left-[109px] top-1/2 -translate-y-1/2 w-px h-[23px] bg-black"
 												/>
 
 												{/* Font size dropdown */}
