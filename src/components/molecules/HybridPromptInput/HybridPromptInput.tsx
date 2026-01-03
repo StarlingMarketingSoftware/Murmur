@@ -2613,12 +2613,14 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 	const [hybridStructureSelection, setHybridStructureSelection] =
 		useState<HybridStructureSelection>({ kind: 'none' });
 	const [expandedHybridTextBlockId, setExpandedHybridTextBlockId] = useState<string | null>(null);
+	const [expandedHybridCoreBlockId, setExpandedHybridCoreBlockId] = useState<string | null>(null);
 
 	// Reset hybrid-only UI when switching modes
 	useEffect(() => {
 		if (selectedModeKey !== 'hybrid') {
 			setHybridStructureSelection({ kind: 'none' });
 			setExpandedHybridTextBlockId(null);
+			setExpandedHybridCoreBlockId(null);
 		}
 	}, [selectedModeKey]);
 
@@ -2635,6 +2637,13 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		const exists = fields.some((f) => f.id === expandedHybridTextBlockId);
 		if (!exists) setExpandedHybridTextBlockId(null);
 	}, [expandedHybridTextBlockId, fields]);
+
+	// If an expanded core block disappears, collapse it
+	useEffect(() => {
+		if (!expandedHybridCoreBlockId) return;
+		const exists = fields.some((f) => f.id === expandedHybridCoreBlockId);
+		if (!exists) setExpandedHybridCoreBlockId(null);
+	}, [expandedHybridCoreBlockId, fields]);
 
 	const getHybridStructureLabel = useCallback((type: HybridBlock) => {
 		switch (type) {
@@ -5246,15 +5255,23 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 													})()}
 
 													{(() => {
-														const introId = HybridBlock.introduction as unknown as string;
-														const researchId = HybridBlock.research as unknown as string;
-														const actionId = HybridBlock.action as unknown as string;
+														// NOTE: `useFieldArray` uses `id` as an internal key by default, so we must
+														// use the field-array ids here (not the block type string).
+														const introField = fields.find(
+															(f) => f.type === HybridBlock.introduction
+														);
+														const researchField = fields.find(
+															(f) => f.type === HybridBlock.research
+														);
+														const actionField = fields.find((f) => f.type === HybridBlock.action);
 
-														const isSelected = (id: string) =>
-															hybridStructureSelection.kind === 'block' &&
-															hybridStructureSelection.blockId === id;
+														const introId = introField?.id;
+														const researchId = researchField?.id;
+														const actionId = actionField?.id;
 
 														const openOrCreateTextAfter = (coreType: HybridBlock) => {
+															// Only allow one expanded block at a time in the structure UI
+															setExpandedHybridCoreBlockId(null);
 															const coreIndex = fields.findIndex((f) => f.type === coreType);
 															if (coreIndex === -1) return;
 															const next = fields[coreIndex + 1];
@@ -5293,13 +5310,19 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																className="group relative w-full overflow-visible"
 																style={{ height }}
 															>
+																{/* Larger hover target so the +Text button is easier to reveal (without changing spacing).
+																    Starts at the pill edge (150px) so it won't interfere with the pills themselves. */}
+																<div
+																	aria-hidden="true"
+																	className="absolute left-[150px] top-0 w-[140px] h-[36px] z-0"
+																/>
 																<button
 																	type="button"
 																	onClick={onClick}
 																	className={cn(
 																		// Place the button 17px to the right of the 150px pill:
 																		// pillWidth (150) + gap (17) = 167px
-																		'absolute left-[167px] top-1/2 -translate-y-1/2',
+																		'absolute left-[167px] top-1/2 -translate-y-1/2 z-10',
 																		'w-[57px] h-[22px] rounded-[4px] border border-[#0B741A] bg-[#9EDDB6]',
 																		'flex items-center justify-center gap-[5px] box-border',
 																		'opacity-0 pointer-events-none',
@@ -5318,8 +5341,11 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														const TextPill = ({ id }: { id: string }) => {
 															const isOpen = expandedHybridTextBlockId === id;
 															const idx = fields.findIndex((f) => f.id === id);
-															const fieldProps =
-																idx >= 0 ? form.register(`hybridBlockPrompts.${idx}.value`) : null;
+															// Use getValues (snapshot) instead of watch to avoid re-renders on each keystroke
+															const initialTextValue =
+																idx >= 0
+																	? ((form.getValues(`hybridBlockPrompts.${idx}.value`) as string) || '')
+																	: '';
 
 															if (!isOpen) {
 																return (
@@ -5328,6 +5354,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																		tabIndex={0}
 																		onClick={() => {
 																			setHybridStructureSelection({ kind: 'block', blockId: id });
+																			setExpandedHybridCoreBlockId(null);
 																			setExpandedHybridTextBlockId(id);
 																		}}
 																		onKeyDown={(e) => {
@@ -5337,68 +5364,64 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																					kind: 'block',
 																					blockId: id,
 																				});
+																				setExpandedHybridCoreBlockId(null);
 																				setExpandedHybridTextBlockId(id);
 																			}
 																		}}
-																		// Keep a full-width hover hitbox so collapsing while the cursor is
-																		// still in the "expanded" hover area doesn't cause the pill to snap shut.
 																		className={cn(
-																			'relative w-[429px] h-[28px] group/hybrid-structure-text-pill cursor-pointer select-none'
+																			'relative h-[28px] cursor-pointer select-none',
+																			// IMPORTANT: keep the hover hitbox to the pill itself (150px),
+																			// so it doesn't cover the "+ Text" buttons at x=167px.
+																			'w-[150px] hover:w-[429px] transition-none',
+																			'rounded-[8px] border-[3px] bg-[#A6E2A8] border-[#0B741A]',
+																			'flex items-center justify-start px-3',
+																			'font-inter font-medium text-[14px] text-black',
+																			'group/hybrid-structure-text-pill'
 																		)}
 																	>
-																		<div
-																			className={cn(
-																				'absolute left-0 top-0 h-[28px]',
-																				'w-[150px] group-hover/hybrid-structure-text-pill:w-[429px] transition-none',
-																				'rounded-[8px] border-[3px] bg-[#A6E2A8] border-[#0B741A]',
-																				'flex items-center justify-start px-3',
-																				'font-inter font-medium text-[14px] text-black'
-																			)}
-																		>
-																			<span className="pr-[56px]">Text</span>
-																			<div className="hidden group-hover/hybrid-structure-text-pill:flex items-center gap-[8px] absolute right-[8px] top-1/2 -translate-y-1/2">
-																				<button
-																					type="button"
-																					onClick={(e) => {
-																						e.stopPropagation();
-																						setExpandedHybridTextBlockId(null);
-																						handleRemoveBlock(id);
-																					}}
-																					className="h-[18px] w-[18px] flex items-center justify-center bg-transparent border-0 p-0 text-black"
-																					aria-label="Delete Text block"
+																		<span className="pr-[56px]">Text</span>
+																		<div className="hidden group-hover/hybrid-structure-text-pill:flex items-center gap-[8px] absolute right-[8px] top-1/2 -translate-y-1/2">
+																			<button
+																				type="button"
+																				onClick={(e) => {
+																					e.stopPropagation();
+																					setExpandedHybridTextBlockId(null);
+																					handleRemoveBlock(id);
+																				}}
+																				className="h-[18px] w-[18px] flex items-center justify-center bg-transparent border-0 p-0 text-black"
+																				aria-label="Delete Text block"
+																			>
+																				<CloseIcon width={7} height={7} />
+																			</button>
+																			<button
+																				type="button"
+																				onClick={(e) => {
+																					e.stopPropagation();
+																					setHybridStructureSelection({
+																						kind: 'block',
+																						blockId: id,
+																					});
+																					setExpandedHybridTextBlockId(id);
+																				}}
+																				className="h-[18px] w-[18px] flex items-center justify-center bg-transparent border-0 p-0"
+																				aria-label="Expand Text block"
+																			>
+																				<svg
+																					width="7"
+																					height="5"
+																					viewBox="0 0 7 5"
+																					fill="none"
+																					xmlns="http://www.w3.org/2000/svg"
 																				>
-																					<CloseIcon width={7} height={7} />
-																				</button>
-																				<button
-																					type="button"
-																					onClick={(e) => {
-																						e.stopPropagation();
-																						setHybridStructureSelection({
-																							kind: 'block',
-																							blockId: id,
-																						});
-																						setExpandedHybridTextBlockId(id);
-																					}}
-																					className="h-[18px] w-[18px] flex items-center justify-center bg-transparent border-0 p-0"
-																					aria-label="Expand Text block"
-																				>
-																					<svg
-																						width="7"
-																						height="5"
-																						viewBox="0 0 7 5"
-																						fill="none"
-																						xmlns="http://www.w3.org/2000/svg"
-																					>
-																						<path
-																							d="M0.796875 0.796875L3.12021 3.34412L5.44355 0.796875"
-																							stroke="black"
-																							strokeWidth="1.59374"
-																							strokeLinecap="round"
-																							strokeLinejoin="round"
-																						/>
-																					</svg>
-																				</button>
-																			</div>
+																					<path
+																						d="M0.796875 0.796875L3.12021 3.34412L5.44355 0.796875"
+																						stroke="black"
+																						strokeWidth="1.59374"
+																						strokeLinecap="round"
+																						strokeLinejoin="round"
+																					/>
+																				</svg>
+																			</button>
 																		</div>
 																	</div>
 																);
@@ -5415,7 +5438,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																	<div
 																		role="button"
 																		tabIndex={0}
-																		onClick={() => setExpandedHybridTextBlockId(null)}
+																		onMouseDown={() => setExpandedHybridTextBlockId(null)}
 																		onKeyDown={(e) => {
 																			if (e.key === 'Enter' || e.key === ' ') {
 																				e.preventDefault();
@@ -5431,7 +5454,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																		<div className="hidden group-hover/hybrid-structure-text-open:flex items-center gap-[8px] absolute right-[8px] top-1/2 -translate-y-1/2">
 																			<button
 																				type="button"
-																				onClick={(e) => {
+																				onMouseDown={(e) => {
 																					e.stopPropagation();
 																					setExpandedHybridTextBlockId(null);
 																					handleRemoveBlock(id);
@@ -5443,7 +5466,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																			</button>
 																			<button
 																				type="button"
-																				onClick={(e) => {
+																				onMouseDown={(e) => {
 																					e.stopPropagation();
 																					setExpandedHybridTextBlockId(null);
 																				}}
@@ -5469,8 +5492,159 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																				'px-3 py-2 resize-none overflow-y-auto',
 																				'font-inter text-[12px] leading-[14px] text-black'
 																			)}
-																			onClick={(e) => e.stopPropagation()}
-																			{...(fieldProps ?? {})}
+																			onMouseDown={(e) => e.stopPropagation()}
+																			autoFocus
+																			defaultValue={initialTextValue}
+																			onBlur={(e) => {
+																				if (idx < 0) return;
+																				form.setValue(
+																					`hybridBlockPrompts.${idx}.value`,
+																					e.target.value,
+																					{ shouldDirty: true }
+																				);
+																			}}
+																		/>
+																	</div>
+																</div>
+															);
+														};
+
+														const HybridCoreBlock = ({
+															id,
+															label,
+															bgClass,
+															borderClass,
+															placeholder,
+														}: {
+															id: string;
+															label: string;
+															bgClass: string;
+															borderClass: string;
+															placeholder: string;
+														}) => {
+															const isOpen = expandedHybridCoreBlockId === id;
+															const idx = fields.findIndex((f) => f.id === id);
+															// Use getValues (snapshot) instead of watch to avoid re-renders on each keystroke
+															const initialValue =
+																idx >= 0
+																	? ((form.getValues(`hybridBlockPrompts.${idx}.value`) as string) || '')
+																	: '';
+
+															if (!isOpen) {
+																return (
+																	<div
+																		role="button"
+																		tabIndex={0}
+																		onClick={() => {
+																			setHybridStructureSelection({ kind: 'block', blockId: id });
+																			setExpandedHybridTextBlockId(null);
+																			setExpandedHybridCoreBlockId(id);
+																		}}
+																		onKeyDown={(e) => {
+																			if (e.key === 'Enter' || e.key === ' ') {
+																				e.preventDefault();
+																				setHybridStructureSelection({
+																					kind: 'block',
+																					blockId: id,
+																				});
+																				setExpandedHybridTextBlockId(null);
+																				setExpandedHybridCoreBlockId(id);
+																			}
+																		}}
+																		className={cn(
+																			'relative h-[28px] cursor-pointer select-none',
+																			// IMPORTANT: keep the hover hitbox to the pill itself (150px),
+																			// so it doesn't cover the "+ Text" buttons at x=167px.
+																			'w-[150px] hover:w-[429px] transition-none',
+																			'rounded-[8px] border-[3px]',
+																			bgClass,
+																			borderClass,
+																			'flex items-center justify-start px-3',
+																			'font-inter font-medium text-[14px] text-black',
+																			'group/hybrid-core'
+																		)}
+																	>
+																		<span className="pr-3 group-hover/hybrid-core:pr-[130px]">
+																			{label}
+																		</span>
+																		{/* Advanced chrome (hover-only) */}
+																		<div className="hidden group-hover/hybrid-core:block absolute inset-0 pointer-events-none">
+																			<div className="absolute top-0 bottom-0 w-px bg-black right-[32px]" />
+																			<div className="absolute top-0 bottom-0 w-px bg-black right-[112px]" />
+																			<div className="absolute top-0 bottom-0 right-[32px] w-[80px] flex items-center justify-center">
+																				<span className="font-inter font-medium text-[14px] text-black">
+																					Advanced
+																				</span>
+																			</div>
+																		</div>
+																	</div>
+																);
+															}
+
+															return (
+																<div
+																	className={cn(
+																		'w-[429px] rounded-[8px] border-[3px] overflow-hidden',
+																		bgClass,
+																		borderClass
+																	)}
+																>
+																	{/* Header row (click anywhere to collapse) */}
+																	<div
+																		role="button"
+																		tabIndex={0}
+																		onMouseDown={() => setExpandedHybridCoreBlockId(null)}
+																		onKeyDown={(e) => {
+																			if (e.key === 'Enter' || e.key === ' ') {
+																				e.preventDefault();
+																				setExpandedHybridCoreBlockId(null);
+																			}
+																		}}
+																		className="h-[28px] flex items-center justify-start px-3 relative cursor-pointer select-none"
+																		aria-label={`Collapse ${label}`}
+																	>
+																		<span className="pr-[130px] font-inter font-medium text-[14px] text-black">
+																			{label}
+																		</span>
+																		{/* Advanced chrome (always visible while expanded) */}
+																		<div className="absolute top-0 bottom-0 w-px bg-black right-[32px]" />
+																		<div className="absolute top-0 bottom-0 w-px bg-black right-[112px]" />
+																		<div className="absolute top-0 bottom-0 right-[32px] w-[80px] flex items-center justify-center">
+																			<span className="font-inter font-medium text-[14px] text-black">
+																				Advanced
+																			</span>
+																		</div>
+																		{/* Collapse indicator in the rightmost 32px region */}
+																		<div className="absolute top-0 bottom-0 right-0 w-[32px] flex items-center justify-center">
+																			<span
+																				aria-hidden="true"
+																				className="block w-[12px] h-[2px] bg-black rounded-[1px]"
+																			/>
+																		</div>
+																	</div>
+																	{/* Divider */}
+																	<div className="h-[2px] bg-black" />
+																	{/* Text area (limited height) */}
+																	<div className="bg-white">
+																		<Textarea
+																			placeholder={placeholder}
+																			className={cn(
+																				'h-[72px] w-full border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0',
+																				'bg-white',
+																				'px-3 py-2 resize-none overflow-y-auto',
+																				'font-inter text-[12px] leading-[14px] text-black'
+																			)}
+																			onMouseDown={(e) => e.stopPropagation()}
+																			autoFocus
+																			defaultValue={initialValue}
+																			onBlur={(e) => {
+																				if (idx < 0) return;
+																				form.setValue(
+																					`hybridBlockPrompts.${idx}.value`,
+																					e.target.value,
+																					{ shouldDirty: true }
+																				);
+																			}}
 																		/>
 																	</div>
 																</div>
@@ -5483,21 +5657,15 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																<div className="h-[17px]" />
 
 																{/* Intro */}
-																<button
-																	type="button"
-																	onClick={() =>
-																		setHybridStructureSelection({ kind: 'block', blockId: introId })
-																	}
-																	className={cn(
-																		'w-[150px] hover:w-[429px] transition-none h-[28px] rounded-[8px] border-[3px] bg-[#DADAFC] border-[#6673FF]',
-																		'flex items-center justify-start px-3',
-																		'font-inter font-medium text-[14px] text-black',
-																		isSelected(introId) &&
-																			'ring-2 ring-black ring-offset-2 ring-offset-[#8989E1]'
-																	)}
-																>
-																	Intro
-																</button>
+																{introId ? (
+																	<HybridCoreBlock
+																		id={introId}
+																		label="Intro"
+																		bgClass="bg-[#DADAFC]"
+																		borderClass="border-[#6673FF]"
+																		placeholder="Automated Intro"
+																	/>
+																) : null}
 
 																{/* Intro -> Research slot */}
 																{introText ? (
@@ -5516,24 +5684,15 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																)}
 
 																{/* Research */}
-																<button
-																	type="button"
-																	onClick={() =>
-																		setHybridStructureSelection({
-																			kind: 'block',
-																			blockId: researchId,
-																		})
-																	}
-																	className={cn(
-																		'w-[150px] hover:w-[429px] transition-none h-[28px] rounded-[8px] border-[3px] bg-[#C7C7FF] border-[#1010E7]',
-																		'flex items-center justify-start px-3',
-																		'font-inter font-medium text-[14px] text-black',
-																		isSelected(researchId) &&
-																			'ring-2 ring-black ring-offset-2 ring-offset-[#8989E1]'
-																	)}
-																>
-																	Research
-																</button>
+																{researchId ? (
+																	<HybridCoreBlock
+																		id={researchId}
+																		label="Research"
+																		bgClass="bg-[#C7C7FF]"
+																		borderClass="border-[#1010E7]"
+																		placeholder="Automated Research on who you’re sending to"
+																	/>
+																) : null}
 
 																{/* Research -> CTA slot */}
 																{researchText ? (
@@ -5550,24 +5709,15 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																)}
 
 																{/* Call to Action */}
-																<button
-																	type="button"
-																	onClick={() =>
-																		setHybridStructureSelection({
-																			kind: 'block',
-																			blockId: actionId,
-																		})
-																	}
-																	className={cn(
-																		'w-[150px] hover:w-[429px] transition-none h-[28px] rounded-[8px] border-[3px] bg-[#A0A0D5] border-[#0E0E7F]',
-																		'flex items-center justify-start px-3',
-																		'font-inter font-medium text-[14px] text-black',
-																		isSelected(actionId) &&
-																			'ring-2 ring-black ring-offset-2 ring-offset-[#8989E1]'
-																	)}
-																>
-																	Call to Action
-																</button>
+																{actionId ? (
+																	<HybridCoreBlock
+																		id={actionId}
+																		label="Call to Action"
+																		bgClass="bg-[#A0A0D5]"
+																		borderClass="border-[#0E0E7F]"
+																		placeholder="Automated Call to Action"
+																	/>
+																) : null}
 
 																{/* CTA -> Signature slot */}
 																{actionText ? (
@@ -5698,14 +5848,20 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 													})()}
 												</div>
 
-												{/* Hybrid editor panel (opens when a pill is selected) */}
+												{/* Hybrid editor panel (legacy): hidden for Intro/Research/CTA/Text (now inline-expanded) */}
 												{hybridStructureSelection.kind === 'block' &&
 													(() => {
 														const idx = fields.findIndex(
 															(f) => f.id === hybridStructureSelection.blockId
 														);
 														if (idx === -1) return false;
-														return fields[idx].type !== HybridBlock.text;
+														const t = fields[idx].type;
+														return (
+															t !== HybridBlock.text &&
+															t !== HybridBlock.introduction &&
+															t !== HybridBlock.research &&
+															t !== HybridBlock.action
+														);
 													})() && (
 													<div
 														className={cn(
