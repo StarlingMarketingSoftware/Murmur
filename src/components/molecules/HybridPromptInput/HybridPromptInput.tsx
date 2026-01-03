@@ -5235,7 +5235,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														className={cn(
 															'w-full h-[33px] flex items-center px-3 bg-[#BCBCF2]',
 															'font-inter font-semibold text-[14px] text-black text-left',
-															isHybridProfileExpanded && 'border-b border-black'
+															isHybridProfileExpanded && 'border-b-2 border-black'
 														)}
 														style={{ backgroundColor: '#BCBCF2' }}
 														aria-expanded={isHybridProfileExpanded}
