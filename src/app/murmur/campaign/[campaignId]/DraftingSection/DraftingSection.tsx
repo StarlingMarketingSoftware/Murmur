@@ -1571,6 +1571,32 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		}
 	}, [contacts, selectedContactForResearch]);
 
+	// When reviewing a draft in the Drafts tab, the research panel should reflect the
+	// currently open draft (not whatever was last hovered in the table).
+	useEffect(() => {
+		if (view !== 'drafting') return;
+		if (!selectedDraft) return;
+
+		// Prefer the contacts list (includes computed `name`) when available.
+		const contactFromList =
+			contacts?.find((c) => c.id === selectedDraft.contactId) ?? null;
+
+		// Fallback: emails include `contact`, but it does not have computed `name`.
+		const synthesizedFromEmail = {
+			...selectedDraft.contact,
+			name:
+				`${selectedDraft.contact.firstName || ''} ${
+					selectedDraft.contact.lastName || ''
+				}`.trim() || null,
+		} as ContactWithName;
+
+		const nextContact = contactFromList ?? synthesizedFromEmail;
+
+		setSelectedContactForResearch(nextContact);
+		setHoveredContactForResearch(null);
+		setHasUserSelectedResearchContact(true);
+	}, [view, selectedDraft?.id, contacts]);
+
 	useEffect(() => {
 		if (!contactsAvailableForDrafting) return;
 		const availableIds = new Set(contactsAvailableForDrafting.map((c) => c.id));
