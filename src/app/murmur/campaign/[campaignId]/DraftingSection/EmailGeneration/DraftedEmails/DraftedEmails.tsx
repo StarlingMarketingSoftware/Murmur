@@ -1195,8 +1195,6 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 								  'Contact'
 								: 'Unknown Contact';
 							const isSelected = selectedDraftIds.has(draft.id);
-							const prevDraft = filteredDrafts[idx - 1];
-							const isPrevSelected = prevDraft && selectedDraftIds.has(prevDraft.id);
 							const isRejected = props.rejectedDraftIds?.has(draft.id) ?? false;
 							const isApproved = props.approvedDraftIds?.has(draft.id) ?? false;
 
@@ -1208,89 +1206,52 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 							);
 
 							const contactTitle = contact?.headline || contact?.title || '';
-							
-							// Determine spacing: if both this and previous are selected, use green connector, otherwise normal gap
-							const showConnector = isSelected && isPrevSelected;
-							
-							// Check if next is selected for bottom cap
-							const nextDraft = filteredDrafts[idx + 1];
-							const isNextSelected = nextDraft && selectedDraftIds.has(nextDraft.id);
-							
-							// Caps for first/last in selection group
-							const isFirstInGroup = isSelected && !isPrevSelected;
-							const isLastInGroup = isSelected && !isNextSelected;
-							
+
 							// Colors based on tab
 							const isRejectedTab = props.statusFilter === 'rejected';
 							const selectedBgColor = isRejectedTab ? 'bg-[#D99696]' : 'bg-[#A4D996]';
-							const connectorColor = isRejectedTab ? 'bg-[#A34C4C]' : 'bg-[#43A24C]';
-							
+
 							return (
-								<>
-									{/* Connector between adjacent selected items */}
-									{showConnector && (
-										<div
-											key={`connector-${draft.id}`}
-											className={cn("h-[10px]", connectorColor, isMobile ? 'w-full' : 'w-[499px]')}
-										/>
-									)}
-									{/* Normal gap spacer when not showing connector */}
-									{!showConnector && idx > 0 && (
-										<div key={`spacer-${draft.id}`} className="h-[10px]" />
-									)}
+								<div key={draft.id} className="w-full flex flex-col items-center overflow-visible">
+									{idx > 0 && <div className="h-[10px]" />}
 									<div
-										key={draft.id}
 										className={cn(
-											'cursor-pointer relative select-none overflow-visible border-2 p-2 group/draft',
+											'cursor-pointer relative select-none overflow-visible border-2 p-2 group/draft rounded-[8px]',
 											isMobile ? 'h-[100px]' : 'h-[97px]',
 											isSelected
-												? cn('rounded-none border-[#FFFFFF]', selectedBgColor, isMobile ? 'w-full' : 'w-[499px]')
+												? cn('border-[#FFFFFF]', selectedBgColor)
 												: cn(
-														'rounded-[8px] border-[#000000]',
+														'border-[#000000]',
 														isHoveringAllButton ? 'bg-[#FFEDCA]' : 'bg-white hover:bg-[#F9E5BA]'
 												  )
 										)}
-										style={!isSelected && isMobile ? { width: mobileEmailRowWidth } : !isSelected ? { width: '489px' } : undefined}
+										style={isMobile ? { width: mobileEmailRowWidth } : { width: '489px' }}
 										data-hover-description="Click to open and review"
-									onMouseDown={(e) => {
-										// Prevent text selection on shift-click
-										if (e.shiftKey) {
-											e.preventDefault();
-										}
-									}}
-									onMouseEnter={() => {
-										if (contact) {
-											onContactHover?.(contact);
-										}
-									}}
-									onClick={() => {
-										handleDraftDoubleClick(draft);
-										if (contact) {
-											onContactClick?.(contact);
-										}
-									}}
-								>
-									{/* Top cap - 6px above first selected in group */}
-									{isFirstInGroup && (
-										<div
-											className={cn("absolute left-0 right-0 h-[6px] pointer-events-none", connectorColor)}
-											style={{ top: '-8px' }}
-										/>
-									)}
-									{/* Bottom cap - 6px below last selected in group */}
-									{isLastInGroup && (
-										<div
-											className={cn("absolute left-0 right-0 h-[6px] pointer-events-none", connectorColor)}
-											style={{ bottom: '-8px' }}
-										/>
-									)}
+										onMouseDown={(e) => {
+											// Prevent text selection on shift-click
+											if (e.shiftKey) {
+												e.preventDefault();
+											}
+										}}
+										onMouseEnter={() => {
+											if (contact) {
+												onContactHover?.(contact);
+											}
+										}}
+										onClick={() => {
+											handleDraftDoubleClick(draft);
+											if (contact) {
+												onContactClick?.(contact);
+											}
+										}}
+									>
 									{/* Used-contact indicator - 11px from top */}
 									{usedContactIdsSet.has(draft.contactId) && (
 										<span
 											className="absolute"
 											title="Used in a previous campaign"
 											style={{
-												left: isSelected ? '13px' : '8px',
+												left: '8px',
 												top: '11px',
 												width: '16px',
 												height: '16px',
@@ -1307,7 +1268,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 											title="Marked for rejection"
 											aria-label="Rejected draft"
 											style={{
-												left: isSelected ? '13px' : '8px',
+												left: '8px',
 												top: usedContactIdsSet.has(draft.contactId) ? '33px' : '11px',
 												width: '16px',
 												height: '16px',
@@ -1324,7 +1285,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 											title="Marked for approval"
 											aria-label="Approved draft"
 											style={{
-												left: isSelected ? '13px' : '8px',
+												left: '8px',
 												top: usedContactIdsSet.has(draft.contactId) ? '33px' : '11px',
 												width: '16px',
 												height: '16px',
@@ -1338,7 +1299,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 									<span
 										className="absolute hidden group-hover/draft:block cursor-pointer"
 										style={{
-											left: isSelected ? '15px' : '10px',
+											left: '10px',
 											bottom: '10px',
 											width: '15px',
 											height: '15px',
@@ -1361,7 +1322,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 										type="button"
 										variant="icon"
 										onClick={(e) => handleDeleteDraft(e, draft.id)}
-										className={cn("absolute top-[50px] p-1 transition-colors z-10 group hidden group-hover/draft:block", isSelected ? "right-[7px]" : "right-[2px]")}
+										className="absolute top-[50px] right-[2px] p-1 transition-colors z-10 group hidden group-hover/draft:block"
 									>
 										<X size={16} className="text-gray-500 group-hover:text-red-500" />
 									</Button>
@@ -1379,7 +1340,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 												handleDraftDoubleClick(draft);
 											}
 										}}
-										className={cn("absolute top-[72px] p-1 transition-colors z-20 hidden group-hover/draft:block", isSelected ? "right-[7px]" : "right-[2px]")}
+										className="absolute top-[72px] right-[2px] p-1 transition-colors z-20 hidden group-hover/draft:block"
 										aria-label="Preview draft"
 									>
 										<PreviewIcon
@@ -1392,7 +1353,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 									{/* Fixed top-right info (Title + Location) - matching contacts table design */}
 									<div 
 										className="absolute top-[6px] flex flex-col items-start gap-[2px] pointer-events-none"
-										style={{ right: isSelected ? '9px' : '4px' }}
+										style={{ right: '4px' }}
 									>
 										{contactTitle ? (
 											<div
@@ -1519,7 +1480,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 									{/* Content flex column */}
 									<div className={cn(
 										"flex flex-col justify-center h-full gap-[2px]",
-										isSelected ? "pl-[35px] pr-[35px]" : "pl-[30px] pr-[30px]"
+										"pl-[30px] pr-[30px]"
 									)}>
 										{/* Row 1 & 2: Name / Company */}
 										{(() => {
@@ -1600,8 +1561,8 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 											</div>
 										</div>
 									</div>
+									</div>
 								</div>
-							</>
 						);
 						})}
 						{Array.from({ length: Math.max(0, (isMobile ? 4 : 6) - filteredDrafts.length) }).map((_, idx) => (
