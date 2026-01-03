@@ -445,7 +445,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 							justifyContent: 'space-between',
 							alignItems: 'flex-start',
 							height: '48px',
-							backgroundColor: 'white',
+							backgroundColor: '#FFE4B5',
 							position: 'relative',
 						}}
 					>
