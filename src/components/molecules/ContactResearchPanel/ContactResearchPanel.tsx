@@ -304,8 +304,12 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 					<div className="w-full h-full pl-3 pr-[12px] flex items-center justify-between overflow-hidden">
 						<div className="flex flex-col justify-center min-w-0 flex-1 pr-2">
 							<div
-								className="font-inter font-bold text-[14px] leading-none truncate text-black"
-								style={hideAllText || isLoading ? { color: 'transparent' } : undefined}
+								className="font-inter font-bold text-[14px] leading-none text-black overflow-hidden whitespace-nowrap"
+								style={{
+									...(hideAllText || isLoading ? { color: 'transparent' } : {}),
+									maskImage: 'linear-gradient(to right, black calc(100% - 12px), transparent 100%)',
+									WebkitMaskImage: 'linear-gradient(to right, black calc(100% - 12px), transparent 100%)',
+								}}
 							>
 								{(() => {
 									if (isLoading) return 'Loading...';
@@ -368,8 +372,12 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 						<div className="w-full h-full px-3 flex items-center justify-between overflow-hidden">
 							<div className="flex flex-col justify-center min-w-0 flex-1 pr-2">
 								<div
-									className="font-inter font-bold text-[16px] leading-none truncate text-black"
-									style={hideAllText || isLoading ? { color: 'transparent' } : undefined}
+									className="font-inter font-bold text-[16px] leading-none text-black overflow-hidden whitespace-nowrap"
+									style={{
+										...(hideAllText || isLoading ? { color: 'transparent' } : {}),
+										maskImage: 'linear-gradient(to right, black calc(100% - 12px), transparent 100%)',
+										WebkitMaskImage: 'linear-gradient(to right, black calc(100% - 12px), transparent 100%)',
+									}}
 								>
 									{(() => {
 										if (isLoading) return 'Loading...';
@@ -463,8 +471,12 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 														<WineBeerSpiritsIcon size={10} className="flex-shrink-0" />
 													)}
 													<span
-														className="text-[10px] leading-none text-black block truncate"
-														style={hideAllText ? { color: 'transparent' } : undefined}
+														className="text-[10px] leading-none text-black block overflow-hidden whitespace-nowrap"
+														style={{
+															...(hideAllText ? { color: 'transparent' } : {}),
+															maskImage: 'linear-gradient(to right, black calc(100% - 10px), transparent 100%)',
+															WebkitMaskImage: 'linear-gradient(to right, black calc(100% - 10px), transparent 100%)',
+														}}
 													>
 														{isRestaurantTitle(titleToShow)
 															? 'Restaurant'

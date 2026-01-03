@@ -17,7 +17,7 @@ export function Toaster() {
 				close: <CloseButtonIcon width={14} height={14} />,
 			}}
 			toastOptions={{
-				duration: 2000,
+				duration: 2000,	
 				classNames: {
 					icon: 'hidden',
 					toast: 'group relative',
