@@ -723,7 +723,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 							)}
 							<div className="flex items-center gap-4 mb-1 w-[95%] mx-auto mt-1">
 								<span className="font-inter font-semibold text-[13px]">Mode</span>
-								<div ref={modeContainerRef} className="relative flex items-center gap-6">
+								<div ref={modeContainerRef} className="relative flex items-center gap-6 ml-2">
 								<div
 									className="absolute top-1/2 -translate-y-1/2 z-10 pointer-events-none"
 									style={{
@@ -753,7 +753,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 										)}
 										onClick={() => setMode('ai')}
 									>
-										Full Auto
+										Auto
 									</button>
 									<button
 										ref={handwrittenButtonRef}
