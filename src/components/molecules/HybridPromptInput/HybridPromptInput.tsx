@@ -5332,8 +5332,8 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																	)}
 																	aria-label="Add Text"
 																>
-																	<span className="text-[14px] leading-none">+</span>
-																	<span className="leading-none">Text</span>
+																	<span className="text-[12px] leading-[12px]">+</span>
+																	<span className="text-[12px] leading-[12px]">Text</span>
 																</button>
 															</div>
 														);
