@@ -11,6 +11,7 @@ import { MusicVenuesIcon } from '@/components/atoms/_svg/MusicVenuesIcon';
 import { WineBeerSpiritsIcon } from '@/components/atoms/_svg/WineBeerSpiritsIcon';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 import ResearchChevron from '@/components/atoms/_svg/ResearchChevron';
+import ResearchHeaderMap from '@/components/atoms/_svg/ResearchHeaderMap';
 
 export interface ContactResearchPanelProps {
 	contact: ContactWithName | null | undefined;
@@ -310,7 +311,7 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 			{/* Contact info bar - boxed version for compact header (All tab) */}
 			{compactHeader ? (
 				<div
-					className="absolute bg-[#FFFFFF] border-2 border-black rounded-[7px]"
+					className="absolute bg-[#FFFFFF] border-2 border-black rounded-[7px] overflow-hidden"
 					style={{
 						top: `${headerHeight + 6}px`,
 						left: '50%',
@@ -319,7 +320,19 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 						height: '40px',
 					}}
 				>
-					<div className="w-full h-full pl-3 pr-[12px] flex items-center justify-between overflow-hidden">
+					{/* Map background */}
+					<div
+						className="absolute inset-0 pointer-events-none"
+						style={{ opacity: 0.35 }}
+					>
+						<ResearchHeaderMap
+							width={containerWidth - 14}
+							height={40}
+							style={{ display: 'block' }}
+							hideBorder
+						/>
+					</div>
+					<div className="relative w-full h-full pl-3 pr-[12px] flex items-center justify-between overflow-hidden">
 						<div className="flex flex-col justify-center min-w-0 flex-1 pr-2">
 							<div
 								className="font-inter font-bold text-[14px] leading-none text-black overflow-hidden whitespace-nowrap"
@@ -378,7 +391,7 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 				<>
 					{/* Identity box (359x51, 10px radius) */}
 					<div
-						className="absolute relative bg-[#FFFFFF] border-2 border-black rounded-[10px]"
+						className="absolute relative bg-[#FFFFFF] border-2 border-black rounded-[10px] overflow-hidden"
 						style={{
 							top: `${headerHeight + 6}px`,
 							left: '50%',
@@ -387,6 +400,18 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 							height: '51px',
 						}}
 					>
+						{/* Map background */}
+						<div
+							className="absolute inset-0 pointer-events-none"
+							style={{ opacity: 0.35 }}
+						>
+							<ResearchHeaderMap
+								width={Math.min(359, containerWidth - 16)}
+								height={51}
+								style={{ display: 'block' }}
+								hideBorder
+							/>
+						</div>
 						{/* Text block */}
 						<div
 							className={cn(
@@ -424,6 +449,7 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 								className="absolute flex items-center gap-[8px]"
 								style={{
 									left: '8px',
+									right: '8px',
 									bottom: '2px',
 									height: '21px',
 								}}
@@ -442,13 +468,7 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 								{!!locationText && (
 									<span
 										className="font-inter font-normal text-[16px] leading-none text-black overflow-hidden whitespace-nowrap"
-										style={{
-											...(hideAllText ? { color: 'transparent' } : {}),
-											maskImage:
-												'linear-gradient(to right, black calc(100% - 12px), transparent 100%)',
-											WebkitMaskImage:
-												'linear-gradient(to right, black calc(100% - 12px), transparent 100%)',
-										}}
+										style={hideAllText ? { color: 'transparent' } : undefined}
 									>
 										{locationText}
 									</span>
