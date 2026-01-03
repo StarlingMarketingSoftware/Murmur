@@ -454,9 +454,17 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 							type="button"
 							variant="ghost"
 							onClick={handleBack}
-							className="absolute top-1/2 -translate-y-1/2 right-2 p-1 h-auto w-auto hover:bg-gray-100 rounded z-10"
+							className="absolute rounded z-10 flex items-center justify-center hover:bg-transparent"
+							style={{ 
+								top: '17px', 
+								right: '21px',
+								padding: '8px 12px',
+								margin: '-8px -12px',
+								width: 'auto',
+								height: 'auto'
+							}}
 						>
-							<CloseButtonIcon width={14} height={14} />
+							<div style={{ width: '16px', height: '2px', backgroundColor: '#000000' }} />
 						</Button>
 						<div style={{ 
 							display: 'flex', 
