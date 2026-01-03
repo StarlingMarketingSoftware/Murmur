@@ -4546,61 +4546,67 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 												style={{ overflow: 'visible' }}
 												data-hpi-manual-entry
 											>
-												{/* Subject (inside the unified manual box) */}
-												<div className="min-h-[39px] flex items-start px-3 py-2 bg-white cursor-text">
-													<FormField
-														control={form.control}
-														name="subject"
-														rules={{ required: form.watch('isAiSubject') }}
-														render={({ field }) => (
-															<FormItem className="flex-1 mb-0">
-																<FormControl>
-																	<Textarea
-																		{...field}
-																		className={cn(
-																			// Auto-expanding textarea for subject (up to 4 lines)
-																			'w-full border-0 rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 !bg-transparent p-0 min-h-[20px] leading-[20px] resize-none overflow-hidden',
-																			// Subject spec: Inter semi-bold, 16px (placeholder + typed text).
-																			'font-inter font-semibold text-[16px] md:text-[16px] placeholder:font-semibold placeholder:text-[16px] placeholder:opacity-100',
-																			shouldShowSubjectRedStyling
-																				? '!text-[#A20000] placeholder:text-[#A20000] focus:placeholder:text-[#A20000]'
-																				: '!text-black placeholder:text-black focus:placeholder:text-gray-400'
-																		)}
-																		style={{ maxHeight: '80px' }} // 4 lines max (20px * 4)
-																		placeholder="Subject"
-																		rows={1}
-																		onInput={(e: React.FormEvent<HTMLTextAreaElement>) => {
-																			const target = e.currentTarget;
-																			target.style.height = 'auto';
-																			// Limit to 4 lines (80px)
-																			target.style.height = Math.min(target.scrollHeight, 80) + 'px';
-																		}}
-																		onKeyDown={(e) => {
-																			// Prevent Enter from creating new lines (email subjects don't support newlines)
-																			if (e.key === 'Enter') {
-																				e.preventDefault();
+												{/* Header wrapper clips the top corners cleanly while preserving overflow-visible for popovers */}
+												<div className="bg-white overflow-hidden rounded-t-[5px]">
+													{/* Subject (inside the unified manual box) */}
+													<div className="min-h-[39px] flex items-start px-3 py-2 bg-white cursor-text">
+														<FormField
+															control={form.control}
+															name="subject"
+															rules={{ required: form.watch('isAiSubject') }}
+															render={({ field }) => (
+																<FormItem className="flex-1 mb-0">
+																	<FormControl>
+																		<Textarea
+																			{...field}
+																			className={cn(
+																				// Auto-expanding textarea for subject (up to 4 lines)
+																				'w-full border-0 rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 !bg-transparent p-0 min-h-[20px] leading-[20px] resize-none overflow-hidden',
+																				// Subject spec: Inter semi-bold, 16px (placeholder + typed text).
+																				'font-inter font-semibold text-[16px] md:text-[16px] placeholder:font-semibold placeholder:text-[16px] placeholder:opacity-100',
+																				shouldShowSubjectRedStyling
+																					? '!text-[#A20000] placeholder:text-[#A20000] focus:placeholder:text-[#A20000]'
+																					: '!text-black placeholder:text-black focus:placeholder:text-gray-400'
+																			)}
+																			style={{ maxHeight: '80px' }} // 4 lines max (20px * 4)
+																			placeholder="Subject"
+																			rows={1}
+																			onInput={(e: React.FormEvent<HTMLTextAreaElement>) => {
+																				const target = e.currentTarget;
+																				target.style.height = 'auto';
+																				// Limit to 4 lines (80px)
+																				target.style.height = Math.min(target.scrollHeight, 80) + 'px';
+																			}}
+																			onKeyDown={(e) => {
+																				// Prevent Enter from creating new lines (email subjects don't support newlines)
+																				if (e.key === 'Enter') {
+																					e.preventDefault();
+																				}
+																			}}
+																			onFocus={(e) =>
+																				trackFocusedField?.(
+																					'subject',
+																					e.target as HTMLTextAreaElement
+																				)
 																			}
-																		}}
-																		onFocus={(e) =>
-																			trackFocusedField?.('subject', e.target as HTMLTextAreaElement)
-																		}
-																		onBlur={() => {
-																			setHasSubjectBeenTouched(true);
-																			field.onBlur();
-																		}}
-																		onChange={(e) => {
-																			if (e.target.value) setHasSubjectBeenTouched(true);
-																			field.onChange(e);
-																		}}
-																	/>
-																</FormControl>
-															</FormItem>
-														)}
-													/>
-												</div>
-												{/* Subject divider line (full width) */}
-												<div className="px-0 bg-white">
-													<div className="w-full h-[2px] bg-[#AFAFAF]" />
+																			onBlur={() => {
+																				setHasSubjectBeenTouched(true);
+																				field.onBlur();
+																			}}
+																			onChange={(e) => {
+																				if (e.target.value) setHasSubjectBeenTouched(true);
+																				field.onChange(e);
+																			}}
+																		/>
+																	</FormControl>
+																</FormItem>
+															)}
+														/>
+													</div>
+													{/* Subject divider line (full width) */}
+													<div className="px-0 bg-white">
+														<div className="w-full h-[2px] bg-[#AFAFAF]" />
+													</div>
 												</div>
 
 												{/* Body (single editor for Manual - no separate signature) */}
