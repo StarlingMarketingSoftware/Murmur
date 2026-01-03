@@ -1217,7 +1217,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 
 							// Colors based on tab
 							const isRejectedTab = props.statusFilter === 'rejected';
-							const selectedBgColor = isRejectedTab ? 'bg-[#D99696]' : 'bg-[#A4D996]';
+							const selectedBgColor = isRejectedTab ? 'bg-[#D99696]' : 'bg-[#8BDA76]';
 
 							return (
 								<div key={draft.id} className="w-full flex flex-col items-center overflow-visible">
