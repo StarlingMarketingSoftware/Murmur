@@ -2614,6 +2614,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		useState<HybridStructureSelection>({ kind: 'none' });
 	const [expandedHybridTextBlockId, setExpandedHybridTextBlockId] = useState<string | null>(null);
 	const [expandedHybridCoreBlockId, setExpandedHybridCoreBlockId] = useState<string | null>(null);
+	const [isHybridProfileExpanded, setIsHybridProfileExpanded] = useState(false);
 
 	// Reset hybrid-only UI when switching modes
 	useEffect(() => {
@@ -2621,6 +2622,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 			setHybridStructureSelection({ kind: 'none' });
 			setExpandedHybridTextBlockId(null);
 			setExpandedHybridCoreBlockId(null);
+			setIsHybridProfileExpanded(false);
 		}
 	}, [selectedModeKey]);
 
@@ -3281,6 +3283,87 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 			});
 		}
 	}, [identityProfile]);
+
+	// Hybrid: profile chips (match Full Auto Profile section formatting)
+	type HybridProfileChipItem = {
+		key: string;
+		text: string;
+		bgClass: string;
+		isEmpty: boolean;
+	};
+	const hybridProfileChipItems = useMemo<HybridProfileChipItem[]>(() => {
+		const truncate = (value: string, max: number) => {
+			const v = (value || '').trim();
+			if (v.length <= max) return v;
+			return v.slice(0, Math.max(0, max - 1)).trimEnd() + '…';
+		};
+
+		const chips: HybridProfileChipItem[] = [];
+
+		const name = (profileFields?.name ?? '').trim();
+		const genre = (profileFields?.genre ?? '').trim();
+		const area = (profileFields?.area ?? '').trim();
+		const band = (profileFields?.band ?? '').trim();
+		const bio = (profileFields?.bio ?? '').trim();
+		const linksRaw = (profileFields?.links ?? '').trim();
+
+		chips.push({
+			key: 'profile-name',
+			text: name ? `Nme. ${truncate(name, 28)}` : 'Nme.',
+			bgClass: 'bg-[#DADAFC]',
+			isEmpty: !name,
+		});
+		chips.push({
+			key: 'profile-genre',
+			text: genre ? `Gnre. ${truncate(genre, 22)}` : 'Gnre.',
+			bgClass: 'bg-[#DADAFC]',
+			isEmpty: !genre,
+		});
+		chips.push({
+			key: 'profile-area',
+			text: area ? `Area. ${truncate(area, 30)}` : 'Area.',
+			bgClass: 'bg-[#DADAFC]',
+			isEmpty: !area,
+		});
+		chips.push({
+			key: 'profile-band',
+			text: band ? `Artst Nme. ${truncate(band, 30)}` : 'Artst Nme.',
+			bgClass: 'bg-[#CFF5F5]',
+			isEmpty: !band,
+		});
+		chips.push({
+			key: 'profile-bio',
+			text: bio ? `Bio. “${truncate(bio, 48)}”` : 'Bio.',
+			bgClass: 'bg-[#CFF5F5]',
+			isEmpty: !bio,
+		});
+
+		const links = linksRaw
+			.split(/\r?\n|,/g)
+			.map((s) => s.trim())
+			.filter(Boolean);
+
+		if (links.length === 0) {
+			chips.push({
+				key: 'profile-link-0',
+				text: 'Link.',
+				bgClass: 'bg-[#C7F2C9]',
+				isEmpty: true,
+			});
+		} else {
+			for (let i = 0; i < links.length; i++) {
+				const link = links[i];
+				chips.push({
+					key: `profile-link-${i}`,
+					text: `Link. ${truncate(link, 42)}`,
+					bgClass: 'bg-[#C7F2C9]',
+					isEmpty: false,
+				});
+			}
+		}
+
+		return chips;
+	}, [profileFields]);
 
 	// Profile score bar (weighted by UI order; more rules will follow)
 	const PROFILE_PROGRESS_SEQUENCE = [
@@ -5137,13 +5220,69 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 										)}
 
 										{selectedModeKey === 'hybrid' && (
-											<div className="w-full flex flex-col items-center gap-3">
+											<div className="w-full flex flex-col items-center mt-[14px]">
+												{/* Profile box (collapsed 33px; expands to 110px) */}
+												<div
+													className={cn(
+														'w-[448px] max-w-[89.33vw] rounded-[8px] border-2 border-black overflow-hidden flex flex-col',
+														isHybridProfileExpanded ? 'h-[110px]' : 'h-[33px]'
+													)}
+													data-hpi-hybrid-profile-bar
+												>
+													<button
+														type="button"
+														onClick={() => setIsHybridProfileExpanded((v) => !v)}
+														className={cn(
+															'w-full h-[33px] flex items-center px-3 bg-[#BCBCF2]',
+															'font-inter font-semibold text-[14px] text-black text-left',
+															isHybridProfileExpanded && 'border-b border-black'
+														)}
+														style={{ backgroundColor: '#BCBCF2' }}
+														aria-expanded={isHybridProfileExpanded}
+														aria-label="Toggle Profile"
+													>
+														Profile
+													</button>
+
+													{isHybridProfileExpanded && (
+														<div
+															role="button"
+															tabIndex={0}
+															aria-label="Open Profile tab"
+															onClick={() => setActiveTab('profile')}
+															onKeyDown={(e) => {
+																if (e.key === 'Enter' || e.key === ' ') {
+																	e.preventDefault();
+																	setActiveTab('profile');
+																}
+															}}
+															className="flex-1 bg-white px-2 py-2 overflow-y-auto overflow-x-hidden hide-native-scrollbar cursor-pointer"
+														>
+															<div className="flex flex-wrap gap-x-[6px] gap-y-[10px] content-start">
+																{hybridProfileChipItems.map((chip) => (
+																	<span
+																		key={chip.key}
+																		className={cn(
+																			'inline-flex items-center rounded-[5px] px-[5px] py-[0.5px] font-inter font-normal text-[10px] leading-[12px] text-black max-w-full whitespace-nowrap',
+																			chip.bgClass,
+																			chip.isEmpty && 'opacity-50'
+																		)}
+																	>
+																		{chip.text}
+																	</span>
+																))}
+															</div>
+														</div>
+													)}
+												</div>
+
 												{/* Hybrid (compressed) structure box */}
 												<div
 													className={cn(
 														'w-[448px] max-w-[89.33vw] min-h-[230px] rounded-[8px] border-2 border-black bg-[#8989E1] flex flex-col',
 														// Left inset is 10px as requested; right inset is tuned so a 429px hover width fits cleanly.
-														'pl-[10px] pr-[5px] py-[14px]'
+														'pl-[10px] pr-[5px] py-[14px]',
+														'mt-[14px]'
 													)}
 													style={{ backgroundColor: '#8989E1' }}
 													data-hpi-hybrid-structure
@@ -5866,7 +6005,8 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 													<div
 														className={cn(
 															'w-[448px] max-w-[89.33vw] rounded-[8px] border-2 border-black bg-white',
-															'px-4 py-3'
+															'px-4 py-3',
+															'mt-3'
 														)}
 														data-hpi-hybrid-structure-editor
 													>
