@@ -26,6 +26,7 @@ interface SentEmailsProps {
 	isPendingEmails: boolean;
 	onContactClick?: (contact: ContactWithName | null) => void;
 	onContactHover?: (contact: ContactWithName | null) => void;
+	onEmailHover?: (email: EmailWithRelations | null) => void;
 	goToDrafts?: () => void;
 	goToWriting?: () => void;
 	goToSearch?: () => void;
@@ -41,6 +42,7 @@ export const SentEmails: FC<SentEmailsProps> = ({
 	isPendingEmails,
 	onContactClick,
 	onContactHover,
+	onEmailHover,
 	goToDrafts,
 	goToWriting,
 	goToSearch,
@@ -76,6 +78,7 @@ export const SentEmails: FC<SentEmailsProps> = ({
 				className="overflow-visible w-full flex flex-col gap-2 items-center"
 				onMouseLeave={() => {
 					onContactHover?.(null);
+					onEmailHover?.(null);
 				}}
 			>
 				{emails.map((email) => {
@@ -111,6 +114,7 @@ export const SentEmails: FC<SentEmailsProps> = ({
 							)}
 							style={isMobile ? { width: mobileEmailRowWidth } : undefined}
 							onMouseEnter={() => {
+								onEmailHover?.(email);
 								if (contactForResearch) {
 									onContactHover?.(contactForResearch);
 								}

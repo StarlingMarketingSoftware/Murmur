@@ -215,12 +215,15 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const [isClient, setIsClient] = useState(false);
 	useEffect(() => setIsClient(true), []);
 	const isDraftingView = view === 'drafting';
+	const isSentView = view === 'sent';
 	const [selectedDraft, setSelectedDraft] = useState<EmailWithRelations | null>(null);
 	const [hoveredDraftForSettings, setHoveredDraftForSettings] =
 		useState<EmailWithRelations | null>(null);
+	const [hoveredSentForSettings, setHoveredSentForSettings] =
+		useState<EmailWithRelations | null>(null);
 	const isDraftPreviewOpen = isDraftingView && Boolean(selectedDraft);
-	const draftsMiniEmailTopHeaderHeight = isDraftingView ? 26 : undefined;
-	const draftsMiniEmailFillColor = isDraftingView ? '#B1CEEF' : undefined;
+	const draftsMiniEmailTopHeaderHeight = isDraftingView || isSentView ? 26 : undefined;
+	const draftsMiniEmailFillColor = isDraftingView || isSentView ? '#B1CEEF' : undefined;
 
 	// Drafts tab: read-only preview form for the MiniEmailStructure, driven by hovered/selected draft settings.
 	const draftsSettingsPreviewForm = useForm<DraftingFormValues>({
@@ -247,6 +250,32 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		form,
 		draftsSettingsPreviewForm,
 		hoveredDraftForSettings,
+	]);
+
+	// Sent tab: read-only preview form for the MiniEmailStructure, driven by hovered sent email settings.
+	const sentSettingsPreviewForm = useForm<DraftingFormValues>({
+		defaultValues: form.getValues(),
+	});
+	const sentForSettingsPreview = isSentView ? hoveredSentForSettings : null;
+	useEffect(() => {
+		if (!isSentView) {
+			// Avoid leaking hover state across tabs.
+			if (hoveredSentForSettings) setHoveredSentForSettings(null);
+			return;
+		}
+
+		const snapshot = sentForSettingsPreview
+			? extractMurmurDraftSettingsSnapshot(sentForSettingsPreview.message)
+			: null;
+		const nextValues = snapshot?.values ?? form.getValues();
+		sentSettingsPreviewForm.reset(nextValues);
+	}, [
+		view,
+		sentForSettingsPreview?.id,
+		sentForSettingsPreview?.message,
+		form,
+		sentSettingsPreviewForm,
+		hoveredSentForSettings,
 	]);
 
 	// All tab hover states
@@ -2150,8 +2179,14 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														/>
 													) : (
 														<MiniEmailStructure
-															form={isDraftingView ? draftsSettingsPreviewForm : form}
-															readOnly={isDraftingView}
+															form={
+																isDraftingView
+																	? draftsSettingsPreviewForm
+																	: isSentView
+																		? sentSettingsPreviewForm
+																		: form
+															}
+															readOnly={isDraftingView || isSentView}
 															profileFields={miniProfileFields}
 															identityProfile={campaign?.identity as IdentityProfileFields | null}
 															onIdentityUpdate={handleIdentityUpdate}
@@ -2171,9 +2206,11 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 															fullWidthMobile
 															hideAddTextButtons
 															// Match the Writing tab contacts list height (557px) so the left panel stays consistent.
-															// Applies on tabs where this pinned panel renders the MiniEmailStructure (Contacts + Drafts).
+															// Applies on tabs where this pinned panel renders the MiniEmailStructure (Contacts + Drafts + Sent).
 															height={
-																view === 'contacts' || view === 'drafting' ? 557 : undefined
+																view === 'contacts' || view === 'drafting' || view === 'sent'
+																	? 557
+																	: undefined
 															}
 															pageFillColor={draftsMiniEmailFillColor}
 															topHeaderHeight={draftsMiniEmailTopHeaderHeight}
@@ -3886,8 +3923,14 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												{/* Mini Email Structure panel */}
 												<div style={{ width: '330px' }}>
 													<MiniEmailStructure
-														form={isDraftingView ? draftsSettingsPreviewForm : form}
-														readOnly={isDraftingView}
+														form={
+															isDraftingView
+																? draftsSettingsPreviewForm
+																: isSentView
+																	? sentSettingsPreviewForm
+																	: form
+														}
+														readOnly={isDraftingView || isSentView}
 														profileFields={miniProfileFields}
 														identityProfile={campaign?.identity as IdentityProfileFields | null}
 														onIdentityUpdate={handleIdentityUpdate}
@@ -4171,8 +4214,14 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											<div className="mt-[10px] w-full flex justify-center">
 												<div style={{ width: '489px' }}>
 													<MiniEmailStructure
-														form={isDraftingView ? draftsSettingsPreviewForm : form}
-														readOnly={isDraftingView}
+														form={
+															isDraftingView
+																? draftsSettingsPreviewForm
+																: isSentView
+																	? sentSettingsPreviewForm
+																	: form
+														}
+														readOnly={isDraftingView || isSentView}
 														profileFields={miniProfileFields}
 														identityProfile={campaign?.identity as IdentityProfileFields | null}
 														onIdentityUpdate={handleIdentityUpdate}
@@ -4214,6 +4263,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											isPendingEmails={isPendingEmails}
 											onContactClick={handleResearchContactClick}
 											onContactHover={handleResearchContactHover}
+											onEmailHover={setHoveredSentForSettings}
 											goToDrafts={goToDrafting}
 											goToWriting={goToWriting}
 											goToSearch={onGoToSearch}
@@ -4240,8 +4290,14 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												{/* Mini Email Structure panel */}
 												<div style={{ width: '330px' }}>
 													<MiniEmailStructure
-														form={isDraftingView ? draftsSettingsPreviewForm : form}
-														readOnly={isDraftingView}
+														form={
+															isDraftingView
+																? draftsSettingsPreviewForm
+																: isSentView
+																	? sentSettingsPreviewForm
+																	: form
+														}
+														readOnly={isDraftingView || isSentView}
 														profileFields={miniProfileFields}
 														identityProfile={campaign?.identity as IdentityProfileFields | null}
 														onIdentityUpdate={handleIdentityUpdate}
@@ -4285,6 +4341,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													isPendingEmails={isPendingEmails}
 													onContactClick={handleResearchContactClick}
 													onContactHover={handleResearchContactHover}
+													onEmailHover={setHoveredSentForSettings}
 													goToDrafts={goToDrafting}
 													goToWriting={goToWriting}
 													goToSearch={onGoToSearch}
@@ -4328,6 +4385,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											isPendingEmails={isPendingEmails}
 											onContactClick={handleResearchContactClick}
 											onContactHover={handleResearchContactHover}
+											onEmailHover={setHoveredSentForSettings}
 											goToDrafts={goToDrafting}
 											goToWriting={goToWriting}
 											goToSearch={onGoToSearch}
@@ -4354,8 +4412,14 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											<div className="mt-[10px] w-full flex justify-center">
 												<div style={{ width: '489px' }}>
 													<MiniEmailStructure
-														form={isDraftingView ? draftsSettingsPreviewForm : form}
-														readOnly={isDraftingView}
+														form={
+															isDraftingView
+																? draftsSettingsPreviewForm
+																: isSentView
+																	? sentSettingsPreviewForm
+																	: form
+														}
+														readOnly={isDraftingView || isSentView}
 														profileFields={miniProfileFields}
 														identityProfile={campaign?.identity as IdentityProfileFields | null}
 														onIdentityUpdate={handleIdentityUpdate}
@@ -5786,8 +5850,14 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											)}
 											<div style={{ position: 'relative', zIndex: 20 }}>
 												<MiniEmailStructure
-													form={isDraftingView ? draftsSettingsPreviewForm : form}
-													readOnly={isDraftingView}
+													form={
+														isDraftingView
+															? draftsSettingsPreviewForm
+															: isSentView
+																? sentSettingsPreviewForm
+																: form
+													}
+													readOnly={isDraftingView || isSentView}
 													profileFields={miniProfileFields}
 													identityProfile={campaign?.identity as IdentityProfileFields | null}
 													onIdentityUpdate={handleIdentityUpdate}
@@ -6509,8 +6579,14 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											)}
 											<div style={{ position: 'relative', zIndex: 20 }}>
 												<MiniEmailStructure
-													form={isDraftingView ? draftsSettingsPreviewForm : form}
-													readOnly={isDraftingView}
+													form={
+														isDraftingView
+															? draftsSettingsPreviewForm
+															: isSentView
+																? sentSettingsPreviewForm
+																: form
+													}
+													readOnly={isDraftingView || isSentView}
 													profileFields={miniProfileFields}
 													identityProfile={campaign?.identity as IdentityProfileFields | null}
 													onIdentityUpdate={handleIdentityUpdate}
