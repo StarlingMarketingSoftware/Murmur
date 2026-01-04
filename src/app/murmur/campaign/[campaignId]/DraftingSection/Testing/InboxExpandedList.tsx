@@ -192,7 +192,6 @@ const getCanonicalContactName = (
 };
 
 export const InboxExpandedList: FC<InboxExpandedListProps> = ({
-	// eslint-disable-next-line @typescript-eslint/no-unused-vars
 	contacts,
 	allowedSenderEmails,
 	contactByEmail,
@@ -205,6 +204,29 @@ export const InboxExpandedList: FC<InboxExpandedListProps> = ({
 	// Fetch ALL inbound emails (same as InboxSection)
 	const { data: allInboundEmails } = useGetInboundEmails();
 
+	/**
+	 * This component is used throughout the campaign UI (including the bottom/compact view).
+	 * When `allowedSenderEmails`/`contactByEmail` are not provided, we derive them from the
+	 * provided `contacts` to keep this list scoped to the current campaign's inbox.
+	 */
+	const effectiveAllowedSenderEmails = useMemo(() => {
+		// If caller explicitly provided a list (even empty), respect it.
+		if (allowedSenderEmails !== undefined) return allowedSenderEmails;
+		return contacts.map((c) => c.email).filter((email): email is string => Boolean(email));
+	}, [allowedSenderEmails, contacts]);
+
+	const effectiveContactByEmail = useMemo(() => {
+		if (contactByEmail) return contactByEmail;
+		const map: Record<string, ContactWithName> = {};
+		for (const c of contacts) {
+			if (!c.email) continue;
+			const key = c.email.toLowerCase().trim();
+			if (!key) continue;
+			if (!map[key]) map[key] = c;
+		}
+		return map;
+	}, [contactByEmail, contacts]);
+
 	// Special hack for "All" tab: if height is exactly 347px, we apply a thicker 3px border
 	// to match the other elements in that layout. Otherwise standard 2px border.
 	const isAllTab = height === 347;
@@ -214,17 +236,19 @@ export const InboxExpandedList: FC<InboxExpandedListProps> = ({
 	// Filter to only show emails from campaign contacts
 	const inboundEmails = useMemo(() => {
 		if (!allInboundEmails) return [];
-		if (!allowedSenderEmails || allowedSenderEmails.length === 0) {
-			return allInboundEmails;
-		}
-
-		const allowedSet = new Set(allowedSenderEmails.map((e) => e.toLowerCase().trim()));
+		const allowedSet = new Set(
+			(effectiveAllowedSenderEmails || [])
+				.filter((e): e is string => Boolean(e))
+				.map((e) => e.toLowerCase().trim())
+		);
+		// If an allow-list is provided/derived but empty, the campaign-scoped inbox has no visible emails.
+		if (allowedSet.size === 0) return [];
 
 		return allInboundEmails.filter((email) => {
 			const sender = email.sender?.toLowerCase().trim();
 			return sender && allowedSet.has(sender);
 		});
-	}, [allInboundEmails, allowedSenderEmails]);
+	}, [allInboundEmails, effectiveAllowedSenderEmails]);
 
 	const isFullyEmpty = inboundEmails.length === 0;
 	const placeholderBgColor = isFullyEmpty ? '#3D9DC0' : '#5EB6D6';
@@ -326,8 +350,8 @@ export const InboxExpandedList: FC<InboxExpandedListProps> = ({
 						}}
 					>
 						{inboundEmails.map((email) => {
-							const contact = resolveContactForEmail(email, contactByEmail);
-							const contactName = getCanonicalContactName(email, contactByEmail);
+							const contact = resolveContactForEmail(email, effectiveContactByEmail);
+							const contactName = getCanonicalContactName(email, effectiveContactByEmail);
 
 							return (
 								<div

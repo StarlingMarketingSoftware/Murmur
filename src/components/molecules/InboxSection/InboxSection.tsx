@@ -263,14 +263,13 @@ export const InboxSection: FC<InboxSectionProps> = ({
 
 	// If a list of allowed sender emails is provided (e.g. campaign contacts),
 	// hide any inbound emails whose sender address does not match.
-	const normalizedAllowedSenders =
-		allowedSenderEmails && allowedSenderEmails.length > 0
-			? new Set(
-					allowedSenderEmails
-						.filter((email) => !!email)
-						.map((email) => email.toLowerCase().trim())
-			  )
-			: null;
+	const normalizedAllowedSenders = allowedSenderEmails
+		? new Set(
+				allowedSenderEmails
+					.filter((email): email is string => Boolean(email))
+					.map((email) => email.toLowerCase().trim())
+		  )
+		: null;
 
 	const filteredBySender =
 		normalizedAllowedSenders && inboundEmails
