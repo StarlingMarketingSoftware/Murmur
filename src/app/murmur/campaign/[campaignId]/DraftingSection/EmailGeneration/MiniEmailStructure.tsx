@@ -21,6 +21,7 @@ import {
 	FullAutoBodyBlock,
 	type FullAutoProfileFields,
 } from '@/components/molecules/HybridPromptInput/FullAutoBodyBlock';
+import { MiniManualEmailEntry } from './MiniManualEmailEntry';
 
 type MiniIdentityProfile = {
 	name: string;
@@ -1040,7 +1041,10 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 					<div
 						className={cn(
 							'px-0 pb-3 max-[480px]:pb-2',
-							activeTab === 'profile' && 'min-h-full flex flex-col pb-0 max-[480px]:pb-0'
+							activeTab === 'profile' && 'min-h-full flex flex-col pb-0 max-[480px]:pb-0',
+							activeTab !== 'profile' &&
+								draftingMode === 'handwritten' &&
+								'min-h-full flex flex-col pb-0 max-[480px]:pb-0'
 						)}
 					>
 						{/* Mode */}
@@ -1447,151 +1451,157 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 							</div>
 						) : (
 							<>
-								{/* Auto Subject */}
-								<div
-									className={cn(
-										'w-[95%] max-[480px]:w-[89.33vw] mx-auto',
-										// Auto tab spacing (matches design spec):
-										// - Subject bar 33px below header divider
-										// - Body 8px below Subject
-										draftingMode === 'ai' ? 'mt-[33px] mb-[8px]' : 'mt-[9px] mb-3'
-									)}
-								>
-									{isAiSubject ? (
-										// Compact bar (default) that expands to full width on hover when Auto Subject is on
-										<div className="group/subject relative">
-											{/* Collapsed state - shown by default, hidden on hover */}
-											<div className="flex items-center gap-2 group-hover/subject:hidden">
-												<div
-													className={cn(
-														'flex items-center justify-center h-[29px] max-[480px]:h-[24px] rounded-[8px] border-2 border-black overflow-hidden subject-bar w-[94px]'
-													)}
-													style={{ backgroundColor: '#E0E0E0' }}
-												>
-													<span className="font-inter font-medium text-[13px] max-[480px]:text-[11px] whitespace-nowrap text-black subject-label">
-														Subject
-													</span>
-												</div>
-												<span className="font-inter font-normal text-[10px] text-[#000000]">
-													Auto
-												</span>
-											</div>
-
-											{/* Expanded state - hidden by default, shown on hover */}
-											<div
-												className={cn(
-													'hidden group-hover/subject:flex items-center h-[29px] max-[480px]:h-[24px] rounded-[8px] border-2 border-black overflow-hidden subject-bar bg-white w-full'
-												)}
-											>
-												<div
-													className={cn(
-														'pl-2 flex items-center h-full shrink-0 w-[110px] bg-[#E0E0E0]'
-													)}
-												>
-													<span className="font-inter font-semibold text-[13px] max-[480px]:text-[11px] whitespace-nowrap text-black subject-label">
-														Auto Subject
-													</span>
-												</div>
-
-												<button
-													type="button"
-													aria-pressed={isAiSubject}
-													onClick={toggleSubject}
-													className={cn(
-														'relative h-full flex items-center text-[10px] font-inter font-normal transition-colors shrink-0 subject-toggle',
-														'w-[47px] px-2 justify-center text-black bg-[#4ADE80] hover:bg-[#3ECC72] active:bg-[#32BA64]'
-													)}
-												>
-													<span className="absolute left-0 h-full border-l border-black"></span>
-													<span>on</span>
-													<span className="absolute right-0 h-full border-r border-black"></span>
-												</button>
-
-												<div className={cn('flex-grow h-full', 'bg-white')}>
-													<input
-														type="text"
-														className={cn(
-															'w-full h-full !bg-transparent pl-3 pr-3 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 outline-none',
-															// Match Subject label size
-															'text-[13px] leading-none max-[480px]:text-[11px] placeholder:text-[13px] placeholder:leading-none max-[480px]:placeholder:text-[11px]',
-															'!text-[#6B6B6B] italic cursor-not-allowed'
-														)}
-														placeholder="Write manual subject here"
-														disabled={true}
-														value={form.watch('subject') || ''}
-														onChange={(e) =>
-															form.setValue('subject', e.target.value, {
-																shouldDirty: true,
-															})
-														}
-													/>
-												</div>
-											</div>
-										</div>
-									) : (
-										// Full bar when Auto Subject is off
+								{draftingMode === 'handwritten' ? (
+									<MiniManualEmailEntry form={form} />
+								) : (
+									<>
+										{/* Auto Subject */}
 										<div
 											className={cn(
-												'flex items-center h-[29px] max-[480px]:h-[24px] rounded-[8px] border-2 border-black overflow-hidden subject-bar bg-white'
+												'w-[95%] max-[480px]:w-[89.33vw] mx-auto',
+												// Auto tab spacing (matches design spec):
+												// - Subject bar 33px below header divider
+												// - Body 8px below Subject
+												draftingMode === 'ai'
+													? 'mt-[33px] mb-[8px]'
+													: 'mt-[9px] mb-3'
 											)}
 										>
-											<div
-												className={cn(
-													'pl-2 flex items-center h-full shrink-0 w-[96px] bg-white'
-												)}
-											>
-												<span className="font-inter font-semibold text-[13px] max-[480px]:text-[11px] whitespace-nowrap text-black subject-label">
-													Subject
-												</span>
-											</div>
+											{isAiSubject ? (
+												// Compact bar (default) that expands to full width on hover when Auto Subject is on
+												<div className="group/subject relative">
+													{/* Collapsed state - shown by default, hidden on hover */}
+													<div className="flex items-center gap-2 group-hover/subject:hidden">
+														<div
+															className={cn(
+																'flex items-center justify-center h-[29px] max-[480px]:h-[24px] rounded-[8px] border-2 border-black overflow-hidden subject-bar w-[94px]'
+															)}
+															style={{ backgroundColor: '#E0E0E0' }}
+														>
+															<span className="font-inter font-medium text-[13px] max-[480px]:text-[11px] whitespace-nowrap text-black subject-label">
+																Subject
+															</span>
+														</div>
+														<span className="font-inter font-normal text-[10px] text-[#000000]">
+															Auto
+														</span>
+													</div>
 
-											<button
-												type="button"
-												aria-pressed={isAiSubject}
-												onClick={toggleSubject}
-												className={cn(
-													'relative h-full flex items-center text-[10px] font-inter font-normal transition-colors shrink-0 subject-toggle',
-													'w-[80px] px-2 justify-center text-black bg-[#DADAFC] hover:bg-[#C4C4F5] active:bg-[#B0B0E8]'
-												)}
-											>
-												<span className="absolute left-0 h-full border-l border-black"></span>
-												<span>Auto off</span>
-												<span className="absolute right-0 h-full border-r border-black"></span>
-											</button>
+													{/* Expanded state - hidden by default, shown on hover */}
+													<div
+														className={cn(
+															'hidden group-hover/subject:flex items-center h-[29px] max-[480px]:h-[24px] rounded-[8px] border-2 border-black overflow-hidden subject-bar bg-white w-full'
+														)}
+													>
+														<div
+															className={cn(
+																'pl-2 flex items-center h-full shrink-0 w-[110px] bg-[#E0E0E0]'
+															)}
+														>
+															<span className="font-inter font-semibold text-[13px] max-[480px]:text-[11px] whitespace-nowrap text-black subject-label">
+																Auto Subject
+															</span>
+														</div>
 
-											<div className={cn('flex-grow h-full', 'bg-white')}>
-												<input
-													type="text"
+														<button
+															type="button"
+															aria-pressed={isAiSubject}
+															onClick={toggleSubject}
+															className={cn(
+																'relative h-full flex items-center text-[10px] font-inter font-normal transition-colors shrink-0 subject-toggle',
+																'w-[47px] px-2 justify-center text-black bg-[#4ADE80] hover:bg-[#3ECC72] active:bg-[#32BA64]'
+															)}
+														>
+															<span className="absolute left-0 h-full border-l border-black"></span>
+															<span>on</span>
+															<span className="absolute right-0 h-full border-r border-black"></span>
+														</button>
+
+														<div className={cn('flex-grow h-full', 'bg-white')}>
+															<input
+																type="text"
+																className={cn(
+																	'w-full h-full !bg-transparent pl-3 pr-3 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 outline-none',
+																	// Match Subject label size
+																	'text-[13px] leading-none max-[480px]:text-[11px] placeholder:text-[13px] placeholder:leading-none max-[480px]:placeholder:text-[11px]',
+																	'!text-[#6B6B6B] italic cursor-not-allowed'
+																)}
+																placeholder="Write manual subject here"
+																disabled={true}
+																value={form.watch('subject') || ''}
+																onChange={(e) =>
+																	form.setValue('subject', e.target.value, {
+																		shouldDirty: true,
+																	})
+																}
+															/>
+														</div>
+													</div>
+												</div>
+											) : (
+												// Full bar when Auto Subject is off
+												<div
 													className={cn(
-														'w-full h-full !bg-transparent pl-2 pr-3 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 outline-none',
-														// Match Subject label size
-														'text-[13px] leading-none max-[480px]:text-[11px] placeholder:text-[13px] placeholder:leading-none max-[480px]:placeholder:text-[11px]',
-														'!text-black placeholder:!text-black'
+														'flex items-center h-[29px] max-[480px]:h-[24px] rounded-[8px] border-2 border-black overflow-hidden subject-bar bg-white'
 													)}
-													placeholder="Type subject..."
-													disabled={false}
-													value={form.watch('subject') || ''}
-													onChange={(e) =>
-														form.setValue('subject', e.target.value, {
-															shouldDirty: true,
-														})
-													}
-												/>
-											</div>
-										</div>
-									)}
-								</div>
+												>
+													<div
+														className={cn(
+															'pl-2 flex items-center h-full shrink-0 w-[96px] bg-white'
+														)}
+													>
+														<span className="font-inter font-semibold text-[13px] max-[480px]:text-[11px] whitespace-nowrap text-black subject-label">
+															Subject
+														</span>
+													</div>
 
-								{/* Blocks list - overflow visible to show buttons outside */}
-								<div
-									className={cn(
-										'flex flex-col overflow-visible',
-										draftingMode === 'hybrid'
-											? 'gap-[7px]'
-											: 'gap-[25px] max-[480px]:gap-[40px]'
-									)}
-								>
-									{(() => {
+													<button
+														type="button"
+														aria-pressed={isAiSubject}
+														onClick={toggleSubject}
+														className={cn(
+															'relative h-full flex items-center text-[10px] font-inter font-normal transition-colors shrink-0 subject-toggle',
+															'w-[80px] px-2 justify-center text-black bg-[#DADAFC] hover:bg-[#C4C4F5] active:bg-[#B0B0E8]'
+														)}
+													>
+														<span className="absolute left-0 h-full border-l border-black"></span>
+														<span>Auto off</span>
+														<span className="absolute right-0 h-full border-r border-black"></span>
+													</button>
+
+													<div className={cn('flex-grow h-full', 'bg-white')}>
+														<input
+															type="text"
+															className={cn(
+																'w-full h-full !bg-transparent pl-2 pr-3 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 outline-none',
+																// Match Subject label size
+																'text-[13px] leading-none max-[480px]:text-[11px] placeholder:text-[13px] placeholder:leading-none max-[480px]:placeholder:text-[11px]',
+																'!text-black placeholder:!text-black'
+															)}
+															placeholder="Type subject..."
+															disabled={false}
+															value={form.watch('subject') || ''}
+															onChange={(e) =>
+																form.setValue('subject', e.target.value, {
+																	shouldDirty: true,
+																})
+															}
+														/>
+													</div>
+												</div>
+											)}
+										</div>
+
+										{/* Blocks list - overflow visible to show buttons outside */}
+										<div
+											className={cn(
+												'flex flex-col overflow-visible',
+												draftingMode === 'hybrid'
+													? 'gap-[7px]'
+													: 'gap-[25px] max-[480px]:gap-[40px]'
+											)}
+										>
+											{(() => {
 								// Renderers reused below
 								const renderHybridCore = (b: {
 									id: string;
@@ -1903,9 +1913,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 												)}
 												style={{
 													borderColor:
-														(draftingMode === 'handwritten' ||
-															draftingMode === 'hybrid') &&
-														b.type === 'text'
+														draftingMode === 'hybrid' && b.type === 'text'
 															? '#53A25D'
 															: '#000000',
 												}}
@@ -1923,10 +1931,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 																	{blockHint(b.type as HybridBlock)}
 																</span>
 															)}
-															{draftingMode !== 'hybrid' &&
-																!(
-																	draftingMode === 'handwritten' && b.type === 'text'
-																) && (
+															{draftingMode !== 'hybrid' && (
 																	<button
 																		type="button"
 																		className="text-[12px] text-[#b30000] hover:text-red-600"
@@ -2046,9 +2051,9 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 
 								return out;
 							})()}
-						</div>
+										</div>
 								{/* Signature inline spacing (mobile portrait/landscape, and Auto mode per design spec) */}
-								{draftingMode !== 'handwritten' && (
+								{(
 									<div
 										className={cn(
 											// Auto + Hybrid: render inline so Signature sits right below the last block (CTA)
@@ -2329,6 +2334,8 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 											</div>
 										)}
 									</div>
+								)}
+									</>
 								)}
 							</>
 						)}
