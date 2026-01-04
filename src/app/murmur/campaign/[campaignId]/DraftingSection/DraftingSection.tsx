@@ -2159,7 +2159,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													position: 'absolute',
 													top: '115px',
 													left: '-15px',
-													zIndex: 10,
+													zIndex: 30,
 													backgroundColor: '#D6EEEF',
 													border: '2px solid #000000',
 													borderRadius: '7px',
