@@ -1156,7 +1156,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 										className="absolute top-1/2 -translate-y-1/2 z-10 pointer-events-none"
 										style={{
 											left: highlightStyle.left,
-											transition: isInitialRender ? 'none' : 'left 0.25s ease-in-out',
+											transition: isInitialRender || readOnly ? 'none' : 'left 0.25s ease-in-out',
 											opacity: highlightStyle.opacity,
 										}}
 									>

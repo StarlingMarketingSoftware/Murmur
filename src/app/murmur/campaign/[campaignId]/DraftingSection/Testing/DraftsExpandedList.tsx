@@ -519,7 +519,7 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 										!isBottomView && 'p-2',
 										isPreviewed && 'bg-[#FDDEA5]',
 										isSelected && !isPreviewed && 'bg-[#FFDF9F]',
-										isPreviewMode && !isPreviewed && 'hover:bg-[#FFEDCA]'
+										!isSelected && !isPreviewed && 'hover:bg-[#F9E5BA]'
 									)}
 									style={
 										isBottomView

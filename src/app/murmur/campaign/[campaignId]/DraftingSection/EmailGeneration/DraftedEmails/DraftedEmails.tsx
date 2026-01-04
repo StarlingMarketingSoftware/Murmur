@@ -1648,21 +1648,23 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 							const isRejectedTab = props.statusFilter === 'rejected';
 							const actionVerb = isRejectedTab ? 'Regenerate' : 'Send';
 							const confirmLabel = `Click to Confirm and ${actionVerb}`;
-							const actionLabel = hasSelection
-								? `${actionVerb} ${selectedCount} Selected`
-								: actionVerb;
+							const actionLabel = `${actionVerb} ${selectedCount} Selected`;
+
+							// Show just text when nothing is selected
+							if (!hasSelection) {
+								return (
+									<div className="w-full h-full flex items-center justify-center text-black font-inter font-normal text-[17px]">
+										Select Emails to Send
+									</div>
+								);
+							}
 
 							return (
-								(hasSelection && props.isSendingDisabled) ? (
+								props.isSendingDisabled ? (
 									<UpgradeSubscriptionDrawer
 										triggerButtonText={showConfirm ? confirmLabel : actionLabel}
 										buttonVariant="primary"
-										className={cn(
-											'w-full h-full rounded-[4px] border-[3px] text-black font-inter font-normal text-[17px] !flex !items-center !justify-center',
-											hasSelection
-												? '!bg-[#C7F2C9] !border-[#349A37] hover:!bg-[#B9E7BC] cursor-pointer'
-												: '!bg-[#E0E0E0] !border-[#A0A0A0] !cursor-not-allowed !opacity-60 pointer-events-none'
-										)}
+										className="w-full h-full rounded-[4px] border-[3px] text-black font-inter font-normal text-[17px] !flex !items-center !justify-center !bg-[#C7F2C9] !border-[#349A37] hover:!bg-[#B9E7BC] cursor-pointer"
 										message={
 											props.isFreeTrial
 												? `Your free trial subscription does not include the ability to send emails. To send the emails\'ve drafted, please upgrade your subscription to the paid version.`
@@ -1673,14 +1675,8 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 									<div className="w-full h-full rounded-[4px] border-[3px] border-[#000000] flex overflow-hidden">
 										<button
 											type="button"
-											className={cn(
-												'flex-1 h-full flex items-center justify-center text-center text-black font-inter font-normal text-[17px] pl-[89px]',
-												hasSelection
-													? 'bg-[#FFDC9F] hover:bg-[#F4C87E] cursor-pointer'
-													: 'bg-[#FFFFFF] cursor-default'
-											)}
+											className="flex-1 h-full flex items-center justify-center text-center text-black font-inter font-normal text-[17px] pl-[89px] bg-[#FFDC9F] hover:bg-[#F4C87E] cursor-pointer"
 											onClick={async () => {
-												if (!hasSelection) return;
 												if (!showConfirm) {
 													setShowConfirm(true);
 													setTimeout(() => setShowConfirm(false), 10000);
@@ -1693,9 +1689,8 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 													await props.onSend();
 												}
 											}}
-											disabled={!hasSelection}
 										>
-											{hasSelection ? (showConfirm ? confirmLabel : actionLabel) : actionVerb}
+											{showConfirm ? confirmLabel : actionLabel}
 										</button>
 
 										{/* Right section "All" button */}
