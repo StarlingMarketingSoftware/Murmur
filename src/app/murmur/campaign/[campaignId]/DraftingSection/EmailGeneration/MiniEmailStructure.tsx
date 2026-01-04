@@ -2048,22 +2048,167 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 							})()}
 						</div>
 								{/* Signature inline spacing (mobile portrait/landscape, and Auto mode per design spec) */}
-								<div
-									className={cn(
-										// Auto mode: render inline so spacing is relative to Body (not pinned to bottom)
-										draftingMode === 'ai' ? 'block' : 'max-[480px]:block hidden',
-										// Auto tab spacing: Signature 12px below Body
-										draftingMode === 'ai'
-											? 'mt-3'
-											: shouldUseLargeHybridSigGap
-												? 'mt-8'
-												: 'mt-2'
-									)}
-									style={{ display: isMobileLandscape ? 'block' : undefined }}
-								>
-									{draftingMode === 'hybrid' ? (
-										<div className="w-[95%] max-[480px]:w-[89.33vw] mx-auto flex items-start justify-between">
-											<div className="flex-1 mr-2">
+								{draftingMode !== 'handwritten' && (
+									<div
+										className={cn(
+											// Auto + Hybrid: render inline so Signature sits right below the last block (CTA)
+											'block',
+											// Auto tab spacing: Signature 12px below Body
+											draftingMode === 'ai'
+												? 'mt-3'
+												: isMobilePortrait && shouldUseLargeHybridSigGap
+													? 'mt-8'
+													: 'mt-2'
+										)}
+										style={{ display: isMobileLandscape ? 'block' : undefined }}
+									>
+										{draftingMode === 'hybrid' ? (
+											<div className="w-[95%] max-[480px]:w-[89.33vw] mx-auto flex items-start justify-between">
+												<div className="flex-1 mr-2">
+													{isAutoSignature ? (
+														<div className="group/signature relative w-full">
+															{/* Collapsed state - shown by default, hidden on hover */}
+															<div className="flex items-center gap-2 group-hover/signature:hidden">
+																<div
+																	className={cn(
+																		'flex items-center justify-center h-[29px] max-[480px]:h-[24px] rounded-[8px] border-2 border-black overflow-hidden w-[105px]'
+																	)}
+																	style={{ backgroundColor: '#E0E0E0' }}
+																>
+																	<span className="font-inter font-medium text-[13px] max-[480px]:text-[11px] whitespace-nowrap text-black">
+																		Signature
+																	</span>
+																</div>
+																<span className="font-inter font-normal text-[10px] text-[#000000]">
+																	Auto
+																</span>
+															</div>
+
+															{/* Expanded state - hidden by default, shown on hover */}
+															<div
+																className={cn(
+																	'hidden group-hover/signature:flex items-center h-[29px] max-[480px]:h-[24px] rounded-[8px] border-2 border-black overflow-hidden bg-white w-full'
+																)}
+															>
+																<div className="pl-2 flex items-center h-full shrink-0 w-[118px] bg-[#E0E0E0]">
+																	<span className="font-inter font-semibold text-[13px] max-[480px]:text-[11px] whitespace-nowrap text-black">
+																		Auto Signature
+																	</span>
+																</div>
+																<button
+																	type="button"
+																	onClick={() => {
+																		setIsAutoSignature(false);
+																		// Start manual editing from the current signature value.
+																		setManualSignatureValue(signature);
+																		updateSignature(signature);
+																	}}
+																	className={cn(
+																		'relative h-full flex items-center text-[10px] font-inter font-normal transition-colors shrink-0',
+																		'w-[47px] px-2 justify-center text-black bg-[#4ADE80] hover:bg-[#3ECC72] active:bg-[#32BA64]'
+																	)}
+																	aria-label="Auto Signature on"
+																>
+																	<span className="absolute left-0 h-full border-l border-black"></span>
+																	<span>on</span>
+																	<span className="absolute right-0 h-full border-r border-black"></span>
+																</button>
+																<div className={cn('flex-grow h-full', 'bg-white')}>
+																	<input
+																		type="text"
+																		className={cn(
+																			'w-full h-full !bg-transparent pl-3 pr-3 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 outline-none',
+																			// Match Signature label size
+																			'text-[13px] leading-none max-[480px]:text-[11px] placeholder:text-[13px] placeholder:leading-none max-[480px]:placeholder:text-[11px]',
+																			'!text-black placeholder:!text-[#9E9E9E]',
+																			'cursor-not-allowed'
+																		)}
+																		placeholder="Write manual Signature here"
+																		value={signature}
+																		disabled
+																		readOnly
+																	/>
+																</div>
+															</div>
+														</div>
+													) : (
+														/* Manual signature mode: expanded downward with textarea */
+														<div className="w-full rounded-[8px] border-2 border-black overflow-hidden flex flex-col bg-white">
+															{/* Header row */}
+															<div className="flex items-center h-[29px] shrink-0 bg-[#E0E0E0]">
+																<div className="pl-2 flex items-center h-full shrink-0 w-[105px] bg-[#E0E0E0]">
+																	<span className="font-inter font-semibold text-[13px] max-[480px]:text-[11px] whitespace-nowrap text-black">
+																		Signature
+																	</span>
+																</div>
+																<button
+																	type="button"
+																	onClick={() => {
+																		setIsAutoSignature(true);
+																		setManualSignatureValue('');
+																		updateSignature(autoSignatureValueRef.current);
+																	}}
+																	className={cn(
+																		'relative h-full flex items-center text-[10px] font-inter font-normal transition-colors shrink-0',
+																		'w-[80px] px-2 justify-center text-black bg-[#C3BCBC] hover:bg-[#B5AEAE] active:bg-[#A7A0A0]'
+																	)}
+																	aria-label="Auto Signature off"
+																>
+																	<span className="absolute left-0 h-full border-l border-black"></span>
+																	<span>Auto off</span>
+																	<span className="absolute right-0 h-full border-r border-black"></span>
+																</button>
+																<div className="flex-grow h-full bg-[#E0E0E0]" />
+															</div>
+															{/* Divider line */}
+															<div className="w-full h-[1px] bg-black shrink-0" />
+															{/* Text entry area */}
+															<div className="bg-white">
+																<textarea
+																	value={manualSignatureValue}
+																	onChange={(e) => {
+																		setManualSignatureValue(e.target.value);
+																		updateSignature(e.target.value);
+																	}}
+																	className={cn(
+																		'w-full !bg-transparent px-3 py-2 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 resize-none outline-none',
+																		'signature-textarea',
+																		// Match Signature label size
+																		'!text-black placeholder:!text-[#9E9E9E] font-inter text-[13px] max-[480px]:text-[11px] placeholder:text-[13px] max-[480px]:placeholder:text-[11px]'
+																	)}
+																	style={{ height: 66 }}
+																	placeholder="Enter your signature..."
+																/>
+															</div>
+														</div>
+													)}
+												</div>
+												<button
+													type="button"
+													onClick={addTextBlocksBetweenAll}
+													className="w-[30px] h-[30px] shrink-0 rounded-[8px] border-2 border-black hidden max-[480px]:flex items-center justify-center cursor-pointer"
+													style={{
+														backgroundColor: '#A6E2AB',
+														display: isMobileLandscape ? 'flex' : undefined,
+													}}
+												>
+													<svg
+														width="15"
+														height="15"
+														viewBox="0 0 15 15"
+														fill="none"
+														xmlns="http://www.w3.org/2000/svg"
+													>
+														<path
+															d="M7.5 0.5V14.5M0.5 7.5H14.5"
+															stroke="#000000"
+															strokeWidth="1"
+														/>
+													</svg>
+												</button>
+											</div>
+										) : (
+											<div className="w-[95%] max-[480px]:w-[89.33vw] mx-auto">
 												{isAutoSignature ? (
 													<div className="group/signature relative w-full">
 														{/* Collapsed state - shown by default, hidden on hover */}
@@ -2182,156 +2327,16 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 													</div>
 												)}
 											</div>
-											<button
-												type="button"
-												onClick={addTextBlocksBetweenAll}
-												className="w-[30px] h-[30px] shrink-0 rounded-[8px] border-2 border-black flex items-center justify-center cursor-pointer"
-												style={{ backgroundColor: '#A6E2AB' }}
-											>
-												<svg
-													width="15"
-													height="15"
-													viewBox="0 0 15 15"
-													fill="none"
-													xmlns="http://www.w3.org/2000/svg"
-												>
-													<path
-														d="M7.5 0.5V14.5M0.5 7.5H14.5"
-														stroke="#000000"
-														strokeWidth="1"
-													/>
-												</svg>
-											</button>
-										</div>
-									) : (
-										<div className="w-[95%] max-[480px]:w-[89.33vw] mx-auto">
-											{isAutoSignature ? (
-												<div className="group/signature relative w-full">
-													{/* Collapsed state - shown by default, hidden on hover */}
-													<div className="flex items-center gap-2 group-hover/signature:hidden">
-														<div
-															className={cn(
-																'flex items-center justify-center h-[29px] max-[480px]:h-[24px] rounded-[8px] border-2 border-black overflow-hidden w-[105px]'
-															)}
-															style={{ backgroundColor: '#E0E0E0' }}
-														>
-															<span className="font-inter font-medium text-[13px] max-[480px]:text-[11px] whitespace-nowrap text-black">
-																Signature
-															</span>
-														</div>
-														<span className="font-inter font-normal text-[10px] text-[#000000]">
-															Auto
-														</span>
-													</div>
-
-													{/* Expanded state - hidden by default, shown on hover */}
-													<div
-														className={cn(
-															'hidden group-hover/signature:flex items-center h-[29px] max-[480px]:h-[24px] rounded-[8px] border-2 border-black overflow-hidden bg-white w-full'
-														)}
-													>
-														<div className="pl-2 flex items-center h-full shrink-0 w-[118px] bg-[#E0E0E0]">
-															<span className="font-inter font-semibold text-[13px] max-[480px]:text-[11px] whitespace-nowrap text-black">
-																Auto Signature
-															</span>
-														</div>
-														<button
-															type="button"
-															onClick={() => {
-																setIsAutoSignature(false);
-																// Start manual editing from the current signature value.
-																setManualSignatureValue(signature);
-																updateSignature(signature);
-															}}
-															className={cn(
-																'relative h-full flex items-center text-[10px] font-inter font-normal transition-colors shrink-0',
-																'w-[47px] px-2 justify-center text-black bg-[#4ADE80] hover:bg-[#3ECC72] active:bg-[#32BA64]'
-															)}
-															aria-label="Auto Signature on"
-														>
-															<span className="absolute left-0 h-full border-l border-black"></span>
-															<span>on</span>
-															<span className="absolute right-0 h-full border-r border-black"></span>
-														</button>
-														<div className={cn('flex-grow h-full', 'bg-white')}>
-															<input
-																type="text"
-																className={cn(
-																	'w-full h-full !bg-transparent pl-3 pr-3 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 outline-none',
-																		// Match Signature label size
-																		'text-[13px] leading-none max-[480px]:text-[11px] placeholder:text-[13px] placeholder:leading-none max-[480px]:placeholder:text-[11px]',
-																	'!text-black placeholder:!text-[#9E9E9E]',
-																	'cursor-not-allowed'
-																)}
-																placeholder="Write manual Signature here"
-																value={signature}
-																disabled
-																readOnly
-															/>
-														</div>
-													</div>
-												</div>
-											) : (
-												/* Manual signature mode: expanded downward with textarea */
-												<div className="w-full rounded-[8px] border-2 border-black overflow-hidden flex flex-col bg-white">
-													{/* Header row */}
-													<div className="flex items-center h-[29px] shrink-0 bg-[#E0E0E0]">
-														<div className="pl-2 flex items-center h-full shrink-0 w-[105px] bg-[#E0E0E0]">
-															<span className="font-inter font-semibold text-[13px] max-[480px]:text-[11px] whitespace-nowrap text-black">
-																Signature
-															</span>
-														</div>
-														<button
-															type="button"
-															onClick={() => {
-																setIsAutoSignature(true);
-																setManualSignatureValue('');
-																updateSignature(autoSignatureValueRef.current);
-															}}
-															className={cn(
-																'relative h-full flex items-center text-[10px] font-inter font-normal transition-colors shrink-0',
-																'w-[80px] px-2 justify-center text-black bg-[#C3BCBC] hover:bg-[#B5AEAE] active:bg-[#A7A0A0]'
-															)}
-															aria-label="Auto Signature off"
-														>
-															<span className="absolute left-0 h-full border-l border-black"></span>
-															<span>Auto off</span>
-															<span className="absolute right-0 h-full border-r border-black"></span>
-														</button>
-														<div className="flex-grow h-full bg-[#E0E0E0]" />
-													</div>
-													{/* Divider line */}
-													<div className="w-full h-[1px] bg-black shrink-0" />
-													{/* Text entry area */}
-													<div className="bg-white">
-														<textarea
-															value={manualSignatureValue}
-															onChange={(e) => {
-																setManualSignatureValue(e.target.value);
-																updateSignature(e.target.value);
-															}}
-															className={cn(
-																'w-full !bg-transparent px-3 py-2 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 resize-none outline-none',
-																'signature-textarea',
-																	// Match Signature label size
-																	'!text-black placeholder:!text-[#9E9E9E] font-inter text-[13px] max-[480px]:text-[11px] placeholder:text-[13px] max-[480px]:placeholder:text-[11px]'
-															)}
-															style={{ height: 66 }}
-															placeholder="Enter your signature..."
-														/>
-													</div>
-												</div>
-											)}
-										</div>
-									)}
-								</div>
+										)}
+									</div>
+								)}
 							</>
 						)}
 					</div>
 				</div>
 
-				{/* Signature - fixed at bottom (outside scroll) for non-mobile only */}
-				{activeTab !== 'profile' && draftingMode !== 'ai' && (
+				{/* Hybrid mode: keep the + button pinned in the bottom-right corner (desktop) */}
+				{activeTab !== 'profile' && draftingMode === 'hybrid' && (
 					<div
 						className={cn(
 							'px-0 pb-2 max-[480px]:hidden',
@@ -2339,132 +2344,13 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 						)}
 						style={{ display: isMobileLandscape ? 'none' : undefined }}
 					>
-						{draftingMode === 'hybrid' ? (
-							<div className="w-[95%] mx-auto flex items-start justify-between">
-								<div className="flex-1 mr-2">
-									{isAutoSignature ? (
-										<div className="group/signature relative w-full">
-										{/* Collapsed state - shown by default, hidden on hover */}
-										<div className="flex items-center gap-2 group-hover/signature:hidden">
-											<div
-												className={cn(
-													'flex items-center justify-center h-[29px] rounded-[8px] border-2 border-black overflow-hidden w-[105px]'
-												)}
-												style={{ backgroundColor: '#E0E0E0' }}
-											>
-												<span className="font-inter font-medium text-[13px] whitespace-nowrap text-black">
-													Signature
-												</span>
-											</div>
-											<span className="font-inter font-normal text-[10px] text-[#000000]">
-												Auto
-											</span>
-										</div>
-
-										{/* Expanded state - hidden by default, shown on hover */}
-										<div
-											className={cn(
-												'hidden group-hover/signature:flex items-center h-[29px] rounded-[8px] border-2 border-black overflow-hidden bg-white w-full'
-											)}
-										>
-											<div className="pl-2 flex items-center h-full shrink-0 w-[118px] bg-[#E0E0E0]">
-												<span className="font-inter font-semibold text-[13px] whitespace-nowrap text-black">
-													Auto Signature
-												</span>
-											</div>
-											<button
-												type="button"
-												onClick={() => {
-													setIsAutoSignature(false);
-													// Start manual editing from the current signature value.
-													setManualSignatureValue(signature);
-													updateSignature(signature);
-												}}
-												className={cn(
-													'relative h-full flex items-center text-[10px] font-inter font-normal transition-colors shrink-0',
-													'w-[47px] px-2 justify-center text-black bg-[#4ADE80] hover:bg-[#3ECC72] active:bg-[#32BA64]'
-												)}
-												aria-label="Auto Signature on"
-											>
-												<span className="absolute left-0 h-full border-l border-black"></span>
-												<span>on</span>
-												<span className="absolute right-0 h-full border-r border-black"></span>
-											</button>
-											<div className={cn('flex-grow h-full', 'bg-white')}>
-												<input
-													type="text"
-													className={cn(
-														'w-full h-full !bg-transparent pl-3 pr-3 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 outline-none',
-															// Match Signature label size
-															'text-[13px] leading-none placeholder:text-[13px] placeholder:leading-none',
-														'!text-black placeholder:!text-[#9E9E9E]',
-														'cursor-not-allowed'
-													)}
-													placeholder="Write manual Signature here"
-													value={signature}
-													disabled
-													readOnly
-												/>
-											</div>
-										</div>
-									</div>
-								) : (
-									/* Manual signature mode: expanded downward with textarea */
-									<div className="w-full rounded-[8px] border-2 border-black overflow-hidden flex flex-col bg-white">
-										{/* Header row */}
-										<div className="flex items-center h-[29px] shrink-0 bg-[#E0E0E0]">
-											<div className="pl-2 flex items-center h-full shrink-0 w-[105px] bg-[#E0E0E0]">
-												<span className="font-inter font-semibold text-[13px] whitespace-nowrap text-black">
-													Signature
-												</span>
-											</div>
-											<button
-												type="button"
-												onClick={() => {
-													setIsAutoSignature(true);
-													setManualSignatureValue('');
-													updateSignature(autoSignatureValueRef.current);
-												}}
-												className={cn(
-													'relative h-full flex items-center text-[10px] font-inter font-normal transition-colors shrink-0',
-													'w-[80px] px-2 justify-center text-black bg-[#C3BCBC] hover:bg-[#B5AEAE] active:bg-[#A7A0A0]'
-												)}
-												aria-label="Auto Signature off"
-											>
-												<span className="absolute left-0 h-full border-l border-black"></span>
-												<span>Auto off</span>
-												<span className="absolute right-0 h-full border-r border-black"></span>
-											</button>
-											<div className="flex-grow h-full bg-[#E0E0E0]" />
-										</div>
-										{/* Divider line */}
-										<div className="w-full h-[1px] bg-black shrink-0" />
-										{/* Text entry area */}
-										<div className="bg-white">
-											<textarea
-												value={manualSignatureValue}
-												onChange={(e) => {
-													setManualSignatureValue(e.target.value);
-													updateSignature(e.target.value);
-												}}
-												className={cn(
-													'w-full !bg-transparent px-3 py-2 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 resize-none outline-none',
-													'signature-textarea',
-													// Match Signature label size
-													'!text-black placeholder:!text-[#9E9E9E] font-inter text-[13px] placeholder:text-[13px]'
-												)}
-												style={{ height: 66 }}
-												placeholder="Enter your signature..."
-											/>
-										</div>
-									</div>
-								)}
-							</div>
+						<div className="w-[95%] mx-auto flex justify-end">
 							<button
 								type="button"
 								onClick={addTextBlocksBetweenAll}
 								className="w-[30px] h-[30px] rounded-[8px] border-2 border-black flex items-center justify-center cursor-pointer"
 								style={{ backgroundColor: '#A6E2AB' }}
+								aria-label="Add text block"
 							>
 								<svg
 									width="15"
@@ -2473,129 +2359,14 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 									fill="none"
 									xmlns="http://www.w3.org/2000/svg"
 								>
-									<path d="M7.5 0.5V14.5M0.5 7.5H14.5" stroke="#000000" strokeWidth="1" />
+									<path
+										d="M7.5 0.5V14.5M0.5 7.5H14.5"
+										stroke="#000000"
+										strokeWidth="1"
+									/>
 								</svg>
 							</button>
 						</div>
-						) : (
-							<div className="w-[95%] mx-auto">
-								{isAutoSignature ? (
-									<div className="group/signature relative w-full">
-									{/* Collapsed state - shown by default, hidden on hover */}
-									<div className="flex items-center gap-2 group-hover/signature:hidden">
-										<div
-											className={cn(
-												'flex items-center justify-center h-[29px] rounded-[8px] border-2 border-black overflow-hidden w-[105px]'
-											)}
-											style={{ backgroundColor: '#E0E0E0' }}
-										>
-											<span className="font-inter font-medium text-[13px] whitespace-nowrap text-black">
-												Signature
-											</span>
-										</div>
-										<span className="font-inter font-normal text-[10px] text-[#000000]">Auto</span>
-									</div>
-
-									{/* Expanded state - hidden by default, shown on hover */}
-									<div
-										className={cn(
-											'hidden group-hover/signature:flex items-center h-[29px] rounded-[8px] border-2 border-black overflow-hidden bg-white w-full'
-										)}
-									>
-										<div className="pl-2 flex items-center h-full shrink-0 w-[118px] bg-[#E0E0E0]">
-											<span className="font-inter font-semibold text-[13px] whitespace-nowrap text-black">
-												Auto Signature
-											</span>
-										</div>
-										<button
-											type="button"
-											onClick={() => {
-												setIsAutoSignature(false);
-												// Start manual editing from the current signature value.
-												setManualSignatureValue(signature);
-												updateSignature(signature);
-											}}
-											className={cn(
-												'relative h-full flex items-center text-[10px] font-inter font-normal transition-colors shrink-0',
-												'w-[47px] px-2 justify-center text-black bg-[#4ADE80] hover:bg-[#3ECC72] active:bg-[#32BA64]'
-											)}
-											aria-label="Auto Signature on"
-										>
-											<span className="absolute left-0 h-full border-l border-black"></span>
-											<span>on</span>
-											<span className="absolute right-0 h-full border-r border-black"></span>
-										</button>
-										<div className={cn('flex-grow h-full', 'bg-white')}>
-											<input
-												type="text"
-												className={cn(
-													'w-full h-full !bg-transparent pl-3 pr-3 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 outline-none',
-														// Match Signature label size
-														'text-[13px] leading-none placeholder:text-[13px] placeholder:leading-none',
-													'!text-black placeholder:!text-[#9E9E9E]',
-													'cursor-not-allowed'
-												)}
-												placeholder="Write manual Signature here"
-												value={signature}
-												disabled
-												readOnly
-											/>
-										</div>
-									</div>
-								</div>
-							) : (
-								/* Manual signature mode: expanded downward with textarea */
-								<div className="w-full rounded-[8px] border-2 border-black overflow-hidden flex flex-col bg-white">
-									{/* Header row */}
-									<div className="flex items-center h-[29px] shrink-0 bg-[#E0E0E0]">
-										<div className="pl-2 flex items-center h-full shrink-0 w-[105px] bg-[#E0E0E0]">
-											<span className="font-inter font-semibold text-[13px] whitespace-nowrap text-black">
-												Signature
-											</span>
-										</div>
-										<button
-											type="button"
-											onClick={() => {
-												setIsAutoSignature(true);
-												setManualSignatureValue('');
-												updateSignature(autoSignatureValueRef.current);
-											}}
-											className={cn(
-												'relative h-full flex items-center text-[10px] font-inter font-normal transition-colors shrink-0',
-												'w-[80px] px-2 justify-center text-black bg-[#C3BCBC] hover:bg-[#B5AEAE] active:bg-[#A7A0A0]'
-											)}
-											aria-label="Auto Signature off"
-										>
-											<span className="absolute left-0 h-full border-l border-black"></span>
-											<span>Auto off</span>
-											<span className="absolute right-0 h-full border-r border-black"></span>
-										</button>
-										<div className="flex-grow h-full bg-[#E0E0E0]" />
-									</div>
-									{/* Divider line */}
-									<div className="w-full h-[1px] bg-black shrink-0" />
-									{/* Text entry area */}
-									<div className="bg-white">
-										<textarea
-											value={manualSignatureValue}
-											onChange={(e) => {
-												setManualSignatureValue(e.target.value);
-												updateSignature(e.target.value);
-											}}
-											className={cn(
-												'w-full !bg-transparent px-3 py-2 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 resize-none outline-none',
-												'signature-textarea',
-												// Match Signature label size
-												'!text-black placeholder:!text-[#9E9E9E] font-inter text-[13px] placeholder:text-[13px]'
-											)}
-											style={{ height: 66 }}
-											placeholder="Enter your signature..."
-										/>
-									</div>
-								</div>
-							)}
-						</div>
-						)}
 					</div>
 				)}
 
