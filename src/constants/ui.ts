@@ -2,10 +2,17 @@ import { Font } from '@/types';
 
 export const FONT_OPTIONS: Font[] = [
 	'Arial',
+	'serif',
+	'Courier New',
+	'Arial Black',
+	'Arial Narrow',
+	'Garamond',
+	'Georgia',
+	'Tahoma',
+	'Trebuchet MS',
+	'Verdana',
 	'Times New Roman',
 	'Calibri',
-	'Georgia',
-	'Courier New',
 ];
 
 export const DEFAULT_FONT: Font = 'Arial';

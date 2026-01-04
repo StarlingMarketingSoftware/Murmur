@@ -30,6 +30,7 @@ import {
 	removeEmDashes,
 	stripEmailSignatureFromAiMessage,
 } from '@/utils';
+import { injectMurmurDraftSettingsSnapshot } from '@/utils/draftSettings';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Contact, HybridBlock, Identity, Signature } from '@prisma/client';
 import { DraftingMode, DraftingTone, EmailStatus } from '@/constants/prismaEnums';
@@ -172,6 +173,7 @@ export const draftingFormSchema = z.object({
 	isAiSubject: z.boolean().default(true),
 	subject: z.string().default(''),
 	fullAiPrompt: z.string().default(''),
+	bookingFor: z.string().default('Anytime'),
 	hybridPrompt: z.string().default(''),
 	hybridAvailableBlocks: z.array(z.nativeEnum(HybridBlock)),
 	hybridBlockPrompts: z.array(
@@ -203,6 +205,7 @@ export const draftingFormSchema = z.object({
 		.default([]),
 	handwrittenPrompt: z.string().default(''),
 	font: z.enum(FONT_VALUES),
+	fontSize: z.number().optional(),
 	signatureId: z.number().optional(),
 	signature: z.string().optional(),
 	draftingTone: z.nativeEnum(DraftingTone).default(DraftingTone.normal),
@@ -311,6 +314,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			isAiSubject: true,
 			subject: '',
 			fullAiPrompt: '',
+			bookingFor: 'Anytime',
 			hybridPrompt: 'Generate a professional email based on the template below.',
 			hybridAvailableBlocks: [
 				HybridBlock.full_automated,
@@ -326,6 +330,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			savedManualBlocks: [],
 			handwrittenPrompt: '',
 			font: (campaign.font as Font) ?? DEFAULT_FONT,
+			fontSize: 12,
 			signatureId: campaign.signatureId ?? signatures?.[0]?.id,
 			signature: `Thank you,\n${campaign.identity?.name || ''}`,
 			draftingTone: DraftingTone.normal,
@@ -350,6 +355,12 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		isPending: isPendingCallGemini,
 		mutateAsync: callGemini,
 	} = useGemini({
+		suppressToasts: true,
+	});
+
+	// Separate Gemini mutation for prompt scoring / suggestions so it doesn't disable
+	// "Generate Test" while the user is evaluating their prompt.
+	const { mutateAsync: callGeminiForScoring } = useGemini({
 		suppressToasts: true,
 	});
 
@@ -613,13 +624,24 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			);
 		});
 
+		const messageHtml = convertAiResponseToRichTextEmail(
+			combinedTextBlocks,
+			values.font,
+			signatureText || null
+		);
+
+		const messageWithSettings = injectMurmurDraftSettingsSnapshot(messageHtml, {
+			version: 1,
+			values: {
+				...values,
+				// Ensure the stored snapshot always has a concrete signature string.
+				signature: signatureText,
+			},
+		});
+
 		return {
 			subject: values.subject || '',
-			message: convertAiResponseToRichTextEmail(
-				combinedTextBlocks,
-				values.font,
-				signatureText || null
-			),
+			message: messageWithSettings,
 			campaignId: campaign.id,
 			status: EmailStatus.draft,
 			contactId: contact.id,
@@ -660,6 +682,12 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			website: identityProfile.website ?? undefined,
 		};
 
+		const bookingForNormalized = (form.getValues('bookingFor') ?? '').trim();
+		const bookingForContext =
+			bookingForNormalized && bookingForNormalized !== 'Anytime'
+				? `\n\nBooking For:\n${bookingForNormalized}`
+				: '';
+
 		const userPrompt = `Sender information (user profile):\n${stringifyJsonSubset(
 			senderProfile,
 			['name', 'bandName', 'genre', 'area', 'bio', 'website']
@@ -675,7 +703,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			'website',
 			'phone',
 			'metadata',
-		])}\n\nUser Goal:\n${prompt}`;
+		])}${bookingForContext}\n\nUser Goal:\n${prompt}`;
 
 		// Debug logging for Full AI path
 		console.log(
@@ -935,26 +963,49 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 				GEMINI_MODEL_OPTIONS.gemini25Flash ||
 				GEMINI_MODEL_OPTIONS.gemini2Flash;
 
-			const scoringPrompt = `You are evaluating the quality of a musician's email-writing prompt that will be used to generate outreach emails to venues and promoters.
+			const scoringPrompt = `You are evaluating the quality of a musician's email-writing PROMPT that will be used to generate outreach emails to venues and promoters.
 
-Analyze the PROMPT text below and assign a single numeric quality score between 60 and 100 inclusive, where:
-- 60–69 = Keep Going
-- 70–79 = Good
-- 80–89 = Great
-- 90–100 = Excellent
+Return a single integer score between 70 and 98 inclusive. This scale intentionally skews high:
+- 70–74 = Keep Going
+- 75–82 = Good
+- 83–90 = Great
+- 91–96 = Excellent
+- 97–98 = Exceptional
 
-			Look for specific details like, do they have specifics about themselves? Did the artist add an EPK?
-			Judge by how many details they have about themselves. 
+BIAS / CALIBRATION:
+- Start from a default baseline of 88 for a typical usable prompt and adjust up/down.
+- This prompt is supplementary “custom instructions” (not the drafting system prompt). Optimize for simple, short add-ons.
+- Default to high scores unless the prompt is extremely empty/vague (e.g., literally “hello”).
+- Do NOT punish brevity. A single great descriptive sentence can be 97–98.
 
-			Return ONLY a valid JSON object with this exact shape and no extra commentary or formatting:
-			{"score": 75, "label": "Good", "suggestion1": "First one-sentence suggestion to improve the prompt.", "suggestion2": "Second one-sentence suggestion to improve the prompt.", "suggestion3": "Third one-sentence suggestion to improve the prompt."}
-			DON'T USE THE WORD "AI" IN THE SUGGESTIONS.
-			Each suggestion MUST be a single, complete sentence (no bullet points) and should be as specific and actionable as possible. Each suggestion should be unique and different from the others.`;
+
+SCORING PRIORITIES (MOST IMPORTANT FIRST):
+1) Descriptive language: reward vivid, specific ADJECTIVES/ADVERBS that shape tone, vibe, and style (e.g., warm, concise, energetic, moody, intimate, high-energy, cinematic).
+2) Useful constraints: clear tone, length, structure, and CTA expectations.
+3) Context & fit: anything that helps match the venue/promoter and the artist honestly.
+
+IMPORTANT RULES:
+- Do NOT reward length. A single concise, highly descriptive sentence can absolutely score 97–98.
+- Prefer adjective-rich specificity over noun lists. Proper nouns and generic nouns add little unless paired with strong descriptors.
+- Be comfortable giving very high scores when the prompt is brief but vivid and directive.
+
+Return ONLY a valid JSON object with this exact shape and no extra commentary or formatting:
+{"score": 88, "label": "Great", "suggestion1": "First one-sentence suggestion to improve the prompt.", "suggestion2": "Second one-sentence suggestion to improve the prompt.", "suggestion3": "Third one-sentence suggestion to improve the prompt."}
+DON'T USE THE WORD "AI" IN THE SUGGESTIONS.
+SUGGESTION STYLE (VERY IMPORTANT):
+- Suggestions are *add-on instructions* the user could paste directly into their custom instructions.
+- Keep each suggestion SHORT: one line, no bullets, no paragraphing, ideally 6–14 words.
+- Prefer patterns like:
+  - Try phrasing: "…"
+  - Add detail about X (…)
+  - Specify tone/length/structure (…)
+- Optimize for wording improvements (“try this phrasing”) or missing specifics (“be more detailed about X”), not rewriting the whole prompt.
+Each suggestion MUST be a single sentence (no bullet points), specific, and actionable. Each suggestion should be unique and different from the others.`;
 
 			const scoringContent = `PROMPT:\n${trimmed}`;
 
 			try {
-				const raw = await callGemini({
+				const raw = await callGeminiForScoring({
 					model: scoringModel,
 					prompt: scoringPrompt,
 					content: scoringContent,
@@ -996,9 +1047,9 @@ Analyze the PROMPT text below and assign a single numeric quality score between 
 					rawScore = Number.isFinite(numeric) ? numeric : null;
 				}
 
-				// Fallback: pull first 60–100-ish number out of the text
+				// Fallback: pull first 70–100-ish number out of the text
 				if (rawScore === null) {
-					const match = cleaned.match(/\b(6[0-9]|7[0-9]|8[0-9]|9[0-9]|100)\b/);
+					const match = cleaned.match(/\b(7[0-9]|8[0-9]|9[0-9]|100)\b/);
 					if (match) {
 						rawScore = Number(match[0]);
 					}
@@ -1012,8 +1063,17 @@ Analyze the PROMPT text below and assign a single numeric quality score between 
 					return;
 				}
 
+				const MIN_PROMPT_SCORE = 70;
+				const MAX_PROMPT_SCORE = 98;
+
 				let score = Math.round(rawScore);
-				score = Math.max(60, Math.min(100, score));
+				score = Math.max(MIN_PROMPT_SCORE, Math.min(MAX_PROMPT_SCORE, score));
+
+				// Skew higher while preserving endpoints (70 stays 70, 98 stays 98).
+				const t = (score - MIN_PROMPT_SCORE) / (MAX_PROMPT_SCORE - MIN_PROMPT_SCORE); // 0..1
+				const skewed = Math.pow(t, 0.55); // lower exponent skews upward more
+				score = Math.round(MIN_PROMPT_SCORE + skewed * (MAX_PROMPT_SCORE - MIN_PROMPT_SCORE));
+				score = Math.max(MIN_PROMPT_SCORE, Math.min(MAX_PROMPT_SCORE, score));
 
 				const labelFromModel =
 					typeof parsed.label === 'string' && parsed.label.trim().length > 0
@@ -1021,13 +1081,15 @@ Analyze the PROMPT text below and assign a single numeric quality score between 
 						: undefined;
 
 				const fallbackLabel =
-					score >= 90
+					score >= 97
+						? 'Exceptional'
+						: score >= 91
 						? 'Excellent'
-						: score >= 80
+						: score >= 83
 						? 'Great'
-						: score >= 70
+						: score >= 75
 						? 'Good'
-						: 'Fair';
+						: 'Keep Going';
 
 				// Extract up to three suggestions from the model response
 				const rawSuggestions: string[] = [];
@@ -1083,7 +1145,7 @@ Analyze the PROMPT text below and assign a single numeric quality score between 
 				setPromptSuggestions([]);
 			}
 		},
-		[callGemini]
+		[callGeminiForScoring]
 	);
 
 	/**
@@ -1131,7 +1193,7 @@ Each suggestion MUST be a single, complete sentence (no bullet points) and shoul
 			const scoringContent = `EMAIL TEXT:\n${trimmed}`;
 
 			try {
-				const raw = await callGemini({
+				const raw = await callGeminiForScoring({
 					model: scoringModel,
 					prompt: critiquePrompt,
 					content: scoringContent,
@@ -1260,7 +1322,7 @@ Each suggestion MUST be a single, complete sentence (no bullet points) and shoul
 				setPromptSuggestions([]);
 			}
 		},
-		[callGemini]
+		[callGeminiForScoring]
 	);
 
 	/**
@@ -1282,18 +1344,35 @@ Each suggestion MUST be a single, complete sentence (no bullet points) and shoul
 		setIsUpscalingPrompt(true);
 
 		try {
-			const upscaleSystemPrompt = `You are an expert at improving email prompts. Your task is to take a user's prompt for generating outreach emails and make it significantly better.
+			const upscaleSystemPrompt = `You are an expert at refining custom instructions for an AI email generator.
 
-INSTRUCTIONS:
-1. You're a musicians trying to get yourself booked for a show by writing an email.
-2. The output should be the improved prompt ONLY - no explanations, no JSON, no markdown
+CONTEXT:
+- The user is a musician trying to book shows at venues
+- The AI already handles the main email generation (intro, research on venue, call to action)
+- These "Custom Instructions" are ADDITIONAL guidance to fine-tune the AI's output
+- They are NOT the full email prompt - just small tweaks and preferences
 
-The improved prompt should result in more personalized, engaging, and effective emails.`;
+YOUR TASK:
+Improve the user's custom instructions by making them clearer, more specific, and more effective.
 
-			const response = await callGemini({
+RULES:
+1. Keep it SHORT - these are supplementary instructions, not a full prompt
+2. Focus on tone, style preferences, specific things to mention/avoid
+3. Do NOT write full email templates or lengthy instructions
+4. Output the improved instructions ONLY - no explanations, no JSON, no markdown
+5. If the input is already good, make only minor refinements
+
+IT IT'S LIKE ONE SENTENCE, MAYBE MAKE IT TWO. BUT DON'T MAKE IT CRAZY LONG
+
+EXAMPLES OF GOOD CUSTOM INSTRUCTIONS:
+- "Keep tone casual but professional. Mention we're touring through their area in March."
+- "Emphasize our draw numbers. Don't mention other venues by name."
+- "Be direct and concise. We prefer Tuesday-Thursday shows."`;
+
+			const response = await callGeminiForScoring({
 				model: GEMINI_MODEL_OPTIONS.gemini25Flash,
 				prompt: upscaleSystemPrompt,
-				content: `Current prompt to improve:\n\n${currentPrompt}`,
+				content: `User's custom instructions to improve:\n\n${currentPrompt}`,
 			});
 
 			// Clean the response - remove any markdown or extra formatting
@@ -1304,26 +1383,31 @@ The improved prompt should result in more personalized, engaging, and effective 
 				.replace(/^```(?:\w+)?\s*/i, '')
 				.replace(/\s*```$/i, '');
 
-			if (improvedPrompt && improvedPrompt.length > currentPrompt.length * 0.5) {
-				// Update the full_automated block with the improved prompt
-				const updatedBlocks = blocks.map((block) => {
-					if (block.type === 'full_automated') {
-						return { ...block, value: improvedPrompt };
-					}
-					return block;
-				});
+			// For custom instructions, just check we got a reasonable response (at least 10 chars)
+			// Shorter can be valid since we're refining, not expanding
+			if (improvedPrompt && improvedPrompt.length >= 10) {
+				// Find the index of the full_automated block and update its value directly
+				// Using the specific field path ensures the registered input syncs properly
+				const fullAutomatedIndex = blocks.findIndex((b) => b.type === 'full_automated');
+				if (fullAutomatedIndex !== -1) {
+					form.setValue(
+						`hybridBlockPrompts.${fullAutomatedIndex}.value` as const,
+						improvedPrompt,
+						{
+							shouldDirty: true,
+							shouldValidate: true,
+						}
+					);
+				}
 
-				form.setValue('hybridBlockPrompts', updatedBlocks, {
-					shouldDirty: true,
-					shouldValidate: true,
-				});
+				toast.success('Instructions refined!');
 
-				toast.success('Prompt upscaled successfully!');
-
-				// Re-score the new prompt
-				await scoreFullAutomatedPrompt(improvedPrompt);
+				// Set score to 95-97 range after upscaling (guaranteed good result)
+				const upscaledScore = 95 + Math.floor(Math.random() * 3); // 95, 96, or 97
+				setPromptQualityScore(upscaledScore);
+				setPromptQualityLabel('Excellent');
 			} else {
-				toast.error('Failed to generate an improved prompt. Please try again.');
+				toast.error('Failed to refine instructions. Please try again.');
 			}
 		} catch (error) {
 			console.error('[Upscale Prompt] Error:', error);
@@ -1331,7 +1415,7 @@ The improved prompt should result in more personalized, engaging, and effective 
 		} finally {
 			setIsUpscalingPrompt(false);
 		}
-	}, [callGemini, form, scoreFullAutomatedPrompt]);
+	}, [callGeminiForScoring, form]);
 
 	/**
 	 * Undo the upscaled prompt by restoring the previous value.
@@ -1343,17 +1427,19 @@ The improved prompt should result in more personalized, engaging, and effective 
 		}
 
 		const blocks = form.getValues('hybridBlockPrompts');
-		const updatedBlocks = blocks.map((block) => {
-			if (block.type === 'full_automated') {
-				return { ...block, value: previousPromptValue };
-			}
-			return block;
-		});
-
-		form.setValue('hybridBlockPrompts', updatedBlocks, {
-			shouldDirty: true,
-			shouldValidate: true,
-		});
+		// Find the index of the full_automated block and update its value directly
+		// Using the specific field path ensures the registered input syncs properly
+		const fullAutomatedIndex = blocks.findIndex((b) => b.type === 'full_automated');
+		if (fullAutomatedIndex !== -1) {
+			form.setValue(
+				`hybridBlockPrompts.${fullAutomatedIndex}.value` as const,
+				previousPromptValue,
+				{
+					shouldDirty: true,
+					shouldValidate: true,
+				}
+			);
+		}
 
 		// Re-score the restored prompt
 		scoreFullAutomatedPrompt(previousPromptValue);
@@ -1668,13 +1754,25 @@ The improved prompt should result in more personalized, engaging, and effective 
 							parsedDraft.subject = values.subject || parsedDraft.subject;
 						}
 
+						const draftMessageHtml = convertAiResponseToRichTextEmail(
+							processedMessage,
+							values.font,
+							signatureText || null
+						);
+						const draftMessageWithSettings = injectMurmurDraftSettingsSnapshot(
+							draftMessageHtml,
+							{
+								version: 1,
+								values: {
+									...values,
+									signature: signatureText,
+								},
+							}
+						);
+
 						await createEmail({
 							subject: parsedDraft.subject,
-							message: convertAiResponseToRichTextEmail(
-								processedMessage,
-								values.font,
-								signatureText || null
-							),
+							message: draftMessageWithSettings,
 							campaignId: campaign.id,
 							status: 'draft' as EmailStatus,
 							contactId: recipient.id,
@@ -2037,6 +2135,7 @@ The improved prompt should result in more personalized, engaging, and effective 
 				isAiSubject: campaign.isAiSubject ?? true,
 				subject: campaign.subject ?? '',
 				fullAiPrompt: campaign.fullAiPrompt ?? '',
+				bookingFor: 'Anytime',
 				hybridPrompt:
 					campaign.hybridPrompt ??
 					'Generate a professional email based on the template below.',

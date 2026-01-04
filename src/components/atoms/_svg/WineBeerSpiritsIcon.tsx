@@ -1,13 +1,21 @@
-import React from 'react';
+import React, { FC } from 'react';
 
-export const WineBeerSpiritsIcon = () => {
+interface WineBeerSpiritsIconProps {
+	size?: number;
+	className?: string;
+}
+
+export const WineBeerSpiritsIcon: FC<WineBeerSpiritsIconProps> = ({ size = 33, className }) => {
+	// Original viewBox is -2 -5 37 47, aspect ratio is approximately 37/47 ≈ 0.787
+	const height = Math.round(size * (47 / 37));
 	return (
 		<svg
-			width="33"
-			height="39"
+			width={size}
+			height={height}
 			viewBox="-2 -5 37 47"
 			fill="none"
 			xmlns="http://www.w3.org/2000/svg"
+			className={className}
 		>
 			<mask id="path-1-inside-1_350_116" fill="white">
 				<path d="M20.4624 8.29297L20.6333 8.29688C22.3859 8.38564 23.7796 9.83478 23.7798 11.6094V30.6826C23.7798 32.5146 22.2944 34 20.4624 34H16.3159C14.4842 33.9997 12.9995 32.5144 12.9995 30.6826V11.6094C12.9997 9.77774 14.4843 8.29323 16.3159 8.29297H16.3169V0H20.4624V8.29297Z" />

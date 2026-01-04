@@ -13,12 +13,20 @@ import {
 import { useGetUsedContactIds } from '@/hooks/queryHooks/useContacts';
 import { ContactWithName } from '@/types/contact';
 import { useIsMobile } from '@/hooks/useIsMobile';
+import { isRestaurantTitle, isCoffeeShopTitle, isMusicVenueTitle, isMusicFestivalTitle, isWeddingPlannerTitle, isWeddingVenueTitle, isWineBeerSpiritsTitle, getWineBeerSpiritsLabel } from '@/utils/restaurantTitle';
+import { WeddingPlannersIcon } from '@/components/atoms/_svg/WeddingPlannersIcon';
+import { RestaurantsIcon } from '@/components/atoms/_svg/RestaurantsIcon';
+import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
+import { FestivalsIcon } from '@/components/atoms/_svg/FestivalsIcon';
+import { MusicVenuesIcon } from '@/components/atoms/_svg/MusicVenuesIcon';
+import { WineBeerSpiritsIcon } from '@/components/atoms/_svg/WineBeerSpiritsIcon';
 
 interface SentEmailsProps {
 	emails: EmailWithRelations[];
 	isPendingEmails: boolean;
 	onContactClick?: (contact: ContactWithName | null) => void;
 	onContactHover?: (contact: ContactWithName | null) => void;
+	onEmailHover?: (email: EmailWithRelations | null) => void;
 	goToDrafts?: () => void;
 	goToWriting?: () => void;
 	goToSearch?: () => void;
@@ -34,6 +42,7 @@ export const SentEmails: FC<SentEmailsProps> = ({
 	isPendingEmails,
 	onContactClick,
 	onContactHover,
+	onEmailHover,
 	goToDrafts,
 	goToWriting,
 	goToSearch,
@@ -65,7 +74,13 @@ export const SentEmails: FC<SentEmailsProps> = ({
 			goToSearch={goToSearch}
 			isMobile={isMobile}
 		>
-			<div className="overflow-visible w-full flex flex-col gap-2 items-center">
+			<div
+				className="overflow-visible w-full flex flex-col gap-2 items-center"
+				onMouseLeave={() => {
+					onContactHover?.(null);
+					onEmailHover?.(null);
+				}}
+			>
 				{emails.map((email) => {
 					const contact = email.contact;
 					const contactName = contact
@@ -99,12 +114,10 @@ export const SentEmails: FC<SentEmailsProps> = ({
 							)}
 							style={isMobile ? { width: mobileEmailRowWidth } : undefined}
 							onMouseEnter={() => {
+								onEmailHover?.(email);
 								if (contactForResearch) {
 									onContactHover?.(contactForResearch);
 								}
-							}}
-							onMouseLeave={() => {
-								onContactHover?.(null);
 							}}
 							onClick={() => {
 								if (contactForResearch) {
@@ -135,12 +148,63 @@ export const SentEmails: FC<SentEmailsProps> = ({
 								isMobile ? "top-[4px] right-[4px]" : "top-[6px] right-[4px]"
 							)}>
 								{contactTitle ? (
-									<div className={cn(
-										"rounded-[6px] px-2 flex items-center bg-[#E8EFFF] border border-black overflow-hidden",
-										isMobile ? "h-[17px] max-w-[140px]" : "h-[21px] w-[240px]"
-									)}>
+									<div
+										className={cn(
+											"rounded-[6px] px-2 flex items-center gap-1 border border-black overflow-hidden",
+											isMobile ? "h-[17px] max-w-[140px]" : "h-[21px] w-[240px]"
+										)}
+										style={{
+											backgroundColor: isRestaurantTitle(contactTitle)
+												? '#C3FBD1'
+												: isCoffeeShopTitle(contactTitle)
+													? '#D6F1BD'
+													: isMusicVenueTitle(contactTitle)
+														? '#B7E5FF'
+														: isMusicFestivalTitle(contactTitle)
+															? '#C1D6FF'
+															: (isWeddingPlannerTitle(contactTitle) || isWeddingVenueTitle(contactTitle))
+																? '#FFF2BC'
+																: isWineBeerSpiritsTitle(contactTitle)
+																	? '#BFC4FF'
+																	: '#E8EFFF',
+										}}
+									>
+										{isRestaurantTitle(contactTitle) && (
+											<RestaurantsIcon size={isMobile ? 10 : 14} />
+										)}
+										{isCoffeeShopTitle(contactTitle) && (
+											<CoffeeShopsIcon size={8} />
+										)}
+										{isMusicVenueTitle(contactTitle) && (
+											<MusicVenuesIcon size={isMobile ? 10 : 14} className="flex-shrink-0" />
+										)}
+										{isMusicFestivalTitle(contactTitle) && (
+											<FestivalsIcon size={isMobile ? 10 : 14} className="flex-shrink-0" />
+										)}
+										{(isWeddingPlannerTitle(contactTitle) || isWeddingVenueTitle(contactTitle)) && (
+											<WeddingPlannersIcon size={14} />
+										)}
+										{isWineBeerSpiritsTitle(contactTitle) && (
+											<WineBeerSpiritsIcon size={isMobile ? 10 : 14} className="flex-shrink-0" />
+										)}
 										<ScrollableText
-											text={contactTitle}
+											text={
+												isRestaurantTitle(contactTitle)
+													? 'Restaurant'
+													: isCoffeeShopTitle(contactTitle)
+														? 'Coffee Shop'
+														: isMusicVenueTitle(contactTitle)
+															? 'Music Venue'
+															: isMusicFestivalTitle(contactTitle)
+																? 'Music Festival'
+																: isWeddingPlannerTitle(contactTitle)
+																	? 'Wedding Planner'
+																	: isWeddingVenueTitle(contactTitle)
+																		? 'Wedding Venue'
+																		: isWineBeerSpiritsTitle(contactTitle)
+																			? getWineBeerSpiritsLabel(contactTitle) ?? contactTitle
+																			: contactTitle
+											}
 											className={cn(
 												"text-black leading-none",
 												isMobile ? "text-[9px]" : "text-[10px]"

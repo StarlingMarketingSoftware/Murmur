@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 
 import { useCampaignDetail } from './useCampaignDetail';
 import { CampaignPageSkeleton } from '@/components/molecules/CampaignPageSkeleton/CampaignPageSkeleton';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { urls } from '@/constants/urls';
 import Link from 'next/link';
 import { cn } from '@/utils';
@@ -14,15 +14,23 @@ import { useMe } from '@/hooks/useMe';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import LeftArrow from '@/components/atoms/_svg/LeftArrow';
 import RightArrow from '@/components/atoms/_svg/RightArrow';
+import BottomArrowIcon from '@/components/atoms/_svg/BottomArrowIcon';
+import { SearchIconDesktop } from '@/components/atoms/_svg/SearchIconDesktop';
+import SearchMap from '@/components/atoms/_svg/SearchMap';
+import BottomFolderIcon from '@/components/atoms/_svg/BottomFolderIcon';
+import BottomHomeIcon from '@/components/atoms/_svg/BottomHomeIcon';
 import nextDynamic from 'next/dynamic';
+import { CampaignsTable } from '@/components/organisms/_tables/CampaignsTable/CampaignsTable';
 import { CampaignHeaderBox } from '@/components/molecules/CampaignHeaderBox/CampaignHeaderBox';
 import { useEditCampaign } from '@/hooks/queryHooks/useCampaigns';
 import { useGetContacts } from '@/hooks/queryHooks/useContacts';
 import { useGetEmails } from '@/hooks/queryHooks/useEmails';
 import { useCreateIdentity, useGetIdentities } from '@/hooks/queryHooks/useIdentities';
 import { EmailStatus } from '@/constants/prismaEnums';
+import { useQueryClient } from '@tanstack/react-query';
+import { HoverDescriptionProvider } from '@/contexts/HoverDescriptionContext';
 
-type ViewType = 'search' | 'contacts' | 'testing' | 'drafting' | 'sent' | 'inbox' | 'all';
+type ViewType = 'contacts' | 'testing' | 'drafting' | 'sent' | 'inbox' | 'all';
 
 // Transition duration in ms - fast enough to feel instant, still smooth
 const TRANSITION_DURATION = 180;
@@ -61,6 +69,7 @@ const Murmur = () => {
 	}, []);
 	const { campaign, isPendingCampaign, setIsIdentityDialogOpen, isIdentityDialogOpen } =
 		useCampaignDetail();
+	const router = useRouter();
 	const isMobile = useIsMobile();
 
 	const searchParams = useSearchParams();
@@ -77,6 +86,22 @@ const Murmur = () => {
 	const { mutateAsync: editCampaign } = useEditCampaign({ suppressToasts: true });
 	const { mutateAsync: createIdentity } = useCreateIdentity({ suppressToasts: true });
 	const autoEnsureIdentityOnceRef = useRef(false);
+	const queryClient = useQueryClient();
+	const hasRefetchedContactsRef = useRef(false);
+
+	// Refetch contacts when returning from map search (origin=search) to ensure newly added contacts are shown
+	useEffect(() => {
+		if (cameFromSearch && campaign && !hasRefetchedContactsRef.current) {
+			hasRefetchedContactsRef.current = true;
+			// Invalidate all contacts and userContactLists queries to force fresh data
+			// This marks queries as stale so they refetch when accessed
+			queryClient.invalidateQueries({ queryKey: ['contacts'] });
+			queryClient.invalidateQueries({ queryKey: ['userContactLists'] });
+			// Also immediately refetch any active queries
+			queryClient.refetchQueries({ queryKey: ['contacts'], type: 'active' });
+			queryClient.refetchQueries({ queryKey: ['userContactLists'], type: 'active' });
+		}
+	}, [cameFromSearch, campaign, queryClient]);
 
 	// If we landed here without an identity:
 	// - Normal flow: force the IdentityDialog (existing behavior)
@@ -157,12 +182,44 @@ const Murmur = () => {
 		if (tabParam === 'contacts') return 'contacts';
 		if (tabParam === 'drafting') return 'drafting';
 		if (tabParam === 'sent') return 'sent';
-		if (tabParam === 'search') return 'search';
+		// Legacy/deeplink support: the campaign no longer has an in-page Search tab.
+		// If someone lands on ?tab=search, fall back to Contacts.
+		if (tabParam === 'search') return 'contacts';
 		if (tabParam === 'all') return 'all';
 		return 'testing';
 	};
 	
 	const [activeView, setActiveViewInternal] = useState<ViewType>(getInitialView());
+	
+	// State for top campaigns dropdown
+	const [showTopCampaignsDropdown, setShowTopCampaignsDropdown] = useState(false);
+	
+	// State for right box icon selection ('info' or 'circle')
+	const [selectedRightBoxIcon, setSelectedRightBoxIcon] = useState<'info' | 'circle'>('info');
+	const topCampaignsDropdownRef = useRef<HTMLDivElement>(null);
+	const topCampaignsFolderButtonRef = useRef<HTMLButtonElement>(null);
+	
+	// Close dropdown when clicking outside (but not on the folder button itself)
+	useEffect(() => {
+		if (!showTopCampaignsDropdown) return;
+		
+		const handleClickOutside = (event: MouseEvent) => {
+			const target = event.target as Node;
+			// Don't close if clicking on the folder button (let the toggle handle it)
+			if (topCampaignsFolderButtonRef.current?.contains(target)) {
+				return;
+			}
+			if (
+				topCampaignsDropdownRef.current &&
+				!topCampaignsDropdownRef.current.contains(target)
+			) {
+				setShowTopCampaignsDropdown(false);
+			}
+		};
+		
+		document.addEventListener('mousedown', handleClickOutside);
+		return () => document.removeEventListener('mousedown', handleClickOutside);
+	}, [showTopCampaignsDropdown]);
 	
 	// Track previous view for crossfade transitions
 	const [previousView, setPreviousView] = useState<ViewType | null>(null);
@@ -205,16 +262,12 @@ const Murmur = () => {
 	const [isNarrowestDesktop, setIsNarrowestDesktop] = useState(false);
 	// Hide right panel when arrows would overlap with it (below 1522px)
 	const [hideRightPanel, setHideRightPanel] = useState(false);
-	// Hide right panel on search tab at wider breakpoint (below 1796px)
-	const [hideRightPanelOnSearch, setHideRightPanelOnSearch] = useState(false);
 	// Hide right panel on all tab at breakpoint (below 1665px)
 	const [hideRightPanelOnAll, setHideRightPanelOnAll] = useState(false);
 	// Hide right panel on inbox tab at breakpoint (below 1681px)
 	const [hideRightPanelOnInbox, setHideRightPanelOnInbox] = useState(false);
 	// Hide arrows when they would overlap with content boxes (below 1317px)
 	const [hideArrowsAtBreakpoint, setHideArrowsAtBreakpoint] = useState(false);
-	// Hide arrows on search tab at wider breakpoint (below 1557px)
-	const [hideArrowsOnSearch, setHideArrowsOnSearch] = useState(false);
 	// Hide arrows on all tab at breakpoint (at or below 1396px)
 	const [hideArrowsOnAll, setHideArrowsOnAll] = useState(false);
 	// Hide arrows on inbox tab at breakpoint (below 1476px)
@@ -226,11 +279,9 @@ const Murmur = () => {
 			setIsNarrowDesktop(width >= 952 && width < 1280);
 			setIsNarrowestDesktop(width < 952);
 			setHideRightPanel(width < 1522);
-			setHideRightPanelOnSearch(width < 1796);
 			setHideRightPanelOnAll(width <= 1665);
 			setHideRightPanelOnInbox(width < 1681);
 			setHideArrowsAtBreakpoint(width < 1317);
-			setHideArrowsOnSearch(width < 1557);
 			setHideArrowsOnAll(width <= 1396);
 			setHideArrowsOnInbox(width < 1476);
 		};
@@ -259,29 +310,26 @@ const Murmur = () => {
 
 	// Hide fixed arrows when in narrow desktop + testing view (arrows show next to draft button instead)
 	// or when width < 1317px to prevent overlap with content boxes
-	// or when on search tab and width < 1557px
 	// or when on all tab and width <= 1396px
-	// or when on inbox tab and width < 1476px
+	// or when on inbox/sent tab and width < 1476px
 	const hideFixedArrows =
 		(activeView === 'testing' && isNarrowDesktop) ||
 		hideArrowsAtBreakpoint ||
-		(activeView === 'search' && hideArrowsOnSearch) ||
 		(activeView === 'all' && hideArrowsOnAll) ||
-		(activeView === 'inbox' && hideArrowsOnInbox);
+		((activeView === 'inbox' || activeView === 'sent') && hideArrowsOnInbox);
 
 	// Tab navigation order
-	const tabOrder: Array<'search' | 'contacts' | 'testing' | 'drafting' | 'sent' | 'inbox' | 'all'> = [
-		'search',
+	const tabOrder: ViewType[] = [
 		'contacts',
 		'testing',
-		'drafting',
-		'sent',
-		'inbox',
 		'all',
+		'drafting',
+		'inbox',
 	];
+	const getTabOrderView = (view: ViewType): ViewType => (view === 'sent' ? 'inbox' : view);
 
 	const goToPreviousTab = () => {
-		const currentIndex = tabOrder.indexOf(activeView);
+		const currentIndex = tabOrder.indexOf(getTabOrderView(activeView));
 		if (currentIndex > 0) {
 			setActiveView(tabOrder[currentIndex - 1]);
 		} else {
@@ -291,7 +339,7 @@ const Murmur = () => {
 	};
 
 	const goToNextTab = () => {
-		const currentIndex = tabOrder.indexOf(activeView);
+		const currentIndex = tabOrder.indexOf(getTabOrderView(activeView));
 		if (currentIndex < tabOrder.length - 1) {
 			setActiveView(tabOrder[currentIndex + 1]);
 		} else {
@@ -328,6 +376,18 @@ const Murmur = () => {
 		}
 	};
 
+	const handleOpenDashboardSearchForCampaign = useCallback(() => {
+		if (!campaign) return;
+
+		const searchName = campaign?.userContactLists?.[0]?.name || campaign?.name || '';
+		const pendingSearch = searchName ? `[Booking] ${searchName}`.trim() : '';
+		if (pendingSearch && typeof window !== 'undefined') {
+			sessionStorage.setItem('murmur_pending_search', pendingSearch);
+		}
+
+		router.push(`${urls.murmur.dashboard.index}?fromCampaignId=${campaign.id}`);
+	}, [campaign, router]);
+
 	if (isPendingCampaign || !campaign) {
 		return silentLoad ? null : <CampaignPageSkeleton />;
 	}
@@ -339,8 +399,35 @@ const Murmur = () => {
 	// or while the full-screen User Settings dialog is open. This prevents any visual "glimpses" and
 	// ensures a premium, smooth transition with no scale effects.
 	const shouldHideContent = isIdentityDialogOpen || !campaign.identityId;
+
+	// Writing + Contacts + Drafts + Sent + Inbox + All tab vertical alignment:
+	// Place the top of the main content box exactly 159px from the top of the page
+	// (only in the standard desktop header layout).
+	//
+	// Notes:
+	// - The campaign header row is a fixed 50px tall.
+	// - DraftingSection contains a small 4px spacer div at the very top (mb-[4px]).
+	// - The default content spacing below the header is mt-6 (24px).
+	const WRITING_BOX_TOP_PX = 159;
+	const CAMPAIGN_HEADER_HEIGHT_PX = 50;
+	const DRAFTING_SECTION_TOP_SPACER_PX = 4;
+	const DEFAULT_CONTENT_TOP_MARGIN_PX = 24;
+	const writingContentTopMarginPx =
+		WRITING_BOX_TOP_PX - CAMPAIGN_HEADER_HEIGHT_PX - DRAFTING_SECTION_TOP_SPACER_PX; // 105px
+	const writingTabShiftPx = writingContentTopMarginPx - DEFAULT_CONTENT_TOP_MARGIN_PX; // 81px
+	const shouldApplyWritingTopShift =
+		(activeView === 'testing' ||
+			activeView === 'contacts' ||
+			activeView === 'drafting' ||
+			activeView === 'sent' ||
+			activeView === 'inbox' ||
+			activeView === 'all') &&
+		!isMobile &&
+		!isNarrowestDesktop;
+	const fixedNavArrowsTopPx = 355 + (shouldApplyWritingTopShift ? writingTabShiftPx : 0);
 	return (
-		<div className="min-h-screen">
+		<HoverDescriptionProvider enabled={selectedRightBoxIcon === 'info'}>
+			<div className="min-h-screen relative">
 			{/* Left navigation arrow - absolute position (hidden in narrow desktop + testing) */}
 			{!hideFixedArrows && (
 				<button
@@ -349,7 +436,7 @@ const Murmur = () => {
 					className="absolute z-50 bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity"
 					style={{
 						left: '33px',
-						top: '467px',
+						top: `${fixedNavArrowsTopPx}px`,
 					}}
 					aria-label="Previous tab"
 				>
@@ -365,12 +452,131 @@ const Murmur = () => {
 					className="absolute z-50 bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity"
 					style={{
 						right: '33px',
-						top: '467px',
+						top: `${fixedNavArrowsTopPx}px`,
 					}}
 					aria-label="Next tab"
 				>
 					<RightArrow />
 				</button>
+			)}
+
+			{/* Desktop top box (477 x 42, 1px stroke #929292, 10px radius) */}
+			{!isMobile && !isNarrowestDesktop && (
+				<div
+					data-slot="campaign-top-box-wrapper"
+					className="absolute inset-x-0 top-16 flex justify-center pointer-events-none"
+				>
+					<div className="relative">
+						{/* Left box - 124 x 42px, 30px to the left of search box */}
+						<div
+							data-slot="campaign-left-box"
+							className="pointer-events-auto absolute right-full top-0 mr-[30px] w-[124px] h-[42px] box-border border border-[#929292] rounded-[10px] overflow-hidden flex items-center justify-center gap-[33px]"
+						>
+							<button
+								ref={topCampaignsFolderButtonRef}
+								type="button"
+								onClick={() => setShowTopCampaignsDropdown((prev) => !prev)}
+								className={cn(
+									"flex items-center justify-center bg-transparent border-0 p-0 cursor-pointer transition-opacity",
+									showTopCampaignsDropdown ? "opacity-100" : "opacity-40 hover:opacity-100"
+								)}
+								aria-label="Toggle campaigns dropdown"
+							>
+								<BottomFolderIcon width={30} height={15} className="text-black" />
+							</button>
+							<button
+								type="button"
+								data-hover-description="Back to Home Button"
+								onClick={() => {
+									if (typeof window !== 'undefined') {
+										window.location.assign(urls.murmur.dashboard.index);
+									}
+								}}
+								className="flex items-center justify-center bg-transparent border-0 p-0 cursor-pointer transition-opacity opacity-40 hover:opacity-100 active:opacity-100"
+								aria-label="Go to dashboard"
+							>
+								<BottomHomeIcon width={20} height={19} className="text-black" />
+							</button>
+						</div>
+						{/* Campaigns dropdown positioned below the left box, left-aligned with content */}
+						{showTopCampaignsDropdown && (
+							<div
+								ref={topCampaignsDropdownRef}
+								data-slot="campaign-top-dropdown"
+								className="pointer-events-auto fixed top-[116px] left-[300px] z-[60]"
+							>
+								<div className="bg-[#EDEDED] rounded-[12px] overflow-hidden w-[891px] h-[242px] border-2 border-[#8C8C8C]">
+									<CampaignsTable />
+								</div>
+							</div>
+						)}
+						<button
+							type="button"
+							data-slot="campaign-top-box"
+							aria-label="Open dashboard search for this campaign"
+							title="Search for more contacts"
+							data-hover-description="Hop back in to the map, Add some more contacts to your campaign"
+							onClick={handleOpenDashboardSearchForCampaign}
+							className="group relative pointer-events-auto w-[477px] max-w-[calc(100vw-32px)] h-[42px] box-border border border-[#929292] hover:border-black hover:border-2 rounded-[10px] overflow-hidden transition-[color,border-color,border-width] duration-150 cursor-pointer"
+						>
+							<SearchMap
+								aria-hidden="true"
+								width="100%"
+								height="100%"
+								viewBox="1 1 475.184 39.877"
+								preserveAspectRatio="none"
+								rectStroke="none"
+								rectStrokeWidth={0}
+								rectRx={10}
+								className="absolute inset-0 w-full h-full opacity-40 group-hover:opacity-100 transition-opacity duration-150"
+							/>
+							<div className="absolute right-3 top-1/2 -translate-y-1/2 flex z-10 text-[#929292] group-hover:text-black transition-colors duration-150">
+								<SearchIconDesktop stroke="currentColor" />
+							</div>
+						</button>
+						{/* Right box - 105 x 42px, 36px to the right of search box */}
+						<div
+							data-slot="campaign-right-box"
+							className="pointer-events-auto absolute left-full top-0 ml-[36px] w-[105px] h-[42px] box-border border border-[#929292] rounded-[10px] overflow-hidden flex items-center justify-center gap-[14px]"
+						>
+							{/* Left icon - italic "i" in circle */}
+							<button
+								type="button"
+								onClick={() => setSelectedRightBoxIcon('info')}
+								className={cn(
+									"w-[35px] h-[35px] flex items-center justify-center bg-transparent border rounded-[8px] cursor-pointer transition-all",
+									selectedRightBoxIcon === 'info'
+										? "border-[#929292]"
+										: "border-transparent"
+								)}
+								aria-label="Turn info on"
+							>
+								<svg width="13" height="13" viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg">
+									<g opacity="0.4">
+										<path d="M6.22656 0.25C9.53383 0.250077 12.2029 2.85379 12.2031 6.05078C12.2031 9.24793 9.53396 11.8525 6.22656 11.8525C2.9191 11.8525 0.25 9.24798 0.25 6.05078C0.250198 2.85375 2.91922 0.25 6.22656 0.25Z" stroke="black" strokeWidth="0.5"/>
+										<path d="M8.05656 2.82696C7.8419 2.82696 7.68856 2.75796 7.59656 2.61996C7.53523 2.54329 7.50456 2.44363 7.50456 2.32096C7.50456 2.07563 7.61956 1.87629 7.84956 1.72296C8.01823 1.63096 8.17156 1.58496 8.30956 1.58496C8.53956 1.58496 8.70056 1.65396 8.79256 1.79196C8.8539 1.86863 8.88456 1.96829 8.88456 2.09096C8.88456 2.33629 8.7619 2.53563 8.51656 2.68896C8.37856 2.78096 8.22523 2.82696 8.05656 2.82696ZM4.05456 11.682C3.90123 11.682 3.7709 11.6513 3.66356 11.59C3.57156 11.5286 3.52556 11.4136 3.52556 11.245C3.52556 11.0303 3.57923 10.7773 3.68656 10.486C3.80923 10.1946 3.93956 9.90329 4.07756 9.61196C4.2309 9.32063 4.3459 9.08296 4.42256 8.89896C4.5299 8.68429 4.66023 8.40829 4.81356 8.07096C4.98223 7.71829 5.13556 7.38863 5.27356 7.08196C5.4269 6.75996 5.53423 6.53763 5.59556 6.41496C5.3809 6.64496 5.12023 6.93629 4.81356 7.28896C4.52223 7.62629 4.24623 7.95596 3.98556 8.27796C3.7249 8.59996 3.52556 8.85296 3.38756 9.03696C3.34156 9.09829 3.30323 9.12896 3.27256 9.12896C3.2419 9.12896 3.22656 9.09063 3.22656 9.01396C3.22656 8.89129 3.2649 8.77629 3.34156 8.66896C3.6329 8.30096 3.9549 7.88696 4.30756 7.42696C4.67556 6.96696 5.00523 6.54529 5.29656 6.16196C5.5879 5.76329 5.7719 5.50263 5.84856 5.37996C6.01723 5.34929 6.26256 5.30329 6.58456 5.24196C6.9219 5.18063 7.1519 5.09629 7.27456 4.98896C7.32056 4.94296 7.36656 4.91996 7.41256 4.91996C7.44323 4.91996 7.45856 4.95063 7.45856 5.01196C7.4739 5.05796 7.45856 5.11163 7.41256 5.17296C7.32056 5.28029 7.15956 5.54096 6.92956 5.95496C6.69956 6.36896 6.45423 6.82896 6.19356 7.33496C5.94823 7.82563 5.71823 8.27029 5.50356 8.66896C5.2889 9.08296 5.1049 9.48163 4.95156 9.86496C4.79823 10.2483 4.72156 10.5243 4.72156 10.693C4.72156 10.9076 4.8289 11.015 5.04356 11.015C5.2429 11.015 5.4959 10.8923 5.80256 10.647C6.12456 10.4016 6.44656 10.1103 6.76856 9.77296C7.09056 9.42029 7.37423 9.09829 7.61956 8.80696C7.69623 8.71496 7.78823 8.60763 7.89556 8.48496C8.01823 8.34696 8.0949 8.26263 8.12556 8.23196C8.15623 8.26263 8.17156 8.31629 8.17156 8.39296C8.15623 8.50029 8.1179 8.60763 8.05656 8.71496C7.99523 8.80696 7.9339 8.89129 7.87256 8.96796C7.55056 9.36663 7.1979 9.78063 6.81456 10.21C6.43123 10.624 6.00956 10.9766 5.54956 11.268C5.08956 11.544 4.59123 11.682 4.05456 11.682Z" fill="black"/>
+									</g>
+								</svg>
+							</button>
+							{/* Right icon - empty circle */}
+							<button
+								type="button"
+								onClick={() => setSelectedRightBoxIcon('circle')}
+								className={cn(
+									"w-[35px] h-[35px] flex items-center justify-center bg-transparent border rounded-[8px] cursor-pointer transition-all",
+									selectedRightBoxIcon === 'circle'
+										? "border-[#929292]"
+										: "border-transparent"
+								)}
+								aria-label="Turn info off"
+							>
+								<svg width="13" height="13" viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg" opacity="0.4">
+									<path d="M6.22656 0.25C9.53383 0.250077 12.2029 2.85379 12.2031 6.05078C12.2031 9.24793 9.53396 11.8525 6.22656 11.8525C2.9191 11.8525 0.25 9.24798 0.25 6.05078C0.250198 2.85375 2.91922 0.25 6.22656 0.25Z" stroke="black" strokeWidth="0.5"/>
+								</svg>
+							</button>
+						</div>
+					</div>
+				</div>
 			)}
 
 			{/* Header row with Back to Home link, centered tabs, and Clerk icon (from layout) */}
@@ -413,20 +619,17 @@ const Murmur = () => {
 					</Link>
 
 					{/* View tabs - centered in header (hidden at narrowest breakpoint and on mobile) */}
-					<div className={cn("flex gap-12 mobile-landscape-hide", (isMobile || isNarrowestDesktop) && "hidden")}>
-						<button
-							type="button"
-							className={cn(
-								'font-inter text-[17px] font-medium max-[480px]:text-[12px] leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
-								activeView === 'search'
-									? 'text-black'
-									: 'text-[#6B6B6B] hover:text-black'
-							)}
-							onClick={() => setActiveView('search')}
+					<div
+						className={cn(
+							'absolute inset-0 flex items-center justify-center pointer-events-none mobile-landscape-hide',
+							(isMobile || isNarrowestDesktop) && 'hidden'
+						)}
+					>
+						<div
+							className="pointer-events-auto grid w-[524px] max-w-full grid-cols-5 items-center justify-items-center"
+							data-hover-description-suppress="true"
 						>
-							Search
-						</button>
-						<button
+							<button
 							type="button"
 							className={cn(
 								'font-inter text-[17px] font-medium max-[480px]:text-[12px] leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
@@ -437,8 +640,8 @@ const Murmur = () => {
 							onClick={() => setActiveView('contacts')}
 						>
 							Contacts
-						</button>
-						<button
+							</button>
+							<button
 							type="button"
 							className={cn(
 								'font-inter text-[17px] font-medium max-[480px]:text-[12px] leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
@@ -449,8 +652,28 @@ const Murmur = () => {
 							onClick={() => setActiveView('testing')}
 						>
 							Writing
-						</button>
-						<button
+							</button>
+							<button
+							type="button"
+							aria-label="All"
+							title="All"
+							className={cn(
+								'font-inter text-[17px] font-medium max-[480px]:text-[12px] leading-none bg-transparent p-0 m-0 border-0 cursor-pointer inline-flex items-center justify-center',
+								activeView === 'all'
+									? 'text-black'
+									: 'text-[#6B6B6B] hover:text-black'
+							)}
+							onClick={() => setActiveView('all')}
+						>
+							<BottomArrowIcon
+								aria-hidden="true"
+								focusable="false"
+								width={20}
+								height={14}
+								className="block translate-y-[1px]"
+							/>
+							</button>
+							<button
 							type="button"
 							className={cn(
 								'font-inter text-[17px] font-medium max-[480px]:text-[12px] leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
@@ -461,43 +684,49 @@ const Murmur = () => {
 							onClick={() => setActiveView('drafting')}
 						>
 							Drafts
-						</button>
-						<button
-							type="button"
-							className={cn(
-								'font-inter text-[17px] font-medium max-[480px]:text-[12px] leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
-								activeView === 'sent'
-									? 'text-black'
-									: 'text-[#6B6B6B] hover:text-black'
-							)}
-							onClick={() => setActiveView('sent')}
-						>
-							Sent
-						</button>
-						<button
-							type="button"
-							className={cn(
-								'font-inter text-[17px] font-medium max-[480px]:text-[12px] leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
-								activeView === 'inbox'
-									? 'text-black'
-									: 'text-[#6B6B6B] hover:text-black'
-							)}
-							onClick={() => setActiveView('inbox')}
-						>
-							Inbox
-						</button>
-						<button
-							type="button"
-							className={cn(
-								'font-inter text-[17px] font-medium max-[480px]:text-[12px] leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
-								activeView === 'all'
-									? 'text-black'
-									: 'text-[#6B6B6B] hover:text-black'
-							)}
-							onClick={() => setActiveView('all')}
-						>
-							All
-						</button>
+							</button>
+							<div className="relative group">
+								<button
+								type="button"
+								className={cn(
+									'font-inter text-[17px] font-medium max-[480px]:text-[12px] leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
+									activeView === 'inbox'
+										? 'text-black'
+										: 'text-[#6B6B6B] hover:text-black'
+								)}
+								onClick={() => setActiveView('inbox')}
+							>
+								Inbox
+								</button>
+								{/* Hover bridge: keeps the "Sent" bubble open while moving the cursor down */}
+								<span
+								aria-hidden="true"
+								className={cn(
+									'absolute left-1/2 -translate-x-1/2 top-full z-40',
+									'hidden group-hover:block group-focus-within:block',
+									'w-[110px] h-[56px]',
+									'bg-transparent cursor-pointer'
+								)}
+							/>
+								<button
+								type="button"
+								aria-label="Sent"
+								title="Sent"
+								onClick={() => setActiveView('sent')}
+								className={cn(
+									'absolute left-1/2 -translate-x-1/2 top-full mt-[6px] z-50',
+									'hidden group-hover:flex group-focus-within:flex',
+									'w-[54px] h-[27px] rounded-[8px]',
+									'bg-[#E4EBE6]/90',
+									'items-center justify-center',
+									'font-inter text-[17px] font-medium',
+									activeView === 'sent' ? 'text-black' : 'text-[#929292]'
+								)}
+							>
+								Sent
+								</button>
+							</div>
+						</div>
 					</div>
 
 				{/* Mobile header - campaign title and tabs */}
@@ -637,19 +866,10 @@ const Murmur = () => {
 					{/* View tabs - shown below header box at narrowest breakpoint (< 952px) */}
 					{!isMobile && isNarrowestDesktop && (
 						<div className="flex justify-center mb-4">
-							<div className="flex gap-6">
-								<button
-									type="button"
-									className={cn(
-										'font-inter text-[14px] font-medium leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
-										activeView === 'search'
-											? 'text-black'
-											: 'text-[#6B6B6B] hover:text-black'
-									)}
-									onClick={() => setActiveView('search')}
-								>
-									Search
-								</button>
+						<div
+							className="grid w-[524px] max-w-full grid-cols-5 items-center justify-items-center"
+							data-hover-description-suppress="true"
+						>
 								<button
 									type="button"
 									className={cn(
@@ -676,6 +896,26 @@ const Murmur = () => {
 								</button>
 								<button
 									type="button"
+									aria-label="All"
+									title="All"
+									className={cn(
+										'font-inter text-[14px] font-medium leading-none bg-transparent p-0 m-0 border-0 cursor-pointer inline-flex items-center justify-center',
+										activeView === 'all'
+											? 'text-black'
+											: 'text-[#6B6B6B] hover:text-black'
+									)}
+									onClick={() => setActiveView('all')}
+								>
+									<BottomArrowIcon
+										aria-hidden="true"
+										focusable="false"
+										width={18}
+										height={12}
+										className="block translate-y-[1px]"
+									/>
+								</button>
+								<button
+									type="button"
 									className={cn(
 										'font-inter text-[14px] font-medium leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
 										activeView === 'drafting'
@@ -686,47 +926,59 @@ const Murmur = () => {
 								>
 									Drafts
 								</button>
-								<button
-									type="button"
-									className={cn(
-										'font-inter text-[14px] font-medium leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
-										activeView === 'sent'
-											? 'text-black'
-											: 'text-[#6B6B6B] hover:text-black'
-									)}
-									onClick={() => setActiveView('sent')}
-								>
-									Sent
-								</button>
-								<button
-									type="button"
-									className={cn(
-										'font-inter text-[14px] font-medium leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
-										activeView === 'inbox'
-											? 'text-black'
-											: 'text-[#6B6B6B] hover:text-black'
-									)}
-									onClick={() => setActiveView('inbox')}
-								>
-									Inbox
-								</button>
-								<button
-									type="button"
-									className={cn(
-										'font-inter text-[14px] font-medium leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
-										activeView === 'all'
-											? 'text-black'
-											: 'text-[#6B6B6B] hover:text-black'
-									)}
-									onClick={() => setActiveView('all')}
-								>
-									All
-								</button>
+								<div className="relative group">
+									<button
+										type="button"
+										className={cn(
+											'font-inter text-[14px] font-medium leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
+											activeView === 'inbox'
+												? 'text-black'
+												: 'text-[#6B6B6B] hover:text-black'
+										)}
+										onClick={() => setActiveView('inbox')}
+									>
+										Inbox
+									</button>
+									{/* Hover bridge: keeps the "Sent" bubble open while moving the cursor down */}
+									<span
+										aria-hidden="true"
+										className={cn(
+											'absolute left-1/2 -translate-x-1/2 top-full z-40',
+											'hidden group-hover:block group-focus-within:block',
+											'w-[110px] h-[56px]',
+											'bg-transparent cursor-pointer'
+										)}
+									/>
+									<button
+										type="button"
+										aria-label="Sent"
+										title="Sent"
+										onClick={() => setActiveView('sent')}
+										className={cn(
+											'absolute left-1/2 -translate-x-1/2 top-full mt-[6px] z-50',
+											'hidden group-hover:flex group-focus-within:flex',
+											'w-[54px] h-[27px] rounded-[8px]',
+											'bg-[#E4EBE6]/90',
+											'items-center justify-center',
+											'font-inter text-[17px] font-medium',
+											activeView === 'sent' ? 'text-black' : 'text-[#929292]'
+										)}
+									>
+										Sent
+									</button>
+								</div>
 							</div>
 						</div>
 					)}
 
-					<div className="mt-6 flex justify-center">
+					<div
+						className={cn('flex justify-center', !shouldApplyWritingTopShift && 'mt-6')}
+						style={
+							shouldApplyWritingTopShift
+								? { marginTop: `${writingContentTopMarginPx}px` }
+								: undefined
+						}
+					>
 						{/* Crossfade transition container */}
 						<div className="relative w-full isolate">
 							{/* Determine if both views share the same research panel position */}
@@ -743,13 +995,15 @@ const Murmur = () => {
 											<DraftingSection
 												campaign={campaign}
 												view={activeView}
-												autoOpenProfileTabWhenIncomplete={
-													cameFromSearch || previousView === 'search'
-												}
+												autoOpenProfileTabWhenIncomplete={cameFromSearch}
 												goToDrafting={() => setActiveView('drafting')}
 												goToAll={() => setActiveView('all')}
 												goToWriting={() => setActiveView('testing')}
-												onGoToSearch={() => setActiveView('search')}
+												onGoToSearch={() => {
+													if (typeof window !== 'undefined') {
+														window.location.assign(urls.murmur.dashboard.index);
+													}
+												}}
 												goToContacts={() => setActiveView('contacts')}
 												goToInbox={() => setActiveView('inbox')}
 												goToSent={() => setActiveView('sent')}
@@ -778,13 +1032,15 @@ const Murmur = () => {
 												<DraftingSection
 													campaign={campaign}
 													view={previousView}
-													autoOpenProfileTabWhenIncomplete={
-														cameFromSearch || previousView === 'search'
-													}
+													autoOpenProfileTabWhenIncomplete={cameFromSearch}
 													goToDrafting={() => setActiveView('drafting')}
 													goToAll={() => setActiveView('all')}
 													goToWriting={() => setActiveView('testing')}
-													onGoToSearch={() => setActiveView('search')}
+													onGoToSearch={() => {
+														if (typeof window !== 'undefined') {
+															window.location.assign(urls.murmur.dashboard.index);
+														}
+													}}
 													goToContacts={() => setActiveView('contacts')}
 													goToInbox={() => setActiveView('inbox')}
 													goToSent={() => setActiveView('sent')}
@@ -1249,9 +1505,13 @@ const Murmur = () => {
 				</div>
 			</div>
 
-			{/* Right side panel - hidden on mobile, when width < 1522px, on search tab when width < 1796px, on all tab when width <= 1665px, or on inbox tab when width < 1681px */}
-			{!isMobile && !hideRightPanel && !(activeView === 'search' && hideRightPanelOnSearch) && !(activeView === 'all' && hideRightPanelOnAll) && !(activeView === 'inbox' && hideRightPanelOnInbox) && (
-				<CampaignRightPanel view={activeView} onTabChange={setActiveView} />
+			{/* Right side panel - hidden on mobile, when width < 1522px, on all tab when width <= 1665px, or on inbox tab when width < 1681px */}
+			{!isMobile && !hideRightPanel && !(activeView === 'all' && hideRightPanelOnAll) && !(activeView === 'inbox' && hideRightPanelOnInbox) && (
+				<CampaignRightPanel
+					view={activeView}
+					onTabChange={setActiveView}
+					className={shouldApplyWritingTopShift ? 'translate-y-[81px]' : undefined}
+				/>
 			)}
 
 			{/* Mobile bottom navigation panel */}
@@ -1278,7 +1538,8 @@ const Murmur = () => {
 					</button>
 				</div>
 			)}
-		</div>
+			</div>
+		</HoverDescriptionProvider>
 	);
 };
 

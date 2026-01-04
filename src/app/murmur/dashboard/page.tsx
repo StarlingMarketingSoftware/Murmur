@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { FC, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { gsap } from 'gsap';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { createPortal, flushSync } from 'react-dom';
@@ -18,6 +18,7 @@ import { MusicVenuesIcon } from '@/components/atoms/_svg/MusicVenuesIcon';
 import { WineBeerSpiritsIcon } from '@/components/atoms/_svg/WineBeerSpiritsIcon';
 import { FestivalsIcon } from '@/components/atoms/_svg/FestivalsIcon';
 import { RestaurantsIcon } from '@/components/atoms/_svg/RestaurantsIcon';
+import { isRestaurantTitle, isCoffeeShopTitle, isMusicVenueTitle, isMusicFestivalTitle, isWeddingPlannerTitle, isWeddingVenueTitle, isWineBeerSpiritsTitle, getWineBeerSpiritsLabel } from '@/utils/restaurantTitle';
 import { WeddingPlannersIcon } from '@/components/atoms/_svg/WeddingPlannersIcon';
 import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
 import { RadioStationsIcon } from '@/components/atoms/_svg/RadioStationsIcon';
@@ -36,7 +37,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { useClerk } from '@clerk/nextjs';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { useDebounce } from '@/hooks/useDebounce';
-import { useGetLocations } from '@/hooks/queryHooks/useContacts';
+import { useGetLocations, useBatchUpdateContacts } from '@/hooks/queryHooks/useContacts';
 import { useMe } from '@/hooks/useMe';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 import { getStateAbbreviation } from '@/utils/string';
@@ -50,7 +51,10 @@ import {
 	ContactResearchHorizontalStrip,
 } from '@/components/molecules/ContactResearchPanel/ContactResearchPanel';
 import { CampaignsInboxView } from '@/components/molecules/CampaignsInboxView/CampaignsInboxView';
-import { useGetCampaigns } from '@/hooks/queryHooks/useCampaigns';
+import { useGetCampaign, useGetCampaigns } from '@/hooks/queryHooks/useCampaigns';
+import { useEditUserContactList } from '@/hooks/queryHooks/useUserContactLists';
+import { useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 
 const DEFAULT_STATE_SUGGESTIONS = [
 	{
@@ -274,7 +278,7 @@ const getCompactMapResearchPanelHeightPxForParsed = (metadata: string): number |
 
 const MAP_RESULTS_SEARCH_TRAY_WHAT_ICON_BY_LABEL: Record<
 	string,
-	{ backgroundColor: string; Icon: () => ReactNode }
+	{ backgroundColor: string; Icon: FC<{ size?: number; className?: string }> }
 > = {
 	'Radio Stations': { backgroundColor: '#56DA73', Icon: RadioStationsIcon },
 	'Music Venues': { backgroundColor: '#71C9FD', Icon: MusicVenuesIcon },
@@ -334,6 +338,23 @@ const DashboardContent = () => {
 	const isMobile = useIsMobile();
 	const { data: campaigns } = useGetCampaigns();
 	const hasCampaigns = campaigns && campaigns.length > 0;
+	const queryClient = useQueryClient();
+
+	// If we navigated here from a campaign, enable "Add to Campaign" mode.
+	const fromCampaignIdParam = searchParams.get('fromCampaignId')?.trim() || '';
+	const isAddToCampaignMode = Boolean(fromCampaignIdParam);
+	// Persisted (URL) search + view state for the normal dashboard flow so refresh keeps the user
+	// in the same results view (map/table) instead of resetting back to the initial search screen.
+	const dashboardViewParam = searchParams.get('view')?.trim() || '';
+	const dashboardSearchParam = searchParams.get('search')?.trim() || '';
+	// Persisted (URL) search + view state for the "from campaign" flow so refresh keeps the user
+	// in the correct results view without affecting the normal dashboard entry.
+	const fromCampaignViewParam = searchParams.get('fromCampaignView')?.trim() || '';
+	const fromCampaignSearchParam = searchParams.get('fromCampaignSearch')?.trim() || '';
+	const { data: fromCampaign, isPending: isPendingFromCampaign } = useGetCampaign(fromCampaignIdParam);
+	const addToCampaignUserContactListId = fromCampaign?.userContactLists?.[0]?.id;
+	const { mutateAsync: editUserContactList, isPending: isPendingAddToCampaign } =
+		useEditUserContactList({ suppressToasts: true });
 
 	// Add body class when on mobile with empty dashboard to hide global Clerk button
 	useEffect(() => {
@@ -350,12 +371,63 @@ const DashboardContent = () => {
 	const [whyValue, setWhyValue] = useState('');
 	const [whatValue, setWhatValue] = useState('');
 	const [whereValue, setWhereValue] = useState('');
+	const [isWhyDropdownOpen, setIsWhyDropdownOpen] = useState(false);
+	const whyDropdownRef = useRef<HTMLDivElement>(null);
+	const [isWhatDropdownOpen, setIsWhatDropdownOpen] = useState(false);
+	const whatDropdownRef = useRef<HTMLDivElement>(null);
+	const [isWhereDropdownOpen, setIsWhereDropdownOpen] = useState(false);
+	const whereDropdownRef = useRef<HTMLDivElement>(null);
 	const [isNearMeLocation, setIsNearMeLocation] = useState(false);
 	const hasWhereValue = whereValue.trim().length > 0;
 	const isPromotion = whyValue === '[Promotion]';
 	const [activeSection, setActiveSection] = useState<'why' | 'what' | 'where' | null>(
 		null
 	);
+
+	// Close why dropdown when clicking outside
+	useEffect(() => {
+		const handleClickOutside = (event: MouseEvent) => {
+			if (whyDropdownRef.current && !whyDropdownRef.current.contains(event.target as Node)) {
+				setIsWhyDropdownOpen(false);
+			}
+		};
+		if (isWhyDropdownOpen) {
+			document.addEventListener('mousedown', handleClickOutside);
+		}
+		return () => {
+			document.removeEventListener('mousedown', handleClickOutside);
+		};
+	}, [isWhyDropdownOpen]);
+
+	// Close what dropdown when clicking outside
+	useEffect(() => {
+		const handleClickOutside = (event: MouseEvent) => {
+			if (whatDropdownRef.current && !whatDropdownRef.current.contains(event.target as Node)) {
+				setIsWhatDropdownOpen(false);
+			}
+		};
+		if (isWhatDropdownOpen) {
+			document.addEventListener('mousedown', handleClickOutside);
+		}
+		return () => {
+			document.removeEventListener('mousedown', handleClickOutside);
+		};
+	}, [isWhatDropdownOpen]);
+
+	// Close where dropdown when clicking outside
+	useEffect(() => {
+		const handleClickOutside = (event: MouseEvent) => {
+			if (whereDropdownRef.current && !whereDropdownRef.current.contains(event.target as Node)) {
+				setIsWhereDropdownOpen(false);
+			}
+		};
+		if (isWhereDropdownOpen) {
+			document.addEventListener('mousedown', handleClickOutside);
+		}
+		return () => {
+			document.removeEventListener('mousedown', handleClickOutside);
+		};
+	}, [isWhereDropdownOpen]);
 	const initialTabFromQuery = searchParams.get('tab') === 'inbox' ? 'inbox' : 'search';
 	const [activeTab, setActiveTab] = useState<'search' | 'inbox'>(initialTabFromQuery);
 	const inboxView = activeTab === 'inbox';
@@ -681,7 +753,7 @@ const DashboardContent = () => {
 									}}
 								>
 									<div className="w-[38px] h-[38px] bg-[#80AAFF] rounded-[8px] flex-shrink-0 flex items-center justify-center">
-										<WineBeerSpiritsIcon />
+										<WineBeerSpiritsIcon size={22} />
 									</div>
 									<div className="ml-[12px] flex flex-col">
 										<div className="text-[20px] font-medium leading-none text-black font-inter">
@@ -765,7 +837,7 @@ const DashboardContent = () => {
 									}}
 								>
 									<div className="w-[38px] h-[38px] bg-[#EED56E] rounded-[8px] flex-shrink-0 flex items-center justify-center">
-										<WeddingPlannersIcon />
+										<WeddingPlannersIcon size={22} />
 									</div>
 									<div className="ml-[12px] flex flex-col">
 										<div className="text-[20px] font-medium leading-none text-black font-inter">
@@ -1139,6 +1211,28 @@ const DashboardContent = () => {
 	// Mini search bar (map view results) indicator refs
 	const miniActiveSectionIndicatorRef = useRef<HTMLDivElement>(null);
 	const prevMiniActiveSectionRef = useRef<'why' | 'what' | 'where' | null>(null);
+	// Derive title for contacts without one (e.g., "Restaurants New York")
+	const derivedContactTitle = useMemo(() => {
+		if (!whatValue) return undefined;
+		if (whereValue) {
+			return `${whatValue} ${whereValue}`;
+		}
+		return whatValue;
+	}, [whatValue, whereValue]);
+
+	// Check if this is a restaurant search - if so, all contacts should get the restaurant label
+	const isRestaurantSearch = useMemo(() => {
+		return /^restaurants?$/i.test(whatValue.trim());
+	}, [whatValue]);
+
+	// Check if this is a coffee shop search - if so, all contacts should get the coffee shop label
+	const isCoffeeShopSearch = useMemo(() => {
+		return /^coffee\s*shops?$/i.test(whatValue.trim());
+	}, [whatValue]);
+
+	// Combined flag for searches that should force-apply the derived title to all contacts
+	const shouldForceApplyDerivedTitle = isRestaurantSearch || isCoffeeShopSearch;
+
 	const {
 		form,
 		onSubmit,
@@ -1164,7 +1258,283 @@ const DashboardContent = () => {
 		setIsMapView,
 		isSearchPending,
 		usedContactIdsSet,
-	} = useDashboard();
+	} = useDashboard({ derivedTitle: derivedContactTitle, forceApplyDerivedTitle: shouldForceApplyDerivedTitle });
+
+	// If we refreshed while in the normal dashboard results view, restore the results by re-running
+	// the last executed search stored in the URL. We intentionally do not auto-trigger auth flows.
+	const hasHydratedDashboardUrlRef = useRef(false);
+	useEffect(() => {
+		if (isAddToCampaignMode) return;
+		if (hasHydratedDashboardUrlRef.current) return;
+		if (!dashboardSearchParam) return;
+		// Don't auto-trigger auth flows; only run if already signed in.
+		if (!isSignedIn) return;
+
+		// If we already have results, don't re-run the hydration search.
+		if (hasSearched && activeSearchQuery.trim().length > 0) {
+			hasHydratedDashboardUrlRef.current = true;
+			return;
+		}
+
+		hasHydratedDashboardUrlRef.current = true;
+
+		// Keep the segmented UI in sync with the restored query (best-effort).
+		const inferredWhy = extractWhyFromSearchQuery(dashboardSearchParam) || '';
+		const inferredWhat = extractWhatFromSearchQuery(dashboardSearchParam) || '';
+		const inferredWhere = extractWhereFromSearchQuery(dashboardSearchParam) || '';
+		if (inferredWhy) setWhyValue(inferredWhy);
+		if (inferredWhat) setWhatValue(inferredWhat);
+		if (inferredWhere) {
+			setWhereValue(inferredWhere);
+			setIsNearMeLocation(false);
+		}
+
+		// Submit after a short delay to allow state to update.
+		setTimeout(() => {
+			form.setValue('searchText', dashboardSearchParam);
+			form.handleSubmit(onSubmit)();
+
+			// Restore table view if that was the last view stored in the URL.
+			if (dashboardViewParam === 'table') {
+				setTimeout(() => setIsMapView(false), 0);
+			}
+		}, 100);
+	}, [
+		activeSearchQuery,
+		dashboardSearchParam,
+		dashboardViewParam,
+		form,
+		hasSearched,
+		isAddToCampaignMode,
+		isSignedIn,
+		onSubmit,
+		setIsMapView,
+	]);
+
+	// If we refreshed while in the "from campaign" map view, restore the map results view by
+	// re-running the last executed search stored in the URL. This is gated to `fromCampaignId`
+	// so the main dashboard flow is unchanged.
+	const hasHydratedFromCampaignUrlRef = useRef(false);
+	useEffect(() => {
+		if (!isAddToCampaignMode) return;
+		if (hasHydratedFromCampaignUrlRef.current) return;
+		if (!fromCampaignSearchParam) return;
+		// Don't auto-trigger auth flows; only run if already signed in.
+		if (!isSignedIn) return;
+
+		// If we already have results, don't re-run the hydration search.
+		if (hasSearched && activeSearchQuery.trim().length > 0) {
+			hasHydratedFromCampaignUrlRef.current = true;
+			return;
+		}
+
+		hasHydratedFromCampaignUrlRef.current = true;
+
+		// Keep the segmented UI in sync with the restored query (best-effort).
+		const inferredWhy = extractWhyFromSearchQuery(fromCampaignSearchParam) || '';
+		const inferredWhat = extractWhatFromSearchQuery(fromCampaignSearchParam) || '';
+		const inferredWhere = extractWhereFromSearchQuery(fromCampaignSearchParam) || '';
+		if (inferredWhy) setWhyValue(inferredWhy);
+		if (inferredWhat) setWhatValue(inferredWhat);
+		if (inferredWhere) {
+			setWhereValue(inferredWhere);
+			setIsNearMeLocation(false);
+		}
+
+		// Submit after a short delay to allow state to update.
+		setTimeout(() => {
+			form.setValue('searchText', fromCampaignSearchParam);
+			form.handleSubmit(onSubmit)();
+
+			// Restore table view if that was the last view stored in the URL.
+			if (fromCampaignViewParam === 'table') {
+				setTimeout(() => setIsMapView(false), 0);
+			}
+		}, 100);
+	}, [
+		activeSearchQuery,
+		form,
+		fromCampaignSearchParam,
+		fromCampaignViewParam,
+		hasSearched,
+		isAddToCampaignMode,
+		isSignedIn,
+		onSubmit,
+		setIsMapView,
+	]);
+
+	// Mirror the current results view + search query into the URL so browser refresh keeps you
+	// in the same place (normal dashboard flow).
+	useEffect(() => {
+		if (isAddToCampaignMode) return;
+		if (!hasSearched) return;
+		if (!activeSearchQuery || activeSearchQuery.trim().length === 0) return;
+
+		const desiredView = isMapView ? 'map' : 'table';
+		const currentView = dashboardViewParam;
+		const currentSearch = dashboardSearchParam;
+
+		if (currentView === desiredView && currentSearch === activeSearchQuery) return;
+
+		const params = new URLSearchParams(searchParams.toString());
+		params.set('view', desiredView);
+		params.set('search', activeSearchQuery);
+		router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+	}, [
+		activeSearchQuery,
+		dashboardSearchParam,
+		dashboardViewParam,
+		hasSearched,
+		isAddToCampaignMode,
+		isMapView,
+		pathname,
+		router,
+		searchParams,
+	]);
+
+	// When leaving the results view, clear the persisted normal-dashboard search/view params
+	// so we don't unexpectedly re-hydrate a stale search after the user has reset.
+	const prevHasSearchedRef = useRef(hasSearched);
+	useEffect(() => {
+		const prev = prevHasSearchedRef.current;
+		prevHasSearchedRef.current = hasSearched;
+
+		if (isAddToCampaignMode) return;
+		if (!prev || hasSearched) return;
+
+		const params = new URLSearchParams(searchParams.toString());
+		const had =
+			params.get('view') !== null ||
+			params.get('search') !== null;
+		if (!had) return;
+
+		params.delete('view');
+		params.delete('search');
+		const qs = params.toString();
+		router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+	}, [hasSearched, isAddToCampaignMode, pathname, router, searchParams]);
+
+	// When in "from campaign" mode, mirror the current results view + search query into the URL
+	// so browser refresh keeps you in the same place. This is intentionally gated to avoid
+	// changing behavior for the normal dashboard entry.
+	useEffect(() => {
+		if (!isAddToCampaignMode) return;
+		if (!hasSearched) return;
+		if (!activeSearchQuery || activeSearchQuery.trim().length === 0) return;
+
+		const desiredView = isMapView ? 'map' : 'table';
+		const currentView = fromCampaignViewParam;
+		const currentSearch = fromCampaignSearchParam;
+
+		if (currentView === desiredView && currentSearch === activeSearchQuery) return;
+
+		const params = new URLSearchParams(searchParams.toString());
+		params.set('fromCampaignView', desiredView);
+		params.set('fromCampaignSearch', activeSearchQuery);
+		router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+	}, [
+		activeSearchQuery,
+		fromCampaignSearchParam,
+		fromCampaignViewParam,
+		hasSearched,
+		isAddToCampaignMode,
+		isMapView,
+		pathname,
+		router,
+		searchParams,
+	]);
+
+	// Batch update for assigning titles to contacts without one
+	const { mutateAsync: batchUpdateContacts } = useBatchUpdateContacts({ suppressToasts: true });
+
+	const handleAddSelectedToCampaign = useCallback(async () => {
+		if (!isAddToCampaignMode) return;
+
+		if (selectedContacts.length === 0) {
+			toast.error('Please select contacts to add');
+			return;
+		}
+
+		if (isPendingFromCampaign) {
+			toast('Loading campaign…');
+			return;
+		}
+
+		if (!addToCampaignUserContactListId) {
+			toast.error('Campaign has no contact list');
+			return;
+		}
+
+		try {
+			// If we have a derived title, update contacts before adding them
+			// For restaurant/coffee shop searches, update ALL contacts; otherwise only those without a title
+			if (derivedContactTitle && contacts) {
+				const contactsToUpdate = contacts.filter(
+					(c) => selectedContacts.includes(c.id) && 
+						(shouldForceApplyDerivedTitle || (!c.title && !c.headline))
+				);
+				if (contactsToUpdate.length > 0) {
+					await batchUpdateContacts({
+						updates: contactsToUpdate.map((c) => ({
+							id: c.id,
+							data: { title: derivedContactTitle },
+						})),
+					});
+				}
+			}
+
+			await editUserContactList({
+				id: addToCampaignUserContactListId,
+				data: {
+					contactOperation: {
+						action: 'connect',
+						contactIds: selectedContacts,
+					},
+				},
+			});
+
+			const addedCount = selectedContacts.length;
+			setSelectedContacts([]);
+
+			// Keep caches consistent (mirrors in-campaign behavior)
+			// Await invalidations to ensure cache is properly cleared before navigation
+			await Promise.all([
+				queryClient.invalidateQueries({ queryKey: ['campaigns'] }),
+				queryClient.invalidateQueries({ queryKey: ['contacts'] }),
+				queryClient.invalidateQueries({ queryKey: ['userContactLists'] }),
+			]);
+
+			toast.success(
+				`${addedCount} contact${addedCount === 1 ? '' : 's'} added to campaign!`
+			);
+
+			// Return to the campaign page we came from
+			router.push(`${urls.murmur.campaign.detail(fromCampaignIdParam)}?origin=search`);
+		} catch (error) {
+			console.error('Error adding contacts to campaign:', error);
+			toast.error('Failed to add contacts to campaign');
+		}
+	}, [
+		fromCampaignIdParam,
+		addToCampaignUserContactListId,
+		batchUpdateContacts,
+		contacts,
+		derivedContactTitle,
+		editUserContactList,
+		isAddToCampaignMode,
+		isPendingFromCampaign,
+		shouldForceApplyDerivedTitle,
+		queryClient,
+		router,
+		selectedContacts,
+		setSelectedContacts,
+	]);
+
+	const primaryCtaLabel = isAddToCampaignMode ? 'Add to Campaign' : 'Create Campaign';
+	const primaryCtaPending = isAddToCampaignMode
+		? isPendingAddToCampaign || isPendingFromCampaign
+		: isPendingCreateCampaign || isPendingBatchUpdateContacts;
+	const handlePrimaryCta = isAddToCampaignMode ? handleAddSelectedToCampaign : handleCreateCampaign;
 
 	// Map-side panel should default to only the searched state, while the map itself keeps
 	// showing all results. Clicking an out-of-state marker adds it to this panel list.
@@ -1177,16 +1547,33 @@ const DashboardContent = () => {
 	const [mapPanelVisibleOverlayContacts, setMapPanelVisibleOverlayContacts] = useState<
 		ContactWithName[]
 	>([]);
+	// Sticky (per-selected-contact) search-derived headline so selected items keep their
+	// category identity (e.g. Wedding Planner) across subsequent searches in the same map session.
+	const [selectedContactStickyHeadlineById, setSelectedContactStickyHeadlineById] = useState<
+		Record<number, string>
+	>({});
 	const mapViewContainerRef = useRef<HTMLDivElement | null>(null);
 	const [activeMapTool, setActiveMapTool] = useState<'select' | 'grab'>('grab');
+	const [selectAllInViewNonce, setSelectAllInViewNonce] = useState(0);
 	const [hoveredMapMarkerContact, setHoveredMapMarkerContact] = useState<ContactWithName | null>(
 		null
 	);
 	// When hovering a row in the map side panel, highlight/show the corresponding marker on the map.
 	const [hoveredMapPanelContactId, setHoveredMapPanelContactId] = useState<number | null>(null);
 	const isMapResultsLoading = isSearchPending || isLoadingContacts || isRefetchingContacts;
+	const isSelectMapToolActive = activeMapTool === 'select';
+	const isGrabMapToolActive = activeMapTool === 'grab';
 	const hasNoSearchResults =
 		hasSearched && !isMapResultsLoading && (contacts?.length ?? 0) === 0;
+
+	const handleSelectMapToolClick = useCallback(() => {
+		// First click: activate Select tool. Second click (while active): select all visible.
+		if (!isSelectMapToolActive) {
+			setActiveMapTool('select');
+			return;
+		}
+		setSelectAllInViewNonce((n) => n + 1);
+	}, [isSelectMapToolActive]);
 
 	useEffect(() => {
 		// Prevent stale hover state when leaving map view or while results are transitioning.
@@ -1255,11 +1642,22 @@ const DashboardContent = () => {
 	const mapResearchPanelCloseDelayTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 	const mapResearchPanelUnmountTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 	const mapResearchPanelContactRef = useRef<ContactWithName | null>(null);
+	// When the executed search changes, reset map-panel "extras" for the new search,
+	// but keep any currently-selected contacts so selection can persist across searches
+	// within the same map session.
+	const prevActiveSearchQueryForMapPanelRef = useRef<string>(activeSearchQuery);
 	useEffect(() => {
+		if (prevActiveSearchQueryForMapPanelRef.current === activeSearchQuery) return;
+		prevActiveSearchQueryForMapPanelRef.current = activeSearchQuery;
+
 		setMapPanelExtraContactIds([]);
-		setMapPanelExtraContacts([]);
 		setMapPanelVisibleOverlayContacts([]);
-	}, [activeSearchQuery]);
+		setMapPanelExtraContacts((prev) => {
+			if (selectedContacts.length === 0) return [];
+			const selectedSet = new Set<number>(selectedContacts);
+			return prev.filter((c) => selectedSet.has(c.id));
+		});
+	}, [activeSearchQuery, selectedContacts]);
 
 	// Cleanup timers on unmount
 	useEffect(() => {
@@ -1358,10 +1756,141 @@ const DashboardContent = () => {
 		[activeSearchQuery]
 	);
 
+	// Check if the current executed search is for a specific category (to apply labels to all results)
+	const searchWhatLower = searchedWhat?.toLowerCase() || '';
+	// Treat "Venues" as shorthand for "Music Venues" but avoid matching "Wedding Venues", etc.
+	const isMusicVenuesSearch =
+		searchWhatLower.includes('music venue') || /^venues?$/.test(searchWhatLower.trim());
+	const isRestaurantsSearch = searchWhatLower.includes('restaurant');
+	const isCoffeeShopsSearch = searchWhatLower.includes('coffee shop') || searchWhatLower.includes('coffee shops');
+	// Treat "Festivals" as shorthand for "Music Festivals" but avoid matching "Beer Festivals", etc.
+	const isMusicFestivalsSearch =
+		searchWhatLower.includes('music festival') || /^festivals?$/.test(searchWhatLower.trim());
+	const isWeddingPlannersSearch = searchWhatLower.includes('wedding planner');
+
+	const searchedWhere = useMemo(
+		() => extractWhereFromSearchQuery(activeSearchQuery),
+		[activeSearchQuery]
+	);
+
+	// For category-style searches, keep a sticky per-selected-contact headline so selected items
+	// retain their category identity when the user runs another search in the same map session.
+	const stickyCategoryHeadlineForCurrentSearch = useMemo(() => {
+		const rawWhat = (searchedWhat || '').trim();
+		const rawWhere = (searchedWhere || '').trim();
+		if (!rawWhat && !rawWhere) return '';
+
+		const canonicalWhat = isRestaurantsSearch
+			? 'Restaurants'
+			: isCoffeeShopsSearch
+				? 'Coffee Shops'
+				: isMusicVenuesSearch
+					? 'Music Venues'
+					: isMusicFestivalsSearch
+						? 'Music Festivals'
+						: isWeddingPlannersSearch
+							? 'Wedding Planners'
+							: rawWhat;
+
+		return [canonicalWhat, rawWhere].filter(Boolean).join(' ').trim();
+	}, [
+		isCoffeeShopsSearch,
+		isMusicFestivalsSearch,
+		isMusicVenuesSearch,
+		isRestaurantsSearch,
+		isWeddingPlannersSearch,
+		searchedWhat,
+		searchedWhere,
+	]);
+
+	const shouldPersistSelectedCategoryIdentity = useMemo(() => {
+		const headline = stickyCategoryHeadlineForCurrentSearch;
+		if (!headline) return false;
+		return (
+			isRestaurantTitle(headline) ||
+			isCoffeeShopTitle(headline) ||
+			isMusicVenueTitle(headline) ||
+			isMusicFestivalTitle(headline) ||
+			isWeddingPlannerTitle(headline) ||
+			isWeddingVenueTitle(headline) ||
+			isWineBeerSpiritsTitle(headline)
+		);
+	}, [stickyCategoryHeadlineForCurrentSearch]);
+
+	const prevSelectedContactsForStickyRef = useRef<number[]>(selectedContacts);
+	useEffect(() => {
+		const prevSelected = prevSelectedContactsForStickyRef.current;
+		const prevSelectedSet = new Set<number>(prevSelected);
+		const nextSelectedSet = new Set<number>(selectedContacts);
+
+		const addedIds: number[] = [];
+		for (const id of selectedContacts) {
+			if (!prevSelectedSet.has(id)) addedIds.push(id);
+		}
+
+		prevSelectedContactsForStickyRef.current = selectedContacts;
+
+		setSelectedContactStickyHeadlineById((prev) => {
+			if (selectedContacts.length === 0) {
+				return Object.keys(prev).length === 0 ? prev : {};
+			}
+
+			let changed = false;
+			const next: Record<number, string> = {};
+
+			// Keep existing sticky headlines for still-selected contacts.
+			for (const [idStr, stickyHeadline] of Object.entries(prev)) {
+				const id = Number(idStr);
+				if (!Number.isFinite(id)) continue;
+				if (!nextSelectedSet.has(id)) {
+					changed = true;
+					continue;
+				}
+				next[id] = stickyHeadline;
+			}
+
+			// For category searches, assign the current category headline to contacts that were just selected.
+			if (
+				addedIds.length > 0 &&
+				shouldPersistSelectedCategoryIdentity &&
+				stickyCategoryHeadlineForCurrentSearch
+			) {
+				for (const id of addedIds) {
+					if (next[id]) continue;
+					next[id] = stickyCategoryHeadlineForCurrentSearch;
+					changed = true;
+				}
+			}
+
+			return changed ? next : prev;
+		});
+	}, [selectedContacts, shouldPersistSelectedCategoryIdentity, stickyCategoryHeadlineForCurrentSearch]);
+
 	const baseContactIdSet = useMemo(
 		() => new Set<number>((contacts || []).map((c) => c.id)),
 		[contacts]
 	);
+
+	// Cache selected contacts as full objects so they can remain pinned/visible in the map side
+	// panel even after running another search (when `contacts` changes).
+	useEffect(() => {
+		if (!isMapView) return;
+		if (!contacts || contacts.length === 0) return;
+		if (selectedContacts.length === 0) return;
+
+		const selectedSet = new Set<number>(selectedContacts);
+		setMapPanelExtraContacts((prev) => {
+			const cachedIds = new Set<number>(prev.map((c) => c.id));
+			const toAdd: ContactWithName[] = [];
+			for (const c of contacts) {
+				if (selectedSet.has(c.id) && !cachedIds.has(c.id)) {
+					toAdd.push(c);
+				}
+			}
+			if (toAdd.length === 0) return prev;
+			return [...toAdd, ...prev];
+		});
+	}, [isMapView, contacts, selectedContacts]);
 
 	const mapPanelContacts = useMemo(() => {
 		const allContacts = contacts || [];
@@ -2029,6 +2558,12 @@ const DashboardContent = () => {
 		setHoveredContact(null);
 		// Reset search completely to return to default dashboard
 		handleEnhancedResetSearch();
+
+		// If we entered the dashboard from a campaign (add-to-campaign mode), the "Home" button
+		// should take the user back to the *regular* dashboard (no campaign-search context).
+		if (isAddToCampaignMode) {
+			router.replace(urls.murmur.dashboard.index, { scroll: false });
+		}
 	};
 
 	useEffect(() => {
@@ -2818,15 +3353,19 @@ const DashboardContent = () => {
 							  };
 
 						const normalizedWhatKey = whatValue.trim();
-						const whatCfg = MAP_RESULTS_SEARCH_TRAY.whatIconByLabel[normalizedWhatKey];
-						const TrayWhatIcon = whatCfg?.Icon || (isPromotion ? RadioStationsIcon : MusicVenuesIcon);
+						// If the segmented "What" state isn't populated (e.g. the user searched via raw text),
+						// fall back to the last executed query so the tray doesn't "jump" to a default icon.
+						const searchedWhatKey = (searchedWhat || '').trim();
+						const effectiveWhatKeyForTray = normalizedWhatKey || searchedWhatKey;
+						const whatCfg = MAP_RESULTS_SEARCH_TRAY.whatIconByLabel[effectiveWhatKeyForTray];
+						const TrayWhatIcon = whatCfg?.Icon || MusicVenuesIcon;
+						const trayWhatIconSize =
+							effectiveWhatKeyForTray === 'Wine, Beer, and Spirits' ? 22 : undefined;
 						const trayWhat = {
 							backgroundColor:
 								whatCfg?.backgroundColor ||
-								(isPromotion
-									? MAP_RESULTS_SEARCH_TRAY.whatIconByLabel['Radio Stations'].backgroundColor
-									: MAP_RESULTS_SEARCH_TRAY.whatIconByLabel['Music Venues'].backgroundColor),
-							icon: <TrayWhatIcon />,
+								MAP_RESULTS_SEARCH_TRAY.whatIconByLabel['Music Venues'].backgroundColor,
+							icon: <TrayWhatIcon size={trayWhatIconSize} />,
 						};
 
 						const whereCandidate = (whereValue || userLocationName || '').trim();
@@ -2886,7 +3425,6 @@ const DashboardContent = () => {
 							{/* Map view: show the 189x52 icon tray to the left of the search bar */}
 							{isMapView && (
 								<div
-									aria-hidden="true"
 									className="hidden lg:flex items-center justify-between"
 									style={{
 										position: 'absolute',
@@ -2904,18 +3442,479 @@ const DashboardContent = () => {
 										borderRadius: `${MAP_RESULTS_SEARCH_TRAY.containerRadius}px`,
 										paddingLeft: '6px',
 										paddingRight: '6px',
-										pointerEvents: 'none',
 									}}
 								>
-									<SearchTrayIconTile backgroundColor={trayWhy.backgroundColor}>
-										{trayWhy.icon}
-									</SearchTrayIconTile>
-									<SearchTrayIconTile backgroundColor={trayWhat.backgroundColor}>
-										{trayWhat.icon}
-									</SearchTrayIconTile>
-									<SearchTrayIconTile backgroundColor={trayWhere.backgroundColor}>
-										{trayWhere.icon}
-									</SearchTrayIconTile>
+									{/* First icon (Why) - clickable with dropdown */}
+									<div ref={whyDropdownRef} className="relative">
+										<button
+											type="button"
+											className="cursor-pointer border-none bg-transparent p-0"
+											onClick={() => setIsWhyDropdownOpen(!isWhyDropdownOpen)}
+											aria-label={isPromotion ? 'Promotion search type' : 'Booking search type'}
+											aria-expanded={isWhyDropdownOpen}
+											aria-haspopup="listbox"
+										>
+											<SearchTrayIconTile backgroundColor={trayWhy.backgroundColor}>
+												{trayWhy.icon}
+											</SearchTrayIconTile>
+										</button>
+										{/* Why dropdown */}
+										{isWhyDropdownOpen && (
+											<div
+												role="listbox"
+												aria-label="Search type options"
+												className="absolute top-[calc(100%+8px)] left-0 border-[3px] border-black rounded-[12px] z-50"
+												style={{
+													width: '171px',
+													height: '110px',
+													backgroundColor: 'rgba(216, 229, 251, 0.9)',
+													padding: '6px',
+												}}
+											>
+												<div className="flex flex-col gap-[6px] h-full items-center">
+													{/* Promotion option */}
+													<div
+														role="option"
+														aria-selected={isPromotion}
+														className="flex items-center gap-3 cursor-pointer bg-white rounded-[8px] hover:bg-gray-50 transition-colors"
+														style={{
+															width: '160px',
+															height: '46px',
+															paddingLeft: '4px',
+															paddingRight: '12px',
+														}}
+														onClick={() => {
+															setWhyValue('[Promotion]');
+															setIsWhyDropdownOpen(false);
+															setIsWhatDropdownOpen(true);
+														}}
+													>
+														<div
+															className="flex items-center justify-center flex-shrink-0"
+															style={{
+																width: '38px',
+																height: '38px',
+																backgroundColor: MAP_RESULTS_SEARCH_TRAY.whyBackgroundColors.promotion,
+																borderRadius: '10px',
+															}}
+														>
+															<PromotionIcon />
+														</div>
+														<span className="text-[15px] font-medium text-black font-inter">Promotion</span>
+													</div>
+													{/* Booking option */}
+													<div
+														role="option"
+														aria-selected={!isPromotion}
+														className="flex items-center gap-3 cursor-pointer bg-white rounded-[8px] hover:bg-gray-50 transition-colors"
+														style={{
+															width: '160px',
+															height: '46px',
+															paddingLeft: '4px',
+															paddingRight: '12px',
+														}}
+														onClick={() => {
+															setWhyValue('[Booking]');
+															setIsWhyDropdownOpen(false);
+															setIsWhatDropdownOpen(true);
+														}}
+													>
+														<div
+															className="flex items-center justify-center flex-shrink-0"
+															style={{
+																width: '38px',
+																height: '38px',
+																backgroundColor: MAP_RESULTS_SEARCH_TRAY.whyBackgroundColors.booking,
+																borderRadius: '10px',
+															}}
+														>
+															<BookingIcon />
+														</div>
+														<span className="text-[15px] font-medium text-black font-inter">Booking</span>
+													</div>
+												</div>
+											</div>
+										)}
+									</div>
+									{/* Second icon (What) - clickable with dropdown */}
+									<div ref={whatDropdownRef} className="relative">
+										<button
+											type="button"
+											className="cursor-pointer border-none bg-transparent p-0"
+											onClick={() => setIsWhatDropdownOpen(!isWhatDropdownOpen)}
+											aria-label={`${whatValue || 'Category'} search category`}
+											aria-expanded={isWhatDropdownOpen}
+											aria-haspopup="listbox"
+										>
+											<SearchTrayIconTile backgroundColor={trayWhat.backgroundColor}>
+												{trayWhat.icon}
+											</SearchTrayIconTile>
+										</button>
+										{/* What dropdown */}
+										{isWhatDropdownOpen && (
+											<div
+												id="map-search-tray-what-dropdown-container"
+												role="listbox"
+												aria-label="Search category options"
+												className="absolute top-[calc(100%+8px)] left-0 border-[3px] border-black rounded-[12px] z-50"
+												style={{
+													width: '249px',
+													height: isPromotion ? '66px' : '277px',
+													backgroundColor: 'rgba(216, 229, 251, 0.9)',
+												}}
+											>
+												<style jsx global>{`
+													#map-search-tray-what-dropdown-container .scrollbar-hide {
+														scrollbar-width: none !important;
+														scrollbar-color: transparent transparent !important;
+														-ms-overflow-style: none !important;
+													}
+													#map-search-tray-what-dropdown-container .scrollbar-hide::-webkit-scrollbar {
+														display: none !important;
+														width: 0 !important;
+														height: 0 !important;
+													}
+												`}</style>
+												{isPromotion ? (
+													/* Promotion: only Radio Stations - centered in compact container */
+													<div className="flex items-center justify-center h-full w-full">
+														<div
+															role="option"
+															aria-selected={whatValue === 'Radio Stations'}
+															className="flex items-center gap-3 cursor-pointer bg-white rounded-[8px] hover:bg-gray-50 transition-colors flex-shrink-0"
+															style={{
+																width: '237px',
+																height: '46px',
+																paddingLeft: '4px',
+																paddingRight: '12px',
+															}}
+															onClick={() => {
+																setWhatValue('Radio Stations');
+																setIsWhatDropdownOpen(false);
+															}}
+														>
+															<div
+																className="flex items-center justify-center flex-shrink-0"
+																style={{
+																	width: '38px',
+																	height: '38px',
+																	backgroundColor:
+																		MAP_RESULTS_SEARCH_TRAY.whatIconByLabel['Radio Stations']
+																			.backgroundColor,
+																	borderRadius: '10px',
+																}}
+															>
+																<RadioStationsIcon />
+															</div>
+															<span className="text-[15px] font-medium text-black font-inter">
+																Radio Stations
+															</span>
+														</div>
+													</div>
+												) : (
+													<CustomScrollbar
+														className="h-full"
+														contentClassName="flex flex-col items-center gap-[10px] py-[10px] pl-[6px] pr-[26px] -mr-[20px]"
+														thumbWidth={2}
+														thumbColor="#000000"
+														offsetRight={-5}
+														lockHorizontalScroll
+													>
+														<>
+															{/* 1. Wine, Beer, and Spirits option */}
+															<div
+																role="option"
+																aria-selected={whatValue === 'Wine, Beer, and Spirits'}
+																className="flex items-center gap-3 cursor-pointer bg-white rounded-[8px] hover:bg-gray-50 transition-colors flex-shrink-0"
+																style={{
+																	width: '237px',
+																	height: '46px',
+																	paddingLeft: '4px',
+																	paddingRight: '12px',
+																}}
+																onClick={() => {
+																	setWhatValue('Wine, Beer, and Spirits');
+																	setIsWhatDropdownOpen(false);
+																}}
+															>
+																<div
+																	className="flex items-center justify-center flex-shrink-0"
+																	style={{
+																		width: '38px',
+																		height: '38px',
+																		backgroundColor:
+																			MAP_RESULTS_SEARCH_TRAY.whatIconByLabel[
+																				'Wine, Beer, and Spirits'
+																			].backgroundColor,
+																		borderRadius: '10px',
+																	}}
+																>
+																	<WineBeerSpiritsIcon size={22} />
+																</div>
+																<span className="text-[15px] font-medium text-black font-inter flex-1 min-w-0 truncate">
+																	Wine, Beer, and Spirits
+																</span>
+															</div>
+															{/* 2. Restaurants option */}
+															<div
+																role="option"
+																aria-selected={whatValue === 'Restaurants'}
+																className="flex items-center gap-3 cursor-pointer bg-white rounded-[8px] hover:bg-gray-50 transition-colors flex-shrink-0"
+																style={{
+																	width: '237px',
+																	height: '46px',
+																	paddingLeft: '4px',
+																	paddingRight: '12px',
+																}}
+																onClick={() => {
+																	setWhatValue('Restaurants');
+																	setIsWhatDropdownOpen(false);
+																}}
+															>
+																<div
+																	className="flex items-center justify-center flex-shrink-0"
+																	style={{
+																		width: '38px',
+																		height: '38px',
+																		backgroundColor:
+																			MAP_RESULTS_SEARCH_TRAY.whatIconByLabel['Restaurants']
+																				.backgroundColor,
+																		borderRadius: '10px',
+																	}}
+																>
+																	<RestaurantsIcon />
+																</div>
+																<span className="text-[15px] font-medium text-black font-inter">
+																	Restaurants
+																</span>
+															</div>
+															{/* 3. Coffee Shops option */}
+															<div
+																role="option"
+																aria-selected={whatValue === 'Coffee Shops'}
+																className="flex items-center gap-3 cursor-pointer bg-white rounded-[8px] hover:bg-gray-50 transition-colors flex-shrink-0"
+																style={{
+																	width: '237px',
+																	height: '46px',
+																	paddingLeft: '4px',
+																	paddingRight: '12px',
+																}}
+																onClick={() => {
+																	setWhatValue('Coffee Shops');
+																	setIsWhatDropdownOpen(false);
+																}}
+															>
+																<div
+																	className="flex items-center justify-center flex-shrink-0"
+																	style={{
+																		width: '38px',
+																		height: '38px',
+																		backgroundColor:
+																			MAP_RESULTS_SEARCH_TRAY.whatIconByLabel['Coffee Shops']
+																				.backgroundColor,
+																		borderRadius: '10px',
+																	}}
+																>
+																	<CoffeeShopsIcon />
+																</div>
+																<span className="text-[15px] font-medium text-black font-inter">
+																	Coffee Shops
+																</span>
+															</div>
+															{/* 4. Festivals option */}
+															<div
+																role="option"
+																aria-selected={whatValue === 'Festivals'}
+																className="flex items-center gap-3 cursor-pointer bg-white rounded-[8px] hover:bg-gray-50 transition-colors flex-shrink-0"
+																style={{
+																	width: '237px',
+																	height: '46px',
+																	paddingLeft: '4px',
+																	paddingRight: '12px',
+																}}
+																onClick={() => {
+																	setWhatValue('Festivals');
+																	setIsWhatDropdownOpen(false);
+																}}
+															>
+																<div
+																	className="flex items-center justify-center flex-shrink-0"
+																	style={{
+																		width: '38px',
+																		height: '38px',
+																		backgroundColor:
+																			MAP_RESULTS_SEARCH_TRAY.whatIconByLabel['Festivals']
+																				.backgroundColor,
+																		borderRadius: '10px',
+																	}}
+																>
+																	<FestivalsIcon />
+																</div>
+																<span className="text-[15px] font-medium text-black font-inter">
+																	Festivals
+																</span>
+															</div>
+															{/* 5. Wedding Planners option */}
+															<div
+																role="option"
+																aria-selected={whatValue === 'Wedding Planners'}
+																className="flex items-center gap-3 cursor-pointer bg-white rounded-[8px] hover:bg-gray-50 transition-colors flex-shrink-0"
+																style={{
+																	width: '237px',
+																	height: '46px',
+																	paddingLeft: '4px',
+																	paddingRight: '12px',
+																}}
+																onClick={() => {
+																	setWhatValue('Wedding Planners');
+																	setIsWhatDropdownOpen(false);
+																}}
+															>
+																<div
+																	className="flex items-center justify-center flex-shrink-0"
+																	style={{
+																		width: '38px',
+																		height: '38px',
+																		backgroundColor:
+																			MAP_RESULTS_SEARCH_TRAY.whatIconByLabel[
+																				'Wedding Planners'
+																			].backgroundColor,
+																		borderRadius: '10px',
+																	}}
+																>
+																	<WeddingPlannersIcon />
+																</div>
+																<span className="text-[15px] font-medium text-black font-inter">
+																	Wedding Planners
+																</span>
+															</div>
+															{/* 6. Music Venues option */}
+															<div
+																role="option"
+																aria-selected={whatValue === 'Music Venues'}
+																className="flex items-center gap-3 cursor-pointer bg-white rounded-[8px] hover:bg-gray-50 transition-colors flex-shrink-0"
+																style={{
+																	width: '237px',
+																	height: '46px',
+																	paddingLeft: '4px',
+																	paddingRight: '12px',
+																}}
+																onClick={() => {
+																	setWhatValue('Music Venues');
+																	setIsWhatDropdownOpen(false);
+																}}
+															>
+																<div
+																	className="flex items-center justify-center flex-shrink-0"
+																	style={{
+																		width: '38px',
+																		height: '38px',
+																		backgroundColor:
+																			MAP_RESULTS_SEARCH_TRAY.whatIconByLabel['Music Venues']
+																				.backgroundColor,
+																		borderRadius: '10px',
+																	}}
+																>
+																	<MusicVenuesIcon />
+																</div>
+																<span className="text-[15px] font-medium text-black font-inter">
+																	Music Venues
+																</span>
+															</div>
+														</>
+													</CustomScrollbar>
+												)}
+											</div>
+										)}
+									</div>
+									{/* Third icon (Where) - clickable with dropdown */}
+									<div ref={whereDropdownRef} className="relative">
+										<button
+											type="button"
+											className="cursor-pointer border-none bg-transparent p-0"
+											onClick={() => setIsWhereDropdownOpen(!isWhereDropdownOpen)}
+											aria-label={`${whereValue || 'Location'} search location`}
+											aria-expanded={isWhereDropdownOpen}
+											aria-haspopup="listbox"
+										>
+											<SearchTrayIconTile backgroundColor={trayWhere.backgroundColor}>
+												{trayWhere.icon}
+											</SearchTrayIconTile>
+										</button>
+										{/* Where dropdown */}
+										{isWhereDropdownOpen && (
+											<div
+												id="map-search-tray-where-dropdown-container"
+												role="listbox"
+												aria-label="Search location options"
+												className="absolute top-[calc(100%+8px)] right-0 border-[3px] border-black rounded-[12px] z-50"
+												style={{
+													width: '206px',
+													height: '277px',
+													backgroundColor: 'rgba(216, 229, 251, 0.9)',
+												}}
+											>
+												<style jsx global>{`
+													#map-search-tray-where-dropdown-container .scrollbar-hide {
+														scrollbar-width: none !important;
+														scrollbar-color: transparent transparent !important;
+														-ms-overflow-style: none !important;
+													}
+													#map-search-tray-where-dropdown-container .scrollbar-hide::-webkit-scrollbar {
+														display: none !important;
+														width: 0 !important;
+														height: 0 !important;
+													}
+												`}</style>
+												<CustomScrollbar
+													className="h-full"
+													contentClassName="flex flex-col items-center gap-[10px] py-[10px] pl-[6px] pr-[26px] -mr-[20px]"
+													thumbWidth={2}
+													thumbColor="#000000"
+													offsetRight={-5}
+													lockHorizontalScroll
+												>
+													{buildAllUsStateNames().map((stateName) => {
+														const { icon, backgroundColor } = getCityIconProps('', stateName);
+														return (
+															<div
+																key={stateName}
+																role="option"
+																aria-selected={whereValue === stateName}
+																className="flex items-center gap-3 cursor-pointer bg-white rounded-[8px] hover:bg-gray-50 transition-colors flex-shrink-0"
+																style={{
+																	width: '194px',
+																	height: '46px',
+																	paddingLeft: '4px',
+																	paddingRight: '12px',
+																}}
+																onClick={() => {
+																	setIsWhereDropdownOpen(false);
+																	setIsNearMeLocation(false);
+																	triggerSearchWithWhere(stateName, false);
+																}}
+															>
+																<div
+																	className="flex items-center justify-center flex-shrink-0"
+																	style={{
+																		width: '38px',
+																		height: '38px',
+																		backgroundColor,
+																		borderRadius: '10px',
+																	}}
+																>
+																	{icon}
+																</div>
+																<span className="text-[15px] font-medium text-black font-inter">
+																	{stateName}
+																</span>
+															</div>
+														);
+													})}
+												</CustomScrollbar>
+											</div>
+										)}
+									</div>
 								</div>
 							)}
 							<div
@@ -3148,95 +4147,240 @@ const DashboardContent = () => {
 								<>
 									{/* Box to the left of the Home button */}
 									<div
-										className="group relative h-[53px] hover:h-[82px]"
+										className="group relative h-[52px] hover:h-[80px]"
 										style={{
+											...(() => {
+												const buttonSize = 43;
+												const gap = isSelectMapToolActive ? 8 : 20;
+												// Existing collapsed design: 2 buttons + 20px gap inside a 130px wrapper.
+												// That leaves ~12px padding on each side (24px total).
+												const horizontalPadding = 24;
+												const innerWidth = isSelectMapToolActive
+													? buttonSize * 3 + gap * 2
+													: buttonSize * 2 + gap;
+												const wrapperWidth = innerWidth + horizontalPadding;
+												const gapToHomeButton = 10;
+												return {
+													width: `${wrapperWidth}px`,
+													left: `calc(100% + 179px - ${wrapperWidth + gapToHomeButton}px)`,
+												};
+											})(),
 											position: 'absolute',
 											// Map is inset 9px from the viewport; "25px from map top" => 34px viewport.
 											// Search bar wrapper sits at 33px viewport, so this becomes 1px inside the wrapper.
 											top: '1px',
 											// Home button is at: calc(100% + 179px). This box should be 10px to its left.
-											left: 'calc(100% + 179px - 143px)', // 133px width + 10px gap
-											width: '133px',
 											borderRadius: '6px',
 											backgroundColor: 'rgba(255, 255, 255, 0.9)', // #FFFFFF @ 90%
 											border: '3px solid #000000',
 										}}
 									>
 										{/* Keep the buttons pinned to the collapsed center so expanding height doesn't move them */}
-										<div className="absolute left-1/2 top-[24px] -translate-x-1/2 -translate-y-1/2 flex items-center justify-center gap-[20px]">
-											<div className="relative">
-												<button
-													type="button"
-													onClick={() => setActiveMapTool('select')}
-													aria-label="Select tool"
-													aria-pressed={activeMapTool === 'select'}
-													className="flex items-center justify-center"
-													style={{
-														width: '44px',
-														height: '44px',
-														borderRadius: '9px',
-														backgroundColor:
-															activeMapTool === 'select'
-																? '#4CDE71'
-																: 'rgba(153, 153, 153, 0.3)', // #999999 @ 30%
-														cursor: 'pointer',
-														padding: 0,
-														border: 'none',
-													}}
-												>
-													<div
-														aria-hidden="true"
-														style={{
-															width: '25px',
-															height: '25px',
-															backgroundColor:
-																activeMapTool === 'select' ? '#FFFFFF' : 'transparent',
-															border: '2px solid #000000',
-															boxSizing: 'border-box',
-														}}
-													/>
-												</button>
-												{activeMapTool === 'select' && (
-													<div className="pointer-events-none absolute left-1/2 top-[52px] -translate-x-1/2 opacity-0 group-hover:opacity-100 font-inter text-[16px] font-semibold leading-none text-black select-none whitespace-nowrap">
-														Select
+										<div
+											className={`absolute left-1/2 top-[24px] -translate-x-1/2 -translate-y-1/2 flex items-center justify-center ${
+												isSelectMapToolActive ? 'gap-[8px]' : 'gap-[20px]'
+											}`}
+										>
+											{isSelectMapToolActive ? (
+												<>
+													{/* Left: active "What" category icon from the current search */}
+													<div className="relative">
+														<div
+															aria-label={`Active category: ${effectiveWhatKeyForTray || 'Music Venues'}`}
+															className="flex items-center justify-center"
+															style={{
+																width: '43px',
+																height: '43px',
+																borderRadius: '9px',
+																backgroundColor: trayWhat.backgroundColor,
+															}}
+														>
+															<TrayWhatIcon size={trayWhatIconSize} />
+														</div>
 													</div>
-												)}
-											</div>
-											<div className="relative">
-												<button
-													type="button"
-													onClick={() => setActiveMapTool('grab')}
-													aria-label="Grab tool"
-													aria-pressed={activeMapTool === 'grab'}
-													className="flex items-center justify-center"
-													style={{
-														width: '44px',
-														height: '44px',
-														borderRadius: '9px',
-														backgroundColor:
-															activeMapTool === 'grab'
-																? '#4CDE71'
-																: 'rgba(153, 153, 153, 0.3)', // #999999 @ 30%
-														cursor: 'pointer',
-														padding: 0,
-														border: 'none',
-													}}
-												>
-													<GrabIcon innerFill={activeMapTool === 'grab' ? '#FFFFFF' : '#DCDFDD'} />
-												</button>
-												{activeMapTool === 'grab' && (
-													<div className="pointer-events-none absolute left-1/2 top-[52px] -translate-x-1/2 opacity-0 group-hover:opacity-100 font-inter text-[16px] font-semibold leading-none text-black select-none whitespace-nowrap">
-														Grab
+
+													{/* Center: Select tool */}
+													<div className="relative">
+														<button
+															type="button"
+															onClick={handleSelectMapToolClick}
+															aria-label="Select tool"
+															aria-pressed={isSelectMapToolActive}
+															className="flex items-center justify-center font-inter text-[16px] font-semibold leading-none text-black"
+															style={{
+																width: '43px',
+																height: '43px',
+																borderRadius: '9px',
+																backgroundColor:
+																	isSelectMapToolActive
+																		? '#999999'
+																		: 'rgba(153, 153, 153, 0.3)', // #999999 @ 30%
+																cursor: 'pointer',
+																padding: 0,
+																border: 'none',
+															}}
+														>
+															<div
+																aria-hidden="true"
+																style={{
+																	width: '24px',
+																	height: '24px',
+																	backgroundColor:
+																		isSelectMapToolActive ? '#999999' : 'transparent',
+																	border: '2px solid #000000',
+																	boxSizing: 'border-box',
+																	display: 'flex',
+																	alignItems: 'center',
+																	justifyContent: 'center',
+																}}
+															>
+																{isSelectMapToolActive && (
+																	<span
+																		className="font-inter"
+																		style={{
+																			fontSize: '8px',
+																			fontWeight: 500,
+																			color: '#000000',
+																			lineHeight: 1,
+																		}}
+																	>
+																		All
+																	</span>
+																)}
+															</div>
+														</button>
+														{isSelectMapToolActive && (
+															<div className="pointer-events-none absolute left-1/2 top-[51px] -translate-x-1/2 opacity-0 group-hover:opacity-100 font-inter text-[16px] font-semibold leading-none text-black select-none whitespace-nowrap">
+																Select
+															</div>
+														)}
 													</div>
-												)}
-											</div>
+
+													{/* Right: Grab tool */}
+													<div className="relative">
+														<button
+															type="button"
+															onClick={() => setActiveMapTool('grab')}
+															aria-label="Grab tool"
+															aria-pressed={isGrabMapToolActive}
+															className="flex items-center justify-center"
+															style={{
+																width: '43px',
+																height: '43px',
+																borderRadius: '9px',
+																backgroundColor:
+																	isGrabMapToolActive
+																		? '#4CDE71'
+																		: '#999999',
+																cursor: 'pointer',
+																padding: 0,
+																border: 'none',
+															}}
+														>
+															<GrabIcon
+																innerFill="#FFFFFF"
+															/>
+														</button>
+													</div>
+												</>
+											) : (
+												<>
+													<div className="relative">
+														<button
+															type="button"
+															onClick={handleSelectMapToolClick}
+															aria-label="Select tool"
+															aria-pressed={isSelectMapToolActive}
+															className="flex items-center justify-center"
+															style={{
+																width: '43px',
+																height: '43px',
+																borderRadius: '9px',
+																backgroundColor:
+																	isSelectMapToolActive
+																		? '#999999'
+																		: 'rgba(153, 153, 153, 0.3)', // #999999 @ 30%
+																cursor: 'pointer',
+																padding: 0,
+																border: 'none',
+															}}
+														>
+															<div
+																aria-hidden="true"
+																style={{
+																	width: '24px',
+																	height: '24px',
+																	backgroundColor:
+																		isSelectMapToolActive
+																			? '#999999'
+																			: 'transparent',
+																	border: '2px solid #000000',
+																	boxSizing: 'border-box',
+																	display: 'flex',
+																	alignItems: 'center',
+																	justifyContent: 'center',
+																}}
+															>
+																{isSelectMapToolActive && (
+																	<span
+																		className="font-inter"
+																		style={{
+																			fontSize: '8px',
+																			fontWeight: 500,
+																			color: '#000000',
+																			lineHeight: 1,
+																		}}
+																	>
+																		All
+																	</span>
+																)}
+															</div>
+														</button>
+														{isSelectMapToolActive && (
+															<div className="pointer-events-none absolute left-1/2 top-[51px] -translate-x-1/2 opacity-0 group-hover:opacity-100 font-inter text-[16px] font-semibold leading-none text-black select-none whitespace-nowrap">
+																Select
+															</div>
+														)}
+													</div>
+													<div className="relative">
+														<button
+															type="button"
+															onClick={() => setActiveMapTool('grab')}
+															aria-label="Grab tool"
+															aria-pressed={isGrabMapToolActive}
+															className="flex items-center justify-center"
+															style={{
+																width: '43px',
+																height: '43px',
+																borderRadius: '9px',
+																backgroundColor:
+																	isGrabMapToolActive
+																		? '#4CDE71'
+																		: '#999999',
+																cursor: 'pointer',
+																padding: 0,
+																border: 'none',
+															}}
+														>
+															<GrabIcon
+																innerFill="#FFFFFF"
+															/>
+														</button>
+														{isGrabMapToolActive && (
+															<div className="pointer-events-none absolute left-1/2 top-[51px] -translate-x-1/2 opacity-0 group-hover:opacity-100 font-inter text-[16px] font-semibold leading-none text-black select-none whitespace-nowrap">
+																Grab
+															</div>
+														)}
+													</div>
+												</>
+											)}
 										</div>
 									</div>
 									<button
 										type="button"
 										onClick={handleCloseMapView}
 										aria-label="Home"
-										className="group flex items-center justify-center cursor-pointer w-[53px] hover:w-[158px]"
+										className="group flex items-center justify-center cursor-pointer w-[52px] hover:w-[155px]"
 										style={{
 											position: 'absolute',
 											// Map is inset 9px from the viewport; "25px from map top" => 34px viewport.
@@ -3244,7 +4388,7 @@ const DashboardContent = () => {
 											top: '1px',
 											// "179px to the right of the searchbar" => from wrapper's right edge.
 											left: 'calc(100% + 179px)',
-											height: '53px',
+											height: '52px',
 											borderRadius: '9px',
 											backgroundColor: '#D6D6D6',
 											border: '3px solid #000000',
@@ -3252,19 +4396,19 @@ const DashboardContent = () => {
 										}}
 									>
 										<div
-											className="flex items-center justify-center w-[43px] group-hover:w-[146px]"
+											className="flex items-center justify-center w-[42px] group-hover:w-[143px]"
 											style={{
-												height: '43px',
+												height: '42px',
 												borderRadius: '9px',
 												backgroundColor: '#EAEAEA',
 											}}
 										>
 											{/* Default: show house icon */}
-											<span className="group-hover:hidden">
-												<HomeIcon width={28} height={24} />
+											<span className="group-hover:hidden flex items-center justify-center">
+												<HomeIcon width={20} height={17} />
 											</span>
 											{/* Hover: show "Home" text SVG */}
-											<HomeExpandedIcon className="hidden group-hover:block" />
+											<HomeExpandedIcon className="hidden group-hover:block" width={80} height={21} />
 										</div>
 									</button>
 								</>
@@ -3282,14 +4426,58 @@ const DashboardContent = () => {
 										</div>
 										<div className="mt-1 w-full flex justify-center">
 											<div
-												className="inline-flex items-center justify-center h-[19px] rounded-[8px] px-2 whitespace-nowrap"
+												className="inline-flex items-center justify-center h-[19px] rounded-[8px] px-2 gap-1 whitespace-nowrap"
 												style={{
-													backgroundColor: '#E8EFFF',
+													backgroundColor: isRestaurantTitle(hoveredContact.title || '')
+														? '#C3FBD1'
+														: isCoffeeShopTitle(hoveredContact.title || '')
+															? '#D6F1BD'
+															: isMusicVenueTitle(hoveredContact.title || '')
+																? '#B7E5FF'
+																: isMusicFestivalTitle(hoveredContact.title || '')
+																	? '#C1D6FF'
+																	: (isWeddingPlannerTitle(hoveredContact.title || '') || isWeddingVenueTitle(hoveredContact.title || ''))
+																		? '#FFF8DC'
+																		: isWineBeerSpiritsTitle(hoveredContact.title || '')
+																			? '#BFC4FF'
+																			: '#E8EFFF',
 													border: '0.7px solid #000000',
 												}}
 											>
+												{isRestaurantTitle(hoveredContact.title || '') && (
+													<RestaurantsIcon size={12} className="flex-shrink-0" />
+												)}
+												{isCoffeeShopTitle(hoveredContact.title || '') && (
+													<CoffeeShopsIcon size={7} />
+												)}
+												{isMusicVenueTitle(hoveredContact.title || '') && (
+													<MusicVenuesIcon size={12} className="flex-shrink-0" />
+												)}
+												{isMusicFestivalTitle(hoveredContact.title || '') && (
+													<FestivalsIcon size={12} className="flex-shrink-0" />
+												)}
+												{(isWeddingPlannerTitle(hoveredContact.title || '') || isWeddingVenueTitle(hoveredContact.title || '')) && (
+													<WeddingPlannersIcon size={12} />
+												)}
+												{isWineBeerSpiritsTitle(hoveredContact.title || '') && (
+													<WineBeerSpiritsIcon size={12} className="flex-shrink-0" />
+												)}
 												<span className="text-[14px] leading-none font-secondary font-medium">
-													{hoveredContact.title || '—'}
+													{isRestaurantTitle(hoveredContact.title || '')
+														? 'Restaurant'
+														: isCoffeeShopTitle(hoveredContact.title || '')
+															? 'Coffee Shop'
+															: isMusicVenueTitle(hoveredContact.title || '')
+																? 'Music Venue'
+																: isMusicFestivalTitle(hoveredContact.title || '')
+																	? 'Music Festival'
+																	: isWeddingVenueTitle(hoveredContact.title || '')
+																		? 'Wedding Venue'
+																		: isWeddingPlannerTitle(hoveredContact.title || '')
+																			? 'Wedding Planner'
+																			: isWineBeerSpiritsTitle(hoveredContact.title || '')
+																				? getWineBeerSpiritsLabel(hoveredContact.title || '')
+																				: (hoveredContact.title || '—')}
 												</span>
 											</div>
 										</div>
@@ -3389,6 +4577,7 @@ const DashboardContent = () => {
 																externallyHoveredContactId={hoveredMapPanelContactId}
 																searchQuery={activeSearchQuery}
 																searchWhat={searchedWhat}
+																selectAllInViewNonce={selectAllInViewNonce}
 																onVisibleOverlayContactsChange={(overlayContacts) => {
 																	setMapPanelVisibleOverlayContacts(overlayContacts);
 
@@ -3512,16 +4701,34 @@ const DashboardContent = () => {
 																	);
 																}}
 																onToggleSelection={(contactId) => {
-																	if (selectedContacts.includes(contactId)) {
-																		setSelectedContacts(
-																			selectedContacts.filter((id) => id !== contactId)
+																	const wasSelected = selectedContacts.includes(contactId);
+
+																	// Ensure the selected contact stays renderable in the side panel across
+																	// subsequent searches by caching the full object.
+																	if (!wasSelected) {
+																		const fromBase = (contacts || []).find((c) => c.id === contactId);
+																		const fromOverlay = mapPanelVisibleOverlayContacts.find(
+																			(c) => c.id === contactId
 																		);
-																	} else {
-																		setSelectedContacts([
-																			...selectedContacts,
-																			contactId,
-																		]);
+																		const fromExtra = mapPanelExtraContacts.find(
+																			(c) => c.id === contactId
+																		);
+																		const selectedContact = fromBase ?? fromOverlay ?? fromExtra;
+																		if (selectedContact) {
+																			setMapPanelExtraContacts((prev) =>
+																				prev.some((c) => c.id === contactId)
+																					? prev
+																					: [selectedContact, ...prev]
+																			);
+																		}
 																	}
+
+																	setSelectedContacts((prev) => {
+																		if (prev.includes(contactId)) {
+																			return prev.filter((id) => id !== contactId);
+																		}
+																		return [...prev, contactId];
+																	});
 																	// Scroll to the contact in the side panel
 																	const tryScroll = (attempt = 0) => {
 																		const contactElement = document.querySelector(
@@ -3677,14 +4884,36 @@ const DashboardContent = () => {
 																				);
 																				const isHovered = hoveredMapPanelContactId === contact.id;
 																				const isUsed = usedContactIdsSet.has(contact.id);
+																				const isInBaseResults = baseContactIdSet.has(contact.id);
 																				const firstName = contact.firstName || '';
 																				const lastName = contact.lastName || '';
 																				const fullName =
 																					contact.name ||
 																					`${firstName} ${lastName}`.trim();
 																				const company = contact.company || '';
+																				// For restaurant/coffee shop searches, always use the search-derived headline
+																				// Otherwise, use contact's headline or fall back to search What + Where
+																				const searchDerivedHeadline =
+																					whatValue && whereValue
+																						? `${whatValue} ${whereValue}`
+																						: whatValue || '';
+																				const isSpecialCategorySearch =
+																					/^restaurants?$/i.test(whatValue.trim()) ||
+																					/^coffee\s*shops?$/i.test(whatValue.trim());
+																				const contactHeadline = contact.headline || contact.title || '';
+																				const computedHeadline =
+																					isSpecialCategorySearch && isInBaseResults
+																						? searchDerivedHeadline
+																						: contactHeadline || searchDerivedHeadline;
+																				const stickyHeadline =
+																					selectedContactStickyHeadlineById[contact.id] || '';
 																				const headline =
-																					contact.headline || contact.title || '';
+																					isSelected && stickyHeadline ? stickyHeadline : computedHeadline;
+																				const isRestaurantsSearchForContact = isRestaurantsSearch && isInBaseResults;
+																				const isCoffeeShopsSearchForContact = isCoffeeShopsSearch && isInBaseResults;
+																				const isMusicVenuesSearchForContact = isMusicVenuesSearch && isInBaseResults;
+																				const isMusicFestivalsSearchForContact = isMusicFestivalsSearch && isInBaseResults;
+																				const isWeddingPlannersSearchForContact = isWeddingPlannersSearch && isInBaseResults;
 																				const stateAbbr =
 																					getStateAbbreviation(contact.state || '') || '';
 																				const city = contact.city || '';
@@ -3693,13 +4922,24 @@ const DashboardContent = () => {
 																					<div
 																						key={contact.id}
 																						data-contact-id={contact.id}
-																						className="cursor-pointer transition-colors grid grid-cols-2 grid-rows-2 w-full h-[49px] overflow-hidden rounded-[8px] border-2 border-black select-none relative"
+																						className="cursor-pointer transition-colors grid grid-cols-2 grid-rows-2 w-full h-[49px] overflow-hidden rounded-[8px] border-[3px] border-[#ABABAB] select-none relative"
 																						style={{
 																							// Hover should be a subtle darken, not "selected" blue.
+																							// Category-specific selection colors.
 																							backgroundColor: isSelected
-																								? isHovered
-																									? '#BFE3FF'
-																									: '#C9EAFF'
+																								? (isRestaurantsSearchForContact || isRestaurantTitle(headline))
+																									? isHovered ? '#C5F5D1' : '#D7FFE1'
+																									: (isCoffeeShopsSearchForContact || isCoffeeShopTitle(headline))
+																										? isHovered ? '#DDF4CC' : '#EDFEDC'
+																										: (isMusicVenuesSearchForContact || isMusicVenueTitle(headline))
+																											? isHovered ? '#C5E8FF' : '#D7F0FF'
+																											: (isMusicFestivalsSearchForContact || isMusicFestivalTitle(headline))
+																												? isHovered ? '#ADD4FF' : '#BFDCFF'
+																												: (isWeddingPlannersSearchForContact || isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline))
+																													? isHovered ? '#F5EDCE' : '#FFF8DC'
+																													: isWineBeerSpiritsTitle(headline)
+																														? isHovered ? '#C8CBFF' : '#DADDFF'
+																														: isHovered ? '#BFE3FF' : '#C9EAFF'
 																								: isHovered
 																									? '#F3F4F6'
 																									: '#FFFFFF',
@@ -3761,10 +5001,59 @@ const DashboardContent = () => {
 																								</div>
 																								{/* Top Right - Title/Headline */}
 																								<div className="pr-2 pl-1 flex items-center h-[23px]">
-																									{headline ? (
-																										<div className="h-[17px] rounded-[6px] px-2 flex items-center w-full bg-[#E8EFFF] border border-black overflow-hidden">
+																									{(headline || isMusicVenuesSearchForContact || isRestaurantsSearchForContact || isCoffeeShopsSearchForContact || isMusicFestivalsSearchForContact || isWeddingPlannersSearchForContact) ? (
+																										<div
+																											className="h-[17px] rounded-[6px] px-2 flex items-center gap-1 w-full border border-black overflow-hidden"
+																											style={{
+																												backgroundColor: (isRestaurantsSearchForContact || isRestaurantTitle(headline))
+																													? '#C3FBD1'
+																													: (isCoffeeShopsSearchForContact || isCoffeeShopTitle(headline))
+																														? '#D6F1BD'
+																														: (isMusicVenuesSearchForContact || isMusicVenueTitle(headline))
+																															? '#B7E5FF'
+																															: (isMusicFestivalsSearchForContact || isMusicFestivalTitle(headline))
+																																? '#C1D6FF'
+																																: (isWeddingPlannersSearchForContact || isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline))
+																																	? '#FFF8DC'
+																																	: isWineBeerSpiritsTitle(headline)
+																																		? '#BFC4FF'
+																																		: '#E8EFFF',
+																											}}
+																										>
+																											{(isRestaurantsSearchForContact || isRestaurantTitle(headline)) && (
+																												<RestaurantsIcon size={12} className="flex-shrink-0" />
+																											)}
+																											{(isCoffeeShopsSearchForContact || isCoffeeShopTitle(headline)) && (
+																												<CoffeeShopsIcon size={7} />
+																											)}
+																											{(isMusicVenuesSearchForContact || isMusicVenueTitle(headline)) && (
+																												<MusicVenuesIcon size={12} className="flex-shrink-0" />
+																											)}
+																											{(isMusicFestivalsSearchForContact || isMusicFestivalTitle(headline)) && (
+																												<FestivalsIcon size={12} className="flex-shrink-0" />
+																											)}
+																											{(isWeddingPlannersSearchForContact || isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline)) && (
+																												<WeddingPlannersIcon size={12} />
+																											)}
+																											{isWineBeerSpiritsTitle(headline) && (
+																												<WineBeerSpiritsIcon size={12} className="flex-shrink-0" />
+																											)}
 																											<span className="text-[10px] text-black leading-none truncate">
-																												{headline}
+																												{(isRestaurantsSearchForContact || isRestaurantTitle(headline))
+																													? 'Restaurant'
+																													: (isCoffeeShopsSearchForContact || isCoffeeShopTitle(headline))
+																														? 'Coffee Shop'
+																														: (isMusicVenuesSearchForContact || isMusicVenueTitle(headline))
+																															? 'Music Venue'
+																															: (isMusicFestivalsSearchForContact || isMusicFestivalTitle(headline))
+																																? 'Music Festival'
+																																: isWeddingVenueTitle(headline)
+																																	? 'Wedding Venue'
+																																	: (isWeddingPlannersSearchForContact || isWeddingPlannerTitle(headline))
+																																		? 'Wedding Planner'
+																																		: isWineBeerSpiritsTitle(headline)
+																																			? getWineBeerSpiritsLabel(headline)
+																																			: headline}
 																											</span>
 																										</div>
 																									) : (
@@ -3838,10 +5127,59 @@ const DashboardContent = () => {
 																								</div>
 																								{/* Top Right - Title/Headline */}
 																								<div className="pr-2 pl-1 flex items-center h-[23px]">
-																									{headline ? (
-																										<div className="h-[17px] rounded-[6px] px-2 flex items-center w-full bg-[#E8EFFF] border border-black overflow-hidden">
+																									{(headline || isMusicVenuesSearchForContact || isRestaurantsSearchForContact || isCoffeeShopsSearchForContact || isMusicFestivalsSearchForContact || isWeddingPlannersSearchForContact) ? (
+																										<div
+																											className="h-[17px] rounded-[6px] px-2 flex items-center gap-1 w-full border border-black overflow-hidden"
+																											style={{
+																												backgroundColor: (isRestaurantsSearchForContact || isRestaurantTitle(headline))
+																													? '#C3FBD1'
+																													: (isCoffeeShopsSearchForContact || isCoffeeShopTitle(headline))
+																														? '#D6F1BD'
+																														: (isMusicVenuesSearchForContact || isMusicVenueTitle(headline))
+																															? '#B7E5FF'
+																															: (isMusicFestivalsSearchForContact || isMusicFestivalTitle(headline))
+																																? '#C1D6FF'
+																																: (isWeddingPlannersSearchForContact || isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline))
+																																	? '#FFF8DC'
+																																	: isWineBeerSpiritsTitle(headline)
+																																		? '#BFC4FF'
+																																		: '#E8EFFF',
+																											}}
+																										>
+																											{(isRestaurantsSearchForContact || isRestaurantTitle(headline)) && (
+																												<RestaurantsIcon size={12} className="flex-shrink-0" />
+																											)}
+																											{(isCoffeeShopsSearchForContact || isCoffeeShopTitle(headline)) && (
+																												<CoffeeShopsIcon size={7} />
+																											)}
+																											{(isMusicVenuesSearchForContact || isMusicVenueTitle(headline)) && (
+																												<MusicVenuesIcon size={12} className="flex-shrink-0" />
+																											)}
+																											{(isMusicFestivalsSearchForContact || isMusicFestivalTitle(headline)) && (
+																												<FestivalsIcon size={12} className="flex-shrink-0" />
+																											)}
+																											{(isWeddingPlannersSearchForContact || isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline)) && (
+																												<WeddingPlannersIcon size={12} />
+																											)}
+																											{isWineBeerSpiritsTitle(headline) && (
+																												<WineBeerSpiritsIcon size={12} className="flex-shrink-0" />
+																											)}
 																											<span className="text-[10px] text-black leading-none truncate">
-																												{headline}
+																												{(isRestaurantsSearchForContact || isRestaurantTitle(headline))
+																													? 'Restaurant'
+																													: (isCoffeeShopsSearchForContact || isCoffeeShopTitle(headline))
+																														? 'Coffee Shop'
+																														: (isMusicVenuesSearchForContact || isMusicVenueTitle(headline))
+																															? 'Music Venue'
+																															: (isMusicFestivalsSearchForContact || isMusicFestivalTitle(headline))
+																																? 'Music Festival'
+																																: isWeddingVenueTitle(headline)
+																																	? 'Wedding Venue'
+																																	: (isWeddingPlannersSearchForContact || isWeddingPlannerTitle(headline))
+																																		? 'Wedding Planner'
+																																		: isWineBeerSpiritsTitle(headline)
+																																			? getWineBeerSpiritsLabel(headline)
+																																			: headline}
 																											</span>
 																										</div>
 																									) : (
@@ -3886,10 +5224,7 @@ const DashboardContent = () => {
 																		{!isMapResultsLoading && isMapPanelCreateCampaignVisible && (
 																			<div className="flex-shrink-0 w-full px-[10px] pb-[10px]">
 																				<Button
-																					disabled={
-																						isPendingCreateCampaign ||
-																						isPendingBatchUpdateContacts
-																					}
+																					disabled={primaryCtaPending}
 																					variant="primary-light"
 																					bold
 																					className={`relative w-full h-[39px] !bg-[#5DAB68] hover:!bg-[#4e9b5d] !text-white border border-[#000000] overflow-hidden ${
@@ -3907,14 +5242,14 @@ const DashboardContent = () => {
 																					}
 																					onClick={() => {
 																						if (selectedContacts.length === 0) return;
-																						handleCreateCampaign();
+																						handlePrimaryCta();
 																					}}
 																				>
 																					<span
 																						className="relative z-20"
 																						style={{ fontFamily: 'Inter, sans-serif', fontWeight: 700 }}
 																					>
-																						Create Campaign
+																						{primaryCtaLabel}
 																					</span>
 																					<div
 																						className="absolute inset-y-0 right-0 w-[65px] z-20 flex items-center justify-center bg-[#74D178] cursor-pointer"
@@ -3984,10 +5319,7 @@ const DashboardContent = () => {
 																			aria-hidden={!isMapBottomCreateCampaignVisible}
 																		>
 																			<Button
-																				disabled={
-																					isPendingCreateCampaign ||
-																					isPendingBatchUpdateContacts
-																				}
+																				disabled={primaryCtaPending}
 																				variant="primary-light"
 																				bold
 																				className={`relative w-full max-w-[420px] h-[39px] !bg-[#5DAB68] hover:!bg-[#4e9b5d] !text-white border border-[#000000] overflow-hidden ${
@@ -4002,12 +5334,12 @@ const DashboardContent = () => {
 																				}
 																				onClick={() => {
 																					if (selectedContacts.length === 0) return;
-																					handleCreateCampaign();
+																					handlePrimaryCta();
 																				}}
 																				tabIndex={isMapBottomCreateCampaignVisible ? 0 : -1}
 																			>
 																				<span className="relative z-20" style={{ fontFamily: 'Inter, sans-serif', fontWeight: 700 }}>
-																					Create Campaign
+																					{primaryCtaLabel}
 																				</span>
 																				<div
 																					className="absolute inset-y-0 right-0 w-[65px] z-20 flex items-center justify-center bg-[#74D178] cursor-pointer"
@@ -4099,14 +5431,34 @@ const DashboardContent = () => {
 																		);
 																		const isHovered = hoveredMapPanelContactId === contact.id;
 																		const isUsed = usedContactIdsSet.has(contact.id);
+																		const isInBaseResults = baseContactIdSet.has(contact.id);
 																		const firstName = contact.firstName || '';
 																		const lastName = contact.lastName || '';
 																		const fullName =
 																			contact.name ||
 																			`${firstName} ${lastName}`.trim();
 																		const company = contact.company || '';
+																		// For restaurant searches, always use the search-derived headline
+																		// Otherwise, use contact's headline or fall back to search What + Where
+																		const searchDerivedHeadline =
+																			whatValue && whereValue
+																				? `${whatValue} ${whereValue}`
+																				: whatValue || '';
+																		const isRestaurantSearch = /^restaurants?$/i.test(whatValue.trim());
+																		const contactHeadline = contact.headline || contact.title || '';
+																		const computedHeadline =
+																			isRestaurantSearch && isInBaseResults
+																				? searchDerivedHeadline
+																				: contactHeadline || searchDerivedHeadline;
+																		const stickyHeadline =
+																			selectedContactStickyHeadlineById[contact.id] || '';
 																		const headline =
-																			contact.headline || contact.title || '';
+																			isSelected && stickyHeadline ? stickyHeadline : computedHeadline;
+																		const isRestaurantsSearchForContact = isRestaurantsSearch && isInBaseResults;
+																		const isCoffeeShopsSearchForContact = isCoffeeShopsSearch && isInBaseResults;
+																		const isMusicVenuesSearchForContact = isMusicVenuesSearch && isInBaseResults;
+																		const isMusicFestivalsSearchForContact = isMusicFestivalsSearch && isInBaseResults;
+																		const isWeddingPlannersSearchForContact = isWeddingPlannersSearch && isInBaseResults;
 																		const stateAbbr =
 																			getStateAbbreviation(contact.state || '') || '';
 																		const city = contact.city || '';
@@ -4115,13 +5467,24 @@ const DashboardContent = () => {
 																			<div
 																				key={contact.id}
 																				data-contact-id={contact.id}
-																				className="cursor-pointer transition-colors flex w-full h-[49px] overflow-hidden rounded-[8px] border-2 border-black select-none relative"
+																				className="cursor-pointer transition-colors flex w-full h-[49px] overflow-hidden rounded-[8px] border-[3px] border-[#ABABAB] select-none relative"
 																				style={{
 																					// Hover should be a subtle darken, not "selected" blue.
+																					// Category-specific selection colors.
 																					backgroundColor: isSelected
-																						? isHovered
-																							? '#BFE3FF'
-																							: '#C9EAFF'
+																						? (isRestaurantsSearchForContact || isRestaurantTitle(headline))
+																							? isHovered ? '#C5F5D1' : '#D7FFE1'
+																							: (isCoffeeShopsSearchForContact || isCoffeeShopTitle(headline))
+																								? isHovered ? '#DDF4CC' : '#EDFEDC'
+																								: (isMusicVenuesSearchForContact || isMusicVenueTitle(headline))
+																									? isHovered ? '#C5E8FF' : '#D7F0FF'
+																									: (isMusicFestivalsSearchForContact || isMusicFestivalTitle(headline))
+																										? isHovered ? '#ADD4FF' : '#BFDCFF'
+																										: (isWeddingPlannersSearchForContact || isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline))
+																											? isHovered ? '#F5EDCE' : '#FFF8DC'
+																											: isWineBeerSpiritsTitle(headline)
+																												? isHovered ? '#C8CBFF' : '#DADDFF'
+																												: isHovered ? '#BFE3FF' : '#C9EAFF'
 																						: isHovered
 																							? '#F3F4F6'
 																							: '#FFFFFF',
@@ -4209,17 +5572,61 @@ const DashboardContent = () => {
 																				<div className="flex-shrink-0 flex flex-col justify-center pr-2" style={{ width: '240px' }}>
 																					{headline ? (
 																						<div
-																							className="overflow-hidden flex items-center px-2"
+																							className="overflow-hidden flex items-center px-2 gap-1"
 																							style={{
 																								width: '230px',
 																								height: '19px',
-																								backgroundColor: '#E8EFFF',
+																								backgroundColor: (isRestaurantsSearchForContact || isRestaurantTitle(headline))
+																									? '#C3FBD1'
+																									: (isCoffeeShopsSearchForContact || isCoffeeShopTitle(headline))
+																										? '#D6F1BD'
+																										: (isMusicVenuesSearchForContact || isMusicVenueTitle(headline))
+																											? '#B7E5FF'
+																											: (isMusicFestivalsSearchForContact || isMusicFestivalTitle(headline))
+																												? '#C1D6FF'
+																												: (isWeddingPlannersSearchForContact || isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline))
+																													? '#FFF8DC'
+																													: isWineBeerSpiritsTitle(headline)
+																														? '#BFC4FF'
+																														: '#E8EFFF',
 																								border: '0.7px solid #000000',
 																								borderRadius: '8px',
 																							}}
 																						>
+																							{(isRestaurantsSearchForContact || isRestaurantTitle(headline)) && (
+																								<RestaurantsIcon size={12} className="flex-shrink-0" />
+																							)}
+																							{(isCoffeeShopsSearchForContact || isCoffeeShopTitle(headline)) && (
+																								<CoffeeShopsIcon size={7} />
+																							)}
+																							{(isMusicVenuesSearchForContact || isMusicVenueTitle(headline)) && (
+																								<MusicVenuesIcon size={12} className="flex-shrink-0" />
+																							)}
+																							{(isMusicFestivalsSearchForContact || isMusicFestivalTitle(headline)) && (
+																								<FestivalsIcon size={12} className="flex-shrink-0" />
+																							)}
+																							{(isWeddingPlannersSearchForContact || isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline)) && (
+																								<WeddingPlannersIcon size={12} />
+																							)}
+																							{isWineBeerSpiritsTitle(headline) && (
+																								<WineBeerSpiritsIcon size={12} className="flex-shrink-0" />
+																							)}
 																							<span className="text-[14px] text-black leading-none truncate">
-																								{headline}
+																								{(isRestaurantsSearchForContact || isRestaurantTitle(headline))
+																									? 'Restaurant'
+																									: (isCoffeeShopsSearchForContact || isCoffeeShopTitle(headline))
+																										? 'Coffee Shop'
+																										: (isMusicVenuesSearchForContact || isMusicVenueTitle(headline))
+																											? 'Music Venue'
+																											: (isMusicFestivalsSearchForContact || isMusicFestivalTitle(headline))
+																												? 'Music Festival'
+																												: isWeddingVenueTitle(headline)
+																													? 'Wedding Venue'
+																													: (isWeddingPlannersSearchForContact || isWeddingPlannerTitle(headline))
+																														? 'Wedding Planner'
+																														: isWineBeerSpiritsTitle(headline)
+																															? getWineBeerSpiritsLabel(headline)
+																															: headline}
 																							</span>
 																						</div>
 																					) : null}
@@ -4255,10 +5662,7 @@ const DashboardContent = () => {
 																{!isMapResultsLoading && (
 																	<div className="flex-shrink-0 w-full px-[10px] pb-[10px]">
 																		<Button
-																			disabled={
-																				isPendingCreateCampaign ||
-																				isPendingBatchUpdateContacts
-																			}
+																			disabled={primaryCtaPending}
 																			variant="primary-light"
 																			bold
 																			className={`relative w-full h-[39px] !bg-[#5DAB68] hover:!bg-[#4e9b5d] !text-white border border-[#000000] overflow-hidden ${
@@ -4273,10 +5677,12 @@ const DashboardContent = () => {
 																			}
 																			onClick={() => {
 																				if (selectedContacts.length === 0) return;
-																				handleCreateCampaign();
+																				handlePrimaryCta();
 																			}}
 																		>
-																			<span className="relative z-20" style={{ fontFamily: 'Inter, sans-serif', fontWeight: 700 }}>Create Campaign</span>
+																			<span className="relative z-20" style={{ fontFamily: 'Inter, sans-serif', fontWeight: 700 }}>
+																				{primaryCtaLabel}
+																			</span>
 																			<div
 																				className="absolute inset-y-0 right-0 w-[65px] z-20 flex items-center justify-center bg-[#74D178] cursor-pointer"
 																				onClick={(e) => {
@@ -4350,19 +5756,19 @@ const DashboardContent = () => {
 															!isMobile ? (
 																<button
 																	type="button"
-																	onClick={handleCreateCampaign}
-																	disabled={selectedContacts.length === 0}
+																	onClick={handlePrimaryCta}
+																	disabled={selectedContacts.length === 0 || primaryCtaPending}
 																	className="font-secondary"
 																	style={{
 																		width: '127px',
 																		height: '31px',
 																		background:
-																			selectedContacts.length === 0
+																			selectedContacts.length === 0 || primaryCtaPending
 																				? 'rgba(93, 171, 104, 0.1)'
 																				: '#B8E4BE',
 																		border: '2px solid #000000',
 																		color:
-																			selectedContacts.length === 0
+																			selectedContacts.length === 0 || primaryCtaPending
 																				? 'rgba(0, 0, 0, 0.4)'
 																				: '#000000',
 																		fontSize: '13px',
@@ -4377,13 +5783,13 @@ const DashboardContent = () => {
 																		textAlign: 'center',
 																		whiteSpace: 'nowrap',
 																		cursor:
-																			selectedContacts.length === 0
+																			selectedContacts.length === 0 || primaryCtaPending
 																				? 'default'
 																				: 'pointer',
-																		opacity: selectedContacts.length === 0 ? 0.6 : 1,
+																		opacity: selectedContacts.length === 0 || primaryCtaPending ? 0.6 : 1,
 																	}}
 																>
-																	Create Campaign
+																	{primaryCtaLabel}
 																</button>
 															) : null
 														}
@@ -4403,18 +5809,18 @@ const DashboardContent = () => {
 											{!isMobile && (
 												<div className="flex items-center justify-center w-full search-results-cta-wrapper">
 													<Button
-														isLoading={
-															isPendingCreateCampaign || isPendingBatchUpdateContacts
-														}
+														isLoading={primaryCtaPending}
 														variant="primary-light"
 														bold
 														className="relative w-full max-w-[984px] h-[39px] mx-auto mt-[20px] !bg-[#5DAB68] hover:!bg-[#4e9b5d] !text-white border border-[#000000] overflow-hidden"
 														onClick={() => {
 															if (selectedContacts.length === 0) return;
-															handleCreateCampaign();
+															handlePrimaryCta();
 														}}
 													>
-														<span className="relative z-20" style={{ fontFamily: 'Inter, sans-serif', fontWeight: 700 }}>Create Campaign</span>
+														<span className="relative z-20" style={{ fontFamily: 'Inter, sans-serif', fontWeight: 700 }}>
+															{primaryCtaLabel}
+														</span>
 														<div
 															className="absolute inset-y-0 right-0 w-[65px] z-20 flex items-center justify-center bg-[#74D178] cursor-pointer"
 															onClick={(e) => {
@@ -4440,16 +5846,16 @@ const DashboardContent = () => {
 												createPortal(
 													<div className="mobile-sticky-cta">
 														<Button
-															onClick={handleCreateCampaign}
-															isLoading={
-																isPendingCreateCampaign || isPendingBatchUpdateContacts
-															}
+															onClick={handlePrimaryCta}
+															isLoading={primaryCtaPending}
 															variant="primary-light"
 															bold
 															className="w-full h-[54px] min-h-[54px] !rounded-none !bg-[#5dab68] hover:!bg-[#4e9b5d] !text-white border border-[#000000] transition-colors !opacity-100 disabled:!opacity-100"
-															disabled={selectedContacts.length === 0}
+															disabled={selectedContacts.length === 0 || primaryCtaPending}
 														>
-															<span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 700 }}>Create Campaign</span>
+															<span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 700 }}>
+																{primaryCtaLabel}
+															</span>
 														</Button>
 													</div>,
 													document.body

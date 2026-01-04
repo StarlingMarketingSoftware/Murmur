@@ -1,13 +1,21 @@
-import React from 'react';
+import React, { FC } from 'react';
 
-export const MusicVenuesIcon = () => {
+interface MusicVenuesIconProps {
+	size?: number;
+	className?: string;
+}
+
+export const MusicVenuesIcon: FC<MusicVenuesIconProps> = ({ size = 29, className }) => {
+	// Original aspect ratio is 29:23, so height = size * (23/29)
+	const height = size * (23 / 29);
 	return (
 		<svg
-			width="29"
-			height="23"
+			width={size}
+			height={height}
 			viewBox="0 0 29 23"
 			fill="none"
 			xmlns="http://www.w3.org/2000/svg"
+			className={className}
 		>
 			<rect
 				x="16.9491"

@@ -14,6 +14,12 @@ import type { ContactWithName } from '@/types/contact';
 import { getStateAbbreviation } from '@/utils/string';
 import { stateBadgeColorMap } from '@/constants/ui';
 import { urls } from '@/constants/urls';
+import { isRestaurantTitle, isCoffeeShopTitle, isMusicVenueTitle, isWeddingPlannerTitle, isWeddingVenueTitle, isWineBeerSpiritsTitle, getWineBeerSpiritsLabel } from '@/utils/restaurantTitle';
+import { WeddingPlannersIcon } from '@/components/atoms/_svg/WeddingPlannersIcon';
+import { RestaurantsIcon } from '@/components/atoms/_svg/RestaurantsIcon';
+import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
+import { MusicVenuesIcon } from '@/components/atoms/_svg/MusicVenuesIcon';
+import { WineBeerSpiritsIcon } from '@/components/atoms/_svg/WineBeerSpiritsIcon';
 
 /**
  * Strip quoted reply content from email body (e.g., "On Thu, Nov 27, 2025 at 2:36 AM ... wrote:")
@@ -257,14 +263,13 @@ export const InboxSection: FC<InboxSectionProps> = ({
 
 	// If a list of allowed sender emails is provided (e.g. campaign contacts),
 	// hide any inbound emails whose sender address does not match.
-	const normalizedAllowedSenders =
-		allowedSenderEmails && allowedSenderEmails.length > 0
-			? new Set(
-					allowedSenderEmails
-						.filter((email) => !!email)
-						.map((email) => email.toLowerCase().trim())
-			  )
-			: null;
+	const normalizedAllowedSenders = allowedSenderEmails
+		? new Set(
+				allowedSenderEmails
+					.filter((email): email is string => Boolean(email))
+					.map((email) => email.toLowerCase().trim())
+		  )
+		: null;
 
 	const filteredBySender =
 		normalizedAllowedSenders && inboundEmails
@@ -1640,9 +1645,51 @@ export const InboxSection: FC<InboxSectionProps> = ({
 															</span>
 														)}
 														{headline && (
-															<div className="h-[16px] max-w-[140px] rounded-[4px] px-1.5 flex items-center bg-[#E8EFFF] border border-black overflow-hidden flex-shrink-0">
+															<div
+																className="h-[16px] max-w-[140px] rounded-[4px] px-1.5 flex items-center gap-0.5 border border-black overflow-hidden flex-shrink-0"
+																style={{
+																	backgroundColor: isRestaurantTitle(headline)
+																		? '#C3FBD1'
+																		: isCoffeeShopTitle(headline)
+																			? '#D6F1BD'
+																			: isMusicVenueTitle(headline)
+																				? '#B7E5FF'
+																				: (isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline))
+																					? '#FFF2BC'
+																					: isWineBeerSpiritsTitle(headline)
+																						? '#BFC4FF'
+																						: '#E8EFFF',
+																}}
+															>
+																{isRestaurantTitle(headline) && (
+																	<RestaurantsIcon size={10} />
+																)}
+																{isCoffeeShopTitle(headline) && (
+																	<CoffeeShopsIcon size={6} />
+																)}
+																{isMusicVenueTitle(headline) && (
+																	<MusicVenuesIcon size={10} className="flex-shrink-0" />
+																)}
+																{(isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline)) && (
+																	<WeddingPlannersIcon size={10} />
+																)}
+																{isWineBeerSpiritsTitle(headline) && (
+																	<WineBeerSpiritsIcon size={10} className="flex-shrink-0" />
+																)}
 																<span className="text-[9px] text-black leading-none truncate">
-																	{headline}
+																	{isRestaurantTitle(headline)
+																		? 'Restaurant'
+																		: isCoffeeShopTitle(headline)
+																			? 'Coffee Shop'
+																			: isMusicVenueTitle(headline)
+																				? 'Music Venue'
+																				: isWeddingPlannerTitle(headline)
+																					? 'Wedding Planner'
+																					: isWeddingVenueTitle(headline)
+																						? 'Wedding Venue'
+																						: isWineBeerSpiritsTitle(headline)
+																							? getWineBeerSpiritsLabel(headline)
+																							: headline}
 																</span>
 															</div>
 														)}
@@ -1677,9 +1724,51 @@ export const InboxSection: FC<InboxSectionProps> = ({
 												return (
 													<>
 														{headline && (
-															<div className="h-[21px] max-w-[160px] rounded-[6px] px-2 flex items-center bg-[#E8EFFF] border border-black overflow-hidden flex-shrink-0">
+															<div
+																className="h-[21px] max-w-[160px] rounded-[6px] px-2 flex items-center gap-1 border border-black overflow-hidden flex-shrink-0"
+																style={{
+																	backgroundColor: isRestaurantTitle(headline)
+																		? '#C3FBD1'
+																		: isCoffeeShopTitle(headline)
+																			? '#D6F1BD'
+																			: isMusicVenueTitle(headline)
+																				? '#B7E5FF'
+																				: (isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline))
+																					? '#FFF2BC'
+																					: isWineBeerSpiritsTitle(headline)
+																						? '#BFC4FF'
+																						: '#E8EFFF',
+																}}
+															>
+																{isRestaurantTitle(headline) && (
+																	<RestaurantsIcon size={14} />
+																)}
+																{isCoffeeShopTitle(headline) && (
+																	<CoffeeShopsIcon size={8} />
+																)}
+																{isMusicVenueTitle(headline) && (
+																	<MusicVenuesIcon size={14} className="flex-shrink-0" />
+																)}
+																{(isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline)) && (
+																	<WeddingPlannersIcon size={14} />
+																)}
+																{isWineBeerSpiritsTitle(headline) && (
+																	<WineBeerSpiritsIcon size={14} className="flex-shrink-0" />
+																)}
 																<span className="text-[10px] text-black leading-none truncate">
-																	{headline}
+																	{isRestaurantTitle(headline)
+																		? 'Restaurant'
+																		: isCoffeeShopTitle(headline)
+																			? 'Coffee Shop'
+																			: isMusicVenueTitle(headline)
+																				? 'Music Venue'
+																				: isWeddingPlannerTitle(headline)
+																					? 'Wedding Planner'
+																					: isWeddingVenueTitle(headline)
+																						? 'Wedding Venue'
+																						: isWineBeerSpiritsTitle(headline)
+																							? getWineBeerSpiritsLabel(headline)
+																							: headline}
 																</span>
 															</div>
 														)}

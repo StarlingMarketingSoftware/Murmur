@@ -7,7 +7,6 @@ import { X } from 'lucide-react';
 import { cn } from '@/utils';
 import { DraftingTable } from '../DraftingTable/DraftingTable';
 import PreviewIcon from '@/components/atoms/_svg/PreviewIcon';
-import CloseButtonIcon from '@/components/atoms/_svg/CloseButtonIcon';
 import ApproveCheckIcon from '@/components/atoms/svg/ApproveCheckIcon';
 import RejectXIcon from '@/components/atoms/svg/RejectXIcon';
 import LeftArrowReviewIcon from '@/components/atoms/svg/LeftArrowReviewIcon';
@@ -26,6 +25,13 @@ import RightArrow from '@/components/atoms/_svg/RightArrow';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import RichTextEditor from '@/components/molecules/RichTextEditor/RichTextEditor';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
+import { isRestaurantTitle, isCoffeeShopTitle, isMusicVenueTitle, isMusicFestivalTitle, isWeddingPlannerTitle, isWeddingVenueTitle, isWineBeerSpiritsTitle, getWineBeerSpiritsLabel } from '@/utils/restaurantTitle';
+import { WeddingPlannersIcon } from '@/components/atoms/_svg/WeddingPlannersIcon';
+import { RestaurantsIcon } from '@/components/atoms/_svg/RestaurantsIcon';
+import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
+import { FestivalsIcon } from '@/components/atoms/_svg/FestivalsIcon';
+import { MusicVenuesIcon } from '@/components/atoms/_svg/MusicVenuesIcon';
+import { WineBeerSpiritsIcon } from '@/components/atoms/_svg/WineBeerSpiritsIcon';
 
 interface ScrollableTextareaProps
 	extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
@@ -225,7 +231,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 		selectedDraftIds,
 		handleSelectAllDrafts,
 	} = useDraftedEmails(props);
-	const { onContactClick, onContactHover, onRegenerateDraft } = props;
+	const { onContactClick, onContactHover, onDraftHover, onRegenerateDraft } = props;
 
 	const isMobile = useIsMobile();
 
@@ -370,8 +376,11 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 		const tabNavGap = '29px';
 		const tabNavMiddleWidth = '691px';
 
-		return (
-			<div className={cn("flex flex-col items-center", isMobile && "w-full px-1")}>
+			return (
+			<div
+				className={cn("flex flex-col items-center", isMobile && "w-full px-1")}
+				data-hover-description="Revise your draft here. Type out your revisions. Approve and Reject Drafts"
+			>
 				<div style={{ 
 					width: isMobile ? 'calc(100vw - 8px)' : '499px', 
 					height: isMobile ? 'calc(100dvh - 160px)' : '703px', 
@@ -435,7 +444,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 							justifyContent: 'space-between',
 							alignItems: 'flex-start',
 							height: '48px',
-							backgroundColor: 'white',
+							backgroundColor: '#FFE4B5',
 							position: 'relative',
 						}}
 					>
@@ -444,9 +453,17 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 							type="button"
 							variant="ghost"
 							onClick={handleBack}
-							className="absolute top-1/2 -translate-y-1/2 right-2 p-1 h-auto w-auto hover:bg-gray-100 rounded z-10"
+							className="absolute rounded z-10 flex items-center justify-center hover:bg-transparent"
+							style={{ 
+								top: '17px', 
+								right: '21px',
+								padding: '8px 12px',
+								margin: '-8px -12px',
+								width: 'auto',
+								height: 'auto'
+							}}
 						>
-							<CloseButtonIcon width={14} height={14} />
+							<div style={{ width: '16px', height: '2px', backgroundColor: '#000000' }} />
 						</Button>
 						<div style={{ 
 							display: 'flex', 
@@ -544,11 +561,61 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 							</div>
 							{contactTitle ? (
 								<div
-									className="rounded-[6px] border border-black bg-[#E8EFFF] px-2 flex items-center justify-start"
-									style={{ width: '152px', height: '18px' }}
+									className="rounded-[6px] border border-black px-2 flex items-center gap-1 justify-start"
+									style={{
+										width: '152px',
+										height: '18px',
+										backgroundColor: isRestaurantTitle(contactTitle)
+											? '#C3FBD1'
+											: isCoffeeShopTitle(contactTitle)
+												? '#D6F1BD'
+												: isMusicVenueTitle(contactTitle)
+													? '#B7E5FF'
+													: isMusicFestivalTitle(contactTitle)
+														? '#C1D6FF'
+														: (isWeddingPlannerTitle(contactTitle) || isWeddingVenueTitle(contactTitle))
+															? '#FFF2BC'
+															: isWineBeerSpiritsTitle(contactTitle)
+																? '#BFC4FF'
+																: '#E8EFFF',
+									}}
 								>
+									{isRestaurantTitle(contactTitle) && (
+										<RestaurantsIcon size={12} />
+									)}
+									{isCoffeeShopTitle(contactTitle) && (
+										<CoffeeShopsIcon size={7} />
+									)}
+									{isMusicVenueTitle(contactTitle) && (
+										<MusicVenuesIcon size={12} className="flex-shrink-0" />
+									)}
+									{isMusicFestivalTitle(contactTitle) && (
+										<FestivalsIcon size={12} className="flex-shrink-0" />
+									)}
+									{(isWeddingPlannerTitle(contactTitle) || isWeddingVenueTitle(contactTitle)) && (
+										<WeddingPlannersIcon size={12} />
+									)}
+									{isWineBeerSpiritsTitle(contactTitle) && (
+										<WineBeerSpiritsIcon size={12} className="flex-shrink-0" />
+									)}
 									<ScrollableText
-										text={contactTitle}
+										text={
+											isRestaurantTitle(contactTitle)
+												? 'Restaurant'
+												: isCoffeeShopTitle(contactTitle)
+													? 'Coffee Shop'
+													: isMusicVenueTitle(contactTitle)
+														? 'Music Venue'
+														: isMusicFestivalTitle(contactTitle)
+															? 'Music Festival'
+															: isWeddingPlannerTitle(contactTitle)
+																? 'Wedding Planner'
+																: isWeddingVenueTitle(contactTitle)
+																	? 'Wedding Venue'
+																	: isWineBeerSpiritsTitle(contactTitle)
+																		? getWineBeerSpiritsLabel(contactTitle) ?? contactTitle
+																		: contactTitle
+										}
 										className="text-[11px] font-inter text-black leading-none w-full"
 									/>
 								</div>
@@ -885,16 +952,18 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 							<div
 								className="bg-white border-2 border-black rounded-[4px] overflow-visible draft-review-box"
 								style={{ width: isMobile ? '100%' : '470px', height: hasStatusBar ? '516px' : '572px', flex: isMobile ? 1 : undefined }}
+								data-hover-description="Revise your draft here. Type out your revisions. Approve and Reject Drafts"
 							>
 								{/* Check if original message has links - if so, use RichTextEditor for proper link editing */}
 								{selectedDraft?.message && /<a\s+[^>]*href=/i.test(selectedDraft.message) ? (
-									<CustomScrollbar
-										className="w-full h-full"
-										thumbWidth={2}
-										thumbColor="#000000"
-										offsetRight={-6}
-										contentClassName="[&_.ProseMirror]:min-h-full [&_.ProseMirror]:border-0 [&_.ProseMirror]:bg-transparent [&_.ProseMirror]:focus:ring-0 [&_.ProseMirror]:focus:outline-none"
-									>
+									<div data-hover-description="Revise your draft here. Type out your revisions. Approve and Reject Drafts" className="w-full h-full">
+										<CustomScrollbar
+											className="w-full h-full"
+											thumbWidth={2}
+											thumbColor="#000000"
+											offsetRight={-6}
+											contentClassName="[&_.ProseMirror]:min-h-full [&_.ProseMirror]:border-0 [&_.ProseMirror]:bg-transparent [&_.ProseMirror]:focus:ring-0 [&_.ProseMirror]:focus:outline-none"
+										>
 										<RichTextEditor
 											value={editedMessage}
 											onChange={setEditedMessage}
@@ -902,17 +971,19 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 											className="w-full h-full border-0 bg-transparent !min-h-0 text-sm"
 											placeholder="Type your message here..."
 										/>
-									</CustomScrollbar>
+										</CustomScrollbar>
+									</div>
 								) : (
-									<ScrollableTextarea
-										value={editedMessage}
-										onChange={(e) => setEditedMessage(e.target.value)}
-										className="w-full h-full p-3 text-sm resize-none focus:outline-none focus:ring-0 bg-transparent border-0 whitespace-pre-wrap"
-										placeholder="Type your message here..."
-										thumbWidth={2}
-										thumbColor="#000000"
-										trackOffset={-6}
-									/>
+								<ScrollableTextarea
+									value={editedMessage}
+									onChange={(e) => setEditedMessage(e.target.value)}
+									className="w-full h-full p-3 text-sm resize-none focus:outline-none focus:ring-0 bg-transparent border-0 whitespace-pre-wrap"
+									placeholder="Type your message here..."
+									thumbWidth={2}
+									thumbColor="#000000"
+									trackOffset={-6}
+									data-hover-description="Revise your draft here. Type out your revisions. Approve and Reject Drafts"
+								/>
 								)}
 							</div>
 						</div>
@@ -998,6 +1069,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 							borderBottomLeftRadius: '8px',
 							backgroundColor: '#D5FFCB',
 						}}
+						data-hover-description="Approve you draft. This draft turned out good"
 						onClick={() => {
 							if (selectedDraft) {
 								const isCurrentlyApproved = props.approvedDraftIds?.has(selectedDraft.id) ?? false;
@@ -1024,6 +1096,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 							height: isMobile ? '36px' : '40px',
 							backgroundColor: '#FFDC9E',
 						}}
+						data-hover-description="Regenerate will rewrite the email you have open automatically so that you can get a better result"
 						onClick={handleRegenerate}
 						disabled={isRegenerating || !onRegenerateDraft}
 					>
@@ -1047,6 +1120,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 							borderBottomRightRadius: '8px',
 							backgroundColor: '#E17272',
 						}}
+						data-hover-description="Reject this contact. This isn't deleting it, but putting it into a rejection folder for you to review"
 						onClick={() => {
 							if (selectedDraft) {
 								const isCurrentlyRejected = props.rejectedDraftIds?.has(selectedDraft.id) ?? false;
@@ -1113,7 +1187,13 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 				isMobile={isMobile}
 			>
 				<>
-					<div className="overflow-visible w-full flex flex-col items-center">
+					<div
+						className="overflow-visible w-full flex flex-col items-center"
+						onMouseLeave={() => {
+							onContactHover?.(null);
+							onDraftHover?.(null);
+						}}
+					>
 						{filteredDrafts.map((draft, idx) => {
 							const contact = contacts?.find((c) => c.id === draft.contactId);
 							const contactName = contact
@@ -1123,8 +1203,6 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 								  'Contact'
 								: 'Unknown Contact';
 							const isSelected = selectedDraftIds.has(draft.id);
-							const prevDraft = filteredDrafts[idx - 1];
-							const isPrevSelected = prevDraft && selectedDraftIds.has(prevDraft.id);
 							const isRejected = props.rejectedDraftIds?.has(draft.id) ?? false;
 							const isApproved = props.approvedDraftIds?.has(draft.id) ?? false;
 
@@ -1136,91 +1214,53 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 							);
 
 							const contactTitle = contact?.headline || contact?.title || '';
-							
-							// Determine spacing: if both this and previous are selected, use green connector, otherwise normal gap
-							const showConnector = isSelected && isPrevSelected;
-							
-							// Check if next is selected for bottom cap
-							const nextDraft = filteredDrafts[idx + 1];
-							const isNextSelected = nextDraft && selectedDraftIds.has(nextDraft.id);
-							
-							// Caps for first/last in selection group
-							const isFirstInGroup = isSelected && !isPrevSelected;
-							const isLastInGroup = isSelected && !isNextSelected;
-							
+
 							// Colors based on tab
 							const isRejectedTab = props.statusFilter === 'rejected';
-							const selectedBgColor = isRejectedTab ? 'bg-[#D99696]' : 'bg-[#A4D996]';
-							const connectorColor = isRejectedTab ? 'bg-[#A34C4C]' : 'bg-[#43A24C]';
-							
+							const selectedBgColor = isRejectedTab ? 'bg-[#D99696]' : 'bg-[#8BDA76]';
+
 							return (
-								<>
-									{/* Connector between adjacent selected items */}
-									{showConnector && (
-										<div
-											key={`connector-${draft.id}`}
-											className={cn("h-[10px]", connectorColor, isMobile ? 'w-full' : 'w-[499px]')}
-										/>
-									)}
-									{/* Normal gap spacer when not showing connector */}
-									{!showConnector && idx > 0 && (
-										<div key={`spacer-${draft.id}`} className="h-[10px]" />
-									)}
+								<div key={draft.id} className="w-full flex flex-col items-center overflow-visible">
+									{idx > 0 && <div className="h-[10px]" />}
 									<div
-										key={draft.id}
 										className={cn(
-											'cursor-pointer relative select-none overflow-visible border-2 p-2 group/draft',
+											'cursor-pointer relative select-none overflow-visible border-2 p-2 group/draft rounded-[8px]',
 											isMobile ? 'h-[100px]' : 'h-[97px]',
 											isSelected
-												? cn('rounded-none border-[#FFFFFF]', selectedBgColor, isMobile ? 'w-full' : 'w-[499px]')
+												? cn('border-[#FFFFFF]', selectedBgColor)
 												: cn(
-														'rounded-[8px] border-[#000000]',
+														'border-[#000000]',
 														isHoveringAllButton ? 'bg-[#FFEDCA]' : 'bg-white hover:bg-[#F9E5BA]'
 												  )
 										)}
-										style={!isSelected && isMobile ? { width: mobileEmailRowWidth } : !isSelected ? { width: '489px' } : undefined}
-									onMouseDown={(e) => {
-										// Prevent text selection on shift-click
-										if (e.shiftKey) {
-											e.preventDefault();
-										}
-									}}
-									onMouseEnter={() => {
-										if (contact) {
-											onContactHover?.(contact);
-										}
-									}}
-									onMouseLeave={() => {
-										onContactHover?.(null);
-									}}
-									onClick={() => {
-										handleDraftDoubleClick(draft);
-										if (contact) {
-											onContactClick?.(contact);
-										}
-									}}
-								>
-									{/* Top cap - 6px above first selected in group */}
-									{isFirstInGroup && (
-										<div
-											className={cn("absolute left-0 right-0 h-[6px] pointer-events-none", connectorColor)}
-											style={{ top: '-8px' }}
-										/>
-									)}
-									{/* Bottom cap - 6px below last selected in group */}
-									{isLastInGroup && (
-										<div
-											className={cn("absolute left-0 right-0 h-[6px] pointer-events-none", connectorColor)}
-											style={{ bottom: '-8px' }}
-										/>
-									)}
+										style={isMobile ? { width: mobileEmailRowWidth } : { width: '489px' }}
+										data-hover-description="Click to open and review"
+										onMouseDown={(e) => {
+											// Prevent text selection on shift-click
+											if (e.shiftKey) {
+												e.preventDefault();
+											}
+										}}
+										onMouseEnter={() => {
+											if (contact) {
+												onContactHover?.(contact);
+											}
+											onDraftHover?.(draft);
+										}}
+										onClick={() => {
+											handleDraftDoubleClick(draft);
+											if (contact) {
+												onContactClick?.(contact);
+											}
+										}}
+									>
 									{/* Used-contact indicator - 11px from top */}
 									{usedContactIdsSet.has(draft.contactId) && (
 										<span
 											className="absolute"
 											title="Used in a previous campaign"
 											style={{
-												left: isSelected ? '13px' : '8px',
+												left: '8px',
 												top: '11px',
 												width: '16px',
 												height: '16px',
@@ -1237,7 +1277,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 											title="Marked for rejection"
 											aria-label="Rejected draft"
 											style={{
-												left: isSelected ? '13px' : '8px',
+												left: '8px',
 												top: usedContactIdsSet.has(draft.contactId) ? '33px' : '11px',
 												width: '16px',
 												height: '16px',
@@ -1254,7 +1294,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 											title="Marked for approval"
 											aria-label="Approved draft"
 											style={{
-												left: isSelected ? '13px' : '8px',
+												left: '8px',
 												top: usedContactIdsSet.has(draft.contactId) ? '33px' : '11px',
 												width: '16px',
 												height: '16px',
@@ -1268,7 +1308,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 									<span
 										className="absolute hidden group-hover/draft:block cursor-pointer"
 										style={{
-											left: isSelected ? '15px' : '10px',
+											left: '10px',
 											bottom: '10px',
 											width: '15px',
 											height: '15px',
@@ -1291,7 +1331,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 										type="button"
 										variant="icon"
 										onClick={(e) => handleDeleteDraft(e, draft.id)}
-										className={cn("absolute top-[50px] p-1 transition-colors z-10 group hidden group-hover/draft:block", isSelected ? "right-[7px]" : "right-[2px]")}
+										className="absolute top-[50px] right-[2px] p-1 transition-colors z-10 group hidden group-hover/draft:block"
 									>
 										<X size={16} className="text-gray-500 group-hover:text-red-500" />
 									</Button>
@@ -1309,7 +1349,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 												handleDraftDoubleClick(draft);
 											}
 										}}
-										className={cn("absolute top-[72px] p-1 transition-colors z-20 hidden group-hover/draft:block", isSelected ? "right-[7px]" : "right-[2px]")}
+										className="absolute top-[72px] right-[2px] p-1 transition-colors z-20 hidden group-hover/draft:block"
 										aria-label="Preview draft"
 									>
 										<PreviewIcon
@@ -1322,12 +1362,56 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 									{/* Fixed top-right info (Title + Location) - matching contacts table design */}
 									<div 
 										className="absolute top-[6px] flex flex-col items-start gap-[2px] pointer-events-none"
-										style={{ right: isSelected ? '9px' : '4px' }}
+										style={{ right: '4px' }}
 									>
 										{contactTitle ? (
-											<div className="h-[21px] w-[240px] rounded-[6px] px-2 flex items-center bg-[#E8EFFF] border border-black overflow-hidden">
+											<div
+												className="h-[21px] w-[240px] rounded-[6px] px-2 flex items-center gap-1 border border-black overflow-hidden"
+												style={{
+													backgroundColor: isRestaurantTitle(contactTitle)
+														? '#C3FBD1'
+														: isCoffeeShopTitle(contactTitle)
+															? '#D6F1BD'
+															: isMusicVenueTitle(contactTitle)
+																? '#B7E5FF'
+																: isMusicFestivalTitle(contactTitle)
+																	? '#C1D6FF'
+																	: (isWeddingPlannerTitle(contactTitle) || isWeddingVenueTitle(contactTitle))
+																		? '#FFF2BC'
+																		: '#E8EFFF',
+												}}
+											>
+												{isRestaurantTitle(contactTitle) && (
+													<RestaurantsIcon size={14} />
+												)}
+												{isCoffeeShopTitle(contactTitle) && (
+													<CoffeeShopsIcon size={8} />
+												)}
+												{isMusicVenueTitle(contactTitle) && (
+													<MusicVenuesIcon size={14} className="flex-shrink-0" />
+												)}
+												{isMusicFestivalTitle(contactTitle) && (
+													<FestivalsIcon size={14} className="flex-shrink-0" />
+												)}
+												{(isWeddingPlannerTitle(contactTitle) || isWeddingVenueTitle(contactTitle)) && (
+													<WeddingPlannersIcon size={14} />
+												)}
 												<ScrollableText
-													text={contactTitle}
+													text={
+														isRestaurantTitle(contactTitle)
+															? 'Restaurant'
+															: isCoffeeShopTitle(contactTitle)
+																? 'Coffee Shop'
+																: isMusicVenueTitle(contactTitle)
+																	? 'Music Venue'
+																	: isMusicFestivalTitle(contactTitle)
+																		? 'Music Festival'
+																		: isWeddingPlannerTitle(contactTitle)
+																			? 'Wedding Planner'
+																			: isWeddingVenueTitle(contactTitle)
+																				? 'Wedding Venue'
+																				: contactTitle
+													}
 													className="text-[10px] text-black leading-none"
 													scrollPixelsPerSecond={60}
 												/>
@@ -1405,7 +1489,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 									{/* Content flex column */}
 									<div className={cn(
 										"flex flex-col justify-center h-full gap-[2px]",
-										isSelected ? "pl-[35px] pr-[35px]" : "pl-[30px] pr-[30px]"
+										"pl-[30px] pr-[30px]"
 									)}>
 										{/* Row 1 & 2: Name / Company */}
 										{(() => {
@@ -1486,8 +1570,8 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 											</div>
 										</div>
 									</div>
+									</div>
 								</div>
-							</>
 						);
 						})}
 						{Array.from({ length: Math.max(0, (isMobile ? 4 : 6) - filteredDrafts.length) }).map((_, idx) => (
@@ -1563,21 +1647,23 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 							const isRejectedTab = props.statusFilter === 'rejected';
 							const actionVerb = isRejectedTab ? 'Regenerate' : 'Send';
 							const confirmLabel = `Click to Confirm and ${actionVerb}`;
-							const actionLabel = hasSelection
-								? `${actionVerb} ${selectedCount} Selected`
-								: actionVerb;
+							const actionLabel = `${actionVerb} ${selectedCount} Selected`;
+
+							// Show just text when nothing is selected
+							if (!hasSelection) {
+								return (
+									<div className="w-full h-full flex items-center justify-center text-black font-inter font-normal text-[17px]">
+										Select Emails to Send
+									</div>
+								);
+							}
 
 							return (
-								(hasSelection && props.isSendingDisabled) ? (
+								props.isSendingDisabled ? (
 									<UpgradeSubscriptionDrawer
 										triggerButtonText={showConfirm ? confirmLabel : actionLabel}
 										buttonVariant="primary"
-										className={cn(
-											'w-full h-full rounded-[4px] border-[3px] text-black font-inter font-normal text-[17px] !flex !items-center !justify-center',
-											hasSelection
-												? '!bg-[#C7F2C9] !border-[#349A37] hover:!bg-[#B9E7BC] cursor-pointer'
-												: '!bg-[#E0E0E0] !border-[#A0A0A0] !cursor-not-allowed !opacity-60 pointer-events-none'
-										)}
+										className="w-full h-full rounded-[4px] border-[3px] text-black font-inter font-normal text-[17px] !flex !items-center !justify-center !bg-[#C7F2C9] !border-[#349A37] hover:!bg-[#B9E7BC] cursor-pointer"
 										message={
 											props.isFreeTrial
 												? `Your free trial subscription does not include the ability to send emails. To send the emails\'ve drafted, please upgrade your subscription to the paid version.`
@@ -1588,14 +1674,8 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 									<div className="w-full h-full rounded-[4px] border-[3px] border-[#000000] flex overflow-hidden">
 										<button
 											type="button"
-											className={cn(
-												'flex-1 h-full flex items-center justify-center text-center text-black font-inter font-normal text-[17px] pl-[89px]',
-												hasSelection
-													? 'bg-[#FFDC9F] hover:bg-[#F4C87E] cursor-pointer'
-													: 'bg-[#FFFFFF] cursor-default'
-											)}
+											className="flex-1 h-full flex items-center justify-center text-center text-black font-inter font-normal text-[17px] pl-[89px] bg-[#FFDC9F] hover:bg-[#F4C87E] cursor-pointer"
 											onClick={async () => {
-												if (!hasSelection) return;
 												if (!showConfirm) {
 													setShowConfirm(true);
 													setTimeout(() => setShowConfirm(false), 10000);
@@ -1608,9 +1688,8 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 													await props.onSend();
 												}
 											}}
-											disabled={!hasSelection}
 										>
-											{hasSelection ? (showConfirm ? confirmLabel : actionLabel) : actionVerb}
+											{showConfirm ? confirmLabel : actionLabel}
 										</button>
 
 										{/* Right section "All" button */}

@@ -186,6 +186,13 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 	return (
 		<div
 			data-campaign-main-box={mainBoxId}
+			data-hover-description={
+				isContacts
+					? 'Select which contacts you want to send to.'
+					: isDrafts
+						? 'Drafts: review and select the emails you want to send.'
+						: undefined
+			}
 			style={{ width: boxWidth, height: boxHeight, position: 'relative' }}
 		>
 			{/* Centered number above block */}
