@@ -44,7 +44,7 @@ export const CampaignRightPanel: FC<CampaignRightPanelProps> = ({ className, vie
 			}}
 		>
 			<div
-				className="relative flex flex-col items-center overflow-visible pt-[180px]"
+				className="relative flex flex-col items-center overflow-visible pt-[140px]"
 				data-hover-description="Side panel navigation; get to other tabs with this"
 			>
 				{/* Border box for All tab - centered around the 6 SVG icons */}
@@ -52,11 +52,11 @@ export const CampaignRightPanel: FC<CampaignRightPanelProps> = ({ className, vie
 					<div
 						style={{
 							position: 'absolute',
-							top: '162px',
+							top: '122px',
 							left: '50%',
 							transform: 'translateX(-50%)',
 							width: '112px',
-							height: '538px',
+							height: '450px',
 							backgroundColor: 'transparent',
 							borderRadius: '8px',
 							border: '2px solid #D0D0D0',
