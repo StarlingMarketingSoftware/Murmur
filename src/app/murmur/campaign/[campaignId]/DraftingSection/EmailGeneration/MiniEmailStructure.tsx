@@ -22,6 +22,35 @@ import {
 	type FullAutoProfileFields,
 } from '@/components/molecules/HybridPromptInput/FullAutoBodyBlock';
 
+type MiniIdentityProfile = {
+	name: string;
+	genre?: string | null;
+	area?: string | null;
+	bandName?: string | null;
+	bio?: string | null;
+	website?: string | null;
+};
+
+type MiniIdentityUpdate = {
+	name?: string;
+	genre?: string | null;
+	area?: string | null;
+	bandName?: string | null;
+	bio?: string | null;
+	website?: string | null;
+};
+
+const PROFILE_PROGRESS_SEQUENCE = [
+	{ key: 'name', label: 'Name' },
+	{ key: 'genre', label: 'Genre' },
+	{ key: 'area', label: 'Area' },
+	{ key: 'band', label: 'Band/Artist Name' },
+	{ key: 'bio', label: 'Bio' },
+	{ key: 'links', label: 'Links' },
+] as const;
+
+type ProfileField = (typeof PROFILE_PROGRESS_SEQUENCE)[number]['key'];
+
 interface MiniEmailStructureProps {
 	form: UseFormReturn<DraftingFormValues>;
 	onDraft: () => void;
@@ -46,6 +75,10 @@ interface MiniEmailStructureProps {
 	onOpenWriting?: () => void;
 	/** Full Auto: profile chips (matches HybridPromptInput "Body" block) */
 	profileFields?: FullAutoProfileFields | null;
+	/** Profile Tab: identity baseline (used for save comparisons) */
+	identityProfile?: MiniIdentityProfile | null;
+	/** Profile Tab: persist identity profile changes (mirrors HybridPromptInput Profile tab) */
+	onIdentityUpdate?: (data: MiniIdentityUpdate) => void | Promise<void>;
 }
 
 export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
@@ -64,11 +97,41 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 	height,
 	onOpenWriting,
 	profileFields,
+	identityProfile,
+	onIdentityUpdate,
 }) => {
 	const watchedHybridBlocks = form.watch('hybridBlockPrompts');
 	const hybridBlocks = useMemo(() => watchedHybridBlocks || [], [watchedHybridBlocks]);
 	const isAiSubject = form.watch('isAiSubject');
 	const signature = form.watch('signature') || '';
+
+	// Track which tab is active: 'main' (normal email structure) or 'profile'
+	const [activeTab, setActiveTab] = useState<'main' | 'profile'>('main');
+	// Track if user has ever left the profile tab (to show red for incomplete fields after returning)
+	const [hasLeftProfileTab, setHasLeftProfileTab] = useState(false);
+	// Track which profile box is expanded (null = none expanded)
+	const [expandedProfileBox, setExpandedProfileBox] = useState<ProfileField | null>(null);
+	const expandedProfileBoxRef = useRef<HTMLDivElement>(null);
+
+	const initialProfileTabFields = useMemo<FullAutoProfileFields>(
+		() => ({
+			name: profileFields?.name ?? identityProfile?.name ?? '',
+			genre: profileFields?.genre ?? (identityProfile?.genre ?? ''),
+			area: profileFields?.area ?? (identityProfile?.area ?? ''),
+			band: profileFields?.band ?? (identityProfile?.bandName ?? ''),
+			bio: profileFields?.bio ?? (identityProfile?.bio ?? ''),
+			links: profileFields?.links ?? (identityProfile?.website ?? ''),
+		}),
+		[identityProfile, profileFields]
+	);
+	// Profile field values - initialized from identity/profileFields, kept local so UI updates immediately.
+	const [profileTabFields, setProfileTabFields] =
+		useState<FullAutoProfileFields>(initialProfileTabFields);
+
+	// Sync profileTabFields when identity/profileFields change
+	useEffect(() => {
+		setProfileTabFields(initialProfileTabFields);
+	}, [initialProfileTabFields]);
 
 	// Signature: Auto/Manual toggle (mirrors HybridPromptInput "Auto" tab behavior)
 	// Auto ON: compact pill by default, expands on hover.
@@ -81,6 +144,296 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 		// Keep a fresh baseline "auto" signature while Auto is enabled (e.g., identity name updates).
 		if (isAutoSignature) autoSignatureValueRef.current = signature;
 	}, [isAutoSignature, signature]);
+
+	// Profile score bar (weighted by UI order; mirrors HybridPromptInput rules)
+	// Bio completion rule:
+	// - Until 7 words: always prompt for a fuller bio
+	// - At 7+ words: require a complete sentence (has sentence punctuation)
+	const bioWordCount = useMemo(() => {
+		const trimmed = profileTabFields.bio.trim();
+		if (!trimmed) return 0;
+		return trimmed.split(/\s+/).filter(Boolean).length;
+	}, [profileTabFields.bio]);
+	const bioHasSentencePunctuation = useMemo(() => {
+		const trimmed = profileTabFields.bio.trim();
+		if (!trimmed) return false;
+		// Accept punctuation anywhere so users don't need to end with a period.
+		// Also accept the unicode ellipsis character.
+		return /[.!?…]/.test(trimmed);
+	}, [profileTabFields.bio]);
+	const isBioIncomplete = useMemo(() => {
+		if (bioWordCount === 0) return true;
+		if (bioWordCount < 7) return true;
+		return !bioHasSentencePunctuation;
+	}, [bioHasSentencePunctuation, bioWordCount]);
+
+	const filledProfileFieldCount = useMemo(() => {
+		const values = [
+			profileTabFields.name,
+			profileTabFields.genre,
+			profileTabFields.area,
+			profileTabFields.band,
+			profileTabFields.bio,
+			profileTabFields.links,
+		];
+		return values.reduce((count, v) => count + (v.trim() ? 1 : 0), 0);
+	}, [
+		profileTabFields.area,
+		profileTabFields.band,
+		profileTabFields.bio,
+		profileTabFields.genre,
+		profileTabFields.links,
+		profileTabFields.name,
+	]);
+
+	const sequentialFilledProfileFieldCount = useMemo(() => {
+		const isComplete = (key: (typeof PROFILE_PROGRESS_SEQUENCE)[number]['key']) => {
+			const trimmed = profileTabFields[key].trim();
+			if (!trimmed) return false;
+			if (key === 'bio') return !isBioIncomplete;
+			return true;
+		};
+
+		let count = 0;
+		for (const step of PROFILE_PROGRESS_SEQUENCE) {
+			if (isComplete(step.key)) count += 1;
+			else break;
+		}
+		return count;
+	}, [
+		isBioIncomplete,
+		profileTabFields.area,
+		profileTabFields.band,
+		profileTabFields.bio,
+		profileTabFields.genre,
+		profileTabFields.links,
+		profileTabFields.name,
+	]);
+
+	const nextProfileFieldToFill = useMemo(() => {
+		const isComplete = (key: (typeof PROFILE_PROGRESS_SEQUENCE)[number]['key']) => {
+			const trimmed = profileTabFields[key].trim();
+			if (!trimmed) return false;
+			if (key === 'bio') return !isBioIncomplete;
+			return true;
+		};
+
+		return PROFILE_PROGRESS_SEQUENCE.find((step) => !isComplete(step.key)) ?? null;
+	}, [
+		isBioIncomplete,
+		profileTabFields.area,
+		profileTabFields.band,
+		profileTabFields.bio,
+		profileTabFields.genre,
+		profileTabFields.links,
+		profileTabFields.name,
+	]);
+
+	const profileSuggestionScore = useMemo(() => {
+		// Completion mapping (weighted by order / consecutive fill):
+		// 0 -> 0
+		// 1 -> 50
+		// 2 -> 60
+		// 3 -> 70
+		// 4 -> 80
+		// 5 -> 90
+		// 6 -> 100
+		if (sequentialFilledProfileFieldCount <= 0) return 0;
+		if (sequentialFilledProfileFieldCount === 1) return 50;
+		if (sequentialFilledProfileFieldCount === 2) return 60;
+		if (sequentialFilledProfileFieldCount === 3) return 70;
+		if (sequentialFilledProfileFieldCount === 4) return 80;
+		if (sequentialFilledProfileFieldCount === 5) return 90;
+		return 100;
+	}, [sequentialFilledProfileFieldCount]);
+
+	const profileSuggestionLabel = useMemo(() => {
+		// If the user hasn't started anything, keep the friendly default.
+		if (filledProfileFieldCount === 0) return 'Get Started';
+
+		// Weighting is ordered: always prompt for the first missing field in UI order.
+		if (nextProfileFieldToFill) {
+			// Custom copy for the Area step once Name + Genre are complete.
+			if (nextProfileFieldToFill.key === 'area' && sequentialFilledProfileFieldCount >= 2) {
+				return 'Where are you Based?';
+			}
+			// Bio guidance: keep prompting until it's 7+ words AND a full sentence.
+			if (nextProfileFieldToFill.key === 'bio') {
+				return 'Write a Full Bio';
+			}
+			return `Add your ${nextProfileFieldToFill.label}`;
+		}
+
+		// All fields filled.
+		return 'Excellent';
+	}, [filledProfileFieldCount, nextProfileFieldToFill, sequentialFilledProfileFieldCount]);
+
+	const profileSuggestionDisplayLabel =
+		profileSuggestionScore === 0
+			? profileSuggestionLabel
+			: `${profileSuggestionScore} - ${profileSuggestionLabel}`;
+	const profileSuggestionFillPercent = Math.max(
+		0,
+		Math.min(100, Math.round(profileSuggestionScore))
+	);
+
+	const isKeyProfileIncomplete = useMemo(() => {
+		return (
+			!profileTabFields.name.trim() ||
+			!profileTabFields.genre.trim() ||
+			!profileTabFields.area.trim() ||
+			!profileTabFields.bio.trim()
+		);
+	}, [profileTabFields.name, profileTabFields.genre, profileTabFields.area, profileTabFields.bio]);
+
+	const normalizeNullable = (value: string | null | undefined) => {
+		const trimmed = (value ?? '').trim();
+		return trimmed === '' ? null : trimmed;
+	};
+
+	const lastProfileSaveRef = useRef<{ key: string; at: number } | null>(null);
+	const shouldSkipDuplicateProfileSave = (key: string) => {
+		const now = Date.now();
+		const last = lastProfileSaveRef.current;
+		// Prevent double-save when an input unmounts (blur + explicit save)
+		if (last?.key === key && now - last.at < 800) return true;
+		lastProfileSaveRef.current = { key, at: now };
+		return false;
+	};
+
+	// Handle saving a profile field
+	const saveProfileField = useCallback(
+		(field: ProfileField) => {
+			if (!onIdentityUpdate || !identityProfile) return;
+
+			// Name is required on Identity. If empty, skip saving.
+			if (field === 'name') {
+				const next = profileTabFields.name.trim();
+				const prev = identityProfile.name.trim();
+				if (!next || next === prev) return;
+				if (shouldSkipDuplicateProfileSave(`name:${next}`)) return;
+				void onIdentityUpdate({ name: next });
+				return;
+			}
+
+			const next = normalizeNullable(profileTabFields[field]);
+			const prev = (() => {
+				switch (field) {
+					case 'genre':
+						return normalizeNullable(identityProfile.genre);
+					case 'area':
+						return normalizeNullable(identityProfile.area);
+					case 'band':
+						return normalizeNullable(identityProfile.bandName);
+					case 'bio':
+						return normalizeNullable(identityProfile.bio);
+					case 'links':
+						return normalizeNullable(identityProfile.website);
+				}
+			})();
+
+			if (next === prev) return;
+			if (shouldSkipDuplicateProfileSave(`${field}:${next ?? ''}`)) return;
+
+			switch (field) {
+				case 'genre':
+					void onIdentityUpdate({ genre: next });
+					return;
+				case 'area':
+					void onIdentityUpdate({ area: next });
+					return;
+				case 'band':
+					void onIdentityUpdate({ bandName: next });
+					return;
+				case 'bio':
+					void onIdentityUpdate({ bio: next });
+					return;
+				case 'links':
+					void onIdentityUpdate({ website: next });
+					return;
+			}
+		},
+		[identityProfile, onIdentityUpdate, profileTabFields]
+	);
+
+	// Close the expanded profile field when clicking away
+	const saveProfileFieldRef = useRef(saveProfileField);
+	saveProfileFieldRef.current = saveProfileField;
+	useEffect(() => {
+		if (activeTab !== 'profile' || !expandedProfileBox) return;
+
+		const handlePointerDown = (event: PointerEvent) => {
+			const target = event.target as Node | null;
+			const container = expandedProfileBoxRef.current;
+			if (!target || !container) return;
+			if (container.contains(target)) return;
+
+			saveProfileFieldRef.current(expandedProfileBox as ProfileField);
+			setExpandedProfileBox(null);
+		};
+
+		document.addEventListener('pointerdown', handlePointerDown);
+		return () => {
+			document.removeEventListener('pointerdown', handlePointerDown);
+		};
+	}, [activeTab, expandedProfileBox]);
+
+	const PROFILE_FIELD_ORDER: ProfileField[] = ['name', 'genre', 'area', 'band', 'bio', 'links'];
+
+	const handleProfileFieldEnter = (field: ProfileField) => {
+		// Don't allow Enter to advance if Name is empty (Identity.name is required)
+		if (field === 'name' && profileTabFields.name.trim() === '') return;
+
+		saveProfileField(field);
+
+		const idx = PROFILE_FIELD_ORDER.indexOf(field);
+		const nextField = idx >= 0 ? PROFILE_FIELD_ORDER[idx + 1] : null;
+		setExpandedProfileBox(nextField ?? null);
+	};
+
+	const getProfileHeaderBg = (field: ProfileField) => {
+		if (expandedProfileBox === field) return '#E0E0E0';
+		if (profileTabFields[field].trim()) return '#94DB96';
+		// Show red only if user has left the profile tab before
+		return hasLeftProfileTab ? '#E47979' : '#E0E0E0';
+	};
+
+	const getProfileHeaderText = (
+		field: ProfileField,
+		labelWhenEmpty: string,
+		labelWhenExpanded: string
+	) => {
+		if (expandedProfileBox === field) return labelWhenExpanded;
+		return profileTabFields[field].trim() || labelWhenEmpty;
+	};
+
+	// Handle saving a profile field on blur
+	const handleProfileFieldBlur = (field: ProfileField) => {
+		saveProfileField(field);
+	};
+
+	// Handle toggling a profile box - saves the current field if collapsing
+	const handleProfileBoxToggle = (box: ProfileField) => {
+		// If we're collapsing the currently expanded box, save its value first
+		if (expandedProfileBox === box) {
+			saveProfileField(box);
+			setExpandedProfileBox(null);
+		} else {
+			// If we're switching to a new box and there's a previously expanded one, save it first
+			if (expandedProfileBox) {
+				saveProfileField(expandedProfileBox as ProfileField);
+			}
+			setExpandedProfileBox(box);
+		}
+	};
+
+	// Save any expanded profile field when switching away from profile tab
+	useEffect(() => {
+		if (activeTab !== 'profile' && expandedProfileBox) {
+			saveProfileField(expandedProfileBox as ProfileField);
+			setExpandedProfileBox(null);
+		}
+	}, [activeTab, expandedProfileBox, saveProfileField]);
 
 	// Track which blocks are expanded
 	const [expandedBlocks, setExpandedBlocks] = useState<Set<string>>(new Set());
@@ -684,7 +1037,12 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 							: 'flex-1 min-h-0 overflow-y-auto overflow-x-hidden'
 					)}
 				>
-					<div className="px-0 pb-3 max-[480px]:pb-2">
+					<div
+						className={cn(
+							'px-0 pb-3 max-[480px]:pb-2',
+							activeTab === 'profile' && 'min-h-full flex flex-col pb-0 max-[480px]:pb-0'
+						)}
+					>
 						{/* Mode */}
 						<div className="w-full bg-white rounded-t-[5px] relative overflow-hidden h-[31px]">
 							{/* Inline step indicator for mobile landscape */}
@@ -706,11 +1064,29 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 									</svg>
 								</div>
 							)}
-							<div className="flex items-center gap-4 w-[95%] mx-auto h-full">
-								<span className="font-inter font-semibold text-[13px]">Profile</span>
+							<div className="flex items-center w-full h-full">
+								{(() => {
+									const showRedWarning = hasLeftProfileTab && isKeyProfileIncomplete;
+									return (
+										<button
+											type="button"
+											onClick={() => setActiveTab('profile')}
+											className={cn(
+												'w-[84px] h-full flex items-center justify-center border-r-2 border-black font-inter font-semibold text-[11px] leading-none transition-colors',
+												activeTab === 'profile'
+													? 'text-black bg-[#A6E2A8] hover:bg-[#A6E2A8]'
+													: showRedWarning
+														? 'text-black bg-[#E47979] hover:bg-[#E47979]'
+														: 'text-black bg-transparent hover:bg-[#eeeeee]'
+											)}
+										>
+											Profile
+										</button>
+									);
+								})()}
 								<div
 									ref={modeContainerRef}
-									className="relative grid flex-1 grid-cols-3 items-center max-w-[300px]"
+									className="relative grid flex-1 grid-cols-3 items-center px-4"
 								>
 									<div
 										className="absolute top-1/2 -translate-y-1/2 z-10 pointer-events-none"
@@ -739,7 +1115,13 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 												? 'text-black'
 												: 'text-[#6B6B6B] hover:text-black'
 										)}
-										onClick={() => setMode('ai')}
+										onClick={() => {
+											if (activeTab !== 'main') {
+												setActiveTab('main');
+												setHasLeftProfileTab(true);
+											}
+											setMode('ai');
+										}}
 									>
 										Auto
 									</button>
@@ -752,7 +1134,13 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 												? 'text-black'
 												: 'text-[#6B6B6B] hover:text-black'
 										)}
-										onClick={() => setMode('handwritten')}
+										onClick={() => {
+											if (activeTab !== 'main') {
+												setActiveTab('main');
+												setHasLeftProfileTab(true);
+											}
+											setMode('handwritten');
+										}}
 									>
 										Manual
 									</button>
@@ -765,7 +1153,13 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 												? 'text-black'
 												: 'text-[#6B6B6B] hover:text-black'
 										)}
-										onClick={() => setMode('hybrid')}
+										onClick={() => {
+											if (activeTab !== 'main') {
+												setActiveTab('main');
+												setHasLeftProfileTab(true);
+											}
+											setMode('hybrid');
+										}}
 									>
 										Hybrid
 									</button>
@@ -774,127 +1168,418 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 						</div>
 						<div className="h-[1px] bg-black w-full" />
 
-						{/* Auto Subject */}
-						<div className="mt-[9px] mb-3 w-[95%] max-[480px]:w-[89.33vw] mx-auto">
-							{isAiSubject ? (
-								// Compact bar (default) that expands to full width on hover when Auto Subject is on
-								<div className="group/subject relative">
-									{/* Collapsed state - shown by default, hidden on hover */}
-									<div className="flex items-center gap-2 group-hover/subject:hidden">
-										<div
-											className={cn(
-												'flex items-center justify-center h-[29px] max-[480px]:h-[24px] rounded-[8px] border-2 border-black overflow-hidden subject-bar w-[94px]'
-											)}
-											style={{ backgroundColor: '#E0E0E0' }}
-										>
-											<span className="font-inter font-medium text-[13px] max-[480px]:text-[11px] whitespace-nowrap text-black subject-label">
-												Subject
-											</span>
-										</div>
-										<span className="font-inter font-normal text-[10px] text-[#000000]">
-											Auto
-										</span>
-									</div>
-
-									{/* Expanded state - hidden by default, shown on hover */}
-									<div
-										className={cn(
-											'hidden group-hover/subject:flex items-center h-[29px] max-[480px]:h-[24px] rounded-[8px] border-2 border-black overflow-hidden subject-bar bg-white w-full'
-										)}
-									>
-										<div className={cn('pl-2 flex items-center h-full shrink-0 w-[110px] bg-[#E0E0E0]')}>
-											<span className="font-inter font-semibold text-[13px] max-[480px]:text-[11px] whitespace-nowrap text-black subject-label">
-												Auto Subject
-											</span>
-										</div>
-
-										<button
-											type="button"
-											aria-pressed={isAiSubject}
-											onClick={toggleSubject}
-											className={cn(
-												'relative h-full flex items-center text-[10px] font-inter font-normal transition-colors shrink-0 subject-toggle',
-												'w-[47px] px-2 justify-center text-black bg-[#4ADE80] hover:bg-[#3ECC72] active:bg-[#32BA64]'
-											)}
-										>
-											<span className="absolute left-0 h-full border-l border-black"></span>
-											<span>on</span>
-											<span className="absolute right-0 h-full border-r border-black"></span>
-										</button>
-
-										<div className={cn('flex-grow h-full', 'bg-white')}>
-											<input
-												type="text"
-												className={cn(
-													'w-full h-full !bg-transparent pl-3 pr-3 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 outline-none max-[480px]:placeholder:text-[8px]',
-													'!text-[#6B6B6B] italic cursor-not-allowed'
-												)}
-												placeholder="Write manual subject here"
-												disabled={true}
-												value={form.watch('subject') || ''}
-												onChange={(e) =>
-													form.setValue('subject', e.target.value, { shouldDirty: true })
-												}
+						{/* Profile Tab (mirrors HybridPromptInput) */}
+						{activeTab === 'profile' ? (
+							<div className="w-full flex flex-col flex-1 min-h-0">
+								{/* Progress header row */}
+								<div className="w-full h-[26px] bg-[#E7F3E8] border-b-2 border-black shrink-0 flex items-center justify-center">
+									<div className="w-[95%] flex items-center gap-3">
+										<div className="relative w-[150px] h-[10px] bg-white border-2 border-black rounded-[8px] overflow-hidden">
+											<div
+												className="absolute left-0 top-0 bottom-0 bg-[#36B24A] rounded-full transition-[width] duration-200"
+												style={{ width: `${profileSuggestionFillPercent}%` }}
 											/>
 										</div>
-									</div>
-								</div>
-							) : (
-								// Full bar when Auto Subject is off
-								<div
-									className={cn(
-										'flex items-center h-[29px] max-[480px]:h-[24px] rounded-[8px] border-2 border-black overflow-hidden subject-bar bg-white'
-									)}
-								>
-									<div className={cn('pl-2 flex items-center h-full shrink-0 w-[96px] bg-white')}>
-										<span className="font-inter font-semibold text-[13px] max-[480px]:text-[11px] whitespace-nowrap text-black subject-label">
-											Subject
+										<span className="font-inter font-medium text-[11px] leading-none text-black whitespace-nowrap">
+											{profileSuggestionDisplayLabel}
 										</span>
 									</div>
-
+								</div>
+								{/* Blue fill */}
+								<div className="bg-[#58A6E5] relative flex flex-col flex-1 min-h-0 py-6">
+									{/* Top-right indicator line */}
 									<button
 										type="button"
-										aria-pressed={isAiSubject}
-										onClick={toggleSubject}
-										className={cn(
-											'relative h-full flex items-center text-[10px] font-inter font-normal transition-colors shrink-0 subject-toggle',
-											'w-[80px] px-2 justify-center text-black bg-[#DADAFC] hover:bg-[#C4C4F5] active:bg-[#B0B0E8]'
-										)}
-									>
-										<span className="absolute left-0 h-full border-l border-black"></span>
-										<span>Auto off</span>
-										<span className="absolute right-0 h-full border-r border-black"></span>
-									</button>
-
-									<div className={cn('flex-grow h-full', 'bg-white')}>
-										<input
-											type="text"
+										aria-label="Back to writing"
+										onClick={() => {
+											setActiveTab('main');
+											setHasLeftProfileTab(true);
+										}}
+										className="absolute top-[10px] right-[10px] w-[15px] h-[2px] bg-black cursor-pointer p-0 border-0 focus:outline-none"
+									/>
+									<div className="px-3 flex flex-col gap-3 items-center">
+										{/* Name */}
+										<div
+											ref={expandedProfileBox === 'name' ? expandedProfileBoxRef : undefined}
 											className={cn(
-												'w-full h-full !bg-transparent pl-2 pr-3 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 outline-none max-[480px]:placeholder:text-[8px]',
-												'!text-black placeholder:!text-black'
+												'w-[95%] flex flex-col rounded-[8px] border-[2px] border-black cursor-pointer overflow-hidden',
+												expandedProfileBox === 'name' ? 'h-[52px]' : 'h-[26px]'
 											)}
-											placeholder="Type subject..."
-											disabled={false}
-											value={form.watch('subject') || ''}
-											onChange={(e) =>
-												form.setValue('subject', e.target.value, { shouldDirty: true })
-											}
-										/>
+											onClick={() => handleProfileBoxToggle('name')}
+										>
+											<div
+												className="h-[26px] flex items-center px-3 font-inter text-[12px] font-semibold truncate"
+												style={{ backgroundColor: getProfileHeaderBg('name') }}
+											>
+												{getProfileHeaderText('name', 'Name', 'Enter your Name')}
+											</div>
+											{expandedProfileBox === 'name' && (
+												<input
+													type="text"
+													className="h-[26px] bg-white px-3 font-inter text-[12px] outline-none border-0"
+													value={profileTabFields.name}
+													onChange={(e) =>
+														setProfileTabFields({
+															...profileTabFields,
+															name: e.target.value,
+														})
+													}
+													onBlur={() => handleProfileFieldBlur('name')}
+													onKeyDown={(e) => {
+														if (e.key === 'Enter') {
+															e.preventDefault();
+															handleProfileFieldEnter('name');
+														}
+													}}
+													onClick={(e) => e.stopPropagation()}
+													autoFocus
+												/>
+											)}
+										</div>
+										{/* Genre */}
+										<div
+											ref={expandedProfileBox === 'genre' ? expandedProfileBoxRef : undefined}
+											className={cn(
+												'w-[95%] flex flex-col rounded-[8px] border-[2px] border-black cursor-pointer overflow-hidden',
+												expandedProfileBox === 'genre' ? 'h-[52px]' : 'h-[26px]'
+											)}
+											onClick={() => handleProfileBoxToggle('genre')}
+										>
+											<div
+												className="h-[26px] flex items-center px-3 font-inter text-[12px] font-semibold truncate"
+												style={{ backgroundColor: getProfileHeaderBg('genre') }}
+											>
+												{getProfileHeaderText('genre', 'Genre', 'Enter your Genre')}
+											</div>
+											{expandedProfileBox === 'genre' && (
+												<input
+													type="text"
+													className="h-[26px] bg-white px-3 font-inter text-[12px] outline-none border-0"
+													value={profileTabFields.genre}
+													onChange={(e) =>
+														setProfileTabFields({
+															...profileTabFields,
+															genre: e.target.value,
+														})
+													}
+													onBlur={() => handleProfileFieldBlur('genre')}
+													onKeyDown={(e) => {
+														if (e.key === 'Enter') {
+															e.preventDefault();
+															handleProfileFieldEnter('genre');
+														}
+													}}
+													onClick={(e) => e.stopPropagation()}
+													autoFocus
+												/>
+											)}
+										</div>
+										{/* Area */}
+										<div
+											ref={expandedProfileBox === 'area' ? expandedProfileBoxRef : undefined}
+											className={cn(
+												'w-[95%] flex flex-col rounded-[8px] border-[2px] border-black cursor-pointer overflow-hidden',
+												expandedProfileBox === 'area' ? 'h-[52px]' : 'h-[26px]'
+											)}
+											onClick={() => handleProfileBoxToggle('area')}
+										>
+											<div
+												className="h-[26px] flex items-center px-3 font-inter text-[12px] font-semibold truncate"
+												style={{ backgroundColor: getProfileHeaderBg('area') }}
+											>
+												{getProfileHeaderText('area', 'Area', 'Enter your Area')}
+											</div>
+											{expandedProfileBox === 'area' && (
+												<input
+													type="text"
+													className="h-[26px] bg-white px-3 font-inter text-[12px] outline-none border-0"
+													value={profileTabFields.area}
+													onChange={(e) =>
+														setProfileTabFields({
+															...profileTabFields,
+															area: e.target.value,
+														})
+													}
+													onBlur={() => handleProfileFieldBlur('area')}
+													onKeyDown={(e) => {
+														if (e.key === 'Enter') {
+															e.preventDefault();
+															handleProfileFieldEnter('area');
+														}
+													}}
+													onClick={(e) => e.stopPropagation()}
+													autoFocus
+												/>
+											)}
+										</div>
+										{/* Band */}
+										<div
+											ref={expandedProfileBox === 'band' ? expandedProfileBoxRef : undefined}
+											className={cn(
+												'w-[95%] flex flex-col rounded-[8px] border-[2px] border-black cursor-pointer overflow-hidden',
+												expandedProfileBox === 'band' ? 'h-[52px]' : 'h-[26px]'
+											)}
+											onClick={() => handleProfileBoxToggle('band')}
+										>
+											<div
+												className="h-[26px] flex items-center px-3 font-inter text-[12px] font-semibold truncate"
+												style={{ backgroundColor: getProfileHeaderBg('band') }}
+											>
+												{getProfileHeaderText(
+													'band',
+													'Band/Artist Name',
+													'Enter your Band/Artist Name'
+												)}
+											</div>
+											{expandedProfileBox === 'band' && (
+												<input
+													type="text"
+													className="h-[26px] bg-white px-3 font-inter text-[12px] outline-none border-0"
+													value={profileTabFields.band}
+													onChange={(e) =>
+														setProfileTabFields({
+															...profileTabFields,
+															band: e.target.value,
+														})
+													}
+													onBlur={() => handleProfileFieldBlur('band')}
+													onKeyDown={(e) => {
+														if (e.key === 'Enter') {
+															e.preventDefault();
+															handleProfileFieldEnter('band');
+														}
+													}}
+													onClick={(e) => e.stopPropagation()}
+													autoFocus
+												/>
+											)}
+										</div>
+										{/* Bio */}
+										<div
+											ref={expandedProfileBox === 'bio' ? expandedProfileBoxRef : undefined}
+											className={cn(
+												'w-[95%] flex flex-col rounded-[8px] border-[2px] border-black cursor-pointer overflow-hidden',
+												expandedProfileBox === 'bio' ? 'h-[52px]' : 'h-[26px]'
+											)}
+											onClick={() => handleProfileBoxToggle('bio')}
+										>
+											<div
+												className="h-[26px] flex items-center px-3 font-inter text-[12px] font-semibold truncate"
+												style={{ backgroundColor: getProfileHeaderBg('bio') }}
+											>
+												{getProfileHeaderText('bio', 'Bio', 'Enter your Bio')}
+											</div>
+											{expandedProfileBox === 'bio' && (
+												<input
+													type="text"
+													className="h-[26px] bg-white px-3 font-inter text-[12px] outline-none border-0"
+													value={profileTabFields.bio}
+													onChange={(e) =>
+														setProfileTabFields({
+															...profileTabFields,
+															bio: e.target.value,
+														})
+													}
+													onBlur={() => handleProfileFieldBlur('bio')}
+													onKeyDown={(e) => {
+														if (e.key === 'Enter') {
+															e.preventDefault();
+															handleProfileFieldEnter('bio');
+														}
+													}}
+													onClick={(e) => e.stopPropagation()}
+													autoFocus
+												/>
+											)}
+										</div>
+										{/* Links */}
+										<div
+											ref={expandedProfileBox === 'links' ? expandedProfileBoxRef : undefined}
+											className={cn(
+												'w-[95%] flex flex-col rounded-[8px] border-[2px] border-black cursor-pointer overflow-hidden',
+												expandedProfileBox === 'links' ? 'h-[52px]' : 'h-[26px]'
+											)}
+											onClick={() => handleProfileBoxToggle('links')}
+										>
+											<div
+												className="h-[26px] flex items-center px-3 font-inter text-[12px] font-semibold truncate"
+												style={{ backgroundColor: getProfileHeaderBg('links') }}
+											>
+												{getProfileHeaderText('links', 'Links', 'Enter your Links')}
+											</div>
+											{expandedProfileBox === 'links' && (
+												<input
+													type="text"
+													className="h-[26px] bg-white px-3 font-inter text-[12px] outline-none border-0"
+													value={profileTabFields.links}
+													onChange={(e) =>
+														setProfileTabFields({
+															...profileTabFields,
+															links: e.target.value,
+														})
+													}
+													onBlur={() => handleProfileFieldBlur('links')}
+													onKeyDown={(e) => {
+														if (e.key === 'Enter') {
+															e.preventDefault();
+															handleProfileFieldEnter('links');
+														}
+													}}
+													onClick={(e) => e.stopPropagation()}
+													autoFocus
+												/>
+											)}
+										</div>
+									</div>
+									<div className="mt-5 flex justify-center">
+										<button
+											type="button"
+											onClick={() => {
+												setActiveTab('main');
+												setHasLeftProfileTab(true);
+											}}
+											className="w-[136px] h-[26px] rounded-[6px] bg-[#C8C8C8] text-white font-inter font-medium text-[12px] leading-none flex items-center justify-center cursor-pointer"
+										>
+											back to writing
+										</button>
 									</div>
 								</div>
-							)}
-						</div>
+							</div>
+						) : (
+							<>
+								{/* Auto Subject */}
+								<div className="mt-[9px] mb-3 w-[95%] max-[480px]:w-[89.33vw] mx-auto">
+									{isAiSubject ? (
+										// Compact bar (default) that expands to full width on hover when Auto Subject is on
+										<div className="group/subject relative">
+											{/* Collapsed state - shown by default, hidden on hover */}
+											<div className="flex items-center gap-2 group-hover/subject:hidden">
+												<div
+													className={cn(
+														'flex items-center justify-center h-[29px] max-[480px]:h-[24px] rounded-[8px] border-2 border-black overflow-hidden subject-bar w-[94px]'
+													)}
+													style={{ backgroundColor: '#E0E0E0' }}
+												>
+													<span className="font-inter font-medium text-[13px] max-[480px]:text-[11px] whitespace-nowrap text-black subject-label">
+														Subject
+													</span>
+												</div>
+												<span className="font-inter font-normal text-[10px] text-[#000000]">
+													Auto
+												</span>
+											</div>
 
-						{/* Blocks list - overflow visible to show buttons outside */}
-						<div
-							className={cn(
-								'flex flex-col overflow-visible',
-								draftingMode === 'hybrid'
-									? 'gap-[7px]'
-									: 'gap-[25px] max-[480px]:gap-[40px]'
-							)}
-						>
-							{(() => {
+											{/* Expanded state - hidden by default, shown on hover */}
+											<div
+												className={cn(
+													'hidden group-hover/subject:flex items-center h-[29px] max-[480px]:h-[24px] rounded-[8px] border-2 border-black overflow-hidden subject-bar bg-white w-full'
+												)}
+											>
+												<div
+													className={cn(
+														'pl-2 flex items-center h-full shrink-0 w-[110px] bg-[#E0E0E0]'
+													)}
+												>
+													<span className="font-inter font-semibold text-[13px] max-[480px]:text-[11px] whitespace-nowrap text-black subject-label">
+														Auto Subject
+													</span>
+												</div>
+
+												<button
+													type="button"
+													aria-pressed={isAiSubject}
+													onClick={toggleSubject}
+													className={cn(
+														'relative h-full flex items-center text-[10px] font-inter font-normal transition-colors shrink-0 subject-toggle',
+														'w-[47px] px-2 justify-center text-black bg-[#4ADE80] hover:bg-[#3ECC72] active:bg-[#32BA64]'
+													)}
+												>
+													<span className="absolute left-0 h-full border-l border-black"></span>
+													<span>on</span>
+													<span className="absolute right-0 h-full border-r border-black"></span>
+												</button>
+
+												<div className={cn('flex-grow h-full', 'bg-white')}>
+													<input
+														type="text"
+														className={cn(
+															'w-full h-full !bg-transparent pl-3 pr-3 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 outline-none max-[480px]:placeholder:text-[8px]',
+															'!text-[#6B6B6B] italic cursor-not-allowed'
+														)}
+														placeholder="Write manual subject here"
+														disabled={true}
+														value={form.watch('subject') || ''}
+														onChange={(e) =>
+															form.setValue('subject', e.target.value, {
+																shouldDirty: true,
+															})
+														}
+													/>
+												</div>
+											</div>
+										</div>
+									) : (
+										// Full bar when Auto Subject is off
+										<div
+											className={cn(
+												'flex items-center h-[29px] max-[480px]:h-[24px] rounded-[8px] border-2 border-black overflow-hidden subject-bar bg-white'
+											)}
+										>
+											<div
+												className={cn(
+													'pl-2 flex items-center h-full shrink-0 w-[96px] bg-white'
+												)}
+											>
+												<span className="font-inter font-semibold text-[13px] max-[480px]:text-[11px] whitespace-nowrap text-black subject-label">
+													Subject
+												</span>
+											</div>
+
+											<button
+												type="button"
+												aria-pressed={isAiSubject}
+												onClick={toggleSubject}
+												className={cn(
+													'relative h-full flex items-center text-[10px] font-inter font-normal transition-colors shrink-0 subject-toggle',
+													'w-[80px] px-2 justify-center text-black bg-[#DADAFC] hover:bg-[#C4C4F5] active:bg-[#B0B0E8]'
+												)}
+											>
+												<span className="absolute left-0 h-full border-l border-black"></span>
+												<span>Auto off</span>
+												<span className="absolute right-0 h-full border-r border-black"></span>
+											</button>
+
+											<div className={cn('flex-grow h-full', 'bg-white')}>
+												<input
+													type="text"
+													className={cn(
+														'w-full h-full !bg-transparent pl-2 pr-3 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 outline-none max-[480px]:placeholder:text-[8px]',
+														'!text-black placeholder:!text-black'
+													)}
+													placeholder="Type subject..."
+													disabled={false}
+													value={form.watch('subject') || ''}
+													onChange={(e) =>
+														form.setValue('subject', e.target.value, {
+															shouldDirty: true,
+														})
+													}
+												/>
+											</div>
+										</div>
+									)}
+								</div>
+
+								{/* Blocks list - overflow visible to show buttons outside */}
+								<div
+									className={cn(
+										'flex flex-col overflow-visible',
+										draftingMode === 'hybrid'
+											? 'gap-[7px]'
+											: 'gap-[25px] max-[480px]:gap-[40px]'
+									)}
+								>
+									{(() => {
 								// Renderers reused below
 								const renderHybridCore = (b: {
 									id: string;
@@ -1181,7 +1866,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 														0,
 														hybridBlocks.findIndex((blk) => blk.id === b.id)
 													)}
-													profileFields={profileFields}
+													profileFields={profileTabFields}
 													className={cn(
 														draftingMode === 'hybrid'
 															? 'w-[93%] ml-[2.5%]'
@@ -1349,288 +2034,291 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 								return out;
 							})()}
 						</div>
-						{/* Mobile portrait/landscape: Signature inline spacing (extra in hybrid to avoid cutoff) */}
-						<div
-							className={cn(
-								'max-[480px]:block hidden',
-								shouldUseLargeHybridSigGap ? 'mt-8' : 'mt-2'
-							)}
-							style={{ display: isMobileLandscape ? 'block' : undefined }}
-						>
-							{draftingMode === 'hybrid' ? (
-								<div className="w-[95%] max-[480px]:w-[89.33vw] mx-auto flex items-start justify-between">
-									<div className="flex-1 mr-2">
-										{isAutoSignature ? (
-											<div className="group/signature relative w-full">
-												{/* Collapsed state - shown by default, hidden on hover */}
-												<div className="flex items-center gap-2 group-hover/signature:hidden">
+								{/* Mobile portrait/landscape: Signature inline spacing (extra in hybrid to avoid cutoff) */}
+								<div
+									className={cn(
+										'max-[480px]:block hidden',
+										shouldUseLargeHybridSigGap ? 'mt-8' : 'mt-2'
+									)}
+									style={{ display: isMobileLandscape ? 'block' : undefined }}
+								>
+									{draftingMode === 'hybrid' ? (
+										<div className="w-[95%] max-[480px]:w-[89.33vw] mx-auto flex items-start justify-between">
+											<div className="flex-1 mr-2">
+												{isAutoSignature ? (
+													<div className="group/signature relative w-full">
+														{/* Collapsed state - shown by default, hidden on hover */}
+														<div className="flex items-center gap-2 group-hover/signature:hidden">
+															<div
+																className={cn(
+																	'flex items-center justify-center h-[29px] max-[480px]:h-[24px] rounded-[8px] border-2 border-black overflow-hidden w-[105px]'
+																)}
+																style={{ backgroundColor: '#E0E0E0' }}
+															>
+																<span className="font-inter font-medium text-[13px] max-[480px]:text-[11px] whitespace-nowrap text-black">
+																	Signature
+																</span>
+															</div>
+															<span className="font-inter font-normal text-[10px] text-[#000000]">
+																Auto
+															</span>
+														</div>
+
+														{/* Expanded state - hidden by default, shown on hover */}
+														<div
+															className={cn(
+																'hidden group-hover/signature:flex items-center h-[29px] max-[480px]:h-[24px] rounded-[8px] border-2 border-black overflow-hidden bg-white w-full'
+															)}
+														>
+															<div className="pl-2 flex items-center h-full shrink-0 w-[118px] bg-[#E0E0E0]">
+																<span className="font-inter font-semibold text-[13px] max-[480px]:text-[11px] whitespace-nowrap text-black">
+																	Auto Signature
+																</span>
+															</div>
+															<button
+																type="button"
+																onClick={() => {
+																	setIsAutoSignature(false);
+																	// Start manual editing from the current signature value.
+																	setManualSignatureValue(signature);
+																	updateSignature(signature);
+																}}
+																className={cn(
+																	'relative h-full flex items-center text-[10px] font-inter font-normal transition-colors shrink-0',
+																	'w-[47px] px-2 justify-center text-black bg-[#4ADE80] hover:bg-[#3ECC72] active:bg-[#32BA64]'
+																)}
+																aria-label="Auto Signature on"
+															>
+																<span className="absolute left-0 h-full border-l border-black"></span>
+																<span>on</span>
+																<span className="absolute right-0 h-full border-r border-black"></span>
+															</button>
+															<div className={cn('flex-grow h-full', 'bg-white')}>
+																<input
+																	type="text"
+																	className={cn(
+																		'w-full h-full !bg-transparent pl-3 pr-3 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 outline-none',
+																		'!text-black placeholder:!text-[#9E9E9E]',
+																		'cursor-not-allowed'
+																	)}
+																	placeholder="Write manual Signature here"
+																	value={signature}
+																	disabled
+																	readOnly
+																/>
+															</div>
+														</div>
+													</div>
+												) : (
+													/* Manual signature mode: expanded downward with textarea */
+													<div className="w-full rounded-[8px] border-2 border-black overflow-hidden flex flex-col bg-white">
+														{/* Header row */}
+														<div className="flex items-center h-[29px] shrink-0 bg-[#E0E0E0]">
+															<div className="pl-2 flex items-center h-full shrink-0 w-[105px] bg-[#E0E0E0]">
+																<span className="font-inter font-semibold text-[13px] max-[480px]:text-[11px] whitespace-nowrap text-black">
+																	Signature
+																</span>
+															</div>
+															<button
+																type="button"
+																onClick={() => {
+																	setIsAutoSignature(true);
+																	setManualSignatureValue('');
+																	updateSignature(autoSignatureValueRef.current);
+																}}
+																className={cn(
+																	'relative h-full flex items-center text-[10px] font-inter font-normal transition-colors shrink-0',
+																	'w-[80px] px-2 justify-center text-black bg-[#C3BCBC] hover:bg-[#B5AEAE] active:bg-[#A7A0A0]'
+																)}
+																aria-label="Auto Signature off"
+															>
+																<span className="absolute left-0 h-full border-l border-black"></span>
+																<span>Auto off</span>
+																<span className="absolute right-0 h-full border-r border-black"></span>
+															</button>
+															<div className="flex-grow h-full bg-[#E0E0E0]" />
+														</div>
+														{/* Divider line */}
+														<div className="w-full h-[1px] bg-black shrink-0" />
+														{/* Text entry area */}
+														<div className="bg-white">
+															<textarea
+																value={manualSignatureValue}
+																onChange={(e) => {
+																	setManualSignatureValue(e.target.value);
+																	updateSignature(e.target.value);
+																}}
+																className={cn(
+																	'w-full !bg-transparent px-3 py-2 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 resize-none outline-none',
+																	'signature-textarea',
+																	'!text-black placeholder:!text-[#9E9E9E] font-inter text-[12px]'
+																)}
+																style={{ height: 66 }}
+																placeholder="Enter your signature..."
+															/>
+														</div>
+													</div>
+												)}
+											</div>
+											<button
+												type="button"
+												onClick={addTextBlocksBetweenAll}
+												className="w-[30px] h-[30px] shrink-0 rounded-[8px] border-2 border-black flex items-center justify-center cursor-pointer"
+												style={{ backgroundColor: '#A6E2AB' }}
+											>
+												<svg
+													width="15"
+													height="15"
+													viewBox="0 0 15 15"
+													fill="none"
+													xmlns="http://www.w3.org/2000/svg"
+												>
+													<path
+														d="M7.5 0.5V14.5M0.5 7.5H14.5"
+														stroke="#000000"
+														strokeWidth="1"
+													/>
+												</svg>
+											</button>
+										</div>
+									) : (
+										<div className="w-[95%] max-[480px]:w-[89.33vw] mx-auto">
+											{isAutoSignature ? (
+												<div className="group/signature relative w-full">
+													{/* Collapsed state - shown by default, hidden on hover */}
+													<div className="flex items-center gap-2 group-hover/signature:hidden">
+														<div
+															className={cn(
+																'flex items-center justify-center h-[29px] max-[480px]:h-[24px] rounded-[8px] border-2 border-black overflow-hidden w-[105px]'
+															)}
+															style={{ backgroundColor: '#E0E0E0' }}
+														>
+															<span className="font-inter font-medium text-[13px] max-[480px]:text-[11px] whitespace-nowrap text-black">
+																Signature
+															</span>
+														</div>
+														<span className="font-inter font-normal text-[10px] text-[#000000]">
+															Auto
+														</span>
+													</div>
+
+													{/* Expanded state - hidden by default, shown on hover */}
 													<div
 														className={cn(
-															'flex items-center justify-center h-[29px] max-[480px]:h-[24px] rounded-[8px] border-2 border-black overflow-hidden w-[105px]'
+															'hidden group-hover/signature:flex items-center h-[29px] max-[480px]:h-[24px] rounded-[8px] border-2 border-black overflow-hidden bg-white w-full'
 														)}
-														style={{ backgroundColor: '#E0E0E0' }}
 													>
-														<span className="font-inter font-medium text-[13px] max-[480px]:text-[11px] whitespace-nowrap text-black">
-															Signature
-														</span>
-													</div>
-													<span className="font-inter font-normal text-[10px] text-[#000000]">
-														Auto
-													</span>
-												</div>
-
-												{/* Expanded state - hidden by default, shown on hover */}
-												<div
-													className={cn(
-														'hidden group-hover/signature:flex items-center h-[29px] max-[480px]:h-[24px] rounded-[8px] border-2 border-black overflow-hidden bg-white w-full'
-													)}
-												>
-													<div className="pl-2 flex items-center h-full shrink-0 w-[118px] bg-[#E0E0E0]">
-														<span className="font-inter font-semibold text-[13px] max-[480px]:text-[11px] whitespace-nowrap text-black">
-															Auto Signature
-														</span>
-													</div>
-													<button
-														type="button"
-														onClick={() => {
-															setIsAutoSignature(false);
-															// Start manual editing from the current signature value.
-															setManualSignatureValue(signature);
-															updateSignature(signature);
-														}}
-														className={cn(
-															'relative h-full flex items-center text-[10px] font-inter font-normal transition-colors shrink-0',
-															'w-[47px] px-2 justify-center text-black bg-[#4ADE80] hover:bg-[#3ECC72] active:bg-[#32BA64]'
-														)}
-														aria-label="Auto Signature on"
-													>
-														<span className="absolute left-0 h-full border-l border-black"></span>
-														<span>on</span>
-														<span className="absolute right-0 h-full border-r border-black"></span>
-													</button>
-													<div className={cn('flex-grow h-full', 'bg-white')}>
-														<input
-															type="text"
+														<div className="pl-2 flex items-center h-full shrink-0 w-[118px] bg-[#E0E0E0]">
+															<span className="font-inter font-semibold text-[13px] max-[480px]:text-[11px] whitespace-nowrap text-black">
+																Auto Signature
+															</span>
+														</div>
+														<button
+															type="button"
+															onClick={() => {
+																setIsAutoSignature(false);
+																// Start manual editing from the current signature value.
+																setManualSignatureValue(signature);
+																updateSignature(signature);
+															}}
 															className={cn(
-																'w-full h-full !bg-transparent pl-3 pr-3 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 outline-none',
-																'!text-black placeholder:!text-[#9E9E9E]',
-																'cursor-not-allowed'
+																'relative h-full flex items-center text-[10px] font-inter font-normal transition-colors shrink-0',
+																'w-[47px] px-2 justify-center text-black bg-[#4ADE80] hover:bg-[#3ECC72] active:bg-[#32BA64]'
 															)}
-															placeholder="Write manual Signature here"
-															value={signature}
-															disabled
-															readOnly
+															aria-label="Auto Signature on"
+														>
+															<span className="absolute left-0 h-full border-l border-black"></span>
+															<span>on</span>
+															<span className="absolute right-0 h-full border-r border-black"></span>
+														</button>
+														<div className={cn('flex-grow h-full', 'bg-white')}>
+															<input
+																type="text"
+																className={cn(
+																	'w-full h-full !bg-transparent pl-3 pr-3 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 outline-none',
+																	'!text-black placeholder:!text-[#9E9E9E]',
+																	'cursor-not-allowed'
+																)}
+																placeholder="Write manual Signature here"
+																value={signature}
+																disabled
+																readOnly
+															/>
+														</div>
+													</div>
+												</div>
+											) : (
+												/* Manual signature mode: expanded downward with textarea */
+												<div className="w-full rounded-[8px] border-2 border-black overflow-hidden flex flex-col bg-white">
+													{/* Header row */}
+													<div className="flex items-center h-[29px] shrink-0 bg-[#E0E0E0]">
+														<div className="pl-2 flex items-center h-full shrink-0 w-[105px] bg-[#E0E0E0]">
+															<span className="font-inter font-semibold text-[13px] max-[480px]:text-[11px] whitespace-nowrap text-black">
+																Signature
+															</span>
+														</div>
+														<button
+															type="button"
+															onClick={() => {
+																setIsAutoSignature(true);
+																setManualSignatureValue('');
+																updateSignature(autoSignatureValueRef.current);
+															}}
+															className={cn(
+																'relative h-full flex items-center text-[10px] font-inter font-normal transition-colors shrink-0',
+																'w-[80px] px-2 justify-center text-black bg-[#C3BCBC] hover:bg-[#B5AEAE] active:bg-[#A7A0A0]'
+															)}
+															aria-label="Auto Signature off"
+														>
+															<span className="absolute left-0 h-full border-l border-black"></span>
+															<span>Auto off</span>
+															<span className="absolute right-0 h-full border-r border-black"></span>
+														</button>
+														<div className="flex-grow h-full bg-[#E0E0E0]" />
+													</div>
+													{/* Divider line */}
+													<div className="w-full h-[1px] bg-black shrink-0" />
+													{/* Text entry area */}
+													<div className="bg-white">
+														<textarea
+															value={manualSignatureValue}
+															onChange={(e) => {
+																setManualSignatureValue(e.target.value);
+																updateSignature(e.target.value);
+															}}
+															className={cn(
+																'w-full !bg-transparent px-3 py-2 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 resize-none outline-none',
+																'signature-textarea',
+																'!text-black placeholder:!text-[#9E9E9E] font-inter text-[12px]'
+															)}
+															style={{ height: 66 }}
+															placeholder="Enter your signature..."
 														/>
 													</div>
 												</div>
-											</div>
-										) : (
-											/* Manual signature mode: expanded downward with textarea */
-											<div className="w-full rounded-[8px] border-2 border-black overflow-hidden flex flex-col bg-white">
-												{/* Header row */}
-												<div className="flex items-center h-[29px] shrink-0 bg-[#E0E0E0]">
-													<div className="pl-2 flex items-center h-full shrink-0 w-[105px] bg-[#E0E0E0]">
-														<span className="font-inter font-semibold text-[13px] max-[480px]:text-[11px] whitespace-nowrap text-black">
-															Signature
-														</span>
-													</div>
-													<button
-														type="button"
-														onClick={() => {
-															setIsAutoSignature(true);
-															setManualSignatureValue('');
-															updateSignature(autoSignatureValueRef.current);
-														}}
-														className={cn(
-															'relative h-full flex items-center text-[10px] font-inter font-normal transition-colors shrink-0',
-															'w-[80px] px-2 justify-center text-black bg-[#C3BCBC] hover:bg-[#B5AEAE] active:bg-[#A7A0A0]'
-														)}
-														aria-label="Auto Signature off"
-													>
-														<span className="absolute left-0 h-full border-l border-black"></span>
-														<span>Auto off</span>
-														<span className="absolute right-0 h-full border-r border-black"></span>
-													</button>
-													<div className="flex-grow h-full bg-[#E0E0E0]" />
-												</div>
-												{/* Divider line */}
-												<div className="w-full h-[1px] bg-black shrink-0" />
-												{/* Text entry area */}
-												<div className="bg-white">
-													<textarea
-														value={manualSignatureValue}
-														onChange={(e) => {
-															setManualSignatureValue(e.target.value);
-															updateSignature(e.target.value);
-														}}
-														className={cn(
-															'w-full !bg-transparent px-3 py-2 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 resize-none outline-none',
-															'signature-textarea',
-															'!text-black placeholder:!text-[#9E9E9E] font-inter text-[12px]'
-														)}
-														style={{ height: 66 }}
-														placeholder="Enter your signature..."
-													/>
-												</div>
-											</div>
-										)}
-									</div>
-									<button
-										type="button"
-										onClick={addTextBlocksBetweenAll}
-										className="w-[30px] h-[30px] shrink-0 rounded-[8px] border-2 border-black flex items-center justify-center cursor-pointer"
-										style={{ backgroundColor: '#A6E2AB' }}
-									>
-										<svg
-											width="15"
-											height="15"
-											viewBox="0 0 15 15"
-											fill="none"
-											xmlns="http://www.w3.org/2000/svg"
-										>
-											<path
-												d="M7.5 0.5V14.5M0.5 7.5H14.5"
-												stroke="#000000"
-												strokeWidth="1"
-											/>
-										</svg>
-									</button>
-								</div>
-							) : (
-								<div className="w-[95%] max-[480px]:w-[89.33vw] mx-auto">
-									{isAutoSignature ? (
-										<div className="group/signature relative w-full">
-											{/* Collapsed state - shown by default, hidden on hover */}
-											<div className="flex items-center gap-2 group-hover/signature:hidden">
-												<div
-													className={cn(
-														'flex items-center justify-center h-[29px] max-[480px]:h-[24px] rounded-[8px] border-2 border-black overflow-hidden w-[105px]'
-													)}
-													style={{ backgroundColor: '#E0E0E0' }}
-												>
-													<span className="font-inter font-medium text-[13px] max-[480px]:text-[11px] whitespace-nowrap text-black">
-														Signature
-													</span>
-												</div>
-												<span className="font-inter font-normal text-[10px] text-[#000000]">
-													Auto
-												</span>
-											</div>
-
-											{/* Expanded state - hidden by default, shown on hover */}
-											<div
-												className={cn(
-													'hidden group-hover/signature:flex items-center h-[29px] max-[480px]:h-[24px] rounded-[8px] border-2 border-black overflow-hidden bg-white w-full'
-												)}
-											>
-												<div className="pl-2 flex items-center h-full shrink-0 w-[118px] bg-[#E0E0E0]">
-													<span className="font-inter font-semibold text-[13px] max-[480px]:text-[11px] whitespace-nowrap text-black">
-														Auto Signature
-													</span>
-												</div>
-												<button
-													type="button"
-													onClick={() => {
-														setIsAutoSignature(false);
-														// Start manual editing from the current signature value.
-														setManualSignatureValue(signature);
-														updateSignature(signature);
-													}}
-													className={cn(
-														'relative h-full flex items-center text-[10px] font-inter font-normal transition-colors shrink-0',
-														'w-[47px] px-2 justify-center text-black bg-[#4ADE80] hover:bg-[#3ECC72] active:bg-[#32BA64]'
-													)}
-													aria-label="Auto Signature on"
-												>
-													<span className="absolute left-0 h-full border-l border-black"></span>
-													<span>on</span>
-													<span className="absolute right-0 h-full border-r border-black"></span>
-												</button>
-												<div className={cn('flex-grow h-full', 'bg-white')}>
-													<input
-														type="text"
-														className={cn(
-															'w-full h-full !bg-transparent pl-3 pr-3 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 outline-none',
-															'!text-black placeholder:!text-[#9E9E9E]',
-															'cursor-not-allowed'
-														)}
-														placeholder="Write manual Signature here"
-														value={signature}
-														disabled
-														readOnly
-													/>
-												</div>
-											</div>
-										</div>
-									) : (
-										/* Manual signature mode: expanded downward with textarea */
-										<div className="w-full rounded-[8px] border-2 border-black overflow-hidden flex flex-col bg-white">
-											{/* Header row */}
-											<div className="flex items-center h-[29px] shrink-0 bg-[#E0E0E0]">
-												<div className="pl-2 flex items-center h-full shrink-0 w-[105px] bg-[#E0E0E0]">
-													<span className="font-inter font-semibold text-[13px] max-[480px]:text-[11px] whitespace-nowrap text-black">
-														Signature
-													</span>
-												</div>
-												<button
-													type="button"
-													onClick={() => {
-														setIsAutoSignature(true);
-														setManualSignatureValue('');
-														updateSignature(autoSignatureValueRef.current);
-													}}
-													className={cn(
-														'relative h-full flex items-center text-[10px] font-inter font-normal transition-colors shrink-0',
-														'w-[80px] px-2 justify-center text-black bg-[#C3BCBC] hover:bg-[#B5AEAE] active:bg-[#A7A0A0]'
-													)}
-													aria-label="Auto Signature off"
-												>
-													<span className="absolute left-0 h-full border-l border-black"></span>
-													<span>Auto off</span>
-													<span className="absolute right-0 h-full border-r border-black"></span>
-												</button>
-												<div className="flex-grow h-full bg-[#E0E0E0]" />
-											</div>
-											{/* Divider line */}
-											<div className="w-full h-[1px] bg-black shrink-0" />
-											{/* Text entry area */}
-											<div className="bg-white">
-												<textarea
-													value={manualSignatureValue}
-													onChange={(e) => {
-														setManualSignatureValue(e.target.value);
-														updateSignature(e.target.value);
-													}}
-													className={cn(
-														'w-full !bg-transparent px-3 py-2 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 resize-none outline-none',
-														'signature-textarea',
-														'!text-black placeholder:!text-[#9E9E9E] font-inter text-[12px]'
-													)}
-													style={{ height: 66 }}
-													placeholder="Enter your signature..."
-												/>
-											</div>
+											)}
 										</div>
 									)}
 								</div>
-							)}
-						</div>
+							</>
+						)}
 					</div>
 				</div>
 
 				{/* Signature - fixed at bottom (outside scroll) for non-mobile only */}
-				<div
-					className={cn(
-						'px-0 pb-2 max-[480px]:hidden',
-						isCompactSignature ? 'mt-1' : 'mt-3'
-					)}
-					style={{ display: isMobileLandscape ? 'none' : undefined }}
-				>
-					{draftingMode === 'hybrid' ? (
-						<div className="w-[95%] mx-auto flex items-start justify-between">
-							<div className="flex-1 mr-2">
-								{isAutoSignature ? (
-									<div className="group/signature relative w-full">
+				{activeTab !== 'profile' && (
+					<div
+						className={cn(
+							'px-0 pb-2 max-[480px]:hidden',
+							isCompactSignature ? 'mt-1' : 'mt-3'
+						)}
+						style={{ display: isMobileLandscape ? 'none' : undefined }}
+					>
+						{draftingMode === 'hybrid' ? (
+							<div className="w-[95%] mx-auto flex items-start justify-between">
+								<div className="flex-1 mr-2">
+									{isAutoSignature ? (
+										<div className="group/signature relative w-full">
 										{/* Collapsed state - shown by default, hidden on hover */}
 										<div className="flex items-center gap-2 group-hover/signature:hidden">
 											<div
@@ -1761,10 +2449,10 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 								</svg>
 							</button>
 						</div>
-					) : (
-						<div className="w-[95%] mx-auto">
-							{isAutoSignature ? (
-								<div className="group/signature relative w-full">
+						) : (
+							<div className="w-[95%] mx-auto">
+								{isAutoSignature ? (
+									<div className="group/signature relative w-full">
 									{/* Collapsed state - shown by default, hidden on hover */}
 									<div className="flex items-center gap-2 group-hover/signature:hidden">
 										<div
@@ -1876,11 +2564,12 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 								</div>
 							)}
 						</div>
-					)}
-				</div>
+						)}
+					</div>
+				)}
 
 				{/* Footer with Draft button */}
-				{!hideFooter && (
+				{!hideFooter && activeTab !== 'profile' && (
 					<div className="px-0 pb-3">
 						<Button
 							type="button"
@@ -1934,7 +2623,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 					</div>
 				)}
 			</div>
-			{!hideAddTextButtons && (
+			{activeTab !== 'profile' && !hideAddTextButtons && (
 				<div
 					className="absolute top-0 left-[-18px] max-[480px]:-left-[10px] flex flex-col"
 					style={{ pointerEvents: 'none', zIndex: 100 }}

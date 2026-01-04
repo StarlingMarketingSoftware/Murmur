@@ -2091,6 +2091,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														<MiniEmailStructure
 															form={form}
 															profileFields={miniProfileFields}
+															identityProfile={campaign?.identity as IdentityProfileFields | null}
+															onIdentityUpdate={handleIdentityUpdate}
 															onDraft={() =>
 																handleGenerateDrafts(
 																	contactsAvailableForDrafting.map((c) => c.id)
@@ -3396,6 +3398,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														<MiniEmailStructure
 															form={form}
 															profileFields={miniProfileFields}
+															identityProfile={campaign?.identity as IdentityProfileFields | null}
+															onIdentityUpdate={handleIdentityUpdate}
 															onDraft={() =>
 																handleGenerateDrafts(
 																	contactsAvailableForDrafting.map((c) => c.id)
@@ -3696,6 +3700,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													<MiniEmailStructure
 														form={form}
 														profileFields={miniProfileFields}
+														identityProfile={campaign?.identity as IdentityProfileFields | null}
+														onIdentityUpdate={handleIdentityUpdate}
 														onDraft={() =>
 															handleGenerateDrafts(
 																contactsAvailableForDrafting.map((c) => c.id)
@@ -3806,6 +3812,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													<MiniEmailStructure
 														form={form}
 														profileFields={miniProfileFields}
+														identityProfile={campaign?.identity as IdentityProfileFields | null}
+														onIdentityUpdate={handleIdentityUpdate}
 														onDraft={() =>
 															handleGenerateDrafts(
 																contactsAvailableForDrafting.map((c) => c.id)
@@ -4085,6 +4093,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													<MiniEmailStructure
 														form={form}
 														profileFields={miniProfileFields}
+														identityProfile={campaign?.identity as IdentityProfileFields | null}
+														onIdentityUpdate={handleIdentityUpdate}
 														onDraft={() =>
 															handleGenerateDrafts(
 																contactsAvailableForDrafting.map((c) => c.id)
@@ -4148,6 +4158,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													<MiniEmailStructure
 														form={form}
 														profileFields={miniProfileFields}
+														identityProfile={campaign?.identity as IdentityProfileFields | null}
+														onIdentityUpdate={handleIdentityUpdate}
 														onDraft={() =>
 															handleGenerateDrafts(
 																contactsAvailableForDrafting.map((c) => c.id)
@@ -4256,6 +4268,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													<MiniEmailStructure
 														form={form}
 														profileFields={miniProfileFields}
+														identityProfile={campaign?.identity as IdentityProfileFields | null}
+														onIdentityUpdate={handleIdentityUpdate}
 														onDraft={() =>
 															handleGenerateDrafts(
 																contactsAvailableForDrafting.map((c) => c.id)
@@ -5682,6 +5696,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												<MiniEmailStructure
 													form={form}
 													profileFields={miniProfileFields}
+													identityProfile={campaign?.identity as IdentityProfileFields | null}
+													onIdentityUpdate={handleIdentityUpdate}
 													onDraft={() =>
 														handleGenerateDrafts(
 															contactsAvailableForDrafting.map((c) => c.id)
@@ -6399,6 +6415,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												<MiniEmailStructure
 													form={form}
 													profileFields={miniProfileFields}
+													identityProfile={campaign?.identity as IdentityProfileFields | null}
+													onIdentityUpdate={handleIdentityUpdate}
 													onDraft={() =>
 														handleGenerateDrafts(
 															contactsAvailableForDrafting.map((c) => c.id)

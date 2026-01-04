@@ -4,6 +4,7 @@ import { cn } from '@/utils';
 import { useSendMailgunMessage } from '@/hooks/queryHooks/useMailgun';
 import { useEditEmail } from '@/hooks/queryHooks/useEmails';
 import { useEditUser } from '@/hooks/queryHooks/useUsers';
+import { useEditIdentity } from '@/hooks/queryHooks/useIdentities';
 import { useMe } from '@/hooks/useMe';
 import { EmailStatus, ReviewStatus } from '@/constants/prismaEnums';
 import { toast } from 'sonner';
@@ -202,6 +203,24 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 	});
 	const { mutateAsync: updateEmail } = useEditEmail({ suppressToasts: true });
 	const { mutateAsync: editUser } = useEditUser({ suppressToasts: true });
+	const { mutateAsync: editIdentity } = useEditIdentity({ suppressToasts: true });
+
+	// Handle identity field updates from the profile tab (mirrors DraftingSection)
+	const handleIdentityUpdate = useCallback(
+		async (data: Parameters<typeof editIdentity>[0]['data']) => {
+			const identityId = (campaign as any)?.identity?.id as number | undefined;
+			if (!identityId) return;
+			try {
+				await editIdentity({ id: identityId, data });
+				// Invalidate campaign query to refresh identity data
+				queryClient.invalidateQueries({ queryKey: ['campaigns'] });
+			} catch (error) {
+				toast.error('Failed to save profile changes.');
+				console.error('Failed to update identity:', error);
+			}
+		},
+		[campaign, editIdentity, queryClient]
+	);
 
 	const handleRejectDraft = useCallback(
 		async (draftId: number, currentlyRejected?: boolean) => {
@@ -443,6 +462,8 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 												<MiniEmailStructure
 													form={form}
 													profileFields={miniProfileFields}
+													identityProfile={(campaign as any)?.identity ?? null}
+													onIdentityUpdate={handleIdentityUpdate}
 													onDraft={handleDraftButtonClick}
 													isDraftDisabled={
 														isGenerationDisabled() || selectedContactIds.size === 0
