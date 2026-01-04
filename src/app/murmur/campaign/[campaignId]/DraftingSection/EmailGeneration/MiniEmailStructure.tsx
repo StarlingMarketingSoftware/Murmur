@@ -84,6 +84,11 @@ interface MiniEmailStructureProps {
 	topHeaderLabel?: string;
 	/** Optional callback to open the Writing tab (shows Open control when provided) */
 	onOpenWriting?: () => void;
+	/**
+	 * When true, renders as a non-editable preview (used on Drafts tab).
+	 * Still allows scrolling, but blocks pointer interactions inside the panel.
+	 */
+	readOnly?: boolean;
 	/** Full Auto: profile chips (matches HybridPromptInput "Body" block) */
 	profileFields?: FullAutoProfileFields | null;
 	/** Profile Tab: identity baseline (used for save comparisons) */
@@ -110,6 +115,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 	topHeaderHeight,
 	topHeaderLabel,
 	onOpenWriting,
+	readOnly,
 	profileFields,
 	identityProfile,
 	onIdentityUpdate,
@@ -960,8 +966,9 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 		<div
 			ref={rootRef}
 			data-mini-email-hide-text={hideAllText ? 'true' : 'false'}
+			data-mini-email-readonly={readOnly ? 'true' : 'false'}
 			style={{
-				cursor: hideAllText ? 'default' : 'auto',
+				cursor: hideAllText || readOnly ? 'default' : 'auto',
 				width: fullWidthMobile ? '100%' : '376px',
 				height: height
 					? height
@@ -983,6 +990,17 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 					[data-mini-email-hide-text='true'] input::placeholder,
 					[data-mini-email-hide-text='true'] textarea::placeholder {
 						color: transparent !important;
+					}
+				`}</style>
+			)}
+			{readOnly && (
+				<style jsx global>{`
+					/* Block pointer interactions for preview mode, but keep scrolling enabled. */
+					[data-mini-email-readonly='true'] * {
+						pointer-events: none !important;
+					}
+					[data-mini-email-readonly='true'] [data-mini-email-scroll='true'] {
+						pointer-events: auto !important;
 					}
 				`}</style>
 			)}
@@ -1048,6 +1066,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 				{/* Content area - miniature, but interactive */}
 				<div
 					ref={buttonContainerRef}
+					data-mini-email-scroll="true"
 					className={cn(
 						isMobilePortrait || isMobileLandscape
 							? 'overflow-visible'

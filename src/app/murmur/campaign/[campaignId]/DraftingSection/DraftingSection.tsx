@@ -2,8 +2,14 @@ import { FC, Fragment, useCallback, useEffect, useLayoutEffect, useState, useRef
 import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { gsap } from 'gsap';
-import { DraftingSectionProps, useDraftingSection, HybridBlockPrompt } from './useDraftingSection';
+import {
+	DraftingSectionProps,
+	useDraftingSection,
+	HybridBlockPrompt,
+	type DraftingFormValues,
+} from './useDraftingSection';
 import { Form } from '@/components/ui/form';
+import { useForm } from 'react-hook-form';
 import { HybridPromptInput } from '@/components/molecules/HybridPromptInput/HybridPromptInput';
 import { UpgradeSubscriptionDrawer } from '@/components/atoms/UpgradeSubscriptionDrawer/UpgradeSubscriptionDrawer';
 // EmailGeneration kept available but not used in current view
@@ -18,6 +24,10 @@ import {
 	convertAiResponseToRichTextEmail,
 	convertHtmlToPlainText,
 } from '@/utils';
+import {
+	extractMurmurDraftSettingsSnapshot,
+	injectMurmurDraftSettingsSnapshot,
+} from '@/utils/draftSettings';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { useDebounce } from '@/hooks/useDebounce';
 import DraftingStatusPanel from '@/app/murmur/campaign/[campaignId]/DraftingSection/Testing/DraftingStatusPanel';
@@ -204,10 +214,40 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const isMobile = useIsMobile();
 	const [isClient, setIsClient] = useState(false);
 	useEffect(() => setIsClient(true), []);
+	const isDraftingView = view === 'drafting';
 	const [selectedDraft, setSelectedDraft] = useState<EmailWithRelations | null>(null);
-	const isDraftPreviewOpen = view === 'drafting' && Boolean(selectedDraft);
-	const draftsMiniEmailTopHeaderHeight = view === 'drafting' ? 26 : undefined;
-	const draftsMiniEmailFillColor = view === 'drafting' ? '#B1CEEF' : undefined;
+	const [hoveredDraftForSettings, setHoveredDraftForSettings] =
+		useState<EmailWithRelations | null>(null);
+	const isDraftPreviewOpen = isDraftingView && Boolean(selectedDraft);
+	const draftsMiniEmailTopHeaderHeight = isDraftingView ? 26 : undefined;
+	const draftsMiniEmailFillColor = isDraftingView ? '#B1CEEF' : undefined;
+
+	// Drafts tab: read-only preview form for the MiniEmailStructure, driven by hovered/selected draft settings.
+	const draftsSettingsPreviewForm = useForm<DraftingFormValues>({
+		defaultValues: form.getValues(),
+	});
+	const draftForSettingsPreview =
+		isDraftingView ? hoveredDraftForSettings ?? selectedDraft : null;
+	useEffect(() => {
+		if (!isDraftingView) {
+			// Avoid leaking hover state across tabs.
+			if (hoveredDraftForSettings) setHoveredDraftForSettings(null);
+			return;
+		}
+
+		const snapshot = draftForSettingsPreview
+			? extractMurmurDraftSettingsSnapshot(draftForSettingsPreview.message)
+			: null;
+		const nextValues = snapshot?.values ?? form.getValues();
+		draftsSettingsPreviewForm.reset(nextValues);
+	}, [
+		view,
+		draftForSettingsPreview?.id,
+		draftForSettingsPreview?.message,
+		form,
+		draftsSettingsPreviewForm,
+		hoveredDraftForSettings,
+	]);
 
 	// All tab hover states
 	const [isContactsHovered, setIsContactsHovered] = useState(false);
@@ -736,19 +776,29 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 					font,
 					signatureText
 				);
+				const richTextMessageWithSettings = injectMurmurDraftSettingsSnapshot(
+					richTextMessage,
+					{
+						version: 1,
+						values: {
+							...values,
+							signature: signatureText,
+						},
+					}
+				);
 
 				await updateEmail({
 					id: draft.id.toString(),
 					data: {
 						subject: cleanedSubject,
-						message: richTextMessage,
+						message: richTextMessageWithSettings,
 					},
 				});
 
 				queryClient.invalidateQueries({ queryKey: ['emails'] });
 
 				toast.success('Draft regenerated successfully');
-				const messageForUi = convertHtmlToPlainText(richTextMessage);
+				const messageForUi = convertHtmlToPlainText(richTextMessageWithSettings);
 				return { subject: cleanedSubject, message: messageForUi };
 			} catch (error) {
 				console.error('[Regenerate] Error:', error);
@@ -2100,7 +2150,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														/>
 													) : (
 														<MiniEmailStructure
-															form={form}
+															form={isDraftingView ? draftsSettingsPreviewForm : form}
+															readOnly={isDraftingView}
 															profileFields={miniProfileFields}
 															identityProfile={campaign?.identity as IdentityProfileFields | null}
 															onIdentityUpdate={handleIdentityUpdate}
@@ -3373,6 +3424,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												subject={form.watch('subject')}
 												onContactClick={handleResearchContactClick}
 												onContactHover={handleResearchContactHover}
+												onDraftHover={setHoveredDraftForSettings}
 												goToWriting={goToWriting}
 												goToSearch={onGoToSearch}
 												goToInbox={goToInbox}
@@ -3410,7 +3462,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													{/* Mini Email Structure panel */}
 													<div style={{ width: '330px' }}>
 														<MiniEmailStructure
-															form={form}
+															form={draftsSettingsPreviewForm}
+															readOnly
 															profileFields={miniProfileFields}
 															identityProfile={campaign?.identity as IdentityProfileFields | null}
 															onIdentityUpdate={handleIdentityUpdate}
@@ -3467,6 +3520,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														subject={form.watch('subject')}
 														onContactClick={handleResearchContactClick}
 														onContactHover={handleResearchContactHover}
+														onDraftHover={setHoveredDraftForSettings}
 														goToWriting={goToWriting}
 														goToSearch={onGoToSearch}
 														goToInbox={goToInbox}
@@ -3608,6 +3662,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												subject={form.watch('subject')}
 												onContactClick={handleResearchContactClick}
 												onContactHover={handleResearchContactHover}
+												onDraftHover={setHoveredDraftForSettings}
 												goToWriting={goToWriting}
 												goToSearch={onGoToSearch}
 												goToInbox={goToInbox}
@@ -3715,7 +3770,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											<div className="mt-[10px] w-full flex justify-center">
 												<div style={{ width: '489px' }}>
 													<MiniEmailStructure
-														form={form}
+														form={draftsSettingsPreviewForm}
+														readOnly
 														profileFields={miniProfileFields}
 														identityProfile={campaign?.identity as IdentityProfileFields | null}
 														onIdentityUpdate={handleIdentityUpdate}
@@ -3830,7 +3886,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												{/* Mini Email Structure panel */}
 												<div style={{ width: '330px' }}>
 													<MiniEmailStructure
-														form={form}
+														form={isDraftingView ? draftsSettingsPreviewForm : form}
+														readOnly={isDraftingView}
 														profileFields={miniProfileFields}
 														identityProfile={campaign?.identity as IdentityProfileFields | null}
 														onIdentityUpdate={handleIdentityUpdate}
@@ -4114,7 +4171,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											<div className="mt-[10px] w-full flex justify-center">
 												<div style={{ width: '489px' }}>
 													<MiniEmailStructure
-														form={form}
+														form={isDraftingView ? draftsSettingsPreviewForm : form}
+														readOnly={isDraftingView}
 														profileFields={miniProfileFields}
 														identityProfile={campaign?.identity as IdentityProfileFields | null}
 														onIdentityUpdate={handleIdentityUpdate}
@@ -4182,7 +4240,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												{/* Mini Email Structure panel */}
 												<div style={{ width: '330px' }}>
 													<MiniEmailStructure
-														form={form}
+														form={isDraftingView ? draftsSettingsPreviewForm : form}
+														readOnly={isDraftingView}
 														profileFields={miniProfileFields}
 														identityProfile={campaign?.identity as IdentityProfileFields | null}
 														onIdentityUpdate={handleIdentityUpdate}
@@ -4295,7 +4354,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											<div className="mt-[10px] w-full flex justify-center">
 												<div style={{ width: '489px' }}>
 													<MiniEmailStructure
-														form={form}
+														form={isDraftingView ? draftsSettingsPreviewForm : form}
+														readOnly={isDraftingView}
 														profileFields={miniProfileFields}
 														identityProfile={campaign?.identity as IdentityProfileFields | null}
 														onIdentityUpdate={handleIdentityUpdate}
@@ -5726,7 +5786,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											)}
 											<div style={{ position: 'relative', zIndex: 20 }}>
 												<MiniEmailStructure
-													form={form}
+													form={isDraftingView ? draftsSettingsPreviewForm : form}
+													readOnly={isDraftingView}
 													profileFields={miniProfileFields}
 													identityProfile={campaign?.identity as IdentityProfileFields | null}
 													onIdentityUpdate={handleIdentityUpdate}
@@ -6448,7 +6509,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											)}
 											<div style={{ position: 'relative', zIndex: 20 }}>
 												<MiniEmailStructure
-													form={form}
+													form={isDraftingView ? draftsSettingsPreviewForm : form}
+													readOnly={isDraftingView}
 													profileFields={miniProfileFields}
 													identityProfile={campaign?.identity as IdentityProfileFields | null}
 													onIdentityUpdate={handleIdentityUpdate}

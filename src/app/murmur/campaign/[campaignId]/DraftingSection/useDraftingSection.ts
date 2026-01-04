@@ -30,6 +30,7 @@ import {
 	removeEmDashes,
 	stripEmailSignatureFromAiMessage,
 } from '@/utils';
+import { injectMurmurDraftSettingsSnapshot } from '@/utils/draftSettings';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Contact, HybridBlock, Identity, Signature } from '@prisma/client';
 import { DraftingMode, DraftingTone, EmailStatus } from '@/constants/prismaEnums';
@@ -623,13 +624,24 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			);
 		});
 
+		const messageHtml = convertAiResponseToRichTextEmail(
+			combinedTextBlocks,
+			values.font,
+			signatureText || null
+		);
+
+		const messageWithSettings = injectMurmurDraftSettingsSnapshot(messageHtml, {
+			version: 1,
+			values: {
+				...values,
+				// Ensure the stored snapshot always has a concrete signature string.
+				signature: signatureText,
+			},
+		});
+
 		return {
 			subject: values.subject || '',
-			message: convertAiResponseToRichTextEmail(
-				combinedTextBlocks,
-				values.font,
-				signatureText || null
-			),
+			message: messageWithSettings,
 			campaignId: campaign.id,
 			status: EmailStatus.draft,
 			contactId: contact.id,
@@ -1742,13 +1754,25 @@ EXAMPLES OF GOOD CUSTOM INSTRUCTIONS:
 							parsedDraft.subject = values.subject || parsedDraft.subject;
 						}
 
+						const draftMessageHtml = convertAiResponseToRichTextEmail(
+							processedMessage,
+							values.font,
+							signatureText || null
+						);
+						const draftMessageWithSettings = injectMurmurDraftSettingsSnapshot(
+							draftMessageHtml,
+							{
+								version: 1,
+								values: {
+									...values,
+									signature: signatureText,
+								},
+							}
+						);
+
 						await createEmail({
 							subject: parsedDraft.subject,
-							message: convertAiResponseToRichTextEmail(
-								processedMessage,
-								values.font,
-								signatureText || null
-							),
+							message: draftMessageWithSettings,
 							campaignId: campaign.id,
 							status: 'draft' as EmailStatus,
 							contactId: recipient.id,

@@ -232,7 +232,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 		selectedDraftIds,
 		handleSelectAllDrafts,
 	} = useDraftedEmails(props);
-	const { onContactClick, onContactHover, onRegenerateDraft } = props;
+	const { onContactClick, onContactHover, onDraftHover, onRegenerateDraft } = props;
 
 	const isMobile = useIsMobile();
 
@@ -1192,6 +1192,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 						className="overflow-visible w-full flex flex-col items-center"
 						onMouseLeave={() => {
 							onContactHover?.(null);
+							onDraftHover?.(null);
 						}}
 					>
 						{filteredDrafts.map((draft, idx) => {
@@ -1245,6 +1246,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 											if (contact) {
 												onContactHover?.(contact);
 											}
+											onDraftHover?.(draft);
 										}}
 										onClick={() => {
 											handleDraftDoubleClick(draft);

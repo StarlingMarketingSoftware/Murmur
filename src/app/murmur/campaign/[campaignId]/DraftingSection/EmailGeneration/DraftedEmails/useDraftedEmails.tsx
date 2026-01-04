@@ -2,6 +2,12 @@ import { useDeleteEmail, useEditEmail } from '@/hooks/queryHooks/useEmails';
 import { EmailWithRelations } from '@/types';
 import { ContactWithName } from '@/types/contact';
 import { convertHtmlToPlainText } from '@/utils';
+import {
+	extractMurmurDraftSettingsSnapshot,
+	injectMurmurDraftSettingsSnapshot,
+	stripMurmurDraftSettingsSnapshot,
+	type MurmurDraftSettingsSnapshotV1,
+} from '@/utils/draftSettings';
 import { Dispatch, SetStateAction, useState, useRef, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 
@@ -35,6 +41,8 @@ export interface DraftedEmailsProps {
 	subject?: string;
 	onContactClick?: (contact: ContactWithName | null) => void;
 	onContactHover?: (contact: ContactWithName | null) => void;
+	/** Optional: called when a draft row is hovered (used to preview the draft's original settings) */
+	onDraftHover?: (draft: EmailWithRelations | null) => void;
 	/** Optional: called when the inline preview icon is clicked */
 	onPreview?: (draft: EmailWithRelations) => void;
 	/** Optional: callback to navigate to the Writing tab */
@@ -95,6 +103,7 @@ export const useDraftedEmails = (props: DraftedEmailsProps) => {
 	const { mutateAsync: deleteEmail, isPending: isPendingDeleteEmail } = useDeleteEmail();
 
 	const lastClickedRef = useRef<number | null>(null);
+	const draftSettingsSnapshotRef = useRef<MurmurDraftSettingsSnapshotV1 | null>(null);
 
 	const handleDraftClick = (draft: EmailWithRelations, event?: React.MouseEvent) => {
 		if (event?.shiftKey && lastClickedRef.current !== null) {
@@ -135,7 +144,7 @@ export const useDraftedEmails = (props: DraftedEmailsProps) => {
 		setEditedSubject(draft.subject || '');
 		// Preserve HTML for drafts with links, otherwise convert to plain text
 		if (hasHyperlinks(draft.message)) {
-			setEditedMessage(draft.message);
+			setEditedMessage(stripMurmurDraftSettingsSnapshot(draft.message));
 		} else {
 			const plainMessage = convertHtmlToPlainText(draft.message);
 			setEditedMessage(plainMessage);
@@ -181,13 +190,17 @@ export const useDraftedEmails = (props: DraftedEmailsProps) => {
 			setEditedSubject('');
 			setEditedMessage('');
 			lastSavedValuesRef.current = null;
+			draftSettingsSnapshotRef.current = null;
 			return;
 		}
+
+		// Preserve the original drafting settings snapshot (if present) so edits don't strip it.
+		draftSettingsSnapshotRef.current = extractMurmurDraftSettingsSnapshot(selectedDraft.message);
 
 		const nextSubject = selectedDraft.subject || '';
 		// Preserve HTML for drafts with links, otherwise convert to plain text
 		const messageContent = hasHyperlinks(selectedDraft.message)
-			? selectedDraft.message
+			? stripMurmurDraftSettingsSnapshot(selectedDraft.message)
 			: convertHtmlToPlainText(selectedDraft.message);
 		setEditedSubject(nextSubject);
 		setEditedMessage(messageContent);
@@ -208,9 +221,16 @@ export const useDraftedEmails = (props: DraftedEmailsProps) => {
 			try {
 				// If message already contains HTML (has links), use it directly
 				// Otherwise, convert plain text to HTML
-				const htmlMessage = hasHyperlinks(messageToSave)
+				const htmlMessageBase = hasHyperlinks(messageToSave)
 					? messageToSave
 					: plainTextToHtml(messageToSave);
+				const htmlMessage =
+					draftSettingsSnapshotRef.current
+						? injectMurmurDraftSettingsSnapshot(
+								htmlMessageBase,
+								draftSettingsSnapshotRef.current
+						  )
+						: htmlMessageBase;
 				await updateEmail({
 					id: selectedDraft.id.toString(),
 					data: {
