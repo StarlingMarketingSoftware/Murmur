@@ -1448,7 +1448,15 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 						) : (
 							<>
 								{/* Auto Subject */}
-								<div className="mt-[9px] mb-3 w-[95%] max-[480px]:w-[89.33vw] mx-auto">
+								<div
+									className={cn(
+										'w-[95%] max-[480px]:w-[89.33vw] mx-auto',
+										// Auto tab spacing (matches design spec):
+										// - Subject bar 33px below header divider
+										// - Body 8px below Subject
+										draftingMode === 'ai' ? 'mt-[33px] mb-[8px]' : 'mt-[9px] mb-3'
+									)}
+								>
 									{isAiSubject ? (
 										// Compact bar (default) that expands to full width on hover when Auto Subject is on
 										<div className="group/subject relative">
@@ -1503,7 +1511,9 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 													<input
 														type="text"
 														className={cn(
-															'w-full h-full !bg-transparent pl-3 pr-3 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 outline-none max-[480px]:placeholder:text-[8px]',
+															'w-full h-full !bg-transparent pl-3 pr-3 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 outline-none',
+															// Match Subject label size
+															'text-[13px] leading-none max-[480px]:text-[11px] placeholder:text-[13px] placeholder:leading-none max-[480px]:placeholder:text-[11px]',
 															'!text-[#6B6B6B] italic cursor-not-allowed'
 														)}
 														placeholder="Write manual subject here"
@@ -1553,7 +1563,9 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 												<input
 													type="text"
 													className={cn(
-														'w-full h-full !bg-transparent pl-2 pr-3 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 outline-none max-[480px]:placeholder:text-[8px]',
+														'w-full h-full !bg-transparent pl-2 pr-3 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 outline-none',
+														// Match Subject label size
+														'text-[13px] leading-none max-[480px]:text-[11px] placeholder:text-[13px] placeholder:leading-none max-[480px]:placeholder:text-[11px]',
 														'!text-black placeholder:!text-black'
 													)}
 													placeholder="Type subject..."
@@ -2034,11 +2046,17 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 								return out;
 							})()}
 						</div>
-								{/* Mobile portrait/landscape: Signature inline spacing (extra in hybrid to avoid cutoff) */}
+								{/* Signature inline spacing (mobile portrait/landscape, and Auto mode per design spec) */}
 								<div
 									className={cn(
-										'max-[480px]:block hidden',
-										shouldUseLargeHybridSigGap ? 'mt-8' : 'mt-2'
+										// Auto mode: render inline so spacing is relative to Body (not pinned to bottom)
+										draftingMode === 'ai' ? 'block' : 'max-[480px]:block hidden',
+										// Auto tab spacing: Signature 12px below Body
+										draftingMode === 'ai'
+											? 'mt-3'
+											: shouldUseLargeHybridSigGap
+												? 'mt-8'
+												: 'mt-2'
 									)}
 									style={{ display: isMobileLandscape ? 'block' : undefined }}
 								>
@@ -2098,6 +2116,8 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 																	type="text"
 																	className={cn(
 																		'w-full h-full !bg-transparent pl-3 pr-3 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 outline-none',
+																		// Match Signature label size
+																		'text-[13px] leading-none max-[480px]:text-[11px] placeholder:text-[13px] placeholder:leading-none max-[480px]:placeholder:text-[11px]',
 																		'!text-black placeholder:!text-[#9E9E9E]',
 																		'cursor-not-allowed'
 																	)}
@@ -2151,7 +2171,8 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 																className={cn(
 																	'w-full !bg-transparent px-3 py-2 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 resize-none outline-none',
 																	'signature-textarea',
-																	'!text-black placeholder:!text-[#9E9E9E] font-inter text-[12px]'
+																	// Match Signature label size
+																	'!text-black placeholder:!text-[#9E9E9E] font-inter text-[13px] max-[480px]:text-[11px] placeholder:text-[13px] max-[480px]:placeholder:text-[11px]'
 																)}
 																style={{ height: 66 }}
 																placeholder="Enter your signature..."
@@ -2236,6 +2257,8 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 																type="text"
 																className={cn(
 																	'w-full h-full !bg-transparent pl-3 pr-3 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 outline-none',
+																		// Match Signature label size
+																		'text-[13px] leading-none max-[480px]:text-[11px] placeholder:text-[13px] placeholder:leading-none max-[480px]:placeholder:text-[11px]',
 																	'!text-black placeholder:!text-[#9E9E9E]',
 																	'cursor-not-allowed'
 																)}
@@ -2289,7 +2312,8 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 															className={cn(
 																'w-full !bg-transparent px-3 py-2 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 resize-none outline-none',
 																'signature-textarea',
-																'!text-black placeholder:!text-[#9E9E9E] font-inter text-[12px]'
+																	// Match Signature label size
+																	'!text-black placeholder:!text-[#9E9E9E] font-inter text-[13px] max-[480px]:text-[11px] placeholder:text-[13px] max-[480px]:placeholder:text-[11px]'
 															)}
 															style={{ height: 66 }}
 															placeholder="Enter your signature..."
@@ -2306,7 +2330,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 				</div>
 
 				{/* Signature - fixed at bottom (outside scroll) for non-mobile only */}
-				{activeTab !== 'profile' && (
+				{activeTab !== 'profile' && draftingMode !== 'ai' && (
 					<div
 						className={cn(
 							'px-0 pb-2 max-[480px]:hidden',
@@ -2370,6 +2394,8 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 													type="text"
 													className={cn(
 														'w-full h-full !bg-transparent pl-3 pr-3 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 outline-none',
+															// Match Signature label size
+															'text-[13px] leading-none placeholder:text-[13px] placeholder:leading-none',
 														'!text-black placeholder:!text-[#9E9E9E]',
 														'cursor-not-allowed'
 													)}
@@ -2423,7 +2449,8 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 												className={cn(
 													'w-full !bg-transparent px-3 py-2 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 resize-none outline-none',
 													'signature-textarea',
-													'!text-black placeholder:!text-[#9E9E9E] font-inter text-[12px]'
+													// Match Signature label size
+													'!text-black placeholder:!text-[#9E9E9E] font-inter text-[13px] placeholder:text-[13px]'
 												)}
 												style={{ height: 66 }}
 												placeholder="Enter your signature..."
@@ -2502,6 +2529,8 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 												type="text"
 												className={cn(
 													'w-full h-full !bg-transparent pl-3 pr-3 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 outline-none',
+														// Match Signature label size
+														'text-[13px] leading-none placeholder:text-[13px] placeholder:leading-none',
 													'!text-black placeholder:!text-[#9E9E9E]',
 													'cursor-not-allowed'
 												)}
@@ -2555,7 +2584,8 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 											className={cn(
 												'w-full !bg-transparent px-3 py-2 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 resize-none outline-none',
 												'signature-textarea',
-												'!text-black placeholder:!text-[#9E9E9E] font-inter text-[12px]'
+												// Match Signature label size
+												'!text-black placeholder:!text-[#9E9E9E] font-inter text-[13px] placeholder:text-[13px]'
 											)}
 											style={{ height: 66 }}
 											placeholder="Enter your signature..."
