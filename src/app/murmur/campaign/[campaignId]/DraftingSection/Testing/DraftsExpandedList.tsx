@@ -602,8 +602,8 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 												isBottomView
 													? 'h-[10px] rounded-[3px] px-1 w-full'
 													: isAllTab
-													? 'w-[158px] h-[15px] rounded-[5px] justify-center'
-													: 'w-[169px] h-[21px] rounded-[5px] justify-center'
+													? 'w-[158px] h-[15px] rounded-[5px] justify-center px-1'
+													: 'w-[169px] h-[21px] rounded-[5px] justify-center px-2'
 											)}
 											style={{
 												backgroundColor: isRestaurantTitle(contactTitle)
@@ -676,7 +676,7 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 																					? getWineBeerSpiritsLabel(contactTitle) ?? contactTitle
 																					: contactTitle
 													}
-													className="text-[11px] text-black leading-none px-1"
+													className="text-[11px] text-black leading-none"
 												/>
 											)}
 										</div>
