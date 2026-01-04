@@ -89,6 +89,11 @@ interface MiniEmailStructureProps {
 	 * Still allows scrolling, but blocks pointer interactions inside the panel.
 	 */
 	readOnly?: boolean;
+	/**
+	 * When true, compresses the layout to avoid showing an internal scrollbar.
+	 * Used by the Campaign "All" tab where this panel is rendered in a fixed-height tile.
+	 */
+	fitToHeight?: boolean;
 	/** Full Auto: profile chips (matches HybridPromptInput "Body" block) */
 	profileFields?: FullAutoProfileFields | null;
 	/** Profile Tab: identity baseline (used for save comparisons) */
@@ -116,6 +121,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 	topHeaderLabel,
 	onOpenWriting,
 	readOnly,
+	fitToHeight,
 	profileFields,
 	identityProfile,
 	onIdentityUpdate,
@@ -495,6 +501,77 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 		Array<{ blockId: string; top: number; show: boolean }>
 	>([]);
 	const blockIds = useMemo(() => hybridBlocks.map((b) => b.id).join(','), [hybridBlocks]);
+
+	// --- All tab: fit-to-height compression (avoid inner scrollbar) ---
+	const fitContentRef = useRef<HTMLDivElement>(null);
+	const [fitScale, setFitScale] = useState(1);
+	const isFitToHeightEnabled = Boolean(fitToHeight) && !isMobilePortrait && !isMobileLandscape;
+
+	useLayoutEffect(() => {
+		if (!isFitToHeightEnabled) {
+			setFitScale(1);
+			return;
+		}
+		if (typeof window === 'undefined') return;
+
+		const container = buttonContainerRef.current;
+		const content = fitContentRef.current;
+		if (!container || !content) return;
+
+		let raf = 0 as number | 0;
+		const compute = () => {
+			if (!container || !content) return;
+			const available = container.clientHeight;
+			const needed = content.scrollHeight;
+			if (!available || !needed) return;
+
+			// If the content already fits, don't scale. This avoids "always slightly smaller"
+			// when the content container has a min-height equal to the available height (e.g. Manual mode).
+			if (needed <= available + 1) {
+				setFitScale(1);
+				return;
+			}
+
+			// Slight pad to avoid 1px overflow from rounding.
+			const next = Math.min(1, Math.max(0.6, (available - 2) / needed));
+			setFitScale((prev) => (Math.abs(prev - next) < 0.004 ? prev : next));
+		};
+
+		const schedule = () => {
+			if (raf) return;
+			raf = requestAnimationFrame(() => {
+				raf = 0;
+				compute();
+			});
+		};
+
+		// Initial pass after layout settles.
+		schedule();
+
+		const ro = new ResizeObserver(() => schedule());
+		ro.observe(container);
+		ro.observe(content);
+		window.addEventListener('resize', schedule);
+
+		return () => {
+			if (raf) cancelAnimationFrame(raf);
+			ro.disconnect();
+			window.removeEventListener('resize', schedule);
+		};
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [
+		isFitToHeightEnabled,
+		activeTab,
+		draftingMode,
+		expandedBlocks,
+		// Profile tab content changes can affect height
+		profileTabFields.name,
+		profileTabFields.genre,
+		profileTabFields.area,
+		profileTabFields.band,
+		profileTabFields.bio,
+		profileTabFields.links,
+	]);
 
 	// Calculate absolute Y positions for the +Text buttons relative to root and whether each should be shown
 	const recomputeAddButtonPositions = useCallback(() => {
@@ -1070,10 +1147,13 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 					className={cn(
 						isMobilePortrait || isMobileLandscape
 							? 'overflow-visible'
-							: 'flex-1 min-h-0 overflow-y-auto overflow-x-hidden'
+							: isFitToHeightEnabled
+								? 'flex-1 min-h-0 overflow-hidden'
+								: 'flex-1 min-h-0 overflow-y-auto overflow-x-hidden'
 					)}
 				>
 					<div
+						ref={fitContentRef}
 						className={cn(
 							'px-0 pb-3 max-[480px]:pb-2',
 							activeTab === 'profile' && 'min-h-full flex flex-col pb-0 max-[480px]:pb-0',
@@ -1081,6 +1161,16 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 								draftingMode === 'handwritten' &&
 								'min-h-full flex flex-col pb-0 max-[480px]:pb-0'
 						)}
+						style={
+							isFitToHeightEnabled
+								? {
+										transform: `scale(${fitScale})`,
+										transformOrigin: 'top left',
+										// Keep visual width at 100% even when scaling down.
+										width: fitScale > 0 ? `${100 / fitScale}%` : '100%',
+								  }
+								: undefined
+						}
 					>
 						{/* Mode */}
 						{hasTopHeaderSpacer && (
@@ -1526,8 +1616,12 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 												// - Subject bar 33px below header divider
 												// - Body 8px below Subject
 												draftingMode === 'ai'
-													? 'mt-[33px] mb-[8px]'
-													: 'mt-[9px] mb-3'
+													? isFitToHeightEnabled
+														? 'mt-[12px] mb-[6px]'
+														: 'mt-[33px] mb-[8px]'
+													: isFitToHeightEnabled
+														? 'mt-[6px] mb-2'
+														: 'mt-[9px] mb-3'
 											)}
 										>
 											{isAiSubject ? (
@@ -1661,7 +1755,9 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 												'flex flex-col overflow-visible',
 												draftingMode === 'hybrid'
 													? 'gap-[7px]'
-													: 'gap-[25px] max-[480px]:gap-[40px]'
+													: isFitToHeightEnabled
+														? 'gap-[12px] max-[480px]:gap-[18px]'
+														: 'gap-[25px] max-[480px]:gap-[40px]'
 											)}
 										>
 											{(() => {
@@ -1952,6 +2048,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 														hybridBlocks.findIndex((blk) => blk.id === b.id)
 													)}
 													profileFields={profileTabFields}
+													constrainHeight={isFitToHeightEnabled}
 													onGoToProfileTab={() => setActiveTab('profile')}
 													className={cn(
 														draftingMode === 'hybrid'
@@ -2123,7 +2220,9 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 											'block',
 											// Auto tab spacing: Signature 12px below Body
 											draftingMode === 'ai'
-												? 'mt-3'
+												? isFitToHeightEnabled
+													? 'mt-2'
+													: 'mt-3'
 												: isMobilePortrait && shouldUseLargeHybridSigGap
 													? 'mt-8'
 													: 'mt-2'
@@ -2495,7 +2594,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 					</div>
 				)}
 			</div>
-			{activeTab !== 'profile' && !hideAddTextButtons && (
+			{activeTab !== 'profile' && !hideAddTextButtons && !isFitToHeightEnabled && (
 				<div
 					className="absolute top-0 left-[-18px] max-[480px]:-left-[10px] flex flex-col"
 					style={{ pointerEvents: 'none', zIndex: 100 }}

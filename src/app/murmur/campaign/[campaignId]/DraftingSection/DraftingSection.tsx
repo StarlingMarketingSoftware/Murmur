@@ -5874,6 +5874,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													hideFooter
 													fullWidthMobile
 													hideAddTextButtons
+													fitToHeight
 													height={349}
 													pageFillColor={draftsMiniEmailFillColor}
 													topHeaderHeight={draftsMiniEmailTopHeaderHeight}
@@ -6603,6 +6604,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													hideFooter
 													fullWidthMobile
 													hideAddTextButtons
+													fitToHeight
 													height={349}
 													pageFillColor={draftsMiniEmailFillColor}
 													topHeaderHeight={draftsMiniEmailTopHeaderHeight}
