@@ -389,14 +389,14 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 				</div>
 			) : (
 				<>
-					{/* Identity box (359x51, 10px radius) */}
+					{/* Identity box (scales with boxWidth, 10px radius) */}
 					<div
 						className="absolute relative bg-[#FFFFFF] border-2 border-black rounded-[10px] overflow-hidden"
 						style={{
 							top: `${headerHeight + 6}px`,
 							left: '50%',
 							transform: 'translateX(-50%)',
-							width: `${Math.min(359, containerWidth - 16)}px`,
+							width: `${boxWidth - 1}px`,
 							height: '51px',
 						}}
 					>
@@ -406,7 +406,7 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 							style={{ opacity: 0.35 }}
 						>
 							<ResearchHeaderMap
-								width={Math.min(359, containerWidth - 16)}
+								width={boxWidth - 1}
 								height={51}
 								style={{ display: 'block' }}
 								hideBorder
