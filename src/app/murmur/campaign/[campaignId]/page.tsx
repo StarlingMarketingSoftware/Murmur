@@ -424,7 +424,7 @@ const Murmur = () => {
 			activeView === 'all') &&
 		!isMobile &&
 		!isNarrowestDesktop;
-	const fixedNavArrowsTopPx = 467 + (shouldApplyWritingTopShift ? writingTabShiftPx : 0);
+	const fixedNavArrowsTopPx = 355 + (shouldApplyWritingTopShift ? writingTabShiftPx : 0);
 	return (
 		<HoverDescriptionProvider enabled={selectedRightBoxIcon === 'info'}>
 			<div className="min-h-screen relative">
