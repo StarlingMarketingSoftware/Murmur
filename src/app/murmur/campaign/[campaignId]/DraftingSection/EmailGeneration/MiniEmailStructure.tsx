@@ -12,7 +12,6 @@ import {
 import { UseFormReturn } from 'react-hook-form';
 import { DraftingFormValues } from '../useDraftingSection';
 import { Button } from '@/components/ui/button';
-import OpenIcon from '@/components/atoms/svg/OpenIcon';
 import { HybridBlock } from '@prisma/client';
 import { cn } from '@/utils';
 import TinyPlusIcon from '@/components/atoms/_svg/TinyPlusIcon';
@@ -119,7 +118,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 	pageFillColor,
 	topHeaderHeight,
 	topHeaderLabel,
-	onOpenWriting,
+	// onOpenWriting is accepted but currently not rendered (reserved for future use)
 	readOnly,
 	fitToHeight,
 	profileFields,

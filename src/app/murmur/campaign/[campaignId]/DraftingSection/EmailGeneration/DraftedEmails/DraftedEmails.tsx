@@ -7,7 +7,6 @@ import { X } from 'lucide-react';
 import { cn } from '@/utils';
 import { DraftingTable } from '../DraftingTable/DraftingTable';
 import PreviewIcon from '@/components/atoms/_svg/PreviewIcon';
-import CloseButtonIcon from '@/components/atoms/_svg/CloseButtonIcon';
 import ApproveCheckIcon from '@/components/atoms/svg/ApproveCheckIcon';
 import RejectXIcon from '@/components/atoms/svg/RejectXIcon';
 import LeftArrowReviewIcon from '@/components/atoms/svg/LeftArrowReviewIcon';

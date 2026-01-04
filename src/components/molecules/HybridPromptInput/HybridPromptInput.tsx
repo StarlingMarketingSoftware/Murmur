@@ -2671,15 +2671,6 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		}
 	}, []);
 
-	const handleHybridStructureAddTextAfterIndex = useCallback(
-		(afterIndex: number) => {
-			if (afterIndex < 0 || afterIndex >= fields.length) return;
-			const newId = handleAddTextBlockAt(afterIndex);
-			setHybridStructureSelection({ kind: 'block', blockId: newId });
-		},
-		[fields.length, handleAddTextBlockAt]
-	);
-
 	// Manual tab redesign assumes a single unified body editor. If multiple manual Text blocks exist,
 	// collapse them into one so the editor can display/edit everything.
 	useEffect(() => {
