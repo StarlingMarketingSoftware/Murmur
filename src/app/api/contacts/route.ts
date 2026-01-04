@@ -129,7 +129,8 @@ const coffeeQueryWantsMarketing = (rawQuery: string | null | undefined): boolean
 	return COFFEE_MARKETING_INTENT_TERMS.some((t) => q.includes(t));
 };
 
-const contactHasStrongCoffeeBusinessSignals = (contact: Contact): boolean => {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const _contactHasStrongCoffeeBusinessSignals = (contact: Contact): boolean => {
 	const company = normalizeSearchText(contact.company);
 	const title = normalizeSearchText(contact.title);
 	const headline = normalizeSearchText(contact.headline);
@@ -143,7 +144,7 @@ const contactHasStrongCoffeeBusinessSignals = (contact: Contact): boolean => {
 
 	// IMPORTANT: titles like "Coffee Shops <State>" are list labels in this dataset and can be wrong.
 	// For "is this really a coffee business?" checks, we avoid letting that list-label title alone
-	// count as a strong coffee signal (otherwise a mislabeled radio station slips through).
+	// count as a strong coffee signal. Note: radio stations are now hard-excluded from coffee searches.
 	const titleIsCoffeeShopsList = /^coffee shops?\b/.test(title);
 
 	const otherBlob = `${company} ${industry} ${website} ${metadata} ${keywordBlob}`.trim();
@@ -242,9 +243,9 @@ const contactLooksLikeNonCoffeeBusinessForCoffeeSearch = (
 	const industry = normalizeSearchText(contact.companyIndustry);
 	const company = normalizeSearchText(contact.company);
 
-	// Exclude radio stations from coffee searches (unless there are strong coffee-business signals).
+	// Hard exclude radio stations from coffee searches - no exceptions.
 	// This removes "College Radio <State>" lists and call-sign entries like "WVCR-FM".
-	if (contactLooksLikeRadioStation(contact) && !contactHasStrongCoffeeBusinessSignals(contact)) {
+	if (contactLooksLikeRadioStation(contact)) {
 		return true;
 	}
 
@@ -517,15 +518,11 @@ const contactLooksLikeHospitalityOnlyForMusicVenueSearch = (contact: Contact): b
 		hasBarTerms || hasBreweryTerms || hasWineryTerms || hasCafeTerms || hasRestaurantTerms;
 
 	if (!hasHospitalityTerms) return false;
-	// Always treat wineries/breweries/distilleries as "hospitality-only" for Music Venues searches,
-	// so they don't dominate the top of the list.
 	if (hasBreweryTerms || hasWineryTerms) return true;
 	if (hasStrongDedicatedVenueTerms || hasClubTerms) return false;
 	return true;
 };
 
-// A stricter tag to push breweries/wineries/distilleries below other "hospitality-only" results
-// for Music Venue searches.
 const contactLooksLikeWineryOrBreweryForMusicVenueSearch = (contact: Contact): boolean => {
 	const company = normalizeSearchText(contact.company);
 	const title = normalizeSearchText(contact.title);
@@ -2162,8 +2159,7 @@ export async function GET(req: NextRequest) {
 								addUnique(filler);
 							}
 						}
-
-						// Finally, if still under limit, widen to contains-based matches in nearby states.
+						
 						if (results.length < finalLimit) {
 							for (
 								let ringIdx = 1;
@@ -3094,16 +3090,29 @@ export async function GET(req: NextRequest) {
 				emailValidationStatus: verificationStatus
 					? { equals: verificationStatus }
 					: undefined,
-				// Exclude aggregator sites
-				AND: excludedDomains.map((domain) => ({
-					NOT: {
-						OR: [
-							{ website: { contains: domain, mode: 'insensitive' } },
-							{ company: { contains: domain, mode: 'insensitive' } },
-							{ email: { contains: domain, mode: 'insensitive' } },
-						],
+				// Exclude aggregator sites and restaurants
+				AND: [
+					...excludedDomains.map(
+						(domain): Prisma.ContactWhereInput => ({
+							NOT: {
+								OR: [
+									{ website: { contains: domain, mode: 'insensitive' } },
+									{ company: { contains: domain, mode: 'insensitive' } },
+									{ email: { contains: domain, mode: 'insensitive' } },
+								],
+							},
+						})
+					),
+					// Exclude restaurants from wedding planner searches
+					{
+						NOT: {
+							OR: [
+								{ title: { startsWith: 'Restaurants', mode: 'insensitive' } },
+								{ title: { startsWith: 'Restaurant ', mode: 'insensitive' } },
+							],
+						},
 					},
-				})),
+				],
 			};
 
 			// State matching - lenient, not strict

@@ -3,9 +3,15 @@ import { ContactWithName } from '@/types/contact';
 import { getStateAbbreviation } from '@/utils/string';
 import { stateBadgeColorMap } from '@/constants/ui';
 import { cn } from '@/utils';
+import { isRestaurantTitle, isCoffeeShopTitle, isMusicVenueTitle, isWeddingPlannerTitle, isWeddingVenueTitle, isWineBeerSpiritsTitle, getWineBeerSpiritsLabel } from '@/utils/restaurantTitle';
+import { WeddingPlannersIcon } from '@/components/atoms/_svg/WeddingPlannersIcon';
+import { RestaurantsIcon } from '@/components/atoms/_svg/RestaurantsIcon';
+import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
+import { MusicVenuesIcon } from '@/components/atoms/_svg/MusicVenuesIcon';
+import { WineBeerSpiritsIcon } from '@/components/atoms/_svg/WineBeerSpiritsIcon';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
-import ResearchMap from '@/components/atoms/_svg/ResearchMap';
 import ResearchChevron from '@/components/atoms/_svg/ResearchChevron';
+import ResearchHeaderMap from '@/components/atoms/_svg/ResearchHeaderMap';
 
 export interface ContactResearchPanelProps {
 	contact: ContactWithName | null | undefined;
@@ -137,6 +143,23 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 
 	// Determine if we're in a "loading" state (no contact yet)
 	const isLoading = !contact;
+	const contactFullName = `${contact?.firstName || ''} ${contact?.lastName || ''}`.trim();
+	const hasName =
+		!isLoading &&
+		(contactFullName.length > 0 || (contact?.name && contact?.name.length > 0));
+	const hasCompany = !isLoading && !!contact?.company && contact.company.trim().length > 0;
+	const isCompanyOnly = !hasName && hasCompany;
+
+	const displayName = isLoading
+		? 'Loading...'
+		: contactFullName || contact?.name || contact?.company || 'Unknown';
+
+	const stateAbbr = !isLoading ? getStateAbbreviation(contact?.state || '') || '' : '';
+	const stateBadgeColor =
+		!isLoading && stateAbbr && stateBadgeColorMap[stateAbbr]
+			? stateBadgeColorMap[stateAbbr]
+			: null;
+	const locationText = !isLoading ? (contact?.city || contact?.state || '') : '';
 
 	const parsedSectionsCount = Object.keys(metadataSections).length;
 	const hasAnyParsedSections = parsedSectionsCount > 0;
@@ -160,8 +183,10 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 
 	// Content start position used by the fixed-height layout math.
 	// Compact: header (19) + gap (6) + contact box (40) + gap (4) = 69
-	// Non-compact: header + divider (2) + contact bar (40) + divider (1) = headerHeight + 43
-	const fixedHeightContentStartTop = compactHeader ? headerHeight + 50 : headerHeight + 43;
+	// Non-compact: header (24) + gap (6) + identity box (51) + gap (4) = 85
+	const fixedHeightContentStartTop = compactHeader ? headerHeight + 50 : headerHeight + 61;
+	// Align summary-only + auto-height layouts to the same first-box top position.
+	const fixedHeightFirstBoxTop = fixedHeightContentStartTop + 6;
 
 	// In parsed + summary mode, the summary box is pinned to the bottom with a fixed inset.
 	const parsedSummaryBottomInsetPx = 14;
@@ -220,7 +245,7 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 	const baseContainerHeight = height
 		? height
 		: shouldHideSummary
-		? `${77 + 65 * displaySectionsCount}px`
+		? `${fixedHeightFirstBoxTop + 65 * displaySectionsCount + 1}px`
 		: !hasAnyParsedSections && !isLoading
 		? '423px'
 		: displaySectionsCount === 3
@@ -247,6 +272,7 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 				height: containerHeight,
 				...style,
 			}}
+			data-hover-description="Research: Background info and notes for the selected contact."
 		>
 			{/* Header background bar */}
 			<div
@@ -285,7 +311,7 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 			{/* Contact info bar - boxed version for compact header (All tab) */}
 			{compactHeader ? (
 				<div
-					className="absolute bg-[#FFFFFF] border-2 border-black rounded-[7px]"
+					className="absolute bg-[#FFFFFF] border-2 border-black rounded-[7px] overflow-hidden"
 					style={{
 						top: `${headerHeight + 6}px`,
 						left: '50%',
@@ -294,11 +320,27 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 						height: '40px',
 					}}
 				>
-					<div className="w-full h-full pl-3 pr-[12px] flex items-center justify-between overflow-hidden">
+					{/* Map background */}
+					<div
+						className="absolute inset-0 pointer-events-none"
+						style={{ opacity: 0.35 }}
+					>
+						<ResearchHeaderMap
+							width={containerWidth - 14}
+							height={40}
+							style={{ display: 'block' }}
+							hideBorder
+						/>
+					</div>
+					<div className="relative w-full h-full pl-3 pr-[12px] flex items-center justify-between overflow-hidden">
 						<div className="flex flex-col justify-center min-w-0 flex-1 pr-2">
 							<div
-								className="font-inter font-bold text-[14px] leading-none truncate text-black"
-								style={hideAllText || isLoading ? { color: 'transparent' } : undefined}
+								className="font-inter font-bold text-[14px] leading-none text-black overflow-hidden whitespace-nowrap"
+								style={{
+									...(hideAllText || isLoading ? { color: 'transparent' } : {}),
+									maskImage: 'linear-gradient(to right, black calc(100% - 12px), transparent 100%)',
+									WebkitMaskImage: 'linear-gradient(to right, black calc(100% - 12px), transparent 100%)',
+								}}
 							>
 								{(() => {
 									if (isLoading) return 'Loading...';
@@ -342,106 +384,139 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 							</div>
 						</div>
 
-						{/* Map thumbnail placeholder */}
-						<div className="flex-shrink-0">
-							<ResearchMap />
-						</div>
+						{/* Map thumbnail placeholder removed */}
 					</div>
 				</div>
 			) : (
 				<>
-					{/* Original contact info bar */}
+					{/* Identity box (scales with boxWidth, 10px radius) */}
 					<div
-						className="absolute left-0 w-full bg-[#FFFFFF]"
+						className="absolute relative bg-[#FFFFFF] border-2 border-black rounded-[10px] overflow-hidden"
 						style={{
-							top: `${headerHeight + 2}px`,
-							height: '40px',
+							top: `${headerHeight + 6}px`,
+							left: '50%',
+							transform: 'translateX(-50%)',
+							width: `${boxWidth - 1}px`,
+							height: '51px',
 						}}
 					>
-						<div className="w-full h-full px-3 flex items-center justify-between overflow-hidden">
-							<div className="flex flex-col justify-center min-w-0 flex-1 pr-2">
-								<div
-									className="font-inter font-bold text-[16px] leading-none truncate text-black"
-									style={hideAllText || isLoading ? { color: 'transparent' } : undefined}
-								>
-									{(() => {
-										if (isLoading) return 'Loading...';
-										const fullName = `${contact?.firstName || ''} ${
-											contact?.lastName || ''
-										}`.trim();
-										const nameToDisplay =
-											fullName || contact?.name || contact?.company || 'Unknown';
-										return nameToDisplay;
-									})()}
-								</div>
-								{/* Only show company if we are displaying a person's name above, and it's different from the company name */}
-								{(() => {
-									if (isLoading) return null;
-									const fullName = `${contact?.firstName || ''} ${
-										contact?.lastName || ''
-									}`.trim();
-									const hasName =
-										fullName.length > 0 || (contact?.name && contact?.name.length > 0);
-									// If we are showing the company as the main title (because no name), don't show it again here
-									if (!hasName) return null;
-
-									return (
-										<div
-											className="text-[12px] leading-tight truncate text-black mt-[2px]"
-											style={hideAllText ? { color: 'transparent' } : undefined}
-										>
-											{contact?.company || ''}
-										</div>
-									);
-								})()}
-							</div>
-
-							<div className="flex items-center gap-3 flex-shrink-0">
-								<div className="flex flex-col items-end gap-[2px] max-w-[140px]">
-									<div className="flex items-center gap-1 w-full justify-end overflow-hidden">
-										{(() => {
-											if (isLoading) return null;
-											const stateAbbr = getStateAbbreviation(contact?.state || '') || '';
-											if (stateAbbr && stateBadgeColorMap[stateAbbr]) {
-												return (
-													<span
-														className="inline-flex items-center justify-center h-[16px] px-[6px] rounded-[4px] border border-black text-[11px] font-bold leading-none flex-shrink-0"
-														style={{
-															backgroundColor: stateBadgeColorMap[stateAbbr],
-														}}
-													>
-														<span style={hideAllText ? { color: 'transparent' } : undefined}>
-															{stateAbbr}
-														</span>
-													</span>
-												);
-											}
-											return null;
-										})()}
-										{!isLoading && (contact?.title || contact?.headline) && (
-											<div className="px-2 py-[2px] rounded-[8px] bg-[#E8EFFF] border border-black max-w-full truncate">
-												<span
-													className="text-[10px] leading-none text-black block truncate"
-													style={hideAllText ? { color: 'transparent' } : undefined}
-												>
-													{contact?.title || contact?.headline}
-												</span>
-											</div>
-										)}
-									</div>
-								</div>
-							</div>
+						{/* Map background */}
+						<div
+							className="absolute inset-0 pointer-events-none"
+							style={{ opacity: 0.35 }}
+						>
+							<ResearchHeaderMap
+								width={boxWidth - 1}
+								height={51}
+								style={{ display: 'block' }}
+								hideBorder
+							/>
 						</div>
-					</div>
+						{/* Text block */}
+						<div
+							className={cn(
+								'absolute left-[12px] top-[6px] flex flex-col min-w-0',
+								isCompanyOnly ? 'right-[12px]' : 'right-[127px]'
+							)}
+						>
+							<div
+								className="font-inter font-bold text-[16px] leading-none text-black overflow-hidden whitespace-nowrap"
+								style={{
+									...(hideAllText || isLoading ? { color: 'transparent' } : {}),
+									maskImage:
+										'linear-gradient(to right, black 0%, black calc(100% - 28px), transparent calc(100% - 16px), transparent 100%)',
+									WebkitMaskImage:
+										'linear-gradient(to right, black 0%, black calc(100% - 28px), transparent calc(100% - 16px), transparent 100%)',
+								}}
+							>
+								{displayName}
+							</div>
 
-					{/* Divider under contact info - only for non-compact */}
-					<div
-						className="absolute left-0 w-full bg-black z-10"
-						style={{
-							top: `${headerHeight + 42}px`,
-							height: '1px',
-						}}
-					/>
+							{/* Company line (only when we have a name above) */}
+							{hasName && hasCompany && (
+								<div
+									className="font-inter font-bold text-[14px] leading-none truncate text-black mt-[3px]"
+									style={hideAllText ? { color: 'transparent' } : undefined}
+								>
+									{contact?.company || ''}
+								</div>
+							)}
+						</div>
+
+						{/* Location */}
+						{isCompanyOnly ? (
+							<div
+								className="absolute flex items-center gap-[8px]"
+								style={{
+									left: '8px',
+									right: '8px',
+									bottom: '2px',
+									height: '21px',
+								}}
+							>
+								{stateBadgeColor && (
+									<span
+										className="inline-flex items-center justify-center w-[39px] h-[21px] rounded-[6px] border border-black font-inter font-normal text-[16px] leading-none flex-shrink-0"
+										style={{
+											backgroundColor: stateBadgeColor,
+											color: hideAllText || isLoading ? 'transparent' : '#000000',
+										}}
+									>
+										{stateAbbr}
+									</span>
+								)}
+								{!!locationText && (
+									<span
+										className="font-inter font-normal text-[16px] leading-none text-black overflow-hidden whitespace-nowrap"
+										style={hideAllText ? { color: 'transparent' } : undefined}
+									>
+										{locationText}
+									</span>
+								)}
+							</div>
+						) : (
+							<>
+								{stateBadgeColor && (
+									<span
+										className="absolute inline-flex items-center justify-center w-[39px] h-[21px] rounded-[6px] border border-black font-inter font-normal text-[16px] leading-none flex-shrink-0"
+										style={{
+											top: '4px',
+											right: '88px',
+											backgroundColor: stateBadgeColor,
+											color: hideAllText || isLoading ? 'transparent' : '#000000',
+										}}
+									>
+										{stateAbbr}
+									</span>
+								)}
+
+								{!!locationText && (
+									<div
+										className="absolute flex items-center"
+										style={{
+											top: '4px',
+											right: '8px',
+											width: '72px',
+											height: '21px',
+										}}
+									>
+										<span
+											className="font-inter font-normal text-[16px] leading-none text-black w-full overflow-hidden whitespace-nowrap"
+											style={{
+												...(hideAllText ? { color: 'transparent' } : {}),
+												maskImage:
+													'linear-gradient(to right, black calc(100% - 12px), transparent 100%)',
+												WebkitMaskImage:
+													'linear-gradient(to right, black calc(100% - 12px), transparent 100%)',
+											}}
+										>
+											{locationText}
+										</span>
+									</div>
+								)}
+							</>
+						)}
+					</div>
 				</>
 			)}
 
@@ -570,10 +645,7 @@ top: isExpanded ? '28px' : '50%',
 				// When height is NOT fixed, the container grows, so no scroll needed.
 				// When height IS fixed (e.g. 352px), scrolling is needed.
 
-				// Calculate content start position based on header type
-				// Compact: header (19) + gap (6) + contact box (40) + gap (4) = 69
-				// Non-compact: header + divider (2) + contact bar (40) + divider (1) = headerHeight + 43
-				const contentStartTop = compactHeader ? headerHeight + 50 : headerHeight + 43;
+				const contentStartTop = fixedHeightContentStartTop;
 
 				if (height) {
 					// When the summary box is pinned to the bottom (parsed bullets present or loading placeholders),
@@ -660,7 +732,7 @@ top: isExpanded ? '28px' : '50%',
 
 				// Original rendering for non-fixed height (absolute relative to main container)
 				// Use contentStartTop + 6 (padding) for first item positioning
-				const baseTop = compactHeader ? headerHeight + 56 : headerHeight + 52;
+				const baseTop = fixedHeightFirstBoxTop;
 				
 				// Calculate cumulative top position accounting for expanded boxes
 				const getAbsoluteBoxTop = (index: number) => {
@@ -765,10 +837,10 @@ top: isExpanded ? '28px' : '50%',
 					id="research-summary-box-shared"
 					className="absolute"
 					style={{
-						// When height is fixed and only showing summary, position from top to match [1] box spacing
-						// Content area starts at headerHeight + 50 = 69px (compact), first box at +6px = 75px
-						...(height && !hasAnyParsedSections && !isLoading
-							? { top: `${headerHeight + 50 + 6}px` }
+						// Summary-only: pin from the top so it always sits below the identity box (avoids overlap).
+						// Parsed-bullets (or loading placeholders): keep the summary pinned to the bottom.
+						...(!hasAnyParsedSections && !isLoading
+							? { top: `${fixedHeightFirstBoxTop}px` }
 							: { bottom: hasAnyParsedSections || isLoading ? '14px' : '8px' }),
 						left: '50%',
 						transform: 'translateX(-50%)',
@@ -779,9 +851,9 @@ top: isExpanded ? '28px' : '50%',
 							? (parsedSummaryOuterHeightPx ?? parsedSummaryMinOuterHeightPx)
 							: height 
 								? typeof height === 'number'
-									? `${height - (headerHeight + 50 + 6) - 8}px`
-									: 'calc(100% - 83px)'
-								: '336px',
+									? `${height - fixedHeightFirstBoxTop - 8}px`
+									: `calc(100% - ${fixedHeightFirstBoxTop + 8}px)`
+								: `calc(100% - ${fixedHeightFirstBoxTop + 8}px)`,
 						backgroundColor: hasAnyParsedSections || isLoading ? '#E9F7FF' : '#158BCF',
 						border: '2px solid #000000',
 						borderRadius: '8px',
@@ -815,16 +887,10 @@ top: isExpanded ? '28px' : '50%',
 										transform: 'translateX(-50%)',
 								  }),
 							width: `${summaryInnerWidth}px`,
-							// Inner box height: relative to summary box height (subtract ~18px for padding)
-							// Summary box height = height - (headerHeight + 50 + 6) - 8 = height - headerHeight - 64
-							// Inner height = summary height - 18 = height - headerHeight - 82
+							// Summary-only: inner box is inset by 9px on top and bottom (18px total).
 							height: hasAnyParsedSections || isLoading
 								? (parsedSummaryInnerHeightPx ?? (parsedSummaryMinOuterHeightPx - parsedSummaryInnerOverheadPx))
-								: height
-									? typeof height === 'number'
-										? `${height - headerHeight - 82}px`
-										: 'calc(100% - 101px)'
-									: '299px',
+								: 'calc(100% - 18px)',
 							backgroundColor: hideAllText || isLoading
 								? hasAnyParsedSections || isLoading
 									? '#E9F7FF'
@@ -978,9 +1044,51 @@ export const ContactResearchHorizontalStrip: FC<
 					)}
 				</div>
 				{contact.title && (
-					<div className="max-w-[160px] px-2 py-[2px] rounded-[8px] bg-[#E8EFFF] border border-black">
+					<div
+						className="max-w-[160px] px-2 py-[2px] rounded-[8px] border border-black flex items-center gap-1"
+						style={{
+							backgroundColor: isRestaurantTitle(contact.title)
+								? '#C3FBD1'
+								: isCoffeeShopTitle(contact.title)
+									? '#D6F1BD'
+									: isMusicVenueTitle(contact.title)
+										? '#B7E5FF'
+										: (isWeddingPlannerTitle(contact.title) || isWeddingVenueTitle(contact.title))
+											? '#FFF2BC'
+											: isWineBeerSpiritsTitle(contact.title)
+												? '#BFC4FF'
+												: '#E8EFFF',
+						}}
+					>
+						{isRestaurantTitle(contact.title) && (
+							<RestaurantsIcon size={12} className="flex-shrink-0" />
+						)}
+						{isCoffeeShopTitle(contact.title) && (
+							<CoffeeShopsIcon size={7} />
+						)}
+						{isMusicVenueTitle(contact.title) && (
+							<MusicVenuesIcon size={12} className="flex-shrink-0" />
+						)}
+						{(isWeddingPlannerTitle(contact.title) || isWeddingVenueTitle(contact.title)) && (
+							<WeddingPlannersIcon size={12} />
+						)}
+						{isWineBeerSpiritsTitle(contact.title) && (
+							<WineBeerSpiritsIcon size={12} className="flex-shrink-0" />
+						)}
 						<span className="text-[10px] leading-none text-black block truncate">
-							{contact.title}
+							{isRestaurantTitle(contact.title)
+								? 'Restaurant'
+								: isCoffeeShopTitle(contact.title)
+									? 'Coffee Shop'
+									: isMusicVenueTitle(contact.title)
+										? 'Music Venue'
+										: isWeddingPlannerTitle(contact.title)
+											? 'Wedding Planner'
+											: isWeddingVenueTitle(contact.title)
+												? 'Wedding Venue'
+												: isWineBeerSpiritsTitle(contact.title)
+													? getWineBeerSpiritsLabel(contact.title)
+													: contact.title}
 						</span>
 					</div>
 				)}
@@ -997,6 +1105,7 @@ export const ContactResearchHorizontalStrip: FC<
 				className
 			)}
 			style={style}
+			data-hover-description="Research: Background info and notes for the selected contact."
 		>
 			{/* CSS for responsive line clamp on bullet text */}
 			<style>{`

@@ -40,7 +40,15 @@ const formSchema = z.object({
 
 type FormData = z.infer<typeof formSchema>;
 
-export const useDashboard = () => {
+interface UseDashboardOptions {
+	/** Derived title to assign to contacts without a title when creating a campaign */
+	derivedTitle?: string;
+	/** If true, the derived title applies to ALL contacts (e.g., for restaurant searches) */
+	forceApplyDerivedTitle?: boolean;
+}
+
+export const useDashboard = (options: UseDashboardOptions = {}) => {
+	const { derivedTitle, forceApplyDerivedTitle = false } = options;
 	/* UI */
 	const [hasSearched, setHasSearched] = useState(false);
 
@@ -138,17 +146,16 @@ export const useDashboard = () => {
 	}, [isLoadingContacts, isRefetchingContacts, isSearchPending]);
 
 	useEffect(() => {
-		if (contacts) {
-			setSelectedContacts([]);
-		}
-	}, [contacts]);
-
-	useEffect(() => {
-		if (contacts && selectedContacts.length > 0) {
-			setIsAllSelected(selectedContacts.length === contacts.length);
-		} else {
+		if (!contacts || contacts.length === 0) {
 			setIsAllSelected(false);
+			return;
 		}
+
+		// `selectedContacts` may include contacts from prior searches (map flow). "All selected"
+		// should mean "all current results are selected", not "selected count equals results count".
+		const selectedSet = new Set<number>(selectedContacts);
+		const allSelected = contacts.every((c) => selectedSet.has(c.id));
+		setIsAllSelected(allSelected);
 	}, [selectedContacts, contacts]);
 
 	useEffect(() => {
@@ -234,6 +241,10 @@ export const useDashboard = () => {
 		setHasSearched(false);
 		setActiveSearchQuery('');
 		setMapBboxFilter(null);
+		// Reset selection when leaving the search/results flow (fresh dashboard start should not
+		// carry over prior selections).
+		setSelectedContacts([]);
+		setIsAllSelected(false);
 		form.reset();
 	};
 
@@ -286,14 +297,41 @@ export const useDashboard = () => {
 			(contact) => !selectedContacts.includes(contact.id)
 		);
 
-		const updates = deselectedContacts.map((contact) => ({
-			id: contact.id,
-			data: {
-				manualDeselections: contact.manualDeselections + 1,
-			},
-		}));
+		// Build updates: increment deselections for deselected contacts,
+		// and assign derived title to selected contacts without a title
+		const updates: Array<{ id: number; data: Record<string, unknown> }> = [];
+		
+		for (const contact of deselectedContacts) {
+			updates.push({
+				id: contact.id,
+				data: {
+					manualDeselections: contact.manualDeselections + 1,
+				},
+			});
+		}
 
-		await batchUpdateContacts({ updates });
+		// If we have a derived title, update selected contacts
+		// For restaurant searches (forceApplyDerivedTitle), update ALL selected contacts
+		// Otherwise, only update contacts that don't have a title
+		if (derivedTitle) {
+			const contactsToUpdate = contacts.filter(
+				(contact) =>
+					selectedContacts.includes(contact.id) &&
+					(forceApplyDerivedTitle || (!contact.title && !contact.headline))
+			);
+			for (const contact of contactsToUpdate) {
+				updates.push({
+					id: contact.id,
+					data: {
+						title: derivedTitle,
+					},
+				});
+			}
+		}
+
+		if (updates.length > 0) {
+			await batchUpdateContacts({ updates });
+		}
 
 		const generateCampaignName = (searchQuery: string): string => {
 			let cleanedQuery = searchQuery.replace(/^\[(booking|promotion)\]\s*/i, '');

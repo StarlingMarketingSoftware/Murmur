@@ -1,13 +1,21 @@
-import React from 'react';
+import React, { FC } from 'react';
 
-export const WeddingPlannersIcon = () => {
+interface WeddingPlannersIconProps {
+	size?: number;
+	className?: string;
+}
+
+export const WeddingPlannersIcon: FC<WeddingPlannersIconProps> = ({ size = 27, className }) => {
+	// Original viewBox is 27x28, so we scale height proportionally
+	const height = size * (28 / 27);
 	return (
 		<svg
-			width="27"
-			height="28"
+			width={size}
+			height={height}
 			viewBox="0 0 27 28"
 			fill="none"
 			xmlns="http://www.w3.org/2000/svg"
+			className={className}
 		>
 			<mask
 				id="path-1-outside-1_65_32997"

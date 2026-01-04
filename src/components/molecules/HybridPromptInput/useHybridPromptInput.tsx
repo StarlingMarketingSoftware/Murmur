@@ -102,9 +102,36 @@ export interface HybridPromptInputProps {
 	 */
 	isUpscalingPrompt?: boolean;
 	/**
+	 * Optional: the current prompt quality score (0-100) for Full Auto prompts.
+	 * Used to render the rating meter UI.
+	 */
+	promptQualityScore?: number | null;
+	/**
+	 * Optional: the label associated with the prompt quality score (e.g. "Good").
+	 * Used to render the rating meter UI.
+	 */
+	promptQualityLabel?: string | null;
+	/**
+	 * Optional: indicates if there is a previous prompt value available for undoing an upscale.
+	 */
+	hasPreviousPrompt?: boolean;
+	/**
+	 * Optional: invoked when the user clicks the Undo button for an upscaled prompt.
+	 */
+	onUndoUpscalePrompt?: () => void;
+	/**
 	 * Optional: invoked when focus state changes within the prompt input area.
 	 */
 	onFocusChange?: (isFocused: boolean) => void;
+	/**
+	 * Optional: invoked when hover state changes within the prompt input area.
+	 */
+	onHoverChange?: (isHovered: boolean) => void;
+	/**
+	 * Optional: invoked when the Full Auto "Custom Instructions" expander opens/closes.
+	 * Used by parents to conditionally show the suggestions panel.
+	 */
+	onCustomInstructionsOpenChange?: (isOpen: boolean) => void;
 	/**
 	 * Optional: indicates narrow desktop mode (1024px-1279px) for responsive layout adjustments.
 	 */
@@ -146,7 +173,13 @@ export const useHybridPromptInput = (props: HybridPromptInputProps) => {
 		onGetSuggestions,
 		onUpscalePrompt,
 		isUpscalingPrompt,
+		promptQualityScore,
+		promptQualityLabel,
+		hasPreviousPrompt,
+		onUndoUpscalePrompt,
 		onFocusChange,
+		onHoverChange,
+		onCustomInstructionsOpenChange,
 		identity,
 		onIdentityUpdate,
 	} = props;
@@ -477,13 +510,15 @@ export const useHybridPromptInput = (props: HybridPromptInputProps) => {
 	// Do not auto-open the Test Preview when a prior testMessage exists.
 	// Users can explicitly open it via the Test button.
 
-	const handleAddTextBlockAt = (index: number) => {
-		const newTextId = `text-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+	const handleAddTextBlockAt = (index: number, explicitId?: string) => {
+		const newTextId =
+			explicitId ?? `text-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 		insert(index + 1, {
 			id: newTextId,
 			type: HybridBlock.text,
 			value: '',
 		});
+		return newTextId;
 	};
 
 	const handleToggleCollapse = (id: string) => {
@@ -519,7 +554,13 @@ export const useHybridPromptInput = (props: HybridPromptInputProps) => {
 		onGetSuggestions,
 		onUpscalePrompt,
 		isUpscalingPrompt,
+		promptQualityScore,
+		promptQualityLabel,
+		hasPreviousPrompt,
+		onUndoUpscalePrompt,
 		onFocusChange,
+		onHoverChange,
+		onCustomInstructionsOpenChange,
 		identity,
 		onIdentityUpdate,
 	};

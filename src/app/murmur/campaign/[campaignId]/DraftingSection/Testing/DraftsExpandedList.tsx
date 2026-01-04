@@ -25,6 +25,13 @@ import {
 	canadianProvinceNames,
 	stateBadgeColorMap,
 } from '@/constants/ui';
+import { isRestaurantTitle, isCoffeeShopTitle, isMusicVenueTitle, isMusicFestivalTitle, isWeddingPlannerTitle, isWeddingVenueTitle, isWineBeerSpiritsTitle, getWineBeerSpiritsLabel } from '@/utils/restaurantTitle';
+import { WeddingPlannersIcon } from '@/components/atoms/_svg/WeddingPlannersIcon';
+import { RestaurantsIcon } from '@/components/atoms/_svg/RestaurantsIcon';
+import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
+import { FestivalsIcon } from '@/components/atoms/_svg/FestivalsIcon';
+import { MusicVenuesIcon } from '@/components/atoms/_svg/MusicVenuesIcon';
+import { WineBeerSpiritsIcon } from '@/components/atoms/_svg/WineBeerSpiritsIcon';
 
 export interface DraftsExpandedListProps {
 	drafts: EmailWithRelations[];
@@ -380,6 +387,7 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 				height: `${height}px`,
 				background: `linear-gradient(to bottom, #ffffff ${whiteSectionHeight}px, #FFDC9E ${whiteSectionHeight}px)`,
 			}}
+			data-hover-description="Drafts: Emails you’ve generated but haven’t sent yet. Select drafts to preview or send."
 			role="region"
 			aria-label="Expanded drafts preview"
 		>
@@ -511,7 +519,7 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 										!isBottomView && 'p-2',
 										isPreviewed && 'bg-[#FDDEA5]',
 										isSelected && !isPreviewed && 'bg-[#FFDF9F]',
-										isPreviewMode && !isPreviewed && 'hover:bg-[#FFEDCA]'
+										!isSelected && !isPreviewed && 'hover:bg-[#F9E5BA]'
 									)}
 									style={
 										isBottomView
@@ -590,22 +598,85 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 									{contactTitle ? (
 										<div
 											className={cn(
-												'bg-[#E8EFFF] border border-black overflow-hidden flex items-center',
+												'border border-black overflow-hidden flex items-center gap-0.5',
 												isBottomView
 													? 'h-[10px] rounded-[3px] px-1 w-full'
 													: isAllTab
-													? 'w-[158px] h-[15px] rounded-[5px] justify-center'
-													: 'w-[169px] h-[21px] rounded-[5px] justify-center'
+													? 'w-[158px] h-[15px] rounded-[5px] justify-center px-1'
+													: 'w-[169px] h-[21px] rounded-[5px] justify-center px-2'
 											)}
+											style={{
+												backgroundColor: isRestaurantTitle(contactTitle)
+													? '#C3FBD1'
+													: isCoffeeShopTitle(contactTitle)
+														? '#D6F1BD'
+														: isMusicVenueTitle(contactTitle)
+															? '#B7E5FF'
+															: isMusicFestivalTitle(contactTitle)
+																? '#C1D6FF'
+																: (isWeddingPlannerTitle(contactTitle) || isWeddingVenueTitle(contactTitle))
+																	? '#FFF2BC'
+																	: isWineBeerSpiritsTitle(contactTitle)
+																		? '#BFC4FF'
+																		: '#E8EFFF',
+											}}
 										>
+											{isRestaurantTitle(contactTitle) && (
+												<RestaurantsIcon size={isBottomView ? 7 : isAllTab ? 10 : 14} />
+											)}
+											{isCoffeeShopTitle(contactTitle) && (
+												<CoffeeShopsIcon size={6} />
+											)}
+											{isMusicVenueTitle(contactTitle) && (
+												<MusicVenuesIcon size={isBottomView ? 7 : isAllTab ? 10 : 14} className="flex-shrink-0" />
+											)}
+											{isMusicFestivalTitle(contactTitle) && (
+												<FestivalsIcon size={isBottomView ? 7 : isAllTab ? 10 : 14} className="flex-shrink-0" />
+											)}
+											{(isWeddingPlannerTitle(contactTitle) || isWeddingVenueTitle(contactTitle)) && (
+												<WeddingPlannersIcon size={isBottomView ? 7 : isAllTab ? 10 : 14} />
+											)}
+											{isWineBeerSpiritsTitle(contactTitle) && (
+												<WineBeerSpiritsIcon size={isBottomView ? 7 : isAllTab ? 10 : 14} className="flex-shrink-0" />
+											)}
 											{isBottomView ? (
 												<span className="text-[7px] text-black leading-none truncate">
-													{contactTitle}
+													{isRestaurantTitle(contactTitle)
+														? 'Restaurant'
+														: isCoffeeShopTitle(contactTitle)
+															? 'Coffee Shop'
+															: isMusicVenueTitle(contactTitle)
+																? 'Music Venue'
+																: isMusicFestivalTitle(contactTitle)
+																	? 'Music Festival'
+																	: isWeddingPlannerTitle(contactTitle)
+																		? 'Wedding Planner'
+																		: isWeddingVenueTitle(contactTitle)
+																			? 'Wedding Venue'
+																			: isWineBeerSpiritsTitle(contactTitle)
+																				? getWineBeerSpiritsLabel(contactTitle)
+																				: contactTitle}
 												</span>
 											) : (
 												<ScrollableText
-													text={contactTitle}
-													className="text-[11px] text-black leading-none px-1"
+													text={
+														isRestaurantTitle(contactTitle)
+															? 'Restaurant'
+															: isCoffeeShopTitle(contactTitle)
+																? 'Coffee Shop'
+																: isMusicVenueTitle(contactTitle)
+																	? 'Music Venue'
+																	: isMusicFestivalTitle(contactTitle)
+																		? 'Music Festival'
+																		: isWeddingPlannerTitle(contactTitle)
+																			? 'Wedding Planner'
+																			: isWeddingVenueTitle(contactTitle)
+																				? 'Wedding Venue'
+																				: isWineBeerSpiritsTitle(contactTitle)
+																					? getWineBeerSpiritsLabel(contactTitle) ?? contactTitle
+																					: contactTitle
+													}
+													className="text-[11px] text-black leading-none"
 												/>
 											)}
 										</div>

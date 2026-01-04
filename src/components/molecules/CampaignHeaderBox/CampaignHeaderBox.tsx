@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { urls } from '@/constants/urls';
 import { useEditCampaign } from '@/hooks/queryHooks/useCampaigns';
 import { cn } from '@/utils';
+import { useHoverDescription } from '@/contexts/HoverDescriptionContext';
 
 interface CampaignHeaderBoxProps {
 	campaignId: number;
@@ -42,6 +43,11 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 	const [isEditing, setIsEditing] = useState(false);
 	const [editedName, setEditedName] = useState(campaignName);
 	const inputRef = useRef<HTMLInputElement>(null);
+	const { enabled: hoverDescriptionsEnabled, description: hoverDescription } =
+		useHoverDescription();
+	const [renderedHoverDescription, setRenderedHoverDescription] = useState('');
+	const [isHoverDescriptionVisible, setIsHoverDescriptionVisible] = useState(false);
+	const hoverDescriptionTimeoutRef = useRef<number | null>(null);
 
 	const { mutate: editCampaign } = useEditCampaign({
 		suppressToasts: true,
@@ -49,6 +55,68 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 			setIsEditing(false);
 		},
 	});
+
+	// Smooth hover-description transitions (tiny fade out -> swap -> fade in).
+	useEffect(() => {
+		const FADE_MS = 140;
+		const SWAP_DELAY_MS = 70;
+
+		const next = hoverDescriptionsEnabled ? hoverDescription : '';
+
+		if (hoverDescriptionTimeoutRef.current != null) {
+			window.clearTimeout(hoverDescriptionTimeoutRef.current);
+			hoverDescriptionTimeoutRef.current = null;
+		}
+
+		// If nothing to show, fade out (briefly) and then clear.
+		if (!next) {
+			if (!renderedHoverDescription) {
+				setIsHoverDescriptionVisible(false);
+				return;
+			}
+
+			// Delay the fade-out a touch so quick cursor movement across gaps doesn't flicker.
+			hoverDescriptionTimeoutRef.current = window.setTimeout(() => {
+				setIsHoverDescriptionVisible(false);
+				hoverDescriptionTimeoutRef.current = window.setTimeout(() => {
+					setRenderedHoverDescription('');
+					hoverDescriptionTimeoutRef.current = null;
+				}, FADE_MS);
+			}, 90);
+			return;
+		}
+
+		// First show: render immediately and fade in.
+		if (!renderedHoverDescription) {
+			setRenderedHoverDescription(next);
+			setIsHoverDescriptionVisible(true);
+			return;
+		}
+
+		// No change.
+		if (next === renderedHoverDescription) {
+			setIsHoverDescriptionVisible(true);
+			return;
+		}
+
+		// Swap with a quick fade.
+		setIsHoverDescriptionVisible(false);
+		hoverDescriptionTimeoutRef.current = window.setTimeout(() => {
+			setRenderedHoverDescription(next);
+			setIsHoverDescriptionVisible(true);
+			hoverDescriptionTimeoutRef.current = null;
+		}, SWAP_DELAY_MS);
+	}, [hoverDescription, hoverDescriptionsEnabled, renderedHoverDescription]);
+
+	// Cleanup timers on unmount
+	useEffect(() => {
+		return () => {
+			if (hoverDescriptionTimeoutRef.current != null) {
+				window.clearTimeout(hoverDescriptionTimeoutRef.current);
+				hoverDescriptionTimeoutRef.current = null;
+			}
+		};
+	}, []);
 
 	// Focus input when entering edit mode
 	useEffect(() => {
@@ -88,7 +156,7 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 	return (
 		<div
 			className={cn(
-				'bg-white border-[2px] border-black rounded-[8px] flex flex-col px-3 pt-0 pb-2 box-border',
+				'relative overflow-visible bg-white border-[2px] border-black rounded-[8px] flex flex-col px-3 pt-0 pb-2 box-border',
 				fullWidth && 'w-[96.27vw] max-w-[499px]',
 				className
 			)}
@@ -109,6 +177,22 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 					  }
 			}
 		>
+			{renderedHoverDescription ? (
+				<div
+					data-hover-description-ignore="true"
+					className={cn(
+						'pointer-events-none absolute left-0 right-0 top-0 -translate-y-full',
+						'-mt-[15px]',
+						'z-[80]',
+						'px-3 font-inter font-extralight text-[13px] leading-[1.15] text-black',
+						'transition-opacity duration-150 ease-out',
+						isHoverDescriptionVisible ? 'opacity-100' : 'opacity-0'
+					)}
+					style={{ willChange: 'opacity' }}
+				>
+					{renderedHoverDescription}
+				</div>
+			) : null}
 			{/* Campaign Title */}
 			<div className="h-[26px] overflow-hidden flex-shrink-0">
 				{isEditing ? (

@@ -20,6 +20,12 @@ import {
 	MAP_MARKER_PIN_VIEWBOX_HEIGHT,
 	MAP_MARKER_PIN_VIEWBOX_WIDTH,
 } from '@/components/atoms/_svg/MapMarkerPinIcon';
+import { RestaurantsIcon } from '@/components/atoms/_svg/RestaurantsIcon';
+import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
+import { MusicVenuesIcon } from '@/components/atoms/_svg/MusicVenuesIcon';
+import { isRestaurantTitle, isCoffeeShopTitle, isMusicVenueTitle, isWeddingPlannerTitle, isWeddingVenueTitle, isWineBeerSpiritsTitle, getWineBeerSpiritsLabel } from '@/utils/restaurantTitle';
+import { WeddingPlannersIcon } from '@/components/atoms/_svg/WeddingPlannersIcon';
+import { WineBeerSpiritsIcon } from '@/components/atoms/_svg/WineBeerSpiritsIcon';
 
 type LatLngLiteral = { lat: number; lng: number };
 type MarkerHoverMeta = { clientX: number; clientY: number };
@@ -175,6 +181,9 @@ const getLatLngFromContact = (contact: ContactWithName): LatLngLiteral | null =>
 	);
 
 	if (lat == null || lng == null) return null;
+	// Treat (0,0) as "unknown" coordinates (common placeholder) to avoid the map jumping to Africa.
+	// This product is US-focused; a true (0,0) contact would be in the Gulf of Guinea.
+	if (Math.abs(lat) < 1e-9 && Math.abs(lng) < 1e-9) return null;
 	// Defensive sanity bounds: Google Maps won't render invalid ranges reliably.
 	if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
 	return { lat, lng };
@@ -720,6 +729,11 @@ interface SearchResultsMapProps {
 	selectedAreaBounds?: MapSelectionBounds | null;
 	/** Map interaction mode controlled by the dashboard (grab = pan/zoom, select = draw rectangle). */
 	activeTool?: 'select' | 'grab';
+	/**
+	 * When incremented, selects all currently-visible markers within the current map viewport
+	 * that match the active search category (including visible overlay pins).
+	 */
+	selectAllInViewNonce?: number;
 	/** Called when the user completes a rectangle selection (south/west/north/east). */
 	onAreaSelect?: (bounds: MapSelectionBounds, payload?: AreaSelectPayload) => void;
 	/**
@@ -1062,6 +1076,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	searchWhat,
 	selectedAreaBounds,
 	activeTool,
+	selectAllInViewNonce,
 	onAreaSelect,
 	onVisibleOverlayContactsChange,
 	onMarkerClick,
@@ -1107,6 +1122,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const selectionStartClientRef = useRef<{ x: number; y: number } | null>(null);
 	const selectionRectRef = useRef<google.maps.Rectangle | null>(null);
 	const selectedAreaRectRef = useRef<google.maps.Rectangle | null>(null);
+	const lastSelectAllInViewNonceRef = useRef<number>(0);
 	// Timeout ref for auto-hiding research panel
 	const researchPanelTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 	// Small delay when moving between marker layers (prevents hover flicker)
@@ -1167,6 +1183,13 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		() => (searchWhat ? normalizeWhatKey(searchWhat) : null),
 		[searchWhat]
 	);
+
+	// Check if the current search is for a specific category (to apply labels to all results)
+	const searchWhatLower = searchWhat?.toLowerCase() || '';
+	const isMusicVenuesSearch = searchWhatLower.includes('music venue') || searchWhatLower.includes('venues');
+	const isRestaurantsSearch = searchWhatLower.includes('restaurant');
+	const isCoffeeShopsSearch = searchWhatLower.includes('coffee shop') || searchWhatLower.includes('coffee shops');
+	const isWeddingPlannersSearch = searchWhatLower.includes('wedding planner');
 
 	// Booking/promotion overlay pins can contain multiple "What" categories at once; only surface
 	// the ones that match the active search "What" in the dashboard's right-hand panel.
@@ -2165,6 +2188,88 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		]
 	);
 
+	// Dashboard UX: "All" button selects all markers currently visible in the viewport that
+	// match the active search category (including overlay pins when visible).
+	useEffect(() => {
+		if (!selectAllInViewNonce) return;
+		if (selectAllInViewNonce === lastSelectAllInViewNonceRef.current) return;
+		if (!map) return;
+		if (typeof onAreaSelect !== 'function') return;
+
+		const viewportBounds = map.getBounds();
+		if (!viewportBounds) return;
+		const sw = viewportBounds.getSouthWest();
+		const ne = viewportBounds.getNorthEast();
+		const west = sw.lng();
+		const east = ne.lng();
+
+		// Skip in the unlikely case the viewport crosses the antimeridian (not relevant for our UI).
+		if (east < west) return;
+
+		const bounds: MapSelectionBounds = {
+			south: sw.lat(),
+			west,
+			north: ne.lat(),
+			east,
+		};
+
+		const selectedIds = new Set<number>();
+
+		// Base results: only select dots currently rendered in the viewport.
+		for (const contact of visibleContacts) selectedIds.add(contact.id);
+
+		const normalizedSearchWhat = searchWhat ? normalizeWhatKey(searchWhat) : null;
+		const extraContactsById = new Map<number, ContactWithName>();
+
+		// Booking overlay pins: select only the visible pins that match the active category.
+		if (isBookingSearch && normalizedSearchWhat && bookingExtraVisibleContacts.length > 0) {
+			for (const contact of bookingExtraVisibleContacts) {
+				const prefix = getBookingTitlePrefixFromContactTitle(contact.title);
+				if (!prefix) continue;
+				if (!bookingTitlePrefixMatchesSearchWhatKey(prefix, normalizedSearchWhat)) continue;
+				selectedIds.add(contact.id);
+				if (!baseContactIdSet.has(contact.id)) {
+					extraContactsById.set(contact.id, contact);
+				}
+			}
+		}
+
+		// Promotion overlay pins: select only the visible pins that match the active category.
+		if (isPromotionSearch && normalizedSearchWhat && promotionOverlayVisibleContacts.length > 0) {
+			for (const contact of promotionOverlayVisibleContacts) {
+				const title = contact.title ?? '';
+				const matchedPrefix =
+					PROMOTION_OVERLAY_TITLE_PREFIXES.find((p) => startsWithCaseInsensitive(title, p)) ??
+					null;
+				if (!matchedPrefix) continue;
+				if (normalizeWhatKey(matchedPrefix) !== normalizedSearchWhat) continue;
+				selectedIds.add(contact.id);
+				if (!baseContactIdSet.has(contact.id)) {
+					extraContactsById.set(contact.id, contact);
+				}
+			}
+		}
+
+		onAreaSelect(bounds, {
+			contactIds: Array.from(selectedIds),
+			extraContacts: Array.from(extraContactsById.values()),
+		});
+
+		// Ensure this runs once per dashboard click, even as viewport-driven state changes.
+		lastSelectAllInViewNonceRef.current = selectAllInViewNonce;
+	}, [
+		selectAllInViewNonce,
+		map,
+		onAreaSelect,
+		visibleContacts,
+		searchWhat,
+		isBookingSearch,
+		bookingExtraVisibleContacts,
+		isPromotionSearch,
+		promotionOverlayVisibleContacts,
+		baseContactIdSet,
+	]);
+
 	const updateBackgroundDots = useCallback(
 		(
 			mapInstance: google.maps.Map | null,
@@ -3008,6 +3113,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const lastFirstContactIdRef = useRef<number | null>(null);
 	// Track last locked state to detect new searches
 	const lastLockedStateKeyRef = useRef<string | null>(null);
+	// Track whether we've successfully fit to the locked state for the current key.
+	// This prevents a race where we fit to contacts before the state GeoJSON layer is ready,
+	// and then never zoom to the intended state once the layer finishes loading.
+	const lastFitToLockedStateKeyRef = useRef<string | null>(null);
 
 	// Helper to fit map bounds with padding
 	const fitMapToBounds = useCallback(
@@ -3105,9 +3214,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			}
 		});
 
-		// Note: Initial bounds fitting is handled by the useEffect that watches contactsWithCoords
-		// and lockedStateKey. This ensures we wait for the state layer to be ready before
-		// fitting to state bounds.
 	}, []);
 
 	const onUnmount = useCallback(() => {
@@ -3121,6 +3227,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		lastContactsCountRef.current = 0;
 		lastFirstContactIdRef.current = null;
 		lastLockedStateKeyRef.current = null;
+		lastFitToLockedStateKeyRef.current = null;
 	}, [clearResultsOutline, clearSearchedStateOutline]);
 
 	// Fit bounds when contacts with coordinates change (or when the locked state changes).
@@ -3128,12 +3235,23 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	useEffect(() => {
 		if (!map) return;
 
+		// If no locked state is active, allow the next locked-state search to refit to its state.
+		if (!lockedStateKey) {
+			lastFitToLockedStateKeyRef.current = null;
+		}
+
 		// Check if this is a new set of search results by comparing the first contact ID
 		const currentFirstId = contactsWithCoords[0]?.id ?? null;
 		const isNewSearch = currentFirstId !== lastFirstContactIdRef.current;
 
 		// Check if the locked state changed (indicating a new search in a different state)
 		const isNewStateSearch = lockedStateKey !== lastLockedStateKeyRef.current;
+
+		const hasFitLockedStateForKey =
+			!!lockedStateKey && lastFitToLockedStateKeyRef.current === lockedStateKey;
+		// Even if we've already fit to contacts, we still want to zoom to the locked state
+		// once the state layer finishes loading (prevents "random" fallback viewports).
+		const shouldFitLockedState = !!lockedStateKey && isStateLayerReady && !hasFitLockedStateForKey;
 
 		// Fit bounds if:
 		// 1. We haven't fit bounds yet (initial load after geocoding)
@@ -3147,16 +3265,19 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			contactsWithCoords.length > lastContactsCountRef.current ||
 			Math.abs(contactsWithCoords.length - lastContactsCountRef.current) > 5;
 
-		if (!shouldFitBounds) return;
+		if (!shouldFitBounds && !shouldFitLockedState) return;
 
 		// If there's a locked state (searched state) and this is a new search or new state,
 		// zoom to that state first for a better initial view (works even with 0 geocoded contacts).
 		if (
 			lockedStateKey &&
 			isStateLayerReady &&
-			(isNewSearch || isNewStateSearch || !hasFitBoundsRef.current)
+			(isNewSearch || isNewStateSearch || !hasFitBoundsRef.current || shouldFitLockedState)
 		) {
 			const didFitToState = fitMapToState(map, lockedStateKey);
+			if (didFitToState) {
+				lastFitToLockedStateKeyRef.current = lockedStateKey;
+			}
 			if (!didFitToState && contactsWithCoords.length > 0) {
 				// Fallback to fitting to contacts if state geometry not found
 				fitMapToBounds(map, contactsWithCoords);
@@ -4092,13 +4213,53 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 												</span>
 											)}
 										</div>
-										{(selectedMarker.title || selectedMarker.headline) && (
-											<div className="px-1.5 py-[1px] rounded-[6px] bg-[#E8EFFF] border border-black max-w-full truncate">
-												<span className="text-[9px] leading-none text-black block truncate">
-													{selectedMarker.title || selectedMarker.headline}
-												</span>
-											</div>
-										)}
+										{(selectedMarker.title || selectedMarker.headline || isMusicVenuesSearch || isRestaurantsSearch || isCoffeeShopsSearch || isWeddingPlannersSearch) && (() => {
+											const titleText = selectedMarker.title || selectedMarker.headline || '';
+											const isRestaurant = isRestaurantsSearch || isRestaurantTitle(titleText);
+											const isCoffeeShop = isCoffeeShopsSearch || isCoffeeShopTitle(titleText);
+											const isMusicVenue = isMusicVenuesSearch || isMusicVenueTitle(titleText);
+											const isWeddingPlanner = isWeddingPlannersSearch || isWeddingPlannerTitle(titleText);
+											const isWeddingVenue = isWeddingVenueTitle(titleText);
+											const isWineBeerSpirits = isWineBeerSpiritsTitle(titleText);
+											const wineBeerSpiritsLabel = getWineBeerSpiritsLabel(titleText);
+											return (
+												<div
+													className="px-1.5 py-[1px] rounded-[6px] border border-black max-w-full flex items-center gap-1"
+													style={{
+														backgroundColor: isRestaurant
+															? '#C3FBD1'
+															: isCoffeeShop
+																? '#D6F1BD'
+																: isMusicVenue
+																	? '#B7E5FF'
+																	: (isWeddingPlanner || isWeddingVenue)
+																		? '#FFF8DC'
+																		: isWineBeerSpirits
+																			? '#BFC4FF'
+																			: '#E8EFFF',
+													}}
+												>
+													{isRestaurant && (
+														<RestaurantsIcon size={10} className="flex-shrink-0" />
+													)}
+													{isCoffeeShop && (
+														<CoffeeShopsIcon size={6} />
+													)}
+													{isMusicVenue && (
+														<MusicVenuesIcon size={10} className="flex-shrink-0" />
+													)}
+													{(isWeddingPlanner || isWeddingVenue) && (
+														<WeddingPlannersIcon size={10} />
+													)}
+													{isWineBeerSpirits && (
+														<WineBeerSpiritsIcon size={10} className="flex-shrink-0" />
+													)}
+													<span className="text-[9px] leading-none text-black block truncate">
+														{isRestaurant ? 'Restaurant' : isCoffeeShop ? 'Coffee Shop' : isMusicVenue ? 'Music Venue' : isWeddingVenue ? 'Wedding Venue' : isWeddingPlanner ? 'Wedding Planner' : isWineBeerSpirits ? wineBeerSpiritsLabel : titleText}
+													</span>
+												</div>
+											);
+										})()}
 									</div>
 								</div>
 							</div>

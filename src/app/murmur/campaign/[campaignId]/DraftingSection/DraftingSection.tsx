@@ -2,8 +2,14 @@ import { FC, Fragment, useCallback, useEffect, useLayoutEffect, useState, useRef
 import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { gsap } from 'gsap';
-import { DraftingSectionProps, useDraftingSection, HybridBlockPrompt } from './useDraftingSection';
+import {
+	DraftingSectionProps,
+	useDraftingSection,
+	HybridBlockPrompt,
+	type DraftingFormValues,
+} from './useDraftingSection';
 import { Form } from '@/components/ui/form';
+import { useForm } from 'react-hook-form';
 import { HybridPromptInput } from '@/components/molecules/HybridPromptInput/HybridPromptInput';
 import { UpgradeSubscriptionDrawer } from '@/components/atoms/UpgradeSubscriptionDrawer/UpgradeSubscriptionDrawer';
 // EmailGeneration kept available but not used in current view
@@ -18,6 +24,10 @@ import {
 	convertAiResponseToRichTextEmail,
 	convertHtmlToPlainText,
 } from '@/utils';
+import {
+	extractMurmurDraftSettingsSnapshot,
+	injectMurmurDraftSettingsSnapshot,
+} from '@/utils/draftSettings';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { useDebounce } from '@/hooks/useDebounce';
 import DraftingStatusPanel from '@/app/murmur/campaign/[campaignId]/DraftingSection/Testing/DraftingStatusPanel';
@@ -37,7 +47,6 @@ import { useMe } from '@/hooks/useMe';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { ContactWithName } from '@/types/contact';
-import { CampaignsTable } from '@/components/organisms/_tables/CampaignsTable/CampaignsTable';
 import { ContactResearchPanel } from '@/components/molecules/ContactResearchPanel/ContactResearchPanel';
 import { TestPreviewPanel } from '@/components/molecules/TestPreviewPanel/TestPreviewPanel';
 import { MiniEmailStructure } from './EmailGeneration/MiniEmailStructure';
@@ -65,6 +74,7 @@ import { getCityIconProps } from '@/utils/cityIcons';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 import { getStateAbbreviation } from '@/utils/string';
 import { stateBadgeColorMap } from '@/constants/ui';
+import { urls } from '@/constants/urls';
 import { useGemini } from '@/hooks/useGemini';
 import { useOpenRouter } from '@/hooks/useOpenRouter';
 import {
@@ -74,11 +84,9 @@ import {
 	insertWebsiteLinkPhrase,
 } from '@/constants/ai';
 import { Contact, Identity } from '@prisma/client';
-import BottomHomeIcon from '@/components/atoms/_svg/BottomHomeIcon';
-import BottomArrowIcon from '@/components/atoms/_svg/BottomArrowIcon';
-import BottomFolderIcon from '@/components/atoms/_svg/BottomFolderIcon';
 import LeftArrow from '@/components/atoms/_svg/LeftArrow';
 import RightArrow from '@/components/atoms/_svg/RightArrow';
+import { isRestaurantTitle, isCoffeeShopTitle, isMusicVenueTitle, isMusicFestivalTitle, isWeddingPlannerTitle, isWeddingVenueTitle, isWineBeerSpiritsTitle, getWineBeerSpiritsLabel } from '@/utils/restaurantTitle';
 
 type IdentityProfileFields = Identity & {
 	genre?: string | null;
@@ -114,7 +122,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const {
 		view = 'testing',
 		goToDrafting,
-		goToAll,
+		// eslint-disable-next-line @typescript-eslint/no-unused-vars
+		goToAll: _goToAll,
 		goToWriting,
 		onOpenIdentityDialog,
 		onGoToSearch,
@@ -187,17 +196,87 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		[campaign?.identity?.id, editIdentity, queryClient]
 	);
 
+	// Full Auto "Body" block profile chips (shared with HybridPromptInput)
+	const miniProfileFields = useMemo(() => {
+		const identityProfile = campaign?.identity as IdentityProfileFields | undefined | null;
+		if (!identityProfile) return null;
+		return {
+			name: identityProfile.name ?? '',
+			genre: identityProfile.genre ?? '',
+			area: identityProfile.area ?? '',
+			band: identityProfile.bandName ?? '',
+			bio: identityProfile.bio ?? '',
+			links: identityProfile.website ?? '',
+		};
+	}, [campaign?.identity]);
+
 	const router = useRouter();
 	const isMobile = useIsMobile();
 	const [isClient, setIsClient] = useState(false);
 	useEffect(() => setIsClient(true), []);
+	const isDraftingView = view === 'drafting';
+	const isSentView = view === 'sent';
 	const [selectedDraft, setSelectedDraft] = useState<EmailWithRelations | null>(null);
-	const isDraftPreviewOpen = view === 'drafting' && Boolean(selectedDraft);
+	const [hoveredDraftForSettings, setHoveredDraftForSettings] =
+		useState<EmailWithRelations | null>(null);
+	const [hoveredSentForSettings, setHoveredSentForSettings] =
+		useState<EmailWithRelations | null>(null);
+	const isDraftPreviewOpen = isDraftingView && Boolean(selectedDraft);
+	const draftsMiniEmailTopHeaderHeight = isDraftingView || isSentView ? 26 : undefined;
+	const draftsMiniEmailFillColor = isDraftingView || isSentView ? '#B1CEEF' : undefined;
 
-	// Bottom hover box state
-	const [showBottomBox, setShowBottomBox] = useState(false);
-	const hoverTimerRef = useRef<NodeJS.Timeout | null>(null);
-	const [showCampaignsTable, setShowCampaignsTable] = useState(false);
+	// Drafts tab: read-only preview form for the MiniEmailStructure, driven by hovered/selected draft settings.
+	const draftsSettingsPreviewForm = useForm<DraftingFormValues>({
+		defaultValues: form.getValues(),
+	});
+	const draftForSettingsPreview =
+		isDraftingView ? hoveredDraftForSettings ?? selectedDraft : null;
+	useEffect(() => {
+		if (!isDraftingView) {
+			// Avoid leaking hover state across tabs.
+			if (hoveredDraftForSettings) setHoveredDraftForSettings(null);
+			return;
+		}
+
+		const snapshot = draftForSettingsPreview
+			? extractMurmurDraftSettingsSnapshot(draftForSettingsPreview.message)
+			: null;
+		const nextValues = snapshot?.values ?? form.getValues();
+		draftsSettingsPreviewForm.reset(nextValues);
+	}, [
+		view,
+		draftForSettingsPreview?.id,
+		draftForSettingsPreview?.message,
+		form,
+		draftsSettingsPreviewForm,
+		hoveredDraftForSettings,
+	]);
+
+	// Sent tab: read-only preview form for the MiniEmailStructure, driven by hovered sent email settings.
+	const sentSettingsPreviewForm = useForm<DraftingFormValues>({
+		defaultValues: form.getValues(),
+	});
+	const sentForSettingsPreview = isSentView ? hoveredSentForSettings : null;
+	useEffect(() => {
+		if (!isSentView) {
+			// Avoid leaking hover state across tabs.
+			if (hoveredSentForSettings) setHoveredSentForSettings(null);
+			return;
+		}
+
+		const snapshot = sentForSettingsPreview
+			? extractMurmurDraftSettingsSnapshot(sentForSettingsPreview.message)
+			: null;
+		const nextValues = snapshot?.values ?? form.getValues();
+		sentSettingsPreviewForm.reset(nextValues);
+	}, [
+		view,
+		sentForSettingsPreview?.id,
+		sentForSettingsPreview?.message,
+		form,
+		sentSettingsPreviewForm,
+		hoveredSentForSettings,
+	]);
 
 	// All tab hover states
 	const [isContactsHovered, setIsContactsHovered] = useState(false);
@@ -234,44 +313,14 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		return () => window.removeEventListener('resize', checkBreakpoints);
 	}, []);
 
-	// --- Pinned left panel height transition (ContactsExpandedList <-> MiniEmailStructure) ---
+	// --- Pinned left panel (ContactsExpandedList <-> MiniEmailStructure) ---
+	// We intentionally render the correct panel immediately (no height-morph animation),
+	// because the panel heights are now kept in sync across tabs.
 	type PinnedLeftPanelVariant = 'contacts' | 'mini';
-
-	const pinnedLeftPanelTargetVariant: PinnedLeftPanelVariant = useMemo(() => {
+	const pinnedLeftPanelVariant: PinnedLeftPanelVariant = useMemo(() => {
 		if (view === 'testing' || view === 'search') return 'contacts';
 		return 'mini';
 	}, [view]);
-
-	// The pinned left panel is sometimes conditionally removed (breakpoints, other tabs).
-	// Track mounts so we don't "animate in" from stale state when it re-appears.
-	const pinnedLeftPanelWasMountedRef = useRef(false);
-	const pinnedLeftPanelTransitionIdRef = useRef(0);
-
-	const pinnedLeftPanelRenderedVariantRef = useRef<PinnedLeftPanelVariant>(
-		pinnedLeftPanelTargetVariant
-	);
-	const [pinnedLeftPanelRenderedVariant, setPinnedLeftPanelRenderedVariant] =
-		useState<PinnedLeftPanelVariant>(pinnedLeftPanelTargetVariant);
-
-	const pinnedLeftPanelOuterRef = useRef<HTMLDivElement | null>(null);
-	const pinnedLeftPanelContentRef = useRef<HTMLDivElement | null>(null);
-	const pinnedLeftPanelGhostRef = useRef<HTMLDivElement | null>(null);
-
-	const PINNED_LEFT_PANEL_HEIGHT_PX: Record<PinnedLeftPanelVariant, number> = {
-		contacts: 557,
-		mini: 373,
-	};
-
-	// Match the visible box styling so the ghost frame doesn't "snap" away.
-	// ContactsExpandedList: rounded-md (~6px) + 1px border
-	// MiniEmailStructure: 8px radius + 3px border
-	const PINNED_LEFT_PANEL_VISUAL: Record<
-		PinnedLeftPanelVariant,
-		{ borderWidthPx: number; radiusPx: number }
-	> = {
-		contacts: { borderWidthPx: 1, radiusPx: 6 },
-		mini: { borderWidthPx: 3, radiusPx: 8 },
-	};
 
 	// Mirror the exact render conditions for the absolute pinned left column and for this shell.
 	// We only animate when the shell is actually rendered.
@@ -286,167 +335,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		!(view === 'search' && isSearchTabNarrow) &&
 		!(view === 'inbox' && isInboxTabStacked);
 
-	const shouldRenderAnimatedPinnedLeftPanelShell =
-		shouldRenderAbsolutePinnedLeftColumn && view !== 'inbox' && !isDraftPreviewOpen;
-
-	useLayoutEffect(() => {
-		if (typeof window === 'undefined') return;
-
-		// If the shell isn't rendered right now, keep state in sync and mark "not mounted".
-		if (!shouldRenderAnimatedPinnedLeftPanelShell) {
-			pinnedLeftPanelWasMountedRef.current = false;
-			if (pinnedLeftPanelRenderedVariantRef.current !== pinnedLeftPanelTargetVariant) {
-				pinnedLeftPanelRenderedVariantRef.current = pinnedLeftPanelTargetVariant;
-				setPinnedLeftPanelRenderedVariant(pinnedLeftPanelTargetVariant);
-			}
-			return;
-		}
-
-		const outer = pinnedLeftPanelOuterRef.current;
-		const content = pinnedLeftPanelContentRef.current;
-		const ghost = pinnedLeftPanelGhostRef.current;
-
-		if (!outer || !content || !ghost) {
-			pinnedLeftPanelWasMountedRef.current = false;
-			if (pinnedLeftPanelRenderedVariantRef.current !== pinnedLeftPanelTargetVariant) {
-				pinnedLeftPanelRenderedVariantRef.current = pinnedLeftPanelTargetVariant;
-				setPinnedLeftPanelRenderedVariant(pinnedLeftPanelTargetVariant);
-			}
-			return;
-		}
-
-		// First mount (or remount after breakpoint): hard sync, no transition.
-		if (!pinnedLeftPanelWasMountedRef.current) {
-			pinnedLeftPanelWasMountedRef.current = true;
-			gsap.killTweensOf([outer, content, ghost]);
-			gsap.set(ghost, { opacity: 0 });
-			gsap.set(content, { opacity: 1, clearProps: 'pointerEvents' });
-			gsap.set(outer, { clearProps: 'height' });
-
-			if (pinnedLeftPanelRenderedVariantRef.current !== pinnedLeftPanelTargetVariant) {
-				pinnedLeftPanelRenderedVariantRef.current = pinnedLeftPanelTargetVariant;
-				setPinnedLeftPanelRenderedVariant(pinnedLeftPanelTargetVariant);
-			}
-			return;
-		}
-
-		const currentVariant = pinnedLeftPanelRenderedVariantRef.current;
-		if (currentVariant === pinnedLeftPanelTargetVariant) {
-			// If a previous transition was interrupted, snap back to a stable state.
-			gsap.killTweensOf([outer, content, ghost]);
-			gsap.set(ghost, { opacity: 0 });
-			gsap.set(content, {
-				opacity: 1,
-				clearProps: 'pointerEvents,height,maskImage,WebkitMaskImage',
-			});
-			gsap.set(outer, { overflow: 'visible', clearProps: 'height,borderRadius' });
-			return;
-		}
-
-		const transitionId = ++pinnedLeftPanelTransitionIdRef.current;
-
-		gsap.killTweensOf([outer, content, ghost]);
-
-		const fadeSeconds = 0.22;
-		const resizeSeconds = 0.22;
-		const toHeight = PINNED_LEFT_PANEL_HEIGHT_PX[pinnedLeftPanelTargetVariant];
-		const fromHeight =
-			outer.getBoundingClientRect().height || PINNED_LEFT_PANEL_HEIGHT_PX[currentVariant];
-
-		const tweenTo = (target: gsap.TweenTarget, vars: gsap.TweenVars) =>
-			new Promise<void>((resolve) => {
-				gsap.to(target, { ...vars, onComplete: resolve });
-			});
-
-		const nextFrame = () =>
-			new Promise<void>((resolve) => {
-				requestAnimationFrame(() => resolve());
-			});
-
-		(async () => {
-			// 1) Panel A fades out
-			gsap.set(ghost, { opacity: 0 });
-			gsap.set(content, { pointerEvents: 'none' });
-			await tweenTo(content, {
-				opacity: 0,
-				duration: fadeSeconds,
-				ease: 'power1.out',
-			});
-			if (pinnedLeftPanelTransitionIdRef.current !== transitionId) return;
-
-			// Swap to Panel B (kept mostly hidden) so the resize can "reveal" it.
-			pinnedLeftPanelRenderedVariantRef.current = pinnedLeftPanelTargetVariant;
-			setPinnedLeftPanelRenderedVariant(pinnedLeftPanelTargetVariant);
-			await nextFrame();
-			if (pinnedLeftPanelTransitionIdRef.current !== transitionId) return;
-
-			// 2) Ghost box animates height (fixed top, same X) while revealing Panel B inside.
-			const revealOpacity = 0.72;
-			const fadeMask =
-				'linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,1) 88%, rgba(0,0,0,0) 100%)';
-
-			const fromVisual = PINNED_LEFT_PANEL_VISUAL[currentVariant];
-			const toVisual = PINNED_LEFT_PANEL_VISUAL[pinnedLeftPanelTargetVariant];
-
-			gsap.set(ghost, {
-				opacity: 1,
-				borderWidth: `${fromVisual.borderWidthPx}px`,
-				borderRadius: `${fromVisual.radiusPx}px`,
-			});
-			gsap.set(outer, {
-				height: fromHeight,
-				overflow: 'hidden',
-				borderRadius: `${fromVisual.radiusPx}px`,
-			});
-			gsap.set(content, {
-				opacity: 0,
-				height: '100%',
-				maskImage: fadeMask,
-				WebkitMaskImage: fadeMask,
-			});
-
-			await Promise.all([
-				tweenTo(outer, {
-					height: toHeight,
-					borderRadius: `${toVisual.radiusPx}px`,
-					duration: resizeSeconds,
-					ease: 'power2.inOut',
-				}),
-				tweenTo(ghost, {
-					borderWidth: `${toVisual.borderWidthPx}px`,
-					borderRadius: `${toVisual.radiusPx}px`,
-					duration: resizeSeconds,
-					ease: 'power2.inOut',
-				}),
-				tweenTo(content, {
-					opacity: revealOpacity,
-					duration: resizeSeconds,
-					ease: 'power1.out',
-				}),
-			]);
-			if (pinnedLeftPanelTransitionIdRef.current !== transitionId) return;
-
-			// Prep stable state *under the ghost* so nothing pops right at the end.
-			// (At this point the box has reached its final height, so un-clipping is safe.)
-			gsap.set(outer, { overflow: 'visible' });
-			gsap.set(content, { maskImage: 'none', WebkitMaskImage: 'none', height: 'auto' });
-
-			// 3) Ghost fades away, Panel B finishes fading in.
-			await Promise.all([
-				tweenTo(ghost, { opacity: 0, duration: fadeSeconds * 1.35, ease: 'power2.out' }),
-				tweenTo(content, { opacity: 1, duration: fadeSeconds * 1.35, ease: 'power2.out' }),
-			]);
-			if (pinnedLeftPanelTransitionIdRef.current !== transitionId) return;
-
-			// Keep the wrapper height as-is to avoid any end-of-transition layout snap.
-			gsap.set(content, { clearProps: 'pointerEvents' });
-		})();
-
-		return () => {
-			pinnedLeftPanelTransitionIdRef.current++;
-			gsap.killTweensOf([outer, content, ghost]);
-		};
-	}, [pinnedLeftPanelTargetVariant, shouldRenderAnimatedPinnedLeftPanelShell]);
+	// (No pinned-left-panel morph animation)
 
 	// --- Main box morph transition (Contacts/Writing/Drafts/Sent <-> Search/Inbox) ---
 	type CampaignMainBoxKey = 'writing' | 'contacts' | 'drafts' | 'sent' | 'search' | 'inbox';
@@ -675,63 +564,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		isInboxTabStacked,
 		getCampaignMainBoxKey,
 	]);
-
-	const handleGoToDashboard = useCallback(() => {
-		router.push('/murmur/dashboard');
-	}, [router]);
-
-	const handleGoToAll = useCallback(() => {
-		if (goToAll) {
-			goToAll();
-			return;
-		}
-		if (campaign?.id) {
-			router.push(`/murmur/campaign/${campaign.id}?tab=all`);
-			return;
-		}
-		router.push('/murmur/campaign');
-	}, [campaign?.id, goToAll, router]);
-
-	const handleToggleCampaignsTable = useCallback(() => {
-		setShowCampaignsTable((prev) => !prev);
-	}, []);
-	const bottomBarIcons = useMemo(
-		() => [
-			{ key: 'home', element: <BottomHomeIcon aria-label="Home icon" />, onClick: handleGoToDashboard },
-			{ key: 'arrow', element: <BottomArrowIcon aria-label="Arrow icon" />, onClick: handleGoToAll },
-			{ key: 'folder', element: <BottomFolderIcon aria-label="Folder icon" />, onClick: handleToggleCampaignsTable },
-		],
-		[handleGoToAll, handleGoToDashboard, handleToggleCampaignsTable]
-	);
-
-	// Hide campaigns table whenever the footer is not visible
-	useEffect(() => {
-		if (!showBottomBox && showCampaignsTable) {
-			setShowCampaignsTable(false);
-		}
-	}, [showBottomBox, showCampaignsTable]);
-
-	const handleBottomHoverEnter = () => {
-		if (showBottomBox || hoverTimerRef.current) return;
-		hoverTimerRef.current = setTimeout(() => {
-			setShowBottomBox(true);
-			hoverTimerRef.current = null;
-		}, 2000);
-	};
-
-	const handleBottomHoverLeave = () => {
-		if (hoverTimerRef.current) {
-			clearTimeout(hoverTimerRef.current);
-			hoverTimerRef.current = null;
-		}
-		setShowBottomBox(false);
-	};
-
-	useEffect(() => {
-		return () => {
-			if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
-		};
-	}, []);
 
 	const handleRejectDraft = useCallback(
 		async (draftId: number, currentlyRejected?: boolean) => {
@@ -973,19 +805,29 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 					font,
 					signatureText
 				);
+				const richTextMessageWithSettings = injectMurmurDraftSettingsSnapshot(
+					richTextMessage,
+					{
+						version: 1,
+						values: {
+							...values,
+							signature: signatureText,
+						},
+					}
+				);
 
 				await updateEmail({
 					id: draft.id.toString(),
 					data: {
 						subject: cleanedSubject,
-						message: richTextMessage,
+						message: richTextMessageWithSettings,
 					},
 				});
 
 				queryClient.invalidateQueries({ queryKey: ['emails'] });
 
 				toast.success('Draft regenerated successfully');
-				const messageForUi = convertHtmlToPlainText(richTextMessage);
+				const messageForUi = convertHtmlToPlainText(richTextMessageWithSettings);
 				return { subject: cleanedSubject, message: messageForUi };
 			} catch (error) {
 				console.error('[Regenerate] Error:', error);
@@ -1008,7 +850,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 
 	const clampedPromptScore =
 		typeof promptQualityScore === 'number'
-			? Math.max(60, Math.min(100, Math.round(promptQualityScore)))
+			? Math.max(70, Math.min(98, Math.round(promptQualityScore)))
 			: null;
 
 	const promptScoreFillPercent = clampedPromptScore == null ? 0 : clampedPromptScore;
@@ -1017,23 +859,39 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const suggestionText2 = promptSuggestions?.[1] || '';
 	const suggestionText3 = promptSuggestions?.[2] || '';
 
-	// Track if the HybridPromptInput is focused to show/hide suggestions box
-	const [isPromptInputFocused, setIsPromptInputFocused] = useState(false);
-	const suggestionBoxRef = useRef<HTMLDivElement>(null);
-	
-	const handlePromptInputFocusChange = useCallback((isFocused: boolean) => {
-		if (isFocused) {
-			setIsPromptInputFocused(true);
-		} else {
-			setTimeout(() => {
-				const activeElement = document.activeElement;
-				if (suggestionBoxRef.current?.contains(activeElement)) {
-					return;
-				}
-				setIsPromptInputFocused(false);
-			}, 50);
-		}
+	// Show the suggestions box only when:
+	// - Custom Instructions is open, AND
+	// - the user is hovering the HybridPromptInput area.
+	const [isPromptInputHovered, setIsPromptInputHovered] = useState(false);
+	const [isCustomInstructionsOpen, setIsCustomInstructionsOpen] = useState(false);
+	const [isSuggestionBoxHovered, setIsSuggestionBoxHovered] = useState(false);
+	const suggestionHoverLeaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+	const clearSuggestionHoverLeaveTimeout = useCallback(() => {
+		if (!suggestionHoverLeaveTimeoutRef.current) return;
+		clearTimeout(suggestionHoverLeaveTimeoutRef.current);
+		suggestionHoverLeaveTimeoutRef.current = null;
 	}, []);
+
+	// Small delay prevents the Suggestions box from disappearing while moving the mouse
+	// across the gap between the Writing box and the Suggestions box.
+	const handlePromptInputHoverChange = useCallback(
+		(isHovered: boolean) => {
+			clearSuggestionHoverLeaveTimeout();
+			if (isHovered) {
+				setIsPromptInputHovered(true);
+				return;
+			}
+			suggestionHoverLeaveTimeoutRef.current = setTimeout(() => {
+				setIsPromptInputHovered(false);
+			}, 900);
+		},
+		[clearSuggestionHoverLeaveTimeout]
+	);
+
+	useEffect(() => {
+		return () => clearSuggestionHoverLeaveTimeout();
+	}, [clearSuggestionHoverLeaveTimeout]);
 
 	const handleGetSuggestions = useCallback(
 		async (text: string) => {
@@ -1057,13 +915,15 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			? ''
 			: `${clampedPromptScore} - ${
 					promptQualityLabel ||
-					(clampedPromptScore >= 90
+					(clampedPromptScore >= 97
+						? 'Exceptional'
+						: clampedPromptScore >= 91
 						? 'Excellent'
-						: clampedPromptScore >= 80
+						: clampedPromptScore >= 83
 						? 'Great'
-						: clampedPromptScore >= 70
+						: clampedPromptScore >= 75
 						? 'Good'
-						: 'Fair')
+						: 'Keep Going')
 			  }`;
 
 	const [contactsTabSelectedIds, setContactsTabSelectedIds] = useState<Set<number>>(
@@ -1429,53 +1289,43 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		what: string;
 		where: string;
 	}) => {
-		// Sync the Search tab's mini searchbar state so the UI reflects the query
-		if (why) {
-			setSearchWhyValue(why);
-		}
-		setSearchWhatValue(what);
-		setSearchWhereValue(where);
+		const trimmedWhy = (why ?? '').trim();
+		const trimmedWhat = (what ?? '').trim();
+		const trimmedWhere = (where ?? '').trim();
 
-		const parts: string[] = [];
-		if (what) parts.push(what);
-		if (where) parts.push(where);
-		const query = parts.join(' ');
-
-		if (!query.trim()) {
+		// Match the top campaign search button behavior: route to dashboard map view in
+		// "from campaign" mode, and pass the query via sessionStorage.
+		if (!trimmedWhat && !trimmedWhere) {
 			toast.error('Please enter what you want to search for');
 			return;
 		}
 
-		// Build a label for the tab
-		const labelParts: string[] = [];
-		if (where) {
-			const stateAbbrev =
-				where.length === 2 ? where.toUpperCase() : where.split(',')[0]?.trim() || where;
-			labelParts.push(stateAbbrev);
+		let searchQuery = '';
+		if (trimmedWhy) {
+			searchQuery += `${trimmedWhy} `;
 		}
-		if (what) {
-			labelParts.push(what);
+		if (trimmedWhat) {
+			searchQuery += trimmedWhat;
 		}
-		const label = labelParts.join(' - ') || query;
-
-		// Create a new search tab
-		const newTab: SearchTab = {
-			id: `search-${Date.now()}`,
-			label,
-			query,
-			what,
-			selectedContacts: [],
-			extraContacts: [],
-		};
-
-		setSearchTabs((tabs) => [...tabs, newTab]);
-		setActiveSearchTabId(newTab.id);
-		setSearchActiveSection(null);
-
-		// Ask the parent page to switch to the Search tab, if supported
-		if (onGoToSearch) {
-			onGoToSearch();
+		if (trimmedWhere) {
+			searchQuery += ` in ${trimmedWhere}`;
 		}
+		searchQuery = searchQuery.trim();
+
+		if (searchQuery) {
+			try {
+				if (typeof window !== 'undefined') {
+					sessionStorage.setItem('murmur_pending_search', searchQuery);
+				}
+			} catch {
+				// Ignore sessionStorage errors (e.g., disabled storage)
+			}
+		}
+
+		const dashboardUrl = campaign?.id
+			? `${urls.murmur.dashboard.index}?fromCampaignId=${campaign.id}`
+			: urls.murmur.dashboard.index;
+		router.push(dashboardUrl);
 	};
 
 	// Handler for adding selected search results to campaign
@@ -1619,12 +1469,47 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 
 	const displayedContactForResearch =
 		hoveredContactForResearch || selectedContactForResearch;
+	const draftsMiniEmailTopHeaderLabel = draftsMiniEmailTopHeaderHeight
+		? (() => {
+				const contact = displayedContactForResearch;
+				if (!contact) return 'Settings';
+				const fullName = `${contact.firstName || ''} ${contact.lastName || ''}`.trim();
+				const displayName = (fullName || contact.name || contact.company || '').trim();
+				return displayName ? `Settings - ${displayName}` : 'Settings';
+		  })()
+		: undefined;
 
 	useEffect(() => {
 		if (!selectedContactForResearch && contacts && contacts.length > 0) {
 			setSelectedContactForResearch(contacts[0]);
 		}
 	}, [contacts, selectedContactForResearch]);
+
+	// When reviewing a draft in the Drafts tab, the research panel should reflect the
+	// currently open draft (not whatever was last hovered in the table).
+	useEffect(() => {
+		if (view !== 'drafting') return;
+		if (!selectedDraft) return;
+
+		// Prefer the contacts list (includes computed `name`) when available.
+		const contactFromList =
+			contacts?.find((c) => c.id === selectedDraft.contactId) ?? null;
+
+		// Fallback: emails include `contact`, but it does not have computed `name`.
+		const synthesizedFromEmail = {
+			...selectedDraft.contact,
+			name:
+				`${selectedDraft.contact.firstName || ''} ${
+					selectedDraft.contact.lastName || ''
+				}`.trim() || null,
+		} as ContactWithName;
+
+		const nextContact = contactFromList ?? synthesizedFromEmail;
+
+		setSelectedContactForResearch(nextContact);
+		setHoveredContactForResearch(null);
+		setHasUserSelectedResearchContact(true);
+	}, [view, selectedDraft?.id, contacts]);
 
 	useEffect(() => {
 		if (!contactsAvailableForDrafting) return;
@@ -2013,7 +1898,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 									}}
 								>
 									<div className="w-[38px] h-[38px] bg-[#EED56E] rounded-[8px] flex-shrink-0 flex items-center justify-center">
-										<WeddingPlannersIcon />
+										<WeddingPlannersIcon size={22} />
 									</div>
 									<div className="ml-[12px] flex flex-col">
 										<div className="text-[20px] font-medium leading-none text-black font-inter">
@@ -2262,35 +2147,13 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											</div>
 										) : (
 											<div
-												ref={pinnedLeftPanelOuterRef}
 												style={{
 													width: '375px',
 													overflow: 'visible',
 													position: 'relative',
 												}}
 											>
-												{/* Ghost box: visible only during the height morph */}
-												<div
-													ref={pinnedLeftPanelGhostRef}
-													aria-hidden="true"
-													style={{
-														position: 'absolute',
-														inset: 0,
-														border: '3px solid #000000',
-														borderRadius: '8px',
-														background: 'rgba(255, 255, 255, 0.18)',
-														backdropFilter: 'blur(1.5px)',
-														WebkitBackdropFilter: 'blur(1.5px)',
-														opacity: 0,
-														pointerEvents: 'none',
-														zIndex: 2,
-													}}
-												/>
-												<div
-													ref={pinnedLeftPanelContentRef}
-													style={{ position: 'relative', zIndex: 1 }}
-												>
-													{pinnedLeftPanelRenderedVariant === 'contacts' ? (
+												{pinnedLeftPanelVariant === 'contacts' ? (
 														<ContactsExpandedList
 															contacts={contactsAvailableForDrafting}
 															campaign={campaign}
@@ -2316,7 +2179,17 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														/>
 													) : (
 														<MiniEmailStructure
-															form={form}
+															form={
+																isDraftingView
+																	? draftsSettingsPreviewForm
+																	: isSentView
+																		? sentSettingsPreviewForm
+																		: form
+															}
+															readOnly={isDraftingView || isSentView}
+															profileFields={miniProfileFields}
+															identityProfile={campaign?.identity as IdentityProfileFields | null}
+															onIdentityUpdate={handleIdentityUpdate}
 															onDraft={() =>
 																handleGenerateDrafts(
 																	contactsAvailableForDrafting.map((c) => c.id)
@@ -2332,6 +2205,16 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 															hideFooter
 															fullWidthMobile
 															hideAddTextButtons
+															// Match the Writing tab contacts list height (557px) so the left panel stays consistent.
+															// Applies on tabs where this pinned panel renders the MiniEmailStructure (Contacts + Drafts + Sent).
+															height={
+																view === 'contacts' || view === 'drafting' || view === 'sent'
+																	? 557
+																	: undefined
+															}
+															pageFillColor={draftsMiniEmailFillColor}
+															topHeaderHeight={draftsMiniEmailTopHeaderHeight}
+															topHeaderLabel={draftsMiniEmailTopHeaderLabel}
 															hideAllText={
 																// Hide all structure text to show chrome-only skeleton:
 																// - When the Drafts tab has no drafts
@@ -2345,38 +2228,27 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 															onOpenWriting={goToWriting}
 														/>
 													)}
-												</div>
 											</div>
 										))}
 
 									{view === 'testing' &&
-										isPromptInputFocused &&
+										(isPromptInputHovered || isSuggestionBoxHovered) &&
+										isCustomInstructionsOpen &&
 										(suggestionText1 || suggestionText2) && (
 											<div
-												ref={suggestionBoxRef}
-												tabIndex={-1}
-												onBlur={(e) => {
-													// Check if focus is moving outside the suggestion box and prompt input
-													const relatedTarget = e.relatedTarget as HTMLElement | null;
-													const promptInputContainer = document.querySelector(
-														'[data-hpi-container]'
-													);
-													if (
-														!suggestionBoxRef.current?.contains(relatedTarget) &&
-														!promptInputContainer?.contains(relatedTarget)
-													) {
-														setIsPromptInputFocused(false);
-													}
+												onMouseEnter={() => {
+													clearSuggestionHoverLeaveTimeout();
+													setIsSuggestionBoxHovered(true);
 												}}
+												onMouseLeave={() => setIsSuggestionBoxHovered(false)}
 												style={{
 													width: '405px',
-													height: '319px',
+													height: '348px',
 													position: 'absolute',
 													top: '115px',
 													left: '-15px',
-													zIndex: 10,
-													background:
-														'linear-gradient(to bottom, #FFFFFF 28px, #D6EFD7 28px)',
+													zIndex: 30,
+													backgroundColor: '#D6EEEF',
 													border: '2px solid #000000',
 													borderRadius: '7px',
 													overflow: 'hidden',
@@ -2398,51 +2270,39 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												<div
 													style={{
 														position: 'absolute',
-														top: '34px',
+														top: '26px',
 														left: '50%',
 														transform: 'translateX(-50%)',
 														width: '369px',
-														height: '44px',
+														height: '25px',
 														backgroundColor: '#FFFFFF',
 														border: '2px solid #000000',
-														borderRadius: '7px',
+														borderRadius: '5px',
+														boxSizing: 'border-box',
+														display: 'flex',
+														alignItems: 'center',
+														gap: '10px',
+														paddingLeft: '8px',
+														paddingRight: '8px',
 													}}
 												>
-													{/* Score label */}
+													{/* Progress bar (223 x 12) */}
 													<div
 														style={{
-															position: 'absolute',
-															top: '6px',
-															left: '10px',
-															fontFamily: 'Inter, system-ui, sans-serif',
-															fontWeight: 700,
-															fontSize: '12px',
-															lineHeight: '14px',
-															color: '#000000',
-														}}
-													>
-														{promptScoreDisplayLabel}
-													</div>
-													{/* Small box inside (progress track) */}
-													<div
-														style={{
-															position: 'absolute',
-															bottom: '3px',
-															left: '4px',
 															width: '223px',
 															height: '12px',
 															backgroundColor: '#FFFFFF',
 															border: '2px solid #000000',
 															borderRadius: '8px',
 															overflow: 'hidden',
+															flexShrink: 0,
+															boxSizing: 'border-box',
+															position: 'relative',
 														}}
 													>
 														<div
 															style={{
-																position: 'absolute',
-																top: 0,
-																bottom: 0,
-																left: 0,
+																height: '100%',
 																borderRadius: '999px',
 																backgroundColor: '#36B24A',
 																width: `${promptScoreFillPercent}%`,
@@ -2450,6 +2310,24 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																transition: 'width 250ms ease-out',
 															}}
 														/>
+													</div>
+													{/* Rating label */}
+													<div
+														style={{
+															fontFamily: 'Inter, system-ui, sans-serif',
+															fontWeight: 700,
+															fontSize: '12px',
+															lineHeight: '14px',
+															color: '#000000',
+															whiteSpace: 'nowrap',
+															overflow: 'hidden',
+															textOverflow: 'ellipsis',
+															flex: 1,
+															minWidth: 0,
+															textAlign: 'right',
+														}}
+													>
+														{promptScoreDisplayLabel}
 													</div>
 												</div>
 												{/* Small box below the first inner box */}
@@ -2461,7 +2339,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													}}
 													style={{
 														position: 'absolute',
-														top: '83px',
+														top: '61px',
 														left: '22px',
 														width: '39px',
 														height: '32px',
@@ -2472,7 +2350,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														alignItems: 'center',
 														justifyContent: 'center',
 														cursor: hasPreviousPrompt ? 'pointer' : 'not-allowed',
-														opacity: hasPreviousPrompt ? 1 : 0.5,
 													}}
 												>
 													<UndoIcon width="24" height="24" />
@@ -2486,9 +2363,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													}}
 													style={{
 														position: 'absolute',
-														top: '83px',
+														top: '61px',
 														left: '66px',
-														width: '196px',
+														width: '233px',
 														height: '32px',
 														backgroundColor: '#D7F0FF',
 														border: '2px solid #000000',
@@ -2510,32 +2387,46 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 															lineHeight: '1',
 														}}
 													>
-														{isUpscalingPrompt ? 'Upscaling...' : 'Upscale Prompt'}
+														{isUpscalingPrompt ? 'Upscaling...' : 'Upscale Instructions'}
 													</span>
 													<div style={{ flexShrink: 0 }}>
 														<UpscaleIcon width="24" height="24" />
 													</div>
 												</div>
+												<div
+													style={{
+														position: 'absolute',
+														top: '110px',
+														left: '22px',
+														fontFamily: 'Inter, system-ui, sans-serif',
+														fontWeight: 500,
+														fontSize: '17px',
+														lineHeight: '20px',
+														color: '#000000',
+													}}
+												>
+													Custom Instructions
+												</div>
 												{/* Box below the two small boxes */}
 												<div
 													style={{
 														position: 'absolute',
-														top: '123px', // 83px + 32px + 8px
+														top: '147px', // bottom-aligned: 348 - 17 - (56*3 + 8*2) = 147
 														left: '50%',
 														transform: 'translateX(-50%)',
 														width: '362px',
 														height: '56px',
-														backgroundColor: '#A6E0B4',
+														backgroundColor: '#A6DDE0',
 														border: '2px solid #000000',
 														borderRadius: '8px',
 													}}
 												>
 													{/* Section indicator */}
 													<div
-														className="absolute font-inter font-bold"
+														className="absolute font-inter font-bold tabular-nums"
 														style={{
 															top: '4.5px',
-															left: '8px',
+															left: '5px',
 															fontSize: '11.5px',
 															color: '#000000',
 														}}
@@ -2581,22 +2472,22 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												<div
 													style={{
 														position: 'absolute',
-														top: '187px', // 123px + 56px + 8px
+														top: '211px', // 147px + 56px + 8px
 														left: '50%',
 														transform: 'translateX(-50%)',
 														width: '362px',
 														height: '56px',
-														backgroundColor: '#5BCB75',
+														backgroundColor: '#5BB9CB',
 														border: '2px solid #000000',
 														borderRadius: '8px',
 													}}
 												>
 													{/* Section indicator */}
 													<div
-														className="absolute font-inter font-bold"
+														className="absolute font-inter font-bold tabular-nums"
 														style={{
 															top: '4.5px',
-															left: '8px',
+															left: '5px',
 															fontSize: '11.5px',
 															color: '#000000',
 														}}
@@ -2642,22 +2533,22 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												<div
 													style={{
 														position: 'absolute',
-														top: '251px', // 187px + 56px + 8px
+														top: '275px', // 211px + 56px + 8px
 														left: '50%',
 														transform: 'translateX(-50%)',
 														width: '362px',
 														height: '56px',
-														backgroundColor: '#359D4D',
+														backgroundColor: '#35859D',
 														border: '2px solid #000000',
 														borderRadius: '8px',
 													}}
 												>
 													{/* Section indicator */}
 													<div
-														className="absolute font-inter font-bold"
+														className="absolute font-inter font-bold tabular-nums"
 														style={{
 															top: '4.5px',
-															left: '8px',
+															left: '5px',
 															fontSize: '11.5px',
 															color: '#000000',
 														}}
@@ -2875,9 +2766,58 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																	{/* Top Right - Title/Headline */}
 																	<div className="pr-2 pl-1 flex items-center h-[23px]">
 																		{headline ? (
-																			<div className="h-[17px] rounded-[6px] px-2 flex items-center w-full bg-[#E8EFFF] border border-black overflow-hidden">
+																			<div
+																				className="h-[17px] rounded-[6px] px-2 flex items-center gap-1 w-full border border-black overflow-hidden"
+																				style={{
+																					backgroundColor: isRestaurantTitle(headline)
+																						? '#C3FBD1'
+																						: isCoffeeShopTitle(headline)
+																							? '#D6F1BD'
+																							: isMusicVenueTitle(headline)
+																								? '#B7E5FF'
+																								: isMusicFestivalTitle(headline)
+																									? '#C1D6FF'
+																									: (isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline))
+																										? '#FFF2BC'
+																										: isWineBeerSpiritsTitle(headline)
+																											? '#BFC4FF'
+																											: '#E8EFFF',
+																				}}
+																			>
+																				{isRestaurantTitle(headline) && (
+																					<RestaurantsIcon size={12} />
+																				)}
+																				{isCoffeeShopTitle(headline) && (
+																					<CoffeeShopsIcon size={7} />
+																				)}
+																				{isMusicVenueTitle(headline) && (
+																					<MusicVenuesIcon size={12} className="flex-shrink-0" />
+																				)}
+																				{isMusicFestivalTitle(headline) && (
+																					<FestivalsIcon size={12} className="flex-shrink-0" />
+																				)}
+																				{(isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline)) && (
+																					<WeddingPlannersIcon size={12} />
+																				)}
+																				{isWineBeerSpiritsTitle(headline) && (
+																					<WineBeerSpiritsIcon size={12} className="flex-shrink-0" />
+																				)}
 																				<span className="text-[10px] text-black leading-none truncate">
-																					{headline}
+																					{isRestaurantTitle(headline)
+																						? 'Restaurant'
+																						: isCoffeeShopTitle(headline)
+																							? 'Coffee Shop'
+																							: isMusicVenueTitle(headline)
+																								? 'Music Venue'
+																								: isMusicFestivalTitle(headline)
+																									? 'Music Festival'
+																									: isWeddingPlannerTitle(headline)
+																										? 'Wedding Planner'
+																										: isWeddingVenueTitle(headline)
+																											? 'Wedding Venue'
+																											: isWineBeerSpiritsTitle(headline)
+																												? getWineBeerSpiritsLabel(headline)
+																												: headline}
 																				</span>
 																			</div>
 																		) : (
@@ -2929,9 +2869,51 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																	{/* Top Right - Title/Headline */}
 																	<div className="pr-2 pl-1 flex items-center h-[23px]">
 																		{headline ? (
-																			<div className="h-[17px] rounded-[6px] px-2 flex items-center w-full bg-[#E8EFFF] border border-black overflow-hidden">
+																			<div
+																				className="h-[17px] rounded-[6px] px-2 flex items-center gap-1 w-full border border-black overflow-hidden"
+																				style={{
+																					backgroundColor: isRestaurantTitle(headline)
+																						? '#C3FBD1'
+																						: isCoffeeShopTitle(headline)
+																							? '#D6F1BD'
+																							: isMusicVenueTitle(headline)
+																								? '#B7E5FF'
+																								: isMusicFestivalTitle(headline)
+																									? '#C1D6FF'
+																									: (isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline))
+																										? '#FFF2BC'
+																										: '#E8EFFF',
+																				}}
+																			>
+																				{isRestaurantTitle(headline) && (
+																					<RestaurantsIcon size={12} />
+																				)}
+																				{isCoffeeShopTitle(headline) && (
+																					<CoffeeShopsIcon size={7} />
+																				)}
+																				{isMusicVenueTitle(headline) && (
+																					<MusicVenuesIcon size={12} className="flex-shrink-0" />
+																				)}
+																				{isMusicFestivalTitle(headline) && (
+																					<FestivalsIcon size={12} className="flex-shrink-0" />
+																				)}
+																				{(isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline)) && (
+																					<WeddingPlannersIcon size={12} />
+																				)}
 																				<span className="text-[10px] text-black leading-none truncate">
-																					{headline}
+																					{isRestaurantTitle(headline)
+																						? 'Restaurant'
+																						: isCoffeeShopTitle(headline)
+																							? 'Coffee Shop'
+																							: isMusicVenueTitle(headline)
+																								? 'Music Venue'
+																								: isMusicFestivalTitle(headline)
+																									? 'Music Festival'
+																									: isWeddingPlannerTitle(headline)
+																										? 'Wedding Planner'
+																										: isWeddingVenueTitle(headline)
+																											? 'Wedding Venue'
+																											: headline}
 																				</span>
 																			</div>
 																		) : (
@@ -3125,7 +3107,12 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													onGetSuggestions={handleGetSuggestions}
 													onUpscalePrompt={upscalePrompt}
 													isUpscalingPrompt={isUpscalingPrompt}
-													onFocusChange={handlePromptInputFocusChange}
+													promptQualityScore={promptQualityScore}
+													promptQualityLabel={promptQualityLabel}
+													hasPreviousPrompt={hasPreviousPrompt}
+													onUndoUpscalePrompt={undoUpscalePrompt}
+													onHoverChange={handlePromptInputHoverChange}
+													onCustomInstructionsOpenChange={setIsCustomInstructionsOpen}
 													hideDraftButton={true}
 													identity={campaign?.identity}
 													onIdentityUpdate={handleIdentityUpdate}
@@ -3254,7 +3241,12 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											onGetSuggestions={handleGetSuggestions}
 											onUpscalePrompt={upscalePrompt}
 											isUpscalingPrompt={isUpscalingPrompt}
-											onFocusChange={handlePromptInputFocusChange}
+											promptQualityScore={promptQualityScore}
+											promptQualityLabel={promptQualityLabel}
+											hasPreviousPrompt={hasPreviousPrompt}
+											onUndoUpscalePrompt={undoUpscalePrompt}
+											onHoverChange={handlePromptInputHoverChange}
+											onCustomInstructionsOpenChange={setIsCustomInstructionsOpen}
 											isNarrowestDesktop={isNarrowestDesktop}
 											hideDraftButton={isNarrowestDesktop}
 											identity={campaign?.identity}
@@ -3469,6 +3461,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												subject={form.watch('subject')}
 												onContactClick={handleResearchContactClick}
 												onContactHover={handleResearchContactHover}
+												onDraftHover={setHoveredDraftForSettings}
 												goToWriting={goToWriting}
 												goToSearch={onGoToSearch}
 												goToInbox={goToInbox}
@@ -3506,7 +3499,11 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													{/* Mini Email Structure panel */}
 													<div style={{ width: '330px' }}>
 														<MiniEmailStructure
-															form={form}
+															form={draftsSettingsPreviewForm}
+															readOnly
+															profileFields={miniProfileFields}
+															identityProfile={campaign?.identity as IdentityProfileFields | null}
+															onIdentityUpdate={handleIdentityUpdate}
 															onDraft={() =>
 																handleGenerateDrafts(
 																	contactsAvailableForDrafting.map((c) => c.id)
@@ -3521,6 +3518,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 															fullWidthMobile
 															hideAddTextButtons
 															height={316}
+															pageFillColor={draftsMiniEmailFillColor}
+															topHeaderHeight={draftsMiniEmailTopHeaderHeight}
+															topHeaderLabel={draftsMiniEmailTopHeaderLabel}
 															onOpenWriting={goToWriting}
 														/>
 													</div>
@@ -3557,6 +3557,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														subject={form.watch('subject')}
 														onContactClick={handleResearchContactClick}
 														onContactHover={handleResearchContactHover}
+														onDraftHover={setHoveredDraftForSettings}
 														goToWriting={goToWriting}
 														goToSearch={onGoToSearch}
 														goToInbox={goToInbox}
@@ -3698,6 +3699,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												subject={form.watch('subject')}
 												onContactClick={handleResearchContactClick}
 												onContactHover={handleResearchContactHover}
+												onDraftHover={setHoveredDraftForSettings}
 												goToWriting={goToWriting}
 												goToSearch={onGoToSearch}
 												goToInbox={goToInbox}
@@ -3805,7 +3807,11 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											<div className="mt-[10px] w-full flex justify-center">
 												<div style={{ width: '489px' }}>
 													<MiniEmailStructure
-														form={form}
+														form={draftsSettingsPreviewForm}
+														readOnly
+														profileFields={miniProfileFields}
+														identityProfile={campaign?.identity as IdentityProfileFields | null}
+														onIdentityUpdate={handleIdentityUpdate}
 														onDraft={() =>
 															handleGenerateDrafts(
 																contactsAvailableForDrafting.map((c) => c.id)
@@ -3819,6 +3825,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														hideFooter
 														fullWidthMobile
 														hideAddTextButtons
+														pageFillColor={draftsMiniEmailFillColor}
+														topHeaderHeight={draftsMiniEmailTopHeaderHeight}
+														topHeaderLabel={draftsMiniEmailTopHeaderLabel}
 														onOpenWriting={goToWriting}
 													/>
 												</div>
@@ -3914,7 +3923,17 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												{/* Mini Email Structure panel */}
 												<div style={{ width: '330px' }}>
 													<MiniEmailStructure
-														form={form}
+														form={
+															isDraftingView
+																? draftsSettingsPreviewForm
+																: isSentView
+																	? sentSettingsPreviewForm
+																	: form
+														}
+														readOnly={isDraftingView || isSentView}
+														profileFields={miniProfileFields}
+														identityProfile={campaign?.identity as IdentityProfileFields | null}
+														onIdentityUpdate={handleIdentityUpdate}
 														onDraft={() =>
 															handleGenerateDrafts(
 																contactsAvailableForDrafting.map((c) => c.id)
@@ -3929,6 +3948,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														fullWidthMobile
 														hideAddTextButtons
 														height={316}
+														pageFillColor={draftsMiniEmailFillColor}
+														topHeaderHeight={draftsMiniEmailTopHeaderHeight}
+														topHeaderLabel={draftsMiniEmailTopHeaderLabel}
 														onOpenWriting={goToWriting}
 													/>
 												</div>
@@ -4192,7 +4214,17 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											<div className="mt-[10px] w-full flex justify-center">
 												<div style={{ width: '489px' }}>
 													<MiniEmailStructure
-														form={form}
+														form={
+															isDraftingView
+																? draftsSettingsPreviewForm
+																: isSentView
+																	? sentSettingsPreviewForm
+																	: form
+														}
+														readOnly={isDraftingView || isSentView}
+														profileFields={miniProfileFields}
+														identityProfile={campaign?.identity as IdentityProfileFields | null}
+														onIdentityUpdate={handleIdentityUpdate}
 														onDraft={() =>
 															handleGenerateDrafts(
 																contactsAvailableForDrafting.map((c) => c.id)
@@ -4206,6 +4238,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														hideFooter
 														fullWidthMobile
 														hideAddTextButtons
+														pageFillColor={draftsMiniEmailFillColor}
+														topHeaderHeight={draftsMiniEmailTopHeaderHeight}
+														topHeaderLabel={draftsMiniEmailTopHeaderLabel}
 														onOpenWriting={goToWriting}
 													/>
 												</div>
@@ -4228,6 +4263,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											isPendingEmails={isPendingEmails}
 											onContactClick={handleResearchContactClick}
 											onContactHover={handleResearchContactHover}
+											onEmailHover={setHoveredSentForSettings}
 											goToDrafts={goToDrafting}
 											goToWriting={goToWriting}
 											goToSearch={onGoToSearch}
@@ -4254,7 +4290,17 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												{/* Mini Email Structure panel */}
 												<div style={{ width: '330px' }}>
 													<MiniEmailStructure
-														form={form}
+														form={
+															isDraftingView
+																? draftsSettingsPreviewForm
+																: isSentView
+																	? sentSettingsPreviewForm
+																	: form
+														}
+														readOnly={isDraftingView || isSentView}
+														profileFields={miniProfileFields}
+														identityProfile={campaign?.identity as IdentityProfileFields | null}
+														onIdentityUpdate={handleIdentityUpdate}
 														onDraft={() =>
 															handleGenerateDrafts(
 																contactsAvailableForDrafting.map((c) => c.id)
@@ -4269,6 +4315,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														fullWidthMobile
 														hideAddTextButtons
 														height={316}
+														pageFillColor={draftsMiniEmailFillColor}
+														topHeaderHeight={draftsMiniEmailTopHeaderHeight}
+														topHeaderLabel={draftsMiniEmailTopHeaderLabel}
 														onOpenWriting={goToWriting}
 													/>
 												</div>
@@ -4292,6 +4341,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													isPendingEmails={isPendingEmails}
 													onContactClick={handleResearchContactClick}
 													onContactHover={handleResearchContactHover}
+													onEmailHover={setHoveredSentForSettings}
 													goToDrafts={goToDrafting}
 													goToWriting={goToWriting}
 													goToSearch={onGoToSearch}
@@ -4335,6 +4385,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											isPendingEmails={isPendingEmails}
 											onContactClick={handleResearchContactClick}
 											onContactHover={handleResearchContactHover}
+											onEmailHover={setHoveredSentForSettings}
 											goToDrafts={goToDrafting}
 											goToWriting={goToWriting}
 											goToSearch={onGoToSearch}
@@ -4361,7 +4412,17 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											<div className="mt-[10px] w-full flex justify-center">
 												<div style={{ width: '489px' }}>
 													<MiniEmailStructure
-														form={form}
+														form={
+															isDraftingView
+																? draftsSettingsPreviewForm
+																: isSentView
+																	? sentSettingsPreviewForm
+																	: form
+														}
+														readOnly={isDraftingView || isSentView}
+														profileFields={miniProfileFields}
+														identityProfile={campaign?.identity as IdentityProfileFields | null}
+														onIdentityUpdate={handleIdentityUpdate}
 														onDraft={() =>
 															handleGenerateDrafts(
 																contactsAvailableForDrafting.map((c) => c.id)
@@ -4375,6 +4436,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														hideFooter
 														fullWidthMobile
 														hideAddTextButtons
+														pageFillColor={draftsMiniEmailFillColor}
+														topHeaderHeight={draftsMiniEmailTopHeaderHeight}
+														topHeaderLabel={draftsMiniEmailTopHeaderLabel}
 														onOpenWriting={goToWriting}
 													/>
 												</div>
@@ -4539,9 +4603,51 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																					{/* Top Right - Title/Headline */}
 																					<div className="pr-2 pl-1 flex items-center h-[23px]">
 																						{headline ? (
-																							<div className="h-[17px] rounded-[6px] px-2 flex items-center w-full bg-[#E8EFFF] border border-black overflow-hidden">
+																							<div
+																								className="h-[17px] rounded-[6px] px-2 flex items-center gap-1 w-full border border-black overflow-hidden"
+																								style={{
+																									backgroundColor: isRestaurantTitle(headline)
+																										? '#C3FBD1'
+																										: isCoffeeShopTitle(headline)
+																											? '#D6F1BD'
+																											: isMusicVenueTitle(headline)
+																												? '#B7E5FF'
+																												: isMusicFestivalTitle(headline)
+																													? '#C1D6FF'
+																													: (isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline))
+																														? '#FFF2BC'
+																														: '#E8EFFF',
+																								}}
+																							>
+																								{isRestaurantTitle(headline) && (
+																									<RestaurantsIcon size={12} />
+																								)}
+																								{isCoffeeShopTitle(headline) && (
+																									<CoffeeShopsIcon size={7} />
+																								)}
+																								{isMusicVenueTitle(headline) && (
+																									<MusicVenuesIcon size={12} className="flex-shrink-0" />
+																								)}
+																								{isMusicFestivalTitle(headline) && (
+																									<FestivalsIcon size={12} className="flex-shrink-0" />
+																								)}
+{(isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline)) && (
+																								<WeddingPlannersIcon size={12} />
+																							)}
 																								<span className="text-[10px] text-black leading-none truncate">
-																									{headline}
+																									{isRestaurantTitle(headline)
+																										? 'Restaurant'
+																										: isCoffeeShopTitle(headline)
+																											? 'Coffee Shop'
+																											: isMusicVenueTitle(headline)
+																												? 'Music Venue'
+																												: isMusicFestivalTitle(headline)
+																													? 'Music Festival'
+																													: isWeddingPlannerTitle(headline)
+																														? 'Wedding Planner'
+																														: isWeddingVenueTitle(headline)
+																															? 'Wedding Venue'
+																															: headline}
 																								</span>
 																							</div>
 																						) : (
@@ -4593,9 +4699,51 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																					{/* Top Right - Title/Headline */}
 																					<div className="pr-2 pl-1 flex items-center h-[23px]">
 																						{headline ? (
-																							<div className="h-[17px] rounded-[6px] px-2 flex items-center w-full bg-[#E8EFFF] border border-black overflow-hidden">
+																							<div
+																								className="h-[17px] rounded-[6px] px-2 flex items-center gap-1 w-full border border-black overflow-hidden"
+																								style={{
+																									backgroundColor: isRestaurantTitle(headline)
+																										? '#C3FBD1'
+																										: isCoffeeShopTitle(headline)
+																											? '#D6F1BD'
+																											: isMusicVenueTitle(headline)
+																												? '#B7E5FF'
+																												: isMusicFestivalTitle(headline)
+																													? '#C1D6FF'
+																													: (isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline))
+																														? '#FFF2BC'
+																														: '#E8EFFF',
+																								}}
+																							>
+																								{isRestaurantTitle(headline) && (
+																									<RestaurantsIcon size={12} />
+																								)}
+																								{isCoffeeShopTitle(headline) && (
+																									<CoffeeShopsIcon size={7} />
+																								)}
+																								{isMusicVenueTitle(headline) && (
+																									<MusicVenuesIcon size={12} className="flex-shrink-0" />
+																								)}
+																								{isMusicFestivalTitle(headline) && (
+																									<FestivalsIcon size={12} className="flex-shrink-0" />
+																								)}
+{(isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline)) && (
+																								<WeddingPlannersIcon size={12} />
+																							)}
 																								<span className="text-[10px] text-black leading-none truncate">
-																									{headline}
+																									{isRestaurantTitle(headline)
+																										? 'Restaurant'
+																										: isCoffeeShopTitle(headline)
+																											? 'Coffee Shop'
+																											: isMusicVenueTitle(headline)
+																												? 'Music Venue'
+																												: isMusicFestivalTitle(headline)
+																													? 'Music Festival'
+																													: isWeddingPlannerTitle(headline)
+																														? 'Wedding Planner'
+																														: isWeddingVenueTitle(headline)
+																															? 'Wedding Venue'
+																															: headline}
 																								</span>
 																							</div>
 																						) : (
@@ -5229,9 +5377,51 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																		{/* Top Right - Title/Headline */}
 																		<div className="pr-2 pl-1 flex items-center h-[23px]">
 																			{headline ? (
-																				<div className="h-[17px] rounded-[6px] px-2 flex items-center w-full bg-[#E8EFFF] border border-black overflow-hidden">
+																				<div
+																					className="h-[17px] rounded-[6px] px-2 flex items-center gap-1 w-full border border-black overflow-hidden"
+																					style={{
+																						backgroundColor: isRestaurantTitle(headline)
+																							? '#C3FBD1'
+																							: isCoffeeShopTitle(headline)
+																								? '#D6F1BD'
+																								: isMusicVenueTitle(headline)
+																									? '#B7E5FF'
+																									: isMusicFestivalTitle(headline)
+																										? '#C1D6FF'
+																										: (isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline))
+																											? '#FFF2BC'
+																											: '#E8EFFF',
+																					}}
+																				>
+																					{isRestaurantTitle(headline) && (
+																						<RestaurantsIcon size={12} />
+																					)}
+																					{isCoffeeShopTitle(headline) && (
+																						<CoffeeShopsIcon size={7} />
+																					)}
+																					{isMusicVenueTitle(headline) && (
+																						<MusicVenuesIcon size={12} className="flex-shrink-0" />
+																					)}
+																					{isMusicFestivalTitle(headline) && (
+																						<FestivalsIcon size={12} className="flex-shrink-0" />
+																					)}
+{(isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline)) && (
+																								<WeddingPlannersIcon size={12} />
+																							)}
 																					<span className="text-[10px] text-black leading-none truncate">
-																						{headline}
+																						{isRestaurantTitle(headline)
+																							? 'Restaurant'
+																							: isCoffeeShopTitle(headline)
+																								? 'Coffee Shop'
+																								: isMusicVenueTitle(headline)
+																									? 'Music Venue'
+																									: isMusicFestivalTitle(headline)
+																										? 'Music Festival'
+																										: isWeddingPlannerTitle(headline)
+																											? 'Wedding Planner'
+																											: isWeddingVenueTitle(headline)
+																												? 'Wedding Venue'
+																												: headline}
 																					</span>
 																				</div>
 																			) : (
@@ -5283,9 +5473,44 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																		{/* Top Right - Title/Headline */}
 																		<div className="pr-2 pl-1 flex items-center h-[23px]">
 																			{headline ? (
-																				<div className="h-[17px] rounded-[6px] px-2 flex items-center w-full bg-[#E8EFFF] border border-black overflow-hidden">
+																				<div
+																					className="h-[17px] rounded-[6px] px-2 flex items-center gap-1 w-full border border-black overflow-hidden"
+																					style={{
+																						backgroundColor: isRestaurantTitle(headline)
+																							? '#C3FBD1'
+																							: isCoffeeShopTitle(headline)
+																								? '#D6F1BD'
+																								: isMusicVenueTitle(headline)
+																									? '#B7E5FF'
+																									: (isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline))
+																										? '#FFF2BC'
+																										: '#E8EFFF',
+																					}}
+																				>
+																					{isRestaurantTitle(headline) && (
+																						<RestaurantsIcon size={12} />
+																					)}
+																					{isCoffeeShopTitle(headline) && (
+																						<CoffeeShopsIcon size={7} />
+																					)}
+																					{isMusicVenueTitle(headline) && (
+																						<MusicVenuesIcon size={12} className="flex-shrink-0" />
+																					)}
+{(isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline)) && (
+																								<WeddingPlannersIcon size={12} />
+																							)}
 																					<span className="text-[10px] text-black leading-none truncate">
-																						{headline}
+																						{isRestaurantTitle(headline)
+																							? 'Restaurant'
+																							: isCoffeeShopTitle(headline)
+																								? 'Coffee Shop'
+																								: isMusicVenueTitle(headline)
+																									? 'Music Venue'
+																									: isWeddingPlannerTitle(headline)
+																										? 'Wedding Planner'
+																										: isWeddingVenueTitle(headline)
+																											? 'Wedding Venue'
+																											: headline}
 																					</span>
 																				</div>
 																			) : (
@@ -5625,7 +5850,17 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											)}
 											<div style={{ position: 'relative', zIndex: 20 }}>
 												<MiniEmailStructure
-													form={form}
+													form={
+														isDraftingView
+															? draftsSettingsPreviewForm
+															: isSentView
+																? sentSettingsPreviewForm
+																: form
+													}
+													readOnly={isDraftingView || isSentView}
+													profileFields={miniProfileFields}
+													identityProfile={campaign?.identity as IdentityProfileFields | null}
+													onIdentityUpdate={handleIdentityUpdate}
 													onDraft={() =>
 														handleGenerateDrafts(
 															contactsAvailableForDrafting.map((c) => c.id)
@@ -5639,7 +5874,11 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													hideFooter
 													fullWidthMobile
 													hideAddTextButtons
+													fitToHeight
 													height={349}
+													pageFillColor={draftsMiniEmailFillColor}
+													topHeaderHeight={draftsMiniEmailTopHeaderHeight}
+													topHeaderLabel={draftsMiniEmailTopHeaderLabel}
 													onOpenWriting={goToWriting}
 												/>
 											</div>
@@ -5747,8 +5986,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											style={{
 												width: '330px',
 												height: '347px',
-												background:
-													'linear-gradient(to bottom, #FFFFFF 28px, #D6EFD7 28px)',
+												backgroundColor: '#D6EEEF',
 												border: '3px solid #000000',
 												borderRadius: '7px',
 												position: 'relative',
@@ -5769,49 +6007,38 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											<div
 												style={{
 													position: 'absolute',
-													top: '34px',
+													top: '26px',
 													left: '50%',
 													transform: 'translateX(-50%)',
 													width: '322px',
-													height: '44px',
+													height: '25px',
 													backgroundColor: '#FFFFFF',
 													border: '2px solid #000000',
-													borderRadius: '7px',
+													borderRadius: '5px',
+													boxSizing: 'border-box',
+													display: 'flex',
+													alignItems: 'center',
+													gap: '10px',
+													paddingLeft: '8px',
+													paddingRight: '8px',
 												}}
 											>
 												<div
 													style={{
-														position: 'absolute',
-														top: '6px',
-														left: '10px',
-														fontFamily: 'Inter, system-ui, sans-serif',
-														fontWeight: 700,
-														fontSize: '12px',
-														lineHeight: '14px',
-														color: '#000000',
-													}}
-												>
-													{promptScoreDisplayLabel}
-												</div>
-												<div
-													style={{
-														position: 'absolute',
-														bottom: '3px',
-														left: '4px',
 														width: '223px',
 														height: '12px',
 														backgroundColor: '#FFFFFF',
 														border: '2px solid #000000',
 														borderRadius: '8px',
 														overflow: 'hidden',
+														flexShrink: 0,
+														boxSizing: 'border-box',
+														position: 'relative',
 													}}
 												>
 													<div
 														style={{
-															position: 'absolute',
-															top: 0,
-															bottom: 0,
-															left: 0,
+															height: '100%',
 															borderRadius: '999px',
 															backgroundColor: '#36B24A',
 															width: `${promptScoreFillPercent}%`,
@@ -5819,6 +6046,23 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 															transition: 'width 250ms ease-out',
 														}}
 													/>
+												</div>
+												<div
+													style={{
+														fontFamily: 'Inter, system-ui, sans-serif',
+														fontWeight: 700,
+														fontSize: '12px',
+														lineHeight: '14px',
+														color: '#000000',
+														whiteSpace: 'nowrap',
+														overflow: 'hidden',
+														textOverflow: 'ellipsis',
+														flex: 1,
+														minWidth: 0,
+														textAlign: 'right',
+													}}
+												>
+													{promptScoreDisplayLabel}
 												</div>
 											</div>
 											<div
@@ -5829,7 +6073,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												}}
 												style={{
 													position: 'absolute',
-													top: '83px',
+													top: '61px',
 													left: '6px',
 													width: '39px',
 													height: '32px',
@@ -5840,7 +6084,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													alignItems: 'center',
 													justifyContent: 'center',
 													cursor: hasPreviousPrompt ? 'pointer' : 'not-allowed',
-													opacity: hasPreviousPrompt ? 1 : 0.5,
 												}}
 											>
 												{clampedPromptScore != null && <UndoIcon width="24" height="24" />}
@@ -5853,9 +6096,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												}}
 												style={{
 													position: 'absolute',
-													top: '83px',
+													top: '61px',
 													left: '50px',
-													width: '155px',
+													width: '233px',
 													height: '32px',
 													backgroundColor: '#D7F0FF',
 													border: '2px solid #000000',
@@ -5879,7 +6122,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																lineHeight: '1',
 															}}
 														>
-															{isUpscalingPrompt ? 'Upscaling...' : 'Upscale Prompt'}
+															{isUpscalingPrompt ? 'Upscaling...' : 'Upscale Instructions'}
 														</span>
 														<div style={{ flexShrink: 0 }}>
 															<UpscaleIcon width="20" height="20" />
@@ -5887,26 +6130,40 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													</>
 												)}
 											</div>
+											<div
+												style={{
+													position: 'absolute',
+													top: '139px',
+													left: '8px',
+													fontFamily: 'Inter, system-ui, sans-serif',
+													fontWeight: 500,
+													fontSize: '17px',
+													lineHeight: '20px',
+													color: '#000000',
+												}}
+											>
+												Custom Instructions
+											</div>
 											{/* Suggestion 1 */}
 											<div
 												style={{
 													position: 'absolute',
-													top: '123px',
+													top: '176px',
 													left: '50%',
 													transform: 'translateX(-50%)',
 													width: '315px',
 													height: '46px',
-													backgroundColor: '#A6E0B4',
+													backgroundColor: '#A6DDE0',
 													border: '2px solid #000000',
 													borderRadius: '8px',
 													overflow: 'hidden',
 												}}
 											>
 												<div
-													className="absolute font-inter font-bold"
+													className="absolute font-inter font-bold tabular-nums"
 													style={{
 														top: '4.5px',
-														left: '8px',
+														left: '5px',
 														fontSize: '11.5px',
 														color: '#000000',
 													}}
@@ -5922,7 +6179,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														right: '6px',
 														width: '260px',
 														height: '39px',
-														backgroundColor: clampedPromptScore == null ? '#A6E0B4' : '#FFFFFF',
+														backgroundColor: clampedPromptScore == null ? '#A6DDE0' : '#FFFFFF',
 														border: '2px solid #000000',
 														borderRadius: '8px',
 														display: 'flex',
@@ -5954,22 +6211,22 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											<div
 												style={{
 													position: 'absolute',
-													top: '187px',
+													top: '230px',
 													left: '50%',
 													transform: 'translateX(-50%)',
 													width: '315px',
 													height: '46px',
-													backgroundColor: '#5BCB75',
+													backgroundColor: '#5BB9CB',
 													border: '2px solid #000000',
 													borderRadius: '8px',
 													overflow: 'hidden',
 												}}
 											>
 												<div
-													className="absolute font-inter font-bold"
+													className="absolute font-inter font-bold tabular-nums"
 													style={{
 														top: '4.5px',
-														left: '8px',
+														left: '5px',
 														fontSize: '11.5px',
 														color: '#000000',
 													}}
@@ -5985,7 +6242,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														right: '6px',
 														width: '260px',
 														height: '39px',
-														backgroundColor: clampedPromptScore == null ? '#5BCB75' : '#FFFFFF',
+														backgroundColor: clampedPromptScore == null ? '#5BB9CB' : '#FFFFFF',
 														border: '2px solid #000000',
 														borderRadius: '8px',
 														display: 'flex',
@@ -6017,22 +6274,22 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											<div
 												style={{
 													position: 'absolute',
-													top: '251px',
+													top: '284px',
 													left: '50%',
 													transform: 'translateX(-50%)',
 													width: '315px',
 													height: '46px',
-													backgroundColor: '#359D4D',
+													backgroundColor: '#35859D',
 													border: '2px solid #000000',
 													borderRadius: '8px',
 													overflow: 'hidden',
 												}}
 											>
 												<div
-													className="absolute font-inter font-bold"
+													className="absolute font-inter font-bold tabular-nums"
 													style={{
 														top: '4.5px',
-														left: '8px',
+														left: '5px',
 														fontSize: '11.5px',
 														color: '#000000',
 													}}
@@ -6048,7 +6305,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														right: '6px',
 														width: '260px',
 														height: '39px',
-														backgroundColor: clampedPromptScore == null ? '#359D4D' : '#FFFFFF',
+														backgroundColor: clampedPromptScore == null ? '#35859D' : '#FFFFFF',
 														border: '2px solid #000000',
 														borderRadius: '8px',
 														display: 'flex',
@@ -6323,7 +6580,17 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											)}
 											<div style={{ position: 'relative', zIndex: 20 }}>
 												<MiniEmailStructure
-													form={form}
+													form={
+														isDraftingView
+															? draftsSettingsPreviewForm
+															: isSentView
+																? sentSettingsPreviewForm
+																: form
+													}
+													readOnly={isDraftingView || isSentView}
+													profileFields={miniProfileFields}
+													identityProfile={campaign?.identity as IdentityProfileFields | null}
+													onIdentityUpdate={handleIdentityUpdate}
 													onDraft={() =>
 														handleGenerateDrafts(
 															contactsAvailableForDrafting.map((c) => c.id)
@@ -6337,7 +6604,11 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													hideFooter
 													fullWidthMobile
 													hideAddTextButtons
+													fitToHeight
 													height={349}
+													pageFillColor={draftsMiniEmailFillColor}
+													topHeaderHeight={draftsMiniEmailTopHeaderHeight}
+													topHeaderLabel={draftsMiniEmailTopHeaderLabel}
 													onOpenWriting={goToWriting}
 												/>
 											</div>
@@ -6393,8 +6664,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											style={{
 												width: '330px',
 												height: '347px',
-												background:
-													'linear-gradient(to bottom, #FFFFFF 28px, #D6EFD7 28px)',
+												backgroundColor: '#D6EEEF',
 												border: '3px solid #000000',
 												borderRadius: '7px',
 												position: 'relative',
@@ -6416,51 +6686,38 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											<div
 												style={{
 													position: 'absolute',
-													top: '34px',
+													top: '26px',
 													left: '50%',
 													transform: 'translateX(-50%)',
 													width: '322px',
-													height: '44px',
+													height: '25px',
 													backgroundColor: '#FFFFFF',
 													border: '2px solid #000000',
-													borderRadius: '7px',
+													borderRadius: '5px',
+													boxSizing: 'border-box',
+													display: 'flex',
+													alignItems: 'center',
+													gap: '10px',
+													paddingLeft: '8px',
+													paddingRight: '8px',
 												}}
 											>
-												{/* Score label */}
 												<div
 													style={{
-														position: 'absolute',
-														top: '6px',
-														left: '10px',
-														fontFamily: 'Inter, system-ui, sans-serif',
-														fontWeight: 700,
-														fontSize: '12px',
-														lineHeight: '14px',
-														color: '#000000',
-													}}
-												>
-													{promptScoreDisplayLabel}
-												</div>
-												{/* Small box inside (progress track) */}
-												<div
-													style={{
-														position: 'absolute',
-														bottom: '3px',
-														left: '4px',
 														width: '223px',
 														height: '12px',
 														backgroundColor: '#FFFFFF',
 														border: '2px solid #000000',
 														borderRadius: '8px',
 														overflow: 'hidden',
+														flexShrink: 0,
+														boxSizing: 'border-box',
+														position: 'relative',
 													}}
 												>
 													<div
 														style={{
-															position: 'absolute',
-															top: 0,
-															bottom: 0,
-															left: 0,
+															height: '100%',
 															borderRadius: '999px',
 															backgroundColor: '#36B24A',
 															width: `${promptScoreFillPercent}%`,
@@ -6468,6 +6725,23 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 															transition: 'width 250ms ease-out',
 														}}
 													/>
+												</div>
+												<div
+													style={{
+														fontFamily: 'Inter, system-ui, sans-serif',
+														fontWeight: 700,
+														fontSize: '12px',
+														lineHeight: '14px',
+														color: '#000000',
+														whiteSpace: 'nowrap',
+														overflow: 'hidden',
+														textOverflow: 'ellipsis',
+														flex: 1,
+														minWidth: 0,
+														textAlign: 'right',
+													}}
+												>
+													{promptScoreDisplayLabel}
 												</div>
 											</div>
 											{/* Undo button */}
@@ -6479,7 +6753,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												}}
 												style={{
 													position: 'absolute',
-													top: '83px',
+													top: '61px',
 													left: '6px',
 													width: '39px',
 													height: '32px',
@@ -6490,7 +6764,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													alignItems: 'center',
 													justifyContent: 'center',
 													cursor: hasPreviousPrompt ? 'pointer' : 'not-allowed',
-													opacity: hasPreviousPrompt ? 1 : 0.5,
 												}}
 											>
 												{clampedPromptScore != null && <UndoIcon width="24" height="24" />}
@@ -6504,9 +6777,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												}}
 												style={{
 													position: 'absolute',
-													top: '83px',
+													top: '61px',
 													left: '50px',
-													width: '155px',
+													width: '233px',
 													height: '32px',
 													backgroundColor: '#D7F0FF',
 													border: '2px solid #000000',
@@ -6530,7 +6803,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																lineHeight: '1',
 															}}
 														>
-															{isUpscalingPrompt ? 'Upscaling...' : 'Upscale Prompt'}
+															{isUpscalingPrompt ? 'Upscaling...' : 'Upscale Instructions'}
 														</span>
 														<div style={{ flexShrink: 0 }}>
 															<UpscaleIcon width="20" height="20" />
@@ -6538,26 +6811,40 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													</>
 												)}
 											</div>
+											<div
+												style={{
+													position: 'absolute',
+													top: '139px',
+													left: '8px',
+													fontFamily: 'Inter, system-ui, sans-serif',
+													fontWeight: 500,
+													fontSize: '17px',
+													lineHeight: '20px',
+													color: '#000000',
+												}}
+											>
+												Custom Instructions
+											</div>
 											{/* Suggestion 1 */}
 											<div
 												style={{
 													position: 'absolute',
-													top: '123px',
+													top: '176px',
 													left: '50%',
 													transform: 'translateX(-50%)',
 													width: '315px',
 													height: '46px',
-													backgroundColor: '#A6E0B4',
+													backgroundColor: '#A6DDE0',
 													border: '2px solid #000000',
 													borderRadius: '8px',
 													overflow: 'hidden',
 												}}
 											>
 												<div
-													className="absolute font-inter font-bold"
+													className="absolute font-inter font-bold tabular-nums"
 													style={{
 														top: '4.5px',
-														left: '8px',
+														left: '5px',
 														fontSize: '11.5px',
 														color: '#000000',
 													}}
@@ -6573,7 +6860,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														right: '6px',
 														width: '260px',
 														height: '39px',
-														backgroundColor: clampedPromptScore == null ? '#A6E0B4' : '#FFFFFF',
+														backgroundColor: clampedPromptScore == null ? '#A6DDE0' : '#FFFFFF',
 														border: '2px solid #000000',
 														borderRadius: '8px',
 														display: 'flex',
@@ -6605,22 +6892,22 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											<div
 												style={{
 													position: 'absolute',
-													top: '187px',
+													top: '230px',
 													left: '50%',
 													transform: 'translateX(-50%)',
 													width: '315px',
 													height: '46px',
-													backgroundColor: '#5BCB75',
+													backgroundColor: '#5BB9CB',
 													border: '2px solid #000000',
 													borderRadius: '8px',
 													overflow: 'hidden',
 												}}
 											>
 												<div
-													className="absolute font-inter font-bold"
+													className="absolute font-inter font-bold tabular-nums"
 													style={{
 														top: '4.5px',
-														left: '8px',
+														left: '5px',
 														fontSize: '11.5px',
 														color: '#000000',
 													}}
@@ -6636,7 +6923,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														right: '6px',
 														width: '260px',
 														height: '39px',
-														backgroundColor: clampedPromptScore == null ? '#5BCB75' : '#FFFFFF',
+														backgroundColor: clampedPromptScore == null ? '#5BB9CB' : '#FFFFFF',
 														border: '2px solid #000000',
 														borderRadius: '8px',
 														display: 'flex',
@@ -6668,22 +6955,22 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											<div
 												style={{
 													position: 'absolute',
-													top: '251px',
+													top: '284px',
 													left: '50%',
 													transform: 'translateX(-50%)',
 													width: '315px',
 													height: '46px',
-													backgroundColor: '#359D4D',
+													backgroundColor: '#35859D',
 													border: '2px solid #000000',
 													borderRadius: '8px',
 													overflow: 'hidden',
 												}}
 											>
 												<div
-													className="absolute font-inter font-bold"
+													className="absolute font-inter font-bold tabular-nums"
 													style={{
 														top: '4.5px',
-														left: '8px',
+														left: '5px',
 														fontSize: '11.5px',
 														color: '#000000',
 													}}
@@ -6699,7 +6986,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														right: '6px',
 														width: '260px',
 														height: '39px',
-														backgroundColor: clampedPromptScore == null ? '#359D4D' : '#FFFFFF',
+														backgroundColor: clampedPromptScore == null ? '#35859D' : '#FFFFFF',
 														border: '2px solid #000000',
 														borderRadius: '8px',
 														display: 'flex',
@@ -6969,78 +7256,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 						)} */}
 					</div>
 
-					{/* Hover area below expanded lists to reveal bottom box */}
+					{/* Spacer below expanded lists */}
 					<div className="relative w-screen max-w-none mt-10 pb-10" aria-hidden="true" />
 				</form>
 			</Form>
-
-			{/* Fixed hover zone at the bottom of the viewport - expands when campaigns table is visible */}
-			<div
-				className={`fixed inset-x-0 bottom-0 z-50 pointer-events-none ${showCampaignsTable ? 'h-[320px]' : 'h-[200px]'}`}
-				onMouseLeave={handleBottomHoverLeave}
-			>
-				{/* Thin hover trigger at the very bottom - only active when bottom box is hidden */}
-				{!showBottomBox && (
-					<div 
-						className="absolute inset-x-0 bottom-0 h-[40px] pointer-events-auto" 
-						onMouseEnter={handleBottomHoverEnter}
-					/>
-				)}
-				
-				{/* Full capture area - only active when bottom box is shown to keep it open */}
-				{showBottomBox && (
-					<div 
-						className="absolute inset-0 pointer-events-auto" 
-						onMouseEnter={handleBottomHoverEnter}
-					/>
-				)}
-
-				{/* Campaigns table - positioned inside hover zone */}
-				{showBottomBox && showCampaignsTable && (
-					<div className="absolute left-1/2 -translate-x-1/2 bottom-[40px] z-[60] pointer-events-auto">
-						<div className="campaigns-popup-wrapper bg-[#EDEDED] rounded-[12px] overflow-hidden w-[891px] h-[242px] border-2 border-[#8C8C8C]">
-							<CampaignsTable />
-						</div>
-					</div>
-				)}
-
-				{/* Revealed bar lives inside the hover zone so moving into it won't dismiss */}
-				{showBottomBox && (
-					<div
-						className="absolute left-1/2 -translate-x-1/2 z-50 flex items-center justify-center text-black font-inter text-[14px] font-medium pointer-events-auto"
-						style={{
-							width: '816px',
-							height: '34px',
-							bottom: 0,
-							backgroundColor: '#F5F5F5',
-							border: '2px solid #000000',
-							borderRadius: '0px',
-						}}
-						aria-label="Bottom navigation reveal"
-					>
-						<div className="flex items-center justify-center gap-0">
-							{bottomBarIcons.map((icon) => (
-								<button
-									key={icon.key}
-									type="button"
-									className="flex items-center justify-center border-0 p-0 cursor-pointer transition-colors"
-									style={{
-										width: '65px',
-										height: '30px',
-										backgroundColor: 'transparent',
-									}}
-									onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#D9D9D9')}
-									onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-									onClick={icon.onClick}
-									aria-label={icon.element.props['aria-label'] || icon.key}
-								>
-									{icon.element}
-								</button>
-							))}
-						</div>
-					</div>
-				)}
-			</div>
 
 			{/* Main-box ghost: portal to <body> so "fixed" aligns with viewport (avoid transformed-parent offsets) */}
 			{isClient &&

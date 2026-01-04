@@ -15,6 +15,13 @@ import {
 } from '@/constants/ui';
 import { useGetInboundEmails } from '@/hooks/queryHooks/useInboundEmails';
 import type { InboundEmailWithRelations } from '@/types';
+import { isRestaurantTitle, isCoffeeShopTitle, isMusicVenueTitle, isMusicFestivalTitle, isWeddingPlannerTitle, isWeddingVenueTitle, isWineBeerSpiritsTitle, getWineBeerSpiritsLabel } from '@/utils/restaurantTitle';
+import { WeddingPlannersIcon } from '@/components/atoms/_svg/WeddingPlannersIcon';
+import { RestaurantsIcon } from '@/components/atoms/_svg/RestaurantsIcon';
+import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
+import { FestivalsIcon } from '@/components/atoms/_svg/FestivalsIcon';
+import { MusicVenuesIcon } from '@/components/atoms/_svg/MusicVenuesIcon';
+import { WineBeerSpiritsIcon } from '@/components/atoms/_svg/WineBeerSpiritsIcon';
 
 export interface InboxExpandedListProps {
 	contacts: ContactWithName[];
@@ -185,7 +192,6 @@ const getCanonicalContactName = (
 };
 
 export const InboxExpandedList: FC<InboxExpandedListProps> = ({
-	// eslint-disable-next-line @typescript-eslint/no-unused-vars
 	contacts,
 	allowedSenderEmails,
 	contactByEmail,
@@ -198,6 +204,29 @@ export const InboxExpandedList: FC<InboxExpandedListProps> = ({
 	// Fetch ALL inbound emails (same as InboxSection)
 	const { data: allInboundEmails } = useGetInboundEmails();
 
+	/**
+	 * This component is used throughout the campaign UI (including the bottom/compact view).
+	 * When `allowedSenderEmails`/`contactByEmail` are not provided, we derive them from the
+	 * provided `contacts` to keep this list scoped to the current campaign's inbox.
+	 */
+	const effectiveAllowedSenderEmails = useMemo(() => {
+		// If caller explicitly provided a list (even empty), respect it.
+		if (allowedSenderEmails !== undefined) return allowedSenderEmails;
+		return contacts.map((c) => c.email).filter((email): email is string => Boolean(email));
+	}, [allowedSenderEmails, contacts]);
+
+	const effectiveContactByEmail = useMemo(() => {
+		if (contactByEmail) return contactByEmail;
+		const map: Record<string, ContactWithName> = {};
+		for (const c of contacts) {
+			if (!c.email) continue;
+			const key = c.email.toLowerCase().trim();
+			if (!key) continue;
+			if (!map[key]) map[key] = c;
+		}
+		return map;
+	}, [contactByEmail, contacts]);
+
 	// Special hack for "All" tab: if height is exactly 347px, we apply a thicker 3px border
 	// to match the other elements in that layout. Otherwise standard 2px border.
 	const isAllTab = height === 347;
@@ -207,17 +236,19 @@ export const InboxExpandedList: FC<InboxExpandedListProps> = ({
 	// Filter to only show emails from campaign contacts
 	const inboundEmails = useMemo(() => {
 		if (!allInboundEmails) return [];
-		if (!allowedSenderEmails || allowedSenderEmails.length === 0) {
-			return allInboundEmails;
-		}
-
-		const allowedSet = new Set(allowedSenderEmails.map((e) => e.toLowerCase().trim()));
+		const allowedSet = new Set(
+			(effectiveAllowedSenderEmails || [])
+				.filter((e): e is string => Boolean(e))
+				.map((e) => e.toLowerCase().trim())
+		);
+		// If an allow-list is provided/derived but empty, the campaign-scoped inbox has no visible emails.
+		if (allowedSet.size === 0) return [];
 
 		return allInboundEmails.filter((email) => {
 			const sender = email.sender?.toLowerCase().trim();
 			return sender && allowedSet.has(sender);
 		});
-	}, [allInboundEmails, allowedSenderEmails]);
+	}, [allInboundEmails, effectiveAllowedSenderEmails]);
 
 	const isFullyEmpty = inboundEmails.length === 0;
 	const placeholderBgColor = isFullyEmpty ? '#3D9DC0' : '#5EB6D6';
@@ -237,6 +268,7 @@ export const InboxExpandedList: FC<InboxExpandedListProps> = ({
 				height: `${height}px`,
 				background: `linear-gradient(to bottom, #ffffff ${whiteSectionHeight}px, #5EB6D6 ${whiteSectionHeight}px)`,
 			}}
+			data-hover-description="Inbox: Replies and inbound messages from contacts in this campaign."
 			role="region"
 			aria-label="Expanded inbox preview"
 		>
@@ -318,8 +350,8 @@ export const InboxExpandedList: FC<InboxExpandedListProps> = ({
 						}}
 					>
 						{inboundEmails.map((email) => {
-							const contact = resolveContactForEmail(email, contactByEmail);
-							const contactName = getCanonicalContactName(email, contactByEmail);
+							const contact = resolveContactForEmail(email, effectiveContactByEmail);
+							const contactName = getCanonicalContactName(email, effectiveContactByEmail);
 
 							return (
 								<div
@@ -341,19 +373,84 @@ export const InboxExpandedList: FC<InboxExpandedListProps> = ({
 									)}>
 										{/* Title row - on top */}
 										{contact?.headline ? (
-											<div className={cn(
-												"bg-[#E8EFFF] border border-black overflow-hidden flex items-center",
-												isBottomView
-													? "h-[10px] rounded-[3px] px-1 w-full"
-													: "w-[110px] h-[10px] rounded-[3.71px] justify-center"
-											)}>
+											<div
+												className={cn(
+													"border border-black overflow-hidden flex items-center gap-0.5",
+													isBottomView
+														? "h-[10px] rounded-[3px] px-1 w-full"
+														: "w-[110px] h-[10px] rounded-[3.71px] justify-center"
+												)}
+												style={{
+													backgroundColor: isRestaurantTitle(contact.headline)
+														? '#C3FBD1'
+														: isCoffeeShopTitle(contact.headline)
+															? '#D6F1BD'
+															: isMusicVenueTitle(contact.headline)
+																? '#B7E5FF'
+																: isMusicFestivalTitle(contact.headline)
+																	? '#C1D6FF'
+																	: (isWeddingPlannerTitle(contact.headline) || isWeddingVenueTitle(contact.headline))
+																		? '#FFF2BC'
+																		: isWineBeerSpiritsTitle(contact.headline)
+																			? '#BFC4FF'
+																			: '#E8EFFF',
+												}}
+											>
+												{isRestaurantTitle(contact.headline) && (
+													<RestaurantsIcon size={isBottomView ? 7 : 8} />
+												)}
+												{isCoffeeShopTitle(contact.headline) && (
+													<CoffeeShopsIcon size={5} />
+												)}
+												{isMusicVenueTitle(contact.headline) && (
+													<MusicVenuesIcon size={isBottomView ? 7 : 8} className="flex-shrink-0" />
+												)}
+												{isMusicFestivalTitle(contact.headline) && (
+													<FestivalsIcon size={isBottomView ? 7 : 8} className="flex-shrink-0" />
+												)}
+												{(isWeddingPlannerTitle(contact.headline) || isWeddingVenueTitle(contact.headline)) && (
+													<WeddingPlannersIcon size={isBottomView ? 7 : 8} />
+												)}
+												{isWineBeerSpiritsTitle(contact.headline) && (
+													<WineBeerSpiritsIcon size={isBottomView ? 7 : 8} className="flex-shrink-0" />
+												)}
 												{isBottomView ? (
 													<span className="text-[7px] text-black leading-none truncate">
-														{contact.headline}
+														{isRestaurantTitle(contact.headline)
+															? 'Restaurant'
+															: isCoffeeShopTitle(contact.headline)
+																? 'Coffee Shop'
+																: isMusicVenueTitle(contact.headline)
+																	? 'Music Venue'
+																	: isMusicFestivalTitle(contact.headline)
+																		? 'Music Festival'
+																		: isWeddingPlannerTitle(contact.headline)
+																			? 'Wedding Planner'
+																			: isWeddingVenueTitle(contact.headline)
+																				? 'Wedding Venue'
+																				: isWineBeerSpiritsTitle(contact.headline)
+																					? getWineBeerSpiritsLabel(contact.headline)
+																					: contact.headline}
 													</span>
 												) : (
 													<ScrollableText
-														text={contact.headline}
+														text={
+															isRestaurantTitle(contact.headline)
+																? 'Restaurant'
+																: isCoffeeShopTitle(contact.headline)
+																	? 'Coffee Shop'
+																	: isMusicVenueTitle(contact.headline)
+																		? 'Music Venue'
+																		: isMusicFestivalTitle(contact.headline)
+																			? 'Music Festival'
+																			: isWeddingPlannerTitle(contact.headline)
+																				? 'Wedding Planner'
+																				: isWeddingVenueTitle(contact.headline)
+																					? 'Wedding Venue'
+																					: isWineBeerSpiritsTitle(contact.headline)
+																						? getWineBeerSpiritsLabel(contact.headline) ?? contact.headline
+																						: contact.headline
+														}
 														className="text-[8px] text-black leading-none px-1"
 													/>
 												)}

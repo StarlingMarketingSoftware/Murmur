@@ -35,6 +35,7 @@ import { RadioStationsIcon } from '@/components/atoms/_svg/RadioStationsIcon';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 import { getCityIconProps } from '@/utils/cityIcons';
 import { urls } from '@/constants/urls';
+import { isRestaurantTitle, isCoffeeShopTitle, isMusicVenueTitle, isMusicFestivalTitle, isWeddingPlannerTitle, isWeddingVenueTitle, isWineBeerSpiritsTitle, getWineBeerSpiritsLabel } from '@/utils/restaurantTitle';
 
 const DEFAULT_STATE_SUGGESTIONS = [
 	{ label: 'New York', description: 'contact venues, restaurants and more' },
@@ -234,6 +235,7 @@ export const MiniSearchBar: FC<{
 			className="relative mx-auto"
 			ref={containerRef}
 			style={{ width: width ?? 'min(489px, 100%)' }}
+			data-hover-description="Search: refine the contacts in this campaign (Why / What / Where)."
 		>
 			<div
 				className="bg-white rounded-[8px] border-2 border-black flex items-center relative w-full"
@@ -704,7 +706,7 @@ export const MiniSearchBar: FC<{
 										}}
 									>
 										<div className="w-[38px] h-[38px] bg-[#EED56E] rounded-[8px] flex-shrink-0 flex items-center justify-center">
-											<WeddingPlannersIcon />
+											<WeddingPlannersIcon size={22} />
 										</div>
 										<div className="ml-[12px] flex flex-col">
 											<div className="text-[20px] font-medium leading-none text-black font-inter">
@@ -941,9 +943,17 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 
 		if (searchQuery) {
 			// Store the search query in sessionStorage for the dashboard to pick up
-			sessionStorage.setItem('murmur_pending_search', searchQuery);
-			// Navigate to the dashboard
-			router.push(urls.murmur.dashboard.index);
+			try {
+				sessionStorage.setItem('murmur_pending_search', searchQuery);
+			} catch {
+				// Ignore sessionStorage errors (e.g., disabled storage)
+			}
+
+			// Navigate to the campaign-scoped dashboard search/map view when possible
+			const dashboardUrl = campaign?.id
+				? `${urls.murmur.dashboard.index}?fromCampaignId=${campaign.id}`
+				: urls.murmur.dashboard.index;
+			router.push(dashboardUrl);
 		}
 	};
 
@@ -1036,7 +1046,15 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 					) : undefined
 				}
 			>
-				<div className={cn("overflow-visible w-full flex flex-col items-center", isMobile ? "gap-2" : "gap-4")}>
+				<div
+					className={cn(
+						"overflow-visible w-full flex flex-col items-center",
+						isMobile ? "gap-2" : "gap-4"
+					)}
+					onMouseLeave={() => {
+						onContactHover?.(null);
+					}}
+				>
 					{contacts.map((contact) => {
 						const isUsedContact = usedContactIdsSet.has(contact.id);
 						// Mobile-specific width values (using CSS calc for responsive sizing)
@@ -1045,9 +1063,11 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 						<div
 							key={contact.id}
 							className={cn(
-								'cursor-pointer transition-colors grid grid-cols-2 grid-rows-2 h-[52px] overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white select-none row-hover-scroll relative',
+								'cursor-pointer grid grid-cols-2 grid-rows-2 h-[52px] overflow-hidden rounded-[8px] border-2 border-[#000000] select-none row-hover-scroll relative',
 								!isMobile && 'w-[489px]',
-								selectedContactIds.has(contact.id) ? 'bg-[#EAAEAE]' : ''
+								selectedContactIds.has(contact.id)
+									? 'bg-[#EAAEAE]'
+									: 'bg-white hover:bg-[#F5DADA]'
 							)}
 							style={isMobile ? { width: mobileContactRowWidth } : undefined}
 							onMouseDown={(e) => {
@@ -1058,9 +1078,6 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 							}}
 							onMouseEnter={() => {
 								onContactHover?.(contact);
-							}}
-							onMouseLeave={() => {
-								onContactHover?.(null);
 							}}
 							onClick={(e) => {
 								handleContactSelection(contact.id, e);
@@ -1104,9 +1121,60 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 											{/* Top Right - Title */}
 											<div className="pr-1 pl-0 flex items-center h-[24px] justify-end">
 												{contactTitle ? (
-													<div className="h-[21px] w-[240px] rounded-[6px] px-2 flex items-center bg-[#E8EFFF] border border-black overflow-hidden">
+													<div
+														className="h-[21px] w-[240px] rounded-[6px] px-2 flex items-center gap-1 border border-black overflow-hidden"
+														style={{
+															backgroundColor: isRestaurantTitle(contactTitle)
+																? '#C3FBD1'
+																: isCoffeeShopTitle(contactTitle)
+																	? '#D6F1BD'
+																	: isMusicVenueTitle(contactTitle)
+																		? '#B7E5FF'
+																		: isMusicFestivalTitle(contactTitle)
+																			? '#C1D6FF'
+																			: (isWeddingPlannerTitle(contactTitle) || isWeddingVenueTitle(contactTitle))
+																				? '#FFF2BC'
+																				: isWineBeerSpiritsTitle(contactTitle)
+																					? '#BFC4FF'
+																					: '#E8EFFF',
+														}}
+													>
+														{isRestaurantTitle(contactTitle) && (
+															<RestaurantsIcon size={14} />
+														)}
+														{isCoffeeShopTitle(contactTitle) && (
+															<CoffeeShopsIcon size={8} />
+														)}
+														{isMusicVenueTitle(contactTitle) && (
+															<MusicVenuesIcon size={14} className="flex-shrink-0" />
+														)}
+														{isMusicFestivalTitle(contactTitle) && (
+															<FestivalsIcon size={14} className="flex-shrink-0" />
+														)}
+														{(isWeddingPlannerTitle(contactTitle) || isWeddingVenueTitle(contactTitle)) && (
+															<WeddingPlannersIcon size={14} />
+														)}
+														{isWineBeerSpiritsTitle(contactTitle) && (
+															<WineBeerSpiritsIcon size={14} className="flex-shrink-0" />
+														)}
 														<ScrollableText
-															text={contactTitle}
+															text={
+																isRestaurantTitle(contactTitle)
+																	? 'Restaurant'
+																	: isCoffeeShopTitle(contactTitle)
+																		? 'Coffee Shop'
+																		: isMusicVenueTitle(contactTitle)
+																			? 'Music Venue'
+																			: isMusicFestivalTitle(contactTitle)
+																				? 'Music Festival'
+																				: isWeddingPlannerTitle(contactTitle)
+																					? 'Wedding Planner'
+																					: isWeddingVenueTitle(contactTitle)
+																						? 'Wedding Venue'
+																						: isWineBeerSpiritsTitle(contactTitle)
+																							? getWineBeerSpiritsLabel(contactTitle) ?? contactTitle
+																							: contactTitle
+															}
 															className="text-[10px] text-black leading-none"
 															scrollPixelsPerSecond={60}
 														/>
@@ -1219,9 +1287,60 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 												<>
 													{/* Top Right - Title */}
 													<div className="pr-1 pl-0 flex items-center h-[24px] justify-end">
-														<div className="h-[21px] w-[240px] rounded-[6px] px-2 flex items-center bg-[#E8EFFF] border border-black overflow-hidden">
+														<div
+															className="h-[21px] w-[240px] rounded-[6px] px-2 flex items-center gap-1 border border-black overflow-hidden"
+															style={{
+																backgroundColor: isRestaurantTitle(contactTitle)
+																	? '#C3FBD1'
+																	: isCoffeeShopTitle(contactTitle)
+																		? '#D6F1BD'
+																		: isMusicVenueTitle(contactTitle)
+																			? '#B7E5FF'
+																			: isMusicFestivalTitle(contactTitle)
+																				? '#C1D6FF'
+																				: (isWeddingPlannerTitle(contactTitle) || isWeddingVenueTitle(contactTitle))
+																					? '#FFF2BC'
+																					: isWineBeerSpiritsTitle(contactTitle)
+																						? '#BFC4FF'
+																						: '#E8EFFF',
+															}}
+														>
+															{isRestaurantTitle(contactTitle) && (
+																<RestaurantsIcon size={14} />
+															)}
+															{isCoffeeShopTitle(contactTitle) && (
+																<CoffeeShopsIcon size={8} />
+															)}
+															{isMusicVenueTitle(contactTitle) && (
+																<MusicVenuesIcon size={14} className="flex-shrink-0" />
+															)}
+															{isMusicFestivalTitle(contactTitle) && (
+																<FestivalsIcon size={14} className="flex-shrink-0" />
+															)}
+															{(isWeddingPlannerTitle(contactTitle) || isWeddingVenueTitle(contactTitle)) && (
+																<WeddingPlannersIcon size={14} />
+															)}
+															{isWineBeerSpiritsTitle(contactTitle) && (
+																<WineBeerSpiritsIcon size={14} className="flex-shrink-0" />
+															)}
 															<ScrollableText
-																text={contactTitle}
+																text={
+																	isRestaurantTitle(contactTitle)
+																		? 'Restaurant'
+																		: isCoffeeShopTitle(contactTitle)
+																			? 'Coffee Shop'
+																			: isMusicVenueTitle(contactTitle)
+																				? 'Music Venue'
+																				: isMusicFestivalTitle(contactTitle)
+																					? 'Music Festival'
+																					: isWeddingPlannerTitle(contactTitle)
+																						? 'Wedding Planner'
+																						: isWeddingVenueTitle(contactTitle)
+																							? 'Wedding Venue'
+																							: isWineBeerSpiritsTitle(contactTitle)
+																								? getWineBeerSpiritsLabel(contactTitle) ?? contactTitle
+																								: contactTitle
+																}
 																className="text-[10px] text-black leading-none"
 																scrollPixelsPerSecond={60}
 															/>

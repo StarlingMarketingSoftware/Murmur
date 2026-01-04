@@ -31,4 +31,16 @@ export type TestDraftEmail = {
 	contactEmail: string;
 };
 
-export type Font = 'Times New Roman' | 'Arial' | 'Calibri' | 'Georgia' | 'Courier New';
+export type Font =
+	| 'Arial'
+	| 'serif'
+	| 'Courier New'
+	| 'Arial Black'
+	| 'Arial Narrow'
+	| 'Garamond'
+	| 'Georgia'
+	| 'Tahoma'
+	| 'Trebuchet MS'
+	| 'Verdana'
+	| 'Times New Roman'
+	| 'Calibri';

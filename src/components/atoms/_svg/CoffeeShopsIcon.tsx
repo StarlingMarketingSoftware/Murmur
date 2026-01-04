@@ -1,13 +1,21 @@
-import React from 'react';
+import React, { FC } from 'react';
 
-export const CoffeeShopsIcon = () => {
+interface CoffeeShopsIconProps {
+	size?: number;
+	className?: string;
+}
+
+export const CoffeeShopsIcon: FC<CoffeeShopsIconProps> = ({ size = 16, className }) => {
+	// Original aspect ratio is 16:29, so height = size * (29/16)
+	const height = size * (29 / 16);
 	return (
 		<svg
-			width="16"
-			height="29"
+			width={size}
+			height={height}
 			viewBox="0 0 16 29"
 			fill="none"
 			xmlns="http://www.w3.org/2000/svg"
+			className={className}
 		>
 			<path
 				d="M1.95605 11.6699H14.0166C14.7655 11.6701 15.378 12.2664 15.3975 13.0137C15.4969 16.8242 15.5116 19.7639 15.4561 23.3613C15.4161 25.9503 13.2921 28.0195 10.6982 28.0195H5.09863C2.59925 28.0195 0.51158 26.0973 0.400391 23.6152C0.238618 20.0039 0.298455 16.9819 0.582031 12.9463C0.632606 12.2278 1.23305 11.6701 1.95605 11.6699Z"
