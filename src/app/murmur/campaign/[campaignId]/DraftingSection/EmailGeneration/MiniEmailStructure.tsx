@@ -1879,6 +1879,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 														hybridBlocks.findIndex((blk) => blk.id === b.id)
 													)}
 													profileFields={profileTabFields}
+													onGoToProfileTab={() => setActiveTab('profile')}
 													className={cn(
 														draftingMode === 'hybrid'
 															? 'w-[93%] ml-[2.5%]'
