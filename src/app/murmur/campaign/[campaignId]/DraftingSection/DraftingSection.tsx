@@ -206,6 +206,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	useEffect(() => setIsClient(true), []);
 	const [selectedDraft, setSelectedDraft] = useState<EmailWithRelations | null>(null);
 	const isDraftPreviewOpen = view === 'drafting' && Boolean(selectedDraft);
+	const draftsMiniEmailTopHeaderHeight = view === 'drafting' ? 26 : undefined;
+	const draftsMiniEmailFillColor = view === 'drafting' ? '#B1CEEF' : undefined;
 
 	// All tab hover states
 	const [isContactsHovered, setIsContactsHovered] = useState(false);
@@ -1388,6 +1390,15 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 
 	const displayedContactForResearch =
 		hoveredContactForResearch || selectedContactForResearch;
+	const draftsMiniEmailTopHeaderLabel = draftsMiniEmailTopHeaderHeight
+		? (() => {
+				const contact = displayedContactForResearch;
+				if (!contact) return 'Settings';
+				const fullName = `${contact.firstName || ''} ${contact.lastName || ''}`.trim();
+				const displayName = (fullName || contact.name || contact.company || '').trim();
+				return displayName ? `Settings - ${displayName}` : 'Settings';
+		  })()
+		: undefined;
 
 	useEffect(() => {
 		if (!selectedContactForResearch && contacts && contacts.length > 0) {
@@ -2113,6 +2124,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 															height={
 																view === 'contacts' || view === 'drafting' ? 557 : undefined
 															}
+															pageFillColor={draftsMiniEmailFillColor}
+															topHeaderHeight={draftsMiniEmailTopHeaderHeight}
+															topHeaderLabel={draftsMiniEmailTopHeaderLabel}
 															hideAllText={
 																// Hide all structure text to show chrome-only skeleton:
 																// - When the Drafts tab has no drafts
@@ -3414,6 +3428,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 															fullWidthMobile
 															hideAddTextButtons
 															height={316}
+															pageFillColor={draftsMiniEmailFillColor}
+															topHeaderHeight={draftsMiniEmailTopHeaderHeight}
+															topHeaderLabel={draftsMiniEmailTopHeaderLabel}
 															onOpenWriting={goToWriting}
 														/>
 													</div>
@@ -3715,6 +3732,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														hideFooter
 														fullWidthMobile
 														hideAddTextButtons
+														pageFillColor={draftsMiniEmailFillColor}
+														topHeaderHeight={draftsMiniEmailTopHeaderHeight}
+														topHeaderLabel={draftsMiniEmailTopHeaderLabel}
 														onOpenWriting={goToWriting}
 													/>
 												</div>
@@ -3828,6 +3848,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														fullWidthMobile
 														hideAddTextButtons
 														height={316}
+														pageFillColor={draftsMiniEmailFillColor}
+														topHeaderHeight={draftsMiniEmailTopHeaderHeight}
+														topHeaderLabel={draftsMiniEmailTopHeaderLabel}
 														onOpenWriting={goToWriting}
 													/>
 												</div>
@@ -4108,6 +4131,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														hideFooter
 														fullWidthMobile
 														hideAddTextButtons
+														pageFillColor={draftsMiniEmailFillColor}
+														topHeaderHeight={draftsMiniEmailTopHeaderHeight}
+														topHeaderLabel={draftsMiniEmailTopHeaderLabel}
 														onOpenWriting={goToWriting}
 													/>
 												</div>
@@ -4174,6 +4200,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														fullWidthMobile
 														hideAddTextButtons
 														height={316}
+														pageFillColor={draftsMiniEmailFillColor}
+														topHeaderHeight={draftsMiniEmailTopHeaderHeight}
+														topHeaderLabel={draftsMiniEmailTopHeaderLabel}
 														onOpenWriting={goToWriting}
 													/>
 												</div>
@@ -4283,6 +4312,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														hideFooter
 														fullWidthMobile
 														hideAddTextButtons
+														pageFillColor={draftsMiniEmailFillColor}
+														topHeaderHeight={draftsMiniEmailTopHeaderHeight}
+														topHeaderLabel={draftsMiniEmailTopHeaderLabel}
 														onOpenWriting={goToWriting}
 													/>
 												</div>
@@ -5712,6 +5744,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													fullWidthMobile
 													hideAddTextButtons
 													height={349}
+													pageFillColor={draftsMiniEmailFillColor}
+													topHeaderHeight={draftsMiniEmailTopHeaderHeight}
+													topHeaderLabel={draftsMiniEmailTopHeaderLabel}
 													onOpenWriting={goToWriting}
 												/>
 											</div>
@@ -6431,6 +6466,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													fullWidthMobile
 													hideAddTextButtons
 													height={349}
+													pageFillColor={draftsMiniEmailFillColor}
+													topHeaderHeight={draftsMiniEmailTopHeaderHeight}
+													topHeaderLabel={draftsMiniEmailTopHeaderLabel}
 													onOpenWriting={goToWriting}
 												/>
 											</div>

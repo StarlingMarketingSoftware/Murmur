@@ -72,6 +72,16 @@ interface MiniEmailStructureProps {
 	hideAllText?: boolean;
 	/** Optional height override for the container */
 	height?: number | string;
+	/** Optional fill/background color for the panel "pages" (defaults to the legacy green). */
+	pageFillColor?: string;
+	/**
+	 * Optional extra top header spacer (in px). When provided (> 0), renders
+	 * a blank white band at the very top with a horizontal divider at the bottom,
+	 * pushing the rest of the contents down.
+	 */
+	topHeaderHeight?: number;
+	/** Optional label rendered inside the top header band (when `topHeaderHeight` is provided). */
+	topHeaderLabel?: string;
 	/** Optional callback to open the Writing tab (shows Open control when provided) */
 	onOpenWriting?: () => void;
 	/** Full Auto: profile chips (matches HybridPromptInput "Body" block) */
@@ -96,6 +106,9 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 	hideAddTextButtons,
 	hideAllText,
 	height,
+	pageFillColor,
+	topHeaderHeight,
+	topHeaderLabel,
 	onOpenWriting,
 	profileFields,
 	identityProfile,
@@ -939,6 +952,9 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 	// left side of the campaign page (where footer + chrome are hidden).
 	// There we want normal-sized controls, but a thinner, tighter signature.
 	const isCompactSignature = hideFooter && hideTopChrome;
+	const resolvedTopHeaderHeight = topHeaderHeight ?? 0;
+	const hasTopHeaderSpacer = resolvedTopHeaderHeight > 0;
+	const resolvedPageFillColor = pageFillColor ?? '#A6E2A8';
 
 	return (
 		<div
@@ -1024,7 +1040,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 					position: 'relative',
 					display: 'flex',
 					flexDirection: 'column',
-					background: '#A6E2A8',
+					background: resolvedPageFillColor,
 					overflow: 'visible',
 					zIndex: 1,
 				}}
@@ -1048,7 +1064,27 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 						)}
 					>
 						{/* Mode */}
-						<div className="w-full bg-white rounded-t-[5px] relative overflow-hidden h-[31px]">
+						{hasTopHeaderSpacer && (
+							<>
+								<div
+									className="w-full bg-white rounded-t-[5px] relative overflow-hidden flex items-center px-[9px]"
+									style={{ height: resolvedTopHeaderHeight }}
+								>
+									{topHeaderLabel && (
+										<span className="font-inter font-semibold text-[12px] leading-none text-black truncate">
+											{topHeaderLabel}
+										</span>
+									)}
+								</div>
+								<div className="h-[1px] bg-black w-full" />
+							</>
+						)}
+						<div
+							className={cn(
+								'w-full bg-white relative overflow-hidden h-[31px]',
+								!hasTopHeaderSpacer && 'rounded-t-[5px]'
+							)}
+						>
 							{/* Inline step indicator for mobile landscape */}
 							{isMobileLandscape && (
 								<div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 text-[12px] leading-none font-inter font-medium text-black">
@@ -1075,10 +1111,15 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 										<button
 											type="button"
 											onClick={() => setActiveTab('profile')}
+											style={
+												activeTab === 'profile'
+													? { backgroundColor: resolvedPageFillColor }
+													: undefined
+											}
 											className={cn(
 												'w-[84px] h-full flex items-center justify-center border-r-2 border-black font-inter font-semibold text-[11px] leading-none transition-colors',
 												activeTab === 'profile'
-													? 'text-black bg-[#A6E2A8] hover:bg-[#A6E2A8]'
+													? 'text-black'
 													: showRedWarning
 														? 'text-black bg-[#E47979] hover:bg-[#E47979]'
 														: 'text-black bg-transparent hover:bg-[#eeeeee]'
@@ -1190,7 +1231,10 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 									</div>
 								</div>
 								{/* Blue fill */}
-								<div className="bg-[#58A6E5] relative flex flex-col flex-1 min-h-0 py-6">
+								<div
+									className="relative flex flex-col flex-1 min-h-0 py-6"
+									style={{ backgroundColor: resolvedPageFillColor }}
+								>
 									{/* Top-right indicator line */}
 									<button
 										type="button"
