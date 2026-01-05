@@ -948,6 +948,8 @@ export const InboxSection: FC<InboxSectionProps> = ({
 												? 'hover:bg-[#A6E2A8]'
 												: idx === 3
 													? 'hover:bg-[#AFD6EF]'
+													: idx === 4
+														? 'hover:bg-[#DBDBDB]'
 												: ''
 									}`}
 									style={{

@@ -563,7 +563,7 @@ const Murmur = () => {
 							/>
 							<div
 								className={cn(
-									"absolute right-3 top-1/2 -translate-y-1/2 flex z-10 text-[#929292] group-hover:text-black transition-colors duration-150",
+									"absolute right-3 top-1/2 -translate-y-1/2 flex text-[#929292] group-hover:text-black transition-colors duration-150",
 									isTopSearchHighlighted && "text-black"
 								)}
 							>
@@ -808,8 +808,8 @@ const Murmur = () => {
 									'absolute left-1/2 -translate-x-1/2 top-full mt-[6px] z-50',
 									'hidden group-hover:flex group-focus-within:flex',
 									'w-[54px] h-[27px] rounded-[8px]',
-									'bg-[#E4EBE6]/90',
-									'items-center justify-center',
+									'bg-[#E4EBE6]',
+									'items-center justify-center cursor-pointer',
 									'font-inter text-[17px] font-medium',
 									activeView === 'sent' ? 'text-black' : 'text-[#929292]'
 								)}
@@ -1049,8 +1049,8 @@ const Murmur = () => {
 											'absolute left-1/2 -translate-x-1/2 top-full mt-[6px] z-50',
 											'hidden group-hover:flex group-focus-within:flex',
 											'w-[54px] h-[27px] rounded-[8px]',
-											'bg-[#E4EBE6]/90',
-											'items-center justify-center',
+											'bg-[#E4EBE6]',
+											'items-center justify-center cursor-pointer',
 											'font-inter text-[17px] font-medium',
 											activeView === 'sent' ? 'text-black' : 'text-[#929292]'
 										)}
