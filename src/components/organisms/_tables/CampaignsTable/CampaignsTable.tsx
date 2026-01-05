@@ -267,6 +267,8 @@ export const CampaignsTable: FC = () => {
 													: columns
 											}
 											data={data}
+											isLoading={isPending}
+											loadingRowCount={6}
 											noDataMessage="No campaigns found."
 											rowsPerPage={100}
 											displayRowsPerPage={false}
@@ -326,6 +328,8 @@ export const CampaignsTable: FC = () => {
 								handleRowClick={handleRowClick}
 								columns={columns}
 								data={data}
+								isLoading={isPending}
+								loadingRowCount={6}
 								noDataMessage="No campaigns found."
 								rowsPerPage={100}
 								displayRowsPerPage={false}
