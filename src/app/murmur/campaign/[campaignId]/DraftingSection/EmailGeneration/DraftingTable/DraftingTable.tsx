@@ -837,9 +837,11 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 									)}
 									{isDrafts && idx === 2 && (
 										<div
-											className="bg-white rounded-[8px] border-2 border-[#000000] flex items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors"
+											className="bg-white rounded-[8px] border-2 border-[#000000] flex items-center justify-center cursor-pointer hover:bg-[#AFD6EF] transition-colors"
 											style={{ width: innerButtonWidth, height: isMobile ? '44px' : '42px' }}
 											onClick={goToSearch}
+											onMouseEnter={() => setTopSearchHighlighted(true)}
+											onMouseLeave={() => setTopSearchHighlighted(false)}
 										>
 											<span className={`font-semibold font-inter text-black ${isMobile ? 'text-[12px]' : 'text-[15px]'}`}>
 												Search For More Contacts
@@ -894,9 +896,11 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 									)}
 									{isSent && idx === 3 && (
 										<div
-											className="bg-white rounded-[8px] border-2 border-[#000000] flex items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors"
+											className="bg-white rounded-[8px] border-2 border-[#000000] flex items-center justify-center cursor-pointer hover:bg-[#AFD6EF] transition-colors"
 											style={{ width: innerButtonWidth, height: isMobile ? '44px' : '42px' }}
 											onClick={goToSearch}
+											onMouseEnter={() => setTopSearchHighlighted(true)}
+											onMouseLeave={() => setTopSearchHighlighted(false)}
 										>
 											<span className={`font-semibold font-inter text-black ${isMobile ? 'text-[12px]' : 'text-[15px]'}`}>
 												Add More Contacts
