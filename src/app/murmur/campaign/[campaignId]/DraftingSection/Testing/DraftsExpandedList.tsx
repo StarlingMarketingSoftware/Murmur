@@ -324,6 +324,7 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 							user?.customDomain && user?.customDomain !== ''
 								? user?.customDomain
 								: user?.murmurEmail,
+						replyToEmail: user?.replyToEmail ?? user?.murmurEmail ?? undefined,
 					});
 					if (res.success) {
 						await updateEmail({
