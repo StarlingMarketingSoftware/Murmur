@@ -880,6 +880,7 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 		hideBottomPanels,
 		hideButton,
 		mainBoxId,
+		showSearchBar = true,
 	} = props;
 	const [isDrafting, setIsDrafting] = useState(false);
 	const router = useRouter();
@@ -1008,6 +1009,7 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 				isPending={false}
 				title="Contacts"
 				mainBoxId={mainBoxId}
+				contactsTopContentVariant={showSearchBar ? 'default' : 'compact'}
 				goToSearch={goToSearch}
 				goToDrafts={goToDrafts}
 				goToInbox={goToInbox}
@@ -1015,22 +1017,29 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 				topContent={
 					!isMobile ? (
 						<div className="w-full flex flex-col items-center pt-[6px]">
-							<MiniSearchBar
-								activeSection={activeSection}
-								setActiveSection={setActiveSection}
-								whyValue={whyValue}
-								setWhyValue={setWhyValue}
-								whatValue={whatValue}
-								setWhatValue={setWhatValue}
-								whereValue={whereValue}
-								setWhereValue={setWhereValue}
-								locationResults={locationResults}
-								isLoadingLocations={isLoadingLocations}
-								debouncedWhereValue={debouncedWhereValue}
-								onSearch={handleSearch}
-							/>
+							{showSearchBar && (
+								<MiniSearchBar
+									activeSection={activeSection}
+									setActiveSection={setActiveSection}
+									whyValue={whyValue}
+									setWhyValue={setWhyValue}
+									whatValue={whatValue}
+									setWhatValue={setWhatValue}
+									whereValue={whereValue}
+									setWhereValue={setWhereValue}
+									locationResults={locationResults}
+									isLoadingLocations={isLoadingLocations}
+									debouncedWhereValue={debouncedWhereValue}
+									onSearch={handleSearch}
+								/>
+							)}
 							{/* Selected count row - positioned right above contact rows */}
-							<div className="w-[489px] relative flex justify-center items-center px-1 mt-[10px] mb-[2px]">
+							<div
+								className={cn(
+									'w-[489px] relative flex justify-center items-center px-1 mb-[2px]',
+									showSearchBar ? 'mt-[10px]' : 'mt-[2px]'
+								)}
+							>
 								<span className="text-[14px] font-inter font-medium text-black">
 									{selectedCount} Selected
 								</span>

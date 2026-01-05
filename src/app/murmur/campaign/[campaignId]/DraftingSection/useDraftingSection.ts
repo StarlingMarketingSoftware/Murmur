@@ -45,6 +45,11 @@ import { ContactWithName } from '@/types/contact';
 export interface DraftingSectionProps {
 	campaign: CampaignWithRelations;
 	view?: 'search' | 'contacts' | 'testing' | 'drafting' | 'sent' | 'inbox' | 'all';
+	/**
+	 * When true, renders viewport-fixed overlays (like the top drafting progress bar).
+	 * This should only be enabled on the "active" DraftingSection instance during tab crossfades.
+	 */
+	renderGlobalOverlays?: boolean;
 	goToDrafting?: () => void;
 	goToAll?: () => void;
 	/**
@@ -252,59 +257,163 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	const [livePreviewContactId, setLivePreviewContactId] = useState<number | null>(null);
 	const [livePreviewMessage, setLivePreviewMessage] = useState('');
 	const [livePreviewSubject, setLivePreviewSubject] = useState('');
+	// Live preview progress (drives the top-of-page progress bar; stays in sync with Draft Preview playback)
+	const [livePreviewDraftNumber, setLivePreviewDraftNumber] = useState(0);
+	const [livePreviewTotal, setLivePreviewTotal] = useState(0);
 	const livePreviewTimerRef = useRef<number | null>(null);
+	const livePreviewDelayTimerRef = useRef<number | null>(null);
 	// Store full text and an index to preserve original whitespace and paragraph breaks
 	const livePreviewFullTextRef = useRef<string>('');
 	const livePreviewIndexRef = useRef<number>(0);
+	const livePreviewQueueRef = useRef<
+		Array<{
+			draftIndex: number;
+			contactId: number;
+			subject: string;
+			message: string;
+		}>
+	>([]);
+	const livePreviewIsTypingRef = useRef<boolean>(false);
+	const livePreviewAutoHideWhenIdleRef = useRef<boolean>(false);
 
-	const hideLivePreview = useCallback(() => {
+	// Typing animation tuning: fixed speed (chars/sec) regardless of backend timing.
+	const LIVE_PREVIEW_TICK_MS = 20;
+	const LIVE_PREVIEW_CHARS_PER_SECOND = 150;
+	const LIVE_PREVIEW_STEP_CHARS = Math.max(
+		1,
+		Math.round((LIVE_PREVIEW_CHARS_PER_SECOND * LIVE_PREVIEW_TICK_MS) / 1000)
+	);
+	const LIVE_PREVIEW_POST_DRAFT_DELAY_MS = 250;
+
+	const stopLivePreviewTimers = useCallback(() => {
 		if (livePreviewTimerRef.current) {
 			clearInterval(livePreviewTimerRef.current);
 			livePreviewTimerRef.current = null;
 		}
+		if (livePreviewDelayTimerRef.current) {
+			clearTimeout(livePreviewDelayTimerRef.current);
+			livePreviewDelayTimerRef.current = null;
+		}
+		livePreviewIsTypingRef.current = false;
+	}, []);
+
+	const hideLivePreview = useCallback(() => {
+		stopLivePreviewTimers();
 		setIsLivePreviewVisible(false);
 		setLivePreviewContactId(null);
 		setLivePreviewMessage('');
 		setLivePreviewSubject('');
+		setLivePreviewDraftNumber(0);
+		setLivePreviewTotal(0);
 		livePreviewFullTextRef.current = '';
 		livePreviewIndexRef.current = 0;
-	}, []);
+		livePreviewQueueRef.current = [];
+		livePreviewAutoHideWhenIdleRef.current = false;
+	}, [stopLivePreviewTimers]);
 
-	const startLivePreviewStreaming = useCallback(
-		(contactId: number, fullMessage: string, subject?: string) => {
-			if (livePreviewTimerRef.current) {
-				clearInterval(livePreviewTimerRef.current);
-				livePreviewTimerRef.current = null;
+	const startNextQueuedLivePreview = useCallback(() => {
+		// Don't interrupt an active typing animation.
+		if (livePreviewIsTypingRef.current) return;
+
+		// If a "post-draft" delay timer is running, let it finish before starting the next.
+		if (livePreviewDelayTimerRef.current) return;
+
+		if (!livePreviewQueueRef.current.length) {
+			// If backend drafting has completed, and there is nothing left to type, hide the panel.
+			if (livePreviewAutoHideWhenIdleRef.current) {
+				// Give React one paint to show the fully-typed message before swapping panels away.
+				livePreviewDelayTimerRef.current = window.setTimeout(() => {
+					livePreviewDelayTimerRef.current = null;
+					hideLivePreview();
+				}, LIVE_PREVIEW_POST_DRAFT_DELAY_MS);
 			}
+			return;
+		}
+
+		// Ensure a stable order when the backend finishes drafts out-of-order.
+		livePreviewQueueRef.current.sort((a, b) => a.draftIndex - b.draftIndex);
+		const next = livePreviewQueueRef.current.shift();
+		if (!next) return;
+
+		// Clear any previous typing interval.
+		if (livePreviewTimerRef.current) {
+			clearInterval(livePreviewTimerRef.current);
+			livePreviewTimerRef.current = null;
+		}
+
+		setLivePreviewDraftNumber((prev) => prev + 1);
+		setIsLivePreviewVisible(true);
+		setLivePreviewContactId(next.contactId);
+		setLivePreviewSubject(next.subject);
+		setLivePreviewMessage('');
+		livePreviewFullTextRef.current = next.message || '';
+		livePreviewIndexRef.current = 0;
+		livePreviewIsTypingRef.current = true;
+
+		livePreviewTimerRef.current = window.setInterval(() => {
+			const full = livePreviewFullTextRef.current;
+			const i = livePreviewIndexRef.current;
+			if (i >= full.length) {
+				// Finished typing this draft.
+				stopLivePreviewTimers();
+				// Ensure we render the full message before moving on / hiding.
+				setLivePreviewMessage(full);
+				livePreviewDelayTimerRef.current = window.setTimeout(() => {
+					livePreviewDelayTimerRef.current = null;
+					startNextQueuedLivePreview();
+				}, LIVE_PREVIEW_POST_DRAFT_DELAY_MS);
+				return;
+			}
+
+			const nextIndex = Math.min(i + LIVE_PREVIEW_STEP_CHARS, full.length);
+			livePreviewIndexRef.current = nextIndex;
+			setLivePreviewMessage(full.slice(0, nextIndex));
+		}, LIVE_PREVIEW_TICK_MS);
+	}, [
+		LIVE_PREVIEW_POST_DRAFT_DELAY_MS,
+		LIVE_PREVIEW_STEP_CHARS,
+		LIVE_PREVIEW_TICK_MS,
+		hideLivePreview,
+		stopLivePreviewTimers,
+	]);
+
+	const beginLivePreviewBatch = useCallback((total?: number) => {
+		// Reset any previous playback and show the preview surface immediately.
+		stopLivePreviewTimers();
+		livePreviewQueueRef.current = [];
+		livePreviewAutoHideWhenIdleRef.current = false;
+		setIsLivePreviewVisible(true);
+		setLivePreviewContactId(null);
+		setLivePreviewSubject('');
+		setLivePreviewMessage('Drafting...');
+		setLivePreviewDraftNumber(0);
+		setLivePreviewTotal(typeof total === 'number' && total > 0 ? total : 0);
+		livePreviewFullTextRef.current = '';
+		livePreviewIndexRef.current = 0;
+	}, [stopLivePreviewTimers]);
+
+	const enqueueLivePreviewDraft = useCallback(
+		(draftIndex: number, contactId: number, message: string, subject: string) => {
+			// Keep the backend ahead: enqueue completed drafts and let the UI play them at a fixed speed.
+			livePreviewQueueRef.current.push({
+				draftIndex,
+				contactId,
+				subject,
+				message,
+			});
+			// Ensure the panel stays visible even if user navigated across tabs mid-generation.
 			setIsLivePreviewVisible(true);
-			setLivePreviewContactId(contactId);
-			setLivePreviewMessage('');
-			if (typeof subject === 'string') {
-				setLivePreviewSubject(subject);
-			}
-			const text = fullMessage || '';
-			livePreviewFullTextRef.current = text;
-			livePreviewIndexRef.current = 0;
-			// Target ~3s reveal regardless of message length; preserve newlines
-			const length = Math.max(text.length, 1);
-			const stepChars = Math.max(1, Math.floor(length / 150));
-			const stepMs = 20; // smooth updates, lightweight
-			livePreviewTimerRef.current = window.setInterval(() => {
-				const i = livePreviewIndexRef.current;
-				if (i >= livePreviewFullTextRef.current.length) {
-					if (livePreviewTimerRef.current) {
-						clearInterval(livePreviewTimerRef.current);
-						livePreviewTimerRef.current = null;
-					}
-					return;
-				}
-				const nextIndex = Math.min(i + stepChars, livePreviewFullTextRef.current.length);
-				livePreviewIndexRef.current = nextIndex;
-				setLivePreviewMessage(livePreviewFullTextRef.current.slice(0, nextIndex));
-			}, stepMs);
+			startNextQueuedLivePreview();
 		},
-		[]
+		[startNextQueuedLivePreview]
 	);
+
+	const endLivePreviewBatch = useCallback(() => {
+		// After backend drafting completes, keep the preview panel visible until all queued
+		// drafts finish typing, then hide automatically.
+		livePreviewAutoHideWhenIdleRef.current = true;
+		startNextQueuedLivePreview();
+	}, [startNextQueuedLivePreview]);
 
 	const { data: signatures } = useGetSignatures();
 
@@ -1743,13 +1852,7 @@ EXAMPLES OF GOOD CUSTOM INSTRUCTIONS:
 						if (campaign.identity?.website) {
 							processedMessage = insertWebsiteLinkPhrase(processedMessage, campaign.identity.website);
 						}
-						
-						// Start live preview streaming for this recipient
-						startLivePreviewStreaming(
-							recipient.id,
-							processedMessage,
-							parsedDraft.subject
-						);
+
 						if (!isAiSubject) {
 							parsedDraft.subject = values.subject || parsedDraft.subject;
 						}
@@ -1782,8 +1885,15 @@ EXAMPLES OF GOOD CUSTOM INSTRUCTIONS:
 								`[Batch][Full AI] Saved draft#${draftIndex} contactId=${recipient.id} email=${recipient.email} model=${attemptModel}`
 							);
 						}
-						// Hide live preview as soon as this draft is written
-						hideLivePreview();
+						// Queue for the live typing preview (fixed speed, independent of backend timing).
+						enqueueLivePreviewDraft(
+							draftIndex,
+							recipient.id,
+							processedMessage,
+							parsedDraft.subject
+						);
+						// Keep live preview visible while batch generation is running so the
+						// Campaign page can show the "draft typing" preview across tabs.
 						// Immediately reflect in UI
 						setGenerationProgress((prev) => prev + 1);
 						queryClient.invalidateQueries({
@@ -1890,10 +2000,9 @@ EXAMPLES OF GOOD CUSTOM INSTRUCTIONS:
 				);
 			}
 
-			// show preview surface while generation is running
-			setIsLivePreviewVisible(true);
-			setLivePreviewMessage('Drafting...');
-			setLivePreviewContactId(null);
+			// Show preview surface while generation is running. Drafts will be queued and
+			// typed out at a fixed speed independent of backend timing.
+			beginLivePreviewBatch(targets.length);
 			for (
 				let i = 0;
 				i < targets.length && !isGenerationCancelledRef.current;
@@ -1982,8 +2091,8 @@ EXAMPLES OF GOOD CUSTOM INSTRUCTIONS:
 		} finally {
 			abortControllerRef.current = null;
 			setGenerationProgress(-1);
-			// Hide live preview after completion so the DraftPreviewBox disappears promptly
-			hideLivePreview();
+			// Keep the preview visible until queued drafts finish typing, then auto-hide.
+			endLivePreviewBatch();
 			isBatchGeneratingRef.current = false;
 			setIsBatchGenerating(false);
 		}
@@ -2189,6 +2298,10 @@ EXAMPLES OF GOOD CUSTOM INSTRUCTIONS:
 				clearInterval(livePreviewTimerRef.current);
 				livePreviewTimerRef.current = null;
 			}
+			if (livePreviewDelayTimerRef.current) {
+				clearTimeout(livePreviewDelayTimerRef.current);
+				livePreviewDelayTimerRef.current = null;
+			}
 		};
 	}, []);
 
@@ -2243,6 +2356,8 @@ EXAMPLES OF GOOD CUSTOM INSTRUCTIONS:
 		livePreviewContactId,
 		livePreviewMessage,
 		livePreviewSubject,
+		livePreviewDraftNumber,
+		livePreviewTotal,
 		scoreFullAutomatedPrompt,
 		critiqueManualEmailText,
 	};

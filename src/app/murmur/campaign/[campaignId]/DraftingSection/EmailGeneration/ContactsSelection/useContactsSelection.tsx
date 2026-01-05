@@ -48,6 +48,11 @@ export interface ContactsSelectionProps {
 	 * When provided, this value is forwarded to the underlying DraftingTable `mainBoxId`.
 	 */
 	mainBoxId?: string;
+	/**
+	 * Whether to show the mini search bar above the contacts rows.
+	 * Defaults to true to preserve existing behavior in non-campaign contexts.
+	 */
+	showSearchBar?: boolean;
 }
 
 export const useContactsSelection = (props: ContactsSelectionProps) => {

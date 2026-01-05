@@ -626,8 +626,9 @@ const Murmur = () => {
 						)}
 					>
 						<div
-							className="pointer-events-auto grid w-[524px] max-w-full grid-cols-5 items-center justify-items-center"
+							className="pointer-events-auto grid w-[560px] max-w-full grid-cols-5 items-center justify-items-center"
 							data-hover-description-suppress="true"
+							style={{ transform: 'translateY(13px)' }}
 						>
 							<button
 							type="button"
@@ -867,7 +868,7 @@ const Murmur = () => {
 					{!isMobile && isNarrowestDesktop && (
 						<div className="flex justify-center mb-4">
 						<div
-							className="grid w-[524px] max-w-full grid-cols-5 items-center justify-items-center"
+							className="grid w-[560px] max-w-full grid-cols-5 items-center justify-items-center"
 							data-hover-description-suppress="true"
 						>
 								<button
@@ -995,6 +996,7 @@ const Murmur = () => {
 											<DraftingSection
 												campaign={campaign}
 												view={activeView}
+												renderGlobalOverlays
 												autoOpenProfileTabWhenIncomplete={cameFromSearch}
 												goToDrafting={() => setActiveView('drafting')}
 												goToAll={() => setActiveView('all')}
@@ -1032,6 +1034,7 @@ const Murmur = () => {
 												<DraftingSection
 													campaign={campaign}
 													view={previousView}
+													renderGlobalOverlays={false}
 													autoOpenProfileTabWhenIncomplete={cameFromSearch}
 													goToDrafting={() => setActiveView('drafting')}
 													goToAll={() => setActiveView('all')}

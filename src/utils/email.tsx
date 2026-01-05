@@ -11,9 +11,21 @@ export const generateMurmurEmail = (
 	firstName: string | null,
 	lastName: string | null
 ): string => {
-	const localPart = sanitizeNameForEmail(firstName) || 'user';
-	const domainLabel = sanitizeNameForEmail(lastName) || 'user';
-	return `${localPart}@${domainLabel}.booking-management.com`;
+	const first = sanitizeNameForEmail(firstName) || 'user';
+	const last = sanitizeNameForEmail(lastName);
+	const localPart = last ? `${first}.${last}` : first;
+	return `${localPart}@murmurmailbox.com`;
+};
+
+export const generateMurmurReplyToEmail = (
+	firstName: string | null,
+	lastName: string | null,
+	userId: number | string
+): string => {
+	const first = sanitizeNameForEmail(firstName);
+	const last = sanitizeNameForEmail(lastName);
+	const base = (first + last) || 'user';
+	return `${base}${String(userId)}@murmurmailbox.com`;
 };
 
 export type StripEmailSignatureFromAiMessageOptions = {

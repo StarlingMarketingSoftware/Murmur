@@ -11,7 +11,7 @@ import {
 	apiServerError,
 	handleApiError,
 } from '@/app/api/_utils';
-import { generateMurmurEmail } from '@/utils';
+import { generateMurmurEmail, generateMurmurReplyToEmail } from '@/utils';
 
 export async function POST(req: Request) {
 	const SIGNING_SECRET = process.env.CLERK_SIGNING_SECRET;
@@ -64,15 +64,28 @@ export async function POST(req: Request) {
 			name: `${first_name ?? ''} ${last_name ?? ''}`.trim() || 'User',
 		});
 		try {
-			await prisma.user.create({
-				data: {
-					clerkId: id,
-					stripeCustomerId: stripeCustomer.id,
-					email: email,
-					firstName: first_name ?? null,
-					lastName: last_name ?? null,
-					murmurEmail,
-				},
+			await prisma.$transaction(async (tx) => {
+				const createdUser = await tx.user.create({
+					data: {
+						clerkId: id,
+						stripeCustomerId: stripeCustomer.id,
+						email: email,
+						firstName: first_name ?? null,
+						lastName: last_name ?? null,
+						murmurEmail,
+					},
+				});
+
+				// Reply-To must be unique and stable; use the DB `id` to guarantee uniqueness.
+				const replyToEmail = generateMurmurReplyToEmail(
+					createdUser.firstName,
+					createdUser.lastName,
+					createdUser.id
+				);
+				await tx.user.update({
+					where: { id: createdUser.id },
+					data: { replyToEmail },
+				});
 			});
 		} catch (error) {
 			return handleApiError(error);
@@ -98,6 +111,19 @@ export async function POST(req: Request) {
 				await prisma.user.update({
 					where: { id: updatedUser.id },
 					data: { murmurEmail: newMurmurEmail },
+				});
+			}
+
+			// Backfill replyToEmail if it was never set (do NOT rotate once set).
+			if (!updatedUser.replyToEmail) {
+				const replyToEmail = generateMurmurReplyToEmail(
+					first_name ?? null,
+					last_name ?? null,
+					updatedUser.id
+				);
+				await prisma.user.update({
+					where: { id: updatedUser.id },
+					data: { replyToEmail },
 				});
 			}
 

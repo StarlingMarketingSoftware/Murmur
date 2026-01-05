@@ -37,13 +37,25 @@ export const DraftPreviewExpandedList: FC<DraftPreviewExpandedListProps> = ({
 	width = 376,
 	height = 426,
 }) => {
+	// Layout spec (pixel-perfect):
+	// - First divider line: 4px from top
+	// - Identity bar: 40px tall (between the two divider lines)
+	// - Subject box: 5px below the identity bar
+	const TOP_DIVIDER_Y = 4;
+	const STROKE_PX = 3;
+	// Identity bar is 40px including its 3px bottom border (box-sizing: border-box)
+	const IDENTITY_BAR_HEIGHT = 40;
+	const IDENTITY_BAR_TOP = TOP_DIVIDER_Y + STROKE_PX;
+	const SUBJECT_GAP_BELOW_IDENTITY = 5;
+	const SUBJECT_BOX_HEIGHT = 46;
+	const BODY_BOTTOM_GAP = 12;
+	// Body marginTop = first divider (3px) + identity bar (40px) + gap (5px) = 48px
+	// This places the subject box 5px below the identity bar's bottom border
+	const BODY_TOP_MARGIN = STROKE_PX + IDENTITY_BAR_HEIGHT + SUBJECT_GAP_BELOW_IDENTITY;
+
 	const useLive = Boolean(
 		livePreview?.visible && (livePreview?.message || livePreview?.subject)
 	);
-
-	// Special hack for "All" tab: if height is exactly 347px, we apply a thicker 3px border
-	// to match the other elements in that layout. Otherwise standard 2px border.
-	const isAllTab = height === 347;
 
 	const effectiveContactId = useMemo(() => {
 		return (
@@ -58,10 +70,12 @@ export const DraftPreviewExpandedList: FC<DraftPreviewExpandedListProps> = ({
 		return !hasLiveContent && !hasFallbackContent;
 	}, [livePreview?.visible, livePreview?.message, livePreview?.subject, fallbackDraft?.message, fallbackDraft?.subject]);
 
-	// Background color for inner boxes - blue when empty, white when has content
-	const innerBoxBg = isEmpty ? '#B6E2FF' : 'white';
-	// Outer container background - darker blue when empty, lighter when has content
-	const outerBg = isEmpty ? '#BAD1FB' : '#B6E2FF';
+	// Color spec:
+	// - Identity strip: #E5EEFF
+	// - Rest of the preview box: #BAD1FB
+	const identityBg = '#E5EEFF';
+	const outerBg = '#BAD1FB';
+	const subjectAndBodyBg = '#FFFFFF';
 
 	const contact = useMemo(
 		() => contacts.find((c) => c.id === effectiveContactId) || null,
@@ -125,8 +139,7 @@ export const DraftPreviewExpandedList: FC<DraftPreviewExpandedListProps> = ({
 	return (
 		<div
 			className={cn(
-				'max-[480px]:w-[96.27vw] rounded-md pb-2 flex flex-col relative',
-				isAllTab ? 'border-[3px] border-black' : 'border-2 border-black/30'
+				'max-[480px]:w-[96.27vw] rounded-md pb-2 flex flex-col relative border-[3px] border-black'
 			)}
 			style={{ width: `${width}px`, height: `${height}px`, backgroundColor: outerBg }}
 			role="region"
@@ -136,11 +149,13 @@ export const DraftPreviewExpandedList: FC<DraftPreviewExpandedListProps> = ({
 			<div
 				style={{
 					position: 'absolute',
-					top: '15px',
+					top: `${IDENTITY_BAR_TOP}px`,
 					left: 0,
 					right: 0,
-					height: '29px',
-					backgroundColor: innerBoxBg,
+					height: `${IDENTITY_BAR_HEIGHT}px`,
+					backgroundColor: identityBg,
+					borderBottom: `${STROKE_PX}px solid #000000`,
+					boxSizing: 'border-box',
 					display: 'flex',
 					alignItems: 'center',
 					paddingLeft: '10px',
@@ -211,32 +226,23 @@ export const DraftPreviewExpandedList: FC<DraftPreviewExpandedListProps> = ({
 			<div
 				style={{
 					position: 'absolute',
-					top: '15px',
+					top: `${TOP_DIVIDER_Y}px`,
 					left: 0,
 					right: 0,
-					height: '1px',
+					height: `${STROKE_PX}px`,
 					backgroundColor: '#000000',
 				}}
 			/>
 
-			{/* Second horizontal divider line - 29px below the first (44px from top) */}
-			<div
-				style={{
-					position: 'absolute',
-					top: '44px',
-					left: 0,
-					right: 0,
-					height: '1px',
-					backgroundColor: '#000000',
-				}}
-			/>
+			{/* Second divider is now the borderBottom of the identity bar above */}
 
 			{/* Header */}
 			<div
 				className={cn(
-					'flex items-center gap-2 h-[15px] px-1',
+					'flex items-center gap-2 px-1',
 					onHeaderClick ? 'cursor-pointer' : ''
 				)}
+				style={{ height: `${TOP_DIVIDER_Y}px` }}
 				role={onHeaderClick ? 'button' : undefined}
 				tabIndex={onHeaderClick ? 0 : undefined}
 				onClick={onHeaderClick}
@@ -248,22 +254,22 @@ export const DraftPreviewExpandedList: FC<DraftPreviewExpandedListProps> = ({
 					}
 				}}
 			>
-				<span className="font-inter font-semibold text-black text-[8px]">Draft Preview</span>
+				{/* Intentionally blank: remove "Draft Preview" label per UI spec */}
 			</div>
 
 			{/* Body - Direct rendering without DraftPreviewBox wrapper */}
 			<div
 				className="flex-1 flex flex-col items-center gap-2 overflow-hidden"
-				style={{ marginTop: '37px' }}
+				style={{ marginTop: `${BODY_TOP_MARGIN}px` }}
 			>
 				{/* Email subject box - 8px below 2nd divider (44px + 8px = 52px from top) */}
 				<div
 					style={{
 						width: `${width - 20}px`,
-						height: '33px',
-						border: '2px solid #000000',
+						height: `${SUBJECT_BOX_HEIGHT}px`,
+						border: `${STROKE_PX}px solid #000000`,
 						borderRadius: '6px',
-						backgroundColor: innerBoxBg,
+						backgroundColor: subjectAndBodyBg,
 					}}
 					className="overflow-hidden flex-shrink-0 flex items-center px-3"
 				>
@@ -278,9 +284,10 @@ export const DraftPreviewExpandedList: FC<DraftPreviewExpandedListProps> = ({
 				<div
 					style={{
 						width: `${width - 20}px`,
-						border: '2px solid #000000',
+						border: `${STROKE_PX}px solid #000000`,
 						borderRadius: '6px',
-						backgroundColor: innerBoxBg,
+						backgroundColor: subjectAndBodyBg,
+						marginBottom: `${BODY_BOTTOM_GAP}px`,
 					}}
 					className="flex-1 overflow-hidden drafting-table-content"
 				>
