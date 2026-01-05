@@ -1432,6 +1432,33 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const sentEmails = (headerEmails || []).filter((e) => e.status === EmailStatus.sent);
 	const sentCount = sentEmails.length;
 
+	// When batch drafting is in progress (or still animating queued drafts), swap the campaign
+	// research panel slot to a live "Draft Preview" so users can watch drafts type out from any tab.
+	const isBatchDraftingInProgress = isLivePreviewVisible;
+	const draftPreviewFallbackDraft = useMemo(() => {
+		const first = draftEmails[0];
+		if (!first) return null;
+		return {
+			contactId: first.contactId,
+			subject: first.subject,
+			message: first.message,
+		};
+	}, [draftEmails]);
+	const liveDraftPreview = useMemo(
+		() => ({
+			visible: isBatchDraftingInProgress,
+			contactId: livePreviewContactId ?? null,
+			subject: livePreviewSubject,
+			message: livePreviewMessage,
+		}),
+		[
+			isBatchDraftingInProgress,
+			livePreviewContactId,
+			livePreviewSubject,
+			livePreviewMessage,
+		]
+	);
+
 	const rejectedDraftIds = useMemo(() => {
 		const ids = new Set<number>();
 		draftEmails.forEach((email) => {
@@ -2622,7 +2649,15 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 									} : {}),
 								}}
 							>
-									{view === 'testing' && showTestPreview ? (
+									{isBatchDraftingInProgress ? (
+										<DraftPreviewExpandedList
+											contacts={contacts || []}
+											livePreview={liveDraftPreview}
+											fallbackDraft={draftPreviewFallbackDraft}
+											width={view === 'inbox' ? 259 : 375}
+											height={670}
+										/>
+									) : view === 'testing' && showTestPreview ? (
 										<TestPreviewPanel
 											setShowTestPreview={setShowTestPreview}
 											testMessage={campaign?.testMessage || ''}
@@ -3056,16 +3091,26 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													/>
 												</div>
 												{/* Compact Research panel */}
-												<ContactResearchPanel
-													contact={displayedContactForResearch}
-													hideAllText={contactsAvailableForDrafting.length === 0}
-													hideSummaryIfBullets={true}
-													height={347}
-													width={330}
-													boxWidth={315}
-													compactHeader
-													style={{ display: 'block' }}
-												/>
+												{isBatchDraftingInProgress ? (
+													<DraftPreviewExpandedList
+														contacts={contacts || []}
+														livePreview={liveDraftPreview}
+														fallbackDraft={draftPreviewFallbackDraft}
+														width={330}
+														height={347}
+													/>
+												) : (
+													<ContactResearchPanel
+														contact={displayedContactForResearch}
+														hideAllText={contactsAvailableForDrafting.length === 0}
+														hideSummaryIfBullets={true}
+														height={347}
+														width={330}
+														boxWidth={315}
+														compactHeader
+														style={{ display: 'block' }}
+													/>
+												)}
 											</div>
 											{/* Right column: Writing box */}
 											<div>
@@ -3358,16 +3403,26 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										{/* Research panel below contacts at narrowest breakpoint */}
 										{isNarrowestDesktop && (
 											<div className="mt-[20px] w-full flex justify-center">
-												<ContactResearchPanel
-													contact={displayedContactForResearch}
-													hideAllText={contactsAvailableForDrafting.length === 0}
-													hideSummaryIfBullets={true}
-													height={400}
-													width={489}
-													boxWidth={474}
-													compactHeader
-													style={{ display: 'block' }}
-												/>
+												{isBatchDraftingInProgress ? (
+													<DraftPreviewExpandedList
+														contacts={contacts || []}
+														livePreview={liveDraftPreview}
+														fallbackDraft={draftPreviewFallbackDraft}
+														width={489}
+														height={400}
+													/>
+												) : (
+													<ContactResearchPanel
+														contact={displayedContactForResearch}
+														hideAllText={contactsAvailableForDrafting.length === 0}
+														hideSummaryIfBullets={true}
+														height={400}
+														width={489}
+														boxWidth={474}
+														compactHeader
+														style={{ display: 'block' }}
+													/>
+												)}
 											</div>
 										)}
 									</div>
@@ -3525,16 +3580,26 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														/>
 													</div>
 												{/* Research panel - height set so bottom aligns with drafts table (71 + 10 + 316 + 10 + 296 = 703 = drafts table height) */}
-												<ContactResearchPanel
-													contact={displayedContactForResearch}
-													hideAllText={draftCount === 0}
-													hideSummaryIfBullets={true}
-													height={296}
+												{isBatchDraftingInProgress ? (
+													<DraftPreviewExpandedList
+														contacts={contacts || []}
+														livePreview={liveDraftPreview}
+														fallbackDraft={draftPreviewFallbackDraft}
+														width={330}
+														height={296}
+													/>
+												) : (
+													<ContactResearchPanel
+														contact={displayedContactForResearch}
+														hideAllText={draftCount === 0}
+														hideSummaryIfBullets={true}
+														height={296}
 														width={330}
 														boxWidth={315}
 														compactHeader
 														style={{ display: 'block' }}
 													/>
+												)}
 												</div>
 												{/* Right column: Drafts table - fixed 499px, overflow visible for bottom panels */}
 												<div className="flex-shrink-0 [&>*]:!items-start" style={{ width: '499px', overflow: 'visible' }}>
@@ -3789,16 +3854,26 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										{/* Research panel below send button at narrowest breakpoint (< 952px) */}
 										{isNarrowestDesktop && (
 											<div className="mt-[20px] w-full flex justify-center">
-												<ContactResearchPanel
-													contact={displayedContactForResearch}
-													hideAllText={draftCount === 0}
-													hideSummaryIfBullets={true}
-													height={400}
-													width={489}
-													boxWidth={474}
-													compactHeader
-													style={{ display: 'block' }}
-												/>
+												{isBatchDraftingInProgress ? (
+													<DraftPreviewExpandedList
+														contacts={contacts || []}
+														livePreview={liveDraftPreview}
+														fallbackDraft={draftPreviewFallbackDraft}
+														width={489}
+														height={400}
+													/>
+												) : (
+													<ContactResearchPanel
+														contact={displayedContactForResearch}
+														hideAllText={draftCount === 0}
+														hideSummaryIfBullets={true}
+														height={400}
+														width={489}
+														boxWidth={474}
+														compactHeader
+														style={{ display: 'block' }}
+													/>
+												)}
 											</div>
 										)}
 
@@ -3955,16 +4030,26 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													/>
 												</div>
 												{/* Research panel - height set so bottom aligns with contacts table (703px) */}
-												<ContactResearchPanel
-													contact={displayedContactForResearch}
-													hideAllText={contactsAvailableForDrafting.length === 0}
-													hideSummaryIfBullets={true}
-													height={296}
-													width={330}
-													boxWidth={315}
-													compactHeader
-													style={{ display: 'block' }}
-												/>
+												{isBatchDraftingInProgress ? (
+													<DraftPreviewExpandedList
+														contacts={contacts || []}
+														livePreview={liveDraftPreview}
+														fallbackDraft={draftPreviewFallbackDraft}
+														width={330}
+														height={296}
+													/>
+												) : (
+													<ContactResearchPanel
+														contact={displayedContactForResearch}
+														hideAllText={contactsAvailableForDrafting.length === 0}
+														hideSummaryIfBullets={true}
+														height={296}
+														width={330}
+														boxWidth={315}
+														compactHeader
+														style={{ display: 'block' }}
+													/>
+												)}
 											</div>
 											{/* Right column: Contacts table - fixed 499px, overflow visible for bottom panels */}
 											<div className="flex-shrink-0 [&>*]:!items-start" style={{ width: '499px', overflow: 'visible' }}>
@@ -4197,16 +4282,26 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										{/* Research panel below draft button at narrowest breakpoint */}
 										{isNarrowestDesktop && (
 											<div className="mt-[20px] w-full flex justify-center">
-												<ContactResearchPanel
-													contact={displayedContactForResearch}
-													hideAllText={contactsAvailableForDrafting.length === 0}
-													hideSummaryIfBullets={true}
-													height={400}
-													width={489}
-													boxWidth={474}
-													compactHeader
-													style={{ display: 'block' }}
-												/>
+												{isBatchDraftingInProgress ? (
+													<DraftPreviewExpandedList
+														contacts={contacts || []}
+														livePreview={liveDraftPreview}
+														fallbackDraft={draftPreviewFallbackDraft}
+														width={489}
+														height={400}
+													/>
+												) : (
+													<ContactResearchPanel
+														contact={displayedContactForResearch}
+														hideAllText={contactsAvailableForDrafting.length === 0}
+														hideSummaryIfBullets={true}
+														height={400}
+														width={489}
+														boxWidth={474}
+														compactHeader
+														style={{ display: 'block' }}
+													/>
+												)}
 											</div>
 										)}
 										{/* MiniEmailStructure below research panel at narrowest breakpoint (< 952px) */}
@@ -4322,16 +4417,26 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													/>
 												</div>
 												{/* Research panel below mini email structure - height set so bottom aligns with sent table (71 + 10 + 316 + 10 + 296 = 703 = sent table height) */}
-												<ContactResearchPanel
-													contact={displayedContactForResearch}
-													hideAllText={sentEmails.length === 0}
-													hideSummaryIfBullets={true}
-													height={296}
-													width={330}
-													boxWidth={315}
-													compactHeader
-													style={{ display: 'block' }}
-												/>
+												{isBatchDraftingInProgress ? (
+													<DraftPreviewExpandedList
+														contacts={contacts || []}
+														livePreview={liveDraftPreview}
+														fallbackDraft={draftPreviewFallbackDraft}
+														width={330}
+														height={296}
+													/>
+												) : (
+													<ContactResearchPanel
+														contact={displayedContactForResearch}
+														hideAllText={sentEmails.length === 0}
+														hideSummaryIfBullets={true}
+														height={296}
+														width={330}
+														boxWidth={315}
+														compactHeader
+														style={{ display: 'block' }}
+													/>
+												)}
 											</div>
 											{/* Right column: Sent table - fixed 499px, overflow visible for bottom panels */}
 											<div className="flex-shrink-0 [&>*]:!items-start" style={{ width: '499px', overflow: 'visible' }}>
@@ -4394,16 +4499,26 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										{/* Research panel below sent box at narrowest breakpoint (< 952px) */}
 										{isNarrowestDesktop && (
 											<div className="mt-[20px] w-full flex justify-center">
-												<ContactResearchPanel
-													contact={displayedContactForResearch}
-													hideAllText={sentEmails.length === 0}
-													hideSummaryIfBullets={true}
-													height={400}
-													width={489}
-													boxWidth={474}
-													compactHeader
-													style={{ display: 'block' }}
-												/>
+												{isBatchDraftingInProgress ? (
+													<DraftPreviewExpandedList
+														contacts={contacts || []}
+														livePreview={liveDraftPreview}
+														fallbackDraft={draftPreviewFallbackDraft}
+														width={489}
+														height={400}
+													/>
+												) : (
+													<ContactResearchPanel
+														contact={displayedContactForResearch}
+														hideAllText={sentEmails.length === 0}
+														hideSummaryIfBullets={true}
+														height={400}
+														width={489}
+														boxWidth={474}
+														compactHeader
+														style={{ display: 'block' }}
+													/>
+												)}
 											</div>
 										)}
 
@@ -4832,11 +4947,21 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														)}
 													</div>
 												) : (
-													<ContactResearchPanel
-														contact={displayedContactForResearch}
-														hideAllText={contactsAvailableForDrafting.length === 0}
-														className="!block"
-													/>
+													isBatchDraftingInProgress ? (
+														<DraftPreviewExpandedList
+															contacts={contacts || []}
+															livePreview={liveDraftPreview}
+															fallbackDraft={draftPreviewFallbackDraft}
+															width={375}
+															height={557}
+														/>
+													) : (
+														<ContactResearchPanel
+															contact={displayedContactForResearch}
+															hideAllText={contactsAvailableForDrafting.length === 0}
+															className="!block"
+														/>
+													)
 												)}
 											</div>
 										</div>
@@ -5553,16 +5678,26 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											</CustomScrollbar>
 										</div>
 									) : (
-										<ContactResearchPanel
-											contact={displayedContactForResearch}
-											hideAllText={contactsAvailableForDrafting.length === 0}
-											hideSummaryIfBullets={true}
-											height={400}
-											width={498}
-											boxWidth={483}
-											compactHeader
-											style={{ display: 'block' }}
-										/>
+										isBatchDraftingInProgress ? (
+											<DraftPreviewExpandedList
+												contacts={contacts || []}
+												livePreview={liveDraftPreview}
+												fallbackDraft={draftPreviewFallbackDraft}
+												width={498}
+												height={400}
+											/>
+										) : (
+											<ContactResearchPanel
+												contact={displayedContactForResearch}
+												hideAllText={contactsAvailableForDrafting.length === 0}
+												hideSummaryIfBullets={true}
+												height={400}
+												width={498}
+												boxWidth={483}
+												compactHeader
+												style={{ display: 'block' }}
+											/>
+										)
 									)}
 								</div>
 							)}
@@ -5596,16 +5731,26 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										{/* Research panel below inbox - matches InboxSection's container structure (w-full mx-auto px-4 maxWidth 516px) - hidden on mobile */}
 									{!isMobile && (
 										<div className="mt-[20px] w-full mx-auto px-4" style={{ maxWidth: '516px' }}>
-											<ContactResearchPanel
-												contact={displayedContactForResearch}
-												hideAllText={false}
-												hideSummaryIfBullets={true}
-												height={400}
-												width={516}
-												boxWidth={488}
-												compactHeader
-												style={{ display: 'block' }}
-											/>
+											{isBatchDraftingInProgress ? (
+												<DraftPreviewExpandedList
+													contacts={contacts || []}
+													livePreview={liveDraftPreview}
+													fallbackDraft={draftPreviewFallbackDraft}
+													width={516}
+													height={400}
+												/>
+											) : (
+												<ContactResearchPanel
+													contact={displayedContactForResearch}
+													hideAllText={false}
+													hideSummaryIfBullets={true}
+													height={400}
+													width={516}
+													boxWidth={488}
+													compactHeader
+													style={{ display: 'block' }}
+												/>
+											)}
 										</div>
 									)}
 									</div>
@@ -5628,12 +5773,22 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												/>
 												{/* Research panel below header - full aesthetic matching other tabs */}
 											{/* Height calculated so bottom aligns with inbox: 657px inbox - 71px header - 16px gap = 570px */}
-												<ContactResearchPanel
-													contact={displayedContactForResearch}
-													hideAllText={false}
-													height={570}
-													style={{ display: 'block' }}
-												/>
+												{isBatchDraftingInProgress ? (
+													<DraftPreviewExpandedList
+														contacts={contacts || []}
+														livePreview={liveDraftPreview}
+														fallbackDraft={draftPreviewFallbackDraft}
+														width={375}
+														height={570}
+													/>
+												) : (
+													<ContactResearchPanel
+														contact={displayedContactForResearch}
+														hideAllText={false}
+														height={570}
+														style={{ display: 'block' }}
+													/>
+												)}
 											</div>
 											{/* Right column: Inbox */}
 											<div className="flex-shrink-0">
@@ -5971,16 +6126,26 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											</div>
 										</div>
 										{/* 6. Research Panel */}
-										<ContactResearchPanel
-											contact={displayedContactForResearch}
-											hideAllText={contactsAvailableForDrafting.length === 0}
-											hideSummaryIfBullets={true}
-											height={347}
-											width={330}
-											boxWidth={315}
-											compactHeader
-											className="!block"
-										/>
+										{isBatchDraftingInProgress ? (
+											<DraftPreviewExpandedList
+												contacts={contacts || []}
+												livePreview={liveDraftPreview}
+												fallbackDraft={draftPreviewFallbackDraft}
+												width={330}
+												height={347}
+											/>
+										) : (
+											<ContactResearchPanel
+												contact={displayedContactForResearch}
+												hideAllText={contactsAvailableForDrafting.length === 0}
+												hideSummaryIfBullets={true}
+												height={347}
+												width={330}
+												boxWidth={315}
+												compactHeader
+												className="!block"
+											/>
+										)}
 										{/* 7. Suggestion Box */}
 										<div
 											style={{
@@ -6514,16 +6679,26 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											</div>
 										)}
 										{/* Research Panel */}
-										<ContactResearchPanel
-											contact={displayedContactForResearch}
-											hideAllText={contactsAvailableForDrafting.length === 0}
-											hideSummaryIfBullets={true}
-											height={347}
-											width={330}
-											boxWidth={315}
-											compactHeader
-											className="!block"
-										/>
+										{isBatchDraftingInProgress ? (
+											<DraftPreviewExpandedList
+												contacts={contacts || []}
+												livePreview={liveDraftPreview}
+												fallbackDraft={draftPreviewFallbackDraft}
+												width={330}
+												height={347}
+											/>
+										) : (
+											<ContactResearchPanel
+												contact={displayedContactForResearch}
+												hideAllText={contactsAvailableForDrafting.length === 0}
+												hideSummaryIfBullets={true}
+												height={347}
+												width={330}
+												boxWidth={315}
+												compactHeader
+												className="!block"
+											/>
+										)}
 										{/* In narrow mode (2x4 grid), move Preview here */}
 										{isAllTabNarrow && (
 											<DraftPreviewExpandedList
