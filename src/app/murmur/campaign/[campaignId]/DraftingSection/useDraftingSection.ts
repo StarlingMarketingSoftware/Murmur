@@ -45,6 +45,11 @@ import { ContactWithName } from '@/types/contact';
 export interface DraftingSectionProps {
 	campaign: CampaignWithRelations;
 	view?: 'search' | 'contacts' | 'testing' | 'drafting' | 'sent' | 'inbox' | 'all';
+	/**
+	 * When true, renders viewport-fixed overlays (like the top drafting progress bar).
+	 * This should only be enabled on the "active" DraftingSection instance during tab crossfades.
+	 */
+	renderGlobalOverlays?: boolean;
 	goToDrafting?: () => void;
 	goToAll?: () => void;
 	/**
@@ -252,6 +257,9 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	const [livePreviewContactId, setLivePreviewContactId] = useState<number | null>(null);
 	const [livePreviewMessage, setLivePreviewMessage] = useState('');
 	const [livePreviewSubject, setLivePreviewSubject] = useState('');
+	// Live preview progress (drives the top-of-page progress bar; stays in sync with Draft Preview playback)
+	const [livePreviewDraftNumber, setLivePreviewDraftNumber] = useState(0);
+	const [livePreviewTotal, setLivePreviewTotal] = useState(0);
 	const livePreviewTimerRef = useRef<number | null>(null);
 	const livePreviewDelayTimerRef = useRef<number | null>(null);
 	// Store full text and an index to preserve original whitespace and paragraph breaks
@@ -295,6 +303,8 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		setLivePreviewContactId(null);
 		setLivePreviewMessage('');
 		setLivePreviewSubject('');
+		setLivePreviewDraftNumber(0);
+		setLivePreviewTotal(0);
 		livePreviewFullTextRef.current = '';
 		livePreviewIndexRef.current = 0;
 		livePreviewQueueRef.current = [];
@@ -331,6 +341,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			livePreviewTimerRef.current = null;
 		}
 
+		setLivePreviewDraftNumber((prev) => prev + 1);
 		setIsLivePreviewVisible(true);
 		setLivePreviewContactId(next.contactId);
 		setLivePreviewSubject(next.subject);
@@ -366,7 +377,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		stopLivePreviewTimers,
 	]);
 
-	const beginLivePreviewBatch = useCallback(() => {
+	const beginLivePreviewBatch = useCallback((total?: number) => {
 		// Reset any previous playback and show the preview surface immediately.
 		stopLivePreviewTimers();
 		livePreviewQueueRef.current = [];
@@ -375,6 +386,8 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		setLivePreviewContactId(null);
 		setLivePreviewSubject('');
 		setLivePreviewMessage('Drafting...');
+		setLivePreviewDraftNumber(0);
+		setLivePreviewTotal(typeof total === 'number' && total > 0 ? total : 0);
 		livePreviewFullTextRef.current = '';
 		livePreviewIndexRef.current = 0;
 	}, [stopLivePreviewTimers]);
@@ -1989,7 +2002,7 @@ EXAMPLES OF GOOD CUSTOM INSTRUCTIONS:
 
 			// Show preview surface while generation is running. Drafts will be queued and
 			// typed out at a fixed speed independent of backend timing.
-			beginLivePreviewBatch();
+			beginLivePreviewBatch(targets.length);
 			for (
 				let i = 0;
 				i < targets.length && !isGenerationCancelledRef.current;
@@ -2343,6 +2356,8 @@ EXAMPLES OF GOOD CUSTOM INSTRUCTIONS:
 		livePreviewContactId,
 		livePreviewMessage,
 		livePreviewSubject,
+		livePreviewDraftNumber,
+		livePreviewTotal,
 		scoreFullAutomatedPrompt,
 		critiqueManualEmailText,
 	};
