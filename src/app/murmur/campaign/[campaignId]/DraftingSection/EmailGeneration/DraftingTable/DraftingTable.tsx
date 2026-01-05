@@ -863,7 +863,7 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 									)}
 									{isDrafts && idx === 4 && (
 										<div
-											className="bg-white rounded-[8px] border-2 border-[#000000] flex items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors"
+											className="bg-white rounded-[8px] border-2 border-[#000000] flex items-center justify-center cursor-pointer hover:bg-[#DBDBDB] transition-colors"
 											style={{ width: innerButtonWidth, height: isMobile ? '44px' : '42px' }}
 											onClick={() => router.push(urls.murmur.dashboard.index)}
 										>
@@ -874,9 +874,11 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 									)}
 									{isSent && idx === 1 && (
 										<div
-											className="bg-white rounded-[8px] border-2 border-[#000000] flex items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors"
+											className="bg-white rounded-[8px] border-2 border-[#000000] flex items-center justify-center cursor-pointer hover:bg-[#EFDAAF] transition-colors"
 											style={{ width: innerButtonWidth, height: isMobile ? '44px' : '42px' }}
 											onClick={goToDrafts}
+											onMouseEnter={() => setDraftsTabHighlighted(true)}
+											onMouseLeave={() => setDraftsTabHighlighted(false)}
 										>
 											<span className={`font-semibold font-inter text-black ${isMobile ? 'text-[12px]' : 'text-[15px]'}`}>
 												Review and Send Drafts
@@ -911,7 +913,7 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 									)}
 									{isSent && idx === 4 && (
 										<div
-											className="bg-white rounded-[8px] border-2 border-[#000000] flex items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors"
+											className="bg-white rounded-[8px] border-2 border-[#000000] flex items-center justify-center cursor-pointer hover:bg-[#DBDBDB] transition-colors"
 											style={{ width: innerButtonWidth, height: isMobile ? '44px' : '42px' }}
 											onClick={() => router.push(urls.murmur.dashboard.index)}
 										>
