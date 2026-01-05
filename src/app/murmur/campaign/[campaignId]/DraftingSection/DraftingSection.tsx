@@ -5731,6 +5731,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											onGoToDrafting={goToDrafting}
 											onGoToWriting={goToWriting}
 											onGoToContacts={goToContacts}
+											onGoToSearch={onGoToSearch}
 											onContactSelect={(contact) => {
 												if (contact) {
 													setSelectedContactForResearch(contact);
@@ -5812,6 +5813,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													onGoToDrafting={goToDrafting}
 													onGoToWriting={goToWriting}
 													onGoToContacts={goToContacts}
+													onGoToSearch={onGoToSearch}
 													onContactSelect={(contact) => {
 														if (contact) {
 															setSelectedContactForResearch(contact);
@@ -5863,6 +5865,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											onGoToDrafting={goToDrafting}
 											onGoToWriting={goToWriting}
 											onGoToContacts={goToContacts}
+											onGoToSearch={onGoToSearch}
 											onContactSelect={(contact) => {
 												if (contact) {
 													setSelectedContactForResearch(contact);

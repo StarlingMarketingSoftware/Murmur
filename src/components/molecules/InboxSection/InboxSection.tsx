@@ -108,6 +108,12 @@ interface InboxSectionProps {
 	onGoToContacts?: () => void;
 
 	/**
+	 * Optional callback to navigate to the campaign-scoped dashboard search/map view.
+	 * Used by the inbox empty-state "Add More Contacts" button.
+	 */
+	onGoToSearch?: () => void;
+
+	/**
 	 * Optional callback when a contact is selected (based on the selected email).
 	 * Used to display the research panel for the selected contact.
 	 */
@@ -208,12 +214,14 @@ export const InboxSection: FC<InboxSectionProps> = ({
 	onGoToDrafting,
 	onGoToWriting,
 	onGoToContacts,
+	onGoToSearch,
 	onContactSelect,
 	onContactHover,
 	isNarrow = false,
 }) => {
 	const isMobile = useIsMobile();
-	const { setDraftsTabHighlighted } = useCampaignTopSearchHighlight();
+	const { setDraftsTabHighlighted, setWriteTabHighlighted, setTopSearchHighlighted } =
+		useCampaignTopSearchHighlight();
 
 	// Width constants based on narrow mode and mobile
 	// On mobile, we use calc() values for responsive sizing (4px margins on each side = 8px total)
@@ -642,8 +650,10 @@ export const InboxSection: FC<InboxSectionProps> = ({
 	useEffect(() => {
 		return () => {
 			setDraftsTabHighlighted(false);
+			setWriteTabHighlighted(false);
+			setTopSearchHighlighted(false);
 		};
-	}, [setDraftsTabHighlighted]);
+	}, [setDraftsTabHighlighted, setWriteTabHighlighted, setTopSearchHighlighted]);
 
 	if (!visibleEmails || visibleEmails.length === 0) {
 		return (
@@ -901,8 +911,10 @@ export const InboxSection: FC<InboxSectionProps> = ({
 											? onGoToDrafting
 											: idx === 2 && onGoToWriting
 											? onGoToWriting
+											: idx === 3 && onGoToSearch
+											? onGoToSearch
 											: idx === 3 && onGoToContacts
-											? onGoToContacts
+												? onGoToContacts
 											: idx === 4
 											? () => {
 													if (typeof window !== 'undefined') {
@@ -911,9 +923,33 @@ export const InboxSection: FC<InboxSectionProps> = ({
 												}
 											: undefined
 									}
-									onMouseEnter={idx === 1 ? () => setDraftsTabHighlighted(true) : undefined}
-									onMouseLeave={idx === 1 ? () => setDraftsTabHighlighted(false) : undefined}
-									className={idx === 1 ? 'bg-white transition-colors hover:bg-[#EFDAAF]' : 'bg-white'}
+									onMouseEnter={
+										idx === 1
+											? () => setDraftsTabHighlighted(true)
+											: idx === 2
+												? () => setWriteTabHighlighted(true)
+												: idx === 3
+													? () => setTopSearchHighlighted(true)
+												: undefined
+									}
+									onMouseLeave={
+										idx === 1
+											? () => setDraftsTabHighlighted(false)
+											: idx === 2
+												? () => setWriteTabHighlighted(false)
+												: idx === 3
+													? () => setTopSearchHighlighted(false)
+												: undefined
+									}
+									className={`bg-white transition-colors ${
+										idx === 1
+											? 'hover:bg-[#EFDAAF]'
+											: idx === 2
+												? 'hover:bg-[#A6E2A8]'
+												: idx === 3
+													? 'hover:bg-[#AFD6EF]'
+												: ''
+									}`}
 									style={{
 										width: isMobile ? 'calc(100% - 24px)' : '314px',
 										height: isMobile ? '44px' : '42px',
@@ -925,7 +961,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 										cursor:
 											(idx === 1 && onGoToDrafting) ||
 											(idx === 2 && onGoToWriting) ||
-											(idx === 3 && onGoToContacts) ||
+											(idx === 3 && (onGoToSearch || onGoToContacts)) ||
 											idx === 4
 												? 'pointer'
 												: 'default',
