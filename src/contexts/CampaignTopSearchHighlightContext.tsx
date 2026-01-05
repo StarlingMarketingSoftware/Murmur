@@ -5,6 +5,12 @@ import React, { createContext, useContext } from 'react';
 export type CampaignTopSearchHighlightContextValue = {
 	isTopSearchHighlighted: boolean;
 	setTopSearchHighlighted: (highlighted: boolean) => void;
+	isDraftsTabHighlighted: boolean;
+	setDraftsTabHighlighted: (highlighted: boolean) => void;
+	isInboxTabHighlighted: boolean;
+	setInboxTabHighlighted: (highlighted: boolean) => void;
+	isWriteTabHighlighted: boolean;
+	setWriteTabHighlighted: (highlighted: boolean) => void;
 };
 
 const CampaignTopSearchHighlightContext =
@@ -12,6 +18,15 @@ const CampaignTopSearchHighlightContext =
 		isTopSearchHighlighted: false,
 		// eslint-disable-next-line @typescript-eslint/no-empty-function
 		setTopSearchHighlighted: () => {},
+		isDraftsTabHighlighted: false,
+		// eslint-disable-next-line @typescript-eslint/no-empty-function
+		setDraftsTabHighlighted: () => {},
+		isInboxTabHighlighted: false,
+		// eslint-disable-next-line @typescript-eslint/no-empty-function
+		setInboxTabHighlighted: () => {},
+		isWriteTabHighlighted: false,
+		// eslint-disable-next-line @typescript-eslint/no-empty-function
+		setWriteTabHighlighted: () => {},
 	});
 
 export function CampaignTopSearchHighlightProvider({

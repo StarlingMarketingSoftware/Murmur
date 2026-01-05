@@ -176,7 +176,12 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 	contactsTopContentVariant = 'default',
 }) => {
 	const router = useRouter();
-	const { setTopSearchHighlighted } = useCampaignTopSearchHighlight();
+	const {
+		setTopSearchHighlighted,
+		setDraftsTabHighlighted,
+		setInboxTabHighlighted,
+		setWriteTabHighlighted,
+	} = useCampaignTopSearchHighlight();
 	const [isDraftsCounterHovered, setIsDraftsCounterHovered] = useState(false);
 	const [isApprovedCounterHovered, setIsApprovedCounterHovered] = useState(false);
 	const [isRejectedCounterHovered, setIsRejectedCounterHovered] = useState(false);
@@ -190,8 +195,16 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 	useEffect(() => {
 		return () => {
 			setTopSearchHighlighted(false);
+			setDraftsTabHighlighted(false);
+			setInboxTabHighlighted(false);
+			setWriteTabHighlighted(false);
 		};
-	}, [setTopSearchHighlighted]);
+	}, [
+		setTopSearchHighlighted,
+		setDraftsTabHighlighted,
+		setInboxTabHighlighted,
+		setWriteTabHighlighted,
+	]);
 
 	// Mobile-responsive box dimensions
 	const mobileBoxWidth = 'calc(100vw - 8px)'; // 4px margins on each side
@@ -811,9 +824,11 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 									)}
 									{isDrafts && idx === 1 && (
 										<div
-											className="bg-white rounded-[8px] border-2 border-[#000000] flex items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors"
+											className="bg-white rounded-[8px] border-2 border-[#000000] flex items-center justify-center cursor-pointer hover:bg-[#A6E2A8] transition-colors"
 											style={{ width: innerButtonWidth, height: isMobile ? '44px' : '42px' }}
 											onClick={goToWriting}
+											onMouseEnter={() => setWriteTabHighlighted(true)}
+											onMouseLeave={() => setWriteTabHighlighted(false)}
 										>
 											<span className={`font-semibold font-inter text-black ${isMobile ? 'text-[12px]' : 'text-[15px]'}`}>
 												Write Your Emails
@@ -866,9 +881,11 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 									)}
 									{isSent && idx === 2 && (
 										<div
-											className="bg-white rounded-[8px] border-2 border-[#000000] flex items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors"
+											className="bg-white rounded-[8px] border-2 border-[#000000] flex items-center justify-center cursor-pointer hover:bg-[#A6E2A8] transition-colors"
 											style={{ width: innerButtonWidth, height: isMobile ? '44px' : '42px' }}
 											onClick={goToWriting}
+											onMouseEnter={() => setWriteTabHighlighted(true)}
+											onMouseLeave={() => setWriteTabHighlighted(false)}
 										>
 											<span className={`font-semibold font-inter text-black ${isMobile ? 'text-[12px]' : 'text-[15px]'}`}>
 												Write More Emails
@@ -938,17 +955,40 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 											idx >= 1 && idx <= 4 && (
 												(() => {
 													const isAddMoreContacts = idx === 1;
+													const isSendDrafts = idx === 2;
+													const isCheckInbox = idx === 3;
+													const isCreateNewCampaign = idx === 4;
 													return (
 												<div
 													className={`bg-white rounded-[8px] border-2 border-[#000000] flex items-center justify-center cursor-pointer transition-colors ${
-														isAddMoreContacts ? 'hover:bg-[#AFD6EF]' : 'hover:bg-gray-50'
+														isAddMoreContacts
+															? 'hover:bg-[#AFD6EF]'
+															: isSendDrafts
+																? 'hover:bg-[#EFDAAF]'
+																: isCheckInbox
+																	? 'hover:bg-[#84B9F5]'
+																	: isCreateNewCampaign
+																		? 'hover:bg-[#DBDBDB]'
+																: 'hover:bg-gray-50'
 													}`}
 													style={{ width: contactsInnerButtonWidth, height: '44px' }}
 													onMouseEnter={
-														isAddMoreContacts ? () => setTopSearchHighlighted(true) : undefined
+														isAddMoreContacts
+															? () => setTopSearchHighlighted(true)
+															: isSendDrafts
+																? () => setDraftsTabHighlighted(true)
+																: isCheckInbox
+																	? () => setInboxTabHighlighted(true)
+																: undefined
 													}
 													onMouseLeave={
-														isAddMoreContacts ? () => setTopSearchHighlighted(false) : undefined
+														isAddMoreContacts
+															? () => setTopSearchHighlighted(false)
+															: isSendDrafts
+																? () => setDraftsTabHighlighted(false)
+																: isCheckInbox
+																	? () => setInboxTabHighlighted(false)
+																: undefined
 													}
 													onClick={() => {
 														if (idx === 1) goToSearch?.();
@@ -971,17 +1011,40 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 											idx >= 2 && idx <= 5 && (
 												(() => {
 													const isAddMoreContacts = idx === 2;
+													const isSendDrafts = idx === 3;
+													const isCheckInbox = idx === 4;
+													const isCreateNewCampaign = idx === 5;
 													return (
 												<div
 													className={`bg-white rounded-[8px] border-2 border-[#000000] flex items-center justify-center cursor-pointer transition-colors ${
-														isAddMoreContacts ? 'hover:bg-[#AFD6EF]' : 'hover:bg-gray-50'
+														isAddMoreContacts
+															? 'hover:bg-[#AFD6EF]'
+															: isSendDrafts
+																? 'hover:bg-[#EFDAAF]'
+																: isCheckInbox
+																	? 'hover:bg-[#84B9F5]'
+																	: isCreateNewCampaign
+																		? 'hover:bg-[#DBDBDB]'
+																: 'hover:bg-gray-50'
 													}`}
 													style={{ width: contactsInnerButtonWidth, height: '42px' }}
 													onMouseEnter={
-														isAddMoreContacts ? () => setTopSearchHighlighted(true) : undefined
+														isAddMoreContacts
+															? () => setTopSearchHighlighted(true)
+															: isSendDrafts
+																? () => setDraftsTabHighlighted(true)
+																: isCheckInbox
+																	? () => setInboxTabHighlighted(true)
+																: undefined
 													}
 													onMouseLeave={
-														isAddMoreContacts ? () => setTopSearchHighlighted(false) : undefined
+														isAddMoreContacts
+															? () => setTopSearchHighlighted(false)
+															: isSendDrafts
+																? () => setDraftsTabHighlighted(false)
+																: isCheckInbox
+																	? () => setInboxTabHighlighted(false)
+																: undefined
 													}
 													onClick={() => {
 														if (idx === 2) goToSearch?.();

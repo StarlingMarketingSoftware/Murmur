@@ -83,9 +83,26 @@ const Murmur = () => {
 	);
 
 	const [isTopSearchHighlighted, setTopSearchHighlighted] = useState(false);
+	const [isDraftsTabHighlighted, setDraftsTabHighlighted] = useState(false);
+	const [isInboxTabHighlighted, setInboxTabHighlighted] = useState(false);
+	const [isWriteTabHighlighted, setWriteTabHighlighted] = useState(false);
 	const topSearchHighlightCtx = useMemo(
-		() => ({ isTopSearchHighlighted, setTopSearchHighlighted }),
-		[isTopSearchHighlighted]
+		() => ({
+			isTopSearchHighlighted,
+			setTopSearchHighlighted,
+			isDraftsTabHighlighted,
+			setDraftsTabHighlighted,
+			isInboxTabHighlighted,
+			setInboxTabHighlighted,
+			isWriteTabHighlighted,
+			setWriteTabHighlighted,
+		}),
+		[
+			isTopSearchHighlighted,
+			isDraftsTabHighlighted,
+			isInboxTabHighlighted,
+			isWriteTabHighlighted,
+		]
 	);
 
 	const { user, isPendingUser, isLoaded } = useMe();
@@ -671,7 +688,25 @@ const Murmur = () => {
 							)}
 							onClick={() => setActiveView('testing')}
 						>
-							Writing
+							<div className="relative inline-flex items-center justify-center w-[62px] h-[27px]">
+								<div
+									aria-hidden="true"
+									className={cn(
+										'absolute inset-0 pointer-events-none',
+										'rounded-[8px] border-2 border-[#000000] bg-[#A6E2A8]',
+										'transition-opacity duration-150',
+										isWriteTabHighlighted ? 'opacity-100' : 'opacity-0'
+									)}
+								/>
+								<span
+									className={cn(
+										'relative z-10',
+										isWriteTabHighlighted && 'text-black'
+									)}
+								>
+									Write
+								</span>
+							</div>
 							</button>
 							<button
 							type="button"
@@ -703,7 +738,25 @@ const Murmur = () => {
 							)}
 							onClick={() => setActiveView('drafting')}
 						>
-							Drafts
+							<div className="relative inline-flex items-center justify-center w-[64px] h-[28px]">
+								<div
+									aria-hidden="true"
+									className={cn(
+										'absolute inset-0 pointer-events-none',
+										'rounded-[8px] border-2 border-[#000000] bg-[#EFDAAF]',
+										'transition-opacity duration-150',
+										isDraftsTabHighlighted ? 'opacity-100' : 'opacity-0'
+									)}
+								/>
+								<span
+									className={cn(
+										'relative z-10',
+										isDraftsTabHighlighted && 'text-black'
+									)}
+								>
+									Drafts
+								</span>
+							</div>
 							</button>
 							<div className="relative group">
 								<button
@@ -716,7 +769,25 @@ const Murmur = () => {
 								)}
 								onClick={() => setActiveView('inbox')}
 							>
-								Inbox
+								<div className="relative inline-flex items-center justify-center w-[62px] h-[27px]">
+									<div
+										aria-hidden="true"
+										className={cn(
+											'absolute inset-0 pointer-events-none',
+											'rounded-[8px] border-2 border-[#000000] bg-[#84B9F5]',
+											'transition-opacity duration-150',
+											isInboxTabHighlighted ? 'opacity-100' : 'opacity-0'
+										)}
+									/>
+									<span
+										className={cn(
+											'relative z-10',
+											isInboxTabHighlighted && 'text-black'
+										)}
+									>
+										Inbox
+									</span>
+								</div>
 								</button>
 								{/* Hover bridge: keeps the "Sent" bubble open while moving the cursor down */}
 								<span
