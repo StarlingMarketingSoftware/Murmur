@@ -1,4 +1,4 @@
-import { FC, ReactNode, useState } from 'react';
+import { FC, ReactNode, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/atoms/Spinner/Spinner';
@@ -6,6 +6,7 @@ import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 import { urls } from '@/constants/urls';
 import ApproveCheckIcon from '@/components/atoms/svg/ApproveCheckIcon';
 import RejectXIcon from '@/components/atoms/svg/RejectXIcon';
+import { useCampaignTopSearchHighlight } from '@/contexts/CampaignTopSearchHighlightContext';
 
 export const ContactsHeaderChrome: FC<{ offsetY?: number; hasData?: boolean; isAllTab?: boolean; whiteSectionHeight?: number }> = ({
 	offsetY = 0,
@@ -175,6 +176,7 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 	contactsTopContentVariant = 'default',
 }) => {
 	const router = useRouter();
+	const { setTopSearchHighlighted } = useCampaignTopSearchHighlight();
 	const [isDraftsCounterHovered, setIsDraftsCounterHovered] = useState(false);
 	const [isApprovedCounterHovered, setIsApprovedCounterHovered] = useState(false);
 	const [isRejectedCounterHovered, setIsRejectedCounterHovered] = useState(false);
@@ -183,6 +185,13 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 	const showTitle = !isContacts && title !== 'Drafts' && title !== 'Sent';
 	const isDrafts = title === 'Drafts';
 	const isSent = title === 'Sent';
+
+	// Safety: never leave the top search bar highlighted if this table unmounts mid-hover.
+	useEffect(() => {
+		return () => {
+			setTopSearchHighlighted(false);
+		};
+	}, [setTopSearchHighlighted]);
 
 	// Mobile-responsive box dimensions
 	const mobileBoxWidth = 'calc(100vw - 8px)'; // 4px margins on each side
@@ -927,9 +936,20 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 										)}
 										{isMobile ? (
 											idx >= 1 && idx <= 4 && (
+												(() => {
+													const isAddMoreContacts = idx === 1;
+													return (
 												<div
-													className="bg-white rounded-[8px] border-2 border-[#000000] flex items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors"
+													className={`bg-white rounded-[8px] border-2 border-[#000000] flex items-center justify-center cursor-pointer transition-colors ${
+														isAddMoreContacts ? 'hover:bg-[#AFD6EF]' : 'hover:bg-gray-50'
+													}`}
 													style={{ width: contactsInnerButtonWidth, height: '44px' }}
+													onMouseEnter={
+														isAddMoreContacts ? () => setTopSearchHighlighted(true) : undefined
+													}
+													onMouseLeave={
+														isAddMoreContacts ? () => setTopSearchHighlighted(false) : undefined
+													}
 													onClick={() => {
 														if (idx === 1) goToSearch?.();
 														if (idx === 2) goToDrafts?.();
@@ -944,12 +964,25 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 														{idx === 4 && 'Create New Campaign'}
 													</span>
 												</div>
+													);
+												})()
 											)
 										) : (
 											idx >= 2 && idx <= 5 && (
+												(() => {
+													const isAddMoreContacts = idx === 2;
+													return (
 												<div
-													className="bg-white rounded-[8px] border-2 border-[#000000] flex items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors"
+													className={`bg-white rounded-[8px] border-2 border-[#000000] flex items-center justify-center cursor-pointer transition-colors ${
+														isAddMoreContacts ? 'hover:bg-[#AFD6EF]' : 'hover:bg-gray-50'
+													}`}
 													style={{ width: contactsInnerButtonWidth, height: '42px' }}
+													onMouseEnter={
+														isAddMoreContacts ? () => setTopSearchHighlighted(true) : undefined
+													}
+													onMouseLeave={
+														isAddMoreContacts ? () => setTopSearchHighlighted(false) : undefined
+													}
 													onClick={() => {
 														if (idx === 2) goToSearch?.();
 														if (idx === 3) goToDrafts?.();
@@ -964,6 +997,8 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 														{idx === 5 && 'Create New Campaign'}
 													</span>
 												</div>
+													);
+												})()
 											)
 										)}
 									</div>

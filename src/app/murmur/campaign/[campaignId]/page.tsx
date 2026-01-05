@@ -11,7 +11,7 @@ import Link from 'next/link';
 import { cn } from '@/utils';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { useMe } from '@/hooks/useMe';
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import LeftArrow from '@/components/atoms/_svg/LeftArrow';
 import RightArrow from '@/components/atoms/_svg/RightArrow';
 import BottomArrowIcon from '@/components/atoms/_svg/BottomArrowIcon';
@@ -29,6 +29,7 @@ import { useCreateIdentity, useGetIdentities } from '@/hooks/queryHooks/useIdent
 import { EmailStatus } from '@/constants/prismaEnums';
 import { useQueryClient } from '@tanstack/react-query';
 import { HoverDescriptionProvider } from '@/contexts/HoverDescriptionContext';
+import { CampaignTopSearchHighlightProvider } from '@/contexts/CampaignTopSearchHighlightContext';
 
 type ViewType = 'contacts' | 'testing' | 'drafting' | 'sent' | 'inbox' | 'all';
 
@@ -79,6 +80,12 @@ const Murmur = () => {
 	const tabParam = searchParams.get('tab');
 	const [identityDialogOrigin, setIdentityDialogOrigin] = useState<'campaign' | 'search'>(
 		cameFromSearch ? 'search' : 'campaign'
+	);
+
+	const [isTopSearchHighlighted, setTopSearchHighlighted] = useState(false);
+	const topSearchHighlightCtx = useMemo(
+		() => ({ isTopSearchHighlighted, setTopSearchHighlighted }),
+		[isTopSearchHighlighted]
 	);
 
 	const { user, isPendingUser, isLoaded } = useMe();
@@ -427,6 +434,7 @@ const Murmur = () => {
 	const fixedNavArrowsTopPx = 355 + (shouldApplyWritingTopShift ? writingTabShiftPx : 0);
 	return (
 		<HoverDescriptionProvider enabled={selectedRightBoxIcon === 'info'}>
+			<CampaignTopSearchHighlightProvider value={topSearchHighlightCtx}>
 			<div className="min-h-screen relative">
 			{/* Left navigation arrow - absolute position (hidden in narrow desktop + testing) */}
 			{!hideFixedArrows && (
@@ -517,7 +525,10 @@ const Murmur = () => {
 							title="Search for more contacts"
 							data-hover-description="Hop back in to the map, Add some more contacts to your campaign"
 							onClick={handleOpenDashboardSearchForCampaign}
-							className="group relative pointer-events-auto w-[477px] max-w-[calc(100vw-32px)] h-[42px] box-border border border-[#929292] hover:border-black hover:border-2 rounded-[10px] overflow-hidden transition-[color,border-color,border-width] duration-150 cursor-pointer"
+							className={cn(
+								"group relative pointer-events-auto w-[477px] max-w-[calc(100vw-32px)] h-[42px] box-border border border-[#929292] hover:border-black hover:border-2 rounded-[10px] overflow-hidden transition-[color,border-color,border-width] duration-150 cursor-pointer",
+								isTopSearchHighlighted && "border-black border-2"
+							)}
 						>
 							<SearchMap
 								aria-hidden="true"
@@ -528,9 +539,17 @@ const Murmur = () => {
 								rectStroke="none"
 								rectStrokeWidth={0}
 								rectRx={10}
-								className="absolute inset-0 w-full h-full opacity-40 group-hover:opacity-100 transition-opacity duration-150"
+								className={cn(
+									"absolute inset-0 w-full h-full opacity-40 group-hover:opacity-100 transition-opacity duration-150",
+									isTopSearchHighlighted && "opacity-100"
+								)}
 							/>
-							<div className="absolute right-3 top-1/2 -translate-y-1/2 flex z-10 text-[#929292] group-hover:text-black transition-colors duration-150">
+							<div
+								className={cn(
+									"absolute right-3 top-1/2 -translate-y-1/2 flex z-10 text-[#929292] group-hover:text-black transition-colors duration-150",
+									isTopSearchHighlighted && "text-black"
+								)}
+							>
 								<SearchIconDesktop stroke="currentColor" />
 							</div>
 						</button>
@@ -1001,11 +1020,7 @@ const Murmur = () => {
 												goToDrafting={() => setActiveView('drafting')}
 												goToAll={() => setActiveView('all')}
 												goToWriting={() => setActiveView('testing')}
-												onGoToSearch={() => {
-													if (typeof window !== 'undefined') {
-														window.location.assign(urls.murmur.dashboard.index);
-													}
-												}}
+												onGoToSearch={handleOpenDashboardSearchForCampaign}
 												goToContacts={() => setActiveView('contacts')}
 												goToInbox={() => setActiveView('inbox')}
 												goToSent={() => setActiveView('sent')}
@@ -1039,11 +1054,7 @@ const Murmur = () => {
 													goToDrafting={() => setActiveView('drafting')}
 													goToAll={() => setActiveView('all')}
 													goToWriting={() => setActiveView('testing')}
-													onGoToSearch={() => {
-														if (typeof window !== 'undefined') {
-															window.location.assign(urls.murmur.dashboard.index);
-														}
-													}}
+													onGoToSearch={handleOpenDashboardSearchForCampaign}
 													goToContacts={() => setActiveView('contacts')}
 													goToInbox={() => setActiveView('inbox')}
 													goToSent={() => setActiveView('sent')}
@@ -1542,6 +1553,7 @@ const Murmur = () => {
 				</div>
 			)}
 			</div>
+			</CampaignTopSearchHighlightProvider>
 		</HoverDescriptionProvider>
 	);
 };
