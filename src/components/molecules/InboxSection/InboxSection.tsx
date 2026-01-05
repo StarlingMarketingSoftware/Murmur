@@ -20,6 +20,7 @@ import { RestaurantsIcon } from '@/components/atoms/_svg/RestaurantsIcon';
 import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
 import { MusicVenuesIcon } from '@/components/atoms/_svg/MusicVenuesIcon';
 import { WineBeerSpiritsIcon } from '@/components/atoms/_svg/WineBeerSpiritsIcon';
+import { useCampaignTopSearchHighlight } from '@/contexts/CampaignTopSearchHighlightContext';
 
 /**
  * Strip quoted reply content from email body (e.g., "On Thu, Nov 27, 2025 at 2:36 AM ... wrote:")
@@ -212,6 +213,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 	isNarrow = false,
 }) => {
 	const isMobile = useIsMobile();
+	const { setDraftsTabHighlighted } = useCampaignTopSearchHighlight();
 
 	// Width constants based on narrow mode and mobile
 	// On mobile, we use calc() values for responsive sizing (4px margins on each side = 8px total)
@@ -636,6 +638,13 @@ export const InboxSection: FC<InboxSectionProps> = ({
 		setReplyMessage('');
 	};
 
+	// Safety: never leave the Drafts tab highlighted if this view unmounts mid-hover.
+	useEffect(() => {
+		return () => {
+			setDraftsTabHighlighted(false);
+		};
+	}, [setDraftsTabHighlighted]);
+
 	if (!visibleEmails || visibleEmails.length === 0) {
 		return (
 			<div className={`w-full flex justify-center ${isMobile ? 'px-1' : 'px-4'}`}>
@@ -902,12 +911,14 @@ export const InboxSection: FC<InboxSectionProps> = ({
 												}
 											: undefined
 									}
+									onMouseEnter={idx === 1 ? () => setDraftsTabHighlighted(true) : undefined}
+									onMouseLeave={idx === 1 ? () => setDraftsTabHighlighted(false) : undefined}
+									className={idx === 1 ? 'bg-white transition-colors hover:bg-[#EFDAAF]' : 'bg-white'}
 									style={{
 										width: isMobile ? 'calc(100% - 24px)' : '314px',
 										height: isMobile ? '44px' : '42px',
 										border: '3px solid #000000',
 										borderRadius: '8px',
-										backgroundColor: '#FFFFFF',
 										display: 'flex',
 										alignItems: 'center',
 										justifyContent: 'center',
