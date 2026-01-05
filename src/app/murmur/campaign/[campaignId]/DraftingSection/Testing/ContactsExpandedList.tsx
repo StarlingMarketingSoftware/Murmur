@@ -1,7 +1,6 @@
 'use client';
 
 import { FC, MouseEvent, useMemo, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { ContactWithName } from '@/types/contact';
 import { CampaignWithRelations } from '@/types';
 import { cn } from '@/utils';
@@ -15,14 +14,8 @@ import {
 	canadianProvinceNames,
 	stateBadgeColorMap,
 } from '@/constants/ui';
-import { useGetUsedContactIds, useGetLocations } from '@/hooks/queryHooks/useContacts';
+import { useGetUsedContactIds } from '@/hooks/queryHooks/useContacts';
 import { ContactsHeaderChrome } from '@/app/murmur/campaign/[campaignId]/DraftingSection/EmailGeneration/DraftingTable/DraftingTable';
-import {
-	MiniSearchBar,
-	parseSearchFromCampaign,
-} from '@/app/murmur/campaign/[campaignId]/DraftingSection/EmailGeneration/ContactsSelection/ContactsSelection';
-import { useDebounce } from '@/hooks/useDebounce';
-import { urls } from '@/constants/urls';
 import { isRestaurantTitle, isCoffeeShopTitle, isMusicVenueTitle, isMusicFestivalTitle, isWeddingPlannerTitle, isWeddingVenueTitle, isWineBeerSpiritsTitle, getWineBeerSpiritsLabel } from '@/utils/restaurantTitle';
 import { WeddingPlannersIcon } from '@/components/atoms/_svg/WeddingPlannersIcon';
 import { RestaurantsIcon } from '@/components/atoms/_svg/RestaurantsIcon';
@@ -66,13 +59,9 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 	width,
 	height,
 	minRows = 7,
-	campaign,
-	showSearchBar = true,
-	onSearchFromMiniBar,
 	whiteSectionHeight: customWhiteSectionHeight,
 	onOpenContacts,
 }) => {
-	const router = useRouter();
 	const [internalSelectedContactIds, setInternalSelectedContactIds] = useState<
 		Set<number>
 	>(new Set());
@@ -143,59 +132,6 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 	};
 
 	const selectedCount = currentSelectedIds.size;
-
-	// Mini search bar state – mirrors ContactsSelection logic so the UX matches
-	const searchInfo = useMemo(() => parseSearchFromCampaign(campaign), [campaign]);
-	const [activeSection, setActiveSection] = useState<'why' | 'what' | 'where' | null>(
-		null
-	);
-	const [whyValue, setWhyValue] = useState('[Booking]');
-	const [whatValue, setWhatValue] = useState(searchInfo.what);
-	const [whereValue, setWhereValue] = useState(searchInfo.where);
-
-	// Location search for the "Where" dropdown
-	const debouncedWhereValue = useDebounce(whereValue, 300);
-	const { data: locationResults, isLoading: isLoadingLocations } = useGetLocations(
-		debouncedWhereValue,
-		'state'
-	);
-
-	const handleSearch = () => {
-		const payload = {
-			why: whyValue,
-			what: whatValue,
-			where: whereValue,
-		};
-
-		if (onSearchFromMiniBar) {
-			onSearchFromMiniBar(payload);
-			return;
-		}
-
-		let searchQuery = '';
-		if (payload.why) {
-			searchQuery += payload.why + ' ';
-		}
-		if (payload.what) {
-			searchQuery += payload.what;
-		}
-		if (payload.where) {
-			searchQuery += ' in ' + payload.where;
-		}
-		searchQuery = searchQuery.trim();
-
-		if (searchQuery) {
-			try {
-				sessionStorage.setItem('murmur_pending_search', searchQuery);
-			} catch {
-				// Ignore sessionStorage errors (e.g., disabled storage)
-			}
-			const dashboardUrl = campaign?.id
-				? `${urls.murmur.dashboard.index}?fromCampaignId=${campaign.id}`
-				: urls.murmur.dashboard.index;
-			router.push(dashboardUrl);
-		}
-	};
 
 	// Allow callers to override dimensions; default to the original sidebar size
 	const resolvedWidth = width ?? 376;
@@ -270,28 +206,6 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 					<div className="flex items-center" style={{ marginTop: isBottomView ? 0 : '1px' }}>
 						<OpenIcon width={isBottomView ? 10 : undefined} height={isBottomView ? 10 : undefined} />
 					</div>
-				</div>
-			)}
-
-			{showSearchBar && !isBottomView && (
-				<div className="pt-2 flex justify-center">
-					<MiniSearchBar
-						activeSection={activeSection}
-						setActiveSection={setActiveSection}
-						whyValue={whyValue}
-						setWhyValue={setWhyValue}
-						whatValue={whatValue}
-						setWhatValue={setWhatValue}
-						whereValue={whereValue}
-						setWhereValue={setWhereValue}
-						locationResults={locationResults}
-						isLoadingLocations={isLoadingLocations}
-						debouncedWhereValue={debouncedWhereValue}
-						onSearch={handleSearch}
-						width={`${innerWidth}px`}
-						height="44px"
-						borderRadius="4px"
-					/>
 				</div>
 			)}
 

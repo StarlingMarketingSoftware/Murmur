@@ -3971,6 +3971,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										setSelectedContactIds={setContactsTabSelectedIds}
 										handleContactSelection={handleContactsTabSelection}
 										campaign={campaign}
+										showSearchBar={false}
 										onDraftEmails={async (ids) => {
 											await handleGenerateDrafts(ids);
 										}}
@@ -4070,6 +4071,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													setSelectedContactIds={setContactsTabSelectedIds}
 													handleContactSelection={handleContactsTabSelection}
 													campaign={campaign}
+													showSearchBar={false}
 													onDraftEmails={async (ids) => {
 														await handleGenerateDrafts(ids);
 													}}
@@ -4197,6 +4199,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											setSelectedContactIds={setContactsTabSelectedIds}
 											handleContactSelection={handleContactsTabSelection}
 											campaign={campaign}
+											showSearchBar={false}
 											onDraftEmails={async (ids) => {
 												await handleGenerateDrafts(ids);
 											}}
