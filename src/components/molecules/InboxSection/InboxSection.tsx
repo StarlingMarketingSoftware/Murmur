@@ -382,6 +382,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 						? `${user.firstName} ${user.lastName}`
 						: user?.firstName || 'Murmur User',
 				originEmail: senderEmail,
+				replyToEmail: user?.replyToEmail ?? user?.murmurEmail ?? undefined,
 			});
 
 			// Store the sent reply

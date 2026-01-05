@@ -47,6 +47,8 @@ import {
 interface DataTableProps<TData, TValue> {
 	columns: ColumnDef<TData, TValue>[];
 	data: TData[] | undefined;
+	isLoading?: boolean;
+	loadingRowCount?: number;
 	setSelectedRows?: ((rows: number[]) => void) | Dispatch<SetStateAction<number[]>>;
 	singleSelection?: boolean;
 	handleRowClick?: (rowData: TData) => void;
@@ -120,6 +122,8 @@ interface CustomTableProps<TData, TValue> extends DataTableProps<TData, TValue> 
 export function CustomTable<TData, TValue>({
 	columns,
 	data,
+	isLoading = false,
+	loadingRowCount = 8,
 	setSelectedRows,
 	singleSelection,
 	handleRowClick,
@@ -275,6 +279,37 @@ export function CustomTable<TData, TValue>({
 		displayRowsPerPage ||
 		Boolean(headerAction) ||
 		Boolean(headerInlineAction);
+
+	const showLoadingSkeleton = isLoading && (!data || data.length === 0);
+	const resolvedLoadingRowCount = Math.max(1, Math.min(loadingRowCount, 20));
+	const visibleLeafColumns = table.getVisibleLeafColumns();
+	const skeletonWidthClassByIndex = (index: number): string => {
+		const widths = ['w-3/4', 'w-2/3', 'w-1/2', 'w-5/6', 'w-4/5', 'w-2/5'];
+		return widths[index % widths.length];
+	};
+	const LoadingSkeletonRows = () => (
+		<>
+			{Array.from({ length: resolvedLoadingRowCount }).map((_, rowIndex) => (
+				<TableRow
+					key={`loading-row-${rowIndex}`}
+					variant={variant}
+					className={cn(rowClassName, 'pointer-events-none')}
+					aria-hidden="true"
+				>
+					{visibleLeafColumns.map((col, colIndex) => (
+						<TableCell key={col.id} variant={variant} className="whitespace-nowrap">
+							<div
+								className={cn(
+									'h-3 rounded bg-black/10 dark:bg-white/10 animate-pulse',
+									skeletonWidthClassByIndex(colIndex)
+								)}
+							/>
+						</TableCell>
+					))}
+				</TableRow>
+			))}
+		</>
+	);
 
 	return (
 		<div className="w-full">
@@ -554,6 +589,8 @@ export function CustomTable<TData, TValue>({
 											})}
 										</TableRow>
 									))
+								) : showLoadingSkeleton ? (
+									<LoadingSkeletonRows />
 								) : (
 									<TableRow variant={variant}>
 										<TableCell
@@ -762,6 +799,8 @@ export function CustomTable<TData, TValue>({
 										})}
 									</TableRow>
 								))
+							) : showLoadingSkeleton ? (
+								<LoadingSkeletonRows />
 							) : (
 								<TableRow variant={variant}>
 									<TableCell

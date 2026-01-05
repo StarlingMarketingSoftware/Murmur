@@ -142,6 +142,12 @@ interface DraftingTableProps {
 	totalDraftsCount?: number;
 	/** Mobile mode flag */
 	isMobile?: boolean | null;
+	/**
+	 * Contacts-only: controls the amount of reserved vertical space when `topContent` is provided.
+	 * - default: assumes the mini search bar + selected row (existing layout)
+	 * - compact: assumes only the selected row (no search bar)
+	 */
+	contactsTopContentVariant?: 'default' | 'compact';
 }
 export const DraftingTable: FC<DraftingTableProps> = ({
 	title,
@@ -166,6 +172,7 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 	rejectedCount = 0,
 	totalDraftsCount = 0,
 	isMobile,
+	contactsTopContentVariant = 'default',
 }) => {
 	const router = useRouter();
 	const [isDraftsCounterHovered, setIsDraftsCounterHovered] = useState(false);
@@ -719,7 +726,9 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 						isContacts && isMobile
 							? '8px' // Minimal margin on mobile (no white header)
 							: isContacts && topContent && hasData
-							? '115px'
+							? contactsTopContentVariant === 'compact'
+								? '45px'
+								: '115px'
 							: isContacts && hasData
 							? '105px'
 							: isContacts
