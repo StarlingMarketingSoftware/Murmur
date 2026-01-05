@@ -850,9 +850,11 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 									)}
 									{isDrafts && idx === 3 && (
 										<div
-											className="bg-white rounded-[8px] border-2 border-[#000000] flex items-center justify-center cursor-pointer hover:bg-gray-50 transition-colors"
+											className="bg-white rounded-[8px] border-2 border-[#000000] flex items-center justify-center cursor-pointer hover:bg-[#84B9F5] transition-colors"
 											style={{ width: innerButtonWidth, height: isMobile ? '44px' : '42px' }}
 											onClick={goToInbox}
+											onMouseEnter={() => setInboxTabHighlighted(true)}
+											onMouseLeave={() => setInboxTabHighlighted(false)}
 										>
 											<span className={`font-semibold font-inter text-black ${isMobile ? 'text-[12px]' : 'text-[15px]'}`}>
 												Check Inbox
