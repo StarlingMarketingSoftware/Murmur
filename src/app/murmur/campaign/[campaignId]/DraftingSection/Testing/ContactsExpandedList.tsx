@@ -210,11 +210,11 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 			)}
 
 			{!isBottomView && (
-				<div className="px-3 mt-1 mb-0 flex items-center justify-center relative text-[14px] font-inter font-medium text-black/70">
+				<div className="px-3 mt-1 mb-0 flex items-center justify-center relative top-1 text-[13px] font-inter font-medium text-black/70">
 					<span>{selectedCount} Selected</span>
 					<button
 						type="button"
-						className="absolute right-3 bg-transparent border-none p-0 hover:text-black text-[14px] font-inter font-medium text-black/70 cursor-pointer"
+						className="absolute right-3 bg-transparent border-none p-0 hover:text-black text-[13px] font-inter font-medium text-black/70 cursor-pointer"
 						onClick={handleSelectAllToggle}
 					>
 						{areAllSelected ? 'Deselect All' : 'Select All'}
