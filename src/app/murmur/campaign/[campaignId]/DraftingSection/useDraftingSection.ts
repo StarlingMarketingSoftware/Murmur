@@ -42,9 +42,24 @@ import { z } from 'zod';
 import { HANDWRITTEN_PLACEHOLDER_OPTIONS } from '@/components/molecules/HandwrittenPromptInput/HandwrittenPromptInput';
 import { ContactWithName } from '@/types/contact';
 
+export type DraftingSectionView =
+	| 'search'
+	| 'contacts'
+	| 'testing'
+	| 'drafting'
+	| 'sent'
+	| 'inbox'
+	| 'all';
+
 export interface DraftingSectionProps {
 	campaign: CampaignWithRelations;
-	view?: 'search' | 'contacts' | 'testing' | 'drafting' | 'sent' | 'inbox' | 'all';
+	view?: DraftingSectionView;
+	/**
+	 * Called after the DraftingSection's current view has rendered on the client.
+	 * Used by the campaign page to time crossfade transitions so heavy views (e.g. Writing)
+	 * don't reveal a blank frame at the end of the animation.
+	 */
+	onViewReady?: (view: DraftingSectionView) => void;
 	/**
 	 * When true, renders viewport-fixed overlays (like the top drafting progress bar).
 	 * This should only be enabled on the "active" DraftingSection instance during tab crossfades.

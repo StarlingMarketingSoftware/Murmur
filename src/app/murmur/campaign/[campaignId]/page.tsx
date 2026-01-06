@@ -4,6 +4,7 @@
 export const dynamic = 'force-dynamic';
 
 import { useCampaignDetail } from './useCampaignDetail';
+import type { DraftingSectionView } from './DraftingSection/useDraftingSection';
 import { CampaignPageSkeleton } from '@/components/molecules/CampaignPageSkeleton/CampaignPageSkeleton';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { urls } from '@/constants/urls';
@@ -11,7 +12,7 @@ import Link from 'next/link';
 import { cn } from '@/utils';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { useMe } from '@/hooks/useMe';
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo, useLayoutEffect } from 'react';
 import LeftArrow from '@/components/atoms/_svg/LeftArrow';
 import RightArrow from '@/components/atoms/_svg/RightArrow';
 import BottomArrowIcon from '@/components/atoms/_svg/BottomArrowIcon';
@@ -35,6 +36,8 @@ type ViewType = 'contacts' | 'testing' | 'drafting' | 'sent' | 'inbox' | 'all';
 
 // Transition duration in ms - fast enough to feel instant, still smooth
 const TRANSITION_DURATION = 180;
+// Safety valve: if a destination view is unusually slow to paint, don't block the transition forever.
+const MAX_TRANSITION_WAIT_MS = 650;
 
 // Dynamically import heavy components to reduce initial bundle size and prevent Vercel timeout
 const DraftingSection = nextDynamic(
@@ -248,34 +251,210 @@ const Murmur = () => {
 	// Track previous view for crossfade transitions
 	const [previousView, setPreviousView] = useState<ViewType | null>(null);
 	const [isTransitioning, setIsTransitioning] = useState(false);
+	const [isFadingOutPreviousView, setIsFadingOutPreviousView] = useState(false);
 	const transitionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+	const maxWaitTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+	const crossfadeContainerRef = useRef<HTMLDivElement>(null);
+	const headerBoxMoveCleanupRef = useRef<(() => void) | null>(null);
 	
 	// Wrapped setActiveView that handles transitions
 	const setActiveView = useCallback((newView: ViewType) => {
 		if (newView === activeView) return;
 		
-		// Clear any pending transition
+		// Clear any pending transition timers
 		if (transitionTimeoutRef.current) {
 			clearTimeout(transitionTimeoutRef.current);
+			transitionTimeoutRef.current = null;
+		}
+		if (maxWaitTimeoutRef.current) {
+			clearTimeout(maxWaitTimeoutRef.current);
+			maxWaitTimeoutRef.current = null;
 		}
 		
 		// Start transition: keep previous view visible while fading
 		setPreviousView(activeView);
 		setIsTransitioning(true);
+		setIsFadingOutPreviousView(false);
 		setActiveViewInternal(newView);
-		
-		// End transition after animation completes
+
+		// Fallback: if we never get a "view ready" callback (should be rare), fade out anyway.
+		maxWaitTimeoutRef.current = setTimeout(() => {
+			setIsFadingOutPreviousView(true);
+		}, MAX_TRANSITION_WAIT_MS);
+	}, [activeView]);
+
+	const handleActiveViewReady = useCallback(
+		(readyView: DraftingSectionView) => {
+			// Only start fading once the destination view has actually painted.
+			if (!isTransitioning || !previousView) return;
+			if (isFadingOutPreviousView) return;
+			if (readyView !== activeView) return;
+
+			if (maxWaitTimeoutRef.current) {
+				clearTimeout(maxWaitTimeoutRef.current);
+				maxWaitTimeoutRef.current = null;
+			}
+
+			setIsFadingOutPreviousView(true);
+		},
+		[activeView, isFadingOutPreviousView, isTransitioning, previousView]
+	);
+
+	// Once the fade-out has started, end the transition after the animation duration.
+	useEffect(() => {
+		if (!isFadingOutPreviousView) return;
+		if (!previousView) return;
+
+		if (transitionTimeoutRef.current) {
+			clearTimeout(transitionTimeoutRef.current);
+			transitionTimeoutRef.current = null;
+		}
+
 		transitionTimeoutRef.current = setTimeout(() => {
 			setPreviousView(null);
 			setIsTransitioning(false);
+			setIsFadingOutPreviousView(false);
 		}, TRANSITION_DURATION);
-	}, [activeView]);
+	}, [isFadingOutPreviousView, previousView]);
+
+	// Shared-element move for the CampaignHeaderBox when tab layouts change.
+	// This is intentionally driven by the same fade-start signal so timing matches other tab transitions.
+	useLayoutEffect(() => {
+		if (!isFadingOutPreviousView) return;
+		if (!previousView) return;
+		if (typeof window === 'undefined') return;
+
+		// Respect reduced motion.
+		if (window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches) return;
+
+		// Cleanup any in-flight header animation.
+		if (headerBoxMoveCleanupRef.current) {
+			headerBoxMoveCleanupRef.current();
+			headerBoxMoveCleanupRef.current = null;
+		}
+
+		const container = crossfadeContainerRef.current;
+		if (!container) return;
+
+		const activeRoot = container.querySelector(
+			'[data-campaign-view-layer="active"]'
+		) as HTMLElement | null;
+		const previousRoot = container.querySelector(
+			'[data-campaign-view-layer="previous"]'
+		) as HTMLElement | null;
+		if (!activeRoot || !previousRoot) return;
+
+		const findVisibleHeader = (root: HTMLElement): HTMLElement | null => {
+			const candidates = Array.from(
+				root.querySelectorAll('[data-campaign-header-box]')
+			) as HTMLElement[];
+			for (const el of candidates) {
+				const rect = el.getBoundingClientRect();
+				if (rect.width > 1 && rect.height > 1) return el;
+			}
+			return null;
+		};
+
+		const fromHeader = findVisibleHeader(previousRoot);
+		const toHeader = findVisibleHeader(activeRoot);
+		if (!fromHeader || !toHeader) return;
+
+		const fromRect = fromHeader.getBoundingClientRect();
+		const toRect = toHeader.getBoundingClientRect();
+		if (fromRect.width <= 1 || fromRect.height <= 1 || toRect.width <= 1 || toRect.height <= 1) {
+			return;
+		}
+
+		// Account for any CSS zoom applied to the root element (keeps the ghost aligned at non-1 zoom).
+		const zoomStr = window.getComputedStyle(document.documentElement).zoom;
+		const zoom = zoomStr ? parseFloat(zoomStr) : 1;
+		const z = zoom || 1;
+
+		const dx = (toRect.left - fromRect.left) / z;
+		const dy = (toRect.top - fromRect.top) / z;
+		// If the header didn't move, don't do anything (avoids flicker on same-layout tab switches).
+		if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return;
+
+		const ghost = fromHeader.cloneNode(true) as HTMLElement;
+		ghost.setAttribute('data-campaign-header-box-ghost', 'true');
+		ghost.style.position = 'fixed';
+		ghost.style.left = `${fromRect.left / z}px`;
+		ghost.style.top = `${fromRect.top / z}px`;
+		ghost.style.right = 'auto';
+		ghost.style.bottom = 'auto';
+		ghost.style.margin = '0';
+		ghost.style.zIndex = '99999';
+		ghost.style.pointerEvents = 'none';
+		ghost.style.willChange = 'transform';
+		ghost.style.transform = 'translate3d(0px, 0px, 0px)';
+
+		// Ensure the ghost uses the measured box size (avoid sublayout style differences).
+		ghost.style.width = `${fromRect.width / z}px`;
+		ghost.style.height = `${fromRect.height / z}px`;
+		ghost.style.maxWidth = `${fromRect.width / z}px`;
+		ghost.style.maxHeight = `${fromRect.height / z}px`;
+
+		// Hide the real headers during the move to avoid "double header" artifacts.
+		const prevFromOpacity = fromHeader.style.opacity;
+		const prevFromPointerEvents = fromHeader.style.pointerEvents;
+		const prevToOpacity = toHeader.style.opacity;
+		const prevToPointerEvents = toHeader.style.pointerEvents;
+		fromHeader.style.opacity = '0';
+		fromHeader.style.pointerEvents = 'none';
+		toHeader.style.opacity = '0';
+		toHeader.style.pointerEvents = 'none';
+
+		document.body.appendChild(ghost);
+
+		const animation = ghost.animate(
+			[
+				{ transform: 'translate3d(0px, 0px, 0px)' },
+				{ transform: `translate3d(${dx}px, ${dy}px, 0px)` },
+			],
+			{
+				duration: TRANSITION_DURATION,
+				easing: 'ease-out',
+				fill: 'forwards',
+			}
+		);
+
+		const cleanup = () => {
+			try {
+				animation.cancel();
+			} catch {
+				// no-op
+			}
+			ghost.remove();
+			fromHeader.style.opacity = prevFromOpacity;
+			fromHeader.style.pointerEvents = prevFromPointerEvents;
+			toHeader.style.opacity = prevToOpacity;
+			toHeader.style.pointerEvents = prevToPointerEvents;
+		};
+
+		headerBoxMoveCleanupRef.current = cleanup;
+
+		animation.onfinish = () => {
+			ghost.remove();
+			// Reveal the destination header.
+			toHeader.style.opacity = prevToOpacity;
+			toHeader.style.pointerEvents = prevToPointerEvents;
+			// Restore the previous header (it's about to be fully faded out / unmounted anyway).
+			fromHeader.style.opacity = prevFromOpacity;
+			fromHeader.style.pointerEvents = prevFromPointerEvents;
+			headerBoxMoveCleanupRef.current = null;
+		};
+
+		return cleanup;
+	}, [isFadingOutPreviousView, previousView]);
 	
 	// Cleanup timeout on unmount
 	useEffect(() => {
 		return () => {
 			if (transitionTimeoutRef.current) {
 				clearTimeout(transitionTimeoutRef.current);
+			}
+			if (maxWaitTimeoutRef.current) {
+				clearTimeout(maxWaitTimeoutRef.current);
 			}
 		};
 	}, []);
@@ -1071,22 +1250,33 @@ const Murmur = () => {
 						}
 					>
 						{/* Crossfade transition container */}
-						<div className="relative w-full isolate">
+						<div ref={crossfadeContainerRef} className="relative w-full isolate">
 							{/* Determine if both views share the same research panel position */}
 							{(() => {
 								const standardPositionTabs: ViewType[] = ['testing', 'contacts', 'drafting', 'sent'];
-								const bothSharePosition = isTransitioning && previousView && 
+								// Only apply the "stable research panel" treatment during the actual fade,
+								// not while we're waiting for the destination view to paint.
+								const bothSharePosition = isFadingOutPreviousView && previousView && 
 									standardPositionTabs.includes(previousView) && 
 									standardPositionTabs.includes(activeView);
 								
 								return (
 									<>
 										{/* Current view - always visible (avoid the "white flash" between tabs) */}
-										<div className="relative w-full" style={{ zIndex: 1 }}>
+										<div
+											data-campaign-view-layer="active"
+											className={cn(
+												'relative w-full',
+												// Prevent interacting with the destination view while the previous view is still covering it.
+												isTransitioning && previousView && 'pointer-events-none'
+											)}
+											style={{ zIndex: 1 }}
+										>
 											<DraftingSection
 												campaign={campaign}
 												view={activeView}
 												renderGlobalOverlays
+												onViewReady={handleActiveViewReady}
 												autoOpenProfileTabWhenIncomplete={cameFromSearch}
 												goToDrafting={() => setActiveView('drafting')}
 												goToAll={() => setActiveView('all')}
@@ -1109,12 +1299,17 @@ const Murmur = () => {
 										{/* Previous view - fades out above the current view */}
 										{isTransitioning && previousView && (
 											<div
+												data-campaign-view-layer="previous"
 												className="absolute inset-0 w-full pointer-events-none"
 												aria-hidden="true"
 												style={{
-													animation: `viewFadeOut ${TRANSITION_DURATION}ms ease-out forwards`,
 													zIndex: 2,
 													willChange: 'opacity',
+													...(isFadingOutPreviousView
+														? {
+																animation: `viewFadeOut ${TRANSITION_DURATION}ms ease-out forwards`,
+														  }
+														: { opacity: 1 }),
 												}}
 											>
 												<DraftingSection
@@ -1595,6 +1790,8 @@ const Murmur = () => {
 				<CampaignRightPanel
 					view={activeView}
 					onTabChange={setActiveView}
+					transitionDurationMs={TRANSITION_DURATION}
+					isViewTransitionFading={isFadingOutPreviousView}
 					className={shouldApplyWritingTopShift ? 'translate-y-[81px]' : undefined}
 				/>
 			)}

@@ -1032,49 +1032,49 @@ export const InboxSection: FC<InboxSectionProps> = ({
 
 	return (
 		<div className={`w-full flex justify-center ${isMobile ? 'px-1' : 'px-4'}`}>
-			<div data-campaign-main-box="inbox">
-				<CustomScrollbar
-					className="flex flex-col items-center relative"
-					contentClassName="flex flex-col items-center w-full"
-					thumbWidth={2}
-					thumbColor="#000000"
-					trackColor="transparent"
-					offsetRight={-6}
-					disableOverflowClass
-					style={{
-						width: isMobile ? mobileBoxWidth : `${boxWidth}px`,
-						maxWidth: isMobile ? undefined : `${boxWidth}px`,
-						height: isMobile ? 'calc(100dvh - 160px)' : '657px',
-						minHeight: isMobile ? 'calc(100dvh - 160px)' : '657px',
-						maxHeight: isMobile ? 'calc(100dvh - 160px)' : '657px',
-						border: '3px solid #000000',
-						borderRadius: '8px',
-						padding: selectedEmail
-							? isMobile
-								? '18px 8px 8px 8px'
-								: '21px 13px 12px 13px'
-							: isMobile
-							? '8px'
-							: '16px',
-						paddingTop: selectedEmail
-							? isMobile
-								? '18px'
-								: '21px'
-							: isMobile
-							? '62px'
-							: '109px', // Adjusted for mobile
-						background: selectedEmail
-							? '#437ec1'
-							: isMobile
-							? activeTab === 'sent'
-								? '#5AB477'
-								: '#6fa4e1'
-							: activeTab === 'sent'
-							? 'linear-gradient(to bottom, #FFFFFF 19px, #5AB477 19px)'
-							: 'linear-gradient(to bottom, #FFFFFF 19px, #6fa4e1 19px)',
-						overflow: isMobile ? 'hidden' : undefined,
-					}}
-				>
+			<CustomScrollbar
+				data-campaign-main-box="inbox"
+				className="flex flex-col items-center relative"
+				contentClassName="flex flex-col items-center w-full"
+				thumbWidth={2}
+				thumbColor="#000000"
+				trackColor="transparent"
+				offsetRight={-6}
+				disableOverflowClass
+				style={{
+					width: isMobile ? mobileBoxWidth : `${boxWidth}px`,
+					maxWidth: isMobile ? undefined : `${boxWidth}px`,
+					height: isMobile ? 'calc(100dvh - 160px)' : '657px',
+					minHeight: isMobile ? 'calc(100dvh - 160px)' : '657px',
+					maxHeight: isMobile ? 'calc(100dvh - 160px)' : '657px',
+					border: '3px solid #000000',
+					borderRadius: '8px',
+					padding: selectedEmail
+						? isMobile
+							? '18px 8px 8px 8px'
+							: '21px 13px 12px 13px'
+						: isMobile
+						? '8px'
+						: '16px',
+					paddingTop: selectedEmail
+						? isMobile
+							? '18px'
+							: '21px'
+						: isMobile
+						? '62px'
+						: '109px', // Adjusted for mobile
+					background: selectedEmail
+						? '#437ec1'
+						: isMobile
+						? activeTab === 'sent'
+							? '#5AB477'
+							: '#6fa4e1'
+						: activeTab === 'sent'
+						? 'linear-gradient(to bottom, #FFFFFF 19px, #5AB477 19px)'
+						: 'linear-gradient(to bottom, #FFFFFF 19px, #6fa4e1 19px)',
+					overflow: isMobile ? 'hidden' : undefined,
+				}}
+			>
 					{/* Back button - shown when email is selected */}
 					{selectedEmail && (
 						<button
@@ -1874,8 +1874,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 						))}
 					</>
 				)}
-				</CustomScrollbar>
-			</div>
+			</CustomScrollbar>
 		</div>
 	);
 };
