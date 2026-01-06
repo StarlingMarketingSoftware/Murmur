@@ -324,14 +324,18 @@ const Murmur = () => {
 		if (!previousView) return;
 		if (typeof window === 'undefined') return;
 
-		// Respect reduced motion.
-		if (window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches) return;
-
 		// Cleanup any in-flight header animation.
 		if (headerBoxMoveCleanupRef.current) {
 			headerBoxMoveCleanupRef.current();
 			headerBoxMoveCleanupRef.current = null;
 		}
+
+		// The All tab should crossfade (opacity-only) rather than sliding/moving the header box.
+		// Skip the shared-element "ghost move" when entering or leaving All.
+		if (activeView === 'all' || previousView === 'all') return;
+
+		// Respect reduced motion.
+		if (window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches) return;
 
 		const container = crossfadeContainerRef.current;
 		if (!container) return;
@@ -445,7 +449,7 @@ const Murmur = () => {
 		};
 
 		return cleanup;
-	}, [isFadingOutPreviousView, previousView]);
+	}, [activeView, isFadingOutPreviousView, previousView]);
 	
 	// Cleanup timeout on unmount
 	useEffect(() => {
