@@ -40,6 +40,7 @@ export const CampaignRightPanel: FC<CampaignRightPanelProps> = ({
 	const containerRef = useRef<HTMLDivElement | null>(null);
 	const prevRectRef = useRef<DOMRect | null>(null);
 	const prevViewRef = useRef<CampaignRightPanelProps['view']>(view);
+	const prevLeftPositionRef = useRef<string | null>(null);
 	const pendingAllDxRef = useRef<number | null>(null);
 
 	const listRef = useRef<HTMLDivElement | null>(null);
@@ -75,6 +76,13 @@ export const CampaignRightPanel: FC<CampaignRightPanelProps> = ({
 	useLayoutEffect(() => {
 		const el = containerRef.current;
 		if (!el) return;
+
+		// Important: `isViewTransitionFading` toggles after the new view paints (to begin the crossfade).
+		// We *don't* want that signal to interrupt an in-flight horizontal slide, so only run the FLIP
+		// positioning logic when the computed `left` position actually changes.
+		const prevLeftPosition = prevLeftPositionRef.current;
+		prevLeftPositionRef.current = leftPosition;
+		if (prevLeftPosition === leftPosition) return;
 
 		const prevView = prevViewRef.current;
 		prevViewRef.current = view;
