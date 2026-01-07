@@ -38,6 +38,8 @@ export const ContactsHeaderChrome: FC<{ offsetY?: number; hasData?: boolean; isA
 	return (
 		<>
 			<div
+				data-campaign-shared-pill="campaign-tabs-pill"
+				data-campaign-shared-pill-variant="contacts"
 				style={{
 					position: 'absolute',
 					top: `${pillTop}px`,
@@ -245,6 +247,8 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 			{isDrafts && !isMobile && (
 				<>
 					<div
+						data-campaign-shared-pill="campaign-tabs-pill"
+						data-campaign-shared-pill-variant="drafts"
 						style={{
 							position: 'absolute',
 							top: '3px',
@@ -336,6 +340,8 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 			{isSent && !isMobile && (
 				<>
 					<div
+						data-campaign-shared-pill="campaign-tabs-pill"
+						data-campaign-shared-pill-variant="sent"
 						style={{
 							position: 'absolute',
 							top: '3px',

@@ -256,6 +256,7 @@ const Murmur = () => {
 	const maxWaitTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 	const crossfadeContainerRef = useRef<HTMLDivElement>(null);
 	const headerBoxMoveCleanupRef = useRef<(() => void) | null>(null);
+	const contactsDraftsPillMoveCleanupRef = useRef<(() => void) | null>(null);
 	
 	// Wrapped setActiveView that handles transitions
 	const setActiveView = useCallback((newView: ViewType) => {
@@ -450,6 +451,194 @@ const Murmur = () => {
 
 		return cleanup;
 	}, [activeView, isFadingOutPreviousView, previousView]);
+
+	// Shared-element move for the Contacts/Drafts table header pill when switching between those tabs.
+	// This uses the same fade-start signal and duration so the slide is perfectly synced to the tab fade.
+	useLayoutEffect(() => {
+		if (!isFadingOutPreviousView) return;
+		if (!previousView) return;
+		if (typeof window === 'undefined') return;
+
+		// Cleanup any in-flight pill animation.
+		if (contactsDraftsPillMoveCleanupRef.current) {
+			contactsDraftsPillMoveCleanupRef.current();
+			contactsDraftsPillMoveCleanupRef.current = null;
+		}
+
+		const pillViews: ViewType[] = ['contacts', 'drafting', 'sent'];
+		const shouldAnimatePill =
+			pillViews.includes(previousView) &&
+			pillViews.includes(activeView) &&
+			previousView !== activeView;
+		if (!shouldAnimatePill) return;
+
+		// Respect reduced motion.
+		if (window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches) return;
+
+		const container = crossfadeContainerRef.current;
+		if (!container) return;
+
+		const activeRoot = container.querySelector(
+			'[data-campaign-view-layer="active"]'
+		) as HTMLElement | null;
+		const previousRoot = container.querySelector(
+			'[data-campaign-view-layer="previous"]'
+		) as HTMLElement | null;
+		if (!activeRoot || !previousRoot) return;
+
+		const boxIdForView = (v: ViewType) => (v === 'drafting' ? 'drafts' : v);
+
+		const findVisiblePill = (root: HTMLElement, v: ViewType): HTMLElement | null => {
+			const boxId = boxIdForView(v);
+			const mainBox = root.querySelector(
+				`[data-campaign-main-box="${boxId}"]`
+			) as HTMLElement | null;
+			if (!mainBox) return null;
+
+			const candidates = Array.from(
+				mainBox.querySelectorAll('[data-campaign-shared-pill="campaign-tabs-pill"]')
+			) as HTMLElement[];
+			for (const el of candidates) {
+				const rect = el.getBoundingClientRect();
+				if (rect.width > 1 && rect.height > 1) return el;
+			}
+			return null;
+		};
+
+		const fromPill = findVisiblePill(previousRoot, previousView);
+		const toPill = findVisiblePill(activeRoot, activeView);
+		if (!fromPill || !toPill) return;
+
+		const fromRect = fromPill.getBoundingClientRect();
+		const toRect = toPill.getBoundingClientRect();
+		if (
+			fromRect.width <= 1 ||
+			fromRect.height <= 1 ||
+			toRect.width <= 1 ||
+			toRect.height <= 1
+		) {
+			return;
+		}
+
+		// Account for any CSS zoom applied to the root element (keeps the ghost aligned at non-1 zoom).
+		const zoomStr = window.getComputedStyle(document.documentElement).zoom;
+		const zoom = zoomStr ? parseFloat(zoomStr) : 1;
+		const z = zoom || 1;
+
+		const dx = (toRect.left - fromRect.left) / z;
+		const dy = (toRect.top - fromRect.top) / z;
+		// If the pill didn't move, don't do anything (avoids flicker on same-layout tab switches).
+		if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return;
+
+		// Two ghosts: crossfade the Contacts and Drafts pills mid-flight so label/colors don't snap.
+		const ghostFrom = fromPill.cloneNode(true) as HTMLElement;
+		const ghostTo = toPill.cloneNode(true) as HTMLElement;
+		ghostFrom.setAttribute('data-campaign-shared-pill-ghost', 'from');
+		ghostTo.setAttribute('data-campaign-shared-pill-ghost', 'to');
+
+		const initGhost = (ghostEl: HTMLElement) => {
+			ghostEl.style.position = 'fixed';
+			ghostEl.style.left = `${fromRect.left / z}px`;
+			ghostEl.style.top = `${fromRect.top / z}px`;
+			ghostEl.style.right = 'auto';
+			ghostEl.style.bottom = 'auto';
+			ghostEl.style.margin = '0';
+			ghostEl.style.zIndex = '99999';
+			ghostEl.style.pointerEvents = 'none';
+			ghostEl.style.willChange = 'transform, opacity';
+			ghostEl.style.transform = 'translate3d(0px, 0px, 0px)';
+
+			// Ensure the ghost uses the measured box size (avoid sublayout style differences).
+			ghostEl.style.width = `${fromRect.width / z}px`;
+			ghostEl.style.height = `${fromRect.height / z}px`;
+			ghostEl.style.maxWidth = `${fromRect.width / z}px`;
+			ghostEl.style.maxHeight = `${fromRect.height / z}px`;
+		};
+		initGhost(ghostFrom);
+		initGhost(ghostTo);
+		ghostFrom.style.opacity = '1';
+		ghostTo.style.opacity = '0';
+
+		// Hide the real pills during the move to avoid "double pill" artifacts.
+		const prevFromOpacity = fromPill.style.opacity;
+		const prevFromPointerEvents = fromPill.style.pointerEvents;
+		const prevToOpacity = toPill.style.opacity;
+		const prevToPointerEvents = toPill.style.pointerEvents;
+		fromPill.style.opacity = '0';
+		fromPill.style.pointerEvents = 'none';
+		toPill.style.opacity = '0';
+		toPill.style.pointerEvents = 'none';
+
+		document.body.appendChild(ghostFrom);
+		document.body.appendChild(ghostTo);
+
+		const transformKeyframes: Keyframe[] = [
+			{ transform: 'translate3d(0px, 0px, 0px)' },
+			{ transform: `translate3d(${dx}px, ${dy}px, 0px)` },
+		];
+		const transformTiming: KeyframeAnimationOptions = {
+			duration: TRANSITION_DURATION,
+			easing: 'ease-out',
+			fill: 'forwards',
+		};
+
+		// Concentrate the crossfade in the middle of the travel (avoid end-snap).
+		const opacityKeyframesFrom: Keyframe[] = [
+			{ opacity: 1, offset: 0 },
+			{ opacity: 1, offset: 0.3 },
+			{ opacity: 0, offset: 0.7 },
+			{ opacity: 0, offset: 1 },
+		];
+		const opacityKeyframesTo: Keyframe[] = [
+			{ opacity: 0, offset: 0 },
+			{ opacity: 0, offset: 0.3 },
+			{ opacity: 1, offset: 0.7 },
+			{ opacity: 1, offset: 1 },
+		];
+		const opacityTiming: KeyframeAnimationOptions = {
+			duration: TRANSITION_DURATION,
+			easing: 'linear',
+			fill: 'forwards',
+		};
+
+		const anims: Animation[] = [
+			ghostFrom.animate(transformKeyframes, transformTiming),
+			ghostTo.animate(transformKeyframes, transformTiming),
+			ghostFrom.animate(opacityKeyframesFrom, opacityTiming),
+			ghostTo.animate(opacityKeyframesTo, opacityTiming),
+		];
+
+		const cleanup = () => {
+			try {
+				for (const a of anims) a.cancel();
+			} catch {
+				// no-op
+			}
+			ghostFrom.remove();
+			ghostTo.remove();
+			fromPill.style.opacity = prevFromOpacity;
+			fromPill.style.pointerEvents = prevFromPointerEvents;
+			toPill.style.opacity = prevToOpacity;
+			toPill.style.pointerEvents = prevToPointerEvents;
+		};
+
+		contactsDraftsPillMoveCleanupRef.current = cleanup;
+
+		// Use the "to" opacity animation as the completion signal (same duration as the fade).
+		anims[3].onfinish = () => {
+			ghostFrom.remove();
+			ghostTo.remove();
+			// Reveal the destination pill.
+			toPill.style.opacity = prevToOpacity;
+			toPill.style.pointerEvents = prevToPointerEvents;
+			// Restore the previous pill (it's about to be fully faded out / unmounted anyway).
+			fromPill.style.opacity = prevFromOpacity;
+			fromPill.style.pointerEvents = prevFromPointerEvents;
+			contactsDraftsPillMoveCleanupRef.current = null;
+		};
+
+		return cleanup;
+	}, [activeView, isFadingOutPreviousView, previousView]);
 	
 	// Cleanup timeout on unmount
 	useEffect(() => {
@@ -531,12 +720,12 @@ const Murmur = () => {
 		'testing',
 		'all',
 		'drafting',
+		'sent',
 		'inbox',
 	];
-	const getTabOrderView = (view: ViewType): ViewType => (view === 'sent' ? 'inbox' : view);
 
 	const goToPreviousTab = () => {
-		const currentIndex = tabOrder.indexOf(getTabOrderView(activeView));
+		const currentIndex = tabOrder.indexOf(activeView);
 		if (currentIndex > 0) {
 			setActiveView(tabOrder[currentIndex - 1]);
 		} else {
@@ -546,7 +735,7 @@ const Murmur = () => {
 	};
 
 	const goToNextTab = () => {
-		const currentIndex = tabOrder.indexOf(getTabOrderView(activeView));
+		const currentIndex = tabOrder.indexOf(activeView);
 		if (currentIndex < tabOrder.length - 1) {
 			setActiveView(tabOrder[currentIndex + 1]);
 		} else {
@@ -989,7 +1178,9 @@ const Murmur = () => {
 								onClick={() => setActiveView('sent')}
 								className={cn(
 									'absolute left-1/2 -translate-x-1/2 top-full mt-[6px] z-50',
-									'hidden group-hover:flex group-focus-within:flex',
+									activeView === 'sent'
+										? 'flex'
+										: 'hidden group-hover:flex group-focus-within:flex',
 									'w-[54px] h-[27px] rounded-[8px]',
 									'bg-[#E4EBE6]',
 									'items-center justify-center cursor-pointer',
@@ -1230,7 +1421,9 @@ const Murmur = () => {
 										onClick={() => setActiveView('sent')}
 										className={cn(
 											'absolute left-1/2 -translate-x-1/2 top-full mt-[6px] z-50',
-											'hidden group-hover:flex group-focus-within:flex',
+											activeView === 'sent'
+												? 'flex'
+												: 'hidden group-hover:flex group-focus-within:flex',
 											'w-[54px] h-[27px] rounded-[8px]',
 											'bg-[#E4EBE6]',
 											'items-center justify-center cursor-pointer',
