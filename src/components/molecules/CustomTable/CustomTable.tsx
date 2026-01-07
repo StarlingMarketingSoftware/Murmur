@@ -592,7 +592,10 @@ export function CustomTable<TData, TValue>({
 								) : showLoadingSkeleton ? (
 									<LoadingSkeletonRows />
 								) : (
-									<TableRow variant={variant}>
+									<TableRow
+										variant={variant}
+										className={cn('cursor-default', rowClassName)}
+									>
 										<TableCell
 											variant={variant}
 											colSpan={columns.length}
@@ -802,7 +805,7 @@ export function CustomTable<TData, TValue>({
 							) : showLoadingSkeleton ? (
 								<LoadingSkeletonRows />
 							) : (
-								<TableRow variant={variant}>
+							<TableRow variant={variant} className={cn('cursor-default', rowClassName)}>
 									<TableCell
 										variant={variant}
 										colSpan={columns.length}
