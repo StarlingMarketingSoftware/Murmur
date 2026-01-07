@@ -4004,6 +4004,19 @@ html.murmur-compact {
 	}
 }
 
+/* Campaign route extra compact scaling (85%) */
+html.murmur-compact.murmur-campaign-compact {
+	zoom: 0.85;
+}
+
+@supports not (zoom: 0.85) {
+	html.murmur-compact.murmur-campaign-compact body {
+		transform: scale(0.85);
+		transform-origin: top center;
+		width: calc(100% / 0.85);
+	}
+}
+
 /* Re-enable necessary transform and ensure stacking for the left icon */
 .results-search-icon-btn {
 	transform: translateY(-50%) !important;
