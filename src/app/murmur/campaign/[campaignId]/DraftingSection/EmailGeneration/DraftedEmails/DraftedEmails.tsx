@@ -476,7 +476,9 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 							flexDirection: 'column',
 							justifyContent: 'center',
 							alignSelf: 'stretch',
-							maxWidth: isMobile ? 'calc(100% - 40px)' : '250px',
+							// Let company/name use more of the header before the right-side state/title pills.
+							// (Right block starts at ~284px from the left inside a 499px header; 268px keeps us flush without overlap.)
+							maxWidth: isMobile ? 'calc(100% - 40px)' : '268px',
 							overflow: 'hidden',
 							transform: 'translateY(-1px)',
 						}}>
@@ -487,8 +489,8 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 										style={{ 
 											fontSize: '17px',
 											lineHeight: '18px',
-											WebkitMaskImage: 'linear-gradient(90deg, #000 85%, transparent 100%)',
-											maskImage: 'linear-gradient(90deg, #000 85%, transparent 100%)',
+											WebkitMaskImage: 'linear-gradient(90deg, #000 96%, transparent 100%)',
+											maskImage: 'linear-gradient(90deg, #000 96%, transparent 100%)',
 										}}
 									>
 										{companyName}
@@ -499,8 +501,8 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 											fontSize: '11px', 
 											lineHeight: '12px',
 											marginTop: '1px',
-											WebkitMaskImage: 'linear-gradient(90deg, #000 85%, transparent 100%)',
-											maskImage: 'linear-gradient(90deg, #000 85%, transparent 100%)',
+											WebkitMaskImage: 'linear-gradient(90deg, #000 96%, transparent 100%)',
+											maskImage: 'linear-gradient(90deg, #000 96%, transparent 100%)',
 										}}
 									>
 										{displayName}
@@ -512,8 +514,8 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 									style={{ 
 										fontSize: '17px',
 										lineHeight: '18px',
-										WebkitMaskImage: 'linear-gradient(90deg, #000 85%, transparent 100%)',
-										maskImage: 'linear-gradient(90deg, #000 85%, transparent 100%)',
+										WebkitMaskImage: 'linear-gradient(90deg, #000 96%, transparent 100%)',
+										maskImage: 'linear-gradient(90deg, #000 96%, transparent 100%)',
 									}}
 								>
 									{companyName || displayName || 'Unknown Contact'}
@@ -563,10 +565,17 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 								) : null}
 
 								{contact?.city ? (
-									<ScrollableText
-										text={contact.city}
-										className="text-[12px] font-inter text-black leading-none max-w-[160px]"
-									/>
+									<div
+										className="text-[12px] font-inter text-black leading-none truncate"
+										style={{
+											maxWidth: '160px',
+											WebkitMaskImage:
+												'linear-gradient(90deg, #000 92%, transparent 100%)',
+											maskImage: 'linear-gradient(90deg, #000 92%, transparent 100%)',
+										}}
+									>
+										{contact.city}
+									</div>
 								) : null}
 							</div>
 							{contactTitle ? (
