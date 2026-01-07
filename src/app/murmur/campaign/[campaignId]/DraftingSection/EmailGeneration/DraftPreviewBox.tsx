@@ -60,6 +60,14 @@ export const DraftPreviewBox: FC<DraftPreviewBoxProps> = ({
 		[overridePlainMessage, draft.message]
 	);
 
+	// When we're streaming a draft, we pass an override message of "Drafting...".
+	// During that brief period (before real content arrives) OR if content is empty,
+	// show the same blank-wave loading animation style used by the Test Preview Panel (but in blue).
+	const shouldBlankWave = useMemo(() => {
+		const text = plainMessage.trim();
+		return text.length === 0 || text.toLowerCase() === 'drafting...';
+	}, [plainMessage]);
+
 	// Check if message contains anchor tags - if so, render as HTML to show links
 	const hasLinks = useMemo(
 		() => /<a\s+[^>]*href=/i.test(draft.message || ''),
@@ -82,7 +90,7 @@ export const DraftPreviewBox: FC<DraftPreviewBoxProps> = ({
 					position: 'relative',
 					display: 'flex',
 					flexDirection: 'column',
-					backgroundColor: '#BFD4FA',
+					backgroundColor: shouldBlankWave ? '#B6CCF6' : '#BFD4FA',
 				}}
 			>
 				{/* Removed close button per request */}
@@ -95,9 +103,12 @@ export const DraftPreviewBox: FC<DraftPreviewBoxProps> = ({
 							height: '41px',
 							border: '2px solid #000000',
 							borderRadius: '8px',
-							backgroundColor: 'white',
+							backgroundColor: shouldBlankWave ? undefined : 'white',
 						}}
-						className="overflow-hidden"
+						className={
+							'overflow-hidden' +
+							(shouldBlankWave ? ' draft-preview-blank-wave-identity' : '')
+						}
 					>
 						<div className="grid grid-cols-[1fr_auto] gap-2 h-full px-2 py-[2px] items-center">
 							<div className="flex flex-col justify-center">
@@ -160,28 +171,33 @@ export const DraftPreviewBox: FC<DraftPreviewBoxProps> = ({
 						height: '390px',
 						border: '2px solid #000000',
 						borderRadius: '8px',
-						backgroundColor: 'white',
+						backgroundColor: shouldBlankWave ? undefined : 'white',
 					}}
-					className="overflow-hidden"
+					className={
+						'overflow-hidden' +
+						(shouldBlankWave ? ' draft-preview-blank-wave-body' : '')
+					}
 				>
-					<CustomScrollbar
-						className="h-full"
-						thumbWidth={2}
-						thumbColor="#000000"
-						offsetRight={2}
-					>
-						{hasLinks ? (
-							<div 
-								className="p-3 text-[12px] leading-[1.5] draft-preview-content"
-								style={{ wordBreak: 'break-word' }}
-								dangerouslySetInnerHTML={{ __html: draft.message || 'No content' }}
-							/>
-						) : (
-							<div className="p-3 whitespace-pre-wrap text-[12px] leading-[1.5]">
-								{plainMessage || 'No content'}
-							</div>
-						)}
-					</CustomScrollbar>
+					{!shouldBlankWave && (
+						<CustomScrollbar
+							className="h-full"
+							thumbWidth={2}
+							thumbColor="#000000"
+							offsetRight={2}
+						>
+							{hasLinks ? (
+								<div
+									className="p-3 text-[12px] leading-[1.5] draft-preview-content"
+									style={{ wordBreak: 'break-word' }}
+									dangerouslySetInnerHTML={{ __html: draft.message || 'No content' }}
+								/>
+							) : (
+								<div className="p-3 whitespace-pre-wrap text-[12px] leading-[1.5]">
+									{plainMessage || 'No content'}
+								</div>
+							)}
+						</CustomScrollbar>
+					)}
 				</div>
 				</div>
 			</div>

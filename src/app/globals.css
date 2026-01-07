@@ -4229,6 +4229,43 @@ body,
 	}
 }
 
+/* --- Draft Preview Blank-State Color Wave (Unified Flow - Blue) --- */
+.draft-preview-blank-wave-identity {
+    background-color: #B6CCF6;
+    animation: draftPreviewWaveFlowBlue 1.2s ease-in-out infinite;
+    animation-delay: 0s;
+}
+
+.draft-preview-blank-wave-subject {
+    background-color: #B6CCF6;
+    animation: draftPreviewWaveFlowBlue 1.2s ease-in-out infinite;
+    animation-delay: 0.2s;
+}
+
+.draft-preview-blank-wave-body {
+    background-color: #B6CCF6;
+    animation: draftPreviewWaveFlowBlue 1.2s ease-in-out infinite;
+    animation-delay: 0.4s;
+}
+
+@keyframes draftPreviewWaveFlowBlue {
+    0%,
+    100% {
+        background-color: #B6CCF6;
+    }
+    50% {
+        background-color: #93B2EB;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .draft-preview-blank-wave-identity,
+    .draft-preview-blank-wave-subject,
+    .draft-preview-blank-wave-body {
+        animation: none;
+    }
+}
+
 .test-preview-panel-content .scrollbar-hide {
 	height: 100% !important;
 	overflow-y: auto !important;
@@ -4286,7 +4323,6 @@ body,
 	-ms-overflow-style: none !important;
 }
 /* -------------------------------------- */
-
 /* Fix for TestPreviewPanel border rendering */
 [data-test-preview-panel] {
 	/* Force proper rendering with hardware acceleration */
@@ -5518,4 +5554,5 @@ body.murmur-mobile .search-input-icon-btn {
 		font-size: 10px !important;
 	}
 }
+
 
