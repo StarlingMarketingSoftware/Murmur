@@ -416,6 +416,15 @@ export const InboxSection: FC<InboxSectionProps> = ({
 		}
 	};
 
+	// Safety: never leave the Drafts tab highlighted if this view unmounts mid-hover.
+	useEffect(() => {
+		return () => {
+			setDraftsTabHighlighted(false);
+			setWriteTabHighlighted(false);
+			setTopSearchHighlighted(false);
+		};
+	}, [setDraftsTabHighlighted, setWriteTabHighlighted, setTopSearchHighlighted]);
+
 	if (isLoading) {
 		const skeletonRowCount = isMobile ? 5 : 6;
 		return (
@@ -645,15 +654,6 @@ export const InboxSection: FC<InboxSectionProps> = ({
 		setSelectedEmailId(null);
 		setReplyMessage('');
 	};
-
-	// Safety: never leave the Drafts tab highlighted if this view unmounts mid-hover.
-	useEffect(() => {
-		return () => {
-			setDraftsTabHighlighted(false);
-			setWriteTabHighlighted(false);
-			setTopSearchHighlighted(false);
-		};
-	}, [setDraftsTabHighlighted, setWriteTabHighlighted, setTopSearchHighlighted]);
 
 	if (!visibleEmails || visibleEmails.length === 0) {
 		return (
