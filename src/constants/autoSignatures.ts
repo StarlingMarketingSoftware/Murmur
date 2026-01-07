@@ -31,6 +31,9 @@ export const AUTO_SIGNATURE_LIBRARY: readonly string[] = [
     `Talk soon,\n{name}`,
     `Take care,\n{name}`,
     `All the best,\n{name}`,
+    `Talk soon,\n{name}`,
+    `Looking forward to hearing from you,\n{name}`,
+    `Respectfully,\n{name}`,
 ];
 
 const normalizeTemplateValue = (value: string): string =>
