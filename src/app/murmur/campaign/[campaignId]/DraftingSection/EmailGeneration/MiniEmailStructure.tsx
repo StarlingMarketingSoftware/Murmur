@@ -93,6 +93,11 @@ interface MiniEmailStructureProps {
 	 * Used by the Campaign "All" tab where this panel is rendered in a fixed-height tile.
 	 */
 	fitToHeight?: boolean;
+	/**
+	 * When `fitToHeight` is enabled, keep the layout scale "sticky" (can shrink but won't grow back).
+	 * This prevents the header/mode pills from changing size when switching between Auto/Manual/Hybrid.
+	 */
+	lockFitToHeightScale?: boolean;
 	/** Full Auto: profile chips (matches HybridPromptInput "Body" block) */
 	profileFields?: FullAutoProfileFields | null;
 	/** Profile Tab: identity baseline (used for save comparisons) */
@@ -121,6 +126,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 	// onOpenWriting is accepted but currently not rendered (reserved for future use)
 	readOnly,
 	fitToHeight,
+	lockFitToHeightScale,
 	profileFields,
 	identityProfile,
 	onIdentityUpdate,
@@ -524,16 +530,18 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 			const needed = content.scrollHeight;
 			if (!available || !needed) return;
 
-			// If the content already fits, don't scale. This avoids "always slightly smaller"
-			// when the content container has a min-height equal to the available height (e.g. Manual mode).
-			if (needed <= available + 1) {
-				setFitScale(1);
-				return;
-			}
+			const rawNext =
+				// If the content already fits, don't scale. This avoids "always slightly smaller"
+				// when the content container has a min-height equal to the available height (e.g. Manual mode).
+				needed <= available + 1
+					? 1
+					: // Slight pad to avoid 1px overflow from rounding.
+					  Math.min(1, Math.max(0.6, (available - 2) / needed));
 
-			// Slight pad to avoid 1px overflow from rounding.
-			const next = Math.min(1, Math.max(0.6, (available - 2) / needed));
-			setFitScale((prev) => (Math.abs(prev - next) < 0.004 ? prev : next));
+			setFitScale((prev) => {
+				const next = lockFitToHeightScale ? Math.min(prev, rawNext) : rawNext;
+				return Math.abs(prev - next) < 0.004 ? prev : next;
+			});
 		};
 
 		const schedule = () => {
@@ -829,7 +837,9 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 		} else {
 			setHighlightStyle({ left: 0, opacity: 0 });
 		}
-	}, [MODE_HIGHLIGHT_WIDTH, draftingMode]);
+		// When fit-to-height is enabled, the content can rescale which changes layout widths.
+		// Recompute on fitScale so the highlight stays aligned with the selected mode button.
+	}, [MODE_HIGHLIGHT_WIDTH, draftingMode, fitScale]);
 
 	// Delay enabling transitions until after the first paint
 	useEffect(() => {
