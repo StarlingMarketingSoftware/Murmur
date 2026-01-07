@@ -365,6 +365,10 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 		const isDraftApproved = props.approvedDraftIds?.has(selectedDraft.id) ?? false;
 		const isDraftRejected = props.rejectedDraftIds?.has(selectedDraft.id) ?? false;
 		const hasStatusBar = isDraftApproved || isDraftRejected;
+		// Keep the bottom strip (Send / Delete + dividers) a consistent height across drafts.
+		// When a status bar is present, the editor container is shorter; we compensate by slightly
+		// increasing the body box height so the remaining bottom strip stays the same "small" height.
+		const bottomStripTop = hasStatusBar ? '574px' : '625px';
 		const isNarrowestDesktop = props.isNarrowestDesktop ?? false;
 		const isNarrowDesktop = props.isNarrowDesktop ?? false;
 		const showBottomCounter = isNarrowestDesktop || isNarrowDesktop;
@@ -438,7 +442,9 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 							borderBottomWidth: '2px',
 							borderBottomStyle: 'solid',
 							borderBottomColor: '#000000',
-							padding: '12px 16px',
+							// Keep header a consistent height in both cases (company-only vs company+name)
+							// while still giving enough vertical room so text doesn't get clipped.
+							padding: '8px 16px',
 							boxSizing: 'border-box',
 							display: 'flex',
 							justifyContent: 'space-between',
@@ -465,13 +471,14 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 						>
 							<div style={{ width: '16px', height: '2px', backgroundColor: '#000000' }} />
 						</Button>
-						<div style={{ 
-							display: 'flex', 
-							flexDirection: 'column', 
+						<div style={{
+							display: 'flex',
+							flexDirection: 'column',
 							justifyContent: 'center',
-							height: '100%',
+							alignSelf: 'stretch',
 							maxWidth: isMobile ? 'calc(100% - 40px)' : '250px',
 							overflow: 'hidden',
+							transform: 'translateY(-1px)',
 						}}>
 							{hasName && companyName ? (
 								<>
@@ -479,6 +486,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 										className="font-inter font-bold text-black leading-none whitespace-nowrap overflow-hidden"
 										style={{ 
 											fontSize: '17px',
+											lineHeight: '18px',
 											WebkitMaskImage: 'linear-gradient(90deg, #000 85%, transparent 100%)',
 											maskImage: 'linear-gradient(90deg, #000 85%, transparent 100%)',
 										}}
@@ -489,7 +497,8 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 										className="font-inter font-normal text-black leading-none whitespace-nowrap overflow-hidden"
 										style={{ 
 											fontSize: '11px', 
-											marginTop: '2px',
+											lineHeight: '12px',
+											marginTop: '1px',
 											WebkitMaskImage: 'linear-gradient(90deg, #000 85%, transparent 100%)',
 											maskImage: 'linear-gradient(90deg, #000 85%, transparent 100%)',
 										}}
@@ -502,6 +511,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 									className="font-inter font-bold text-black leading-none whitespace-nowrap overflow-hidden"
 									style={{ 
 										fontSize: '17px',
+										lineHeight: '18px',
 										WebkitMaskImage: 'linear-gradient(90deg, #000 85%, transparent 100%)',
 										maskImage: 'linear-gradient(90deg, #000 85%, transparent 100%)',
 									}}
@@ -807,7 +817,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 							style={{
 								position: 'absolute',
 								right: '20px',
-								top: hasStatusBar ? '563px' : '625px',
+								top: bottomStripTop,
 								bottom: 0,
 								width: '1px',
 								backgroundColor: '#000000',
@@ -818,7 +828,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 							style={{
 								position: 'absolute',
 								right: '114px',
-								top: hasStatusBar ? '563px' : '625px',
+								top: bottomStripTop,
 								bottom: 0,
 								width: '1px',
 								backgroundColor: '#000000',
@@ -838,7 +848,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 							style={{
 								right: '20px',
 								width: '94px',
-								top: hasStatusBar ? '563px' : '625px',
+								top: bottomStripTop,
 								bottom: 0,
 							}}
 						>
@@ -849,7 +859,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 							style={{
 								position: 'absolute',
 								right: '119px',
-								top: hasStatusBar ? '563px' : '625px',
+								top: bottomStripTop,
 								bottom: 0,
 								width: '1px',
 								backgroundColor: '#000000',
@@ -860,7 +870,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 							style={{
 								position: 'absolute',
 								right: '211px',
-								top: hasStatusBar ? '563px' : '625px',
+								top: bottomStripTop,
 								bottom: 0,
 								width: '1px',
 								backgroundColor: '#000000',
@@ -883,7 +893,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 							style={{
 								right: '119px',
 								width: '92px',
-								top: hasStatusBar ? '563px' : '625px',
+								top: bottomStripTop,
 								bottom: 0,
 							}}
 						>
@@ -897,7 +907,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 									style={{
 										position: 'absolute',
 										left: '35px',
-										top: hasStatusBar ? '563px' : '625px',
+										top: bottomStripTop,
 										bottom: 0,
 										width: '1px',
 										backgroundColor: '#000000',
@@ -908,7 +918,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 									style={{
 										left: '35px',
 										width: '95px',
-										top: hasStatusBar ? '563px' : '625px',
+										top: bottomStripTop,
 										bottom: 0,
 									}}
 								>
@@ -928,7 +938,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 									style={{
 										position: 'absolute',
 										left: '130px',
-										top: hasStatusBar ? '563px' : '625px',
+										top: bottomStripTop,
 										bottom: 0,
 										width: '1px',
 										backgroundColor: '#000000',
@@ -951,7 +961,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 						<div className="flex justify-center flex-1" style={{ padding: isMobile ? '0 8px' : undefined }}>
 							<div
 								className="bg-white border-2 border-black rounded-[4px] overflow-visible draft-review-box"
-								style={{ width: isMobile ? '100%' : '470px', height: hasStatusBar ? '516px' : '572px', flex: isMobile ? 1 : undefined }}
+								style={{ width: isMobile ? '100%' : '470px', height: hasStatusBar ? '527px' : '572px', flex: isMobile ? 1 : undefined }}
 								data-hover-description="Revise your draft here. Type out your revisions. Approve and Reject Drafts"
 							>
 								{/* Check if original message has links - if so, use RichTextEditor for proper link editing */}
