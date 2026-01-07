@@ -155,6 +155,7 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 
 	return (
 		<div
+			data-campaign-header-box="true"
 			className={cn(
 				'relative overflow-visible bg-white border-[2px] border-black rounded-[8px] flex flex-col px-3 pt-0 pb-2 box-border',
 				fullWidth && 'w-[96.27vw] max-w-[499px]',

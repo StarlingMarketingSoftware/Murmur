@@ -3297,6 +3297,27 @@ body.murmur-page.murmur-map-view .results-search-input-group .search-wave-contai
 	}
 }
 
+/* Delayed fade-in for MiniEmailStructure when transitioning from inbox/search tabs.
+   This prevents the component from appearing before morph animations complete. */
+@keyframes miniEmailStructureFadeIn {
+	from {
+		opacity: 0;
+	}
+	to {
+		opacity: 1;
+	}
+}
+
+/* Counter-animation to keep the research panel stable during tab transitions */
+@keyframes researchPanelStable {
+	from {
+		opacity: 0;
+	}
+	to {
+		opacity: 1;
+	}
+}
+
 /* Responsive table layout */
 .results-appear {
 	width: 100%;
@@ -4171,6 +4192,103 @@ body,
 	overflow: visible !important;
 }
 
+/* --- Test Preview Panel Blank-State Color Wave (Unified Flow) --- */
+.test-preview-blank-wave-identity {
+	background-color: #fce392;
+	animation: testPreviewWaveFlow 1.2s ease-in-out infinite;
+	animation-delay: 0s;
+}
+
+.test-preview-blank-wave-subject {
+	background-color: #fce392;
+	animation: testPreviewWaveFlow 1.2s ease-in-out infinite;
+	animation-delay: 0.2s;
+}
+
+.test-preview-blank-wave-body {
+	background-color: #fce392;
+	animation: testPreviewWaveFlow 1.2s ease-in-out infinite;
+	animation-delay: 0.4s;
+}
+
+@keyframes testPreviewWaveFlow {
+	0%,
+	100% {
+		background-color: #fce392;
+	}
+	50% {
+		background-color: #f1cc54;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.test-preview-blank-wave-identity,
+	.test-preview-blank-wave-subject,
+	.test-preview-blank-wave-body {
+		animation: none;
+	}
+}
+
+/* --- Draft Preview Blank-State Color Wave (Unified Flow - Blue) --- */
+.draft-preview-blank-wave-identity {
+    background-color: #B6CCF6;
+    animation: draftPreviewWaveFlowBlue 1.2s ease-in-out infinite;
+    animation-delay: 0s;
+}
+
+.draft-preview-blank-wave-subject {
+    background-color: #B6CCF6;
+    animation: draftPreviewWaveFlowBlue 1.2s ease-in-out infinite;
+    animation-delay: 0.2s;
+}
+
+.draft-preview-blank-wave-body {
+    background-color: #B6CCF6;
+    animation: draftPreviewWaveFlowBlue 1.2s ease-in-out infinite;
+    animation-delay: 0.4s;
+}
+
+@keyframes draftPreviewWaveFlowBlue {
+    0%,
+    100% {
+        background-color: #B6CCF6;
+    }
+    50% {
+        background-color: #93B2EB;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .draft-preview-blank-wave-identity,
+    .draft-preview-blank-wave-subject,
+    .draft-preview-blank-wave-body {
+        animation: none;
+    }
+}
+
+/* --- Map Search Results Panel Loading Wave (12-step top-to-bottom + reverse) --- */
+.map-results-panel-loading-wave-row {
+	background-color: #C5F0FF;
+	animation: mapResultsPanelLoadingWave 2.5s ease-in-out infinite;
+	will-change: background-color;
+}
+
+@keyframes mapResultsPanelLoadingWave {
+	0%,
+	100% {
+		background-color: #C5F0FF;
+	}
+	50% {
+		background-color: #81C8E1;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.map-results-panel-loading-wave-row {
+		animation: none;
+	}
+}
+
 .test-preview-panel-content .scrollbar-hide {
 	height: 100% !important;
 	overflow-y: auto !important;
@@ -4228,7 +4346,6 @@ body,
 	-ms-overflow-style: none !important;
 }
 /* -------------------------------------- */
-
 /* Fix for TestPreviewPanel border rendering */
 [data-test-preview-panel] {
 	/* Force proper rendering with hardware acceleration */
@@ -5460,4 +5577,5 @@ body.murmur-mobile .search-input-icon-btn {
 		font-size: 10px !important;
 	}
 }
+
 

@@ -4,6 +4,7 @@
 export const dynamic = 'force-dynamic';
 
 import { useCampaignDetail } from './useCampaignDetail';
+import type { DraftingSectionView } from './DraftingSection/useDraftingSection';
 import { CampaignPageSkeleton } from '@/components/molecules/CampaignPageSkeleton/CampaignPageSkeleton';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { urls } from '@/constants/urls';
@@ -11,7 +12,7 @@ import Link from 'next/link';
 import { cn } from '@/utils';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { useMe } from '@/hooks/useMe';
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo, useLayoutEffect } from 'react';
 import LeftArrow from '@/components/atoms/_svg/LeftArrow';
 import RightArrow from '@/components/atoms/_svg/RightArrow';
 import BottomArrowIcon from '@/components/atoms/_svg/BottomArrowIcon';
@@ -29,11 +30,14 @@ import { useCreateIdentity, useGetIdentities } from '@/hooks/queryHooks/useIdent
 import { EmailStatus } from '@/constants/prismaEnums';
 import { useQueryClient } from '@tanstack/react-query';
 import { HoverDescriptionProvider } from '@/contexts/HoverDescriptionContext';
+import { CampaignTopSearchHighlightProvider } from '@/contexts/CampaignTopSearchHighlightContext';
 
 type ViewType = 'contacts' | 'testing' | 'drafting' | 'sent' | 'inbox' | 'all';
 
 // Transition duration in ms - fast enough to feel instant, still smooth
 const TRANSITION_DURATION = 180;
+// Safety valve: if a destination view is unusually slow to paint, don't block the transition forever.
+const MAX_TRANSITION_WAIT_MS = 650;
 
 // Dynamically import heavy components to reduce initial bundle size and prevent Vercel timeout
 const DraftingSection = nextDynamic(
@@ -79,6 +83,29 @@ const Murmur = () => {
 	const tabParam = searchParams.get('tab');
 	const [identityDialogOrigin, setIdentityDialogOrigin] = useState<'campaign' | 'search'>(
 		cameFromSearch ? 'search' : 'campaign'
+	);
+
+	const [isTopSearchHighlighted, setTopSearchHighlighted] = useState(false);
+	const [isDraftsTabHighlighted, setDraftsTabHighlighted] = useState(false);
+	const [isInboxTabHighlighted, setInboxTabHighlighted] = useState(false);
+	const [isWriteTabHighlighted, setWriteTabHighlighted] = useState(false);
+	const topSearchHighlightCtx = useMemo(
+		() => ({
+			isTopSearchHighlighted,
+			setTopSearchHighlighted,
+			isDraftsTabHighlighted,
+			setDraftsTabHighlighted,
+			isInboxTabHighlighted,
+			setInboxTabHighlighted,
+			isWriteTabHighlighted,
+			setWriteTabHighlighted,
+		}),
+		[
+			isTopSearchHighlighted,
+			isDraftsTabHighlighted,
+			isInboxTabHighlighted,
+			isWriteTabHighlighted,
+		]
 	);
 
 	const { user, isPendingUser, isLoaded } = useMe();
@@ -224,34 +251,403 @@ const Murmur = () => {
 	// Track previous view for crossfade transitions
 	const [previousView, setPreviousView] = useState<ViewType | null>(null);
 	const [isTransitioning, setIsTransitioning] = useState(false);
+	const [isFadingOutPreviousView, setIsFadingOutPreviousView] = useState(false);
 	const transitionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+	const maxWaitTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+	const crossfadeContainerRef = useRef<HTMLDivElement>(null);
+	const headerBoxMoveCleanupRef = useRef<(() => void) | null>(null);
+	const contactsDraftsPillMoveCleanupRef = useRef<(() => void) | null>(null);
 	
 	// Wrapped setActiveView that handles transitions
 	const setActiveView = useCallback((newView: ViewType) => {
 		if (newView === activeView) return;
 		
-		// Clear any pending transition
+		// Clear any pending transition timers
 		if (transitionTimeoutRef.current) {
 			clearTimeout(transitionTimeoutRef.current);
+			transitionTimeoutRef.current = null;
+		}
+		if (maxWaitTimeoutRef.current) {
+			clearTimeout(maxWaitTimeoutRef.current);
+			maxWaitTimeoutRef.current = null;
 		}
 		
 		// Start transition: keep previous view visible while fading
 		setPreviousView(activeView);
 		setIsTransitioning(true);
+		setIsFadingOutPreviousView(false);
 		setActiveViewInternal(newView);
-		
-		// End transition after animation completes
+
+		// Fallback: if we never get a "view ready" callback (should be rare), fade out anyway.
+		maxWaitTimeoutRef.current = setTimeout(() => {
+			setIsFadingOutPreviousView(true);
+		}, MAX_TRANSITION_WAIT_MS);
+	}, [activeView]);
+
+	const handleActiveViewReady = useCallback(
+		(readyView: DraftingSectionView) => {
+			// Only start fading once the destination view has actually painted.
+			if (!isTransitioning || !previousView) return;
+			if (isFadingOutPreviousView) return;
+			if (readyView !== activeView) return;
+
+			if (maxWaitTimeoutRef.current) {
+				clearTimeout(maxWaitTimeoutRef.current);
+				maxWaitTimeoutRef.current = null;
+			}
+
+			setIsFadingOutPreviousView(true);
+		},
+		[activeView, isFadingOutPreviousView, isTransitioning, previousView]
+	);
+
+	// Once the fade-out has started, end the transition after the animation duration.
+	useEffect(() => {
+		if (!isFadingOutPreviousView) return;
+		if (!previousView) return;
+
+		if (transitionTimeoutRef.current) {
+			clearTimeout(transitionTimeoutRef.current);
+			transitionTimeoutRef.current = null;
+		}
+
 		transitionTimeoutRef.current = setTimeout(() => {
 			setPreviousView(null);
 			setIsTransitioning(false);
+			setIsFadingOutPreviousView(false);
 		}, TRANSITION_DURATION);
-	}, [activeView]);
+	}, [isFadingOutPreviousView, previousView]);
+
+	// Shared-element move for the CampaignHeaderBox when tab layouts change.
+	// This is intentionally driven by the same fade-start signal so timing matches other tab transitions.
+	useLayoutEffect(() => {
+		if (!isFadingOutPreviousView) return;
+		if (!previousView) return;
+		if (typeof window === 'undefined') return;
+
+		// Cleanup any in-flight header animation.
+		if (headerBoxMoveCleanupRef.current) {
+			headerBoxMoveCleanupRef.current();
+			headerBoxMoveCleanupRef.current = null;
+		}
+
+		// The All tab should crossfade (opacity-only) rather than sliding/moving the header box.
+		// Skip the shared-element "ghost move" when entering or leaving All.
+		if (activeView === 'all' || previousView === 'all') return;
+
+		// Respect reduced motion.
+		if (window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches) return;
+
+		const container = crossfadeContainerRef.current;
+		if (!container) return;
+
+		const activeRoot = container.querySelector(
+			'[data-campaign-view-layer="active"]'
+		) as HTMLElement | null;
+		const previousRoot = container.querySelector(
+			'[data-campaign-view-layer="previous"]'
+		) as HTMLElement | null;
+		if (!activeRoot || !previousRoot) return;
+
+		const findVisibleHeader = (root: HTMLElement): HTMLElement | null => {
+			const candidates = Array.from(
+				root.querySelectorAll('[data-campaign-header-box]')
+			) as HTMLElement[];
+			for (const el of candidates) {
+				const rect = el.getBoundingClientRect();
+				if (rect.width > 1 && rect.height > 1) return el;
+			}
+			return null;
+		};
+
+		const fromHeader = findVisibleHeader(previousRoot);
+		const toHeader = findVisibleHeader(activeRoot);
+		if (!fromHeader || !toHeader) return;
+
+		const fromRect = fromHeader.getBoundingClientRect();
+		const toRect = toHeader.getBoundingClientRect();
+		if (fromRect.width <= 1 || fromRect.height <= 1 || toRect.width <= 1 || toRect.height <= 1) {
+			return;
+		}
+
+		// Account for any CSS zoom applied to the root element (keeps the ghost aligned at non-1 zoom).
+		const zoomStr = window.getComputedStyle(document.documentElement).zoom;
+		const zoom = zoomStr ? parseFloat(zoomStr) : 1;
+		const z = zoom || 1;
+
+		const dx = (toRect.left - fromRect.left) / z;
+		const dy = (toRect.top - fromRect.top) / z;
+		// If the header didn't move, don't do anything (avoids flicker on same-layout tab switches).
+		if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return;
+
+		const ghost = fromHeader.cloneNode(true) as HTMLElement;
+		ghost.setAttribute('data-campaign-header-box-ghost', 'true');
+		ghost.style.position = 'fixed';
+		ghost.style.left = `${fromRect.left / z}px`;
+		ghost.style.top = `${fromRect.top / z}px`;
+		ghost.style.right = 'auto';
+		ghost.style.bottom = 'auto';
+		ghost.style.margin = '0';
+		ghost.style.zIndex = '99999';
+		ghost.style.pointerEvents = 'none';
+		ghost.style.willChange = 'transform';
+		ghost.style.transform = 'translate3d(0px, 0px, 0px)';
+
+		// Ensure the ghost uses the measured box size (avoid sublayout style differences).
+		ghost.style.width = `${fromRect.width / z}px`;
+		ghost.style.height = `${fromRect.height / z}px`;
+		ghost.style.maxWidth = `${fromRect.width / z}px`;
+		ghost.style.maxHeight = `${fromRect.height / z}px`;
+
+		// Hide the real headers during the move to avoid "double header" artifacts.
+		const prevFromOpacity = fromHeader.style.opacity;
+		const prevFromPointerEvents = fromHeader.style.pointerEvents;
+		const prevToOpacity = toHeader.style.opacity;
+		const prevToPointerEvents = toHeader.style.pointerEvents;
+		fromHeader.style.opacity = '0';
+		fromHeader.style.pointerEvents = 'none';
+		toHeader.style.opacity = '0';
+		toHeader.style.pointerEvents = 'none';
+
+		document.body.appendChild(ghost);
+
+		const animation = ghost.animate(
+			[
+				{ transform: 'translate3d(0px, 0px, 0px)' },
+				{ transform: `translate3d(${dx}px, ${dy}px, 0px)` },
+			],
+			{
+				duration: TRANSITION_DURATION,
+				easing: 'ease-out',
+				fill: 'forwards',
+			}
+		);
+
+		const cleanup = () => {
+			try {
+				animation.cancel();
+			} catch {
+				// no-op
+			}
+			ghost.remove();
+			fromHeader.style.opacity = prevFromOpacity;
+			fromHeader.style.pointerEvents = prevFromPointerEvents;
+			toHeader.style.opacity = prevToOpacity;
+			toHeader.style.pointerEvents = prevToPointerEvents;
+		};
+
+		headerBoxMoveCleanupRef.current = cleanup;
+
+		animation.onfinish = () => {
+			ghost.remove();
+			// Reveal the destination header.
+			toHeader.style.opacity = prevToOpacity;
+			toHeader.style.pointerEvents = prevToPointerEvents;
+			// Restore the previous header (it's about to be fully faded out / unmounted anyway).
+			fromHeader.style.opacity = prevFromOpacity;
+			fromHeader.style.pointerEvents = prevFromPointerEvents;
+			headerBoxMoveCleanupRef.current = null;
+		};
+
+		return cleanup;
+	}, [activeView, isFadingOutPreviousView, previousView]);
+
+	// Shared-element move for the Contacts/Drafts table header pill when switching between those tabs.
+	// This uses the same fade-start signal and duration so the slide is perfectly synced to the tab fade.
+	useLayoutEffect(() => {
+		if (!isFadingOutPreviousView) return;
+		if (!previousView) return;
+		if (typeof window === 'undefined') return;
+
+		// Cleanup any in-flight pill animation.
+		if (contactsDraftsPillMoveCleanupRef.current) {
+			contactsDraftsPillMoveCleanupRef.current();
+			contactsDraftsPillMoveCleanupRef.current = null;
+		}
+
+		const pillViews: ViewType[] = ['contacts', 'drafting', 'sent'];
+		const shouldAnimatePill =
+			pillViews.includes(previousView) &&
+			pillViews.includes(activeView) &&
+			previousView !== activeView;
+		if (!shouldAnimatePill) return;
+
+		// Respect reduced motion.
+		if (window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches) return;
+
+		const container = crossfadeContainerRef.current;
+		if (!container) return;
+
+		const activeRoot = container.querySelector(
+			'[data-campaign-view-layer="active"]'
+		) as HTMLElement | null;
+		const previousRoot = container.querySelector(
+			'[data-campaign-view-layer="previous"]'
+		) as HTMLElement | null;
+		if (!activeRoot || !previousRoot) return;
+
+		const boxIdForView = (v: ViewType) => (v === 'drafting' ? 'drafts' : v);
+
+		const findVisiblePill = (root: HTMLElement, v: ViewType): HTMLElement | null => {
+			const boxId = boxIdForView(v);
+			const mainBox = root.querySelector(
+				`[data-campaign-main-box="${boxId}"]`
+			) as HTMLElement | null;
+			if (!mainBox) return null;
+
+			const candidates = Array.from(
+				mainBox.querySelectorAll('[data-campaign-shared-pill="campaign-tabs-pill"]')
+			) as HTMLElement[];
+			for (const el of candidates) {
+				const rect = el.getBoundingClientRect();
+				if (rect.width > 1 && rect.height > 1) return el;
+			}
+			return null;
+		};
+
+		const fromPill = findVisiblePill(previousRoot, previousView);
+		const toPill = findVisiblePill(activeRoot, activeView);
+		if (!fromPill || !toPill) return;
+
+		const fromRect = fromPill.getBoundingClientRect();
+		const toRect = toPill.getBoundingClientRect();
+		if (
+			fromRect.width <= 1 ||
+			fromRect.height <= 1 ||
+			toRect.width <= 1 ||
+			toRect.height <= 1
+		) {
+			return;
+		}
+
+		// Account for any CSS zoom applied to the root element (keeps the ghost aligned at non-1 zoom).
+		const zoomStr = window.getComputedStyle(document.documentElement).zoom;
+		const zoom = zoomStr ? parseFloat(zoomStr) : 1;
+		const z = zoom || 1;
+
+		const dx = (toRect.left - fromRect.left) / z;
+		const dy = (toRect.top - fromRect.top) / z;
+		// If the pill didn't move, don't do anything (avoids flicker on same-layout tab switches).
+		if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return;
+
+		// Two ghosts: crossfade the Contacts and Drafts pills mid-flight so label/colors don't snap.
+		const ghostFrom = fromPill.cloneNode(true) as HTMLElement;
+		const ghostTo = toPill.cloneNode(true) as HTMLElement;
+		ghostFrom.setAttribute('data-campaign-shared-pill-ghost', 'from');
+		ghostTo.setAttribute('data-campaign-shared-pill-ghost', 'to');
+
+		const initGhost = (ghostEl: HTMLElement) => {
+			ghostEl.style.position = 'fixed';
+			ghostEl.style.left = `${fromRect.left / z}px`;
+			ghostEl.style.top = `${fromRect.top / z}px`;
+			ghostEl.style.right = 'auto';
+			ghostEl.style.bottom = 'auto';
+			ghostEl.style.margin = '0';
+			ghostEl.style.zIndex = '99999';
+			ghostEl.style.pointerEvents = 'none';
+			ghostEl.style.willChange = 'transform, opacity';
+			ghostEl.style.transform = 'translate3d(0px, 0px, 0px)';
+
+			// Ensure the ghost uses the measured box size (avoid sublayout style differences).
+			ghostEl.style.width = `${fromRect.width / z}px`;
+			ghostEl.style.height = `${fromRect.height / z}px`;
+			ghostEl.style.maxWidth = `${fromRect.width / z}px`;
+			ghostEl.style.maxHeight = `${fromRect.height / z}px`;
+		};
+		initGhost(ghostFrom);
+		initGhost(ghostTo);
+		ghostFrom.style.opacity = '1';
+		ghostTo.style.opacity = '0';
+
+		// Hide the real pills during the move to avoid "double pill" artifacts.
+		const prevFromOpacity = fromPill.style.opacity;
+		const prevFromPointerEvents = fromPill.style.pointerEvents;
+		const prevToOpacity = toPill.style.opacity;
+		const prevToPointerEvents = toPill.style.pointerEvents;
+		fromPill.style.opacity = '0';
+		fromPill.style.pointerEvents = 'none';
+		toPill.style.opacity = '0';
+		toPill.style.pointerEvents = 'none';
+
+		document.body.appendChild(ghostFrom);
+		document.body.appendChild(ghostTo);
+
+		const transformKeyframes: Keyframe[] = [
+			{ transform: 'translate3d(0px, 0px, 0px)' },
+			{ transform: `translate3d(${dx}px, ${dy}px, 0px)` },
+		];
+		const transformTiming: KeyframeAnimationOptions = {
+			duration: TRANSITION_DURATION,
+			easing: 'ease-out',
+			fill: 'forwards',
+		};
+
+		// Concentrate the crossfade in the middle of the travel (avoid end-snap).
+		const opacityKeyframesFrom: Keyframe[] = [
+			{ opacity: 1, offset: 0 },
+			{ opacity: 1, offset: 0.3 },
+			{ opacity: 0, offset: 0.7 },
+			{ opacity: 0, offset: 1 },
+		];
+		const opacityKeyframesTo: Keyframe[] = [
+			{ opacity: 0, offset: 0 },
+			{ opacity: 0, offset: 0.3 },
+			{ opacity: 1, offset: 0.7 },
+			{ opacity: 1, offset: 1 },
+		];
+		const opacityTiming: KeyframeAnimationOptions = {
+			duration: TRANSITION_DURATION,
+			easing: 'linear',
+			fill: 'forwards',
+		};
+
+		const anims: Animation[] = [
+			ghostFrom.animate(transformKeyframes, transformTiming),
+			ghostTo.animate(transformKeyframes, transformTiming),
+			ghostFrom.animate(opacityKeyframesFrom, opacityTiming),
+			ghostTo.animate(opacityKeyframesTo, opacityTiming),
+		];
+
+		const cleanup = () => {
+			try {
+				for (const a of anims) a.cancel();
+			} catch {
+				// no-op
+			}
+			ghostFrom.remove();
+			ghostTo.remove();
+			fromPill.style.opacity = prevFromOpacity;
+			fromPill.style.pointerEvents = prevFromPointerEvents;
+			toPill.style.opacity = prevToOpacity;
+			toPill.style.pointerEvents = prevToPointerEvents;
+		};
+
+		contactsDraftsPillMoveCleanupRef.current = cleanup;
+
+		// Use the "to" opacity animation as the completion signal (same duration as the fade).
+		anims[3].onfinish = () => {
+			ghostFrom.remove();
+			ghostTo.remove();
+			// Reveal the destination pill.
+			toPill.style.opacity = prevToOpacity;
+			toPill.style.pointerEvents = prevToPointerEvents;
+			// Restore the previous pill (it's about to be fully faded out / unmounted anyway).
+			fromPill.style.opacity = prevFromOpacity;
+			fromPill.style.pointerEvents = prevFromPointerEvents;
+			contactsDraftsPillMoveCleanupRef.current = null;
+		};
+
+		return cleanup;
+	}, [activeView, isFadingOutPreviousView, previousView]);
 	
 	// Cleanup timeout on unmount
 	useEffect(() => {
 		return () => {
 			if (transitionTimeoutRef.current) {
 				clearTimeout(transitionTimeoutRef.current);
+			}
+			if (maxWaitTimeoutRef.current) {
+				clearTimeout(maxWaitTimeoutRef.current);
 			}
 		};
 	}, []);
@@ -324,12 +720,12 @@ const Murmur = () => {
 		'testing',
 		'all',
 		'drafting',
+		'sent',
 		'inbox',
 	];
-	const getTabOrderView = (view: ViewType): ViewType => (view === 'sent' ? 'inbox' : view);
 
 	const goToPreviousTab = () => {
-		const currentIndex = tabOrder.indexOf(getTabOrderView(activeView));
+		const currentIndex = tabOrder.indexOf(activeView);
 		if (currentIndex > 0) {
 			setActiveView(tabOrder[currentIndex - 1]);
 		} else {
@@ -339,7 +735,7 @@ const Murmur = () => {
 	};
 
 	const goToNextTab = () => {
-		const currentIndex = tabOrder.indexOf(getTabOrderView(activeView));
+		const currentIndex = tabOrder.indexOf(activeView);
 		if (currentIndex < tabOrder.length - 1) {
 			setActiveView(tabOrder[currentIndex + 1]);
 		} else {
@@ -427,6 +823,7 @@ const Murmur = () => {
 	const fixedNavArrowsTopPx = 355 + (shouldApplyWritingTopShift ? writingTabShiftPx : 0);
 	return (
 		<HoverDescriptionProvider enabled={selectedRightBoxIcon === 'info'}>
+			<CampaignTopSearchHighlightProvider value={topSearchHighlightCtx}>
 			<div className="min-h-screen relative">
 			{/* Left navigation arrow - absolute position (hidden in narrow desktop + testing) */}
 			{!hideFixedArrows && (
@@ -517,7 +914,10 @@ const Murmur = () => {
 							title="Search for more contacts"
 							data-hover-description="Hop back in to the map, Add some more contacts to your campaign"
 							onClick={handleOpenDashboardSearchForCampaign}
-							className="group relative pointer-events-auto w-[477px] max-w-[calc(100vw-32px)] h-[42px] box-border border border-[#929292] hover:border-black hover:border-2 rounded-[10px] overflow-hidden transition-[color,border-color,border-width] duration-150 cursor-pointer"
+							className={cn(
+								"group relative pointer-events-auto w-[477px] max-w-[calc(100vw-32px)] h-[42px] box-border border border-[#929292] hover:border-black hover:border-2 rounded-[10px] overflow-hidden transition-[color,border-color,border-width] duration-150 cursor-pointer",
+								isTopSearchHighlighted && "border-black border-2"
+							)}
 						>
 							<SearchMap
 								aria-hidden="true"
@@ -528,9 +928,17 @@ const Murmur = () => {
 								rectStroke="none"
 								rectStrokeWidth={0}
 								rectRx={10}
-								className="absolute inset-0 w-full h-full opacity-40 group-hover:opacity-100 transition-opacity duration-150"
+								className={cn(
+									"absolute inset-0 w-full h-full opacity-40 group-hover:opacity-100 transition-opacity duration-150",
+									isTopSearchHighlighted && "opacity-100"
+								)}
 							/>
-							<div className="absolute right-3 top-1/2 -translate-y-1/2 flex z-10 text-[#929292] group-hover:text-black transition-colors duration-150">
+							<div
+								className={cn(
+									"absolute right-3 top-1/2 -translate-y-1/2 flex text-[#929292] group-hover:text-black transition-colors duration-150",
+									isTopSearchHighlighted && "text-black"
+								)}
+							>
 								<SearchIconDesktop stroke="currentColor" />
 							</div>
 						</button>
@@ -652,7 +1060,25 @@ const Murmur = () => {
 							)}
 							onClick={() => setActiveView('testing')}
 						>
-							Writing
+							<div className="relative inline-flex items-center justify-center w-[62px] h-[27px]">
+								<div
+									aria-hidden="true"
+									className={cn(
+										'absolute inset-0 pointer-events-none',
+										'rounded-[8px] border-2 border-[#000000] bg-[#A6E2A8]',
+										'transition-opacity duration-150',
+										isWriteTabHighlighted ? 'opacity-100' : 'opacity-0'
+									)}
+								/>
+								<span
+									className={cn(
+										'relative z-10',
+										isWriteTabHighlighted && 'text-black'
+									)}
+								>
+									Write
+								</span>
+							</div>
 							</button>
 							<button
 							type="button"
@@ -684,7 +1110,25 @@ const Murmur = () => {
 							)}
 							onClick={() => setActiveView('drafting')}
 						>
-							Drafts
+							<div className="relative inline-flex items-center justify-center w-[64px] h-[28px]">
+								<div
+									aria-hidden="true"
+									className={cn(
+										'absolute inset-0 pointer-events-none',
+										'rounded-[8px] border-2 border-[#000000] bg-[#EFDAAF]',
+										'transition-opacity duration-150',
+										isDraftsTabHighlighted ? 'opacity-100' : 'opacity-0'
+									)}
+								/>
+								<span
+									className={cn(
+										'relative z-10',
+										isDraftsTabHighlighted && 'text-black'
+									)}
+								>
+									Drafts
+								</span>
+							</div>
 							</button>
 							<div className="relative group">
 								<button
@@ -697,7 +1141,25 @@ const Murmur = () => {
 								)}
 								onClick={() => setActiveView('inbox')}
 							>
-								Inbox
+								<div className="relative inline-flex items-center justify-center w-[62px] h-[27px]">
+									<div
+										aria-hidden="true"
+										className={cn(
+											'absolute inset-0 pointer-events-none',
+											'rounded-[8px] border-2 border-[#000000] bg-[#84B9F5]',
+											'transition-opacity duration-150',
+											isInboxTabHighlighted ? 'opacity-100' : 'opacity-0'
+										)}
+									/>
+									<span
+										className={cn(
+											'relative z-10',
+											isInboxTabHighlighted && 'text-black'
+										)}
+									>
+										Inbox
+									</span>
+								</div>
 								</button>
 								{/* Hover bridge: keeps the "Sent" bubble open while moving the cursor down */}
 								<span
@@ -716,10 +1178,12 @@ const Murmur = () => {
 								onClick={() => setActiveView('sent')}
 								className={cn(
 									'absolute left-1/2 -translate-x-1/2 top-full mt-[6px] z-50',
-									'hidden group-hover:flex group-focus-within:flex',
+									activeView === 'sent'
+										? 'flex'
+										: 'hidden group-hover:flex group-focus-within:flex',
 									'w-[54px] h-[27px] rounded-[8px]',
-									'bg-[#E4EBE6]/90',
-									'items-center justify-center',
+									'bg-[#E4EBE6]',
+									'items-center justify-center cursor-pointer',
 									'font-inter text-[17px] font-medium',
 									activeView === 'sent' ? 'text-black' : 'text-[#929292]'
 								)}
@@ -957,10 +1421,12 @@ const Murmur = () => {
 										onClick={() => setActiveView('sent')}
 										className={cn(
 											'absolute left-1/2 -translate-x-1/2 top-full mt-[6px] z-50',
-											'hidden group-hover:flex group-focus-within:flex',
+											activeView === 'sent'
+												? 'flex'
+												: 'hidden group-hover:flex group-focus-within:flex',
 											'w-[54px] h-[27px] rounded-[8px]',
-											'bg-[#E4EBE6]/90',
-											'items-center justify-center',
+											'bg-[#E4EBE6]',
+											'items-center justify-center cursor-pointer',
 											'font-inter text-[17px] font-medium',
 											activeView === 'sent' ? 'text-black' : 'text-[#929292]'
 										)}
@@ -981,31 +1447,38 @@ const Murmur = () => {
 						}
 					>
 						{/* Crossfade transition container */}
-						<div className="relative w-full isolate">
+						<div ref={crossfadeContainerRef} className="relative w-full isolate">
 							{/* Determine if both views share the same research panel position */}
 							{(() => {
 								const standardPositionTabs: ViewType[] = ['testing', 'contacts', 'drafting', 'sent'];
-								const bothSharePosition = isTransitioning && previousView && 
+								// Only apply the "stable research panel" treatment during the actual fade,
+								// not while we're waiting for the destination view to paint.
+								const bothSharePosition = isFadingOutPreviousView && previousView && 
 									standardPositionTabs.includes(previousView) && 
 									standardPositionTabs.includes(activeView);
 								
 								return (
 									<>
 										{/* Current view - always visible (avoid the "white flash" between tabs) */}
-										<div className="relative w-full" style={{ zIndex: 1 }}>
+										<div
+											data-campaign-view-layer="active"
+											className={cn(
+												'relative w-full',
+												// Prevent interacting with the destination view while the previous view is still covering it.
+												isTransitioning && previousView && 'pointer-events-none'
+											)}
+											style={{ zIndex: 1 }}
+										>
 											<DraftingSection
 												campaign={campaign}
 												view={activeView}
 												renderGlobalOverlays
+												onViewReady={handleActiveViewReady}
 												autoOpenProfileTabWhenIncomplete={cameFromSearch}
 												goToDrafting={() => setActiveView('drafting')}
 												goToAll={() => setActiveView('all')}
 												goToWriting={() => setActiveView('testing')}
-												onGoToSearch={() => {
-													if (typeof window !== 'undefined') {
-														window.location.assign(urls.murmur.dashboard.index);
-													}
-												}}
+												onGoToSearch={handleOpenDashboardSearchForCampaign}
 												goToContacts={() => setActiveView('contacts')}
 												goToInbox={() => setActiveView('inbox')}
 												goToSent={() => setActiveView('sent')}
@@ -1023,12 +1496,17 @@ const Murmur = () => {
 										{/* Previous view - fades out above the current view */}
 										{isTransitioning && previousView && (
 											<div
+												data-campaign-view-layer="previous"
 												className="absolute inset-0 w-full pointer-events-none"
 												aria-hidden="true"
 												style={{
-													animation: `viewFadeOut ${TRANSITION_DURATION}ms ease-out forwards`,
 													zIndex: 2,
 													willChange: 'opacity',
+													...(isFadingOutPreviousView
+														? {
+																animation: `viewFadeOut ${TRANSITION_DURATION}ms ease-out forwards`,
+														  }
+														: { opacity: 1 }),
 												}}
 											>
 												<DraftingSection
@@ -1039,11 +1517,7 @@ const Murmur = () => {
 													goToDrafting={() => setActiveView('drafting')}
 													goToAll={() => setActiveView('all')}
 													goToWriting={() => setActiveView('testing')}
-													onGoToSearch={() => {
-														if (typeof window !== 'undefined') {
-															window.location.assign(urls.murmur.dashboard.index);
-														}
-													}}
+													onGoToSearch={handleOpenDashboardSearchForCampaign}
 													goToContacts={() => setActiveView('contacts')}
 													goToInbox={() => setActiveView('inbox')}
 													goToSent={() => setActiveView('sent')}
@@ -1513,6 +1987,8 @@ const Murmur = () => {
 				<CampaignRightPanel
 					view={activeView}
 					onTabChange={setActiveView}
+					transitionDurationMs={TRANSITION_DURATION}
+					isViewTransitionFading={isFadingOutPreviousView}
 					className={shouldApplyWritingTopShift ? 'translate-y-[81px]' : undefined}
 				/>
 			)}
@@ -1542,6 +2018,7 @@ const Murmur = () => {
 				</div>
 			)}
 			</div>
+			</CampaignTopSearchHighlightProvider>
 		</HoverDescriptionProvider>
 	);
 };

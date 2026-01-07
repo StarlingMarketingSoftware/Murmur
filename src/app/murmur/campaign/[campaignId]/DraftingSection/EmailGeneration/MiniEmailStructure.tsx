@@ -805,12 +805,14 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 	};
 
 	// Selected mode highlight (mirror main selector)
+	const MODE_HIGHLIGHT_WIDTH = 80.38;
 	const modeContainerRef = useRef<HTMLDivElement>(null);
 	const aiButtonRef = useRef<HTMLButtonElement>(null);
 	const hybridButtonRef = useRef<HTMLButtonElement>(null);
 	const handwrittenButtonRef = useRef<HTMLButtonElement>(null);
 	const [highlightStyle, setHighlightStyle] = useState<{ left: number; opacity: number }>(
-		{ left: 0, opacity: 1 }
+		// Start hidden so it never flashes in the wrong spot during view transitions.
+		{ left: 0, opacity: 0 }
 	);
 	const [isInitialRender, setIsInitialRender] = useState(true);
 
@@ -821,12 +823,13 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 		else if (draftingMode === 'hybrid') target = hybridButtonRef.current;
 		else target = handwrittenButtonRef.current;
 		if (target) {
-			const newLeft = target.offsetLeft + target.offsetWidth / 2 - 80.38 / 2;
+			const newLeft =
+				target.offsetLeft + target.offsetWidth / 2 - MODE_HIGHLIGHT_WIDTH / 2;
 			setHighlightStyle({ left: newLeft, opacity: 1 });
 		} else {
 			setHighlightStyle({ left: 0, opacity: 0 });
 		}
-	}, [draftingMode]);
+	}, [MODE_HIGHLIGHT_WIDTH, draftingMode]);
 
 	// Delay enabling transitions until after the first paint
 	useEffect(() => {
@@ -1251,7 +1254,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 									>
 										<div
 											style={{
-												width: '80.38px',
+												width: `${MODE_HIGHLIGHT_WIDTH}px`,
 												height: '17px',
 												backgroundColor: getModeBackgroundColor(),
 												border: '1.3px solid #000000',

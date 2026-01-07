@@ -25,6 +25,7 @@ import { RadioStationsIcon } from '@/components/atoms/_svg/RadioStationsIcon';
 import { NearMeIcon } from '@/components/atoms/_svg/NearMeIcon';
 import HomeIcon from '@/components/atoms/_svg/HomeIcon';
 import HomeExpandedIcon from '@/components/atoms/_svg/HomeExpandedIcon';
+import BottomArrowIcon from '@/components/atoms/_svg/BottomArrowIcon';
 import GrabIcon from '@/components/atoms/svg/GrabIcon';
 import { getCityIconProps } from '@/utils/cityIcons';
 import { Typography } from '@/components/ui/typography';
@@ -4506,11 +4507,102 @@ const DashboardContent = () => {
 						</div>
 						);
 
+						const campaignMapTopTabs =
+							isMapView && isAddToCampaignMode ? (
+								<div
+									data-slot="campaign-map-top-tabs"
+									className="fixed z-[9999] flex items-center justify-center pointer-events-none"
+									style={{
+										// The map search bar is fixed at top: 33px in map view.
+										// The map container is inset 9px from the viewport.
+										// Center the tabs within the 24px band between the map top (9px)
+										// and the search bar top (33px) so they never feel too high/low.
+										top: '9px',
+										height: '24px',
+										left: '50%',
+										transform: 'translateX(-50%)',
+										width: 'min(440px, calc(100vw - 120px))',
+									}}
+								>
+									<div className="pointer-events-auto flex w-full items-center justify-between">
+										<button
+											type="button"
+											className="font-inter text-[14px] font-medium leading-none bg-transparent p-0 m-0 border-0 cursor-pointer text-[#A0A0A0]"
+											onClick={() =>
+												router.push(
+													`${urls.murmur.campaign.detail(fromCampaignIdParam)}?origin=search&tab=contacts`
+												)
+											}
+										>
+											Contacts
+										</button>
+										<button
+											type="button"
+											className="font-inter text-[14px] font-medium leading-none bg-transparent p-0 m-0 border-0 cursor-pointer text-[#A0A0A0]"
+											onClick={() =>
+												router.push(
+													`${urls.murmur.campaign.detail(fromCampaignIdParam)}?origin=search&tab=testing`
+												)
+											}
+										>
+											Write
+										</button>
+										<button
+											type="button"
+											aria-label="All"
+											title="All"
+											className="bg-transparent p-0 m-0 border-0 cursor-pointer text-[#A0A0A0] inline-flex items-center justify-center"
+											onClick={() =>
+												router.push(
+													`${urls.murmur.campaign.detail(fromCampaignIdParam)}?origin=search&tab=all`
+												)
+											}
+										>
+											<BottomArrowIcon
+												aria-hidden="true"
+												focusable="false"
+												width={18}
+												height={12}
+												className="block translate-y-[1px]"
+											/>
+										</button>
+										<button
+											type="button"
+											className="font-inter text-[14px] font-medium leading-none bg-transparent p-0 m-0 border-0 cursor-pointer text-[#A0A0A0]"
+											onClick={() =>
+												router.push(
+													`${urls.murmur.campaign.detail(fromCampaignIdParam)}?origin=search&tab=drafting`
+												)
+											}
+										>
+											Drafts
+										</button>
+										<button
+											type="button"
+											className="font-inter text-[14px] font-medium leading-none bg-transparent p-0 m-0 border-0 cursor-pointer text-[#A0A0A0]"
+											onClick={() =>
+												router.push(
+													`${urls.murmur.campaign.detail(fromCampaignIdParam)}?origin=search&tab=inbox`
+												)
+											}
+										>
+											Inbox
+										</button>
+									</div>
+								</div>
+							) : null;
+
 						// In map view, the map itself is rendered via a portal to <body>.
 						// Portal the mini search bar too so it reliably stacks above the map,
 						// regardless of any parent stacking contexts/transforms.
 						if (isMapView && typeof window !== 'undefined') {
-							return createPortal(searchBar, document.body);
+							return createPortal(
+								<>
+									{campaignMapTopTabs}
+									{searchBar}
+								</>,
+								document.body
+							);
 						}
 						return searchBar;
 					})()}

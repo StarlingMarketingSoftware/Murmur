@@ -91,6 +91,10 @@ export const TestPreviewPanel: FC<TestPreviewPanelProps> = ({
 		};
 	}, [testMessage]);
 
+	const isBlankPreview = typedSubject.trim().length === 0 && typedBody.trim().length === 0;
+	const hasMessageTokens = subjectTokens.length > 0 || bodyTokens.length > 0;
+	const shouldBlankWave = isBlankPreview && (isLoading || hasMessageTokens);
+
 	// Multi-layer grayscale blobs with soft edges and top fade mask
 	useEffect(() => {
 		const overlay = overlayRef.current;
@@ -289,7 +293,7 @@ export const TestPreviewPanel: FC<TestPreviewPanelProps> = ({
 				overflow: 'hidden',
 				outline: '2px solid black',
 				outlineOffset: '-2px',
-				backgroundColor: '#F5DE94',
+				backgroundColor: shouldBlankWave ? '#FCE392' : '#F5DE94',
 				...style,
 			}}
 		>
@@ -305,7 +309,10 @@ export const TestPreviewPanel: FC<TestPreviewPanelProps> = ({
 				<div className="flex-1 flex flex-col overflow-visible relative z-20">
 					{/* Content area between dividers - fixed 40px height, white background */}
 					<div
-						className="relative px-3 sm:px-5 bg-white"
+						className={cn(
+							'relative px-3 sm:px-5',
+							shouldBlankWave ? 'test-preview-blank-wave-identity' : 'bg-white'
+						)}
 						style={{ height: '40px' }}
 						data-test-preview-header
 					>
@@ -424,7 +431,10 @@ export const TestPreviewPanel: FC<TestPreviewPanelProps> = ({
 
 					{/* Subject box - 354x46px, 6px below the second divider */}
 					<div
-						className="bg-white border-2 border-black rounded-[4px] flex items-center px-3 mx-auto"
+						className={cn(
+							'border-2 border-black rounded-[4px] flex items-center px-3 mx-auto',
+							shouldBlankWave ? 'test-preview-blank-wave-subject' : 'bg-white'
+						)}
 						style={{
 							width: '354px',
 							height: '46px',
@@ -439,7 +449,10 @@ export const TestPreviewPanel: FC<TestPreviewPanelProps> = ({
 					{/* Email body box - 355x504px, 4px below the subject box */}
 					<div
 						ref={boxRef}
-						className="bg-white border-2 border-black rounded-[4px] mx-auto overflow-hidden relative"
+						className={cn(
+							'border-2 border-black rounded-[4px] mx-auto overflow-hidden relative',
+							shouldBlankWave ? 'test-preview-blank-wave-body' : 'bg-white'
+						)}
 						style={{
 							width: '355px',
 							height: '504px',
