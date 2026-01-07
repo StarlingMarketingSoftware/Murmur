@@ -269,7 +269,7 @@ export const CampaignsTable: FC = () => {
 											data={data}
 											isLoading={isPending}
 											loadingRowCount={6}
-											noDataMessage="No campaigns found."
+											noDataMessage="Start Your First Campaign"
 											rowsPerPage={100}
 											displayRowsPerPage={false}
 											constrainHeight={false}
@@ -330,7 +330,7 @@ export const CampaignsTable: FC = () => {
 								data={data}
 								isLoading={isPending}
 								loadingRowCount={6}
-								noDataMessage="No campaigns found."
+								noDataMessage="Start Your First Campaign"
 								rowsPerPage={100}
 								displayRowsPerPage={false}
 								constrainHeight

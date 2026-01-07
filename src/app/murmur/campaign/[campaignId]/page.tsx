@@ -75,6 +75,25 @@ const Murmur = () => {
 		useCampaignDetail();
 	const router = useRouter();
 	const isMobile = useIsMobile();
+	const CAMPAIGN_COMPACT_CLASS = 'murmur-campaign-compact';
+
+	// Make the campaign page render slightly "zoomed out" on desktop (85%),
+	// without changing the rest of the Murmur app.
+	useEffect(() => {
+		// Avoid running until we know whether this is a real mobile device.
+		if (isMobile === null) return;
+
+		// Never shrink the mobile campaign UI (it's already heavily tuned).
+		if (isMobile) {
+			document.documentElement.classList.remove(CAMPAIGN_COMPACT_CLASS);
+			return;
+		}
+
+		document.documentElement.classList.add(CAMPAIGN_COMPACT_CLASS);
+		return () => {
+			document.documentElement.classList.remove(CAMPAIGN_COMPACT_CLASS);
+		};
+	}, [isMobile]);
 
 	const searchParams = useSearchParams();
 	const silentLoad = searchParams.get('silent') === '1';

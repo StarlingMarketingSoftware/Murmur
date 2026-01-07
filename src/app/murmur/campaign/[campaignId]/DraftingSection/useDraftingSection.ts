@@ -15,6 +15,7 @@ import {
 	OPENROUTER_DRAFTING_MODELS,
 	insertWebsiteLinkPhrase,
 } from '@/constants/ai';
+import { resolveAutoSignatureText } from '@/constants/autoSignatures';
 import {
 	CampaignWithRelations,
 	Font,
@@ -510,8 +511,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	// VARIABLES
 
 	const draftCredits = user?.draftCredits;
-	const signatureText =
-		form.watch('signature') || `Thank you,\n${campaign.identity?.name || ''}`;
+	const defaultAutoSignature = `Thank you,\n${campaign.identity?.name || ''}`;
 	// Full Auto: allow drafts even when user hasn't entered any custom prompt.
 	// We still pass a sensible default "User Goal" to the model so it produces useful output.
 	const DEFAULT_FULL_AI_PROMPT =
@@ -725,6 +725,16 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 
 	const generateHandwrittenDraft = (contact: ContactWithName): GeneratedEmail => {
 		const values = getValues();
+		const signatureTextForDraft = resolveAutoSignatureText({
+			currentSignature: values.signature ?? null,
+			fallbackSignature: defaultAutoSignature,
+			context: {
+				name: campaign.identity?.name ?? null,
+				bandName: campaign.identity?.bandName ?? null,
+				website: campaign.identity?.website ?? null,
+				email: campaign.identity?.email ?? null,
+			},
+		});
 		let combinedTextBlocks = values.hybridBlockPrompts
 			?.filter((block) => block.type === 'text')
 			.map((block) => block.value)
@@ -751,7 +761,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		const messageHtml = convertAiResponseToRichTextEmail(
 			combinedTextBlocks,
 			values.font,
-			signatureText || null
+			signatureTextForDraft || null
 		);
 
 		const messageWithSettings = injectMurmurDraftSettingsSnapshot(messageHtml, {
@@ -759,7 +769,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			values: {
 				...values,
 				// Ensure the stored snapshot always has a concrete signature string.
-				signature: signatureText,
+				signature: signatureTextForDraft,
 			},
 		});
 
@@ -1727,6 +1737,16 @@ EXAMPLES OF GOOD CUSTOM INSTRUCTIONS:
 					
 					// Prepend subject line in Inter bold to the message
 					const messageWithSubject = `<span style="font-family: Inter; font-weight: bold;">${finalSubject}</span><br><br>${processedMessage}`;
+					const signatureTextForDraft = resolveAutoSignatureText({
+						currentSignature: values.signature ?? null,
+						fallbackSignature: defaultAutoSignature,
+						context: {
+							name: campaign.identity?.name ?? null,
+							bandName: campaign.identity?.bandName ?? null,
+							website: campaign.identity?.website ?? null,
+							email: campaign.identity?.email ?? null,
+						},
+					});
 					await saveTestEmail({
 						id: campaign.id,
 						data: {
@@ -1734,7 +1754,7 @@ EXAMPLES OF GOOD CUSTOM INSTRUCTIONS:
 							testMessage: convertAiResponseToRichTextEmail(
 								messageWithSubject,
 								values.font,
-								signatureText || null
+								signatureTextForDraft || null
 							),
 						},
 					});
@@ -1796,6 +1816,16 @@ EXAMPLES OF GOOD CUSTOM INSTRUCTIONS:
 			const draftIndex = overallIndex + 1;
 			const MAX_RETRIES = 5;
 			let lastError: Error | null = null;
+			const signatureTextForDraft = resolveAutoSignatureText({
+				currentSignature: values.signature ?? null,
+				fallbackSignature: defaultAutoSignature,
+				context: {
+					name: campaign.identity?.name ?? null,
+					bandName: campaign.identity?.bandName ?? null,
+					website: campaign.identity?.website ?? null,
+					email: campaign.identity?.email ?? null,
+				},
+			});
 
 			for (
 				let retryCount = 0;
@@ -1875,7 +1905,7 @@ EXAMPLES OF GOOD CUSTOM INSTRUCTIONS:
 						const draftMessageHtml = convertAiResponseToRichTextEmail(
 							processedMessage,
 							values.font,
-							signatureText || null
+							signatureTextForDraft || null
 						);
 						const draftMessageWithSettings = injectMurmurDraftSettingsSnapshot(
 							draftMessageHtml,
@@ -1883,7 +1913,7 @@ EXAMPLES OF GOOD CUSTOM INSTRUCTIONS:
 								version: 1,
 								values: {
 									...values,
-									signature: signatureText,
+									signature: signatureTextForDraft,
 								},
 							}
 						);

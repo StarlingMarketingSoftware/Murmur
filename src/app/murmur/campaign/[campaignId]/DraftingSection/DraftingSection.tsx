@@ -36,6 +36,7 @@ import { useGetContacts, useGetLocations } from '@/hooks/queryHooks/useContacts'
 import { useEditUserContactList } from '@/hooks/queryHooks/useUserContactLists';
 import { useEditEmail, useGetEmails } from '@/hooks/queryHooks/useEmails';
 import { EmailStatus, EmailVerificationStatus, DraftingMode, ReviewStatus } from '@/constants/prismaEnums';
+import { resolveAutoSignatureText } from '@/constants/autoSignatures';
 import { ContactsSelection } from './EmailGeneration/ContactsSelection/ContactsSelection';
 import { SentEmails } from './EmailGeneration/SentEmails/SentEmails';
 import { DraftedEmails } from './EmailGeneration/DraftedEmails/DraftedEmails';
@@ -1273,7 +1274,16 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 					senderBandName: campaign.identity?.bandName ?? null,
 				});
 
-				const signatureText = values.signature || `Thank you,\n${campaign.identity?.name || ''}`;
+				const signatureText = resolveAutoSignatureText({
+					currentSignature: values.signature ?? null,
+					fallbackSignature: `Thank you,\n${campaign.identity?.name || ''}`,
+					context: {
+						name: campaign.identity?.name ?? null,
+						bandName: campaign.identity?.bandName ?? null,
+						website: campaign.identity?.website ?? null,
+						email: campaign.identity?.email ?? null,
+					},
+				});
 				const font = values.font || 'Arial';
 
 				let processedMessageText = cleanedMessageNoSignature;
@@ -4082,6 +4092,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 															hideFooter
 															fullWidthMobile
 															hideAddTextButtons
+															fitToHeight
+															lockFitToHeightScale
 															height={316}
 															pageFillColor={draftsMiniEmailFillColor}
 															topHeaderHeight={draftsMiniEmailTopHeaderHeight}
@@ -4533,6 +4545,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														hideFooter
 														fullWidthMobile
 														hideAddTextButtons
+														fitToHeight
+														lockFitToHeightScale
 														height={316}
 														pageFillColor={draftsMiniEmailFillColor}
 														topHeaderHeight={draftsMiniEmailTopHeaderHeight}
@@ -4922,6 +4936,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														hideFooter
 														fullWidthMobile
 														hideAddTextButtons
+														fitToHeight
+														lockFitToHeightScale
 														height={316}
 														pageFillColor={draftsMiniEmailFillColor}
 														topHeaderHeight={draftsMiniEmailTopHeaderHeight}
