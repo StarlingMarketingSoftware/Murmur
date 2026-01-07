@@ -4192,6 +4192,43 @@ body,
 	overflow: visible !important;
 }
 
+/* --- Test Preview Panel Blank-State Color Wave (Unified Flow) --- */
+.test-preview-blank-wave-identity {
+	background-color: #fce392;
+	animation: testPreviewWaveFlow 1.2s ease-in-out infinite;
+	animation-delay: 0s;
+}
+
+.test-preview-blank-wave-subject {
+	background-color: #fce392;
+	animation: testPreviewWaveFlow 1.2s ease-in-out infinite;
+	animation-delay: 0.2s;
+}
+
+.test-preview-blank-wave-body {
+	background-color: #fce392;
+	animation: testPreviewWaveFlow 1.2s ease-in-out infinite;
+	animation-delay: 0.4s;
+}
+
+@keyframes testPreviewWaveFlow {
+	0%,
+	100% {
+		background-color: #fce392;
+	}
+	50% {
+		background-color: #f1cc54;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.test-preview-blank-wave-identity,
+	.test-preview-blank-wave-subject,
+	.test-preview-blank-wave-body {
+		animation: none;
+	}
+}
+
 .test-preview-panel-content .scrollbar-hide {
 	height: 100% !important;
 	overflow-y: auto !important;
