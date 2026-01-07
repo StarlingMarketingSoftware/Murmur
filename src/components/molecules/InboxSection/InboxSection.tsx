@@ -20,6 +20,7 @@ import { RestaurantsIcon } from '@/components/atoms/_svg/RestaurantsIcon';
 import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
 import { MusicVenuesIcon } from '@/components/atoms/_svg/MusicVenuesIcon';
 import { WineBeerSpiritsIcon } from '@/components/atoms/_svg/WineBeerSpiritsIcon';
+import { useCampaignTopSearchHighlight } from '@/contexts/CampaignTopSearchHighlightContext';
 
 /**
  * Strip quoted reply content from email body (e.g., "On Thu, Nov 27, 2025 at 2:36 AM ... wrote:")
@@ -105,6 +106,12 @@ interface InboxSectionProps {
 	 * Optional callback to navigate to the contacts tab in the campaign page.
 	 */
 	onGoToContacts?: () => void;
+
+	/**
+	 * Optional callback to navigate to the campaign-scoped dashboard search/map view.
+	 * Used by the inbox empty-state "Add More Contacts" button.
+	 */
+	onGoToSearch?: () => void;
 
 	/**
 	 * Optional callback when a contact is selected (based on the selected email).
@@ -207,11 +214,14 @@ export const InboxSection: FC<InboxSectionProps> = ({
 	onGoToDrafting,
 	onGoToWriting,
 	onGoToContacts,
+	onGoToSearch,
 	onContactSelect,
 	onContactHover,
 	isNarrow = false,
 }) => {
 	const isMobile = useIsMobile();
+	const { setDraftsTabHighlighted, setWriteTabHighlighted, setTopSearchHighlighted } =
+		useCampaignTopSearchHighlight();
 
 	// Width constants based on narrow mode and mobile
 	// On mobile, we use calc() values for responsive sizing (4px margins on each side = 8px total)
@@ -405,6 +415,15 @@ export const InboxSection: FC<InboxSectionProps> = ({
 			setIsSending(false);
 		}
 	};
+
+	// Safety: never leave the Drafts tab highlighted if this view unmounts mid-hover.
+	useEffect(() => {
+		return () => {
+			setDraftsTabHighlighted(false);
+			setWriteTabHighlighted(false);
+			setTopSearchHighlighted(false);
+		};
+	}, [setDraftsTabHighlighted, setWriteTabHighlighted, setTopSearchHighlighted]);
 
 	if (isLoading) {
 		const skeletonRowCount = isMobile ? 5 : 6;
@@ -892,8 +911,10 @@ export const InboxSection: FC<InboxSectionProps> = ({
 											? onGoToDrafting
 											: idx === 2 && onGoToWriting
 											? onGoToWriting
+											: idx === 3 && onGoToSearch
+											? onGoToSearch
 											: idx === 3 && onGoToContacts
-											? onGoToContacts
+												? onGoToContacts
 											: idx === 4
 											? () => {
 													if (typeof window !== 'undefined') {
@@ -902,19 +923,47 @@ export const InboxSection: FC<InboxSectionProps> = ({
 												}
 											: undefined
 									}
+									onMouseEnter={
+										idx === 1
+											? () => setDraftsTabHighlighted(true)
+											: idx === 2
+												? () => setWriteTabHighlighted(true)
+												: idx === 3
+													? () => setTopSearchHighlighted(true)
+												: undefined
+									}
+									onMouseLeave={
+										idx === 1
+											? () => setDraftsTabHighlighted(false)
+											: idx === 2
+												? () => setWriteTabHighlighted(false)
+												: idx === 3
+													? () => setTopSearchHighlighted(false)
+												: undefined
+									}
+									className={`bg-white transition-colors ${
+										idx === 1
+											? 'hover:bg-[#EFDAAF]'
+											: idx === 2
+												? 'hover:bg-[#A6E2A8]'
+												: idx === 3
+													? 'hover:bg-[#AFD6EF]'
+													: idx === 4
+														? 'hover:bg-[#DBDBDB]'
+												: ''
+									}`}
 									style={{
 										width: isMobile ? 'calc(100% - 24px)' : '314px',
 										height: isMobile ? '44px' : '42px',
 										border: '3px solid #000000',
 										borderRadius: '8px',
-										backgroundColor: '#FFFFFF',
 										display: 'flex',
 										alignItems: 'center',
 										justifyContent: 'center',
 										cursor:
 											(idx === 1 && onGoToDrafting) ||
 											(idx === 2 && onGoToWriting) ||
-											(idx === 3 && onGoToContacts) ||
+											(idx === 3 && (onGoToSearch || onGoToContacts)) ||
 											idx === 4
 												? 'pointer'
 												: 'default',
@@ -983,49 +1032,49 @@ export const InboxSection: FC<InboxSectionProps> = ({
 
 	return (
 		<div className={`w-full flex justify-center ${isMobile ? 'px-1' : 'px-4'}`}>
-			<div data-campaign-main-box="inbox">
-				<CustomScrollbar
-					className="flex flex-col items-center relative"
-					contentClassName="flex flex-col items-center w-full"
-					thumbWidth={2}
-					thumbColor="#000000"
-					trackColor="transparent"
-					offsetRight={-6}
-					disableOverflowClass
-					style={{
-						width: isMobile ? mobileBoxWidth : `${boxWidth}px`,
-						maxWidth: isMobile ? undefined : `${boxWidth}px`,
-						height: isMobile ? 'calc(100dvh - 160px)' : '657px',
-						minHeight: isMobile ? 'calc(100dvh - 160px)' : '657px',
-						maxHeight: isMobile ? 'calc(100dvh - 160px)' : '657px',
-						border: '3px solid #000000',
-						borderRadius: '8px',
-						padding: selectedEmail
-							? isMobile
-								? '18px 8px 8px 8px'
-								: '21px 13px 12px 13px'
-							: isMobile
-							? '8px'
-							: '16px',
-						paddingTop: selectedEmail
-							? isMobile
-								? '18px'
-								: '21px'
-							: isMobile
-							? '62px'
-							: '109px', // Adjusted for mobile
-						background: selectedEmail
-							? '#437ec1'
-							: isMobile
-							? activeTab === 'sent'
-								? '#5AB477'
-								: '#6fa4e1'
-							: activeTab === 'sent'
-							? 'linear-gradient(to bottom, #FFFFFF 19px, #5AB477 19px)'
-							: 'linear-gradient(to bottom, #FFFFFF 19px, #6fa4e1 19px)',
-						overflow: isMobile ? 'hidden' : undefined,
-					}}
-				>
+			<CustomScrollbar
+				data-campaign-main-box="inbox"
+				className="flex flex-col items-center relative"
+				contentClassName="flex flex-col items-center w-full"
+				thumbWidth={2}
+				thumbColor="#000000"
+				trackColor="transparent"
+				offsetRight={-6}
+				disableOverflowClass
+				style={{
+					width: isMobile ? mobileBoxWidth : `${boxWidth}px`,
+					maxWidth: isMobile ? undefined : `${boxWidth}px`,
+					height: isMobile ? 'calc(100dvh - 160px)' : '657px',
+					minHeight: isMobile ? 'calc(100dvh - 160px)' : '657px',
+					maxHeight: isMobile ? 'calc(100dvh - 160px)' : '657px',
+					border: '3px solid #000000',
+					borderRadius: '8px',
+					padding: selectedEmail
+						? isMobile
+							? '18px 8px 8px 8px'
+							: '21px 13px 12px 13px'
+						: isMobile
+						? '8px'
+						: '16px',
+					paddingTop: selectedEmail
+						? isMobile
+							? '18px'
+							: '21px'
+						: isMobile
+						? '62px'
+						: '109px', // Adjusted for mobile
+					background: selectedEmail
+						? '#437ec1'
+						: isMobile
+						? activeTab === 'sent'
+							? '#5AB477'
+							: '#6fa4e1'
+						: activeTab === 'sent'
+						? 'linear-gradient(to bottom, #FFFFFF 19px, #5AB477 19px)'
+						: 'linear-gradient(to bottom, #FFFFFF 19px, #6fa4e1 19px)',
+					overflow: isMobile ? 'hidden' : undefined,
+				}}
+			>
 					{/* Back button - shown when email is selected */}
 					{selectedEmail && (
 						<button
@@ -1825,8 +1874,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 						))}
 					</>
 				)}
-				</CustomScrollbar>
-			</div>
+			</CustomScrollbar>
 		</div>
 	);
 };

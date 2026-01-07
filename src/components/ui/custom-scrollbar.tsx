@@ -3,7 +3,11 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { cn } from '@/utils';
 
-interface CustomScrollbarProps {
+interface CustomScrollbarProps
+	extends Omit<
+		React.HTMLAttributes<HTMLDivElement>,
+		'children' | 'className' | 'style' | 'onScroll'
+	> {
 	children: React.ReactNode;
 	className?: string;
 	thumbColor?: string;
@@ -37,6 +41,8 @@ export function CustomScrollbar({
 	onScroll,
 	nativeScroll = false,
 	lockHorizontalScroll = false,
+	onWheel: onWheelProp,
+	...rest
 }: CustomScrollbarProps) {
 	const scrollContainerRef = useRef<HTMLDivElement>(null);
 	const scrollThumbRef = useRef<HTMLDivElement>(null);
@@ -132,7 +138,8 @@ export function CustomScrollbar({
 		if (container.scrollTop !== previousScrollTop) {
 			e.stopPropagation();
 		}
-	}, []);
+		onWheelProp?.(e);
+	}, [onWheelProp]);
 
 	useEffect(() => {
 		if (nativeScroll) return;
@@ -191,9 +198,11 @@ export function CustomScrollbar({
 	if (nativeScroll) {
 		return (
 			<div
+				{...rest}
 				ref={scrollContainerRef}
 				className={cn(className, 'overflow-y-auto')}
 				onScroll={onScroll}
+				onWheel={onWheelProp}
 				style={style}
 			>
 				{children}
@@ -202,7 +211,7 @@ export function CustomScrollbar({
 	}
 
 	return (
-		<div className={cn('relative', className)} style={style} onWheel={handleWheel}>
+		<div {...rest} className={cn('relative', className)} style={style} onWheel={handleWheel}>
 			{/* Scrollable content container */}
 			<div
 				ref={scrollContainerRef}

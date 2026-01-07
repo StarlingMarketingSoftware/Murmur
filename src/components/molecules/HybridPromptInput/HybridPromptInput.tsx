@@ -3691,11 +3691,13 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		}, 100);
 	};
 
-	const [highlightStyle, setHighlightStyle] = useState({
+	const MODE_HIGHLIGHT_WIDTH = 80.38;
+	// Hide until we can measure and position it, so it never flashes off-center during tab transitions.
+	const [highlightStyle, setHighlightStyle] = useState(() => ({
 		left: 0,
-		width: 0,
-		opacity: 1,
-	});
+		width: MODE_HIGHLIGHT_WIDTH,
+		opacity: 0,
+	}));
 	const [isInitialRender, setIsInitialRender] = useState(true);
 
 	const dragBounds = useRef({ min: 0, max: 0 });
@@ -3705,7 +3707,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		if (selectedModeKey === 'none') {
 			setHighlightStyle({
 				left: 0,
-				width: 0,
+				width: MODE_HIGHLIGHT_WIDTH,
 				opacity: 0,
 			});
 			return;
@@ -3720,10 +3722,11 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		}
 
 		if (targetButton) {
-			const newLeft = targetButton.offsetLeft + targetButton.offsetWidth / 2 - 80.38 / 2;
+			const newLeft =
+				targetButton.offsetLeft + targetButton.offsetWidth / 2 - MODE_HIGHLIGHT_WIDTH / 2;
 			setHighlightStyle({
 				left: newLeft,
-				width: 80.38,
+				width: MODE_HIGHLIGHT_WIDTH,
 				opacity: 1,
 			});
 		}
@@ -3732,14 +3735,14 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 			const min =
 				fullModeButtonRef.current.offsetLeft +
 				fullModeButtonRef.current.offsetWidth / 2 -
-				80.38 / 2;
+				MODE_HIGHLIGHT_WIDTH / 2;
 			const max =
 				manualModeButtonRef.current.offsetLeft +
 				manualModeButtonRef.current.offsetWidth / 2 -
-				80.38 / 2;
+				MODE_HIGHLIGHT_WIDTH / 2;
 			dragBounds.current = { min, max };
 		}
-	}, [selectedModeKey]);
+	}, [MODE_HIGHLIGHT_WIDTH, selectedModeKey]);
 
 	// Delay enabling transitions until after the first paint
 	useEffect(() => {
@@ -3797,8 +3800,8 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		];
 
 		const closest = positions.reduce((prev, curr) => {
-			return Math.abs(curr.center - (finalX + 80.38 / 2)) <
-				Math.abs(prev.center - (finalX + 80.38 / 2))
+			return Math.abs(curr.center - (finalX + MODE_HIGHLIGHT_WIDTH / 2)) <
+				Math.abs(prev.center - (finalX + MODE_HIGHLIGHT_WIDTH / 2))
 				? curr
 				: prev;
 		});

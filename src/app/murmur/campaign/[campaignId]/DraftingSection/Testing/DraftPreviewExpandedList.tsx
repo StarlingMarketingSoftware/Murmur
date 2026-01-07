@@ -53,14 +53,18 @@ export const DraftPreviewExpandedList: FC<DraftPreviewExpandedListProps> = ({
 	// This places the subject box 5px below the identity bar's bottom border
 	const BODY_TOP_MARGIN = STROKE_PX + IDENTITY_BAR_HEIGHT + SUBJECT_GAP_BELOW_IDENTITY;
 
-	const useLive = Boolean(
-		livePreview?.visible && (livePreview?.message || livePreview?.subject)
-	);
+	const useLive = Boolean(livePreview?.visible);
 
 	const effectiveContactId = useMemo(() => {
-		return (
-			(useLive ? livePreview?.contactId || undefined : fallbackDraft?.contactId) ?? 0
-		);
+		// If live preview is active and has a contact ID, use it.
+		// Note: livePreview.contactId might be missing/null during initial stream start,
+		// so we fall back to fallbackDraft if needed.
+		if (useLive && livePreview?.contactId) {
+			return livePreview.contactId;
+		}
+		// If live preview doesn't have an ID (or isn't active), use fallback.
+		// This ensures we show the contact info even if the live stream hasn't sent the ID yet.
+		return fallbackDraft?.contactId ?? 0;
 	}, [useLive, livePreview?.contactId, fallbackDraft?.contactId]);
 
 	// Determine if we're in an empty state (no content to display)
@@ -76,6 +80,7 @@ export const DraftPreviewExpandedList: FC<DraftPreviewExpandedListProps> = ({
 	const identityBg = '#E5EEFF';
 	const outerBg = '#BAD1FB';
 	const subjectAndBodyBg = '#FFFFFF';
+	const draftWaveBaseBg = '#B6CCF6';
 
 	const contact = useMemo(
 		() => contacts.find((c) => c.id === effectiveContactId) || null,
@@ -131,6 +136,23 @@ export const DraftPreviewExpandedList: FC<DraftPreviewExpandedListProps> = ({
 		return fallbackDraft?.subject || '';
 	}, [useLive, livePreview?.subject, fallbackDraft?.subject]);
 
+	// Draft-loading wave state:
+	// - Use the same staggered wave style as the Test Preview Panel, but with the blue palette.
+	// - Apply wave when content is empty OR when the text matches the placeholder "Drafting..."
+	const liveSubjectText = (livePreview?.subject || '').trim();
+	const liveMessageText = (livePreview?.message || '').trim();
+	const isDraftingPlaceholder = (text: string) => text.trim().toLowerCase() === 'drafting...';
+	
+	// Check if live content is "real" (not empty and not placeholder)
+	const hasRealSubject = liveSubjectText.length > 0 && !isDraftingPlaceholder(liveSubjectText);
+	const hasRealMessage = liveMessageText.length > 0 && !isDraftingPlaceholder(liveMessageText);
+	
+	// Wave if empty state (global) OR if in live mode but content isn't "real" yet
+	const shouldWaveSubject = isEmpty || (useLive && !hasRealSubject);
+	const shouldWaveBody = isEmpty || (useLive && !hasRealMessage);
+	const shouldWaveIdentity = shouldWaveSubject || shouldWaveBody;
+	const isWaveActive = shouldWaveIdentity;
+
 	const stateAbbr = useMemo(() => {
 		if (!contact?.state) return '';
 		return getStateAbbreviation(contact.state) || '';
@@ -141,19 +163,24 @@ export const DraftPreviewExpandedList: FC<DraftPreviewExpandedListProps> = ({
 			className={cn(
 				'max-[480px]:w-[96.27vw] rounded-md pb-2 flex flex-col relative border-[3px] border-black'
 			)}
-			style={{ width: `${width}px`, height: `${height}px`, backgroundColor: outerBg }}
+			style={{
+				width: `${width}px`,
+				height: `${height}px`,
+				backgroundColor: isWaveActive ? draftWaveBaseBg : outerBg,
+			}}
 			role="region"
 			aria-label="Expanded draft preview"
 		>
 			{/* Section between the two divider lines - shows contact info */}
 			<div
+				className={cn(shouldWaveIdentity && 'draft-preview-blank-wave-identity')}
 				style={{
 					position: 'absolute',
 					top: `${IDENTITY_BAR_TOP}px`,
 					left: 0,
 					right: 0,
 					height: `${IDENTITY_BAR_HEIGHT}px`,
-					backgroundColor: identityBg,
+					backgroundColor: shouldWaveIdentity ? undefined : identityBg,
 					borderBottom: `${STROKE_PX}px solid #000000`,
 					boxSizing: 'border-box',
 					display: 'flex',
@@ -162,7 +189,7 @@ export const DraftPreviewExpandedList: FC<DraftPreviewExpandedListProps> = ({
 					paddingRight: '10px',
 				}}
 			>
-				{!isEmpty && (
+				{contact && (
 					<div className="flex items-center justify-between w-full h-full">
 						{/* Left side: Name and Company */}
 						<div className="flex flex-col justify-center min-w-0 flex-1">
@@ -269,11 +296,14 @@ export const DraftPreviewExpandedList: FC<DraftPreviewExpandedListProps> = ({
 						height: `${SUBJECT_BOX_HEIGHT}px`,
 						border: `${STROKE_PX}px solid #000000`,
 						borderRadius: '6px',
-						backgroundColor: subjectAndBodyBg,
+						backgroundColor: shouldWaveSubject ? undefined : subjectAndBodyBg,
 					}}
-					className="overflow-hidden flex-shrink-0 flex items-center px-3"
+					className={cn(
+						'overflow-hidden flex-shrink-0 flex items-center px-3',
+						shouldWaveSubject && 'draft-preview-blank-wave-subject'
+					)}
 				>
-					{!isEmpty && (
+					{!shouldWaveSubject && !isEmpty && (
 						<span className="font-inter font-bold text-[13px] leading-tight truncate">
 							{subjectLine || 'No subject'}
 						</span>
@@ -286,12 +316,15 @@ export const DraftPreviewExpandedList: FC<DraftPreviewExpandedListProps> = ({
 						width: `${width - 20}px`,
 						border: `${STROKE_PX}px solid #000000`,
 						borderRadius: '6px',
-						backgroundColor: subjectAndBodyBg,
+						backgroundColor: shouldWaveBody ? undefined : subjectAndBodyBg,
 						marginBottom: `${BODY_BOTTOM_GAP}px`,
 					}}
-					className="flex-1 overflow-hidden drafting-table-content"
+					className={cn(
+						'flex-1 overflow-hidden drafting-table-content',
+						shouldWaveBody && 'draft-preview-blank-wave-body'
+					)}
 				>
-					{!isEmpty && (
+					{!shouldWaveBody && !isEmpty && (
 					<CustomScrollbar
 						className="h-full"
 						thumbWidth={2}
