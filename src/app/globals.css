@@ -4266,6 +4266,29 @@ body,
     }
 }
 
+/* --- Map Search Results Panel Loading Wave (12-step top-to-bottom + reverse) --- */
+.map-results-panel-loading-wave-row {
+	background-color: #C5F0FF;
+	animation: mapResultsPanelLoadingWave 2.5s ease-in-out infinite;
+	will-change: background-color;
+}
+
+@keyframes mapResultsPanelLoadingWave {
+	0%,
+	100% {
+		background-color: #C5F0FF;
+	}
+	50% {
+		background-color: #81C8E1;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.map-results-panel-loading-wave-row {
+		animation: none;
+	}
+}
+
 .test-preview-panel-content .scrollbar-hide {
 	height: 100% !important;
 	overflow-y: auto !important;
