@@ -1261,6 +1261,31 @@ const DashboardContent = () => {
 		usedContactIdsSet,
 	} = useDashboard({ derivedTitle: derivedContactTitle, forceApplyDerivedTitle: shouldForceApplyDerivedTitle });
 
+	const DASHBOARD_MAP_COMPACT_CLASS = 'murmur-dashboard-map-compact';
+
+	// Make the fullscreen dashboard map view render slightly "zoomed out" on desktop (85%),
+	// mirroring the campaign page's extra-compact scaling.
+	useEffect(() => {
+		// Avoid running until we know whether this is a real mobile device.
+		if (isMobile === null) return;
+
+		// Never shrink the mobile map UI (it's already heavily tuned).
+		if (isMobile) {
+			document.documentElement.classList.remove(DASHBOARD_MAP_COMPACT_CLASS);
+			return;
+		}
+
+		if (isMapView) {
+			document.documentElement.classList.add(DASHBOARD_MAP_COMPACT_CLASS);
+		} else {
+			document.documentElement.classList.remove(DASHBOARD_MAP_COMPACT_CLASS);
+		}
+
+		return () => {
+			document.documentElement.classList.remove(DASHBOARD_MAP_COMPACT_CLASS);
+		};
+	}, [isMapView, isMobile]);
+
 	// If we refreshed while in the normal dashboard results view, restore the results by re-running
 	// the last executed search stored in the URL. We intentionally do not auto-trigger auth flows.
 	const hasHydratedDashboardUrlRef = useRef(false);
