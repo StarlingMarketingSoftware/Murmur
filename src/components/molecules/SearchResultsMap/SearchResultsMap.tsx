@@ -851,6 +851,12 @@ const PROMOTION_OVERLAY_MARKERS_MIN_ZOOM = 8;
 // Defensive cap; expected to be ~2 per state.
 const PROMOTION_OVERLAY_MARKERS_MAX_PINS = 220;
 
+// "All contacts" gray-dot overlay: only show when zoomed in *extremely* close.
+const ALL_CONTACTS_OVERLAY_MARKERS_MIN_ZOOM = 18;
+const ALL_CONTACTS_OVERLAY_LIMIT = 2000;
+const ALL_CONTACTS_OVERLAY_DOT_FILL_COLOR = '#9CA3AF';
+const ALL_CONTACTS_OVERLAY_TOOLTIP_FILL_COLOR = '#6B7280';
+
 const BOOKING_EXTRA_TITLE_PREFIXES = [
 	'Music Venues',
 	'Coffee Shops',
@@ -1116,6 +1122,17 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const [promotionOverlayFetchBbox, setPromotionOverlayFetchBbox] = useState<BoundingBox | null>(
 		null
 	);
+
+	// High-zoom "all contacts" overlay (gray dots)
+	const [allContactsOverlayVisibleContacts, setAllContactsOverlayVisibleContacts] = useState<
+		ContactWithName[]
+	>([]);
+	const allContactsOverlayVisibleIdSetRef = useRef<Set<number>>(new Set());
+	const lastAllContactsOverlayVisibleContactsKeyRef = useRef<string>('');
+	const lastAllContactsOverlayFetchKeyRef = useRef<string>('');
+	const [allContactsOverlayFetchBbox, setAllContactsOverlayFetchBbox] = useState<BoundingBox | null>(
+		null
+	);
 	// Rectangle selection state (dashboard map select tool)
 	const [isAreaSelecting, setIsAreaSelecting] = useState(false);
 	const selectionStartLatLngRef = useRef<LatLngLiteral | null>(null);
@@ -1152,12 +1169,18 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 	const isBookingSearch = useMemo(() => isBookingSearchQuery(searchQuery), [searchQuery]);
 	const isPromotionSearch = useMemo(() => isPromotionSearchQuery(searchQuery), [searchQuery]);
+	const isAnySearch = useMemo(() => Boolean((searchQuery ?? '').trim()), [searchQuery]);
 	useEffect(() => {
 		visibleContactIdSetRef.current = new Set(visibleContacts.map((c) => c.id));
 	}, [visibleContacts]);
 	useEffect(() => {
 		bookingExtraVisibleIdSetRef.current = new Set(bookingExtraVisibleContacts.map((c) => c.id));
 	}, [bookingExtraVisibleContacts]);
+	useEffect(() => {
+		allContactsOverlayVisibleIdSetRef.current = new Set(
+			allContactsOverlayVisibleContacts.map((c) => c.id)
+		);
+	}, [allContactsOverlayVisibleContacts]);
 	// When hovering a booking "extra" marker, highlight all other visible extra markers
 	// of the same booking category (e.g. hover a festival → highlight all festivals in view).
 	const hoveredBookingExtraCategory = useMemo(() => {
@@ -1177,6 +1200,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		setPromotionOverlayFetchBbox(null);
 		lastPromotionOverlayVisibleContactsKeyRef.current = '';
 		setPromotionOverlayVisibleContacts([]);
+		lastAllContactsOverlayFetchKeyRef.current = '';
+		setAllContactsOverlayFetchBbox(null);
+		lastAllContactsOverlayVisibleContactsKeyRef.current = '';
+		setAllContactsOverlayVisibleContacts([]);
 	}, [searchQuery]);
 
 	const normalizedSearchWhatKey = useMemo(
@@ -1540,6 +1567,89 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		[isPromotionSearch]
 	);
 
+	const updateAllContactsOverlayFetchBbox = useCallback(
+		(mapInstance: google.maps.Map | null) => {
+			if (!mapInstance) return;
+
+			// Only run when an explicit search is active (avoid loading the entire dataset in non-search views).
+			if (!isAnySearch) {
+				if (lastAllContactsOverlayFetchKeyRef.current !== '') {
+					lastAllContactsOverlayFetchKeyRef.current = '';
+					setAllContactsOverlayFetchBbox(null);
+				}
+				return;
+			}
+
+			const zoomRaw = mapInstance.getZoom() ?? 4;
+			// Only fetch/render the gray-dot overlay when zoomed in very close.
+			if (zoomRaw < ALL_CONTACTS_OVERLAY_MARKERS_MIN_ZOOM) {
+				if (lastAllContactsOverlayFetchKeyRef.current !== '') {
+					lastAllContactsOverlayFetchKeyRef.current = '';
+					setAllContactsOverlayFetchBbox(null);
+				}
+				return;
+			}
+
+			const bounds = mapInstance.getBounds();
+			if (!bounds) return;
+
+			const sw = bounds.getSouthWest();
+			const ne = bounds.getNorthEast();
+			const south = sw.lat();
+			const west = sw.lng();
+			const north = ne.lat();
+			const east = ne.lng();
+
+			// Skip antimeridian-crossing viewports (not relevant for our UI).
+			if (east < west) return;
+
+			// Light padding to avoid refetching on small pans.
+			const latSpan = north - south;
+			const lngSpan = east - west;
+			const padLat = latSpan * 0.2;
+			const padLng = lngSpan * 0.2;
+
+			const paddedSouth = clamp(south - padLat, -90, 90);
+			const paddedWest = clamp(west - padLng, -180, 180);
+			const paddedNorth = clamp(north + padLat, -90, 90);
+			const paddedEast = clamp(east + padLng, -180, 180);
+
+			// Quantize the fetch window so we don't refetch on tiny pans/zooms.
+			const zoomKey = Math.round(zoomRaw);
+			const quant = getBackgroundDotsQuantizationDeg(zoomKey);
+			const qSouth = Math.floor(paddedSouth / quant) * quant;
+			const qWest = Math.floor(paddedWest / quant) * quant;
+			const qNorth = Math.ceil(paddedNorth / quant) * quant;
+			const qEast = Math.ceil(paddedEast / quant) * quant;
+
+			const nextKey = `${zoomKey}|${qSouth.toFixed(4)}|${qWest.toFixed(4)}|${qNorth.toFixed(
+				4
+			)}|${qEast.toFixed(4)}`;
+			if (nextKey === lastAllContactsOverlayFetchKeyRef.current) return;
+
+			lastAllContactsOverlayFetchKeyRef.current = nextKey;
+			setAllContactsOverlayFetchBbox({ minLat: qSouth, minLng: qWest, maxLat: qNorth, maxLng: qEast });
+		},
+		[isAnySearch]
+	);
+
+	const allContactsOverlayFilters = useMemo(() => {
+		if (!allContactsOverlayFetchBbox) return undefined;
+		return {
+			mode: 'all' as const,
+			south: allContactsOverlayFetchBbox.minLat,
+			west: allContactsOverlayFetchBbox.minLng,
+			north: allContactsOverlayFetchBbox.maxLat,
+			east: allContactsOverlayFetchBbox.maxLng,
+			limit: ALL_CONTACTS_OVERLAY_LIMIT,
+		};
+	}, [allContactsOverlayFetchBbox]);
+
+	const { data: allContactsOverlayRawContacts } = useGetContactsMapOverlay({
+		filters: allContactsOverlayFilters,
+		enabled: Boolean(allContactsOverlayFilters),
+	});
+
 	const bookingExtraOverlayFilters = useMemo(() => {
 		if (!bookingExtraFetchBbox) return undefined;
 		return {
@@ -1659,6 +1769,44 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		return { contactsWithCoords, coordsByContactId };
 	}, [promotionOverlayContacts]);
 
+	const {
+		contactsWithCoords: allContactsOverlayContactsWithCoords,
+		coordsByContactId: allContactsOverlayCoordsByContactId,
+	} = useMemo(() => {
+		const coordsByContactId = new Map<number, LatLngLiteral>();
+		const contactsWithCoords: ContactWithName[] = [];
+		const groups = new Map<string, number[]>();
+
+		if (!allContactsOverlayRawContacts || allContactsOverlayRawContacts.length === 0) {
+			return { contactsWithCoords, coordsByContactId };
+		}
+
+		for (const contact of allContactsOverlayRawContacts) {
+			const coords = getLatLngFromContact(contact);
+			if (!coords) continue;
+			coordsByContactId.set(contact.id, coords);
+			contactsWithCoords.push(contact);
+			const key = coordinateKey(coords);
+			const existing = groups.get(key);
+			if (existing) existing.push(contact.id);
+			else groups.set(key, [contact.id]);
+		}
+
+		// Offset duplicates (keep the smallest id at the true coordinate for accuracy)
+		for (const ids of groups.values()) {
+			if (ids.length <= 1) continue;
+			ids.sort((a, b) => a - b);
+			for (let i = 1; i < ids.length; i++) {
+				const id = ids[i];
+				const base = coordsByContactId.get(id);
+				if (!base) continue;
+				coordsByContactId.set(id, jitterDuplicateCoords(base, i));
+			}
+		}
+
+		return { contactsWithCoords, coordsByContactId };
+	}, [allContactsOverlayRawContacts]);
+
 	const getBookingExtraContactCoords = useCallback(
 		(contact: ContactWithName): LatLngLiteral | null =>
 			bookingExtraCoordsByContactId.get(contact.id) ?? null,
@@ -1669,6 +1817,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		(contact: ContactWithName): LatLngLiteral | null =>
 			promotionOverlayCoordsByContactId.get(contact.id) ?? null,
 		[promotionOverlayCoordsByContactId]
+	);
+
+	const getAllContactsOverlayContactCoords = useCallback(
+		(contact: ContactWithName): LatLngLiteral | null =>
+			allContactsOverlayCoordsByContactId.get(contact.id) ?? null,
+		[allContactsOverlayCoordsByContactId]
 	);
 
 	useEffect(() => {
@@ -1690,7 +1844,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		const stillVisible =
 			visibleContacts.some((c) => c.id === hoveredMarkerId) ||
 			bookingExtraVisibleContacts.some((c) => c.id === hoveredMarkerId) ||
-			promotionOverlayVisibleContacts.some((c) => c.id === hoveredMarkerId);
+			promotionOverlayVisibleContacts.some((c) => c.id === hoveredMarkerId) ||
+			allContactsOverlayVisibleContacts.some((c) => c.id === hoveredMarkerId);
 		if (stillVisible) return;
 		if (hoverClearTimeoutRef.current) {
 			clearTimeout(hoverClearTimeoutRef.current);
@@ -1704,6 +1859,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		visibleContacts,
 		bookingExtraVisibleContacts,
 		promotionOverlayVisibleContacts,
+		allContactsOverlayVisibleContacts,
 		hoveredMarkerId,
 		onMarkerHover,
 	]);
@@ -2065,6 +2221,20 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		const bbox = lockedStateSelectionBboxRef.current;
 		if (bbox && !isLatLngInBbox(coords.lat, coords.lng, bbox)) return false;
 		return pointInMultiPolygon([coords.lng, coords.lat], selection);
+	}, []);
+
+	// Used to ensure the high-zoom "all contacts" gray-dot overlay never renders in water.
+	// We approximate "land" by requiring the coordinate to fall within at least one US state polygon
+	// loaded from `states.js` (this reliably removes oceans/coastal water artifacts without extra API calls).
+	const isCoordsInAnyUsState = useCallback((coords: LatLngLiteral): boolean => {
+		const prepared = usStatesPolygonsRef.current;
+		if (!prepared || prepared.length === 0) return false;
+		const point: ClippingCoord = [coords.lng, coords.lat];
+		for (const { polygon, bbox } of prepared) {
+			if (bbox && !isLatLngInBbox(coords.lat, coords.lng, bbox)) continue;
+			if (pointInClippingPolygon(point, polygon)) return true;
+		}
+		return false;
 	}, []);
 
 	const resultStateKeysSignature = useMemo(
@@ -2854,6 +3024,39 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				setBookingExtraVisibleContacts(nextBookingExtraVisible);
 			}
 
+			// High-zoom gray-dot overlay: show *all* contacts in the viewport (excluding contacts
+			// already rendered as primary dots or overlay pins).
+			const shouldShowAllContactsOverlay =
+				isAnySearch &&
+				zoomRaw >= ALL_CONTACTS_OVERLAY_MARKERS_MIN_ZOOM &&
+				allContactsOverlayContactsWithCoords.length > 0;
+			let nextAllContactsOverlayVisible: ContactWithName[] = [];
+			if (shouldShowAllContactsOverlay) {
+				const excludeIdSet = new Set<number>(baseContactIdSet);
+				for (const c of nextBookingExtraVisible) excludeIdSet.add(c.id);
+				for (const c of nextPromotionOverlayVisible) excludeIdSet.add(c.id);
+
+				const inBounds: ContactWithName[] = [];
+				for (const contact of allContactsOverlayContactsWithCoords) {
+					if (excludeIdSet.has(contact.id)) continue;
+					const coords = getAllContactsOverlayContactCoords(contact);
+					if (!coords) continue;
+					if (!isLatLngInBbox(coords.lat, coords.lng, viewportBbox)) continue;
+					// Never render gray dots in water (e.g. oceans). Treat "land" as inside any US state polygon.
+					if (!isCoordsInAnyUsState(coords)) continue;
+					inBounds.push(contact);
+				}
+
+				inBounds.sort((a, b) => a.id - b.id);
+				nextAllContactsOverlayVisible = inBounds;
+			}
+
+			const nextAllKey = nextAllContactsOverlayVisible.map((c) => c.id).join(',');
+			if (nextAllKey !== lastAllContactsOverlayVisibleContactsKeyRef.current) {
+				lastAllContactsOverlayVisibleContactsKeyRef.current = nextAllKey;
+				setAllContactsOverlayVisibleContacts(nextAllContactsOverlayVisible);
+			}
+
 			const totalRendered = nextVisibleContacts.length + nextBookingExtraVisible.length;
 			const backgroundBudget = Math.max(0, MAX_TOTAL_DOTS - totalRendered);
 			backgroundDotsBudgetRef.current = backgroundBudget;
@@ -2862,6 +3065,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		[
 			contactsWithCoords,
 			getContactCoords,
+			baseContactIdSet,
 			selectedContacts,
 			lockedStateKey,
 			isCoordsInLockedState,
@@ -2872,6 +3076,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			isPromotionSearch,
 			promotionOverlayContactsWithCoords,
 			getPromotionOverlayContactCoords,
+			isAnySearch,
+			allContactsOverlayContactsWithCoords,
+			getAllContactsOverlayContactCoords,
+			isCoordsInAnyUsState,
 		]
 	);
 
@@ -2915,6 +3123,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		const onIdle = () => {
 			updateBookingExtraFetchBbox(map);
 			updatePromotionOverlayFetchBbox(map);
+			updateAllContactsOverlayFetchBbox(map);
 			recomputeViewportDots(map, isLoadingRef.current);
 		};
 		const listener = map.addListener('idle', onIdle);
@@ -2923,7 +3132,13 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		return () => {
 			listener.remove();
 		};
-	}, [map, recomputeViewportDots, updateBookingExtraFetchBbox, updatePromotionOverlayFetchBbox]);
+	}, [
+		map,
+		recomputeViewportDots,
+		updateBookingExtraFetchBbox,
+		updatePromotionOverlayFetchBbox,
+		updateAllContactsOverlayFetchBbox,
+	]);
 
 	// Draw a gray outline around the *group of states* that have results.
 	// This uses the state polygons we load via the Data layer and unions them so the outline is one shape.
@@ -3454,7 +3669,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		if (
 			map &&
 			!visibleContactIdSetRef.current.has(nextId) &&
-			!bookingExtraVisibleIdSetRef.current.has(nextId)
+			!bookingExtraVisibleIdSetRef.current.has(nextId) &&
+			!allContactsOverlayVisibleIdSetRef.current.has(nextId)
 		) {
 			recomputeViewportDots(map, isLoadingRef.current);
 		}
@@ -3573,6 +3789,49 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		};
 	}, [isLoaded, markerScale]);
 
+	// All-contacts gray dot markers (only shown at very high zoom levels).
+	const allContactsOverlayDotScale = useMemo(() => markerScale * 0.72, [markerScale]);
+	const allContactsOverlayDotStrokeWeight = useMemo(
+		() => Math.max(1, strokeWeight * 0.85),
+		[strokeWeight]
+	);
+
+	const allContactsOverlayMarkerIcon = useMemo(() => {
+		if (!isLoaded) return undefined;
+		return {
+			path: google.maps.SymbolPath.CIRCLE,
+			fillColor: ALL_CONTACTS_OVERLAY_DOT_FILL_COLOR,
+			fillOpacity: 1,
+			strokeColor: RESULT_DOT_STROKE_COLOR_DEFAULT,
+			strokeWeight: allContactsOverlayDotStrokeWeight,
+			scale: allContactsOverlayDotScale,
+		};
+	}, [isLoaded, allContactsOverlayDotScale, allContactsOverlayDotStrokeWeight]);
+
+	const allContactsOverlayMarkerIconSelected = useMemo(() => {
+		if (!isLoaded) return undefined;
+		return {
+			path: google.maps.SymbolPath.CIRCLE,
+			fillColor: ALL_CONTACTS_OVERLAY_DOT_FILL_COLOR,
+			fillOpacity: 1,
+			strokeColor: RESULT_DOT_STROKE_COLOR_SELECTED,
+			strokeWeight: allContactsOverlayDotStrokeWeight,
+			scale: allContactsOverlayDotScale,
+		};
+	}, [isLoaded, allContactsOverlayDotScale, allContactsOverlayDotStrokeWeight]);
+
+	const invisibleAllContactsOverlayHitAreaIcon = useMemo(() => {
+		if (!isLoaded) return undefined;
+		return {
+			path: google.maps.SymbolPath.CIRCLE,
+			fillColor: 'transparent',
+			fillOpacity: 0,
+			strokeColor: 'transparent',
+			strokeWeight: 0,
+			scale: allContactsOverlayDotScale,
+		};
+	}, [isLoaded, allContactsOverlayDotScale]);
+
 	// Invisible hit area sized to match the pin circle (pins are clamped larger at low zoom).
 	const invisiblePinHitAreaIcon = useMemo(() => {
 		if (!isLoaded) return undefined;
@@ -3657,6 +3916,109 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			onMouseUp={handleMapMouseUp}
 		>
 			{/* Only render markers when not loading */}
+			{!isLoading &&
+				allContactsOverlayVisibleContacts.map((contact) => {
+					const coords = getAllContactsOverlayContactCoords(contact);
+					if (!coords) return null;
+					const isHovered = hoveredMarkerId === contact.id;
+					const isSelected = selectedContacts.includes(contact.id);
+
+					const dotIcon = isSelected ? allContactsOverlayMarkerIconSelected : allContactsOverlayMarkerIcon;
+
+					// Show tooltip if hovered or if this marker is fading out
+					const isFading = fadingTooltipId === contact.id;
+					const shouldShowTooltip = isHovered || isFading;
+					const hoverTooltip = shouldShowTooltip
+						? (() => {
+								const fullName = `${contact.firstName || ''} ${
+									contact.lastName || ''
+								}`.trim();
+								const nameForTooltip = fullName || contact.name || '';
+								const companyForTooltip = contact.company || '';
+								const titleForTooltip = (contact.title || contact.headline || '').trim();
+								const tooltipFillColor = isSelected
+									? TOOLTIP_FILL_COLOR_SELECTED
+									: ALL_CONTACTS_OVERLAY_TOOLTIP_FILL_COLOR;
+								const width = calculateTooltipWidth(
+									nameForTooltip,
+									companyForTooltip,
+									titleForTooltip
+								);
+								const height = calculateTooltipHeight(nameForTooltip, companyForTooltip);
+								const anchorY = calculateTooltipAnchorY(nameForTooltip, companyForTooltip);
+								return {
+									url: generateMapTooltipIconUrl(
+										nameForTooltip,
+										companyForTooltip,
+										titleForTooltip,
+										tooltipFillColor
+									),
+									width,
+									height,
+									anchorY,
+								};
+							})()
+						: null;
+
+					return (
+						<Fragment key={`allOverlay-${contact.id}`}>
+							{/* Low z-index hit area so primary/overlay pins win when overlapping */}
+							<MarkerF
+								position={coords}
+								icon={invisibleAllContactsOverlayHitAreaIcon}
+								onMouseOver={(e) => handleMarkerMouseOver(contact, e)}
+								onMouseOut={() => handleMarkerMouseOut(contact.id)}
+								onClick={() => handleMarkerClick(contact)}
+								clickable={true}
+								zIndex={-1}
+							/>
+							{/* Gray dot marker */}
+							<MarkerF position={coords} icon={dotIcon} clickable={false} zIndex={-2} />
+							{/* Hover SVG tooltip */}
+							{shouldShowTooltip && hoverTooltip && (
+								<OverlayViewF
+									position={coords}
+									mapPaneName={OverlayView.FLOAT_PANE}
+									zIndex={HOVER_TOOLTIP_Z_INDEX}
+									getPixelPositionOffset={() => ({
+										x: -MAP_TOOLTIP_ANCHOR_X,
+										y: -hoverTooltip.anchorY,
+									})}
+								>
+									<div
+										style={{
+											width: `${hoverTooltip.width}px`,
+											height: `${hoverTooltip.height + hoverLeaveBufferPx}px`,
+											pointerEvents: isHovered ? 'auto' : 'none',
+											display: 'flex',
+											flexDirection: 'column',
+										}}
+										onMouseEnter={() => handleMarkerMouseOver(contact)}
+										onMouseLeave={() => handleMarkerMouseOut(contact.id)}
+										onClick={() => handleMarkerClick(contact)}
+									>
+										<div
+											style={{
+												width: '100%',
+												height: `${hoverTooltip.height}px`,
+												opacity: isHovered ? 1 : 0,
+												transition: 'opacity 150ms ease-in-out',
+												flexShrink: 0,
+											}}
+										>
+											<img
+												src={hoverTooltip.url}
+												alt=""
+												draggable={false}
+												style={{ width: '100%', height: '100%', display: 'block' }}
+											/>
+										</div>
+									</div>
+								</OverlayViewF>
+							)}
+						</Fragment>
+					);
+				})}
 			{!isLoading &&
 				promotionOverlayVisibleContacts.map((contact) => {
 					const coords = getPromotionOverlayContactCoords(contact);
