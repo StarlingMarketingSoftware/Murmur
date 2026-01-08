@@ -50,9 +50,9 @@ export default function HomePage() {
 	const heroRef = useRef<HTMLDivElement>(null);
 	const heroVideoRef = useRef<any>(null);
 	const heroVideoStyle = {
-		// Show the full 16:9 frame (no vertical cropping)
-		'--media-object-fit': 'contain',
-		'--media-object-position': 'center',
+		// Fill the full hero width; crop (preferably bottom) as needed
+		'--media-object-fit': 'cover',
+		'--media-object-position': 'top',
 		'--controls': 'none',
 		'--play-button': 'none',
 		'--center-play-button': 'none',
@@ -161,12 +161,12 @@ export default function HomePage() {
 		<main className="overflow-x-hidden">
 			<div
 				id="landing-hero"
-				className="relative w-screen overflow-hidden bg-background parallax-container"
+				className="relative w-screen h-dvh overflow-hidden bg-background parallax-container"
 				ref={heroRef}
 				data-parallax-speed="0.3"
 			>
-				{/* Hero frame (enforces 16:9 on md+; fixed height on small screens) */}
-				<div className="relative w-full h-[373px] sm:h-[418px] md:h-auto md:aspect-video">
+				{/* Hero frame (locked to the viewport height across breakpoints) */}
+				<div className="relative w-full h-full">
 					{/* Background video layer */}
 					<div className="absolute inset-0 pointer-events-none bg-black">
 						<MuxPlayer
@@ -189,7 +189,11 @@ export default function HomePage() {
 					{/* Content layer */}
 					<div className="relative z-10 flex h-full w-full items-center justify-center px-4 pt-12 sm:pt-16">
 						<div className="w-full max-w-[1132px] flex flex-col items-center -translate-y-[99px] sm:-translate-y-[107px] md:-translate-y-[123px] lg:-translate-y-[139px]">
-							<h1 className="font-crimson text-white font-normal leading-[1.05] text-center text-[44px] sm:text-[56px] md:text-[72px] lg:text-[88px] mb-8">
+							<h1
+								className="font-crimson text-white font-normal leading-[1.05] text-center text-[clamp(44px,8.5vw,88px)] mb-8"
+								// Crimson Text doesn't ship a 300 weight; this subtly "thins" the fill without adding a new font.
+								style={{ WebkitTextStroke: '0.6px rgba(0,0,0,0.6)' }}
+							>
 								Built to get you booked.
 								<br />
 								You deserve an audience.
@@ -198,7 +202,6 @@ export default function HomePage() {
 						</div>
 					</div>
 				</div>
-				<div className="h-16 sm:h-20 md:h-24" />
 			</div>
 			{/* Explanation */}
 			<div className="w-full bg-gray-200 pt-16 pb-4">

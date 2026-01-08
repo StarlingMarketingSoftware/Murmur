@@ -26,7 +26,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 export const LandingHeroSearchBar = () => {
 	// Dashboard is scaled down via `html.murmur-compact { zoom: 0.9 }`.
 	// We scale this component to match the perceived size on the dashboard.
-	const SCALE = 0.9;
+	// const SCALE = 0.9;
 
 	type ActiveSection = 'why' | 'what' | 'where' | null;
 
@@ -719,8 +719,11 @@ export const LandingHeroSearchBar = () => {
 	};
 
 	return (
-		<div className="origin-center" style={{ transform: `scale(${SCALE})` }}>
-			<div className="search-bar-wrapper w-full max-w-[1132px] mx-auto px-4 !z-[50]">
+		<div
+			className="origin-center w-full"
+			style={{ transform: 'scale(clamp(0.7, calc(0.6 + (100vw / 4000px)), 0.9))' }}
+		>
+			<div className="search-bar-wrapper w-full max-w-[1132px] mx-auto px-4 max-[480px]:px-2 !z-[50]">
 				<div className="search-bar-inner">
 					<form
 						onSubmit={(e) => {
@@ -731,7 +734,7 @@ export const LandingHeroSearchBar = () => {
 						<div className="search-input-group relative" ref={searchContainerRef}>
 							<div className="search-wave-container" style={{ transition: 'none' }}>
 								<Input
-									className="search-wave-input !focus-visible:ring-0 !focus-visible:ring-offset-0 !focus:ring-0 !focus:ring-offset-0 !ring-0 !outline-none !accent-transparent !h-[72px] !border-2 !border-black pr-[70px] md:pr-[80px]"
+									className="search-wave-input !focus-visible:ring-0 !focus-visible:ring-offset-0 !focus:ring-0 !focus:ring-offset-0 !ring-0 !outline-none !accent-transparent !h-[72px] max-[480px]:!h-[60px] !border-2 !border-black pr-[70px] max-[480px]:pr-[58px] md:pr-[80px]"
 									placeholder=""
 									style={{
 										accentColor: 'transparent',
@@ -745,7 +748,7 @@ export const LandingHeroSearchBar = () => {
 
 								{/* 3-section dashboard-style UI overlay (Why / What / Where) */}
 								<div
-									className={`search-sections-container absolute left-[4px] right-[68px] top-1/2 -translate-y-1/2 h-[64px] rounded-[8px] z-20 font-secondary flex items-center ${
+									className={`search-sections-container absolute left-[4px] right-[68px] max-[480px]:right-[56px] top-1/2 -translate-y-1/2 h-[64px] max-[480px]:h-[52px] rounded-[8px] z-20 font-secondary flex items-center ${
 										activeSection ? 'bg-[#EFEFEF] border border-transparent' : 'bg-white border border-black'
 									}`}
 									style={{ transition: 'none' }}
@@ -759,7 +762,7 @@ export const LandingHeroSearchBar = () => {
 
 									{/* Why */}
 									<div
-										className={`relative h-full cursor-pointer border flex-1 min-w-0 ${
+										className={`relative h-full cursor-pointer border flex-1 min-w-0 overflow-hidden ${
 											activeSection === 'why'
 												? 'bg-transparent border-transparent rounded-[8px]'
 												: `border-transparent ${
@@ -768,10 +771,10 @@ export const LandingHeroSearchBar = () => {
 										}`}
 										onClick={() => setActiveSection(activeSection === 'why' ? null : 'why')}
 									>
-										<div className="absolute z-20 left-[24px] top-[10px] text-[22px] font-bold text-black leading-none">
+										<div className="absolute z-20 left-[24px] max-[480px]:left-[12px] top-[10px] max-[480px]:top-[7px] text-[22px] max-[480px]:text-[18px] font-bold text-black leading-none">
 											Why
 										</div>
-										<div className="absolute z-20 left-[24px] right-[4px] top-[42px] h-[12px] overflow-hidden">
+										<div className="absolute z-20 left-[24px] max-[480px]:left-[12px] right-[4px] top-[42px] max-[480px]:top-[30px] h-[12px] overflow-hidden">
 											<div
 												className="absolute top-0 left-0 font-semibold text-[12px] whitespace-nowrap"
 												style={{
@@ -807,10 +810,10 @@ export const LandingHeroSearchBar = () => {
 										}`}
 										onClick={() => setActiveSection('what')}
 									>
-										<div className="absolute z-20 left-[24px] top-[10px] text-[22px] font-bold text-black leading-none">
+										<div className="absolute z-20 left-[24px] max-[480px]:left-[12px] top-[10px] max-[480px]:top-[7px] text-[22px] max-[480px]:text-[18px] font-bold text-black leading-none">
 											What
 										</div>
-										<div className="absolute z-20 left-[24px] right-[8px] top-[42px] h-[12px] overflow-hidden">
+										<div className="absolute z-20 left-[24px] max-[480px]:left-[12px] right-[8px] top-[42px] max-[480px]:top-[30px] h-[12px] overflow-hidden">
 											{activeSection === 'what' ? (
 												<input
 													ref={whatInputRef}
@@ -874,10 +877,10 @@ export const LandingHeroSearchBar = () => {
 										}`}
 										onClick={() => setActiveSection('where')}
 									>
-										<div className="absolute z-20 left-[24px] top-[10px] text-[22px] font-bold text-black leading-none">
+										<div className="absolute z-20 left-[24px] max-[480px]:left-[12px] top-[10px] max-[480px]:top-[7px] text-[22px] max-[480px]:text-[18px] font-bold text-black leading-none">
 											Where
 										</div>
-										<div className="absolute z-20 left-[24px] right-[8px] top-[42px] h-[12px] overflow-hidden">
+										<div className="absolute z-20 left-[24px] max-[480px]:left-[12px] right-[8px] top-[42px] max-[480px]:top-[30px] h-[12px] overflow-hidden">
 											{activeSection === 'where' ? (
 												<div className="absolute z-20 top-0 left-0 w-full h-full flex items-center gap-[2px]">
 													<input
@@ -933,7 +936,7 @@ export const LandingHeroSearchBar = () => {
 								{/* Search button (still not wired up to search) */}
 								<button
 									type="submit"
-									className="flex absolute right-[6px] items-center justify-center w-[58px] h-[62px] z-40 cursor-pointer group"
+									className="flex absolute right-[6px] items-center justify-center w-[58px] max-[480px]:w-[46px] h-[62px] max-[480px]:h-[50px] z-40 cursor-pointer group"
 									style={{
 										top: '50%',
 										transform: 'translateY(-50%)',
