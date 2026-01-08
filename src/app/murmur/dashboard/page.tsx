@@ -1261,6 +1261,31 @@ const DashboardContent = () => {
 		usedContactIdsSet,
 	} = useDashboard({ derivedTitle: derivedContactTitle, forceApplyDerivedTitle: shouldForceApplyDerivedTitle });
 
+	const DASHBOARD_MAP_COMPACT_CLASS = 'murmur-dashboard-map-compact';
+
+	// Make the fullscreen dashboard map view render slightly "zoomed out" on desktop (85%),
+	// mirroring the campaign page's extra-compact scaling.
+	useEffect(() => {
+		// Avoid running until we know whether this is a real mobile device.
+		if (isMobile === null) return;
+
+		// Never shrink the mobile map UI (it's already heavily tuned).
+		if (isMobile) {
+			document.documentElement.classList.remove(DASHBOARD_MAP_COMPACT_CLASS);
+			return;
+		}
+
+		if (isMapView) {
+			document.documentElement.classList.add(DASHBOARD_MAP_COMPACT_CLASS);
+		} else {
+			document.documentElement.classList.remove(DASHBOARD_MAP_COMPACT_CLASS);
+		}
+
+		return () => {
+			document.documentElement.classList.remove(DASHBOARD_MAP_COMPACT_CLASS);
+		};
+	}, [isMapView, isMobile]);
+
 	// If we refreshed while in the normal dashboard results view, restore the results by re-running
 	// the last executed search stored in the URL. We intentionally do not auto-trigger auth flows.
 	const hasHydratedDashboardUrlRef = useRef(false);
@@ -1856,8 +1881,13 @@ const DashboardContent = () => {
 				shouldPersistSelectedCategoryIdentity &&
 				stickyCategoryHeadlineForCurrentSearch
 			) {
+				// Only apply the sticky category identity to contacts that were part of the current
+				// base search results list. Overlay-only contacts (e.g. high-zoom gray dots) should
+				// keep their real `contact.title` / `contact.headline`.
+				const baseIdsForThisSearch = new Set<number>((contacts || []).map((c) => c.id));
 				for (const id of addedIds) {
 					if (next[id]) continue;
+					if (!baseIdsForThisSearch.has(id)) continue;
 					next[id] = stickyCategoryHeadlineForCurrentSearch;
 					changed = true;
 				}
@@ -1865,7 +1895,12 @@ const DashboardContent = () => {
 
 			return changed ? next : prev;
 		});
-	}, [selectedContacts, shouldPersistSelectedCategoryIdentity, stickyCategoryHeadlineForCurrentSearch]);
+	}, [
+		selectedContacts,
+		shouldPersistSelectedCategoryIdentity,
+		stickyCategoryHeadlineForCurrentSearch,
+		contacts,
+	]);
 
 	const baseContactIdSet = useMemo(
 		() => new Set<number>((contacts || []).map((c) => c.id)),
@@ -4992,11 +5027,15 @@ const DashboardContent = () => {
 																				const isSpecialCategorySearch =
 																					/^restaurants?$/i.test(whatValue.trim()) ||
 																					/^coffee\s*shops?$/i.test(whatValue.trim());
-																				const contactHeadline = contact.headline || contact.title || '';
-																				const computedHeadline =
-																					isSpecialCategorySearch && isInBaseResults
+																				// For overlay-only contacts (not in base results), prefer the true contact title.
+																				const contactHeadline = isInBaseResults
+																					? contact.headline || contact.title || ''
+																					: contact.title || contact.headline || '';
+																				const computedHeadline = isInBaseResults
+																					? isSpecialCategorySearch
 																						? searchDerivedHeadline
-																						: contactHeadline || searchDerivedHeadline;
+																						: contactHeadline || searchDerivedHeadline
+																					: contactHeadline;
 																				const stickyHeadline =
 																					selectedContactStickyHeadlineById[contact.id] || '';
 																				const headline =
@@ -5537,11 +5576,15 @@ const DashboardContent = () => {
 																				? `${whatValue} ${whereValue}`
 																				: whatValue || '';
 																		const isRestaurantSearch = /^restaurants?$/i.test(whatValue.trim());
-																		const contactHeadline = contact.headline || contact.title || '';
-																		const computedHeadline =
-																			isRestaurantSearch && isInBaseResults
+																		// For overlay-only contacts (not in base results), prefer the true contact title.
+																		const contactHeadline = isInBaseResults
+																			? contact.headline || contact.title || ''
+																			: contact.title || contact.headline || '';
+																		const computedHeadline = isInBaseResults
+																			? isRestaurantSearch
 																				? searchDerivedHeadline
-																				: contactHeadline || searchDerivedHeadline;
+																				: contactHeadline || searchDerivedHeadline
+																			: contactHeadline;
 																		const stickyHeadline =
 																			selectedContactStickyHeadlineById[contact.id] || '';
 																		const headline =

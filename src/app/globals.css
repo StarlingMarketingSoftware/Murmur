@@ -4004,13 +4004,15 @@ html.murmur-compact {
 	}
 }
 
-/* Campaign route extra compact scaling (85%) */
-html.murmur-compact.murmur-campaign-compact {
+/* Extra compact scaling (85%) for fullscreen map/campaign views */
+html.murmur-compact.murmur-campaign-compact,
+html.murmur-compact.murmur-dashboard-map-compact {
 	zoom: 0.85;
 }
 
 @supports not (zoom: 0.85) {
-	html.murmur-compact.murmur-campaign-compact body {
+	html.murmur-compact.murmur-campaign-compact body,
+	html.murmur-compact.murmur-dashboard-map-compact body {
 		transform: scale(0.85);
 		transform-origin: top center;
 		width: calc(100% / 0.85);
