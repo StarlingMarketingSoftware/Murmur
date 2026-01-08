@@ -12,6 +12,7 @@ import { ComparisonTable } from '@/components/molecules/ComparisonTable/Comparis
 import { ScrollingReviews } from '@/components/molecules/ScrollingReviews/ScrollingReviews';
 import { LandingHeroSearchBar } from '@/components/molecules/LandingHeroSearchBar/LandingHeroSearchBar';
 import { useAdvancedScrollAnimations } from '@/hooks/useAdvancedScrollAnimations';
+import MuxPlayer from '@mux/mux-player-react';
 import { useEffect, useRef } from 'react';
 import { gsap } from 'gsap';
 import './landing-animations.css';
@@ -47,6 +48,19 @@ export default function HomePage() {
 		addScaleIn,
 	} = useAdvancedScrollAnimations();
 	const heroRef = useRef<HTMLDivElement>(null);
+	const heroVideoRef = useRef<any>(null);
+	const heroVideoStyle = {
+		'--media-object-fit': 'cover',
+		'--media-object-position': 'center',
+		'--controls': 'none',
+		'--play-button': 'none',
+		'--center-play-button': 'none',
+		'--mute-button': 'none',
+		'--pip-button': 'none',
+		'--airplay-button': 'none',
+		'--cast-button': 'none',
+		'--fullscreen-button': 'none',
+	} as any;
 
 	useEffect(() => {
 		// Check if browser is Chrome before running GSAP animations
@@ -91,15 +105,85 @@ export default function HomePage() {
 		// No animations for hero text and subtitle - they appear immediately
 	}, []);
 
+	// Work around HLS loop "hiccup" by seeking back to the start *before* the stream ends.
+	// This avoids hitting the "ended" state, which can cause a noticeable pause on some browsers.
+	useEffect(() => {
+		const player = heroVideoRef.current;
+		if (!player) return;
+
+		let rafId: number | null = null;
+		let lastCheckTs = 0;
+		let lastSeekTs = 0;
+		const CHECK_EVERY_MS = 200;
+		const LOOP_THRESHOLD_SECONDS = 0.35;
+
+		const tick = (ts: number) => {
+			try {
+				// Throttle checks to reduce overhead.
+				if (ts - lastCheckTs < CHECK_EVERY_MS) {
+					rafId = window.requestAnimationFrame(tick);
+					return;
+				}
+				lastCheckTs = ts;
+
+				const duration = Number(player.duration);
+				const currentTime = Number(player.currentTime);
+
+				if (
+					Number.isFinite(duration) &&
+					duration > 0 &&
+					Number.isFinite(currentTime) &&
+					duration - currentTime <= LOOP_THRESHOLD_SECONDS &&
+					// Avoid repeatedly seeking if the player is still processing a prior seek.
+					ts - lastSeekTs > 1000
+				) {
+					lastSeekTs = ts;
+					player.currentTime = 0;
+					// Ensure playback continues after seeking.
+					player.play?.();
+				}
+			} catch {
+				// Ignore transient read/seek errors
+			}
+
+			rafId = window.requestAnimationFrame(tick);
+		};
+
+		rafId = window.requestAnimationFrame(tick);
+
+		return () => {
+			if (rafId) window.cancelAnimationFrame(rafId);
+		};
+	}, []);
+
 	return (
-		<main className="overflow-hidden">
+		<main className="overflow-x-hidden">
 			<div
-				className="relative w-screen bg-background py-12 sm:py-16 md:py-20 lg:py-24 parallax-container"
+				className="relative w-screen overflow-hidden bg-background py-12 sm:py-16 md:py-20 lg:py-24 parallax-container -mt-12"
 				ref={heroRef}
 				data-parallax-speed="0.3"
 			>
+				{/* Background video layer */}
+				<div className="absolute inset-0 pointer-events-none">
+					<MuxPlayer
+						ref={heroVideoRef}
+						className="h-full w-full"
+						style={heroVideoStyle}
+						playbackId="pKbGxKyrsRlE3NJPXUULvpu01wi00CBIBFn8UvbAjyvo4"
+						streamType="on-demand"
+						preload="auto"
+						autoPlay="muted"
+						muted
+						playsInline
+						nohotkeys
+						aria-hidden="true"
+					/>
+					{/* Optional contrast layer to keep UI readable */}
+					<div className="absolute inset-0 bg-black/35" />
+				</div>
+
 				{/* Content layer */}
-				<div className="relative justify-items-center gap-0 flex flex-col items-center justify-start">
+				<div className="relative z-10 justify-items-center gap-0 flex flex-col items-center justify-start">
 					{/* Hero content removed; space reserved for next iteration */}
 					<div className="flex justify-center w-full px-4">
 						<div className="w-full h-[373px] sm:h-[418px] md:h-[461px] lg:h-[475px] flex items-center justify-center">
