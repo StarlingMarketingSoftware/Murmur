@@ -358,7 +358,7 @@ export const useGetLocations = (query: string, mode?: 'state' | 'state-first') =
 	});
 };
 
-export type ContactsMapOverlayMode = 'booking' | 'promotion';
+export type ContactsMapOverlayMode = 'booking' | 'promotion' | 'all';
 
 export interface ContactsMapOverlayFilters
 	extends Record<string, string[] | number[] | string | number | boolean | undefined> {

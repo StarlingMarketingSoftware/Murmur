@@ -15,7 +15,7 @@ import { StripeSubscriptionStatus } from '@/types';
 export const maxDuration = 60;
 
 const mapOverlaySchema = z.object({
-	mode: z.enum(['booking', 'promotion']).optional().default('booking'),
+	mode: z.enum(['booking', 'promotion', 'all']).optional().default('booking'),
 	south: z.coerce.number(),
 	west: z.coerce.number(),
 	north: z.coerce.number(),
@@ -54,6 +54,10 @@ const MAX_LNG_SPAN_DEG_BOOKING = 24;
 // Promotion overlays are small (state-level list pins) and should work at wide zoom levels.
 const MAX_LAT_SPAN_DEG_PROMOTION = 180;
 const MAX_LNG_SPAN_DEG_PROMOTION = 360;
+// "All contacts" overlay is only intended for very close zoom levels; keep this tight to avoid
+// accidentally querying dense regions at once.
+const MAX_LAT_SPAN_DEG_ALL = 3;
+const MAX_LNG_SPAN_DEG_ALL = 3;
 
 export async function GET(req: NextRequest) {
 	try {
@@ -100,8 +104,18 @@ export async function GET(req: NextRequest) {
 
 		const latSpan = maxLat - minLat;
 		const lngSpan = maxLng - minLng;
-		const maxLatSpan = mode === 'promotion' ? MAX_LAT_SPAN_DEG_PROMOTION : MAX_LAT_SPAN_DEG_BOOKING;
-		const maxLngSpan = mode === 'promotion' ? MAX_LNG_SPAN_DEG_PROMOTION : MAX_LNG_SPAN_DEG_BOOKING;
+		const maxLatSpan =
+			mode === 'promotion'
+				? MAX_LAT_SPAN_DEG_PROMOTION
+				: mode === 'all'
+					? MAX_LAT_SPAN_DEG_ALL
+					: MAX_LAT_SPAN_DEG_BOOKING;
+		const maxLngSpan =
+			mode === 'promotion'
+				? MAX_LNG_SPAN_DEG_PROMOTION
+				: mode === 'all'
+					? MAX_LNG_SPAN_DEG_ALL
+					: MAX_LNG_SPAN_DEG_BOOKING;
 		if (latSpan > maxLatSpan || lngSpan > maxLngSpan) {
 			return apiBadRequest('Viewport too large; zoom in to load overlay markers');
 		}

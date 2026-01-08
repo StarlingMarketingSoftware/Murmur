@@ -14,6 +14,7 @@ const TOOLTIP_TEXT_X = 12; // aligns with <text x="..."> (excluding stroke paddi
 const TOOLTIP_TEXT_RIGHT_PADDING = 10;
 const TITLE_BAND_HEIGHT = 16;
 const TITLE_BAND_BOTTOM_PADDING = 8;
+const TITLE_FADE_OVERLAY_WIDTH = 32;
 
 // Body content area heights (before title band)
 const BODY_CONTENT_HEIGHT_TWO_LINES = 46; // For name + company
@@ -178,6 +179,14 @@ export const generateMapTooltipSvg = (
 
 	const primaryTextX = TOOLTIP_TEXT_X + offsetX;
 	const secondaryTextX = TOOLTIP_TEXT_X + offsetX;
+	const titleTextX = TOOLTIP_TEXT_X + offsetX;
+
+	// Subtle right-edge fade for very long titles (so truncation is visually softer)
+	const titleFadeOverlayX = Math.max(
+		offsetX,
+		innerWidth + offsetX - TOOLTIP_TEXT_RIGHT_PADDING - TITLE_FADE_OVERLAY_WIDTH
+	);
+	const titleFadeOverlayWidth = innerWidth + offsetX - titleFadeOverlayX;
 
 	// Place the icon to the right of the primary (name) text line.
 	const primaryMeasuredForIcon =
@@ -214,6 +223,10 @@ ${normalized}
   <clipPath id="bubbleClip">
     <path d="${bubblePathD}"/>
   </clipPath>
+  <linearGradient id="titleFadeOverlayGradient" x1="0" y1="0" x2="1" y2="0">
+    <stop offset="0%" stop-color="#E8EFFF" stop-opacity="0"/>
+    <stop offset="100%" stop-color="#E8EFFF" stop-opacity="1"/>
+  </linearGradient>
 </defs>
 <path d="${bubblePathD}" fill="${safeFillColor}"/>
 <g clip-path="url(#bubbleClip)">
@@ -223,7 +236,12 @@ ${normalized}
   <text x="${primaryTextX}" y="${primaryBaselineY}" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="${textFill}">${primaryText}</text>
   ${categoryIconPlacement === 'primary' ? renderCategoryIcon(primaryIconX, categoryIconPrimaryY) : ''}
   ${secondaryText ? `<text x="${secondaryTextX}" y="${secondaryBaselineY}" font-family="Arial, sans-serif" font-size="13" fill="${textFill}">${secondaryText}</text>` : ''}
-  ${titleText ? `<text x="${innerWidth / 2 + offsetX}" y="${titleBaselineY}" font-family="Arial, sans-serif" font-size="11" fill="black" text-anchor="middle">${titleText}</text>` : ''}
+  ${
+		titleText
+			? `<text x="${titleTextX}" y="${titleBaselineY}" font-family="Arial, sans-serif" font-size="11" fill="black" text-anchor="start">${titleText}</text>
+  <rect x="${titleFadeOverlayX}" y="${titleBandTopY + offsetY + 1}" width="${titleFadeOverlayWidth}" height="${TITLE_BAND_HEIGHT - 2}" fill="url(#titleFadeOverlayGradient)"/>`
+			: ''
+	}
 </g>
 <path d="${bubblePathD}" fill="none" stroke="black" stroke-width="2"/>
 </svg>`;
