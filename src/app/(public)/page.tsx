@@ -199,9 +199,8 @@ export default function HomePage() {
 					<div className="relative z-10 flex flex-col h-full min-h-[750px] w-full items-center px-4 pt-[164px]">
 						<div className="w-full max-w-[1132px] flex flex-col items-center shrink-0">
 							<h1
-								className="font-crimson text-white font-normal leading-[1.05] text-center text-[clamp(44px,8.5vw,88px)]"
-								style={{ filter: 'url(#thin-text)' }}
-							>
+								className="font-primary text-white font-normal leading-[1.05] text-center text-[clamp(44px,8.5vw,88px)]"
+								>
 								Built to get you booked.
 								<br />
 								You deserve an audience.
@@ -230,43 +229,8 @@ export default function HomePage() {
 			<div className="w-full bg-gray-200 pt-16 pb-4">
 				{/* Video Section */}
 				<div className="pt-0 pb-6 px-4">
-					<div className="mx-auto max-w-[943px] flex items-center justify-center flex-col">
-						<div ref={(el) => addReveal(el)}>
-							<Typography
-								variant="h2"
-								className="text-center sm:text-left text-[30px] sm:text-[42px] w-full mb-8 !font-zen"
-							>
-								Not Another Email Tool.
-							</Typography>
-						</div>
-						<div className="relative max-w-[943px] w-full h-full aspect-video">
-							<VideoPlayer
-								playbackId="aBYYjecc99ZfIWP016iEXTwZvyg1HQV700haM1c6Ll9wQ"
-								className="h-full w-full"
-								thumbnailTime={1.5}
-								metadata={{
-									video_title: 'Murmur Testimonials',
-								}}
-							/>
-						</div>
-						<div ref={(el) => addTextReveal(el)}>
-							<Typography
-								className="mt-8 mx-auto max-w-[943px] !text-justify"
-								variant="promoP"
-							>
-								{`Murmur serves an entirely different purpose. While other email marketing tools like Mailchimp are great for keeping up an email newsletter, Murmur is designed specifically for musicians and managers in the music industry. We've trained our system on industry knowledge to help you succeed`}
-							</Typography>
-						</div>
-						<div className="flex justify-center mt-24">
-							<Link href={urls.contact.index}>
-								<Button
-									size="lg"
-									className="bg-black text-background hover:bg-[#000000]/90 px-12 font-tertiary rounded-[5.59px] luxury-hover luxury-shadow"
-								>
-									Book a demo
-								</Button>
-							</Link>
-						</div>
+					<div className="mx-auto max-w-[943px] flex items-center justify-center flex-col h-[441px]">
+						<div className="w-full h-full" />
 					</div>
 				</div>
 			</div>

@@ -52,3 +52,50 @@ body {
 * {
 	-webkit-font-smoothing: subpixel-antialiased;
 }
+
+/* Landing hero search button: 3/4 pulse (accent on beat 3) */
+.landing-search-waltz-pulse {
+	animation: landing-search-waltz-pulse 3s ease-in-out infinite;
+	will-change: background-color;
+}
+
+@keyframes landing-search-waltz-pulse {
+	/* Beat 1 (small) */
+	0% {
+		background-color: rgba(93, 171, 104, 0.49);
+	}
+	12% {
+		background-color: rgba(93, 171, 104, 0.58);
+	}
+	24% {
+		background-color: rgba(93, 171, 104, 0.49);
+	}
+
+	/* Beat 2 (small) */
+	33.333% {
+		background-color: rgba(93, 171, 104, 0.49);
+	}
+	45% {
+		background-color: rgba(93, 171, 104, 0.6);
+	}
+	57% {
+		background-color: rgba(93, 171, 104, 0.49);
+	}
+
+	/* Beat 3 (big accent) */
+	66.666% {
+		background-color: rgba(120, 206, 140, 0.78);
+	}
+	85% {
+		background-color: rgba(93, 171, 104, 0.58);
+	}
+	100% {
+		background-color: rgba(93, 171, 104, 0.49);
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.landing-search-waltz-pulse {
+		animation: none;
+	}
+}

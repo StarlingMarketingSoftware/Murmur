@@ -936,7 +936,7 @@ export const LandingHeroSearchBar = () => {
 								{/* Search button (still not wired up to search) */}
 								<button
 									type="submit"
-									className="flex absolute right-[6px] items-center justify-center w-[58px] max-[480px]:w-[46px] h-[62px] max-[480px]:h-[50px] z-40 cursor-pointer group"
+									className="landing-search-waltz-pulse flex absolute right-[6px] items-center justify-center w-[58px] max-[480px]:w-[46px] h-[62px] max-[480px]:h-[50px] z-40 cursor-pointer group"
 									style={{
 										top: '50%',
 										transform: 'translateY(-50%)',
@@ -948,12 +948,6 @@ export const LandingHeroSearchBar = () => {
 										border: '1px solid #5DAB68',
 										borderLeft: '1px solid #5DAB68',
 										transition: 'none',
-									}}
-									onMouseEnter={(e) => {
-										e.currentTarget.style.backgroundColor = 'rgba(93, 171, 104, 0.65)';
-									}}
-									onMouseLeave={(e) => {
-										e.currentTarget.style.backgroundColor = 'rgba(93, 171, 104, 0.49)';
 									}}
 									aria-label="Search"
 								>
