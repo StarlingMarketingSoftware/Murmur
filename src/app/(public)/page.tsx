@@ -208,7 +208,12 @@ export default function HomePage() {
 						</div>
 						<div className="flex-[0.5]" />
 						<div className="w-full flex justify-center px-4 shrink-0">
-							<LandingHeroSearchBar />
+							<LandingHeroSearchBar
+								initialWhy="[Booking]"
+								initialWhat="Wine, Beer, and Spirits"
+								initialWhere="California"
+								readOnly
+							/>
 						</div>
 						<div className="flex-[2]" />
 						<div className="flex flex-col justify-end pb-8 sm:pb-12 text-center shrink-0">

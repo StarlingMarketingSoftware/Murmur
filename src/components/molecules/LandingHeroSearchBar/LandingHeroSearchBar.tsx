@@ -23,16 +23,28 @@ import { useEffect, useMemo, useRef, useState } from 'react';
  * Visual-only copy of the dashboard's initial search bar.
  * Intentionally does not trigger any search behavior yet.
  */
-export const LandingHeroSearchBar = () => {
+interface LandingHeroSearchBarProps {
+	initialWhy?: string;
+	initialWhat?: string;
+	initialWhere?: string;
+	readOnly?: boolean;
+}
+
+export const LandingHeroSearchBar = ({
+	initialWhy = '',
+	initialWhat = '',
+	initialWhere = '',
+	readOnly = false,
+}: LandingHeroSearchBarProps = {}) => {
 	// Dashboard is scaled down via `html.murmur-compact { zoom: 0.9 }`.
 	// We scale this component to match the perceived size on the dashboard.
 	// const SCALE = 0.9;
 
 	type ActiveSection = 'why' | 'what' | 'where' | null;
 
-	const [whyValue, setWhyValue] = useState('');
-	const [whatValue, setWhatValue] = useState('');
-	const [whereValue, setWhereValue] = useState('');
+	const [whyValue, setWhyValue] = useState(initialWhy);
+	const [whatValue, setWhatValue] = useState(initialWhat);
+	const [whereValue, setWhereValue] = useState(initialWhere);
 	const [activeSection, setActiveSection] = useState<ActiveSection>(null);
 	const [isNearMeLocation, setIsNearMeLocation] = useState(false);
 
@@ -138,6 +150,7 @@ export const LandingHeroSearchBar = () => {
 		// Between tabs, slide
 		gsap.to(indicator, {
 			xPercent: nextXPercent,
+			scaleX: 1,
 			duration: 0.6,
 			ease: 'power2.out',
 			overwrite: 'auto',
@@ -343,10 +356,16 @@ export const LandingHeroSearchBar = () => {
 				>
 					<div className="flex flex-col items-center justify-start gap-[12px] w-full h-full py-[12px]">
 						<div
-							className="w-[410px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+							className={`w-[410px] h-[68px] rounded-[12px] flex items-center px-[15px] cursor-pointer transition-colors duration-200 border ${
+								whyValue === '[Booking]'
+									? 'bg-[#DBECFF] border-[#000000]'
+									: 'bg-white hover:bg-[#f0f0f0] border-transparent'
+							}`}
 							onClick={() => {
-								setWhyValue('[Booking]');
-								setActiveSection('what');
+								if (!readOnly) {
+									setWhyValue('[Booking]');
+									setActiveSection('what');
+								}
 							}}
 						>
 							<div className="w-[38px] h-[38px] bg-[#9DCBFF] rounded-[8px] flex-shrink-0 flex items-center justify-center">
@@ -362,10 +381,16 @@ export const LandingHeroSearchBar = () => {
 							</div>
 						</div>
 						<div
-							className="w-[410px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+							className={`w-[410px] h-[68px] rounded-[12px] flex items-center px-[15px] cursor-pointer transition-colors duration-200 border ${
+								whyValue === '[Promotion]'
+									? 'bg-[#DBECFF] border-[#000000]'
+									: 'bg-white hover:bg-[#f0f0f0] border-transparent'
+							}`}
 							onClick={() => {
-								setWhyValue('[Promotion]');
-								setActiveSection('what');
+								if (!readOnly) {
+									setWhyValue('[Promotion]');
+									setActiveSection('what');
+								}
 							}}
 						>
 							<div className="w-[38px] h-[38px] bg-[#7AD47A] rounded-[8px] flex-shrink-0 flex items-center justify-center">
@@ -396,10 +421,16 @@ export const LandingHeroSearchBar = () => {
 					{whyValue === '[Promotion]' ? (
 						<div className="flex flex-col items-center justify-start gap-[10px] w-full h-full py-[12px]">
 							<div
-								className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+								className={`w-[415px] h-[68px] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200 border ${
+									whatValue === 'Radio Stations'
+										? 'bg-[#DBECFF] border-[#000000]'
+										: 'bg-white hover:bg-[#f0f0f0] border-transparent'
+								}`}
 								onClick={() => {
-									setWhatValue('Radio Stations');
-									setActiveSection('where');
+									if (!readOnly) {
+										setWhatValue('Radio Stations');
+										setActiveSection('where');
+									}
 								}}
 							>
 								<div className="w-[38px] h-[38px] bg-[#56DA73] rounded-[8px] flex-shrink-0 flex items-center justify-center">
@@ -438,10 +469,16 @@ export const LandingHeroSearchBar = () => {
 								offsetRight={-5}
 							>
 								<div
-									className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+									className={`w-[415px] h-[68px] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200 border ${
+										whatValue === 'Wine, Beer, and Spirits'
+											? 'bg-[#DBECFF] border-[#000000]'
+											: 'bg-white hover:bg-[#f0f0f0] border-transparent'
+									}`}
 									onClick={() => {
-										setWhatValue('Wine, Beer, and Spirits');
-										setActiveSection('where');
+										if (!readOnly) {
+											setWhatValue('Wine, Beer, and Spirits');
+											setActiveSection('where');
+										}
 									}}
 								>
 									<div className="w-[38px] h-[38px] bg-[#80AAFF] rounded-[8px] flex-shrink-0 flex items-center justify-center">
@@ -457,10 +494,16 @@ export const LandingHeroSearchBar = () => {
 									</div>
 								</div>
 								<div
-									className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+									className={`w-[415px] h-[68px] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200 border ${
+										whatValue === 'Restaurants'
+											? 'bg-[#DBECFF] border-[#000000]'
+											: 'bg-white hover:bg-[#f0f0f0] border-transparent'
+									}`}
 									onClick={() => {
-										setWhatValue('Restaurants');
-										setActiveSection('where');
+										if (!readOnly) {
+											setWhatValue('Restaurants');
+											setActiveSection('where');
+										}
 									}}
 								>
 									<div className="w-[38px] h-[38px] bg-[#77DD91] rounded-[8px] flex-shrink-0 flex items-center justify-center">
@@ -476,10 +519,16 @@ export const LandingHeroSearchBar = () => {
 									</div>
 								</div>
 								<div
-									className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+									className={`w-[415px] h-[68px] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200 border ${
+										whatValue === 'Coffee Shops'
+											? 'bg-[#DBECFF] border-[#000000]'
+											: 'bg-white hover:bg-[#f0f0f0] border-transparent'
+									}`}
 									onClick={() => {
-										setWhatValue('Coffee Shops');
-										setActiveSection('where');
+										if (!readOnly) {
+											setWhatValue('Coffee Shops');
+											setActiveSection('where');
+										}
 									}}
 								>
 									<div className="w-[38px] h-[38px] bg-[#A9DE78] rounded-[8px] flex-shrink-0 flex items-center justify-center">
@@ -495,10 +544,16 @@ export const LandingHeroSearchBar = () => {
 									</div>
 								</div>
 								<div
-									className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+									className={`w-[415px] h-[68px] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200 border ${
+										whatValue === 'Festivals'
+											? 'bg-[#DBECFF] border-[#000000]'
+											: 'bg-white hover:bg-[#f0f0f0] border-transparent'
+									}`}
 									onClick={() => {
-										setWhatValue('Festivals');
-										setActiveSection('where');
+										if (!readOnly) {
+											setWhatValue('Festivals');
+											setActiveSection('where');
+										}
 									}}
 								>
 									<div className="w-[38px] h-[38px] bg-[#80AAFF] rounded-[8px] flex-shrink-0 flex items-center justify-center">
@@ -514,10 +569,16 @@ export const LandingHeroSearchBar = () => {
 									</div>
 								</div>
 								<div
-									className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+									className={`w-[415px] h-[68px] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200 border ${
+										whatValue === 'Wedding Planners'
+											? 'bg-[#DBECFF] border-[#000000]'
+											: 'bg-white hover:bg-[#f0f0f0] border-transparent'
+									}`}
 									onClick={() => {
-										setWhatValue('Wedding Planners');
-										setActiveSection('where');
+										if (!readOnly) {
+											setWhatValue('Wedding Planners');
+											setActiveSection('where');
+										}
 									}}
 								>
 									<div className="w-[38px] h-[38px] bg-[#EED56E] rounded-[8px] flex-shrink-0 flex items-center justify-center">
@@ -533,10 +594,16 @@ export const LandingHeroSearchBar = () => {
 									</div>
 								</div>
 								<div
-									className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+									className={`w-[415px] h-[68px] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200 border ${
+										whatValue === 'Music Venues'
+											? 'bg-[#DBECFF] border-[#000000]'
+											: 'bg-white hover:bg-[#f0f0f0] border-transparent'
+									}`}
 									onClick={() => {
-										setWhatValue('Music Venues');
-										setActiveSection('where');
+										if (!readOnly) {
+											setWhatValue('Music Venues');
+											setActiveSection('where');
+										}
 									}}
 								>
 									<div className="w-[38px] h-[38px] bg-[#71C9FD] rounded-[8px] flex-shrink-0 flex items-center justify-center">
@@ -582,7 +649,7 @@ export const LandingHeroSearchBar = () => {
 							}
 						`}</style>
 
-						{whereValue.length >= 1 ? (
+						{whereValue.length >= 1 && !readOnly ? (
 							<CustomScrollbar
 								className="w-full h-full"
 								contentClassName="flex flex-col items-center justify-start gap-[20px] py-4"
@@ -597,8 +664,12 @@ export const LandingHeroSearchBar = () => {
 										return (
 											<div
 												key={stateName}
-												className="w-[415px] min-h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200 mb-2"
-												onClick={() => setWhereAndClose(stateName, false)}
+												className={`w-[415px] min-h-[68px] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200 mb-2 border ${
+													whereValue === stateName
+														? 'bg-[#DBECFF] border-[#000000]'
+														: 'bg-white hover:bg-[#f0f0f0] border-transparent'
+												}`}
+												onClick={() => !readOnly && setWhereAndClose(stateName, false)}
 											>
 												<div
 													className="w-[38px] h-[38px] rounded-[8px] flex-shrink-0 flex items-center justify-center"
@@ -631,9 +702,13 @@ export const LandingHeroSearchBar = () => {
 								offsetRight={-5}
 							>
 								<div
-									className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+									className={`w-[415px] h-[68px] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200 border ${
+										userLocationName && whereValue === userLocationName
+											? 'bg-[#DBECFF] border-[#000000]'
+											: 'bg-white hover:bg-[#f0f0f0] border-transparent'
+									}`}
 									onClick={() => {
-										if (userLocationName && !isLoadingLocation) {
+										if (userLocationName && !isLoadingLocation && !readOnly) {
 											setWhereAndClose(userLocationName, true);
 										}
 									}}
@@ -663,8 +738,12 @@ export const LandingHeroSearchBar = () => {
 										return (
 											<div
 												key={label}
-												className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
-												onClick={() => setWhereAndClose(label, false)}
+												className={`w-[415px] h-[68px] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200 border ${
+													whereValue === label
+														? 'bg-[#DBECFF] border-[#000000]'
+														: 'bg-white hover:bg-[#f0f0f0] border-transparent'
+												}`}
+												onClick={() => !readOnly && setWhereAndClose(label, false)}
 											>
 												<div
 													className="w-[38px] h-[38px] rounded-[8px] flex-shrink-0 flex items-center justify-center"
@@ -690,8 +769,12 @@ export const LandingHeroSearchBar = () => {
 									return (
 										<div
 											key={stateName}
-											className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
-											onClick={() => setWhereAndClose(stateName, false)}
+											className={`w-[415px] h-[68px] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200 border ${
+												whereValue === stateName
+													? 'bg-[#DBECFF] border-[#000000]'
+													: 'bg-white hover:bg-[#f0f0f0] border-transparent'
+											}`}
+											onClick={() => !readOnly && setWhereAndClose(stateName, false)}
 										>
 											<div
 												className="w-[38px] h-[38px] rounded-[8px] flex-shrink-0 flex items-center justify-center"
@@ -817,6 +900,7 @@ export const LandingHeroSearchBar = () => {
 											{activeSection === 'what' ? (
 												<input
 													ref={whatInputRef}
+													readOnly={readOnly}
 													type="text"
 													value={whatValue}
 													onChange={(e) => setWhatValue(e.target.value)}
@@ -885,6 +969,7 @@ export const LandingHeroSearchBar = () => {
 												<div className="absolute z-20 top-0 left-0 w-full h-full flex items-center gap-[2px]">
 													<input
 														ref={whereInputRef}
+														readOnly={readOnly}
 														type="text"
 														value={whereValue}
 														onChange={(e) => {
