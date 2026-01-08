@@ -187,8 +187,9 @@ export default function HomePage() {
 					</div>
 
 					{/* Content layer */}
-					<div className="relative z-10 flex h-full w-full items-center justify-center px-4 pt-12 sm:pt-16">
-						<div className="w-full max-w-[1132px] flex flex-col items-center -translate-y-[99px] sm:-translate-y-[107px] md:-translate-y-[123px] lg:-translate-y-[139px]">
+					<div className="relative z-10 flex flex-col h-full w-full items-center px-4 pt-12 sm:pt-16">
+						<div className="flex-grow basis-0" />
+						<div className="w-full max-w-[1132px] flex flex-col items-center shrink-0">
 							<h1
 								className="font-crimson text-white font-normal leading-[1.05] text-center text-[clamp(44px,8.5vw,88px)] mb-8"
 								// Crimson Text doesn't ship a 300 weight; this subtly "thins" the fill without adding a new font.
@@ -200,6 +201,7 @@ export default function HomePage() {
 							</h1>
 							<LandingHeroSearchBar />
 						</div>
+						<div className="flex-grow-[1.5] basis-0" />
 					</div>
 				</div>
 			</div>
