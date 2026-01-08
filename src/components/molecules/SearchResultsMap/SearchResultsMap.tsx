@@ -2336,6 +2336,18 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				}
 			}
 
+			// Include "all contacts" high-zoom gray dots (no category filtering).
+			if (allContactsOverlayVisibleContacts.length > 0) {
+				for (const contact of allContactsOverlayVisibleContacts) {
+					const coords = allContactsOverlayCoordsByContactId.get(contact.id) ?? null;
+					if (!isCoordsInBounds(coords)) continue;
+					selectedIds.add(contact.id);
+					if (!baseContactIdSet.has(contact.id)) {
+						extraContactsById.set(contact.id, contact);
+					}
+				}
+			}
+
 			onAreaSelect?.(bounds, {
 				contactIds: Array.from(selectedIds),
 				extraContacts: Array.from(extraContactsById.values()),
@@ -2354,6 +2366,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			isPromotionSearch,
 			promotionOverlayVisibleContacts,
 			promotionOverlayCoordsByContactId,
+			allContactsOverlayVisibleContacts,
+			allContactsOverlayCoordsByContactId,
 			baseContactIdSet,
 		]
 	);
@@ -2420,6 +2434,16 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			}
 		}
 
+		// All-contacts gray overlay: select all visible gray dots in the viewport.
+		if (allContactsOverlayVisibleContacts.length > 0) {
+			for (const contact of allContactsOverlayVisibleContacts) {
+				selectedIds.add(contact.id);
+				if (!baseContactIdSet.has(contact.id)) {
+					extraContactsById.set(contact.id, contact);
+				}
+			}
+		}
+
 		onAreaSelect(bounds, {
 			contactIds: Array.from(selectedIds),
 			extraContacts: Array.from(extraContactsById.values()),
@@ -2437,6 +2461,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		bookingExtraVisibleContacts,
 		isPromotionSearch,
 		promotionOverlayVisibleContacts,
+		allContactsOverlayVisibleContacts,
 		baseContactIdSet,
 	]);
 
@@ -3533,7 +3558,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		const isPrimaryResult = baseContactIdSet.has(contact.id);
 		const isBookingExtraResult =
 			isBookingSearch && bookingExtraVisibleContacts.some((c) => c.id === contact.id);
-		if (isPrimaryResult || isBookingExtraResult) {
+		// - At extremely high zoom, also allow toggling for the "all contacts" gray-dot overlay.
+		const isAllContactsOverlayResult = allContactsOverlayVisibleIdSetRef.current.has(contact.id);
+		if (isPrimaryResult || isBookingExtraResult || isAllContactsOverlayResult) {
 			onToggleSelection?.(contact.id);
 		}
 	};
