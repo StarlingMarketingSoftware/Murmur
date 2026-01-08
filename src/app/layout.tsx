@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Inter, Zen_Antique } from 'next/font/google';
+import { Crimson_Text, Inter, Zen_Antique } from 'next/font/google';
 import { Footer } from '@/components/molecules/Footer/Footer';
 import { Toaster } from '@/components/ui/toast';
 import './globals.css';
@@ -22,6 +22,12 @@ const inter = Inter({
 const zenAntique = Zen_Antique({
 	weight: '400',
 	variable: '--font-zen-antique',
+	subsets: ['latin'],
+});
+
+const crimsonText = Crimson_Text({
+	weight: '400',
+	variable: '--font-crimson-text',
 	subsets: ['latin'],
 });
 
@@ -65,7 +71,7 @@ export default function RootLayout({
 		<StoreProvider>
 			<html
 				lang="en"
-				className={`${inter.variable} ${timesNewRoman.variable} ${zenAntique.variable}`}
+				className={`${inter.variable} ${timesNewRoman.variable} ${zenAntique.variable} ${crimsonText.variable}`}
 				suppressHydrationWarning
 			>
 				<body

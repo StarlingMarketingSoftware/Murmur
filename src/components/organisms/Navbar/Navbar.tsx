@@ -15,13 +15,34 @@ export const Navbar = () => {
 	const [scrolled, setScrolled] = useState(false);
 
 	useEffect(() => {
-		const handleScroll = () => {
+		const HERO_SECTION_ID = 'landing-hero';
+		const isLanding = pathname === urls.home.index;
+
+		const update = () => {
+			// Landing page: keep the navbar fully transparent until the hero/video section is passed.
+			if (isLanding) {
+				const hero = document.getElementById(HERO_SECTION_ID);
+				if (hero) {
+					const heroBottom = hero.getBoundingClientRect().bottom;
+					// Switch as soon as the hero is fully out of view.
+					// This prevents the "border line" from flashing while re-entering the hero on scroll up.
+					setScrolled(heroBottom <= 0);
+					return;
+				}
+			}
+
+			// Other pages: default behavior.
 			setScrolled(window.scrollY > 20);
 		};
 
-		window.addEventListener('scroll', handleScroll);
-		return () => window.removeEventListener('scroll', handleScroll);
-	}, []);
+		update();
+		window.addEventListener('scroll', update, { passive: true });
+		window.addEventListener('resize', update);
+		return () => {
+			window.removeEventListener('scroll', update);
+			window.removeEventListener('resize', update);
+		};
+	}, [pathname]);
 
 	// Close mobile menu on route change
 	useEffect(() => {
@@ -52,15 +73,22 @@ export const Navbar = () => {
 		{ path: urls.admin.index, label: 'Admin' },
 	].filter((item) => !(user?.role !== 'admin' && item.path === '/admin'));
 
+	const isLanding = pathname === urls.home.index;
+	const isOverLandingHero = isLanding && !scrolled;
+
 	return (
 		<>
 			{/* Main Navigation Bar - Artistic Glass */}
 			<nav
 				className={cn(
-					'fixed top-0 left-0 right-0 z-50 transition-all duration-700 font-secondary',
-					scrolled
-						? 'bg-background/70 backdrop-blur-xl border-b border-gray-200/20'
-						: 'bg-background/40 backdrop-blur-md'
+					'fixed top-0 left-0 right-0 z-50 font-secondary',
+					// Keep a smooth fade-in when leaving the hero, but snap to transparent when re-entering it.
+					isOverLandingHero ? 'transition-none' : 'transition-colors duration-700',
+					isOverLandingHero
+						? 'bg-transparent'
+						: scrolled
+							? 'bg-background/70 backdrop-blur-xl border-b border-gray-200/20'
+							: 'bg-background/40 backdrop-blur-md'
 				)}
 			>
 				<div className="w-full">
@@ -92,10 +120,14 @@ export const Navbar = () => {
 										className={cn(
 											'relative text-[13px] font-medium tracking-[0.02em] transition-all duration-300',
 											pathname === item.path
-												? 'text-gray-900'
-												: 'text-gray-700/70 hover:text-gray-900',
+												? isOverLandingHero
+													? 'text-white drop-shadow-[0_1px_1px_rgba(0,0,0,0.55)]'
+													: 'text-gray-900'
+												: isOverLandingHero
+													? 'text-white/70 hover:text-white drop-shadow-[0_1px_1px_rgba(0,0,0,0.55)]'
+													: 'text-gray-700/70 hover:text-gray-900',
 											'after:absolute after:bottom-[-8px] after:left-0 after:right-0 after:h-[1px]',
-											'after:bg-gray-900',
+											isOverLandingHero ? 'after:bg-white' : 'after:bg-gray-900',
 											pathname === item.path
 												? 'after:scale-x-100'
 												: 'after:scale-x-0 hover:after:scale-x-100',
@@ -120,7 +152,8 @@ export const Navbar = () => {
 							>
 								<span
 									className={cn(
-										'absolute block h-[1.5px] w-[18px] bg-gray-700 transition-all duration-300',
+										'absolute block h-[1.5px] w-[18px] transition-all duration-300',
+										isOverLandingHero ? 'bg-white/90' : 'bg-gray-700',
 										isMobileMenuOpen
 											? 'top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rotate-45'
 											: 'top-[11px] left-1/2 -translate-x-1/2'
@@ -128,7 +161,8 @@ export const Navbar = () => {
 								/>
 								<span
 									className={cn(
-										'absolute block h-[1.5px] w-[18px] bg-gray-700 transition-all duration-300',
+										'absolute block h-[1.5px] w-[18px] transition-all duration-300',
+										isOverLandingHero ? 'bg-white/90' : 'bg-gray-700',
 										isMobileMenuOpen
 											? 'top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 -rotate-45'
 											: 'bottom-[10px] left-1/2 -translate-x-1/2'
@@ -142,22 +176,51 @@ export const Navbar = () => {
 									<UserButton
 										appearance={{
 											elements: {
-												avatarBox: 'w-7 h-7 ring-1 ring-black/10',
+												avatarBox: cn(
+													'w-7 h-7 ring-1',
+													isOverLandingHero ? 'ring-white/25' : 'ring-black/10'
+												),
 												userButtonTrigger:
-													'opacity-80 hover:opacity-100 transition-opacity duration-500',
+													cn(
+														'opacity-80 hover:opacity-100 transition-opacity duration-500',
+														isOverLandingHero && 'drop-shadow-[0_1px_1px_rgba(0,0,0,0.55)]'
+													),
 											},
 										}}
 									/>
 								) : (
 									<div className="flex items-center">
 										<SignInButton mode="modal">
-											<button className="relative px-4 text-[12px] font-medium tracking-[0.02em] text-gray-700/70 hover:text-gray-900 transition-all duration-300 after:absolute after:bottom-[-8px] after:left-4 after:right-4 after:h-[1px] after:bg-gray-900 after:scale-x-0 hover:after:scale-x-100 after:transition-transform after:duration-300 after:origin-center">
+											<button
+												className={cn(
+													'relative px-4 text-[12px] font-medium tracking-[0.02em] transition-all duration-300',
+													'after:absolute after:bottom-[-8px] after:left-4 after:right-4 after:h-[1px]',
+													'after:scale-x-0 hover:after:scale-x-100 after:transition-transform after:duration-300 after:origin-center',
+													isOverLandingHero
+														? 'text-white/80 hover:text-white drop-shadow-[0_1px_1px_rgba(0,0,0,0.55)] after:bg-white'
+														: 'text-gray-700/70 hover:text-gray-900 after:bg-gray-900'
+												)}
+											>
 												Sign in
 											</button>
 										</SignInButton>
-										<div className="w-[1px] h-4 bg-gray-300/50 mx-3" />
+										<div
+											className={cn(
+												'w-[1px] h-4 mx-3',
+												isOverLandingHero ? 'bg-white/30' : 'bg-gray-300/50'
+											)}
+										/>
 										<SignUpButton mode="modal">
-											<button className="relative px-4 text-[12px] font-medium tracking-[0.02em] text-gray-700/70 hover:text-gray-900 transition-all duration-300 after:absolute after:bottom-[-8px] after:left-4 after:right-4 after:h-[1px] after:bg-gray-900 after:scale-x-0 hover:after:scale-x-100 after:transition-transform after:duration-300 after:origin-center">
+											<button
+												className={cn(
+													'relative px-4 text-[12px] font-medium tracking-[0.02em] transition-all duration-300',
+													'after:absolute after:bottom-[-8px] after:left-4 after:right-4 after:h-[1px]',
+													'after:scale-x-0 hover:after:scale-x-100 after:transition-transform after:duration-300 after:origin-center',
+													isOverLandingHero
+														? 'text-white/80 hover:text-white drop-shadow-[0_1px_1px_rgba(0,0,0,0.55)] after:bg-white'
+														: 'text-gray-700/70 hover:text-gray-900 after:bg-gray-900'
+												)}
+											>
 												Sign up
 											</button>
 										</SignUpButton>
@@ -263,7 +326,7 @@ export const Navbar = () => {
 			</div>
 
 			{/* Spacer */}
-			<div className="h-12" />
+			{!isLanding && <div className="h-12" />}
 		</>
 	);
 };

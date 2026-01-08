@@ -50,7 +50,8 @@ export default function HomePage() {
 	const heroRef = useRef<HTMLDivElement>(null);
 	const heroVideoRef = useRef<any>(null);
 	const heroVideoStyle = {
-		'--media-object-fit': 'cover',
+		// Show the full 16:9 frame (no vertical cropping)
+		'--media-object-fit': 'contain',
 		'--media-object-position': 'center',
 		'--controls': 'none',
 		'--play-button': 'none',
@@ -159,39 +160,45 @@ export default function HomePage() {
 	return (
 		<main className="overflow-x-hidden">
 			<div
-				className="relative w-screen overflow-hidden bg-background py-12 sm:py-16 md:py-20 lg:py-24 parallax-container -mt-12"
+				id="landing-hero"
+				className="relative w-screen overflow-hidden bg-background parallax-container"
 				ref={heroRef}
 				data-parallax-speed="0.3"
 			>
-				{/* Background video layer */}
-				<div className="absolute inset-0 pointer-events-none">
-					<MuxPlayer
-						ref={heroVideoRef}
-						className="h-full w-full"
-						style={heroVideoStyle}
-						playbackId="pKbGxKyrsRlE3NJPXUULvpu01wi00CBIBFn8UvbAjyvo4"
-						streamType="on-demand"
-						preload="auto"
-						autoPlay="muted"
-						muted
-						playsInline
-						nohotkeys
-						aria-hidden="true"
-					/>
-					{/* Optional contrast layer to keep UI readable */}
-					<div className="absolute inset-0 bg-black/35" />
-				</div>
+				{/* Hero frame (enforces 16:9 on md+; fixed height on small screens) */}
+				<div className="relative w-full h-[373px] sm:h-[418px] md:h-auto md:aspect-video">
+					{/* Background video layer */}
+					<div className="absolute inset-0 pointer-events-none bg-black">
+						<MuxPlayer
+							ref={heroVideoRef}
+							className="h-full w-full"
+							style={heroVideoStyle}
+							playbackId="pKbGxKyrsRlE3NJPXUULvpu01wi00CBIBFn8UvbAjyvo4"
+							streamType="on-demand"
+							preload="auto"
+							autoPlay="muted"
+							muted
+							playsInline
+							nohotkeys
+							aria-hidden="true"
+						/>
+						{/* Optional contrast layer to keep UI readable */}
+						<div className="absolute inset-0 bg-black/35" />
+					</div>
 
-				{/* Content layer */}
-				<div className="relative z-10 justify-items-center gap-0 flex flex-col items-center justify-start">
-					{/* Hero content removed; space reserved for next iteration */}
-					<div className="flex justify-center w-full px-4">
-						<div className="w-full h-[373px] sm:h-[418px] md:h-[461px] lg:h-[475px] flex items-center justify-center">
+					{/* Content layer */}
+					<div className="relative z-10 flex h-full w-full items-center justify-center px-4 pt-12 sm:pt-16">
+						<div className="w-full max-w-[1132px] flex flex-col items-center -translate-y-[99px] sm:-translate-y-[107px] md:-translate-y-[123px] lg:-translate-y-[139px]">
+							<h1 className="font-crimson text-white font-normal leading-[1.05] text-center text-[44px] sm:text-[56px] md:text-[72px] lg:text-[88px] mb-8">
+								Built to get you booked.
+								<br />
+								You deserve an audience.
+							</h1>
 							<LandingHeroSearchBar />
 						</div>
 					</div>
 				</div>
-				<div className="h-16 sm:h-20 md:h-24"></div>
+				<div className="h-16 sm:h-20 md:h-24" />
 			</div>
 			{/* Explanation */}
 			<div className="w-full bg-gray-200 pt-16 pb-4">

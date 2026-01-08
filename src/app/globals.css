@@ -75,6 +75,7 @@
 	--font-primary: var(--font-times);
 	--font-secondary: var(--font-inter);
 	--font-zen: var(--font-zen-antique);
+	--font-crimson: var(--font-crimson-text);
 }
 
 /* Mobile landscape hard sizing for campaign metric boxes and headers */
