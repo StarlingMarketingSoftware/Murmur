@@ -35,7 +35,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel } from '@/components/
 import CustomTable from '@/components/molecules/CustomTable/CustomTable';
 import { Card, CardContent } from '@/components/ui/card';
 
-import { useClerk } from '@clerk/nextjs';
+import { useClerk, useAuth, SignUp } from '@clerk/nextjs';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useGetLocations, useBatchUpdateContacts } from '@/hooks/queryHooks/useContacts';
@@ -332,7 +332,8 @@ const SearchTrayIconTile = ({
 };
 
 const DashboardContent = () => {
-	const { isSignedIn, openSignIn } = useClerk();
+	const { openSignIn } = useClerk();
+	const { isSignedIn, isLoaded: isAuthLoaded } = useAuth();
 	const searchParams = useSearchParams();
 	const router = useRouter();
 	const pathname = usePathname();
@@ -352,6 +353,13 @@ const DashboardContent = () => {
 	// in the correct results view without affecting the normal dashboard entry.
 	const fromCampaignViewParam = searchParams.get('fromCampaignView')?.trim() || '';
 	const fromCampaignSearchParam = searchParams.get('fromCampaignSearch')?.trim() || '';
+	// "From Home" mode: triggered from landing page search button, shows a pre-configured search
+	// with sign-up modal for unauthenticated users.
+	const fromHomeParam = searchParams.get('fromHome') === 'true';
+	const FROM_HOME_SEARCH_QUERY = '[Booking] Wine, Beer, and Spirits (California)';
+	const FROM_HOME_WHY = '[Booking]';
+	const FROM_HOME_WHAT = 'Wine, Beer, and Spirits';
+	const FROM_HOME_WHERE = 'California';
 	const { data: fromCampaign, isPending: isPendingFromCampaign } = useGetCampaign(fromCampaignIdParam);
 	const addToCampaignUserContactListId = fromCampaign?.userContactLists?.[0]?.id;
 	const { mutateAsync: editUserContactList, isPending: isPendingAddToCampaign } =
@@ -1468,6 +1476,56 @@ const DashboardContent = () => {
 		pathname,
 		router,
 		searchParams,
+	]);
+
+	// If we're in "from home" mode, immediately show the map view and set the search UI values
+	// so the user sees the map preview while the sign-up modal is shown.
+	const hasInitializedFromHomeRef = useRef(false);
+	useEffect(() => {
+		if (!fromHomeParam) return;
+		if (hasInitializedFromHomeRef.current) return;
+
+		hasInitializedFromHomeRef.current = true;
+
+		// Set the segmented UI values immediately so they appear in the search bar
+		setWhyValue(FROM_HOME_WHY);
+		setWhatValue(FROM_HOME_WHAT);
+		setWhereValue(FROM_HOME_WHERE);
+		setIsNearMeLocation(false);
+
+		// Force map view immediately
+		setIsMapView(true);
+	}, [fromHomeParam]);
+
+	// If we're in "from home" mode (from landing page), auto-trigger the pre-configured search
+	// once the user signs in. This shows the Wine, Beer, and Spirits in California results.
+	const hasHydratedFromHomeRef = useRef(false);
+	useEffect(() => {
+		if (!fromHomeParam) return;
+		if (hasHydratedFromHomeRef.current) return;
+		// Don't auto-trigger if not signed in - they'll see the sign-up modal.
+		if (!isSignedIn) return;
+
+		// If we already have results from this search, don't re-run.
+		if (hasSearched && activeSearchQuery === FROM_HOME_SEARCH_QUERY) {
+			hasHydratedFromHomeRef.current = true;
+			return;
+		}
+
+		hasHydratedFromHomeRef.current = true;
+
+		// Submit after a short delay to allow state to update.
+		setTimeout(() => {
+			form.setValue('searchText', FROM_HOME_SEARCH_QUERY);
+			form.handleSubmit(onSubmit)();
+		}, 100);
+	}, [
+		activeSearchQuery,
+		form,
+		fromHomeParam,
+		hasSearched,
+		isSignedIn,
+		onSubmit,
 	]);
 
 	// Batch update for assigning titles to contacts without one
@@ -4642,7 +4700,7 @@ const DashboardContent = () => {
 						return searchBar;
 					})()}
 
-				{activeSearchQuery && activeTab === 'search' && (
+				{(activeSearchQuery || fromHomeParam) && activeTab === 'search' && (
 					<>
 						{isError ? (
 							<div className="mt-10 w-full px-4">
@@ -4674,7 +4732,8 @@ const DashboardContent = () => {
 						  isLoadingContacts ||
 						  isRefetchingContacts ||
 						  (contacts && contacts.length > 0) ||
-						  (isMapView && hasNoSearchResults) ? (
+						  (isMapView && hasNoSearchResults) ||
+						  (fromHomeParam && isMapView) ? (
 							<div className="flex justify-center w-full px-0 sm:px-4 relative">
 								<div className="w-full max-w-full results-appear results-align">
 									{isMapView ? (
@@ -6044,6 +6103,45 @@ const DashboardContent = () => {
 						<CampaignsTable />
 					</div>
 				)}
+
+				{/* Sign-up overlay for "from home" mode when user is not authenticated */}
+				{fromHomeParam &&
+					isAuthLoaded &&
+					isSignedIn === false &&
+					typeof window !== 'undefined' &&
+					createPortal(
+						<div
+							className="fixed inset-0 z-[10000] flex items-center justify-center"
+							style={{
+								backgroundColor: 'rgba(0, 0, 0, 0.6)',
+								backdropFilter: 'blur(2px)',
+							}}
+						>
+							<SignUp
+								appearance={{
+									elements: {
+										rootBox: 'w-full max-w-[420px] mx-4',
+										card: 'shadow-2xl rounded-[16px]',
+										formButtonPrimary:
+											'bg-black hover:bg-gray-800 text-sm normal-case',
+										socialButtonsBlockButton:
+											'border border-gray-300 hover:bg-gray-50',
+										dividerLine: 'bg-gray-200',
+										dividerText: 'text-gray-500',
+										formFieldLabel: 'text-gray-700',
+										formFieldInput:
+											'border-gray-300 focus:border-black focus:ring-black',
+										footerActionLink: 'text-black hover:text-gray-700',
+									},
+								}}
+								routing="hash"
+								forceRedirectUrl={`${urls.murmur.dashboard.index}?fromHome=true`}
+								signInUrl={`/sign-in?redirect_url=${encodeURIComponent(`${urls.murmur.dashboard.index}?fromHome=true`)}`}
+								signInForceRedirectUrl={`${urls.murmur.dashboard.index}?fromHome=true`}
+							/>
+						</div>,
+						document.body
+					)}
 			</div>
 		</AppLayout>
 	);

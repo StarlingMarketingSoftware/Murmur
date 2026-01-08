@@ -16,7 +16,9 @@ import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 import { US_STATES } from '@/constants/usStates';
 import { getCityIconProps } from '@/utils/cityIcons';
 import { buildAllUsStateNames } from '@/utils/usStates';
+import { urls } from '@/constants/urls';
 import { gsap } from 'gsap';
+import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 /**
@@ -39,6 +41,8 @@ export const LandingHeroSearchBar = ({
 	// Dashboard is scaled down via `html.murmur-compact { zoom: 0.9 }`.
 	// We scale this component to match the perceived size on the dashboard.
 	// const SCALE = 0.9;
+
+	const router = useRouter();
 
 	type ActiveSection = 'why' | 'what' | 'where' | null;
 
@@ -812,6 +816,8 @@ export const LandingHeroSearchBar = ({
 						onSubmit={(e) => {
 							e.preventDefault();
 							setActiveSection(null);
+							// Navigate to the dashboard with fromHome mode
+							router.push(`${urls.murmur.dashboard.index}?fromHome=true`);
 						}}
 					>
 						<div className="search-input-group relative" ref={searchContainerRef}>
@@ -1018,7 +1024,7 @@ export const LandingHeroSearchBar = ({
 									</div>
 								</div>
 
-								{/* Search button (still not wired up to search) */}
+								{/* Search button - navigates to dashboard with fromHome mode */}
 								<button
 									type="submit"
 									className="landing-search-waltz-pulse flex absolute right-[6px] items-center justify-center w-[58px] max-[480px]:w-[46px] h-[62px] max-[480px]:h-[50px] z-40 cursor-pointer group"
@@ -1035,6 +1041,11 @@ export const LandingHeroSearchBar = ({
 										transition: 'none',
 									}}
 									aria-label="Search"
+									onClick={(e) => {
+										e.preventDefault();
+										setActiveSection(null);
+										router.push(`${urls.murmur.dashboard.index}?fromHome=true`);
+									}}
 								>
 									<SearchIconDesktop width={26} height={28} />
 								</button>
