@@ -1,5 +1,4 @@
 'use client';
-import LogoIcon from '@/components/atoms/_svg/LogoIcon';
 import { Button } from '@/components/ui/button';
 import { Typography } from '@/components/ui/typography';
 import { urls } from '@/constants/urls';
@@ -11,8 +10,7 @@ import { FaqSection } from '@/components/molecules/FaqSection/FaqSection';
 import { VideoPlayer } from '@/components/molecules/VideoPlayer/VideoPlayer';
 import { ComparisonTable } from '@/components/molecules/ComparisonTable/ComparisonTable';
 import { ScrollingReviews } from '@/components/molecules/ScrollingReviews/ScrollingReviews';
-import { LeadSender } from '@/components/organisms/LeadSender/LeadSender';
-import { LaunchButton } from '@/components/atoms/LaunchButton/LaunchButton';
+import { LandingHeroSearchBar } from '@/components/molecules/LandingHeroSearchBar/LandingHeroSearchBar';
 import { useAdvancedScrollAnimations } from '@/hooks/useAdvancedScrollAnimations';
 import { useEffect, useRef } from 'react';
 import { gsap } from 'gsap';
@@ -102,53 +100,11 @@ export default function HomePage() {
 			>
 				{/* Content layer */}
 				<div className="relative justify-items-center gap-0 flex flex-col items-center justify-start">
-					{/* Exact dashboard structure */}
+					{/* Hero content removed; space reserved for next iteration */}
 					<div className="flex justify-center w-full px-4">
-						<div className="text-center w-full max-w-[900px]">
-							<div
-								className="inline-block"
-								data-transition-element="logo-start"
-								data-hero-element
-							>
-								<LogoIcon width="106px" height="84px" />
-							</div>
-							<Typography
-								variant="h1"
-								className="text-center mt-2 !text-[60px] sm:!text-[70px] md:!text-[80px] leading-[0.8]"
-								data-transition-element="title-start"
-								data-hero-element
-							>
-								Murmur
-							</Typography>
-							<h2
-								className="text-center !text-[24px] sm:!text-[28px] md:!text-[34px] leading-[1] mt-8 sm:mt-12 md:mt-16 lg:mt-[72px] whitespace-normal sm:whitespace-nowrap !font-zen font-normal"
-								data-hero-element
-							>
-								Get Contacts. Get Work. Email Anyone.
-							</h2>
-							<div
-								className="w-full max-w-[764px] mx-auto mt-2 flex items-center justify-center px-4"
-								data-hero-element
-							>
-								<p className="text-center text-black font-inter !text-[14px] sm:!text-[22px] md:!text-[26px] whitespace-nowrap font-light">
-									The Ultimate Database + Email Tool for Musicians
-								</p>
-							</div>
+						<div className="w-full h-[373px] sm:h-[418px] md:h-[461px] lg:h-[475px] flex items-center justify-center">
+							<LandingHeroSearchBar />
 						</div>
-					</div>
-
-					<div
-						className="mt-8 sm:mt-10 md:mt-12 flex flex-col items-center"
-						data-hero-element
-						ref={(el) => addFadeIn(el)}
-					>
-						<LeadSender />
-						<div className="mt-0 mx-auto w-full max-w-[490px] px-4 luxury-cta">
-							<LaunchButton />
-						</div>
-						<Typography variant="p" className="text-center mt-4 tracking-[0.08em]">
-							Full access for 7 days. Start today.
-						</Typography>
 					</div>
 				</div>
 				<div className="h-16 sm:h-20 md:h-24"></div>
