@@ -165,6 +165,15 @@ export default function HomePage() {
 				ref={heroRef}
 				data-parallax-speed="0.3"
 			>
+				{/* SVG Filter for thinning text */}
+				<svg width="0" height="0" className="absolute">
+					<defs>
+						<filter id="thin-text">
+							<feMorphology operator="erode" radius="0.45" />
+						</filter>
+					</defs>
+				</svg>
+
 				{/* Hero frame (locked to the viewport height across breakpoints) */}
 				<div className="relative w-full h-full">
 					{/* Background video layer */}
@@ -187,21 +196,33 @@ export default function HomePage() {
 					</div>
 
 					{/* Content layer */}
-					<div className="relative z-10 flex flex-col h-full w-full items-center px-4 pt-12 sm:pt-16">
-						<div className="flex-grow basis-0" />
+					<div className="relative z-10 flex flex-col h-full min-h-[750px] w-full items-center px-4 pt-[164px]">
 						<div className="w-full max-w-[1132px] flex flex-col items-center shrink-0">
 							<h1
-								className="font-crimson text-white font-normal leading-[1.05] text-center text-[clamp(44px,8.5vw,88px)] mb-8"
-								// Crimson Text doesn't ship a 300 weight; this subtly "thins" the fill without adding a new font.
-								style={{ WebkitTextStroke: '0.6px rgba(0,0,0,0.6)' }}
+								className="font-crimson text-white font-normal leading-[1.05] text-center text-[clamp(44px,8.5vw,88px)]"
+								style={{ filter: 'url(#thin-text)' }}
 							>
 								Built to get you booked.
 								<br />
 								You deserve an audience.
 							</h1>
+						</div>
+						<div className="flex-[0.5]" />
+						<div className="w-full flex justify-center px-4 shrink-0">
 							<LandingHeroSearchBar />
 						</div>
-						<div className="flex-grow-[1.5] basis-0" />
+						<div className="flex-[2]" />
+						<div className="flex flex-col justify-end pb-8 sm:pb-12 text-center shrink-0">
+							<p className="font-inter font-normal text-[27px] text-[#C4C4C4] mb-2">
+								Every Contact in One Place
+							</p>
+							<p className="font-inter font-normal text-[18px] text-[#B8B8B8] leading-tight">
+								Murmur brings together more than 100,000+ venues, festivals, and
+							</p>
+							<p className="font-inter font-normal text-[18px] text-[#B8B8B8] leading-tight">
+								radio stations, with tools to actually reach them.
+							</p>
+						</div>
 					</div>
 				</div>
 			</div>
