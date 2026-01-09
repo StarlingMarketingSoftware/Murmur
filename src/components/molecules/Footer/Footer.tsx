@@ -9,6 +9,11 @@ export function Footer() {
 	const currentYear = new Date().getFullYear();
 	const pathname = usePathname();
 
+	// Hide footer on landing page
+	if (pathname === '/') {
+		return null;
+	}
+
 	const isLightFooter =
 		pathname === urls.pricing.index || pathname === urls.contact.index;
 
