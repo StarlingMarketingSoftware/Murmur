@@ -4700,40 +4700,15 @@ const DashboardContent = () => {
 						return searchBar;
 					})()}
 
-				{(activeSearchQuery || fromHomeParam) && activeTab === 'search' && (
+					{(activeSearchQuery || fromHomeParam) && activeTab === 'search' && (
 					<>
-						{isError ? (
-							<div className="mt-10 w-full px-4">
-								<Card className="w-full max-w-full mx-auto">
-									<CardContent className="py-8">
-										<div className="text-center">
-											<Typography variant="h3" className="text-destructive mb-2">
-												Search Failed
-											</Typography>
-											<Typography className="text-gray-600 mb-4">
-												{error instanceof Error && error.message.includes('timeout')
-													? 'The search took too long to complete. Please try a more specific query.'
-													: error instanceof Error
-													? error.message
-													: 'Unable to complete your search. Please try again.'}
-											</Typography>
-											<Button
-												onClick={() => form.handleSubmit(onSubmit)()}
-												variant="primary-light"
-												className="mt-4"
-											>
-												Retry Search
-											</Button>
-										</div>
-									</CardContent>
-								</Card>
-							</div>
-						) : isSearchPending ||
+						{isSearchPending ||
 						  isLoadingContacts ||
 						  isRefetchingContacts ||
 						  (contacts && contacts.length > 0) ||
 						  (isMapView && hasNoSearchResults) ||
-						  (fromHomeParam && isMapView) ? (
+						  (fromHomeParam && isMapView) ||
+						  isError ? (
 							<div className="flex justify-center w-full px-0 sm:px-4 relative">
 								<div className="w-full max-w-full results-appear results-align">
 									{isMapView ? (
@@ -4934,7 +4909,7 @@ const DashboardContent = () => {
 																	setTimeout(() => tryScroll(0), 0);
 																}}
 															/>
-															{hasNoSearchResults && (
+															{hasNoSearchResults && !isError && (
 																<div className="absolute inset-0 z-[120] flex items-start justify-center pt-[120px] pointer-events-none">
 																	<div
 																		className="pointer-events-auto flex flex-col items-center justify-center text-center"
@@ -4974,6 +4949,72 @@ const DashboardContent = () => {
 																			>
 																				<span className="font-secondary font-bold text-[16px] leading-tight text-black">
 																					Try a new search term to find contacts in this area
+																				</span>
+																			</div>
+																		</div>
+																	</div>
+																</div>
+															)}
+															{/* Search Failed overlay - shown when there's an error */}
+															{isError && (
+																<div className="absolute inset-0 z-[120] flex items-start justify-center pt-[180px] pointer-events-none">
+																	<div
+																		className="pointer-events-auto flex flex-col items-center justify-center text-center"
+																		style={{
+																			width: 517,
+																			padding: '24px 0',
+																			borderRadius: 8,
+																			backgroundColor: 'rgba(106, 180, 227, 0.8)',
+																			border: '3px solid #143883',
+																		}}
+																	>
+																		<div
+																			className="flex flex-col items-center justify-center gap-[16px]"
+																			style={{ width: 496 }}
+																		>
+																			<div
+																				className="flex items-center justify-center text-center bg-white"
+																				style={{
+																					width: 496,
+																					height: 58,
+																					borderRadius: 8,
+																					border: '2px solid #101010',
+																				}}
+																			>
+																				<span className="font-secondary font-bold text-[18px] leading-none text-black">
+																					Search Failed
+																				</span>
+																			</div>
+																			<div
+																				className="flex items-center justify-center text-center bg-white px-6"
+																				style={{
+																					width: 496,
+																					minHeight: 58,
+																					borderRadius: 8,
+																					border: '2px solid #101010',
+																					padding: '12px 24px',
+																				}}
+																			>
+																				<span className="font-secondary font-bold text-[16px] leading-tight text-black">
+																					{error instanceof Error && error.message.includes('timeout')
+																						? 'The search took too long to complete. Please try a more specific query.'
+																						: error instanceof Error
+																						? error.message
+																						: 'Unable to complete your search. Please try again.'}
+																				</span>
+																			</div>
+																			<div
+																				className="flex items-center justify-center text-center bg-white cursor-pointer hover:bg-gray-50 transition-colors"
+																				style={{
+																					width: 496,
+																					height: 58,
+																					borderRadius: 8,
+																					border: '2px solid #101010',
+																				}}
+																				onClick={() => form.handleSubmit(onSubmit)()}
+																			>
+																				<span className="font-secondary font-bold text-[18px] leading-none text-black">
+																					Retry Search
 																				</span>
 																			</div>
 																		</div>
