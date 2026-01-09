@@ -104,7 +104,7 @@ body {
 .video-carousel-track {
 	display: flex;
 	width: max-content;
-	animation: scroll-left-to-right 40s linear infinite;
+	animation: scroll-left-to-right 80s linear infinite;
 	will-change: transform;
 }
 

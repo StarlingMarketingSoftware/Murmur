@@ -152,9 +152,12 @@ export default function HomePage() {
 			);
 			if (iframes.length === 0) return;
 
-			for (const iframe of iframes) {
+			const setupPlayer = (iframe: HTMLIFrameElement) => {
 				const key = iframe.getAttribute('data-cf-stream-key') || iframe.id;
-				if (!key) continue;
+				if (!key) return;
+
+				// Store original src to reload iframe back to unplayed state
+				const originalSrc = iframe.src;
 
 				let player: ReturnType<NonNullable<typeof window.Stream>> | null = null;
 				try {
@@ -162,7 +165,7 @@ export default function HomePage() {
 				} catch {
 					player = null;
 				}
-				if (!player) continue;
+				if (!player) return;
 
 				playersByKey.set(key, player);
 
@@ -188,6 +191,14 @@ export default function HomePage() {
 				const onEnded = () => {
 					playingKeys.delete(key);
 					updatePaused();
+					// Reload iframe to reset to unplayed state with poster and play button
+					iframe.src = originalSrc;
+					// Re-initialize player after iframe reloads
+					const onLoad = () => {
+						iframe.removeEventListener('load', onLoad);
+						setupPlayer(iframe);
+					};
+					iframe.addEventListener('load', onLoad);
 				};
 
 				try {
@@ -196,7 +207,7 @@ export default function HomePage() {
 					player.addEventListener('ended', onEnded);
 				} catch {
 					// If the SDK fails to attach listeners, just skip pausing behavior.
-					continue;
+					return;
 				}
 
 				cleanupFns.push(() => {
@@ -208,6 +219,10 @@ export default function HomePage() {
 						// ignore
 					}
 				});
+			};
+
+			for (const iframe of iframes) {
+				setupPlayer(iframe);
 			}
 		};
 
@@ -331,8 +346,8 @@ export default function HomePage() {
 					{[
 						'0296ecdbfe566d2f84b26c0d11fd9ce4',
 						'c632d11b941509127fc6ccfaa43f2eba',
-						'a40138f71785012f227bf3430f2524fd',
 						'c2efbb80b81b494eaa0c124707e74731',
+						'a40138f71785012f227bf3430f2524fd',
 						'73ed190ad2842b092efbeb5c3270edc9',
 					].map((videoId, index) => (
 						<div
@@ -343,7 +358,7 @@ export default function HomePage() {
 								id={`landing-carousel-video-1-${videoId}-${index}`}
 								data-cf-stream-video="true"
 								data-cf-stream-key={`landing-carousel-video-1-${videoId}-${index}`}
-								src={`https://customer-frd3j62ijq7wakh9.cloudflarestream.com/${videoId}/iframe?poster=https%3A%2F%2Fcustomer-frd3j62ijq7wakh9.cloudflarestream.com%2F${videoId}%2Fthumbnails%2Fthumbnail.jpg%3Ftime%3D%26height%3D600`}
+								src={`https://customer-frd3j62ijq7wakh9.cloudflarestream.com/${videoId}/iframe?poster=https%3A%2F%2Fcustomer-frd3j62ijq7wakh9.cloudflarestream.com%2F${videoId}%2Fthumbnails%2Fthumbnail.jpg%3Ftime%3D${videoId === 'c632d11b941509127fc6ccfaa43f2eba' ? '1s' : videoId === '0296ecdbfe566d2f84b26c0d11fd9ce4' ? '9s' : ''}%26height%3D600`}
 								loading="lazy"
 								className="w-full h-full border-none"
 								allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;"
@@ -356,8 +371,8 @@ export default function HomePage() {
 					{[
 						'0296ecdbfe566d2f84b26c0d11fd9ce4',
 						'c632d11b941509127fc6ccfaa43f2eba',
-						'a40138f71785012f227bf3430f2524fd',
 						'c2efbb80b81b494eaa0c124707e74731',
+						'a40138f71785012f227bf3430f2524fd',
 						'73ed190ad2842b092efbeb5c3270edc9',
 					].map((videoId, index) => (
 						<div
@@ -368,7 +383,7 @@ export default function HomePage() {
 								id={`landing-carousel-video-2-${videoId}-${index}`}
 								data-cf-stream-video="true"
 								data-cf-stream-key={`landing-carousel-video-2-${videoId}-${index}`}
-								src={`https://customer-frd3j62ijq7wakh9.cloudflarestream.com/${videoId}/iframe?poster=https%3A%2F%2Fcustomer-frd3j62ijq7wakh9.cloudflarestream.com%2F${videoId}%2Fthumbnails%2Fthumbnail.jpg%3Ftime%3D%26height%3D600`}
+								src={`https://customer-frd3j62ijq7wakh9.cloudflarestream.com/${videoId}/iframe?poster=https%3A%2F%2Fcustomer-frd3j62ijq7wakh9.cloudflarestream.com%2F${videoId}%2Fthumbnails%2Fthumbnail.jpg%3Ftime%3D${videoId === 'c632d11b941509127fc6ccfaa43f2eba' ? '1s' : videoId === '0296ecdbfe566d2f84b26c0d11fd9ce4' ? '9s' : ''}%26height%3D600`}
 								loading="lazy"
 								className="w-full h-full border-none"
 								allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;"
