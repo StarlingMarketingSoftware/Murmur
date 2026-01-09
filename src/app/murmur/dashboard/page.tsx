@@ -56,6 +56,7 @@ import { useGetCampaign, useGetCampaigns } from '@/hooks/queryHooks/useCampaigns
 import { useEditUserContactList } from '@/hooks/queryHooks/useUserContactLists';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { useCreateCheckoutSession } from '@/hooks/queryHooks/useStripeCheckouts';
 
 const DEFAULT_STATE_SUGGESTIONS = [
 	{
@@ -544,7 +545,7 @@ const DashboardContent = () => {
 		if (isFromHomeDemoMode) {
 			// Close the section and show a message
 			setActiveSection(null);
-			toast.info('Subscribe to search for other contacts');
+			setShowFreeTrialPrompt(true);
 			return null;
 		}
 
@@ -1278,6 +1279,29 @@ const DashboardContent = () => {
 		isFromHomeDemoMode,
 	} = useDashboard({ derivedTitle: derivedContactTitle, forceApplyDerivedTitle: shouldForceApplyDerivedTitle, fromHome: fromHomeParam });
 
+	// Free trial checkout for fromHome demo mode
+	const { mutateAsync: createCheckoutSession, isPending: isPendingCheckout } = useCreateCheckoutSession();
+	const handleStartFreeTrial = useCallback(async () => {
+		const proPriceId = process.env.NEXT_PUBLIC_STANDARD_MONTHLY_PRICE_ID;
+		if (!proPriceId) {
+			toast.error('Stripe price ID not found. Please contact support.');
+			return;
+		}
+		try {
+			const res = await createCheckoutSession({
+				priceId: proPriceId,
+				freeTrial: true,
+			});
+			if (res.url) {
+				window.location.href = res.url;
+			} else {
+				toast.error('No checkout URL returned');
+			}
+		} catch (error) {
+			toast.error('Failed to start checkout. Please try again.');
+		}
+	}, [createCheckoutSession]);
+
 	const DASHBOARD_MAP_COMPACT_CLASS = 'murmur-dashboard-map-compact';
 
 	// Make the fullscreen dashboard map view render slightly "zoomed out" on desktop (85%),
@@ -1505,6 +1529,18 @@ const DashboardContent = () => {
 		// Force map view immediately
 		setIsMapView(true);
 	}, [fromHomeParam]);
+
+	// Show the free trial prompt after 15 seconds in fromHome demo mode
+	const [showFreeTrialPrompt, setShowFreeTrialPrompt] = useState(false);
+	useEffect(() => {
+		if (!fromHomeParam || !isFromHomeDemoMode || !isSignedIn) return;
+
+		const timer = setTimeout(() => {
+			setShowFreeTrialPrompt(true);
+		}, 15000);
+
+		return () => clearTimeout(timer);
+	}, [fromHomeParam, isFromHomeDemoMode, isSignedIn]);
 
 	// If we're in "from home" mode (from landing page), auto-trigger the pre-configured search
 	// once the user signs in. This shows the Wine, Beer, and Spirits in California results.
@@ -2889,7 +2925,7 @@ const DashboardContent = () => {
 																		}`}
 																			onClick={() => {
 																				if (isFromHomeDemoMode) {
-																					toast.info('Subscribe to search for other contacts');
+																					setShowFreeTrialPrompt(true);
 																					return;
 																				}
 																				setActiveSection('why');
@@ -2934,7 +2970,7 @@ const DashboardContent = () => {
 																		}`}
 																			onClick={() => {
 																				if (isFromHomeDemoMode) {
-																					toast.info('Subscribe to search for other contacts');
+																					setShowFreeTrialPrompt(true);
 																					return;
 																				}
 																				setActiveSection('what');
@@ -3042,7 +3078,7 @@ const DashboardContent = () => {
 																		}`}
 																			onClick={() => {
 																				if (isFromHomeDemoMode) {
-																					toast.info('Subscribe to search for other contacts');
+																					setShowFreeTrialPrompt(true);
 																					return;
 																				}
 																				setActiveSection('where');
@@ -4153,7 +4189,7 @@ const DashboardContent = () => {
 																			} h-full min-w-0 relative pl-[16px] pr-1 mini-search-section-why`}
 																			onClick={() => {
 																				if (isFromHomeDemoMode) {
-																					toast.info('Subscribe to search for other contacts');
+																					setShowFreeTrialPrompt(true);
 																					return;
 																				}
 																				setActiveSection('why');
@@ -4198,7 +4234,7 @@ const DashboardContent = () => {
 																			} pl-[16px] mini-search-section-where`}
 																			onClick={() => {
 																				if (isFromHomeDemoMode) {
-																					toast.info('Subscribe to search for other contacts');
+																					setShowFreeTrialPrompt(true);
 																					return;
 																				}
 																				setActiveSection('where');
@@ -4227,7 +4263,7 @@ const DashboardContent = () => {
 																				onFocus={(e) => {
 																					if (isFromHomeDemoMode) {
 																						e.target.blur();
-																						toast.info('Subscribe to search for other contacts');
+																						setShowFreeTrialPrompt(true);
 																						return;
 																					}
 																					setActiveSection('where');
@@ -4886,6 +4922,12 @@ const DashboardContent = () => {
 																onMarkerHover={handleMapMarkerHover}
 																lockedStateName={searchedStateAbbrForMap}
 																onStateSelect={(stateName) => {
+																	// In demo mode, show the free trial prompt instead of searching
+																	if (isFromHomeDemoMode) {
+																		setShowFreeTrialPrompt(true);
+																		return;
+																	}
+
 																	const nextState = (stateName || '').trim();
 																	if (!nextState) return;
 
@@ -6246,6 +6288,58 @@ const DashboardContent = () => {
 								signInUrl={`/sign-in?redirect_url=${encodeURIComponent(`${urls.murmur.dashboard.index}?fromHome=true`)}`}
 								signInForceRedirectUrl={`${urls.murmur.dashboard.index}?fromHome=true`}
 							/>
+						</div>,
+						document.body
+					)}
+
+				{/* Free trial prompt for "from home" mode when user is authenticated but has no subscription (after 15s) */}
+				{fromHomeParam &&
+					isFromHomeDemoMode &&
+					isSignedIn === true &&
+					showFreeTrialPrompt &&
+					typeof window !== 'undefined' &&
+					createPortal(
+						<div
+							className="fixed inset-0 z-[10000] flex items-center justify-center pointer-events-none"
+							style={{
+								backdropFilter: 'blur(1px)',
+							}}
+						>
+							<div
+								className="flex flex-col items-center rounded-[16px] pointer-events-auto py-8 px-8"
+								style={{
+									backgroundColor: '#6FCF84',
+									border: '2px solid #000000',
+								}}
+							>
+								<button
+									type="button"
+									onClick={handleStartFreeTrial}
+									disabled={isPendingCheckout}
+									className="font-semibold text-white rounded-[8px] cursor-pointer hover:opacity-90 transition-opacity disabled:opacity-70 disabled:cursor-not-allowed"
+									style={{
+										width: '475px',
+										height: '56px',
+										backgroundColor: '#1D942E',
+										border: '2px solid #000000',
+									}}
+								>
+									Start Your Free Trial
+								</button>
+								<div
+									className="flex flex-col items-center justify-center text-center mt-5"
+									style={{
+										fontFamily: '"Times New Roman", Times, serif',
+									}}
+								>
+									<p className="text-lg italic text-black mb-1">
+										"You miss 100% of the shots you don't take"
+									</p>
+									<p className="text-sm text-black">
+										-Wayne Gretzky
+									</p>
+								</div>
+							</div>
 						</div>,
 						document.body
 					)}
