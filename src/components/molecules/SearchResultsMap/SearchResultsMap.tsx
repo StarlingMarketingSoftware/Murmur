@@ -750,6 +750,8 @@ interface SearchResultsMapProps {
 	lockedStateName?: string | null;
 	/** When true, hides the state outlines (useful while search is loading). */
 	isLoading?: boolean;
+	/** When true, prevents the map from auto-zooming to fit contacts or the locked state. */
+	skipAutoFit?: boolean;
 }
 
 const mapContainerStyle = {
@@ -1092,6 +1094,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	enableStateInteractions,
 	lockedStateName,
 	isLoading,
+	skipAutoFit,
 }) => {
 	const [selectedMarker, setSelectedMarker] = useState<ContactWithName | null>(null);
 	const [hoveredMarkerId, setHoveredMarkerId] = useState<number | null>(null);
@@ -3475,6 +3478,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	useEffect(() => {
 		if (!map) return;
 
+		// Skip auto-fit entirely if requested (e.g. for fromHome loading state)
+		if (skipAutoFit) return;
+
 		// If no locked state is active, allow the next locked-state search to refit to its state.
 		if (!lockedStateKey) {
 			lastFitToLockedStateKeyRef.current = null;
@@ -3537,6 +3543,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		fitMapToState,
 		lockedStateKey,
 		isStateLayerReady,
+		skipAutoFit,
 	]);
 
 	// Reset bounds tracking when contacts prop is empty (preparing for new search)

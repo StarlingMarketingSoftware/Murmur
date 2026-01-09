@@ -414,11 +414,12 @@ const DashboardContent = () => {
 			updatedAt: new Date(),
 		} as ContactWithName);
 
-		// Add invisible anchor points at US corners to keep the map zoomed out
-		placeholders.push(createPlaceholder(-1, 48.0, -124.0, 'Washington'));  // Northwest
-		placeholders.push(createPlaceholder(-2, 45.0, -70.0, 'Maine'));        // Northeast
-		placeholders.push(createPlaceholder(-3, 25.5, -80.5, 'Florida'));      // Southeast
-		placeholders.push(createPlaceholder(-4, 32.0, -110.0, 'Arizona'));     // Southwest
+		// Add anchor points in neighboring states to keep the map somewhat zoomed out
+		// and show blue outlines on Arizona and Nevada (visually near California)
+		placeholders.push(createPlaceholder(-1, 36.2, -115.1, 'Nevada'));     // Las Vegas area
+		placeholders.push(createPlaceholder(-2, 39.5, -119.8, 'Nevada'));     // Reno area
+		placeholders.push(createPlaceholder(-3, 33.4, -112.0, 'Arizona'));    // Phoenix area
+		placeholders.push(createPlaceholder(-4, 32.2, -110.9, 'Arizona'));    // Tucson area
 
 		// California regions spread across the entire state (all inland, no water)
 		// Kept well east of the coastline to avoid ocean
@@ -5055,10 +5056,14 @@ const DashboardContent = () => {
 																	}}
 																onMarkerHover={handleMapMarkerHover}
 																lockedStateName={
-																	// Don't lock to a state for fromHome placeholder - keep map zoomed out over US
+																	// Show California outline for fromHome placeholder state
 																	fromHomeParam && (!isSignedIn || !hasSearched)
-																		? undefined
+																		? 'CA'
 																		: searchedStateAbbrForMap
+																}
+																skipAutoFit={
+																	// Prevent zoom for fromHome placeholder - keep map zoomed out over US
+																	fromHomeParam && (!isSignedIn || !hasSearched)
 																}
 																onStateSelect={(stateName) => {
 																	// In demo mode, show the free trial prompt instead of searching
