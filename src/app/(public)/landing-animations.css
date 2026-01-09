@@ -99,3 +99,29 @@ body {
 		animation: none;
 	}
 }
+
+/* Video carousel infinite scroll */
+.video-carousel-track {
+	display: flex;
+	animation: scroll-left-to-right 40s linear infinite;
+	will-change: transform;
+}
+
+.video-carousel-container:hover .video-carousel-track {
+	animation-play-state: paused;
+}
+
+@keyframes scroll-left-to-right {
+	0% {
+		transform: translateX(-50%);
+	}
+	100% {
+		transform: translateX(0%);
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.video-carousel-track {
+		animation: none;
+	}
+}

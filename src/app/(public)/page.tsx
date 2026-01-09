@@ -203,13 +203,51 @@ export default function HomePage() {
 					</div>
 				</div>
 			</div>
-			{/* Explanation */}
-			<div className="w-full bg-gray-200 pt-16 pb-4">
-				{/* Video Section */}
-				<div className="pt-0 pb-6 px-4">
-					<div className="mx-auto max-w-[943px] flex items-center justify-center flex-col h-[441px]">
-						<div className="w-full h-full" />
-					</div>
+			{/* Video Carousel Section */}
+			<div className="w-full bg-[#2a2a2a] py-16 overflow-hidden video-carousel-container">
+				<div className="video-carousel-track">
+					{/* First set of videos */}
+					{[
+						'0296ecdbfe566d2f84b26c0d11fd9ce4',
+						'c632d11b941509127fc6ccfaa43f2eba',
+						'a40138f71785012f227bf3430f2524fd',
+						'c2efbb80b81b494eaa0c124707e74731',
+						'73ed190ad2842b092efbeb5c3270edc9',
+					].map((videoId, index) => (
+						<div
+							key={`video-1-${index}`}
+							className="flex-shrink-0 w-[480px] h-[270px] mx-4 overflow-hidden"
+						>
+							<iframe
+								src={`https://customer-frd3j62ijq7wakh9.cloudflarestream.com/${videoId}/iframe?poster=https%3A%2F%2Fcustomer-frd3j62ijq7wakh9.cloudflarestream.com%2F${videoId}%2Fthumbnails%2Fthumbnail.jpg%3Ftime%3D%26height%3D600`}
+								loading="lazy"
+								className="w-full h-full border-none"
+								allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;"
+								allowFullScreen
+							/>
+						</div>
+					))}
+					{/* Duplicate set for seamless loop */}
+					{[
+						'0296ecdbfe566d2f84b26c0d11fd9ce4',
+						'c632d11b941509127fc6ccfaa43f2eba',
+						'a40138f71785012f227bf3430f2524fd',
+						'c2efbb80b81b494eaa0c124707e74731',
+						'73ed190ad2842b092efbeb5c3270edc9',
+					].map((videoId, index) => (
+						<div
+							key={`video-2-${index}`}
+							className="flex-shrink-0 w-[480px] h-[270px] mx-4 overflow-hidden"
+						>
+							<iframe
+								src={`https://customer-frd3j62ijq7wakh9.cloudflarestream.com/${videoId}/iframe?poster=https%3A%2F%2Fcustomer-frd3j62ijq7wakh9.cloudflarestream.com%2F${videoId}%2Fthumbnails%2Fthumbnail.jpg%3Ftime%3D%26height%3D600`}
+								loading="lazy"
+								className="w-full h-full border-none"
+								allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;"
+								allowFullScreen
+							/>
+						</div>
+					))}
 				</div>
 			</div>
 
