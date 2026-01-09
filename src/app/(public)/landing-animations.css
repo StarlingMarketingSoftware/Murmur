@@ -103,11 +103,13 @@ body {
 /* Video carousel infinite scroll */
 .video-carousel-track {
 	display: flex;
+	width: max-content;
 	animation: scroll-left-to-right 40s linear infinite;
 	will-change: transform;
 }
 
-.video-carousel-container:hover .video-carousel-track {
+.video-carousel-container:hover .video-carousel-track,
+.video-carousel-container[data-paused='true'] .video-carousel-track {
 	animation-play-state: paused;
 }
 

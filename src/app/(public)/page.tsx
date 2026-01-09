@@ -1,27 +1,26 @@
 'use client';
-import { Button } from '@/components/ui/button';
-import { Typography } from '@/components/ui/typography';
-import { urls } from '@/constants/urls';
-import Link from 'next/link';
 import { LandingHeroSearchBar } from '@/components/molecules/LandingHeroSearchBar/LandingHeroSearchBar';
-import { useAdvancedScrollAnimations } from '@/hooks/useAdvancedScrollAnimations';
 import MuxPlayer from '@mux/mux-player-react';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { gsap } from 'gsap';
 import './landing-animations.css';
 
+declare global {
+	interface Window {
+		Stream?: (iframe: HTMLIFrameElement) => {
+			addEventListener: (event: string, handler: () => void) => void;
+			removeEventListener?: (event: string, handler: () => void) => void;
+			play?: () => void;
+			pause?: () => void;
+		};
+	}
+}
+
 export default function HomePage() {
-	const {
-		addFadeIn,
-		addParallax,
-		addReveal,
-		addSlideUp,
-		addStagger,
-		addTextReveal,
-		addScaleIn,
-	} = useAdvancedScrollAnimations();
 	const heroRef = useRef<HTMLDivElement>(null);
 	const heroVideoRef = useRef<any>(null);
+	const videoCarouselContainerRef = useRef<HTMLDivElement>(null);
+	const [isVideoCarouselPaused, setIsVideoCarouselPaused] = useState(false);
 	const heroVideoStyle = {
 		// Fill the full hero width; crop (preferably bottom) as needed
 		'--media-object-fit': 'cover',
@@ -130,6 +129,124 @@ export default function HomePage() {
 		};
 	}, []);
 
+	useEffect(() => {
+		const container = videoCarouselContainerRef.current;
+		if (!container) return;
+
+		let isUnmounted = false;
+		const playingKeys = new Set<string>();
+		const playersByKey = new Map<string, ReturnType<NonNullable<typeof window.Stream>>>();
+		const cleanupFns: Array<() => void> = [];
+
+		const updatePaused = () => {
+			if (isUnmounted) return;
+			setIsVideoCarouselPaused(playingKeys.size > 0);
+		};
+
+		const initStreamPlayers = () => {
+			const Stream = window.Stream;
+			if (!Stream) return;
+
+			const iframes = Array.from(
+				container.querySelectorAll<HTMLIFrameElement>('iframe[data-cf-stream-video="true"]')
+			);
+			if (iframes.length === 0) return;
+
+			for (const iframe of iframes) {
+				const key = iframe.getAttribute('data-cf-stream-key') || iframe.id;
+				if (!key) continue;
+
+				let player: ReturnType<NonNullable<typeof window.Stream>> | null = null;
+				try {
+					player = Stream(iframe);
+				} catch {
+					player = null;
+				}
+				if (!player) continue;
+
+				playersByKey.set(key, player);
+
+				const onPlay = () => {
+					// Ensure only one carousel video can play at a time.
+					playingKeys.clear();
+					playingKeys.add(key);
+					updatePaused();
+
+					for (const [otherKey, otherPlayer] of playersByKey.entries()) {
+						if (otherKey === key) continue;
+						try {
+							otherPlayer.pause?.();
+						} catch {
+							// ignore
+						}
+					}
+				};
+				const onPause = () => {
+					playingKeys.delete(key);
+					updatePaused();
+				};
+				const onEnded = () => {
+					playingKeys.delete(key);
+					updatePaused();
+				};
+
+				try {
+					player.addEventListener('play', onPlay);
+					player.addEventListener('pause', onPause);
+					player.addEventListener('ended', onEnded);
+				} catch {
+					// If the SDK fails to attach listeners, just skip pausing behavior.
+					continue;
+				}
+
+				cleanupFns.push(() => {
+					try {
+						player?.removeEventListener?.('play', onPlay);
+						player?.removeEventListener?.('pause', onPause);
+						player?.removeEventListener?.('ended', onEnded);
+					} catch {
+						// ignore
+					}
+				});
+			}
+		};
+
+		const ensureStreamSdk = () => {
+			if (window.Stream) {
+				initStreamPlayers();
+				return;
+			}
+
+			const existing = document.querySelector<HTMLScriptElement>(
+				'script[data-cloudflare-stream-sdk="true"]'
+			);
+			if (existing) {
+				const onLoad = () => initStreamPlayers();
+				existing.addEventListener('load', onLoad, { once: true });
+				cleanupFns.push(() => existing.removeEventListener('load', onLoad));
+				return;
+			}
+
+			const script = document.createElement('script');
+			script.src = 'https://embed.cloudflarestream.com/embed/sdk.latest.js';
+			script.async = true;
+			script.dataset.cloudflareStreamSdk = 'true';
+			script.onload = () => initStreamPlayers();
+			document.body.appendChild(script);
+			cleanupFns.push(() => {
+				script.onload = null;
+			});
+		};
+
+		ensureStreamSdk();
+
+		return () => {
+			isUnmounted = true;
+			playingKeys.clear();
+			for (const fn of cleanupFns) fn();
+		};
+	}, []);
+
 	return (
 		<main className="overflow-x-hidden">
 			<div
@@ -204,7 +321,11 @@ export default function HomePage() {
 				</div>
 			</div>
 			{/* Video Carousel Section */}
-			<div className="w-full bg-[#2a2a2a] py-16 overflow-hidden video-carousel-container">
+			<div
+				ref={videoCarouselContainerRef}
+				data-paused={isVideoCarouselPaused ? 'true' : 'false'}
+				className="w-full bg-[#EBEBEB] py-16 overflow-hidden video-carousel-container"
+			>
 				<div className="video-carousel-track">
 					{/* First set of videos */}
 					{[
@@ -219,11 +340,15 @@ export default function HomePage() {
 							className="flex-shrink-0 w-[480px] h-[270px] mx-4 overflow-hidden"
 						>
 							<iframe
+								id={`landing-carousel-video-1-${videoId}-${index}`}
+								data-cf-stream-video="true"
+								data-cf-stream-key={`landing-carousel-video-1-${videoId}-${index}`}
 								src={`https://customer-frd3j62ijq7wakh9.cloudflarestream.com/${videoId}/iframe?poster=https%3A%2F%2Fcustomer-frd3j62ijq7wakh9.cloudflarestream.com%2F${videoId}%2Fthumbnails%2Fthumbnail.jpg%3Ftime%3D%26height%3D600`}
 								loading="lazy"
 								className="w-full h-full border-none"
 								allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;"
 								allowFullScreen
+								title={`Murmur video ${index + 1}`}
 							/>
 						</div>
 					))}
@@ -240,11 +365,15 @@ export default function HomePage() {
 							className="flex-shrink-0 w-[480px] h-[270px] mx-4 overflow-hidden"
 						>
 							<iframe
+								id={`landing-carousel-video-2-${videoId}-${index}`}
+								data-cf-stream-video="true"
+								data-cf-stream-key={`landing-carousel-video-2-${videoId}-${index}`}
 								src={`https://customer-frd3j62ijq7wakh9.cloudflarestream.com/${videoId}/iframe?poster=https%3A%2F%2Fcustomer-frd3j62ijq7wakh9.cloudflarestream.com%2F${videoId}%2Fthumbnails%2Fthumbnail.jpg%3Ftime%3D%26height%3D600`}
 								loading="lazy"
 								className="w-full h-full border-none"
 								allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;"
 								allowFullScreen
+								title={`Murmur video ${index + 1} (duplicate)`}
 							/>
 						</div>
 					))}
