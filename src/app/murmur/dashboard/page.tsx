@@ -1651,6 +1651,19 @@ const DashboardContent = () => {
 		setIsMapView(true);
 	}, [fromHomeParam]);
 
+	// Delay showing the sign-up modal for 3 seconds in fromHome mode
+	// so the user can see the map and placeholder dots first
+	const [showFromHomeSignUp, setShowFromHomeSignUp] = useState(false);
+	useEffect(() => {
+		if (!fromHomeParam || isSignedIn) return;
+
+		const timer = setTimeout(() => {
+			setShowFromHomeSignUp(true);
+		}, 3000);
+
+		return () => clearTimeout(timer);
+	}, [fromHomeParam, isSignedIn]);
+
 	// Show the free trial prompt after 15 seconds in fromHome demo mode
 	const [showFreeTrialPrompt, setShowFreeTrialPrompt] = useState(false);
 	useEffect(() => {
@@ -6400,9 +6413,11 @@ const DashboardContent = () => {
 				)}
 
 				{/* Sign-up overlay for "from home" mode when user is not authenticated */}
+				{/* Shows after 3 seconds so user can see the map and placeholders first */}
 				{fromHomeParam &&
 					isAuthLoaded &&
 					isSignedIn === false &&
+					showFromHomeSignUp &&
 					typeof window !== 'undefined' &&
 					createPortal(
 						<div
