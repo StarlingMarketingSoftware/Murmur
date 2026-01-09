@@ -108,8 +108,12 @@ body {
 	will-change: transform;
 }
 
-.video-carousel-container:hover .video-carousel-track,
 .video-carousel-container[data-paused='true'] .video-carousel-track {
+	animation-play-state: paused;
+}
+
+/* Pause only when hovering a video, not just the gray container */
+.video-carousel-track:has(iframe:hover) {
 	animation-play-state: paused;
 }
 

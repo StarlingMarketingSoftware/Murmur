@@ -1,5 +1,6 @@
 'use client';
 import { LandingHeroSearchBar } from '@/components/molecules/LandingHeroSearchBar/LandingHeroSearchBar';
+import LandingPageMap1 from '@/components/atoms/_svg/LandingPageMap1';
 import MuxPlayer from '@mux/mux-player-react';
 import { useEffect, useRef, useState } from 'react';
 import { gsap } from 'gsap';
@@ -341,7 +342,7 @@ export default function HomePage() {
 			<div
 				ref={videoCarouselContainerRef}
 				data-paused={isVideoCarouselPaused ? 'true' : 'false'}
-				className="w-full bg-[#EBEBEB] py-16 overflow-hidden video-carousel-container"
+				className="w-full h-[661px] bg-[#EBEBEB] py-16 overflow-hidden video-carousel-container"
 			>
 				<div className="video-carousel-track">
 					{/* First set of videos */}
@@ -354,7 +355,7 @@ export default function HomePage() {
 					].map((videoId, index) => (
 						<div
 							key={`video-1-${index}`}
-							className="flex-shrink-0 w-[480px] h-[270px] mx-4 overflow-hidden"
+							className="flex-shrink-0 w-[946px] h-[532px] mx-4 overflow-hidden"
 						>
 							<iframe
 								id={`landing-carousel-video-1-${videoId}-${index}`}
@@ -379,7 +380,7 @@ export default function HomePage() {
 					].map((videoId, index) => (
 						<div
 							key={`video-2-${index}`}
-							className="flex-shrink-0 w-[480px] h-[270px] mx-4 overflow-hidden"
+							className="flex-shrink-0 w-[946px] h-[532px] mx-4 overflow-hidden"
 						>
 							<iframe
 								id={`landing-carousel-video-2-${videoId}-${index}`}
@@ -398,7 +399,7 @@ export default function HomePage() {
 			</div>
 
 			{/* Start Free Trial Button Section */}
-			<div className="w-full bg-white flex justify-center" style={{ paddingTop: '124px' }}>
+			<div className="w-full bg-white flex flex-col items-center" style={{ paddingTop: '124px' }}>
 				<Link
 					href={urls.pricing.freeTrial.index}
 					className="flex items-center justify-center bg-transparent cursor-pointer text-center"
@@ -415,6 +416,28 @@ export default function HomePage() {
 				>
 					Start Free Trial
 				</Link>
+				<div
+					className="relative flex items-center justify-center"
+					style={{
+						marginTop: '125px',
+						width: '1884px',
+						height: '1073px',
+						border: '3px solid #000000',
+						borderRadius: '8px',
+						backgroundColor: '#AFD6EF',
+						padding: '16px',
+						overflow: 'hidden',
+					}}
+				>
+					<LandingPageMap1
+						// Crop out extra SVG padding so the framed map box sits centered/snug.
+						viewBox="0 0 1858 1044"
+						preserveAspectRatio="xMidYMid meet"
+						width="100%"
+						height="100%"
+						className="block"
+					/>
+				</div>
 			</div>
 
 			{/* White space section */}
