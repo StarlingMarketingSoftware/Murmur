@@ -3638,10 +3638,12 @@ const DashboardContent = () => {
 						</div>
 					)}
 
-				{hasSearched &&
-					activeTab === 'search' &&
-					(isMapView || (!isLoadingContacts && !isRefetchingContacts)) &&
-					(() => {
+			{/* Show the mini search bar and tools when:
+			    1. A search has been executed (normal case), OR
+			    2. We're in fromHome mode with map view (pre-auth demo state) */}
+			{((hasSearched && activeTab === 'search') || (fromHomeParam && isMapView)) &&
+				(isMapView || (!isLoadingContacts && !isRefetchingContacts)) &&
+				(() => {
 						const trayWhy = isPromotion
 							? {
 									backgroundColor: MAP_RESULTS_SEARCH_TRAY.whyBackgroundColors.promotion,
