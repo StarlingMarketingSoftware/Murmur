@@ -3,6 +3,8 @@ import { LandingHeroSearchBar } from '@/components/molecules/LandingHeroSearchBa
 import MuxPlayer from '@mux/mux-player-react';
 import { useEffect, useRef, useState } from 'react';
 import { gsap } from 'gsap';
+import Link from 'next/link';
+import { urls } from '@/constants/urls';
 import './landing-animations.css';
 
 declare global {
@@ -393,6 +395,26 @@ export default function HomePage() {
 						</div>
 					))}
 				</div>
+			</div>
+
+			{/* Start Free Trial Button Section */}
+			<div className="w-full bg-white flex justify-center" style={{ paddingTop: '124px' }}>
+				<Link
+					href={urls.pricing.freeTrial.index}
+					className="flex items-center justify-center bg-transparent cursor-pointer text-center"
+					style={{
+						width: '707px',
+						height: '57px',
+						border: '4px solid #118521',
+						borderRadius: '10px',
+						color: '#238731',
+						fontSize: '18px',
+						fontWeight: 500,
+						textAlign: 'center',
+					}}
+				>
+					Start Free Trial
+				</Link>
 			</div>
 
 			{/* White space section */}
