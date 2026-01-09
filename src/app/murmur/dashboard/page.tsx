@@ -540,6 +540,14 @@ const DashboardContent = () => {
 	const renderDesktopSearchDropdowns = () => {
 		if (!activeSection) return null;
 
+		// Don't show dropdowns in demo mode - search is locked to the pre-configured query
+		if (isFromHomeDemoMode) {
+			// Close the section and show a message
+			setActiveSection(null);
+			toast.info('Subscribe to search for other contacts');
+			return null;
+		}
+
 		// Match the active-section pill timing (0.6s) and easing.
 		const dropdownEase = 'cubic-bezier(0.22, 1, 0.36, 1)';
 		const dropdownTransition =
@@ -1267,7 +1275,8 @@ const DashboardContent = () => {
 		setIsMapView,
 		isSearchPending,
 		usedContactIdsSet,
-	} = useDashboard({ derivedTitle: derivedContactTitle, forceApplyDerivedTitle: shouldForceApplyDerivedTitle });
+		isFromHomeDemoMode,
+	} = useDashboard({ derivedTitle: derivedContactTitle, forceApplyDerivedTitle: shouldForceApplyDerivedTitle, fromHome: fromHomeParam });
 
 	const DASHBOARD_MAP_COMPACT_CLASS = 'murmur-dashboard-map-compact';
 
@@ -2648,6 +2657,12 @@ const DashboardContent = () => {
 
 	// Close map view and return to default dashboard view (before any search)
 	const handleCloseMapView = () => {
+		// If in "from home" mode, navigate back to the landing page
+		if (fromHomeParam) {
+			router.push(urls.home.index);
+			return;
+		}
+
 		setIsMapView(false);
 		setHoveredContact(null);
 		// Reset search completely to return to default dashboard
@@ -2872,7 +2887,13 @@ const DashboardContent = () => {
 																							: 'hover:bg-black/5'
 																				  } rounded-l-[8px]`
 																		}`}
-																			onClick={() => setActiveSection('why')}
+																			onClick={() => {
+																				if (isFromHomeDemoMode) {
+																					toast.info('Subscribe to search for other contacts');
+																					return;
+																				}
+																				setActiveSection('why');
+																			}}
 																		>
 																			<div className={`absolute z-20 left-[24px] ${inboxView ? 'top-1/2 -translate-y-1/2 text-[14px]' : 'top-[10px] text-[22px]'} font-bold text-black leading-none`}>
 																				{inboxView ? (whyValue ? whyValue.replace(/[\[\]]/g, '') : 'Why') : 'Why'}
@@ -2911,7 +2932,13 @@ const DashboardContent = () => {
 																							: 'hover:bg-black/5'
 																				  }`
 																		}`}
-																			onClick={() => setActiveSection('what')}
+																			onClick={() => {
+																				if (isFromHomeDemoMode) {
+																					toast.info('Subscribe to search for other contacts');
+																					return;
+																				}
+																				setActiveSection('what');
+																			}}
 																		>
 																			{inboxView ? (
 																				activeSection === 'what' ? (
@@ -2919,7 +2946,11 @@ const DashboardContent = () => {
 																						ref={whatInputRef}
 																						type="text"
 																						value={whatValue}
-																						onChange={(e) => setWhatValue(e.target.value)}
+																						onChange={(e) => {
+																							if (isFromHomeDemoMode) return;
+																							setWhatValue(e.target.value);
+																						}}
+																						readOnly={isFromHomeDemoMode}
 																						onKeyDown={(e) => {
 																							if (e.key === 'Enter') {
 																								e.preventDefault();
@@ -2949,7 +2980,11 @@ const DashboardContent = () => {
 																								ref={whatInputRef}
 																								type="text"
 																								value={whatValue}
-																								onChange={(e) => setWhatValue(e.target.value)}
+																								onChange={(e) => {
+																									if (isFromHomeDemoMode) return;
+																									setWhatValue(e.target.value);
+																								}}
+																								readOnly={isFromHomeDemoMode}
 																								onKeyDown={(e) => {
 																									if (e.key === 'Enter') {
 																										e.preventDefault();
@@ -3005,7 +3040,13 @@ const DashboardContent = () => {
 																							: 'hover:bg-black/5'
 																				  } rounded-r-[8px]`
 																		}`}
-																			onClick={() => setActiveSection('where')}
+																			onClick={() => {
+																				if (isFromHomeDemoMode) {
+																					toast.info('Subscribe to search for other contacts');
+																					return;
+																				}
+																				setActiveSection('where');
+																			}}
 																		>
 																			{inboxView ? (
 																				activeSection === 'where' ? (
@@ -3014,9 +3055,11 @@ const DashboardContent = () => {
 																						type="text"
 																						value={whereValue}
 																						onChange={(e) => {
+																							if (isFromHomeDemoMode) return;
 																							setWhereValue(e.target.value);
 																							setIsNearMeLocation(false);
 																						}}
+																						readOnly={isFromHomeDemoMode}
 																						onKeyDown={(e) => {
 																							if (e.key === 'Enter') {
 																								e.preventDefault();
@@ -3048,9 +3091,11 @@ const DashboardContent = () => {
 																									type="text"
 																									value={whereValue}
 																									onChange={(e) => {
+																										if (isFromHomeDemoMode) return;
 																										setWhereValue(e.target.value);
 																										setIsNearMeLocation(false);
 																									}}
+																									readOnly={isFromHomeDemoMode}
 																									onKeyDown={(e) => {
 																										if (e.key === 'Enter') {
 																											e.preventDefault();
@@ -4106,7 +4151,13 @@ const DashboardContent = () => {
 																					? 'group-hover:border-black/10'
 																					: ''
 																			} h-full min-w-0 relative pl-[16px] pr-1 mini-search-section-why`}
-																			onClick={() => setActiveSection('why')}
+																			onClick={() => {
+																				if (isFromHomeDemoMode) {
+																					toast.info('Subscribe to search for other contacts');
+																					return;
+																				}
+																				setActiveSection('why');
+																			}}
 																		>
 																			<div className="w-full h-full flex items-center text-left text-[13px] font-bold font-secondary truncate p-0 relative z-10 cursor-pointer">
 																				{whyValue
@@ -4145,11 +4196,18 @@ const DashboardContent = () => {
 																			className={`flex-1 flex items-center justify-end h-full min-w-0 relative ${
 																				isMapView ? 'pr-[12px]' : 'pr-[29px]'
 																			} pl-[16px] mini-search-section-where`}
-																			onClick={() => setActiveSection('where')}
+																			onClick={() => {
+																				if (isFromHomeDemoMode) {
+																					toast.info('Subscribe to search for other contacts');
+																					return;
+																				}
+																				setActiveSection('where');
+																			}}
 																		>
 																			<input
 																				value={whereValue}
 																				onChange={(e) => {
+																					if (isFromHomeDemoMode) return;
 																					setWhereValue(e.target.value);
 																					setIsNearMeLocation(false);
 																				}}
@@ -4159,6 +4217,7 @@ const DashboardContent = () => {
 																						triggerSearchWithCurrentValues();
 																					}
 																				}}
+																				readOnly={isFromHomeDemoMode}
 																				className="w-full h-full text-left bg-transparent border-none outline-none text-[13px] font-bold font-secondary overflow-hidden placeholder:text-gray-400 p-0 focus:ring-0 cursor-pointer relative z-10"
 																				style={{
 																					maskImage: 'linear-gradient(to right, black 75%, transparent 100%)',
@@ -4166,6 +4225,11 @@ const DashboardContent = () => {
 																				}}
 																				placeholder="Where"
 																				onFocus={(e) => {
+																					if (isFromHomeDemoMode) {
+																						e.target.blur();
+																						toast.info('Subscribe to search for other contacts');
+																						return;
+																					}
 																					setActiveSection('where');
 																					const target = e.target;
 																					setTimeout(
@@ -5452,7 +5516,7 @@ const DashboardContent = () => {
 																				})
 																			)}
 																		</CustomScrollbar>
-																		{!isMapResultsLoading && isMapPanelCreateCampaignVisible && (
+																		{!isMapResultsLoading && isMapPanelCreateCampaignVisible && !fromHomeParam && (
 																			<div className="flex-shrink-0 w-full px-[10px] pb-[10px]">
 																				<Button
 																					disabled={primaryCtaPending}
@@ -5535,6 +5599,7 @@ const DashboardContent = () => {
 																{/* Create Campaign button overlaid on map - only show when not loading */}
 																{/* Hidden below xl (1280px) to prevent overlap with right panel */}
 																{!isMobile &&
+																	!fromHomeParam &&
 																	!(
 																		isSearchPending ||
 																		isLoadingContacts ||
@@ -5893,8 +5958,8 @@ const DashboardContent = () => {
 																		);
 																		})
 																	)}
-																</CustomScrollbar>
-																{!isMapResultsLoading && (
+														</CustomScrollbar>
+															{!isMapResultsLoading && !fromHomeParam && (
 																	<div className="flex-shrink-0 w-full px-[10px] pb-[10px]">
 																		<Button
 																			disabled={primaryCtaPending}
@@ -5988,7 +6053,7 @@ const DashboardContent = () => {
 															isMobile ? undefined : (row) => setHoveredContact(row)
 														}
 														headerAction={
-															!isMobile ? (
+															!isMobile && !fromHomeParam ? (
 																<button
 																	type="button"
 																	onClick={handlePrimaryCta}
@@ -6041,7 +6106,7 @@ const DashboardContent = () => {
 												</CardContent>
 											</Card>
 											{/* Desktop button (non-sticky) */}
-											{!isMobile && (
+											{!isMobile && !fromHomeParam && (
 												<div className="flex items-center justify-center w-full search-results-cta-wrapper">
 													<Button
 														isLoading={primaryCtaPending}
@@ -6077,6 +6142,7 @@ const DashboardContent = () => {
 
 											{/* Mobile sticky button at bottom */}
 											{isMobile &&
+												!fromHomeParam &&
 												typeof window !== 'undefined' &&
 												createPortal(
 													<div className="mobile-sticky-cta">
