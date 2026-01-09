@@ -361,6 +361,126 @@ const DashboardContent = () => {
 	const FROM_HOME_WHY = '[Booking]';
 	const FROM_HOME_WHAT = 'Wine, Beer, and Spirits';
 	const FROM_HOME_WHERE = 'California';
+
+	// Placeholder contacts for fromHome loading state - shows fake dots in California
+	const fromHomePlaceholderContacts = useMemo(() => {
+		if (!fromHomeParam) return [];
+		const placeholders: ContactWithName[] = [];
+		// Use a seeded random approach for consistent positions
+		const seed = 12345;
+		const random = (i: number) => {
+			const x = Math.sin(seed + i) * 10000;
+			return x - Math.floor(x);
+		};
+		const createPlaceholder = (id: number, lat: number, lng: number, state?: string): ContactWithName => ({
+			id,
+			email: '',
+			name: null,
+			firstName: null,
+			lastName: null,
+			company: null,
+			title: null,
+			headline: null,
+			latitude: lat,
+			longitude: lng,
+			state: state ?? 'California',
+			city: null,
+			country: 'United States',
+			address: null,
+			phone: null,
+			website: null,
+			linkedInUrl: null,
+			photoUrl: null,
+			metadata: null,
+			apolloPersonId: null,
+			contactListId: null,
+			userId: null,
+			isPrivate: false,
+			hasVectorEmbedding: false,
+			userContactListCount: 0,
+			manualDeselections: 0,
+			companyFoundedYear: null,
+			companyIndustry: null,
+			companyKeywords: [],
+			companyLinkedInUrl: null,
+			companyPostalCode: null,
+			companyTechStack: [],
+			companyType: null,
+			lastResearchedDate: null,
+			emailValidatedAt: null,
+			emailValidationStatus: 'unknown',
+			emailValidationSubStatus: null,
+			createdAt: new Date(),
+			updatedAt: new Date(),
+		} as ContactWithName);
+
+		// Add invisible anchor points at US corners to keep the map zoomed out
+		placeholders.push(createPlaceholder(-1, 48.0, -124.0, 'Washington'));  // Northwest
+		placeholders.push(createPlaceholder(-2, 45.0, -70.0, 'Maine'));        // Northeast
+		placeholders.push(createPlaceholder(-3, 25.5, -80.5, 'Florida'));      // Southeast
+		placeholders.push(createPlaceholder(-4, 32.0, -110.0, 'Arizona'));     // Southwest
+
+		// California regions spread across the entire state (all inland, no water)
+		// Kept well east of the coastline to avoid ocean
+		const regions = [
+			// Northern California (inland)
+			{ lat: 41.5, lng: -122.0, spread: 0.8, weight: 8 },   // Redding area
+			{ lat: 40.5, lng: -121.5, spread: 0.7, weight: 6 },   // Shasta
+			{ lat: 41.0, lng: -120.5, spread: 0.8, weight: 5 },   // Modoc
+			// Sacramento Valley
+			{ lat: 39.5, lng: -121.5, spread: 1.0, weight: 12 },  // Sacramento
+			{ lat: 39.0, lng: -121.8, spread: 0.8, weight: 8 },   // Yuba City
+			{ lat: 38.6, lng: -121.3, spread: 0.6, weight: 10 },  // Sacramento city
+			// Napa/Sonoma (inland from coast)
+			{ lat: 38.5, lng: -122.3, spread: 0.5, weight: 15 },  // Napa
+			{ lat: 38.4, lng: -122.7, spread: 0.4, weight: 12 },  // Sonoma
+			// Bay Area (inland parts)
+			{ lat: 37.7, lng: -121.9, spread: 0.6, weight: 14 },  // East Bay
+			{ lat: 37.4, lng: -121.5, spread: 0.7, weight: 12 },  // San Jose area
+			{ lat: 37.0, lng: -121.8, spread: 0.5, weight: 8 },   // Gilroy
+			// Central Valley (entire length)
+			{ lat: 38.0, lng: -120.8, spread: 1.0, weight: 10 },  // Stockton
+			{ lat: 37.5, lng: -120.5, spread: 1.0, weight: 10 },  // Modesto
+			{ lat: 36.7, lng: -119.8, spread: 1.2, weight: 12 },  // Fresno
+			{ lat: 36.0, lng: -119.3, spread: 1.0, weight: 10 },  // Visalia
+			{ lat: 35.4, lng: -119.0, spread: 1.0, weight: 10 },  // Bakersfield
+			// Central Coast (inland from coast)
+			{ lat: 35.6, lng: -120.5, spread: 0.6, weight: 10 },  // Paso Robles
+			{ lat: 34.9, lng: -120.2, spread: 0.5, weight: 8 },   // Santa Maria
+			// Los Angeles Basin (inland)
+			{ lat: 34.1, lng: -117.8, spread: 0.8, weight: 15 },  // Inland Empire
+			{ lat: 34.4, lng: -118.5, spread: 0.6, weight: 12 },  // San Fernando Valley
+			{ lat: 34.0, lng: -117.4, spread: 0.7, weight: 12 },  // Riverside/San Bernardino
+			{ lat: 33.8, lng: -117.9, spread: 0.5, weight: 10 },  // Orange County inland
+			// San Diego (inland)
+			{ lat: 33.0, lng: -116.8, spread: 0.6, weight: 10 },  // Escondido/Temecula
+			{ lat: 32.8, lng: -116.9, spread: 0.5, weight: 8 },   // East San Diego
+			// Desert regions
+			{ lat: 34.5, lng: -116.5, spread: 1.0, weight: 8 },   // High Desert
+			{ lat: 33.8, lng: -116.5, spread: 0.8, weight: 6 },   // Palm Springs area
+			{ lat: 35.5, lng: -117.5, spread: 1.0, weight: 6 },   // Mojave
+			// Sierra Nevada foothills
+			{ lat: 39.0, lng: -120.5, spread: 0.8, weight: 8 },   // Gold Country
+			{ lat: 38.0, lng: -120.0, spread: 0.8, weight: 6 },   // Yosemite foothills
+			{ lat: 37.0, lng: -119.5, spread: 0.7, weight: 5 },   // Southern Sierra
+		];
+		// Build weighted list
+		const weightedRegions: typeof regions = [];
+		for (const r of regions) {
+			for (let w = 0; w < r.weight; w++) {
+				weightedRegions.push(r);
+			}
+		}
+		for (let i = 0; i < 300; i++) {
+			const regionIdx = Math.floor(random(i * 7) * weightedRegions.length);
+			const region = weightedRegions[regionIdx];
+			const lat = region.lat + (random(i) - 0.5) * region.spread * 2;
+			const lng = region.lng + (random(i + 1) - 0.5) * region.spread * 2;
+			placeholders.push(createPlaceholder(-1000 - i, lat, lng));
+		}
+		return placeholders;
+	}, [fromHomeParam]);
+
 	const { data: fromCampaign, isPending: isPendingFromCampaign } = useGetCampaign(fromCampaignIdParam);
 	const addToCampaignUserContactListId = fromCampaign?.userContactLists?.[0]?.id;
 	const { mutateAsync: editUserContactList, isPending: isPendingAddToCampaign } =
@@ -1689,7 +1809,11 @@ const DashboardContent = () => {
 	);
 	// When hovering a row in the map side panel, highlight/show the corresponding marker on the map.
 	const [hoveredMapPanelContactId, setHoveredMapPanelContactId] = useState<number | null>(null);
-	const isMapResultsLoading = isSearchPending || isLoadingContacts || isRefetchingContacts;
+	// Show loading in the map panel when:
+	// 1. A search is actively pending/loading, OR
+	// 2. We're in fromHome mode and the search hasn't been executed yet (user not signed in or waiting for search trigger)
+	const isMapResultsLoading = isSearchPending || isLoadingContacts || isRefetchingContacts ||
+		(fromHomeParam && isMapView && (!isSignedIn || !hasSearched));
 	const isSelectMapToolActive = activeMapTool === 'select';
 	const isGrabMapToolActive = activeMapTool === 'grab';
 	const hasNoSearchResults =
@@ -4833,11 +4957,21 @@ const DashboardContent = () => {
 															className="w-full h-full rounded-[8px] border-[3px] border-[#143883] overflow-hidden relative"
 														>
 															<SearchResultsMap
-																contacts={contacts || []}
+																contacts={
+																	// Show placeholder dots while in fromHome loading state
+																	fromHomeParam && (!isSignedIn || !hasSearched)
+																		? fromHomePlaceholderContacts
+																		: (contacts || [])
+																}
 																selectedContacts={selectedContacts}
 																externallyHoveredContactId={hoveredMapPanelContactId}
 																searchQuery={activeSearchQuery}
-																searchWhat={searchedWhat}
+																searchWhat={
+																	// Use Wine, Beer, and Spirits color for fromHome placeholder dots
+																	fromHomeParam && (!isSignedIn || !hasSearched)
+																		? FROM_HOME_WHAT
+																		: searchedWhat
+																}
 																selectAllInViewNonce={selectAllInViewNonce}
 																onVisibleOverlayContactsChange={(overlayContacts) => {
 																	setMapPanelVisibleOverlayContacts(overlayContacts);
@@ -4920,7 +5054,12 @@ const DashboardContent = () => {
 																		setActiveMapTool('grab');
 																	}}
 																onMarkerHover={handleMapMarkerHover}
-																lockedStateName={searchedStateAbbrForMap}
+																lockedStateName={
+																	// Don't lock to a state for fromHome placeholder - keep map zoomed out over US
+																	fromHomeParam && (!isSignedIn || !hasSearched)
+																		? undefined
+																		: searchedStateAbbrForMap
+																}
 																onStateSelect={(stateName) => {
 																	// In demo mode, show the free trial prompt instead of searching
 																	if (isFromHomeDemoMode) {
@@ -6262,7 +6401,6 @@ const DashboardContent = () => {
 						<div
 							className="fixed inset-0 z-[10000] flex items-center justify-center"
 							style={{
-								backgroundColor: 'rgba(0, 0, 0, 0.6)',
 								backdropFilter: 'blur(2px)',
 							}}
 						>
