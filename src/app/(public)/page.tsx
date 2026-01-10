@@ -9,6 +9,8 @@ import { urls } from '@/constants/urls';
 import { ContactsExpandedList } from '@/app/murmur/campaign/[campaignId]/DraftingSection/Testing/ContactsExpandedList';
 import { ContactResearchPanel } from '@/components/molecules/ContactResearchPanel/ContactResearchPanel';
 import { ContactWithName } from '@/types/contact';
+import InboxSection from '@/components/molecules/InboxSection/InboxSection';
+import type { InboundEmailWithRelations } from '@/types';
 
 // Sample contacts for landing page demo (company-only, no names)
 const sampleContacts: ContactWithName[] = [
@@ -400,6 +402,65 @@ Dizzy's Club offers one of the most spectacular settings for jazz in the world. 
 		longitude: null,
 	},
 ];
+
+// Sample inbox data for landing page demo (uses the real InboxSection UI)
+const sampleContactsByEmail: Record<string, ContactWithName> = Object.fromEntries(
+	sampleContacts
+		.filter((c): c is ContactWithName & { email: string } => Boolean(c.email))
+		.map((c) => [c.email.toLowerCase().trim(), c])
+);
+
+const sampleInboundEmails = [
+	{
+		id: 101,
+		sender: 'info@villagevanguard.com',
+		senderName: 'Village Vanguard',
+		subject: 'July 4th Celebration — booking inquiry',
+		bodyPlain:
+			"Thanks so much for reaching out and for your interest in playing here. At the moment, we're not booking new acts for July 4th, but please follow up with alternate dates and a link to live video.",
+		strippedText:
+			"Thanks so much for reaching out and for your interest in playing here. At the moment, we're not booking new acts for July 4th, but please follow up with alternate dates and a link to live video.",
+		bodyHtml: null,
+		receivedAt: new Date('2025-12-11T14:12:00Z'),
+		contact: null,
+		campaign: null,
+		originalEmail: null,
+	},
+	{
+		id: 102,
+		sender: 'info@bluenotejazz.com',
+		senderName: 'Blue Note',
+		subject: 'Re: Live jazz performance at Blue Note',
+		bodyPlain:
+			"Appreciate the note. Please send a one-sheet, a short bio, and 2–3 live clips. If you have a draw in NYC, include recent ticket numbers and preferred weekdays.",
+		strippedText:
+			"Appreciate the note. Please send a one-sheet, a short bio, and 2–3 live clips. If you have a draw in NYC, include recent ticket numbers and preferred weekdays.",
+		bodyHtml: null,
+		receivedAt: new Date('2025-12-01T15:05:00Z'),
+		contact: null,
+		campaign: null,
+		originalEmail: null,
+	},
+] as unknown as InboundEmailWithRelations[];
+
+const sampleSentEmails = [
+	{
+		id: 201,
+		sender: 'info@smallsjazzclub.com',
+		senderName: 'Smalls',
+		subject: 'Re: Spring dates (Mar–Apr)',
+		bodyPlain:
+			"Hi there — sharing a quick note about available spring dates. We’d love to be considered for a set in late March or early April. Here are 2 live clips and our one-sheet.",
+		strippedText:
+			"Hi there — sharing a quick note about available spring dates. We’d love to be considered for a set in late March or early April. Here are 2 live clips and our one-sheet.",
+		bodyHtml: null,
+		receivedAt: new Date('2025-11-20T19:31:00Z'),
+		contact: null,
+		campaign: null,
+		originalEmail: null,
+		isSent: true,
+	},
+] as unknown as Array<InboundEmailWithRelations & { isSent?: boolean }>;
 
 import './landing-animations.css';
 
@@ -956,8 +1017,23 @@ export default function HomePage() {
 							height: '712px',
 							backgroundColor: '#F1F1F1',
 							borderRadius: '8px',
+							display: 'flex',
+							alignItems: 'center',
+							justifyContent: 'center',
 						}}
-					/>
+					>
+						<InboxSection
+							noOuterPadding
+							desktopWidth={998}
+							desktopHeight={535}
+							allowedSenderEmails={Object.keys(sampleContactsByEmail)}
+							contactByEmail={sampleContactsByEmail}
+							sampleData={{
+								inboundEmails: sampleInboundEmails,
+								sentEmails: sampleSentEmails,
+							}}
+						/>
+					</div>
 					{/* Inner box - right */}
 					<div
 						style={{
