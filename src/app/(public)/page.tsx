@@ -927,23 +927,26 @@ export default function HomePage() {
 							Take a look through every contact, and you'll get to see information on what styles they book, their live music schedules, and even how to actually find the right person.
 						</p>
 						{/* Learn about research button */}
-						<div
-							style={{
-								position: 'absolute',
-								left: '22px',
-								bottom: '75px',
-								width: '302px',
-								height: '51px',
-								border: '2px solid #5DAB68',
-								borderRadius: '6px',
-								backgroundColor: 'transparent',
-								display: 'flex',
-								alignItems: 'center',
-								justifyContent: 'center',
-							}}
-						>
-							<span className="font-inter font-normal text-[25px] text-[#5DAB68]">Learn about research</span>
-						</div>
+						<Link href="/research">
+							<div
+								style={{
+									position: 'absolute',
+									left: '22px',
+									bottom: '75px',
+									width: '302px',
+									height: '51px',
+									border: '2px solid #5DAB68',
+									borderRadius: '6px',
+									backgroundColor: 'transparent',
+									display: 'flex',
+									alignItems: 'center',
+									justifyContent: 'center',
+									cursor: 'pointer'
+								}}
+							>
+								<span className="font-inter font-normal text-[25px] text-[#5DAB68]">Learn about research</span>
+							</div>
+						</Link>
 					</div>
 					{/* Inner box - right - Contacts and Research panels */}
 					<div
@@ -1055,23 +1058,26 @@ export default function HomePage() {
 							Never miss a reply! Get full context on each response, including what campaign it came from, all in one place.
 						</p>
 						{/* Learn about Inbox button */}
-						<div
-							style={{
-								position: 'absolute',
-								left: '31px',
-								bottom: '45px',
-								width: '260px',
-								height: '51px',
-								border: '2px solid #5DAB68',
-								borderRadius: '6px',
-								backgroundColor: 'transparent',
-								display: 'flex',
-								alignItems: 'center',
-								justifyContent: 'center',
-							}}
-						>
-							<span className="font-inter font-normal text-[25px] text-[#5DAB68]">Learn about Inbox</span>
-						</div>
+						<Link href="/inbox">
+							<div
+								style={{
+									position: 'absolute',
+									left: '31px',
+									bottom: '45px',
+									width: '260px',
+									height: '51px',
+									border: '2px solid #5DAB68',
+									borderRadius: '6px',
+									backgroundColor: 'transparent',
+									display: 'flex',
+									alignItems: 'center',
+									justifyContent: 'center',
+									cursor: 'pointer'
+								}}
+							>
+								<span className="font-inter font-normal text-[25px] text-[#5DAB68]">Learn about Inbox</span>
+							</div>
+						</Link>
 					</div>
 				</div>
 
@@ -1105,23 +1111,26 @@ export default function HomePage() {
 							Emails not getting responses? Ditch the templates. Murmur drafts pitches based on your bio and date range that venues actually respond to.
 						</p>
 						{/* Learn about Drafting button */}
-						<div
-							style={{
-								position: 'absolute',
-								left: '47px',
-								bottom: '26px',
-								width: '288px',
-								height: '51px',
-								border: '2px solid #5DAB68',
-								borderRadius: '6px',
-								backgroundColor: 'transparent',
-								display: 'flex',
-								alignItems: 'center',
-								justifyContent: 'center',
-							}}
-						>
-							<span className="font-inter font-normal text-[25px] text-[#5DAB68]">Learn about Drafting</span>
-						</div>
+						<Link href="/drafting">
+							<div
+								style={{
+									position: 'absolute',
+									left: '47px',
+									bottom: '26px',
+									width: '288px',
+									height: '51px',
+									border: '2px solid #5DAB68',
+									borderRadius: '6px',
+									backgroundColor: 'transparent',
+									display: 'flex',
+									alignItems: 'center',
+									justifyContent: 'center',
+									cursor: 'pointer'
+								}}
+							>
+								<span className="font-inter font-normal text-[25px] text-[#5DAB68]">Learn about Drafting</span>
+							</div>
+						</Link>
 					</div>
 					{/* Inner box - right */}
 					<div

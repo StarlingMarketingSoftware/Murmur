@@ -1,5 +1,6 @@
 import * as React from "react"
 import { SVGProps } from "react"
+import Link from "next/link"
 const SvgComponent = (props: SVGProps<SVGSVGElement>) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
@@ -1928,30 +1929,32 @@ const SvgComponent = (props: SVGProps<SVGSVGElement>) => (
       </text>
     </g>
     {/* Learn about the Map button */}
-    <g>
-      <rect
-        x={38}
-        y={638}
-        width={302}
-        height={51}
-        rx={6}
-        ry={6}
-        fill="#F1F1F1"
-        stroke="#5DAB68"
-        strokeWidth={2}
-      />
-      <text
-        x={38 + 302 / 2}
-        y={638 + 51 / 2}
-        textAnchor="middle"
-        dominantBaseline="central"
-        fontFamily="Inter, sans-serif"
-        fontSize={24}
-        fill="#5DAB68"
-      >
-        Learn about the Map
-      </text>
-    </g>
+    <Link href="/map">
+      <g style={{ cursor: "pointer" }}>
+        <rect
+          x={38}
+          y={638}
+          width={302}
+          height={51}
+          rx={6}
+          ry={6}
+          fill="#F1F1F1"
+          stroke="#5DAB68"
+          strokeWidth={2}
+        />
+        <text
+          x={38 + 302 / 2}
+          y={638 + 51 / 2}
+          textAnchor="middle"
+          dominantBaseline="central"
+          fontFamily="Inter, sans-serif"
+          fontSize={24}
+          fill="#5DAB68"
+        >
+          Learn about the Map
+        </text>
+      </g>
+    </Link>
   </svg>
 )
 export default SvgComponent
