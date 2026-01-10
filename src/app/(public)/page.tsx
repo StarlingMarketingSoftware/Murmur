@@ -990,13 +990,18 @@ export default function HomePage() {
 								bottom: '46px',
 							}}
 						>
-							<ContactResearchPanel
-								contact={hoveredContact}
-								width={359}
-								boxWidth={344}
-								height={635}
-								className="!block"
-							/>
+						<ContactResearchPanel
+							contact={hoveredContact}
+							width={359}
+							boxWidth={344}
+							height={635}
+							fixedHeightBoxSpacingPx={60}
+							fixedHeightBulletOuterHeightPx={52}
+							fixedHeightBulletInnerHeightPx={44}
+							expandSummaryToFillHeight
+							disableExpansion
+							className="!block"
+						/>
 						</div>
 					</div>
 				</div>

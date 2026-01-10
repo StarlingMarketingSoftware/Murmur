@@ -64,6 +64,11 @@ export interface ContactResearchPanelProps {
 	 * When true, uses a compact 19px header with smaller font (for All tab).
 	 */
 	compactHeader?: boolean;
+	/**
+	 * When true, prevents bullet points from expanding on click.
+	 * Useful for demo/landing page views where interaction should be limited.
+	 */
+	disableExpansion?: boolean;
 }
 
 // Parse metadata sections [1], [2], etc. from the contact metadata field.
@@ -123,6 +128,7 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 	boxWidth = 360,
 	width,
 	compactHeader = false,
+	disableExpansion = false,
 }) => {
 	// Track which box is expanded (null = none expanded)
 	const [expandedBox, setExpandedBox] = useState<string | null>(null);
@@ -557,7 +563,7 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 						<div
 							key={config.key}
 							// Relative to the scroll container now
-							className="absolute cursor-pointer"
+							className={cn("absolute", !disableExpansion && "cursor-pointer")}
 							style={{
 								top: `${getBoxTop(index)}px`,
 								left: '50%',
@@ -569,7 +575,7 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 								borderRadius: '8px',
 							}}
 							onClick={() => {
-								if (!isLoading && !hideAllText) {
+								if (!isLoading && !hideAllText && !disableExpansion) {
 									setExpandedBox(isExpanded ? null : config.key);
 								}
 							}}
@@ -752,7 +758,7 @@ top: isExpanded ? '28px' : '50%',
 					return (
 						<div
 							key={config.key}
-							className="absolute cursor-pointer"
+							className={cn("absolute", !disableExpansion && "cursor-pointer")}
 							style={{
 								top: `${getAbsoluteBoxTop(index)}px`,
 								left: '50%',
@@ -764,7 +770,7 @@ top: isExpanded ? '28px' : '50%',
 								borderRadius: '8px',
 							}}
 							onClick={() => {
-								if (!isLoading && !hideAllText) {
+								if (!isLoading && !hideAllText && !disableExpansion) {
 									setExpandedBox(isExpanded ? null : config.key);
 								}
 							}}
