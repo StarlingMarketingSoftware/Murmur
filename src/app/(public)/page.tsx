@@ -11,6 +11,7 @@ import { ContactResearchPanel } from '@/components/molecules/ContactResearchPane
 import { ContactWithName } from '@/types/contact';
 import InboxSection from '@/components/molecules/InboxSection/InboxSection';
 import type { InboundEmailWithRelations } from '@/types';
+import { LandingDraftingDemo } from '@/components/molecules/LandingDraftingDemo/LandingDraftingDemo';
 
 // Sample contacts for landing page demo (company-only, no names)
 const sampleContacts: ContactWithName[] = [
@@ -1133,7 +1134,9 @@ export default function HomePage() {
 							backgroundColor: '#F1F1F1',
 							borderRadius: '8px',
 						}}
-					/>
+					>
+						<LandingDraftingDemo />
+					</div>
 				</div>
 			</div>
 

@@ -167,6 +167,16 @@ interface SortableAIBlockProps {
 	} | null;
 	onGoToProfileTab?: () => void;
 	isDragDisabled?: boolean;
+	/**
+	 * Full Auto: when true, start with Custom Instructions expanded.
+	 * Useful for demos (e.g. landing page) to show the full UI immediately.
+	 */
+	defaultOpenCustomInstructions?: boolean;
+	/**
+	 * When true, the Booking For dropdown is positioned statically below its trigger
+	 * button instead of using a portal with viewport-based fixed positioning.
+	 */
+	useStaticDropdownPosition?: boolean;
 }
 
 const SortableAIBlock = ({
@@ -188,6 +198,8 @@ const SortableAIBlock = ({
 	profileFields,
 	onGoToProfileTab,
 	isDragDisabled = false,
+	defaultOpenCustomInstructions,
+	useStaticDropdownPosition = false,
 }: SortableAIBlockProps) => {
 	const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
 		useSortable({ id, disabled: isDragDisabled });
@@ -197,11 +209,17 @@ const SortableAIBlock = ({
 	// Track if advanced mode is enabled for hybrid blocks
 	const [isAdvancedEnabled, setIsAdvancedEnabled] = useState(false);
 	// Full Auto: custom instructions expander (stored in hybridBlockPrompts[fieldIndex].value)
-	const [isCustomInstructionsOpen, setIsCustomInstructionsOpen] = useState(false);
+	const [isCustomInstructionsOpen, setIsCustomInstructionsOpen] = useState(
+		() => Boolean(defaultOpenCustomInstructions) && block.value === HybridBlock.full_automated
+	);
 	// Used by effects below (declared early to avoid TDZ issues)
 	const isFullAutomatedBlock = block.value === HybridBlock.full_automated;
 	const customInstructionsRef = useRef<HTMLTextAreaElement | null>(null);
 	const customInstructionsContainerRef = useRef<HTMLDivElement | null>(null);
+	// If we default-open Custom Instructions, avoid auto-focusing on mount (especially for landing page demos).
+	const shouldSkipInitialCustomInstructionsFocusRef = useRef(
+		Boolean(defaultOpenCustomInstructions) && block.value === HybridBlock.full_automated
+	);
 	// Full Auto: Booking For dropdown
 	type BookingForTab = 'Anytime' | 'Season' | 'Calendar';
 	type BookingForSeason = 'Spring' | 'Summer' | 'Fall' | 'Winter';
@@ -327,6 +345,10 @@ const SortableAIBlock = ({
 	// Focus textarea when Custom Instructions opens
 	useEffect(() => {
 		if (!isCustomInstructionsOpen) return;
+		if (shouldSkipInitialCustomInstructionsFocusRef.current) {
+			shouldSkipInitialCustomInstructionsFocusRef.current = false;
+			return;
+		}
 		requestAnimationFrame(() => customInstructionsRef.current?.focus());
 	}, [isCustomInstructionsOpen]);
 
@@ -1309,37 +1331,96 @@ const SortableAIBlock = ({
 														</button>
 
 														{isBookingForOpen &&
-														bookingForDropdownPosition &&
-														typeof document !== 'undefined' &&
-														createPortal(
-															<div
-																ref={bookingForDropdownRef}
-																style={{
-																	position: 'fixed',
-																	top: bookingForDropdownPosition.top,
-																	left: bookingForDropdownPosition.left,
-																	width: bookingForDropdownSize.width,
-																	height: bookingForDropdownSize.height,
-																}}
-																className={cn(
-																	'z-[9999] rounded-[6px]',
-																	bookingForTab === 'Season'
-																		? bookingForSeason === 'Spring'
-																			? 'bg-[#9BD2FF]'
-																			: bookingForSeason === 'Summer'
-																				? 'bg-[#7ADF85]'
-																				: bookingForSeason === 'Fall'
-																					? 'bg-[#D77C2C]'
-																					: 'bg-[#1960AC]'
-																		: 'bg-[#F5F5F5]',
-																	'border-2 border-black',
-																	'flex flex-col overflow-hidden'
-																)}
-																onMouseEnter={clearBookingForCloseTimeout}
-																onMouseLeave={scheduleBookingForCloseTimeout}
-																role="dialog"
-																aria-label="Booking For"
-															>
+														(useStaticDropdownPosition || bookingForDropdownPosition) &&
+														(() => {
+															// Use static positioning only for Anytime/Season (small dropdowns).
+															// Calendar is too wide (829px) and gets clipped by overflow-x-hidden ancestors.
+															const useStatic = useStaticDropdownPosition && bookingForTab !== 'Calendar';
+															
+															// For Calendar in landing page mode, calculate position to align tabs with button
+															// Note: In landing mode the entire HybridPromptInput panel is scaled down (see `LandingDraftingDemo`).
+															// The Calendar dropdown is portaled to `document.body`, so we must:
+															// - Scale the Calendar dropdown by the same factor, and
+															// - Compute its fixed position in *screen* pixels so the tab strip doesn't "jump".
+															const landingScale = (() => {
+																// If the panel isn't scaled, this should be ~1.
+																const anchor = bookingForButtonRef.current;
+																if (!anchor) return 1;
+																const unscaledWidth = anchor.offsetWidth;
+																if (!unscaledWidth) return 1;
+																const scaledWidth = anchor.getBoundingClientRect().width;
+																const scale = scaledWidth / unscaledWidth;
+																return Number.isFinite(scale) && scale > 0 ? scale : 1;
+															})();
+															// Small aesthetic nudge: move the (wide) Calendar box a bit right,
+															// while keeping the tab strip aligned to the narrow dropdown.
+															const calendarBoxNudgeX = 32;
+															const getCalendarLandingPosition = () => {
+																if (!useStaticDropdownPosition || bookingForTab !== 'Calendar') {
+																	return null;
+																}
+																const containerRect = bookingForContainerRef.current?.getBoundingClientRect();
+																if (!containerRect) return null;
+																const seasonWidth = 317;
+																const calendarWidth = bookingForDropdownSize.width; // 829
+																return {
+																	// Match the scaled spacing of the in-panel (non-portaled) dropdown.
+																	top: containerRect.bottom + 6 * landingScale,
+																	// Align the (scaled) Calendar dropdown's right edge to the (scaled) narrow dropdown's right edge.
+																	left:
+																		containerRect.left +
+																		seasonWidth * landingScale -
+																		calendarWidth +
+																		calendarBoxNudgeX,
+																};
+															};
+															const calendarPos = getCalendarLandingPosition();
+															
+															const dropdownContent = (
+																<div
+																	ref={bookingForDropdownRef}
+																	style={
+																		useStatic
+																			? {
+																					position: 'absolute',
+																					top: '100%',
+																					left: 0,
+																					marginTop: 6,
+																					width: bookingForDropdownSize.width,
+																					height: bookingForDropdownSize.height,
+																			  }
+																			: {
+																					position: 'fixed',
+																					top: calendarPos?.top ?? bookingForDropdownPosition?.top ?? 0,
+																					left: calendarPos?.left ?? bookingForDropdownPosition?.left ?? 0,
+																					width: bookingForDropdownSize.width,
+																					height: bookingForDropdownSize.height,
+																					// Scale down Calendar in landing page mode to match the scaled container
+																					...(useStaticDropdownPosition && bookingForTab === 'Calendar' ? {
+																						transform: `scale(${landingScale})`,
+																						transformOrigin: 'top right',
+																					} : {}),
+																			  }
+																	}
+																	className={cn(
+																		'z-[9999] rounded-[6px]',
+																		bookingForTab === 'Season'
+																			? bookingForSeason === 'Spring'
+																				? 'bg-[#9BD2FF]'
+																				: bookingForSeason === 'Summer'
+																					? 'bg-[#7ADF85]'
+																					: bookingForSeason === 'Fall'
+																						? 'bg-[#D77C2C]'
+																						: 'bg-[#1960AC]'
+																			: 'bg-[#F5F5F5]',
+																		'border-2 border-black',
+																		'flex flex-col overflow-hidden'
+																	)}
+																	onMouseEnter={clearBookingForCloseTimeout}
+																	onMouseLeave={scheduleBookingForCloseTimeout}
+																	role="dialog"
+																	aria-label="Booking For"
+																>
 																<div className="relative h-[46px]">
 																	{bookingForTab === 'Season' && (
 																		<div
@@ -1353,14 +1434,21 @@ const SortableAIBlock = ({
 																	<div
 																		className={cn(
 																			'relative z-[1] h-full flex items-center',
-																			bookingForTab === 'Calendar' && bookingForTabStripLeft != null
+																			bookingForTab === 'Calendar' && bookingForTabStripLeft != null && !useStaticDropdownPosition
 																				? 'justify-start'
-																				: 'justify-center'
+																				: bookingForTab === 'Calendar' && useStaticDropdownPosition
+																					? 'justify-end'
+																					: 'justify-center'
 																		)}
 																		style={
-																			bookingForTab === 'Calendar' && bookingForTabStripLeft != null
+																			bookingForTab === 'Calendar' && !useStaticDropdownPosition && bookingForTabStripLeft != null
 																				? { paddingLeft: bookingForTabStripLeft }
-																				: undefined
+																				: bookingForTab === 'Calendar' && useStaticDropdownPosition
+																					? {
+																							// Keep tabs aligned even though we nudged the container right.
+																							paddingRight: 16.5 + calendarBoxNudgeX / landingScale,
+																					  }
+																					: undefined
 																		}
 																	>
 																		<div className="w-[284px] grid grid-cols-3 items-center gap-[8px]">
@@ -1741,9 +1829,14 @@ const SortableAIBlock = ({
 																		</div>
 																	</div>
 																)}
-															</div>,
-															document.body
-														)}
+															</div>
+														);
+														return useStatic
+															? dropdownContent
+															: typeof document !== 'undefined'
+																? createPortal(dropdownContent, document.body)
+																: null;
+													})()}
 													</div>
 												)}
 
@@ -1957,37 +2050,89 @@ const SortableAIBlock = ({
 														</button>
 
 														{isBookingForOpen &&
-															bookingForDropdownPosition &&
-															typeof document !== 'undefined' &&
-															createPortal(
-																<div
-																	ref={bookingForDropdownRef}
-																	style={{
-																		position: 'fixed',
-																		top: bookingForDropdownPosition.top,
-																		left: bookingForDropdownPosition.left,
-																		width: bookingForDropdownSize.width,
-																		height: bookingForDropdownSize.height,
-																	}}
-																	className={cn(
-																		'z-[9999] rounded-[6px]',
-																		bookingForTab === 'Season'
-																			? bookingForSeason === 'Spring'
-																				? 'bg-[#9BD2FF]'
-																				: bookingForSeason === 'Summer'
-																					? 'bg-[#7ADF85]'
-																					: bookingForSeason === 'Fall'
-																						? 'bg-[#D77C2C]'
-																						: 'bg-[#1960AC]'
-																			: 'bg-[#F5F5F5]',
-																		'border-2 border-black',
-																		'flex flex-col overflow-hidden'
-																	)}
-																	onMouseEnter={clearBookingForCloseTimeout}
-																	onMouseLeave={scheduleBookingForCloseTimeout}
-																	role="dialog"
-																	aria-label="Booking For"
-																>
+															(useStaticDropdownPosition || bookingForDropdownPosition) &&
+															(() => {
+																// Use static positioning only for Anytime/Season (small dropdowns).
+																// Calendar is too wide (829px) and gets clipped by overflow-x-hidden ancestors.
+																const useStatic2 = useStaticDropdownPosition && bookingForTab !== 'Calendar';
+																
+																// For Calendar in landing page mode, calculate position to align tabs with button
+																// See comment in the other Booking For render path for why this needs
+																// special handling when the panel is scaled on the landing page.
+																const landingScale2 = (() => {
+																	const anchor = bookingForButtonRef.current;
+																	if (!anchor) return 1;
+																	const unscaledWidth = anchor.offsetWidth;
+																	if (!unscaledWidth) return 1;
+																	const scaledWidth = anchor.getBoundingClientRect().width;
+																	const scale = scaledWidth / unscaledWidth;
+																	return Number.isFinite(scale) && scale > 0 ? scale : 1;
+																})();
+																const calendarBoxNudgeX2 = 32;
+																const getCalendarLandingPosition2 = () => {
+																	if (!useStaticDropdownPosition || bookingForTab !== 'Calendar') {
+																		return null;
+																	}
+																	const containerRect = bookingForContainerRef.current?.getBoundingClientRect();
+																	if (!containerRect) return null;
+																	const seasonWidth = 317;
+																	const calendarWidth = bookingForDropdownSize.width; // 829
+																	return {
+																		top: containerRect.bottom + 6 * landingScale2,
+																		left:
+																			containerRect.left +
+																			seasonWidth * landingScale2 -
+																			calendarWidth +
+																			calendarBoxNudgeX2,
+																	};
+																};
+																const calendarPos2 = getCalendarLandingPosition2();
+																
+																const dropdownContent2 = (
+																	<div
+																		ref={bookingForDropdownRef}
+																		style={
+																			useStatic2
+																				? {
+																						position: 'absolute',
+																						top: '100%',
+																						left: 0,
+																						marginTop: 6,
+																						width: bookingForDropdownSize.width,
+																						height: bookingForDropdownSize.height,
+																				  }
+																				: {
+																						position: 'fixed',
+																						top: calendarPos2?.top ?? bookingForDropdownPosition?.top ?? 0,
+																						left: calendarPos2?.left ?? bookingForDropdownPosition?.left ?? 0,
+																						width: bookingForDropdownSize.width,
+																						height: bookingForDropdownSize.height,
+																						// Scale down Calendar in landing page mode to match the scaled container
+																						...(useStaticDropdownPosition && bookingForTab === 'Calendar' ? {
+																							transform: `scale(${landingScale2})`,
+																							transformOrigin: 'top right',
+																						} : {}),
+																				  }
+																		}
+																		className={cn(
+																			'z-[9999] rounded-[6px]',
+																			bookingForTab === 'Season'
+																				? bookingForSeason === 'Spring'
+																					? 'bg-[#9BD2FF]'
+																					: bookingForSeason === 'Summer'
+																						? 'bg-[#7ADF85]'
+																						: bookingForSeason === 'Fall'
+																							? 'bg-[#D77C2C]'
+																							: 'bg-[#1960AC]'
+																				: 'bg-[#F5F5F5]',
+																			'border-2 border-black',
+																			'flex flex-col overflow-hidden'
+																		)}
+																		onMouseEnter={clearBookingForCloseTimeout}
+																		onMouseLeave={scheduleBookingForCloseTimeout}
+																		role="dialog"
+																		aria-label="Booking For"
+																	>
 																	<div className="relative h-[46px]">
 																		{bookingForTab === 'Season' && (
 																			<div
@@ -2001,14 +2146,20 @@ const SortableAIBlock = ({
 																		<div
 																			className={cn(
 																				'relative z-[1] h-full flex items-center',
-																				bookingForTab === 'Calendar' && bookingForTabStripLeft != null
+																				bookingForTab === 'Calendar' && bookingForTabStripLeft != null && !useStaticDropdownPosition
 																					? 'justify-start'
-																					: 'justify-center'
+																					: bookingForTab === 'Calendar' && useStaticDropdownPosition
+																						? 'justify-end'
+																						: 'justify-center'
 																			)}
 																			style={
-																				bookingForTab === 'Calendar' && bookingForTabStripLeft != null
+																				bookingForTab === 'Calendar' && !useStaticDropdownPosition && bookingForTabStripLeft != null
 																					? { paddingLeft: bookingForTabStripLeft }
-																					: undefined
+																					: bookingForTab === 'Calendar' && useStaticDropdownPosition
+																						? {
+																								paddingRight: 16.5 + calendarBoxNudgeX2 / landingScale2,
+																						  }
+																						: undefined
 																			}
 																		>
 																			<div className="w-[284px] grid grid-cols-3 items-center gap-[8px]">
@@ -2381,9 +2532,14 @@ const SortableAIBlock = ({
 																			</div>
 																		</div>
 																	)}
-																</div>,
-																document.body
-															)}
+																</div>
+															);
+															return useStatic2
+																? dropdownContent2
+																: typeof document !== 'undefined'
+																	? createPortal(dropdownContent2, document.body)
+																	: null;
+														})()}
 													</div>
 												)}
 											</div>
@@ -2513,6 +2669,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		isNarrowDesktop,
 		isNarrowestDesktop,
 		hideDraftButton,
+		useStaticDropdownPosition,
 	} = props;
 
 	// Track if the user has attempted to Test to control error styling
@@ -6296,6 +6453,11 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																		isUpscalingPrompt={isUpscalingPrompt}
 																		hasPreviousPrompt={hasPreviousPrompt}
 																		onUndoUpscalePrompt={onUndoUpscalePrompt}
+																		defaultOpenCustomInstructions={
+																			field.type === HybridBlock.full_automated
+																				? props.defaultOpenFullAutoCustomInstructions
+																				: undefined
+																		}
 																		onCustomInstructionsOpenChange={
 																			field.type === HybridBlock.full_automated
 																				? handleCustomInstructionsOpenChange
@@ -6304,6 +6466,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																		profileFields={profileFields}
 																		onGoToProfileTab={() => setActiveTab('profile')}
 																		isDragDisabled={isHybridModeSelected}
+																		useStaticDropdownPosition={useStaticDropdownPosition}
 																	/>
 																</div>
 																{/* Plus button under hybrid blocks */}

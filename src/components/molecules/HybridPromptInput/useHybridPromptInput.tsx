@@ -157,6 +157,17 @@ export interface HybridPromptInputProps {
 	 * if key profile fields are incomplete.
 	 */
 	autoOpenProfileTabWhenIncomplete?: boolean;
+	/**
+	 * Optional: when true, default-open the Full Auto "Custom Instructions" expander on mount.
+	 * Useful for demos (e.g. landing page) so the Suggestions UI is visible immediately.
+	 */
+	defaultOpenFullAutoCustomInstructions?: boolean;
+	/**
+	 * Optional: when true, the Booking For dropdown is positioned statically below its trigger
+	 * button instead of using a portal with viewport-based fixed positioning.
+	 * Useful when the component is rendered inside a scaled/transformed container (e.g. landing page demo).
+	 */
+	useStaticDropdownPosition?: boolean;
 }
 
 export const useHybridPromptInput = (props: HybridPromptInputProps) => {
