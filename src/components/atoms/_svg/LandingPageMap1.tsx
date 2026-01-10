@@ -1927,6 +1927,31 @@ const SvgComponent = (props: SVGProps<SVGSVGElement>) => (
         thoroughly verified by musicians.
       </text>
     </g>
+    {/* Learn about the Map button */}
+    <g>
+      <rect
+        x={38}
+        y={638}
+        width={302}
+        height={51}
+        rx={6}
+        ry={6}
+        fill="#F1F1F1"
+        stroke="#5DAB68"
+        strokeWidth={2}
+      />
+      <text
+        x={38 + 302 / 2}
+        y={638 + 51 / 2}
+        textAnchor="middle"
+        dominantBaseline="central"
+        fontFamily="Inter, sans-serif"
+        fontSize={24}
+        fill="#5DAB68"
+      >
+        Learn about the Map
+      </text>
+    </g>
   </svg>
 )
 export default SvgComponent

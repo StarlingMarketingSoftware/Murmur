@@ -1140,8 +1140,26 @@ export default function HomePage() {
 				</div>
 			</div>
 
-			{/* White space section */}
-			<div className="w-full bg-white min-h-[200px]" />
+			{/* Try Murmur Now CTA Section */}
+			<div className="w-full bg-white flex flex-col items-center pt-40 pb-24">
+				<p className="font-inter font-normal text-[62px] text-black text-center">
+					Try Murmur Now
+				</p>
+				<Link
+					href={urls.pricing.freeTrial.index}
+					className="flex items-center justify-center cursor-pointer text-center text-white font-inter font-medium text-[14px]"
+					style={{
+						marginTop: '32px',
+						width: '219px',
+						height: '33px',
+						backgroundColor: '#53B060',
+						border: '1px solid #118521',
+						borderRadius: '8px',
+					}}
+				>
+					Start Free Trial
+				</Link>
+			</div>
 		</main>
 	);
 }
