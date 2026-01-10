@@ -6,6 +6,401 @@ import { useEffect, useRef, useState } from 'react';
 import { gsap } from 'gsap';
 import Link from 'next/link';
 import { urls } from '@/constants/urls';
+import { ContactsExpandedList } from '@/app/murmur/campaign/[campaignId]/DraftingSection/Testing/ContactsExpandedList';
+import { ContactResearchPanel } from '@/components/molecules/ContactResearchPanel/ContactResearchPanel';
+import { ContactWithName } from '@/types/contact';
+
+// Sample contacts for landing page demo (company-only, no names)
+const sampleContacts: ContactWithName[] = [
+	{
+		id: 1,
+		email: 'info@villagevanguard.com',
+		firstName: null,
+		lastName: null,
+		company: 'Village Vanguard',
+		title: 'Music Venue',
+		city: 'New York',
+		state: 'New York',
+		name: null,
+		country: 'USA',
+		createdAt: new Date(),
+		updatedAt: new Date(),
+		phone: null,
+		website: null,
+		contactListId: null,
+		address: null,
+		apolloPersonId: null,
+		emailValidatedAt: null,
+		emailValidationStatus: 'unknown',
+		emailValidationSubStatus: null,
+		headline: null,
+		linkedInUrl: null,
+		photoUrl: null,
+		metadata: `[1] Located at 178 7th Avenue South in Greenwich Village [2] Legendary jazz club opened in 1935, one of the oldest in NYC [3] Intimate basement venue with capacity of about 123 seats [4] Shows typically at 8:30pm and 10:30pm, reservations recommended [5] No food service, two-drink minimum per set
+
+The Village Vanguard is the most prestigious jazz club in the world, having hosted virtually every major jazz artist since the 1950s. The triangular basement room has exceptional acoustics and an intimate atmosphere. Artists have recorded over 100 live albums here.`,
+		userId: null,
+		isPrivate: false,
+		hasVectorEmbedding: false,
+		userContactListCount: 0,
+		manualDeselections: 0,
+		companyFoundedYear: null,
+		companyIndustry: null,
+		companyKeywords: [],
+		companyLinkedInUrl: null,
+		companyPostalCode: null,
+		companyTechStack: [],
+		companyType: null,
+		lastResearchedDate: null,
+		latitude: null,
+		longitude: null,
+	},
+	{
+		id: 2,
+		email: 'info@bluenotejazz.com',
+		firstName: null,
+		lastName: null,
+		company: 'Blue Note Jazz Club',
+		title: 'Music Venue',
+		city: 'New York',
+		state: 'New York',
+		name: null,
+		country: 'USA',
+		createdAt: new Date(),
+		updatedAt: new Date(),
+		phone: null,
+		website: null,
+		contactListId: null,
+		address: null,
+		apolloPersonId: null,
+		emailValidatedAt: null,
+		emailValidationStatus: 'unknown',
+		emailValidationSubStatus: null,
+		headline: null,
+		linkedInUrl: null,
+		photoUrl: null,
+		metadata: `[1] Located at 131 W 3rd Street in Greenwich Village [2] Premier jazz venue opened in 1981, known for world-class acts [3] Capacity of approximately 240 seats with table seating [4] Two shows nightly at 8pm and 10:30pm, late night jam sessions on weekends [5] Full dinner and cocktail menu available during shows
+
+Blue Note NYC is one of the world's most famous jazz clubs, featuring top international artists nightly. The venue offers an upscale dining experience with excellent sightlines from every seat. They also have a jazz brunch on Sundays.`,
+		userId: null,
+		isPrivate: false,
+		hasVectorEmbedding: false,
+		userContactListCount: 0,
+		manualDeselections: 0,
+		companyFoundedYear: null,
+		companyIndustry: null,
+		companyKeywords: [],
+		companyLinkedInUrl: null,
+		companyPostalCode: null,
+		companyTechStack: [],
+		companyType: null,
+		lastResearchedDate: null,
+		latitude: null,
+		longitude: null,
+	},
+	{
+		id: 3,
+		email: 'info@smallsjazzclub.com',
+		firstName: null,
+		lastName: null,
+		company: 'Smalls',
+		title: 'Music Venue',
+		city: 'New York',
+		state: 'New York',
+		name: null,
+		country: 'USA',
+		createdAt: new Date(),
+		updatedAt: new Date(),
+		phone: null,
+		website: null,
+		contactListId: null,
+		address: null,
+		apolloPersonId: null,
+		emailValidatedAt: null,
+		emailValidationStatus: 'unknown',
+		emailValidationSubStatus: null,
+		headline: null,
+		linkedInUrl: null,
+		photoUrl: null,
+		metadata: `[1] Located at 183 W 10th Street in the West Village [2] Underground jazz club known for nurturing young talent since 1994[3] Cozy basement space with capacity of about 60 people [4] Live music from 7:30pm until 4am, jam sessions after midnight[5] BYOB policy, $20 cover includes all sets for the evening
+
+Smalls is famous for its marathon sessions and launching careers of now-famous musicians. The intimate space creates an electric atmosphere where audience and musicians share the experience. Known for straight-ahead and bebop jazz.`,
+		userId: null,
+		isPrivate: false,
+		hasVectorEmbedding: false,
+		userContactListCount: 0,
+		manualDeselections: 0,
+		companyFoundedYear: null,
+		companyIndustry: null,
+		companyKeywords: [],
+		companyLinkedInUrl: null,
+		companyPostalCode: null,
+		companyTechStack: [],
+		companyType: null,
+		lastResearchedDate: null,
+		latitude: null,
+		longitude: null,
+	},
+	{
+		id: 4,
+		email: 'info@nublu.net',
+		firstName: null,
+		lastName: null,
+		company: 'Nublu',
+		title: 'Music Venue',
+		city: 'New York',
+		state: 'New York',
+		name: null,
+		country: 'USA',
+		createdAt: new Date(),
+		updatedAt: new Date(),
+		phone: null,
+		website: null,
+		contactListId: null,
+		address: null,
+		apolloPersonId: null,
+		emailValidatedAt: null,
+		emailValidationStatus: 'unknown',
+		emailValidationSubStatus: null,
+		headline: null,
+		linkedInUrl: null,
+		photoUrl: null,
+		metadata: `[1] Located at 151 Avenue C in the East Village [2] Eclectic venue mixing jazz, electronic, and world music since 2002 [3] Standing room venue with capacity around 150 people [4] Shows typically start at 9pm or 10pm, often going until 4am [5] Full bar, casual atmosphere with a dance floor
+
+Nublu is known for its experimental and genre-bending programming. The venue has been central to the downtown avant-garde jazz scene and regularly features musicians who blur lines between jazz, electronic, and global sounds.`,
+		userId: null,
+		isPrivate: false,
+		hasVectorEmbedding: false,
+		userContactListCount: 0,
+		manualDeselections: 0,
+		companyFoundedYear: null,
+		companyIndustry: null,
+		companyKeywords: [],
+		companyLinkedInUrl: null,
+		companyPostalCode: null,
+		companyTechStack: [],
+		companyType: null,
+		lastResearchedDate: null,
+		latitude: null,
+		longitude: null,
+	},
+	{
+		id: 5,
+		email: 'info@thestonenyc.com',
+		firstName: null,
+		lastName: null,
+		company: 'The Stone',
+		title: 'Music Venue',
+		city: 'New York',
+		state: 'New York',
+		name: null,
+		country: 'USA',
+		createdAt: new Date(),
+		updatedAt: new Date(),
+		phone: null,
+		website: null,
+		contactListId: null,
+		address: null,
+		apolloPersonId: null,
+		emailValidatedAt: null,
+		emailValidationStatus: 'unknown',
+		emailValidationSubStatus: null,
+		headline: null,
+		linkedInUrl: null,
+		photoUrl: null,
+		metadata: `[1] Located at The New School, 55 W 13th Street [2] Founded by John Zorn in 2005, dedicated to avant-garde music [3] Small listening room with seating for about 75 people [4] Two shows nightly at 8pm and 10pm, curated by rotating artists [5] Suggested donation, no food or drink service
+
+The Stone is a non-profit performance space focusing on experimental and avant-garde music. Each week features a different artist-curator who programs both sets every night. Known for presenting cutting-edge improvisation and new compositions.`,
+		userId: null,
+		isPrivate: false,
+		hasVectorEmbedding: false,
+		userContactListCount: 0,
+		manualDeselections: 0,
+		companyFoundedYear: null,
+		companyIndustry: null,
+		companyKeywords: [],
+		companyLinkedInUrl: null,
+		companyPostalCode: null,
+		companyTechStack: [],
+		companyType: null,
+		lastResearchedDate: null,
+		latitude: null,
+		longitude: null,
+	},
+	{
+		id: 6,
+		email: 'info@mezzrow.com',
+		firstName: null,
+		lastName: null,
+		company: 'Mezzrow',
+		title: 'Music Venue',
+		city: 'New York',
+		state: 'New York',
+		name: null,
+		country: 'USA',
+		createdAt: new Date(),
+		updatedAt: new Date(),
+		phone: null,
+		website: null,
+		contactListId: null,
+		address: null,
+		apolloPersonId: null,
+		emailValidatedAt: null,
+		emailValidationStatus: 'unknown',
+		emailValidationSubStatus: null,
+		headline: null,
+		linkedInUrl: null,
+		photoUrl: null,
+		metadata: `[1] Located at 163 W 10th Street, sister club to Smalls [2] Opened in 2014, named after jazz clarinetist Mezz Mezzrow [3] Ultra-intimate space with only 40 seats around a grand piano [4] Piano-focused jazz, shows at 7:30pm and 9pm, late sets on weekends [5] Premium spirits and wine, no food service, $20 cover
+
+Mezzrow specializes in piano jazz and features a beautiful Steinway grand. The room was designed for optimal acoustics with the audience seated around the piano. Perfect for duo and trio performances in an elegant speakeasy atmosphere.`,
+		userId: null,
+		isPrivate: false,
+		hasVectorEmbedding: false,
+		userContactListCount: 0,
+		manualDeselections: 0,
+		companyFoundedYear: null,
+		companyIndustry: null,
+		companyKeywords: [],
+		companyLinkedInUrl: null,
+		companyPostalCode: null,
+		companyTechStack: [],
+		companyType: null,
+		lastResearchedDate: null,
+		latitude: null,
+		longitude: null,
+	},
+	{
+		id: 7,
+		email: 'info@55bar.com',
+		firstName: null,
+		lastName: null,
+		company: '55 Bar',
+		title: 'Music Venue',
+		city: 'New York',
+		state: 'New York',
+		name: null,
+		country: 'USA',
+		createdAt: new Date(),
+		updatedAt: new Date(),
+		phone: null,
+		website: null,
+		contactListId: null,
+		address: null,
+		apolloPersonId: null,
+		emailValidatedAt: null,
+		emailValidationStatus: 'unknown',
+		emailValidationSubStatus: null,
+		headline: null,
+		linkedInUrl: null,
+		photoUrl: null,
+		metadata: `[1] Located at 55 Christopher Street in the West Village [2] Legendary dive bar with live jazz since 1919 (speakeasy era) [3] Tiny venue with capacity around 50 people, no stage [4] Two sets nightly, typically at 7pm and 10pm, no cover most nights [5] Cash-only bar, no food, relaxed neighborhood vibe
+
+55 Bar is one of NYC's oldest continuously operating bars. The no-frills atmosphere and lack of stage means musicians play at eye level with the audience. Known for launching careers and attracting top players for low-key gigs.`,
+		userId: null,
+		isPrivate: false,
+		hasVectorEmbedding: false,
+		userContactListCount: 0,
+		manualDeselections: 0,
+		companyFoundedYear: null,
+		companyIndustry: null,
+		companyKeywords: [],
+		companyLinkedInUrl: null,
+		companyPostalCode: null,
+		companyTechStack: [],
+		companyType: null,
+		lastResearchedDate: null,
+		latitude: null,
+		longitude: null,
+	},
+	{
+		id: 8,
+		email: 'info@ornithologyjazz.com',
+		firstName: null,
+		lastName: null,
+		company: 'Ornithology',
+		title: 'Music Venue',
+		city: 'New York',
+		state: 'New York',
+		name: null,
+		country: 'USA',
+		createdAt: new Date(),
+		updatedAt: new Date(),
+		phone: null,
+		website: null,
+		contactListId: null,
+		address: null,
+		apolloPersonId: null,
+		emailValidatedAt: null,
+		emailValidationStatus: 'unknown',
+		emailValidationSubStatus: null,
+		headline: null,
+		linkedInUrl: null,
+		photoUrl: null,
+		metadata: `[1] Located at 6 Suydam Street in Bushwick, Brooklyn [2] Named after the Charlie Parker composition, opened in 2017 [3] Industrial-chic space with capacity around 80 people [4] Live jazz nightly starting at 8pm, late night sets on weekends [5] Full cocktail menu and small plates, no cover for early sets
+
+Ornithology brought serious jazz to Brooklyn's Bushwick neighborhood. The venue attracts both established players and rising stars, with a focus on creative and contemporary jazz. The backyard garden is open in warmer months.`,
+		userId: null,
+		isPrivate: false,
+		hasVectorEmbedding: false,
+		userContactListCount: 0,
+		manualDeselections: 0,
+		companyFoundedYear: null,
+		companyIndustry: null,
+		companyKeywords: [],
+		companyLinkedInUrl: null,
+		companyPostalCode: null,
+		companyTechStack: [],
+		companyType: null,
+		lastResearchedDate: null,
+		latitude: null,
+		longitude: null,
+	},
+	{
+		id: 9,
+		email: 'info@dizzys.com',
+		firstName: null,
+		lastName: null,
+		company: "Dizzy's",
+		title: 'Music Venue',
+		city: 'New York',
+		state: 'New York',
+		name: null,
+		country: 'USA',
+		createdAt: new Date(),
+		updatedAt: new Date(),
+		phone: null,
+		website: null,
+		contactListId: null,
+		address: null,
+		apolloPersonId: null,
+		emailValidatedAt: null,
+		emailValidationStatus: 'unknown',
+		emailValidationSubStatus: null,
+		headline: null,
+		linkedInUrl: null,
+		photoUrl: null,
+		metadata: `[1] Located at Jazz at Lincoln Center, Broadway at 60th Street [2] Part of Jazz at Lincoln Center, opened in 2004 [3] Stunning room with 140 seats and floor-to-ceiling windows overlooking Central Park [4] Shows at 7:30pm and 9:30pm, student discounts available [5] Southern-inspired menu and craft cocktails, dinner reservations recommended
+
+Dizzy's Club offers one of the most spectacular settings for jazz in the world. The backdrop of Columbus Circle and Central Park through massive windows creates an unforgettable experience. Programming ranges from traditional to contemporary jazz.`,
+		userId: null,
+		isPrivate: false,
+		hasVectorEmbedding: false,
+		userContactListCount: 0,
+		manualDeselections: 0,
+		companyFoundedYear: null,
+		companyIndustry: null,
+		companyKeywords: [],
+		companyLinkedInUrl: null,
+		companyPostalCode: null,
+		companyTechStack: [],
+		companyType: null,
+		lastResearchedDate: null,
+		latitude: null,
+		longitude: null,
+	},
+];
+
 import './landing-animations.css';
 
 declare global {
@@ -24,6 +419,7 @@ export default function HomePage() {
 	const heroVideoRef = useRef<any>(null);
 	const videoCarouselContainerRef = useRef<HTMLDivElement>(null);
 	const [isVideoCarouselPaused, setIsVideoCarouselPaused] = useState(false);
+	const [hoveredContact, setHoveredContact] = useState<ContactWithName | null>(sampleContacts[0]);
 	const heroVideoStyle = {
 		// Fill the full hero width; crop (preferably bottom) as needed
 		'--media-object-fit': 'cover',
@@ -436,6 +832,231 @@ export default function HomePage() {
 						width="100%"
 						height="100%"
 						className="block"
+					/>
+				</div>
+
+				{/* Block below map */}
+				<div
+					style={{
+						marginTop: '145px',
+						width: '1866px',
+						height: '771px',
+						backgroundColor: '#FAFAFA',
+						position: 'relative',
+					}}
+				>
+					{/* Inner box - left */}
+					<div
+						style={{
+							position: 'absolute',
+							left: '39px',
+							top: '200px',
+							width: '738px',
+							height: '417px',
+							backgroundColor: '#EFEFEF',
+							borderRadius: '8px',
+							padding: '40px',
+						}}
+					>
+						<p className="font-inter font-normal text-[62px] text-black leading-tight">
+							We Did The Research
+						</p>
+						<p className="font-inter font-normal text-[25px] text-black mt-6">
+							Take a look through every contact, and you'll get to see information on what styles they book, their live music schedules, and even how to actually find the right person.
+						</p>
+						{/* Learn about research button */}
+						<div
+							style={{
+								position: 'absolute',
+								left: '22px',
+								bottom: '75px',
+								width: '302px',
+								height: '51px',
+								border: '2px solid #5DAB68',
+								borderRadius: '6px',
+								backgroundColor: 'transparent',
+								display: 'flex',
+								alignItems: 'center',
+								justifyContent: 'center',
+							}}
+						>
+							<span className="font-inter font-normal text-[25px] text-[#5DAB68]">Learn about research</span>
+						</div>
+					</div>
+					{/* Inner box - right - Contacts and Research panels */}
+					<div
+						style={{
+							position: 'absolute',
+							right: '74px',
+							top: '29px',
+							width: '904px',
+							height: '712px',
+							backgroundColor: '#F1F1F1',
+							borderRadius: '8px',
+						}}
+					>
+						{/* Contacts list */}
+						<div
+							style={{
+								position: 'absolute',
+								left: '141px',
+								top: '108px',
+								bottom: '91px',
+							}}
+						>
+							<ContactsExpandedList
+								contacts={sampleContacts}
+								width={326}
+								height={513}
+								minRows={9}
+								onContactHover={(contact) => {
+									if (contact) {
+										setHoveredContact(contact);
+									}
+								}}
+							/>
+						</div>
+						{/* Research panel */}
+						<div
+							style={{
+								position: 'absolute',
+								right: '52px',
+								top: '31px',
+								bottom: '46px',
+							}}
+						>
+							<ContactResearchPanel
+								contact={hoveredContact}
+								width={359}
+								boxWidth={344}
+								height={635}
+								className="!block"
+							/>
+						</div>
+					</div>
+				</div>
+
+				{/* Second block below map */}
+				<div
+					style={{
+						marginTop: '82px',
+						width: '1866px',
+						height: '771px',
+						backgroundColor: '#FAFAFA',
+						position: 'relative',
+					}}
+				>
+					{/* Inner box - left */}
+					<div
+						style={{
+							position: 'absolute',
+							left: '35px',
+							top: '26px',
+							width: '1130px',
+							height: '712px',
+							backgroundColor: '#F1F1F1',
+							borderRadius: '8px',
+						}}
+					/>
+					{/* Inner box - right */}
+					<div
+						style={{
+							position: 'absolute',
+							right: '42px',
+							top: '199px',
+							width: '542px',
+							height: '459px',
+							backgroundColor: '#EFEFEF',
+							borderRadius: '8px',
+							padding: '40px',
+						}}
+					>
+						<p className="font-inter font-normal text-[62px] text-black leading-tight">
+							Every Reply
+						</p>
+						<p className="font-inter font-normal text-[25px] text-black mt-10">
+							Never miss a reply! Get full context on each response, including what campaign it came from, all in one place.
+						</p>
+						{/* Learn about Inbox button */}
+						<div
+							style={{
+								position: 'absolute',
+								left: '31px',
+								bottom: '45px',
+								width: '260px',
+								height: '51px',
+								border: '2px solid #5DAB68',
+								borderRadius: '6px',
+								backgroundColor: 'transparent',
+								display: 'flex',
+								alignItems: 'center',
+								justifyContent: 'center',
+							}}
+						>
+							<span className="font-inter font-normal text-[25px] text-[#5DAB68]">Learn about Inbox</span>
+						</div>
+					</div>
+				</div>
+
+				{/* Third block below map */}
+				<div
+					style={{
+						marginTop: '75px',
+						width: '1866px',
+						height: '771px',
+						backgroundColor: '#FAFAFA',
+						position: 'relative',
+					}}
+				>
+					{/* Inner box - left */}
+					<div
+						style={{
+							position: 'absolute',
+							left: '39px',
+							top: '140px',
+							width: '738px',
+							height: '447px',
+							backgroundColor: '#EFEFEF',
+							borderRadius: '8px',
+							padding: '40px',
+						}}
+					>
+						<p className="font-inter font-normal text-[62px] text-black leading-tight">
+							Emails That Land
+						</p>
+						<p className="font-inter font-normal text-[25px] text-black mt-14">
+							Emails not getting responses? Ditch the templates. Murmur drafts pitches based on your bio and date range that venues actually respond to.
+						</p>
+						{/* Learn about Drafting button */}
+						<div
+							style={{
+								position: 'absolute',
+								left: '47px',
+								bottom: '26px',
+								width: '288px',
+								height: '51px',
+								border: '2px solid #5DAB68',
+								borderRadius: '6px',
+								backgroundColor: 'transparent',
+								display: 'flex',
+								alignItems: 'center',
+								justifyContent: 'center',
+							}}
+						>
+							<span className="font-inter font-normal text-[25px] text-[#5DAB68]">Learn about Drafting</span>
+						</div>
+					</div>
+					{/* Inner box - right */}
+					<div
+						style={{
+							position: 'absolute',
+							right: '47px',
+							top: '27px',
+							width: '904px',
+							height: '712px',
+							backgroundColor: '#F1F1F1',
+							borderRadius: '8px',
+						}}
 					/>
 				</div>
 			</div>

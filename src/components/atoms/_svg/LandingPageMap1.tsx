@@ -1885,6 +1885,48 @@ const SvgComponent = (props: SVGProps<SVGSVGElement>) => (
         - Coast to Coast
       </text>
     </g>
+    {/* Venues description block */}
+    <g>
+      <rect
+        x={23}
+        y={503}
+        width={625}
+        height={124}
+        rx={7}
+        ry={7}
+        fill="#EFEFEF"
+      />
+      <text
+        x={43}
+        y={540}
+        textAnchor="start"
+        fontFamily="Inter, sans-serif"
+        fontSize={24}
+        fill="#000"
+      >
+        Venues, Festivals, Wineries, Breweries, Coffee
+      </text>
+      <text
+        x={43}
+        y={572}
+        textAnchor="start"
+        fontFamily="Inter, sans-serif"
+        fontSize={24}
+        fill="#000"
+      >
+        Shops; Hundreds of thousands of contacts
+      </text>
+      <text
+        x={43}
+        y={604}
+        textAnchor="start"
+        fontFamily="Inter, sans-serif"
+        fontSize={24}
+        fill="#000"
+      >
+        thoroughly verified by musicians.
+      </text>
+    </g>
   </svg>
 )
 export default SvgComponent
