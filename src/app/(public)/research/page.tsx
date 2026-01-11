@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { urls } from '@/constants/urls';
 import ResearchDemo from '@/components/atoms/_svg/ResearchDemo';
 import PanelDemo from '@/components/atoms/_svg/PanelDemo';
+import SampleEmail from '@/components/atoms/_svg/sampleEmail';
 
 export default function ResearchPage() {
   React.useEffect(() => {
@@ -94,6 +95,16 @@ export default function ResearchPage() {
             <p className="font-inter font-bold text-[24px] text-black">
               The Details Matter
             </p>
+          </div>
+          <div
+            style={{
+              position: 'absolute',
+              top: '171px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+            }}
+          >
+            <SampleEmail />
           </div>
           <div style={{
             width: '1218px',
