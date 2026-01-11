@@ -149,6 +149,137 @@ const SvgComponent = (props: SVGProps<SVGSVGElement>) => (
         d="M49.263 408.709h340.494a9.325 9.325 0 0 1 9.324 9.324v28.124c0 5.149-4.175 9.323-9.324 9.323H49.263a9.324 9.324 0 0 1-9.325-9.323v-28.124a9.325 9.325 0 0 1 9.325-9.324Z"
       />
     </g>
+    <foreignObject x={39.289} y={109.241} width={360.441} height={48.071}>
+      <div
+        style={{
+          fontFamily:
+            "Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif",
+          fontSize: 17,
+          lineHeight: "19px",
+          color: "#000",
+          display: "flex",
+          alignItems: "center",
+          height: "100%",
+          width: "100%",
+          padding: "0 10px",
+          boxSizing: "border-box",
+          whiteSpace: "pre-line",
+        }}
+      >
+        {"Located at 600 N Broad\nStreet"}
+      </div>
+    </foreignObject>
+    <foreignObject x={39.289} y={183.293} width={360.441} height={48.071}>
+      <div
+        style={{
+          fontFamily:
+            "Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif",
+          fontSize: 17,
+          lineHeight: "19px",
+          color: "#000",
+          display: "flex",
+          alignItems: "center",
+          height: "100%",
+          width: "100%",
+          padding: "0 10px",
+          boxSizing: "border-box",
+          whiteSpace: "pre-line",
+        }}
+      >
+        {"Full dinner and drinks are served in both\nthe restaurant and the jazz club."}
+      </div>
+    </foreignObject>
+    <foreignObject x={39.289} y={254.75} width={360.441} height={48.071}>
+      <div
+        style={{
+          fontFamily:
+            "Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif",
+          fontSize: 17,
+          lineHeight: "19px",
+          color: "#000",
+          display: "flex",
+          alignItems: "center",
+          height: "100%",
+          width: "100%",
+          padding: "0 10px",
+          boxSizing: "border-box",
+          whiteSpace: "pre-line",
+        }}
+      >
+        {"Upscale Southern restaurant with an\nintimate jazz club with under 75 seats"}
+      </div>
+    </foreignObject>
+    <foreignObject x={39.289} y={330.108} width={360.441} height={48.071}>
+      <div
+        style={{
+          fontFamily:
+            "Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif",
+          fontSize: 17,
+          lineHeight: "19px",
+          color: "#000",
+          display: "flex",
+          alignItems: "center",
+          height: "100%",
+          width: "100%",
+          padding: "0 10px",
+          boxSizing: "border-box",
+          whiteSpace: "pre-line",
+        }}
+      >
+        {"Live jazz shows are ticketed with table seating"}
+      </div>
+    </foreignObject>
+    <foreignObject x={39.289} y={408.06} width={360.441} height={48.071}>
+      <div
+        style={{
+          fontFamily:
+            "Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif",
+          fontSize: 17,
+          lineHeight: "19px",
+          color: "#000",
+          display: "flex",
+          alignItems: "center",
+          height: "100%",
+          width: "100%",
+          padding: "0 10px",
+          boxSizing: "border-box",
+          whiteSpace: "pre-line",
+        }}
+      >
+        {"Shows last about 75 minutes"}
+      </div>
+    </foreignObject>
+    <rect
+      x={14.464}
+      y={490.964}
+      width={392}
+      height={251}
+      fill="#fff"
+      stroke="#000"
+      strokeWidth={1.299}
+      rx={10}
+    />
+    <foreignObject x={14.464} y={490.964} width={392} height={251}>
+      <div
+        style={{
+          fontFamily:
+            "Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif",
+          fontSize: 17,
+          lineHeight: "19px",
+          color: "#000",
+          height: "100%",
+          width: "100%",
+          padding: 14,
+          boxSizing: "border-box",
+          wordBreak: "normal",
+          overflowWrap: "break-word",
+        }}
+      >
+        {
+          "SOUTH is a cozy, <75-seat dinner-jazz listening room at 600 N Broad St in Philadelphia, featuring two ticketed seatings per night (Thu 6:30 & 9:00; Fri–Sat 7:00 & 9:30; Sun 6:00 & 8:30). They present contemporary, Latin, and straight-ahead jazz in headline sets (typically ~75 minutes) with minimal audience chatter, and tickets (via Tock) reserve your table—no separate dinner reservation required. The stage includes an acoustic piano (confirm brand), and there’s a built-in 20% service gratuity on F&B checks. For booking, target Thursday through Sunday, pitch your draw with video/press, propose dual sets, and provide your tech needs up front"
+        }
+      </div>
+    </foreignObject>
     <path
       fill="#000"
       d="M17.523 128.221v-11.677h3.64v1.467h-1.739v8.738h1.74v1.472h-3.64Zm8.818-10.565v9.448h-1.998v-7.552h-.055l-2.164 1.356v-1.771l2.34-1.481h1.877Zm5.42-1.112v11.677h-3.64v-1.472h1.74v-8.738h-1.74v-1.467h3.64ZM17.062 201.937V190.26h3.64v1.467h-1.739v8.738h1.74v1.472h-3.64Zm4.707-1.117v-1.439l3.364-3.114c.286-.277.526-.526.72-.748.196-.221.346-.438.447-.65.102-.216.152-.448.152-.697 0-.277-.063-.515-.189-.715a1.245 1.245 0 0 0-.517-.466 1.616 1.616 0 0 0-.742-.166c-.29 0-.542.058-.757.175a1.212 1.212 0 0 0-.498.503 1.63 1.63 0 0 0-.176.78h-1.896c0-.618.14-1.155.42-1.61a2.8 2.8 0 0 1 1.176-1.057c.505-.249 1.086-.374 1.744-.374.677 0 1.266.12 1.768.36.504.237.896.566 1.176.988.28.421.42.904.42 1.448 0 .357-.07.709-.212 1.057-.139.347-.386.733-.743 1.158-.357.421-.86.927-1.509 1.518l-1.38 1.351v.065h3.968v1.633H21.77Zm11.358-10.56v11.677h-3.64v-1.472h1.74v-8.738h-1.74v-1.467h3.64ZM17.062 273.394v-11.677h3.64v1.467h-1.739v8.738h1.74v1.472h-3.64Zm8.2-.987c-.689 0-1.303-.119-1.84-.356-.536-.24-.959-.569-1.27-.987a2.48 2.48 0 0 1-.475-1.458h2.012c.012.231.087.434.226.609.141.172.329.306.563.401.233.096.496.143.789.143.304 0 .573-.053.807-.161.234-.108.417-.257.55-.448.131-.19.197-.41.197-.659 0-.253-.07-.476-.212-.669a1.358 1.358 0 0 0-.6-.462 2.346 2.346 0 0 0-.922-.166h-.881v-1.467h.88c.302 0 .568-.052.799-.157.234-.104.415-.249.544-.433.13-.188.194-.406.194-.656 0-.236-.057-.444-.17-.622a1.129 1.129 0 0 0-.471-.425 1.537 1.537 0 0 0-.701-.152c-.271 0-.519.049-.743.147a1.307 1.307 0 0 0-.54.411 1.081 1.081 0 0 0-.217.628h-1.915a2.46 2.46 0 0 1 .466-1.44 3.02 3.02 0 0 1 1.218-.973c.514-.237 1.094-.356 1.74-.356.652 0 1.222.119 1.711.356.49.236.87.556 1.14.959.274.4.409.849.406 1.347.003.529-.162.971-.494 1.325-.329.353-.758.578-1.287.673v.074c.695.089 1.224.331 1.587.724.366.391.548.88.545 1.467a2.304 2.304 0 0 1-.466 1.435c-.311.419-.74.748-1.288.988-.547.24-1.174.36-1.882.36Zm8.246-10.69v11.677h-3.64v-1.472h1.739v-8.738h-1.74v-1.467h3.64ZM17.062 347.454v-11.677h3.64v1.467h-1.739v8.739h1.74v1.471h-3.64Zm4.564-2.777v-1.573l3.945-6.215h1.357v2.178h-.803l-2.487 3.935v.074h5.606v1.601h-7.618Zm4.536 1.661v-2.141l.037-.697v-6.611h1.873v9.449h-1.91Zm7.587-10.561v11.677h-3.64v-1.471h1.739v-8.739h-1.74v-1.467h3.64ZM17.062 425.407v-11.678h3.64v1.467h-1.739v8.739h1.74v1.472h-3.64Zm8.159-.988c-.653 0-1.234-.12-1.744-.36a3.03 3.03 0 0 1-1.21-.992 2.545 2.545 0 0 1-.465-1.448h1.938c.021.366.175.663.46.89.287.228.627.342 1.02.342.314 0 .591-.07.831-.208a1.49 1.49 0 0 0 .567-.586 1.77 1.77 0 0 0 .208-.867c0-.333-.07-.625-.212-.877a1.497 1.497 0 0 0-.577-.59 1.691 1.691 0 0 0-.844-.217c-.277 0-.546.057-.808.17a1.46 1.46 0 0 0-.604.466l-1.776-.318.447-4.983h5.777v1.633h-4.13l-.244 2.367h.055c.166-.233.417-.427.752-.581.335-.154.71-.231 1.126-.231.569 0 1.076.134 1.523.402.445.267.798.635 1.056 1.102.258.465.386 1 .383 1.606.003.637-.145 1.203-.443 1.698a3.122 3.122 0 0 1-1.241 1.162c-.53.28-1.144.42-1.845.42Zm8.097-10.69v11.678h-3.64v-1.472h1.739v-8.739h-1.74v-1.467h3.64Z"
