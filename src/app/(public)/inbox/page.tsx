@@ -4,6 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import { urls } from '@/constants/urls';
 import InboxDemo from '@/components/atoms/_svg/InboxDemo';
+import InboundDemo from '@/components/atoms/_svg/InboundDemo';
 
 export default function InboxPage() {
   React.useEffect(() => {
@@ -51,6 +52,9 @@ export default function InboxPage() {
             <p className="font-inter text-[23px] text-black leading-[45px] tracking-wide [word-spacing:5px]">
               Keep track of when venues reply to you. Each response is tagged to its corresponding campaign, so you'll always know where it came from.
             </p>
+          </div>
+          <div className="absolute" style={{ top: '79px', right: '37px' }}>
+            <InboundDemo />
           </div>
         </div>
       </div>
