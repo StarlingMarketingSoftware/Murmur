@@ -908,18 +908,21 @@ export default function HomePage() {
 					}}
 				>
 					{/* Inner box - left */}
-					<div
-						style={{
-							position: 'absolute',
-							left: '39px',
-							top: '200px',
-							width: '738px',
-							height: '417px',
-							backgroundColor: '#EFEFEF',
-							borderRadius: '8px',
-							padding: '40px',
-						}}
-					>
+				<div
+					style={{
+						position: 'absolute',
+						left: '39px',
+						top: '200px',
+						width: '792px',
+						height: '417px',
+						backgroundColor: '#EFEFEF',
+						borderRadius: '8px',
+						paddingLeft: '22px',
+						paddingRight: '40px',
+						paddingTop: '40px',
+						paddingBottom: '40px',
+					}}
+				>
 						<p className="font-inter font-normal text-[62px] text-black leading-tight">
 							We Did The Research
 						</p>
