@@ -4,6 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import { urls } from '@/constants/urls';
 import ResearchDemo from '@/components/atoms/_svg/ResearchDemo';
+import PanelDemo from '@/components/atoms/_svg/PanelDemo';
 
 export default function ResearchPage() {
   React.useEffect(() => {
@@ -35,6 +36,9 @@ export default function ResearchPage() {
       </div>
       <div className="flex justify-center mt-[180px]">
         <div style={{ width: '1363px', height: '1053px', backgroundColor: '#FAFAFA', position: 'relative' }}>
+          <div style={{ position: 'absolute', right: '130px', top: '128px' }}>
+            <PanelDemo />
+          </div>
           <div style={{
             width: '686px',
             height: '383px',
@@ -42,8 +46,16 @@ export default function ResearchPage() {
             borderRadius: '6px',
             position: 'absolute',
             top: '19px',
-            left: '24px'
+            left: '24px',
+            paddingLeft: '56px',
+            paddingTop: '32px'
           }}>
+            <p className="font-inter font-bold text-[24px] text-black">
+              From Booking Schedules to Genre
+            </p>
+            <p className="font-inter text-[23px] text-black mt-[24px] pr-[56px] leading-[45px] tracking-wide [word-spacing:5px]">
+              For every contact, we provide detailed descriptions, including facts like what times a venue in Eastern Pennsylvania is booking shows, and what genres they book. See the research at any point in the tool, from searching the map up to sending your first email.
+            </p>
           </div>
           <div style={{
             width: '686px',
@@ -52,8 +64,16 @@ export default function ResearchPage() {
             borderRadius: '6px',
             position: 'absolute',
             bottom: '60px',
-            left: '24px'
+            left: '24px',
+            paddingLeft: '56px',
+            paddingTop: '32px'
           }}>
+            <p className="font-inter font-bold text-[24px] text-black">
+              Know the History
+            </p>
+            <p className="font-inter text-[23px] text-black mt-[24px] pr-[56px] leading-[45px] tracking-wide [word-spacing:5px]">
+              The research goes beyond the basics and into the culture of each location. Know if a brewery in West Virginia is serving hikers, or if a coffee shop in Illinois hosts an outdoor summer concert series. We care about the details.
+            </p>
           </div>
         </div>
       </div>
@@ -66,8 +86,14 @@ export default function ResearchPage() {
             borderRadius: '6px',
             position: 'absolute',
             top: '45px',
-            left: '24px'
+            left: '24px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
           }}>
+            <p className="font-inter font-bold text-[24px] text-black">
+              The Details Matter
+            </p>
           </div>
           <div style={{
             width: '1218px',
@@ -77,8 +103,14 @@ export default function ResearchPage() {
             position: 'absolute',
             bottom: '35px',
             left: '50%',
-            transform: 'translateX(-50%)'
+            transform: 'translateX(-50%)',
+            paddingLeft: '56px',
+            paddingTop: '32px',
+            paddingRight: '56px'
           }}>
+            <p className="font-inter text-[23px] text-black leading-[45px] tracking-wide [word-spacing:5px]">
+              Get the details right the first time you reach out to a winery or a coffee shop. Research feeds into your drafts so every pitch fits the venue.
+            </p>
           </div>
         </div>
       </div>
