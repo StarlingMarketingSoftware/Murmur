@@ -59,6 +59,27 @@ export default function ResearchPage() {
       </div>
       <div className="flex justify-center mt-[82px]">
         <div style={{ width: '1363px', height: '1026px', backgroundColor: '#FAFAFA', position: 'relative' }}>
+          <div style={{
+            width: '356px',
+            height: '77px',
+            backgroundColor: '#EFEFEF',
+            borderRadius: '6px',
+            position: 'absolute',
+            top: '45px',
+            left: '24px'
+          }}>
+          </div>
+          <div style={{
+            width: '1218px',
+            height: '155px',
+            backgroundColor: '#EFEFEF',
+            borderRadius: '6px',
+            position: 'absolute',
+            bottom: '35px',
+            left: '50%',
+            transform: 'translateX(-50%)'
+          }}>
+          </div>
         </div>
       </div>
       <div className="h-[660px] flex flex-col items-center justify-center">
