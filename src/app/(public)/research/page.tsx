@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import ResearchDemo from '@/components/atoms/_svg/ResearchDemo';
 
 export default function ResearchPage() {
   React.useEffect(() => {
@@ -27,7 +28,9 @@ export default function ResearchPage() {
           Research
         </h1>
       </div>
-      {/* Content will go here */}
+      <div className="flex justify-center">
+        <ResearchDemo />
+      </div>
     </div>
   );
 }
