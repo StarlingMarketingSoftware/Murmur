@@ -79,6 +79,12 @@ export const Navbar = () => {
 		pathname === urls.freeTrial.index || pathname.startsWith(`${urls.freeTrial.index}/`);
 	const isTransparentHeader = isOverLandingHero || isFreeTrial;
 
+	// On `/free-trial` we show either the Clerk auth flow or embedded Stripe checkout;
+	// hide the header entirely in both cases so it doesn't distract or clip.
+	if (isFreeTrial) {
+		return null;
+	}
+
 	return (
 		<>
 			{/* Main Navigation Bar - Artistic Glass */}
