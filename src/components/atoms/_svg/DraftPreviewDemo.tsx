@@ -1,6 +1,117 @@
+/* eslint-disable react/no-unknown-property */
+"use client"
+
 import * as React from "react"
 
-function SvgComponent(props) {
+const LEFT_EMAIL_TEXT = `Hi John,
+
+It’s great to speak with you! My name is Parker and I run the Parker Jazz Trio based in New York City. We’ve performed at almost all of the major NYC Jazz venues you can think of, from the Blue Note, where we held a week-long residency, to a feature Saturday set at Dizzy’s.
+
+I love what you’ve done with Mezzrow, and I know we’ll draw out the perfect crowd.
+
+Let me know about the date you have open on the 17th and we’ll go from there.
+
+Thank you,
+Parker
+`
+
+const RIGHT_EMAIL_TEXT = `Hello John,
+
+I wanted to reach out about booking a date for my Jazz trio, the Parker trio on the 17th. We’re currently breaking 89,000 monthly listeners on Spotify and ticket sales for our last show at Smalls were tremendous, we sold it out completely.
+
+Additionally we were looking at perhaps doing a cocktail hour date on the 28th if that is also good for a cocktail type set with only bass and piano. Let me know what you think.
+
+All the best,
+Parker
+`
+
+function SvgComponent(props: React.SVGProps<SVGSVGElement>) {
+  const svgRef = React.useRef<SVGSVGElement | null>(null)
+  const typingTimerRef = React.useRef<number | null>(null)
+  const hasStartedRef = React.useRef(false)
+
+  const [typedLeft, setTypedLeft] = React.useState("")
+  const [typedRight, setTypedRight] = React.useState("")
+
+  // Match the "Test Preview" typing behavior: token-by-token (words + whitespace)
+  const leftTokens = React.useMemo(
+    () => LEFT_EMAIL_TEXT.split(/(\s+)/).filter(Boolean),
+    []
+  )
+  const rightTokens = React.useMemo(
+    () => RIGHT_EMAIL_TEXT.split(/(\s+)/).filter(Boolean),
+    []
+  )
+
+  React.useEffect(() => {
+    const el = svgRef.current
+    if (!el) return
+
+    const startTyping = () => {
+      if (hasStartedRef.current) return
+      hasStartedRef.current = true
+
+      setTypedLeft("")
+      setTypedRight("")
+
+      let leftIndex = 0
+      let rightIndex = 0
+
+      if (typingTimerRef.current) {
+        window.clearInterval(typingTimerRef.current)
+        typingTimerRef.current = null
+      }
+
+      typingTimerRef.current = window.setInterval(() => {
+        let didWork = false
+
+        if (leftIndex < leftTokens.length) {
+          const token = leftTokens[leftIndex]
+          setTypedLeft((prev) => prev + token)
+          leftIndex += 1
+          didWork = true
+        }
+
+        if (rightIndex < rightTokens.length) {
+          const token = rightTokens[rightIndex]
+          setTypedRight((prev) => prev + token)
+          rightIndex += 1
+          didWork = true
+        }
+
+        if (!didWork && typingTimerRef.current) {
+          window.clearInterval(typingTimerRef.current)
+          typingTimerRef.current = null
+        }
+      }, 30)
+    }
+
+    if (typeof IntersectionObserver === "undefined") {
+      startTyping()
+      return
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry?.isIntersecting) {
+          startTyping()
+          observer.disconnect()
+        }
+      },
+      { threshold: 0.35 }
+    )
+
+    observer.observe(el)
+
+    return () => {
+      observer.disconnect()
+      if (typingTimerRef.current) {
+        window.clearInterval(typingTimerRef.current)
+        typingTimerRef.current = null
+      }
+    }
+  }, [leftTokens, rightTokens])
+
   return (
     <svg
       width={786}
@@ -9,6 +120,7 @@ function SvgComponent(props) {
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       {...props}
+      ref={svgRef}
     >
       <rect
         x={1.17786}
@@ -446,6 +558,46 @@ function SvgComponent(props) {
         d="M649.746 28.832h.89l2.094 5.113h.072l2.093-5.113h.891v6.16h-.698v-4.68h-.06l-1.925 4.68h-.674l-1.925-4.68h-.06v4.68h-.698v-6.16zm10.35 4.27v-2.73h.71v4.62h-.71v-.782h-.048a1.509 1.509 0 01-.505.598c-.229.163-.517.244-.866.244-.289 0-.546-.063-.77-.19a1.33 1.33 0 01-.53-.577c-.128-.259-.192-.585-.192-.978v-2.935h.71v2.887c0 .337.094.606.282.806.191.2.434.301.728.301.177 0 .356-.045.539-.135.184-.09.339-.229.463-.415.126-.187.189-.424.189-.713zm5.283-1.696l-.638.18a1.185 1.185 0 00-.177-.309.863.863 0 00-.313-.253 1.136 1.136 0 00-.508-.099c-.283 0-.519.065-.707.196-.187.128-.28.291-.28.49 0 .176.064.316.193.418.128.102.328.188.601.256l.686.168c.413.1.721.254.923.46.203.205.304.469.304.791 0 .265-.076.502-.229.71a1.51 1.51 0 01-.631.493 2.31 2.31 0 01-.945.18c-.471 0-.861-.101-1.17-.306-.308-.204-.504-.503-.586-.896l.674-.169c.064.249.185.435.364.56.18.124.416.186.706.186.331 0 .594-.07.788-.21.197-.143.295-.313.295-.512a.538.538 0 00-.168-.403c-.113-.11-.285-.192-.518-.246l-.77-.18c-.423-.1-.734-.256-.932-.467a1.127 1.127 0 01-.295-.797c0-.26.073-.491.22-.692.148-.2.35-.358.604-.472.257-.114.548-.171.873-.171.457 0 .816.1 1.076.3.263.2.45.466.56.794zm1.153 3.586v-4.62h.709v4.62h-.709zm.36-5.39a.503.503 0 01-.357-.142.452.452 0 01-.148-.34c0-.132.049-.245.148-.34a.503.503 0 01.357-.14c.139 0 .257.046.355.14a.448.448 0 01.151.34c0 .133-.05.246-.151.34a.493.493 0 01-.355.142zm3.526 5.486c-.433 0-.806-.102-1.119-.307a2 2 0 01-.721-.845 2.856 2.856 0 01-.253-1.23c0-.47.086-.884.259-1.242.174-.361.417-.643.727-.846a1.957 1.957 0 011.095-.306c.325 0 .618.06.879.18.26.12.474.289.64.505.167.217.27.47.31.758h-.71a1.096 1.096 0 00-.361-.56c-.184-.163-.433-.246-.746-.246a1.25 1.25 0 00-.728.217 1.42 1.42 0 00-.484.604 2.244 2.244 0 00-.171.912c0 .357.056.667.168.932.115.265.275.47.481.617.209.146.454.22.734.22.185 0 .352-.033.503-.097.15-.064.277-.156.382-.277a1.06 1.06 0 00.222-.433h.71a1.637 1.637 0 01-.92 1.255 2.01 2.01 0 01-.897.189zm5.586-6.256l1.829 5.185h.072l1.828-5.185h.782l-2.261 6.16h-.77l-2.262-6.16h.782zm6.882 6.256c-.446 0-.83-.098-1.152-.295a1.974 1.974 0 01-.743-.83c-.173-.357-.259-.772-.259-1.245 0-.473.086-.89.259-1.251.174-.363.417-.646.728-.849a1.95 1.95 0 011.094-.306c.241 0 .479.04.713.12.235.08.448.21.641.39.192.18.346.416.46.71.114.296.172.659.172 1.09v.3h-3.562v-.613h2.84c0-.26-.052-.493-.157-.698a1.173 1.173 0 00-.439-.484 1.229 1.229 0 00-.668-.178c-.282 0-.527.07-.734.21a1.395 1.395 0 00-.472.542c-.11.223-.165.461-.165.716v.41c0 .348.06.644.18.886.123.241.292.425.509.55.216.125.468.187.755.187.186 0 .354-.026.505-.078.152-.054.284-.134.394-.24a1.11 1.11 0 00.256-.404l.685.193a1.512 1.512 0 01-.364.614c-.17.174-.381.31-.631.409a2.347 2.347 0 01-.845.144zm3.702-2.876v2.78h-.71v-4.62h.686v.722h.06c.109-.235.273-.424.494-.566.22-.144.505-.216.854-.216.313 0 .586.064.821.192.234.126.417.319.547.578.131.256.196.581.196.974v2.936h-.71v-2.888c0-.363-.094-.645-.283-.848-.188-.204-.447-.307-.776-.307-.226 0-.429.05-.607.148a1.05 1.05 0 00-.418.43 1.412 1.412 0 00-.154.685zm7.156.89v-2.73h.71v4.62h-.71v-.782h-.048a1.509 1.509 0 01-.505.598c-.229.163-.517.244-.866.244-.289 0-.546-.063-.77-.19a1.33 1.33 0 01-.53-.577c-.128-.259-.192-.585-.192-.978v-2.935h.71v2.887c0 .337.094.606.282.806.191.2.434.301.728.301.177 0 .356-.045.539-.135.184-.09.339-.229.463-.415.126-.187.189-.424.189-.713zm3.947 1.986c-.445 0-.829-.098-1.152-.295a1.987 1.987 0 01-.743-.83c-.172-.357-.258-.772-.258-1.245 0-.473.086-.89.258-1.251a2.05 2.05 0 01.728-.849 1.957 1.957 0 011.095-.306c.241 0 .478.04.713.12.235.08.448.21.641.39.192.18.346.416.46.71.114.296.171.659.171 1.09v.3h-3.561v-.613h2.839c0-.26-.052-.493-.156-.698a1.18 1.18 0 00-1.107-.662c-.283 0-.527.07-.734.21a1.386 1.386 0 00-.472.542c-.11.223-.165.461-.165.716v.41c0 .348.06.644.18.886.122.241.292.425.508.55.217.125.469.187.755.187.187 0 .355-.026.506-.078a1.09 1.09 0 00.394-.24c.11-.109.195-.243.255-.404l.686.193a1.512 1.512 0 01-.364.614c-.17.174-.381.31-.631.409a2.349 2.349 0 01-.846.144z"
         fill="#000"
       />
+
+      {/* Left email body copy */}
+      <foreignObject x={24} y={118} width={327} height={410}>
+        <div
+          {...({
+            xmlns: "http://www.w3.org/1999/xhtml",
+          } as unknown as React.HTMLAttributes<HTMLDivElement>)}
+          style={{
+            fontFamily: "Inter, sans-serif",
+            fontSize: 12,
+            lineHeight: "14px",
+            color: "#000",
+            whiteSpace: "pre-wrap",
+            overflow: "hidden",
+            pointerEvents: "none",
+          }}
+        >
+          {typedLeft}
+        </div>
+      </foreignObject>
+
+      {/* Right email body copy */}
+      <foreignObject x={434} y={118} width={327} height={410}>
+        <div
+          {...({
+            xmlns: "http://www.w3.org/1999/xhtml",
+          } as unknown as React.HTMLAttributes<HTMLDivElement>)}
+          style={{
+            fontFamily: "Inter, sans-serif",
+            fontSize: 12,
+            lineHeight: "14px",
+            color: "#000",
+            whiteSpace: "pre-wrap",
+            overflow: "hidden",
+            pointerEvents: "none",
+          }}
+        >
+          {typedRight}
+        </div>
+      </foreignObject>
     </svg>
   )
 }
