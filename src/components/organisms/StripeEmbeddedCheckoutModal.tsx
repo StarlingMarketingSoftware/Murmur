@@ -2,6 +2,7 @@
 
 import { loadStripe, StripeEmbeddedCheckout } from '@stripe/stripe-js';
 import { useEffect, useRef, useState } from 'react';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface StripeEmbeddedCheckoutModalProps {
 	open: boolean;
@@ -78,22 +79,22 @@ export function StripeEmbeddedCheckoutModal({
 
 	return (
 		<div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/20 p-2 sm:p-4">
-			<div className="flex w-full max-w-[1040px] max-h-[92dvh] overflow-hidden rounded-[8px] border-[3px] border-black bg-white shadow-lg">
-				<div className="flex w-full flex-col">
-					<div className="flex items-center justify-between border-b-[3px] border-black bg-white px-4 py-2">
-						<div className="text-sm font-semibold">{title}</div>
-						{onClose && (
-							<button
-								type="button"
-								onClick={onClose}
-								className="text-sm font-semibold underline underline-offset-4"
-							>
-								Close
-							</button>
-						)}
-					</div>
+			<div className="w-full max-w-[1100px] max-h-[92dvh] overflow-hidden rounded-[8px] border-[3px] border-black bg-white shadow-lg">
+				<div className="flex items-center justify-between border-b-[3px] border-black bg-white px-4 py-2">
+					<div className="text-sm font-semibold">{title}</div>
+					{onClose && (
+						<button
+							type="button"
+							onClick={onClose}
+							className="text-sm font-semibold underline underline-offset-4"
+						>
+							Close
+						</button>
+					)}
+				</div>
 
-					<div className="flex-1 overflow-auto p-3 sm:p-4 min-h-[220px] sm:min-h-[280px]">
+				<ScrollArea className="w-full h-[calc(92dvh-50px)] min-h-[220px] sm:min-h-[280px] [&_[data-slot='scroll-area-scrollbar']]:-translate-x-[2px]">
+					<div className="p-3 sm:p-4 md:p-6">
 						{error ? (
 							<div className="text-sm text-red-600">{error}</div>
 						) : stripeError ? (
@@ -103,10 +104,13 @@ export function StripeEmbeddedCheckoutModal({
 								{loadingText}
 							</div>
 						) : (
-							<div id={containerIdRef.current} />
+							<div
+								id={containerIdRef.current}
+								className="w-full [&>iframe]:!w-full"
+							/>
 						)}
 					</div>
-				</div>
+				</ScrollArea>
 			</div>
 		</div>
 	);
