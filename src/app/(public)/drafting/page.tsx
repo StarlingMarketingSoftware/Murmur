@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { urls } from '@/constants/urls';
 import DraftingDemo from '@/components/atoms/_svg/DraftingDemo';
 import ProfileDemo from '@/components/atoms/_svg/ProfileDemo';
+import ModesDemo from '@/components/atoms/_svg/ModesDemo';
 
 export default function DraftingPage() {
   React.useEffect(() => {
@@ -81,10 +82,18 @@ export default function DraftingPage() {
         >
           <p 
             className="font-inter font-bold text-[24px] text-black"
-            style={{ position: 'absolute', top: 70, left: 58 }}
+            style={{ position: 'absolute', top: 50, left: 58 }}
           >
             Drafting Modes:
           </p>
+          <ModesDemo 
+            style={{
+              position: 'absolute',
+              top: 142,
+              left: '50%',
+              transform: 'translateX(-50%)'
+            }}
+          />
           <div
             style={{
               width: 1326,
