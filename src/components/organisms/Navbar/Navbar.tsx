@@ -4,15 +4,39 @@ import { urls } from '@/constants/urls';
 import { useMe } from '@/hooks/useMe';
 import Link from 'next/link';
 import { cn } from '@/utils';
-import { useState, useEffect } from 'react';
-import { usePathname } from 'next/navigation';
+import { useState, useEffect, useRef } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
+import { StripeSubscriptionStatus } from '@/types';
 
 export const Navbar = () => {
 	const { user } = useMe();
 	const { isSignedIn } = useAuth();
 	const pathname = usePathname();
+	const router = useRouter();
 	const [isMobileMenuOpen, setMobileMenuOpen] = useState(false);
 	const [scrolled, setScrolled] = useState(false);
+	const prevIsSignedInRef = useRef(isSignedIn);
+
+	const hasActiveSubscription =
+		user?.stripeSubscriptionStatus === StripeSubscriptionStatus.ACTIVE ||
+		user?.stripeSubscriptionStatus === StripeSubscriptionStatus.TRIALING;
+	const canAccessApp = hasActiveSubscription || user?.role === 'admin';
+
+	// If a signed-in user has an active subscription, keep them out of the landing page.
+	// Also, if they just signed in (modal), send them to the dashboard immediately.
+	useEffect(() => {
+		const wasSignedIn = prevIsSignedInRef.current;
+		prevIsSignedInRef.current = isSignedIn;
+
+		if (!isSignedIn) return;
+		if (!canAccessApp) return;
+
+		const justSignedIn = !wasSignedIn && isSignedIn;
+		const isLanding = pathname === urls.home.index;
+		if (!justSignedIn && !isLanding) return;
+
+		router.replace(urls.murmur.dashboard.index);
+	}, [canAccessApp, isSignedIn, pathname, router]);
 
 	useEffect(() => {
 		const HERO_SECTION_ID = 'landing-hero';
