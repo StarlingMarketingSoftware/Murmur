@@ -52,7 +52,14 @@ export default function DraftingPage() {
               left: 24,
               top: 20
             }}
-          />
+          >
+            <p className="font-inter font-bold text-[24px] text-black pt-6 pl-6">
+              Tell your story:
+            </p>
+            <p className="font-inter text-[23px] text-black pl-6 pr-6 mt-[24px] leading-[56px] tracking-wide [word-spacing:5px]">
+              When you add basic information to your profile, it gives context to the drafting. This creates much better results that incorporate your real bio, links, booking date range, and any custom instructions.
+            </p>
+          </div>
         </div>
       </div>
       <div className="flex justify-center mt-[146px]">
@@ -64,6 +71,12 @@ export default function DraftingPage() {
             position: 'relative'
           }} 
         >
+          <p 
+            className="font-inter font-bold text-[24px] text-black"
+            style={{ position: 'absolute', top: 70, left: 58 }}
+          >
+            Drafting Modes:
+          </p>
           <div
             style={{
               width: 1326,
@@ -73,9 +86,17 @@ export default function DraftingPage() {
               position: 'absolute',
               bottom: 33,
               left: '50%',
-              transform: 'translateX(-50%)'
+              transform: 'translateX(-50%)',
+              paddingLeft: 56,
+              paddingRight: 56,
+              display: 'flex',
+              alignItems: 'center'
             }}
-          />
+          >
+            <p className="font-inter text-[23px] text-black leading-[56px] tracking-wide [word-spacing:5px]">
+              Murmur has three distinct drafting modes: Auto, Manual, and Hybrid. Auto drafts based on the full range of information it has provided, such as the user profile, the contact research, contact location, and booking date range. In contrast to this, manual mode is a complete text editor with full customization. Then for edge cases, there's hybrid.
+            </p>
+          </div>
         </div>
       </div>
       <div className="flex justify-center mt-[181px]">
