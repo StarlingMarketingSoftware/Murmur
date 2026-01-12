@@ -57,6 +57,14 @@ export async function POST(req: Request) {
 		if (!id || !email_addresses || email_addresses.length === 0) {
 			return apiBadRequest('Error: Missing required fields');
 		}
+
+		// If the user was already created locally (e.g. by an on-demand provisioning flow),
+		// don't attempt to recreate them (or create a duplicate Stripe customer).
+		const existingUser = await prisma.user.findUnique({ where: { clerkId: id } });
+		if (existingUser) {
+			return apiAccepted('Webhook received');
+		}
+
 		const email = evt.data.email_addresses[0].email_address;
 		const murmurEmail = generateMurmurEmail(first_name ?? null, last_name ?? null);
 		const stripeCustomer = await stripe.customers.create({

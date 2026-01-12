@@ -1,9 +1,10 @@
 'use client';
 import { useTheme } from 'next-themes';
 
-import { ClerkProvider } from '@clerk/nextjs';
+import { ClerkProvider, useAuth } from '@clerk/nextjs';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { FC, useEffect } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
 
 const queryClient = new QueryClient({
 	defaultOptions: {
@@ -30,6 +31,30 @@ const queryClient = new QueryClient({
 interface SubLayoutProps {
 	children: React.ReactNode;
 }
+
+function RedirectAfterSignIn({ children }: { children: React.ReactNode }) {
+	const { isSignedIn } = useAuth();
+	const router = useRouter();
+	const pathname = usePathname();
+
+	// If a page sets `redirectAfterSignIn` before kicking off an auth flow (e.g. OAuth),
+	// bring the user back there once they are signed in.
+	useEffect(() => {
+		if (!isSignedIn) return;
+		if (typeof window === 'undefined') return;
+
+		const redirectUrl = sessionStorage.getItem('redirectAfterSignIn');
+		if (!redirectUrl) return;
+
+		sessionStorage.removeItem('redirectAfterSignIn');
+		if (redirectUrl !== pathname) {
+			router.replace(redirectUrl);
+		}
+	}, [isSignedIn, pathname, router]);
+
+	return <>{children}</>;
+}
+
 const SubLayout: FC<SubLayoutProps> = ({ children }) => {
 	const { setTheme } = useTheme();
 
@@ -39,7 +64,9 @@ const SubLayout: FC<SubLayoutProps> = ({ children }) => {
 
 	return (
 		<ClerkProvider>
-			<QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+			<RedirectAfterSignIn>
+				<QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+			</RedirectAfterSignIn>
 		</ClerkProvider>
 	);
 };

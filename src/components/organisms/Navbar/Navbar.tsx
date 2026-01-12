@@ -75,6 +75,9 @@ export const Navbar = () => {
 
 	const isLanding = pathname === urls.home.index;
 	const isOverLandingHero = isLanding && !scrolled;
+	const isFreeTrial =
+		pathname === urls.freeTrial.index || pathname.startsWith(`${urls.freeTrial.index}/`);
+	const isTransparentHeader = isOverLandingHero || isFreeTrial;
 
 	return (
 		<>
@@ -83,8 +86,8 @@ export const Navbar = () => {
 				className={cn(
 					'fixed top-0 left-0 right-0 z-50 font-secondary',
 					// Keep a smooth fade-in when leaving the hero, but snap to transparent when re-entering it.
-					isOverLandingHero ? 'transition-none' : 'transition-colors duration-700',
-					isOverLandingHero
+					isTransparentHeader ? 'transition-none' : 'transition-colors duration-700',
+					isTransparentHeader
 						? 'bg-transparent'
 						: scrolled
 							? 'bg-background/70 backdrop-blur-xl border-b border-gray-200/20'
@@ -92,7 +95,12 @@ export const Navbar = () => {
 				)}
 			>
 				<div className="w-full">
-					<div className="flex items-center justify-between h-12 px-5 sm:px-6 lg:px-12">
+					<div
+						className={cn(
+							'flex items-center justify-between h-12 px-5 sm:px-6 lg:px-12',
+							isFreeTrial && 'pt-[4px]'
+						)}
+					>
 						{/* Left Section - UserButton on mobile, empty on desktop */}
 						<div className="lg:hidden flex items-center">
 							{isSignedIn ? (
@@ -120,14 +128,14 @@ export const Navbar = () => {
 										className={cn(
 											'relative text-[13px] font-medium tracking-[0.02em] transition-all duration-300',
 											pathname === item.path
-												? isOverLandingHero
+												? isTransparentHeader
 													? 'text-white drop-shadow-[0_1px_1px_rgba(0,0,0,0.55)]'
 													: 'text-gray-900'
-												: isOverLandingHero
+												: isTransparentHeader
 													? 'text-white/70 hover:text-white drop-shadow-[0_1px_1px_rgba(0,0,0,0.55)]'
 													: 'text-gray-700/70 hover:text-gray-900',
 											'after:absolute after:bottom-[-8px] after:left-0 after:right-0 after:h-[1px]',
-											isOverLandingHero ? 'after:bg-white' : 'after:bg-gray-900',
+											isTransparentHeader ? 'after:bg-white' : 'after:bg-gray-900',
 											pathname === item.path
 												? 'after:scale-x-100'
 												: 'after:scale-x-0 hover:after:scale-x-100',
@@ -153,7 +161,7 @@ export const Navbar = () => {
 								<span
 									className={cn(
 										'absolute block h-[1.5px] w-[18px] transition-all duration-300',
-										isOverLandingHero ? 'bg-white/90' : 'bg-gray-700',
+										isTransparentHeader ? 'bg-white/90' : 'bg-gray-700',
 										isMobileMenuOpen
 											? 'top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rotate-45'
 											: 'top-[11px] left-1/2 -translate-x-1/2'
@@ -162,7 +170,7 @@ export const Navbar = () => {
 								<span
 									className={cn(
 										'absolute block h-[1.5px] w-[18px] transition-all duration-300',
-										isOverLandingHero ? 'bg-white/90' : 'bg-gray-700',
+										isTransparentHeader ? 'bg-white/90' : 'bg-gray-700',
 										isMobileMenuOpen
 											? 'top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 -rotate-45'
 											: 'bottom-[10px] left-1/2 -translate-x-1/2'
@@ -178,12 +186,13 @@ export const Navbar = () => {
 											elements: {
 												avatarBox: cn(
 													'w-7 h-7 ring-1',
-													isOverLandingHero ? 'ring-white/25' : 'ring-black/10'
+													isTransparentHeader ? 'ring-white/25' : 'ring-black/10'
 												),
 												userButtonTrigger:
 													cn(
 														'opacity-80 hover:opacity-100 transition-opacity duration-500',
-														isOverLandingHero && 'drop-shadow-[0_1px_1px_rgba(0,0,0,0.55)]'
+														isTransparentHeader &&
+															'drop-shadow-[0_1px_1px_rgba(0,0,0,0.55)]'
 													),
 											},
 										}}
@@ -196,7 +205,7 @@ export const Navbar = () => {
 													'relative px-4 text-[12px] font-medium tracking-[0.02em] transition-all duration-300',
 													'after:absolute after:bottom-[-8px] after:left-4 after:right-4 after:h-[1px]',
 													'after:scale-x-0 hover:after:scale-x-100 after:transition-transform after:duration-300 after:origin-center',
-													isOverLandingHero
+													isTransparentHeader
 														? 'text-white/80 hover:text-white drop-shadow-[0_1px_1px_rgba(0,0,0,0.55)] after:bg-white'
 														: 'text-gray-700/70 hover:text-gray-900 after:bg-gray-900'
 												)}
@@ -207,7 +216,7 @@ export const Navbar = () => {
 										<div
 											className={cn(
 												'w-[1px] h-4 mx-3',
-												isOverLandingHero ? 'bg-white/30' : 'bg-gray-300/50'
+												isTransparentHeader ? 'bg-white/30' : 'bg-gray-300/50'
 											)}
 										/>
 										<SignUpButton mode="modal">
@@ -216,7 +225,7 @@ export const Navbar = () => {
 													'relative px-4 text-[12px] font-medium tracking-[0.02em] transition-all duration-300',
 													'after:absolute after:bottom-[-8px] after:left-4 after:right-4 after:h-[1px]',
 													'after:scale-x-0 hover:after:scale-x-100 after:transition-transform after:duration-300 after:origin-center',
-													isOverLandingHero
+													isTransparentHeader
 														? 'text-white/80 hover:text-white drop-shadow-[0_1px_1px_rgba(0,0,0,0.55)] after:bg-white'
 														: 'text-gray-700/70 hover:text-gray-900 after:bg-gray-900'
 												)}
@@ -326,7 +335,7 @@ export const Navbar = () => {
 			</div>
 
 			{/* Spacer */}
-			{!isLanding && <div className="h-12" />}
+			{!(isLanding || isFreeTrial) && <div className="h-12" />}
 		</>
 	);
 };
