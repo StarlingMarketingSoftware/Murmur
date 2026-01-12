@@ -5,7 +5,6 @@ import {
 	apiBadRequest,
 	apiNotFound,
 	apiResponse,
-	apiServerError,
 	apiUnauthorized,
 	handleApiError,
 } from '@/app/api/_utils';
@@ -13,6 +12,7 @@ import { z } from 'zod';
 import { getUser } from '../../_utils';
 import { urls } from '@/constants/urls';
 import { BASE_URL } from '@/constants';
+import prisma from '@/lib/prisma';
 
 const stripeCheckoutRequestSchema = z.object({
 	priceId: z.string().min(1),
@@ -45,8 +45,25 @@ export async function POST(req: Request) {
 		if (!user) {
 			return apiNotFound('User not found');
 		}
-		if (!user.stripeCustomerId) {
-			return apiServerError('User does not have a Stripe customer ID');
+
+		let stripeCustomerId = user.stripeCustomerId;
+
+		// Create a Stripe customer if one doesn't exist
+		if (!stripeCustomerId) {
+			const customer = await stripe.customers.create({
+				email: user.email,
+				name: `${user.firstName} ${user.lastName}`.trim() || undefined,
+				metadata: {
+					clerkId: user.clerkId,
+				},
+			});
+			stripeCustomerId = customer.id;
+
+			// Update the user with the new Stripe customer ID
+			await prisma.user.update({
+				where: { id: user.id },
+				data: { stripeCustomerId: customer.id },
+			});
 		}
 
 		const payment_method_types = ['card'];
@@ -59,7 +76,7 @@ export async function POST(req: Request) {
 			await stripe.checkout.sessions.create({
 				payment_method_types:
 					payment_method_types as Stripe.Checkout.SessionCreateParams.PaymentMethodType[],
-				customer: user.stripeCustomerId,
+				customer: stripeCustomerId,
 				line_items: [
 					{
 						price: priceId,
