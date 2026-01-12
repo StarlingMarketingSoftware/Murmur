@@ -56,7 +56,6 @@ import { useGetCampaign, useGetCampaigns } from '@/hooks/queryHooks/useCampaigns
 import { useEditUserContactList } from '@/hooks/queryHooks/useUserContactLists';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { useCreateCheckoutSession } from '@/hooks/queryHooks/useStripeCheckouts';
 
 const DEFAULT_STATE_SUGGESTIONS = [
 	{
@@ -1400,28 +1399,10 @@ const DashboardContent = () => {
 		isFromHomeDemoMode,
 	} = useDashboard({ derivedTitle: derivedContactTitle, forceApplyDerivedTitle: shouldForceApplyDerivedTitle, fromHome: fromHomeParam });
 
-	// Free trial checkout for fromHome demo mode
-	const { mutateAsync: createCheckoutSession, isPending: isPendingCheckout } = useCreateCheckoutSession();
-	const handleStartFreeTrial = useCallback(async () => {
-		const proPriceId = process.env.NEXT_PUBLIC_STANDARD_MONTHLY_PRICE_ID;
-		if (!proPriceId) {
-			toast.error('Stripe price ID not found. Please contact support.');
-			return;
-		}
-		try {
-			const res = await createCheckoutSession({
-				priceId: proPriceId,
-				freeTrial: true,
-			});
-			if (res.url) {
-				window.location.href = res.url;
-			} else {
-				toast.error('No checkout URL returned');
-			}
-		} catch (error) {
-			toast.error('Failed to start checkout. Please try again.');
-		}
-	}, [createCheckoutSession]);
+	// Free trial CTA for fromHome demo mode
+	const handleStartFreeTrial = useCallback(() => {
+		router.push(urls.freeTrial.index);
+	}, [router]);
 
 	const DASHBOARD_MAP_COMPACT_CLASS = 'murmur-dashboard-map-compact';
 
@@ -1675,6 +1656,22 @@ const DashboardContent = () => {
 
 		return () => clearTimeout(timer);
 	}, [fromHomeParam, isFromHomeDemoMode, isSignedIn]);
+
+	const isFreeTrialPromptVisible =
+		fromHomeParam && isFromHomeDemoMode && isSignedIn === true && showFreeTrialPrompt;
+
+	// When the free-trial prompt is open, "pause" the page by preventing scroll/interaction behind it.
+	useEffect(() => {
+		if (!isFreeTrialPromptVisible) return;
+		if (typeof document === 'undefined') return;
+
+		const previousOverflow = document.body.style.overflow;
+		document.body.style.overflow = 'hidden';
+
+		return () => {
+			document.body.style.overflow = previousOverflow;
+		};
+	}, [isFreeTrialPromptVisible]);
 
 	// If we're in "from home" mode (from landing page), auto-trigger the pre-configured search
 	// once the user signs in. This shows the Wine, Beer, and Spirits in California results.
@@ -6422,15 +6419,16 @@ const DashboardContent = () => {
 					createPortal(
 						<div
 							className="fixed inset-0 z-[10000] flex items-center justify-center"
-							style={{
-								backdropFilter: 'blur(2px)',
-							}}
 						>
 							<SignUp
 								appearance={{
 									elements: {
 										rootBox: 'w-full max-w-[420px] mx-4',
-										card: 'shadow-2xl rounded-[16px]',
+										cardBox: { boxShadow: 'none' },
+										card: {
+											boxShadow: 'none',
+											borderRadius: '16px',
+										},
 										formButtonPrimary:
 											'bg-black hover:bg-gray-800 text-sm normal-case',
 										socialButtonsBlockButton:
@@ -6453,35 +6451,28 @@ const DashboardContent = () => {
 					)}
 
 				{/* Free trial prompt for "from home" mode when user is authenticated but has no subscription (after 15s) */}
-				{fromHomeParam &&
-					isFromHomeDemoMode &&
-					isSignedIn === true &&
-					showFreeTrialPrompt &&
+				{isFreeTrialPromptVisible &&
 					typeof window !== 'undefined' &&
 					createPortal(
 						<div
-							className="fixed inset-0 z-[10000] flex items-center justify-center pointer-events-none"
-							style={{
-								backdropFilter: 'blur(1px)',
-							}}
+							className="fixed inset-0 z-[10000] flex items-center justify-center"
 						>
 							<div
 								className="flex flex-col items-center rounded-[16px] pointer-events-auto py-8 px-8"
 								style={{
 									backgroundColor: '#6FCF84',
-									border: '2px solid #000000',
+									border: '3px solid #000000',
 								}}
 							>
 								<button
 									type="button"
 									onClick={handleStartFreeTrial}
-									disabled={isPendingCheckout}
 									className="font-semibold text-white rounded-[8px] cursor-pointer hover:opacity-90 transition-opacity disabled:opacity-70 disabled:cursor-not-allowed"
 									style={{
 										width: '475px',
 										height: '56px',
 										backgroundColor: '#1D942E',
-										border: '2px solid #000000',
+										border: '3px solid #000000',
 									}}
 								>
 									Start Your Free Trial
