@@ -6,6 +6,7 @@ import { urls } from '@/constants/urls';
 import DraftingDemo from '@/components/atoms/_svg/DraftingDemo';
 import ProfileDemo from '@/components/atoms/_svg/ProfileDemo';
 import ModesDemo from '@/components/atoms/_svg/ModesDemo';
+import DraftPreviewDemo from '@/components/atoms/_svg/DraftPreviewDemo';
 
 export default function DraftingPage() {
   React.useEffect(() => {
@@ -131,6 +132,13 @@ export default function DraftingPage() {
           >
             Built-in Variation:
           </p>
+          <DraftPreviewDemo 
+            style={{
+              position: 'absolute',
+              top: 36,
+              right: 15
+            }}
+          />
           <div
             style={{
               width: 476,
