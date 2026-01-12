@@ -4,6 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import { urls } from '@/constants/urls';
 import DraftingDemo from '@/components/atoms/_svg/DraftingDemo';
+import ProfileDemo from '@/components/atoms/_svg/ProfileDemo';
 
 export default function DraftingPage() {
   React.useEffect(() => {
@@ -60,6 +61,13 @@ export default function DraftingPage() {
               When you add basic information to your profile, it gives context to the drafting. This creates much better results that incorporate your real bio, links, booking date range, and any custom instructions.
             </p>
           </div>
+          <ProfileDemo 
+            style={{
+              position: 'absolute',
+              right: 142,
+              top: 17
+            }}
+          />
         </div>
       </div>
       <div className="flex justify-center mt-[146px]">
