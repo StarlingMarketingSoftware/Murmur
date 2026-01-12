@@ -859,7 +859,7 @@ export default function HomePage() {
 			{/* Start Free Trial Button Section */}
 			<div className="w-full bg-white flex flex-col items-center" style={{ paddingTop: '124px' }}>
 				<Link
-					href={urls.pricing.freeTrial.index}
+					href={urls.freeTrial.index}
 					className="flex items-center justify-center bg-transparent cursor-pointer text-center"
 					style={{
 						width: '707px',
@@ -1163,7 +1163,7 @@ export default function HomePage() {
 					Try Murmur Now
 				</p>
 				<Link
-					href={urls.pricing.freeTrial.index}
+					href={urls.freeTrial.index}
 					className="flex items-center justify-center cursor-pointer text-center text-white font-inter font-medium text-[14px]"
 					style={{
 						marginTop: '32px',
