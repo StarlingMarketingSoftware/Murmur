@@ -164,7 +164,7 @@ export default function DraftingPage() {
           Try Murmur Now
         </p>
         <Link
-          href={urls.pricing.freeTrial.index}
+          href={urls.freeTrial.index}
           className="flex items-center justify-center cursor-pointer text-center text-white font-inter font-medium text-[14px]"
           style={{
             marginTop: '32px',
