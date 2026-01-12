@@ -1,8 +1,8 @@
 'use client';
 
 import React, { type FC, useCallback, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
-import { toast } from 'sonner';
 import { Form } from '@/components/ui/form';
 import { DEFAULT_FONT } from '@/constants/ui';
 import { DraftingTone } from '@/constants/prismaEnums';
@@ -21,6 +21,7 @@ const INITIAL_CUSTOM_INSTRUCTIONS =
 	'Help me write a short and concise booking pitch.\nWe play modern jazz with a bit of indie energy.\nKeep it warm, clear, and brief.';
 
 export const LandingDraftingDemo: FC = () => {
+	const router = useRouter();
 	const [identity, setIdentity] = useState<Identity>(() => ({
 		id: 0,
 		name: 'Parker Jazz Trio',
@@ -112,31 +113,9 @@ export const LandingDraftingDemo: FC = () => {
 	}, []);
 
 	const handleUpscalePrompt = useCallback(async () => {
-		const fullAutoPromptFieldName = getFullAutoPromptFieldName();
-		if (!fullAutoPromptFieldName) return;
-
-		const current = (form.getValues(fullAutoPromptFieldName as any) as string) || '';
-		setPreviousPromptValue(current);
 		setIsUpscalingPrompt(true);
-
-		// Tiny delay so the UI shows the "Upscaling..." state like the real flow.
-		await new Promise((r) => setTimeout(r, 650));
-
-		const upscaled = [
-			'Compose a professional booking pitch email.',
-			'Reference the venue naturally using the contact research.',
-			'Introduce my band using the profile details.',
-			'Include 1–2 concrete highlights (recent release, draw, notable shows).',
-			'Ask a single clear next-steps question about availability.',
-			'Keep it warm, concise, and human — no hype or templates.',
-		].join('\n');
-
-		form.setValue(fullAutoPromptFieldName as any, upscaled, { shouldDirty: true });
-		setPromptQualityScore(92);
-		setPromptQualityLabel('Excellent');
-		setPromptSuggestions(DEMO_SUGGESTIONS);
-		setIsUpscalingPrompt(false);
-	}, [form, getFullAutoPromptFieldName]);
+		router.push('/free-trial');
+	}, [router]);
 
 	const handleUndoUpscalePrompt = useCallback(() => {
 		const fullAutoPromptFieldName = getFullAutoPromptFieldName();
@@ -196,7 +175,7 @@ export const LandingDraftingDemo: FC = () => {
 							useStaticDropdownPosition
 							testMessage="Demo only"
 							handleGenerateTestDrafts={() => {
-								toast.message('Demo only — this landing preview does not generate drafts.');
+								router.push('/free-trial');
 							}}
 							isGenerationDisabled={() => false}
 							isPendingGeneration={false}
