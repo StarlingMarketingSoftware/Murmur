@@ -108,6 +108,12 @@ export default function DraftingPage() {
             position: 'relative'
           }} 
         >
+          <p 
+            className="font-inter font-bold text-[24px] text-black"
+            style={{ position: 'absolute', top: 40, left: 58 }}
+          >
+            Built-in Variation:
+          </p>
           <div
             style={{
               width: 476,
@@ -116,9 +122,16 @@ export default function DraftingPage() {
               borderRadius: 6,
               position: 'absolute',
               left: 37,
-              top: 99
+              top: 99,
+              paddingLeft: 36,
+              paddingRight: 36,
+              paddingTop: 28
             }}
-          />
+          >
+            <p className="font-inter text-[23px] text-black leading-[56px] tracking-wide [word-spacing:5px]">
+              When drafting in Auto mode, we've done extensive work to ensure that no two emails are identical, often drafting in fairly different structures. This allows you to embody a more unique voice for each contact you reach out to.
+            </p>
+          </div>
         </div>
       </div>
       <div className="h-[660px] flex flex-col items-center justify-center">
