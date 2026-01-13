@@ -1026,6 +1026,32 @@ export default function HomePage() {
 							height="100%"
 							className="block"
 						/>
+						{/* Overlay "Learn about the Map" button with anti-scaling logic */}
+						<Link
+							href="/map"
+							style={{
+								position: 'absolute',
+								// Matches SVG position x=38 y=638 plus container padding/border offset
+								left: '55px',
+								top: '652px',
+								width: '302px',
+								height: '51px',
+								backgroundColor: '#F1F1F1',
+								border: '2px solid #5DAB68',
+								borderRadius: '6px',
+								display: 'flex',
+								alignItems: 'center',
+								justifyContent: 'center',
+								cursor: 'pointer',
+								transformOrigin: 'top left',
+								// When map scales down, scale this button up (clamped) to remain readable
+								transform: 'scale(calc(max(1, 0.65 / var(--landing-map-scale, 1))))',
+							}}
+						>
+							<span className="font-inter font-normal text-[24px] text-[#5DAB68]">
+								Learn about the Map
+							</span>
+						</Link>
 					</div>
 				</div>
 

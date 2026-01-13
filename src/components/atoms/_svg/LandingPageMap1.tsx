@@ -1,6 +1,5 @@
 import * as React from "react"
 import { SVGProps } from "react"
-import Link from "next/link"
 const SvgComponent = (props: SVGProps<SVGSVGElement>) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
@@ -1928,8 +1927,8 @@ const SvgComponent = (props: SVGProps<SVGSVGElement>) => (
         thoroughly verified by musicians.
       </text>
     </g>
-    {/* Learn about the Map button */}
-    <Link href="/map">
+    {/* Learn about the Map button - MOVED TO HTML OVERLAY IN PAGE.TSX */}
+    {/* <Link href="/map">
       <g style={{ cursor: "pointer" }}>
         <rect
           x={38}
@@ -1954,7 +1953,7 @@ const SvgComponent = (props: SVGProps<SVGSVGElement>) => (
           Learn about the Map
         </text>
       </g>
-    </Link>
+    </Link> */}
   </svg>
 )
 export default SvgComponent
