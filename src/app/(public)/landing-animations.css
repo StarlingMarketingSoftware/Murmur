@@ -99,7 +99,6 @@ body {
 		animation: none;
 	}
 }
-
 /* Video carousel infinite scroll */
 .video-carousel-track {
 	display: flex;
@@ -131,3 +130,4 @@ body {
 		animation: none;
 	}
 }
+
