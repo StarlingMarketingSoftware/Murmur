@@ -10,15 +10,27 @@ import DraftPreviewDemo from '@/components/atoms/_svg/DraftPreviewDemo';
 
 export default function DraftingPage() {
   React.useEffect(() => {
-    const footer = document.querySelector('footer');
+    const footer = document.querySelector('footer') as HTMLElement | null;
+    const prevFooterDisplay = footer?.style.display ?? '';
+    const prevBodyZoom = document.body.style.getPropertyValue('zoom');
+
     if (footer) {
       footer.style.display = 'none';
     }
-    
+
+    // Make this route render at ~80% browser zoom.
+    document.body.style.setProperty('zoom', '0.8');
+
     return () => {
-      const footer = document.querySelector('footer');
+      const footer = document.querySelector('footer') as HTMLElement | null;
       if (footer) {
-        footer.style.display = '';
+        footer.style.display = prevFooterDisplay;
+      }
+
+      if (prevBodyZoom) {
+        document.body.style.setProperty('zoom', prevBodyZoom);
+      } else {
+        document.body.style.removeProperty('zoom');
       }
     };
   }, []);

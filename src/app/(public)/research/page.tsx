@@ -13,12 +13,16 @@ export default function ResearchPage() {
     if (footer) {
       footer.style.display = 'none';
     }
+
+    document.documentElement.classList.add('murmur-research-compact');
     
     return () => {
       const footer = document.querySelector('footer');
       if (footer) {
         footer.style.display = '';
       }
+
+      document.documentElement.classList.remove('murmur-research-compact');
     };
   }, []);
 

@@ -98,6 +98,7 @@ export const Navbar = () => {
 	].filter((item) => !(user?.role !== 'admin' && item.path === '/admin'));
 
 	const isLanding = pathname === urls.home.index;
+	const isLandingNavbarZoom80 = isLanding || pathname === '/map' || pathname.startsWith('/map/');
 	const isOverLandingHero = isLanding && !scrolled;
 	const isFreeTrial =
 		pathname === urls.freeTrial.index || pathname.startsWith(`${urls.freeTrial.index}/`);
@@ -116,7 +117,7 @@ export const Navbar = () => {
 				className={cn(
 					'fixed top-0 z-50 font-secondary',
 					// Landing page: zoom the fixed navbar without drifting horizontally.
-					isLanding ? 'landing-navbar-zoom-80' : 'left-0 right-0',
+					isLandingNavbarZoom80 ? 'landing-navbar-zoom-80' : 'left-0 right-0',
 					// Keep a smooth fade-in when leaving the hero, but snap to transparent when re-entering it.
 					isTransparentHeader ? 'transition-none' : 'transition-colors duration-700',
 					isTransparentHeader
