@@ -94,8 +94,28 @@ body {
 	}
 }
 
+/* New subtle glow pulse for the entire search bar */
+.search-bar-glow-pulse {
+	animation: search-bar-glow-pulse 4.5s ease-in-out infinite;
+	will-change: opacity, box-shadow;
+}
+
+@keyframes search-bar-glow-pulse {
+	0%, 100% {
+		opacity: 0.2;
+		box-shadow: 0 0 12px 1px rgba(255, 255, 255, 0.2);
+	}
+	50% {
+		opacity: 0.5;
+		box-shadow: 0 0 22px 4px rgba(255, 255, 255, 0.45);
+	}
+}
+
 @media (prefers-reduced-motion: reduce) {
 	.landing-search-waltz-pulse {
+		animation: none;
+	}
+	.search-bar-glow-pulse {
 		animation: none;
 	}
 }
@@ -203,3 +223,87 @@ body {
 	}
 }
 
+/* ========================================
+   Landing Page - Responsive Scaling
+   ======================================== */
+
+/* Start Free Trial Button */
+.landing-free-trial-btn {
+	width: 707px;
+	height: 57px;
+	border: 4px solid #118521;
+	border-radius: 10px;
+	color: #238731;
+	font-size: 18px;
+	font-weight: 500;
+	text-align: center;
+}
+
+/* Scale button at 1582px and below, but clamp to minimum 50% */
+@media (max-width: 1582px) {
+	.landing-free-trial-btn {
+		/* Scale proportionally but never below 50% */
+		width: max(calc(707px * 0.5), calc(707px * ((100vw - 32px) / 1884px)));
+		height: max(calc(57px * 0.5), calc(57px * ((100vw - 32px) / 1884px)));
+		font-size: max(calc(18px * 0.5), calc(18px * ((100vw - 32px) / 1884px)));
+		border-width: max(calc(4px * 0.5), calc(4px * ((100vw - 32px) / 1884px)));
+		border-radius: max(calc(10px * 0.5), calc(10px * ((100vw - 32px) / 1884px)));
+	}
+}
+
+/* Wrapper controls the visible height in the document flow */
+.landing-map-wrapper {
+	margin-top: 125px;
+	width: 100%;
+	display: flex;
+	justify-content: center;
+	overflow: visible;
+	/* Full height at default */
+	height: 1073px;
+}
+
+/* The actual map container with border and background */
+.landing-map-container {
+	position: relative;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 1884px;
+	height: 1073px;
+	border: 3px solid #000000;
+	border-radius: 8px;
+	background-color: #AFD6EF;
+	padding: 16px;
+	overflow: hidden;
+	transform-origin: top center;
+	flex-shrink: 0;
+}
+
+/* At 1582px and below, scale proportionally */
+/* Scale factor at 1582px: (1582-32)/1884 = 0.823 */
+/* Scale factor at 1200px: (1200-32)/1884 = 0.620 */
+/* Scale factor at 900px: (900-32)/1884 = 0.461 */
+@media (max-width: 1582px) {
+	.landing-map-wrapper {
+		/* Height = 1073 * (100vw - 32px) / 1884 */
+		/* Simplified: 0.5695 * (100vw - 32px) */
+		height: calc(0.5695 * (100vw - 32px));
+	}
+	
+	.landing-map-container {
+		/* Scale = (100vw - 32px) / 1884px */
+		/* Using container query units or viewport-based scaling */
+		transform: scale(calc((100vw - 32px) / 1884px));
+	}
+}
+
+/* Minimum scale floor for very small screens */
+@media (max-width: 650px) {
+	.landing-map-wrapper {
+		height: calc(1073px * 0.33);
+	}
+	
+	.landing-map-container {
+		transform: scale(0.33);
+	}
+}

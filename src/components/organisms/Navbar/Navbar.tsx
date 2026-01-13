@@ -229,6 +229,19 @@ export const Navbar = () => {
 									/>
 								) : (
 									<div className="flex items-center">
+										<Link
+											href={urls.freeTrial.index}
+											className="mr-6 flex items-center justify-center text-white text-[12px] font-medium tracking-[0.02em] transition-all duration-300 hover:opacity-90"
+											style={{
+												width: '219px',
+												height: '33px',
+												backgroundColor: '#53B060',
+												border: '1px solid #118521',
+												borderRadius: '8px',
+											}}
+										>
+											Start Free Trial
+										</Link>
 										<SignInButton mode="modal">
 											<button
 												className={cn(

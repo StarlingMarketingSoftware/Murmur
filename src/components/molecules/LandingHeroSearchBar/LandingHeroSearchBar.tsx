@@ -808,7 +808,7 @@ export const LandingHeroSearchBar = ({
 	return (
 		<div
 			className="origin-center w-full"
-			style={{ transform: 'scale(clamp(0.7, calc(0.6 + (100vw / 4000px)), 0.9))' }}
+			style={{ transform: 'scale(clamp(0.84, calc(0.72 + (100vw / 3333px)), 1.08))' }}
 		>
 			<div className="search-bar-wrapper w-full max-w-[1132px] mx-auto px-4 max-[480px]:px-2 !z-[50]">
 				<div className="search-bar-inner">
@@ -821,6 +821,8 @@ export const LandingHeroSearchBar = ({
 						}}
 					>
 						<div className="search-input-group relative" ref={searchContainerRef}>
+							{/* Subtle glowing pulse behind the search bar */}
+							<div className="absolute inset-0 rounded-[8px] search-bar-glow-pulse -z-10" />
 							<div className="search-wave-container" style={{ transition: 'none' }}>
 								<Input
 									className="search-wave-input !focus-visible:ring-0 !focus-visible:ring-offset-0 !focus:ring-0 !focus:ring-offset-0 !ring-0 !outline-none !accent-transparent !h-[72px] max-[480px]:!h-[60px] !border-2 !border-black pr-[70px] max-[480px]:pr-[58px] md:pr-[80px]"

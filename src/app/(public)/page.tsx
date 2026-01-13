@@ -493,11 +493,15 @@ export default function HomePage() {
 	
 	const videoIds = [
 		'217455815bac246b922e15ebd83dacf6',
-		'5e867125be06a82c81c9bec4ed1f502a',
 		'de693044d2ee6f2968a5eb92d73cacaf',
+		'5e867125be06a82c81c9bec4ed1f502a',
 		'f5ec9f11f866731a70ebf8543d5ecf5a',
 		'f4e119c7abb95bb18c011311fe640f4e',
 	];
+
+	const carouselStartTimeByVideoId: Record<string, string> = {
+		'5e867125be06a82c81c9bec4ed1f502a': '0.5',
+	};
 
 	const carouselPosterTimeByVideoId: Record<string, string> = {
 		// 2nd video
@@ -898,7 +902,8 @@ export default function HomePage() {
 							{extendedVideos.map(({ videoId, originalIndex }, idx) => {
 								const isActive = idx === displayIndex;
 								// Start time offsets for specific videos (in seconds)
-								const startTime = originalIndex === 1 ? '&startTime=0.5' : '';
+								const startAt = carouselStartTimeByVideoId[videoId];
+								const startTime = startAt ? `&startTime=${startAt}` : '';
 								// Get poster thumbnail time (can be different from startTime)
 								const posterTime = carouselPosterTimeByVideoId[videoId] ?? '';
 								const posterUrl = posterTime
@@ -963,45 +968,84 @@ export default function HomePage() {
 			<div className="w-full bg-white flex flex-col items-center" style={{ paddingTop: '124px' }}>
 				<Link
 					href={urls.freeTrial.index}
-					className="flex items-center justify-center bg-transparent cursor-pointer text-center"
-					style={{
-						width: '707px',
-						height: '57px',
-						border: '4px solid #118521',
-						borderRadius: '10px',
-						color: '#238731',
-						fontSize: '18px',
-						fontWeight: 500,
-						textAlign: 'center',
-					}}
+					className="landing-free-trial-btn flex items-center justify-center bg-transparent cursor-pointer text-center"
 				>
 					Start Free Trial
 				</Link>
-				<div
-					className="relative flex items-center justify-center"
-					style={{
-						marginTop: '125px',
-						width: '1884px',
-						height: '1073px',
-						border: '3px solid #000000',
-						borderRadius: '8px',
-						backgroundColor: '#AFD6EF',
-						padding: '16px',
-						overflow: 'hidden',
-					}}
-				>
-					<LandingPageMap1
-						// Crop out extra SVG padding so the framed map box sits centered/snug.
-						viewBox="0 0 1858 1044"
-						preserveAspectRatio="xMidYMid meet"
-						width="100%"
-						height="100%"
-						className="block"
-					/>
+				<div className="landing-map-wrapper">
+					<div className="landing-map-container">
+						<LandingPageMap1
+							// Crop out extra SVG padding so the framed map box sits centered/snug.
+							viewBox="0 0 1858 1044"
+							preserveAspectRatio="xMidYMid meet"
+							width="100%"
+							height="100%"
+							className="block"
+						/>
+					</div>
 				</div>
 
 				{/* Block below map */}
+				{/* Narrow layout: stack text on top, demo below */}
+				<div className="2xl:hidden w-full px-4" style={{ marginTop: '145px' }}>
+					<div className="mx-auto w-full max-w-[904px] bg-[#FAFAFA]">
+						{/* Text */}
+						<div className="bg-[#EFEFEF] rounded-[8px] px-6 py-8">
+							<p className="font-inter font-normal text-[clamp(40px,7vw,56px)] text-black leading-tight">
+								We Did The Research
+							</p>
+							<p className="font-inter font-normal text-[18px] xs:text-[20px] text-black mt-4">
+								Take a look through every contact, and you&apos;ll get to see information on what styles they
+								book, their live music schedules, and even how to actually find the right person.
+							</p>
+							<Link
+								href="/research"
+								className="mt-6 inline-flex h-[46px] px-5 items-center justify-center border-2 border-[#5DAB68] rounded-[6px] bg-transparent"
+							>
+								<span className="font-inter font-normal text-[18px] xs:text-[20px] text-[#5DAB68]">
+									Learn about research
+								</span>
+							</Link>
+						</div>
+
+						{/* Demo */}
+						<div className="mt-6 bg-[#F1F1F1] rounded-[8px] px-6 pt-8 pb-10 overflow-hidden">
+							<div className="w-full overflow-x-auto">
+								<div className="w-max mx-auto flex gap-6 pr-2">
+									<div className="mt-[76px]">
+										<ContactsExpandedList
+											contacts={sampleContacts}
+											width={326}
+											height={513}
+											minRows={9}
+											onContactHover={(contact) => {
+												if (contact) {
+													setHoveredContact(contact);
+												}
+											}}
+										/>
+									</div>
+									<ContactResearchPanel
+										contact={hoveredContact}
+										width={359}
+										boxWidth={344}
+										height={635}
+										fixedHeightBoxSpacingPx={60}
+										fixedHeightBulletOuterHeightPx={52}
+										fixedHeightBulletInnerHeightPx={44}
+										expandSummaryToFillHeight
+										disableExpansion
+										className="!block"
+									/>
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+
+				{/* Wide layout: original design */}
 				<div
+					className="hidden 2xl:block"
 					style={{
 						marginTop: '145px',
 						width: '1866px',
@@ -1113,7 +1157,52 @@ export default function HomePage() {
 				</div>
 
 				{/* Second block below map */}
+				{/* Narrow layout: stack text on top, demo below */}
+				<div className="2xl:hidden w-full px-4" style={{ marginTop: '82px' }}>
+					<div className="mx-auto w-full max-w-[904px] bg-[#FAFAFA]">
+						{/* Text */}
+						<div className="bg-[#EFEFEF] rounded-[8px] px-6 py-8">
+							<p className="font-inter font-normal text-[clamp(40px,7vw,56px)] text-black leading-tight">
+								Every Reply
+							</p>
+							<p className="font-inter font-normal text-[18px] xs:text-[20px] text-black mt-4">
+								Never miss a reply! Get full context on each response, including what campaign it came from,
+								all in one place.
+							</p>
+							<Link
+								href="/inbox"
+								className="mt-6 inline-flex h-[46px] px-5 items-center justify-center border-2 border-[#5DAB68] rounded-[6px] bg-transparent"
+							>
+								<span className="font-inter font-normal text-[18px] xs:text-[20px] text-[#5DAB68]">
+									Learn about Inbox
+								</span>
+							</Link>
+						</div>
+
+						{/* Demo */}
+						<div className="mt-6 bg-[#F1F1F1] rounded-[8px] px-4 xs:px-6 pt-6 xs:pt-8 pb-8 xs:pb-10 overflow-hidden">
+							<div className="w-full overflow-x-auto">
+								<div className="w-max mx-auto">
+									<InboxSection
+										noOuterPadding
+										desktopWidth={856}
+										desktopHeight={535}
+										allowedSenderEmails={Object.keys(sampleContactsByEmail)}
+										contactByEmail={sampleContactsByEmail}
+										sampleData={{
+											inboundEmails: sampleInboundEmails,
+											sentEmails: sampleSentEmails,
+										}}
+									/>
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+
+				{/* Wide layout: original design */}
 				<div
+					className="hidden 2xl:block"
 					style={{
 						marginTop: '82px',
 						width: '1866px',
@@ -1166,7 +1255,8 @@ export default function HomePage() {
 							Every Reply
 						</p>
 						<p className="font-inter font-normal text-[25px] text-black mt-10">
-							Never miss a reply! Get full context on each response, including what campaign it came from, all in one place.
+							Never miss a reply! Get full context on each response, including what campaign it came from,
+							all in one place.
 						</p>
 						{/* Learn about Inbox button */}
 						<Link href="/inbox">
@@ -1183,10 +1273,12 @@ export default function HomePage() {
 									display: 'flex',
 									alignItems: 'center',
 									justifyContent: 'center',
-									cursor: 'pointer'
+									cursor: 'pointer',
 								}}
 							>
-								<span className="font-inter font-normal text-[25px] text-[#5DAB68]">Learn about Inbox</span>
+								<span className="font-inter font-normal text-[25px] text-[#5DAB68]">
+									Learn about Inbox
+								</span>
 							</div>
 						</Link>
 					</div>
@@ -1261,7 +1353,7 @@ export default function HomePage() {
 			</div>
 
 			{/* Try Murmur Now CTA Section */}
-			<div className="w-full bg-white flex flex-col items-center pt-40 pb-24">
+			<div className="w-full bg-white flex flex-col items-center justify-center h-[747px]">
 				<p className="font-inter font-normal text-[62px] text-black text-center">
 					Try Murmur Now
 				</p>
