@@ -114,7 +114,9 @@ export const Navbar = () => {
 			{/* Main Navigation Bar - Artistic Glass */}
 			<nav
 				className={cn(
-					'fixed top-0 left-0 right-0 z-50 font-secondary',
+					'fixed top-0 z-50 font-secondary',
+					// Landing page: zoom the fixed navbar without drifting horizontally.
+					isLanding ? 'landing-navbar-zoom-80' : 'left-0 right-0',
 					// Keep a smooth fade-in when leaving the hero, but snap to transparent when re-entering it.
 					isTransparentHeader ? 'transition-none' : 'transition-colors duration-700',
 					isTransparentHeader
@@ -127,12 +129,12 @@ export const Navbar = () => {
 				<div className="w-full">
 					<div
 						className={cn(
-							'flex items-center justify-between h-12 px-5 sm:px-6 lg:px-12',
+							'flex items-center justify-between h-12 px-5 sm:px-6 min-[1145px]:px-12',
 							isFreeTrial && 'pt-[4px]'
 						)}
 					>
 						{/* Left Section - UserButton on mobile, empty on desktop */}
-						<div className="lg:hidden flex items-center">
+						<div className="min-[1145px]:hidden flex items-center">
 							{isSignedIn ? (
 								<UserButton
 									appearance={{
@@ -147,9 +149,9 @@ export const Navbar = () => {
 								<div className="w-7 h-7" /> /* Empty spacer */
 							)}
 						</div>
-						<div className="hidden lg:block w-7 h-7" /> {/* Spacer for desktop */}
+						<div className="hidden min-[1145px]:block w-7 h-7" /> {/* Spacer for desktop */}
 						{/* Desktop Navigation */}
-						<div className="absolute inset-0 hidden lg:flex items-center justify-center pointer-events-none">
+						<div className="absolute inset-0 hidden min-[1145px]:flex items-center justify-center pointer-events-none">
 							<nav className="pointer-events-auto flex items-center gap-14">
 								{navItems.map((item) => (
 									<Link
@@ -183,7 +185,7 @@ export const Navbar = () => {
 							<button
 								onClick={() => setMobileMenuOpen(!isMobileMenuOpen)}
 								className={cn(
-									'lg:hidden relative w-7 h-7 flex items-center justify-center',
+									'min-[1145px]:hidden relative w-7 h-7 flex items-center justify-center',
 									'transition-all duration-300'
 								)}
 								aria-label="Toggle menu"
@@ -209,7 +211,7 @@ export const Navbar = () => {
 							</button>
 
 							{/* Desktop - Show auth buttons */}
-							<div className="hidden lg:flex items-center">
+							<div className="hidden min-[1145px]:flex items-center">
 								{isSignedIn ? (
 									<UserButton
 										appearance={{
@@ -287,7 +289,7 @@ export const Navbar = () => {
 			{/* Mobile Menu Overlay */}
 			<div
 				className={cn(
-					'fixed inset-0 z-40 lg:hidden',
+					'fixed inset-0 z-40 min-[1145px]:hidden',
 					isMobileMenuOpen ? 'pointer-events-auto' : 'pointer-events-none'
 				)}
 			>

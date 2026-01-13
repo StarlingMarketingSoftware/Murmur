@@ -12,6 +12,7 @@ import { ContactWithName } from '@/types/contact';
 import InboxSection from '@/components/molecules/InboxSection/InboxSection';
 import type { InboundEmailWithRelations } from '@/types';
 import { LandingDraftingDemo } from '@/components/molecules/LandingDraftingDemo/LandingDraftingDemo';
+import { ScaledToFit } from '@/components/atoms/ScaledToFit';
 
 // Sample contacts for landing page demo (company-only, no names)
 const sampleContacts: ContactWithName[] = [
@@ -484,6 +485,7 @@ export default function HomePage() {
 	const heroRef = useRef<HTMLDivElement>(null);
 	const heroVideoRef = useRef<any>(null);
 	const videoCarouselContainerRef = useRef<HTMLDivElement>(null);
+	const landingMapWrapperRef = useRef<HTMLDivElement>(null);
 	const [currentVideoIndex, setCurrentVideoIndex] = useState(0);
 	const [displayIndex, setDisplayIndex] = useState(1); // Offset by 1 for the prepended last video
 	const [skipTransition, setSkipTransition] = useState(false);
@@ -595,6 +597,44 @@ export default function HomePage() {
 		}
 
 		// No animations for hero text and subtitle - they appear immediately
+	}, []);
+
+	// Keep the framed map scaling responsive without "cancelling" browser zoom.
+	// The previous vw-based transform kept the map the same physical size when zooming.
+	useEffect(() => {
+		const baseDpr = window.devicePixelRatio || 1;
+
+		const DESIGN_WIDTH_PX = 1884;
+		const SCALE_BREAKPOINT_PX = 1582;
+		const MIN_SCALE_BREAKPOINT_PX = 650;
+		const MIN_SCALE = 0.33;
+		const SIDE_PADDING_PX = 32;
+
+		const setLandingMapScale = () => {
+			const wrapper = landingMapWrapperRef.current;
+			if (!wrapper) return;
+
+			// Normalize to the initial DPR so zooming doesn't increase the computed width.
+			const normalizedViewportWidthPx =
+				window.innerWidth * ((window.devicePixelRatio || 1) / baseDpr);
+
+			let scale = 1;
+			if (normalizedViewportWidthPx <= MIN_SCALE_BREAKPOINT_PX) {
+				scale = MIN_SCALE;
+			} else if (normalizedViewportWidthPx <= SCALE_BREAKPOINT_PX) {
+				scale = (normalizedViewportWidthPx - SIDE_PADDING_PX) / DESIGN_WIDTH_PX;
+				scale = Math.max(MIN_SCALE, Math.min(1, scale));
+			}
+
+			wrapper.style.setProperty('--landing-map-scale', String(scale));
+		};
+
+		setLandingMapScale();
+		window.addEventListener('resize', setLandingMapScale);
+
+		return () => {
+			window.removeEventListener('resize', setLandingMapScale);
+		};
 	}, []);
 
 	// Work around HLS loop "hiccup" by seeking back to the start *before* the stream ends.
@@ -808,12 +848,15 @@ export default function HomePage() {
 
 	return (
 		<main className="overflow-x-hidden">
-			<div
-				id="landing-hero"
-				className="relative w-screen h-dvh overflow-hidden bg-background parallax-container"
-				ref={heroRef}
-				data-parallax-speed="0.3"
-			>
+			<div className="landing-zoom-80">
+				<div
+					id="landing-hero"
+					className="relative w-full overflow-hidden bg-background parallax-container"
+					ref={heroRef}
+					data-parallax-speed="0.3"
+					// Keep the hero truly viewport-height after zooming the page wrapper.
+					style={{ height: 'calc(100dvh / var(--landing-zoom, 1))' }}
+				>
 				{/* SVG Filter for thinning text */}
 				<svg width="0" height="0" className="absolute">
 					<defs>
@@ -882,7 +925,7 @@ export default function HomePage() {
 			{/* Video Carousel Section */}
 			<div
 				ref={videoCarouselContainerRef}
-				className="w-full h-[661px] bg-[#EBEBEB] py-16 overflow-hidden video-carousel-container"
+				className="w-full bg-[#EBEBEB] py-16 overflow-hidden video-carousel-container"
 			>
 				{(() => {
 					// Create extended array for seamless loop: [last, ...all, first]
@@ -896,7 +939,8 @@ export default function HomePage() {
 						<div 
 							className={`video-carousel-track ${skipTransition ? 'no-transition' : ''}`}
 							style={{
-								transform: `translateX(calc(50vw - ${displayIndex * (946 + 32)}px - ${946 / 2}px))`,
+								// Center the active video relative to the carousel container (zoom-safe).
+								transform: `translateX(calc(-${displayIndex} * (var(--video-carousel-item-width) + var(--video-carousel-gap)) - (var(--video-carousel-item-width) / 2)))`,
 							}}
 						>
 							{extendedVideos.map(({ videoId, originalIndex }, idx) => {
@@ -972,7 +1016,7 @@ export default function HomePage() {
 				>
 					Start Free Trial
 				</Link>
-				<div className="landing-map-wrapper">
+				<div className="landing-map-wrapper" ref={landingMapWrapperRef}>
 					<div className="landing-map-container">
 						<LandingPageMap1
 							// Crop out extra SVG padding so the framed map box sits centered/snug.
@@ -1010,8 +1054,8 @@ export default function HomePage() {
 
 						{/* Demo */}
 						<div className="mt-6 bg-[#F1F1F1] rounded-[8px] px-6 pt-8 pb-10 overflow-hidden">
-							<div className="w-full overflow-x-auto">
-								<div className="w-max mx-auto flex gap-6 pr-2">
+							<ScaledToFit baseWidth={709} baseHeight={635}>
+								<div className="flex gap-6">
 									<div className="mt-[76px]">
 										<ContactsExpandedList
 											contacts={sampleContacts}
@@ -1038,7 +1082,7 @@ export default function HomePage() {
 										className="!block"
 									/>
 								</div>
-							</div>
+							</ScaledToFit>
 						</div>
 					</div>
 				</div>
@@ -1181,21 +1225,19 @@ export default function HomePage() {
 
 						{/* Demo */}
 						<div className="mt-6 bg-[#F1F1F1] rounded-[8px] px-4 xs:px-6 pt-6 xs:pt-8 pb-8 xs:pb-10 overflow-hidden">
-							<div className="w-full overflow-x-auto">
-								<div className="w-max mx-auto">
-									<InboxSection
-										noOuterPadding
-										desktopWidth={856}
-										desktopHeight={535}
-										allowedSenderEmails={Object.keys(sampleContactsByEmail)}
-										contactByEmail={sampleContactsByEmail}
-										sampleData={{
-											inboundEmails: sampleInboundEmails,
-											sentEmails: sampleSentEmails,
-										}}
-									/>
-								</div>
-							</div>
+							<ScaledToFit baseWidth={856} baseHeight={535}>
+								<InboxSection
+									noOuterPadding
+									desktopWidth={856}
+									desktopHeight={535}
+									allowedSenderEmails={Object.keys(sampleContactsByEmail)}
+									contactByEmail={sampleContactsByEmail}
+									sampleData={{
+										inboundEmails: sampleInboundEmails,
+										sentEmails: sampleSentEmails,
+									}}
+								/>
+							</ScaledToFit>
 						</div>
 					</div>
 				</div>
@@ -1285,7 +1327,39 @@ export default function HomePage() {
 				</div>
 
 				{/* Third block below map */}
+				{/* Narrow layout: stack text on top, demo below */}
+				<div className="2xl:hidden w-full px-4" style={{ marginTop: '75px' }}>
+					<div className="mx-auto w-full max-w-[904px] bg-[#FAFAFA]">
+						{/* Text */}
+						<div className="bg-[#EFEFEF] rounded-[8px] px-6 py-8">
+							<p className="font-inter font-normal text-[clamp(40px,7vw,56px)] text-black leading-tight">
+								Emails That Land
+							</p>
+							<p className="font-inter font-normal text-[18px] xs:text-[20px] text-black mt-4">
+								Emails not getting responses? Ditch the templates. Murmur drafts pitches based on your bio and date range that venues actually respond to.
+							</p>
+							<Link
+								href="/drafting"
+								className="mt-6 inline-flex h-[46px] px-5 items-center justify-center border-2 border-[#5DAB68] rounded-[6px] bg-transparent"
+							>
+								<span className="font-inter font-normal text-[18px] xs:text-[20px] text-[#5DAB68]">
+									Learn about Drafting
+								</span>
+							</Link>
+						</div>
+
+						{/* Demo */}
+						<div className="mt-6 bg-[#F1F1F1] rounded-[8px] overflow-hidden">
+							<ScaledToFit baseWidth={904} baseHeight={712}>
+								<LandingDraftingDemo />
+							</ScaledToFit>
+						</div>
+					</div>
+				</div>
+
+				{/* Wide layout: original design */}
 				<div
+					className="hidden 2xl:block"
 					style={{
 						marginTop: '75px',
 						width: '1866px',
@@ -1371,6 +1445,7 @@ export default function HomePage() {
 				>
 					Start Free Trial
 				</Link>
+			</div>
 			</div>
 		</main>
 	);

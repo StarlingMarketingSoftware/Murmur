@@ -820,177 +820,113 @@ export const LandingHeroSearchBar = ({
 							router.push(`${urls.murmur.dashboard.index}?fromHome=true`);
 						}}
 					>
-						<div className="search-input-group relative" ref={searchContainerRef}>
-							{/* Subtle glowing pulse behind the search bar */}
-							<div className="absolute inset-0 rounded-[8px] search-bar-glow-pulse -z-10" />
-							<div className="search-wave-container" style={{ transition: 'none' }}>
-								<Input
-									className="search-wave-input !focus-visible:ring-0 !focus-visible:ring-offset-0 !focus:ring-0 !focus:ring-offset-0 !ring-0 !outline-none !accent-transparent !h-[72px] max-[480px]:!h-[60px] !border-2 !border-black pr-[70px] max-[480px]:pr-[58px] md:pr-[80px]"
-									placeholder=""
-									style={{
-										accentColor: 'transparent',
-										transition: 'none',
-									}}
-									autoComplete="off"
-									autoCorrect="off"
-									autoCapitalize="off"
-									spellCheck={false}
-								/>
-
-								{/* 3-section dashboard-style UI overlay (Why / What / Where) */}
-								<div
-									className={`search-sections-container absolute left-[4px] right-[68px] max-[480px]:right-[56px] top-1/2 -translate-y-1/2 h-[64px] max-[480px]:h-[52px] rounded-[8px] z-20 font-secondary flex items-center ${
-										activeSection ? 'bg-[#EFEFEF] border border-transparent' : 'bg-white border border-black'
-									}`}
-									style={{ transition: 'none' }}
-								>
-									{/* Sliding active tab indicator */}
-									<div
-										ref={activeSectionIndicatorRef}
-										className="absolute top-0 left-0 h-full w-1/3 bg-white border border-black rounded-[8px] pointer-events-none z-10"
-										style={{ opacity: 0, willChange: 'transform' }}
+						{/* Keep the hero search bar from stretching full-width at < md (e.g. 767px). */}
+						<div className="mx-auto w-full max-w-[603px]">
+							<div className="search-input-group relative" ref={searchContainerRef}>
+								{/* Subtle glowing pulse behind the search bar */}
+								<div className="absolute inset-0 rounded-[8px] search-bar-glow-pulse -z-10" />
+								<div className="search-wave-container" style={{ transition: 'none' }}>
+									<Input
+										className="search-wave-input !focus-visible:ring-0 !focus-visible:ring-offset-0 !focus:ring-0 !focus:ring-offset-0 !ring-0 !outline-none !accent-transparent !h-[72px] max-[480px]:!h-[60px] !border-2 !border-black pr-[70px] max-[480px]:pr-[58px] md:pr-[80px]"
+										placeholder=""
+										style={{
+											accentColor: 'transparent',
+											transition: 'none',
+										}}
+										autoComplete="off"
+										autoCorrect="off"
+										autoCapitalize="off"
+										spellCheck={false}
 									/>
 
-									{/* Why */}
+									{/* 3-section dashboard-style UI overlay (Why / What / Where) */}
 									<div
-										className={`relative h-full cursor-pointer border flex-1 min-w-0 overflow-hidden ${
-											activeSection === 'why'
-												? 'bg-transparent border-transparent rounded-[8px]'
-												: `border-transparent ${
-														activeSection ? 'hover:bg-[#F9F9F9]' : 'hover:bg-black/5'
-												  } rounded-l-[8px]`
+										className={`search-sections-container absolute left-[4px] right-[68px] max-[480px]:right-[56px] top-1/2 -translate-y-1/2 h-[64px] max-[480px]:h-[52px] rounded-[8px] z-20 font-secondary flex items-center ${
+											activeSection
+												? 'bg-[#EFEFEF] border border-transparent'
+												: 'bg-white border border-black'
 										}`}
-										onClick={() => setActiveSection(activeSection === 'why' ? null : 'why')}
+										style={{ transition: 'none' }}
 									>
-										<div className="absolute z-20 left-[24px] max-[480px]:left-[12px] top-[10px] max-[480px]:top-[7px] text-[22px] max-[480px]:text-[18px] font-bold text-black leading-none">
-											Why
-										</div>
-										<div className="absolute z-20 left-[24px] max-[480px]:left-[12px] right-[4px] top-[42px] max-[480px]:top-[30px] h-[12px] overflow-hidden">
-											<div
-												className="absolute top-0 left-0 font-semibold text-[12px] whitespace-nowrap"
-												style={{
-													height: '12px',
-													lineHeight: '12px',
-													padding: '0',
-													margin: '0',
-													color:
-														whyValue && whyValue.trim().length > 0
-															? '#000000'
-															: 'rgba(0, 0, 0, 0.42)',
-												}}
-											>
-												{whyValue ? whyValue.replace(/[\[\]]/g, '') : 'Choose Type of Search'}
+										{/* Sliding active tab indicator */}
+										<div
+											ref={activeSectionIndicatorRef}
+											className="absolute top-0 left-0 h-full w-1/3 bg-white border border-black rounded-[8px] pointer-events-none z-10"
+											style={{ opacity: 0, willChange: 'transform' }}
+										/>
+
+										{/* Why */}
+										<div
+											className={`relative h-full cursor-pointer border flex-1 min-w-0 overflow-hidden ${
+												activeSection === 'why'
+													? 'bg-transparent border-transparent rounded-[8px]'
+													: `border-transparent ${
+															activeSection
+																? 'hover:bg-[#F9F9F9]'
+																: 'hover:bg-black/5'
+													  } rounded-l-[8px]`
+											}`}
+											onClick={() => setActiveSection(activeSection === 'why' ? null : 'why')}
+										>
+											<div className="absolute z-20 left-[24px] max-[480px]:left-[12px] top-[10px] max-[480px]:top-[7px] text-[22px] max-[480px]:text-[18px] font-bold text-black leading-none">
+												Why
 											</div>
-										</div>
-									</div>
-
-									<div
-										className={`w-[2px] h-full bg-black/10 flex-shrink-0 ${
-											activeSection ? 'hidden' : ''
-										}`}
-									/>
-
-									{/* What */}
-									<div
-										className={`relative h-full cursor-pointer border overflow-hidden flex-1 min-w-0 ${
-											activeSection === 'what'
-												? 'bg-transparent border-transparent rounded-[8px]'
-												: `border-transparent ${
-														activeSection ? 'hover:bg-[#F9F9F9]' : 'hover:bg-black/5'
-												  }`
-										}`}
-										onClick={() => setActiveSection('what')}
-									>
-										<div className="absolute z-20 left-[24px] max-[480px]:left-[12px] top-[10px] max-[480px]:top-[7px] text-[22px] max-[480px]:text-[18px] font-bold text-black leading-none">
-											What
-										</div>
-										<div className="absolute z-20 left-[24px] max-[480px]:left-[12px] right-[8px] top-[42px] max-[480px]:top-[30px] h-[12px] overflow-hidden">
-											{activeSection === 'what' ? (
-												<input
-													ref={whatInputRef}
-													readOnly={readOnly}
-													type="text"
-													value={whatValue}
-													onChange={(e) => setWhatValue(e.target.value)}
-													onKeyDown={(e) => {
-														if (e.key === 'Enter') {
-															e.preventDefault();
-															setActiveSection('where');
-														}
-													}}
-													className="absolute z-20 top-0 left-0 w-full font-semibold text-black text-[12px] bg-transparent outline-none border-none"
-													style={{
-														height: '12px',
-														lineHeight: '12px',
-														padding: '0',
-														margin: '0',
-														transform: 'translateY(-1px)',
-														fontFamily:
-															'var(--font-secondary), Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
-													}}
-													placeholder="Add Recipients"
-													onClick={(e) => e.stopPropagation()}
-												/>
-											) : (
+											<div className="absolute z-20 left-[24px] max-[480px]:left-[12px] right-[4px] top-[42px] max-[480px]:top-[30px] h-[12px] overflow-hidden">
 												<div
-													className="absolute z-20 top-0 left-0 w-full font-semibold text-[12px] whitespace-nowrap overflow-hidden hover:text-black/60 transition-colors"
+													className="absolute top-0 left-0 font-semibold text-[12px] whitespace-nowrap"
 													style={{
 														height: '12px',
 														lineHeight: '12px',
 														padding: '0',
 														margin: '0',
-														color: whatValue ? '#000000' : 'rgba(0, 0, 0, 0.42)',
-														maskImage:
-															'linear-gradient(to right, black 80%, transparent 100%)',
-														WebkitMaskImage:
-															'linear-gradient(to right, black 80%, transparent 100%)',
+														color:
+															whyValue && whyValue.trim().length > 0
+																? '#000000'
+																: 'rgba(0, 0, 0, 0.42)',
 													}}
 												>
-													{whatValue || 'Add Recipients'}
+													{whyValue ? whyValue.replace(/[\[\]]/g, '') : 'Choose Type of Search'}
 												</div>
-											)}
+											</div>
 										</div>
-									</div>
 
-									<div
-										className={`w-[2px] h-full bg-black/10 flex-shrink-0 ${
-											activeSection ? 'hidden' : ''
-										}`}
-									/>
+										<div
+											className={`w-[2px] h-full bg-black/10 flex-shrink-0 ${
+												activeSection ? 'hidden' : ''
+											}`}
+										/>
 
-									{/* Where */}
-									<div
-										className={`relative h-full cursor-pointer border overflow-hidden flex-1 min-w-0 ${
-											activeSection === 'where'
-												? 'bg-transparent border-transparent rounded-[8px]'
-												: `border-transparent ${
-														activeSection ? 'hover:bg-[#F9F9F9]' : 'hover:bg-black/5'
-												  } rounded-r-[8px]`
-										}`}
-										onClick={() => setActiveSection('where')}
-									>
-										<div className="absolute z-20 left-[24px] max-[480px]:left-[12px] top-[10px] max-[480px]:top-[7px] text-[22px] max-[480px]:text-[18px] font-bold text-black leading-none">
-											Where
-										</div>
-										<div className="absolute z-20 left-[24px] max-[480px]:left-[12px] right-[8px] top-[42px] max-[480px]:top-[30px] h-[12px] overflow-hidden">
-											{activeSection === 'where' ? (
-												<div className="absolute z-20 top-0 left-0 w-full h-full flex items-center gap-[2px]">
+										{/* What */}
+										<div
+											className={`relative h-full cursor-pointer border overflow-hidden flex-1 min-w-0 ${
+												activeSection === 'what'
+													? 'bg-transparent border-transparent rounded-[8px]'
+													: `border-transparent ${
+															activeSection
+																? 'hover:bg-[#F9F9F9]'
+																: 'hover:bg-black/5'
+													  }`
+											}`}
+											onClick={() => setActiveSection('what')}
+										>
+											<div className="absolute z-20 left-[24px] max-[480px]:left-[12px] top-[10px] max-[480px]:top-[7px] text-[22px] max-[480px]:text-[18px] font-bold text-black leading-none">
+												What
+											</div>
+											<div className="absolute z-20 left-[24px] max-[480px]:left-[12px] right-[8px] top-[42px] max-[480px]:top-[30px] h-[12px] overflow-hidden">
+												{activeSection === 'what' ? (
 													<input
-														ref={whereInputRef}
+														ref={whatInputRef}
 														readOnly={readOnly}
 														type="text"
-														value={whereValue}
-														onChange={(e) => {
-															setWhereValue(e.target.value);
-															setIsNearMeLocation(false);
-														}}
+														value={whatValue}
+														onChange={(e) => setWhatValue(e.target.value)}
 														onKeyDown={(e) => {
 															if (e.key === 'Enter') {
 																e.preventDefault();
-																setActiveSection(null);
+																setActiveSection('where');
 															}
 														}}
-														className="z-20 flex-1 font-semibold text-black text-[12px] bg-transparent outline-none border-none"
+														className="absolute z-20 top-0 left-0 w-full font-semibold text-black text-[12px] bg-transparent outline-none border-none"
 														style={{
 															height: '12px',
 															lineHeight: '12px',
@@ -1000,60 +936,135 @@ export const LandingHeroSearchBar = ({
 															fontFamily:
 																'var(--font-secondary), Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
 														}}
-														placeholder="Search States"
+														placeholder="Add Recipients"
 														onClick={(e) => e.stopPropagation()}
 													/>
-												</div>
-											) : (
-												<div
-													className="absolute z-20 top-0 left-0 w-full font-semibold text-[12px] whitespace-nowrap overflow-hidden hover:text-black/60 transition-colors"
-													style={{
-														height: '12px',
-														lineHeight: '12px',
-														padding: '0',
-														margin: '0',
-														color: hasWhereValue ? '#000000' : 'rgba(0, 0, 0, 0.42)',
-														maskImage:
-															'linear-gradient(to right, black 80%, transparent 100%)',
-														WebkitMaskImage:
-															'linear-gradient(to right, black 80%, transparent 100%)',
-													}}
-												>
-													{hasWhereValue ? whereValue : 'Search States'}
-												</div>
-											)}
+												) : (
+													<div
+														className="absolute z-20 top-0 left-0 w-full font-semibold text-[12px] whitespace-nowrap overflow-hidden hover:text-black/60 transition-colors"
+														style={{
+															height: '12px',
+															lineHeight: '12px',
+															padding: '0',
+															margin: '0',
+															color: whatValue ? '#000000' : 'rgba(0, 0, 0, 0.42)',
+															maskImage:
+																'linear-gradient(to right, black 80%, transparent 100%)',
+															WebkitMaskImage:
+																'linear-gradient(to right, black 80%, transparent 100%)',
+														}}
+													>
+														{whatValue || 'Add Recipients'}
+													</div>
+												)}
+											</div>
+										</div>
+
+										<div
+											className={`w-[2px] h-full bg-black/10 flex-shrink-0 ${
+												activeSection ? 'hidden' : ''
+											}`}
+										/>
+
+										{/* Where */}
+										<div
+											className={`relative h-full cursor-pointer border overflow-hidden flex-1 min-w-0 ${
+												activeSection === 'where'
+													? 'bg-transparent border-transparent rounded-[8px]'
+													: `border-transparent ${
+															activeSection
+																? 'hover:bg-[#F9F9F9]'
+																: 'hover:bg-black/5'
+													  } rounded-r-[8px]`
+											}`}
+											onClick={() => setActiveSection('where')}
+										>
+											<div className="absolute z-20 left-[24px] max-[480px]:left-[12px] top-[10px] max-[480px]:top-[7px] text-[22px] max-[480px]:text-[18px] font-bold text-black leading-none">
+												Where
+											</div>
+											<div className="absolute z-20 left-[24px] max-[480px]:left-[12px] right-[8px] top-[42px] max-[480px]:top-[30px] h-[12px] overflow-hidden">
+												{activeSection === 'where' ? (
+													<div className="absolute z-20 top-0 left-0 w-full h-full flex items-center gap-[2px]">
+														<input
+															ref={whereInputRef}
+															readOnly={readOnly}
+															type="text"
+															value={whereValue}
+															onChange={(e) => {
+																setWhereValue(e.target.value);
+																setIsNearMeLocation(false);
+															}}
+															onKeyDown={(e) => {
+																if (e.key === 'Enter') {
+																	e.preventDefault();
+																	setActiveSection(null);
+																}
+															}}
+															className="z-20 flex-1 font-semibold text-black text-[12px] bg-transparent outline-none border-none"
+															style={{
+																height: '12px',
+																lineHeight: '12px',
+																padding: '0',
+																margin: '0',
+																transform: 'translateY(-1px)',
+																fontFamily:
+																	'var(--font-secondary), Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
+															}}
+															placeholder="Search States"
+															onClick={(e) => e.stopPropagation()}
+														/>
+													</div>
+												) : (
+													<div
+														className="absolute z-20 top-0 left-0 w-full font-semibold text-[12px] whitespace-nowrap overflow-hidden hover:text-black/60 transition-colors"
+														style={{
+															height: '12px',
+															lineHeight: '12px',
+															padding: '0',
+															margin: '0',
+															color: hasWhereValue ? '#000000' : 'rgba(0, 0, 0, 0.42)',
+															maskImage:
+																'linear-gradient(to right, black 80%, transparent 100%)',
+															WebkitMaskImage:
+																'linear-gradient(to right, black 80%, transparent 100%)',
+														}}
+													>
+														{hasWhereValue ? whereValue : 'Search States'}
+													</div>
+												)}
+											</div>
 										</div>
 									</div>
+
+									{/* Search button - navigates to dashboard with fromHome mode */}
+									<button
+										type="submit"
+										className="landing-search-waltz-pulse flex absolute right-[6px] items-center justify-center w-[58px] max-[480px]:w-[46px] h-[62px] max-[480px]:h-[50px] z-40 cursor-pointer group"
+										style={{
+											top: '50%',
+											transform: 'translateY(-50%)',
+											backgroundColor: 'rgba(93, 171, 104, 0.49)',
+											borderTopRightRadius: '7px',
+											borderBottomRightRadius: '7px',
+											borderTopLeftRadius: '0',
+											borderBottomLeftRadius: '0',
+											border: '1px solid #5DAB68',
+											borderLeft: '1px solid #5DAB68',
+											transition: 'none',
+										}}
+										aria-label="Search"
+										onClick={(e) => {
+											e.preventDefault();
+											setActiveSection(null);
+											router.push(`${urls.murmur.dashboard.index}?fromHome=true`);
+										}}
+									>
+										<SearchIconDesktop width={26} height={28} />
+									</button>
 								</div>
 
-								{/* Search button - navigates to dashboard with fromHome mode */}
-								<button
-									type="submit"
-									className="landing-search-waltz-pulse flex absolute right-[6px] items-center justify-center w-[58px] max-[480px]:w-[46px] h-[62px] max-[480px]:h-[50px] z-40 cursor-pointer group"
-									style={{
-										top: '50%',
-										transform: 'translateY(-50%)',
-										backgroundColor: 'rgba(93, 171, 104, 0.49)',
-										borderTopRightRadius: '7px',
-										borderBottomRightRadius: '7px',
-										borderTopLeftRadius: '0',
-										borderBottomLeftRadius: '0',
-										border: '1px solid #5DAB68',
-										borderLeft: '1px solid #5DAB68',
-										transition: 'none',
-									}}
-									aria-label="Search"
-									onClick={(e) => {
-										e.preventDefault();
-										setActiveSection(null);
-										router.push(`${urls.murmur.dashboard.index}?fromHome=true`);
-									}}
-								>
-									<SearchIconDesktop width={26} height={28} />
-								</button>
+								{renderDesktopSearchDropdowns()}
 							</div>
-
-							{renderDesktopSearchDropdowns()}
 						</div>
 					</form>
 				</div>
