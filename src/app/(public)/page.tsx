@@ -488,15 +488,25 @@ export default function HomePage() {
 	const [displayIndex, setDisplayIndex] = useState(1); // Offset by 1 for the prepended last video
 	const [skipTransition, setSkipTransition] = useState(false);
 	const [activeCarouselVideoProgress, setActiveCarouselVideoProgress] = useState(0);
+	const [isActiveCarouselVideoPlaying, setIsActiveCarouselVideoPlaying] = useState(false);
 	const [hoveredContact, setHoveredContact] = useState<ContactWithName | null>(sampleContacts[0]);
 	
 	const videoIds = [
 		'217455815bac246b922e15ebd83dacf6',
 		'5e867125be06a82c81c9bec4ed1f502a',
 		'de693044d2ee6f2968a5eb92d73cacaf',
-		'f4e119c7abb95bb18c011311fe640f4e',
 		'f5ec9f11f866731a70ebf8543d5ecf5a',
+		'f4e119c7abb95bb18c011311fe640f4e',
 	];
+
+	const carouselPosterTimeByVideoId: Record<string, string> = {
+		// 2nd video
+		'5e867125be06a82c81c9bec4ed1f502a': '3s',
+		// 3rd video
+		'de693044d2ee6f2968a5eb92d73cacaf': '5.5s',
+		// 5th video (previously last; reordering won't break this)
+		'f5ec9f11f866731a70ebf8543d5ecf5a': '14.8s',
+	};
 	
 	// Handle seamless looping when going from last to first video
 	const prevVideoIndexRef = useRef(0);
@@ -637,6 +647,7 @@ export default function HomePage() {
 	// Reset the progress fill when we advance to a new carousel video
 	useEffect(() => {
 		setActiveCarouselVideoProgress(0);
+		setIsActiveCarouselVideoPlaying(false);
 	}, [currentVideoIndex]);
 
 	// Initialize the active video's player and set up ended handler
@@ -648,25 +659,31 @@ export default function HomePage() {
 		let currentPlayer: ReturnType<NonNullable<typeof window.Stream>> | null = null;
 		let onEnded: (() => void) | null = null;
 		let onTimeUpdate: (() => void) | null = null;
+		let onPlay: (() => void) | null = null;
+		let onPause: (() => void) | null = null;
+		let retryTimeoutId: ReturnType<typeof setTimeout> | null = null;
+		let didInit = false;
 
 		const initActivePlayer = () => {
+			if (didInit) return true;
 			const Stream = window.Stream;
-			if (!Stream) return;
+			if (!Stream) return false;
 
 			const iframe = container.querySelector<HTMLIFrameElement>(
 				`iframe[data-video-index="${currentVideoIndex}"]`
 			);
-			if (!iframe) return;
+			if (!iframe) return false;
 
 			try {
 				currentPlayer = Stream(iframe);
 			} catch {
-				return;
+				return false;
 			}
-			if (!currentPlayer) return;
+			if (!currentPlayer) return false;
 
 			onEnded = () => {
 				if (isUnmounted) return;
+				setIsActiveCarouselVideoPlaying(false);
 				setActiveCarouselVideoProgress(1);
 				// Move to next video, looping back to start
 				setCurrentVideoIndex((prev) => (prev + 1) % videoIds.length);
@@ -684,21 +701,68 @@ export default function HomePage() {
 					setActiveCarouselVideoProgress(0);
 					return;
 				}
+				setIsActiveCarouselVideoPlaying(currentTime > 0.05);
 				setActiveCarouselVideoProgress(Math.min(1, Math.max(0, currentTime / duration)));
+			};
+
+			onPlay = () => {
+				if (isUnmounted) return;
+				setIsActiveCarouselVideoPlaying(true);
+			};
+
+			onPause = () => {
+				if (isUnmounted) return;
+				// If paused at the very beginning (autoplay didn't kick in), keep the poster overlay visible.
+				const currentTime = Number(currentPlayer?.currentTime);
+				if (!Number.isFinite(currentTime) || currentTime <= 0.05) {
+					setIsActiveCarouselVideoPlaying(false);
+				}
 			};
 
 			try {
 				currentPlayer.addEventListener('ended', onEnded);
 				currentPlayer.addEventListener('timeupdate', onTimeUpdate);
+				currentPlayer.addEventListener('play', onPlay);
+				currentPlayer.addEventListener('pause', onPause);
 				onTimeUpdate();
 			} catch {
 				// SDK may not support event listeners
 			}
+
+			// Autoplay fallback: some embeds don't always start on their own.
+			// Try to start playback after the player is initialized.
+			setTimeout(() => {
+				if (isUnmounted) return;
+				try {
+					currentPlayer?.play?.();
+				} catch {
+					// ignore
+				}
+			}, 75);
+
+			didInit = true;
+			return true;
 		};
 
 		const ensureStreamSdk = () => {
+			const startInitLoop = () => {
+				const MAX_ATTEMPTS = 25;
+				const RETRY_MS = 80;
+
+				let attempts = 0;
+				const attempt = () => {
+					if (isUnmounted) return;
+					if (initActivePlayer()) return;
+					attempts += 1;
+					if (attempts >= MAX_ATTEMPTS) return;
+					retryTimeoutId = setTimeout(attempt, RETRY_MS);
+				};
+
+				attempt();
+			};
+
 			if (window.Stream) {
-				initActivePlayer();
+				startInitLoop();
 				return;
 			}
 
@@ -706,7 +770,7 @@ export default function HomePage() {
 				'script[data-cloudflare-stream-sdk="true"]'
 			);
 			if (existing) {
-				existing.addEventListener('load', initActivePlayer, { once: true });
+				existing.addEventListener('load', startInitLoop, { once: true });
 				return;
 			}
 
@@ -714,7 +778,7 @@ export default function HomePage() {
 			script.src = 'https://embed.cloudflarestream.com/embed/sdk.latest.js';
 			script.async = true;
 			script.dataset.cloudflareStreamSdk = 'true';
-			script.onload = () => initActivePlayer();
+			script.onload = () => startInitLoop();
 			document.body.appendChild(script);
 		};
 
@@ -724,10 +788,13 @@ export default function HomePage() {
 		return () => {
 			isUnmounted = true;
 			clearTimeout(timeoutId);
+			if (retryTimeoutId) clearTimeout(retryTimeoutId);
 			if (currentPlayer && onEnded) {
 				try {
 					currentPlayer.removeEventListener?.('ended', onEnded);
 					if (onTimeUpdate) currentPlayer.removeEventListener?.('timeupdate', onTimeUpdate);
+					if (onPlay) currentPlayer.removeEventListener?.('play', onPlay);
+					if (onPause) currentPlayer.removeEventListener?.('pause', onPause);
 				} catch {
 					// ignore
 				}
@@ -833,7 +900,11 @@ export default function HomePage() {
 								// Start time offsets for specific videos (in seconds)
 								const startTime = originalIndex === 1 ? '&startTime=0.5' : '';
 								// Get poster thumbnail time (can be different from startTime)
-								const posterTime = originalIndex === 1 ? '3' : '';
+								const posterTime = carouselPosterTimeByVideoId[videoId] ?? '';
+								const posterUrl = posterTime
+									? `https://customer-frd3j62ijq7wakh9.cloudflarestream.com/${videoId}/thumbnails/thumbnail.jpg?time=${posterTime}&height=600`
+									: `https://customer-frd3j62ijq7wakh9.cloudflarestream.com/${videoId}/thumbnails/thumbnail.jpg?height=600`;
+								const showPosterOverlay = !isActive || !isActiveCarouselVideoPlaying;
 								return (
 									<div
 										key={`video-display-${idx}`}
@@ -841,20 +912,20 @@ export default function HomePage() {
 									>
 										{/* Overlay to hide play button and show thumbnail on non-active videos */}
 										<div 
-											className={`absolute inset-0 z-10 transition-opacity duration-300 ${isActive ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
+											className={`absolute inset-0 z-10 transition-opacity duration-300 pointer-events-none ${showPosterOverlay ? 'opacity-100' : 'opacity-0'}`}
 											style={{
 												backgroundColor: '#000',
-												backgroundImage: `url(https://customer-frd3j62ijq7wakh9.cloudflarestream.com/${videoId}/thumbnails/thumbnail.jpg?time=${posterTime}&height=600)`,
+												backgroundImage: `url(${posterUrl})`,
 												backgroundSize: 'cover',
 												backgroundPosition: 'center',
 											}}
 										/>
-										<iframe
+								<iframe
 											key={`iframe-${idx}-${isActive}`}
 											id={`landing-carousel-video-${videoId}-${idx}`}
 											data-cf-stream-video="true"
 											data-video-index={isActive ? originalIndex : -1}
-											src={`https://customer-frd3j62ijq7wakh9.cloudflarestream.com/${videoId}/iframe?poster=https%3A%2F%2Fcustomer-frd3j62ijq7wakh9.cloudflarestream.com%2F${videoId}%2Fthumbnails%2Fthumbnail.jpg%3Ftime%3D%26height%3D600${isActive ? '&autoplay=true&muted=true&preload=auto' : '&preload=metadata'}${startTime}`}
+											src={`https://customer-frd3j62ijq7wakh9.cloudflarestream.com/${videoId}/iframe?${isActive ? 'autoplay=true&muted=true&preload=auto' : 'preload=metadata'}${startTime}`}
 											className="w-full h-full border-none"
 											allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;"
 											allowFullScreen
