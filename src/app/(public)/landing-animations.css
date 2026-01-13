@@ -99,35 +99,107 @@ body {
 		animation: none;
 	}
 }
-/* Video carousel infinite scroll */
+/* Video carousel - centered with smooth transitions */
+.video-carousel-container {
+	position: relative;
+	display: flex;
+	align-items: center;
+}
+
 .video-carousel-track {
 	display: flex;
-	width: max-content;
-	animation: scroll-left-to-right 80s linear infinite;
+	gap: 32px;
+	position: absolute;
+	left: 0;
+	transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
 	will-change: transform;
 }
 
-.video-carousel-container[data-paused='true'] .video-carousel-track {
-	animation-play-state: paused;
+.video-carousel-track.no-transition {
+	transition: none !important;
 }
 
-/* Pause only when hovering a video, not just the gray container */
-.video-carousel-track:has(iframe:hover) {
-	animation-play-state: paused;
+.video-carousel-item {
+	flex-shrink: 0;
+	width: 946px;
+	height: 532px;
+	overflow: hidden;
+	position: relative;
+	transition: transform 0.4s ease;
+	transform: scale(0.95);
 }
 
-@keyframes scroll-left-to-right {
-	0% {
-		transform: translateX(-50%);
-	}
-	100% {
-		transform: translateX(0%);
-	}
+.video-carousel-item.active {
+	transform: scale(1);
+}
+
+/* Overlay to block interaction and hide play button on non-active videos */
+.video-carousel-item:not(.active)::after {
+	content: '';
+	position: absolute;
+	inset: 0;
+	background: transparent;
+	pointer-events: auto;
+	z-index: 10;
+}
+
+/* Ensure iframe doesn't capture clicks on non-active videos */
+.video-carousel-item:not(.active) iframe {
+	pointer-events: none;
+}
+
+/* Video carousel indicators (5 dots + active progress pill) */
+.video-carousel-indicators {
+	position: absolute;
+	left: 50%;
+	bottom: 28px;
+	transform: translateX(-50%);
+	display: flex;
+	align-items: center;
+	gap: 18px;
+	z-index: 20;
+	pointer-events: none;
+}
+
+.video-carousel-indicator {
+	position: relative;
+	width: 10px;
+	height: 10px;
+	background: #c8c8c8;
+	border-radius: 9999px;
+	overflow: hidden;
+	transition: width 240ms ease, height 240ms ease, border-radius 240ms ease;
+}
+
+.video-carousel-indicator.active {
+	width: 66px;
+	height: 11px;
+	border-radius: 8px;
+}
+
+.video-carousel-indicator-fill {
+	position: absolute;
+	left: 0;
+	top: 0;
+	height: 100%;
+	background: #888888;
+	border-radius: 8px;
+	will-change: width;
+	transition: width 120ms linear;
 }
 
 @media (prefers-reduced-motion: reduce) {
 	.video-carousel-track {
-		animation: none;
+		transition: none;
+	}
+	.video-carousel-item {
+		transition: none;
+	}
+	.video-carousel-indicator {
+		transition: none;
+	}
+	.video-carousel-indicator-fill {
+		transition: none;
 	}
 }
 

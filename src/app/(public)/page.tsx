@@ -466,13 +466,17 @@ const sampleSentEmails = [
 import './landing-animations.css';
 
 declare global {
+	interface CloudflareStreamPlayer {
+		addEventListener: (event: string, handler: () => void) => void;
+		removeEventListener?: (event: string, handler: () => void) => void;
+		play?: () => void;
+		pause?: () => void;
+		currentTime?: number;
+		duration?: number;
+	}
+
 	interface Window {
-		Stream?: (iframe: HTMLIFrameElement) => {
-			addEventListener: (event: string, handler: () => void) => void;
-			removeEventListener?: (event: string, handler: () => void) => void;
-			play?: () => void;
-			pause?: () => void;
-		};
+		Stream?: (iframe: HTMLIFrameElement) => CloudflareStreamPlayer;
 	}
 }
 
@@ -480,8 +484,48 @@ export default function HomePage() {
 	const heroRef = useRef<HTMLDivElement>(null);
 	const heroVideoRef = useRef<any>(null);
 	const videoCarouselContainerRef = useRef<HTMLDivElement>(null);
-	const [isVideoCarouselPaused, setIsVideoCarouselPaused] = useState(false);
+	const [currentVideoIndex, setCurrentVideoIndex] = useState(0);
+	const [displayIndex, setDisplayIndex] = useState(1); // Offset by 1 for the prepended last video
+	const [skipTransition, setSkipTransition] = useState(false);
+	const [activeCarouselVideoProgress, setActiveCarouselVideoProgress] = useState(0);
 	const [hoveredContact, setHoveredContact] = useState<ContactWithName | null>(sampleContacts[0]);
+	
+	const videoIds = [
+		'217455815bac246b922e15ebd83dacf6',
+		'5e867125be06a82c81c9bec4ed1f502a',
+		'de693044d2ee6f2968a5eb92d73cacaf',
+		'f4e119c7abb95bb18c011311fe640f4e',
+		'f5ec9f11f866731a70ebf8543d5ecf5a',
+	];
+	
+	// Handle seamless looping when going from last to first video
+	const prevVideoIndexRef = useRef(0);
+	useEffect(() => {
+		const prevIndex = prevVideoIndexRef.current;
+		const newIndex = currentVideoIndex;
+		prevVideoIndexRef.current = newIndex;
+		
+		// Going from last video (4) to first video (0)
+		if (prevIndex === videoIds.length - 1 && newIndex === 0) {
+			// First, scroll to the duplicate first video at the end (displayIndex = videoIds.length + 1)
+			setDisplayIndex(videoIds.length + 1);
+			
+			// After animation completes, instantly reset to the real first video position
+			setTimeout(() => {
+				setSkipTransition(true);
+				setDisplayIndex(1);
+				// Re-enable transitions after the instant reset
+				requestAnimationFrame(() => {
+					requestAnimationFrame(() => {
+						setSkipTransition(false);
+					});
+				});
+			}, 650); // Slightly longer than the 600ms CSS transition
+		} else {
+			// Normal transition: displayIndex = currentVideoIndex + 1
+			setDisplayIndex(newIndex + 1);
+		}
+	}, [currentVideoIndex, videoIds.length]);
 	const heroVideoStyle = {
 		// Fill the full hero width; crop (preferably bottom) as needed
 		'--media-object-fit': 'cover',
@@ -590,106 +634,71 @@ export default function HomePage() {
 		};
 	}, []);
 
+	// Reset the progress fill when we advance to a new carousel video
+	useEffect(() => {
+		setActiveCarouselVideoProgress(0);
+	}, [currentVideoIndex]);
+
+	// Initialize the active video's player and set up ended handler
 	useEffect(() => {
 		const container = videoCarouselContainerRef.current;
 		if (!container) return;
 
 		let isUnmounted = false;
-		const playingKeys = new Set<string>();
-		const playersByKey = new Map<string, ReturnType<NonNullable<typeof window.Stream>>>();
-		const cleanupFns: Array<() => void> = [];
+		let currentPlayer: ReturnType<NonNullable<typeof window.Stream>> | null = null;
+		let onEnded: (() => void) | null = null;
+		let onTimeUpdate: (() => void) | null = null;
 
-		const updatePaused = () => {
-			if (isUnmounted) return;
-			setIsVideoCarouselPaused(playingKeys.size > 0);
-		};
-
-		const initStreamPlayers = () => {
+		const initActivePlayer = () => {
 			const Stream = window.Stream;
 			if (!Stream) return;
 
-			const iframes = Array.from(
-				container.querySelectorAll<HTMLIFrameElement>('iframe[data-cf-stream-video="true"]')
+			const iframe = container.querySelector<HTMLIFrameElement>(
+				`iframe[data-video-index="${currentVideoIndex}"]`
 			);
-			if (iframes.length === 0) return;
+			if (!iframe) return;
 
-			const setupPlayer = (iframe: HTMLIFrameElement) => {
-				const key = iframe.getAttribute('data-cf-stream-key') || iframe.id;
-				if (!key) return;
+			try {
+				currentPlayer = Stream(iframe);
+			} catch {
+				return;
+			}
+			if (!currentPlayer) return;
 
-				// Store original src to reload iframe back to unplayed state
-				const originalSrc = iframe.src;
-
-				let player: ReturnType<NonNullable<typeof window.Stream>> | null = null;
-				try {
-					player = Stream(iframe);
-				} catch {
-					player = null;
-				}
-				if (!player) return;
-
-				playersByKey.set(key, player);
-
-				const onPlay = () => {
-					// Ensure only one carousel video can play at a time.
-					playingKeys.clear();
-					playingKeys.add(key);
-					updatePaused();
-
-					for (const [otherKey, otherPlayer] of playersByKey.entries()) {
-						if (otherKey === key) continue;
-						try {
-							otherPlayer.pause?.();
-						} catch {
-							// ignore
-						}
-					}
-				};
-				const onPause = () => {
-					playingKeys.delete(key);
-					updatePaused();
-				};
-				const onEnded = () => {
-					playingKeys.delete(key);
-					updatePaused();
-					// Reload iframe to reset to unplayed state with poster and play button
-					iframe.src = originalSrc;
-					// Re-initialize player after iframe reloads
-					const onLoad = () => {
-						iframe.removeEventListener('load', onLoad);
-						setupPlayer(iframe);
-					};
-					iframe.addEventListener('load', onLoad);
-				};
-
-				try {
-					player.addEventListener('play', onPlay);
-					player.addEventListener('pause', onPause);
-					player.addEventListener('ended', onEnded);
-				} catch {
-					// If the SDK fails to attach listeners, just skip pausing behavior.
-					return;
-				}
-
-				cleanupFns.push(() => {
-					try {
-						player?.removeEventListener?.('play', onPlay);
-						player?.removeEventListener?.('pause', onPause);
-						player?.removeEventListener?.('ended', onEnded);
-					} catch {
-						// ignore
-					}
-				});
+			onEnded = () => {
+				if (isUnmounted) return;
+				setActiveCarouselVideoProgress(1);
+				// Move to next video, looping back to start
+				setCurrentVideoIndex((prev) => (prev + 1) % videoIds.length);
 			};
 
-			for (const iframe of iframes) {
-				setupPlayer(iframe);
+			onTimeUpdate = () => {
+				if (isUnmounted || !currentPlayer) return;
+				const duration = Number(currentPlayer.duration);
+				const currentTime = Number(currentPlayer.currentTime);
+				if (!Number.isFinite(duration) || duration <= 0) {
+					setActiveCarouselVideoProgress(0);
+					return;
+				}
+				if (!Number.isFinite(currentTime) || currentTime < 0) {
+					setActiveCarouselVideoProgress(0);
+					return;
+				}
+				setActiveCarouselVideoProgress(Math.min(1, Math.max(0, currentTime / duration)));
+			};
+
+			try {
+				currentPlayer.addEventListener('ended', onEnded);
+				currentPlayer.addEventListener('timeupdate', onTimeUpdate);
+				onTimeUpdate();
+			} catch {
+				// SDK may not support event listeners
 			}
 		};
 
 		const ensureStreamSdk = () => {
 			if (window.Stream) {
-				initStreamPlayers();
+				initActivePlayer();
 				return;
 			}
 
@@ -697,9 +706,7 @@ export default function HomePage() {
 				'script[data-cloudflare-stream-sdk="true"]'
 			);
 			if (existing) {
-				const onLoad = () => initStreamPlayers();
-				existing.addEventListener('load', onLoad, { once: true });
-				cleanupFns.push(() => existing.removeEventListener('load', onLoad));
+				existing.addEventListener('load', initActivePlayer, { once: true });
 				return;
 			}
 
@@ -707,21 +714,26 @@ export default function HomePage() {
 			script.src = 'https://embed.cloudflarestream.com/embed/sdk.latest.js';
 			script.async = true;
 			script.dataset.cloudflareStreamSdk = 'true';
-			script.onload = () => initStreamPlayers();
+			script.onload = () => initActivePlayer();
 			document.body.appendChild(script);
-			cleanupFns.push(() => {
-				script.onload = null;
-			});
 		};
 
-		ensureStreamSdk();
+		// Delay to ensure iframe is rendered after state change
+		const timeoutId = setTimeout(ensureStreamSdk, 200);
 
 		return () => {
 			isUnmounted = true;
-			playingKeys.clear();
-			for (const fn of cleanupFns) fn();
+			clearTimeout(timeoutId);
+			if (currentPlayer && onEnded) {
+				try {
+					currentPlayer.removeEventListener?.('ended', onEnded);
+					if (onTimeUpdate) currentPlayer.removeEventListener?.('timeupdate', onTimeUpdate);
+				} catch {
+					// ignore
+				}
+			}
 		};
-	}, []);
+	}, [currentVideoIndex, displayIndex, videoIds.length]);
 
 	return (
 		<main className="overflow-x-hidden">
@@ -799,60 +811,80 @@ export default function HomePage() {
 			{/* Video Carousel Section */}
 			<div
 				ref={videoCarouselContainerRef}
-				data-paused={isVideoCarouselPaused ? 'true' : 'false'}
 				className="w-full h-[661px] bg-[#EBEBEB] py-16 overflow-hidden video-carousel-container"
 			>
-				<div className="video-carousel-track">
-					{/* First set of videos */}
-					{[
-						'217455815bac246b922e15ebd83dacf6',
-						'5e867125be06a82c81c9bec4ed1f502a',
-						'de693044d2ee6f2968a5eb92d73cacaf',
-						'f4e119c7abb95bb18c011311fe640f4e',
-						'f5ec9f11f866731a70ebf8543d5ecf5a',
-					].map((videoId, index) => (
-						<div
-							key={`video-1-${index}`}
-							className="flex-shrink-0 w-[946px] h-[532px] mx-4 overflow-hidden"
+				{(() => {
+					// Create extended array for seamless loop: [last, ...all, first]
+					const extendedVideos = [
+						{ videoId: videoIds[videoIds.length - 1], originalIndex: videoIds.length - 1 },
+						...videoIds.map((id, i) => ({ videoId: id, originalIndex: i })),
+						{ videoId: videoIds[0], originalIndex: 0 },
+					];
+					
+					return (
+						<div 
+							className={`video-carousel-track ${skipTransition ? 'no-transition' : ''}`}
+							style={{
+								transform: `translateX(calc(50vw - ${displayIndex * (946 + 32)}px - ${946 / 2}px))`,
+							}}
 						>
-							<iframe
-								id={`landing-carousel-video-1-${videoId}-${index}`}
-								data-cf-stream-video="true"
-								data-cf-stream-key={`landing-carousel-video-1-${videoId}-${index}`}
-								src={`https://customer-frd3j62ijq7wakh9.cloudflarestream.com/${videoId}/iframe?poster=https%3A%2F%2Fcustomer-frd3j62ijq7wakh9.cloudflarestream.com%2F${videoId}%2Fthumbnails%2Fthumbnail.jpg%3Ftime%3D%26height%3D600`}
-								loading="lazy"
-								className="w-full h-full border-none"
-								allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;"
-								allowFullScreen
-								title={`Murmur video ${index + 1}`}
-							/>
+							{extendedVideos.map(({ videoId, originalIndex }, idx) => {
+								const isActive = idx === displayIndex;
+								// Start time offsets for specific videos (in seconds)
+								const startTime = originalIndex === 1 ? '&startTime=0.5' : '';
+								// Get poster thumbnail time (can be different from startTime)
+								const posterTime = originalIndex === 1 ? '3' : '';
+								return (
+									<div
+										key={`video-display-${idx}`}
+										className={`video-carousel-item ${isActive ? 'active' : ''}`}
+									>
+										{/* Overlay to hide play button and show thumbnail on non-active videos */}
+										<div 
+											className={`absolute inset-0 z-10 transition-opacity duration-300 ${isActive ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
+											style={{
+												backgroundColor: '#000',
+												backgroundImage: `url(https://customer-frd3j62ijq7wakh9.cloudflarestream.com/${videoId}/thumbnails/thumbnail.jpg?time=${posterTime}&height=600)`,
+												backgroundSize: 'cover',
+												backgroundPosition: 'center',
+											}}
+										/>
+										<iframe
+											key={`iframe-${idx}-${isActive}`}
+											id={`landing-carousel-video-${videoId}-${idx}`}
+											data-cf-stream-video="true"
+											data-video-index={isActive ? originalIndex : -1}
+											src={`https://customer-frd3j62ijq7wakh9.cloudflarestream.com/${videoId}/iframe?poster=https%3A%2F%2Fcustomer-frd3j62ijq7wakh9.cloudflarestream.com%2F${videoId}%2Fthumbnails%2Fthumbnail.jpg%3Ftime%3D%26height%3D600${isActive ? '&autoplay=true&muted=true&preload=auto' : '&preload=metadata'}${startTime}`}
+											className="w-full h-full border-none"
+											allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;"
+											allowFullScreen
+											title={`Murmur video ${originalIndex + 1}`}
+										/>
+									</div>
+								);
+							})}
 						</div>
-					))}
-					{/* Duplicate set for seamless loop */}
-					{[
-						'217455815bac246b922e15ebd83dacf6',
-						'5e867125be06a82c81c9bec4ed1f502a',
-						'de693044d2ee6f2968a5eb92d73cacaf',
-						'f4e119c7abb95bb18c011311fe640f4e',
-						'f5ec9f11f866731a70ebf8543d5ecf5a',
-					].map((videoId, index) => (
-						<div
-							key={`video-2-${index}`}
-							className="flex-shrink-0 w-[946px] h-[532px] mx-4 overflow-hidden"
-						>
-							<iframe
-								id={`landing-carousel-video-2-${videoId}-${index}`}
-								data-cf-stream-video="true"
-								data-cf-stream-key={`landing-carousel-video-2-${videoId}-${index}`}
-								src={`https://customer-frd3j62ijq7wakh9.cloudflarestream.com/${videoId}/iframe?poster=https%3A%2F%2Fcustomer-frd3j62ijq7wakh9.cloudflarestream.com%2F${videoId}%2Fthumbnails%2Fthumbnail.jpg%3Ftime%3D%26height%3D600`}
-								loading="lazy"
-								className="w-full h-full border-none"
-								allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;"
-								allowFullScreen
-								title={`Murmur video ${index + 1} (duplicate)`}
-							/>
-						</div>
-					))}
+					);
+				})()}
+
+				{/* Carousel progress dots */}
+				<div className="video-carousel-indicators" aria-hidden="true">
+					{videoIds.map((_, idx) => {
+						const isActive = idx === currentVideoIndex;
+						return (
+							<div
+								key={`carousel-indicator-${idx}`}
+								className={`video-carousel-indicator ${isActive ? 'active' : ''}`}
+							>
+								{isActive ? (
+									<div
+										className="video-carousel-indicator-fill"
+										style={{ width: `${activeCarouselVideoProgress * 100}%` }}
+									/>
+								) : null}
+							</div>
+						);
+					})}
 				</div>
 			</div>
 
@@ -927,7 +959,7 @@ export default function HomePage() {
 							We Did The Research
 						</p>
 						<p className="font-inter font-normal text-[25px] text-black mt-6">
-							Take a look through every contact, and you'll get to see information on what styles they book, their live music schedules, and even how to actually find the right person.
+							Take a look through every contact, and you&apos;ll get to see information on what styles they book, their live music schedules, and even how to actually find the right person.
 						</p>
 						{/* Learn about research button */}
 						<Link href="/research">
