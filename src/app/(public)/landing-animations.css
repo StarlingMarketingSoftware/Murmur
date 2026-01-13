@@ -298,7 +298,13 @@ body {
 
 /* Start Free Trial Button */
 .landing-free-trial-btn {
+	/*
+	 * Keep the CTA full-size, but cap it to the visual viewport width.
+	 * This page is wrapped in `.landing-zoom-80` (zoom/scale), so we divide
+	 * by `--landing-zoom` to keep the *rendered* width within the viewport.
+	 */
 	width: 707px;
+	max-width: calc((100vw - 32px) / var(--landing-zoom, 1));
 	height: 57px;
 	border: 4px solid #118521;
 	border-radius: 10px;
@@ -306,18 +312,6 @@ body {
 	font-size: 18px;
 	font-weight: 500;
 	text-align: center;
-}
-
-/* Scale button at 1582px and below, but clamp to minimum 50% */
-@media (max-width: 1582px) {
-	.landing-free-trial-btn {
-		/* Scale proportionally but never below 50% */
-		width: max(calc(707px * 0.5), calc(707px * ((100vw - 32px) / 1884px)));
-		height: max(calc(57px * 0.5), calc(57px * ((100vw - 32px) / 1884px)));
-		font-size: max(calc(18px * 0.5), calc(18px * ((100vw - 32px) / 1884px)));
-		border-width: max(calc(4px * 0.5), calc(4px * ((100vw - 32px) / 1884px)));
-		border-radius: max(calc(10px * 0.5), calc(10px * ((100vw - 32px) / 1884px)));
-	}
 }
 
 /* Wrapper controls the visible height in the document flow */
