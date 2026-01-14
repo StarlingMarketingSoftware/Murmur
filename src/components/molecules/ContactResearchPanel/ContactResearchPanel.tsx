@@ -328,8 +328,7 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 				>
 					{/* Map background */}
 					<div
-						className="absolute inset-0 pointer-events-none"
-						style={{ opacity: 0.35 }}
+						className="absolute inset-0 pointer-events-none opacity-0 xl:opacity-[0.35]"
 					>
 						<ResearchHeaderMap
 							width={containerWidth - 14}
@@ -408,8 +407,7 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 					>
 						{/* Map background */}
 						<div
-							className="absolute inset-0 pointer-events-none"
-							style={{ opacity: 0.35 }}
+						className="absolute inset-0 pointer-events-none opacity-0 xl:opacity-[0.35]"
 						>
 							<ResearchHeaderMap
 								width={boxWidth - 1}
