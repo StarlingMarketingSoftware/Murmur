@@ -365,6 +365,11 @@ body {
 	text-align: center;
 }
 
+/* Section right after the video carousel (contains the framed map) */
+.landing-map-section {
+	padding-top: 124px;
+}
+
 /* Wrapper controls the visible height in the document flow */
 .landing-map-wrapper {
 	--landing-map-scale: 1;
@@ -395,6 +400,46 @@ body {
 	flex-shrink: 0;
 }
 
+/* Landing map copy blocks inside the SVG */
+.landing-map-copy--mobile {
+	display: none;
+}
+
+/* Spacing between the map and the next section */
+.landing-after-map {
+	margin-top: 145px;
+}
+
+@media (max-width: 767px) {
+	.landing-map-copy--desktop {
+		display: none;
+	}
+
+	.landing-map-copy--mobile {
+		display: inline;
+	}
+
+	.landing-map-section {
+		/* ~45px visual gap below the carousel (account for page zoom) */
+		padding-top: calc(45px / var(--landing-zoom, 1));
+	}
+
+	.landing-map-wrapper {
+		/* Let the map sit directly under the section padding on mobile */
+		margin-top: 0;
+	}
+
+	.landing-map-container {
+		/* Let the SVG frame fill edge-to-edge on mobile */
+		padding: 0;
+	}
+
+	.landing-after-map {
+		/* ~70px visual gap below the map (account for page zoom) */
+		margin-top: calc(70px / var(--landing-zoom, 1));
+	}
+}
+
 /* At 1582px and below, scale proportionally */
 /* Scale factor at 1582px: (1582-32)/1884 = 0.823 */
 /* Scale factor at 1200px: (1200-32)/1884 = 0.620 */
@@ -409,6 +454,10 @@ body {
 /* Minimum scale floor for very small screens */
 @media (max-width: 650px) {
 	.landing-map-wrapper {
-		--landing-map-scale: 0.33;
+		/* If JS doesn't run: fit the map to the viewport (mobile is edge-to-edge). */
+		--landing-map-scale: calc(
+			(100vw - env(safe-area-inset-left) - env(safe-area-inset-right)) /
+				(1890px * var(--landing-zoom, 1))
+		);
 	}
 }

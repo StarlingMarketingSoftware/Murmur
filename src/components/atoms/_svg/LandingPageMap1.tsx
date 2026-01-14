@@ -1853,79 +1853,206 @@ const SvgComponent = (props: SVGProps<SVGSVGElement>) => (
         preserveAspectRatio="none"
       />
     </defs>
-    {/* 100,000+ Contacts block */}
-    <g>
-      <rect
-        x={23}
-        y={315}
-        width={625}
-        height={181}
-        rx={7}
-        ry={7}
-        fill="#EFEFEF"
-      />
-      <text
-        x={335.5}
-        y={385}
-        textAnchor="middle"
-        fontFamily="Inter, sans-serif"
-        fontSize={62}
-        fill="#000"
-      >
-        100,000+ Contacts
-      </text>
-      <text
-        x={335.5}
-        y={455}
-        textAnchor="middle"
-        fontFamily="Inter, sans-serif"
-        fontSize={62}
-        fill="#000"
-      >
-        - Coast to Coast
-      </text>
+    {/* Desktop copy (default placement) */}
+    <g className="landing-map-copy landing-map-copy--desktop">
+      {/* 100,000+ Contacts block */}
+      <g>
+        <rect
+          x={23}
+          y={315}
+          width={625}
+          height={181}
+          rx={7}
+          ry={7}
+          fill="#EFEFEF"
+        />
+        <text
+          x={335.5}
+          y={385}
+          textAnchor="middle"
+          fontFamily="Inter, sans-serif"
+          fontSize={62}
+          fill="#000"
+        >
+          100,000+ Contacts
+        </text>
+        <text
+          x={335.5}
+          y={455}
+          textAnchor="middle"
+          fontFamily="Inter, sans-serif"
+          fontSize={62}
+          fill="#000"
+        >
+          - Coast to Coast
+        </text>
+      </g>
+
+      {/* Venues description block */}
+      <g>
+        <rect
+          x={23}
+          y={503}
+          width={625}
+          height={124}
+          rx={7}
+          ry={7}
+          fill="#EFEFEF"
+        />
+        <text
+          x={43}
+          y={540}
+          textAnchor="start"
+          fontFamily="Inter, sans-serif"
+          fontSize={24}
+          fill="#000"
+        >
+          Venues, Festivals, Wineries, Breweries, Coffee
+        </text>
+        <text
+          x={43}
+          y={572}
+          textAnchor="start"
+          fontFamily="Inter, sans-serif"
+          fontSize={24}
+          fill="#000"
+        >
+          Shops; Hundreds of thousands of contacts
+        </text>
+        <text
+          x={43}
+          y={604}
+          textAnchor="start"
+          fontFamily="Inter, sans-serif"
+          fontSize={24}
+          fill="#000"
+        >
+          thoroughly verified by musicians.
+        </text>
+      </g>
     </g>
-    {/* Venues description block */}
-    <g>
-      <rect
-        x={23}
-        y={503}
-        width={625}
-        height={124}
-        rx={7}
-        ry={7}
-        fill="#EFEFEF"
-      />
-      <text
-        x={43}
-        y={540}
-        textAnchor="start"
-        fontFamily="Inter, sans-serif"
-        fontSize={24}
-        fill="#000"
-      >
-        Venues, Festivals, Wineries, Breweries, Coffee
-      </text>
-      <text
-        x={43}
-        y={572}
-        textAnchor="start"
-        fontFamily="Inter, sans-serif"
-        fontSize={24}
-        fill="#000"
-      >
-        Shops; Hundreds of thousands of contacts
-      </text>
-      <text
-        x={43}
-        y={604}
-        textAnchor="start"
-        fontFamily="Inter, sans-serif"
-        fontSize={24}
-        fill="#000"
-      >
-        thoroughly verified by musicians.
-      </text>
+
+    {/* Mobile copy (centered + readability boost) */}
+    <g
+      className="landing-map-copy landing-map-copy--mobile"
+      style={{
+        // IMPORTANT:
+        // We scale this group up on small screens (when the framed map scales down).
+        // Use an explicit pivot around the viewBox center so the blocks stay centered
+        // across *all* mobile widths (no breakpoint-specific drift).
+        transformBox: "view-box",
+        transformOrigin: "0px 0px",
+        // Keep these blocks readable when the map scales down on mobile.
+        // Example: if map scale is 0.25, we scale this group by 2 to net ~0.5.
+        // Pivot: (929, 509) = (viewBoxWidth/2, copy-stack center)
+        transform:
+          "translate(929px, 509px) scale(calc(max(1, 0.6 / var(--landing-map-scale, 1)))) translate(-929px, -509px)",
+      }}
+    >
+      {/* Centered stack (headline + description + CTA) */}
+      <g>
+        <rect
+          x={616.5}
+          y={315}
+          width={625}
+          height={181}
+          rx={7}
+          ry={7}
+          fill="#EFEFEF"
+        />
+        <text
+          x={929}
+          y={385}
+          textAnchor="middle"
+          fontFamily="Inter, sans-serif"
+          fontSize={62}
+          fill="#000"
+        >
+          100,000+ Contacts
+        </text>
+        <text
+          x={929}
+          y={455}
+          textAnchor="middle"
+          fontFamily="Inter, sans-serif"
+          fontSize={62}
+          fill="#000"
+        >
+          - Coast to Coast
+        </text>
+      </g>
+
+      {/* Venues description block */}
+      <g>
+        <rect
+          x={616.5}
+          y={503}
+          width={625}
+          height={124}
+          rx={7}
+          ry={7}
+          fill="#EFEFEF"
+        />
+        <text
+          x={636.5}
+          y={540}
+          textAnchor="start"
+          fontFamily="Inter, sans-serif"
+          fontSize={24}
+          fill="#000"
+        >
+          Venues, Festivals, Wineries, Breweries, Coffee
+        </text>
+        <text
+          x={636.5}
+          y={572}
+          textAnchor="start"
+          fontFamily="Inter, sans-serif"
+          fontSize={24}
+          fill="#000"
+        >
+          Shops; Hundreds of thousands of contacts
+        </text>
+        <text
+          x={636.5}
+          y={604}
+          textAnchor="start"
+          fontFamily="Inter, sans-serif"
+          fontSize={24}
+          fill="#000"
+        >
+          thoroughly verified by musicians.
+        </text>
+      </g>
+
+      {/* Learn about the Map button (inside SVG on mobile) */}
+      <a href="/map" aria-label="Learn about the Map">
+        <g style={{ cursor: "pointer" }}>
+          <rect
+            /* Left-align to the blocks above */
+            x={616.5}
+            y={638}
+            width={420}
+            height={64}
+            rx={8}
+            ry={8}
+            fill="#F1F1F1"
+            stroke="#5DAB68"
+            strokeWidth={2}
+          />
+          <text
+            x={846.5}
+            y={670}
+            textAnchor="middle"
+            dominantBaseline="central"
+            fontFamily="Inter, sans-serif"
+            fontSize={28}
+            fill="#5DAB68"
+          >
+            Learn about the Map
+          </text>
+        </g>
+      </a>
     </g>
     {/* Learn about the Map button - MOVED TO HTML OVERLAY IN PAGE.TSX */}
     {/* <Link href="/map">

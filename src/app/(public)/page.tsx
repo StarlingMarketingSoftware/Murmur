@@ -667,9 +667,17 @@ export default function HomePage() {
 
 		const DESIGN_WIDTH_PX = 1884;
 		const SCALE_BREAKPOINT_PX = 1582;
-		const MIN_SCALE_BREAKPOINT_PX = 650;
-		const MIN_SCALE = 0.33;
-		const SIDE_PADDING_PX = 32;
+		const MOBILE_BREAKPOINT_PX = 767;
+		const SIDE_PADDING_DESKTOP_PX = 32;
+		const MAP_BORDER_PX = 3;
+		const MAP_PADDING_DESKTOP_PX = 16;
+		const MAP_PADDING_MOBILE_PX = 0;
+
+		const getLandingZoom = (el: HTMLElement) => {
+			const zoomVar = getComputedStyle(el).getPropertyValue('--landing-zoom');
+			const zoom = Number.parseFloat(zoomVar);
+			return Number.isFinite(zoom) && zoom > 0 ? zoom : 1;
+		};
 
 		const setLandingMapScale = () => {
 			const wrapper = landingMapWrapperRef.current;
@@ -679,12 +687,20 @@ export default function HomePage() {
 			const normalizedViewportWidthPx =
 				window.innerWidth * ((window.devicePixelRatio || 1) / baseDpr);
 
+			const landingZoom = getLandingZoom(wrapper);
+			const isMobile = normalizedViewportWidthPx <= MOBILE_BREAKPOINT_PX;
+			const sidePaddingPx = isMobile ? 0 : SIDE_PADDING_DESKTOP_PX;
+			const mapPaddingPx = isMobile ? MAP_PADDING_MOBILE_PX : MAP_PADDING_DESKTOP_PX;
+
+			// Fit the *outer* framed map (content + padding + border) to the viewport.
+			const mapOuterWidthPx = DESIGN_WIDTH_PX + (MAP_BORDER_PX + mapPaddingPx) * 2;
+			const availableWidthPx = Math.max(0, normalizedViewportWidthPx - sidePaddingPx);
+			const fitScale = availableWidthPx / (mapOuterWidthPx * landingZoom);
+
 			let scale = 1;
-			if (normalizedViewportWidthPx <= MIN_SCALE_BREAKPOINT_PX) {
-				scale = MIN_SCALE;
-			} else if (normalizedViewportWidthPx <= SCALE_BREAKPOINT_PX) {
-				scale = (normalizedViewportWidthPx - SIDE_PADDING_PX) / DESIGN_WIDTH_PX;
-				scale = Math.max(MIN_SCALE, Math.min(1, scale));
+			if (normalizedViewportWidthPx <= SCALE_BREAKPOINT_PX) {
+				// Fill the viewport width (no mobile side gutters), never exceed 1:1.
+				scale = Math.max(0, Math.min(1, fitScale));
 			}
 
 			wrapper.style.setProperty('--landing-map-scale', String(scale));
@@ -1084,7 +1100,7 @@ export default function HomePage() {
 			</div>
 
 			{/* Start Free Trial Button Section */}
-			<div className="w-full bg-white flex flex-col items-center" style={{ paddingTop: '124px' }}>
+			<div className="landing-map-section w-full bg-white flex flex-col items-center">
 				<Link
 					href={urls.freeTrial.index}
 					className="landing-free-trial-btn hidden md:flex items-center justify-center bg-transparent cursor-pointer text-center"
@@ -1104,6 +1120,7 @@ export default function HomePage() {
 						{/* Overlay "Learn about the Map" button with anti-scaling logic */}
 						<Link
 							href="/map"
+							className="hidden md:flex items-center justify-center"
 							style={{
 								position: 'absolute',
 								// Matches SVG position x=38 y=638 plus container padding/border offset
@@ -1114,9 +1131,6 @@ export default function HomePage() {
 								backgroundColor: '#F1F1F1',
 								border: '2px solid #5DAB68',
 								borderRadius: '6px',
-								display: 'flex',
-								alignItems: 'center',
-								justifyContent: 'center',
 								cursor: 'pointer',
 								transformOrigin: 'top left',
 								// When map scales down, scale this button up (clamped) to remain readable
@@ -1132,7 +1146,7 @@ export default function HomePage() {
 
 				{/* Block below map */}
 				{/* Narrow layout: stack text on top, demo below */}
-				<div className="2xl:hidden w-full px-[14%]" style={{ marginTop: '145px' }}>
+				<div className="landing-after-map 2xl:hidden w-full px-[14%]">
 					<div className="mx-auto w-full max-w-[904px] bg-[#FAFAFA]">
 						{/* Text */}
 						<div className="bg-[#EFEFEF] rounded-[8px] px-6 py-8">
