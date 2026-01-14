@@ -324,6 +324,29 @@ body {
    Landing Page - Responsive Scaling
    ======================================== */
 
+/* Hero (mobile) - Start Free Trial CTA */
+.landing-hero-free-trial-btn {
+	/* Base sizing matches the hero copy width on large phones. */
+	width: 603px;
+	/* Default: viewport-safe (prevents edge clipping). */
+	max-width: calc(100vw - 32px);
+	/* Prefer safe-area aware sizing when supported. */
+	max-width: calc(100vw - 32px - env(safe-area-inset-left) - env(safe-area-inset-right));
+}
+
+/* If `zoom` isn't supported, the landing wrapper uses a transform scale.
+ * In that case we need to compensate so the CTA remains viewport-safe.
+ */
+@supports not (zoom: 1) {
+	.landing-hero-free-trial-btn {
+		max-width: calc((100vw - 32px) / var(--landing-zoom, 1));
+		max-width: calc(
+			(100vw - 32px - env(safe-area-inset-left) - env(safe-area-inset-right)) /
+				var(--landing-zoom, 1)
+		);
+	}
+}
+
 /* Start Free Trial Button */
 .landing-free-trial-btn {
 	/*

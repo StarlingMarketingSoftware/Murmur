@@ -947,10 +947,10 @@ export default function HomePage() {
 					</div>
 
 					{/* Content layer */}
-					<div className="relative z-10 flex flex-col h-full min-h-0 md:min-h-[750px] w-full items-center px-4 pt-[128px] md:pt-[164px]">
+					<div className="relative z-10 flex flex-col h-full min-h-0 md:min-h-[750px] w-full items-center px-4 pt-[90px] md:pt-[164px]">
 						<div className="w-full max-w-[1132px] flex flex-col items-center shrink-0">
 							<h1
-								className="font-primary text-white font-normal leading-[1.05] text-center text-[clamp(44px,8.5vw,88px)]"
+								className="font-primary text-white font-normal leading-[1.05] text-center text-[clamp(36px,8.5vw,88px)]"
 								>
 								Built to get you booked.
 								<br />
@@ -958,7 +958,7 @@ export default function HomePage() {
 							</h1>
 						</div>
 						<div className="flex-[0.5]" />
-						<div className="w-full flex justify-center px-4 shrink-0">
+						<div className="hidden md:flex w-full justify-center px-4 shrink-0">
 							<LandingHeroSearchBar
 								initialWhy="[Booking]"
 								initialWhat="Wine, Beer, and Spirits"
@@ -967,40 +967,28 @@ export default function HomePage() {
 							/>
 						</div>
 						<div className="flex-1 md:flex-[2]" />
+						{/* Mobile-only spacer to push content down toward the bottom */}
+						<div
+							className="md:hidden"
+							style={{ height: 'calc(140px / var(--landing-zoom, 1))' }}
+						/>
 						<div className="flex flex-col justify-end pb-8 sm:pb-12 text-center shrink-0 w-full items-center">
-							<div
-								className="w-full"
-								style={{
-									width: '603px',
-									// Match the mobile hero CTA sizing so copy doesn't feel flush against the edges
-									// under the landing page zoom wrapper.
-									maxWidth: 'calc((100vw - 32px) / var(--landing-zoom, 1))',
-								}}
-							>
+							<div className="w-full max-w-[603px]">
 								<p className="font-inter font-normal text-[22px] xs:text-[24px] sm:text-[27px] text-[#C4C4C4] mb-2">
 									Every Contact in One Place
 								</p>
-								<p className="font-inter font-normal text-[14px] xs:text-[15px] sm:text-[18px] text-[#B8B8B8] leading-tight">
-									Murmur brings together more than 100,000+ venues, festivals, and
-								</p>
-								<p className="font-inter font-normal text-[14px] xs:text-[15px] sm:text-[18px] text-[#B8B8B8] leading-tight">
-									radio stations, with tools to actually reach them.
-								</p>
+							<p className="font-inter font-normal text-[11.5px] xs:text-[12.5px] sm:text-[18px] text-[#B8B8B8] leading-tight">
+								Murmur brings together more than 100,000+ venues, festivals, and
+							</p>
+							<p className="font-inter font-normal text-[11.5px] xs:text-[12.5px] sm:text-[18px] text-[#B8B8B8] leading-tight">
+								radio stations, with tools to actually reach them.
+							</p>
 							</div>
 							{/* Mobile-only CTA anchored to bottom of the hero/video area */}
-							<div
-								className="w-full flex justify-center md:hidden"
-								style={{ marginTop: 'calc(140px / var(--landing-zoom, 1))' }}
-							>
+							<div className="w-full flex justify-center md:hidden mt-4">
 								<Link
 									href={urls.freeTrial.index}
-									className="h-[56px] flex items-center justify-center text-white font-inter font-medium text-[16px] bg-[#53B060] border border-[#118521] rounded-[8px]"
-									style={{
-										width: '603px',
-										// This page is wrapped in `.landing-zoom-80` (zoom/scale), so we divide
-										// by `--landing-zoom` to keep the *rendered* width within the viewport.
-										maxWidth: 'calc((100vw - 32px) / var(--landing-zoom, 1))',
-									}}
+									className="landing-hero-free-trial-btn h-[56px] flex items-center justify-center text-white font-inter font-semibold text-[18px] bg-[#53B060] border-2 border-[#118521] rounded-[8px]"
 								>
 									Start Free Trial
 								</Link>
@@ -1099,7 +1087,7 @@ export default function HomePage() {
 			<div className="w-full bg-white flex flex-col items-center" style={{ paddingTop: '124px' }}>
 				<Link
 					href={urls.freeTrial.index}
-					className="landing-free-trial-btn flex items-center justify-center bg-transparent cursor-pointer text-center"
+					className="landing-free-trial-btn hidden md:flex items-center justify-center bg-transparent cursor-pointer text-center"
 				>
 					Start Free Trial
 				</Link>
