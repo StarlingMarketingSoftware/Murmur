@@ -2041,7 +2041,7 @@ const SvgComponent = (props: SVGProps<SVGSVGElement>) => (
             strokeWidth={2}
           />
           <text
-            x={846.5}
+            x={616.5 + 420 / 2}
             y={670}
             textAnchor="middle"
             dominantBaseline="central"
@@ -2049,7 +2049,7 @@ const SvgComponent = (props: SVGProps<SVGSVGElement>) => (
             fontSize={28}
             fill="#5DAB68"
           >
-            Learn about the Map
+            {"Learn about the Map"}
           </text>
         </g>
       </a>

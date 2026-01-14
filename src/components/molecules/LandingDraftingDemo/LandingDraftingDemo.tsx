@@ -173,6 +173,7 @@ export const LandingDraftingDemo: FC = () => {
 						<HybridPromptInput
 							defaultOpenFullAutoCustomInstructions
 							useStaticDropdownPosition
+							hideMobileStickyTestFooter
 							testMessage="Demo only"
 							handleGenerateTestDrafts={() => {
 								router.push('/free-trial');

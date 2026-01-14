@@ -168,6 +168,11 @@ export interface HybridPromptInputProps {
 	 * Useful when the component is rendered inside a scaled/transformed container (e.g. landing page demo).
 	 */
 	useStaticDropdownPosition?: boolean;
+	/**
+	 * Optional: when true, hide the fixed mobile sticky "Test / Go to Drafting" footer.
+	 * Useful for embedded/scaled demos (e.g. landing page) where fixed UI bleeds outside the demo frame.
+	 */
+	hideMobileStickyTestFooter?: boolean;
 }
 
 export const useHybridPromptInput = (props: HybridPromptInputProps) => {

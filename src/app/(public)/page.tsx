@@ -1149,19 +1149,19 @@ export default function HomePage() {
 				<div className="landing-after-map 2xl:hidden w-full px-[14%]">
 					<div className="mx-auto w-full max-w-[904px] bg-[#FAFAFA]">
 						{/* Text */}
-						<div className="bg-[#EFEFEF] rounded-[8px] px-6 py-8">
-							<p className="font-inter font-normal text-[clamp(40px,7vw,56px)] text-black leading-tight">
+						<div className="bg-[#EFEFEF] rounded-[8px] px-6 py-6">
+							<p className="font-inter font-normal text-[22px] xs:text-[24px] sm:text-[27px] text-black leading-tight">
 								We Did The Research
 							</p>
-							<p className="font-inter font-normal text-[18px] xs:text-[20px] text-black mt-4 break-words">
+							<p className="font-inter font-normal text-[11.5px] xs:text-[12.5px] sm:text-[18px] text-black leading-tight mt-2 break-words">
 								Take a look through every contact, and you&apos;ll get to see information on what styles they
 								book, their live music schedules, and even how to actually find the right person.
 							</p>
 							<Link
 								href="/research"
-								className="mt-6 inline-flex h-[46px] px-5 items-center justify-center border-2 border-[#5DAB68] rounded-[6px] bg-transparent"
+								className="mt-4 inline-flex h-[40px] px-4 items-center justify-center border-2 border-[#5DAB68] rounded-[6px] bg-transparent"
 							>
-								<span className="font-inter font-normal text-[18px] xs:text-[20px] text-[#5DAB68]">
+								<span className="font-inter font-normal text-[16px] xs:text-[18px] text-[#5DAB68]">
 									Learn about research
 								</span>
 							</Link>
@@ -1320,19 +1320,19 @@ export default function HomePage() {
 				<div className="2xl:hidden w-full px-[14%]" style={{ marginTop: '82px' }}>
 					<div className="mx-auto w-full max-w-[904px] bg-[#FAFAFA]">
 						{/* Text */}
-						<div className="bg-[#EFEFEF] rounded-[8px] px-6 py-8">
-							<p className="font-inter font-normal text-[clamp(40px,7vw,56px)] text-black leading-tight">
+						<div className="bg-[#EFEFEF] rounded-[8px] px-6 py-6">
+							<p className="font-inter font-normal text-[22px] xs:text-[24px] sm:text-[27px] text-black leading-tight">
 								Every Reply
 							</p>
-							<p className="font-inter font-normal text-[18px] xs:text-[20px] text-black mt-4 break-words">
+							<p className="font-inter font-normal text-[11.5px] xs:text-[12.5px] sm:text-[18px] text-black leading-tight mt-2 break-words">
 								Never miss a reply! Get full context on each response, including what campaign it came from,
 								all in one place.
 							</p>
 							<Link
 								href="/inbox"
-								className="mt-6 inline-flex h-[46px] px-5 items-center justify-center border-2 border-[#5DAB68] rounded-[6px] bg-transparent"
+								className="mt-4 inline-flex h-[40px] px-4 items-center justify-center border-2 border-[#5DAB68] rounded-[6px] bg-transparent"
 							>
-								<span className="font-inter font-normal text-[18px] xs:text-[20px] text-[#5DAB68]">
+								<span className="font-inter font-normal text-[16px] xs:text-[18px] text-[#5DAB68]">
 									Learn about Inbox
 								</span>
 							</Link>
@@ -1446,18 +1446,18 @@ export default function HomePage() {
 				<div className="2xl:hidden w-full px-[14%]" style={{ marginTop: '75px' }}>
 					<div className="mx-auto w-full max-w-[904px] bg-[#FAFAFA]">
 						{/* Text */}
-						<div className="bg-[#EFEFEF] rounded-[8px] px-6 py-8">
-							<p className="font-inter font-normal text-[clamp(40px,7vw,56px)] text-black leading-tight">
+						<div className="bg-[#EFEFEF] rounded-[8px] px-6 py-6">
+							<p className="font-inter font-normal text-[22px] xs:text-[24px] sm:text-[27px] text-black leading-tight">
 								Emails That Land
 							</p>
-							<p className="font-inter font-normal text-[18px] xs:text-[20px] text-black mt-4 break-words">
+							<p className="font-inter font-normal text-[11.5px] xs:text-[12.5px] sm:text-[18px] text-black leading-tight mt-2 break-words">
 								Emails not getting responses? Ditch the templates. Murmur drafts pitches based on your bio and date range that venues actually respond to.
 							</p>
 							<Link
 								href="/drafting"
-								className="mt-6 inline-flex h-[46px] px-5 items-center justify-center border-2 border-[#5DAB68] rounded-[6px] bg-transparent"
+								className="mt-4 inline-flex h-[40px] px-4 items-center justify-center border-2 border-[#5DAB68] rounded-[6px] bg-transparent"
 							>
-								<span className="font-inter font-normal text-[18px] xs:text-[20px] text-[#5DAB68]">
+								<span className="font-inter font-normal text-[16px] xs:text-[18px] text-[#5DAB68]">
 									Learn about Drafting
 								</span>
 							</Link>

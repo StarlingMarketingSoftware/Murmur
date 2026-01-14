@@ -1147,7 +1147,7 @@ const SortableAIBlock = ({
 												>
 													<span
 														className={cn(
-															'font-inter font-normal italic text-[14px] transition-colors',
+															'font-inter font-normal italic text-[14px] max-[480px]:text-[12px] transition-colors',
 															selectedPowerMode === 'normal'
 																? 'text-[#000000]'
 																: 'text-[#9E9E9E]'
@@ -1179,7 +1179,7 @@ const SortableAIBlock = ({
 												>
 													<span
 														className={cn(
-															'font-inter font-normal italic text-[14px] transition-colors',
+															'font-inter font-normal italic text-[14px] max-[480px]:text-[12px] transition-colors',
 															selectedPowerMode === 'high'
 																? 'text-[#000000]'
 																: 'text-[#9E9E9E]'
@@ -1857,8 +1857,8 @@ const SortableAIBlock = ({
 																	onClick={() => setIsCustomInstructionsOpen(true)}
 																	className={cn(
 																		'w-[157px] h-[22px] bg-[#95CFFF] rounded-[8px] border-2 border-black',
-																		'flex items-center justify-center gap-1 px-2',
-																		'font-inter font-semibold text-[11px] leading-none text-black',
+																		'flex items-center justify-center gap-1 px-2 max-[480px]:gap-[2px] max-[480px]:px-1',
+																		'font-inter font-semibold text-[11px] max-[480px]:text-[9px] leading-none text-black whitespace-nowrap',
 																		'hover:brightness-[0.98] active:brightness-[0.95]'
 																	)}
 																	aria-label="Custom Instructions"
@@ -1879,7 +1879,7 @@ const SortableAIBlock = ({
 																aria-label="Custom Instructions"
 															>
 																<div className="h-[22px] flex items-center justify-between px-2">
-																	<span className="font-inter font-semibold text-[11px] leading-none text-black">
+																	<span className="font-inter font-semibold text-[11px] max-[480px]:text-[9px] leading-none text-black whitespace-nowrap">
 																		Custom Instructions
 																	</span>
 																	<button
@@ -2670,6 +2670,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		isNarrowestDesktop,
 		hideDraftButton,
 		useStaticDropdownPosition,
+		hideMobileStickyTestFooter,
 	} = props;
 
 	// Track if the user has attempted to Test to control error styling
@@ -4082,7 +4083,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 									className="pointer-events-none absolute -inset-[3px] z-[60] rounded-[8px] border-[3px] border-black"
 								/>
 							)}
-							{/* Mobile-only gradient background overlay starting under Mode divider */}
+							{/* Mobile-only background overlay starting under Mode divider (match desktop fill) */}
 							{isMobile && activeTab === 'main' && !showTestPreview && overlayTopPx !== null && (
 								<div
 									style={{
@@ -4091,8 +4092,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 										right: 0,
 										top: overlayTopPx,
 										bottom: 0,
-										background:
-											'linear-gradient(to bottom, rgba(222,242,225,0.71) 0%, rgba(222,242,225,0.5) 40%, rgba(222,242,225,0.25) 80%, rgba(222,242,225,0.15) 100%)',
+										background: '#A6E2A8',
 										pointerEvents: 'none',
 										zIndex: -1,
 										// Square off the top corners so the fill meets the border flush on mobile
@@ -4177,7 +4177,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 												{!compactLeftOnly && <div className="w-[130px] shrink-0" />}
 												<div
 													ref={modeContainerRef}
-													className="relative flex items-center gap-[78px] max-[480px]:gap-0 max-[480px]:justify-between ml-[42px] max-[480px]:ml-[2px] flex-1 max-[480px]:w-auto max-[480px]:pr-[4.4vw]"
+													className="relative flex items-center gap-[78px] max-[480px]:gap-0 max-[480px]:justify-between ml-[42px] max-[480px]:ml-[2px] flex-1 max-[480px]:w-auto max-[480px]:px-[24px]"
 													data-hover-description-suppress="true"
 												>
 													<DndContext
@@ -5864,12 +5864,12 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																			'rounded-[8px] border-[3px]',
 																			bgClass,
 																			borderClass,
-																			'flex items-center justify-start px-3',
-																			'font-inter font-medium text-[14px] text-black',
+																			'flex items-center justify-start px-3 max-[480px]:px-2',
+																			'font-inter font-medium text-[14px] max-[480px]:text-[12px] max-[480px]:leading-none text-black',
 																			'group/hybrid-core'
 																		)}
 																	>
-																		<span className="pr-3 group-hover/hybrid-core:pr-[130px]">
+																		<span className="pr-3 group-hover/hybrid-core:pr-[130px] whitespace-nowrap">
 																			{label}
 																		</span>
 																		{/* Expand chevron (matches Text pill) */}
@@ -5938,7 +5938,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																		className="h-[28px] flex items-center justify-start px-3 relative cursor-pointer select-none"
 																		aria-label={`Collapse ${label}`}
 																	>
-																		<span className="pr-[130px] font-inter font-medium text-[14px] text-black">
+																		<span className="pr-[130px] font-inter font-medium text-[14px] max-[480px]:text-[12px] max-[480px]:leading-none text-black whitespace-nowrap">
 																			{label}
 																		</span>
 																		{/* Advanced chrome (always visible while expanded) */}
@@ -6813,7 +6813,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 										)}
 
 										{/* Mobile sticky Test button at page bottom */}
-										{!showTestPreview && (
+										{!hideMobileStickyTestFooter && !showTestPreview && (
 											<div className="hidden max-[480px]:block mobile-sticky-test-button">
 												<div className="fixed bottom-0 left-0 right-0 z-40">
 													<div className="flex w-full">
@@ -6885,29 +6885,31 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 													/>
 												</DraggableBox>
 												{/* Mobile sticky footer with Back to Testing and Go to Drafting */}
-												<div className="hidden max-[480px]:block mobile-landscape-sticky-preview-footer">
-													<div className="fixed bottom-0 left-0 right-0 z-40">
-														<div className="flex w-full">
-															<Button
-																type="button"
-																onClick={() => setShowTestPreview?.(false)}
-																className={cn(
-																	'h-[53px] flex-1 rounded-none bg-[#5DAB68] text-white font-times font-bold cursor-pointer flex items-center justify-center font-primary border-2 border-black border-r-0'
-																)}
-															>
-																Back to Testing
-															</Button>
-															<button
-																type="button"
-																onClick={() => onGoToDrafting?.()}
-																className="h-[53px] w-[92px] bg-[#EEEEEE] text-black font-inter text-[16px] leading-none border-2 border-[#626262] rounded-none flex-shrink-0 border-l-[#626262]"
-															>
-																<span className="block">Go to</span>
-																<span className="block">Drafting</span>
-															</button>
+												{!hideMobileStickyTestFooter && (
+													<div className="hidden max-[480px]:block mobile-landscape-sticky-preview-footer">
+														<div className="fixed bottom-0 left-0 right-0 z-40">
+															<div className="flex w-full">
+																<Button
+																	type="button"
+																	onClick={() => setShowTestPreview?.(false)}
+																	className={cn(
+																		'h-[53px] flex-1 rounded-none bg-[#5DAB68] text-white font-times font-bold cursor-pointer flex items-center justify-center font-primary border-2 border-black border-r-0'
+																	)}
+																>
+																	Back to Testing
+																</Button>
+																<button
+																	type="button"
+																	onClick={() => onGoToDrafting?.()}
+																	className="h-[53px] w-[92px] bg-[#EEEEEE] text-black font-inter text-[16px] leading-none border-2 border-[#626262] rounded-none flex-shrink-0 border-l-[#626262]"
+																>
+																	<span className="block">Go to</span>
+																	<span className="block">Drafting</span>
+																</button>
+															</div>
 														</div>
 													</div>
-												</div>
+												)}
 											</div>
 										</div>
 								  )}
