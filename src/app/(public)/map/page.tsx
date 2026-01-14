@@ -48,9 +48,14 @@ export default function MapPage() {
               Mapping
             </h1>
           </div>
-          <div className="flex justify-center overflow-hidden">
+          <div className="flex justify-center">
             <MuxPlayer
-              style={{ ...videoStyle, height: '772px', aspectRatio: '16/9' }}
+              style={{
+                ...videoStyle,
+                width: 'calc(100vw - 8px)',
+                maxWidth: '1372px',
+                aspectRatio: '16/9',
+              }}
               playbackId="C02P1SQEGXOZ00sb2s9qZrhVGqhLqgBDNy014vrcueeGH4"
               streamType="on-demand"
               autoPlay="muted"
@@ -60,104 +65,107 @@ export default function MapPage() {
               nohotkeys
             />
           </div>
-          <div className="flex justify-center mt-[196px]">
-            <div
-              style={{
-                width: '1347px',
-                height: '364px',
-                backgroundColor: '#FAFAFA',
-                position: 'relative',
-              }}
-            >
-              <div
-                style={{
-                  width: '678px',
-                  height: '327px',
-                  backgroundColor: '#EFEFEF',
-                  borderRadius: '6px',
-                  position: 'absolute',
-                  left: '24px',
-                  top: '17px',
-                  paddingLeft: '56px',
-                  paddingTop: '46px',
-                }}
-              >
-                <p className="font-inter font-bold text-[24px] text-black">Explore the Country:</p>
-                <p className="font-inter text-[23px] text-black mt-[24px] pr-[56px] leading-[45px] tracking-wide [word-spacing:5px]">
-                  Plan a city-wide tour in Los Angeles or Portland for a week of shows. Go explore
-                  100,000+ contacts from the Pacific to the Atlantic.
+
+          {/* Explore the Country */}
+          {/* Narrow layout (match landing page ultra-narrow typography/padding) */}
+          <div className="lg:hidden w-full mt-[196px] px-[14%]">
+            <div className="mx-auto w-full max-w-[904px] bg-[#FAFAFA]">
+              <div className="bg-[#EFEFEF] rounded-[8px] px-6 py-8">
+                <p className="font-inter font-normal text-[clamp(40px,7vw,56px)] text-black leading-tight">
+                  Explore the Country
+                </p>
+                <p className="font-inter font-normal text-[18px] xs:text-[20px] text-black mt-4 break-words">
+                  Plan a city-wide tour in Los Angeles or Portland for a week of shows. Go explore 100,000+
+                  contacts from the Pacific to the Atlantic.
                 </p>
               </div>
-              <div style={{ position: 'absolute', right: '59px', top: '37px', bottom: '41px' }}>
+
+              <div className="mt-6 bg-[#F1F1F1] rounded-[8px] px-6 pt-8 pb-10 overflow-hidden flex justify-center">
+                <MapDemo1 className="w-full h-auto max-w-[508px]" />
+              </div>
+            </div>
+          </div>
+
+          {/* Wide layout (original design) */}
+          <div className="hidden lg:flex justify-center mt-[196px] px-4">
+            <div className="w-full max-w-[1347px] bg-[#FAFAFA] flex items-stretch flex-row h-[364px]">
+              <div className="w-full max-w-[678px] bg-[#EFEFEF] rounded-[6px] ml-[24px] my-[17px] px-[56px] py-[46px] h-[327px]">
+                <p className="font-inter font-bold text-[24px] text-black">Explore the Country</p>
+                <p className="font-inter text-[23px] text-black mt-[24px] pr-[56px] leading-[45px] tracking-wide [word-spacing:5px]">
+                  Plan a city-wide tour in Los Angeles or Portland for a week of shows. Go explore 100,000+
+                  contacts from the Pacific to the Atlantic.
+                </p>
+              </div>
+              <div className="flex justify-center ml-auto mr-[59px] self-center">
                 <MapDemo1 />
               </div>
             </div>
           </div>
-          <div className="flex justify-center mt-[81px]">
-            <div
-              style={{
-                width: '1347px',
-                height: '364px',
-                backgroundColor: '#FAFAFA',
-                position: 'relative',
-              }}
-            >
-              <div
-                style={{
-                  width: '678px',
-                  height: '327px',
-                  backgroundColor: '#EFEFEF',
-                  borderRadius: '6px',
-                  position: 'absolute',
-                  right: '23px',
-                  top: '17px',
-                  paddingLeft: '56px',
-                  paddingTop: '46px',
-                }}
-              >
-                <p className="font-inter font-bold text-[24px] text-black">All Data in One Place:</p>
-                <p className="font-inter text-[23px] text-black mt-[24px] pr-[56px] leading-[45px] tracking-wide [word-spacing:5px]">
-                  Filter each search by category, whether you’re looking for coffee shops for gigs
-                  or radio stations for airplay.
+
+          {/* All Data in One Place */}
+          {/* Narrow layout (match landing page ultra-narrow typography/padding) */}
+          <div className="lg:hidden w-full mt-[81px] px-[14%]">
+            <div className="mx-auto w-full max-w-[904px] bg-[#FAFAFA]">
+              <div className="bg-[#EFEFEF] rounded-[8px] px-6 py-8">
+                <p className="font-inter font-normal text-[clamp(40px,7vw,56px)] text-black leading-tight">
+                  All Data in One Place:
+                </p>
+                <p className="font-inter font-normal text-[18px] xs:text-[20px] text-black mt-4 break-words">
+                  Filter each search by category, whether you're looking for coffee shops for gigs or radio stations for airplay.
                 </p>
               </div>
-              <div style={{ position: 'absolute', left: '55px', top: '17px', bottom: '31px' }}>
+
+              <div className="mt-6 bg-[#F1F1F1] rounded-[8px] px-6 pt-8 pb-10 overflow-hidden flex justify-center">
+                <WhatDemo className="w-full h-auto max-w-[450px] -translate-x-[11.75%]" />
+              </div>
+            </div>
+          </div>
+
+          {/* Wide layout (original design) */}
+          <div className="hidden lg:flex justify-center mt-[81px] px-4">
+            <div className="w-full max-w-[1347px] bg-[#FAFAFA] flex items-stretch flex-row-reverse h-[364px]">
+              <div className="w-full max-w-[678px] bg-[#EFEFEF] rounded-[6px] mr-[23px] my-[17px] px-[56px] py-[46px] h-[327px]">
+                <p className="font-inter font-bold text-[24px] text-black">All Data in One Place:</p>
+                <p className="font-inter text-[23px] text-black mt-[24px] pr-[56px] leading-[45px] tracking-wide [word-spacing:5px]">
+                  Filter each search by category, whether you're looking for coffee shops for gigs or radio stations for airplay.
+                </p>
+              </div>
+              <div className="flex justify-center mr-auto ml-[55px] self-center">
                 <WhatDemo />
               </div>
             </div>
           </div>
-          <div className="flex justify-center mt-[119px]">
-            <div
-              style={{
-                width: '1347px',
-                height: '364px',
-                backgroundColor: '#FAFAFA',
-                position: 'relative',
-              }}
-            >
-              <div
-                style={{
-                  width: '678px',
-                  height: '327px',
-                  backgroundColor: '#EFEFEF',
-                  borderRadius: '6px',
-                  position: 'absolute',
-                  left: '24px',
-                  top: '17px',
-                  paddingLeft: '56px',
-                  paddingTop: '46px',
-                }}
-              >
-                <p className="font-inter font-bold text-[24px] text-black">
+
+          {/* Zoom Closer, See the Details */}
+          {/* Narrow layout (match landing page ultra-narrow typography/padding) */}
+          <div className="lg:hidden w-full mt-[119px] px-[14%]">
+            <div className="mx-auto w-full max-w-[904px] bg-[#FAFAFA]">
+              <div className="bg-[#EFEFEF] rounded-[8px] px-6 py-8">
+                <p className="font-inter font-normal text-[clamp(40px,7vw,56px)] text-black leading-tight">
                   Zoom Closer, See the Details:
                 </p>
-                <p className="font-inter text-[23px] text-black mt-[24px] pr-[56px] leading-[45px] tracking-wide [word-spacing:5px]">
-                  Zoom in on San Francisco and see more contacts appear. The closer you get, the
-                  more you see.
+                <p className="font-inter font-normal text-[18px] xs:text-[20px] text-black mt-4 break-words">
+                  Zoom in on San Francisco and see more contacts appear. The closer you get, the more you see.
                 </p>
               </div>
-              <div style={{ position: 'absolute', right: '24px', top: '37px', bottom: '41px' }}>
-                <ZoomDemo />
+
+              <div className="mt-6 bg-[#F1F1F1] rounded-[8px] px-6 pt-8 pb-10 overflow-hidden flex justify-center">
+                <ZoomDemo className="w-full h-auto max-w-[561px]" />
+              </div>
+            </div>
+          </div>
+
+          {/* Wide layout (original design) */}
+          <div className="hidden lg:flex justify-center mt-[119px] px-4">
+            <div className="w-full max-w-[1347px] bg-[#FAFAFA] flex items-stretch flex-row h-[364px]">
+              <div className="w-full max-w-[678px] bg-[#EFEFEF] rounded-[6px] ml-[24px] my-[17px] px-[56px] py-[46px] h-[327px]">
+                <p className="font-inter font-bold text-[24px] text-black">Zoom Closer, See the Details:</p>
+                <p className="font-inter text-[23px] text-black mt-[24px] pr-[56px] leading-[45px] tracking-wide [word-spacing:5px]">
+                  Zoom in on San Francisco and see more contacts appear. The closer you get, the more you see.
+                </p>
+              </div>
+              <div className="flex justify-center ml-auto mr-[24px] self-center">
+                <ZoomDemo className="w-full max-w-[561px] h-auto" />
               </div>
             </div>
           </div>
