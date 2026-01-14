@@ -1,6 +1,6 @@
 'use client';
 
-import { FC, useState, useEffect } from 'react';
+import { FC, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useGetInboundEmails } from '@/hooks/queryHooks/useInboundEmails';
 import { useGetEmails } from '@/hooks/queryHooks/useEmails';
@@ -157,6 +157,20 @@ interface InboxSectionProps {
 	 * Useful when the parent container already controls spacing.
 	 */
 	noOuterPadding?: boolean;
+
+	/**
+	 * Forces the "desktop" layout even on mobile devices.
+	 * Useful for marketing embeds that are already scaled by a parent (e.g. ScaledToFit)
+	 * and should keep the same proportions as desktop.
+	 */
+	forceDesktopLayout?: boolean;
+
+	/**
+	 * Marketing/demo mode: prevents the inbox from capturing scroll/touch (so the page scroll
+	 * works normally) and keeps the demo pinned to the "top" state where the header/search
+	 * is visible.
+	 */
+	demoMode?: boolean;
 }
 
 /**
@@ -249,10 +263,14 @@ export const InboxSection: FC<InboxSectionProps> = ({
 	desktopWidth,
 	desktopHeight,
 	noOuterPadding = false,
+	forceDesktopLayout = false,
+	demoMode = false,
 }) => {
-	const isMobile = useIsMobile();
+	const detectedIsMobile = useIsMobile();
+	const isMobile = forceDesktopLayout ? false : Boolean(detectedIsMobile);
 	const { setDraftsTabHighlighted, setWriteTabHighlighted, setTopSearchHighlighted } =
 		useCampaignTopSearchHighlight();
+	const rootRef = useRef<HTMLDivElement | null>(null);
 
 	// Width constants based on narrow mode and mobile
 	// On mobile, we use calc() values for responsive sizing (4px margins on each side = 8px total)
@@ -776,6 +794,77 @@ export const InboxSection: FC<InboxSectionProps> = ({
 		setReplyMessage('');
 	};
 
+	// In demo mode, ensure the internal scroll position stays at the top so the header/search
+	// remains visible (especially on mobile where swipes can otherwise scroll the inbox UI).
+	const getDemoScrollEl = () => {
+		const root = rootRef.current;
+		if (!root) return null;
+		const mainBox = root.querySelector<HTMLElement>('[data-campaign-main-box="inbox"]');
+		// `CustomScrollbar` renders its scroll container as a `.scrollbar-hide` child.
+		return mainBox?.querySelector<HTMLElement>('.scrollbar-hide') ?? null;
+	};
+
+	// Run as early as possible to avoid a "scrolled" first paint.
+	useLayoutEffect(() => {
+		if (!demoMode) return;
+		const scrollEl = getDemoScrollEl();
+		if (!scrollEl) return;
+		scrollEl.scrollTop = 0;
+	}, [demoMode]);
+
+	useEffect(() => {
+		if (!demoMode) return;
+		const scrollEl = getDemoScrollEl();
+		if (!scrollEl) return;
+
+		const prevOverflowY = scrollEl.style.overflowY;
+		const prevScrollBehavior = scrollEl.style.scrollBehavior;
+
+		// Prevent internal scrolling in the demo embed.
+		scrollEl.style.overflowY = 'hidden';
+		scrollEl.style.scrollBehavior = 'auto';
+
+		const forceTop = () => {
+			// Use direct assignment to avoid smooth scrolling / layout jank in a demo embed.
+			scrollEl.scrollTop = 0;
+		};
+
+		// Beat mobile browser overflow-scroll restoration by re-applying for a few frames.
+		let rafId: number | null = null;
+		let rafCount = 0;
+		const rafTick = () => {
+			forceTop();
+			rafCount += 1;
+			if (rafCount < 8) {
+				rafId = window.requestAnimationFrame(rafTick);
+			}
+		};
+		rafId = window.requestAnimationFrame(rafTick);
+
+		// Also re-apply after the browser finishes restoring state.
+		const t0 = window.setTimeout(forceTop, 0);
+		const t1 = window.setTimeout(forceTop, 50);
+		const t2 = window.setTimeout(forceTop, 200);
+		const t3 = window.setTimeout(forceTop, 500);
+
+		// Safety: if anything tries to scroll it anyway, snap back.
+		const onScroll = () => {
+			if (scrollEl.scrollTop !== 0) forceTop();
+		};
+		scrollEl.addEventListener('scroll', onScroll, { passive: true });
+
+		return () => {
+			scrollEl.removeEventListener('scroll', onScroll);
+			window.clearTimeout(t0);
+			window.clearTimeout(t1);
+			window.clearTimeout(t2);
+			window.clearTimeout(t3);
+			if (rafId != null) window.cancelAnimationFrame(rafId);
+			scrollEl.style.overflowY = prevOverflowY;
+			scrollEl.style.scrollBehavior = prevScrollBehavior;
+		};
+	}, [demoMode, activeTab, selectedEmailId]);
+
 	if (!visibleEmails || visibleEmails.length === 0) {
 		return (
 			<div className={`w-full flex justify-center ${outerPaddingClass}`}>
@@ -1152,7 +1241,12 @@ export const InboxSection: FC<InboxSectionProps> = ({
 	}
 
 	return (
-		<div className={`w-full flex justify-center ${outerPaddingClass}`}>
+		<div
+			ref={rootRef}
+			className={`w-full flex justify-center ${outerPaddingClass} ${
+				demoMode ? 'pointer-events-none select-none' : ''
+			}`}
+		>
 			<CustomScrollbar
 				data-campaign-main-box="inbox"
 				className="flex flex-col items-center relative"

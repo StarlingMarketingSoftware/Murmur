@@ -1343,6 +1343,8 @@ export default function HomePage() {
 							<ScaledToFit baseWidth={856} baseHeight={535}>
 								<InboxSection
 									noOuterPadding
+									forceDesktopLayout
+									demoMode
 									desktopWidth={856}
 									desktopHeight={535}
 									allowedSenderEmails={Object.keys(sampleContactsByEmail)}
