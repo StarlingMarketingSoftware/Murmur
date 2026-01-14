@@ -69,6 +69,34 @@ body {
 	}
 }
 
+/* ========================================
+   Landing Hero - Mobile-safe first fold
+   ======================================== */
+
+.landing-hero {
+	/* Default before JS runs */
+	--landing-hero-visible-height: 100vh;
+	/* Responsive video framing (overridden on mobile below) */
+	--landing-hero-video-object-position: top;
+
+	/* Keep the hero truly viewport-height after zooming the page wrapper. */
+	height: calc(var(--landing-hero-visible-height) / var(--landing-zoom, 1));
+}
+
+@supports (height: 100svh) {
+	.landing-hero {
+		/* Small viewport height (matches first visible fold on mobile browsers) */
+		--landing-hero-visible-height: 100svh;
+	}
+}
+
+@media (max-width: 767px) {
+	.landing-hero {
+		/* Slightly less aggressive crop on portrait screens */
+		--landing-hero-video-object-position: center;
+	}
+}
+
 /* Subtle shadow for depth */
 .luxury-shadow {
 	box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02), 0 4px 8px rgba(0, 0, 0, 0.02),

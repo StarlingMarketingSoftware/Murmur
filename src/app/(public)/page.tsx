@@ -486,6 +486,7 @@ export default function HomePage() {
 	const heroVideoRef = useRef<any>(null);
 	const videoCarouselContainerRef = useRef<HTMLDivElement>(null);
 	const landingMapWrapperRef = useRef<HTMLDivElement>(null);
+	const heroLastVisibleHeightPxRef = useRef<number | null>(null);
 	const [currentVideoIndex, setCurrentVideoIndex] = useState(0);
 	const [displayIndex, setDisplayIndex] = useState(1); // Offset by 1 for the prepended last video
 	const [skipTransition, setSkipTransition] = useState(false);
@@ -545,7 +546,7 @@ export default function HomePage() {
 	const heroVideoStyle = {
 		// Fill the full hero width; crop (preferably bottom) as needed
 		'--media-object-fit': 'cover',
-		'--media-object-position': 'top',
+		'--media-object-position': 'var(--landing-hero-video-object-position, top)',
 		'--controls': 'none',
 		'--play-button': 'none',
 		'--center-play-button': 'none',
@@ -555,6 +556,66 @@ export default function HomePage() {
 		'--cast-button': 'none',
 		'--fullscreen-button': 'none',
 	} as any;
+
+	useEffect(() => {
+		const heroEl = heroRef.current;
+		if (!heroEl) return;
+
+		const readVisibleHeightPx = () => {
+			const vvHeight = window.visualViewport?.height;
+			const raw =
+				typeof vvHeight === 'number' && vvHeight > 0 ? vvHeight : window.innerHeight;
+			return Math.round(raw);
+		};
+
+		const setHeroVisibleHeightPx = (heightPx: number) => {
+			if (!Number.isFinite(heightPx) || heightPx <= 0) return;
+			if (heroLastVisibleHeightPxRef.current === heightPx) return;
+			heroLastVisibleHeightPxRef.current = heightPx;
+			heroEl.style.setProperty('--landing-hero-visible-height', `${heightPx}px`);
+		};
+
+		const isTextInputFocused = () => {
+			const active = document.activeElement;
+			if (!active) return false;
+			return (
+				active instanceof HTMLInputElement ||
+				active instanceof HTMLTextAreaElement ||
+				(active instanceof HTMLElement && active.isContentEditable)
+			);
+		};
+
+		let rafId: number | null = null;
+		const scheduleUpdate = () => {
+			if (rafId != null) return;
+			rafId = window.requestAnimationFrame(() => {
+				rafId = null;
+				// Avoid reacting to on-screen keyboard changes.
+				if (isTextInputFocused()) return;
+				setHeroVisibleHeightPx(readVisibleHeightPx());
+			});
+		};
+
+		// Initial set (and re-set after HMR without needing refresh)
+		scheduleUpdate();
+
+		// iOS Safari "rubber band" can change viewport metrics during scroll without a reliable
+		// resize-to-restore event. Listening to scroll keeps us from getting stuck.
+		window.addEventListener('resize', scheduleUpdate);
+		window.addEventListener('orientationchange', scheduleUpdate);
+		window.addEventListener('scroll', scheduleUpdate, { passive: true });
+		window.visualViewport?.addEventListener('resize', scheduleUpdate);
+		window.visualViewport?.addEventListener('scroll', scheduleUpdate);
+
+		return () => {
+			if (rafId != null) window.cancelAnimationFrame(rafId);
+			window.removeEventListener('resize', scheduleUpdate);
+			window.removeEventListener('orientationchange', scheduleUpdate);
+			window.removeEventListener('scroll', scheduleUpdate);
+			window.visualViewport?.removeEventListener('resize', scheduleUpdate);
+			window.visualViewport?.removeEventListener('scroll', scheduleUpdate);
+		};
+	}, []);
 
 	useEffect(() => {
 		// Check if browser is Chrome before running GSAP animations
@@ -851,11 +912,9 @@ export default function HomePage() {
 			<div className="landing-zoom-80">
 				<div
 					id="landing-hero"
-					className="relative w-full overflow-hidden bg-background parallax-container"
+					className="landing-hero relative w-full overflow-hidden bg-background parallax-container"
 					ref={heroRef}
 					data-parallax-speed="0.3"
-					// Keep the hero truly viewport-height after zooming the page wrapper.
-					style={{ height: 'calc(100dvh / var(--landing-zoom, 1))' }}
 				>
 				{/* SVG Filter for thinning text */}
 				<svg width="0" height="0" className="absolute">
@@ -888,7 +947,7 @@ export default function HomePage() {
 					</div>
 
 					{/* Content layer */}
-					<div className="relative z-10 flex flex-col h-full min-h-[750px] w-full items-center px-4 pt-[164px]">
+					<div className="relative z-10 flex flex-col h-full min-h-0 md:min-h-[750px] w-full items-center px-4 pt-[128px] md:pt-[164px]">
 						<div className="w-full max-w-[1132px] flex flex-col items-center shrink-0">
 							<h1
 								className="font-primary text-white font-normal leading-[1.05] text-center text-[clamp(44px,8.5vw,88px)]"
@@ -907,17 +966,45 @@ export default function HomePage() {
 								readOnly
 							/>
 						</div>
-						<div className="flex-[2]" />
-						<div className="flex flex-col justify-end pb-8 sm:pb-12 text-center shrink-0">
-							<p className="font-inter font-normal text-[27px] text-[#C4C4C4] mb-2">
-								Every Contact in One Place
-							</p>
-							<p className="font-inter font-normal text-[18px] text-[#B8B8B8] leading-tight">
-								Murmur brings together more than 100,000+ venues, festivals, and
-							</p>
-							<p className="font-inter font-normal text-[18px] text-[#B8B8B8] leading-tight">
-								radio stations, with tools to actually reach them.
-							</p>
+						<div className="flex-1 md:flex-[2]" />
+						<div className="flex flex-col justify-end pb-8 sm:pb-12 text-center shrink-0 w-full items-center">
+							<div
+								className="w-full"
+								style={{
+									width: '603px',
+									// Match the mobile hero CTA sizing so copy doesn't feel flush against the edges
+									// under the landing page zoom wrapper.
+									maxWidth: 'calc((100vw - 32px) / var(--landing-zoom, 1))',
+								}}
+							>
+								<p className="font-inter font-normal text-[22px] xs:text-[24px] sm:text-[27px] text-[#C4C4C4] mb-2">
+									Every Contact in One Place
+								</p>
+								<p className="font-inter font-normal text-[14px] xs:text-[15px] sm:text-[18px] text-[#B8B8B8] leading-tight">
+									Murmur brings together more than 100,000+ venues, festivals, and
+								</p>
+								<p className="font-inter font-normal text-[14px] xs:text-[15px] sm:text-[18px] text-[#B8B8B8] leading-tight">
+									radio stations, with tools to actually reach them.
+								</p>
+							</div>
+							{/* Mobile-only CTA anchored to bottom of the hero/video area */}
+							<div
+								className="w-full flex justify-center md:hidden"
+								style={{ marginTop: 'calc(140px / var(--landing-zoom, 1))' }}
+							>
+								<Link
+									href={urls.freeTrial.index}
+									className="h-[56px] flex items-center justify-center text-white font-inter font-medium text-[16px] bg-[#53B060] border border-[#118521] rounded-[8px]"
+									style={{
+										width: '603px',
+										// This page is wrapped in `.landing-zoom-80` (zoom/scale), so we divide
+										// by `--landing-zoom` to keep the *rendered* width within the viewport.
+										maxWidth: 'calc((100vw - 32px) / var(--landing-zoom, 1))',
+									}}
+								>
+									Start Free Trial
+								</Link>
+							</div>
 						</div>
 					</div>
 				</div>

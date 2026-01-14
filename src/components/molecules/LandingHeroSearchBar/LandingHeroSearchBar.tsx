@@ -50,10 +50,25 @@ export const LandingHeroSearchBar = ({
 	const [whatValue, setWhatValue] = useState(initialWhat);
 	const [whereValue, setWhereValue] = useState(initialWhere);
 	const [activeSection, setActiveSection] = useState<ActiveSection>(null);
-	const [isNearMeLocation, setIsNearMeLocation] = useState(false);
+	const [, setIsNearMeLocation] = useState(false);
 
 	const [userLocationName, setUserLocationName] = useState<string | null>(null);
 	const [isLoadingLocation, setIsLoadingLocation] = useState(false);
+
+	const handleSearchActivate = (event?: { preventDefault: () => void }) => {
+		event?.preventDefault();
+		setActiveSection(null);
+
+		// On mobile (below `md`) route to free-trial instead of the dashboard.
+		const isMobile = window.matchMedia('(max-width: 767px)').matches;
+		if (isMobile) {
+			router.push(urls.freeTrial.index);
+			return;
+		}
+
+		// Desktop: navigate to the dashboard with fromHome mode.
+		router.push(`${urls.murmur.dashboard.index}?fromHome=true`);
+	};
 
 	const searchContainerRef = useRef<HTMLDivElement>(null);
 	const whatInputRef = useRef<HTMLInputElement>(null);
@@ -814,10 +829,7 @@ export const LandingHeroSearchBar = ({
 				<div className="search-bar-inner">
 					<form
 						onSubmit={(e) => {
-							e.preventDefault();
-							setActiveSection(null);
-							// Navigate to the dashboard with fromHome mode
-							router.push(`${urls.murmur.dashboard.index}?fromHome=true`);
+							handleSearchActivate(e);
 						}}
 					>
 						{/* Keep the hero search bar from stretching full-width at < md (e.g. 767px). */}
@@ -1036,7 +1048,7 @@ export const LandingHeroSearchBar = ({
 										</div>
 									</div>
 
-									{/* Search button - navigates to dashboard with fromHome mode */}
+									{/* Search button - routes to free-trial on mobile */}
 									<button
 										type="submit"
 										className="landing-search-waltz-pulse flex absolute right-[6px] items-center justify-center w-[58px] max-[480px]:w-[46px] h-[62px] max-[480px]:h-[50px] z-40 cursor-pointer group"
@@ -1054,9 +1066,7 @@ export const LandingHeroSearchBar = ({
 										}}
 										aria-label="Search"
 										onClick={(e) => {
-											e.preventDefault();
-											setActiveSection(null);
-											router.push(`${urls.murmur.dashboard.index}?fromHome=true`);
+											handleSearchActivate(e);
 										}}
 									>
 										<SearchIconDesktop width={26} height={28} />
