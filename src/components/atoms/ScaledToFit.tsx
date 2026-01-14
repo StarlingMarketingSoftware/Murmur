@@ -10,6 +10,12 @@ export type ScaledToFitProps = PropsWithChildren<{
 	 */
 	baseWidth: number;
 	/**
+	 * Optional: use a different width for the "fit" calculation (px).
+	 * Useful when the content's *visual* width is larger than `baseWidth` due to transforms
+	 * (e.g. translated marketing SVGs), but you still want centering based on `baseWidth`.
+	 */
+	fitWidth?: number;
+	/**
 	 * The "designed" height of the content inside (px).
 	 * The wrapper will reserve `baseHeight * scale` so the scaled content doesn't overflow.
 	 */
@@ -21,7 +27,7 @@ export type ScaledToFitProps = PropsWithChildren<{
  * Scales fixed-size demo content down to fit the available width (no horizontal scrollbars).
  * Useful for marketing/landing page embeds that use pixel-perfect demo components.
  */
-export function ScaledToFit({ baseWidth, baseHeight, className, children }: ScaledToFitProps) {
+export function ScaledToFit({ baseWidth, fitWidth, baseHeight, className, children }: ScaledToFitProps) {
 	const containerRef = useRef<HTMLDivElement | null>(null);
 	const [containerWidth, setContainerWidth] = useState<number | null>(null);
 
@@ -42,9 +48,10 @@ export function ScaledToFit({ baseWidth, baseHeight, className, children }: Scal
 	}, []);
 
 	const scale = useMemo(() => {
-		if (!containerWidth || baseWidth <= 0) return 1;
-		return Math.min(1, containerWidth / baseWidth);
-	}, [baseWidth, containerWidth]);
+		const widthForScale = fitWidth ?? baseWidth;
+		if (!containerWidth || widthForScale <= 0) return 1;
+		return Math.min(1, containerWidth / widthForScale);
+	}, [baseWidth, fitWidth, containerWidth]);
 
 	const scaledHeight = useMemo(() => Math.ceil(baseHeight * scale), [baseHeight, scale]);
 

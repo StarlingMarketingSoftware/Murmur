@@ -1057,7 +1057,7 @@ export default function HomePage() {
 
 				{/* Block below map */}
 				{/* Narrow layout: stack text on top, demo below */}
-				<div className="2xl:hidden w-full pl-16 pr-16 xs:px-4" style={{ marginTop: '145px' }}>
+				<div className="2xl:hidden w-full px-[14%]" style={{ marginTop: '145px' }}>
 					<div className="mx-auto w-full max-w-[904px] bg-[#FAFAFA]">
 						{/* Text */}
 						<div className="bg-[#EFEFEF] rounded-[8px] px-6 py-8">
@@ -1228,7 +1228,7 @@ export default function HomePage() {
 
 				{/* Second block below map */}
 				{/* Narrow layout: stack text on top, demo below */}
-				<div className="2xl:hidden w-full pl-16 pr-16 xs:px-4" style={{ marginTop: '82px' }}>
+				<div className="2xl:hidden w-full px-[14%]" style={{ marginTop: '82px' }}>
 					<div className="mx-auto w-full max-w-[904px] bg-[#FAFAFA]">
 						{/* Text */}
 						<div className="bg-[#EFEFEF] rounded-[8px] px-6 py-8">
@@ -1354,7 +1354,7 @@ export default function HomePage() {
 
 				{/* Third block below map */}
 				{/* Narrow layout: stack text on top, demo below */}
-				<div className="2xl:hidden w-full pl-16 pr-16 xs:px-4" style={{ marginTop: '75px' }}>
+				<div className="2xl:hidden w-full px-[14%]" style={{ marginTop: '75px' }}>
 					<div className="mx-auto w-full max-w-[904px] bg-[#FAFAFA]">
 						{/* Text */}
 						<div className="bg-[#EFEFEF] rounded-[8px] px-6 py-8">
