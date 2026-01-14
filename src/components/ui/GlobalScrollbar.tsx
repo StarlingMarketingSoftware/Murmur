@@ -20,6 +20,7 @@ export function GlobalScrollbar() {
 	const isMobile = useIsMobile();
 	const [isMobileLandscape, setIsMobileLandscape] = useState<boolean | null>(null);
 	const pathname = usePathname();
+	const isLandingPage = typeof pathname === 'string' && pathname === '/';
 
 	const updateScrollbar = useCallback(() => {
 		const { scrollTop, scrollHeight, clientHeight } = document.documentElement;
@@ -234,7 +235,7 @@ export function GlobalScrollbar() {
 
 	return (
 		<div
-			className="fixed top-0 right-0 h-screen cursor-pointer z-[9999]"
+			className={`fixed top-0 right-0 h-screen cursor-pointer z-[9999] ${isLandingPage ? 'hidden sm:block' : ''}`}
 			style={{
 				width: '2px',
 				backgroundColor: 'transparent',

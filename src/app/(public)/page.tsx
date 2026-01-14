@@ -1543,7 +1543,7 @@ export default function HomePage() {
 
 			{/* Try Murmur Now CTA Section */}
 			<div className="w-full bg-white flex flex-col items-center justify-center h-[747px]">
-				<p className="font-inter font-normal text-[62px] text-black text-center">
+				<p className="font-inter font-normal text-[clamp(32px,9vw,62px)] text-black text-center leading-[1.05]">
 					Try Murmur Now
 				</p>
 				<Link
