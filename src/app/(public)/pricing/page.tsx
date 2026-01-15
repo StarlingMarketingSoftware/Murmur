@@ -7,6 +7,78 @@ import { usePricingPage } from './usePricingPage';
 import { cn } from '@/utils';
 import Link from 'next/link';
 
+type VenueColumns = [string[], string[], string[], string[]];
+
+const VENUE_NAMES = [
+	'Village Vangaurd',
+	'Smalls',
+	'Mezzrow',
+	'Blue Note',
+	'South',
+	"Chris'",
+	'TLA',
+	'The Mann',
+	'Time',
+	'Nublu',
+	'Ornithology',
+	"Dizzy's",
+	"Cliff Bell's",
+	'Franklin Music Hall',
+	'Union Transfer',
+	'The Met',
+	'Solar Myth',
+];
+
+const PIPELINE_COLUMNS = ['Contacts', 'Drafted', 'Sent', 'Replied'] as const;
+const PIPELINE_FILLED_BG_CLASSES = [
+	'bg-[#EB8586]', // Contacts
+	'bg-[#FFCD73]', // Drafted
+	'bg-[#53C076]', // Sent
+	'bg-[#4B91E0]', // Replied
+] as const;
+const PIPELINE_ROWS = 7;
+
+function mulberry32(seed: number) {
+	let t = seed;
+	return () => {
+		t += 0x6d2b79f5;
+		let x = t;
+		x = Math.imul(x ^ (x >>> 15), x | 1);
+		x ^= x + Math.imul(x ^ (x >>> 7), x | 61);
+		return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
+	};
+}
+
+function shuffle<T>(items: T[], random: () => number = Math.random) {
+	const array = [...items];
+	for (let i = array.length - 1; i > 0; i -= 1) {
+		const j = Math.floor(random() * (i + 1));
+		[array[i], array[j]] = [array[j], array[i]];
+	}
+	return array;
+}
+
+function getInitialVenueColumns(): VenueColumns {
+	const rng = mulberry32(1337);
+	const shuffledNames = shuffle(VENUE_NAMES, rng);
+	const columns: VenueColumns = [[], [], [], []];
+
+	// Ensure each column starts with at least 1 item.
+	for (let col = 0; col < 4; col += 1) {
+		const name = shuffledNames[col];
+		if (name) columns[col].push(name);
+	}
+
+	shuffledNames.slice(4).forEach((name) => {
+		const availableColumns = [0, 1, 2, 3].filter((col) => columns[col].length < PIPELINE_ROWS);
+		const chosenCol =
+			availableColumns[Math.floor(rng() * availableColumns.length)] ?? availableColumns[0] ?? 0;
+		columns[chosenCol].push(name);
+	});
+
+	return columns;
+}
+
 function formatCount(value: number) {
 	return value.toLocaleString('en-US');
 }
@@ -162,6 +234,138 @@ function LiveNumber({
 
 export default function Products() {
 	const { billingCycle, setBillingCycle } = usePricingPage();
+	const [venueColumns, setVenueColumns] = useState<VenueColumns>(getInitialVenueColumns);
+
+	useEffect(() => {
+		const prefersReducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+		if (prefersReducedMotion) return;
+
+		const stepIntervalMs = 950;
+
+		const step = () => {
+			// No sliding—items "teleport" between columns.
+			// Keep each column packed from the top (no gaps) and never fully empty.
+			setVenueColumns((prev) => {
+				const next: VenueColumns = [
+					[...prev[0]],
+					[...prev[1]],
+					[...prev[2]],
+					[...prev[3]],
+				];
+
+				const MIN_PER_COLUMN = 1;
+
+				// Target a balanced spread so we don't starve any column.
+				// With 17 venues: [4, 4, 4, 5] (extra weight to the last column).
+				const total = next.reduce((sum, col) => sum + col.length, 0);
+				const base = Math.floor(total / 4);
+				const remainder = total % 4;
+				const targets = [base, base, base, base];
+				for (let i = 0; i < remainder; i += 1) targets[3 - i] += 1;
+
+				const counts = next.map((col) => col.length);
+				const deviations = counts.map((count, idx) => Math.abs(count - targets[idx]));
+				const maxDeviation = Math.max(...deviations);
+				const totalDeviation = deviations.reduce((sum, d) => sum + d, 0);
+
+				// Mostly move 1, but occasionally 2–3; more likely when we're far from target.
+				let movesThisTick = 1;
+				const r = Math.random();
+				if (r < 0.82) movesThisTick = 1;
+				else if (r < 0.95) movesThisTick = 2;
+				else movesThisTick = 3;
+
+				if (maxDeviation >= 3 || totalDeviation >= 7) {
+					movesThisTick = Math.random() < 0.6 ? 2 : 3;
+				}
+
+				const scoreCounts = (c: number[]) =>
+					c.reduce((sum, count, idx) => sum + (count - targets[idx]) ** 2, 0);
+
+				const edges = [
+					{ from: 0, to: 1 },
+					{ from: 1, to: 2 },
+					{ from: 2, to: 3 },
+					{ from: 3, to: 0 },
+				];
+
+				for (let i = 0; i < movesThisTick; i += 1) {
+					const currentCounts = next.map((col) => col.length);
+					const beforeScore = scoreCounts(currentCounts);
+
+					const candidates = edges
+						.filter(
+							(edge) =>
+								next[edge.from].length > MIN_PER_COLUMN && next[edge.to].length < PIPELINE_ROWS
+						)
+						.map((edge) => {
+							const afterCounts = [...currentCounts];
+							afterCounts[edge.from] -= 1;
+							afterCounts[edge.to] += 1;
+							const afterScore = scoreCounts(afterCounts);
+							const improvement = beforeScore - afterScore;
+
+							// Small baseline weight to keep motion even when perfectly balanced.
+							let weight = 0.15 + Math.max(0, improvement) * 2;
+
+							// If Replied is overloaded and Contacts is light, wrap becomes more likely.
+							if (edge.from === 3 && edge.to === 0) {
+								const wrapNeed = (currentCounts[3] - targets[3]) - (currentCounts[0] - targets[0]);
+								weight *= 0.25 + Math.max(0, wrapNeed) * 0.6;
+							} else {
+								// Favor forward flow slightly when not wrapping.
+								weight *= 1.15;
+							}
+
+							// Tiny jitter to avoid repetitive patterns.
+							weight *= 0.9 + Math.random() * 0.2;
+
+							return { ...edge, afterScore, weight };
+						});
+
+					if (candidates.length === 0) break;
+
+					const bestAfter = Math.min(...candidates.map((c) => c.afterScore));
+					const top = candidates.filter((c) => c.afterScore <= bestAfter + 1);
+
+					const totalWeight = top.reduce((sum, c) => sum + c.weight, 0);
+					let threshold = Math.random() * totalWeight;
+					let chosen = top[0]!;
+					for (const c of top) {
+						threshold -= c.weight;
+						if (threshold <= 0) {
+							chosen = c;
+							break;
+						}
+					}
+
+					const name = next[chosen.from].shift();
+					if (!name) continue;
+					next[chosen.to].push(name);
+				}
+
+				// Safety: if a column ever becomes empty, restore it immediately.
+				for (let col = 0; col < 4; col += 1) {
+					if (next[col].length > 0) continue;
+					const donor = [0, 1, 2, 3]
+						.filter((d) => d !== col && next[d].length > MIN_PER_COLUMN)
+						.sort((a, b) => next[b].length - next[a].length)[0];
+					if (typeof donor !== 'number') continue;
+					const name = next[donor].shift();
+					if (!name) continue;
+					next[col].push(name);
+				}
+
+				return next;
+			});
+		};
+
+		const intervalId = window.setInterval(step, stepIntervalMs);
+
+		return () => {
+			window.clearInterval(intervalId);
+		};
+	}, []);
 
 	return (
 		<div className="w-full">
@@ -189,10 +393,34 @@ export default function Products() {
 			<section className="relative w-full h-[728px] bg-[#EFF6F0]">
 				{/* Top-box placeholders (empty outline only) */}
 				<div className="hidden lg:flex absolute top-[196px] left-1/2 -translate-x-[49px] gap-[11px] flex-nowrap z-10">
-					<div className="w-[234px] h-[349px] rounded-[8px] border-2 border-black bg-transparent" />
-					<div className="w-[234px] h-[349px] rounded-[8px] border-2 border-black bg-transparent" />
-					<div className="w-[234px] h-[349px] rounded-[8px] border-2 border-black bg-transparent" />
-					<div className="w-[234px] h-[349px] rounded-[8px] border-2 border-black bg-transparent" />
+					{PIPELINE_COLUMNS.map((title, boxIndex) => (
+						<div
+							key={title}
+							className="relative shrink-0 w-[234px] h-[349px] rounded-[8px] border-2 border-black bg-transparent flex flex-col items-center pt-[37px] pb-[22px] gap-[8px]"
+						>
+							<div className="absolute top-[10px] left-[12px] font-[var(--font-inter)] text-[15px] font-normal leading-none text-black">
+								{title}
+							</div>
+
+							{Array.from({ length: PIPELINE_ROWS }, (_, innerIndex) => {
+								const name = venueColumns[boxIndex][innerIndex];
+								const fillClassName = name ? PIPELINE_FILLED_BG_CLASSES[boxIndex] : 'bg-transparent';
+								return (
+									<div
+										key={innerIndex}
+										className={cn(
+											'w-[222px] h-[34px] rounded-[8px] border-2 border-black flex items-center px-[11px]',
+											fillClassName
+										)}
+									>
+										<span className="font-[var(--font-inter)] text-[14px] leading-none text-black truncate">
+											{name ?? '\u00A0'}
+										</span>
+									</div>
+								);
+							})}
+						</div>
+					))}
 				</div>
 
 				<div className="mx-auto h-full w-full max-w-[1200px] px-6">
