@@ -5,6 +5,7 @@ import { Typography } from '@/components/ui/typography';
 import { ProductList } from '@/components/organisms/ProductList/ProductList';
 import { usePricingPage } from './usePricingPage';
 import { cn } from '@/utils';
+import Clock from '@/components/atoms/_svg/Clock';
 import Link from 'next/link';
 
 type VenueColumns = [string[], string[], string[], string[]];
@@ -421,6 +422,15 @@ export default function Products() {
 							})}
 						</div>
 					))}
+
+					<div
+						aria-hidden="true"
+						className="pointer-events-none select-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-20"
+					>
+						<div className="-translate-x-[0px]">
+							<Clock focusable="false" className="w-[560px] h-[560px]" />
+						</div>
+					</div>
 				</div>
 
 				<div className="mx-auto h-full w-full max-w-[1200px] px-6">
