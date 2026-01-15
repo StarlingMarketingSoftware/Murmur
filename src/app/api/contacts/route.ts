@@ -62,7 +62,13 @@ const contactFilterSchema = z.object({
 	bboxNorth: z.coerce.number().optional(),
 	bboxEast: z.coerce.number().optional(),
 	bboxTitlePrefix: z.string().optional(),
+	// "From Home" demo mode: allows one specific search without a subscription.
+	// When true, only the pre-configured demo query is permitted for non-subscribed users.
+	fromHome: z.boolean().optional(),
 });
+
+// The only search query permitted for non-subscribed users in "from home" demo mode.
+const FROM_HOME_ALLOWED_QUERY = '[Booking] Wine, Beer, and Spirits (California)';
 
 export type ContactFilterData = z.infer<typeof contactFilterSchema>;
 
@@ -887,23 +893,7 @@ export async function GET(req: NextRequest) {
 			return apiUnauthorized();
 		}
 
-		// Check subscription status
-		const user = await prisma.user.findUnique({
-			where: { clerkId: userId },
-			select: { stripeSubscriptionStatus: true },
-		});
-
-		// Allow both active subscriptions and free trials
-		if (
-			!user ||
-			(user.stripeSubscriptionStatus !== StripeSubscriptionStatus.ACTIVE &&
-				user.stripeSubscriptionStatus !== StripeSubscriptionStatus.TRIALING)
-		) {
-			return apiBadRequest(
-				'An active subscription or free trial is required to search for contacts'
-			);
-		}
-
+		// Parse filters first so we can check for "from home" demo mode
 		const validatedFilters = getValidatedParamsFromUrl(req.url, contactFilterSchema);
 		if (!validatedFilters.success) {
 			return apiBadRequest(validatedFilters.error);
@@ -921,7 +911,38 @@ export async function GET(req: NextRequest) {
 			bboxNorth,
 			bboxEast,
 			bboxTitlePrefix,
+			fromHome,
 		} = validatedFilters.data;
+
+		// Check if this is a valid "from home" demo search (allows one specific search without subscription)
+		const isFromHomeDemoSearch =
+			fromHome === true &&
+			query?.trim().toLowerCase() === FROM_HOME_ALLOWED_QUERY.toLowerCase();
+
+		// Check subscription status
+		const user = await prisma.user.findUnique({
+			where: { clerkId: userId },
+			select: { stripeSubscriptionStatus: true },
+		});
+
+		const hasActiveSubscription =
+			user?.stripeSubscriptionStatus === StripeSubscriptionStatus.ACTIVE ||
+			user?.stripeSubscriptionStatus === StripeSubscriptionStatus.TRIALING;
+
+		// Allow both active subscriptions, free trials, OR the specific "from home" demo search
+		if (!hasActiveSubscription && !isFromHomeDemoSearch) {
+			return apiBadRequest(
+				'An active subscription or free trial is required to search for contacts'
+			);
+		}
+
+		// If user is in "from home" mode but trying a different query, block it
+		if (fromHome === true && !hasActiveSubscription && !isFromHomeDemoSearch) {
+			return apiBadRequest(
+				'Only the demo search is available without a subscription'
+			);
+		}
+
 		let locationFilter = location ?? null;
 
 		// --- Bounding-box override (map rectangle selection) ---

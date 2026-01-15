@@ -38,6 +38,9 @@ export const urls = {
 		},
 		detail: ((id) => `/pricing/${id}`) as DetailRoute,
 	},
+	freeTrial: {
+		index: '/free-trial',
+	},
 	contact: {
 		index: '/contact',
 	},

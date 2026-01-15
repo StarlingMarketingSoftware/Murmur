@@ -17,6 +17,86 @@ body {
 	-webkit-touch-callout: none;
 }
 
+/* Landing page "80% zoom" (zoomed-out view) */
+.landing-zoom-80 {
+	--landing-zoom: 0.8;
+	/* `zoom` behaves most like browser zoom (affects layout) */
+	zoom: var(--landing-zoom);
+	/* Keep full-width sections full-width after zoom */
+	width: calc(100% / var(--landing-zoom));
+	/* Re-center the widened box so content doesn't drift right */
+	margin-left: calc((100% - (100% / var(--landing-zoom))) / 2);
+	margin-right: calc((100% - (100% / var(--landing-zoom))) / 2);
+}
+
+/* Landing navbar: fixed-position safe zoom (no right drift) */
+.landing-navbar-zoom-80 {
+	--landing-zoom: 0.8;
+	left: 50%;
+	right: auto;
+	width: calc(100% / var(--landing-zoom));
+	transform: translateX(-50%) scale(var(--landing-zoom));
+	transform-origin: top center;
+}
+
+/* Compensate viewport-sized Tailwind utilities under zoom */
+.landing-zoom-80 .w-screen {
+	width: calc(100vw / var(--landing-zoom));
+}
+.landing-zoom-80 .h-screen {
+	height: calc(100vh / var(--landing-zoom));
+}
+.landing-zoom-80 .min-h-screen {
+	min-height: calc(100vh / var(--landing-zoom));
+}
+.landing-zoom-80 .h-dvh {
+	height: calc(100dvh / var(--landing-zoom));
+}
+.landing-zoom-80 .min-h-dvh {
+	min-height: calc(100dvh / var(--landing-zoom));
+}
+
+/* Fallback if `zoom` isn't supported */
+@supports not (zoom: 1) {
+	.landing-zoom-80 {
+		zoom: 1;
+		transform: scale(var(--landing-zoom));
+		transform-origin: top left;
+		width: calc(100% / var(--landing-zoom));
+		/* For the transform fallback, keep it anchored to the left */
+		margin-left: 0;
+		margin-right: 0;
+	}
+}
+
+/* ========================================
+   Landing Hero - Mobile-safe first fold
+   ======================================== */
+
+.landing-hero {
+	/* Default before JS runs */
+	--landing-hero-visible-height: 100vh;
+	/* Responsive video framing (overridden on mobile below) */
+	--landing-hero-video-object-position: top;
+
+	/* Keep the hero truly viewport-height after zooming the page wrapper. */
+	height: calc(var(--landing-hero-visible-height) / var(--landing-zoom, 1));
+}
+
+@supports (height: 100svh) {
+	.landing-hero {
+		/* Small viewport height (matches first visible fold on mobile browsers) */
+		--landing-hero-visible-height: 100svh;
+	}
+}
+
+@media (max-width: 767px) {
+	.landing-hero {
+		/* Slightly less aggressive crop on portrait screens */
+		--landing-hero-video-object-position: center;
+	}
+}
+
 /* Subtle shadow for depth */
 .luxury-shadow {
 	box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02), 0 4px 8px rgba(0, 0, 0, 0.02),
@@ -36,19 +116,348 @@ body {
 
 /* Remove CTA animation */
 .luxury-cta {
-	/* No animation */
+	animation: none;
 }
 
 /* Safari opacity animation fixes */
 [ref*='addFadeIn'],
 [ref*='addTextSlide'],
 [ref*='addContainerFade'] {
+	transform: translateZ(0);
 	-webkit-transform: translateZ(0);
+	backface-visibility: hidden;
 	-webkit-backface-visibility: hidden;
+	perspective: 1000px;
 	-webkit-perspective: 1000px;
 }
 
 /* Prevent Safari flicker on animated elements */
 * {
 	-webkit-font-smoothing: subpixel-antialiased;
+}
+
+/* Landing hero search button: 3/4 pulse (accent on beat 3) */
+.landing-search-waltz-pulse {
+	animation: landing-search-waltz-pulse 3s ease-in-out infinite;
+	will-change: background-color;
+}
+
+@keyframes landing-search-waltz-pulse {
+	/* Beat 1 (small) */
+	0% {
+		background-color: rgba(93, 171, 104, 0.49);
+	}
+	12% {
+		background-color: rgba(93, 171, 104, 0.58);
+	}
+	24% {
+		background-color: rgba(93, 171, 104, 0.49);
+	}
+
+	/* Beat 2 (small) */
+	33.333% {
+		background-color: rgba(93, 171, 104, 0.49);
+	}
+	45% {
+		background-color: rgba(93, 171, 104, 0.6);
+	}
+	57% {
+		background-color: rgba(93, 171, 104, 0.49);
+	}
+
+	/* Beat 3 (big accent) */
+	66.666% {
+		background-color: rgba(120, 206, 140, 0.78);
+	}
+	85% {
+		background-color: rgba(93, 171, 104, 0.58);
+	}
+	100% {
+		background-color: rgba(93, 171, 104, 0.49);
+	}
+}
+
+/* New subtle glow pulse for the entire search bar */
+.search-bar-glow-pulse {
+	animation: search-bar-glow-pulse 4.5s ease-in-out infinite;
+	will-change: opacity, box-shadow;
+}
+
+@keyframes search-bar-glow-pulse {
+	0%, 100% {
+		opacity: 0.2;
+		box-shadow: 0 0 12px 1px rgba(255, 255, 255, 0.2);
+	}
+	50% {
+		opacity: 0.5;
+		box-shadow: 0 0 22px 4px rgba(255, 255, 255, 0.45);
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.landing-search-waltz-pulse {
+		animation: none;
+	}
+	.search-bar-glow-pulse {
+		animation: none;
+	}
+}
+/* Video carousel - centered with smooth transitions */
+.video-carousel-container {
+	position: relative;
+	display: flex;
+	align-items: center;
+	/* Responsive slide sizing */
+	--video-carousel-item-width: min(946px, calc(100vw - 32px));
+	--video-carousel-gap: clamp(12px, 3vw, 32px);
+	/* Responsive indicator sizing */
+	--video-carousel-indicator-size: clamp(7px, 1.4vw, 10px);
+	--video-carousel-indicator-gap: clamp(10px, 2.2vw, 18px);
+	--video-carousel-indicator-bottom: clamp(16px, 3.5vw, 28px);
+	--video-carousel-indicator-active-width: clamp(46px, 10vw, 66px);
+	--video-carousel-indicator-active-height: clamp(8px, 1.6vw, 11px);
+	--video-carousel-indicator-active-radius: clamp(6px, 1.2vw, 8px);
+	/* Overall section height = slide height + py-16 (128px) */
+	height: calc((var(--video-carousel-item-width) * 532 / 946) + 128px);
+}
+
+.video-carousel-track {
+	display: flex;
+	gap: var(--video-carousel-gap);
+	position: absolute;
+	left: 50%;
+	transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+	will-change: transform;
+}
+
+.video-carousel-track.no-transition {
+	transition: none !important;
+}
+
+.video-carousel-item {
+	flex-shrink: 0;
+	width: var(--video-carousel-item-width);
+	/* Fallback sizing (in case aspect-ratio isn't supported) */
+	height: calc(var(--video-carousel-item-width) * 532 / 946);
+	aspect-ratio: 946 / 532;
+	overflow: hidden;
+	position: relative;
+	transition: transform 0.4s ease;
+	transform: scale(0.95);
+}
+
+.video-carousel-item.active {
+	transform: scale(1);
+}
+
+/* Overlay to block interaction and hide play button on non-active videos */
+.video-carousel-item:not(.active)::after {
+	content: '';
+	position: absolute;
+	inset: 0;
+	background: transparent;
+	pointer-events: auto;
+	z-index: 10;
+}
+
+/* Ensure iframe doesn't capture clicks on non-active videos */
+.video-carousel-item:not(.active) iframe {
+	pointer-events: none;
+}
+
+/* Video carousel indicators (5 dots + active progress pill) */
+.video-carousel-indicators {
+	position: absolute;
+	left: 50%;
+	bottom: var(--video-carousel-indicator-bottom);
+	transform: translateX(-50%);
+	display: flex;
+	align-items: center;
+	gap: var(--video-carousel-indicator-gap);
+	z-index: 20;
+	pointer-events: none;
+}
+
+.video-carousel-indicator {
+	position: relative;
+	width: var(--video-carousel-indicator-size);
+	height: var(--video-carousel-indicator-size);
+	background: #c8c8c8;
+	border-radius: 9999px;
+	overflow: hidden;
+	transition: width 240ms ease, height 240ms ease, border-radius 240ms ease;
+}
+
+.video-carousel-indicator.active {
+	width: var(--video-carousel-indicator-active-width);
+	height: var(--video-carousel-indicator-active-height);
+	border-radius: var(--video-carousel-indicator-active-radius);
+}
+
+.video-carousel-indicator-fill {
+	position: absolute;
+	left: 0;
+	top: 0;
+	height: 100%;
+	background: #888888;
+	border-radius: var(--video-carousel-indicator-active-radius);
+	will-change: width;
+	transition: width 120ms linear;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.video-carousel-track {
+		transition: none;
+	}
+	.video-carousel-item {
+		transition: none;
+	}
+	.video-carousel-indicator {
+		transition: none;
+	}
+	.video-carousel-indicator-fill {
+		transition: none;
+	}
+}
+
+/* ========================================
+   Landing Page - Responsive Scaling
+   ======================================== */
+
+/* Hero (mobile) - Start Free Trial CTA */
+.landing-hero-free-trial-btn {
+	/* Base sizing matches the hero copy width on large phones. */
+	width: 603px;
+	/* Default: viewport-safe (prevents edge clipping). */
+	max-width: calc(100vw - 32px);
+	/* Prefer safe-area aware sizing when supported. */
+	max-width: calc(100vw - 32px - env(safe-area-inset-left) - env(safe-area-inset-right));
+}
+
+/* If `zoom` isn't supported, the landing wrapper uses a transform scale.
+ * In that case we need to compensate so the CTA remains viewport-safe.
+ */
+@supports not (zoom: 1) {
+	.landing-hero-free-trial-btn {
+		max-width: calc((100vw - 32px) / var(--landing-zoom, 1));
+		max-width: calc(
+			(100vw - 32px - env(safe-area-inset-left) - env(safe-area-inset-right)) /
+				var(--landing-zoom, 1)
+		);
+	}
+}
+
+/* Start Free Trial Button */
+.landing-free-trial-btn {
+	/*
+	 * Keep the CTA full-size, but cap it to the visual viewport width.
+	 * This page is wrapped in `.landing-zoom-80` (zoom/scale), so we divide
+	 * by `--landing-zoom` to keep the *rendered* width within the viewport.
+	 */
+	width: 707px;
+	max-width: calc((100vw - 32px) / var(--landing-zoom, 1));
+	height: 57px;
+	border: 4px solid #118521;
+	border-radius: 10px;
+	color: #238731;
+	font-size: 18px;
+	font-weight: 500;
+	text-align: center;
+}
+
+/* Section right after the video carousel (contains the framed map) */
+.landing-map-section {
+	padding-top: 124px;
+}
+
+/* Wrapper controls the visible height in the document flow */
+.landing-map-wrapper {
+	--landing-map-scale: 1;
+	margin-top: 125px;
+	width: 100%;
+	display: flex;
+	justify-content: center;
+	overflow: visible;
+	/* Height tracks the scaled map */
+	height: calc(1073px * var(--landing-map-scale));
+}
+
+/* The actual map container with border and background */
+.landing-map-container {
+	position: relative;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 1884px;
+	height: 1073px;
+	border: 3px solid #000000;
+	border-radius: 8px;
+	background-color: #AFD6EF;
+	padding: 16px;
+	overflow: hidden;
+	transform-origin: top center;
+	transform: scale(var(--landing-map-scale));
+	flex-shrink: 0;
+}
+
+/* Landing map copy blocks inside the SVG */
+.landing-map-copy--mobile {
+	display: none;
+}
+
+/* Spacing between the map and the next section */
+.landing-after-map {
+	margin-top: 145px;
+}
+
+@media (max-width: 767px) {
+	.landing-map-copy--desktop {
+		display: none;
+	}
+
+	.landing-map-copy--mobile {
+		display: inline;
+	}
+
+	.landing-map-section {
+		/* ~45px visual gap below the carousel (account for page zoom) */
+		padding-top: calc(45px / var(--landing-zoom, 1));
+	}
+
+	.landing-map-wrapper {
+		/* Let the map sit directly under the section padding on mobile */
+		margin-top: 0;
+	}
+
+	.landing-map-container {
+		/* Let the SVG frame fill edge-to-edge on mobile */
+		padding: 0;
+	}
+
+	.landing-after-map {
+		/* ~70px visual gap below the map (account for page zoom) */
+		margin-top: calc(70px / var(--landing-zoom, 1));
+	}
+}
+
+/* At 1582px and below, scale proportionally */
+/* Scale factor at 1582px: (1582-32)/1884 = 0.823 */
+/* Scale factor at 1200px: (1200-32)/1884 = 0.620 */
+/* Scale factor at 900px: (900-32)/1884 = 0.461 */
+@media (max-width: 1582px) {
+	.landing-map-wrapper {
+		/* Fallback if JS doesn't run: scale proportionally */
+		--landing-map-scale: calc((100vw - 32px) / 1884px);
+	}
+}
+
+/* Minimum scale floor for very small screens */
+@media (max-width: 650px) {
+	.landing-map-wrapper {
+		/* If JS doesn't run: fit the map to the viewport (mobile is edge-to-edge). */
+		--landing-map-scale: calc(
+			(100vw - env(safe-area-inset-left) - env(safe-area-inset-right)) /
+				(1890px * var(--landing-zoom, 1))
+		);
+	}
 }

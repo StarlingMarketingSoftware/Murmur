@@ -45,10 +45,12 @@ interface UseDashboardOptions {
 	derivedTitle?: string;
 	/** If true, the derived title applies to ALL contacts (e.g., for restaurant searches) */
 	forceApplyDerivedTitle?: boolean;
+	/** If true, indicates user came from landing page and is in demo mode (allows one specific search without subscription) */
+	fromHome?: boolean;
 }
 
 export const useDashboard = (options: UseDashboardOptions = {}) => {
-	const { derivedTitle, forceApplyDerivedTitle = false } = options;
+	const { derivedTitle, forceApplyDerivedTitle = false, fromHome = false } = options;
 	/* UI */
 	const [hasSearched, setHasSearched] = useState(false);
 
@@ -83,9 +85,16 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 		/* HOOKS */
 	const { isFreeTrial, user } = useMe() || { isFreeTrial: false, user: null };
 
-	const canSearch =
+	const hasActiveSubscription =
 		user?.stripeSubscriptionStatus === StripeSubscriptionStatus.ACTIVE ||
 		user?.stripeSubscriptionStatus === StripeSubscriptionStatus.TRIALING;
+
+	// "From Home Demo Mode": user came from landing page and doesn't have a subscription.
+	// In this mode, they can only execute the one pre-configured demo search.
+	const isFromHomeDemoMode = fromHome && !hasActiveSubscription;
+
+	// Allow searching if user has subscription OR is in fromHome demo mode (for the demo query only)
+	const canSearch = hasActiveSubscription || fromHome;
 	const [selectedContactListRows, setSelectedContactListRows] = useState<
 		UserContactList[]
 	>([]);
@@ -132,6 +141,7 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 			bboxNorth: mapBboxFilter?.north,
 			bboxEast: mapBboxFilter?.east,
 			bboxTitlePrefix: mapBboxFilter?.titlePrefix ?? undefined,
+			fromHome,
 		},
 		enabled: hasSearched && !!activeSearchQuery && activeSearchQuery.trim().length > 0,
 	});
@@ -816,6 +826,7 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 		isPendingBatchUpdateContacts,
 		isFreeTrial,
 		canSearch,
+		isFromHomeDemoMode,
 		hasSearched,
 		handleResetSearch,
 		hoveredText,

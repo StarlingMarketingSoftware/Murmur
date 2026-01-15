@@ -20,6 +20,9 @@ export function GlobalScrollbar() {
 	const isMobile = useIsMobile();
 	const [isMobileLandscape, setIsMobileLandscape] = useState<boolean | null>(null);
 	const pathname = usePathname();
+	const hideOnMobileByRoute =
+		typeof pathname === 'string' &&
+		new Set(['/', '/map', '/research', '/inbox', '/drafting']).has(pathname);
 
 	const updateScrollbar = useCallback(() => {
 		const { scrollTop, scrollHeight, clientHeight } = document.documentElement;
@@ -223,18 +226,21 @@ export function GlobalScrollbar() {
 	}, [updateScrollbar]);
 
 	// Do not render the global scrollbar while a dialog is open.
-	// Also hide on the campaign and dashboard pages when in mobile landscape orientation.
+	// Also hide on mobile landscape orientation (touch devices).
 	const isCampaignPage =
 		typeof pathname === 'string' && pathname.startsWith('/murmur/campaign');
 	const isDashboardPage =
 		typeof pathname === 'string' && pathname.startsWith('/murmur/dashboard');
-	if (isDialogOpen || ((isCampaignPage || isDashboardPage) && isMobileLandscape)) {
+	// Keep these around for potential route-specific behavior, but the hide rule is now global.
+	void isCampaignPage;
+	void isDashboardPage;
+	if (isDialogOpen || isMobileLandscape) {
 		return null;
 	}
 
 	return (
 		<div
-			className="fixed top-0 right-0 h-screen cursor-pointer z-[9999]"
+			className={`fixed top-0 right-0 h-screen cursor-pointer z-[9999] ${hideOnMobileByRoute ? 'hidden sm:block' : ''}`}
 			style={{
 				width: '2px',
 				backgroundColor: 'transparent',

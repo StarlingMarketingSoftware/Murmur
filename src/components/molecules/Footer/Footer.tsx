@@ -9,6 +9,16 @@ export function Footer() {
 	const currentYear = new Date().getFullYear();
 	const pathname = usePathname();
 
+	// Hide footer on landing page, map page, and free-trial page
+	if (
+		pathname === urls.home.index ||
+		pathname === '/map' ||
+		pathname === urls.freeTrial.index ||
+		pathname.startsWith(`${urls.freeTrial.index}/`)
+	) {
+		return null;
+	}
+
 	const isLightFooter =
 		pathname === urls.pricing.index || pathname === urls.contact.index;
 
