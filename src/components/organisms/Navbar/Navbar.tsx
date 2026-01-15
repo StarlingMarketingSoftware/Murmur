@@ -85,6 +85,19 @@ export const Navbar = () => {
 		};
 	}, [isMobileMenuOpen]);
 
+	// If the viewport grows to desktop, ensure the mobile menu is closed (button is hidden on desktop).
+	useEffect(() => {
+		const DESKTOP_BREAKPOINT_PX = 1145;
+		const onResize = () => {
+			if (window.innerWidth >= DESKTOP_BREAKPOINT_PX) {
+				setMobileMenuOpen(false);
+			}
+		};
+		onResize();
+		window.addEventListener('resize', onResize, { passive: true });
+		return () => window.removeEventListener('resize', onResize);
+	}, []);
+
 	type NavItem = {
 		path: string;
 		label: string;
@@ -108,6 +121,13 @@ export const Navbar = () => {
 	const isFreeTrial =
 		pathname === urls.freeTrial.index || pathname.startsWith(`${urls.freeTrial.index}/`);
 	const isTransparentHeader = isOverLandingHero || isFreeTrial;
+	// When the mobile menu is open, the menu panel has a light background even on the landing hero.
+	// Force the hamburger/X icon to a dark color so we don't get a "double icon" feel through transparency.
+	const mobileMenuIconColor = isMobileMenuOpen
+		? 'bg-gray-700'
+		: isTransparentHeader
+			? 'bg-white/90'
+			: 'bg-gray-700';
 
 	// On `/free-trial` we show either the Clerk auth flow or embedded Stripe checkout;
 	// hide the header entirely in both cases so it doesn't distract or clip.
@@ -120,16 +140,29 @@ export const Navbar = () => {
 			{/* Main Navigation Bar - Artistic Glass */}
 			<nav
 				className={cn(
-					'fixed top-0 z-50 font-secondary',
-					// Landing page: zoom the fixed navbar without drifting horizontally.
-					isLandingNavbarZoom80 ? 'landing-navbar-zoom-80' : 'left-0 right-0',
-					// Keep a smooth fade-in when leaving the hero, but snap to transparent when re-entering it.
-					isTransparentHeader ? 'transition-none' : 'transition-colors duration-700',
-					isTransparentHeader
-						? 'bg-transparent'
-						: scrolled
-							? 'bg-background/70 backdrop-blur-xl border-b border-gray-200/20'
-							: 'bg-background/40 backdrop-blur-md'
+					'fixed z-50 font-secondary',
+					// Mobile: make the navbar "morph" into the dropdown card (so it doesn't feel split).
+					isMobileMenuOpen
+						? [
+								'top-4 left-4 right-4',
+								'rounded-lg bg-background/95 backdrop-blur-3xl',
+								'shadow-[0_18px_50px_rgba(0,0,0,0.18)]',
+								'overflow-hidden',
+								// Only animate vertical + visual properties (avoid "slides in from right" feel)
+								'transition-[top,background-color,box-shadow,border-radius] duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]',
+							]
+						: [
+								'top-0',
+								// Landing page: zoom the fixed navbar without drifting horizontally.
+								isLandingNavbarZoom80 ? 'landing-navbar-zoom-80' : 'left-0 right-0',
+								// Keep a smooth fade-in when leaving the hero, but snap to transparent when re-entering it.
+								isTransparentHeader ? 'transition-none' : 'transition-colors duration-700',
+								isTransparentHeader
+									? 'bg-transparent'
+									: scrolled
+										? 'bg-background/70 backdrop-blur-xl border-b border-gray-200/20'
+										: 'bg-background/40 backdrop-blur-md',
+							]
 				)}
 			>
 				<div className="w-full">
@@ -165,14 +198,17 @@ export const Navbar = () => {
 								<UserButton
 									appearance={{
 										elements: {
-											avatarBox: 'w-7 h-7',
+											avatarBox: cn(
+												'shrink-0',
+												isMobileMenuOpen ? 'w-5 h-5' : 'w-6 h-6'
+											),
 											userButtonTrigger:
-												'opacity-70 hover:opacity-100 transition-opacity duration-300',
+												'p-0 opacity-70 hover:opacity-100 transition-opacity duration-300',
 										},
 									}}
 								/>
 							) : (
-								<div className="w-7 h-7" /> /* Empty spacer */
+								<div className={cn(isMobileMenuOpen ? 'w-5 h-5' : 'w-6 h-6')} /> /* Empty spacer */
 							)}
 						</div>
 						{/* Desktop left section - Back arrow on feature pages, spacer otherwise */}
@@ -242,7 +278,7 @@ export const Navbar = () => {
 								<span
 									className={cn(
 										'absolute block h-[1.5px] w-[18px] transition-all duration-300',
-										isTransparentHeader ? 'bg-white/90' : 'bg-gray-700',
+										mobileMenuIconColor,
 										isMobileMenuOpen
 											? 'top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rotate-45'
 											: 'top-[11px] left-1/2 -translate-x-1/2'
@@ -251,7 +287,7 @@ export const Navbar = () => {
 								<span
 									className={cn(
 										'absolute block h-[1.5px] w-[18px] transition-all duration-300',
-										isTransparentHeader ? 'bg-white/90' : 'bg-gray-700',
+										mobileMenuIconColor,
 										isMobileMenuOpen
 											? 'top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 -rotate-45'
 											: 'bottom-[10px] left-1/2 -translate-x-1/2'
@@ -332,6 +368,68 @@ export const Navbar = () => {
 							</div>
 						</div>
 					</div>
+
+					{/* Mobile dropdown content (lives inside navbar so it expands/morphs) */}
+					<div
+						className={cn(
+							'min-[1145px]:hidden',
+							'transition-[max-height,opacity,transform] duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]',
+							isMobileMenuOpen
+								? 'max-h-[calc(100dvh-112px)] opacity-100 translate-y-0 overflow-y-auto overscroll-contain'
+								: 'max-h-0 opacity-0 -translate-y-2 overflow-hidden'
+						)}
+					>
+						<div className="border-t border-gray-200/20">
+							{/* Mobile Navigation Links */}
+							<div className="px-5 pt-4 pb-3">
+								<nav>
+									<ul className="space-y-0">
+										{navItems.map((item) => (
+											<li key={item.path}>
+												<Link
+													href={item.path}
+													className={cn(
+														'block py-3 text-[20px] text-gray-800 font-secondary',
+														'transition-colors duration-200',
+														pathname === item.path
+															? 'text-gray-900'
+															: 'hover:text-gray-900'
+													)}
+													onClick={() => setMobileMenuOpen(false)}
+												>
+													{item.label}
+												</Link>
+											</li>
+										))}
+									</ul>
+								</nav>
+							</div>
+
+							{/* Mobile Auth Section */}
+							{!isSignedIn && (
+								<div className="px-5 py-4 border-t border-gray-200/20">
+									<div className="flex space-x-6">
+										<SignInButton mode="modal">
+											<button
+												className="flex-1 py-2.5 text-center text-[14px] text-gray-600 hover:text-gray-900 transition-colors duration-200 font-secondary"
+												onClick={() => setMobileMenuOpen(false)}
+											>
+												Sign in
+											</button>
+										</SignInButton>
+										<SignUpButton mode="modal">
+											<button
+												className="flex-1 py-2.5 text-center text-[14px] text-gray-600 hover:text-gray-900 transition-colors duration-200 font-secondary"
+												onClick={() => setMobileMenuOpen(false)}
+											>
+												Sign up
+											</button>
+										</SignUpButton>
+									</div>
+								</div>
+							)}
+						</div>
+					</div>
 				</div>
 			</nav>
 
@@ -350,82 +448,6 @@ export const Navbar = () => {
 					)}
 					onClick={() => setMobileMenuOpen(false)}
 				/>
-
-				{/* Menu Panel */}
-				<div
-					className={cn(
-						'absolute top-0 left-0 right-0 h-screen',
-						'bg-background/90 backdrop-blur-3xl',
-						'transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]',
-						isMobileMenuOpen ? 'translate-y-0' : '-translate-y-full'
-					)}
-				>
-					{/* Mobile Header */}
-					<div className="flex items-center justify-between h-12 px-5 pt-2">
-						{isSignedIn ? (
-							<UserButton
-								appearance={{
-									elements: {
-										avatarBox: 'w-6 h-6',
-										userButtonTrigger: 'opacity-60',
-									},
-								}}
-							/>
-						) : (
-							<div className="w-6 h-6" />
-						)}
-
-						<button
-							onClick={() => setMobileMenuOpen(false)}
-							className="relative w-8 h-8 flex items-center justify-center"
-							aria-label="Close menu"
-						>
-							<span className="absolute block h-[1.5px] w-[20px] bg-gray-700 rotate-45" />
-							<span className="absolute block h-[1.5px] w-[20px] bg-gray-700 -rotate-45" />
-						</button>
-					</div>
-
-					{/* Mobile Navigation Links */}
-					<div className="px-5 pt-8">
-						<nav>
-							<ul className="space-y-0">
-								{navItems.map((item) => (
-									<li key={item.path}>
-										<Link
-											href={item.path}
-											className={cn(
-												'block py-4 text-[28px] text-gray-800 font-primary',
-												'transition-colors duration-200',
-												pathname === item.path ? 'text-gray-900' : 'hover:text-gray-900'
-											)}
-											onClick={() => setMobileMenuOpen(false)}
-										>
-											{item.label}
-										</Link>
-									</li>
-								))}
-							</ul>
-						</nav>
-					</div>
-
-					{/* Mobile Auth Section */}
-					{!isSignedIn && (
-						<div className="absolute bottom-0 left-0 right-0 p-6 border-t border-gray-200/20">
-							<div className="flex space-x-6">
-								<SignInButton mode="modal">
-									<button className="flex-1 py-3 text-center text-[16px] text-gray-600 hover:text-gray-900 transition-colors duration-200 font-primary">
-										Sign in
-									</button>
-								</SignInButton>
-								<SignUpButton mode="modal">
-									<button className="flex-1 py-3 text-center text-[16px] text-gray-600 hover:text-gray-900 transition-colors duration-200 font-primary">
-										Sign up
-									</button>
-								</SignUpButton>
-							</div>
-						</div>
-					)}
-				</div>
 			</div>
 
 			{/* Spacer */}
