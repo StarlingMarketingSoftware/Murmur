@@ -98,7 +98,12 @@ export const Navbar = () => {
 	].filter((item) => !(user?.role !== 'admin' && item.path === '/admin'));
 
 	const isLanding = pathname === urls.home.index;
-	const isLandingNavbarZoom80 = isLanding || pathname === '/map' || pathname.startsWith('/map/');
+	const isMapPage = pathname === '/map' || pathname.startsWith('/map/');
+	const isResearchPage = pathname === '/research' || pathname.startsWith('/research/');
+	const isInboxPage = pathname === '/inbox' || pathname.startsWith('/inbox/');
+	const isDraftingPage = pathname === '/drafting' || pathname.startsWith('/drafting/');
+	const showBackArrow = isMapPage || isResearchPage || isInboxPage || isDraftingPage;
+	const isLandingNavbarZoom80 = isLanding || isMapPage;
 	const isOverLandingHero = isLanding && !scrolled;
 	const isFreeTrial =
 		pathname === urls.freeTrial.index || pathname.startsWith(`${urls.freeTrial.index}/`);
@@ -134,9 +139,29 @@ export const Navbar = () => {
 							isFreeTrial && 'pt-[4px]'
 						)}
 					>
-						{/* Left Section - UserButton on mobile, empty on desktop */}
+						{/* Left Section - Back arrow on feature pages, UserButton on mobile otherwise */}
 						<div className="min-[1145px]:hidden flex items-center">
-							{isSignedIn ? (
+							{showBackArrow ? (
+								<Link
+									href="/"
+									className="text-[#060606] hover:text-gray-500 transition-colors"
+									title="Back to Home"
+									aria-label="Back to Home"
+								>
+									<svg
+										width="22"
+										height="13"
+										viewBox="0 0 27 16"
+										fill="none"
+										xmlns="http://www.w3.org/2000/svg"
+									>
+										<path
+											d="M0.292892 7.29289C-0.0976315 7.68342 -0.0976315 8.31658 0.292892 8.70711L6.65685 15.0711C7.04738 15.4616 7.68054 15.4616 8.07107 15.0711C8.46159 14.6805 8.46159 14.0474 8.07107 13.6569L2.41421 8L8.07107 2.34315C8.46159 1.95262 8.46159 1.31946 8.07107 0.928932C7.68054 0.538408 7.04738 0.538408 6.65685 0.928932L0.292892 7.29289ZM27 8V7L1 7V8V9L27 9V8Z"
+											fill="currentColor"
+										/>
+									</svg>
+								</Link>
+							) : isSignedIn ? (
 								<UserButton
 									appearance={{
 										elements: {
@@ -150,7 +175,30 @@ export const Navbar = () => {
 								<div className="w-7 h-7" /> /* Empty spacer */
 							)}
 						</div>
-						<div className="hidden min-[1145px]:block w-7 h-7" /> {/* Spacer for desktop */}
+						{/* Desktop left section - Back arrow on feature pages, spacer otherwise */}
+						<div className="hidden min-[1145px]:flex items-center w-7 h-7">
+							{showBackArrow && (
+								<Link
+									href="/"
+									className="text-[#060606] hover:text-gray-500 transition-colors"
+									title="Back to Home"
+									aria-label="Back to Home"
+								>
+									<svg
+										width="16"
+										height="10"
+										viewBox="0 0 27 16"
+										fill="none"
+										xmlns="http://www.w3.org/2000/svg"
+									>
+										<path
+											d="M0.292892 7.29289C-0.0976315 7.68342 -0.0976315 8.31658 0.292892 8.70711L6.65685 15.0711C7.04738 15.4616 7.68054 15.4616 8.07107 15.0711C8.46159 14.6805 8.46159 14.0474 8.07107 13.6569L2.41421 8L8.07107 2.34315C8.46159 1.95262 8.46159 1.31946 8.07107 0.928932C7.68054 0.538408 7.04738 0.538408 6.65685 0.928932L0.292892 7.29289ZM27 8V7L1 7V8V9L27 9V8Z"
+											fill="currentColor"
+										/>
+									</svg>
+								</Link>
+							)}
+						</div>
 						{/* Desktop Navigation */}
 						<div className="absolute inset-0 hidden min-[1145px]:flex items-center justify-center pointer-events-none">
 							<nav className="pointer-events-auto flex items-center gap-14">
