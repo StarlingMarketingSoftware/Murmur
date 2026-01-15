@@ -43,8 +43,8 @@ export default function MapPage() {
     <main className="overflow-x-hidden">
       <div className="landing-zoom-80">
         <div className="min-h-screen bg-white">
-          <div className="w-full h-[264px] flex items-center justify-center">
-            <h1 className="font-inter text-center" style={{ fontSize: '65px' }}>
+          <div className="w-full flex items-start justify-center pt-8 pb-6 lg:h-[264px] lg:items-center lg:pt-0 lg:pb-0">
+            <h1 className="font-inter text-center text-[48px] sm:text-[56px] lg:text-[65px] leading-none">
               Mapping
             </h1>
           </div>
@@ -68,13 +68,13 @@ export default function MapPage() {
 
           {/* Explore the Country */}
           {/* Narrow layout (match landing page ultra-narrow typography/padding) */}
-          <div className="lg:hidden w-full mt-[196px] px-[14%]">
+          <div className="lg:hidden w-full mt-10 px-[14%]">
             <div className="mx-auto w-full max-w-[904px] bg-[#FAFAFA]">
               <div className="bg-[#EFEFEF] rounded-[8px] px-6 py-8">
-                <p className="font-inter font-normal text-[clamp(40px,7vw,56px)] text-black leading-tight">
+                <p className="font-inter font-normal text-[22px] xs:text-[24px] sm:text-[27px] text-black leading-tight">
                   Explore the Country
                 </p>
-                <p className="font-inter font-normal text-[18px] xs:text-[20px] text-black mt-4 break-words">
+                <p className="font-inter font-normal text-[11.5px] xs:text-[12.5px] sm:text-[18px] text-black leading-tight mt-2 break-words">
                   Plan a city-wide tour in Los Angeles or Portland for a week of shows. Go explore 100,000+
                   contacts from the Pacific to the Atlantic.
                 </p>
@@ -104,13 +104,13 @@ export default function MapPage() {
 
           {/* All Data in One Place */}
           {/* Narrow layout (match landing page ultra-narrow typography/padding) */}
-          <div className="lg:hidden w-full mt-[81px] px-[14%]">
+          <div className="lg:hidden w-full mt-12 px-[14%]">
             <div className="mx-auto w-full max-w-[904px] bg-[#FAFAFA]">
               <div className="bg-[#EFEFEF] rounded-[8px] px-6 py-8">
-                <p className="font-inter font-normal text-[clamp(40px,7vw,56px)] text-black leading-tight">
+                <p className="font-inter font-normal text-[22px] xs:text-[24px] sm:text-[27px] text-black leading-tight">
                   All Data in One Place:
                 </p>
-                <p className="font-inter font-normal text-[18px] xs:text-[20px] text-black mt-4 break-words">
+                <p className="font-inter font-normal text-[11.5px] xs:text-[12.5px] sm:text-[18px] text-black leading-tight mt-2 break-words">
                   Filter each search by category, whether you're looking for coffee shops for gigs or radio stations for airplay.
                 </p>
               </div>
@@ -138,13 +138,13 @@ export default function MapPage() {
 
           {/* Zoom Closer, See the Details */}
           {/* Narrow layout (match landing page ultra-narrow typography/padding) */}
-          <div className="lg:hidden w-full mt-[119px] px-[14%]">
+          <div className="lg:hidden w-full mt-12 px-[14%]">
             <div className="mx-auto w-full max-w-[904px] bg-[#FAFAFA]">
               <div className="bg-[#EFEFEF] rounded-[8px] px-6 py-8">
-                <p className="font-inter font-normal text-[clamp(40px,7vw,56px)] text-black leading-tight">
+                <p className="font-inter font-normal text-[22px] xs:text-[24px] sm:text-[27px] text-black leading-tight">
                   Zoom Closer, See the Details:
                 </p>
-                <p className="font-inter font-normal text-[18px] xs:text-[20px] text-black mt-4 break-words">
+                <p className="font-inter font-normal text-[11.5px] xs:text-[12.5px] sm:text-[18px] text-black leading-tight mt-2 break-words">
                   Zoom in on San Francisco and see more contacts appear. The closer you get, the more you see.
                 </p>
               </div>
@@ -170,7 +170,9 @@ export default function MapPage() {
             </div>
           </div>
           <div className="h-[660px] flex flex-col items-center justify-center">
-            <p className="font-inter font-normal text-[62px] text-black text-center">Try Murmur Now</p>
+            <p className="font-inter font-normal text-[clamp(32px,9vw,62px)] text-black text-center leading-[1.05]">
+              Try Murmur Now
+            </p>
             <Link
               href={urls.freeTrial.index}
               className="flex items-center justify-center cursor-pointer text-center text-white font-inter font-medium text-[14px]"
