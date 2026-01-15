@@ -53,7 +53,7 @@ export const useProductCard = (props: ProductCardProps) => {
 	}
 
 	const isHighlighted =
-		getSubscriptionTierWithPriceId(product.prices[0].id)?.name === 'Standard';
+		getSubscriptionTierWithPriceId(product.prices[0].id)?.name === 'Pro';
 
 	const formattedPrice = formatPrice(price.unit_amount || 0, price.currency || 'usd');
 	const period = '/ month';
