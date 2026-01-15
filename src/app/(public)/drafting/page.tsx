@@ -39,30 +39,31 @@ export default function DraftingPage() {
   return (
     <div className="min-h-screen bg-white">
       <div className="w-full h-[264px] flex items-center justify-center">
-        <h1 
-          className="font-inter text-center"
-          style={{ fontSize: '65px' }}
-        >
+        <h1 className="font-inter text-center text-[48px] sm:text-[56px] lg:text-[65px] leading-none">
           Drafting
         </h1>
       </div>
       <div className="flex justify-center w-full px-4">
         <div className="w-full max-w-[1082px]">
           {/* Avoid overflow-x clipping from translate-x-14 on narrower viewports */}
-          <DraftingDemo className="w-full h-auto translate-x-14 max-[1193px]:w-[calc(100%-3.5rem)]" />
+          <DraftingDemo className="w-full h-auto translate-x-12 max-[1193px]:w-[calc(100%-3rem)]" />
         </div>
       </div>
       {/* Tell your story */}
       {/* Narrow layout (stacked, keep the light #FAFAFA panel) */}
       <div className="hidden max-[1193px]:block w-full mt-[192px] px-[14%]">
-        <div className="mx-auto w-full max-w-[904px] bg-[#FAFAFA] rounded-[6px] px-6 xs:px-8 pt-10 pb-12">
-          <p className="font-inter font-bold text-[24px] text-black">Tell your story</p>
-          <p className="font-inter font-normal text-[18px] xs:text-[20px] text-black mt-4 leading-[32px] break-words">
-            When you add basic information to your profile, it gives context to the drafting. This creates much better results that incorporate
-            your real bio, links, booking date range, and any custom instructions.
-          </p>
+        <div className="mx-auto w-full max-w-[904px] bg-[#FAFAFA] px-6 xs:px-8 pt-10 pb-12">
+          <div className="bg-[#EFEFEF] rounded-[8px] px-6 py-8">
+            <p className="font-inter font-normal text-[22px] xs:text-[24px] sm:text-[27px] text-black leading-tight">
+              Tell your story
+            </p>
+            <p className="font-inter font-normal text-[11.5px] xs:text-[12.5px] sm:text-[18px] text-black leading-tight mt-2 break-words">
+              When you add basic information to your profile, it gives context to the drafting. This creates much better results that incorporate
+              your real bio, links, booking date range, and any custom instructions.
+            </p>
+          </div>
 
-          <div className="mt-10">
+          <div className="mt-8">
             <ScaledToFit baseWidth={394} baseHeight={366}>
               <ProfileDemo />
             </ScaledToFit>
@@ -109,13 +110,17 @@ export default function DraftingPage() {
       {/* Drafting Modes */}
       {/* Narrow layout (stacked mode panels) */}
       <div className="hidden max-[1193px]:block w-full mt-[146px] px-[14%]">
-        <div className="mx-auto w-full max-w-[904px] bg-[#FAFAFA] rounded-[6px] px-6 xs:px-8 pt-10 pb-12">
-          <p className="font-inter font-bold text-[24px] text-black">Drafting Modes:</p>
-          <p className="font-inter font-normal text-[18px] xs:text-[20px] text-black mt-4 leading-[32px] break-words">
-            Murmur has three distinct drafting modes: Auto, Manual, and Hybrid. Auto drafts based on the full range of information it has
-            provided, such as the user profile, the contact research, contact location, and booking date range. In contrast to this, manual mode
-            is a complete text editor with full customization. Then for edge cases, there&apos;s hybrid.
-          </p>
+        <div className="mx-auto w-full max-w-[904px] bg-[#FAFAFA] px-6 xs:px-8 pt-10 pb-12">
+          <div className="bg-[#EFEFEF] rounded-[8px] px-6 py-8">
+            <p className="font-inter font-normal text-[22px] xs:text-[24px] sm:text-[27px] text-black leading-tight">
+              Drafting Modes:
+            </p>
+            <p className="font-inter font-normal text-[11.5px] xs:text-[12.5px] sm:text-[18px] text-black leading-tight mt-2 break-words">
+              Murmur has three distinct drafting modes: Auto, Manual, and Hybrid. Auto drafts based on the full range of information it has
+              provided, such as the user profile, the contact research, contact location, and booking date range. In contrast to this, manual mode
+              is a complete text editor with full customization. Then for edge cases, there&apos;s hybrid.
+            </p>
+          </div>
 
           <div className="mt-12">
             <p className="font-inter font-semibold text-[16px] xs:text-[18px] text-black">Auto</p>
@@ -197,10 +202,12 @@ export default function DraftingPage() {
       {/* Built-in variation */}
       {/* Narrow layout (stacked, show both preview variants) */}
       <div className="hidden max-[1193px]:block w-full mt-[181px] px-[14%]">
-        <div className="mx-auto w-full max-w-[904px] bg-[#FAFAFA] rounded-[6px] px-6 xs:px-8 pt-10 pb-12">
-          <div className="bg-[#EFEFEF] rounded-[6px] px-8 xs:px-10 py-10">
-            <p className="font-inter font-bold text-[24px] text-black">Built-in variation</p>
-            <p className="font-inter font-normal text-[18px] xs:text-[20px] text-black mt-4 leading-[32px] break-words">
+        <div className="mx-auto w-full max-w-[904px] bg-[#FAFAFA] px-6 xs:px-8 pt-10 pb-12">
+          <div className="bg-[#EFEFEF] rounded-[8px] px-6 py-8">
+            <p className="font-inter font-normal text-[22px] xs:text-[24px] sm:text-[27px] text-black leading-tight">
+              Built-in variation
+            </p>
+            <p className="font-inter font-normal text-[11.5px] xs:text-[12.5px] sm:text-[18px] text-black leading-tight mt-2 break-words">
               When drafting in Auto mode, we&apos;ve done extensive work to ensure that no two emails are identical, often drafting in fairly
               different structures. This allows you to embody a more unique voice for each contact you reach out to.
             </p>
@@ -263,7 +270,7 @@ export default function DraftingPage() {
         </div>
       </div>
       <div className="h-[660px] flex flex-col items-center justify-center">
-        <p className="font-inter font-normal text-[62px] text-black text-center">
+        <p className="font-inter font-normal text-[clamp(32px,9vw,62px)] text-black text-center leading-[1.05]">
           Try Murmur Now
         </p>
         <Link
