@@ -30,15 +30,12 @@ export default function InboxPage() {
   return (
     <div className="min-h-screen bg-white">
       <div className="w-full h-[264px] flex items-center justify-center">
-        <h1 
-          className="font-inter text-center"
-          style={{ fontSize: '65px' }}
-        >
+        <h1 className="font-inter text-center text-[48px] sm:text-[56px] lg:text-[65px] leading-none">
           Inbox
         </h1>
       </div>
       <div className="flex justify-center">
-        <ScaledToFit baseWidth={1017} fitWidth={1241} baseHeight={568}>
+        <ScaledToFit baseWidth={1017} fitWidth={1241} baseHeight={568} className="max-w-[85vw] sm:max-w-none">
           <InboxDemo className="translate-x-28" />
         </ScaledToFit>
       </div>
@@ -46,11 +43,11 @@ export default function InboxPage() {
       {/* Narrow layout (stacked, keep the light #FAFAFA panel) */}
       <div className="xl:hidden w-full mt-[102px] px-[14%]">
         <div className="mx-auto w-full max-w-[904px] bg-[#FAFAFA] px-6 xs:px-8 pt-10 pb-12">
-          <div className="bg-[#EFEFEF] rounded-[6px] px-8 xs:px-10 py-10">
-            <p className="font-inter font-normal text-[clamp(40px,7vw,56px)] text-black leading-tight">
+          <div className="bg-[#EFEFEF] rounded-[8px] px-6 py-8">
+            <p className="font-inter font-normal text-[22px] xs:text-[24px] sm:text-[27px] text-black leading-tight">
               Never miss a reply
             </p>
-            <p className="font-inter font-normal text-[18px] xs:text-[20px] text-black mt-4 break-words">
+            <p className="font-inter font-normal text-[11.5px] xs:text-[12.5px] sm:text-[18px] text-black leading-tight mt-2 break-words">
               Keep track of when venues reply to you. Each response is tagged to its corresponding campaign, so you&apos;ll always know where it came from.
             </p>
           </div>
@@ -100,12 +97,11 @@ export default function InboxPage() {
       {/* Narrow layout (stacked, keep the light #FAFAFA panel) */}
       <div className="xl:hidden w-full mt-[97px] px-[14%]">
         <div className="mx-auto w-full max-w-[904px] bg-[#FAFAFA] px-6 xs:px-8 pt-10 pb-12">
-          <p className="font-inter font-normal text-[clamp(40px,7vw,56px)] text-black leading-tight text-center">
-            Respond from Within Campaigns
-          </p>
-
-          <div className="mt-8 bg-[#EFEFEF] rounded-[6px] px-8 xs:px-10 py-10">
-            <p className="font-inter font-normal text-[18px] xs:text-[20px] text-black break-words">
+          <div className="bg-[#EFEFEF] rounded-[8px] px-6 py-8">
+            <p className="font-inter font-normal text-[22px] xs:text-[24px] sm:text-[27px] text-black leading-tight">
+              Respond from Within Campaigns
+            </p>
+            <p className="font-inter font-normal text-[11.5px] xs:text-[12.5px] sm:text-[18px] text-black leading-tight mt-2 break-words">
               Each campaign has its own inbox tab, showing just responses from that batch. Contact research is provided next to each reply so you can reply quickly without digging through notes. Since your inbox lives inside the campaign, you can see exactly what you sent alongside their reply.
             </p>
           </div>
@@ -245,7 +241,7 @@ export default function InboxPage() {
         </div>
       </div>
       <div className="h-[660px] flex flex-col items-center justify-center">
-        <p className="font-inter font-normal text-[62px] text-black text-center">
+        <p className="font-inter font-normal text-[clamp(32px,9vw,62px)] text-black text-center leading-[1.05]">
           Try Murmur Now
         </p>
         <Link
