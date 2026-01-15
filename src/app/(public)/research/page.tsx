@@ -28,19 +28,19 @@ export default function ResearchPage() {
 
   return (
     <div className="min-h-screen bg-white">
-      <div className="w-full h-[264px] flex items-center justify-center">
-        <h1 className="font-inter text-center text-[48px] sm:text-[56px] lg:text-[65px] leading-none">
+      <div className="w-full flex items-start justify-center pt-12 pb-10 lg:h-[264px] lg:items-center lg:pt-0 lg:pb-0">
+        <h1 className="font-inter text-center text-[40px] sm:text-[56px] lg:text-[65px] leading-none">
           Research
         </h1>
       </div>
-      <div className="flex justify-center w-full px-4">
+      <div className="flex justify-center w-full px-[14%] lg:px-4">
         <div className="w-full max-w-[747px]">
           <ResearchDemo className="w-full h-auto" />
         </div>
       </div>
       
       {/* Mobile Layout (match landing page ultra-narrow typography/padding) */}
-      <div className="lg:hidden w-full mt-[80px] px-[14%]">
+      <div className="lg:hidden w-full mt-14 px-[14%]">
         <div className="mx-auto w-full max-w-[686px] bg-[#FAFAFA]">
           <div className="bg-[#EFEFEF] rounded-[8px] px-6 py-8">
             <p className="font-inter font-normal text-[22px] xs:text-[24px] sm:text-[27px] text-black leading-tight">
@@ -112,7 +112,7 @@ export default function ResearchPage() {
       </div>
 
       {/* Mobile Layout (match landing page ultra-narrow typography/padding) */}
-      <div className="lg:hidden w-full mt-[82px] px-[14%]">
+      <div className="lg:hidden w-full mt-12 px-[14%]">
         <div className="mx-auto w-full max-w-[686px] bg-[#FAFAFA]">
           <div className="bg-[#EFEFEF] rounded-[8px] px-6 py-8">
             <p className="font-inter font-normal text-[22px] xs:text-[24px] sm:text-[27px] text-black leading-tight">

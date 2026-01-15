@@ -15,7 +15,25 @@ export default function InboxPage() {
       footer.style.display = 'none';
     }
 
-    document.documentElement.classList.add('murmur-inbox-compact');
+    // The `murmur-inbox-compact` class applies a global 80% scale in `globals.css`.
+    // On small screens this compounds with `ScaledToFit` (used for the hero SVG),
+    // making the demo appear excessively small. Only apply the compact scaling on
+    // larger viewports.
+    const compactMql = window.matchMedia('(min-width: 768px)');
+    const syncCompactClass = () => {
+      if (compactMql.matches) {
+        document.documentElement.classList.add('murmur-inbox-compact');
+      } else {
+        document.documentElement.classList.remove('murmur-inbox-compact');
+      }
+    };
+    syncCompactClass();
+    // Safari < 14 uses addListener/removeListener.
+    if (typeof compactMql.addEventListener === 'function') {
+      compactMql.addEventListener('change', syncCompactClass);
+    } else {
+      compactMql.addListener(syncCompactClass);
+    }
     
     return () => {
       const footer = document.querySelector('footer');
@@ -24,24 +42,29 @@ export default function InboxPage() {
       }
 
       document.documentElement.classList.remove('murmur-inbox-compact');
+      if (typeof compactMql.removeEventListener === 'function') {
+        compactMql.removeEventListener('change', syncCompactClass);
+      } else {
+        compactMql.removeListener(syncCompactClass);
+      }
     };
   }, []);
 
   return (
     <div className="min-h-screen bg-white">
-      <div className="w-full h-[264px] flex items-center justify-center">
-        <h1 className="font-inter text-center text-[48px] sm:text-[56px] lg:text-[65px] leading-none">
+      <div className="w-full flex justify-center pt-8 pb-4 sm:h-[264px] sm:items-center sm:pt-0 sm:pb-0">
+        <h1 className="font-inter text-center text-[40px] sm:text-[56px] lg:text-[65px] leading-none">
           Inbox
         </h1>
       </div>
-      <div className="flex justify-center">
+      <div className="flex justify-center mt-4 sm:mt-0">
         <ScaledToFit baseWidth={1017} fitWidth={1241} baseHeight={568} className="max-w-[85vw] sm:max-w-none">
           <InboxDemo className="translate-x-28" />
         </ScaledToFit>
       </div>
       {/* Never miss a reply */}
       {/* Narrow layout (stacked, keep the light #FAFAFA panel) */}
-      <div className="xl:hidden w-full mt-[102px] px-[14%]">
+      <div className="xl:hidden w-full mt-16 md:mt-[102px] px-[14%]">
         <div className="mx-auto w-full max-w-[904px] bg-[#FAFAFA] px-6 xs:px-8 pt-10 pb-12">
           <div className="bg-[#EFEFEF] rounded-[8px] px-6 py-8">
             <p className="font-inter font-normal text-[22px] xs:text-[24px] sm:text-[27px] text-black leading-tight">
@@ -95,7 +118,7 @@ export default function InboxPage() {
       </div>
       {/* Respond from Within Campaigns */}
       {/* Narrow layout (stacked, keep the light #FAFAFA panel) */}
-      <div className="xl:hidden w-full mt-[97px] px-[14%]">
+      <div className="xl:hidden w-full mt-16 md:mt-[97px] px-[14%]">
         <div className="mx-auto w-full max-w-[904px] bg-[#FAFAFA] px-6 xs:px-8 pt-10 pb-12">
           <div className="bg-[#EFEFEF] rounded-[8px] px-6 py-8">
             <p className="font-inter font-normal text-[22px] xs:text-[24px] sm:text-[27px] text-black leading-tight">
@@ -142,14 +165,16 @@ export default function InboxPage() {
                 <ReplyInbox
                   width={650}
                   height={498}
-                  viewBox="684 0 650 498"
+                  // Shift the crop slightly so the green panel centers like the blue one on mobile.
+                  viewBox="690.36 0 650 498"
                   preserveAspectRatio="xMinYMin meet"
                 />
                 <div
                   className="absolute text-black font-inter text-[11px] leading-[15px]"
                   style={{
                     top: '188px',
-                    left: '56px',
+                    // Keep the overlay aligned with the shifted SVG crop.
+                    left: '49.64px',
                     width: '540px',
                     height: '160px',
                     paddingLeft: '20px',

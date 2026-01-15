@@ -39,7 +39,7 @@ export default function DraftingPage() {
   return (
     <div className="min-h-screen bg-white">
       <div className="w-full h-[264px] flex items-center justify-center">
-        <h1 className="font-inter text-center text-[48px] sm:text-[56px] lg:text-[65px] leading-none">
+        <h1 className="font-inter text-center text-[40px] sm:text-[56px] lg:text-[65px] leading-none">
           Drafting
         </h1>
       </div>

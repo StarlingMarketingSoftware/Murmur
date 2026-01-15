@@ -44,7 +44,7 @@ export default function MapPage() {
       <div className="landing-zoom-80">
         <div className="min-h-screen bg-white">
           <div className="w-full flex items-start justify-center pt-8 pb-6 lg:h-[264px] lg:items-center lg:pt-0 lg:pb-0">
-            <h1 className="font-inter text-center text-[48px] sm:text-[56px] lg:text-[65px] leading-none">
+            <h1 className="font-inter text-center text-[40px] sm:text-[56px] lg:text-[65px] leading-none">
               Mapping
             </h1>
           </div>
