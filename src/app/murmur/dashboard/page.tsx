@@ -35,7 +35,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel } from '@/components/
 import CustomTable from '@/components/molecules/CustomTable/CustomTable';
 import { Card, CardContent } from '@/components/ui/card';
 
-import { useClerk } from '@clerk/nextjs';
+import { useClerk, useAuth, SignUp } from '@clerk/nextjs';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useGetLocations, useBatchUpdateContacts } from '@/hooks/queryHooks/useContacts';
@@ -332,7 +332,8 @@ const SearchTrayIconTile = ({
 };
 
 const DashboardContent = () => {
-	const { isSignedIn, openSignIn } = useClerk();
+	const { openSignIn } = useClerk();
+	const { isSignedIn, isLoaded: isAuthLoaded } = useAuth();
 	const searchParams = useSearchParams();
 	const router = useRouter();
 	const pathname = usePathname();
@@ -352,6 +353,134 @@ const DashboardContent = () => {
 	// in the correct results view without affecting the normal dashboard entry.
 	const fromCampaignViewParam = searchParams.get('fromCampaignView')?.trim() || '';
 	const fromCampaignSearchParam = searchParams.get('fromCampaignSearch')?.trim() || '';
+	// "From Home" mode: triggered from landing page search button, shows a pre-configured search
+	// with sign-up modal for unauthenticated users.
+	const fromHomeParam = searchParams.get('fromHome') === 'true';
+	const FROM_HOME_SEARCH_QUERY = '[Booking] Wine, Beer, and Spirits (California)';
+	const FROM_HOME_WHY = '[Booking]';
+	const FROM_HOME_WHAT = 'Wine, Beer, and Spirits';
+	const FROM_HOME_WHERE = 'California';
+
+	// Placeholder contacts for fromHome loading state - shows fake dots in California
+	const fromHomePlaceholderContacts = useMemo(() => {
+		if (!fromHomeParam) return [];
+		const placeholders: ContactWithName[] = [];
+		// Use a seeded random approach for consistent positions
+		const seed = 12345;
+		const random = (i: number) => {
+			const x = Math.sin(seed + i) * 10000;
+			return x - Math.floor(x);
+		};
+		const createPlaceholder = (id: number, lat: number, lng: number, state?: string): ContactWithName => ({
+			id,
+			email: '',
+			name: null,
+			firstName: null,
+			lastName: null,
+			company: null,
+			title: null,
+			headline: null,
+			latitude: lat,
+			longitude: lng,
+			state: state ?? 'California',
+			city: null,
+			country: 'United States',
+			address: null,
+			phone: null,
+			website: null,
+			linkedInUrl: null,
+			photoUrl: null,
+			metadata: null,
+			apolloPersonId: null,
+			contactListId: null,
+			userId: null,
+			isPrivate: false,
+			hasVectorEmbedding: false,
+			userContactListCount: 0,
+			manualDeselections: 0,
+			companyFoundedYear: null,
+			companyIndustry: null,
+			companyKeywords: [],
+			companyLinkedInUrl: null,
+			companyPostalCode: null,
+			companyTechStack: [],
+			companyType: null,
+			lastResearchedDate: null,
+			emailValidatedAt: null,
+			emailValidationStatus: 'unknown',
+			emailValidationSubStatus: null,
+			createdAt: new Date(),
+			updatedAt: new Date(),
+		} as ContactWithName);
+
+		// Add anchor points in neighboring states to keep the map somewhat zoomed out
+		// and show blue outlines on Arizona and Nevada (visually near California)
+		placeholders.push(createPlaceholder(-1, 36.2, -115.1, 'Nevada'));     // Las Vegas area
+		placeholders.push(createPlaceholder(-2, 39.5, -119.8, 'Nevada'));     // Reno area
+		placeholders.push(createPlaceholder(-3, 33.4, -112.0, 'Arizona'));    // Phoenix area
+		placeholders.push(createPlaceholder(-4, 32.2, -110.9, 'Arizona'));    // Tucson area
+
+		// California regions spread across the entire state (all inland, no water)
+		// Kept well east of the coastline to avoid ocean
+		const regions = [
+			// Northern California (inland)
+			{ lat: 41.5, lng: -122.0, spread: 0.8, weight: 8 },   // Redding area
+			{ lat: 40.5, lng: -121.5, spread: 0.7, weight: 6 },   // Shasta
+			{ lat: 41.0, lng: -120.5, spread: 0.8, weight: 5 },   // Modoc
+			// Sacramento Valley
+			{ lat: 39.5, lng: -121.5, spread: 1.0, weight: 12 },  // Sacramento
+			{ lat: 39.0, lng: -121.8, spread: 0.8, weight: 8 },   // Yuba City
+			{ lat: 38.6, lng: -121.3, spread: 0.6, weight: 10 },  // Sacramento city
+			// Napa/Sonoma (inland from coast)
+			{ lat: 38.5, lng: -122.3, spread: 0.5, weight: 15 },  // Napa
+			{ lat: 38.4, lng: -122.7, spread: 0.4, weight: 12 },  // Sonoma
+			// Bay Area (inland parts)
+			{ lat: 37.7, lng: -121.9, spread: 0.6, weight: 14 },  // East Bay
+			{ lat: 37.4, lng: -121.5, spread: 0.7, weight: 12 },  // San Jose area
+			{ lat: 37.0, lng: -121.8, spread: 0.5, weight: 8 },   // Gilroy
+			// Central Valley (entire length)
+			{ lat: 38.0, lng: -120.8, spread: 1.0, weight: 10 },  // Stockton
+			{ lat: 37.5, lng: -120.5, spread: 1.0, weight: 10 },  // Modesto
+			{ lat: 36.7, lng: -119.8, spread: 1.2, weight: 12 },  // Fresno
+			{ lat: 36.0, lng: -119.3, spread: 1.0, weight: 10 },  // Visalia
+			{ lat: 35.4, lng: -119.0, spread: 1.0, weight: 10 },  // Bakersfield
+			// Central Coast (inland from coast)
+			{ lat: 35.6, lng: -120.5, spread: 0.6, weight: 10 },  // Paso Robles
+			{ lat: 34.9, lng: -120.2, spread: 0.5, weight: 8 },   // Santa Maria
+			// Los Angeles Basin (inland)
+			{ lat: 34.1, lng: -117.8, spread: 0.8, weight: 15 },  // Inland Empire
+			{ lat: 34.4, lng: -118.5, spread: 0.6, weight: 12 },  // San Fernando Valley
+			{ lat: 34.0, lng: -117.4, spread: 0.7, weight: 12 },  // Riverside/San Bernardino
+			{ lat: 33.8, lng: -117.9, spread: 0.5, weight: 10 },  // Orange County inland
+			// San Diego (inland)
+			{ lat: 33.0, lng: -116.8, spread: 0.6, weight: 10 },  // Escondido/Temecula
+			{ lat: 32.8, lng: -116.9, spread: 0.5, weight: 8 },   // East San Diego
+			// Desert regions
+			{ lat: 34.5, lng: -116.5, spread: 1.0, weight: 8 },   // High Desert
+			{ lat: 33.8, lng: -116.5, spread: 0.8, weight: 6 },   // Palm Springs area
+			{ lat: 35.5, lng: -117.5, spread: 1.0, weight: 6 },   // Mojave
+			// Sierra Nevada foothills
+			{ lat: 39.0, lng: -120.5, spread: 0.8, weight: 8 },   // Gold Country
+			{ lat: 38.0, lng: -120.0, spread: 0.8, weight: 6 },   // Yosemite foothills
+			{ lat: 37.0, lng: -119.5, spread: 0.7, weight: 5 },   // Southern Sierra
+		];
+		// Build weighted list
+		const weightedRegions: typeof regions = [];
+		for (const r of regions) {
+			for (let w = 0; w < r.weight; w++) {
+				weightedRegions.push(r);
+			}
+		}
+		for (let i = 0; i < 300; i++) {
+			const regionIdx = Math.floor(random(i * 7) * weightedRegions.length);
+			const region = weightedRegions[regionIdx];
+			const lat = region.lat + (random(i) - 0.5) * region.spread * 2;
+			const lng = region.lng + (random(i + 1) - 0.5) * region.spread * 2;
+			placeholders.push(createPlaceholder(-1000 - i, lat, lng));
+		}
+		return placeholders;
+	}, [fromHomeParam]);
+
 	const { data: fromCampaign, isPending: isPendingFromCampaign } = useGetCampaign(fromCampaignIdParam);
 	const addToCampaignUserContactListId = fromCampaign?.userContactLists?.[0]?.id;
 	const { mutateAsync: editUserContactList, isPending: isPendingAddToCampaign } =
@@ -531,6 +660,14 @@ const DashboardContent = () => {
 
 	const renderDesktopSearchDropdowns = () => {
 		if (!activeSection) return null;
+
+		// Don't show dropdowns in demo mode - search is locked to the pre-configured query
+		if (isFromHomeDemoMode) {
+			// Close the section and show a message
+			setActiveSection(null);
+			setShowFreeTrialPrompt(true);
+			return null;
+		}
 
 		// Match the active-section pill timing (0.6s) and easing.
 		const dropdownEase = 'cubic-bezier(0.22, 1, 0.36, 1)';
@@ -1259,7 +1396,13 @@ const DashboardContent = () => {
 		setIsMapView,
 		isSearchPending,
 		usedContactIdsSet,
-	} = useDashboard({ derivedTitle: derivedContactTitle, forceApplyDerivedTitle: shouldForceApplyDerivedTitle });
+		isFromHomeDemoMode,
+	} = useDashboard({ derivedTitle: derivedContactTitle, forceApplyDerivedTitle: shouldForceApplyDerivedTitle, fromHome: fromHomeParam });
+
+	// Free trial CTA for fromHome demo mode
+	const handleStartFreeTrial = useCallback(() => {
+		router.push(urls.freeTrial.index);
+	}, [router]);
 
 	const DASHBOARD_MAP_COMPACT_CLASS = 'murmur-dashboard-map-compact';
 
@@ -1470,6 +1613,97 @@ const DashboardContent = () => {
 		searchParams,
 	]);
 
+	// If we're in "from home" mode, immediately show the map view and set the search UI values
+	// so the user sees the map preview while the sign-up modal is shown.
+	const hasInitializedFromHomeRef = useRef(false);
+	useEffect(() => {
+		if (!fromHomeParam) return;
+		if (hasInitializedFromHomeRef.current) return;
+
+		hasInitializedFromHomeRef.current = true;
+
+		// Set the segmented UI values immediately so they appear in the search bar
+		setWhyValue(FROM_HOME_WHY);
+		setWhatValue(FROM_HOME_WHAT);
+		setWhereValue(FROM_HOME_WHERE);
+		setIsNearMeLocation(false);
+
+		// Force map view immediately
+		setIsMapView(true);
+	}, [fromHomeParam]);
+
+	// Delay showing the sign-up modal for 3 seconds in fromHome mode
+	// so the user can see the map and placeholder dots first
+	const [showFromHomeSignUp, setShowFromHomeSignUp] = useState(false);
+	useEffect(() => {
+		if (!fromHomeParam || isSignedIn) return;
+
+		const timer = setTimeout(() => {
+			setShowFromHomeSignUp(true);
+		}, 3000);
+
+		return () => clearTimeout(timer);
+	}, [fromHomeParam, isSignedIn]);
+
+	// Show the free trial prompt after 15 seconds in fromHome demo mode
+	const [showFreeTrialPrompt, setShowFreeTrialPrompt] = useState(false);
+	useEffect(() => {
+		if (!fromHomeParam || !isFromHomeDemoMode || !isSignedIn) return;
+
+		const timer = setTimeout(() => {
+			setShowFreeTrialPrompt(true);
+		}, 15000);
+
+		return () => clearTimeout(timer);
+	}, [fromHomeParam, isFromHomeDemoMode, isSignedIn]);
+
+	const isFreeTrialPromptVisible =
+		fromHomeParam && isFromHomeDemoMode && isSignedIn === true && showFreeTrialPrompt;
+
+	// When the free-trial prompt is open, "pause" the page by preventing scroll/interaction behind it.
+	useEffect(() => {
+		if (!isFreeTrialPromptVisible) return;
+		if (typeof document === 'undefined') return;
+
+		const previousOverflow = document.body.style.overflow;
+		document.body.style.overflow = 'hidden';
+
+		return () => {
+			document.body.style.overflow = previousOverflow;
+		};
+	}, [isFreeTrialPromptVisible]);
+
+	// If we're in "from home" mode (from landing page), auto-trigger the pre-configured search
+	// once the user signs in. This shows the Wine, Beer, and Spirits in California results.
+	const hasHydratedFromHomeRef = useRef(false);
+	useEffect(() => {
+		if (!fromHomeParam) return;
+		if (hasHydratedFromHomeRef.current) return;
+		// Don't auto-trigger if not signed in - they'll see the sign-up modal.
+		if (!isSignedIn) return;
+
+		// If we already have results from this search, don't re-run.
+		if (hasSearched && activeSearchQuery === FROM_HOME_SEARCH_QUERY) {
+			hasHydratedFromHomeRef.current = true;
+			return;
+		}
+
+		hasHydratedFromHomeRef.current = true;
+
+		// Submit after a short delay to allow state to update.
+		setTimeout(() => {
+			form.setValue('searchText', FROM_HOME_SEARCH_QUERY);
+			form.handleSubmit(onSubmit)();
+		}, 100);
+	}, [
+		activeSearchQuery,
+		form,
+		fromHomeParam,
+		hasSearched,
+		isSignedIn,
+		onSubmit,
+	]);
+
 	// Batch update for assigning titles to contacts without one
 	const { mutateAsync: batchUpdateContacts } = useBatchUpdateContacts({ suppressToasts: true });
 
@@ -1586,7 +1820,11 @@ const DashboardContent = () => {
 	);
 	// When hovering a row in the map side panel, highlight/show the corresponding marker on the map.
 	const [hoveredMapPanelContactId, setHoveredMapPanelContactId] = useState<number | null>(null);
-	const isMapResultsLoading = isSearchPending || isLoadingContacts || isRefetchingContacts;
+	// Show loading in the map panel when:
+	// 1. A search is actively pending/loading, OR
+	// 2. We're in fromHome mode and the search hasn't been executed yet (user not signed in or waiting for search trigger)
+	const isMapResultsLoading = isSearchPending || isLoadingContacts || isRefetchingContacts ||
+		(fromHomeParam && isMapView && (!isSignedIn || !hasSearched));
 	const isSelectMapToolActive = activeMapTool === 'select';
 	const isGrabMapToolActive = activeMapTool === 'grab';
 	const hasNoSearchResults =
@@ -2590,6 +2828,12 @@ const DashboardContent = () => {
 
 	// Close map view and return to default dashboard view (before any search)
 	const handleCloseMapView = () => {
+		// If in "from home" mode, navigate back to the landing page
+		if (fromHomeParam) {
+			router.push(urls.home.index);
+			return;
+		}
+
 		setIsMapView(false);
 		setHoveredContact(null);
 		// Reset search completely to return to default dashboard
@@ -2814,7 +3058,13 @@ const DashboardContent = () => {
 																							: 'hover:bg-black/5'
 																				  } rounded-l-[8px]`
 																		}`}
-																			onClick={() => setActiveSection('why')}
+																			onClick={() => {
+																				if (isFromHomeDemoMode) {
+																					setShowFreeTrialPrompt(true);
+																					return;
+																				}
+																				setActiveSection('why');
+																			}}
 																		>
 																			<div className={`absolute z-20 left-[24px] ${inboxView ? 'top-1/2 -translate-y-1/2 text-[14px]' : 'top-[10px] text-[22px]'} font-bold text-black leading-none`}>
 																				{inboxView ? (whyValue ? whyValue.replace(/[\[\]]/g, '') : 'Why') : 'Why'}
@@ -2853,7 +3103,13 @@ const DashboardContent = () => {
 																							: 'hover:bg-black/5'
 																				  }`
 																		}`}
-																			onClick={() => setActiveSection('what')}
+																			onClick={() => {
+																				if (isFromHomeDemoMode) {
+																					setShowFreeTrialPrompt(true);
+																					return;
+																				}
+																				setActiveSection('what');
+																			}}
 																		>
 																			{inboxView ? (
 																				activeSection === 'what' ? (
@@ -2861,7 +3117,11 @@ const DashboardContent = () => {
 																						ref={whatInputRef}
 																						type="text"
 																						value={whatValue}
-																						onChange={(e) => setWhatValue(e.target.value)}
+																						onChange={(e) => {
+																							if (isFromHomeDemoMode) return;
+																							setWhatValue(e.target.value);
+																						}}
+																						readOnly={isFromHomeDemoMode}
 																						onKeyDown={(e) => {
 																							if (e.key === 'Enter') {
 																								e.preventDefault();
@@ -2891,7 +3151,11 @@ const DashboardContent = () => {
 																								ref={whatInputRef}
 																								type="text"
 																								value={whatValue}
-																								onChange={(e) => setWhatValue(e.target.value)}
+																								onChange={(e) => {
+																									if (isFromHomeDemoMode) return;
+																									setWhatValue(e.target.value);
+																								}}
+																								readOnly={isFromHomeDemoMode}
 																								onKeyDown={(e) => {
 																									if (e.key === 'Enter') {
 																										e.preventDefault();
@@ -2947,7 +3211,13 @@ const DashboardContent = () => {
 																							: 'hover:bg-black/5'
 																				  } rounded-r-[8px]`
 																		}`}
-																			onClick={() => setActiveSection('where')}
+																			onClick={() => {
+																				if (isFromHomeDemoMode) {
+																					setShowFreeTrialPrompt(true);
+																					return;
+																				}
+																				setActiveSection('where');
+																			}}
 																		>
 																			{inboxView ? (
 																				activeSection === 'where' ? (
@@ -2956,9 +3226,11 @@ const DashboardContent = () => {
 																						type="text"
 																						value={whereValue}
 																						onChange={(e) => {
+																							if (isFromHomeDemoMode) return;
 																							setWhereValue(e.target.value);
 																							setIsNearMeLocation(false);
 																						}}
+																						readOnly={isFromHomeDemoMode}
 																						onKeyDown={(e) => {
 																							if (e.key === 'Enter') {
 																								e.preventDefault();
@@ -2990,9 +3262,11 @@ const DashboardContent = () => {
 																									type="text"
 																									value={whereValue}
 																									onChange={(e) => {
+																										if (isFromHomeDemoMode) return;
 																										setWhereValue(e.target.value);
 																										setIsNearMeLocation(false);
 																									}}
+																									readOnly={isFromHomeDemoMode}
 																									onKeyDown={(e) => {
 																										if (e.key === 'Enter') {
 																											e.preventDefault();
@@ -3374,10 +3648,12 @@ const DashboardContent = () => {
 						</div>
 					)}
 
-				{hasSearched &&
-					activeTab === 'search' &&
-					(isMapView || (!isLoadingContacts && !isRefetchingContacts)) &&
-					(() => {
+			{/* Show the mini search bar and tools when:
+			    1. A search has been executed (normal case), OR
+			    2. We're in fromHome mode with map view (pre-auth demo state) */}
+			{((hasSearched && activeTab === 'search') || (fromHomeParam && isMapView)) &&
+				(isMapView || (!isLoadingContacts && !isRefetchingContacts)) &&
+				(() => {
 						const trayWhy = isPromotion
 							? {
 									backgroundColor: MAP_RESULTS_SEARCH_TRAY.whyBackgroundColors.promotion,
@@ -4048,7 +4324,13 @@ const DashboardContent = () => {
 																					? 'group-hover:border-black/10'
 																					: ''
 																			} h-full min-w-0 relative pl-[16px] pr-1 mini-search-section-why`}
-																			onClick={() => setActiveSection('why')}
+																			onClick={() => {
+																				if (isFromHomeDemoMode) {
+																					setShowFreeTrialPrompt(true);
+																					return;
+																				}
+																				setActiveSection('why');
+																			}}
 																		>
 																			<div className="w-full h-full flex items-center text-left text-[13px] font-bold font-secondary truncate p-0 relative z-10 cursor-pointer">
 																				{whyValue
@@ -4087,11 +4369,18 @@ const DashboardContent = () => {
 																			className={`flex-1 flex items-center justify-end h-full min-w-0 relative ${
 																				isMapView ? 'pr-[12px]' : 'pr-[29px]'
 																			} pl-[16px] mini-search-section-where`}
-																			onClick={() => setActiveSection('where')}
+																			onClick={() => {
+																				if (isFromHomeDemoMode) {
+																					setShowFreeTrialPrompt(true);
+																					return;
+																				}
+																				setActiveSection('where');
+																			}}
 																		>
 																			<input
 																				value={whereValue}
 																				onChange={(e) => {
+																					if (isFromHomeDemoMode) return;
 																					setWhereValue(e.target.value);
 																					setIsNearMeLocation(false);
 																				}}
@@ -4101,6 +4390,7 @@ const DashboardContent = () => {
 																						triggerSearchWithCurrentValues();
 																					}
 																				}}
+																				readOnly={isFromHomeDemoMode}
 																				className="w-full h-full text-left bg-transparent border-none outline-none text-[13px] font-bold font-secondary overflow-hidden placeholder:text-gray-400 p-0 focus:ring-0 cursor-pointer relative z-10"
 																				style={{
 																					maskImage: 'linear-gradient(to right, black 75%, transparent 100%)',
@@ -4108,6 +4398,11 @@ const DashboardContent = () => {
 																				}}
 																				placeholder="Where"
 																				onFocus={(e) => {
+																					if (isFromHomeDemoMode) {
+																						e.target.blur();
+																						setShowFreeTrialPrompt(true);
+																						return;
+																					}
 																					setActiveSection('where');
 																					const target = e.target;
 																					setTimeout(
@@ -4642,39 +4937,15 @@ const DashboardContent = () => {
 						return searchBar;
 					})()}
 
-				{activeSearchQuery && activeTab === 'search' && (
+					{(activeSearchQuery || fromHomeParam) && activeTab === 'search' && (
 					<>
-						{isError ? (
-							<div className="mt-10 w-full px-4">
-								<Card className="w-full max-w-full mx-auto">
-									<CardContent className="py-8">
-										<div className="text-center">
-											<Typography variant="h3" className="text-destructive mb-2">
-												Search Failed
-											</Typography>
-											<Typography className="text-gray-600 mb-4">
-												{error instanceof Error && error.message.includes('timeout')
-													? 'The search took too long to complete. Please try a more specific query.'
-													: error instanceof Error
-													? error.message
-													: 'Unable to complete your search. Please try again.'}
-											</Typography>
-											<Button
-												onClick={() => form.handleSubmit(onSubmit)()}
-												variant="primary-light"
-												className="mt-4"
-											>
-												Retry Search
-											</Button>
-										</div>
-									</CardContent>
-								</Card>
-							</div>
-						) : isSearchPending ||
+						{isSearchPending ||
 						  isLoadingContacts ||
 						  isRefetchingContacts ||
 						  (contacts && contacts.length > 0) ||
-						  (isMapView && hasNoSearchResults) ? (
+						  (isMapView && hasNoSearchResults) ||
+						  (fromHomeParam && isMapView) ||
+						  isError ? (
 							<div className="flex justify-center w-full px-0 sm:px-4 relative">
 								<div className="w-full max-w-full results-appear results-align">
 									{isMapView ? (
@@ -4699,11 +4970,21 @@ const DashboardContent = () => {
 															className="w-full h-full rounded-[8px] border-[3px] border-[#143883] overflow-hidden relative"
 														>
 															<SearchResultsMap
-																contacts={contacts || []}
+																contacts={
+																	// Show placeholder dots while in fromHome loading state
+																	fromHomeParam && (!isSignedIn || !hasSearched)
+																		? fromHomePlaceholderContacts
+																		: (contacts || [])
+																}
 																selectedContacts={selectedContacts}
 																externallyHoveredContactId={hoveredMapPanelContactId}
 																searchQuery={activeSearchQuery}
-																searchWhat={searchedWhat}
+																searchWhat={
+																	// Use Wine, Beer, and Spirits color for fromHome placeholder dots
+																	fromHomeParam && (!isSignedIn || !hasSearched)
+																		? FROM_HOME_WHAT
+																		: searchedWhat
+																}
 																selectAllInViewNonce={selectAllInViewNonce}
 																onVisibleOverlayContactsChange={(overlayContacts) => {
 																	setMapPanelVisibleOverlayContacts(overlayContacts);
@@ -4786,8 +5067,23 @@ const DashboardContent = () => {
 																		setActiveMapTool('grab');
 																	}}
 																onMarkerHover={handleMapMarkerHover}
-																lockedStateName={searchedStateAbbrForMap}
+																lockedStateName={
+																	// Show California outline for fromHome placeholder state
+																	fromHomeParam && (!isSignedIn || !hasSearched)
+																		? 'CA'
+																		: searchedStateAbbrForMap
+																}
+																skipAutoFit={
+																	// Prevent zoom for fromHome placeholder - keep map zoomed out over US
+																	fromHomeParam && (!isSignedIn || !hasSearched)
+																}
 																onStateSelect={(stateName) => {
+																	// In demo mode, show the free trial prompt instead of searching
+																	if (isFromHomeDemoMode) {
+																		setShowFreeTrialPrompt(true);
+																		return;
+																	}
+
 																	const nextState = (stateName || '').trim();
 																	if (!nextState) return;
 
@@ -4875,7 +5171,7 @@ const DashboardContent = () => {
 																	setTimeout(() => tryScroll(0), 0);
 																}}
 															/>
-															{hasNoSearchResults && (
+															{hasNoSearchResults && !isError && (
 																<div className="absolute inset-0 z-[120] flex items-start justify-center pt-[120px] pointer-events-none">
 																	<div
 																		className="pointer-events-auto flex flex-col items-center justify-center text-center"
@@ -4915,6 +5211,72 @@ const DashboardContent = () => {
 																			>
 																				<span className="font-secondary font-bold text-[16px] leading-tight text-black">
 																					Try a new search term to find contacts in this area
+																				</span>
+																			</div>
+																		</div>
+																	</div>
+																</div>
+															)}
+															{/* Search Failed overlay - shown when there's an error */}
+															{isError && (
+																<div className="absolute inset-0 z-[120] flex items-start justify-center pt-[180px] pointer-events-none">
+																	<div
+																		className="pointer-events-auto flex flex-col items-center justify-center text-center"
+																		style={{
+																			width: 517,
+																			padding: '24px 0',
+																			borderRadius: 8,
+																			backgroundColor: 'rgba(106, 180, 227, 0.8)',
+																			border: '3px solid #143883',
+																		}}
+																	>
+																		<div
+																			className="flex flex-col items-center justify-center gap-[16px]"
+																			style={{ width: 496 }}
+																		>
+																			<div
+																				className="flex items-center justify-center text-center bg-white"
+																				style={{
+																					width: 496,
+																					height: 58,
+																					borderRadius: 8,
+																					border: '2px solid #101010',
+																				}}
+																			>
+																				<span className="font-secondary font-bold text-[18px] leading-none text-black">
+																					Search Failed
+																				</span>
+																			</div>
+																			<div
+																				className="flex items-center justify-center text-center bg-white px-6"
+																				style={{
+																					width: 496,
+																					minHeight: 58,
+																					borderRadius: 8,
+																					border: '2px solid #101010',
+																					padding: '12px 24px',
+																				}}
+																			>
+																				<span className="font-secondary font-bold text-[16px] leading-tight text-black">
+																					{error instanceof Error && error.message.includes('timeout')
+																						? 'The search took too long to complete. Please try a more specific query.'
+																						: error instanceof Error
+																						? error.message
+																						: 'Unable to complete your search. Please try again.'}
+																				</span>
+																			</div>
+																			<div
+																				className="flex items-center justify-center text-center bg-white cursor-pointer hover:bg-gray-50 transition-colors"
+																				style={{
+																					width: 496,
+																					height: 58,
+																					borderRadius: 8,
+																					border: '2px solid #101010',
+																				}}
+																				onClick={() => form.handleSubmit(onSubmit)()}
+																			>
+																				<span className="font-secondary font-bold text-[18px] leading-none text-black">
+																					Retry Search
 																				</span>
 																			</div>
 																		</div>
@@ -5352,7 +5714,7 @@ const DashboardContent = () => {
 																				})
 																			)}
 																		</CustomScrollbar>
-																		{!isMapResultsLoading && isMapPanelCreateCampaignVisible && (
+																		{!isMapResultsLoading && isMapPanelCreateCampaignVisible && !fromHomeParam && (
 																			<div className="flex-shrink-0 w-full px-[10px] pb-[10px]">
 																				<Button
 																					disabled={primaryCtaPending}
@@ -5435,6 +5797,7 @@ const DashboardContent = () => {
 																{/* Create Campaign button overlaid on map - only show when not loading */}
 																{/* Hidden below xl (1280px) to prevent overlap with right panel */}
 																{!isMobile &&
+																	!fromHomeParam &&
 																	!(
 																		isSearchPending ||
 																		isLoadingContacts ||
@@ -5793,8 +6156,8 @@ const DashboardContent = () => {
 																		);
 																		})
 																	)}
-																</CustomScrollbar>
-																{!isMapResultsLoading && (
+														</CustomScrollbar>
+															{!isMapResultsLoading && !fromHomeParam && (
 																	<div className="flex-shrink-0 w-full px-[10px] pb-[10px]">
 																		<Button
 																			disabled={primaryCtaPending}
@@ -5888,7 +6251,7 @@ const DashboardContent = () => {
 															isMobile ? undefined : (row) => setHoveredContact(row)
 														}
 														headerAction={
-															!isMobile ? (
+															!isMobile && !fromHomeParam ? (
 																<button
 																	type="button"
 																	onClick={handlePrimaryCta}
@@ -5941,7 +6304,7 @@ const DashboardContent = () => {
 												</CardContent>
 											</Card>
 											{/* Desktop button (non-sticky) */}
-											{!isMobile && (
+											{!isMobile && !fromHomeParam && (
 												<div className="flex items-center justify-center w-full search-results-cta-wrapper">
 													<Button
 														isLoading={primaryCtaPending}
@@ -5977,6 +6340,7 @@ const DashboardContent = () => {
 
 											{/* Mobile sticky button at bottom */}
 											{isMobile &&
+												!fromHomeParam &&
 												typeof window !== 'undefined' &&
 												createPortal(
 													<div className="mobile-sticky-cta">
@@ -6044,6 +6408,92 @@ const DashboardContent = () => {
 						<CampaignsTable />
 					</div>
 				)}
+
+				{/* Sign-up overlay for "from home" mode when user is not authenticated */}
+				{/* Shows after 3 seconds so user can see the map and placeholders first */}
+				{fromHomeParam &&
+					isAuthLoaded &&
+					isSignedIn === false &&
+					showFromHomeSignUp &&
+					typeof window !== 'undefined' &&
+					createPortal(
+						<div
+							className="fixed inset-0 z-[10000] flex items-center justify-center"
+						>
+							<SignUp
+								appearance={{
+									elements: {
+										rootBox: 'w-full max-w-[420px] mx-4',
+										cardBox: { boxShadow: 'none' },
+										card: {
+											boxShadow: 'none',
+											borderRadius: '16px',
+										},
+										formButtonPrimary:
+											'bg-black hover:bg-gray-800 text-sm normal-case',
+										socialButtonsBlockButton:
+											'border border-gray-300 hover:bg-gray-50',
+										dividerLine: 'bg-gray-200',
+										dividerText: 'text-gray-500',
+										formFieldLabel: 'text-gray-700',
+										formFieldInput:
+											'border-gray-300 focus:border-black focus:ring-black',
+										footerActionLink: 'text-black hover:text-gray-700',
+									},
+								}}
+								routing="hash"
+								forceRedirectUrl={`${urls.murmur.dashboard.index}?fromHome=true`}
+								signInUrl={`/sign-in?redirect_url=${encodeURIComponent(`${urls.murmur.dashboard.index}?fromHome=true`)}`}
+								signInForceRedirectUrl={`${urls.murmur.dashboard.index}?fromHome=true`}
+							/>
+						</div>,
+						document.body
+					)}
+
+				{/* Free trial prompt for "from home" mode when user is authenticated but has no subscription (after 15s) */}
+				{isFreeTrialPromptVisible &&
+					typeof window !== 'undefined' &&
+					createPortal(
+						<div
+							className="fixed inset-0 z-[10000] flex items-center justify-center"
+						>
+							<div
+								className="flex flex-col items-center rounded-[16px] pointer-events-auto py-8 px-8"
+								style={{
+									backgroundColor: '#6FCF84',
+									border: '3px solid #000000',
+								}}
+							>
+								<button
+									type="button"
+									onClick={handleStartFreeTrial}
+									className="font-semibold text-white rounded-[8px] cursor-pointer hover:opacity-90 transition-opacity disabled:opacity-70 disabled:cursor-not-allowed"
+									style={{
+										width: '475px',
+										height: '56px',
+										backgroundColor: '#1D942E',
+										border: '3px solid #000000',
+									}}
+								>
+									Start Your Free Trial
+								</button>
+								<div
+									className="flex flex-col items-center justify-center text-center mt-5"
+									style={{
+										fontFamily: '"Times New Roman", Times, serif',
+									}}
+								>
+								<p className="text-lg italic text-black mb-1">
+									&quot;You miss 100% of the shots you don&apos;t take&quot;
+								</p>
+									<p className="text-sm text-black">
+										-Wayne Gretzky
+									</p>
+								</div>
+							</div>
+						</div>,
+						document.body
+					)}
 			</div>
 		</AppLayout>
 	);

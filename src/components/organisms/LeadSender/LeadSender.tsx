@@ -41,7 +41,7 @@ export const LeadSender = () => {
 						isLoading={isPending}
 						className="!absolute !right-[2px] !top-[2px] !h-[38px] !opacity-100 !w-[100px] sm:!w-[150px] px-3 sm:px-6 hover:bg-gray-100 !border-l !border-l-black !border-r-0 !border-t-0 !border-b-0 text-foreground !text-[14px] sm:!text-[18px] bg-background rounded-[7px]"
 					>
-						Try for Free
+						{/* Intentionally blank (placeholder CTA removed) */}
 					</Button>
 				</form>
 			</div>

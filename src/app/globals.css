@@ -75,6 +75,7 @@
 	--font-primary: var(--font-times);
 	--font-secondary: var(--font-inter);
 	--font-zen: var(--font-zen-antique);
+	--font-crimson: var(--font-crimson-text);
 }
 
 /* Mobile landscape hard sizing for campaign metric boxes and headers */
@@ -4001,6 +4002,32 @@ html.murmur-compact {
 		transform: scale(0.9);
 		transform-origin: top center;
 		width: calc(100% / 0.9);
+	}
+}
+
+/* Research public page scaling (80%) */
+html.murmur-research-compact {
+	zoom: 0.8;
+}
+
+@supports not (zoom: 0.8) {
+	html.murmur-research-compact body {
+		transform: scale(0.8);
+		transform-origin: top center;
+		width: calc(100% / 0.8);
+	}
+}
+
+/* Inbox public page scaling (80%) */
+html.murmur-inbox-compact {
+	zoom: 0.8;
+}
+
+@supports not (zoom: 0.8) {
+	html.murmur-inbox-compact body {
+		transform: scale(0.8);
+		transform-origin: top center;
+		width: calc(100% / 0.8);
 	}
 }
 

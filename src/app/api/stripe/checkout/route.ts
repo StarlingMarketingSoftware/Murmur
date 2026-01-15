@@ -13,11 +13,13 @@ import { z } from 'zod';
 import { getUser } from '../../_utils';
 import { urls } from '@/constants/urls';
 import { BASE_URL } from '@/constants';
+import prisma from '@/lib/prisma';
 
 const stripeCheckoutRequestSchema = z.object({
 	priceId: z.string().min(1),
 	isYearly: z.boolean().optional(),
 	freeTrial: z.boolean().optional(),
+	uiMode: z.enum(['embedded', 'hosted']).optional(),
 });
 
 export type PostCheckoutSessionData = z.infer<typeof stripeCheckoutRequestSchema>;
@@ -36,7 +38,7 @@ export async function POST(req: Request) {
 			return apiBadRequest(validatedData.error);
 		}
 
-		const { priceId, freeTrial, isYearly } = validatedData.data;
+		const { priceId, freeTrial, isYearly, uiMode } = validatedData.data;
 		if (!priceId) {
 			return apiBadRequest('Price ID is required');
 		}
@@ -45,8 +47,25 @@ export async function POST(req: Request) {
 		if (!user) {
 			return apiNotFound('User not found');
 		}
-		if (!user.stripeCustomerId) {
-			return apiServerError('User does not have a Stripe customer ID');
+
+		let stripeCustomerId = user.stripeCustomerId;
+
+		// Create a Stripe customer if one doesn't exist
+		if (!stripeCustomerId) {
+			const customer = await stripe.customers.create({
+				email: user.email,
+				name: `${user.firstName} ${user.lastName}`.trim() || undefined,
+				metadata: {
+					clerkId: user.clerkId,
+				},
+			});
+			stripeCustomerId = customer.id;
+
+			// Update the user with the new Stripe customer ID
+			await prisma.user.update({
+				where: { id: user.id },
+				data: { stripeCustomerId: customer.id },
+			});
 		}
 
 		const payment_method_types = ['card'];
@@ -55,11 +74,13 @@ export async function POST(req: Request) {
 			payment_method_types.push('klarna');
 		}
 
+		const isEmbedded = uiMode === 'embedded';
+
 		const session: Stripe.Response<Stripe.Checkout.Session> =
 			await stripe.checkout.sessions.create({
 				payment_method_types:
 					payment_method_types as Stripe.Checkout.SessionCreateParams.PaymentMethodType[],
-				customer: user.stripeCustomerId,
+				customer: stripeCustomerId,
 				line_items: [
 					{
 						price: priceId,
@@ -67,8 +88,15 @@ export async function POST(req: Request) {
 					},
 				],
 				mode: 'subscription',
-				success_url: `${BASE_URL}${urls.murmur.dashboard.index}?success=true`,
-				cancel_url: `${BASE_URL}${urls.murmur.dashboard.index}?canceled=true`,
+				...(isEmbedded
+					? {
+							ui_mode: 'embedded' as const,
+							return_url: `${BASE_URL}${urls.murmur.dashboard.index}?session_id={CHECKOUT_SESSION_ID}`,
+					  }
+					: {
+							success_url: `${BASE_URL}${urls.murmur.dashboard.index}?success=true`,
+							cancel_url: `${BASE_URL}${urls.murmur.dashboard.index}?canceled=true`,
+					  }),
 				allow_promotion_codes: true,
 				subscription_data: freeTrial
 					? {
@@ -76,6 +104,13 @@ export async function POST(req: Request) {
 					  }
 					: undefined,
 			});
+
+		if (isEmbedded) {
+			if (!session.client_secret) {
+				return apiServerError('Stripe did not return a client secret for embedded checkout');
+			}
+			return apiResponse({ clientSecret: session.client_secret });
+		}
 
 		return apiResponse({ url: session.url });
 	} catch (error) {

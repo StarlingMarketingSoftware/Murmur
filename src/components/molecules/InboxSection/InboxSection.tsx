@@ -1,6 +1,6 @@
 'use client';
 
-import { FC, useState, useEffect } from 'react';
+import { FC, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useGetInboundEmails } from '@/hooks/queryHooks/useInboundEmails';
 import { useGetEmails } from '@/hooks/queryHooks/useEmails';
@@ -130,6 +130,47 @@ interface InboxSectionProps {
 	 * Used when viewport width is <= 1520px.
 	 */
 	isNarrow?: boolean;
+
+	/**
+	 * Optional sample data for non-auth/demo contexts (e.g. landing page).
+	 * When provided, API queries are disabled and this data is rendered instead.
+	 */
+	sampleData?: {
+		inboundEmails: InboundEmailWithRelations[];
+		sentEmails?: Array<InboundEmailWithRelations & { isSent?: boolean }>;
+	};
+
+	/**
+	 * Override the desktop (non-mobile) inbox container width in pixels.
+	 * Useful when embedding the inbox in marketing/landing layouts.
+	 */
+	desktopWidth?: number;
+
+	/**
+	 * Override the desktop (non-mobile) inbox container height in pixels.
+	 * Useful when embedding the inbox in marketing/landing layouts.
+	 */
+	desktopHeight?: number;
+
+	/**
+	 * Removes the default outer horizontal padding used in app pages.
+	 * Useful when the parent container already controls spacing.
+	 */
+	noOuterPadding?: boolean;
+
+	/**
+	 * Forces the "desktop" layout even on mobile devices.
+	 * Useful for marketing embeds that are already scaled by a parent (e.g. ScaledToFit)
+	 * and should keep the same proportions as desktop.
+	 */
+	forceDesktopLayout?: boolean;
+
+	/**
+	 * Marketing/demo mode: prevents the inbox from capturing scroll/touch (so the page scroll
+	 * works normally) and keeps the demo pinned to the "top" state where the header/search
+	 * is visible.
+	 */
+	demoMode?: boolean;
 }
 
 /**
@@ -218,22 +259,34 @@ export const InboxSection: FC<InboxSectionProps> = ({
 	onContactSelect,
 	onContactHover,
 	isNarrow = false,
+	sampleData,
+	desktopWidth,
+	desktopHeight,
+	noOuterPadding = false,
+	forceDesktopLayout = false,
+	demoMode = false,
 }) => {
-	const isMobile = useIsMobile();
+	const detectedIsMobile = useIsMobile();
+	const isMobile = forceDesktopLayout ? false : Boolean(detectedIsMobile);
 	const { setDraftsTabHighlighted, setWriteTabHighlighted, setTopSearchHighlighted } =
 		useCampaignTopSearchHighlight();
+	const rootRef = useRef<HTMLDivElement | null>(null);
 
 	// Width constants based on narrow mode and mobile
 	// On mobile, we use calc() values for responsive sizing (4px margins on each side = 8px total)
-	const boxWidth = isNarrow ? 516 : 907;
+	const baseBoxWidth = isNarrow ? 516 : 907;
+	const boxWidth = desktopWidth ?? baseBoxWidth;
 	// NOTE: Desktop rows must fit inside the scroll container's content box.
 	// With a 3px border and 16px left/right padding on the outer container (border-box),
 	// the available inner width is: boxWidth - (2 * 3) - (2 * 16).
 	// If rows are wider than that, their left/right borders get clipped.
-	const emailRowWidth = isNarrow ? 478 : 869;
-	const searchBarWidth = isNarrow ? 334 : 725;
-	const expandedEmailWidth = isNarrow ? 489 : 880;
-	const emailBodyWidth = isNarrow ? 461 : 828;
+	const emailRowWidth = boxWidth - 38;
+	const searchBarWidth = boxWidth - 182;
+	const expandedEmailWidth = boxWidth - 34;
+	const emailBodyWidth = isNarrow ? boxWidth - 55 : boxWidth - 79;
+
+	// Height constants (desktop only; mobile uses responsive calc())
+	const desktopBoxHeight = desktopHeight ?? 657;
 
 	// Mobile-specific width values (using CSS calc for responsive sizing)
 	// 4px margins on each side for edge-to-edge feel
@@ -243,19 +296,25 @@ export const InboxSection: FC<InboxSectionProps> = ({
 	const mobileExpandedEmailWidth = 'calc(100% - 16px)'; // Match email row width
 	const mobileEmailBodyWidth = 'calc(100% - 40px)'; // With additional padding
 
+	const outerPaddingClass = isMobile ? 'px-1' : noOuterPadding ? 'px-0' : 'px-4';
+	const isUsingSampleData = Boolean(sampleData);
+
 	const [activeTab, setActiveTab] = useState<'inbox' | 'sent'>('inbox');
 	const {
-		data: inboundEmails,
+		data: inboundEmailsFromApi,
 		isLoading: isLoadingInbound,
 		error: inboundError,
-	} = useGetInboundEmails();
+	} = useGetInboundEmails({ enabled: !isUsingSampleData });
 	const {
-		data: emails,
+		data: emailsFromApi,
 		isLoading: isLoadingEmails,
 		error: emailsError,
 	} = useGetEmails({
 		filters: campaignId ? { campaignId } : undefined,
+		enabled: !isUsingSampleData,
 	});
+	const inboundEmails = isUsingSampleData ? sampleData?.inboundEmails ?? [] : inboundEmailsFromApi;
+	const emails = isUsingSampleData ? undefined : emailsFromApi;
 	const sentEmails = emails?.filter((email) => email.status === 'sent') || [];
 	const [selectedEmailId, setSelectedEmailId] = useState<number | null>(null);
 	const [replyMessage, setReplyMessage] = useState('');
@@ -264,6 +323,9 @@ export const InboxSection: FC<InboxSectionProps> = ({
 	const [sentReplies, setSentReplies] = useState<
 		Record<number, Array<{ message: string; timestamp: Date }>>
 	>({});
+	// Tracks "waiting for their reply" state by sender (used to drive the green reply theme).
+	// Keyed by normalized sender email; value is the timestamp (ms) when we last replied.
+	const [replyThemeBySender, setReplyThemeBySender] = useState<Record<string, number>>({});
 
 	const { user } = useMe();
 	const { mutateAsync: sendMailgunMessage } = useSendMailgunMessage({
@@ -291,30 +353,36 @@ export const InboxSection: FC<InboxSectionProps> = ({
 
 	// Convert sent emails to a format compatible with inbox display
 	const normalizedSentEmails: Array<InboundEmailWithRelations & { isSent?: boolean }> =
-		sentEmails.map(
-			(email) =>
-				({
-					id: email.id,
-					sender: email.contact?.email || '',
-					senderName: email.contact
-						? `${email.contact.firstName || ''} ${email.contact.lastName || ''}`.trim()
-						: '',
-					subject: email.subject || '',
-					bodyPlain: email.message || '',
-					strippedText: email.message?.replace(/<[^>]*>/g, '') || '',
-					bodyHtml: email.message || '',
-					receivedAt: email.sentAt || email.createdAt,
-					contact: email.contact,
-					campaign: null,
-					originalEmail: null,
-					isSent: true,
-				} as any)
-		);
+		isUsingSampleData
+			? sampleData?.sentEmails ?? []
+			: sentEmails.map(
+					(email) =>
+						({
+							id: email.id,
+							sender: email.contact?.email || '',
+							senderName: email.contact
+								? `${email.contact.firstName || ''} ${email.contact.lastName || ''}`.trim()
+								: '',
+							subject: email.subject || '',
+							bodyPlain: email.message || '',
+							strippedText: email.message?.replace(/<[^>]*>/g, '') || '',
+							bodyHtml: email.message || '',
+							receivedAt: email.sentAt || email.createdAt,
+							contact: email.contact,
+							campaign: null,
+							originalEmail: null,
+							isSent: true,
+						} as any)
+			  );
 
 	// Choose which emails to display based on active tab
 	const emailsToDisplay = activeTab === 'inbox' ? filteredBySender : normalizedSentEmails;
-	const isLoading = activeTab === 'inbox' ? isLoadingInbound : isLoadingEmails;
-	const error = activeTab === 'inbox' ? inboundError : emailsError;
+	const isLoading = isUsingSampleData
+		? false
+		: activeTab === 'inbox'
+		? isLoadingInbound
+		: isLoadingEmails;
+	const error = isUsingSampleData ? null : activeTab === 'inbox' ? inboundError : emailsError;
 
 	// Further filter by search query (sender, subject, body, contact name/company/email)
 	const visibleEmails = emailsToDisplay?.filter((email) => {
@@ -350,6 +418,46 @@ export const InboxSection: FC<InboxSectionProps> = ({
 	});
 
 	const selectedEmail = visibleEmails?.find((email) => email.id === selectedEmailId);
+	const selectedSenderKey = selectedEmail?.sender?.toLowerCase().trim();
+	const isSelectedEmailSent = Boolean((selectedEmail as any)?.isSent);
+	const isReplySentThemeActive =
+		Boolean(
+			selectedEmail &&
+				!isSelectedEmailSent &&
+				activeTab === 'inbox' &&
+				selectedSenderKey &&
+				replyThemeBySender[selectedSenderKey] !== undefined
+		);
+
+	// If we receive a newer inbound email from a sender we've replied to, revert the UI theme.
+	useEffect(() => {
+		if (!inboundEmails || inboundEmails.length === 0) return;
+
+		setReplyThemeBySender((prev) => {
+			const entries = Object.entries(prev);
+			if (entries.length === 0) return prev;
+
+			let changed = false;
+			const next: Record<string, number> = { ...prev };
+
+			for (const [senderKey, repliedAtMs] of entries) {
+				const hasNewInbound = inboundEmails.some((email) => {
+					const sender = email.sender?.toLowerCase().trim();
+					if (!sender || sender !== senderKey) return false;
+					const receivedAt = (email as any).receivedAt;
+					if (!receivedAt) return false;
+					return new Date(receivedAt).getTime() > repliedAtMs;
+				});
+
+				if (hasNewInbound) {
+					delete next[senderKey];
+					changed = true;
+				}
+			}
+
+			return changed ? next : prev;
+		});
+	}, [inboundEmails]);
 
 	// Notify parent when selected contact changes (for research panel)
 	useEffect(() => {
@@ -365,6 +473,28 @@ export const InboxSection: FC<InboxSectionProps> = ({
 
 	const handleSendReply = async () => {
 		if (!selectedEmail || !replyMessage.trim()) return;
+
+		const senderKey = selectedEmail.sender?.toLowerCase().trim();
+		const repliedAtMs = Date.now();
+		// Optimistically flip the UI theme to "sent" (green) for this sender.
+		if (senderKey) {
+			setReplyThemeBySender((prev) => ({ ...prev, [senderKey]: repliedAtMs }));
+		}
+
+		// Sample-data/demo mode (e.g. landing page): never actually send.
+		// Just append the reply to the UI immediately.
+		if (isUsingSampleData) {
+			setSentReplies((prev) => {
+				const emailId = selectedEmail.id;
+				const existingReplies = prev[emailId] || [];
+				return {
+					...prev,
+					[emailId]: [...existingReplies, { message: replyMessage, timestamp: new Date() }],
+				};
+			});
+			setReplyMessage('');
+			return;
+		}
 
 		const senderEmail =
 			user?.customDomain && user?.customDomain !== ''
@@ -410,6 +540,15 @@ export const InboxSection: FC<InboxSectionProps> = ({
 
 			setReplyMessage('');
 		} catch (error) {
+			// If sending fails, revert the optimistic theme flip.
+			if (senderKey) {
+				setReplyThemeBySender((prev) => {
+					if (prev[senderKey] === undefined) return prev;
+					const next = { ...prev };
+					delete next[senderKey];
+					return next;
+				});
+			}
 			console.error('Failed to send reply:', error);
 		} finally {
 			setIsSending(false);
@@ -425,17 +564,88 @@ export const InboxSection: FC<InboxSectionProps> = ({
 		};
 	}, [setDraftsTabHighlighted, setWriteTabHighlighted, setTopSearchHighlighted]);
 
+	// In demo mode, ensure the internal scroll position stays at the top so the header/search
+	// remains visible (especially on mobile where swipes can otherwise scroll the inbox UI).
+	const getDemoScrollEl = () => {
+		const root = rootRef.current;
+		if (!root) return null;
+		const mainBox = root.querySelector<HTMLElement>('[data-campaign-main-box="inbox"]');
+		// `CustomScrollbar` renders its scroll container as a `.scrollbar-hide` child.
+		return mainBox?.querySelector<HTMLElement>('.scrollbar-hide') ?? null;
+	};
+
+	// Run as early as possible to avoid a "scrolled" first paint.
+	useLayoutEffect(() => {
+		if (!demoMode) return;
+		const scrollEl = getDemoScrollEl();
+		if (!scrollEl) return;
+		scrollEl.scrollTop = 0;
+	}, [demoMode]);
+
+	useEffect(() => {
+		if (!demoMode) return;
+		const scrollEl = getDemoScrollEl();
+		if (!scrollEl) return;
+
+		const prevOverflowY = scrollEl.style.overflowY;
+		const prevScrollBehavior = scrollEl.style.scrollBehavior;
+
+		// Prevent internal scrolling in the demo embed.
+		scrollEl.style.overflowY = 'hidden';
+		scrollEl.style.scrollBehavior = 'auto';
+
+		const forceTop = () => {
+			// Use direct assignment to avoid smooth scrolling / layout jank in a demo embed.
+			scrollEl.scrollTop = 0;
+		};
+
+		// Beat mobile browser overflow-scroll restoration by re-applying for a few frames.
+		let rafId: number | null = null;
+		let rafCount = 0;
+		const rafTick = () => {
+			forceTop();
+			rafCount += 1;
+			if (rafCount < 8) {
+				rafId = window.requestAnimationFrame(rafTick);
+			}
+		};
+		rafId = window.requestAnimationFrame(rafTick);
+
+		// Also re-apply after the browser finishes restoring state.
+		const t0 = window.setTimeout(forceTop, 0);
+		const t1 = window.setTimeout(forceTop, 50);
+		const t2 = window.setTimeout(forceTop, 200);
+		const t3 = window.setTimeout(forceTop, 500);
+
+		// Safety: if anything tries to scroll it anyway, snap back.
+		const onScroll = () => {
+			if (scrollEl.scrollTop !== 0) forceTop();
+		};
+		scrollEl.addEventListener('scroll', onScroll, { passive: true });
+
+		return () => {
+			scrollEl.removeEventListener('scroll', onScroll);
+			window.clearTimeout(t0);
+			window.clearTimeout(t1);
+			window.clearTimeout(t2);
+			window.clearTimeout(t3);
+			if (rafId != null) window.cancelAnimationFrame(rafId);
+			scrollEl.style.overflowY = prevOverflowY;
+			scrollEl.style.scrollBehavior = prevScrollBehavior;
+		};
+	}, [demoMode, activeTab, selectedEmailId]);
+
 	if (isLoading) {
 		const skeletonRowCount = isMobile ? 5 : 6;
 		return (
-			<div className={`w-full flex justify-center ${isMobile ? 'px-1' : 'px-4'}`}>
+			<div className={`w-full flex justify-center ${outerPaddingClass}`}>
 				<div
 					data-campaign-main-box="inbox"
 					className="flex flex-col items-center space-y-2 overflow-y-auto overflow-x-hidden relative animate-pulse"
 					style={{
 						width: isMobile ? mobileBoxWidth : `${boxWidth}px`,
 						maxWidth: isMobile ? undefined : `${boxWidth}px`,
-						height: isMobile ? 'calc(100dvh - 160px)' : '657px',
+						height: isMobile ? 'calc(100dvh - 160px)' : `${desktopBoxHeight}px`,
 						border: '3px solid #000000',
 						borderRadius: '8px',
 						padding: isMobile ? '8px' : '16px',
@@ -630,14 +840,14 @@ export const InboxSection: FC<InboxSectionProps> = ({
 
 	if (error) {
 		return (
-			<div className={`w-full flex justify-center ${isMobile ? 'px-1' : 'px-4'}`}>
+			<div className={`w-full flex justify-center ${outerPaddingClass}`}>
 				<div
 					data-campaign-main-box="inbox"
 					className="flex items-center justify-center"
 					style={{
 						width: isMobile ? mobileBoxWidth : `${boxWidth}px`,
 						maxWidth: isMobile ? undefined : `${boxWidth}px`,
-						height: isMobile ? 'calc(100dvh - 160px)' : '657px',
+						height: isMobile ? 'calc(100dvh - 160px)' : `${desktopBoxHeight}px`,
 						border: '3px solid #000000',
 						borderRadius: '8px',
 					}}
@@ -657,14 +867,14 @@ export const InboxSection: FC<InboxSectionProps> = ({
 
 	if (!visibleEmails || visibleEmails.length === 0) {
 		return (
-			<div className={`w-full flex justify-center ${isMobile ? 'px-1' : 'px-4'}`}>
+			<div className={`w-full flex justify-center ${outerPaddingClass}`}>
 				<div
 					data-campaign-main-box="inbox"
 					className="flex flex-col items-center space-y-2 overflow-y-auto overflow-x-hidden relative"
 					style={{
 						width: isMobile ? mobileBoxWidth : `${boxWidth}px`,
 						maxWidth: isMobile ? undefined : `${boxWidth}px`,
-						height: isMobile ? 'calc(100dvh - 160px)' : '657px',
+						height: isMobile ? 'calc(100dvh - 160px)' : `${desktopBoxHeight}px`,
 						border: '3px solid #000000',
 						borderRadius: '8px',
 						padding: isMobile ? '8px' : '16px',
@@ -1031,7 +1241,12 @@ export const InboxSection: FC<InboxSectionProps> = ({
 	}
 
 	return (
-		<div className={`w-full flex justify-center ${isMobile ? 'px-1' : 'px-4'}`}>
+		<div
+			ref={rootRef}
+			className={`w-full flex justify-center ${outerPaddingClass} ${
+				demoMode ? 'pointer-events-none select-none' : ''
+			}`}
+		>
 			<CustomScrollbar
 				data-campaign-main-box="inbox"
 				className="flex flex-col items-center relative"
@@ -1044,9 +1259,9 @@ export const InboxSection: FC<InboxSectionProps> = ({
 				style={{
 					width: isMobile ? mobileBoxWidth : `${boxWidth}px`,
 					maxWidth: isMobile ? undefined : `${boxWidth}px`,
-					height: isMobile ? 'calc(100dvh - 160px)' : '657px',
-					minHeight: isMobile ? 'calc(100dvh - 160px)' : '657px',
-					maxHeight: isMobile ? 'calc(100dvh - 160px)' : '657px',
+					height: isMobile ? 'calc(100dvh - 160px)' : `${desktopBoxHeight}px`,
+					minHeight: isMobile ? 'calc(100dvh - 160px)' : `${desktopBoxHeight}px`,
+					maxHeight: isMobile ? 'calc(100dvh - 160px)' : `${desktopBoxHeight}px`,
 					border: '3px solid #000000',
 					borderRadius: '8px',
 					padding: selectedEmail
@@ -1064,7 +1279,9 @@ export const InboxSection: FC<InboxSectionProps> = ({
 						? '62px'
 						: '109px', // Adjusted for mobile
 					background: selectedEmail
-						? '#437ec1'
+						? isReplySentThemeActive
+							? '#467842'
+							: '#437ec1'
 						: isMobile
 						? activeTab === 'sent'
 							? '#5AB477'
@@ -1312,7 +1529,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 							width: isMobile ? mobileExpandedEmailWidth : `${expandedEmailWidth}px`,
 							border: '3px solid #000000',
 							borderRadius: '8px',
-							backgroundColor: '#5DA0EB',
+							backgroundColor: isReplySentThemeActive ? '#5DB169' : '#5DA0EB',
 							overflow: 'hidden',
 						}}
 					>
@@ -1416,34 +1633,115 @@ export const InboxSection: FC<InboxSectionProps> = ({
 						</div>
 
 						{/* Content Section */}
-						<div
-							className="flex-1 overflow-y-auto flex flex-col"
-							style={{ paddingBottom: isMobile ? '14px' : '18px' }}
-						>
-							{/* Email Body Box - 828x326px (or 461px when narrow), 19px below header */}
-							<div
-								style={{
-									width: isMobile ? mobileEmailBodyWidth : `${emailBodyWidth}px`,
-									height: isMobile ? '280px' : '326px',
-									marginTop: isMobile ? '12px' : '19px',
-									marginLeft: activeTab === 'sent' ? 'auto' : 0,
-									marginRight: activeTab === 'sent' ? 0 : 'auto',
-									alignSelf: activeTab === 'sent' ? 'flex-end' : 'flex-start',
-									backgroundColor: activeTab === 'sent' ? '#FFFFFF' : '#E5F1FF',
-									border: '3px solid #000000',
-									borderRadius: '8px',
-									padding: isMobile ? '12px' : '16px',
-									overflowY: 'auto',
-								}}
+						<div className="flex-1 w-full flex flex-col min-h-0">
+							<CustomScrollbar
+								className="flex-1 w-full min-h-0"
+								contentClassName={`flex flex-col ${isMobile ? 'pb-[14px]' : 'pb-[18px]'}`}
+								thumbWidth={2}
+								thumbColor="#000000"
+								trackColor="transparent"
+								offsetRight={-6}
+								disableOverflowClass
+								lockHorizontalScroll
 							>
-								{/* Date/time header */}
-								<div className="text-sm text-black mb-4">
-									{selectedEmail.receivedAt
-										? (() => {
-												const date = new Date(selectedEmail.receivedAt);
+								{/* Email Body Box - 828x326px (or 461px when narrow), 19px below header */}
+								<div
+									style={{
+										width: isMobile ? mobileEmailBodyWidth : `${emailBodyWidth}px`,
+										height: isUsingSampleData ? 'auto' : isMobile ? '280px' : '326px',
+										marginTop: isMobile ? '12px' : '19px',
+										marginLeft: activeTab === 'sent' ? 'auto' : 0,
+										marginRight: activeTab === 'sent' ? 0 : 'auto',
+										alignSelf: activeTab === 'sent' ? 'flex-end' : 'flex-start',
+										flexShrink: 0,
+										backgroundColor: activeTab === 'sent' ? '#FFFFFF' : '#E5F1FF',
+										border: '3px solid #000000',
+										borderRadius: '8px',
+										padding: isMobile ? '12px' : '16px',
+										overflowY: isUsingSampleData ? 'visible' : 'auto',
+									}}
+								>
+									{/* Date/time header */}
+									<div className="text-sm text-black mb-4">
+										{selectedEmail.receivedAt
+											? (() => {
+													const date = new Date(selectedEmail.receivedAt);
+													const now = new Date();
+													const diffTime = Math.abs(now.getTime() - date.getTime());
+													const diffDays = Math.floor(
+														diffTime / (1000 * 60 * 60 * 24)
+													);
+													const dayName = date.toLocaleDateString('en-US', {
+														weekday: 'long',
+													});
+													const monthDay = date.toLocaleDateString('en-US', {
+														month: 'long',
+														day: 'numeric',
+													});
+													const time = date
+														.toLocaleTimeString([], {
+															hour: 'numeric',
+															minute: '2-digit',
+															hour12: true,
+														})
+														.toLowerCase();
+													const ago =
+														diffDays === 0
+															? 'today'
+															: diffDays === 1
+															? '1 day ago'
+															: `${diffDays} days ago`;
+													return `${dayName}, ${monthDay} ${time} (${ago})`;
+											  })()
+											: ''}
+									</div>
+
+									{/* Email body */}
+									<div className="text-sm">
+										{selectedEmail.bodyHtml ? (
+											<div
+												dangerouslySetInnerHTML={{
+													__html: stripQuotedReplyHtml(selectedEmail.bodyHtml),
+												}}
+												className="prose prose-sm max-w-none"
+											/>
+										) : (
+											<div className="whitespace-pre-wrap">
+												{stripQuotedReply(
+													selectedEmail.strippedText || selectedEmail.bodyPlain || ''
+												) || 'No content'}
+											</div>
+										)}
+									</div>
+								</div>
+
+								{/* Sent Replies - Right aligned */}
+								{(sentReplies[selectedEmail.id] || []).map((reply, index) => (
+									<div
+										key={index}
+										style={{
+											width: isMobile ? mobileEmailBodyWidth : `${emailBodyWidth}px`,
+											height: isUsingSampleData ? 'auto' : isMobile ? '200px' : '326px',
+											marginTop: isMobile ? '12px' : '19px',
+											marginRight: 0,
+											alignSelf: 'flex-end',
+											flexShrink: 0,
+											backgroundColor: '#FFFFFF',
+											border: '3px solid #000000',
+											borderRadius: '8px',
+											padding: isMobile ? '12px' : '16px',
+											overflowY: isUsingSampleData ? 'visible' : 'auto',
+										}}
+									>
+										{/* Date/time header */}
+										<div className="text-sm text-black mb-4">
+											{(() => {
+												const date = reply.timestamp;
 												const now = new Date();
 												const diffTime = Math.abs(now.getTime() - date.getTime());
-												const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+												const diffDays = Math.floor(
+													diffTime / (1000 * 60 * 60 * 24)
+												);
 												const dayName = date.toLocaleDateString('en-US', {
 													weekday: 'long',
 												});
@@ -1465,85 +1763,25 @@ export const InboxSection: FC<InboxSectionProps> = ({
 														? '1 day ago'
 														: `${diffDays} days ago`;
 												return `${dayName}, ${monthDay} ${time} (${ago})`;
-										  })()
-										: ''}
-								</div>
-
-								{/* Email body */}
-								<div className="text-sm">
-									{selectedEmail.bodyHtml ? (
-										<div
-											dangerouslySetInnerHTML={{
-												__html: stripQuotedReplyHtml(selectedEmail.bodyHtml),
-											}}
-											className="prose prose-sm max-w-none"
-										/>
-									) : (
-										<div className="whitespace-pre-wrap">
-											{stripQuotedReply(
-												selectedEmail.strippedText || selectedEmail.bodyPlain || ''
-											) || 'No content'}
+											})()}
 										</div>
-									)}
-								</div>
-							</div>
 
-							{/* Sent Replies - Right aligned */}
-							{(sentReplies[selectedEmail.id] || []).map((reply, index) => (
+										{/* Reply body */}
+										<div className="text-sm whitespace-pre-wrap">{reply.message}</div>
+									</div>
+								))}
+							</CustomScrollbar>
+
+							{/* Reply Box - fixed at bottom (inbox only) */}
+							{activeTab === 'inbox' && (
 								<div
-									key={index}
+									className="w-full flex justify-center"
 									style={{
-										width: isMobile ? mobileEmailBodyWidth : `${emailBodyWidth}px`,
-										height: isMobile ? '200px' : '326px',
-										marginTop: isMobile ? '12px' : '19px',
-										marginRight: 0,
-										alignSelf: 'flex-end',
-										backgroundColor: '#FFFFFF',
-										border: '3px solid #000000',
-										borderRadius: '8px',
-										padding: isMobile ? '12px' : '16px',
-										overflowY: 'auto',
+										marginTop: isMobile ? '14px' : '18px',
+										paddingBottom: isMobile ? '6px' : '10px',
+										flexShrink: 0,
 									}}
 								>
-									{/* Date/time header */}
-									<div className="text-sm text-black mb-4">
-										{(() => {
-											const date = reply.timestamp;
-											const now = new Date();
-											const diffTime = Math.abs(now.getTime() - date.getTime());
-											const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-											const dayName = date.toLocaleDateString('en-US', {
-												weekday: 'long',
-											});
-											const monthDay = date.toLocaleDateString('en-US', {
-												month: 'long',
-												day: 'numeric',
-											});
-											const time = date
-												.toLocaleTimeString([], {
-													hour: 'numeric',
-													minute: '2-digit',
-													hour12: true,
-												})
-												.toLowerCase();
-											const ago =
-												diffDays === 0
-													? 'today'
-													: diffDays === 1
-													? '1 day ago'
-													: `${diffDays} days ago`;
-											return `${dayName}, ${monthDay} ${time} (${ago})`;
-										})()}
-									</div>
-
-									{/* Reply body */}
-									<div className="text-sm whitespace-pre-wrap">{reply.message}</div>
-								</div>
-							))}
-
-							{/* Reply Box - only show for inbox emails */}
-							{activeTab === 'inbox' && (
-								<div className="w-full flex justify-center" style={{ marginTop: isMobile ? '24px' : '49px' }}>
 									<div
 										style={{
 											width: isMobile ? mobileEmailBodyWidth : `${emailBodyWidth}px`,
@@ -1585,7 +1823,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 								</div>
 							)}
 						</div>
-					</div>
+				</div>
 				) : (
 					/* Email List View */
 					<>

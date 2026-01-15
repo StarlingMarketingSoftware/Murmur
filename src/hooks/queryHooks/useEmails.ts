@@ -37,6 +37,7 @@ export const useGetEmails = (options: EmailQueryOptions) => {
 
 			return response.json() as Promise<EmailWithRelations[]>;
 		},
+		enabled: options.enabled,
 	});
 };
 
