@@ -186,7 +186,15 @@ export default function Products() {
 			</section>
 
 			{/* 728px tall block of #EFF6F0 */}
-			<section className="w-full h-[728px] bg-[#EFF6F0]">
+			<section className="relative w-full h-[728px] bg-[#EFF6F0]">
+				{/* Top-box placeholders (empty outline only) */}
+				<div className="hidden lg:flex absolute top-[196px] left-1/2 -translate-x-[49px] gap-[11px] flex-nowrap z-10">
+					<div className="w-[234px] h-[349px] rounded-[8px] border-2 border-black bg-transparent" />
+					<div className="w-[234px] h-[349px] rounded-[8px] border-2 border-black bg-transparent" />
+					<div className="w-[234px] h-[349px] rounded-[8px] border-2 border-black bg-transparent" />
+					<div className="w-[234px] h-[349px] rounded-[8px] border-2 border-black bg-transparent" />
+				</div>
+
 				<div className="mx-auto h-full w-full max-w-[1200px] px-6">
 					<div className="flex h-full items-start pt-[104px]">
 						<div className="w-full max-w-[560px]">
