@@ -39,7 +39,7 @@ type Feature = {
 	};
 };
 
-type Plan = 'basic' | 'standard' | 'pro';
+type Plan = 'basic' | 'pro' | 'ultra';
 
 const FEATURE_DATA: Record<Plan, Feature> = {
 	basic: {
@@ -69,7 +69,7 @@ const FEATURE_DATA: Record<Plan, Feature> = {
 			'1on1Consultation': false,
 		},
 	},
-	standard: {
+	pro: {
 		contactFeatures: {
 			contactGeneration: true,
 			additionalContactGeneration: true,
@@ -96,7 +96,7 @@ const FEATURE_DATA: Record<Plan, Feature> = {
 			'1on1Consultation': false,
 		},
 	},
-	pro: {
+	ultra: {
 		contactFeatures: {
 			contactGeneration: true,
 			additionalContactGeneration: true,
@@ -212,11 +212,11 @@ const FeatureRow = <T extends keyof Feature>({
 				bgColor={rowBgColor}
 			/>
 			<FeatureCell
-				value={FEATURE_DATA.standard[sectionKey][featureKey] as boolean | string}
+				value={FEATURE_DATA.pro[sectionKey][featureKey] as boolean | string}
 				bgColor={rowBgColor}
 			/>
 			<FeatureCell
-				value={FEATURE_DATA.pro[sectionKey][featureKey] as boolean | string}
+				value={FEATURE_DATA.ultra[sectionKey][featureKey] as boolean | string}
 				bgColor={rowBgColor}
 			/>
 		</TableRow>
@@ -362,12 +362,12 @@ export const FeaturesTable: FC = () => {
 									)}
 									variant="h3"
 								>
-									Standard
+									Pro
 								</Typography>
 							</TableHead>
 							<TableHead className="">
 								<Typography className={tableHeadingStyles} variant="h3">
-									Pro
+									Ultra
 								</Typography>
 							</TableHead>
 						</TableRow>
@@ -398,8 +398,8 @@ export const FeaturesTable: FC = () => {
 			</div>
 			<div className="block md:hidden px-4">
 				<MobilePlanTable plan="basic" planTitle="Basic" />
-				<MobilePlanTable plan="standard" planTitle="Standard" />
 				<MobilePlanTable plan="pro" planTitle="Pro" />
+				<MobilePlanTable plan="ultra" planTitle="Ultra" />
 			</div>
 		</>
 	);

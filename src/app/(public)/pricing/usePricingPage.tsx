@@ -2,7 +2,7 @@ import { BillingCycle } from '@/types';
 import { useRef, useState } from 'react';
 
 export const usePricingPage = () => {
-	const [billingCycle, setBillingCycle] = useState<BillingCycle>('year');
+	const [billingCycle, setBillingCycle] = useState<BillingCycle>('month');
 	const tableRef = useRef<HTMLDivElement>(null);
 
 	const handleScrollToTable = () => {

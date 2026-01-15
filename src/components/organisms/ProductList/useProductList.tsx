@@ -15,7 +15,8 @@ export const useProductList = (props: ProductListProps) => {
 
 	let filteredProducts = products?.filter((product) => product.metadata.main === '1');
 
-	if (billingCycle === 'month' && basicYearlyPriceId) {
+	// Always hide the Basic product
+	if (basicYearlyPriceId) {
 		filteredProducts = filteredProducts?.filter(
 			(product) => product.default_price !== basicYearlyPriceId
 		);

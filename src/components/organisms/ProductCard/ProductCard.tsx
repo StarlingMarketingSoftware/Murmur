@@ -38,7 +38,7 @@ export const ProductCard: FC<ProductCardProps> = (props) => {
 					</Typography>
 				</CardTitle>
 				<div className="h-14 w-7/10">
-					{product.name === 'Pro' ? (
+					{product.name === 'Ultra' ? (
 						<Typography variant="label" className="text-[14px] text-muted leading-1">
 							Make Campaigns with New Contacts and AI Customization
 						</Typography>
