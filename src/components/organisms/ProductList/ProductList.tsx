@@ -18,15 +18,12 @@ export const ProductList: FC<ProductListProps> = (props) => {
 	return (
 		<div
 			className={cn(
-				'grid grid-cols-1 md:gap-5 lg:gap-5 xl:gap-28 w-fit mx-auto place-items-center [&>*:hover~*]:opacity-50 [&>*:hover~*]:scale-[0.99]',
+					'grid grid-cols-1 gap-[22px] w-fit mx-auto place-items-center',
 				'lg:grid-cols-2'
 			)}
 		>
 			{sortedProducts.map((product) => (
-				<div
-					key={product.id}
-					className="transition duration-300 hover:opacity-100 hover:scale-100 [&:has(~:hover)]:opacity-50 [&:has(~:hover)]:scale-[0.99]"
-				>
+					<div key={product.id}>
 					<ProductCard product={product} user={user} billingCycle={billingCycle} />
 				</div>
 			))}
