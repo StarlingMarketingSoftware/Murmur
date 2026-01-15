@@ -14,6 +14,11 @@ import type { InboundEmailWithRelations } from '@/types';
 import { LandingDraftingDemo } from '@/components/molecules/LandingDraftingDemo/LandingDraftingDemo';
 import { ScaledToFit } from '@/components/atoms/ScaledToFit';
 
+const DESKTOP_HERO_MUX_PLAYBACK_ID = 'pKbGxKyrsRlE3NJPXUULvpu01wi00CBIBFn8UvbAjyvo4';
+const MOBILE_PORTRAIT_HERO_MUX_PLAYBACK_ID =
+	'oJRmxjK84SC01hXrjMyuPg7oGbvbRxu1QLCugmaEuYks';
+const MOBILE_PORTRAIT_MEDIA_QUERY = '(max-width: 767px) and (orientation: portrait)';
+
 // Sample contacts for landing page demo (company-only, no names)
 const sampleContacts: ContactWithName[] = [
 	{
@@ -487,6 +492,7 @@ export default function HomePage() {
 	const videoCarouselContainerRef = useRef<HTMLDivElement>(null);
 	const landingMapWrapperRef = useRef<HTMLDivElement>(null);
 	const heroLastVisibleHeightPxRef = useRef<number | null>(null);
+	const [heroPlaybackId, setHeroPlaybackId] = useState(DESKTOP_HERO_MUX_PLAYBACK_ID);
 	const [currentVideoIndex, setCurrentVideoIndex] = useState(0);
 	const [displayIndex, setDisplayIndex] = useState(1); // Offset by 1 for the prepended last video
 	const [skipTransition, setSkipTransition] = useState(false);
@@ -556,6 +562,46 @@ export default function HomePage() {
 		'--cast-button': 'none',
 		'--fullscreen-button': 'none',
 	} as any;
+
+	// Swap the hero background video only for the mobile portrait breakpoint.
+	useEffect(() => {
+		const mql = window.matchMedia(MOBILE_PORTRAIT_MEDIA_QUERY);
+
+		const update = () => {
+			setHeroPlaybackId(
+				mql.matches
+					? MOBILE_PORTRAIT_HERO_MUX_PLAYBACK_ID
+					: DESKTOP_HERO_MUX_PLAYBACK_ID
+			);
+		};
+
+		update();
+
+		// MediaQueryList event APIs vary across older Safari versions.
+		const add = (mql as any).addEventListener?.bind(mql) as
+			| ((type: 'change', listener: () => void) => void)
+			| undefined;
+		const remove = (mql as any).removeEventListener?.bind(mql) as
+			| ((type: 'change', listener: () => void) => void)
+			| undefined;
+		if (typeof add === 'function' && typeof remove === 'function') {
+			add('change', update);
+			return () => remove('change', update);
+		}
+
+		const addListener = (mql as any).addListener?.bind(mql) as
+			| ((listener: () => void) => void)
+			| undefined;
+		const removeListener = (mql as any).removeListener?.bind(mql) as
+			| ((listener: () => void) => void)
+			| undefined;
+		if (typeof addListener === 'function' && typeof removeListener === 'function') {
+			addListener(update);
+			return () => removeListener(update);
+		}
+
+		return;
+	}, []);
 
 	useEffect(() => {
 		const heroEl = heroRef.current;
@@ -949,7 +995,7 @@ export default function HomePage() {
 							ref={heroVideoRef}
 							className="h-full w-full"
 							style={heroVideoStyle}
-							playbackId="pKbGxKyrsRlE3NJPXUULvpu01wi00CBIBFn8UvbAjyvo4"
+							playbackId={heroPlaybackId}
 							streamType="on-demand"
 							preload="auto"
 							autoPlay="muted"
