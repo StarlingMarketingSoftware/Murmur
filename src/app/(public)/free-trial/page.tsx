@@ -21,7 +21,7 @@ export default function FreeTrialPage() {
 	const [clientSecret, setClientSecret] = useState<string | null>(null);
 	const [checkoutError, setCheckoutError] = useState<string | null>(null);
 	const [checkoutLoadingText, setCheckoutLoadingText] = useState<string>('Preparing checkout…');
-	const [isCreatingCheckoutSession, setIsCreatingCheckoutSession] = useState(false);
+	const [, setIsCreatingCheckoutSession] = useState(false);
 
 	const freeTrialPriceId = process.env.NEXT_PUBLIC_STANDARD_MONTHLY_PRICE_ID;
 

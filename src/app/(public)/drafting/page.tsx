@@ -38,20 +38,20 @@ export default function DraftingPage() {
 
   return (
     <div className="min-h-screen bg-white">
-      <div className="w-full h-[264px] flex items-center justify-center">
+      <div className="w-full flex items-start sm:items-center justify-center pt-6 pb-8 sm:h-[264px] sm:pt-0 sm:pb-0">
         <h1 className="font-inter text-center text-[40px] sm:text-[56px] lg:text-[65px] leading-none">
           Drafting
         </h1>
       </div>
-      <div className="flex justify-center w-full px-4">
+      <div className="flex justify-center w-full px-4 mt-4 sm:mt-0">
         <div className="w-full max-w-[1082px]">
-          {/* Avoid overflow-x clipping from translate-x-14 on narrower viewports */}
-          <DraftingDemo className="w-full h-auto translate-x-12 max-[1193px]:w-[calc(100%-3rem)]" />
+          {/* Keep the main middle panel visually centered across breakpoints */}
+          <DraftingDemo className="block w-full h-auto mx-auto translate-x-12 max-[1193px]:w-[91.85%] max-[1193px]:translate-x-[4.44%]" />
         </div>
       </div>
       {/* Tell your story */}
       {/* Narrow layout (stacked, keep the light #FAFAFA panel) */}
-      <div className="hidden max-[1193px]:block w-full mt-[192px] px-[14%]">
+      <div className="hidden max-[1193px]:block w-full mt-16 sm:mt-[192px] px-[14%]">
         <div className="mx-auto w-full max-w-[904px] bg-[#FAFAFA] px-6 xs:px-8 pt-10 pb-12">
           <div className="bg-[#EFEFEF] rounded-[8px] px-6 py-8">
             <p className="font-inter font-normal text-[22px] xs:text-[24px] sm:text-[27px] text-black leading-tight">
@@ -109,7 +109,7 @@ export default function DraftingPage() {
       </div>
       {/* Drafting Modes */}
       {/* Narrow layout (stacked mode panels) */}
-      <div className="hidden max-[1193px]:block w-full mt-[146px] px-[14%]">
+      <div className="hidden max-[1193px]:block w-full mt-14 sm:mt-[146px] px-[14%]">
         <div className="mx-auto w-full max-w-[904px] bg-[#FAFAFA] px-6 xs:px-8 pt-10 pb-12">
           <div className="bg-[#EFEFEF] rounded-[8px] px-6 py-8">
             <p className="font-inter font-normal text-[22px] xs:text-[24px] sm:text-[27px] text-black leading-tight">
@@ -201,7 +201,7 @@ export default function DraftingPage() {
       </div>
       {/* Built-in variation */}
       {/* Narrow layout (stacked, show both preview variants) */}
-      <div className="hidden max-[1193px]:block w-full mt-[181px] px-[14%]">
+      <div className="hidden max-[1193px]:block w-full mt-16 sm:mt-[181px] px-[14%]">
         <div className="mx-auto w-full max-w-[904px] bg-[#FAFAFA] px-6 xs:px-8 pt-10 pb-12">
           <div className="bg-[#EFEFEF] rounded-[8px] px-6 py-8">
             <p className="font-inter font-normal text-[22px] xs:text-[24px] sm:text-[27px] text-black leading-tight">

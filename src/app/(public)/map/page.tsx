@@ -111,7 +111,7 @@ export default function MapPage() {
                   All Data in One Place:
                 </p>
                 <p className="font-inter font-normal text-[11.5px] xs:text-[12.5px] sm:text-[18px] text-black leading-tight mt-2 break-words">
-                  Filter each search by category, whether you're looking for coffee shops for gigs or radio stations for airplay.
+                  Filter each search by category, whether you&apos;re looking for coffee shops for gigs or radio stations for airplay.
                 </p>
               </div>
 
@@ -127,7 +127,7 @@ export default function MapPage() {
               <div className="w-full max-w-[678px] bg-[#EFEFEF] rounded-[6px] mr-[23px] my-[17px] px-[56px] py-[46px] h-[327px]">
                 <p className="font-inter font-bold text-[24px] text-black">All Data in One Place:</p>
                 <p className="font-inter text-[23px] text-black mt-[24px] pr-[56px] leading-[45px] tracking-wide [word-spacing:5px]">
-                  Filter each search by category, whether you're looking for coffee shops for gigs or radio stations for airplay.
+                  Filter each search by category, whether you&apos;re looking for coffee shops for gigs or radio stations for airplay.
                 </p>
               </div>
               <div className="flex justify-center mr-auto ml-[55px] self-center">

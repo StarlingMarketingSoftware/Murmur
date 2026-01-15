@@ -6483,9 +6483,9 @@ const DashboardContent = () => {
 										fontFamily: '"Times New Roman", Times, serif',
 									}}
 								>
-									<p className="text-lg italic text-black mb-1">
-										"You miss 100% of the shots you don't take"
-									</p>
+								<p className="text-lg italic text-black mb-1">
+									&quot;You miss 100% of the shots you don&apos;t take&quot;
+								</p>
 									<p className="text-sm text-black">
 										-Wayne Gretzky
 									</p>

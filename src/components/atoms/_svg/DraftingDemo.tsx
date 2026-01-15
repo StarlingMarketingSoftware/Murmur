@@ -1150,7 +1150,7 @@ function SvgComponent(props: React.SVGProps<SVGSVGElement>) {
           Yardbird Sanctuary. Bushwick Daily The venue programs primarily
           straight-ahead jazz Big Apple Jazz and bebop, though its musicians-first
           philosophy explicitly encourages experimentation—as guitarist Dida Pelled
-          noted, "it allows for more experimental things, which is amazing"— BKMAGand
+          noted, &quot;it allows for more experimental things, which is amazing&quot;— BKMAGand
           it hosts live music seven nights a week with two booked sets (6:30-8:30pm
           and 9pm-midnight) followed by late-night jam sessions that run until Timeout
           2-3am. Timeout The intimate space features a Bechstein grand piano,

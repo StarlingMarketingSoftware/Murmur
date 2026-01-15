@@ -564,6 +564,77 @@ export const InboxSection: FC<InboxSectionProps> = ({
 		};
 	}, [setDraftsTabHighlighted, setWriteTabHighlighted, setTopSearchHighlighted]);
 
+	// In demo mode, ensure the internal scroll position stays at the top so the header/search
+	// remains visible (especially on mobile where swipes can otherwise scroll the inbox UI).
+	const getDemoScrollEl = () => {
+		const root = rootRef.current;
+		if (!root) return null;
+		const mainBox = root.querySelector<HTMLElement>('[data-campaign-main-box="inbox"]');
+		// `CustomScrollbar` renders its scroll container as a `.scrollbar-hide` child.
+		return mainBox?.querySelector<HTMLElement>('.scrollbar-hide') ?? null;
+	};
+
+	// Run as early as possible to avoid a "scrolled" first paint.
+	useLayoutEffect(() => {
+		if (!demoMode) return;
+		const scrollEl = getDemoScrollEl();
+		if (!scrollEl) return;
+		scrollEl.scrollTop = 0;
+	}, [demoMode]);
+
+	useEffect(() => {
+		if (!demoMode) return;
+		const scrollEl = getDemoScrollEl();
+		if (!scrollEl) return;
+
+		const prevOverflowY = scrollEl.style.overflowY;
+		const prevScrollBehavior = scrollEl.style.scrollBehavior;
+
+		// Prevent internal scrolling in the demo embed.
+		scrollEl.style.overflowY = 'hidden';
+		scrollEl.style.scrollBehavior = 'auto';
+
+		const forceTop = () => {
+			// Use direct assignment to avoid smooth scrolling / layout jank in a demo embed.
+			scrollEl.scrollTop = 0;
+		};
+
+		// Beat mobile browser overflow-scroll restoration by re-applying for a few frames.
+		let rafId: number | null = null;
+		let rafCount = 0;
+		const rafTick = () => {
+			forceTop();
+			rafCount += 1;
+			if (rafCount < 8) {
+				rafId = window.requestAnimationFrame(rafTick);
+			}
+		};
+		rafId = window.requestAnimationFrame(rafTick);
+
+		// Also re-apply after the browser finishes restoring state.
+		const t0 = window.setTimeout(forceTop, 0);
+		const t1 = window.setTimeout(forceTop, 50);
+		const t2 = window.setTimeout(forceTop, 200);
+		const t3 = window.setTimeout(forceTop, 500);
+
+		// Safety: if anything tries to scroll it anyway, snap back.
+		const onScroll = () => {
+			if (scrollEl.scrollTop !== 0) forceTop();
+		};
+		scrollEl.addEventListener('scroll', onScroll, { passive: true });
+
+		return () => {
+			scrollEl.removeEventListener('scroll', onScroll);
+			window.clearTimeout(t0);
+			window.clearTimeout(t1);
+			window.clearTimeout(t2);
+			window.clearTimeout(t3);
+			if (rafId != null) window.cancelAnimationFrame(rafId);
+			scrollEl.style.overflowY = prevOverflowY;
+			scrollEl.style.scrollBehavior = prevScrollBehavior;
+		};
+	}, [demoMode, activeTab, selectedEmailId]);
+
 	if (isLoading) {
 		const skeletonRowCount = isMobile ? 5 : 6;
 		return (
@@ -793,77 +864,6 @@ export const InboxSection: FC<InboxSectionProps> = ({
 		setSelectedEmailId(null);
 		setReplyMessage('');
 	};
-
-	// In demo mode, ensure the internal scroll position stays at the top so the header/search
-	// remains visible (especially on mobile where swipes can otherwise scroll the inbox UI).
-	const getDemoScrollEl = () => {
-		const root = rootRef.current;
-		if (!root) return null;
-		const mainBox = root.querySelector<HTMLElement>('[data-campaign-main-box="inbox"]');
-		// `CustomScrollbar` renders its scroll container as a `.scrollbar-hide` child.
-		return mainBox?.querySelector<HTMLElement>('.scrollbar-hide') ?? null;
-	};
-
-	// Run as early as possible to avoid a "scrolled" first paint.
-	useLayoutEffect(() => {
-		if (!demoMode) return;
-		const scrollEl = getDemoScrollEl();
-		if (!scrollEl) return;
-		scrollEl.scrollTop = 0;
-	}, [demoMode]);
-
-	useEffect(() => {
-		if (!demoMode) return;
-		const scrollEl = getDemoScrollEl();
-		if (!scrollEl) return;
-
-		const prevOverflowY = scrollEl.style.overflowY;
-		const prevScrollBehavior = scrollEl.style.scrollBehavior;
-
-		// Prevent internal scrolling in the demo embed.
-		scrollEl.style.overflowY = 'hidden';
-		scrollEl.style.scrollBehavior = 'auto';
-
-		const forceTop = () => {
-			// Use direct assignment to avoid smooth scrolling / layout jank in a demo embed.
-			scrollEl.scrollTop = 0;
-		};
-
-		// Beat mobile browser overflow-scroll restoration by re-applying for a few frames.
-		let rafId: number | null = null;
-		let rafCount = 0;
-		const rafTick = () => {
-			forceTop();
-			rafCount += 1;
-			if (rafCount < 8) {
-				rafId = window.requestAnimationFrame(rafTick);
-			}
-		};
-		rafId = window.requestAnimationFrame(rafTick);
-
-		// Also re-apply after the browser finishes restoring state.
-		const t0 = window.setTimeout(forceTop, 0);
-		const t1 = window.setTimeout(forceTop, 50);
-		const t2 = window.setTimeout(forceTop, 200);
-		const t3 = window.setTimeout(forceTop, 500);
-
-		// Safety: if anything tries to scroll it anyway, snap back.
-		const onScroll = () => {
-			if (scrollEl.scrollTop !== 0) forceTop();
-		};
-		scrollEl.addEventListener('scroll', onScroll, { passive: true });
-
-		return () => {
-			scrollEl.removeEventListener('scroll', onScroll);
-			window.clearTimeout(t0);
-			window.clearTimeout(t1);
-			window.clearTimeout(t2);
-			window.clearTimeout(t3);
-			if (rafId != null) window.cancelAnimationFrame(rafId);
-			scrollEl.style.overflowY = prevOverflowY;
-			scrollEl.style.scrollBehavior = prevScrollBehavior;
-		};
-	}, [demoMode, activeTab, selectedEmailId]);
 
 	if (!visibleEmails || visibleEmails.length === 0) {
 		return (
