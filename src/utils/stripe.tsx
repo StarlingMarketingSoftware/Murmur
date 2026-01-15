@@ -21,8 +21,9 @@ export const getSubscriptionTierWithPriceId = (
 		case process.env.NEXT_PUBLIC_STANDARD_LEGACY_PRICE_ID:
 		case process.env.NEXT_PUBLIC_STANDARD_MONTHLY_PRICE_ID:
 		case process.env.NEXT_PUBLIC_STANDARD_YEARLY_PRICE_ID:
+		case process.env.NEXT_PUBLIC_PRO_YEARLY_STANDARD_PRICE_ID:
 			return {
-				name: 'Standard',
+				name: 'Pro',
 				draftCredits: 1000,
 				sendingCredits: 1000,
 				verificationCredits: 500,
@@ -31,9 +32,11 @@ export const getSubscriptionTierWithPriceId = (
 			};
 		case process.env.NEXT_PUBLIC_PRO_LEGACY_PRICE_ID:
 		case process.env.NEXT_PUBLIC_PRO_MONTHLY_PRICE_ID:
+		case process.env.NEXT_PUBLIC_PRO_ULTRA_MONTHLY_PRICE_ID:
 		case process.env.NEXT_PUBLIC_PRO_YEARLY_PRICE_ID:
+		case process.env.NEXT_PUBLIC_ULTRA_YEARLY_PRICE_ID:
 			return {
-				name: 'Pro',
+				name: 'Ultra',
 				draftCredits: 3000,
 				sendingCredits: 3000,
 				verificationCredits: 1000,

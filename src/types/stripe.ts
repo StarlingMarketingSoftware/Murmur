@@ -26,8 +26,8 @@ export type SubscriptionTierData = {
 
 export type SubscriptionName =
 	| 'Basic'
-	| 'Standard'
 	| 'Pro'
+	| 'Ultra'
 	| 'Partner'
 	| 'Custom'
 	| 'Elite'
