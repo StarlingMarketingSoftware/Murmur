@@ -39,33 +39,34 @@ export const ProductCard: FC<ProductCardProps> = (props) => {
 		<Card
 			onClick={isLink ? handleClick : undefined}
 			className={cn(
-				'!my-0 w-[477px] border-black !border-[3px] rounded-md !p-6',
-				'flex flex-col gap-3',
+				'!my-0 w-[90vw] max-w-[380px] sm:w-[477px] sm:max-w-none',
+				'border-black !border-[3px] rounded-md !p-4 sm:!p-6',
+				'flex flex-col gap-2 sm:gap-3',
 				'!font-secondary',
 				productCardFillClassName,
 				isLink && 'cursor-pointer',
 				className
 			)}
 		>
-			<div className="w-[423px] h-[122px] rounded-md border-2 border-black bg-white px-4 py-3 flex flex-col justify-between">
-				<p className="text-[22px] leading-none font-secondary font-normal">
+			<div className="w-full sm:w-[423px] sm:h-[122px] rounded-md border-2 border-black bg-white px-3 sm:px-4 py-2 sm:py-3 flex flex-col gap-2 sm:gap-0 sm:justify-between">
+				<p className="text-[18px] sm:text-[22px] leading-none font-secondary font-normal">
 					{product.name}
 				</p>
 				<div className="flex items-end gap-2">
-					<p className="text-[54px] leading-none font-secondary font-medium">
+					<p className="text-[42px] sm:text-[54px] leading-none font-secondary font-medium">
 						{formattedPrice}
 					</p>
-					<p className="text-[22px] leading-none font-secondary pb-[6px]">
+					<p className="text-[18px] sm:text-[22px] leading-none font-secondary pb-[4px] sm:pb-[6px]">
 						{period}
 					</p>
 				</div>
 			</div>
 
 			{!isLink && (
-				<div className="w-[423px] h-[69px]">
+				<div className="w-full sm:w-[423px]">
 					{getButton({
 						className: cn(
-							'!w-[423px] !h-[69px] rounded-md border-2 border-black !p-0 text-[26px] !font-secondary font-normal text-black',
+							'!w-full !h-[56px] sm:!h-[69px] rounded-md border-2 border-black !p-0 text-[22px] sm:text-[26px] !font-secondary font-normal text-black',
 							productButtonFillClassName
 						),
 					})}
@@ -75,9 +76,9 @@ export const ProductCard: FC<ProductCardProps> = (props) => {
 			{featureBoxes.map((featureText, index) => (
 				<div
 					key={index}
-					className="w-[423px] h-[53px] rounded-md border-2 border-black bg-white px-4 flex items-center"
+					className="w-full sm:w-[423px] sm:h-[53px] rounded-md border-2 border-black bg-white px-3 sm:px-4 py-2 sm:py-0 flex items-center"
 				>
-					<p className="font-secondary text-[15px] leading-snug font-normal">
+					<p className="font-secondary text-[13px] sm:text-[15px] leading-snug font-normal">
 						{featureText || '\u00A0'}
 					</p>
 				</div>

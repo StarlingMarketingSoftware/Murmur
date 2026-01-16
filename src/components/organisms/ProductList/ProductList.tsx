@@ -18,7 +18,7 @@ export const ProductList: FC<ProductListProps> = (props) => {
 	return (
 		<div
 			className={cn(
-				'grid grid-cols-1 gap-x-[22px] gap-y-[50px] w-fit mx-auto place-items-center',
+				'grid grid-cols-1 gap-x-[22px] gap-y-6 sm:gap-y-[50px] w-fit mx-auto place-items-center',
 				'lg:grid-cols-2'
 			)}
 		>
