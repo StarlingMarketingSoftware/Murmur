@@ -233,6 +233,29 @@ const Resources = () => {
 					</div>
 				</div>
 			</section>
+
+			<section className="w-full mt-[73px] h-[86px] bg-[#F9F9F9]">
+				<div className="mx-auto h-full w-full max-w-[1200px] px-6">
+					<div className="flex h-full items-center justify-center">
+						<Typography
+							variant="h2"
+							className="text-center font-[var(--font-inter)] text-[32px] sm:text-[45px] font-light leading-none"
+						>
+							Step by Step
+						</Typography>
+					</div>
+				</div>
+			</section>
+
+			<section className="w-full mt-[20px] h-[669px] bg-[#F9F9F9]">
+				<div className="relative mx-auto h-full w-full max-w-[1200px] px-6">
+					<div className="absolute left-1/2 -translate-x-1/2 bottom-[12px] w-[797px] h-[639px] rounded-[6px] border-[2px] border-[#000000] bg-[#ADD8E7] overflow-hidden">
+						<div className="absolute top-[9px] left-0 right-0 h-[44px] bg-[#DAF5FF] border-y-[2px] border-[#000000] flex items-center">
+							<span className="ml-[30px] font-[var(--font-inter)] text-[22.5px]">Search</span>
+						</div>
+					</div>
+				</div>
+			</section>
 		</div>
 	);
 };
