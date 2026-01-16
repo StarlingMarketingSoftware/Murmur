@@ -449,7 +449,7 @@ export default function Products() {
 
 				<div className="mx-auto h-full w-full max-w-[1200px] px-6">
 					<div className="flex flex-col items-stretch pt-8 sm:pt-[54px] pb-10 sm:pb-[54px] xl:flex-row xl:h-full xl:pb-0">
-						<div className="flex w-full max-w-[560px] flex-col xl:pb-[54px]">
+						<div className="flex w-full max-w-[560px] flex-col mx-auto xl:mx-0 xl:pb-[54px]">
 							<Typography
 								variant="h2"
 								className="text-center xl:text-left font-[var(--font-inter)] text-[36px] xl:text-[64px] leading-[1.05] text-black"
@@ -457,7 +457,13 @@ export default function Products() {
 								Get your time back
 							</Typography>
 
-							<div className="mt-4 xl:mt-10 grid w-fit mx-auto relative -left-2 xl:left-0 xl:w-auto xl:mx-0 grid-cols-[auto_1fr] gap-x-3 xl:gap-x-8 gap-y-2 xl:gap-y-5">
+							<div
+								className={cn(
+									'mt-4 grid w-fit grid-cols-[auto_1fr] gap-x-3 gap-y-4',
+									'mx-auto -translate-x-9',
+									'xl:mt-10 xl:mx-0 xl:w-auto xl:translate-x-0 xl:gap-x-8 xl:gap-y-5'
+								)}
+							>
 								<div className="text-right font-[var(--font-inter)] text-[18px] xl:text-[32px] font-semibold leading-none text-black">
 									<LiveNumber
 										initialValue={210_000}
@@ -491,12 +497,14 @@ export default function Products() {
 							</div>
 
 							{/* Mobile pipeline + clock graphic */}
-							<div className="relative mt-8 w-screen -mx-6 overflow-hidden xl:hidden">
-								<div className="relative h-[360px] w-full">
-									<div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-0">
-										<div className="origin-center scale-[0.58]">
-											<div className="flex gap-[11px] flex-nowrap">
-												<PipelineColumns venueColumns={venueColumns} />
+							<div className="relative left-1/2 -translate-x-1/2 mt-6 w-screen overflow-hidden xl:hidden sm:mt-8">
+								<div className="relative h-[320px] w-full sm:h-[360px]">
+									<div className="absolute left-1/2 top-[46%] -translate-x-1/2 -translate-y-1/2 z-0 sm:top-1/2">
+										<div className="translate-x-7 sm:translate-x-0">
+											<div className="origin-center scale-[0.58] translate-y-3 sm:translate-y-0">
+												<div className="flex gap-[11px] flex-nowrap">
+													<PipelineColumns venueColumns={venueColumns} />
+												</div>
 											</div>
 										</div>
 									</div>
@@ -505,14 +513,16 @@ export default function Products() {
 										aria-hidden="true"
 										className="pointer-events-none select-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10 w-[84vw] max-w-[520px]"
 									>
-										<Clock focusable="false" scale={0.65} className="h-auto w-full" />
+										<div className="translate-x-8 sm:translate-x-0">
+											<Clock focusable="false" scale={0.8} className="h-auto w-full" />
+										</div>
 									</div>
 								</div>
 							</div>
 
 							<Typography
 								variant="p"
-								className="mt-8 xl:mt-auto w-full xl:w-[660px] 2xl:w-[720px] font-[var(--font-inter)] text-[13px] 2xl:text-[23px] font-medium leading-[1.4] 2xl:leading-[1.25] text-black"
+								className="mt-8 xl:mt-auto w-full xl:w-[660px] 2xl:w-[720px] font-[var(--font-inter)] text-[13px] 2xl:text-[23px] font-medium leading-[1.4] 2xl:leading-[1.25] text-black text-center xl:text-left"
 							>
 								{'Booking out your calendar can take months of back and forth. '}
 								<br className="hidden 2xl:block" />
@@ -533,7 +543,7 @@ export default function Products() {
 				<div className="mx-auto w-full max-w-[1200px] px-6 pt-[72px] pb-16 xl:pb-0">
 					<Typography
 						variant="h2"
-						className="font-[var(--font-inter)] text-[32px] xl:text-[64px] leading-[1.05] text-white"
+						className="mx-auto w-full max-w-[562px] text-left xl:mx-0 xl:max-w-none font-[var(--font-inter)] text-[32px] xl:text-[64px] leading-[1.05] text-white"
 					>
 						Results that matter
 					</Typography>
@@ -587,10 +597,14 @@ export default function Products() {
 					</div>
 
 					<div className="mt-12 -mx-6 w-[calc(100%+48px)] flex items-start rounded-none bg-[#666666] px-6 py-4 xl:absolute xl:bottom-[180px] xl:left-1/2 xl:mt-0 xl:h-[76px] xl:w-[1077px] xl:mx-0 xl:-translate-x-1/2 xl:items-center xl:rounded-[10px] xl:px-10 xl:py-0">
-						<p className="w-full font-[var(--font-inter)] text-[13px] xl:text-[22.5px] font-medium leading-[1.35] xl:leading-[1.2] text-white">
-							This is because we help them find the right person to reach, give them the best way to
-							structure what they’re sending, and provide the correct info about each contact they send
-							to.
+						<p className="mx-auto w-full max-w-[680px] xl:mx-0 xl:max-w-none font-[var(--font-inter)] text-[13px] xl:text-[22.5px] font-medium leading-[1.35] xl:leading-[1.2] text-white">
+							<span className="block">
+								This is because we help them find the right person to reach, give them the best way to
+								structure
+							</span>
+							<span className="block">
+								what they’re sending, and provide the correct info about each contact they send to.
+							</span>
 						</p>
 					</div>
 				</div>
