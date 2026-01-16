@@ -427,15 +427,15 @@ export default function Products() {
 						aria-hidden="true"
 						className="pointer-events-none select-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-20"
 					>
-						<div className="-translate-x-[0px]">
+						<div className="translate-x-[50px]">
 							<Clock focusable="false" className="w-[560px] h-[560px]" />
 						</div>
 					</div>
 				</div>
 
 				<div className="mx-auto h-full w-full max-w-[1200px] px-6">
-					<div className="flex h-full items-start pt-[104px]">
-						<div className="w-full max-w-[560px]">
+					<div className="flex h-full items-stretch pt-[104px]">
+						<div className="flex w-full max-w-[560px] flex-col pb-[54px]">
 							<Typography
 								variant="h2"
 								className="font-[var(--font-inter)] text-[48px] sm:text-[64px] leading-[1.05] text-black"
@@ -475,6 +475,17 @@ export default function Products() {
 									Bookings
 								</div>
 							</div>
+
+							<Typography
+								variant="p"
+								className="mt-auto w-full lg:w-[660px] xl:w-[720px] font-[var(--font-inter)] text-[23px] sm:text-[23px] font-medium leading-[1.25] text-black"
+							>
+								{'Booking out your calendar can take months of back and forth.'}
+								<br />
+								{'With Murmur, most users spend about 5 hours a month and their'}
+								<br />
+								{'calendars are fully booked.'}
+							</Typography>
 						</div>
 					</div>
 				</div>
