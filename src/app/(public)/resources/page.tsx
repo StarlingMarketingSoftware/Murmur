@@ -19,6 +19,7 @@ import ResourceResearchNav from '@/components/atoms/_svg/ResourceResearchNav';
 import ResourceInboxNav from '@/components/atoms/_svg/ResourceInboxNav';
 import ResourceDraftingNav from '@/components/atoms/_svg/ResourceDraftingNav';
 import SearchStep from '@/components/atoms/_svg/SearchStep';
+import SelectContactsMap from '@/components/atoms/_svg/SelectContactsMap';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -275,6 +276,10 @@ const Resources = () => {
 						<div className="absolute top-[9px] left-0 right-0 h-[44px] bg-[#FEC5C5] border-y-[2px] border-[#000000] flex items-center">
 							<span className="ml-[30px] font-[var(--font-inter)] text-[22.5px]">Select Contacts</span>
 						</div>
+						<div className="absolute top-[77px] left-1/2 -translate-x-1/2">
+							<SelectContactsMap />
+						</div>
+						<div className="absolute top-[420px] left-1/2 -translate-x-1/2 w-[732px] h-[288px] rounded-[6px] border-[2px] border-[#000000] bg-[#FFE0E0]" />
 					</div>
 				</div>
 			</section>
