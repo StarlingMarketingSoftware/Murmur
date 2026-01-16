@@ -14,6 +14,8 @@ import RichTextEditor from '@/components/molecules/RichTextEditor/RichTextEditor
 import { useResourcesPage } from './useResourcesPage';
 import { Typography } from '@/components/ui/typography';
 import { cn } from '@/utils';
+import ResourceMapNav from '@/components/atoms/_svg/ResourceMapNav';
+import ResourceResearchNav from '@/components/atoms/_svg/ResourceResearchNav';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -180,8 +182,10 @@ const Resources = () => {
 					<div className="absolute left-1/2 -translate-x-1/2 bottom-[75px] grid grid-cols-2 gap-x-[31px] gap-y-[38px]">
 						<div className="w-[276px] h-[185px] rounded-[8px] border-[2px] border-[#000000] bg-[#ADD8E7] overflow-hidden">
 							<div className="h-full flex flex-col">
-								<div className="flex-1" />
-								<div className="flex-1 flex items-center justify-center">
+								<div className="flex-1 flex items-center justify-center pt-2">
+									<ResourceMapNav />
+								</div>
+								<div className="h-[70px] flex items-center justify-center">
 									<p className="font-[var(--font-inter)] text-[28px] font-semibold text-black leading-none">
 										Map
 									</p>
@@ -190,8 +194,10 @@ const Resources = () => {
 						</div>
 						<div className="w-[276px] h-[185px] rounded-[8px] border-[2px] border-[#000000] bg-[#E9F7FF] overflow-hidden">
 							<div className="h-full flex flex-col">
-								<div className="flex-1" />
-								<div className="flex-1 flex items-center justify-center">
+								<div className="flex-1 flex items-center justify-center pt-2">
+									<ResourceResearchNav />
+								</div>
+								<div className="h-[70px] flex items-center justify-center">
 									<p className="font-[var(--font-inter)] text-[28px] font-semibold text-black leading-none">
 										Research
 									</p>
@@ -201,7 +207,7 @@ const Resources = () => {
 						<div className="w-[276px] h-[185px] rounded-[8px] border-[2px] border-[#000000] bg-[#6FA4E1] overflow-hidden">
 							<div className="h-full flex flex-col">
 								<div className="flex-1" />
-								<div className="flex-1 flex items-center justify-center">
+								<div className="h-[70px] flex items-center justify-center">
 									<p className="font-[var(--font-inter)] text-[28px] font-semibold text-black leading-none">
 										Inbox
 									</p>
@@ -211,7 +217,7 @@ const Resources = () => {
 						<div className="w-[276px] h-[185px] rounded-[8px] border-[2px] border-[#000000] bg-[#FFDC9E] overflow-hidden">
 							<div className="h-full flex flex-col">
 								<div className="flex-1" />
-								<div className="flex-1 flex items-center justify-center">
+								<div className="h-[70px] flex items-center justify-center">
 									<p className="font-[var(--font-inter)] text-[28px] font-semibold text-black leading-none">
 										Drafting
 									</p>
