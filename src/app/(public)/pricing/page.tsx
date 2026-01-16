@@ -234,6 +234,41 @@ function LiveNumber({
 	return <span className="tabular-nums">{formatCount(value)}</span>;
 }
 
+function PipelineColumns({ venueColumns }: { venueColumns: VenueColumns }) {
+	return (
+		<>
+			{PIPELINE_COLUMNS.map((title, boxIndex) => (
+				<div
+					key={title}
+					className="relative shrink-0 w-[234px] h-[349px] rounded-[8px] border-2 border-black bg-transparent flex flex-col items-center pt-[37px] pb-[22px] gap-[8px]"
+				>
+					<div className="absolute top-[10px] left-[12px] font-[var(--font-inter)] text-[15px] font-normal leading-none text-black">
+						{title}
+					</div>
+
+					{Array.from({ length: PIPELINE_ROWS }, (_, innerIndex) => {
+						const name = venueColumns[boxIndex][innerIndex];
+						const fillClassName = name ? PIPELINE_FILLED_BG_CLASSES[boxIndex] : 'bg-transparent';
+						return (
+							<div
+								key={innerIndex}
+								className={cn(
+									'w-[222px] h-[34px] rounded-[8px] border-2 border-black flex items-center px-[11px]',
+									fillClassName
+								)}
+							>
+								<span className="font-[var(--font-inter)] text-[14px] leading-none text-black truncate">
+									{name ?? '\u00A0'}
+								</span>
+							</div>
+						);
+					})}
+				</div>
+			))}
+		</>
+	);
+}
+
 export default function Products() {
 	const { billingCycle, setBillingCycle } = usePricingPage();
 	const [venueColumns, setVenueColumns] = useState<VenueColumns>(getInitialVenueColumns);
@@ -372,18 +407,23 @@ export default function Products() {
 	return (
 		<div className="w-full">
 			{/* First panel begins 450px from the very top of the page (accounts for 48px fixed navbar spacer) */}
-			<section className="w-full h-[402px] bg-white">
-				<div className="flex flex-col items-center pt-[185px]">
+			<section className="w-full bg-white sm:h-[402px]">
+				<div className="flex flex-col items-center justify-center py-12 sm:justify-start sm:pt-[185px] sm:py-0">
 					<Typography
 						variant="h1"
-						className="text-center font-[var(--font-inter)] text-[45px] font-light leading-none"
+						className="text-center font-[var(--font-inter)] text-[32px] sm:text-[45px] font-light leading-none"
 					>
 						Start Booking Today
 					</Typography>
-					<div className="flex justify-center mt-[39px]">
+					<div className="flex justify-center mt-[18px] sm:mt-[39px]">
 						<Link
 							href="/free-trial"
-							className="w-[265px] h-[40px] rounded-[10px] border-[3px] border-[#118521] bg-transparent font-[var(--font-inter)] text-[24px] font-medium text-[#118521] flex items-center justify-center"
+							className={cn(
+								'w-[168px] h-[28px] rounded-[8px] border-[2px] border-[#118521]',
+								'bg-transparent font-[var(--font-inter)] text-[14px] font-medium text-[#118521]',
+								'flex items-center justify-center',
+								'sm:w-[265px] sm:h-[40px] sm:rounded-[10px] sm:border-[3px] sm:text-[24px]'
+							)}
 						>
 							Start Free Trial
 						</Link>
@@ -392,37 +432,10 @@ export default function Products() {
 			</section>
 
 			{/* 728px tall block of #EFF6F0 */}
-			<section className="relative w-full h-[728px] bg-[#EFF6F0]">
+			<section className="relative w-full bg-[#EFF6F0] overflow-hidden xl:h-[728px]">
 				{/* Top-box placeholders (empty outline only) */}
-				<div className="hidden lg:flex absolute top-[196px] left-1/2 -translate-x-[49px] gap-[11px] flex-nowrap z-10">
-					{PIPELINE_COLUMNS.map((title, boxIndex) => (
-						<div
-							key={title}
-							className="relative shrink-0 w-[234px] h-[349px] rounded-[8px] border-2 border-black bg-transparent flex flex-col items-center pt-[37px] pb-[22px] gap-[8px]"
-						>
-							<div className="absolute top-[10px] left-[12px] font-[var(--font-inter)] text-[15px] font-normal leading-none text-black">
-								{title}
-							</div>
-
-							{Array.from({ length: PIPELINE_ROWS }, (_, innerIndex) => {
-								const name = venueColumns[boxIndex][innerIndex];
-								const fillClassName = name ? PIPELINE_FILLED_BG_CLASSES[boxIndex] : 'bg-transparent';
-								return (
-									<div
-										key={innerIndex}
-										className={cn(
-											'w-[222px] h-[34px] rounded-[8px] border-2 border-black flex items-center px-[11px]',
-											fillClassName
-										)}
-									>
-										<span className="font-[var(--font-inter)] text-[14px] leading-none text-black truncate">
-											{name ?? '\u00A0'}
-										</span>
-									</div>
-								);
-							})}
-						</div>
-					))}
+				<div className="hidden xl:flex absolute top-[196px] left-1/2 -translate-x-[49px] gap-[11px] flex-nowrap z-10">
+					<PipelineColumns venueColumns={venueColumns} />
 
 					<div
 						aria-hidden="true"
@@ -435,17 +448,17 @@ export default function Products() {
 				</div>
 
 				<div className="mx-auto h-full w-full max-w-[1200px] px-6">
-					<div className="flex h-full items-stretch pt-[54px]">
-						<div className="flex w-full max-w-[560px] flex-col pb-[54px]">
+					<div className="flex flex-col items-stretch pt-8 sm:pt-[54px] pb-10 sm:pb-[54px] xl:flex-row xl:h-full xl:pb-0">
+						<div className="flex w-full max-w-[560px] flex-col xl:pb-[54px]">
 							<Typography
 								variant="h2"
-								className="font-[var(--font-inter)] text-[48px] sm:text-[64px] leading-[1.05] text-black"
+								className="text-center xl:text-left font-[var(--font-inter)] text-[36px] xl:text-[64px] leading-[1.05] text-black"
 							>
 								Get your time back
 							</Typography>
 
-							<div className="mt-10 grid grid-cols-[auto_1fr] gap-x-8 gap-y-5">
-								<div className="text-right font-[var(--font-inter)] text-[24px] sm:text-[32px] font-semibold leading-none text-black">
+							<div className="mt-4 xl:mt-10 grid w-fit mx-auto relative -left-2 xl:left-0 xl:w-auto xl:mx-0 grid-cols-[auto_1fr] gap-x-3 xl:gap-x-8 gap-y-2 xl:gap-y-5">
+								<div className="text-right font-[var(--font-inter)] text-[18px] xl:text-[32px] font-semibold leading-none text-black">
 									<LiveNumber
 										initialValue={210_000}
 										incrementPerSecond={18}
@@ -453,11 +466,11 @@ export default function Products() {
 										burstTargetMax={48}
 									/>
 								</div>
-								<div className="font-[var(--font-inter)] text-[24px] sm:text-[32px] font-semibold leading-none text-black">
+								<div className="font-[var(--font-inter)] text-[18px] xl:text-[32px] font-semibold leading-none text-black">
 									Emails Sent
 								</div>
 
-								<div className="text-right font-[var(--font-inter)] text-[24px] sm:text-[32px] font-semibold leading-none text-black">
+								<div className="text-right font-[var(--font-inter)] text-[18px] xl:text-[32px] font-semibold leading-none text-black">
 									<LiveNumber
 										initialValue={25_999}
 										incrementPerSecond={6}
@@ -465,26 +478,46 @@ export default function Products() {
 										burstTargetMax={18}
 									/>
 								</div>
-								<div className="font-[var(--font-inter)] text-[24px] sm:text-[32px] font-semibold leading-none text-black">
+								<div className="font-[var(--font-inter)] text-[18px] xl:text-[32px] font-semibold leading-none text-black">
 									Replies
 								</div>
 
-								<div className="text-right font-[var(--font-inter)] text-[24px] sm:text-[32px] font-semibold leading-none text-black">
+								<div className="text-right font-[var(--font-inter)] text-[18px] xl:text-[32px] font-semibold leading-none text-black">
 									<LiveNumber initialValue={6_000} incrementPerSecond={0.2} />
 								</div>
-								<div className="font-[var(--font-inter)] text-[24px] sm:text-[32px] font-semibold leading-none text-black">
+								<div className="font-[var(--font-inter)] text-[18px] xl:text-[32px] font-semibold leading-none text-black">
 									Bookings
+								</div>
+							</div>
+
+							{/* Mobile pipeline + clock graphic */}
+							<div className="relative mt-8 w-screen -mx-6 overflow-hidden xl:hidden">
+								<div className="relative h-[360px] w-full">
+									<div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-0">
+										<div className="origin-center scale-[0.58]">
+											<div className="flex gap-[11px] flex-nowrap">
+												<PipelineColumns venueColumns={venueColumns} />
+											</div>
+										</div>
+									</div>
+
+									<div
+										aria-hidden="true"
+										className="pointer-events-none select-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10 w-[84vw] max-w-[520px]"
+									>
+										<Clock focusable="false" scale={0.65} className="h-auto w-full" />
+									</div>
 								</div>
 							</div>
 
 							<Typography
 								variant="p"
-								className="mt-auto w-full lg:w-[660px] xl:w-[720px] font-[var(--font-inter)] text-[23px] sm:text-[23px] font-medium leading-[1.25] text-black"
+								className="mt-8 xl:mt-auto w-full xl:w-[660px] 2xl:w-[720px] font-[var(--font-inter)] text-[13px] 2xl:text-[23px] font-medium leading-[1.4] 2xl:leading-[1.25] text-black"
 							>
-								{'Booking out your calendar can take months of back and forth.'}
-								<br />
-								{'With Murmur, most users spend about 5 hours a month and their'}
-								<br />
+								{'Booking out your calendar can take months of back and forth. '}
+								<br className="hidden 2xl:block" />
+								{'With Murmur, most users spend about 5 hours a month and their '}
+								<br className="hidden 2xl:block" />
 								{'calendars are fully booked.'}
 							</Typography>
 						</div>
@@ -496,51 +529,56 @@ export default function Products() {
 			<div className="w-full h-[58px] bg-white" />
 
 			{/* 1028px tall block of #333333 */}
-			<section className="relative w-full h-[1028px] bg-[#333333]">
-				<div className="mx-auto w-full max-w-[1200px] px-6 pt-[72px]">
+			<section className="relative w-full bg-[#333333] xl:h-[1028px]">
+				<div className="mx-auto w-full max-w-[1200px] px-6 pt-[72px] pb-16 xl:pb-0">
 					<Typography
 						variant="h2"
-						className="font-[var(--font-inter)] text-[48px] sm:text-[64px] leading-[1.05] text-white"
+						className="font-[var(--font-inter)] text-[32px] xl:text-[64px] leading-[1.05] text-white"
 					>
 						Results that matter
 					</Typography>
 
-					<div className="mt-12 mx-auto w-full max-w-[562px] lg:absolute lg:bottom-[360px] lg:left-1/2 lg:-translate-x-[441px] lg:mt-0 lg:mx-0">
+					<div className="mt-12 mx-auto w-full max-w-[562px] xl:absolute xl:bottom-[360px] xl:left-1/2 xl:-translate-x-[441px] xl:mt-0 xl:mx-0">
 						<Graph aria-hidden="true" className="h-auto w-full" />
 					</div>
 
-					<div className="mt-10 flex flex-col items-center gap-6 lg:absolute lg:top-[249px] lg:left-1/2 lg:translate-x-[230px] lg:mt-0 lg:items-start lg:gap-[125px]">
-						<div className="relative h-[120px] w-[262px]">
-							<div className="absolute bottom-[calc(100%+6px)] left-0 w-full px-6 text-left font-[var(--font-inter)] text-[18px] leading-[1.2] text-[#C2C2C2]">
+					<div
+						className={cn(
+							'mt-10 mx-auto grid w-full max-w-[562px] grid-cols-2 justify-items-center gap-x-3 gap-y-16',
+							'xl:absolute xl:top-[249px] xl:left-1/2 xl:mx-0 xl:mt-0 xl:w-auto xl:max-w-none xl:translate-x-[230px] xl:flex xl:flex-col xl:items-start xl:gap-[125px]'
+						)}
+					>
+						<div className="relative h-[120px] w-full max-w-[262px]">
+							<div className="absolute bottom-[calc(100%+6px)] left-0 w-full px-3 xl:px-6 text-left font-[var(--font-inter)] text-[12px] xl:text-[18px] leading-[1.2] text-[#C2C2C2]">
 								users experience up to
 							</div>
-							<div className="flex h-full w-full flex-col justify-between rounded-[10px] border-[3px] border-[#20B135] bg-[#177110] px-6 py-[10px]">
-								<div className="font-[var(--font-inter)] text-[70px] font-medium leading-[0.9] text-white">
+							<div className="flex h-full w-full flex-col justify-between rounded-[10px] border-[3px] border-[#20B135] bg-[#177110] px-3 xl:px-6 py-2 xl:py-[10px]">
+								<div className="font-[var(--font-inter)] text-[44px] xl:text-[70px] font-medium leading-[0.9] text-white">
 									5.7x
 								</div>
-								<div className="font-[var(--font-inter)] text-[30px] leading-none text-[#CAC7C7]">
+								<div className="font-[var(--font-inter)] text-[18px] xl:text-[30px] leading-none text-[#CAC7C7]">
 									more replies
 								</div>
 							</div>
-							<div className="absolute top-[calc(100%+6px)] left-0 w-full px-6 text-left font-[var(--font-inter)] text-[18px] leading-[1.2] text-[#C2C2C2]">
+							<div className="absolute top-[calc(100%+6px)] left-0 w-full px-3 xl:px-6 text-left font-[var(--font-inter)] text-[12px] xl:text-[18px] leading-[1.2] text-[#C2C2C2]">
 								than musicians booking
 								<br />
 								on their own
 							</div>
 						</div>
-						<div className="relative h-[120px] w-[262px]">
-							<div className="absolute bottom-[calc(100%+6px)] left-0 w-full px-6 text-left font-[var(--font-inter)] text-[18px] leading-[1.2] text-[#C2C2C2]">
+						<div className="relative h-[120px] w-full max-w-[262px]">
+							<div className="absolute bottom-[calc(100%+6px)] left-0 w-full px-3 xl:px-6 text-left font-[var(--font-inter)] text-[12px] xl:text-[18px] leading-[1.2] text-[#C2C2C2]">
 								users hear back from
 							</div>
-							<div className="flex h-full w-full flex-col justify-between rounded-[10px] border-[3px] border-[#20B135] bg-[#177110] px-6 py-[10px]">
-								<div className="font-[var(--font-inter)] text-[70px] font-medium leading-[0.9] text-white">
+							<div className="flex h-full w-full flex-col justify-between rounded-[10px] border-[3px] border-[#20B135] bg-[#177110] px-3 xl:px-6 py-2 xl:py-[10px]">
+								<div className="font-[var(--font-inter)] text-[44px] xl:text-[70px] font-medium leading-[0.9] text-white">
 									471%
 								</div>
-								<div className="font-[var(--font-inter)] text-[30px] leading-none text-[#CAC7C7]">
+								<div className="font-[var(--font-inter)] text-[18px] xl:text-[30px] leading-none text-[#CAC7C7]">
 									more venues
 								</div>
 							</div>
-							<div className="absolute top-[calc(100%+6px)] left-0 w-full px-6 text-left font-[var(--font-inter)] text-[18px] leading-[1.2] text-[#C2C2C2]">
+							<div className="absolute top-[calc(100%+6px)] left-0 w-full px-3 xl:px-6 text-left font-[var(--font-inter)] text-[12px] xl:text-[18px] leading-[1.2] text-[#C2C2C2]">
 								than they’re used to
 								<br />
 								hearing from.
@@ -548,8 +586,8 @@ export default function Products() {
 						</div>
 					</div>
 
-					<div className="mx-auto mt-12 flex h-[76px] w-full max-w-[1077px] items-center rounded-[10px] bg-[#666666] px-10 lg:absolute lg:bottom-[180px] lg:left-1/2 lg:mt-0 lg:w-[1077px] lg:-translate-x-1/2">
-						<p className="w-full font-[var(--font-inter)] text-[22.5px] font-medium leading-[1.2] text-white">
+					<div className="mt-12 -mx-6 w-[calc(100%+48px)] flex items-start rounded-none bg-[#666666] px-6 py-4 xl:absolute xl:bottom-[180px] xl:left-1/2 xl:mt-0 xl:h-[76px] xl:w-[1077px] xl:mx-0 xl:-translate-x-1/2 xl:items-center xl:rounded-[10px] xl:px-10 xl:py-0">
+						<p className="w-full font-[var(--font-inter)] text-[13px] xl:text-[22.5px] font-medium leading-[1.35] xl:leading-[1.2] text-white">
 							This is because we help them find the right person to reach, give them the best way to
 							structure what they’re sending, and provide the correct info about each contact they send
 							to.
@@ -565,10 +603,10 @@ export default function Products() {
 			<div className="w-full h-[72px] bg-white" />
 
 			{/* 1168px tall block of #F9F9F9 (product cards live here) */}
-			<section className="w-full h-[1168px] bg-[#F9F9F9]">
+			<section className="w-full bg-[#F9F9F9] lg:h-[1168px]">
 				<div className="mx-auto flex h-full w-full max-w-[90vw] flex-col pt-12 lg:pt-[135px]">
 					<div className="relative w-fit mx-auto pt-[99px]">
-						<div className="absolute top-0 left-1/2 -translate-x-1/2 lg:left-[777px] lg:translate-x-0">
+						<div className="absolute top-0 right-0 lg:right-auto lg:left-[777px]">
 							<div
 								className="relative w-[278px] h-[76px] bg-black/75 rounded-[7px]"
 								role="group"
@@ -623,7 +661,7 @@ export default function Products() {
 						<ProductList billingCycle={billingCycle} />
 					</div>
 
-					<div className="mt-auto flex flex-col items-center pb-[120px]">
+					<div className="mt-[120px] flex flex-col items-center pb-[160px] lg:mt-auto lg:pb-[120px]">
 						<p className="font-inter font-normal text-[clamp(32px,9vw,62px)] text-black text-center leading-[1.05]">
 							Try Murmur Now
 						</p>

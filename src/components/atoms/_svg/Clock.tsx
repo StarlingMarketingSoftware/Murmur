@@ -1,6 +1,17 @@
 import React from 'react';
 
-const Clock: React.FC<React.SVGProps<SVGSVGElement>> = (props) => {
+type ClockProps = React.SVGProps<SVGSVGElement> & {
+	/**
+	 * Scales the drawn clock content around the center (269, 269) without
+	 * changing the SVG element's CSS/layout size.
+	 */
+	scale?: number;
+};
+
+const Clock: React.FC<ClockProps> = ({ scale = 1, ...props }) => {
+	const contentTransform =
+		scale === 1 ? undefined : `translate(269 269) scale(${scale}) translate(-269 -269)`;
+
 	return (
 		<svg
 			width={539}
@@ -10,6 +21,7 @@ const Clock: React.FC<React.SVGProps<SVGSVGElement>> = (props) => {
 			xmlns="http://www.w3.org/2000/svg"
 			{...props}
 		>
+			<g transform={contentTransform}>
       <path
         opacity={0.7}
         d="M538 269c0 148.565-120.435 269-269 269S0 417.565 0 269 120.435 0 269 0s269 120.435 269 269z"
@@ -61,6 +73,7 @@ const Clock: React.FC<React.SVGProps<SVGSVGElement>> = (props) => {
           repeatCount="indefinite"
         />
       </path>
+			</g>
 		</svg>
 	);
 };
