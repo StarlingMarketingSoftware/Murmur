@@ -18,6 +18,7 @@ import ResourceMapNav from '@/components/atoms/_svg/ResourceMapNav';
 import ResourceResearchNav from '@/components/atoms/_svg/ResourceResearchNav';
 import ResourceInboxNav from '@/components/atoms/_svg/ResourceInboxNav';
 import ResourceDraftingNav from '@/components/atoms/_svg/ResourceDraftingNav';
+import SearchStep from '@/components/atoms/_svg/SearchStep';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -252,6 +253,27 @@ const Resources = () => {
 					<div className="absolute left-1/2 -translate-x-1/2 bottom-[12px] w-[797px] h-[639px] rounded-[6px] border-[2px] border-[#000000] bg-[#ADD8E7] overflow-hidden">
 						<div className="absolute top-[9px] left-0 right-0 h-[44px] bg-[#DAF5FF] border-y-[2px] border-[#000000] flex items-center">
 							<span className="ml-[30px] font-[var(--font-inter)] text-[22.5px]">Search</span>
+						</div>
+						<div className="absolute top-[77px] left-1/2 -translate-x-1/2 w-[732px] h-[290px] rounded-[6px] border-[2px] border-[#000000] bg-[#E9F9FF] flex items-center justify-center">
+							<SearchStep />
+						</div>
+						<div className="absolute top-[413px] left-1/2 -translate-x-1/2 w-[732px] h-[186px] rounded-[6px] border-[2px] border-[#000000] bg-[#FFFFFF] px-[28px] py-[24px] flex flex-col gap-[32px]">
+							<p className="font-[var(--font-inter)] text-[22.5px] leading-tight">
+								Start by doing a search for the type of venue and location you're looking to book.
+							</p>
+							<p className="font-[var(--font-inter)] text-[22.5px] leading-tight">
+								There are two "why" options, and "promotion" will help you more so with radio stations.
+							</p>
+						</div>
+					</div>
+				</div>
+			</section>
+
+			<section className="w-full mt-[24px] h-[968px] bg-[#F9F9F9]">
+				<div className="relative mx-auto h-full w-full max-w-[1200px] px-6">
+					<div className="absolute left-1/2 -translate-x-1/2 bottom-[16px] w-[797px] h-[943px] rounded-[6px] border-[2px] border-[#000000] bg-[#EB8586]">
+						<div className="absolute top-[9px] left-0 right-0 h-[44px] bg-[#FEC5C5] border-y-[2px] border-[#000000] flex items-center">
+							<span className="ml-[30px] font-[var(--font-inter)] text-[22.5px]">Select Contacts</span>
 						</div>
 					</div>
 				</div>
