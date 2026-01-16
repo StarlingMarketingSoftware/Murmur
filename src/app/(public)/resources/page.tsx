@@ -21,6 +21,7 @@ import ResourceDraftingNav from '@/components/atoms/_svg/ResourceDraftingNav';
 import SearchStep from '@/components/atoms/_svg/SearchStep';
 import SelectContactsMap from '@/components/atoms/_svg/SelectContactsMap';
 import SelectedContactsResource from '@/components/atoms/_svg/SelectedContactsResource';
+import CreateCampaign from '@/components/atoms/_svg/CreateCampaign';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -282,6 +283,24 @@ const Resources = () => {
 						</div>
 						<div className="absolute top-[420px] left-1/2 -translate-x-1/2 w-[732px] h-[288px] rounded-[6px] border-[2px] border-[#000000] bg-[#FFE0E0] overflow-hidden">
 							<SelectedContactsResource className="w-full h-full block" />
+						</div>
+						<div className="absolute top-[734px] left-1/2 -translate-x-1/2 w-[732px] h-[186px] rounded-[6px] border-[2px] border-[#000000] bg-[#FFFFFF] px-[28px] py-[24px]">
+							<p className="font-[var(--font-inter)] text-[22.5px] leading-tight">
+								You can select contacts by either clicking on them on the map or by clicking them in the right side panel in the map. The selection is for what contacts you're looking to actually reach out to.
+							</p>
+						</div>
+					</div>
+				</div>
+			</section>
+
+			<section className="w-full mt-[24px] h-[670px] bg-[#F9F9F9]">
+				<div className="relative mx-auto h-full w-full max-w-[1200px] px-6">
+					<div className="absolute left-1/2 -translate-x-1/2 bottom-[18px] w-[797px] h-[639px] rounded-[6px] border-[2px] border-[#000000] bg-[#D4F1DB]">
+						<div className="absolute top-[9px] left-0 right-0 h-[44px] bg-[#EDF5EF] border-y-[2px] border-[#000000] flex items-center">
+							<span className="ml-[30px] font-[var(--font-inter)] text-[22.5px]">Create Campaign</span>
+						</div>
+						<div className="absolute top-[77px] left-1/2 -translate-x-1/2">
+							<CreateCampaign />
 						</div>
 					</div>
 				</div>
