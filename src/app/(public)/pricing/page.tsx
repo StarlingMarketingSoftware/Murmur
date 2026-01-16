@@ -6,6 +6,7 @@ import { ProductList } from '@/components/organisms/ProductList/ProductList';
 import { usePricingPage } from './usePricingPage';
 import { cn } from '@/utils';
 import Clock from '@/components/atoms/_svg/Clock';
+import Graph from '@/components/atoms/_svg/Graph';
 import Link from 'next/link';
 
 type VenueColumns = [string[], string[], string[], string[]];
@@ -495,7 +496,67 @@ export default function Products() {
 			<div className="w-full h-[58px] bg-white" />
 
 			{/* 1028px tall block of #333333 */}
-			<section className="w-full h-[1028px] bg-[#333333]" />
+			<section className="relative w-full h-[1028px] bg-[#333333]">
+				<div className="mx-auto w-full max-w-[1200px] px-6 pt-[72px]">
+					<Typography
+						variant="h2"
+						className="font-[var(--font-inter)] text-[48px] sm:text-[64px] leading-[1.05] text-white"
+					>
+						Results that matter
+					</Typography>
+
+					<div className="mt-12 mx-auto w-full max-w-[562px] lg:absolute lg:bottom-[360px] lg:left-1/2 lg:-translate-x-[441px] lg:mt-0 lg:mx-0">
+						<Graph aria-hidden="true" className="h-auto w-full" />
+					</div>
+
+					<div className="mt-10 flex flex-col items-center gap-6 lg:absolute lg:top-[249px] lg:left-1/2 lg:translate-x-[230px] lg:mt-0 lg:items-start lg:gap-[125px]">
+						<div className="relative h-[120px] w-[262px]">
+							<div className="absolute bottom-[calc(100%+6px)] left-0 w-full px-6 text-left font-[var(--font-inter)] text-[18px] leading-[1.2] text-[#C2C2C2]">
+								users experience up to
+							</div>
+							<div className="flex h-full w-full flex-col justify-between rounded-[10px] border-[3px] border-[#20B135] bg-[#177110] px-6 py-[10px]">
+								<div className="font-[var(--font-inter)] text-[70px] font-medium leading-[0.9] text-white">
+									5.7x
+								</div>
+								<div className="font-[var(--font-inter)] text-[30px] leading-none text-[#CAC7C7]">
+									more replies
+								</div>
+							</div>
+							<div className="absolute top-[calc(100%+6px)] left-0 w-full px-6 text-left font-[var(--font-inter)] text-[18px] leading-[1.2] text-[#C2C2C2]">
+								than musicians booking
+								<br />
+								on their own
+							</div>
+						</div>
+						<div className="relative h-[120px] w-[262px]">
+							<div className="absolute bottom-[calc(100%+6px)] left-0 w-full px-6 text-left font-[var(--font-inter)] text-[18px] leading-[1.2] text-[#C2C2C2]">
+								users hear back from
+							</div>
+							<div className="flex h-full w-full flex-col justify-between rounded-[10px] border-[3px] border-[#20B135] bg-[#177110] px-6 py-[10px]">
+								<div className="font-[var(--font-inter)] text-[70px] font-medium leading-[0.9] text-white">
+									471%
+								</div>
+								<div className="font-[var(--font-inter)] text-[30px] leading-none text-[#CAC7C7]">
+									more venues
+								</div>
+							</div>
+							<div className="absolute top-[calc(100%+6px)] left-0 w-full px-6 text-left font-[var(--font-inter)] text-[18px] leading-[1.2] text-[#C2C2C2]">
+								than they’re used to
+								<br />
+								hearing from.
+							</div>
+						</div>
+					</div>
+
+					<div className="mx-auto mt-12 flex h-[76px] w-full max-w-[1077px] items-center rounded-[10px] bg-[#666666] px-10 lg:absolute lg:bottom-[180px] lg:left-1/2 lg:mt-0 lg:w-[1077px] lg:-translate-x-1/2">
+						<p className="w-full font-[var(--font-inter)] text-[22.5px] font-medium leading-[1.2] text-white">
+							This is because we help them find the right person to reach, give them the best way to
+							structure what they’re sending, and provide the correct info about each contact they send
+							to.
+						</p>
+					</div>
+				</div>
+			</section>
 
 			{/* 58px white space */}
 			<div className="w-full h-[58px] bg-white" />
