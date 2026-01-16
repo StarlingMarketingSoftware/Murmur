@@ -434,7 +434,7 @@ export default function Products() {
 				</div>
 
 				<div className="mx-auto h-full w-full max-w-[1200px] px-6">
-					<div className="flex h-full items-stretch pt-[104px]">
+					<div className="flex h-full items-stretch pt-[54px]">
 						<div className="flex w-full max-w-[560px] flex-col pb-[54px]">
 							<Typography
 								variant="h2"
