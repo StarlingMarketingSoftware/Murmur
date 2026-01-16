@@ -1,0 +1,52 @@
+/* Pricing page "80% zoom" (zoomed-out view) */
+.pricing-zoom-80 {
+	--pricing-zoom: 0.8;
+	/* `zoom` behaves most like browser zoom (affects layout) */
+	zoom: var(--pricing-zoom);
+	/* Keep full-width sections full-width after zoom */
+	width: calc(100% / var(--pricing-zoom));
+	/* Re-center the widened box so content doesn't drift right */
+	margin-left: calc((100% - (100% / var(--pricing-zoom))) / 2);
+	margin-right: calc((100% - (100% / var(--pricing-zoom))) / 2);
+}
+
+/* Pricing navbar: fixed-position safe zoom (no right drift) */
+.pricing-navbar-zoom-80 {
+	--pricing-zoom: 0.8;
+	left: 50%;
+	right: auto;
+	width: calc(100% / var(--pricing-zoom));
+	transform: translateX(-50%) scale(var(--pricing-zoom));
+	transform-origin: top center;
+}
+
+/* Compensate viewport-sized Tailwind utilities under zoom */
+.pricing-zoom-80 .w-screen {
+	width: calc(100vw / var(--pricing-zoom));
+}
+.pricing-zoom-80 .h-screen {
+	height: calc(100vh / var(--pricing-zoom));
+}
+.pricing-zoom-80 .min-h-screen {
+	min-height: calc(100vh / var(--pricing-zoom));
+}
+.pricing-zoom-80 .h-dvh {
+	height: calc(100dvh / var(--pricing-zoom));
+}
+.pricing-zoom-80 .min-h-dvh {
+	min-height: calc(100dvh / var(--pricing-zoom));
+}
+
+/* Fallback if `zoom` isn't supported */
+@supports not (zoom: 1) {
+	.pricing-zoom-80 {
+		zoom: 1;
+		transform: scale(var(--pricing-zoom));
+		transform-origin: top left;
+		width: calc(100% / var(--pricing-zoom));
+		/* For the transform fallback, keep it anchored to the left */
+		margin-left: 0;
+		margin-right: 0;
+	}
+}
+

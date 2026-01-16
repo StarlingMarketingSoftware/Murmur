@@ -8,7 +8,6 @@ import { cn } from '@/utils';
 import Clock from '@/components/atoms/_svg/Clock';
 import Graph from '@/components/atoms/_svg/Graph';
 import Link from 'next/link';
-import styles from './pricing.module.css';
 
 type VenueColumns = [string[], string[], string[], string[]];
 
@@ -408,13 +407,8 @@ export default function Products() {
 	return (
 		<div className="w-full">
 			{/* First panel begins 450px from the very top of the page (accounts for 48px fixed navbar spacer) */}
-			<section className={cn('w-full bg-white sm:h-[402px]', styles.heroSection)}>
-				<div
-					className={cn(
-						'flex flex-col items-center justify-center py-12 sm:justify-start sm:pt-[185px] sm:py-0',
-						styles.heroInner
-					)}
-				>
+			<section className="w-full bg-white min-[1145px]:h-[402px]">
+				<div className="flex flex-col items-center justify-center py-12 sm:pt-24 sm:pb-12 min-[1145px]:pt-[235px] min-[1145px]:py-0">
 					<Typography
 						variant="h1"
 						className="text-center font-[var(--font-inter)] text-[32px] sm:text-[45px] font-light leading-none"
