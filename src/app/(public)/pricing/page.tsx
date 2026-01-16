@@ -566,7 +566,7 @@ export default function Products() {
 
 			{/* 1168px tall block of #F9F9F9 (product cards live here) */}
 			<section className="w-full h-[1168px] bg-[#F9F9F9]">
-				<div className="w-full max-w-[90vw] mx-auto pt-12">
+				<div className="mx-auto flex h-full w-full max-w-[90vw] flex-col pt-12 lg:pt-[135px]">
 					<div className="relative w-fit mx-auto pt-[99px]">
 						<div className="absolute top-0 left-1/2 -translate-x-1/2 lg:left-[777px] lg:translate-x-0">
 							<div
@@ -621,6 +621,20 @@ export default function Products() {
 						</div>
 
 						<ProductList billingCycle={billingCycle} />
+					</div>
+
+					<div className="mt-auto flex flex-col items-center pb-[120px]">
+						<p className="font-inter font-normal text-[clamp(32px,9vw,62px)] text-black text-center leading-[1.05]">
+							Try Murmur Now
+						</p>
+						<div className="mt-[39px] flex justify-center">
+							<Link
+								href="/free-trial"
+								className="w-[265px] h-[40px] rounded-[10px] border-[3px] border-[#118521] bg-transparent font-[var(--font-inter)] text-[24px] font-medium text-[#118521] flex items-center justify-center"
+							>
+								Start Free Trial
+							</Link>
+						</div>
 					</div>
 				</div>
 			</section>
