@@ -23,6 +23,7 @@ import SelectContactsMap from '@/components/atoms/_svg/SelectContactsMap';
 import SelectedContactsResource from '@/components/atoms/_svg/SelectedContactsResource';
 import CreateCampaign from '@/components/atoms/_svg/CreateCampaign';
 import ResourcePageProfile from '@/components/atoms/_svg/ResourcePageProfile';
+import FineTuneResource from '@/components/atoms/_svg/FineTuneResource';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -324,6 +325,24 @@ const Resources = () => {
 						<div className="absolute top-[639px] left-1/2 -translate-x-1/2 w-[732px] h-[186px] rounded-[6px] border-[2px] border-[#000000] bg-[#FFFFFF] px-[28px] py-[24px]">
 							<p className="font-[var(--font-inter)] text-[22.5px] leading-tight">
 								You'll see a button at the bottom of the map, and when you click it, all of your selected contacts are brought into your campaign.
+							</p>
+						</div>
+					</div>
+				</div>
+			</section>
+
+			<section className="w-full mt-[23px] h-[676px] bg-[#F9F9F9]">
+				<div className="relative mx-auto h-full w-full max-w-[1200px] px-6">
+					<div className="absolute left-1/2 -translate-x-1/2 bottom-[19px] w-[797px] h-[639px] rounded-[6px] border-[2px] border-[#000000] bg-[#A6E2A8]">
+						<div className="absolute top-[9px] left-0 right-0 h-[44px] bg-[#EDF5EF] border-y-[2px] border-[#000000] flex items-center">
+							<span className="ml-[30px] font-[var(--font-inter)] text-[22.5px]">Fine tune your drafting settings</span>
+						</div>
+						<div className="absolute top-[77px] left-1/2 -translate-x-1/2 w-[727px] h-[288px] rounded-[6px] border-[2px] border-[#000000] bg-[#D0FAD2] overflow-hidden flex items-center justify-center">
+							<FineTuneResource />
+						</div>
+						<div className="absolute top-[413px] left-1/2 -translate-x-1/2 w-[732px] h-[186px] rounded-[6px] border-[2px] border-[#000000] bg-white px-[28px] py-[24px]">
+							<p className="font-[var(--font-inter)] text-[22.5px] leading-tight">
+								Now you can switch back to one of the three drafting modes, though we would likely recommend "Auto" to start, as it's trained on all of the venue data. You can then set a calendar date range, and even add in custom instructions.
 							</p>
 						</div>
 					</div>
