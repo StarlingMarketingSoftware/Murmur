@@ -14,13 +14,14 @@ export function Footer() {
 		pathname === urls.home.index ||
 		pathname === '/map' ||
 		pathname === urls.pricing.index ||
+		pathname === urls.resources.index ||
 		pathname === urls.freeTrial.index ||
 		pathname.startsWith(`${urls.freeTrial.index}/`)
 	) {
 		return null;
 	}
 
-	const isLightFooter = pathname === urls.contact.index;
+	const isLightFooter = pathname === urls.resources.index;
 
 	const footerClass = isLightFooter
 		? 'border-t border-gray-200 py-8 bg-background'
@@ -73,10 +74,10 @@ export function Footer() {
 							</li>
 							<li>
 								<Link
-									href={urls.contact.index}
+									href={urls.resources.index}
 									className={cn(textMutedClass, hoverClass, 'transition-colors')}
 								>
-									Help
+									Resources
 								</Link>
 							</li>
 						</ul>

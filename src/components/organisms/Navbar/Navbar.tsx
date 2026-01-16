@@ -106,7 +106,7 @@ export const Navbar = () => {
 	const navItems: NavItem[] = [
 		{ path: urls.home.index, label: 'Home' },
 		{ path: urls.pricing.index, label: 'Pricing' },
-		{ path: urls.contact.index, label: 'Help' },
+		{ path: urls.resources.index, label: 'Resources' },
 		{ path: urls.admin.index, label: 'Admin' },
 	].filter((item) => !(user?.role !== 'admin' && item.path === '/admin'));
 
