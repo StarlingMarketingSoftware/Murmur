@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
 import { Crimson_Text, Inter, Zen_Antique } from 'next/font/google';
-import { Footer } from '@/components/molecules/Footer/Footer';
 import { Toaster } from '@/components/ui/toast';
 import './globals.css';
 import './advanced-scroll.css';
@@ -84,7 +83,6 @@ export default function RootLayout({
 							<PageTransitionProvider>
 								<SubLayout>
 									<main className="flex-1">{children}</main>
-									<Footer />
 									<Toaster />
 								</SubLayout>
 							</PageTransitionProvider>
