@@ -1,11 +1,8 @@
 'use client';
-import { Card, CardContent, CardTitle } from '@/components/ui/card';
-import { Typography } from '@/components/ui/typography';
+import { Card } from '@/components/ui/card';
 import { cn } from '@/utils';
-import { Stripe } from 'stripe';
 import { FC } from 'react';
 import { ProductCardProps, useProductCard } from './useProductCard';
-import { CheckIcon } from 'lucide-react';
 
 export const ProductCard: FC<ProductCardProps> = (props) => {
 	const {
@@ -17,63 +14,75 @@ export const ProductCard: FC<ProductCardProps> = (props) => {
 		marketingFeatures,
 		isLink,
 		className,
-		isHighlighted,
-		billingCycle,
 	} = useProductCard(props);
+
+	const normalizedProductName = product.name.trim().toLowerCase();
+	const productCardFillClassName = normalizedProductName === 'pro'
+		? 'bg-[#4DA6D7]'
+		: normalizedProductName === 'ultra'
+			? 'bg-[#78D18C]'
+			: 'bg-gray-100';
+
+	const productButtonFillClassName = normalizedProductName === 'pro'
+		? 'bg-[#A5E0FF] hover:bg-[#A5E0FF] hover:brightness-95 active:brightness-90'
+		: normalizedProductName === 'ultra'
+			? 'bg-[#ABFFA5] hover:bg-[#ABFFA5] hover:brightness-95 active:brightness-90'
+			: 'bg-white/55 hover:bg-white/70 hover:brightness-95 active:brightness-90';
+
+	const featureNames = (marketingFeatures ?? [])
+		.map((feature) => feature.name?.trim())
+		.filter(Boolean) as string[];
+
+	const featureBoxes = Array.from({ length: 3 }, (_, index) => featureNames[index] ?? '');
 
 	return (
 		<Card
 			onClick={isLink ? handleClick : undefined}
 			className={cn(
-				'w-[300px] sm:w-[315px] h-[737px] bg-gradient-to-b from-white to-gray-100 hover:-translate-y-1 transition-all duration-300 border-black !border-3 pt-3 px-6',
+				'!my-0 w-[90vw] max-w-[380px] sm:w-[477px] sm:max-w-none',
+				'border-black !border-[3px] rounded-md !p-4 sm:!p-6',
+				'flex flex-col gap-2 sm:gap-3',
+				'!font-secondary',
+				productCardFillClassName,
 				isLink && 'cursor-pointer',
-				isHighlighted && 'border-navy from-secondary/7 to-gray-100',
 				className
 			)}
 		>
-			<div className="">
-				<CardTitle>
-					<Typography variant="h3" className="text-[30px] !font-primary ">
-						{product.name}
-					</Typography>
-				</CardTitle>
-				<div className="h-14 w-7/10">
-					{product.name === 'Ultra' ? (
-						<Typography variant="label" className="text-[14px] text-muted leading-1">
-							Make Campaigns with New Contacts and AI Customization
-						</Typography>
-					) : null}
-				</div>
-				<div className="flex gap-3">
-					<Typography variant="h4" className="text-[59px] font-bold">
+			<div className="w-full sm:w-[423px] sm:h-[122px] rounded-md border-2 border-black bg-white px-3 sm:px-4 py-2 sm:py-3 flex flex-col gap-2 sm:gap-0 sm:justify-between">
+				<p className="text-[18px] sm:text-[22px] leading-none font-secondary font-normal">
+					{product.name}
+				</p>
+				<div className="flex items-end gap-2">
+					<p className="text-[42px] sm:text-[54px] leading-none font-secondary font-medium">
 						{formattedPrice}
-					</Typography>
-					<Typography variant="p" className="text-[27px] translate-y-8">
+					</p>
+					<p className="text-[18px] sm:text-[22px] leading-none font-secondary pb-[4px] sm:pb-[6px]">
 						{period}
-					</Typography>
+					</p>
 				</div>
-				<CardContent>
-					{billingCycle === 'year' ? (
-						<Typography variant="h4" className="text-[16px]">
-							per month, billed annually
-						</Typography>
-					) : null}
-					<div className="mt-7">{!isLink && <>{getButton()}</>}</div>
-					<div className="my-7 h-14 flex items-center">
-						<Typography variant="h4" className="text-[20px] font-semibold">
-							{product.metadata?.includes && product.metadata.includes + ' +'}
-						</Typography>
-					</div>
-					{marketingFeatures.map(
-						(feature: Stripe.Product.MarketingFeature, index: number) => (
-							<div key={index} className="flex gap-2 items-center mb-4">
-								<CheckIcon className="stroke-success shrink-0" size="20px" />
-								<Typography variant="label">{feature.name}</Typography>
-							</div>
-						)
-					)}
-				</CardContent>
 			</div>
+
+			{!isLink && (
+				<div className="w-full sm:w-[423px]">
+					{getButton({
+						className: cn(
+							'!w-full !h-[56px] sm:!h-[69px] rounded-md border-2 border-black !p-0 text-[22px] sm:text-[26px] !font-secondary font-normal text-black',
+							productButtonFillClassName
+						),
+					})}
+				</div>
+			)}
+
+			{featureBoxes.map((featureText, index) => (
+				<div
+					key={index}
+					className="w-full sm:w-[423px] sm:h-[53px] rounded-md border-2 border-black bg-white px-3 sm:px-4 py-2 sm:py-0 flex items-center"
+				>
+					<p className="font-secondary text-[13px] sm:text-[15px] leading-snug font-normal">
+						{featureText || '\u00A0'}
+					</p>
+				</div>
+			))}
 		</Card>
 	);
 };

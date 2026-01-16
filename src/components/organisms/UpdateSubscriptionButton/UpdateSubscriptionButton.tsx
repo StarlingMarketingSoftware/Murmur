@@ -13,6 +13,7 @@ interface UpdateSubscriptionButtonProps {
 	priceId: string;
 	productId: string;
 	user: User;
+	buttonText?: string;
 }
 
 const UpdateSubscriptionButton: FC<UpdateSubscriptionButtonProps> = ({
@@ -20,6 +21,7 @@ const UpdateSubscriptionButton: FC<UpdateSubscriptionButtonProps> = ({
 	priceId,
 	user,
 	productId,
+	buttonText = 'Buy Now',
 }) => {
 	const { mutateAsync: accessPortal, isPending } = useCreateCustomerPortal({
 		suppressToasts: true,
@@ -50,7 +52,7 @@ const UpdateSubscriptionButton: FC<UpdateSubscriptionButtonProps> = ({
 			size="xl"
 			variant="product"
 		>
-			Buy Now
+			{buttonText}
 		</Button>
 	);
 };
