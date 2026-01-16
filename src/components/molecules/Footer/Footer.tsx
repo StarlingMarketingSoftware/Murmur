@@ -9,18 +9,18 @@ export function Footer() {
 	const currentYear = new Date().getFullYear();
 	const pathname = usePathname();
 
-	// Hide footer on landing page, map page, and free-trial page
+	// Hide footer on landing page, map page, pricing page, and free-trial page
 	if (
 		pathname === urls.home.index ||
 		pathname === '/map' ||
+		pathname === urls.pricing.index ||
 		pathname === urls.freeTrial.index ||
 		pathname.startsWith(`${urls.freeTrial.index}/`)
 	) {
 		return null;
 	}
 
-	const isLightFooter =
-		pathname === urls.pricing.index || pathname === urls.contact.index;
+	const isLightFooter = pathname === urls.contact.index;
 
 	const footerClass = isLightFooter
 		? 'border-t border-gray-200 py-8 bg-background'

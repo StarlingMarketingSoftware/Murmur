@@ -1,5 +1,4 @@
 'use client';
-import { Stripe } from 'stripe';
 import { CheckoutButton } from '../CheckoutButton/CheckoutButton';
 import { User } from '@prisma/client';
 import ManageSubscriptionButton from '@/components/organisms/ManageSubscriptionButton/ManageSubscriptionButton';
@@ -15,6 +14,11 @@ export interface ProductCardProps {
 	user: User | null | undefined;
 	isLink?: boolean;
 	billingCycle: BillingCycle;
+}
+
+export interface GetButtonOptions {
+	className?: string;
+	buttonText?: string;
 }
 
 export const useProductCard = (props: ProductCardProps) => {
@@ -60,13 +64,18 @@ export const useProductCard = (props: ProductCardProps) => {
 
 	const HIGHLIGHTED_CLASS = 'bg-secondary-light hover:bg-secondary-light/80';
 
-	const getButton = (): ReactNode => {
+	const defaultButtonText = `Get ${product.name}`;
+
+	const getButton = (options: GetButtonOptions = {}): ReactNode => {
+		const { className: buttonClassName, buttonText } = options;
+		const resolvedButtonText = buttonText ?? defaultButtonText;
+
 		const checkoutButton = (
 			<CheckoutButton
-				className={cn(isHighlighted && HIGHLIGHTED_CLASS)}
+				className={cn(isHighlighted && HIGHLIGHTED_CLASS, buttonClassName)}
 				user={user}
 				priceId={price.id}
-				buttonText="Buy Now"
+				buttonText={resolvedButtonText}
 				billingCycle={billingCycle}
 			/>
 		);
@@ -78,7 +87,12 @@ export const useProductCard = (props: ProductCardProps) => {
 				user.stripeSubscriptionStatus === StripeSubscriptionStatus.TRIALING)
 		) {
 			return (
-				<ManageSubscriptionButton className="bg-primary hover:bg-primary/80 text-background" />
+				<ManageSubscriptionButton
+					className={cn(
+						'bg-primary hover:bg-primary/80 text-background',
+						buttonClassName
+					)}
+				/>
 			);
 		} else if (user.stripeSubscriptionId) {
 			return (
@@ -86,7 +100,8 @@ export const useProductCard = (props: ProductCardProps) => {
 					priceId={price.id}
 					user={user}
 					productId={product.id}
-					className={cn(isHighlighted && HIGHLIGHTED_CLASS)}
+					buttonText={resolvedButtonText}
+					className={cn(isHighlighted && HIGHLIGHTED_CLASS, buttonClassName)}
 				/>
 			);
 		} else {
@@ -98,8 +113,7 @@ export const useProductCard = (props: ProductCardProps) => {
 		window.location.href = `/pricing/${product.id}`;
 	};
 
-	const marketingFeatures: Stripe.Product.MarketingFeature[] =
-		product.marketing_features || [];
+	const marketingFeatures = product.marketing_features ?? [];
 
 	return {
 		product,
