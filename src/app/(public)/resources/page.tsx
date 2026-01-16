@@ -302,6 +302,11 @@ const Resources = () => {
 						<div className="absolute top-[77px] left-1/2 -translate-x-1/2">
 							<CreateCampaign />
 						</div>
+						<div className="absolute top-[398px] left-1/2 -translate-x-1/2 w-[731px] h-[186px] rounded-[6px] border-[2px] border-[#000000] bg-[#FFFFFF] px-[28px] py-[24px]">
+							<p className="font-[var(--font-inter)] text-[22.5px] leading-tight">
+								You'll see a button at the bottom of the map, and when you click it, all of your selected contacts are brought into your campaign.
+							</p>
+						</div>
 					</div>
 				</div>
 			</section>
