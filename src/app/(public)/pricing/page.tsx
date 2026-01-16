@@ -8,6 +8,7 @@ import { cn } from '@/utils';
 import Clock from '@/components/atoms/_svg/Clock';
 import Graph from '@/components/atoms/_svg/Graph';
 import Link from 'next/link';
+import styles from './pricing.module.css';
 
 type VenueColumns = [string[], string[], string[], string[]];
 
@@ -407,8 +408,13 @@ export default function Products() {
 	return (
 		<div className="w-full">
 			{/* First panel begins 450px from the very top of the page (accounts for 48px fixed navbar spacer) */}
-			<section className="w-full bg-white sm:h-[402px]">
-				<div className="flex flex-col items-center justify-center py-12 sm:justify-start sm:pt-[185px] sm:py-0">
+			<section className={cn('w-full bg-white sm:h-[402px]', styles.heroSection)}>
+				<div
+					className={cn(
+						'flex flex-col items-center justify-center py-12 sm:justify-start sm:pt-[185px] sm:py-0',
+						styles.heroInner
+					)}
+				>
 					<Typography
 						variant="h1"
 						className="text-center font-[var(--font-inter)] text-[32px] sm:text-[45px] font-light leading-none"
@@ -511,10 +517,10 @@ export default function Products() {
 
 									<div
 										aria-hidden="true"
-										className="pointer-events-none select-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10 w-[84vw] max-w-[520px]"
+										className="pointer-events-none select-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10 h-full aspect-square"
 									>
-										<div className="translate-x-8 sm:translate-x-0">
-											<Clock focusable="false" scale={0.8} className="h-auto w-full" />
+										<div className="h-full w-full translate-x-8 sm:translate-x-0">
+											<Clock focusable="false" scale={0.8} className="h-full w-full" />
 										</div>
 									</div>
 								</div>

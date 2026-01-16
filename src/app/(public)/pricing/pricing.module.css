@@ -1,0 +1,22 @@
+.heroSection {
+	/* Empty on purpose - we only override in mobile landscape */
+}
+
+.heroInner {
+	/* Empty on purpose - we only override in mobile landscape */
+}
+
+/* Mobile landscape: iPhones hit the `sm` breakpoint by width, but have short height.
+   Override the `sm:h-[402px]` + `sm:pt-[185px]` hero spacing so content doesn't get pushed down. */
+@media (orientation: landscape) and (max-height: 500px) {
+	.heroSection {
+		height: auto !important;
+	}
+
+	.heroInner {
+		justify-content: center !important;
+		padding-top: 2rem !important;
+		padding-bottom: 2rem !important;
+	}
+}
+
