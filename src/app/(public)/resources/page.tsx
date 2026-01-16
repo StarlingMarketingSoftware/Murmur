@@ -16,6 +16,8 @@ import { Typography } from '@/components/ui/typography';
 import { cn } from '@/utils';
 import ResourceMapNav from '@/components/atoms/_svg/ResourceMapNav';
 import ResourceResearchNav from '@/components/atoms/_svg/ResourceResearchNav';
+import ResourceInboxNav from '@/components/atoms/_svg/ResourceInboxNav';
+import ResourceDraftingNav from '@/components/atoms/_svg/ResourceDraftingNav';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -180,7 +182,7 @@ const Resources = () => {
 					</div>
 
 					<div className="absolute left-1/2 -translate-x-1/2 bottom-[75px] grid grid-cols-2 gap-x-[31px] gap-y-[38px]">
-						<div className="w-[276px] h-[185px] rounded-[8px] border-[2px] border-[#000000] bg-[#ADD8E7] overflow-hidden">
+						<Link href="/map" className="w-[276px] h-[185px] rounded-[8px] border-[2px] border-[#000000] bg-[#ADD8E7] overflow-hidden block">
 							<div className="h-full flex flex-col">
 								<div className="flex-1 flex items-center justify-center pt-2">
 									<ResourceMapNav />
@@ -191,10 +193,10 @@ const Resources = () => {
 									</p>
 								</div>
 							</div>
-						</div>
-						<div className="w-[276px] h-[185px] rounded-[8px] border-[2px] border-[#000000] bg-[#E9F7FF] overflow-hidden">
+						</Link>
+						<Link href="/research" className="w-[276px] h-[185px] rounded-[8px] border-[2px] border-[#000000] bg-[#E9F7FF] overflow-hidden block">
 							<div className="h-full flex flex-col">
-								<div className="flex-1 flex items-center justify-center pt-2">
+								<div className="flex-1 flex items-center justify-center pt-3">
 									<ResourceResearchNav />
 								</div>
 								<div className="h-[70px] flex items-center justify-center">
@@ -203,27 +205,31 @@ const Resources = () => {
 									</p>
 								</div>
 							</div>
-						</div>
-						<div className="w-[276px] h-[185px] rounded-[8px] border-[2px] border-[#000000] bg-[#6FA4E1] overflow-hidden">
+						</Link>
+						<Link href="/inbox" className="w-[276px] h-[185px] rounded-[8px] border-[2px] border-[#000000] bg-[#6FA4E1] overflow-hidden block">
 							<div className="h-full flex flex-col">
-								<div className="flex-1" />
+								<div className="flex-1 flex items-center justify-center pt-2">
+									<ResourceInboxNav className="translate-x-[3px]" />
+								</div>
 								<div className="h-[70px] flex items-center justify-center">
 									<p className="font-[var(--font-inter)] text-[28px] font-semibold text-black leading-none">
 										Inbox
 									</p>
 								</div>
 							</div>
-						</div>
-						<div className="w-[276px] h-[185px] rounded-[8px] border-[2px] border-[#000000] bg-[#FFDC9E] overflow-hidden">
+						</Link>
+						<Link href="/drafting" className="w-[276px] h-[185px] rounded-[8px] border-[2px] border-[#000000] bg-[#FFDC9E] overflow-hidden block">
 							<div className="h-full flex flex-col">
-								<div className="flex-1" />
+								<div className="flex-1 flex items-center justify-center pt-4">
+									<ResourceDraftingNav />
+								</div>
 								<div className="h-[70px] flex items-center justify-center">
 									<p className="font-[var(--font-inter)] text-[28px] font-semibold text-black leading-none">
 										Drafting
 									</p>
 								</div>
 							</div>
-						</div>
+						</Link>
 					</div>
 				</div>
 			</section>
