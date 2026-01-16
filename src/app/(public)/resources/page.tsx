@@ -310,6 +310,16 @@ const Resources = () => {
 					</div>
 				</div>
 			</section>
+
+			<section className="w-full mt-[30px] h-[889px] bg-[#F9F9F9]">
+				<div className="relative mx-auto h-full w-full max-w-[1200px] px-6">
+					<div className="absolute left-1/2 -translate-x-1/2 bottom-[25px] w-[797px] h-[853px] rounded-[6px] border-[2px] border-[#000000] bg-[#58A6E5]">
+						<div className="absolute top-[9px] left-0 right-0 h-[44px] bg-[#C9E0F3] border-y-[2px] border-[#000000] flex items-center">
+							<span className="ml-[30px] font-[var(--font-inter)] text-[22.5px]">Create a Profile</span>
+						</div>
+					</div>
+				</div>
+			</section>
 		</div>
 	);
 };
