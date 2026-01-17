@@ -1,0 +1,52 @@
+/* Resources page "80% zoom" (zoomed-out view) */
+.resources-zoom-80 {
+	--resources-zoom: 0.8;
+	/* `zoom` behaves most like browser zoom (affects layout) */
+	zoom: var(--resources-zoom);
+	/* Keep full-width sections full-width after zoom */
+	width: calc(100% / var(--resources-zoom));
+	/* Re-center the widened box so content doesn't drift right */
+	margin-left: calc((100% - (100% / var(--resources-zoom))) / 2);
+	margin-right: calc((100% - (100% / var(--resources-zoom))) / 2);
+}
+
+/* Resources navbar: fixed-position safe zoom (no right drift) */
+.resources-navbar-zoom-80 {
+	--resources-zoom: 0.8;
+	left: 50%;
+	right: auto;
+	width: calc(100% / var(--resources-zoom));
+	transform: translateX(-50%) scale(var(--resources-zoom));
+	transform-origin: top center;
+}
+
+/* Compensate viewport-sized Tailwind utilities under zoom */
+.resources-zoom-80 .w-screen {
+	width: calc(100vw / var(--resources-zoom));
+}
+.resources-zoom-80 .h-screen {
+	height: calc(100vh / var(--resources-zoom));
+}
+.resources-zoom-80 .min-h-screen {
+	min-height: calc(100vh / var(--resources-zoom));
+}
+.resources-zoom-80 .h-dvh {
+	height: calc(100dvh / var(--resources-zoom));
+}
+.resources-zoom-80 .min-h-dvh {
+	min-height: calc(100dvh / var(--resources-zoom));
+}
+
+/* Fallback if `zoom` isn't supported */
+@supports not (zoom: 1) {
+	.resources-zoom-80 {
+		zoom: 1;
+		transform: scale(var(--resources-zoom));
+		transform-origin: top left;
+		width: calc(100% / var(--resources-zoom));
+		/* For the transform fallback, keep it anchored to the left */
+		margin-left: 0;
+		margin-right: 0;
+	}
+}
+

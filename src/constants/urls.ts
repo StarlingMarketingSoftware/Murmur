@@ -44,6 +44,9 @@ export const urls = {
 	contact: {
 		index: '/contact',
 	},
+	resources: {
+		index: '/resources',
+	},
 	signIn: {
 		index: '/sign-in',
 	},
