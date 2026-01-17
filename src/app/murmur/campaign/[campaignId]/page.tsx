@@ -40,6 +40,51 @@ const TRANSITION_DURATION = 180;
 // Safety valve: if a destination view is unusually slow to paint, don't block the transition forever.
 const MAX_TRANSITION_WAIT_MS = 650;
 
+const SIXTEEN_BY_TEN_ZOOM_MATCH_TOLERANCE_PX = 50;
+
+// 16:10 resolution-specific zoom levels: [width, height] → zoom
+const SIXTEEN_BY_TEN_ZOOM_MAP: Array<{ w: number; h: number; zoom: number }> = [
+	{ w: 1152, h: 720, zoom: 0.52 },
+	{ w: 1280, h: 800, zoom: 0.6 },
+	{ w: 1440, h: 900, zoom: 0.7 },
+	{ w: 1664, h: 1040, zoom: 0.77 },
+	{ w: 1920, h: 1200, zoom: 0.95 },
+	{ w: 2048, h: 1280, zoom: 0.95 },
+	{ w: 2304, h: 1440, zoom: 1.1 },
+	{ w: 2592, h: 1620, zoom: 1.2 },
+	{ w: 2880, h: 1800, zoom: 1.2 },
+	{ w: 2976, h: 1860, zoom: 1.45 },
+	{ w: 4608, h: 2880, zoom: 1.6 },
+];
+
+// Fallback zoom for 16:10-ish resolutions that don't match any tuned point
+const SIXTEEN_BY_TEN_FALLBACK_ZOOM = 0.8;
+
+type SixteenByTenZoomPoint = { w: number; h: number; zoom: number; metric: number };
+
+// Precompute a size metric (diagonal length) so we can smoothly interpolate between tuned points.
+const SIXTEEN_BY_TEN_ZOOM_POINTS: SixteenByTenZoomPoint[] = SIXTEEN_BY_TEN_ZOOM_MAP.map(
+	(entry) => ({ ...entry, metric: Math.hypot(entry.w, entry.h) })
+).sort((a, b) => a.metric - b.metric);
+
+// 16:9 resolution-specific zoom levels: [width, height] → zoom
+const SIXTEEN_BY_NINE_ZOOM_MAP: Array<{ w: number; h: number; zoom: number }> = [
+	{ w: 1280, h: 720, zoom: 0.52 },
+	{ w: 1344, h: 756, zoom: 0.55 },
+	{ w: 1600, h: 900, zoom: 0.68 },
+	{ w: 1920, h: 1080, zoom: 0.83 },
+];
+
+// Fallback zoom for 16:9 resolutions that don't match any tuned point
+const SIXTEEN_BY_NINE_FALLBACK_ZOOM = 0.85;
+
+type SixteenByNineZoomPoint = { w: number; h: number; zoom: number; metric: number };
+
+// Precompute a size metric (diagonal length) so we can smoothly interpolate between tuned points.
+const SIXTEEN_BY_NINE_ZOOM_POINTS: SixteenByNineZoomPoint[] = SIXTEEN_BY_NINE_ZOOM_MAP.map(
+	(entry) => ({ ...entry, metric: Math.hypot(entry.w, entry.h) })
+).sort((a, b) => a.metric - b.metric);
+
 // Dynamically import heavy components to reduce initial bundle size and prevent Vercel timeout
 const DraftingSection = nextDynamic(
 	() => import('./DraftingSection/DraftingSection').then((mod) => mod.DraftingSection),
@@ -81,16 +126,6 @@ const Murmur = () => {
 	const DEFAULT_CAMPAIGN_ZOOM = 0.85;
 	const CAMPAIGN_ZOOM_EVENT = 'murmur:campaign-zoom-changed';
 
-	// 16:10 resolution-specific zoom levels: [width, height] → zoom
-	const SIXTEEN_BY_TEN_ZOOM_MAP: Array<{ w: number; h: number; zoom: number }> = [
-		{ w: 1280, h: 800, zoom: 0.60 },
-		{ w: 1440, h: 900, zoom: 0.70 },
-		{ w: 1664, h: 1040, zoom: 0.77 },
-	];
-
-	// Fallback zoom for 16:10 resolutions not in the map
-	const SIXTEEN_BY_TEN_FALLBACK_ZOOM = 0.85;
-
 	// Resolution-aware zoom calculation for campaign page
 	const updateCampaignZoomForViewport = useCallback(() => {
 		if (typeof window === 'undefined') return;
@@ -102,29 +137,188 @@ const Murmur = () => {
 
 		const ratio = viewportW / viewportH;
 		const IDEAL_16X10 = 16 / 10; // 1.6
-		const viewportDelta = Math.abs(ratio - IDEAL_16X10);
+		const IDEAL_16X9 = 16 / 9; // ~1.777
+		const viewportDelta16x10 = Math.abs(ratio - IDEAL_16X10);
+		const viewportDelta16x9 = Math.abs(ratio - IDEAL_16X9);
 		const screenW = window.screen?.availWidth ?? window.screen?.width ?? viewportW;
 		const screenH = window.screen?.availHeight ?? window.screen?.height ?? viewportH;
 		const screenRatio = screenW > 0 && screenH > 0 ? screenW / screenH : ratio;
-		const screenDelta = Math.abs(screenRatio - IDEAL_16X10);
-		const isSixteenByTenish = viewportDelta <= 0.14 || screenDelta <= 0.14;
+		const screenDelta16x10 = Math.abs(screenRatio - IDEAL_16X10);
+		const screenDelta16x9 = Math.abs(screenRatio - IDEAL_16X9);
+		const isSixteenByTenish = viewportDelta16x10 <= 0.14 || screenDelta16x10 <= 0.14;
+		const isSixteenByNineish = viewportDelta16x9 <= 0.08 || screenDelta16x9 <= 0.08;
 
 		let targetZoom = DEFAULT_CAMPAIGN_ZOOM;
 
 		if (isSixteenByTenish) {
-			// Check both screen dimensions AND viewport dimensions
-			// Screen dims work for real monitors; viewport dims work for dev tools simulation
-			const matchScreenW = window.screen?.width ?? viewportW;
-			const matchScreenH = window.screen?.height ?? viewportH;
-			
-			// Look for an exact or near-exact resolution match (within 50px tolerance)
-			// Try screen dimensions first, then fall back to viewport dimensions
-			const match = SIXTEEN_BY_TEN_ZOOM_MAP.find(
-				(entry) =>
-					(Math.abs(matchScreenW - entry.w) <= 50 && Math.abs(matchScreenH - entry.h) <= 50) ||
-					(Math.abs(viewportW - entry.w) <= 50 && Math.abs(viewportH - entry.h) <= 50)
+			// Check both screen dimensions AND viewport dimensions.
+			// Screen dims work for real monitors; viewport dims work for dev tools simulation.
+			const screenW = window.screen?.width;
+			const screenH = window.screen?.height;
+			const matchScreenW = screenW ?? viewportW;
+			const matchScreenH = screenH ?? viewportH;
+
+			const findNearMatch = (w: number, h: number) =>
+				SIXTEEN_BY_TEN_ZOOM_MAP.find(
+					(entry) =>
+						Math.abs(w - entry.w) <= SIXTEEN_BY_TEN_ZOOM_MATCH_TOLERANCE_PX &&
+						Math.abs(h - entry.h) <= SIXTEEN_BY_TEN_ZOOM_MATCH_TOLERANCE_PX
+				);
+
+			const interpolateZoom = (w: number, h: number) => {
+				const metric = Math.hypot(w, h);
+				if (!Number.isFinite(metric) || metric <= 0 || SIXTEEN_BY_TEN_ZOOM_POINTS.length === 0) {
+					return SIXTEEN_BY_TEN_FALLBACK_ZOOM;
+				}
+
+				const first = SIXTEEN_BY_TEN_ZOOM_POINTS[0];
+				const last = SIXTEEN_BY_TEN_ZOOM_POINTS[SIXTEEN_BY_TEN_ZOOM_POINTS.length - 1];
+				if (metric <= first.metric) return first.zoom;
+				if (metric >= last.metric) return last.zoom;
+
+				for (let i = 0; i < SIXTEEN_BY_TEN_ZOOM_POINTS.length - 1; i++) {
+					const a = SIXTEEN_BY_TEN_ZOOM_POINTS[i];
+					const b = SIXTEEN_BY_TEN_ZOOM_POINTS[i + 1];
+					if (metric < a.metric || metric > b.metric) continue;
+
+					const denom = b.metric - a.metric;
+					const t = denom > 0 ? (metric - a.metric) / denom : 0;
+					return a.zoom + (b.zoom - a.zoom) * t;
+				}
+
+				return SIXTEEN_BY_TEN_FALLBACK_ZOOM;
+			};
+
+			const distanceToMap = (w: number, h: number) => {
+				let best = Number.POSITIVE_INFINITY;
+				for (const entry of SIXTEEN_BY_TEN_ZOOM_POINTS) {
+					best = Math.min(best, Math.hypot(w - entry.w, h - entry.h));
+				}
+				return best;
+			};
+
+			// Prefer a tuned near-match when possible (screen first, then viewport).
+			const screenNearMatch = findNearMatch(matchScreenW, matchScreenH);
+			if (screenNearMatch) {
+				targetZoom = screenNearMatch.zoom;
+			} else {
+				const viewportNearMatch = findNearMatch(viewportW, viewportH);
+				if (viewportNearMatch) {
+					targetZoom = viewportNearMatch.zoom;
+				} else {
+					// Otherwise interpolate smoothly between the two nearest tuned points.
+					// Choose whichever dimensions are "closer" to our tuned resolution set.
+					const screenDistance = distanceToMap(matchScreenW, matchScreenH);
+					const viewportDistance = distanceToMap(viewportW, viewportH);
+					const useViewportDims = viewportDistance + 0.5 < screenDistance; // bias ties toward screen dims
+					const w = useViewportDims ? viewportW : matchScreenW;
+					const h = useViewportDims ? viewportH : matchScreenH;
+					targetZoom = interpolateZoom(w, h);
+				}
+			}
+		} else if (isSixteenByNineish) {
+			// 16:9 monitor handling
+			const screenW = window.screen?.width;
+			const screenH = window.screen?.height;
+			const matchScreenW = screenW ?? viewportW;
+			const matchScreenH = screenH ?? viewportH;
+
+			const findNearMatch = (w: number, h: number) =>
+				SIXTEEN_BY_NINE_ZOOM_MAP.find(
+					(entry) =>
+						Math.abs(w - entry.w) <= SIXTEEN_BY_TEN_ZOOM_MATCH_TOLERANCE_PX &&
+						Math.abs(h - entry.h) <= SIXTEEN_BY_TEN_ZOOM_MATCH_TOLERANCE_PX
+				);
+
+			const interpolateZoom = (w: number, h: number) => {
+				const metric = Math.hypot(w, h);
+				if (!Number.isFinite(metric) || metric <= 0 || SIXTEEN_BY_NINE_ZOOM_POINTS.length === 0) {
+					return SIXTEEN_BY_NINE_FALLBACK_ZOOM;
+				}
+
+				const first = SIXTEEN_BY_NINE_ZOOM_POINTS[0];
+				const last = SIXTEEN_BY_NINE_ZOOM_POINTS[SIXTEEN_BY_NINE_ZOOM_POINTS.length - 1];
+				if (metric <= first.metric) return first.zoom;
+				if (metric >= last.metric) return last.zoom;
+
+				for (let i = 0; i < SIXTEEN_BY_NINE_ZOOM_POINTS.length - 1; i++) {
+					const a = SIXTEEN_BY_NINE_ZOOM_POINTS[i];
+					const b = SIXTEEN_BY_NINE_ZOOM_POINTS[i + 1];
+					if (metric < a.metric || metric > b.metric) continue;
+
+					const denom = b.metric - a.metric;
+					const t = denom > 0 ? (metric - a.metric) / denom : 0;
+					return a.zoom + (b.zoom - a.zoom) * t;
+				}
+
+				return SIXTEEN_BY_NINE_FALLBACK_ZOOM;
+			};
+
+			const distanceToMap = (w: number, h: number) => {
+				let best = Number.POSITIVE_INFINITY;
+				for (const entry of SIXTEEN_BY_NINE_ZOOM_POINTS) {
+					best = Math.min(best, Math.hypot(w - entry.w, h - entry.h));
+				}
+				return best;
+			};
+
+			// Prefer a tuned near-match when possible (screen first, then viewport).
+			const screenNearMatch = findNearMatch(matchScreenW, matchScreenH);
+			if (screenNearMatch) {
+				targetZoom = screenNearMatch.zoom;
+			} else {
+				const viewportNearMatch = findNearMatch(viewportW, viewportH);
+				if (viewportNearMatch) {
+					targetZoom = viewportNearMatch.zoom;
+				} else {
+					// Otherwise interpolate smoothly between the two nearest tuned points.
+					const screenDistance = distanceToMap(matchScreenW, matchScreenH);
+					const viewportDistance = distanceToMap(viewportW, viewportH);
+					const useViewportDims = viewportDistance + 0.5 < screenDistance;
+					const w = useViewportDims ? viewportW : matchScreenW;
+					const h = useViewportDims ? viewportH : matchScreenH;
+					targetZoom = interpolateZoom(w, h);
+				}
+			}
+		}
+
+		// If the viewport height shrinks (e.g. Dock/taskbar visible), clamp zoom so the bottom panels
+		// remain fully visible. This is applied only when we'd otherwise clip content.
+		try {
+			const anchors = Array.from(
+				document.querySelectorAll<HTMLElement>('[data-campaign-bottom-anchor]')
 			);
-			targetZoom = match ? match.zoom : SIXTEEN_BY_TEN_FALLBACK_ZOOM;
+			if (anchors.length > 0) {
+				const computed = window.getComputedStyle(html);
+				const zoomStr = computed.zoom;
+				const parsedZoom = zoomStr ? parseFloat(zoomStr) : NaN;
+				const varZoomStr = computed.getPropertyValue(CAMPAIGN_ZOOM_VAR);
+				const parsedVarZoom = varZoomStr ? parseFloat(varZoomStr) : NaN;
+				const currentZoom =
+					Number.isFinite(parsedZoom) && parsedZoom > 0 && parsedZoom !== 1
+						? parsedZoom
+						: Number.isFinite(parsedVarZoom) && parsedVarZoom > 0
+							? parsedVarZoom
+							: DEFAULT_CAMPAIGN_ZOOM;
+
+				const maxBottomPx = anchors.reduce((acc, el) => {
+					const rect = el.getBoundingClientRect();
+					return Math.max(acc, rect.bottom);
+				}, 0);
+
+				// Reserve a small safety margin so we're not "flush" to the bottom edge.
+				const SAFE_BOTTOM_MARGIN_PX = 24;
+				const availableH = Math.max(0, viewportH - SAFE_BOTTOM_MARGIN_PX);
+				if (currentZoom > 0 && maxBottomPx > availableH) {
+					const unscaledBottomPx = maxBottomPx / currentZoom;
+					const maxZoomToFit = unscaledBottomPx > 0 ? availableH / unscaledBottomPx : NaN;
+					if (Number.isFinite(maxZoomToFit) && maxZoomToFit > 0) {
+						targetZoom = Math.min(targetZoom, maxZoomToFit);
+					}
+				}
+			}
+		} catch {
+			// no-op
 		}
 
 		const existingOverrideStr = html.style.getPropertyValue(CAMPAIGN_ZOOM_VAR);
@@ -168,12 +362,25 @@ const Murmur = () => {
 
 		const onResize = () => updateCampaignZoomForViewport();
 		updateCampaignZoomForViewport();
+		// Re-run once the drafting UI mounts so the bottom-panels clamp can measure real DOM.
+		// (DraftingSection is dynamically imported, so it may not exist on the first call.)
+		let mo: MutationObserver | null = null;
+		if (typeof MutationObserver !== 'undefined') {
+			mo = new MutationObserver(() => {
+				const hasAnchors = Boolean(document.querySelector('[data-campaign-bottom-anchor]'));
+				if (!hasAnchors) return;
+				requestAnimationFrame(() => updateCampaignZoomForViewport());
+				mo?.disconnect();
+			});
+			mo.observe(document.body, { childList: true, subtree: true });
+		}
 		window.addEventListener('resize', onResize, { passive: true });
 		window.visualViewport?.addEventListener('resize', onResize);
 
 		return () => {
 			document.documentElement.classList.remove(CAMPAIGN_COMPACT_CLASS);
 			document.documentElement.style.removeProperty(CAMPAIGN_ZOOM_VAR);
+			mo?.disconnect();
 			window.removeEventListener('resize', onResize);
 			window.visualViewport?.removeEventListener('resize', onResize);
 		};
