@@ -1405,6 +1405,136 @@ const DashboardContent = () => {
 	}, [router]);
 
 	const DASHBOARD_MAP_COMPACT_CLASS = 'murmur-dashboard-map-compact';
+	const DASHBOARD_COMPACT_CLASS = 'murmur-dashboard-compact';
+	const DASHBOARD_ZOOM_VAR = '--murmur-dashboard-zoom';
+	const DEFAULT_DASHBOARD_ZOOM = 0.85;
+	const MIN_DASHBOARD_ZOOM = 0.72;
+	const DASHBOARD_ZOOM_EVENT = 'murmur:dashboard-zoom-changed';
+
+	// Apply dashboard-only compact class + clear zoom var on mobile/unmount.
+	useEffect(() => {
+		if (isMobile === null) return;
+		if (isMobile) {
+			document.documentElement.classList.remove(DASHBOARD_COMPACT_CLASS);
+			document.documentElement.style.removeProperty(DASHBOARD_ZOOM_VAR);
+			return;
+		}
+
+		document.documentElement.classList.add(DASHBOARD_COMPACT_CLASS);
+		return () => {
+			document.documentElement.classList.remove(DASHBOARD_COMPACT_CLASS);
+			document.documentElement.style.removeProperty(DASHBOARD_ZOOM_VAR);
+		};
+	}, [isMobile]);
+
+	const updateDashboardZoomToFitViewport = useCallback(() => {
+		if (typeof window === 'undefined') return;
+
+		const html = document.documentElement;
+		const viewportH = window.visualViewport?.height ?? window.innerHeight;
+		const viewportW = window.visualViewport?.width ?? window.innerWidth;
+		const SAFETY_MARGIN_PX = 24;
+		const availableH = Math.max(0, viewportH - SAFETY_MARGIN_PX);
+		const availableW = Math.max(0, viewportW - SAFETY_MARGIN_PX);
+
+		// Prefer measuring the main dashboard container so the result reflects any internal transforms.
+		const root = dashboardContentRef.current;
+		if (!root) return;
+		const rect = root.getBoundingClientRect();
+		const contentBottom = Math.max(0, rect.bottom);
+		const contentRight = Math.max(0, rect.right);
+		if (contentBottom <= 0 || contentRight <= 0) return;
+
+		const zoomStr = window.getComputedStyle(html).zoom;
+		const parsedZoom = zoomStr ? parseFloat(zoomStr) : NaN;
+		const varZoomStr = window.getComputedStyle(html).getPropertyValue(DASHBOARD_ZOOM_VAR);
+		const parsedVarZoom = varZoomStr ? parseFloat(varZoomStr) : NaN;
+		const currentZoom =
+			Number.isFinite(parsedZoom) && parsedZoom > 0 && parsedZoom !== 1
+				? parsedZoom
+				: Number.isFinite(parsedVarZoom) && parsedVarZoom > 0
+					? parsedVarZoom
+					: DEFAULT_DASHBOARD_ZOOM;
+
+		const scaleH = contentBottom > 0 ? availableH / contentBottom : 1;
+		const scaleW = contentRight > 0 ? availableW / contentRight : 1;
+		const scale = Math.min(1, scaleH, scaleW);
+
+		const rawZoom = Math.max(
+			MIN_DASHBOARD_ZOOM,
+			Math.min(DEFAULT_DASHBOARD_ZOOM, currentZoom * scale)
+		);
+		const ZOOM_STEP = 0.01;
+		const snappedZoom = Math.max(
+			MIN_DASHBOARD_ZOOM,
+			Math.floor(rawZoom / ZOOM_STEP) * ZOOM_STEP
+		);
+
+		const existingOverride = parseFloat(html.style.getPropertyValue(DASHBOARD_ZOOM_VAR));
+		const existingZoom =
+			Number.isFinite(existingOverride) && existingOverride > 0
+				? existingOverride
+				: DEFAULT_DASHBOARD_ZOOM;
+		if (Math.abs(snappedZoom - existingZoom) < 0.004) return;
+
+		if (Math.abs(snappedZoom - DEFAULT_DASHBOARD_ZOOM) < 0.004) {
+			html.style.removeProperty(DASHBOARD_ZOOM_VAR);
+			try {
+				window.dispatchEvent(
+					new CustomEvent(DASHBOARD_ZOOM_EVENT, {
+						detail: { zoom: DEFAULT_DASHBOARD_ZOOM },
+					})
+				);
+			} catch {
+				// no-op
+			}
+			return;
+		}
+
+		html.style.setProperty(DASHBOARD_ZOOM_VAR, snappedZoom.toFixed(3));
+		try {
+			window.dispatchEvent(
+				new CustomEvent(DASHBOARD_ZOOM_EVENT, { detail: { zoom: snappedZoom } })
+			);
+		} catch {
+			// no-op
+		}
+	}, []);
+
+	// Update dashboard zoom on resize and on major layout toggles (map/search/tab).
+	useEffect(() => {
+		if (isMobile === null) return;
+		if (isMobile) return;
+		if (typeof window === 'undefined') return;
+
+		let raf: number | null = null;
+		const schedule = () => {
+			if (raf != null) cancelAnimationFrame(raf);
+			raf = requestAnimationFrame(() => {
+				raf = null;
+				updateDashboardZoomToFitViewport();
+			});
+		};
+
+		window.addEventListener('resize', schedule, { passive: true });
+		window.visualViewport?.addEventListener('resize', schedule);
+
+		// Observe root size changes (search results, tab switches, etc.)
+		const root = dashboardContentRef.current;
+		const ro = root ? new ResizeObserver(() => schedule()) : null;
+		if (root && ro) ro.observe(root);
+
+		schedule();
+		const t = window.setTimeout(schedule, 250);
+
+		return () => {
+			if (raf != null) cancelAnimationFrame(raf);
+			window.removeEventListener('resize', schedule);
+			window.visualViewport?.removeEventListener('resize', schedule);
+			window.clearTimeout(t);
+			ro?.disconnect();
+		};
+	}, [activeTab, hasSearched, isMapView, isMobile, updateDashboardZoomToFitViewport]);
 
 	// Make the fullscreen dashboard map view render slightly "zoomed out" on desktop (85%),
 	// mirroring the campaign page's extra-compact scaling.
