@@ -1409,6 +1409,8 @@ const DashboardContent = () => {
 	const DASHBOARD_ZOOM_VAR = '--murmur-dashboard-zoom';
 	const DEFAULT_DASHBOARD_ZOOM = 0.85;
 	const MIN_DASHBOARD_ZOOM = 0.72;
+	// 16:10-ish viewpoint: zoom IN by 110% vs the dashboard's normal baseline.
+	const DASHBOARD_SIXTEEN_BY_TEN_ZOOM_MULTIPLIER = 1.1;
 	const DASHBOARD_ZOOM_EVENT = 'murmur:dashboard-zoom-changed';
 
 	// Apply dashboard-only compact class + clear zoom var on mobile/unmount.
@@ -1433,6 +1435,21 @@ const DashboardContent = () => {
 		const html = document.documentElement;
 		const viewportH = window.visualViewport?.height ?? window.innerHeight;
 		const viewportW = window.visualViewport?.width ?? window.innerWidth;
+		const ratio = viewportW > 0 && viewportH > 0 ? viewportW / viewportH : 0;
+		// Robust 16:10-ish detection (mirrors the campaign page):
+		// - Use both viewport and screen ratios (browser chrome / window sizing changes viewport).
+		// - Include common 16:10-adjacent laptop ratios but exclude true 16:9 (1.777...).
+		const IDEAL_16X10 = 16 / 10; // 1.6
+		const viewportDelta = Math.abs(ratio - IDEAL_16X10);
+		const screenW = window.screen?.availWidth ?? window.screen?.width ?? viewportW;
+		const screenH = window.screen?.availHeight ?? window.screen?.height ?? viewportH;
+		const screenRatio = screenW > 0 && screenH > 0 ? screenW / screenH : ratio;
+		const screenDelta = Math.abs(screenRatio - IDEAL_16X10);
+		const isSixteenByTenish = viewportDelta <= 0.14 || screenDelta <= 0.14;
+		const maxDashboardZoom = isSixteenByTenish
+			? DEFAULT_DASHBOARD_ZOOM * DASHBOARD_SIXTEEN_BY_TEN_ZOOM_MULTIPLIER
+			: DEFAULT_DASHBOARD_ZOOM;
+
 		const SAFETY_MARGIN_PX = 24;
 		const availableH = Math.max(0, viewportH - SAFETY_MARGIN_PX);
 		const availableW = Math.max(0, viewportW - SAFETY_MARGIN_PX);
@@ -1458,11 +1475,15 @@ const DashboardContent = () => {
 
 		const scaleH = contentBottom > 0 ? availableH / contentBottom : 1;
 		const scaleW = contentRight > 0 ? availableW / contentRight : 1;
-		const scale = Math.min(1, scaleH, scaleW);
+		// Default behavior: never scale up (avoids "bounce in" when content changes).
+		// 16:10-ish behavior: allow scaling up to the 16:10 max zoom so the dashboard fills more
+		// of the viewport, while still fitting if space is tight.
+		const scaleToFit = Math.min(scaleH, scaleW);
+		const scale = isSixteenByTenish ? scaleToFit : Math.min(1, scaleToFit);
 
 		const rawZoom = Math.max(
 			MIN_DASHBOARD_ZOOM,
-			Math.min(DEFAULT_DASHBOARD_ZOOM, currentZoom * scale)
+			Math.min(maxDashboardZoom, currentZoom * scale)
 		);
 		const ZOOM_STEP = 0.01;
 		const snappedZoom = Math.max(
@@ -1477,7 +1498,9 @@ const DashboardContent = () => {
 				: DEFAULT_DASHBOARD_ZOOM;
 		if (Math.abs(snappedZoom - existingZoom) < 0.004) return;
 
-		if (Math.abs(snappedZoom - DEFAULT_DASHBOARD_ZOOM) < 0.004) {
+		// Only remove the override when we're at the *true* CSS default (non-16:10).
+		// On 16:10 we keep an explicit var so the CSS fallback doesn't revert to 0.85.
+		if (!isSixteenByTenish && Math.abs(snappedZoom - DEFAULT_DASHBOARD_ZOOM) < 0.004) {
 			html.style.removeProperty(DASHBOARD_ZOOM_VAR);
 			try {
 				window.dispatchEvent(
