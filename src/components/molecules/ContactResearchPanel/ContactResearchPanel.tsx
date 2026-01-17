@@ -270,7 +270,11 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 	return (
 		<div
 			className={cn(
-				'hidden xl:block relative bg-[#D8E5FB] border-[3px] border-black rounded-[7px]',
+				// NOTE: Do not gate visibility with Tailwind breakpoints here.
+				// The campaign app applies its own CSS zoom scaling, and the campaign page decides
+				// when/where to render this panel. Keeping this component visible by default avoids
+				// "it disappears at 1152px unless I browser-zoom" behavior.
+				'relative bg-[#D8E5FB] border-[3px] border-black rounded-[7px]',
 				className
 			)}
 			style={{

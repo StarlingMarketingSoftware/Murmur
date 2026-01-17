@@ -265,7 +265,7 @@ export default function InboxPage() {
           </div>
         </div>
       </div>
-      <div className="h-[660px] flex flex-col items-center justify-center">
+      <div className="flex flex-col items-center justify-center pt-14 pb-16 sm:pt-16 sm:pb-20 lg:py-0 lg:h-[660px]">
         <p className="font-inter font-normal text-[clamp(32px,9vw,62px)] text-black text-center leading-[1.05]">
           Try Murmur Now
         </p>

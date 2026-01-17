@@ -321,6 +321,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const [isInboxTabStacked, setIsInboxTabStacked] = useState(false);
 	useEffect(() => {
 		if (typeof window === 'undefined') return;
+		// Matches `DEFAULT_CAMPAIGN_ZOOM` in the campaign page.
+		// Important: when `--murmur-campaign-zoom` is NOT set, CSS still defaults to 0.85 via
+		// `zoom: var(--murmur-campaign-zoom, 0.85)` (and the transform fallback mirrors this).
+		const DEFAULT_CAMPAIGN_ZOOM = 0.85;
 		const CAMPAIGN_ZOOM_VAR = '--murmur-campaign-zoom';
 		const CAMPAIGN_ZOOM_EVENT = 'murmur:campaign-zoom-changed';
 		const checkBreakpoints = () => {
@@ -335,7 +339,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 					? parsedZoom
 					: Number.isFinite(parsedVarZoom) && parsedVarZoom > 0
 						? parsedVarZoom
-						: 1;
+						: DEFAULT_CAMPAIGN_ZOOM;
 			const effectiveWidth = window.innerWidth / (z || 1);
 
 			setIsNarrowDesktop(effectiveWidth >= 952 && effectiveWidth < 1280);
@@ -3161,13 +3165,17 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 						{/* Shared Research / Test Preview panel to the right of the drafting tables / writing view */}
 						{/* Hide when transitioning out from standard-position tabs to prevent double-fade */}
 						{!isMobile &&
+							// Use our *effective* width breakpoints (which account for campaign zoom),
+							// rather than Tailwind's `xl:` media query which ignores CSS zoom.
+							!isNarrowDesktop &&
+							!isNarrowestDesktop &&
 							['testing', 'contacts', 'drafting', 'sent', 'search', 'inbox'].includes(view) &&
 							!(view === 'search' && hasCampaignSearched) &&
 							!(view === 'search' && isSearchTabNarrow) &&
 							!(view === 'inbox' && isInboxTabStacked) &&
 							!(isTransitioningOut && ['testing', 'contacts', 'drafting', 'sent'].includes(view)) && (
 							<div
-								className="absolute hidden xl:block"
+								className="absolute"
 								data-research-panel-container
 								data-research-panel-variant={
 									view === 'search' ? 'search' : view === 'inbox' ? 'inbox' : 'standard'
@@ -3237,7 +3245,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 							!isSearchTabNarrow &&
 							searchResultsForPanel.length > 0 && (
 								<div
-									className="absolute hidden xl:block"
+									className="absolute"
 									style={{
 										top: '29px',
 										left: 'calc(50% + 384px + 32px)',
@@ -3996,7 +4004,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 
 								{/* Bottom Panels: Drafts, Sent, and Inbox - hidden at narrowest breakpoint */}
 								{!hideHeaderBox && (
-									<div className="mt-[35px] flex justify-center gap-[15px]">
+									<div
+										className="mt-[35px] flex justify-center gap-[15px]"
+										data-campaign-bottom-anchor
+									>
 										<DraftsExpandedList
 											drafts={draftEmails}
 											contacts={contacts || []}
@@ -4256,6 +4267,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														draftEmails.length === 0 ? 'mt-[91px]' : 'mt-[35px]',
 														'flex justify-center gap-[15px]'
 													)}
+													data-campaign-bottom-anchor
 												>
 													<ContactsExpandedList
 														contacts={contactsAvailableForDrafting}
@@ -4457,6 +4469,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													draftEmails.length === 0 ? 'mt-[91px]' : 'mt-[35px]',
 													'flex justify-center gap-[15px]'
 												)}
+												data-campaign-bottom-anchor
 											>
 												<ContactsExpandedList
 													contacts={contactsAvailableForDrafting}
@@ -4698,7 +4711,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											</button>
 										</div>
 										{/* Bottom Panels: Drafts, Sent, and Inbox - centered relative to 864px container */}
-										<div className="mt-[35px] flex justify-center gap-[15px]">
+										<div
+											className="mt-[35px] flex justify-center gap-[15px]"
+											data-campaign-bottom-anchor
+										>
 											<DraftsExpandedList
 												drafts={draftEmails}
 												contacts={contacts || []}
@@ -5002,7 +5018,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											</div>
 										</div>
 										{/* Bottom Panels: Contacts, Drafts, and Inbox - centered relative to container */}
-										<div className="mt-[91px] flex justify-center gap-[15px]">
+										<div
+											className="mt-[91px] flex justify-center gap-[15px]"
+											data-campaign-bottom-anchor
+										>
 											<ContactsExpandedList
 												contacts={contactsAvailableForDrafting}
 												width={232}
@@ -6414,7 +6433,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 
 										{/* Bottom Panels: Contacts, Drafts, and Sent - hidden at narrowest breakpoint (< 952px) */}
 										{!isNarrowestDesktop && (
-											<div className="mt-[112px] flex justify-center gap-[15px]">
+											<div
+												className="mt-[112px] flex justify-center gap-[15px]"
+												data-campaign-bottom-anchor
+											>
 												<ContactsExpandedList
 													contacts={contactsAvailableForDrafting}
 													width={232}
