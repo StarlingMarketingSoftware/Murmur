@@ -113,6 +113,8 @@ export const Navbar = () => {
 	const isLanding = pathname === urls.home.index;
 	const isMapPage = pathname === '/map' || pathname.startsWith('/map/');
 	const isPricingPage = pathname === urls.pricing.index || pathname.startsWith(`${urls.pricing.index}/`);
+	const isResourcesPage =
+		pathname === urls.resources.index || pathname.startsWith(`${urls.resources.index}/`);
 	const isResearchPage = pathname === '/research' || pathname.startsWith('/research/');
 	const isInboxPage = pathname === '/inbox' || pathname.startsWith('/inbox/');
 	const isDraftingPage = pathname === '/drafting' || pathname.startsWith('/drafting/');
@@ -159,6 +161,8 @@ export const Navbar = () => {
 									? 'landing-navbar-zoom-80'
 									: isPricingPage
 										? 'pricing-navbar-zoom-80'
+										: isResourcesPage
+											? 'resources-navbar-zoom-80'
 										: 'left-0 right-0',
 								// Keep a smooth fade-in when leaving the hero, but snap to transparent when re-entering it.
 								isTransparentHeader ? 'transition-none' : 'transition-colors duration-700',
