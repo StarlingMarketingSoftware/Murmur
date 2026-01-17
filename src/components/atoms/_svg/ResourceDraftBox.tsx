@@ -67,6 +67,7 @@ function ResourceDraftBox(props: Props) {
 				fill="#000"
 				mask={`url(#${maskB})`}
 			/>
+            
 			<defs>
 				<filter
 					id={filter0}
