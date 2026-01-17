@@ -79,15 +79,19 @@ const Murmur = () => {
 	const CAMPAIGN_COMPACT_CLASS = 'murmur-campaign-compact';
 	const CAMPAIGN_ZOOM_VAR = '--murmur-campaign-zoom';
 	const DEFAULT_CAMPAIGN_ZOOM = 0.85;
-	// 16:10 viewpoint: zoom IN by 110% (relative to whatever the current 16:10 baseline is),
-	// without affecting 16:9/other ratios.
-	const SIXTEEN_BY_TEN_ZOOM_MULTIPLIER = 1.1;
-	// Previous/smaller-laptop 16:10 baseline (used only for small 16:10-ish viewports).
-	const SIXTEEN_BY_TEN_BASE_CAMPAIGN_ZOOM_SMALL = 0.88;
 	const CAMPAIGN_ZOOM_EVENT = 'murmur:campaign-zoom-changed';
 
-	// Keep the original campaign zoom on normal 16:9-ish monitors (0.85),
-	// but apply a 16:10-only zoom-in so the UI fills more of the viewport.
+	// 16:10 resolution-specific zoom levels: [width, height] → zoom
+	const SIXTEEN_BY_TEN_ZOOM_MAP: Array<{ w: number; h: number; zoom: number }> = [
+		{ w: 1280, h: 800, zoom: 0.60 },
+		{ w: 1440, h: 900, zoom: 0.70 },
+		{ w: 1664, h: 1040, zoom: 0.77 },
+	];
+
+	// Fallback zoom for 16:10 resolutions not in the map
+	const SIXTEEN_BY_TEN_FALLBACK_ZOOM = 0.85;
+
+	// Resolution-aware zoom calculation for campaign page
 	const updateCampaignZoomForViewport = useCallback(() => {
 		if (typeof window === 'undefined') return;
 
@@ -97,10 +101,6 @@ const Murmur = () => {
 		if (viewportH <= 0 || viewportW <= 0) return;
 
 		const ratio = viewportW / viewportH;
-		// Robust 16:10-ish detection:
-		// - Use both viewport and screen ratios (windows can be resized / browser chrome changes viewport).
-		// - Keep a buffer wide enough to include common 16:10-adjacent laptops (e.g. MBP 14/16),
-		//   but still exclude true 16:9 (1.777...).
 		const IDEAL_16X10 = 16 / 10; // 1.6
 		const viewportDelta = Math.abs(ratio - IDEAL_16X10);
 		const screenW = window.screen?.availWidth ?? window.screen?.width ?? viewportW;
@@ -108,18 +108,24 @@ const Murmur = () => {
 		const screenRatio = screenW > 0 && screenH > 0 ? screenW / screenH : ratio;
 		const screenDelta = Math.abs(screenRatio - IDEAL_16X10);
 		const isSixteenByTenish = viewportDelta <= 0.14 || screenDelta <= 0.14;
-		// Preserve the existing "small 16:10 laptop" baseline so the requested +10% is truly
-		// +10% relative to what those users currently see.
-		const isSmallSixteenByTenViewport =
-			isSixteenByTenish && viewportH <= 1000 && viewportW <= 1700;
-		const baseZoomForSixteenByTen = isSmallSixteenByTenViewport
-			? SIXTEEN_BY_TEN_BASE_CAMPAIGN_ZOOM_SMALL
-			: DEFAULT_CAMPAIGN_ZOOM;
 
-		const targetZoom =
-			isSixteenByTenish
-				? baseZoomForSixteenByTen * SIXTEEN_BY_TEN_ZOOM_MULTIPLIER
-				: DEFAULT_CAMPAIGN_ZOOM;
+		let targetZoom = DEFAULT_CAMPAIGN_ZOOM;
+
+		if (isSixteenByTenish) {
+			// Check both screen dimensions AND viewport dimensions
+			// Screen dims work for real monitors; viewport dims work for dev tools simulation
+			const matchScreenW = window.screen?.width ?? viewportW;
+			const matchScreenH = window.screen?.height ?? viewportH;
+			
+			// Look for an exact or near-exact resolution match (within 50px tolerance)
+			// Try screen dimensions first, then fall back to viewport dimensions
+			const match = SIXTEEN_BY_TEN_ZOOM_MAP.find(
+				(entry) =>
+					(Math.abs(matchScreenW - entry.w) <= 50 && Math.abs(matchScreenH - entry.h) <= 50) ||
+					(Math.abs(viewportW - entry.w) <= 50 && Math.abs(viewportH - entry.h) <= 50)
+			);
+			targetZoom = match ? match.zoom : SIXTEEN_BY_TEN_FALLBACK_ZOOM;
+		}
 
 		const existingOverrideStr = html.style.getPropertyValue(CAMPAIGN_ZOOM_VAR);
 		const existingOverride = existingOverrideStr ? parseFloat(existingOverrideStr) : NaN;
@@ -143,11 +149,7 @@ const Murmur = () => {
 		} catch {
 			// no-op
 		}
-	}, [
-		DEFAULT_CAMPAIGN_ZOOM,
-		SIXTEEN_BY_TEN_BASE_CAMPAIGN_ZOOM_SMALL,
-		SIXTEEN_BY_TEN_ZOOM_MULTIPLIER,
-	]);
+	}, []);
 
 	// Make the campaign page render slightly "zoomed out" on desktop (85%),
 	// without changing the rest of the Murmur app.
