@@ -31,6 +31,7 @@ import { EmailStatus } from '@/constants/prismaEnums';
 import { useQueryClient } from '@tanstack/react-query';
 import { HoverDescriptionProvider } from '@/contexts/HoverDescriptionContext';
 import { CampaignTopSearchHighlightProvider } from '@/contexts/CampaignTopSearchHighlightContext';
+import { CampaignDeviceProvider } from '@/contexts/CampaignDeviceContext';
 
 type ViewType = 'contacts' | 'testing' | 'drafting' | 'sent' | 'inbox' | 'all';
 
@@ -357,9 +358,45 @@ const Murmur = () => {
 	const crossfadeContainerRef = useRef<HTMLDivElement>(null);
 	const headerBoxMoveCleanupRef = useRef<(() => void) | null>(null);
 	const contactsDraftsPillMoveCleanupRef = useRef<(() => void) | null>(null);
+
+	// Mobile never supports the Writing ("testing") or All tabs. Clamp immediately so we never mount
+	// HybridPromptInput on mobile (and never transition through it).
+	const MOBILE_ALLOWED_VIEWS: Array<'contacts' | 'drafting' | 'sent' | 'inbox'> = [
+		'contacts',
+		'drafting',
+		'sent',
+		'inbox',
+	];
+	useLayoutEffect(() => {
+		if (isMobile !== true) return;
+		if (MOBILE_ALLOWED_VIEWS.includes(activeView as (typeof MOBILE_ALLOWED_VIEWS)[number])) return;
+
+		// Cancel any in-flight transitions so we don't briefly show a previous (invalid) view.
+		if (transitionTimeoutRef.current) {
+			clearTimeout(transitionTimeoutRef.current);
+			transitionTimeoutRef.current = null;
+		}
+		if (maxWaitTimeoutRef.current) {
+			clearTimeout(maxWaitTimeoutRef.current);
+			maxWaitTimeoutRef.current = null;
+		}
+
+		setPreviousView(null);
+		setIsTransitioning(false);
+		setIsFadingOutPreviousView(false);
+		setActiveViewInternal('contacts');
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [isMobile, activeView]);
 	
 	// Wrapped setActiveView that handles transitions
 	const setActiveView = useCallback((newView: ViewType) => {
+		// Never allow unsupported views on mobile.
+		if (
+			isMobile === true &&
+			!MOBILE_ALLOWED_VIEWS.includes(newView as (typeof MOBILE_ALLOWED_VIEWS)[number])
+		) {
+			newView = 'contacts';
+		}
 		if (newView === activeView) return;
 		
 		// Clear any pending transition timers
@@ -382,7 +419,7 @@ const Murmur = () => {
 		maxWaitTimeoutRef.current = setTimeout(() => {
 			setIsFadingOutPreviousView(true);
 		}, MAX_TRANSITION_WAIT_MS);
-	}, [activeView]);
+	}, [activeView, isMobile, MOBILE_ALLOWED_VIEWS]);
 
 	const handleActiveViewReady = useCallback(
 		(readyView: DraftingSectionView) => {
@@ -903,11 +940,19 @@ const Murmur = () => {
 	}, [campaign, router]);
 
 	if (isPendingCampaign || !campaign) {
-		return silentLoad ? null : <CampaignPageSkeleton />;
+		return (
+			<CampaignDeviceProvider isMobile={isMobile} activeView={activeView}>
+				{silentLoad || isMobile === null ? null : <CampaignPageSkeleton />}
+			</CampaignDeviceProvider>
+		);
 	}
 
 	if (isMobile === null) {
-		return null;
+		return (
+			<CampaignDeviceProvider isMobile={isMobile} activeView={activeView}>
+				{null}
+			</CampaignDeviceProvider>
+		);
 	}
 	// Hide underlying content and show a white overlay when we require the user to set up an identity
 	// or while the full-screen User Settings dialog is open. This prevents any visual "glimpses" and
@@ -940,9 +985,10 @@ const Murmur = () => {
 		!isNarrowestDesktop;
 	const fixedNavArrowsTopPx = 355 + (shouldApplyWritingTopShift ? writingTabShiftPx : 0);
 	return (
-		<HoverDescriptionProvider enabled={selectedRightBoxIcon === 'info'}>
-			<CampaignTopSearchHighlightProvider value={topSearchHighlightCtx}>
-			<div className="min-h-screen relative">
+		<CampaignDeviceProvider isMobile={isMobile} activeView={activeView}>
+			<HoverDescriptionProvider enabled={selectedRightBoxIcon === 'info'}>
+				<CampaignTopSearchHighlightProvider value={topSearchHighlightCtx}>
+				<div className="min-h-screen relative">
 			{/* Left navigation arrow - absolute position (hidden in narrow desktop + testing) */}
 			{!hideFixedArrows && (
 				<button
@@ -2135,9 +2181,10 @@ const Murmur = () => {
 					</button>
 				</div>
 			)}
-			</div>
-			</CampaignTopSearchHighlightProvider>
-		</HoverDescriptionProvider>
+				</div>
+				</CampaignTopSearchHighlightProvider>
+			</HoverDescriptionProvider>
+		</CampaignDeviceProvider>
 	);
 };
 

@@ -2,12 +2,22 @@
 
 import { FC } from 'react';
 import { cn } from '@/utils';
+import { type CampaignViewType, useCampaignDevice } from '@/contexts/CampaignDeviceContext';
 
 /**
  * Skeleton loader for the campaign page that matches the exact dimensions
  * of the HybridPromptInput, ContactsExpandedList, and ContactResearchPanel components.
  */
 export const CampaignPageSkeleton: FC = () => {
+	const { isMobile, activeView } = useCampaignDevice();
+	// Mobile has no Writing tab — never show the HybridPromptInput skeleton there.
+	// Treat "unknown" as mobile-safe to avoid flashing the Write skeleton during hydration.
+	const shouldRenderMobileSkeleton = isMobile !== false;
+
+	if (shouldRenderMobileSkeleton) {
+		return <CampaignPageMobileSkeleton view={activeView} />;
+	}
+
 	return (
 		<div className="flex justify-center gap-[32px] pt-1">
 			{/* Left side: CampaignHeaderBox + ContactsExpandedList skeleton */}
@@ -24,6 +34,168 @@ export const CampaignPageSkeleton: FC = () => {
 			{/* Right side: ContactResearchPanel skeleton */}
 			<div className="hidden xl:block pt-[29px]">
 				<ContactResearchPanelSkeleton />
+			</div>
+		</div>
+	);
+};
+
+/**
+ * Mobile campaign loading skeleton.
+ * Mobile does not expose the Writing tab, so we show a neutral "list box" placeholder
+ * that fits the mobile tabbed layout (Contacts/Drafts/Sent/Inbox).
+ */
+const CampaignPageMobileSkeleton: FC<{ view: CampaignViewType | null }> = ({ view }) => {
+	// If the user is landing directly on Inbox, match the inbox skeleton 1:1.
+	if (view === 'inbox') {
+		return <CampaignPageMobileInboxSkeleton activeTab="inbox" />;
+	}
+
+	// Fallback: a neutral list-style skeleton for other mobile views.
+	return <CampaignPageMobileListSkeleton />;
+};
+
+const CampaignPageMobileInboxSkeleton: FC<{ activeTab: 'inbox' | 'sent' }> = ({
+	activeTab,
+}) => {
+	const skeletonRowCount = 5;
+	const mobileBoxWidth = 'calc(100vw - 8px)'; // 4px margins on each side
+	const mobileSearchBarWidth = 'calc(100% - 124px)'; // matches InboxSection mobile sizing
+	const mobileEmailRowWidth = '100%';
+
+	return (
+		<div className="w-full flex justify-center px-1">
+			<div
+				data-campaign-main-box="inbox"
+				className="mt-6 flex flex-col items-center space-y-2 overflow-y-auto overflow-x-hidden relative animate-pulse"
+				style={{
+					width: mobileBoxWidth,
+					height: 'calc(100dvh - 160px)',
+					border: '3px solid #000000',
+					borderRadius: '8px',
+					padding: '8px',
+					paddingTop: '62px',
+					background: activeTab === 'sent' ? '#5AB477' : '#6fa4e1',
+				}}
+				role="status"
+				aria-busy="true"
+				aria-label="Loading emails"
+			>
+				<span className="sr-only">Loading emails…</span>
+
+				{/* Search bar skeleton (matches InboxSection mobile) */}
+				<div
+					style={{
+						position: 'absolute',
+						top: '12px',
+						left: '8px',
+						width: mobileSearchBarWidth,
+						height: '42px',
+						border: '3px solid #000000',
+						borderRadius: '8px',
+						backgroundColor: '#FFFFFF',
+						zIndex: 10,
+						display: 'flex',
+						alignItems: 'center',
+						paddingLeft: '12px',
+						gap: '10px',
+						pointerEvents: 'none',
+					}}
+					aria-hidden
+				>
+					<div className="h-[14px] w-[14px] rounded bg-[#D9D9D9]" />
+					<div className="h-[14px] flex-1 rounded bg-[#E5E5E5]" />
+				</div>
+
+				{/* Inbox/Sent toggle skeleton (matches InboxSection mobile) */}
+				<div
+					style={{
+						position: 'absolute',
+						top: '12.5px',
+						right: '8px',
+						width: '100px',
+						height: '40px',
+						border: '3px solid #000000',
+						borderRadius: '8px',
+						backgroundColor: '#FFFFFF',
+						zIndex: 10,
+						display: 'flex',
+						alignItems: 'center',
+						padding: '3px',
+						gap: '2px',
+						pointerEvents: 'none',
+					}}
+					aria-hidden
+				>
+					<div
+						className="rounded-[8px] bg-[#E5E5E5]"
+						style={{ width: '46px', height: '16px' }}
+					/>
+					<div
+						className="rounded-[8px] bg-[#E5E5E5]"
+						style={{ width: '46px', height: '16px' }}
+					/>
+				</div>
+
+				{/* Email rows skeleton (matches InboxSection mobile) */}
+				{Array.from({ length: skeletonRowCount }).map((_, idx) => (
+					<div
+						key={`campaign-inbox-loading-${idx}`}
+						className="bg-white px-4 flex items-center w-full max-[480px]:px-2"
+						style={{
+							width: mobileEmailRowWidth,
+							height: '100px',
+							minHeight: '100px',
+							border: '3px solid #000000',
+							borderRadius: '8px',
+							backgroundColor: '#FFFFFF',
+						}}
+					>
+						<div className="flex flex-col w-full">
+							<div className="flex items-center justify-between gap-3">
+								<div className="h-[14px] rounded bg-[#D9D9D9]" style={{ width: '55%' }} />
+								<div className="h-[14px] rounded bg-[#D9D9D9]" style={{ width: '60px' }} />
+							</div>
+							<div className="mt-2 h-[12px] rounded bg-[#E5E5E5]" style={{ width: '85%' }} />
+							<div className="mt-2 h-[10px] rounded bg-[#E5E5E5]" style={{ width: '70%' }} />
+						</div>
+					</div>
+				))}
+			</div>
+		</div>
+	);
+};
+
+const CampaignPageMobileListSkeleton: FC = () => {
+	return (
+		<div className="w-full flex justify-center px-1">
+			<div
+				className={cn(
+					'mt-6',
+					'rounded-[8px] border-[3px] border-black',
+					'flex flex-col overflow-hidden',
+					'animate-pulse'
+				)}
+				style={{
+					width: 'calc(100vw - 8px)',
+					height: 'calc(100dvh - 160px)',
+					backgroundColor: '#E8EFFF',
+				}}
+			>
+				{/* Top controls */}
+				<div className="w-full h-[62px] px-2 py-2">
+					<div className="w-full h-[42px] bg-white border-[3px] border-black rounded-[8px]" />
+				</div>
+
+				{/* Rows */}
+				<div className="flex-1 flex flex-col items-center px-2 space-y-2">
+					{Array.from({ length: 5 }).map((_, i) => (
+						<div
+							key={`campaign-mobile-row-${i}`}
+							className="w-full bg-white border-[3px] border-black rounded-[8px]"
+							style={{ height: '100px' }}
+						/>
+					))}
+				</div>
 			</div>
 		</div>
 	);
