@@ -267,6 +267,7 @@ export const CampaignRightPanel: FC<CampaignRightPanelProps> = ({
 	return (
 		<div
 			ref={containerRef}
+			data-slot="campaign-right-panel"
 			className={cn(
 				'absolute top-[50px]',
 				'pointer-events-none',

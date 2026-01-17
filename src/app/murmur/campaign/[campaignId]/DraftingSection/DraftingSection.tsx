@@ -321,18 +321,37 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const [isInboxTabStacked, setIsInboxTabStacked] = useState(false);
 	useEffect(() => {
 		if (typeof window === 'undefined') return;
+		const CAMPAIGN_ZOOM_VAR = '--murmur-campaign-zoom';
+		const CAMPAIGN_ZOOM_EVENT = 'murmur:campaign-zoom-changed';
 		const checkBreakpoints = () => {
-			const width = window.innerWidth;
-			setIsNarrowDesktop(width >= 952 && width < 1280);
-			setIsNarrowestDesktop(width < 952);
-			setIsSearchTabNarrow(width < 1414);
-			setIsAllTabNarrow(width <= 1269);
-			setIsInboxTabNarrow(width <= 1520);
-			setIsInboxTabStacked(width <= 1279);
+			const html = document.documentElement;
+			const zoomStr = window.getComputedStyle(html).zoom;
+			const parsedZoom = zoomStr ? parseFloat(zoomStr) : NaN;
+			const varZoomStr = window.getComputedStyle(html).getPropertyValue(CAMPAIGN_ZOOM_VAR);
+			const parsedVarZoom = varZoomStr ? parseFloat(varZoomStr) : NaN;
+			// Prefer actual zoom() when supported; otherwise fall back to the campaign zoom var.
+			const z =
+				Number.isFinite(parsedZoom) && parsedZoom > 0 && parsedZoom !== 1
+					? parsedZoom
+					: Number.isFinite(parsedVarZoom) && parsedVarZoom > 0
+						? parsedVarZoom
+						: 1;
+			const effectiveWidth = window.innerWidth / (z || 1);
+
+			setIsNarrowDesktop(effectiveWidth >= 952 && effectiveWidth < 1280);
+			setIsNarrowestDesktop(effectiveWidth < 952);
+			setIsSearchTabNarrow(effectiveWidth < 1414);
+			setIsAllTabNarrow(effectiveWidth <= 1269);
+			setIsInboxTabNarrow(effectiveWidth <= 1520);
+			setIsInboxTabStacked(effectiveWidth <= 1279);
 		};
 		checkBreakpoints();
 		window.addEventListener('resize', checkBreakpoints);
-		return () => window.removeEventListener('resize', checkBreakpoints);
+		window.addEventListener(CAMPAIGN_ZOOM_EVENT, checkBreakpoints as EventListener);
+		return () => {
+			window.removeEventListener('resize', checkBreakpoints);
+			window.removeEventListener(CAMPAIGN_ZOOM_EVENT, checkBreakpoints as EventListener);
+		};
 	}, []);
 
 	// --- Pinned left panel (ContactsExpandedList <-> MiniEmailStructure) ---
