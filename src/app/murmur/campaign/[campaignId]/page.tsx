@@ -78,8 +78,75 @@ const Murmur = () => {
 	const CAMPAIGN_COMPACT_CLASS = 'murmur-campaign-compact';
 	const CAMPAIGN_ZOOM_VAR = '--murmur-campaign-zoom';
 	const DEFAULT_CAMPAIGN_ZOOM = 0.85;
-	const MIN_CAMPAIGN_ZOOM = 0.68;
+	// 16:10 viewpoint: zoom IN by 110% (relative to whatever the current 16:10 baseline is),
+	// without affecting 16:9/other ratios.
+	const SIXTEEN_BY_TEN_ZOOM_MULTIPLIER = 1.1;
+	// Previous/smaller-laptop 16:10 baseline (used only for small 16:10-ish viewports).
+	const SIXTEEN_BY_TEN_BASE_CAMPAIGN_ZOOM_SMALL = 0.88;
 	const CAMPAIGN_ZOOM_EVENT = 'murmur:campaign-zoom-changed';
+
+	// Keep the original campaign zoom on normal 16:9-ish monitors (0.85),
+	// but apply a 16:10-only zoom-in so the UI fills more of the viewport.
+	const updateCampaignZoomForViewport = useCallback(() => {
+		if (typeof window === 'undefined') return;
+
+		const html = document.documentElement;
+		const viewportH = window.visualViewport?.height ?? window.innerHeight;
+		const viewportW = window.visualViewport?.width ?? window.innerWidth;
+		if (viewportH <= 0 || viewportW <= 0) return;
+
+		const ratio = viewportW / viewportH;
+		// Robust 16:10-ish detection:
+		// - Use both viewport and screen ratios (windows can be resized / browser chrome changes viewport).
+		// - Keep a buffer wide enough to include common 16:10-adjacent laptops (e.g. MBP 14/16),
+		//   but still exclude true 16:9 (1.777...).
+		const IDEAL_16X10 = 16 / 10; // 1.6
+		const viewportDelta = Math.abs(ratio - IDEAL_16X10);
+		const screenW = window.screen?.availWidth ?? window.screen?.width ?? viewportW;
+		const screenH = window.screen?.availHeight ?? window.screen?.height ?? viewportH;
+		const screenRatio = screenW > 0 && screenH > 0 ? screenW / screenH : ratio;
+		const screenDelta = Math.abs(screenRatio - IDEAL_16X10);
+		const isSixteenByTenish = viewportDelta <= 0.14 || screenDelta <= 0.14;
+		// Preserve the existing "small 16:10 laptop" baseline so the requested +10% is truly
+		// +10% relative to what those users currently see.
+		const isSmallSixteenByTenViewport =
+			isSixteenByTenish && viewportH <= 1000 && viewportW <= 1700;
+		const baseZoomForSixteenByTen = isSmallSixteenByTenViewport
+			? SIXTEEN_BY_TEN_BASE_CAMPAIGN_ZOOM_SMALL
+			: DEFAULT_CAMPAIGN_ZOOM;
+
+		const targetZoom =
+			isSixteenByTenish
+				? baseZoomForSixteenByTen * SIXTEEN_BY_TEN_ZOOM_MULTIPLIER
+				: DEFAULT_CAMPAIGN_ZOOM;
+
+		const existingOverrideStr = html.style.getPropertyValue(CAMPAIGN_ZOOM_VAR);
+		const existingOverride = existingOverrideStr ? parseFloat(existingOverrideStr) : NaN;
+		const existingZoom =
+			Number.isFinite(existingOverride) && existingOverride > 0
+				? existingOverride
+				: DEFAULT_CAMPAIGN_ZOOM;
+
+		if (Math.abs(existingZoom - targetZoom) < 0.002) return;
+
+		if (Math.abs(targetZoom - DEFAULT_CAMPAIGN_ZOOM) < 0.002) {
+			html.style.removeProperty(CAMPAIGN_ZOOM_VAR);
+		} else {
+			html.style.setProperty(CAMPAIGN_ZOOM_VAR, targetZoom.toFixed(3));
+		}
+
+		try {
+			window.dispatchEvent(
+				new CustomEvent(CAMPAIGN_ZOOM_EVENT, { detail: { zoom: targetZoom } })
+			);
+		} catch {
+			// no-op
+		}
+	}, [
+		DEFAULT_CAMPAIGN_ZOOM,
+		SIXTEEN_BY_TEN_BASE_CAMPAIGN_ZOOM_SMALL,
+		SIXTEEN_BY_TEN_ZOOM_MULTIPLIER,
+	]);
 
 	// Make the campaign page render slightly "zoomed out" on desktop (85%),
 	// without changing the rest of the Murmur app.
@@ -95,142 +162,19 @@ const Murmur = () => {
 		}
 
 		document.documentElement.classList.add(CAMPAIGN_COMPACT_CLASS);
-		return () => {
-			document.documentElement.classList.remove(CAMPAIGN_COMPACT_CLASS);
-			document.documentElement.style.removeProperty(CAMPAIGN_ZOOM_VAR);
-		};
-	}, [isMobile]);
 
-	// Fit-to-viewport zoom for desktop: compute an exact zoom so the full campaign UI fits
-	// on shorter screens (e.g. 16:10 MacBook) without relying on aspect-ratio detection.
-	const updateCampaignZoomToFitViewport = useCallback(() => {
-		if (typeof window === 'undefined') return;
-
-		const html = document.documentElement;
-		const body = document.body;
-		const doc = document.documentElement;
-
-		const viewportH = window.visualViewport?.height ?? window.innerHeight;
-		const viewportW = window.visualViewport?.width ?? window.innerWidth;
-		const SAFETY_MARGIN_PX = 24; // keep a bit of breathing room so edge-positioned UI never clips
-		const availableH = Math.max(0, viewportH - SAFETY_MARGIN_PX);
-		const availableW = Math.max(0, viewportW - SAFETY_MARGIN_PX);
-
-		let contentH = Math.max(
-			doc.scrollHeight,
-			body.scrollHeight,
-			doc.offsetHeight,
-			body.offsetHeight
-		);
-		let contentW = Math.max(
-			doc.scrollWidth,
-			body.scrollWidth,
-			doc.offsetWidth,
-			body.offsetWidth
-		);
-		if (contentH <= 0 || contentW <= 0) return;
-
-		const zoomStr = window.getComputedStyle(html).zoom;
-		const parsedZoom = zoomStr ? parseFloat(zoomStr) : NaN;
-		const varZoomStr = window.getComputedStyle(html).getPropertyValue(CAMPAIGN_ZOOM_VAR);
-		const parsedVarZoom = varZoomStr ? parseFloat(varZoomStr) : NaN;
-		const currentZoom =
-			Number.isFinite(parsedZoom) && parsedZoom > 0 && parsedZoom !== 1
-				? parsedZoom
-				: Number.isFinite(parsedVarZoom) && parsedVarZoom > 0
-					? parsedVarZoom
-					: DEFAULT_CAMPAIGN_ZOOM;
-
-		// Include the right SVG panel in the fit measurement; it is positioned absolutely and can
-		// fall outside document scrollWidth depending on overflow and layout.
-		const rightPanelEl = document.querySelector(
-			'[data-slot="campaign-right-panel"]'
-		) as HTMLElement | null;
-		if (rightPanelEl) {
-			const rect = rightPanelEl.getBoundingClientRect();
-			// Use viewport-relative edges (scrollX/scrollY are effectively 0 here, but keep it correct).
-			contentW = Math.max(contentW, rect.right + window.scrollX);
-			contentH = Math.max(contentH, rect.bottom + window.scrollY);
-		}
-
-		const scaleH = contentH > 0 ? availableH / contentH : 1;
-		const scaleW = contentW > 0 ? availableW / contentW : 1;
-		const scale = Math.min(1, scaleH, scaleW);
-
-		const rawZoom = Math.max(
-			MIN_CAMPAIGN_ZOOM,
-			Math.min(DEFAULT_CAMPAIGN_ZOOM, currentZoom * scale)
-		);
-		// Snap down by one “notch” (1%) so edge-aligned UI doesn’t end up 1–2px clipped.
-		const ZOOM_STEP = 0.01;
-		const snappedZoom = Math.max(
-			MIN_CAMPAIGN_ZOOM,
-			Math.floor(rawZoom / ZOOM_STEP) * ZOOM_STEP
-		);
-
-		const existingOverride = parseFloat(html.style.getPropertyValue(CAMPAIGN_ZOOM_VAR));
-		const existingZoom =
-			Number.isFinite(existingOverride) && existingOverride > 0
-				? existingOverride
-				: DEFAULT_CAMPAIGN_ZOOM;
-
-		// Avoid thrashing tiny float differences.
-		if (Math.abs(snappedZoom - existingZoom) < 0.004) return;
-
-		// If we're essentially at the default zoom, clear the override to reduce cascade surprises.
-		if (Math.abs(snappedZoom - DEFAULT_CAMPAIGN_ZOOM) < 0.004) {
-			html.style.removeProperty(CAMPAIGN_ZOOM_VAR);
-			try {
-				window.dispatchEvent(
-					new CustomEvent(CAMPAIGN_ZOOM_EVENT, { detail: { zoom: DEFAULT_CAMPAIGN_ZOOM } })
-				);
-			} catch {
-				// no-op
-			}
-			return;
-		}
-
-		html.style.setProperty(CAMPAIGN_ZOOM_VAR, snappedZoom.toFixed(3));
-		try {
-			window.dispatchEvent(
-				new CustomEvent(CAMPAIGN_ZOOM_EVENT, { detail: { zoom: snappedZoom } })
-			);
-		} catch {
-			// no-op
-		}
-	}, []);
-
-	useEffect(() => {
-		if (isMobile === null) return;
-		if (isMobile) return;
-		if (typeof window === 'undefined') return;
-
-		let raf: number | null = null;
-		const schedule = () => {
-			if (raf != null) {
-				cancelAnimationFrame(raf);
-			}
-			raf = requestAnimationFrame(() => {
-				raf = null;
-				updateCampaignZoomToFitViewport();
-			});
-		};
-
-		const onResize = () => schedule();
+		const onResize = () => updateCampaignZoomForViewport();
+		updateCampaignZoomForViewport();
 		window.addEventListener('resize', onResize, { passive: true });
 		window.visualViewport?.addEventListener('resize', onResize);
 
-		// Initial + post-layout pass (covers async fonts/data/layout)
-		schedule();
-		const t = window.setTimeout(schedule, 250);
-
 		return () => {
-			if (raf != null) cancelAnimationFrame(raf);
+			document.documentElement.classList.remove(CAMPAIGN_COMPACT_CLASS);
+			document.documentElement.style.removeProperty(CAMPAIGN_ZOOM_VAR);
 			window.removeEventListener('resize', onResize);
 			window.visualViewport?.removeEventListener('resize', onResize);
-			window.clearTimeout(t);
 		};
-	}, [isMobile, updateCampaignZoomToFitViewport]);
+	}, [isMobile, updateCampaignZoomForViewport]);
 
 	const searchParams = useSearchParams();
 	const silentLoad = searchParams.get('silent') === '1';
@@ -457,17 +401,7 @@ const Murmur = () => {
 		[activeView, isFadingOutPreviousView, isTransitioning, previousView]
 	);
 
-	// Re-fit zoom after tab transitions complete (prevents “cut off” on shorter screens).
-	useEffect(() => {
-		if (isMobile === null) return;
-		if (isMobile) return;
-		if (isTransitioning) return;
-		if (typeof window === 'undefined') return;
-
-		// Wait a frame so the new view has fully committed layout after the crossfade.
-		const raf = requestAnimationFrame(() => updateCampaignZoomToFitViewport());
-		return () => cancelAnimationFrame(raf);
-	}, [campaign?.id, isMobile, isTransitioning, updateCampaignZoomToFitViewport]);
+	// Zoom is viewport-driven; no need to recompute per tab transition (keeps 16:9 looking unchanged).
 
 	// Once the fade-out has started, end the transition after the animation duration.
 	useEffect(() => {
