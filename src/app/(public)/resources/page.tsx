@@ -325,11 +325,11 @@ const Resources = () => {
 						<div className="absolute top-[77px] left-1/2 -translate-x-1/2 w-[732px] h-[290px] rounded-[6px] border-[2px] border-[#000000] bg-[#E9F9FF] flex items-center justify-center">
 							<SearchStep />
 						</div>
-						<div className="absolute top-[413px] left-1/2 -translate-x-1/2 w-[774px] h-[186px] rounded-[6px] border-[2px] border-[#000000] bg-[#FFFFFF] px-[20px] pt-[16px] pb-[24px] flex flex-col gap-[32px]">
-							<p className="font-[var(--font-inter)] text-[22.5px] font-medium leading-snug">
+						<div className="absolute top-[413px] left-1/2 -translate-x-1/2 w-[774px] h-[186px] rounded-[6px] border-[2px] border-[#000000] bg-[#FFFFFF] px-[16px] sm:px-[20px] pt-[12px] sm:pt-[16px] pb-[16px] sm:pb-[24px] flex flex-col gap-[18px] sm:gap-[32px]">
+							<p className="font-[var(--font-inter)] text-[20px] lg:text-[22.5px] font-medium leading-tight lg:leading-snug">
 								Start by doing a search for the type of venue and location you're looking to book.
 							</p>
-							<p className="font-[var(--font-inter)] text-[22.5px] font-medium leading-snug">
+							<p className="font-[var(--font-inter)] text-[20px] lg:text-[22.5px] font-medium leading-tight lg:leading-snug">
 								There are two "why" options, and "promotion" will help you more so with radio stations.
 							</p>
 						</div>
@@ -354,8 +354,8 @@ const Resources = () => {
 						<div className="absolute top-[420px] left-1/2 -translate-x-1/2 w-[732px] h-[288px] rounded-[6px] border-[2px] border-[#000000] bg-[#FFE0E0] overflow-hidden">
 							<SelectedContactsResource className="w-full h-full block" />
 						</div>
-						<div className="absolute top-[734px] left-1/2 -translate-x-1/2 w-[774px] h-[186px] rounded-[6px] border-[2px] border-[#000000] bg-[#FFFFFF] px-[20px] pt-[30px] pb-[24px]">
-							<p className="font-[var(--font-inter)] text-[22.5px] font-medium leading-snug">
+						<div className="absolute top-[734px] left-1/2 -translate-x-1/2 w-[774px] h-[186px] rounded-[6px] border-[2px] border-[#000000] bg-[#FFFFFF] px-[16px] sm:px-[20px] pt-[18px] sm:pt-[30px] pb-[16px] sm:pb-[24px]">
+							<p className="font-[var(--font-inter)] text-[20px] lg:text-[22.5px] font-medium leading-tight lg:leading-snug">
 								You can select contacts by either clicking on them on the map or by clicking them in the right side panel in the map. The selection is for what contacts you're looking to actually reach out to.
 							</p>
 						</div>
@@ -377,8 +377,8 @@ const Resources = () => {
 						<div className="absolute top-[77px] left-1/2 -translate-x-1/2">
 							<CreateCampaign />
 						</div>
-						<div className="absolute top-[398px] left-1/2 -translate-x-1/2 w-[774px] h-[186px] rounded-[6px] border-[2px] border-[#000000] bg-[#FFFFFF] px-[20px] pt-[30px] pb-[24px]">
-							<p className="font-[var(--font-inter)] text-[22.5px] font-medium leading-snug">
+						<div className="absolute top-[398px] left-1/2 -translate-x-1/2 w-[774px] h-[186px] rounded-[6px] border-[2px] border-[#000000] bg-[#FFFFFF] px-[16px] sm:px-[20px] pt-[18px] sm:pt-[30px] pb-[16px] sm:pb-[24px]">
+							<p className="font-[var(--font-inter)] text-[20px] lg:text-[22.5px] font-medium leading-tight lg:leading-snug">
 								You'll see a button at the bottom of the map, and when you click it, all of your selected contacts are brought into your campaign.
 							</p>
 						</div>
@@ -400,8 +400,8 @@ const Resources = () => {
 						<div className="absolute top-[77px] left-1/2 -translate-x-1/2 w-[732px] h-[500px] rounded-[6px] border-[2px] border-[#000000] bg-[#ACCCE6] flex items-center justify-center">
 							<ResourcePageProfile />
 						</div>
-						<div className="absolute top-[639px] left-1/2 -translate-x-1/2 w-[774px] h-[186px] rounded-[6px] border-[2px] border-[#000000] bg-[#FFFFFF] px-[20px] pt-[30px] pb-[24px]">
-							<p className="font-[var(--font-inter)] text-[22.5px] font-medium leading-snug">
+						<div className="absolute top-[639px] left-1/2 -translate-x-1/2 w-[774px] h-[186px] rounded-[6px] border-[2px] border-[#000000] bg-[#FFFFFF] px-[16px] sm:px-[20px] pt-[18px] sm:pt-[30px] pb-[16px] sm:pb-[24px]">
+							<p className="font-[var(--font-inter)] text-[20px] lg:text-[22.5px] font-medium leading-tight lg:leading-snug">
 								You'll see a button at the bottom of the map, and when you click it, all of your selected contacts are brought into your campaign.
 							</p>
 						</div>
@@ -423,8 +423,8 @@ const Resources = () => {
 						<div className="absolute top-[77px] left-1/2 -translate-x-1/2 w-[727px] h-[288px] rounded-[6px] border-[2px] border-[#000000] bg-[#D0FAD2] overflow-hidden flex items-center justify-center">
 							<FineTuneResource />
 						</div>
-						<div className="absolute top-[413px] left-1/2 -translate-x-1/2 w-[774px] h-[186px] rounded-[6px] border-[2px] border-[#000000] bg-white px-[20px] pt-[16px] pb-[24px]">
-							<p className="font-[var(--font-inter)] text-[22.5px] font-medium leading-snug">
+						<div className="absolute top-[413px] left-1/2 -translate-x-1/2 w-[774px] h-[186px] rounded-[6px] border-[2px] border-[#000000] bg-white px-[16px] sm:px-[20px] pt-[12px] sm:pt-[16px] pb-[16px] sm:pb-[24px]">
+							<p className="font-[var(--font-inter)] text-[20px] lg:text-[22.5px] font-medium leading-tight lg:leading-snug">
 								Now you can switch back to one of the three drafting modes, though we would likely recommend "Auto" to start, as it's trained on all of the venue data. You can then set a calendar date range, and even add in custom instructions.
 							</p>
 						</div>
@@ -446,8 +446,8 @@ const Resources = () => {
 						<div className="absolute top-[77px] left-1/2 -translate-x-1/2 w-[732px] h-[606px] rounded-[6px] border-[2px] border-[#000000] bg-[#FFF1D9] flex items-center justify-center">
 							<ResourceTestDraft />
 						</div>
-						<div className="absolute top-[725px] left-1/2 -translate-x-1/2 w-[774px] h-[124px] rounded-[6px] border-[2px] border-[#000000] bg-[#FFFFFF] px-[20px] pt-[16px] pb-[24px]">
-							<p className="font-[var(--font-inter)] text-[22.5px] font-medium leading-snug">
+						<div className="absolute top-[725px] left-1/2 -translate-x-1/2 w-[774px] h-[124px] rounded-[6px] border-[2px] border-[#000000] bg-[#FFFFFF] px-[16px] sm:px-[20px] pt-[10px] sm:pt-[16px] pb-[12px] sm:pb-[24px]">
+							<p className="font-[var(--font-inter)] text-[20px] lg:text-[22.5px] font-medium leading-tight lg:leading-snug">
 								Try doing a test draft, and if you don't feel that the first try got it right, try modifying information you're putting it to get a better results
 							</p>
 						</div>
@@ -469,8 +469,8 @@ const Resources = () => {
 						<div className="absolute top-[79px] left-1/2 -translate-x-1/2 w-[732px] h-[288px] rounded-[6px] border-[2px] border-[#000000] bg-[#FFF1D9]">
 							<ResourceDraftBox className="absolute left-1/2 -translate-x-1/2 top-0" />
 						</div>
-						<div className="absolute top-[413px] left-1/2 -translate-x-1/2 w-[774px] h-[186px] rounded-[6px] border-[2px] border-[#000000] bg-[#FFFFFF] px-[20px] pt-[16px] pb-[24px]">
-							<p className="font-[var(--font-inter)] text-[22.5px] font-medium leading-snug">
+						<div className="absolute top-[413px] left-1/2 -translate-x-1/2 w-[774px] h-[186px] rounded-[6px] border-[2px] border-[#000000] bg-[#FFFFFF] px-[16px] sm:px-[20px] pt-[12px] sm:pt-[16px] pb-[16px] sm:pb-[24px]">
+							<p className="font-[var(--font-inter)] text-[20px] lg:text-[22.5px] font-medium leading-tight lg:leading-snug">
 								In order to draft, contacts must be selected. If you're on the "write" tab, you'll see your campaign contacts in this table, you can click on them in order to select them, after which you can then click the "Draft" button at the bottom and it will meticulously compose drafts for that set of contacts
 							</p>
 						</div>
@@ -492,8 +492,8 @@ const Resources = () => {
 						<div className="absolute top-[83px] left-1/2 -translate-x-1/2 w-[732px] h-[772px] rounded-[6px] border-[2px] border-[#000000] bg-[#FFF1D9] flex items-center justify-center">
 							<DraftReviewDemo className="block" />
 						</div>
-						<div className="absolute top-[922px] left-1/2 -translate-x-1/2 w-[774px] h-[186px] rounded-[6px] border-[2px] border-[#000000] bg-[#FFFFFF] px-[20px] pt-[16px] pb-[24px]">
-							<p className="font-[var(--font-inter)] text-[22.5px] font-medium leading-snug">
+						<div className="absolute top-[922px] left-1/2 -translate-x-1/2 w-[774px] h-[186px] rounded-[6px] border-[2px] border-[#000000] bg-[#FFFFFF] px-[16px] sm:px-[20px] pt-[12px] sm:pt-[16px] pb-[16px] sm:pb-[24px]">
+							<p className="font-[var(--font-inter)] text-[20px] lg:text-[22.5px] font-medium leading-tight lg:leading-snug">
 								Now head over to the drafts tab! Once you're here, you can click directly on one of the drafts and it will bring you into a review. You can approve and reject drafted emails in this view, and when you exit out of the draft review mode, you'll then see every email filtered by how you've approved and rejected them.
 							</p>
 						</div>
