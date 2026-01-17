@@ -409,14 +409,23 @@ const Murmur = () => {
 			maxWaitTimeoutRef.current = null;
 		}
 		
-		// Start transition: keep previous view visible while fading
+		// Start transition: keep previous view visible while the destination paints.
+		// Desktop: fade out the previous view once the destination is ready.
+		// Mobile: no fade (hard swap) once the destination is ready.
 		setPreviousView(activeView);
 		setIsTransitioning(true);
 		setIsFadingOutPreviousView(false);
 		setActiveViewInternal(newView);
 
-		// Fallback: if we never get a "view ready" callback (should be rare), fade out anyway.
+		// Fallback: if we never get a "view ready" callback (should be rare),
+		// end the transition anyway (fade on desktop, hard swap on mobile).
 		maxWaitTimeoutRef.current = setTimeout(() => {
+			if (isMobile === true) {
+				setPreviousView(null);
+				setIsTransitioning(false);
+				setIsFadingOutPreviousView(false);
+				return;
+			}
 			setIsFadingOutPreviousView(true);
 		}, MAX_TRANSITION_WAIT_MS);
 	}, [activeView, isMobile, MOBILE_ALLOWED_VIEWS]);
@@ -425,7 +434,6 @@ const Murmur = () => {
 		(readyView: DraftingSectionView) => {
 			// Only start fading once the destination view has actually painted.
 			if (!isTransitioning || !previousView) return;
-			if (isFadingOutPreviousView) return;
 			if (readyView !== activeView) return;
 
 			if (maxWaitTimeoutRef.current) {
@@ -433,9 +441,19 @@ const Murmur = () => {
 				maxWaitTimeoutRef.current = null;
 			}
 
+			// Mobile: hard swap (no fade) when the destination is ready.
+			if (isMobile === true) {
+				setPreviousView(null);
+				setIsTransitioning(false);
+				setIsFadingOutPreviousView(false);
+				return;
+			}
+
+			// Desktop: fade out the previous view.
+			if (isFadingOutPreviousView) return;
 			setIsFadingOutPreviousView(true);
 		},
-		[activeView, isFadingOutPreviousView, isTransitioning, previousView]
+		[activeView, isFadingOutPreviousView, isMobile, isTransitioning, previousView]
 	);
 
 	// Zoom is viewport-driven; no need to recompute per tab transition (keeps 16:9 looking unchanged).
