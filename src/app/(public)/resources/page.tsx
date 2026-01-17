@@ -134,15 +134,15 @@ const Resources = () => {
 					<div className="flex h-full flex-col items-center justify-center">
 						<Form {...form}>
 							<form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col items-center w-full">
-								<div className="w-full max-w-[850px] h-auto min-h-[393px] rounded-[8px] border-[2px] border-[#000000] bg-[#A6E2A8] overflow-hidden flex flex-col py-8 lg:py-0 transition-none">
+								<div className="w-full max-w-[calc(100vw-48px)] sm:max-w-[850px] h-auto min-h-[393px] rounded-[8px] border-[2px] border-[#000000] bg-[#A6E2A8] overflow-hidden flex flex-col py-8 lg:py-0 transition-none">
 									<div className="flex-1 flex items-center justify-center px-4 lg:px-0">
-										<div className="w-full lg:w-[791px] flex flex-col gap-[16px] lg:gap-[23px]">
+										<div className="w-full min-w-0 lg:w-[791px] flex flex-col gap-[16px] lg:gap-[23px]">
 											<div className="flex flex-col lg:flex-row gap-[16px] lg:gap-[19px]">
 												<FormField
 													control={form.control}
 													name="name"
 													render={({ field }) => (
-														<FormItem className="mb-0 w-full lg:w-auto">
+														<FormItem className="mb-0 w-full min-w-0 lg:w-auto">
 															<FormLabel className="sr-only">Full Name</FormLabel>
 															<FormControl>
 																<Input
@@ -159,7 +159,7 @@ const Resources = () => {
 													control={form.control}
 													name="email"
 													render={({ field }) => (
-														<FormItem className="mb-0 w-full lg:w-auto">
+														<FormItem className="mb-0 w-full min-w-0 lg:w-auto">
 															<FormLabel className="sr-only">Email Address</FormLabel>
 															<FormControl>
 																<Input
@@ -177,7 +177,7 @@ const Resources = () => {
 												control={form.control}
 												name="subject"
 												render={({ field }) => (
-													<FormItem className="mb-0">
+													<FormItem className="mb-0 min-w-0">
 														<FormLabel className="sr-only">Subject</FormLabel>
 														<FormControl>
 															<Input
@@ -194,7 +194,7 @@ const Resources = () => {
 												control={form.control}
 												name="message"
 												render={({ field }) => (
-													<FormItem className="mb-0">
+													<FormItem className="mb-0 min-w-0">
 														<FormLabel className="sr-only">Message</FormLabel>
 														<FormControl>
 															<RichTextEditor
