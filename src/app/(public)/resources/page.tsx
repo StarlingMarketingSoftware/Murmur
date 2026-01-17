@@ -74,26 +74,26 @@ const Resources = () => {
 				</div>
 			</section>
 
-			<section className="w-full h-[560px] bg-[#F9F9F9]">
+			<section className="w-full min-h-[560px] h-auto lg:h-[560px] bg-[#F9F9F9] py-12 lg:py-0">
 				<div className="mx-auto h-full w-full max-w-[1200px] px-6">
 					<div className="flex h-full flex-col items-center justify-center">
 						<Form {...form}>
-							<form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col items-center">
-								<div className="w-[850px] h-[393px] rounded-[8px] border-[2px] border-[#000000] bg-[#A6E2A8] overflow-hidden flex flex-col">
-									<div className="flex-1 flex items-center justify-center">
-										<div className="w-[791px] flex flex-col gap-[23px]">
-											<div className="flex gap-[19px]">
+							<form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col items-center w-full">
+								<div className="w-full max-w-[850px] h-auto min-h-[393px] rounded-[8px] border-[2px] border-[#000000] bg-[#A6E2A8] overflow-hidden flex flex-col py-8 lg:py-0 transition-none">
+									<div className="flex-1 flex items-center justify-center px-4 lg:px-0">
+										<div className="w-full lg:w-[791px] flex flex-col gap-[16px] lg:gap-[23px]">
+											<div className="flex flex-col lg:flex-row gap-[16px] lg:gap-[19px]">
 												<FormField
 													control={form.control}
 													name="name"
 													render={({ field }) => (
-														<FormItem className="mb-0">
+														<FormItem className="mb-0 w-full lg:w-auto">
 															<FormLabel className="sr-only">Full Name</FormLabel>
 															<FormControl>
 																<Input
 																	{...field}
 																	placeholder="Full Name"
-																	className="w-[386px] h-[38px] bg-[#FFFFFF] border-[#000000] border-[2px] rounded-[8px] placeholder:text-[#000000] placeholder:font-semibold font-semibold"
+																	className="w-full lg:w-[386px] h-[38px] bg-[#FFFFFF] border-[#000000] border-[2px] rounded-[8px] placeholder:text-[#000000] placeholder:font-semibold font-semibold transition-none"
 																/>
 															</FormControl>
 															<FormMessage />
@@ -104,13 +104,13 @@ const Resources = () => {
 													control={form.control}
 													name="email"
 													render={({ field }) => (
-														<FormItem className="mb-0">
+														<FormItem className="mb-0 w-full lg:w-auto">
 															<FormLabel className="sr-only">Email Address</FormLabel>
 															<FormControl>
 																<Input
 																	{...field}
 																	placeholder="Email Address"
-																	className="w-[386px] h-[38px] bg-[#FFFFFF] border-[#000000] border-[2px] rounded-[8px] placeholder:text-[#000000] placeholder:font-semibold font-semibold"
+																	className="w-full lg:w-[386px] h-[38px] bg-[#FFFFFF] border-[#000000] border-[2px] rounded-[8px] placeholder:text-[#000000] placeholder:font-semibold font-semibold transition-none"
 																/>
 															</FormControl>
 															<FormMessage />
@@ -128,7 +128,7 @@ const Resources = () => {
 															<Input
 																{...field}
 																placeholder="Subject"
-																className="w-[791px] h-[38px] bg-[#FFFFFF] border-[#000000] border-[2px] rounded-[8px] placeholder:text-[#000000] placeholder:font-semibold font-semibold"
+																className="w-full lg:w-[791px] h-[38px] bg-[#FFFFFF] border-[#000000] border-[2px] rounded-[8px] placeholder:text-[#000000] placeholder:font-semibold font-semibold transition-none"
 															/>
 														</FormControl>
 														<FormMessage />
@@ -147,7 +147,7 @@ const Resources = () => {
 																placeholder="Message"
 																value={field.value}
 																onChange={field.onChange}
-																className="w-[791px] min-h-[189px] h-[189px] bg-[#FFFFFF] border-[#000000] border-[2px] rounded-[8px] placeholder:text-[#000000] placeholder:font-semibold font-semibold"
+																className="w-full lg:w-[791px] min-h-[189px] h-[189px] bg-[#FFFFFF] border-[#000000] border-[2px] rounded-[8px] placeholder:text-[#000000] placeholder:font-semibold font-semibold transition-none"
 															/>
 														</FormControl>
 														<FormMessage />
@@ -157,7 +157,7 @@ const Resources = () => {
 										</div>
 									</div>
 									{isReadyToSubmit && (
-										<div className="w-full">
+										<div className="w-full mt-6 lg:mt-0">
 											<div className="w-full h-[2px] bg-[#000000]" />
 											<button
 												type="submit"
