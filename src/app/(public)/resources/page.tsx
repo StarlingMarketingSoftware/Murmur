@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { urls } from '@/constants/urls';
 import {
 	Form,
 	FormControl,
@@ -405,6 +406,27 @@ const Resources = () => {
 					</div>
 				</div>
 			</section>
+
+			{/* Try Murmur Now CTA Section */}
+			<div className="w-full bg-white flex flex-col items-center justify-center h-[747px]">
+				<p className="font-[var(--font-inter)] font-normal text-[clamp(32px,9vw,62px)] text-black text-center leading-[1.05]">
+					Try Murmur Now
+				</p>
+				<Link
+					href={urls.freeTrial.index}
+					className="flex items-center justify-center cursor-pointer text-center text-white font-[var(--font-inter)] font-medium text-[14px]"
+					style={{
+						marginTop: '32px',
+						width: '219px',
+						height: '33px',
+						backgroundColor: '#53B060',
+						border: '1px solid #118521',
+						borderRadius: '8px',
+					}}
+				>
+					Start Free Trial
+				</Link>
+			</div>
 		</div>
 	);
 };
