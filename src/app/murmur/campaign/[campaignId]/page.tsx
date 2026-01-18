@@ -282,8 +282,35 @@ const Murmur = () => {
 			}
 		}
 
+		// Short-viewport readability override:
+		// When the window is wide but short (common when the macOS Dock is present),
+		// the resolution maps can pick an aggressive zoom-out (e.g. 1440x900 → 0.70).
+		// In these cases we prefer allowing vertical scroll instead of making the whole UI tiny.
+		if (viewportW >= 1400 && viewportH <= 780) {
+			const SHORT_VIEWPORT_MIN_ZOOM = 0.7;
+			targetZoom = Math.max(targetZoom, SHORT_VIEWPORT_MIN_ZOOM);
+		}
+
+		// Tiny nudge for "wide-but-slightly-short" 16:10 windows (e.g. ~1952x1220 with Dock):
+		// the 1920x1200 tuned zoom can feel a hair too large once the viewport height is reduced.
+		if (viewportW >= 1900 && viewportW <= 2050 && viewportH >= 1180 && viewportH <= 1245) {
+			const DOCK_NUDGE_MAX_ZOOM = 0.93;
+			targetZoom = Math.min(targetZoom, DOCK_NUDGE_MAX_ZOOM);
+		}
+
+		// Tiny bump for ~2144x1340 windows with Dock present: this size tends to feel just a touch
+		// too zoomed out relative to nearby 16:10 breakpoints.
+		if (viewportW >= 2100 && viewportW <= 2200 && viewportH >= 1320 && viewportH <= 1380) {
+			const DOCK_BOOST_MIN_ZOOM = 1.2;
+			targetZoom = Math.max(targetZoom, DOCK_BOOST_MIN_ZOOM);
+		}
+
 		// If the viewport height shrinks (e.g. Dock/taskbar visible), clamp zoom so the bottom panels
 		// remain fully visible. This is applied only when we'd otherwise clip content.
+		//
+		// Important: on short viewports (e.g. ~740px tall) this can demand an overly aggressive zoom
+		// reduction (making the whole UI feel "tiny"). In those cases, we cap how far we shrink and
+		// prefer allowing vertical scroll rather than destroying readability.
 		try {
 			const anchors = Array.from(
 				document.querySelectorAll<HTMLElement>('[data-campaign-bottom-anchor]')
@@ -307,13 +334,19 @@ const Murmur = () => {
 				}, 0);
 
 				// Reserve a small safety margin so we're not "flush" to the bottom edge.
-				const SAFE_BOTTOM_MARGIN_PX = 24;
+				// On short viewports (e.g. when macOS Dock is visible) we use a smaller margin
+				// to avoid forcing the entire UI to scale down too much.
+				const SAFE_BOTTOM_MARGIN_PX = viewportH <= 780 ? 8 : 24;
+				// Don't shrink the entire campaign UI below this just to fit bottom panels.
+				// If the panels still can't fit, we'll accept that the page may need to scroll.
+				// Slightly higher floor on short viewports to keep things readable at ~1440x740.
+				const MIN_DOCK_CLAMP_ZOOM = viewportH <= 780 ? 0.8 : 0.8;
 				const availableH = Math.max(0, viewportH - SAFE_BOTTOM_MARGIN_PX);
 				if (currentZoom > 0 && maxBottomPx > availableH) {
 					const unscaledBottomPx = maxBottomPx / currentZoom;
 					const maxZoomToFit = unscaledBottomPx > 0 ? availableH / unscaledBottomPx : NaN;
 					if (Number.isFinite(maxZoomToFit) && maxZoomToFit > 0) {
-						targetZoom = Math.min(targetZoom, maxZoomToFit);
+						targetZoom = Math.min(targetZoom, Math.max(maxZoomToFit, MIN_DOCK_CLAMP_ZOOM));
 					}
 				}
 			}
