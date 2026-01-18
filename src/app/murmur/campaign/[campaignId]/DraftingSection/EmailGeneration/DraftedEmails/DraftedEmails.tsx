@@ -234,6 +234,28 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 	const { onContactClick, onContactHover, onDraftHover, onRegenerateDraft } = props;
 
 	const isMobile = useIsMobile();
+	const draftReviewContainerRef = useRef<HTMLDivElement | null>(null);
+
+	// Close the draft review UI when clicking anywhere outside of it.
+	// This should return the user back to the normal drafts table view.
+	useEffect(() => {
+		if (!selectedDraft) return;
+
+		const handlePointerDown = (event: PointerEvent) => {
+			const container = draftReviewContainerRef.current;
+			const target = event.target as Node | null;
+			if (!container || !target) return;
+
+			if (!container.contains(target)) {
+				setSelectedDraft(null);
+			}
+		};
+
+		document.addEventListener('pointerdown', handlePointerDown, true);
+		return () => {
+			document.removeEventListener('pointerdown', handlePointerDown, true);
+		};
+	}, [selectedDraft, setSelectedDraft]);
 
 	// Mobile-specific width values (using CSS calc for responsive sizing)
 	// 4px margins on each side for edge-to-edge feel
@@ -382,6 +404,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 
 			return (
 			<div
+				ref={draftReviewContainerRef}
 				className={cn("flex flex-col items-center", isMobile && "w-full px-1")}
 				data-hover-description="Revise your draft here. Type out your revisions. Approve and Reject Drafts"
 			>
