@@ -266,7 +266,7 @@ export default function FreeTrialPage() {
 	return (
 		<div className="w-full h-[100dvh] bg-[#AFD6EF] px-[14px] pt-[17px] pb-[12px] overflow-hidden">
 			<div className="relative w-full h-full border-[3px] border-black rounded-[8px] overflow-hidden">
-				<div ref={mapContainerRef} className="w-full h-full" />
+				<div ref={mapContainerRef} className="w-full h-full free-trial-map" />
 				{isLoaded && isSignedIn && (
 					<StripeEmbeddedCheckoutModal
 						open
@@ -298,6 +298,11 @@ export default function FreeTrialPage() {
 					</div>
 				)}
 			</div>
+			<style jsx global>{`
+				.free-trial-map .mapboxgl-ctrl-logo {
+					display: none !important;
+				}
+			`}</style>
 		</div>
 	);
 }
