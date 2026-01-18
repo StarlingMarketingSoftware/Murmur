@@ -282,28 +282,44 @@ const Murmur = () => {
 			}
 		}
 
-		// Short-viewport readability override:
-		// When the window is wide but short (common when the macOS Dock is present),
-		// the resolution maps can pick an aggressive zoom-out (e.g. 1440x900 → 0.70).
-		// In these cases we prefer allowing vertical scroll instead of making the whole UI tiny.
-		if (viewportW >= 1400 && viewportH <= 780) {
-			const SHORT_VIEWPORT_MIN_ZOOM = 0.7;
-			targetZoom = Math.max(targetZoom, SHORT_VIEWPORT_MIN_ZOOM);
+		// --- Dock / windowed zoom overrides ---
+		// Keep these rules narrow + ordered so they’re easy to reason about and don’t accidentally
+		// affect unrelated resolutions. These apply after the general resolution map.
+		const clampZoom = (z: number, min = -Infinity, max = Infinity) =>
+			Math.min(max, Math.max(min, z));
+		const appliedDockRules: string[] = [];
+		type DockZoomRule = { id: string; when: boolean; min?: number; max?: number };
+		const dockZoomRules: DockZoomRule[] = [
+			{
+				// Wide-but-short windows (often due to macOS Dock / non-maximized browser windows)
+				// can feel too zoomed out; prefer allowing scroll instead of shrinking indefinitely.
+				id: 'short-viewport-min',
+				when: viewportW >= 1400 && viewportH <= 780,
+				min: 0.7,
+			},
+			{
+				// ~1952x1220 with Dock: 1920x1200 tuned zoom feels a hair too large.
+				id: 'dock-1952x1220-max',
+				when: viewportW >= 1900 && viewportW <= 2050 && viewportH >= 1180 && viewportH <= 1245,
+				max: 0.93,
+			},
+			{
+				// ~2144x1340 with Dock: custom preference bump.
+				id: 'dock-2144x1340-min',
+				when: viewportW >= 2100 && viewportW <= 2200 && viewportH >= 1320 && viewportH <= 1380,
+				min: 1.2,
+			},
+		];
+		for (const rule of dockZoomRules) {
+			if (!rule.when) continue;
+			const next = clampZoom(targetZoom, rule.min, rule.max);
+			if (Math.abs(next - targetZoom) > 1e-6) {
+				targetZoom = next;
+				appliedDockRules.push(rule.id);
+			}
 		}
-
-		// Tiny nudge for "wide-but-slightly-short" 16:10 windows (e.g. ~1952x1220 with Dock):
-		// the 1920x1200 tuned zoom can feel a hair too large once the viewport height is reduced.
-		if (viewportW >= 1900 && viewportW <= 2050 && viewportH >= 1180 && viewportH <= 1245) {
-			const DOCK_NUDGE_MAX_ZOOM = 0.93;
-			targetZoom = Math.min(targetZoom, DOCK_NUDGE_MAX_ZOOM);
-		}
-
-		// Tiny bump for ~2144x1340 windows with Dock present: this size tends to feel just a touch
-		// too zoomed out relative to nearby 16:10 breakpoints.
-		if (viewportW >= 2100 && viewportW <= 2200 && viewportH >= 1320 && viewportH <= 1380) {
-			const DOCK_BOOST_MIN_ZOOM = 1.2;
-			targetZoom = Math.max(targetZoom, DOCK_BOOST_MIN_ZOOM);
-		}
+		// Guardrails: keep zoom within sane bounds (prevents accidental extreme values).
+		targetZoom = clampZoom(targetZoom, 0.5, 1.6);
 
 		// If the viewport height shrinks (e.g. Dock/taskbar visible), clamp zoom so the bottom panels
 		// remain fully visible. This is applied only when we'd otherwise clip content.
@@ -337,16 +353,20 @@ const Murmur = () => {
 				// On short viewports (e.g. when macOS Dock is visible) we use a smaller margin
 				// to avoid forcing the entire UI to scale down too much.
 				const SAFE_BOTTOM_MARGIN_PX = viewportH <= 780 ? 8 : 24;
-				// Don't shrink the entire campaign UI below this just to fit bottom panels.
-				// If the panels still can't fit, we'll accept that the page may need to scroll.
-				// Slightly higher floor on short viewports to keep things readable at ~1440x740.
-				const MIN_DOCK_CLAMP_ZOOM = viewportH <= 780 ? 0.8 : 0.8;
+				// Soft clamp: shrink to fit only up to a point; beyond that, prefer scroll over
+				// making the entire UI unreadably small/large swings on resize.
+				const RELATIVE_MIN_DOCK_CLAMP_RATIO = viewportH <= 780 ? 0.95 : 0.9;
+				const ABSOLUTE_MIN_DOCK_CLAMP_ZOOM = 0.5;
+				const minDockClampZoom = Math.max(
+					ABSOLUTE_MIN_DOCK_CLAMP_ZOOM,
+					targetZoom * RELATIVE_MIN_DOCK_CLAMP_RATIO
+				);
 				const availableH = Math.max(0, viewportH - SAFE_BOTTOM_MARGIN_PX);
 				if (currentZoom > 0 && maxBottomPx > availableH) {
 					const unscaledBottomPx = maxBottomPx / currentZoom;
 					const maxZoomToFit = unscaledBottomPx > 0 ? availableH / unscaledBottomPx : NaN;
 					if (Number.isFinite(maxZoomToFit) && maxZoomToFit > 0) {
-						targetZoom = Math.min(targetZoom, Math.max(maxZoomToFit, MIN_DOCK_CLAMP_ZOOM));
+						targetZoom = Math.min(targetZoom, Math.max(maxZoomToFit, minDockClampZoom));
 					}
 				}
 			}
@@ -367,6 +387,24 @@ const Murmur = () => {
 			html.style.removeProperty(CAMPAIGN_ZOOM_VAR);
 		} else {
 			html.style.setProperty(CAMPAIGN_ZOOM_VAR, targetZoom.toFixed(3));
+		}
+
+		// Optional debugging for tuning (enable via `?debugCampaignZoom=1` or localStorage key).
+		let debugCampaignZoom = false;
+		try {
+			debugCampaignZoom =
+				window.location.search.includes('debugCampaignZoom=1') ||
+				window.localStorage.getItem('murmur:debugCampaignZoom') === '1';
+		} catch {
+			// ignore
+		}
+		if (debugCampaignZoom) {
+			console.debug('[CampaignZoom]', {
+				viewportW,
+				viewportH,
+				targetZoom,
+				appliedDockRules,
+			});
 		}
 
 		try {
