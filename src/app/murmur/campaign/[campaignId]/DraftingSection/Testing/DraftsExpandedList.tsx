@@ -893,7 +893,7 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 							);
 						})}
 						{Array.from({
-							length: Math.max(0, (isBottomView ? 3 : 4) - drafts.length),
+							length: Math.max(0, (isBottomView ? 3 : isPreviewMode ? 5 : 4) - drafts.length),
 						}).map((_, idx) => (
 							<div
 								key={`draft-placeholder-${idx}`}

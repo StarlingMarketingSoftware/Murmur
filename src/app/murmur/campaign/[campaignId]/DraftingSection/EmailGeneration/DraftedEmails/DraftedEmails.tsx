@@ -851,19 +851,22 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 								right: '20px',
 								top: bottomStripTop,
 								bottom: 0,
-								width: '1px',
+								width: '2px',
 								backgroundColor: '#000000',
 							}}
 						/>
-						{/* Second divider line 94px to the left of the first one (20 + 94 = 114) */}
+						{/* Double divider between Delete and Send (two 1px lines) */}
 						<div
 							style={{
 								position: 'absolute',
 								right: '114px',
 								top: bottomStripTop,
 								bottom: 0,
-								width: '1px',
-								backgroundColor: '#000000',
+								width: '7px',
+								backgroundImage:
+									'linear-gradient(to right, #000000 0px, #000000 2px, transparent 2px, transparent 5px, #000000 5px, #000000 7px)',
+								pointerEvents: 'none',
+								zIndex: 5,
 							}}
 						/>
 						{/* Delete button between lines */}
@@ -886,17 +889,6 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 						>
 							{isPendingDeleteEmail ? '...' : 'Delete'}
 						</button>
-						{/* Third divider line 5px to the left of the second one (114 + 5 = 119) */}
-						<div
-							style={{
-								position: 'absolute',
-								right: '119px',
-								top: bottomStripTop,
-								bottom: 0,
-								width: '1px',
-								backgroundColor: '#000000',
-							}}
-						/>
 						{/* Fourth divider line 92px to the left of the third one (119 + 92 = 211) */}
 						<div
 							style={{
@@ -904,7 +896,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 								right: '211px',
 								top: bottomStripTop,
 								bottom: 0,
-								width: '1px',
+								width: '2px',
 								backgroundColor: '#000000',
 							}}
 						/>
@@ -941,7 +933,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 										left: '35px',
 										top: bottomStripTop,
 										bottom: 0,
-										width: '1px',
+										width: '2px',
 										backgroundColor: '#000000',
 									}}
 								/>
@@ -972,7 +964,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 										left: '130px',
 										top: bottomStripTop,
 										bottom: 0,
-										width: '1px',
+										width: '2px',
 										backgroundColor: '#000000',
 									}}
 								/>
@@ -1101,7 +1093,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 						type="button"
 						variant="ghost"
 						className={cn(
-							"font-secondary font-semibold text-black border-[2px] border-black rounded-none",
+							"font-secondary font-semibold text-black border-[2px] border-black rounded-none transition enabled:hover:brightness-95",
 							isMobile ? "text-[12px]" : "text-[14px]"
 						)}
 						style={{
@@ -1130,7 +1122,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 						type="button"
 						variant="ghost"
 						className={cn(
-							"font-secondary font-semibold text-black border-[2px] border-black rounded-none",
+							"font-secondary font-semibold text-black border-[2px] border-black rounded-none transition enabled:hover:brightness-95",
 							isMobile ? "text-[12px]" : "text-[14px]"
 						)}
 						style={{
@@ -1152,7 +1144,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 						type="button"
 						variant="ghost"
 						className={cn(
-							"font-secondary font-semibold text-black border-[2px] border-black rounded-none",
+							"font-secondary font-semibold text-black border-[2px] border-black rounded-none transition enabled:hover:brightness-95",
 							isMobile ? "text-[12px]" : "text-[14px]"
 						)}
 						style={{
