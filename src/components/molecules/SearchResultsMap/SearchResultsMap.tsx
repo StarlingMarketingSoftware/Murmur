@@ -1148,6 +1148,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	// Small delay when moving between marker layers (prevents hover flicker)
 	const hoverClearTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 	const stateLayerRef = useRef<google.maps.Data | null>(null);
+	// Track the currently hovered state feature to prevent "sticky" highlights
+	const hoveredStateFeatureRef = useRef<google.maps.Data.Feature | null>(null);
 	const resultsOutlinePolygonsRef = useRef<google.maps.Polygon[]>([]);
 	const searchedStateOutlinePolygonsRef = useRef<google.maps.Polygon[]>([]);
 	const lockedStateSelectionMultiPolygonRef = useRef<ClippingMultiPolygon | null>(null);
@@ -2011,6 +2013,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					if (currentZoom > stateHoverMaxZoom + 0.001) return;
 					if (isLoadingRef.current) return;
 
+					// Global nuke of all hover overrides. This guarantees that no other state stays
+					// highlighted, even if mouseout events were missed or raced.
+					dataLayer.revertStyle();
+
+					hoveredStateFeatureRef.current = event.feature;
+
 					const hoveredKey = normalizeStateKey(
 						(event.feature.getProperty('NAME') as string) ||
 							(event.feature.getId() as string)
@@ -2031,7 +2039,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			mouseoutListener = dataLayer.addListener(
 				'mouseout',
 				(event: google.maps.Data.MouseEvent) => {
-					dataLayer.revertStyle(event.feature);
+					// Only revert if we are leaving the currently highlighted feature.
+					if (hoveredStateFeatureRef.current === event.feature) {
+						dataLayer.revertStyle();
+						hoveredStateFeatureRef.current = null;
+					}
 				}
 			);
 		}
@@ -2087,6 +2099,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			// If the user zoomed in while hovering, ensure we clear any lingering fill override.
 			if (shouldEnableHoverHighlight) {
 				dataLayer.revertStyle();
+				hoveredStateFeatureRef.current = null;
 			}
 		};
 	}, [
