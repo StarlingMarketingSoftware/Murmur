@@ -246,9 +246,45 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 			const target = event.target as Node | null;
 			if (!container || !target) return;
 
-			if (!container.contains(target)) {
-				setSelectedDraft(null);
-			}
+			// If the click is inside the review UI, do nothing.
+			if (container.contains(target)) return;
+
+			// Otherwise, do NOT close the review if the user is clicking on other drafting UI
+			// (e.g., DraftsExpandedList, research panel, header boxes, or action buttons).
+			const targetEl = target instanceof Element ? target : null;
+			const isClickInAllowedDraftingUI = targetEl
+				? Boolean(
+						targetEl.closest(
+							[
+								// Campaign header box (title + counts)
+								'[data-campaign-header-box]',
+								// Mini email structure panel
+								'[data-mini-email-hide-text]',
+								'[data-mini-email-readonly]',
+								// Research panel (standard + narrow layouts)
+								'[data-research-panel-container]',
+								'[data-contact-research-panel]',
+								// Expanded lists / previews (Drafts/Sent/Inbox/etc.)
+								'[role="region"][aria-label^="Expanded"]',
+								// Draggable EmailGeneration layout
+								'[data-draggable-box-id]',
+								'[data-drafting-container]',
+								// Interactive controls should never dismiss the review pre-emptively
+								'button',
+								'[role="button"]',
+								'a',
+								'input',
+								'textarea',
+								'select',
+								'[contenteditable="true"]',
+							].join(', ')
+						)
+				  )
+				: false;
+
+			if (isClickInAllowedDraftingUI) return;
+
+			setSelectedDraft(null);
 		};
 
 		document.addEventListener('pointerdown', handlePointerDown, true);

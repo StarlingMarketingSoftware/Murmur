@@ -269,6 +269,7 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 
 	return (
 		<div
+			data-contact-research-panel="true"
 			className={cn(
 				// NOTE: Do not gate visibility with Tailwind breakpoints here.
 				// The campaign app applies its own CSS zoom scaling, and the campaign page decides
@@ -283,6 +284,8 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 				...style,
 			}}
 			data-hover-description="Research: Background info and notes for the selected contact."
+			role="region"
+			aria-label="Research panel"
 		>
 			{/* Header background bar */}
 			<div
