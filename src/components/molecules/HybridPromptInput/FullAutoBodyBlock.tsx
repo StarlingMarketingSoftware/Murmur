@@ -134,99 +134,63 @@ export const FullAutoBodyBlock: FC<FullAutoBodyBlockProps> = ({
 
 	const updateBookingForDropdownPosition = useCallback(() => {
 		if (typeof window === 'undefined') return;
-		const anchor = bookingForButtonRef.current;
-		if (!anchor) return;
+		// Use the container's position to match static positioning (which uses left: 0 relative to container)
+		const container = bookingForContainerRef.current;
+		const button = bookingForButtonRef.current;
+		if (!container || !button) return;
 
-		const rect = anchor.getBoundingClientRect();
+		// Get the page zoom factor. Murmur uses `zoom: 0.9` (or similar) on <html>.
+		// getBoundingClientRect() returns zoomed coordinates, but position: fixed uses unzoomed.
+		// We need to divide by zoom to convert.
+		const getZoomFactor = (): number => {
+			const html = document.documentElement;
+			const computed = window.getComputedStyle(html);
+			const zoom = computed.zoom;
+			if (zoom && zoom !== 'normal') {
+				const zoomValue = parseFloat(zoom);
+				if (Number.isFinite(zoomValue) && zoomValue > 0) return zoomValue;
+			}
+			return 1;
+		};
+		const zoom = getZoomFactor();
+
+		const containerRect = container.getBoundingClientRect();
+		const buttonRect = button.getBoundingClientRect();
 		const margin = 6;
 		const viewportPadding = 8;
-		// MiniEmailStructure usage: dropdown looked slightly too far right + a touch too high.
-		// Nudge it left/down so it sits more naturally under the trigger.
-		const offsetX = 65;
-		const offsetY = 55;
-		const calendarNudgeX = 100;
 
-		// For Calendar, we want the internal Anytime/Season/Calendar tab strip to line up
-		// with where it sits in the narrow dropdown (Anytime/Season). If we keep the
-		// Calendar dropdown fully centered, the strip can end up clamped too far right
-		// when the trigger is on the left (MiniEmailStructure), so we shift the whole
-		// dropdown left/right as needed to preserve alignment (within the viewport).
-		let left: number;
+		// Convert zoomed coordinates to unzoomed for fixed positioning
+		let baseLeft = containerRect.left / zoom;
+		let top = (buttonRect.bottom + margin) / zoom;
+
+		// For MiniEmailStructure (left panel), the Calendar should extend RIGHTWARD
+		// with tabs on the LEFT side, since there's limited space on the left.
+		// Anytime/Season dropdowns stay aligned with container left edge.
+		// Calendar also aligns its LEFT edge with the container, extending rightward.
+		let left = baseLeft;
+
+		// Make sure it doesn't overflow viewport edges (in unzoomed coordinates)
+		const viewportWidth = window.innerWidth / zoom;
+		const viewportHeight = window.innerHeight / zoom;
+		const maxLeft = Math.max(viewportPadding, viewportWidth - bookingForDropdownSize.width - viewportPadding);
+		left = Math.min(left, maxLeft);
+		left = Math.max(left, viewportPadding);
+
+		// For Calendar, put tabs on the LEFT side (small padding from left edge)
+		// to align with where Anytime/Season tabs sit in their narrower dropdown.
+		// Anytime/Season (317px): tabs (284px) centered = tabs start at 16.5px from left
 		if (bookingForTab === 'Calendar') {
-			const tabStripWidth = 284;
-			const narrowDropdownWidth = 317;
-			const tabStripPadding = 8;
-			const minTabStripLeft = tabStripPadding;
-			const maxTabStripLeft = Math.max(
-				minTabStripLeft,
-				bookingForDropdownSize.width - tabStripWidth - tabStripPadding
-			);
-
-			const tabStripLeftInNarrowDropdown = (narrowDropdownWidth - tabStripWidth) / 2; // 16.5
-			const desiredTabStripLeftGlobal = rect.left + offsetX + tabStripLeftInNarrowDropdown;
-
-			// The tab strip can align iff:
-			//   desiredTabStripLeftGlobal ∈ [left + minTabStripLeft, left + maxTabStripLeft]
-			// ⇒ left ∈ [desired - maxTabStripLeft, desired - minTabStripLeft]
-			const minLeftForAlignment = desiredTabStripLeftGlobal - maxTabStripLeft;
-			const maxLeftForAlignment = desiredTabStripLeftGlobal - minTabStripLeft;
-
-			const viewportMaxLeft = Math.max(
-				viewportPadding,
-				window.innerWidth - bookingForDropdownSize.width - viewportPadding
-			);
-
-			// Prefer centered, then clamp into the intersection of (alignment range ∩ viewport range).
-			const preferredLeft =
-				(window.innerWidth - bookingForDropdownSize.width) / 2 + calendarNudgeX;
-			const minLeft = Math.max(viewportPadding, minLeftForAlignment);
-			const maxLeft = Math.min(viewportMaxLeft, maxLeftForAlignment);
-			if (minLeft <= maxLeft) {
-				left = Math.min(Math.max(preferredLeft, minLeft), maxLeft);
-			} else {
-				// Fallback: viewport-constrained center.
-				left = Math.min(Math.max(preferredLeft, viewportPadding), viewportMaxLeft);
-			}
-		} else {
-			left = rect.left + offsetX;
-		}
-		let top = rect.bottom + margin + offsetY;
-
-		const maxLeft = Math.max(
-			viewportPadding,
-			window.innerWidth - bookingForDropdownSize.width - viewportPadding
-		);
-		left = Math.min(Math.max(left, viewportPadding), maxLeft);
-
-		// Calendar: keep tab strip aligned with where it sits in the narrow dropdown.
-		if (bookingForTab === 'Calendar') {
-			const tabStripWidth = 284;
-			const narrowDropdownWidth = 317;
-			const tabStripLeftInNarrowDropdown = (narrowDropdownWidth - tabStripWidth) / 2; // 16.5
-			const desiredTabStripLeftGlobal = rect.left + offsetX + tabStripLeftInNarrowDropdown;
-			let tabStripLeftInDropdown = desiredTabStripLeftGlobal - left;
-
-			const tabStripPadding = 8;
-			const minTabStripLeft = tabStripPadding;
-			const maxTabStripLeft = Math.max(
-				minTabStripLeft,
-				bookingForDropdownSize.width - tabStripWidth - tabStripPadding
-			);
-			tabStripLeftInDropdown = Math.min(
-				Math.max(tabStripLeftInDropdown, minTabStripLeft),
-				maxTabStripLeft
-			);
-
-			setBookingForTabStripLeft(Math.round(tabStripLeftInDropdown));
+			setBookingForTabStripLeft(17); // Match Anytime/Season tab position from left
 		} else {
 			setBookingForTabStripLeft(null);
 		}
 
+		// Check if would overflow bottom, flip above if possible
 		const wouldOverflowBottom =
-			top + bookingForDropdownSize.height > window.innerHeight - viewportPadding;
-		const canOpenAbove = rect.top - margin - bookingForDropdownSize.height >= viewportPadding;
+			top + bookingForDropdownSize.height > viewportHeight - viewportPadding;
+		const canOpenAbove = buttonRect.top / zoom - margin - bookingForDropdownSize.height >= viewportPadding;
 		if (wouldOverflowBottom && canOpenAbove) {
-			top = rect.top - margin - bookingForDropdownSize.height - offsetY;
+			top = buttonRect.top / zoom - margin - bookingForDropdownSize.height;
 		}
 
 		setBookingForDropdownPosition({
