@@ -2639,7 +2639,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	};
 
 	return (
-		<div className="mb-30 flex flex-col items-center">
+		<div className="flex flex-col items-center">
 			<Form {...form}>
 				<form className="flex flex-col items-center w-full">
 					<div
@@ -3285,11 +3285,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												hideAllText={
 													// Hide all research text to show a chrome-only skeleton:
 													// - When the Drafts tab has no drafts
-													// - When the Sent tab is in its empty state
-													// - When the Contacts tab has no contacts to show
-													(view === 'drafting' && draftCount === 0) ||
-													(view === 'sent' && sentCount === 0) ||
-													(view === 'contacts' && contactsAvailableForDrafting.length === 0)
+													(view === 'drafting' && draftCount === 0)
 												}
 												hideSummaryIfBullets
 												// Requested: 300px tall research block in the bottom half.
@@ -6556,7 +6552,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										{/* Bottom Panels: Contacts, Drafts, and Sent - hidden at narrowest breakpoint (< 952px) */}
 										{!isNarrowestDesktop && (
 											<div
-												className="mt-[112px] flex justify-center gap-[15px]"
+												className="mt-[35px] flex justify-center gap-[15px]"
 												data-campaign-bottom-anchor
 											>
 												<ContactsExpandedList
@@ -8138,8 +8134,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 						)} */}
 					</div>
 
-					{/* Spacer below expanded lists */}
-					<div className="relative w-screen max-w-none mt-10 pb-10" aria-hidden="true" />
+					{/* Spacer below expanded lists (mobile only; desktop campaign page should not scroll) */}
+					{isMobile && (
+						<div className="relative w-screen max-w-none mt-10 pb-10" aria-hidden="true" />
+					)}
 				</form>
 			</Form>
 

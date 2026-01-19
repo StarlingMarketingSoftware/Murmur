@@ -322,12 +322,8 @@ const Murmur = () => {
 		// Guardrails: keep zoom within sane bounds (prevents accidental extreme values).
 		targetZoom = clampZoom(targetZoom, 0.5, 1.6);
 
-		// If the viewport height shrinks (e.g. Dock/taskbar visible), clamp zoom so the bottom panels
-		// remain fully visible. This is applied only when we'd otherwise clip content.
-		//
-		// Important: on short viewports (e.g. ~740px tall) this can demand an overly aggressive zoom
-		// reduction (making the whole UI feel "tiny"). In those cases, we cap how far we shrink and
-		// prefer allowing vertical scroll rather than destroying readability.
+		// Clamp zoom so the bottom panels remain fully visible.
+		// The campaign page is overflow-hidden on desktop, so clipping is not acceptable.
 		try {
 			const anchors = Array.from(
 				document.querySelectorAll<HTMLElement>('[data-campaign-bottom-anchor]')
@@ -354,20 +350,32 @@ const Murmur = () => {
 				// On short viewports (e.g. when macOS Dock is visible) we use a smaller margin
 				// to avoid forcing the entire UI to scale down too much.
 				const SAFE_BOTTOM_MARGIN_PX = viewportH <= 780 ? 8 : 24;
-				// Soft clamp: shrink to fit only up to a point; beyond that, prefer scroll over
-				// making the entire UI unreadably small/large swings on resize.
-				const RELATIVE_MIN_DOCK_CLAMP_RATIO = viewportH <= 780 ? 0.95 : 0.9;
 				const ABSOLUTE_MIN_DOCK_CLAMP_ZOOM = 0.5;
-				const minDockClampZoom = Math.max(
-					ABSOLUTE_MIN_DOCK_CLAMP_ZOOM,
-					targetZoom * RELATIVE_MIN_DOCK_CLAMP_RATIO
-				);
+				const ABSOLUTE_MAX_HEIGHT_FIT_ZOOM = 1.25;
 				const availableH = Math.max(0, viewportH - SAFE_BOTTOM_MARGIN_PX);
-				if (currentZoom > 0 && maxBottomPx > availableH) {
+
+				if (currentZoom > 0 && maxBottomPx > 0) {
 					const unscaledBottomPx = maxBottomPx / currentZoom;
-					const maxZoomToFit = unscaledBottomPx > 0 ? availableH / unscaledBottomPx : NaN;
-					if (Number.isFinite(maxZoomToFit) && maxZoomToFit > 0) {
-						targetZoom = Math.min(targetZoom, Math.max(maxZoomToFit, minDockClampZoom));
+					// Calculate exact zoom to make the content bottom align with the viewport bottom
+					const zoomToFitHeight = unscaledBottomPx > 0 ? availableH / unscaledBottomPx : NaN;
+
+					if (Number.isFinite(zoomToFitHeight) && zoomToFitHeight > 0) {
+						// Apply the fit-height zoom, but constrained:
+						// 1. Never shrink below ABSOLUTE_MIN_DOCK_CLAMP_ZOOM (0.5)
+						// 2. Never grow above ABSOLUTE_MAX_HEIGHT_FIT_ZOOM (1.25)
+						// 3. Ensure we don't break the layout width (keep effective width >= 952px)
+
+						const minEffectiveWidth = 952;
+						const maxZoomForWidth = viewportW / minEffectiveWidth;
+
+						const finalMaxZoom = Math.min(ABSOLUTE_MAX_HEIGHT_FIT_ZOOM, maxZoomForWidth);
+
+						// We strictly use the calculated zoomToFitHeight (clamped)
+						// because the user wants it "SNUG" (filled).
+						targetZoom = Math.min(
+							Math.max(zoomToFitHeight, ABSOLUTE_MIN_DOCK_CLAMP_ZOOM),
+							finalMaxZoom
+						);
 					}
 				}
 			}

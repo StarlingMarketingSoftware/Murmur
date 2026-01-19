@@ -4034,6 +4034,12 @@ html.murmur-inbox-compact {
 /* Extra compact scaling (85%) for fullscreen map/campaign views */
 html.murmur-compact.murmur-campaign-compact {
 	zoom: var(--murmur-campaign-zoom, 0.85);
+	/* Campaign page should never page-scroll; panels handle their own scrolling */
+	overflow: hidden;
+}
+
+html.murmur-compact.murmur-campaign-compact body {
+	overflow: hidden;
 }
 
 /* Dashboard compact scaling (defaults to 85%, can be driven by JS via --murmur-dashboard-zoom) */
