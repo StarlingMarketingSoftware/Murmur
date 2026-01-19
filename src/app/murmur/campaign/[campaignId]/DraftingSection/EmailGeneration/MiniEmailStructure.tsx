@@ -1154,44 +1154,57 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 				);
 			}
 
-			// Hybrid mode: compact read-only cards
+			// Hybrid mode: render collapsed-looking hybrid blocks (like the real UI) instead of "open" cards
 			const borderFor = (t: HybridBlock) => {
 				if (t === 'introduction') return '#6673FF';
 				if (t === 'research') return '#1010E7';
 				if (t === 'action') return '#0E0E7F';
-				if (t === 'text') return '#000000';
 				return '#000000';
 			};
-			const headerBgFor = (t: HybridBlock) => {
+			const fillFor = (t: HybridBlock) => {
 				if (t === 'text') return '#A2E2AF';
 				return '#DADAFC';
 			};
 
 			return (
-				<div className="w-full px-2 py-2 flex flex-col gap-2">
+				<div className="w-full py-2 flex flex-col gap-[7px]">
 					{hybridBlocks.map((b) => {
 						const type = b.type as HybridBlock;
-						const value = (b.value || '').trim();
 						return (
 							<div
 								key={b.id}
-								className="rounded-[8px] border-2 overflow-hidden bg-white"
-								style={{ borderColor: borderFor(type) }}
+								className="rounded-[8px] border-2 overflow-hidden relative w-[93%] ml-[2.5%] h-[26px]"
+								style={{
+									borderColor: borderFor(type),
+									backgroundColor: fillFor(type),
+								}}
 							>
-								<div
-									className="h-[24px] flex items-center px-3"
-									style={{ backgroundColor: headerBgFor(type) }}
-								>
-									<span className="font-inter font-semibold text-[11px] leading-none text-black truncate">
-										{blockLabel(type)}
-									</span>
-								</div>
-								<div className="px-3 py-2 font-inter text-[11px] leading-[14px] text-black whitespace-pre-wrap">
-									{value ? (
-										value
-									) : (
-										<span className="italic text-black/40">No content</span>
-									)}
+								<div className="w-full h-full flex items-center justify-between">
+									<div className="flex-1 flex h-full px-3 items-center min-w-0">
+										<span className="font-inter text-[12px] leading-none font-semibold text-black truncate">
+											{blockLabel(type)}
+										</span>
+									</div>
+									<div
+										className="w-[26px] h-full flex items-center justify-center"
+										aria-hidden="true"
+									>
+										<svg
+											width="7"
+											height="5"
+											viewBox="0 0 7 5"
+											fill="none"
+											xmlns="http://www.w3.org/2000/svg"
+										>
+											<path
+												d="M0.796875 0.796875L3.12021 3.34412L5.44355 0.796875"
+												stroke="black"
+												strokeWidth="1.59374"
+												strokeLinecap="round"
+												strokeLinejoin="round"
+											/>
+										</svg>
+									</div>
 								</div>
 							</div>
 						);
@@ -1211,7 +1224,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 						Settings
 					</span>
 				</div>
-				<div className="h-[1px] bg-black w-full" />
+				<div className="h-[2px] bg-[#000000] w-full" />
 
 				{/* Name / Company (28px) */}
 				<div
@@ -1229,7 +1242,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 						)}
 					</div>
 				</div>
-				<div className="h-[1px] bg-black w-full" />
+				<div className="h-[2px] bg-[#000000] w-full" />
 
 				{/* Mode used (27px) */}
 				<div
@@ -1240,7 +1253,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 						{modeLabel}
 					</span>
 				</div>
-				<div className="h-[1px] bg-black w-full" />
+				<div className="h-[2px] bg-[#000000] w-full" />
 
 				{/* Subject (27px) */}
 				<div
@@ -1252,7 +1265,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 				>
 					<span className={subjectTextClass}>{subjectLabel}</span>
 				</div>
-				<div className="h-[1px] bg-black w-full" />
+				<div className="h-[2px] bg-[#000000] w-full" />
 
 				{/* Body area (209px) */}
 				<div
@@ -1263,21 +1276,25 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 						{renderBody()}
 					</div>
 				</div>
-				<div className="h-[1px] bg-black w-full" />
+				<div className="h-[2px] bg-[#000000] w-full" />
 
-				{/* Signature (29px) */}
-				<div
-					className="w-full flex items-center px-[9px]"
-					style={{
-						height: 29,
-						backgroundColor: isAutoSignatureResolved ? '#E0E0E0' : '#FFFFFF',
-					}}
-				>
-					<span className={signatureTextClass}>{signatureLabel}</span>
-				</div>
+				{/* Signature (29px) - not shown for Manual mode */}
+				{draftingMode !== 'handwritten' && (
+					<>
+						<div
+							className="w-full flex items-center px-[9px]"
+							style={{
+								height: 29,
+								backgroundColor: isAutoSignatureResolved ? '#E0E0E0' : '#FFFFFF',
+							}}
+						>
+							<span className={signatureTextClass}>{signatureLabel}</span>
+						</div>
 
-				{/* Divider under the last row */}
-				<div className="h-[1px] bg-black w-full" />
+						{/* Divider under the last row */}
+						<div className="h-[2px] bg-[#000000] w-full" />
+					</>
+				)}
 
 				{/* Remaining fill */}
 				<div className="flex-1" style={{ backgroundColor: '#95CFFF' }} />
@@ -1436,7 +1453,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 										</span>
 									)}
 								</div>
-								<div className="h-[1px] bg-black w-full" />
+								<div className="h-[2px] bg-[#000000] w-full" />
 							</>
 								)}
 						<div
@@ -1571,7 +1588,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 								</div>
 							</div>
 						</div>
-						<div className="h-[1px] bg-black w-full" />
+						<div className="h-[2px] bg-[#000000] w-full" />
 
 						{/* Profile Tab (mirrors HybridPromptInput) */}
 						{activeTab === 'profile' ? (
