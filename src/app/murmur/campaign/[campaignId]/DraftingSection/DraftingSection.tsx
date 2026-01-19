@@ -4146,6 +4146,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												isFreeTrial={isFreeTrial || false}
 												fromName={fromName}
 												fromEmail={fromEmail}
+												identity={campaign?.identity ?? null}
+												onIdentityUpdate={handleIdentityUpdate}
 												subject={form.watch('subject')}
 												onContactClick={handleResearchContactClick}
 												onContactHover={handleResearchContactHover}
@@ -4260,6 +4262,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														isFreeTrial={isFreeTrial || false}
 														fromName={fromName}
 														fromEmail={fromEmail}
+														identity={campaign?.identity ?? null}
+														onIdentityUpdate={handleIdentityUpdate}
 														subject={form.watch('subject')}
 														onContactClick={handleResearchContactClick}
 														onContactHover={handleResearchContactHover}
@@ -4403,6 +4407,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												isFreeTrial={isFreeTrial || false}
 												fromName={fromName}
 												fromEmail={fromEmail}
+												identity={campaign?.identity ?? null}
+												onIdentityUpdate={handleIdentityUpdate}
 												subject={form.watch('subject')}
 												onContactClick={handleResearchContactClick}
 												onContactHover={handleResearchContactHover}

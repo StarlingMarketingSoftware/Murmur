@@ -550,6 +550,8 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 												isFreeTrial={isFreeTrial}
 												fromName={campaign?.identity?.name}
 												fromEmail={campaign?.identity?.email}
+												identity={(campaign?.identity as any) ?? null}
+												onIdentityUpdate={handleIdentityUpdate}
 												subject={form.watch('subject')}
 												onRejectDraft={handleRejectDraft}
 												rejectedDraftIds={rejectedDraftIds}

@@ -32,6 +32,7 @@ import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
 import { FestivalsIcon } from '@/components/atoms/_svg/FestivalsIcon';
 import { MusicVenuesIcon } from '@/components/atoms/_svg/MusicVenuesIcon';
 import { WineBeerSpiritsIcon } from '@/components/atoms/_svg/WineBeerSpiritsIcon';
+import { HybridPromptInput } from '@/components/molecules/HybridPromptInput/HybridPromptInput';
 
 interface ScrollableTextareaProps
 	extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
@@ -299,6 +300,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 
 	const [showConfirm, setShowConfirm] = useState(false);
 	const [isRegenerating, setIsRegenerating] = useState(false);
+	const [isRegenSettingsPreviewOpen, setIsRegenSettingsPreviewOpen] = useState(false);
 	const [isHoveringAllButton, setIsHoveringAllButton] = useState(false);
 	// Used contacts indicator
 	const { data: usedContactIds } = useGetUsedContactIds();
@@ -373,6 +375,13 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 
 	const handleRegenerate = useCallback(async () => {
 		if (!selectedDraft || !onRegenerateDraft || isRegenerating) return;
+
+		// First click: open the embedded prompt/settings preview so the user can confirm settings.
+		// Second click (while preview is open): confirm and run regeneration.
+		if (!isRegenSettingsPreviewOpen) {
+			setIsRegenSettingsPreviewOpen(true);
+			return;
+		}
 		
 		setIsRegenerating(true);
 		try {
@@ -393,8 +402,14 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 			}
 		} finally {
 			setIsRegenerating(false);
+			setIsRegenSettingsPreviewOpen(false);
 		}
-	}, [selectedDraft, onRegenerateDraft, isRegenerating, setEditedSubject, setEditedMessage, setSelectedDraft]);
+	}, [selectedDraft, onRegenerateDraft, isRegenerating, isRegenSettingsPreviewOpen, setEditedSubject, setEditedMessage, setSelectedDraft]);
+
+	// Reset the regen settings preview any time the selected draft changes (or closes).
+	useEffect(() => {
+		setIsRegenSettingsPreviewOpen(false);
+	}, [selectedDraft?.id]);
 
 	if (selectedDraft) {
 		const contact = contacts?.find((c) => c.id === selectedDraft.contactId);
@@ -422,7 +437,8 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 		const isUSAbbr = /^[A-Z]{2}$/.test(stateAbbr);
 		const isDraftApproved = props.approvedDraftIds?.has(selectedDraft.id) ?? false;
 		const isDraftRejected = props.rejectedDraftIds?.has(selectedDraft.id) ?? false;
-		const hasStatusBar = isDraftApproved || isDraftRejected;
+		const hasStatusBar =
+			(isDraftApproved || isDraftRejected) && !isRegenSettingsPreviewOpen;
 		// Keep the bottom strip (Send / Delete + dividers) a consistent height across drafts.
 		// When a status bar is present, the editor container is shorter; we compensate by slightly
 		// increasing the body box height so the remaining bottom strip stays the same "small" height.
@@ -702,7 +718,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 					</div>
 
 					{/* Approved status bar - 6px from header, 11px above subject box */}
-					{isDraftApproved && (
+					{!isRegenSettingsPreviewOpen && isDraftApproved && (
 						<div
 							style={{
 								backgroundColor: '#FFDC9E',
@@ -790,7 +806,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 					)}
 
 					{/* Rejected status bar - 6px from header, 11px above subject box */}
-					{isDraftRejected && (
+					{!isRegenSettingsPreviewOpen && isDraftRejected && (
 						<div
 							style={{
 								backgroundColor: '#FFDC9E',
@@ -878,185 +894,245 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 					<div
 						className="flex-1 overflow-hidden flex flex-col relative"
 						data-lenis-prevent
-						style={{ margin: '0', border: 'none', padding: hasStatusBar ? '0 12px 12px 12px' : '6px 12px 12px 12px', borderBottomLeftRadius: '5px', borderBottomRightRadius: '5px', backgroundColor: '#FFDC9E' }}
+						style={{
+							margin: '0',
+							border: 'none',
+							padding: isRegenSettingsPreviewOpen
+								? '0'
+								: hasStatusBar
+									? '0 12px 12px 12px'
+									: '6px 12px 12px 12px',
+							borderBottomLeftRadius: '5px',
+							borderBottomRightRadius: '5px',
+							backgroundColor: isRegenSettingsPreviewOpen ? '#FFE3B3' : '#FFDC9E',
+						}}
 					>
-						{/* Vertical divider line 20px from right - bottom area only */}
-						<div
-							style={{
-								position: 'absolute',
-								right: '20px',
-								top: bottomStripTop,
-								bottom: 0,
-								width: '2px',
-								backgroundColor: '#000000',
-							}}
-						/>
-						{/* Double divider between Delete and Send (two 1px lines) */}
-						<div
-							style={{
-								position: 'absolute',
-								right: '114px',
-								top: bottomStripTop,
-								bottom: 0,
-								width: '7px',
-								backgroundImage:
-									'linear-gradient(to right, #000000 0px, #000000 2px, transparent 2px, transparent 5px, #000000 5px, #000000 7px)',
-								pointerEvents: 'none',
-								zIndex: 5,
-							}}
-						/>
-						{/* Delete button between lines */}
-						<button
-							type="button"
-							onClick={async (e) => {
-								if (selectedDraft) {
-									await handleDeleteDraft(e, selectedDraft.id);
-									setSelectedDraft(null);
-								}
-							}}
-							disabled={isPendingDeleteEmail}
-							className="absolute font-inter text-[14px] font-normal text-black hover:bg-black/5 flex items-center justify-center transition-colors leading-none"
-							style={{
-								right: '20px',
-								width: '94px',
-								top: bottomStripTop,
-								bottom: 0,
-							}}
-						>
-							{isPendingDeleteEmail ? '...' : 'Delete'}
-						</button>
-						{/* Fourth divider line 92px to the left of the third one (119 + 92 = 211) */}
-						<div
-							style={{
-								position: 'absolute',
-								right: '211px',
-								top: bottomStripTop,
-								bottom: 0,
-								width: '2px',
-								backgroundColor: '#000000',
-							}}
-						/>
-						{/* Send button between lines */}
-						<button
-							type="button"
-							onClick={async () => {
-								if (selectedDraft && !props.isSendingDisabled) {
-									// Select only the current draft and send it
-									props.setSelectedDraftIds(new Set([selectedDraft.id]));
-									// Small delay to ensure state is updated before sending
-									await new Promise((resolve) => setTimeout(resolve, 50));
-									await props.onSend();
-								}
-							}}
-							disabled={props.isSendingDisabled}
-							className="absolute font-inter text-[14px] font-normal text-black hover:bg-black/5 flex items-center justify-center transition-colors leading-none"
-							style={{
-								right: '119px',
-								width: '92px',
-								top: bottomStripTop,
-								bottom: 0,
-							}}
-						>
-							Send
-						</button>
-						{/* Counter in bottom-left corner - at narrow/narrowest breakpoint */}
-						{showBottomCounter && (
+						{!isRegenSettingsPreviewOpen && (
 							<>
-								{/* Left divider for counter */}
+								{/* Vertical divider line 20px from right - bottom area only */}
 								<div
 									style={{
 										position: 'absolute',
-										left: '35px',
+										right: '20px',
 										top: bottomStripTop,
 										bottom: 0,
 										width: '2px',
 										backgroundColor: '#000000',
 									}}
 								/>
+								{/* Double divider between Delete and Send (two 1px lines) */}
 								<div
-									className="absolute flex items-center justify-center gap-[8px]"
 									style={{
-										left: '35px',
-										width: '95px',
+										position: 'absolute',
+										right: '114px',
+										top: bottomStripTop,
+										bottom: 0,
+										width: '7px',
+										backgroundImage:
+											'linear-gradient(to right, #000000 0px, #000000 2px, transparent 2px, transparent 5px, #000000 5px, #000000 7px)',
+										pointerEvents: 'none',
+										zIndex: 5,
+									}}
+								/>
+								{/* Delete button between lines */}
+								<button
+									type="button"
+									onClick={async (e) => {
+										if (selectedDraft) {
+											await handleDeleteDraft(e, selectedDraft.id);
+											setSelectedDraft(null);
+										}
+									}}
+									disabled={isPendingDeleteEmail}
+									className="absolute font-inter text-[14px] font-normal text-black hover:bg-black/5 flex items-center justify-center transition-colors leading-none"
+									style={{
+										right: '20px',
+										width: '94px',
 										top: bottomStripTop,
 										bottom: 0,
 									}}
 								>
-									{/* Approved count */}
-									<div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-										<span className="font-bold text-[12px] text-black" style={{ fontFamily: 'Times New Roman, serif' }}>{approvedCount}</span>
-										<ApproveCheckIcon width={12} height={9} className="text-black" />
-									</div>
-									{/* Rejected count */}
-									<div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-										<span className="font-bold text-[12px] text-black" style={{ fontFamily: 'Times New Roman, serif' }}>{rejectedCount}</span>
-										<RejectXIcon width={10} height={10} className="text-black" />
-									</div>
-								</div>
-								{/* Right divider for counter */}
+									{isPendingDeleteEmail ? '...' : 'Delete'}
+								</button>
+								{/* Fourth divider line 92px to the left of the third one (119 + 92 = 211) */}
 								<div
 									style={{
 										position: 'absolute',
-										left: '130px',
+										right: '211px',
 										top: bottomStripTop,
 										bottom: 0,
 										width: '2px',
 										backgroundColor: '#000000',
 									}}
 								/>
+								{/* Send button between lines */}
+								<button
+									type="button"
+									onClick={async () => {
+										if (selectedDraft && !props.isSendingDisabled) {
+											// Select only the current draft and send it
+											props.setSelectedDraftIds(new Set([selectedDraft.id]));
+											// Small delay to ensure state is updated before sending
+											await new Promise((resolve) => setTimeout(resolve, 50));
+											await props.onSend();
+										}
+									}}
+									disabled={props.isSendingDisabled}
+									className="absolute font-inter text-[14px] font-normal text-black hover:bg-black/5 flex items-center justify-center transition-colors leading-none"
+									style={{
+										right: '119px',
+										width: '92px',
+										top: bottomStripTop,
+										bottom: 0,
+									}}
+								>
+									Send
+								</button>
+								{/* Counter in bottom-left corner - at narrow/narrowest breakpoint */}
+								{showBottomCounter && (
+									<>
+										{/* Left divider for counter */}
+										<div
+											style={{
+												position: 'absolute',
+												left: '35px',
+												top: bottomStripTop,
+												bottom: 0,
+												width: '2px',
+												backgroundColor: '#000000',
+											}}
+										/>
+										<div
+											className="absolute flex items-center justify-center gap-[8px]"
+											style={{
+												left: '35px',
+												width: '95px',
+												top: bottomStripTop,
+												bottom: 0,
+											}}
+										>
+											{/* Approved count */}
+											<div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+												<span
+													className="font-bold text-[12px] text-black"
+													style={{ fontFamily: 'Times New Roman, serif' }}
+												>
+													{approvedCount}
+												</span>
+												<ApproveCheckIcon width={12} height={9} className="text-black" />
+											</div>
+											{/* Rejected count */}
+											<div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+												<span
+													className="font-bold text-[12px] text-black"
+													style={{ fontFamily: 'Times New Roman, serif' }}
+												>
+													{rejectedCount}
+												</span>
+												<RejectXIcon width={10} height={10} className="text-black" />
+											</div>
+										</div>
+										{/* Right divider for counter */}
+										<div
+											style={{
+												position: 'absolute',
+												left: '130px',
+												top: bottomStripTop,
+												bottom: 0,
+												width: '2px',
+												backgroundColor: '#000000',
+											}}
+										/>
+									</>
+								)}
 							</>
 						)}
-						{/* Subject input */}
-						<div className="flex justify-center" style={{ marginBottom: '8px', padding: isMobile ? '0 8px' : undefined }}>
-							<input
-								type="text"
-								value={editedSubject}
-								onChange={(e) => setEditedSubject(e.target.value)}
-								className="font-inter text-[14px] font-extrabold bg-white border-2 border-black rounded-[4px] px-2 focus:outline-none focus:ring-0"
-								style={{ width: isMobile ? '100%' : '469px', height: '39px' }}
-							/>
-						</div>
 
-						{/* Message editor - rich text for links, plain textarea otherwise */}
-						<div className="flex justify-center flex-1" style={{ padding: isMobile ? '0 8px' : undefined }}>
-							<div
-								className="bg-white border-2 border-black rounded-[4px] overflow-visible draft-review-box"
-								style={{ width: isMobile ? '100%' : '470px', height: hasStatusBar ? '527px' : '572px', flex: isMobile ? 1 : undefined }}
-								data-hover-description="Revise your draft here. Type out your revisions. Approve and Reject Drafts"
-							>
-								{/* Check if original message has links - if so, use RichTextEditor for proper link editing */}
-								{selectedDraft?.message && /<a\s+[^>]*href=/i.test(selectedDraft.message) ? (
-									<div data-hover-description="Revise your draft here. Type out your revisions. Approve and Reject Drafts" className="w-full h-full">
-										<CustomScrollbar
-											className="w-full h-full"
-											thumbWidth={2}
-											thumbColor="#000000"
-											offsetRight={-6}
-											contentClassName="[&_.ProseMirror]:min-h-full [&_.ProseMirror]:border-0 [&_.ProseMirror]:bg-transparent [&_.ProseMirror]:focus:ring-0 [&_.ProseMirror]:focus:outline-none"
-										>
-										<RichTextEditor
-											value={editedMessage}
-											onChange={setEditedMessage}
-											hideMenuBar
-											className="w-full h-full border-0 bg-transparent !min-h-0 text-sm"
-											placeholder="Type your message here..."
-										/>
-										</CustomScrollbar>
-									</div>
-								) : (
-								<ScrollableTextarea
-									value={editedMessage}
-									onChange={(e) => setEditedMessage(e.target.value)}
-									className="w-full h-full p-3 text-sm resize-none focus:outline-none focus:ring-0 bg-transparent border-0 whitespace-pre-wrap"
-									placeholder="Type your message here..."
-									thumbWidth={2}
-									thumbColor="#000000"
-									trackOffset={-6}
-									data-hover-description="Revise your draft here. Type out your revisions. Approve and Reject Drafts"
+						{isRegenSettingsPreviewOpen ? (
+							<div className="flex justify-center flex-1">
+								<HybridPromptInput
+									contact={contact || null}
+									identity={props.identity ?? null}
+									onIdentityUpdate={props.onIdentityUpdate}
+									hideDraftButton
+									hideGenerateTestButton
+									containerHeightPx={635}
+									useStaticDropdownPosition
+									hideMobileStickyTestFooter
+									dataCampaignMainBox={null}
 								/>
-								)}
 							</div>
-						</div>
+						) : (
+							<>
+								{/* Subject input */}
+								<div
+									className="flex justify-center"
+									style={{
+										marginBottom: '8px',
+										padding: isMobile ? '0 8px' : undefined,
+									}}
+								>
+									<input
+										type="text"
+										value={editedSubject}
+										onChange={(e) => setEditedSubject(e.target.value)}
+										className="font-inter text-[14px] font-extrabold bg-white border-2 border-black rounded-[4px] px-2 focus:outline-none focus:ring-0"
+										style={{ width: isMobile ? '100%' : '469px', height: '39px' }}
+									/>
+								</div>
+
+								{/* Message editor - rich text for links, plain textarea otherwise */}
+								<div
+									className="flex justify-center flex-1"
+									style={{ padding: isMobile ? '0 8px' : undefined }}
+								>
+									<div
+										className="bg-white border-2 border-black rounded-[4px] overflow-visible draft-review-box"
+										style={{
+											width: isMobile ? '100%' : '470px',
+											height: hasStatusBar ? '527px' : '572px',
+											flex: isMobile ? 1 : undefined,
+										}}
+										data-hover-description="Revise your draft here. Type out your revisions. Approve and Reject Drafts"
+									>
+										{/* Check if original message has links - if so, use RichTextEditor for proper link editing */}
+										{selectedDraft?.message && /<a\\s+[^>]*href=/i.test(selectedDraft.message) ? (
+											<div
+												data-hover-description="Revise your draft here. Type out your revisions. Approve and Reject Drafts"
+												className="w-full h-full"
+											>
+												<CustomScrollbar
+													className="w-full h-full"
+													thumbWidth={2}
+													thumbColor="#000000"
+													offsetRight={-6}
+													contentClassName="[&_.ProseMirror]:min-h-full [&_.ProseMirror]:border-0 [&_.ProseMirror]:bg-transparent [&_.ProseMirror]:focus:ring-0 [&_.ProseMirror]:focus:outline-none"
+												>
+													<RichTextEditor
+														value={editedMessage}
+														onChange={setEditedMessage}
+														hideMenuBar
+														className="w-full h-full border-0 bg-transparent !min-h-0 text-sm"
+														placeholder="Type your message here..."
+													/>
+												</CustomScrollbar>
+											</div>
+										) : (
+											<ScrollableTextarea
+												value={editedMessage}
+												onChange={(e) => setEditedMessage(e.target.value)}
+												className="w-full h-full p-3 text-sm resize-none focus:outline-none focus:ring-0 bg-transparent border-0 whitespace-pre-wrap"
+												placeholder="Type your message here..."
+												thumbWidth={2}
+												thumbColor="#000000"
+												trackOffset={-6}
+												data-hover-description="Revise your draft here. Type out your revisions. Approve and Reject Drafts"
+											/>
+										)}
+									</div>
+								</div>
+							</>
+						)}
 
 						{/* Save and Delete buttons - hidden for now */}
 						<div className="hidden mt-3 flex justify-end gap-2">
@@ -1099,7 +1175,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 			}}
 		>
 			{/* Tab navigation left arrow - only in narrow breakpoints, hidden on mobile */}
-			{showTabNavArrows && !isMobile && props.goToPreviousTab && (
+			{showTabNavArrows && !isMobile && props.goToPreviousTab && !isRegenSettingsPreviewOpen && (
 				<button
 					type="button"
 					onClick={props.goToPreviousTab}
@@ -1112,113 +1188,152 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 			{/* Inner container with draft navigation and buttons */}
 			<div
 				className="flex items-center justify-center flex-shrink-0"
-				style={showTabNavArrows && !isMobile ? { width: tabNavMiddleWidth } : undefined}
+				style={
+					isRegenSettingsPreviewOpen
+						? { width: '100%' }
+						: showTabNavArrows && !isMobile
+							? { width: tabNavMiddleWidth }
+							: undefined
+				}
 			>
-				<button
-					type="button"
-					onClick={handleNavigatePrevious}
-					disabled={!hasDrafts}
-					aria-label="View previous draft"
-					className="p-0 bg-transparent border-0 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-					style={{ marginRight: isMobile ? '10px' : '20px' }}
-				>
-					<LeftArrowReviewIcon />
-				</button>
-				<div className="flex" style={{ gap: isMobile ? '6px' : '13px' }}>
-					<Button
-						type="button"
-						variant="ghost"
-						className={cn(
-							"font-secondary font-semibold text-black border-[2px] border-black rounded-none transition enabled:hover:brightness-95",
-							isMobile ? "text-[12px]" : "text-[14px]"
-						)}
-						style={{
-							width: isMobile ? '80px' : '124px',
-							height: isMobile ? '36px' : '40px',
-							borderTopLeftRadius: '8px',
-							borderBottomLeftRadius: '8px',
-							backgroundColor: '#D5FFCB',
-						}}
-						data-hover-description="Approve you draft. This draft turned out good"
-						onClick={() => {
-							if (selectedDraft) {
-								const isCurrentlyApproved = props.approvedDraftIds?.has(selectedDraft.id) ?? false;
-								props.onApproveDraft?.(selectedDraft.id, isCurrentlyApproved);
-								// Only navigate to next if we're approving, not toggling off
-								if (!isCurrentlyApproved) {
-									handleNavigateNext();
-								}
-							}
-						}}
-					>
-						<span>Approve</span>
-						{!isMobile && <ApproveCheckIcon />}
-					</Button>
-					<Button
-						type="button"
-						variant="ghost"
-						className={cn(
-							"font-secondary font-semibold text-black border-[2px] border-black rounded-none transition enabled:hover:brightness-95",
-							isMobile ? "text-[12px]" : "text-[14px]"
-						)}
-						style={{
-							width: isMobile ? '80px' : '124px',
-							height: isMobile ? '36px' : '40px',
-							backgroundColor: '#FFDC9E',
-						}}
-						data-hover-description="Regenerate will rewrite the email you have open automatically so that you can get a better result"
-						onClick={handleRegenerate}
-						disabled={isRegenerating || !onRegenerateDraft}
-					>
-						{isRegenerating ? (
-							<Spinner size="small" />
-						) : (
-							isMobile ? 'Regen' : 'Regenerate'
-						)}
-					</Button>
-					<Button
-						type="button"
-						variant="ghost"
-						className={cn(
-							"font-secondary font-semibold text-black border-[2px] border-black rounded-none transition enabled:hover:brightness-95",
-							isMobile ? "text-[12px]" : "text-[14px]"
-						)}
-						style={{
-							width: isMobile ? '80px' : '124px',
-							height: isMobile ? '36px' : '40px',
-							borderTopRightRadius: '8px',
-							borderBottomRightRadius: '8px',
-							backgroundColor: '#E17272',
-						}}
-						data-hover-description="Reject this contact. This isn't deleting it, but putting it into a rejection folder for you to review"
-						onClick={() => {
-							if (selectedDraft) {
-								const isCurrentlyRejected = props.rejectedDraftIds?.has(selectedDraft.id) ?? false;
-								props.onRejectDraft?.(selectedDraft.id, isCurrentlyRejected);
-								// Only navigate to next if we're rejecting, not toggling off
-								if (!isCurrentlyRejected) {
-									handleNavigateNext();
-								}
-							}
-						}}
-					>
-						<span>Reject</span>
-						{!isMobile && <RejectXIcon />}
-					</Button>
-				</div>
-				<button
-					type="button"
-					onClick={handleNavigateNext}
-					disabled={!hasDrafts}
-					aria-label="View next draft"
-					className="p-0 bg-transparent border-0 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-					style={{ marginLeft: isMobile ? '10px' : '20px' }}
-				>
-					<RightArrowReviewIcon />
-				</button>
+				{isRegenSettingsPreviewOpen ? (
+					<div className="relative w-full flex items-center justify-center">
+						<button
+							type="button"
+							onClick={() => setIsRegenSettingsPreviewOpen(false)}
+							aria-label="Back"
+							className="absolute left-0 top-0 bottom-0 p-0 bg-transparent border-0 cursor-pointer hover:opacity-80 transition-opacity flex items-center justify-center"
+						>
+							<LeftArrowReviewIcon />
+						</button>
+						<Button
+							type="button"
+							variant="ghost"
+							className={cn(
+								"font-secondary font-semibold text-black border-[2px] border-black transition enabled:hover:brightness-95",
+								isMobile ? "text-[12px]" : "text-[14px]"
+							)}
+							style={{
+								width: isMobile ? 'calc(100vw - 140px)' : '397px',
+								maxWidth: '397px',
+								height: isMobile ? '36px' : '40px',
+								borderRadius: '8px',
+								backgroundColor: '#FFDC9E',
+							}}
+							data-hover-description="Regenerate this email using the settings shown above"
+							onClick={handleRegenerate}
+							disabled={isRegenerating || !onRegenerateDraft}
+						>
+							{isRegenerating ? <Spinner size="small" /> : 'Regenerate'}
+						</Button>
+					</div>
+				) : (
+					<>
+						<button
+							type="button"
+							onClick={handleNavigatePrevious}
+							disabled={!hasDrafts}
+							aria-label="View previous draft"
+							className="p-0 bg-transparent border-0 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+							style={{ marginRight: isMobile ? '10px' : '20px' }}
+						>
+							<LeftArrowReviewIcon />
+						</button>
+						<div className="flex" style={{ gap: isMobile ? '6px' : '13px' }}>
+							<Button
+								type="button"
+								variant="ghost"
+								className={cn(
+									"font-secondary font-semibold text-black border-[2px] border-black rounded-none transition enabled:hover:brightness-95",
+									isMobile ? "text-[12px]" : "text-[14px]"
+								)}
+								style={{
+									width: isMobile ? '80px' : '124px',
+									height: isMobile ? '36px' : '40px',
+									borderTopLeftRadius: '8px',
+									borderBottomLeftRadius: '8px',
+									backgroundColor: '#D5FFCB',
+								}}
+								data-hover-description="Approve you draft. This draft turned out good"
+								onClick={() => {
+									if (selectedDraft) {
+										const isCurrentlyApproved =
+											props.approvedDraftIds?.has(selectedDraft.id) ?? false;
+										props.onApproveDraft?.(selectedDraft.id, isCurrentlyApproved);
+										// Only navigate to next if we're approving, not toggling off
+										if (!isCurrentlyApproved) {
+											handleNavigateNext();
+										}
+									}
+								}}
+							>
+								<span>Approve</span>
+								{!isMobile && <ApproveCheckIcon />}
+							</Button>
+							<Button
+								type="button"
+								variant="ghost"
+								className={cn(
+									"font-secondary font-semibold text-black border-[2px] border-black rounded-none transition enabled:hover:brightness-95",
+									isMobile ? "text-[12px]" : "text-[14px]"
+								)}
+								style={{
+									width: isMobile ? '80px' : '124px',
+									height: isMobile ? '36px' : '40px',
+									backgroundColor: '#FFDC9E',
+								}}
+								data-hover-description="Click to preview your prompt/settings before regenerating this draft"
+								onClick={handleRegenerate}
+								disabled={isRegenerating || !onRegenerateDraft}
+							>
+								{isRegenerating ? <Spinner size="small" /> : isMobile ? 'Regen' : 'Regenerate'}
+							</Button>
+							<Button
+								type="button"
+								variant="ghost"
+								className={cn(
+									"font-secondary font-semibold text-black border-[2px] border-black rounded-none transition enabled:hover:brightness-95",
+									isMobile ? "text-[12px]" : "text-[14px]"
+								)}
+								style={{
+									width: isMobile ? '80px' : '124px',
+									height: isMobile ? '36px' : '40px',
+									borderTopRightRadius: '8px',
+									borderBottomRightRadius: '8px',
+									backgroundColor: '#E17272',
+								}}
+								data-hover-description="Reject this contact. This isn't deleting it, but putting it into a rejection folder for you to review"
+								onClick={() => {
+									if (selectedDraft) {
+										const isCurrentlyRejected =
+											props.rejectedDraftIds?.has(selectedDraft.id) ?? false;
+										props.onRejectDraft?.(selectedDraft.id, isCurrentlyRejected);
+										// Only navigate to next if we're rejecting, not toggling off
+										if (!isCurrentlyRejected) {
+											handleNavigateNext();
+										}
+									}
+								}}
+							>
+								<span>Reject</span>
+								{!isMobile && <RejectXIcon />}
+							</Button>
+						</div>
+						<button
+							type="button"
+							onClick={handleNavigateNext}
+							disabled={!hasDrafts}
+							aria-label="View next draft"
+							className="p-0 bg-transparent border-0 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+							style={{ marginLeft: isMobile ? '10px' : '20px' }}
+						>
+							<RightArrowReviewIcon />
+						</button>
+					</>
+				)}
 			</div>
 			{/* Tab navigation right arrow - only in narrow breakpoints, hidden on mobile */}
-			{showTabNavArrows && !isMobile && props.goToNextTab && (
+			{showTabNavArrows && !isMobile && props.goToNextTab && !isRegenSettingsPreviewOpen && (
 				<button
 					type="button"
 					onClick={props.goToNextTab}

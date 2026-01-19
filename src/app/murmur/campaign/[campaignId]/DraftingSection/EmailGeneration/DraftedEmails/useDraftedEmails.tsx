@@ -2,6 +2,8 @@ import { useDeleteEmail, useEditEmail } from '@/hooks/queryHooks/useEmails';
 import { EmailWithRelations } from '@/types';
 import { ContactWithName } from '@/types/contact';
 import { convertHtmlToPlainText } from '@/utils';
+import { Identity } from '@prisma/client';
+import { PatchIdentityData } from '@/app/api/identities/[id]/route';
 import {
 	extractMurmurDraftSettingsSnapshot,
 	injectMurmurDraftSettingsSnapshot,
@@ -51,6 +53,10 @@ export interface DraftedEmailsProps {
 	goToSearch?: () => void;
 	/** Optional: callback to navigate to the Inbox tab */
 	goToInbox?: () => void;
+	/** Optional: identity passed through for embedded prompt settings preview (regeneration) */
+	identity?: Identity | null;
+	/** Optional: callback to update identity fields from the embedded prompt settings preview */
+	onIdentityUpdate?: (data: PatchIdentityData) => void;
 	/** Optional: callback invoked when a draft is rejected in preview (toggle behavior) */
 	onRejectDraft?: (draftId: number, currentlyRejected?: boolean) => void;
 	/** Optional: callback invoked when a draft is approved in preview (toggle behavior) */

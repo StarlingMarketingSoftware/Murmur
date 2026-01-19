@@ -2671,6 +2671,9 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		hideDraftButton,
 		useStaticDropdownPosition,
 		hideMobileStickyTestFooter,
+		hideGenerateTestButton,
+		containerHeightPx,
+		dataCampaignMainBox,
 	} = props;
 
 	// Track if the user has attempted to Test to control error styling
@@ -4062,13 +4065,30 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 					>
 						<div
 							ref={mainContainerRef}
-							className={`${
+							className={cn(
 								compactLeftOnly
 									? 'flex-col'
-									: 'w-[96.27vw] max-w-[499px] h-[703px] transition flex mx-auto flex-col border-[3px] border-transparent rounded-[8px] bg-[#A6E2A8]'
-							} relative overflow-visible isolate`}
-							style={!compactLeftOnly ? { backgroundColor: '#A6E2A8' } : undefined}
-							data-campaign-main-box={compactLeftOnly ? undefined : 'writing'}
+									: cn(
+											'w-[96.27vw] max-w-[499px] transition flex mx-auto flex-col border-[3px] border-transparent rounded-[8px] bg-[#A6E2A8]',
+											containerHeightPx ? null : 'h-[703px]'
+									  ),
+								'relative overflow-visible isolate'
+							)}
+							style={
+								!compactLeftOnly
+									? {
+											backgroundColor: '#A6E2A8',
+											...(containerHeightPx ? { height: `${containerHeightPx}px` } : {}),
+									  }
+									: undefined
+							}
+							data-campaign-main-box={
+								compactLeftOnly
+									? undefined
+									: dataCampaignMainBox === undefined
+										? 'writing'
+										: dataCampaignMainBox || undefined
+							}
 							data-hover-description={hoverDescription}
 							data-hpi-container
 							onFocus={handleContainerFocus}
@@ -6184,7 +6204,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 												</div>
 
 												{/* Hybrid: Generate Test button (Auto-tab style) — 26px below the main box (desktop) */}
-												{!showTestPreview && !compactLeftOnly && (
+												{!hideGenerateTestButton && !showTestPreview && !compactLeftOnly && (
 													<div className="mt-[26px] w-[448px] max-w-[89.33vw] flex items-center justify-center max-[480px]:hidden">
 														<Button
 															type="button"
@@ -6634,7 +6654,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 											</div>
 										)}
 										{/* Full Auto: Generate Test button sits in the empty green space (desktop) */}
-										{selectedModeKey === 'full' && !showTestPreview && !compactLeftOnly && (
+										{!hideGenerateTestButton && selectedModeKey === 'full' && !showTestPreview && !compactLeftOnly && (
 											<div className={cn(
 												'absolute left-0 right-0 w-full flex items-center justify-center max-[480px]:hidden',
 												isLocalCustomInstructionsOpen ? 'bottom-[124px]' : 'bottom-[194px]'
@@ -6760,7 +6780,10 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 								)}
 
 								{/* Test button and notices (hidden in compact mode, profile tab, and Manual mode) */}
-								{compactLeftOnly || activeTab === 'profile' || selectedModeKey === 'manual' ? null : (
+								{compactLeftOnly ||
+								activeTab === 'profile' ||
+								selectedModeKey === 'manual' ||
+								hideGenerateTestButton ? null : (
 									<>
 										{/* Desktop (manual/hybrid): bottom bar Generate Test button */}
 										{selectedModeKey !== 'full' && selectedModeKey !== 'hybrid' && (

@@ -173,6 +173,23 @@ export interface HybridPromptInputProps {
 	 * Useful for embedded/scaled demos (e.g. landing page) where fixed UI bleeds outside the demo frame.
 	 */
 	hideMobileStickyTestFooter?: boolean;
+	/**
+	 * Optional: when true, hide all "Generate Test" / "Test" controls.
+	 * Useful for embedded prompt previews (e.g. regen settings) where testing is not needed.
+	 */
+	hideGenerateTestButton?: boolean;
+	/**
+	 * Optional: override the main container height (default 703px).
+	 * Useful for embedded previews that should not fill the full box.
+	 */
+	containerHeightPx?: number;
+	/**
+	 * Optional: override the `data-campaign-main-box` attribute used for cross-tab morph animations.
+	 * - `undefined` (default): uses "writing" (current behavior)
+	 * - `null` or empty string: omits the attribute
+	 * - string: sets the attribute to that value
+	 */
+	dataCampaignMainBox?: string | null;
 }
 
 export const useHybridPromptInput = (props: HybridPromptInputProps) => {
