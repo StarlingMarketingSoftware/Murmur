@@ -317,22 +317,6 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 		};
 	}, [selectedDraft, setSelectedDraft]);
 
-	// Close the draft review UI when pressing Escape key.
-	useEffect(() => {
-		if (!selectedDraft) return;
-
-		const handleKeyDown = (event: KeyboardEvent) => {
-			if (event.key === 'Escape') {
-				handleBack();
-			}
-		};
-
-		document.addEventListener('keydown', handleKeyDown);
-		return () => {
-			document.removeEventListener('keydown', handleKeyDown);
-		};
-	}, [selectedDraft, handleBack]);
-
 	// Mobile-specific width values (using CSS calc for responsive sizing)
 	// 4px margins on each side for edge-to-edge feel
 	const mobileEmailRowWidth = 'calc(100vw - 24px)'; // Full width minus padding
@@ -405,6 +389,42 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 		() => handleNavigateDraft('next'),
 		[handleNavigateDraft]
 	);
+
+	// Keyboard navigation for draft review UI:
+	// - Escape: close the review and return to drafts list
+	// - ArrowUp/ArrowDown: navigate between drafts (when not in text entry)
+	useEffect(() => {
+		if (!selectedDraft) return;
+
+		const handleKeyDown = (event: KeyboardEvent) => {
+			if (event.key === 'Escape') {
+				handleBack();
+				return;
+			}
+
+			// Check if user is currently in a text entry field
+			const activeElement = document.activeElement;
+			const isTextEntry =
+				activeElement instanceof HTMLInputElement ||
+				activeElement instanceof HTMLTextAreaElement ||
+				activeElement?.getAttribute('contenteditable') === 'true';
+
+			if (isTextEntry) return;
+
+			if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') {
+				event.preventDefault();
+				handleNavigatePrevious();
+			} else if (event.key === 'ArrowDown' || event.key === 'ArrowRight') {
+				event.preventDefault();
+				handleNavigateNext();
+			}
+		};
+
+		document.addEventListener('keydown', handleKeyDown);
+		return () => {
+			document.removeEventListener('keydown', handleKeyDown);
+		};
+	}, [selectedDraft, handleBack, handleNavigatePrevious, handleNavigateNext]);
 
 	const handleRegenerateSelectedDrafts = useCallback(async () => {
 		if (!props.onRegenerateDraft) return;

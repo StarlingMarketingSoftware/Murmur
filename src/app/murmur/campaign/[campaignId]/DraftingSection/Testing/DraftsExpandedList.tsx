@@ -1,6 +1,6 @@
 'use client';
 
-import { FC, MouseEvent, useMemo, useRef, useState } from 'react';
+import { FC, MouseEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
@@ -178,6 +178,17 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 	const [selectedDraftIds, setSelectedDraftIds] = useState<Set<number>>(new Set());
 	const lastClickedRef = useRef<number | null>(null);
 	const [isSending, setIsSending] = useState(false);
+	const draftRowRefs = useRef<Map<number, HTMLDivElement>>(new Map());
+
+	// Scroll the previewed draft into view when it changes
+	useEffect(() => {
+		if (previewedDraftId == null) return;
+		const rowEl = draftRowRefs.current.get(previewedDraftId);
+		if (rowEl) {
+			// Use 'auto' (instant) instead of 'smooth' so rapid key navigation works
+			rowEl.scrollIntoView({ behavior: 'auto', block: 'nearest' });
+		}
+	}, [previewedDraftId]);
 
 	// Data/context for sending
 	const { campaignId } = useParams() as { campaignId: string };
@@ -511,6 +522,13 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 							return (
 								<div
 									key={draft.id}
+									ref={(el) => {
+										if (el) {
+											draftRowRefs.current.set(draft.id as number, el);
+										} else {
+											draftRowRefs.current.delete(draft.id as number);
+										}
+									}}
 									className={cn(
 										'cursor-pointer relative select-none overflow-visible rounded-[8px] border-2 border-[#000000] bg-white',
 										isBottomView
