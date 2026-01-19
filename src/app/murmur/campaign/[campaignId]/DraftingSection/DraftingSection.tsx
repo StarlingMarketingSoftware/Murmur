@@ -244,8 +244,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const [hoveredSentForSettings, setHoveredSentForSettings] =
 		useState<EmailWithRelations | null>(null);
 	const isDraftPreviewOpen = isDraftingView && Boolean(selectedDraft);
-	const draftsMiniEmailTopHeaderHeight = isDraftingView || isSentView ? 26 : undefined;
-	const draftsMiniEmailFillColor = isDraftingView || isSentView ? '#B1CEEF' : undefined;
+	const draftsMiniEmailTopHeaderHeight = isDraftingView || isSentView ? 23 : undefined;
+	const draftsMiniEmailFillColor = isDraftingView || isSentView ? '#DAE6FE' : undefined;
 
 	// Drafts tab: read-only preview form for the MiniEmailStructure, driven by hovered/selected draft settings.
 	const draftsSettingsPreviewForm = useForm<DraftingFormValues>({
@@ -2015,15 +2015,19 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 
 	const displayedContactForResearch =
 		hoveredContactForResearch || selectedContactForResearch;
-	const draftsMiniEmailTopHeaderLabel = draftsMiniEmailTopHeaderHeight
-		? (() => {
-				const contact = displayedContactForResearch;
-				if (!contact) return 'Settings';
-				const fullName = `${contact.firstName || ''} ${contact.lastName || ''}`.trim();
-				const displayName = (fullName || contact.name || contact.company || '').trim();
-				return displayName ? `Settings - ${displayName}` : 'Settings';
-		  })()
-		: undefined;
+	const draftsMiniEmailTopHeaderLabel = draftsMiniEmailTopHeaderHeight ? 'Settings' : undefined;
+	const draftsMiniEmailSettingsLabels = useMemo(() => {
+		const contact = displayedContactForResearch;
+		if (!draftsMiniEmailTopHeaderHeight || !contact) return { primary: '', secondary: '' };
+
+		const fullName = `${contact.firstName || ''} ${contact.lastName || ''}`.trim();
+		const name = (fullName || contact.name || '').trim();
+		const company = (contact.company || '').trim();
+
+		if (!name) return { primary: company, secondary: '' };
+		if (!company) return { primary: name, secondary: '' };
+		return { primary: name, secondary: company };
+	}, [displayedContactForResearch, draftsMiniEmailTopHeaderHeight]);
 
 	useEffect(() => {
 		if (!selectedContactForResearch && contacts && contacts.length > 0) {
@@ -2758,6 +2762,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																		: form
 															}
 															readOnly={isDraftingView || isSentView}
+															variant={draftsMiniEmailTopHeaderHeight ? 'settings' : undefined}
+															settingsPrimaryLabel={draftsMiniEmailSettingsLabels.primary}
+															settingsSecondaryLabel={draftsMiniEmailSettingsLabels.secondary}
 															profileFields={miniProfileFields}
 															identityProfile={campaign?.identity as IdentityProfileFields | null}
 															onIdentityUpdate={handleIdentityUpdate}
@@ -4117,6 +4124,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														<MiniEmailStructure
 															form={draftsSettingsPreviewForm}
 															readOnly
+															variant={draftsMiniEmailTopHeaderHeight ? 'settings' : undefined}
+															settingsPrimaryLabel={draftsMiniEmailSettingsLabels.primary}
+															settingsSecondaryLabel={draftsMiniEmailSettingsLabels.secondary}
 															profileFields={miniProfileFields}
 															identityProfile={campaign?.identity as IdentityProfileFields | null}
 															onIdentityUpdate={handleIdentityUpdate}
@@ -4448,6 +4458,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													<MiniEmailStructure
 														form={draftsSettingsPreviewForm}
 														readOnly
+														variant={draftsMiniEmailTopHeaderHeight ? 'settings' : undefined}
+														settingsPrimaryLabel={draftsMiniEmailSettingsLabels.primary}
+														settingsSecondaryLabel={draftsMiniEmailSettingsLabels.secondary}
 														profileFields={miniProfileFields}
 														identityProfile={campaign?.identity as IdentityProfileFields | null}
 														onIdentityUpdate={handleIdentityUpdate}
@@ -4575,6 +4588,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																	: form
 														}
 														readOnly={isDraftingView || isSentView}
+														variant={draftsMiniEmailTopHeaderHeight ? 'settings' : undefined}
+														settingsPrimaryLabel={draftsMiniEmailSettingsLabels.primary}
+														settingsSecondaryLabel={draftsMiniEmailSettingsLabels.secondary}
 														profileFields={miniProfileFields}
 														identityProfile={campaign?.identity as IdentityProfileFields | null}
 														onIdentityUpdate={handleIdentityUpdate}
@@ -4893,6 +4909,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																	: form
 														}
 														readOnly={isDraftingView || isSentView}
+														variant={draftsMiniEmailTopHeaderHeight ? 'settings' : undefined}
+														settingsPrimaryLabel={draftsMiniEmailSettingsLabels.primary}
+														settingsSecondaryLabel={draftsMiniEmailSettingsLabels.secondary}
 														profileFields={miniProfileFields}
 														identityProfile={campaign?.identity as IdentityProfileFields | null}
 														onIdentityUpdate={handleIdentityUpdate}
@@ -4972,6 +4991,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																	: form
 														}
 														readOnly={isDraftingView || isSentView}
+														variant={draftsMiniEmailTopHeaderHeight ? 'settings' : undefined}
+														settingsPrimaryLabel={draftsMiniEmailSettingsLabels.primary}
+														settingsSecondaryLabel={draftsMiniEmailSettingsLabels.secondary}
 														profileFields={miniProfileFields}
 														identityProfile={campaign?.identity as IdentityProfileFields | null}
 														onIdentityUpdate={handleIdentityUpdate}
@@ -5119,6 +5141,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																	: form
 														}
 														readOnly={isDraftingView || isSentView}
+														variant={draftsMiniEmailTopHeaderHeight ? 'settings' : undefined}
+														settingsPrimaryLabel={draftsMiniEmailSettingsLabels.primary}
+														settingsSecondaryLabel={draftsMiniEmailSettingsLabels.secondary}
 														profileFields={miniProfileFields}
 														identityProfile={campaign?.identity as IdentityProfileFields | null}
 														onIdentityUpdate={handleIdentityUpdate}
@@ -6612,6 +6637,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																: form
 													}
 													readOnly={isDraftingView || isSentView}
+													variant={draftsMiniEmailTopHeaderHeight ? 'settings' : undefined}
+													settingsPrimaryLabel={draftsMiniEmailSettingsLabels.primary}
+													settingsSecondaryLabel={draftsMiniEmailSettingsLabels.secondary}
 													profileFields={miniProfileFields}
 													identityProfile={campaign?.identity as IdentityProfileFields | null}
 													onIdentityUpdate={handleIdentityUpdate}
@@ -7365,6 +7393,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																: form
 													}
 													readOnly={isDraftingView || isSentView}
+													variant={draftsMiniEmailTopHeaderHeight ? 'settings' : undefined}
+													settingsPrimaryLabel={draftsMiniEmailSettingsLabels.primary}
+													settingsSecondaryLabel={draftsMiniEmailSettingsLabels.secondary}
 													profileFields={miniProfileFields}
 													identityProfile={campaign?.identity as IdentityProfileFields | null}
 													onIdentityUpdate={handleIdentityUpdate}
