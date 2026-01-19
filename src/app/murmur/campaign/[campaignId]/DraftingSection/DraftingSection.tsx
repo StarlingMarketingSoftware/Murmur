@@ -2664,6 +2664,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										draftCount={draftCount}
 										sentCount={sentCount}
 										onFromClick={onOpenIdentityDialog}
+										onContactsClick={goToContacts}
+										onDraftsClick={goToDrafting}
+										onSentClick={goToSent}
 									/>
 									{view !== 'inbox' &&
 										(isDraftPreviewOpen ? (
@@ -3608,6 +3611,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													draftCount={draftCount}
 													sentCount={sentCount}
 													onFromClick={onOpenIdentityDialog}
+													onContactsClick={goToContacts}
+													onDraftsClick={goToDrafting}
+													onSentClick={goToSent}
 													width={330}
 												/>
 												{/* Compact Contacts table */}
@@ -4101,6 +4107,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														draftCount={draftCount}
 														sentCount={sentCount}
 														onFromClick={onOpenIdentityDialog}
+														onContactsClick={goToContacts}
+														onDraftsClick={goToDrafting}
+														onSentClick={goToSent}
 														width={330}
 													/>
 													{/* Mini Email Structure panel */}
@@ -4550,6 +4559,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													draftCount={draftCount}
 													sentCount={sentCount}
 													onFromClick={onOpenIdentityDialog}
+													onContactsClick={goToContacts}
+													onDraftsClick={goToDrafting}
+													onSentClick={goToSent}
 													width={330}
 												/>
 												{/* Mini Email Structure panel */}
@@ -4944,6 +4956,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													draftCount={draftCount}
 													sentCount={sentCount}
 													onFromClick={onOpenIdentityDialog}
+													onContactsClick={goToContacts}
+													onDraftsClick={goToDrafting}
+													onSentClick={goToSent}
 													width={330}
 												/>
 												{/* Mini Email Structure panel */}
@@ -5180,6 +5195,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												draftCount={draftCount}
 												sentCount={sentCount}
 												onFromClick={onOpenIdentityDialog}
+												onContactsClick={goToContacts}
+												onDraftsClick={goToDrafting}
+												onSentClick={goToSent}
 											/>
 											<div
 												style={{
@@ -6339,6 +6357,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													draftCount={draftCount}
 													sentCount={sentCount}
 													onFromClick={onOpenIdentityDialog}
+													onContactsClick={goToContacts}
+													onDraftsClick={goToDrafting}
+													onSentClick={goToSent}
 													width={375}
 												/>
 												{/* Research panel below header - full aesthetic matching other tabs */}
@@ -6487,6 +6508,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											draftCount={draftCount}
 											sentCount={sentCount}
 											onFromClick={onOpenIdentityDialog}
+											onContactsClick={goToContacts}
+											onDraftsClick={goToDrafting}
+											onSentClick={goToSent}
 											width={330}
 										/>
 										{/* 2. Contacts */}
@@ -7147,6 +7171,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											draftCount={draftCount}
 											sentCount={sentCount}
 											onFromClick={onOpenIdentityDialog}
+											onContactsClick={goToContacts}
+											onDraftsClick={goToDrafting}
+											onSentClick={goToSent}
 											width={330}
 										/>
 										<div

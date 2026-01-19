@@ -16,6 +16,9 @@ interface CampaignHeaderBoxProps {
 	draftCount: number;
 	sentCount: number;
 	onFromClick?: () => void;
+	onContactsClick?: () => void;
+	onDraftsClick?: () => void;
+	onSentClick?: () => void;
 	width?: number;
 	/** When true, uses responsive width (matching writing box) with left-aligned content */
 	fullWidth?: boolean;
@@ -36,6 +39,9 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 	draftCount,
 	sentCount,
 	onFromClick,
+	onContactsClick,
+	onDraftsClick,
+	onSentClick,
 	width = 374,
 	fullWidth = false,
 	className,
@@ -195,7 +201,7 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 				</div>
 			) : null}
 			{/* Campaign Title */}
-			<div className="h-[26px] overflow-hidden flex-shrink-0">
+			<div className="h-[26px] overflow-hidden flex-shrink-0 mt-[6px]">
 				{isEditing ? (
 					<input
 						ref={inputRef}
@@ -285,9 +291,11 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 			<div className="flex-1" />
 
 			{/* Metrics Row */}
-			<div className={cn('flex items-center', fullWidth ? 'gap-[10px]' : 'gap-[20px]')}>
-				<div
-					className="inline-flex items-center justify-center rounded-[8px] border border-black leading-none truncate font-inter font-semibold"
+			<div className={cn('flex items-center -mt-[6px]', fullWidth ? 'gap-[10px]' : 'gap-[20px]')}>
+				<button
+					type="button"
+					onClick={onContactsClick}
+					className="inline-flex items-center justify-center rounded-[8px] border border-black leading-none truncate font-inter font-semibold cursor-pointer hover:brightness-95 transition-all"
 					style={{
 						backgroundColor: getContactsFillColor(),
 						borderWidth: '1px',
@@ -297,9 +305,11 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 					}}
 				>
 					{`${String(contactsCount).padStart(2, '0')} Contacts`}
-				</div>
-				<div
-					className="inline-flex items-center justify-center rounded-[8px] border border-black leading-none truncate font-inter font-semibold"
+				</button>
+				<button
+					type="button"
+					onClick={onDraftsClick}
+					className="inline-flex items-center justify-center rounded-[8px] border border-black leading-none truncate font-inter font-semibold cursor-pointer hover:brightness-95 transition-all"
 					style={{
 						backgroundColor: getDraftFillColor(),
 						borderWidth: '1px',
@@ -309,9 +319,11 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 					}}
 				>
 					{draftCount === 0 ? 'Drafts' : `${String(draftCount).padStart(2, '0')} Drafts`}
-				</div>
-				<div
-					className="inline-flex items-center justify-center rounded-[8px] border border-black leading-none truncate font-inter font-semibold"
+				</button>
+				<button
+					type="button"
+					onClick={onSentClick}
+					className="inline-flex items-center justify-center rounded-[8px] border border-black leading-none truncate font-inter font-semibold cursor-pointer hover:brightness-95 transition-all"
 					style={{
 						backgroundColor: getSentFillColor(),
 						borderWidth: '1px',
@@ -321,7 +333,7 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 					}}
 				>
 					{sentCount === 0 ? 'Sent' : `${String(sentCount).padStart(2, '0')} Sent`}
-				</div>
+				</button>
 			</div>
 		</div>
 	);

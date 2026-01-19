@@ -1788,6 +1788,9 @@ const Murmur = () => {
 									setIdentityDialogOrigin('campaign');
 									setIsIdentityDialogOpen(true);
 								}}
+								onContactsClick={() => setActiveView('contacts')}
+								onDraftsClick={() => setActiveView('drafting')}
+								onSentClick={() => setActiveView('sent')}
 								fullWidth
 							/>
 						</div>
