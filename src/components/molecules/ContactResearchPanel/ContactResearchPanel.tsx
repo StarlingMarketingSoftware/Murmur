@@ -729,7 +729,8 @@ top: isExpanded ? '28px' : '50%',
 								className="w-full h-full"
 								thumbColor="#000000"
 								thumbWidth={2}
-								offsetRight={-5}
+								// Nudge scrollbar slightly further right so it sits closer to the panel border.
+								offsetRight={-7}
 							>
 								<div
 									style={{
