@@ -211,17 +211,27 @@ const ScrollableTextarea: FC<ScrollableTextareaProps> = ({
 	);
 };
 
+// Hover/click zones for a draft row:
+// - Left: selection zone (matches the green accent line)
+// - Middle: open zone (most of the row)
+// - Right: delete zone (the last/rightmost slice)
 type DraftRowHoverRegion = 'left' | 'middle' | 'right';
 
-const DRAFT_ROW_SELECT_ZONE_PX = 80;
-const DRAFT_ROW_OPEN_ZONE_PX = 254;
+const DRAFT_ROW_SELECT_ZONE_PX = 115;
+const DRAFT_ROW_DELETE_ZONE_PX = 80;
 
 function getDraftRowHoverRegion(event: React.MouseEvent<HTMLElement>): DraftRowHoverRegion {
 	const rect = event.currentTarget.getBoundingClientRect();
 	const x = event.clientX - rect.left;
-	if (x < DRAFT_ROW_SELECT_ZONE_PX) return 'left';
-	if (x < DRAFT_ROW_SELECT_ZONE_PX + DRAFT_ROW_OPEN_ZONE_PX) return 'middle';
-	return 'right';
+	const width = rect.width;
+
+	// Clamp zones so we never end up with negative widths on very small layouts.
+	const selectZone = Math.min(DRAFT_ROW_SELECT_ZONE_PX, width);
+	const deleteZone = Math.min(DRAFT_ROW_DELETE_ZONE_PX, Math.max(0, width - selectZone));
+
+	if (x < selectZone) return 'left';
+	if (x > width - deleteZone) return 'right';
+	return 'middle';
 }
 
 export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
@@ -1432,7 +1442,11 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 										: hoveredRegion === 'middle'
 											? 'bg-[#F9E5BA]'
 											: null;
-							const rowBgColor = hoveredBgColor ?? (isSelected ? selectedBgColor : 'bg-white');
+							const rowBgColor = isHoveringAllButton
+								? hoveredBgColor
+								: isSelected
+									? selectedBgColor
+									: hoveredBgColor ?? 'bg-white';
 							const hoverDescription =
 								hoveredRegion === 'left'
 									? 'Click to select row'
@@ -1498,10 +1512,22 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 											void handleDeleteDraft(e, draft.id);
 										}}
 									>
+									{/* Left-hover accent bar (156px x 5px) */}
+									{hoveredRegion === 'left' && (
+										<span
+											className="absolute left-0 top-0 w-[156px] h-[5px] bg-[#CCECD4] pointer-events-none rounded-tl-[6px]"
+										/>
+									)}
+									{/* Middle-hover accent bar (from x=156px to right edge, 5px tall) */}
+									{hoveredRegion === 'middle' && (
+										<span
+											className="absolute left-[156px] right-0 top-0 h-[5px] bg-[#FFDE97] pointer-events-none rounded-tr-[6px]"
+										/>
+									)}
 									{/* Used-contact indicator - 11px from top */}
 									{usedContactIdsSet.has(draft.contactId) && (
 										<span
-											className="absolute"
+											className="absolute z-10"
 											title="Used in a previous campaign"
 											style={{
 												left: '8px',
@@ -1517,7 +1543,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 									{/* Rejected indicator - stacked below used-contact when present */}
 									{isRejected && (
 										<span
-											className="absolute"
+											className="absolute z-10"
 											title="Marked for rejection"
 											aria-label="Rejected draft"
 											style={{
@@ -1534,7 +1560,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 									{/* Approved indicator - stacked below used-contact when present */}
 									{isApproved && (
 										<span
-											className="absolute"
+											className="absolute z-10"
 											title="Marked for approval"
 											aria-label="Approved draft"
 											style={{
@@ -1548,28 +1574,20 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 											}}
 										/>
 									)}
-									{/* Checkbox indicator - visible on hover only */}
-									<span
-										className="absolute hidden group-hover/draft:block cursor-pointer"
-										style={{
-											left: '10px',
-											bottom: '10px',
-											width: '15px',
-											height: '15px',
-											borderRadius: '1px',
-											border: isSelected ? '2px solid #FFFFFF' : '2px solid #676767',
-											backgroundColor: isSelected ? '#22C21C' : 'transparent',
-										}}
-										onClick={(e) => {
-											e.stopPropagation();
-											e.preventDefault();
-											handleDraftSelect(draft, e);
-										}}
-										onDoubleClick={(e) => {
-											e.stopPropagation();
-											e.preventDefault();
-										}}
-									/>
+									{/* Selection switch (replaces old checkbox square) */}
+									<div
+										className={cn(
+											'absolute left-[10px] bottom-[4px] z-0 w-[9px] h-[36px] rounded-[11px] border-2 border-black bg-white overflow-hidden pointer-events-none',
+											'hidden group-hover/draft:block'
+										)}
+									>
+										<div
+											className={cn(
+												'absolute left-0 top-0 w-full rounded-[11px] transition-all duration-200 ease-out',
+												isSelected ? 'h-full bg-[#ECF5EE]' : 'h-[26px] bg-[#6DC683]'
+											)}
+										/>
+									</div>
 									{/* Delete button */}
 									<Button
 										type="button"
