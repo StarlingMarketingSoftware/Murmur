@@ -317,6 +317,22 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 		};
 	}, [selectedDraft, setSelectedDraft]);
 
+	// Close the draft review UI when pressing Escape key.
+	useEffect(() => {
+		if (!selectedDraft) return;
+
+		const handleKeyDown = (event: KeyboardEvent) => {
+			if (event.key === 'Escape') {
+				handleBack();
+			}
+		};
+
+		document.addEventListener('keydown', handleKeyDown);
+		return () => {
+			document.removeEventListener('keydown', handleKeyDown);
+		};
+	}, [selectedDraft, handleBack]);
+
 	// Mobile-specific width values (using CSS calc for responsive sizing)
 	// 4px margins on each side for edge-to-edge feel
 	const mobileEmailRowWidth = 'calc(100vw - 24px)'; // Full width minus padding
