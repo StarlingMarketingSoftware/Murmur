@@ -171,7 +171,6 @@ export const FullAutoBodyBlock: FC<FullAutoBodyBlockProps> = ({
 
 		// Make sure it doesn't overflow viewport edges (in unzoomed coordinates)
 		const viewportWidth = window.innerWidth / zoom;
-		const viewportHeight = window.innerHeight / zoom;
 		const maxLeft = Math.max(viewportPadding, viewportWidth - bookingForDropdownSize.width - viewportPadding);
 		left = Math.min(left, maxLeft);
 		left = Math.max(left, viewportPadding);
@@ -185,19 +184,12 @@ export const FullAutoBodyBlock: FC<FullAutoBodyBlockProps> = ({
 			setBookingForTabStripLeft(null);
 		}
 
-		// Check if would overflow bottom, flip above if possible
-		const wouldOverflowBottom =
-			top + bookingForDropdownSize.height > viewportHeight - viewportPadding;
-		const canOpenAbove = buttonRect.top / zoom - margin - bookingForDropdownSize.height >= viewportPadding;
-		if (wouldOverflowBottom && canOpenAbove) {
-			top = buttonRect.top / zoom - margin - bookingForDropdownSize.height;
-		}
-
+		// Always position below the button (no flip above)
 		setBookingForDropdownPosition({
 			top: Math.round(top),
 			left: Math.round(left),
 		});
-	}, [bookingForDropdownSize.height, bookingForDropdownSize.width, bookingForTab]);
+	}, [bookingForDropdownSize.width, bookingForTab]);
 
 	// Focus textarea when Custom Instructions opens
 	useEffect(() => {
@@ -295,9 +287,41 @@ export const FullAutoBodyBlock: FC<FullAutoBodyBlockProps> = ({
 		window.addEventListener('resize', handle);
 		// capture=true so we also reposition when any scrollable ancestor scrolls
 		window.addEventListener('scroll', handle, true);
+
+		// Listen to visual viewport changes (catches browser zoom)
+		const visualViewport = window.visualViewport;
+		if (visualViewport) {
+			visualViewport.addEventListener('resize', handle);
+			visualViewport.addEventListener('scroll', handle);
+		}
+
+		// Use requestAnimationFrame loop to keep position in sync during zoom/transitions
+		let rafId: number | null = null;
+		let lastButtonRect = '';
+		const checkPosition = () => {
+			const button = bookingForButtonRef.current;
+			if (button) {
+				const rect = button.getBoundingClientRect();
+				const currentRect = `${rect.top},${rect.left},${rect.bottom},${rect.right}`;
+				if (currentRect !== lastButtonRect) {
+					lastButtonRect = currentRect;
+					updateBookingForDropdownPosition();
+				}
+			}
+			rafId = requestAnimationFrame(checkPosition);
+		};
+		rafId = requestAnimationFrame(checkPosition);
+
 		return () => {
 			window.removeEventListener('resize', handle);
 			window.removeEventListener('scroll', handle, true);
+			if (visualViewport) {
+				visualViewport.removeEventListener('resize', handle);
+				visualViewport.removeEventListener('scroll', handle);
+			}
+			if (rafId != null) {
+				cancelAnimationFrame(rafId);
+			}
 		};
 	}, [isBookingForOpen, updateBookingForDropdownPosition]);
 
