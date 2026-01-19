@@ -1228,6 +1228,49 @@ const Murmur = () => {
 		}
 	};
 
+	// Keyboard navigation: left/right arrow keys to switch tabs when no text input is focused
+	useEffect(() => {
+		const handleKeyDown = (e: KeyboardEvent) => {
+			// Only handle left/right arrow keys
+			if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+
+			// Check if a text input element is focused (don't intercept typing)
+			const activeElement = document.activeElement;
+			if (activeElement) {
+				const tagName = activeElement.tagName.toLowerCase();
+				// Skip if focused on input, textarea, or contentEditable
+				if (
+					tagName === 'input' ||
+					tagName === 'textarea' ||
+					(activeElement as HTMLElement).isContentEditable
+				) {
+					return;
+				}
+			}
+
+			// Prevent default scrolling behavior
+			e.preventDefault();
+
+			// Use mobile tab order on mobile, desktop tab order otherwise
+			if (isMobile === true) {
+				if (e.key === 'ArrowLeft') {
+					goToPreviousMobileTab();
+				} else {
+					goToNextMobileTab();
+				}
+			} else {
+				if (e.key === 'ArrowLeft') {
+					goToPreviousTab();
+				} else {
+					goToNextTab();
+				}
+			}
+		};
+
+		window.addEventListener('keydown', handleKeyDown);
+		return () => window.removeEventListener('keydown', handleKeyDown);
+	}, [isMobile, goToPreviousTab, goToNextTab]);
+
 	const handleOpenDashboardSearchForCampaign = useCallback(() => {
 		if (!campaign) return;
 
