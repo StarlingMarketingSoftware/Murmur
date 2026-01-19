@@ -211,6 +211,19 @@ const ScrollableTextarea: FC<ScrollableTextareaProps> = ({
 	);
 };
 
+type DraftRowHoverRegion = 'left' | 'middle' | 'right';
+
+const DRAFT_ROW_SELECT_ZONE_PX = 80;
+const DRAFT_ROW_OPEN_ZONE_PX = 254;
+
+function getDraftRowHoverRegion(event: React.MouseEvent<HTMLElement>): DraftRowHoverRegion {
+	const rect = event.currentTarget.getBoundingClientRect();
+	const x = event.clientX - rect.left;
+	if (x < DRAFT_ROW_SELECT_ZONE_PX) return 'left';
+	if (x < DRAFT_ROW_SELECT_ZONE_PX + DRAFT_ROW_OPEN_ZONE_PX) return 'middle';
+	return 'right';
+}
+
 export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 	const {
 		draftEmails,
@@ -302,6 +315,10 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 	const [isRegenerating, setIsRegenerating] = useState(false);
 	const [isRegenSettingsPreviewOpen, setIsRegenSettingsPreviewOpen] = useState(false);
 	const [isHoveringAllButton, setIsHoveringAllButton] = useState(false);
+	const [hoveredDraftRow, setHoveredDraftRow] = useState<{
+		draftId: number;
+		region: DraftRowHoverRegion;
+	} | null>(null);
 	// Used contacts indicator
 	const { data: usedContactIds } = useGetUsedContactIds();
 	const usedContactIdsSet = useMemo(
@@ -1375,6 +1392,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 					<div
 						className="overflow-visible w-full flex flex-col items-center"
 						onMouseLeave={() => {
+							setHoveredDraftRow(null);
 							onContactHover?.(null);
 							onDraftHover?.(null);
 						}}
@@ -1403,40 +1421,81 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 							// Colors based on tab
 							const isRejectedTab = props.statusFilter === 'rejected';
 							const selectedBgColor = isRejectedTab ? 'bg-[#D99696]' : 'bg-[#8BDA76]';
+							const hoveredRegion =
+								hoveredDraftRow?.draftId === draft.id ? hoveredDraftRow.region : null;
+							const hoveredBgColor = isHoveringAllButton
+								? 'bg-[#FFEDCA]'
+								: hoveredRegion === 'left'
+									? 'bg-[#ECFBF0]'
+									: hoveredRegion === 'right'
+										? 'bg-[#FFCACA]'
+										: hoveredRegion === 'middle'
+											? 'bg-[#F9E5BA]'
+											: null;
+							const rowBgColor = hoveredBgColor ?? (isSelected ? selectedBgColor : 'bg-white');
+							const hoverDescription =
+								hoveredRegion === 'left'
+									? 'Click to select row'
+									: hoveredRegion === 'right'
+										? 'Click to delete draft'
+										: 'Click to open and review';
 
 							return (
 								<div key={draft.id} className="w-full flex flex-col items-center overflow-visible">
 									{idx > 0 && <div className="h-[10px]" />}
 									<div
 										className={cn(
-											'cursor-pointer relative select-none overflow-visible border-2 p-2 group/draft rounded-[8px]',
+											'cursor-pointer relative select-none overflow-visible border-2 p-2 group/draft rounded-[8px] transition-colors',
 											isMobile ? 'h-[100px]' : 'h-[97px]',
-											isSelected
-												? cn('border-[#FFFFFF]', selectedBgColor)
-												: cn(
-														'border-[#000000]',
-														isHoveringAllButton ? 'bg-[#FFEDCA]' : 'bg-white hover:bg-[#F9E5BA]'
-												  )
+											isSelected ? 'border-[#FFFFFF]' : 'border-[#000000]',
+											rowBgColor,
 										)}
 										style={isMobile ? { width: mobileEmailRowWidth } : { width: '489px' }}
-										data-hover-description="Click to open and review"
+										data-hover-description={hoverDescription}
 										onMouseDown={(e) => {
 											// Prevent text selection on shift-click
 											if (e.shiftKey) {
 												e.preventDefault();
 											}
 										}}
-										onMouseEnter={() => {
+										onMouseEnter={(e) => {
 											if (contact) {
 												onContactHover?.(contact);
 											}
 											onDraftHover?.(draft);
+											const region = getDraftRowHoverRegion(e);
+											setHoveredDraftRow({ draftId: draft.id, region });
 										}}
-										onClick={() => {
-											handleDraftDoubleClick(draft);
-											if (contact) {
-												onContactClick?.(contact);
+										onMouseMove={(e) => {
+											const region = getDraftRowHoverRegion(e);
+											setHoveredDraftRow((prev) => {
+												if (prev?.draftId === draft.id && prev.region === region) return prev;
+												return { draftId: draft.id, region };
+											});
+										}}
+										onMouseLeave={() => {
+											setHoveredDraftRow((prev) => (prev?.draftId === draft.id ? null : prev));
+										}}
+										onClick={(e) => {
+											const region = getDraftRowHoverRegion(e);
+
+											// Left zone: select row
+											if (region === 'left') {
+												handleDraftSelect(draft, e);
+												return;
 											}
+
+											// Middle zone: open draft (existing behavior)
+											if (region === 'middle') {
+												handleDraftDoubleClick(draft);
+												if (contact) {
+													onContactClick?.(contact);
+												}
+												return;
+											}
+
+											// Right zone: delete draft
+											void handleDeleteDraft(e, draft.id);
 										}}
 									>
 									{/* Used-contact indicator - 11px from top */}
