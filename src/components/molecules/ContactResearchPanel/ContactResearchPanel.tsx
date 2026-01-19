@@ -261,11 +261,15 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 		: '630px';
 
 	// Add expansion difference if a box is expanded
-	const containerHeight = expandedBox
-		? typeof baseContainerHeight === 'number'
-			? baseContainerHeight + expansionDiff
-			: `calc(${baseContainerHeight} + ${expansionDiff}px)`
-		: baseContainerHeight;
+	// In fixed-height mode, the panel must remain fixed; expanded bullets are handled via the
+	// internal scroll wrapper. Only auto-height layouts should grow to accommodate expansion.
+	const containerHeight = height
+		? height
+		: expandedBox
+			? typeof baseContainerHeight === 'number'
+				? baseContainerHeight + expansionDiff
+				: `calc(${baseContainerHeight} + ${expansionDiff}px)`
+			: baseContainerHeight;
 
 	return (
 		<div

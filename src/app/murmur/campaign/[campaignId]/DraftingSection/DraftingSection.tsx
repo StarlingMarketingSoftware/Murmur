@@ -251,8 +251,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const draftsSettingsPreviewForm = useForm<DraftingFormValues>({
 		defaultValues: form.getValues(),
 	});
+	// When a draft is OPEN for review/editing, the settings panel should ALWAYS reflect that draft,
+	// even if the user hovers other rows in the list.
 	const draftForSettingsPreview =
-		isDraftingView ? hoveredDraftForSettings ?? selectedDraft : null;
+		isDraftingView ? selectedDraft ?? hoveredDraftForSettings : null;
 	useEffect(() => {
 		if (!isDraftingView) {
 			// Avoid leaking hover state across tabs.
@@ -273,6 +275,13 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		draftsSettingsPreviewForm,
 		hoveredDraftForSettings,
 	]);
+
+	// When a draft is open, disable/clear hover-driven settings previews so the right panel is stable.
+	useEffect(() => {
+		if (!isDraftingView) return;
+		if (!selectedDraft) return;
+		if (hoveredDraftForSettings) setHoveredDraftForSettings(null);
+	}, [hoveredDraftForSettings, isDraftingView, selectedDraft]);
 
 	// Sent tab: read-only preview form for the MiniEmailStructure, driven by hovered sent email settings.
 	const sentSettingsPreviewForm = useForm<DraftingFormValues>({
@@ -2013,8 +2022,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		useState(false);
 	const [showTestPreview, setShowTestPreview] = useState(false);
 
-	const displayedContactForResearch =
-		hoveredContactForResearch || selectedContactForResearch;
+	// When a draft is open, the research panel should stay locked to that draft's contact.
+	const displayedContactForResearch = isDraftPreviewOpen
+		? selectedContactForResearch
+		: hoveredContactForResearch || selectedContactForResearch;
 	const draftsMiniEmailTopHeaderLabel = draftsMiniEmailTopHeaderHeight ? 'Settings' : undefined;
 	const draftsMiniEmailSettingsLabels = useMemo(() => {
 		const contact = displayedContactForResearch;
@@ -3230,6 +3241,63 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											contact={contacts?.[0] || displayedContactForResearch}
 											style={{ width: 375, height: 670 }}
 										/>
+									) : view === 'drafting' && Boolean(selectedDraft) ? (
+										<div
+											className="flex flex-col"
+											style={{
+												// Match the legacy research panel footprint so it remains aligned with the rest of the layout.
+												width: 376,
+												height: 670,
+												gap: 12,
+											}}
+										>
+											<MiniEmailStructure
+												form={draftsSettingsPreviewForm}
+												readOnly
+												variant={draftsMiniEmailTopHeaderHeight ? 'settings' : undefined}
+												settingsPrimaryLabel={draftsMiniEmailSettingsLabels.primary}
+												settingsSecondaryLabel={draftsMiniEmailSettingsLabels.secondary}
+												profileFields={miniProfileFields}
+												identityProfile={campaign?.identity as IdentityProfileFields | null}
+												onIdentityUpdate={handleIdentityUpdate}
+												onDraft={() =>
+													handleGenerateDrafts(
+														contactsAvailableForDrafting.map((c) => c.id)
+													)
+												}
+												isDraftDisabled={isGenerationDisabled() || isPendingGeneration}
+												isPendingGeneration={isPendingGeneration}
+												generationProgress={generationProgress}
+												generationTotal={contactsAvailableForDrafting.length}
+												hideTopChrome
+												hideFooter
+												hideAddTextButtons
+												// Keep this a tight preview that never shows an inner scrollbar.
+												fitToHeight
+												lockFitToHeightScale
+												// Requested: compressed Settings view height.
+												height={358}
+												pageFillColor={draftsMiniEmailFillColor}
+											/>
+
+											<ContactResearchPanel
+												contact={displayedContactForResearch}
+												hideAllText={
+													// Hide all research text to show a chrome-only skeleton:
+													// - When the Drafts tab has no drafts
+													// - When the Sent tab is in its empty state
+													// - When the Contacts tab has no contacts to show
+													(view === 'drafting' && draftCount === 0) ||
+													(view === 'sent' && sentCount === 0) ||
+													(view === 'contacts' && contactsAvailableForDrafting.length === 0)
+												}
+												hideSummaryIfBullets
+												// Requested: 300px tall research block in the bottom half.
+												height={300}
+												width={376}
+												boxWidth={361}
+											/>
+										</div>
 									) : (
 										<ContactResearchPanel
 											contact={displayedContactForResearch}
