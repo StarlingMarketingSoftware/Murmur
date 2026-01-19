@@ -268,60 +268,72 @@ const SortableAIBlock = ({
 	}, [bookingForTab]);
 	const updateBookingForDropdownPosition = useCallback(() => {
 		if (typeof window === 'undefined') return;
-		const anchor = bookingForButtonRef.current;
-		if (!anchor) return;
+		// Use the container's position to match static positioning (which uses left: 0 relative to container)
+		const container = bookingForContainerRef.current;
+		const button = bookingForButtonRef.current;
+		if (!container || !button) return;
 
-		const rect = anchor.getBoundingClientRect();
+		// Get the page zoom factor. Murmur uses `zoom: 0.9` (or similar) on <html>.
+		// getBoundingClientRect() returns zoomed coordinates, but position: fixed uses unzoomed.
+		// We need to divide by zoom to convert.
+		const getZoomFactor = (): number => {
+			const html = document.documentElement;
+			const computed = window.getComputedStyle(html);
+			const zoom = computed.zoom;
+			if (zoom && zoom !== 'normal') {
+				const zoomValue = parseFloat(zoom);
+				if (Number.isFinite(zoomValue) && zoomValue > 0) return zoomValue;
+			}
+			return 1;
+		};
+		const zoom = getZoomFactor();
+
+		const containerRect = container.getBoundingClientRect();
+		const buttonRect = button.getBoundingClientRect();
 		const margin = 6;
 		const viewportPadding = 8;
-		const offsetX = 85;
-		const offsetY = 45;
-		const calendarNudgeX = 100;
 
-		let left =
-			bookingForTab === 'Calendar'
-				? (window.innerWidth - bookingForDropdownSize.width) / 2 + calendarNudgeX
-				: rect.left + offsetX;
-		let top = rect.bottom + margin + offsetY;
+		// For Calendar, we want the tabs CENTERED in the Calendar box,
+		// but the whole Calendar shifted left so those centered tabs roughly align with Anytime/Season tabs.
+		// 
+		// Anytime/Season (317px): tabs (284px) centered = tab center at 158.5px from dropdown left
+		// Calendar (829px): tabs centered = tab center at 414.5px from dropdown left
+		// Base shift: (414.5 - 158.5) = 256px, but we offset 20px right for better visual balance
+		const tabStripWidth = 284;
+		const narrowDropdownWidth = 317;
+		const calendarWidth = bookingForDropdownSize.width; // 829
+		const narrowTabCenter = narrowDropdownWidth / 2; // 158.5
+		const calendarTabCenter = calendarWidth / 2; // 414.5
+		const calendarShift = calendarTabCenter - narrowTabCenter - 20; // 236 (20px less shift = 20px right)
 
-		const maxLeft = Math.max(
-			viewportPadding,
-			window.innerWidth - bookingForDropdownSize.width - viewportPadding
-		);
-		left = Math.min(Math.max(left, viewportPadding), maxLeft);
+		// Convert zoomed coordinates to unzoomed for fixed positioning
+		let baseLeft = containerRect.left / zoom;
+		let left = bookingForTab === 'Calendar' ? baseLeft - calendarShift : baseLeft;
+		let top = (buttonRect.bottom + margin) / zoom;
 
-		// In Calendar mode, the dropdown is much wider and centered, which makes the internal
-		// tab strip appear to "jump" horizontally vs. Anytime/Season. Compute a Calendar-only
-		// left padding so the strip sits in the same global X position as the narrow dropdown.
+		// Make sure it doesn't overflow viewport edges (in unzoomed coordinates)
+		const viewportWidth = window.innerWidth / zoom;
+		const viewportHeight = window.innerHeight / zoom;
+		const maxLeft = Math.max(viewportPadding, viewportWidth - bookingForDropdownSize.width - viewportPadding);
+		left = Math.min(left, maxLeft);
+		left = Math.max(left, viewportPadding);
+
+		// For Calendar, adjust tab position to compensate for the 20px right shift of the box.
+		// Tabs centered in Calendar would be at (829-284)/2 = 272.5px from Calendar left.
+		// To shift tabs 20px LEFT (to align with Anytime/Season), use paddingLeft of 272.5 - 20 = 252.5px
 		if (bookingForTab === 'Calendar') {
-			const tabStripWidth = 284;
-			const narrowDropdownWidth = 317;
-			const tabStripLeftInNarrowDropdown = (narrowDropdownWidth - tabStripWidth) / 2; // 16.5
-			const desiredTabStripLeftGlobal = rect.left + offsetX + tabStripLeftInNarrowDropdown;
-			let tabStripLeftInDropdown = desiredTabStripLeftGlobal - left;
-
-			// Keep it within the Calendar dropdown bounds.
-			const tabStripPadding = 8;
-			const minTabStripLeft = tabStripPadding;
-			const maxTabStripLeft = Math.max(
-				minTabStripLeft,
-				bookingForDropdownSize.width - tabStripWidth - tabStripPadding
-			);
-			tabStripLeftInDropdown = Math.min(
-				Math.max(tabStripLeftInDropdown, minTabStripLeft),
-				maxTabStripLeft
-			);
-
-			setBookingForTabStripLeft(Math.round(tabStripLeftInDropdown));
+			const centeredTabsLeft = (calendarWidth - tabStripWidth) / 2; // 272.5
+			setBookingForTabStripLeft(Math.round(centeredTabsLeft - 20)); // 252.5, shifts tabs 20px left of center
 		} else {
 			setBookingForTabStripLeft(null);
 		}
 
+		// Check if would overflow bottom, flip above if possible
 		const wouldOverflowBottom =
-			top + bookingForDropdownSize.height > window.innerHeight - viewportPadding;
-		const canOpenAbove = rect.top - margin - bookingForDropdownSize.height >= viewportPadding;
+			top + bookingForDropdownSize.height > viewportHeight - viewportPadding;
+		const canOpenAbove = buttonRect.top / zoom - margin - bookingForDropdownSize.height >= viewportPadding;
 		if (wouldOverflowBottom && canOpenAbove) {
-			top = rect.top - margin - bookingForDropdownSize.height - offsetY;
+			top = buttonRect.top / zoom - margin - bookingForDropdownSize.height;
 		}
 
 		setBookingForDropdownPosition({
@@ -1331,11 +1343,11 @@ const SortableAIBlock = ({
 														</button>
 
 														{isBookingForOpen &&
-														(useStaticDropdownPosition || bookingForDropdownPosition) &&
+														(bookingForDropdownPosition || bookingForTab !== 'Calendar') &&
 														(() => {
-															// Use static positioning only for Anytime/Season (small dropdowns).
-															// Calendar is too wide (829px) and gets clipped by overflow-x-hidden ancestors.
-															const useStatic = useStaticDropdownPosition && bookingForTab !== 'Calendar';
+															// Anytime/Season use static (absolute) positioning - they fit in the container.
+															// Calendar uses portal with fixed positioning so it's not clipped by overflow.
+															const useStatic = bookingForTab !== 'Calendar';
 															
 															// For Calendar in landing page mode, calculate position to align tabs with button
 															// Note: In landing mode the entire HybridPromptInput panel is scaled down (see `LandingDraftingDemo`).
@@ -1352,26 +1364,24 @@ const SortableAIBlock = ({
 																const scale = scaledWidth / unscaledWidth;
 																return Number.isFinite(scale) && scale > 0 ? scale : 1;
 															})();
-															// Small aesthetic nudge: move the (wide) Calendar box a bit right,
-															// while keeping the tab strip aligned to the narrow dropdown.
-															const calendarBoxNudgeX = 32;
+															// For landing page, position Calendar so centered tabs align with Anytime/Season tabs.
+															// With transformOrigin: 'top left', the left edge stays in place during scaling.
 															const getCalendarLandingPosition = () => {
 																if (!useStaticDropdownPosition || bookingForTab !== 'Calendar') {
 																	return null;
 																}
 																const containerRect = bookingForContainerRef.current?.getBoundingClientRect();
 																if (!containerRect) return null;
-																const seasonWidth = 317;
-																const calendarWidth = bookingForDropdownSize.width; // 829
+																
+																// Anytime/Season tabs are centered in 317px at 16.5px from dropdown left
+																// Calendar tabs are centered in 829px at 272.5px from dropdown left
+																// To align: Calendar left = container left - (272.5 - 16.5) = container left - 256
+																// Fine-tuned to 250px for better visual alignment
+																const tabsAlignShift = 250 * landingScale;
+																
 																return {
-																	// Match the scaled spacing of the in-panel (non-portaled) dropdown.
 																	top: containerRect.bottom + 6 * landingScale,
-																	// Align the (scaled) Calendar dropdown's right edge to the (scaled) narrow dropdown's right edge.
-																	left:
-																		containerRect.left +
-																		seasonWidth * landingScale -
-																		calendarWidth +
-																		calendarBoxNudgeX,
+																	left: containerRect.left - tabsAlignShift,
 																};
 															};
 															const calendarPos = getCalendarLandingPosition();
@@ -1398,7 +1408,7 @@ const SortableAIBlock = ({
 																					// Scale down Calendar in landing page mode to match the scaled container
 																					...(useStaticDropdownPosition && bookingForTab === 'Calendar' ? {
 																						transform: `scale(${landingScale})`,
-																						transformOrigin: 'top right',
+																						transformOrigin: 'top left',
 																					} : {}),
 																			  }
 																	}
@@ -1434,22 +1444,11 @@ const SortableAIBlock = ({
 																	<div
 																		className={cn(
 																			'relative z-[1] h-full flex items-center',
-																			bookingForTab === 'Calendar' && bookingForTabStripLeft != null && !useStaticDropdownPosition
-																				? 'justify-start'
-																				: bookingForTab === 'Calendar' && useStaticDropdownPosition
-																					? 'justify-end'
-																					: 'justify-center'
+																			// On landing page (useStaticDropdownPosition), always center tabs
+																			// On campaign page, use paddingLeft to align tabs
+																			!useStaticDropdownPosition && bookingForTabStripLeft != null ? 'justify-start' : 'justify-center'
 																		)}
-																		style={
-																			bookingForTab === 'Calendar' && !useStaticDropdownPosition && bookingForTabStripLeft != null
-																				? { paddingLeft: bookingForTabStripLeft }
-																				: bookingForTab === 'Calendar' && useStaticDropdownPosition
-																					? {
-																							// Keep tabs aligned even though we nudged the container right.
-																							paddingRight: 16.5 + calendarBoxNudgeX / landingScale,
-																					  }
-																					: undefined
-																		}
+																		style={!useStaticDropdownPosition && bookingForTabStripLeft != null ? { paddingLeft: bookingForTabStripLeft } : undefined}
 																	>
 																		<div className="w-[284px] grid grid-cols-3 items-center gap-[8px]">
 																			{(['Anytime', 'Season', 'Calendar'] as const).map(
@@ -1834,7 +1833,10 @@ const SortableAIBlock = ({
 														return useStatic
 															? dropdownContent
 															: typeof document !== 'undefined'
-																? createPortal(dropdownContent, document.body)
+																// Portal to <html> instead of <body> because Murmur uses
+																// body { transform: scale() } on Firefox, which would offset
+																// position: fixed children.
+																? createPortal(dropdownContent, document.documentElement)
 																: null;
 													})()}
 													</div>
@@ -2050,11 +2052,11 @@ const SortableAIBlock = ({
 														</button>
 
 														{isBookingForOpen &&
-															(useStaticDropdownPosition || bookingForDropdownPosition) &&
+															(bookingForDropdownPosition || bookingForTab !== 'Calendar') &&
 															(() => {
-																// Use static positioning only for Anytime/Season (small dropdowns).
-																// Calendar is too wide (829px) and gets clipped by overflow-x-hidden ancestors.
-																const useStatic2 = useStaticDropdownPosition && bookingForTab !== 'Calendar';
+																// Anytime/Season use static (absolute) positioning - they fit in the container.
+																// Calendar uses portal with fixed positioning so it's not clipped by overflow.
+																const useStatic2 = bookingForTab !== 'Calendar';
 																
 																// For Calendar in landing page mode, calculate position to align tabs with button
 																// See comment in the other Booking For render path for why this needs
@@ -2068,22 +2070,24 @@ const SortableAIBlock = ({
 																	const scale = scaledWidth / unscaledWidth;
 																	return Number.isFinite(scale) && scale > 0 ? scale : 1;
 																})();
-																const calendarBoxNudgeX2 = 32;
+																// For landing page, position Calendar so centered tabs align with Anytime/Season tabs.
+																// With transformOrigin: 'top left', the left edge stays in place during scaling.
 																const getCalendarLandingPosition2 = () => {
 																	if (!useStaticDropdownPosition || bookingForTab !== 'Calendar') {
 																		return null;
 																	}
 																	const containerRect = bookingForContainerRef.current?.getBoundingClientRect();
 																	if (!containerRect) return null;
-																	const seasonWidth = 317;
-																	const calendarWidth = bookingForDropdownSize.width; // 829
+																	
+																	// Anytime/Season tabs are centered in 317px at 16.5px from dropdown left
+																	// Calendar tabs are centered in 829px at 272.5px from dropdown left
+																	// To align: Calendar left = container left - (272.5 - 16.5) = container left - 256
+																	// Fine-tuned to 250px for better visual alignment
+																	const tabsAlignShift = 250 * landingScale2;
+																	
 																	return {
 																		top: containerRect.bottom + 6 * landingScale2,
-																		left:
-																			containerRect.left +
-																			seasonWidth * landingScale2 -
-																			calendarWidth +
-																			calendarBoxNudgeX2,
+																		left: containerRect.left - tabsAlignShift,
 																	};
 																};
 																const calendarPos2 = getCalendarLandingPosition2();
@@ -2110,7 +2114,7 @@ const SortableAIBlock = ({
 																						// Scale down Calendar in landing page mode to match the scaled container
 																						...(useStaticDropdownPosition && bookingForTab === 'Calendar' ? {
 																							transform: `scale(${landingScale2})`,
-																							transformOrigin: 'top right',
+																							transformOrigin: 'top left',
 																						} : {}),
 																				  }
 																		}
@@ -2146,21 +2150,11 @@ const SortableAIBlock = ({
 																		<div
 																			className={cn(
 																				'relative z-[1] h-full flex items-center',
-																				bookingForTab === 'Calendar' && bookingForTabStripLeft != null && !useStaticDropdownPosition
-																					? 'justify-start'
-																					: bookingForTab === 'Calendar' && useStaticDropdownPosition
-																						? 'justify-end'
-																						: 'justify-center'
+																				// On landing page (useStaticDropdownPosition), always center tabs
+																				// On campaign page, use paddingLeft to align tabs
+																				!useStaticDropdownPosition && bookingForTabStripLeft != null ? 'justify-start' : 'justify-center'
 																			)}
-																			style={
-																				bookingForTab === 'Calendar' && !useStaticDropdownPosition && bookingForTabStripLeft != null
-																					? { paddingLeft: bookingForTabStripLeft }
-																					: bookingForTab === 'Calendar' && useStaticDropdownPosition
-																						? {
-																								paddingRight: 16.5 + calendarBoxNudgeX2 / landingScale2,
-																						  }
-																						: undefined
-																			}
+																			style={!useStaticDropdownPosition && bookingForTabStripLeft != null ? { paddingLeft: bookingForTabStripLeft } : undefined}
 																		>
 																			<div className="w-[284px] grid grid-cols-3 items-center gap-[8px]">
 																				{(['Anytime', 'Season', 'Calendar'] as const).map(
@@ -2537,7 +2531,10 @@ const SortableAIBlock = ({
 															return useStatic2
 																? dropdownContent2
 																: typeof document !== 'undefined'
-																	? createPortal(dropdownContent2, document.body)
+																	// Portal to <html> instead of <body> because Murmur uses
+																	// body { transform: scale() } on Firefox, which would offset
+																	// position: fixed children.
+																	? createPortal(dropdownContent2, document.documentElement)
 																	: null;
 														})()}
 													</div>
