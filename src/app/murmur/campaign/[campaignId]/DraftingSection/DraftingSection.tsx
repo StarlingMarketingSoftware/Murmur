@@ -307,7 +307,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const [isSentHovered, setIsSentHovered] = useState(false);
 	const [isInboxHovered, setIsInboxHovered] = useState(false);
 
-	// Narrow desktop detection for Writing tab compact layout (952px - 1279px)
+	// Narrow desktop detection for Writing tab compact layout.
+	// Note: widened upper bound from 1280 -> 1317 so the left pinned panel never clips
+	// when campaign zoom / browser zoom reduces available space.
 	const [isNarrowDesktop, setIsNarrowDesktop] = useState(false);
 	// Narrowest desktop detection (< 952px) - shows contacts table below writing box
 	const [isNarrowestDesktop, setIsNarrowestDesktop] = useState(false);
@@ -342,7 +344,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 						: DEFAULT_CAMPAIGN_ZOOM;
 			const effectiveWidth = window.innerWidth / (z || 1);
 
-			setIsNarrowDesktop(effectiveWidth >= 952 && effectiveWidth < 1280);
+			setIsNarrowDesktop(effectiveWidth >= 952 && effectiveWidth < 1317);
 			setIsNarrowestDesktop(effectiveWidth < 952);
 			setIsSearchTabNarrow(effectiveWidth < 1414);
 			setIsAllTabNarrow(effectiveWidth <= 1269);

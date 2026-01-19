@@ -41,12 +41,13 @@ const TRANSITION_DURATION = 180;
 const MAX_TRANSITION_WAIT_MS = 650;
 
 const SIXTEEN_BY_TEN_ZOOM_MATCH_TOLERANCE_PX = 50;
-
+	
 // 16:10 resolution-specific zoom levels: [width, height] → zoom
 const SIXTEEN_BY_TEN_ZOOM_MAP: Array<{ w: number; h: number; zoom: number }> = [
 	{ w: 1152, h: 720, zoom: 0.52 },
 	{ w: 1280, h: 800, zoom: 0.6 },
 	{ w: 1440, h: 900, zoom: 0.7 },
+	{ w: 1504, h: 940, zoom: 0.816 },  // 14" MacBook Pro
 	{ w: 1664, h: 1040, zoom: 0.77 },
 	{ w: 1920, h: 1200, zoom: 0.95 },
 	{ w: 2048, h: 1280, zoom: 0.95 },
@@ -1089,7 +1090,9 @@ const Murmur = () => {
 		};
 	}, []);
 
-	// Narrow desktop detection for Writing tab compact layout (952px - 1279px)
+	// Narrow desktop detection for Writing tab compact layout.
+	// Note: widened upper bound from 1280 -> 1317 so the left pinned panel never clips
+	// when campaign zoom / browser zoom reduces available space.
 	const [isNarrowDesktop, setIsNarrowDesktop] = useState(false);
 	// Narrowest desktop detection (< 952px) - header box above tabs
 	const [isNarrowestDesktop, setIsNarrowestDesktop] = useState(false);
@@ -1121,7 +1124,7 @@ const Murmur = () => {
 						: DEFAULT_CAMPAIGN_ZOOM;
 			const effectiveWidth = window.innerWidth / (z || 1);
 
-			setIsNarrowDesktop(effectiveWidth >= 952 && effectiveWidth < 1280);
+			setIsNarrowDesktop(effectiveWidth >= 952 && effectiveWidth < 1317);
 			setIsNarrowestDesktop(effectiveWidth < 952);
 			setHideRightPanel(effectiveWidth < 1522);
 			setHideRightPanelOnAll(effectiveWidth <= 1665);
