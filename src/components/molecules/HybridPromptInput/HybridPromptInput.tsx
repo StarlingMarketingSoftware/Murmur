@@ -4932,17 +4932,34 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 													</div>
 												</div>
 
-												<div className="w-full flex justify-center mt-[18px] pb-[24px]">
-													<button
-														type="button"
-														onClick={() => {
-															setActiveTab('main');
-															setHasLeftProfileTab(true);
-														}}
-														className="w-[298px] h-[26px] rounded-[6px] bg-[#B1B1B1] border-2 border-black text-white font-inter font-medium text-[15px] leading-none flex items-center justify-center cursor-pointer"
-													>
-														back
-													</button>
+												{/* New container below Body box (472 x 93, 9px gap) */}
+												<div className="w-full flex justify-center mt-[9px] pb-[24px]">
+													<div className="relative w-[472px] h-[93px] max-w-full rounded-[8px] bg-[#84CB86] border-2 border-black">
+														{/* Decorative inner boxes (no fill) */}
+														<div
+															aria-hidden="true"
+															className="pointer-events-none absolute left-[12px] top-[15px] w-[203px] h-[28px] rounded-[8px] border-2 border-black z-0"
+														/>
+														<div
+															aria-hidden="true"
+															className="pointer-events-none absolute left-[12px] top-[56px] w-[160px] h-[25px] rounded-[8px] border-2 border-black z-0"
+														/>
+														{/* Inner content wrapper: flush to top + centered (matches mock) */}
+														{/* Note: offset upward by the container border width so borders overlap (prevents “double line”). */}
+														<div className="absolute -top-[2px] left-1/2 -translate-x-1/2 flex flex-col items-center w-full z-10">
+															<button
+																type="button"
+																onClick={() => {
+																	setActiveTab('main');
+																	setHasLeftProfileTab(true);
+																}}
+																className="w-[298px] h-[26px] rounded-[6px] bg-[#B1B1B1] border-2 border-black text-white font-inter font-medium text-[15px] leading-none flex items-center justify-center cursor-pointer"
+															>
+																back
+															</button>
+															{/* next prompt: we'll add the smaller inner boxes here */}
+														</div>
+													</div>
 												</div>
 											</div>
 										</div>
