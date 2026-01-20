@@ -46,6 +46,9 @@ export const CampaignRightPanel: FC<CampaignRightPanelProps> = ({
 	const listRef = useRef<HTMLDivElement | null>(null);
 	const highlightRef = useRef<HTMLDivElement | null>(null);
 	const hasPositionedHighlightOnceRef = useRef(false);
+	// Track the last computed target Y so we can reliably animate *from* the prior tab position.
+	// This prevents "teleport" cases where some layout event snaps the highlight before the tween starts.
+	const lastHighlightYRef = useRef<number | null>(null);
 
 	const contactsRef = useRef<HTMLDivElement | null>(null);
 	const testingRef = useRef<HTMLDivElement | null>(null);
@@ -234,11 +237,30 @@ export const CampaignRightPanel: FC<CampaignRightPanelProps> = ({
 				activeTop + activeTabEl.offsetHeight / 2 - ACTIVE_HIGHLIGHT_HEIGHT_PX / 2;
 
 			gsap.killTweensOf(highlightEl);
-			gsap.set(highlightEl, { opacity: 1, xPercent: -50 });
+			// Capture the current Y *after* killing tweens so we can smoothly retarget mid-flight.
+			// (If some external layout event snapped the highlight to the target, we can still force
+			// the animation to start from the previous targetY so the slide is always visible.)
+			const currentYRaw = gsap.getProperty(highlightEl, 'y');
+			const currentY =
+				typeof currentYRaw === 'number' ? currentYRaw : parseFloat(String(currentYRaw)) || 0;
+
+			// Pin the start position explicitly so setting xPercent can't inadvertently reset Y
+			// (which can make rapid tab flips look like a teleport, especially when targeting the top tab).
+			gsap.set(highlightEl, { opacity: 1, xPercent: -50, y: currentY });
 
 			if (!shouldAnimate || reducedMotion) {
 				gsap.set(highlightEl, { y: targetY });
+				lastHighlightYRef.current = targetY;
 				return;
+			}
+
+			const prevTargetY = lastHighlightYRef.current;
+			const shouldForceFromPrev =
+				prevTargetY != null &&
+				Math.abs(currentY - targetY) < 0.5 &&
+				Math.abs(prevTargetY - targetY) > 0.5;
+			if (shouldForceFromPrev) {
+				gsap.set(highlightEl, { y: prevTargetY });
 			}
 
 			gsap.to(highlightEl, {
@@ -247,6 +269,7 @@ export const CampaignRightPanel: FC<CampaignRightPanelProps> = ({
 				ease: 'power2.out',
 				overwrite: 'auto',
 			});
+			lastHighlightYRef.current = targetY;
 		},
 		[getActiveTabEl, transitionDurationMs]
 	);
@@ -259,9 +282,20 @@ export const CampaignRightPanel: FC<CampaignRightPanelProps> = ({
 
 	useLayoutEffect(() => {
 		if (typeof window === 'undefined') return;
-		const onResize = () => positionActiveHighlight(false);
+		// If a layout/viewport adjustment fires during a tab switch, we still want to *animate* the
+		// highlight rather than snapping it (snapping can cancel the slide and looks "random").
+		const onResize = () => positionActiveHighlight(hasPositionedHighlightOnceRef.current);
 		window.addEventListener('resize', onResize);
 		return () => window.removeEventListener('resize', onResize);
+	}, [positionActiveHighlight]);
+	
+	// Keep highlight aligned when campaign zoom changes (this doesn't always trigger a window resize).
+	useLayoutEffect(() => {
+		if (typeof window === 'undefined') return;
+		const onZoomChanged = () => positionActiveHighlight(hasPositionedHighlightOnceRef.current);
+		window.addEventListener('murmur:campaign-zoom-changed', onZoomChanged as EventListener);
+		return () =>
+			window.removeEventListener('murmur:campaign-zoom-changed', onZoomChanged as EventListener);
 	}, [positionActiveHighlight]);
 	
 	return (

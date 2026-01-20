@@ -649,6 +649,13 @@ const Murmur = () => {
 	};
 	
 	const [activeView, setActiveViewInternal] = useState<ViewType>(getInitialView());
+	// Track the latest requested view so rapid tab flips don't get dropped due to stale closures.
+	// Example: user clicks A -> B, then quickly clicks A again before React commits B.
+	// Without this, the second click can be ignored (newView === activeView), skipping the right-panel slide.
+	const requestedViewRef = useRef<ViewType>(activeView);
+	useEffect(() => {
+		requestedViewRef.current = activeView;
+	}, [activeView]);
 
 	// In the thinnest "scrollable" campaign breakpoint, some nested scroll containers can trap
 	// wheel/trackpad scroll (especially on Write + Inbox), making the page feel "stuck" unless the
@@ -780,6 +787,7 @@ const Murmur = () => {
 		setPreviousView(null);
 		setIsTransitioning(false);
 		setIsFadingOutPreviousView(false);
+		requestedViewRef.current = 'contacts';
 		setActiveViewInternal('contacts');
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [isMobile, activeView]);
@@ -793,7 +801,10 @@ const Murmur = () => {
 		) {
 			newView = 'contacts';
 		}
-		if (newView === activeView) return;
+		// Dedupe against the *latest requested* view (not just the last committed render) so
+		// rapid flips like A -> B -> A still enqueue the final A update and don't get dropped.
+		if (newView === requestedViewRef.current) return;
+		requestedViewRef.current = newView;
 		
 		// Clear any pending transition timers
 		if (transitionTimeoutRef.current) {
@@ -803,6 +814,16 @@ const Murmur = () => {
 		if (maxWaitTimeoutRef.current) {
 			clearTimeout(maxWaitTimeoutRef.current);
 			maxWaitTimeoutRef.current = null;
+		}
+
+		// If the user clicks back to the currently committed view while a different view was pending,
+		// treat it as a cancel (no need to stage a crossfade from an uncommitted/never-painted view).
+		if (newView === activeView) {
+			setPreviousView(null);
+			setIsTransitioning(false);
+			setIsFadingOutPreviousView(false);
+			setActiveViewInternal(newView);
+			return;
 		}
 		
 		// Start transition: keep previous view visible while the destination paints.
