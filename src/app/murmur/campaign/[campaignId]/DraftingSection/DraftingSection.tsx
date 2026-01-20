@@ -39,7 +39,7 @@ import { EmailStatus, EmailVerificationStatus, DraftingMode, ReviewStatus } from
 import { resolveAutoSignatureText } from '@/constants/autoSignatures';
 import { ContactsSelection } from './EmailGeneration/ContactsSelection/ContactsSelection';
 import { SentEmails } from './EmailGeneration/SentEmails/SentEmails';
-import { DraftedEmails } from './EmailGeneration/DraftedEmails/DraftedEmails';
+import { DraftedEmails, type DraftedEmailsHandle } from './EmailGeneration/DraftedEmails/DraftedEmails';
 import { EmailWithRelations, StripeSubscriptionStatus } from '@/types';
 import { useSendMailgunMessage } from '@/hooks/queryHooks/useMailgun';
 import { useEditUser } from '@/hooks/queryHooks/useUsers';
@@ -239,11 +239,31 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const isDraftingView = view === 'drafting';
 	const isSentView = view === 'sent';
 	const [selectedDraft, setSelectedDraft] = useState<EmailWithRelations | null>(null);
+	// Ref to the main DraftedEmails instance (center column) so side preview controls can exit regen mode.
+	const draftedEmailsRef = useRef<DraftedEmailsHandle | null>(null);
+	// Tracks whether the DraftedEmails "regen settings preview" (HybridPromptInput) is open for the selected draft.
+	// Used to swap the pinned left column from DraftsExpandedList -> full email preview while regenerating.
+	const [isSelectedDraftRegenSettingsPreviewOpen, setIsSelectedDraftRegenSettingsPreviewOpen] =
+		useState(false);
+	const exitSelectedDraftRegenView = useCallback(() => {
+		draftedEmailsRef.current?.exitRegenSettingsPreview();
+	}, []);
 	const [hoveredDraftForSettings, setHoveredDraftForSettings] =
 		useState<EmailWithRelations | null>(null);
 	const [hoveredSentForSettings, setHoveredSentForSettings] =
 		useState<EmailWithRelations | null>(null);
 	const isDraftPreviewOpen = isDraftingView && Boolean(selectedDraft);
+	const shouldShowPinnedRegenEmailPreview =
+		isDraftPreviewOpen && isSelectedDraftRegenSettingsPreviewOpen;
+
+	// Defensive reset so we don't get "stuck" showing regen UI when leaving Drafts or closing the draft.
+	useEffect(() => {
+		if (!isDraftingView || !selectedDraft) {
+			if (isSelectedDraftRegenSettingsPreviewOpen) {
+				setIsSelectedDraftRegenSettingsPreviewOpen(false);
+			}
+		}
+	}, [isDraftingView, selectedDraft, isSelectedDraftRegenSettingsPreviewOpen]);
 	const draftsMiniEmailTopHeaderHeight = isDraftingView || isSentView ? 23 : undefined;
 	const draftsMiniEmailFillColor = isDraftingView || isSentView ? '#DAE6FE' : undefined;
 
@@ -2685,31 +2705,99 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 									/>
 									{view !== 'inbox' &&
 										(isDraftPreviewOpen ? (
-											<div
-												style={{
-													width: '376px',
-													height: '587px',
-												}}
-											>
-												<DraftsExpandedList
-													drafts={draftEmails}
-													contacts={contacts || []}
-													width={376}
-													height={587}
-													hideSendButton
-													rowWidth={366}
-													rowHeight={92}
-													rejectedDraftIds={rejectedDraftIds}
-													approvedDraftIds={approvedDraftIds}
-													previewedDraftId={selectedDraft?.id}
-													isPreviewMode
-													onDraftPreviewClick={(draft) =>
-														setSelectedDraft((prev) =>
-															prev?.id === draft.id ? null : draft
-														)
-													}
-												/>
-											</div>
+											shouldShowPinnedRegenEmailPreview ? (
+												<div
+													data-draft-review-side-preview
+													style={{
+														width: '376px',
+														height: '587px',
+														overflow: 'hidden',
+														position: 'relative',
+													}}
+												>
+													<div
+														style={{
+															position: 'absolute',
+															top: 0,
+															left: 0,
+															// Important: scale the *original* DraftedEmails review canvas (499x703)
+															// down into the old DraftsExpandedList slot (376x587). Transforms don't
+															// affect layout, so we fix the unscaled canvas size explicitly here to
+															// avoid any centering/offset drift.
+															width: '499px',
+															height: '703px',
+															transform: `scale(${376 / 499}, ${587 / 703})`,
+															transformOrigin: 'top left',
+														}}
+													>
+														<DraftedEmails
+														mainBoxId={undefined}
+														contacts={contacts || []}
+														selectedDraftIds={draftsTabSelectedIds}
+														selectedDraft={selectedDraft}
+														setSelectedDraft={setSelectedDraft}
+														setIsDraftDialogOpen={setIsDraftDialogOpen}
+														handleDraftSelection={handleDraftSelection}
+														draftEmails={draftEmails}
+														isPendingEmails={isPendingEmails}
+														setSelectedDraftIds={setDraftsTabSelectedIds}
+														onSend={handleSendDrafts}
+														isSendingDisabled={isSendingDisabled}
+														isFreeTrial={isFreeTrial || false}
+														fromName={fromName}
+														fromEmail={fromEmail}
+														identity={campaign?.identity ?? null}
+														onIdentityUpdate={handleIdentityUpdate}
+														subject={form.watch('subject')}
+														onContactClick={handleResearchContactClick}
+														onContactHover={handleResearchContactHover}
+														onDraftHover={setHoveredDraftForSettings}
+														goToWriting={goToWriting}
+														goToSearch={onGoToSearch}
+														goToInbox={goToInbox}
+														onRejectDraft={handleRejectDraft}
+														onApproveDraft={handleApproveDraft}
+														// Disable regen inside the side preview so it stays as an email preview.
+														onRegenerateDraft={undefined}
+														rejectedDraftIds={rejectedDraftIds}
+														approvedDraftIds={approvedDraftIds}
+														statusFilter={draftStatusFilter}
+														onStatusFilterChange={setDraftStatusFilter}
+														hideSendButton
+														disableOutsideClickClose
+														onDraftReviewCloseOverride={exitSelectedDraftRegenView}
+														hideDraftReviewCounter
+														hideDraftReviewActionRow
+													/>
+													</div>
+												</div>
+											) : (
+												<div
+													style={{
+														width: '376px',
+														height: '587px',
+													}}
+												>
+													<DraftsExpandedList
+														drafts={draftEmails}
+														contacts={contacts || []}
+														width={376}
+														height={587}
+														hideSendButton
+														rowWidth={366}
+														rowHeight={92}
+														rejectedDraftIds={rejectedDraftIds}
+														approvedDraftIds={approvedDraftIds}
+														previewedDraftId={selectedDraft?.id}
+														isPreviewMode
+														onDraftPreviewClick={(draft) =>
+															setSelectedDraft((prev) =>
+																prev?.id === draft.id ? null : draft
+															)
+														}
+													/>
+												</div>
+											)
 										) : (
 											<div
 												style={{
@@ -4127,6 +4215,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										// Mobile layout: Full-width drafts, no side panels
 										<div className="flex flex-col items-center w-full px-1">
 											<DraftedEmails
+												ref={draftedEmailsRef}
 												mainBoxId="drafts"
 												contacts={contacts || []}
 												selectedDraftIds={draftsTabSelectedIds}
@@ -4154,6 +4243,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												onRejectDraft={handleRejectDraft}
 												onApproveDraft={handleApproveDraft}
 												onRegenerateDraft={handleRegenerateDraft}
+												onRegenSettingsPreviewOpenChange={
+													setIsSelectedDraftRegenSettingsPreviewOpen
+												}
 												rejectedDraftIds={rejectedDraftIds}
 												approvedDraftIds={approvedDraftIds}
 												statusFilter={draftStatusFilter}
@@ -4243,6 +4335,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												{/* Right column: Drafts table - fixed 499px, overflow visible for bottom panels */}
 												<div className="flex-shrink-0 [&>*]:!items-start" style={{ width: '499px', overflow: 'visible' }}>
 													<DraftedEmails
+														ref={draftedEmailsRef}
 														mainBoxId="drafts"
 														contacts={contacts || []}
 														selectedDraftIds={draftsTabSelectedIds}
@@ -4270,6 +4363,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														onRejectDraft={handleRejectDraft}
 														onApproveDraft={handleApproveDraft}
 														onRegenerateDraft={handleRegenerateDraft}
+														onRegenSettingsPreviewOpenChange={
+															setIsSelectedDraftRegenSettingsPreviewOpen
+														}
 														rejectedDraftIds={rejectedDraftIds}
 														approvedDraftIds={approvedDraftIds}
 														statusFilter={draftStatusFilter}
@@ -4388,6 +4484,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										// Regular centered layout for wider viewports
 										<div className="flex flex-col items-center">
 											<DraftedEmails
+												ref={draftedEmailsRef}
 											mainBoxId="drafts"
 												contacts={contacts || []}
 												selectedDraftIds={draftsTabSelectedIds}
@@ -4415,6 +4512,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												onRejectDraft={handleRejectDraft}
 												onApproveDraft={handleApproveDraft}
 												onRegenerateDraft={handleRegenerateDraft}
+												onRegenSettingsPreviewOpenChange={
+													setIsSelectedDraftRegenSettingsPreviewOpen
+												}
 												rejectedDraftIds={rejectedDraftIds}
 												approvedDraftIds={approvedDraftIds}
 												statusFilter={draftStatusFilter}

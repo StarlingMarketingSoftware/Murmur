@@ -86,6 +86,22 @@ export interface DraftedEmailsProps {
 	 * When provided, this value is forwarded to the underlying DraftingTable `mainBoxId`.
 	 */
 	mainBoxId?: string;
+	/** Optional: notify parent when the embedded regeneration settings preview is opened/closed */
+	onRegenSettingsPreviewOpenChange?: (open: boolean) => void;
+	/**
+	 * Optional: disables outside-click-to-close behavior for the draft review UI.
+	 * Useful when rendering a secondary/side preview while the main view is in regeneration settings mode.
+	 */
+	disableOutsideClickClose?: boolean;
+	/** Optional: hide the small approved/rejected counter box (above or bottom-left depending on breakpoint) in draft review UI */
+	hideDraftReviewCounter?: boolean;
+	/** Optional: hide the bottom action row (Approve / Regenerate / Reject + nav arrows) in draft review UI */
+	hideDraftReviewActionRow?: boolean;
+	/**
+	 * Optional: override the behavior of the draft review header close ("-") button.
+	 * Useful when rendering the draft review UI as a side preview inside regenerate mode.
+	 */
+	onDraftReviewCloseOverride?: () => void;
 }
 
 export const useDraftedEmails = (props: DraftedEmailsProps) => {

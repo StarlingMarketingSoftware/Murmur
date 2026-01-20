@@ -1,4 +1,4 @@
-import { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { FC, forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { DraftedEmailsProps, useDraftedEmails } from './useDraftedEmails';
 import { Spinner } from '@/components/atoms/Spinner/Spinner';
 import { Button } from '@/components/ui/button';
@@ -220,6 +220,11 @@ type DraftRowHoverRegion = 'left' | 'middle' | 'right';
 const DRAFT_ROW_SELECT_ZONE_PX = 115;
 const DRAFT_ROW_DELETE_ZONE_PX = 80;
 
+export type DraftedEmailsHandle = {
+	/** Exit the embedded regen settings preview (HybridPromptInput) and return to the normal draft editor / approve-reject view. */
+	exitRegenSettingsPreview: () => void;
+};
+
 function getDraftRowHoverRegion(event: React.MouseEvent<HTMLElement>): DraftRowHoverRegion {
 	const rect = event.currentTarget.getBoundingClientRect();
 	const x = event.clientX - rect.left;
@@ -234,7 +239,7 @@ function getDraftRowHoverRegion(event: React.MouseEvent<HTMLElement>): DraftRowH
 	return 'middle';
 }
 
-export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
+export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>((props, ref) => {
 	const {
 		draftEmails,
 		isPendingEmails,
@@ -264,6 +269,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 	// This should return the user back to the normal drafts table view.
 	useEffect(() => {
 		if (!selectedDraft) return;
+		if (props.disableOutsideClickClose) return;
 
 		const handlePointerDown = (event: PointerEvent) => {
 			const container = draftReviewContainerRef.current;
@@ -280,6 +286,8 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 				? Boolean(
 						targetEl.closest(
 							[
+								// Side preview container (used while regen settings preview is open)
+								'[data-draft-review-side-preview]',
 								// Campaign header box (title + counts)
 								'[data-campaign-header-box]',
 								// Mini email structure panel
@@ -315,7 +323,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 		return () => {
 			document.removeEventListener('pointerdown', handlePointerDown, true);
 		};
-	}, [selectedDraft, setSelectedDraft]);
+	}, [selectedDraft, setSelectedDraft, props.disableOutsideClickClose]);
 
 	// Mobile-specific width values (using CSS calc for responsive sizing)
 	// 4px margins on each side for edge-to-edge feel
@@ -452,7 +460,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 	);
 
 	// Keyboard navigation for draft review UI:
-	// - Escape: close the review and return to drafts list
+	// - Escape: if regen settings preview is open, exit regen view; otherwise close the review and return to drafts list
 	// - ArrowUp/ArrowDown: navigate between drafts (when not in text entry)
 	useEffect(() => {
 		if (!selectedDraft) return;
@@ -460,6 +468,19 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 		const handleKeyDown = (event: KeyboardEvent) => {
 			if (event.key === 'Escape') {
 				event.stopImmediatePropagation(); // Prevent campaign page tab navigation
+				// Side preview override: allow parent to decide what "close" means in this context.
+				if (props.onDraftReviewCloseOverride) {
+					props.onDraftReviewCloseOverride();
+					return;
+				}
+
+				// In regenerate view, Esc should exit regen preview (back to the normal editor / approve-reject view),
+				// not close the entire draft review UI.
+				if (isRegenSettingsPreviewOpen) {
+					setIsRegenSettingsPreviewOpen(false);
+					return;
+				}
+
 				handleBack();
 				return;
 			}
@@ -489,7 +510,14 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 		return () => {
 			document.removeEventListener('keydown', handleKeyDown, true);
 		};
-	}, [selectedDraft, handleBack, handleNavigatePrevious, handleNavigateNext]);
+	}, [
+		selectedDraft,
+		handleBack,
+		handleNavigatePrevious,
+		handleNavigateNext,
+		isRegenSettingsPreviewOpen,
+		props.onDraftReviewCloseOverride,
+	]);
 
 	const handleRegenerateSelectedDrafts = useCallback(async () => {
 		if (!props.onRegenerateDraft) return;
@@ -539,6 +567,36 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 		setIsRegenSettingsPreviewOpen(false);
 	}, [selectedDraft?.id]);
 
+	// Notify parent when the embedded regen settings preview is opened/closed.
+	useEffect(() => {
+		props.onRegenSettingsPreviewOpenChange?.(isRegenSettingsPreviewOpen);
+	}, [isRegenSettingsPreviewOpen, props.onRegenSettingsPreviewOpenChange]);
+
+	useImperativeHandle(
+		ref,
+		() => ({
+			exitRegenSettingsPreview: () => setIsRegenSettingsPreviewOpen(false),
+		}),
+		[]
+	);
+
+	const handleDraftReviewCloseButtonClick = useCallback(() => {
+		// Side preview override: allow parent to decide what "close" means in this context.
+		if (props.onDraftReviewCloseOverride) {
+			props.onDraftReviewCloseOverride();
+			return;
+		}
+
+		// When we're in regenerate settings preview mode, the "-" button should exit regen mode
+		// (back to the normal editor / approve-reject view), not close the draft entirely.
+		if (isRegenSettingsPreviewOpen) {
+			setIsRegenSettingsPreviewOpen(false);
+			return;
+		}
+
+		handleBack();
+	}, [props.onDraftReviewCloseOverride, isRegenSettingsPreviewOpen, handleBack]);
+
 	if (selectedDraft) {
 		const contact = contacts?.find((c) => c.id === selectedDraft.contactId);
 		const contactTitle = contact?.headline || contact?.title || '';
@@ -573,7 +631,8 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 		const bottomStripTop = hasStatusBar ? '574px' : '625px';
 		const isNarrowestDesktop = props.isNarrowestDesktop ?? false;
 		const isNarrowDesktop = props.isNarrowDesktop ?? false;
-		const showBottomCounter = isNarrowestDesktop || isNarrowDesktop;
+		const showBottomCounter =
+			!props.hideDraftReviewCounter && (isNarrowestDesktop || isNarrowDesktop);
 		// Show tab navigation arrows only on narrow desktop; hide them on the
 		// narrowest breakpoint when the draft review (Approve/Reject) view is open.
 		const showTabNavArrows = showBottomCounter && !isNarrowestDesktop;
@@ -594,7 +653,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 					position: 'relative' 
 				}}>
 				{/* Counter box - above preview on wide screens, bottom-left corner on narrow/narrowest breakpoint, hidden on mobile */}
-				{!showBottomCounter && !isMobile && (
+				{!props.hideDraftReviewCounter && !showBottomCounter && !isMobile && (
 					<div
 						style={{
 							position: 'absolute',
@@ -661,7 +720,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 						<Button
 							type="button"
 							variant="ghost"
-							onClick={handleBack}
+							onClick={handleDraftReviewCloseButtonClick}
 							className="absolute rounded z-10 flex items-center justify-center hover:bg-transparent"
 							style={{ 
 								top: '17px', 
@@ -1292,189 +1351,191 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 					</div>
 				</div>
 			</div>
-		<div
-			className="flex items-center justify-center"
-			style={{
-				marginTop: isMobile ? '12px' : '22px',
-				// Ensure this row has a stable width so centering math is correct
-				// (otherwise it can shrink-to-fit in narrow layouts and appear shifted right).
-				width: '100%',
-				// For narrow desktop (two-column layout), shift left by 170px to center on page
-				// For narrowest desktop (single-column), no shift needed as layout is already centered
-				...(isNarrowDesktop && !isMobile ? { transform: 'translateX(-170px)' } : {}),
-				...(showTabNavArrows && !isMobile ? { gap: tabNavGap } : {}),
-			}}
-		>
-			{/* Tab navigation left arrow - only in narrow breakpoints, hidden on mobile */}
-			{showTabNavArrows && !isMobile && props.goToPreviousTab && !isRegenSettingsPreviewOpen && (
-				<button
-					type="button"
-					onClick={props.goToPreviousTab}
-					className="bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0"
-					aria-label="Previous tab"
-				>
-					<LeftArrow width="20" height="39" />
-				</button>
-			)}
-			{/* Inner container with draft navigation and buttons */}
+		{!props.hideDraftReviewActionRow && (
 			<div
-				className="flex items-center justify-center flex-shrink-0"
-				style={
-					isRegenSettingsPreviewOpen
-						? { width: '100%' }
-						: showTabNavArrows && !isMobile
-							? { width: tabNavMiddleWidth }
-							: undefined
-				}
+				className="flex items-center justify-center"
+				style={{
+					marginTop: isMobile ? '12px' : '22px',
+					// Ensure this row has a stable width so centering math is correct
+					// (otherwise it can shrink-to-fit in narrow layouts and appear shifted right).
+					width: '100%',
+					// For narrow desktop (two-column layout), shift left by 170px to center on page
+					// For narrowest desktop (single-column), no shift needed as layout is already centered
+					...(isNarrowDesktop && !isMobile ? { transform: 'translateX(-170px)' } : {}),
+					...(showTabNavArrows && !isMobile ? { gap: tabNavGap } : {}),
+				}}
 			>
-				{isRegenSettingsPreviewOpen ? (
-					<div className="relative w-full flex items-center justify-center">
-						<button
-							type="button"
-							onClick={() => setIsRegenSettingsPreviewOpen(false)}
-							aria-label="Back"
-							className="absolute left-0 top-0 bottom-0 p-0 bg-transparent border-0 cursor-pointer hover:opacity-80 transition-opacity flex items-center justify-center"
-						>
-							<LeftArrowReviewIcon />
-						</button>
-						<Button
-							type="button"
-							variant="ghost"
-							className={cn(
-								"font-secondary font-semibold text-black border-[2px] border-black transition enabled:hover:brightness-95",
-								isMobile ? "text-[12px]" : "text-[14px]"
-							)}
-							style={{
-								width: isMobile ? 'calc(100vw - 140px)' : '397px',
-								maxWidth: '397px',
-								height: isMobile ? '36px' : '40px',
-								borderRadius: '8px',
-								backgroundColor: '#FFDC9E',
-							}}
-							data-hover-description="Regenerate this email using the settings shown above"
-							onClick={handleRegenerate}
-							disabled={isRegenerating || !onRegenerateDraft}
-						>
-							{isRegenerating ? <Spinner size="small" /> : 'Regenerate'}
-						</Button>
-					</div>
-				) : (
-					<>
-						<button
-							type="button"
-							onClick={handleNavigatePrevious}
-							disabled={!hasDrafts}
-							aria-label="View previous draft"
-							className="p-0 bg-transparent border-0 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-							style={{ marginRight: isMobile ? '10px' : '20px' }}
-						>
-							<LeftArrowReviewIcon />
-						</button>
-						<div className="flex" style={{ gap: isMobile ? '6px' : '13px' }}>
-							<Button
+				{/* Tab navigation left arrow - only in narrow breakpoints, hidden on mobile */}
+				{showTabNavArrows && !isMobile && props.goToPreviousTab && !isRegenSettingsPreviewOpen && (
+					<button
+						type="button"
+						onClick={props.goToPreviousTab}
+						className="bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0"
+						aria-label="Previous tab"
+					>
+						<LeftArrow width="20" height="39" />
+					</button>
+				)}
+				{/* Inner container with draft navigation and buttons */}
+				<div
+					className="flex items-center justify-center flex-shrink-0"
+					style={
+						isRegenSettingsPreviewOpen
+							? { width: '100%' }
+							: showTabNavArrows && !isMobile
+								? { width: tabNavMiddleWidth }
+								: undefined
+					}
+				>
+					{isRegenSettingsPreviewOpen ? (
+						<div className="relative w-full flex items-center justify-center">
+							<button
 								type="button"
-								variant="ghost"
-								className={cn(
-									"font-secondary font-semibold text-black border-[2px] border-black rounded-none transition enabled:hover:brightness-95",
-									isMobile ? "text-[12px]" : "text-[14px]"
-								)}
-								style={{
-									width: isMobile ? '80px' : '124px',
-									height: isMobile ? '36px' : '40px',
-									borderTopLeftRadius: '8px',
-									borderBottomLeftRadius: '8px',
-									backgroundColor: '#D5FFCB',
-								}}
-								data-hover-description="Approve you draft. This draft turned out good"
-								onClick={() => {
-									if (selectedDraft) {
-										const isCurrentlyApproved =
-											props.approvedDraftIds?.has(selectedDraft.id) ?? false;
-										props.onApproveDraft?.(selectedDraft.id, isCurrentlyApproved);
-										// Only navigate to next if we're approving, not toggling off
-										if (!isCurrentlyApproved) {
-											handleNavigateNext();
-										}
-									}
-								}}
+								onClick={() => setIsRegenSettingsPreviewOpen(false)}
+								aria-label="Back"
+								className="absolute left-0 top-0 bottom-0 p-0 bg-transparent border-0 cursor-pointer hover:opacity-80 transition-opacity flex items-center justify-center"
 							>
-								<span>Approve</span>
-								{!isMobile && <ApproveCheckIcon />}
-							</Button>
+								<LeftArrowReviewIcon />
+							</button>
 							<Button
 								type="button"
 								variant="ghost"
 								className={cn(
-									"font-secondary font-semibold text-black border-[2px] border-black rounded-none transition enabled:hover:brightness-95",
+									"font-secondary font-semibold text-black border-[2px] border-black transition enabled:hover:brightness-95",
 									isMobile ? "text-[12px]" : "text-[14px]"
 								)}
 								style={{
-									width: isMobile ? '80px' : '124px',
+									width: isMobile ? 'calc(100vw - 140px)' : '397px',
+									maxWidth: '397px',
 									height: isMobile ? '36px' : '40px',
+									borderRadius: '8px',
 									backgroundColor: '#FFDC9E',
 								}}
-								data-hover-description="Click to preview your prompt/settings before regenerating this draft"
+								data-hover-description="Regenerate this email using the settings shown above"
 								onClick={handleRegenerate}
 								disabled={isRegenerating || !onRegenerateDraft}
 							>
-								{isRegenerating ? <Spinner size="small" /> : isMobile ? 'Regen' : 'Regenerate'}
-							</Button>
-							<Button
-								type="button"
-								variant="ghost"
-								className={cn(
-									"font-secondary font-semibold text-black border-[2px] border-black rounded-none transition enabled:hover:brightness-95",
-									isMobile ? "text-[12px]" : "text-[14px]"
-								)}
-								style={{
-									width: isMobile ? '80px' : '124px',
-									height: isMobile ? '36px' : '40px',
-									borderTopRightRadius: '8px',
-									borderBottomRightRadius: '8px',
-									backgroundColor: '#E17272',
-								}}
-								data-hover-description="Reject this contact. This isn't deleting it, but putting it into a rejection folder for you to review"
-								onClick={() => {
-									if (selectedDraft) {
-										const isCurrentlyRejected =
-											props.rejectedDraftIds?.has(selectedDraft.id) ?? false;
-										props.onRejectDraft?.(selectedDraft.id, isCurrentlyRejected);
-										// Only navigate to next if we're rejecting, not toggling off
-										if (!isCurrentlyRejected) {
-											handleNavigateNext();
-										}
-									}
-								}}
-							>
-								<span>Reject</span>
-								{!isMobile && <RejectXIcon />}
+								{isRegenerating ? <Spinner size="small" /> : 'Regenerate'}
 							</Button>
 						</div>
-						<button
-							type="button"
-							onClick={handleNavigateNext}
-							disabled={!hasDrafts}
-							aria-label="View next draft"
-							className="p-0 bg-transparent border-0 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-							style={{ marginLeft: isMobile ? '10px' : '20px' }}
-						>
-							<RightArrowReviewIcon />
-						</button>
-					</>
+					) : (
+						<>
+							<button
+								type="button"
+								onClick={handleNavigatePrevious}
+								disabled={!hasDrafts}
+								aria-label="View previous draft"
+								className="p-0 bg-transparent border-0 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+								style={{ marginRight: isMobile ? '10px' : '20px' }}
+							>
+								<LeftArrowReviewIcon />
+							</button>
+							<div className="flex" style={{ gap: isMobile ? '6px' : '13px' }}>
+								<Button
+									type="button"
+									variant="ghost"
+									className={cn(
+										"font-secondary font-semibold text-black border-[2px] border-black rounded-none transition enabled:hover:brightness-95",
+										isMobile ? "text-[12px]" : "text-[14px]"
+									)}
+									style={{
+										width: isMobile ? '80px' : '124px',
+										height: isMobile ? '36px' : '40px',
+										borderTopLeftRadius: '8px',
+										borderBottomLeftRadius: '8px',
+										backgroundColor: '#D5FFCB',
+									}}
+									data-hover-description="Approve you draft. This draft turned out good"
+									onClick={() => {
+										if (selectedDraft) {
+											const isCurrentlyApproved =
+												props.approvedDraftIds?.has(selectedDraft.id) ?? false;
+											props.onApproveDraft?.(selectedDraft.id, isCurrentlyApproved);
+											// Only navigate to next if we're approving, not toggling off
+											if (!isCurrentlyApproved) {
+												handleNavigateNext();
+											}
+										}
+									}}
+								>
+									<span>Approve</span>
+									{!isMobile && <ApproveCheckIcon />}
+								</Button>
+								<Button
+									type="button"
+									variant="ghost"
+									className={cn(
+										"font-secondary font-semibold text-black border-[2px] border-black rounded-none transition enabled:hover:brightness-95",
+										isMobile ? "text-[12px]" : "text-[14px]"
+									)}
+									style={{
+										width: isMobile ? '80px' : '124px',
+										height: isMobile ? '36px' : '40px',
+										backgroundColor: '#FFDC9E',
+									}}
+									data-hover-description="Click to preview your prompt/settings before regenerating this draft"
+									onClick={handleRegenerate}
+									disabled={isRegenerating || !onRegenerateDraft}
+								>
+									{isRegenerating ? <Spinner size="small" /> : isMobile ? 'Regen' : 'Regenerate'}
+								</Button>
+								<Button
+									type="button"
+									variant="ghost"
+									className={cn(
+										"font-secondary font-semibold text-black border-[2px] border-black rounded-none transition enabled:hover:brightness-95",
+										isMobile ? "text-[12px]" : "text-[14px]"
+									)}
+									style={{
+										width: isMobile ? '80px' : '124px',
+										height: isMobile ? '36px' : '40px',
+										borderTopRightRadius: '8px',
+										borderBottomRightRadius: '8px',
+										backgroundColor: '#E17272',
+									}}
+									data-hover-description="Reject this contact. This isn't deleting it, but putting it into a rejection folder for you to review"
+									onClick={() => {
+										if (selectedDraft) {
+											const isCurrentlyRejected =
+												props.rejectedDraftIds?.has(selectedDraft.id) ?? false;
+											props.onRejectDraft?.(selectedDraft.id, isCurrentlyRejected);
+											// Only navigate to next if we're rejecting, not toggling off
+											if (!isCurrentlyRejected) {
+												handleNavigateNext();
+											}
+										}
+									}}
+								>
+									<span>Reject</span>
+									{!isMobile && <RejectXIcon />}
+								</Button>
+							</div>
+							<button
+								type="button"
+								onClick={handleNavigateNext}
+								disabled={!hasDrafts}
+								aria-label="View next draft"
+								className="p-0 bg-transparent border-0 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+								style={{ marginLeft: isMobile ? '10px' : '20px' }}
+							>
+								<RightArrowReviewIcon />
+							</button>
+						</>
+					)}
+				</div>
+				{/* Tab navigation right arrow - only in narrow breakpoints, hidden on mobile */}
+				{showTabNavArrows && !isMobile && props.goToNextTab && !isRegenSettingsPreviewOpen && (
+					<button
+						type="button"
+						onClick={props.goToNextTab}
+						className="bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0"
+						aria-label="Next tab"
+					>
+						<RightArrow width="20" height="39" />
+					</button>
 				)}
 			</div>
-			{/* Tab navigation right arrow - only in narrow breakpoints, hidden on mobile */}
-			{showTabNavArrows && !isMobile && props.goToNextTab && !isRegenSettingsPreviewOpen && (
-				<button
-					type="button"
-					onClick={props.goToNextTab}
-					className="bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0"
-					aria-label="Next tab"
-				>
-					<RightArrow width="20" height="39" />
-				</button>
-			)}
-		</div>
+		)}
 			</div>
 		);
 	}
@@ -2092,4 +2153,6 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 			)}
 		</div>
 	);
-};
+});
+
+DraftedEmails.displayName = 'DraftedEmails';
