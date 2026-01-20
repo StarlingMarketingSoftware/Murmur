@@ -201,6 +201,12 @@ export interface HybridPromptInputProps {
 	 * Intended for embedded prompt previews (e.g. Drafts tab regen settings).
 	 */
 	clipProfileTabOverflow?: boolean;
+	/**
+	 * Optional: override the Manual mode entry box height (default is 623px).
+	 * Useful for embedded previews (e.g. Drafts tab regen settings) so the outer container
+	 * doesn't need to scroll.
+	 */
+	manualEntryHeightPx?: number;
 }
 
 export const useHybridPromptInput = (props: HybridPromptInputProps) => {

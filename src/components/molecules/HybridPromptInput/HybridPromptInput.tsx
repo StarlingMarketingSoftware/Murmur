@@ -4992,7 +4992,12 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 													'w-[468px] h-[623px] bg-white border-[3px] border-[#0B5C0D] rounded-[8px] flex flex-col',
 													'max-[480px]:w-[89.33vw]'
 												)}
-												style={{ overflow: 'visible' }}
+												style={{
+													overflow: 'visible',
+													...(props.manualEntryHeightPx != null
+														? { height: props.manualEntryHeightPx }
+														: {}),
+												}}
 												data-hpi-manual-entry
 											>
 												{/* Header wrapper clips the top corners cleanly while preserving overflow-visible for popovers */}

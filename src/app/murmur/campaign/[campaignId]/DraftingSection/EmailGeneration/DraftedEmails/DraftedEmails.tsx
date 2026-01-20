@@ -1186,6 +1186,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 									hideGenerateTestButton
 									hideProfileBottomMiniBox
 									clipProfileTabOverflow
+									manualEntryHeightPx={560}
 									containerHeightPx={635}
 									useStaticDropdownPosition
 									hideMobileStickyTestFooter
