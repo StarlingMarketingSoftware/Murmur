@@ -3845,6 +3845,10 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 			area: '',
 			bandName: '',
 			bio: '',
+			website: '',
+		});
+	};
+
 	// Save any expanded profile field when switching away from profile tab
 	useEffect(() => {
 		if (activeTab !== 'profile' && expandedProfileBox) {
