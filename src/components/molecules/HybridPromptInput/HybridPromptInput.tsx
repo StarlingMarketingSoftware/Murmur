@@ -4932,8 +4932,9 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 													</div>
 												</div>
 
-												{/* New container below Body box (472 x 93, 9px gap) */}
-												<div className="w-full flex justify-center mt-[9px] pb-[24px]">
+												{/* New containers below Body box */}
+												<div className="w-full flex flex-col items-center mt-[9px]">
+													{/* 472 x 93 container */}
 													<div className="relative w-[472px] h-[93px] max-w-full rounded-[8px] bg-[#84CB86] border-2 border-black">
 														{/* Decorative inner boxes (no fill) */}
 														<div
@@ -4959,6 +4960,14 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 															</button>
 															{/* next prompt: we'll add the smaller inner boxes here */}
 														</div>
+													</div>
+
+													{/* 229 x 34 box, 13px below the 472 x 93 container */}
+													<div className="w-[472px] max-w-full mt-[13px]">
+														<div
+															aria-hidden="true"
+															className="w-[229px] h-[34px] rounded-[8px] bg-[#84CB86] border-2 border-black"
+														/>
 													</div>
 												</div>
 											</div>
