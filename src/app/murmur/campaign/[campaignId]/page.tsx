@@ -47,7 +47,7 @@ const SIXTEEN_BY_TEN_ZOOM_MAP: Array<{ w: number; h: number; zoom: number }> = [
 	{ w: 1152, h: 720, zoom: 0.52 },
 	{ w: 1280, h: 800, zoom: 0.6 },
 	{ w: 1440, h: 900, zoom: 0.7 },
-	{ w: 1504, h: 940, zoom: 0.816 },  // 14" MacBook Pro
+	{ w: 1504, h: 940, zoom: 0.84 },  // 14" MacBook Pro (slightly more zoomed-in)
 	{ w: 1664, h: 1040, zoom: 0.77 },
 	{ w: 1920, h: 1200, zoom: 0.95 },
 	{ w: 2048, h: 1280, zoom: 0.95 },
@@ -126,12 +126,59 @@ const Murmur = () => {
 	const CAMPAIGN_ZOOM_VAR = '--murmur-campaign-zoom';
 	const DEFAULT_CAMPAIGN_ZOOM = 0.85;
 	const CAMPAIGN_ZOOM_EVENT = 'murmur:campaign-zoom-changed';
+	const CAMPAIGN_SCROLLABLE_CLASS = 'murmur-campaign-scrollable';
 
 	// Resolution-aware zoom calculation for campaign page
 	const updateCampaignZoomForViewport = useCallback(() => {
 		if (typeof window === 'undefined') return;
 
 		const html = document.documentElement;
+		// IMPORTANT: `visualViewport.width` can jitter on mobile / responsive emulation while scrolling
+		// (address-bar/show-hide), which can accidentally flip us back into the no-scroll "nuclear" mode
+		// mid-scroll. Use the stable layout viewport width for breakpoint decisions.
+		const stableViewportW = window.innerWidth;
+
+		// On the thinnest breakpoint (<= 776px), we *must* allow page scroll for the stacked layout.
+		const THINNEST_VIEWPORT_W_PX = 776;
+		const shouldAllowScroll = stableViewportW <= THINNEST_VIEWPORT_W_PX;
+
+		// IMPORTANT:
+		// The campaign page uses the "nuclear option" (overflow hidden + snug zoom fit) for normal + narrow.
+		// On the thinnest breakpoint (<= 776px), we *must* allow page scroll for the stacked layout.
+		//
+		// On some browsers (notably those without CSS `zoom`), the combination of root-level scaling +
+		// overflow locking can make scroll restoration unreliable. So on the thinnest breakpoint we:
+		// - enable scroll mode via class
+		// - disable campaign compact scaling entirely (removes overflow:hidden + zoom/transform fallback)
+		if (shouldAllowScroll) {
+			html.classList.add(CAMPAIGN_SCROLLABLE_CLASS);
+			html.classList.remove(CAMPAIGN_COMPACT_CLASS);
+			html.style.removeProperty(CAMPAIGN_ZOOM_VAR);
+			// Clear any inline scroll locks that could prevent scrolling (defensive).
+			try {
+				document.body.style.overflow = '';
+				document.body.style.overflowX = '';
+				document.body.style.overflowY = '';
+				document.body.style.position = '';
+				document.body.style.top = '';
+				document.body.style.width = '';
+				document.body.style.touchAction = '';
+				document.documentElement.style.overflow = '';
+			} catch {
+				// ignore
+			}
+			return;
+		}
+
+		// Never shrink the mobile campaign UI (it's already heavily tuned).
+		// Still enforce the <=776px scrollable mode above.
+		if (isMobile) {
+			html.classList.remove(CAMPAIGN_SCROLLABLE_CLASS);
+			html.classList.remove(CAMPAIGN_COMPACT_CLASS);
+			html.style.removeProperty(CAMPAIGN_ZOOM_VAR);
+			return;
+		}
+
 		const viewportH = window.visualViewport?.height ?? window.innerHeight;
 		const viewportW = window.visualViewport?.width ?? window.innerWidth;
 		if (viewportH <= 0 || viewportW <= 0) return;
@@ -322,8 +369,11 @@ const Murmur = () => {
 		// Guardrails: keep zoom within sane bounds (prevents accidental extreme values).
 		targetZoom = clampZoom(targetZoom, 0.5, 1.6);
 
-		// Clamp zoom so the bottom panels remain fully visible.
-		// The campaign page is overflow-hidden on desktop, so clipping is not acceptable.
+		// Normal + narrow: keep compact mode (snug, no page scroll).
+		html.classList.remove(CAMPAIGN_SCROLLABLE_CLASS);
+		html.classList.add(CAMPAIGN_COMPACT_CLASS);
+
+		// Clamp zoom so the bottom panels remain fully visible (snug, no scroll).
 		try {
 			const anchors = Array.from(
 				document.querySelectorAll<HTMLElement>('[data-campaign-bottom-anchor]')
@@ -351,7 +401,7 @@ const Murmur = () => {
 				// to avoid forcing the entire UI to scale down too much.
 				const SAFE_BOTTOM_MARGIN_PX = viewportH <= 780 ? 8 : 24;
 				const ABSOLUTE_MIN_DOCK_CLAMP_ZOOM = 0.5;
-				const ABSOLUTE_MAX_HEIGHT_FIT_ZOOM = 1.25;
+				const ABSOLUTE_MAX_HEIGHT_FIT_ZOOM = 1.2;
 				const availableH = Math.max(0, viewportH - SAFE_BOTTOM_MARGIN_PX);
 
 				if (currentZoom > 0 && maxBottomPx > 0) {
@@ -362,7 +412,7 @@ const Murmur = () => {
 					if (Number.isFinite(zoomToFitHeight) && zoomToFitHeight > 0) {
 						// Apply the fit-height zoom, but constrained:
 						// 1. Never shrink below ABSOLUTE_MIN_DOCK_CLAMP_ZOOM (0.5)
-						// 2. Never grow above ABSOLUTE_MAX_HEIGHT_FIT_ZOOM (1.25)
+						// 2. Never grow above ABSOLUTE_MAX_HEIGHT_FIT_ZOOM (1.2)
 						// 3. Ensure we don't break the layout width (keep effective width >= 952px)
 
 						const minEffectiveWidth = 952;
@@ -423,7 +473,7 @@ const Murmur = () => {
 		} catch {
 			// no-op
 		}
-	}, []);
+	}, [isMobile]);
 
 	// Make the campaign page render slightly "zoomed out" on desktop (85%),
 	// without changing the rest of the Murmur app.
@@ -431,21 +481,12 @@ const Murmur = () => {
 		// Avoid running until we know whether this is a real mobile device.
 		if (isMobile === null) return;
 
-		// Never shrink the mobile campaign UI (it's already heavily tuned).
-		if (isMobile) {
-			document.documentElement.classList.remove(CAMPAIGN_COMPACT_CLASS);
-			document.documentElement.style.removeProperty(CAMPAIGN_ZOOM_VAR);
-			return;
-		}
-
-		document.documentElement.classList.add(CAMPAIGN_COMPACT_CLASS);
-
 		const onResize = () => updateCampaignZoomForViewport();
 		updateCampaignZoomForViewport();
 		// Re-run once the drafting UI mounts so the bottom-panels clamp can measure real DOM.
 		// (DraftingSection is dynamically imported, so it may not exist on the first call.)
 		let mo: MutationObserver | null = null;
-		if (typeof MutationObserver !== 'undefined') {
+		if (isMobile === false && typeof MutationObserver !== 'undefined') {
 			mo = new MutationObserver(() => {
 				const hasAnchors = Boolean(document.querySelector('[data-campaign-bottom-anchor]'));
 				if (!hasAnchors) return;
@@ -459,6 +500,7 @@ const Murmur = () => {
 
 		return () => {
 			document.documentElement.classList.remove(CAMPAIGN_COMPACT_CLASS);
+			document.documentElement.classList.remove(CAMPAIGN_SCROLLABLE_CLASS);
 			document.documentElement.style.removeProperty(CAMPAIGN_ZOOM_VAR);
 			mo?.disconnect();
 			window.removeEventListener('resize', onResize);
@@ -607,6 +649,71 @@ const Murmur = () => {
 	};
 	
 	const [activeView, setActiveViewInternal] = useState<ViewType>(getInitialView());
+
+	// In the thinnest "scrollable" campaign breakpoint, some nested scroll containers can trap
+	// wheel/trackpad scroll (especially on Write + Inbox), making the page feel "stuck" unless the
+	// cursor is positioned just right.
+	//
+	// This capture handler restores expected scroll behavior:
+	// - If a nested scroll container under the cursor CAN scroll, let it.
+	// - Otherwise, force the wheel gesture to scroll the PAGE.
+	// - Never interfere with text inputs / editable fields.
+	useEffect(() => {
+		if (typeof window === 'undefined') return;
+
+		const isEditableTarget = (el: HTMLElement | null) =>
+			Boolean(
+				el?.closest('textarea, input, select, [contenteditable="true"], [role="textbox"]')
+			);
+
+		const findScrollableAncestor = (el: HTMLElement | null): HTMLElement | null => {
+			let node: HTMLElement | null = el;
+			while (node && node !== document.body && node !== document.documentElement) {
+				const cs = window.getComputedStyle(node);
+				const overflowY = cs.overflowY;
+				const isScrollableY =
+					(overflowY === 'auto' || overflowY === 'scroll') &&
+					node.scrollHeight > node.clientHeight + 1;
+				if (isScrollableY) return node;
+				node = node.parentElement;
+			}
+			return null;
+		};
+
+		const canScrollY = (el: HTMLElement, deltaY: number) => {
+			if (!Number.isFinite(deltaY) || deltaY === 0) return false;
+			if (deltaY > 0) return el.scrollTop + el.clientHeight < el.scrollHeight - 1;
+			return el.scrollTop > 0;
+		};
+
+		const onWheelCapture = (e: WheelEvent) => {
+			try {
+				const html = document.documentElement;
+				if (!html.classList.contains(CAMPAIGN_SCROLLABLE_CLASS)) return;
+				// Limit to the views that were observed to trap scroll.
+				if (!(activeView === 'testing' || activeView === 'inbox')) return;
+
+				const target = e.target as HTMLElement | null;
+				if (!target) return;
+				if (isEditableTarget(target)) return;
+
+				// Prefer native behavior when the immediate scroll container can handle it.
+				const scrollParent = findScrollableAncestor(target);
+				if (scrollParent && canScrollY(scrollParent, e.deltaY)) return;
+
+				// Otherwise, force the wheel gesture to scroll the document.
+				e.preventDefault();
+				window.scrollBy({ top: e.deltaY, left: 0, behavior: 'auto' });
+			} catch {
+				// ignore
+			}
+		};
+
+		window.addEventListener('wheel', onWheelCapture, { passive: false, capture: true });
+		return () => {
+			window.removeEventListener('wheel', onWheelCapture, true);
+		};
+	}, [activeView]);
 	
 	// State for top campaigns dropdown
 	const [showTopCampaignsDropdown, setShowTopCampaignsDropdown] = useState(false);

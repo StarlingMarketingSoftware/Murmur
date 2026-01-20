@@ -6413,7 +6413,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										/>
 										{/* Research panel below inbox - matches InboxSection's container structure (w-full mx-auto px-4 maxWidth 516px) - hidden on mobile */}
 									{!isMobile && (
-										<div className="mt-[20px] w-full mx-auto px-4" style={{ maxWidth: '516px' }}>
+										<div className="mt-[20px] w-full flex justify-center px-4">
 											{isBatchDraftingInProgress ? (
 												<DraftPreviewExpandedList
 													contacts={contacts || []}

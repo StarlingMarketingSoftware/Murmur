@@ -4042,6 +4042,32 @@ html.murmur-compact.murmur-campaign-compact body {
 	overflow: hidden;
 }
 
+/* Narrowest breakpoint: stacked campaign layout needs page scroll */
+/* Must have higher specificity than any overflow locks applied to the campaign page */
+html.murmur-campaign-scrollable,
+html.murmur-campaign-scrollable body {
+	overflow-y: auto !important;
+	overflow-x: hidden !important;
+	height: auto !important;
+	min-height: 100% !important;
+}
+
+/* Thinnest campaign breakpoint: hide the hover-description banner above the campaign header box.
+   This text can overlap the header area and isn't useful at the stacked/scrollable layout. */
+html.murmur-campaign-scrollable [data-campaign-header-box='true'] [data-hover-description-ignore='true'] {
+	display: none !important;
+}
+
+/* When the campaign page is in "scrollable" mode, allow scroll chaining back to the page.
+   Our CustomScrollbar sets `overscroll-behavior: contain` inline, which can trap wheel scroll
+   and make the page feel "stuck" on narrow stacked layouts. */
+html.murmur-campaign-scrollable .scrollbar-hide,
+html.murmur-campaign-scrollable .hide-native-scrollbar,
+html.murmur-campaign-scrollable [data-lenis-prevent] {
+	overscroll-behavior: auto !important;
+	overscroll-behavior-y: auto !important;
+}
+
 /* Dashboard compact scaling (defaults to 85%, can be driven by JS via --murmur-dashboard-zoom) */
 html.murmur-compact.murmur-dashboard-compact {
 	zoom: var(--murmur-dashboard-zoom, 0.85);
