@@ -2753,7 +2753,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														onContactHover={handleResearchContactHover}
 														onDraftHover={setHoveredDraftForSettings}
 														goToWriting={goToWriting}
+														goToContacts={goToContacts}
 														goToSearch={onGoToSearch}
+														goToSent={goToSent}
 														goToInbox={goToInbox}
 														onRejectDraft={handleRejectDraft}
 														onApproveDraft={handleApproveDraft}
@@ -4238,7 +4240,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												onContactHover={handleResearchContactHover}
 												onDraftHover={setHoveredDraftForSettings}
 												goToWriting={goToWriting}
+												goToContacts={goToContacts}
 												goToSearch={onGoToSearch}
+												goToSent={goToSent}
 												goToInbox={goToInbox}
 												onRejectDraft={handleRejectDraft}
 												onApproveDraft={handleApproveDraft}
@@ -4358,7 +4362,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														onContactHover={handleResearchContactHover}
 														onDraftHover={setHoveredDraftForSettings}
 														goToWriting={goToWriting}
+														goToContacts={goToContacts}
 														goToSearch={onGoToSearch}
+														goToSent={goToSent}
 														goToInbox={goToInbox}
 														onRejectDraft={handleRejectDraft}
 														onApproveDraft={handleApproveDraft}
@@ -4507,7 +4513,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												onContactHover={handleResearchContactHover}
 												onDraftHover={setHoveredDraftForSettings}
 												goToWriting={goToWriting}
+												goToContacts={goToContacts}
 												goToSearch={onGoToSearch}
+												goToSent={goToSent}
 												goToInbox={goToInbox}
 												onRejectDraft={handleRejectDraft}
 												onApproveDraft={handleApproveDraft}
@@ -4721,6 +4729,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										goToSearch={onGoToSearch}
 										goToDrafts={goToDrafting}
 										goToInbox={goToInbox}
+										goToWriting={goToWriting}
 										hideBottomPanels
 										hideButton
 									/>
@@ -4829,6 +4838,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													goToSearch={onGoToSearch}
 													goToDrafts={goToDrafting}
 													goToInbox={goToInbox}
+													goToWriting={goToWriting}
 													hideBottomPanels
 													hideButton
 												/>
@@ -4960,6 +4970,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											goToSearch={onGoToSearch}
 											goToDrafts={goToDrafting}
 											goToInbox={goToInbox}
+											goToWriting={goToWriting}
 											hideBottomPanels={isNarrowestDesktop}
 											hideButton={isNarrowestDesktop}
 										/>
@@ -5124,9 +5135,11 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											onContactClick={handleResearchContactClick}
 											onContactHover={handleResearchContactHover}
 											onEmailHover={setHoveredSentForSettings}
+											goToContacts={goToContacts}
 											goToDrafts={goToDrafting}
 											goToWriting={goToWriting}
 											goToSearch={onGoToSearch}
+											goToInbox={goToInbox}
 										/>
 									</div>
 								) : isNarrowDesktop ? (
@@ -5220,9 +5233,11 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													onContactClick={handleResearchContactClick}
 													onContactHover={handleResearchContactHover}
 													onEmailHover={setHoveredSentForSettings}
+													goToContacts={goToContacts}
 													goToDrafts={goToDrafting}
 													goToWriting={goToWriting}
 													goToSearch={onGoToSearch}
+													goToInbox={goToInbox}
 												/>
 											</div>
 										</div>
@@ -5267,9 +5282,11 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											onContactClick={handleResearchContactClick}
 											onContactHover={handleResearchContactHover}
 											onEmailHover={setHoveredSentForSettings}
+											goToContacts={goToContacts}
 											goToDrafts={goToDrafting}
 											goToWriting={goToWriting}
 											goToSearch={onGoToSearch}
+											goToInbox={goToInbox}
 										/>
 
 										{/* Research panel below sent box at narrowest breakpoint (< 952px) */}

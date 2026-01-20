@@ -1,4 +1,4 @@
-import { FC, ReactNode, useEffect, useState } from 'react';
+import { FC, ReactNode, useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/atoms/Spinner/Spinner';
@@ -9,12 +9,27 @@ import RejectXIcon from '@/components/atoms/svg/RejectXIcon';
 import { useCampaignTopSearchHighlight } from '@/contexts/CampaignTopSearchHighlightContext';
 import { DraftingTableSkeleton } from './DraftingTableSkeleton';
 
-export const ContactsHeaderChrome: FC<{ offsetY?: number; hasData?: boolean; isAllTab?: boolean; whiteSectionHeight?: number }> = ({
+export const ContactsHeaderChrome: FC<{
+	offsetY?: number;
+	hasData?: boolean;
+	isAllTab?: boolean;
+	whiteSectionHeight?: number;
+	onWriteClick?: () => void;
+	onDraftsClick?: () => void;
+	onInboxClick?: () => void;
+}> = ({
 	offsetY = 0,
 	hasData = true,
 	isAllTab = false,
 	whiteSectionHeight,
+	onWriteClick,
+	onDraftsClick,
+	onInboxClick,
 }) => {
+	const [isDot1Hovered, setIsDot1Hovered] = useState(false);
+	const [isDot2Hovered, setIsDot2Hovered] = useState(false);
+	const [isDot3Hovered, setIsDot3Hovered] = useState(false);
+	const wasAnyDotHoveredRef = useRef(false);
 	const isBottomView = whiteSectionHeight === 15;
 	const dotColor = hasData ? '#D9D9D9' : '#B0B0B0';
 	const pillBorderColor = hasData ? '#8D5B5B' : '#B0B0B0';
@@ -39,24 +54,91 @@ export const ContactsHeaderChrome: FC<{ offsetY?: number; hasData?: boolean; isA
 	const dotTop = Math.round(pillCenterY - dotSize / 2);
 	const pillLeft = isBottomView ? 18 : 21;
 
+	// Check if any dot is hovered (for Contacts pill transformation)
+	const isAnyDotHovered = isDot1Hovered || isDot2Hovered || isDot3Hovered;
+	
+	// Determine if we're switching between dots (instant) or entering/exiting hover (animated)
+	// Switching between dots: wasAnyHovered && isAnyHovered (stays in hover, just different dot)
+	// Entering/exiting: wasAnyHovered !== isAnyHovered
+	const isSwitchingBetweenDots = wasAnyDotHoveredRef.current && isAnyDotHovered;
+	
+	// Update the ref after calculating (for next render)
+	useEffect(() => {
+		wasAnyDotHoveredRef.current = isAnyDotHovered;
+	}, [isAnyDotHovered]);
+	
+	// Transition timing
+	const animatedTransition = '0.6s cubic-bezier(0.22, 1, 0.36, 1)';
+	const instantTransition = '0s';
+	const pillOpacityTransition = isSwitchingBetweenDots ? instantTransition : animatedTransition;
+
+	// Write pill dimensions (shown when hovering dot 1)
+	const writePillWidth = 73;
+	const writePillHeight = pillHeight;
+	const writePillBorderRadius = pillBorderRadius;
+	const writePillFontSize = pillFontSize;
+	// Position Write pill centered where dot 1 was
+	const writePillLeft = dot1Left + dotSize / 2 - writePillWidth / 2;
+
+	// Drafts pill dimensions (shown when hovering dot 2)
+	const draftsPillWidth = 73;
+	const draftsPillHeight = pillHeight;
+	const draftsPillBorderRadius = pillBorderRadius;
+	const draftsPillFontSize = pillFontSize;
+	// Position Drafts pill centered where dot 2 was
+	const draftsPillLeft = dot2Left + dotSize / 2 - draftsPillWidth / 2;
+
+	// Inbox pill dimensions (shown when hovering dot 3)
+	const inboxPillWidth = 73;
+	const inboxPillHeight = pillHeight;
+	const inboxPillBorderRadius = pillBorderRadius;
+	const inboxPillFontSize = pillFontSize;
+	// Position Inbox pill centered where dot 3 was
+	const inboxPillLeft = dot3Left + dotSize / 2 - inboxPillWidth / 2;
+
+	// Hover zone dimensions - wide zones that meet at midpoints for smooth transitions
+	const hoverZoneHeight = isBottomView ? 20 : isAllTab ? 25 : 40;
+	const hoverZoneTop = dotTop + dotSize / 2 - hoverZoneHeight / 2;
+	
+	// Calculate midpoints between dots for seamless transition
+	const dot1Center = dot1Left + dotSize / 2;
+	const dot2Center = dot2Left + dotSize / 2;
+	const dot3Center = dot3Left + dotSize / 2;
+	const midpoint1to2 = (dot1Center + dot2Center) / 2;
+	const midpoint2to3 = (dot2Center + dot3Center) / 2;
+	
+	// Zone 1: extends from before dot1 to midpoint between dot1 and dot2
+	const hoverZone1Left = dot1Center - 30; // 30px before dot1 center
+	const hoverZone1Width = midpoint1to2 - hoverZone1Left;
+	
+	// Zone 2: extends from midpoint1to2 to midpoint2to3
+	const hoverZone2Left = midpoint1to2;
+	const hoverZone2Width = midpoint2to3 - midpoint1to2;
+	
+	// Zone 3: extends from midpoint2to3 to after dot3
+	const hoverZone3Left = midpoint2to3;
+	const hoverZone3Width = dot3Center + 30 - midpoint2to3; // 30px after dot3 center
+
 	return (
 		<>
+			{/* Contacts pill - transforms to white empty pill on any dot hover */}
 			<div
 				data-campaign-shared-pill="campaign-tabs-pill"
 				data-campaign-shared-pill-variant="contacts"
 				style={{
 					position: 'absolute',
 					top: `${pillTop}px`,
-					left: `${pillLeft}px`,
+					left: isAnyDotHovered ? '3px' : `${pillLeft}px`,
 					width: `${pillWidth}px`,
 					height: `${pillHeight}px`,
-					backgroundColor: pillBgColor,
-					border: `2px solid ${pillBorderColor}`,
+					backgroundColor: isAnyDotHovered ? '#FFFFFF' : pillBgColor,
+					border: isAnyDotHovered ? '2px solid #000000' : `2px solid ${pillBorderColor}`,
 					borderRadius: `${pillBorderRadius}px`,
 					display: 'flex',
 					alignItems: 'center',
 					justifyContent: 'center',
 					zIndex: 10,
+					transition: 'left 0.6s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.6s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.6s cubic-bezier(0.22, 1, 0.36, 1)',
 				}}
 			>
 				<span
@@ -70,12 +152,145 @@ export const ContactsHeaderChrome: FC<{ offsetY?: number; hasData?: boolean; isA
 						justifyContent: 'center',
 						alignItems: 'center',
 						height: '100%',
-						marginTop: isBottomView ? '-1px' : isAllTab ? '-1px' : 0 // Optical alignment adjustment
+						marginTop: isBottomView ? '-1px' : isAllTab ? '-1px' : 0, // Optical alignment adjustment
+						opacity: isAnyDotHovered ? 0 : 1,
+						transition: 'opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1)',
 					}}
 				>
 					Contacts
 				</span>
 			</div>
+
+			{/* Write pill - shown when hovering dot 1 */}
+			<div
+				style={{
+					position: 'absolute',
+					top: `${pillTop}px`,
+					left: `${writePillLeft}px`,
+					width: `${writePillWidth}px`,
+					height: `${writePillHeight}px`,
+					backgroundColor: '#A6E2A8',
+					border: '2px solid #000000',
+					borderRadius: `${writePillBorderRadius}px`,
+					display: 'flex',
+					alignItems: 'center',
+					justifyContent: 'center',
+					zIndex: 10,
+					opacity: isDot1Hovered ? 1 : 0,
+					pointerEvents: isDot1Hovered ? 'auto' : 'none',
+					transition: `opacity ${pillOpacityTransition}`,
+					cursor: onWriteClick ? 'pointer' : undefined,
+				}}
+				onClick={(e) => {
+					e.stopPropagation();
+					onWriteClick?.();
+				}}
+			>
+				<span
+					className="font-semibold font-inter leading-none"
+					style={{ 
+						color: '#000000', 
+						fontSize: writePillFontSize, 
+						textAlign: 'center', 
+						width: '100%',
+						display: 'flex',
+						justifyContent: 'center',
+						alignItems: 'center',
+						height: '100%',
+						marginTop: isBottomView ? '-1px' : isAllTab ? '-1px' : 0,
+					}}
+				>
+					Write
+				</span>
+			</div>
+
+			{/* Drafts pill - shown when hovering dot 2 */}
+			<div
+				style={{
+					position: 'absolute',
+					top: `${pillTop}px`,
+					left: `${draftsPillLeft}px`,
+					width: `${draftsPillWidth}px`,
+					height: `${draftsPillHeight}px`,
+					backgroundColor: '#EFDAAF',
+					border: '2px solid #000000',
+					borderRadius: `${draftsPillBorderRadius}px`,
+					display: 'flex',
+					alignItems: 'center',
+					justifyContent: 'center',
+					zIndex: 10,
+					opacity: isDot2Hovered ? 1 : 0,
+					pointerEvents: isDot2Hovered ? 'auto' : 'none',
+					transition: `opacity ${pillOpacityTransition}`,
+					cursor: onDraftsClick ? 'pointer' : undefined,
+				}}
+				onClick={(e) => {
+					e.stopPropagation();
+					onDraftsClick?.();
+				}}
+			>
+				<span
+					className="font-semibold font-inter leading-none"
+					style={{ 
+						color: '#000000', 
+						fontSize: draftsPillFontSize, 
+						textAlign: 'center', 
+						width: '100%',
+						display: 'flex',
+						justifyContent: 'center',
+						alignItems: 'center',
+						height: '100%',
+						marginTop: isBottomView ? '-1px' : isAllTab ? '-1px' : 0,
+					}}
+				>
+					Drafts
+				</span>
+			</div>
+
+			{/* Inbox pill - shown when hovering dot 3 */}
+			<div
+				style={{
+					position: 'absolute',
+					top: `${pillTop}px`,
+					left: `${inboxPillLeft}px`,
+					width: `${inboxPillWidth}px`,
+					height: `${inboxPillHeight}px`,
+					backgroundColor: '#CCDFF4',
+					border: '2px solid #000000',
+					borderRadius: `${inboxPillBorderRadius}px`,
+					display: 'flex',
+					alignItems: 'center',
+					justifyContent: 'center',
+					zIndex: 10,
+					opacity: isDot3Hovered ? 1 : 0,
+					pointerEvents: isDot3Hovered ? 'auto' : 'none',
+					transition: `opacity ${pillOpacityTransition}`,
+					cursor: onInboxClick ? 'pointer' : undefined,
+				}}
+				onClick={(e) => {
+					e.stopPropagation();
+					onInboxClick?.();
+				}}
+			>
+				<span
+					className="font-semibold font-inter leading-none"
+					style={{ 
+						color: '#000000', 
+						fontSize: inboxPillFontSize, 
+						textAlign: 'center', 
+						width: '100%',
+						display: 'flex',
+						justifyContent: 'center',
+						alignItems: 'center',
+						height: '100%',
+						marginTop: isBottomView ? '-1px' : isAllTab ? '-1px' : 0,
+					}}
+				>
+					Inbox
+				</span>
+			</div>
+
+			{/* Dot 1 - hidden when hovered */}
 			<div
 				style={{
 					position: 'absolute',
@@ -86,8 +301,31 @@ export const ContactsHeaderChrome: FC<{ offsetY?: number; hasData?: boolean; isA
 					borderRadius: '50%',
 					backgroundColor: dotColor,
 					zIndex: 10,
+					opacity: isDot1Hovered ? 0 : 1,
+					transition: `opacity ${pillOpacityTransition}`,
 				}}
 			/>
+
+			{/* Invisible hover zone for dot 1 */}
+			<div
+				onMouseEnter={() => setIsDot1Hovered(true)}
+				onMouseLeave={() => setIsDot1Hovered(false)}
+				onClick={(e) => {
+					e.stopPropagation();
+					onWriteClick?.();
+				}}
+				style={{
+					position: 'absolute',
+					top: `${hoverZoneTop}px`,
+					left: `${hoverZone1Left}px`,
+					width: `${hoverZone1Width}px`,
+					height: `${hoverZoneHeight}px`,
+					zIndex: 20,
+					cursor: 'pointer',
+				}}
+			/>
+
+			{/* Dot 2 - hidden when hovered */}
 			<div
 				style={{
 					position: 'absolute',
@@ -98,8 +336,31 @@ export const ContactsHeaderChrome: FC<{ offsetY?: number; hasData?: boolean; isA
 					borderRadius: '50%',
 					backgroundColor: dotColor,
 					zIndex: 10,
+					opacity: isDot2Hovered ? 0 : 1,
+					transition: `opacity ${pillOpacityTransition}`,
 				}}
 			/>
+
+			{/* Invisible hover zone for dot 2 */}
+			<div
+				onMouseEnter={() => setIsDot2Hovered(true)}
+				onMouseLeave={() => setIsDot2Hovered(false)}
+				onClick={(e) => {
+					e.stopPropagation();
+					onDraftsClick?.();
+				}}
+				style={{
+					position: 'absolute',
+					top: `${hoverZoneTop}px`,
+					left: `${hoverZone2Left}px`,
+					width: `${hoverZone2Width}px`,
+					height: `${hoverZoneHeight}px`,
+					zIndex: 20,
+					cursor: onDraftsClick ? 'pointer' : 'default',
+				}}
+			/>
+
+			{/* Dot 3 - hidden when hovered */}
 			<div
 				style={{
 					position: 'absolute',
@@ -110,6 +371,779 @@ export const ContactsHeaderChrome: FC<{ offsetY?: number; hasData?: boolean; isA
 					borderRadius: '50%',
 					backgroundColor: dotColor,
 					zIndex: 10,
+					opacity: isDot3Hovered ? 0 : 1,
+					transition: `opacity ${pillOpacityTransition}`,
+				}}
+			/>
+
+			{/* Invisible hover zone for dot 3 */}
+			<div
+				onMouseEnter={() => setIsDot3Hovered(true)}
+				onMouseLeave={() => setIsDot3Hovered(false)}
+				onClick={(e) => {
+					e.stopPropagation();
+					onInboxClick?.();
+				}}
+				style={{
+					position: 'absolute',
+					top: `${hoverZoneTop}px`,
+					left: `${hoverZone3Left}px`,
+					width: `${hoverZone3Width}px`,
+					height: `${hoverZoneHeight}px`,
+					zIndex: 20,
+					cursor: onInboxClick ? 'pointer' : 'default',
+				}}
+			/>
+		</>
+	);
+};
+
+export const DraftsHeaderChrome: FC<{
+	hasData?: boolean;
+	onContactsClick?: () => void;
+	onSentClick?: () => void;
+	onInboxClick?: () => void;
+}> = ({ hasData = true, onContactsClick, onSentClick, onInboxClick }) => {
+	const [isDot1Hovered, setIsDot1Hovered] = useState(false);
+	const [isDot2Hovered, setIsDot2Hovered] = useState(false);
+	const [isDot3Hovered, setIsDot3Hovered] = useState(false);
+	const wasAnyDotHoveredRef = useRef(false);
+	
+	// Drafts tab positions (from existing code)
+	const pillTop = 4;
+	const pillHeight = 22;
+	const pillWidth = 72;
+	const pillBorderRadius = 11;
+	const pillFontSize = '13px';
+	const dotSize = 9;
+	const dotTop = 11;
+	
+	// Existing positions
+	const dot1Left = 36; // The dot before the Drafts pill
+	const draftsPillLeft = 69; // Current position of Drafts pill
+	const dot2Left = 176;
+	const dot3Left = 235;
+	
+	// Colors
+	const dotColor = hasData ? '#D9D9D9' : '#B0B0B0';
+	const draftsPillBgColor = hasData ? '#FFECDC' : '#F8D69A';
+	const draftsPillBorderColor = hasData ? '#A8833A' : '#B0B0B0';
+	const pillTextColor = hasData ? '#000000' : '#B0B0B0';
+	
+	// Check if any dot is hovered
+	const isAnyDotHovered = isDot1Hovered || isDot2Hovered || isDot3Hovered;
+	
+	// Determine if we're switching between dots or entering/exiting hover
+	const isSwitchingBetweenDots = wasAnyDotHoveredRef.current && isAnyDotHovered;
+	
+	// Update the ref after calculating
+	useEffect(() => {
+		wasAnyDotHoveredRef.current = isAnyDotHovered;
+	}, [isAnyDotHovered]);
+	
+	// Transition timing
+	const animatedTransition = '0.6s cubic-bezier(0.22, 1, 0.36, 1)';
+	const instantTransition = '0s';
+	const pillOpacityTransition = isSwitchingBetweenDots ? instantTransition : animatedTransition;
+	
+	// Contacts pill dimensions (shown when hovering dot 1)
+	const contactsPillWidth = 73;
+	const contactsPillHeight = pillHeight;
+	const contactsPillBorderRadius = pillBorderRadius;
+	const contactsPillFontSize = pillFontSize;
+	// Position Contacts pill centered where dot 1 was
+	const contactsPillLeft = dot1Left + dotSize / 2 - contactsPillWidth / 2;
+	
+	// Sent pill dimensions (shown when hovering dot 2)
+	const sentPillWidth = 73;
+	const sentPillHeight = pillHeight;
+	const sentPillBorderRadius = pillBorderRadius;
+	const sentPillFontSize = pillFontSize;
+	// Position Sent pill centered where dot 2 was
+	const sentPillLeft = dot2Left + dotSize / 2 - sentPillWidth / 2;
+	
+	// Inbox pill dimensions (shown when hovering dot 3)
+	const inboxPillWidth = 73;
+	const inboxPillHeight = pillHeight;
+	const inboxPillBorderRadius = pillBorderRadius;
+	const inboxPillFontSize = pillFontSize;
+	// Position Inbox pill centered where dot 3 was
+	const inboxPillLeft = dot3Left + dotSize / 2 - inboxPillWidth / 2;
+	
+	// New position for Drafts pill when hovered
+	// Moves right when dot 1 is hovered (to make room for Contacts pill on left)
+	// Moves left when dot 2 or 3 is hovered (just a pinch to make room for Sent/Inbox pills)
+	const draftsPillLeftHoveredRight = draftsPillLeft + 18;
+	const draftsPillLeftHoveredLeft = draftsPillLeft - 5;
+	const getDraftsPillLeft = () => {
+		if (isDot1Hovered) return draftsPillLeftHoveredRight;
+		if (isDot2Hovered || isDot3Hovered) return draftsPillLeftHoveredLeft;
+		return draftsPillLeft;
+	};
+	
+	// Hover zone dimensions
+	const hoverZoneHeight = 40;
+	const hoverZoneTop = dotTop + dotSize / 2 - hoverZoneHeight / 2;
+	
+	// Calculate centers and midpoints for seamless transitions
+	const dot1Center = dot1Left + dotSize / 2;
+	const dot2Center = dot2Left + dotSize / 2;
+	const dot3Center = dot3Left + dotSize / 2;
+	const midpoint1to2 = (dot1Center + dot2Center) / 2;
+	const midpoint2to3 = (dot2Center + dot3Center) / 2;
+	
+	// Zone 1: extends from before dot1 to midpoint between dot1 and dot2
+	const hoverZone1Left = dot1Center - 30;
+	const hoverZone1Width = midpoint1to2 - hoverZone1Left;
+	
+	// Zone 2: extends from midpoint1to2 to midpoint2to3
+	const hoverZone2Left = midpoint1to2;
+	const hoverZone2Width = midpoint2to3 - midpoint1to2;
+	
+	// Zone 3: extends from midpoint2to3 to after dot3
+	const hoverZone3Left = midpoint2to3;
+	const hoverZone3Width = dot3Center + 30 - midpoint2to3;
+	
+	return (
+		<>
+			{/* Drafts pill - transforms to white pill and moves on hover */}
+			<div
+				data-campaign-shared-pill="campaign-tabs-pill"
+				data-campaign-shared-pill-variant="drafts"
+				style={{
+					position: 'absolute',
+					top: `${pillTop}px`,
+					left: `${getDraftsPillLeft()}px`,
+					width: `${pillWidth}px`,
+					height: `${pillHeight}px`,
+					backgroundColor: isAnyDotHovered ? '#FFFFFF' : draftsPillBgColor,
+					border: isAnyDotHovered ? '2px solid #000000' : `2px solid ${draftsPillBorderColor}`,
+					borderRadius: `${pillBorderRadius}px`,
+					display: 'flex',
+					alignItems: 'center',
+					justifyContent: 'center',
+					zIndex: 10,
+					transition: `left ${animatedTransition}, background-color ${animatedTransition}, border-color ${animatedTransition}`,
+				}}
+			>
+				<span
+					className="font-semibold font-inter leading-none"
+					style={{ 
+						color: pillTextColor, 
+						fontSize: pillFontSize, 
+						textAlign: 'center', 
+						width: '100%',
+						display: 'flex',
+						justifyContent: 'center',
+						alignItems: 'center',
+						height: '100%',
+						opacity: isAnyDotHovered ? 0 : 1,
+						transition: `opacity ${animatedTransition}`,
+					}}
+				>
+					Drafts
+				</span>
+			</div>
+
+			{/* Contacts pill - shown when hovering dot 1 */}
+			<div
+				style={{
+					position: 'absolute',
+					top: `${pillTop}px`,
+					left: `${contactsPillLeft}px`,
+					width: `${contactsPillWidth}px`,
+					height: `${contactsPillHeight}px`,
+					backgroundColor: '#F5DADA',
+					border: '2px solid #000000',
+					borderRadius: `${contactsPillBorderRadius}px`,
+					display: 'flex',
+					alignItems: 'center',
+					justifyContent: 'center',
+					zIndex: 10,
+					opacity: isDot1Hovered ? 1 : 0,
+					pointerEvents: isDot1Hovered ? 'auto' : 'none',
+					transition: `opacity ${pillOpacityTransition}`,
+					cursor: onContactsClick ? 'pointer' : undefined,
+				}}
+				onClick={(e) => {
+					e.stopPropagation();
+					onContactsClick?.();
+				}}
+			>
+				<span
+					className="font-semibold font-inter leading-none"
+					style={{ 
+						color: '#000000', 
+						fontSize: contactsPillFontSize, 
+						textAlign: 'center', 
+						width: '100%',
+						display: 'flex',
+						justifyContent: 'center',
+						alignItems: 'center',
+						height: '100%',
+					}}
+				>
+					Contacts
+				</span>
+			</div>
+
+			{/* Sent pill - shown when hovering dot 2 */}
+			<div
+				style={{
+					position: 'absolute',
+					top: `${pillTop}px`,
+					left: `${sentPillLeft}px`,
+					width: `${sentPillWidth}px`,
+					height: `${sentPillHeight}px`,
+					backgroundColor: '#B0E0A6',
+					border: '2px solid #000000',
+					borderRadius: `${sentPillBorderRadius}px`,
+					display: 'flex',
+					alignItems: 'center',
+					justifyContent: 'center',
+					zIndex: 10,
+					opacity: isDot2Hovered ? 1 : 0,
+					pointerEvents: isDot2Hovered ? 'auto' : 'none',
+					transition: `opacity ${pillOpacityTransition}`,
+					cursor: onSentClick ? 'pointer' : undefined,
+				}}
+				onClick={(e) => {
+					e.stopPropagation();
+					onSentClick?.();
+				}}
+			>
+				<span
+					className="font-semibold font-inter leading-none"
+					style={{ 
+						color: '#000000', 
+						fontSize: sentPillFontSize, 
+						textAlign: 'center', 
+						width: '100%',
+						display: 'flex',
+						justifyContent: 'center',
+						alignItems: 'center',
+						height: '100%',
+					}}
+				>
+					Sent
+				</span>
+			</div>
+
+			{/* Inbox pill - shown when hovering dot 3 */}
+			<div
+				style={{
+					position: 'absolute',
+					top: `${pillTop}px`,
+					left: `${inboxPillLeft}px`,
+					width: `${inboxPillWidth}px`,
+					height: `${inboxPillHeight}px`,
+					backgroundColor: '#CCDFF4',
+					border: '2px solid #000000',
+					borderRadius: `${inboxPillBorderRadius}px`,
+					display: 'flex',
+					alignItems: 'center',
+					justifyContent: 'center',
+					zIndex: 10,
+					opacity: isDot3Hovered ? 1 : 0,
+					pointerEvents: isDot3Hovered ? 'auto' : 'none',
+					transition: `opacity ${pillOpacityTransition}`,
+					cursor: onInboxClick ? 'pointer' : undefined,
+				}}
+				onClick={(e) => {
+					e.stopPropagation();
+					onInboxClick?.();
+				}}
+			>
+				<span
+					className="font-semibold font-inter leading-none"
+					style={{ 
+						color: '#000000', 
+						fontSize: inboxPillFontSize, 
+						textAlign: 'center', 
+						width: '100%',
+						display: 'flex',
+						justifyContent: 'center',
+						alignItems: 'center',
+						height: '100%',
+					}}
+				>
+					Inbox
+				</span>
+			</div>
+
+			{/* Dot 1 - hidden when hovered */}
+			<div
+				style={{
+					position: 'absolute',
+					top: `${dotTop}px`,
+					left: `${dot1Left}px`,
+					width: `${dotSize}px`,
+					height: `${dotSize}px`,
+					borderRadius: '50%',
+					backgroundColor: dotColor,
+					zIndex: 10,
+					opacity: isDot1Hovered ? 0 : 1,
+					transition: `opacity ${pillOpacityTransition}`,
+				}}
+			/>
+
+			{/* Invisible hover zone for dot 1 */}
+			<div
+				onMouseEnter={() => setIsDot1Hovered(true)}
+				onMouseLeave={() => setIsDot1Hovered(false)}
+				onClick={(e) => {
+					e.stopPropagation();
+					onContactsClick?.();
+				}}
+				style={{
+					position: 'absolute',
+					top: `${hoverZoneTop}px`,
+					left: `${hoverZone1Left}px`,
+					width: `${hoverZone1Width}px`,
+					height: `${hoverZoneHeight}px`,
+					zIndex: 20,
+					cursor: onContactsClick ? 'pointer' : 'default',
+				}}
+			/>
+
+			{/* Dot 2 - hidden when hovered */}
+			<div
+				style={{
+					position: 'absolute',
+					top: `${dotTop}px`,
+					left: `${dot2Left}px`,
+					width: `${dotSize}px`,
+					height: `${dotSize}px`,
+					borderRadius: '50%',
+					backgroundColor: dotColor,
+					zIndex: 10,
+					opacity: isDot2Hovered ? 0 : 1,
+					transition: `opacity ${pillOpacityTransition}`,
+				}}
+			/>
+
+			{/* Invisible hover zone for dot 2 */}
+			<div
+				onMouseEnter={() => setIsDot2Hovered(true)}
+				onMouseLeave={() => setIsDot2Hovered(false)}
+				onClick={(e) => {
+					e.stopPropagation();
+					onSentClick?.();
+				}}
+				style={{
+					position: 'absolute',
+					top: `${hoverZoneTop}px`,
+					left: `${hoverZone2Left}px`,
+					width: `${hoverZone2Width}px`,
+					height: `${hoverZoneHeight}px`,
+					zIndex: 20,
+					cursor: onSentClick ? 'pointer' : 'default',
+				}}
+			/>
+			
+			{/* Dot 3 - hidden when hovered */}
+			<div
+				style={{
+					position: 'absolute',
+					top: `${dotTop}px`,
+					left: `${dot3Left}px`,
+					width: `${dotSize}px`,
+					height: `${dotSize}px`,
+					borderRadius: '50%',
+					backgroundColor: dotColor,
+					zIndex: 10,
+					opacity: isDot3Hovered ? 0 : 1,
+					transition: `opacity ${pillOpacityTransition}`,
+				}}
+			/>
+
+			{/* Invisible hover zone for dot 3 */}
+			<div
+				onMouseEnter={() => setIsDot3Hovered(true)}
+				onMouseLeave={() => setIsDot3Hovered(false)}
+				onClick={(e) => {
+					e.stopPropagation();
+					onInboxClick?.();
+				}}
+				style={{
+					position: 'absolute',
+					top: `${hoverZoneTop}px`,
+					left: `${hoverZone3Left}px`,
+					width: `${hoverZone3Width}px`,
+					height: `${hoverZoneHeight}px`,
+					zIndex: 20,
+					cursor: onInboxClick ? 'pointer' : 'default',
+				}}
+			/>
+		</>
+	);
+};
+
+export const SentHeaderChrome: FC<{
+	hasData?: boolean;
+	onContactsClick?: () => void;
+	onDraftsClick?: () => void;
+	onInboxClick?: () => void;
+}> = ({ hasData = true, onContactsClick, onDraftsClick, onInboxClick }) => {
+	const [isDot1Hovered, setIsDot1Hovered] = useState(false);
+	const [isDot2Hovered, setIsDot2Hovered] = useState(false);
+	const [isDot3Hovered, setIsDot3Hovered] = useState(false);
+	const wasAnyDotHoveredRef = useRef(false);
+	
+	// Sent tab positions (from existing inline code)
+	const pillTop = 4;
+	const pillHeight = 22;
+	const pillWidth = 72;
+	const pillBorderRadius = 11;
+	const pillFontSize = '13px';
+	const dotSize = 9;
+	const dotTop = 11;
+	
+	// Dot positions from existing code
+	const dot1Left = 36;  // First dot (Contacts)
+	const dot2Left = 102; // Second dot (Drafts)
+	const dot3Left = 235; // Third dot (Inbox)
+	
+	// Main Sent pill position
+	const sentPillLeft = 137;
+	
+	// Contacts pill dimensions (shown when hovering dot 1)
+	const contactsPillWidth = 82;
+	const contactsPillHeight = pillHeight;
+	const contactsPillBorderRadius = pillBorderRadius;
+	const contactsPillFontSize = pillFontSize;
+	const contactsPillLeft = 3; // Position near left edge
+	
+	// Drafts pill dimensions (shown when hovering dot 2)
+	const draftsPillWidth = 72;
+	const draftsPillHeight = pillHeight;
+	const draftsPillBorderRadius = pillBorderRadius;
+	const draftsPillFontSize = pillFontSize;
+	const draftsPillLeft = 62; // Position between first dot area and Sent pill
+	
+	// Inbox pill dimensions (shown when hovering dot 3)
+	const inboxPillWidth = 66;
+	const inboxPillHeight = pillHeight;
+	const inboxPillBorderRadius = pillBorderRadius;
+	const inboxPillFontSize = pillFontSize;
+	const inboxPillLeft = 208; // Position to the right of Sent pill
+	
+	const isAnyDotHovered = isDot1Hovered || isDot2Hovered || isDot3Hovered;
+	const isSwitchingBetweenDots = wasAnyDotHoveredRef.current && isAnyDotHovered;
+	const animatedTransition = '0.6s cubic-bezier(0.22, 1, 0.36, 1)';
+	const instantTransition = '0s';
+	const pillOpacityTransition = isSwitchingBetweenDots ? instantTransition : animatedTransition;
+	
+	useEffect(() => {
+		wasAnyDotHoveredRef.current = isAnyDotHovered;
+	}, [isAnyDotHovered]);
+	
+	const sentPillBgColor = hasData ? '#DBF6D4' : '#a2e1b7';
+	const sentPillBorderColor = hasData ? '#19670F' : '#B0B0B0';
+	const pillTextColor = hasData ? '#000000' : '#B0B0B0';
+	const dotColor = hasData ? '#D9D9D9' : '#B0B0B0';
+	
+	// Hover zones
+	const hoverZoneHeight = 30;
+	const hoverZoneTop = dotTop + dotSize / 2 - hoverZoneHeight / 2;
+	const dot1Center = dot1Left + dotSize / 2;
+	const dot2Center = dot2Left + dotSize / 2;
+	const dot3Center = dot3Left + dotSize / 2;
+	const midpoint1to2 = (dot1Center + dot2Center) / 2;
+	const midpoint2to3 = (dot2Center + dot3Center) / 2;
+	
+	// Zone 1: extends from before dot1 to midpoint between dot1 and dot2
+	const hoverZone1Left = dot1Center - 30;
+	const hoverZone1Width = midpoint1to2 - hoverZone1Left;
+	
+	// Zone 2: extends from midpoint1to2 to midpoint2to3
+	const hoverZone2Left = midpoint1to2;
+	const hoverZone2Width = midpoint2to3 - midpoint1to2;
+	
+	// Zone 3: extends from midpoint2to3 to after dot3
+	const hoverZone3Left = midpoint2to3;
+	const hoverZone3Width = dot3Center + 30 - midpoint2to3;
+	
+	// Sent pill position when hovered
+	// Moves right when dot 1 is hovered (to make room for Contacts pill)
+	// Moves right when dot 2 is hovered (to make room for Drafts pill)
+	// Moves left when dot 3 is hovered (to make room for Inbox pill)
+	const getSentPillLeft = () => {
+		if (isDot1Hovered) return sentPillLeft + 18;
+		if (isDot2Hovered) return sentPillLeft + 5;
+		if (isDot3Hovered) return sentPillLeft - 5;
+		return sentPillLeft;
+	};
+	
+	return (
+		<>
+			{/* Sent pill - transforms to white pill and moves on hover */}
+			<div
+				data-campaign-shared-pill="campaign-tabs-pill"
+				data-campaign-shared-pill-variant="sent"
+				style={{
+					position: 'absolute',
+					top: `${pillTop}px`,
+					left: `${getSentPillLeft()}px`,
+					width: `${pillWidth}px`,
+					height: `${pillHeight}px`,
+					backgroundColor: isAnyDotHovered ? '#FFFFFF' : sentPillBgColor,
+					border: isAnyDotHovered ? '2px solid #000000' : `2px solid ${sentPillBorderColor}`,
+					borderRadius: `${pillBorderRadius}px`,
+					display: 'flex',
+					alignItems: 'center',
+					justifyContent: 'center',
+					zIndex: 10,
+					transition: `left ${animatedTransition}, background-color ${animatedTransition}, border-color ${animatedTransition}`,
+				}}
+			>
+				<span
+					className="font-semibold font-inter leading-none"
+					style={{ 
+						color: pillTextColor, 
+						fontSize: pillFontSize, 
+						textAlign: 'center', 
+						width: '100%',
+						display: 'flex',
+						justifyContent: 'center',
+						alignItems: 'center',
+						height: '100%',
+						opacity: isAnyDotHovered ? 0 : 1,
+						transition: `opacity ${animatedTransition}`,
+					}}
+				>
+					Sent
+				</span>
+			</div>
+
+			{/* Contacts pill - shown when hovering dot 1 */}
+			<div
+				style={{
+					position: 'absolute',
+					top: `${pillTop}px`,
+					left: `${contactsPillLeft}px`,
+					width: `${contactsPillWidth}px`,
+					height: `${contactsPillHeight}px`,
+					backgroundColor: '#F5DADA',
+					border: '2px solid #000000',
+					borderRadius: `${contactsPillBorderRadius}px`,
+					display: 'flex',
+					alignItems: 'center',
+					justifyContent: 'center',
+					zIndex: 10,
+					opacity: isDot1Hovered ? 1 : 0,
+					pointerEvents: isDot1Hovered ? 'auto' : 'none',
+					transition: `opacity ${pillOpacityTransition}`,
+					cursor: onContactsClick ? 'pointer' : undefined,
+				}}
+				onClick={(e) => {
+					e.stopPropagation();
+					onContactsClick?.();
+				}}
+			>
+				<span
+					className="font-semibold font-inter leading-none"
+					style={{ 
+						color: '#000000', 
+						fontSize: contactsPillFontSize, 
+						textAlign: 'center', 
+						width: '100%',
+						display: 'flex',
+						justifyContent: 'center',
+						alignItems: 'center',
+						height: '100%',
+					}}
+				>
+					Contacts
+				</span>
+			</div>
+
+			{/* Drafts pill - shown when hovering dot 2 */}
+			<div
+				style={{
+					position: 'absolute',
+					top: `${pillTop}px`,
+					left: `${draftsPillLeft}px`,
+					width: `${draftsPillWidth}px`,
+					height: `${draftsPillHeight}px`,
+					backgroundColor: '#EFDAAF',
+					border: '2px solid #000000',
+					borderRadius: `${draftsPillBorderRadius}px`,
+					display: 'flex',
+					alignItems: 'center',
+					justifyContent: 'center',
+					zIndex: 10,
+					opacity: isDot2Hovered ? 1 : 0,
+					pointerEvents: isDot2Hovered ? 'auto' : 'none',
+					transition: `opacity ${pillOpacityTransition}`,
+					cursor: onDraftsClick ? 'pointer' : undefined,
+				}}
+				onClick={(e) => {
+					e.stopPropagation();
+					onDraftsClick?.();
+				}}
+			>
+				<span
+					className="font-semibold font-inter leading-none"
+					style={{ 
+						color: '#000000', 
+						fontSize: draftsPillFontSize, 
+						textAlign: 'center', 
+						width: '100%',
+						display: 'flex',
+						justifyContent: 'center',
+						alignItems: 'center',
+						height: '100%',
+					}}
+				>
+					Drafts
+				</span>
+			</div>
+
+			{/* Inbox pill - shown when hovering dot 3 */}
+			<div
+				style={{
+					position: 'absolute',
+					top: `${pillTop}px`,
+					left: `${inboxPillLeft}px`,
+					width: `${inboxPillWidth}px`,
+					height: `${inboxPillHeight}px`,
+					backgroundColor: '#CCDFF4',
+					border: '2px solid #000000',
+					borderRadius: `${inboxPillBorderRadius}px`,
+					display: 'flex',
+					alignItems: 'center',
+					justifyContent: 'center',
+					zIndex: 10,
+					opacity: isDot3Hovered ? 1 : 0,
+					pointerEvents: isDot3Hovered ? 'auto' : 'none',
+					transition: `opacity ${pillOpacityTransition}`,
+					cursor: onInboxClick ? 'pointer' : undefined,
+				}}
+				onClick={(e) => {
+					e.stopPropagation();
+					onInboxClick?.();
+				}}
+			>
+				<span
+					className="font-semibold font-inter leading-none"
+					style={{ 
+						color: '#000000', 
+						fontSize: inboxPillFontSize, 
+						textAlign: 'center', 
+						width: '100%',
+						display: 'flex',
+						justifyContent: 'center',
+						alignItems: 'center',
+						height: '100%',
+					}}
+				>
+					Inbox
+				</span>
+			</div>
+
+			{/* Dot 1 - hidden when hovered */}
+			<div
+				style={{
+					position: 'absolute',
+					top: `${dotTop}px`,
+					left: `${dot1Left}px`,
+					width: `${dotSize}px`,
+					height: `${dotSize}px`,
+					borderRadius: '50%',
+					backgroundColor: dotColor,
+					zIndex: 10,
+					opacity: isDot1Hovered ? 0 : 1,
+					transition: `opacity ${pillOpacityTransition}`,
+				}}
+			/>
+
+			{/* Dot 2 - hidden when hovered */}
+			<div
+				style={{
+					position: 'absolute',
+					top: `${dotTop}px`,
+					left: `${dot2Left}px`,
+					width: `${dotSize}px`,
+					height: `${dotSize}px`,
+					borderRadius: '50%',
+					backgroundColor: dotColor,
+					zIndex: 10,
+					opacity: isDot2Hovered ? 0 : 1,
+					transition: `opacity ${pillOpacityTransition}`,
+				}}
+			/>
+
+			{/* Dot 3 - hidden when hovered */}
+			<div
+				style={{
+					position: 'absolute',
+					top: `${dotTop}px`,
+					left: `${dot3Left}px`,
+					width: `${dotSize}px`,
+					height: `${dotSize}px`,
+					borderRadius: '50%',
+					backgroundColor: dotColor,
+					zIndex: 10,
+					opacity: isDot3Hovered ? 0 : 1,
+					transition: `opacity ${pillOpacityTransition}`,
+				}}
+			/>
+
+			{/* Invisible hover zone for dot 1 */}
+			<div
+				onMouseEnter={() => setIsDot1Hovered(true)}
+				onMouseLeave={() => setIsDot1Hovered(false)}
+				onClick={(e) => {
+					e.stopPropagation();
+					onContactsClick?.();
+				}}
+				style={{
+					position: 'absolute',
+					top: `${hoverZoneTop}px`,
+					left: `${hoverZone1Left}px`,
+					width: `${hoverZone1Width}px`,
+					height: `${hoverZoneHeight}px`,
+					zIndex: 20,
+					cursor: onContactsClick ? 'pointer' : 'default',
+				}}
+			/>
+
+			{/* Invisible hover zone for dot 2 */}
+			<div
+				onMouseEnter={() => setIsDot2Hovered(true)}
+				onMouseLeave={() => setIsDot2Hovered(false)}
+				onClick={(e) => {
+					e.stopPropagation();
+					onDraftsClick?.();
+				}}
+				style={{
+					position: 'absolute',
+					top: `${hoverZoneTop}px`,
+					left: `${hoverZone2Left}px`,
+					width: `${hoverZone2Width}px`,
+					height: `${hoverZoneHeight}px`,
+					zIndex: 20,
+					cursor: onDraftsClick ? 'pointer' : 'default',
+				}}
+			/>
+
+			{/* Invisible hover zone for dot 3 */}
+			<div
+				onMouseEnter={() => setIsDot3Hovered(true)}
+				onMouseLeave={() => setIsDot3Hovered(false)}
+				onClick={(e) => {
+					e.stopPropagation();
+					onInboxClick?.();
+				}}
+				style={{
+					position: 'absolute',
+					top: `${hoverZoneTop}px`,
+					left: `${hoverZone3Left}px`,
+					width: `${hoverZone3Width}px`,
+					height: `${hoverZoneHeight}px`,
+					zIndex: 20,
+					cursor: onInboxClick ? 'pointer' : 'default',
 				}}
 			/>
 		</>
@@ -133,8 +1167,10 @@ interface DraftingTableProps {
 	footer?: ReactNode;
 	topContent?: ReactNode;
 	goToWriting?: () => void;
+	goToContacts?: () => void;
 	goToSearch?: () => void;
 	goToDrafts?: () => void;
+	goToSent?: () => void;
 	goToInbox?: () => void;
 	selectedCount?: number;
 	/** Filter state for Drafts table */
@@ -169,8 +1205,10 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 	footer,
 	topContent,
 	goToWriting,
+	goToContacts,
 	goToSearch,
 	goToDrafts,
+	goToSent,
 	goToInbox,
 	selectedCount = 0,
 	statusFilter = 'all',
@@ -250,73 +1288,23 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 				{isContacts ? '' : isDrafts ? '' : isSent ? '' : ''}
 			</div>
 			{/* New Contacts Pill - hidden on mobile */}
-			{isContacts && !isMobile && <ContactsHeaderChrome hasData={hasData} />}
+			{isContacts && !isMobile && (
+				<ContactsHeaderChrome
+					hasData={hasData}
+					onWriteClick={goToWriting}
+					onDraftsClick={goToDrafts}
+					onInboxClick={goToInbox}
+				/>
+			)}
 
 			{/* New Drafts Pill - hidden on mobile */}
 			{isDrafts && !isMobile && (
-				<>
-					<div
-						data-campaign-shared-pill="campaign-tabs-pill"
-						data-campaign-shared-pill-variant="drafts"
-						style={{
-							position: 'absolute',
-							top: '4px',
-							left: '69px',
-							width: '72px',
-							height: '22px',
-							backgroundColor: !hasData ? '#F8D69A' : '#FFECDC',
-							border: `2px solid ${!hasData ? '#B0B0B0' : '#A8833A'}`,
-							borderRadius: '11px',
-							display: 'flex',
-							alignItems: 'center',
-							justifyContent: 'center',
-							zIndex: 10,
-						}}
-					>
-						<span
-							className="text-[13px] font-semibold font-inter leading-none"
-							style={{ color: !hasData ? '#B0B0B0' : '#000000' }}
-						>
-							Drafts
-						</span>
-					</div>
-					<div
-						style={{
-							position: 'absolute',
-							top: '11px',
-							left: '36px',
-							width: '9px',
-							height: '9px',
-							borderRadius: '50%',
-							backgroundColor: !hasData ? '#B0B0B0' : '#D9D9D9',
-							zIndex: 10,
-						}}
-					/>
-					<div
-						style={{
-							position: 'absolute',
-							top: '11px',
-							left: '176px',
-							width: '9px',
-							height: '9px',
-							borderRadius: '50%',
-							backgroundColor: !hasData ? '#B0B0B0' : '#D9D9D9',
-							zIndex: 10,
-						}}
-					/>
-					<div
-						style={{
-							position: 'absolute',
-							top: '11px',
-							left: '235px',
-							width: '9px',
-							height: '9px',
-							borderRadius: '50%',
-							backgroundColor: !hasData ? '#B0B0B0' : '#D9D9D9',
-							zIndex: 10,
-						}}
-					/>
-				</>
+				<DraftsHeaderChrome
+					hasData={hasData}
+					onContactsClick={goToContacts}
+					onSentClick={goToSent}
+					onInboxClick={goToInbox}
+				/>
 			)}
 
 			{/* Counter in top right corner of Drafts table - hidden on approved/rejected tabs and on mobile */}
@@ -347,69 +1335,12 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 
 			{/* New Sent Pill - hidden on mobile (use simpler header) */}
 			{isSent && !isMobile && (
-				<>
-					<div
-						data-campaign-shared-pill="campaign-tabs-pill"
-						data-campaign-shared-pill-variant="sent"
-						style={{
-							position: 'absolute',
-							top: '4px',
-							left: '137px',
-							width: '72px',
-							height: '22px',
-							backgroundColor: hasData ? '#DBF6D4' : '#a2e1b7',
-							border: `2px solid ${hasData ? '#19670F' : '#B0B0B0'}`,
-							borderRadius: '11px',
-							display: 'flex',
-							alignItems: 'center',
-							justifyContent: 'center',
-							zIndex: 10,
-						}}
-					>
-						<span
-							className="text-[13px] font-semibold font-inter leading-none"
-							style={{ color: hasData ? '#000000' : '#B0B0B0' }}
-						>
-							Sent
-						</span>
-					</div>
-					<div
-						style={{
-							position: 'absolute',
-							top: '11px',
-							left: '102px',
-							width: '9px',
-							height: '9px',
-							borderRadius: '50%',
-							backgroundColor: hasData ? '#D9D9D9' : '#B0B0B0',
-							zIndex: 10,
-						}}
-					/>
-					<div
-						style={{
-							position: 'absolute',
-							top: '11px',
-							left: '36px',
-							width: '9px',
-							height: '9px',
-							borderRadius: '50%',
-							backgroundColor: hasData ? '#D9D9D9' : '#B0B0B0',
-							zIndex: 10,
-						}}
-					/>
-					<div
-						style={{
-							position: 'absolute',
-							top: '11px',
-							left: '235px',
-							width: '9px',
-							height: '9px',
-							borderRadius: '50%',
-							backgroundColor: hasData ? '#D9D9D9' : '#B0B0B0',
-							zIndex: 10,
-						}}
-					/>
-				</>
+				<SentHeaderChrome
+					hasData={hasData}
+					onContactsClick={goToContacts}
+					onDraftsClick={goToDrafts}
+					onInboxClick={goToInbox}
+				/>
 			)}
 			{/* Mobile Sent Header - hidden on mobile per user request */}
 

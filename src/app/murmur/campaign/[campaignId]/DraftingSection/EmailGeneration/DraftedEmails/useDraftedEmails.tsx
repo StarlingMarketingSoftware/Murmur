@@ -49,8 +49,12 @@ export interface DraftedEmailsProps {
 	onPreview?: (draft: EmailWithRelations) => void;
 	/** Optional: callback to navigate to the Writing tab */
 	goToWriting?: () => void;
+	/** Optional: callback to navigate to the Contacts tab */
+	goToContacts?: () => void;
 	/** Optional: callback to navigate to the Search tab */
 	goToSearch?: () => void;
+	/** Optional: callback to navigate to the Sent tab */
+	goToSent?: () => void;
 	/** Optional: callback to navigate to the Inbox tab */
 	goToInbox?: () => void;
 	/** Optional: identity passed through for embedded prompt settings preview (regeneration) */

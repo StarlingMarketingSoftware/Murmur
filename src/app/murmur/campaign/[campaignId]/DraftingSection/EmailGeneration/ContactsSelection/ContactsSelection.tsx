@@ -877,6 +877,7 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 		goToSearch,
 		goToDrafts,
 		goToInbox,
+		goToWriting,
 		hideBottomPanels,
 		hideButton,
 		mainBoxId,
@@ -1072,6 +1073,7 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 				goToSearch={goToSearch}
 				goToDrafts={goToDrafts}
 				goToInbox={goToInbox}
+				goToWriting={goToWriting}
 				isMobile={isMobile}
 				topContent={
 					!isMobile ? (

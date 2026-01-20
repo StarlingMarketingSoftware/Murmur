@@ -174,6 +174,324 @@ interface InboxSectionProps {
 }
 
 /**
+ * Header chrome for the Inbox section with hover functionality.
+ * Shows Contacts pill when hovering the first dot, Write pill for second dot, Drafts for third.
+ */
+const InboxSectionHeaderChrome: FC<{
+	onContactsClick?: () => void;
+	onWriteClick?: () => void;
+	onDraftsClick?: () => void;
+}> = ({ onContactsClick, onWriteClick, onDraftsClick }) => {
+	const [isDot1Hovered, setIsDot1Hovered] = useState(false);
+	const [isDot2Hovered, setIsDot2Hovered] = useState(false);
+	const [isDot3Hovered, setIsDot3Hovered] = useState(false);
+	const wasAnyDotHoveredRef = useRef(false);
+	
+	// Inbox header positions (from existing inline code)
+	const dotTop = 9.5; // top with translateY(-50%)
+	const dotSize = 9;
+	
+	// Dot positions
+	const dot1Left = 17;
+	const dot2Left = 78;
+	const dot3Left = 139;
+	
+	// Main Inbox pill position
+	const inboxPillLeft = 174;
+	const inboxPillWidth = 66;
+	const inboxPillHeight = 17;
+	
+	// Contacts pill dimensions (shown when hovering dot 1)
+	const contactsPillWidth = 66;
+	const contactsPillHeight = 17;
+	const contactsPillLeft = 3;
+	
+	// Write pill dimensions (shown when hovering dot 2)
+	const writePillWidth = 56;
+	const writePillHeight = 17;
+	const writePillLeft = 55;
+	
+	// Drafts pill dimensions (shown when hovering dot 3)
+	const draftsPillWidth = 56;
+	const draftsPillHeight = 17;
+	const draftsPillLeft = 115;
+	
+	const isAnyDotHovered = isDot1Hovered || isDot2Hovered || isDot3Hovered;
+	const isSwitchingBetweenDots = wasAnyDotHoveredRef.current && isAnyDotHovered;
+	const animatedTransition = '0.6s cubic-bezier(0.22, 1, 0.36, 1)';
+	const instantTransition = '0s';
+	const pillOpacityTransition = isSwitchingBetweenDots ? instantTransition : animatedTransition;
+	
+	useEffect(() => {
+		wasAnyDotHoveredRef.current = isAnyDotHovered;
+	}, [isAnyDotHovered]);
+	
+	// Inbox pill position when hovered
+	const getInboxPillLeft = () => {
+		if (isDot1Hovered) return inboxPillLeft + 18;
+		if (isDot2Hovered) return inboxPillLeft + 5;
+		if (isDot3Hovered) return inboxPillLeft + 5;
+		return inboxPillLeft;
+	};
+	
+	// Hover zones
+	const hoverZoneHeight = 30;
+	const hoverZoneTop = dotTop - hoverZoneHeight / 2;
+	const dot1Center = dot1Left + dotSize / 2;
+	const dot2Center = dot2Left + dotSize / 2;
+	const dot3Center = dot3Left + dotSize / 2;
+	const midpoint1to2 = (dot1Center + dot2Center) / 2;
+	const midpoint2to3 = (dot2Center + dot3Center) / 2;
+	const hoverZone1Left = dot1Center - 20;
+	const hoverZone1Width = midpoint1to2 - hoverZone1Left;
+	const hoverZone2Left = midpoint1to2;
+	const hoverZone2Width = midpoint2to3 - midpoint1to2;
+	const hoverZone3Left = midpoint2to3;
+	const hoverZone3Width = dot3Center + 30 - midpoint2to3;
+	
+	return (
+		<>
+			{/* Inbox pill - transforms to white and moves on hover */}
+			<div
+				style={{
+					position: 'absolute',
+					top: `${dotTop}px`,
+					transform: 'translateY(-50%)',
+					left: `${getInboxPillLeft()}px`,
+					width: `${inboxPillWidth}px`,
+					height: `${inboxPillHeight}px`,
+					borderRadius: '9px',
+					border: '2px solid #000000',
+					backgroundColor: isAnyDotHovered ? '#FFFFFF' : '#CCDFF4',
+					zIndex: 10,
+					display: 'flex',
+					alignItems: 'center',
+					justifyContent: 'center',
+					transition: `left ${animatedTransition}, background-color ${animatedTransition}`,
+				}}
+			>
+				<span
+					className="text-[10px] font-bold text-black leading-none"
+					style={{
+						opacity: isAnyDotHovered ? 0 : 1,
+						transition: `opacity ${animatedTransition}`,
+					}}
+				>
+					Inbox
+				</span>
+			</div>
+
+			{/* Contacts pill - shown when hovering dot 1 */}
+			<div
+				style={{
+					position: 'absolute',
+					top: `${dotTop}px`,
+					transform: 'translateY(-50%)',
+					left: `${contactsPillLeft}px`,
+					width: `${contactsPillWidth}px`,
+					height: `${contactsPillHeight}px`,
+					backgroundColor: '#F5DADA',
+					border: '2px solid #000000',
+					borderRadius: '9px',
+					display: 'flex',
+					alignItems: 'center',
+					justifyContent: 'center',
+					zIndex: 10,
+					opacity: isDot1Hovered ? 1 : 0,
+					pointerEvents: isDot1Hovered ? 'auto' : 'none',
+					transition: `opacity ${pillOpacityTransition}`,
+					cursor: onContactsClick ? 'pointer' : 'default',
+				}}
+				onClick={(e) => {
+					e.stopPropagation();
+					onContactsClick?.();
+				}}
+			>
+				<span className="text-[10px] font-bold text-black leading-none">
+					Contacts
+				</span>
+			</div>
+
+			{/* Write pill - shown when hovering dot 2 */}
+			<div
+				style={{
+					position: 'absolute',
+					top: `${dotTop}px`,
+					transform: 'translateY(-50%)',
+					left: `${writePillLeft}px`,
+					width: `${writePillWidth}px`,
+					height: `${writePillHeight}px`,
+					backgroundColor: '#A6E2A8',
+					border: '2px solid #000000',
+					borderRadius: '9px',
+					display: 'flex',
+					alignItems: 'center',
+					justifyContent: 'center',
+					zIndex: 10,
+					opacity: isDot2Hovered ? 1 : 0,
+					pointerEvents: isDot2Hovered ? 'auto' : 'none',
+					transition: `opacity ${pillOpacityTransition}`,
+					cursor: onWriteClick ? 'pointer' : 'default',
+				}}
+				onClick={(e) => {
+					e.stopPropagation();
+					onWriteClick?.();
+				}}
+			>
+				<span className="text-[10px] font-bold text-black leading-none">
+					Write
+				</span>
+			</div>
+
+			{/* Drafts pill - shown when hovering dot 3 */}
+			<div
+				style={{
+					position: 'absolute',
+					top: `${dotTop}px`,
+					transform: 'translateY(-50%)',
+					left: `${draftsPillLeft}px`,
+					width: `${draftsPillWidth}px`,
+					height: `${draftsPillHeight}px`,
+					backgroundColor: '#EFDAAF',
+					border: '2px solid #000000',
+					borderRadius: '9px',
+					display: 'flex',
+					alignItems: 'center',
+					justifyContent: 'center',
+					zIndex: 10,
+					opacity: isDot3Hovered ? 1 : 0,
+					pointerEvents: isDot3Hovered ? 'auto' : 'none',
+					transition: `opacity ${pillOpacityTransition}`,
+					cursor: onDraftsClick ? 'pointer' : 'default',
+				}}
+				onClick={(e) => {
+					e.stopPropagation();
+					onDraftsClick?.();
+				}}
+			>
+				<span className="text-[10px] font-bold text-black leading-none">
+					Drafts
+				</span>
+			</div>
+
+			{/* Dot 1 - hidden when hovered */}
+			<svg
+				width="9"
+				height="9"
+				viewBox="0 0 9 9"
+				fill="none"
+				style={{
+					position: 'absolute',
+					top: `${dotTop}px`,
+					transform: 'translateY(-50%)',
+					left: `${dot1Left}px`,
+					zIndex: 10,
+					opacity: isDot1Hovered ? 0 : 1,
+					transition: `opacity ${pillOpacityTransition}`,
+				}}
+			>
+				<circle cx="4.5" cy="4.5" r="4.5" fill="#D9D9D9" />
+			</svg>
+
+			{/* Dot 2 - hidden when hovered */}
+			<svg
+				width="9"
+				height="9"
+				viewBox="0 0 9 9"
+				fill="none"
+				style={{
+					position: 'absolute',
+					top: `${dotTop}px`,
+					transform: 'translateY(-50%)',
+					left: `${dot2Left}px`,
+					zIndex: 10,
+					opacity: isDot2Hovered ? 0 : 1,
+					transition: `opacity ${pillOpacityTransition}`,
+				}}
+			>
+				<circle cx="4.5" cy="4.5" r="4.5" fill="#D9D9D9" />
+			</svg>
+
+			{/* Dot 3 - hidden when hovered */}
+			<svg
+				width="9"
+				height="9"
+				viewBox="0 0 9 9"
+				fill="none"
+				style={{
+					position: 'absolute',
+					top: `${dotTop}px`,
+					transform: 'translateY(-50%)',
+					left: `${dot3Left}px`,
+					zIndex: 10,
+					opacity: isDot3Hovered ? 0 : 1,
+					transition: `opacity ${pillOpacityTransition}`,
+				}}
+			>
+				<circle cx="4.5" cy="4.5" r="4.5" fill="#D9D9D9" />
+			</svg>
+
+			{/* Invisible hover zone for dot 1 */}
+			<div
+				onMouseEnter={() => setIsDot1Hovered(true)}
+				onMouseLeave={() => setIsDot1Hovered(false)}
+				onClick={(e) => {
+					e.stopPropagation();
+					onContactsClick?.();
+				}}
+				style={{
+					position: 'absolute',
+					top: `${hoverZoneTop}px`,
+					left: `${hoverZone1Left}px`,
+					width: `${hoverZone1Width}px`,
+					height: `${hoverZoneHeight}px`,
+					zIndex: 20,
+					cursor: onContactsClick ? 'pointer' : 'default',
+				}}
+			/>
+
+			{/* Invisible hover zone for dot 2 */}
+			<div
+				onMouseEnter={() => setIsDot2Hovered(true)}
+				onMouseLeave={() => setIsDot2Hovered(false)}
+				onClick={(e) => {
+					e.stopPropagation();
+					onWriteClick?.();
+				}}
+				style={{
+					position: 'absolute',
+					top: `${hoverZoneTop}px`,
+					left: `${hoverZone2Left}px`,
+					width: `${hoverZone2Width}px`,
+					height: `${hoverZoneHeight}px`,
+					zIndex: 20,
+					cursor: onWriteClick ? 'pointer' : 'default',
+				}}
+			/>
+
+			{/* Invisible hover zone for dot 3 */}
+			<div
+				onMouseEnter={() => setIsDot3Hovered(true)}
+				onMouseLeave={() => setIsDot3Hovered(false)}
+				onClick={(e) => {
+					e.stopPropagation();
+					onDraftsClick?.();
+				}}
+				style={{
+					position: 'absolute',
+					top: `${hoverZoneTop}px`,
+					left: `${hoverZone3Left}px`,
+					width: `${hoverZone3Width}px`,
+					height: `${hoverZoneHeight}px`,
+					zIndex: 20,
+					cursor: onDraftsClick ? 'pointer' : 'default',
+				}}
+			/>
+		</>
+	);
+};
+
+/**
  * Resolve the best contact object for a given inbound email, preferring
  * the campaign contact (from `contactByEmail`) over the raw `email.contact`.
  */
@@ -1320,76 +1638,13 @@ export const InboxSection: FC<InboxSectionProps> = ({
 							</svg>
 						</button>
 					)}
-				{/* Three circles at top - hidden on mobile */}
+				{/* Header chrome with dots and Inbox pill - hidden on mobile */}
 				{!selectedEmail && !isMobile && (
-					<>
-						<svg
-							width="9"
-							height="9"
-							viewBox="0 0 9 9"
-							fill="none"
-							style={{
-								position: 'absolute',
-								top: '9.5px',
-								transform: 'translateY(-50%)',
-								left: '17px',
-								zIndex: 10,
-							}}
-						>
-							<circle cx="4.5" cy="4.5" r="4.5" fill="#D9D9D9" />
-						</svg>
-						<svg
-							width="9"
-							height="9"
-							viewBox="0 0 9 9"
-							fill="none"
-							style={{
-								position: 'absolute',
-								top: '9.5px',
-								transform: 'translateY(-50%)',
-								left: '78px',
-								zIndex: 10,
-							}}
-						>
-							<circle cx="4.5" cy="4.5" r="4.5" fill="#D9D9D9" />
-						</svg>
-						<svg
-							width="9"
-							height="9"
-							viewBox="0 0 9 9"
-							fill="none"
-							style={{
-								position: 'absolute',
-								top: '9.5px',
-								transform: 'translateY(-50%)',
-								left: '139px',
-								zIndex: 10,
-							}}
-						>
-							<circle cx="4.5" cy="4.5" r="4.5" fill="#D9D9D9" />
-						</svg>
-
-						{/* Inbox Badge */}
-						<div
-							style={{
-								position: 'absolute',
-								top: '9.5px',
-								transform: 'translateY(-50%)',
-								left: '174px', // 139px (3rd circle left) + 9px (width) + 26px (gap)
-								width: '66px',
-								height: '17px',
-								borderRadius: '9px',
-								border: '2px solid #000000',
-								backgroundColor: '#CCDFF4',
-								zIndex: 10,
-								display: 'flex',
-								alignItems: 'center',
-								justifyContent: 'center',
-							}}
-						>
-							<span className="text-[10px] font-bold text-black leading-none">Inbox</span>
-						</div>
-					</>
+					<InboxSectionHeaderChrome
+						onContactsClick={onGoToContacts}
+						onWriteClick={onGoToWriting}
+						onDraftsClick={onGoToDrafting}
+					/>
 				)}
 				{/* Search Bar - positioned 55px from top, left-aligned with emails */}
 				{!selectedEmail && (

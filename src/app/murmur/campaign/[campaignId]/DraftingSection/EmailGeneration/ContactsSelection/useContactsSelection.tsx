@@ -32,6 +32,10 @@ export interface ContactsSelectionProps {
 	 * Callback to navigate to the inbox tab.
 	 */
 	goToInbox?: () => void;
+	/**
+	 * Callback to navigate to the write tab.
+	 */
+	goToWriting?: () => void;
 	allContacts?: ContactWithName[];
 	/**
 	 * If true, the bottom panels (Drafts, Sent, Inbox) will not be rendered.
