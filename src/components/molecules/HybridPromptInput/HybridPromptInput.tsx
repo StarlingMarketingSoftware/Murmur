@@ -4474,224 +4474,322 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 													</span>
 												</div>
 											</div>
-											{/* Blue fill starts under the second divider */}
-											<div className="flex-1 bg-[#58A6E5] relative flex flex-col">
-												{/* Top-right indicator line (15x2px) */}
-												<button
-													type="button"
-													aria-label="Back to Auto"
-													onClick={() => {
-														setActiveTab('main');
-														setHasLeftProfileTab(true);
-														switchToFull();
-													}}
-													className="absolute top-[14px] right-[14px] w-[15px] h-[2px] bg-black cursor-pointer p-0 border-0 focus:outline-none"
-												/>
-												<div className="pt-[54px] pr-3 pb-0 pl-3 flex flex-col gap-[18px] items-center flex-1">
-											<div
-												ref={expandedProfileBox === 'name' ? expandedProfileBoxRef : undefined}
-												className={cn(
-													"w-[468px] flex flex-col rounded-[8px] border-[3px] border-black cursor-pointer overflow-hidden",
-													expandedProfileBox === 'name' ? 'h-[68px]' : 'h-[34px]'
-												)}
-												onClick={() => handleProfileBoxToggle('name')}
-											>
-												<div
-													className="h-[34px] flex items-center px-3 font-inter text-[14px] font-semibold truncate"
-													style={{ backgroundColor: getProfileHeaderBg('name') }}
-												>
-													{getProfileHeaderText('name', 'Name', 'Enter your Name')}
+											{/* Body container (380px tall) - positioned 64px below the score line */}
+											<div className="flex-1 bg-[#92CE94] relative flex flex-col">
+												<div className="w-full mt-[64px]">
+													<div
+														className={cn(
+															'w-full bg-[#4597DA] border-t-[3px] border-b-[3px] border-black rounded-[8px] overflow-hidden flex flex-col transition-[height] duration-150',
+															expandedProfileBox ? 'h-[414px]' : 'h-[380px]'
+														)}
+													>
+														{/* Header band (30px fill + 3px divider) */}
+														<div className="shrink-0 h-[33px] bg-[#95CFFF] border-b-[3px] border-black flex items-center">
+															<span className="pl-4 font-inter font-semibold text-[15px] leading-none text-black">
+																Body
+															</span>
+															{/* Top-right indicator line (15x2px) */}
+															<button
+																type="button"
+																aria-label="Back to Auto"
+																onClick={() => {
+																	setActiveTab('main');
+																	setHasLeftProfileTab(true);
+																	switchToFull();
+																}}
+																className="ml-auto mr-[14px] w-[15px] h-[2px] bg-black cursor-pointer p-0 border-0 focus:outline-none"
+															/>
+														</div>
+
+														{/* Profile fields live inside the 380px Body container */}
+														<div className="flex-1 min-h-0 overflow-y-auto hide-native-scrollbar">
+															<div className="px-3 pt-[14px] pb-[14px] flex flex-col gap-[18px]">
+																<div
+																	ref={
+																		expandedProfileBox === 'name'
+																			? expandedProfileBoxRef
+																			: undefined
+																	}
+																	className={cn(
+																		'w-[413px] max-w-full mx-auto flex flex-col rounded-[8px] border-[3px] border-black cursor-pointer overflow-hidden',
+																		expandedProfileBox === 'name' ? 'h-[68px]' : 'h-[34px]'
+																	)}
+																	onClick={() => handleProfileBoxToggle('name')}
+																>
+																	<div
+																		className="h-[34px] flex items-center px-3 font-inter text-[14px] font-semibold truncate"
+																		style={{ backgroundColor: getProfileHeaderBg('name') }}
+																	>
+																		{getProfileHeaderText(
+																			'name',
+																			'Name',
+																			'Enter your Name'
+																		)}
+																	</div>
+																	{expandedProfileBox === 'name' && (
+																		<input
+																			type="text"
+																			className="h-[34px] bg-white px-3 font-inter text-[14px] outline-none border-0"
+																			value={profileFields.name}
+																			onChange={(e) =>
+																				setProfileFields({
+																					...profileFields,
+																					name: e.target.value,
+																				})
+																			}
+																			onBlur={() => handleProfileFieldBlur('name')}
+																			onKeyDown={(e) => {
+																				if (e.key === 'Enter') {
+																					e.preventDefault();
+																					handleProfileFieldEnter('name');
+																				}
+																			}}
+																			onClick={(e) => e.stopPropagation()}
+																			placeholder=""
+																			autoFocus
+																		/>
+																	)}
+																</div>
+
+																<div
+																	ref={
+																		expandedProfileBox === 'genre'
+																			? expandedProfileBoxRef
+																			: undefined
+																	}
+																	className={cn(
+																		'w-[413px] max-w-full mx-auto flex flex-col rounded-[8px] border-[3px] border-black cursor-pointer overflow-hidden',
+																		expandedProfileBox === 'genre' ? 'h-[68px]' : 'h-[34px]'
+																	)}
+																	onClick={() => handleProfileBoxToggle('genre')}
+																>
+																	<div
+																		className="h-[34px] flex items-center px-3 font-inter text-[14px] font-semibold truncate"
+																		style={{ backgroundColor: getProfileHeaderBg('genre') }}
+																	>
+																		{getProfileHeaderText(
+																			'genre',
+																			'Genre',
+																			'Enter your Genre'
+																		)}
+																	</div>
+																	{expandedProfileBox === 'genre' && (
+																		<input
+																			type="text"
+																			className="h-[34px] bg-white px-3 font-inter text-[14px] outline-none border-0"
+																			value={profileFields.genre}
+																			onChange={(e) =>
+																				setProfileFields({
+																					...profileFields,
+																					genre: e.target.value,
+																				})
+																			}
+																			onBlur={() => handleProfileFieldBlur('genre')}
+																			onKeyDown={(e) => {
+																				if (e.key === 'Enter') {
+																					e.preventDefault();
+																					handleProfileFieldEnter('genre');
+																				}
+																			}}
+																			onClick={(e) => e.stopPropagation()}
+																			placeholder=""
+																			autoFocus
+																		/>
+																	)}
+																</div>
+
+																<div
+																	ref={
+																		expandedProfileBox === 'area'
+																			? expandedProfileBoxRef
+																			: undefined
+																	}
+																	className={cn(
+																		'w-[413px] max-w-full mx-auto flex flex-col rounded-[8px] border-[3px] border-black cursor-pointer overflow-hidden',
+																		expandedProfileBox === 'area' ? 'h-[68px]' : 'h-[34px]'
+																	)}
+																	onClick={() => handleProfileBoxToggle('area')}
+																>
+																	<div
+																		className="h-[34px] flex items-center px-3 font-inter text-[14px] font-semibold truncate"
+																		style={{ backgroundColor: getProfileHeaderBg('area') }}
+																	>
+																		{getProfileHeaderText(
+																			'area',
+																			'Area',
+																			'Enter your Area'
+																		)}
+																	</div>
+																	{expandedProfileBox === 'area' && (
+																		<input
+																			type="text"
+																			className="h-[34px] bg-white px-3 font-inter text-[14px] outline-none border-0"
+																			value={profileFields.area}
+																			onChange={(e) =>
+																				setProfileFields({
+																					...profileFields,
+																					area: e.target.value,
+																				})
+																			}
+																			onBlur={() => handleProfileFieldBlur('area')}
+																			onKeyDown={(e) => {
+																				if (e.key === 'Enter') {
+																					e.preventDefault();
+																					handleProfileFieldEnter('area');
+																				}
+																			}}
+																			onClick={(e) => e.stopPropagation()}
+																			placeholder=""
+																			autoFocus
+																		/>
+																	)}
+																</div>
+
+																<div
+																	ref={
+																		expandedProfileBox === 'band'
+																			? expandedProfileBoxRef
+																			: undefined
+																	}
+																	className={cn(
+																		'w-[413px] max-w-full mx-auto flex flex-col rounded-[8px] border-[3px] border-black cursor-pointer overflow-hidden',
+																		expandedProfileBox === 'band' ? 'h-[68px]' : 'h-[34px]'
+																	)}
+																	onClick={() => handleProfileBoxToggle('band')}
+																>
+																	<div
+																		className="h-[34px] flex items-center px-3 font-inter text-[14px] font-semibold truncate"
+																		style={{ backgroundColor: getProfileHeaderBg('band') }}
+																	>
+																		{getProfileHeaderText(
+																			'band',
+																			'Band/Artist Name',
+																			'Enter your Band/Artist Name'
+																		)}
+																	</div>
+																	{expandedProfileBox === 'band' && (
+																		<input
+																			type="text"
+																			className="h-[34px] bg-white px-3 font-inter text-[14px] outline-none border-0"
+																			value={profileFields.band}
+																			onChange={(e) =>
+																				setProfileFields({
+																					...profileFields,
+																					band: e.target.value,
+																				})
+																			}
+																			onBlur={() => handleProfileFieldBlur('band')}
+																			onKeyDown={(e) => {
+																				if (e.key === 'Enter') {
+																					e.preventDefault();
+																					handleProfileFieldEnter('band');
+																				}
+																			}}
+																			onClick={(e) => e.stopPropagation()}
+																			placeholder=""
+																			autoFocus
+																		/>
+																	)}
+																</div>
+
+																<div
+																	ref={
+																		expandedProfileBox === 'bio'
+																			? expandedProfileBoxRef
+																			: undefined
+																	}
+																	className={cn(
+																		'w-[413px] max-w-full mx-auto flex flex-col rounded-[8px] border-[3px] border-black cursor-pointer overflow-hidden',
+																		expandedProfileBox === 'bio' ? 'h-[68px]' : 'h-[34px]'
+																	)}
+																	onClick={() => handleProfileBoxToggle('bio')}
+																>
+																	<div
+																		className="h-[34px] flex items-center px-3 font-inter text-[14px] font-semibold truncate"
+																		style={{ backgroundColor: getProfileHeaderBg('bio') }}
+																	>
+																		{getProfileHeaderText('bio', 'Bio', 'Enter your Bio')}
+																	</div>
+																	{expandedProfileBox === 'bio' && (
+																		<input
+																			type="text"
+																			className="h-[34px] bg-white px-3 font-inter text-[14px] outline-none border-0"
+																			value={profileFields.bio}
+																			onChange={(e) =>
+																				setProfileFields({
+																					...profileFields,
+																					bio: e.target.value,
+																				})
+																			}
+																			onBlur={() => handleProfileFieldBlur('bio')}
+																			onKeyDown={(e) => {
+																				if (e.key === 'Enter') {
+																					e.preventDefault();
+																					handleProfileFieldEnter('bio');
+																				}
+																			}}
+																			onClick={(e) => e.stopPropagation()}
+																			placeholder=""
+																			autoFocus
+																		/>
+																	)}
+																</div>
+
+																<div
+																	ref={
+																		expandedProfileBox === 'links'
+																			? expandedProfileBoxRef
+																			: undefined
+																	}
+																	className={cn(
+																		'w-[413px] max-w-full mx-auto flex flex-col rounded-[8px] border-[3px] border-black cursor-pointer overflow-hidden',
+																		expandedProfileBox === 'links' ? 'h-[68px]' : 'h-[34px]'
+																	)}
+																	onClick={() => handleProfileBoxToggle('links')}
+																>
+																	<div
+																		className="h-[34px] flex items-center px-3 font-inter text-[14px] font-semibold truncate"
+																		style={{ backgroundColor: getProfileHeaderBg('links') }}
+																	>
+																		{getProfileHeaderText(
+																			'links',
+																			'Links',
+																			'Enter your Links'
+																		)}
+																	</div>
+																	{expandedProfileBox === 'links' && (
+																		<input
+																			type="text"
+																			className="h-[34px] bg-white px-3 font-inter text-[14px] outline-none border-0"
+																			value={profileFields.links}
+																			onChange={(e) =>
+																				setProfileFields({
+																					...profileFields,
+																					links: e.target.value,
+																				})
+																			}
+																			onBlur={() => handleProfileFieldBlur('links')}
+																			onKeyDown={(e) => {
+																				if (e.key === 'Enter') {
+																					e.preventDefault();
+																					handleProfileFieldEnter('links');
+																				}
+																			}}
+																			onClick={(e) => e.stopPropagation()}
+																			placeholder=""
+																			autoFocus
+																		/>
+																	)}
+																</div>
+															</div>
+														</div>
+
+														{/* Bottom band (3px divider + 10px fill) */}
+														<div className="shrink-0 h-[13px] bg-[#58A6E5] border-t-[3px] border-black" />
+													</div>
 												</div>
-												{expandedProfileBox === 'name' && (
-													<input
-														type="text"
-														className="h-[34px] bg-white px-3 font-inter text-[14px] outline-none border-0"
-														value={profileFields.name}
-														onChange={(e) => setProfileFields({ ...profileFields, name: e.target.value })}
-														onBlur={() => handleProfileFieldBlur('name')}
-														onKeyDown={(e) => {
-															if (e.key === 'Enter') {
-																e.preventDefault();
-																handleProfileFieldEnter('name');
-															}
-														}}
-														onClick={(e) => e.stopPropagation()}
-														placeholder=""
-														autoFocus
-													/>
-												)}
-											</div>
-											<div
-												ref={expandedProfileBox === 'genre' ? expandedProfileBoxRef : undefined}
-												className={cn(
-													"w-[468px] flex flex-col rounded-[8px] border-[3px] border-black cursor-pointer overflow-hidden",
-													expandedProfileBox === 'genre' ? 'h-[68px]' : 'h-[34px]'
-												)}
-												onClick={() => handleProfileBoxToggle('genre')}
-											>
-												<div
-													className="h-[34px] flex items-center px-3 font-inter text-[14px] font-semibold truncate"
-													style={{ backgroundColor: getProfileHeaderBg('genre') }}
-												>
-													{getProfileHeaderText('genre', 'Genre', 'Enter your Genre')}
-												</div>
-												{expandedProfileBox === 'genre' && (
-													<input
-														type="text"
-														className="h-[34px] bg-white px-3 font-inter text-[14px] outline-none border-0"
-														value={profileFields.genre}
-														onChange={(e) => setProfileFields({ ...profileFields, genre: e.target.value })}
-														onBlur={() => handleProfileFieldBlur('genre')}
-														onKeyDown={(e) => {
-															if (e.key === 'Enter') {
-																e.preventDefault();
-																handleProfileFieldEnter('genre');
-															}
-														}}
-														onClick={(e) => e.stopPropagation()}
-														placeholder=""
-														autoFocus
-													/>
-												)}
-											</div>
-											<div
-												ref={expandedProfileBox === 'area' ? expandedProfileBoxRef : undefined}
-												className={cn(
-													"w-[468px] flex flex-col rounded-[8px] border-[3px] border-black cursor-pointer overflow-hidden",
-													expandedProfileBox === 'area' ? 'h-[68px]' : 'h-[34px]'
-												)}
-												onClick={() => handleProfileBoxToggle('area')}
-											>
-												<div
-													className="h-[34px] flex items-center px-3 font-inter text-[14px] font-semibold truncate"
-													style={{ backgroundColor: getProfileHeaderBg('area') }}
-												>
-													{getProfileHeaderText('area', 'Area', 'Enter your Area')}
-												</div>
-												{expandedProfileBox === 'area' && (
-													<input
-														type="text"
-														className="h-[34px] bg-white px-3 font-inter text-[14px] outline-none border-0"
-														value={profileFields.area}
-														onChange={(e) => setProfileFields({ ...profileFields, area: e.target.value })}
-														onBlur={() => handleProfileFieldBlur('area')}
-														onKeyDown={(e) => {
-															if (e.key === 'Enter') {
-																e.preventDefault();
-																handleProfileFieldEnter('area');
-															}
-														}}
-														onClick={(e) => e.stopPropagation()}
-														placeholder=""
-														autoFocus
-													/>
-												)}
-											</div>
-											<div
-												ref={expandedProfileBox === 'band' ? expandedProfileBoxRef : undefined}
-												className={cn(
-													"w-[468px] flex flex-col rounded-[8px] border-[3px] border-black cursor-pointer overflow-hidden",
-													expandedProfileBox === 'band' ? 'h-[68px]' : 'h-[34px]'
-												)}
-												onClick={() => handleProfileBoxToggle('band')}
-											>
-												<div
-													className="h-[34px] flex items-center px-3 font-inter text-[14px] font-semibold truncate"
-													style={{ backgroundColor: getProfileHeaderBg('band') }}
-												>
-													{getProfileHeaderText(
-														'band',
-														'Band/Artist Name',
-														'Enter your Band/Artist Name'
-													)}
-												</div>
-												{expandedProfileBox === 'band' && (
-													<input
-														type="text"
-														className="h-[34px] bg-white px-3 font-inter text-[14px] outline-none border-0"
-														value={profileFields.band}
-														onChange={(e) => setProfileFields({ ...profileFields, band: e.target.value })}
-														onBlur={() => handleProfileFieldBlur('band')}
-														onKeyDown={(e) => {
-															if (e.key === 'Enter') {
-																e.preventDefault();
-																handleProfileFieldEnter('band');
-															}
-														}}
-														onClick={(e) => e.stopPropagation()}
-														placeholder=""
-														autoFocus
-													/>
-												)}
-											</div>
-											<div
-												ref={expandedProfileBox === 'bio' ? expandedProfileBoxRef : undefined}
-												className={cn(
-													"w-[468px] flex flex-col rounded-[8px] border-[3px] border-black cursor-pointer overflow-hidden",
-													expandedProfileBox === 'bio' ? 'h-[68px]' : 'h-[34px]'
-												)}
-												onClick={() => handleProfileBoxToggle('bio')}
-											>
-												<div
-													className="h-[34px] flex items-center px-3 font-inter text-[14px] font-semibold truncate"
-													style={{ backgroundColor: getProfileHeaderBg('bio') }}
-												>
-													{getProfileHeaderText('bio', 'Bio', 'Enter your Bio')}
-												</div>
-												{expandedProfileBox === 'bio' && (
-													<input
-														type="text"
-														className="h-[34px] bg-white px-3 font-inter text-[14px] outline-none border-0"
-														value={profileFields.bio}
-														onChange={(e) => setProfileFields({ ...profileFields, bio: e.target.value })}
-														onBlur={() => handleProfileFieldBlur('bio')}
-														onKeyDown={(e) => {
-															if (e.key === 'Enter') {
-																e.preventDefault();
-																handleProfileFieldEnter('bio');
-															}
-														}}
-														onClick={(e) => e.stopPropagation()}
-														placeholder=""
-														autoFocus
-													/>
-												)}
-											</div>
-											<div
-												ref={expandedProfileBox === 'links' ? expandedProfileBoxRef : undefined}
-												className={cn(
-													"w-[468px] flex flex-col rounded-[8px] border-[3px] border-black cursor-pointer overflow-hidden",
-													expandedProfileBox === 'links' ? 'h-[68px]' : 'h-[34px]'
-												)}
-												onClick={() => handleProfileBoxToggle('links')}
-											>
-												<div
-													className="h-[34px] flex items-center px-3 font-inter text-[14px] font-semibold truncate"
-													style={{ backgroundColor: getProfileHeaderBg('links') }}
-												>
-													{getProfileHeaderText('links', 'Links', 'Enter your Links')}
-												</div>
-												{expandedProfileBox === 'links' && (
-													<input
-														type="text"
-														className="h-[34px] bg-white px-3 font-inter text-[14px] outline-none border-0"
-														value={profileFields.links}
-														onChange={(e) => setProfileFields({ ...profileFields, links: e.target.value })}
-														onBlur={() => handleProfileFieldBlur('links')}
-														onKeyDown={(e) => {
-															if (e.key === 'Enter') {
-																e.preventDefault();
-																handleProfileFieldEnter('links');
-															}
-														}}
-														onClick={(e) => e.stopPropagation()}
-														placeholder=""
-														autoFocus
-													/>
-												)}
-											</div>
-												</div>
-												<div className="absolute left-0 right-0 bottom-[139px] flex justify-center">
+
+												<div className="w-full flex justify-center mt-[18px] pb-[24px]">
 													<button
 														type="button"
 														onClick={() => {
