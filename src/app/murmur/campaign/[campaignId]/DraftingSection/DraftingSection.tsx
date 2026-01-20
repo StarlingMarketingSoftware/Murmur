@@ -3839,6 +3839,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													isTest={isTest}
 													contact={contacts?.[0]}
 													onGoToDrafting={goToDrafting}
+													onGoToContacts={goToContacts}
+													onGoToInbox={goToInbox}
 													onTestPreviewToggle={setShowTestPreview}
 													draftCount={contactsTabSelectedIds.size}
 													onDraftClick={async () => {
@@ -3973,6 +3975,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											isTest={isTest}
 											contact={contacts?.[0]}
 											onGoToDrafting={goToDrafting}
+											onGoToContacts={goToContacts}
+											onGoToInbox={goToInbox}
 											onTestPreviewToggle={setShowTestPreview}
 											draftCount={contactsTabSelectedIds.size}
 											onDraftClick={async () => {

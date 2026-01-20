@@ -230,7 +230,11 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 			role="region"
 			aria-label="Expanded contacts preview"
 		>
-			<ContactsHeaderChrome isAllTab={isAllTab} whiteSectionHeight={customWhiteSectionHeight} />
+			<ContactsHeaderChrome
+				isAllTab={isAllTab}
+				whiteSectionHeight={customWhiteSectionHeight}
+				interactive={false}
+			/>
 			<div
 				className={cn(
 					'flex items-center gap-2 px-3 shrink-0',

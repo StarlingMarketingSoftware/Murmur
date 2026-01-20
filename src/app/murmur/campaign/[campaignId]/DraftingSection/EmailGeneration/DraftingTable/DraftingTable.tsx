@@ -17,6 +17,11 @@ export const ContactsHeaderChrome: FC<{
 	onWriteClick?: () => void;
 	onDraftsClick?: () => void;
 	onInboxClick?: () => void;
+	/**
+	 * When false, renders a static header (no hover pill animation, no dot hover/click zones).
+	 * Useful for small preview/expanded-list variants where the full interaction feels noisy.
+	 */
+	interactive?: boolean;
 }> = ({
 	offsetY = 0,
 	hasData = true,
@@ -25,6 +30,7 @@ export const ContactsHeaderChrome: FC<{
 	onWriteClick,
 	onDraftsClick,
 	onInboxClick,
+	interactive = true,
 }) => {
 	const [isDot1Hovered, setIsDot1Hovered] = useState(false);
 	const [isDot2Hovered, setIsDot2Hovered] = useState(false);
@@ -161,134 +167,138 @@ export const ContactsHeaderChrome: FC<{
 				</span>
 			</div>
 
-			{/* Write pill - shown when hovering dot 1 */}
-			<div
-				style={{
-					position: 'absolute',
-					top: `${pillTop}px`,
-					left: `${writePillLeft}px`,
-					width: `${writePillWidth}px`,
-					height: `${writePillHeight}px`,
-					backgroundColor: '#A6E2A8',
-					border: '2px solid #000000',
-					borderRadius: `${writePillBorderRadius}px`,
-					display: 'flex',
-					alignItems: 'center',
-					justifyContent: 'center',
-					zIndex: 10,
-					opacity: isDot1Hovered ? 1 : 0,
-					pointerEvents: isDot1Hovered ? 'auto' : 'none',
-					transition: `opacity ${pillOpacityTransition}`,
-					cursor: onWriteClick ? 'pointer' : undefined,
-				}}
-				onClick={(e) => {
-					e.stopPropagation();
-					onWriteClick?.();
-				}}
-			>
-				<span
-					className="font-semibold font-inter leading-none"
-					style={{ 
-						color: '#000000', 
-						fontSize: writePillFontSize, 
-						textAlign: 'center', 
-						width: '100%',
-						display: 'flex',
-						justifyContent: 'center',
-						alignItems: 'center',
-						height: '100%',
-						marginTop: isBottomView ? '-1px' : isAllTab ? '-1px' : 0,
-					}}
-				>
-					Write
-				</span>
-			</div>
+			{interactive && (
+				<>
+					{/* Write pill - shown when hovering dot 1 */}
+					<div
+						style={{
+							position: 'absolute',
+							top: `${pillTop}px`,
+							left: `${writePillLeft}px`,
+							width: `${writePillWidth}px`,
+							height: `${writePillHeight}px`,
+							backgroundColor: '#A6E2A8',
+							border: '2px solid #000000',
+							borderRadius: `${writePillBorderRadius}px`,
+							display: 'flex',
+							alignItems: 'center',
+							justifyContent: 'center',
+							zIndex: 10,
+							opacity: isDot1Hovered ? 1 : 0,
+							pointerEvents: isDot1Hovered ? 'auto' : 'none',
+							transition: `opacity ${pillOpacityTransition}`,
+							cursor: onWriteClick ? 'pointer' : undefined,
+						}}
+						onClick={(e) => {
+							e.stopPropagation();
+							onWriteClick?.();
+						}}
+					>
+						<span
+							className="font-semibold font-inter leading-none"
+							style={{
+								color: '#000000',
+								fontSize: writePillFontSize,
+								textAlign: 'center',
+								width: '100%',
+								display: 'flex',
+								justifyContent: 'center',
+								alignItems: 'center',
+								height: '100%',
+								marginTop: isBottomView ? '-1px' : isAllTab ? '-1px' : 0,
+							}}
+						>
+							Write
+						</span>
+					</div>
 
-			{/* Drafts pill - shown when hovering dot 2 */}
-			<div
-				style={{
-					position: 'absolute',
-					top: `${pillTop}px`,
-					left: `${draftsPillLeft}px`,
-					width: `${draftsPillWidth}px`,
-					height: `${draftsPillHeight}px`,
-					backgroundColor: '#EFDAAF',
-					border: '2px solid #000000',
-					borderRadius: `${draftsPillBorderRadius}px`,
-					display: 'flex',
-					alignItems: 'center',
-					justifyContent: 'center',
-					zIndex: 10,
-					opacity: isDot2Hovered ? 1 : 0,
-					pointerEvents: isDot2Hovered ? 'auto' : 'none',
-					transition: `opacity ${pillOpacityTransition}`,
-					cursor: onDraftsClick ? 'pointer' : undefined,
-				}}
-				onClick={(e) => {
-					e.stopPropagation();
-					onDraftsClick?.();
-				}}
-			>
-				<span
-					className="font-semibold font-inter leading-none"
-					style={{ 
-						color: '#000000', 
-						fontSize: draftsPillFontSize, 
-						textAlign: 'center', 
-						width: '100%',
-						display: 'flex',
-						justifyContent: 'center',
-						alignItems: 'center',
-						height: '100%',
-						marginTop: isBottomView ? '-1px' : isAllTab ? '-1px' : 0,
-					}}
-				>
-					Drafts
-				</span>
-			</div>
+					{/* Drafts pill - shown when hovering dot 2 */}
+					<div
+						style={{
+							position: 'absolute',
+							top: `${pillTop}px`,
+							left: `${draftsPillLeft}px`,
+							width: `${draftsPillWidth}px`,
+							height: `${draftsPillHeight}px`,
+							backgroundColor: '#EFDAAF',
+							border: '2px solid #000000',
+							borderRadius: `${draftsPillBorderRadius}px`,
+							display: 'flex',
+							alignItems: 'center',
+							justifyContent: 'center',
+							zIndex: 10,
+							opacity: isDot2Hovered ? 1 : 0,
+							pointerEvents: isDot2Hovered ? 'auto' : 'none',
+							transition: `opacity ${pillOpacityTransition}`,
+							cursor: onDraftsClick ? 'pointer' : undefined,
+						}}
+						onClick={(e) => {
+							e.stopPropagation();
+							onDraftsClick?.();
+						}}
+					>
+						<span
+							className="font-semibold font-inter leading-none"
+							style={{
+								color: '#000000',
+								fontSize: draftsPillFontSize,
+								textAlign: 'center',
+								width: '100%',
+								display: 'flex',
+								justifyContent: 'center',
+								alignItems: 'center',
+								height: '100%',
+								marginTop: isBottomView ? '-1px' : isAllTab ? '-1px' : 0,
+							}}
+						>
+							Drafts
+						</span>
+					</div>
 
-			{/* Inbox pill - shown when hovering dot 3 */}
-			<div
-				style={{
-					position: 'absolute',
-					top: `${pillTop}px`,
-					left: `${inboxPillLeft}px`,
-					width: `${inboxPillWidth}px`,
-					height: `${inboxPillHeight}px`,
-					backgroundColor: '#CCDFF4',
-					border: '2px solid #000000',
-					borderRadius: `${inboxPillBorderRadius}px`,
-					display: 'flex',
-					alignItems: 'center',
-					justifyContent: 'center',
-					zIndex: 10,
-					opacity: isDot3Hovered ? 1 : 0,
-					pointerEvents: isDot3Hovered ? 'auto' : 'none',
-					transition: `opacity ${pillOpacityTransition}`,
-					cursor: onInboxClick ? 'pointer' : undefined,
-				}}
-				onClick={(e) => {
-					e.stopPropagation();
-					onInboxClick?.();
-				}}
-			>
-				<span
-					className="font-semibold font-inter leading-none"
-					style={{ 
-						color: '#000000', 
-						fontSize: inboxPillFontSize, 
-						textAlign: 'center', 
-						width: '100%',
-						display: 'flex',
-						justifyContent: 'center',
-						alignItems: 'center',
-						height: '100%',
-						marginTop: isBottomView ? '-1px' : isAllTab ? '-1px' : 0,
-					}}
-				>
-					Inbox
-				</span>
-			</div>
+					{/* Inbox pill - shown when hovering dot 3 */}
+					<div
+						style={{
+							position: 'absolute',
+							top: `${pillTop}px`,
+							left: `${inboxPillLeft}px`,
+							width: `${inboxPillWidth}px`,
+							height: `${inboxPillHeight}px`,
+							backgroundColor: '#CCDFF4',
+							border: '2px solid #000000',
+							borderRadius: `${inboxPillBorderRadius}px`,
+							display: 'flex',
+							alignItems: 'center',
+							justifyContent: 'center',
+							zIndex: 10,
+							opacity: isDot3Hovered ? 1 : 0,
+							pointerEvents: isDot3Hovered ? 'auto' : 'none',
+							transition: `opacity ${pillOpacityTransition}`,
+							cursor: onInboxClick ? 'pointer' : undefined,
+						}}
+						onClick={(e) => {
+							e.stopPropagation();
+							onInboxClick?.();
+						}}
+					>
+						<span
+							className="font-semibold font-inter leading-none"
+							style={{
+								color: '#000000',
+								fontSize: inboxPillFontSize,
+								textAlign: 'center',
+								width: '100%',
+								display: 'flex',
+								justifyContent: 'center',
+								alignItems: 'center',
+								height: '100%',
+								marginTop: isBottomView ? '-1px' : isAllTab ? '-1px' : 0,
+							}}
+						>
+							Inbox
+						</span>
+					</div>
+				</>
+			)}
 
 			{/* Dot 1 - hidden when hovered */}
 			<div
@@ -307,23 +317,25 @@ export const ContactsHeaderChrome: FC<{
 			/>
 
 			{/* Invisible hover zone for dot 1 */}
-			<div
-				onMouseEnter={() => setIsDot1Hovered(true)}
-				onMouseLeave={() => setIsDot1Hovered(false)}
-				onClick={(e) => {
-					e.stopPropagation();
-					onWriteClick?.();
-				}}
-				style={{
-					position: 'absolute',
-					top: `${hoverZoneTop}px`,
-					left: `${hoverZone1Left}px`,
-					width: `${hoverZone1Width}px`,
-					height: `${hoverZoneHeight}px`,
-					zIndex: 20,
-					cursor: 'pointer',
-				}}
-			/>
+			{interactive && (
+				<div
+					onMouseEnter={() => setIsDot1Hovered(true)}
+					onMouseLeave={() => setIsDot1Hovered(false)}
+					onClick={(e) => {
+						e.stopPropagation();
+						onWriteClick?.();
+					}}
+					style={{
+						position: 'absolute',
+						top: `${hoverZoneTop}px`,
+						left: `${hoverZone1Left}px`,
+						width: `${hoverZone1Width}px`,
+						height: `${hoverZoneHeight}px`,
+						zIndex: 20,
+						cursor: 'pointer',
+					}}
+				/>
+			)}
 
 			{/* Dot 2 - hidden when hovered */}
 			<div
@@ -342,23 +354,25 @@ export const ContactsHeaderChrome: FC<{
 			/>
 
 			{/* Invisible hover zone for dot 2 */}
-			<div
-				onMouseEnter={() => setIsDot2Hovered(true)}
-				onMouseLeave={() => setIsDot2Hovered(false)}
-				onClick={(e) => {
-					e.stopPropagation();
-					onDraftsClick?.();
-				}}
-				style={{
-					position: 'absolute',
-					top: `${hoverZoneTop}px`,
-					left: `${hoverZone2Left}px`,
-					width: `${hoverZone2Width}px`,
-					height: `${hoverZoneHeight}px`,
-					zIndex: 20,
-					cursor: onDraftsClick ? 'pointer' : 'default',
-				}}
-			/>
+			{interactive && (
+				<div
+					onMouseEnter={() => setIsDot2Hovered(true)}
+					onMouseLeave={() => setIsDot2Hovered(false)}
+					onClick={(e) => {
+						e.stopPropagation();
+						onDraftsClick?.();
+					}}
+					style={{
+						position: 'absolute',
+						top: `${hoverZoneTop}px`,
+						left: `${hoverZone2Left}px`,
+						width: `${hoverZone2Width}px`,
+						height: `${hoverZoneHeight}px`,
+						zIndex: 20,
+						cursor: onDraftsClick ? 'pointer' : 'default',
+					}}
+				/>
+			)}
 
 			{/* Dot 3 - hidden when hovered */}
 			<div
@@ -377,23 +391,25 @@ export const ContactsHeaderChrome: FC<{
 			/>
 
 			{/* Invisible hover zone for dot 3 */}
-			<div
-				onMouseEnter={() => setIsDot3Hovered(true)}
-				onMouseLeave={() => setIsDot3Hovered(false)}
-				onClick={(e) => {
-					e.stopPropagation();
-					onInboxClick?.();
-				}}
-				style={{
-					position: 'absolute',
-					top: `${hoverZoneTop}px`,
-					left: `${hoverZone3Left}px`,
-					width: `${hoverZone3Width}px`,
-					height: `${hoverZoneHeight}px`,
-					zIndex: 20,
-					cursor: onInboxClick ? 'pointer' : 'default',
-				}}
-			/>
+			{interactive && (
+				<div
+					onMouseEnter={() => setIsDot3Hovered(true)}
+					onMouseLeave={() => setIsDot3Hovered(false)}
+					onClick={(e) => {
+						e.stopPropagation();
+						onInboxClick?.();
+					}}
+					style={{
+						position: 'absolute',
+						top: `${hoverZoneTop}px`,
+						left: `${hoverZone3Left}px`,
+						width: `${hoverZone3Width}px`,
+						height: `${hoverZoneHeight}px`,
+						zIndex: 20,
+						cursor: onInboxClick ? 'pointer' : 'default',
+					}}
+				/>
+			)}
 		</>
 	);
 };

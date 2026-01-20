@@ -69,6 +69,14 @@ export interface HybridPromptInputProps {
 	compactLeftOnly?: boolean;
 	onGoToDrafting?: () => void;
 	/**
+	 * Optional: invoked when the user clicks to navigate to the Contacts tab.
+	 */
+	onGoToContacts?: () => void;
+	/**
+	 * Optional: invoked when the user clicks to navigate to the Inbox tab.
+	 */
+	onGoToInbox?: () => void;
+	/**
 	 * Optional: invoked when the user clicks the Draft button on the Writing tab.
 	 * Typically used to generate drafts for the currently selected contacts.
 	 */
