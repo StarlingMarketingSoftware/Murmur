@@ -4479,7 +4479,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 												<div className="w-full mt-[64px]">
 													<div
 														className={cn(
-															'w-full bg-[#4597DA] border-t-[3px] border-b-[3px] border-black rounded-[8px] overflow-hidden flex flex-col',
+															'relative w-full bg-[#4597DA] border-t-[3px] border-b-[3px] border-black rounded-[8px] overflow-hidden flex flex-col',
 															expandedProfileBox ? 'h-[414px]' : 'h-[380px]'
 														)}
 													>
@@ -4488,18 +4488,19 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 															<span className="pl-4 font-inter font-semibold text-[15px] leading-none text-black">
 																Body
 															</span>
-															{/* Top-right indicator line (15x2px) */}
-															<button
-																type="button"
-																aria-label="Back to Auto"
-																onClick={() => {
-																	setActiveTab('main');
-																	setHasLeftProfileTab(true);
-																	switchToFull();
-																}}
-																className="ml-auto mr-[14px] w-[15px] h-[2px] bg-black cursor-pointer p-0 border-0 focus:outline-none"
-															/>
 														</div>
+
+														{/* Top-right "-" button (positioned in the main Body area, not the header strip) */}
+														<button
+															type="button"
+															aria-label="Back to Auto"
+															onClick={() => {
+																setActiveTab('main');
+																setHasLeftProfileTab(true);
+																switchToFull();
+															}}
+															className="absolute right-[14px] top-[43px] w-[15px] h-[2px] bg-black cursor-pointer p-0 border-0 focus:outline-none"
+														/>
 
 														{/* Profile fields live inside the 380px Body container */}
 														<div className="flex-1 min-h-0 overflow-y-auto hide-native-scrollbar">
