@@ -48,6 +48,11 @@ interface FullAutoBodyBlockProps {
 	 * and allow internal scrolling when Custom Instructions is expanded.
 	 */
 	constrainHeight?: boolean;
+	/**
+	 * When true, renders the header chrome flush (no inset padding / rounded corners).
+	 * Used by the Drafts/Sent settings preview panel where the parent provides the framing.
+	 */
+	embedded?: boolean;
 	className?: string;
 }
 
@@ -74,8 +79,11 @@ export const FullAutoBodyBlock: FC<FullAutoBodyBlockProps> = ({
 	hasPreviousPrompt,
 	onUndoUpscalePrompt,
 	constrainHeight,
+	embedded,
 	className,
 }) => {
+	const isEmbedded = Boolean(embedded);
+
 	// Power mode from form (shared with HybridPromptInput + MiniEmailStructure)
 	const selectedPowerMode = form.watch('powerMode') || 'normal';
 	const setSelectedPowerMode = (mode: 'normal' | 'high') => {
@@ -939,8 +947,8 @@ export const FullAutoBodyBlock: FC<FullAutoBodyBlockProps> = ({
 			data-block-type="full"
 		>
 			{/* Header background fill (Body + power mode toggles) */}
-			<div className="w-full px-1 pt-1 pb-1">
-				<div className="rounded-t-[6px] overflow-hidden">
+			<div className={cn('w-full', isEmbedded ? 'p-0' : 'px-1 pt-1 pb-1')}>
+				<div className={cn(!isEmbedded && 'rounded-t-[6px] overflow-hidden')}>
 					<div className="h-[27px] bg-[#B9DAF5] flex items-stretch">
 						{/* Body label section */}
 						<div className="flex-1 flex items-center pl-[16px]">

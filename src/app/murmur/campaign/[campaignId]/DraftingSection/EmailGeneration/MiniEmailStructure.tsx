@@ -1112,6 +1112,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 						fieldIndex={idx}
 						profileFields={profileTabFields}
 						constrainHeight
+						embedded
 						className="!h-[209px] !rounded-none !border-0"
 					/>
 				);
