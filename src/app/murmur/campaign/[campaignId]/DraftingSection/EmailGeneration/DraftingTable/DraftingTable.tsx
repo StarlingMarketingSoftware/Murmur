@@ -7,6 +7,7 @@ import { urls } from '@/constants/urls';
 import ApproveCheckIcon from '@/components/atoms/svg/ApproveCheckIcon';
 import RejectXIcon from '@/components/atoms/svg/RejectXIcon';
 import { useCampaignTopSearchHighlight } from '@/contexts/CampaignTopSearchHighlightContext';
+import { DraftingTableSkeleton } from './DraftingTableSkeleton';
 
 export const ContactsHeaderChrome: FC<{ offsetY?: number; hasData?: boolean; isAllTab?: boolean; whiteSectionHeight?: number }> = ({
 	offsetY = 0,
@@ -213,6 +214,11 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 	const mobileBoxHeight = 'calc(100dvh - 160px)';
 	const boxWidth = isMobile ? mobileBoxWidth : (isContacts || isDrafts || isSent ? '499px' : '376px');
 	const boxHeight = isMobile ? mobileBoxHeight : (isContacts || isDrafts || isSent ? '703px' : '474px');
+
+	// Show skeleton while loading for Drafts table
+	if (isDrafts && isPending) {
+		return <DraftingTableSkeleton isMobile={isMobile} />;
+	}
 
 	return (
 		<div
