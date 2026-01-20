@@ -4500,6 +4500,11 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 											</div>
 											{/* Body container (380px tall) - positioned 64px below the score line */}
 											<div className="flex-1 bg-[#92CE94] relative flex flex-col">
+												{/* Green top space box (122 x 34) */}
+												<div
+													aria-hidden="true"
+													className="absolute left-[15px] top-[14px] w-[122px] h-[34px] rounded-[8px] border-2 border-black bg-[#84CB86]"
+												/>
 												<div className="w-full mt-[64px]">
 													<div
 														className={cn(
@@ -4934,9 +4939,9 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 															setActiveTab('main');
 															setHasLeftProfileTab(true);
 														}}
-														className="w-[136px] h-[26px] rounded-[6px] bg-[#C8C8C8] text-white font-inter font-medium text-[15px] leading-none flex items-center justify-center cursor-pointer"
+														className="w-[298px] h-[26px] rounded-[6px] bg-[#B1B1B1] border-2 border-black text-white font-inter font-medium text-[15px] leading-none flex items-center justify-center cursor-pointer"
 													>
-														back to writing
+														back
 													</button>
 												</div>
 											</div>
