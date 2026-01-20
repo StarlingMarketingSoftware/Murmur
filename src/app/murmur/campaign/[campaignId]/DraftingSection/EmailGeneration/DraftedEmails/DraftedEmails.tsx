@@ -1184,6 +1184,8 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 									onIdentityUpdate={props.onIdentityUpdate}
 									hideDraftButton
 									hideGenerateTestButton
+									hideProfileBottomMiniBox
+									clipProfileTabOverflow
 									containerHeightPx={635}
 									useStaticDropdownPosition
 									hideMobileStickyTestFooter

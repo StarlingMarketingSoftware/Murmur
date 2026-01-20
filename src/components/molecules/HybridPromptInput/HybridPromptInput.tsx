@@ -4474,7 +4474,10 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 									</div>
 								<div
 									className={cn(
-										'flex-1 min-h-0 flex flex-col overflow-y-auto hide-native-scrollbar relative',
+										'flex-1 min-h-0 flex flex-col hide-native-scrollbar relative',
+										props.clipProfileTabOverflow && activeTab === 'profile'
+											? 'overflow-y-hidden'
+											: 'overflow-y-auto',
 										shouldEnableHybridPlusGutter && 'w-[calc(100%_+_90px)] -mr-[90px]'
 									)}
 									data-hpi-content
@@ -4963,12 +4966,14 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 													</div>
 
 													{/* 229 x 34 box, 13px below the 472 x 93 container */}
-													<div className="w-[472px] max-w-full mt-[13px]">
-														<div
-															aria-hidden="true"
-															className="w-[229px] h-[34px] rounded-[8px] bg-[#84CB86] border-2 border-black"
-														/>
-													</div>
+													{!props.hideProfileBottomMiniBox && (
+														<div className="w-[472px] max-w-full mt-[13px]">
+															<div
+																aria-hidden="true"
+																className="w-[229px] h-[34px] rounded-[8px] bg-[#84CB86] border-2 border-black"
+															/>
+														</div>
+													)}
 												</div>
 											</div>
 										</div>

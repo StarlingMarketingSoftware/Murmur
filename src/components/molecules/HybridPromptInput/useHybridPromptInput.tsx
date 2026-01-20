@@ -190,6 +190,17 @@ export interface HybridPromptInputProps {
 	 * - string: sets the attribute to that value
 	 */
 	dataCampaignMainBox?: string | null;
+	/**
+	 * Optional: hide the small 229x34px box at the very bottom of the Profile tab.
+	 * Useful for embedded prompt previews (e.g. Drafts tab regen settings) to avoid scrollbars.
+	 */
+	hideProfileBottomMiniBox?: boolean;
+	/**
+	 * Optional: when true, disable the main content area's vertical scrolling on the Profile tab
+	 * (so expanding a Profile field won't trigger a scrollbar). Overflow will be clipped instead.
+	 * Intended for embedded prompt previews (e.g. Drafts tab regen settings).
+	 */
+	clipProfileTabOverflow?: boolean;
 }
 
 export const useHybridPromptInput = (props: HybridPromptInputProps) => {
