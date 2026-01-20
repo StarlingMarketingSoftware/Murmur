@@ -1497,7 +1497,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 										className={cn(
 											'cursor-pointer relative select-none overflow-visible border-2 p-2 group/draft rounded-[8px] transition-colors',
 											isMobile ? 'h-[100px]' : 'h-[97px]',
-											isSelected ? 'border-[#FFFFFF]' : 'border-[#000000]',
+											'border-[#000000]',
 											rowBgColor,
 										)}
 										style={isMobile ? { width: mobileEmailRowWidth } : { width: '489px' }}
