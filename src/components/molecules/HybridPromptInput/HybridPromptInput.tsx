@@ -3825,6 +3825,26 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		}
 	};
 
+	const handleClearAllProfileFields = () => {
+		// Close any expanded field (we are clearing values)
+		setExpandedProfileBox(null);
+
+		// Name is required; keep it and clear the rest.
+		setProfileFields((prev) => ({
+			...prev,
+			genre: '',
+			area: '',
+			band: '',
+			bio: '',
+			links: '',
+		}));
+
+		if (!onIdentityUpdate || !identityProfile) return;
+		onIdentityUpdate({
+			genre: '',
+			area: '',
+			bandName: '',
+			bio: '',
 	// Save any expanded profile field when switching away from profile tab
 	useEffect(() => {
 		if (activeTab !== 'profile' && expandedProfileBox) {
@@ -4488,6 +4508,17 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 															<span className="pl-4 font-inter font-semibold text-[15px] leading-none text-black">
 																Body
 															</span>
+															{/* Right controls: divider @ 138px from right, "Clear all" segment (89px), divider @ 49px from right */}
+															<div className="ml-auto flex items-stretch h-full">
+																<button
+																	type="button"
+																	onClick={handleClearAllProfileFields}
+																	className="w-[89px] shrink-0 h-full bg-[#58A6E5] border-l-[3px] border-black flex items-center justify-center font-inter font-semibold text-[13px] leading-none text-black cursor-pointer p-0 border-0 focus:outline-none focus-visible:outline-none"
+																>
+																	Clear all
+																</button>
+																<div className="w-[49px] shrink-0 border-l-[3px] border-black" />
+															</div>
 														</div>
 
 														{/* Top-right "-" button (positioned in the main Body area, not the header strip) */}
