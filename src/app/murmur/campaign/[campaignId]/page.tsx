@@ -540,6 +540,68 @@ const Murmur = () => {
 		]
 	);
 
+	const topSearchHighlightTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+	// Moved here to be accessible by the keydown listener
+	const handleOpenDashboardSearchForCampaign = useCallback(() => {
+		if (!campaign) return;
+
+		const searchName = campaign?.userContactLists?.[0]?.name || campaign?.name || '';
+		const pendingSearch = searchName ? `[Booking] ${searchName}`.trim() : '';
+		if (pendingSearch && typeof window !== 'undefined') {
+			sessionStorage.setItem('murmur_pending_search', pendingSearch);
+		}
+
+		router.push(`${urls.murmur.dashboard.index}?fromCampaignId=${campaign.id}`);
+	}, [campaign, router]);
+
+	// Track highlight state in a ref so the event listener has fresh access without re-binding constantly
+	const isTopSearchHighlightedRef = useRef(isTopSearchHighlighted);
+	useEffect(() => {
+		isTopSearchHighlightedRef.current = isTopSearchHighlighted;
+	}, [isTopSearchHighlighted]);
+
+	useEffect(() => {
+		const handleKeyDown = (e: KeyboardEvent) => {
+			if (e.code === 'Space') {
+				const target = e.target as HTMLElement;
+				if (target.matches('input, textarea, [contenteditable="true"]')) {
+					return;
+				}
+
+				e.preventDefault();
+
+				if (isTopSearchHighlightedRef.current) {
+					handleOpenDashboardSearchForCampaign();
+				} else {
+					setTopSearchHighlighted(true);
+
+					if (topSearchHighlightTimeoutRef.current) {
+						clearTimeout(topSearchHighlightTimeoutRef.current);
+					}
+
+					topSearchHighlightTimeoutRef.current = setTimeout(() => {
+						setTopSearchHighlighted(false);
+					}, 3000);
+				}
+			}
+		};
+
+		window.addEventListener('keydown', handleKeyDown);
+		return () => {
+			window.removeEventListener('keydown', handleKeyDown);
+		};
+	}, [handleOpenDashboardSearchForCampaign]);
+
+	// Cleanup timer on unmount
+	useEffect(() => {
+		return () => {
+			if (topSearchHighlightTimeoutRef.current) {
+				clearTimeout(topSearchHighlightTimeoutRef.current);
+			}
+		};
+	}, []);
+
 	const { user, isPendingUser, isLoaded } = useMe();
 	const { data: identities, isPending: isPendingIdentities } = useGetIdentities({});
 	const { mutateAsync: editCampaign } = useEditCampaign({ suppressToasts: true });
@@ -1452,17 +1514,6 @@ const Murmur = () => {
 		return () => window.removeEventListener('keydown', handleKeyDown);
 	}, [isMobile, goToPreviousTab, goToNextTab, activeView, tabBeforeAll, cameToSentFromInbox, setActiveView]);
 
-	const handleOpenDashboardSearchForCampaign = useCallback(() => {
-		if (!campaign) return;
-
-		const searchName = campaign?.userContactLists?.[0]?.name || campaign?.name || '';
-		const pendingSearch = searchName ? `[Booking] ${searchName}`.trim() : '';
-		if (pendingSearch && typeof window !== 'undefined') {
-			sessionStorage.setItem('murmur_pending_search', pendingSearch);
-		}
-
-		router.push(`${urls.murmur.dashboard.index}?fromCampaignId=${campaign.id}`);
-	}, [campaign, router]);
 
 	if (isPendingCampaign || !campaign) {
 		return (
