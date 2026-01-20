@@ -329,6 +329,9 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 		draftId: number;
 		region: DraftRowHoverRegion;
 	} | null>(null);
+	// Track hovered draft index for keyboard navigation (separate from hoveredDraftRow which tracks region)
+	const [hoveredDraftIndex, setHoveredDraftIndex] = useState<number | null>(null);
+	
 	// Used contacts indicator
 	const { data: usedContactIds } = useGetUsedContactIds();
 	const usedContactIdsSet = useMemo(
@@ -344,6 +347,64 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 		}
 		return draftEmails;
 	}, [draftEmails, props.approvedDraftIds, props.rejectedDraftIds, props.statusFilter]);
+	
+	// Keyboard navigation for draft list: up/down arrows move keyboard focus between rows
+	// This works independently of mouse hover - both can highlight different rows
+	const handleDraftListKeyboardNavigation = useCallback((e: KeyboardEvent) => {
+		// Only handle up/down arrows
+		if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+		
+		// Only work if we have a hovered draft and NOT in the review/selected draft view
+		if (hoveredDraftIndex === null || selectedDraft) return;
+		
+		// Check if a text input element is focused (don't intercept typing)
+		const activeElement = document.activeElement;
+		if (activeElement) {
+			const tagName = activeElement.tagName.toLowerCase();
+			if (
+				tagName === 'input' ||
+				tagName === 'textarea' ||
+				(activeElement as HTMLElement).isContentEditable
+			) {
+				return;
+			}
+		}
+		
+		e.preventDefault();
+		e.stopImmediatePropagation(); // Prevent campaign page tab navigation
+		
+		// Handle up/down arrows: move keyboard focus between rows
+		let newIndex: number;
+		if (e.key === 'ArrowUp') {
+			newIndex = hoveredDraftIndex > 0 ? hoveredDraftIndex - 1 : filteredDrafts.length - 1;
+		} else {
+			newIndex = hoveredDraftIndex < filteredDrafts.length - 1 ? hoveredDraftIndex + 1 : 0;
+		}
+		
+		setHoveredDraftIndex(newIndex);
+		const newDraft = filteredDrafts[newIndex];
+		if (newDraft) {
+			// Preserve the current region (left/middle/right) when moving to a new row
+			const currentRegion = hoveredDraftRow?.region ?? 'middle';
+			setHoveredDraftRow({ draftId: newDraft.id, region: currentRegion });
+			// Notify parent about hover for the keyboard-focused row
+			const contact = contacts?.find((c) => c.id === newDraft.contactId);
+			onContactHover?.(contact ?? null);
+			onDraftHover?.(newDraft);
+		}
+	}, [hoveredDraftIndex, selectedDraft, filteredDrafts, contacts, onContactHover, onDraftHover, hoveredDraftRow]);
+
+	useEffect(() => {
+		// Only add listener if we have a hovered draft and not in review mode
+		if (hoveredDraftIndex === null || selectedDraft) return;
+		
+		// Use capture phase to run before campaign page handler
+		document.addEventListener('keydown', handleDraftListKeyboardNavigation, true);
+		return () => {
+			document.removeEventListener('keydown', handleDraftListKeyboardNavigation, true);
+		};
+	}, [hoveredDraftIndex, selectedDraft, handleDraftListKeyboardNavigation]);
+
 	const approvedCount = props.approvedDraftIds?.size ?? 0;
 	const rejectedCount = props.rejectedDraftIds?.size ?? 0;
 	const allFilteredSelected =
@@ -398,6 +459,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 
 		const handleKeyDown = (event: KeyboardEvent) => {
 			if (event.key === 'Escape') {
+				event.stopImmediatePropagation(); // Prevent campaign page tab navigation
 				handleBack();
 				return;
 			}
@@ -413,16 +475,19 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 
 			if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') {
 				event.preventDefault();
+				event.stopImmediatePropagation(); // Prevent campaign page tab navigation
 				handleNavigatePrevious();
 			} else if (event.key === 'ArrowDown' || event.key === 'ArrowRight') {
 				event.preventDefault();
+				event.stopImmediatePropagation(); // Prevent campaign page tab navigation
 				handleNavigateNext();
 			}
 		};
 
-		document.addEventListener('keydown', handleKeyDown);
+		// Use capture phase to ensure this handler runs before the campaign page's tab navigation handler
+		document.addEventListener('keydown', handleKeyDown, true);
 		return () => {
-			document.removeEventListener('keydown', handleKeyDown);
+			document.removeEventListener('keydown', handleKeyDown, true);
 		};
 	}, [selectedDraft, handleBack, handleNavigatePrevious, handleNavigateNext]);
 
@@ -1439,6 +1504,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 						className="overflow-visible w-full flex flex-col items-center"
 						onMouseLeave={() => {
 							setHoveredDraftRow(null);
+							setHoveredDraftIndex(null);
 							onContactHover?.(null);
 							onDraftHover?.(null);
 						}}
@@ -1489,6 +1555,9 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 									: hoveredRegion === 'right'
 										? 'Click to delete draft'
 										: 'Click to open and review';
+							
+							// hoveredDraftRow is updated by both mouse hover and keyboard navigation,
+							// so hoveredBgColor already reflects the correct region color for both cases
 
 							return (
 								<div key={draft.id} className="w-full flex flex-col items-center overflow-visible">
@@ -1515,6 +1584,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 											onDraftHover?.(draft);
 											const region = getDraftRowHoverRegion(e);
 											setHoveredDraftRow({ draftId: draft.id, region });
+											setHoveredDraftIndex(idx);
 										}}
 										onMouseMove={(e) => {
 											const region = getDraftRowHoverRegion(e);

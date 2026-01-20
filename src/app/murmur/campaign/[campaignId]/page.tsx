@@ -649,6 +649,10 @@ const Murmur = () => {
 	};
 	
 	const [activeView, setActiveViewInternal] = useState<ViewType>(getInitialView());
+	// Track the tab we were on before pressing up arrow to go to "all" (so down arrow can return)
+	const [tabBeforeAll, setTabBeforeAll] = useState<ViewType | null>(null);
+	// Track if we navigated from inbox to sent via down arrow (so up arrow can return to inbox)
+	const [cameToSentFromInbox, setCameToSentFromInbox] = useState(false);
 	// Track the latest requested view so rapid tab flips don't get dropped due to stale closures.
 	// Example: user clicks A -> B, then quickly clicks A again before React commits B.
 	// Without this, the second click can be ignored (newView === activeView), skipping the right-panel slide.
@@ -1306,17 +1310,21 @@ const Murmur = () => {
 		(activeView === 'all' && hideArrowsOnAll) ||
 		((activeView === 'inbox' || activeView === 'sent') && hideArrowsOnInbox);
 
-	// Tab navigation order
+	// Tab navigation order (excludes 'all' tab from arrow navigation)
 	const tabOrder: ViewType[] = [
 		'contacts',
 		'testing',
-		'all',
 		'drafting',
 		'sent',
 		'inbox',
 	];
 
 	const goToPreviousTab = () => {
+		// Special case: when on 'all' tab, left arrow goes to 'testing' (Writing tab)
+		if (activeView === 'all') {
+			setActiveView('testing');
+			return;
+		}
 		const currentIndex = tabOrder.indexOf(activeView);
 		if (currentIndex > 0) {
 			setActiveView(tabOrder[currentIndex - 1]);
@@ -1327,6 +1335,11 @@ const Murmur = () => {
 	};
 
 	const goToNextTab = () => {
+		// Special case: when on 'all' tab, right arrow goes to 'drafting' (Drafts tab)
+		if (activeView === 'all') {
+			setActiveView('drafting');
+			return;
+		}
 		const currentIndex = tabOrder.indexOf(activeView);
 		if (currentIndex < tabOrder.length - 1) {
 			setActiveView(tabOrder[currentIndex + 1]);
@@ -1364,11 +1377,12 @@ const Murmur = () => {
 		}
 	};
 
-	// Keyboard navigation: left/right arrow keys to switch tabs when no text input is focused
+	// Keyboard navigation: arrow keys to switch tabs when no text input is focused
+	// Left/Right: cycle through tabs, Up: go to "all" tab, Down: return from "all" tab
 	useEffect(() => {
 		const handleKeyDown = (e: KeyboardEvent) => {
-			// Only handle left/right arrow keys
-			if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+			// Only handle arrow keys
+			if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight' && e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
 
 			// Check if a text input element is focused (don't intercept typing)
 			const activeElement = document.activeElement;
@@ -1386,6 +1400,37 @@ const Murmur = () => {
 
 			// Prevent default scrolling behavior
 			e.preventDefault();
+
+			// Handle up/down arrows for vertical tab navigation
+			if (e.key === 'ArrowUp') {
+				// Special case: if on sent tab and we got here from inbox via down arrow, go back to inbox
+				if (activeView === 'sent' && cameToSentFromInbox) {
+					setCameToSentFromInbox(false);
+					setActiveView('inbox');
+					return;
+				}
+				// Go to "all" tab and remember current tab (unless already on "all")
+				if (activeView !== 'all') {
+					setTabBeforeAll(activeView);
+					setActiveView('all');
+				}
+				return;
+			}
+
+			if (e.key === 'ArrowDown') {
+				// Special case: inbox tab -> sent tab
+				if (activeView === 'inbox') {
+					setCameToSentFromInbox(true);
+					setActiveView('sent');
+					return;
+				}
+				// Return to the tab we were on before going to "all"
+				if (tabBeforeAll) {
+					setActiveView(tabBeforeAll);
+					setTabBeforeAll(null);
+				}
+				return;
+			}
 
 			// Use mobile tab order on mobile, desktop tab order otherwise
 			if (isMobile === true) {
@@ -1405,7 +1450,7 @@ const Murmur = () => {
 
 		window.addEventListener('keydown', handleKeyDown);
 		return () => window.removeEventListener('keydown', handleKeyDown);
-	}, [isMobile, goToPreviousTab, goToNextTab]);
+	}, [isMobile, goToPreviousTab, goToNextTab, activeView, tabBeforeAll, cameToSentFromInbox, setActiveView]);
 
 	const handleOpenDashboardSearchForCampaign = useCallback(() => {
 		if (!campaign) return;

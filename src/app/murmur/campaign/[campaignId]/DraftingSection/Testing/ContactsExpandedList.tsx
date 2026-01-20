@@ -1,6 +1,6 @@
 'use client';
 
-import { FC, MouseEvent, useMemo, useRef, useState } from 'react';
+import { FC, MouseEvent, useMemo, useRef, useState, useEffect, useCallback } from 'react';
 import { ContactWithName } from '@/types/contact';
 import { CampaignWithRelations } from '@/types';
 import { cn } from '@/utils';
@@ -66,6 +66,10 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 		Set<number>
 	>(new Set());
 	const lastClickedRef = useRef<number | null>(null);
+	
+	// Track hovered contact index for keyboard navigation
+	const [hoveredContactIndex, setHoveredContactIndex] = useState<number | null>(null);
+	const containerRef = useRef<HTMLDivElement>(null);
 
 	// Used contacts indicator data (IDs for current user)
 	const { data: usedContactIds } = useGetUsedContactIds();
@@ -77,13 +81,76 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 	const isControlled = Boolean(selectedContactIds);
 	const currentSelectedIds = selectedContactIds ?? internalSelectedContactIds;
 
-	const updateSelection = (updater: (prev: Set<number>) => Set<number>) => {
+	const updateSelection = useCallback((updater: (prev: Set<number>) => Set<number>) => {
 		if (isControlled && onContactSelectionChange) {
 			onContactSelectionChange(updater);
 		} else {
 			setInternalSelectedContactIds((prev) => updater(new Set(prev)));
 		}
-	};
+	}, [isControlled, onContactSelectionChange]);
+
+	// Keyboard navigation: up/down arrows move hover between rows, Enter selects hovered contact
+	const handleKeyboardNavigation = useCallback((e: KeyboardEvent) => {
+		// Only handle up/down arrows and Enter
+		if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown' && e.key !== 'Enter') return;
+		
+		// Only work if we have a hovered contact
+		if (hoveredContactIndex === null) return;
+		
+		// Check if a text input element is focused (don't intercept typing)
+		const activeElement = document.activeElement;
+		if (activeElement) {
+			const tagName = activeElement.tagName.toLowerCase();
+			if (
+				tagName === 'input' ||
+				tagName === 'textarea' ||
+				(activeElement as HTMLElement).isContentEditable
+			) {
+				return;
+			}
+		}
+		
+		e.preventDefault();
+		e.stopImmediatePropagation(); // Prevent campaign page tab navigation
+		
+		// Handle Enter key - select/deselect the hovered contact
+		if (e.key === 'Enter') {
+			const contact = contacts[hoveredContactIndex];
+			if (contact) {
+				updateSelection((prev) => {
+					const next = new Set(prev);
+					if (next.has(contact.id)) {
+						next.delete(contact.id);
+					} else {
+						next.add(contact.id);
+					}
+					return next;
+				});
+			}
+			return;
+		}
+		
+		let newIndex: number;
+		if (e.key === 'ArrowUp') {
+			newIndex = hoveredContactIndex > 0 ? hoveredContactIndex - 1 : contacts.length - 1;
+		} else {
+			newIndex = hoveredContactIndex < contacts.length - 1 ? hoveredContactIndex + 1 : 0;
+		}
+		
+		setHoveredContactIndex(newIndex);
+		onContactHover?.(contacts[newIndex]);
+	}, [hoveredContactIndex, contacts, onContactHover, updateSelection]);
+
+	useEffect(() => {
+		// Only add listener if we have a hovered contact
+		if (hoveredContactIndex === null) return;
+		
+		// Use capture phase to run before campaign page handler
+		document.addEventListener('keydown', handleKeyboardNavigation, true);
+		return () => {
+			document.removeEventListener('keydown', handleKeyboardNavigation, true);
+		};
+	}, [hoveredContactIndex, handleKeyboardNavigation]);
 
 	const handleContactClick = (contact: ContactWithName, e: MouseEvent) => {
 		if (e.shiftKey && lastClickedRef.current !== null) {
@@ -228,6 +295,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 					isBottomView ? 'px-[2px] pt-0 pb-0' : 'pb-2 pt-2'
 				)}
 				onMouseLeave={() => {
+					setHoveredContactIndex(null);
 					onContactHover?.(null);
 				}}
 			>
@@ -250,37 +318,46 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 							paddingTop: customWhiteSectionHeight !== undefined ? '2px' : undefined,
 						}}
 					>
-						{contacts.map((contact) => {
-							const fullName =
-								contact.name ||
-								`${contact.firstName || ''} ${contact.lastName || ''}`.trim();
-							const isSelected = currentSelectedIds.has(contact.id);
-							const isUsed = usedContactIdsSet.has(contact.id);
-							const contactTitle = contact.title || contact.headline || '';
-							// Left padding: 12px base + 16px dot + 8px gap = 36px when used, else 12px
-							const leftPadding = isUsed ? 'pl-[36px]' : 'pl-3';
-							return (
-								<div
-									key={contact.id}
-							className={cn(
-								'cursor-pointer overflow-hidden rounded-[8px] border-2 border-[#000000] select-none relative grid grid-cols-2 grid-rows-2',
-								isBottomView
-									? 'w-[224px] h-[28px]'
-									: 'max-[480px]:w-[96.27vw] h-[49px] max-[480px]:h-[50px]',
-								isSelected ? 'bg-[#EAAEAE]' : 'bg-white hover:bg-[#F5DADA]'
-							)}
-									style={!isBottomView ? { width: `${innerWidth}px` } : undefined}
-									onMouseDown={(e) => {
-										if (e.shiftKey) e.preventDefault();
-									}}
-									onMouseEnter={() => {
-										onContactHover?.(contact);
-									}}
-									onClick={(e) => {
-										handleContactClick(contact, e);
-										onContactClick?.(contact);
-									}}
-								>
+					{contacts.map((contact, contactIndex) => {
+						const fullName =
+							contact.name ||
+							`${contact.firstName || ''} ${contact.lastName || ''}`.trim();
+						const isSelected = currentSelectedIds.has(contact.id);
+						const isUsed = usedContactIdsSet.has(contact.id);
+						const contactTitle = contact.title || contact.headline || '';
+						// Left padding: 12px base + 16px dot + 8px gap = 36px when used, else 12px
+						const leftPadding = isUsed ? 'pl-[36px]' : 'pl-3';
+						// Keyboard focus shows hover UI independently of mouse hover
+						const isKeyboardFocused = hoveredContactIndex === contactIndex;
+						// Final background: selected > keyboard focus > white (mouse hover handled by CSS)
+						const contactBgColor = isSelected 
+							? 'bg-[#EAAEAE]' 
+							: isKeyboardFocused 
+								? 'bg-[#F5DADA]' 
+								: 'bg-white hover:bg-[#F5DADA]';
+						return (
+							<div
+								key={contact.id}
+						className={cn(
+							'cursor-pointer overflow-hidden rounded-[8px] border-2 border-[#000000] select-none relative grid grid-cols-2 grid-rows-2',
+							isBottomView
+								? 'w-[224px] h-[28px]'
+								: 'max-[480px]:w-[96.27vw] h-[49px] max-[480px]:h-[50px]',
+							contactBgColor,
+						)}
+								style={!isBottomView ? { width: `${innerWidth}px` } : undefined}
+								onMouseDown={(e) => {
+									if (e.shiftKey) e.preventDefault();
+								}}
+								onMouseEnter={() => {
+									setHoveredContactIndex(contactIndex);
+									onContactHover?.(contact);
+								}}
+								onClick={(e) => {
+									handleContactClick(contact, e);
+									onContactClick?.(contact);
+								}}
+							>
 									{/* Used contact indicator - absolutely positioned, vertically centered */}
 									{isUsed && (
 										<span
