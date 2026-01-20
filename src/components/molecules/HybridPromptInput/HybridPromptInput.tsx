@@ -4479,7 +4479,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 												<div className="w-full mt-[64px]">
 													<div
 														className={cn(
-															'w-full bg-[#4597DA] border-t-[3px] border-b-[3px] border-black rounded-[8px] overflow-hidden flex flex-col transition-[height] duration-150',
+															'w-full bg-[#4597DA] border-t-[3px] border-b-[3px] border-black rounded-[8px] overflow-hidden flex flex-col',
 															expandedProfileBox ? 'h-[414px]' : 'h-[380px]'
 														)}
 													>
@@ -4517,13 +4517,30 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																	onClick={() => handleProfileBoxToggle('name')}
 																>
 																	<div
-																		className="h-[34px] flex items-center px-3 font-inter text-[14px] font-semibold truncate"
+																		className="h-[34px] flex items-center font-inter text-[14px] font-semibold overflow-hidden"
 																		style={{ backgroundColor: getProfileHeaderBg('name') }}
 																	>
-																		{getProfileHeaderText(
-																			'name',
-																			'Name',
-																			'Enter your Name'
+																		{expandedProfileBox !== 'name' &&
+																		profileFields.name.trim() ? (
+																			<div className="flex items-stretch w-full h-full">
+																				<div className="w-[20px] shrink-0" />
+																				<div className="w-[3px] bg-black" />
+																				<div className="min-w-0 max-w-[calc(100%_-_46px)] bg-[#E5EEE6] h-full flex items-center px-4">
+																					<span className="truncate">
+																						{profileFields.name.trim()}
+																					</span>
+																				</div>
+																				<div className="w-[3px] bg-black" />
+																				<div className="min-w-[20px] flex-1" />
+																			</div>
+																		) : (
+																			<div className="w-full px-3 truncate">
+																				{getProfileHeaderText(
+																					'name',
+																					'Name',
+																					'Enter your Name'
+																				)}
+																			</div>
 																		)}
 																	</div>
 																	{expandedProfileBox === 'name' && (
@@ -4564,13 +4581,30 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																	onClick={() => handleProfileBoxToggle('genre')}
 																>
 																	<div
-																		className="h-[34px] flex items-center px-3 font-inter text-[14px] font-semibold truncate"
+																		className="h-[34px] flex items-center font-inter text-[14px] font-semibold overflow-hidden"
 																		style={{ backgroundColor: getProfileHeaderBg('genre') }}
 																	>
-																		{getProfileHeaderText(
-																			'genre',
-																			'Genre',
-																			'Enter your Genre'
+																		{expandedProfileBox !== 'genre' &&
+																		profileFields.genre.trim() ? (
+																			<div className="flex items-stretch w-full h-full">
+																				<div className="w-[20px] shrink-0" />
+																				<div className="w-[3px] bg-black" />
+																				<div className="min-w-0 max-w-[calc(100%_-_46px)] bg-[#E5EEE6] h-full flex items-center px-4">
+																					<span className="truncate">
+																						{profileFields.genre.trim()}
+																					</span>
+																				</div>
+																				<div className="w-[3px] bg-black" />
+																				<div className="min-w-[20px] flex-1" />
+																			</div>
+																		) : (
+																			<div className="w-full px-3 truncate">
+																				{getProfileHeaderText(
+																					'genre',
+																					'Genre',
+																					'Enter your Genre'
+																				)}
+																			</div>
 																		)}
 																	</div>
 																	{expandedProfileBox === 'genre' && (
@@ -4611,13 +4645,30 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																	onClick={() => handleProfileBoxToggle('area')}
 																>
 																	<div
-																		className="h-[34px] flex items-center px-3 font-inter text-[14px] font-semibold truncate"
+																		className="h-[34px] flex items-center font-inter text-[14px] font-semibold overflow-hidden"
 																		style={{ backgroundColor: getProfileHeaderBg('area') }}
 																	>
-																		{getProfileHeaderText(
-																			'area',
-																			'Area',
-																			'Enter your Area'
+																		{expandedProfileBox !== 'area' &&
+																		profileFields.area.trim() ? (
+																			<div className="flex items-stretch w-full h-full">
+																				<div className="w-[20px] shrink-0" />
+																				<div className="w-[3px] bg-black" />
+																				<div className="min-w-0 max-w-[calc(100%_-_46px)] bg-[#E5EEE6] h-full flex items-center px-4">
+																					<span className="truncate">
+																						{profileFields.area.trim()}
+																					</span>
+																				</div>
+																				<div className="w-[3px] bg-black" />
+																				<div className="min-w-[20px] flex-1" />
+																			</div>
+																		) : (
+																			<div className="w-full px-3 truncate">
+																				{getProfileHeaderText(
+																					'area',
+																					'Area',
+																					'Enter your Area'
+																				)}
+																			</div>
 																		)}
 																	</div>
 																	{expandedProfileBox === 'area' && (
@@ -4658,13 +4709,30 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																	onClick={() => handleProfileBoxToggle('band')}
 																>
 																	<div
-																		className="h-[34px] flex items-center px-3 font-inter text-[14px] font-semibold truncate"
+																		className="h-[34px] flex items-center font-inter text-[14px] font-semibold overflow-hidden"
 																		style={{ backgroundColor: getProfileHeaderBg('band') }}
 																	>
-																		{getProfileHeaderText(
-																			'band',
-																			'Band/Artist Name',
-																			'Enter your Band/Artist Name'
+																		{expandedProfileBox !== 'band' &&
+																		profileFields.band.trim() ? (
+																			<div className="flex items-stretch w-full h-full">
+																				<div className="w-[20px] shrink-0" />
+																				<div className="w-[3px] bg-black" />
+																				<div className="min-w-0 max-w-[calc(100%_-_46px)] bg-[#E5EEE6] h-full flex items-center px-4">
+																					<span className="truncate">
+																						{profileFields.band.trim()}
+																					</span>
+																				</div>
+																				<div className="w-[3px] bg-black" />
+																				<div className="min-w-[20px] flex-1" />
+																			</div>
+																		) : (
+																			<div className="w-full px-3 truncate">
+																				{getProfileHeaderText(
+																					'band',
+																					'Band/Artist Name',
+																					'Enter your Band/Artist Name'
+																				)}
+																			</div>
 																		)}
 																	</div>
 																	{expandedProfileBox === 'band' && (
@@ -4705,10 +4773,27 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																	onClick={() => handleProfileBoxToggle('bio')}
 																>
 																	<div
-																		className="h-[34px] flex items-center px-3 font-inter text-[14px] font-semibold truncate"
+																		className="h-[34px] flex items-center font-inter text-[14px] font-semibold overflow-hidden"
 																		style={{ backgroundColor: getProfileHeaderBg('bio') }}
 																	>
-																		{getProfileHeaderText('bio', 'Bio', 'Enter your Bio')}
+																		{expandedProfileBox !== 'bio' &&
+																		profileFields.bio.trim() ? (
+																			<div className="flex items-stretch w-full h-full">
+																				<div className="w-[20px] shrink-0" />
+																				<div className="w-[3px] bg-black" />
+																				<div className="min-w-0 max-w-[calc(100%_-_46px)] bg-[#E5EEE6] h-full flex items-center px-4">
+																					<span className="truncate">
+																						{profileFields.bio.trim()}
+																					</span>
+																				</div>
+																				<div className="w-[3px] bg-black" />
+																				<div className="min-w-[20px] flex-1" />
+																			</div>
+																		) : (
+																			<div className="w-full px-3 truncate">
+																				{getProfileHeaderText('bio', 'Bio', 'Enter your Bio')}
+																			</div>
+																		)}
 																	</div>
 																	{expandedProfileBox === 'bio' && (
 																		<input
@@ -4748,13 +4833,30 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																	onClick={() => handleProfileBoxToggle('links')}
 																>
 																	<div
-																		className="h-[34px] flex items-center px-3 font-inter text-[14px] font-semibold truncate"
+																		className="h-[34px] flex items-center font-inter text-[14px] font-semibold overflow-hidden"
 																		style={{ backgroundColor: getProfileHeaderBg('links') }}
 																	>
-																		{getProfileHeaderText(
-																			'links',
-																			'Links',
-																			'Enter your Links'
+																		{expandedProfileBox !== 'links' &&
+																		profileFields.links.trim() ? (
+																			<div className="flex items-stretch w-full h-full">
+																				<div className="w-[20px] shrink-0" />
+																				<div className="w-[3px] bg-black" />
+																				<div className="min-w-0 max-w-[calc(100%_-_46px)] bg-[#E5EEE6] h-full flex items-center px-4">
+																					<span className="truncate">
+																						{profileFields.links.trim()}
+																					</span>
+																				</div>
+																				<div className="w-[3px] bg-black" />
+																				<div className="min-w-[20px] flex-1" />
+																			</div>
+																		) : (
+																			<div className="w-full px-3 truncate">
+																				{getProfileHeaderText(
+																					'links',
+																					'Links',
+																					'Enter your Links'
+																				)}
+																			</div>
 																		)}
 																	</div>
 																	{expandedProfileBox === 'links' && (
