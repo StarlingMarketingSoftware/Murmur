@@ -31,7 +31,10 @@ export const ContactsHeaderChrome: FC<{ offsetY?: number; hasData?: boolean; isA
 	const pillBorderRadius = isBottomView ? 5 : isAllTab ? 7.5 : 11;
 	const pillFontSize = isBottomView ? '6px' : isAllTab ? '10px' : '13px';
 	// Center dots vertically with the pill - calculate both positions relative to each other
-	const pillTop = whiteSectionHeight !== undefined ? (whiteSectionHeight - pillHeight) / 2 : 3 + offsetY;
+	// Add a tiny visual padding so the pill doesn't visually "kiss" the top border in tighter headers.
+	const visualTopPaddingPx = 1;
+	const pillTopBase = whiteSectionHeight !== undefined ? (whiteSectionHeight - pillHeight) / 2 : 3;
+	const pillTop = pillTopBase + offsetY + visualTopPaddingPx;
 	const pillCenterY = pillTop + pillHeight / 2;
 	const dotTop = Math.round(pillCenterY - dotSize / 2);
 	const pillLeft = isBottomView ? 18 : 21;
@@ -257,7 +260,7 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 						data-campaign-shared-pill-variant="drafts"
 						style={{
 							position: 'absolute',
-							top: '3px',
+							top: '4px',
 							left: '69px',
 							width: '72px',
 							height: '22px',
@@ -280,7 +283,7 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 					<div
 						style={{
 							position: 'absolute',
-							top: '10px',
+							top: '11px',
 							left: '36px',
 							width: '9px',
 							height: '9px',
@@ -292,7 +295,7 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 					<div
 						style={{
 							position: 'absolute',
-							top: '10px',
+							top: '11px',
 							left: '176px',
 							width: '9px',
 							height: '9px',
@@ -304,7 +307,7 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 					<div
 						style={{
 							position: 'absolute',
-							top: '10px',
+							top: '11px',
 							left: '235px',
 							width: '9px',
 							height: '9px',
@@ -350,7 +353,7 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 						data-campaign-shared-pill-variant="sent"
 						style={{
 							position: 'absolute',
-							top: '3px',
+							top: '4px',
 							left: '137px',
 							width: '72px',
 							height: '22px',
@@ -373,7 +376,7 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 					<div
 						style={{
 							position: 'absolute',
-							top: '10px',
+							top: '11px',
 							left: '102px',
 							width: '9px',
 							height: '9px',
@@ -385,7 +388,7 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 					<div
 						style={{
 							position: 'absolute',
-							top: '10px',
+							top: '11px',
 							left: '36px',
 							width: '9px',
 							height: '9px',
@@ -397,7 +400,7 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 					<div
 						style={{
 							position: 'absolute',
-							top: '10px',
+							top: '11px',
 							left: '235px',
 							width: '9px',
 							height: '9px',

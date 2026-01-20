@@ -63,8 +63,10 @@ const SentHeaderChrome: FC<{
 	const pillBorderRadius = isBottomView ? 5 : isAllTab ? 7.5 : 11;
 	const pillFontSize = isBottomView ? '8px' : isAllTab ? '10px' : '13px';
 	// Center dots vertically with the pill - calculate both positions relative to each other
-	const pillTop =
-		whiteSectionHeight !== undefined ? (whiteSectionHeight - pillHeight) / 2 : 3 + offsetY;
+	// Add a tiny visual padding so the pill doesn't visually "kiss" the top border in tighter headers.
+	const visualTopPaddingPx = 1;
+	const pillTopBase = whiteSectionHeight !== undefined ? (whiteSectionHeight - pillHeight) / 2 : 3;
+	const pillTop = pillTopBase + offsetY + visualTopPaddingPx;
 	const pillCenterY = pillTop + pillHeight / 2;
 	const dotTop = Math.round(pillCenterY - dotSize / 2);
 
