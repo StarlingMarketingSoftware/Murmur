@@ -4954,7 +4954,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																	setActiveTab('main');
 																	setHasLeftProfileTab(true);
 																}}
-																className="w-[298px] h-[26px] rounded-[6px] bg-[#B1B1B1] border-2 border-black text-white font-inter font-medium text-[15px] leading-none flex items-center justify-center cursor-pointer"
+																className="w-[298px] h-[26px] rounded-[6px] bg-[#B1B1B1] hover:bg-[#A7A7A7] active:bg-[#A1A1A1] transition-colors duration-150 border-2 border-black text-white font-inter font-medium text-[15px] leading-none flex items-center justify-center cursor-pointer"
 															>
 																back
 															</button>
