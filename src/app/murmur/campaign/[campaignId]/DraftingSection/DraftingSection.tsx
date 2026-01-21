@@ -350,8 +350,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const [isInboxTabNarrow, setIsInboxTabNarrow] = useState(false);
 	// Inbox tab stacked layout detection (<= 1279px) - moves research panel below header box on the left
 	const [isInboxTabStacked, setIsInboxTabStacked] = useState(false);
-	// 16:10 compact bottom panels (<= 1504x940) - collapse the bottom 3-box strip to header-only
-	const [areBottomPanelsCollapsed16x10, setAreBottomPanelsCollapsed16x10] = useState(false);
+	// Compact bottom panels at small 16:10 / 16:9 monitor sizes - collapse the bottom 3-box strip to header-only
+	const [areBottomPanelsCollapsedAtCompactBreakpoint, setAreBottomPanelsCollapsedAtCompactBreakpoint] =
+		useState(false);
 	useEffect(() => {
 		if (typeof window === 'undefined') return;
 		// Matches `DEFAULT_CAMPAIGN_ZOOM` in the campaign page.
@@ -382,7 +383,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			setIsInboxTabNarrow(effectiveWidth <= 1520);
 			setIsInboxTabStacked(effectiveWidth <= 1279);
 
-			// --- Bottom panel collapse breakpoint (16:10-ish @/below 1504x940) ---
+			// --- Bottom panel collapse breakpoint (16:10-ish @/below 1504x940 OR 16:9-ish @/below 1344x756) ---
 			// This is intentionally keyed off the *viewport* size (not effectiveWidth),
 			// because the campaign page applies CSS zoom at these resolutions and we still
 			// want the physical monitor size threshold to win.
@@ -390,6 +391,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			const viewportH = window.visualViewport?.height ?? window.innerHeight;
 			const ratio = viewportH > 0 ? viewportW / viewportH : 0;
 			const IDEAL_16X10 = 16 / 10; // 1.6
+			const IDEAL_16X9 = 16 / 9; // ~1.777
 			const screenW = window.screen?.availWidth ?? window.screen?.width ?? viewportW;
 			const screenH = window.screen?.availHeight ?? window.screen?.height ?? viewportH;
 			const screenRatio = screenW > 0 && screenH > 0 ? screenW / screenH : ratio;
@@ -398,12 +400,19 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 				Math.abs(screenRatio - IDEAL_16X10)
 			);
 			const isSixteenByTenish = delta16x10 <= 0.14;
-			const TARGET_W = 1504;
-			const TARGET_H = 940;
+			const delta16x9 = Math.min(Math.abs(ratio - IDEAL_16X9), Math.abs(screenRatio - IDEAL_16X9));
+			const isSixteenByNineish = delta16x9 <= 0.08;
+
 			const TOLERANCE_PX = 50;
-			const isAtOrBelowTarget =
-				viewportW <= TARGET_W + TOLERANCE_PX && viewportH <= TARGET_H + TOLERANCE_PX;
-			setAreBottomPanelsCollapsed16x10(Boolean(!isMobile && isSixteenByTenish && isAtOrBelowTarget));
+			const isAtOrBelow16x10 =
+				viewportW <= 1504 + TOLERANCE_PX && viewportH <= 940 + TOLERANCE_PX;
+			const isAtOrBelow16x9 =
+				viewportW <= 1344 + TOLERANCE_PX && viewportH <= 756 + TOLERANCE_PX;
+
+			const shouldCollapseBottomPanels =
+				!isMobile &&
+				((isSixteenByTenish && isAtOrBelow16x10) || (isSixteenByNineish && isAtOrBelow16x9));
+			setAreBottomPanelsCollapsedAtCompactBreakpoint(Boolean(shouldCollapseBottomPanels));
 		};
 		checkBreakpoints();
 		window.addEventListener('resize', checkBreakpoints);
@@ -414,8 +423,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		};
 	}, [isMobile]);
 
-	const bottomPanelBoxHeightPx = areBottomPanelsCollapsed16x10 ? 31 : 117;
-	const bottomPanelCollapsed = areBottomPanelsCollapsed16x10;
+	const bottomPanelBoxHeightPx = areBottomPanelsCollapsedAtCompactBreakpoint ? 31 : 117;
+	const bottomPanelCollapsed = areBottomPanelsCollapsedAtCompactBreakpoint;
 
 	// --- Pinned left panel (ContactsExpandedList <-> MiniEmailStructure) ---
 	// We intentionally render the correct panel immediately (no height-morph animation),
