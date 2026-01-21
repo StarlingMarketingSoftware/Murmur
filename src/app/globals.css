@@ -1887,7 +1887,7 @@ body {
 /* Desktop campaigns table: keep ticks centered and ensure the 4-pill block fits (no right-side clipping) */
 .my-campaigns-table {
 	/* Responsive but capped so 4x92px pills never overflow the metrics column */
-	--campaign-metric-gap: clamp(18px, 2.5vw, 32px);
+	--campaign-metric-gap: clamp(18px, 2.5vw, 31px);
 }
 
 /* Give the metrics column a touch more usable width on desktop by reducing cell padding */
@@ -1897,8 +1897,8 @@ body {
 .my-campaigns-table:not(.narrow-desktop-table):not(.mobile-table-no-scroll)
 	tbody
 	td:nth-child(2) {
-	padding-left: 4px !important;
-	padding-right: 4px !important;
+	padding-left: 0px !important;
+	padding-right: 0px !important;
 }
 
 /* Desktop campaigns table: ticks centered between 92px metric pills */
