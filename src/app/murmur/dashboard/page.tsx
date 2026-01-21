@@ -2,6 +2,7 @@
 
 import { FC, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { gsap } from 'gsap';
+import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { createPortal, flushSync } from 'react-dom';
 import { CampaignsTable } from '../../../components/organisms/_tables/CampaignsTable/CampaignsTable';
@@ -577,6 +578,7 @@ const DashboardContent = () => {
 	const [isLoadingLocation, setIsLoadingLocation] = useState(false);
 
 	// Narrowest desktop detection (< 952px) - single column layout for map view
+	const [isBelowMd, setIsBelowMd] = useState(false);
 	const [isNarrowestDesktop, setIsNarrowestDesktop] = useState(false);
 	const [isXlDesktop, setIsXlDesktop] = useState(false);
 
@@ -586,6 +588,7 @@ const DashboardContent = () => {
 
 		const handleResize = () => {
 			const width = window.innerWidth;
+			setIsBelowMd(width < 768);
 			setIsNarrowestDesktop(width < 952);
 			setIsXlDesktop(width >= 1280);
 		};
@@ -746,7 +749,7 @@ const DashboardContent = () => {
 
 		const dropdownContent = (
 			<div
-				className="search-dropdown-menu hidden md:block w-[439px] bg-[#D8E5FB] rounded-[16px] border-2 border-black z-[110] relative overflow-hidden"
+				className="search-dropdown-menu w-[439px] max-w-[calc(100vw-16px)] bg-[#D8E5FB] rounded-[16px] border-2 border-black z-[110] relative overflow-hidden"
 				style={
 					isMapView
 						? {
@@ -755,7 +758,8 @@ const DashboardContent = () => {
 								// so the dropdown should anchor just below it.
 								// Search bar is fixed at 33px and the input is 49px tall; add a small gap.
 								top: '92px',
-								left: dropdownLeft,
+								left: isBelowMd ? '50%' : dropdownLeft,
+								transform: isBelowMd ? 'translateX(-50%)' : undefined,
 								height: dropdownHeight,
 								transition: dropdownTransition,
 								willChange: 'left, height',
@@ -765,7 +769,8 @@ const DashboardContent = () => {
 						: {
 								position: 'absolute',
 								top: 'calc(100% + 10px)',
-								left: dropdownLeft,
+								left: isBelowMd ? '50%' : dropdownLeft,
+								transform: isBelowMd ? 'translateX(-50%)' : undefined,
 								height: dropdownHeight,
 								transition: dropdownTransition,
 								willChange: 'left, height',
@@ -784,7 +789,7 @@ const DashboardContent = () => {
 				>
 					<div className="flex flex-col items-center justify-start gap-[12px] w-full h-full py-[12px]">
 						<div
-							className="w-[410px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+							className="w-[410px] max-w-[calc(100%-24px)] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex items-center px-[15px] cursor-pointer transition-colors duration-200"
 							onClick={() => {
 								setWhyValue('[Booking]');
 								setActiveSection('what');
@@ -803,7 +808,7 @@ const DashboardContent = () => {
 							</div>
 						</div>
 						<div
-							className="w-[410px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+							className="w-[410px] max-w-[calc(100%-24px)] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex items-center px-[15px] cursor-pointer transition-colors duration-200"
 							onClick={() => {
 								setWhyValue('[Promotion]');
 								setActiveSection('what');
@@ -838,7 +843,7 @@ const DashboardContent = () => {
 					{whyValue === '[Promotion]' ? (
 						<div className="flex flex-col items-center justify-start gap-[10px] w-full h-full py-[12px]">
 							<div
-								className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+								className="w-[415px] max-w-[calc(100%-24px)] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
 								onClick={() => {
 									setWhatValue('Radio Stations');
 									// On the results screen, changing "What" should immediately re-search
@@ -882,7 +887,7 @@ const DashboardContent = () => {
 								offsetRight={-5}
 							>
 								<div
-									className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+									className="w-[415px] max-w-[calc(100%-24px)] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
 									onClick={() => {
 										setWhatValue('Wine, Beer, and Spirits');
 										// On the results screen, changing "What" should immediately re-search
@@ -903,7 +908,7 @@ const DashboardContent = () => {
 									</div>
 								</div>
 								<div
-									className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+									className="w-[415px] max-w-[calc(100%-24px)] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
 									onClick={() => {
 										setWhatValue('Restaurants');
 										// On the results screen, changing "What" should immediately re-search
@@ -924,7 +929,7 @@ const DashboardContent = () => {
 									</div>
 								</div>
 								<div
-									className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+									className="w-[415px] max-w-[calc(100%-24px)] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
 									onClick={() => {
 										setWhatValue('Coffee Shops');
 										// On the results screen, changing "What" should immediately re-search
@@ -945,7 +950,7 @@ const DashboardContent = () => {
 									</div>
 								</div>
 								<div
-									className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+									className="w-[415px] max-w-[calc(100%-24px)] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
 									onClick={() => {
 										setWhatValue('Festivals');
 										// On the results screen, changing "What" should immediately re-search
@@ -966,7 +971,7 @@ const DashboardContent = () => {
 									</div>
 								</div>
 								<div
-									className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+									className="w-[415px] max-w-[calc(100%-24px)] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
 									onClick={() => {
 										setWhatValue('Wedding Planners');
 										// On the results screen, changing "What" should immediately re-search
@@ -987,7 +992,7 @@ const DashboardContent = () => {
 									</div>
 								</div>
 								<div
-									className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+									className="w-[415px] max-w-[calc(100%-24px)] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
 									onClick={() => {
 										setWhatValue('Music Venues');
 										// On the results screen, changing "What" should immediately re-search
@@ -1062,7 +1067,7 @@ const DashboardContent = () => {
 										return (
 											<div
 												key={`${loc.city}-${loc.state}-${loc.label}-${idx}`}
-												className="w-[415px] min-h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200 mb-2"
+												className="w-[415px] max-w-[calc(100%-24px)] min-h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200 mb-2"
 												onClick={() => {
 													triggerSearchWithWhere(loc.label, false);
 												}}
@@ -1100,7 +1105,7 @@ const DashboardContent = () => {
 								offsetRight={-5}
 							>
 								<div
-									className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+									className="w-[415px] max-w-[calc(100%-24px)] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
 									onClick={() => {
 										if (userLocationName && !isLoadingLocation) {
 											triggerSearchWithWhere(userLocationName, true);
@@ -1134,7 +1139,7 @@ const DashboardContent = () => {
 										return (
 											<div
 												key={label}
-												className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+												className="w-[415px] max-w-[calc(100%-24px)] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
 												onClick={() => {
 													triggerSearchWithWhere(label, false);
 												}}
@@ -1168,7 +1173,7 @@ const DashboardContent = () => {
 											return (
 												<div
 													key={stateName}
-													className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+													className="w-[415px] max-w-[calc(100%-24px)] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
 													onClick={() => {
 														triggerSearchWithWhere(stateName, false);
 													}}
@@ -1330,9 +1335,14 @@ const DashboardContent = () => {
 		};
 	}, [isMobile]);
 
-	// Mobile-friendly sizing for hero logo and subtitle; desktop remains unchanged
-	const logoWidth = isMobile ? '190px' : '300px';
-	const logoHeight = isMobile ? '50px' : '79px';
+	// Responsive sizing for hero logo (shrink with viewport width, but keep sensible min/max)
+	// NOTE: We keep the same aspect ratio as the previous desktop size (300x79).
+	const logoWidth = isMobile
+		? 'clamp(150px, 45vw, 190px)'
+		: 'clamp(180px, 30vw, 300px)';
+	const logoHeight = isMobile
+		? 'clamp(39.5px, 11.85vw, 50px)'
+		: 'clamp(47.4px, 7.9vw, 79px)';
 	const hasProblematicBrowser = isProblematicBrowser();
 	useMe(); // Hook call for side effects
 	const tabToggleTrackRef = useRef<HTMLDivElement>(null);
@@ -1407,11 +1417,6 @@ const DashboardContent = () => {
 	const DASHBOARD_MAP_COMPACT_CLASS = 'murmur-dashboard-map-compact';
 	const DASHBOARD_COMPACT_CLASS = 'murmur-dashboard-compact';
 	const DASHBOARD_ZOOM_VAR = '--murmur-dashboard-zoom';
-	const DEFAULT_DASHBOARD_ZOOM = 0.85;
-	const MIN_DASHBOARD_ZOOM = 0.72;
-	// 16:10-ish viewpoint: zoom IN by 110% vs the dashboard's normal baseline.
-	const DASHBOARD_SIXTEEN_BY_TEN_ZOOM_MULTIPLIER = 1.1;
-	const DASHBOARD_ZOOM_EVENT = 'murmur:dashboard-zoom-changed';
 
 	// Apply dashboard-only compact class + clear zoom var on mobile/unmount.
 	useEffect(() => {
@@ -1422,142 +1427,14 @@ const DashboardContent = () => {
 			return;
 		}
 
+		// Keep the dashboard at its CSS baseline zoom (avoid "whole page" rescaling on desktop window resize).
+		document.documentElement.style.removeProperty(DASHBOARD_ZOOM_VAR);
 		document.documentElement.classList.add(DASHBOARD_COMPACT_CLASS);
 		return () => {
 			document.documentElement.classList.remove(DASHBOARD_COMPACT_CLASS);
 			document.documentElement.style.removeProperty(DASHBOARD_ZOOM_VAR);
 		};
 	}, [isMobile]);
-
-	const updateDashboardZoomToFitViewport = useCallback(() => {
-		if (typeof window === 'undefined') return;
-
-		const html = document.documentElement;
-		const viewportH = window.visualViewport?.height ?? window.innerHeight;
-		const viewportW = window.visualViewport?.width ?? window.innerWidth;
-		const ratio = viewportW > 0 && viewportH > 0 ? viewportW / viewportH : 0;
-		// Robust 16:10-ish detection (mirrors the campaign page):
-		// - Use both viewport and screen ratios (browser chrome / window sizing changes viewport).
-		// - Include common 16:10-adjacent laptop ratios but exclude true 16:9 (1.777...).
-		const IDEAL_16X10 = 16 / 10; // 1.6
-		const viewportDelta = Math.abs(ratio - IDEAL_16X10);
-		const screenW = window.screen?.availWidth ?? window.screen?.width ?? viewportW;
-		const screenH = window.screen?.availHeight ?? window.screen?.height ?? viewportH;
-		const screenRatio = screenW > 0 && screenH > 0 ? screenW / screenH : ratio;
-		const screenDelta = Math.abs(screenRatio - IDEAL_16X10);
-		const isSixteenByTenish = viewportDelta <= 0.14 || screenDelta <= 0.14;
-		const maxDashboardZoom = isSixteenByTenish
-			? DEFAULT_DASHBOARD_ZOOM * DASHBOARD_SIXTEEN_BY_TEN_ZOOM_MULTIPLIER
-			: DEFAULT_DASHBOARD_ZOOM;
-
-		const SAFETY_MARGIN_PX = 24;
-		const availableH = Math.max(0, viewportH - SAFETY_MARGIN_PX);
-		const availableW = Math.max(0, viewportW - SAFETY_MARGIN_PX);
-
-		// Prefer measuring the main dashboard container so the result reflects any internal transforms.
-		const root = dashboardContentRef.current;
-		if (!root) return;
-		const rect = root.getBoundingClientRect();
-		const contentBottom = Math.max(0, rect.bottom);
-		const contentRight = Math.max(0, rect.right);
-		if (contentBottom <= 0 || contentRight <= 0) return;
-
-		const zoomStr = window.getComputedStyle(html).zoom;
-		const parsedZoom = zoomStr ? parseFloat(zoomStr) : NaN;
-		const varZoomStr = window.getComputedStyle(html).getPropertyValue(DASHBOARD_ZOOM_VAR);
-		const parsedVarZoom = varZoomStr ? parseFloat(varZoomStr) : NaN;
-		const currentZoom =
-			Number.isFinite(parsedZoom) && parsedZoom > 0 && parsedZoom !== 1
-				? parsedZoom
-				: Number.isFinite(parsedVarZoom) && parsedVarZoom > 0
-					? parsedVarZoom
-					: DEFAULT_DASHBOARD_ZOOM;
-
-		const scaleH = contentBottom > 0 ? availableH / contentBottom : 1;
-		const scaleW = contentRight > 0 ? availableW / contentRight : 1;
-		// Default behavior: never scale up (avoids "bounce in" when content changes).
-		// 16:10-ish behavior: allow scaling up to the 16:10 max zoom so the dashboard fills more
-		// of the viewport, while still fitting if space is tight.
-		const scaleToFit = Math.min(scaleH, scaleW);
-		const scale = isSixteenByTenish ? scaleToFit : Math.min(1, scaleToFit);
-
-		const rawZoom = Math.max(
-			MIN_DASHBOARD_ZOOM,
-			Math.min(maxDashboardZoom, currentZoom * scale)
-		);
-		const ZOOM_STEP = 0.01;
-		const snappedZoom = Math.max(
-			MIN_DASHBOARD_ZOOM,
-			Math.floor(rawZoom / ZOOM_STEP) * ZOOM_STEP
-		);
-
-		const existingOverride = parseFloat(html.style.getPropertyValue(DASHBOARD_ZOOM_VAR));
-		const existingZoom =
-			Number.isFinite(existingOverride) && existingOverride > 0
-				? existingOverride
-				: DEFAULT_DASHBOARD_ZOOM;
-		if (Math.abs(snappedZoom - existingZoom) < 0.004) return;
-
-		// Only remove the override when we're at the *true* CSS default (non-16:10).
-		// On 16:10 we keep an explicit var so the CSS fallback doesn't revert to 0.85.
-		if (!isSixteenByTenish && Math.abs(snappedZoom - DEFAULT_DASHBOARD_ZOOM) < 0.004) {
-			html.style.removeProperty(DASHBOARD_ZOOM_VAR);
-			try {
-				window.dispatchEvent(
-					new CustomEvent(DASHBOARD_ZOOM_EVENT, {
-						detail: { zoom: DEFAULT_DASHBOARD_ZOOM },
-					})
-				);
-			} catch {
-				// no-op
-			}
-			return;
-		}
-
-		html.style.setProperty(DASHBOARD_ZOOM_VAR, snappedZoom.toFixed(3));
-		try {
-			window.dispatchEvent(
-				new CustomEvent(DASHBOARD_ZOOM_EVENT, { detail: { zoom: snappedZoom } })
-			);
-		} catch {
-			// no-op
-		}
-	}, []);
-
-	// Update dashboard zoom on resize and on major layout toggles (map/search/tab).
-	useEffect(() => {
-		if (isMobile === null) return;
-		if (isMobile) return;
-		if (typeof window === 'undefined') return;
-
-		let raf: number | null = null;
-		const schedule = () => {
-			if (raf != null) cancelAnimationFrame(raf);
-			raf = requestAnimationFrame(() => {
-				raf = null;
-				updateDashboardZoomToFitViewport();
-			});
-		};
-
-		window.addEventListener('resize', schedule, { passive: true });
-		window.visualViewport?.addEventListener('resize', schedule);
-
-		// Observe root size changes (search results, tab switches, etc.)
-		const root = dashboardContentRef.current;
-		const ro = root ? new ResizeObserver(() => schedule()) : null;
-		if (root && ro) ro.observe(root);
-
-		schedule();
-		const t = window.setTimeout(schedule, 250);
-
-		return () => {
-			if (raf != null) cancelAnimationFrame(raf);
-			window.removeEventListener('resize', schedule);
-			window.visualViewport?.removeEventListener('resize', schedule);
-			window.clearTimeout(t);
-			ro?.disconnect();
-		};
-	}, [activeTab, hasSearched, isMapView, isMobile, updateDashboardZoomToFitViewport]);
 
 	// Make the fullscreen dashboard map view render slightly "zoomed out" on desktop (85%),
 	// mirroring the campaign page's extra-compact scaling.
@@ -2433,8 +2310,9 @@ const DashboardContent = () => {
 		const pill = tabTogglePillRef.current;
 
 		// Fallbacks match the fixed design values used in the markup below.
-		const trackWidth = track?.getBoundingClientRect().width ?? 228;
-		const pillWidth = pill?.getBoundingClientRect().width ?? 85;
+		// Use offsetWidth to get unscaled width, ensuring correct positioning even when scaled via CSS transform
+		const trackWidth = track?.offsetWidth ?? 228;
+		const pillWidth = pill?.offsetWidth ?? 85;
 
 		const half = trackWidth / 2;
 		const inset = (half - pillWidth) / 2;
@@ -3022,6 +2900,35 @@ const DashboardContent = () => {
 	if (isMobile) {
 		return (
 			<div className="min-h-screen w-full">
+				<Link
+					href={urls.home.activeLanding}
+					prefetch
+					className="fixed left-8 top-6 flex items-center gap-5 text-[15px] font-inter font-normal no-underline hover:no-underline z-[10000] group text-[#060606] hover:text-gray-500"
+					title="Back to Landing"
+					aria-label="Back to Landing"
+					onClick={(e) => {
+						e.preventDefault();
+						if (typeof window !== 'undefined') {
+							window.location.assign(urls.home.activeLanding);
+						}
+					}}
+				>
+					<svg
+						width="16"
+						height="10"
+						viewBox="0 0 27 16"
+						fill="none"
+						xmlns="http://www.w3.org/2000/svg"
+						className="inline-block align-middle"
+					>
+						<path
+							d="M0.292892 7.29289C-0.0976315 7.68342 -0.0976315 8.31658 0.292892 8.70711L6.65685 15.0711C7.04738 15.4616 7.68054 15.4616 8.07107 15.0711C8.46159 14.6805 8.46159 14.0474 8.07107 13.6569L2.41421 8L8.07107 2.34315C8.46159 1.95262 8.46159 1.31946 8.07107 0.928932C7.68054 0.538408 7.04738 0.538408 6.65685 0.928932L0.292892 7.29289ZM27 8V7L1 7V8V9L27 9V8Z"
+							fill="currentColor"
+						/>
+					</svg>
+					<span>to Landing</span>
+				</Link>
+
 				{/* Only show logo above box when there are campaigns */}
 				{hasCampaigns && (
 					<div className="w-full">
@@ -3060,6 +2967,35 @@ const DashboardContent = () => {
 
 	return (
 		<AppLayout>
+			<Link
+				href={urls.home.activeLanding}
+				prefetch
+				className="fixed left-8 top-6 flex items-center gap-5 text-[15px] font-inter font-normal no-underline hover:no-underline z-[10000] group text-[#060606] hover:text-gray-500"
+				title="Back to Landing"
+				aria-label="Back to Landing"
+				onClick={(e) => {
+					e.preventDefault();
+					if (typeof window !== 'undefined') {
+						window.location.assign(urls.home.activeLanding);
+					}
+				}}
+			>
+				<svg
+					width="16"
+					height="10"
+					viewBox="0 0 27 16"
+					fill="none"
+					xmlns="http://www.w3.org/2000/svg"
+					className="inline-block align-middle"
+				>
+					<path
+						d="M0.292892 7.29289C-0.0976315 7.68342 -0.0976315 8.31658 0.292892 8.70711L6.65685 15.0711C7.04738 15.4616 7.68054 15.4616 8.07107 15.0711C8.46159 14.6805 8.46159 14.0474 8.07107 13.6569L2.41421 8L8.07107 2.34315C8.46159 1.95262 8.46159 1.31946 8.07107 0.928932C7.68054 0.538408 7.04738 0.538408 6.65685 0.928932L0.292892 7.29289ZM27 8V7L1 7V8V9L27 9V8Z"
+						fill="currentColor"
+					/>
+				</svg>
+				<span>to Landing</span>
+			</Link>
+
 			<div
 				ref={dashboardContentRef}
 				className={`relative min-h-screen dashboard-main-offset w-full max-w-full ${bottomPadding} ${
@@ -3101,11 +3037,18 @@ const DashboardContent = () => {
 						</div>
 
 						<div
-							className={`search-bar-wrapper w-full max-w-[1132px] mx-auto px-4 !z-[50] ${
+							className={`search-bar-wrapper w-full max-w-[1132px] mx-auto px-4 max-[480px]:px-2 !z-[50] ${
 								hasSearched ? 'search-bar-active' : ''
 							}`}
 						>
-							<div className="search-bar-inner">
+							<div
+								className="origin-center w-full"
+								style={{
+									transform:
+										'scale(clamp(0.84, calc(0.72 + (100vw / 3333px)), 1.08))',
+								}}
+							>
+								<div className="search-bar-inner">
 								{hasSearched && activeSearchQuery && (
 									<div className="search-context-label">
 										<span className="search-query-text">{activeSearchQuery}</span>
@@ -3153,6 +3096,8 @@ const DashboardContent = () => {
 												render={({ field }) => (
 													<FormItem>
 														<FormControl>
+															{/* Keep the hero search bar from stretching full-width at narrower widths. */}
+															<div className="mx-auto w-full max-w-[603px]">
 															<div
 																ref={searchContainerRef}
 																className={`search-input-group relative ${
@@ -3170,7 +3115,11 @@ const DashboardContent = () => {
 																	style={{ transition: 'none' }}
 																>
 																<Input
-																		className={`search-wave-input !focus-visible:ring-0 !focus-visible:ring-offset-0 !focus:ring-0 !focus:ring-offset-0 !ring-0 !outline-none !accent-transparent ${inboxView ? '!h-[39px] !border-0' : '!h-[72px] !border-2 !border-black'} pr-[70px] md:pr-[80px]`}
+																		className={`search-wave-input !focus-visible:ring-0 !focus-visible:ring-offset-0 !focus:ring-0 !focus:ring-offset-0 !ring-0 !outline-none !accent-transparent ${
+																			inboxView
+																				? '!h-[39px] !border-0'
+																				: '!h-[72px] max-[480px]:!h-[60px] !border-2 !border-black'
+																		} pr-[70px] max-[480px]:pr-[58px] md:pr-[80px]`}
 																		placeholder=""
 																		style={{
 																			accentColor: 'transparent',
@@ -3185,7 +3134,13 @@ const DashboardContent = () => {
 																	/>
 																	{/* New 532x64px element - Added border-black and z-20 */}
 																	<div
-																		className={`search-sections-container absolute left-[4px] right-[68px] top-1/2 -translate-y-1/2 ${inboxView ? 'h-[31px]' : 'h-[64px]'} rounded-[8px] z-20 font-secondary flex items-center ${
+																		className={`search-sections-container absolute left-[4px] right-[68px] ${
+																			inboxView ? '' : 'max-[480px]:right-[56px]'
+																		} top-1/2 -translate-y-1/2 ${
+																			inboxView
+																				? 'h-[31px]'
+																				: 'h-[64px] max-[480px]:h-[52px]'
+																		} rounded-[8px] z-20 font-secondary flex items-center ${
 																			inboxView
 																				? 'bg-[#EFEFEF] border-0'
 																				: activeSection
@@ -3219,10 +3174,20 @@ const DashboardContent = () => {
 																				setActiveSection('why');
 																			}}
 																		>
-																			<div className={`absolute z-20 left-[24px] ${inboxView ? 'top-1/2 -translate-y-1/2 text-[14px]' : 'top-[10px] text-[22px]'} font-bold text-black leading-none`}>
+																			<div
+																				className={`absolute z-20 left-[24px] max-[480px]:left-[12px] ${
+																					inboxView
+																						? 'top-1/2 -translate-y-1/2 text-[14px]'
+																						: 'top-[10px] max-[480px]:top-[7px] text-[22px] max-[480px]:text-[18px]'
+																				} font-bold text-black leading-none`}
+																			>
 																				{inboxView ? (whyValue ? whyValue.replace(/[\[\]]/g, '') : 'Why') : 'Why'}
 																			</div>
-																			<div className={`absolute z-20 left-[24px] right-[4px] top-[42px] h-[12px] overflow-hidden ${inboxView ? 'hidden' : ''}`}>
+																			<div
+																				className={`absolute z-20 left-[24px] max-[480px]:left-[12px] right-[4px] top-[42px] max-[480px]:top-[30px] h-[12px] overflow-hidden ${
+																					inboxView ? 'hidden' : ''
+																				}`}
+																			>
 																				<div
 																					className="absolute top-0 left-0 font-semibold text-[12px] whitespace-nowrap"
 																					style={{
@@ -3281,7 +3246,7 @@ const DashboardContent = () => {
 																								setActiveSection(null);
 																							}
 																						}}
-																					className="absolute z-20 left-[24px] right-[8px] top-1/2 -translate-y-1/2 w-auto font-bold text-black text-[14px] bg-transparent outline-none border-none leading-none placeholder:text-black"
+																					className="absolute z-20 left-[24px] max-[480px]:left-[12px] right-[8px] top-1/2 -translate-y-1/2 w-auto font-bold text-black text-[14px] bg-transparent outline-none border-none leading-none placeholder:text-black"
 																						style={{
 																							fontFamily: 'var(--font-secondary), Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
 																						}}
@@ -3289,16 +3254,16 @@ const DashboardContent = () => {
 																						onClick={(e) => e.stopPropagation()}
 																					/>
 																				) : (
-																				<div className="absolute z-20 left-[24px] right-[8px] top-1/2 -translate-y-1/2 font-bold text-black text-[14px] leading-none">
+																				<div className="absolute z-20 left-[24px] max-[480px]:left-[12px] right-[8px] top-1/2 -translate-y-1/2 font-bold text-black text-[14px] leading-none">
 																						{whatValue || 'What'}
 																					</div>
 																				)
 																			) : (
 																				<>
-																				<div className="absolute z-20 left-[24px] top-[10px] text-[22px] font-bold text-black leading-none">
+																				<div className="absolute z-20 left-[24px] max-[480px]:left-[12px] top-[10px] max-[480px]:top-[7px] text-[22px] max-[480px]:text-[18px] font-bold text-black leading-none">
 																						What
 																					</div>
-																				<div className="absolute z-20 left-[24px] right-[8px] top-[42px] h-[12px] overflow-hidden">
+																				<div className="absolute z-20 left-[24px] max-[480px]:left-[12px] right-[8px] top-[42px] max-[480px]:top-[30px] h-[12px] overflow-hidden">
 																						{activeSection === 'what' ? (
 																							<input
 																								ref={whatInputRef}
@@ -3390,7 +3355,7 @@ const DashboardContent = () => {
 																								triggerSearchWithCurrentValues();
 																							}
 																						}}
-																					className="absolute z-20 left-[24px] right-[8px] top-1/2 -translate-y-1/2 w-auto font-bold text-black text-[14px] bg-transparent outline-none border-none leading-none placeholder:text-black"
+																					className="absolute z-20 left-[24px] max-[480px]:left-[12px] right-[8px] top-1/2 -translate-y-1/2 w-auto font-bold text-black text-[14px] bg-transparent outline-none border-none leading-none placeholder:text-black"
 																						style={{
 																							fontFamily: 'var(--font-secondary), Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
 																						}}
@@ -3398,16 +3363,16 @@ const DashboardContent = () => {
 																						onClick={(e) => e.stopPropagation()}
 																					/>
 																				) : (
-																				<div className="absolute z-20 left-[24px] right-[8px] top-1/2 -translate-y-1/2 font-bold text-black text-[14px] leading-none">
+																				<div className="absolute z-20 left-[24px] max-[480px]:left-[12px] right-[8px] top-1/2 -translate-y-1/2 font-bold text-black text-[14px] leading-none">
 																						{whereValue || 'Where'}
 																					</div>
 																				)
 																			) : (
 																				<>
-																				<div className="absolute z-20 left-[24px] top-[10px] text-[22px] font-bold text-black leading-none">
+																				<div className="absolute z-20 left-[24px] max-[480px]:left-[12px] top-[10px] max-[480px]:top-[7px] text-[22px] max-[480px]:text-[18px] font-bold text-black leading-none">
 																						Where
 																					</div>
-																				<div className="absolute z-20 left-[24px] right-[8px] top-[42px] h-[12px] overflow-hidden">
+																				<div className="absolute z-20 left-[24px] max-[480px]:left-[12px] right-[8px] top-[42px] max-[480px]:top-[30px] h-[12px] overflow-hidden">
 																						{activeSection === 'where' ? (
 																						<div className="absolute z-20 top-0 left-0 w-full h-full flex items-center gap-[2px]">
 																								<input
@@ -3464,7 +3429,11 @@ const DashboardContent = () => {
 																	{/* Desktop Search Button */}
 																	<button
 																		type="submit"
-																		className={`flex absolute right-[6px] items-center justify-center w-[58px] ${inboxView ? 'h-[31px]' : 'h-[62px]'} z-40 cursor-pointer group`}
+																		className={`flex absolute right-[6px] items-center justify-center w-[58px] ${
+																			inboxView
+																				? 'h-[31px]'
+																				: 'h-[62px] max-[480px]:h-[50px] max-[480px]:w-[46px]'
+																		} z-40 cursor-pointer group`}
 																		style={{
 																			top: '50%',
 																			transform: 'translateY(-50%)',
@@ -3498,6 +3467,7 @@ const DashboardContent = () => {
 																	</button>
 																</div>
 																{renderDesktopSearchDropdowns()}
+															</div>
 															</div>
 														</FormControl>
 													</FormItem>
@@ -3623,6 +3593,7 @@ const DashboardContent = () => {
 										</form>
 									</Form>
 								)}
+								</div>
 							</div>
 						</div>
 
@@ -3644,7 +3615,7 @@ const DashboardContent = () => {
 							<div className="flex justify-center" style={{ marginTop: '92px' }}>
 								<div
 									ref={tabToggleTrackRef}
-									className="relative flex items-center"
+									className="relative flex items-center origin-center scale-[0.8] sm:scale-[0.9] lg:scale-100"
 									style={{
 										width: '228px',
 										height: '36px',
