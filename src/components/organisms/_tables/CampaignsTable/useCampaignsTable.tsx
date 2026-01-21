@@ -132,20 +132,19 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 						'metrics-header-grid w-full items-center',
 						compactMetrics
 							? 'flex flex-nowrap gap-[7px] justify-start'
-							: 'grid justify-items-start gap-8 md:gap-10 lg:gap-12'
+							: 'flex flex-nowrap justify-start'
 					)}
 					style={
 						compactMetrics
 							? undefined
-							: {
-									gridTemplateColumns:
-										'minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1.25fr)',
-							  }
+							: ({ gap: 'var(--campaign-metric-gap, 32px)' } as React.CSSProperties)
 					}
 				>
 					<span
 						className={cn(
 							'metrics-header-label',
+							!compactMetrics &&
+								'flex h-[20px] w-[92px] items-center justify-center text-center',
 							compactMetrics &&
 								'flex h-[15px] metric-width-short items-center justify-center text-[10px] font-medium tracking-[0.01em] metrics-header-label-compact'
 						)}
@@ -156,6 +155,8 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 					<span
 						className={cn(
 							'metrics-header-label',
+							!compactMetrics &&
+								'flex h-[20px] w-[92px] items-center justify-center text-center',
 							compactMetrics &&
 								'flex h-[15px] metric-width-short items-center justify-center text-[10px] font-medium tracking-[0.01em] metrics-header-label-compact'
 						)}
@@ -166,7 +167,8 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 					<span
 						className={cn(
 							'metrics-header-label',
-							!compactMetrics && 'relative left-[-13px]',
+							!compactMetrics &&
+								'flex h-[20px] w-[92px] items-center justify-center text-center',
 							compactMetrics &&
 								'flex h-[15px] metric-width-long items-center justify-center text-center text-[10px] font-medium leading-[1.05] tracking-[0.01em] metrics-header-label-compact'
 						)}
@@ -181,6 +183,8 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 					<span
 						className={cn(
 							'metrics-header-label',
+							!compactMetrics &&
+								'flex h-[20px] w-[92px] items-center justify-center text-center',
 							compactMetrics &&
 								'flex h-[15px] metric-width-long items-center justify-center text-center text-[10px] font-medium leading-[1.05] tracking-[0.01em] metrics-header-label-compact'
 						)}
@@ -226,7 +230,7 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 									className={cn(
 										'pointer-events-none font-inter font-normal text-white',
 										compactMetrics
-											? 'flex h-[15px] items-center justify-start text-[11px] uppercase tracking-[0.01em]'
+											? 'flex h-[20px] items-center justify-start text-[11px] uppercase tracking-[0.01em]'
 											: 'text-[14px]'
 									)}
 								>
@@ -239,7 +243,7 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 									className={cn(
 										'flex items-center',
 										compactMetrics
-											? 'h-[15px] metric-width-long flex-shrink-0 justify-center'
+											? 'h-[20px] w-[92px] flex-none justify-center'
 											: 'w-full'
 									)}
 								/>
@@ -275,15 +279,12 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 							'metrics-grid-container w-full items-center text-left',
 							compactMetrics
 								? 'flex flex-nowrap gap-[7px] justify-start'
-								: 'grid justify-items-start gap-8 md:gap-10 lg:gap-12'
+								: 'flex flex-nowrap justify-start'
 						)}
 						style={
 							compactMetrics
 								? undefined
-								: {
-										gridTemplateColumns:
-											'minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1.25fr)',
-								  }
+								: ({ gap: 'var(--campaign-metric-gap, 32px)' } as React.CSSProperties)
 						}
 					>
 						{[
@@ -291,45 +292,36 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 								label: draftDisplay,
 								fill: draftFill,
 								dataAttr: { 'data-draft-fill': draftFill } as Record<string, string>,
-								width: compactMetrics ? 'metric-width-short' : 'w-[6.13em]',
-								separator: !compactMetrics,
 							},
 							{
 								label: sentDisplay,
 								fill: sentFill,
 								dataAttr: { 'data-sent-fill': sentFill } as Record<string, string>,
-								width: compactMetrics ? 'metric-width-short' : 'w-[6.13em]',
-								separator: !compactMetrics,
 							},
 							{
 								label: mmdd(updatedAt),
 								fill: updatedFill,
 								dataAttr: { 'data-updated-fill': updatedFill } as Record<string, string>,
-								width: compactMetrics ? 'metric-width-long' : 'w-[6.13em]',
-								separator: !compactMetrics,
 							},
 							{
 								label: mmdd(createdAt),
 								fill: createdFill,
 								dataAttr: { 'data-created-fill': createdFill } as Record<string, string>,
-								width: compactMetrics ? 'metric-width-long' : 'w-[6.13em]',
-								separator: false,
 							},
-						].map(({ label, fill, dataAttr, width, separator }, index) => (
+						].map(({ label, fill, dataAttr }, index) => (
 							<div
 								key={index}
 								className={cn(
-									'relative flex items-center',
-									compactMetrics ? 'w-auto flex-shrink-0 justify-start' : 'w-full'
+									'campaign-metric-slot relative flex items-center',
+									compactMetrics
+										? 'w-auto flex-shrink-0 justify-start'
+										: 'h-[20px] w-[92px] flex-none justify-center'
 								)}
 							>
 								<div
 									{...dataAttr}
 									className={cn(
-										'metric-box inline-flex items-center justify-start border border-[#8C8C8C] leading-none truncate',
-										compactMetrics
-											? cn(width, 'h-[15px] rounded-[4px] justify-center')
-											: 'h-[20px] w-[92px] rounded-[4px] justify-center px-0'
+										'metric-box inline-flex items-center justify-center border border-[#8C8C8C] leading-none truncate h-[20px] w-[92px] min-w-[92px] max-w-[92px] rounded-[6px] px-0 flex-none'
 									)}
 									style={
 										{
@@ -348,16 +340,6 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 								>
 									{label}
 								</div>
-								{separator && (
-									<div
-										className="metric-separator absolute h-[17px] w-[2px]"
-										style={{
-											top: 'calc(50% - 8.5px)',
-											backgroundColor: isConfirming ? 'transparent' : 'black',
-											right: 'calc(-1rem - 1px)',
-										}}
-									/>
-								)}
 							</div>
 						))}
 					</div>

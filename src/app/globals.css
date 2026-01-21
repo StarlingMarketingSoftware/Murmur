@@ -1884,6 +1884,38 @@ body {
 	content: ' ';
 }
 
+/* Desktop campaigns table: keep ticks centered and ensure the 4-pill block fits (no right-side clipping) */
+.my-campaigns-table {
+	/* Responsive but capped so 4x92px pills never overflow the metrics column */
+	--campaign-metric-gap: clamp(18px, 2.5vw, 32px);
+}
+
+/* Give the metrics column a touch more usable width on desktop by reducing cell padding */
+.my-campaigns-table:not(.narrow-desktop-table):not(.mobile-table-no-scroll)
+	thead
+	th:nth-child(2),
+.my-campaigns-table:not(.narrow-desktop-table):not(.mobile-table-no-scroll)
+	tbody
+	td:nth-child(2) {
+	padding-left: 4px !important;
+	padding-right: 4px !important;
+}
+
+/* Desktop campaigns table: ticks centered between 92px metric pills */
+.my-campaigns-table:not(.narrow-desktop-table):not(.mobile-table-no-scroll)
+	.campaign-metric-slot:not(:last-child)::after {
+	content: '';
+	position: absolute;
+	top: 50%;
+	/* Center a 1px tick in the middle of the inter-pill gap */
+	left: calc(100% + (var(--campaign-metric-gap, 32px) / 2) - 0.5px);
+	transform: translateY(-50%);
+	width: 1px;
+	height: 20px;
+	background-color: #000000;
+	pointer-events: none;
+}
+
 /* Keep exclude contacts box consistent on smaller screens */
 @media (max-width: 640px) {
 	/* Remove the synthetic space on mobile where the <br> is visible */
