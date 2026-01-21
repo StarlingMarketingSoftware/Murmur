@@ -880,6 +880,8 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 		goToSent,
 		goToWriting,
 		hideBottomPanels,
+		bottomPanelHeightPx,
+		bottomPanelCollapsed,
 		hideButton,
 		mainBoxId,
 		showSearchBar = true,
@@ -1635,8 +1637,9 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 						drafts={drafts || []}
 						contacts={props.allContacts || props.contacts}
 						width={233}
-						height={117}
+						height={bottomPanelHeightPx ?? 117}
 						whiteSectionHeight={15}
+						collapsed={bottomPanelCollapsed}
 						hideSendButton={true}
 						onOpenDrafts={goToDrafts}
 					/>
@@ -1644,8 +1647,9 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 						sent={sentEmails || []}
 						contacts={props.allContacts || props.contacts}
 						width={233}
-						height={117}
+						height={bottomPanelHeightPx ?? 117}
 						whiteSectionHeight={15}
+						collapsed={bottomPanelCollapsed}
 						onOpenSent={goToSent}
 					/>
 					<InboxExpandedList
@@ -1653,8 +1657,9 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 						allowedSenderEmails={allowedSenderEmails}
 						contactByEmail={contactByEmail}
 						width={233}
-						height={117}
+						height={bottomPanelHeightPx ?? 117}
 						whiteSectionHeight={15}
+						collapsed={bottomPanelCollapsed}
 						onOpenInbox={goToInbox}
 					/>
 				</div>

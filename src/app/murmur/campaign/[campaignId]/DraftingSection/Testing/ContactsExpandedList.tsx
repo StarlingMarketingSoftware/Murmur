@@ -47,6 +47,10 @@ export interface ContactsExpandedListProps {
 	onSearchFromMiniBar?: (params: { why: string; what: string; where: string }) => void;
 	whiteSectionHeight?: number;
 	onOpenContacts?: () => void;
+	/**
+	 * When true, renders only the header chrome (no rows) for ultra-compact bottom panel layouts.
+	 */
+	collapsed?: boolean;
 }
 
 export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
@@ -61,6 +65,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 	minRows = 7,
 	whiteSectionHeight: customWhiteSectionHeight,
 	onOpenContacts,
+	collapsed = false,
 }) => {
 	const [internalSelectedContactIds, setInternalSelectedContactIds] = useState<
 		Set<number>
@@ -302,7 +307,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 				</div>
 			)}
 
-			{!isBottomView && (
+			{!collapsed && !isBottomView && (
 				<div className="px-3 mt-1 mb-0 flex items-center justify-center relative top-1 text-[13px] font-inter font-medium text-black/70">
 					<span>{selectedCount} Selected</span>
 					<button
@@ -315,35 +320,36 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 				</div>
 			)}
 
-			<div
-				className={cn(
-					'relative flex-1 flex flex-col min-h-0',
-					isBottomView ? 'px-[2px] pt-0 pb-0' : 'pb-2 pt-2'
-				)}
-				onMouseLeave={() => {
-					setHoveredContactIndex(null);
-					onContactHover?.(null);
-				}}
-			>
-				{/* Scrollable list */}
-				<CustomScrollbar
-					className="flex-1 drafting-table-content"
-					thumbWidth={2}
-					thumbColor={isBottomView ? 'transparent' : '#000000'}
-					trackColor="transparent"
-					offsetRight={isBottomView ? -7 : -6}
-					contentClassName="overflow-x-hidden"
-					alwaysShow={!isBottomView}
+			{!collapsed && (
+				<div
+					className={cn(
+						'relative flex-1 flex flex-col min-h-0',
+						isBottomView ? 'px-[2px] pt-0 pb-0' : 'pb-2 pt-2'
+					)}
+					onMouseLeave={() => {
+						setHoveredContactIndex(null);
+						onContactHover?.(null);
+					}}
 				>
-					<div
-						className={cn(
-							'flex flex-col items-center',
-							isBottomView ? 'space-y-1 pb-0' : 'space-y-2 pb-2'
-						)}
-						style={{
-							paddingTop: customWhiteSectionHeight !== undefined ? '2px' : undefined,
-						}}
+					{/* Scrollable list */}
+					<CustomScrollbar
+						className="flex-1 drafting-table-content"
+						thumbWidth={2}
+						thumbColor={isBottomView ? 'transparent' : '#000000'}
+						trackColor="transparent"
+						offsetRight={isBottomView ? -7 : -6}
+						contentClassName="overflow-x-hidden"
+						alwaysShow={!isBottomView}
 					>
+						<div
+							className={cn(
+								'flex flex-col items-center',
+								isBottomView ? 'space-y-1 pb-0' : 'space-y-2 pb-2'
+							)}
+							style={{
+								paddingTop: customWhiteSectionHeight !== undefined ? '2px' : undefined,
+							}}
+						>
 					{contacts.map((contact, contactIndex) => {
 						const fullName =
 							contact.name ||
@@ -1033,9 +1039,10 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 							/>
 						)
 					)}
-					</div>
-				</CustomScrollbar>
-			</div>
+						</div>
+					</CustomScrollbar>
+				</div>
+			)}
 		</div>
 	);
 };

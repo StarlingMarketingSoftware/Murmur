@@ -47,6 +47,15 @@ export interface ContactsSelectionProps {
 	 */
 	hideBottomPanels?: boolean;
 	/**
+	 * Optional height to use for the bottom panels (Drafts/Sent/Inbox) when rendered inside this component.
+	 * Used for 16:10 compact breakpoints where the panels collapse to header-only.
+	 */
+	bottomPanelHeightPx?: number;
+	/**
+	 * When true, bottom panels render header-only (no rows).
+	 */
+	bottomPanelCollapsed?: boolean;
+	/**
 	 * If true, the draft button will not be rendered.
 	 * Useful when the button needs to be rendered separately in the parent layout for centering.
 	 */

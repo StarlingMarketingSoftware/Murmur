@@ -350,6 +350,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const [isInboxTabNarrow, setIsInboxTabNarrow] = useState(false);
 	// Inbox tab stacked layout detection (<= 1279px) - moves research panel below header box on the left
 	const [isInboxTabStacked, setIsInboxTabStacked] = useState(false);
+	// 16:10 compact bottom panels (<= 1504x940) - collapse the bottom 3-box strip to header-only
+	const [areBottomPanelsCollapsed16x10, setAreBottomPanelsCollapsed16x10] = useState(false);
 	useEffect(() => {
 		if (typeof window === 'undefined') return;
 		// Matches `DEFAULT_CAMPAIGN_ZOOM` in the campaign page.
@@ -379,6 +381,29 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			setIsAllTabNarrow(effectiveWidth <= 1269);
 			setIsInboxTabNarrow(effectiveWidth <= 1520);
 			setIsInboxTabStacked(effectiveWidth <= 1279);
+
+			// --- Bottom panel collapse breakpoint (16:10-ish @/below 1504x940) ---
+			// This is intentionally keyed off the *viewport* size (not effectiveWidth),
+			// because the campaign page applies CSS zoom at these resolutions and we still
+			// want the physical monitor size threshold to win.
+			const viewportW = window.innerWidth;
+			const viewportH = window.visualViewport?.height ?? window.innerHeight;
+			const ratio = viewportH > 0 ? viewportW / viewportH : 0;
+			const IDEAL_16X10 = 16 / 10; // 1.6
+			const screenW = window.screen?.availWidth ?? window.screen?.width ?? viewportW;
+			const screenH = window.screen?.availHeight ?? window.screen?.height ?? viewportH;
+			const screenRatio = screenW > 0 && screenH > 0 ? screenW / screenH : ratio;
+			const delta16x10 = Math.min(
+				Math.abs(ratio - IDEAL_16X10),
+				Math.abs(screenRatio - IDEAL_16X10)
+			);
+			const isSixteenByTenish = delta16x10 <= 0.14;
+			const TARGET_W = 1504;
+			const TARGET_H = 940;
+			const TOLERANCE_PX = 50;
+			const isAtOrBelowTarget =
+				viewportW <= TARGET_W + TOLERANCE_PX && viewportH <= TARGET_H + TOLERANCE_PX;
+			setAreBottomPanelsCollapsed16x10(Boolean(!isMobile && isSixteenByTenish && isAtOrBelowTarget));
 		};
 		checkBreakpoints();
 		window.addEventListener('resize', checkBreakpoints);
@@ -387,7 +412,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			window.removeEventListener('resize', checkBreakpoints);
 			window.removeEventListener(CAMPAIGN_ZOOM_EVENT, checkBreakpoints as EventListener);
 		};
-	}, []);
+	}, [isMobile]);
+
+	const bottomPanelBoxHeightPx = areBottomPanelsCollapsed16x10 ? 31 : 117;
+	const bottomPanelCollapsed = areBottomPanelsCollapsed16x10;
 
 	// --- Pinned left panel (ContactsExpandedList <-> MiniEmailStructure) ---
 	// We intentionally render the correct panel immediately (no height-morph animation),
@@ -4185,8 +4213,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											drafts={draftEmails}
 											contacts={contacts || []}
 											width={233}
-											height={117}
+											height={bottomPanelBoxHeightPx}
 											whiteSectionHeight={15}
+											collapsed={bottomPanelCollapsed}
 											hideSendButton={true}
 												onOpenDrafts={goToDrafting}
 										/>
@@ -4194,15 +4223,17 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											sent={sentEmails}
 											contacts={contacts || []}
 											width={233}
-											height={117}
+											height={bottomPanelBoxHeightPx}
 											whiteSectionHeight={15}
+											collapsed={bottomPanelCollapsed}
 												onOpenSent={goToSent}
 										/>
 										<InboxExpandedList
 											contacts={contacts || []}
 											width={233}
-											height={117}
+											height={bottomPanelBoxHeightPx}
 											whiteSectionHeight={15}
+											collapsed={bottomPanelCollapsed}
 											onOpenInbox={goToInbox}
 										/>
 									</div>
@@ -4467,8 +4498,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													<ContactsExpandedList
 														contacts={contactsAvailableForDrafting}
 														width={232}
-														height={117}
+														height={bottomPanelBoxHeightPx}
 														whiteSectionHeight={15}
+														collapsed={bottomPanelCollapsed}
 														showSearchBar={false}
 														onOpenContacts={goToContacts}
 													/>
@@ -4476,15 +4508,17 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														sent={sentEmails}
 														contacts={contacts || []}
 														width={233}
-														height={117}
+														height={bottomPanelBoxHeightPx}
 														whiteSectionHeight={15}
+														collapsed={bottomPanelCollapsed}
 														onOpenSent={goToSent}
 													/>
 													<InboxExpandedList
 														contacts={contacts || []}
 														width={233}
-														height={117}
+														height={bottomPanelBoxHeightPx}
 														whiteSectionHeight={15}
+														collapsed={bottomPanelCollapsed}
 														onOpenInbox={goToInbox}
 													/>
 												</div>
@@ -4680,8 +4714,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												<ContactsExpandedList
 													contacts={contactsAvailableForDrafting}
 													width={232}
-													height={117}
+													height={bottomPanelBoxHeightPx}
 													whiteSectionHeight={15}
+													collapsed={bottomPanelCollapsed}
 													showSearchBar={false}
 													onOpenContacts={goToContacts}
 												/>
@@ -4689,15 +4724,17 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													sent={sentEmails}
 													contacts={contacts || []}
 													width={233}
-													height={117}
+													height={bottomPanelBoxHeightPx}
 													whiteSectionHeight={15}
+													collapsed={bottomPanelCollapsed}
 													onOpenSent={goToSent}
 												/>
 												<InboxExpandedList
 													contacts={contacts || []}
 													width={233}
-													height={117}
+													height={bottomPanelBoxHeightPx}
 													whiteSectionHeight={15}
+													collapsed={bottomPanelCollapsed}
 													onOpenInbox={goToInbox}
 												/>
 											</div>
@@ -4735,6 +4772,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										goToInbox={goToInbox}
 										goToSent={goToSent}
 										goToWriting={goToWriting}
+										bottomPanelHeightPx={bottomPanelBoxHeightPx}
+										bottomPanelCollapsed={bottomPanelCollapsed}
 										hideBottomPanels
 										hideButton
 									/>
@@ -4845,6 +4884,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													goToInbox={goToInbox}
 													goToSent={goToSent}
 													goToWriting={goToWriting}
+													bottomPanelHeightPx={bottomPanelBoxHeightPx}
+													bottomPanelCollapsed={bottomPanelCollapsed}
 													hideBottomPanels
 													hideButton
 												/>
@@ -4935,22 +4976,25 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												drafts={draftEmails}
 												contacts={contacts || []}
 												width={233}
-												height={117}
+												height={bottomPanelBoxHeightPx}
 												whiteSectionHeight={15}
+												collapsed={bottomPanelCollapsed}
 												hideSendButton={true}
 											/>
 											<SentExpandedList
 												sent={sentEmails}
 												contacts={contacts || []}
 												width={233}
-												height={117}
+												height={bottomPanelBoxHeightPx}
 												whiteSectionHeight={15}
+												collapsed={bottomPanelCollapsed}
 											/>
 											<InboxExpandedList
 												contacts={contacts || []}
 												width={233}
-												height={117}
+												height={bottomPanelBoxHeightPx}
 												whiteSectionHeight={15}
+												collapsed={bottomPanelCollapsed}
 											/>
 										</div>
 									</div>
@@ -4978,6 +5022,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											goToInbox={goToInbox}
 											goToSent={goToSent}
 											goToWriting={goToWriting}
+											bottomPanelHeightPx={bottomPanelBoxHeightPx}
+											bottomPanelCollapsed={bottomPanelCollapsed}
 											hideBottomPanels={isNarrowestDesktop}
 											hideButton={isNarrowestDesktop}
 										/>
@@ -5256,8 +5302,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											<ContactsExpandedList
 												contacts={contactsAvailableForDrafting}
 												width={232}
-												height={117}
+												height={bottomPanelBoxHeightPx}
 												whiteSectionHeight={15}
+												collapsed={bottomPanelCollapsed}
 												showSearchBar={false}
 												onOpenContacts={goToContacts}
 											/>
@@ -5265,16 +5312,18 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												drafts={draftEmails}
 												contacts={contacts || []}
 												width={233}
-												height={117}
+												height={bottomPanelBoxHeightPx}
 												whiteSectionHeight={15}
+												collapsed={bottomPanelCollapsed}
 												hideSendButton={true}
 												onOpenDrafts={goToDrafting}
 											/>
 											<InboxExpandedList
 												contacts={contacts || []}
 												width={233}
-												height={117}
+												height={bottomPanelBoxHeightPx}
 												whiteSectionHeight={15}
+												collapsed={bottomPanelCollapsed}
 												onOpenInbox={goToInbox}
 											/>
 										</div>
@@ -5369,8 +5418,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												<ContactsExpandedList
 													contacts={contactsAvailableForDrafting}
 													width={232}
-													height={117}
+													height={bottomPanelBoxHeightPx}
 													whiteSectionHeight={15}
+													collapsed={bottomPanelCollapsed}
 													showSearchBar={false}
 													onOpenContacts={goToContacts}
 												/>
@@ -5378,16 +5428,18 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													drafts={draftEmails}
 													contacts={contacts || []}
 													width={233}
-													height={117}
+													height={bottomPanelBoxHeightPx}
 													whiteSectionHeight={15}
+													collapsed={bottomPanelCollapsed}
 													hideSendButton={true}
 													onOpenDrafts={goToDrafting}
 												/>
 												<InboxExpandedList
 													contacts={contacts || []}
 													width={233}
-													height={117}
+													height={bottomPanelBoxHeightPx}
 													whiteSectionHeight={15}
+													collapsed={bottomPanelCollapsed}
 													onOpenInbox={goToInbox}
 												/>
 											</div>
@@ -6627,8 +6679,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											<ContactsExpandedList
 												contacts={contactsAvailableForDrafting}
 												width={232}
-												height={117}
+												height={bottomPanelBoxHeightPx}
 												whiteSectionHeight={15}
+												collapsed={bottomPanelCollapsed}
 												showSearchBar={false}
 												onOpenContacts={goToContacts}
 											/>
@@ -6636,8 +6689,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												drafts={draftEmails}
 												contacts={contacts || []}
 												width={233}
-												height={117}
+												height={bottomPanelBoxHeightPx}
 												whiteSectionHeight={15}
+												collapsed={bottomPanelCollapsed}
 												hideSendButton={true}
 												onOpenDrafts={goToDrafting}
 											/>
@@ -6645,8 +6699,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												sent={sentEmails}
 												contacts={contacts || []}
 												width={233}
-												height={117}
+												height={bottomPanelBoxHeightPx}
 												whiteSectionHeight={15}
+												collapsed={bottomPanelCollapsed}
 												onOpenSent={goToSent}
 											/>
 										</div>
@@ -6682,8 +6737,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												<ContactsExpandedList
 													contacts={contactsAvailableForDrafting}
 													width={232}
-													height={117}
+													height={bottomPanelBoxHeightPx}
 													whiteSectionHeight={15}
+													collapsed={bottomPanelCollapsed}
 													showSearchBar={false}
 													onOpenContacts={goToContacts}
 												/>
@@ -6691,8 +6747,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													drafts={draftEmails}
 													contacts={contacts || []}
 													width={233}
-													height={117}
+													height={bottomPanelBoxHeightPx}
 													whiteSectionHeight={15}
+													collapsed={bottomPanelCollapsed}
 													hideSendButton={true}
 													onOpenDrafts={goToDrafting}
 												/>
@@ -6700,8 +6757,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													sent={sentEmails}
 													contacts={contacts || []}
 													width={233}
-													height={117}
+													height={bottomPanelBoxHeightPx}
 													whiteSectionHeight={15}
+													collapsed={bottomPanelCollapsed}
 													onOpenSent={goToSent}
 												/>
 											</div>
