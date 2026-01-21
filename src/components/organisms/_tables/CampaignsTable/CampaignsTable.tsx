@@ -19,6 +19,8 @@ export const CampaignsTable: FC = () => {
 	);
 	const [desktopScale, setDesktopScale] = useState<number>(1);
 	const [shouldScaleDesktopTable, setShouldScaleDesktopTable] = useState<boolean>(false);
+	const [mobileScale, setMobileScale] = useState<number>(1);
+	const [shouldScaleMobileTable, setShouldScaleMobileTable] = useState<boolean>(false);
 
 	const shouldShowMobileFeatures = isMobile === true;
 	// Detect landscape to decide whether to embed delete buttons back into rows
@@ -78,18 +80,17 @@ export const CampaignsTable: FC = () => {
 	// letting it reflow into an unusable compressed layout.
 	useEffect(() => {
 		if (typeof window === 'undefined') return;
-		// Only apply on non-mobile rendering paths
-		if (shouldShowMobileFeatures) {
-			setDesktopScale(1);
-			setShouldScaleDesktopTable(false);
-			return;
-		}
 
 		const el = desktopMeasureRef.current;
 		if (!el || !('ResizeObserver' in window)) return;
 
-		const BASE_WIDTH = 460; // designed minimum width for narrow-desktop table
-		const MIN_SCALE = 0.62; // prevent extreme unreadability on ultra-narrow widths
+		const DESKTOP_BASE_WIDTH = 460; // designed minimum width for narrow-desktop table
+		const DESKTOP_MIN_SCALE = 0.62; // prevent extreme unreadability on ultra-narrow widths
+
+		// Mobile: once the container gets under 388px, keep the table layout at 388px and
+		// scale it down as one whole object (instead of squeezing columns).
+		const MOBILE_BASE_WIDTH = 388;
+		const MOBILE_MIN_SCALE = 0.7;
 
 		let raf: number | null = null;
 		const update = () => {
@@ -98,13 +99,33 @@ export const CampaignsTable: FC = () => {
 				const available = el.clientWidth;
 				if (!available || available <= 0) return;
 
-				const shouldScale = available < BASE_WIDTH;
-				const nextScale = shouldScale
-					? Math.max(MIN_SCALE, Math.min(1, available / BASE_WIDTH))
-					: 1;
+				if (shouldShowMobileFeatures) {
+					const shouldScale = available < MOBILE_BASE_WIDTH;
+					const nextScale = shouldScale
+						? Math.max(MOBILE_MIN_SCALE, Math.min(1, available / MOBILE_BASE_WIDTH))
+						: 1;
 
-				setShouldScaleDesktopTable(shouldScale);
-				setDesktopScale((prev) => (Math.abs(prev - nextScale) > 0.01 ? nextScale : prev));
+					setShouldScaleMobileTable(shouldScale);
+					setMobileScale((prev) => (Math.abs(prev - nextScale) > 0.01 ? nextScale : prev));
+
+					// Reset desktop scaling state while in mobile mode
+					setShouldScaleDesktopTable(false);
+					setDesktopScale(1);
+				} else {
+					const shouldScale = available < DESKTOP_BASE_WIDTH;
+					const nextScale = shouldScale
+						? Math.max(DESKTOP_MIN_SCALE, Math.min(1, available / DESKTOP_BASE_WIDTH))
+						: 1;
+
+					setShouldScaleDesktopTable(shouldScale);
+					setDesktopScale((prev) =>
+						Math.abs(prev - nextScale) > 0.01 ? nextScale : prev
+					);
+
+					// Reset mobile scaling state while in desktop mode
+					setShouldScaleMobileTable(false);
+					setMobileScale(1);
+				}
 			});
 		};
 
@@ -128,6 +149,11 @@ export const CampaignsTable: FC = () => {
 			return;
 		}
 
+		// If the entire table is being scaled down, measurements from getBoundingClientRect()
+		// are also scaled. We store unscaled measurements so the delete buttons remain aligned
+		// after the same scale is applied to them.
+		const measurementScale = shouldScaleMobileTable ? mobileScale : 1;
+
 		let resizeObserver: ResizeObserver | null = null;
 		let frameId: number | null = null;
 
@@ -145,7 +171,9 @@ export const CampaignsTable: FC = () => {
 				const containerRect = containerEl.getBoundingClientRect();
 				const rowRect = (firstRow as HTMLElement).getBoundingClientRect();
 				const offset = Math.max(rowRect.top - containerRect.top, 0);
-				containerEl.style.setProperty('--delete-column-top', `${offset}px`);
+				const unscaledOffset =
+					measurementScale !== 1 ? offset / measurementScale : offset;
+				containerEl.style.setProperty('--delete-column-top', `${unscaledOffset}px`);
 
 				// Measure each row height and store by campaign id for per-button height
 				const rows = containerEl.querySelectorAll('.my-campaigns-table tbody tr');
@@ -155,7 +183,9 @@ export const CampaignsTable: FC = () => {
 					const idAttr = el.getAttribute('data-campaign-id');
 					if (!idAttr) return;
 					const rect = el.getBoundingClientRect();
-					nextHeights[idAttr] = Math.max(Math.round(rect.height), 44);
+					const unscaledHeight =
+						measurementScale !== 1 ? rect.height / measurementScale : rect.height;
+					nextHeights[idAttr] = Math.max(Math.round(unscaledHeight), 44);
 				});
 
 				// Shallow compare before updating state to avoid loops
@@ -203,7 +233,13 @@ export const CampaignsTable: FC = () => {
 			}
 			containerEl.style.removeProperty('--delete-column-top');
 		};
-	}, [shouldUseExternalDeleteColumn, data?.length, rowHeightsById]);
+	}, [
+		shouldUseExternalDeleteColumn,
+		data?.length,
+		rowHeightsById,
+		shouldScaleMobileTable,
+		mobileScale,
+	]);
 
 	// Synchronize scrolling between table wrapper and delete buttons
 	useEffect(() => {
@@ -273,6 +309,12 @@ export const CampaignsTable: FC = () => {
 		return null;
 	}
 
+	const campaignsTableScale = shouldScaleDesktopTable
+		? desktopScale
+		: shouldScaleMobileTable
+			? mobileScale
+			: 1;
+
 	return (
 		<Card className="relative border-none bg-transparent w-full max-w-[1132px] mx-auto !p-0 !my-0">
 			{isPending && <Spinner size="medium" className="absolute top-2 right-2" />}
@@ -301,9 +343,10 @@ export const CampaignsTable: FC = () => {
 						id="campaigns-table-container"
 						ref={desktopMeasureRef}
 						data-ultra-narrow-scale={shouldScaleDesktopTable ? 'true' : undefined}
+						data-mobile-ultra-narrow-scale={shouldScaleMobileTable ? 'true' : undefined}
 						style={
 							{
-								['--campaigns-table-scale' as never]: desktopScale,
+								['--campaigns-table-scale' as never]: campaignsTableScale,
 							} as React.CSSProperties
 						}
 					>

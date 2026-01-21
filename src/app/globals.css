@@ -5712,6 +5712,31 @@ body.murmur-mobile .search-input-icon-btn {
 	}
 }
 
+/* =========================================================
+   ULTRA-NARROW MOBILE (component-driven scaling)
+   When the campaigns table container is narrower than 388px,
+   keep the mobile campaigns table layout at 388px and scale it down as a whole
+   (instead of squeezing the columns horizontally).
+   ========================================================= */
+.campaigns-table-container[data-mobile-ultra-narrow-scale='true'] .mobile-campaigns-outer-container {
+	/* Lock the layout width, then scale to fit */
+	width: 388px !important;
+	max-width: 388px !important;
+	margin-left: auto !important;
+	margin-right: auto !important;
+	zoom: var(--campaigns-table-scale);
+}
+
+@supports not (zoom: 1) {
+	.campaigns-table-container[data-mobile-ultra-narrow-scale='true'] .mobile-campaigns-outer-container {
+		zoom: 1;
+		transform: scale(var(--campaigns-table-scale));
+		transform-origin: top center;
+		margin-left: auto !important;
+		margin-right: auto !important;
+	}
+}
+
 /* At the smallest end (630px and below), lock to minimum sizes */
 @media (max-width: 630px) {
 	.narrow-desktop-table {

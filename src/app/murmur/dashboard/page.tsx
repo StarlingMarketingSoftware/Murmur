@@ -3101,11 +3101,18 @@ const DashboardContent = () => {
 						</div>
 
 						<div
-							className={`search-bar-wrapper w-full max-w-[1132px] mx-auto px-4 !z-[50] ${
+							className={`search-bar-wrapper w-full max-w-[1132px] mx-auto px-4 max-[480px]:px-2 !z-[50] ${
 								hasSearched ? 'search-bar-active' : ''
 							}`}
 						>
-							<div className="search-bar-inner">
+							<div
+								className="origin-center w-full"
+								style={{
+									transform:
+										'scale(clamp(0.84, calc(0.72 + (100vw / 3333px)), 1.08))',
+								}}
+							>
+								<div className="search-bar-inner">
 								{hasSearched && activeSearchQuery && (
 									<div className="search-context-label">
 										<span className="search-query-text">{activeSearchQuery}</span>
@@ -3153,6 +3160,8 @@ const DashboardContent = () => {
 												render={({ field }) => (
 													<FormItem>
 														<FormControl>
+															{/* Keep the hero search bar from stretching full-width at narrower widths. */}
+															<div className="mx-auto w-full max-w-[603px]">
 															<div
 																ref={searchContainerRef}
 																className={`search-input-group relative ${
@@ -3170,7 +3179,11 @@ const DashboardContent = () => {
 																	style={{ transition: 'none' }}
 																>
 																<Input
-																		className={`search-wave-input !focus-visible:ring-0 !focus-visible:ring-offset-0 !focus:ring-0 !focus:ring-offset-0 !ring-0 !outline-none !accent-transparent ${inboxView ? '!h-[39px] !border-0' : '!h-[72px] !border-2 !border-black'} pr-[70px] md:pr-[80px]`}
+																		className={`search-wave-input !focus-visible:ring-0 !focus-visible:ring-offset-0 !focus:ring-0 !focus:ring-offset-0 !ring-0 !outline-none !accent-transparent ${
+																			inboxView
+																				? '!h-[39px] !border-0'
+																				: '!h-[72px] max-[480px]:!h-[60px] !border-2 !border-black'
+																		} pr-[70px] max-[480px]:pr-[58px] md:pr-[80px]`}
 																		placeholder=""
 																		style={{
 																			accentColor: 'transparent',
@@ -3185,7 +3198,13 @@ const DashboardContent = () => {
 																	/>
 																	{/* New 532x64px element - Added border-black and z-20 */}
 																	<div
-																		className={`search-sections-container absolute left-[4px] right-[68px] top-1/2 -translate-y-1/2 ${inboxView ? 'h-[31px]' : 'h-[64px]'} rounded-[8px] z-20 font-secondary flex items-center ${
+																		className={`search-sections-container absolute left-[4px] right-[68px] ${
+																			inboxView ? '' : 'max-[480px]:right-[56px]'
+																		} top-1/2 -translate-y-1/2 ${
+																			inboxView
+																				? 'h-[31px]'
+																				: 'h-[64px] max-[480px]:h-[52px]'
+																		} rounded-[8px] z-20 font-secondary flex items-center ${
 																			inboxView
 																				? 'bg-[#EFEFEF] border-0'
 																				: activeSection
@@ -3219,10 +3238,20 @@ const DashboardContent = () => {
 																				setActiveSection('why');
 																			}}
 																		>
-																			<div className={`absolute z-20 left-[24px] ${inboxView ? 'top-1/2 -translate-y-1/2 text-[14px]' : 'top-[10px] text-[22px]'} font-bold text-black leading-none`}>
+																			<div
+																				className={`absolute z-20 left-[24px] max-[480px]:left-[12px] ${
+																					inboxView
+																						? 'top-1/2 -translate-y-1/2 text-[14px]'
+																						: 'top-[10px] max-[480px]:top-[7px] text-[22px] max-[480px]:text-[18px]'
+																				} font-bold text-black leading-none`}
+																			>
 																				{inboxView ? (whyValue ? whyValue.replace(/[\[\]]/g, '') : 'Why') : 'Why'}
 																			</div>
-																			<div className={`absolute z-20 left-[24px] right-[4px] top-[42px] h-[12px] overflow-hidden ${inboxView ? 'hidden' : ''}`}>
+																			<div
+																				className={`absolute z-20 left-[24px] max-[480px]:left-[12px] right-[4px] top-[42px] max-[480px]:top-[30px] h-[12px] overflow-hidden ${
+																					inboxView ? 'hidden' : ''
+																				}`}
+																			>
 																				<div
 																					className="absolute top-0 left-0 font-semibold text-[12px] whitespace-nowrap"
 																					style={{
@@ -3281,7 +3310,7 @@ const DashboardContent = () => {
 																								setActiveSection(null);
 																							}
 																						}}
-																					className="absolute z-20 left-[24px] right-[8px] top-1/2 -translate-y-1/2 w-auto font-bold text-black text-[14px] bg-transparent outline-none border-none leading-none placeholder:text-black"
+																					className="absolute z-20 left-[24px] max-[480px]:left-[12px] right-[8px] top-1/2 -translate-y-1/2 w-auto font-bold text-black text-[14px] bg-transparent outline-none border-none leading-none placeholder:text-black"
 																						style={{
 																							fontFamily: 'var(--font-secondary), Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
 																						}}
@@ -3289,16 +3318,16 @@ const DashboardContent = () => {
 																						onClick={(e) => e.stopPropagation()}
 																					/>
 																				) : (
-																				<div className="absolute z-20 left-[24px] right-[8px] top-1/2 -translate-y-1/2 font-bold text-black text-[14px] leading-none">
+																				<div className="absolute z-20 left-[24px] max-[480px]:left-[12px] right-[8px] top-1/2 -translate-y-1/2 font-bold text-black text-[14px] leading-none">
 																						{whatValue || 'What'}
 																					</div>
 																				)
 																			) : (
 																				<>
-																				<div className="absolute z-20 left-[24px] top-[10px] text-[22px] font-bold text-black leading-none">
+																				<div className="absolute z-20 left-[24px] max-[480px]:left-[12px] top-[10px] max-[480px]:top-[7px] text-[22px] max-[480px]:text-[18px] font-bold text-black leading-none">
 																						What
 																					</div>
-																				<div className="absolute z-20 left-[24px] right-[8px] top-[42px] h-[12px] overflow-hidden">
+																				<div className="absolute z-20 left-[24px] max-[480px]:left-[12px] right-[8px] top-[42px] max-[480px]:top-[30px] h-[12px] overflow-hidden">
 																						{activeSection === 'what' ? (
 																							<input
 																								ref={whatInputRef}
@@ -3390,7 +3419,7 @@ const DashboardContent = () => {
 																								triggerSearchWithCurrentValues();
 																							}
 																						}}
-																					className="absolute z-20 left-[24px] right-[8px] top-1/2 -translate-y-1/2 w-auto font-bold text-black text-[14px] bg-transparent outline-none border-none leading-none placeholder:text-black"
+																					className="absolute z-20 left-[24px] max-[480px]:left-[12px] right-[8px] top-1/2 -translate-y-1/2 w-auto font-bold text-black text-[14px] bg-transparent outline-none border-none leading-none placeholder:text-black"
 																						style={{
 																							fontFamily: 'var(--font-secondary), Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
 																						}}
@@ -3398,16 +3427,16 @@ const DashboardContent = () => {
 																						onClick={(e) => e.stopPropagation()}
 																					/>
 																				) : (
-																				<div className="absolute z-20 left-[24px] right-[8px] top-1/2 -translate-y-1/2 font-bold text-black text-[14px] leading-none">
+																				<div className="absolute z-20 left-[24px] max-[480px]:left-[12px] right-[8px] top-1/2 -translate-y-1/2 font-bold text-black text-[14px] leading-none">
 																						{whereValue || 'Where'}
 																					</div>
 																				)
 																			) : (
 																				<>
-																				<div className="absolute z-20 left-[24px] top-[10px] text-[22px] font-bold text-black leading-none">
+																				<div className="absolute z-20 left-[24px] max-[480px]:left-[12px] top-[10px] max-[480px]:top-[7px] text-[22px] max-[480px]:text-[18px] font-bold text-black leading-none">
 																						Where
 																					</div>
-																				<div className="absolute z-20 left-[24px] right-[8px] top-[42px] h-[12px] overflow-hidden">
+																				<div className="absolute z-20 left-[24px] max-[480px]:left-[12px] right-[8px] top-[42px] max-[480px]:top-[30px] h-[12px] overflow-hidden">
 																						{activeSection === 'where' ? (
 																						<div className="absolute z-20 top-0 left-0 w-full h-full flex items-center gap-[2px]">
 																								<input
@@ -3464,7 +3493,11 @@ const DashboardContent = () => {
 																	{/* Desktop Search Button */}
 																	<button
 																		type="submit"
-																		className={`flex absolute right-[6px] items-center justify-center w-[58px] ${inboxView ? 'h-[31px]' : 'h-[62px]'} z-40 cursor-pointer group`}
+																		className={`flex absolute right-[6px] items-center justify-center w-[58px] ${
+																			inboxView
+																				? 'h-[31px]'
+																				: 'h-[62px] max-[480px]:h-[50px] max-[480px]:w-[46px]'
+																		} z-40 cursor-pointer group`}
 																		style={{
 																			top: '50%',
 																			transform: 'translateY(-50%)',
@@ -3498,6 +3531,7 @@ const DashboardContent = () => {
 																	</button>
 																</div>
 																{renderDesktopSearchDropdowns()}
+															</div>
 															</div>
 														</FormControl>
 													</FormItem>
@@ -3623,6 +3657,7 @@ const DashboardContent = () => {
 										</form>
 									</Form>
 								)}
+								</div>
 							</div>
 						</div>
 
