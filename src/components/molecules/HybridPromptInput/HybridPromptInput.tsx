@@ -224,8 +224,26 @@ const SortableAIBlock = ({
 	// Full Auto: Booking For dropdown
 	type BookingForTab = 'Anytime' | 'Season' | 'Calendar';
 	type BookingForSeason = 'Spring' | 'Summer' | 'Fall' | 'Winter';
+	const BOOKING_FOR_SEASON_STYLES: Record<
+		BookingForSeason,
+		{ bgClass: string; textClass: string }
+	> = {
+		Spring: { bgClass: 'bg-[#9BD2FF]', textClass: 'text-black' },
+		Summer: { bgClass: 'bg-[#7ADF85]', textClass: 'text-black' },
+		Fall: { bgClass: 'bg-[#D77C2C]', textClass: 'text-white' },
+		Winter: { bgClass: 'bg-[#1960AC]', textClass: 'text-white' },
+	};
+	const isBookingForSeason = (value: string): value is BookingForSeason =>
+		value === 'Spring' || value === 'Summer' || value === 'Fall' || value === 'Winter';
 	const [isBookingForOpen, setIsBookingForOpen] = useState(false);
 	const bookingForValue = form.watch('bookingFor') || 'Anytime';
+	const bookingForSeasonFromValue = isBookingForSeason(bookingForValue) ? bookingForValue : null;
+	const bookingForTriggerBgClass = bookingForSeasonFromValue
+		? BOOKING_FOR_SEASON_STYLES[bookingForSeasonFromValue].bgClass
+		: 'bg-white';
+	const bookingForTriggerTextClass = bookingForSeasonFromValue
+		? BOOKING_FOR_SEASON_STYLES[bookingForSeasonFromValue].textClass
+		: 'text-black';
 	const setBookingForValue = useCallback(
 		(value: string) => {
 			form.setValue('bookingFor', value);
@@ -1331,14 +1349,27 @@ const SortableAIBlock = ({
 
 																setIsBookingForOpen(true);
 															}}
-															className="min-w-[203px] h-[28px] bg-white rounded-[8px] border-2 border-black inline-flex items-center justify-between gap-2 px-4 whitespace-nowrap"
+															className={cn(
+																'min-w-[203px] h-[28px] rounded-[8px] border-2 border-black inline-flex items-center justify-between gap-2 px-4 whitespace-nowrap',
+																bookingForTriggerBgClass
+															)}
 															aria-haspopup="dialog"
 															aria-expanded={isBookingForOpen}
 														>
-															<span className="font-inter font-normal text-[14px] leading-[14px] text-black whitespace-nowrap">
+															<span
+																className={cn(
+																	'font-inter font-normal text-[14px] leading-[14px] whitespace-nowrap',
+																	bookingForTriggerTextClass
+																)}
+															>
 																Booking For
 															</span>
-															<span className="font-inter font-bold text-[14px] leading-[14px] text-black mr-1 whitespace-nowrap">
+															<span
+																className={cn(
+																	'font-inter font-bold text-[14px] leading-[14px] mr-1 whitespace-nowrap',
+																	bookingForTriggerTextClass
+																)}
+															>
 																{bookingForValue}
 															</span>
 														</button>
@@ -1416,13 +1447,7 @@ const SortableAIBlock = ({
 																	className={cn(
 																		'z-[9999] rounded-[6px]',
 																		bookingForTab === 'Season'
-																			? bookingForSeason === 'Spring'
-																				? 'bg-[#9BD2FF]'
-																				: bookingForSeason === 'Summer'
-																					? 'bg-[#7ADF85]'
-																					: bookingForSeason === 'Fall'
-																						? 'bg-[#D77C2C]'
-																						: 'bg-[#1960AC]'
+																			? BOOKING_FOR_SEASON_STYLES[bookingForSeason].bgClass
 																			: 'bg-[#F5F5F5]',
 																		'border-2 border-black',
 																		'flex flex-col overflow-hidden'
@@ -2040,14 +2065,27 @@ const SortableAIBlock = ({
 
 																setIsBookingForOpen(true);
 															}}
-															className="min-w-[203px] h-[28px] bg-white rounded-[8px] border-2 border-black inline-flex items-center justify-between gap-2 px-4 whitespace-nowrap"
+															className={cn(
+																'min-w-[203px] h-[28px] rounded-[8px] border-2 border-black inline-flex items-center justify-between gap-2 px-4 whitespace-nowrap',
+																bookingForTriggerBgClass
+															)}
 															aria-haspopup="dialog"
 															aria-expanded={isBookingForOpen}
 														>
-															<span className="font-inter font-normal text-[14px] leading-[14px] text-black whitespace-nowrap">
+															<span
+																className={cn(
+																	'font-inter font-normal text-[14px] leading-[14px] whitespace-nowrap',
+																	bookingForTriggerTextClass
+																)}
+															>
 																Booking For
 															</span>
-															<span className="font-inter font-bold text-[14px] leading-[14px] text-black mr-1 whitespace-nowrap">
+															<span
+																className={cn(
+																	'font-inter font-bold text-[14px] leading-[14px] mr-1 whitespace-nowrap',
+																	bookingForTriggerTextClass
+																)}
+															>
 																{bookingForValue}
 															</span>
 														</button>
@@ -2122,13 +2160,7 @@ const SortableAIBlock = ({
 																		className={cn(
 																			'z-[9999] rounded-[6px]',
 																			bookingForTab === 'Season'
-																				? bookingForSeason === 'Spring'
-																					? 'bg-[#9BD2FF]'
-																					: bookingForSeason === 'Summer'
-																						? 'bg-[#7ADF85]'
-																						: bookingForSeason === 'Fall'
-																							? 'bg-[#D77C2C]'
-																							: 'bg-[#1960AC]'
+																				? BOOKING_FOR_SEASON_STYLES[bookingForSeason].bgClass
 																				: 'bg-[#F5F5F5]',
 																			'border-2 border-black',
 																			'flex flex-col overflow-hidden'
