@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import { Navbar } from '@/components/organisms/Navbar/Navbar';
 
 export default function PublicLayout({
@@ -7,7 +8,9 @@ export default function PublicLayout({
 }) {
 	return (
 		<>
-			<Navbar />
+			<Suspense fallback={null}>
+				<Navbar />
+			</Suspense>
 			{children}
 		</>
 	);
