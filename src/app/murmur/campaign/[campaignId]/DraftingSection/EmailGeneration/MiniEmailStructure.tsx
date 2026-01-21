@@ -16,6 +16,7 @@ import { HybridBlock } from '@prisma/client';
 import { cn } from '@/utils';
 import TinyPlusIcon from '@/components/atoms/_svg/TinyPlusIcon';
 import CloseButtonIcon from '@/components/atoms/_svg/CloseButtonIcon';
+import { AUTO_SIGNATURE_LIBRARY, isAutoSignatureValue } from '@/constants/autoSignatures';
 import {
 	FullAutoBodyBlock,
 	type FullAutoProfileFields,
@@ -59,6 +60,12 @@ interface MiniEmailStructureProps {
 	generationProgress?: number;
 	generationTotal?: number;
 	onCancel?: () => void;
+	/** Optional render variant; `settings` is used by Drafts/Sent settings preview panel. */
+	variant?: 'default' | 'settings';
+	/** Settings variant: top contact/name row (left side). */
+	settingsPrimaryLabel?: string;
+	/** Settings variant: top contact/company row (right side). */
+	settingsSecondaryLabel?: string;
 	/** When true, hides the floating top number/label chrome */
 	hideTopChrome?: boolean;
 	/** When true, hides the footer Draft/progress controls */
@@ -114,6 +121,9 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 	generationProgress,
 	generationTotal,
 	onCancel,
+	variant = 'default',
+	settingsPrimaryLabel,
+	settingsSecondaryLabel,
 	hideTopChrome,
 	hideFooter,
 	fullWidthMobile,
@@ -134,7 +144,24 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 	const watchedHybridBlocks = form.watch('hybridBlockPrompts');
 	const hybridBlocks = useMemo(() => watchedHybridBlocks || [], [watchedHybridBlocks]);
 	const isAiSubject = form.watch('isAiSubject');
+	const manualSubjectValue = (form.watch('subject') || '').trim();
 	const signature = form.watch('signature') || '';
+	const isSettingsPanel = variant === 'settings';
+	const isAutoSignatureResolved = useMemo(() => {
+		const normalized = (signature || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
+		if (!normalized) return true;
+		// Legacy heuristic ("Thank you,\n...") still counts as Auto.
+		if (isAutoSignatureValue(normalized)) return true;
+
+		// Draft snapshots store the *resolved* auto signature (random per draft), so treat any
+		// signature whose first line matches the auto library phrases as "Auto Signature".
+		const firstLine = normalized.split('\n')[0]?.trim() || '';
+		if (!firstLine) return false;
+		return AUTO_SIGNATURE_LIBRARY.some((tpl) => {
+			const tplFirstLine = String(tpl).split('\n')[0]?.trim() || '';
+			return tplFirstLine !== '' && tplFirstLine === firstLine;
+		});
+	}, [signature]);
 
 	// Track which tab is active: 'main' (normal email structure) or 'profile'
 	const [activeTab, setActiveTab] = useState<'main' | 'profile'>('main');
@@ -1051,6 +1078,231 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 	const hasTopHeaderSpacer = resolvedTopHeaderHeight > 0;
 	const resolvedPageFillColor = pageFillColor ?? '#A6E2A8';
 
+	const SettingsPanelContent = () => {
+		const primary = (settingsPrimaryLabel ?? '').trim();
+		const secondary = (settingsSecondaryLabel ?? '').trim();
+		const left = primary || secondary;
+		const right = primary && secondary ? secondary : '';
+		const modeLabel =
+			draftingMode === 'ai' ? 'Auto' : draftingMode === 'handwritten' ? 'Manual' : 'Hybrid';
+		const subjectLabel = isAiSubject ? 'Auto Subject' : manualSubjectValue || 'Manual Subject';
+		const signatureLabel = isAutoSignatureResolved
+			? 'Auto Signature'
+			: signature.trim() || 'Manual Signature';
+
+		const subjectTextClass = cn(
+			'font-inter font-medium text-[12px] leading-none truncate',
+			isAiSubject ? 'text-black' : manualSubjectValue ? 'text-black' : 'text-black/40 italic'
+		);
+		const signatureTextClass = cn(
+			'font-inter font-medium text-[12px] leading-none truncate',
+			isAutoSignatureResolved
+				? 'text-black'
+				: signature.trim()
+					? 'text-black'
+					: 'text-black/40 italic'
+		);
+
+		const renderBody = () => {
+			if (draftingMode === 'ai') {
+				const idx = Math.max(0, hybridBlocks.findIndex((b) => b.type === 'full_automated'));
+				return (
+					<FullAutoBodyBlock
+						form={form}
+						fieldIndex={idx}
+						profileFields={profileTabFields}
+						constrainHeight
+						embedded
+						className="!h-[209px] !rounded-none !border-0"
+					/>
+				);
+			}
+
+			if (draftingMode === 'handwritten') {
+				const html = (form.getValues('hybridBlockPrompts.0.value') as string) || '';
+				return (
+					<div className="w-full h-full bg-white">
+						<style>{`
+							[data-mini-settings-manual-body] ul {
+								list-style: disc;
+								padding-left: 1.25rem;
+								margin: 0.5rem 0;
+							}
+							[data-mini-settings-manual-body] ol {
+								list-style: decimal;
+								padding-left: 1.25rem;
+								margin: 0.5rem 0;
+							}
+							[data-mini-settings-manual-body] li {
+								margin: 0.125rem 0;
+							}
+							[data-mini-settings-manual-body] a {
+								color: #0066cc;
+								text-decoration: underline;
+							}
+						`}</style>
+						<div
+							data-mini-settings-manual-body
+							className="h-full w-full px-[10px] py-[8px] font-inter text-[12px] leading-[16px] text-black overflow-y-auto"
+							data-mini-email-scroll="true"
+							dangerouslySetInnerHTML={{
+								__html: html?.trim()
+									? html
+									: '<span style="opacity:0.4;font-style:italic;">No body</span>',
+							}}
+						/>
+					</div>
+				);
+			}
+
+			// Hybrid mode: render collapsed-looking hybrid blocks (like the real UI) instead of "open" cards
+			const borderFor = (t: HybridBlock) => {
+				if (t === 'introduction') return '#6673FF';
+				if (t === 'research') return '#1010E7';
+				if (t === 'action') return '#0E0E7F';
+				return '#000000';
+			};
+			const fillFor = (t: HybridBlock) => {
+				if (t === 'text') return '#A2E2AF';
+				return '#DADAFC';
+			};
+
+			return (
+				<div className="w-full py-2 flex flex-col gap-[7px]">
+					{hybridBlocks.map((b) => {
+						const type = b.type as HybridBlock;
+						return (
+							<div
+								key={b.id}
+								className="rounded-[8px] border-2 overflow-hidden relative w-[93%] ml-[2.5%] h-[26px]"
+								style={{
+									borderColor: borderFor(type),
+									backgroundColor: fillFor(type),
+								}}
+							>
+								<div className="w-full h-full flex items-center justify-between">
+									<div className="flex-1 flex h-full px-3 items-center min-w-0">
+										<span className="font-inter text-[12px] leading-none font-semibold text-black truncate">
+											{blockLabel(type)}
+										</span>
+									</div>
+									<div
+										className="w-[26px] h-full flex items-center justify-center"
+										aria-hidden="true"
+									>
+										<svg
+											width="7"
+											height="5"
+											viewBox="0 0 7 5"
+											fill="none"
+											xmlns="http://www.w3.org/2000/svg"
+										>
+											<path
+												d="M0.796875 0.796875L3.12021 3.34412L5.44355 0.796875"
+												stroke="black"
+												strokeWidth="1.59374"
+												strokeLinecap="round"
+												strokeLinejoin="round"
+											/>
+										</svg>
+									</div>
+								</div>
+							</div>
+						);
+					})}
+				</div>
+			);
+		};
+
+		return (
+			<>
+				{/* Settings header (23px) */}
+				<div
+					className="w-full bg-white rounded-t-[5px] relative overflow-hidden flex items-center px-[9px]"
+					style={{ height: 23 }}
+				>
+					<span className="font-inter font-semibold text-[12px] leading-none text-black truncate">
+						Settings
+					</span>
+				</div>
+				<div className="h-[2px] bg-[#000000] w-full" />
+
+				{/* Name / Company (28px) */}
+				<div
+					className="w-full flex items-center px-[9px]"
+					style={{ height: 28, backgroundColor: '#C1D6FF' }}
+				>
+					<div className="w-full flex items-center justify-between gap-2 min-w-0">
+						<span className="font-inter font-medium text-[12px] leading-none text-black truncate min-w-0">
+							{left || ' '}
+						</span>
+						{right && (
+							<span className="font-inter font-medium text-[12px] leading-none text-black/80 truncate min-w-0">
+								{right}
+							</span>
+						)}
+					</div>
+				</div>
+				<div className="h-[2px] bg-[#000000] w-full" />
+
+				{/* Mode used (27px) */}
+				<div
+					className="w-full flex items-center px-[9px]"
+					style={{ height: 27, backgroundColor: '#DAE6FE' }}
+				>
+					<span className="font-inter font-semibold text-[12px] leading-none text-black truncate">
+						{modeLabel}
+					</span>
+				</div>
+				<div className="h-[2px] bg-[#000000] w-full" />
+
+				{/* Subject (27px) */}
+				<div
+					className="w-full flex items-center px-[9px]"
+					style={{
+						height: 27,
+						backgroundColor: isAiSubject ? '#E0E0E0' : '#FFFFFF',
+					}}
+				>
+					<span className={subjectTextClass}>{subjectLabel}</span>
+				</div>
+				<div className="h-[2px] bg-[#000000] w-full" />
+
+				{/* Body area (209px) */}
+				<div
+					className="w-full overflow-hidden"
+					style={{ height: 209, backgroundColor: resolvedPageFillColor }}
+				>
+					<div className="w-full h-full overflow-y-auto" data-mini-email-scroll="true">
+						{renderBody()}
+					</div>
+				</div>
+				<div className="h-[2px] bg-[#000000] w-full" />
+
+				{/* Signature (29px) - not shown for Manual mode */}
+				{draftingMode !== 'handwritten' && (
+					<>
+						<div
+							className="w-full flex items-center px-[9px]"
+							style={{
+								height: 29,
+								backgroundColor: isAutoSignatureResolved ? '#E0E0E0' : '#FFFFFF',
+							}}
+						>
+							<span className={signatureTextClass}>{signatureLabel}</span>
+						</div>
+
+						{/* Divider under the last row */}
+						<div className="h-[2px] bg-[#000000] w-full" />
+					</>
+				)}
+
+				{/* Remaining fill */}
+				<div className="flex-1" style={{ backgroundColor: '#95CFFF' }} />
+			</>
+		);
+	};
+
 	return (
 		<div
 			ref={rootRef}
@@ -1168,6 +1420,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 						ref={fitContentRef}
 						className={cn(
 							'px-0 pb-3 max-[480px]:pb-2',
+							isSettingsPanel && 'min-h-full flex flex-col pb-0 max-[480px]:pb-0',
 							activeTab === 'profile' && 'min-h-full flex flex-col pb-0 max-[480px]:pb-0',
 							activeTab !== 'profile' &&
 								draftingMode === 'handwritten' &&
@@ -1184,8 +1437,12 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 								: undefined
 						}
 					>
-						{/* Mode */}
-						{hasTopHeaderSpacer && (
+						{isSettingsPanel ? (
+							<SettingsPanelContent />
+						) : (
+							<>
+								{/* Mode */}
+								{hasTopHeaderSpacer && (
 							<>
 								<div
 									className="w-full bg-white rounded-t-[5px] relative overflow-hidden flex items-center px-[9px]"
@@ -1197,9 +1454,9 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 										</span>
 									)}
 								</div>
-								<div className="h-[1px] bg-black w-full" />
+								<div className="h-[2px] bg-[#000000] w-full" />
 							</>
-						)}
+								)}
 						<div
 							className={cn(
 								'w-full bg-white relative overflow-hidden h-[31px]',
@@ -1332,7 +1589,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 								</div>
 							</div>
 						</div>
-						<div className="h-[1px] bg-black w-full" />
+						<div className="h-[2px] bg-[#000000] w-full" />
 
 						{/* Profile Tab (mirrors HybridPromptInput) */}
 						{activeTab === 'profile' ? (
@@ -2513,11 +2770,13 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 								)}
 							</>
 						)}
+							</>
+						)}
 					</div>
 				</div>
 
 				{/* Hybrid mode: keep the + button pinned in the bottom-right corner (desktop) */}
-				{activeTab !== 'profile' && draftingMode === 'hybrid' && (
+				{!isSettingsPanel && activeTab !== 'profile' && draftingMode === 'hybrid' && (
 					<div
 						className={cn(
 							'px-0 pb-2 max-[480px]:hidden',
@@ -2552,7 +2811,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 				)}
 
 				{/* Footer with Draft button */}
-				{!hideFooter && activeTab !== 'profile' && (
+				{!isSettingsPanel && !hideFooter && activeTab !== 'profile' && (
 					<div className="px-0 pb-3">
 						<Button
 							type="button"
@@ -2606,7 +2865,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 					</div>
 				)}
 			</div>
-			{activeTab !== 'profile' && !hideAddTextButtons && !isFitToHeightEnabled && (
+			{!isSettingsPanel && activeTab !== 'profile' && !hideAddTextButtons && !isFitToHeightEnabled && (
 				<div
 					className="absolute top-0 left-[-18px] max-[480px]:-left-[10px] flex flex-col"
 					style={{ pointerEvents: 'none', zIndex: 100 }}

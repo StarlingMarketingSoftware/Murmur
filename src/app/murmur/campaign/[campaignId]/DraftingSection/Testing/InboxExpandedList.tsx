@@ -1,6 +1,6 @@
 'use client';
 
-import { FC, useMemo } from 'react';
+import { FC, useMemo, useState } from 'react';
 import { ContactWithName } from '@/types/contact';
 import { cn } from '@/utils';
 import { ScrollableText } from '@/components/atoms/ScrollableText/ScrollableText';
@@ -201,6 +201,9 @@ export const InboxExpandedList: FC<InboxExpandedListProps> = ({
 	height = 426,
 	whiteSectionHeight: customWhiteSectionHeight,
 }) => {
+	// Track whether the container is being hovered (for bottom view outline)
+	const [isContainerHovered, setIsContainerHovered] = useState(false);
+	
 	// Fetch ALL inbound emails (same as InboxSection)
 	const { data: allInboundEmails } = useGetInboundEmails();
 
@@ -267,11 +270,31 @@ export const InboxExpandedList: FC<InboxExpandedListProps> = ({
 				width: `${width}px`,
 				height: `${height}px`,
 				background: `linear-gradient(to bottom, #ffffff ${whiteSectionHeight}px, #5EB6D6 ${whiteSectionHeight}px)`,
+				...(isBottomView ? { cursor: 'pointer' } : {}),
 			}}
 			data-hover-description="Inbox: Replies and inbound messages from contacts in this campaign."
 			role="region"
 			aria-label="Expanded inbox preview"
+			onMouseEnter={() => isBottomView && setIsContainerHovered(true)}
+			onMouseLeave={() => isBottomView && setIsContainerHovered(false)}
+			onClick={() => isBottomView && onOpenInbox?.()}
 		>
+			{/* Hover outline for bottom view - 3px gap top/bottom, 2px gap sides, 4px thick */}
+			{isBottomView && isContainerHovered && (
+				<div
+					style={{
+						position: 'absolute',
+						top: '-7px',
+						bottom: '-7px',
+						left: '-6px',
+						right: '-6px',
+						border: '4px solid #87B0DE',
+						borderRadius: 0,
+						pointerEvents: 'none',
+						zIndex: 50,
+					}}
+				/>
+			)}
 			{/* Header row (no explicit divider; let the background change from white to blue like the main table) */}
 			<InboxHeaderChrome isAllTab={isAllTab} whiteSectionHeight={customWhiteSectionHeight} />
 			<div

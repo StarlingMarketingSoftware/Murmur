@@ -22,6 +22,7 @@ import { X } from 'lucide-react';
 import { DraftingFormValues } from '@/app/murmur/campaign/[campaignId]/DraftingSection/useDraftingSection';
 import { HybridBlock, Identity } from '@prisma/client';
 import { HybridPromptInputProps, useHybridPromptInput } from './useHybridPromptInput';
+import { WriteTabChromeHeader } from './WriteTabChromeHeader';
 import { cn } from '@/utils';
 import { DEFAULT_FONT, FONT_OPTIONS } from '@/constants/ui';
 import React, {
@@ -268,60 +269,72 @@ const SortableAIBlock = ({
 	}, [bookingForTab]);
 	const updateBookingForDropdownPosition = useCallback(() => {
 		if (typeof window === 'undefined') return;
-		const anchor = bookingForButtonRef.current;
-		if (!anchor) return;
+		// Use the container's position to match static positioning (which uses left: 0 relative to container)
+		const container = bookingForContainerRef.current;
+		const button = bookingForButtonRef.current;
+		if (!container || !button) return;
 
-		const rect = anchor.getBoundingClientRect();
+		// Get the page zoom factor. Murmur uses `zoom: 0.9` (or similar) on <html>.
+		// getBoundingClientRect() returns zoomed coordinates, but position: fixed uses unzoomed.
+		// We need to divide by zoom to convert.
+		const getZoomFactor = (): number => {
+			const html = document.documentElement;
+			const computed = window.getComputedStyle(html);
+			const zoom = computed.zoom;
+			if (zoom && zoom !== 'normal') {
+				const zoomValue = parseFloat(zoom);
+				if (Number.isFinite(zoomValue) && zoomValue > 0) return zoomValue;
+			}
+			return 1;
+		};
+		const zoom = getZoomFactor();
+
+		const containerRect = container.getBoundingClientRect();
+		const buttonRect = button.getBoundingClientRect();
 		const margin = 6;
 		const viewportPadding = 8;
-		const offsetX = 85;
-		const offsetY = 45;
-		const calendarNudgeX = 100;
 
-		let left =
-			bookingForTab === 'Calendar'
-				? (window.innerWidth - bookingForDropdownSize.width) / 2 + calendarNudgeX
-				: rect.left + offsetX;
-		let top = rect.bottom + margin + offsetY;
+		// For Calendar, we want the tabs CENTERED in the Calendar box,
+		// but the whole Calendar shifted left so those centered tabs roughly align with Anytime/Season tabs.
+		// 
+		// Anytime/Season (317px): tabs (284px) centered = tab center at 158.5px from dropdown left
+		// Calendar (829px): tabs centered = tab center at 414.5px from dropdown left
+		// Base shift: (414.5 - 158.5) = 256px, but we offset 20px right for better visual balance
+		const tabStripWidth = 284;
+		const narrowDropdownWidth = 317;
+		const calendarWidth = bookingForDropdownSize.width; // 829
+		const narrowTabCenter = narrowDropdownWidth / 2; // 158.5
+		const calendarTabCenter = calendarWidth / 2; // 414.5
+		const calendarShift = calendarTabCenter - narrowTabCenter - 20; // 236 (20px less shift = 20px right)
 
-		const maxLeft = Math.max(
-			viewportPadding,
-			window.innerWidth - bookingForDropdownSize.width - viewportPadding
-		);
-		left = Math.min(Math.max(left, viewportPadding), maxLeft);
+		// Convert zoomed coordinates to unzoomed for fixed positioning
+		const baseLeft = containerRect.left / zoom;
+		let left = bookingForTab === 'Calendar' ? baseLeft - calendarShift : baseLeft;
+		let top = (buttonRect.bottom + margin) / zoom;
 
-		// In Calendar mode, the dropdown is much wider and centered, which makes the internal
-		// tab strip appear to "jump" horizontally vs. Anytime/Season. Compute a Calendar-only
-		// left padding so the strip sits in the same global X position as the narrow dropdown.
+		// Make sure it doesn't overflow viewport edges (in unzoomed coordinates)
+		const viewportWidth = window.innerWidth / zoom;
+		const viewportHeight = window.innerHeight / zoom;
+		const maxLeft = Math.max(viewportPadding, viewportWidth - bookingForDropdownSize.width - viewportPadding);
+		left = Math.min(left, maxLeft);
+		left = Math.max(left, viewportPadding);
+
+		// For Calendar, adjust tab position to compensate for the 20px right shift of the box.
+		// Tabs centered in Calendar would be at (829-284)/2 = 272.5px from Calendar left.
+		// To shift tabs 20px LEFT (to align with Anytime/Season), use paddingLeft of 272.5 - 20 = 252.5px
 		if (bookingForTab === 'Calendar') {
-			const tabStripWidth = 284;
-			const narrowDropdownWidth = 317;
-			const tabStripLeftInNarrowDropdown = (narrowDropdownWidth - tabStripWidth) / 2; // 16.5
-			const desiredTabStripLeftGlobal = rect.left + offsetX + tabStripLeftInNarrowDropdown;
-			let tabStripLeftInDropdown = desiredTabStripLeftGlobal - left;
-
-			// Keep it within the Calendar dropdown bounds.
-			const tabStripPadding = 8;
-			const minTabStripLeft = tabStripPadding;
-			const maxTabStripLeft = Math.max(
-				minTabStripLeft,
-				bookingForDropdownSize.width - tabStripWidth - tabStripPadding
-			);
-			tabStripLeftInDropdown = Math.min(
-				Math.max(tabStripLeftInDropdown, minTabStripLeft),
-				maxTabStripLeft
-			);
-
-			setBookingForTabStripLeft(Math.round(tabStripLeftInDropdown));
+			const centeredTabsLeft = (calendarWidth - tabStripWidth) / 2; // 272.5
+			setBookingForTabStripLeft(Math.round(centeredTabsLeft - 20)); // 252.5, shifts tabs 20px left of center
 		} else {
 			setBookingForTabStripLeft(null);
 		}
 
+		// Check if would overflow bottom, flip above if possible
 		const wouldOverflowBottom =
-			top + bookingForDropdownSize.height > window.innerHeight - viewportPadding;
-		const canOpenAbove = rect.top - margin - bookingForDropdownSize.height >= viewportPadding;
+			top + bookingForDropdownSize.height > viewportHeight - viewportPadding;
+		const canOpenAbove = buttonRect.top / zoom - margin - bookingForDropdownSize.height >= viewportPadding;
 		if (wouldOverflowBottom && canOpenAbove) {
-			top = rect.top - margin - bookingForDropdownSize.height - offsetY;
+			top = buttonRect.top / zoom - margin - bookingForDropdownSize.height;
 		}
 
 		setBookingForDropdownPosition({
@@ -1331,11 +1344,11 @@ const SortableAIBlock = ({
 														</button>
 
 														{isBookingForOpen &&
-														(useStaticDropdownPosition || bookingForDropdownPosition) &&
+														(bookingForDropdownPosition || bookingForTab !== 'Calendar') &&
 														(() => {
-															// Use static positioning only for Anytime/Season (small dropdowns).
-															// Calendar is too wide (829px) and gets clipped by overflow-x-hidden ancestors.
-															const useStatic = useStaticDropdownPosition && bookingForTab !== 'Calendar';
+															// Anytime/Season use static (absolute) positioning - they fit in the container.
+															// Calendar uses portal with fixed positioning so it's not clipped by overflow.
+															const useStatic = bookingForTab !== 'Calendar';
 															
 															// For Calendar in landing page mode, calculate position to align tabs with button
 															// Note: In landing mode the entire HybridPromptInput panel is scaled down (see `LandingDraftingDemo`).
@@ -1352,26 +1365,24 @@ const SortableAIBlock = ({
 																const scale = scaledWidth / unscaledWidth;
 																return Number.isFinite(scale) && scale > 0 ? scale : 1;
 															})();
-															// Small aesthetic nudge: move the (wide) Calendar box a bit right,
-															// while keeping the tab strip aligned to the narrow dropdown.
-															const calendarBoxNudgeX = 32;
+															// For landing page, position Calendar so centered tabs align with Anytime/Season tabs.
+															// With transformOrigin: 'top left', the left edge stays in place during scaling.
 															const getCalendarLandingPosition = () => {
 																if (!useStaticDropdownPosition || bookingForTab !== 'Calendar') {
 																	return null;
 																}
 																const containerRect = bookingForContainerRef.current?.getBoundingClientRect();
 																if (!containerRect) return null;
-																const seasonWidth = 317;
-																const calendarWidth = bookingForDropdownSize.width; // 829
+																
+																// Anytime/Season tabs are centered in 317px at 16.5px from dropdown left
+																// Calendar tabs are centered in 829px at 272.5px from dropdown left
+																// To align: Calendar left = container left - (272.5 - 16.5) = container left - 256
+																// Fine-tuned to 250px for better visual alignment
+																const tabsAlignShift = 250 * landingScale;
+																
 																return {
-																	// Match the scaled spacing of the in-panel (non-portaled) dropdown.
 																	top: containerRect.bottom + 6 * landingScale,
-																	// Align the (scaled) Calendar dropdown's right edge to the (scaled) narrow dropdown's right edge.
-																	left:
-																		containerRect.left +
-																		seasonWidth * landingScale -
-																		calendarWidth +
-																		calendarBoxNudgeX,
+																	left: containerRect.left - tabsAlignShift,
 																};
 															};
 															const calendarPos = getCalendarLandingPosition();
@@ -1398,7 +1409,7 @@ const SortableAIBlock = ({
 																					// Scale down Calendar in landing page mode to match the scaled container
 																					...(useStaticDropdownPosition && bookingForTab === 'Calendar' ? {
 																						transform: `scale(${landingScale})`,
-																						transformOrigin: 'top right',
+																						transformOrigin: 'top left',
 																					} : {}),
 																			  }
 																	}
@@ -1434,22 +1445,11 @@ const SortableAIBlock = ({
 																	<div
 																		className={cn(
 																			'relative z-[1] h-full flex items-center',
-																			bookingForTab === 'Calendar' && bookingForTabStripLeft != null && !useStaticDropdownPosition
-																				? 'justify-start'
-																				: bookingForTab === 'Calendar' && useStaticDropdownPosition
-																					? 'justify-end'
-																					: 'justify-center'
+																			// On landing page (useStaticDropdownPosition), always center tabs
+																			// On campaign page, use paddingLeft to align tabs
+																			!useStaticDropdownPosition && bookingForTabStripLeft != null ? 'justify-start' : 'justify-center'
 																		)}
-																		style={
-																			bookingForTab === 'Calendar' && !useStaticDropdownPosition && bookingForTabStripLeft != null
-																				? { paddingLeft: bookingForTabStripLeft }
-																				: bookingForTab === 'Calendar' && useStaticDropdownPosition
-																					? {
-																							// Keep tabs aligned even though we nudged the container right.
-																							paddingRight: 16.5 + calendarBoxNudgeX / landingScale,
-																					  }
-																					: undefined
-																		}
+																		style={!useStaticDropdownPosition && bookingForTabStripLeft != null ? { paddingLeft: bookingForTabStripLeft } : undefined}
 																	>
 																		<div className="w-[284px] grid grid-cols-3 items-center gap-[8px]">
 																			{(['Anytime', 'Season', 'Calendar'] as const).map(
@@ -1834,7 +1834,10 @@ const SortableAIBlock = ({
 														return useStatic
 															? dropdownContent
 															: typeof document !== 'undefined'
-																? createPortal(dropdownContent, document.body)
+																// Portal to <html> instead of <body> because Murmur uses
+																// body { transform: scale() } on Firefox, which would offset
+																// position: fixed children.
+																? createPortal(dropdownContent, document.documentElement)
 																: null;
 													})()}
 													</div>
@@ -2050,11 +2053,11 @@ const SortableAIBlock = ({
 														</button>
 
 														{isBookingForOpen &&
-															(useStaticDropdownPosition || bookingForDropdownPosition) &&
+															(bookingForDropdownPosition || bookingForTab !== 'Calendar') &&
 															(() => {
-																// Use static positioning only for Anytime/Season (small dropdowns).
-																// Calendar is too wide (829px) and gets clipped by overflow-x-hidden ancestors.
-																const useStatic2 = useStaticDropdownPosition && bookingForTab !== 'Calendar';
+																// Anytime/Season use static (absolute) positioning - they fit in the container.
+																// Calendar uses portal with fixed positioning so it's not clipped by overflow.
+																const useStatic2 = bookingForTab !== 'Calendar';
 																
 																// For Calendar in landing page mode, calculate position to align tabs with button
 																// See comment in the other Booking For render path for why this needs
@@ -2068,22 +2071,24 @@ const SortableAIBlock = ({
 																	const scale = scaledWidth / unscaledWidth;
 																	return Number.isFinite(scale) && scale > 0 ? scale : 1;
 																})();
-																const calendarBoxNudgeX2 = 32;
+																// For landing page, position Calendar so centered tabs align with Anytime/Season tabs.
+																// With transformOrigin: 'top left', the left edge stays in place during scaling.
 																const getCalendarLandingPosition2 = () => {
 																	if (!useStaticDropdownPosition || bookingForTab !== 'Calendar') {
 																		return null;
 																	}
 																	const containerRect = bookingForContainerRef.current?.getBoundingClientRect();
 																	if (!containerRect) return null;
-																	const seasonWidth = 317;
-																	const calendarWidth = bookingForDropdownSize.width; // 829
+																	
+																	// Anytime/Season tabs are centered in 317px at 16.5px from dropdown left
+																	// Calendar tabs are centered in 829px at 272.5px from dropdown left
+																	// To align: Calendar left = container left - (272.5 - 16.5) = container left - 256
+																	// Fine-tuned to 250px for better visual alignment
+																	const tabsAlignShift = 250 * landingScale2;
+																	
 																	return {
 																		top: containerRect.bottom + 6 * landingScale2,
-																		left:
-																			containerRect.left +
-																			seasonWidth * landingScale2 -
-																			calendarWidth +
-																			calendarBoxNudgeX2,
+																		left: containerRect.left - tabsAlignShift,
 																	};
 																};
 																const calendarPos2 = getCalendarLandingPosition2();
@@ -2110,7 +2115,7 @@ const SortableAIBlock = ({
 																						// Scale down Calendar in landing page mode to match the scaled container
 																						...(useStaticDropdownPosition && bookingForTab === 'Calendar' ? {
 																							transform: `scale(${landingScale2})`,
-																							transformOrigin: 'top right',
+																							transformOrigin: 'top left',
 																						} : {}),
 																				  }
 																		}
@@ -2146,21 +2151,11 @@ const SortableAIBlock = ({
 																		<div
 																			className={cn(
 																				'relative z-[1] h-full flex items-center',
-																				bookingForTab === 'Calendar' && bookingForTabStripLeft != null && !useStaticDropdownPosition
-																					? 'justify-start'
-																					: bookingForTab === 'Calendar' && useStaticDropdownPosition
-																						? 'justify-end'
-																						: 'justify-center'
+																				// On landing page (useStaticDropdownPosition), always center tabs
+																				// On campaign page, use paddingLeft to align tabs
+																				!useStaticDropdownPosition && bookingForTabStripLeft != null ? 'justify-start' : 'justify-center'
 																			)}
-																			style={
-																				bookingForTab === 'Calendar' && !useStaticDropdownPosition && bookingForTabStripLeft != null
-																					? { paddingLeft: bookingForTabStripLeft }
-																					: bookingForTab === 'Calendar' && useStaticDropdownPosition
-																						? {
-																								paddingRight: 16.5 + calendarBoxNudgeX2 / landingScale2,
-																						  }
-																						: undefined
-																			}
+																			style={!useStaticDropdownPosition && bookingForTabStripLeft != null ? { paddingLeft: bookingForTabStripLeft } : undefined}
 																		>
 																			<div className="w-[284px] grid grid-cols-3 items-center gap-[8px]">
 																				{(['Anytime', 'Season', 'Calendar'] as const).map(
@@ -2537,7 +2532,10 @@ const SortableAIBlock = ({
 															return useStatic2
 																? dropdownContent2
 																: typeof document !== 'undefined'
-																	? createPortal(dropdownContent2, document.body)
+																	// Portal to <html> instead of <body> because Murmur uses
+																	// body { transform: scale() } on Firefox, which would offset
+																	// position: fixed children.
+																	? createPortal(dropdownContent2, document.documentElement)
 																	: null;
 														})()}
 													</div>
@@ -2671,6 +2669,11 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		hideDraftButton,
 		useStaticDropdownPosition,
 		hideMobileStickyTestFooter,
+		hideGenerateTestButton,
+		containerHeightPx,
+		dataCampaignMainBox,
+		onGoToContacts,
+		onGoToInbox,
 	} = props;
 
 	// Track if the user has attempted to Test to control error styling
@@ -3825,6 +3828,30 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		}
 	};
 
+	const handleClearAllProfileFields = () => {
+		// Close any expanded field (we are clearing values)
+		setExpandedProfileBox(null);
+
+		// Name is required; keep it and clear the rest.
+		setProfileFields((prev) => ({
+			...prev,
+			genre: '',
+			area: '',
+			band: '',
+			bio: '',
+			links: '',
+		}));
+
+		if (!onIdentityUpdate || !identityProfile) return;
+		onIdentityUpdate({
+			genre: '',
+			area: '',
+			bandName: '',
+			bio: '',
+			website: '',
+		});
+	};
+
 	// Save any expanded profile field when switching away from profile tab
 	useEffect(() => {
 		if (activeTab !== 'profile' && expandedProfileBox) {
@@ -4062,13 +4089,30 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 					>
 						<div
 							ref={mainContainerRef}
-							className={`${
+							className={cn(
 								compactLeftOnly
 									? 'flex-col'
-									: 'w-[96.27vw] max-w-[499px] h-[703px] transition flex mx-auto flex-col border-[3px] border-transparent rounded-[8px] bg-[#A6E2A8]'
-							} relative overflow-visible isolate`}
-							style={!compactLeftOnly ? { backgroundColor: '#A6E2A8' } : undefined}
-							data-campaign-main-box={compactLeftOnly ? undefined : 'writing'}
+									: cn(
+											'w-[96.27vw] max-w-[499px] transition flex mx-auto flex-col border-[3px] border-transparent rounded-[8px] bg-[#A6E2A8]',
+											containerHeightPx ? null : 'h-[703px]'
+									  ),
+								'relative overflow-visible isolate'
+							)}
+							style={
+								!compactLeftOnly
+									? {
+											backgroundColor: '#A6E2A8',
+											...(containerHeightPx ? { height: `${containerHeightPx}px` } : {}),
+									  }
+									: undefined
+							}
+							data-campaign-main-box={
+								compactLeftOnly
+									? undefined
+									: dataCampaignMainBox === undefined
+										? 'writing'
+										: dataCampaignMainBox || undefined
+							}
 							data-hover-description={hoverDescription}
 							data-hpi-container
 							onFocus={handleContainerFocus}
@@ -4076,6 +4120,14 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 							onMouseEnter={() => onHoverChange?.(true)}
 							onMouseLeave={() => onHoverChange?.(false)}
 						>
+							{/* Write tab chrome header (pill + dots) */}
+							{!isMobile && !compactLeftOnly && (
+								<WriteTabChromeHeader
+									onContactsClick={onGoToContacts}
+									onDraftsClick={onGoToDrafting}
+									onInboxClick={onGoToInbox}
+								/>
+							)}
 							{/* Border overlay to ensure crisp, unbroken stroke at rounded corners */}
 							{!compactLeftOnly && (
 								<div
@@ -4433,7 +4485,10 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 									</div>
 								<div
 									className={cn(
-										'flex-1 min-h-0 flex flex-col overflow-y-auto hide-native-scrollbar relative',
+										'flex-1 min-h-0 flex flex-col hide-native-scrollbar relative',
+										props.clipProfileTabOverflow && activeTab === 'profile'
+											? 'overflow-y-hidden'
+											: 'overflow-y-auto',
 										shouldEnableHybridPlusGutter && 'w-[calc(100%_+_90px)] -mr-[90px]'
 									)}
 									data-hpi-content
@@ -4457,234 +4512,479 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 													</span>
 												</div>
 											</div>
-											{/* Blue fill starts under the second divider */}
-											<div className="flex-1 bg-[#58A6E5] relative flex flex-col">
-												{/* Top-right indicator line (15x2px) */}
-												<button
-													type="button"
-													aria-label="Back to Auto"
-													onClick={() => {
-														setActiveTab('main');
-														setHasLeftProfileTab(true);
-														switchToFull();
-													}}
-													className="absolute top-[14px] right-[14px] w-[15px] h-[2px] bg-black cursor-pointer p-0 border-0 focus:outline-none"
+											{/* Body container (380px tall) - positioned 64px below the score line */}
+											<div className="flex-1 bg-[#92CE94] relative flex flex-col">
+												{/* Green top space box (122 x 34) */}
+												<div
+													aria-hidden="true"
+													className="absolute left-[15px] top-[14px] w-[122px] h-[34px] rounded-[8px] border-2 border-black bg-[#84CB86]"
 												/>
-												<div className="pt-[54px] pr-3 pb-0 pl-3 flex flex-col gap-[18px] items-center flex-1">
-											<div
-												ref={expandedProfileBox === 'name' ? expandedProfileBoxRef : undefined}
-												className={cn(
-													"w-[468px] flex flex-col rounded-[8px] border-[3px] border-black cursor-pointer overflow-hidden",
-													expandedProfileBox === 'name' ? 'h-[68px]' : 'h-[34px]'
-												)}
-												onClick={() => handleProfileBoxToggle('name')}
-											>
-												<div
-													className="h-[34px] flex items-center px-3 font-inter text-[14px] font-semibold truncate"
-													style={{ backgroundColor: getProfileHeaderBg('name') }}
-												>
-													{getProfileHeaderText('name', 'Name', 'Enter your Name')}
-												</div>
-												{expandedProfileBox === 'name' && (
-													<input
-														type="text"
-														className="h-[34px] bg-white px-3 font-inter text-[14px] outline-none border-0"
-														value={profileFields.name}
-														onChange={(e) => setProfileFields({ ...profileFields, name: e.target.value })}
-														onBlur={() => handleProfileFieldBlur('name')}
-														onKeyDown={(e) => {
-															if (e.key === 'Enter') {
-																e.preventDefault();
-																handleProfileFieldEnter('name');
-															}
-														}}
-														onClick={(e) => e.stopPropagation()}
-														placeholder=""
-														autoFocus
-													/>
-												)}
-											</div>
-											<div
-												ref={expandedProfileBox === 'genre' ? expandedProfileBoxRef : undefined}
-												className={cn(
-													"w-[468px] flex flex-col rounded-[8px] border-[3px] border-black cursor-pointer overflow-hidden",
-													expandedProfileBox === 'genre' ? 'h-[68px]' : 'h-[34px]'
-												)}
-												onClick={() => handleProfileBoxToggle('genre')}
-											>
-												<div
-													className="h-[34px] flex items-center px-3 font-inter text-[14px] font-semibold truncate"
-													style={{ backgroundColor: getProfileHeaderBg('genre') }}
-												>
-													{getProfileHeaderText('genre', 'Genre', 'Enter your Genre')}
-												</div>
-												{expandedProfileBox === 'genre' && (
-													<input
-														type="text"
-														className="h-[34px] bg-white px-3 font-inter text-[14px] outline-none border-0"
-														value={profileFields.genre}
-														onChange={(e) => setProfileFields({ ...profileFields, genre: e.target.value })}
-														onBlur={() => handleProfileFieldBlur('genre')}
-														onKeyDown={(e) => {
-															if (e.key === 'Enter') {
-																e.preventDefault();
-																handleProfileFieldEnter('genre');
-															}
-														}}
-														onClick={(e) => e.stopPropagation()}
-														placeholder=""
-														autoFocus
-													/>
-												)}
-											</div>
-											<div
-												ref={expandedProfileBox === 'area' ? expandedProfileBoxRef : undefined}
-												className={cn(
-													"w-[468px] flex flex-col rounded-[8px] border-[3px] border-black cursor-pointer overflow-hidden",
-													expandedProfileBox === 'area' ? 'h-[68px]' : 'h-[34px]'
-												)}
-												onClick={() => handleProfileBoxToggle('area')}
-											>
-												<div
-													className="h-[34px] flex items-center px-3 font-inter text-[14px] font-semibold truncate"
-													style={{ backgroundColor: getProfileHeaderBg('area') }}
-												>
-													{getProfileHeaderText('area', 'Area', 'Enter your Area')}
-												</div>
-												{expandedProfileBox === 'area' && (
-													<input
-														type="text"
-														className="h-[34px] bg-white px-3 font-inter text-[14px] outline-none border-0"
-														value={profileFields.area}
-														onChange={(e) => setProfileFields({ ...profileFields, area: e.target.value })}
-														onBlur={() => handleProfileFieldBlur('area')}
-														onKeyDown={(e) => {
-															if (e.key === 'Enter') {
-																e.preventDefault();
-																handleProfileFieldEnter('area');
-															}
-														}}
-														onClick={(e) => e.stopPropagation()}
-														placeholder=""
-														autoFocus
-													/>
-												)}
-											</div>
-											<div
-												ref={expandedProfileBox === 'band' ? expandedProfileBoxRef : undefined}
-												className={cn(
-													"w-[468px] flex flex-col rounded-[8px] border-[3px] border-black cursor-pointer overflow-hidden",
-													expandedProfileBox === 'band' ? 'h-[68px]' : 'h-[34px]'
-												)}
-												onClick={() => handleProfileBoxToggle('band')}
-											>
-												<div
-													className="h-[34px] flex items-center px-3 font-inter text-[14px] font-semibold truncate"
-													style={{ backgroundColor: getProfileHeaderBg('band') }}
-												>
-													{getProfileHeaderText(
-														'band',
-														'Band/Artist Name',
-														'Enter your Band/Artist Name'
-													)}
-												</div>
-												{expandedProfileBox === 'band' && (
-													<input
-														type="text"
-														className="h-[34px] bg-white px-3 font-inter text-[14px] outline-none border-0"
-														value={profileFields.band}
-														onChange={(e) => setProfileFields({ ...profileFields, band: e.target.value })}
-														onBlur={() => handleProfileFieldBlur('band')}
-														onKeyDown={(e) => {
-															if (e.key === 'Enter') {
-																e.preventDefault();
-																handleProfileFieldEnter('band');
-															}
-														}}
-														onClick={(e) => e.stopPropagation()}
-														placeholder=""
-														autoFocus
-													/>
-												)}
-											</div>
-											<div
-												ref={expandedProfileBox === 'bio' ? expandedProfileBoxRef : undefined}
-												className={cn(
-													"w-[468px] flex flex-col rounded-[8px] border-[3px] border-black cursor-pointer overflow-hidden",
-													expandedProfileBox === 'bio' ? 'h-[68px]' : 'h-[34px]'
-												)}
-												onClick={() => handleProfileBoxToggle('bio')}
-											>
-												<div
-													className="h-[34px] flex items-center px-3 font-inter text-[14px] font-semibold truncate"
-													style={{ backgroundColor: getProfileHeaderBg('bio') }}
-												>
-													{getProfileHeaderText('bio', 'Bio', 'Enter your Bio')}
-												</div>
-												{expandedProfileBox === 'bio' && (
-													<input
-														type="text"
-														className="h-[34px] bg-white px-3 font-inter text-[14px] outline-none border-0"
-														value={profileFields.bio}
-														onChange={(e) => setProfileFields({ ...profileFields, bio: e.target.value })}
-														onBlur={() => handleProfileFieldBlur('bio')}
-														onKeyDown={(e) => {
-															if (e.key === 'Enter') {
-																e.preventDefault();
-																handleProfileFieldEnter('bio');
-															}
-														}}
-														onClick={(e) => e.stopPropagation()}
-														placeholder=""
-														autoFocus
-													/>
-												)}
-											</div>
-											<div
-												ref={expandedProfileBox === 'links' ? expandedProfileBoxRef : undefined}
-												className={cn(
-													"w-[468px] flex flex-col rounded-[8px] border-[3px] border-black cursor-pointer overflow-hidden",
-													expandedProfileBox === 'links' ? 'h-[68px]' : 'h-[34px]'
-												)}
-												onClick={() => handleProfileBoxToggle('links')}
-											>
-												<div
-													className="h-[34px] flex items-center px-3 font-inter text-[14px] font-semibold truncate"
-													style={{ backgroundColor: getProfileHeaderBg('links') }}
-												>
-													{getProfileHeaderText('links', 'Links', 'Enter your Links')}
-												</div>
-												{expandedProfileBox === 'links' && (
-													<input
-														type="text"
-														className="h-[34px] bg-white px-3 font-inter text-[14px] outline-none border-0"
-														value={profileFields.links}
-														onChange={(e) => setProfileFields({ ...profileFields, links: e.target.value })}
-														onBlur={() => handleProfileFieldBlur('links')}
-														onKeyDown={(e) => {
-															if (e.key === 'Enter') {
-																e.preventDefault();
-																handleProfileFieldEnter('links');
-															}
-														}}
-														onClick={(e) => e.stopPropagation()}
-														placeholder=""
-														autoFocus
-													/>
-												)}
-											</div>
-												</div>
-												<div className="absolute left-0 right-0 bottom-[139px] flex justify-center">
-													<button
-														type="button"
-														onClick={() => {
-															setActiveTab('main');
-															setHasLeftProfileTab(true);
-														}}
-														className="w-[136px] h-[26px] rounded-[6px] bg-[#C8C8C8] text-white font-inter font-medium text-[15px] leading-none flex items-center justify-center cursor-pointer"
+												<div className="w-full mt-[64px]">
+													<div
+														className={cn(
+															'relative w-full bg-[#4597DA] border-t-[3px] border-b-[3px] border-black rounded-[8px] overflow-hidden flex flex-col',
+															expandedProfileBox ? 'h-[414px]' : 'h-[380px]'
+														)}
 													>
-														back to writing
-													</button>
+														{/* Header band (30px fill + 3px divider) */}
+														<div className="shrink-0 h-[33px] bg-[#95CFFF] border-b-[3px] border-black flex items-center">
+															<span className="pl-4 font-inter font-semibold text-[15px] leading-none text-black">
+																Body
+															</span>
+															{/* Right controls: divider @ 138px from right, "Clear all" segment (89px), divider @ 49px from right */}
+															<div className="ml-auto flex items-stretch h-full">
+																<button
+																	type="button"
+																	onClick={handleClearAllProfileFields}
+																	className="w-[89px] shrink-0 h-full bg-[#58A6E5] border-l-[3px] border-black flex items-center justify-center font-inter font-semibold text-[13px] leading-none text-black cursor-pointer p-0 border-0 focus:outline-none focus-visible:outline-none"
+																>
+																	Clear all
+																</button>
+																<div className="w-[49px] shrink-0 border-l-[3px] border-black" />
+															</div>
+														</div>
+
+														{/* Top-right "-" button (positioned in the main Body area, not the header strip) */}
+														<button
+															type="button"
+															aria-label="Back to Auto"
+															onClick={() => {
+																setActiveTab('main');
+																setHasLeftProfileTab(true);
+																switchToFull();
+															}}
+															className="absolute right-[14px] top-[43px] w-[15px] h-[2px] bg-black cursor-pointer p-0 border-0 focus:outline-none"
+														/>
+
+														{/* Profile fields live inside the 380px Body container */}
+														<div className="flex-1 min-h-0 overflow-y-auto hide-native-scrollbar">
+															<div className="px-3 pt-[14px] pb-[14px] flex flex-col gap-[18px]">
+																<div
+																	ref={
+																		expandedProfileBox === 'name'
+																			? expandedProfileBoxRef
+																			: undefined
+																	}
+																	className={cn(
+																		'w-[413px] max-w-full mx-auto flex flex-col rounded-[8px] border-[3px] border-black cursor-pointer overflow-hidden',
+																		expandedProfileBox === 'name' ? 'h-[68px]' : 'h-[34px]'
+																	)}
+																	onClick={() => handleProfileBoxToggle('name')}
+																>
+																	<div
+																		className="h-[34px] flex items-center font-inter text-[14px] font-semibold overflow-hidden"
+																		style={{ backgroundColor: getProfileHeaderBg('name') }}
+																	>
+																		{expandedProfileBox !== 'name' &&
+																		profileFields.name.trim() ? (
+																			<div className="flex items-stretch w-full h-full">
+																				<div className="w-[20px] shrink-0" />
+																				<div className="w-[3px] bg-black" />
+																				<div className="min-w-0 max-w-[calc(100%_-_46px)] bg-[#E5EEE6] h-full flex items-center px-4">
+																					<span className="truncate">
+																						{profileFields.name.trim()}
+																					</span>
+																				</div>
+																				<div className="w-[3px] bg-black" />
+																				<div className="min-w-[20px] flex-1" />
+																			</div>
+																		) : (
+																			<div className="w-full px-3 truncate">
+																				{getProfileHeaderText(
+																					'name',
+																					'Name',
+																					'Enter your Name'
+																				)}
+																			</div>
+																		)}
+																	</div>
+																	{expandedProfileBox === 'name' && (
+																		<input
+																			type="text"
+																			className="h-[34px] bg-white px-3 font-inter text-[14px] outline-none border-0"
+																			value={profileFields.name}
+																			onChange={(e) =>
+																				setProfileFields({
+																					...profileFields,
+																					name: e.target.value,
+																				})
+																			}
+																			onBlur={() => handleProfileFieldBlur('name')}
+																			onKeyDown={(e) => {
+																				if (e.key === 'Enter') {
+																					e.preventDefault();
+																					handleProfileFieldEnter('name');
+																				}
+																			}}
+																			onClick={(e) => e.stopPropagation()}
+																			placeholder=""
+																			autoFocus
+																		/>
+																	)}
+																</div>
+
+																<div
+																	ref={
+																		expandedProfileBox === 'genre'
+																			? expandedProfileBoxRef
+																			: undefined
+																	}
+																	className={cn(
+																		'w-[413px] max-w-full mx-auto flex flex-col rounded-[8px] border-[3px] border-black cursor-pointer overflow-hidden',
+																		expandedProfileBox === 'genre' ? 'h-[68px]' : 'h-[34px]'
+																	)}
+																	onClick={() => handleProfileBoxToggle('genre')}
+																>
+																	<div
+																		className="h-[34px] flex items-center font-inter text-[14px] font-semibold overflow-hidden"
+																		style={{ backgroundColor: getProfileHeaderBg('genre') }}
+																	>
+																		{expandedProfileBox !== 'genre' &&
+																		profileFields.genre.trim() ? (
+																			<div className="flex items-stretch w-full h-full">
+																				<div className="w-[20px] shrink-0" />
+																				<div className="w-[3px] bg-black" />
+																				<div className="min-w-0 max-w-[calc(100%_-_46px)] bg-[#E5EEE6] h-full flex items-center px-4">
+																					<span className="truncate">
+																						{profileFields.genre.trim()}
+																					</span>
+																				</div>
+																				<div className="w-[3px] bg-black" />
+																				<div className="min-w-[20px] flex-1" />
+																			</div>
+																		) : (
+																			<div className="w-full px-3 truncate">
+																				{getProfileHeaderText(
+																					'genre',
+																					'Genre',
+																					'Enter your Genre'
+																				)}
+																			</div>
+																		)}
+																	</div>
+																	{expandedProfileBox === 'genre' && (
+																		<input
+																			type="text"
+																			className="h-[34px] bg-white px-3 font-inter text-[14px] outline-none border-0"
+																			value={profileFields.genre}
+																			onChange={(e) =>
+																				setProfileFields({
+																					...profileFields,
+																					genre: e.target.value,
+																				})
+																			}
+																			onBlur={() => handleProfileFieldBlur('genre')}
+																			onKeyDown={(e) => {
+																				if (e.key === 'Enter') {
+																					e.preventDefault();
+																					handleProfileFieldEnter('genre');
+																				}
+																			}}
+																			onClick={(e) => e.stopPropagation()}
+																			placeholder=""
+																			autoFocus
+																		/>
+																	)}
+																</div>
+
+																<div
+																	ref={
+																		expandedProfileBox === 'area'
+																			? expandedProfileBoxRef
+																			: undefined
+																	}
+																	className={cn(
+																		'w-[413px] max-w-full mx-auto flex flex-col rounded-[8px] border-[3px] border-black cursor-pointer overflow-hidden',
+																		expandedProfileBox === 'area' ? 'h-[68px]' : 'h-[34px]'
+																	)}
+																	onClick={() => handleProfileBoxToggle('area')}
+																>
+																	<div
+																		className="h-[34px] flex items-center font-inter text-[14px] font-semibold overflow-hidden"
+																		style={{ backgroundColor: getProfileHeaderBg('area') }}
+																	>
+																		{expandedProfileBox !== 'area' &&
+																		profileFields.area.trim() ? (
+																			<div className="flex items-stretch w-full h-full">
+																				<div className="w-[20px] shrink-0" />
+																				<div className="w-[3px] bg-black" />
+																				<div className="min-w-0 max-w-[calc(100%_-_46px)] bg-[#E5EEE6] h-full flex items-center px-4">
+																					<span className="truncate">
+																						{profileFields.area.trim()}
+																					</span>
+																				</div>
+																				<div className="w-[3px] bg-black" />
+																				<div className="min-w-[20px] flex-1" />
+																			</div>
+																		) : (
+																			<div className="w-full px-3 truncate">
+																				{getProfileHeaderText(
+																					'area',
+																					'Area',
+																					'Enter your Area'
+																				)}
+																			</div>
+																		)}
+																	</div>
+																	{expandedProfileBox === 'area' && (
+																		<input
+																			type="text"
+																			className="h-[34px] bg-white px-3 font-inter text-[14px] outline-none border-0"
+																			value={profileFields.area}
+																			onChange={(e) =>
+																				setProfileFields({
+																					...profileFields,
+																					area: e.target.value,
+																				})
+																			}
+																			onBlur={() => handleProfileFieldBlur('area')}
+																			onKeyDown={(e) => {
+																				if (e.key === 'Enter') {
+																					e.preventDefault();
+																					handleProfileFieldEnter('area');
+																				}
+																			}}
+																			onClick={(e) => e.stopPropagation()}
+																			placeholder=""
+																			autoFocus
+																		/>
+																	)}
+																</div>
+
+																<div
+																	ref={
+																		expandedProfileBox === 'band'
+																			? expandedProfileBoxRef
+																			: undefined
+																	}
+																	className={cn(
+																		'w-[413px] max-w-full mx-auto flex flex-col rounded-[8px] border-[3px] border-black cursor-pointer overflow-hidden',
+																		expandedProfileBox === 'band' ? 'h-[68px]' : 'h-[34px]'
+																	)}
+																	onClick={() => handleProfileBoxToggle('band')}
+																>
+																	<div
+																		className="h-[34px] flex items-center font-inter text-[14px] font-semibold overflow-hidden"
+																		style={{ backgroundColor: getProfileHeaderBg('band') }}
+																	>
+																		{expandedProfileBox !== 'band' &&
+																		profileFields.band.trim() ? (
+																			<div className="flex items-stretch w-full h-full">
+																				<div className="w-[20px] shrink-0" />
+																				<div className="w-[3px] bg-black" />
+																				<div className="min-w-0 max-w-[calc(100%_-_46px)] bg-[#E5EEE6] h-full flex items-center px-4">
+																					<span className="truncate">
+																						{profileFields.band.trim()}
+																					</span>
+																				</div>
+																				<div className="w-[3px] bg-black" />
+																				<div className="min-w-[20px] flex-1" />
+																			</div>
+																		) : (
+																			<div className="w-full px-3 truncate">
+																				{getProfileHeaderText(
+																					'band',
+																					'Band/Artist Name',
+																					'Enter your Band/Artist Name'
+																				)}
+																			</div>
+																		)}
+																	</div>
+																	{expandedProfileBox === 'band' && (
+																		<input
+																			type="text"
+																			className="h-[34px] bg-white px-3 font-inter text-[14px] outline-none border-0"
+																			value={profileFields.band}
+																			onChange={(e) =>
+																				setProfileFields({
+																					...profileFields,
+																					band: e.target.value,
+																				})
+																			}
+																			onBlur={() => handleProfileFieldBlur('band')}
+																			onKeyDown={(e) => {
+																				if (e.key === 'Enter') {
+																					e.preventDefault();
+																					handleProfileFieldEnter('band');
+																				}
+																			}}
+																			onClick={(e) => e.stopPropagation()}
+																			placeholder=""
+																			autoFocus
+																		/>
+																	)}
+																</div>
+
+																<div
+																	ref={
+																		expandedProfileBox === 'bio'
+																			? expandedProfileBoxRef
+																			: undefined
+																	}
+																	className={cn(
+																		'w-[413px] max-w-full mx-auto flex flex-col rounded-[8px] border-[3px] border-black cursor-pointer overflow-hidden',
+																		expandedProfileBox === 'bio' ? 'h-[68px]' : 'h-[34px]'
+																	)}
+																	onClick={() => handleProfileBoxToggle('bio')}
+																>
+																	<div
+																		className="h-[34px] flex items-center font-inter text-[14px] font-semibold overflow-hidden"
+																		style={{ backgroundColor: getProfileHeaderBg('bio') }}
+																	>
+																		{expandedProfileBox !== 'bio' &&
+																		profileFields.bio.trim() ? (
+																			<div className="flex items-stretch w-full h-full">
+																				<div className="w-[20px] shrink-0" />
+																				<div className="w-[3px] bg-black" />
+																				<div className="min-w-0 max-w-[calc(100%_-_46px)] bg-[#E5EEE6] h-full flex items-center px-4">
+																					<span className="truncate">
+																						{profileFields.bio.trim()}
+																					</span>
+																				</div>
+																				<div className="w-[3px] bg-black" />
+																				<div className="min-w-[20px] flex-1" />
+																			</div>
+																		) : (
+																			<div className="w-full px-3 truncate">
+																				{getProfileHeaderText('bio', 'Bio', 'Enter your Bio')}
+																			</div>
+																		)}
+																	</div>
+																	{expandedProfileBox === 'bio' && (
+																		<input
+																			type="text"
+																			className="h-[34px] bg-white px-3 font-inter text-[14px] outline-none border-0"
+																			value={profileFields.bio}
+																			onChange={(e) =>
+																				setProfileFields({
+																					...profileFields,
+																					bio: e.target.value,
+																				})
+																			}
+																			onBlur={() => handleProfileFieldBlur('bio')}
+																			onKeyDown={(e) => {
+																				if (e.key === 'Enter') {
+																					e.preventDefault();
+																					handleProfileFieldEnter('bio');
+																				}
+																			}}
+																			onClick={(e) => e.stopPropagation()}
+																			placeholder=""
+																			autoFocus
+																		/>
+																	)}
+																</div>
+
+																<div
+																	ref={
+																		expandedProfileBox === 'links'
+																			? expandedProfileBoxRef
+																			: undefined
+																	}
+																	className={cn(
+																		'w-[413px] max-w-full mx-auto flex flex-col rounded-[8px] border-[3px] border-black cursor-pointer overflow-hidden',
+																		expandedProfileBox === 'links' ? 'h-[68px]' : 'h-[34px]'
+																	)}
+																	onClick={() => handleProfileBoxToggle('links')}
+																>
+																	<div
+																		className="h-[34px] flex items-center font-inter text-[14px] font-semibold overflow-hidden"
+																		style={{ backgroundColor: getProfileHeaderBg('links') }}
+																	>
+																		{expandedProfileBox !== 'links' &&
+																		profileFields.links.trim() ? (
+																			<div className="flex items-stretch w-full h-full">
+																				<div className="w-[20px] shrink-0" />
+																				<div className="w-[3px] bg-black" />
+																				<div className="min-w-0 max-w-[calc(100%_-_46px)] bg-[#E5EEE6] h-full flex items-center px-4">
+																					<span className="truncate">
+																						{profileFields.links.trim()}
+																					</span>
+																				</div>
+																				<div className="w-[3px] bg-black" />
+																				<div className="min-w-[20px] flex-1" />
+																			</div>
+																		) : (
+																			<div className="w-full px-3 truncate">
+																				{getProfileHeaderText(
+																					'links',
+																					'Links',
+																					'Enter your Links'
+																				)}
+																			</div>
+																		)}
+																	</div>
+																	{expandedProfileBox === 'links' && (
+																		<input
+																			type="text"
+																			className="h-[34px] bg-white px-3 font-inter text-[14px] outline-none border-0"
+																			value={profileFields.links}
+																			onChange={(e) =>
+																				setProfileFields({
+																					...profileFields,
+																					links: e.target.value,
+																				})
+																			}
+																			onBlur={() => handleProfileFieldBlur('links')}
+																			onKeyDown={(e) => {
+																				if (e.key === 'Enter') {
+																					e.preventDefault();
+																					handleProfileFieldEnter('links');
+																				}
+																			}}
+																			onClick={(e) => e.stopPropagation()}
+																			placeholder=""
+																			autoFocus
+																		/>
+																	)}
+																</div>
+															</div>
+														</div>
+
+														{/* Bottom band (3px divider + 10px fill) */}
+														<div className="shrink-0 h-[13px] bg-[#58A6E5] border-t-[3px] border-black" />
+													</div>
+												</div>
+
+												{/* New containers below Body box */}
+												<div className="w-full flex flex-col items-center mt-[9px]">
+													{/* 472 x 93 container */}
+													<div className="relative w-[472px] h-[93px] max-w-full rounded-[8px] bg-[#84CB86] border-2 border-black">
+														{/* Decorative inner boxes (no fill) */}
+														<div
+															aria-hidden="true"
+															className="pointer-events-none absolute left-[12px] top-[15px] w-[203px] h-[28px] rounded-[8px] border-2 border-black z-0"
+														/>
+														<div
+															aria-hidden="true"
+															className="pointer-events-none absolute left-[12px] top-[56px] w-[160px] h-[25px] rounded-[8px] border-2 border-black z-0"
+														/>
+														{/* Inner content wrapper: flush to top + centered (matches mock) */}
+														{/* Note: offset upward by the container border width so borders overlap (prevents “double line”). */}
+														<div className="absolute -top-[2px] left-1/2 -translate-x-1/2 flex flex-col items-center w-full z-10">
+															<button
+																type="button"
+																onClick={() => {
+																	setActiveTab('main');
+																	setHasLeftProfileTab(true);
+																}}
+																className="w-[298px] h-[26px] rounded-[6px] bg-[#B1B1B1] hover:bg-[#A7A7A7] active:bg-[#A1A1A1] transition-colors duration-150 border-2 border-black text-white font-inter font-medium text-[15px] leading-none flex items-center justify-center cursor-pointer"
+															>
+																back
+															</button>
+															{/* next prompt: we'll add the smaller inner boxes here */}
+														</div>
+													</div>
+
+													{/* 229 x 34 box, 13px below the 472 x 93 container */}
+													{!props.hideProfileBottomMiniBox && (
+														<div className="w-[472px] max-w-full mt-[13px]">
+															<div
+																aria-hidden="true"
+																className="w-[229px] h-[34px] rounded-[8px] bg-[#84CB86] border-2 border-black"
+															/>
+														</div>
+													)}
 												</div>
 											</div>
 										</div>
@@ -4703,7 +5003,12 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 													'w-[468px] h-[623px] bg-white border-[3px] border-[#0B5C0D] rounded-[8px] flex flex-col',
 													'max-[480px]:w-[89.33vw]'
 												)}
-												style={{ overflow: 'visible' }}
+												style={{
+													overflow: 'visible',
+													...(props.manualEntryHeightPx != null
+														? { height: props.manualEntryHeightPx }
+														: {}),
+												}}
 												data-hpi-manual-entry
 											>
 												{/* Header wrapper clips the top corners cleanly while preserving overflow-visible for popovers */}
@@ -6184,7 +6489,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 												</div>
 
 												{/* Hybrid: Generate Test button (Auto-tab style) — 26px below the main box (desktop) */}
-												{!showTestPreview && !compactLeftOnly && (
+												{!hideGenerateTestButton && !showTestPreview && !compactLeftOnly && (
 													<div className="mt-[26px] w-[448px] max-w-[89.33vw] flex items-center justify-center max-[480px]:hidden">
 														<Button
 															type="button"
@@ -6634,7 +6939,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 											</div>
 										)}
 										{/* Full Auto: Generate Test button sits in the empty green space (desktop) */}
-										{selectedModeKey === 'full' && !showTestPreview && !compactLeftOnly && (
+										{!hideGenerateTestButton && selectedModeKey === 'full' && !showTestPreview && !compactLeftOnly && (
 											<div className={cn(
 												'absolute left-0 right-0 w-full flex items-center justify-center max-[480px]:hidden',
 												isLocalCustomInstructionsOpen ? 'bottom-[124px]' : 'bottom-[194px]'
@@ -6760,7 +7065,10 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 								)}
 
 								{/* Test button and notices (hidden in compact mode, profile tab, and Manual mode) */}
-								{compactLeftOnly || activeTab === 'profile' || selectedModeKey === 'manual' ? null : (
+								{compactLeftOnly ||
+								activeTab === 'profile' ||
+								selectedModeKey === 'manual' ||
+								hideGenerateTestButton ? null : (
 									<>
 										{/* Desktop (manual/hybrid): bottom bar Generate Test button */}
 										{selectedModeKey !== 'full' && selectedModeKey !== 'hybrid' && (

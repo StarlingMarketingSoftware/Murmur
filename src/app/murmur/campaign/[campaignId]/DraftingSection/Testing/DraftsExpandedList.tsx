@@ -1,6 +1,6 @@
 'use client';
 
-import { FC, MouseEvent, useMemo, useRef, useState } from 'react';
+import { FC, MouseEvent, useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
@@ -76,8 +76,10 @@ const DraftsHeaderChrome: FC<{
 	const pillHeight = isBottomView ? 10 : isAllTab ? 15 : 22;
 	const pillBorderRadius = isBottomView ? 5 : isAllTab ? 7.5 : 11;
 	const pillFontSize = isBottomView ? '8px' : isAllTab ? '10px' : '13px';
-	const pillTop =
-		whiteSectionHeight !== undefined ? (whiteSectionHeight - pillHeight) / 2 : 3 + offsetY;
+	// Add a tiny visual padding so the pill doesn't visually "kiss" the top border in tighter headers.
+	const visualTopPaddingPx = 1;
+	const pillTopBase = whiteSectionHeight !== undefined ? (whiteSectionHeight - pillHeight) / 2 : 3;
+	const pillTop = pillTopBase + offsetY + visualTopPaddingPx;
 	const pillCenterY = pillTop + pillHeight / 2;
 	const dotTop = Math.round(pillCenterY - dotSize / 2);
 
@@ -178,6 +180,68 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 	const [selectedDraftIds, setSelectedDraftIds] = useState<Set<number>>(new Set());
 	const lastClickedRef = useRef<number | null>(null);
 	const [isSending, setIsSending] = useState(false);
+	const draftRowRefs = useRef<Map<number, HTMLDivElement>>(new Map());
+	
+	// Track whether the container is being hovered (for bottom view outline)
+	const [isContainerHovered, setIsContainerHovered] = useState(false);
+	
+	// Track hovered draft index for keyboard navigation
+	const [hoveredDraftIndex, setHoveredDraftIndex] = useState<number | null>(null);
+	
+	// Keyboard navigation: up/down arrows move hover between rows when hovering over the table
+	const handleKeyboardNavigation = useCallback((e: KeyboardEvent) => {
+		// Only handle up/down arrows
+		if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+		
+		// Only work if we have a hovered draft
+		if (hoveredDraftIndex === null) return;
+		
+		// Check if a text input element is focused (don't intercept typing)
+		const activeElement = document.activeElement;
+		if (activeElement) {
+			const tagName = activeElement.tagName.toLowerCase();
+			if (
+				tagName === 'input' ||
+				tagName === 'textarea' ||
+				(activeElement as HTMLElement).isContentEditable
+			) {
+				return;
+			}
+		}
+		
+		e.preventDefault();
+		e.stopImmediatePropagation(); // Prevent campaign page tab navigation
+		
+		let newIndex: number;
+		if (e.key === 'ArrowUp') {
+			newIndex = hoveredDraftIndex > 0 ? hoveredDraftIndex - 1 : drafts.length - 1;
+		} else {
+			newIndex = hoveredDraftIndex < drafts.length - 1 ? hoveredDraftIndex + 1 : 0;
+		}
+		
+		setHoveredDraftIndex(newIndex);
+	}, [hoveredDraftIndex, drafts.length]);
+
+	useEffect(() => {
+		// Only add listener if we have a hovered draft
+		if (hoveredDraftIndex === null) return;
+		
+		// Use capture phase to run before campaign page handler
+		document.addEventListener('keydown', handleKeyboardNavigation, true);
+		return () => {
+			document.removeEventListener('keydown', handleKeyboardNavigation, true);
+		};
+	}, [hoveredDraftIndex, handleKeyboardNavigation]);
+
+	// Scroll the previewed draft into view when it changes
+	useEffect(() => {
+		if (previewedDraftId == null) return;
+		const rowEl = draftRowRefs.current.get(previewedDraftId);
+		if (rowEl) {
+			// Use 'auto' (instant) instead of 'smooth' so rapid key navigation works
+			rowEl.scrollIntoView({ behavior: 'auto', block: 'nearest' });
+		}
+	}, [previewedDraftId]);
 
 	// Data/context for sending
 	const { campaignId } = useParams() as { campaignId: string };
@@ -387,11 +451,31 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 				width: `${width}px`,
 				height: `${height}px`,
 				background: `linear-gradient(to bottom, #ffffff ${whiteSectionHeight}px, #FFDC9E ${whiteSectionHeight}px)`,
+				...(isBottomView ? { cursor: 'pointer' } : {}),
 			}}
-			data-hover-description="Drafts: Emails you’ve generated but haven’t sent yet. Select drafts to preview or send."
+			data-hover-description="Drafts: Emails you've generated but haven't sent yet. Select drafts to preview or send."
 			role="region"
 			aria-label="Expanded drafts preview"
+			onMouseEnter={() => isBottomView && setIsContainerHovered(true)}
+			onMouseLeave={() => isBottomView && setIsContainerHovered(false)}
+			onClick={() => isBottomView && onOpenDrafts?.()}
 		>
+			{/* Hover outline for bottom view - 3px gap top/bottom, 2px gap sides, 4px thick */}
+			{isBottomView && isContainerHovered && (
+				<div
+					style={{
+						position: 'absolute',
+						top: '-7px',
+						bottom: '-7px',
+						left: '-6px',
+						right: '-6px',
+						border: '4px solid #FCCF7E',
+						borderRadius: 0,
+						pointerEvents: 'none',
+						zIndex: 50,
+					}}
+				/>
+			)}
 			<DraftsHeaderChrome isAllTab={isAllTab} whiteSectionHeight={customWhiteSectionHeight} />
 			<div
 				className={cn(
@@ -492,8 +576,11 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 									? `${39 - whiteSectionHeight}px`
 									: `${38 - whiteSectionHeight}px`,
 						}}
+						onMouseLeave={() => {
+							setHoveredDraftIndex(null);
+						}}
 					>
-						{drafts.map((draft) => {
+						{drafts.map((draft, draftIndex) => {
 							const contact = contacts?.find((c) => c.id === draft.contactId);
 							const contactName = contact
 								? contact.name ||
@@ -508,19 +595,34 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 							const isPreviewed = previewedDraftId === draft.id;
 							const contactTitle = contact?.headline || contact?.title || '';
 							const indicatorLeftClass = isBottomView ? 'left-2' : 'left-[8px]';
+							// Keyboard focus shows hover UI independently of mouse hover
+							const isKeyboardFocused = hoveredDraftIndex === draftIndex;
+							// Final background: previewed > selected > keyboard focus > white (mouse hover handled by CSS)
+							const draftBgColor = isPreviewed
+								? 'bg-[#FDDEA5]'
+								: isSelected
+									? 'bg-[#FFDF9F]'
+									: isKeyboardFocused
+										? 'bg-[#F9E5BA]'
+										: 'bg-white hover:bg-[#F9E5BA]';
 							return (
 								<div
 									key={draft.id}
+									ref={(el) => {
+										if (el) {
+											draftRowRefs.current.set(draft.id as number, el);
+										} else {
+											draftRowRefs.current.delete(draft.id as number);
+										}
+									}}
 									className={cn(
-										'cursor-pointer relative select-none overflow-visible rounded-[8px] border-2 border-[#000000] bg-white',
+										'cursor-pointer relative select-none overflow-visible rounded-[8px] border-2 border-[#000000]',
 										isBottomView
 											? 'w-[224px] h-[28px]'
 											: !hasCustomRowSize &&
 											  'w-full max-w-[356px] max-[480px]:max-w-none h-[64px] max-[480px]:h-[50px]',
 										!isBottomView && 'p-2',
-										isPreviewed && 'bg-[#FDDEA5]',
-										isSelected && !isPreviewed && 'bg-[#FFDF9F]',
-										!isSelected && !isPreviewed && 'hover:bg-[#F9E5BA]'
+										draftBgColor,
 									)}
 									style={
 										isBottomView
@@ -532,6 +634,9 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 									}
 									onMouseDown={(e) => {
 										if (e.shiftKey && !isPreviewMode) e.preventDefault();
+									}}
+									onMouseEnter={() => {
+										setHoveredDraftIndex(draftIndex);
 									}}
 									onClick={(e) => handleDraftClick(draft, e)}
 								>
@@ -893,7 +998,7 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 							);
 						})}
 						{Array.from({
-							length: Math.max(0, (isBottomView ? 3 : 4) - drafts.length),
+							length: Math.max(0, (isBottomView ? 3 : isPreviewMode ? 5 : 4) - drafts.length),
 						}).map((_, idx) => (
 							<div
 								key={`draft-placeholder-${idx}`}

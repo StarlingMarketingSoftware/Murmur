@@ -2,6 +2,8 @@ import { useDeleteEmail, useEditEmail } from '@/hooks/queryHooks/useEmails';
 import { EmailWithRelations } from '@/types';
 import { ContactWithName } from '@/types/contact';
 import { convertHtmlToPlainText } from '@/utils';
+import { Identity } from '@prisma/client';
+import { PatchIdentityData } from '@/app/api/identities/[id]/route';
 import {
 	extractMurmurDraftSettingsSnapshot,
 	injectMurmurDraftSettingsSnapshot,
@@ -47,10 +49,18 @@ export interface DraftedEmailsProps {
 	onPreview?: (draft: EmailWithRelations) => void;
 	/** Optional: callback to navigate to the Writing tab */
 	goToWriting?: () => void;
+	/** Optional: callback to navigate to the Contacts tab */
+	goToContacts?: () => void;
 	/** Optional: callback to navigate to the Search tab */
 	goToSearch?: () => void;
+	/** Optional: callback to navigate to the Sent tab */
+	goToSent?: () => void;
 	/** Optional: callback to navigate to the Inbox tab */
 	goToInbox?: () => void;
+	/** Optional: identity passed through for embedded prompt settings preview (regeneration) */
+	identity?: Identity | null;
+	/** Optional: callback to update identity fields from the embedded prompt settings preview */
+	onIdentityUpdate?: (data: PatchIdentityData) => void;
 	/** Optional: callback invoked when a draft is rejected in preview (toggle behavior) */
 	onRejectDraft?: (draftId: number, currentlyRejected?: boolean) => void;
 	/** Optional: callback invoked when a draft is approved in preview (toggle behavior) */
@@ -80,6 +90,22 @@ export interface DraftedEmailsProps {
 	 * When provided, this value is forwarded to the underlying DraftingTable `mainBoxId`.
 	 */
 	mainBoxId?: string;
+	/** Optional: notify parent when the embedded regeneration settings preview is opened/closed */
+	onRegenSettingsPreviewOpenChange?: (open: boolean) => void;
+	/**
+	 * Optional: disables outside-click-to-close behavior for the draft review UI.
+	 * Useful when rendering a secondary/side preview while the main view is in regeneration settings mode.
+	 */
+	disableOutsideClickClose?: boolean;
+	/** Optional: hide the small approved/rejected counter box (above or bottom-left depending on breakpoint) in draft review UI */
+	hideDraftReviewCounter?: boolean;
+	/** Optional: hide the bottom action row (Approve / Regenerate / Reject + nav arrows) in draft review UI */
+	hideDraftReviewActionRow?: boolean;
+	/**
+	 * Optional: override the behavior of the draft review header close ("-") button.
+	 * Useful when rendering the draft review UI as a side preview inside regenerate mode.
+	 */
+	onDraftReviewCloseOverride?: () => void;
 }
 
 export const useDraftedEmails = (props: DraftedEmailsProps) => {

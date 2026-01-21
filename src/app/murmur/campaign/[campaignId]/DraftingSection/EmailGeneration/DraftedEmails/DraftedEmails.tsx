@@ -1,4 +1,4 @@
-import { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { FC, forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { DraftedEmailsProps, useDraftedEmails } from './useDraftedEmails';
 import { Spinner } from '@/components/atoms/Spinner/Spinner';
 import { Button } from '@/components/ui/button';
@@ -32,6 +32,7 @@ import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
 import { FestivalsIcon } from '@/components/atoms/_svg/FestivalsIcon';
 import { MusicVenuesIcon } from '@/components/atoms/_svg/MusicVenuesIcon';
 import { WineBeerSpiritsIcon } from '@/components/atoms/_svg/WineBeerSpiritsIcon';
+import { HybridPromptInput } from '@/components/molecules/HybridPromptInput/HybridPromptInput';
 
 interface ScrollableTextareaProps
 	extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
@@ -210,7 +211,35 @@ const ScrollableTextarea: FC<ScrollableTextareaProps> = ({
 	);
 };
 
-export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
+// Hover/click zones for a draft row:
+// - Left: selection zone (matches the green accent line)
+// - Middle: open zone (most of the row)
+// - Right: delete zone (the last/rightmost slice)
+type DraftRowHoverRegion = 'left' | 'middle' | 'right';
+
+const DRAFT_ROW_SELECT_ZONE_PX = 115;
+const DRAFT_ROW_DELETE_ZONE_PX = 80;
+
+export type DraftedEmailsHandle = {
+	/** Exit the embedded regen settings preview (HybridPromptInput) and return to the normal draft editor / approve-reject view. */
+	exitRegenSettingsPreview: () => void;
+};
+
+function getDraftRowHoverRegion(event: React.MouseEvent<HTMLElement>): DraftRowHoverRegion {
+	const rect = event.currentTarget.getBoundingClientRect();
+	const x = event.clientX - rect.left;
+	const width = rect.width;
+
+	// Clamp zones so we never end up with negative widths on very small layouts.
+	const selectZone = Math.min(DRAFT_ROW_SELECT_ZONE_PX, width);
+	const deleteZone = Math.min(DRAFT_ROW_DELETE_ZONE_PX, Math.max(0, width - selectZone));
+
+	if (x < selectZone) return 'left';
+	if (x > width - deleteZone) return 'right';
+	return 'middle';
+}
+
+export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>((props, ref) => {
 	const {
 		draftEmails,
 		isPendingEmails,
@@ -240,22 +269,61 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 	// This should return the user back to the normal drafts table view.
 	useEffect(() => {
 		if (!selectedDraft) return;
+		if (props.disableOutsideClickClose) return;
 
 		const handlePointerDown = (event: PointerEvent) => {
 			const container = draftReviewContainerRef.current;
 			const target = event.target as Node | null;
 			if (!container || !target) return;
 
-			if (!container.contains(target)) {
-				setSelectedDraft(null);
-			}
+			// If the click is inside the review UI, do nothing.
+			if (container.contains(target)) return;
+
+			// Otherwise, do NOT close the review if the user is clicking on other drafting UI
+			// (e.g., DraftsExpandedList, research panel, header boxes, or action buttons).
+			const targetEl = target instanceof Element ? target : null;
+			const isClickInAllowedDraftingUI = targetEl
+				? Boolean(
+						targetEl.closest(
+							[
+								// Side preview container (used while regen settings preview is open)
+								'[data-draft-review-side-preview]',
+								// Campaign header box (title + counts)
+								'[data-campaign-header-box]',
+								// Mini email structure panel
+								'[data-mini-email-hide-text]',
+								'[data-mini-email-readonly]',
+								// Research panel (standard + narrow layouts)
+								'[data-research-panel-container]',
+								'[data-contact-research-panel]',
+								// Expanded lists / previews (Drafts/Sent/Inbox/etc.)
+								'[role="region"][aria-label^="Expanded"]',
+								// Draggable EmailGeneration layout
+								'[data-draggable-box-id]',
+								'[data-drafting-container]',
+								// Interactive controls should never dismiss the review pre-emptively
+								'button',
+								'[role="button"]',
+								'a',
+								'input',
+								'textarea',
+								'select',
+								'[contenteditable="true"]',
+							].join(', ')
+						)
+				  )
+				: false;
+
+			if (isClickInAllowedDraftingUI) return;
+
+			setSelectedDraft(null);
 		};
 
 		document.addEventListener('pointerdown', handlePointerDown, true);
 		return () => {
 			document.removeEventListener('pointerdown', handlePointerDown, true);
 		};
-	}, [selectedDraft, setSelectedDraft]);
+	}, [selectedDraft, setSelectedDraft, props.disableOutsideClickClose]);
 
 	// Mobile-specific width values (using CSS calc for responsive sizing)
 	// 4px margins on each side for edge-to-edge feel
@@ -263,7 +331,15 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 
 	const [showConfirm, setShowConfirm] = useState(false);
 	const [isRegenerating, setIsRegenerating] = useState(false);
+	const [isRegenSettingsPreviewOpen, setIsRegenSettingsPreviewOpen] = useState(false);
 	const [isHoveringAllButton, setIsHoveringAllButton] = useState(false);
+	const [hoveredDraftRow, setHoveredDraftRow] = useState<{
+		draftId: number;
+		region: DraftRowHoverRegion;
+	} | null>(null);
+	// Track hovered draft index for keyboard navigation (separate from hoveredDraftRow which tracks region)
+	const [hoveredDraftIndex, setHoveredDraftIndex] = useState<number | null>(null);
+	
 	// Used contacts indicator
 	const { data: usedContactIds } = useGetUsedContactIds();
 	const usedContactIdsSet = useMemo(
@@ -279,6 +355,64 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 		}
 		return draftEmails;
 	}, [draftEmails, props.approvedDraftIds, props.rejectedDraftIds, props.statusFilter]);
+	
+	// Keyboard navigation for draft list: up/down arrows move keyboard focus between rows
+	// This works independently of mouse hover - both can highlight different rows
+	const handleDraftListKeyboardNavigation = useCallback((e: KeyboardEvent) => {
+		// Only handle up/down arrows
+		if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+		
+		// Only work if we have a hovered draft and NOT in the review/selected draft view
+		if (hoveredDraftIndex === null || selectedDraft) return;
+		
+		// Check if a text input element is focused (don't intercept typing)
+		const activeElement = document.activeElement;
+		if (activeElement) {
+			const tagName = activeElement.tagName.toLowerCase();
+			if (
+				tagName === 'input' ||
+				tagName === 'textarea' ||
+				(activeElement as HTMLElement).isContentEditable
+			) {
+				return;
+			}
+		}
+		
+		e.preventDefault();
+		e.stopImmediatePropagation(); // Prevent campaign page tab navigation
+		
+		// Handle up/down arrows: move keyboard focus between rows
+		let newIndex: number;
+		if (e.key === 'ArrowUp') {
+			newIndex = hoveredDraftIndex > 0 ? hoveredDraftIndex - 1 : filteredDrafts.length - 1;
+		} else {
+			newIndex = hoveredDraftIndex < filteredDrafts.length - 1 ? hoveredDraftIndex + 1 : 0;
+		}
+		
+		setHoveredDraftIndex(newIndex);
+		const newDraft = filteredDrafts[newIndex];
+		if (newDraft) {
+			// Preserve the current region (left/middle/right) when moving to a new row
+			const currentRegion = hoveredDraftRow?.region ?? 'middle';
+			setHoveredDraftRow({ draftId: newDraft.id, region: currentRegion });
+			// Notify parent about hover for the keyboard-focused row
+			const contact = contacts?.find((c) => c.id === newDraft.contactId);
+			onContactHover?.(contact ?? null);
+			onDraftHover?.(newDraft);
+		}
+	}, [hoveredDraftIndex, selectedDraft, filteredDrafts, contacts, onContactHover, onDraftHover, hoveredDraftRow]);
+
+	useEffect(() => {
+		// Only add listener if we have a hovered draft and not in review mode
+		if (hoveredDraftIndex === null || selectedDraft) return;
+		
+		// Use capture phase to run before campaign page handler
+		document.addEventListener('keydown', handleDraftListKeyboardNavigation, true);
+		return () => {
+			document.removeEventListener('keydown', handleDraftListKeyboardNavigation, true);
+		};
+	}, [hoveredDraftIndex, selectedDraft, handleDraftListKeyboardNavigation]);
+
 	const approvedCount = props.approvedDraftIds?.size ?? 0;
 	const rejectedCount = props.rejectedDraftIds?.size ?? 0;
 	const allFilteredSelected =
@@ -325,6 +459,66 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 		[handleNavigateDraft]
 	);
 
+	// Keyboard navigation for draft review UI:
+	// - Escape: if regen settings preview is open, exit regen view; otherwise close the review and return to drafts list
+	// - ArrowUp/ArrowDown: navigate between drafts (when not in text entry)
+	useEffect(() => {
+		if (!selectedDraft) return;
+
+		const handleKeyDown = (event: KeyboardEvent) => {
+			if (event.key === 'Escape') {
+				event.stopImmediatePropagation(); // Prevent campaign page tab navigation
+				// Side preview override: allow parent to decide what "close" means in this context.
+				if (props.onDraftReviewCloseOverride) {
+					props.onDraftReviewCloseOverride();
+					return;
+				}
+
+				// In regenerate view, Esc should exit regen preview (back to the normal editor / approve-reject view),
+				// not close the entire draft review UI.
+				if (isRegenSettingsPreviewOpen) {
+					setIsRegenSettingsPreviewOpen(false);
+					return;
+				}
+
+				handleBack();
+				return;
+			}
+
+			// Check if user is currently in a text entry field
+			const activeElement = document.activeElement;
+			const isTextEntry =
+				activeElement instanceof HTMLInputElement ||
+				activeElement instanceof HTMLTextAreaElement ||
+				activeElement?.getAttribute('contenteditable') === 'true';
+
+			if (isTextEntry) return;
+
+			if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') {
+				event.preventDefault();
+				event.stopImmediatePropagation(); // Prevent campaign page tab navigation
+				handleNavigatePrevious();
+			} else if (event.key === 'ArrowDown' || event.key === 'ArrowRight') {
+				event.preventDefault();
+				event.stopImmediatePropagation(); // Prevent campaign page tab navigation
+				handleNavigateNext();
+			}
+		};
+
+		// Use capture phase to ensure this handler runs before the campaign page's tab navigation handler
+		document.addEventListener('keydown', handleKeyDown, true);
+		return () => {
+			document.removeEventListener('keydown', handleKeyDown, true);
+		};
+	}, [
+		selectedDraft,
+		handleBack,
+		handleNavigatePrevious,
+		handleNavigateNext,
+		isRegenSettingsPreviewOpen,
+		props.onDraftReviewCloseOverride,
+	]);
+
 	const handleRegenerateSelectedDrafts = useCallback(async () => {
 		if (!props.onRegenerateDraft) return;
 		const selected = filteredDrafts.filter((d) => selectedDraftIds.has(d.id));
@@ -337,6 +531,13 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 
 	const handleRegenerate = useCallback(async () => {
 		if (!selectedDraft || !onRegenerateDraft || isRegenerating) return;
+
+		// First click: open the embedded prompt/settings preview so the user can confirm settings.
+		// Second click (while preview is open): confirm and run regeneration.
+		if (!isRegenSettingsPreviewOpen) {
+			setIsRegenSettingsPreviewOpen(true);
+			return;
+		}
 		
 		setIsRegenerating(true);
 		try {
@@ -357,8 +558,44 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 			}
 		} finally {
 			setIsRegenerating(false);
+			setIsRegenSettingsPreviewOpen(false);
 		}
-	}, [selectedDraft, onRegenerateDraft, isRegenerating, setEditedSubject, setEditedMessage, setSelectedDraft]);
+	}, [selectedDraft, onRegenerateDraft, isRegenerating, isRegenSettingsPreviewOpen, setEditedSubject, setEditedMessage, setSelectedDraft]);
+
+	// Reset the regen settings preview any time the selected draft changes (or closes).
+	useEffect(() => {
+		setIsRegenSettingsPreviewOpen(false);
+	}, [selectedDraft?.id]);
+
+	// Notify parent when the embedded regen settings preview is opened/closed.
+	useEffect(() => {
+		props.onRegenSettingsPreviewOpenChange?.(isRegenSettingsPreviewOpen);
+	}, [isRegenSettingsPreviewOpen, props.onRegenSettingsPreviewOpenChange]);
+
+	useImperativeHandle(
+		ref,
+		() => ({
+			exitRegenSettingsPreview: () => setIsRegenSettingsPreviewOpen(false),
+		}),
+		[]
+	);
+
+	const handleDraftReviewCloseButtonClick = useCallback(() => {
+		// Side preview override: allow parent to decide what "close" means in this context.
+		if (props.onDraftReviewCloseOverride) {
+			props.onDraftReviewCloseOverride();
+			return;
+		}
+
+		// When we're in regenerate settings preview mode, the "-" button should exit regen mode
+		// (back to the normal editor / approve-reject view), not close the draft entirely.
+		if (isRegenSettingsPreviewOpen) {
+			setIsRegenSettingsPreviewOpen(false);
+			return;
+		}
+
+		handleBack();
+	}, [props.onDraftReviewCloseOverride, isRegenSettingsPreviewOpen, handleBack]);
 
 	if (selectedDraft) {
 		const contact = contacts?.find((c) => c.id === selectedDraft.contactId);
@@ -386,14 +623,16 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 		const isUSAbbr = /^[A-Z]{2}$/.test(stateAbbr);
 		const isDraftApproved = props.approvedDraftIds?.has(selectedDraft.id) ?? false;
 		const isDraftRejected = props.rejectedDraftIds?.has(selectedDraft.id) ?? false;
-		const hasStatusBar = isDraftApproved || isDraftRejected;
+		const hasStatusBar =
+			(isDraftApproved || isDraftRejected) && !isRegenSettingsPreviewOpen;
 		// Keep the bottom strip (Send / Delete + dividers) a consistent height across drafts.
 		// When a status bar is present, the editor container is shorter; we compensate by slightly
 		// increasing the body box height so the remaining bottom strip stays the same "small" height.
 		const bottomStripTop = hasStatusBar ? '574px' : '625px';
 		const isNarrowestDesktop = props.isNarrowestDesktop ?? false;
 		const isNarrowDesktop = props.isNarrowDesktop ?? false;
-		const showBottomCounter = isNarrowestDesktop || isNarrowDesktop;
+		const showBottomCounter =
+			!props.hideDraftReviewCounter && (isNarrowestDesktop || isNarrowDesktop);
 		// Show tab navigation arrows only on narrow desktop; hide them on the
 		// narrowest breakpoint when the draft review (Approve/Reject) view is open.
 		const showTabNavArrows = showBottomCounter && !isNarrowestDesktop;
@@ -414,7 +653,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 					position: 'relative' 
 				}}>
 				{/* Counter box - above preview on wide screens, bottom-left corner on narrow/narrowest breakpoint, hidden on mobile */}
-				{!showBottomCounter && !isMobile && (
+				{!props.hideDraftReviewCounter && !showBottomCounter && !isMobile && (
 					<div
 						style={{
 							position: 'absolute',
@@ -481,7 +720,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 						<Button
 							type="button"
 							variant="ghost"
-							onClick={handleBack}
+							onClick={handleDraftReviewCloseButtonClick}
 							className="absolute rounded z-10 flex items-center justify-center hover:bg-transparent"
 							style={{ 
 								top: '17px', 
@@ -666,7 +905,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 					</div>
 
 					{/* Approved status bar - 6px from header, 11px above subject box */}
-					{isDraftApproved && (
+					{!isRegenSettingsPreviewOpen && isDraftApproved && (
 						<div
 							style={{
 								backgroundColor: '#FFDC9E',
@@ -754,7 +993,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 					)}
 
 					{/* Rejected status bar - 6px from header, 11px above subject box */}
-					{isDraftRejected && (
+					{!isRegenSettingsPreviewOpen && isDraftRejected && (
 						<div
 							style={{
 								backgroundColor: '#FFDC9E',
@@ -842,193 +1081,248 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 					<div
 						className="flex-1 overflow-hidden flex flex-col relative"
 						data-lenis-prevent
-						style={{ margin: '0', border: 'none', padding: hasStatusBar ? '0 12px 12px 12px' : '6px 12px 12px 12px', borderBottomLeftRadius: '5px', borderBottomRightRadius: '5px', backgroundColor: '#FFDC9E' }}
+						style={{
+							margin: '0',
+							border: 'none',
+							padding: isRegenSettingsPreviewOpen
+								? '0'
+								: hasStatusBar
+									? '0 12px 12px 12px'
+									: '6px 12px 12px 12px',
+							borderBottomLeftRadius: '5px',
+							borderBottomRightRadius: '5px',
+							backgroundColor: isRegenSettingsPreviewOpen ? '#FFE3B3' : '#FFDC9E',
+						}}
 					>
-						{/* Vertical divider line 20px from right - bottom area only */}
-						<div
-							style={{
-								position: 'absolute',
-								right: '20px',
-								top: bottomStripTop,
-								bottom: 0,
-								width: '1px',
-								backgroundColor: '#000000',
-							}}
-						/>
-						{/* Second divider line 94px to the left of the first one (20 + 94 = 114) */}
-						<div
-							style={{
-								position: 'absolute',
-								right: '114px',
-								top: bottomStripTop,
-								bottom: 0,
-								width: '1px',
-								backgroundColor: '#000000',
-							}}
-						/>
-						{/* Delete button between lines */}
-						<button
-							type="button"
-							onClick={async (e) => {
-								if (selectedDraft) {
-									await handleDeleteDraft(e, selectedDraft.id);
-									setSelectedDraft(null);
-								}
-							}}
-							disabled={isPendingDeleteEmail}
-							className="absolute font-inter text-[14px] font-normal text-black hover:bg-black/5 flex items-center justify-center transition-colors leading-none"
-							style={{
-								right: '20px',
-								width: '94px',
-								top: bottomStripTop,
-								bottom: 0,
-							}}
-						>
-							{isPendingDeleteEmail ? '...' : 'Delete'}
-						</button>
-						{/* Third divider line 5px to the left of the second one (114 + 5 = 119) */}
-						<div
-							style={{
-								position: 'absolute',
-								right: '119px',
-								top: bottomStripTop,
-								bottom: 0,
-								width: '1px',
-								backgroundColor: '#000000',
-							}}
-						/>
-						{/* Fourth divider line 92px to the left of the third one (119 + 92 = 211) */}
-						<div
-							style={{
-								position: 'absolute',
-								right: '211px',
-								top: bottomStripTop,
-								bottom: 0,
-								width: '1px',
-								backgroundColor: '#000000',
-							}}
-						/>
-						{/* Send button between lines */}
-						<button
-							type="button"
-							onClick={async () => {
-								if (selectedDraft && !props.isSendingDisabled) {
-									// Select only the current draft and send it
-									props.setSelectedDraftIds(new Set([selectedDraft.id]));
-									// Small delay to ensure state is updated before sending
-									await new Promise((resolve) => setTimeout(resolve, 50));
-									await props.onSend();
-								}
-							}}
-							disabled={props.isSendingDisabled}
-							className="absolute font-inter text-[14px] font-normal text-black hover:bg-black/5 flex items-center justify-center transition-colors leading-none"
-							style={{
-								right: '119px',
-								width: '92px',
-								top: bottomStripTop,
-								bottom: 0,
-							}}
-						>
-							Send
-						</button>
-						{/* Counter in bottom-left corner - at narrow/narrowest breakpoint */}
-						{showBottomCounter && (
+						{!isRegenSettingsPreviewOpen && (
 							<>
-								{/* Left divider for counter */}
+								{/* Vertical divider line 20px from right - bottom area only */}
 								<div
 									style={{
 										position: 'absolute',
-										left: '35px',
+										right: '20px',
 										top: bottomStripTop,
 										bottom: 0,
-										width: '1px',
+										width: '2px',
 										backgroundColor: '#000000',
 									}}
 								/>
+								{/* Double divider between Delete and Send (two 1px lines) */}
 								<div
-									className="absolute flex items-center justify-center gap-[8px]"
 									style={{
-										left: '35px',
-										width: '95px',
+										position: 'absolute',
+										right: '114px',
+										top: bottomStripTop,
+										bottom: 0,
+										width: '7px',
+										backgroundImage:
+											'linear-gradient(to right, #000000 0px, #000000 2px, transparent 2px, transparent 5px, #000000 5px, #000000 7px)',
+										pointerEvents: 'none',
+										zIndex: 5,
+									}}
+								/>
+								{/* Delete button between lines */}
+								<button
+									type="button"
+									onClick={async (e) => {
+										if (selectedDraft) {
+											await handleDeleteDraft(e, selectedDraft.id);
+											setSelectedDraft(null);
+										}
+									}}
+									disabled={isPendingDeleteEmail}
+									className="absolute font-inter text-[14px] font-normal text-black hover:bg-black/5 flex items-center justify-center transition-colors leading-none"
+									style={{
+										right: '20px',
+										width: '94px',
 										top: bottomStripTop,
 										bottom: 0,
 									}}
 								>
-									{/* Approved count */}
-									<div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-										<span className="font-bold text-[12px] text-black" style={{ fontFamily: 'Times New Roman, serif' }}>{approvedCount}</span>
-										<ApproveCheckIcon width={12} height={9} className="text-black" />
-									</div>
-									{/* Rejected count */}
-									<div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-										<span className="font-bold text-[12px] text-black" style={{ fontFamily: 'Times New Roman, serif' }}>{rejectedCount}</span>
-										<RejectXIcon width={10} height={10} className="text-black" />
-									</div>
-								</div>
-								{/* Right divider for counter */}
+									{isPendingDeleteEmail ? '...' : 'Delete'}
+								</button>
+								{/* Fourth divider line 92px to the left of the third one (119 + 92 = 211) */}
 								<div
 									style={{
 										position: 'absolute',
-										left: '130px',
+										right: '211px',
 										top: bottomStripTop,
 										bottom: 0,
-										width: '1px',
+										width: '2px',
 										backgroundColor: '#000000',
 									}}
 								/>
+								{/* Send button between lines */}
+								<button
+									type="button"
+									onClick={async () => {
+										if (selectedDraft && !props.isSendingDisabled) {
+											// Select only the current draft and send it
+											props.setSelectedDraftIds(new Set([selectedDraft.id]));
+											// Small delay to ensure state is updated before sending
+											await new Promise((resolve) => setTimeout(resolve, 50));
+											await props.onSend();
+										}
+									}}
+									disabled={props.isSendingDisabled}
+									className="absolute font-inter text-[14px] font-normal text-black hover:bg-black/5 flex items-center justify-center transition-colors leading-none"
+									style={{
+										right: '119px',
+										width: '92px',
+										top: bottomStripTop,
+										bottom: 0,
+									}}
+								>
+									Send
+								</button>
+								{/* Counter in bottom-left corner - at narrow/narrowest breakpoint */}
+								{showBottomCounter && (
+									<>
+										{/* Left divider for counter */}
+										<div
+											style={{
+												position: 'absolute',
+												left: '35px',
+												top: bottomStripTop,
+												bottom: 0,
+												width: '2px',
+												backgroundColor: '#000000',
+											}}
+										/>
+										<div
+											className="absolute flex items-center justify-center gap-[8px]"
+											style={{
+												left: '35px',
+												width: '95px',
+												top: bottomStripTop,
+												bottom: 0,
+											}}
+										>
+											{/* Approved count */}
+											<div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+												<span
+													className="font-bold text-[12px] text-black"
+													style={{ fontFamily: 'Times New Roman, serif' }}
+												>
+													{approvedCount}
+												</span>
+												<ApproveCheckIcon width={12} height={9} className="text-black" />
+											</div>
+											{/* Rejected count */}
+											<div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+												<span
+													className="font-bold text-[12px] text-black"
+													style={{ fontFamily: 'Times New Roman, serif' }}
+												>
+													{rejectedCount}
+												</span>
+												<RejectXIcon width={10} height={10} className="text-black" />
+											</div>
+										</div>
+										{/* Right divider for counter */}
+										<div
+											style={{
+												position: 'absolute',
+												left: '130px',
+												top: bottomStripTop,
+												bottom: 0,
+												width: '2px',
+												backgroundColor: '#000000',
+											}}
+										/>
+									</>
+								)}
 							</>
 						)}
-						{/* Subject input */}
-						<div className="flex justify-center" style={{ marginBottom: '8px', padding: isMobile ? '0 8px' : undefined }}>
-							<input
-								type="text"
-								value={editedSubject}
-								onChange={(e) => setEditedSubject(e.target.value)}
-								className="font-inter text-[14px] font-extrabold bg-white border-2 border-black rounded-[4px] px-2 focus:outline-none focus:ring-0"
-								style={{ width: isMobile ? '100%' : '469px', height: '39px' }}
-							/>
-						</div>
 
-						{/* Message editor - rich text for links, plain textarea otherwise */}
-						<div className="flex justify-center flex-1" style={{ padding: isMobile ? '0 8px' : undefined }}>
-							<div
-								className="bg-white border-2 border-black rounded-[4px] overflow-visible draft-review-box"
-								style={{ width: isMobile ? '100%' : '470px', height: hasStatusBar ? '527px' : '572px', flex: isMobile ? 1 : undefined }}
-								data-hover-description="Revise your draft here. Type out your revisions. Approve and Reject Drafts"
-							>
-								{/* Check if original message has links - if so, use RichTextEditor for proper link editing */}
-								{selectedDraft?.message && /<a\s+[^>]*href=/i.test(selectedDraft.message) ? (
-									<div data-hover-description="Revise your draft here. Type out your revisions. Approve and Reject Drafts" className="w-full h-full">
-										<CustomScrollbar
-											className="w-full h-full"
-											thumbWidth={2}
-											thumbColor="#000000"
-											offsetRight={-6}
-											contentClassName="[&_.ProseMirror]:min-h-full [&_.ProseMirror]:border-0 [&_.ProseMirror]:bg-transparent [&_.ProseMirror]:focus:ring-0 [&_.ProseMirror]:focus:outline-none"
-										>
-										<RichTextEditor
-											value={editedMessage}
-											onChange={setEditedMessage}
-											hideMenuBar
-											className="w-full h-full border-0 bg-transparent !min-h-0 text-sm"
-											placeholder="Type your message here..."
-										/>
-										</CustomScrollbar>
-									</div>
-								) : (
-								<ScrollableTextarea
-									value={editedMessage}
-									onChange={(e) => setEditedMessage(e.target.value)}
-									className="w-full h-full p-3 text-sm resize-none focus:outline-none focus:ring-0 bg-transparent border-0 whitespace-pre-wrap"
-									placeholder="Type your message here..."
-									thumbWidth={2}
-									thumbColor="#000000"
-									trackOffset={-6}
-									data-hover-description="Revise your draft here. Type out your revisions. Approve and Reject Drafts"
+						{isRegenSettingsPreviewOpen ? (
+							<div className="flex justify-center flex-1">
+								<HybridPromptInput
+									contact={contact || null}
+									identity={props.identity ?? null}
+									onIdentityUpdate={props.onIdentityUpdate}
+									hideDraftButton
+									hideGenerateTestButton
+									hideProfileBottomMiniBox
+									clipProfileTabOverflow
+									manualEntryHeightPx={560}
+									containerHeightPx={635}
+									useStaticDropdownPosition
+									hideMobileStickyTestFooter
+									dataCampaignMainBox={null}
 								/>
-								)}
 							</div>
-						</div>
+						) : (
+							<>
+								{/* Subject input */}
+								<div
+									className="flex justify-center"
+									style={{
+										marginBottom: '8px',
+										padding: isMobile ? '0 8px' : undefined,
+									}}
+								>
+									<input
+										type="text"
+										value={editedSubject}
+										onChange={(e) => setEditedSubject(e.target.value)}
+										className="font-inter text-[14px] font-extrabold bg-white border-2 border-black rounded-[4px] px-2 focus:outline-none focus:ring-0"
+										style={{ width: isMobile ? '100%' : '469px', height: '39px' }}
+									/>
+								</div>
+
+								{/* Message editor - rich text for links, plain textarea otherwise */}
+								<div
+									className="flex justify-center flex-1"
+									style={{ padding: isMobile ? '0 8px' : undefined }}
+								>
+									<div
+										className="bg-white border-2 border-black rounded-[4px] overflow-visible draft-review-box"
+										style={{
+											width: isMobile ? '100%' : '470px',
+											height: hasStatusBar ? '527px' : '572px',
+											flex: isMobile ? 1 : undefined,
+										}}
+										data-hover-description="Revise your draft here. Type out your revisions. Approve and Reject Drafts"
+									>
+										{/* Check if original message has links - if so, use RichTextEditor for proper link editing */}
+										{selectedDraft?.message && /<a\\s+[^>]*href=/i.test(selectedDraft.message) ? (
+											<div
+												data-hover-description="Revise your draft here. Type out your revisions. Approve and Reject Drafts"
+												className="w-full h-full"
+											>
+												<CustomScrollbar
+													className="w-full h-full"
+													thumbWidth={2}
+													thumbColor="#000000"
+													offsetRight={-6}
+													contentClassName="[&_.ProseMirror]:min-h-full [&_.ProseMirror]:border-0 [&_.ProseMirror]:bg-transparent [&_.ProseMirror]:focus:ring-0 [&_.ProseMirror]:focus:outline-none"
+												>
+													<RichTextEditor
+														value={editedMessage}
+														onChange={setEditedMessage}
+														hideMenuBar
+														className="w-full h-full border-0 bg-transparent !min-h-0 text-sm"
+														placeholder="Type your message here..."
+													/>
+												</CustomScrollbar>
+											</div>
+										) : (
+											<ScrollableTextarea
+												value={editedMessage}
+												onChange={(e) => setEditedMessage(e.target.value)}
+												className="w-full h-full p-3 text-sm resize-none focus:outline-none focus:ring-0 bg-transparent border-0 whitespace-pre-wrap"
+												placeholder="Type your message here..."
+												thumbWidth={2}
+												thumbColor="#000000"
+												trackOffset={-6}
+												data-hover-description="Revise your draft here. Type out your revisions. Approve and Reject Drafts"
+											/>
+										)}
+									</div>
+								</div>
+							</>
+						)}
 
 						{/* Save and Delete buttons - hidden for now */}
 						<div className="hidden mt-3 flex justify-end gap-2">
@@ -1057,150 +1351,191 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 					</div>
 				</div>
 			</div>
-		<div
-			className="flex items-center justify-center"
-			style={{
-				marginTop: isMobile ? '12px' : '22px',
-				// Ensure this row has a stable width so centering math is correct
-				// (otherwise it can shrink-to-fit in narrow layouts and appear shifted right).
-				width: '100%',
-				// For narrow desktop (two-column layout), shift left by 170px to center on page
-				// For narrowest desktop (single-column), no shift needed as layout is already centered
-				...(isNarrowDesktop && !isMobile ? { transform: 'translateX(-170px)' } : {}),
-				...(showTabNavArrows && !isMobile ? { gap: tabNavGap } : {}),
-			}}
-		>
-			{/* Tab navigation left arrow - only in narrow breakpoints, hidden on mobile */}
-			{showTabNavArrows && !isMobile && props.goToPreviousTab && (
-				<button
-					type="button"
-					onClick={props.goToPreviousTab}
-					className="bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0"
-					aria-label="Previous tab"
-				>
-					<LeftArrow width="20" height="39" />
-				</button>
-			)}
-			{/* Inner container with draft navigation and buttons */}
+		{!props.hideDraftReviewActionRow && (
 			<div
-				className="flex items-center justify-center flex-shrink-0"
-				style={showTabNavArrows && !isMobile ? { width: tabNavMiddleWidth } : undefined}
+				className="flex items-center justify-center"
+				style={{
+					marginTop: isMobile ? '12px' : '22px',
+					// Ensure this row has a stable width so centering math is correct
+					// (otherwise it can shrink-to-fit in narrow layouts and appear shifted right).
+					width: '100%',
+					// For narrow desktop (two-column layout), shift left by 170px to center on page
+					// For narrowest desktop (single-column), no shift needed as layout is already centered
+					...(isNarrowDesktop && !isMobile ? { transform: 'translateX(-170px)' } : {}),
+					...(showTabNavArrows && !isMobile ? { gap: tabNavGap } : {}),
+				}}
 			>
-				<button
-					type="button"
-					onClick={handleNavigatePrevious}
-					disabled={!hasDrafts}
-					aria-label="View previous draft"
-					className="p-0 bg-transparent border-0 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-					style={{ marginRight: isMobile ? '10px' : '20px' }}
+				{/* Tab navigation left arrow - only in narrow breakpoints, hidden on mobile */}
+				{showTabNavArrows && !isMobile && props.goToPreviousTab && !isRegenSettingsPreviewOpen && (
+					<button
+						type="button"
+						onClick={props.goToPreviousTab}
+						className="bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0"
+						aria-label="Previous tab"
+					>
+						<LeftArrow width="20" height="39" />
+					</button>
+				)}
+				{/* Inner container with draft navigation and buttons */}
+				<div
+					className="flex items-center justify-center flex-shrink-0"
+					style={
+						isRegenSettingsPreviewOpen
+							? { width: '100%' }
+							: showTabNavArrows && !isMobile
+								? { width: tabNavMiddleWidth }
+								: undefined
+					}
 				>
-					<LeftArrowReviewIcon />
-				</button>
-				<div className="flex" style={{ gap: isMobile ? '6px' : '13px' }}>
-					<Button
-						type="button"
-						variant="ghost"
-						className={cn(
-							"font-secondary font-semibold text-black border-[2px] border-black rounded-none",
-							isMobile ? "text-[12px]" : "text-[14px]"
-						)}
-						style={{
-							width: isMobile ? '80px' : '124px',
-							height: isMobile ? '36px' : '40px',
-							borderTopLeftRadius: '8px',
-							borderBottomLeftRadius: '8px',
-							backgroundColor: '#D5FFCB',
-						}}
-						data-hover-description="Approve you draft. This draft turned out good"
-						onClick={() => {
-							if (selectedDraft) {
-								const isCurrentlyApproved = props.approvedDraftIds?.has(selectedDraft.id) ?? false;
-								props.onApproveDraft?.(selectedDraft.id, isCurrentlyApproved);
-								// Only navigate to next if we're approving, not toggling off
-								if (!isCurrentlyApproved) {
-									handleNavigateNext();
-								}
-							}
-						}}
-					>
-						<span>Approve</span>
-						{!isMobile && <ApproveCheckIcon />}
-					</Button>
-					<Button
-						type="button"
-						variant="ghost"
-						className={cn(
-							"font-secondary font-semibold text-black border-[2px] border-black rounded-none",
-							isMobile ? "text-[12px]" : "text-[14px]"
-						)}
-						style={{
-							width: isMobile ? '80px' : '124px',
-							height: isMobile ? '36px' : '40px',
-							backgroundColor: '#FFDC9E',
-						}}
-						data-hover-description="Regenerate will rewrite the email you have open automatically so that you can get a better result"
-						onClick={handleRegenerate}
-						disabled={isRegenerating || !onRegenerateDraft}
-					>
-						{isRegenerating ? (
-							<Spinner size="small" />
-						) : (
-							isMobile ? 'Regen' : 'Regenerate'
-						)}
-					</Button>
-					<Button
-						type="button"
-						variant="ghost"
-						className={cn(
-							"font-secondary font-semibold text-black border-[2px] border-black rounded-none",
-							isMobile ? "text-[12px]" : "text-[14px]"
-						)}
-						style={{
-							width: isMobile ? '80px' : '124px',
-							height: isMobile ? '36px' : '40px',
-							borderTopRightRadius: '8px',
-							borderBottomRightRadius: '8px',
-							backgroundColor: '#E17272',
-						}}
-						data-hover-description="Reject this contact. This isn't deleting it, but putting it into a rejection folder for you to review"
-						onClick={() => {
-							if (selectedDraft) {
-								const isCurrentlyRejected = props.rejectedDraftIds?.has(selectedDraft.id) ?? false;
-								props.onRejectDraft?.(selectedDraft.id, isCurrentlyRejected);
-								// Only navigate to next if we're rejecting, not toggling off
-								if (!isCurrentlyRejected) {
-									handleNavigateNext();
-								}
-							}
-						}}
-					>
-						<span>Reject</span>
-						{!isMobile && <RejectXIcon />}
-					</Button>
+					{isRegenSettingsPreviewOpen ? (
+						<div className="relative w-full flex items-center justify-center">
+							<button
+								type="button"
+								onClick={() => setIsRegenSettingsPreviewOpen(false)}
+								aria-label="Back"
+								className="absolute left-0 top-0 bottom-0 p-0 bg-transparent border-0 cursor-pointer hover:opacity-80 transition-opacity flex items-center justify-center"
+							>
+								<LeftArrowReviewIcon />
+							</button>
+							<Button
+								type="button"
+								variant="ghost"
+								className={cn(
+									"font-secondary font-semibold text-black border-[2px] border-black transition enabled:hover:brightness-95",
+									isMobile ? "text-[12px]" : "text-[14px]"
+								)}
+								style={{
+									width: isMobile ? 'calc(100vw - 140px)' : '397px',
+									maxWidth: '397px',
+									height: isMobile ? '36px' : '40px',
+									borderRadius: '8px',
+									backgroundColor: '#FFDC9E',
+								}}
+								data-hover-description="Regenerate this email using the settings shown above"
+								onClick={handleRegenerate}
+								disabled={isRegenerating || !onRegenerateDraft}
+							>
+								{isRegenerating ? <Spinner size="small" /> : 'Regenerate'}
+							</Button>
+						</div>
+					) : (
+						<>
+							<button
+								type="button"
+								onClick={handleNavigatePrevious}
+								disabled={!hasDrafts}
+								aria-label="View previous draft"
+								className="p-0 bg-transparent border-0 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+								style={{ marginRight: isMobile ? '10px' : '20px' }}
+							>
+								<LeftArrowReviewIcon />
+							</button>
+							<div className="flex" style={{ gap: isMobile ? '6px' : '13px' }}>
+								<Button
+									type="button"
+									variant="ghost"
+									className={cn(
+										"font-secondary font-semibold text-black border-[2px] border-black rounded-none transition enabled:hover:brightness-95",
+										isMobile ? "text-[12px]" : "text-[14px]"
+									)}
+									style={{
+										width: isMobile ? '80px' : '124px',
+										height: isMobile ? '36px' : '40px',
+										borderTopLeftRadius: '8px',
+										borderBottomLeftRadius: '8px',
+										backgroundColor: '#D5FFCB',
+									}}
+									data-hover-description="Approve you draft. This draft turned out good"
+									onClick={() => {
+										if (selectedDraft) {
+											const isCurrentlyApproved =
+												props.approvedDraftIds?.has(selectedDraft.id) ?? false;
+											props.onApproveDraft?.(selectedDraft.id, isCurrentlyApproved);
+											// Only navigate to next if we're approving, not toggling off
+											if (!isCurrentlyApproved) {
+												handleNavigateNext();
+											}
+										}
+									}}
+								>
+									<span>Approve</span>
+									{!isMobile && <ApproveCheckIcon />}
+								</Button>
+								<Button
+									type="button"
+									variant="ghost"
+									className={cn(
+										"font-secondary font-semibold text-black border-[2px] border-black rounded-none transition enabled:hover:brightness-95",
+										isMobile ? "text-[12px]" : "text-[14px]"
+									)}
+									style={{
+										width: isMobile ? '80px' : '124px',
+										height: isMobile ? '36px' : '40px',
+										backgroundColor: '#FFDC9E',
+									}}
+									data-hover-description="Click to preview your prompt/settings before regenerating this draft"
+									onClick={handleRegenerate}
+									disabled={isRegenerating || !onRegenerateDraft}
+								>
+									{isRegenerating ? <Spinner size="small" /> : isMobile ? 'Regen' : 'Regenerate'}
+								</Button>
+								<Button
+									type="button"
+									variant="ghost"
+									className={cn(
+										"font-secondary font-semibold text-black border-[2px] border-black rounded-none transition enabled:hover:brightness-95",
+										isMobile ? "text-[12px]" : "text-[14px]"
+									)}
+									style={{
+										width: isMobile ? '80px' : '124px',
+										height: isMobile ? '36px' : '40px',
+										borderTopRightRadius: '8px',
+										borderBottomRightRadius: '8px',
+										backgroundColor: '#E17272',
+									}}
+									data-hover-description="Reject this contact. This isn't deleting it, but putting it into a rejection folder for you to review"
+									onClick={() => {
+										if (selectedDraft) {
+											const isCurrentlyRejected =
+												props.rejectedDraftIds?.has(selectedDraft.id) ?? false;
+											props.onRejectDraft?.(selectedDraft.id, isCurrentlyRejected);
+											// Only navigate to next if we're rejecting, not toggling off
+											if (!isCurrentlyRejected) {
+												handleNavigateNext();
+											}
+										}
+									}}
+								>
+									<span>Reject</span>
+									{!isMobile && <RejectXIcon />}
+								</Button>
+							</div>
+							<button
+								type="button"
+								onClick={handleNavigateNext}
+								disabled={!hasDrafts}
+								aria-label="View next draft"
+								className="p-0 bg-transparent border-0 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+								style={{ marginLeft: isMobile ? '10px' : '20px' }}
+							>
+								<RightArrowReviewIcon />
+							</button>
+						</>
+					)}
 				</div>
-				<button
-					type="button"
-					onClick={handleNavigateNext}
-					disabled={!hasDrafts}
-					aria-label="View next draft"
-					className="p-0 bg-transparent border-0 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-					style={{ marginLeft: isMobile ? '10px' : '20px' }}
-				>
-					<RightArrowReviewIcon />
-				</button>
+				{/* Tab navigation right arrow - only in narrow breakpoints, hidden on mobile */}
+				{showTabNavArrows && !isMobile && props.goToNextTab && !isRegenSettingsPreviewOpen && (
+					<button
+						type="button"
+						onClick={props.goToNextTab}
+						className="bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0"
+						aria-label="Next tab"
+					>
+						<RightArrow width="20" height="39" />
+					</button>
+				)}
 			</div>
-			{/* Tab navigation right arrow - only in narrow breakpoints, hidden on mobile */}
-			{showTabNavArrows && !isMobile && props.goToNextTab && (
-				<button
-					type="button"
-					onClick={props.goToNextTab}
-					className="bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0"
-					aria-label="Next tab"
-				>
-					<RightArrow width="20" height="39" />
-				</button>
-			)}
-		</div>
+		)}
 			</div>
 		);
 	}
@@ -1214,11 +1549,13 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 				hasData={draftEmails.length > 0}
 				noDataMessage="No drafts generated"
 				noDataDescription='Click "Generate Drafts" to create emails for the selected contacts'
-				isPending={isPendingEmails}
+				isPending={isPendingEmails || isPendingDeleteEmail}
 				title="Drafts"
 				mainBoxId={props.mainBoxId}
 				goToWriting={props.goToWriting}
+				goToContacts={props.goToContacts}
 				goToSearch={props.goToSearch}
+				goToSent={props.goToSent}
 				goToInbox={props.goToInbox}
 				selectedCount={selectedDraftIds.size}
 				statusFilter={props.statusFilter}
@@ -1232,6 +1569,8 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 					<div
 						className="overflow-visible w-full flex flex-col items-center"
 						onMouseLeave={() => {
+							setHoveredDraftRow(null);
+							setHoveredDraftIndex(null);
 							onContactHover?.(null);
 							onDraftHover?.(null);
 						}}
@@ -1260,46 +1599,107 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 							// Colors based on tab
 							const isRejectedTab = props.statusFilter === 'rejected';
 							const selectedBgColor = isRejectedTab ? 'bg-[#D99696]' : 'bg-[#8BDA76]';
+							const hoveredRegion =
+								hoveredDraftRow?.draftId === draft.id ? hoveredDraftRow.region : null;
+							const hoveredBgColor = isHoveringAllButton
+								? 'bg-[#FFEDCA]'
+								: hoveredRegion === 'left'
+									? 'bg-[#ECFBF0]'
+									: hoveredRegion === 'right'
+										? 'bg-[#FFCACA]'
+										: hoveredRegion === 'middle'
+											? 'bg-[#F9E5BA]'
+											: null;
+							const rowBgColor = isHoveringAllButton
+								? hoveredBgColor
+								: isSelected
+									? selectedBgColor
+									: hoveredBgColor ?? 'bg-white';
+							const hoverDescription =
+								hoveredRegion === 'left'
+									? 'Click to select row'
+									: hoveredRegion === 'right'
+										? 'Click to delete draft'
+										: 'Click to open and review';
+							
+							// hoveredDraftRow is updated by both mouse hover and keyboard navigation,
+							// so hoveredBgColor already reflects the correct region color for both cases
 
 							return (
 								<div key={draft.id} className="w-full flex flex-col items-center overflow-visible">
 									{idx > 0 && <div className="h-[10px]" />}
 									<div
 										className={cn(
-											'cursor-pointer relative select-none overflow-visible border-2 p-2 group/draft rounded-[8px]',
+											'cursor-pointer relative select-none overflow-visible border-2 p-2 group/draft rounded-[8px] transition-colors',
 											isMobile ? 'h-[100px]' : 'h-[97px]',
-											isSelected
-												? cn('border-[#FFFFFF]', selectedBgColor)
-												: cn(
-														'border-[#000000]',
-														isHoveringAllButton ? 'bg-[#FFEDCA]' : 'bg-white hover:bg-[#F9E5BA]'
-												  )
+											'border-[#000000]',
+											rowBgColor,
 										)}
 										style={isMobile ? { width: mobileEmailRowWidth } : { width: '489px' }}
-										data-hover-description="Click to open and review"
+										data-hover-description={hoverDescription}
 										onMouseDown={(e) => {
 											// Prevent text selection on shift-click
 											if (e.shiftKey) {
 												e.preventDefault();
 											}
 										}}
-										onMouseEnter={() => {
+										onMouseEnter={(e) => {
 											if (contact) {
 												onContactHover?.(contact);
 											}
 											onDraftHover?.(draft);
+											const region = getDraftRowHoverRegion(e);
+											setHoveredDraftRow({ draftId: draft.id, region });
+											setHoveredDraftIndex(idx);
 										}}
-										onClick={() => {
-											handleDraftDoubleClick(draft);
-											if (contact) {
-												onContactClick?.(contact);
+										onMouseMove={(e) => {
+											const region = getDraftRowHoverRegion(e);
+											setHoveredDraftRow((prev) => {
+												if (prev?.draftId === draft.id && prev.region === region) return prev;
+												return { draftId: draft.id, region };
+											});
+										}}
+										onMouseLeave={() => {
+											setHoveredDraftRow((prev) => (prev?.draftId === draft.id ? null : prev));
+										}}
+										onClick={(e) => {
+											const region = getDraftRowHoverRegion(e);
+
+											// Left zone: select row
+											if (region === 'left') {
+												handleDraftSelect(draft, e);
+												return;
 											}
+
+											// Middle zone: open draft (existing behavior)
+											if (region === 'middle') {
+												handleDraftDoubleClick(draft);
+												if (contact) {
+													onContactClick?.(contact);
+												}
+												return;
+											}
+
+											// Right zone: delete draft
+											void handleDeleteDraft(e, draft.id);
 										}}
 									>
+									{/* Left-hover accent bar (156px x 5px) */}
+									{hoveredRegion === 'left' && (
+										<span
+											className="absolute left-0 top-0 w-[156px] h-[5px] bg-[#CCECD4] pointer-events-none rounded-tl-[6px]"
+										/>
+									)}
+									{/* Middle-hover accent bar (from x=156px to right edge, 5px tall) */}
+									{hoveredRegion === 'middle' && (
+										<span
+											className="absolute left-[156px] right-0 top-0 h-[5px] bg-[#FFDE97] pointer-events-none rounded-tr-[6px]"
+										/>
+									)}
 									{/* Used-contact indicator - 11px from top */}
 									{usedContactIdsSet.has(draft.contactId) && (
 										<span
-											className="absolute"
+											className="absolute z-10"
 											title="Used in a previous campaign"
 											style={{
 												left: '8px',
@@ -1315,7 +1715,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 									{/* Rejected indicator - stacked below used-contact when present */}
 									{isRejected && (
 										<span
-											className="absolute"
+											className="absolute z-10"
 											title="Marked for rejection"
 											aria-label="Rejected draft"
 											style={{
@@ -1332,7 +1732,7 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 									{/* Approved indicator - stacked below used-contact when present */}
 									{isApproved && (
 										<span
-											className="absolute"
+											className="absolute z-10"
 											title="Marked for approval"
 											aria-label="Approved draft"
 											style={{
@@ -1346,28 +1746,20 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 											}}
 										/>
 									)}
-									{/* Checkbox indicator - visible on hover only */}
-									<span
-										className="absolute hidden group-hover/draft:block cursor-pointer"
-										style={{
-											left: '10px',
-											bottom: '10px',
-											width: '15px',
-											height: '15px',
-											borderRadius: '1px',
-											border: isSelected ? '2px solid #FFFFFF' : '2px solid #676767',
-											backgroundColor: isSelected ? '#22C21C' : 'transparent',
-										}}
-										onClick={(e) => {
-											e.stopPropagation();
-											e.preventDefault();
-											handleDraftSelect(draft, e);
-										}}
-										onDoubleClick={(e) => {
-											e.stopPropagation();
-											e.preventDefault();
-										}}
-									/>
+									{/* Selection switch (replaces old checkbox square) */}
+									<div
+										className={cn(
+											'absolute left-[10px] bottom-[4px] z-0 w-[9px] h-[36px] rounded-[11px] border-2 border-black bg-white overflow-hidden pointer-events-none',
+											'hidden group-hover/draft:block'
+										)}
+									>
+										<div
+											className={cn(
+												'absolute left-0 top-0 w-full rounded-[11px] transition-all duration-200 ease-out',
+												isSelected ? 'h-full bg-[#ECF5EE]' : 'h-[26px] bg-[#6DC683]'
+											)}
+										/>
+									</div>
 									{/* Delete button */}
 									<Button
 										type="button"
@@ -1763,4 +2155,6 @@ export const DraftedEmails: FC<DraftedEmailsProps> = (props) => {
 			)}
 		</div>
 	);
-};
+});
+
+DraftedEmails.displayName = 'DraftedEmails';

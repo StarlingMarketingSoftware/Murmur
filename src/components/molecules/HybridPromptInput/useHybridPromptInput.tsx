@@ -69,6 +69,14 @@ export interface HybridPromptInputProps {
 	compactLeftOnly?: boolean;
 	onGoToDrafting?: () => void;
 	/**
+	 * Optional: invoked when the user clicks to navigate to the Contacts tab.
+	 */
+	onGoToContacts?: () => void;
+	/**
+	 * Optional: invoked when the user clicks to navigate to the Inbox tab.
+	 */
+	onGoToInbox?: () => void;
+	/**
 	 * Optional: invoked when the user clicks the Draft button on the Writing tab.
 	 * Typically used to generate drafts for the currently selected contacts.
 	 */
@@ -173,6 +181,40 @@ export interface HybridPromptInputProps {
 	 * Useful for embedded/scaled demos (e.g. landing page) where fixed UI bleeds outside the demo frame.
 	 */
 	hideMobileStickyTestFooter?: boolean;
+	/**
+	 * Optional: when true, hide all "Generate Test" / "Test" controls.
+	 * Useful for embedded prompt previews (e.g. regen settings) where testing is not needed.
+	 */
+	hideGenerateTestButton?: boolean;
+	/**
+	 * Optional: override the main container height (default 703px).
+	 * Useful for embedded previews that should not fill the full box.
+	 */
+	containerHeightPx?: number;
+	/**
+	 * Optional: override the `data-campaign-main-box` attribute used for cross-tab morph animations.
+	 * - `undefined` (default): uses "writing" (current behavior)
+	 * - `null` or empty string: omits the attribute
+	 * - string: sets the attribute to that value
+	 */
+	dataCampaignMainBox?: string | null;
+	/**
+	 * Optional: hide the small 229x34px box at the very bottom of the Profile tab.
+	 * Useful for embedded prompt previews (e.g. Drafts tab regen settings) to avoid scrollbars.
+	 */
+	hideProfileBottomMiniBox?: boolean;
+	/**
+	 * Optional: when true, disable the main content area's vertical scrolling on the Profile tab
+	 * (so expanding a Profile field won't trigger a scrollbar). Overflow will be clipped instead.
+	 * Intended for embedded prompt previews (e.g. Drafts tab regen settings).
+	 */
+	clipProfileTabOverflow?: boolean;
+	/**
+	 * Optional: override the Manual mode entry box height (default is 623px).
+	 * Useful for embedded previews (e.g. Drafts tab regen settings) so the outer container
+	 * doesn't need to scroll.
+	 */
+	manualEntryHeightPx?: number;
 }
 
 export const useHybridPromptInput = (props: HybridPromptInputProps) => {

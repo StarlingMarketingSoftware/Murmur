@@ -41,12 +41,13 @@ const TRANSITION_DURATION = 180;
 const MAX_TRANSITION_WAIT_MS = 650;
 
 const SIXTEEN_BY_TEN_ZOOM_MATCH_TOLERANCE_PX = 50;
-
+	
 // 16:10 resolution-specific zoom levels: [width, height] → zoom
 const SIXTEEN_BY_TEN_ZOOM_MAP: Array<{ w: number; h: number; zoom: number }> = [
 	{ w: 1152, h: 720, zoom: 0.52 },
 	{ w: 1280, h: 800, zoom: 0.6 },
 	{ w: 1440, h: 900, zoom: 0.7 },
+	{ w: 1504, h: 940, zoom: 0.84 },  // 14" MacBook Pro (slightly more zoomed-in)
 	{ w: 1664, h: 1040, zoom: 0.77 },
 	{ w: 1920, h: 1200, zoom: 0.95 },
 	{ w: 2048, h: 1280, zoom: 0.95 },
@@ -125,12 +126,59 @@ const Murmur = () => {
 	const CAMPAIGN_ZOOM_VAR = '--murmur-campaign-zoom';
 	const DEFAULT_CAMPAIGN_ZOOM = 0.85;
 	const CAMPAIGN_ZOOM_EVENT = 'murmur:campaign-zoom-changed';
+	const CAMPAIGN_SCROLLABLE_CLASS = 'murmur-campaign-scrollable';
 
 	// Resolution-aware zoom calculation for campaign page
 	const updateCampaignZoomForViewport = useCallback(() => {
 		if (typeof window === 'undefined') return;
 
 		const html = document.documentElement;
+		// IMPORTANT: `visualViewport.width` can jitter on mobile / responsive emulation while scrolling
+		// (address-bar/show-hide), which can accidentally flip us back into the no-scroll "nuclear" mode
+		// mid-scroll. Use the stable layout viewport width for breakpoint decisions.
+		const stableViewportW = window.innerWidth;
+
+		// On the thinnest breakpoint (<= 776px), we *must* allow page scroll for the stacked layout.
+		const THINNEST_VIEWPORT_W_PX = 776;
+		const shouldAllowScroll = stableViewportW <= THINNEST_VIEWPORT_W_PX;
+
+		// IMPORTANT:
+		// The campaign page uses the "nuclear option" (overflow hidden + snug zoom fit) for normal + narrow.
+		// On the thinnest breakpoint (<= 776px), we *must* allow page scroll for the stacked layout.
+		//
+		// On some browsers (notably those without CSS `zoom`), the combination of root-level scaling +
+		// overflow locking can make scroll restoration unreliable. So on the thinnest breakpoint we:
+		// - enable scroll mode via class
+		// - disable campaign compact scaling entirely (removes overflow:hidden + zoom/transform fallback)
+		if (shouldAllowScroll) {
+			html.classList.add(CAMPAIGN_SCROLLABLE_CLASS);
+			html.classList.remove(CAMPAIGN_COMPACT_CLASS);
+			html.style.removeProperty(CAMPAIGN_ZOOM_VAR);
+			// Clear any inline scroll locks that could prevent scrolling (defensive).
+			try {
+				document.body.style.overflow = '';
+				document.body.style.overflowX = '';
+				document.body.style.overflowY = '';
+				document.body.style.position = '';
+				document.body.style.top = '';
+				document.body.style.width = '';
+				document.body.style.touchAction = '';
+				document.documentElement.style.overflow = '';
+			} catch {
+				// ignore
+			}
+			return;
+		}
+
+		// Never shrink the mobile campaign UI (it's already heavily tuned).
+		// Still enforce the <=776px scrollable mode above.
+		if (isMobile) {
+			html.classList.remove(CAMPAIGN_SCROLLABLE_CLASS);
+			html.classList.remove(CAMPAIGN_COMPACT_CLASS);
+			html.style.removeProperty(CAMPAIGN_ZOOM_VAR);
+			return;
+		}
+
 		const viewportH = window.visualViewport?.height ?? window.innerHeight;
 		const viewportW = window.visualViewport?.width ?? window.innerWidth;
 		if (viewportH <= 0 || viewportW <= 0) return;
@@ -321,12 +369,11 @@ const Murmur = () => {
 		// Guardrails: keep zoom within sane bounds (prevents accidental extreme values).
 		targetZoom = clampZoom(targetZoom, 0.5, 1.6);
 
-		// If the viewport height shrinks (e.g. Dock/taskbar visible), clamp zoom so the bottom panels
-		// remain fully visible. This is applied only when we'd otherwise clip content.
-		//
-		// Important: on short viewports (e.g. ~740px tall) this can demand an overly aggressive zoom
-		// reduction (making the whole UI feel "tiny"). In those cases, we cap how far we shrink and
-		// prefer allowing vertical scroll rather than destroying readability.
+		// Normal + narrow: keep compact mode (snug, no page scroll).
+		html.classList.remove(CAMPAIGN_SCROLLABLE_CLASS);
+		html.classList.add(CAMPAIGN_COMPACT_CLASS);
+
+		// Clamp zoom so the bottom panels remain fully visible (snug, no scroll).
 		try {
 			const anchors = Array.from(
 				document.querySelectorAll<HTMLElement>('[data-campaign-bottom-anchor]')
@@ -353,20 +400,32 @@ const Murmur = () => {
 				// On short viewports (e.g. when macOS Dock is visible) we use a smaller margin
 				// to avoid forcing the entire UI to scale down too much.
 				const SAFE_BOTTOM_MARGIN_PX = viewportH <= 780 ? 8 : 24;
-				// Soft clamp: shrink to fit only up to a point; beyond that, prefer scroll over
-				// making the entire UI unreadably small/large swings on resize.
-				const RELATIVE_MIN_DOCK_CLAMP_RATIO = viewportH <= 780 ? 0.95 : 0.9;
 				const ABSOLUTE_MIN_DOCK_CLAMP_ZOOM = 0.5;
-				const minDockClampZoom = Math.max(
-					ABSOLUTE_MIN_DOCK_CLAMP_ZOOM,
-					targetZoom * RELATIVE_MIN_DOCK_CLAMP_RATIO
-				);
+				const ABSOLUTE_MAX_HEIGHT_FIT_ZOOM = 1.2;
 				const availableH = Math.max(0, viewportH - SAFE_BOTTOM_MARGIN_PX);
-				if (currentZoom > 0 && maxBottomPx > availableH) {
+
+				if (currentZoom > 0 && maxBottomPx > 0) {
 					const unscaledBottomPx = maxBottomPx / currentZoom;
-					const maxZoomToFit = unscaledBottomPx > 0 ? availableH / unscaledBottomPx : NaN;
-					if (Number.isFinite(maxZoomToFit) && maxZoomToFit > 0) {
-						targetZoom = Math.min(targetZoom, Math.max(maxZoomToFit, minDockClampZoom));
+					// Calculate exact zoom to make the content bottom align with the viewport bottom
+					const zoomToFitHeight = unscaledBottomPx > 0 ? availableH / unscaledBottomPx : NaN;
+
+					if (Number.isFinite(zoomToFitHeight) && zoomToFitHeight > 0) {
+						// Apply the fit-height zoom, but constrained:
+						// 1. Never shrink below ABSOLUTE_MIN_DOCK_CLAMP_ZOOM (0.5)
+						// 2. Never grow above ABSOLUTE_MAX_HEIGHT_FIT_ZOOM (1.2)
+						// 3. Ensure we don't break the layout width (keep effective width >= 952px)
+
+						const minEffectiveWidth = 952;
+						const maxZoomForWidth = viewportW / minEffectiveWidth;
+
+						const finalMaxZoom = Math.min(ABSOLUTE_MAX_HEIGHT_FIT_ZOOM, maxZoomForWidth);
+
+						// We strictly use the calculated zoomToFitHeight (clamped)
+						// because the user wants it "SNUG" (filled).
+						targetZoom = Math.min(
+							Math.max(zoomToFitHeight, ABSOLUTE_MIN_DOCK_CLAMP_ZOOM),
+							finalMaxZoom
+						);
 					}
 				}
 			}
@@ -414,7 +473,7 @@ const Murmur = () => {
 		} catch {
 			// no-op
 		}
-	}, []);
+	}, [isMobile]);
 
 	// Make the campaign page render slightly "zoomed out" on desktop (85%),
 	// without changing the rest of the Murmur app.
@@ -422,21 +481,12 @@ const Murmur = () => {
 		// Avoid running until we know whether this is a real mobile device.
 		if (isMobile === null) return;
 
-		// Never shrink the mobile campaign UI (it's already heavily tuned).
-		if (isMobile) {
-			document.documentElement.classList.remove(CAMPAIGN_COMPACT_CLASS);
-			document.documentElement.style.removeProperty(CAMPAIGN_ZOOM_VAR);
-			return;
-		}
-
-		document.documentElement.classList.add(CAMPAIGN_COMPACT_CLASS);
-
 		const onResize = () => updateCampaignZoomForViewport();
 		updateCampaignZoomForViewport();
 		// Re-run once the drafting UI mounts so the bottom-panels clamp can measure real DOM.
 		// (DraftingSection is dynamically imported, so it may not exist on the first call.)
 		let mo: MutationObserver | null = null;
-		if (typeof MutationObserver !== 'undefined') {
+		if (isMobile === false && typeof MutationObserver !== 'undefined') {
 			mo = new MutationObserver(() => {
 				const hasAnchors = Boolean(document.querySelector('[data-campaign-bottom-anchor]'));
 				if (!hasAnchors) return;
@@ -450,6 +500,7 @@ const Murmur = () => {
 
 		return () => {
 			document.documentElement.classList.remove(CAMPAIGN_COMPACT_CLASS);
+			document.documentElement.classList.remove(CAMPAIGN_SCROLLABLE_CLASS);
 			document.documentElement.style.removeProperty(CAMPAIGN_ZOOM_VAR);
 			mo?.disconnect();
 			window.removeEventListener('resize', onResize);
@@ -488,6 +539,68 @@ const Murmur = () => {
 			isWriteTabHighlighted,
 		]
 	);
+
+	const topSearchHighlightTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+	// Moved here to be accessible by the keydown listener
+	const handleOpenDashboardSearchForCampaign = useCallback(() => {
+		if (!campaign) return;
+
+		const searchName = campaign?.userContactLists?.[0]?.name || campaign?.name || '';
+		const pendingSearch = searchName ? `[Booking] ${searchName}`.trim() : '';
+		if (pendingSearch && typeof window !== 'undefined') {
+			sessionStorage.setItem('murmur_pending_search', pendingSearch);
+		}
+
+		router.push(`${urls.murmur.dashboard.index}?fromCampaignId=${campaign.id}`);
+	}, [campaign, router]);
+
+	// Track highlight state in a ref so the event listener has fresh access without re-binding constantly
+	const isTopSearchHighlightedRef = useRef(isTopSearchHighlighted);
+	useEffect(() => {
+		isTopSearchHighlightedRef.current = isTopSearchHighlighted;
+	}, [isTopSearchHighlighted]);
+
+	useEffect(() => {
+		const handleKeyDown = (e: KeyboardEvent) => {
+			if (e.code === 'Space') {
+				const target = e.target as HTMLElement;
+				if (target.matches('input, textarea, [contenteditable="true"]')) {
+					return;
+				}
+
+				e.preventDefault();
+
+				if (isTopSearchHighlightedRef.current) {
+					handleOpenDashboardSearchForCampaign();
+				} else {
+					setTopSearchHighlighted(true);
+
+					if (topSearchHighlightTimeoutRef.current) {
+						clearTimeout(topSearchHighlightTimeoutRef.current);
+					}
+
+					topSearchHighlightTimeoutRef.current = setTimeout(() => {
+						setTopSearchHighlighted(false);
+					}, 3000);
+				}
+			}
+		};
+
+		window.addEventListener('keydown', handleKeyDown);
+		return () => {
+			window.removeEventListener('keydown', handleKeyDown);
+		};
+	}, [handleOpenDashboardSearchForCampaign]);
+
+	// Cleanup timer on unmount
+	useEffect(() => {
+		return () => {
+			if (topSearchHighlightTimeoutRef.current) {
+				clearTimeout(topSearchHighlightTimeoutRef.current);
+			}
+		};
+	}, []);
 
 	const { user, isPendingUser, isLoaded } = useMe();
 	const { data: identities, isPending: isPendingIdentities } = useGetIdentities({});
@@ -598,6 +711,82 @@ const Murmur = () => {
 	};
 	
 	const [activeView, setActiveViewInternal] = useState<ViewType>(getInitialView());
+	// Track the tab we were on before pressing up arrow to go to "all" (so down arrow can return)
+	const [tabBeforeAll, setTabBeforeAll] = useState<ViewType | null>(null);
+	// Track if we navigated from inbox to sent via down arrow (so up arrow can return to inbox)
+	const [cameToSentFromInbox, setCameToSentFromInbox] = useState(false);
+	// Track the latest requested view so rapid tab flips don't get dropped due to stale closures.
+	// Example: user clicks A -> B, then quickly clicks A again before React commits B.
+	// Without this, the second click can be ignored (newView === activeView), skipping the right-panel slide.
+	const requestedViewRef = useRef<ViewType>(activeView);
+	useEffect(() => {
+		requestedViewRef.current = activeView;
+	}, [activeView]);
+
+	// In the thinnest "scrollable" campaign breakpoint, some nested scroll containers can trap
+	// wheel/trackpad scroll (especially on Write + Inbox), making the page feel "stuck" unless the
+	// cursor is positioned just right.
+	//
+	// This capture handler restores expected scroll behavior:
+	// - If a nested scroll container under the cursor CAN scroll, let it.
+	// - Otherwise, force the wheel gesture to scroll the PAGE.
+	// - Never interfere with text inputs / editable fields.
+	useEffect(() => {
+		if (typeof window === 'undefined') return;
+
+		const isEditableTarget = (el: HTMLElement | null) =>
+			Boolean(
+				el?.closest('textarea, input, select, [contenteditable="true"], [role="textbox"]')
+			);
+
+		const findScrollableAncestor = (el: HTMLElement | null): HTMLElement | null => {
+			let node: HTMLElement | null = el;
+			while (node && node !== document.body && node !== document.documentElement) {
+				const cs = window.getComputedStyle(node);
+				const overflowY = cs.overflowY;
+				const isScrollableY =
+					(overflowY === 'auto' || overflowY === 'scroll') &&
+					node.scrollHeight > node.clientHeight + 1;
+				if (isScrollableY) return node;
+				node = node.parentElement;
+			}
+			return null;
+		};
+
+		const canScrollY = (el: HTMLElement, deltaY: number) => {
+			if (!Number.isFinite(deltaY) || deltaY === 0) return false;
+			if (deltaY > 0) return el.scrollTop + el.clientHeight < el.scrollHeight - 1;
+			return el.scrollTop > 0;
+		};
+
+		const onWheelCapture = (e: WheelEvent) => {
+			try {
+				const html = document.documentElement;
+				if (!html.classList.contains(CAMPAIGN_SCROLLABLE_CLASS)) return;
+				// Limit to the views that were observed to trap scroll.
+				if (!(activeView === 'testing' || activeView === 'inbox')) return;
+
+				const target = e.target as HTMLElement | null;
+				if (!target) return;
+				if (isEditableTarget(target)) return;
+
+				// Prefer native behavior when the immediate scroll container can handle it.
+				const scrollParent = findScrollableAncestor(target);
+				if (scrollParent && canScrollY(scrollParent, e.deltaY)) return;
+
+				// Otherwise, force the wheel gesture to scroll the document.
+				e.preventDefault();
+				window.scrollBy({ top: e.deltaY, left: 0, behavior: 'auto' });
+			} catch {
+				// ignore
+			}
+		};
+
+		window.addEventListener('wheel', onWheelCapture, { passive: false, capture: true });
+		return () => {
+			window.removeEventListener('wheel', onWheelCapture, true);
+		};
+	}, [activeView]);
 	
 	// State for top campaigns dropdown
 	const [showTopCampaignsDropdown, setShowTopCampaignsDropdown] = useState(false);
@@ -664,6 +853,7 @@ const Murmur = () => {
 		setPreviousView(null);
 		setIsTransitioning(false);
 		setIsFadingOutPreviousView(false);
+		requestedViewRef.current = 'contacts';
 		setActiveViewInternal('contacts');
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [isMobile, activeView]);
@@ -677,7 +867,10 @@ const Murmur = () => {
 		) {
 			newView = 'contacts';
 		}
-		if (newView === activeView) return;
+		// Dedupe against the *latest requested* view (not just the last committed render) so
+		// rapid flips like A -> B -> A still enqueue the final A update and don't get dropped.
+		if (newView === requestedViewRef.current) return;
+		requestedViewRef.current = newView;
 		
 		// Clear any pending transition timers
 		if (transitionTimeoutRef.current) {
@@ -687,6 +880,16 @@ const Murmur = () => {
 		if (maxWaitTimeoutRef.current) {
 			clearTimeout(maxWaitTimeoutRef.current);
 			maxWaitTimeoutRef.current = null;
+		}
+
+		// If the user clicks back to the currently committed view while a different view was pending,
+		// treat it as a cancel (no need to stage a crossfade from an uncommitted/never-painted view).
+		if (newView === activeView) {
+			setPreviousView(null);
+			setIsTransitioning(false);
+			setIsFadingOutPreviousView(false);
+			setActiveViewInternal(newView);
+			return;
 		}
 		
 		// Start transition: keep previous view visible while the destination paints.
@@ -1089,7 +1292,9 @@ const Murmur = () => {
 		};
 	}, []);
 
-	// Narrow desktop detection for Writing tab compact layout (952px - 1279px)
+	// Narrow desktop detection for Writing tab compact layout.
+	// Note: widened upper bound from 1280 -> 1317 so the left pinned panel never clips
+	// when campaign zoom / browser zoom reduces available space.
 	const [isNarrowDesktop, setIsNarrowDesktop] = useState(false);
 	// Narrowest desktop detection (< 952px) - header box above tabs
 	const [isNarrowestDesktop, setIsNarrowestDesktop] = useState(false);
@@ -1121,7 +1326,7 @@ const Murmur = () => {
 						: DEFAULT_CAMPAIGN_ZOOM;
 			const effectiveWidth = window.innerWidth / (z || 1);
 
-			setIsNarrowDesktop(effectiveWidth >= 952 && effectiveWidth < 1280);
+			setIsNarrowDesktop(effectiveWidth >= 952 && effectiveWidth < 1317);
 			setIsNarrowestDesktop(effectiveWidth < 952);
 			setHideRightPanel(effectiveWidth < 1522);
 			setHideRightPanelOnAll(effectiveWidth <= 1665);
@@ -1167,17 +1372,21 @@ const Murmur = () => {
 		(activeView === 'all' && hideArrowsOnAll) ||
 		((activeView === 'inbox' || activeView === 'sent') && hideArrowsOnInbox);
 
-	// Tab navigation order
+	// Tab navigation order (excludes 'all' tab from arrow navigation)
 	const tabOrder: ViewType[] = [
 		'contacts',
 		'testing',
-		'all',
 		'drafting',
 		'sent',
 		'inbox',
 	];
 
 	const goToPreviousTab = () => {
+		// Special case: when on 'all' tab, left arrow goes to 'testing' (Writing tab)
+		if (activeView === 'all') {
+			setActiveView('testing');
+			return;
+		}
 		const currentIndex = tabOrder.indexOf(activeView);
 		if (currentIndex > 0) {
 			setActiveView(tabOrder[currentIndex - 1]);
@@ -1188,6 +1397,11 @@ const Murmur = () => {
 	};
 
 	const goToNextTab = () => {
+		// Special case: when on 'all' tab, right arrow goes to 'drafting' (Drafts tab)
+		if (activeView === 'all') {
+			setActiveView('drafting');
+			return;
+		}
 		const currentIndex = tabOrder.indexOf(activeView);
 		if (currentIndex < tabOrder.length - 1) {
 			setActiveView(tabOrder[currentIndex + 1]);
@@ -1225,17 +1439,81 @@ const Murmur = () => {
 		}
 	};
 
-	const handleOpenDashboardSearchForCampaign = useCallback(() => {
-		if (!campaign) return;
+	// Keyboard navigation: arrow keys to switch tabs when no text input is focused
+	// Left/Right: cycle through tabs, Up: go to "all" tab, Down: return from "all" tab
+	useEffect(() => {
+		const handleKeyDown = (e: KeyboardEvent) => {
+			// Only handle arrow keys
+			if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight' && e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
 
-		const searchName = campaign?.userContactLists?.[0]?.name || campaign?.name || '';
-		const pendingSearch = searchName ? `[Booking] ${searchName}`.trim() : '';
-		if (pendingSearch && typeof window !== 'undefined') {
-			sessionStorage.setItem('murmur_pending_search', pendingSearch);
-		}
+			// Check if a text input element is focused (don't intercept typing)
+			const activeElement = document.activeElement;
+			if (activeElement) {
+				const tagName = activeElement.tagName.toLowerCase();
+				// Skip if focused on input, textarea, or contentEditable
+				if (
+					tagName === 'input' ||
+					tagName === 'textarea' ||
+					(activeElement as HTMLElement).isContentEditable
+				) {
+					return;
+				}
+			}
 
-		router.push(`${urls.murmur.dashboard.index}?fromCampaignId=${campaign.id}`);
-	}, [campaign, router]);
+			// Prevent default scrolling behavior
+			e.preventDefault();
+
+			// Handle up/down arrows for vertical tab navigation
+			if (e.key === 'ArrowUp') {
+				// Special case: if on sent tab and we got here from inbox via down arrow, go back to inbox
+				if (activeView === 'sent' && cameToSentFromInbox) {
+					setCameToSentFromInbox(false);
+					setActiveView('inbox');
+					return;
+				}
+				// Go to "all" tab and remember current tab (unless already on "all")
+				if (activeView !== 'all') {
+					setTabBeforeAll(activeView);
+					setActiveView('all');
+				}
+				return;
+			}
+
+			if (e.key === 'ArrowDown') {
+				// Special case: inbox tab -> sent tab
+				if (activeView === 'inbox') {
+					setCameToSentFromInbox(true);
+					setActiveView('sent');
+					return;
+				}
+				// Return to the tab we were on before going to "all"
+				if (tabBeforeAll) {
+					setActiveView(tabBeforeAll);
+					setTabBeforeAll(null);
+				}
+				return;
+			}
+
+			// Use mobile tab order on mobile, desktop tab order otherwise
+			if (isMobile === true) {
+				if (e.key === 'ArrowLeft') {
+					goToPreviousMobileTab();
+				} else {
+					goToNextMobileTab();
+				}
+			} else {
+				if (e.key === 'ArrowLeft') {
+					goToPreviousTab();
+				} else {
+					goToNextTab();
+				}
+			}
+		};
+
+		window.addEventListener('keydown', handleKeyDown);
+		return () => window.removeEventListener('keydown', handleKeyDown);
+	}, [isMobile, goToPreviousTab, goToNextTab, activeView, tabBeforeAll, cameToSentFromInbox, setActiveView]);
+
 
 	if (isPendingCampaign || !campaign) {
 		return (
@@ -1470,6 +1748,7 @@ const Murmur = () => {
 						style={{
 							gap: '20px',
 							fontWeight: 400,
+							transform: 'translateY(13px)',
 						}}
 					>
 						<svg
@@ -1785,6 +2064,9 @@ const Murmur = () => {
 									setIdentityDialogOrigin('campaign');
 									setIsIdentityDialogOpen(true);
 								}}
+								onContactsClick={() => setActiveView('contacts')}
+								onDraftsClick={() => setActiveView('drafting')}
+								onSentClick={() => setActiveView('sent')}
 								fullWidth
 							/>
 						</div>
