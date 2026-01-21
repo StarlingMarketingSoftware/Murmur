@@ -2,6 +2,7 @@
 
 import { FC, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { gsap } from 'gsap';
+import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { createPortal, flushSync } from 'react-dom';
 import { CampaignsTable } from '../../../components/organisms/_tables/CampaignsTable/CampaignsTable';
@@ -2899,6 +2900,35 @@ const DashboardContent = () => {
 	if (isMobile) {
 		return (
 			<div className="min-h-screen w-full">
+				<Link
+					href={urls.home.index}
+					prefetch
+					className="fixed left-8 top-6 flex items-center gap-5 text-[15px] font-inter font-normal no-underline hover:no-underline z-[10000] group text-[#060606] hover:text-gray-500"
+					title="Back to Landing"
+					aria-label="Back to Landing"
+					onClick={(e) => {
+						e.preventDefault();
+						if (typeof window !== 'undefined') {
+							window.location.assign(urls.home.index);
+						}
+					}}
+				>
+					<svg
+						width="16"
+						height="10"
+						viewBox="0 0 27 16"
+						fill="none"
+						xmlns="http://www.w3.org/2000/svg"
+						className="inline-block align-middle"
+					>
+						<path
+							d="M0.292892 7.29289C-0.0976315 7.68342 -0.0976315 8.31658 0.292892 8.70711L6.65685 15.0711C7.04738 15.4616 7.68054 15.4616 8.07107 15.0711C8.46159 14.6805 8.46159 14.0474 8.07107 13.6569L2.41421 8L8.07107 2.34315C8.46159 1.95262 8.46159 1.31946 8.07107 0.928932C7.68054 0.538408 7.04738 0.538408 6.65685 0.928932L0.292892 7.29289ZM27 8V7L1 7V8V9L27 9V8Z"
+							fill="currentColor"
+						/>
+					</svg>
+					<span>to Landing</span>
+				</Link>
+
 				{/* Only show logo above box when there are campaigns */}
 				{hasCampaigns && (
 					<div className="w-full">
@@ -2937,6 +2967,35 @@ const DashboardContent = () => {
 
 	return (
 		<AppLayout>
+			<Link
+				href={urls.home.index}
+				prefetch
+				className="fixed left-8 top-6 flex items-center gap-5 text-[15px] font-inter font-normal no-underline hover:no-underline z-[10000] group text-[#060606] hover:text-gray-500"
+				title="Back to Landing"
+				aria-label="Back to Landing"
+				onClick={(e) => {
+					e.preventDefault();
+					if (typeof window !== 'undefined') {
+						window.location.assign(urls.home.index);
+					}
+				}}
+			>
+				<svg
+					width="16"
+					height="10"
+					viewBox="0 0 27 16"
+					fill="none"
+					xmlns="http://www.w3.org/2000/svg"
+					className="inline-block align-middle"
+				>
+					<path
+						d="M0.292892 7.29289C-0.0976315 7.68342 -0.0976315 8.31658 0.292892 8.70711L6.65685 15.0711C7.04738 15.4616 7.68054 15.4616 8.07107 15.0711C8.46159 14.6805 8.46159 14.0474 8.07107 13.6569L2.41421 8L8.07107 2.34315C8.46159 1.95262 8.46159 1.31946 8.07107 0.928932C7.68054 0.538408 7.04738 0.538408 6.65685 0.928932L0.292892 7.29289ZM27 8V7L1 7V8V9L27 9V8Z"
+						fill="currentColor"
+					/>
+				</svg>
+				<span>to Landing</span>
+			</Link>
+
 			<div
 				ref={dashboardContentRef}
 				className={`relative min-h-screen dashboard-main-offset w-full max-w-full ${bottomPadding} ${

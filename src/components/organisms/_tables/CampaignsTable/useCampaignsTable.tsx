@@ -213,8 +213,7 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 				// Align it to the "Drafts" text start (pl-2) or center in compact mode.
 				const desiredAscWidth = 36;
 				const ascWidth = Math.max(0, Math.min(desiredAscWidth, headerWidth - 2));
-				const shouldCenterAsc =
-					compactMetrics || metricSortKey === 'updated' || metricSortKey === 'created';
+				const shouldCenterAsc = compactMetrics;
 				const ascLeft = shouldCenterAsc
 					? baseLeftInTh + (headerWidth - ascWidth) / 2
 					: baseLeftInTh + 8; // Tailwind pl-2 = 8px, aligns to text start
