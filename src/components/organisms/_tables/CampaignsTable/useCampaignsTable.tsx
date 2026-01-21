@@ -166,6 +166,7 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 					<span
 						className={cn(
 							'metrics-header-label',
+							!compactMetrics && 'relative left-[-13px]',
 							compactMetrics &&
 								'flex h-[15px] metric-width-long items-center justify-center text-center text-[10px] font-medium leading-[1.05] tracking-[0.01em] metrics-header-label-compact'
 						)}

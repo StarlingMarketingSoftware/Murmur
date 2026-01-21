@@ -13,14 +13,17 @@ export const CampaignsTable: FC = () => {
 	const mobileTableWrapperRef = useRef<HTMLDivElement | null>(null);
 	const mobileScrollWrapperRef = useRef<HTMLDivElement | null>(null);
 	const mobileDeleteButtonsRef = useRef<HTMLDivElement | null>(null);
+	const desktopMeasureRef = useRef<HTMLDivElement | null>(null);
 	const [rowHeightsById, setRowHeightsById] = useState<Record<string | number, number>>(
 		{}
 	);
+	const [desktopScale, setDesktopScale] = useState<number>(1);
+	const [shouldScaleDesktopTable, setShouldScaleDesktopTable] = useState<boolean>(false);
 
 	const shouldShowMobileFeatures = isMobile === true;
 	// Detect landscape to decide whether to embed delete buttons back into rows
 	const [isLandscape, setIsLandscape] = useState<boolean>(false);
-	// Detect narrow desktop viewport (<=630px) for compact mode on desktop
+	// Detect narrow desktop viewport (<=960px) for compact mode on desktop
 	const [isNarrowDesktop, setIsNarrowDesktop] = useState<boolean>(false);
 
 	useEffect(() => {
@@ -57,7 +60,7 @@ export const CampaignsTable: FC = () => {
 	// Only use the external delete overlay in portrait; in landscape place delete inside each row
 	const shouldUseExternalDeleteColumn = shouldShowMobileFeatures && !isLandscape;
 
-	// Use compact metrics on mobile OR on narrow desktop (<=630px)
+	// Use compact metrics on mobile OR on narrow desktop (<=960px)
 	const shouldUseCompactMetrics = shouldShowMobileFeatures || (!isMobile && isNarrowDesktop);
 
 	const {
@@ -70,6 +73,50 @@ export const CampaignsTable: FC = () => {
 	} = useCampaignsTable({ compactMetrics: shouldUseCompactMetrics });
 
 	// No orientation gating; we rely on device detection so landscape uses mobile layout too
+
+	// Ultra-narrow desktop: measure available width and scale the table as a whole instead of
+	// letting it reflow into an unusable compressed layout.
+	useEffect(() => {
+		if (typeof window === 'undefined') return;
+		// Only apply on non-mobile rendering paths
+		if (shouldShowMobileFeatures) {
+			setDesktopScale(1);
+			setShouldScaleDesktopTable(false);
+			return;
+		}
+
+		const el = desktopMeasureRef.current;
+		if (!el || !('ResizeObserver' in window)) return;
+
+		const BASE_WIDTH = 460; // designed minimum width for narrow-desktop table
+		const MIN_SCALE = 0.62; // prevent extreme unreadability on ultra-narrow widths
+
+		let raf: number | null = null;
+		const update = () => {
+			if (raf !== null) cancelAnimationFrame(raf);
+			raf = requestAnimationFrame(() => {
+				const available = el.clientWidth;
+				if (!available || available <= 0) return;
+
+				const shouldScale = available < BASE_WIDTH;
+				const nextScale = shouldScale
+					? Math.max(MIN_SCALE, Math.min(1, available / BASE_WIDTH))
+					: 1;
+
+				setShouldScaleDesktopTable(shouldScale);
+				setDesktopScale((prev) => (Math.abs(prev - nextScale) > 0.01 ? nextScale : prev));
+			});
+		};
+
+		update();
+		const ro = new ResizeObserver(() => update());
+		ro.observe(el);
+
+		return () => {
+			if (raf !== null) cancelAnimationFrame(raf);
+			ro.disconnect();
+		};
+	}, [shouldShowMobileFeatures]);
 
 	useLayoutEffect(() => {
 		if (typeof window === 'undefined' || !shouldUseExternalDeleteColumn) {
@@ -249,7 +296,17 @@ export const CampaignsTable: FC = () => {
 						shouldShowMobileFeatures ? 'mobile-portrait-mode' : ''
 					} ${shouldShowMobileFeatures && isLandscape ? 'mobile-landscape-mode' : ''}`}
 				>
-					<div className="campaigns-table-container" id="campaigns-table-container">
+					<div
+						className="campaigns-table-container"
+						id="campaigns-table-container"
+						ref={desktopMeasureRef}
+						data-ultra-narrow-scale={shouldScaleDesktopTable ? 'true' : undefined}
+						style={
+							{
+								['--campaigns-table-scale' as never]: desktopScale,
+							} as React.CSSProperties
+						}
+					>
 						{shouldShowMobileFeatures ? (
 							// Mobile portrait mode: wrapper scroll container with table, and delete buttons outside
 							<div className="mobile-campaigns-outer-container">
