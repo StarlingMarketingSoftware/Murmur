@@ -23,6 +23,7 @@ export const DraftingTableSkeleton: FC<DraftingTableSkeletonProps> = ({ isMobile
 							left: '69px',
 							width: '72px',
 							height: '22px',
+							// Keep original warm/yellow chrome for the outer box header
 							backgroundColor: '#F8D69A',
 							border: '2px solid #B0B0B0',
 							borderRadius: '11px',
@@ -79,6 +80,7 @@ export const DraftingTableSkeleton: FC<DraftingTableSkeletonProps> = ({ isMobile
 					position: 'relative',
 					display: 'flex',
 					flexDirection: 'column',
+					// Keep the original yellow fill for the larger container box
 					backgroundColor: '#FFDC9E',
 					overflow: 'hidden',
 				}}
@@ -113,7 +115,7 @@ export const DraftingTableSkeleton: FC<DraftingTableSkeletonProps> = ({ isMobile
 					</div>
 				)}
 
-				{/* Yellow section header skeleton - hidden on mobile */}
+				{/* Section header skeleton - hidden on mobile */}
 				{!isMobile && (
 					<div
 						style={{
@@ -122,6 +124,7 @@ export const DraftingTableSkeleton: FC<DraftingTableSkeletonProps> = ({ isMobile
 							left: 0,
 							right: 0,
 							height: '29px',
+							// Match the container's yellow fill
 							backgroundColor: '#FFDC9E',
 							zIndex: 9,
 							display: 'grid',
@@ -189,7 +192,6 @@ const SkeletonRow: FC<{ index: number; isMobile?: boolean | null }> = ({ index, 
 
 	return (
 		<div
-			className="animate-pulse"
 			style={{
 				width: rowWidth,
 				height: rowHeight,
@@ -200,59 +202,68 @@ const SkeletonRow: FC<{ index: number; isMobile?: boolean | null }> = ({ index, 
 				display: 'flex',
 				flexDirection: 'column',
 				gap: '8px',
-				animationDelay: `${index * 100}ms`,
 			}}
 		>
 			{/* Top row: checkbox placeholder + name */}
 			<div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
 				{/* Checkbox placeholder */}
 				<div
+					className="animate-pulse"
 					style={{
 						width: '16px',
 						height: '16px',
 						borderRadius: '50%',
 						backgroundColor: '#E5E5E5',
+						animationDelay: `${index * 100}ms`,
 					}}
 				/>
 				{/* Status dot placeholder */}
 				<div
+					className="animate-pulse"
 					style={{
 						width: '10px',
 						height: '10px',
 						borderRadius: '50%',
 						backgroundColor: '#E5E5E5',
+						animationDelay: `${index * 100}ms`,
 					}}
 				/>
 				{/* Name placeholder */}
 				<div
+					className="animate-pulse"
 					style={{
 						width: isMobile ? '120px' : '140px',
 						height: '14px',
 						backgroundColor: '#E5E5E5',
 						borderRadius: '4px',
+						animationDelay: `${index * 100}ms`,
 					}}
 				/>
 			</div>
 
 			{/* Subject line placeholder */}
 			<div
+				className="animate-pulse"
 				style={{
 					width: isMobile ? '80%' : '320px',
 					height: '14px',
 					backgroundColor: '#EBEBEB',
 					borderRadius: '4px',
 					marginLeft: '38px',
+					animationDelay: `${index * 100}ms`,
 				}}
 			/>
 
 			{/* Preview text placeholder */}
 			<div
+				className="animate-pulse"
 				style={{
 					width: isMobile ? '90%' : '380px',
 					height: '12px',
 					backgroundColor: '#F0F0F0',
 					borderRadius: '4px',
 					marginLeft: '38px',
+					animationDelay: `${index * 100}ms`,
 				}}
 			/>
 		</div>
