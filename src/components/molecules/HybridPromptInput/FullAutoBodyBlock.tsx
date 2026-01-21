@@ -168,8 +168,8 @@ export const FullAutoBodyBlock: FC<FullAutoBodyBlockProps> = ({
 		const viewportPadding = 8;
 
 		// Convert zoomed coordinates to unzoomed for fixed positioning
-		let baseLeft = containerRect.left / zoom;
-		let top = (buttonRect.bottom + margin) / zoom;
+		const baseLeft = containerRect.left / zoom;
+		const top = (buttonRect.bottom + margin) / zoom;
 
 		// For MiniEmailStructure (left panel), the Calendar should extend RIGHTWARD
 		// with tabs on the LEFT side, since there's limited space on the left.

@@ -72,7 +72,6 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 	
 	// Track hovered contact index for keyboard navigation
 	const [hoveredContactIndex, setHoveredContactIndex] = useState<number | null>(null);
-	const containerRef = useRef<HTMLDivElement>(null);
 
 	// Used contacts indicator data (IDs for current user)
 	const { data: usedContactIds } = useGetUsedContactIds();

@@ -308,7 +308,7 @@ const SortableAIBlock = ({
 		const calendarShift = calendarTabCenter - narrowTabCenter - 20; // 236 (20px less shift = 20px right)
 
 		// Convert zoomed coordinates to unzoomed for fixed positioning
-		let baseLeft = containerRect.left / zoom;
+		const baseLeft = containerRect.left / zoom;
 		let left = bookingForTab === 'Calendar' ? baseLeft - calendarShift : baseLeft;
 		let top = (buttonRect.bottom + margin) / zoom;
 
