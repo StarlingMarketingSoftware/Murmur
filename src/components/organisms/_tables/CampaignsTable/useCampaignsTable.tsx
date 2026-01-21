@@ -5,7 +5,7 @@ import { Typography } from '@/components/ui/typography';
 import { useDeleteCampaign, useGetCampaigns } from '@/hooks/queryHooks/useCampaigns';
 import { useRouter } from 'next/navigation';
 import { urls } from '@/constants/urls';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import { cn, mmdd } from '@/utils';
 import { useRowConfirmationAnimation } from '@/hooks/useRowConfirmationAnimation';
 
@@ -13,6 +13,13 @@ type CampaignWithCounts = Campaign & {
 	draftCount?: number;
 	sentCount?: number;
 };
+
+const useIsomorphicLayoutEffect =
+	typeof window !== 'undefined' ? useLayoutEffect : useEffect;
+
+type MetricSortKey = 'drafts' | 'sent' | 'updated' | 'created';
+type MetricSortMode = 'desc' | 'asc';
+type MetricSortState = { key: MetricSortKey; mode: MetricSortMode } | null;
 
 const getDraftFillColor = (value: number): string => {
 	const v = Math.max(0, Math.min(value, 50));
@@ -81,6 +88,32 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 	const [countdown, setCountdown] = useState<number>(5);
 	const confirmationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+	const [metricSort, setMetricSort] = useState<MetricSortState>(null);
+	const metricSortKey = metricSort?.key ?? null;
+	const metricSortMode = metricSort?.mode ?? null;
+	const isMetricSortActive = metricSort !== null;
+	const metricSortRef = useRef<MetricSortState>(null);
+	useEffect(() => {
+		metricSortRef.current = metricSort;
+	}, [metricSort]);
+
+	const draftsHeaderButtonRef = useRef<HTMLButtonElement | null>(null);
+	const setDraftsHeaderButtonRef = useCallback((el: HTMLButtonElement | null) => {
+		draftsHeaderButtonRef.current = el;
+	}, []);
+	const sentHeaderButtonRef = useRef<HTMLButtonElement | null>(null);
+	const setSentHeaderButtonRef = useCallback((el: HTMLButtonElement | null) => {
+		sentHeaderButtonRef.current = el;
+	}, []);
+	const updatedHeaderButtonRef = useRef<HTMLButtonElement | null>(null);
+	const setUpdatedHeaderButtonRef = useCallback((el: HTMLButtonElement | null) => {
+		updatedHeaderButtonRef.current = el;
+	}, []);
+	const createdHeaderButtonRef = useRef<HTMLButtonElement | null>(null);
+	const setCreatedHeaderButtonRef = useCallback((el: HTMLButtonElement | null) => {
+		createdHeaderButtonRef.current = el;
+	}, []);
+
 	// Use the custom animation hook
 	useRowConfirmationAnimation({
 		confirmingCampaignId,
@@ -95,6 +128,182 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 			}
 		};
 	}, []);
+
+	// Keep the Drafts sort underline anchored to the bottom of the table container,
+	// aligned with the Drafts header "pill" width.
+	useIsomorphicLayoutEffect(() => {
+		let raf1: number | null = null;
+		let raf2: number | null = null;
+
+		const cancelRafs = () => {
+			if (raf1 !== null) cancelAnimationFrame(raf1);
+			if (raf2 !== null) cancelAnimationFrame(raf2);
+			raf1 = null;
+			raf2 = null;
+		};
+
+		const update = () => {
+			const btn =
+				metricSortKey === 'sent'
+					? sentHeaderButtonRef.current
+					: metricSortKey === 'updated'
+						? updatedHeaderButtonRef.current
+						: metricSortKey === 'created'
+							? createdHeaderButtonRef.current
+					: metricSortKey === 'drafts'
+						? draftsHeaderButtonRef.current
+						: null;
+			if (!btn) return;
+
+			const container = btn.closest('.my-campaigns-table') as HTMLElement | null;
+			if (!container) return;
+
+			const headerGrid = btn.closest('.metrics-header-grid') as HTMLElement | null;
+
+			const btnRect = btn.getBoundingClientRect();
+			const containerRect = container.getBoundingClientRect();
+			const headerTh = btn.closest('th') as HTMLElement | null;
+
+			// If an ancestor scales the table (transform: scale OR CSS zoom), getBoundingClientRect()
+			// reflects the visual size. We want the *layout* size for CSS positioning inside the same
+			// scaled subtree, so compute a visual->layout scale factor. Prefer computed style widths
+			// because offsetWidth reflects the *used* (flex-shrunk) layout size (which is what we want).
+			const safeScale = (() => {
+				if (btn.offsetWidth > 0) {
+					const s = btnRect.width / btn.offsetWidth;
+					if (Number.isFinite(s) && s > 0) return s;
+				}
+				return 1;
+			})();
+
+			const btnLeftInContainer = (btnRect.left - containerRect.left) / safeScale;
+			const bottomLineLeft = btnLeftInContainer + 1;
+			const metricBoxSelector =
+				metricSortKey === 'sent'
+					? ".metric-box[data-sent-fill]"
+					: metricSortKey === 'updated'
+						? ".metric-box[data-updated-fill]"
+						: metricSortKey === 'created'
+							? ".metric-box[data-created-fill]"
+					: ".metric-box[data-draft-fill]";
+			const metricBox =
+				compactMetrics
+					? (container.querySelector(metricBoxSelector) as HTMLElement | null)
+					: null;
+			const headerWidth = metricBox?.offsetWidth ?? btn.offsetWidth;
+
+			const bottomLineWidth = Math.max(0, headerWidth - 2);
+
+			container.style.setProperty('--drafts-sort-indicator-left', `${bottomLineLeft}px`);
+			container.style.setProperty('--drafts-sort-indicator-width', `${bottomLineWidth}px`);
+
+			// Header highlight follows the actual rendered Drafts header "pill" width at every breakpoint.
+			// Use offsetLeft/offsetWidth to avoid computed-width vs flex-shrink mismatches.
+			// Attach it to the <th> so it can fill the full header height.
+			if (headerTh) {
+				const gridLeftInTh = headerGrid ? headerGrid.offsetLeft : 0;
+				const baseLeftInTh = gridLeftInTh + btn.offsetLeft;
+				// In very narrow/compact layouts, the header label can be slightly wider than the
+				// actual metric pill below (due to flex/text sizing). Prefer the real pill width
+				// so the highlight never includes the inter-pill spacing at ~500px widths.
+				headerTh.style.setProperty('--drafts-sort-highlight-left', `${baseLeftInTh}px`);
+				headerTh.style.setProperty('--drafts-sort-highlight-width', `${headerWidth}px`);
+
+				// Ascending indicator (36x2, BABABA) lives on the header <th> so it scrolls away with the header.
+				// Align it to the "Drafts" text start (pl-2) or center in compact mode.
+				const desiredAscWidth = 36;
+				const ascWidth = Math.max(0, Math.min(desiredAscWidth, headerWidth - 2));
+				const shouldCenterAsc = compactMetrics;
+				const ascLeft = shouldCenterAsc
+					? baseLeftInTh + (headerWidth - ascWidth) / 2
+					: baseLeftInTh + 8; // Tailwind pl-2 = 8px, aligns to text start
+				headerTh.style.setProperty('--drafts-sort-asc-left', `${ascLeft}px`);
+				headerTh.style.setProperty('--drafts-sort-asc-width', `${ascWidth}px`);
+			}
+		};
+
+		const scheduleUpdate = () => {
+			// Run now, then on the next two frames. This catches layout changes that happen via
+			// ResizeObserver + requestAnimationFrame (e.g., campaigns-table scaling/zoom).
+			cancelRafs();
+			update();
+			raf1 = requestAnimationFrame(() => {
+				update();
+				raf2 = requestAnimationFrame(() => update());
+			});
+		};
+
+		if (!isMetricSortActive) {
+			const btn =
+				draftsHeaderButtonRef.current ??
+				sentHeaderButtonRef.current ??
+				updatedHeaderButtonRef.current ??
+				createdHeaderButtonRef.current;
+			const container = btn
+				? (btn.closest('.my-campaigns-table') as HTMLElement | null)
+				: null;
+			if (container) {
+				container.removeAttribute('data-drafts-sort-active');
+				container.removeAttribute('data-drafts-sort-mode');
+				container.style.removeProperty('--drafts-sort-indicator-left');
+				container.style.removeProperty('--drafts-sort-indicator-width');
+			}
+			const headerTh = btn ? (btn.closest('th') as HTMLElement | null) : null;
+			if (headerTh) {
+				headerTh.style.removeProperty('--drafts-sort-highlight-left');
+				headerTh.style.removeProperty('--drafts-sort-highlight-width');
+				headerTh.style.removeProperty('--drafts-sort-asc-left');
+				headerTh.style.removeProperty('--drafts-sort-asc-width');
+			}
+			cancelRafs();
+			return;
+		}
+
+		const btn =
+			metricSortKey === 'sent'
+				? sentHeaderButtonRef.current
+				: metricSortKey === 'updated'
+					? updatedHeaderButtonRef.current
+					: metricSortKey === 'created'
+						? createdHeaderButtonRef.current
+				: metricSortKey === 'drafts'
+					? draftsHeaderButtonRef.current
+					: null;
+		if (!btn) return;
+		const container = btn.closest('.my-campaigns-table') as HTMLElement | null;
+		if (!container) return;
+
+		container.setAttribute('data-drafts-sort-active', 'true');
+		container.setAttribute('data-drafts-sort-mode', metricSortMode === 'asc' ? 'asc' : 'desc');
+		scheduleUpdate();
+
+		const handleResize = () => scheduleUpdate();
+		window.addEventListener('resize', handleResize, { passive: true });
+
+		const ro = new ResizeObserver(() => scheduleUpdate());
+		ro.observe(container);
+
+		// Watch the parent campaigns-table container for scale/zoom updates (style/attr changes),
+		// since CSS zoom changes don't always trigger ResizeObserver on the table itself.
+		const scaleContainer = container.closest('.campaigns-table-container') as HTMLElement | null;
+		const mo =
+			scaleContainer && 'MutationObserver' in window
+				? new MutationObserver(() => scheduleUpdate())
+				: null;
+		if (scaleContainer && mo) {
+			mo.observe(scaleContainer, {
+				attributes: true,
+				attributeFilter: ['style', 'data-ultra-narrow-scale', 'data-mobile-ultra-narrow-scale'],
+			});
+		}
+
+		return () => {
+			window.removeEventListener('resize', handleResize);
+			ro.disconnect();
+			mo?.disconnect();
+			cancelRafs();
+		};
+	}, [isMetricSortActive, metricSortKey, metricSortMode, compactMetrics]);
 
 	const columns: ColumnDef<CampaignWithCounts>[] = [
 		{
@@ -126,73 +335,238 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 		},
 		{
 			id: 'metrics',
-			header: () => (
-				<div
-					className={cn(
-						'metrics-header-grid w-full items-center',
-						compactMetrics
-							? 'flex flex-nowrap gap-[7px] justify-start'
-							: 'grid justify-items-start gap-8 md:gap-10 lg:gap-12'
-					)}
-					style={
-						compactMetrics
-							? undefined
-							: {
-									gridTemplateColumns:
-										'minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1.25fr)',
-							  }
-					}
-				>
-					<span
+			// This is a "display" column visually, but we still provide an accessor so TanStack
+			// treats it as sortable (we sort by Drafts or Sent when their headers are clicked).
+			accessorFn: (row) =>
+				(metricSortKey === 'sent'
+					? (row as CampaignWithCounts)?.sentCount
+					: metricSortKey === 'updated'
+						? new Date((row as CampaignWithCounts)?.updatedAt as unknown as string | number | Date)
+								.getTime()
+						: metricSortKey === 'created'
+							? new Date((row as CampaignWithCounts)?.createdAt as unknown as string | number | Date)
+									.getTime()
+					: (row as CampaignWithCounts)?.draftCount) ?? 0,
+			enableSorting: true,
+			// Sort campaigns by Drafts or Sent, depending on which header is active.
+			sortingFn: (rowA, rowB) => {
+				const aRow = rowA.original as CampaignWithCounts;
+				const bRow = rowB.original as CampaignWithCounts;
+				const sortKey = metricSortRef.current?.key ?? metricSortKey ?? 'drafts';
+				const a =
+					sortKey === 'sent'
+						? aRow?.sentCount ?? 0
+						: sortKey === 'updated'
+							? new Date(aRow?.updatedAt as unknown as string | number | Date).getTime() || 0
+							: sortKey === 'created'
+								? new Date(aRow?.createdAt as unknown as string | number | Date).getTime() ||
+									0
+							: aRow?.draftCount ?? 0;
+				const b =
+					sortKey === 'sent'
+						? bRow?.sentCount ?? 0
+						: sortKey === 'updated'
+							? new Date(bRow?.updatedAt as unknown as string | number | Date).getTime() || 0
+							: sortKey === 'created'
+								? new Date(bRow?.createdAt as unknown as string | number | Date).getTime() ||
+									0
+							: bRow?.draftCount ?? 0;
+				return a === b ? 0 : a > b ? 1 : -1;
+			},
+			header: ({ column, table }) => {
+				const highlightColor =
+					metricSortKey === 'updated'
+						? '#FFA3A3'
+						: metricSortKey === 'created'
+							? '#BED2FF'
+						: metricSortKey === 'sent'
+							? '#B4E8A8'
+							: '#FFDA8F';
+
+				return (
+				<>
+					{isMetricSortActive ? (
+						<span
+							aria-hidden="true"
+							className="absolute top-0 bottom-0 pointer-events-none z-0"
+							style={
+								{
+									left: 'var(--drafts-sort-highlight-left, 0px)',
+									width: 'var(--drafts-sort-highlight-width, 94px)',
+									backgroundColor: highlightColor,
+								} as React.CSSProperties
+							}
+						/>
+					) : null}
+					<div
 						className={cn(
-							'metrics-header-label',
+							'metrics-header-grid w-full h-full items-center relative z-[1]',
+							compactMetrics
+								? 'flex flex-nowrap gap-[7px] justify-start'
+								: 'flex flex-nowrap justify-start'
+						)}
+						style={
+							compactMetrics
+								? undefined
+								: ({ gap: 'var(--campaign-metric-gap, 32px)' } as React.CSSProperties)
+						}
+					>
+					<button
+						type="button"
+						ref={setDraftsHeaderButtonRef}
+						onClick={(e) => {
+							e.stopPropagation();
+							// Toggle (Drafts):
+							// 1) desc (highest → lowest) with bottom indicator line
+							// 2) asc (lowest → highest) with top (36px) indicator line
+							// 3) default state (no sorting / no highlight)
+							const next: MetricSortState =
+								metricSortKey !== 'drafts'
+									? { key: 'drafts', mode: 'desc' }
+									: metricSortMode === 'desc'
+										? { key: 'drafts', mode: 'asc' }
+										: null;
+
+							metricSortRef.current = next;
+							setMetricSort(next);
+							if (next === null) {
+								table.setSorting([]);
+							} else {
+								table.setSorting([{ id: column.id, desc: next.mode === 'desc' }]);
+							}
+						}}
+						className={cn(
+							'metrics-header-label relative z-[1] cursor-pointer select-none border-0 bg-transparent p-0 m-0',
+							!compactMetrics &&
+								'flex w-[94px] min-w-[94px] max-w-[94px] items-center justify-start pl-2 text-left text-[11px] font-medium',
 							compactMetrics &&
-								'flex h-[15px] metric-width-short items-center justify-center text-[10px] font-medium tracking-[0.01em] metrics-header-label-compact'
+								'flex metric-width-short items-center justify-center text-[10px] font-medium tracking-[0.01em] metrics-header-label-compact'
 						)}
 						data-label="drafts"
+						aria-pressed={metricSortKey === 'drafts'}
 					>
 						Drafts
-					</span>
-					<span
+					</button>
+					<button
+						type="button"
+						ref={setSentHeaderButtonRef}
+						onClick={(e) => {
+							e.stopPropagation();
+							// Toggle (Sent):
+							// 1) desc (highest → lowest)
+							// 2) asc (lowest → highest)
+							// 3) default state (no sorting)
+							const next: MetricSortState =
+								metricSortKey !== 'sent'
+									? { key: 'sent', mode: 'desc' }
+									: metricSortMode === 'desc'
+										? { key: 'sent', mode: 'asc' }
+										: null;
+
+							metricSortRef.current = next;
+							setMetricSort(next);
+							if (next === null) {
+								table.setSorting([]);
+							} else {
+								table.setSorting([{ id: column.id, desc: next.mode === 'desc' }]);
+							}
+						}}
 						className={cn(
-							'metrics-header-label',
+							'metrics-header-label relative z-[1] cursor-pointer select-none border-0 bg-transparent p-0 m-0',
+							!compactMetrics &&
+								'flex w-[94px] min-w-[94px] max-w-[94px] items-center justify-start pl-2 text-left text-[11px] font-medium',
 							compactMetrics &&
-								'flex h-[15px] metric-width-short items-center justify-center text-[10px] font-medium tracking-[0.01em] metrics-header-label-compact'
+								'flex metric-width-short items-center justify-center text-[10px] font-medium tracking-[0.01em] metrics-header-label-compact'
 						)}
 						data-label="sent"
+						aria-pressed={metricSortKey === 'sent'}
 					>
 						Sent
-					</span>
-					<span
+					</button>
+					<button
+						type="button"
+						ref={setUpdatedHeaderButtonRef}
+						onClick={(e) => {
+							e.stopPropagation();
+							// Toggle (Updated Last):
+							// 1) desc (most recent → oldest)
+							// 2) asc (oldest → most recent)
+							// 3) default state (no sorting)
+							const next: MetricSortState =
+								metricSortKey !== 'updated'
+									? { key: 'updated', mode: 'desc' }
+									: metricSortMode === 'desc'
+										? { key: 'updated', mode: 'asc' }
+										: null;
+
+							metricSortRef.current = next;
+							setMetricSort(next);
+							if (next === null) {
+								table.setSorting([]);
+							} else {
+								table.setSorting([{ id: column.id, desc: next.mode === 'desc' }]);
+							}
+						}}
 						className={cn(
-							'metrics-header-label',
+							'metrics-header-label relative z-[1] cursor-pointer select-none border-0 bg-transparent p-0 m-0',
+							!compactMetrics &&
+								'flex w-[94px] min-w-[94px] max-w-[94px] items-center justify-center text-center text-[11px] font-medium',
 							compactMetrics &&
-								'flex h-[15px] metric-width-long items-center justify-center text-center text-[10px] font-medium leading-[1.05] tracking-[0.01em] metrics-header-label-compact'
+								'flex metric-width-long items-center justify-center text-center text-[10px] font-medium leading-[1.05] tracking-[0.01em] metrics-header-label-compact'
 						)}
 						data-label="updated"
+						aria-pressed={metricSortKey === 'updated'}
 					>
 						<span className="metrics-two-line-label">
 							<span>Updated</span>
 							<br className="metrics-force-br" />
 							<span>Last</span>
 						</span>
-					</span>
-					<span
+					</button>
+					<button
+						type="button"
+						ref={setCreatedHeaderButtonRef}
+						onClick={(e) => {
+							e.stopPropagation();
+							// Toggle (Created On):
+							// 1) desc (newest → oldest)
+							// 2) asc (oldest → newest)
+							// 3) default state (no sorting)
+							const next: MetricSortState =
+								metricSortKey !== 'created'
+									? { key: 'created', mode: 'desc' }
+									: metricSortMode === 'desc'
+										? { key: 'created', mode: 'asc' }
+										: null;
+
+							metricSortRef.current = next;
+							setMetricSort(next);
+							if (next === null) {
+								table.setSorting([]);
+							} else {
+								table.setSorting([{ id: column.id, desc: next.mode === 'desc' }]);
+							}
+						}}
 						className={cn(
-							'metrics-header-label',
+							'metrics-header-label relative z-[1] cursor-pointer select-none border-0 bg-transparent p-0 m-0',
+							!compactMetrics &&
+								'flex w-[94px] min-w-[94px] max-w-[94px] items-center justify-center text-center text-[11px] font-medium',
 							compactMetrics &&
-								'flex h-[15px] metric-width-long items-center justify-center text-center text-[10px] font-medium leading-[1.05] tracking-[0.01em] metrics-header-label-compact'
+								'flex metric-width-long items-center justify-center text-center text-[10px] font-medium leading-[1.05] tracking-[0.01em] metrics-header-label-compact'
 						)}
 						data-label="created"
+						aria-pressed={metricSortKey === 'created'}
 					>
 						<span className="metrics-two-line-label">
 							<span>Created</span>
 							<br className="metrics-force-br" />
 							<span>On</span>
 						</span>
-					</span>
-				</div>
-			),
+					</button>
+					</div>
+				</>
+				);
+			},
 			cell: ({ row }) => {
 				const campaign = row.original as CampaignWithCounts;
 				const isConfirming = campaign.id === confirmingCampaignId;
@@ -225,7 +599,7 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 									className={cn(
 										'pointer-events-none font-inter font-normal text-white',
 										compactMetrics
-											? 'flex h-[15px] items-center justify-start text-[11px] uppercase tracking-[0.01em]'
+											? 'flex h-[20px] items-center justify-start text-[11px] uppercase tracking-[0.01em]'
 											: 'text-[14px]'
 									)}
 								>
@@ -238,7 +612,7 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 									className={cn(
 										'flex items-center',
 										compactMetrics
-											? 'h-[15px] metric-width-long flex-shrink-0 justify-center'
+											? 'h-[20px] w-[94px] flex-none justify-center'
 											: 'w-full'
 									)}
 								/>
@@ -274,15 +648,12 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 							'metrics-grid-container w-full items-center text-left',
 							compactMetrics
 								? 'flex flex-nowrap gap-[7px] justify-start'
-								: 'grid justify-items-start gap-8 md:gap-10 lg:gap-12'
+								: 'flex flex-nowrap justify-start'
 						)}
 						style={
 							compactMetrics
 								? undefined
-								: {
-										gridTemplateColumns:
-											'minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1.25fr)',
-								  }
+								: ({ gap: 'var(--campaign-metric-gap, 32px)' } as React.CSSProperties)
 						}
 					>
 						{[
@@ -290,45 +661,36 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 								label: draftDisplay,
 								fill: draftFill,
 								dataAttr: { 'data-draft-fill': draftFill } as Record<string, string>,
-								width: compactMetrics ? 'metric-width-short' : 'w-[6.13em]',
-								separator: !compactMetrics,
 							},
 							{
 								label: sentDisplay,
 								fill: sentFill,
 								dataAttr: { 'data-sent-fill': sentFill } as Record<string, string>,
-								width: compactMetrics ? 'metric-width-short' : 'w-[6.13em]',
-								separator: !compactMetrics,
 							},
 							{
 								label: mmdd(updatedAt),
 								fill: updatedFill,
 								dataAttr: { 'data-updated-fill': updatedFill } as Record<string, string>,
-								width: compactMetrics ? 'metric-width-long' : 'w-[6.13em]',
-								separator: !compactMetrics,
 							},
 							{
 								label: mmdd(createdAt),
 								fill: createdFill,
 								dataAttr: { 'data-created-fill': createdFill } as Record<string, string>,
-								width: compactMetrics ? 'metric-width-long' : 'w-[6.13em]',
-								separator: false,
 							},
-						].map(({ label, fill, dataAttr, width, separator }, index) => (
+						].map(({ label, fill, dataAttr }, index) => (
 							<div
 								key={index}
 								className={cn(
-									'relative flex items-center',
-									compactMetrics ? 'w-auto flex-shrink-0 justify-start' : 'w-full'
+									'campaign-metric-slot relative flex items-center',
+									compactMetrics
+										? 'w-auto flex-shrink-0 justify-start'
+										: 'h-[20px] w-[94px] flex-none justify-center'
 								)}
 							>
 								<div
 									{...dataAttr}
 									className={cn(
-										'metric-box inline-flex items-center justify-start border border-[#8C8C8C] leading-none truncate',
-										compactMetrics
-											? cn(width, 'h-[15px] rounded-[4px] justify-center')
-											: 'h-[20px] w-[92px] rounded-[4px] justify-center px-0'
+										'metric-box inline-flex items-center justify-center border border-[#8C8C8C] leading-none truncate h-[20px] w-[92px] min-w-[92px] max-w-[92px] rounded-[6px] px-0 flex-none'
 									)}
 									style={
 										{
@@ -347,16 +709,6 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 								>
 									{label}
 								</div>
-								{separator && (
-									<div
-										className="metric-separator absolute h-[17px] w-[2px]"
-										style={{
-											top: 'calc(50% - 8.5px)',
-											backgroundColor: isConfirming ? 'transparent' : 'black',
-											right: 'calc(-1rem - 1px)',
-										}}
-									/>
-								)}
 							</div>
 						))}
 					</div>

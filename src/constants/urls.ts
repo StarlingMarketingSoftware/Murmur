@@ -3,6 +3,7 @@ type DetailRoute = <T extends string | number>(id: T) => string;
 export const urls = {
 	home: {
 		index: '/',
+		activeLanding: '/?activeLanding=1',
 	},
 	about: {
 		index: '/about',

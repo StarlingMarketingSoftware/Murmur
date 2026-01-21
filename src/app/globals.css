@@ -1884,6 +1884,38 @@ body {
 	content: ' ';
 }
 
+/* Desktop campaigns table: keep ticks centered and ensure the 4-pill block fits (no right-side clipping) */
+.my-campaigns-table {
+	/* Responsive but capped so 4x92px pills never overflow the metrics column */
+	--campaign-metric-gap: clamp(18px, 2.5vw, 31px);
+}
+
+/* Give the metrics column a touch more usable width on desktop by reducing cell padding */
+.my-campaigns-table:not(.narrow-desktop-table):not(.mobile-table-no-scroll)
+	thead
+	th:nth-child(2),
+.my-campaigns-table:not(.narrow-desktop-table):not(.mobile-table-no-scroll)
+	tbody
+	td:nth-child(2) {
+	padding-left: 0px !important;
+	padding-right: 0px !important;
+}
+
+/* Desktop campaigns table: ticks centered between 92px metric pills */
+.my-campaigns-table:not(.narrow-desktop-table):not(.mobile-table-no-scroll)
+	.campaign-metric-slot:not(:last-child)::after {
+	content: '';
+	position: absolute;
+	top: 50%;
+	/* Center a 1px tick in the middle of the inter-pill gap */
+	left: calc(100% + (var(--campaign-metric-gap, 32px) / 2) - 0.5px);
+	transform: translateY(-50%);
+	width: 1px;
+	height: 20px;
+	background-color: #000000;
+	pointer-events: none;
+}
+
 /* Keep exclude contacts box consistent on smaller screens */
 @media (max-width: 640px) {
 	/* Remove the synthetic space on mobile where the <br> is visible */
@@ -3600,8 +3632,9 @@ body.murmur-mobile .results-align {
 }
 
 /* Mobile landscape: scale campaigns table wrapper width proportionally
-   Example: at 852px viewport width, table width ≈ 503px → 503/852 ≈ 59.04% */
-@media (orientation: landscape) and (max-width: 960px) {
+   Example: at 852px viewport width, table width ≈ 503px → 503/852 ≈ 59.04%
+   NOTE: Restrict to touch devices so narrow desktop windows don't inherit this rule. */
+@media (orientation: landscape) and (max-width: 960px) and (hover: none) and (pointer: coarse) {
 	.campaigns-table-wrapper {
 		width: 59.04vw !important; /* Maintain 503/852 proportion across breakpoints */
 		max-width: none !important; /* Override tailwind max-w-[960px] */
@@ -3990,6 +4023,53 @@ main {
 /* Specific styles for My Campaigns table header */
 .my-campaigns-table thead th {
 	background-color: #f8f8f8 !important;
+}
+
+/* Drafts sort indicators (Campaigns table)
+   - Mode `desc`: underline is anchored to the bottom of the table container
+   - Mode `asc`: underline sits just below the header row (beneath the yellow highlight)
+   - Positioned via CSS vars set from the Drafts header button */
+.my-campaigns-table[data-drafts-sort-active='true'][data-drafts-sort-mode='desc']::after {
+	content: '';
+	position: absolute;
+	left: var(--drafts-sort-indicator-left, 0px);
+	width: var(--drafts-sort-indicator-width, 92px);
+	height: 2px;
+	bottom: 2px;
+	background: #8d8a8a;
+	pointer-events: none;
+	z-index: 5;
+}
+
+/* ASC indicator is attached to the header cell so it scrolls away with the header */
+.my-campaigns-table[data-drafts-sort-active='true'][data-drafts-sort-mode='asc']
+	thead
+	th:nth-child(2)::after {
+	content: '';
+	position: absolute;
+	left: var(--drafts-sort-asc-left, 0px);
+	width: var(--drafts-sort-asc-width, 36px);
+	height: 2px;
+	/* A few pixels below the header so it feels "on the table", and it scrolls away */
+	top: calc(100% + 4px);
+	background: #bababa;
+	pointer-events: none;
+	z-index: 6;
+}
+
+/* Ensure the ASC indicator can render below the header without being clipped or painted under rows */
+.my-campaigns-table[data-drafts-sort-active='true'][data-drafts-sort-mode='asc'] thead {
+	position: relative;
+	z-index: 10;
+}
+.my-campaigns-table[data-drafts-sort-active='true'][data-drafts-sort-mode='asc'] tbody {
+	position: relative;
+	z-index: 1;
+}
+.my-campaigns-table[data-drafts-sort-active='true'][data-drafts-sort-mode='asc']
+	thead
+	th:nth-child(2) {
+	overflow: visible !important;
 }
 
 /* Murmur route compact scaling (90%) */
@@ -5575,9 +5655,52 @@ body.murmur-mobile .search-input-icon-btn {
 	   At 630px viewport -> 460px table
 	   Using clamp for smooth scaling */
 	.narrow-desktop-table {
-		/* Scale proportionally with viewport */
-		width: clamp(460px, calc(100vw - 210px), 750px) !important;
+		/* Fit within the centered wrapper (prevents right-shift overflow on narrow layouts) */
+		margin-left: auto !important;
+		margin-right: auto !important;
+		width: 100% !important;
 		max-width: clamp(460px, calc(100vw - 210px), 750px) !important;
+		/* Shared gap used by the compact metrics layout */
+		--narrow-metric-gap: clamp(6px, calc(0px + 1vw), 12px);
+	}
+
+	/* Give the metrics column a couple extra pixels so the last box never gets clipped */
+	.narrow-desktop-table thead th:nth-child(2),
+	.narrow-desktop-table tbody td:nth-child(2) {
+		padding-left: 8px !important;
+		padding-right: 8px !important;
+	}
+
+	/* Compact metrics: distribute the 4 boxes across the available space (and scale down cleanly). */
+	.narrow-desktop-table .metrics-grid-container,
+	.narrow-desktop-table .metrics-header-grid {
+		gap: var(--narrow-metric-gap) !important;
+		/* Keep the group visually centered when there's extra room */
+		justify-content: space-evenly !important;
+		width: 100% !important;
+		/* Per-slot width derived from the available column width (clamped to a sensible range). */
+		--narrow-metric-slot: clamp(
+			40px,
+			calc((100% - (3 * var(--narrow-metric-gap))) / 4),
+			92px
+		);
+	}
+
+	/* In narrow desktop, show "Updated / Last" and "Created / On" on two lines to avoid clipping */
+	.narrow-desktop-table .metrics-two-line-label .metrics-force-br {
+		display: inline !important;
+	}
+	/* Remove the synthetic space that is used when the <br> is hidden on wider screens */
+	.narrow-desktop-table .metrics-two-line-label .metrics-force-br + span::before {
+		content: none !important;
+	}
+
+	/* Ensure each metric "slot" (wrapper) shares the same width in rows */
+	.narrow-desktop-table .metrics-grid-container > div {
+		flex: 0 1 var(--narrow-metric-slot) !important;
+		width: var(--narrow-metric-slot) !important;
+		max-width: var(--narrow-metric-slot) !important;
+		min-width: 0 !important;
 	}
 
 	/* Metric boxes scale proportionally */
@@ -5585,22 +5708,13 @@ body.murmur-mobile .search-input-icon-btn {
 		/* Height scales: 20px at 960px -> 18px at 630px */
 		height: clamp(18px, calc(15px + 0.5vw), 20px) !important;
 		min-height: clamp(18px, calc(15px + 0.5vw), 20px) !important;
-		/* Width scales: 80px at 960px -> 40px at 630px */
-		width: clamp(40px, calc(-8px + 9vw), 80px) !important;
-		min-width: clamp(40px, calc(-8px + 9vw), 80px) !important;
+		/* Let the box fill the (shrinkable) flex item */
+		width: 100% !important;
+		min-width: 0 !important;
+		max-width: 100% !important;
 		/* Font scales: 13px at 960px -> 11px at 630px */
 		font-size: clamp(11px, calc(9px + 0.3vw), 13px) !important;
 		padding: 0 4px !important;
-	}
-
-	/* Adjust metrics grid gap proportionally */
-	.narrow-desktop-table .metrics-grid-container {
-		/* Gap scales: 12px at 960px -> 6px at 630px */
-		gap: clamp(6px, calc(0px + 1vw), 12px) !important;
-	}
-
-	.narrow-desktop-table .metrics-header-grid {
-		gap: clamp(6px, calc(0px + 1vw), 12px) !important;
 	}
 
 	/* Hide metric separators in narrow desktop */
@@ -5613,9 +5727,20 @@ body.murmur-mobile .search-input-icon-btn {
 		font-size: clamp(14px, calc(11px + 0.5vw), 17px) !important;
 	}
 
-	/* Header labels scale */
-	.narrow-desktop-table .metrics-header-label {
-		font-size: clamp(10px, calc(7px + 0.5vw), 13px) !important;
+	/* Header labels: match slot widths and scale text down so "Updated Last" / "Created On" don't clip */
+	.narrow-desktop-table .metrics-header-grid .metrics-header-label {
+		flex: 0 1 var(--narrow-metric-slot) !important;
+		width: var(--narrow-metric-slot) !important;
+		max-width: var(--narrow-metric-slot) !important;
+		min-width: 0 !important;
+		font-size: clamp(8px, calc(6px + 0.35vw), 10px) !important;
+		line-height: 1.05 !important;
+		/* Allow the built-in two-line labels to render without being cropped */
+		height: auto !important;
+		min-height: 22px !important;
+		overflow: visible !important;
+		text-overflow: clip !important;
+		white-space: normal !important;
 	}
 
 	/* Column sizing - flexible */
@@ -5637,32 +5762,89 @@ body.murmur-mobile .search-input-icon-btn {
 	}
 }
 
+/* =========================================================
+   ULTRA-NARROW DESKTOP (component-driven scaling)
+   When the campaigns table container is narrower than 460px,
+   we keep the table layout at 460px and scale it down as a whole.
+   ========================================================= */
+.campaigns-table-container {
+	--campaigns-table-scale: 1;
+}
+
+.campaigns-table-container[data-ultra-narrow-scale='true'] .narrow-desktop-table {
+	/* Maintain the intended minimum layout width, then scale to fit */
+	width: 460px !important;
+	max-width: 460px !important;
+	margin-left: auto !important;
+	margin-right: auto !important;
+	zoom: var(--campaigns-table-scale);
+}
+
+@supports not (zoom: 1) {
+	.campaigns-table-container[data-ultra-narrow-scale='true'] .narrow-desktop-table {
+		zoom: 1;
+		transform: scale(var(--campaigns-table-scale));
+		transform-origin: top center;
+		/* Ensure the scaled element stays visually centered */
+		margin-left: auto !important;
+		margin-right: auto !important;
+	}
+}
+
+/* =========================================================
+   ULTRA-NARROW MOBILE (component-driven scaling)
+   When the campaigns table container is narrower than 388px,
+   keep the mobile campaigns table layout at 388px and scale it down as a whole
+   (instead of squeezing the columns horizontally).
+   ========================================================= */
+.campaigns-table-container[data-mobile-ultra-narrow-scale='true'] .mobile-campaigns-outer-container {
+	/* Lock the layout width, then scale to fit */
+	width: 388px !important;
+	max-width: 388px !important;
+	margin-left: auto !important;
+	margin-right: auto !important;
+	zoom: var(--campaigns-table-scale);
+}
+
+@supports not (zoom: 1) {
+	.campaigns-table-container[data-mobile-ultra-narrow-scale='true'] .mobile-campaigns-outer-container {
+		zoom: 1;
+		transform: scale(var(--campaigns-table-scale));
+		transform-origin: top center;
+		margin-left: auto !important;
+		margin-right: auto !important;
+	}
+}
+
 /* At the smallest end (630px and below), lock to minimum sizes */
 @media (max-width: 630px) {
 	.narrow-desktop-table {
-		width: 460px !important;
+		margin-left: auto !important;
+		margin-right: auto !important;
+		width: 100% !important;
 		max-width: 460px !important;
+		/* Lock spacing at the smallest end */
+		--narrow-metric-gap: 6px;
 	}
 
 	.narrow-desktop-table .metric-box {
 		height: 18px !important;
 		min-height: 18px !important;
-		width: 40px !important;
-		min-width: 40px !important;
 		font-size: 11px !important;
 	}
 
 	.narrow-desktop-table .metrics-grid-container,
 	.narrow-desktop-table .metrics-header-grid {
-		gap: 6px !important;
+		gap: var(--narrow-metric-gap) !important;
+		--narrow-metric-slot: 40px;
 	}
 
 	.narrow-desktop-table .campaign-name-text {
 		font-size: 14px !important;
 	}
 
-	.narrow-desktop-table .metrics-header-label {
-		font-size: 10px !important;
+	.narrow-desktop-table .metrics-header-grid .metrics-header-label {
+		font-size: 8px !important;
 	}
 }
 
