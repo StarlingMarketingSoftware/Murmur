@@ -518,6 +518,7 @@ const Murmur = () => {
 	);
 
 	const [isTopSearchHighlighted, setTopSearchHighlighted] = useState(false);
+	const [isHomeButtonHighlighted, setHomeButtonHighlighted] = useState(false);
 	const [isDraftsTabHighlighted, setDraftsTabHighlighted] = useState(false);
 	const [isInboxTabHighlighted, setInboxTabHighlighted] = useState(false);
 	const [isWriteTabHighlighted, setWriteTabHighlighted] = useState(false);
@@ -525,6 +526,8 @@ const Murmur = () => {
 		() => ({
 			isTopSearchHighlighted,
 			setTopSearchHighlighted,
+			isHomeButtonHighlighted,
+			setHomeButtonHighlighted,
 			isDraftsTabHighlighted,
 			setDraftsTabHighlighted,
 			isInboxTabHighlighted,
@@ -534,6 +537,7 @@ const Murmur = () => {
 		}),
 		[
 			isTopSearchHighlighted,
+			isHomeButtonHighlighted,
 			isDraftsTabHighlighted,
 			isInboxTabHighlighted,
 			isWriteTabHighlighted,
@@ -1629,10 +1633,26 @@ const Murmur = () => {
 										window.location.assign(urls.murmur.dashboard.index);
 									}
 								}}
-								className="flex items-center justify-center bg-transparent border-0 p-0 cursor-pointer transition-opacity opacity-40 hover:opacity-100 active:opacity-100"
+								className="group relative w-[35px] h-[35px] flex items-center justify-center bg-transparent border-0 p-0 cursor-pointer"
 								aria-label="Go to dashboard"
 							>
-								<BottomHomeIcon width={20} height={19} className="text-black" />
+								<div
+									aria-hidden="true"
+									className={cn(
+										'pointer-events-none absolute inset-0 box-border rounded-[8px] bg-[#FFFFFF] border-[3px] border-[#000000] transition-opacity duration-150',
+										isHomeButtonHighlighted ? 'opacity-100' : 'opacity-0'
+									)}
+								/>
+								<BottomHomeIcon
+									width={20}
+									height={19}
+									className={cn(
+										'relative z-10 transition-opacity duration-150',
+										isHomeButtonHighlighted
+											? 'opacity-100'
+											: 'opacity-40 group-hover:opacity-100 group-active:opacity-100'
+									)}
+								/>
 							</button>
 						</div>
 						{/* Campaigns dropdown positioned below the left box, left-aligned with content */}

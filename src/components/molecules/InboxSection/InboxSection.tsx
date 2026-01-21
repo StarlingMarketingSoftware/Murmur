@@ -586,7 +586,12 @@ export const InboxSection: FC<InboxSectionProps> = ({
 }) => {
 	const detectedIsMobile = useIsMobile();
 	const isMobile = forceDesktopLayout ? false : Boolean(detectedIsMobile);
-	const { setDraftsTabHighlighted, setWriteTabHighlighted, setTopSearchHighlighted } =
+	const {
+		setDraftsTabHighlighted,
+		setWriteTabHighlighted,
+		setTopSearchHighlighted,
+		setHomeButtonHighlighted,
+	} =
 		useCampaignTopSearchHighlight();
 	const rootRef = useRef<HTMLDivElement | null>(null);
 
@@ -879,8 +884,14 @@ export const InboxSection: FC<InboxSectionProps> = ({
 			setDraftsTabHighlighted(false);
 			setWriteTabHighlighted(false);
 			setTopSearchHighlighted(false);
+			setHomeButtonHighlighted(false);
 		};
-	}, [setDraftsTabHighlighted, setWriteTabHighlighted, setTopSearchHighlighted]);
+	}, [
+		setDraftsTabHighlighted,
+		setWriteTabHighlighted,
+		setTopSearchHighlighted,
+		setHomeButtonHighlighted,
+	]);
 
 	// In demo mode, ensure the internal scroll position stays at the top so the header/search
 	// remains visible (especially on mobile where swipes can otherwise scroll the inbox UI).
@@ -1458,6 +1469,8 @@ export const InboxSection: FC<InboxSectionProps> = ({
 												? () => setWriteTabHighlighted(true)
 												: idx === 3
 													? () => setTopSearchHighlighted(true)
+													: idx === 4
+														? () => setHomeButtonHighlighted(true)
 												: undefined
 									}
 									onMouseLeave={
@@ -1467,6 +1480,8 @@ export const InboxSection: FC<InboxSectionProps> = ({
 												? () => setWriteTabHighlighted(false)
 												: idx === 3
 													? () => setTopSearchHighlighted(false)
+													: idx === 4
+														? () => setHomeButtonHighlighted(false)
 												: undefined
 									}
 									className={`bg-white transition-colors ${
