@@ -577,6 +577,7 @@ const DashboardContent = () => {
 	const [isLoadingLocation, setIsLoadingLocation] = useState(false);
 
 	// Narrowest desktop detection (< 952px) - single column layout for map view
+	const [isBelowMd, setIsBelowMd] = useState(false);
 	const [isNarrowestDesktop, setIsNarrowestDesktop] = useState(false);
 	const [isXlDesktop, setIsXlDesktop] = useState(false);
 
@@ -586,6 +587,7 @@ const DashboardContent = () => {
 
 		const handleResize = () => {
 			const width = window.innerWidth;
+			setIsBelowMd(width < 768);
 			setIsNarrowestDesktop(width < 952);
 			setIsXlDesktop(width >= 1280);
 		};
@@ -746,7 +748,7 @@ const DashboardContent = () => {
 
 		const dropdownContent = (
 			<div
-				className="search-dropdown-menu hidden md:block w-[439px] bg-[#D8E5FB] rounded-[16px] border-2 border-black z-[110] relative overflow-hidden"
+				className="search-dropdown-menu w-[439px] max-w-[calc(100vw-16px)] bg-[#D8E5FB] rounded-[16px] border-2 border-black z-[110] relative overflow-hidden"
 				style={
 					isMapView
 						? {
@@ -755,7 +757,8 @@ const DashboardContent = () => {
 								// so the dropdown should anchor just below it.
 								// Search bar is fixed at 33px and the input is 49px tall; add a small gap.
 								top: '92px',
-								left: dropdownLeft,
+								left: isBelowMd ? '50%' : dropdownLeft,
+								transform: isBelowMd ? 'translateX(-50%)' : undefined,
 								height: dropdownHeight,
 								transition: dropdownTransition,
 								willChange: 'left, height',
@@ -765,7 +768,8 @@ const DashboardContent = () => {
 						: {
 								position: 'absolute',
 								top: 'calc(100% + 10px)',
-								left: dropdownLeft,
+								left: isBelowMd ? '50%' : dropdownLeft,
+								transform: isBelowMd ? 'translateX(-50%)' : undefined,
 								height: dropdownHeight,
 								transition: dropdownTransition,
 								willChange: 'left, height',
@@ -784,7 +788,7 @@ const DashboardContent = () => {
 				>
 					<div className="flex flex-col items-center justify-start gap-[12px] w-full h-full py-[12px]">
 						<div
-							className="w-[410px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+							className="w-[410px] max-w-[calc(100%-24px)] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex items-center px-[15px] cursor-pointer transition-colors duration-200"
 							onClick={() => {
 								setWhyValue('[Booking]');
 								setActiveSection('what');
@@ -803,7 +807,7 @@ const DashboardContent = () => {
 							</div>
 						</div>
 						<div
-							className="w-[410px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+							className="w-[410px] max-w-[calc(100%-24px)] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex items-center px-[15px] cursor-pointer transition-colors duration-200"
 							onClick={() => {
 								setWhyValue('[Promotion]');
 								setActiveSection('what');
@@ -838,7 +842,7 @@ const DashboardContent = () => {
 					{whyValue === '[Promotion]' ? (
 						<div className="flex flex-col items-center justify-start gap-[10px] w-full h-full py-[12px]">
 							<div
-								className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+								className="w-[415px] max-w-[calc(100%-24px)] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
 								onClick={() => {
 									setWhatValue('Radio Stations');
 									// On the results screen, changing "What" should immediately re-search
@@ -882,7 +886,7 @@ const DashboardContent = () => {
 								offsetRight={-5}
 							>
 								<div
-									className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+									className="w-[415px] max-w-[calc(100%-24px)] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
 									onClick={() => {
 										setWhatValue('Wine, Beer, and Spirits');
 										// On the results screen, changing "What" should immediately re-search
@@ -903,7 +907,7 @@ const DashboardContent = () => {
 									</div>
 								</div>
 								<div
-									className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+									className="w-[415px] max-w-[calc(100%-24px)] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
 									onClick={() => {
 										setWhatValue('Restaurants');
 										// On the results screen, changing "What" should immediately re-search
@@ -924,7 +928,7 @@ const DashboardContent = () => {
 									</div>
 								</div>
 								<div
-									className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+									className="w-[415px] max-w-[calc(100%-24px)] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
 									onClick={() => {
 										setWhatValue('Coffee Shops');
 										// On the results screen, changing "What" should immediately re-search
@@ -945,7 +949,7 @@ const DashboardContent = () => {
 									</div>
 								</div>
 								<div
-									className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+									className="w-[415px] max-w-[calc(100%-24px)] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
 									onClick={() => {
 										setWhatValue('Festivals');
 										// On the results screen, changing "What" should immediately re-search
@@ -966,7 +970,7 @@ const DashboardContent = () => {
 									</div>
 								</div>
 								<div
-									className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+									className="w-[415px] max-w-[calc(100%-24px)] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
 									onClick={() => {
 										setWhatValue('Wedding Planners');
 										// On the results screen, changing "What" should immediately re-search
@@ -987,7 +991,7 @@ const DashboardContent = () => {
 									</div>
 								</div>
 								<div
-									className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+									className="w-[415px] max-w-[calc(100%-24px)] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
 									onClick={() => {
 										setWhatValue('Music Venues');
 										// On the results screen, changing "What" should immediately re-search
@@ -1062,7 +1066,7 @@ const DashboardContent = () => {
 										return (
 											<div
 												key={`${loc.city}-${loc.state}-${loc.label}-${idx}`}
-												className="w-[415px] min-h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200 mb-2"
+												className="w-[415px] max-w-[calc(100%-24px)] min-h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200 mb-2"
 												onClick={() => {
 													triggerSearchWithWhere(loc.label, false);
 												}}
@@ -1100,7 +1104,7 @@ const DashboardContent = () => {
 								offsetRight={-5}
 							>
 								<div
-									className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+									className="w-[415px] max-w-[calc(100%-24px)] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
 									onClick={() => {
 										if (userLocationName && !isLoadingLocation) {
 											triggerSearchWithWhere(userLocationName, true);
@@ -1134,7 +1138,7 @@ const DashboardContent = () => {
 										return (
 											<div
 												key={label}
-												className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+												className="w-[415px] max-w-[calc(100%-24px)] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
 												onClick={() => {
 													triggerSearchWithWhere(label, false);
 												}}
@@ -1168,7 +1172,7 @@ const DashboardContent = () => {
 											return (
 												<div
 													key={stateName}
-													className="w-[415px] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+													className="w-[415px] max-w-[calc(100%-24px)] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
 													onClick={() => {
 														triggerSearchWithWhere(stateName, false);
 													}}
