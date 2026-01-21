@@ -877,6 +877,7 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 		goToSearch,
 		goToDrafts,
 		goToInbox,
+		goToSent,
 		goToWriting,
 		hideBottomPanels,
 		hideButton,
@@ -1629,7 +1630,7 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 
 			{/* Bottom Panels: Drafts, Sent, and Inbox */}
 			{!hideBottomPanels && (
-				<div className="mt-[35px] flex justify-center gap-[15px]">
+				<div className="mt-[35px] pb-[8px] flex justify-center gap-[15px]">
 					<DraftsExpandedList
 						drafts={drafts || []}
 						contacts={props.allContacts || props.contacts}
@@ -1637,6 +1638,7 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 						height={117}
 						whiteSectionHeight={15}
 						hideSendButton={true}
+						onOpenDrafts={goToDrafts}
 					/>
 					<SentExpandedList
 						sent={sentEmails || []}
@@ -1644,6 +1646,7 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 						width={233}
 						height={117}
 						whiteSectionHeight={15}
+						onOpenSent={goToSent}
 					/>
 					<InboxExpandedList
 						contacts={props.allContacts || props.contacts}
@@ -1652,6 +1655,7 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 						width={233}
 						height={117}
 						whiteSectionHeight={15}
+						onOpenInbox={goToInbox}
 					/>
 				</div>
 			)}

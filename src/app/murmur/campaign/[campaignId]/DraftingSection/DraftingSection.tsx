@@ -4178,7 +4178,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 								{/* Bottom Panels: Drafts, Sent, and Inbox - hidden at narrowest breakpoint */}
 								{!hideHeaderBox && (
 									<div
-										className="mt-[35px] flex justify-center gap-[15px]"
+										className="mt-[35px] pb-[8px] flex justify-center gap-[15px]"
 										data-campaign-bottom-anchor
 									>
 										<DraftsExpandedList
@@ -4460,7 +4460,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												<div
 													className={cn(
 														draftEmails.length === 0 ? 'mt-[91px]' : 'mt-[35px]',
-														'flex justify-center gap-[15px]'
+														'pb-[8px] flex justify-center gap-[15px]'
 													)}
 													data-campaign-bottom-anchor
 												>
@@ -4673,7 +4673,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											<div
 												className={cn(
 													draftEmails.length === 0 ? 'mt-[91px]' : 'mt-[35px]',
-													'flex justify-center gap-[15px]'
+													'pb-[8px] flex justify-center gap-[15px]'
 												)}
 												data-campaign-bottom-anchor
 											>
@@ -4733,6 +4733,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										goToSearch={onGoToSearch}
 										goToDrafts={goToDrafting}
 										goToInbox={goToInbox}
+										goToSent={goToSent}
 										goToWriting={goToWriting}
 										hideBottomPanels
 										hideButton
@@ -4842,6 +4843,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													goToSearch={onGoToSearch}
 													goToDrafts={goToDrafting}
 													goToInbox={goToInbox}
+													goToSent={goToSent}
 													goToWriting={goToWriting}
 													hideBottomPanels
 													hideButton
@@ -4926,7 +4928,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										</div>
 										{/* Bottom Panels: Drafts, Sent, and Inbox - centered relative to 864px container */}
 										<div
-											className="mt-[35px] flex justify-center gap-[15px]"
+											className="mt-[35px] pb-[8px] flex justify-center gap-[15px]"
 											data-campaign-bottom-anchor
 										>
 											<DraftsExpandedList
@@ -4974,6 +4976,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											goToSearch={onGoToSearch}
 											goToDrafts={goToDrafting}
 											goToInbox={goToInbox}
+											goToSent={goToSent}
 											goToWriting={goToWriting}
 											hideBottomPanels={isNarrowestDesktop}
 											hideButton={isNarrowestDesktop}
@@ -5247,7 +5250,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										</div>
 										{/* Bottom Panels: Contacts, Drafts, and Inbox - centered relative to container */}
 										<div
-											className="mt-[91px] flex justify-center gap-[15px]"
+											className="mt-[91px] pb-[8px] flex justify-center gap-[15px]"
 											data-campaign-bottom-anchor
 										>
 											<ContactsExpandedList
@@ -5362,7 +5365,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 
 										{/* Bottom Panels: Contacts, Drafts, and Inbox - hidden at narrowest breakpoint (< 952px) */}
 										{!isNarrowestDesktop && (
-											<div className="mt-[91px] flex justify-center gap-[15px]">
+											<div className="mt-[91px] pb-[8px] flex justify-center gap-[15px]">
 												<ContactsExpandedList
 													contacts={contactsAvailableForDrafting}
 													width={232}
@@ -6620,7 +6623,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											</div>
 										</div>
 										{/* Bottom Panels: Contacts, Drafts, and Sent */}
-										<div className="mt-[91px] flex justify-center gap-[15px]">
+										<div className="mt-[91px] pb-[8px] flex justify-center gap-[15px]">
 											<ContactsExpandedList
 												contacts={contactsAvailableForDrafting}
 												width={232}
@@ -6673,7 +6676,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										{/* Bottom Panels: Contacts, Drafts, and Sent - hidden at narrowest breakpoint (< 952px) */}
 										{!isNarrowestDesktop && (
 											<div
-												className="mt-[35px] flex justify-center gap-[15px]"
+												className="mt-[35px] pb-[8px] flex justify-center gap-[15px]"
 												data-campaign-bottom-anchor
 											>
 												<ContactsExpandedList

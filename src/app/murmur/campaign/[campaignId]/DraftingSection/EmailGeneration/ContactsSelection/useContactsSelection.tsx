@@ -33,6 +33,10 @@ export interface ContactsSelectionProps {
 	 */
 	goToInbox?: () => void;
 	/**
+	 * Callback to navigate to the sent tab.
+	 */
+	goToSent?: () => void;
+	/**
 	 * Callback to navigate to the write tab.
 	 */
 	goToWriting?: () => void;

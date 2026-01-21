@@ -182,6 +182,9 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 	const [isSending, setIsSending] = useState(false);
 	const draftRowRefs = useRef<Map<number, HTMLDivElement>>(new Map());
 	
+	// Track whether the container is being hovered (for bottom view outline)
+	const [isContainerHovered, setIsContainerHovered] = useState(false);
+	
 	// Track hovered draft index for keyboard navigation
 	const [hoveredDraftIndex, setHoveredDraftIndex] = useState<number | null>(null);
 	
@@ -448,11 +451,31 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 				width: `${width}px`,
 				height: `${height}px`,
 				background: `linear-gradient(to bottom, #ffffff ${whiteSectionHeight}px, #FFDC9E ${whiteSectionHeight}px)`,
+				...(isBottomView ? { cursor: 'pointer' } : {}),
 			}}
-			data-hover-description="Drafts: Emails you’ve generated but haven’t sent yet. Select drafts to preview or send."
+			data-hover-description="Drafts: Emails you've generated but haven't sent yet. Select drafts to preview or send."
 			role="region"
 			aria-label="Expanded drafts preview"
+			onMouseEnter={() => isBottomView && setIsContainerHovered(true)}
+			onMouseLeave={() => isBottomView && setIsContainerHovered(false)}
+			onClick={() => isBottomView && onOpenDrafts?.()}
 		>
+			{/* Hover outline for bottom view - 3px gap top/bottom, 2px gap sides, 4px thick */}
+			{isBottomView && isContainerHovered && (
+				<div
+					style={{
+						position: 'absolute',
+						top: '-7px',
+						bottom: '-7px',
+						left: '-6px',
+						right: '-6px',
+						border: '4px solid #FCCF7E',
+						borderRadius: 0,
+						pointerEvents: 'none',
+						zIndex: 50,
+					}}
+				/>
+			)}
 			<DraftsHeaderChrome isAllTab={isAllTab} whiteSectionHeight={customWhiteSectionHeight} />
 			<div
 				className={cn(
