@@ -261,14 +261,19 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 		: '630px';
 
 	// Add expansion difference if a box is expanded
-	const containerHeight = expandedBox
-		? typeof baseContainerHeight === 'number'
-			? baseContainerHeight + expansionDiff
-			: `calc(${baseContainerHeight} + ${expansionDiff}px)`
-		: baseContainerHeight;
+	// In fixed-height mode, the panel must remain fixed; expanded bullets are handled via the
+	// internal scroll wrapper. Only auto-height layouts should grow to accommodate expansion.
+	const containerHeight = height
+		? height
+		: expandedBox
+			? typeof baseContainerHeight === 'number'
+				? baseContainerHeight + expansionDiff
+				: `calc(${baseContainerHeight} + ${expansionDiff}px)`
+			: baseContainerHeight;
 
 	return (
 		<div
+			data-contact-research-panel="true"
 			className={cn(
 				// NOTE: Do not gate visibility with Tailwind breakpoints here.
 				// The campaign app applies its own CSS zoom scaling, and the campaign page decides
@@ -283,6 +288,8 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 				...style,
 			}}
 			data-hover-description="Research: Background info and notes for the selected contact."
+			role="region"
+			aria-label="Research panel"
 		>
 			{/* Header background bar */}
 			<div
@@ -722,7 +729,8 @@ top: isExpanded ? '28px' : '50%',
 								className="w-full h-full"
 								thumbColor="#000000"
 								thumbWidth={2}
-								offsetRight={-5}
+								// Nudge scrollbar slightly further right so it sits closer to the panel border.
+								offsetRight={-7}
 							>
 								<div
 									style={{

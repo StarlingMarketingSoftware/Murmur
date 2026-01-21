@@ -39,7 +39,7 @@ import { EmailStatus, EmailVerificationStatus, DraftingMode, ReviewStatus } from
 import { resolveAutoSignatureText } from '@/constants/autoSignatures';
 import { ContactsSelection } from './EmailGeneration/ContactsSelection/ContactsSelection';
 import { SentEmails } from './EmailGeneration/SentEmails/SentEmails';
-import { DraftedEmails } from './EmailGeneration/DraftedEmails/DraftedEmails';
+import { DraftedEmails, type DraftedEmailsHandle } from './EmailGeneration/DraftedEmails/DraftedEmails';
 import { EmailWithRelations, StripeSubscriptionStatus } from '@/types';
 import { useSendMailgunMessage } from '@/hooks/queryHooks/useMailgun';
 import { useEditUser } from '@/hooks/queryHooks/useUsers';
@@ -239,20 +239,42 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const isDraftingView = view === 'drafting';
 	const isSentView = view === 'sent';
 	const [selectedDraft, setSelectedDraft] = useState<EmailWithRelations | null>(null);
+	// Ref to the main DraftedEmails instance (center column) so side preview controls can exit regen mode.
+	const draftedEmailsRef = useRef<DraftedEmailsHandle | null>(null);
+	// Tracks whether the DraftedEmails "regen settings preview" (HybridPromptInput) is open for the selected draft.
+	// Used to swap the pinned left column from DraftsExpandedList -> full email preview while regenerating.
+	const [isSelectedDraftRegenSettingsPreviewOpen, setIsSelectedDraftRegenSettingsPreviewOpen] =
+		useState(false);
+	const exitSelectedDraftRegenView = useCallback(() => {
+		draftedEmailsRef.current?.exitRegenSettingsPreview();
+	}, []);
 	const [hoveredDraftForSettings, setHoveredDraftForSettings] =
 		useState<EmailWithRelations | null>(null);
 	const [hoveredSentForSettings, setHoveredSentForSettings] =
 		useState<EmailWithRelations | null>(null);
 	const isDraftPreviewOpen = isDraftingView && Boolean(selectedDraft);
-	const draftsMiniEmailTopHeaderHeight = isDraftingView || isSentView ? 26 : undefined;
-	const draftsMiniEmailFillColor = isDraftingView || isSentView ? '#B1CEEF' : undefined;
+	const shouldShowPinnedRegenEmailPreview =
+		isDraftPreviewOpen && isSelectedDraftRegenSettingsPreviewOpen;
+
+	// Defensive reset so we don't get "stuck" showing regen UI when leaving Drafts or closing the draft.
+	useEffect(() => {
+		if (!isDraftingView || !selectedDraft) {
+			if (isSelectedDraftRegenSettingsPreviewOpen) {
+				setIsSelectedDraftRegenSettingsPreviewOpen(false);
+			}
+		}
+	}, [isDraftingView, selectedDraft, isSelectedDraftRegenSettingsPreviewOpen]);
+	const draftsMiniEmailTopHeaderHeight = isDraftingView || isSentView ? 23 : undefined;
+	const draftsMiniEmailFillColor = isDraftingView || isSentView ? '#DAE6FE' : undefined;
 
 	// Drafts tab: read-only preview form for the MiniEmailStructure, driven by hovered/selected draft settings.
 	const draftsSettingsPreviewForm = useForm<DraftingFormValues>({
 		defaultValues: form.getValues(),
 	});
+	// When a draft is OPEN for review/editing, the settings panel should ALWAYS reflect that draft,
+	// even if the user hovers other rows in the list.
 	const draftForSettingsPreview =
-		isDraftingView ? hoveredDraftForSettings ?? selectedDraft : null;
+		isDraftingView ? selectedDraft ?? hoveredDraftForSettings : null;
 	useEffect(() => {
 		if (!isDraftingView) {
 			// Avoid leaking hover state across tabs.
@@ -273,6 +295,13 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		draftsSettingsPreviewForm,
 		hoveredDraftForSettings,
 	]);
+
+	// When a draft is open, disable/clear hover-driven settings previews so the right panel is stable.
+	useEffect(() => {
+		if (!isDraftingView) return;
+		if (!selectedDraft) return;
+		if (hoveredDraftForSettings) setHoveredDraftForSettings(null);
+	}, [hoveredDraftForSettings, isDraftingView, selectedDraft]);
 
 	// Sent tab: read-only preview form for the MiniEmailStructure, driven by hovered sent email settings.
 	const sentSettingsPreviewForm = useForm<DraftingFormValues>({
@@ -307,7 +336,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const [isSentHovered, setIsSentHovered] = useState(false);
 	const [isInboxHovered, setIsInboxHovered] = useState(false);
 
-	// Narrow desktop detection for Writing tab compact layout (952px - 1279px)
+	// Narrow desktop detection for Writing tab compact layout.
+	// Note: widened upper bound from 1280 -> 1317 so the left pinned panel never clips
+	// when campaign zoom / browser zoom reduces available space.
 	const [isNarrowDesktop, setIsNarrowDesktop] = useState(false);
 	// Narrowest desktop detection (< 952px) - shows contacts table below writing box
 	const [isNarrowestDesktop, setIsNarrowestDesktop] = useState(false);
@@ -342,7 +373,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 						: DEFAULT_CAMPAIGN_ZOOM;
 			const effectiveWidth = window.innerWidth / (z || 1);
 
-			setIsNarrowDesktop(effectiveWidth >= 952 && effectiveWidth < 1280);
+			setIsNarrowDesktop(effectiveWidth >= 952 && effectiveWidth < 1317);
 			setIsNarrowestDesktop(effectiveWidth < 952);
 			setIsSearchTabNarrow(effectiveWidth < 1414);
 			setIsAllTabNarrow(effectiveWidth <= 1269);
@@ -2011,17 +2042,23 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		useState(false);
 	const [showTestPreview, setShowTestPreview] = useState(false);
 
-	const displayedContactForResearch =
-		hoveredContactForResearch || selectedContactForResearch;
-	const draftsMiniEmailTopHeaderLabel = draftsMiniEmailTopHeaderHeight
-		? (() => {
-				const contact = displayedContactForResearch;
-				if (!contact) return 'Settings';
-				const fullName = `${contact.firstName || ''} ${contact.lastName || ''}`.trim();
-				const displayName = (fullName || contact.name || contact.company || '').trim();
-				return displayName ? `Settings - ${displayName}` : 'Settings';
-		  })()
-		: undefined;
+	// When a draft is open, the research panel should stay locked to that draft's contact.
+	const displayedContactForResearch = isDraftPreviewOpen
+		? selectedContactForResearch
+		: hoveredContactForResearch || selectedContactForResearch;
+	const draftsMiniEmailTopHeaderLabel = draftsMiniEmailTopHeaderHeight ? 'Settings' : undefined;
+	const draftsMiniEmailSettingsLabels = useMemo(() => {
+		const contact = displayedContactForResearch;
+		if (!draftsMiniEmailTopHeaderHeight || !contact) return { primary: '', secondary: '' };
+
+		const fullName = `${contact.firstName || ''} ${contact.lastName || ''}`.trim();
+		const name = (fullName || contact.name || '').trim();
+		const company = (contact.company || '').trim();
+
+		if (!name) return { primary: company, secondary: '' };
+		if (!company) return { primary: name, secondary: '' };
+		return { primary: name, secondary: company };
+	}, [displayedContactForResearch, draftsMiniEmailTopHeaderHeight]);
 
 	useEffect(() => {
 		if (!selectedContactForResearch && contacts && contacts.length > 0) {
@@ -2622,7 +2659,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	};
 
 	return (
-		<div className="mb-30 flex flex-col items-center">
+		<div className="flex flex-col items-center">
 			<Form {...form}>
 				<form className="flex flex-col items-center w-full">
 					<div
@@ -2662,34 +2699,107 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										draftCount={draftCount}
 										sentCount={sentCount}
 										onFromClick={onOpenIdentityDialog}
+										onContactsClick={goToContacts}
+										onDraftsClick={goToDrafting}
+										onSentClick={goToSent}
 									/>
 									{view !== 'inbox' &&
 										(isDraftPreviewOpen ? (
-											<div
-												style={{
-													width: '376px',
-													height: '587px',
-												}}
-											>
-												<DraftsExpandedList
-													drafts={draftEmails}
-													contacts={contacts || []}
-													width={376}
-													height={587}
-													hideSendButton
-													rowWidth={366}
-													rowHeight={92}
-													rejectedDraftIds={rejectedDraftIds}
-													approvedDraftIds={approvedDraftIds}
-													previewedDraftId={selectedDraft?.id}
-													isPreviewMode
-													onDraftPreviewClick={(draft) =>
-														setSelectedDraft((prev) =>
-															prev?.id === draft.id ? null : draft
-														)
-													}
-												/>
-											</div>
+											shouldShowPinnedRegenEmailPreview ? (
+												<div
+													data-draft-review-side-preview
+													style={{
+														width: '376px',
+														height: '587px',
+														overflow: 'hidden',
+														position: 'relative',
+													}}
+												>
+													<div
+														style={{
+															position: 'absolute',
+															top: 0,
+															left: 0,
+															// Important: scale the *original* DraftedEmails review canvas (499x703)
+															// down into the old DraftsExpandedList slot (376x587). Transforms don't
+															// affect layout, so we fix the unscaled canvas size explicitly here to
+															// avoid any centering/offset drift.
+															width: '499px',
+															height: '703px',
+															transform: `scale(${376 / 499}, ${587 / 703})`,
+															transformOrigin: 'top left',
+														}}
+													>
+														<DraftedEmails
+														mainBoxId={undefined}
+														contacts={contacts || []}
+														selectedDraftIds={draftsTabSelectedIds}
+														selectedDraft={selectedDraft}
+														setSelectedDraft={setSelectedDraft}
+														setIsDraftDialogOpen={setIsDraftDialogOpen}
+														handleDraftSelection={handleDraftSelection}
+														draftEmails={draftEmails}
+														isPendingEmails={isPendingEmails}
+														setSelectedDraftIds={setDraftsTabSelectedIds}
+														onSend={handleSendDrafts}
+														isSendingDisabled={isSendingDisabled}
+														isFreeTrial={isFreeTrial || false}
+														fromName={fromName}
+														fromEmail={fromEmail}
+														identity={campaign?.identity ?? null}
+														onIdentityUpdate={handleIdentityUpdate}
+														subject={form.watch('subject')}
+														onContactClick={handleResearchContactClick}
+														onContactHover={handleResearchContactHover}
+														onDraftHover={setHoveredDraftForSettings}
+														goToWriting={goToWriting}
+														goToContacts={goToContacts}
+														goToSearch={onGoToSearch}
+														goToSent={goToSent}
+														goToInbox={goToInbox}
+														onRejectDraft={handleRejectDraft}
+														onApproveDraft={handleApproveDraft}
+														// Disable regen inside the side preview so it stays as an email preview.
+														onRegenerateDraft={undefined}
+														rejectedDraftIds={rejectedDraftIds}
+														approvedDraftIds={approvedDraftIds}
+														statusFilter={draftStatusFilter}
+														onStatusFilterChange={setDraftStatusFilter}
+														hideSendButton
+														disableOutsideClickClose
+														onDraftReviewCloseOverride={exitSelectedDraftRegenView}
+														hideDraftReviewCounter
+														hideDraftReviewActionRow
+													/>
+													</div>
+												</div>
+											) : (
+												<div
+													style={{
+														width: '376px',
+														height: '587px',
+													}}
+												>
+													<DraftsExpandedList
+														drafts={draftEmails}
+														contacts={contacts || []}
+														width={376}
+														height={587}
+														hideSendButton
+														rowWidth={366}
+														rowHeight={92}
+														rejectedDraftIds={rejectedDraftIds}
+														approvedDraftIds={approvedDraftIds}
+														previewedDraftId={selectedDraft?.id}
+														isPreviewMode
+														onDraftPreviewClick={(draft) =>
+															setSelectedDraft((prev) =>
+																prev?.id === draft.id ? null : draft
+															)
+														}
+													/>
+												</div>
+											)
 										) : (
 											<div
 												style={{
@@ -2753,6 +2863,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																		: form
 															}
 															readOnly={isDraftingView || isSentView}
+															variant={draftsMiniEmailTopHeaderHeight ? 'settings' : undefined}
+															settingsPrimaryLabel={draftsMiniEmailSettingsLabels.primary}
+															settingsSecondaryLabel={draftsMiniEmailSettingsLabels.secondary}
 															profileFields={miniProfileFields}
 															identityProfile={campaign?.identity as IdentityProfileFields | null}
 															onIdentityUpdate={handleIdentityUpdate}
@@ -3218,6 +3331,59 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											contact={contacts?.[0] || displayedContactForResearch}
 											style={{ width: 375, height: 670 }}
 										/>
+									) : view === 'drafting' && Boolean(selectedDraft) ? (
+										<div
+											className="flex flex-col"
+											style={{
+												// Match the legacy research panel footprint so it remains aligned with the rest of the layout.
+												width: 376,
+												height: 670,
+												gap: 12,
+											}}
+										>
+											<MiniEmailStructure
+												form={draftsSettingsPreviewForm}
+												readOnly
+												variant={draftsMiniEmailTopHeaderHeight ? 'settings' : undefined}
+												settingsPrimaryLabel={draftsMiniEmailSettingsLabels.primary}
+												settingsSecondaryLabel={draftsMiniEmailSettingsLabels.secondary}
+												profileFields={miniProfileFields}
+												identityProfile={campaign?.identity as IdentityProfileFields | null}
+												onIdentityUpdate={handleIdentityUpdate}
+												onDraft={() =>
+													handleGenerateDrafts(
+														contactsAvailableForDrafting.map((c) => c.id)
+													)
+												}
+												isDraftDisabled={isGenerationDisabled() || isPendingGeneration}
+												isPendingGeneration={isPendingGeneration}
+												generationProgress={generationProgress}
+												generationTotal={contactsAvailableForDrafting.length}
+												hideTopChrome
+												hideFooter
+												hideAddTextButtons
+												// Keep this a tight preview that never shows an inner scrollbar.
+												fitToHeight
+												lockFitToHeightScale
+												// Requested: compressed Settings view height.
+												height={358}
+												pageFillColor={draftsMiniEmailFillColor}
+											/>
+
+											<ContactResearchPanel
+												contact={displayedContactForResearch}
+												hideAllText={
+													// Hide all research text to show a chrome-only skeleton:
+													// - When the Drafts tab has no drafts
+													(view === 'drafting' && draftCount === 0)
+												}
+												hideSummaryIfBullets
+												// Requested: 300px tall research block in the bottom half.
+												height={300}
+												width={376}
+												boxWidth={361}
+											/>
+										</div>
 									) : (
 										<ContactResearchPanel
 											contact={displayedContactForResearch}
@@ -3606,6 +3772,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													draftCount={draftCount}
 													sentCount={sentCount}
 													onFromClick={onOpenIdentityDialog}
+													onContactsClick={goToContacts}
+													onDraftsClick={goToDrafting}
+													onSentClick={goToSent}
 													width={330}
 												/>
 												{/* Compact Contacts table */}
@@ -3670,6 +3839,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													isTest={isTest}
 													contact={contacts?.[0]}
 													onGoToDrafting={goToDrafting}
+													onGoToContacts={goToContacts}
+													onGoToInbox={goToInbox}
 													onTestPreviewToggle={setShowTestPreview}
 													draftCount={contactsTabSelectedIds.size}
 													onDraftClick={async () => {
@@ -3804,6 +3975,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											isTest={isTest}
 											contact={contacts?.[0]}
 											onGoToDrafting={goToDrafting}
+											onGoToContacts={goToContacts}
+											onGoToInbox={goToInbox}
 											onTestPreviewToggle={setShowTestPreview}
 											draftCount={contactsTabSelectedIds.size}
 											onDraftClick={async () => {
@@ -4005,7 +4178,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 								{/* Bottom Panels: Drafts, Sent, and Inbox - hidden at narrowest breakpoint */}
 								{!hideHeaderBox && (
 									<div
-										className="mt-[35px] flex justify-center gap-[15px]"
+										className="mt-[35px] pb-[8px] flex justify-center gap-[15px]"
 										data-campaign-bottom-anchor
 									>
 										<DraftsExpandedList
@@ -4048,6 +4221,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										// Mobile layout: Full-width drafts, no side panels
 										<div className="flex flex-col items-center w-full px-1">
 											<DraftedEmails
+												ref={draftedEmailsRef}
 												mainBoxId="drafts"
 												contacts={contacts || []}
 												selectedDraftIds={draftsTabSelectedIds}
@@ -4063,16 +4237,23 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												isFreeTrial={isFreeTrial || false}
 												fromName={fromName}
 												fromEmail={fromEmail}
+												identity={campaign?.identity ?? null}
+												onIdentityUpdate={handleIdentityUpdate}
 												subject={form.watch('subject')}
 												onContactClick={handleResearchContactClick}
 												onContactHover={handleResearchContactHover}
 												onDraftHover={setHoveredDraftForSettings}
 												goToWriting={goToWriting}
+												goToContacts={goToContacts}
 												goToSearch={onGoToSearch}
+												goToSent={goToSent}
 												goToInbox={goToInbox}
 												onRejectDraft={handleRejectDraft}
 												onApproveDraft={handleApproveDraft}
 												onRegenerateDraft={handleRegenerateDraft}
+												onRegenSettingsPreviewOpenChange={
+													setIsSelectedDraftRegenSettingsPreviewOpen
+												}
 												rejectedDraftIds={rejectedDraftIds}
 												approvedDraftIds={approvedDraftIds}
 												statusFilter={draftStatusFilter}
@@ -4099,6 +4280,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														draftCount={draftCount}
 														sentCount={sentCount}
 														onFromClick={onOpenIdentityDialog}
+														onContactsClick={goToContacts}
+														onDraftsClick={goToDrafting}
+														onSentClick={goToSent}
 														width={330}
 													/>
 													{/* Mini Email Structure panel */}
@@ -4106,6 +4290,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														<MiniEmailStructure
 															form={draftsSettingsPreviewForm}
 															readOnly
+															variant={draftsMiniEmailTopHeaderHeight ? 'settings' : undefined}
+															settingsPrimaryLabel={draftsMiniEmailSettingsLabels.primary}
+															settingsSecondaryLabel={draftsMiniEmailSettingsLabels.secondary}
 															profileFields={miniProfileFields}
 															identityProfile={campaign?.identity as IdentityProfileFields | null}
 															onIdentityUpdate={handleIdentityUpdate}
@@ -4156,6 +4343,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												{/* Right column: Drafts table - fixed 499px, overflow visible for bottom panels */}
 												<div className="flex-shrink-0 [&>*]:!items-start" style={{ width: '499px', overflow: 'visible' }}>
 													<DraftedEmails
+														ref={draftedEmailsRef}
 														mainBoxId="drafts"
 														contacts={contacts || []}
 														selectedDraftIds={draftsTabSelectedIds}
@@ -4171,16 +4359,23 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														isFreeTrial={isFreeTrial || false}
 														fromName={fromName}
 														fromEmail={fromEmail}
+														identity={campaign?.identity ?? null}
+														onIdentityUpdate={handleIdentityUpdate}
 														subject={form.watch('subject')}
 														onContactClick={handleResearchContactClick}
 														onContactHover={handleResearchContactHover}
 														onDraftHover={setHoveredDraftForSettings}
 														goToWriting={goToWriting}
+														goToContacts={goToContacts}
 														goToSearch={onGoToSearch}
+														goToSent={goToSent}
 														goToInbox={goToInbox}
 														onRejectDraft={handleRejectDraft}
 														onApproveDraft={handleApproveDraft}
 														onRegenerateDraft={handleRegenerateDraft}
+														onRegenSettingsPreviewOpenChange={
+															setIsSelectedDraftRegenSettingsPreviewOpen
+														}
 														rejectedDraftIds={rejectedDraftIds}
 														approvedDraftIds={approvedDraftIds}
 														statusFilter={draftStatusFilter}
@@ -4265,7 +4460,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												<div
 													className={cn(
 														draftEmails.length === 0 ? 'mt-[91px]' : 'mt-[35px]',
-														'flex justify-center gap-[15px]'
+														'pb-[8px] flex justify-center gap-[15px]'
 													)}
 													data-campaign-bottom-anchor
 												>
@@ -4299,6 +4494,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										// Regular centered layout for wider viewports
 										<div className="flex flex-col items-center">
 											<DraftedEmails
+												ref={draftedEmailsRef}
 											mainBoxId="drafts"
 												contacts={contacts || []}
 												selectedDraftIds={draftsTabSelectedIds}
@@ -4314,16 +4510,23 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												isFreeTrial={isFreeTrial || false}
 												fromName={fromName}
 												fromEmail={fromEmail}
+												identity={campaign?.identity ?? null}
+												onIdentityUpdate={handleIdentityUpdate}
 												subject={form.watch('subject')}
 												onContactClick={handleResearchContactClick}
 												onContactHover={handleResearchContactHover}
 												onDraftHover={setHoveredDraftForSettings}
 												goToWriting={goToWriting}
+												goToContacts={goToContacts}
 												goToSearch={onGoToSearch}
+												goToSent={goToSent}
 												goToInbox={goToInbox}
 												onRejectDraft={handleRejectDraft}
 												onApproveDraft={handleApproveDraft}
 												onRegenerateDraft={handleRegenerateDraft}
+												onRegenSettingsPreviewOpenChange={
+													setIsSelectedDraftRegenSettingsPreviewOpen
+												}
 												rejectedDraftIds={rejectedDraftIds}
 												approvedDraftIds={approvedDraftIds}
 												statusFilter={draftStatusFilter}
@@ -4437,6 +4640,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													<MiniEmailStructure
 														form={draftsSettingsPreviewForm}
 														readOnly
+														variant={draftsMiniEmailTopHeaderHeight ? 'settings' : undefined}
+														settingsPrimaryLabel={draftsMiniEmailSettingsLabels.primary}
+														settingsSecondaryLabel={draftsMiniEmailSettingsLabels.secondary}
 														profileFields={miniProfileFields}
 														identityProfile={campaign?.identity as IdentityProfileFields | null}
 														onIdentityUpdate={handleIdentityUpdate}
@@ -4467,7 +4673,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											<div
 												className={cn(
 													draftEmails.length === 0 ? 'mt-[91px]' : 'mt-[35px]',
-													'flex justify-center gap-[15px]'
+													'pb-[8px] flex justify-center gap-[15px]'
 												)}
 												data-campaign-bottom-anchor
 											>
@@ -4527,6 +4733,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										goToSearch={onGoToSearch}
 										goToDrafts={goToDrafting}
 										goToInbox={goToInbox}
+										goToSent={goToSent}
+										goToWriting={goToWriting}
 										hideBottomPanels
 										hideButton
 									/>
@@ -4548,6 +4756,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													draftCount={draftCount}
 													sentCount={sentCount}
 													onFromClick={onOpenIdentityDialog}
+													onContactsClick={goToContacts}
+													onDraftsClick={goToDrafting}
+													onSentClick={goToSent}
 													width={330}
 												/>
 												{/* Mini Email Structure panel */}
@@ -4561,6 +4772,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																	: form
 														}
 														readOnly={isDraftingView || isSentView}
+														variant={draftsMiniEmailTopHeaderHeight ? 'settings' : undefined}
+														settingsPrimaryLabel={draftsMiniEmailSettingsLabels.primary}
+														settingsSecondaryLabel={draftsMiniEmailSettingsLabels.secondary}
 														profileFields={miniProfileFields}
 														identityProfile={campaign?.identity as IdentityProfileFields | null}
 														onIdentityUpdate={handleIdentityUpdate}
@@ -4629,6 +4843,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													goToSearch={onGoToSearch}
 													goToDrafts={goToDrafting}
 													goToInbox={goToInbox}
+													goToSent={goToSent}
+													goToWriting={goToWriting}
 													hideBottomPanels
 													hideButton
 												/>
@@ -4712,7 +4928,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										</div>
 										{/* Bottom Panels: Drafts, Sent, and Inbox - centered relative to 864px container */}
 										<div
-											className="mt-[35px] flex justify-center gap-[15px]"
+											className="mt-[35px] pb-[8px] flex justify-center gap-[15px]"
 											data-campaign-bottom-anchor
 										>
 											<DraftsExpandedList
@@ -4760,6 +4976,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											goToSearch={onGoToSearch}
 											goToDrafts={goToDrafting}
 											goToInbox={goToInbox}
+											goToSent={goToSent}
+											goToWriting={goToWriting}
 											hideBottomPanels={isNarrowestDesktop}
 											hideButton={isNarrowestDesktop}
 										/>
@@ -4879,6 +5097,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																	: form
 														}
 														readOnly={isDraftingView || isSentView}
+														variant={draftsMiniEmailTopHeaderHeight ? 'settings' : undefined}
+														settingsPrimaryLabel={draftsMiniEmailSettingsLabels.primary}
+														settingsSecondaryLabel={draftsMiniEmailSettingsLabels.secondary}
 														profileFields={miniProfileFields}
 														identityProfile={campaign?.identity as IdentityProfileFields | null}
 														onIdentityUpdate={handleIdentityUpdate}
@@ -4921,9 +5142,11 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											onContactClick={handleResearchContactClick}
 											onContactHover={handleResearchContactHover}
 											onEmailHover={setHoveredSentForSettings}
+											goToContacts={goToContacts}
 											goToDrafts={goToDrafting}
 											goToWriting={goToWriting}
 											goToSearch={onGoToSearch}
+											goToInbox={goToInbox}
 										/>
 									</div>
 								) : isNarrowDesktop ? (
@@ -4942,6 +5165,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													draftCount={draftCount}
 													sentCount={sentCount}
 													onFromClick={onOpenIdentityDialog}
+													onContactsClick={goToContacts}
+													onDraftsClick={goToDrafting}
+													onSentClick={goToSent}
 													width={330}
 												/>
 												{/* Mini Email Structure panel */}
@@ -4955,6 +5181,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																	: form
 														}
 														readOnly={isDraftingView || isSentView}
+														variant={draftsMiniEmailTopHeaderHeight ? 'settings' : undefined}
+														settingsPrimaryLabel={draftsMiniEmailSettingsLabels.primary}
+														settingsSecondaryLabel={draftsMiniEmailSettingsLabels.secondary}
 														profileFields={miniProfileFields}
 														identityProfile={campaign?.identity as IdentityProfileFields | null}
 														onIdentityUpdate={handleIdentityUpdate}
@@ -5011,15 +5240,17 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													onContactClick={handleResearchContactClick}
 													onContactHover={handleResearchContactHover}
 													onEmailHover={setHoveredSentForSettings}
+													goToContacts={goToContacts}
 													goToDrafts={goToDrafting}
 													goToWriting={goToWriting}
 													goToSearch={onGoToSearch}
+													goToInbox={goToInbox}
 												/>
 											</div>
 										</div>
 										{/* Bottom Panels: Contacts, Drafts, and Inbox - centered relative to container */}
 										<div
-											className="mt-[91px] flex justify-center gap-[15px]"
+											className="mt-[91px] pb-[8px] flex justify-center gap-[15px]"
 											data-campaign-bottom-anchor
 										>
 											<ContactsExpandedList
@@ -5058,9 +5289,11 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											onContactClick={handleResearchContactClick}
 											onContactHover={handleResearchContactHover}
 											onEmailHover={setHoveredSentForSettings}
+											goToContacts={goToContacts}
 											goToDrafts={goToDrafting}
 											goToWriting={goToWriting}
 											goToSearch={onGoToSearch}
+											goToInbox={goToInbox}
 										/>
 
 										{/* Research panel below sent box at narrowest breakpoint (< 952px) */}
@@ -5102,6 +5335,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																	: form
 														}
 														readOnly={isDraftingView || isSentView}
+														variant={draftsMiniEmailTopHeaderHeight ? 'settings' : undefined}
+														settingsPrimaryLabel={draftsMiniEmailSettingsLabels.primary}
+														settingsSecondaryLabel={draftsMiniEmailSettingsLabels.secondary}
 														profileFields={miniProfileFields}
 														identityProfile={campaign?.identity as IdentityProfileFields | null}
 														onIdentityUpdate={handleIdentityUpdate}
@@ -5129,7 +5365,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 
 										{/* Bottom Panels: Contacts, Drafts, and Inbox - hidden at narrowest breakpoint (< 952px) */}
 										{!isNarrowestDesktop && (
-											<div className="mt-[91px] flex justify-center gap-[15px]">
+											<div className="mt-[91px] pb-[8px] flex justify-center gap-[15px]">
 												<ContactsExpandedList
 													contacts={contactsAvailableForDrafting}
 													width={232}
@@ -5178,6 +5414,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												draftCount={draftCount}
 												sentCount={sentCount}
 												onFromClick={onOpenIdentityDialog}
+												onContactsClick={goToContacts}
+												onDraftsClick={goToDrafting}
+												onSentClick={goToSent}
 											/>
 											<div
 												style={{
@@ -6298,7 +6537,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										/>
 										{/* Research panel below inbox - matches InboxSection's container structure (w-full mx-auto px-4 maxWidth 516px) - hidden on mobile */}
 									{!isMobile && (
-										<div className="mt-[20px] w-full mx-auto px-4" style={{ maxWidth: '516px' }}>
+										<div className="mt-[20px] w-full flex justify-center px-4">
 											{isBatchDraftingInProgress ? (
 												<DraftPreviewExpandedList
 													contacts={contacts || []}
@@ -6337,6 +6576,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													draftCount={draftCount}
 													sentCount={sentCount}
 													onFromClick={onOpenIdentityDialog}
+													onContactsClick={goToContacts}
+													onDraftsClick={goToDrafting}
+													onSentClick={goToSent}
 													width={375}
 												/>
 												{/* Research panel below header - full aesthetic matching other tabs */}
@@ -6381,7 +6623,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											</div>
 										</div>
 										{/* Bottom Panels: Contacts, Drafts, and Sent */}
-										<div className="mt-[91px] flex justify-center gap-[15px]">
+										<div className="mt-[91px] pb-[8px] flex justify-center gap-[15px]">
 											<ContactsExpandedList
 												contacts={contactsAvailableForDrafting}
 												width={232}
@@ -6434,7 +6676,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										{/* Bottom Panels: Contacts, Drafts, and Sent - hidden at narrowest breakpoint (< 952px) */}
 										{!isNarrowestDesktop && (
 											<div
-												className="mt-[112px] flex justify-center gap-[15px]"
+												className="mt-[35px] pb-[8px] flex justify-center gap-[15px]"
 												data-campaign-bottom-anchor
 											>
 												<ContactsExpandedList
@@ -6485,6 +6727,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											draftCount={draftCount}
 											sentCount={sentCount}
 											onFromClick={onOpenIdentityDialog}
+											onContactsClick={goToContacts}
+											onDraftsClick={goToDrafting}
+											onSentClick={goToSent}
 											width={330}
 										/>
 										{/* 2. Contacts */}
@@ -6586,6 +6831,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																: form
 													}
 													readOnly={isDraftingView || isSentView}
+													variant={draftsMiniEmailTopHeaderHeight ? 'settings' : undefined}
+													settingsPrimaryLabel={draftsMiniEmailSettingsLabels.primary}
+													settingsSecondaryLabel={draftsMiniEmailSettingsLabels.secondary}
 													profileFields={miniProfileFields}
 													identityProfile={campaign?.identity as IdentityProfileFields | null}
 													onIdentityUpdate={handleIdentityUpdate}
@@ -7145,6 +7393,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											draftCount={draftCount}
 											sentCount={sentCount}
 											onFromClick={onOpenIdentityDialog}
+											onContactsClick={goToContacts}
+											onDraftsClick={goToDrafting}
+											onSentClick={goToSent}
 											width={330}
 										/>
 										<div
@@ -7336,6 +7587,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																: form
 													}
 													readOnly={isDraftingView || isSentView}
+													variant={draftsMiniEmailTopHeaderHeight ? 'settings' : undefined}
+													settingsPrimaryLabel={draftsMiniEmailSettingsLabels.primary}
+													settingsSecondaryLabel={draftsMiniEmailSettingsLabels.secondary}
 													profileFields={miniProfileFields}
 													identityProfile={campaign?.identity as IdentityProfileFields | null}
 													onIdentityUpdate={handleIdentityUpdate}
@@ -8004,8 +8258,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 						)} */}
 					</div>
 
-					{/* Spacer below expanded lists */}
-					<div className="relative w-screen max-w-none mt-10 pb-10" aria-hidden="true" />
+					{/* Spacer below expanded lists (mobile only; desktop campaign page should not scroll) */}
+					{isMobile && (
+						<div className="relative w-screen max-w-none mt-10 pb-10" aria-hidden="true" />
+					)}
 				</form>
 			</Form>
 

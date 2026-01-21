@@ -27,9 +27,11 @@ interface SentEmailsProps {
 	onContactClick?: (contact: ContactWithName | null) => void;
 	onContactHover?: (contact: ContactWithName | null) => void;
 	onEmailHover?: (email: EmailWithRelations | null) => void;
+	goToContacts?: () => void;
 	goToDrafts?: () => void;
 	goToWriting?: () => void;
 	goToSearch?: () => void;
+	goToInbox?: () => void;
 	/**
 	 * Optional: marks this sent table as the "main box" for cross-tab morph animations.
 	 * When provided, this value is forwarded to the underlying DraftingTable `mainBoxId`.
@@ -43,9 +45,11 @@ export const SentEmails: FC<SentEmailsProps> = ({
 	onContactClick,
 	onContactHover,
 	onEmailHover,
+	goToContacts,
 	goToDrafts,
 	goToWriting,
 	goToSearch,
+	goToInbox,
 	mainBoxId,
 }) => {
 	const isMobile = useIsMobile();
@@ -69,9 +73,11 @@ export const SentEmails: FC<SentEmailsProps> = ({
 			isPending={isPendingEmails}
 			title="Sent"
 			mainBoxId={mainBoxId}
+			goToContacts={goToContacts}
 			goToDrafts={goToDrafts}
 			goToWriting={goToWriting}
 			goToSearch={goToSearch}
+			goToInbox={goToInbox}
 			isMobile={isMobile}
 		>
 			<div

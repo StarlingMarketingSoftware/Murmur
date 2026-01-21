@@ -1148,6 +1148,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	// Small delay when moving between marker layers (prevents hover flicker)
 	const hoverClearTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 	const stateLayerRef = useRef<google.maps.Data | null>(null);
+	// Track the currently hovered state feature to prevent "sticky" highlights
+	const hoveredStateFeatureRef = useRef<google.maps.Data.Feature | null>(null);
 	const resultsOutlinePolygonsRef = useRef<google.maps.Polygon[]>([]);
 	const searchedStateOutlinePolygonsRef = useRef<google.maps.Polygon[]>([]);
 	const lockedStateSelectionMultiPolygonRef = useRef<ClippingMultiPolygon | null>(null);
@@ -2011,6 +2013,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					if (currentZoom > stateHoverMaxZoom + 0.001) return;
 					if (isLoadingRef.current) return;
 
+					// Global nuke of all hover overrides. This guarantees that no other state stays
+					// highlighted, even if mouseout events were missed or raced.
+					dataLayer.revertStyle();
+
+					hoveredStateFeatureRef.current = event.feature;
+
 					const hoveredKey = normalizeStateKey(
 						(event.feature.getProperty('NAME') as string) ||
 							(event.feature.getId() as string)
@@ -2031,7 +2039,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			mouseoutListener = dataLayer.addListener(
 				'mouseout',
 				(event: google.maps.Data.MouseEvent) => {
-					dataLayer.revertStyle(event.feature);
+					// Only revert if we are leaving the currently highlighted feature.
+					if (hoveredStateFeatureRef.current === event.feature) {
+						dataLayer.revertStyle();
+						hoveredStateFeatureRef.current = null;
+					}
 				}
 			);
 		}
@@ -2062,6 +2074,15 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						geometry.forEachLatLng((latLng) => {
 							bounds.extend(latLng);
 						});
+						// Avoid zoom "bounce" on small states by preventing fitBounds from overshooting the cap.
+						const AUTO_FIT_STATE_MAX_ZOOM = 8;
+						const DEFAULT_MAX_ZOOM_FALLBACK = 22;
+						const prevMaxZoomRaw = map.get('maxZoom') as unknown;
+						const prevMaxZoom =
+							typeof prevMaxZoomRaw === 'number' && Number.isFinite(prevMaxZoomRaw)
+								? prevMaxZoomRaw
+								: null;
+						map.setOptions({ maxZoom: AUTO_FIT_STATE_MAX_ZOOM });
 						map.fitBounds(bounds, {
 							top: 100,
 							right: 100,
@@ -2070,9 +2091,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						});
 						google.maps.event.addListenerOnce(map, 'idle', () => {
 							const currentZoom = map.getZoom();
-							if (currentZoom && currentZoom > 8) {
-								map.setZoom(8);
+							if (currentZoom && currentZoom > AUTO_FIT_STATE_MAX_ZOOM) {
+								map.setZoom(AUTO_FIT_STATE_MAX_ZOOM);
 							}
+							// Restore maxZoom so the user can zoom in further after the animation.
+							map.setOptions({ maxZoom: prevMaxZoom ?? DEFAULT_MAX_ZOOM_FALLBACK });
 						});
 					}
 				}
@@ -2087,6 +2110,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			// If the user zoomed in while hovering, ensure we clear any lingering fill override.
 			if (shouldEnableHoverHighlight) {
 				dataLayer.revertStyle();
+				hoveredStateFeatureRef.current = null;
 			}
 		};
 	}, [
@@ -3360,6 +3384,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	// This prevents a race where we fit to contacts before the state GeoJSON layer is ready,
 	// and then never zoom to the intended state once the layer finishes loading.
 	const lastFitToLockedStateKeyRef = useRef<string | null>(null);
+	// In search mode, use the query string as the stable "search session" key. This avoids
+	// treating resorted/streaming results as a brand new search (which causes map bouncing).
+	const lastSearchQueryKeyRef = useRef<string | null>(null);
+	// Debounce auto-fit camera moves so rapid result updates don't cause zoom oscillation.
+	const autoFitTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
 	// Helper to fit map bounds with padding
 	const fitMapToBounds = useCallback(
@@ -3379,6 +3408,20 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 			if (!hasValidCoords) return;
 
+			// Avoid a visible "zoom in then zoom out" bounce:
+			// Temporarily cap maxZoom during fitBounds so the camera never overshoots our cap
+			// and then gets corrected in a second animation.
+			const AUTO_FIT_MAX_ZOOM = 14;
+			const DEFAULT_MAX_ZOOM_FALLBACK = 22;
+			const prevMaxZoomRaw = mapInstance.get('maxZoom') as unknown;
+			const prevMaxZoom =
+				typeof prevMaxZoomRaw === 'number' && Number.isFinite(prevMaxZoomRaw)
+					? prevMaxZoomRaw
+					: null;
+			mapInstance.setOptions({
+				maxZoom: AUTO_FIT_MAX_ZOOM,
+			});
+
 			// Fit bounds with padding
 			mapInstance.fitBounds(bounds, {
 				top: 50,
@@ -3390,9 +3433,13 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			// Prevent too much zoom on single marker or very close markers
 			const listener = google.maps.event.addListener(mapInstance, 'idle', () => {
 				const currentZoom = mapInstance.getZoom();
-				if (currentZoom && currentZoom > 14) {
-					mapInstance.setZoom(14);
+				if (currentZoom && currentZoom > AUTO_FIT_MAX_ZOOM) {
+					mapInstance.setZoom(AUTO_FIT_MAX_ZOOM);
 				}
+				// Restore maxZoom so users can zoom in further after the auto-fit completes.
+				mapInstance.setOptions({
+					maxZoom: prevMaxZoom ?? DEFAULT_MAX_ZOOM_FALLBACK,
+				});
 				google.maps.event.removeListener(listener);
 			});
 		},
@@ -3424,6 +3471,17 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 		if (!stateBounds) return false;
 
+		// Avoid a visible "zoom in then zoom out" bounce on small states:
+		// temporarily cap maxZoom during fitBounds so the camera never overshoots the cap.
+		const AUTO_FIT_STATE_MAX_ZOOM = 8;
+		const DEFAULT_MAX_ZOOM_FALLBACK = 22;
+		const prevMaxZoomRaw = mapInstance.get('maxZoom') as unknown;
+		const prevMaxZoom =
+			typeof prevMaxZoomRaw === 'number' && Number.isFinite(prevMaxZoomRaw) ? prevMaxZoomRaw : null;
+		mapInstance.setOptions({
+			maxZoom: AUTO_FIT_STATE_MAX_ZOOM,
+		});
+
 		// Fit to state bounds with padding for a comfortable zoomed view
 		mapInstance.fitBounds(stateBounds, {
 			top: 100,
@@ -3435,9 +3493,13 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		// Ensure we don't zoom in too much (especially for small states like DC, RI)
 		const listener = google.maps.event.addListener(mapInstance, 'idle', () => {
 			const currentZoom = mapInstance.getZoom();
-			if (currentZoom && currentZoom > 8) {
-				mapInstance.setZoom(8);
+			if (currentZoom && currentZoom > AUTO_FIT_STATE_MAX_ZOOM) {
+				mapInstance.setZoom(AUTO_FIT_STATE_MAX_ZOOM);
 			}
+			// Restore maxZoom so users can zoom in further after the auto-fit completes.
+			mapInstance.setOptions({
+				maxZoom: prevMaxZoom ?? DEFAULT_MAX_ZOOM_FALLBACK,
+			});
 			google.maps.event.removeListener(listener);
 		});
 
@@ -3466,11 +3528,16 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		lockedStateSelectionBboxRef.current = null;
 		lockedStateSelectionKeyRef.current = null;
 		setMap(null);
+		if (autoFitTimeoutRef.current) {
+			clearTimeout(autoFitTimeoutRef.current);
+			autoFitTimeoutRef.current = null;
+		}
 		hasFitBoundsRef.current = false;
 		lastContactsCountRef.current = 0;
 		lastFirstContactIdRef.current = null;
 		lastLockedStateKeyRef.current = null;
 		lastFitToLockedStateKeyRef.current = null;
+		lastSearchQueryKeyRef.current = null;
 	}, [clearResultsOutline, clearSearchedStateOutline]);
 
 	// Fit bounds when contacts with coordinates change (or when the locked state changes).
@@ -3486,56 +3553,115 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			lastFitToLockedStateKeyRef.current = null;
 		}
 
-		// Check if this is a new set of search results by comparing the first contact ID
+		const searchQueryKey = (searchQuery ?? '').trim();
+		const isSearchMode = searchQueryKey.length > 0;
+
+		// Check if this is a new set of search results.
+		// In search mode, rely on the query string (stable). Outside of search mode,
+		// fall back to the first contact id heuristic.
 		const currentFirstId = contactsWithCoords[0]?.id ?? null;
-		const isNewSearch = currentFirstId !== lastFirstContactIdRef.current;
+		const isNewSearch = isSearchMode
+			? searchQueryKey !== lastSearchQueryKeyRef.current
+			: currentFirstId !== lastFirstContactIdRef.current;
 
 		// Check if the locked state changed (indicating a new search in a different state)
 		const isNewStateSearch = lockedStateKey !== lastLockedStateKeyRef.current;
 
+		// Only treat the locked state as a *real* US state if it's a known state abbreviation.
+		// This prevents endless "fit to locked state" attempts for values like "Near Me" or city strings.
+		const lockedStateKeyIsUsState =
+			!!lockedStateKey && Object.prototype.hasOwnProperty.call(stateBadgeColorMap, lockedStateKey);
+
 		const hasFitLockedStateForKey =
-			!!lockedStateKey && lastFitToLockedStateKeyRef.current === lockedStateKey;
+			lockedStateKeyIsUsState && lastFitToLockedStateKeyRef.current === lockedStateKey;
 		// Even if we've already fit to contacts, we still want to zoom to the locked state
 		// once the state layer finishes loading (prevents "random" fallback viewports).
-		const shouldFitLockedState = !!lockedStateKey && isStateLayerReady && !hasFitLockedStateForKey;
+		const shouldFitLockedState = lockedStateKeyIsUsState && isStateLayerReady && !hasFitLockedStateForKey;
 
 		// Fit bounds if:
 		// 1. We haven't fit bounds yet (initial load after geocoding)
 		// 2. This is a completely new search (first contact ID changed)
 		// 3. The number of contacts with coords has increased (more were geocoded)
 		// 4. The contacts list changed significantly (new search)
-		const shouldFitBounds =
-			!hasFitBoundsRef.current ||
-			isNewSearch ||
-			isNewStateSearch ||
-			contactsWithCoords.length > lastContactsCountRef.current ||
-			Math.abs(contactsWithCoords.length - lastContactsCountRef.current) > 5;
+		const coordsJustBecameAvailable =
+			lastContactsCountRef.current === 0 && contactsWithCoords.length > 0;
+		const shouldFitBounds = isSearchMode
+			? // In search mode, fit once per search/where change. Avoid repeated fits as results stream/reorder.
+				!hasFitBoundsRef.current ||
+				isNewSearch ||
+				isNewStateSearch ||
+				(!lockedStateKeyIsUsState && coordsJustBecameAvailable)
+			: // Outside search mode (campaign contacts view), keep the existing "results changed" behavior.
+				!hasFitBoundsRef.current ||
+				isNewSearch ||
+				isNewStateSearch ||
+				contactsWithCoords.length > lastContactsCountRef.current ||
+				Math.abs(contactsWithCoords.length - lastContactsCountRef.current) > 5;
+
+		// Keep new-search detection refs up to date even if we can't fit yet.
+		if (isSearchMode) lastSearchQueryKeyRef.current = searchQueryKey;
+		else lastFirstContactIdRef.current = currentFirstId;
+		lastLockedStateKeyRef.current = lockedStateKey;
 
 		if (!shouldFitBounds && !shouldFitLockedState) return;
 
-		// If there's a locked state (searched state) and this is a new search or new state,
-		// zoom to that state first for a better initial view (works even with 0 geocoded contacts).
-		if (
-			lockedStateKey &&
-			isStateLayerReady &&
-			(isNewSearch || isNewStateSearch || !hasFitBoundsRef.current || shouldFitLockedState)
-		) {
-			const didFitToState = fitMapToState(map, lockedStateKey);
-			if (didFitToState) {
-				lastFitToLockedStateKeyRef.current = lockedStateKey;
-			}
-			if (!didFitToState && contactsWithCoords.length > 0) {
-				// Fallback to fitting to contacts if state geometry not found
-				fitMapToBounds(map, contactsWithCoords);
-			}
-		} else if (contactsWithCoords.length > 0) {
-			fitMapToBounds(map, contactsWithCoords);
+		// If we can't fit to anything yet (no coords and no state geometry ready), wait for the next update.
+		const canFitToStateNow = lockedStateKeyIsUsState && !!lockedStateKey && isStateLayerReady;
+		const canFitToBoundsNow = contactsWithCoords.length > 0;
+		if (!canFitToStateNow && !canFitToBoundsNow) return;
+
+		// Debounce camera moves so rapid updates don't cause zoom in/out oscillation.
+		if (autoFitTimeoutRef.current) {
+			clearTimeout(autoFitTimeoutRef.current);
+			autoFitTimeoutRef.current = null;
 		}
 
-		hasFitBoundsRef.current = true;
-		lastContactsCountRef.current = contactsWithCoords.length;
-		lastFirstContactIdRef.current = currentFirstId;
-		lastLockedStateKeyRef.current = lockedStateKey;
+		autoFitTimeoutRef.current = setTimeout(() => {
+			let didFit = false;
+
+			// If there's a locked state (searched state) and this is a new search or new state,
+			// zoom to that state first for a better initial view (works even with 0 geocoded contacts).
+			// Only do this when the locked state is actually a US state; otherwise we'd keep trying
+			// to fit "Near Me" / city strings and cause bouncing.
+			if (
+				lockedStateKeyIsUsState &&
+				lockedStateKey &&
+				isStateLayerReady &&
+				(isNewSearch || isNewStateSearch || !hasFitBoundsRef.current || shouldFitLockedState)
+			) {
+				const didFitToState = fitMapToState(map, lockedStateKey);
+				// Mark as attempted so we never loop (even if something unexpected prevents a fit).
+				lastFitToLockedStateKeyRef.current = lockedStateKey;
+				if (didFitToState) {
+					didFit = true;
+				} else if (contactsWithCoords.length > 0) {
+					// Fallback to fitting to contacts if state geometry not found
+					fitMapToBounds(map, contactsWithCoords);
+					didFit = true;
+				}
+			} else if (contactsWithCoords.length > 0) {
+				fitMapToBounds(map, contactsWithCoords);
+				didFit = true;
+			}
+
+			// Only mark as "fit" if we actually moved the camera.
+			if (didFit) {
+				hasFitBoundsRef.current = true;
+				lastContactsCountRef.current = contactsWithCoords.length;
+			}
+
+			if (autoFitTimeoutRef.current) {
+				clearTimeout(autoFitTimeoutRef.current);
+				autoFitTimeoutRef.current = null;
+			}
+		}, 180);
+
+		return () => {
+			if (autoFitTimeoutRef.current) {
+				clearTimeout(autoFitTimeoutRef.current);
+				autoFitTimeoutRef.current = null;
+			}
+		};
 	}, [
 		map,
 		contactsWithCoords,
@@ -3544,6 +3670,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		lockedStateKey,
 		isStateLayerReady,
 		skipAutoFit,
+		searchQuery,
 	]);
 
 	// Reset bounds tracking when contacts prop is empty (preparing for new search)

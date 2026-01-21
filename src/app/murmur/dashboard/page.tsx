@@ -5003,74 +5003,100 @@ const DashboardContent = () => {
 										top: '9px',
 										height: '24px',
 										left: '50%',
-										transform: 'translateX(-50%)',
+										// Optical nudge: align the tray with the visible search bar below.
+										transform: 'translateX(-50%) translateX(-5px)',
 										width: 'min(440px, calc(100vw - 120px))',
+										maxWidth: '440px',
 									}}
 								>
-									<div className="pointer-events-auto flex w-full items-center justify-between">
-										<button
-											type="button"
-											className="font-inter text-[14px] font-medium leading-none bg-transparent p-0 m-0 border-0 cursor-pointer text-[#A0A0A0]"
-											onClick={() =>
-												router.push(
-													`${urls.murmur.campaign.detail(fromCampaignIdParam)}?origin=search&tab=contacts`
-												)
-											}
-										>
-											Contacts
-										</button>
-										<button
-											type="button"
-											className="font-inter text-[14px] font-medium leading-none bg-transparent p-0 m-0 border-0 cursor-pointer text-[#A0A0A0]"
-											onClick={() =>
-												router.push(
-													`${urls.murmur.campaign.detail(fromCampaignIdParam)}?origin=search&tab=testing`
-												)
-											}
-										>
-											Write
-										</button>
-										<button
-											type="button"
-											aria-label="All"
-											title="All"
-											className="bg-transparent p-0 m-0 border-0 cursor-pointer text-[#A0A0A0] inline-flex items-center justify-center"
-											onClick={() =>
-												router.push(
-													`${urls.murmur.campaign.detail(fromCampaignIdParam)}?origin=search&tab=all`
-												)
-											}
-										>
-											<BottomArrowIcon
-												aria-hidden="true"
-												focusable="false"
-												width={18}
-												height={12}
-												className="block translate-y-[1px]"
-											/>
-										</button>
-										<button
-											type="button"
-											className="font-inter text-[14px] font-medium leading-none bg-transparent p-0 m-0 border-0 cursor-pointer text-[#A0A0A0]"
-											onClick={() =>
-												router.push(
-													`${urls.murmur.campaign.detail(fromCampaignIdParam)}?origin=search&tab=drafting`
-												)
-											}
-										>
-											Drafts
-										</button>
-										<button
-											type="button"
-											className="font-inter text-[14px] font-medium leading-none bg-transparent p-0 m-0 border-0 cursor-pointer text-[#A0A0A0]"
-											onClick={() =>
-												router.push(
-													`${urls.murmur.campaign.detail(fromCampaignIdParam)}?origin=search&tab=inbox`
-												)
-											}
-										>
-											Inbox
-										</button>
+									<div className="pointer-events-auto relative h-full w-full">
+										{/* Background box behind tabs (matches search bar width & centering) */}
+										<div
+											aria-hidden="true"
+											style={{
+												position: 'absolute',
+												// Keep the map's 3px black border visible above this box.
+												top: '3px',
+												left: 0,
+												right: 0,
+												// Leave a small gap so it doesn't press against the search bar.
+												bottom: '3px',
+												backgroundColor: 'rgba(238, 237, 237, 0.8)', // #EEEDED @ 80%
+												border: '1px solid rgba(173, 173, 173, 0.8)', // #ADADAD @ 80%
+												borderTopLeftRadius: 0,
+												borderTopRightRadius: 0,
+												borderBottomLeftRadius: '8px',
+												borderBottomRightRadius: '8px',
+												boxSizing: 'border-box',
+												pointerEvents: 'none',
+											}}
+										/>
+
+										<div className="relative z-[1] flex h-full w-full items-center justify-between px-4 pt-[3px] pb-[3px]">
+											<button
+												type="button"
+												className="font-inter text-[14px] font-medium leading-none bg-transparent p-0 m-0 border-0 cursor-pointer text-[#A0A0A0] inline-flex items-center h-full"
+												onClick={() =>
+													router.push(
+														`${urls.murmur.campaign.detail(fromCampaignIdParam)}?origin=search&tab=contacts`
+													)
+												}
+											>
+												Contacts
+											</button>
+											<button
+												type="button"
+												className="font-inter text-[14px] font-medium leading-none bg-transparent p-0 m-0 border-0 cursor-pointer text-[#A0A0A0] inline-flex items-center h-full"
+												onClick={() =>
+													router.push(
+														`${urls.murmur.campaign.detail(fromCampaignIdParam)}?origin=search&tab=testing`
+													)
+												}
+											>
+												Write
+											</button>
+											<button
+												type="button"
+												aria-label="All"
+												title="All"
+												className="bg-transparent p-0 m-0 border-0 cursor-pointer text-[#A0A0A0] inline-flex items-center justify-center h-full"
+												onClick={() =>
+													router.push(
+														`${urls.murmur.campaign.detail(fromCampaignIdParam)}?origin=search&tab=all`
+													)
+												}
+											>
+												<BottomArrowIcon
+													aria-hidden="true"
+													focusable="false"
+													width={18}
+													height={12}
+													className="block translate-y-[1px]"
+												/>
+											</button>
+											<button
+												type="button"
+												className="font-inter text-[14px] font-medium leading-none bg-transparent p-0 m-0 border-0 cursor-pointer text-[#A0A0A0] inline-flex items-center h-full"
+												onClick={() =>
+													router.push(
+														`${urls.murmur.campaign.detail(fromCampaignIdParam)}?origin=search&tab=drafting`
+													)
+												}
+											>
+												Drafts
+											</button>
+											<button
+												type="button"
+												className="font-inter text-[14px] font-medium leading-none bg-transparent p-0 m-0 border-0 cursor-pointer text-[#A0A0A0] inline-flex items-center h-full"
+												onClick={() =>
+													router.push(
+														`${urls.murmur.campaign.detail(fromCampaignIdParam)}?origin=search&tab=inbox`
+													)
+												}
+											>
+												Inbox
+											</button>
+										</div>
 									</div>
 								</div>
 							) : null;

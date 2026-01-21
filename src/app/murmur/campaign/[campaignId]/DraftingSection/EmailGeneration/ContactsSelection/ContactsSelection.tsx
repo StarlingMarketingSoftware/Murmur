@@ -1,6 +1,6 @@
 'use client';
 
-import { FC, useMemo, useState, useRef, useEffect } from 'react';
+import { FC, useMemo, useState, useRef, useEffect, useCallback } from 'react';
 import { gsap } from 'gsap';
 import { useRouter } from 'next/navigation';
 import { ContactsSelectionProps, useContactsSelection } from './useContactsSelection';
@@ -877,6 +877,8 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 		goToSearch,
 		goToDrafts,
 		goToInbox,
+		goToSent,
+		goToWriting,
 		hideBottomPanels,
 		hideButton,
 		mainBoxId,
@@ -886,6 +888,65 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 	const router = useRouter();
 	const isMobile = useIsMobile();
 	const searchInfo = useMemo(() => parseSearchFromCampaign(campaign), [campaign]);
+	
+	// Track hovered contact index for keyboard navigation
+	const [hoveredContactIndex, setHoveredContactIndex] = useState<number | null>(null);
+	
+	// Keyboard navigation: up/down arrows move hover between rows, Enter selects hovered contact
+	const handleKeyboardNavigation = useCallback((e: KeyboardEvent) => {
+		// Only handle up/down arrows and Enter
+		if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown' && e.key !== 'Enter') return;
+		
+		// Only work if we have a hovered contact
+		if (hoveredContactIndex === null) return;
+		
+		// Check if a text input element is focused (don't intercept typing)
+		const activeElement = document.activeElement;
+		if (activeElement) {
+			const tagName = activeElement.tagName.toLowerCase();
+			if (
+				tagName === 'input' ||
+				tagName === 'textarea' ||
+				(activeElement as HTMLElement).isContentEditable
+			) {
+				return;
+			}
+		}
+		
+		e.preventDefault();
+		e.stopImmediatePropagation(); // Prevent campaign page tab navigation
+		
+		// Handle Enter key - select/deselect the hovered contact
+		if (e.key === 'Enter') {
+			const contact = contacts[hoveredContactIndex];
+			if (contact) {
+				handleContactSelection(contact.id);
+				onContactClick?.(contact);
+			}
+			return;
+		}
+		
+		let newIndex: number;
+		if (e.key === 'ArrowUp') {
+			newIndex = hoveredContactIndex > 0 ? hoveredContactIndex - 1 : contacts.length - 1;
+		} else {
+			newIndex = hoveredContactIndex < contacts.length - 1 ? hoveredContactIndex + 1 : 0;
+		}
+		
+		setHoveredContactIndex(newIndex);
+		onContactHover?.(contacts[newIndex]);
+	}, [hoveredContactIndex, contacts, onContactHover, handleContactSelection, onContactClick]);
+
+	useEffect(() => {
+		// Only add listener if we have a hovered contact
+		if (hoveredContactIndex === null) return;
+		
+		// Use capture phase to run before campaign page handler
+		document.addEventListener('keydown', handleKeyboardNavigation, true);
+		return () => {
+			document.removeEventListener('keydown', handleKeyboardNavigation, true);
+		};
+	}, [hoveredContactIndex, handleKeyboardNavigation]);
 
 	const { data: drafts } = useGetEmails({
 		filters: { campaignId: campaign?.id },
@@ -1013,6 +1074,7 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 				goToSearch={goToSearch}
 				goToDrafts={goToDrafts}
 				goToInbox={goToInbox}
+				goToWriting={goToWriting}
 				isMobile={isMobile}
 				topContent={
 					!isMobile ? (
@@ -1061,22 +1123,29 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 						isMobile ? "gap-2" : "gap-4"
 					)}
 					onMouseLeave={() => {
+						setHoveredContactIndex(null);
 						onContactHover?.(null);
 					}}
 				>
-					{contacts.map((contact) => {
+					{contacts.map((contact, contactIndex) => {
 						const isUsedContact = usedContactIdsSet.has(contact.id);
 						// Mobile-specific width values (using CSS calc for responsive sizing)
 						const mobileContactRowWidth = 'calc(100vw - 24px)';
+						// Keyboard focus shows hover UI independently of mouse hover
+						const isKeyboardFocused = hoveredContactIndex === contactIndex;
+						// Final background: selected > keyboard focus > white (mouse hover handled by CSS)
+						const contactBgColor = selectedContactIds.has(contact.id)
+							? 'bg-[#EAAEAE]'
+							: isKeyboardFocused
+								? 'bg-[#F5DADA]'
+								: 'bg-white hover:bg-[#F5DADA]';
 						return (
 						<div
 							key={contact.id}
 							className={cn(
 								'cursor-pointer grid grid-cols-2 grid-rows-2 h-[52px] overflow-hidden rounded-[8px] border-2 border-[#000000] select-none row-hover-scroll relative',
 								!isMobile && 'w-[489px]',
-								selectedContactIds.has(contact.id)
-									? 'bg-[#EAAEAE]'
-									: 'bg-white hover:bg-[#F5DADA]'
+								contactBgColor,
 							)}
 							style={isMobile ? { width: mobileContactRowWidth } : undefined}
 							onMouseDown={(e) => {
@@ -1086,6 +1155,7 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 								}
 							}}
 							onMouseEnter={() => {
+								setHoveredContactIndex(contactIndex);
 								onContactHover?.(contact);
 							}}
 							onClick={(e) => {
@@ -1560,7 +1630,7 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 
 			{/* Bottom Panels: Drafts, Sent, and Inbox */}
 			{!hideBottomPanels && (
-				<div className="mt-[35px] flex justify-center gap-[15px]">
+				<div className="mt-[35px] pb-[8px] flex justify-center gap-[15px]">
 					<DraftsExpandedList
 						drafts={drafts || []}
 						contacts={props.allContacts || props.contacts}
@@ -1568,6 +1638,7 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 						height={117}
 						whiteSectionHeight={15}
 						hideSendButton={true}
+						onOpenDrafts={goToDrafts}
 					/>
 					<SentExpandedList
 						sent={sentEmails || []}
@@ -1575,6 +1646,7 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 						width={233}
 						height={117}
 						whiteSectionHeight={15}
+						onOpenSent={goToSent}
 					/>
 					<InboxExpandedList
 						contacts={props.allContacts || props.contacts}
@@ -1583,6 +1655,7 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 						width={233}
 						height={117}
 						whiteSectionHeight={15}
+						onOpenInbox={goToInbox}
 					/>
 				</div>
 			)}

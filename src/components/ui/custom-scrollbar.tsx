@@ -131,6 +131,18 @@ export function CustomScrollbar({
 
 	// Forward wheel to internal container to ensure scrolling always works
 	const handleWheel: React.WheelEventHandler<HTMLDivElement> = useCallback((e) => {
+		// Campaign "scrollable" mode (<= 776px): allow natural page scrolling / scroll chaining.
+		// The campaign page intentionally becomes page-scrollable in this mode, so we should not
+		// trap wheel events inside nested custom scroll containers.
+		try {
+			if (document.documentElement.classList.contains('murmur-campaign-scrollable')) {
+				onWheelProp?.(e);
+				return;
+			}
+		} catch {
+			// ignore and fall back to default behavior
+		}
+
 		const container = scrollContainerRef.current;
 		if (!container) return;
 		const previousScrollTop = container.scrollTop;

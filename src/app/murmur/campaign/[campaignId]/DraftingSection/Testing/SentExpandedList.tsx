@@ -63,8 +63,10 @@ const SentHeaderChrome: FC<{
 	const pillBorderRadius = isBottomView ? 5 : isAllTab ? 7.5 : 11;
 	const pillFontSize = isBottomView ? '8px' : isAllTab ? '10px' : '13px';
 	// Center dots vertically with the pill - calculate both positions relative to each other
-	const pillTop =
-		whiteSectionHeight !== undefined ? (whiteSectionHeight - pillHeight) / 2 : 3 + offsetY;
+	// Add a tiny visual padding so the pill doesn't visually "kiss" the top border in tighter headers.
+	const visualTopPaddingPx = 1;
+	const pillTopBase = whiteSectionHeight !== undefined ? (whiteSectionHeight - pillHeight) / 2 : 3;
+	const pillTop = pillTopBase + offsetY + visualTopPaddingPx;
 	const pillCenterY = pillTop + pillHeight / 2;
 	const dotTop = Math.round(pillCenterY - dotSize / 2);
 
@@ -154,6 +156,9 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 }) => {
 	const [selectedSentIds, setSelectedSentIds] = useState<Set<number>>(new Set());
 	const lastClickedRef = useRef<number | null>(null);
+	
+	// Track whether the container is being hovered (for bottom view outline)
+	const [isContainerHovered, setIsContainerHovered] = useState(false);
 
 	const { data: usedContactIds } = useGetUsedContactIds();
 	const usedContactIdsSet = useMemo(
@@ -224,11 +229,31 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 				width: `${width}px`,
 				height: `${height}px`,
 				background: `linear-gradient(to bottom, #ffffff ${whiteSectionHeight}px, #5AB477 ${whiteSectionHeight}px)`,
+				...(isBottomView ? { cursor: 'pointer' } : {}),
 			}}
 			data-hover-description="Sent: Emails that have already been sent for this campaign."
 			role="region"
 			aria-label="Expanded sent preview"
+			onMouseEnter={() => isBottomView && setIsContainerHovered(true)}
+			onMouseLeave={() => isBottomView && setIsContainerHovered(false)}
+			onClick={() => isBottomView && onOpenSent?.()}
 		>
+			{/* Hover outline for bottom view - 3px gap top/bottom, 2px gap sides, 4px thick */}
+			{isBottomView && isContainerHovered && (
+				<div
+					style={{
+						position: 'absolute',
+						top: '-7px',
+						bottom: '-7px',
+						left: '-6px',
+						right: '-6px',
+						border: '4px solid #84CC7C',
+						borderRadius: 0,
+						pointerEvents: 'none',
+						zIndex: 50,
+					}}
+				/>
+			)}
 			{/* Header row (no explicit divider; let the background change from white to green like the main table) */}
 			<SentHeaderChrome isAllTab={isAllTab} whiteSectionHeight={customWhiteSectionHeight} />
 			<div
