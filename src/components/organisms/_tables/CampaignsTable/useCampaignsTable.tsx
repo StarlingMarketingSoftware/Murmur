@@ -17,7 +17,9 @@ type CampaignWithCounts = Campaign & {
 const useIsomorphicLayoutEffect =
 	typeof window !== 'undefined' ? useLayoutEffect : useEffect;
 
-type DraftsSortMode = 'desc' | 'asc' | null;
+type MetricSortKey = 'drafts' | 'sent';
+type MetricSortMode = 'desc' | 'asc';
+type MetricSortState = { key: MetricSortKey; mode: MetricSortMode } | null;
 
 const getDraftFillColor = (value: number): string => {
 	const v = Math.max(0, Math.min(value, 50));
@@ -86,11 +88,22 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 	const [countdown, setCountdown] = useState<number>(5);
 	const confirmationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-	const [draftsSortMode, setDraftsSortMode] = useState<DraftsSortMode>(null);
-	const isDraftsSortActive = draftsSortMode !== null;
+	const [metricSort, setMetricSort] = useState<MetricSortState>(null);
+	const metricSortKey = metricSort?.key ?? null;
+	const metricSortMode = metricSort?.mode ?? null;
+	const isMetricSortActive = metricSort !== null;
+	const metricSortRef = useRef<MetricSortState>(null);
+	useEffect(() => {
+		metricSortRef.current = metricSort;
+	}, [metricSort]);
+
 	const draftsHeaderButtonRef = useRef<HTMLButtonElement | null>(null);
 	const setDraftsHeaderButtonRef = useCallback((el: HTMLButtonElement | null) => {
 		draftsHeaderButtonRef.current = el;
+	}, []);
+	const sentHeaderButtonRef = useRef<HTMLButtonElement | null>(null);
+	const setSentHeaderButtonRef = useCallback((el: HTMLButtonElement | null) => {
+		sentHeaderButtonRef.current = el;
 	}, []);
 
 	// Use the custom animation hook
@@ -122,7 +135,12 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 		};
 
 		const update = () => {
-			const btn = draftsHeaderButtonRef.current;
+			const btn =
+				metricSortKey === 'sent'
+					? sentHeaderButtonRef.current
+					: metricSortKey === 'drafts'
+						? draftsHeaderButtonRef.current
+						: null;
 			if (!btn) return;
 
 			const container = btn.closest('.my-campaigns-table') as HTMLElement | null;
@@ -148,7 +166,17 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 
 			const btnLeftInContainer = (btnRect.left - containerRect.left) / safeScale;
 			const bottomLineLeft = btnLeftInContainer + 1;
-			const bottomLineWidth = Math.max(0, btn.offsetWidth - 2);
+			const metricBoxSelector =
+				metricSortKey === 'sent'
+					? ".metric-box[data-sent-fill]"
+					: ".metric-box[data-draft-fill]";
+			const metricBox =
+				compactMetrics
+					? (container.querySelector(metricBoxSelector) as HTMLElement | null)
+					: null;
+			const headerWidth = metricBox?.offsetWidth ?? btn.offsetWidth;
+
+			const bottomLineWidth = Math.max(0, headerWidth - 2);
 
 			container.style.setProperty('--drafts-sort-indicator-left', `${bottomLineLeft}px`);
 			container.style.setProperty('--drafts-sort-indicator-width', `${bottomLineWidth}px`);
@@ -162,14 +190,6 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 				// In very narrow/compact layouts, the header label can be slightly wider than the
 				// actual metric pill below (due to flex/text sizing). Prefer the real pill width
 				// so the highlight never includes the inter-pill spacing at ~500px widths.
-				const draftMetricBox =
-					compactMetrics
-						? (container.querySelector(
-								".metric-box[data-draft-fill]"
-						  ) as HTMLElement | null)
-						: null;
-				const headerWidth = draftMetricBox?.offsetWidth ?? btn.offsetWidth;
-
 				headerTh.style.setProperty('--drafts-sort-highlight-left', `${baseLeftInTh}px`);
 				headerTh.style.setProperty('--drafts-sort-highlight-width', `${headerWidth}px`);
 
@@ -196,8 +216,8 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 			});
 		};
 
-		if (!isDraftsSortActive) {
-			const btn = draftsHeaderButtonRef.current;
+		if (!isMetricSortActive) {
+			const btn = draftsHeaderButtonRef.current ?? sentHeaderButtonRef.current;
 			const container = btn
 				? (btn.closest('.my-campaigns-table') as HTMLElement | null)
 				: null;
@@ -218,13 +238,18 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 			return;
 		}
 
-		const btn = draftsHeaderButtonRef.current;
+		const btn =
+			metricSortKey === 'sent'
+				? sentHeaderButtonRef.current
+				: metricSortKey === 'drafts'
+					? draftsHeaderButtonRef.current
+					: null;
 		if (!btn) return;
 		const container = btn.closest('.my-campaigns-table') as HTMLElement | null;
 		if (!container) return;
 
 		container.setAttribute('data-drafts-sort-active', 'true');
-		container.setAttribute('data-drafts-sort-mode', draftsSortMode === 'asc' ? 'asc' : 'desc');
+		container.setAttribute('data-drafts-sort-mode', metricSortMode === 'asc' ? 'asc' : 'desc');
 		scheduleUpdate();
 
 		const handleResize = () => scheduleUpdate();
@@ -253,7 +278,7 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 			mo?.disconnect();
 			cancelRafs();
 		};
-	}, [isDraftsSortActive, draftsSortMode, compactMetrics]);
+	}, [isMetricSortActive, metricSortKey, metricSortMode, compactMetrics]);
 
 	const columns: ColumnDef<CampaignWithCounts>[] = [
 		{
@@ -286,26 +311,35 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 		{
 			id: 'metrics',
 			// This is a "display" column visually, but we still provide an accessor so TanStack
-			// treats it as sortable (we sort by draftCount when the Drafts header is clicked).
-			accessorFn: (row) => (row as CampaignWithCounts)?.draftCount ?? 0,
+			// treats it as sortable (we sort by Drafts or Sent when their headers are clicked).
+			accessorFn: (row) =>
+				(metricSortKey === 'sent'
+					? (row as CampaignWithCounts)?.sentCount
+					: (row as CampaignWithCounts)?.draftCount) ?? 0,
 			enableSorting: true,
-			// Sort campaigns by highest-to-lowest draft count when the Drafts header is clicked.
+			// Sort campaigns by Drafts or Sent, depending on which header is active.
 			sortingFn: (rowA, rowB) => {
-				const a = (rowA.original as CampaignWithCounts)?.draftCount ?? 0;
-				const b = (rowB.original as CampaignWithCounts)?.draftCount ?? 0;
+				const aRow = rowA.original as CampaignWithCounts;
+				const bRow = rowB.original as CampaignWithCounts;
+				const sortKey = metricSortRef.current?.key ?? metricSortKey ?? 'drafts';
+				const a = (sortKey === 'sent' ? aRow?.sentCount : aRow?.draftCount) ?? 0;
+				const b = (sortKey === 'sent' ? bRow?.sentCount : bRow?.draftCount) ?? 0;
 				return a === b ? 0 : a > b ? 1 : -1;
 			},
 			header: ({ column, table }) => {
+				const highlightColor = metricSortKey === 'sent' ? '#B4E8A8' : '#FFDA8F';
+
 				return (
 				<>
-					{isDraftsSortActive ? (
+					{isMetricSortActive ? (
 						<span
 							aria-hidden="true"
-							className="absolute top-0 bottom-0 bg-[#FFDA8F] pointer-events-none z-0"
+							className="absolute top-0 bottom-0 pointer-events-none z-0"
 							style={
 								{
 									left: 'var(--drafts-sort-highlight-left, 0px)',
 									width: 'var(--drafts-sort-highlight-width, 94px)',
+									backgroundColor: highlightColor,
 								} as React.CSSProperties
 							}
 						/>
@@ -328,18 +362,23 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 						ref={setDraftsHeaderButtonRef}
 						onClick={(e) => {
 							e.stopPropagation();
-							// Toggle:
+							// Toggle (Drafts):
 							// 1) desc (highest → lowest) with bottom indicator line
 							// 2) asc (lowest → highest) with top (36px) indicator line
 							// 3) default state (no sorting / no highlight)
-							const nextMode: DraftsSortMode =
-								draftsSortMode === null ? 'desc' : draftsSortMode === 'desc' ? 'asc' : null;
+							const next: MetricSortState =
+								metricSortKey !== 'drafts'
+									? { key: 'drafts', mode: 'desc' }
+									: metricSortMode === 'desc'
+										? { key: 'drafts', mode: 'asc' }
+										: null;
 
-							setDraftsSortMode(nextMode);
-							if (nextMode === null) {
+							metricSortRef.current = next;
+							setMetricSort(next);
+							if (next === null) {
 								table.setSorting([]);
 							} else {
-								table.setSorting([{ id: column.id, desc: nextMode === 'desc' }]);
+								table.setSorting([{ id: column.id, desc: next.mode === 'desc' }]);
 							}
 						}}
 						className={cn(
@@ -350,22 +389,46 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 								'flex metric-width-short items-center justify-center text-[10px] font-medium tracking-[0.01em] metrics-header-label-compact'
 						)}
 						data-label="drafts"
-						aria-pressed={isDraftsSortActive}
+						aria-pressed={metricSortKey === 'drafts'}
 					>
 						Drafts
 					</button>
-					<span
+					<button
+						type="button"
+						ref={setSentHeaderButtonRef}
+						onClick={(e) => {
+							e.stopPropagation();
+							// Toggle (Sent):
+							// 1) desc (highest → lowest)
+							// 2) asc (lowest → highest)
+							// 3) default state (no sorting)
+							const next: MetricSortState =
+								metricSortKey !== 'sent'
+									? { key: 'sent', mode: 'desc' }
+									: metricSortMode === 'desc'
+										? { key: 'sent', mode: 'asc' }
+										: null;
+
+							metricSortRef.current = next;
+							setMetricSort(next);
+							if (next === null) {
+								table.setSorting([]);
+							} else {
+								table.setSorting([{ id: column.id, desc: next.mode === 'desc' }]);
+							}
+						}}
 						className={cn(
-							'metrics-header-label relative z-[1]',
+							'metrics-header-label relative z-[1] cursor-pointer select-none border-0 bg-transparent p-0 m-0',
 							!compactMetrics &&
-								'flex h-[20px] w-[92px] items-center justify-start pl-2 text-left text-[11px] font-medium',
+								'flex w-[94px] min-w-[94px] max-w-[94px] items-center justify-start pl-2 text-left text-[11px] font-medium',
 							compactMetrics &&
-								'flex h-[15px] metric-width-short items-center justify-center text-[10px] font-medium tracking-[0.01em] metrics-header-label-compact'
+								'flex metric-width-short items-center justify-center text-[10px] font-medium tracking-[0.01em] metrics-header-label-compact'
 						)}
 						data-label="sent"
+						aria-pressed={metricSortKey === 'sent'}
 					>
 						Sent
-					</span>
+					</button>
 					<span
 						className={cn(
 							'metrics-header-label relative z-[1]',
