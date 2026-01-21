@@ -2901,7 +2901,7 @@ const DashboardContent = () => {
 		return (
 			<div className="min-h-screen w-full">
 				<Link
-					href={urls.home.index}
+					href={urls.home.activeLanding}
 					prefetch
 					className="fixed left-8 top-6 flex items-center gap-5 text-[15px] font-inter font-normal no-underline hover:no-underline z-[10000] group text-[#060606] hover:text-gray-500"
 					title="Back to Landing"
@@ -2909,7 +2909,7 @@ const DashboardContent = () => {
 					onClick={(e) => {
 						e.preventDefault();
 						if (typeof window !== 'undefined') {
-							window.location.assign(urls.home.index);
+							window.location.assign(urls.home.activeLanding);
 						}
 					}}
 				>
@@ -2968,7 +2968,7 @@ const DashboardContent = () => {
 	return (
 		<AppLayout>
 			<Link
-				href={urls.home.index}
+				href={urls.home.activeLanding}
 				prefetch
 				className="fixed left-8 top-6 flex items-center gap-5 text-[15px] font-inter font-normal no-underline hover:no-underline z-[10000] group text-[#060606] hover:text-gray-500"
 				title="Back to Landing"
@@ -2976,7 +2976,7 @@ const DashboardContent = () => {
 				onClick={(e) => {
 					e.preventDefault();
 					if (typeof window !== 'undefined') {
-						window.location.assign(urls.home.index);
+						window.location.assign(urls.home.activeLanding);
 					}
 				}}
 			>

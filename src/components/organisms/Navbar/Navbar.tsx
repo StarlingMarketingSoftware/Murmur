@@ -5,13 +5,14 @@ import { useMe } from '@/hooks/useMe';
 import Link from 'next/link';
 import { cn } from '@/utils';
 import { useState, useEffect, useRef } from 'react';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { StripeSubscriptionStatus } from '@/types';
 
 export const Navbar = () => {
 	const { user } = useMe();
 	const { isSignedIn } = useAuth();
 	const pathname = usePathname();
+	const searchParams = useSearchParams();
 	const router = useRouter();
 	const [isMobileMenuOpen, setMobileMenuOpen] = useState(false);
 	const [scrolled, setScrolled] = useState(false);
@@ -33,10 +34,15 @@ export const Navbar = () => {
 
 		const justSignedIn = !wasSignedIn && isSignedIn;
 		const isLanding = pathname === urls.home.index;
+		const isActiveLandingView =
+			isLanding && searchParams?.get('activeLanding') === '1';
 		if (!justSignedIn && !isLanding) return;
+		// Allow an active, subscribed user to view the landing page only when explicitly requested
+		// (e.g. navigating from the dashboard via a special link).
+		if (!justSignedIn && isActiveLandingView) return;
 
 		router.replace(urls.murmur.dashboard.index);
-	}, [canAccessApp, isSignedIn, pathname, router]);
+	}, [canAccessApp, isSignedIn, pathname, router, searchParams]);
 
 	useEffect(() => {
 		const HERO_SECTION_ID = 'landing-hero';
