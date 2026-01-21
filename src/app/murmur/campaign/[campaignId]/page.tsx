@@ -1748,6 +1748,7 @@ const Murmur = () => {
 						style={{
 							gap: '20px',
 							fontWeight: 400,
+							transform: 'translateY(13px)',
 						}}
 					>
 						<svg
