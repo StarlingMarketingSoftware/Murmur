@@ -1330,9 +1330,14 @@ const DashboardContent = () => {
 		};
 	}, [isMobile]);
 
-	// Mobile-friendly sizing for hero logo and subtitle; desktop remains unchanged
-	const logoWidth = isMobile ? '190px' : '300px';
-	const logoHeight = isMobile ? '50px' : '79px';
+	// Responsive sizing for hero logo (shrink with viewport width, but keep sensible min/max)
+	// NOTE: We keep the same aspect ratio as the previous desktop size (300x79).
+	const logoWidth = isMobile
+		? 'clamp(150px, 45vw, 190px)'
+		: 'clamp(180px, 30vw, 300px)';
+	const logoHeight = isMobile
+		? 'clamp(39.5px, 11.85vw, 50px)'
+		: 'clamp(47.4px, 7.9vw, 79px)';
 	const hasProblematicBrowser = isProblematicBrowser();
 	useMe(); // Hook call for side effects
 	const tabToggleTrackRef = useRef<HTMLDivElement>(null);
@@ -1407,11 +1412,6 @@ const DashboardContent = () => {
 	const DASHBOARD_MAP_COMPACT_CLASS = 'murmur-dashboard-map-compact';
 	const DASHBOARD_COMPACT_CLASS = 'murmur-dashboard-compact';
 	const DASHBOARD_ZOOM_VAR = '--murmur-dashboard-zoom';
-	const DEFAULT_DASHBOARD_ZOOM = 0.85;
-	const MIN_DASHBOARD_ZOOM = 0.72;
-	// 16:10-ish viewpoint: zoom IN by 110% vs the dashboard's normal baseline.
-	const DASHBOARD_SIXTEEN_BY_TEN_ZOOM_MULTIPLIER = 1.1;
-	const DASHBOARD_ZOOM_EVENT = 'murmur:dashboard-zoom-changed';
 
 	// Apply dashboard-only compact class + clear zoom var on mobile/unmount.
 	useEffect(() => {
@@ -1422,142 +1422,14 @@ const DashboardContent = () => {
 			return;
 		}
 
+		// Keep the dashboard at its CSS baseline zoom (avoid "whole page" rescaling on desktop window resize).
+		document.documentElement.style.removeProperty(DASHBOARD_ZOOM_VAR);
 		document.documentElement.classList.add(DASHBOARD_COMPACT_CLASS);
 		return () => {
 			document.documentElement.classList.remove(DASHBOARD_COMPACT_CLASS);
 			document.documentElement.style.removeProperty(DASHBOARD_ZOOM_VAR);
 		};
 	}, [isMobile]);
-
-	const updateDashboardZoomToFitViewport = useCallback(() => {
-		if (typeof window === 'undefined') return;
-
-		const html = document.documentElement;
-		const viewportH = window.visualViewport?.height ?? window.innerHeight;
-		const viewportW = window.visualViewport?.width ?? window.innerWidth;
-		const ratio = viewportW > 0 && viewportH > 0 ? viewportW / viewportH : 0;
-		// Robust 16:10-ish detection (mirrors the campaign page):
-		// - Use both viewport and screen ratios (browser chrome / window sizing changes viewport).
-		// - Include common 16:10-adjacent laptop ratios but exclude true 16:9 (1.777...).
-		const IDEAL_16X10 = 16 / 10; // 1.6
-		const viewportDelta = Math.abs(ratio - IDEAL_16X10);
-		const screenW = window.screen?.availWidth ?? window.screen?.width ?? viewportW;
-		const screenH = window.screen?.availHeight ?? window.screen?.height ?? viewportH;
-		const screenRatio = screenW > 0 && screenH > 0 ? screenW / screenH : ratio;
-		const screenDelta = Math.abs(screenRatio - IDEAL_16X10);
-		const isSixteenByTenish = viewportDelta <= 0.14 || screenDelta <= 0.14;
-		const maxDashboardZoom = isSixteenByTenish
-			? DEFAULT_DASHBOARD_ZOOM * DASHBOARD_SIXTEEN_BY_TEN_ZOOM_MULTIPLIER
-			: DEFAULT_DASHBOARD_ZOOM;
-
-		const SAFETY_MARGIN_PX = 24;
-		const availableH = Math.max(0, viewportH - SAFETY_MARGIN_PX);
-		const availableW = Math.max(0, viewportW - SAFETY_MARGIN_PX);
-
-		// Prefer measuring the main dashboard container so the result reflects any internal transforms.
-		const root = dashboardContentRef.current;
-		if (!root) return;
-		const rect = root.getBoundingClientRect();
-		const contentBottom = Math.max(0, rect.bottom);
-		const contentRight = Math.max(0, rect.right);
-		if (contentBottom <= 0 || contentRight <= 0) return;
-
-		const zoomStr = window.getComputedStyle(html).zoom;
-		const parsedZoom = zoomStr ? parseFloat(zoomStr) : NaN;
-		const varZoomStr = window.getComputedStyle(html).getPropertyValue(DASHBOARD_ZOOM_VAR);
-		const parsedVarZoom = varZoomStr ? parseFloat(varZoomStr) : NaN;
-		const currentZoom =
-			Number.isFinite(parsedZoom) && parsedZoom > 0 && parsedZoom !== 1
-				? parsedZoom
-				: Number.isFinite(parsedVarZoom) && parsedVarZoom > 0
-					? parsedVarZoom
-					: DEFAULT_DASHBOARD_ZOOM;
-
-		const scaleH = contentBottom > 0 ? availableH / contentBottom : 1;
-		const scaleW = contentRight > 0 ? availableW / contentRight : 1;
-		// Default behavior: never scale up (avoids "bounce in" when content changes).
-		// 16:10-ish behavior: allow scaling up to the 16:10 max zoom so the dashboard fills more
-		// of the viewport, while still fitting if space is tight.
-		const scaleToFit = Math.min(scaleH, scaleW);
-		const scale = isSixteenByTenish ? scaleToFit : Math.min(1, scaleToFit);
-
-		const rawZoom = Math.max(
-			MIN_DASHBOARD_ZOOM,
-			Math.min(maxDashboardZoom, currentZoom * scale)
-		);
-		const ZOOM_STEP = 0.01;
-		const snappedZoom = Math.max(
-			MIN_DASHBOARD_ZOOM,
-			Math.floor(rawZoom / ZOOM_STEP) * ZOOM_STEP
-		);
-
-		const existingOverride = parseFloat(html.style.getPropertyValue(DASHBOARD_ZOOM_VAR));
-		const existingZoom =
-			Number.isFinite(existingOverride) && existingOverride > 0
-				? existingOverride
-				: DEFAULT_DASHBOARD_ZOOM;
-		if (Math.abs(snappedZoom - existingZoom) < 0.004) return;
-
-		// Only remove the override when we're at the *true* CSS default (non-16:10).
-		// On 16:10 we keep an explicit var so the CSS fallback doesn't revert to 0.85.
-		if (!isSixteenByTenish && Math.abs(snappedZoom - DEFAULT_DASHBOARD_ZOOM) < 0.004) {
-			html.style.removeProperty(DASHBOARD_ZOOM_VAR);
-			try {
-				window.dispatchEvent(
-					new CustomEvent(DASHBOARD_ZOOM_EVENT, {
-						detail: { zoom: DEFAULT_DASHBOARD_ZOOM },
-					})
-				);
-			} catch {
-				// no-op
-			}
-			return;
-		}
-
-		html.style.setProperty(DASHBOARD_ZOOM_VAR, snappedZoom.toFixed(3));
-		try {
-			window.dispatchEvent(
-				new CustomEvent(DASHBOARD_ZOOM_EVENT, { detail: { zoom: snappedZoom } })
-			);
-		} catch {
-			// no-op
-		}
-	}, []);
-
-	// Update dashboard zoom on resize and on major layout toggles (map/search/tab).
-	useEffect(() => {
-		if (isMobile === null) return;
-		if (isMobile) return;
-		if (typeof window === 'undefined') return;
-
-		let raf: number | null = null;
-		const schedule = () => {
-			if (raf != null) cancelAnimationFrame(raf);
-			raf = requestAnimationFrame(() => {
-				raf = null;
-				updateDashboardZoomToFitViewport();
-			});
-		};
-
-		window.addEventListener('resize', schedule, { passive: true });
-		window.visualViewport?.addEventListener('resize', schedule);
-
-		// Observe root size changes (search results, tab switches, etc.)
-		const root = dashboardContentRef.current;
-		const ro = root ? new ResizeObserver(() => schedule()) : null;
-		if (root && ro) ro.observe(root);
-
-		schedule();
-		const t = window.setTimeout(schedule, 250);
-
-		return () => {
-			if (raf != null) cancelAnimationFrame(raf);
-			window.removeEventListener('resize', schedule);
-			window.visualViewport?.removeEventListener('resize', schedule);
-			window.clearTimeout(t);
-			ro?.disconnect();
-		};
-	}, [activeTab, hasSearched, isMapView, isMobile, updateDashboardZoomToFitViewport]);
 
 	// Make the fullscreen dashboard map view render slightly "zoomed out" on desktop (85%),
 	// mirroring the campaign page's extra-compact scaling.
@@ -2433,8 +2305,9 @@ const DashboardContent = () => {
 		const pill = tabTogglePillRef.current;
 
 		// Fallbacks match the fixed design values used in the markup below.
-		const trackWidth = track?.getBoundingClientRect().width ?? 228;
-		const pillWidth = pill?.getBoundingClientRect().width ?? 85;
+		// Use offsetWidth to get unscaled width, ensuring correct positioning even when scaled via CSS transform
+		const trackWidth = track?.offsetWidth ?? 228;
+		const pillWidth = pill?.offsetWidth ?? 85;
 
 		const half = trackWidth / 2;
 		const inset = (half - pillWidth) / 2;
@@ -3679,7 +3552,7 @@ const DashboardContent = () => {
 							<div className="flex justify-center" style={{ marginTop: '92px' }}>
 								<div
 									ref={tabToggleTrackRef}
-									className="relative flex items-center"
+									className="relative flex items-center origin-center scale-[0.8] sm:scale-[0.9] lg:scale-100"
 									style={{
 										width: '228px',
 										height: '36px',
