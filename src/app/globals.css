@@ -4025,6 +4025,53 @@ main {
 	background-color: #f8f8f8 !important;
 }
 
+/* Drafts sort indicators (Campaigns table)
+   - Mode `desc`: underline is anchored to the bottom of the table container
+   - Mode `asc`: underline sits just below the header row (beneath the yellow highlight)
+   - Positioned via CSS vars set from the Drafts header button */
+.my-campaigns-table[data-drafts-sort-active='true'][data-drafts-sort-mode='desc']::after {
+	content: '';
+	position: absolute;
+	left: var(--drafts-sort-indicator-left, 0px);
+	width: var(--drafts-sort-indicator-width, 92px);
+	height: 2px;
+	bottom: 2px;
+	background: #8d8a8a;
+	pointer-events: none;
+	z-index: 5;
+}
+
+/* ASC indicator is attached to the header cell so it scrolls away with the header */
+.my-campaigns-table[data-drafts-sort-active='true'][data-drafts-sort-mode='asc']
+	thead
+	th:nth-child(2)::after {
+	content: '';
+	position: absolute;
+	left: var(--drafts-sort-asc-left, 0px);
+	width: var(--drafts-sort-asc-width, 36px);
+	height: 2px;
+	/* A few pixels below the header so it feels "on the table", and it scrolls away */
+	top: calc(100% + 4px);
+	background: #bababa;
+	pointer-events: none;
+	z-index: 6;
+}
+
+/* Ensure the ASC indicator can render below the header without being clipped or painted under rows */
+.my-campaigns-table[data-drafts-sort-active='true'][data-drafts-sort-mode='asc'] thead {
+	position: relative;
+	z-index: 10;
+}
+.my-campaigns-table[data-drafts-sort-active='true'][data-drafts-sort-mode='asc'] tbody {
+	position: relative;
+	z-index: 1;
+}
+.my-campaigns-table[data-drafts-sort-active='true'][data-drafts-sort-mode='asc']
+	thead
+	th:nth-child(2) {
+	overflow: visible !important;
+}
+
 /* Murmur route compact scaling (90%) */
 html.murmur-compact {
 	zoom: 0.9;

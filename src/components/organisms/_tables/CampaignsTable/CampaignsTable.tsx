@@ -358,7 +358,7 @@ export const CampaignsTable: FC = () => {
 							<CustomTable
 								variant="secondary"
 								containerClassName="my-campaigns-table mobile-table-no-scroll !bg-[#EDEDED]"
-								headerClassName="[&_tr]:!bg-[#EDEDED] [&_th]:!bg-[#EDEDED] [&_th]:!border-b-[#EDEDED]"
+								headerClassName="[&_tr]:!bg-[#EDEDED] [&_th]:!bg-[#EDEDED] [&_th]:!border-b-[#EDEDED] [&_th]:relative [&_th]:!overflow-visible"
 								rowClassName="!bg-[#EDEDED] !border-b-[#EDEDED] hover:!bg-[#E0E0E0] transition-colors duration-200"
 											handleRowClick={handleRowClick}
 											columns={
@@ -423,7 +423,7 @@ export const CampaignsTable: FC = () => {
 								containerClassName={`border-none rounded-[8px] my-campaigns-table !bg-[#EDEDED] !mx-auto !p-[6px] ${
 									isNarrowDesktop ? 'narrow-desktop-table' : '!w-[891px]'
 								}`}
-								headerClassName="[&_tr]:!bg-white [&_th]:!bg-white [&_th]:!border-0 [&_th]:!h-[28px] [&_tr]:!h-[28px] [&_th:first-child]:rounded-tl-[4px] [&_th:last-child]:rounded-tr-[4px]"
+								headerClassName="[&_tr]:!bg-white [&_th]:!bg-white [&_th]:!border-0 [&_th]:!h-[28px] [&_tr]:!h-[28px] [&_th:first-child]:rounded-tl-[4px] [&_th:last-child]:rounded-tr-[4px] [&_th]:relative [&_th]:!overflow-visible"
 								rowClassName="!bg-[#EDEDED] !border-0 hover:!bg-[#E0E0E0] transition-colors duration-200"
 								handleRowClick={handleRowClick}
 								columns={columns}

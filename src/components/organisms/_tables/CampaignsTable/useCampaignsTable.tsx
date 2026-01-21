@@ -5,7 +5,7 @@ import { Typography } from '@/components/ui/typography';
 import { useDeleteCampaign, useGetCampaigns } from '@/hooks/queryHooks/useCampaigns';
 import { useRouter } from 'next/navigation';
 import { urls } from '@/constants/urls';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import { cn, mmdd } from '@/utils';
 import { useRowConfirmationAnimation } from '@/hooks/useRowConfirmationAnimation';
 
@@ -13,6 +13,11 @@ type CampaignWithCounts = Campaign & {
 	draftCount?: number;
 	sentCount?: number;
 };
+
+const useIsomorphicLayoutEffect =
+	typeof window !== 'undefined' ? useLayoutEffect : useEffect;
+
+type DraftsSortMode = 'desc' | 'asc' | null;
 
 const getDraftFillColor = (value: number): string => {
 	const v = Math.max(0, Math.min(value, 50));
@@ -81,6 +86,13 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 	const [countdown, setCountdown] = useState<number>(5);
 	const confirmationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+	const [draftsSortMode, setDraftsSortMode] = useState<DraftsSortMode>(null);
+	const isDraftsSortActive = draftsSortMode !== null;
+	const draftsHeaderButtonRef = useRef<HTMLButtonElement | null>(null);
+	const setDraftsHeaderButtonRef = useCallback((el: HTMLButtonElement | null) => {
+		draftsHeaderButtonRef.current = el;
+	}, []);
+
 	// Use the custom animation hook
 	useRowConfirmationAnimation({
 		confirmingCampaignId,
@@ -95,6 +107,153 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 			}
 		};
 	}, []);
+
+	// Keep the Drafts sort underline anchored to the bottom of the table container,
+	// aligned with the Drafts header "pill" width.
+	useIsomorphicLayoutEffect(() => {
+		let raf1: number | null = null;
+		let raf2: number | null = null;
+
+		const cancelRafs = () => {
+			if (raf1 !== null) cancelAnimationFrame(raf1);
+			if (raf2 !== null) cancelAnimationFrame(raf2);
+			raf1 = null;
+			raf2 = null;
+		};
+
+		const update = () => {
+			const btn = draftsHeaderButtonRef.current;
+			if (!btn) return;
+
+			const container = btn.closest('.my-campaigns-table') as HTMLElement | null;
+			if (!container) return;
+
+			const headerGrid = btn.closest('.metrics-header-grid') as HTMLElement | null;
+
+			const btnRect = btn.getBoundingClientRect();
+			const containerRect = container.getBoundingClientRect();
+			const headerTh = btn.closest('th') as HTMLElement | null;
+
+			// If an ancestor scales the table (transform: scale OR CSS zoom), getBoundingClientRect()
+			// reflects the visual size. We want the *layout* size for CSS positioning inside the same
+			// scaled subtree, so compute a visual->layout scale factor. Prefer computed style widths
+			// because offsetWidth reflects the *used* (flex-shrunk) layout size (which is what we want).
+			const safeScale = (() => {
+				if (btn.offsetWidth > 0) {
+					const s = btnRect.width / btn.offsetWidth;
+					if (Number.isFinite(s) && s > 0) return s;
+				}
+				return 1;
+			})();
+
+			const btnLeftInContainer = (btnRect.left - containerRect.left) / safeScale;
+			const bottomLineLeft = btnLeftInContainer + 1;
+			const bottomLineWidth = Math.max(0, btn.offsetWidth - 2);
+
+			container.style.setProperty('--drafts-sort-indicator-left', `${bottomLineLeft}px`);
+			container.style.setProperty('--drafts-sort-indicator-width', `${bottomLineWidth}px`);
+
+			// Header highlight follows the actual rendered Drafts header "pill" width at every breakpoint.
+			// Use offsetLeft/offsetWidth to avoid computed-width vs flex-shrink mismatches.
+			// Attach it to the <th> so it can fill the full header height.
+			if (headerTh) {
+				const gridLeftInTh = headerGrid ? headerGrid.offsetLeft : 0;
+				const baseLeftInTh = gridLeftInTh + btn.offsetLeft;
+				// In very narrow/compact layouts, the header label can be slightly wider than the
+				// actual metric pill below (due to flex/text sizing). Prefer the real pill width
+				// so the highlight never includes the inter-pill spacing at ~500px widths.
+				const draftMetricBox =
+					compactMetrics
+						? (container.querySelector(
+								".metric-box[data-draft-fill]"
+						  ) as HTMLElement | null)
+						: null;
+				const headerWidth = draftMetricBox?.offsetWidth ?? btn.offsetWidth;
+
+				headerTh.style.setProperty('--drafts-sort-highlight-left', `${baseLeftInTh}px`);
+				headerTh.style.setProperty('--drafts-sort-highlight-width', `${headerWidth}px`);
+
+				// Ascending indicator (36x2, BABABA) lives on the header <th> so it scrolls away with the header.
+				// Align it to the "Drafts" text start (pl-2) or center in compact mode.
+				const desiredAscWidth = 36;
+				const ascWidth = Math.max(0, Math.min(desiredAscWidth, headerWidth - 2));
+				const ascLeft = compactMetrics
+					? baseLeftInTh + (headerWidth - ascWidth) / 2
+					: baseLeftInTh + 8; // Tailwind pl-2 = 8px, aligns to "Drafts" text start
+				headerTh.style.setProperty('--drafts-sort-asc-left', `${ascLeft}px`);
+				headerTh.style.setProperty('--drafts-sort-asc-width', `${ascWidth}px`);
+			}
+		};
+
+		const scheduleUpdate = () => {
+			// Run now, then on the next two frames. This catches layout changes that happen via
+			// ResizeObserver + requestAnimationFrame (e.g., campaigns-table scaling/zoom).
+			cancelRafs();
+			update();
+			raf1 = requestAnimationFrame(() => {
+				update();
+				raf2 = requestAnimationFrame(() => update());
+			});
+		};
+
+		if (!isDraftsSortActive) {
+			const btn = draftsHeaderButtonRef.current;
+			const container = btn
+				? (btn.closest('.my-campaigns-table') as HTMLElement | null)
+				: null;
+			if (container) {
+				container.removeAttribute('data-drafts-sort-active');
+				container.removeAttribute('data-drafts-sort-mode');
+				container.style.removeProperty('--drafts-sort-indicator-left');
+				container.style.removeProperty('--drafts-sort-indicator-width');
+			}
+			const headerTh = btn ? (btn.closest('th') as HTMLElement | null) : null;
+			if (headerTh) {
+				headerTh.style.removeProperty('--drafts-sort-highlight-left');
+				headerTh.style.removeProperty('--drafts-sort-highlight-width');
+				headerTh.style.removeProperty('--drafts-sort-asc-left');
+				headerTh.style.removeProperty('--drafts-sort-asc-width');
+			}
+			cancelRafs();
+			return;
+		}
+
+		const btn = draftsHeaderButtonRef.current;
+		if (!btn) return;
+		const container = btn.closest('.my-campaigns-table') as HTMLElement | null;
+		if (!container) return;
+
+		container.setAttribute('data-drafts-sort-active', 'true');
+		container.setAttribute('data-drafts-sort-mode', draftsSortMode === 'asc' ? 'asc' : 'desc');
+		scheduleUpdate();
+
+		const handleResize = () => scheduleUpdate();
+		window.addEventListener('resize', handleResize, { passive: true });
+
+		const ro = new ResizeObserver(() => scheduleUpdate());
+		ro.observe(container);
+
+		// Watch the parent campaigns-table container for scale/zoom updates (style/attr changes),
+		// since CSS zoom changes don't always trigger ResizeObserver on the table itself.
+		const scaleContainer = container.closest('.campaigns-table-container') as HTMLElement | null;
+		const mo =
+			scaleContainer && 'MutationObserver' in window
+				? new MutationObserver(() => scheduleUpdate())
+				: null;
+		if (scaleContainer && mo) {
+			mo.observe(scaleContainer, {
+				attributes: true,
+				attributeFilter: ['style', 'data-ultra-narrow-scale', 'data-mobile-ultra-narrow-scale'],
+			});
+		}
+
+		return () => {
+			window.removeEventListener('resize', handleResize);
+			ro.disconnect();
+			mo?.disconnect();
+			cancelRafs();
+		};
+	}, [isDraftsSortActive, draftsSortMode, compactMetrics]);
 
 	const columns: ColumnDef<CampaignWithCounts>[] = [
 		{
@@ -126,37 +285,80 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 		},
 		{
 			id: 'metrics',
-			header: () => (
-				<div
-					className={cn(
-						'metrics-header-grid w-full items-center',
-						compactMetrics
-							? 'flex flex-nowrap gap-[7px] justify-start'
-							: 'flex flex-nowrap justify-start'
-					)}
-					style={
-						compactMetrics
-							? undefined
-							: ({ gap: 'var(--campaign-metric-gap, 32px)' } as React.CSSProperties)
-					}
-				>
-					<span
+			// This is a "display" column visually, but we still provide an accessor so TanStack
+			// treats it as sortable (we sort by draftCount when the Drafts header is clicked).
+			accessorFn: (row) => (row as CampaignWithCounts)?.draftCount ?? 0,
+			enableSorting: true,
+			// Sort campaigns by highest-to-lowest draft count when the Drafts header is clicked.
+			sortingFn: (rowA, rowB) => {
+				const a = (rowA.original as CampaignWithCounts)?.draftCount ?? 0;
+				const b = (rowB.original as CampaignWithCounts)?.draftCount ?? 0;
+				return a === b ? 0 : a > b ? 1 : -1;
+			},
+			header: ({ column, table }) => {
+				return (
+				<>
+					{isDraftsSortActive ? (
+						<span
+							aria-hidden="true"
+							className="absolute top-0 bottom-0 bg-[#FFDA8F] pointer-events-none z-0"
+							style={
+								{
+									left: 'var(--drafts-sort-highlight-left, 0px)',
+									width: 'var(--drafts-sort-highlight-width, 94px)',
+								} as React.CSSProperties
+							}
+						/>
+					) : null}
+					<div
 						className={cn(
-							'metrics-header-label',
+							'metrics-header-grid w-full h-full items-center relative z-[1]',
+							compactMetrics
+								? 'flex flex-nowrap gap-[7px] justify-start'
+								: 'flex flex-nowrap justify-start'
+						)}
+						style={
+							compactMetrics
+								? undefined
+								: ({ gap: 'var(--campaign-metric-gap, 32px)' } as React.CSSProperties)
+						}
+					>
+					<button
+						type="button"
+						ref={setDraftsHeaderButtonRef}
+						onClick={(e) => {
+							e.stopPropagation();
+							// Toggle:
+							// 1) desc (highest → lowest) with bottom indicator line
+							// 2) asc (lowest → highest) with top (36px) indicator line
+							// 3) default state (no sorting / no highlight)
+							const nextMode: DraftsSortMode =
+								draftsSortMode === null ? 'desc' : draftsSortMode === 'desc' ? 'asc' : null;
+
+							setDraftsSortMode(nextMode);
+							if (nextMode === null) {
+								table.setSorting([]);
+							} else {
+								table.setSorting([{ id: column.id, desc: nextMode === 'desc' }]);
+							}
+						}}
+						className={cn(
+							'metrics-header-label relative z-[1] cursor-pointer select-none border-0 bg-transparent p-0 m-0',
 							!compactMetrics &&
-								'flex h-[20px] w-[92px] items-center justify-center text-center',
+								'flex w-[94px] min-w-[94px] max-w-[94px] items-center justify-start pl-2 text-left text-[11px] font-medium',
 							compactMetrics &&
-								'flex h-[15px] metric-width-short items-center justify-center text-[10px] font-medium tracking-[0.01em] metrics-header-label-compact'
+								'flex metric-width-short items-center justify-center text-[10px] font-medium tracking-[0.01em] metrics-header-label-compact'
 						)}
 						data-label="drafts"
+						aria-pressed={isDraftsSortActive}
 					>
 						Drafts
-					</span>
+					</button>
 					<span
 						className={cn(
-							'metrics-header-label',
+							'metrics-header-label relative z-[1]',
 							!compactMetrics &&
-								'flex h-[20px] w-[92px] items-center justify-center text-center',
+								'flex h-[20px] w-[92px] items-center justify-start pl-2 text-left text-[11px] font-medium',
 							compactMetrics &&
 								'flex h-[15px] metric-width-short items-center justify-center text-[10px] font-medium tracking-[0.01em] metrics-header-label-compact'
 						)}
@@ -166,9 +368,9 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 					</span>
 					<span
 						className={cn(
-							'metrics-header-label',
+							'metrics-header-label relative z-[1]',
 							!compactMetrics &&
-								'flex h-[20px] w-[92px] items-center justify-center text-center',
+								'flex h-[20px] w-[92px] items-center justify-center text-center text-[11px] font-medium',
 							compactMetrics &&
 								'flex h-[15px] metric-width-long items-center justify-center text-center text-[10px] font-medium leading-[1.05] tracking-[0.01em] metrics-header-label-compact'
 						)}
@@ -182,9 +384,9 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 					</span>
 					<span
 						className={cn(
-							'metrics-header-label',
+							'metrics-header-label relative z-[1]',
 							!compactMetrics &&
-								'flex h-[20px] w-[92px] items-center justify-center text-center',
+								'flex h-[20px] w-[92px] items-center justify-center text-center text-[11px] font-medium',
 							compactMetrics &&
 								'flex h-[15px] metric-width-long items-center justify-center text-center text-[10px] font-medium leading-[1.05] tracking-[0.01em] metrics-header-label-compact'
 						)}
@@ -196,8 +398,10 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 							<span>On</span>
 						</span>
 					</span>
-				</div>
-			),
+					</div>
+				</>
+				);
+			},
 			cell: ({ row }) => {
 				const campaign = row.original as CampaignWithCounts;
 				const isConfirming = campaign.id === confirmingCampaignId;
