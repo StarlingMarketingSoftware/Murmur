@@ -5612,7 +5612,6 @@ const DashboardContent = () => {
 																						{fullName && isUsed && (
 																							<span
 																								className="absolute shrink-0"
-																								title="Used in a previous campaign"
 																								style={{
 																									width: '16px',
 																									height: '16px',
@@ -5754,7 +5753,6 @@ const DashboardContent = () => {
 																									{isUsed && (
 																										<span
 																											className="inline-block shrink-0 mr-2"
-																											title="Used in a previous campaign"
 																											style={{
 																												width: '16px',
 																												height: '16px',
@@ -6166,7 +6164,6 @@ const DashboardContent = () => {
 																								{isUsed && (
 																									<span
 																										className="inline-block shrink-0 mr-2"
-																										title="Used in a previous campaign"
 																										style={{
 																											width: '16px',
 																											height: '16px',
@@ -6200,7 +6197,6 @@ const DashboardContent = () => {
 																							{isUsed && (
 																								<span
 																									className="inline-block shrink-0 mr-2"
-																									title="Used in a previous campaign"
 																									style={{
 																										width: '16px',
 																										height: '16px',

@@ -135,7 +135,6 @@ export const SentEmails: FC<SentEmailsProps> = ({
 							{usedContactIdsSet.has(email.contactId) && !isMobile && (
 								<span
 									className="absolute left-[8px]"
-									title="Used in a previous campaign"
 									style={{
 										top: hasSeparateName ? '50%' : '30px',
 										transform: 'translateY(-50%)',

@@ -392,7 +392,6 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 												"absolute left-[8px]",
 												isBottomView ? "left-[6px]" : "left-[8px]"
 											)}
-											title="Used in a previous campaign"
 											style={{
 												top: '50%',
 												transform: 'translateY(-50%)',

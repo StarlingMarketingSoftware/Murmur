@@ -648,7 +648,6 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 									{usedContactIdsSet.has(draft.contactId) && (
 										<span
 											className={cn('absolute', indicatorLeftClass)}
-											title="Used in a previous campaign"
 											style={{
 												top: (isRejected || isApproved) ? 'calc(50% - 16px)' : '50%',
 												transform: (isRejected || isApproved) ? 'none' : 'translateY(-50%)',
