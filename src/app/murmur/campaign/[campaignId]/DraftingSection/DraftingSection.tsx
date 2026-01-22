@@ -4511,33 +4511,33 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													)}
 													data-campaign-bottom-anchor
 												>
-													<ContactsExpandedList
-														contacts={contactsAvailableForDrafting}
-														width={232}
-														height={bottomPanelBoxHeightPx}
-														enableUsedContactTooltip={view === 'testing'}
-														whiteSectionHeight={15}
-														collapsed={bottomPanelCollapsed}
-														showSearchBar={false}
-														onOpenContacts={goToContacts}
-													/>
-													<SentExpandedList
-														sent={sentEmails}
-														contacts={contacts || []}
-														width={233}
-														height={bottomPanelBoxHeightPx}
-														whiteSectionHeight={15}
-														collapsed={bottomPanelCollapsed}
-														onOpenSent={goToSent}
-													/>
-													<InboxExpandedList
-														contacts={contacts || []}
-														width={233}
-														height={bottomPanelBoxHeightPx}
-														whiteSectionHeight={15}
-														collapsed={bottomPanelCollapsed}
-														onOpenInbox={goToInbox}
-													/>
+												<ContactsExpandedList
+													contacts={contactsAvailableForDrafting}
+													width={232}
+													height={bottomPanelBoxHeightPx}
+													enableUsedContactTooltip={false}
+													whiteSectionHeight={15}
+													collapsed={bottomPanelCollapsed}
+													showSearchBar={false}
+													onOpenContacts={goToContacts}
+												/>
+												<SentExpandedList
+													sent={sentEmails}
+													contacts={contacts || []}
+													width={233}
+													height={bottomPanelBoxHeightPx}
+													whiteSectionHeight={15}
+													collapsed={bottomPanelCollapsed}
+													onOpenSent={goToSent}
+												/>
+												<InboxExpandedList
+													contacts={contacts || []}
+													width={233}
+													height={bottomPanelBoxHeightPx}
+													whiteSectionHeight={15}
+													collapsed={bottomPanelCollapsed}
+													onOpenInbox={goToInbox}
+												/>
 												</div>
 											)}
 										</div>
@@ -4732,7 +4732,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													contacts={contactsAvailableForDrafting}
 													width={232}
 													height={bottomPanelBoxHeightPx}
-													enableUsedContactTooltip={view === 'testing'}
+													enableUsedContactTooltip={false}
 													whiteSectionHeight={15}
 													collapsed={bottomPanelCollapsed}
 													showSearchBar={false}
@@ -5324,7 +5324,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												contacts={contactsAvailableForDrafting}
 												width={232}
 												height={bottomPanelBoxHeightPx}
-												enableUsedContactTooltip={view === 'testing'}
+												enableUsedContactTooltip={false}
 												whiteSectionHeight={15}
 												collapsed={bottomPanelCollapsed}
 												showSearchBar={false}
@@ -5441,7 +5441,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													contacts={contactsAvailableForDrafting}
 													width={232}
 													height={bottomPanelBoxHeightPx}
-													enableUsedContactTooltip={view === 'testing'}
+													enableUsedContactTooltip={false}
 													whiteSectionHeight={15}
 													collapsed={bottomPanelCollapsed}
 													showSearchBar={false}
@@ -6703,7 +6703,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												contacts={contactsAvailableForDrafting}
 												width={232}
 												height={bottomPanelBoxHeightPx}
-												enableUsedContactTooltip={view === 'testing'}
+												enableUsedContactTooltip={false}
 												whiteSectionHeight={15}
 												collapsed={bottomPanelCollapsed}
 												showSearchBar={false}
@@ -6762,7 +6762,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													contacts={contactsAvailableForDrafting}
 													width={232}
 													height={bottomPanelBoxHeightPx}
-													enableUsedContactTooltip={view === 'testing'}
+													enableUsedContactTooltip={false}
 													whiteSectionHeight={15}
 													collapsed={bottomPanelCollapsed}
 													showSearchBar={false}

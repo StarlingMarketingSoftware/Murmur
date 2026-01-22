@@ -423,8 +423,8 @@ export const SentEmails: FC<SentEmailsProps> = ({
 					const isUsedContact = usedContactIdsSet.has(email.contactId);
 					const isUsedContactHoverCardVisible =
 						Boolean(hoveredUsedContact) &&
-						hoveredUsedContact.contactId === email.contactId &&
-						hoveredUsedContact.rowKey === (email.id as number) &&
+						hoveredUsedContact?.contactId === email.contactId &&
+						hoveredUsedContact?.rowKey === (email.id as number) &&
 						Boolean(usedContactTooltipPos) &&
 						Boolean(hoveredUsedContactCampaigns?.length);
 
