@@ -2861,6 +2861,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																contacts={contactsAvailableForDrafting}
 																isLoading={isContactsLoading}
 																campaign={campaign}
+																enableUsedContactTooltip={view === 'testing'}
 																selectedContactIds={contactsTabSelectedIds}
 																onContactSelectionChange={(updater) =>
 																	setContactsTabSelectedIds((prev) =>
@@ -3828,6 +3829,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														contacts={contactsAvailableForDrafting}
 														isLoading={isContactsLoading}
 														campaign={campaign}
+														enableUsedContactTooltip={view === 'testing'}
 														selectedContactIds={contactsTabSelectedIds}
 														onContactSelectionChange={(updater) =>
 															setContactsTabSelectedIds((prev) => updater(new Set(prev)))
@@ -4143,6 +4145,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													contacts={contactsAvailableForDrafting}
 													isLoading={isContactsLoading}
 													campaign={campaign}
+													enableUsedContactTooltip={view === 'testing'}
 													selectedContactIds={contactsTabSelectedIds}
 													onContactSelectionChange={(updater) =>
 														setContactsTabSelectedIds((prev) => updater(new Set(prev)))
@@ -4512,6 +4515,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														contacts={contactsAvailableForDrafting}
 														width={232}
 														height={bottomPanelBoxHeightPx}
+														enableUsedContactTooltip={view === 'testing'}
 														whiteSectionHeight={15}
 														collapsed={bottomPanelCollapsed}
 														showSearchBar={false}
@@ -4728,6 +4732,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													contacts={contactsAvailableForDrafting}
 													width={232}
 													height={bottomPanelBoxHeightPx}
+													enableUsedContactTooltip={view === 'testing'}
 													whiteSectionHeight={15}
 													collapsed={bottomPanelCollapsed}
 													showSearchBar={false}
@@ -5319,6 +5324,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												contacts={contactsAvailableForDrafting}
 												width={232}
 												height={bottomPanelBoxHeightPx}
+												enableUsedContactTooltip={view === 'testing'}
 												whiteSectionHeight={15}
 												collapsed={bottomPanelCollapsed}
 												showSearchBar={false}
@@ -5435,6 +5441,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													contacts={contactsAvailableForDrafting}
 													width={232}
 													height={bottomPanelBoxHeightPx}
+													enableUsedContactTooltip={view === 'testing'}
 													whiteSectionHeight={15}
 													collapsed={bottomPanelCollapsed}
 													showSearchBar={false}
@@ -6696,6 +6703,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												contacts={contactsAvailableForDrafting}
 												width={232}
 												height={bottomPanelBoxHeightPx}
+												enableUsedContactTooltip={view === 'testing'}
 												whiteSectionHeight={15}
 												collapsed={bottomPanelCollapsed}
 												showSearchBar={false}
@@ -6754,6 +6762,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													contacts={contactsAvailableForDrafting}
 													width={232}
 													height={bottomPanelBoxHeightPx}
+													enableUsedContactTooltip={view === 'testing'}
 													whiteSectionHeight={15}
 													collapsed={bottomPanelCollapsed}
 													showSearchBar={false}

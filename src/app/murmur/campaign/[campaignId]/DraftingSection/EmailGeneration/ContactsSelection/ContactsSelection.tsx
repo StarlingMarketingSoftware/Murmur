@@ -1137,7 +1137,7 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 				const rowLeftInBody = (rect.left - bodyCtx.left) / bodyCtx.scaleX;
 				const rowTopInBody = (rect.top - bodyCtx.top) / bodyCtx.scaleY;
 				setUsedContactTooltipPos({
-					left: rowLeftInBody + 43,
+					left: rowLeftInBody + 33,
 					top: rowTopInBody + 44,
 				});
 			}
@@ -1198,7 +1198,7 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 			const rowLeftInBody = (rect.left - bodyCtx.left) / bodyCtx.scaleX;
 			const rowTopInBody = (rect.top - bodyCtx.top) / bodyCtx.scaleY;
 			setUsedContactTooltipPos({
-				left: rowLeftInBody + 43,
+				left: rowLeftInBody + 33,
 				top: rowTopInBody + 44,
 			});
 		};

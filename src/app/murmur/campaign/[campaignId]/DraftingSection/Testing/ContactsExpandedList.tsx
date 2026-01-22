@@ -1,6 +1,8 @@
 'use client';
 
-import { FC, MouseEvent, useMemo, useRef, useState, useEffect, useCallback } from 'react';
+import { FC, MouseEvent, useMemo, useRef, useState, useEffect, useCallback, useLayoutEffect } from 'react';
+import { createPortal } from 'react-dom';
+import { useRouter } from 'next/navigation';
 import { ContactWithName } from '@/types/contact';
 import { CampaignWithRelations } from '@/types';
 import { cn } from '@/utils';
@@ -18,7 +20,7 @@ import {
 	canadianProvinceNames,
 	stateBadgeColorMap,
 } from '@/constants/ui';
-import { useGetUsedContactIds } from '@/hooks/queryHooks/useContacts';
+import { useGetUsedContactCampaigns, useGetUsedContactIds } from '@/hooks/queryHooks/useContacts';
 import { ContactsHeaderChrome } from '@/app/murmur/campaign/[campaignId]/DraftingSection/EmailGeneration/DraftingTable/DraftingTable';
 import { isRestaurantTitle, isCoffeeShopTitle, isMusicVenueTitle, isMusicFestivalTitle, isWeddingPlannerTitle, isWeddingVenueTitle, isWineBeerSpiritsTitle, getWineBeerSpiritsLabel } from '@/utils/restaurantTitle';
 import { WeddingPlannersIcon } from '@/components/atoms/_svg/WeddingPlannersIcon';
@@ -27,6 +29,60 @@ import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
 import { FestivalsIcon } from '@/components/atoms/_svg/FestivalsIcon';
 import { MusicVenuesIcon } from '@/components/atoms/_svg/MusicVenuesIcon';
 import { WineBeerSpiritsIcon } from '@/components/atoms/_svg/WineBeerSpiritsIcon';
+
+const FadeOverflowText: FC<{
+	text: string;
+	className?: string;
+	fadePx?: number;
+	measureKey?: unknown;
+}> = ({ text, className, fadePx = 16, measureKey }) => {
+	const spanRef = useRef<HTMLSpanElement | null>(null);
+	const [isOverflowing, setIsOverflowing] = useState(false);
+
+	const measure = useCallback(() => {
+		const el = spanRef.current;
+		if (!el) return;
+		// A tiny epsilon avoids flicker from sub-pixel rounding.
+		setIsOverflowing(el.scrollWidth > el.clientWidth + 1);
+	}, []);
+
+	useLayoutEffect(() => {
+		measure();
+	}, [measure, text, measureKey]);
+
+	useEffect(() => {
+		const el = spanRef.current;
+		if (!el) return;
+
+		if (typeof ResizeObserver === 'undefined') {
+			window.addEventListener('resize', measure);
+			return () => window.removeEventListener('resize', measure);
+		}
+
+		const ro = new ResizeObserver(() => measure());
+		ro.observe(el);
+		return () => ro.disconnect();
+	}, [measure]);
+
+	const safeFadePx = Math.max(0, fadePx);
+	const style = isOverflowing
+		? {
+				maskImage: `linear-gradient(to right, black calc(100% - ${safeFadePx}px), transparent 100%)`,
+				WebkitMaskImage: `linear-gradient(to right, black calc(100% - ${safeFadePx}px), transparent 100%)`,
+			}
+		: undefined;
+
+	return (
+		<span
+			ref={spanRef}
+			className={cn('block w-full whitespace-nowrap overflow-hidden', className)}
+			style={style}
+			title={text}
+		>
+			{text}
+		</span>
+	);
+};
 
 export interface ContactsExpandedListProps {
 	contacts: ContactWithName[];
@@ -50,6 +106,11 @@ export interface ContactsExpandedListProps {
 	height?: number | string;
 	minRows?: number;
 	campaign?: CampaignWithRelations;
+	/**
+	 * When true, the used-contact indicator shows the full "Appears in" hover tooltip (Write tab only).
+	 * When false, used contacts are shown with the simple dot indicator only.
+	 */
+	enableUsedContactTooltip?: boolean;
 	showSearchBar?: boolean;
 	
 	onSearchFromMiniBar?: (params: { why: string; what: string; where: string }) => void;
@@ -72,10 +133,13 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 	width,
 	height,
 	minRows = 7,
+	campaign,
+	enableUsedContactTooltip = false,
 	whiteSectionHeight: customWhiteSectionHeight,
 	onOpenContacts,
 	collapsed = false,
 }) => {
+	const router = useRouter();
 	const [internalSelectedContactIds, setInternalSelectedContactIds] = useState<
 		Set<number>
 	>(new Set());
@@ -93,6 +157,148 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 		() => new Set(usedContactIds || []),
 		[usedContactIds]
 	);
+
+	const [hoveredUsedContactId, setHoveredUsedContactId] = useState<number | null>(null);
+	const { data: hoveredUsedContactCampaigns } = useGetUsedContactCampaigns(hoveredUsedContactId);
+	const [activeUsedContactCampaignIndex, setActiveUsedContactCampaignIndex] = useState<number | null>(null);
+	// Memoize resolved campaigns so it can be used in both tooltip and indicator
+	const resolvedUsedContactCampaigns = useMemo(() => {
+		const all = hoveredUsedContactCampaigns ?? [];
+		const other = all.filter((c) => c.id !== campaign?.id);
+		return other.length ? other : all;
+	}, [hoveredUsedContactCampaigns, campaign?.id]);
+	const usedContactRowElsRef = useRef<Map<number, HTMLDivElement>>(new Map());
+	const usedContactTooltipCloseTimeoutRef = useRef<number | null>(null);
+	const [usedContactTooltipPos, setUsedContactTooltipPos] = useState<{
+		left: number;
+		top: number;
+	} | null>(null);
+
+	const getBodyScaleContext = useCallback(() => {
+		// In some compact modes (Firefox fallback), `<body>` is scaled via `transform: scale(...)`.
+		// In that case, `position: fixed` children of body are positioned in *body coordinates*,
+		// while getBoundingClientRect() returns *viewport coordinates*.
+		// This helper lets us convert between the two so the tooltip is pixel-perfect.
+		const body = document.body;
+		const rect = body.getBoundingClientRect();
+		const scaleX = body.offsetWidth ? rect.width / body.offsetWidth : 1;
+		const scaleY = body.offsetHeight ? rect.height / body.offsetHeight : 1;
+		return {
+			left: rect.left,
+			top: rect.top,
+			scaleX: scaleX || 1,
+			scaleY: scaleY || 1,
+		};
+	}, []);
+
+	const clearUsedContactTooltipCloseTimeout = useCallback(() => {
+		if (usedContactTooltipCloseTimeoutRef.current !== null) {
+			window.clearTimeout(usedContactTooltipCloseTimeoutRef.current);
+			usedContactTooltipCloseTimeoutRef.current = null;
+		}
+	}, []);
+
+	// If this feature is toggled off while active (e.g. tab switch), immediately reset state
+	// so we don't keep background queries alive.
+	useEffect(() => {
+		if (!enableUsedContactTooltip) {
+			clearUsedContactTooltipCloseTimeout();
+			setHoveredUsedContactId(null);
+		}
+	}, [clearUsedContactTooltipCloseTimeout, enableUsedContactTooltip]);
+
+	const computeUsedContactTooltipPos = useCallback(
+		(rect: DOMRect) => {
+			const bodyCtx = getBodyScaleContext();
+			const rowLeftInBody = (rect.left - bodyCtx.left) / bodyCtx.scaleX;
+			const rowTopInBody = (rect.top - bodyCtx.top) / bodyCtx.scaleY;
+			const rowHeightInBody = rect.height / bodyCtx.scaleY;
+			return {
+				left: rowLeftInBody + 33,
+				// Match ContactsSelection positioning: sit ~8px above the bottom of the row.
+				top: rowTopInBody + (rowHeightInBody - 8),
+			};
+		},
+		[getBodyScaleContext]
+	);
+
+	const openUsedContactTooltip = useCallback(
+		(contactId: number) => {
+			clearUsedContactTooltipCloseTimeout();
+			const el = usedContactRowElsRef.current.get(contactId);
+			if (el) {
+				const rect = el.getBoundingClientRect();
+				setUsedContactTooltipPos(computeUsedContactTooltipPos(rect));
+			}
+			// Start with first campaign active, but don't reset if we're already on this contact
+			// (e.g., user selected a row in the tooltip and moves back to the pill to click).
+			setActiveUsedContactCampaignIndex((prev) =>
+				hoveredUsedContactId === contactId ? (prev ?? 0) : 0
+			);
+			setHoveredUsedContactId(contactId);
+		},
+		[clearUsedContactTooltipCloseTimeout, computeUsedContactTooltipPos, hoveredUsedContactId]
+	);
+
+	const goToUsedContactCampaign = useCallback(
+		(contactId: number) => {
+			// Only navigate when this contact's hover state is active (campaign list is scoped to hovered contact).
+			if (hoveredUsedContactId !== contactId) return;
+			if (!resolvedUsedContactCampaigns.length) return;
+
+			const idx = Math.min(
+				resolvedUsedContactCampaigns.length - 1,
+				Math.max(0, activeUsedContactCampaignIndex ?? 0)
+			);
+			const selected = resolvedUsedContactCampaigns[idx];
+			if (!selected?.id) return;
+
+			router.push(`/murmur/campaign/${selected.id}`);
+		},
+		[activeUsedContactCampaignIndex, hoveredUsedContactId, resolvedUsedContactCampaigns, router]
+	);
+
+	const scheduleCloseUsedContactTooltip = useCallback(
+		(contactId: number) => {
+			clearUsedContactTooltipCloseTimeout();
+			usedContactTooltipCloseTimeoutRef.current = window.setTimeout(() => {
+				setHoveredUsedContactId((prev) => (prev === contactId ? null : prev));
+			}, 120);
+		},
+		[clearUsedContactTooltipCloseTimeout]
+	);
+
+	useEffect(() => {
+		if (hoveredUsedContactId === null) {
+			setUsedContactTooltipPos(null);
+			setActiveUsedContactCampaignIndex(null);
+			return;
+		}
+
+		let rafId = 0;
+		const update = () => {
+			const el = usedContactRowElsRef.current.get(hoveredUsedContactId);
+			if (!el) return;
+			const rect = el.getBoundingClientRect();
+			setUsedContactTooltipPos(computeUsedContactTooltipPos(rect));
+		};
+
+		const schedule = () => {
+			cancelAnimationFrame(rafId);
+			rafId = requestAnimationFrame(update);
+		};
+
+		update();
+		// Capture scroll from any scroll container
+		window.addEventListener('scroll', schedule, true);
+		window.addEventListener('resize', schedule);
+
+		return () => {
+			window.removeEventListener('scroll', schedule, true);
+			window.removeEventListener('resize', schedule);
+			cancelAnimationFrame(rafId);
+		};
+	}, [computeUsedContactTooltipPos, hoveredUsedContactId]);
 
 	const isControlled = Boolean(selectedContactIds);
 	const currentSelectedIds = selectedContactIds ?? internalSelectedContactIds;
@@ -347,6 +553,107 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 						onContactHover?.(null);
 					}}
 				>
+					{enableUsedContactTooltip &&
+						typeof document !== 'undefined' &&
+						hoveredUsedContactId !== null &&
+						usedContactTooltipPos &&
+						(() => {
+							const resolvedCampaigns = resolvedUsedContactCampaigns;
+							const isMultiCampaign = resolvedCampaigns.length > 1;
+							const resolvedCampaign = resolvedCampaigns[0] ?? null;
+
+							// Don't render anything until we actually have the campaign info.
+							if (!resolvedCampaign) return null;
+
+							const campaignName = resolvedCampaign.name;
+							const campaignIdToNavigate = resolvedCampaign.id;
+
+							return createPortal(
+								<div
+									className={cn(
+										'fixed z-[9999] w-[322px] rounded-[8px] bg-[#DAE6FE] text-black border-2 border-black shadow-none',
+										!isMultiCampaign && 'h-[60px]'
+									)}
+									style={{ left: usedContactTooltipPos.left, top: usedContactTooltipPos.top }}
+									onMouseEnter={() => {
+										clearUsedContactTooltipCloseTimeout();
+									}}
+									onMouseLeave={() => {
+										// Don't hard-close on leave — allow moving between tooltip <-> pill without losing state.
+										// The close timeout is cleared when entering either area.
+										scheduleCloseUsedContactTooltip(hoveredUsedContactId as number);
+									}}
+								>
+									<span className="absolute left-[12px] top-[6px] text-[17px] font-inter font-medium text-black leading-none pointer-events-none">
+										Appears in
+									</span>
+
+									{isMultiCampaign ? (
+										<div className="pt-[28px] pb-[4px]">
+											<div className="flex flex-col gap-[6px] px-[3px]">
+												{resolvedCampaigns.map((c, idx) => {
+													const isActive = activeUsedContactCampaignIndex === idx;
+													return (
+														<button
+															key={c.id}
+															type="button"
+															className={cn(
+																'w-[312px] h-[26px] rounded-[4px] border-2 border-black text-[17px] font-inter font-medium text-black cursor-pointer flex items-center gap-[10px] px-[10px] box-border',
+																isActive ? 'bg-[#AAE19E]' : 'bg-[#CFE4FF]'
+															)}
+															onMouseEnter={() => setActiveUsedContactCampaignIndex(idx)}
+															onClick={(e) => {
+																e.stopPropagation();
+																router.push(`/murmur/campaign/${c.id}`);
+															}}
+														>
+															{isActive && (
+																<span className="leading-none whitespace-nowrap shrink-0">
+																	Go To
+																</span>
+															)}
+															<div className="h-[22px] w-fit max-w-full min-w-0 rounded-[4px] bg-[#F9FAFB] border-2 border-black px-2 flex items-center overflow-hidden box-border">
+																<FadeOverflowText
+																	text={c.name}
+																	// Slightly later fade than before, and only when overflowing.
+																	fadePx={16}
+																	measureKey={isActive}
+																	className="text-[17px] font-inter font-medium text-black leading-none"
+																/>
+															</div>
+														</button>
+													);
+												})}
+											</div>
+										</div>
+									) : (
+										<>
+											<div className="absolute top-[4px] right-[3px] w-[204px] h-[22px] rounded-[4px] bg-[#F9FAFB] border-2 border-black px-2 flex items-center overflow-hidden box-border">
+												<FadeOverflowText
+													text={campaignName}
+													fadePx={16}
+													className="text-[17px] font-inter font-medium text-black leading-none"
+												/>
+											</div>
+
+											<button
+												type="button"
+												className="absolute bottom-[2px] left-1/2 -translate-x-1/2 w-[312px] h-[26px] rounded-[4px] border-2 border-black bg-[#AAE19E] text-[17px] font-inter font-medium text-black cursor-pointer flex items-center justify-center box-border"
+												onClick={(e) => {
+													e.stopPropagation();
+													if (campaignIdToNavigate) {
+														router.push(`/murmur/campaign/${campaignIdToNavigate}`);
+													}
+												}}
+											>
+												Go To
+											</button>
+										</>
+									)}
+								</div>,
+								document.body
+							);
+						})()}
 					{/* Scrollable list */}
 					<CustomScrollbar
 						className="flex-1 drafting-table-content"
@@ -372,6 +679,11 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 							`${contact.firstName || ''} ${contact.lastName || ''}`.trim();
 						const isSelected = currentSelectedIds.has(contact.id);
 						const isUsed = usedContactIdsSet.has(contact.id);
+						const isUsedContactHoverCardVisible =
+							enableUsedContactTooltip &&
+							hoveredUsedContactId === contact.id &&
+							Boolean(usedContactTooltipPos) &&
+							Boolean(hoveredUsedContactCampaigns?.length);
 						const contactTitle = contact.title || contact.headline || '';
 						// Left padding: 12px base + 16px dot + 8px gap = 36px when used, else 12px
 						const leftPadding = isUsed ? 'pl-[36px]' : 'pl-3';
@@ -386,6 +698,13 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 						return (
 							<div
 								key={contact.id}
+								ref={(el) => {
+									if (el) {
+										usedContactRowElsRef.current.set(contact.id, el);
+									} else {
+										usedContactRowElsRef.current.delete(contact.id);
+									}
+								}}
 						className={cn(
 							'cursor-pointer overflow-hidden rounded-[8px] border-2 border-[#000000] select-none relative grid grid-cols-2 grid-rows-2',
 							isBottomView
@@ -407,13 +726,120 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 								}}
 							>
 									{/* Used contact indicator - absolutely positioned, vertically centered */}
-									{isUsed && (
+									{isUsed && (enableUsedContactTooltip ? (() => {
+										const isMultiCampaignIndicator =
+											isUsedContactHoverCardVisible && resolvedUsedContactCampaigns.length > 1;
+										const isSingleCampaignIndicator =
+											isUsedContactHoverCardVisible && resolvedUsedContactCampaigns.length === 1;
+										// For multi-campaign: #A0C0FF with sliding dot
+										// For single-campaign: #B0EAA4 (green, no dot)
+										// For default (not hovered): #DAE6FE
+										const pillBg = isMultiCampaignIndicator
+											? '#A0C0FF'
+											: isSingleCampaignIndicator
+												? '#B0EAA4'
+												: '#DAE6FE';
+
+										const DEFAULT_SIZE = isBottomView ? 12 : 16;
+										const PILL_WIDTH = isBottomView ? 10 : 14;
+										const PILL_HEIGHT = isBottomView ? 24 : 37;
+
+										// Handle mouse move on the pill to drive campaign selection
+										const handlePillMouseMove = isMultiCampaignIndicator
+											? (e: MouseEvent<HTMLSpanElement>) => {
+													// We render a thin stroke via box-shadow (doesn't affect box-model), so the
+													// interactive area is the full pill rect.
+													const PILL_BORDER = 0;
+													const rect = e.currentTarget.getBoundingClientRect();
+													const actualHeight = rect.height;
+													const offsetY = e.clientY - rect.top;
+													const innerHeight = Math.max(1, actualHeight - PILL_BORDER * 2);
+													const innerOffsetY = offsetY - PILL_BORDER;
+													const campaignCount = resolvedUsedContactCampaigns.length;
+													if (campaignCount <= 1) return;
+													// Map cursor Y position to campaign index (0 at top, max at bottom)
+													const ratio = Math.max(0, Math.min(1, innerOffsetY / innerHeight));
+													const idx = Math.round(ratio * (campaignCount - 1));
+													const clampedIdx = Math.max(0, Math.min(campaignCount - 1, idx));
+													setActiveUsedContactCampaignIndex((prev) =>
+														prev === clampedIdx ? prev : clampedIdx
+													);
+												}
+											: undefined;
+
+										return (
+											<span
+												className="z-10 cursor-pointer transition-all duration-150 ease-out"
+												style={{
+													position: 'absolute',
+													left: isBottomView ? '8px' : '12px',
+													top: '50%',
+													transform: 'translateY(-50%)',
+													boxSizing: 'border-box',
+													// Default state: circle. Hover state (single/multi): pill.
+													width: isUsedContactHoverCardVisible ? `${PILL_WIDTH}px` : `${DEFAULT_SIZE}px`,
+													height: isUsedContactHoverCardVisible ? `${PILL_HEIGHT}px` : `${DEFAULT_SIZE}px`,
+													borderRadius: isUsedContactHoverCardVisible ? '9999px' : '50%',
+													// Thin stroke: use box-shadow so sizes stay exact (per design spec).
+													border: isUsedContactHoverCardVisible ? 'none' : '1px solid #000000',
+													boxShadow: isUsedContactHoverCardVisible
+														? '0 0 0 1px #000000'
+														: undefined,
+													backgroundColor: pillBg,
+													overflow: 'hidden',
+												}}
+												onMouseEnter={() => openUsedContactTooltip(contact.id)}
+												onMouseLeave={() => scheduleCloseUsedContactTooltip(contact.id)}
+												onMouseMove={handlePillMouseMove}
+												onClick={(e) => {
+													// Only hijack click when the hover card is visible (prevents breaking normal
+													// contact selection clicks on the indicator in its default state).
+													if (!isUsedContactHoverCardVisible) return;
+													e.stopPropagation();
+													goToUsedContactCampaign(contact.id);
+												}}
+												aria-label="Used in a previous campaign"
+											>
+												{/* Sliding dot for multi-campaign */}
+												{isMultiCampaignIndicator && (
+													<span
+														className="rounded-full bg-[#DAE6FE] pointer-events-none transition-all duration-150 ease-out"
+														style={(() => {
+															const maxTop = Math.max(0, PILL_HEIGHT - PILL_WIDTH);
+															const campaignCount = resolvedUsedContactCampaigns.length;
+															const clampedIdx =
+																typeof activeUsedContactCampaignIndex === 'number' && campaignCount > 0
+																	? Math.min(
+																			campaignCount - 1,
+																			Math.max(0, activeUsedContactCampaignIndex)
+																		)
+																	: 0;
+															// Position dot based on active index
+															const top =
+																campaignCount > 1
+																	? (maxTop * clampedIdx) / (campaignCount - 1)
+																	: maxTop / 2;
+															return {
+																position: 'absolute' as const,
+																left: '0px',
+																top: `${top}px`,
+																width: `${PILL_WIDTH}px`,
+																height: `${PILL_WIDTH}px`,
+																// Thin stroke without changing geometry.
+																boxShadow: '0 0 0 1px #000000',
+															};
+														})()}
+													/>
+												)}
+											</span>
+										);
+									})() : (
 										<span
 											className={cn(
 												"absolute top-1/2 -translate-y-1/2",
 												isBottomView ? "left-2" : "left-3"
 											)}
-											title="Used in a previous campaign"
+											aria-label="Used in a previous campaign"
 											style={{
 												width: isBottomView ? '12px' : '16px',
 												height: isBottomView ? '12px' : '16px',
@@ -422,7 +848,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 												backgroundColor: '#DAE6FE',
 											}}
 										/>
-									)}
+									))}
 									{/* Bottom view - compact 2-row layout */}
 									{isBottomView ? (
 										<>
