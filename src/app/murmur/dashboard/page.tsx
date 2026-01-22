@@ -1407,6 +1407,8 @@ const DashboardContent = () => {
 		isSearchPending,
 		usedContactIdsSet,
 		isFromHomeDemoMode,
+		mapBboxFilter,
+		setMapBboxFilter,
 	} = useDashboard({ derivedTitle: derivedContactTitle, forceApplyDerivedTitle: shouldForceApplyDerivedTitle, fromHome: fromHomeParam });
 
 	// Free trial CTA for fromHome demo mode
@@ -1860,6 +1862,98 @@ const DashboardContent = () => {
 	const hasNoSearchResults =
 		hasSearched && !isMapResultsLoading && (contacts?.length ?? 0) === 0;
 
+	type SearchThisAreaViewportIdlePayload = {
+		bounds: { south: number; west: number; north: number; east: number };
+		zoom: number;
+		isCenterInSearchArea: boolean;
+	};
+
+	// "Search this area" CTA timing + placement (map view).
+	const SEARCH_THIS_AREA_MIN_ZOOM = 8;
+	const SEARCH_THIS_AREA_DELAY_MS = 2000;
+	const MAP_VIEW_SEARCH_BAR_TOP_PX = 33;
+	const MAP_VIEW_SEARCH_BAR_INPUT_HEIGHT_PX = 49;
+	const SEARCH_THIS_AREA_GAP_PX = 45;
+	const SEARCH_THIS_AREA_BUTTON_TOP_PX =
+		MAP_VIEW_SEARCH_BAR_TOP_PX + MAP_VIEW_SEARCH_BAR_INPUT_HEIGHT_PX + SEARCH_THIS_AREA_GAP_PX;
+
+	const [isSearchThisAreaCtaVisible, setIsSearchThisAreaCtaVisible] = useState(false);
+	const searchThisAreaCtaTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+	const lastSearchThisAreaViewportRef = useRef<SearchThisAreaViewportIdlePayload | null>(null);
+
+	const clearSearchThisAreaCtaTimer = useCallback(() => {
+		if (!searchThisAreaCtaTimeoutRef.current) return;
+		clearTimeout(searchThisAreaCtaTimeoutRef.current);
+		searchThisAreaCtaTimeoutRef.current = null;
+	}, []);
+
+	const hideSearchThisAreaCta = useCallback(() => {
+		clearSearchThisAreaCtaTimer();
+		setIsSearchThisAreaCtaVisible(false);
+	}, [clearSearchThisAreaCtaTimer]);
+
+	const handleMapViewportInteraction = useCallback(() => {
+		hideSearchThisAreaCta();
+	}, [hideSearchThisAreaCta]);
+
+	const handleMapViewportIdle = useCallback(
+		(payload: SearchThisAreaViewportIdlePayload) => {
+			lastSearchThisAreaViewportRef.current = payload;
+			hideSearchThisAreaCta();
+
+			// Only show in fullscreen map view when we have an active executed search.
+			if (!isMapView) return;
+			if (!hasSearched) return;
+			if (!activeSearchQuery || activeSearchQuery.trim().length === 0) return;
+			// Don't show while results are loading/transitioning.
+			if (isMapResultsLoading) return;
+
+			// Only show when zoomed in and the user is outside the current search area.
+			if (payload.zoom < SEARCH_THIS_AREA_MIN_ZOOM) return;
+			if (payload.isCenterInSearchArea) return;
+
+			searchThisAreaCtaTimeoutRef.current = setTimeout(() => {
+				setIsSearchThisAreaCtaVisible(true);
+			}, SEARCH_THIS_AREA_DELAY_MS);
+		},
+		[activeSearchQuery, hasSearched, hideSearchThisAreaCta, isMapResultsLoading, isMapView]
+	);
+
+	const handleSearchThisAreaClick = useCallback(() => {
+		const payload = lastSearchThisAreaViewportRef.current;
+		if (!payload) return;
+
+		// Keep the same query (Why/What), but constrain the search to the exact current viewport.
+		// Provide an explicit title prefix when available (API also infers from `activeSearchQuery`).
+		const titlePrefix = extractWhatFromSearchQuery(activeSearchQuery);
+		setMapBboxFilter({
+			south: payload.bounds.south,
+			west: payload.bounds.west,
+			north: payload.bounds.north,
+			east: payload.bounds.east,
+			titlePrefix,
+		});
+
+		// UX: once a new bbox search is triggered, keep the user in grab mode to pan/zoom freely.
+		setActiveMapTool('grab');
+		hideSearchThisAreaCta();
+	}, [activeSearchQuery, hideSearchThisAreaCta, setMapBboxFilter]);
+
+	// Defensive cleanup on unmount.
+	useEffect(() => {
+		return () => {
+			if (searchThisAreaCtaTimeoutRef.current) {
+				clearTimeout(searchThisAreaCtaTimeoutRef.current);
+				searchThisAreaCtaTimeoutRef.current = null;
+			}
+		};
+	}, []);
+
+	// Hide CTA whenever the map view or search state changes.
+	useEffect(() => {
+		hideSearchThisAreaCta();
+	}, [activeSearchQuery, hideSearchThisAreaCta, isMapResultsLoading, isMapView, mapBboxFilter]);
+
 	const handleSelectMapToolClick = useCallback(() => {
 		// First click: activate Select tool. Second click (while active): select all visible.
 		if (!isSelectMapToolActive) {
@@ -2042,7 +2136,7 @@ const DashboardContent = () => {
 		[activeSearchQuery]
 	);
 	// Keep the map side panel defaulted to the searched state (markers outside can still be added as extras).
-	const searchedStateAbbrForMap = searchedStateAbbr;
+	const searchedStateAbbrForMap = mapBboxFilter ? null : searchedStateAbbr;
 
 	// Use the "What" from the last executed search (activeSearchQuery), not the live dropdown value.
 	const searchedWhat = useMemo(
@@ -4961,6 +5055,35 @@ const DashboardContent = () => {
 						</div>
 						);
 
+						const searchThisAreaCta =
+							isMapView && isSearchThisAreaCtaVisible ? (
+								<div
+									className="fixed z-[9999] pointer-events-none"
+									style={{
+										top: `${SEARCH_THIS_AREA_BUTTON_TOP_PX}px`,
+										left: '50%',
+										transform: 'translateX(-50%)',
+									}}
+								>
+									<button
+										type="button"
+										className="pointer-events-auto flex items-center justify-center font-secondary font-medium text-[17px] leading-none text-black"
+										style={{
+											width: '212px',
+											height: '39px',
+											opacity: 0.9,
+											backgroundColor: '#AFD6EF',
+											border: '2px solid #347AB3',
+											borderRadius: '11px',
+											boxSizing: 'border-box',
+										}}
+										onClick={handleSearchThisAreaClick}
+									>
+										Search this area
+									</button>
+								</div>
+							) : null;
+
 						const campaignMapTopTabs =
 							isMapView && isAddToCampaignMode ? (
 								<div
@@ -5080,6 +5203,7 @@ const DashboardContent = () => {
 								<>
 									{campaignMapTopTabs}
 									{searchBar}
+									{searchThisAreaCta}
 								</>,
 								document.body
 							);
@@ -5153,6 +5277,18 @@ const DashboardContent = () => {
 																	}
 																}}
 																activeTool={activeMapTool}
+																selectedAreaBounds={
+																	mapBboxFilter
+																		? {
+																				south: mapBboxFilter.south,
+																				west: mapBboxFilter.west,
+																				north: mapBboxFilter.north,
+																				east: mapBboxFilter.east,
+																		  }
+																		: null
+																}
+																onViewportInteraction={handleMapViewportInteraction}
+																onViewportIdle={handleMapViewportIdle}
 																	onAreaSelect={(bounds, payload) => {
 																		const ids = payload?.contactIds ?? [];
 																		const extraContacts = payload?.extraContacts ?? [];
@@ -5218,14 +5354,17 @@ const DashboardContent = () => {
 																	}}
 																onMarkerHover={handleMapMarkerHover}
 																lockedStateName={
-																	// Show California outline for fromHome placeholder state
-																	fromHomeParam && (!isSignedIn || !hasSearched)
-																		? 'CA'
-																		: searchedStateAbbrForMap
+																	// When a bbox search is active, don't lock/wash out a single state.
+																	mapBboxFilter
+																		? null
+																		: // Show California outline for fromHome placeholder state
+																		  fromHomeParam && (!isSignedIn || !hasSearched)
+																			? 'CA'
+																			: searchedStateAbbrForMap
 																}
 																skipAutoFit={
 																	// Prevent zoom for fromHome placeholder - keep map zoomed out over US
-																	fromHomeParam && (!isSignedIn || !hasSearched)
+																	(fromHomeParam && (!isSignedIn || !hasSearched)) || Boolean(mapBboxFilter)
 																}
 																onStateSelect={(stateName) => {
 																	// In demo mode, show the free trial prompt instead of searching

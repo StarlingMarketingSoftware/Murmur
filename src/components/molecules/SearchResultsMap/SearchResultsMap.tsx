@@ -727,6 +727,26 @@ interface SearchResultsMapProps {
 	searchWhat?: string | null;
 	/** When set, shows a persistent outline of the selected search area. */
 	selectedAreaBounds?: MapSelectionBounds | null;
+	/**
+	 * Called as soon as the user starts interacting with the viewport (drag/zoom).
+	 * Useful for dismissing transient UI (e.g. "Search this area" CTA).
+	 */
+	onViewportInteraction?: () => void;
+	/**
+	 * Called when the map becomes idle after a pan/zoom gesture, with the exact current
+	 * viewport bounds and a precomputed "is center inside current search area" signal.
+	 *
+	 * Search area is interpreted as:
+	 * - `selectedAreaBounds` when provided, otherwise
+	 * - the locked state polygon (when present), otherwise
+	 * - "in area" (so callers won't show CTAs without a known search area)
+	 */
+	onViewportIdle?: (payload: {
+		bounds: MapSelectionBounds;
+		center: LatLngLiteral;
+		zoom: number;
+		isCenterInSearchArea: boolean;
+	}) => void;
 	/** Map interaction mode controlled by the dashboard (grab = pan/zoom, select = draw rectangle). */
 	activeTool?: 'select' | 'grab';
 	/**
@@ -1083,6 +1103,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	searchQuery,
 	searchWhat,
 	selectedAreaBounds,
+	onViewportInteraction,
+	onViewportIdle,
 	activeTool,
 	selectAllInViewNonce,
 	onAreaSelect,
@@ -1175,6 +1197,18 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const isBookingSearch = useMemo(() => isBookingSearchQuery(searchQuery), [searchQuery]);
 	const isPromotionSearch = useMemo(() => isPromotionSearchQuery(searchQuery), [searchQuery]);
 	const isAnySearch = useMemo(() => Boolean((searchQuery ?? '').trim()), [searchQuery]);
+	const onViewportInteractionRef = useRef<SearchResultsMapProps['onViewportInteraction'] | null>(null);
+	const onViewportIdleRef = useRef<SearchResultsMapProps['onViewportIdle'] | null>(null);
+	const selectedAreaBoundsRef = useRef<MapSelectionBounds | null>(null);
+	useEffect(() => {
+		onViewportInteractionRef.current = onViewportInteraction ?? null;
+	}, [onViewportInteraction]);
+	useEffect(() => {
+		onViewportIdleRef.current = onViewportIdle ?? null;
+	}, [onViewportIdle]);
+	useEffect(() => {
+		selectedAreaBoundsRef.current = selectedAreaBounds ?? null;
+	}, [selectedAreaBounds]);
 	useEffect(() => {
 		visibleContactIdSetRef.current = new Set(visibleContacts.map((c) => c.id));
 	}, [visibleContacts]);
@@ -3517,8 +3551,53 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			if (newZoom !== undefined) {
 				setZoomLevel(newZoom);
 			}
+			onViewportInteractionRef.current?.();
 		});
 
+		// Hide transient UI immediately when the user starts panning.
+		mapInstance.addListener('dragstart', () => {
+			onViewportInteractionRef.current?.();
+		});
+
+		// Report viewport state after the camera settles.
+		mapInstance.addListener('idle', () => {
+			const bounds = mapInstance.getBounds();
+			const center = mapInstance.getCenter();
+			if (!bounds || !center) return;
+
+			const sw = bounds.getSouthWest();
+			const ne = bounds.getNorthEast();
+			const south = sw.lat();
+			const west = sw.lng();
+			const north = ne.lat();
+			const east = ne.lng();
+
+			// Skip antimeridian-crossing viewports (not relevant for our UI).
+			if (east < west) return;
+
+			const zoom = mapInstance.getZoom() ?? 4;
+			const centerCoords = center.toJSON();
+
+			const selectedBounds = selectedAreaBoundsRef.current;
+			const isCenterInSelectedBounds = selectedBounds
+				? centerCoords.lat >= selectedBounds.south &&
+				  centerCoords.lat <= selectedBounds.north &&
+				  centerCoords.lng >= selectedBounds.west &&
+				  centerCoords.lng <= selectedBounds.east
+				: null;
+
+			const isCenterInSearchArea =
+				typeof isCenterInSelectedBounds === 'boolean'
+					? isCenterInSelectedBounds
+					: isCoordsInLockedState(centerCoords);
+
+			onViewportIdleRef.current?.({
+				bounds: { south, west, north, east },
+				center: centerCoords,
+				zoom,
+				isCenterInSearchArea,
+			});
+		});
 	}, []);
 
 	const onUnmount = useCallback(() => {
@@ -3672,6 +3751,15 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		skipAutoFit,
 		searchQuery,
 	]);
+
+	// If auto-fit is disabled, ensure we don't have a queued fit from a prior render.
+	useEffect(() => {
+		if (!skipAutoFit) return;
+		if (autoFitTimeoutRef.current) {
+			clearTimeout(autoFitTimeoutRef.current);
+			autoFitTimeoutRef.current = null;
+		}
+	}, [skipAutoFit]);
 
 	// Reset bounds tracking when contacts prop is empty (preparing for new search)
 	useEffect(() => {
