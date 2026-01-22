@@ -48,7 +48,6 @@ export const useRecipientsTable = (props: RecipientsTableProps) => {
 						{isUsed && (
 							<span
 								className="inline-block shrink-0"
-								title="Used in a previous campaign"
 								style={{
 									width: '16px',
 									height: '16px',

@@ -477,7 +477,7 @@ const Murmur = () => {
 
 	// Make the campaign page render slightly "zoomed out" on desktop (85%),
 	// without changing the rest of the Murmur app.
-	useEffect(() => {
+	useLayoutEffect(() => {
 		// Avoid running until we know whether this is a real mobile device.
 		if (isMobile === null) return;
 
@@ -518,6 +518,7 @@ const Murmur = () => {
 	);
 
 	const [isTopSearchHighlighted, setTopSearchHighlighted] = useState(false);
+	const [isHomeButtonHighlighted, setHomeButtonHighlighted] = useState(false);
 	const [isDraftsTabHighlighted, setDraftsTabHighlighted] = useState(false);
 	const [isInboxTabHighlighted, setInboxTabHighlighted] = useState(false);
 	const [isWriteTabHighlighted, setWriteTabHighlighted] = useState(false);
@@ -525,6 +526,8 @@ const Murmur = () => {
 		() => ({
 			isTopSearchHighlighted,
 			setTopSearchHighlighted,
+			isHomeButtonHighlighted,
+			setHomeButtonHighlighted,
 			isDraftsTabHighlighted,
 			setDraftsTabHighlighted,
 			isInboxTabHighlighted,
@@ -534,6 +537,7 @@ const Murmur = () => {
 		}),
 		[
 			isTopSearchHighlighted,
+			isHomeButtonHighlighted,
 			isDraftsTabHighlighted,
 			isInboxTabHighlighted,
 			isWriteTabHighlighted,
@@ -1310,6 +1314,11 @@ const Murmur = () => {
 	const [hideArrowsOnAll, setHideArrowsOnAll] = useState(false);
 	// Hide arrows on inbox tab at breakpoint (below 1476px)
 	const [hideArrowsOnInbox, setHideArrowsOnInbox] = useState(false);
+	// Fixed nav arrow refs + overlap-driven hiding (prevents arrows from sitting on top of right SVG panel)
+	const leftFixedNavArrowButtonRef = useRef<HTMLButtonElement | null>(null);
+	const rightFixedNavArrowButtonRef = useRef<HTMLButtonElement | null>(null);
+	const [hideFixedNavArrowsBecauseOverlappingRightPanel, setHideFixedNavArrowsBecauseOverlappingRightPanel] =
+		useState(false);
 	useEffect(() => {
 		if (typeof window === 'undefined') return;
 		const checkBreakpoints = () => {
@@ -1366,11 +1375,97 @@ const Murmur = () => {
 	// or when width < 1317px to prevent overlap with content boxes
 	// or when on all tab and width <= 1396px
 	// or when on inbox/sent tab and width < 1476px
-	const hideFixedArrows =
+	const baseHideFixedArrows =
 		(activeView === 'testing' && isNarrowDesktop) ||
 		hideArrowsAtBreakpoint ||
 		(activeView === 'all' && hideArrowsOnAll) ||
 		((activeView === 'inbox' || activeView === 'sent') && hideArrowsOnInbox);
+	
+	const isRightPanelRendered =
+		!isMobile &&
+		!hideRightPanel &&
+		!(activeView === 'all' && hideRightPanelOnAll) &&
+		!(activeView === 'inbox' && hideRightPanelOnInbox);
+	
+	const getIsFixedNavArrowsOverlappingRightPanel = useCallback(() => {
+		if (typeof document === 'undefined') return { overlapping: false, panelFound: false };
+		if (!isRightPanelRendered) return { overlapping: false, panelFound: false };
+		
+		const panelEl = document.querySelector('[data-slot="campaign-right-panel"]') as HTMLElement | null;
+		if (!panelEl) return { overlapping: false, panelFound: false };
+		
+		const leftEl = leftFixedNavArrowButtonRef.current;
+		const rightEl = rightFixedNavArrowButtonRef.current;
+		if (!leftEl || !rightEl) return { overlapping: false, panelFound: true };
+		
+		const paddingPx = 4;
+		const panelRect = panelEl.getBoundingClientRect();
+		
+		const overlaps = (a: DOMRect, b: DOMRect) =>
+			a.left < b.right + paddingPx &&
+			a.right > b.left - paddingPx &&
+			a.top < b.bottom + paddingPx &&
+			a.bottom > b.top - paddingPx;
+		
+		const isOverlapping =
+			overlaps(panelRect, leftEl.getBoundingClientRect()) ||
+			overlaps(panelRect, rightEl.getBoundingClientRect());
+		
+		return { overlapping: isOverlapping, panelFound: true };
+	}, [isRightPanelRendered]);
+	
+	useLayoutEffect(() => {
+		if (typeof window === 'undefined') return;
+		
+		let raf = 0;
+		let retryInterval: number | null = null;
+		
+		const run = () => {
+			const { overlapping, panelFound } = getIsFixedNavArrowsOverlappingRightPanel();
+			setHideFixedNavArrowsBecauseOverlappingRightPanel(overlapping);
+			
+			// `CampaignRightPanel` is dynamically imported; on first paint the DOM node can be missing.
+			// If we're supposed to render it, retry briefly so the arrows hide as soon as it mounts.
+			if (isRightPanelRendered && !panelFound && retryInterval == null) {
+				let attempts = 0;
+				retryInterval = window.setInterval(() => {
+					attempts += 1;
+					const { overlapping, panelFound } = getIsFixedNavArrowsOverlappingRightPanel();
+					setHideFixedNavArrowsBecauseOverlappingRightPanel(overlapping);
+					
+					if (panelFound || !isRightPanelRendered || attempts >= 20) {
+						if (retryInterval != null) window.clearInterval(retryInterval);
+						retryInterval = null;
+					}
+				}, 100);
+			}
+			
+			if (!isRightPanelRendered && retryInterval != null) {
+				window.clearInterval(retryInterval);
+				retryInterval = null;
+			}
+		};
+		
+		const schedule = () => {
+			window.cancelAnimationFrame(raf);
+			raf = window.requestAnimationFrame(run);
+		};
+		
+		schedule();
+		window.addEventListener('resize', schedule);
+		window.addEventListener(CAMPAIGN_ZOOM_EVENT, schedule as EventListener);
+		
+		return () => {
+			window.cancelAnimationFrame(raf);
+			window.removeEventListener('resize', schedule);
+			window.removeEventListener(CAMPAIGN_ZOOM_EVENT, schedule as EventListener);
+			if (retryInterval != null) window.clearInterval(retryInterval);
+		};
+	}, [activeView, getIsFixedNavArrowsOverlappingRightPanel, isRightPanelRendered]);
+	
+	// If the right SVG panel is hidden (breakpoint/mobile), don't let the fixed chevrons reappear.
+	const hideFixedArrows =
+		baseHideFixedArrows || hideFixedNavArrowsBecauseOverlappingRightPanel || !isRightPanelRendered;
 
 	// Tab navigation order (excludes 'all' tab from arrow navigation)
 	const tabOrder: ViewType[] = [
@@ -1566,36 +1661,44 @@ const Murmur = () => {
 				<CampaignTopSearchHighlightProvider value={topSearchHighlightCtx}>
 				<div className="min-h-screen relative">
 			{/* Left navigation arrow - absolute position (hidden in narrow desktop + testing) */}
-			{!hideFixedArrows && (
 				<button
+					ref={leftFixedNavArrowButtonRef}
 					type="button"
 					onClick={goToPreviousTab}
-					className="absolute z-50 bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity"
+					className={cn(
+						"absolute z-50 bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity",
+						hideFixedArrows && "opacity-0 pointer-events-none"
+					)}
 					style={{
 						left: '33px',
 						top: `${fixedNavArrowsTopPx}px`,
 					}}
 					aria-label="Previous tab"
+					aria-hidden={hideFixedArrows}
+					tabIndex={hideFixedArrows ? -1 : 0}
 				>
 					<LeftArrow />
 				</button>
-			)}
 
 			{/* Right navigation arrow - absolute position (hidden in narrow desktop + testing) */}
-			{!hideFixedArrows && (
 				<button
+					ref={rightFixedNavArrowButtonRef}
 					type="button"
 					onClick={goToNextTab}
-					className="absolute z-50 bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity"
+					className={cn(
+						"absolute z-50 bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity",
+						hideFixedArrows && "opacity-0 pointer-events-none"
+					)}
 					style={{
 						right: '33px',
 						top: `${fixedNavArrowsTopPx}px`,
 					}}
 					aria-label="Next tab"
+					aria-hidden={hideFixedArrows}
+					tabIndex={hideFixedArrows ? -1 : 0}
 				>
 					<RightArrow />
 				</button>
-			)}
 
 			{/* Desktop top box (477 x 42, 1px stroke #929292, 10px radius) */}
 			{!isMobile && !isNarrowestDesktop && (
@@ -1629,10 +1732,26 @@ const Murmur = () => {
 										window.location.assign(urls.murmur.dashboard.index);
 									}
 								}}
-								className="flex items-center justify-center bg-transparent border-0 p-0 cursor-pointer transition-opacity opacity-40 hover:opacity-100 active:opacity-100"
+								className="group relative w-[35px] h-[35px] flex items-center justify-center bg-transparent border-0 p-0 cursor-pointer"
 								aria-label="Go to dashboard"
 							>
-								<BottomHomeIcon width={20} height={19} className="text-black" />
+								<div
+									aria-hidden="true"
+									className={cn(
+										'pointer-events-none absolute inset-0 box-border rounded-[8px] bg-[#FFFFFF] border-[3px] border-[#000000] transition-opacity duration-150',
+										isHomeButtonHighlighted ? 'opacity-100' : 'opacity-0'
+									)}
+								/>
+								<BottomHomeIcon
+									width={20}
+									height={19}
+									className={cn(
+										'relative z-10 transition-opacity duration-150',
+										isHomeButtonHighlighted
+											? 'opacity-100'
+											: 'opacity-40 group-hover:opacity-100 group-active:opacity-100'
+									)}
+								/>
 							</button>
 						</div>
 						{/* Campaigns dropdown positioned below the left box, left-aligned with content */}
