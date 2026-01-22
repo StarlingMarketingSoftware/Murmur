@@ -153,6 +153,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const {
 		campaign,
 		contacts,
+		isContactsLoading,
 		form,
 		promptQualityScore,
 		promptQualityLabel,
@@ -2858,6 +2859,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														>
 															<ContactsExpandedList
 																contacts={contactsAvailableForDrafting}
+																isLoading={isContactsLoading}
 																campaign={campaign}
 																selectedContactIds={contactsTabSelectedIds}
 																onContactSelectionChange={(updater) =>
@@ -3824,6 +3826,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												>
 													<ContactsExpandedList
 														contacts={contactsAvailableForDrafting}
+														isLoading={isContactsLoading}
 														campaign={campaign}
 														selectedContactIds={contactsTabSelectedIds}
 														onContactSelectionChange={(updater) =>
@@ -4138,6 +4141,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											<div className="mt-[20px] w-full flex justify-center">
 												<ContactsExpandedList
 													contacts={contactsAvailableForDrafting}
+													isLoading={isContactsLoading}
 													campaign={campaign}
 													selectedContactIds={contactsTabSelectedIds}
 													onContactSelectionChange={(updater) =>
@@ -6835,6 +6839,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											<div style={{ position: 'relative', zIndex: 20 }}>
 												<ContactsExpandedList
 													contacts={contactsAvailableForDrafting}
+													isLoading={isContactsLoading}
 													campaign={campaign}
 													selectedContactIds={contactsTabSelectedIds}
 													onContactSelectionChange={(updater) =>
@@ -7502,6 +7507,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											<div style={{ position: 'relative', zIndex: 20 }}>
 												<ContactsExpandedList
 													contacts={contactsAvailableForDrafting}
+													isLoading={isContactsLoading}
 													campaign={campaign}
 													selectedContactIds={contactsTabSelectedIds}
 													onContactSelectionChange={(updater) =>

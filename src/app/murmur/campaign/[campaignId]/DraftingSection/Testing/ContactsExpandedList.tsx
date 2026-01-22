@@ -30,6 +30,10 @@ export interface ContactsExpandedListProps {
 	onDraftSelected?: (contactIds: number[]) => void;
 	isDraftDisabled?: boolean;
 	isPendingGeneration?: boolean;
+	/**
+	 * When true, renders the "flowing color" loading wave placeholders (used on initial load).
+	 */
+	isLoading?: boolean;
 	onContactClick?: (contact: ContactWithName | null) => void;
 	onContactHover?: (contact: ContactWithName | null) => void;
 	/**
@@ -60,6 +64,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 	onContactHover,
 	selectedContactIds,
 	onContactSelectionChange,
+	isLoading = false,
 	width,
 	height,
 	minRows = 7,
@@ -206,6 +211,10 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 	};
 
 	const selectedCount = currentSelectedIds.size;
+	const shouldShowLoadingWave = isLoading && contacts.length === 0;
+	const loadingWaveDurationSeconds = 2.5;
+	// Match MapResultsPanelSkeleton step delay exactly for consistent "fluid" feel
+	const loadingWaveStepSeconds = 0.1;
 
 	// Allow callers to override dimensions; default to the original sidebar size
 	const resolvedWidth = width ?? 376;
@@ -1030,12 +1039,26 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 							<div
 								key={`placeholder-${idx}`}
 								className={cn(
-									'select-none overflow-hidden rounded-[8px] border-2 border-[#000000] bg-[#EB8586]',
+									'select-none overflow-hidden rounded-[8px] border-2 border-[#000000]',
 									isBottomView
 										? 'w-[224px] h-[28px]'
 										: 'max-[480px]:w-[96.27vw] h-[49px] max-[480px]:h-[50px]'
+									,
+									shouldShowLoadingWave
+										? 'contacts-expanded-list-loading-wave-row'
+										: 'bg-[#EB8586]'
 								)}
-								style={!isBottomView ? { width: `${innerWidth}px` } : undefined}
+								style={{
+									...(!isBottomView ? { width: `${innerWidth}px` } : {}),
+									...(shouldShowLoadingWave
+										? {
+												animationDelay: `${-(
+													loadingWaveDurationSeconds -
+													idx * loadingWaveStepSeconds
+												)}s`,
+											}
+										: {}),
+								}}
 							/>
 						)
 					)}
