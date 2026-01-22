@@ -6537,8 +6537,8 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 															}}
 															disabled={isGenerationDisabled?.()}
 															className={cn(
-																'h-[28px] w-[232px] bg-[#DBF3DC] text-black font-inter font-normal text-[17px] leading-none rounded-[4px] cursor-pointer flex items-center justify-center p-0 border-0',
-																'transition-colors hover:bg-[#D6EED7] active:bg-[#D1E9D2]',
+																'h-[28px] w-[232px] bg-[#DBF3DC] text-black font-inter font-normal text-[17px] leading-none rounded-[4px] cursor-pointer flex items-center justify-center p-0 border-2 border-transparent',
+																'transition-colors hover:bg-[#EAF9EB] hover:border-black active:bg-[#D1E9D2]',
 																isGenerationDisabled?.()
 																	? 'opacity-50 cursor-not-allowed'
 																	: 'opacity-100'
@@ -6990,8 +6990,8 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 													}}
 													disabled={isGenerationDisabled?.()}
 													className={cn(
-														'h-[28px] w-[232px] bg-[#DBF3DC] text-black font-inter font-normal text-[17px] leading-none rounded-[4px] cursor-pointer flex items-center justify-center p-0 border-0',
-														'transition-colors hover:bg-[#D6EED7] active:bg-[#D1E9D2]',
+														'h-[28px] w-[232px] bg-[#DBF3DC] text-black font-inter font-normal text-[17px] leading-none rounded-[4px] cursor-pointer flex items-center justify-center p-0 border-2 border-transparent',
+														'transition-colors hover:bg-[#EAF9EB] hover:border-black active:bg-[#D1E9D2]',
 														isGenerationDisabled?.()
 															? 'opacity-50 cursor-not-allowed'
 															: 'opacity-100'
@@ -7139,7 +7139,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														}}
 														disabled={isGenerationDisabled?.()}
 														className={cn(
-															'h-[28px] bg-white border-[3px] border-[#349A37] text-black font-inter font-normal text-[17px] leading-none rounded-[4px] cursor-pointer flex items-center justify-center transition-all hover:bg-primary/20 active:bg-primary/20 p-0',
+															'h-[28px] bg-white border-[3px] border-[#349A37] text-black font-inter font-normal text-[17px] leading-none rounded-[4px] cursor-pointer flex items-center justify-center transition-all hover:bg-[#EAF9EB] hover:border-black active:bg-primary/20 p-0',
 															'w-[93.7vw] max-w-[475px]',
 															isGenerationDisabled?.()
 																? 'opacity-50 cursor-not-allowed'
