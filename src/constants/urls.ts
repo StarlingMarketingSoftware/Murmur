@@ -86,6 +86,9 @@ export const urls = {
 			},
 			usedContacts: {
 				index: '/api/contacts/used-contacts',
+				campaigns: {
+					index: '/api/contacts/used-contacts/campaigns',
+				},
 			},
 			batch: {
 				index: '/api/contacts/batch',

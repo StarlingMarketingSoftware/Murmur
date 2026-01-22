@@ -5,6 +5,8 @@ import React, { createContext, useContext } from 'react';
 export type CampaignTopSearchHighlightContextValue = {
 	isTopSearchHighlighted: boolean;
 	setTopSearchHighlighted: (highlighted: boolean) => void;
+	isHomeButtonHighlighted: boolean;
+	setHomeButtonHighlighted: (highlighted: boolean) => void;
 	isDraftsTabHighlighted: boolean;
 	setDraftsTabHighlighted: (highlighted: boolean) => void;
 	isInboxTabHighlighted: boolean;
@@ -18,6 +20,9 @@ const CampaignTopSearchHighlightContext =
 		isTopSearchHighlighted: false,
 		// eslint-disable-next-line @typescript-eslint/no-empty-function
 		setTopSearchHighlighted: () => {},
+		isHomeButtonHighlighted: false,
+		// eslint-disable-next-line @typescript-eslint/no-empty-function
+		setHomeButtonHighlighted: () => {},
 		isDraftsTabHighlighted: false,
 		// eslint-disable-next-line @typescript-eslint/no-empty-function
 		setDraftsTabHighlighted: () => {},

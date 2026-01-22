@@ -92,6 +92,46 @@ export const useGetUsedContactIds = () => {
 	});
 };
 
+export interface UsedContactCampaignSummary {
+	id: number;
+	name: string;
+}
+
+export const useGetUsedContactCampaigns = (contactId: number | null) => {
+	return useQuery<UsedContactCampaignSummary[]>({
+		queryKey: [...QUERY_KEYS.list(), 'used-contacts', 'campaigns', contactId],
+		queryFn: async ({ signal }) => {
+			const url = appendQueryParamsToUrl(urls.api.contacts.usedContacts.campaigns.index, {
+				contactId: contactId as number,
+			});
+			const response = await _fetch(url, undefined, undefined, {
+				signal,
+				timeout: 25000,
+			});
+
+			if (!response.ok) {
+				let errorMessage = 'Failed to fetch used contact campaigns';
+				try {
+					const errorData = await response.json();
+					errorMessage = errorData.error || errorMessage;
+				} catch {
+					try {
+						const textError = await response.text();
+						errorMessage = textError || `HTTP ${response.status} error`;
+					} catch {
+						errorMessage = `HTTP ${response.status} error`;
+					}
+				}
+				throw new Error(errorMessage);
+			}
+
+			return response.json() as Promise<UsedContactCampaignSummary[]>;
+		},
+		enabled: Boolean(contactId),
+		staleTime: 1000 * 60 * 5,
+	});
+};
+
 export const useCreateContact = (options: CustomMutationOptions = {}) => {
 	const {
 		suppressToasts = false,

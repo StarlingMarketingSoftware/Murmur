@@ -469,11 +469,18 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 
 	// API
 
-	const { data: contacts } = useGetContacts({
+	const {
+		data: contacts,
+		isPending: isPendingContacts,
+		isLoading: isLoadingContacts,
+		isRefetching: isRefetchingContacts,
+	} = useGetContacts({
 		filters: {
 			contactListIds: campaign.userContactLists.map((list) => list.id),
 		},
 	});
+	const isContactsLoading =
+		isLoadingContacts || isPendingContacts || (isRefetchingContacts && !contacts?.length);
 
 	const {
 		data: dataGemini,
@@ -2368,6 +2375,7 @@ EXAMPLES OF GOOD CUSTOM INSTRUCTIONS:
 		campaign,
 		cancelGeneration,
 		contacts,
+		isContactsLoading,
 		draftingMode,
 		form,
 		generationProgress,

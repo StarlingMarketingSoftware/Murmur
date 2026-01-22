@@ -325,12 +325,25 @@ export const TestPreviewPanel: FC<TestPreviewPanelProps> = ({
 												{/* Left Column - Name and Company */}
 												<div className="flex flex-col">
 													<div className="p-0.5 sm:p-1 pl-2 sm:pl-3 pb-0 sm:pb-[1.5px] flex items-start">
-														<div className="font-inter font-bold text-[14px] sm:text-[15.45px] w-full whitespace-normal break-words leading-[1.15] sm:leading-4">
+														<div
+															className="font-inter font-bold text-[14px] sm:text-[15.45px] w-full leading-[1.15] sm:leading-4 overflow-hidden"
+															style={{
+																maxHeight: '2lh',
+																maskImage: 'linear-gradient(to right, black calc(100% - 12px), transparent 100%)',
+																WebkitMaskImage: 'linear-gradient(to right, black calc(100% - 12px), transparent 100%)',
+															}}
+														>
 															{fullName}
 														</div>
 													</div>
 													<div className="p-0.5 sm:p-1 pl-2 sm:pl-3 pt-0 flex items-start">
-														<div className="text-[11px] sm:text-xs text-black w-full whitespace-normal break-words leading-[1.2] sm:leading-4">
+														<div
+															className="text-[11px] sm:text-xs text-black w-full leading-[1.2] sm:leading-4 overflow-hidden whitespace-nowrap"
+															style={{
+																maskImage: 'linear-gradient(to right, black calc(100% - 12px), transparent 100%)',
+																WebkitMaskImage: 'linear-gradient(to right, black calc(100% - 12px), transparent 100%)',
+															}}
+														>
 															{contact.company || ''}
 														</div>
 													</div>
@@ -371,13 +384,20 @@ export const TestPreviewPanel: FC<TestPreviewPanelProps> = ({
 												</div>
 											</>
 										) : (
-											<>
-												{/* Left Column - Company Name */}
-												<div className="p-0.5 sm:p-1 pl-2 sm:pl-3 flex items-center">
-													<div className="font-inter font-bold text-[14px] sm:text-[15.45px] w-full whitespace-normal break-words leading-[1.15] sm:leading-4">
-														{contact.company || ''}
-													</div>
+										<>
+											{/* Left Column - Company Name */}
+											<div className="p-0.5 sm:p-1 pl-2 sm:pl-3 flex items-center">
+												<div
+													className="font-inter font-bold text-[14px] sm:text-[15.45px] w-full leading-[1.15] sm:leading-4 overflow-hidden"
+													style={{
+														maxHeight: '2lh',
+														maskImage: 'linear-gradient(to right, black calc(100% - 12px), transparent 100%)',
+														WebkitMaskImage: 'linear-gradient(to right, black calc(100% - 12px), transparent 100%)',
+													}}
+												>
+													{contact.company || ''}
 												</div>
+											</div>
 												{/* Right Column - Location and Title */}
 												<div className="p-0.5 sm:p-1 pb-0 sm:pb-[1.5px] flex flex-col gap-[1px]">
 													{/* State and City */}

@@ -1238,6 +1238,7 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 	const router = useRouter();
 	const {
 		setTopSearchHighlighted,
+		setHomeButtonHighlighted,
 		setDraftsTabHighlighted,
 		setInboxTabHighlighted,
 		setWriteTabHighlighted,
@@ -1255,12 +1256,14 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 	useEffect(() => {
 		return () => {
 			setTopSearchHighlighted(false);
+			setHomeButtonHighlighted(false);
 			setDraftsTabHighlighted(false);
 			setInboxTabHighlighted(false);
 			setWriteTabHighlighted(false);
 		};
 	}, [
 		setTopSearchHighlighted,
+		setHomeButtonHighlighted,
 		setDraftsTabHighlighted,
 		setInboxTabHighlighted,
 		setWriteTabHighlighted,
@@ -1729,9 +1732,39 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 					offsetRight={-6}
 				>
 					{isPending ? (
-						<div className="flex items-center justify-center h-full">
-							<Spinner size="small" />
-						</div>
+						isContacts && !hasData ? (
+							(() => {
+								// Match the "flowing" wave feel used elsewhere (staggered delays).
+								const durationSeconds = 6;
+								const stepDelaySeconds = 0.1;
+								const rows = isMobile ? 8 : 12;
+								const rowWidthClass = isMobile ? 'w-full' : 'w-[489px]';
+								return (
+									<div
+										className="overflow-visible w-full flex flex-col items-center"
+										style={{
+											gap: isMobile ? '8px' : '16px',
+											padding: isMobile ? '0 8px' : undefined,
+										}}
+										aria-hidden="true"
+									>
+										{Array.from({ length: rows }).map((_, idx) => (
+											<div
+												key={`contacts-loading-wave-${idx}`}
+												className={`select-none ${rowWidthClass} h-[52px] overflow-hidden rounded-[8px] border-2 border-[#000000] contacts-expanded-list-loading-wave-row`}
+												style={{
+													animationDelay: `${-(durationSeconds - idx * stepDelaySeconds)}s`,
+												}}
+											/>
+										))}
+									</div>
+								);
+							})()
+						) : (
+							<div className="flex items-center justify-center h-full">
+								<Spinner size="small" />
+							</div>
+						)
 					) : hasData ? (
 						children
 					) : isDrafts || isSent ? (
@@ -1828,6 +1861,8 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 											className="bg-white rounded-[8px] border-2 border-[#000000] flex items-center justify-center cursor-pointer hover:bg-[#DBDBDB] transition-colors"
 											style={{ width: innerButtonWidth, height: isMobile ? '44px' : '42px' }}
 											onClick={() => router.push(urls.murmur.dashboard.index)}
+											onMouseEnter={() => setHomeButtonHighlighted(true)}
+											onMouseLeave={() => setHomeButtonHighlighted(false)}
 										>
 											<span className={`font-semibold font-inter text-black ${isMobile ? 'text-[12px]' : 'text-[15px]'}`}>
 												Create New Campaign
@@ -1878,6 +1913,8 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 											className="bg-white rounded-[8px] border-2 border-[#000000] flex items-center justify-center cursor-pointer hover:bg-[#DBDBDB] transition-colors"
 											style={{ width: innerButtonWidth, height: isMobile ? '44px' : '42px' }}
 											onClick={() => router.push(urls.murmur.dashboard.index)}
+											onMouseEnter={() => setHomeButtonHighlighted(true)}
+											onMouseLeave={() => setHomeButtonHighlighted(false)}
 										>
 											<span className={`font-semibold font-inter text-black ${isMobile ? 'text-[12px]' : 'text-[15px]'}`}>
 												Create New Campaign
@@ -1949,6 +1986,8 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 																? () => setDraftsTabHighlighted(true)
 																: isCheckInbox
 																	? () => setInboxTabHighlighted(true)
+																	: isCreateNewCampaign
+																		? () => setHomeButtonHighlighted(true)
 																: undefined
 													}
 													onMouseLeave={
@@ -1958,6 +1997,8 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 																? () => setDraftsTabHighlighted(false)
 																: isCheckInbox
 																	? () => setInboxTabHighlighted(false)
+																	: isCreateNewCampaign
+																		? () => setHomeButtonHighlighted(false)
 																: undefined
 													}
 													onClick={() => {
@@ -2005,6 +2046,8 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 																? () => setDraftsTabHighlighted(true)
 																: isCheckInbox
 																	? () => setInboxTabHighlighted(true)
+																	: isCreateNewCampaign
+																		? () => setHomeButtonHighlighted(true)
 																: undefined
 													}
 													onMouseLeave={
@@ -2014,6 +2057,8 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 																? () => setDraftsTabHighlighted(false)
 																: isCheckInbox
 																	? () => setInboxTabHighlighted(false)
+																	: isCreateNewCampaign
+																		? () => setHomeButtonHighlighted(false)
 																: undefined
 													}
 													onClick={() => {

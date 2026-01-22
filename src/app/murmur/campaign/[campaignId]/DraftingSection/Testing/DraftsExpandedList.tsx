@@ -40,6 +40,10 @@ export interface DraftsExpandedListProps {
 	onOpenDrafts?: () => void;
 	onSendingPreviewUpdate?: (args: { contactId: number; subject?: string }) => void;
 	onSendingPreviewReset?: () => void;
+	/**
+	 * When true, renders only the header chrome (no rows) for ultra-compact bottom panel layouts.
+	 */
+	collapsed?: boolean;
 	width?: number;
 	height?: number;
 	hideSendButton?: boolean;
@@ -165,6 +169,7 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 	onOpenDrafts,
 	onSendingPreviewUpdate,
 	onSendingPreviewReset,
+	collapsed = false,
 	width = 376,
 	height = 426,
 	hideSendButton = false,
@@ -523,7 +528,7 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 			)}
 
 			{/* Selection counter and Select All row - absolutely positioned */}
-			{isAllTab && (
+			{!collapsed && isAllTab && (
 				<div
 					className="absolute flex items-center justify-center px-2 z-10"
 					style={{ top: '22px', left: 0, right: 0, height: '14px' }}
@@ -544,42 +549,41 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 				</div>
 			)}
 
-			<div
-				className={cn(
-					'relative flex-1 flex flex-col min-h-0',
-					horizontalPaddingClass,
-					verticalPaddingClass
-				)}
-			>
-				{/* Scrollable list */}
-				<CustomScrollbar
-					className="flex-1 drafting-table-content"
-					thumbWidth={2}
-					thumbColor={isBottomView ? 'transparent' : '#000000'}
-					trackColor="transparent"
-					offsetRight={
-						isBottomView ? -7 : hasCustomRowSize ? -4 : -14
-					}
-					contentClassName="overflow-x-hidden"
-					alwaysShow={!isBottomView && !isFullyEmpty}
+			{!collapsed && (
+				<div
+					className={cn(
+						'relative flex-1 flex flex-col min-h-0',
+						horizontalPaddingClass,
+						verticalPaddingClass
+					)}
 				>
-					<div
-						className={cn(
-							'flex flex-col items-center',
-							isBottomView ? 'space-y-[5px] pb-0' : 'space-y-2 pb-2'
-						)}
-						style={{
-							paddingTop:
-								customWhiteSectionHeight !== undefined
-									? '2px'
-									: isAllTab
-									? `${39 - whiteSectionHeight}px`
-									: `${38 - whiteSectionHeight}px`,
-						}}
-						onMouseLeave={() => {
-							setHoveredDraftIndex(null);
-						}}
+					{/* Scrollable list */}
+					<CustomScrollbar
+						className="flex-1 drafting-table-content"
+						thumbWidth={2}
+						thumbColor={isBottomView ? 'transparent' : '#000000'}
+						trackColor="transparent"
+						offsetRight={isBottomView ? -7 : hasCustomRowSize ? -4 : -14}
+						contentClassName="overflow-x-hidden"
+						alwaysShow={!isBottomView && !isFullyEmpty}
 					>
+						<div
+							className={cn(
+								'flex flex-col items-center',
+								isBottomView ? 'space-y-[5px] pb-0' : 'space-y-2 pb-2'
+							)}
+							style={{
+								paddingTop:
+									customWhiteSectionHeight !== undefined
+										? '2px'
+										: isAllTab
+										? `${39 - whiteSectionHeight}px`
+										: `${38 - whiteSectionHeight}px`,
+							}}
+							onMouseLeave={() => {
+								setHoveredDraftIndex(null);
+							}}
+						>
 						{drafts.map((draft, draftIndex) => {
 							const contact = contacts?.find((c) => c.id === draft.contactId);
 							const contactName = contact
@@ -644,7 +648,6 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 									{usedContactIdsSet.has(draft.contactId) && (
 										<span
 											className={cn('absolute', indicatorLeftClass)}
-											title="Used in a previous campaign"
 											style={{
 												top: (isRejected || isApproved) ? 'calc(50% - 16px)' : '50%',
 												transform: (isRejected || isApproved) ? 'none' : 'translateY(-50%)',
@@ -998,7 +1001,10 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 							);
 						})}
 						{Array.from({
-							length: Math.max(0, (isBottomView ? 3 : isPreviewMode ? 5 : 4) - drafts.length),
+							length: Math.max(
+								0,
+								(isBottomView ? 3 : isPreviewMode ? 5 : 4) - drafts.length
+							),
 						}).map((_, idx) => (
 							<div
 								key={`draft-placeholder-${idx}`}
@@ -1010,9 +1016,9 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 										  'w-full max-w-[356px] max-[480px]:max-w-none h-[64px] max-[480px]:h-[50px]',
 									!isBottomView && 'p-2'
 								)}
-							style={
-								isBottomView
-									? { backgroundColor: placeholderBgColor }
+								style={
+									isBottomView
+										? { backgroundColor: placeholderBgColor }
 										: {
 												backgroundColor: placeholderBgColor,
 												width: hasCustomRowSize ? `${resolvedRowWidth}px` : undefined,
@@ -1021,11 +1027,12 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 								}
 							/>
 						))}
-					</div>
-				</CustomScrollbar>
-			</div>
+						</div>
+					</CustomScrollbar>
+				</div>
+			)}
 
-			{!hideSendButton && (
+			{!collapsed && !hideSendButton && (
 				<div className="flex justify-center w-full mt-2">
 					<button
 						type="button"

@@ -31,6 +31,10 @@ export interface InboxExpandedListProps {
 	contactByEmail?: Record<string, ContactWithName>;
 	onHeaderClick?: () => void;
 	onOpenInbox?: () => void;
+	/**
+	 * When true, renders only the header chrome (no rows) for ultra-compact bottom panel layouts.
+	 */
+	collapsed?: boolean;
 	/** Custom width in pixels */
 	width?: number;
 	/** Custom height in pixels */
@@ -197,6 +201,7 @@ export const InboxExpandedList: FC<InboxExpandedListProps> = ({
 	contactByEmail,
 	onHeaderClick,
 	onOpenInbox,
+	collapsed = false,
 	width = 376,
 	height = 426,
 	whiteSectionHeight: customWhiteSectionHeight,
@@ -342,37 +347,38 @@ export const InboxExpandedList: FC<InboxExpandedListProps> = ({
 				</div>
 			)}
 
-			<div
-				className={cn(
-					'relative flex-1 flex flex-col min-h-0',
-					isBottomView ? 'px-[2px] pt-0 pb-0' : 'px-2 pt-2 pb-2'
-				)}
-			>
-				{/* Scrollable list */}
-				<CustomScrollbar
-					className="flex-1 drafting-table-content"
-					thumbWidth={2}
-					thumbColor={isBottomView ? 'transparent' : '#000000'}
-					trackColor="transparent"
-					offsetRight={isBottomView ? -7 : -14}
-					contentClassName="overflow-x-hidden"
-					alwaysShow={!isBottomView && !isFullyEmpty}
+			{!collapsed && (
+				<div
+					className={cn(
+						'relative flex-1 flex flex-col min-h-0',
+						isBottomView ? 'px-[2px] pt-0 pb-0' : 'px-2 pt-2 pb-2'
+					)}
 				>
-					<div
-						className={cn(
-							'flex flex-col items-center',
-							isBottomView ? 'space-y-[5px] pb-0' : 'space-y-2 pb-2'
-						)}
-						style={{
-							paddingTop:
-								customWhiteSectionHeight !== undefined
-									? '2px'
-									: isAllTab
-									? `${31 - whiteSectionHeight}px`
-									: `${38 - whiteSectionHeight}px`,
-						}}
+					{/* Scrollable list */}
+					<CustomScrollbar
+						className="flex-1 drafting-table-content"
+						thumbWidth={2}
+						thumbColor={isBottomView ? 'transparent' : '#000000'}
+						trackColor="transparent"
+						offsetRight={isBottomView ? -7 : -14}
+						contentClassName="overflow-x-hidden"
+						alwaysShow={!isBottomView && !isFullyEmpty}
 					>
-						{inboundEmails.map((email) => {
+						<div
+							className={cn(
+								'flex flex-col items-center',
+								isBottomView ? 'space-y-[5px] pb-0' : 'space-y-2 pb-2'
+							)}
+							style={{
+								paddingTop:
+									customWhiteSectionHeight !== undefined
+										? '2px'
+										: isAllTab
+										? `${31 - whiteSectionHeight}px`
+										: `${38 - whiteSectionHeight}px`,
+							}}
+						>
+							{inboundEmails.map((email) => {
 							const contact = resolveContactForEmail(email, effectiveContactByEmail);
 							const contactName = getCanonicalContactName(email, effectiveContactByEmail);
 
@@ -648,25 +654,26 @@ export const InboxExpandedList: FC<InboxExpandedListProps> = ({
 									)}
 								</div>
 							);
-						})}
-						{Array.from({
-							length: Math.max(0, (isBottomView ? 3 : 4) - inboundEmails.length),
-						}).map((_, idx) => (
-							<div
-								key={`inbox-placeholder-${idx}`}
-								className={cn(
-									'select-none overflow-hidden rounded-[8px] border-2 border-[#000000]',
-									isBottomView
-										? 'w-[224px] h-[28px]'
-										: 'w-full max-w-[356px] max-[480px]:max-w-none h-[64px] max-[480px]:h-[50px]',
-									!isBottomView && 'p-2'
-								)}
-								style={{ backgroundColor: placeholderBgColor }}
-							/>
-						))}
-					</div>
-				</CustomScrollbar>
-			</div>
+							})}
+							{Array.from({
+								length: Math.max(0, (isBottomView ? 3 : 4) - inboundEmails.length),
+							}).map((_, idx) => (
+								<div
+									key={`inbox-placeholder-${idx}`}
+									className={cn(
+										'select-none overflow-hidden rounded-[8px] border-2 border-[#000000]',
+										isBottomView
+											? 'w-[224px] h-[28px]'
+											: 'w-full max-w-[356px] max-[480px]:max-w-none h-[64px] max-[480px]:h-[50px]',
+										!isBottomView && 'p-2'
+									)}
+									style={{ backgroundColor: placeholderBgColor }}
+								/>
+							))}
+						</div>
+					</CustomScrollbar>
+				</div>
+			)}
 		</div>
 	);
 };

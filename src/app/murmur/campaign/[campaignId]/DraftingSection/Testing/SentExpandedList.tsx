@@ -28,6 +28,10 @@ export interface SentExpandedListProps {
 	contacts: ContactWithName[];
 	onHeaderClick?: () => void;
 	onOpenSent?: () => void;
+	/**
+	 * When true, renders only the header chrome (no rows) for ultra-compact bottom panel layouts.
+	 */
+	collapsed?: boolean;
 	/** Custom width in pixels */
 	width?: number;
 	/** Custom height in pixels */
@@ -150,6 +154,7 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 	contacts,
 	onHeaderClick,
 	onOpenSent,
+	collapsed = false,
 	width = 376,
 	height = 426,
 	whiteSectionHeight: customWhiteSectionHeight,
@@ -302,7 +307,7 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 			)}
 
 			{/* Selection counter and Select All row - absolutely positioned */}
-			{isAllTab && (
+			{!collapsed && isAllTab && (
 				<div
 					className="absolute flex items-center justify-center px-2 z-10"
 					style={{ top: '22px', left: 0, right: 0, height: '14px' }}
@@ -323,37 +328,38 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 				</div>
 			)}
 
-			<div
-				className={cn(
-					'relative flex-1 flex flex-col min-h-0',
-					isBottomView ? 'px-[2px] pt-0 pb-0' : 'px-2 pt-2 pb-2'
-				)}
-			>
-				{/* Scrollable list */}
-				<CustomScrollbar
-					className="flex-1 drafting-table-content"
-					thumbWidth={2}
-					thumbColor={isBottomView ? 'transparent' : '#000000'}
-					trackColor="transparent"
-					offsetRight={isBottomView ? -7 : -14}
-					contentClassName="overflow-x-hidden"
-					alwaysShow={!isBottomView && !isFullyEmpty}
+			{!collapsed && (
+				<div
+					className={cn(
+						'relative flex-1 flex flex-col min-h-0',
+						isBottomView ? 'px-[2px] pt-0 pb-0' : 'px-2 pt-2 pb-2'
+					)}
 				>
-					<div
-						className={cn(
-							'flex flex-col items-center',
-							isBottomView ? 'space-y-[5px] pb-0' : 'space-y-2 pb-2'
-						)}
-						style={{
-							paddingTop:
-								customWhiteSectionHeight !== undefined
-									? '2px'
-									: isAllTab
-									? `${39 - whiteSectionHeight}px`
-									: `${38 - whiteSectionHeight}px`,
-						}}
+					{/* Scrollable list */}
+					<CustomScrollbar
+						className="flex-1 drafting-table-content"
+						thumbWidth={2}
+						thumbColor={isBottomView ? 'transparent' : '#000000'}
+						trackColor="transparent"
+						offsetRight={isBottomView ? -7 : -14}
+						contentClassName="overflow-x-hidden"
+						alwaysShow={!isBottomView && !isFullyEmpty}
 					>
-						{sent.map((email) => {
+						<div
+							className={cn(
+								'flex flex-col items-center',
+								isBottomView ? 'space-y-[5px] pb-0' : 'space-y-2 pb-2'
+							)}
+							style={{
+								paddingTop:
+									customWhiteSectionHeight !== undefined
+										? '2px'
+										: isAllTab
+										? `${39 - whiteSectionHeight}px`
+										: `${38 - whiteSectionHeight}px`,
+							}}
+						>
+							{sent.map((email) => {
 							const contact = contacts?.find((c) => c.id === email.contactId);
 							const contactName = contact
 								? `${contact.firstName || ''} ${contact.lastName || ''}`.trim() ||
@@ -386,7 +392,6 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 												"absolute left-[8px]",
 												isBottomView ? "left-[6px]" : "left-[8px]"
 											)}
-											title="Used in a previous campaign"
 											style={{
 												top: '50%',
 												transform: 'translateY(-50%)',
@@ -735,10 +740,11 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 								)}
 								style={{ backgroundColor: placeholderBgColor }}
 							/>
-						))}
-					</div>
-				</CustomScrollbar>
-			</div>
+							))}
+						</div>
+					</CustomScrollbar>
+				</div>
+			)}
 		</div>
 	);
 };

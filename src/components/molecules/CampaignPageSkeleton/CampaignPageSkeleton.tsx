@@ -1,14 +1,23 @@
 'use client';
 
-import { FC } from 'react';
+import { FC, useRef } from 'react';
 import { cn } from '@/utils';
 import { type CampaignViewType, useCampaignDevice } from '@/contexts/CampaignDeviceContext';
+import { setCampaignLoadingWaveStartNow } from '@/utils/campaignLoadingWave';
 
 /**
  * Skeleton loader for the campaign page that matches the exact dimensions
  * of the HybridPromptInput, ContactsExpandedList, and ContactResearchPanel components.
  */
 export const CampaignPageSkeleton: FC = () => {
+	// Establish a shared wave "start" timestamp so when the real components mount
+	// (ContactsExpandedList / ContactResearchPanel) their wave phase can continue seamlessly.
+	const didInitWaveRef = useRef(false);
+	if (!didInitWaveRef.current) {
+		setCampaignLoadingWaveStartNow();
+		didInitWaveRef.current = true;
+	}
+
 	const { isMobile, activeView } = useCampaignDevice();
 	// Mobile has no Writing tab — never show the HybridPromptInput skeleton there.
 	// Treat "unknown" as mobile-safe to avoid flashing the Write skeleton during hydration.
@@ -19,22 +28,31 @@ export const CampaignPageSkeleton: FC = () => {
 	}
 
 	return (
-		<div className="flex justify-center gap-[32px] pt-1">
-			{/* Left side: CampaignHeaderBox + ContactsExpandedList skeleton */}
-			<div className="hidden xl:block pt-[29px]">
-				<div className="flex flex-col" style={{ gap: '16px' }}>
-					<CampaignHeaderBoxSkeleton />
-					<ContactsExpandedListSkeleton />
+		<div className="flex flex-col items-center pt-1">
+			{/* Top row: matches DraftingSection "Write" tab geometry */}
+			<div className="flex justify-center gap-[32px]">
+				{/* Left side: CampaignHeaderBox + ContactsExpandedList skeleton */}
+				<div className="hidden xl:block pt-[29px]">
+					<div className="flex flex-col" style={{ gap: '16px' }}>
+						<CampaignHeaderBoxSkeleton />
+						<ContactsExpandedListSkeleton />
+					</div>
+				</div>
+
+				{/* Center: HybridPromptInput (Writing Box) skeleton */}
+				<HybridPromptInputSkeleton />
+
+				{/* Right side: ContactResearchPanel skeleton */}
+				<div className="hidden xl:block pt-[29px]">
+					<ContactResearchPanelSkeleton />
 				</div>
 			</div>
 
-			{/* Center: HybridPromptInput (Writing Box) skeleton */}
-			<HybridPromptInputSkeleton />
-
-			{/* Right side: ContactResearchPanel skeleton */}
-			<div className="hidden xl:block pt-[29px]">
-				<ContactResearchPanelSkeleton />
-			</div>
+			{/* Bottom panels anchor (critical):
+			    Campaign zoom is clamped using `[data-campaign-bottom-anchor]`.
+			    Without this, the skeleton can render at a different zoom than the real DraftingSection,
+			    making the writing skeleton appear larger/smaller right as the page finishes loading. */}
+			<CampaignBottomPanelsSkeleton />
 		</div>
 	);
 };
@@ -203,14 +221,14 @@ const CampaignPageMobileListSkeleton: FC = () => {
 
 /**
  * Skeleton for the HybridPromptInput writing box.
- * Dimensions: width 96.27vw max 499px, min-height 703px
+ * Dimensions: width 96.27vw max 499px, height 703px
  */
 export const HybridPromptInputSkeleton: FC = () => {
 	return (
 		<div
 			className={cn(
-				'w-[96.27vw] max-w-[499px] min-h-[703px]',
-				'border-[3px] border-black rounded-md',
+				'w-[96.27vw] max-w-[499px] h-[703px]',
+				'border-[3px] border-black rounded-[8px]',
 				'flex flex-col overflow-hidden',
 				'animate-pulse'
 			)}
@@ -303,6 +321,63 @@ export const HybridPromptInputSkeleton: FC = () => {
 };
 
 /**
+ * Skeleton for the bottom 3-box strip (Drafts/Sent/Inbox) used by the campaign zoom clamp.
+ * This is intentionally lightweight and primarily exists to provide a stable
+ * `[data-campaign-bottom-anchor]` while DraftingSection is dynamically loading.
+ *
+ * Note: DraftingSection initially renders these panels at 117px height (collapsed state,
+ * when applicable, is applied later via an effect). Matching that initial geometry prevents
+ * a zoom re-clamp on load that can visually "shrink" the writing panel after the skeleton.
+ */
+const CampaignBottomPanelsSkeleton: FC = () => {
+	const panelW = 233;
+	const panelH = 117;
+	const border = '3px solid #000000';
+	const radius = '8px';
+
+	return (
+		<div
+			// Keep this in the DOM to preserve the zoom clamp geometry (measured via getBoundingClientRect),
+			// but hide it so the loading animation doesn't show the bottom panel boxes.
+			className="mt-[35px] pb-[8px] flex justify-center gap-[15px] invisible"
+			data-campaign-bottom-anchor
+			aria-hidden
+		>
+			<div
+				className="animate-pulse"
+				style={{
+					width: `${panelW}px`,
+					height: `${panelH}px`,
+					border,
+					borderRadius: radius,
+					backgroundColor: '#FFE3AA', // drafts-ish
+				}}
+			/>
+			<div
+				className="animate-pulse"
+				style={{
+					width: `${panelW}px`,
+					height: `${panelH}px`,
+					border,
+					borderRadius: radius,
+					backgroundColor: '#A6E2A8', // sent-ish
+				}}
+			/>
+			<div
+				className="animate-pulse"
+				style={{
+					width: `${panelW}px`,
+					height: `${panelH}px`,
+					border,
+					borderRadius: radius,
+					backgroundColor: '#D8E5FB', // inbox-ish
+				}}
+			/>
+		</div>
+	);
+};
+
+/**
  * Skeleton for the CampaignHeaderBox.
  * Dimensions: 375px x 71px
  */
@@ -389,12 +464,19 @@ export const CampaignHeaderBoxSkeleton: FC = () => {
  * Dimensions: 375px x 557px
  */
 export const ContactsExpandedListSkeleton: FC = () => {
+	// Keep timing aligned with the real ContactsExpandedList loading wave.
+	// (CSS animation is 4.5s; we use this only to stagger start delays per row.)
+	const loadingWaveDurationSeconds = 4.5;
+	const loadingWaveStepSeconds = 0.1;
+	const rowCount = 8;
+
 	return (
 		<div
 			className={cn(
-				'relative rounded-md flex flex-col overflow-hidden',
-				'border border-black',
-				'animate-pulse'
+				// Match ContactsExpandedList container chrome as closely as possible to avoid
+				// a visual "flip" when the real component mounts.
+				'relative rounded-md flex flex-col overflow-visible',
+				'border border-black'
 			)}
 			style={{
 				width: '375px',
@@ -405,26 +487,23 @@ export const ContactsExpandedListSkeleton: FC = () => {
 			{/* Header */}
 			<div className="h-[28px] flex items-center px-3" />
 
-			{/* Search bar skeleton */}
-			<div className="pt-2 flex justify-center">
-				<div
-					className="w-[366px] h-[44px] bg-white border-2 border-black rounded-[4px] flex items-center px-3 gap-2"
-				/>
-			</div>
-
 			{/* Selection info */}
 			<div className="px-3 mt-1 mb-0 flex items-center justify-center h-[20px]" />
 
 			{/* Contact rows skeleton */}
 			<div className="flex-1 flex flex-col items-center pt-2 pb-2 space-y-2 px-2">
-				{[...Array(7)].map((_, i) => (
+				{Array.from({ length: rowCount }).map((_, i) => (
 					<div
 						key={i}
 						className={cn(
-							'w-[366px] h-[49px]',
-							'rounded-[8px] border-2 border-black bg-white',
-							'flex items-center px-3'
+							// Match ContactsExpandedList innerWidth for width={375} (375 - 10 = 365)
+							'w-[365px] h-[49px]',
+							'rounded-[8px] border-2 border-black overflow-hidden',
+							'contacts-expanded-list-loading-wave-row'
 						)}
+						style={{
+							animationDelay: `${-(loadingWaveDurationSeconds - i * loadingWaveStepSeconds)}s`,
+						}}
 					/>
 				))}
 			</div>
@@ -441,13 +520,24 @@ export const ContactResearchPanelSkeleton: FC = () => {
 	const boxWidth = 360;
 	const containerWidth = 375;
 	const innerBoxWidth = boxWidth - 41; // 319
+	const identityTop = headerHeight + 6;
+	const identityHeight = 51;
+	const bulletCount = 3;
+	const bulletOuterHeight = 52;
+	const bulletSpacing = 65;
+	const firstBulletTop = identityTop + identityHeight + 10;
+
+	// Match the live loader timing so the skeleton and real panel feel identical.
+	const loadingWaveDurationSeconds = 6;
+	const loadingWaveStepDelaySeconds = 0.1;
+	const waveDelayForIndex = (idx: number) =>
+		`${-(loadingWaveDurationSeconds - idx * loadingWaveStepDelaySeconds)}s`;
 
 	return (
 		<div
 			className={cn(
 				'relative rounded-[7px]',
-				'border-[3px] border-black',
-				'animate-pulse'
+				'border-[3px] border-black'
 			)}
 			style={{
 				width: `${containerWidth}px`,
@@ -457,10 +547,13 @@ export const ContactResearchPanelSkeleton: FC = () => {
 		>
 			{/* Header background bar */}
 			<div
-				className="absolute top-0 left-0 w-full rounded-t-[5px]"
+				className={cn(
+					"absolute top-0 left-0 w-full rounded-t-[5px]",
+					"research-panel-loading-wave-box"
+				)}
 				style={{
 					height: `${headerHeight}px`,
-					backgroundColor: '#E8EFFF',
+					animationDelay: waveDelayForIndex(0),
 				}}
 			/>
 
@@ -479,42 +572,41 @@ export const ContactResearchPanelSkeleton: FC = () => {
 				}}
 			/>
 
-			{/* Contact info bar */}
+			{/* Identity box */}
 			<div
-				className="absolute left-0 w-full bg-white"
+				className={cn(
+					"absolute border-2 border-black rounded-[10px] overflow-hidden",
+					"research-panel-loading-wave-box"
+				)}
 				style={{
-					top: `${headerHeight + 2}px`,
-					height: '40px',
+					top: `${identityTop}px`,
+					left: '50%',
+					transform: 'translateX(-50%)',
+					width: `${boxWidth - 1}px`,
+					height: `${identityHeight}px`,
+					animationDelay: waveDelayForIndex(1),
 				}}
 			/>
 
-			{/* Divider under contact info */}
-			<div
-				className="absolute left-0 w-full bg-black z-10"
-				style={{
-					top: `${headerHeight + 42}px`,
-					height: '1px',
-				}}
-			/>
+			{/* Bullet boxes skeleton (3 max while loading) */}
+			{Array.from({ length: bulletCount }).map((_, idx) => {
+				const key = String(idx + 1);
+				const top = firstBulletTop + idx * bulletSpacing;
+				const waveIndex = 2 + idx;
 
-			{/* Research boxes skeleton */}
-			{[
-				{ key: '1', color: '#158BCF', top: 76 },
-				{ key: '2', color: '#43AEEC', top: 141 },
-				{ key: '3', color: '#7CC9F6', top: 206 },
-			].map(({ key, color, top }) => (
+				return (
 				<div
 					key={key}
-					className="absolute"
+					className={cn("absolute", "research-panel-loading-wave-box")}
 					style={{
 						top: `${top}px`,
 						left: '50%',
 						transform: 'translateX(-50%)',
 						width: `${boxWidth}px`,
-						height: '52px',
-						backgroundColor: color,
+						height: `${bulletOuterHeight}px`,
 						border: '2px solid #000000',
 						borderRadius: '8px',
+						animationDelay: waveDelayForIndex(waveIndex),
 					}}
 				>
 					{/* Section indicator */}
@@ -529,7 +621,7 @@ export const ContactResearchPanelSkeleton: FC = () => {
 					>
 						[{key}]
 					</div>
-					{/* Inner content box - empty to match loading state */}
+					{/* Inner content box stroke (keep outline visible while loading) */}
 					<div
 						className="absolute"
 						style={{
@@ -538,29 +630,30 @@ export const ContactResearchPanelSkeleton: FC = () => {
 							right: '10px',
 							width: `${innerBoxWidth}px`,
 							height: '43px',
-							backgroundColor: color,
+							backgroundColor: 'transparent',
 							border: '1px solid #000000',
 							borderRadius: '6px',
 						}}
 					/>
 				</div>
-			))}
+				);
+			})}
 
 			{/* Summary box skeleton */}
 			<div
-				className="absolute"
+				className={cn("absolute", "research-panel-loading-wave-box")}
 				style={{
 					bottom: '14px',
 					left: '50%',
 					transform: 'translateX(-50%)',
 					width: `${boxWidth}px`,
 					height: '197px',
-					backgroundColor: '#E9F7FF',
 					border: '2px solid #000000',
 					borderRadius: '8px',
+					animationDelay: waveDelayForIndex(2 + bulletCount),
 				}}
 			>
-				{/* Inner content box - empty to match loading state */}
+				{/* Inner content box stroke (keep outline visible while loading) */}
 				<div
 					className="absolute"
 					style={{
@@ -569,7 +662,7 @@ export const ContactResearchPanelSkeleton: FC = () => {
 						transform: 'translate(-50%, -50%)',
 						width: '350px',
 						height: '182px',
-						backgroundColor: '#E9F7FF',
+						backgroundColor: 'transparent',
 						border: '1px solid #000000',
 						borderRadius: '6px',
 					}}

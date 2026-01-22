@@ -4451,8 +4451,102 @@ body,
 	}
 }
 
+/* --- Contacts Expanded List Loading Wave (9-color forward + reverse, no loop jump) --- */
+.contacts-expanded-list-loading-wave-row {
+	background-color: #FFA3A4;
+	animation: contactsExpandedListLoadingWave 4.5s linear infinite;
+	will-change: background-color;
+}
+
+@keyframes contactsExpandedListLoadingWave {
+	0%,
+	100% {
+		background-color: #FFA3A4;
+	}
+	6.25% {
+		background-color: #FF9798;
+	}
+	12.5% {
+		background-color: #EE8889;
+	}
+	18.75% {
+		background-color: #E76E6F;
+	}
+	25% {
+		background-color: #E56667;
+	}
+	31.25% {
+		background-color: #DF6061;
+	}
+	37.5% {
+		background-color: #DA5556;
+	}
+	43.75% {
+		background-color: #C64142;
+	}
+	50% {
+		background-color: #B32A2B;
+	}
+	56.25% {
+		background-color: #C64142;
+	}
+	62.5% {
+		background-color: #DA5556;
+	}
+	68.75% {
+		background-color: #DF6061;
+	}
+	75% {
+		background-color: #E56667;
+	}
+	81.25% {
+		background-color: #E76E6F;
+	}
+	87.5% {
+		background-color: #EE8889;
+	}
+	93.75% {
+		background-color: #FF9798;
+	}
+}
+
+/* --- Research Panel Loading Wave (Hold light briefly, then smooth wave) --- */
+.research-panel-loading-wave-box {
+	background-color: #E9F7FF;
+	animation: researchPanelLoadingWave 6s linear infinite;
+	will-change: background-color;
+}
+
+@keyframes researchPanelLoadingWave {
+	/* Hold on lightest (0-30%) */
+	0%,
+	30% {
+		background-color: #E9F7FF;
+	}
+	/* Smooth wave down */
+	47.5% {
+		background-color: #43AEEC; /* Mid-point */
+	}
+	65% {
+		background-color: #005587; /* Darkest */
+	}
+	/* Smooth wave up */
+	82.5% {
+		background-color: #43AEEC; /* Mid-point */
+	}
+	100% {
+		background-color: #E9F7FF;
+	}
+}
+
 @media (prefers-reduced-motion: reduce) {
 	.map-results-panel-loading-wave-row {
+		animation: none;
+	}
+	.contacts-expanded-list-loading-wave-row {
+		animation: none;
+	}
+	.research-panel-loading-wave-box {
 		animation: none;
 	}
 }
