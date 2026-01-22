@@ -1419,7 +1419,9 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 								// Handle mouse move on the pill to drive campaign selection
 								const handlePillMouseMove = isMultiCampaignIndicator
 									? (e: React.MouseEvent<HTMLSpanElement>) => {
-										const PILL_BORDER = 2;
+										// We render a thin stroke via box-shadow (doesn't affect box-model), so the
+										// interactive area is the full pill rect.
+										const PILL_BORDER = 0;
 										const rect = e.currentTarget.getBoundingClientRect();
 										const actualHeight = rect.height;
 										const offsetY = e.clientY - rect.top;
@@ -1445,12 +1447,16 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 											left: '12px',
 											top: '50%',
 											transform: 'translateY(-50%)',
-											width: isUsedContactHoverCardVisible ? '15px' : '16px',
-											height: isUsedContactHoverCardVisible ? '35px' : '16px',
-											borderRadius: isUsedContactHoverCardVisible ? '12px' : '50%',
-											border: isUsedContactHoverCardVisible
-												? '2px solid #000000'
-												: '1px solid #000000',
+											boxSizing: 'border-box',
+											// Default state: 16×16 circle. Hover state (single/multi): 14×37 pill.
+											width: isUsedContactHoverCardVisible ? '14px' : '16px',
+											height: isUsedContactHoverCardVisible ? '37px' : '16px',
+											borderRadius: isUsedContactHoverCardVisible ? '9999px' : '50%',
+											// Thin stroke: use box-shadow so sizes stay exact (per design spec).
+											border: isUsedContactHoverCardVisible ? 'none' : '1px solid #000000',
+											boxShadow: isUsedContactHoverCardVisible
+												? '0 0 0 1px #000000'
+												: undefined,
 											backgroundColor: pillBg,
 											overflow: 'hidden',
 										}}
@@ -1463,30 +1469,25 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 											<span
 												className="rounded-full bg-[#DAE6FE] pointer-events-none transition-all duration-150 ease-out"
 												style={(() => {
-													const DOT_SIZE = 11;
-													const PILL_HEIGHT = 35;
-													const PILL_BORDER = 2;
-													const innerHeight = Math.max(0, PILL_HEIGHT - PILL_BORDER * 2);
-													const maxTop = Math.max(0, innerHeight - DOT_SIZE);
+													// Spec: 14×37 pill, 14×14 circle, thin stroke.
+													const PILL_HEIGHT = 37;
+													const DOT_SIZE = 14;
+													const maxTop = Math.max(0, PILL_HEIGHT - DOT_SIZE);
 													const campaignCount = resolvedUsedContactCampaigns.length;
 													const clampedIdx =
 														typeof activeUsedContactCampaignIndex === 'number' && campaignCount > 0
 															? Math.min(campaignCount - 1, Math.max(0, activeUsedContactCampaignIndex))
 															: 0;
 													// Position dot based on active index
-													const top =
-														campaignCount > 1
-															? (maxTop * clampedIdx) / (campaignCount - 1)
-															: maxTop / 2;
+													const top = campaignCount > 1 ? (maxTop * clampedIdx) / (campaignCount - 1) : maxTop / 2;
 													return {
 														position: 'absolute' as const,
-														left: '50%',
-														transform: 'translateX(-50%)',
+														left: '0px',
+														top: `${top}px`,
 														width: `${DOT_SIZE}px`,
 														height: `${DOT_SIZE}px`,
-														top: `${top}px`,
-														border: '1px solid #000000',
-														boxSizing: 'border-box' as const,
+														// Thin stroke without changing geometry.
+														boxShadow: '0 0 0 1px #000000',
 													};
 												})()}
 											/>
