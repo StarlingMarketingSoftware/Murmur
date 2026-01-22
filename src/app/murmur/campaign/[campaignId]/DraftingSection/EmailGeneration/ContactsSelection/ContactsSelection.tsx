@@ -1,6 +1,6 @@
 'use client';
 
-import { FC, useMemo, useState, useRef, useEffect, useCallback } from 'react';
+import { FC, useMemo, useState, useRef, useEffect, useCallback, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { gsap } from 'gsap';
 import { useRouter } from 'next/navigation';
@@ -69,6 +69,60 @@ export const parseSearchFromCampaign = (campaign?: CampaignWithRelations) => {
 	}
 
 	return { why, what, where };
+};
+
+const FadeOverflowText: FC<{
+	text: string;
+	className?: string;
+	fadePx?: number;
+	measureKey?: unknown;
+}> = ({ text, className, fadePx = 16, measureKey }) => {
+	const spanRef = useRef<HTMLSpanElement | null>(null);
+	const [isOverflowing, setIsOverflowing] = useState(false);
+
+	const measure = useCallback(() => {
+		const el = spanRef.current;
+		if (!el) return;
+		// A tiny epsilon avoids flicker from sub-pixel rounding.
+		setIsOverflowing(el.scrollWidth > el.clientWidth + 1);
+	}, []);
+
+	useLayoutEffect(() => {
+		measure();
+	}, [measure, text, measureKey]);
+
+	useEffect(() => {
+		const el = spanRef.current;
+		if (!el) return;
+
+		if (typeof ResizeObserver === 'undefined') {
+			window.addEventListener('resize', measure);
+			return () => window.removeEventListener('resize', measure);
+		}
+
+		const ro = new ResizeObserver(() => measure());
+		ro.observe(el);
+		return () => ro.disconnect();
+	}, [measure]);
+
+	const safeFadePx = Math.max(0, fadePx);
+	const style = isOverflowing
+		? {
+				maskImage: `linear-gradient(to right, black calc(100% - ${safeFadePx}px), transparent 100%)`,
+				WebkitMaskImage: `linear-gradient(to right, black calc(100% - ${safeFadePx}px), transparent 100%)`,
+			}
+		: undefined;
+
+	return (
+		<span
+			ref={spanRef}
+			className={cn('block w-full whitespace-nowrap overflow-hidden', className)}
+			style={style}
+			title={text}
+		>
+			{text}
+		</span>
+	);
 };
 
 // Mini search bar component for contacts filtering - matches dashboard design
@@ -1087,10 +1141,32 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 					top: rowTopInBody + 44,
 				});
 			}
-			setActiveUsedContactCampaignIndex(0); // Start with first campaign active
+			// Start with first campaign active, but don't reset if we're already on this contact
+			// (e.g., user selected a row in the tooltip and moves back to the pill to click).
+			setActiveUsedContactCampaignIndex((prev) =>
+				hoveredUsedContactId === contactId ? (prev ?? 0) : 0
+			);
 			setHoveredUsedContactId(contactId);
 		},
-		[clearUsedContactTooltipCloseTimeout, getBodyScaleContext]
+		[clearUsedContactTooltipCloseTimeout, getBodyScaleContext, hoveredUsedContactId]
+	);
+
+	const goToUsedContactCampaign = useCallback(
+		(contactId: number) => {
+			// Only navigate when this contact's hover state is active (campaign list is scoped to hovered contact).
+			if (hoveredUsedContactId !== contactId) return;
+			if (!resolvedUsedContactCampaigns.length) return;
+
+			const idx = Math.min(
+				resolvedUsedContactCampaigns.length - 1,
+				Math.max(0, activeUsedContactCampaignIndex ?? 0)
+			);
+			const selected = resolvedUsedContactCampaigns[idx];
+			if (!selected?.id) return;
+
+			router.push(`/murmur/campaign/${selected.id}`);
+		},
+		[activeUsedContactCampaignIndex, hoveredUsedContactId, resolvedUsedContactCampaigns, router]
 	);
 
 	const scheduleCloseUsedContactTooltip = useCallback(
@@ -1272,7 +1348,9 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 										clearUsedContactTooltipCloseTimeout();
 									}}
 									onMouseLeave={() => {
-										setHoveredUsedContactId(null);
+										// Don't hard-close on leave — allow moving between tooltip <-> pill without losing state.
+										// The close timeout is cleared when entering either area.
+										scheduleCloseUsedContactTooltip(hoveredUsedContactId as number);
 									}}
 								>
 									<span className="absolute left-[12px] top-[6px] text-[17px] font-inter font-medium text-black leading-none pointer-events-none">
@@ -1304,18 +1382,13 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 															</span>
 														)}
 														<div className="h-[22px] w-fit max-w-full min-w-0 rounded-[4px] bg-[#F9FAFB] border-2 border-black px-2 flex items-center overflow-hidden box-border">
-															<span
-																className="text-[17px] font-inter font-medium text-black leading-none block whitespace-nowrap overflow-hidden"
-																style={{
-																	// Fade out the last characters instead of showing an ellipsis
-																	maskImage:
-																		'linear-gradient(to right, black calc(100% - 24px), transparent 100%)',
-																	WebkitMaskImage:
-																		'linear-gradient(to right, black calc(100% - 24px), transparent 100%)',
-																}}
-															>
-																{c.name}
-															</span>
+															<FadeOverflowText
+																text={c.name}
+																// Slightly later fade than before, and only when overflowing.
+																fadePx={16}
+																measureKey={isActive}
+																className="text-[17px] font-inter font-medium text-black leading-none"
+															/>
 														</div>
 													</button>
 												);
@@ -1325,18 +1398,11 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 								) : (
 										<>
 											<div className="absolute top-[4px] right-[3px] w-[204px] h-[22px] rounded-[4px] bg-[#F9FAFB] border-2 border-black px-2 flex items-center overflow-hidden box-border">
-												<span
-													className="text-[17px] font-inter font-medium text-black leading-none block w-full whitespace-nowrap overflow-hidden"
-													style={{
-														// Fade out the last characters instead of showing an ellipsis
-														maskImage:
-															'linear-gradient(to right, black calc(100% - 24px), transparent 100%)',
-														WebkitMaskImage:
-															'linear-gradient(to right, black calc(100% - 24px), transparent 100%)',
-													}}
-												>
-													{campaignName}
-												</span>
+												<FadeOverflowText
+													text={campaignName}
+													fadePx={16}
+													className="text-[17px] font-inter font-medium text-black leading-none"
+												/>
 											</div>
 
 											<button
@@ -1463,6 +1529,13 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 										onMouseEnter={() => openUsedContactTooltip(contact.id)}
 										onMouseLeave={() => scheduleCloseUsedContactTooltip(contact.id)}
 										onMouseMove={handlePillMouseMove}
+									onClick={(e) => {
+										// Only hijack click when the hover card is visible (prevents breaking normal
+										// contact selection clicks on the indicator in its default state).
+										if (!isUsedContactHoverCardVisible) return;
+										e.stopPropagation();
+										goToUsedContactCampaign(contact.id);
+									}}
 									>
 										{/* Sliding dot for multi-campaign */}
 										{isMultiCampaignIndicator && (
