@@ -4,6 +4,11 @@ import { Dispatch, MouseEvent, SetStateAction, useRef } from 'react';
 
 export interface ContactsSelectionProps {
 	contacts: ContactWithName[];
+	/**
+	 * When true, the contacts table is still loading (typically initial load).
+	 * Used to render animated placeholder rows instead of the empty-state message.
+	 */
+	isLoading?: boolean;
 	selectedContactIds: Set<number>;
 	setSelectedContactIds: Dispatch<SetStateAction<Set<number>>>;
 	handleContactSelection: (contactId: number, event?: React.MouseEvent) => void;

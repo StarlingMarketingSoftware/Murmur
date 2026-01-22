@@ -4766,6 +4766,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 								<div className="flex flex-col items-center w-full px-1">
 									<ContactsSelection
 										mainBoxId="contacts"
+										isLoading={isContactsLoading}
 										contacts={contactsAvailableForDrafting}
 										allContacts={contacts}
 										selectedContactIds={contactsTabSelectedIds}
@@ -4878,6 +4879,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											<div className="flex-shrink-0 [&>*]:!items-start" style={{ width: '499px', overflow: 'visible' }}>
 												<ContactsSelection
 													mainBoxId="contacts"
+													isLoading={isContactsLoading}
 													contacts={contactsAvailableForDrafting}
 													allContacts={contacts}
 													selectedContactIds={contactsTabSelectedIds}
@@ -5016,6 +5018,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 									<div className="flex flex-col items-center">
 										<ContactsSelection
 										mainBoxId="contacts"
+											isLoading={isContactsLoading}
 											contacts={contactsAvailableForDrafting}
 											allContacts={contacts}
 											selectedContactIds={contactsTabSelectedIds}

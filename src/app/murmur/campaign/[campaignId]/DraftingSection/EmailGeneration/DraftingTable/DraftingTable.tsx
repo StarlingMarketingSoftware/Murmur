@@ -1732,9 +1732,39 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 					offsetRight={-6}
 				>
 					{isPending ? (
-						<div className="flex items-center justify-center h-full">
-							<Spinner size="small" />
-						</div>
+						isContacts && !hasData ? (
+							(() => {
+								// Match the "flowing" wave feel used elsewhere (staggered delays).
+								const durationSeconds = 2.5;
+								const stepDelaySeconds = 0.1;
+								const rows = isMobile ? 8 : 12;
+								const rowWidthClass = isMobile ? 'w-full' : 'w-[489px]';
+								return (
+									<div
+										className="overflow-visible w-full flex flex-col items-center"
+										style={{
+											gap: isMobile ? '8px' : '16px',
+											padding: isMobile ? '0 8px' : undefined,
+										}}
+										aria-hidden="true"
+									>
+										{Array.from({ length: rows }).map((_, idx) => (
+											<div
+												key={`contacts-loading-wave-${idx}`}
+												className={`select-none ${rowWidthClass} h-[52px] overflow-hidden rounded-[8px] border-2 border-[#000000] contacts-expanded-list-loading-wave-row`}
+												style={{
+													animationDelay: `${-(durationSeconds - idx * stepDelaySeconds)}s`,
+												}}
+											/>
+										))}
+									</div>
+								);
+							})()
+						) : (
+							<div className="flex items-center justify-center h-full">
+								<Spinner size="small" />
+							</div>
+						)
 					) : hasData ? (
 						children
 					) : isDrafts || isSent ? (

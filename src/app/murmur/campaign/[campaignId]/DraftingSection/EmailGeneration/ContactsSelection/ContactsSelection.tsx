@@ -885,6 +885,7 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 		hideButton,
 		mainBoxId,
 		showSearchBar = true,
+		isLoading = false,
 	} = props;
 	const [isDrafting, setIsDrafting] = useState(false);
 	const router = useRouter();
@@ -1069,7 +1070,8 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 				hasData={contacts.length > 0}
 				noDataMessage="No contacts selected"
 				noDataDescription="Select contacts to generate personalized emails"
-				isPending={false}
+				// Only show loading placeholders when the table is empty and still loading.
+				isPending={Boolean(isLoading) && contacts.length === 0}
 				title="Contacts"
 				mainBoxId={mainBoxId}
 				contactsTopContentVariant={showSearchBar ? 'default' : 'compact'}
