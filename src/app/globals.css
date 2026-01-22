@@ -4454,7 +4454,7 @@ body,
 /* --- Contacts Expanded List Loading Wave (9-color forward + reverse, no loop jump) --- */
 .contacts-expanded-list-loading-wave-row {
 	background-color: #FFA3A4;
-	animation: contactsExpandedListLoadingWave 2.5s linear infinite;
+	animation: contactsExpandedListLoadingWave 4.5s linear infinite;
 	will-change: background-color;
 }
 
@@ -4510,11 +4510,43 @@ body,
 	}
 }
 
+/* --- Research Panel Loading Wave (Hold light briefly, then smooth wave) --- */
+.research-panel-loading-wave-box {
+	background-color: #E9F7FF;
+	animation: researchPanelLoadingWave 6s linear infinite;
+	will-change: background-color;
+}
+
+@keyframes researchPanelLoadingWave {
+	/* Hold on lightest (0-30%) */
+	0%,
+	30% {
+		background-color: #E9F7FF;
+	}
+	/* Smooth wave down */
+	47.5% {
+		background-color: #43AEEC; /* Mid-point */
+	}
+	65% {
+		background-color: #005587; /* Darkest */
+	}
+	/* Smooth wave up */
+	82.5% {
+		background-color: #43AEEC; /* Mid-point */
+	}
+	100% {
+		background-color: #E9F7FF;
+	}
+}
+
 @media (prefers-reduced-motion: reduce) {
 	.map-results-panel-loading-wave-row {
 		animation: none;
 	}
 	.contacts-expanded-list-loading-wave-row {
+		animation: none;
+	}
+	.research-panel-loading-wave-box {
 		animation: none;
 	}
 }

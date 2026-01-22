@@ -477,7 +477,7 @@ const Murmur = () => {
 
 	// Make the campaign page render slightly "zoomed out" on desktop (85%),
 	// without changing the rest of the Murmur app.
-	useEffect(() => {
+	useLayoutEffect(() => {
 		// Avoid running until we know whether this is a real mobile device.
 		if (isMobile === null) return;
 

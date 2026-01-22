@@ -12,6 +12,10 @@ import { WineBeerSpiritsIcon } from '@/components/atoms/_svg/WineBeerSpiritsIcon
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 import ResearchChevron from '@/components/atoms/_svg/ResearchChevron';
 import ResearchHeaderMap from '@/components/atoms/_svg/ResearchHeaderMap';
+import {
+	getCampaignLoadingWaveElapsedSeconds,
+	getSyncedWaveDelay,
+} from '@/utils/campaignLoadingWave';
 
 export interface ContactResearchPanelProps {
 	contact: ContactWithName | null | undefined;
@@ -173,8 +177,29 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 	// (2) we're loading and hideSummaryIfBullets is true (since we show placeholder boxes)
 	const shouldHideSummary = (hasAnyParsedSections || isLoading) && hideSummaryIfBullets;
 
-	// When loading (no contact), show 3 placeholder boxes
+	// When loading (no contact), show 4 placeholder boxes (matches typical "4 bullets" research layout)
 	const displaySectionsCount = isLoading ? 3 : parsedSectionsCount;
+
+	// Loading wave timing (match other panels for a consistent feel)
+	// IMPORTANT: `.research-panel-loading-wave-box` uses a 6s CSS animation in globals.css.
+	// Keep our delay math aligned to that duration.
+	const loadingWaveDurationSeconds = 6;
+	const loadingWaveStepDelaySeconds = 0.1;
+	const loadingWaveBaseColor = '#E9F7FF';
+	// If the page-level CampaignPageSkeleton was shown, sync our wave phase to it so
+	// the animation does not restart when the real component mounts.
+	const syncedWaveElapsedSeconds = useMemo(() => getCampaignLoadingWaveElapsedSeconds(), []);
+	const waveDelayForIndex = (idx: number) =>
+		syncedWaveElapsedSeconds !== null
+			? getSyncedWaveDelay({
+					elapsedSeconds: syncedWaveElapsedSeconds,
+					durationSeconds: loadingWaveDurationSeconds,
+					index: idx,
+					stepSeconds: loadingWaveStepDelaySeconds,
+			  })
+			: `${-(loadingWaveDurationSeconds - idx * loadingWaveStepDelaySeconds)}s`;
+	// Number of bullet boxes we render while loading (used to place the summary wave after bullets).
+	const loadingBulletCount = isLoading ? Math.min(displaySectionsCount, 5) : 0;
 
 	const fixedHeightBoxSpacing = fixedHeightBoxSpacingPx ?? 52;
 	const fixedHeightBulletOuterHeight = fixedHeightBulletOuterHeightPx ?? 44;
@@ -293,10 +318,14 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 		>
 			{/* Header background bar */}
 			<div
-				className="absolute top-0 left-0 w-full rounded-t-[5px]"
+				className={cn(
+					'absolute top-0 left-0 w-full rounded-t-[5px]',
+					isLoading && 'research-panel-loading-wave-box'
+				)}
 				style={{
 					height: `${headerHeight}px`,
-					backgroundColor: '#E8EFFF',
+					backgroundColor: isLoading ? loadingWaveBaseColor : '#E8EFFF',
+					...(isLoading ? { animationDelay: waveDelayForIndex(0) } : {}),
 				}}
 			/>
 
@@ -328,26 +357,31 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 			{/* Contact info bar - boxed version for compact header (All tab) */}
 			{compactHeader ? (
 				<div
-					className="absolute bg-[#FFFFFF] border-2 border-black rounded-[7px] overflow-hidden"
+					className={cn(
+						'absolute border-2 border-black rounded-[7px] overflow-hidden',
+						isLoading ? 'research-panel-loading-wave-box' : 'bg-[#FFFFFF]'
+					)}
 					style={{
 						top: `${headerHeight + 6}px`,
 						left: '50%',
 						transform: 'translateX(-50%)',
 						width: `${containerWidth - 14}px`,
 						height: '40px',
+						backgroundColor: isLoading ? loadingWaveBaseColor : '#FFFFFF',
+						...(isLoading ? { animationDelay: waveDelayForIndex(1) } : {}),
 					}}
 				>
 					{/* Map background */}
-					<div
-						className="absolute inset-0 pointer-events-none opacity-0 xl:opacity-[0.35]"
-					>
-						<ResearchHeaderMap
-							width={containerWidth - 14}
-							height={40}
-							style={{ display: 'block' }}
-							hideBorder
-						/>
-					</div>
+					{!isLoading && (
+						<div className="absolute inset-0 pointer-events-none opacity-0 xl:opacity-[0.35]">
+							<ResearchHeaderMap
+								width={containerWidth - 14}
+								height={40}
+								style={{ display: 'block' }}
+								hideBorder
+							/>
+						</div>
+					)}
 					<div className="relative w-full h-full pl-3 pr-[12px] flex items-center justify-between overflow-hidden">
 						<div className="flex flex-col justify-center min-w-0 flex-1 pr-2">
 							<div
@@ -407,26 +441,31 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 				<>
 					{/* Identity box (scales with boxWidth, 10px radius) */}
 					<div
-						className="absolute relative bg-[#FFFFFF] border-2 border-black rounded-[10px] overflow-hidden"
+						className={cn(
+							'absolute relative border-2 border-black rounded-[10px] overflow-hidden',
+							isLoading ? 'research-panel-loading-wave-box' : 'bg-[#FFFFFF]'
+						)}
 						style={{
 							top: `${headerHeight + 6}px`,
 							left: '50%',
 							transform: 'translateX(-50%)',
 							width: `${boxWidth - 1}px`,
 							height: '51px',
+							backgroundColor: isLoading ? loadingWaveBaseColor : '#FFFFFF',
+							...(isLoading ? { animationDelay: waveDelayForIndex(1) } : {}),
 						}}
 					>
 						{/* Map background */}
-						<div
-						className="absolute inset-0 pointer-events-none opacity-0 xl:opacity-[0.35]"
-						>
-							<ResearchHeaderMap
-								width={boxWidth - 1}
-								height={51}
-								style={{ display: 'block' }}
-								hideBorder
-							/>
-						</div>
+						{!isLoading && (
+							<div className="absolute inset-0 pointer-events-none opacity-0 xl:opacity-[0.35]">
+								<ResearchHeaderMap
+									width={boxWidth - 1}
+									height={51}
+									style={{ display: 'block' }}
+									hideBorder
+								/>
+							</div>
+						)}
 						{/* Text block */}
 						<div
 							className={cn(
@@ -545,9 +584,9 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 					{ key: '5', color: '#D7F0FF' },
 				] as const;
 
-				// When loading, show first 3 placeholder boxes; otherwise filter to boxes with data
+				// When loading, show first N placeholder boxes; otherwise filter to boxes with data
 				const visibleBoxes = isLoading
-					? boxConfigs.slice(0, 3)
+					? boxConfigs.slice(0, Math.min(displaySectionsCount, boxConfigs.length))
 					: boxConfigs.filter((config) => metadataSections[config.key]);
 
 				// Fixed-height mode spacing (used by map panel + compact layouts)
@@ -567,21 +606,32 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 					const isExpanded = expandedBox === config.key;
 					const currentBoxHeight = isExpanded ? expandedOuterHeight : normalOuterHeight;
 					const currentInnerHeight = isExpanded ? expandedInnerHeight : normalInnerHeight;
+					// Wave order: header (0) -> identity (1) -> bullets start at (2)
+					const waveIndex = 2 + index;
 
 					return (
 						<div
 							key={config.key}
 							// Relative to the scroll container now
-							className={cn("absolute", !disableExpansion && "cursor-pointer")}
+							className={cn(
+								"absolute",
+								!disableExpansion && "cursor-pointer",
+								isLoading && "research-panel-loading-wave-box"
+							)}
 							style={{
 								top: `${getBoxTop(index)}px`,
 								left: '50%',
 								transform: 'translateX(-50%)',
 								width: `${boxWidth}px`,
 								height: `${currentBoxHeight}px`,
-								backgroundColor: config.color,
+								backgroundColor: isLoading ? loadingWaveBaseColor : config.color,
 								border: '2px solid #000000',
 								borderRadius: '8px',
+								...(isLoading
+									? {
+											animationDelay: waveDelayForIndex(waveIndex),
+									  }
+									: {}),
 							}}
 							onClick={() => {
 								if (!isLoading && !hideAllText && !disableExpansion) {
@@ -610,7 +660,13 @@ top: isExpanded ? '28px' : '50%',
 									right: '10px',
 									width: `${innerBoxWidth}px`,
 									height: `${currentInnerHeight}px`,
-									backgroundColor: hideAllText || isLoading ? config.color : '#FFFFFF',
+									// Treat the full bullet box (outer + inner) as ONE colored unit while loading:
+									// the inner box becomes transparent so the outer wave color fills everything.
+									backgroundColor: isLoading
+										? 'transparent'
+										: hideAllText
+											? config.color
+											: '#FFFFFF',
 									border: '1px solid #000000',
 									borderRadius: '6px',
 								}}
@@ -764,20 +820,29 @@ top: isExpanded ? '28px' : '50%',
 					const isExpanded = expandedBox === config.key;
 					const currentBoxHeight = isExpanded ? expandedOuterHeight : normalOuterHeight;
 					const currentInnerHeight = isExpanded ? expandedInnerHeight : normalInnerHeight;
+					// Wave order: header (0) -> identity (1) -> bullets start at (2)
+					const waveIndex = 2 + index;
 
 					return (
 						<div
 							key={config.key}
-							className={cn("absolute", !disableExpansion && "cursor-pointer")}
+							className={cn(
+								"absolute",
+								!disableExpansion && "cursor-pointer",
+								isLoading && "research-panel-loading-wave-box"
+							)}
 							style={{
 								top: `${getAbsoluteBoxTop(index)}px`,
 								left: '50%',
 								transform: 'translateX(-50%)',
 								width: `${boxWidth}px`,
 								height: `${currentBoxHeight}px`,
-								backgroundColor: config.color,
+								backgroundColor: isLoading ? loadingWaveBaseColor : config.color,
 								border: '2px solid #000000',
 								borderRadius: '8px',
+								...(isLoading
+									? { animationDelay: waveDelayForIndex(waveIndex) }
+									: {}),
 							}}
 							onClick={() => {
 								if (!isLoading && !hideAllText && !disableExpansion) {
@@ -801,12 +866,18 @@ top: isExpanded ? '28px' : '50%',
 							<div
 								className="absolute overflow-hidden"
 								style={{
-top: isExpanded ? '28px' : '50%',
-								transform: isExpanded ? 'none' : 'translateY(-50%)',
+									top: isExpanded ? '28px' : '50%',
+									transform: isExpanded ? 'none' : 'translateY(-50%)',
 									right: '10px',
 									width: `${innerBoxWidth}px`,
 									height: `${currentInnerHeight}px`,
-									backgroundColor: hideAllText || isLoading ? config.color : '#FFFFFF',
+									// Treat the full bullet box as ONE colored unit while loading:
+									// the inner box becomes transparent so the outer wave color fills everything.
+									backgroundColor: isLoading
+										? 'transparent'
+										: hideAllText
+											? config.color
+											: '#FFFFFF',
 									border: '1px solid #000000',
 									borderRadius: '6px',
 								}}
@@ -851,7 +922,7 @@ top: isExpanded ? '28px' : '50%',
 			{!shouldHideSummary && (
 				<div
 					id="research-summary-box-shared"
-					className="absolute"
+					className={cn('absolute', isLoading && 'research-panel-loading-wave-box')}
 					style={{
 						// Summary-only: pin from the top so it always sits below the identity box (avoids overlap).
 						// Parsed-bullets (or loading placeholders): keep the summary pinned to the bottom.
@@ -870,9 +941,19 @@ top: isExpanded ? '28px' : '50%',
 									? `${height - fixedHeightFirstBoxTop - 8}px`
 									: `calc(100% - ${fixedHeightFirstBoxTop + 8}px)`
 								: `calc(100% - ${fixedHeightFirstBoxTop + 8}px)`,
-						backgroundColor: hasAnyParsedSections || isLoading ? '#E9F7FF' : '#158BCF',
+						backgroundColor: isLoading
+							? loadingWaveBaseColor
+							: hasAnyParsedSections
+								? '#E9F7FF'
+								: '#158BCF',
 						border: '2px solid #000000',
 						borderRadius: '8px',
+						...(isLoading
+							? {
+									// Summary comes after: header + identity + bullets
+									animationDelay: waveDelayForIndex(2 + loadingBulletCount),
+							  }
+							: {}),
 					}}
 				>
 					<style>{`
@@ -907,11 +988,14 @@ top: isExpanded ? '28px' : '50%',
 							height: hasAnyParsedSections || isLoading
 								? (parsedSummaryInnerHeightPx ?? (parsedSummaryMinOuterHeightPx - parsedSummaryInnerOverheadPx))
 								: 'calc(100% - 18px)',
-							backgroundColor: hideAllText || isLoading
-								? hasAnyParsedSections || isLoading
-									? '#E9F7FF'
-									: '#158BCF'
-								: '#FFFFFF',
+							// Treat the summary as ONE colored unit while loading.
+							backgroundColor: isLoading
+								? 'transparent'
+								: hideAllText
+									? hasAnyParsedSections
+										? '#E9F7FF'
+										: '#158BCF'
+									: '#FFFFFF',
 							border: '1px solid #000000',
 							borderRadius: '6px',
 						}}

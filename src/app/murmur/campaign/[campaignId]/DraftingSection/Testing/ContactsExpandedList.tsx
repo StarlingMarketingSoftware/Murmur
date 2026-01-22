@@ -10,6 +10,10 @@ import { getStateAbbreviation } from '@/utils/string';
 import { CanadianFlag } from '@/components/atoms/_svg/CanadianFlag';
 import OpenIcon from '@/components/atoms/svg/OpenIcon';
 import {
+	getCampaignLoadingWaveElapsedSeconds,
+	getSyncedWaveDelay,
+} from '@/utils/campaignLoadingWave';
+import {
 	canadianProvinceAbbreviations,
 	canadianProvinceNames,
 	stateBadgeColorMap,
@@ -212,9 +216,12 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 
 	const selectedCount = currentSelectedIds.size;
 	const shouldShowLoadingWave = isLoading && contacts.length === 0;
-	const loadingWaveDurationSeconds = 2.5;
+	const loadingWaveDurationSeconds = 4.5;
 	// Match MapResultsPanelSkeleton step delay exactly for consistent "fluid" feel
 	const loadingWaveStepSeconds = 0.1;
+	// If the page-level CampaignPageSkeleton was shown, sync our wave phase to it so
+	// the animation does not restart when the real component mounts.
+	const syncedWaveElapsedSeconds = useMemo(() => getCampaignLoadingWaveElapsedSeconds(), []);
 
 	// Allow callers to override dimensions; default to the original sidebar size
 	const resolvedWidth = width ?? 376;
@@ -1052,10 +1059,18 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 									...(!isBottomView ? { width: `${innerWidth}px` } : {}),
 									...(shouldShowLoadingWave
 										? {
-												animationDelay: `${-(
-													loadingWaveDurationSeconds -
-													idx * loadingWaveStepSeconds
-												)}s`,
+												animationDelay:
+													syncedWaveElapsedSeconds !== null
+														? getSyncedWaveDelay({
+																elapsedSeconds: syncedWaveElapsedSeconds,
+																durationSeconds: loadingWaveDurationSeconds,
+																index: idx,
+																stepSeconds: loadingWaveStepSeconds,
+														  })
+														: `${-(
+																loadingWaveDurationSeconds -
+																idx * loadingWaveStepSeconds
+														  )}s`,
 											}
 										: {}),
 								}}

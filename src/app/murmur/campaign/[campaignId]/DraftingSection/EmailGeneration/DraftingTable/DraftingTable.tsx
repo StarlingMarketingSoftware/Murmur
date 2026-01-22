@@ -1735,7 +1735,7 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 						isContacts && !hasData ? (
 							(() => {
 								// Match the "flowing" wave feel used elsewhere (staggered delays).
-								const durationSeconds = 2.5;
+								const durationSeconds = 6;
 								const stepDelaySeconds = 0.1;
 								const rows = isMobile ? 8 : 12;
 								const rowWidthClass = isMobile ? 'w-full' : 'w-[489px]';
