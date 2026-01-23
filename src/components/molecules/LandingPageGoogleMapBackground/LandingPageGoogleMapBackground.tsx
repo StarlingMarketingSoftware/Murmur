@@ -13,6 +13,8 @@ import {
 	LandingPageMapResultsSidePanel,
 	type LandingMapPanelContact,
 } from './LandingPageMapResultsSidePanel';
+import { LandingPageMapSearchTray } from './LandingPageMapSearchTray';
+import { LandingPageMapSearchTools } from './LandingPageMapSearchTools';
 
 type Props = {
 	className?: string;
@@ -758,12 +760,20 @@ export function LandingPageGoogleMapBackground({ className, onReady }: Props) {
 
 			{/* Landing map overlay: dashboard "mini" (map view) segmented search bar */}
 			<div className="absolute top-[12px] left-1/2 -translate-x-1/2 z-[80] pointer-events-none">
-				<div className="pointer-events-auto">
+				<div className="pointer-events-auto relative">
+					{/* Keep the search bar centered; position the tray to its left (desktop only). */}
+					<div className="hidden lg:block absolute top-1/2 -translate-y-1/2 right-full mr-[43px]">
+						<LandingPageMapSearchTray />
+					</div>
 					<LandingPageMapMiniSearchBar
 						initialWhy="[Booking]"
 						initialWhat="Music Venues"
 						initialWhere="California"
 					/>
+					{/* Dashboard map-view tools (Select / Grab / Home) to the right of the search bar (desktop only). */}
+					<div className="hidden lg:block">
+						<LandingPageMapSearchTools />
+					</div>
 				</div>
 			</div>
 
