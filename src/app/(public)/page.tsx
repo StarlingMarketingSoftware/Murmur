@@ -1231,7 +1231,7 @@ export default function HomePage() {
 						{/* Overlay "Learn about the Map" button with anti-scaling logic */}
 						<Link
 							href="/map"
-							className="hidden md:flex items-center justify-center"
+							className="landing-learn-research-btn hidden md:flex items-center justify-center bg-[#F1F1F1]"
 							style={{
 								position: 'absolute',
 								// Matches SVG position x=38 y=638 plus container padding/border offset
@@ -1239,8 +1239,6 @@ export default function HomePage() {
 								top: '652px',
 								width: '302px',
 								height: '51px',
-								backgroundColor: '#F1F1F1',
-								border: '2px solid #5DAB68',
 								borderRadius: '6px',
 								cursor: 'pointer',
 								transformOrigin: 'top left',
@@ -1270,7 +1268,7 @@ export default function HomePage() {
 							</p>
 							<Link
 								href="/research"
-								className="mt-4 inline-flex h-[40px] px-4 items-center justify-center border-2 border-[#5DAB68] rounded-[6px] bg-transparent"
+								className="landing-learn-research-btn mt-4 inline-flex h-[40px] px-4 items-center justify-center border-2 border-[#5DAB68] rounded-[6px] bg-transparent"
 							>
 								<span className="font-inter font-normal text-[16px] xs:text-[18px] text-[#5DAB68]">
 									Learn about research
@@ -1349,15 +1347,14 @@ export default function HomePage() {
 						{/* Learn about research button */}
 						<Link href="/research">
 							<div
+								className="landing-learn-research-btn"
 								style={{
 									position: 'absolute',
 									left: '22px',
 									bottom: '75px',
 									width: '302px',
 									height: '51px',
-									border: '2px solid #5DAB68',
 									borderRadius: '6px',
-									backgroundColor: 'transparent',
 									display: 'flex',
 									alignItems: 'center',
 									justifyContent: 'center',
@@ -1441,7 +1438,7 @@ export default function HomePage() {
 							</p>
 							<Link
 								href="/inbox"
-								className="mt-4 inline-flex h-[40px] px-4 items-center justify-center border-2 border-[#5DAB68] rounded-[6px] bg-transparent"
+								className="landing-learn-research-btn mt-4 inline-flex h-[40px] px-4 items-center justify-center border-2 border-[#5DAB68] rounded-[6px] bg-transparent"
 							>
 								<span className="font-inter font-normal text-[16px] xs:text-[18px] text-[#5DAB68]">
 									Learn about Inbox
@@ -1531,15 +1528,14 @@ export default function HomePage() {
 						{/* Learn about Inbox button */}
 						<Link href="/inbox">
 							<div
+								className="landing-learn-research-btn"
 								style={{
 									position: 'absolute',
 									left: '31px',
 									bottom: '45px',
 									width: '260px',
 									height: '51px',
-									border: '2px solid #5DAB68',
 									borderRadius: '6px',
-									backgroundColor: 'transparent',
 									display: 'flex',
 									alignItems: 'center',
 									justifyContent: 'center',
@@ -1568,7 +1564,7 @@ export default function HomePage() {
 							</p>
 							<Link
 								href="/drafting"
-								className="mt-4 inline-flex h-[40px] px-4 items-center justify-center border-2 border-[#5DAB68] rounded-[6px] bg-transparent"
+								className="landing-learn-research-btn mt-4 inline-flex h-[40px] px-4 items-center justify-center border-2 border-[#5DAB68] rounded-[6px] bg-transparent"
 							>
 								<span className="font-inter font-normal text-[16px] xs:text-[18px] text-[#5DAB68]">
 									Learn about Drafting
@@ -1618,15 +1614,14 @@ export default function HomePage() {
 						{/* Learn about Drafting button */}
 						<Link href="/drafting">
 							<div
+								className="landing-learn-research-btn"
 								style={{
 									position: 'absolute',
 									left: '47px',
 									bottom: '26px',
 									width: '288px',
 									height: '51px',
-									border: '2px solid #5DAB68',
 									borderRadius: '6px',
-									backgroundColor: 'transparent',
 									display: 'flex',
 									alignItems: 'center',
 									justifyContent: 'center',
