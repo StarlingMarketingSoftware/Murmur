@@ -1,6 +1,11 @@
 import * as React from "react"
 import { SVGProps } from "react"
-const SvgComponent = (props: SVGProps<SVGSVGElement>) => (
+
+type Props = SVGProps<SVGSVGElement> & {
+  mobileCopyScale?: number
+}
+
+const SvgComponent = ({ mobileCopyScale = 1, ...props }: Props) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
     xmlnsXlink="http://www.w3.org/1999/xlink"
@@ -1935,19 +1940,10 @@ const SvgComponent = (props: SVGProps<SVGSVGElement>) => (
     {/* Mobile copy (centered + readability boost) */}
     <g
       className="landing-map-copy landing-map-copy--mobile"
-      style={{
-        // IMPORTANT:
-        // We scale this group up on small screens (when the framed map scales down).
-        // Use an explicit pivot around the viewBox center so the blocks stay centered
-        // across *all* mobile widths (no breakpoint-specific drift).
-        transformBox: "view-box",
-        transformOrigin: "0px 0px",
-        // Keep these blocks readable when the map scales down on mobile.
-        // Example: if map scale is 0.25, we scale this group by 2 to net ~0.5.
-        // Pivot: (929, 509) = (viewBoxWidth/2, copy-stack center)
-        transform:
-          "translate(929px, 509px) scale(calc(max(1, 0.6 / var(--landing-map-scale, 1)))) translate(-929px, -509px)",
-      }}
+      // NOTE:
+      // Use the SVG `transform` attribute (not CSS transforms) so the pivoted scaling stays
+      // centered in iOS Safari (CSS `translate()` inside SVG transforms can be ignored).
+      transform={`translate(929 509) scale(${Number.isFinite(mobileCopyScale) && mobileCopyScale > 0 ? mobileCopyScale : 1}) translate(-929 -509)`}
     >
       {/* Centered stack (headline + description + CTA) */}
       <g>

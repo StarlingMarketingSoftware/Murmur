@@ -223,13 +223,75 @@ function LiveNumber({
 	incrementPerSecond,
 	burstTargetMin,
 	burstTargetMax,
+	storageKey,
 }: {
 	initialValue: number;
 	incrementPerSecond: number;
 	burstTargetMin?: number;
 	burstTargetMax?: number;
+	storageKey?: string;
 }) {
-	const value = useLiveCounter(initialValue, incrementPerSecond, burstTargetMin, burstTargetMax);
+	const [effectiveInitialValue, setEffectiveInitialValue] = useState(initialValue);
+
+	useEffect(() => {
+		if (!storageKey) {
+			setEffectiveInitialValue(initialValue);
+			return;
+		}
+
+		try {
+			const storedRaw = window.localStorage.getItem(storageKey);
+			const storedValue = storedRaw ? Number.parseInt(storedRaw, 10) : Number.NaN;
+			const nextInitial = Number.isFinite(storedValue)
+				? Math.max(initialValue, storedValue)
+				: initialValue;
+			setEffectiveInitialValue(nextInitial);
+		} catch {
+			setEffectiveInitialValue(initialValue);
+		}
+	}, [initialValue, storageKey]);
+
+	const value = useLiveCounter(effectiveInitialValue, incrementPerSecond, burstTargetMin, burstTargetMax);
+	const valueRef = useRef(value);
+
+	useEffect(() => {
+		valueRef.current = value;
+	}, [value]);
+
+	useEffect(() => {
+		if (!storageKey) return;
+
+		const save = () => {
+			try {
+				const currentValue = valueRef.current;
+				const existingRaw = window.localStorage.getItem(storageKey);
+				const existingValue = existingRaw ? Number.parseInt(existingRaw, 10) : Number.NaN;
+				const nextValue = Number.isFinite(existingValue)
+					? Math.max(existingValue, currentValue)
+					: currentValue;
+				window.localStorage.setItem(storageKey, String(nextValue));
+			} catch {
+				// Ignore storage failures (e.g. Safari private mode).
+			}
+		};
+
+		// Periodic saves so refresh/navigation won't reset the counters.
+		const intervalId = window.setInterval(save, 1500);
+
+		const onVisibilityChange = () => {
+			if (document.hidden) save();
+		};
+
+		window.addEventListener('pagehide', save);
+		document.addEventListener('visibilitychange', onVisibilityChange);
+
+		return () => {
+			window.clearInterval(intervalId);
+			window.removeEventListener('pagehide', save);
+			document.removeEventListener('visibilitychange', onVisibilityChange);
+			save();
+		};
+	}, [storageKey]);
 
 	return <span className="tabular-nums">{formatCount(value)}</span>;
 }
@@ -466,6 +528,7 @@ export default function Products() {
 							>
 								<div className="text-right font-[var(--font-inter)] text-[18px] xl:text-[32px] font-semibold leading-none text-black">
 									<LiveNumber
+										storageKey="murmur:pricing:liveCounter:emailsSent"
 										initialValue={210_000}
 										incrementPerSecond={18}
 										burstTargetMin={12}
@@ -478,6 +541,7 @@ export default function Products() {
 
 								<div className="text-right font-[var(--font-inter)] text-[18px] xl:text-[32px] font-semibold leading-none text-black">
 									<LiveNumber
+										storageKey="murmur:pricing:liveCounter:replies"
 										initialValue={25_999}
 										incrementPerSecond={6}
 										burstTargetMin={4}
@@ -489,7 +553,11 @@ export default function Products() {
 								</div>
 
 								<div className="text-right font-[var(--font-inter)] text-[18px] xl:text-[32px] font-semibold leading-none text-black">
-									<LiveNumber initialValue={6_000} incrementPerSecond={0.2} />
+									<LiveNumber
+										storageKey="murmur:pricing:liveCounter:bookings"
+										initialValue={6_000}
+										incrementPerSecond={0.2}
+									/>
 								</div>
 								<div className="font-[var(--font-inter)] text-[18px] xl:text-[32px] font-semibold leading-none text-black">
 									Bookings

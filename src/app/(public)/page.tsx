@@ -509,6 +509,8 @@ export default function HomePage() {
 	const [hoveredContact, setHoveredContact] = useState<ContactWithName | null>(sampleContacts[0]);
 	const [shouldMountLandingGoogleMap, setShouldMountLandingGoogleMap] = useState(false);
 	const [isLandingGoogleMapReady, setIsLandingGoogleMapReady] = useState(false);
+	const [landingMapScale, setLandingMapScaleState] = useState(1);
+	const landingMapScaleRef = useRef(1);
 	
 	const videoIds = [
 		'217455815bac246b922e15ebd83dacf6',
@@ -781,7 +783,13 @@ export default function HomePage() {
 				scale = Math.max(0, Math.min(1, fitScale));
 			}
 
-			wrapper.style.setProperty('--landing-map-scale', String(scale));
+			// Clamp precision to avoid churn from tiny float diffs (helps avoid extra rerenders).
+			const nextScale = Math.round(scale * 10000) / 10000;
+			wrapper.style.setProperty('--landing-map-scale', String(nextScale));
+			if (Math.abs(nextScale - landingMapScaleRef.current) > 0.0001) {
+				landingMapScaleRef.current = nextScale;
+				setLandingMapScaleState(nextScale);
+			}
 		};
 
 		setLandingMapScale();
@@ -791,6 +799,13 @@ export default function HomePage() {
 			window.removeEventListener('resize', setLandingMapScale);
 		};
 	}, []);
+
+	// Keep the mobile map copy readable while ensuring it stays centered in Safari.
+	// NOTE: This value is used by the inline SVG for its mobile-only copy blocks.
+	const landingMapMobileCopyScale =
+		Number.isFinite(landingMapScale) && landingMapScale > 0
+			? Math.max(1, 0.6 / landingMapScale)
+			: 1;
 
 	// Work around HLS loop "hiccup" by seeking back to the start *before* the stream ends.
 	// This avoids hitting the "ended" state, which can cause a noticeable pause on some browsers.
@@ -1258,6 +1273,7 @@ export default function HomePage() {
 							preserveAspectRatio="xMidYMid meet"
 							width="100%"
 							height="100%"
+							mobileCopyScale={landingMapMobileCopyScale}
 							className="landing-map-svg relative z-10 block md:pointer-events-none"
 						/>
 						{/* Overlay "Learn about the Map" button with anti-scaling logic */}

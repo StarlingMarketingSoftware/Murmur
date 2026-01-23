@@ -3020,7 +3020,7 @@ const DashboardContent = () => {
 							fill="currentColor"
 						/>
 					</svg>
-					<span>to Landing</span>
+					<span className="hidden md:inline">to Landing</span>
 				</Link>
 
 				{/* Only show logo above box when there are campaigns */}
@@ -3087,7 +3087,7 @@ const DashboardContent = () => {
 						fill="currentColor"
 					/>
 				</svg>
-				<span>to Landing</span>
+				<span className="hidden md:inline">to Landing</span>
 			</Link>
 
 			<div
