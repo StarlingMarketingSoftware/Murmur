@@ -1081,23 +1081,39 @@ export default function HomePage() {
 				className="w-full bg-[#EBEBEB] py-16 overflow-hidden video-carousel-container"
 			>
 				{(() => {
-					// Create extended array for seamless loop: [last, ...all, first]
-					const extendedVideos = [
+					// Render extra repeated thumbnails on both sides so you don't see "empty space"
+					// when the viewport gets very wide (e.g. browser zoomed far out).
+					// Only the active item mounts an iframe; the rest are poster thumbnails.
+					const CAROUSEL_REPEAT_SEGMENTS_PER_SIDE = 10;
+
+					// Base segment supports seamless looping: [last, ...all, first]
+					const baseVideos = [
 						{ videoId: videoIds[videoIds.length - 1], originalIndex: videoIds.length - 1 },
 						...videoIds.map((id, i) => ({ videoId: id, originalIndex: i })),
 						{ videoId: videoIds[0], originalIndex: 0 },
 					];
+
+					// Repeat the same seamless segment on both sides.
+					// This avoids visible seams like "... last, last ..." when zoomed way out.
+					const repeatedBase = Array.from(
+						{ length: CAROUSEL_REPEAT_SEGMENTS_PER_SIDE },
+						() => baseVideos
+					).flat();
+
+					const baseOffset = repeatedBase.length; // index where the "main" segment starts
+					const activeDisplayIndex = baseOffset + displayIndex;
+					const renderVideos = [...repeatedBase, ...baseVideos, ...repeatedBase];
 					
 					return (
 						<div 
 							className={`video-carousel-track ${skipTransition ? 'no-transition' : ''}`}
 							style={{
 								// Center the active video relative to the carousel container (zoom-safe).
-								transform: `translateX(calc(-${displayIndex} * (var(--video-carousel-item-width) + var(--video-carousel-gap)) - (var(--video-carousel-item-width) / 2)))`,
+								transform: `translateX(calc(-${activeDisplayIndex} * (var(--video-carousel-item-width) + var(--video-carousel-gap)) - (var(--video-carousel-item-width) / 2)))`,
 							}}
 						>
-							{extendedVideos.map(({ videoId, originalIndex }, idx) => {
-								const isActive = idx === displayIndex;
+							{renderVideos.map(({ videoId, originalIndex }, idx) => {
+								const isActive = idx === activeDisplayIndex;
 								// Start time offsets for specific videos (in seconds)
 								const startAt = carouselStartTimeByVideoId[videoId];
 								const startTime = startAt ? `&startTime=${startAt}` : '';
@@ -1144,17 +1160,19 @@ export default function HomePage() {
 												backgroundPosition: 'center',
 											}}
 										/>
-								<iframe
-											key={`iframe-${idx}-${isActive}`}
-											id={`landing-carousel-video-${videoId}-${idx}`}
-											data-cf-stream-video="true"
-											data-video-index={isActive ? originalIndex : -1}
-											src={`https://customer-frd3j62ijq7wakh9.cloudflarestream.com/${videoId}/iframe?${isActive ? 'autoplay=true&muted=true&preload=auto' : 'preload=metadata'}${startTime}`}
-											className="w-full h-full border-none"
-											allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;"
-											allowFullScreen
-											title={`Murmur video ${originalIndex + 1}`}
-										/>
+										{isActive ? (
+											<iframe
+												key={`iframe-${idx}`}
+												id={`landing-carousel-video-${videoId}-${idx}`}
+												data-cf-stream-video="true"
+												data-video-index={originalIndex}
+												src={`https://customer-frd3j62ijq7wakh9.cloudflarestream.com/${videoId}/iframe?autoplay=true&muted=true&preload=auto${startTime}`}
+												className="w-full h-full border-none"
+												allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;"
+												allowFullScreen
+												title={`Murmur video ${originalIndex + 1}`}
+											/>
+										) : null}
 									</div>
 								);
 							})}
