@@ -246,6 +246,15 @@ body {
 	transform: scale(0.95);
 }
 
+.video-carousel-item:not(.active) {
+	cursor: pointer;
+}
+
+.video-carousel-item:not(.active):focus-visible {
+	outline: 2px solid #5dab68;
+	outline-offset: 4px;
+}
+
 .video-carousel-item.active {
 	transform: scale(1);
 }
@@ -283,9 +292,19 @@ body {
 	width: var(--video-carousel-indicator-size);
 	height: var(--video-carousel-indicator-size);
 	background: #c8c8c8;
+	border: 0;
+	padding: 0;
 	border-radius: 9999px;
 	overflow: hidden;
+	cursor: pointer;
+	pointer-events: auto;
+	appearance: none;
 	transition: width 240ms ease, height 240ms ease, border-radius 240ms ease;
+}
+
+.video-carousel-indicator:focus-visible {
+	outline: 2px solid #5dab68;
+	outline-offset: 3px;
 }
 
 .video-carousel-indicator.active {

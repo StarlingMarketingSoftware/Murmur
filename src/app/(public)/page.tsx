@@ -521,7 +521,7 @@ export default function HomePage() {
 		'f5ec9f11f866731a70ebf8543d5ecf5a': '14.8s',
 	};
 	
-	// Handle seamless looping when going from last to first video
+	// Handle seamless looping when wrapping from last->first and first->last
 	const prevVideoIndexRef = useRef(0);
 	useEffect(() => {
 		const prevIndex = prevVideoIndexRef.current;
@@ -537,6 +537,22 @@ export default function HomePage() {
 			setTimeout(() => {
 				setSkipTransition(true);
 				setDisplayIndex(1);
+				// Re-enable transitions after the instant reset
+				requestAnimationFrame(() => {
+					requestAnimationFrame(() => {
+						setSkipTransition(false);
+					});
+				});
+			}, 650); // Slightly longer than the 600ms CSS transition
+		// Going from first video (0) to last video (4)
+		} else if (prevIndex === 0 && newIndex === videoIds.length - 1) {
+			// First, scroll to the duplicate last video at the beginning (displayIndex = 0)
+			setDisplayIndex(0);
+
+			// After animation completes, instantly reset to the real last video position
+			setTimeout(() => {
+				setSkipTransition(true);
+				setDisplayIndex(videoIds.length);
 				// Re-enable transitions after the instant reset
 				requestAnimationFrame(() => {
 					requestAnimationFrame(() => {
@@ -1095,6 +1111,28 @@ export default function HomePage() {
 									<div
 										key={`video-display-${idx}`}
 										className={`video-carousel-item ${isActive ? 'active' : ''}`}
+										role={!isActive ? 'button' : undefined}
+										tabIndex={!isActive ? 0 : undefined}
+										aria-label={
+											!isActive
+												? `Play video ${originalIndex + 1}`
+												: `Video ${originalIndex + 1}`
+										}
+										onClick={() => {
+											if (isActive) return;
+											setActiveCarouselVideoProgress(0);
+											setIsActiveCarouselVideoPlaying(false);
+											setCurrentVideoIndex(originalIndex);
+										}}
+										onKeyDown={(e) => {
+											if (isActive) return;
+											if (e.key === 'Enter' || e.key === ' ') {
+												e.preventDefault();
+												setActiveCarouselVideoProgress(0);
+												setIsActiveCarouselVideoPlaying(false);
+												setCurrentVideoIndex(originalIndex);
+											}
+										}}
 									>
 										{/* Overlay to hide play button and show thumbnail on non-active videos */}
 										<div 
@@ -1125,13 +1163,22 @@ export default function HomePage() {
 				})()}
 
 				{/* Carousel progress dots */}
-				<div className="video-carousel-indicators" aria-hidden="true">
+				<div className="video-carousel-indicators" aria-label="Video carousel navigation">
 					{videoIds.map((_, idx) => {
 						const isActive = idx === currentVideoIndex;
 						return (
-							<div
+							<button
 								key={`carousel-indicator-${idx}`}
+								type="button"
 								className={`video-carousel-indicator ${isActive ? 'active' : ''}`}
+								aria-label={`Go to video ${idx + 1}`}
+								aria-current={isActive ? true : undefined}
+								onClick={() => {
+									if (idx === currentVideoIndex) return;
+									setActiveCarouselVideoProgress(0);
+									setIsActiveCarouselVideoPlaying(false);
+									setCurrentVideoIndex(idx);
+								}}
 							>
 								{isActive ? (
 									<div
@@ -1139,7 +1186,7 @@ export default function HomePage() {
 										style={{ width: `${activeCarouselVideoProgress * 100}%` }}
 									/>
 								) : null}
-							</div>
+							</button>
 						);
 					})}
 				</div>
