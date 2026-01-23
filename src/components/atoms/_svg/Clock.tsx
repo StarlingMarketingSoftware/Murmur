@@ -1,4 +1,18 @@
-import React from 'react';
+/* eslint-disable react/no-unknown-property */
+'use client';
+
+import React, { useEffect, useMemo, useState } from 'react';
+import ClockHands from './ClockHands';
+
+const CLOCK_HANDS_PIVOT = { x: 91, y: 153 };
+// Matches the original (static) hands center point in this SVG.
+const CLOCK_HANDS_TARGET = { x: 269.587, y: 268.586 };
+const CLOCK_CENTER = { x: 269, y: 269 };
+// The “thin” second hand path is drawn pointing ~7 o’clock at 0deg.
+// This base angle is derived from the long segment vector: dx=-65.32, dy=244.521.
+const SECOND_HAND_BASE_ANGLE_DEG = 104.956;
+
+const FALLBACK_TIME = { hours: 10, minutes: 10, seconds: 30 };
 
 type ClockProps = React.SVGProps<SVGSVGElement> & {
 	/**
@@ -6,11 +20,78 @@ type ClockProps = React.SVGProps<SVGSVGElement> & {
 	 * changing the SVG element's CSS/layout size.
 	 */
 	scale?: number;
+	/**
+	 * When true (default), the clock hands are synced to the user's local time.
+	 * When false, the clock renders a static “design pose”.
+	 */
+	syncToSystemTime?: boolean;
+	/**
+	 * Extra rotation applied to the large hour/minute hands as a group (degrees).
+	 * This adds on top of real time; default is 0.
+	 */
+	handsRotationDeg?: number;
 };
 
-const Clock: React.FC<ClockProps> = ({ scale = 1, ...props }) => {
+const Clock: React.FC<ClockProps> = ({
+	scale = 1,
+	syncToSystemTime = true,
+	handsRotationDeg = 0,
+	...props
+}) => {
+	const [now, setNow] = useState<Date | null>(null);
+
+	useEffect(() => {
+		if (!syncToSystemTime) return;
+
+		const tick = () => setNow(new Date());
+		tick();
+
+		const prefersReducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+		if (prefersReducedMotion) return;
+
+		let intervalId: number | null = null;
+		const timeoutId = window.setTimeout(() => {
+			tick();
+			intervalId = window.setInterval(tick, 1000);
+		}, 1000 - (Date.now() % 1000));
+
+		return () => {
+			window.clearTimeout(timeoutId);
+			if (intervalId !== null) window.clearInterval(intervalId);
+		};
+	}, [syncToSystemTime]);
+
+	const { hourHandAngleDeg, minuteHandAngleDeg, secondHandAngleDeg } = useMemo(() => {
+		const date = now;
+		const hours24 = date?.getHours() ?? FALLBACK_TIME.hours;
+		const minutes = date?.getMinutes() ?? FALLBACK_TIME.minutes;
+		const seconds = date?.getSeconds() ?? FALLBACK_TIME.seconds;
+
+		// Clock angles measured clockwise from 12 o’clock, converted to SVG rotate degrees
+		// where 0deg points right (3 o’clock) and -90deg points up (12 o’clock).
+		const hourFrom12 = ((hours24 % 12) + minutes / 60 + seconds / 3600) * 30;
+		const minuteFrom12 = (minutes + seconds / 60) * 6;
+		const secondFrom12 = seconds * 6;
+
+		return {
+			hourHandAngleDeg: hourFrom12 - 90,
+			minuteHandAngleDeg: minuteFrom12 - 90,
+			secondHandAngleDeg: secondFrom12 - 90,
+		};
+	}, [now]);
+
 	const contentTransform =
 		scale === 1 ? undefined : `translate(269 269) scale(${scale}) translate(-269 -269)`;
+
+	const clockHandsTranslateX = CLOCK_HANDS_TARGET.x - CLOCK_HANDS_PIVOT.x;
+	const clockHandsTranslateY = CLOCK_HANDS_TARGET.y - CLOCK_HANDS_PIVOT.y;
+	// Transform order is right-to-left in SVG: rotate first, then translate.
+	const clockHandsTransform =
+		handsRotationDeg === 0
+			? `translate(${clockHandsTranslateX} ${clockHandsTranslateY})`
+			: `translate(${clockHandsTranslateX} ${clockHandsTranslateY}) rotate(${handsRotationDeg} ${CLOCK_HANDS_PIVOT.x} ${CLOCK_HANDS_PIVOT.y})`;
+
+	const secondHandTransform = `rotate(${secondHandAngleDeg - SECOND_HAND_BASE_ANGLE_DEG} ${CLOCK_CENTER.x} ${CLOCK_CENTER.y})`;
 
 	return (
 		<svg
@@ -56,22 +137,23 @@ const Clock: React.FC<ClockProps> = ({ scale = 1, ...props }) => {
         fill="#000"
       />
       <path
-        d="M280.331 397.508c0-4.297-2.579-8.165-6.446-9.884l-1.719-60.163-2.579-5.157-2.578 5.157-1.719 60.163c-3.868 1.719-6.446 5.587-6.446 9.884 0 4.297 2.148 7.735 5.586 9.454v12.033h10.314v-12.033c3.008-1.719 5.157-5.157 5.157-9.454h.43zm-10.744 5.157c-3.008 0-5.157-2.579-5.157-5.157s2.579-5.157 5.157-5.157c2.579 0 5.157 2.579 5.157 5.157s-2.578 5.157-5.157 5.157zM463.399 132.789L268.298 244.521l-137.946-56.725 112.161 86.377-16.33 25.355 40.825-9.455h3.009c1.719 0 3.437 0 4.727-.429l41.684 6.016-18.049-22.776 165.02-139.665v-.43zm-193.812 148.26c-6.876 0-12.892-5.587-12.892-12.463 0-6.875 5.586-12.892 12.892-12.892 7.305 0 12.462 5.587 12.462 12.892 0 7.306-5.586 12.463-12.462 12.463z"
+        d="M280.331 397.508c0-4.297-2.579-8.165-6.446-9.884l-1.719-60.163-2.579-5.157-2.578 5.157-1.719 60.163c-3.868 1.719-6.446 5.587-6.446 9.884 0 4.297 2.148 7.735 5.586 9.454v12.033h10.314v-12.033c3.008-1.719 5.157-5.157 5.157-9.454h.43zm-10.744 5.157c-3.008 0-5.157-2.579-5.157-5.157s2.579-5.157 5.157-5.157c2.579 0 5.157 2.579 5.157 5.157s-2.578 5.157-5.157 5.157z"
         fill="#000"
 
       />
+			<ClockHands
+				aria-hidden="true"
+				focusable="false"
+				className="clock-large-hands"
+				transform={clockHandsTransform}
+				minuteHandAngleDeg={minuteHandAngleDeg}
+				hourHandAngleDeg={hourHandAngleDeg}
+			/>
       <path
         d="M284.229 213.58c-1.29 0-3.008.43-3.438 1.719L267.899 263c-2.149.43-3.868 2.578-3.868 5.157 0 2.578.43 3.008 1.719 3.868l-65.32 244.521c0 1.289.429 3.008 1.719 3.438h.859c1.289 0 2.149-.86 2.579-2.149l65.75-244.521c2.148-.43 3.867-2.579 3.867-5.157 0-2.579-.43-3.008-1.719-3.868l12.892-47.271c0-1.289-.429-3.008-1.719-3.438h-.429z"
         fill="#000"
+				transform={secondHandTransform}
       >
-        <animateTransform
-          attributeName="transform"
-          type="rotate"
-          from="0 269 269"
-          to="360 269 269"
-          dur="60s"
-          repeatCount="indefinite"
-        />
       </path>
 			</g>
 		</svg>
