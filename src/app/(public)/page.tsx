@@ -1258,7 +1258,7 @@ export default function HomePage() {
 							preserveAspectRatio="xMidYMid meet"
 							width="100%"
 							height="100%"
-							className="relative z-10 block md:pointer-events-none"
+							className="landing-map-svg relative z-10 block md:pointer-events-none"
 						/>
 						{/* Overlay "Learn about the Map" button with anti-scaling logic */}
 						<Link

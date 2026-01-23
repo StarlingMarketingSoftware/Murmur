@@ -8,6 +8,11 @@ import {
 	MAP_MARKER_PIN_VIEWBOX_HEIGHT,
 	MAP_MARKER_PIN_VIEWBOX_WIDTH,
 } from '@/components/atoms/_svg/MapMarkerPinIcon';
+import { LandingPageMapMiniSearchBar } from './LandingPageMapMiniSearchBar';
+import {
+	LandingPageMapResultsSidePanel,
+	type LandingMapPanelContact,
+} from './LandingPageMapResultsSidePanel';
 
 type Props = {
 	className?: string;
@@ -42,6 +47,72 @@ type DemoCategory =
 	| 'Cideries';
 
 type DemoMarker = { id: number; lat: number; lng: number; category: DemoCategory };
+
+// Demo rows for the landing-page map side panel (the real data can be wired in later).
+const LANDING_DEMO_PANEL_CONTACTS: LandingMapPanelContact[] = [
+	{
+		id: 1,
+		name: 'Acquiesce Winery & Vineya...',
+		headline: 'Winery',
+		city: 'Acampo',
+		state: 'CA',
+		isUsed: true,
+	},
+	{ id: 2, name: 'Durst Winery', headline: 'Winery', city: 'Acampo', state: 'CA', isUsed: true },
+	{
+		id: 3,
+		name: "Housley's Century Oak Win...",
+		headline: 'Winery',
+		city: 'Acampo',
+		state: 'CA',
+		isUsed: true,
+	},
+	{ id: 4, name: 'Agua Dulce Winery', headline: 'Winery', city: 'Agua Dulce', state: 'CA', isUsed: true },
+	{
+		id: 5,
+		name: 'Alameda Island Brewing Co...',
+		headline: 'Brewery',
+		city: 'Alameda',
+		state: 'CA',
+		isUsed: true,
+	},
+	{ id: 6, name: 'Building 43 Winery', headline: 'Winery', city: 'Alameda', state: 'CA', isUsed: true },
+	{
+		id: 7,
+		name: 'E.J. Phair Brewing Company',
+		headline: 'Brewery',
+		city: 'Alamo',
+		state: 'CA',
+		isUsed: true,
+	},
+	{
+		id: 8,
+		name: 'Ocean View Brew Works',
+		headline: 'Brewery',
+		city: 'Albany',
+		state: 'CA',
+		isUsed: true,
+	},
+	{
+		id: 9,
+		name: 'Wine Tree Farm & Corinne ...',
+		headline: 'Winery',
+		city: 'Amador City',
+		state: 'CA',
+		isUsed: true,
+	},
+	{ id: 10, name: 'Ballast Point: Anaheim', headline: 'Brewery', city: 'Anaheim', state: 'CA', isUsed: true },
+	{
+		id: 11,
+		name: 'Broken Timbers Brewing C...',
+		headline: 'Brewery',
+		city: 'Anaheim',
+		state: 'CA',
+		isUsed: true,
+	},
+	{ id: 12, name: 'Vino Metate', headline: 'Winery', city: 'Angels Camp', state: 'CA', isUsed: true },
+	{ id: 13, name: 'Bravante Vineyards', headline: 'Winery', city: 'Angwin', state: 'CA', isUsed: true },
+];
 
 type GeoJsonFeatureCollection = {
 	type: 'FeatureCollection';
@@ -464,13 +535,11 @@ const generateDemoMarkersInCalifornia = (
 	const maxAttempts = 80_000;
 	let attempts = 0;
 
-	// Mix: city cores + wider metro/outskirts + major corridors + a little extra background.
-	// Goal: cities are still densest, but avoid unrealistic "parks/deserts" placement.
 	const tightCityProbability = 0.22;
 	const wideCityProbability = 0.23; // cumulative 0.45
 	const corridorProbability = 0.45; // cumulative 0.90
 	const wideSigmaMultiplier = 3.0;
-	const maxBackgroundDistanceToCorridorDeg = 0.22; // ~15mi latitude; keeps strays near major roads
+	const maxBackgroundDistanceToCorridorDeg = 0.22; 
 	const maxBackgroundDistanceToCorridorSq = maxBackgroundDistanceToCorridorDeg ** 2;
 
 	while (markers.length < LANDING_DEMO_MARKER_COUNT && attempts < maxAttempts) {
@@ -548,7 +617,7 @@ export function LandingPageGoogleMapBackground({ className, onReady }: Props) {
 	const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
 
 	const { isLoaded, loadError } = useJsApiLoader({
-		id: 'landing-page-google-map',
+		id: 'google-maps-loader',
 		googleMapsApiKey: apiKey,
 	});
 
@@ -643,46 +712,64 @@ export function LandingPageGoogleMapBackground({ className, onReady }: Props) {
 
 	if (!apiKey || loadError || !isLoaded) return null;
 
+	const containerClassName = className ?? 'w-full h-full';
+
 	return (
-		<GoogleMap
-			mapContainerClassName={className ?? 'w-full h-full'}
-			center={DEFAULT_CENTER}
-			zoom={DEFAULT_ZOOM}
-			onLoad={() => onReady?.()}
-			options={{
-				disableDefaultUI: true,
-				clickableIcons: false,
-				// Allow pan via drag, but keep page scroll-friendly.
-				gestureHandling: 'cooperative',
-				keyboardShortcuts: false,
-				draggable: true,
-				scrollwheel: false,
-				disableDoubleClickZoom: true,
-				// Lock the zoom level so users can't zoom in/out.
-				minZoom: DEFAULT_ZOOM,
-				maxZoom: DEFAULT_ZOOM,
-				// Limit how far the map can be panned.
-				restriction: {
-					latLngBounds: CALIFORNIA_PAN_BOUNDS,
-					strictBounds: true,
-				},
-				zoomControl: false,
-				fullscreenControl: false,
-				streetViewControl: false,
-				mapTypeControl: false,
-			}}
-		>
-			{demoMarkers.map((m) => (
-				<MarkerF
-					key={m.id}
-					position={{ lat: m.lat, lng: m.lng }}
-					icon={markerIconByCategory.get(m.category)}
-					clickable={false}
-					// Keep overlap ordering stable to avoid “surfacing/under” flicker.
-					zIndex={m.id}
-				/>
-			))}
-		</GoogleMap>
+		<div className={`relative ${containerClassName}`}>
+			<GoogleMap
+				mapContainerClassName="w-full h-full"
+				center={DEFAULT_CENTER}
+				zoom={DEFAULT_ZOOM}
+				onLoad={() => onReady?.()}
+				options={{
+					disableDefaultUI: true,
+					clickableIcons: false,
+					// Allow pan via drag, but keep page scroll-friendly.
+					gestureHandling: 'cooperative',
+					keyboardShortcuts: false,
+					draggable: true,
+					scrollwheel: false,
+					disableDoubleClickZoom: true,
+					// Lock the zoom level so users can't zoom in/out.
+					minZoom: DEFAULT_ZOOM,
+					maxZoom: DEFAULT_ZOOM,
+					// Limit how far the map can be panned.
+					restriction: {
+						latLngBounds: CALIFORNIA_PAN_BOUNDS,
+						strictBounds: true,
+					},
+					zoomControl: false,
+					fullscreenControl: false,
+					streetViewControl: false,
+					mapTypeControl: false,
+				}}
+			>
+				{demoMarkers.map((m) => (
+					<MarkerF
+						key={m.id}
+						position={{ lat: m.lat, lng: m.lng }}
+						icon={markerIconByCategory.get(m.category)}
+						clickable={false}
+						// Keep overlap ordering stable to avoid “surfacing/under” flicker.
+						zIndex={m.id}
+					/>
+				))}
+			</GoogleMap>
+
+			{/* Landing map overlay: dashboard "mini" (map view) segmented search bar */}
+			<div className="absolute top-[12px] left-1/2 -translate-x-1/2 z-[80] pointer-events-none">
+				<div className="pointer-events-auto">
+					<LandingPageMapMiniSearchBar
+						initialWhy="[Booking]"
+						initialWhat="Music Venues"
+						initialWhere="California"
+					/>
+				</div>
+			</div>
+
+			{/* Landing page overlay: map results side panel (right side). */}
+			<LandingPageMapResultsSidePanel contacts={LANDING_DEMO_PANEL_CONTACTS} />
+		</div>
 	);
 }
 

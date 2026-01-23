@@ -473,7 +473,7 @@ body {
 
 /* Desktop Google-map mode: hide all remaining SVG UI layers.
    Keep only the copy blocks (e.g. "100,000+ Contacts..."). */
-.landing-map-container--google svg > :not(.landing-map-copy) {
+.landing-map-container--google .landing-map-svg > :not(.landing-map-copy) {
 	opacity: 0;
 }
 
