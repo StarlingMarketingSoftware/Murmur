@@ -718,45 +718,50 @@ export function LandingPageGoogleMapBackground({ className, onReady }: Props) {
 
 	return (
 		<div className={`relative ${containerClassName}`}>
-			<GoogleMap
-				mapContainerClassName="w-full h-full"
-				center={DEFAULT_CENTER}
-				zoom={DEFAULT_ZOOM}
-				onLoad={() => onReady?.()}
-				options={{
-					disableDefaultUI: true,
-					clickableIcons: false,
-					// Allow pan via drag, but keep page scroll-friendly.
-					gestureHandling: 'cooperative',
-					keyboardShortcuts: false,
-					draggable: true,
-					scrollwheel: false,
-					disableDoubleClickZoom: true,
-					// Lock the zoom level so users can't zoom in/out.
-					minZoom: DEFAULT_ZOOM,
-					maxZoom: DEFAULT_ZOOM,
-					// Limit how far the map can be panned.
-					restriction: {
-						latLngBounds: CALIFORNIA_PAN_BOUNDS,
-						strictBounds: true,
-					},
-					zoomControl: false,
-					fullscreenControl: false,
-					streetViewControl: false,
-					mapTypeControl: false,
-				}}
-			>
-				{demoMarkers.map((m) => (
-					<MarkerF
-						key={m.id}
-						position={{ lat: m.lat, lng: m.lng }}
-						icon={markerIconByCategory.get(m.category)}
-						clickable={false}
-						// Keep overlap ordering stable to avoid “surfacing/under” flicker.
-						zIndex={m.id}
-					/>
-				))}
-			</GoogleMap>
+			{/* Map frame (rounded corners + black stroke) */}
+			<div className="absolute inset-0 rounded-[8px] overflow-hidden">
+				<GoogleMap
+					mapContainerClassName="w-full h-full"
+					center={DEFAULT_CENTER}
+					zoom={DEFAULT_ZOOM}
+					onLoad={() => onReady?.()}
+					options={{
+						disableDefaultUI: true,
+						clickableIcons: false,
+						// Allow pan via drag, but keep page scroll-friendly.
+						gestureHandling: 'cooperative',
+						keyboardShortcuts: false,
+						draggable: true,
+						scrollwheel: false,
+						disableDoubleClickZoom: true,
+						// Lock the zoom level so users can't zoom in/out.
+						minZoom: DEFAULT_ZOOM,
+						maxZoom: DEFAULT_ZOOM,
+						// Limit how far the map can be panned.
+						restriction: {
+							latLngBounds: CALIFORNIA_PAN_BOUNDS,
+							strictBounds: true,
+						},
+						zoomControl: false,
+						fullscreenControl: false,
+						streetViewControl: false,
+						mapTypeControl: false,
+					}}
+				>
+					{demoMarkers.map((m) => (
+						<MarkerF
+							key={m.id}
+							position={{ lat: m.lat, lng: m.lng }}
+							icon={markerIconByCategory.get(m.category)}
+							clickable={false}
+							// Keep overlap ordering stable to avoid “surfacing/under” flicker.
+							zIndex={m.id}
+						/>
+					))}
+				</GoogleMap>
+			</div>
+
+			<div className="pointer-events-none absolute inset-0 rounded-[8px] border-[3px] border-[#000000] z-[20]" />
 
 			{/* Landing map overlay: dashboard "mini" (map view) segmented search bar */}
 			<div className="absolute top-[12px] left-1/2 -translate-x-1/2 z-[80] pointer-events-none">
