@@ -466,6 +466,17 @@ body {
 	flex-shrink: 0;
 }
 
+/* When using the live Google map background on desktop, hide the baked-in SVG map raster. */
+.landing-map-container--google .landing-map-bg-image {
+	opacity: 0;
+}
+
+/* Desktop Google-map mode: hide all remaining SVG UI layers.
+   Keep only the copy blocks (e.g. "100,000+ Contacts..."). */
+.landing-map-container--google svg > :not(.landing-map-copy) {
+	opacity: 0;
+}
+
 /* Landing map copy blocks inside the SVG */
 .landing-map-copy--mobile {
 	display: none;

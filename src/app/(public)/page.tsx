@@ -1,6 +1,7 @@
 'use client';
 import { LandingHeroSearchBar } from '@/components/molecules/LandingHeroSearchBar/LandingHeroSearchBar';
 import LandingPageMap1 from '@/components/atoms/_svg/LandingPageMap1';
+import { LandingPageGoogleMapBackground } from '@/components/molecules/LandingPageGoogleMapBackground/LandingPageGoogleMapBackground';
 import MuxPlayer from '@mux/mux-player-react';
 import { useEffect, useRef, useState } from 'react';
 import { gsap } from 'gsap';
@@ -497,6 +498,8 @@ export default function HomePage() {
 	const [activeCarouselVideoProgress, setActiveCarouselVideoProgress] = useState(0);
 	const [isActiveCarouselVideoPlaying, setIsActiveCarouselVideoPlaying] = useState(false);
 	const [hoveredContact, setHoveredContact] = useState<ContactWithName | null>(sampleContacts[0]);
+	const [shouldMountLandingGoogleMap, setShouldMountLandingGoogleMap] = useState(false);
+	const [isLandingGoogleMapReady, setIsLandingGoogleMapReady] = useState(false);
 	
 	const videoIds = [
 		'217455815bac246b922e15ebd83dacf6',
@@ -749,6 +752,12 @@ export default function HomePage() {
 
 			const landingZoom = getLandingZoom(wrapper);
 			const isMobile = normalizedViewportWidthPx <= MOBILE_BREAKPOINT_PX;
+			// Only mount the live Google Map background on desktop.
+			const shouldMountGoogleMap = !isMobile;
+			setShouldMountLandingGoogleMap(shouldMountGoogleMap);
+			if (!shouldMountGoogleMap) {
+				setIsLandingGoogleMapReady(false);
+			}
 			const sidePaddingPx = isMobile ? 0 : SIDE_PADDING_DESKTOP_PX;
 			const mapPaddingPx = isMobile ? MAP_PADDING_MOBILE_PX : MAP_PADDING_DESKTOP_PX;
 
@@ -1217,19 +1226,35 @@ export default function HomePage() {
 					Start Free Trial
 				</Link>
 				<div className="landing-map-wrapper" ref={landingMapWrapperRef}>
-					<div className="landing-map-container">
+					<div
+						className={`landing-map-container ${
+							isLandingGoogleMapReady ? 'landing-map-container--google' : ''
+						}`}
+					>
+						{/* Desktop-only: live Google Map background (SVG raster stays until map is ready) */}
+						{shouldMountLandingGoogleMap ? (
+							<div
+								className="absolute inset-[16px] z-0"
+								aria-hidden="true"
+							>
+								<LandingPageGoogleMapBackground
+									className="w-full h-full"
+									onReady={() => setIsLandingGoogleMapReady(true)}
+								/>
+							</div>
+						) : null}
 						<LandingPageMap1
 							// Crop out extra SVG padding so the framed map box sits centered/snug.
 							viewBox="0 0 1858 1044"
 							preserveAspectRatio="xMidYMid meet"
 							width="100%"
 							height="100%"
-							className="block"
+							className="relative z-10 block md:pointer-events-none"
 						/>
 						{/* Overlay "Learn about the Map" button with anti-scaling logic */}
 						<Link
 							href="/map"
-							className="landing-learn-research-btn hidden md:flex items-center justify-center bg-[#F1F1F1]"
+							className="landing-learn-research-btn hidden md:flex items-center justify-center bg-[#F1F1F1] z-20"
 							style={{
 								position: 'absolute',
 								// Matches SVG position x=38 y=638 plus container padding/border offset
