@@ -6,14 +6,23 @@ import MuxPlayer from '@mux/mux-player-react';
 import { useEffect, useRef, useState } from 'react';
 import { gsap } from 'gsap';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import { urls } from '@/constants/urls';
 import { ContactsExpandedList } from '@/app/murmur/campaign/[campaignId]/DraftingSection/Testing/ContactsExpandedList';
 import { ContactResearchPanel } from '@/components/molecules/ContactResearchPanel/ContactResearchPanel';
 import { ContactWithName } from '@/types/contact';
 import InboxSection from '@/components/molecules/InboxSection/InboxSection';
 import type { InboundEmailWithRelations } from '@/types';
-import { LandingDraftingDemo } from '@/components/molecules/LandingDraftingDemo/LandingDraftingDemo';
 import { ScaledToFit } from '@/components/atoms/ScaledToFit';
+
+// Prevent SSR hydration mismatches from @dnd-kit IDs inside the drafting demo UI.
+const LandingDraftingDemo = dynamic(
+	() =>
+		import('@/components/molecules/LandingDraftingDemo/LandingDraftingDemo').then(
+			(m) => m.LandingDraftingDemo
+		),
+	{ ssr: false }
+);
 
 const DESKTOP_HERO_MUX_PLAYBACK_ID = 'pKbGxKyrsRlE3NJPXUULvpu01wi00CBIBFn8UvbAjyvo4';
 const MOBILE_PORTRAIT_HERO_MUX_PLAYBACK_ID =
