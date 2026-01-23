@@ -271,14 +271,11 @@ export default function InboxPage() {
         </p>
         <Link
           href={urls.freeTrial.index}
-          className="flex items-center justify-center cursor-pointer text-center text-white font-inter font-medium text-[14px]"
+          className="landing-bottom-free-trial-btn flex items-center justify-center cursor-pointer text-center text-white font-inter font-medium text-[14px]"
           style={{
             marginTop: '32px',
             width: '219px',
             height: '33px',
-            backgroundColor: '#53B060',
-            border: '1px solid #118521',
-            borderRadius: '8px',
           }}
         >
           Start Free Trial

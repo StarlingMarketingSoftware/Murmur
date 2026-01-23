@@ -6,7 +6,6 @@ import { urls } from '@/constants/urls';
 import MapDemo1 from '@/components/atoms/_svg/MapDemo1';
 import WhatDemo from '@/components/atoms/_svg/WhatDemo';
 import ZoomDemo from '@/components/atoms/_svg/ZoomDemo';
-import '../landing-animations.css';
 
 const videoStyle = {
   '--controls': 'none',
@@ -175,14 +174,11 @@ export default function MapPage() {
             </p>
             <Link
               href={urls.freeTrial.index}
-              className="flex items-center justify-center cursor-pointer text-center text-white font-inter font-medium text-[14px]"
+              className="landing-bottom-free-trial-btn flex items-center justify-center cursor-pointer text-center text-white font-inter font-medium text-[14px]"
               style={{
                 marginTop: '32px',
                 width: '219px',
                 height: '33px',
-                backgroundColor: '#53B060',
-                border: '1px solid #118521',
-                borderRadius: '8px',
               }}
             >
               Start Free Trial

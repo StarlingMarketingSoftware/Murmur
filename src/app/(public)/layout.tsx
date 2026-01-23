@@ -1,3 +1,4 @@
+import './landing-animations.css';
 import { Suspense } from 'react';
 import { Navbar } from '@/components/organisms/Navbar/Navbar';
 

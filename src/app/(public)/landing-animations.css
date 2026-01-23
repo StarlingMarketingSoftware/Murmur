@@ -415,6 +415,22 @@ body {
 	color: #ffffff;
 }
 
+/* Bottom CTA ("Try Murmur Now") - Start Free Trial */
+.landing-bottom-free-trial-btn {
+	background-color: #53b060;
+	border: 1px solid #118521;
+	border-radius: 8px;
+	transition:
+		background-color 160ms ease,
+		border-color 160ms ease,
+		border-width 160ms ease;
+}
+
+.landing-bottom-free-trial-btn:hover {
+	background-color: #4ea25a;
+	border: 2px solid #000000;
+}
+
 /* Section right after the video carousel (contains the framed map) */
 .landing-map-section {
 	padding-top: 124px;
