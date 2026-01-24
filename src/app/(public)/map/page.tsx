@@ -99,17 +99,17 @@ export default function MapPage() {
           </div>
 
           {/* Wide layout (original design) */}
-          <div className="relative hidden lg:flex justify-center mt-[196px] px-4">
-            <div className="w-full max-w-[1347px] bg-[#FAFAFA] flex items-stretch flex-row h-[364px]">
-              <div className="w-full max-w-[678px] bg-[#EFEFEF] rounded-[6px] ml-[24px] my-[17px] px-[56px] py-[46px] h-[327px]">
-                <p className="font-inter font-bold text-[24px] text-black">Explore the Country</p>
-                <p className="font-inter text-[23px] text-black mt-[24px] pr-[56px] leading-[45px] tracking-wide [word-spacing:5px]">
+          <div className="relative hidden lg:flex justify-center mt-[80px] px-4">
+            <div className="w-[1403px] h-[455px] flex items-stretch gap-[14px]">
+              <div className="w-[585px] h-[455px] bg-[#FFFFFF] rounded-[22px] px-[56px] pt-[62px] pb-[46px]">
+                <p className="font-inter font-bold text-[23px] text-black">Explore the Country</p>
+                <p className="font-inter text-[23px] text-black mt-[44px] pr-[56px] leading-[56px] tracking-wide [word-spacing:5px]">
                   Plan a city-wide tour in Los Angeles or Portland for a week of shows. Go explore 100,000+
                   contacts from the Pacific to the Atlantic.
                 </p>
               </div>
-              <div className="flex justify-center ml-auto mr-[59px] self-center">
-                <MapDemo1 />
+              <div className="w-[804px] h-[455px] rounded-[22px] overflow-hidden">
+                <MapDemo1 className="w-full h-full" viewBox="0 0 508 287" />
               </div>
             </div>
           </div>
@@ -133,17 +133,23 @@ export default function MapPage() {
             </div>
           </div>
 
-          {/* Wide layout (original design) */}
+          {/* Wide layout (updated design) */}
           <div className="relative hidden lg:flex justify-center mt-[81px] px-4">
-            <div className="w-full max-w-[1347px] bg-[#FAFAFA] flex items-stretch flex-row-reverse h-[364px]">
-              <div className="w-full max-w-[678px] bg-[#EFEFEF] rounded-[6px] mr-[23px] my-[17px] px-[56px] py-[46px] h-[327px]">
-                <p className="font-inter font-bold text-[24px] text-black">All Data in One Place:</p>
-                <p className="font-inter text-[23px] text-black mt-[24px] pr-[56px] leading-[45px] tracking-wide [word-spacing:5px]">
+            <div className="w-[1428px] flex items-stretch gap-[15px]">
+              <div
+                className="w-[702px] h-[532px] rounded-[22px] flex items-center justify-center"
+                style={{
+                  background: 'linear-gradient(180deg, #C3E8C9 0%, #AFF1B8 100%)',
+                }}
+              >
+                <WhatDemo className="w-[680px] h-auto -translate-x-[11.75%]" />
+              </div>
+
+              <div className="w-[711px] h-[532px] bg-white rounded-[22px] px-[60px] pt-[62px] pb-[46px]">
+                <p className="font-inter font-bold text-[24px] text-black">All Data in One Place</p>
+                <p className="font-inter text-[23px] text-black mt-[44px] pr-[24px] leading-[56px] tracking-wide [word-spacing:5px]">
                   Filter each search by category, whether you&apos;re looking for coffee shops for gigs or radio stations for airplay.
                 </p>
-              </div>
-              <div className="flex justify-center mr-auto ml-[55px] self-center">
-                <WhatDemo />
               </div>
             </div>
           </div>
@@ -167,17 +173,22 @@ export default function MapPage() {
             </div>
           </div>
 
-          {/* Wide layout (original design) */}
+          {/* Wide layout (updated design) */}
           <div className="relative hidden lg:flex justify-center mt-[119px] px-4">
-            <div className="w-full max-w-[1347px] bg-[#FAFAFA] flex items-stretch flex-row h-[364px]">
-              <div className="w-full max-w-[678px] bg-[#EFEFEF] rounded-[6px] ml-[24px] my-[17px] px-[56px] py-[46px] h-[327px]">
+            <div className="w-[1404px] h-[470px] flex items-stretch gap-[15px]">
+              <div className="w-[469px] h-[470px] bg-white rounded-[22px] px-[56px] pt-[62px] pb-[46px]">
                 <p className="font-inter font-bold text-[24px] text-black">Zoom Closer, See the Details:</p>
-                <p className="font-inter text-[23px] text-black mt-[24px] pr-[56px] leading-[45px] tracking-wide [word-spacing:5px]">
+                <p className="font-inter text-[23px] text-black mt-[44px] leading-[56px] tracking-wide [word-spacing:5px]">
                   Zoom in on San Francisco and see more contacts appear. The closer you get, the more you see.
                 </p>
               </div>
-              <div className="flex justify-center ml-auto mr-[24px] self-center">
-                <ZoomDemo className="w-full max-w-[561px] h-auto" />
+
+              <div className="w-[920px] h-[470px] rounded-[22px] overflow-hidden">
+                <ZoomDemo
+                  className="w-full h-full"
+                  viewBox="0 0 561 287"
+                  preserveAspectRatio="none"
+                />
               </div>
             </div>
           </div>
