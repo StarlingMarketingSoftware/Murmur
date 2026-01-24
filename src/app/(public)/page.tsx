@@ -1240,7 +1240,7 @@ export default function HomePage() {
 			</div>
 
 			{/* Start Free Trial Button Section */}
-			<div className="landing-map-section w-full bg-white flex flex-col items-center">
+			<div className="landing-map-section w-full bg-[#F5F5F7] flex flex-col items-center">
 				<Link
 					href={urls.freeTrial.index}
 					className="landing-free-trial-btn hidden md:flex items-center justify-center bg-transparent cursor-pointer text-center"
@@ -1696,7 +1696,7 @@ export default function HomePage() {
 			</div>
 
 			{/* Try Murmur Now CTA Section */}
-			<div className="w-full bg-white flex flex-col items-center justify-center h-[280px] md:h-[450px] lg:h-[747px]">
+			<div className="w-full bg-[#F5F5F7] flex flex-col items-center justify-center h-[280px] md:h-[450px] lg:h-[747px]">
 				<p className="font-inter font-normal text-[clamp(32px,9vw,62px)] text-black text-center leading-[1.05]">
 					Try Murmur Now
 				</p>
