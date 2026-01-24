@@ -1301,29 +1301,34 @@ export default function HomePage() {
 
 				{/* Block below map */}
 				{/* Narrow layout: stack text on top, demo below */}
-				<div className="landing-after-map min-[1500px]:hidden w-full px-[14%]">
-					<div className="mx-auto w-full max-w-[904px] bg-[#FAFAFA]">
+				<div className="landing-after-map md:hidden w-full px-[14%]">
+					<div className="mx-auto w-full max-w-[904px] rounded-[28px] overflow-hidden bg-[#FAFAFA]">
 						{/* Text */}
-						<div className="bg-[#EFEFEF] rounded-[8px] px-6 py-6">
-							<p className="font-inter font-normal text-[22px] xs:text-[24px] sm:text-[27px] text-black leading-tight">
+						<div className="px-6 xs:px-8 pt-8 xs:pt-10 pb-8 xs:pb-10">
+							<p className="font-inter font-normal text-[32px] xs:text-[36px] sm:text-[42px] text-black leading-[1.05]">
 								We Did The Research
 							</p>
-							<p className="font-inter font-normal text-[11.5px] xs:text-[12.5px] sm:text-[18px] text-black leading-tight mt-2 break-words">
+							<p className="font-inter font-normal text-[15px] xs:text-[17px] sm:text-[20px] text-black leading-snug mt-3 xs:mt-4 break-words">
 								Take a look through every contact, and you&apos;ll get to see information on what styles they
 								book, their live music schedules, and even how to actually find the right person.
 							</p>
 							<Link
 								href="/research"
-								className="landing-learn-research-btn mt-4 inline-flex h-[40px] px-4 items-center justify-center border-2 border-[#5DAB68] rounded-[6px] bg-transparent"
+								className="landing-learn-research-btn mt-6 xs:mt-8 inline-flex h-[44px] xs:h-[48px] px-5 xs:px-6 items-center justify-center border-2 border-[#5DAB68] rounded-[6px] bg-transparent"
 							>
-								<span className="font-inter font-normal text-[16px] xs:text-[18px] text-[#5DAB68]">
+								<span className="font-inter font-normal text-[17px] xs:text-[19px] sm:text-[21px] text-[#5DAB68]">
 									Learn about research
 								</span>
 							</Link>
 						</div>
 
 						{/* Demo */}
-						<div className="mt-6 bg-[#F1F1F1] rounded-[8px] px-6 pt-8 pb-10 overflow-hidden">
+						<div
+							className="px-4 xs:px-6 pt-8 xs:pt-10 pb-10 xs:pb-12"
+							style={{
+								background: 'linear-gradient(180deg, #EAF7FF 0%, #BEE6FF 100%)',
+							}}
+						>
 							<ScaledToFit baseWidth={709} baseHeight={635}>
 								<div className="flex gap-6">
 									<div className="mt-[76px]">
@@ -1357,9 +1362,10 @@ export default function HomePage() {
 					</div>
 				</div>
 
-				{/* Wide layout */}
-				<div className="hidden min-[1500px]:flex w-full justify-center" style={{ marginTop: '145px' }}>
-					<div
+				{/* Wide layout (scaled down on thinner breakpoints) */}
+				<div className="hidden md:block w-full px-4" style={{ marginTop: '145px' }}>
+					<ScaledToFit baseWidth={1753} baseHeight={712} className="mx-auto max-w-[1753px]">
+						<div
 						className="w-[1753px] h-[712px] rounded-[22px] overflow-hidden grid grid-cols-2"
 						aria-label="We Did The Research"
 					>
@@ -1425,34 +1431,38 @@ export default function HomePage() {
 								</div>
 							</div>
 						</div>
-					</div>
+						</div>
+					</ScaledToFit>
 				</div>
 
-				{/* Second block below map */}
-				{/* Narrow layout: stack text on top, demo below */}
-				<div className="min-[1500px]:hidden w-full px-[14%]" style={{ marginTop: '82px' }}>
-					<div className="mx-auto w-full max-w-[904px] bg-[#FAFAFA]">
+				<div className="md:hidden w-full px-[14%]" style={{ marginTop: '82px' }}>
+					<div className="mx-auto w-full max-w-[904px] rounded-[28px] overflow-hidden bg-[#FAFAFA]">
 						{/* Text */}
-						<div className="bg-[#EFEFEF] rounded-[8px] px-6 py-6">
-							<p className="font-inter font-normal text-[22px] xs:text-[24px] sm:text-[27px] text-black leading-tight">
+						<div className="px-6 xs:px-8 pt-8 xs:pt-10 pb-8 xs:pb-10">
+							<p className="font-inter font-normal text-[32px] xs:text-[36px] sm:text-[42px] text-black leading-[1.05]">
 								Every Reply
 							</p>
-							<p className="font-inter font-normal text-[11.5px] xs:text-[12.5px] sm:text-[18px] text-black leading-tight mt-2 break-words">
+							<p className="font-inter font-normal text-[15px] xs:text-[17px] sm:text-[20px] text-black leading-snug mt-3 xs:mt-4 break-words">
 								Never miss a reply! Get full context on each response, including what campaign it came from,
 								all in one place.
 							</p>
 							<Link
 								href="/inbox"
-								className="landing-learn-research-btn mt-4 inline-flex h-[40px] px-4 items-center justify-center border-2 border-[#5DAB68] rounded-[6px] bg-transparent"
+								className="landing-learn-research-btn mt-6 xs:mt-8 inline-flex h-[44px] xs:h-[48px] px-5 xs:px-6 items-center justify-center border-2 border-[#5DAB68] rounded-[6px] bg-transparent"
 							>
-								<span className="font-inter font-normal text-[16px] xs:text-[18px] text-[#5DAB68]">
+								<span className="font-inter font-normal text-[17px] xs:text-[19px] sm:text-[21px] text-[#5DAB68]">
 									Learn about Inbox
 								</span>
 							</Link>
 						</div>
 
 						{/* Demo */}
-						<div className="mt-6 bg-[#F1F1F1] rounded-[8px] px-4 xs:px-6 pt-6 xs:pt-8 pb-8 xs:pb-10 overflow-hidden">
+						<div
+							className="px-4 xs:px-6 pt-8 xs:pt-10 pb-10 xs:pb-12"
+							style={{
+								background: 'linear-gradient(180deg, #DBFFE2 0%, #99D8A5 100%)',
+							}}
+						>
 							<ScaledToFit baseWidth={856} baseHeight={535}>
 								<InboxSection
 									noOuterPadding
@@ -1472,9 +1482,9 @@ export default function HomePage() {
 					</div>
 				</div>
 
-				{/* Wide layout */}
-				<div className="hidden min-[1500px]:flex w-full justify-center" style={{ marginTop: '82px' }}>
-					<div className="w-[1789px] h-[718px] rounded-[22px] overflow-hidden flex" aria-label="Every Reply">
+				<div className="hidden md:block w-full px-4" style={{ marginTop: '82px' }}>
+					<ScaledToFit baseWidth={1789} baseHeight={718} className="mx-auto max-w-[1789px]">
+						<div className="w-[1789px] h-[718px] rounded-[22px] overflow-hidden flex" aria-label="Every Reply">
 						{/* Left side (gradient) */}
 						<div
 							className="h-full w-[1130px] flex items-center justify-center"
@@ -1515,46 +1525,52 @@ export default function HomePage() {
 								</Link>
 							</div>
 						</div>
-					</div>
+						</div>
+					</ScaledToFit>
 				</div>
 
-				{/* Third block below map */}
-				{/* Narrow layout: stack text on top, demo below */}
-				<div className="min-[1500px]:hidden w-full px-[14%]" style={{ marginTop: '75px' }}>
-					<div className="mx-auto w-full max-w-[904px] bg-[#FAFAFA]">
+				<div className="md:hidden w-full px-[14%]" style={{ marginTop: '75px' }}>
+					<div className="mx-auto w-full max-w-[904px] rounded-[28px] overflow-hidden bg-[#FAFAFA]">
 						{/* Text */}
-						<div className="bg-[#EFEFEF] rounded-[8px] px-6 py-6">
-							<p className="font-inter font-normal text-[22px] xs:text-[24px] sm:text-[27px] text-black leading-tight">
+						<div className="px-6 xs:px-8 pt-8 xs:pt-10 pb-8 xs:pb-10">
+							<p className="font-inter font-normal text-[32px] xs:text-[36px] sm:text-[42px] text-black leading-[1.05]">
 								Emails That Land
 							</p>
-							<p className="font-inter font-normal text-[11.5px] xs:text-[12.5px] sm:text-[18px] text-black leading-tight mt-2 break-words">
-								Emails not getting responses? Ditch the templates. Murmur drafts pitches based on your bio and date range that venues actually respond to.
+							<p className="font-inter font-normal text-[15px] xs:text-[17px] sm:text-[20px] text-black leading-snug mt-3 xs:mt-4 break-words">
+								Emails not getting responses? Ditch the templates. Murmur drafts pitches based on your bio and
+								date range that venues actually respond to.
 							</p>
 							<Link
 								href="/drafting"
-								className="landing-learn-research-btn mt-4 inline-flex h-[40px] px-4 items-center justify-center border-2 border-[#5DAB68] rounded-[6px] bg-transparent"
+								className="landing-learn-research-btn mt-6 xs:mt-8 inline-flex h-[44px] xs:h-[48px] px-5 xs:px-6 items-center justify-center border-2 border-[#5DAB68] rounded-[6px] bg-transparent"
 							>
-								<span className="font-inter font-normal text-[16px] xs:text-[18px] text-[#5DAB68]">
+								<span className="font-inter font-normal text-[17px] xs:text-[19px] sm:text-[21px] text-[#5DAB68]">
 									Learn about Drafting
 								</span>
 							</Link>
 						</div>
 
 						{/* Demo */}
-						<div className="mt-6 bg-[#F1F1F1] rounded-[8px] overflow-hidden">
+						<div
+							className="px-4 xs:px-6 pt-8 xs:pt-10 pb-10 xs:pb-12"
+							style={{
+								background: 'linear-gradient(180deg, #DAE6FE 0%, #CAD5F9 100%)',
+							}}
+						>
 							<ScaledToFit baseWidth={904} baseHeight={712}>
-								<LandingDraftingDemo />
+								<LandingDraftingDemo isMobileLayout />
 							</ScaledToFit>
 						</div>
 					</div>
 				</div>
 
-				{/* Wide layout */}
-				<div className="hidden min-[1500px]:flex w-full justify-center" style={{ marginTop: '75px' }}>
-					<div
-						className="w-[1783px] h-[712px] rounded-[22px] overflow-hidden grid grid-cols-[879px_904px]"
-						aria-label="Emails That Land"
-					>
+				{/* Wide layout (scaled down on thinner breakpoints) */}
+				<div className="hidden md:block w-full px-4" style={{ marginTop: '75px' }}>
+					<ScaledToFit baseWidth={1783} baseHeight={712} className="mx-auto max-w-[1783px]">
+						<div
+							className="w-[1783px] h-[712px] rounded-[22px] overflow-hidden grid grid-cols-[879px_904px]"
+							aria-label="Emails That Land"
+						>
 						{/* Left side (white) */}
 						<div className="h-full w-full bg-white flex items-center">
 							<div className="w-[712px] mx-auto">
@@ -1587,7 +1603,8 @@ export default function HomePage() {
 								<LandingDraftingDemo />
 							</div>
 						</div>
-					</div>
+						</div>
+					</ScaledToFit>
 				</div>
 			</div>
 

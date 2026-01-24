@@ -20,7 +20,26 @@ const DEMO_SUGGESTIONS = [
 const INITIAL_CUSTOM_INSTRUCTIONS =
 	'Help me write a short and concise booking pitch.\nWe play modern jazz with a bit of indie energy.\nKeep it warm, clear, and brief.';
 
-export const LandingDraftingDemo: FC = () => {
+// Layout constants for different view modes
+const LAYOUT_DESKTOP = {
+	suggestions: { left: 67, top: 52, width: 338, height: 290 },
+	hybridPromptInput: { right: 67, top: 48, width: 416, height: 587 },
+} as const;
+
+const LAYOUT_MOBILE = {
+	suggestions: { left: 30, top: 36, width: 368, height: 320 },
+	hybridPromptInput: { right: 30, top: 32, width: 460, height: 648 },
+} as const;
+
+interface LandingDraftingDemoProps {
+	/**
+	 * When true, uses larger layout dimensions optimized for the mobile landing page view.
+	 * When false (default), uses the original compact desktop layout.
+	 */
+	isMobileLayout?: boolean;
+}
+
+export const LandingDraftingDemo: FC<LandingDraftingDemoProps> = ({ isMobileLayout = false }) => {
 	const router = useRouter();
 	const [identity, setIdentity] = useState<Identity>(() => ({
 		id: 0,
@@ -44,25 +63,20 @@ export const LandingDraftingDemo: FC = () => {
 	const [previousPromptValue, setPreviousPromptValue] = useState<string | null>(null);
 	const hasPreviousPrompt = previousPromptValue != null;
 
-	// Layout specs for landing demo (px)
-	// Centered: content spans 771px (338+17gap+416), margins = (904-771)/2 ≈ 67px each side
-	const suggestionsSpec = {
-		left: 67,
-		top: 52,
-		width: 338,
-		height: 290,
-	} as const;
-	const hybridPromptInputSpec = {
-		right: 67,
-		top: 48,
-		width: 416,
-		height: 587,
-	} as const;
+	const layout = isMobileLayout ? LAYOUT_MOBILE : LAYOUT_DESKTOP;
+	const suggestionsSpec = layout.suggestions;
+	const hybridPromptInputSpec = layout.hybridPromptInput;
 
-	// HybridPromptInput is designed around a 499x703 desktop panel; scale it to fit 416x587.
+	// HybridPromptInput is designed around a 499x703 desktop panel; scale it to fit.
 	const HPI_BASE_WIDTH = 499;
 	const HPI_BASE_HEIGHT = 703;
 	const hpiScale = hybridPromptInputSpec.width / HPI_BASE_WIDTH;
+
+	// PromptSuggestionsBox (landing variant) is designed around 338x290; scale it to fit.
+	const PSB_BASE_WIDTH = 338;
+	const PSB_BASE_HEIGHT = 290;
+	// Only scale suggestions box if using the larger mobile layout to fill space
+	const psbScale = isMobileLayout ? suggestionsSpec.width / PSB_BASE_WIDTH : 1;
 
 	const form = useForm<DraftingFormValues>({
 		defaultValues: {
@@ -138,18 +152,27 @@ export const LandingDraftingDemo: FC = () => {
 					height: suggestionsSpec.height,
 				}}
 			>
-				<PromptSuggestionsBox
-					variant="landing"
-					title="Suggestions"
-					promptQualityScore={promptQualityScore}
-					promptQualityLabel={promptQualityLabel}
-					suggestions={promptSuggestions}
-					isUpscalingPrompt={isUpscalingPrompt}
-					hasPreviousPrompt={hasPreviousPrompt}
-					onUpscalePrompt={handleUpscalePrompt}
-					onUndoUpscalePrompt={handleUndoUpscalePrompt}
-					style={{ width: '100%', height: '100%' }}
-				/>
+				<div
+					style={{
+						width: PSB_BASE_WIDTH,
+						height: PSB_BASE_HEIGHT,
+						transform: `scale(${psbScale})`,
+						transformOrigin: 'top left',
+					}}
+				>
+					<PromptSuggestionsBox
+						variant="landing"
+						title="Suggestions"
+						promptQualityScore={promptQualityScore}
+						promptQualityLabel={promptQualityLabel}
+						suggestions={promptSuggestions}
+						isUpscalingPrompt={isUpscalingPrompt}
+						hasPreviousPrompt={hasPreviousPrompt}
+						onUpscalePrompt={handleUpscalePrompt}
+						onUndoUpscalePrompt={handleUndoUpscalePrompt}
+						style={{ width: '100%', height: '100%' }}
+					/>
+				</div>
 			</div>
 
 			{/* HybridPromptInput */}
@@ -194,6 +217,7 @@ export const LandingDraftingDemo: FC = () => {
 							onIdentityUpdate={(data) => {
 								setIdentity((prev) => ({ ...prev, ...(data as any), updatedAt: new Date() }));
 							}}
+							forceDesktop
 						/>
 					</Form>
 				</div>
