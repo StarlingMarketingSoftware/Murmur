@@ -1549,70 +1549,44 @@ export default function HomePage() {
 					</div>
 				</div>
 
-				{/* Wide layout: original design */}
-				<div
-					className="hidden min-[1500px]:block"
-					style={{
-						marginTop: '75px',
-						width: '1866px',
-						height: '771px',
-						backgroundColor: '#FAFAFA',
-						position: 'relative',
-					}}
-				>
-					{/* Inner box - left */}
+				{/* Wide layout */}
+				<div className="hidden min-[1500px]:flex w-full justify-center" style={{ marginTop: '75px' }}>
 					<div
-						style={{
-							position: 'absolute',
-							left: '39px',
-							top: '140px',
-							width: '738px',
-							height: '447px',
-							backgroundColor: '#EFEFEF',
-							borderRadius: '8px',
-							padding: '40px',
-						}}
+						className="w-[1783px] h-[712px] rounded-[22px] overflow-hidden grid grid-cols-[879px_904px]"
+						aria-label="Emails That Land"
 					>
-						<p className="font-inter font-normal text-[62px] text-black leading-tight">
-							Emails That Land
-						</p>
-						<p className="font-inter font-normal text-[25px] text-black mt-14">
-							Emails not getting responses? Ditch the templates. Murmur drafts pitches based on your bio and date range that venues actually respond to.
-						</p>
-						{/* Learn about Drafting button */}
-						<Link href="/drafting">
-							<div
-								className="landing-learn-research-btn"
-								style={{
-									position: 'absolute',
-									left: '47px',
-									bottom: '26px',
-									width: '288px',
-									height: '51px',
-									borderRadius: '6px',
-									display: 'flex',
-									alignItems: 'center',
-									justifyContent: 'center',
-									cursor: 'pointer'
-								}}
-							>
-								<span className="font-inter font-normal text-[25px] text-[#5DAB68]">Learn about Drafting</span>
+						{/* Left side (white) */}
+						<div className="h-full w-full bg-white flex items-center">
+							<div className="w-[712px] mx-auto">
+								<p className="font-inter font-normal text-[62px] text-black leading-tight">
+									Emails That Land
+								</p>
+								<p className="font-inter font-normal text-[25px] text-black mt-14">
+									Emails not getting responses? Ditch the templates. Murmur drafts pitches based on your bio
+									and date range that venues actually respond to.
+								</p>
+								<Link
+									href="/drafting"
+									className="landing-learn-research-btn mt-14 inline-flex items-center justify-center w-[288px] h-[51px] rounded-[6px] bg-transparent"
+								>
+									<span className="font-inter font-normal text-[25px] text-[#5DAB68]">
+										Learn about Drafting
+									</span>
+								</Link>
 							</div>
-						</Link>
-					</div>
-					{/* Inner box - right */}
-					<div
-						style={{
-							position: 'absolute',
-							right: '47px',
-							top: '27px',
-							width: '904px',
-							height: '712px',
-							backgroundColor: '#F1F1F1',
-							borderRadius: '8px',
-						}}
-					>
-						<LandingDraftingDemo />
+						</div>
+
+						{/* Right side (gradient) */}
+						<div
+							className="h-full w-full flex items-center justify-center"
+							style={{
+								background: 'linear-gradient(180deg, #DAE6FE 0%, #CAD5F9 100%)',
+							}}
+						>
+							<div className="w-[904px] h-[712px]">
+								<LandingDraftingDemo />
+							</div>
+						</div>
 					</div>
 				</div>
 			</div>

@@ -45,14 +45,15 @@ export const LandingDraftingDemo: FC = () => {
 	const hasPreviousPrompt = previousPromptValue != null;
 
 	// Layout specs for landing demo (px)
+	// Centered: content spans 771px (338+17gap+416), margins = (904-771)/2 ≈ 67px each side
 	const suggestionsSpec = {
-		left: 43,
+		left: 67,
 		top: 52,
 		width: 338,
 		height: 290,
 	} as const;
 	const hybridPromptInputSpec = {
-		right: 90,
+		right: 67,
 		top: 48,
 		width: 416,
 		height: 587,
