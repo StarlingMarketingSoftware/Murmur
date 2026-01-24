@@ -1374,7 +1374,7 @@ export default function HomePage() {
 								</p>
 								<Link
 									href="/research"
-									className="landing-learn-research-btn mt-10 inline-flex items-center justify-center w-[302px] h-[51px] rounded-[6px] bg-transparent"
+									className="landing-learn-research-btn mt-14 inline-flex items-center justify-center w-[302px] h-[51px] rounded-[6px] bg-transparent"
 								>
 									<span className="font-inter font-normal text-[25px] text-[#5DAB68]">
 										Learn about research
@@ -1501,13 +1501,13 @@ export default function HomePage() {
 								<p className="font-inter font-normal text-[62px] text-black leading-tight">
 									Every Reply
 								</p>
-								<p className="font-inter font-normal text-[25px] text-black mt-10">
+								<p className="font-inter font-normal text-[25px] text-black mt-4">
 									Never miss a reply! Get full context on each response, including what campaign it came from,
 									all in one place.
 								</p>
 								<Link
 									href="/inbox"
-									className="landing-learn-research-btn mt-14 inline-flex items-center justify-center w-[260px] h-[51px] rounded-[6px] bg-transparent"
+									className="landing-learn-research-btn mt-20 inline-flex items-center justify-center w-[260px] h-[51px] rounded-[6px] bg-transparent"
 								>
 									<span className="font-inter font-normal text-[25px] text-[#5DAB68]">
 										Learn about Inbox
@@ -1561,13 +1561,13 @@ export default function HomePage() {
 								<p className="font-inter font-normal text-[62px] text-black leading-tight">
 									Emails That Land
 								</p>
-								<p className="font-inter font-normal text-[25px] text-black mt-14">
+								<p className="font-inter font-normal text-[25px] text-black mt-4">
 									Emails not getting responses? Ditch the templates. Murmur drafts pitches based on your bio
 									and date range that venues actually respond to.
 								</p>
 								<Link
 									href="/drafting"
-									className="landing-learn-research-btn mt-14 inline-flex items-center justify-center w-[288px] h-[51px] rounded-[6px] bg-transparent"
+									className="landing-learn-research-btn mt-20 inline-flex items-center justify-center w-[288px] h-[51px] rounded-[6px] bg-transparent"
 								>
 									<span className="font-inter font-normal text-[25px] text-[#5DAB68]">
 										Learn about Drafting
