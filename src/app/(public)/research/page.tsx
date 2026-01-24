@@ -80,27 +80,27 @@ export default function ResearchPage() {
       <div className="hidden lg:flex justify-center mt-[180px] px-4">
         <div className="flex w-[1352px] h-[945px] gap-[20px]">
           <div className="flex h-full w-[745px] flex-col gap-[21px]">
-            <div className="h-[462px] w-[745px] rounded-[22px] bg-white px-[56px] pt-[32px]">
+            <div className="h-[462px] w-[745px] rounded-[22px] bg-white px-[56px] pt-[48px]">
               <p className="font-inter font-bold text-[24px] text-black">
                 From Booking Schedules to Genre
               </p>
-              <p className="font-inter text-[23px] text-black mt-[24px] pr-[56px] leading-[45px] tracking-wide [word-spacing:5px]">
+              <p className="font-inter text-[21px] text-black mt-[32px] pr-[24px] leading-[57px] tracking-wide [word-spacing:5px]">
                 For every contact, we provide detailed descriptions, including facts like what times a venue in Eastern Pennsylvania is booking shows, and what genres they book. See the research at any point in the tool, from searching the map up to sending your first email.
               </p>
             </div>
 
-            <div className="h-[462px] w-[745px] rounded-[22px] bg-white px-[56px] pt-[32px]">
+            <div className="h-[462px] w-[745px] rounded-[22px] bg-white px-[56px] pt-[48px]">
               <p className="font-inter font-bold text-[24px] text-black">
                 Know the History
               </p>
-              <p className="font-inter text-[23px] text-black mt-[24px] pr-[56px] leading-[45px] tracking-wide [word-spacing:5px]">
+              <p className="font-inter text-[21px] text-black mt-[32px] pr-[24px] leading-[57px] tracking-wide [word-spacing:5px]">
                 The research goes beyond the basics and into the culture of each location. Know if a brewery in West Virginia is serving hikers, or if a coffee shop in Illinois hosts an outdoor summer concert series. We care about the details.
               </p>
             </div>
           </div>
 
-          <div className="h-[945px] w-[587px] rounded-[22px] bg-[#D3F4FF] flex items-center justify-center">
-            <PanelDemo className="w-[424px] h-auto" />
+          <div className="h-[945px] w-[587px] rounded-[22px] bg-[#D3F4FF] flex items-center justify-center overflow-hidden">
+            <PanelDemo className="w-[424px]" style={{ height: 'auto' }} />
           </div>
         </div>
       </div>
