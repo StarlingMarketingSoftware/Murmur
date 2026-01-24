@@ -477,6 +477,10 @@ body {
 }
 
 /* Landing map copy blocks inside the SVG */
+.landing-map-copy--desktop {
+	display: none;
+}
+
 .landing-map-copy--mobile {
 	display: none;
 }
