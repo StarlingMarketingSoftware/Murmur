@@ -800,8 +800,6 @@ export default function HomePage() {
 		};
 	}, []);
 
-	// Keep the mobile map copy readable while ensuring it stays centered in Safari.
-	// NOTE: This value is used by the inline SVG for its mobile-only copy blocks.
 	const landingMapMobileCopyScale =
 		Number.isFinite(landingMapScale) && landingMapScale > 0
 			? Math.max(1, 0.6 / landingMapScale)
