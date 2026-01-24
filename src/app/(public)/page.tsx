@@ -1472,86 +1472,49 @@ export default function HomePage() {
 					</div>
 				</div>
 
-				{/* Wide layout: original design */}
-				<div
-					className="hidden min-[1500px]:block"
-					style={{
-						marginTop: '82px',
-						width: '1866px',
-						height: '771px',
-						backgroundColor: '#FAFAFA',
-						position: 'relative',
-					}}
-				>
-					{/* Inner box - left */}
-					<div
-						style={{
-							position: 'absolute',
-							left: '35px',
-							top: '26px',
-							width: '1130px',
-							height: '712px',
-							backgroundColor: '#F1F1F1',
-							borderRadius: '8px',
-							display: 'flex',
-							alignItems: 'center',
-							justifyContent: 'center',
-						}}
-					>
-						<InboxSection
-							noOuterPadding
-							desktopWidth={998}
-							desktopHeight={535}
-							allowedSenderEmails={Object.keys(sampleContactsByEmail)}
-							contactByEmail={sampleContactsByEmail}
-							sampleData={{
-								inboundEmails: sampleInboundEmails,
-								sentEmails: sampleSentEmails,
+				{/* Wide layout */}
+				<div className="hidden min-[1500px]:flex w-full justify-center" style={{ marginTop: '82px' }}>
+					<div className="w-[1789px] h-[718px] rounded-[22px] overflow-hidden flex" aria-label="Every Reply">
+						{/* Left side (gradient) */}
+						<div
+							className="h-full w-[1130px] flex items-center justify-center"
+							style={{
+								background: 'linear-gradient(180deg, #DBFFE2 0%, #99D8A5 100%)',
 							}}
-						/>
-					</div>
-					{/* Inner box - right */}
-					<div
-						style={{
-							position: 'absolute',
-							right: '42px',
-							top: '199px',
-							width: '542px',
-							height: '459px',
-							backgroundColor: '#EFEFEF',
-							borderRadius: '8px',
-							padding: '40px',
-						}}
-					>
-						<p className="font-inter font-normal text-[62px] text-black leading-tight">
-							Every Reply
-						</p>
-						<p className="font-inter font-normal text-[25px] text-black mt-10">
-							Never miss a reply! Get full context on each response, including what campaign it came from,
-							all in one place.
-						</p>
-						{/* Learn about Inbox button */}
-						<Link href="/inbox">
-							<div
-								className="landing-learn-research-btn"
-								style={{
-									position: 'absolute',
-									left: '31px',
-									bottom: '45px',
-									width: '260px',
-									height: '51px',
-									borderRadius: '6px',
-									display: 'flex',
-									alignItems: 'center',
-									justifyContent: 'center',
-									cursor: 'pointer',
+						>
+							<InboxSection
+								noOuterPadding
+								desktopWidth={998}
+								desktopHeight={535}
+								allowedSenderEmails={Object.keys(sampleContactsByEmail)}
+								contactByEmail={sampleContactsByEmail}
+								sampleData={{
+									inboundEmails: sampleInboundEmails,
+									sentEmails: sampleSentEmails,
 								}}
-							>
-								<span className="font-inter font-normal text-[25px] text-[#5DAB68]">
-									Learn about Inbox
-								</span>
+							/>
+						</div>
+
+						{/* Right side (white) */}
+						<div className="h-full w-[659px] bg-white flex items-center">
+							<div className="w-[520px] mx-auto">
+								<p className="font-inter font-normal text-[62px] text-black leading-tight">
+									Every Reply
+								</p>
+								<p className="font-inter font-normal text-[25px] text-black mt-10">
+									Never miss a reply! Get full context on each response, including what campaign it came from,
+									all in one place.
+								</p>
+								<Link
+									href="/inbox"
+									className="landing-learn-research-btn mt-14 inline-flex items-center justify-center w-[260px] h-[51px] rounded-[6px] bg-transparent"
+								>
+									<span className="font-inter font-normal text-[25px] text-[#5DAB68]">
+										Learn about Inbox
+									</span>
+								</Link>
 							</div>
-						</Link>
+						</div>
 					</div>
 				</div>
 
