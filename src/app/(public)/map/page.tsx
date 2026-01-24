@@ -39,15 +39,25 @@ const videoStyle = {
 
 export default function MapPage() {
   return (
-    <main className="overflow-x-hidden">
-      <div className="landing-zoom-80">
-        <div className="min-h-screen bg-white">
-          <div className="w-full flex items-start justify-center pt-8 pb-6 lg:h-[264px] lg:items-center lg:pt-0 lg:pb-0">
+    <main className="relative bg-[#F5F5F7]">
+      {/* Gradient overlay for first 1307px (outside `.landing-zoom-80` so it isn't scaled by `zoom`) */}
+      <div
+        // Offset by the navbar spacer height (h-12 = 48px) so the gradient starts at the true top of the page.
+        className="absolute -top-12 left-0 w-full pointer-events-none z-0"
+        style={{
+          height: '1307px',
+          background: 'linear-gradient(to bottom, #E6D6C6, #F5F5F7)',
+        }}
+      />
+
+      <div className="landing-zoom-80 relative z-10">
+        <div className="min-h-screen relative">
+          <div className="relative w-full flex items-start justify-center pt-8 pb-6 lg:h-[264px] lg:items-center lg:pt-0 lg:pb-0">
             <h1 className="font-inter text-center text-[40px] sm:text-[56px] lg:text-[65px] leading-none">
               Mapping
             </h1>
           </div>
-          <div className="flex justify-center">
+          <div className="relative flex justify-center">
             <MuxPlayer
               style={{
                 ...videoStyle,
@@ -67,7 +77,7 @@ export default function MapPage() {
 
           {/* Explore the Country */}
           {/* Narrow layout (match landing page ultra-narrow typography/padding) */}
-          <div className="lg:hidden w-full mt-10 px-[14%]">
+          <div className="relative lg:hidden w-full mt-10 px-[14%]">
             <div className="mx-auto w-full max-w-[904px] bg-[#FAFAFA]">
               <div className="bg-[#EFEFEF] rounded-[8px] px-6 py-8">
                 <p className="font-inter font-normal text-[22px] xs:text-[24px] sm:text-[27px] text-black leading-tight">
@@ -86,7 +96,7 @@ export default function MapPage() {
           </div>
 
           {/* Wide layout (original design) */}
-          <div className="hidden lg:flex justify-center mt-[196px] px-4">
+          <div className="relative hidden lg:flex justify-center mt-[196px] px-4">
             <div className="w-full max-w-[1347px] bg-[#FAFAFA] flex items-stretch flex-row h-[364px]">
               <div className="w-full max-w-[678px] bg-[#EFEFEF] rounded-[6px] ml-[24px] my-[17px] px-[56px] py-[46px] h-[327px]">
                 <p className="font-inter font-bold text-[24px] text-black">Explore the Country</p>
@@ -103,7 +113,7 @@ export default function MapPage() {
 
           {/* All Data in One Place */}
           {/* Narrow layout (match landing page ultra-narrow typography/padding) */}
-          <div className="lg:hidden w-full mt-12 px-[14%]">
+          <div className="relative lg:hidden w-full mt-12 px-[14%]">
             <div className="mx-auto w-full max-w-[904px] bg-[#FAFAFA]">
               <div className="bg-[#EFEFEF] rounded-[8px] px-6 py-8">
                 <p className="font-inter font-normal text-[22px] xs:text-[24px] sm:text-[27px] text-black leading-tight">
@@ -121,7 +131,7 @@ export default function MapPage() {
           </div>
 
           {/* Wide layout (original design) */}
-          <div className="hidden lg:flex justify-center mt-[81px] px-4">
+          <div className="relative hidden lg:flex justify-center mt-[81px] px-4">
             <div className="w-full max-w-[1347px] bg-[#FAFAFA] flex items-stretch flex-row-reverse h-[364px]">
               <div className="w-full max-w-[678px] bg-[#EFEFEF] rounded-[6px] mr-[23px] my-[17px] px-[56px] py-[46px] h-[327px]">
                 <p className="font-inter font-bold text-[24px] text-black">All Data in One Place:</p>
@@ -137,7 +147,7 @@ export default function MapPage() {
 
           {/* Zoom Closer, See the Details */}
           {/* Narrow layout (match landing page ultra-narrow typography/padding) */}
-          <div className="lg:hidden w-full mt-12 px-[14%]">
+          <div className="relative lg:hidden w-full mt-12 px-[14%]">
             <div className="mx-auto w-full max-w-[904px] bg-[#FAFAFA]">
               <div className="bg-[#EFEFEF] rounded-[8px] px-6 py-8">
                 <p className="font-inter font-normal text-[22px] xs:text-[24px] sm:text-[27px] text-black leading-tight">
@@ -155,7 +165,7 @@ export default function MapPage() {
           </div>
 
           {/* Wide layout (original design) */}
-          <div className="hidden lg:flex justify-center mt-[119px] px-4">
+          <div className="relative hidden lg:flex justify-center mt-[119px] px-4">
             <div className="w-full max-w-[1347px] bg-[#FAFAFA] flex items-stretch flex-row h-[364px]">
               <div className="w-full max-w-[678px] bg-[#EFEFEF] rounded-[6px] ml-[24px] my-[17px] px-[56px] py-[46px] h-[327px]">
                 <p className="font-inter font-bold text-[24px] text-black">Zoom Closer, See the Details:</p>
@@ -168,7 +178,7 @@ export default function MapPage() {
               </div>
             </div>
           </div>
-          <div className="flex flex-col items-center justify-center pt-14 pb-16 sm:pt-16 sm:pb-20 lg:py-0 lg:h-[660px]">
+          <div className="relative flex flex-col items-center justify-center pt-14 pb-16 sm:pt-16 sm:pb-20 lg:py-0 lg:h-[660px]">
             <p className="font-inter font-normal text-[clamp(32px,9vw,62px)] text-black text-center leading-[1.05]">
               Try Murmur Now
             </p>
