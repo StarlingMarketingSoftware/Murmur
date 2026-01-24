@@ -5,6 +5,9 @@ html {
 	scroll-behavior: smooth;
 	/* Safari scroll fix */
 	-webkit-overflow-scrolling: touch;
+	/* Prevent iOS Safari font boosting (esp. when using transforms/zoom) */
+	-webkit-text-size-adjust: 100%;
+	text-size-adjust: 100%;
 }
 
 /* Premium text rendering */
@@ -539,6 +542,53 @@ body {
 			(100vw - env(safe-area-inset-left) - env(safe-area-inset-right)) /
 				(1890px * var(--landing-zoom, 1))
 		);
+	}
+}
+
+/* ========================================
+   Map Page - Feature Section Scaling
+   ======================================== */
+
+.map-feature-scale-wrapper {
+	--map-feature-scale: 1;
+	--map-feature-base-height: 0px;
+	/* Wrapper controls the visible height in the document flow */
+	height: calc(var(--map-feature-base-height) * var(--map-feature-scale));
+}
+
+.map-feature-scale-inner {
+	transform-origin: top center;
+	transform: scale(var(--map-feature-scale));
+	flex-shrink: 0;
+}
+
+.map-feature-scale-wrapper--explore {
+	--map-feature-base-height: 455px;
+}
+
+@media (max-width: 1435px) {
+	.map-feature-scale-wrapper--explore {
+		--map-feature-scale: calc((100vw - 32px) / 1403px);
+	}
+}
+
+.map-feature-scale-wrapper--all-data {
+	--map-feature-base-height: 532px;
+}
+
+@media (max-width: 1460px) {
+	.map-feature-scale-wrapper--all-data {
+		--map-feature-scale: calc((100vw - 32px) / 1428px);
+	}
+}
+
+.map-feature-scale-wrapper--zoom {
+	--map-feature-base-height: 470px;
+}
+
+@media (max-width: 1436px) {
+	.map-feature-scale-wrapper--zoom {
+		--map-feature-scale: calc((100vw - 32px) / 1404px);
 	}
 }
 

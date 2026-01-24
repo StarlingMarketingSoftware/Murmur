@@ -79,30 +79,41 @@ export default function MapPage() {
           </div>
 
           {/* Explore the Country */}
-          {/* Narrow layout (match landing page ultra-narrow typography/padding) */}
-          <div className="relative lg:hidden w-full mt-10 px-[14%]">
-            <div className="mx-auto w-full max-w-[904px] bg-[#FAFAFA]">
-              <div className="bg-[#EFEFEF] rounded-[8px] px-6 py-8">
-                <p className="font-inter font-normal text-[22px] xs:text-[24px] sm:text-[27px] text-black leading-tight">
+          {/* Mobile layout (match screenshot card style; avoid SVG clipping) */}
+          <div className="relative md:hidden flex justify-center mt-10">
+            <div
+              className="w-[calc(100vw-32px)] max-w-[904px] flex flex-col gap-6"
+              style={{
+                maxWidth:
+                  'min(904px, calc(100vw - 32px - env(safe-area-inset-left) - env(safe-area-inset-right)))',
+              }}
+            >
+              <div className="bg-white rounded-[34px] px-8 pt-10 pb-12">
+                <p className="font-inter font-bold text-[20px] text-black leading-tight">
                   Explore the Country
                 </p>
-                <p className="font-inter font-normal text-[11.5px] xs:text-[12.5px] sm:text-[18px] text-black leading-tight mt-2 break-words">
+                <p className="font-inter font-normal text-[16px] text-black mt-5 leading-[1.75] tracking-wide [word-spacing:3px] break-words">
                   Plan a city-wide tour in Los Angeles or Portland for a week of shows. Go explore 100,000+
                   contacts from the Pacific to the Atlantic.
                 </p>
               </div>
 
-              <div className="mt-6 bg-[#F1F1F1] rounded-[8px] px-6 pt-8 pb-10 overflow-hidden flex justify-center">
-                <MapDemo1 className="w-full h-auto max-w-[508px]" />
+              <div className="bg-[#F1F1F1] rounded-[34px] overflow-hidden">
+                <MapDemo1
+                  className="w-full h-auto block"
+                  viewBox="0 0 508 287"
+                  preserveAspectRatio="xMidYMid meet"
+                />
               </div>
             </div>
           </div>
 
           {/* Wide layout (original design) */}
-          <div className="relative hidden lg:flex justify-center mt-[80px] px-4">
-            <div className="w-[1403px] h-[455px] flex items-stretch gap-[14px]">
+          <div className="relative hidden md:flex justify-center mt-[80px] px-4 overflow-visible map-feature-scale-wrapper map-feature-scale-wrapper--explore">
+            <div className="map-feature-scale-inner w-[1403px] h-[455px] flex items-stretch gap-[14px]">
               <div className="w-[585px] h-[455px] bg-[#FFFFFF] rounded-[22px] px-[56px] pt-[62px] pb-[46px]">
                 <p className="font-inter font-bold text-[23px] text-black">Explore the Country</p>
+                
                 <p className="font-inter text-[23px] text-black mt-[44px] pr-[56px] leading-[56px] tracking-wide [word-spacing:5px]">
                   Plan a city-wide tour in Los Angeles or Portland for a week of shows. Go explore 100,000+
                   contacts from the Pacific to the Atlantic.
@@ -115,27 +126,38 @@ export default function MapPage() {
           </div>
 
           {/* All Data in One Place */}
-          {/* Narrow layout (match landing page ultra-narrow typography/padding) */}
-          <div className="relative lg:hidden w-full mt-12 px-[14%]">
-            <div className="mx-auto w-full max-w-[904px] bg-[#FAFAFA]">
-              <div className="bg-[#EFEFEF] rounded-[8px] px-6 py-8">
-                <p className="font-inter font-normal text-[22px] xs:text-[24px] sm:text-[27px] text-black leading-tight">
-                  All Data in One Place:
+          {/* Mobile layout (match screenshot card style; avoid SVG clipping) */}
+          <div className="relative md:hidden flex justify-center mt-12">
+            <div
+              className="w-[calc(100vw-32px)] max-w-[904px] flex flex-col gap-6"
+              style={{
+                maxWidth:
+                  'min(904px, calc(100vw - 32px - env(safe-area-inset-left) - env(safe-area-inset-right)))',
+              }}
+            >
+              <div className="bg-white rounded-[34px] px-8 pt-10 pb-12">
+                <p className="font-inter font-bold text-[20px] text-black leading-tight">
+                  All Data in One Place
                 </p>
-                <p className="font-inter font-normal text-[11.5px] xs:text-[12.5px] sm:text-[18px] text-black leading-tight mt-2 break-words">
+                <p className="font-inter font-normal text-[16px] text-black mt-5 leading-[1.75] tracking-wide [word-spacing:3px] break-words">
                   Filter each search by category, whether you&apos;re looking for coffee shops for gigs or radio stations for airplay.
                 </p>
               </div>
 
-              <div className="mt-6 bg-[#F1F1F1] rounded-[8px] px-6 pt-8 pb-10 overflow-hidden flex justify-center">
-                <WhatDemo className="w-full h-auto max-w-[450px] -translate-x-[11.75%]" />
+              <div
+                className="rounded-[34px] p-6 sm:p-8 flex justify-center overflow-visible"
+                style={{
+                  background: 'linear-gradient(180deg, #C3E8C9 0%, #AFF1B8 100%)',
+                }}
+              >
+                <WhatDemo className="w-full h-auto max-w-[520px] -translate-x-[11.75%]" />
               </div>
             </div>
           </div>
 
           {/* Wide layout (updated design) */}
-          <div className="relative hidden lg:flex justify-center mt-[81px] px-4">
-            <div className="w-[1428px] flex items-stretch gap-[15px]">
+          <div className="relative hidden md:flex justify-center mt-[81px] px-4 overflow-visible map-feature-scale-wrapper map-feature-scale-wrapper--all-data">
+            <div className="map-feature-scale-inner w-[1428px] flex items-stretch gap-[15px]">
               <div
                 className="w-[702px] h-[532px] rounded-[22px] flex items-center justify-center"
                 style={{
@@ -155,27 +177,37 @@ export default function MapPage() {
           </div>
 
           {/* Zoom Closer, See the Details */}
-          {/* Narrow layout (match landing page ultra-narrow typography/padding) */}
-          <div className="relative lg:hidden w-full mt-12 px-[14%]">
-            <div className="mx-auto w-full max-w-[904px] bg-[#FAFAFA]">
-              <div className="bg-[#EFEFEF] rounded-[8px] px-6 py-8">
-                <p className="font-inter font-normal text-[22px] xs:text-[24px] sm:text-[27px] text-black leading-tight">
-                  Zoom Closer, See the Details:
+          {/* Mobile layout (match the card style above; avoid SVG clipping) */}
+          <div className="relative md:hidden flex justify-center mt-12">
+            <div
+              className="w-[calc(100vw-32px)] max-w-[904px] flex flex-col gap-6"
+              style={{
+                maxWidth:
+                  'min(904px, calc(100vw - 32px - env(safe-area-inset-left) - env(safe-area-inset-right)))',
+              }}
+            >
+              <div className="bg-white rounded-[34px] px-8 pt-10 pb-12">
+                <p className="font-inter font-bold text-[20px] text-black leading-tight">
+                  Zoom Closer, See the Details
                 </p>
-                <p className="font-inter font-normal text-[11.5px] xs:text-[12.5px] sm:text-[18px] text-black leading-tight mt-2 break-words">
+                <p className="font-inter font-normal text-[16px] text-black mt-5 leading-[1.75] tracking-wide [word-spacing:3px] break-words">
                   Zoom in on San Francisco and see more contacts appear. The closer you get, the more you see.
                 </p>
               </div>
 
-              <div className="mt-6 bg-[#F1F1F1] rounded-[8px] px-6 pt-8 pb-10 overflow-hidden flex justify-center">
-                <ZoomDemo className="w-full h-auto max-w-[561px]" />
+              <div className="rounded-[22px] overflow-hidden">
+                <ZoomDemo
+                  className="w-full h-auto block"
+                  viewBox="0 0 561 287"
+                  preserveAspectRatio="xMidYMid meet"
+                />
               </div>
             </div>
           </div>
 
           {/* Wide layout (updated design) */}
-          <div className="relative hidden lg:flex justify-center mt-[119px] px-4">
-            <div className="w-[1404px] h-[470px] flex items-stretch gap-[15px]">
+          <div className="relative hidden md:flex justify-center mt-[119px] px-4 overflow-visible map-feature-scale-wrapper map-feature-scale-wrapper--zoom">
+            <div className="map-feature-scale-inner w-[1404px] h-[470px] flex items-stretch gap-[15px]">
               <div className="w-[469px] h-[470px] bg-white rounded-[22px] px-[56px] pt-[62px] pb-[46px]">
                 <p className="font-inter font-bold text-[24px] text-black">Zoom Closer, See the Details:</p>
                 <p className="font-inter text-[23px] text-black mt-[44px] leading-[56px] tracking-wide [word-spacing:5px]">

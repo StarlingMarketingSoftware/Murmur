@@ -27,17 +27,27 @@ export default function ResearchPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-white">
-      <div className="w-full flex items-start justify-center pt-12 pb-10 lg:h-[264px] lg:items-center lg:pt-0 lg:pb-0">
-        <h1 className="font-inter text-center text-[40px] sm:text-[56px] lg:text-[65px] leading-none">
-          Research
-        </h1>
-      </div>
-      <div className="flex justify-center w-full px-[14%] lg:px-4">
-        <div className="w-full max-w-[747px]">
-          <ResearchDemo className="w-full h-auto" />
+    <main className="relative bg-[#F5F5F7]">
+      {/* Gradient overlay for first 1935px (offset by navbar spacer height, h-12 = 48px) */}
+      <div
+        className="absolute -top-12 left-0 w-full pointer-events-none z-0"
+        style={{
+          height: '1935px',
+          background: 'linear-gradient(to bottom, #D3F4FF, #F5F5F7)',
+        }}
+      />
+
+      <div className="relative z-10 min-h-screen">
+        <div className="relative flex justify-center pt-8 pb-6 lg:pt-[53px] lg:pb-0">
+          <div className="w-[calc(100vw-32px)] max-w-[966px] bg-[#F2FBFF] rounded-[22px] flex flex-col items-center gap-6 px-4 pt-6 pb-6 lg:w-[966px] lg:h-[823px] lg:px-[46px] lg:pt-[30px] lg:pb-[30px]">
+            <h1 className="font-inter font-extralight tracking-[0.19em] text-[#696969] text-center text-[40px] sm:text-[56px] lg:text-[65px] leading-none">
+              Research
+            </h1>
+            <div className="w-full flex-1 min-h-0 flex justify-center">
+              <ResearchDemo className="w-full h-auto lg:h-full" />
+            </div>
+          </div>
         </div>
-      </div>
       
       {/* Mobile Layout (match landing page ultra-narrow typography/padding) */}
       <div className="lg:hidden w-full mt-14 px-[14%]">
@@ -196,6 +206,7 @@ export default function ResearchPage() {
           Start Free Trial
         </Link>
       </div>
-    </div>
+      </div>
+    </main>
   );
 }
