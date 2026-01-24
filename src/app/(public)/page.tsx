@@ -1357,114 +1357,73 @@ export default function HomePage() {
 					</div>
 				</div>
 
-				{/* Wide layout: original design */}
-				<div
-					className="hidden min-[1500px]:block"
-					style={{
-						marginTop: '145px',
-						width: '1866px',
-						height: '771px',
-						backgroundColor: '#FAFAFA',
-						position: 'relative',
-					}}
-				>
-					{/* Inner box - left */}
-				<div
-					style={{
-						position: 'absolute',
-						left: '39px',
-						top: '200px',
-						width: '792px',
-						height: '417px',
-						backgroundColor: '#EFEFEF',
-						borderRadius: '8px',
-						paddingLeft: '22px',
-						paddingRight: '40px',
-						paddingTop: '40px',
-						paddingBottom: '40px',
-					}}
-				>
-						<p className="font-inter font-normal text-[62px] text-black leading-tight">
-							We Did The Research
-						</p>
-						<p className="font-inter font-normal text-[25px] text-black mt-6">
-							Take a look through every contact, and you&apos;ll get to see information on what styles they book, their live music schedules, and even how to actually find the right person.
-						</p>
-						{/* Learn about research button */}
-						<Link href="/research">
+				{/* Wide layout */}
+				<div className="hidden min-[1500px]:flex w-full justify-center" style={{ marginTop: '145px' }}>
+					<div
+						className="w-[1753px] h-[712px] rounded-[22px] overflow-hidden grid grid-cols-2"
+						aria-label="We Did The Research"
+					>
+						<div className="h-full w-full bg-white flex items-center">
+							<div className="w-[712px] mx-auto">
+								<p className="font-inter font-normal text-[62px] text-black leading-tight">
+									We Did The Research
+								</p>
+								<p className="font-inter font-normal text-[25px] text-black mt-6">
+									Take a look through every contact, and you&apos;ll get to see information on what styles
+									they book, their live music schedules, and even how to actually find the right person.
+								</p>
+								<Link
+									href="/research"
+									className="landing-learn-research-btn mt-10 inline-flex items-center justify-center w-[302px] h-[51px] rounded-[6px] bg-transparent"
+								>
+									<span className="font-inter font-normal text-[25px] text-[#5DAB68]">
+										Learn about research
+									</span>
+								</Link>
+							</div>
+						</div>
+
+						<div
+							className="h-full w-full flex items-center"
+							style={{
+								background: 'linear-gradient(180deg, #EAF7FF 0%, #BEE6FF 100%)',
+							}}
+						>
 							<div
-								className="landing-learn-research-btn"
+								className="w-[712px] h-[712px] mx-auto"
 								style={{
-									position: 'absolute',
-									left: '22px',
-									bottom: '75px',
-									width: '302px',
-									height: '51px',
-									borderRadius: '6px',
-									display: 'flex',
-									alignItems: 'center',
-									justifyContent: 'center',
-									cursor: 'pointer'
+									paddingTop: '31px',
+									paddingBottom: '46px',
 								}}
 							>
-								<span className="font-inter font-normal text-[25px] text-[#5DAB68]">Learn about research</span>
+								<div className="w-[709px] h-[635px] mx-auto flex gap-6">
+									<div className="mt-[76px]">
+										<ContactsExpandedList
+											contacts={sampleContacts}
+											width={326}
+											height={513}
+											minRows={9}
+											onContactHover={(contact) => {
+												if (contact) {
+													setHoveredContact(contact);
+												}
+											}}
+										/>
+									</div>
+									<ContactResearchPanel
+										contact={hoveredContact}
+										width={359}
+										boxWidth={344}
+										height={635}
+										fixedHeightBoxSpacingPx={60}
+										fixedHeightBulletOuterHeightPx={52}
+										fixedHeightBulletInnerHeightPx={44}
+										expandSummaryToFillHeight
+										disableExpansion
+										className="!block"
+									/>
+								</div>
 							</div>
-						</Link>
-					</div>
-					{/* Inner box - right - Contacts and Research panels */}
-					<div
-						style={{
-							position: 'absolute',
-							right: '74px',
-							top: '29px',
-							width: '904px',
-							height: '712px',
-							backgroundColor: '#F1F1F1',
-							borderRadius: '8px',
-						}}
-					>
-						{/* Contacts list */}
-						<div
-							style={{
-								position: 'absolute',
-								left: '141px',
-								top: '108px',
-								bottom: '91px',
-							}}
-						>
-							<ContactsExpandedList
-								contacts={sampleContacts}
-								width={326}
-								height={513}
-								minRows={9}
-								onContactHover={(contact) => {
-									if (contact) {
-										setHoveredContact(contact);
-									}
-								}}
-							/>
-						</div>
-						{/* Research panel */}
-						<div
-							style={{
-								position: 'absolute',
-								right: '52px',
-								top: '31px',
-								bottom: '46px',
-							}}
-						>
-						<ContactResearchPanel
-							contact={hoveredContact}
-							width={359}
-							boxWidth={344}
-							height={635}
-							fixedHeightBoxSpacingPx={60}
-							fixedHeightBulletOuterHeightPx={52}
-							fixedHeightBulletInnerHeightPx={44}
-							expandSummaryToFillHeight
-							disableExpansion
-							className="!block"
-						/>
 						</div>
 					</div>
 				</div>
