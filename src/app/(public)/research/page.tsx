@@ -78,45 +78,29 @@ export default function ResearchPage() {
 
       {/* Desktop Layout */}
       <div className="hidden lg:flex justify-center mt-[180px] px-4">
-        <div className="relative bg-[#FAFAFA]" style={{ width: '1363px', height: '1053px' }}>
-          <div style={{ position: 'absolute', right: '130px', top: '128px' }}>
-            <PanelDemo />
+        <div className="flex w-[1352px] h-[945px] gap-[20px]">
+          <div className="flex h-full w-[745px] flex-col gap-[21px]">
+            <div className="h-[462px] w-[745px] rounded-[22px] bg-white px-[56px] pt-[32px]">
+              <p className="font-inter font-bold text-[24px] text-black">
+                From Booking Schedules to Genre
+              </p>
+              <p className="font-inter text-[23px] text-black mt-[24px] pr-[56px] leading-[45px] tracking-wide [word-spacing:5px]">
+                For every contact, we provide detailed descriptions, including facts like what times a venue in Eastern Pennsylvania is booking shows, and what genres they book. See the research at any point in the tool, from searching the map up to sending your first email.
+              </p>
+            </div>
+
+            <div className="h-[462px] w-[745px] rounded-[22px] bg-white px-[56px] pt-[32px]">
+              <p className="font-inter font-bold text-[24px] text-black">
+                Know the History
+              </p>
+              <p className="font-inter text-[23px] text-black mt-[24px] pr-[56px] leading-[45px] tracking-wide [word-spacing:5px]">
+                The research goes beyond the basics and into the culture of each location. Know if a brewery in West Virginia is serving hikers, or if a coffee shop in Illinois hosts an outdoor summer concert series. We care about the details.
+              </p>
+            </div>
           </div>
-          <div style={{
-            width: '686px',
-            height: '383px',
-            backgroundColor: '#EFEFEF',
-            borderRadius: '6px',
-            position: 'absolute',
-            top: '19px',
-            left: '24px',
-            paddingLeft: '56px',
-            paddingTop: '32px'
-          }}>
-            <p className="font-inter font-bold text-[24px] text-black">
-              From Booking Schedules to Genre
-            </p>
-            <p className="font-inter text-[23px] text-black mt-[24px] pr-[56px] leading-[45px] tracking-wide [word-spacing:5px]">
-              For every contact, we provide detailed descriptions, including facts like what times a venue in Eastern Pennsylvania is booking shows, and what genres they book. See the research at any point in the tool, from searching the map up to sending your first email.
-            </p>
-          </div>
-          <div style={{
-            width: '686px',
-            height: '383px',
-            backgroundColor: '#EFEFEF',
-            borderRadius: '6px',
-            position: 'absolute',
-            bottom: '60px',
-            left: '24px',
-            paddingLeft: '56px',
-            paddingTop: '32px'
-          }}>
-            <p className="font-inter font-bold text-[24px] text-black">
-              Know the History
-            </p>
-            <p className="font-inter text-[23px] text-black mt-[24px] pr-[56px] leading-[45px] tracking-wide [word-spacing:5px]">
-              The research goes beyond the basics and into the culture of each location. Know if a brewery in West Virginia is serving hikers, or if a coffee shop in Illinois hosts an outdoor summer concert series. We care about the details.
-            </p>
+
+          <div className="h-[945px] w-[587px] rounded-[22px] bg-[#D3F4FF] flex items-center justify-center">
+            <PanelDemo className="w-[424px] h-auto" />
           </div>
         </div>
       </div>

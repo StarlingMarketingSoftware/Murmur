@@ -111,7 +111,7 @@ export default function MapPage() {
           {/* Wide layout (original design) */}
           <div className="relative hidden md:flex justify-center mt-[80px] px-4 overflow-visible map-feature-scale-wrapper map-feature-scale-wrapper--explore">
             <div className="map-feature-scale-inner w-[1403px] h-[455px] flex items-stretch gap-[14px]">
-              <div className="w-[585px] h-[455px] bg-[#FFFFFF] rounded-[22px] px-[56px] pt-[62px] pb-[46px]">
+              <div className="w-[585px] h-[455px] bg-[#FFFFFF] rounded-[22px] px-[56px] pt-[62px] pb-[46px]"> 
                 <p className="font-inter font-bold text-[23px] text-black">Explore the Country</p>
                 
                 <p className="font-inter text-[23px] text-black mt-[44px] pr-[56px] leading-[56px] tracking-wide [word-spacing:5px]">
