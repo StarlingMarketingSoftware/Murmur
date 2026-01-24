@@ -1301,7 +1301,7 @@ export default function HomePage() {
 
 				{/* Block below map */}
 				{/* Narrow layout: stack text on top, demo below */}
-				<div className="landing-after-map 2xl:hidden w-full px-[14%]">
+				<div className="landing-after-map min-[1500px]:hidden w-full px-[14%]">
 					<div className="mx-auto w-full max-w-[904px] bg-[#FAFAFA]">
 						{/* Text */}
 						<div className="bg-[#EFEFEF] rounded-[8px] px-6 py-6">
@@ -1359,7 +1359,7 @@ export default function HomePage() {
 
 				{/* Wide layout: original design */}
 				<div
-					className="hidden 2xl:block"
+					className="hidden min-[1500px]:block"
 					style={{
 						marginTop: '145px',
 						width: '1866px',
@@ -1471,7 +1471,7 @@ export default function HomePage() {
 
 				{/* Second block below map */}
 				{/* Narrow layout: stack text on top, demo below */}
-				<div className="2xl:hidden w-full px-[14%]" style={{ marginTop: '82px' }}>
+				<div className="min-[1500px]:hidden w-full px-[14%]" style={{ marginTop: '82px' }}>
 					<div className="mx-auto w-full max-w-[904px] bg-[#FAFAFA]">
 						{/* Text */}
 						<div className="bg-[#EFEFEF] rounded-[8px] px-6 py-6">
@@ -1515,7 +1515,7 @@ export default function HomePage() {
 
 				{/* Wide layout: original design */}
 				<div
-					className="hidden 2xl:block"
+					className="hidden min-[1500px]:block"
 					style={{
 						marginTop: '82px',
 						width: '1866px',
@@ -1598,7 +1598,7 @@ export default function HomePage() {
 
 				{/* Third block below map */}
 				{/* Narrow layout: stack text on top, demo below */}
-				<div className="2xl:hidden w-full px-[14%]" style={{ marginTop: '75px' }}>
+				<div className="min-[1500px]:hidden w-full px-[14%]" style={{ marginTop: '75px' }}>
 					<div className="mx-auto w-full max-w-[904px] bg-[#FAFAFA]">
 						{/* Text */}
 						<div className="bg-[#EFEFEF] rounded-[8px] px-6 py-6">
@@ -1629,7 +1629,7 @@ export default function HomePage() {
 
 				{/* Wide layout: original design */}
 				<div
-					className="hidden 2xl:block"
+					className="hidden min-[1500px]:block"
 					style={{
 						marginTop: '75px',
 						width: '1866px',
