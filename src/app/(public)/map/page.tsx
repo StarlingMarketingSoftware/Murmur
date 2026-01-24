@@ -52,27 +52,30 @@ export default function MapPage() {
 
       <div className="landing-zoom-80 relative z-10">
         <div className="min-h-screen relative">
-          <div className="relative w-full flex items-start justify-center pt-8 pb-6 lg:h-[264px] lg:items-center lg:pt-0 lg:pb-0">
-            <h1 className="font-inter text-center text-[40px] sm:text-[56px] lg:text-[65px] leading-none">
-              Mapping
-            </h1>
-          </div>
-          <div className="relative flex justify-center">
-            <MuxPlayer
-              style={{
-                ...videoStyle,
-                width: 'calc(100vw - 8px)',
-                maxWidth: '1372px',
-                aspectRatio: '16/9',
-              }}
-              playbackId="C02P1SQEGXOZ00sb2s9qZrhVGqhLqgBDNy014vrcueeGH4"
-              streamType="on-demand"
-              autoPlay="muted"
-              muted
-              loop
-              playsInline
-              nohotkeys
-            />
+          <div className="relative flex justify-center pt-8 pb-6 lg:pt-[53px] lg:pb-0">
+            <div className="w-[calc(100vw-32px)] max-w-[1464px] bg-[#F2FBFF] rounded-[22px] flex flex-col items-center gap-6 px-4 pt-6 pb-6 lg:w-[1464px] lg:h-[975px] lg:px-[46px] lg:pt-[30px] lg:pb-[30px]">
+              <h1 className="font-inter font-extralight tracking-[0.19em] text-[#696969] text-center text-[40px] sm:text-[56px] lg:text-[65px] leading-none">
+                Mapping
+              </h1>
+              <div className="w-full flex justify-center lg:mt-auto">
+                <div className="w-full max-w-[1372px] rounded-[8px] border border-black overflow-hidden flex">
+                  <MuxPlayer
+                    style={{
+                      ...videoStyle,
+                      width: '100%',
+                      aspectRatio: '16/9',
+                    }}
+                    playbackId="C02P1SQEGXOZ00sb2s9qZrhVGqhLqgBDNy014vrcueeGH4"
+                    streamType="on-demand"
+                    autoPlay="muted"
+                    muted
+                    loop
+                    playsInline
+                    nohotkeys
+                  />
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Explore the Country */}
