@@ -16,6 +16,7 @@ import { ContactWithName } from '@/types/contact';
 import InboxSection from '@/components/molecules/InboxSection/InboxSection';
 import type { InboundEmailWithRelations } from '@/types';
 import { ScaledToFit } from '@/components/atoms/ScaledToFit';
+import { useLenis } from '@/contexts/ScrollContext';
 
 // Prevent SSR hydration mismatches from @dnd-kit IDs inside the drafting demo UI.
 const LandingDraftingDemo = dynamic(
@@ -497,6 +498,7 @@ declare global {
 }
 
 export default function HomePage() {
+	const lenis = useLenis();
 	const heroRef = useRef<HTMLDivElement>(null);
 	const heroVideoRef = useRef<any>(null);
 	const videoCarouselContainerRef = useRef<HTMLDivElement>(null);
@@ -514,6 +516,137 @@ export default function HomePage() {
 	const [isLandingGoogleMapReady, setIsLandingGoogleMapReady] = useState(false);
 	const [landingMapScale, setLandingMapScaleState] = useState(1);
 	const landingMapScaleRef = useRef(1);
+
+	// Ensure the landing page doesn't "jump" down after a hard refresh at the top.
+	// (Some browsers + smooth scroll libs can restore an old scroll position asynchronously.)
+	useEffect(() => {
+		if (typeof window === 'undefined') return;
+
+		const storageKey = 'murmur:scrollY:/';
+		const persistScrollY = () => {
+			try {
+				window.sessionStorage.setItem(storageKey, String(window.scrollY || 0));
+			} catch {
+				// ignore (private mode / quota / disabled)
+			}
+		};
+
+		// `pagehide` covers bfcache; `beforeunload` covers refresh.
+		window.addEventListener('pagehide', persistScrollY);
+		window.addEventListener('beforeunload', persistScrollY);
+		return () => {
+			window.removeEventListener('pagehide', persistScrollY);
+			window.removeEventListener('beforeunload', persistScrollY);
+		};
+	}, []);
+
+	useEffect(() => {
+		if (typeof window === 'undefined') return;
+
+		const getNavigationType = (): 'navigate' | 'reload' | 'back_forward' | 'prerender' => {
+			try {
+				const entry = performance.getEntriesByType?.('navigation')?.[0] as
+					| PerformanceNavigationTiming
+					| undefined;
+				if (entry?.type) return entry.type as any;
+			} catch {
+				// ignore
+			}
+
+			// Legacy Safari fallback.
+			const legacyType = (performance as any)?.navigation?.type;
+			if (legacyType === 1) return 'reload';
+			if (legacyType === 2) return 'back_forward';
+			return 'navigate';
+		};
+
+		if (getNavigationType() !== 'reload') return;
+
+		let lastScrollY = 0;
+		try {
+			const raw = window.sessionStorage.getItem('murmur:scrollY:/');
+			lastScrollY = raw ? Number(raw) : 0;
+		} catch {
+			// ignore
+		}
+
+		// Only enforce if the user refreshed from the very top.
+		if (!Number.isFinite(lastScrollY) || lastScrollY > 4) return;
+
+		const prevRestoration = 'scrollRestoration' in history ? history.scrollRestoration : undefined;
+		try {
+			if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+		} catch {
+			// ignore
+		}
+
+		let userInteracted = false;
+		const markUserInteracted = () => {
+			userInteracted = true;
+			cleanupUserIntentListeners();
+		};
+		const cleanupUserIntentListeners = () => {
+			window.removeEventListener('wheel', markUserInteracted);
+			window.removeEventListener('touchstart', markUserInteracted);
+			window.removeEventListener('pointerdown', markUserInteracted);
+			window.removeEventListener('keydown', markUserInteracted);
+		};
+
+		// If the user immediately starts scrolling, don't fight them.
+		window.addEventListener('wheel', markUserInteracted, { passive: true });
+		window.addEventListener('touchstart', markUserInteracted, { passive: true });
+		window.addEventListener('pointerdown', markUserInteracted, { passive: true });
+		window.addEventListener('keydown', markUserInteracted);
+
+		const forceTop = () => {
+			if (userInteracted) return;
+			try {
+				(lenis as any)?.scrollTo?.(0, { immediate: true });
+			} catch {
+				// ignore
+			}
+			window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+		};
+
+		const onUnexpectedScroll = () => {
+			// Only correct if the page "jumps" without user input.
+			if (userInteracted) return;
+			if (window.scrollY > 20) {
+				forceTop();
+			}
+		};
+		window.addEventListener('scroll', onUnexpectedScroll, { passive: true });
+
+		// Run immediately + after the typical async "jump" window (Lenis/ScrollTrigger init, embeds, etc).
+		forceTop();
+		const t1 = window.setTimeout(forceTop, 250);
+		const t2 = window.setTimeout(forceTop, 900);
+		const restoreTimer = window.setTimeout(() => {
+			window.removeEventListener('scroll', onUnexpectedScroll);
+			try {
+				if (prevRestoration && 'scrollRestoration' in history) {
+					history.scrollRestoration = prevRestoration;
+				}
+			} catch {
+				// ignore
+			}
+		}, 3500);
+
+		return () => {
+			cleanupUserIntentListeners();
+			window.removeEventListener('scroll', onUnexpectedScroll);
+			window.clearTimeout(t1);
+			window.clearTimeout(t2);
+			window.clearTimeout(restoreTimer);
+			try {
+				if (prevRestoration && 'scrollRestoration' in history) {
+					history.scrollRestoration = prevRestoration;
+				}
+			} catch {
+				// ignore
+			}
+		};
+	}, [lenis]);
 	
 	const videoIds = [
 		'217455815bac246b922e15ebd83dacf6',
