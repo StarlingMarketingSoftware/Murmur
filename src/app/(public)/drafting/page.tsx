@@ -93,44 +93,48 @@ export default function DraftingPage() {
         </div>
       </div>
       {/* Drafting Modes */}
-      {/* Narrow layout (stacked mode panels) */}
+      {/* Narrow layout (mobile) */}
       <div className="hidden max-[1193px]:block w-full mt-14 sm:mt-[146px] px-[14%]">
-        <div className="mx-auto w-full max-w-[904px] bg-[#FAFAFA] px-6 xs:px-8 pt-10 pb-12">
-          <div className="bg-[#EFEFEF] rounded-[8px] px-6 py-8">
-            <p className="font-inter font-normal text-[22px] xs:text-[24px] sm:text-[27px] text-black leading-tight">
-              Drafting Modes:
+        <div className="mx-auto w-full max-w-[904px] flex flex-col gap-6">
+          <div className="bg-white rounded-[22px] px-6 xs:px-8 pt-10 pb-12">
+            <p className="font-inter font-bold text-[22px] xs:text-[24px] sm:text-[27px] text-black leading-tight">
+              Drafting Modes
             </p>
-            <p className="font-inter font-normal text-[11.5px] xs:text-[12.5px] sm:text-[18px] text-black leading-tight mt-2 break-words">
+            <p className="font-inter font-normal text-[11.5px] xs:text-[12.5px] sm:text-[18px] text-black leading-relaxed mt-3 break-words">
               Murmur has three distinct drafting modes: Auto, Manual, and Hybrid. Auto drafts based on the full range of information it has
               provided, such as the user profile, the contact research, contact location, and booking date range. In contrast to this, manual mode
               is a complete text editor with full customization. Then for edge cases, there&apos;s hybrid.
             </p>
           </div>
 
-          <div className="mt-12">
-            <p className="font-inter font-semibold text-[16px] xs:text-[18px] text-black">Auto</p>
-            <div className="mt-4">
-              <ScaledToFit baseWidth={329} baseHeight={466}>
-                <ModesDemo width={329} height={466} viewBox="0 0 329 466" preserveAspectRatio="xMinYMin meet" />
-              </ScaledToFit>
-            </div>
-          </div>
+          <div className="rounded-[22px] bg-gradient-to-b from-[#ECFFF9] to-[#BFEADC] px-6 xs:px-8 pt-10 pb-12">
+            <div className="space-y-16">
+              <div>
+                <p className="font-inter font-bold text-[20px] xs:text-[22px] sm:text-[24px] text-black leading-tight">Auto</p>
+                <div className="mt-6">
+                  <ScaledToFit baseWidth={329} baseHeight={466}>
+                    <ModesDemo width={329} height={466} viewBox="0 0 329 466" preserveAspectRatio="xMinYMin meet" />
+                  </ScaledToFit>
+                </div>
+              </div>
 
-          <div className="mt-12">
-            <p className="font-inter font-semibold text-[16px] xs:text-[18px] text-black">Manual Mode</p>
-            <div className="mt-4">
-              <ScaledToFit baseWidth={329} baseHeight={466}>
-                <ModesDemo width={329} height={466} viewBox="423 0 329 466" preserveAspectRatio="xMinYMin meet" />
-              </ScaledToFit>
-            </div>
-          </div>
+              <div>
+                <p className="font-inter font-bold text-[20px] xs:text-[22px] sm:text-[24px] text-black leading-tight">Manual Mode</p>
+                <div className="mt-6">
+                  <ScaledToFit baseWidth={329} baseHeight={466}>
+                    <ModesDemo width={329} height={466} viewBox="423 0 329 466" preserveAspectRatio="xMinYMin meet" />
+                  </ScaledToFit>
+                </div>
+              </div>
 
-          <div className="mt-12">
-            <p className="font-inter font-semibold text-[16px] xs:text-[18px] text-black">Hybrid Mode</p>
-            <div className="mt-4">
-              <ScaledToFit baseWidth={329} baseHeight={466}>
-                <ModesDemo width={329} height={466} viewBox="846 0 329 466" preserveAspectRatio="xMinYMin meet" />
-              </ScaledToFit>
+              <div>
+                <p className="font-inter font-bold text-[20px] xs:text-[22px] sm:text-[24px] text-black leading-tight">Hybrid Mode</p>
+                <div className="mt-6">
+                  <ScaledToFit baseWidth={329} baseHeight={466}>
+                    <ModesDemo width={329} height={466} viewBox="846 0 329 466" preserveAspectRatio="xMinYMin meet" />
+                  </ScaledToFit>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -156,25 +160,32 @@ export default function DraftingPage() {
       {/* Built-in variation */}
       {/* Narrow layout (stacked, show both preview variants) */}
       <div className="hidden max-[1193px]:block w-full mt-16 sm:mt-[181px] px-[14%]">
-        <div className="mx-auto w-full max-w-[904px] bg-[#FAFAFA] px-6 xs:px-8 pt-10 pb-12">
-          <div className="bg-[#EFEFEF] rounded-[8px] px-6 py-8">
-            <p className="font-inter font-normal text-[22px] xs:text-[24px] sm:text-[27px] text-black leading-tight">
+        <div className="mx-auto w-full max-w-[904px] flex flex-col gap-6">
+          <div className="bg-white rounded-[22px] px-6 xs:px-8 pt-10 pb-12">
+            <p className="font-inter font-bold text-[22px] xs:text-[24px] sm:text-[27px] text-black leading-tight">
               Built-in variation
             </p>
-            <p className="font-inter font-normal text-[11.5px] xs:text-[12.5px] sm:text-[18px] text-black leading-tight mt-2 break-words">
+            <p className="font-inter font-normal text-[11.5px] xs:text-[12.5px] sm:text-[18px] text-black leading-relaxed mt-3 break-words">
               When drafting in Auto mode, we&apos;ve done extensive work to ensure that no two emails are identical, often drafting in fairly
               different structures. This allows you to embody a more unique voice for each contact you reach out to.
             </p>
           </div>
 
-          <div className="mt-10 space-y-10">
-            <ScaledToFit baseWidth={393} baseHeight={555}>
-              <DraftPreviewDemo width={393} height={555} viewBox="0 0 393 555" preserveAspectRatio="xMinYMin meet" />
-            </ScaledToFit>
+          <div
+            className="rounded-[22px] px-6 xs:px-8 pt-10 pb-12"
+            style={{
+              background: 'linear-gradient(229deg, #EFFDFF -10%, #C2E9EF 90%)',
+            }}
+          >
+            <div className="space-y-10">
+              <ScaledToFit baseWidth={393} baseHeight={555}>
+                <DraftPreviewDemo width={393} height={555} viewBox="0 0 393 555" preserveAspectRatio="xMinYMin meet" />
+              </ScaledToFit>
 
-            <ScaledToFit baseWidth={393} baseHeight={555}>
-              <DraftPreviewDemo width={393} height={555} viewBox="410 0 393 555" preserveAspectRatio="xMinYMin meet" />
-            </ScaledToFit>
+              <ScaledToFit baseWidth={393} baseHeight={555}>
+                <DraftPreviewDemo width={393} height={555} viewBox="410 0 393 555" preserveAspectRatio="xMinYMin meet" />
+              </ScaledToFit>
+            </div>
           </div>
         </div>
       </div>
