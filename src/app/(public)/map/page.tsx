@@ -79,7 +79,6 @@ export default function MapPage() {
           </div>
 
           {/* Explore the Country */}
-          {/* Mobile layout (match screenshot card style; avoid SVG clipping) */}
           <div className="relative md:hidden flex justify-center mt-10">
             <div
               className="w-[calc(100vw-32px)] max-w-[904px] flex flex-col gap-6"
@@ -126,7 +125,6 @@ export default function MapPage() {
           </div>
 
           {/* All Data in One Place */}
-          {/* Mobile layout (match screenshot card style; avoid SVG clipping) */}
           <div className="relative md:hidden flex justify-center mt-12">
             <div
               className="w-[calc(100vw-32px)] max-w-[904px] flex flex-col gap-6"
@@ -176,8 +174,7 @@ export default function MapPage() {
             </div>
           </div>
 
-          {/* Zoom Closer, See the Details */}
-          {/* Mobile layout (match the card style above; avoid SVG clipping) */}
+              
           <div className="relative md:hidden flex justify-center mt-12">
             <div
               className="w-[calc(100vw-32px)] max-w-[904px] flex flex-col gap-6"

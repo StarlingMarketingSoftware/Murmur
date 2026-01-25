@@ -592,3 +592,40 @@ body {
 	}
 }
 
+/* ========================================
+   Research Page - Feature Section Scaling
+   ======================================== */
+
+.research-feature-scale-wrapper {
+	--research-feature-scale: 1;
+	--research-feature-base-height: 0px;
+	/* Wrapper controls the visible height in the document flow */
+	height: calc(var(--research-feature-base-height) * var(--research-feature-scale));
+}
+
+.research-feature-scale-inner {
+	transform-origin: top center;
+	transform: scale(var(--research-feature-scale));
+	flex-shrink: 0;
+}
+
+.research-feature-scale-wrapper--top {
+	--research-feature-base-height: 945px;
+}
+
+@media (max-width: 1384px) {
+	.research-feature-scale-wrapper--top {
+		--research-feature-scale: calc((100vw - 32px) / 1352px);
+	}
+}
+
+.research-feature-scale-wrapper--details {
+	--research-feature-base-height: 989px;
+}
+
+@media (max-width: 1395px) {
+	.research-feature-scale-wrapper--details {
+		--research-feature-scale: calc((100vw - 32px) / 1363px);
+	}
+}
+

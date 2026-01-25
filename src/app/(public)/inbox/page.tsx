@@ -15,10 +15,6 @@ export default function InboxPage() {
       footer.style.display = 'none';
     }
 
-    // The `murmur-inbox-compact` class applies a global 80% scale in `globals.css`.
-    // On small screens this compounds with `ScaledToFit` (used for the hero SVG),
-    // making the demo appear excessively small. Only apply the compact scaling on
-    // larger viewports.
     const compactMql = window.matchMedia('(min-width: 768px)');
     const syncCompactClass = () => {
       if (compactMql.matches) {
@@ -165,7 +161,6 @@ export default function InboxPage() {
                 <ReplyInbox
                   width={650}
                   height={498}
-                  // Shift the crop slightly so the green panel centers like the blue one on mobile.
                   viewBox="690.36 0 650 498"
                   preserveAspectRatio="xMinYMin meet"
                 />
@@ -173,7 +168,6 @@ export default function InboxPage() {
                   className="absolute text-black font-inter text-[11px] leading-[15px]"
                   style={{
                     top: '188px',
-                    // Keep the overlay aligned with the shifted SVG crop.
                     left: '49.64px',
                     width: '540px',
                     height: '160px',

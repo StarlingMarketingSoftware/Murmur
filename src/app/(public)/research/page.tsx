@@ -77,8 +77,8 @@ export default function ResearchPage() {
       </div>
 
       {/* Desktop Layout */}
-      <div className="hidden lg:flex justify-center mt-[180px] px-4">
-        <div className="flex w-[1352px] h-[945px] gap-[20px]">
+      <div className="relative hidden lg:flex justify-center mt-[180px] px-4 overflow-visible research-feature-scale-wrapper research-feature-scale-wrapper--top">
+        <div className="research-feature-scale-inner flex w-[1352px] h-[945px] gap-[20px]">
           <div className="flex h-full w-[745px] flex-col gap-[21px]">
             <div className="h-[462px] w-[745px] rounded-[22px] bg-white px-[56px] pt-[48px]">
               <p className="font-inter font-bold text-[24px] text-black">
@@ -127,48 +127,20 @@ export default function ResearchPage() {
       </div>
 
       {/* Desktop Layout */}
-      <div className="hidden lg:flex justify-center mt-[82px] px-4">
-        <div className="relative bg-[#FAFAFA]" style={{ width: '1363px', height: '1026px' }}>
-          <div style={{
-            width: '356px',
-            height: '77px',
-            backgroundColor: '#EFEFEF',
-            borderRadius: '6px',
-            position: 'absolute',
-            top: '45px',
-            left: '24px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
-          }}>
+      <div className="relative hidden lg:flex justify-center mt-[82px] px-4 overflow-visible research-feature-scale-wrapper research-feature-scale-wrapper--details">
+        <div className="research-feature-scale-inner flex flex-col w-[1363px] h-[989px]">
+          <div className="w-full h-[110px] rounded-[22px] bg-white flex items-center px-[56px]">
             <p className="font-inter font-bold text-[24px] text-black">
               The Details Matter
             </p>
           </div>
-          <div
-            style={{
-              position: 'absolute',
-              top: '171px',
-              left: '50%',
-              transform: 'translateX(-50%)',
-            }}
-          >
+
+          <div className="mt-[9px] w-full h-[651px] rounded-[22px] bg-[#D7E7FF] flex items-center justify-center overflow-hidden">
             <SampleEmail />
           </div>
-          <div style={{
-            width: '1218px',
-            height: '155px',
-            backgroundColor: '#EFEFEF',
-            borderRadius: '6px',
-            position: 'absolute',
-            bottom: '35px',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            paddingLeft: '56px',
-            paddingTop: '32px',
-            paddingRight: '56px'
-          }}>
-            <p className="font-inter text-[23px] text-black leading-[45px] tracking-wide [word-spacing:5px]">
+
+          <div className="mt-[19px] w-full h-[200px] rounded-[22px] bg-white flex items-center justify-start px-[56px]">
+            <p className="font-inter text-[23px] text-black leading-[45px] tracking-wide [word-spacing:5px] text-left max-w-[1200px]">
               Get the details right the first time you reach out to a winery or a coffee shop. Research feeds into your drafts so every pitch fits the venue.
             </p>
           </div>
