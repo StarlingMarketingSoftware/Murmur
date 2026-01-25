@@ -64,10 +64,10 @@ export default function InboxPage() {
       <div className="xl:hidden w-full mt-16 md:mt-[102px] px-[14%]">
         <div className="mx-auto w-full max-w-[904px] bg-[#FAFAFA] px-6 xs:px-8 pt-10 pb-12">
           <div className="bg-[#EFEFEF] rounded-[8px] px-6 py-8">
-            <p className="font-inter font-normal text-[22px] xs:text-[24px] sm:text-[27px] text-black leading-tight">
+            <p className="font-inter font-bold text-[20px] text-black text-left leading-tight">
               Never miss a reply
             </p>
-            <p className="font-inter font-normal text-[11.5px] xs:text-[12.5px] sm:text-[18px] text-black leading-tight mt-2 break-words">
+            <p className="font-inter font-normal text-[16px] text-black text-left mt-5 leading-[1.75] tracking-wide [word-spacing:3px] break-words">
               Keep track of when venues reply to you. Each response is tagged to its corresponding campaign, so you&apos;ll always know where it came from.
             </p>
           </div>
@@ -82,34 +82,19 @@ export default function InboxPage() {
 
       {/* Wide layout (original design) */}
       <div className="hidden xl:flex justify-center mt-[102px]">
-        <div
-          className="bg-[#FAFAFA] relative"
-          style={{ width: '1363px', height: '599px' }}
-        >
-          <p
-            className="font-inter font-bold text-[24px] text-black absolute"
-            style={{ top: '56px', left: '65px' }}
-          >
-            Never miss a reply
-          </p>
-          <div
-            className="bg-[#EFEFEF] rounded-[6px] absolute"
-            style={{
-              width: '441px',
-              height: '383px',
-              top: '108px',
-              left: '25px',
-              paddingLeft: '40px',
-              paddingTop: '40px',
-              paddingRight: '40px',
-            }}
-          >
-            <p className="font-inter text-[23px] text-black leading-[45px] tracking-wide [word-spacing:5px]">
+        <div className="flex w-[1363px] h-[599px] gap-[11px]">
+          <div className="shrink-0 w-[439px] h-[599px] bg-white rounded-[22px] px-[56px] pt-[78px]">
+            <p className="font-inter font-bold text-[24px] text-black text-left">
+              Never miss a reply
+            </p>
+            <p className="font-inter text-[21px] text-black text-left mt-[32px] pr-[24px] leading-[57px] tracking-wide [word-spacing:5px]">
               Keep track of when venues reply to you. Each response is tagged to its corresponding campaign, so you&apos;ll always know where it came from.
             </p>
           </div>
-          <div className="absolute" style={{ top: '79px', right: '37px' }}>
-            <InboundDemo />
+          <div className="shrink-0 w-[913px] h-[599px] rounded-[22px] bg-[linear-gradient(90deg,#DFF2F4_0%,#B9EDFD_100%)] overflow-hidden flex items-center justify-center">
+            <ScaledToFit baseWidth={834} baseHeight={466}>
+              <InboundDemo />
+            </ScaledToFit>
           </div>
         </div>
       </div>
