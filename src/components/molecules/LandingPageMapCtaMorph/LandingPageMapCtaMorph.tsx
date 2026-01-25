@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import { useLenis } from '@/contexts/ScrollContext';
 import './styles.css';
 
 if (typeof window !== 'undefined') {
@@ -29,13 +30,25 @@ const GLASS_IN_PORTION = 0.18; // keep big card fully intact while it turns to g
 // Point at which the small content starts fading in (placeholder fades out).
 const CONTENT_CROSSFADE_END = 0.74;
 
+const LENIS_SCROLL_SLOWDOWN_FACTOR = 0.55;
+// Stop slowing down once the small CTA is fully faded in.
+// (With `smooth = min(1, fadeInProgress * 2)`, `smooth` reaches 1 halfway through the remaining progress.)
+const LENIS_SLOWDOWN_RELEASE_PROGRESS = (1 + CONTENT_CROSSFADE_END) / 2;
+
 export function LandingPageMapCtaMorph({ mapContainerRef }: Props) {
+	const lenis = useLenis();
 	const cardRef = useRef<HTMLDivElement | null>(null);
 	const bigContentRef = useRef<HTMLDivElement | null>(null);
 	const smallContentRef = useRef<HTMLDivElement | null>(null);
 	const blurPlaceholderRef = useRef<HTMLDivElement | null>(null);
 	const startMarkerRef = useRef<HTMLDivElement | null>(null);
 	const endMarkerRef = useRef<HTMLDivElement | null>(null);
+
+	const lenisOriginalMultipliersRef = useRef<{
+		wheelMultiplier: number;
+		touchMultiplier: number;
+	} | null>(null);
+	const lenisSlowdownEnabledRef = useRef(false);
 
 	useEffect(() => {
 		if (typeof window === 'undefined') return;
@@ -59,6 +72,57 @@ export function LandingPageMapCtaMorph({ mapContainerRef }: Props) {
 			/Google Inc/.test(navigator.vendor) &&
 			!/Edg/.test(navigator.userAgent);
 		if (!isChrome) return;
+
+		// Reset cached values when lenis instance changes.
+		lenisOriginalMultipliersRef.current = null;
+		lenisSlowdownEnabledRef.current = false;
+
+		const setLenisSlowdownEnabled = (enabled: boolean) => {
+			if (!lenis) return;
+			if (lenisSlowdownEnabledRef.current === enabled) return;
+
+			const l = lenis as any;
+
+			const getWheelMultiplier = () =>
+				Number(l?.virtualScroll?.options?.wheelMultiplier ?? l?.options?.wheelMultiplier ?? 1);
+			const getTouchMultiplier = () =>
+				Number(l?.virtualScroll?.options?.touchMultiplier ?? l?.options?.touchMultiplier ?? 1);
+
+			const applyMultipliers = (wheelMultiplier: number, touchMultiplier: number) => {
+				try {
+					if (l?.options) {
+						l.options.wheelMultiplier = wheelMultiplier;
+						l.options.touchMultiplier = touchMultiplier;
+					}
+					if (l?.virtualScroll?.options) {
+						l.virtualScroll.options.wheelMultiplier = wheelMultiplier;
+						l.virtualScroll.options.touchMultiplier = touchMultiplier;
+					}
+				} catch {}
+			};
+
+			if (enabled) {
+				if (!lenisOriginalMultipliersRef.current) {
+					lenisOriginalMultipliersRef.current = {
+						wheelMultiplier: getWheelMultiplier(),
+						touchMultiplier: getTouchMultiplier(),
+					};
+				}
+
+				const { wheelMultiplier, touchMultiplier } = lenisOriginalMultipliersRef.current;
+				applyMultipliers(
+					Math.max(0.05, wheelMultiplier * LENIS_SCROLL_SLOWDOWN_FACTOR),
+					Math.max(0.05, touchMultiplier * LENIS_SCROLL_SLOWDOWN_FACTOR)
+				);
+				lenisSlowdownEnabledRef.current = true;
+			} else {
+				const original = lenisOriginalMultipliersRef.current;
+				if (original) {
+					applyMultipliers(original.wheelMultiplier, original.touchMultiplier);
+				}
+				lenisSlowdownEnabledRef.current = false;
+			}
+		};
 
 		let refreshTimer: number | null = null;
 		const ctx = gsap.context(() => {
@@ -110,6 +174,7 @@ export function LandingPageMapCtaMorph({ mapContainerRef }: Props) {
 					invalidateOnRefresh: true,
 					onUpdate: (self) => {
 						const p = self.progress;
+						setLenisSlowdownEnabled(self.isActive && p < LENIS_SLOWDOWN_RELEASE_PROGRESS);
 
 						// Three phases:
 						// 1. p < GLASS_IN_PORTION: big content fully visible
@@ -196,13 +261,20 @@ export function LandingPageMapCtaMorph({ mapContainerRef }: Props) {
 
 			// Ensure ScrollTrigger uses the latest geometry after mount/layout settles.
 			refreshTimer = window.setTimeout(() => ScrollTrigger.refresh(), 200);
+
+			// If the page loads while this trigger is already active, ensure slowdown is applied.
+			setLenisSlowdownEnabled(
+				Boolean(tl.scrollTrigger?.isActive) &&
+					(tl.scrollTrigger?.progress ?? 0) < LENIS_SLOWDOWN_RELEASE_PROGRESS
+			);
 		}, card);
 
 		return () => {
+			setLenisSlowdownEnabled(false);
 			if (refreshTimer != null) window.clearTimeout(refreshTimer);
 			ctx.revert();
 		};
-	}, [mapContainerRef]);
+	}, [mapContainerRef, lenis]);
 
 	return (
 		<div className="pointer-events-none absolute inset-0 z-40 hidden md:block">
