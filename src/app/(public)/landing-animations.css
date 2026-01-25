@@ -629,3 +629,40 @@ body {
 	}
 }
 
+/* ========================================
+   Inbox Page - Feature Section Scaling
+   ======================================== */
+
+.inbox-feature-scale-wrapper {
+	--inbox-feature-scale: 1;
+	--inbox-feature-base-height: 0px;
+	/* Wrapper controls the visible height in the document flow */
+	height: calc(var(--inbox-feature-base-height) * var(--inbox-feature-scale));
+}
+
+.inbox-feature-scale-inner {
+	transform-origin: top center;
+	transform: scale(var(--inbox-feature-scale));
+	flex-shrink: 0;
+}
+
+.inbox-feature-scale-wrapper--never-miss {
+	--inbox-feature-base-height: 599px;
+}
+
+@media (max-width: 1395px) {
+	.inbox-feature-scale-wrapper--never-miss {
+		--inbox-feature-scale: calc((100vw - 32px) / 1363px);
+	}
+}
+
+.inbox-feature-scale-wrapper--respond {
+	--inbox-feature-base-height: 939px;
+}
+
+@media (max-width: 1415px) {
+	.inbox-feature-scale-wrapper--respond {
+		--inbox-feature-scale: calc((100vw - 32px) / 1383px);
+	}
+}
+
