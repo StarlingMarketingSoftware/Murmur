@@ -2,6 +2,7 @@
 import { LandingHeroSearchBar } from '@/components/molecules/LandingHeroSearchBar/LandingHeroSearchBar';
 import LandingPageMap1 from '@/components/atoms/_svg/LandingPageMap1';
 import { LandingPageGoogleMapBackground } from '@/components/molecules/LandingPageGoogleMapBackground/LandingPageGoogleMapBackground';
+import { LandingPageMapCtaMorph } from '@/components/molecules/LandingPageMapCtaMorph/LandingPageMapCtaMorph';
 import MuxPlayer from '@mux/mux-player-react';
 import { useEffect, useRef, useState } from 'react';
 import { gsap } from 'gsap';
@@ -499,6 +500,7 @@ export default function HomePage() {
 	const heroVideoRef = useRef<any>(null);
 	const videoCarouselContainerRef = useRef<HTMLDivElement>(null);
 	const landingMapWrapperRef = useRef<HTMLDivElement>(null);
+	const landingMapContainerRef = useRef<HTMLDivElement>(null);
 	const heroLastVisibleHeightPxRef = useRef<number | null>(null);
 	const [heroPlaybackId, setHeroPlaybackId] = useState(DESKTOP_HERO_MUX_PLAYBACK_ID);
 	const [currentVideoIndex, setCurrentVideoIndex] = useState(0);
@@ -1249,6 +1251,7 @@ export default function HomePage() {
 				</Link>
 				<div className="landing-map-wrapper" ref={landingMapWrapperRef}>
 					<div
+						ref={landingMapContainerRef}
 						className={`landing-map-container ${
 							isLandingGoogleMapReady ? 'landing-map-container--google' : ''
 						}`}
@@ -1274,37 +1277,7 @@ export default function HomePage() {
 							mobileCopyScale={landingMapMobileCopyScale}
 							className="landing-map-svg relative z-10 block md:pointer-events-none"
 						/>
-						{/* Centered map copy + CTA (desktop) */}
-						<div className="pointer-events-none absolute inset-0 z-40 hidden md:flex items-center justify-center">
-							<div className="pointer-events-auto w-[912px] h-[487px] rounded-[22px] bg-white relative">
-								{/* Subject: 53px from top, pushed right */}
-								<div className="absolute left-[198px] top-[53px] w-[678px]">
-									<h2 className="font-inter font-light text-[62px] leading-[1.05] text-black text-left">
-										100,000+ Contacts
-										<br />- Coast to Coast
-									</h2>
-								</div>
-
-								{/* Body + CTA: button 39px from bottom; body 39px above button, pushed right */}
-								<div className="absolute left-[200px] bottom-[39px] w-[678px]">
-									<p className="font-inter font-normal text-[24px] leading-snug tracking-[0.02em] text-black text-left">
-										Venues, Festivals, Wineries, Breweries, Coffee
-										<br />
-										Shops; Hundreds of thousands of contacts
-										<br />
-										thoroughly verified by musicians.
-									</p>
-									<Link
-										href="/map"
-										className="landing-learn-research-btn mt-[39px] inline-flex items-center justify-center w-[302px] h-[51px] rounded-[6px] bg-transparent"
-									>
-										<span className="font-inter font-normal text-[24px] text-[#5DAB68]">
-											Learn about the Map
-										</span>
-									</Link>
-								</div>
-							</div>
-						</div>
+						<LandingPageMapCtaMorph mapContainerRef={landingMapContainerRef} />
 					</div>
 				</div>
 
