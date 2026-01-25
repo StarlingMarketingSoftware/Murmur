@@ -58,20 +58,18 @@ export default function DraftingPage() {
         </div>
       </div>
       {/* Tell your story */}
-      {/* Narrow layout (stacked, keep the light #FAFAFA panel) */}
+      {/* Narrow layout (stacked) */}
       <div className="hidden max-[1193px]:block w-full mt-16 sm:mt-[192px] px-[14%]">
-        <div className="mx-auto w-full max-w-[904px] bg-[#FAFAFA] px-6 xs:px-8 pt-10 pb-12">
-          <div className="bg-[#EFEFEF] rounded-[8px] px-6 py-8">
-            <p className="font-inter font-normal text-[22px] xs:text-[24px] sm:text-[27px] text-black leading-tight">
-              Tell your story
-            </p>
+        <div className="mx-auto w-full max-w-[904px] flex flex-col gap-6">
+          <div className="bg-white rounded-[22px] px-6 xs:px-8 pt-10 pb-12">
+            <p className="font-inter font-normal text-[22px] xs:text-[24px] sm:text-[27px] text-black leading-tight">Tell your story</p>
             <p className="font-inter font-normal text-[11.5px] xs:text-[12.5px] sm:text-[18px] text-black leading-tight mt-2 break-words">
               When you add basic information to your profile, it gives context to the drafting. This creates much better results that incorporate
               your real bio, links, booking date range, and any custom instructions.
             </p>
           </div>
 
-          <div className="mt-8">
+          <div className="rounded-[22px] bg-gradient-to-b from-[#E1D5FF] to-[#F1ECFB] px-6 xs:px-8 pt-10 pb-12 flex justify-center">
             <ScaledToFit baseWidth={394} baseHeight={366}>
               <ProfileDemo />
             </ScaledToFit>
@@ -79,40 +77,19 @@ export default function DraftingPage() {
         </div>
       </div>
 
-      {/* Wide layout (original design) */}
+      {/* Wide layout */}
       <div className="flex max-[1193px]:hidden justify-center mt-[192px]">
-        <div
-          style={{
-            width: 1354,
-            height: 424,
-            backgroundColor: '#FAFAFA',
-            position: 'relative',
-          }}
-        >
-          <div
-            style={{
-              width: 682,
-              height: 381,
-              backgroundColor: '#EFEFEF',
-              borderRadius: 6,
-              position: 'absolute',
-              left: 24,
-              top: 20,
-            }}
-          >
-            <p className="font-inter font-bold text-[24px] text-black pt-6 pl-6">Tell your story</p>
-            <p className="font-inter text-[23px] text-black pl-6 pr-6 mt-[24px] leading-[56px] tracking-wide [word-spacing:5px]">
-              When you add basic information to your profile, it gives context to the drafting. This creates much better results
-              that incorporate your real bio, links, booking date range, and any custom instructions.
+        <div className="flex w-[1355px] h-[424px] gap-[13px]">
+          <div className="w-[752px] h-[424px] rounded-[22px] bg-white px-[86px] pt-[74px]">
+            <p className="font-inter font-bold text-[24px] text-black">Tell your story</p>
+            <p className="font-inter text-[23px] text-black mt-[24px] leading-[56px] tracking-wide [word-spacing:5px]">
+              When you add basic information to your profile, it gives context to the drafting. This creates much better results that incorporate
+              your real bio, links, booking date range, and any custom instructions.
             </p>
           </div>
-          <ProfileDemo
-            style={{
-              position: 'absolute',
-              right: 142,
-              top: 17,
-            }}
-          />
+          <div className="w-[590px] h-[424px] rounded-[22px] bg-gradient-to-b from-[#E1D5FF] to-[#F1ECFB] flex items-center justify-center">
+            <ProfileDemo />
+          </div>
         </div>
       </div>
       {/* Drafting Modes */}
