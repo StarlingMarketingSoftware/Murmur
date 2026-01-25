@@ -78,8 +78,8 @@ export default function DraftingPage() {
       </div>
 
       {/* Wide layout */}
-      <div className="flex max-[1193px]:hidden justify-center mt-[192px]">
-        <div className="flex w-[1355px] h-[424px] gap-[13px]">
+      <div className="relative flex max-[1193px]:hidden justify-center mt-[192px] px-4 overflow-visible drafting-feature-scale-wrapper drafting-feature-scale-wrapper--tell">
+        <div className="drafting-feature-scale-inner flex w-[1355px] h-[424px] gap-[13px]">
           <div className="w-[752px] h-[424px] rounded-[22px] bg-white px-[86px] pt-[74px]">
             <p className="font-inter font-bold text-[24px] text-black">Tell your story</p>
             <p className="font-inter text-[23px] text-black mt-[24px] leading-[56px] tracking-wide [word-spacing:5px]">
@@ -137,13 +137,13 @@ export default function DraftingPage() {
       </div>
 
       {/* Wide layout */}
-      <div className="flex max-[1193px]:hidden justify-center mt-[146px]">
-        <div className="w-[1354px]">
-          <div className="w-[1354px] h-[535px] rounded-[22px] bg-gradient-to-b from-[#ECFFF9] to-[#BFEADC] flex items-center justify-center overflow-hidden">
+      <div className="relative flex max-[1193px]:hidden justify-center mt-[146px] px-4 overflow-visible drafting-feature-scale-wrapper drafting-feature-scale-wrapper--modes">
+        <div className="drafting-feature-scale-inner w-[1354px] h-[895px] flex flex-col gap-[13px]">
+          <div className="w-full h-[535px] rounded-[22px] bg-gradient-to-b from-[#ECFFF9] to-[#BFEADC] flex items-center justify-center overflow-hidden">
             <ModesDemo className="max-w-full max-h-full" />
           </div>
 
-          <div className="mt-[13px] w-[1354px] h-[347px] rounded-[22px] bg-white px-[58px] pt-[44px]">
+          <div className="w-full h-[347px] rounded-[22px] bg-white px-[58px] pt-[44px]">
             <p className="font-inter font-bold text-[24px] text-black">Drafting Modes</p>
             <p className="font-inter text-[23px] text-black mt-[24px] leading-[56px] tracking-wide [word-spacing:5px]">
               Murmur has three distinct drafting modes: Auto, Manual, and Hybrid. Auto drafts based on the full range of information it has
@@ -180,8 +180,8 @@ export default function DraftingPage() {
       </div>
 
       {/* Wide layout (original design) */}
-      <div className="flex max-[1193px]:hidden justify-center mt-[181px]">
-        <div className="flex w-[1354px] h-[627px] gap-[7px]">
+      <div className="relative flex max-[1193px]:hidden justify-center mt-[181px] px-4 overflow-visible drafting-feature-scale-wrapper drafting-feature-scale-wrapper--variation">
+        <div className="drafting-feature-scale-inner flex w-[1354px] h-[627px] gap-[7px]">
           <div className="w-[527px] h-[627px] rounded-[22px] bg-white px-[58px] pt-[58px]">
             <p className="font-inter font-bold text-[24px] text-black">Built-in variation</p>
             <p className="font-inter text-[23px] text-black mt-[44px] leading-[56px] tracking-wide [word-spacing:5px]">

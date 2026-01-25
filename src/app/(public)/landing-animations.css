@@ -666,3 +666,50 @@ body {
 	}
 }
 
+/* ========================================
+   Drafting Page - Feature Section Scaling
+   ======================================== */
+
+.drafting-feature-scale-wrapper {
+	--drafting-feature-scale: 1;
+	--drafting-feature-base-height: 0px;
+	/* Wrapper controls the visible height in the document flow */
+	height: calc(var(--drafting-feature-base-height) * var(--drafting-feature-scale));
+}
+
+.drafting-feature-scale-inner {
+	transform-origin: top center;
+	transform: scale(var(--drafting-feature-scale));
+	flex-shrink: 0;
+}
+
+.drafting-feature-scale-wrapper--tell {
+	--drafting-feature-base-height: 424px;
+}
+
+@media (max-width: 1387px) {
+	.drafting-feature-scale-wrapper--tell {
+		--drafting-feature-scale: calc((100vw - 32px) / 1355px);
+	}
+}
+
+.drafting-feature-scale-wrapper--modes {
+	--drafting-feature-base-height: 895px;
+}
+
+@media (max-width: 1386px) {
+	.drafting-feature-scale-wrapper--modes {
+		--drafting-feature-scale: calc((100vw - 32px) / 1354px);
+	}
+}
+
+.drafting-feature-scale-wrapper--variation {
+	--drafting-feature-base-height: 627px;
+}
+
+@media (max-width: 1386px) {
+	.drafting-feature-scale-wrapper--variation {
+		--drafting-feature-scale: calc((100vw - 32px) / 1354px);
+	}
+}
+
