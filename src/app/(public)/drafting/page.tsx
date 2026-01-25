@@ -181,45 +181,22 @@ export default function DraftingPage() {
 
       {/* Wide layout (original design) */}
       <div className="flex max-[1193px]:hidden justify-center mt-[181px]">
-        <div 
-          style={{ 
-            width: 1355, 
-            height: 627, 
-            backgroundColor: '#FAFAFA',
-            position: 'relative'
-          }} 
-        >
-          <p 
-            className="font-inter font-bold text-[24px] text-black"
-            style={{ position: 'absolute', top: 40, left: 58 }}
-          >
-            Built-in Variation:
-          </p>
-          <DraftPreviewDemo 
-            style={{
-              position: 'absolute',
-              top: 36,
-              right: 15
-            }}
-          />
-          <div
-            style={{
-              width: 476,
-              height: 491,
-              backgroundColor: '#EFEFEF',
-              borderRadius: 6,
-              position: 'absolute',
-              left: 37,
-              top: 99,
-              paddingLeft: 36,
-              paddingRight: 36,
-              paddingTop: 28
-            }}
-          >
-            <p className="font-inter text-[23px] text-black leading-[56px] tracking-wide [word-spacing:5px]">
+        <div className="flex w-[1354px] h-[627px] gap-[7px]">
+          <div className="w-[527px] h-[627px] rounded-[22px] bg-white px-[58px] pt-[58px]">
+            <p className="font-inter font-bold text-[24px] text-black">Built-in variation</p>
+            <p className="font-inter text-[23px] text-black mt-[44px] leading-[56px] tracking-wide [word-spacing:5px]">
               When drafting in Auto mode, we&apos;ve done extensive work to ensure that no two emails are identical, often drafting in fairly
               different structures. This allows you to embody a more unique voice for each contact you reach out to.
             </p>
+          </div>
+
+          <div
+            className="w-[820px] h-[627px] rounded-[22px] flex items-center justify-center overflow-hidden"
+            style={{
+              background: 'linear-gradient(229deg, #EFFDFF -10%, #C2E9EF 90%)',
+            }}
+          >
+            <DraftPreviewDemo className="max-w-full max-h-full" />
           </div>
         </div>
       </div>
