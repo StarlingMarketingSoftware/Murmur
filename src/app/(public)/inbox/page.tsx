@@ -47,17 +47,18 @@ export default function InboxPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-white">
-      <div className="w-full flex justify-center pt-8 pb-4 sm:h-[264px] sm:items-center sm:pt-0 sm:pb-0">
-        <h1 className="font-inter text-center text-[40px] sm:text-[56px] lg:text-[65px] leading-none">
-          Inbox
-        </h1>
-      </div>
-      <div className="flex justify-center mt-4 sm:mt-0">
-        <ScaledToFit baseWidth={1017} fitWidth={1241} baseHeight={568} className="max-w-[85vw] sm:max-w-none">
-          <InboxDemo className="translate-x-28" />
-        </ScaledToFit>
-      </div>
+    <main className="relative bg-[#F5F5F7]">
+      <div className="relative z-10 min-h-screen">
+        <div className="relative flex justify-center pt-8 pb-6 lg:pt-[53px] lg:pb-0">
+          <div className="w-[calc(100vw-32px)] max-w-[1160px] bg-[#F2FBFF] rounded-[22px] flex flex-col items-center gap-6 px-4 pt-6 pb-6 lg:w-[1160px] lg:h-[823px] lg:px-[46px] lg:pt-[30px] lg:pb-[30px]">
+            <h1 className="font-inter font-extralight tracking-[0.19em] text-[#696969] text-center text-[40px] sm:text-[56px] lg:text-[65px] leading-none">
+              Inbox
+            </h1>
+            <div className="w-full flex-1 min-h-0 flex justify-center">
+              <InboxDemo className="w-full h-auto lg:h-full" />
+            </div>
+          </div>
+        </div>
       {/* Never miss a reply */}
       {/* Narrow layout (stacked, keep the light #FAFAFA panel) */}
       <div className="xl:hidden w-full mt-16 md:mt-[102px] px-[14%]">
@@ -275,6 +276,7 @@ export default function InboxPage() {
           Start Free Trial
         </Link>
       </div>
-    </div>
+      </div>
+    </main>
   );
 }
