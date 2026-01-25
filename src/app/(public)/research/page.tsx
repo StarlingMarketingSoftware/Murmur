@@ -49,27 +49,27 @@ export default function ResearchPage() {
           </div>
         </div>
       
-      {/* Mobile Layout (match landing page ultra-narrow typography/padding) */}
-      <div className="lg:hidden w-full mt-14 px-[14%]">
-        <div className="mx-auto w-full max-w-[686px] bg-[#FAFAFA]">
-          <div className="bg-[#EFEFEF] rounded-[8px] px-6 py-8">
-            <p className="font-inter font-normal text-[22px] xs:text-[24px] sm:text-[27px] text-black leading-tight">
+      {/* Mobile Layout (match the screenshot card styling/typography) */}
+      <div className="lg:hidden w-full mt-14 px-4 sm:px-6">
+        <div className="mx-auto w-full max-w-[686px] flex flex-col gap-6">
+          <div className="bg-white rounded-[22px] px-6 py-10 sm:px-10">
+            <p className="font-inter font-bold text-[20px] text-black text-left leading-tight">
               From Booking Schedules to Genre
             </p>
-            <p className="font-inter font-normal text-[11.5px] xs:text-[12.5px] sm:text-[18px] text-black leading-tight mt-2 break-words">
+            <p className="font-inter font-normal text-[16px] text-black text-left mt-5 leading-[1.75] tracking-wide [word-spacing:3px] break-words">
               For every contact, we provide detailed descriptions, including facts like what times a venue in Eastern Pennsylvania is booking shows, and what genres they book. See the research at any point in the tool, from searching the map up to sending your first email.
             </p>
           </div>
 
-          <div className="mt-6 bg-[#F1F1F1] rounded-[8px] px-6 pt-8 pb-10 overflow-hidden flex justify-center">
+          <div className="bg-[#D3F4FF] rounded-[22px] px-4 pt-8 pb-10 sm:px-10 overflow-hidden flex justify-center">
             <PanelDemo className="w-full h-auto max-w-[424px]" />
           </div>
 
-          <div className="mt-6 bg-[#EFEFEF] rounded-[8px] px-6 py-8">
-            <p className="font-inter font-normal text-[22px] xs:text-[24px] sm:text-[27px] text-black leading-tight">
+          <div className="bg-white rounded-[22px] px-6 py-10 sm:px-10">
+            <p className="font-inter font-bold text-[20px] text-black text-left leading-tight">
               Know the History
             </p>
-            <p className="font-inter font-normal text-[11.5px] xs:text-[12.5px] sm:text-[18px] text-black leading-tight mt-2 break-words">
+            <p className="font-inter font-normal text-[16px] text-black text-left mt-5 leading-[1.75] tracking-wide [word-spacing:3px] break-words">
               The research goes beyond the basics and into the culture of each location. Know if a brewery in West Virginia is serving hikers, or if a coffee shop in Illinois hosts an outdoor summer concert series. We care about the details.
             </p>
           </div>
@@ -105,21 +105,21 @@ export default function ResearchPage() {
         </div>
       </div>
 
-      {/* Mobile Layout (match landing page ultra-narrow typography/padding) */}
-      <div className="lg:hidden w-full mt-12 px-[14%]">
-        <div className="mx-auto w-full max-w-[686px] bg-[#FAFAFA]">
-          <div className="bg-[#EFEFEF] rounded-[8px] px-6 py-8">
-            <p className="font-inter font-normal text-[22px] xs:text-[24px] sm:text-[27px] text-black leading-tight">
+      {/* Mobile Layout ("The Details Matter" block) */}
+      <div className="lg:hidden w-full mt-12 px-4 sm:px-6">
+        <div className="mx-auto w-full max-w-[686px] flex flex-col gap-6">
+          <div className="bg-[#D7E7FF] rounded-[22px] px-6 pt-10 pb-10 sm:px-10">
+            <p className="font-inter font-bold text-[20px] text-black leading-tight">
               The Details Matter
             </p>
+
+            <div className="mt-8 flex justify-center overflow-hidden">
+              <SampleEmail className="w-full h-auto max-w-[520px]" />
+            </div>
           </div>
 
-          <div className="mt-6 bg-[#F1F1F1] rounded-[8px] px-6 pt-8 pb-10 overflow-hidden flex justify-center">
-            <SampleEmail className="w-full h-auto max-w-[376px]" />
-          </div>
-
-          <div className="mt-6 bg-[#EFEFEF] rounded-[8px] px-6 py-8">
-            <p className="font-inter font-normal text-[11.5px] xs:text-[12.5px] sm:text-[18px] text-black leading-tight break-words">
+          <div className="bg-white rounded-[22px] px-6 py-10 sm:px-10">
+            <p className="font-inter font-normal text-[16px] text-black text-left leading-[1.75] tracking-wide [word-spacing:4px]">
               Get the details right the first time you reach out to a winery or a coffee shop. Research feeds into your drafts so every pitch fits the venue.
             </p>
           </div>
