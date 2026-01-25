@@ -20,6 +20,14 @@ body {
 	-webkit-touch-callout: none;
 }
 
+/* Landing page: prevent embedded demo panels from trapping page scroll.
+   (Our CustomScrollbar sets `overscroll-behavior: contain` inline.) */
+.landing-page .scrollbar-hide,
+.landing-page .hide-native-scrollbar {
+	overscroll-behavior: auto !important;
+	overscroll-behavior-y: auto !important;
+}
+
 /* Landing page "80% zoom" (zoomed-out view) */
 .landing-zoom-80 {
 	--landing-zoom: 0.8;

@@ -3,6 +3,7 @@ import { LandingHeroSearchBar } from '@/components/molecules/LandingHeroSearchBa
 import LandingPageMap1 from '@/components/atoms/_svg/LandingPageMap1';
 import { LandingPageGoogleMapBackground } from '@/components/molecules/LandingPageGoogleMapBackground/LandingPageGoogleMapBackground';
 import { LandingPageMapCtaMorph } from '@/components/molecules/LandingPageMapCtaMorph/LandingPageMapCtaMorph';
+import { FadeInUp } from '@/components/animations/FadeInUp';
 import MuxPlayer from '@mux/mux-player-react';
 import { useEffect, useRef, useState } from 'react';
 import { gsap } from 'gsap';
@@ -1017,7 +1018,7 @@ export default function HomePage() {
 	}, [currentVideoIndex, displayIndex, videoIds.length]);
 
 	return (
-		<main className="overflow-x-hidden">
+		<main className="overflow-x-hidden landing-page">
 			<div className="landing-zoom-80">
 				<div
 					id="landing-hero"
@@ -1107,11 +1108,12 @@ export default function HomePage() {
 				</div>
 			</div>
 			{/* Video Carousel Section */}
-			<div
-				ref={videoCarouselContainerRef}
-				className="w-full bg-[#EBEBEB] py-16 overflow-hidden video-carousel-container"
-			>
-				{(() => {
+			<FadeInUp duration={1.6} className="w-full">
+				<div
+					ref={videoCarouselContainerRef}
+					className="w-full bg-[#EBEBEB] py-16 overflow-hidden video-carousel-container"
+				>
+					{(() => {
 					// Render extra repeated thumbnails on both sides so you don't see "empty space"
 					// when the viewport gets very wide (e.g. browser zoomed far out).
 					// Only the active item mounts an iframe; the rest are poster thumbnails.
@@ -1239,218 +1241,257 @@ export default function HomePage() {
 						);
 					})}
 				</div>
-			</div>
+				</div>
+			</FadeInUp>
 
 			{/* Start Free Trial Button Section */}
 			<div className="landing-map-section w-full bg-[#F5F5F7] flex flex-col items-center">
-				<Link
-					href={urls.freeTrial.index}
-					className="landing-free-trial-btn hidden md:flex items-center justify-center bg-transparent cursor-pointer text-center"
-				>
-					Start Free Trial
-				</Link>
-				<div className="landing-map-wrapper" ref={landingMapWrapperRef}>
-					<div
-						ref={landingMapContainerRef}
-						className={`landing-map-container ${
-							isLandingGoogleMapReady ? 'landing-map-container--google' : ''
-						}`}
+				<FadeInUp duration={1.6} className="w-full flex flex-col items-center">
+					<Link
+						href={urls.freeTrial.index}
+						className="landing-free-trial-btn hidden md:flex items-center justify-center bg-transparent cursor-pointer text-center"
 					>
-						{/* Desktop-only: live Google Map background (SVG raster stays until map is ready) */}
-						{shouldMountLandingGoogleMap ? (
-							<div
-								className="absolute inset-[16px] z-0"
-								aria-hidden="true"
-							>
-								<LandingPageGoogleMapBackground
-									className="w-full h-full"
-									onReady={() => setIsLandingGoogleMapReady(true)}
-								/>
-							</div>
-						) : null}
-						<LandingPageMap1
-							// Crop out extra SVG padding so the framed map box sits centered/snug.
-							viewBox="0 0 1858 1044"
-							preserveAspectRatio="xMidYMid meet"
-							width="100%"
-							height="100%"
-							mobileCopyScale={landingMapMobileCopyScale}
-							className="landing-map-svg relative z-10 block md:pointer-events-none"
-						/>
-						<LandingPageMapCtaMorph mapContainerRef={landingMapContainerRef} />
+						Start Free Trial
+					</Link>
+				</FadeInUp>
+				<FadeInUp duration={1.6} delay={0.2} className="w-full flex flex-col items-center">
+					<div className="landing-map-wrapper" ref={landingMapWrapperRef}>
+						<div
+							ref={landingMapContainerRef}
+							className={`landing-map-container ${
+								isLandingGoogleMapReady ? 'landing-map-container--google' : ''
+							}`}
+						>
+							{/* Desktop-only: live Google Map background (SVG raster stays until map is ready) */}
+							{shouldMountLandingGoogleMap ? (
+								<div
+									className="absolute inset-[16px] z-0"
+									aria-hidden="true"
+								>
+									<LandingPageGoogleMapBackground
+										className="w-full h-full"
+										onReady={() => setIsLandingGoogleMapReady(true)}
+									/>
+								</div>
+							) : null}
+							<LandingPageMap1
+								// Crop out extra SVG padding so the framed map box sits centered/snug.
+								viewBox="0 0 1858 1044"
+								preserveAspectRatio="xMidYMid meet"
+								width="100%"
+								height="100%"
+								mobileCopyScale={landingMapMobileCopyScale}
+								className="landing-map-svg relative z-10 block md:pointer-events-none"
+							/>
+							<LandingPageMapCtaMorph mapContainerRef={landingMapContainerRef} />
+						</div>
 					</div>
-				</div>
+				</FadeInUp>
 
 				{/* Block below map */}
 				{/* Narrow layout: stack text on top, demo below */}
 				<div className="landing-after-map md:hidden w-full px-[14%]">
-					<div className="mx-auto w-full max-w-[904px] rounded-[28px] overflow-hidden bg-[#FAFAFA]">
-						{/* Text */}
-						<div className="px-6 xs:px-8 pt-8 xs:pt-10 pb-8 xs:pb-10">
-							<p className="font-inter font-normal text-[32px] xs:text-[36px] sm:text-[42px] text-black leading-[1.05]">
-								We Did The Research
-							</p>
-							<p className="font-inter font-normal text-[15px] xs:text-[17px] sm:text-[20px] text-black leading-snug mt-3 xs:mt-4 break-words">
-								Take a look through every contact, and you&apos;ll get to see information on what styles they
-								book, their live music schedules, and even how to actually find the right person.
-							</p>
-							<Link
-								href="/research"
-								className="landing-learn-research-btn mt-6 xs:mt-8 inline-flex h-[44px] xs:h-[48px] px-5 xs:px-6 items-center justify-center border-2 border-[#5DAB68] rounded-[6px] bg-transparent"
-							>
-								<span className="font-inter font-normal text-[17px] xs:text-[19px] sm:text-[21px] text-[#5DAB68]">
-									Learn about research
-								</span>
-							</Link>
-						</div>
-
-						{/* Demo */}
-						<div
-							className="px-4 xs:px-6 pt-8 xs:pt-10 pb-10 xs:pb-12"
-							style={{
-								background: 'linear-gradient(180deg, #EAF7FF 0%, #BEE6FF 100%)',
-							}}
-						>
-							<ScaledToFit baseWidth={709} baseHeight={635}>
-								<div className="flex gap-6">
-									<div className="mt-[76px]">
-										<ContactsExpandedList
-											contacts={sampleContacts}
-											width={326}
-											height={513}
-											minRows={9}
-											onContactHover={(contact) => {
-												if (contact) {
-													setHoveredContact(contact);
-												}
-											}}
-										/>
-									</div>
-									<ContactResearchPanel
-										contact={hoveredContact}
-										width={359}
-										boxWidth={344}
-										height={635}
-										fixedHeightBoxSpacingPx={60}
-										fixedHeightBulletOuterHeightPx={52}
-										fixedHeightBulletInnerHeightPx={44}
-										expandSummaryToFillHeight
-										disableExpansion
-										className="!block"
-									/>
-								</div>
-							</ScaledToFit>
-						</div>
-					</div>
-				</div>
-
-				{/* Wide layout (scaled down on thinner breakpoints) */}
-				<div className="hidden md:block w-full px-4" style={{ marginTop: '145px' }}>
-					<ScaledToFit baseWidth={1753} baseHeight={712} className="mx-auto max-w-[1753px]">
-						<div
-						className="w-[1753px] h-[712px] rounded-[22px] overflow-hidden grid grid-cols-2"
-						aria-label="We Did The Research"
-					>
-						<div className="h-full w-full bg-white flex items-center">
-							<div className="w-[712px] mx-auto">
-								<p className="font-inter font-normal text-[62px] text-black leading-tight">
+					<FadeInUp duration={1.6}>
+						<div className="mx-auto w-full max-w-[904px] rounded-[28px] overflow-hidden bg-[#FAFAFA]">
+							{/* Text */}
+							<div className="px-6 xs:px-8 pt-8 xs:pt-10 pb-8 xs:pb-10">
+								<p className="font-inter font-normal text-[32px] xs:text-[36px] sm:text-[42px] text-black leading-[1.05]">
 									We Did The Research
 								</p>
-								<p className="font-inter font-normal text-[25px] text-black mt-6">
-									Take a look through every contact, and you&apos;ll get to see information on what styles
-									they book, their live music schedules, and even how to actually find the right person.
+								<p className="font-inter font-normal text-[15px] xs:text-[17px] sm:text-[20px] text-black leading-snug mt-3 xs:mt-4 break-words">
+									Take a look through every contact, and you&apos;ll get to see information on what styles they
+									book, their live music schedules, and even how to actually find the right person.
 								</p>
 								<Link
 									href="/research"
-									className="landing-learn-research-btn mt-14 inline-flex items-center justify-center w-[302px] h-[51px] rounded-[6px] bg-transparent"
+									className="landing-learn-research-btn mt-6 xs:mt-8 inline-flex h-[44px] xs:h-[48px] px-5 xs:px-6 items-center justify-center border-2 border-[#5DAB68] rounded-[6px] bg-transparent"
 								>
-									<span className="font-inter font-normal text-[25px] text-[#5DAB68]">
+									<span className="font-inter font-normal text-[17px] xs:text-[19px] sm:text-[21px] text-[#5DAB68]">
 										Learn about research
 									</span>
 								</Link>
 							</div>
-						</div>
 
-						<div
-							className="h-full w-full flex items-center"
-							style={{
-								background: 'linear-gradient(180deg, #EAF7FF 0%, #BEE6FF 100%)',
-							}}
-						>
+							{/* Demo */}
 							<div
-								className="w-[712px] h-[712px] mx-auto"
+								className="px-4 xs:px-6 pt-8 xs:pt-10 pb-10 xs:pb-12"
 								style={{
-									paddingTop: '31px',
-									paddingBottom: '46px',
+									background: 'linear-gradient(180deg, #EAF7FF 0%, #BEE6FF 100%)',
 								}}
 							>
-								<div className="w-[709px] h-[635px] mx-auto flex gap-6">
-									<div className="mt-[76px]">
-										<ContactsExpandedList
-											contacts={sampleContacts}
-											width={326}
-											height={513}
-											minRows={9}
-											onContactHover={(contact) => {
-												if (contact) {
-													setHoveredContact(contact);
-												}
-											}}
+								<ScaledToFit baseWidth={709} baseHeight={635}>
+									<div className="flex gap-6">
+										<div className="mt-[76px]">
+											<ContactsExpandedList
+												contacts={sampleContacts}
+												width={326}
+												height={513}
+												minRows={9}
+												onContactHover={(contact) => {
+													if (contact) {
+														setHoveredContact(contact);
+													}
+												}}
+											/>
+										</div>
+										<ContactResearchPanel
+											contact={hoveredContact}
+											width={359}
+											boxWidth={344}
+											height={635}
+											fixedHeightBoxSpacingPx={60}
+											fixedHeightBulletOuterHeightPx={52}
+											fixedHeightBulletInnerHeightPx={44}
+											expandSummaryToFillHeight
+											disableExpansion
+											className="!block"
 										/>
 									</div>
-									<ContactResearchPanel
-										contact={hoveredContact}
-										width={359}
-										boxWidth={344}
-										height={635}
-										fixedHeightBoxSpacingPx={60}
-										fixedHeightBulletOuterHeightPx={52}
-										fixedHeightBulletInnerHeightPx={44}
-										expandSummaryToFillHeight
-										disableExpansion
-										className="!block"
-									/>
-								</div>
+								</ScaledToFit>
 							</div>
 						</div>
-						</div>
-					</ScaledToFit>
+					</FadeInUp>
+				</div>
+
+				{/* Wide layout (scaled down on thinner breakpoints) */}
+				<div className="hidden md:block w-full px-4" style={{ marginTop: '145px' }}>
+					<FadeInUp duration={1.6}>
+						<ScaledToFit baseWidth={1753} baseHeight={712} className="mx-auto max-w-[1753px]">
+							<div
+								className="w-[1753px] h-[712px] rounded-[22px] overflow-hidden grid grid-cols-2"
+								aria-label="We Did The Research"
+							>
+								<div className="h-full w-full bg-white flex items-center">
+									<div className="w-[712px] mx-auto">
+										<p className="font-inter font-normal text-[62px] text-black leading-tight">
+											We Did The Research
+										</p>
+										<p className="font-inter font-normal text-[25px] text-black mt-6">
+											Take a look through every contact, and you&apos;ll get to see information on what styles
+											they book, their live music schedules, and even how to actually find the right person.
+										</p>
+										<Link
+											href="/research"
+											className="landing-learn-research-btn mt-14 inline-flex items-center justify-center w-[302px] h-[51px] rounded-[6px] bg-transparent"
+										>
+											<span className="font-inter font-normal text-[25px] text-[#5DAB68]">
+												Learn about research
+											</span>
+										</Link>
+									</div>
+								</div>
+
+								<div
+									className="h-full w-full flex items-center"
+									style={{
+										background: 'linear-gradient(180deg, #EAF7FF 0%, #BEE6FF 100%)',
+									}}
+								>
+									<div
+										className="w-[712px] h-[712px] mx-auto"
+										style={{
+											paddingTop: '31px',
+											paddingBottom: '46px',
+										}}
+									>
+										<div className="w-[709px] h-[635px] mx-auto flex gap-6">
+											<div className="mt-[76px]">
+												<ContactsExpandedList
+													contacts={sampleContacts}
+													width={326}
+													height={513}
+													minRows={9}
+													onContactHover={(contact) => {
+														if (contact) {
+															setHoveredContact(contact);
+														}
+													}}
+												/>
+											</div>
+											<ContactResearchPanel
+												contact={hoveredContact}
+												width={359}
+												boxWidth={344}
+												height={635}
+												fixedHeightBoxSpacingPx={60}
+												fixedHeightBulletOuterHeightPx={52}
+												fixedHeightBulletInnerHeightPx={44}
+												expandSummaryToFillHeight
+												disableExpansion
+												className="!block"
+											/>
+										</div>
+									</div>
+								</div>
+							</div>
+						</ScaledToFit>
+					</FadeInUp>
 				</div>
 
 				<div className="md:hidden w-full px-[14%]" style={{ marginTop: '82px' }}>
-					<div className="mx-auto w-full max-w-[904px] rounded-[28px] overflow-hidden bg-[#FAFAFA]">
-						{/* Text */}
-						<div className="px-6 xs:px-8 pt-8 xs:pt-10 pb-8 xs:pb-10">
-							<p className="font-inter font-normal text-[32px] xs:text-[36px] sm:text-[42px] text-black leading-[1.05]">
-								Every Reply
-							</p>
-							<p className="font-inter font-normal text-[15px] xs:text-[17px] sm:text-[20px] text-black leading-snug mt-3 xs:mt-4 break-words">
-								Never miss a reply! Get full context on each response, including what campaign it came from,
-								all in one place.
-							</p>
-							<Link
-								href="/inbox"
-								className="landing-learn-research-btn mt-6 xs:mt-8 inline-flex h-[44px] xs:h-[48px] px-5 xs:px-6 items-center justify-center border-2 border-[#5DAB68] rounded-[6px] bg-transparent"
-							>
-								<span className="font-inter font-normal text-[17px] xs:text-[19px] sm:text-[21px] text-[#5DAB68]">
-									Learn about Inbox
-								</span>
-							</Link>
-						</div>
+					<FadeInUp duration={1.6}>
+						<div className="mx-auto w-full max-w-[904px] rounded-[28px] overflow-hidden bg-[#FAFAFA]">
+							{/* Text */}
+							<div className="px-6 xs:px-8 pt-8 xs:pt-10 pb-8 xs:pb-10">
+								<p className="font-inter font-normal text-[32px] xs:text-[36px] sm:text-[42px] text-black leading-[1.05]">
+									Every Reply
+								</p>
+								<p className="font-inter font-normal text-[15px] xs:text-[17px] sm:text-[20px] text-black leading-snug mt-3 xs:mt-4 break-words">
+									Never miss a reply! Get full context on each response, including what campaign it came from,
+									all in one place.
+								</p>
+								<Link
+									href="/inbox"
+									className="landing-learn-research-btn mt-6 xs:mt-8 inline-flex h-[44px] xs:h-[48px] px-5 xs:px-6 items-center justify-center border-2 border-[#5DAB68] rounded-[6px] bg-transparent"
+								>
+									<span className="font-inter font-normal text-[17px] xs:text-[19px] sm:text-[21px] text-[#5DAB68]">
+										Learn about Inbox
+									</span>
+								</Link>
+							</div>
 
-						{/* Demo */}
-						<div
-							className="px-4 xs:px-6 pt-8 xs:pt-10 pb-10 xs:pb-12"
-							style={{
-								background: 'linear-gradient(180deg, #DBFFE2 0%, #99D8A5 100%)',
-							}}
-						>
-							<ScaledToFit baseWidth={856} baseHeight={535}>
+							{/* Demo */}
+							<div
+								className="px-4 xs:px-6 pt-8 xs:pt-10 pb-10 xs:pb-12"
+								style={{
+									background: 'linear-gradient(180deg, #DBFFE2 0%, #99D8A5 100%)',
+								}}
+							>
+								<ScaledToFit baseWidth={856} baseHeight={535}>
+									<InboxSection
+										noOuterPadding
+										forceDesktopLayout
+										demoMode
+										desktopWidth={856}
+										desktopHeight={535}
+										allowedSenderEmails={Object.keys(sampleContactsByEmail)}
+										contactByEmail={sampleContactsByEmail}
+										sampleData={{
+											inboundEmails: sampleInboundEmails,
+											sentEmails: sampleSentEmails,
+										}}
+									/>
+								</ScaledToFit>
+							</div>
+						</div>
+					</FadeInUp>
+				</div>
+
+				<div className="hidden md:block w-full px-4" style={{ marginTop: '82px' }}>
+					<FadeInUp duration={1.6}>
+						<ScaledToFit baseWidth={1789} baseHeight={718} className="mx-auto max-w-[1789px]">
+							<div className="w-[1789px] h-[718px] rounded-[22px] overflow-hidden flex" aria-label="Every Reply">
+							{/* Left side (gradient) */}
+							<div
+								className="h-full w-[1130px] flex items-center justify-center"
+								style={{
+									background: 'linear-gradient(180deg, #DBFFE2 0%, #99D8A5 100%)',
+								}}
+							>
 								<InboxSection
 									noOuterPadding
-									forceDesktopLayout
 									demoMode
-									desktopWidth={856}
+									desktopWidth={998}
 									desktopHeight={535}
 									allowedSenderEmails={Object.keys(sampleContactsByEmail)}
 									contactByEmail={sampleContactsByEmail}
@@ -1459,153 +1500,136 @@ export default function HomePage() {
 										sentEmails: sampleSentEmails,
 									}}
 								/>
-							</ScaledToFit>
-						</div>
-					</div>
-				</div>
-
-				<div className="hidden md:block w-full px-4" style={{ marginTop: '82px' }}>
-					<ScaledToFit baseWidth={1789} baseHeight={718} className="mx-auto max-w-[1789px]">
-						<div className="w-[1789px] h-[718px] rounded-[22px] overflow-hidden flex" aria-label="Every Reply">
-						{/* Left side (gradient) */}
-						<div
-							className="h-full w-[1130px] flex items-center justify-center"
-							style={{
-								background: 'linear-gradient(180deg, #DBFFE2 0%, #99D8A5 100%)',
-							}}
-						>
-							<InboxSection
-								noOuterPadding
-								desktopWidth={998}
-								desktopHeight={535}
-								allowedSenderEmails={Object.keys(sampleContactsByEmail)}
-								contactByEmail={sampleContactsByEmail}
-								sampleData={{
-									inboundEmails: sampleInboundEmails,
-									sentEmails: sampleSentEmails,
-								}}
-							/>
-						</div>
-
-						{/* Right side (white) */}
-						<div className="h-full w-[659px] bg-white flex items-center">
-							<div className="w-[520px] mx-auto">
-								<p className="font-inter font-normal text-[62px] text-black leading-tight">
-									Every Reply
-								</p>
-								<p className="font-inter font-normal text-[25px] text-black mt-4">
-									Never miss a reply! Get full context on each response, including what campaign it came from,
-									all in one place.
-								</p>
-								<Link
-									href="/inbox"
-									className="landing-learn-research-btn mt-20 inline-flex items-center justify-center w-[260px] h-[51px] rounded-[6px] bg-transparent"
-								>
-									<span className="font-inter font-normal text-[25px] text-[#5DAB68]">
-										Learn about Inbox
-									</span>
-								</Link>
 							</div>
-						</div>
-						</div>
-					</ScaledToFit>
+
+							{/* Right side (white) */}
+							<div className="h-full w-[659px] bg-white flex items-center">
+								<div className="w-[520px] mx-auto">
+									<p className="font-inter font-normal text-[62px] text-black leading-tight">
+										Every Reply
+									</p>
+									<p className="font-inter font-normal text-[25px] text-black mt-4">
+										Never miss a reply! Get full context on each response, including what campaign it came from,
+										all in one place.
+									</p>
+									<Link
+										href="/inbox"
+										className="landing-learn-research-btn mt-20 inline-flex items-center justify-center w-[260px] h-[51px] rounded-[6px] bg-transparent"
+									>
+										<span className="font-inter font-normal text-[25px] text-[#5DAB68]">
+											Learn about Inbox
+										</span>
+									</Link>
+								</div>
+							</div>
+							</div>
+						</ScaledToFit>
+					</FadeInUp>
 				</div>
 
 				<div className="md:hidden w-full px-[14%]" style={{ marginTop: '75px' }}>
-					<div className="mx-auto w-full max-w-[904px] rounded-[28px] overflow-hidden bg-[#FAFAFA]">
-						{/* Text */}
-						<div className="px-6 xs:px-8 pt-8 xs:pt-10 pb-8 xs:pb-10">
-							<p className="font-inter font-normal text-[32px] xs:text-[36px] sm:text-[42px] text-black leading-[1.05]">
-								Emails That Land
-							</p>
-							<p className="font-inter font-normal text-[15px] xs:text-[17px] sm:text-[20px] text-black leading-snug mt-3 xs:mt-4 break-words">
-								Emails not getting responses? Ditch the templates. Murmur drafts pitches based on your bio and
-								date range that venues actually respond to.
-							</p>
-							<Link
-								href="/drafting"
-								className="landing-learn-research-btn mt-6 xs:mt-8 inline-flex h-[44px] xs:h-[48px] px-5 xs:px-6 items-center justify-center border-2 border-[#5DAB68] rounded-[6px] bg-transparent"
-							>
-								<span className="font-inter font-normal text-[17px] xs:text-[19px] sm:text-[21px] text-[#5DAB68]">
-									Learn about Drafting
-								</span>
-							</Link>
-						</div>
-
-						{/* Demo */}
-						<div
-							className="px-4 xs:px-6 pt-8 xs:pt-10 pb-10 xs:pb-12"
-							style={{
-								background: 'linear-gradient(180deg, #DAE6FE 0%, #CAD5F9 100%)',
-							}}
-						>
-							<ScaledToFit baseWidth={904} baseHeight={712}>
-								<LandingDraftingDemo isMobileLayout />
-							</ScaledToFit>
-						</div>
-					</div>
-				</div>
-
-				{/* Wide layout (scaled down on thinner breakpoints) */}
-				<div className="hidden md:block w-full px-4" style={{ marginTop: '75px' }}>
-					<ScaledToFit baseWidth={1783} baseHeight={712} className="mx-auto max-w-[1783px]">
-						<div
-							className="w-[1783px] h-[712px] rounded-[22px] overflow-hidden grid grid-cols-[879px_904px]"
-							aria-label="Emails That Land"
-						>
-						{/* Left side (white) */}
-						<div className="h-full w-full bg-white flex items-center">
-							<div className="w-[712px] mx-auto">
-								<p className="font-inter font-normal text-[62px] text-black leading-tight">
+					<FadeInUp duration={1.6}>
+						<div className="mx-auto w-full max-w-[904px] rounded-[28px] overflow-hidden bg-[#FAFAFA]">
+							{/* Text */}
+							<div className="px-6 xs:px-8 pt-8 xs:pt-10 pb-8 xs:pb-10">
+								<p className="font-inter font-normal text-[32px] xs:text-[36px] sm:text-[42px] text-black leading-[1.05]">
 									Emails That Land
 								</p>
-								<p className="font-inter font-normal text-[25px] text-black mt-4">
-									Emails not getting responses? Ditch the templates. Murmur drafts pitches based on your bio
-									and date range that venues actually respond to.
+								<p className="font-inter font-normal text-[15px] xs:text-[17px] sm:text-[20px] text-black leading-snug mt-3 xs:mt-4 break-words">
+									Emails not getting responses? Ditch the templates. Murmur drafts pitches based on your bio and
+									date range that venues actually respond to.
 								</p>
 								<Link
 									href="/drafting"
-									className="landing-learn-research-btn mt-20 inline-flex items-center justify-center w-[288px] h-[51px] rounded-[6px] bg-transparent"
+									className="landing-learn-research-btn mt-6 xs:mt-8 inline-flex h-[44px] xs:h-[48px] px-5 xs:px-6 items-center justify-center border-2 border-[#5DAB68] rounded-[6px] bg-transparent"
 								>
-									<span className="font-inter font-normal text-[25px] text-[#5DAB68]">
+									<span className="font-inter font-normal text-[17px] xs:text-[19px] sm:text-[21px] text-[#5DAB68]">
 										Learn about Drafting
 									</span>
 								</Link>
 							</div>
-						</div>
 
-						{/* Right side (gradient) */}
-						<div
-							className="h-full w-full flex items-center justify-center"
-							style={{
-								background: 'linear-gradient(180deg, #DAE6FE 0%, #CAD5F9 100%)',
-							}}
-						>
-							<div className="w-[904px] h-[712px]">
-								<LandingDraftingDemo />
+							{/* Demo */}
+							<div
+								className="px-4 xs:px-6 pt-8 xs:pt-10 pb-10 xs:pb-12"
+								style={{
+									background: 'linear-gradient(180deg, #DAE6FE 0%, #CAD5F9 100%)',
+								}}
+							>
+								<ScaledToFit baseWidth={904} baseHeight={712}>
+									<LandingDraftingDemo isMobileLayout />
+								</ScaledToFit>
 							</div>
 						</div>
-						</div>
-					</ScaledToFit>
+					</FadeInUp>
+				</div>
+
+				{/* Wide layout (scaled down on thinner breakpoints) */}
+				<div className="hidden md:block w-full px-4" style={{ marginTop: '75px' }}>
+					<FadeInUp duration={1.6}>
+						<ScaledToFit baseWidth={1783} baseHeight={712} className="mx-auto max-w-[1783px]">
+							<div
+								className="w-[1783px] h-[712px] rounded-[22px] overflow-hidden grid grid-cols-[879px_904px]"
+								aria-label="Emails That Land"
+							>
+							{/* Left side (white) */}
+							<div className="h-full w-full bg-white flex items-center">
+								<div className="w-[712px] mx-auto">
+									<p className="font-inter font-normal text-[62px] text-black leading-tight">
+										Emails That Land
+									</p>
+									<p className="font-inter font-normal text-[25px] text-black mt-4">
+										Emails not getting responses? Ditch the templates. Murmur drafts pitches based on your bio
+										and date range that venues actually respond to.
+									</p>
+									<Link
+										href="/drafting"
+										className="landing-learn-research-btn mt-20 inline-flex items-center justify-center w-[288px] h-[51px] rounded-[6px] bg-transparent"
+									>
+										<span className="font-inter font-normal text-[25px] text-[#5DAB68]">
+											Learn about Drafting
+										</span>
+									</Link>
+								</div>
+							</div>
+
+							{/* Right side (gradient) */}
+							<div
+								className="h-full w-full flex items-center justify-center"
+								style={{
+									background: 'linear-gradient(180deg, #DAE6FE 0%, #CAD5F9 100%)',
+								}}
+							>
+								<div className="w-[904px] h-[712px]">
+									<LandingDraftingDemo />
+								</div>
+							</div>
+							</div>
+						</ScaledToFit>
+					</FadeInUp>
 				</div>
 			</div>
 
 			{/* Try Murmur Now CTA Section */}
 			<div className="w-full bg-[#F5F5F7] flex flex-col items-center justify-center h-[280px] md:h-[450px] lg:h-[747px]">
-				<p className="font-inter font-normal text-[clamp(32px,9vw,62px)] text-black text-center leading-[1.05]">
-					Try Murmur Now
-				</p>
-				<Link
-					href={urls.freeTrial.index}
-					className="landing-bottom-free-trial-btn flex items-center justify-center cursor-pointer text-center text-white font-inter font-medium text-[14px]"
-					style={{
-						marginTop: '32px',
-						width: '219px',
-						height: '33px',
-					}}
-				>
-					Start Free Trial
-				</Link>
+				<FadeInUp duration={1.6}>
+					<div className="flex flex-col items-center">
+						<p className="font-inter font-normal text-[clamp(32px,9vw,62px)] text-black text-center leading-[1.05]">
+							Try Murmur Now
+						</p>
+						<Link
+							href={urls.freeTrial.index}
+							className="landing-bottom-free-trial-btn flex items-center justify-center cursor-pointer text-center text-white font-inter font-medium text-[14px]"
+							style={{
+								marginTop: '32px',
+								width: '219px',
+								height: '33px',
+							}}
+						>
+							Start Free Trial
+						</Link>
+					</div>
+				</FadeInUp>
 			</div>
 			</div>
 		</main>

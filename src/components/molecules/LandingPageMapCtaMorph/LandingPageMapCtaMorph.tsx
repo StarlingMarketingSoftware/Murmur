@@ -25,12 +25,12 @@ const SMALL_CARD_LEFT_INSET_PX = 40; // from the map's left edge
 const SMALL_CARD_BOTTOM_INSET_PX = -156; // from the map's bottom edge
 
 // Keep this feeling directly tied to scroll (Apple-style).
-const SCRUB_SMOOTHNESS: true | number = true;
+const SCRUB_SMOOTHNESS: true | number = 1.2;
 const GLASS_IN_PORTION = 0.18; // keep big card fully intact while it turns to glass
 // Point at which the small content starts fading in (placeholder fades out).
 const CONTENT_CROSSFADE_END = 0.74;
 
-const LENIS_SCROLL_SLOWDOWN_FACTOR = 0.55;
+const LENIS_SCROLL_SLOWDOWN_FACTOR = 0.85;
 // Stop slowing down once the small CTA is fully faded in.
 // (With `smooth = min(1, fadeInProgress * 2)`, `smooth` reaches 1 halfway through the remaining progress.)
 const LENIS_SLOWDOWN_RELEASE_PROGRESS = (1 + CONTENT_CROSSFADE_END) / 2;
@@ -43,6 +43,12 @@ export function LandingPageMapCtaMorph({ mapContainerRef }: Props) {
 	const blurPlaceholderRef = useRef<HTMLDivElement | null>(null);
 	const startMarkerRef = useRef<HTMLDivElement | null>(null);
 	const endMarkerRef = useRef<HTMLDivElement | null>(null);
+	// Once the CTA morph reaches its final (bottom-left) state, we "latch" it there
+	// for the rest of the session (until refresh). Scrolling back up should not reverse it.
+	const hasCompletedMorphRef = useRef(false);
+	// When the user reaches the end, we disable the ScrollTrigger and let the animation
+	// smoothly finish to completion (then it stays locked).
+	const isMorphFinalizingRef = useRef(false);
 
 	const lenisOriginalMultipliersRef = useRef<{
 		wheelMultiplier: number;
@@ -126,6 +132,90 @@ export function LandingPageMapCtaMorph({ mapContainerRef }: Props) {
 
 		let refreshTimer: number | null = null;
 		const ctx = gsap.context(() => {
+			const computeEndPosition = () => {
+				// Use the unscaled map container height (the container is CSS-scaled, but
+				// our card positioning is *inside* the scaled context, so we use unscaled coords).
+				const left = SMALL_CARD_LEFT_INSET_PX;
+				const top = MAP_CONTAINER_HEIGHT_PX - SMALL_CARD_BOTTOM_INSET_PX - SMALL_CARD_HEIGHT_PX;
+				return { left, top };
+			};
+
+			const applyCompletedState = () => {
+				const { left, top } = computeEndPosition();
+
+				gsap.set(card, {
+					width: SMALL_CARD_WIDTH_PX,
+					height: SMALL_CARD_HEIGHT_PX,
+					left,
+					top,
+					xPercent: 0,
+					yPercent: 0,
+					x: 0,
+					y: 0,
+					css: {
+						'--cta-bg-opacity': 1,
+						'--cta-blur': 0,
+						'--cta-border-opacity': 0,
+					},
+					willChange: 'transform, width, height, backdrop-filter',
+				});
+
+				gsap.set(bigContent, { opacity: 0 });
+				gsap.set(blurPlaceholder, { opacity: 0 });
+				gsap.set(smallContent, { opacity: 1 });
+				bigContent.style.pointerEvents = 'none';
+				smallContent.style.pointerEvents = 'auto';
+				blurPlaceholder.style.pointerEvents = 'none';
+
+				setLenisSlowdownEnabled(false);
+			};
+
+			const updateContentForProgress = (p: number) => {
+				// Three phases:
+				// 1. p < GLASS_IN_PORTION: big content fully visible
+				// 2. GLASS_IN_PORTION <= p < CONTENT_CROSSFADE_END: blur placeholder visible (hides text overlap)
+				// 3. p >= CONTENT_CROSSFADE_END: small content fades in
+
+				const morphStart = GLASS_IN_PORTION;
+				const morphEnd = CONTENT_CROSSFADE_END;
+
+				if (p < morphStart) {
+					// Phase 1: Big content fully visible
+					gsap.set(bigContent, { opacity: 1 });
+					gsap.set(blurPlaceholder, { opacity: 0 });
+					gsap.set(smallContent, { opacity: 0 });
+					bigContent.style.pointerEvents = 'auto';
+					smallContent.style.pointerEvents = 'none';
+				} else if (p < morphEnd) {
+					// Phase 2: Blur placeholder visible, hide both text layers
+					// Fade big content out quickly at the start
+					const fadeOutProgress = (p - morphStart) / 0.08;
+					const bigOpacity = gsap.utils.clamp(0, 1, 1 - fadeOutProgress);
+					const placeholderOpacity = gsap.utils.clamp(0, 1, fadeOutProgress);
+					gsap.set(bigContent, { opacity: bigOpacity });
+					gsap.set(blurPlaceholder, { opacity: placeholderOpacity });
+					gsap.set(smallContent, { opacity: 0 });
+					bigContent.style.pointerEvents = 'none';
+					smallContent.style.pointerEvents = 'none';
+				} else {
+					// Phase 3: Small content fades in, blur placeholder fades out
+					const fadeInProgress = (p - morphEnd) / (1 - morphEnd);
+					const smooth = Math.min(1, fadeInProgress * 2); // fade in over half the remaining progress
+					gsap.set(bigContent, { opacity: 0 });
+					gsap.set(blurPlaceholder, { opacity: 1 - smooth });
+					gsap.set(smallContent, { opacity: smooth });
+					bigContent.style.pointerEvents = 'none';
+					smallContent.style.pointerEvents = smooth >= 0.5 ? 'auto' : 'none';
+				}
+			};
+
+			// If we've already completed the morph (within this session), lock the final state
+			// and skip re-registering scroll triggers that would allow reverse animation.
+			if (hasCompletedMorphRef.current) {
+				applyCompletedState();
+				return;
+			}
+
 			// Defaults (also doubles as "no JS" fallback values).
 			gsap.set(card, {
 				width: BIG_CARD_WIDTH_PX,
@@ -152,14 +242,6 @@ export function LandingPageMapCtaMorph({ mapContainerRef }: Props) {
 			smallContent.style.pointerEvents = 'none';
 			blurPlaceholder.style.pointerEvents = 'none';
 
-			const computeEndPosition = () => {
-				// Use the unscaled map container height (the container is CSS-scaled, but
-				// our card positioning is *inside* the scaled context, so we use unscaled coords).
-				const left = SMALL_CARD_LEFT_INSET_PX;
-				const top = MAP_CONTAINER_HEIGHT_PX - SMALL_CARD_BOTTOM_INSET_PX - SMALL_CARD_HEIGHT_PX;
-				return { left, top };
-			};
-
 			// Scroll-tied morph: big centered → glass → small bottom-left.
 			const tl = gsap.timeline({
 				defaults: { ease: 'none' },
@@ -173,45 +255,43 @@ export function LandingPageMapCtaMorph({ mapContainerRef }: Props) {
 					scrub: SCRUB_SMOOTHNESS,
 					invalidateOnRefresh: true,
 					onUpdate: (self) => {
-						const p = self.progress;
-						setLenisSlowdownEnabled(self.isActive && p < LENIS_SLOWDOWN_RELEASE_PROGRESS);
+						const scrollP = self.progress;
+						const visualP = tl.progress();
 
-						// Three phases:
-						// 1. p < GLASS_IN_PORTION: big content fully visible
-						// 2. GLASS_IN_PORTION <= p < CONTENT_CROSSFADE_END: blur placeholder visible (hides text overlap)
-						// 3. p >= CONTENT_CROSSFADE_END: small content fades in
+						// If the user reaches the end of the scroll range, make this irreversible:
+						// stop the ScrollTrigger (so it can't drive backwards), then smoothly finish
+						// the animation to the final state and keep it locked until refresh.
+						if (!hasCompletedMorphRef.current && !isMorphFinalizingRef.current && scrollP >= 0.999) {
+							hasCompletedMorphRef.current = true;
+							isMorphFinalizingRef.current = true;
 
-						const morphStart = GLASS_IN_PORTION;
-						const morphEnd = CONTENT_CROSSFADE_END;
+							if (refreshTimer != null) {
+								window.clearTimeout(refreshTimer);
+								refreshTimer = null;
+							}
 
-						if (p < morphStart) {
-							// Phase 1: Big content fully visible
-							gsap.set(bigContent, { opacity: 1 });
-							gsap.set(blurPlaceholder, { opacity: 0 });
-							gsap.set(smallContent, { opacity: 0 });
-							bigContent.style.pointerEvents = 'auto';
-							smallContent.style.pointerEvents = 'none';
-						} else if (p < morphEnd) {
-							// Phase 2: Blur placeholder visible, hide both text layers
-							// Fade big content out quickly at the start
-							const fadeOutProgress = (p - morphStart) / 0.08;
-							const bigOpacity = gsap.utils.clamp(0, 1, 1 - fadeOutProgress);
-							const placeholderOpacity = gsap.utils.clamp(0, 1, fadeOutProgress);
-							gsap.set(bigContent, { opacity: bigOpacity });
-							gsap.set(blurPlaceholder, { opacity: placeholderOpacity });
-							gsap.set(smallContent, { opacity: 0 });
-							bigContent.style.pointerEvents = 'none';
-							smallContent.style.pointerEvents = 'none';
-						} else {
-							// Phase 3: Small content fades in, blur placeholder fades out
-							const fadeInProgress = (p - morphEnd) / (1 - morphEnd);
-							const smooth = Math.min(1, fadeInProgress * 2); // fade in over half the remaining progress
-							gsap.set(bigContent, { opacity: 0 });
-							gsap.set(blurPlaceholder, { opacity: 1 - smooth });
-							gsap.set(smallContent, { opacity: smooth });
-							bigContent.style.pointerEvents = 'none';
-							smallContent.style.pointerEvents = smooth >= 0.5 ? 'auto' : 'none';
+							setLenisSlowdownEnabled(false);
+							self.kill(false);
+							gsap.killTweensOf(tl);
+
+							gsap.to(tl, {
+								progress: 1,
+								duration: 0.75,
+								ease: 'power2.out',
+								overwrite: true,
+								onUpdate: () => updateContentForProgress(tl.progress()),
+								onComplete: () => {
+									isMorphFinalizingRef.current = false;
+									applyCompletedState();
+									tl.kill();
+								},
+							});
+
+							return;
 						}
+
+						setLenisSlowdownEnabled(self.isActive && visualP < LENIS_SLOWDOWN_RELEASE_PROGRESS);
+						updateContentForProgress(visualP);
 					},
 				},
 			});
@@ -241,6 +321,7 @@ export function LandingPageMapCtaMorph({ mapContainerRef }: Props) {
 					xPercent: 0,
 					yPercent: 0,
 					duration: 1 - GLASS_IN_PORTION,
+					ease: 'power2.inOut',
 				},
 				GLASS_IN_PORTION
 			);
