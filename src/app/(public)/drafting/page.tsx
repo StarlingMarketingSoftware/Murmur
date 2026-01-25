@@ -136,47 +136,16 @@ export default function DraftingPage() {
         </div>
       </div>
 
-      {/* Wide layout (original design) */}
+      {/* Wide layout */}
       <div className="flex max-[1193px]:hidden justify-center mt-[146px]">
-        <div 
-          style={{ 
-            width: 1354, 
-            height: 996, 
-            backgroundColor: '#FAFAFA',
-            position: 'relative'
-          }} 
-        >
-          <p 
-            className="font-inter font-bold text-[24px] text-black"
-            style={{ position: 'absolute', top: 50, left: 58 }}
-          >
-            Drafting Modes:
-          </p>
-          <ModesDemo 
-            style={{
-              position: 'absolute',
-              top: 142,
-              left: '50%',
-              transform: 'translateX(-50%)'
-            }}
-          />
-          <div
-            style={{
-              width: 1326,
-              height: 265,
-              backgroundColor: '#EFEFEF',
-              borderRadius: 6,
-              position: 'absolute',
-              bottom: 33,
-              left: '50%',
-              transform: 'translateX(-50%)',
-              paddingLeft: 56,
-              paddingRight: 56,
-              display: 'flex',
-              alignItems: 'center'
-            }}
-          >
-            <p className="font-inter text-[23px] text-black leading-[56px] tracking-wide [word-spacing:5px]">
+        <div className="w-[1354px]">
+          <div className="w-[1354px] h-[535px] rounded-[22px] bg-gradient-to-b from-[#ECFFF9] to-[#BFEADC] flex items-center justify-center overflow-hidden">
+            <ModesDemo className="max-w-full max-h-full" />
+          </div>
+
+          <div className="mt-[13px] w-[1354px] h-[347px] rounded-[22px] bg-white px-[58px] pt-[44px]">
+            <p className="font-inter font-bold text-[24px] text-black">Drafting Modes</p>
+            <p className="font-inter text-[23px] text-black mt-[24px] leading-[56px] tracking-wide [word-spacing:5px]">
               Murmur has three distinct drafting modes: Auto, Manual, and Hybrid. Auto drafts based on the full range of information it has
               provided, such as the user profile, the contact research, contact location, and booking date range. In contrast to this, manual mode
               is a complete text editor with full customization. Then for edge cases, there&apos;s hybrid.
