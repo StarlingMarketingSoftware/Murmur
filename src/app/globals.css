@@ -4077,7 +4077,7 @@ html.murmur-compact {
 	zoom: 0.9;
 }
 
-@supports not (zoom: 0.9) {
+@supports not (zoom: 1) {
 	html.murmur-compact body {
 		transform: scale(0.9);
 		transform-origin: top center;
@@ -4090,7 +4090,7 @@ html.murmur-research-compact {
 	zoom: 0.8;
 }
 
-@supports not (zoom: 0.8) {
+@supports not (zoom: 1) {
 	html.murmur-research-compact body {
 		transform: scale(0.8);
 		transform-origin: top center;
@@ -4103,7 +4103,7 @@ html.murmur-inbox-compact {
 	zoom: 0.8;
 }
 
-@supports not (zoom: 0.8) {
+@supports not (zoom: 1) {
 	html.murmur-inbox-compact body {
 		transform: scale(0.8);
 		transform-origin: top center;
@@ -4116,6 +4116,21 @@ html.murmur-compact.murmur-campaign-compact {
 	zoom: var(--murmur-campaign-zoom, 0.85);
 	/* Campaign page should never page-scroll; panels handle their own scrolling */
 	overflow: hidden;
+}
+
+/* Safari-specific safety valve:
+   On some Safari versions, root-level `zoom` can produce incorrect initial scaling.
+   When this class is present we force transform-based scaling and explicitly disable `zoom`
+   to avoid any chance of double-scaling. */
+html.murmur-compact.murmur-campaign-compact.murmur-campaign-force-transform {
+	zoom: 1 !important;
+}
+
+html.murmur-compact.murmur-campaign-compact.murmur-campaign-force-transform body {
+	transform: scale(var(--murmur-campaign-zoom, 0.85));
+	/* Using `top left` prevents the whole page from drifting right after scale. */
+	transform-origin: top left;
+	width: calc(100% / var(--murmur-campaign-zoom, 0.85));
 }
 
 html.murmur-compact.murmur-campaign-compact body {
@@ -4157,7 +4172,7 @@ html.murmur-compact.murmur-dashboard-map-compact {
 	zoom: var(--murmur-dashboard-zoom, 0.85);
 }
 
-@supports not (zoom: 0.85) {
+@supports not (zoom: 1) {
 	html.murmur-compact.murmur-campaign-compact body {
 		transform: scale(var(--murmur-campaign-zoom, 0.85));
 		transform-origin: top center;

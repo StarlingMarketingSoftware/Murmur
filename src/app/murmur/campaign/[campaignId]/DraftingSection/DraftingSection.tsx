@@ -24,6 +24,7 @@ import {
 	convertAiResponseToRichTextEmail,
 	convertHtmlToPlainText,
 } from '@/utils';
+import { isSafariBrowser } from '@/utils/browserDetection';
 import {
 	extractMurmurDraftSettingsSnapshot,
 	injectMurmurDraftSettingsSnapshot,
@@ -229,6 +230,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 
 	const router = useRouter();
 	const isMobile = useIsMobile();
+	const isSafari = useMemo(() => isSafariBrowser(), []);
 	const [isClient, setIsClient] = useState(false);
 	useEffect(() => setIsClient(true), []);
 	const progressBarPortalTarget = useMemo(() => {
@@ -389,7 +391,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			// because the campaign page applies CSS zoom at these resolutions and we still
 			// want the physical monitor size threshold to win.
 			const viewportW = window.innerWidth;
-			const viewportH = window.visualViewport?.height ?? window.innerHeight;
+			// Avoid `visualViewport.height` here: on Safari it can change when we apply CSS `zoom`,
+			// which would make this "physical monitor size" breakpoint drift as zoom updates.
+			const viewportH = window.innerHeight;
 			const ratio = viewportH > 0 ? viewportW / viewportH : 0;
 			const IDEAL_16X10 = 16 / 10; // 1.6
 			const IDEAL_16X9 = 16 / 9; // ~1.777
@@ -446,7 +450,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		prevViewForPinnedPanelRef.current = view;
 		// Detect transition from inbox/search to tabs that show the pinned left panel.
 		// This includes: testing (ContactsExpandedList), contacts/drafting/sent (MiniEmailStructure)
-		const isMorphOrigin = prevView === 'inbox' || prevView === 'search';
+		const isMorphOrigin = prevView === 'search' || (prevView === 'inbox' && !isSafari);
 		const showsPinnedPanel = view === 'testing' || view === 'contacts' || view === 'drafting' || view === 'sent';
 		if (isMorphOrigin && showsPinnedPanel) {
 			setIsEnteringFromMorphView(true);
@@ -454,7 +458,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			const timer = setTimeout(() => setIsEnteringFromMorphView(false), 400);
 			return () => clearTimeout(timer);
 		}
-	}, [view]);
+	}, [isSafari, view]);
 
 	// Mirror the exact render conditions for the absolute pinned left column and for this shell.
 	// We only animate when the shell is actually rendered.
@@ -563,6 +567,13 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			fromKey === toKey ||
 			(!isMorphEndpoint(fromKey) && !isMorphEndpoint(toKey))
 		) {
+			gsap.killTweensOf(ghost);
+			gsap.set(ghost, { opacity: 0 });
+			return;
+		}
+
+		// Safari: the Inbox morph animation is unstable. Hard swap instead.
+		if (isSafari && (fromKey === 'inbox' || toKey === 'inbox')) {
 			gsap.killTweensOf(ghost);
 			gsap.set(ghost, { opacity: 0 });
 			return;
@@ -808,7 +819,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			ghostToContent.replaceChildren();
 			mainBoxActiveElRef.current = null;
 		};
-	}, [view, isMobile, MAIN_BOX_VISUAL, getCampaignMainBoxKey]);
+	}, [view, isMobile, isSafari, MAIN_BOX_VISUAL, getCampaignMainBoxKey]);
 
 	useLayoutEffect(() => {
 		if (typeof window === 'undefined') return;
@@ -837,6 +848,13 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			fromKey === toKey ||
 			(!isMorphEndpoint(fromKey) && !isMorphEndpoint(toKey))
 		) {
+			gsap.killTweensOf(ghost);
+			gsap.set(ghost, { opacity: 0 });
+			return;
+		}
+
+		// Safari: the Inbox morph animation is unstable. Hard swap instead.
+		if (isSafari && (fromKey === 'inbox' || toKey === 'inbox')) {
 			gsap.killTweensOf(ghost);
 			gsap.set(ghost, { opacity: 0 });
 			return;
@@ -1085,7 +1103,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			ghostToContent.replaceChildren();
 			researchPanelActiveElRef.current = null;
 		};
-	}, [view, isMobile, getCampaignResearchPanelKey, renderGlobalOverlays]);
+	}, [view, isMobile, isSafari, getCampaignResearchPanelKey, renderGlobalOverlays]);
 
 	// After every view/layout change, record the current main box rect so we can morph from it next time.
 	useLayoutEffect(() => {
