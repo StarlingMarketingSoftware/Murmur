@@ -1192,6 +1192,8 @@ export default function HomePage() {
 
 					{/* Content layer */}
 					<div className="relative z-10 flex flex-col h-full min-h-0 md:min-h-[750px] w-full items-center px-4 pt-[90px] md:pt-[164px] [@media(orientation:landscape)_and_(max-height:500px)]:pt-[60px]">
+						{/* Mobile: spacer to push h1 toward center */}
+						<div className="flex-1 md:hidden" />
 						<div className="w-full max-w-[1132px] flex flex-col items-center shrink-0">
 							<h1
 								className="font-primary text-white font-normal leading-[1.05] text-center text-[clamp(36px,8.5vw,88px)] [@media(orientation:landscape)_and_(max-height:500px)]:text-[clamp(36px,8.5vmin,88px)]"
@@ -1200,8 +1202,17 @@ export default function HomePage() {
 								<br />
 								You deserve an audience.
 							</h1>
+							{/* Mobile-only CTA right under h1 */}
+							<div className="w-full flex justify-center md:hidden mt-6">
+								<Link
+									href={urls.freeTrial.index}
+									className="landing-hero-free-trial-btn h-[56px] flex items-center justify-center text-white font-inter font-semibold text-[22px] bg-[#53B060] border-2 border-[#118521] rounded-[8px]"
+								>
+									Start Free Trial
+								</Link>
+							</div>
 						</div>
-						<div className="flex-[0.5]" />
+						<div className="hidden md:block flex-[0.5]" />
 						<div className="hidden md:flex w-full justify-center px-4 shrink-0">
 							<LandingHeroSearchBar
 								initialWhy="[Booking]"
@@ -1210,12 +1221,8 @@ export default function HomePage() {
 								readOnly
 							/>
 						</div>
-						<div className="flex-1 md:flex-[2]" />
-						{/* Mobile-only spacer to push content down toward the bottom */}
-						<div
-							className="md:hidden"
-							style={{ height: 'calc(140px / var(--landing-zoom, 1))' }}
-						/>
+						{/* Spacer between h1+CTA and subtext */}
+						<div className="flex-[1.5] md:flex-[2]" />
 						<div className="flex flex-col justify-end pb-8 sm:pb-12 text-center shrink-0 w-full items-center">
 							<div className="w-full max-w-[603px]">
 								<p className="font-inter font-normal text-[22px] xs:text-[24px] sm:text-[27px] text-[#C4C4C4] mb-2 [@media(orientation:landscape)_and_(max-height:500px)]:!text-[22px]">
@@ -1227,15 +1234,6 @@ export default function HomePage() {
 							<p className="font-inter font-normal text-[11.5px] xs:text-[12.5px] sm:text-[18px] text-[#B8B8B8] leading-tight [@media(orientation:landscape)_and_(max-height:500px)]:!text-[11.5px]">
 								radio stations, with tools to actually reach them.
 							</p>
-							</div>
-							{/* Mobile-only CTA anchored to bottom of the hero/video area */}
-							<div className="w-full flex justify-center md:hidden mt-4">
-								<Link
-									href={urls.freeTrial.index}
-									className="landing-hero-free-trial-btn h-[56px] flex items-center justify-center text-white font-inter font-semibold text-[18px] bg-[#53B060] border-2 border-[#118521] rounded-[8px]"
-								>
-									Start Free Trial
-								</Link>
 							</div>
 						</div>
 					</div>
