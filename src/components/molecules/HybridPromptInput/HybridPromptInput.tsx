@@ -122,6 +122,9 @@ const MANUAL_EDITOR_COLOR_SWATCHES = [
 	'#4C1130',
 ] as const;
 
+const HPI_GREEN_BG_GRADIENT =
+	'linear-gradient(to bottom, #7BDB7E 0%, #7BDB7E 25%, #A6E2A8 100%)';
+
 interface SortableAIBlockProps {
 	block: {
 		value: HybridBlock;
@@ -3917,6 +3920,63 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 	}));
 	const [isInitialRender, setIsInitialRender] = useState(true);
 
+	// Chrome-style mode hover preview (active turns white, hovered mode appears)
+	const [hoveredModeKey, setHoveredModeKey] = useState<'full' | 'hybrid' | 'manual' | null>(null);
+	const isModePreviewingOther =
+		hoveredModeKey !== null && selectedModeKey !== 'none' && hoveredModeKey !== selectedModeKey;
+
+	const wasModePreviewingRef = useRef(false);
+	const isSwitchingBetweenModePreviews = wasModePreviewingRef.current && isModePreviewingOther;
+	useEffect(() => {
+		wasModePreviewingRef.current = isModePreviewingOther;
+	}, [isModePreviewingOther]);
+
+	const modePreviewAnimatedTransition = '0.6s cubic-bezier(0.22, 1, 0.36, 1)';
+	const modePreviewInstantTransition = '0s';
+	const modePreviewOpacityTransition = isSwitchingBetweenModePreviews
+		? modePreviewInstantTransition
+		: modePreviewAnimatedTransition;
+
+	const [hoverPreviewHighlightStyle, setHoverPreviewHighlightStyle] = useState(() => ({
+		left: 0,
+		width: MODE_HIGHLIGHT_WIDTH,
+		opacity: 0,
+	}));
+
+	const getModeHighlightBackgroundColor = useCallback((mode: 'full' | 'hybrid' | 'manual') => {
+		switch (mode) {
+			case 'hybrid':
+				return 'rgba(74, 74, 217, 0.31)'; // #4A4AD9 at 31% opacity
+			case 'manual':
+				return 'rgba(109, 171, 104, 0.47)'; // #6DAB68 at 47% opacity
+			case 'full':
+			default:
+				return '#DAE6FE';
+		}
+	}, []);
+
+	useLayoutEffect(() => {
+		if (!isModePreviewingOther || !hoveredModeKey) {
+			setHoverPreviewHighlightStyle((prev) => ({ ...prev, opacity: 0 }));
+			return;
+		}
+
+		let targetButton: HTMLButtonElement | null = null;
+		if (hoveredModeKey === 'full') targetButton = fullModeButtonRef.current;
+		else if (hoveredModeKey === 'hybrid') targetButton = hybridModeButtonRef.current;
+		else targetButton = manualModeButtonRef.current;
+
+		if (!targetButton) return;
+
+		const newLeft =
+			targetButton.offsetLeft + targetButton.offsetWidth / 2 - MODE_HIGHLIGHT_WIDTH / 2;
+		setHoverPreviewHighlightStyle({
+			left: newLeft,
+			width: MODE_HIGHLIGHT_WIDTH,
+			opacity: 1,
+		});
+	}, [MODE_HIGHLIGHT_WIDTH, hoveredModeKey, isModePreviewingOther]);
+
 	const dragBounds = useRef({ min: 0, max: 0 });
 
 	// Use useLayoutEffect to calculate position BEFORE browser paints, preventing any visual jump
@@ -4126,7 +4186,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 								compactLeftOnly
 									? 'flex-col'
 									: cn(
-											cn(!forceDesktop ? 'w-[96.27vw]' : 'w-[499px]', 'max-w-[499px] transition flex mx-auto flex-col border-[3px] border-transparent rounded-[8px] bg-[#A6E2A8]'),
+											cn(!forceDesktop ? 'w-[96.27vw]' : 'w-[499px]', 'max-w-[499px] transition flex mx-auto flex-col border-[3px] border-transparent rounded-[8px]'),
 											containerHeightPx ? null : 'h-[703px]'
 									  ),
 								'relative overflow-visible isolate'
@@ -4135,6 +4195,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 								!compactLeftOnly
 									? {
 											backgroundColor: '#A6E2A8',
+											backgroundImage: HPI_GREEN_BG_GRADIENT,
 											...(containerHeightPx ? { height: `${containerHeightPx}px` } : {}),
 									  }
 									: undefined
@@ -4177,7 +4238,8 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 										right: 0,
 										top: overlayTopPx,
 										bottom: 0,
-										background: '#A6E2A8',
+										backgroundColor: '#A6E2A8',
+										backgroundImage: HPI_GREEN_BG_GRADIENT,
 										pointerEvents: 'none',
 										zIndex: -1,
 										// Square off the top corners so the fill meets the border flush on mobile
@@ -4262,9 +4324,42 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 												{!compactLeftOnly && <div className="w-[130px] shrink-0" />}
 												<div
 													ref={modeContainerRef}
-														className={cn('relative flex items-center flex-1', forceDesktop ? 'gap-[70px] ml-[30px]' : 'gap-[78px] ml-[42px]', !forceDesktop && 'max-[480px]:gap-0 max-[480px]:justify-between max-[480px]:ml-[2px] max-[480px]:w-auto max-[480px]:px-[24px]')}
+													onMouseLeave={() => setHoveredModeKey(null)}
+													className={cn(
+														'relative flex items-center flex-1',
+														forceDesktop ? 'gap-[70px] ml-[30px]' : 'gap-[78px] ml-[42px]',
+														!forceDesktop &&
+															'max-[480px]:gap-0 max-[480px]:justify-between max-[480px]:ml-[2px] max-[480px]:w-auto max-[480px]:px-[24px]'
+													)}
 													data-hover-description-suppress="true"
 												>
+													{/* Hover preview pill (appears under hovered mode; selected pill turns white) */}
+													{selectedModeKey !== 'none' && (
+														<div
+															aria-hidden="true"
+															className="absolute top-1/2 -translate-y-1/2 z-10 rounded-[8px] pointer-events-none"
+															style={{
+																left: hoverPreviewHighlightStyle.left,
+																width: MODE_HIGHLIGHT_WIDTH,
+																opacity: hoverPreviewHighlightStyle.opacity,
+																transition: `opacity ${modePreviewOpacityTransition}`,
+															}}
+														>
+															<div
+																style={{
+																	width: MODE_HIGHLIGHT_WIDTH,
+																	height: 19,
+																	backgroundColor:
+																		hoveredModeKey && isModePreviewingOther
+																			? getModeHighlightBackgroundColor(hoveredModeKey)
+																			: 'transparent',
+																	border: '1.3px solid #000000',
+																	borderRadius: '8px',
+																	transition: `background-color ${modePreviewOpacityTransition}`,
+																}}
+															/>
+														</div>
+													)}
 													<DndContext
 														onDragEnd={handleHighlightDragEnd}
 														modifiers={[restrictToHorizontalAxisAndBounds]}
@@ -4275,15 +4370,16 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																style={highlightStyle}
 																isInitialRender={isInitialRender}
 																mode={selectedModeKey as 'full' | 'hybrid' | 'manual'}
-															disabled={isHybridModeSelected}
-															onSelectMode={() => {
-																// Clicking the pill should behave like selecting that mode tab.
-																// Avoid re-running switch logic (which can overwrite in-progress edits).
-																if (activeTab !== 'main') {
-																	setActiveTab('main');
-																	setHasLeftProfileTab(true);
-																}
-															}}
+																disabled={isHybridModeSelected}
+																backgroundColorOverride={isModePreviewingOther ? '#FFFFFF' : undefined}
+																onSelectMode={() => {
+																	// Clicking the pill should behave like selecting that mode tab.
+																	// Avoid re-running switch logic (which can overwrite in-progress edits).
+																	if (activeTab !== 'main') {
+																		setActiveTab('main');
+																		setHasLeftProfileTab(true);
+																	}
+																}}
 															/>
 														)}
 													</DndContext>
@@ -4291,16 +4387,28 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														ref={fullModeButtonRef}
 														variant="ghost"
 														type="button"
-														className={cn('!p-0 h-fit !m-0 text-[13px] font-inter font-semibold bg-transparent z-20 text-black', !forceDesktop && 'max-[480px]:text-[14px]')}
+														onMouseEnter={() => setHoveredModeKey('full')}
+														style={{ transition: `opacity ${modePreviewAnimatedTransition}` }}
+														className={cn(
+															'!p-0 h-fit !m-0 text-[13px] font-inter font-semibold bg-transparent z-20 text-black transition-opacity',
+															!forceDesktop && 'max-[480px]:text-[14px]',
+															isModePreviewingOther && selectedModeKey === 'full' && 'opacity-0'
+														)}
 														onClick={() => { setActiveTab('main'); setHasLeftProfileTab(true); switchToFull(); }}
 													>
-												Auto
-												</Button>
+														Auto
+													</Button>
 													<Button
 														ref={manualModeButtonRef}
 														variant="ghost"
 														type="button"
-														className={cn('!p-0 h-fit !m-0 text-[13px] font-inter font-semibold bg-transparent z-20 text-black', !forceDesktop && 'max-[480px]:text-[14px]')}
+														onMouseEnter={() => setHoveredModeKey('manual')}
+														style={{ transition: `opacity ${modePreviewAnimatedTransition}` }}
+														className={cn(
+															'!p-0 h-fit !m-0 text-[13px] font-inter font-semibold bg-transparent z-20 text-black transition-opacity',
+															!forceDesktop && 'max-[480px]:text-[14px]',
+															isModePreviewingOther && selectedModeKey === 'manual' && 'opacity-0'
+														)}
 														onClick={() => { setActiveTab('main'); setHasLeftProfileTab(true); switchToManual(); }}
 													>
 														Manual
@@ -4309,7 +4417,13 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														ref={hybridModeButtonRef}
 														variant="ghost"
 														type="button"
-														className={cn('!p-0 h-fit !m-0 text-[13px] font-inter font-semibold bg-transparent z-20 text-black', !forceDesktop && 'max-[480px]:text-[14px]')}
+														onMouseEnter={() => setHoveredModeKey('hybrid')}
+														style={{ transition: `opacity ${modePreviewAnimatedTransition}` }}
+														className={cn(
+															'!p-0 h-fit !m-0 text-[13px] font-inter font-semibold bg-transparent z-20 text-black transition-opacity',
+															!forceDesktop && 'max-[480px]:text-[14px]',
+															isModePreviewingOther && selectedModeKey === 'hybrid' && 'opacity-0'
+														)}
 														onClick={() => { setActiveTab('main'); setHasLeftProfileTab(true); switchToHybrid(); }}
 													>
 														Hybrid
