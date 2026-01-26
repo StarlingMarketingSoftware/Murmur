@@ -787,6 +787,11 @@ const defaultCenter = {
 const MAP_MIN_ZOOM = 5;
 // Dashboard UX: allow state hover highlight one zoom step past minZoom.
 const STATE_HOVER_HIGHLIGHT_MAX_ZOOM = MAP_MIN_ZOOM + 1;
+// Auto-fit temporarily caps maxZoom to prevent a visible "zoom bounce", but we must restore
+// it afterward so the user can still zoom in normally.
+const AUTO_FIT_CONTACTS_MAX_ZOOM = 14;
+const AUTO_FIT_STATE_MAX_ZOOM = 8;
+const DEFAULT_MAX_ZOOM_FALLBACK = 22;
 
 const mapOptions: google.maps.MapOptions = {
 	disableDefaultUI: true,
@@ -2109,12 +2114,16 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 							bounds.extend(latLng);
 						});
 						// Avoid zoom "bounce" on small states by preventing fitBounds from overshooting the cap.
-						const AUTO_FIT_STATE_MAX_ZOOM = 8;
-						const DEFAULT_MAX_ZOOM_FALLBACK = 22;
 						const prevMaxZoomRaw = map.get('maxZoom') as unknown;
-						const prevMaxZoom =
+						const prevMaxZoomCandidate =
 							typeof prevMaxZoomRaw === 'number' && Number.isFinite(prevMaxZoomRaw)
 								? prevMaxZoomRaw
+								: null;
+						// Ignore our temporary auto-fit caps (8/14) so repeated fits don't permanently lock zoom-in.
+						const prevMaxZoom =
+							prevMaxZoomCandidate != null &&
+							prevMaxZoomCandidate > AUTO_FIT_CONTACTS_MAX_ZOOM + 0.001
+								? prevMaxZoomCandidate
 								: null;
 						map.setOptions({ maxZoom: AUTO_FIT_STATE_MAX_ZOOM });
 						map.fitBounds(bounds, {
@@ -3446,15 +3455,19 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			// Avoid a visible "zoom in then zoom out" bounce:
 			// Temporarily cap maxZoom during fitBounds so the camera never overshoots our cap
 			// and then gets corrected in a second animation.
-			const AUTO_FIT_MAX_ZOOM = 14;
-			const DEFAULT_MAX_ZOOM_FALLBACK = 22;
 			const prevMaxZoomRaw = mapInstance.get('maxZoom') as unknown;
-			const prevMaxZoom =
+			const prevMaxZoomCandidate =
 				typeof prevMaxZoomRaw === 'number' && Number.isFinite(prevMaxZoomRaw)
 					? prevMaxZoomRaw
 					: null;
+			// Ignore our temporary auto-fit caps (8/14) so repeated fits don't permanently lock zoom-in.
+			const prevMaxZoom =
+				prevMaxZoomCandidate != null &&
+				prevMaxZoomCandidate > AUTO_FIT_CONTACTS_MAX_ZOOM + 0.001
+					? prevMaxZoomCandidate
+					: null;
 			mapInstance.setOptions({
-				maxZoom: AUTO_FIT_MAX_ZOOM,
+				maxZoom: AUTO_FIT_CONTACTS_MAX_ZOOM,
 			});
 
 			// Fit bounds with padding
@@ -3468,8 +3481,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			// Prevent too much zoom on single marker or very close markers
 			const listener = google.maps.event.addListener(mapInstance, 'idle', () => {
 				const currentZoom = mapInstance.getZoom();
-				if (currentZoom && currentZoom > AUTO_FIT_MAX_ZOOM) {
-					mapInstance.setZoom(AUTO_FIT_MAX_ZOOM);
+				if (currentZoom && currentZoom > AUTO_FIT_CONTACTS_MAX_ZOOM) {
+					mapInstance.setZoom(AUTO_FIT_CONTACTS_MAX_ZOOM);
 				}
 				// Restore maxZoom so users can zoom in further after the auto-fit completes.
 				mapInstance.setOptions({
@@ -3508,11 +3521,17 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 		// Avoid a visible "zoom in then zoom out" bounce on small states:
 		// temporarily cap maxZoom during fitBounds so the camera never overshoots the cap.
-		const AUTO_FIT_STATE_MAX_ZOOM = 8;
-		const DEFAULT_MAX_ZOOM_FALLBACK = 22;
 		const prevMaxZoomRaw = mapInstance.get('maxZoom') as unknown;
+		const prevMaxZoomCandidate =
+			typeof prevMaxZoomRaw === 'number' && Number.isFinite(prevMaxZoomRaw)
+				? prevMaxZoomRaw
+				: null;
+		// Ignore our temporary auto-fit caps (8/14) so repeated fits don't permanently lock zoom-in.
 		const prevMaxZoom =
-			typeof prevMaxZoomRaw === 'number' && Number.isFinite(prevMaxZoomRaw) ? prevMaxZoomRaw : null;
+			prevMaxZoomCandidate != null &&
+			prevMaxZoomCandidate > AUTO_FIT_CONTACTS_MAX_ZOOM + 0.001
+				? prevMaxZoomCandidate
+				: null;
 		mapInstance.setOptions({
 			maxZoom: AUTO_FIT_STATE_MAX_ZOOM,
 		});
