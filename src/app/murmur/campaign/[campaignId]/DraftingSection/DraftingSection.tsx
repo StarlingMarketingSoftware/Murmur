@@ -6727,7 +6727,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												whiteSectionHeight={15}
 												collapsed={bottomPanelCollapsed}
 												onOpenSent={goToSent}
-											/>
+											/>     
 										</div>
 									</div>
 								) : (

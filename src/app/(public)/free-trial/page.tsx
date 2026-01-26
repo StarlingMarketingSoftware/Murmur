@@ -264,8 +264,8 @@ export default function FreeTrialPage() {
 	}, []);
 
 	return (
-		<div className="w-full h-[100dvh] bg-[#AFD6EF] px-[14px] pt-[17px] pb-[12px] overflow-hidden">
-			<div className="relative w-full h-full border-[3px] border-black rounded-[8px] overflow-hidden">
+		<div className="w-full h-[100dvh] bg-black md:bg-[#AFD6EF] px-0 pt-0 pb-0 md:px-[14px] md:pt-[17px] md:pb-[12px] overflow-hidden">
+			<div className="relative w-full h-full border-0 md:border-[3px] md:border-black rounded-none md:rounded-[8px] overflow-hidden">
 				<div ref={mapContainerRef} className="w-full h-full free-trial-map" />
 				{isLoaded && isSignedIn && (
 					<StripeEmbeddedCheckoutModal
@@ -298,11 +298,16 @@ export default function FreeTrialPage() {
 					</div>
 				)}
 			</div>
-			<style jsx global>{`
-				.free-trial-map .mapboxgl-ctrl-logo {
+		<style jsx global>{`
+			.free-trial-map .mapboxgl-ctrl-logo {
+				display: none !important;
+			}
+			@media (max-width: 767px) {
+				.free-trial-map .mapboxgl-ctrl-attrib {
 					display: none !important;
 				}
-			`}</style>
+			}
+		`}</style>
 		</div>
 	);
 }

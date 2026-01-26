@@ -223,13 +223,75 @@ function LiveNumber({
 	incrementPerSecond,
 	burstTargetMin,
 	burstTargetMax,
+	storageKey,
 }: {
 	initialValue: number;
 	incrementPerSecond: number;
 	burstTargetMin?: number;
 	burstTargetMax?: number;
+	storageKey?: string;
 }) {
-	const value = useLiveCounter(initialValue, incrementPerSecond, burstTargetMin, burstTargetMax);
+	const [effectiveInitialValue, setEffectiveInitialValue] = useState(initialValue);
+
+	useEffect(() => {
+		if (!storageKey) {
+			setEffectiveInitialValue(initialValue);
+			return;
+		}
+
+		try {
+			const storedRaw = window.localStorage.getItem(storageKey);
+			const storedValue = storedRaw ? Number.parseInt(storedRaw, 10) : Number.NaN;
+			const nextInitial = Number.isFinite(storedValue)
+				? Math.max(initialValue, storedValue)
+				: initialValue;
+			setEffectiveInitialValue(nextInitial);
+		} catch {
+			setEffectiveInitialValue(initialValue);
+		}
+	}, [initialValue, storageKey]);
+
+	const value = useLiveCounter(effectiveInitialValue, incrementPerSecond, burstTargetMin, burstTargetMax);
+	const valueRef = useRef(value);
+
+	useEffect(() => {
+		valueRef.current = value;
+	}, [value]);
+
+	useEffect(() => {
+		if (!storageKey) return;
+
+		const save = () => {
+			try {
+				const currentValue = valueRef.current;
+				const existingRaw = window.localStorage.getItem(storageKey);
+				const existingValue = existingRaw ? Number.parseInt(existingRaw, 10) : Number.NaN;
+				const nextValue = Number.isFinite(existingValue)
+					? Math.max(existingValue, currentValue)
+					: currentValue;
+				window.localStorage.setItem(storageKey, String(nextValue));
+			} catch {
+				// Ignore storage failures (e.g. Safari private mode).
+			}
+		};
+
+		// Periodic saves so refresh/navigation won't reset the counters.
+		const intervalId = window.setInterval(save, 1500);
+
+		const onVisibilityChange = () => {
+			if (document.hidden) save();
+		};
+
+		window.addEventListener('pagehide', save);
+		document.addEventListener('visibilitychange', onVisibilityChange);
+
+		return () => {
+			window.clearInterval(intervalId);
+			window.removeEventListener('pagehide', save);
+			document.removeEventListener('visibilitychange', onVisibilityChange);
+			save();
+		};
+	}, [storageKey]);
 
 	return <span className="tabular-nums">{formatCount(value)}</span>;
 }
@@ -466,6 +528,7 @@ export default function Products() {
 							>
 								<div className="text-right font-[var(--font-inter)] text-[18px] xl:text-[32px] font-semibold leading-none text-black">
 									<LiveNumber
+										storageKey="murmur:pricing:liveCounter:emailsSent"
 										initialValue={210_000}
 										incrementPerSecond={18}
 										burstTargetMin={12}
@@ -478,6 +541,7 @@ export default function Products() {
 
 								<div className="text-right font-[var(--font-inter)] text-[18px] xl:text-[32px] font-semibold leading-none text-black">
 									<LiveNumber
+										storageKey="murmur:pricing:liveCounter:replies"
 										initialValue={25_999}
 										incrementPerSecond={6}
 										burstTargetMin={4}
@@ -489,7 +553,11 @@ export default function Products() {
 								</div>
 
 								<div className="text-right font-[var(--font-inter)] text-[18px] xl:text-[32px] font-semibold leading-none text-black">
-									<LiveNumber initialValue={6_000} incrementPerSecond={0.2} />
+									<LiveNumber
+										storageKey="murmur:pricing:liveCounter:bookings"
+										initialValue={6_000}
+										incrementPerSecond={0.2}
+									/>
 								</div>
 								<div className="font-[var(--font-inter)] text-[18px] xl:text-[32px] font-semibold leading-none text-black">
 									Bookings
@@ -522,7 +590,7 @@ export default function Products() {
 
 							<Typography
 								variant="p"
-								className="mt-8 xl:mt-auto w-full xl:w-[660px] 2xl:w-[720px] font-[var(--font-inter)] text-[13px] 2xl:text-[23px] font-medium leading-[1.4] 2xl:leading-[1.25] text-black text-center xl:text-left"
+								className="mt-8 xl:mt-auto w-full max-w-[320px] sm:max-w-none mx-auto xl:mx-0 xl:w-[660px] 2xl:w-[720px] font-[var(--font-inter)] text-[13px] sm:text-[13px] 2xl:text-[23px] font-medium leading-[1.5] sm:leading-[1.4] 2xl:leading-[1.25] text-black text-center xl:text-left"
 							>
 								{'Booking out your calendar can take months of back and forth. '}
 								<br className="hidden 2xl:block" />
@@ -540,55 +608,55 @@ export default function Products() {
 
 			{/* 1028px tall block of #333333 */}
 			<section className="relative w-full bg-[#333333] xl:h-[1028px]">
-				<div className="mx-auto w-full max-w-[1200px] px-6 pt-[72px] pb-16 xl:pb-0">
+				<div className="mx-auto w-full max-w-[1200px] px-4 sm:px-6 pt-8 sm:pt-[72px] pb-10 sm:pb-16 xl:pb-0">
 					<Typography
 						variant="h2"
-						className="mx-auto w-full max-w-[562px] text-left xl:mx-0 xl:max-w-none font-[var(--font-inter)] text-[32px] xl:text-[64px] leading-[1.05] text-white"
+						className="mx-auto w-full max-w-[320px] sm:max-w-[562px] text-left xl:mx-0 xl:max-w-none font-[var(--font-inter)] text-[24px] sm:text-[32px] xl:text-[64px] leading-[1.05] text-white"
 					>
 						Results that matter
 					</Typography>
 
-					<div className="mt-12 mx-auto w-full max-w-[562px] xl:absolute xl:bottom-[360px] xl:left-1/2 xl:-translate-x-[441px] xl:mt-0 xl:mx-0">
+					<div className="mt-6 sm:mt-12 mx-auto w-full max-w-[320px] sm:max-w-[562px] xl:absolute xl:bottom-[360px] xl:left-1/2 xl:-translate-x-[441px] xl:mt-0 xl:mx-0">
 						<Graph aria-hidden="true" className="h-auto w-full" />
 					</div>
 
 					<div
 						className={cn(
-							'mt-10 mx-auto grid w-full max-w-[562px] grid-cols-2 justify-items-center gap-x-3 gap-y-16',
+							'mt-6 sm:mt-10 mx-auto grid w-full max-w-[320px] sm:max-w-[562px] grid-cols-2 justify-items-center gap-x-2 sm:gap-x-3 gap-y-10 sm:gap-y-16',
 							'xl:absolute xl:top-[249px] xl:left-1/2 xl:mx-0 xl:mt-0 xl:w-auto xl:max-w-none xl:translate-x-[230px] xl:flex xl:flex-col xl:items-start xl:gap-[125px]'
 						)}
 					>
-						<div className="relative h-[120px] w-full max-w-[262px]">
-							<div className="absolute bottom-[calc(100%+6px)] left-0 w-full px-3 xl:px-6 text-left font-[var(--font-inter)] text-[12px] xl:text-[18px] leading-[1.2] text-[#C2C2C2]">
+						<div className="relative h-[80px] sm:h-[120px] w-full max-w-[150px] sm:max-w-[262px]">
+							<div className="absolute bottom-[calc(100%+4px)] sm:bottom-[calc(100%+6px)] left-0 w-full px-2 sm:px-3 xl:px-6 text-left font-[var(--font-inter)] text-[10px] sm:text-[12px] xl:text-[18px] leading-[1.2] text-[#C2C2C2]">
 								users experience up to
 							</div>
-							<div className="flex h-full w-full flex-col justify-between rounded-[10px] border-[3px] border-[#20B135] bg-[#177110] px-3 xl:px-6 py-2 xl:py-[10px]">
-								<div className="font-[var(--font-inter)] text-[44px] xl:text-[70px] font-medium leading-[0.9] text-white">
+							<div className="flex h-full w-full flex-col justify-between rounded-[8px] sm:rounded-[10px] border-2 sm:border-[3px] border-[#20B135] bg-[#177110] px-2 sm:px-3 xl:px-6 py-1.5 sm:py-2 xl:py-[10px]">
+								<div className="font-[var(--font-inter)] text-[28px] sm:text-[44px] xl:text-[70px] font-medium leading-[0.9] text-white">
 									5.7x
 								</div>
-								<div className="font-[var(--font-inter)] text-[18px] xl:text-[30px] leading-none text-[#CAC7C7]">
+								<div className="font-[var(--font-inter)] text-[12px] sm:text-[18px] xl:text-[30px] leading-none text-[#CAC7C7]">
 									more replies
 								</div>
 							</div>
-							<div className="absolute top-[calc(100%+6px)] left-0 w-full px-3 xl:px-6 text-left font-[var(--font-inter)] text-[12px] xl:text-[18px] leading-[1.2] text-[#C2C2C2]">
+							<div className="absolute top-[calc(100%+4px)] sm:top-[calc(100%+6px)] left-0 w-full px-2 sm:px-3 xl:px-6 text-left font-[var(--font-inter)] text-[9px] sm:text-[12px] xl:text-[18px] leading-[1.2] text-[#C2C2C2]">
 								than musicians booking
 								<br />
 								on their own
 							</div>
 						</div>
-						<div className="relative h-[120px] w-full max-w-[262px]">
-							<div className="absolute bottom-[calc(100%+6px)] left-0 w-full px-3 xl:px-6 text-left font-[var(--font-inter)] text-[12px] xl:text-[18px] leading-[1.2] text-[#C2C2C2]">
+						<div className="relative h-[80px] sm:h-[120px] w-full max-w-[150px] sm:max-w-[262px]">
+							<div className="absolute bottom-[calc(100%+4px)] sm:bottom-[calc(100%+6px)] left-0 w-full px-2 sm:px-3 xl:px-6 text-left font-[var(--font-inter)] text-[10px] sm:text-[12px] xl:text-[18px] leading-[1.2] text-[#C2C2C2]">
 								users hear back from
 							</div>
-							<div className="flex h-full w-full flex-col justify-between rounded-[10px] border-[3px] border-[#20B135] bg-[#177110] px-3 xl:px-6 py-2 xl:py-[10px]">
-								<div className="font-[var(--font-inter)] text-[44px] xl:text-[70px] font-medium leading-[0.9] text-white">
+							<div className="flex h-full w-full flex-col justify-between rounded-[8px] sm:rounded-[10px] border-2 sm:border-[3px] border-[#20B135] bg-[#177110] px-2 sm:px-3 xl:px-6 py-1.5 sm:py-2 xl:py-[10px]">
+								<div className="font-[var(--font-inter)] text-[28px] sm:text-[44px] xl:text-[70px] font-medium leading-[0.9] text-white">
 									471%
 								</div>
-								<div className="font-[var(--font-inter)] text-[18px] xl:text-[30px] leading-none text-[#CAC7C7]">
+								<div className="font-[var(--font-inter)] text-[12px] sm:text-[18px] xl:text-[30px] leading-none text-[#CAC7C7]">
 									more venues
 								</div>
 							</div>
-							<div className="absolute top-[calc(100%+6px)] left-0 w-full px-3 xl:px-6 text-left font-[var(--font-inter)] text-[12px] xl:text-[18px] leading-[1.2] text-[#C2C2C2]">
+							<div className="absolute top-[calc(100%+4px)] sm:top-[calc(100%+6px)] left-0 w-full px-2 sm:px-3 xl:px-6 text-left font-[var(--font-inter)] text-[9px] sm:text-[12px] xl:text-[18px] leading-[1.2] text-[#C2C2C2]">
 								than they’re used to
 								<br />
 								hearing from.
@@ -596,14 +664,17 @@ export default function Products() {
 						</div>
 					</div>
 
-					<div className="mt-12 -mx-6 w-[calc(100%+48px)] flex items-start rounded-none bg-[#666666] px-6 py-4 xl:absolute xl:bottom-[180px] xl:left-1/2 xl:mt-0 xl:h-[76px] xl:w-[1077px] xl:mx-0 xl:-translate-x-1/2 xl:items-center xl:rounded-[10px] xl:px-10 xl:py-0">
-						<p className="mx-auto w-full max-w-[680px] xl:mx-0 xl:max-w-none font-[var(--font-inter)] text-[13px] xl:text-[22.5px] font-medium leading-[1.35] xl:leading-[1.2] text-white">
-							<span className="block">
+					<div className="mt-14 sm:mt-12 -mx-4 sm:-mx-6 w-[calc(100%+32px)] sm:w-[calc(100%+48px)] flex items-start rounded-none bg-[#666666] px-4 sm:px-6 py-4 sm:py-4 xl:absolute xl:bottom-[180px] xl:left-1/2 xl:mt-0 xl:h-[76px] xl:w-[1077px] xl:mx-0 xl:-translate-x-1/2 xl:items-center xl:rounded-[10px] xl:px-10 xl:py-0">
+						<p className="mx-auto w-full max-w-[340px] sm:max-w-[680px] xl:mx-0 xl:max-w-none font-[var(--font-inter)] text-[11px] sm:text-[13px] xl:text-[22.5px] font-medium leading-[1.5] sm:leading-[1.35] xl:leading-[1.2] text-white text-center xl:text-left">
+							<span className="hidden xl:block">
 								This is because we help them find the right person to reach, give them the best way to
 								structure
 							</span>
-							<span className="block">
+							<span className="hidden xl:block">
 								what they’re sending, and provide the correct info about each contact they send to.
+							</span>
+							<span className="xl:hidden">
+								This is because we help them find the right person to reach, give them the best way to structure what they&apos;re sending, and provide the correct info about each contact they send to.
 							</span>
 						</p>
 					</div>

@@ -23,6 +23,9 @@ const ScrollContext = createContext<ScrollContextType>({
 
 export const useScroll = () => useContext(ScrollContext);
 
+const LenisContext = createContext<any | null>(null);
+export const useLenis = () => useContext(LenisContext);
+
 interface ScrollProviderProps {
 	children: React.ReactNode;
 }
@@ -30,6 +33,7 @@ interface ScrollProviderProps {
 export function ScrollProvider({ children }: ScrollProviderProps) {
 	const lenisRef = useRef<any | null>(null);
 	const rafRef = useRef<number | null>(null);
+	const [lenisInstance, setLenisInstance] = useState<any | null>(null);
 	const [scrollState, setScrollState] = useState<Omit<ScrollContextType, 'lenis'>>({
 		progress: 0,
 		velocity: 0,
@@ -63,6 +67,7 @@ export function ScrollProvider({ children }: ScrollProviderProps) {
 				if (lenisRef.current) {
 					lenisRef.current.destroy();
 					lenisRef.current = null;
+					setLenisInstance(null);
 				}
 			} catch {}
 			document.documentElement.classList.remove('lenis-active');
@@ -114,6 +119,7 @@ export function ScrollProvider({ children }: ScrollProviderProps) {
 				});
 
 				lenisRef.current = lenis;
+				setLenisInstance(lenis);
 
 				// Add class to HTML element when Lenis is active
 				document.documentElement.classList.add('lenis-active');
@@ -157,6 +163,7 @@ export function ScrollProvider({ children }: ScrollProviderProps) {
 					clearTimeout(refreshTimeout);
 					window.removeEventListener('resize', handleResize);
 					document.documentElement.classList.remove('lenis-active');
+					setLenisInstance(null);
 					if (lenis) {
 						lenis.destroy();
 					}
@@ -183,8 +190,10 @@ export function ScrollProvider({ children }: ScrollProviderProps) {
 	}, [isClient, pathname, isMobile]);
 
 	return (
-		<ScrollContext.Provider value={{ lenis: lenisRef.current, ...scrollState }}>
-			{children}
-		</ScrollContext.Provider>
+		<LenisContext.Provider value={lenisInstance}>
+			<ScrollContext.Provider value={{ lenis: lenisInstance, ...scrollState }}>
+				{children}
+			</ScrollContext.Provider>
+		</LenisContext.Provider>
 	);
 }

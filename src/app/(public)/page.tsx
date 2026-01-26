@@ -1,18 +1,31 @@
 'use client';
 import { LandingHeroSearchBar } from '@/components/molecules/LandingHeroSearchBar/LandingHeroSearchBar';
 import LandingPageMap1 from '@/components/atoms/_svg/LandingPageMap1';
+import { LandingPageGoogleMapBackground } from '@/components/molecules/LandingPageGoogleMapBackground/LandingPageGoogleMapBackground';
+import { LandingPageMapCtaMorph } from '@/components/molecules/LandingPageMapCtaMorph/LandingPageMapCtaMorph';
+import { FadeInUp } from '@/components/animations/FadeInUp';
 import MuxPlayer from '@mux/mux-player-react';
 import { useEffect, useRef, useState } from 'react';
 import { gsap } from 'gsap';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import { urls } from '@/constants/urls';
 import { ContactsExpandedList } from '@/app/murmur/campaign/[campaignId]/DraftingSection/Testing/ContactsExpandedList';
 import { ContactResearchPanel } from '@/components/molecules/ContactResearchPanel/ContactResearchPanel';
 import { ContactWithName } from '@/types/contact';
 import InboxSection from '@/components/molecules/InboxSection/InboxSection';
 import type { InboundEmailWithRelations } from '@/types';
-import { LandingDraftingDemo } from '@/components/molecules/LandingDraftingDemo/LandingDraftingDemo';
 import { ScaledToFit } from '@/components/atoms/ScaledToFit';
+import { useLenis } from '@/contexts/ScrollContext';
+
+// Prevent SSR hydration mismatches from @dnd-kit IDs inside the drafting demo UI.
+const LandingDraftingDemo = dynamic(
+	() =>
+		import('@/components/molecules/LandingDraftingDemo/LandingDraftingDemo').then(
+			(m) => m.LandingDraftingDemo
+		),
+	{ ssr: false }
+);
 
 const DESKTOP_HERO_MUX_PLAYBACK_ID = 'pKbGxKyrsRlE3NJPXUULvpu01wi00CBIBFn8UvbAjyvo4';
 const MOBILE_PORTRAIT_HERO_MUX_PLAYBACK_ID =
@@ -469,8 +482,6 @@ const sampleSentEmails = [
 	},
 ] as unknown as Array<InboundEmailWithRelations & { isSent?: boolean }>;
 
-import './landing-animations.css';
-
 declare global {
 	interface CloudflareStreamPlayer {
 		addEventListener: (event: string, handler: () => void) => void;
@@ -487,10 +498,12 @@ declare global {
 }
 
 export default function HomePage() {
+	const lenis = useLenis();
 	const heroRef = useRef<HTMLDivElement>(null);
 	const heroVideoRef = useRef<any>(null);
 	const videoCarouselContainerRef = useRef<HTMLDivElement>(null);
 	const landingMapWrapperRef = useRef<HTMLDivElement>(null);
+	const landingMapContainerRef = useRef<HTMLDivElement>(null);
 	const heroLastVisibleHeightPxRef = useRef<number | null>(null);
 	const [heroPlaybackId, setHeroPlaybackId] = useState(DESKTOP_HERO_MUX_PLAYBACK_ID);
 	const [currentVideoIndex, setCurrentVideoIndex] = useState(0);
@@ -499,6 +512,141 @@ export default function HomePage() {
 	const [activeCarouselVideoProgress, setActiveCarouselVideoProgress] = useState(0);
 	const [isActiveCarouselVideoPlaying, setIsActiveCarouselVideoPlaying] = useState(false);
 	const [hoveredContact, setHoveredContact] = useState<ContactWithName | null>(sampleContacts[0]);
+	const [shouldMountLandingGoogleMap, setShouldMountLandingGoogleMap] = useState(false);
+	const [isLandingGoogleMapReady, setIsLandingGoogleMapReady] = useState(false);
+	const [landingMapScale, setLandingMapScaleState] = useState(1);
+	const landingMapScaleRef = useRef(1);
+
+	// Ensure the landing page doesn't "jump" down after a hard refresh at the top.
+	// (Some browsers + smooth scroll libs can restore an old scroll position asynchronously.)
+	useEffect(() => {
+		if (typeof window === 'undefined') return;
+
+		const storageKey = 'murmur:scrollY:/';
+		const persistScrollY = () => {
+			try {
+				window.sessionStorage.setItem(storageKey, String(window.scrollY || 0));
+			} catch {
+				// ignore (private mode / quota / disabled)
+			}
+		};
+
+		// `pagehide` covers bfcache; `beforeunload` covers refresh.
+		window.addEventListener('pagehide', persistScrollY);
+		window.addEventListener('beforeunload', persistScrollY);
+		return () => {
+			window.removeEventListener('pagehide', persistScrollY);
+			window.removeEventListener('beforeunload', persistScrollY);
+		};
+	}, []);
+
+	useEffect(() => {
+		if (typeof window === 'undefined') return;
+
+		const getNavigationType = (): 'navigate' | 'reload' | 'back_forward' | 'prerender' => {
+			try {
+				const entry = performance.getEntriesByType?.('navigation')?.[0] as
+					| PerformanceNavigationTiming
+					| undefined;
+				if (entry?.type) return entry.type as any;
+			} catch {
+				// ignore
+			}
+
+			// Legacy Safari fallback.
+			const legacyType = (performance as any)?.navigation?.type;
+			if (legacyType === 1) return 'reload';
+			if (legacyType === 2) return 'back_forward';
+			return 'navigate';
+		};
+
+		if (getNavigationType() !== 'reload') return;
+
+		let lastScrollY = 0;
+		try {
+			const raw = window.sessionStorage.getItem('murmur:scrollY:/');
+			lastScrollY = raw ? Number(raw) : 0;
+		} catch {
+			// ignore
+		}
+
+		// Only enforce if the user refreshed from the very top.
+		if (!Number.isFinite(lastScrollY) || lastScrollY > 4) return;
+
+		const prevRestoration = 'scrollRestoration' in history ? history.scrollRestoration : undefined;
+		try {
+			if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+		} catch {
+			// ignore
+		}
+
+		let userInteracted = false;
+		const markUserInteracted = () => {
+			userInteracted = true;
+			cleanupUserIntentListeners();
+		};
+		const cleanupUserIntentListeners = () => {
+			window.removeEventListener('wheel', markUserInteracted);
+			window.removeEventListener('touchstart', markUserInteracted);
+			window.removeEventListener('pointerdown', markUserInteracted);
+			window.removeEventListener('keydown', markUserInteracted);
+		};
+
+		// If the user immediately starts scrolling, don't fight them.
+		window.addEventListener('wheel', markUserInteracted, { passive: true });
+		window.addEventListener('touchstart', markUserInteracted, { passive: true });
+		window.addEventListener('pointerdown', markUserInteracted, { passive: true });
+		window.addEventListener('keydown', markUserInteracted);
+
+		const forceTop = () => {
+			if (userInteracted) return;
+			try {
+				(lenis as any)?.scrollTo?.(0, { immediate: true });
+			} catch {
+				// ignore
+			}
+			window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+		};
+
+		const onUnexpectedScroll = () => {
+			// Only correct if the page "jumps" without user input.
+			if (userInteracted) return;
+			if (window.scrollY > 20) {
+				forceTop();
+			}
+		};
+		window.addEventListener('scroll', onUnexpectedScroll, { passive: true });
+
+		// Run immediately + after the typical async "jump" window (Lenis/ScrollTrigger init, embeds, etc).
+		forceTop();
+		const t1 = window.setTimeout(forceTop, 250);
+		const t2 = window.setTimeout(forceTop, 900);
+		const restoreTimer = window.setTimeout(() => {
+			window.removeEventListener('scroll', onUnexpectedScroll);
+			try {
+				if (prevRestoration && 'scrollRestoration' in history) {
+					history.scrollRestoration = prevRestoration;
+				}
+			} catch {
+				// ignore
+			}
+		}, 3500);
+
+		return () => {
+			cleanupUserIntentListeners();
+			window.removeEventListener('scroll', onUnexpectedScroll);
+			window.clearTimeout(t1);
+			window.clearTimeout(t2);
+			window.clearTimeout(restoreTimer);
+			try {
+				if (prevRestoration && 'scrollRestoration' in history) {
+					history.scrollRestoration = prevRestoration;
+				}
+			} catch {
+				// ignore
+			}
+		};
+	}, [lenis]);
 	
 	const videoIds = [
 		'217455815bac246b922e15ebd83dacf6',
@@ -521,7 +669,7 @@ export default function HomePage() {
 		'f5ec9f11f866731a70ebf8543d5ecf5a': '14.8s',
 	};
 	
-	// Handle seamless looping when going from last to first video
+	// Handle seamless looping when wrapping from last->first and first->last
 	const prevVideoIndexRef = useRef(0);
 	useEffect(() => {
 		const prevIndex = prevVideoIndexRef.current;
@@ -537,6 +685,22 @@ export default function HomePage() {
 			setTimeout(() => {
 				setSkipTransition(true);
 				setDisplayIndex(1);
+				// Re-enable transitions after the instant reset
+				requestAnimationFrame(() => {
+					requestAnimationFrame(() => {
+						setSkipTransition(false);
+					});
+				});
+			}, 650); // Slightly longer than the 600ms CSS transition
+		// Going from first video (0) to last video (4)
+		} else if (prevIndex === 0 && newIndex === videoIds.length - 1) {
+			// First, scroll to the duplicate last video at the beginning (displayIndex = 0)
+			setDisplayIndex(0);
+
+			// After animation completes, instantly reset to the real last video position
+			setTimeout(() => {
+				setSkipTransition(true);
+				setDisplayIndex(videoIds.length);
 				// Re-enable transitions after the instant reset
 				requestAnimationFrame(() => {
 					requestAnimationFrame(() => {
@@ -735,6 +899,12 @@ export default function HomePage() {
 
 			const landingZoom = getLandingZoom(wrapper);
 			const isMobile = normalizedViewportWidthPx <= MOBILE_BREAKPOINT_PX;
+			// Only mount the live Google Map background on desktop.
+			const shouldMountGoogleMap = !isMobile;
+			setShouldMountLandingGoogleMap(shouldMountGoogleMap);
+			if (!shouldMountGoogleMap) {
+				setIsLandingGoogleMapReady(false);
+			}
 			const sidePaddingPx = isMobile ? 0 : SIDE_PADDING_DESKTOP_PX;
 			const mapPaddingPx = isMobile ? MAP_PADDING_MOBILE_PX : MAP_PADDING_DESKTOP_PX;
 
@@ -749,7 +919,13 @@ export default function HomePage() {
 				scale = Math.max(0, Math.min(1, fitScale));
 			}
 
-			wrapper.style.setProperty('--landing-map-scale', String(scale));
+			// Clamp precision to avoid churn from tiny float diffs (helps avoid extra rerenders).
+			const nextScale = Math.round(scale * 10000) / 10000;
+			wrapper.style.setProperty('--landing-map-scale', String(nextScale));
+			if (Math.abs(nextScale - landingMapScaleRef.current) > 0.0001) {
+				landingMapScaleRef.current = nextScale;
+				setLandingMapScaleState(nextScale);
+			}
 		};
 
 		setLandingMapScale();
@@ -759,6 +935,11 @@ export default function HomePage() {
 			window.removeEventListener('resize', setLandingMapScale);
 		};
 	}, []);
+
+	const landingMapMobileCopyScale =
+		Number.isFinite(landingMapScale) && landingMapScale > 0
+			? Math.max(1, 0.6 / landingMapScale)
+			: 1;
 
 	// Work around HLS loop "hiccup" by seeking back to the start *before* the stream ends.
 	// This avoids hitting the "ended" state, which can cause a noticeable pause on some browsers.
@@ -970,7 +1151,7 @@ export default function HomePage() {
 	}, [currentVideoIndex, displayIndex, videoIds.length]);
 
 	return (
-		<main className="overflow-x-hidden">
+		<main className="overflow-x-hidden landing-page">
 			<div className="landing-zoom-80">
 				<div
 					id="landing-hero"
@@ -996,6 +1177,7 @@ export default function HomePage() {
 							className="h-full w-full"
 							style={heroVideoStyle}
 							playbackId={heroPlaybackId}
+							poster={`https://image.mux.com/${heroPlaybackId}/thumbnail.jpg?time=0`}
 							streamType="on-demand"
 							preload="auto"
 							autoPlay="muted"
@@ -1060,28 +1242,45 @@ export default function HomePage() {
 				</div>
 			</div>
 			{/* Video Carousel Section */}
-			<div
-				ref={videoCarouselContainerRef}
-				className="w-full bg-[#EBEBEB] py-16 overflow-hidden video-carousel-container"
-			>
-				{(() => {
-					// Create extended array for seamless loop: [last, ...all, first]
-					const extendedVideos = [
+			<FadeInUp duration={1.6} className="w-full">
+				<div
+					ref={videoCarouselContainerRef}
+					className="w-full bg-[#EBEBEB] py-16 overflow-hidden video-carousel-container"
+				>
+					{(() => {
+					// Render extra repeated thumbnails on both sides so you don't see "empty space"
+					// when the viewport gets very wide (e.g. browser zoomed far out).
+					// Only the active item mounts an iframe; the rest are poster thumbnails.
+					const CAROUSEL_REPEAT_SEGMENTS_PER_SIDE = 10;
+
+					// Base segment supports seamless looping: [last, ...all, first]
+					const baseVideos = [
 						{ videoId: videoIds[videoIds.length - 1], originalIndex: videoIds.length - 1 },
 						...videoIds.map((id, i) => ({ videoId: id, originalIndex: i })),
 						{ videoId: videoIds[0], originalIndex: 0 },
 					];
+
+					// Repeat the same seamless segment on both sides.
+					// This avoids visible seams like "... last, last ..." when zoomed way out.
+					const repeatedBase = Array.from(
+						{ length: CAROUSEL_REPEAT_SEGMENTS_PER_SIDE },
+						() => baseVideos
+					).flat();
+
+					const baseOffset = repeatedBase.length; // index where the "main" segment starts
+					const activeDisplayIndex = baseOffset + displayIndex;
+					const renderVideos = [...repeatedBase, ...baseVideos, ...repeatedBase];
 					
 					return (
 						<div 
 							className={`video-carousel-track ${skipTransition ? 'no-transition' : ''}`}
 							style={{
 								// Center the active video relative to the carousel container (zoom-safe).
-								transform: `translateX(calc(-${displayIndex} * (var(--video-carousel-item-width) + var(--video-carousel-gap)) - (var(--video-carousel-item-width) / 2)))`,
+								transform: `translateX(calc(-${activeDisplayIndex} * (var(--video-carousel-item-width) + var(--video-carousel-gap)) - (var(--video-carousel-item-width) / 2)))`,
 							}}
 						>
-							{extendedVideos.map(({ videoId, originalIndex }, idx) => {
-								const isActive = idx === displayIndex;
+							{renderVideos.map(({ videoId, originalIndex }, idx) => {
+								const isActive = idx === activeDisplayIndex;
 								// Start time offsets for specific videos (in seconds)
 								const startAt = carouselStartTimeByVideoId[videoId];
 								const startTime = startAt ? `&startTime=${startAt}` : '';
@@ -1095,6 +1294,28 @@ export default function HomePage() {
 									<div
 										key={`video-display-${idx}`}
 										className={`video-carousel-item ${isActive ? 'active' : ''}`}
+										role={!isActive ? 'button' : undefined}
+										tabIndex={!isActive ? 0 : undefined}
+										aria-label={
+											!isActive
+												? `Play video ${originalIndex + 1}`
+												: `Video ${originalIndex + 1}`
+										}
+										onClick={() => {
+											if (isActive) return;
+											setActiveCarouselVideoProgress(0);
+											setIsActiveCarouselVideoPlaying(false);
+											setCurrentVideoIndex(originalIndex);
+										}}
+										onKeyDown={(e) => {
+											if (isActive) return;
+											if (e.key === 'Enter' || e.key === ' ') {
+												e.preventDefault();
+												setActiveCarouselVideoProgress(0);
+												setIsActiveCarouselVideoPlaying(false);
+												setCurrentVideoIndex(originalIndex);
+											}
+										}}
 									>
 										{/* Overlay to hide play button and show thumbnail on non-active videos */}
 										<div 
@@ -1106,17 +1327,19 @@ export default function HomePage() {
 												backgroundPosition: 'center',
 											}}
 										/>
-								<iframe
-											key={`iframe-${idx}-${isActive}`}
-											id={`landing-carousel-video-${videoId}-${idx}`}
-											data-cf-stream-video="true"
-											data-video-index={isActive ? originalIndex : -1}
-											src={`https://customer-frd3j62ijq7wakh9.cloudflarestream.com/${videoId}/iframe?${isActive ? 'autoplay=true&muted=true&preload=auto' : 'preload=metadata'}${startTime}`}
-											className="w-full h-full border-none"
-											allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;"
-											allowFullScreen
-											title={`Murmur video ${originalIndex + 1}`}
-										/>
+										{isActive ? (
+											<iframe
+												key={`iframe-${idx}`}
+												id={`landing-carousel-video-${videoId}-${idx}`}
+												data-cf-stream-video="true"
+												data-video-index={originalIndex}
+												src={`https://customer-frd3j62ijq7wakh9.cloudflarestream.com/${videoId}/iframe?autoplay=true&muted=true&preload=auto${startTime}`}
+												className="w-full h-full border-none"
+												allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;"
+												allowFullScreen
+												title={`Murmur video ${originalIndex + 1}`}
+											/>
+										) : null}
 									</div>
 								);
 							})}
@@ -1125,13 +1348,22 @@ export default function HomePage() {
 				})()}
 
 				{/* Carousel progress dots */}
-				<div className="video-carousel-indicators" aria-hidden="true">
+				<div className="video-carousel-indicators" aria-label="Video carousel navigation">
 					{videoIds.map((_, idx) => {
 						const isActive = idx === currentVideoIndex;
 						return (
-							<div
+							<button
 								key={`carousel-indicator-${idx}`}
+								type="button"
 								className={`video-carousel-indicator ${isActive ? 'active' : ''}`}
+								aria-label={`Go to video ${idx + 1}`}
+								aria-current={isActive ? true : undefined}
+								onClick={() => {
+									if (idx === currentVideoIndex) return;
+									setActiveCarouselVideoProgress(0);
+									setIsActiveCarouselVideoPlaying(false);
+									setCurrentVideoIndex(idx);
+								}}
 							>
 								{isActive ? (
 									<div
@@ -1139,259 +1371,261 @@ export default function HomePage() {
 										style={{ width: `${activeCarouselVideoProgress * 100}%` }}
 									/>
 								) : null}
-							</div>
+							</button>
 						);
 					})}
 				</div>
-			</div>
+				</div>
+			</FadeInUp>
 
 			{/* Start Free Trial Button Section */}
-			<div className="landing-map-section w-full bg-white flex flex-col items-center">
-				<Link
-					href={urls.freeTrial.index}
-					className="landing-free-trial-btn hidden md:flex items-center justify-center bg-transparent cursor-pointer text-center"
-				>
-					Start Free Trial
-				</Link>
-				<div className="landing-map-wrapper" ref={landingMapWrapperRef}>
-					<div className="landing-map-container">
-						<LandingPageMap1
-							// Crop out extra SVG padding so the framed map box sits centered/snug.
-							viewBox="0 0 1858 1044"
-							preserveAspectRatio="xMidYMid meet"
-							width="100%"
-							height="100%"
-							className="block"
-						/>
-						{/* Overlay "Learn about the Map" button with anti-scaling logic */}
-						<Link
-							href="/map"
-							className="hidden md:flex items-center justify-center"
-							style={{
-								position: 'absolute',
-								// Matches SVG position x=38 y=638 plus container padding/border offset
-								left: '55px',
-								top: '652px',
-								width: '302px',
-								height: '51px',
-								backgroundColor: '#F1F1F1',
-								border: '2px solid #5DAB68',
-								borderRadius: '6px',
-								cursor: 'pointer',
-								transformOrigin: 'top left',
-								// When map scales down, scale this button up (clamped) to remain readable
-								transform: 'scale(calc(max(1, 0.65 / var(--landing-map-scale, 1))))',
-							}}
+			<div className="landing-map-section w-full bg-[#F5F5F7] flex flex-col items-center">
+				<FadeInUp duration={1.6} className="w-full flex flex-col items-center">
+					<Link
+						href={urls.freeTrial.index}
+						className="landing-free-trial-btn hidden md:flex items-center justify-center bg-transparent cursor-pointer text-center"
+					>
+						Start Free Trial
+					</Link>
+				</FadeInUp>
+				<FadeInUp duration={1.6} delay={0.2} className="w-full flex flex-col items-center">
+					<div className="landing-map-wrapper" ref={landingMapWrapperRef}>
+						<div
+							ref={landingMapContainerRef}
+							className={`landing-map-container ${
+								isLandingGoogleMapReady ? 'landing-map-container--google' : ''
+							}`}
 						>
-							<span className="font-inter font-normal text-[24px] text-[#5DAB68]">
-								Learn about the Map
-							</span>
-						</Link>
+							{/* Desktop-only: live Google Map background (SVG raster stays until map is ready) */}
+							{shouldMountLandingGoogleMap ? (
+								<div
+									className="absolute inset-[16px] z-0"
+									aria-hidden="true"
+								>
+									<LandingPageGoogleMapBackground
+										className="w-full h-full"
+										onReady={() => setIsLandingGoogleMapReady(true)}
+									/>
+								</div>
+							) : null}
+							<LandingPageMap1
+								// Crop out extra SVG padding so the framed map box sits centered/snug.
+								viewBox="0 0 1858 1044"
+								preserveAspectRatio="xMidYMid meet"
+								width="100%"
+								height="100%"
+								mobileCopyScale={landingMapMobileCopyScale}
+								className="landing-map-svg relative z-10 block md:pointer-events-none"
+							/>
+							<LandingPageMapCtaMorph mapContainerRef={landingMapContainerRef} />
+						</div>
 					</div>
-				</div>
+				</FadeInUp>
 
 				{/* Block below map */}
 				{/* Narrow layout: stack text on top, demo below */}
-				<div className="landing-after-map 2xl:hidden w-full px-[14%]">
-					<div className="mx-auto w-full max-w-[904px] bg-[#FAFAFA]">
-						{/* Text */}
-						<div className="bg-[#EFEFEF] rounded-[8px] px-6 py-6">
-							<p className="font-inter font-normal text-[22px] xs:text-[24px] sm:text-[27px] text-black leading-tight">
-								We Did The Research
-							</p>
-							<p className="font-inter font-normal text-[11.5px] xs:text-[12.5px] sm:text-[18px] text-black leading-tight mt-2 break-words">
-								Take a look through every contact, and you&apos;ll get to see information on what styles they
-								book, their live music schedules, and even how to actually find the right person.
-							</p>
-							<Link
-								href="/research"
-								className="mt-4 inline-flex h-[40px] px-4 items-center justify-center border-2 border-[#5DAB68] rounded-[6px] bg-transparent"
-							>
-								<span className="font-inter font-normal text-[16px] xs:text-[18px] text-[#5DAB68]">
-									Learn about research
-								</span>
-							</Link>
-						</div>
+				<div className="landing-after-map md:hidden w-full px-[14%]">
+					<FadeInUp duration={1.6}>
+						<div className="mx-auto w-full max-w-[904px] rounded-[28px] overflow-hidden bg-[#FAFAFA]">
+							{/* Text */}
+							<div className="px-6 xs:px-8 pt-8 xs:pt-10 pb-8 xs:pb-10">
+								<p className="font-inter font-normal text-[32px] xs:text-[36px] sm:text-[42px] text-black leading-[1.05]">
+									We Did The Research
+								</p>
+								<p className="font-inter font-normal text-[15px] xs:text-[17px] sm:text-[20px] text-black leading-snug mt-3 xs:mt-4 break-words">
+									Take a look through every contact, and you&apos;ll get to see information on what styles they
+									book, their live music schedules, and even how to actually find the right person.
+								</p>
+								<Link
+									href="/research"
+									className="landing-learn-research-btn mt-6 xs:mt-8 inline-flex h-[44px] xs:h-[48px] px-5 xs:px-6 items-center justify-center border-2 border-[#5DAB68] rounded-[6px] bg-transparent"
+								>
+									<span className="font-inter font-normal text-[17px] xs:text-[19px] sm:text-[21px] text-[#5DAB68]">
+										Learn about research
+									</span>
+								</Link>
+							</div>
 
-						{/* Demo */}
-						<div className="mt-6 bg-[#F1F1F1] rounded-[8px] px-6 pt-8 pb-10 overflow-hidden">
-							<ScaledToFit baseWidth={709} baseHeight={635}>
-								<div className="flex gap-6">
-									<div className="mt-[76px]">
-										<ContactsExpandedList
-											contacts={sampleContacts}
-											width={326}
-											height={513}
-											minRows={9}
-											onContactHover={(contact) => {
-												if (contact) {
-													setHoveredContact(contact);
-												}
-											}}
+							{/* Demo */}
+							<div
+								className="px-4 xs:px-6 pt-8 xs:pt-10 pb-10 xs:pb-12"
+								style={{
+									background: 'linear-gradient(180deg, #EAF7FF 0%, #BEE6FF 100%)',
+								}}
+							>
+								<ScaledToFit baseWidth={709} baseHeight={635}>
+									<div className="flex gap-6">
+										<div className="mt-[76px]">
+											<ContactsExpandedList
+												contacts={sampleContacts}
+												width={326}
+												height={513}
+												minRows={9}
+												onContactHover={(contact) => {
+													if (contact) {
+														setHoveredContact(contact);
+													}
+												}}
+											/>
+										</div>
+										<ContactResearchPanel
+											contact={hoveredContact}
+											width={359}
+											boxWidth={344}
+											height={635}
+											fixedHeightBoxSpacingPx={60}
+											fixedHeightBulletOuterHeightPx={52}
+											fixedHeightBulletInnerHeightPx={44}
+											expandSummaryToFillHeight
+											disableExpansion
+											className="!block"
 										/>
 									</div>
-									<ContactResearchPanel
-										contact={hoveredContact}
-										width={359}
-										boxWidth={344}
-										height={635}
-										fixedHeightBoxSpacingPx={60}
-										fixedHeightBulletOuterHeightPx={52}
-										fixedHeightBulletInnerHeightPx={44}
-										expandSummaryToFillHeight
-										disableExpansion
-										className="!block"
-									/>
-								</div>
-							</ScaledToFit>
-						</div>
-					</div>
-				</div>
-
-				{/* Wide layout: original design */}
-				<div
-					className="hidden 2xl:block"
-					style={{
-						marginTop: '145px',
-						width: '1866px',
-						height: '771px',
-						backgroundColor: '#FAFAFA',
-						position: 'relative',
-					}}
-				>
-					{/* Inner box - left */}
-				<div
-					style={{
-						position: 'absolute',
-						left: '39px',
-						top: '200px',
-						width: '792px',
-						height: '417px',
-						backgroundColor: '#EFEFEF',
-						borderRadius: '8px',
-						paddingLeft: '22px',
-						paddingRight: '40px',
-						paddingTop: '40px',
-						paddingBottom: '40px',
-					}}
-				>
-						<p className="font-inter font-normal text-[62px] text-black leading-tight">
-							We Did The Research
-						</p>
-						<p className="font-inter font-normal text-[25px] text-black mt-6">
-							Take a look through every contact, and you&apos;ll get to see information on what styles they book, their live music schedules, and even how to actually find the right person.
-						</p>
-						{/* Learn about research button */}
-						<Link href="/research">
-							<div
-								style={{
-									position: 'absolute',
-									left: '22px',
-									bottom: '75px',
-									width: '302px',
-									height: '51px',
-									border: '2px solid #5DAB68',
-									borderRadius: '6px',
-									backgroundColor: 'transparent',
-									display: 'flex',
-									alignItems: 'center',
-									justifyContent: 'center',
-									cursor: 'pointer'
-								}}
-							>
-								<span className="font-inter font-normal text-[25px] text-[#5DAB68]">Learn about research</span>
+								</ScaledToFit>
 							</div>
-						</Link>
-					</div>
-					{/* Inner box - right - Contacts and Research panels */}
-					<div
-						style={{
-							position: 'absolute',
-							right: '74px',
-							top: '29px',
-							width: '904px',
-							height: '712px',
-							backgroundColor: '#F1F1F1',
-							borderRadius: '8px',
-						}}
-					>
-						{/* Contacts list */}
-						<div
-							style={{
-								position: 'absolute',
-								left: '141px',
-								top: '108px',
-								bottom: '91px',
-							}}
-						>
-							<ContactsExpandedList
-								contacts={sampleContacts}
-								width={326}
-								height={513}
-								minRows={9}
-								onContactHover={(contact) => {
-									if (contact) {
-										setHoveredContact(contact);
-									}
-								}}
-							/>
 						</div>
-						{/* Research panel */}
-						<div
-							style={{
-								position: 'absolute',
-								right: '52px',
-								top: '31px',
-								bottom: '46px',
-							}}
-						>
-						<ContactResearchPanel
-							contact={hoveredContact}
-							width={359}
-							boxWidth={344}
-							height={635}
-							fixedHeightBoxSpacingPx={60}
-							fixedHeightBulletOuterHeightPx={52}
-							fixedHeightBulletInnerHeightPx={44}
-							expandSummaryToFillHeight
-							disableExpansion
-							className="!block"
-						/>
-						</div>
-					</div>
+					</FadeInUp>
 				</div>
 
-				{/* Second block below map */}
-				{/* Narrow layout: stack text on top, demo below */}
-				<div className="2xl:hidden w-full px-[14%]" style={{ marginTop: '82px' }}>
-					<div className="mx-auto w-full max-w-[904px] bg-[#FAFAFA]">
-						{/* Text */}
-						<div className="bg-[#EFEFEF] rounded-[8px] px-6 py-6">
-							<p className="font-inter font-normal text-[22px] xs:text-[24px] sm:text-[27px] text-black leading-tight">
-								Every Reply
-							</p>
-							<p className="font-inter font-normal text-[11.5px] xs:text-[12.5px] sm:text-[18px] text-black leading-tight mt-2 break-words">
-								Never miss a reply! Get full context on each response, including what campaign it came from,
-								all in one place.
-							</p>
-							<Link
-								href="/inbox"
-								className="mt-4 inline-flex h-[40px] px-4 items-center justify-center border-2 border-[#5DAB68] rounded-[6px] bg-transparent"
+				{/* Wide layout (scaled down on thinner breakpoints) */}
+				<div className="hidden md:block w-full px-4" style={{ marginTop: '145px' }}>
+					<FadeInUp duration={1.6}>
+						<ScaledToFit baseWidth={1753} baseHeight={712} className="mx-auto max-w-[1753px]">
+							<div
+								className="w-[1753px] h-[712px] rounded-[22px] overflow-hidden grid grid-cols-2"
+								aria-label="We Did The Research"
 							>
-								<span className="font-inter font-normal text-[16px] xs:text-[18px] text-[#5DAB68]">
-									Learn about Inbox
-								</span>
-							</Link>
-						</div>
+								<div className="h-full w-full bg-white flex items-center">
+									<div className="w-[712px] mx-auto">
+										<p className="font-inter font-normal text-[62px] text-black leading-tight">
+											We Did The Research
+										</p>
+										<p className="font-inter font-normal text-[25px] text-black mt-6">
+											Take a look through every contact, and you&apos;ll get to see information on what styles
+											they book, their live music schedules, and even how to actually find the right person.
+										</p>
+										<Link
+											href="/research"
+											className="landing-learn-research-btn mt-14 inline-flex items-center justify-center w-[302px] h-[51px] rounded-[6px] bg-transparent"
+										>
+											<span className="font-inter font-normal text-[25px] text-[#5DAB68]">
+												Learn about research
+											</span>
+										</Link>
+									</div>
+								</div>
 
-						{/* Demo */}
-						<div className="mt-6 bg-[#F1F1F1] rounded-[8px] px-4 xs:px-6 pt-6 xs:pt-8 pb-8 xs:pb-10 overflow-hidden">
-							<ScaledToFit baseWidth={856} baseHeight={535}>
+								<div
+									className="h-full w-full flex items-center"
+									style={{
+										background: 'linear-gradient(180deg, #EAF7FF 0%, #BEE6FF 100%)',
+									}}
+								>
+									<div
+										className="w-[712px] h-[712px] mx-auto"
+										style={{
+											paddingTop: '31px',
+											paddingBottom: '46px',
+										}}
+									>
+										<div className="w-[709px] h-[635px] mx-auto flex gap-6">
+											<div className="mt-[76px]">
+												<ContactsExpandedList
+													contacts={sampleContacts}
+													width={326}
+													height={513}
+													minRows={9}
+													onContactHover={(contact) => {
+														if (contact) {
+															setHoveredContact(contact);
+														}
+													}}
+												/>
+											</div>
+											<ContactResearchPanel
+												contact={hoveredContact}
+												width={359}
+												boxWidth={344}
+												height={635}
+												fixedHeightBoxSpacingPx={60}
+												fixedHeightBulletOuterHeightPx={52}
+												fixedHeightBulletInnerHeightPx={44}
+												expandSummaryToFillHeight
+												disableExpansion
+												className="!block"
+											/>
+										</div>
+									</div>
+								</div>
+							</div>
+						</ScaledToFit>
+					</FadeInUp>
+				</div>
+
+				<div className="md:hidden w-full px-[14%]" style={{ marginTop: '82px' }}>
+					<FadeInUp duration={1.6}>
+						<div className="mx-auto w-full max-w-[904px] rounded-[28px] overflow-hidden bg-[#FAFAFA]">
+							{/* Text */}
+							<div className="px-6 xs:px-8 pt-8 xs:pt-10 pb-8 xs:pb-10">
+								<p className="font-inter font-normal text-[32px] xs:text-[36px] sm:text-[42px] text-black leading-[1.05]">
+									Every Reply
+								</p>
+								<p className="font-inter font-normal text-[15px] xs:text-[17px] sm:text-[20px] text-black leading-snug mt-3 xs:mt-4 break-words">
+									Never miss a reply! Get full context on each response, including what campaign it came from,
+									all in one place.
+								</p>
+								<Link
+									href="/inbox"
+									className="landing-learn-research-btn mt-6 xs:mt-8 inline-flex h-[44px] xs:h-[48px] px-5 xs:px-6 items-center justify-center border-2 border-[#5DAB68] rounded-[6px] bg-transparent"
+								>
+									<span className="font-inter font-normal text-[17px] xs:text-[19px] sm:text-[21px] text-[#5DAB68]">
+										Learn about Inbox
+									</span>
+								</Link>
+							</div>
+
+							{/* Demo */}
+							<div
+								className="px-4 xs:px-6 pt-8 xs:pt-10 pb-10 xs:pb-12"
+								style={{
+									background: 'linear-gradient(180deg, #DBFFE2 0%, #99D8A5 100%)',
+								}}
+							>
+								<ScaledToFit baseWidth={856} baseHeight={535}>
+									<InboxSection
+										noOuterPadding
+										forceDesktopLayout
+										demoMode
+										desktopWidth={856}
+										desktopHeight={535}
+										allowedSenderEmails={Object.keys(sampleContactsByEmail)}
+										contactByEmail={sampleContactsByEmail}
+										sampleData={{
+											inboundEmails: sampleInboundEmails,
+											sentEmails: sampleSentEmails,
+										}}
+									/>
+								</ScaledToFit>
+							</div>
+						</div>
+					</FadeInUp>
+				</div>
+
+				<div className="hidden md:block w-full px-4" style={{ marginTop: '82px' }}>
+					<FadeInUp duration={1.6}>
+						<ScaledToFit baseWidth={1789} baseHeight={718} className="mx-auto max-w-[1789px]">
+							<div className="w-[1789px] h-[718px] rounded-[22px] overflow-hidden flex" aria-label="Every Reply">
+							{/* Left side (gradient) */}
+							<div
+								className="h-full w-[1130px] flex items-center justify-center"
+								style={{
+									background: 'linear-gradient(180deg, #DBFFE2 0%, #99D8A5 100%)',
+								}}
+							>
 								<InboxSection
 									noOuterPadding
-									forceDesktopLayout
 									demoMode
-									desktopWidth={856}
+									desktopWidth={998}
 									desktopHeight={535}
 									allowedSenderEmails={Object.keys(sampleContactsByEmail)}
 									contactByEmail={sampleContactsByEmail}
@@ -1400,214 +1634,136 @@ export default function HomePage() {
 										sentEmails: sampleSentEmails,
 									}}
 								/>
-							</ScaledToFit>
-						</div>
-					</div>
+							</div>
+
+							{/* Right side (white) */}
+							<div className="h-full w-[659px] bg-white flex items-center">
+								<div className="w-[520px] mx-auto">
+									<p className="font-inter font-normal text-[62px] text-black leading-tight">
+										Every Reply
+									</p>
+									<p className="font-inter font-normal text-[25px] text-black mt-4">
+										Never miss a reply! Get full context on each response, including what campaign it came from,
+										all in one place.
+									</p>
+									<Link
+										href="/inbox"
+										className="landing-learn-research-btn mt-20 inline-flex items-center justify-center w-[260px] h-[51px] rounded-[6px] bg-transparent"
+									>
+										<span className="font-inter font-normal text-[25px] text-[#5DAB68]">
+											Learn about Inbox
+										</span>
+									</Link>
+								</div>
+							</div>
+							</div>
+						</ScaledToFit>
+					</FadeInUp>
 				</div>
 
-				{/* Wide layout: original design */}
-				<div
-					className="hidden 2xl:block"
-					style={{
-						marginTop: '82px',
-						width: '1866px',
-						height: '771px',
-						backgroundColor: '#FAFAFA',
-						position: 'relative',
-					}}
-				>
-					{/* Inner box - left */}
-					<div
-						style={{
-							position: 'absolute',
-							left: '35px',
-							top: '26px',
-							width: '1130px',
-							height: '712px',
-							backgroundColor: '#F1F1F1',
-							borderRadius: '8px',
-							display: 'flex',
-							alignItems: 'center',
-							justifyContent: 'center',
-						}}
-					>
-						<InboxSection
-							noOuterPadding
-							desktopWidth={998}
-							desktopHeight={535}
-							allowedSenderEmails={Object.keys(sampleContactsByEmail)}
-							contactByEmail={sampleContactsByEmail}
-							sampleData={{
-								inboundEmails: sampleInboundEmails,
-								sentEmails: sampleSentEmails,
-							}}
-						/>
-					</div>
-					{/* Inner box - right */}
-					<div
-						style={{
-							position: 'absolute',
-							right: '42px',
-							top: '199px',
-							width: '542px',
-							height: '459px',
-							backgroundColor: '#EFEFEF',
-							borderRadius: '8px',
-							padding: '40px',
-						}}
-					>
-						<p className="font-inter font-normal text-[62px] text-black leading-tight">
-							Every Reply
-						</p>
-						<p className="font-inter font-normal text-[25px] text-black mt-10">
-							Never miss a reply! Get full context on each response, including what campaign it came from,
-							all in one place.
-						</p>
-						{/* Learn about Inbox button */}
-						<Link href="/inbox">
+				<div className="md:hidden w-full px-[14%]" style={{ marginTop: '75px' }}>
+					<FadeInUp duration={1.6}>
+						<div className="mx-auto w-full max-w-[904px] rounded-[28px] overflow-hidden bg-[#FAFAFA]">
+							{/* Text */}
+							<div className="px-6 xs:px-8 pt-8 xs:pt-10 pb-8 xs:pb-10">
+								<p className="font-inter font-normal text-[32px] xs:text-[36px] sm:text-[42px] text-black leading-[1.05]">
+									Emails That Land
+								</p>
+								<p className="font-inter font-normal text-[15px] xs:text-[17px] sm:text-[20px] text-black leading-snug mt-3 xs:mt-4 break-words">
+									Emails not getting responses? Ditch the templates. Murmur drafts pitches based on your bio and
+									date range that venues actually respond to.
+								</p>
+								<Link
+									href="/drafting"
+									className="landing-learn-research-btn mt-6 xs:mt-8 inline-flex h-[44px] xs:h-[48px] px-5 xs:px-6 items-center justify-center border-2 border-[#5DAB68] rounded-[6px] bg-transparent"
+								>
+									<span className="font-inter font-normal text-[17px] xs:text-[19px] sm:text-[21px] text-[#5DAB68]">
+										Learn about Drafting
+									</span>
+								</Link>
+							</div>
+
+							{/* Demo */}
 							<div
+								className="px-4 xs:px-6 pt-8 xs:pt-10 pb-10 xs:pb-12"
 								style={{
-									position: 'absolute',
-									left: '31px',
-									bottom: '45px',
-									width: '260px',
-									height: '51px',
-									border: '2px solid #5DAB68',
-									borderRadius: '6px',
-									backgroundColor: 'transparent',
-									display: 'flex',
-									alignItems: 'center',
-									justifyContent: 'center',
-									cursor: 'pointer',
+									background: 'linear-gradient(180deg, #DAE6FE 0%, #CAD5F9 100%)',
 								}}
 							>
-								<span className="font-inter font-normal text-[25px] text-[#5DAB68]">
-									Learn about Inbox
-								</span>
+								<ScaledToFit baseWidth={904} baseHeight={712}>
+									<LandingDraftingDemo isMobileLayout />
+								</ScaledToFit>
 							</div>
-						</Link>
-					</div>
+						</div>
+					</FadeInUp>
 				</div>
 
-				{/* Third block below map */}
-				{/* Narrow layout: stack text on top, demo below */}
-				<div className="2xl:hidden w-full px-[14%]" style={{ marginTop: '75px' }}>
-					<div className="mx-auto w-full max-w-[904px] bg-[#FAFAFA]">
-						{/* Text */}
-						<div className="bg-[#EFEFEF] rounded-[8px] px-6 py-6">
-							<p className="font-inter font-normal text-[22px] xs:text-[24px] sm:text-[27px] text-black leading-tight">
-								Emails That Land
-							</p>
-							<p className="font-inter font-normal text-[11.5px] xs:text-[12.5px] sm:text-[18px] text-black leading-tight mt-2 break-words">
-								Emails not getting responses? Ditch the templates. Murmur drafts pitches based on your bio and date range that venues actually respond to.
-							</p>
-							<Link
-								href="/drafting"
-								className="mt-4 inline-flex h-[40px] px-4 items-center justify-center border-2 border-[#5DAB68] rounded-[6px] bg-transparent"
-							>
-								<span className="font-inter font-normal text-[16px] xs:text-[18px] text-[#5DAB68]">
-									Learn about Drafting
-								</span>
-							</Link>
-						</div>
-
-						{/* Demo */}
-						<div className="mt-6 bg-[#F1F1F1] rounded-[8px] overflow-hidden">
-							<ScaledToFit baseWidth={904} baseHeight={712}>
-								<LandingDraftingDemo />
-							</ScaledToFit>
-						</div>
-					</div>
-				</div>
-
-				{/* Wide layout: original design */}
-				<div
-					className="hidden 2xl:block"
-					style={{
-						marginTop: '75px',
-						width: '1866px',
-						height: '771px',
-						backgroundColor: '#FAFAFA',
-						position: 'relative',
-					}}
-				>
-					{/* Inner box - left */}
-					<div
-						style={{
-							position: 'absolute',
-							left: '39px',
-							top: '140px',
-							width: '738px',
-							height: '447px',
-							backgroundColor: '#EFEFEF',
-							borderRadius: '8px',
-							padding: '40px',
-						}}
-					>
-						<p className="font-inter font-normal text-[62px] text-black leading-tight">
-							Emails That Land
-						</p>
-						<p className="font-inter font-normal text-[25px] text-black mt-14">
-							Emails not getting responses? Ditch the templates. Murmur drafts pitches based on your bio and date range that venues actually respond to.
-						</p>
-						{/* Learn about Drafting button */}
-						<Link href="/drafting">
+				{/* Wide layout (scaled down on thinner breakpoints) */}
+				<div className="hidden md:block w-full px-4" style={{ marginTop: '75px' }}>
+					<FadeInUp duration={1.6}>
+						<ScaledToFit baseWidth={1783} baseHeight={712} className="mx-auto max-w-[1783px]">
 							<div
+								className="w-[1783px] h-[712px] rounded-[22px] overflow-hidden grid grid-cols-[879px_904px]"
+								aria-label="Emails That Land"
+							>
+							{/* Left side (white) */}
+							<div className="h-full w-full bg-white flex items-center">
+								<div className="w-[712px] mx-auto">
+									<p className="font-inter font-normal text-[62px] text-black leading-tight">
+										Emails That Land
+									</p>
+									<p className="font-inter font-normal text-[25px] text-black mt-4">
+										Emails not getting responses? Ditch the templates. Murmur drafts pitches based on your bio
+										and date range that venues actually respond to.
+									</p>
+									<Link
+										href="/drafting"
+										className="landing-learn-research-btn mt-20 inline-flex items-center justify-center w-[288px] h-[51px] rounded-[6px] bg-transparent"
+									>
+										<span className="font-inter font-normal text-[25px] text-[#5DAB68]">
+											Learn about Drafting
+										</span>
+									</Link>
+								</div>
+							</div>
+
+							{/* Right side (gradient) */}
+							<div
+								className="h-full w-full flex items-center justify-center"
 								style={{
-									position: 'absolute',
-									left: '47px',
-									bottom: '26px',
-									width: '288px',
-									height: '51px',
-									border: '2px solid #5DAB68',
-									borderRadius: '6px',
-									backgroundColor: 'transparent',
-									display: 'flex',
-									alignItems: 'center',
-									justifyContent: 'center',
-									cursor: 'pointer'
+									background: 'linear-gradient(180deg, #DAE6FE 0%, #CAD5F9 100%)',
 								}}
 							>
-								<span className="font-inter font-normal text-[25px] text-[#5DAB68]">Learn about Drafting</span>
+								<div className="w-[904px] h-[712px]">
+									<LandingDraftingDemo />
+								</div>
 							</div>
-						</Link>
-					</div>
-					{/* Inner box - right */}
-					<div
-						style={{
-							position: 'absolute',
-							right: '47px',
-							top: '27px',
-							width: '904px',
-							height: '712px',
-							backgroundColor: '#F1F1F1',
-							borderRadius: '8px',
-						}}
-					>
-						<LandingDraftingDemo />
-					</div>
+							</div>
+						</ScaledToFit>
+					</FadeInUp>
 				</div>
 			</div>
 
 			{/* Try Murmur Now CTA Section */}
-			<div className="w-full bg-white flex flex-col items-center justify-center h-[280px] md:h-[450px] lg:h-[747px]">
-				<p className="font-inter font-normal text-[clamp(32px,9vw,62px)] text-black text-center leading-[1.05]">
-					Try Murmur Now
-				</p>
-				<Link
-					href={urls.freeTrial.index}
-					className="flex items-center justify-center cursor-pointer text-center text-white font-inter font-medium text-[14px]"
-					style={{
-						marginTop: '32px',
-						width: '219px',
-						height: '33px',
-						backgroundColor: '#53B060',
-						border: '1px solid #118521',
-						borderRadius: '8px',
-					}}
-				>
-					Start Free Trial
-				</Link>
+			<div className="w-full bg-[#F5F5F7] flex flex-col items-center justify-center h-[280px] md:h-[450px] lg:h-[747px]">
+				<FadeInUp duration={1.6}>
+					<div className="flex flex-col items-center">
+						<p className="font-inter font-normal text-[clamp(32px,9vw,62px)] text-black text-center leading-[1.05]">
+							Try Murmur Now
+						</p>
+						<Link
+							href={urls.freeTrial.index}
+							className="landing-bottom-free-trial-btn flex items-center justify-center cursor-pointer text-center text-white font-inter font-medium text-[14px]"
+							style={{
+								marginTop: '32px',
+								width: '219px',
+								height: '33px',
+							}}
+						>
+							Start Free Trial
+						</Link>
+					</div>
+				</FadeInUp>
 			</div>
 			</div>
 		</main>

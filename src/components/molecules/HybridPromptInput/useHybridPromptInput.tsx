@@ -215,6 +215,11 @@ export interface HybridPromptInputProps {
 	 * doesn't need to scroll.
 	 */
 	manualEntryHeightPx?: number;
+	/**
+	 * Optional: force desktop layout logic even on mobile devices.
+	 * Useful for scaled-down desktop demos on mobile screens.
+	 */
+	forceDesktop?: boolean;
 }
 
 export const useHybridPromptInput = (props: HybridPromptInputProps) => {
