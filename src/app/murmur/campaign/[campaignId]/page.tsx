@@ -10,6 +10,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { urls } from '@/constants/urls';
 import Link from 'next/link';
 import { cn } from '@/utils';
+import { isSafariBrowser } from '@/utils/browserDetection';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { useMe } from '@/hooks/useMe';
 import { useState, useEffect, useRef, useCallback, useMemo, useLayoutEffect } from 'react';
@@ -127,6 +128,7 @@ const Murmur = () => {
 	const DEFAULT_CAMPAIGN_ZOOM = 0.85;
 	const CAMPAIGN_ZOOM_EVENT = 'murmur:campaign-zoom-changed';
 	const CAMPAIGN_SCROLLABLE_CLASS = 'murmur-campaign-scrollable';
+	const CAMPAIGN_FORCE_TRANSFORM_CLASS = 'murmur-campaign-force-transform';
 
 	// Resolution-aware zoom calculation for campaign page
 	const updateCampaignZoomForViewport = useCallback(() => {
@@ -137,6 +139,24 @@ const Murmur = () => {
 		// (address-bar/show-hide), which can accidentally flip us back into the no-scroll "nuclear" mode
 		// mid-scroll. Use the stable layout viewport width for breakpoint decisions.
 		const stableViewportW = window.innerWidth;
+
+		// Safari desktop: prefer transform-based scaling (root `zoom` can mis-render and/or double-scale).
+		let shouldForceTransform = false;
+		try {
+			const ua = navigator.userAgent || '';
+			const vendor = navigator.vendor || '';
+			shouldForceTransform =
+				/Safari/.test(ua) &&
+				/Apple Computer/.test(vendor) &&
+				!/Chrome|CriOS|FxiOS|Edg/i.test(ua);
+		} catch {
+			// ignore
+		}
+		if (shouldForceTransform) {
+			html.classList.add(CAMPAIGN_FORCE_TRANSFORM_CLASS);
+		} else {
+			html.classList.remove(CAMPAIGN_FORCE_TRANSFORM_CLASS);
+		}
 
 		// On the thinnest breakpoint (<= 776px), we *must* allow page scroll for the stacked layout.
 		const THINNEST_VIEWPORT_W_PX = 776;
@@ -153,6 +173,7 @@ const Murmur = () => {
 		if (shouldAllowScroll) {
 			html.classList.add(CAMPAIGN_SCROLLABLE_CLASS);
 			html.classList.remove(CAMPAIGN_COMPACT_CLASS);
+			html.classList.remove(CAMPAIGN_FORCE_TRANSFORM_CLASS);
 			html.style.removeProperty(CAMPAIGN_ZOOM_VAR);
 			// Clear any inline scroll locks that could prevent scrolling (defensive).
 			try {
@@ -175,12 +196,18 @@ const Murmur = () => {
 		if (isMobile) {
 			html.classList.remove(CAMPAIGN_SCROLLABLE_CLASS);
 			html.classList.remove(CAMPAIGN_COMPACT_CLASS);
+			html.classList.remove(CAMPAIGN_FORCE_TRANSFORM_CLASS);
 			html.style.removeProperty(CAMPAIGN_ZOOM_VAR);
 			return;
 		}
 
-		const viewportH = window.visualViewport?.height ?? window.innerHeight;
-		const viewportW = window.visualViewport?.width ?? window.innerWidth;
+		// NOTE: We intentionally avoid `window.visualViewport` here.
+		// Safari can fire `visualViewport.resize` (and report different viewport sizes) when we apply
+		// CSS `zoom` to the root element, which can create a feedback loop that progressively shrinks
+		// the campaign UI on first load. `innerWidth/innerHeight` reflect the stable layout viewport
+		// we want for resolution mapping + snug-fit clamping.
+		const viewportH = window.innerHeight;
+		const viewportW = window.innerWidth;
 		if (viewportH <= 0 || viewportW <= 0) return;
 
 		const ratio = viewportW / viewportH;
@@ -379,23 +406,6 @@ const Murmur = () => {
 				document.querySelectorAll<HTMLElement>('[data-campaign-bottom-anchor]')
 			);
 			if (anchors.length > 0) {
-				const computed = window.getComputedStyle(html);
-				const zoomStr = computed.zoom;
-				const parsedZoom = zoomStr ? parseFloat(zoomStr) : NaN;
-				const varZoomStr = computed.getPropertyValue(CAMPAIGN_ZOOM_VAR);
-				const parsedVarZoom = varZoomStr ? parseFloat(varZoomStr) : NaN;
-				const currentZoom =
-					Number.isFinite(parsedZoom) && parsedZoom > 0 && parsedZoom !== 1
-						? parsedZoom
-						: Number.isFinite(parsedVarZoom) && parsedVarZoom > 0
-							? parsedVarZoom
-							: DEFAULT_CAMPAIGN_ZOOM;
-
-				const maxBottomPx = anchors.reduce((acc, el) => {
-					const rect = el.getBoundingClientRect();
-					return Math.max(acc, rect.bottom);
-				}, 0);
-
 				// Reserve a small safety margin so we're not "flush" to the bottom edge.
 				// On short viewports (e.g. when macOS Dock is visible) we use a smaller margin
 				// to avoid forcing the entire UI to scale down too much.
@@ -404,10 +414,60 @@ const Murmur = () => {
 				const ABSOLUTE_MAX_HEIGHT_FIT_ZOOM = 1.2;
 				const availableH = Math.max(0, viewportH - SAFE_BOTTOM_MARGIN_PX);
 
-				if (currentZoom > 0 && maxBottomPx > 0) {
-					const unscaledBottomPx = maxBottomPx / currentZoom;
+				const isTransformScaleMode = (() => {
+					try {
+						if (html.classList.contains(CAMPAIGN_FORCE_TRANSFORM_CLASS)) return true;
+						return window.getComputedStyle(document.body).transform !== 'none';
+					} catch {
+						return false;
+					}
+				})();
+
+				const getOffsetTopToDocument = (el: HTMLElement): number => {
+					let top = 0;
+					let node: HTMLElement | null = el;
+					// `offsetTop` is layout-based (unaffected by transforms), so this works well
+					// when we are using transform scaling.
+					while (node) {
+						top += node.offsetTop || 0;
+						node = node.offsetParent as HTMLElement | null;
+					}
+					return top;
+				};
+
+				let unscaledBottomPx = 0;
+				if (isTransformScaleMode) {
+					// Transform scaling does not affect layout metrics — use offset* to avoid any
+					// Safari/WebKit quirks with getBoundingClientRect under a transformed <body>.
+					unscaledBottomPx = anchors.reduce((acc, el) => {
+						const top = getOffsetTopToDocument(el);
+						return Math.max(acc, top + el.offsetHeight);
+					}, 0);
+				} else {
+					// Zoom scaling affects layout — use bounding rect and unscale.
+					const maxBottomPx = anchors.reduce((acc, el) => {
+						const rect = el.getBoundingClientRect();
+						return Math.max(acc, rect.bottom);
+					}, 0);
+
+					const computed = window.getComputedStyle(html);
+					const zoomStr = computed.zoom;
+					const parsedZoom = zoomStr ? parseFloat(zoomStr) : NaN;
+					const varZoomStr = computed.getPropertyValue(CAMPAIGN_ZOOM_VAR);
+					const parsedVarZoom = varZoomStr ? parseFloat(varZoomStr) : NaN;
+					const appliedScale =
+						Number.isFinite(parsedZoom) && parsedZoom > 0 && parsedZoom !== 1
+							? parsedZoom
+							: Number.isFinite(parsedVarZoom) && parsedVarZoom > 0
+								? parsedVarZoom
+								: DEFAULT_CAMPAIGN_ZOOM;
+
+					unscaledBottomPx = appliedScale > 0 ? maxBottomPx / appliedScale : maxBottomPx;
+				}
+
+				if (unscaledBottomPx > 0) {
 					// Calculate exact zoom to make the content bottom align with the viewport bottom
-					const zoomToFitHeight = unscaledBottomPx > 0 ? availableH / unscaledBottomPx : NaN;
+					const zoomToFitHeight = availableH / unscaledBottomPx;
 
 					if (Number.isFinite(zoomToFitHeight) && zoomToFitHeight > 0) {
 						// Apply the fit-height zoom, but constrained:
@@ -463,6 +523,28 @@ const Murmur = () => {
 				viewportH,
 				targetZoom,
 				appliedDockRules,
+				forceTransform: shouldForceTransform,
+				htmlZoom: (() => {
+					try {
+						return window.getComputedStyle(html).zoom;
+					} catch {
+						return 'unknown';
+					}
+				})(),
+				bodyTransform: (() => {
+					try {
+						return window.getComputedStyle(document.body).transform;
+					} catch {
+						return 'unknown';
+					}
+				})(),
+				campaignZoomVar: (() => {
+					try {
+						return window.getComputedStyle(html).getPropertyValue(CAMPAIGN_ZOOM_VAR);
+					} catch {
+						return 'unknown';
+					}
+				})(),
 			});
 		}
 
@@ -482,7 +564,16 @@ const Murmur = () => {
 		if (isMobile === null) return;
 
 		const onResize = () => updateCampaignZoomForViewport();
+		// Defensive: clear any stale campaign zoom (e.g. Safari BFCache restores).
+		try {
+			document.documentElement.style.removeProperty(CAMPAIGN_ZOOM_VAR);
+		} catch {
+			// ignore
+		}
+
 		updateCampaignZoomForViewport();
+		// Re-run on the next frame to catch late style/font application (especially Safari/WebKit).
+		const rafId = window.requestAnimationFrame(() => updateCampaignZoomForViewport());
 		// Re-run once the drafting UI mounts so the bottom-panels clamp can measure real DOM.
 		// (DraftingSection is dynamically imported, so it may not exist on the first call.)
 		let mo: MutationObserver | null = null;
@@ -496,15 +587,20 @@ const Murmur = () => {
 			mo.observe(document.body, { childList: true, subtree: true });
 		}
 		window.addEventListener('resize', onResize, { passive: true });
-		window.visualViewport?.addEventListener('resize', onResize);
+		const onPageShow = (e: PageTransitionEvent) => {
+			if (e.persisted) updateCampaignZoomForViewport();
+		};
+		window.addEventListener('pageshow', onPageShow);
 
 		return () => {
 			document.documentElement.classList.remove(CAMPAIGN_COMPACT_CLASS);
 			document.documentElement.classList.remove(CAMPAIGN_SCROLLABLE_CLASS);
+			document.documentElement.classList.remove(CAMPAIGN_FORCE_TRANSFORM_CLASS);
 			document.documentElement.style.removeProperty(CAMPAIGN_ZOOM_VAR);
 			mo?.disconnect();
+			window.cancelAnimationFrame(rafId);
 			window.removeEventListener('resize', onResize);
-			window.visualViewport?.removeEventListener('resize', onResize);
+			window.removeEventListener('pageshow', onPageShow);
 		};
 	}, [isMobile, updateCampaignZoomForViewport]);
 
@@ -831,6 +927,7 @@ const Murmur = () => {
 	const crossfadeContainerRef = useRef<HTMLDivElement>(null);
 	const headerBoxMoveCleanupRef = useRef<(() => void) | null>(null);
 	const contactsDraftsPillMoveCleanupRef = useRef<(() => void) | null>(null);
+	const isSafari = useMemo(() => isSafariBrowser(), []);
 
 	// Mobile never supports the Writing ("testing") or All tabs. Clamp immediately so we never mount
 	// HybridPromptInput on mobile (and never transition through it).
@@ -895,6 +992,26 @@ const Murmur = () => {
 			setActiveViewInternal(newView);
 			return;
 		}
+
+		// Safari: disable the Inbox tab transition animation (it breaks badly in WebKit).
+		// We keep the animation for Chrome/Chromium.
+		if (isSafari && (activeView === 'inbox' || newView === 'inbox')) {
+			// Stop any in-flight shared-element animations so we don't leave "ghost" nodes behind.
+			if (headerBoxMoveCleanupRef.current) {
+				headerBoxMoveCleanupRef.current();
+				headerBoxMoveCleanupRef.current = null;
+			}
+			if (contactsDraftsPillMoveCleanupRef.current) {
+				contactsDraftsPillMoveCleanupRef.current();
+				contactsDraftsPillMoveCleanupRef.current = null;
+			}
+
+			setPreviousView(null);
+			setIsTransitioning(false);
+			setIsFadingOutPreviousView(false);
+			setActiveViewInternal(newView);
+			return;
+		}
 		
 		// Start transition: keep previous view visible while the destination paints.
 		// Desktop: fade out the previous view once the destination is ready.
@@ -915,7 +1032,7 @@ const Murmur = () => {
 			}
 			setIsFadingOutPreviousView(true);
 		}, MAX_TRANSITION_WAIT_MS);
-	}, [activeView, isMobile, MOBILE_ALLOWED_VIEWS]);
+	}, [activeView, isMobile, isSafari, MOBILE_ALLOWED_VIEWS]);
 
 	const handleActiveViewReady = useCallback(
 		(readyView: DraftingSectionView) => {
