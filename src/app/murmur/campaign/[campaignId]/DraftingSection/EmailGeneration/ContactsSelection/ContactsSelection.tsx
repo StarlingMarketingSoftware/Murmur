@@ -1974,7 +1974,7 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 
 			{/* Draft Emails Button - below the table box */}
 			{!isDrafting && !hideButton && (
-				<div className="relative w-[475px] h-[40px] mt-4 mx-auto">
+				<div className="group relative w-[475px] h-[40px] mt-4 mx-auto">
 					{selectedCount > 0 ? (
 						<>
 							<button
@@ -2012,8 +2012,22 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 							</button>
 						</>
 					) : (
-						<div className="w-full h-full flex items-center justify-center text-black font-inter font-normal text-[17px]">
-							Select Contacts and Draft Emails
+						<div className="relative w-full h-full rounded-[4px] border-[3px] border-transparent overflow-hidden transition-colors group-hover:bg-[#EEF5EF] group-hover:border-black">
+							<div className="w-full h-full flex items-center justify-center text-black font-inter font-normal text-[17px] cursor-default">
+								Select Contacts and Draft Emails
+							</div>
+							<button
+								type="button"
+								aria-label="Select all contacts"
+								className="absolute right-0 top-0 bottom-0 w-[62px] bg-[#D17474] rounded-r-[1px] rounded-l-none flex items-center justify-center font-inter font-normal text-[17px] text-black hover:bg-[#C26666] cursor-pointer z-10 opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto"
+								onClick={(e) => {
+									e.stopPropagation();
+									handleClick();
+								}}
+							>
+								<div className="absolute left-0 top-0 bottom-0 w-[3px] bg-black" />
+								All
+							</button>
 						</div>
 					)}
 				</div>

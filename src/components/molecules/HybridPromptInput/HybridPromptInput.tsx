@@ -7425,7 +7425,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 						{!compactLeftOnly && !isPendingGeneration && !hideDraftButton && (
 							<div
 								className={cn(
-									'relative h-[40px] mt-4 mx-auto',
+									'group relative h-[40px] mt-4 mx-auto',
 									isNarrowDesktop
 										? 'w-full max-w-[691px] px-4'
 										: isNarrowestDesktop
@@ -7465,8 +7465,21 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 										</button>
 									</>
 								) : (
-									<div className="w-full h-full flex items-center justify-center text-black font-inter font-normal text-[17px]">
-										Select Contacts and Draft Emails
+									<div className="relative w-full h-full rounded-[4px] border-[3px] border-transparent overflow-hidden transition-colors group-hover:bg-[#EEF5EF] group-hover:border-black">
+										<div className="w-full h-full flex items-center justify-center text-black font-inter font-normal text-[17px] cursor-default">
+											Select Contacts and Draft Emails
+										</div>
+										<button
+											type="button"
+											aria-label="Select all contacts"
+											className="absolute right-0 top-0 bottom-0 w-[62px] bg-[#74D178] rounded-r-[1px] flex items-center justify-center font-inter font-normal text-[17px] text-black hover:bg-[#65C269] cursor-pointer z-10 opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto"
+											onClick={() => {
+												onSelectAllContacts?.();
+											}}
+										>
+											<div className="absolute left-0 top-0 bottom-0 w-[3px] bg-black" />
+											All
+										</button>
 									</div>
 								)}
 							</div>
