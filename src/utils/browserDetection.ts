@@ -20,7 +20,6 @@ export const isProblematicBrowser = (): boolean => {
 	if (typeof navigator === 'undefined') return false;
 	
 	const ua = navigator.userAgent || '';
-	const vendor = navigator.vendor || '';
 	
 	// Edge browser (all versions)
 	const isEdge = ua.includes('Edg');
