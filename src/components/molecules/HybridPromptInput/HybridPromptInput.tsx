@@ -4468,39 +4468,49 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 															<FormControl>
 																{form.watch('isAiSubject') ? (
 																	// Compact bar that expands to full width on hover when auto mode is on
-																	<div className="group/subject relative">
-																		{/* Collapsed state - shown by default, hidden on hover */}
-																		<div className="flex items-center gap-2 group-hover/subject:hidden">
-																			<div
-																				className={cn(
-																					cn('flex items-center justify-center h-[31px] rounded-[8px] border-2 border-black overflow-hidden subject-bar w-[110px]', !forceDesktop && 'max-[480px]:h-[24px]')
-																				)}
-																				style={{ backgroundColor: '#E0E0E0' }}
-																			>
-																				<span className="font-inter font-medium text-[18px] max-[480px]:text-[12px] whitespace-nowrap text-black subject-label">
-																					Subject
-																				</span>
-																			</div>
-																			<span className="font-inter font-normal text-[13px] text-[#000000]">
-																				Auto
-																			</span>
-																		</div>
-																		{/* Expanded state - hidden by default, shown on hover */}
+																	<div className="flex items-center">
 																		<div
 																			className={cn(
-																				cn('hidden group-hover/subject:flex items-center h-[31px] rounded-[8px] border-2 border-black overflow-hidden subject-bar bg-white w-full', !forceDesktop && 'max-[480px]:h-[24px]')
+																				// Default: only the 110px Subject box is hoverable (so it doesn't expand from the right-side area).
+																				// On hover: expand to full width so the user can interact with the expanded controls.
+																				'relative group/subject peer/subject w-[110px] hover:w-full transition-none'
 																			)}
 																		>
+																			{/* Collapsed state - shown by default, hidden on hover */}
+																			<div className="flex items-center group-hover/subject:hidden">
+																				<div
+																					className={cn(
+																						cn(
+																							'flex items-center justify-center h-[31px] rounded-[8px] border-2 border-black overflow-hidden subject-bar w-[110px]',
+																							!forceDesktop && 'max-[480px]:h-[24px]'
+																						)
+																					)}
+																					style={{ backgroundColor: '#E0E0E0' }}
+																				>
+																					<span className="font-inter font-medium text-[18px] max-[480px]:text-[12px] whitespace-nowrap text-black subject-label">
+																						Subject
+																					</span>
+																				</div>
+																			</div>
+																			{/* Expanded state - hidden by default, shown on hover */}
 																			<div
 																				className={cn(
-																					'pl-2 flex items-center h-full shrink-0 w-[130px]',
-																					'bg-[#E0E0E0]'
+																					cn(
+																						'hidden group-hover/subject:flex items-center h-[31px] rounded-[8px] border-2 border-black overflow-hidden subject-bar bg-white w-full',
+																						!forceDesktop && 'max-[480px]:h-[24px]'
+																					)
 																				)}
 																			>
-																				<span className="font-inter font-semibold text-[17px] max-[480px]:text-[12px] whitespace-nowrap text-black subject-label">
-																					Auto Subject
-																				</span>
-																			</div>
+																				<div
+																					className={cn(
+																						'pl-2 flex items-center h-full shrink-0 w-[130px]',
+																						'bg-[#E0E0E0]'
+																					)}
+																				>
+																					<span className="font-inter font-semibold text-[17px] max-[480px]:text-[12px] whitespace-nowrap text-black subject-label">
+																						Subject
+																					</span>
+																				</div>
 
 																			<button
 																				type="button"
@@ -4550,6 +4560,22 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																					}}
 																				/>
 																			</div>
+																		</div>
+																	</div>
+
+																		{/* Right-side hover zone (where "Auto" used to be).
+																		    - Does NOT trigger expansion.
+																		    - Reveals "AUTO" only while hovering this area. */}
+																		<div
+																			aria-hidden="true"
+																			className={cn(
+																				'group/subject-auto flex items-center pl-2 w-[52px] h-[31px] shrink-0 select-none peer-hover/subject:hidden',
+																				!forceDesktop && 'max-[480px]:h-[24px]'
+																			)}
+																		>
+																			<span className="font-inter font-normal text-[13px] text-[#000000] opacity-0 group-hover/subject-auto:opacity-100 transition-opacity">
+																				AUTO
+																			</span>
 																		</div>
 																	</div>
 																) : (
@@ -5959,7 +5985,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																		)}
 																	>
 																		<span className="font-inter font-semibold text-[14px] whitespace-nowrap text-black">
-																			{isAiSubjectLocal ? 'Auto Subject' : 'Subject'}
+																			Subject
 																		</span>
 																	</div>
 
@@ -6554,7 +6580,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																		<div className="hidden group-hover/hybrid-signature:flex items-center h-[28px] rounded-[8px] border-2 border-black overflow-hidden bg-white w-full">
 																			<div className="pl-2 flex items-center h-full shrink-0 w-[140px] bg-[#E0E0E0]">
 																				<span className="font-inter font-semibold text-[14px] whitespace-nowrap text-black">
-																					Auto Signature
+																					Signature
 																				</span>
 																			</div>
 																			<button
@@ -6969,39 +6995,49 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 												data-hpi-signature-auto
 											>
 												{isAutoSignature ? (
-													<div className="group/signature relative h-[31px]">
-														{/* Collapsed state - shown by default, hidden on hover */}
-														<div className="flex items-center gap-2 group-hover/signature:hidden">
-															<div
-																className={cn(
-																	cn('flex items-center justify-center h-[31px] rounded-[8px] border-2 border-black overflow-hidden w-[122px]', !forceDesktop && 'max-[480px]:h-[24px]')
-																)}
-																style={{ backgroundColor: '#E0E0E0' }}
-															>
-																<span className="font-inter font-medium text-[18px] max-[480px]:text-[12px] whitespace-nowrap text-black">
-																	Signature
-																</span>
-															</div>
-															<span className="font-inter font-normal text-[13px] text-[#000000]">
-																Auto
-															</span>
-														</div>
-														{/* Expanded state - hidden by default, shown on hover */}
+													<div className="flex items-center">
 														<div
 															className={cn(
-																cn('hidden group-hover/signature:flex items-center h-[31px] rounded-[8px] border-2 border-black overflow-hidden bg-white w-full', !forceDesktop && 'max-[480px]:h-[24px]')
+																// Default: only the 122px Signature box is hoverable (so it doesn't expand from the right-side area).
+																// On hover: expand to full width so the user can interact with the expanded controls.
+																'relative group/signature peer/signature w-[122px] hover:w-full transition-none'
 															)}
 														>
+															{/* Collapsed state - shown by default, hidden on hover */}
+															<div className="flex items-center group-hover/signature:hidden">
+																<div
+																	className={cn(
+																		cn(
+																			'flex items-center justify-center h-[31px] rounded-[8px] border-2 border-black overflow-hidden w-[122px]',
+																			!forceDesktop && 'max-[480px]:h-[24px]'
+																		)
+																	)}
+																	style={{ backgroundColor: '#E0E0E0' }}
+																>
+																	<span className="font-inter font-medium text-[18px] max-[480px]:text-[12px] whitespace-nowrap text-black">
+																		Signature
+																	</span>
+																</div>
+															</div>
+															{/* Expanded state - hidden by default, shown on hover */}
 															<div
 																className={cn(
-																	'pl-2 flex items-center h-full shrink-0 w-[140px]',
-																	'bg-[#E0E0E0]'
+																	cn(
+																		'hidden group-hover/signature:flex items-center h-[31px] rounded-[8px] border-2 border-black overflow-hidden bg-white w-full',
+																		!forceDesktop && 'max-[480px]:h-[24px]'
+																	)
 																)}
 															>
-																<span className="font-inter font-semibold text-[17px] max-[480px]:text-[12px] whitespace-nowrap text-black">
-																	Auto Signature
-																</span>
-															</div>
+																<div
+																	className={cn(
+																		'pl-2 flex items-center h-full shrink-0 w-[140px]',
+																		'bg-[#E0E0E0]'
+																	)}
+																>
+																	<span className="font-inter font-semibold text-[17px] max-[480px]:text-[12px] whitespace-nowrap text-black">
+																		Signature
+																	</span>
+																</div>
 
 															<button
 																type="button"
@@ -7027,6 +7063,22 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																	placeholder="Write manual Signature here"
 																/>
 															</div>
+														</div>
+													</div>
+
+														{/* Right-side hover zone (where "Auto" used to be).
+														    - Does NOT trigger expansion.
+														    - Reveals "AUTO" only while hovering this area. */}
+														<div
+															aria-hidden="true"
+															className={cn(
+																'group/signature-auto flex items-center pl-2 w-[52px] h-[31px] shrink-0 select-none peer-hover/signature:hidden',
+																!forceDesktop && 'max-[480px]:h-[24px]'
+															)}
+														>
+															<span className="font-inter font-normal text-[13px] text-[#000000] opacity-0 group-hover/signature-auto:opacity-100 transition-opacity">
+																AUTO
+															</span>
 														</div>
 													</div>
 												) : (
