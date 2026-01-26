@@ -18,7 +18,7 @@ export const FadeInUp = ({
 	yOffset = 50,
 	threshold = 0.1,
 	className = '',
-	stagger: _stagger,
+	stagger: _stagger, // eslint-disable-line @typescript-eslint/no-unused-vars
 	...divProps
 }: FadeInUpProps) => {
 	const elementRef = useRef<HTMLDivElement>(null);

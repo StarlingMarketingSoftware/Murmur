@@ -75,6 +75,13 @@ export const LandingHeroSearchBar = ({
 	const whereInputRef = useRef<HTMLInputElement>(null);
 	const activeSectionIndicatorRef = useRef<HTMLDivElement>(null);
 	const prevActiveSectionForIndicatorRef = useRef<Exclude<ActiveSection, null> | null>(null);
+	const isMountedRef = useRef(true);
+
+	useEffect(() => {
+		return () => {
+			isMountedRef.current = false;
+		};
+	}, []);
 
 	const hasWhereValue = whereValue.trim().length > 0;
 	const isPromotion = whyValue === '[Promotion]';
@@ -184,109 +191,74 @@ export const LandingHeroSearchBar = ({
 		prevActiveSectionForIndicatorRef.current = activeSection;
 	}, [activeSection]);
 
-	// Fetch "Near Me" label only when the user opens the Where dropdown.
-	useEffect(() => {
-		if (activeSection !== 'where' || userLocationName || isLoadingLocation) return;
+	const requestUserLocationName = async (): Promise<string | null> => {
+		if (isLoadingLocation) return null;
 
-		setIsLoadingLocation(true);
-		if (typeof navigator !== 'undefined' && 'geolocation' in navigator) {
-			navigator.geolocation.getCurrentPosition(
-				async (position) => {
-					try {
-						const { latitude, longitude } = position.coords;
-						const response = await fetch(
-							`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`
-						);
-						const data = await response.json();
-						const city =
-							data.address?.city ||
-							data.address?.town ||
-							data.address?.village ||
-							data.address?.hamlet;
-						const state = data.address?.state;
+		const setLoading = (value: boolean) => {
+			if (isMountedRef.current) setIsLoadingLocation(value);
+		};
+		const setLocationName = (value: string) => {
+			if (isMountedRef.current) setUserLocationName(value);
+		};
 
-						const stateToAbbr: Record<string, string> = {
-							Alabama: 'AL',
-							Alaska: 'AK',
-							Arizona: 'AZ',
-							Arkansas: 'AR',
-							California: 'CA',
-							Colorado: 'CO',
-							Connecticut: 'CT',
-							Delaware: 'DE',
-							Florida: 'FL',
-							Georgia: 'GA',
-							Hawaii: 'HI',
-							Idaho: 'ID',
-							Illinois: 'IL',
-							Indiana: 'IN',
-							Iowa: 'IA',
-							Kansas: 'KS',
-							Kentucky: 'KY',
-							Louisiana: 'LA',
-							Maine: 'ME',
-							Maryland: 'MD',
-							Massachusetts: 'MA',
-							Michigan: 'MI',
-							Minnesota: 'MN',
-							Mississippi: 'MS',
-							Missouri: 'MO',
-							Montana: 'MT',
-							Nebraska: 'NE',
-							Nevada: 'NV',
-							'New Hampshire': 'NH',
-							'New Jersey': 'NJ',
-							'New Mexico': 'NM',
-							'New York': 'NY',
-							'North Carolina': 'NC',
-							'North Dakota': 'ND',
-							Ohio: 'OH',
-							Oklahoma: 'OK',
-							Oregon: 'OR',
-							Pennsylvania: 'PA',
-							'Rhode Island': 'RI',
-							'South Carolina': 'SC',
-							'South Dakota': 'SD',
-							Tennessee: 'TN',
-							Texas: 'TX',
-							Utah: 'UT',
-							Vermont: 'VT',
-							Virginia: 'VA',
-							Washington: 'WA',
-							'West Virginia': 'WV',
-							Wisconsin: 'WI',
-							Wyoming: 'WY',
-						};
+		setLoading(true);
 
-						const stateAbbr = state ? stateToAbbr[state] || state : null;
+		try {
+			if (typeof navigator === 'undefined' || !('geolocation' in navigator)) {
+				setLocationName('Geolocation not supported');
+				return null;
+			}
 
-						if (city && stateAbbr) {
-							setUserLocationName(`${city}, ${stateAbbr}`);
-						} else if (city) {
-							setUserLocationName(city);
-						} else if (stateAbbr) {
-							setUserLocationName(stateAbbr);
-						} else {
-							setUserLocationName('Current Location');
-						}
-					} catch (error) {
-						console.error('Error getting location:', error);
-						setUserLocationName('Unable to find location');
-					} finally {
-						setIsLoadingLocation(false);
-					}
-				},
-				(error) => {
-					console.error('Geolocation error:', error);
-					setUserLocationName('Location access needed');
-					setIsLoadingLocation(false);
-				}
-			);
-		} else {
-			setUserLocationName('Geolocation not supported');
-			setIsLoadingLocation(false);
+			const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+				navigator.geolocation.getCurrentPosition(resolve, reject);
+			});
+
+			try {
+				const { latitude, longitude } = position.coords;
+				const response = await fetch(
+					`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`
+				);
+				const data = await response.json();
+				const city =
+					data.address?.city || data.address?.town || data.address?.village || data.address?.hamlet;
+				const state = data.address?.state as string | undefined;
+
+				const stateAbbr =
+					state != null ? US_STATES.find((s) => s.name === state)?.abbr ?? state : null;
+
+				const label =
+					city && stateAbbr
+						? `${city}, ${stateAbbr}`
+						: city
+							? city
+							: stateAbbr
+								? stateAbbr
+								: 'Current Location';
+
+				setLocationName(label);
+				return label;
+			} catch (error) {
+				console.error('Error getting location:', error);
+				setLocationName('Unable to find location');
+				return null;
+			}
+		} catch (error) {
+			console.error('Geolocation error:', error);
+			setLocationName('Location access needed');
+			return null;
+		} finally {
+			setLoading(false);
 		}
-	}, [activeSection, userLocationName, isLoadingLocation]);
+	};
+
+	const handleNearMeClick = async () => {
+		if (readOnly || isLoadingLocation) return;
+
+		const unusable = new Set(['Location access needed', 'Unable to find location', 'Geolocation not supported']);
+		const existing = userLocationName && !unusable.has(userLocationName) ? userLocationName : null;
+		const label = existing ?? (await requestUserLocationName());
+		if (label) setWhereAndClose(label, true);
+	};
 
 	const DEFAULT_STATE_SUGGESTIONS = useMemo(
 		() => [
@@ -727,9 +699,7 @@ export const LandingHeroSearchBar = ({
 											: 'bg-white hover:bg-[#f0f0f0] border-transparent'
 									}`}
 									onClick={() => {
-										if (userLocationName && !isLoadingLocation && !readOnly) {
-											setWhereAndClose(userLocationName, true);
-										}
+										void handleNearMeClick();
 									}}
 								>
 									<div className="w-[38px] h-[38px] bg-[#D0E6FF] rounded-[8px] flex-shrink-0 flex items-center justify-center">

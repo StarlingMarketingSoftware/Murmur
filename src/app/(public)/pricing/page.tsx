@@ -674,7 +674,7 @@ export default function Products() {
 								what they’re sending, and provide the correct info about each contact they send to.
 							</span>
 							<span className="xl:hidden">
-								This is because we help them find the right person to reach, give them the best way to structure what they're sending, and provide the correct info about each contact they send to.
+								This is because we help them find the right person to reach, give them the best way to structure what they&apos;re sending, and provide the correct info about each contact they send to.
 							</span>
 						</p>
 					</div>
