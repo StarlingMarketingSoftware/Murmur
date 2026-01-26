@@ -40,7 +40,7 @@ const videoStyle = {
 
 export default function MapPage() {
   return (
-    <main className="relative bg-[#F5F5F7]">
+    <main className="relative bg-[#F5F5F7] overflow-x-hidden landing-page">
       {/* Gradient overlay for first 1307px (outside `.landing-zoom-80` so it isn't scaled by `zoom`) */}
       <div
         // Offset by the navbar spacer height (h-12 = 48px) so the gradient starts at the true top of the page.
@@ -62,6 +62,7 @@ export default function MapPage() {
                 <div className="w-full flex justify-center lg:mt-auto">
                   <div className="w-full max-w-[1372px] rounded-[8px] border border-black overflow-hidden flex">
                     <MuxPlayer
+                      className="pointer-events-none"
                       style={{
                         ...videoStyle,
                         width: '100%',
