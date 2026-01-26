@@ -692,7 +692,7 @@ const SortableAIBlock = ({
 				!isTextBlock &&
 				!isFullAutomatedBlock &&
 				'border-2 border-gray-300 bg-background',
-			isFullAutomatedBlock && 'border border-gray-300 bg-[#51A2E4]',
+			isFullAutomatedBlock && 'border border-[#51A2E4] bg-[#51A2E4]',
 			isTextBlock
 				? showTestPreview
 					? cn('w-[426px] min-h-[44px]', !forceDesktop && 'max-[480px]:w-[89.33vw]')
@@ -1144,7 +1144,14 @@ const SortableAIBlock = ({
 								{isFullAutomatedBlock && (
 									<div className="w-full px-1 pt-1 pb-1">
 										<div className="rounded-t-[6px] overflow-hidden">
-											<div className="h-[27px] bg-[#B9DAF5] flex items-stretch">
+											<div
+												className={cn(
+													'h-[27px] flex items-stretch transition-colors duration-75 ease-out',
+													selectedPowerMode === 'high'
+														? 'bg-[#95CFFF]'
+														: 'bg-[#58A6E5]'
+												)}
+											>
 												{/* Full Auto label section */}
 												<div className="flex-1 flex items-center pl-[16px]">
 													<Typography
@@ -1154,78 +1161,63 @@ const SortableAIBlock = ({
 														Body
 													</Typography>
 												</div>
-												{/* Divider - black when Normal Power selected */}
-												<div
-													className={cn(
-														'w-[1px] flex-shrink-0 transition-colors',
-														selectedPowerMode === 'normal'
-															? 'bg-[#000000]'
-															: 'bg-[#51A2E4]'
-													)}
-												/>
-												{/* Normal Power section */}
+												{/* Divider (only when Standard is selected) */}
+												{selectedPowerMode === 'normal' && (
+													<div className="w-[1px] flex-shrink-0 bg-[#000000]" />
+												)}
+												{/* Standard Power section */}
 												<button
 													type="button"
 													onClick={() => setSelectedPowerMode('normal')}
 													className={cn(
-														'w-[101px] flex items-center justify-center cursor-pointer border-0 p-0 m-0 transition-colors flex-shrink-0 outline-none focus:outline-none',
+														'h-full flex items-center justify-center cursor-pointer border-0 p-0 m-0 flex-shrink-0 outline-none focus:outline-none whitespace-nowrap transition-[background-color,width] duration-75 ease-out',
+														selectedPowerMode === 'high'
+															? 'w-[108px]'
+															: 'w-[132px]',
 														selectedPowerMode === 'normal'
-															? 'bg-[#8DBFE8]'
+															? 'bg-[#88C5F7]'
 															: 'bg-transparent'
 													)}
 												>
 													<span
-														className={cn(
-															'font-inter font-normal italic text-[14px] max-[480px]:text-[12px] transition-colors',
-															selectedPowerMode === 'normal'
-																? 'text-[#000000]'
-																: 'text-[#9E9E9E]'
-														)}
+														className="font-inter font-normal italic text-[14px] max-[480px]:text-[12px] text-[#000000]"
 													>
-														Normal Power
+														{selectedPowerMode === 'high'
+															? 'Standard'
+															: 'Standard Power'}
 													</span>
 												</button>
-												{/* Divider - black when either Normal Power or High selected */}
-												<div
-													className={cn(
-														'w-[1px] flex-shrink-0 transition-colors',
-														selectedPowerMode === 'normal' ||
-															selectedPowerMode === 'high'
-															? 'bg-[#000000]'
-															: 'bg-[#51A2E4]'
-													)}
-												/>
+												{/* Divider */}
+												<div className="w-[1px] flex-shrink-0 bg-[#000000]" />
 												{/* High section */}
 												<button
 													type="button"
 													onClick={() => setSelectedPowerMode('high')}
 													className={cn(
-														'w-[46px] flex items-center justify-center cursor-pointer border-0 p-0 m-0 transition-colors flex-shrink-0 outline-none focus:outline-none',
+														'h-full flex items-center justify-center cursor-pointer border-0 p-0 m-0 flex-shrink-0 outline-none focus:outline-none whitespace-nowrap transition-[background-color,width] duration-75 ease-out',
 														selectedPowerMode === 'high'
-															? 'bg-[#8DBFE8]'
+															? 'w-[100px]'
+															: 'w-[46px]',
+														selectedPowerMode === 'high'
+															? 'bg-[#58A6E5]'
 															: 'bg-transparent'
 													)}
 												>
 													<span
 														className={cn(
-															'font-inter font-normal italic text-[14px] max-[480px]:text-[12px] transition-colors',
+															'font-inter font-normal italic text-[14px] max-[480px]:text-[12px] transition-colors duration-75 ease-out',
 															selectedPowerMode === 'high'
-																? 'text-[#000000]'
-																: 'text-[#9E9E9E]'
+																? 'text-[#FFFFFF]'
+																: 'text-[#000000]'
 														)}
 													>
-														High
+														{selectedPowerMode === 'high' ? 'High Power' : 'High'}
 													</span>
 												</button>
-												{/* Divider - black when High selected */}
-												<div
-													className={cn(
-														'w-[1px] flex-shrink-0 transition-colors',
-														selectedPowerMode === 'high'
-															? 'bg-[#000000]'
-															: 'bg-[#51A2E4]'
-													)}
-												/>
+												{/* Divider (only when High is selected) */}
+												{selectedPowerMode === 'high' && (
+													<div className="w-[1px] flex-shrink-0 bg-[#000000]" />
+												)}
 												{/* Right empty section */}
 												<div className="w-[31px] flex-shrink-0" />
 											</div>
@@ -1269,7 +1261,14 @@ const SortableAIBlock = ({
 								)}
 								{isFullAutomatedBlock ? (
 									<div className="min-h-[60px] w-full px-1 pb-1">
-										<div className="w-full bg-[#58A6E5] rounded-b-[6px] p-2 flex justify-center">
+										<div
+											className={cn(
+												'w-full rounded-b-[6px] p-2 flex justify-center transition-colors duration-75 ease-out',
+												selectedPowerMode === 'high'
+													? 'bg-[#58A6E5]'
+													: 'bg-[#88C5F7]'
+											)}
+										>
 											<div className="w-[448px] max-w-full flex flex-col items-start">
 												<div
 													className="w-full h-[104px] bg-white rounded-[8px] border border-black px-2 pt-1 pb-2 overflow-y-auto overflow-x-hidden hide-native-scrollbar cursor-pointer"
@@ -1884,7 +1883,10 @@ const SortableAIBlock = ({
 																	type="button"
 																	onClick={() => setIsCustomInstructionsOpen(true)}
 																	className={cn(
-																		'w-full h-[22px] bg-[#95CFFF] rounded-[8px] border-2 border-black',
+																		'w-full h-[22px] rounded-[8px] border-2 border-black transition-colors duration-75 ease-out',
+																		selectedPowerMode === 'high'
+																			? 'bg-[#58A6E5]'
+																			: 'bg-[#88C5F7]',
 																		'flex items-center justify-start gap-1 px-4 max-[480px]:gap-[2px] max-[480px]:px-3',
 																		'font-inter font-semibold text-[11px] max-[480px]:text-[9px] leading-none text-black whitespace-nowrap',
 																		'hover:brightness-[0.98] active:brightness-[0.95]'
@@ -1902,7 +1904,10 @@ const SortableAIBlock = ({
 															<div
 																className={cn(
 																	'w-full rounded-[8px] border-2 border-black overflow-hidden',
-																	'flex flex-col bg-[#95CFFF]'
+																	'flex flex-col transition-colors duration-75 ease-out',
+																	selectedPowerMode === 'high'
+																		? 'bg-[#58A6E5]'
+																		: 'bg-[#88C5F7]'
 																)}
 																aria-label="Custom Instructions"
 															>
