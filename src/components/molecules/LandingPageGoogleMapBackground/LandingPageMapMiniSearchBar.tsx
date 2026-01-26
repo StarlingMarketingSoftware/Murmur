@@ -8,44 +8,35 @@ import { NearMeIcon } from '@/components/atoms/_svg/NearMeIcon';
 import { PromotionIcon } from '@/components/atoms/_svg/PromotionIcon';
 import { RadioStationsIcon } from '@/components/atoms/_svg/RadioStationsIcon';
 import { RestaurantsIcon } from '@/components/atoms/_svg/RestaurantsIcon';
-import { SearchIconDesktop } from '@/components/atoms/_svg/SearchIconDesktop';
-import { WeddingPlannersIcon } from '@/components/atoms/_svg/WeddingPlannersIcon';
 import { WineBeerSpiritsIcon } from '@/components/atoms/_svg/WineBeerSpiritsIcon';
+import { WeddingPlannersIcon } from '@/components/atoms/_svg/WeddingPlannersIcon';
 import { Input } from '@/components/ui/input';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 import { US_STATES } from '@/constants/usStates';
 import { getCityIconProps } from '@/utils/cityIcons';
 import { buildAllUsStateNames } from '@/utils/usStates';
-import { urls } from '@/constants/urls';
 import { gsap } from 'gsap';
-import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
-/**
- * Visual-only copy of the dashboard's initial search bar.
- * Intentionally does not trigger any search behavior yet.
- */
-interface LandingHeroSearchBarProps {
+type ActiveSection = 'why' | 'what' | 'where' | null;
+
+type Props = {
 	initialWhy?: string;
 	initialWhat?: string;
 	initialWhere?: string;
+	/**
+	 * When true, the inputs can be focused (to show the indicator animation),
+	 * but their values cannot be edited.
+	 */
 	readOnly?: boolean;
-}
+};
 
-export const LandingHeroSearchBar = ({
-	initialWhy = '',
-	initialWhat = '',
-	initialWhere = '',
-	readOnly = false,
-}: LandingHeroSearchBarProps = {}) => {
-	// Dashboard is scaled down via `html.murmur-compact { zoom: 0.9 }`.
-	// We scale this component to match the perceived size on the dashboard.
-	// const SCALE = 0.9;
-
-	const router = useRouter();
-
-	type ActiveSection = 'why' | 'what' | 'where' | null;
-
+export function LandingPageMapMiniSearchBar({
+	initialWhy = '[Promotion]',
+	initialWhat = 'Radio Stations',
+	initialWhere = 'New York',
+	readOnly = true,
+}: Props) {
 	const [whyValue, setWhyValue] = useState(initialWhy);
 	const [whatValue, setWhatValue] = useState(initialWhat);
 	const [whereValue, setWhereValue] = useState(initialWhere);
@@ -55,26 +46,9 @@ export const LandingHeroSearchBar = ({
 	const [userLocationName, setUserLocationName] = useState<string | null>(null);
 	const [isLoadingLocation, setIsLoadingLocation] = useState(false);
 
-	const handleSearchActivate = (event?: { preventDefault: () => void }) => {
-		event?.preventDefault();
-		setActiveSection(null);
-
-		// On mobile (below `md`) route to free-trial instead of the dashboard.
-		const isMobile = window.matchMedia('(max-width: 767px)').matches;
-		if (isMobile) {
-			router.push(urls.freeTrial.index);
-			return;
-		}
-
-		// Desktop: navigate to the dashboard with fromHome mode.
-		router.push(`${urls.murmur.dashboard.index}?fromHome=true`);
-	};
-
-	const searchContainerRef = useRef<HTMLDivElement>(null);
+	const rootRef = useRef<HTMLDivElement>(null);
 	const whatInputRef = useRef<HTMLInputElement>(null);
 	const whereInputRef = useRef<HTMLInputElement>(null);
-	const activeSectionIndicatorRef = useRef<HTMLDivElement>(null);
-	const prevActiveSectionForIndicatorRef = useRef<Exclude<ActiveSection, null> | null>(null);
 	const isMountedRef = useRef(true);
 
 	useEffect(() => {
@@ -83,36 +57,34 @@ export const LandingHeroSearchBar = ({
 		};
 	}, []);
 
-	const hasWhereValue = whereValue.trim().length > 0;
-	const isPromotion = whyValue === '[Promotion]';
+	// Mini search bar (map view results) indicator refs (copied from dashboard map view)
+	const miniActiveSectionIndicatorRef = useRef<HTMLDivElement>(null);
+	const prevMiniActiveSectionRef = useRef<'why' | 'what' | 'where' | null>(null);
 
-	// Close dropdown when clicking outside
+	// Close active section when clicking outside.
 	useEffect(() => {
-		const handleClickOutside = (event: MouseEvent) => {
-			if (
-				searchContainerRef.current &&
-				!searchContainerRef.current.contains(event.target as Node)
-			) {
+		if (!activeSection) return;
+		const onMouseDown = (event: MouseEvent) => {
+			const root = rootRef.current;
+			if (!root) return;
+			if (!root.contains(event.target as Node)) {
 				setActiveSection(null);
 			}
 		};
-
-		if (activeSection) {
-			document.addEventListener('mousedown', handleClickOutside);
-		}
-		return () => {
-			document.removeEventListener('mousedown', handleClickOutside);
-		};
+		document.addEventListener('mousedown', onMouseDown);
+		return () => document.removeEventListener('mousedown', onMouseDown);
 	}, [activeSection]);
 
-	// Animate the active section "pill" sliding between tabs (Why/What/Where)
+	// Animation for the mini search bar pill indicator (copied from dashboard map view)
 	useEffect(() => {
-		const indicator = activeSectionIndicatorRef.current;
+		const indicator = miniActiveSectionIndicatorRef.current;
 		if (!indicator) return;
 
+		// Prevent overlapping tweens when the user clicks quickly
 		gsap.killTweensOf(indicator);
 
-		const xPercentForSection = (section: Exclude<ActiveSection, null>) => {
+		// xPercent shifts by the indicator's own width (which is 1/3 of the container)
+		const xPercentForSection = (section: 'why' | 'what' | 'where') => {
 			switch (section) {
 				case 'why':
 					return 0;
@@ -123,7 +95,7 @@ export const LandingHeroSearchBar = ({
 			}
 		};
 
-		const transformOriginForSection = (section: Exclude<ActiveSection, null>) => {
+		const transformOriginForSection = (section: 'why' | 'what' | 'where') => {
 			switch (section) {
 				case 'why':
 					return 'left center';
@@ -144,19 +116,18 @@ export const LandingHeroSearchBar = ({
 				overwrite: 'auto',
 			});
 			gsap.set(indicator, { scaleX: 1, transformOrigin: 'center center' });
-			prevActiveSectionForIndicatorRef.current = null;
+			prevMiniActiveSectionRef.current = null;
 			return;
 		}
 
 		const nextXPercent = xPercentForSection(activeSection);
-		const prevSection = prevActiveSectionForIndicatorRef.current;
+		const prevSection = prevMiniActiveSectionRef.current;
 
 		// On first open (empty -> selected), animate a "shrink" into the selected segment
 		if (!prevSection) {
 			const origin = transformOriginForSection(activeSection);
 
-			// Start as full-width highlight (scaleX: 3 because indicator is 1/3 width),
-			// then shrink toward the selected segment's side/center.
+			// Start as a full-width highlight (scaleX: 3 because the indicator is 1/3 width),
 			gsap.set(indicator, {
 				xPercent: nextXPercent,
 				opacity: 1,
@@ -169,14 +140,14 @@ export const LandingHeroSearchBar = ({
 				ease: 'power2.out',
 				overwrite: 'auto',
 			});
-			prevActiveSectionForIndicatorRef.current = activeSection;
+			prevMiniActiveSectionRef.current = activeSection;
 			return;
 		}
 
-		// Between tabs, slide
+		// Between tabs, slide with requested timing/ease (width/height remain constant)
+		gsap.set(indicator, { scaleX: 1, transformOrigin: 'center center' });
 		gsap.to(indicator, {
 			xPercent: nextXPercent,
-			scaleX: 1,
 			duration: 0.6,
 			ease: 'power2.out',
 			overwrite: 'auto',
@@ -188,8 +159,19 @@ export const LandingHeroSearchBar = ({
 			overwrite: 'auto',
 		});
 
-		prevActiveSectionForIndicatorRef.current = activeSection;
+		prevMiniActiveSectionRef.current = activeSection;
 	}, [activeSection]);
+
+	// Mirror dashboard behavior: focus input when selecting What/Where.
+	useEffect(() => {
+		if (activeSection === 'what' && whatInputRef.current) {
+			whatInputRef.current.focus();
+		} else if (activeSection === 'where' && whereInputRef.current) {
+			whereInputRef.current.focus();
+		}
+	}, [activeSection]);
+
+	const isPromotion = whyValue === '[Promotion]';
 
 	const requestUserLocationName = async (): Promise<string | null> => {
 		if (isLoadingLocation) return null;
@@ -252,7 +234,7 @@ export const LandingHeroSearchBar = ({
 	};
 
 	const handleNearMeClick = async () => {
-		if (readOnly || isLoadingLocation) return;
+		if (isLoadingLocation) return;
 
 		const unusable = new Set(['Location access needed', 'Unable to find location', 'Geolocation not supported']);
 		const existing = userLocationName && !unusable.has(userLocationName) ? userLocationName : null;
@@ -321,11 +303,18 @@ export const LandingHeroSearchBar = ({
 						: 404
 					: 370;
 
-		const dropdownLeft = activeSection === 'why' ? 4 : activeSection === 'what' ? 176 : 98;
+		// Slide the dropdown between segments like the dashboard:
+		// left, center, right (clamped so it never goes negative).
+		const dropdownLeft =
+			activeSection === 'why'
+				? '0px'
+				: activeSection === 'what'
+					? 'max(0px, calc((100% - 439px) / 2))'
+					: 'max(0px, calc(100% - 439px))';
 
 		return (
 			<div
-				className="search-dropdown-menu hidden md:block w-[439px] bg-[#D8E5FB] rounded-[16px] border-2 border-black z-[110] relative overflow-hidden"
+				className="search-dropdown-menu w-[439px] max-w-[calc(100vw-16px)] bg-[#D8E5FB] rounded-[16px] border-2 border-black z-[110] relative overflow-hidden"
 				style={{
 					position: 'absolute',
 					top: 'calc(100% + 10px)',
@@ -347,16 +336,14 @@ export const LandingHeroSearchBar = ({
 				>
 					<div className="flex flex-col items-center justify-start gap-[12px] w-full h-full py-[12px]">
 						<div
-							className={`w-[410px] h-[68px] rounded-[12px] flex items-center px-[15px] cursor-pointer transition-colors duration-200 border ${
+							className={`w-[410px] max-w-[calc(100%-24px)] h-[68px] rounded-[12px] flex items-center px-[15px] cursor-pointer transition-colors duration-200 border ${
 								whyValue === '[Booking]'
 									? 'bg-[#DBECFF] border-[#000000]'
 									: 'bg-white hover:bg-[#f0f0f0] border-transparent'
 							}`}
 							onClick={() => {
-								if (!readOnly) {
-									setWhyValue('[Booking]');
-									setActiveSection('what');
-								}
+								setWhyValue('[Booking]');
+								setActiveSection('what');
 							}}
 						>
 							<div className="w-[38px] h-[38px] bg-[#9DCBFF] rounded-[8px] flex-shrink-0 flex items-center justify-center">
@@ -372,16 +359,14 @@ export const LandingHeroSearchBar = ({
 							</div>
 						</div>
 						<div
-							className={`w-[410px] h-[68px] rounded-[12px] flex items-center px-[15px] cursor-pointer transition-colors duration-200 border ${
+							className={`w-[410px] max-w-[calc(100%-24px)] h-[68px] rounded-[12px] flex items-center px-[15px] cursor-pointer transition-colors duration-200 border ${
 								whyValue === '[Promotion]'
 									? 'bg-[#DBECFF] border-[#000000]'
 									: 'bg-white hover:bg-[#f0f0f0] border-transparent'
 							}`}
 							onClick={() => {
-								if (!readOnly) {
-									setWhyValue('[Promotion]');
-									setActiveSection('what');
-								}
+								setWhyValue('[Promotion]');
+								setActiveSection('what');
 							}}
 						>
 							<div className="w-[38px] h-[38px] bg-[#7AD47A] rounded-[8px] flex-shrink-0 flex items-center justify-center">
@@ -412,16 +397,15 @@ export const LandingHeroSearchBar = ({
 					{whyValue === '[Promotion]' ? (
 						<div className="flex flex-col items-center justify-start gap-[10px] w-full h-full py-[12px]">
 							<div
-								className={`w-[415px] h-[68px] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200 border ${
+								className={`w-[415px] max-w-[calc(100%-24px)] h-[68px] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200 border ${
 									whatValue === 'Radio Stations'
 										? 'bg-[#DBECFF] border-[#000000]'
 										: 'bg-white hover:bg-[#f0f0f0] border-transparent'
 								}`}
 								onClick={() => {
-									if (!readOnly) {
-										setWhatValue('Radio Stations');
-										setActiveSection('where');
-									}
+									setWhatValue('Radio Stations');
+									// Match map-view behavior: close after selecting "What".
+									setActiveSection(null);
 								}}
 							>
 								<div className="w-[38px] h-[38px] bg-[#56DA73] rounded-[8px] flex-shrink-0 flex items-center justify-center">
@@ -460,16 +444,14 @@ export const LandingHeroSearchBar = ({
 								offsetRight={-5}
 							>
 								<div
-									className={`w-[415px] h-[68px] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200 border ${
+									className={`w-[415px] max-w-[calc(100%-24px)] h-[68px] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200 border ${
 										whatValue === 'Wine, Beer, and Spirits'
 											? 'bg-[#DBECFF] border-[#000000]'
 											: 'bg-white hover:bg-[#f0f0f0] border-transparent'
 									}`}
 									onClick={() => {
-										if (!readOnly) {
-											setWhatValue('Wine, Beer, and Spirits');
-											setActiveSection('where');
-										}
+										setWhatValue('Wine, Beer, and Spirits');
+										setActiveSection(null);
 									}}
 								>
 									<div className="w-[38px] h-[38px] bg-[#80AAFF] rounded-[8px] flex-shrink-0 flex items-center justify-center">
@@ -485,16 +467,14 @@ export const LandingHeroSearchBar = ({
 									</div>
 								</div>
 								<div
-									className={`w-[415px] h-[68px] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200 border ${
+									className={`w-[415px] max-w-[calc(100%-24px)] h-[68px] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200 border ${
 										whatValue === 'Restaurants'
 											? 'bg-[#DBECFF] border-[#000000]'
 											: 'bg-white hover:bg-[#f0f0f0] border-transparent'
 									}`}
 									onClick={() => {
-										if (!readOnly) {
-											setWhatValue('Restaurants');
-											setActiveSection('where');
-										}
+										setWhatValue('Restaurants');
+										setActiveSection(null);
 									}}
 								>
 									<div className="w-[38px] h-[38px] bg-[#77DD91] rounded-[8px] flex-shrink-0 flex items-center justify-center">
@@ -510,20 +490,18 @@ export const LandingHeroSearchBar = ({
 									</div>
 								</div>
 								<div
-									className={`w-[415px] h-[68px] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200 border ${
+									className={`w-[415px] max-w-[calc(100%-24px)] h-[68px] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200 border ${
 										whatValue === 'Coffee Shops'
 											? 'bg-[#DBECFF] border-[#000000]'
 											: 'bg-white hover:bg-[#f0f0f0] border-transparent'
 									}`}
 									onClick={() => {
-										if (!readOnly) {
-											setWhatValue('Coffee Shops');
-											setActiveSection('where');
-										}
+										setWhatValue('Coffee Shops');
+										setActiveSection(null);
 									}}
 								>
 									<div className="w-[38px] h-[38px] bg-[#A9DE78] rounded-[8px] flex-shrink-0 flex items-center justify-center">
-										<CoffeeShopsIcon />
+										<CoffeeShopsIcon size={7} />
 									</div>
 									<div className="ml-[12px] flex flex-col">
 										<div className="text-[20px] font-medium leading-none text-black font-inter">
@@ -535,16 +513,14 @@ export const LandingHeroSearchBar = ({
 									</div>
 								</div>
 								<div
-									className={`w-[415px] h-[68px] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200 border ${
+									className={`w-[415px] max-w-[calc(100%-24px)] h-[68px] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200 border ${
 										whatValue === 'Festivals'
 											? 'bg-[#DBECFF] border-[#000000]'
 											: 'bg-white hover:bg-[#f0f0f0] border-transparent'
 									}`}
 									onClick={() => {
-										if (!readOnly) {
-											setWhatValue('Festivals');
-											setActiveSection('where');
-										}
+										setWhatValue('Festivals');
+										setActiveSection(null);
 									}}
 								>
 									<div className="w-[38px] h-[38px] bg-[#80AAFF] rounded-[8px] flex-shrink-0 flex items-center justify-center">
@@ -560,16 +536,14 @@ export const LandingHeroSearchBar = ({
 									</div>
 								</div>
 								<div
-									className={`w-[415px] h-[68px] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200 border ${
+									className={`w-[415px] max-w-[calc(100%-24px)] h-[68px] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200 border ${
 										whatValue === 'Wedding Planners'
 											? 'bg-[#DBECFF] border-[#000000]'
 											: 'bg-white hover:bg-[#f0f0f0] border-transparent'
 									}`}
 									onClick={() => {
-										if (!readOnly) {
-											setWhatValue('Wedding Planners');
-											setActiveSection('where');
-										}
+										setWhatValue('Wedding Planners');
+										setActiveSection(null);
 									}}
 								>
 									<div className="w-[38px] h-[38px] bg-[#EED56E] rounded-[8px] flex-shrink-0 flex items-center justify-center">
@@ -585,16 +559,14 @@ export const LandingHeroSearchBar = ({
 									</div>
 								</div>
 								<div
-									className={`w-[415px] h-[68px] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200 border ${
+									className={`w-[415px] max-w-[calc(100%-24px)] h-[68px] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200 border ${
 										whatValue === 'Music Venues'
 											? 'bg-[#DBECFF] border-[#000000]'
 											: 'bg-white hover:bg-[#f0f0f0] border-transparent'
 									}`}
 									onClick={() => {
-										if (!readOnly) {
-											setWhatValue('Music Venues');
-											setActiveSection('where');
-										}
+										setWhatValue('Music Venues');
+										setActiveSection(null);
 									}}
 								>
 									<div className="w-[38px] h-[38px] bg-[#71C9FD] rounded-[8px] flex-shrink-0 flex items-center justify-center">
@@ -640,7 +612,7 @@ export const LandingHeroSearchBar = ({
 							}
 						`}</style>
 
-						{whereValue.length >= 1 && !readOnly ? (
+						{whereValue.length >= 1 ? (
 							<CustomScrollbar
 								className="w-full h-full"
 								contentClassName="flex flex-col items-center justify-start gap-[20px] py-4"
@@ -655,12 +627,12 @@ export const LandingHeroSearchBar = ({
 										return (
 											<div
 												key={stateName}
-												className={`w-[415px] min-h-[68px] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200 mb-2 border ${
+												className={`w-[415px] max-w-[calc(100%-24px)] min-h-[68px] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200 mb-2 border ${
 													whereValue === stateName
 														? 'bg-[#DBECFF] border-[#000000]'
 														: 'bg-white hover:bg-[#f0f0f0] border-transparent'
 												}`}
-												onClick={() => !readOnly && setWhereAndClose(stateName, false)}
+												onClick={() => setWhereAndClose(stateName, false)}
 											>
 												<div
 													className="w-[38px] h-[38px] rounded-[8px] flex-shrink-0 flex items-center justify-center"
@@ -693,7 +665,7 @@ export const LandingHeroSearchBar = ({
 								offsetRight={-5}
 							>
 								<div
-									className={`w-[415px] h-[68px] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200 border ${
+									className={`w-[415px] max-w-[calc(100%-24px)] h-[68px] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200 border ${
 										userLocationName && whereValue === userLocationName
 											? 'bg-[#DBECFF] border-[#000000]'
 											: 'bg-white hover:bg-[#f0f0f0] border-transparent'
@@ -727,12 +699,12 @@ export const LandingHeroSearchBar = ({
 										return (
 											<div
 												key={label}
-												className={`w-[415px] h-[68px] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200 border ${
+												className={`w-[415px] max-w-[calc(100%-24px)] h-[68px] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200 border ${
 													whereValue === label
 														? 'bg-[#DBECFF] border-[#000000]'
 														: 'bg-white hover:bg-[#f0f0f0] border-transparent'
 												}`}
-												onClick={() => !readOnly && setWhereAndClose(label, false)}
+												onClick={() => setWhereAndClose(label, false)}
 											>
 												<div
 													className="w-[38px] h-[38px] rounded-[8px] flex-shrink-0 flex items-center justify-center"
@@ -758,12 +730,12 @@ export const LandingHeroSearchBar = ({
 									return (
 										<div
 											key={stateName}
-											className={`w-[415px] h-[68px] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200 border ${
+											className={`w-[415px] max-w-[calc(100%-24px)] h-[68px] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200 border ${
 												whereValue === stateName
 													? 'bg-[#DBECFF] border-[#000000]'
 													: 'bg-white hover:bg-[#f0f0f0] border-transparent'
 											}`}
-											onClick={() => !readOnly && setWhereAndClose(stateName, false)}
+											onClick={() => setWhereAndClose(stateName, false)}
 										>
 											<div
 												className="w-[38px] h-[38px] rounded-[8px] flex-shrink-0 flex items-center justify-center"
@@ -790,266 +762,117 @@ export const LandingHeroSearchBar = ({
 		);
 	};
 
+	const searchTextValue = useMemo(() => {
+		const formattedWhere = whereValue.trim() ? `(${whereValue.trim()})` : '';
+		return [whyValue, whatValue, formattedWhere].filter(Boolean).join(' ').trim();
+	}, [whyValue, whatValue, whereValue]);
+
 	return (
-		<div
-			className="origin-center w-full"
-			style={{ transform: 'scale(clamp(0.84, calc(0.72 + (100vw / 3333px)), 1.08))' }}
-		>
-			<div className="search-bar-wrapper w-full max-w-[1132px] mx-auto px-4 max-[480px]:px-2 !z-[50]">
-				<div className="search-bar-inner">
-					<form
-						onSubmit={(e) => {
-							handleSearchActivate(e);
-						}}
+		<div ref={rootRef} className="results-search-input-group">
+			<div className="search-wave-container relative">
+				<Input
+					className={`search-wave-input results-search-input !h-[49px] !border-[3px] !focus-visible:ring-0 !focus-visible:ring-offset-0 !focus:ring-0 !focus:ring-offset-0 !ring-0 !outline-none !accent-transparent !border-black !pr-[12px] ${
+						activeSection ? '!bg-[#F3F3F3]' : '!bg-white'
+					} text-center text-transparent placeholder:text-transparent`}
+					placeholder=""
+					autoComplete="off"
+					autoCorrect="off"
+					autoCapitalize="off"
+					spellCheck={false}
+					readOnly
+					value={searchTextValue}
+					aria-label="Search"
+				/>
+
+				{/* 3-part mini search tray overlay (Why / What / Where) */}
+				<div
+					className={`absolute left-[6px] top-1/2 -translate-y-1/2 flex items-center rounded-[6px] z-10 group ${
+						activeSection ? 'bg-[#F3F3F3] border border-transparent' : 'bg-white border border-black'
+					}`}
+					style={{
+						width: 'calc(100% - 12px)',
+						height: '38px',
+					}}
+				>
+					{/* Sliding active section indicator for mini search bar */}
+					<div
+						ref={miniActiveSectionIndicatorRef}
+						className="absolute top-0 left-0 h-full w-1/3 bg-white border border-black rounded-[6px] pointer-events-none z-0"
+						style={{ opacity: 0, willChange: 'transform' }}
+					/>
+
+					{/* Why */}
+					<div
+						className={`flex-1 flex items-center justify-start border-r border-transparent ${
+							!activeSection ? 'group-hover:border-black/10' : ''
+						} h-full min-w-0 relative pl-[16px] pr-1 mini-search-section-why`}
+						onClick={() => setActiveSection('why')}
 					>
-						{/* Keep the hero search bar from stretching full-width at < md (e.g. 767px). */}
-						<div className="mx-auto w-full max-w-[603px]">
-							<div className="search-input-group relative" ref={searchContainerRef}>
-								{/* Subtle glowing pulse behind the search bar */}
-								<div className="absolute inset-0 rounded-[8px] search-bar-glow-pulse -z-10" />
-								<div className="search-wave-container" style={{ transition: 'none' }}>
-									<Input
-										className="search-wave-input !focus-visible:ring-0 !focus-visible:ring-offset-0 !focus:ring-0 !focus:ring-offset-0 !ring-0 !outline-none !accent-transparent !h-[72px] max-[480px]:!h-[60px] !border-2 !border-black pr-[70px] max-[480px]:pr-[58px] md:pr-[80px]"
-										placeholder=""
-										style={{
-											accentColor: 'transparent',
-											transition: 'none',
-										}}
-										autoComplete="off"
-										autoCorrect="off"
-										autoCapitalize="off"
-										spellCheck={false}
-									/>
-
-									{/* 3-section dashboard-style UI overlay (Why / What / Where) */}
-									<div
-										className={`search-sections-container absolute left-[4px] right-[68px] max-[480px]:right-[56px] top-1/2 -translate-y-1/2 h-[64px] max-[480px]:h-[52px] rounded-[8px] z-20 font-secondary flex items-center ${
-											activeSection
-												? 'bg-[#EFEFEF] border border-transparent'
-												: 'bg-white border border-black'
-										}`}
-										style={{ transition: 'none' }}
-									>
-										{/* Sliding active tab indicator */}
-										<div
-											ref={activeSectionIndicatorRef}
-											className="absolute top-0 left-0 h-full w-1/3 bg-white border border-black rounded-[8px] pointer-events-none z-10"
-											style={{ opacity: 0, willChange: 'transform' }}
-										/>
-
-										{/* Why */}
-										<div
-											className={`relative h-full cursor-pointer border flex-1 min-w-0 overflow-hidden ${
-												activeSection === 'why'
-													? 'bg-transparent border-transparent rounded-[8px]'
-													: `border-transparent ${
-															activeSection
-																? 'hover:bg-[#F9F9F9]'
-																: 'hover:bg-black/5'
-													  } rounded-l-[8px]`
-											}`}
-											onClick={() => setActiveSection(activeSection === 'why' ? null : 'why')}
-										>
-											<div className="absolute z-20 left-[24px] max-[480px]:left-[12px] top-[10px] max-[480px]:top-[7px] text-[22px] max-[480px]:text-[18px] font-bold text-black leading-none">
-												Why
-											</div>
-											<div className="absolute z-20 left-[24px] max-[480px]:left-[12px] right-[4px] top-[42px] max-[480px]:top-[30px] h-[12px] overflow-hidden">
-												<div
-													className="absolute top-0 left-0 font-semibold text-[12px] whitespace-nowrap"
-													style={{
-														height: '12px',
-														lineHeight: '12px',
-														padding: '0',
-														margin: '0',
-														color:
-															whyValue && whyValue.trim().length > 0
-																? '#000000'
-																: 'rgba(0, 0, 0, 0.42)',
-													}}
-												>
-													{whyValue ? whyValue.replace(/[\[\]]/g, '') : 'Choose Type of Search'}
-												</div>
-											</div>
-										</div>
-
-										<div
-											className={`w-[2px] h-full bg-black/10 flex-shrink-0 ${
-												activeSection ? 'hidden' : ''
-											}`}
-										/>
-
-										{/* What */}
-										<div
-											className={`relative h-full cursor-pointer border overflow-hidden flex-1 min-w-0 ${
-												activeSection === 'what'
-													? 'bg-transparent border-transparent rounded-[8px]'
-													: `border-transparent ${
-															activeSection
-																? 'hover:bg-[#F9F9F9]'
-																: 'hover:bg-black/5'
-													  }`
-											}`}
-											onClick={() => setActiveSection('what')}
-										>
-											<div className="absolute z-20 left-[24px] max-[480px]:left-[12px] top-[10px] max-[480px]:top-[7px] text-[22px] max-[480px]:text-[18px] font-bold text-black leading-none">
-												What
-											</div>
-											<div className="absolute z-20 left-[24px] max-[480px]:left-[12px] right-[8px] top-[42px] max-[480px]:top-[30px] h-[12px] overflow-hidden">
-												{activeSection === 'what' ? (
-													<input
-														ref={whatInputRef}
-														readOnly={readOnly}
-														type="text"
-														value={whatValue}
-														onChange={(e) => setWhatValue(e.target.value)}
-														onKeyDown={(e) => {
-															if (e.key === 'Enter') {
-																e.preventDefault();
-																setActiveSection('where');
-															}
-														}}
-														className="absolute z-20 top-0 left-0 w-full font-semibold text-black text-[12px] bg-transparent outline-none border-none"
-														style={{
-															height: '12px',
-															lineHeight: '12px',
-															padding: '0',
-															margin: '0',
-															transform: 'translateY(-1px)',
-															fontFamily:
-																'var(--font-secondary), Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
-														}}
-														placeholder="Add Recipients"
-														onClick={(e) => e.stopPropagation()}
-													/>
-												) : (
-													<div
-														className="absolute z-20 top-0 left-0 w-full font-semibold text-[12px] whitespace-nowrap overflow-hidden hover:text-black/60 transition-colors"
-														style={{
-															height: '12px',
-															lineHeight: '12px',
-															padding: '0',
-															margin: '0',
-															color: whatValue ? '#000000' : 'rgba(0, 0, 0, 0.42)',
-															maskImage:
-																'linear-gradient(to right, black 80%, transparent 100%)',
-															WebkitMaskImage:
-																'linear-gradient(to right, black 80%, transparent 100%)',
-														}}
-													>
-														{whatValue || 'Add Recipients'}
-													</div>
-												)}
-											</div>
-										</div>
-
-										<div
-											className={`w-[2px] h-full bg-black/10 flex-shrink-0 ${
-												activeSection ? 'hidden' : ''
-											}`}
-										/>
-
-										{/* Where */}
-										<div
-											className={`relative h-full cursor-pointer border overflow-hidden flex-1 min-w-0 ${
-												activeSection === 'where'
-													? 'bg-transparent border-transparent rounded-[8px]'
-													: `border-transparent ${
-															activeSection
-																? 'hover:bg-[#F9F9F9]'
-																: 'hover:bg-black/5'
-													  } rounded-r-[8px]`
-											}`}
-											onClick={() => setActiveSection('where')}
-										>
-											<div className="absolute z-20 left-[24px] max-[480px]:left-[12px] top-[10px] max-[480px]:top-[7px] text-[22px] max-[480px]:text-[18px] font-bold text-black leading-none">
-												Where
-											</div>
-											<div className="absolute z-20 left-[24px] max-[480px]:left-[12px] right-[8px] top-[42px] max-[480px]:top-[30px] h-[12px] overflow-hidden">
-												{activeSection === 'where' ? (
-													<div className="absolute z-20 top-0 left-0 w-full h-full flex items-center gap-[2px]">
-														<input
-															ref={whereInputRef}
-															readOnly={readOnly}
-															type="text"
-															value={whereValue}
-															onChange={(e) => {
-																setWhereValue(e.target.value);
-																setIsNearMeLocation(false);
-															}}
-															onKeyDown={(e) => {
-																if (e.key === 'Enter') {
-																	e.preventDefault();
-																	setActiveSection(null);
-																}
-															}}
-															className="z-20 flex-1 font-semibold text-black text-[12px] bg-transparent outline-none border-none"
-															style={{
-																height: '12px',
-																lineHeight: '12px',
-																padding: '0',
-																margin: '0',
-																transform: 'translateY(-1px)',
-																fontFamily:
-																	'var(--font-secondary), Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
-															}}
-															placeholder="Search States"
-															onClick={(e) => e.stopPropagation()}
-														/>
-													</div>
-												) : (
-													<div
-														className="absolute z-20 top-0 left-0 w-full font-semibold text-[12px] whitespace-nowrap overflow-hidden hover:text-black/60 transition-colors"
-														style={{
-															height: '12px',
-															lineHeight: '12px',
-															padding: '0',
-															margin: '0',
-															color: hasWhereValue ? '#000000' : 'rgba(0, 0, 0, 0.42)',
-															maskImage:
-																'linear-gradient(to right, black 80%, transparent 100%)',
-															WebkitMaskImage:
-																'linear-gradient(to right, black 80%, transparent 100%)',
-														}}
-													>
-														{hasWhereValue ? whereValue : 'Search States'}
-													</div>
-												)}
-											</div>
-										</div>
-									</div>
-
-									{/* Search button - routes to free-trial on mobile */}
-									<button
-										type="submit"
-										className="landing-search-waltz-pulse flex absolute right-[6px] items-center justify-center w-[58px] max-[480px]:w-[46px] h-[62px] max-[480px]:h-[50px] z-40 cursor-pointer group"
-										style={{
-											top: '50%',
-											transform: 'translateY(-50%)',
-											backgroundColor: 'rgba(93, 171, 104, 0.49)',
-											borderTopRightRadius: '7px',
-											borderBottomRightRadius: '7px',
-											borderTopLeftRadius: '0',
-											borderBottomLeftRadius: '0',
-											border: '1px solid #5DAB68',
-											borderLeft: '1px solid #5DAB68',
-											transition: 'none',
-										}}
-										aria-label="Search"
-										onClick={(e) => {
-											handleSearchActivate(e);
-										}}
-									>
-										<SearchIconDesktop width={26} height={28} />
-									</button>
-								</div>
-
-								{renderDesktopSearchDropdowns()}
-							</div>
+						<div className="w-full h-full flex items-center text-left text-[13px] font-bold font-secondary truncate p-0 relative z-10 cursor-pointer">
+							{whyValue ? whyValue.replace(/[\[\]]/g, '') : 'Why'}
 						</div>
-					</form>
+					</div>
+
+					{/* What */}
+					<div
+						className={`flex-1 flex items-center justify-start border-r border-transparent ${
+							!activeSection ? 'group-hover:border-black/10' : ''
+						} h-full min-w-0 relative pl-[16px] pr-1 mini-search-section-what`}
+						onClick={() => setActiveSection('what')}
+					>
+						<input
+							ref={whatInputRef}
+							value={whatValue}
+							readOnly={readOnly}
+							onChange={(e) => setWhatValue(e.target.value)}
+							className="w-full h-full text-left bg-transparent border-none outline-none text-[13px] font-bold font-secondary overflow-hidden placeholder:text-gray-400 p-0 focus:ring-0 cursor-pointer relative z-10"
+							style={{
+								maskImage: 'linear-gradient(to right, black 75%, transparent 100%)',
+								WebkitMaskImage: 'linear-gradient(to right, black 75%, transparent 100%)',
+							}}
+							placeholder="What"
+							onFocus={(e) => {
+								setActiveSection('what');
+								const target = e.target;
+								setTimeout(() => target.setSelectionRange(0, 0), 0);
+							}}
+						/>
+					</div>
+
+					{/* Where */}
+					<div
+						className="flex-1 flex items-center justify-end h-full min-w-0 relative pr-[12px] pl-[16px] mini-search-section-where"
+						onClick={() => setActiveSection('where')}
+					>
+						<input
+							ref={whereInputRef}
+							value={whereValue}
+							readOnly={readOnly}
+							onChange={(e) => setWhereValue(e.target.value)}
+							onKeyDown={(e) => {
+								if (e.key === 'Enter') {
+									e.preventDefault();
+									setActiveSection(null);
+								}
+							}}
+							className="w-full h-full text-left bg-transparent border-none outline-none text-[13px] font-bold font-secondary overflow-hidden placeholder:text-gray-400 p-0 focus:ring-0 cursor-pointer relative z-10"
+							style={{
+								maskImage: 'linear-gradient(to right, black 75%, transparent 100%)',
+								WebkitMaskImage: 'linear-gradient(to right, black 75%, transparent 100%)',
+							}}
+							placeholder="Where"
+							onFocus={(e) => {
+								setActiveSection('where');
+								const target = e.target;
+								setTimeout(() => target.setSelectionRange(0, target.value.length), 0);
+							}}
+						/>
+					</div>
 				</div>
 			</div>
+
+			{renderDesktopSearchDropdowns()}
 		</div>
 	);
-};
+}
 

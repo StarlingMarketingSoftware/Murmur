@@ -2225,6 +2225,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	}, []);
 
 	const { isLoaded, loadError } = useJsApiLoader({
+		id: 'google-maps-loader',
 		googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '',
 	});
 

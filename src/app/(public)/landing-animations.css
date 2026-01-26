@@ -5,6 +5,9 @@ html {
 	scroll-behavior: smooth;
 	/* Safari scroll fix */
 	-webkit-overflow-scrolling: touch;
+	/* Prevent iOS Safari font boosting (esp. when using transforms/zoom) */
+	-webkit-text-size-adjust: 100%;
+	text-size-adjust: 100%;
 }
 
 /* Premium text rendering */
@@ -15,6 +18,14 @@ body {
 	/* Safari fixes */
 	-webkit-tap-highlight-color: transparent;
 	-webkit-touch-callout: none;
+}
+
+/* Landing page: prevent embedded demo panels from trapping page scroll.
+   (Our CustomScrollbar sets `overscroll-behavior: contain` inline.) */
+.landing-page .scrollbar-hide,
+.landing-page .hide-native-scrollbar {
+	overscroll-behavior: auto !important;
+	overscroll-behavior-y: auto !important;
 }
 
 /* Landing page "80% zoom" (zoomed-out view) */
@@ -246,6 +257,15 @@ body {
 	transform: scale(0.95);
 }
 
+.video-carousel-item:not(.active) {
+	cursor: pointer;
+}
+
+.video-carousel-item:not(.active):focus-visible {
+	outline: 2px solid #5dab68;
+	outline-offset: 4px;
+}
+
 .video-carousel-item.active {
 	transform: scale(1);
 }
@@ -283,9 +303,19 @@ body {
 	width: var(--video-carousel-indicator-size);
 	height: var(--video-carousel-indicator-size);
 	background: #c8c8c8;
+	border: 0;
+	padding: 0;
 	border-radius: 9999px;
 	overflow: hidden;
+	cursor: pointer;
+	pointer-events: auto;
+	appearance: none;
 	transition: width 240ms ease, height 240ms ease, border-radius 240ms ease;
+}
+
+.video-carousel-indicator:focus-visible {
+	outline: 2px solid #5dab68;
+	outline-offset: 3px;
 }
 
 .video-carousel-indicator.active {
@@ -363,6 +393,53 @@ body {
 	font-size: 18px;
 	font-weight: 500;
 	text-align: center;
+	transition:
+		background-color 160ms ease,
+		border-color 160ms ease,
+		color 160ms ease;
+}
+
+.landing-free-trial-btn:hover {
+	background-color: #5dab68;
+	border-width: 2px;
+	border-color: #bbbbbb;
+	color: #ffffff;
+}
+
+/* "Learn about ..." buttons (landing page) */
+.landing-learn-research-btn {
+	border: 2px solid #5dab68;
+	color: #5dab68;
+	transition:
+		background-color 160ms ease,
+		border-color 160ms ease,
+		color 160ms ease;
+}
+
+.landing-learn-research-btn:hover {
+	background-color: #5dab68;
+	border-color: #bbbbbb;
+	color: #ffffff;
+}
+
+.landing-learn-research-btn:hover span {
+	color: #ffffff;
+}
+
+/* Bottom CTA ("Try Murmur Now") - Start Free Trial */
+.landing-bottom-free-trial-btn {
+	background-color: #53b060;
+	border: 1px solid #118521;
+	border-radius: 8px;
+	transition:
+		background-color 160ms ease,
+		border-color 160ms ease,
+		border-width 160ms ease;
+}
+
+.landing-bottom-free-trial-btn:hover {
+	background-color: #4ea25a;
+	border: 2px solid #000000;
 }
 
 /* Section right after the video carousel (contains the framed map) */
@@ -400,7 +477,21 @@ body {
 	flex-shrink: 0;
 }
 
+/* When using the live Google map background on desktop, hide the baked-in SVG map raster. */.landing-map-container--google .landing-map-bg-image {
+	opacity: 0;
+}
+
+/* Desktop Google-map mode: hide all remaining SVG UI layers.
+   Keep only the copy blocks (e.g. "100,000+ Contacts..."). */
+.landing-map-container--google .landing-map-svg > :not(.landing-map-copy) {
+	opacity: 0;
+}
+
 /* Landing map copy blocks inside the SVG */
+.landing-map-copy--desktop {
+	display: none;
+}
+
 .landing-map-copy--mobile {
 	display: none;
 }
@@ -461,3 +552,172 @@ body {
 		);
 	}
 }
+
+/* ========================================
+   Map Page - Feature Section Scaling
+   ======================================== */
+
+.map-feature-scale-wrapper {
+	--map-feature-scale: 1;
+	--map-feature-base-height: 0px;
+	/* Wrapper controls the visible height in the document flow */
+	height: calc(var(--map-feature-base-height) * var(--map-feature-scale));
+}
+
+.map-feature-scale-inner {
+	transform-origin: top center;
+	transform: scale(var(--map-feature-scale));
+	flex-shrink: 0;
+}
+
+.map-feature-scale-wrapper--explore {
+	--map-feature-base-height: 455px;
+}
+
+@media (max-width: 1435px) {
+	.map-feature-scale-wrapper--explore {
+		--map-feature-scale: calc((100vw - 32px) / 1403px);
+	}
+}
+
+.map-feature-scale-wrapper--all-data {
+	--map-feature-base-height: 532px;
+}
+
+@media (max-width: 1460px) {
+	.map-feature-scale-wrapper--all-data {
+		--map-feature-scale: calc((100vw - 32px) / 1428px);
+	}
+}
+
+.map-feature-scale-wrapper--zoom {
+	--map-feature-base-height: 470px;
+}
+
+@media (max-width: 1436px) {
+	.map-feature-scale-wrapper--zoom {
+		--map-feature-scale: calc((100vw - 32px) / 1404px);
+	}
+}
+
+/* ========================================
+   Research Page - Feature Section Scaling
+   ======================================== */
+
+.research-feature-scale-wrapper {
+	--research-feature-scale: 1;
+	--research-feature-base-height: 0px;
+	/* Wrapper controls the visible height in the document flow */
+	height: calc(var(--research-feature-base-height) * var(--research-feature-scale));
+}
+
+.research-feature-scale-inner {
+	transform-origin: top center;
+	transform: scale(var(--research-feature-scale));
+	flex-shrink: 0;
+}
+
+.research-feature-scale-wrapper--top {
+	--research-feature-base-height: 945px;
+}
+
+@media (max-width: 1384px) {
+	.research-feature-scale-wrapper--top {
+		--research-feature-scale: calc((100vw - 32px) / 1352px);
+	}
+}
+
+.research-feature-scale-wrapper--details {
+	--research-feature-base-height: 989px;
+}
+
+@media (max-width: 1395px) {
+	.research-feature-scale-wrapper--details {
+		--research-feature-scale: calc((100vw - 32px) / 1363px);
+	}
+}
+
+/* ========================================
+   Inbox Page - Feature Section Scaling
+   ======================================== */
+
+.inbox-feature-scale-wrapper {
+	--inbox-feature-scale: 1;
+	--inbox-feature-base-height: 0px;
+	/* Wrapper controls the visible height in the document flow */
+	height: calc(var(--inbox-feature-base-height) * var(--inbox-feature-scale));
+}
+
+.inbox-feature-scale-inner {
+	transform-origin: top center;
+	transform: scale(var(--inbox-feature-scale));
+	flex-shrink: 0;
+}
+
+.inbox-feature-scale-wrapper--never-miss {
+	--inbox-feature-base-height: 599px;
+}
+
+@media (max-width: 1395px) {
+	.inbox-feature-scale-wrapper--never-miss {
+		--inbox-feature-scale: calc((100vw - 32px) / 1363px);
+	}
+}
+
+.inbox-feature-scale-wrapper--respond {
+	--inbox-feature-base-height: 939px;
+}
+
+@media (max-width: 1415px) {
+	.inbox-feature-scale-wrapper--respond {
+		--inbox-feature-scale: calc((100vw - 32px) / 1383px);
+	}
+}
+
+/* ========================================
+   Drafting Page - Feature Section Scaling
+   ======================================== */
+
+.drafting-feature-scale-wrapper {
+	--drafting-feature-scale: 1;
+	--drafting-feature-base-height: 0px;
+	/* Wrapper controls the visible height in the document flow */
+	height: calc(var(--drafting-feature-base-height) * var(--drafting-feature-scale));
+}
+
+.drafting-feature-scale-inner {
+	transform-origin: top center;
+	transform: scale(var(--drafting-feature-scale));
+	flex-shrink: 0;
+}
+
+.drafting-feature-scale-wrapper--tell {
+	--drafting-feature-base-height: 424px;
+}
+
+@media (max-width: 1387px) {
+	.drafting-feature-scale-wrapper--tell {
+		--drafting-feature-scale: calc((100vw - 32px) / 1355px);
+	}
+}
+
+.drafting-feature-scale-wrapper--modes {
+	--drafting-feature-base-height: 895px;
+}
+
+@media (max-width: 1386px) {
+	.drafting-feature-scale-wrapper--modes {
+		--drafting-feature-scale: calc((100vw - 32px) / 1354px);
+	}
+}
+
+.drafting-feature-scale-wrapper--variation {
+	--drafting-feature-base-height: 627px;
+}
+
+@media (max-width: 1386px) {
+	.drafting-feature-scale-wrapper--variation {
+		--drafting-feature-scale: calc((100vw - 32px) / 1354px);
+	}
+}
+

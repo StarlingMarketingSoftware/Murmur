@@ -178,6 +178,7 @@ interface SortableAIBlockProps {
 	 * button instead of using a portal with viewport-based fixed positioning.
 	 */
 	useStaticDropdownPosition?: boolean;
+	forceDesktop?: boolean;
 }
 
 const SortableAIBlock = ({
@@ -201,6 +202,7 @@ const SortableAIBlock = ({
 	isDragDisabled = false,
 	defaultOpenCustomInstructions,
 	useStaticDropdownPosition = false,
+	forceDesktop,
 }: SortableAIBlockProps) => {
 	const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
 		useSortable({ id, disabled: isDragDisabled });
@@ -513,7 +515,8 @@ const SortableAIBlock = ({
 	const shouldShowRedStyling = isTextBlockEmpty && hasBeenTouched;
 
 	// Mobile detection for conditional placeholder shortening
-	const isMobile = useIsMobile();
+	const isMobileHook = useIsMobile();
+	const isMobile = forceDesktop ? false : isMobileHook;
 
 	type ProfileFields = {
 		name: string;
@@ -638,8 +641,8 @@ const SortableAIBlock = ({
 				className={cn(
 					'flex justify-end',
 					showTestPreview
-						? 'w-[426px] max-[480px]:w-[89.8vw]'
-						: 'w-[93.7vw] max-w-[475px]'
+						? cn('w-[426px]', !forceDesktop && 'max-[480px]:w-[89.8vw]')
+						: cn(!forceDesktop ? 'w-[93.7vw]' : 'w-full', 'max-w-[475px]')
 				)}
 			>
 				<Button
@@ -689,29 +692,21 @@ const SortableAIBlock = ({
 			isFullAutomatedBlock && 'border border-gray-300 bg-[#51A2E4]',
 			isTextBlock
 				? showTestPreview
-					? 'w-[426px] max-[480px]:w-[89.33vw] min-h-[44px]'
+					? cn('w-[426px] min-h-[44px]', !forceDesktop && 'max-[480px]:w-[89.33vw]')
 					: isManualModeSelected
-					? 'w-[89.33vw] max-w-[475px] min-h-[188px]'
-					: 'w-[89.33vw] max-w-[475px] min-h-[80px]'
+					? cn(!forceDesktop ? 'w-[89.33vw]' : 'w-[475px]', 'max-w-[475px] min-h-[188px]')
+					: cn(!forceDesktop ? 'w-[89.33vw]' : 'w-[475px]', 'max-w-[475px] min-h-[80px]')
 					: isCompactBlock
 					? showTestPreview
-						? `w-[426px] max-[480px]:w-[89.33vw] ${
-								isAdvancedEnabled ? 'h-[78px]' : 'h-[31px] max-[480px]:h-[24px]'
-						  }`
-						: `w-[89.33vw] max-w-[475px] ${
-								isAdvancedEnabled ? 'h-[78px]' : 'h-[31px] max-[480px]:h-[24px]'
-						  }`
+						? cn('w-[426px]', !forceDesktop && 'max-[480px]:w-[89.33vw]', isAdvancedEnabled ? 'h-[78px]' : cn('h-[31px]', !forceDesktop && 'max-[480px]:h-[24px]'))
+						: cn(!forceDesktop ? 'w-[89.33vw]' : 'w-[475px]', 'max-w-[475px]', isAdvancedEnabled ? 'h-[78px]' : cn('h-[31px]', !forceDesktop && 'max-[480px]:h-[24px]'))
 					: isFullAutomatedBlock
 					? showTestPreview
-						? `w-[426px] max-[480px]:w-[89.33vw] ${
-								isCustomInstructionsOpen ? 'h-auto min-h-[233px]' : 'h-[233px]'
-						  }`
-						: `w-[468px] max-[480px]:w-[89.33vw] ${
-								isCustomInstructionsOpen ? 'h-auto min-h-[233px]' : 'h-[233px]'
-						  }`
+						? cn('w-[426px]', !forceDesktop && 'max-[480px]:w-[89.33vw]', isCustomInstructionsOpen ? 'h-auto min-h-[233px]' : 'h-[233px]')
+						: cn(!forceDesktop ? 'w-[89.33vw]' : 'w-[468px]', 'max-w-[468px]', isCustomInstructionsOpen ? 'h-auto min-h-[233px]' : 'h-[233px]')
 					: showTestPreview
-					? 'w-[426px] max-[480px]:w-[89.33vw]'
-					: 'w-[89.33vw] max-w-[475px]',
+					? cn('w-[426px]', !forceDesktop && 'max-[480px]:w-[89.33vw]')
+					: cn(!forceDesktop ? 'w-[89.33vw]' : 'w-[475px]', 'max-w-[475px]'),
 				!isIntroductionBlock &&
 					!isResearchBlock &&
 					!isActionBlock &&
@@ -746,10 +741,10 @@ const SortableAIBlock = ({
 							: isCompactBlock
 							? showTestPreview
 								? `${
-										isAdvancedEnabled ? 'h-[78px]' : 'h-[31px] max-[480px]:h-[24px]'
+										isAdvancedEnabled ? 'h-[78px]' : cn('h-[31px]', !forceDesktop && 'max-[480px]:h-[24px]')
 								  } w-[80px]`
 								: `${
-										isAdvancedEnabled ? 'h-[78px]' : 'h-[31px] max-[480px]:h-[24px]'
+										isAdvancedEnabled ? 'h-[78px]' : cn('h-[31px]', !forceDesktop && 'max-[480px]:h-[24px]')
 								  } w-[90px]`
 							: 'h-12',
 						isFullAutomatedBlock
@@ -876,7 +871,7 @@ const SortableAIBlock = ({
 															'font-inter placeholder:italic placeholder:text-[#5d5d5d]',
 														isManualModeSelected ? 'pl-2 pt-2 pr-4 pb-[35px]' : 'pl-0 pr-12',
 														// Make placeholder text much smaller on mobile portrait when in Manual mode
-														isManualModeSelected && 'max-[480px]:placeholder:text-[10px]'
+														isManualModeSelected && !forceDesktop && 'max-[480px]:placeholder:text-[10px]'
 													)}
 													rows={isMobile ? 2 : 1}
 													{...fieldProps}
@@ -935,7 +930,7 @@ const SortableAIBlock = ({
 														</span>
 													</div>
 													<div className="flex-1 min-w-0 flex items-center pl-0 pr-12 overflow-hidden">
-														<span className="text-sm max-[480px]:text-[10px] font-inter italic text-[#5d5d5d] truncate">
+														<span className={cn('text-sm font-inter italic text-[#5d5d5d] truncate', !forceDesktop && 'max-[480px]:text-[10px]')}>
 															{isResearchBlock
 																? isMobile
 																	? 'Automatic Research'
@@ -1059,14 +1054,14 @@ const SortableAIBlock = ({
 																	!isAdvancedEnabled
 																}
 																className={cn(
-																	'flex-1 outline-none text-sm max-[480px]:text-[10px] truncate min-w-0',
+																	cn('flex-1 outline-none text-sm truncate min-w-0', !forceDesktop && 'max-[480px]:text-[10px]'),
 																	isIntroductionBlock || isResearchBlock || isActionBlock
 																		? '!bg-[#DADAFC]'
 																		: 'bg-white placeholder:text-gray-400',
 																	(isIntroductionBlock ||
 																		isResearchBlock ||
 																		isActionBlock) &&
-																		'font-inter placeholder:italic placeholder:text-[#5d5d5d] max-[480px]:placeholder:text-[10px]',
+																		cn('font-inter placeholder:italic placeholder:text-[#5d5d5d]', !forceDesktop && 'max-[480px]:placeholder:text-[10px]'),
 																	'pl-0',
 																	isIntroductionBlock || isResearchBlock || isActionBlock
 																		? 'pr-24'
@@ -1931,7 +1926,7 @@ const SortableAIBlock = ({
 																			'bg-white',
 																			'px-3 py-2 resize-none overflow-y-auto',
 																			'font-inter text-[12px] leading-[14px] text-black',
-																			'max-[480px]:text-[10px]'
+																			!forceDesktop && 'max-[480px]:text-[10px]'
 																		)}
 																		{...fieldProps}
 																		onClick={(e) => e.stopPropagation()}
@@ -2706,6 +2701,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		dataCampaignMainBox,
 		onGoToContacts,
 		onGoToInbox,
+		forceDesktop,
 	} = props;
 
 	// Track if the user has attempted to Test to control error styling
@@ -4036,7 +4032,8 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		}
 	};
 
-	const isMobile = useIsMobile();
+	const isMobileHook = useIsMobile();
+	const isMobile = forceDesktop ? false : isMobileHook;
 	const modeHighlightSensors = useSensors(
 		useSensor(PointerSensor, {
 			activationConstraint: { distance: 8 },
@@ -4107,7 +4104,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		<div
 			className={cn(
 				compactLeftOnly ? '' : 'flex justify-center',
-				!showTestPreview && 'max-[480px]:pb-[60px]'
+				!showTestPreview && !forceDesktop && 'max-[480px]:pb-[60px]'
 			)}
 			data-hpi-root
 		>
@@ -4125,7 +4122,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 								compactLeftOnly
 									? 'flex-col'
 									: cn(
-											'w-[96.27vw] max-w-[499px] transition flex mx-auto flex-col border-[3px] border-transparent rounded-[8px] bg-[#A6E2A8]',
+											cn(!forceDesktop ? 'w-[96.27vw]' : 'w-[499px]', 'max-w-[499px] transition flex mx-auto flex-col border-[3px] border-transparent rounded-[8px] bg-[#A6E2A8]'),
 											containerHeightPx ? null : 'h-[703px]'
 									  ),
 								'relative overflow-visible isolate'
@@ -4243,7 +4240,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 											<div
 												className={cn(
 													'h-[31px] flex items-center relative z-20',
-													'w-[93.7vw] max-w-[475px] mx-auto pl-[8px] max-[480px]:pl-[6px]'
+													cn(!forceDesktop ? 'w-[93.7vw]' : 'w-[475px]', 'max-w-[475px] mx-auto pl-[8px]', !forceDesktop && 'max-[480px]:pl-[6px]')
 												)}
 												data-left-drag-handle
 												data-root-drag-handle
@@ -4251,7 +4248,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 												{compactLeftOnly && (
 													<span
 														className={cn(
-															'font-inter font-semibold text-[13px] max-[480px]:text-[14px] ml-[8px] mr-[112px] max-[480px]:mr-[22px] text-black relative z-10'
+															cn('font-inter font-semibold text-[13px] ml-[8px] mr-[112px] text-black relative z-10', !forceDesktop && 'max-[480px]:text-[14px] max-[480px]:mr-[22px]')
 														)}
 													>
 														Profile
@@ -4261,7 +4258,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 												{!compactLeftOnly && <div className="w-[130px] shrink-0" />}
 												<div
 													ref={modeContainerRef}
-													className="relative flex items-center gap-[78px] max-[480px]:gap-0 max-[480px]:justify-between ml-[42px] max-[480px]:ml-[2px] flex-1 max-[480px]:w-auto max-[480px]:px-[24px]"
+														className={cn('relative flex items-center flex-1', forceDesktop ? 'gap-[70px] ml-[30px]' : 'gap-[78px] ml-[42px]', !forceDesktop && 'max-[480px]:gap-0 max-[480px]:justify-between max-[480px]:ml-[2px] max-[480px]:w-auto max-[480px]:px-[24px]')}
 													data-hover-description-suppress="true"
 												>
 													<DndContext
@@ -4290,7 +4287,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														ref={fullModeButtonRef}
 														variant="ghost"
 														type="button"
-														className="!p-0 h-fit !m-0 text-[13px] max-[480px]:text-[14px] font-inter font-semibold bg-transparent z-20 text-black"
+														className={cn('!p-0 h-fit !m-0 text-[13px] font-inter font-semibold bg-transparent z-20 text-black', !forceDesktop && 'max-[480px]:text-[14px]')}
 														onClick={() => { setActiveTab('main'); setHasLeftProfileTab(true); switchToFull(); }}
 													>
 												Auto
@@ -4299,7 +4296,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														ref={manualModeButtonRef}
 														variant="ghost"
 														type="button"
-														className="!p-0 h-fit !m-0 text-[13px] max-[480px]:text-[14px] font-inter font-semibold bg-transparent z-20 text-black"
+														className={cn('!p-0 h-fit !m-0 text-[13px] font-inter font-semibold bg-transparent z-20 text-black', !forceDesktop && 'max-[480px]:text-[14px]')}
 														onClick={() => { setActiveTab('main'); setHasLeftProfileTab(true); switchToManual(); }}
 													>
 														Manual
@@ -4308,7 +4305,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														ref={hybridModeButtonRef}
 														variant="ghost"
 														type="button"
-														className="!p-0 h-fit !m-0 text-[13px] max-[480px]:text-[14px] font-inter font-semibold bg-transparent z-20 text-black"
+														className={cn('!p-0 h-fit !m-0 text-[13px] font-inter font-semibold bg-transparent z-20 text-black', !forceDesktop && 'max-[480px]:text-[14px]')}
 														onClick={() => { setActiveTab('main'); setHasLeftProfileTab(true); switchToHybrid(); }}
 													>
 														Hybrid
@@ -4344,8 +4341,8 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														<FormItem
 															className={cn(
 																showTestPreview
-																	? 'w-[426px] max-[480px]:w-[89.33vw]'
-																	: 'w-[89.33vw] max-w-[468px]',
+																	? cn('w-[426px]', !forceDesktop && 'max-[480px]:w-[89.33vw]')
+																	: cn(!forceDesktop ? 'w-[89.33vw]' : 'w-[468px]', 'max-w-[468px]'),
 																// Remove default margin to control spacing to content below
 																'mb-0'
 															)}
@@ -4358,7 +4355,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																		<div className="flex items-center gap-2 group-hover/subject:hidden">
 																			<div
 																				className={cn(
-																					'flex items-center justify-center h-[31px] max-[480px]:h-[24px] rounded-[8px] border-2 border-black overflow-hidden subject-bar w-[110px]'
+																					cn('flex items-center justify-center h-[31px] rounded-[8px] border-2 border-black overflow-hidden subject-bar w-[110px]', !forceDesktop && 'max-[480px]:h-[24px]')
 																				)}
 																				style={{ backgroundColor: '#E0E0E0' }}
 																			>
@@ -4373,7 +4370,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																		{/* Expanded state - hidden by default, shown on hover */}
 																		<div
 																			className={cn(
-																				'hidden group-hover/subject:flex items-center h-[31px] max-[480px]:h-[24px] rounded-[8px] border-2 border-black overflow-hidden subject-bar bg-white w-full'
+																				cn('hidden group-hover/subject:flex items-center h-[31px] rounded-[8px] border-2 border-black overflow-hidden subject-bar bg-white w-full', !forceDesktop && 'max-[480px]:h-[24px]')
 																			)}
 																		>
 																			<div
@@ -4415,7 +4412,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																				<Input
 																					{...field}
 																					className={cn(
-																						'w-full h-full !bg-transparent pl-4 pr-3 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 max-[480px]:placeholder:text-[10px] max-[480px]:!transition-none max-[480px]:!duration-0',
+																						cn('w-full h-full !bg-transparent pl-4 pr-3 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0', !forceDesktop && 'max-[480px]:placeholder:text-[10px] max-[480px]:!transition-none max-[480px]:!duration-0'),
 																						'!text-black placeholder:!text-[#9E9E9E]',
 																						'max-[480px]:pl-2'
 																					)}
@@ -4441,7 +4438,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																	// Full bar when auto mode is off
 																	<div
 																		className={cn(
-																			'flex items-center h-[31px] max-[480px]:h-[24px] rounded-[8px] border-2 border-black overflow-hidden subject-bar bg-white'
+																			cn('flex items-center h-[31px] rounded-[8px] border-2 border-black overflow-hidden subject-bar bg-white', !forceDesktop && 'max-[480px]:h-[24px]')
 																		)}
 																	>
 																		<div
@@ -4483,7 +4480,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																			<Input
 																				{...field}
 																				className={cn(
-																					'w-full h-full !bg-transparent pl-2 pr-3 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 max-[480px]:placeholder:text-[10px] max-[480px]:!transition-none max-[480px]:!duration-0',
+																					cn('w-full h-full !bg-transparent pl-2 pr-3 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0', !forceDesktop && 'max-[480px]:placeholder:text-[10px] max-[480px]:!transition-none max-[480px]:!duration-0'),
 																					shouldShowSubjectRedStyling
 																						? '!text-[#A20000] placeholder:!text-[#A20000]'
 																						: '!text-black placeholder:!text-black',
@@ -5033,7 +5030,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 											<div
 												className={cn(
 													'w-[468px] h-[623px] bg-white border-[3px] border-[#0B5C0D] rounded-[8px] flex flex-col',
-													'max-[480px]:w-[89.33vw]'
+													!forceDesktop && 'max-[480px]:w-[89.33vw]'
 												)}
 												style={{
 													overflow: 'visible',
@@ -5727,7 +5724,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 												{/* Profile box (collapsed 33px; expands to 110px) */}
 												<div
 													className={cn(
-														'w-[448px] max-w-[89.33vw] rounded-[8px] border-2 border-black overflow-hidden flex flex-col',
+														cn('w-[448px]', !forceDesktop && 'max-w-[89.33vw]', 'rounded-[8px] border-2 border-black overflow-hidden flex flex-col'),
 														isHybridProfileExpanded ? 'h-[110px]' : 'h-[33px]'
 													)}
 													data-hpi-hybrid-profile-bar
@@ -5782,7 +5779,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 												{/* Hybrid (compressed) structure box */}
 												<div
 													className={cn(
-														'w-[448px] max-w-[89.33vw] min-h-[230px] rounded-[8px] border-2 border-black bg-[#8989E1] flex flex-col',
+														cn('w-[448px]', !forceDesktop && 'max-w-[89.33vw]', 'min-h-[230px] rounded-[8px] border-2 border-black bg-[#8989E1] flex flex-col'),
 														// Left inset is 10px as requested; right inset is tuned so a 429px hover width fits cleanly.
 														'pl-[10px] pr-[5px] py-[14px]',
 														'mt-[14px]'
@@ -6522,7 +6519,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 
 												{/* Hybrid: Generate Test button (Auto-tab style) — 26px below the main box (desktop) */}
 												{!hideGenerateTestButton && !showTestPreview && !compactLeftOnly && (
-													<div className="mt-[26px] w-[448px] max-w-[89.33vw] flex items-center justify-center max-[480px]:hidden">
+													<div className={cn('mt-[26px] w-[448px] flex items-center justify-center', !forceDesktop && 'max-w-[89.33vw] max-[480px]:hidden')}>
 														<Button
 															type="button"
 															data-hover-description="This will show you a test draft, given all of what you provided"
@@ -6566,7 +6563,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 													})() && (
 													<div
 														className={cn(
-															'w-[448px] max-w-[89.33vw] rounded-[8px] border-2 border-black bg-white',
+															cn('w-[448px] rounded-[8px] border-2 border-black bg-white', !forceDesktop && 'max-w-[89.33vw]'),
 															'px-4 py-3',
 															'mt-3'
 														)}
@@ -6804,6 +6801,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																		onGoToProfileTab={() => setActiveTab('profile')}
 																		isDragDisabled={isHybridModeSelected}
 																		useStaticDropdownPosition={useStaticDropdownPosition}
+																		forceDesktop={forceDesktop}
 																	/>
 																</div>
 																{/* Plus button under hybrid blocks */}
@@ -6813,7 +6811,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																			'flex relative z-[70]',
 																			showTestPreview
 																				? 'justify-start w-full'
-																				: 'justify-end -mr-[85px] w-[93.7vw] max-w-[475px] max-[480px]:-mr-[2vw]'
+																				: cn('justify-end -mr-[85px] max-w-[475px]', !forceDesktop ? 'w-[93.7vw] max-[480px]:-mr-[2vw]' : 'w-full')
 																		)}
 																		style={{ transform: 'translateY(-12px)' }}
 																	>
@@ -6821,7 +6819,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																			type="button"
 																			onClick={() => handleAddTextBlockAt(index)}
 																			className={cn(
-																				'w-[52px] h-[20px] bg-background hover:bg-stone-100 active:bg-stone-200 border border-primary rounded-[4px] !font-normal text-[10px] text-gray-600 max-[480px]:translate-x-[6px]',
+																				cn('w-[52px] h-[20px] bg-background hover:bg-stone-100 active:bg-stone-200 border border-primary rounded-[4px] !font-normal text-[10px] text-gray-600', !forceDesktop && 'max-[480px]:translate-x-[6px]'),
 																				showTestPreview &&
 																					'absolute left-0 -translate-x-[calc(100%+5px)]'
 																			)}
@@ -6846,8 +6844,8 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 											<div
 												className={cn(
 													showTestPreview
-														? 'w-[426px] max-[480px]:w-[89.33vw]'
-														: 'w-[89.33vw] max-w-[467px]',
+														? cn('w-[426px]', !forceDesktop && 'max-[480px]:w-[89.33vw]')
+														: cn(!forceDesktop ? 'w-[89.33vw]' : 'w-full', 'max-w-[467px]'),
 													'h-[97px] flex flex-col'
 												)}
 												data-hpi-signature-auto
@@ -6858,7 +6856,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														<div className="flex items-center gap-2 group-hover/signature:hidden">
 															<div
 																className={cn(
-																	'flex items-center justify-center h-[31px] max-[480px]:h-[24px] rounded-[8px] border-2 border-black overflow-hidden w-[122px]'
+																	cn('flex items-center justify-center h-[31px] rounded-[8px] border-2 border-black overflow-hidden w-[122px]', !forceDesktop && 'max-[480px]:h-[24px]')
 																)}
 																style={{ backgroundColor: '#E0E0E0' }}
 															>
@@ -6873,7 +6871,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														{/* Expanded state - hidden by default, shown on hover */}
 														<div
 															className={cn(
-																'hidden group-hover/signature:flex items-center h-[31px] max-[480px]:h-[24px] rounded-[8px] border-2 border-black overflow-hidden bg-white w-full'
+																cn('hidden group-hover/signature:flex items-center h-[31px] rounded-[8px] border-2 border-black overflow-hidden bg-white w-full', !forceDesktop && 'max-[480px]:h-[24px]')
 															)}
 														>
 															<div
@@ -6904,7 +6902,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 															<div className={cn('flex-grow h-full', 'bg-white')}>
 																<Input
 																	className={cn(
-																		'w-full h-full !bg-transparent pl-4 pr-3 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 max-[480px]:placeholder:text-[10px] max-[480px]:!transition-none max-[480px]:!duration-0',
+																		cn('w-full h-full !bg-transparent pl-4 pr-3 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0', !forceDesktop && 'max-[480px]:placeholder:text-[10px] max-[480px]:!transition-none max-[480px]:!duration-0'),
 																		'!text-black placeholder:!text-[#9E9E9E]',
 																		'max-[480px]:pl-2'
 																	)}
@@ -6973,7 +6971,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 										{/* Full Auto: Generate Test button sits in the empty green space (desktop) */}
 										{!hideGenerateTestButton && selectedModeKey === 'full' && !showTestPreview && !compactLeftOnly && (
 											<div className={cn(
-												'absolute left-0 right-0 w-full flex items-center justify-center max-[480px]:hidden',
+												cn('absolute left-0 right-0 w-full flex items-center justify-center', !forceDesktop && 'max-[480px]:hidden'),
 												isLocalCustomInstructionsOpen ? 'bottom-[124px]' : 'bottom-[194px]'
 											)}>
 												<Button
@@ -7019,8 +7017,8 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 															className={cn(
 																`min-h-[57px] border-2 border-gray-400 rounded-md bg-white px-4 py-2`,
 																showTestPreview
-																	? 'w-[426px] max-[480px]:w-[89.33vw]'
-																	: 'w-[89.33vw] max-w-[475px]'
+																	? cn('w-[426px]', !forceDesktop && 'max-[480px]:w-[89.33vw]')
+																	: cn(!forceDesktop ? 'w-[89.33vw]' : 'w-full', 'max-w-[475px]')
 															)}
 														>
 															<FormLabel className="text-base font-semibold font-secondary">
@@ -7067,7 +7065,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 												<div
 													className={cn(
 														'min-h-[57px] border-2 border-gray-400 rounded-md bg-white px-4 py-2',
-														'w-[89.33vw] max-w-[475px]'
+														cn(!forceDesktop ? 'w-[89.33vw]' : 'w-full', 'max-w-[475px]')
 													)}
 													data-hpi-signature-card
 												>
@@ -7107,7 +7105,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 											<div
 												className={cn(
 													'w-full flex flex-col items-center',
-													'max-[480px]:hidden'
+													!forceDesktop && 'max-[480px]:hidden'
 												)}
 											>
 												{hasEmptyTextBlocks && (
@@ -7117,7 +7115,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																? 'text-destructive'
 																: 'text-black',
 															'text-sm font-medium mb-2',
-															'w-[93.7vw] max-w-[475px]'
+															cn(!forceDesktop ? 'w-[93.7vw]' : 'w-full', 'max-w-[475px]')
 														)}
 													>
 														Fill in all text blocks in order to compose an email.
@@ -7140,7 +7138,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														disabled={isGenerationDisabled?.()}
 														className={cn(
 															'h-[28px] bg-white border-[3px] border-[#349A37] text-black font-inter font-normal text-[17px] leading-none rounded-[4px] cursor-pointer flex items-center justify-center transition-all hover:bg-[#EAF9EB] hover:border-black active:bg-primary/20 p-0',
-															'w-[93.7vw] max-w-[475px]',
+															cn(!forceDesktop ? 'w-[93.7vw]' : 'w-full', 'max-w-[475px]'),
 															isGenerationDisabled?.()
 																? 'opacity-50 cursor-not-allowed'
 																: 'opacity-100'
@@ -7200,7 +7198,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 											onClick={() => setShowTestPreview?.(false)}
 										>
 											<div
-												className={cn('w-[461px] max-[480px]:w-[96.27vw]')}
+												className={cn('w-[461px]', !forceDesktop && 'max-[480px]:w-[96.27vw]')}
 												data-test-preview-wrapper
 												onClick={(e) => e.stopPropagation()}
 											>

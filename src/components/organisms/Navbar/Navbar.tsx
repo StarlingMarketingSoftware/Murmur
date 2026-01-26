@@ -130,6 +130,10 @@ export const Navbar = () => {
 	const isFreeTrial =
 		pathname === urls.freeTrial.index || pathname.startsWith(`${urls.freeTrial.index}/`);
 	const isTransparentHeader = isOverLandingHero || isFreeTrial;
+	// Map + Research + Inbox + Drafting pages: navbar should be fully invisible at the top (so the gradient shows behind it),
+	// then become visible once the user scrolls.
+	const isMapTopTransparent =
+		(isMapPage || isResearchPage || isInboxPage || isDraftingPage) && !scrolled;
 	// When the mobile menu is open, the menu panel has a light background even on the landing hero.
 	// Force the hamburger/X icon to a dark color so we don't get a "double icon" feel through transparency.
 	const mobileMenuIconColor = isMobileMenuOpen
@@ -174,9 +178,11 @@ export const Navbar = () => {
 								isTransparentHeader ? 'transition-none' : 'transition-colors duration-700',
 								isTransparentHeader
 									? 'bg-transparent'
-									: scrolled
-										? 'bg-background/70 backdrop-blur-xl border-b border-gray-200/20'
-										: 'bg-background/40 backdrop-blur-md',
+									: isMapTopTransparent
+										? 'bg-transparent'
+										: scrolled
+											? 'bg-background/70 backdrop-blur-xl border-b border-gray-200/20'
+											: 'bg-background/40 backdrop-blur-md',
 							]
 				)}
 			>
