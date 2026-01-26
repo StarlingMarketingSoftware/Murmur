@@ -1306,7 +1306,7 @@ const SortableAIBlock = ({
 
 												{/* Booking For box (203 x 28px) + dropdown - rendered before Custom Instructions when closed */}
 												{!isCustomInstructionsOpen && (
-													<div ref={bookingForContainerRef} className="relative mt-[10px]">
+													<div ref={bookingForContainerRef} className="relative mt-[10px] w-full">
 														<button
 															ref={bookingForButtonRef}
 															type="button"
@@ -1345,28 +1345,30 @@ const SortableAIBlock = ({
 																setIsBookingForOpen(true);
 															}}
 															className={cn(
-																'min-w-[203px] h-[28px] rounded-[8px] border-2 border-black inline-flex items-center justify-between gap-2 px-4 whitespace-nowrap',
+																'w-full h-[28px] rounded-[8px] border-2 border-black flex items-center px-4 whitespace-nowrap',
 																bookingForTriggerBgClass
 															)}
 															aria-haspopup="dialog"
 															aria-expanded={isBookingForOpen}
 														>
-															<span
-																className={cn(
-																	'font-inter font-normal text-[14px] leading-[14px] whitespace-nowrap',
-																	bookingForTriggerTextClass
-																)}
-															>
-																Booking For
-															</span>
-															<span
-																className={cn(
-																	'font-inter font-bold text-[14px] leading-[14px] mr-1 whitespace-nowrap',
-																	bookingForTriggerTextClass
-																)}
-															>
-																{bookingForValue}
-															</span>
+															<div className="inline-flex min-w-[203px] items-center justify-between gap-2 pr-12">
+																<span
+																	className={cn(
+																		'font-inter font-normal text-[14px] leading-[14px] whitespace-nowrap',
+																		bookingForTriggerTextClass
+																	)}
+																>
+																	Booking For
+																</span>
+																<span
+																	className={cn(
+																		'font-inter font-bold text-[14px] leading-[14px] mr-1 whitespace-nowrap',
+																		bookingForTriggerTextClass
+																	)}
+																>
+																	{bookingForValue}
+																</span>
+															</div>
 														</button>
 
 														{isBookingForOpen &&
@@ -1879,8 +1881,8 @@ const SortableAIBlock = ({
 																	type="button"
 																	onClick={() => setIsCustomInstructionsOpen(true)}
 																	className={cn(
-																		'w-[157px] h-[22px] bg-[#95CFFF] rounded-[8px] border-2 border-black',
-																		'flex items-center justify-center gap-1 px-2 max-[480px]:gap-[2px] max-[480px]:px-1',
+																		'w-full h-[22px] bg-[#95CFFF] rounded-[8px] border-2 border-black',
+																		'flex items-center justify-start gap-1 px-4 max-[480px]:gap-[2px] max-[480px]:px-3',
 																		'font-inter font-semibold text-[11px] max-[480px]:text-[9px] leading-none text-black whitespace-nowrap',
 																		'hover:brightness-[0.98] active:brightness-[0.95]'
 																	)}
@@ -2024,7 +2026,7 @@ const SortableAIBlock = ({
 
 												{/* Booking For box - rendered AFTER Custom Instructions when it's open */}
 												{isCustomInstructionsOpen && (
-													<div ref={bookingForContainerRef} className="relative mt-[10px]">
+													<div ref={bookingForContainerRef} className="relative mt-[10px] w-full">
 														<button
 															ref={bookingForButtonRef}
 															type="button"
@@ -2061,28 +2063,30 @@ const SortableAIBlock = ({
 																setIsBookingForOpen(true);
 															}}
 															className={cn(
-																'min-w-[203px] h-[28px] rounded-[8px] border-2 border-black inline-flex items-center justify-between gap-2 px-4 whitespace-nowrap',
+																'w-full h-[28px] rounded-[8px] border-2 border-black flex items-center px-4 whitespace-nowrap',
 																bookingForTriggerBgClass
 															)}
 															aria-haspopup="dialog"
 															aria-expanded={isBookingForOpen}
 														>
-															<span
-																className={cn(
-																	'font-inter font-normal text-[14px] leading-[14px] whitespace-nowrap',
-																	bookingForTriggerTextClass
-																)}
-															>
-																Booking For
-															</span>
-															<span
-																className={cn(
-																	'font-inter font-bold text-[14px] leading-[14px] mr-1 whitespace-nowrap',
-																	bookingForTriggerTextClass
-																)}
-															>
-																{bookingForValue}
-															</span>
+															<div className="inline-flex min-w-[203px] items-center justify-between gap-2 pr-16">
+																<span
+																	className={cn(
+																		'font-inter font-normal text-[14px] leading-[14px] whitespace-nowrap',
+																		bookingForTriggerTextClass
+																	)}
+																>
+																	Booking For
+																</span>
+																<span
+																	className={cn(
+																		'font-inter font-bold text-[14px] leading-[14px] mr-1 whitespace-nowrap',
+																		bookingForTriggerTextClass
+																	)}
+																>
+																	{bookingForValue}
+																</span>
+															</div>
 														</button>
 
 														{isBookingForOpen &&
