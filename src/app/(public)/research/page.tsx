@@ -6,6 +6,7 @@ import { urls } from '@/constants/urls';
 import ResearchDemo from '@/components/atoms/_svg/ResearchDemo';
 import PanelDemo from '@/components/atoms/_svg/PanelDemo';
 import SampleEmail from '@/components/atoms/_svg/sampleEmail';
+import { FadeInUp } from '@/components/animations/FadeInUp';
 
 export default function ResearchPage() {
   React.useEffect(() => {
@@ -39,47 +40,50 @@ export default function ResearchPage() {
 
       <div className="relative z-10 min-h-screen">
         <div className="relative flex justify-center pt-8 pb-6 lg:pt-[53px] lg:pb-0">
-          <div className="w-[calc(100vw-32px)] max-w-[966px] bg-[#F2FBFF] rounded-[22px] flex flex-col items-center gap-6 px-4 pt-6 pb-6 lg:w-[966px] lg:h-[823px] lg:px-[46px] lg:pt-[30px] lg:pb-[30px]">
+          <FadeInUp className="w-[calc(100vw-32px)] max-w-[966px] bg-[#F2FBFF] rounded-[22px] flex flex-col items-center gap-6 px-4 pt-6 pb-6 lg:w-[966px] lg:h-[823px] lg:px-[46px] lg:pt-[30px] lg:pb-[30px]">
             <h1 className="font-inter font-extralight tracking-[0.19em] text-[#696969] text-center text-[40px] sm:text-[56px] lg:text-[65px] leading-none">
               Research
             </h1>
             <div className="w-full flex-1 min-h-0 flex justify-center">
               <ResearchDemo className="w-full h-auto lg:h-full" />
             </div>
-          </div>
+          </FadeInUp>
         </div>
       
       {/* Mobile Layout (match the screenshot card styling/typography) */}
       <div className="lg:hidden w-full mt-14 px-4 sm:px-6">
         <div className="mx-auto w-full max-w-[686px] flex flex-col gap-6">
-          <div className="bg-white rounded-[22px] px-6 py-10 sm:px-10">
+          <FadeInUp className="bg-white rounded-[22px] px-6 py-10 sm:px-10">
             <p className="font-inter font-bold text-[20px] text-black text-left leading-tight">
               From Booking Schedules to Genre
             </p>
             <p className="font-inter font-normal text-[16px] text-black text-left mt-5 leading-[1.75] tracking-wide [word-spacing:3px] break-words">
               For every contact, we provide detailed descriptions, including facts like what times a venue in Eastern Pennsylvania is booking shows, and what genres they book. See the research at any point in the tool, from searching the map up to sending your first email.
             </p>
-          </div>
+          </FadeInUp>
 
-          <div className="bg-[#D3F4FF] rounded-[22px] px-4 pt-8 pb-10 sm:px-10 overflow-hidden flex justify-center">
+          <FadeInUp
+            delay={0.05}
+            className="bg-[#D3F4FF] rounded-[22px] px-4 pt-8 pb-10 sm:px-10 overflow-hidden flex justify-center"
+          >
             <PanelDemo className="w-full h-auto max-w-[424px]" />
-          </div>
+          </FadeInUp>
 
-          <div className="bg-white rounded-[22px] px-6 py-10 sm:px-10">
+          <FadeInUp delay={0.1} className="bg-white rounded-[22px] px-6 py-10 sm:px-10">
             <p className="font-inter font-bold text-[20px] text-black text-left leading-tight">
               Know the History
             </p>
             <p className="font-inter font-normal text-[16px] text-black text-left mt-5 leading-[1.75] tracking-wide [word-spacing:3px] break-words">
               The research goes beyond the basics and into the culture of each location. Know if a brewery in West Virginia is serving hikers, or if a coffee shop in Illinois hosts an outdoor summer concert series. We care about the details.
             </p>
-          </div>
+          </FadeInUp>
         </div>
       </div>
 
       {/* Desktop Layout */}
       <div className="relative hidden lg:flex justify-center mt-[180px] px-4 overflow-visible research-feature-scale-wrapper research-feature-scale-wrapper--top">
         <div className="research-feature-scale-inner flex w-[1352px] h-[945px] gap-[20px]">
-          <div className="flex h-full w-[745px] flex-col gap-[21px]">
+          <FadeInUp className="flex h-full w-[745px] flex-col gap-[21px]">
             <div className="h-[462px] w-[745px] rounded-[22px] bg-white px-[56px] pt-[48px]">
               <p className="font-inter font-bold text-[24px] text-black">
                 From Booking Schedules to Genre
@@ -97,18 +101,21 @@ export default function ResearchPage() {
                 The research goes beyond the basics and into the culture of each location. Know if a brewery in West Virginia is serving hikers, or if a coffee shop in Illinois hosts an outdoor summer concert series. We care about the details.
               </p>
             </div>
-          </div>
+          </FadeInUp>
 
-          <div className="h-[945px] w-[587px] rounded-[22px] bg-[#D3F4FF] flex items-center justify-center overflow-hidden">
+          <FadeInUp
+            delay={0.05}
+            className="h-[945px] w-[587px] rounded-[22px] bg-[#D3F4FF] flex items-center justify-center overflow-hidden"
+          >
             <PanelDemo className="w-[424px]" style={{ height: 'auto' }} />
-          </div>
+          </FadeInUp>
         </div>
       </div>
 
       {/* Mobile Layout ("The Details Matter" block) */}
       <div className="lg:hidden w-full mt-12 px-4 sm:px-6">
         <div className="mx-auto w-full max-w-[686px] flex flex-col gap-6">
-          <div className="bg-[#D7E7FF] rounded-[22px] px-6 pt-10 pb-10 sm:px-10">
+          <FadeInUp className="bg-[#D7E7FF] rounded-[22px] px-6 pt-10 pb-10 sm:px-10">
             <p className="font-inter font-bold text-[20px] text-black leading-tight">
               The Details Matter
             </p>
@@ -116,37 +123,43 @@ export default function ResearchPage() {
             <div className="mt-8 flex justify-center overflow-hidden">
               <SampleEmail className="w-full h-auto max-w-[520px]" />
             </div>
-          </div>
+          </FadeInUp>
 
-          <div className="bg-white rounded-[22px] px-6 py-10 sm:px-10">
+          <FadeInUp delay={0.05} className="bg-white rounded-[22px] px-6 py-10 sm:px-10">
             <p className="font-inter font-normal text-[16px] text-black text-left leading-[1.75] tracking-wide [word-spacing:4px]">
               Get the details right the first time you reach out to a winery or a coffee shop. Research feeds into your drafts so every pitch fits the venue.
             </p>
-          </div>
+          </FadeInUp>
         </div>
       </div>
 
       {/* Desktop Layout */}
       <div className="relative hidden lg:flex justify-center mt-[82px] px-4 overflow-visible research-feature-scale-wrapper research-feature-scale-wrapper--details">
         <div className="research-feature-scale-inner flex flex-col w-[1363px] h-[989px]">
-          <div className="w-full h-[110px] rounded-[22px] bg-white flex items-center px-[56px]">
+          <FadeInUp className="w-full h-[110px] rounded-[22px] bg-white flex items-center px-[56px]">
             <p className="font-inter font-bold text-[24px] text-black">
               The Details Matter
             </p>
-          </div>
+          </FadeInUp>
 
-          <div className="mt-[9px] w-full h-[651px] rounded-[22px] bg-[#D7E7FF] flex items-center justify-center overflow-hidden">
+          <FadeInUp
+            delay={0.05}
+            className="mt-[9px] w-full h-[651px] rounded-[22px] bg-[#D7E7FF] flex items-center justify-center overflow-hidden"
+          >
             <SampleEmail />
-          </div>
+          </FadeInUp>
 
-          <div className="mt-[19px] w-full h-[200px] rounded-[22px] bg-white flex items-center justify-start px-[56px]">
+          <FadeInUp
+            delay={0.1}
+            className="mt-[19px] w-full h-[200px] rounded-[22px] bg-white flex items-center justify-start px-[56px]"
+          >
             <p className="font-inter text-[23px] text-black leading-[45px] tracking-wide [word-spacing:5px] text-left max-w-[1200px]">
               Get the details right the first time you reach out to a winery or a coffee shop. Research feeds into your drafts so every pitch fits the venue.
             </p>
-          </div>
+          </FadeInUp>
         </div>
       </div>
-      <div className="flex flex-col items-center justify-center pt-14 pb-16 sm:pt-16 sm:pb-20 lg:py-0 lg:h-[660px]">
+      <FadeInUp className="flex flex-col items-center justify-center pt-14 pb-16 sm:pt-16 sm:pb-20 lg:py-0 lg:h-[660px]">
         <p className="font-inter font-normal text-[clamp(32px,9vw,62px)] text-black text-center leading-[1.05]">
           Try Murmur Now
         </p>
@@ -161,7 +174,7 @@ export default function ResearchPage() {
         >
           Start Free Trial
         </Link>
-      </div>
+      </FadeInUp>
       </div>
     </main>
   );

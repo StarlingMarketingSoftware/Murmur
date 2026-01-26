@@ -1177,6 +1177,7 @@ export default function HomePage() {
 							className="h-full w-full"
 							style={heroVideoStyle}
 							playbackId={heroPlaybackId}
+							poster={`https://image.mux.com/${heroPlaybackId}/thumbnail.jpg?time=0`}
 							streamType="on-demand"
 							preload="auto"
 							autoPlay="muted"

@@ -3,15 +3,13 @@
 import { useEffect, useRef } from 'react';
 import { gsap } from 'gsap';
 
-interface FadeInUpProps {
-	children: React.ReactNode;
+type FadeInUpProps = React.ComponentPropsWithoutRef<'div'> & {
 	duration?: number;
 	delay?: number;
 	yOffset?: number;
 	threshold?: number;
-	className?: string;
 	stagger?: number; // If we want to stagger children, though this component wraps a single block usually
-}
+};
 
 export const FadeInUp = ({
 	children,
@@ -20,6 +18,8 @@ export const FadeInUp = ({
 	yOffset = 50,
 	threshold = 0.1,
 	className = '',
+	stagger: _stagger,
+	...divProps
 }: FadeInUpProps) => {
 	const elementRef = useRef<HTMLDivElement>(null);
 
@@ -66,7 +66,7 @@ export const FadeInUp = ({
 	}, [duration, delay, yOffset, threshold]);
 
 	return (
-		<div ref={elementRef} className={className}>
+		<div ref={elementRef} className={className} {...divProps}>
 			{children}
 		</div>
 	);
