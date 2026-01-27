@@ -540,8 +540,9 @@ body {
 		display: none;
 	}
 
+	/* Mobile map CTA copy is rendered as an HTML overlay in `page.tsx`. */
 	.landing-map-copy--mobile {
-		display: inline;
+		display: none;
 	}
 
 	.landing-map-section {

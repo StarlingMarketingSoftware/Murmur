@@ -4098,6 +4098,22 @@ html.murmur-research-compact {
 	}
 }
 
+/* Mobile: disable compact scaling to preserve touch scrolling (iOS Safari) */
+@media (max-width: 767px) {
+	html.murmur-research-compact {
+		zoom: 1;
+	}
+}
+
+@media (max-width: 767px) {
+	@supports not (zoom: 1) {
+		html.murmur-research-compact body {
+			transform: none;
+			width: 100%;
+		}
+	}
+}
+
 /* Inbox public page scaling (80%) */
 html.murmur-inbox-compact {
 	zoom: 0.8;

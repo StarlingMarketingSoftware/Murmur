@@ -16,9 +16,27 @@ export default function InboxPage() {
       footer.style.display = 'none';
     }
 
-    const compactMql = window.matchMedia('(min-width: 768px)');
+    // Defensive: if any prior view left inline scroll locks behind (overflow hidden, fixed body, etc),
+    // clear them so the marketing pages always remain scrollable on mobile Safari.
+    try {
+      document.body.style.overflow = '';
+      document.body.style.overflowX = '';
+      document.body.style.overflowY = '';
+      document.body.style.position = '';
+      document.body.style.width = '';
+      document.body.style.top = '';
+      document.body.style.touchAction = '';
+      document.documentElement.style.overflow = '';
+    } catch {
+      // ignore
+    }
+
+    // Only apply compact (zoom/scale) treatment on desktop *non-touch* devices.
+    // On mobile Safari, root-level scaling can break touch scrolling (and can fully lock scrolling).
+    const compactMql = window.matchMedia('(min-width: 1024px)');
+    const touchMql = window.matchMedia('(hover: none) and (pointer: coarse)');
     const syncCompactClass = () => {
-      if (compactMql.matches) {
+      if (compactMql.matches && !touchMql.matches) {
         document.documentElement.classList.add('murmur-inbox-compact');
       } else {
         document.documentElement.classList.remove('murmur-inbox-compact');
@@ -30,6 +48,11 @@ export default function InboxPage() {
       compactMql.addEventListener('change', syncCompactClass);
     } else {
       compactMql.addListener(syncCompactClass);
+    }
+    if (typeof touchMql.addEventListener === 'function') {
+      touchMql.addEventListener('change', syncCompactClass);
+    } else {
+      touchMql.addListener(syncCompactClass);
     }
     
     return () => {
@@ -43,6 +66,11 @@ export default function InboxPage() {
         compactMql.removeEventListener('change', syncCompactClass);
       } else {
         compactMql.removeListener(syncCompactClass);
+      }
+      if (typeof touchMql.removeEventListener === 'function') {
+        touchMql.removeEventListener('change', syncCompactClass);
+      } else {
+        touchMql.removeListener(syncCompactClass);
       }
     };
   }, []);

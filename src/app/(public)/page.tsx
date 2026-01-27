@@ -1387,7 +1387,29 @@ export default function HomePage() {
 					</Link>
 				</FadeInUp>
 				<FadeInUp duration={1.6} delay={0.2} className="w-full flex flex-col items-center">
-					<div className="landing-map-wrapper" ref={landingMapWrapperRef}>
+					<div className="landing-map-wrapper relative" ref={landingMapWrapperRef}>
+						{/* Mobile-only: map CTA copy overlay (keeps text crisp + avoids SVG clipping) */}
+						<div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center px-3 md:hidden">
+							<div className="pointer-events-auto w-full max-w-[280px] rounded-[16px] bg-white border border-black/10 px-3 py-3 shadow-[0_2px_12px_rgba(0,0,0,0.08)]">
+								<p className="font-inter font-light text-[18px] leading-[1.1] text-black text-center">
+									100,000+ Contacts
+									<br />- Coast to Coast
+								</p>
+								<p className="mt-2 font-inter font-normal text-[10px] leading-snug tracking-[0.01em] text-black text-left">
+									Venues, Festivals, Wineries, Breweries, Coffee Shops; Hundreds of thousands of contacts thoroughly verified by musicians.
+								</p>
+								<div className="mt-2 flex justify-center">
+									<Link
+										href="/map"
+										className="landing-learn-research-btn inline-flex h-[32px] w-full items-center justify-center rounded-[5px] bg-transparent"
+									>
+										<span className="font-inter font-normal text-[13px] text-[#5DAB68]">
+											Learn about the Map
+										</span>
+									</Link>
+								</div>
+							</div>
+						</div>
 						<div
 							ref={landingMapContainerRef}
 							className={`landing-map-container ${

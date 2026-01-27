@@ -15,7 +15,23 @@ export default function ResearchPage() {
       footer.style.display = 'none';
     }
 
-    document.documentElement.classList.add('murmur-research-compact');
+    // Only apply the compact (zoom/scale) treatment on desktop widths.
+    // On mobile Safari, root-level scaling can break touch scrolling.
+    const compactMql = window.matchMedia('(min-width: 1024px)');
+    const syncCompactClass = () => {
+      if (compactMql.matches) {
+        document.documentElement.classList.add('murmur-research-compact');
+      } else {
+        document.documentElement.classList.remove('murmur-research-compact');
+      }
+    };
+    syncCompactClass();
+    // Safari < 14 uses addListener/removeListener.
+    if (typeof compactMql.addEventListener === 'function') {
+      compactMql.addEventListener('change', syncCompactClass);
+    } else {
+      compactMql.addListener(syncCompactClass);
+    }
     
     return () => {
       const footer = document.querySelector('footer');
@@ -24,6 +40,11 @@ export default function ResearchPage() {
       }
 
       document.documentElement.classList.remove('murmur-research-compact');
+      if (typeof compactMql.removeEventListener === 'function') {
+        compactMql.removeEventListener('change', syncCompactClass);
+      } else {
+        compactMql.removeListener(syncCompactClass);
+      }
     };
   }, []);
 
