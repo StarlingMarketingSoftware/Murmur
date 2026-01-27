@@ -122,6 +122,9 @@ const MANUAL_EDITOR_COLOR_SWATCHES = [
 	'#4C1130',
 ] as const;
 
+const HPI_GREEN_BG_GRADIENT =
+	'linear-gradient(to bottom, #7BDB7E 0%, #7BDB7E 25%, #A6E2A8 100%)';
+
 interface SortableAIBlockProps {
 	block: {
 		value: HybridBlock;
@@ -689,7 +692,7 @@ const SortableAIBlock = ({
 				!isTextBlock &&
 				!isFullAutomatedBlock &&
 				'border-2 border-gray-300 bg-background',
-			isFullAutomatedBlock && 'border border-gray-300 bg-[#51A2E4]',
+			isFullAutomatedBlock && 'border border-[#51A2E4] bg-[#51A2E4]',
 			isTextBlock
 				? showTestPreview
 					? cn('w-[426px] min-h-[44px]', !forceDesktop && 'max-[480px]:w-[89.33vw]')
@@ -1141,7 +1144,14 @@ const SortableAIBlock = ({
 								{isFullAutomatedBlock && (
 									<div className="w-full px-1 pt-1 pb-1">
 										<div className="rounded-t-[6px] overflow-hidden">
-											<div className="h-[27px] bg-[#B9DAF5] flex items-stretch">
+											<div
+												className={cn(
+													'h-[27px] flex items-stretch transition-colors duration-75 ease-out',
+													selectedPowerMode === 'high'
+														? 'bg-[#95CFFF]'
+														: 'bg-[#58A6E5]'
+												)}
+											>
 												{/* Full Auto label section */}
 												<div className="flex-1 flex items-center pl-[16px]">
 													<Typography
@@ -1151,78 +1161,63 @@ const SortableAIBlock = ({
 														Body
 													</Typography>
 												</div>
-												{/* Divider - black when Normal Power selected */}
-												<div
-													className={cn(
-														'w-[1px] flex-shrink-0 transition-colors',
-														selectedPowerMode === 'normal'
-															? 'bg-[#000000]'
-															: 'bg-[#51A2E4]'
-													)}
-												/>
-												{/* Normal Power section */}
+												{/* Divider (only when Standard is selected) */}
+												{selectedPowerMode === 'normal' && (
+													<div className="w-[1px] flex-shrink-0 bg-[#000000]" />
+												)}
+												{/* Standard Power section */}
 												<button
 													type="button"
 													onClick={() => setSelectedPowerMode('normal')}
 													className={cn(
-														'w-[101px] flex items-center justify-center cursor-pointer border-0 p-0 m-0 transition-colors flex-shrink-0 outline-none focus:outline-none',
+														'h-full flex items-center justify-center cursor-pointer border-0 p-0 m-0 flex-shrink-0 outline-none focus:outline-none whitespace-nowrap transition-[background-color,width] duration-75 ease-out',
+														selectedPowerMode === 'high'
+															? 'w-[108px]'
+															: 'w-[132px]',
 														selectedPowerMode === 'normal'
-															? 'bg-[#8DBFE8]'
+															? 'bg-[#88C5F7]'
 															: 'bg-transparent'
 													)}
 												>
 													<span
-														className={cn(
-															'font-inter font-normal italic text-[14px] max-[480px]:text-[12px] transition-colors',
-															selectedPowerMode === 'normal'
-																? 'text-[#000000]'
-																: 'text-[#9E9E9E]'
-														)}
+														className="font-inter font-normal italic text-[14px] max-[480px]:text-[12px] text-[#000000]"
 													>
-														Normal Power
+														{selectedPowerMode === 'high'
+															? 'Standard'
+															: 'Standard Power'}
 													</span>
 												</button>
-												{/* Divider - black when either Normal Power or High selected */}
-												<div
-													className={cn(
-														'w-[1px] flex-shrink-0 transition-colors',
-														selectedPowerMode === 'normal' ||
-															selectedPowerMode === 'high'
-															? 'bg-[#000000]'
-															: 'bg-[#51A2E4]'
-													)}
-												/>
+												{/* Divider */}
+												<div className="w-[1px] flex-shrink-0 bg-[#000000]" />
 												{/* High section */}
 												<button
 													type="button"
 													onClick={() => setSelectedPowerMode('high')}
 													className={cn(
-														'w-[46px] flex items-center justify-center cursor-pointer border-0 p-0 m-0 transition-colors flex-shrink-0 outline-none focus:outline-none',
+														'h-full flex items-center justify-center cursor-pointer border-0 p-0 m-0 flex-shrink-0 outline-none focus:outline-none whitespace-nowrap transition-[background-color,width] duration-75 ease-out',
 														selectedPowerMode === 'high'
-															? 'bg-[#8DBFE8]'
+															? 'w-[100px]'
+															: 'w-[46px]',
+														selectedPowerMode === 'high'
+															? 'bg-[#58A6E5]'
 															: 'bg-transparent'
 													)}
 												>
 													<span
 														className={cn(
-															'font-inter font-normal italic text-[14px] max-[480px]:text-[12px] transition-colors',
+															'font-inter font-normal italic text-[14px] max-[480px]:text-[12px] transition-colors duration-75 ease-out',
 															selectedPowerMode === 'high'
-																? 'text-[#000000]'
-																: 'text-[#9E9E9E]'
+																? 'text-[#FFFFFF]'
+																: 'text-[#000000]'
 														)}
 													>
-														High
+														{selectedPowerMode === 'high' ? 'High Power' : 'High'}
 													</span>
 												</button>
-												{/* Divider - black when High selected */}
-												<div
-													className={cn(
-														'w-[1px] flex-shrink-0 transition-colors',
-														selectedPowerMode === 'high'
-															? 'bg-[#000000]'
-															: 'bg-[#51A2E4]'
-													)}
-												/>
+												{/* Divider (only when High is selected) */}
+												{selectedPowerMode === 'high' && (
+													<div className="w-[1px] flex-shrink-0 bg-[#000000]" />
+												)}
 												{/* Right empty section */}
 												<div className="w-[31px] flex-shrink-0" />
 											</div>
@@ -1266,7 +1261,14 @@ const SortableAIBlock = ({
 								)}
 								{isFullAutomatedBlock ? (
 									<div className="min-h-[60px] w-full px-1 pb-1">
-										<div className="w-full bg-[#58A6E5] rounded-b-[6px] p-2 flex justify-center">
+										<div
+											className={cn(
+												'w-full rounded-b-[6px] p-2 flex justify-center transition-colors duration-75 ease-out',
+												selectedPowerMode === 'high'
+													? 'bg-[#58A6E5]'
+													: 'bg-[#88C5F7]'
+											)}
+										>
 											<div className="w-[448px] max-w-full flex flex-col items-start">
 												<div
 													className="w-full h-[104px] bg-white rounded-[8px] border border-black px-2 pt-1 pb-2 overflow-y-auto overflow-x-hidden hide-native-scrollbar cursor-pointer"
@@ -1306,7 +1308,7 @@ const SortableAIBlock = ({
 
 												{/* Booking For box (203 x 28px) + dropdown - rendered before Custom Instructions when closed */}
 												{!isCustomInstructionsOpen && (
-													<div ref={bookingForContainerRef} className="relative mt-[10px]">
+													<div ref={bookingForContainerRef} className="relative mt-[10px] w-full">
 														<button
 															ref={bookingForButtonRef}
 															type="button"
@@ -1345,28 +1347,30 @@ const SortableAIBlock = ({
 																setIsBookingForOpen(true);
 															}}
 															className={cn(
-																'min-w-[203px] h-[28px] rounded-[8px] border-2 border-black inline-flex items-center justify-between gap-2 px-4 whitespace-nowrap',
+																'w-full h-[28px] rounded-[8px] border-2 border-black flex items-center px-4 whitespace-nowrap',
 																bookingForTriggerBgClass
 															)}
 															aria-haspopup="dialog"
 															aria-expanded={isBookingForOpen}
 														>
-															<span
-																className={cn(
-																	'font-inter font-normal text-[14px] leading-[14px] whitespace-nowrap',
-																	bookingForTriggerTextClass
-																)}
-															>
-																Booking For
-															</span>
-															<span
-																className={cn(
-																	'font-inter font-bold text-[14px] leading-[14px] mr-1 whitespace-nowrap',
-																	bookingForTriggerTextClass
-																)}
-															>
-																{bookingForValue}
-															</span>
+															<div className="inline-flex min-w-[203px] items-center justify-between gap-2 pr-12">
+																<span
+																	className={cn(
+																		'font-inter font-normal text-[14px] leading-[14px] whitespace-nowrap',
+																		bookingForTriggerTextClass
+																	)}
+																>
+																	Booking For
+																</span>
+																<span
+																	className={cn(
+																		'font-inter font-bold text-[14px] leading-[14px] mr-1 whitespace-nowrap',
+																		bookingForTriggerTextClass
+																	)}
+																>
+																	{bookingForValue}
+																</span>
+															</div>
 														</button>
 
 														{isBookingForOpen &&
@@ -1879,8 +1883,11 @@ const SortableAIBlock = ({
 																	type="button"
 																	onClick={() => setIsCustomInstructionsOpen(true)}
 																	className={cn(
-																		'w-[157px] h-[22px] bg-[#95CFFF] rounded-[8px] border-2 border-black',
-																		'flex items-center justify-center gap-1 px-2 max-[480px]:gap-[2px] max-[480px]:px-1',
+																		'w-full h-[22px] rounded-[8px] border-2 border-black transition-colors duration-75 ease-out',
+																		selectedPowerMode === 'high'
+																			? 'bg-[#58A6E5]'
+																			: 'bg-[#88C5F7]',
+																		'flex items-center justify-start gap-1 px-4 max-[480px]:gap-[2px] max-[480px]:px-3',
 																		'font-inter font-semibold text-[11px] max-[480px]:text-[9px] leading-none text-black whitespace-nowrap',
 																		'hover:brightness-[0.98] active:brightness-[0.95]'
 																	)}
@@ -1897,7 +1904,10 @@ const SortableAIBlock = ({
 															<div
 																className={cn(
 																	'w-full rounded-[8px] border-2 border-black overflow-hidden',
-																	'flex flex-col bg-[#95CFFF]'
+																	'flex flex-col transition-colors duration-75 ease-out',
+																	selectedPowerMode === 'high'
+																		? 'bg-[#58A6E5]'
+																		: 'bg-[#88C5F7]'
 																)}
 																aria-label="Custom Instructions"
 															>
@@ -2024,7 +2034,7 @@ const SortableAIBlock = ({
 
 												{/* Booking For box - rendered AFTER Custom Instructions when it's open */}
 												{isCustomInstructionsOpen && (
-													<div ref={bookingForContainerRef} className="relative mt-[10px]">
+													<div ref={bookingForContainerRef} className="relative mt-[10px] w-full">
 														<button
 															ref={bookingForButtonRef}
 															type="button"
@@ -2061,28 +2071,30 @@ const SortableAIBlock = ({
 																setIsBookingForOpen(true);
 															}}
 															className={cn(
-																'min-w-[203px] h-[28px] rounded-[8px] border-2 border-black inline-flex items-center justify-between gap-2 px-4 whitespace-nowrap',
+																'w-full h-[28px] rounded-[8px] border-2 border-black flex items-center px-4 whitespace-nowrap',
 																bookingForTriggerBgClass
 															)}
 															aria-haspopup="dialog"
 															aria-expanded={isBookingForOpen}
 														>
-															<span
-																className={cn(
-																	'font-inter font-normal text-[14px] leading-[14px] whitespace-nowrap',
-																	bookingForTriggerTextClass
-																)}
-															>
-																Booking For
-															</span>
-															<span
-																className={cn(
-																	'font-inter font-bold text-[14px] leading-[14px] mr-1 whitespace-nowrap',
-																	bookingForTriggerTextClass
-																)}
-															>
-																{bookingForValue}
-															</span>
+															<div className="inline-flex min-w-[203px] items-center justify-between gap-2 pr-16">
+																<span
+																	className={cn(
+																		'font-inter font-normal text-[14px] leading-[14px] whitespace-nowrap',
+																		bookingForTriggerTextClass
+																	)}
+																>
+																	Booking For
+																</span>
+																<span
+																	className={cn(
+																		'font-inter font-bold text-[14px] leading-[14px] mr-1 whitespace-nowrap',
+																		bookingForTriggerTextClass
+																	)}
+																>
+																	{bookingForValue}
+																</span>
+															</div>
 														</button>
 
 														{isBookingForOpen &&
@@ -3913,6 +3925,63 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 	}));
 	const [isInitialRender, setIsInitialRender] = useState(true);
 
+	// Chrome-style mode hover preview (active turns white, hovered mode appears)
+	const [hoveredModeKey, setHoveredModeKey] = useState<'full' | 'hybrid' | 'manual' | null>(null);
+	const isModePreviewingOther =
+		hoveredModeKey !== null && selectedModeKey !== 'none' && hoveredModeKey !== selectedModeKey;
+
+	const wasModePreviewingRef = useRef(false);
+	const isSwitchingBetweenModePreviews = wasModePreviewingRef.current && isModePreviewingOther;
+	useEffect(() => {
+		wasModePreviewingRef.current = isModePreviewingOther;
+	}, [isModePreviewingOther]);
+
+	const modePreviewAnimatedTransition = '0.6s cubic-bezier(0.22, 1, 0.36, 1)';
+	const modePreviewInstantTransition = '0s';
+	const modePreviewOpacityTransition = isSwitchingBetweenModePreviews
+		? modePreviewInstantTransition
+		: modePreviewAnimatedTransition;
+
+	const [hoverPreviewHighlightStyle, setHoverPreviewHighlightStyle] = useState(() => ({
+		left: 0,
+		width: MODE_HIGHLIGHT_WIDTH,
+		opacity: 0,
+	}));
+
+	const getModeHighlightBackgroundColor = useCallback((mode: 'full' | 'hybrid' | 'manual') => {
+		switch (mode) {
+			case 'hybrid':
+				return 'rgba(74, 74, 217, 0.31)'; // #4A4AD9 at 31% opacity
+			case 'manual':
+				return 'rgba(109, 171, 104, 0.47)'; // #6DAB68 at 47% opacity
+			case 'full':
+			default:
+				return '#DAE6FE';
+		}
+	}, []);
+
+	useLayoutEffect(() => {
+		if (!isModePreviewingOther || !hoveredModeKey) {
+			setHoverPreviewHighlightStyle((prev) => ({ ...prev, opacity: 0 }));
+			return;
+		}
+
+		let targetButton: HTMLButtonElement | null = null;
+		if (hoveredModeKey === 'full') targetButton = fullModeButtonRef.current;
+		else if (hoveredModeKey === 'hybrid') targetButton = hybridModeButtonRef.current;
+		else targetButton = manualModeButtonRef.current;
+
+		if (!targetButton) return;
+
+		const newLeft =
+			targetButton.offsetLeft + targetButton.offsetWidth / 2 - MODE_HIGHLIGHT_WIDTH / 2;
+		setHoverPreviewHighlightStyle({
+			left: newLeft,
+			width: MODE_HIGHLIGHT_WIDTH,
+			opacity: 1,
+		});
+	}, [MODE_HIGHLIGHT_WIDTH, hoveredModeKey, isModePreviewingOther]);
+
 	const dragBounds = useRef({ min: 0, max: 0 });
 
 	// Use useLayoutEffect to calculate position BEFORE browser paints, preventing any visual jump
@@ -4122,7 +4191,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 								compactLeftOnly
 									? 'flex-col'
 									: cn(
-											cn(!forceDesktop ? 'w-[96.27vw]' : 'w-[499px]', 'max-w-[499px] transition flex mx-auto flex-col border-[3px] border-transparent rounded-[8px] bg-[#A6E2A8]'),
+											cn(!forceDesktop ? 'w-[96.27vw]' : 'w-[499px]', 'max-w-[499px] transition flex mx-auto flex-col border-[3px] border-transparent rounded-[8px]'),
 											containerHeightPx ? null : 'h-[703px]'
 									  ),
 								'relative overflow-visible isolate'
@@ -4131,6 +4200,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 								!compactLeftOnly
 									? {
 											backgroundColor: '#A6E2A8',
+											backgroundImage: HPI_GREEN_BG_GRADIENT,
 											...(containerHeightPx ? { height: `${containerHeightPx}px` } : {}),
 									  }
 									: undefined
@@ -4173,7 +4243,8 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 										right: 0,
 										top: overlayTopPx,
 										bottom: 0,
-										background: '#A6E2A8',
+										backgroundColor: '#A6E2A8',
+										backgroundImage: HPI_GREEN_BG_GRADIENT,
 										pointerEvents: 'none',
 										zIndex: -1,
 										// Square off the top corners so the fill meets the border flush on mobile
@@ -4258,9 +4329,42 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 												{!compactLeftOnly && <div className="w-[130px] shrink-0" />}
 												<div
 													ref={modeContainerRef}
-														className={cn('relative flex items-center flex-1', forceDesktop ? 'gap-[70px] ml-[30px]' : 'gap-[78px] ml-[42px]', !forceDesktop && 'max-[480px]:gap-0 max-[480px]:justify-between max-[480px]:ml-[2px] max-[480px]:w-auto max-[480px]:px-[24px]')}
+													onMouseLeave={() => setHoveredModeKey(null)}
+													className={cn(
+														'relative flex items-center flex-1',
+														forceDesktop ? 'gap-[70px] ml-[30px]' : 'gap-[78px] ml-[42px]',
+														!forceDesktop &&
+															'max-[480px]:gap-0 max-[480px]:justify-between max-[480px]:ml-[2px] max-[480px]:w-auto max-[480px]:px-[24px]'
+													)}
 													data-hover-description-suppress="true"
 												>
+													{/* Hover preview pill (appears under hovered mode; selected pill turns white) */}
+													{selectedModeKey !== 'none' && (
+														<div
+															aria-hidden="true"
+															className="absolute top-1/2 -translate-y-1/2 z-10 rounded-[8px] pointer-events-none"
+															style={{
+																left: hoverPreviewHighlightStyle.left,
+																width: MODE_HIGHLIGHT_WIDTH,
+																opacity: hoverPreviewHighlightStyle.opacity,
+																transition: `opacity ${modePreviewOpacityTransition}`,
+															}}
+														>
+															<div
+																style={{
+																	width: MODE_HIGHLIGHT_WIDTH,
+																	height: 19,
+																	backgroundColor:
+																		hoveredModeKey && isModePreviewingOther
+																			? getModeHighlightBackgroundColor(hoveredModeKey)
+																			: 'transparent',
+																	border: '1.3px solid #000000',
+																	borderRadius: '8px',
+																	transition: `background-color ${modePreviewOpacityTransition}`,
+																}}
+															/>
+														</div>
+													)}
 													<DndContext
 														onDragEnd={handleHighlightDragEnd}
 														modifiers={[restrictToHorizontalAxisAndBounds]}
@@ -4271,15 +4375,16 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																style={highlightStyle}
 																isInitialRender={isInitialRender}
 																mode={selectedModeKey as 'full' | 'hybrid' | 'manual'}
-															disabled={isHybridModeSelected}
-															onSelectMode={() => {
-																// Clicking the pill should behave like selecting that mode tab.
-																// Avoid re-running switch logic (which can overwrite in-progress edits).
-																if (activeTab !== 'main') {
-																	setActiveTab('main');
-																	setHasLeftProfileTab(true);
-																}
-															}}
+																disabled={isHybridModeSelected}
+																backgroundColorOverride={isModePreviewingOther ? '#FFFFFF' : undefined}
+																onSelectMode={() => {
+																	// Clicking the pill should behave like selecting that mode tab.
+																	// Avoid re-running switch logic (which can overwrite in-progress edits).
+																	if (activeTab !== 'main') {
+																		setActiveTab('main');
+																		setHasLeftProfileTab(true);
+																	}
+																}}
 															/>
 														)}
 													</DndContext>
@@ -4287,16 +4392,28 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														ref={fullModeButtonRef}
 														variant="ghost"
 														type="button"
-														className={cn('!p-0 h-fit !m-0 text-[13px] font-inter font-semibold bg-transparent z-20 text-black', !forceDesktop && 'max-[480px]:text-[14px]')}
+														onMouseEnter={() => setHoveredModeKey('full')}
+														style={{ transition: `opacity ${modePreviewAnimatedTransition}` }}
+														className={cn(
+															'!p-0 h-fit !m-0 text-[13px] font-inter font-semibold bg-transparent z-20 text-black transition-opacity',
+															!forceDesktop && 'max-[480px]:text-[14px]',
+															isModePreviewingOther && selectedModeKey === 'full' && 'opacity-0'
+														)}
 														onClick={() => { setActiveTab('main'); setHasLeftProfileTab(true); switchToFull(); }}
 													>
-												Auto
-												</Button>
+														Auto
+													</Button>
 													<Button
 														ref={manualModeButtonRef}
 														variant="ghost"
 														type="button"
-														className={cn('!p-0 h-fit !m-0 text-[13px] font-inter font-semibold bg-transparent z-20 text-black', !forceDesktop && 'max-[480px]:text-[14px]')}
+														onMouseEnter={() => setHoveredModeKey('manual')}
+														style={{ transition: `opacity ${modePreviewAnimatedTransition}` }}
+														className={cn(
+															'!p-0 h-fit !m-0 text-[13px] font-inter font-semibold bg-transparent z-20 text-black transition-opacity',
+															!forceDesktop && 'max-[480px]:text-[14px]',
+															isModePreviewingOther && selectedModeKey === 'manual' && 'opacity-0'
+														)}
 														onClick={() => { setActiveTab('main'); setHasLeftProfileTab(true); switchToManual(); }}
 													>
 														Manual
@@ -4305,7 +4422,13 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														ref={hybridModeButtonRef}
 														variant="ghost"
 														type="button"
-														className={cn('!p-0 h-fit !m-0 text-[13px] font-inter font-semibold bg-transparent z-20 text-black', !forceDesktop && 'max-[480px]:text-[14px]')}
+														onMouseEnter={() => setHoveredModeKey('hybrid')}
+														style={{ transition: `opacity ${modePreviewAnimatedTransition}` }}
+														className={cn(
+															'!p-0 h-fit !m-0 text-[13px] font-inter font-semibold bg-transparent z-20 text-black transition-opacity',
+															!forceDesktop && 'max-[480px]:text-[14px]',
+															isModePreviewingOther && selectedModeKey === 'hybrid' && 'opacity-0'
+														)}
 														onClick={() => { setActiveTab('main'); setHasLeftProfileTab(true); switchToHybrid(); }}
 													>
 														Hybrid
@@ -4350,39 +4473,49 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 															<FormControl>
 																{form.watch('isAiSubject') ? (
 																	// Compact bar that expands to full width on hover when auto mode is on
-																	<div className="group/subject relative">
-																		{/* Collapsed state - shown by default, hidden on hover */}
-																		<div className="flex items-center gap-2 group-hover/subject:hidden">
-																			<div
-																				className={cn(
-																					cn('flex items-center justify-center h-[31px] rounded-[8px] border-2 border-black overflow-hidden subject-bar w-[110px]', !forceDesktop && 'max-[480px]:h-[24px]')
-																				)}
-																				style={{ backgroundColor: '#E0E0E0' }}
-																			>
-																				<span className="font-inter font-medium text-[18px] max-[480px]:text-[12px] whitespace-nowrap text-black subject-label">
-																					Subject
-																				</span>
-																			</div>
-																			<span className="font-inter font-normal text-[13px] text-[#000000]">
-																				Auto
-																			</span>
-																		</div>
-																		{/* Expanded state - hidden by default, shown on hover */}
+																	<div className="flex items-center">
 																		<div
 																			className={cn(
-																				cn('hidden group-hover/subject:flex items-center h-[31px] rounded-[8px] border-2 border-black overflow-hidden subject-bar bg-white w-full', !forceDesktop && 'max-[480px]:h-[24px]')
+																				// Default: only the 110px Subject box is hoverable (so it doesn't expand from the right-side area).
+																				// On hover: expand to full width so the user can interact with the expanded controls.
+																				'relative group/subject peer/subject w-[110px] hover:w-full transition-none'
 																			)}
 																		>
+																			{/* Collapsed state - shown by default, hidden on hover */}
+																			<div className="flex items-center group-hover/subject:hidden">
+																				<div
+																					className={cn(
+																						cn(
+																							'flex items-center justify-center h-[31px] rounded-[8px] border-2 border-black overflow-hidden subject-bar w-[110px]',
+																							!forceDesktop && 'max-[480px]:h-[24px]'
+																						)
+																					)}
+																					style={{ backgroundColor: '#E0E0E0' }}
+																				>
+																					<span className="font-inter font-medium text-[18px] max-[480px]:text-[12px] whitespace-nowrap text-black subject-label">
+																						Subject
+																					</span>
+																				</div>
+																			</div>
+																			{/* Expanded state - hidden by default, shown on hover */}
 																			<div
 																				className={cn(
-																					'pl-2 flex items-center h-full shrink-0 w-[130px]',
-																					'bg-[#E0E0E0]'
+																					cn(
+																						'hidden group-hover/subject:flex items-center h-[31px] rounded-[8px] border-2 border-black overflow-hidden subject-bar bg-white w-full',
+																						!forceDesktop && 'max-[480px]:h-[24px]'
+																					)
 																				)}
 																			>
-																				<span className="font-inter font-semibold text-[17px] max-[480px]:text-[12px] whitespace-nowrap text-black subject-label">
-																					Auto Subject
-																				</span>
-																			</div>
+																				<div
+																					className={cn(
+																						'pl-2 flex items-center h-full shrink-0 w-[130px]',
+																						'bg-[#E0E0E0]'
+																					)}
+																				>
+																					<span className="font-inter font-semibold text-[17px] max-[480px]:text-[12px] whitespace-nowrap text-black subject-label">
+																						Subject
+																					</span>
+																				</div>
 
 																			<button
 																				type="button"
@@ -4432,6 +4565,22 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																					}}
 																				/>
 																			</div>
+																		</div>
+																	</div>
+
+																		{/* Right-side hover zone (where "Auto" used to be).
+																		    - Does NOT trigger expansion.
+																		    - Reveals "AUTO" only while hovering this area. */}
+																		<div
+																			aria-hidden="true"
+																			className={cn(
+																				'group/subject-auto flex items-center pl-2 w-[52px] h-[31px] shrink-0 select-none peer-hover/subject:hidden',
+																				!forceDesktop && 'max-[480px]:h-[24px]'
+																			)}
+																		>
+																			<span className="font-inter font-normal text-[13px] text-[#000000] opacity-0 group-hover/subject-auto:opacity-100 transition-opacity">
+																				AUTO
+																			</span>
 																		</div>
 																	</div>
 																) : (
@@ -5841,7 +5990,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																		)}
 																	>
 																		<span className="font-inter font-semibold text-[14px] whitespace-nowrap text-black">
-																			{isAiSubjectLocal ? 'Auto Subject' : 'Subject'}
+																			Subject
 																		</span>
 																	</div>
 
@@ -6436,7 +6585,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																		<div className="hidden group-hover/hybrid-signature:flex items-center h-[28px] rounded-[8px] border-2 border-black overflow-hidden bg-white w-full">
 																			<div className="pl-2 flex items-center h-full shrink-0 w-[140px] bg-[#E0E0E0]">
 																				<span className="font-inter font-semibold text-[14px] whitespace-nowrap text-black">
-																					Auto Signature
+																					Signature
 																				</span>
 																			</div>
 																			<button
@@ -6851,39 +7000,49 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 												data-hpi-signature-auto
 											>
 												{isAutoSignature ? (
-													<div className="group/signature relative h-[31px]">
-														{/* Collapsed state - shown by default, hidden on hover */}
-														<div className="flex items-center gap-2 group-hover/signature:hidden">
-															<div
-																className={cn(
-																	cn('flex items-center justify-center h-[31px] rounded-[8px] border-2 border-black overflow-hidden w-[122px]', !forceDesktop && 'max-[480px]:h-[24px]')
-																)}
-																style={{ backgroundColor: '#E0E0E0' }}
-															>
-																<span className="font-inter font-medium text-[18px] max-[480px]:text-[12px] whitespace-nowrap text-black">
-																	Signature
-																</span>
-															</div>
-															<span className="font-inter font-normal text-[13px] text-[#000000]">
-																Auto
-															</span>
-														</div>
-														{/* Expanded state - hidden by default, shown on hover */}
+													<div className="flex items-center">
 														<div
 															className={cn(
-																cn('hidden group-hover/signature:flex items-center h-[31px] rounded-[8px] border-2 border-black overflow-hidden bg-white w-full', !forceDesktop && 'max-[480px]:h-[24px]')
+																// Default: only the 122px Signature box is hoverable (so it doesn't expand from the right-side area).
+																// On hover: expand to full width so the user can interact with the expanded controls.
+																'relative group/signature peer/signature w-[122px] hover:w-full transition-none'
 															)}
 														>
+															{/* Collapsed state - shown by default, hidden on hover */}
+															<div className="flex items-center group-hover/signature:hidden">
+																<div
+																	className={cn(
+																		cn(
+																			'flex items-center justify-center h-[31px] rounded-[8px] border-2 border-black overflow-hidden w-[122px]',
+																			!forceDesktop && 'max-[480px]:h-[24px]'
+																		)
+																	)}
+																	style={{ backgroundColor: '#E0E0E0' }}
+																>
+																	<span className="font-inter font-medium text-[18px] max-[480px]:text-[12px] whitespace-nowrap text-black">
+																		Signature
+																	</span>
+																</div>
+															</div>
+															{/* Expanded state - hidden by default, shown on hover */}
 															<div
 																className={cn(
-																	'pl-2 flex items-center h-full shrink-0 w-[140px]',
-																	'bg-[#E0E0E0]'
+																	cn(
+																		'hidden group-hover/signature:flex items-center h-[31px] rounded-[8px] border-2 border-black overflow-hidden bg-white w-full',
+																		!forceDesktop && 'max-[480px]:h-[24px]'
+																	)
 																)}
 															>
-																<span className="font-inter font-semibold text-[17px] max-[480px]:text-[12px] whitespace-nowrap text-black">
-																	Auto Signature
-																</span>
-															</div>
+																<div
+																	className={cn(
+																		'pl-2 flex items-center h-full shrink-0 w-[140px]',
+																		'bg-[#E0E0E0]'
+																	)}
+																>
+																	<span className="font-inter font-semibold text-[17px] max-[480px]:text-[12px] whitespace-nowrap text-black">
+																		Signature
+																	</span>
+																</div>
 
 															<button
 																type="button"
@@ -6909,6 +7068,22 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																	placeholder="Write manual Signature here"
 																/>
 															</div>
+														</div>
+													</div>
+
+														{/* Right-side hover zone (where "Auto" used to be).
+														    - Does NOT trigger expansion.
+														    - Reveals "AUTO" only while hovering this area. */}
+														<div
+															aria-hidden="true"
+															className={cn(
+																'group/signature-auto flex items-center pl-2 w-[52px] h-[31px] shrink-0 select-none peer-hover/signature:hidden',
+																!forceDesktop && 'max-[480px]:h-[24px]'
+															)}
+														>
+															<span className="font-inter font-normal text-[13px] text-[#000000] opacity-0 group-hover/signature-auto:opacity-100 transition-opacity">
+																AUTO
+															</span>
 														</div>
 													</div>
 												) : (
@@ -7255,7 +7430,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 						{!compactLeftOnly && !isPendingGeneration && !hideDraftButton && (
 							<div
 								className={cn(
-									'relative h-[40px] mt-4 mx-auto',
+									'group relative h-[40px] mt-4 mx-auto',
 									isNarrowDesktop
 										? 'w-full max-w-[691px] px-4'
 										: isNarrowestDesktop
@@ -7295,8 +7470,21 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 										</button>
 									</>
 								) : (
-									<div className="w-full h-full flex items-center justify-center text-black font-inter font-normal text-[17px]">
-										Select Contacts and Draft Emails
+									<div className="relative w-full h-full rounded-[4px] border-[3px] border-transparent overflow-hidden transition-colors group-hover:bg-[#EEF5EF] group-hover:border-black">
+										<div className="w-full h-full flex items-center justify-center text-black font-inter font-normal text-[17px] cursor-default">
+											Select Contacts and Draft Emails
+										</div>
+										<button
+											type="button"
+											aria-label="Select all contacts"
+											className="absolute right-0 top-0 bottom-0 w-[62px] bg-[#74D178] rounded-r-[1px] flex items-center justify-center font-inter font-normal text-[17px] text-black hover:bg-[#65C269] cursor-pointer z-10 opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto"
+											onClick={() => {
+												onSelectAllContacts?.();
+											}}
+										>
+											<div className="absolute left-0 top-0 bottom-0 w-[3px] bg-black" />
+											All
+										</button>
 									</div>
 								)}
 							</div>

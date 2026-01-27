@@ -52,6 +52,9 @@ const PROFILE_PROGRESS_SEQUENCE = [
 
 type ProfileField = (typeof PROFILE_PROGRESS_SEQUENCE)[number]['key'];
 
+const MINI_EMAIL_GREEN_BG_GRADIENT =
+	'linear-gradient(to bottom, #7BDB7E 0%, #7BDB7E 25%, #A6E2A8 100%)';
+
 interface MiniEmailStructureProps {
 	form: UseFormReturn<DraftingFormValues>;
 	onDraft: () => void;
@@ -1076,7 +1079,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 	const isCompactSignature = hideFooter && hideTopChrome;
 	const resolvedTopHeaderHeight = topHeaderHeight ?? 0;
 	const hasTopHeaderSpacer = resolvedTopHeaderHeight > 0;
-	const resolvedPageFillColor = pageFillColor ?? '#A6E2A8';
+	const resolvedPageFillColor = pageFillColor ?? MINI_EMAIL_GREEN_BG_GRADIENT;
 
 	const SettingsPanelContent = () => {
 		const primary = (settingsPrimaryLabel ?? '').trim();

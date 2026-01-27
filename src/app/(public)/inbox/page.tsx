@@ -48,7 +48,7 @@ export default function InboxPage() {
   }, []);
 
   return (
-    <main className="relative bg-[#F5F5F7]">
+    <main className="relative bg-[#F5F5F7] overflow-x-hidden landing-page">
       {/* Gradient overlay for first 1935px (offset by navbar spacer height, h-12 = 48px) */}
       <div
         className="absolute -top-12 left-0 w-full pointer-events-none z-0"

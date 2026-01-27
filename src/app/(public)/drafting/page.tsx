@@ -20,8 +20,12 @@ export default function DraftingPage() {
       footer.style.display = 'none';
     }
 
-    // Make this route render at ~80% browser zoom.
-    document.body.style.setProperty('zoom', '0.8');
+    // Make this route render at ~80% browser zoom (desktop only).
+    // Mobile devices have touch scrolling issues with zoom, so skip it.
+    const isMobile = window.innerWidth < 768;
+    if (!isMobile) {
+      document.body.style.setProperty('zoom', '0.8');
+    }
 
     return () => {
       const footer = document.querySelector('footer') as HTMLElement | null;
@@ -38,7 +42,7 @@ export default function DraftingPage() {
   }, []);
 
   return (
-    <main className="relative bg-[#F5F5F7]">
+    <main className="relative bg-[#F5F5F7] overflow-x-hidden landing-page">
       {/* Gradient overlay for first 1935px (offset by navbar spacer height, h-12 = 48px) */}
       <div
         className="absolute -top-12 left-0 w-full pointer-events-none z-0"
@@ -60,11 +64,11 @@ export default function DraftingPage() {
       </div>
       {/* Tell your story */}
       {/* Narrow layout (stacked) */}
-      <div className="hidden max-[1193px]:block w-full mt-16 sm:mt-[192px] px-[14%]">
-        <div className="mx-auto w-full max-w-[904px] flex flex-col gap-6">
-          <FadeInUp className="bg-white rounded-[22px] px-6 xs:px-8 pt-10 pb-12">
-            <p className="font-inter font-normal text-[22px] xs:text-[24px] sm:text-[27px] text-black leading-tight">Tell your story</p>
-            <p className="font-inter font-normal text-[11.5px] xs:text-[12.5px] sm:text-[18px] text-black leading-tight mt-2 break-words">
+      <div className="hidden max-[1193px]:block w-full mt-16 sm:mt-[192px] px-4 sm:px-6">
+        <div className="mx-auto w-full max-w-[686px] flex flex-col gap-6">
+          <FadeInUp className="bg-white rounded-[34px] px-8 pt-10 pb-12">
+            <p className="font-inter font-bold text-[20px] text-black leading-tight">Tell your story</p>
+            <p className="font-inter font-normal text-[16px] text-black mt-5 leading-[1.75] tracking-wide [word-spacing:3px] break-words">
               When you add basic information to your profile, it gives context to the drafting. This creates much better results that incorporate
               your real bio, links, booking date range, and any custom instructions.
             </p>
@@ -72,7 +76,7 @@ export default function DraftingPage() {
 
           <FadeInUp
             delay={0.05}
-            className="rounded-[22px] bg-gradient-to-b from-[#E1D5FF] to-[#F1ECFB] px-6 xs:px-8 pt-10 pb-12 flex justify-center"
+            className="rounded-[34px] bg-gradient-to-b from-[#E1D5FF] to-[#F1ECFB] px-8 pt-10 pb-12 flex justify-center"
           >
             <ScaledToFit baseWidth={394} baseHeight={366}>
               <ProfileDemo />
@@ -101,13 +105,13 @@ export default function DraftingPage() {
       </div>
       {/* Drafting Modes */}
       {/* Narrow layout (mobile) */}
-      <div className="hidden max-[1193px]:block w-full mt-14 sm:mt-[146px] px-[14%]">
-        <div className="mx-auto w-full max-w-[904px] flex flex-col gap-6">
-          <FadeInUp className="bg-white rounded-[22px] px-6 xs:px-8 pt-10 pb-12">
-            <p className="font-inter font-bold text-[22px] xs:text-[24px] sm:text-[27px] text-black leading-tight">
+      <div className="hidden max-[1193px]:block w-full mt-14 sm:mt-[146px] px-4 sm:px-6">
+        <div className="mx-auto w-full max-w-[686px] flex flex-col gap-6">
+          <FadeInUp className="bg-white rounded-[34px] px-8 pt-10 pb-12">
+            <p className="font-inter font-bold text-[20px] text-black leading-tight">
               Drafting Modes
             </p>
-            <p className="font-inter font-normal text-[11.5px] xs:text-[12.5px] sm:text-[18px] text-black leading-relaxed mt-3 break-words">
+            <p className="font-inter font-normal text-[16px] text-black mt-5 leading-[1.75] tracking-wide [word-spacing:3px] break-words">
               Murmur has three distinct drafting modes: Auto, Manual, and Hybrid. Auto drafts based on the full range of information it has
               provided, such as the user profile, the contact research, contact location, and booking date range. In contrast to this, manual mode
               is a complete text editor with full customization. Then for edge cases, there&apos;s hybrid.
@@ -116,7 +120,7 @@ export default function DraftingPage() {
 
           <FadeInUp
             delay={0.05}
-            className="rounded-[22px] bg-gradient-to-b from-[#ECFFF9] to-[#BFEADC] px-6 xs:px-8 pt-10 pb-12"
+            className="rounded-[34px] bg-gradient-to-b from-[#ECFFF9] to-[#BFEADC] px-8 pt-10 pb-12"
           >
             <div className="space-y-16">
               <div>
@@ -169,13 +173,13 @@ export default function DraftingPage() {
       </div>
       {/* Built-in variation */}
       {/* Narrow layout (stacked, show both preview variants) */}
-      <div className="hidden max-[1193px]:block w-full mt-16 sm:mt-[181px] px-[14%]">
-        <div className="mx-auto w-full max-w-[904px] flex flex-col gap-6">
-          <FadeInUp className="bg-white rounded-[22px] px-6 xs:px-8 pt-10 pb-12">
-            <p className="font-inter font-bold text-[22px] xs:text-[24px] sm:text-[27px] text-black leading-tight">
+      <div className="hidden max-[1193px]:block w-full mt-16 sm:mt-[181px] px-4 sm:px-6">
+        <div className="mx-auto w-full max-w-[686px] flex flex-col gap-6">
+          <FadeInUp className="bg-white rounded-[34px] px-8 pt-10 pb-12">
+            <p className="font-inter font-bold text-[20px] text-black leading-tight">
               Built-in variation
             </p>
-            <p className="font-inter font-normal text-[11.5px] xs:text-[12.5px] sm:text-[18px] text-black leading-relaxed mt-3 break-words">
+            <p className="font-inter font-normal text-[16px] text-black mt-5 leading-[1.75] tracking-wide [word-spacing:3px] break-words">
               When drafting in Auto mode, we&apos;ve done extensive work to ensure that no two emails are identical, often drafting in fairly
               different structures. This allows you to embody a more unique voice for each contact you reach out to.
             </p>
@@ -183,7 +187,7 @@ export default function DraftingPage() {
 
           <FadeInUp
             delay={0.05}
-            className="rounded-[22px] px-6 xs:px-8 pt-10 pb-12"
+            className="rounded-[34px] px-8 pt-10 pb-12"
             style={{
               background: 'linear-gradient(229deg, #EFFDFF -10%, #C2E9EF 90%)',
             }}
