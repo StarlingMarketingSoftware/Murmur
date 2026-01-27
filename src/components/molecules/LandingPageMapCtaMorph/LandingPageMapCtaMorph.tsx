@@ -37,6 +37,7 @@ const LENIS_SLOWDOWN_RELEASE_PROGRESS = (1 + CONTENT_CROSSFADE_END) / 2;
 
 export function LandingPageMapCtaMorph({ mapContainerRef }: Props) {
 	const lenis = useLenis();
+	const lenisRef = useRef<any | null>(null);
 	const cardRef = useRef<HTMLDivElement | null>(null);
 	const bigContentRef = useRef<HTMLDivElement | null>(null);
 	const smallContentRef = useRef<HTMLDivElement | null>(null);
@@ -55,6 +56,15 @@ export function LandingPageMapCtaMorph({ mapContainerRef }: Props) {
 		touchMultiplier: number;
 	} | null>(null);
 	const lenisSlowdownEnabledRef = useRef(false);
+
+	// Keep the main GSAP/ScrollTrigger setup stable; Lenis initializes asynchronously and
+	// we don't want to tear down/recreate the morph timeline mid-load.
+	useEffect(() => {
+		lenisRef.current = lenis;
+		// Reset multiplier cache when Lenis instance changes.
+		lenisOriginalMultipliersRef.current = null;
+		lenisSlowdownEnabledRef.current = false;
+	}, [lenis]);
 
 	useEffect(() => {
 		if (typeof window === 'undefined') return;
@@ -79,15 +89,12 @@ export function LandingPageMapCtaMorph({ mapContainerRef }: Props) {
 			!/Edg/.test(navigator.userAgent);
 		if (!isChrome) return;
 
-		// Reset cached values when lenis instance changes.
-		lenisOriginalMultipliersRef.current = null;
-		lenisSlowdownEnabledRef.current = false;
-
 		const setLenisSlowdownEnabled = (enabled: boolean) => {
-			if (!lenis) return;
+			const activeLenis = lenisRef.current;
+			if (!activeLenis) return;
 			if (lenisSlowdownEnabledRef.current === enabled) return;
 
-			const l = lenis as any;
+			const l = activeLenis as any;
 
 			const getWheelMultiplier = () =>
 				Number(l?.virtualScroll?.options?.wheelMultiplier ?? l?.options?.wheelMultiplier ?? 1);
@@ -243,58 +250,55 @@ export function LandingPageMapCtaMorph({ mapContainerRef }: Props) {
 			blurPlaceholder.style.pointerEvents = 'none';
 
 			// Scroll-tied morph: big centered → glass → small bottom-left.
-			const tl = gsap.timeline({
-				defaults: { ease: 'none' },
-				scrollTrigger: {
-					// Start exactly when the bottom of the *original* (centered) big card hits the viewport bottom.
-					trigger: startMarker,
-					start: 'top bottom',
-					// Finish exactly when the bottom of the map is visible (bottom edge hits viewport bottom).
-					endTrigger: endMarker,
-					end: 'top bottom',
-					scrub: SCRUB_SMOOTHNESS,
-					invalidateOnRefresh: true,
-					onUpdate: (self) => {
-						const scrollP = self.progress;
-						const visualP = tl.progress();
+			// Build the timeline first, then attach ScrollTrigger so refresh/mount can't
+			// update text without the card geometry being rendered to the same progress.
+			const tl = gsap.timeline({ defaults: { ease: 'none' } });
 
-						// If the user reaches the end of the scroll range, make this irreversible:
-						// stop the ScrollTrigger (so it can't drive backwards), then smoothly finish
-						// the animation to the final state and keep it locked until refresh.
-						if (!hasCompletedMorphRef.current && !isMorphFinalizingRef.current && scrollP >= 0.999) {
-							hasCompletedMorphRef.current = true;
-							isMorphFinalizingRef.current = true;
+			const handleUpdate = (self: any, opts?: { forceRender?: boolean }) => {
+				// On refresh / initial mount, force the timeline to the *current* scroll progress
+				// so the card geometry + text layer are always in sync (prevents mismatched states).
+				if (opts?.forceRender) {
+					tl.progress(self.progress);
+				}
 
-							if (refreshTimer != null) {
-								window.clearTimeout(refreshTimer);
-								refreshTimer = null;
-							}
+				const scrollP = self.progress;
+				const visualP = tl.progress();
 
-							setLenisSlowdownEnabled(false);
-							self.kill(false);
-							gsap.killTweensOf(tl);
+				// If the user reaches the end of the scroll range, make this irreversible:
+				// stop the ScrollTrigger (so it can't drive backwards), then smoothly finish
+				// the animation to the final state and keep it locked until refresh.
+				if (!hasCompletedMorphRef.current && !isMorphFinalizingRef.current && scrollP >= 0.999) {
+					hasCompletedMorphRef.current = true;
+					isMorphFinalizingRef.current = true;
 
-							gsap.to(tl, {
-								progress: 1,
-								duration: 0.75,
-								ease: 'power2.out',
-								overwrite: true,
-								onUpdate: () => updateContentForProgress(tl.progress()),
-								onComplete: () => {
-									isMorphFinalizingRef.current = false;
-									applyCompletedState();
-									tl.kill();
-								},
-							});
+					if (refreshTimer != null) {
+						window.clearTimeout(refreshTimer);
+						refreshTimer = null;
+					}
 
-							return;
-						}
+					setLenisSlowdownEnabled(false);
+					self.kill(false);
+					gsap.killTweensOf(tl);
 
-						setLenisSlowdownEnabled(self.isActive && visualP < LENIS_SLOWDOWN_RELEASE_PROGRESS);
-						updateContentForProgress(visualP);
-					},
-				},
-			});
+					gsap.to(tl, {
+						progress: 1,
+						duration: 0.75,
+						ease: 'power2.out',
+						overwrite: true,
+						onUpdate: () => updateContentForProgress(tl.progress()),
+						onComplete: () => {
+							isMorphFinalizingRef.current = false;
+							applyCompletedState();
+							tl.kill();
+						},
+					});
+
+					return;
+				}
+
+				setLenisSlowdownEnabled(self.isActive && visualP < LENIS_SLOWDOWN_RELEASE_PROGRESS);
+				updateContentForProgress(visualP);
+			};
 
 			// Phase 1: Glass-in while the *full* big card stays intact.
 			tl.to(
@@ -340,14 +344,30 @@ export function LandingPageMapCtaMorph({ mapContainerRef }: Props) {
 				0.78
 			);
 
-			// Ensure ScrollTrigger uses the latest geometry after mount/layout settles.
-			refreshTimer = window.setTimeout(() => ScrollTrigger.refresh(), 200);
+			const st = ScrollTrigger.create({
+				// Start exactly when the bottom of the *original* (centered) big card hits the viewport bottom.
+				trigger: startMarker,
+				start: 'top bottom',
+				// Finish exactly when the bottom of the map is visible (bottom edge hits viewport bottom).
+				endTrigger: endMarker,
+				end: 'top bottom',
+				scrub: SCRUB_SMOOTHNESS,
+				invalidateOnRefresh: true,
+				animation: tl,
+				onUpdate: (self) => handleUpdate(self),
+				onRefresh: (self) => handleUpdate(self, { forceRender: true }),
+			});
 
-			// If the page loads while this trigger is already active, ensure slowdown is applied.
-			setLenisSlowdownEnabled(
-				Boolean(tl.scrollTrigger?.isActive) &&
-					(tl.scrollTrigger?.progress ?? 0) < LENIS_SLOWDOWN_RELEASE_PROGRESS
-			);
+			// Ensure ScrollTrigger uses the latest geometry after mount/layout settles.
+			refreshTimer = window.setTimeout(() => {
+				ScrollTrigger.refresh();
+				// Re-sync after the refresh in case layout/scroll changed (e.g. map scaling, fade-in).
+				handleUpdate(st, { forceRender: true });
+			}, 200);
+
+			// Initial sync (handles refresh-with-scroll-restoration).
+			// Placed after scheduling the refresh so the "latch" path can cancel it.
+			handleUpdate(st, { forceRender: true });
 		}, card);
 
 		return () => {
@@ -355,7 +375,7 @@ export function LandingPageMapCtaMorph({ mapContainerRef }: Props) {
 			if (refreshTimer != null) window.clearTimeout(refreshTimer);
 			ctx.revert();
 		};
-	}, [mapContainerRef, lenis]);
+	}, [mapContainerRef]);
 
 	return (
 		<div className="pointer-events-none absolute inset-0 z-40 hidden md:block">
