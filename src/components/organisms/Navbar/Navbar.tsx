@@ -84,10 +84,10 @@ export const Navbar = () => {
 		if (isMobileMenuOpen) {
 			document.body.style.overflow = 'hidden';
 		} else {
-			document.body.style.overflow = 'unset';
+			document.body.style.overflow = '';
 		}
 		return () => {
-			document.body.style.overflow = 'unset';
+			document.body.style.overflow = '';
 		};
 	}, [isMobileMenuOpen]);
 
@@ -152,6 +152,7 @@ export const Navbar = () => {
 		<>
 			{/* Main Navigation Bar - Artistic Glass */}
 			<nav
+				data-mobile-menu-open={isMobileMenuOpen ? 'true' : 'false'}
 				className={cn(
 					'fixed z-50 font-secondary',
 					// Mobile: make the navbar "morph" into the dropdown card (so it doesn't feel split).

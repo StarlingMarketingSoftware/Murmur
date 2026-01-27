@@ -60,8 +60,26 @@ export function ScrollProvider({ children }: ScrollProviderProps) {
 			typeof pathname === 'string' && pathname.startsWith('/murmur/dashboard');
 		const isCampaignPage =
 			typeof pathname === 'string' && pathname.startsWith('/murmur/campaign');
+
+		// Mobile Safari: disable Lenis on public feature marketing pages.
+		// These pages should feel like native scroll, and smooth-scroll layers can feel "sticky"
+		// at the extreme top/bottom on touch devices.
+		const isPublicFeaturePage =
+			typeof pathname === 'string' &&
+			(pathname === '/map' ||
+				pathname.startsWith('/map/') ||
+				pathname === '/research' ||
+				pathname.startsWith('/research/') ||
+				pathname === '/inbox' ||
+				pathname.startsWith('/inbox/') ||
+				pathname === '/drafting' ||
+				pathname.startsWith('/drafting/'));
 		
-		if (isCampaignPage || (isMobile === true && isDashboardPage)) {
+		if (
+			isCampaignPage ||
+			(isMobile === true && isDashboardPage) ||
+			(isMobile === true && isPublicFeaturePage)
+		) {
 			// Ensure any existing Lenis instance is destroyed and classes updated
 			try {
 				if (lenisRef.current) {
