@@ -77,9 +77,9 @@ export default function InboxPage() {
 
   return (
     <main className="relative bg-[#F5F5F7] overflow-x-hidden landing-page">
-      {/* Gradient overlay for first 1935px (offset by navbar spacer height, h-12 = 48px) */}
+      {/* Gradient overlay for first 1935px */}
       <div
-        className="absolute -top-12 left-0 w-full pointer-events-none z-0"
+        className="fixed top-0 left-0 w-full pointer-events-none z-0"
         style={{
           height: '1935px',
           background: 'linear-gradient(to bottom, #D3E9FF, #F5F5F7)',
@@ -101,8 +101,10 @@ export default function InboxPage() {
       <div className="xl:hidden w-full mt-16 md:mt-[102px] px-4 sm:px-[8%] md:px-[14%]">
         <div className="mx-auto w-full max-w-[904px]">
           <FadeInUp className="bg-white rounded-[22px] px-6 xs:px-8 sm:px-10 pt-10 pb-12">
-            <p className="font-inter font-bold text-[24px] text-black text-left">Never miss a reply</p>
-            <p className="font-inter text-[21px] text-black text-left mt-8 leading-[57px] tracking-wide [word-spacing:5px] break-words">
+            <p className="font-inter font-bold text-[20px] text-black text-left leading-tight">
+              Never miss a reply
+            </p>
+            <p className="font-inter font-normal text-[16px] text-black text-left mt-5 leading-[1.75] tracking-wide [word-spacing:3px] break-words">
               Keep track of when venues reply to you. Each response is tagged to its corresponding campaign, so you&apos;ll always know where it came from.
             </p>
           </FadeInUp>
@@ -144,8 +146,10 @@ export default function InboxPage() {
       <div className="xl:hidden w-full mt-16 md:mt-[97px] px-4 sm:px-[8%] md:px-[14%]">
         <div className="mx-auto w-full max-w-[904px]">
           <FadeInUp className="bg-white rounded-[22px] px-6 xs:px-8 sm:px-10 pt-10 pb-12">
-            <p className="font-inter font-bold text-[24px] text-black text-left">Respond from Within Campaigns</p>
-            <p className="font-inter text-[21px] text-black text-left mt-8 leading-[57px] tracking-wide [word-spacing:5px] break-words">
+            <p className="font-inter font-bold text-[20px] text-black text-left leading-tight">
+              Respond from Within Campaigns
+            </p>
+            <p className="font-inter font-normal text-[16px] text-black text-left mt-5 leading-[1.75] tracking-wide [word-spacing:3px] break-words">
               Each campaign has its own inbox tab, showing just responses from that batch. Contact research is
               provided next to each reply so you can reply quickly without digging through notes. Since your inbox
               lives inside the campaign, you can see exactly what you sent alongside their reply.

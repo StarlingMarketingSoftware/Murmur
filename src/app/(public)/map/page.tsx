@@ -43,8 +43,7 @@ export default function MapPage() {
     <main className="relative bg-[#F5F5F7] overflow-x-hidden landing-page">
       {/* Gradient overlay for first 1307px (outside `.landing-zoom-80` so it isn't scaled by `zoom`) */}
       <div
-        // Offset by the navbar spacer height (h-12 = 48px) so the gradient starts at the true top of the page.
-        className="absolute -top-12 left-0 w-full pointer-events-none z-0"
+        className="fixed top-0 left-0 w-full pointer-events-none z-0"
         style={{
           height: '1307px',
           background: 'linear-gradient(to bottom, #E6D6C6, #F5F5F7)',

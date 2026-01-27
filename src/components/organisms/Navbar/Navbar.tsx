@@ -471,8 +471,8 @@ export const Navbar = () => {
 				/>
 			</div>
 
-			{/* Spacer */}
-			{!(isLanding || isFreeTrial) && <div className="h-12" />}
+			{/* Spacer - skip on landing, free-trial, and marketing feature pages that want full-bleed gradients */}
+			{!(isLanding || isFreeTrial || isMapPage || isResearchPage || isInboxPage || isDraftingPage) && <div className="h-12" />}
 		</>
 	);
 };

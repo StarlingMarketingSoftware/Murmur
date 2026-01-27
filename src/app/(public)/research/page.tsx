@@ -50,9 +50,9 @@ export default function ResearchPage() {
 
   return (
     <main className="relative bg-[#F5F5F7] overflow-x-hidden landing-page">
-      {/* Gradient overlay for first 1935px (offset by navbar spacer height, h-12 = 48px) */}
+      {/* Gradient overlay for first 1935px */}
       <div
-        className="absolute -top-12 left-0 w-full pointer-events-none z-0"
+        className="fixed top-0 left-0 w-full pointer-events-none z-0"
         style={{
           height: '1935px',
           background: 'linear-gradient(to bottom, #D3F4FF, #F5F5F7)',

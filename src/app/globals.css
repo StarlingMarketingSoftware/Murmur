@@ -4127,6 +4127,35 @@ html.murmur-inbox-compact {
 	}
 }
 
+/* Drafting public page scaling (80%) */
+html.murmur-drafting-compact {
+	zoom: 0.8;
+}
+
+@supports not (zoom: 1) {
+	html.murmur-drafting-compact body {
+		transform: scale(0.8);
+		transform-origin: top center;
+		width: calc(100% / 0.8);
+	}
+}
+
+/* Mobile: disable compact scaling to preserve touch scrolling (iOS Safari) */
+@media (max-width: 767px) {
+	html.murmur-drafting-compact {
+		zoom: 1;
+	}
+}
+
+@media (max-width: 767px) {
+	@supports not (zoom: 1) {
+		html.murmur-drafting-compact body {
+			transform: none;
+			width: 100%;
+		}
+	}
+}
+
 /* Extra compact scaling (85%) for fullscreen map/campaign views */
 html.murmur-compact.murmur-campaign-compact {
 	zoom: var(--murmur-campaign-zoom, 0.85);
