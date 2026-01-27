@@ -875,12 +875,12 @@ export default function HomePage() {
 	useEffect(() => {
 		const baseDpr = window.devicePixelRatio || 1;
 
-		const DESIGN_WIDTH_PX = 1884;
-		const SCALE_BREAKPOINT_PX = 1582;
+		const DESIGN_WIDTH_PX = 1864;
+		const TARGET_MAX_WIDTH_PX = 1280;
 		const MOBILE_BREAKPOINT_PX = 767;
 		const SIDE_PADDING_DESKTOP_PX = 32;
 		const MAP_BORDER_PX = 3;
-		const MAP_PADDING_DESKTOP_PX = 16;
+		const MAP_PADDING_DESKTOP_PX = 0;
 		const MAP_PADDING_MOBILE_PX = 0;
 
 		const getLandingZoom = (el: HTMLElement) => {
@@ -912,12 +912,11 @@ export default function HomePage() {
 			const mapOuterWidthPx = DESIGN_WIDTH_PX + (MAP_BORDER_PX + mapPaddingPx) * 2;
 			const availableWidthPx = Math.max(0, normalizedViewportWidthPx - sidePaddingPx);
 			const fitScale = availableWidthPx / (mapOuterWidthPx * landingZoom);
+			const maxScale = TARGET_MAX_WIDTH_PX / DESIGN_WIDTH_PX;
 
-			let scale = 1;
-			if (normalizedViewportWidthPx <= SCALE_BREAKPOINT_PX) {
-				// Fill the viewport width (no mobile side gutters), never exceed 1:1.
-				scale = Math.max(0, Math.min(1, fitScale));
-			}
+			// Always apply the scale, capping it at the target max width (1535px).
+			// This ensures the map shrinks on smaller screens AND stays limited on large screens.
+			const scale = Math.max(0, Math.min(maxScale, fitScale));
 
 			// Clamp precision to avoid churn from tiny float diffs (helps avoid extra rerenders).
 			const nextScale = Math.round(scale * 10000) / 10000;
@@ -1419,7 +1418,7 @@ export default function HomePage() {
 							{/* Desktop-only: live Google Map background (SVG raster stays until map is ready) */}
 							{shouldMountLandingGoogleMap ? (
 								<div
-									className="absolute inset-[16px] z-0"
+									className="absolute inset-0 z-0"
 									aria-hidden="true"
 								>
 									<LandingPageGoogleMapBackground

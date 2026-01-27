@@ -761,8 +761,6 @@ export function LandingPageGoogleMapBackground({ className, onReady }: Props) {
 				</GoogleMap>
 			</div>
 
-			<div className="pointer-events-none absolute inset-0 rounded-[8px] border-[3px] border-[#000000] z-[20]" />
-
 			{/* Landing map overlay: dashboard "mini" (map view) segmented search bar */}
 			<div className="absolute top-[12px] left-1/2 -translate-x-1/2 z-[80] pointer-events-none">
 				<div className="pointer-events-auto relative">

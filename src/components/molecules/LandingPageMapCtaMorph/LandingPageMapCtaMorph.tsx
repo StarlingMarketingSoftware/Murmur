@@ -20,9 +20,9 @@ const BIG_CARD_HEIGHT_PX = 487;
 const SMALL_CARD_WIDTH_PX = 485;
 const SMALL_CARD_HEIGHT_PX = 219;
 // The unscaled map container dimensions (from `.landing-map-container` CSS).
-const MAP_CONTAINER_HEIGHT_PX = 1073;
-const SMALL_CARD_LEFT_INSET_PX = 40; // from the map's left edge
-const SMALL_CARD_BOTTOM_INSET_PX = -156; // from the map's bottom edge
+const MAP_CONTAINER_HEIGHT_PX = 1050;
+const SMALL_CARD_LEFT_INSET_PX = 24; // from the map's left edge
+const SMALL_CARD_BOTTOM_INSET_PX = -172; // from the map's bottom edge
 
 // Keep this feeling directly tied to scroll (Apple-style).
 const SCRUB_SMOOTHNESS: true | number = 1.2;

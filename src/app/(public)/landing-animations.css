@@ -499,12 +499,12 @@ body {
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	width: 1884px;
-	height: 1073px;
+	width: 1864px;
+	height: 1050px;
 	border: 3px solid #000000;
 	border-radius: 8px;
-	background-color: #AFD6EF;
-	padding: 16px;
+	background-color: transparent;
+	padding: 0;
 	overflow: hidden;
 	transform-origin: top center;
 	transform: scale(var(--landing-map-scale));
@@ -567,13 +567,11 @@ body {
 }
 
 /* At 1582px and below, scale proportionally */
-/* Scale factor at 1582px: (1582-32)/1884 = 0.823 */
-/* Scale factor at 1200px: (1200-32)/1884 = 0.620 */
-/* Scale factor at 900px: (900-32)/1884 = 0.461 */
+/* Scale factor at 1582px: (1582-32)/1864 = 0.831 */
 @media (max-width: 1582px) {
 	.landing-map-wrapper {
 		/* Fallback if JS doesn't run: scale proportionally */
-		--landing-map-scale: calc((100vw - 32px) / 1884px);
+		--landing-map-scale: calc((100vw - 32px) / 1864px);
 	}
 }
 
