@@ -8,6 +8,7 @@ interface DraggableHighlightProps {
 	mode?: 'full' | 'hybrid' | 'manual';
 	disabled?: boolean;
 	onSelectMode?: (mode: 'full' | 'hybrid' | 'manual') => void;
+	backgroundColorOverride?: string;
 }
 
 export const DraggableHighlight = ({
@@ -16,19 +17,21 @@ export const DraggableHighlight = ({
 	mode = 'full',
 	disabled = false,
 	onSelectMode,
+	backgroundColorOverride,
 }: DraggableHighlightProps) => {
 	const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
 		id: 'mode-highlight',
 		disabled,
 	});
 
+	const animatedTransition = '0.6s cubic-bezier(0.22, 1, 0.36, 1)';
 	const combinedStyle = {
 		...style,
 		transform: CSS.Translate.toString(transform),
 		transition:
 			isInitialRender || isDragging
 				? 'none'
-				: `left 0.3s ease-in-out, width 0.3s ease-in-out`,
+				: `left ${animatedTransition}, width ${animatedTransition}`,
 	};
 
 	// Set background color based on mode
@@ -43,6 +46,8 @@ export const DraggableHighlight = ({
 				return '#DAE6FE'; // Keep existing color for Full Auto
 		}
 	};
+
+	const highlightBackgroundColor = backgroundColorOverride ?? getBackgroundColor();
 
 	return (
 		<div
@@ -62,11 +67,11 @@ export const DraggableHighlight = ({
 				style={{
 					width: '80.38px',
 					height: '19px',
-					backgroundColor: getBackgroundColor(),
+					backgroundColor: highlightBackgroundColor,
 					border: '1.3px solid #000000',
 					borderRadius: '8px',
 					transform: isDragging ? 'scale(1.05)' : 'scale(1)',
-					transition: 'transform 0.2s ease-in-out',
+					transition: `transform 0.2s ease-in-out, background-color ${animatedTransition}`,
 				}}
 			/>
 		</div>

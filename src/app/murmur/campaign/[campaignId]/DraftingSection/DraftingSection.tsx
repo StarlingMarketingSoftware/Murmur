@@ -3959,7 +3959,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												</button>
 												{/* Draft button container */}
 												<div
-													className="relative h-[40px] flex-1"
+													className="group relative h-[40px] flex-1"
 													style={{ maxWidth: '691px' }}
 												>
 													{contactsTabSelectedIds.size > 0 ? (
@@ -4006,8 +4006,34 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 															</button>
 														</>
 													) : (
-														<div className="w-full h-full flex items-center justify-center text-black font-inter font-normal text-[17px]">
-															Select Contacts and Draft Emails
+														<div className="relative w-full h-full rounded-[4px] border-[3px] border-transparent overflow-hidden transition-colors group-hover:bg-[#EEF5EF] group-hover:border-black">
+															<div className="w-full h-full flex items-center justify-center text-black font-inter font-normal text-[17px] cursor-default">
+																Select Contacts and Draft Emails
+															</div>
+															<button
+																type="button"
+																aria-label="Select all contacts"
+																className="absolute right-0 top-0 bottom-0 w-[62px] bg-[#74D178] rounded-r-[1px] flex items-center justify-center font-inter font-normal text-[17px] text-black hover:bg-[#65C269] cursor-pointer z-10 opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto"
+																onClick={() => {
+																	const allIds = new Set(
+																		contactsAvailableForDrafting.map((c) => c.id)
+																	);
+																	const areAllSelected =
+																		contactsTabSelectedIds.size === allIds.size &&
+																		[...allIds].every((id) =>
+																			contactsTabSelectedIds.has(id)
+																		);
+
+																	if (areAllSelected) {
+																		setContactsTabSelectedIds(new Set());
+																	} else {
+																		setContactsTabSelectedIds(allIds);
+																	}
+																}}
+															>
+																<div className="absolute left-0 top-0 bottom-0 w-[3px] bg-black" />
+																All
+															</button>
 														</div>
 													)}
 												</div>
@@ -4094,7 +4120,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												</button>
 												{/* Draft button container */}
 												<div
-													className="relative h-[40px] w-full max-w-[407px]"
+													className="group relative h-[40px] w-full max-w-[407px]"
 												>
 													{contactsTabSelectedIds.size > 0 ? (
 														<>
@@ -4140,8 +4166,34 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 															</button>
 														</>
 													) : (
-														<div className="w-full h-full flex items-center justify-center text-black font-inter font-normal text-[17px]">
-															Select Contacts and Draft Emails
+														<div className="relative w-full h-full rounded-[4px] border-[3px] border-transparent overflow-hidden transition-colors group-hover:bg-[#EEF5EF] group-hover:border-black">
+															<div className="w-full h-full flex items-center justify-center text-black font-inter font-normal text-[17px] cursor-default">
+																Select Contacts and Draft Emails
+															</div>
+															<button
+																type="button"
+																aria-label="Select all contacts"
+																className="absolute right-0 top-0 bottom-0 w-[62px] bg-[#74D178] rounded-r-[1px] flex items-center justify-center font-inter font-normal text-[17px] text-black hover:bg-[#65C269] cursor-pointer z-10 opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto"
+																onClick={() => {
+																	const allIds = new Set(
+																		contactsAvailableForDrafting.map((c) => c.id)
+																	);
+																	const areAllSelected =
+																		contactsTabSelectedIds.size === allIds.size &&
+																		[...allIds].every((id) =>
+																			contactsTabSelectedIds.has(id)
+																		);
+
+																	if (areAllSelected) {
+																		setContactsTabSelectedIds(new Set());
+																	} else {
+																		setContactsTabSelectedIds(allIds);
+																	}
+																}}
+															>
+																<div className="absolute left-0 top-0 bottom-0 w-[3px] bg-black" />
+																All
+															</button>
 														</div>
 													)}
 												</div>
@@ -4942,7 +4994,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											</button>
 											{/* Draft button container */}
 											<div
-												className="relative h-[40px] flex-1"
+												className="group relative h-[40px] flex-1"
 												style={{ maxWidth: '691px' }}
 											>
 												{contactsTabSelectedIds.size > 0 ? (
@@ -4990,8 +5042,34 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														</button>
 													</>
 												) : (
-													<div className="w-full h-full flex items-center justify-center text-black font-inter font-normal text-[17px]">
-														Select Contacts and Draft Emails
+													<div className="relative w-full h-full rounded-[4px] border-[3px] border-transparent overflow-hidden transition-colors group-hover:bg-[#EEF5EF] group-hover:border-black">
+														<div className="w-full h-full flex items-center justify-center text-black font-inter font-normal text-[17px] cursor-default">
+															Select Contacts and Draft Emails
+														</div>
+														<button
+															type="button"
+															aria-label="Select all contacts"
+															className="absolute right-0 top-0 bottom-0 w-[62px] bg-[#D17474] rounded-r-[1px] rounded-l-none flex items-center justify-center font-inter font-normal text-[17px] text-black hover:bg-[#C26666] cursor-pointer z-10 opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto"
+															onClick={(e) => {
+																e.stopPropagation();
+																const allIds = new Set(
+																	contactsAvailableForDrafting.map((c) => c.id)
+																);
+																const isAllSelected =
+																	contactsTabSelectedIds.size === allIds.size &&
+																	[...allIds].every((id) =>
+																		contactsTabSelectedIds.has(id)
+																	);
+																if (isAllSelected) {
+																	setContactsTabSelectedIds(new Set());
+																} else {
+																	setContactsTabSelectedIds(allIds);
+																}
+															}}
+														>
+															<div className="absolute left-0 top-0 bottom-0 w-[3px] bg-black" />
+															All
+														</button>
 													</div>
 												)}
 											</div>
@@ -5080,7 +5158,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												</button>
 												{/* Draft button container */}
 												<div
-													className="relative h-[36px] flex-1"
+													className="group relative h-[36px] flex-1"
 													style={{ maxWidth: '400px' }}
 												>
 													{contactsTabSelectedIds.size > 0 ? (
@@ -5128,8 +5206,34 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 															</button>
 														</>
 													) : (
-														<div className="w-full h-full flex items-center justify-center text-black font-inter font-normal text-[15px]">
-															Select Contacts and Draft Emails
+														<div className="relative w-full h-full rounded-[4px] border-[3px] border-transparent overflow-hidden transition-colors group-hover:bg-[#EEF5EF] group-hover:border-black">
+															<div className="w-full h-full flex items-center justify-center text-black font-inter font-normal text-[15px] cursor-default">
+																Select Contacts and Draft Emails
+															</div>
+															<button
+																type="button"
+																aria-label="Select all contacts"
+																className="absolute right-0 top-0 bottom-0 w-[52px] bg-[#D17474] rounded-r-[1px] rounded-l-none flex items-center justify-center font-inter font-normal text-[15px] text-black hover:bg-[#C26666] cursor-pointer z-10 opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto"
+																onClick={(e) => {
+																	e.stopPropagation();
+																	const allIds = new Set(
+																		contactsAvailableForDrafting.map((c) => c.id)
+																	);
+																	const isAllSelected =
+																		contactsTabSelectedIds.size === allIds.size &&
+																		[...allIds].every((id) =>
+																			contactsTabSelectedIds.has(id)
+																		);
+																	if (isAllSelected) {
+																		setContactsTabSelectedIds(new Set());
+																	} else {
+																		setContactsTabSelectedIds(allIds);
+																	}
+																}}
+															>
+																<div className="absolute left-0 top-0 bottom-0 w-[3px] bg-black" />
+																All
+															</button>
 														</div>
 													)}
 												</div>

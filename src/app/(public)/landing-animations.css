@@ -80,6 +80,40 @@ body {
 	}
 }
 
+/* Mobile: disable zoom to fix touch scrolling issues on iOS Safari */
+@media (max-width: 767px) {
+	.landing-zoom-80 {
+		--landing-zoom: 1;
+		zoom: 1;
+		width: 100%;
+		margin-left: 0;
+		margin-right: 0;
+	}
+
+	.landing-navbar-zoom-80 {
+		--landing-zoom: 1;
+		width: 100%;
+		transform: translateX(-50%) scale(1);
+	}
+
+	/* Reset viewport-sized utilities since zoom is now 1 */
+	.landing-zoom-80 .w-screen {
+		width: 100vw;
+	}
+	.landing-zoom-80 .h-screen {
+		height: 100vh;
+	}
+	.landing-zoom-80 .min-h-screen {
+		min-height: 100vh;
+	}
+	.landing-zoom-80 .h-dvh {
+		height: 100dvh;
+	}
+	.landing-zoom-80 .min-h-dvh {
+		min-height: 100dvh;
+	}
+}
+
 /* ========================================
    Landing Hero - Mobile-safe first fold
    ======================================== */
