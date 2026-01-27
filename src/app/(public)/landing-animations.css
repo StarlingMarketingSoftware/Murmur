@@ -115,30 +115,110 @@ body {
 }
 
 /* ========================================
-   Landing Hero - Mobile-safe first fold
+   Landing Hero (gradient + framed video)
    ======================================== */
 
 .landing-hero {
-	/* Default before JS runs */
-	--landing-hero-visible-height: 100vh;
-	/* Responsive video framing (overridden on mobile below) */
-	--landing-hero-video-object-position: top;
-
-	/* Keep the hero truly viewport-height after zooming the page wrapper. */
-	height: calc(var(--landing-hero-visible-height) / var(--landing-zoom, 1));
+	/* Match Figma: top-right → bottom-left */
+	background: linear-gradient(to bottom left, #c8cfee 0%, #ffffff 60%);
 }
 
-@supports (height: 100svh) {
-	.landing-hero {
-		/* Small viewport height (matches first visible fold on mobile browsers) */
-		--landing-hero-visible-height: 100svh;
+.landing-hero-inner {
+	width: min(1265px, calc(100% - 64px));
+	margin: 0 auto;
+	padding-top: 85px;
+	padding-bottom: 64px;
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 22px;
+}
+
+.landing-hero-headline-card {
+	width: 500px;
+	height: 180px;
+	border-radius: 22px;
+	background: #f5f5f7;
+	padding: 20px 22px;
+	display: flex;
+	flex-direction: column;
+	justify-content: space-between;
+	margin-left: 0;
+}
+
+.landing-hero-headline {
+	margin: 0;
+	font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+	font-size: 34px;
+	line-height: 1.15;
+	font-weight: 300;
+	color: #060606;
+}
+
+.landing-hero-card-cta {
+	width: min(280px, 100%);
+	height: 33px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	background: #53b060;
+	border: 1px solid #118521;
+	border-radius: 8px;
+	color: #ffffff;
+	font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+	font-size: 16px;
+	font-weight: 500;
+	text-decoration: none;
+	transition: filter 160ms ease, transform 160ms ease;
+}
+
+.landing-hero-card-cta:hover {
+	filter: brightness(0.97);
+}
+
+.landing-hero-card-cta:active {
+	transform: translateY(1px);
+}
+
+.landing-hero-video-frame {
+	width: 100%;
+	border-radius: 17px;
+	overflow: hidden;
+	background: #000;
+	aspect-ratio: 16 / 9;
+}
+
+.landing-hero-video-player {
+	width: 100%;
+	height: 100%;
+	display: block;
+}
+
+@media (min-width: 1145px) {
+	.landing-hero-headline-card {
+		/* Card should start 126px left of the video */
+		margin-left: -126px;
 	}
 }
 
 @media (max-width: 767px) {
-	.landing-hero {
-		/* Slightly less aggressive crop on portrait screens */
-		--landing-hero-video-object-position: center;
+	.landing-hero-inner {
+		width: calc(100% - 32px);
+		padding-top: 92px;
+		padding-bottom: 40px;
+		gap: 20px;
+	}
+
+	.landing-hero-headline-card {
+		width: 100%;
+		max-width: 500px;
+		height: auto;
+		min-height: 160px;
+		margin-left: 0;
+	}
+
+	.landing-hero-headline {
+		font-size: clamp(26px, 7vw, 34px);
 	}
 }
 
@@ -253,8 +333,8 @@ body {
 	display: flex;
 	align-items: center;
 	/* Responsive slide sizing */
-	--video-carousel-item-width: min(946px, calc(100vw - 32px));
-	--video-carousel-gap: clamp(12px, 3vw, 32px);
+	--video-carousel-item-width: min(400px, calc(100vw - 32px));
+	--video-carousel-gap: clamp(8px, 1.8vw, 16px);
 	/* Responsive indicator sizing */
 	--video-carousel-indicator-size: clamp(7px, 1.4vw, 10px);
 	--video-carousel-indicator-gap: clamp(10px, 2.2vw, 18px);
@@ -262,8 +342,8 @@ body {
 	--video-carousel-indicator-active-width: clamp(46px, 10vw, 66px);
 	--video-carousel-indicator-active-height: clamp(8px, 1.6vw, 11px);
 	--video-carousel-indicator-active-radius: clamp(6px, 1.2vw, 8px);
-	/* Overall section height = slide height + py-16 (128px) */
-	height: calc((var(--video-carousel-item-width) * 532 / 946) + 128px);
+	/* Overall section height = slide height + py-3 (24px) */
+	height: calc((var(--video-carousel-item-width) * 532 / 946) + 24px);
 }
 
 .video-carousel-track {
@@ -286,9 +366,10 @@ body {
 	height: calc(var(--video-carousel-item-width) * 532 / 946);
 	aspect-ratio: 946 / 532;
 	overflow: hidden;
+	border-radius: 4px;
 	position: relative;
 	transition: transform 0.4s ease;
-	transform: scale(0.95);
+	transform: scale(0.985);
 }
 
 .video-carousel-item:not(.active) {
@@ -325,7 +406,8 @@ body {
 	left: 50%;
 	bottom: var(--video-carousel-indicator-bottom);
 	transform: translateX(-50%);
-	display: flex;
+	/* Hide the progress dots row on the landing page. */
+	display: none;
 	align-items: center;
 	gap: var(--video-carousel-indicator-gap);
 	z-index: 20;
@@ -478,13 +560,13 @@ body {
 
 /* Section right after the video carousel (contains the framed map) */
 .landing-map-section {
-	padding-top: 124px;
+	padding-top: 100px;
 }
 
 /* Wrapper controls the visible height in the document flow */
 .landing-map-wrapper {
 	--landing-map-scale: 1;
-	margin-top: 125px;
+	margin-top: 32px;
 	width: 100%;
 	display: flex;
 	justify-content: center;

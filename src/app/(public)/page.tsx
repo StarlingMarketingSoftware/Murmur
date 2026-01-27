@@ -1,5 +1,5 @@
 'use client';
-import { LandingHeroSearchBar } from '@/components/molecules/LandingHeroSearchBar/LandingHeroSearchBar';
+// import { LandingHeroSearchBar } from '@/components/molecules/LandingHeroSearchBar/LandingHeroSearchBar';
 import LandingPageMap1 from '@/components/atoms/_svg/LandingPageMap1';
 import { LandingPageGoogleMapBackground } from '@/components/molecules/LandingPageGoogleMapBackground/LandingPageGoogleMapBackground';
 import { LandingPageMapCtaMorph } from '@/components/molecules/LandingPageMapCtaMorph/LandingPageMapCtaMorph';
@@ -714,9 +714,9 @@ export default function HomePage() {
 		}
 	}, [currentVideoIndex, videoIds.length]);
 	const heroVideoStyle = {
-		// Fill the full hero width; crop (preferably bottom) as needed
-		'--media-object-fit': 'cover',
-		'--media-object-position': 'var(--landing-hero-video-object-position, top)',
+		// Keep the full video visible (no cropping)
+		'--media-object-fit': 'contain',
+		'--media-object-position': 'center',
 		'--controls': 'none',
 		'--play-button': 'none',
 		'--center-play-button': 'none',
@@ -1154,96 +1154,86 @@ export default function HomePage() {
 			<div className="landing-zoom-80">
 				<div
 					id="landing-hero"
-					className="landing-hero relative w-full overflow-hidden bg-background parallax-container"
+					className="landing-hero relative w-full overflow-hidden parallax-container"
 					ref={heroRef}
 					data-parallax-speed="0.3"
 				>
-				{/* SVG Filter for thinning text */}
-				<svg width="0" height="0" className="absolute">
-					<defs>
-						<filter id="thin-text">
-							<feMorphology operator="erode" radius="0.45" />
-						</filter>
-					</defs>
-				</svg>
-
-				{/* Hero frame (locked to the viewport height across breakpoints) */}
-				<div className="relative w-full h-full">
-					{/* Background video layer */}
-					<div className="absolute inset-0 pointer-events-none bg-black">
-						<MuxPlayer
-							ref={heroVideoRef}
-							className="h-full w-full"
-							style={heroVideoStyle}
-							playbackId={heroPlaybackId}
-							poster={`https://image.mux.com/${heroPlaybackId}/thumbnail.jpg?time=0`}
-							streamType="on-demand"
-							preload="auto"
-							autoPlay="muted"
-							muted
-							playsInline
-							nohotkeys
-							aria-hidden="true"
-						/>
-						{/* Optional contrast layer to keep UI readable */}
-						<div className="absolute inset-0 bg-black/35" />
-					</div>
-
-					{/* Content layer */}
-					<div className="relative z-10 flex flex-col h-full min-h-0 md:min-h-[750px] w-full items-center px-4 pt-[90px] md:pt-[164px] [@media(orientation:landscape)_and_(max-height:500px)]:pt-[60px]">
-						{/* Mobile: spacer to push h1 toward center */}
-						<div className="flex-1 md:hidden" />
-						<div className="w-full max-w-[1132px] flex flex-col items-center shrink-0">
-							<h1
-								className="font-primary text-white font-normal leading-[1.05] text-center text-[clamp(36px,8.5vw,88px)] [@media(orientation:landscape)_and_(max-height:500px)]:text-[clamp(36px,8.5vmin,88px)]"
-								>
-								Built to get you booked.
+					<div className="landing-hero-inner">
+						<div className="landing-hero-headline-card">
+							<h1 className="landing-hero-headline">
+								Built to get you booked,
 								<br />
 								You deserve an audience.
 							</h1>
-							{/* Mobile-only CTA right under h1 */}
-							<div className="w-full flex justify-center md:hidden mt-6">
-								<Link
-									href={urls.freeTrial.index}
-									className="landing-hero-free-trial-btn h-[56px] flex items-center justify-center text-white font-inter font-semibold text-[22px] bg-[#53B060] border-2 border-[#118521] rounded-[8px]"
-								>
-									Start Free Trial
-								</Link>
-							</div>
+							<Link href={urls.freeTrial.index} className="landing-hero-card-cta">
+								Start Free Trial
+							</Link>
 						</div>
-						<div className="hidden md:block flex-[0.5]" />
-						<div className="hidden md:flex w-full justify-center px-4 shrink-0">
-							<LandingHeroSearchBar
-								initialWhy="[Booking]"
-								initialWhat="Wine, Beer, and Spirits"
-								initialWhere="California"
-								readOnly
+
+						<div className="landing-hero-video-frame">
+							<MuxPlayer
+								ref={heroVideoRef}
+								className="landing-hero-video-player"
+								style={heroVideoStyle}
+								playbackId={heroPlaybackId}
+								poster={`https://image.mux.com/${heroPlaybackId}/thumbnail.jpg?time=0`}
+								streamType="on-demand"
+								preload="auto"
+								autoPlay="muted"
+								muted
+								playsInline
+								nohotkeys
+								aria-hidden="true"
 							/>
 						</div>
-						{/* Spacer between h1+CTA and subtext */}
-						<div className="flex-[1.5] md:flex-[2]" />
-						<div className="flex flex-col justify-end pb-8 sm:pb-12 text-center shrink-0 w-full items-center">
-							<div className="w-full max-w-[603px]">
-								<p className="font-inter font-normal text-[22px] xs:text-[24px] sm:text-[27px] text-[#C4C4C4] mb-2 [@media(orientation:landscape)_and_(max-height:500px)]:!text-[22px]">
-									Every Contact in One Place
-								</p>
-							<p className="font-inter font-normal text-[11.5px] xs:text-[12.5px] sm:text-[18px] text-[#B8B8B8] leading-tight [@media(orientation:landscape)_and_(max-height:500px)]:!text-[11.5px]">
-								Murmur brings together more than 100,000+ venues, festivals, and
-							</p>
-							<p className="font-inter font-normal text-[11.5px] xs:text-[12.5px] sm:text-[18px] text-[#B8B8B8] leading-tight [@media(orientation:landscape)_and_(max-height:500px)]:!text-[11.5px]">
-								radio stations, with tools to actually reach them.
-							</p>
-							</div>
-						</div>
 					</div>
-				</div>
 			</div>
 			{/* Video Carousel Section */}
-			<FadeInUp duration={1.6} className="w-full">
-				<div
-					ref={videoCarouselContainerRef}
-					className="w-full bg-[#EBEBEB] py-16 overflow-hidden video-carousel-container"
-				>
+			<div className="relative">
+				{/* Gradient fade overlays - vertical gradient (white top to gray bottom) + horizontal fade */}
+				{/* Starts at ~1780px, visible at 1920px, aggressive beyond */}
+				<div 
+					style={{
+						position: 'absolute',
+						top: 0,
+						left: 0,
+						bottom: 0,
+						// Kicks in around 1780px, shows at 1920px
+						// At 1780px: 0px
+						// At 1920px: ~130px (noticeable)
+						// At 2400px: 560px
+						// At 2800px: 920px (aggressive crop)
+						width: 'calc(90vw - 1600px)',
+						minWidth: '0px',
+						background: 'linear-gradient(to bottom, white 0%, #F5F5F7 100%)',
+						maskImage: 'linear-gradient(to right, black 0%, black 85%, transparent 100%)',
+						WebkitMaskImage: 'linear-gradient(to right, black 0%, black 85%, transparent 100%)',
+						pointerEvents: 'none',
+						zIndex: 50,
+					}}
+					aria-hidden="true"
+				/>
+				<div 
+					style={{
+						position: 'absolute',
+						top: 0,
+						right: 0,
+						bottom: 0,
+						width: 'calc(90vw - 1600px)',
+						minWidth: '0px',
+						background: 'linear-gradient(to bottom, white 0%, #F5F5F7 100%)',
+						maskImage: 'linear-gradient(to left, black 0%, black 85%, transparent 100%)',
+						WebkitMaskImage: 'linear-gradient(to left, black 0%, black 85%, transparent 100%)',
+						pointerEvents: 'none',
+						zIndex: 50,
+					}}
+					aria-hidden="true"
+				/>
+				<FadeInUp duration={1.6} className="w-full">
+					<div
+						ref={videoCarouselContainerRef}
+						className="w-full bg-[#EBEBEB] py-3 overflow-hidden video-carousel-container"
+					>
 					{(() => {
 					// Render extra repeated thumbnails on both sides so you don't see "empty space"
 					// when the viewport gets very wide (e.g. browser zoomed far out).
@@ -1371,21 +1361,14 @@ export default function HomePage() {
 							</button>
 						);
 					})}
+					</div>
 				</div>
-				</div>
-			</FadeInUp>
+				</FadeInUp>
+			</div>
 
-			{/* Start Free Trial Button Section */}
+			{/* Map Section */}
 			<div className="landing-map-section w-full bg-[#F5F5F7] flex flex-col items-center">
 				<FadeInUp duration={1.6} className="w-full flex flex-col items-center">
-					<Link
-						href={urls.freeTrial.index}
-						className="landing-free-trial-btn hidden md:flex items-center justify-center bg-transparent cursor-pointer text-center"
-					>
-						Start Free Trial
-					</Link>
-				</FadeInUp>
-				<FadeInUp duration={1.6} delay={0.2} className="w-full flex flex-col items-center">
 					<div className="landing-map-wrapper relative" ref={landingMapWrapperRef}>
 						{/* Mobile-only: map CTA copy overlay (keeps text crisp + avoids SVG clipping) */}
 						<div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center px-3 md:hidden">
