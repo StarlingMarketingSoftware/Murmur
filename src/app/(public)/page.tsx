@@ -516,6 +516,17 @@ export default function HomePage() {
 	const [isLandingGoogleMapReady, setIsLandingGoogleMapReady] = useState(false);
 	const [landingMapScale, setLandingMapScaleState] = useState(1);
 	const landingMapScaleRef = useRef(1);
+	const [isMobile, setIsMobile] = useState<boolean | null>(null);
+
+	// Detect mobile on mount
+	useEffect(() => {
+		const checkMobile = () => window.innerWidth < 768;
+		setIsMobile(checkMobile());
+
+		const handleResize = () => setIsMobile(checkMobile());
+		window.addEventListener('resize', handleResize);
+		return () => window.removeEventListener('resize', handleResize);
+	}, []);
 
 	// Ensure the landing page doesn't "jump" down after a hard refresh at the top.
 	// (Some browsers + smooth scroll libs can restore an old scroll position asynchronously.)
@@ -1214,7 +1225,7 @@ export default function HomePage() {
 					}}
 					aria-hidden="true"
 				/>
-				<FadeInUp duration={1.6} className="w-full">
+				<FadeInUp duration={1.6} disabled={isMobile === true} className="w-full">
 					<div
 						ref={videoCarouselContainerRef}
 						className="w-full bg-[#EBEBEB] py-3 overflow-hidden video-carousel-container"
@@ -1353,7 +1364,7 @@ export default function HomePage() {
 
 			{/* Map Section */}
 			<div className="landing-map-section w-full bg-[#F5F5F7] flex flex-col items-center">
-				<FadeInUp duration={1.6} className="w-full flex flex-col items-center">
+				<FadeInUp duration={1.6} disabled={isMobile === true} className="w-full flex flex-col items-center">
 					<div className="landing-map-wrapper relative" ref={landingMapWrapperRef}>
 						{/* Mobile-only: map CTA copy overlay (keeps text crisp + avoids SVG clipping) */}
 						<div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center px-3 md:hidden">
@@ -1411,8 +1422,8 @@ export default function HomePage() {
 
 				{/* Block below map */}
 				{/* Narrow layout: stack text on top, demo below */}
-				<div className="landing-after-map md:hidden w-full px-[14%]">
-					<FadeInUp duration={1.6}>
+				<div className="landing-after-map md:hidden w-full px-4 sm:px-[8%] md:px-[14%]">
+					<FadeInUp duration={1.6} disabled={isMobile === true}>
 						<div className="mx-auto w-full max-w-[904px] rounded-[28px] overflow-hidden bg-[#FAFAFA]">
 							{/* Text */}
 							<div className="px-6 xs:px-8 pt-8 xs:pt-10 pb-8 xs:pb-10">
@@ -1476,7 +1487,7 @@ export default function HomePage() {
 
 				{/* Wide layout (scaled down on thinner breakpoints) */}
 				<div className="hidden md:block w-full px-4" style={{ marginTop: '145px' }}>
-					<FadeInUp duration={1.6}>
+					<FadeInUp duration={1.6} disabled={isMobile === true}>
 						<ScaledToFit baseWidth={1753} baseHeight={712} className="mx-auto max-w-[1753px]">
 							<div
 								className="w-[1753px] h-[712px] rounded-[22px] overflow-hidden grid grid-cols-2"
@@ -1549,8 +1560,8 @@ export default function HomePage() {
 					</FadeInUp>
 				</div>
 
-				<div className="md:hidden w-full px-[14%]" style={{ marginTop: '82px' }}>
-					<FadeInUp duration={1.6}>
+				<div className="md:hidden w-full px-4 sm:px-[8%] md:px-[14%]" style={{ marginTop: '82px' }}>
+					<FadeInUp duration={1.6} disabled={isMobile === true}>
 						<div className="mx-auto w-full max-w-[904px] rounded-[28px] overflow-hidden bg-[#FAFAFA]">
 							{/* Text */}
 							<div className="px-6 xs:px-8 pt-8 xs:pt-10 pb-8 xs:pb-10">
@@ -1599,7 +1610,7 @@ export default function HomePage() {
 				</div>
 
 				<div className="hidden md:block w-full px-4" style={{ marginTop: '82px' }}>
-					<FadeInUp duration={1.6}>
+					<FadeInUp duration={1.6} disabled={isMobile === true}>
 						<ScaledToFit baseWidth={1789} baseHeight={718} className="mx-auto max-w-[1789px]">
 							<div className="w-[1789px] h-[718px] rounded-[22px] overflow-hidden flex" aria-label="Every Reply">
 							{/* Left side (gradient) */}
@@ -1648,8 +1659,8 @@ export default function HomePage() {
 					</FadeInUp>
 				</div>
 
-				<div className="md:hidden w-full px-[14%]" style={{ marginTop: '75px' }}>
-					<FadeInUp duration={1.6}>
+				<div className="md:hidden w-full px-4 sm:px-[8%] md:px-[14%]" style={{ marginTop: '75px' }}>
+					<FadeInUp duration={1.6} disabled={isMobile === true}>
 						<div className="mx-auto w-full max-w-[904px] rounded-[28px] overflow-hidden bg-[#FAFAFA]">
 							{/* Text */}
 							<div className="px-6 xs:px-8 pt-8 xs:pt-10 pb-8 xs:pb-10">
@@ -1687,7 +1698,7 @@ export default function HomePage() {
 
 				{/* Wide layout (scaled down on thinner breakpoints) */}
 				<div className="hidden md:block w-full px-4" style={{ marginTop: '75px' }}>
-					<FadeInUp duration={1.6}>
+					<FadeInUp duration={1.6} disabled={isMobile === true}>
 						<ScaledToFit baseWidth={1783} baseHeight={712} className="mx-auto max-w-[1783px]">
 							<div
 								className="w-[1783px] h-[712px] rounded-[22px] overflow-hidden grid grid-cols-[879px_904px]"
@@ -1733,7 +1744,7 @@ export default function HomePage() {
 
 			{/* Try Murmur Now CTA Section */}
 			<div className="w-full bg-[#F5F5F7] flex flex-col items-center justify-center h-[280px] md:h-[450px] lg:h-[747px]">
-				<FadeInUp duration={1.6}>
+				<FadeInUp duration={1.6} disabled={isMobile === true}>
 					<div className="flex flex-col items-center">
 						<p className="font-inter font-normal text-[clamp(32px,9vw,62px)] text-black text-center leading-[1.05]">
 							Try Murmur Now
