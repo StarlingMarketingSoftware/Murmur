@@ -43,12 +43,6 @@ export default function MapPage() {
   // Use a layout effect so any leaked scroll locks (overflow hidden / fixed body)
   // are cleared *before paint* on mobile, preventing the brief "stuck" state on load.
   React.useLayoutEffect(() => {
-    const isMobileSafari = () => {
-      if (typeof navigator === 'undefined') return false;
-      const ua = navigator.userAgent;
-      return /iPhone|iPad|iPod/.test(ua) && /WebKit/.test(ua) && !/CriOS|FxiOS|OPiOS|EdgiOS/.test(ua);
-    };
-
     const clearInlineScrollLocks = () => {
       // Clear any common inline scroll locks (overflow hidden, fixed body, etc).
       document.body.style.overflow = '';
@@ -260,9 +254,7 @@ export default function MapPage() {
     
     // Mobile Safari specific: also listen for scroll events that might not be happening
     // If we detect the page is at 0 and user is trying to scroll, unlock
-    let lastScrollY = window.scrollY;
     const onScroll = () => {
-      lastScrollY = window.scrollY;
       // Reset touch unlock counter when scrolling works
       touchUnlockCount = 0;
     };
