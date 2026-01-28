@@ -195,6 +195,7 @@ const SortableAIBlock = ({
 	showTestPreview,
 	onGetSuggestions,
 	promptQualityScore,
+	promptQualityLabel,
 	onUpscalePrompt,
 	isUpscalingPrompt,
 	hasPreviousPrompt,
@@ -1969,9 +1970,9 @@ const SortableAIBlock = ({
 																	/>
 																</div>
 																{/* Prompt rating + Upscale controls (same wiring as Writing tab) */}
-																<div className="h-[23px] bg-white px-3 flex items-start gap-[6px]">
+																<div className="h-[22px] bg-[#F0F0F0] px-3 flex items-start justify-end gap-[6px]">
 																	{/* Score (159 x 20) */}
-																	<div className="w-[159px] h-[20px] box-border bg-[#D7F0FF] border-2 border-black rounded-[8px] flex items-center gap-[6px] px-[6px]">
+																	<div className="w-[159px] h-[20px] box-border bg-transparent border-2 border-transparent rounded-[8px] flex items-center gap-[6px] px-[6px]">
 																		<div className="w-[92px] h-[12px] box-border bg-white border-2 border-black rounded-[8px] overflow-hidden shrink-0">
 																			<div
 																				className="h-full bg-[#36B24A] rounded-full transition-[width] duration-200"
@@ -1979,7 +1980,7 @@ const SortableAIBlock = ({
 																			/>
 																		</div>
 																		<span className="font-inter font-semibold text-[12px] leading-none text-black flex-1 text-center tabular-nums truncate">
-																			{clampedPromptScore ?? ''}
+																			{promptQualityLabel ?? clampedPromptScore ?? ''}
 																		</span>
 																	</div>
 
@@ -1993,7 +1994,7 @@ const SortableAIBlock = ({
 																		}}
 																		disabled={!hasPreviousPrompt}
 																		className={cn(
-																			'w-[20px] h-[20px] box-border rounded-[6px] border-2 border-black bg-[#D7F0FF] flex items-center justify-center p-0',
+																			'w-[20px] h-[20px] box-border rounded-[6px] border-2 border-transparent bg-transparent flex items-center justify-center p-0',
 																			hasPreviousPrompt
 																				? 'cursor-pointer hover:brightness-[0.98] active:brightness-[0.95]'
 																				: 'cursor-not-allowed'
@@ -2014,7 +2015,7 @@ const SortableAIBlock = ({
 																		}}
 																		disabled={!onUpscalePrompt || Boolean(isUpscalingPrompt)}
 																		className={cn(
-																			'w-[73px] h-[20px] box-border rounded-[8px] border-2 border-black bg-[#D7F0FF] flex items-center justify-between gap-[4px] px-[4px] py-0',
+																			'w-[73px] h-[20px] box-border rounded-[8px] border-2 border-transparent bg-transparent flex items-center justify-between gap-[4px] px-[4px] py-0',
 																			isUpscalingPrompt
 																				? 'cursor-wait opacity-80'
 																				: 'cursor-pointer hover:brightness-[0.98] active:brightness-[0.95]'
