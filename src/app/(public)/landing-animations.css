@@ -155,6 +155,10 @@ body {
 	color: #060606;
 }
 
+.landing-hero-headline-line {
+	display: block;
+}
+
 .landing-hero-card-cta {
 	width: min(280px, 100%);
 	height: 33px;
