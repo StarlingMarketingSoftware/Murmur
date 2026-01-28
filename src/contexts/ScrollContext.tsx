@@ -55,30 +55,19 @@ export function ScrollProvider({ children }: ScrollProviderProps) {
 		// Skip if not on client or if window is not available
 		if (!isClient || typeof window === 'undefined') return;
 
-		// Disable Lenis smooth scrolling on campaign pages (all users) and mobile dashboard
+		// Disable Lenis smooth scrolling on:
+		// - all mobile devices (native scrolling only)
+		// - campaign pages (all devices)
 		const isDashboardPage =
 			typeof pathname === 'string' && pathname.startsWith('/murmur/dashboard');
 		const isCampaignPage =
 			typeof pathname === 'string' && pathname.startsWith('/murmur/campaign');
-
-		// Mobile Safari: disable Lenis on public feature marketing pages.
-		// These pages should feel like native scroll, and smooth-scroll layers can feel "sticky"
-		// at the extreme top/bottom on touch devices.
-		const isPublicFeaturePage =
-			typeof pathname === 'string' &&
-			(pathname === '/map' ||
-				pathname.startsWith('/map/') ||
-				pathname === '/research' ||
-				pathname.startsWith('/research/') ||
-				pathname === '/inbox' ||
-				pathname.startsWith('/inbox/') ||
-				pathname === '/drafting' ||
-				pathname.startsWith('/drafting/'));
 		
 		if (
 			isCampaignPage ||
-			(isMobile === true && isDashboardPage) ||
-			(isMobile === true && isPublicFeaturePage)
+			isMobile === true ||
+			// Redundant with `isMobile === true`, but keep intent explicit.
+			(isMobile === true && isDashboardPage)
 		) {
 			// Ensure any existing Lenis instance is destroyed and classes updated
 			try {
@@ -90,7 +79,7 @@ export function ScrollProvider({ children }: ScrollProviderProps) {
 			} catch {}
 			document.documentElement.classList.remove('lenis-active');
 			document.documentElement.classList.add('no-smooth-scroll');
-			// Provide cleanup to restore defaults when leaving dashboard or switching to desktop
+			// Provide cleanup to restore defaults when leaving campaign pages or switching to desktop
 			return () => {
 				document.documentElement.classList.remove('no-smooth-scroll');
 			};

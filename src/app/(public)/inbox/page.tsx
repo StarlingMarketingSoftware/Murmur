@@ -23,6 +23,9 @@ export default function InboxPage() {
       document.body.style.overflowX = '';
       document.body.style.overflowY = '';
       document.body.style.position = '';
+      document.body.style.height = '';
+      document.body.style.minHeight = '';
+      document.body.style.maxHeight = '';
       document.body.style.width = '';
       document.body.style.top = '';
       document.body.style.touchAction = '';
