@@ -20,6 +20,46 @@ body {
 	-webkit-touch-callout: none;
 }
 
+/* Mobile: Force landing/marketing pages to be scrollable
+   This prevents scroll-lock issues on iOS Safari when navigating
+   from app pages that may have had scroll locks. */
+@media (max-width: 767px) {
+	html:has(.landing-page) {
+		overflow-y: auto !important;
+		overflow-x: hidden !important;
+		height: auto !important;
+		min-height: 100% !important;
+		position: static !important;
+		touch-action: pan-y !important;
+		-webkit-overflow-scrolling: touch !important;
+	}
+
+	html:has(.landing-page) body {
+		overflow-y: auto !important;
+		overflow-x: hidden !important;
+		height: auto !important;
+		min-height: 100% !important;
+		position: static !important;
+		touch-action: pan-y !important;
+		-webkit-overflow-scrolling: touch !important;
+	}
+
+	/* Ensure the main landing-page element allows content to flow */
+	.landing-page {
+		min-height: 100vh;
+		height: auto !important;
+		overflow-y: visible !important;
+		position: relative !important;
+	}
+
+	/* Override lenis-stopped on landing pages - they should always scroll */
+	html.lenis-stopped:has(.landing-page),
+	html.lenis-stopped:has(.landing-page) body {
+		overflow: auto !important;
+		overflow-y: auto !important;
+	}
+}
+
 /* Landing page: prevent embedded demo panels from trapping page scroll.
    (Our CustomScrollbar sets `overscroll-behavior: contain` inline.) */
 .landing-page .scrollbar-hide,
