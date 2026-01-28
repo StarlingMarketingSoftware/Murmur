@@ -43,6 +43,12 @@ export default function MapPage() {
   // Use a layout effect so any leaked scroll locks (overflow hidden / fixed body)
   // are cleared *before paint* on mobile, preventing the brief "stuck" state on load.
   React.useLayoutEffect(() => {
+    const isMobileSafari = () => {
+      if (typeof navigator === 'undefined') return false;
+      const ua = navigator.userAgent;
+      return /iPhone|iPad|iPod/.test(ua) && /WebKit/.test(ua) && !/CriOS|FxiOS|OPiOS|EdgiOS/.test(ua);
+    };
+
     const clearInlineScrollLocks = () => {
       // Clear any common inline scroll locks (overflow hidden, fixed body, etc).
       document.body.style.overflow = '';
@@ -87,11 +93,45 @@ export default function MapPage() {
       }
     };
 
+    const forceScrollableOnMobile = () => {
+      // On mobile, explicitly force the page to be scrollable by setting
+      // permissive scroll/touch styles on the root elements.
+      const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+      if (!isMobile) return;
+
+      // Force scrollable state
+      document.documentElement.style.setProperty('overflow-y', 'auto', 'important');
+      document.documentElement.style.setProperty('overflow-x', 'hidden', 'important');
+      document.body.style.setProperty('overflow-y', 'auto', 'important');
+      document.body.style.setProperty('overflow-x', 'hidden', 'important');
+      
+      // Ensure touch actions are enabled
+      document.documentElement.style.setProperty('touch-action', 'pan-y', 'important');
+      document.body.style.setProperty('touch-action', 'pan-y', 'important');
+      
+      // Mobile Safari: ensure -webkit-overflow-scrolling is touch
+      document.documentElement.style.setProperty('-webkit-overflow-scrolling', 'touch');
+      document.body.style.setProperty('-webkit-overflow-scrolling', 'touch');
+      
+      // Clear any position: fixed on body that might have leaked
+      if (document.body.style.position === 'fixed') {
+        const scrollY = parseInt(document.body.style.top || '0', 10) * -1;
+        document.body.style.position = '';
+        document.body.style.top = '';
+        document.body.style.width = '';
+        // Restore scroll position if we were locked
+        if (scrollY > 0) {
+          window.scrollTo(0, scrollY);
+        }
+      }
+    };
+
     // Defensive: if any prior view left inline scroll locks behind (overflow hidden, fixed body, etc),
     // clear them so this marketing page always remains scrollable on mobile Safari.
     try {
       clearInlineScrollLocks();
       clearLeakedAppScrollClasses();
+      forceScrollableOnMobile();
       // This page does not use inline body zoom; ensure nothing stale persists.
       document.body.style.removeProperty('zoom');
     } catch {
@@ -154,10 +194,10 @@ export default function MapPage() {
 
     const unlockIfStuck = () => {
       if (isOverlayOpen()) return;
-      if (!isHardScrollLocked()) return;
       try {
         clearInlineScrollLocks();
         clearLeakedAppScrollClasses();
+        forceScrollableOnMobile();
       } catch {
         // ignore
       }
@@ -169,7 +209,9 @@ export default function MapPage() {
       if (rafId !== null) cancelAnimationFrame(rafId);
       rafId = requestAnimationFrame(() => {
         rafId = null;
-        unlockIfStuck();
+        if (!isOverlayOpen() && isHardScrollLocked()) {
+          unlockIfStuck();
+        }
       });
     };
 
@@ -185,21 +227,72 @@ export default function MapPage() {
     const onVisibilityChange = () => {
       if (!document.hidden) unlockIfStuck();
     };
-    window.addEventListener('pageshow', unlockIfStuck);
+    
+    // Mobile Safari BFCache: pageshow fires when returning via back/forward
+    const onPageShow = (e: PageTransitionEvent) => {
+      // If page was restored from BFCache, force unlock
+      if (e.persisted) {
+        unlockIfStuck();
+        // Safari sometimes needs a small delay after BFCache restore
+        setTimeout(unlockIfStuck, 50);
+        setTimeout(unlockIfStuck, 150);
+      } else {
+        unlockIfStuck();
+      }
+    };
+    
+    window.addEventListener('pageshow', onPageShow);
     window.addEventListener('focus', unlockIfStuck);
     document.addEventListener('visibilitychange', onVisibilityChange);
+    
     // If the user tries to interact and we're locked, recover immediately.
-    window.addEventListener('touchstart', unlockIfStuck, { passive: true });
+    // Use touchstart AND touchmove for better coverage on iOS.
+    let touchUnlockCount = 0;
+    const onTouchInteraction = () => {
+      // Only do this a limited number of times to avoid performance impact
+      if (touchUnlockCount < 5) {
+        touchUnlockCount++;
+        unlockIfStuck();
+      }
+    };
+    window.addEventListener('touchstart', onTouchInteraction, { passive: true });
+    window.addEventListener('touchmove', onTouchInteraction, { passive: true });
+    
+    // Mobile Safari specific: also listen for scroll events that might not be happening
+    // If we detect the page is at 0 and user is trying to scroll, unlock
+    let lastScrollY = window.scrollY;
+    const onScroll = () => {
+      lastScrollY = window.scrollY;
+      // Reset touch unlock counter when scrolling works
+      touchUnlockCount = 0;
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
 
-    return () => {
-      window.removeEventListener('pageshow', unlockIfStuck);
+    // Cleanup function to restore original styles
+    const cleanup = () => {
+      window.removeEventListener('pageshow', onPageShow);
       window.removeEventListener('focus', unlockIfStuck);
       document.removeEventListener('visibilitychange', onVisibilityChange);
-      window.removeEventListener('touchstart', unlockIfStuck);
+      window.removeEventListener('touchstart', onTouchInteraction);
+      window.removeEventListener('touchmove', onTouchInteraction);
+      window.removeEventListener('scroll', onScroll);
       bodyObserver.disconnect();
       htmlObserver.disconnect();
       if (rafId !== null) cancelAnimationFrame(rafId);
+      
+      // Remove forced styles on cleanup
+      const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+      if (isMobile) {
+        document.documentElement.style.removeProperty('overflow-y');
+        document.documentElement.style.removeProperty('touch-action');
+        document.documentElement.style.removeProperty('-webkit-overflow-scrolling');
+        document.body.style.removeProperty('overflow-y');
+        document.body.style.removeProperty('touch-action');
+        document.body.style.removeProperty('-webkit-overflow-scrolling');
+      }
     };
+
+    return cleanup;
   }, []);
 
   return (

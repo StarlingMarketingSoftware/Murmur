@@ -17,9 +17,7 @@ export default function DraftingPage() {
     const footer = document.querySelector('footer') as HTMLElement | null;
     const prevFooterDisplay = footer?.style.display ?? '';
 
-    if (footer) {
-      footer.style.display = 'none';
-    }
+    if (footer) footer.style.display = 'none';
 
     const clearInlineScrollLocks = () => {
       // Clear any common inline scroll locks (overflow hidden, fixed body, etc).
@@ -46,16 +44,55 @@ export default function DraftingPage() {
           'murmur-compact',
           'murmur-campaign-compact',
           'murmur-campaign-scrollable',
-          'murmur-campaign-force-transform'
+          'murmur-campaign-force-transform',
+          'murmur-dashboard-compact',
+          'murmur-dashboard-map-compact',
+          'murmur-research-compact',
+          'murmur-inbox-compact',
+          'murmur-drafting-compact'
         );
         // Lenis can toggle this when scrolling is stopped; if it leaks, scrolling can appear "frozen".
         document.documentElement.classList.remove('lenis-stopped');
         document.body.classList.remove('lenis-stopped');
 
-        // Campaign zoom var can also leak; clear it for this marketing page.
+        // Campaign/dashboard zoom vars can leak; clear them for this marketing page.
         document.documentElement.style.removeProperty('--murmur-campaign-zoom');
+        document.documentElement.style.removeProperty('--murmur-dashboard-zoom');
       } catch {
         // ignore
+      }
+    };
+
+    const forceScrollableOnMobile = () => {
+      // On mobile, explicitly force the page to be scrollable by setting
+      // permissive scroll/touch styles on the root elements.
+      const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+      if (!isMobile) return;
+
+      // Force scrollable state
+      document.documentElement.style.setProperty('overflow-y', 'auto', 'important');
+      document.documentElement.style.setProperty('overflow-x', 'hidden', 'important');
+      document.body.style.setProperty('overflow-y', 'auto', 'important');
+      document.body.style.setProperty('overflow-x', 'hidden', 'important');
+      
+      // Ensure touch actions are enabled
+      document.documentElement.style.setProperty('touch-action', 'pan-y', 'important');
+      document.body.style.setProperty('touch-action', 'pan-y', 'important');
+      
+      // Mobile Safari: ensure -webkit-overflow-scrolling is touch
+      document.documentElement.style.setProperty('-webkit-overflow-scrolling', 'touch');
+      document.body.style.setProperty('-webkit-overflow-scrolling', 'touch');
+      
+      // Clear any position: fixed on body that might have leaked
+      if (document.body.style.position === 'fixed') {
+        const scrollY = parseInt(document.body.style.top || '0', 10) * -1;
+        document.body.style.position = '';
+        document.body.style.top = '';
+        document.body.style.width = '';
+        // Restore scroll position if we were locked
+        if (scrollY > 0) {
+          window.scrollTo(0, scrollY);
+        }
       }
     };
 
@@ -64,14 +101,16 @@ export default function DraftingPage() {
     try {
       clearInlineScrollLocks();
       clearLeakedAppScrollClasses();
+      forceScrollableOnMobile();
       // This page no longer uses inline body zoom; ensure nothing stale persists.
       document.body.style.removeProperty('zoom');
+      document.documentElement.style.removeProperty('--murmur-dashboard-zoom');
     } catch {
       // ignore
     }
 
-    // Desktop "compact" (80%) scaling.
-    // On touch devices (iOS Safari/iPadOS), root-level scaling can break touch scrolling.
+    // Only apply the compact (zoom/scale) treatment on desktop *non-touch* devices.
+    // On iOS Safari/iPadOS, root-level scaling can break touch scrolling (and can fully lock scrolling).
     const compactMql = window.matchMedia('(min-width: 1024px)');
     const touchMql = window.matchMedia('(hover: none) and (pointer: coarse)');
     const syncCompactClass = () => {
@@ -88,7 +127,6 @@ export default function DraftingPage() {
         document.documentElement.classList.remove('murmur-drafting-compact');
       }
     };
-
     syncCompactClass();
     // Safari < 14 uses addListener/removeListener.
     if (typeof compactMql.addEventListener === 'function') {
@@ -162,10 +200,10 @@ export default function DraftingPage() {
 
     const unlockIfStuck = () => {
       if (isOverlayOpen()) return;
-      if (!isHardScrollLocked()) return;
       try {
         clearInlineScrollLocks();
         clearLeakedAppScrollClasses();
+        forceScrollableOnMobile();
       } catch {
         // ignore
       }
@@ -179,7 +217,9 @@ export default function DraftingPage() {
       if (rafId !== null) cancelAnimationFrame(rafId);
       rafId = requestAnimationFrame(() => {
         rafId = null;
-        unlockIfStuck();
+        if (!isOverlayOpen() && isHardScrollLocked()) {
+          unlockIfStuck();
+        }
       });
     };
 
@@ -195,17 +235,50 @@ export default function DraftingPage() {
     const onVisibilityChange = () => {
       if (!document.hidden) unlockIfStuck();
     };
-    window.addEventListener('pageshow', unlockIfStuck);
+    
+    // Mobile Safari BFCache: pageshow fires when returning via back/forward
+    const onPageShow = (e: PageTransitionEvent) => {
+      // If page was restored from BFCache, force unlock
+      if (e.persisted) {
+        unlockIfStuck();
+        // Safari sometimes needs a small delay after BFCache restore
+        setTimeout(unlockIfStuck, 50);
+        setTimeout(unlockIfStuck, 150);
+      } else {
+        unlockIfStuck();
+      }
+    };
+    
+    window.addEventListener('pageshow', onPageShow);
     window.addEventListener('focus', unlockIfStuck);
     document.addEventListener('visibilitychange', onVisibilityChange);
+    
     // If the user tries to interact and we're locked, recover immediately.
-    window.addEventListener('touchstart', unlockIfStuck, { passive: true });
+    // Use touchstart AND touchmove for better coverage on iOS.
+    let touchUnlockCount = 0;
+    const onTouchInteraction = () => {
+      // Only do this a limited number of times to avoid performance impact
+      if (touchUnlockCount < 5) {
+        touchUnlockCount++;
+        unlockIfStuck();
+      }
+    };
+    window.addEventListener('touchstart', onTouchInteraction, { passive: true });
+    window.addEventListener('touchmove', onTouchInteraction, { passive: true });
+    
+    // Mobile Safari specific: also listen for scroll events that might not be happening
+    // If we detect the page is at 0 and user is trying to scroll, unlock
+    const onScroll = () => {
+      // Reset touch unlock counter when scrolling works
+      touchUnlockCount = 0;
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
 
     return () => {
       const footer = document.querySelector('footer') as HTMLElement | null;
-      if (footer) {
-        footer.style.display = prevFooterDisplay;
-      }
+      if (footer) footer.style.display = prevFooterDisplay;
+
+      document.documentElement.classList.remove('murmur-drafting-compact');
 
       if (typeof compactMql.removeEventListener === 'function') {
         compactMql.removeEventListener('change', syncCompactClass);
@@ -219,15 +292,26 @@ export default function DraftingPage() {
       }
       window.removeEventListener('resize', syncCompactClass);
       window.removeEventListener('orientationchange', syncCompactClass);
-      window.removeEventListener('pageshow', unlockIfStuck);
+      window.removeEventListener('pageshow', onPageShow);
       window.removeEventListener('focus', unlockIfStuck);
       document.removeEventListener('visibilitychange', onVisibilityChange);
-      window.removeEventListener('touchstart', unlockIfStuck);
+      window.removeEventListener('touchstart', onTouchInteraction);
+      window.removeEventListener('touchmove', onTouchInteraction);
+      window.removeEventListener('scroll', onScroll);
       bodyObserver.disconnect();
       htmlObserver.disconnect();
       if (rafId !== null) cancelAnimationFrame(rafId);
-
-      document.documentElement.classList.remove('murmur-drafting-compact');
+      
+      // Remove forced styles on cleanup
+      const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+      if (isMobile) {
+        document.documentElement.style.removeProperty('overflow-y');
+        document.documentElement.style.removeProperty('touch-action');
+        document.documentElement.style.removeProperty('-webkit-overflow-scrolling');
+        document.body.style.removeProperty('overflow-y');
+        document.body.style.removeProperty('touch-action');
+        document.body.style.removeProperty('-webkit-overflow-scrolling');
+      }
     };
   }, []);
 
@@ -241,8 +325,8 @@ export default function DraftingPage() {
           background: 'linear-gradient(to bottom, #D2F2DE, #F5F5F7)',
         }}
       />
-      <div className="landing-zoom-80 relative z-10">
-        <div className="relative min-h-screen">
+
+      <div className="relative z-10 min-h-screen">
           <div className="relative flex justify-center pt-16 pb-6 lg:pt-[100px] lg:pb-0">
             <FadeInUp className="w-[calc(100vw-32px)] max-w-[1352px] bg-[#F2FBFF] rounded-[22px] flex flex-col items-center gap-6 px-4 pt-6 pb-6 lg:w-[1352px] lg:h-[823px] lg:px-[46px] lg:pt-[30px] lg:pb-[30px]">
               <h1 className="font-inter font-extralight tracking-[0.19em] text-[#696969] text-center text-[40px] sm:text-[56px] lg:text-[65px] leading-none">
@@ -428,23 +512,22 @@ export default function DraftingPage() {
               </FadeInUp>
             </div>
           </div>
-          <FadeInUp className="flex flex-col items-center justify-center pt-14 pb-16 sm:pt-16 sm:pb-20 lg:py-0 lg:h-[660px]">
-            <p className="font-inter font-normal text-[clamp(32px,9vw,62px)] text-black text-center leading-[1.05]">
-              Try Murmur Now
-            </p>
-            <Link
-              href={urls.freeTrial.index}
-              className="landing-bottom-free-trial-btn flex items-center justify-center cursor-pointer text-center text-white font-inter font-medium text-[14px]"
-              style={{
-                marginTop: '32px',
-                width: '219px',
-                height: '33px',
-              }}
-            >
-              Start Free Trial
-            </Link>
-          </FadeInUp>
-        </div>
+        <FadeInUp className="flex flex-col items-center justify-center pt-14 pb-16 sm:pt-16 sm:pb-20 lg:py-0 lg:h-[660px]">
+          <p className="font-inter font-normal text-[clamp(32px,9vw,62px)] text-black text-center leading-[1.05]">
+            Try Murmur Now
+          </p>
+          <Link
+            href={urls.freeTrial.index}
+            className="landing-bottom-free-trial-btn flex items-center justify-center cursor-pointer text-center text-white font-inter font-medium text-[14px]"
+            style={{
+              marginTop: '32px',
+              width: '219px',
+              height: '33px',
+            }}
+          >
+            Start Free Trial
+          </Link>
+        </FadeInUp>
       </div>
     </main>
   );
