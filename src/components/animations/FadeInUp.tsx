@@ -9,6 +9,7 @@ type FadeInUpProps = React.ComponentPropsWithoutRef<'div'> & {
 	yOffset?: number;
 	threshold?: number;
 	stagger?: number; // If we want to stagger children, though this component wraps a single block usually
+	disabled?: boolean; // If true, skip the animation entirely
 };
 
 export const FadeInUp = ({
@@ -19,6 +20,7 @@ export const FadeInUp = ({
 	threshold = 0.1,
 	className = '',
 	stagger: _stagger, // eslint-disable-line @typescript-eslint/no-unused-vars
+	disabled = false,
 	...divProps
 }: FadeInUpProps) => {
 	const elementRef = useRef<HTMLDivElement>(null);
@@ -26,6 +28,12 @@ export const FadeInUp = ({
 	useEffect(() => {
 		const element = elementRef.current;
 		if (!element) return;
+
+		// If disabled, ensure element is visible and skip animation
+		if (disabled) {
+			gsap.set(element, { opacity: 1, y: 0 });
+			return;
+		}
 
 		// Set initial state
 		gsap.set(element, { 
@@ -63,7 +71,7 @@ export const FadeInUp = ({
 			observer.disconnect();
 			// Optional: reset on unmount if needed, but for landing page usually fine to leave
 		};
-	}, [duration, delay, yOffset, threshold]);
+	}, [duration, delay, yOffset, threshold, disabled]);
 
 	return (
 		<div ref={elementRef} className={className} {...divProps}>
