@@ -911,8 +911,8 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 						style={{
 							borderTopLeftRadius: '8px',
 							borderTopRightRadius: '8px',
-							borderBottomWidth: '2px',
-							borderBottomStyle: 'solid',
+							borderBottomWidth: isRegenSettingsPreviewOpen ? '0px' : '2px',
+							borderBottomStyle: isRegenSettingsPreviewOpen ? 'none' : 'solid',
 							borderBottomColor: '#000000',
 							// Keep header a consistent height in both cases (company-only vs company+name)
 							// while still giving enough vertical room so text doesn't get clipped.
@@ -1480,6 +1480,32 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 								)}
 							</>
 						)}
+						{isRegenSettingsPreviewOpen && !isMobile && !showBottomCounter && (
+							<>
+								{/* Bottom-left breadcrumb label (Drafts > Contact > Regenerate) */}
+								<div
+									className="absolute flex items-center font-inter font-normal text-[11px] text-black leading-none"
+									style={{
+										left: '12px',
+										right: '12px',
+										top: bottomStripTop,
+										bottom: 0,
+										paddingRight: '12px',
+										pointerEvents: 'none',
+										overflow: 'hidden',
+										zIndex: 6,
+									}}
+								>
+									<span className="whitespace-nowrap flex-shrink-0">Drafts</span>
+									<span className="mx-[10px] whitespace-nowrap flex-shrink-0">{'>'}</span>
+									<span className="min-w-0 truncate">
+										{displayName || companyName || 'Unknown Contact'}
+									</span>
+									<span className="mx-[10px] whitespace-nowrap flex-shrink-0">{'>'}</span>
+									<span className="whitespace-nowrap flex-shrink-0">Regenerate</span>
+								</div>
+							</>
+						)}
 
 						{isRegenSettingsPreviewOpen ? (
 							<div className="flex justify-center flex-1">
@@ -1491,8 +1517,8 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 									hideGenerateTestButton
 									hideProfileBottomMiniBox
 									clipProfileTabOverflow
-									manualEntryHeightPx={560}
-									containerHeightPx={635}
+									manualEntryHeightPx={550}
+									containerHeightPx={625}
 									useStaticDropdownPosition
 									hideMobileStickyTestFooter
 									dataCampaignMainBox={null}
