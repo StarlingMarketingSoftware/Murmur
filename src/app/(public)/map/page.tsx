@@ -466,7 +466,7 @@ export default function MapPage() {
       <div className="landing-zoom-80 relative z-10" style={{ touchAction: 'pan-y' }}>
         <div className="min-h-screen relative">
           <div className="relative flex justify-center pt-16 pb-6 lg:pt-[100px] lg:pb-0">
-            <FadeInUp>
+            <FadeInUp disabled={isMobile === true}>
               <div className="w-[calc(100vw-32px)] max-w-[1464px] bg-[#F2FBFF] rounded-[22px] flex flex-col items-center gap-6 px-4 pt-6 pb-6 lg:w-[1464px] lg:h-[975px] lg:px-[46px] lg:pt-[30px] lg:pb-[30px]">
                 <h1 className="font-inter font-extralight tracking-[0.19em] text-[#696969] text-center text-[40px] sm:text-[56px] lg:text-[65px] leading-none">
                   Mapping
@@ -514,7 +514,7 @@ export default function MapPage() {
                   'min(904px, calc(100vw - 32px - env(safe-area-inset-left) - env(safe-area-inset-right)))',
               }}
             >
-              <FadeInUp className="bg-white rounded-[34px] px-8 pt-10 pb-12">
+              <FadeInUp disabled={isMobile === true} className="bg-white rounded-[34px] px-8 pt-10 pb-12">
                 <p className="font-inter font-bold text-[20px] text-black leading-tight">
                   Explore the Country
                 </p>
@@ -524,7 +524,7 @@ export default function MapPage() {
                 </p>
               </FadeInUp>
 
-              <FadeInUp delay={0.05} className="bg-[#F1F1F1] rounded-[34px] overflow-hidden relative">
+              <FadeInUp disabled={isMobile === true} delay={0.05} className="bg-[#F1F1F1] rounded-[34px] overflow-hidden relative">
                 {/* Skeleton overlay for mobile */}
                 {showMobileSkeletons && (
                   <SkeletonOverlay 
@@ -569,7 +569,7 @@ export default function MapPage() {
                   'min(904px, calc(100vw - 32px - env(safe-area-inset-left) - env(safe-area-inset-right)))',
               }}
             >
-              <FadeInUp className="bg-white rounded-[34px] px-8 pt-10 pb-12">
+              <FadeInUp disabled={isMobile === true} className="bg-white rounded-[34px] px-8 pt-10 pb-12">
                 <p className="font-inter font-bold text-[20px] text-black leading-tight">
                   All Data in One Place
                 </p>
@@ -579,6 +579,7 @@ export default function MapPage() {
               </FadeInUp>
 
               <FadeInUp
+                disabled={isMobile === true}
                 delay={0.05}
                 className="rounded-[34px] p-6 sm:p-8 flex justify-center overflow-visible relative"
                 style={{
@@ -629,7 +630,7 @@ export default function MapPage() {
                   'min(904px, calc(100vw - 32px - env(safe-area-inset-left) - env(safe-area-inset-right)))',
               }}
             >
-              <FadeInUp className="bg-white rounded-[34px] px-8 pt-10 pb-12">
+              <FadeInUp disabled={isMobile === true} className="bg-white rounded-[34px] px-8 pt-10 pb-12">
                 <p className="font-inter font-bold text-[20px] text-black leading-tight">
                   Zoom Closer, See the Details
                 </p>
@@ -638,7 +639,7 @@ export default function MapPage() {
                 </p>
               </FadeInUp>
 
-              <FadeInUp delay={0.05} className="rounded-[22px] overflow-hidden relative">
+              <FadeInUp disabled={isMobile === true} delay={0.05} className="rounded-[22px] overflow-hidden relative">
                 {/* Skeleton overlay for mobile */}
                 {showMobileSkeletons && (
                   <SkeletonOverlay 
@@ -676,7 +677,7 @@ export default function MapPage() {
               </FadeInUp>
             </div>
           </div>
-          <FadeInUp className="relative flex flex-col items-center justify-center pt-14 pb-16 sm:pt-16 sm:pb-20 lg:py-0 lg:h-[660px]">
+          <FadeInUp disabled={isMobile === true} className="relative flex flex-col items-center justify-center pt-14 pb-16 sm:pt-16 sm:pb-20 lg:py-0 lg:h-[660px]">
             <p className="font-inter font-normal text-[clamp(32px,9vw,62px)] text-black text-center leading-[1.05]">
               Try Murmur Now
             </p>
