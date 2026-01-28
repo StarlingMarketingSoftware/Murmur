@@ -10,28 +10,218 @@ import { FadeInUp } from '@/components/animations/FadeInUp';
 
 export default function ResearchPage() {
   React.useEffect(() => {
-    const footer = document.querySelector('footer');
-    if (footer) {
-      footer.style.display = 'none';
+    const footer = document.querySelector('footer') as HTMLElement | null;
+    const prevFooterDisplay = footer?.style.display ?? '';
+
+    if (footer) footer.style.display = 'none';
+
+    const clearInlineScrollLocks = () => {
+      // Clear any common inline scroll locks (overflow hidden, fixed body, etc).
+      document.body.style.overflow = '';
+      document.body.style.overflowX = '';
+      document.body.style.overflowY = '';
+      document.body.style.position = '';
+      document.body.style.width = '';
+      document.body.style.top = '';
+      document.body.style.touchAction = '';
+      document.documentElement.style.overflow = '';
+      document.documentElement.style.overflowX = '';
+      document.documentElement.style.overflowY = '';
+    };
+
+    const clearLeakedAppScrollClasses = () => {
+      // Defensive: if a user navigates here from an app page (or via Safari BFCache),
+      // some root classes can leak and *hard lock* scrolling on mobile.
+      try {
+        document.documentElement.classList.remove(
+          'murmur-compact',
+          'murmur-campaign-compact',
+          'murmur-campaign-scrollable',
+          'murmur-campaign-force-transform'
+        );
+        // Lenis can toggle this when scrolling is stopped; if it leaks, scrolling can appear "frozen".
+        document.documentElement.classList.remove('lenis-stopped');
+        document.body.classList.remove('lenis-stopped');
+
+        // Campaign zoom var can also leak; clear it for this marketing page.
+        document.documentElement.style.removeProperty('--murmur-campaign-zoom');
+      } catch {
+        // ignore
+      }
+    };
+
+    // Defensive: if any prior view left inline scroll locks behind (overflow hidden, fixed body, etc),
+    // clear them so this marketing page always remains scrollable on mobile Safari.
+    try {
+      clearInlineScrollLocks();
+      clearLeakedAppScrollClasses();
+      // This page does not use inline body zoom; ensure nothing stale persists.
+      document.body.style.removeProperty('zoom');
+    } catch {
+      // ignore
     }
 
-    document.documentElement.classList.add('murmur-research-compact');
+    // Only apply the compact (zoom/scale) treatment on desktop *non-touch* devices.
+    // On iOS Safari/iPadOS, root-level scaling can break touch scrolling (and can fully lock scrolling).
+    const compactMql = window.matchMedia('(min-width: 1024px)');
+    const touchMql = window.matchMedia('(hover: none) and (pointer: coarse)');
+    const syncCompactClass = () => {
+      // `hover/pointer` media queries are not fully reliable across Safari versions,
+      // so also fall back to touch-point detection.
+      const isTouchDevice =
+        touchMql.matches ||
+        (typeof navigator !== 'undefined' && navigator.maxTouchPoints > 0) ||
+        'ontouchstart' in window;
+
+      if (compactMql.matches && !isTouchDevice) {
+        document.documentElement.classList.add('murmur-research-compact');
+      } else {
+        document.documentElement.classList.remove('murmur-research-compact');
+      }
+    };
+    syncCompactClass();
+    // Safari < 14 uses addListener/removeListener.
+    if (typeof compactMql.addEventListener === 'function') {
+      compactMql.addEventListener('change', syncCompactClass);
+    } else {
+      compactMql.addListener(syncCompactClass);
+    }
+    if (typeof touchMql.addEventListener === 'function') {
+      touchMql.addEventListener('change', syncCompactClass);
+    } else {
+      touchMql.addListener(syncCompactClass);
+    }
+    // Extra redundancy: make sure rotation/resize never leaves compact scaling applied on touch devices.
+    window.addEventListener('resize', syncCompactClass, { passive: true });
+    window.addEventListener('orientationchange', syncCompactClass);
+
+    const isAnyModalOpen = () => {
+      // Generic modal detection (covers Radix + most third-party modals, including Clerk).
+      try {
+        return Boolean(
+          document.querySelector(
+            '[aria-modal="true"], [data-slot="dialog-content"][data-state="open"]'
+          )
+        );
+      } catch {
+        return false;
+      }
+    };
+
+    const isMobileMenuOpen = () => {
+      // Navbar exposes this attribute; use it so we don't fight legitimate scroll locks.
+      try {
+        return Boolean(document.querySelector('[data-mobile-menu-open="true"]'));
+      } catch {
+        return false;
+      }
+    };
+
+    const isOverlayOpen = () => isAnyModalOpen() || isMobileMenuOpen();
+
+    const isHardScrollLocked = () => {
+      const bodyInline = document.body.style;
+      const htmlInline = document.documentElement.style;
+
+      const hasLeakedScrollClasses =
+        document.documentElement.classList.contains('murmur-compact') ||
+        document.documentElement.classList.contains('murmur-campaign-compact') ||
+        document.documentElement.classList.contains('lenis-stopped');
+
+      const overflowLockedInline =
+        bodyInline.overflow === 'hidden' ||
+        bodyInline.overflowY === 'hidden' ||
+        bodyInline.overflow === 'clip' ||
+        bodyInline.overflowY === 'clip' ||
+        htmlInline.overflow === 'hidden' ||
+        htmlInline.overflowY === 'hidden' ||
+        htmlInline.overflow === 'clip' ||
+        htmlInline.overflowY === 'clip';
+
+      const positionOrTouchLocked =
+        bodyInline.position === 'fixed' || bodyInline.top !== '' || bodyInline.touchAction === 'none';
+
+      // NOTE: Avoid `getComputedStyle()` here — it can introduce noticeable touch-scroll lag
+      // on iOS Safari (especially at the very top/bottom where users do short gestures).
+      // For this marketing page, hard locks have been observed to come from inline styles
+      // or leaked root classes (handled above), which MutationObservers also catch.
+      return hasLeakedScrollClasses || overflowLockedInline || positionOrTouchLocked;
+    };
+
+    const unlockIfStuck = () => {
+      if (isOverlayOpen()) return;
+      if (!isHardScrollLocked()) return;
+      try {
+        clearInlineScrollLocks();
+        clearLeakedAppScrollClasses();
+      } catch {
+        // ignore
+      }
+      // Ensure we also don't accidentally re-apply compact scaling on touch devices.
+      syncCompactClass();
+    };
+
+    // Watch for any code leaving scroll locks behind after mount (e.g., modals/overlays).
+    let rafId: number | null = null;
+    const scheduleUnlockCheck = () => {
+      if (rafId !== null) cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        rafId = null;
+        unlockIfStuck();
+      });
+    };
+
+    const bodyObserver = new MutationObserver(scheduleUnlockCheck);
+    const htmlObserver = new MutationObserver(scheduleUnlockCheck);
+    bodyObserver.observe(document.body, { attributes: true, attributeFilter: ['style', 'class'] });
+    htmlObserver.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['style', 'class'],
+    });
+
+    // Also re-check on common Safari lifecycle edges.
+    const onVisibilityChange = () => {
+      if (!document.hidden) unlockIfStuck();
+    };
+    window.addEventListener('pageshow', unlockIfStuck);
+    window.addEventListener('focus', unlockIfStuck);
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    // If the user tries to interact and we're locked, recover immediately.
+    window.addEventListener('touchstart', unlockIfStuck, { passive: true });
     
     return () => {
-      const footer = document.querySelector('footer');
-      if (footer) {
-        footer.style.display = '';
-      }
+      const footer = document.querySelector('footer') as HTMLElement | null;
+      if (footer) footer.style.display = prevFooterDisplay;
 
       document.documentElement.classList.remove('murmur-research-compact');
+
+      if (typeof compactMql.removeEventListener === 'function') {
+        compactMql.removeEventListener('change', syncCompactClass);
+      } else {
+        compactMql.removeListener(syncCompactClass);
+      }
+      if (typeof touchMql.removeEventListener === 'function') {
+        touchMql.removeEventListener('change', syncCompactClass);
+      } else {
+        touchMql.removeListener(syncCompactClass);
+      }
+      window.removeEventListener('resize', syncCompactClass);
+      window.removeEventListener('orientationchange', syncCompactClass);
+      window.removeEventListener('pageshow', unlockIfStuck);
+      window.removeEventListener('focus', unlockIfStuck);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      window.removeEventListener('touchstart', unlockIfStuck);
+      bodyObserver.disconnect();
+      htmlObserver.disconnect();
+      if (rafId !== null) cancelAnimationFrame(rafId);
     };
   }, []);
 
   return (
     <main className="relative bg-[#F5F5F7] overflow-x-hidden landing-page">
-      {/* Gradient overlay for first 1935px (offset by navbar spacer height, h-12 = 48px) */}
+      {/* Gradient overlay for first 1935px */}
       <div
-        className="absolute -top-12 left-0 w-full pointer-events-none z-0"
+        className="absolute top-0 left-0 w-full pointer-events-none z-0"
         style={{
           height: '1935px',
           background: 'linear-gradient(to bottom, #D3F4FF, #F5F5F7)',
@@ -39,7 +229,7 @@ export default function ResearchPage() {
       />
 
       <div className="relative z-10 min-h-screen">
-        <div className="relative flex justify-center pt-8 pb-6 lg:pt-[53px] lg:pb-0">
+        <div className="relative flex justify-center pt-16 pb-6 lg:pt-[100px] lg:pb-0">
           <FadeInUp className="w-[calc(100vw-32px)] max-w-[966px] bg-[#F2FBFF] rounded-[22px] flex flex-col items-center gap-6 px-4 pt-6 pb-6 lg:w-[966px] lg:h-[823px] lg:px-[46px] lg:pt-[30px] lg:pb-[30px]">
             <h1 className="font-inter font-extralight tracking-[0.19em] text-[#696969] text-center text-[40px] sm:text-[56px] lg:text-[65px] leading-none">
               Research

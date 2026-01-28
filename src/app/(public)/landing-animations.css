@@ -115,30 +115,194 @@ body {
 }
 
 /* ========================================
-   Landing Hero - Mobile-safe first fold
+   Landing Hero (gradient + framed video)
    ======================================== */
 
 .landing-hero {
-	/* Default before JS runs */
-	--landing-hero-visible-height: 100vh;
-	/* Responsive video framing (overridden on mobile below) */
-	--landing-hero-video-object-position: top;
-
-	/* Keep the hero truly viewport-height after zooming the page wrapper. */
-	height: calc(var(--landing-hero-visible-height) / var(--landing-zoom, 1));
+	/* Match Figma: top-right → bottom-left */
+	background: linear-gradient(to bottom left, #c8cfee 0%, #ffffff 60%);
 }
 
-@supports (height: 100svh) {
-	.landing-hero {
-		/* Small viewport height (matches first visible fold on mobile browsers) */
-		--landing-hero-visible-height: 100svh;
+.landing-hero-inner {
+	width: min(1265px, calc(100% - 64px));
+	margin: 0 auto;
+	padding-top: 85px;
+	padding-bottom: 64px;
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 22px;
+}
+
+.landing-hero-headline-card {
+	width: 500px;
+	height: 180px;
+	border-radius: 22px;
+	background: #f5f5f7;
+	padding: 20px 22px;
+	display: flex;
+	flex-direction: column;
+	justify-content: space-between;
+	margin-left: 0;
+}
+
+.landing-hero-headline {
+	margin: 0;
+	font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+	font-size: 34px;
+	line-height: 1.15;
+	font-weight: 300;
+	color: #060606;
+}
+
+.landing-hero-headline-line {
+	display: block;
+}
+
+.landing-hero-card-cta {
+	width: min(280px, 100%);
+	height: 33px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	background: #53b060;
+	border: 1px solid #118521;
+	border-radius: 8px;
+	color: #ffffff;
+	font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+	font-size: 16px;
+	font-weight: 500;
+	text-decoration: none;
+	transition: filter 160ms ease, transform 160ms ease;
+}
+
+.landing-hero-card-cta:hover {
+	filter: brightness(0.97);
+}
+
+.landing-hero-card-cta:active {
+	transform: translateY(1px);
+}
+
+.landing-hero-video-frame {
+	width: 100%;
+	border-radius: 17px;
+	overflow: hidden;
+	background: #000;
+	aspect-ratio: 16 / 9;
+}
+
+.landing-hero-video-player {
+	width: 100%;
+	height: 100%;
+	display: block;
+	/* Mux Player styling for background-video behavior */
+	--media-object-fit: contain;
+	--media-object-position: center;
+	--controls: none;
+	--play-button: none;
+	--center-play-button: none;
+	--mute-button: none;
+	--pip-button: none;
+	--airplay-button: none;
+	--cast-button: none;
+	--fullscreen-button: none;
+}
+
+@media (min-width: 1145px) {
+	.landing-hero-headline-card {
+		/* Card should start 126px left of the video */
+		margin-left: -126px;
 	}
 }
 
 @media (max-width: 767px) {
 	.landing-hero {
-		/* Slightly less aggressive crop on portrait screens */
-		--landing-hero-video-object-position: center;
+		/* Mobile hero is a full-bleed video moment */
+		background: #000;
+	}
+
+	.landing-hero-inner {
+		width: 100%;
+		height: var(--landing-hero-visible-height, 100dvh);
+		padding-top: 92px;
+		padding-right: 16px;
+		padding-bottom: 64px;
+		padding-left: 16px;
+		position: relative;
+		gap: 0;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.landing-hero-video-frame {
+		position: absolute;
+		inset: 0;
+		z-index: 0;
+		border-radius: 0;
+		aspect-ratio: auto;
+		height: 100%;
+	}
+
+	.landing-hero-video-frame::after {
+		content: '';
+		position: absolute;
+		inset: 0;
+		background: linear-gradient(
+			to bottom,
+			rgba(0, 0, 0, 0.58) 0%,
+			rgba(0, 0, 0, 0.18) 35%,
+			rgba(0, 0, 0, 0.58) 100%
+		);
+		pointer-events: none;
+	}
+
+	.landing-hero-video-player {
+		pointer-events: none;
+		--media-object-fit: cover;
+		--media-object-position: center;
+	}
+
+	.landing-hero-headline-card {
+		width: 100%;
+		max-width: 640px;
+		height: auto;
+		min-height: unset;
+		margin-left: 0;
+		padding: 0;
+		border-radius: 0;
+		background: transparent;
+		position: relative;
+		z-index: 1;
+		justify-content: center;
+		align-items: center;
+		text-align: center;
+		gap: 18px;
+	}
+
+	.landing-hero-headline {
+		/* Match the reference: Times on mobile hero */
+		font-family: var(--font-times), 'Times New Roman', Times, serif;
+		font-weight: 400;
+		font-size: clamp(24px, 8vw, 54px);
+		line-height: 1.05;
+		color: #ffffff;
+		text-shadow: 0 4px 18px rgba(0, 0, 0, 0.65);
+	}
+
+	/* Force exactly two lines (no mid-line wraps) */
+	.landing-hero-headline-line {
+		display: block;
+		white-space: nowrap;
+	}
+
+	.landing-hero-card-cta {
+		width: min(460px, 100%);
+		height: 48px;
+		font-size: 20px;
+		border-radius: 10px;
+		border-width: 3px;
+		box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
 	}
 }
 
@@ -253,8 +417,8 @@ body {
 	display: flex;
 	align-items: center;
 	/* Responsive slide sizing */
-	--video-carousel-item-width: min(946px, calc(100vw - 32px));
-	--video-carousel-gap: clamp(12px, 3vw, 32px);
+	--video-carousel-item-width: min(400px, calc(100vw - 32px));
+	--video-carousel-gap: clamp(8px, 1.8vw, 16px);
 	/* Responsive indicator sizing */
 	--video-carousel-indicator-size: clamp(7px, 1.4vw, 10px);
 	--video-carousel-indicator-gap: clamp(10px, 2.2vw, 18px);
@@ -262,8 +426,8 @@ body {
 	--video-carousel-indicator-active-width: clamp(46px, 10vw, 66px);
 	--video-carousel-indicator-active-height: clamp(8px, 1.6vw, 11px);
 	--video-carousel-indicator-active-radius: clamp(6px, 1.2vw, 8px);
-	/* Overall section height = slide height + py-16 (128px) */
-	height: calc((var(--video-carousel-item-width) * 532 / 946) + 128px);
+	/* Overall section height = slide height + py-3 (24px) */
+	height: calc((var(--video-carousel-item-width) * 532 / 946) + 24px);
 }
 
 .video-carousel-track {
@@ -286,9 +450,10 @@ body {
 	height: calc(var(--video-carousel-item-width) * 532 / 946);
 	aspect-ratio: 946 / 532;
 	overflow: hidden;
+	border-radius: 4px;
 	position: relative;
 	transition: transform 0.4s ease;
-	transform: scale(0.95);
+	transform: scale(0.985);
 }
 
 .video-carousel-item:not(.active) {
@@ -325,7 +490,8 @@ body {
 	left: 50%;
 	bottom: var(--video-carousel-indicator-bottom);
 	transform: translateX(-50%);
-	display: flex;
+	/* Hide the progress dots row on the landing page. */
+	display: none;
 	align-items: center;
 	gap: var(--video-carousel-indicator-gap);
 	z-index: 20;
@@ -478,13 +644,13 @@ body {
 
 /* Section right after the video carousel (contains the framed map) */
 .landing-map-section {
-	padding-top: 124px;
+	padding-top: 100px;
 }
 
 /* Wrapper controls the visible height in the document flow */
 .landing-map-wrapper {
 	--landing-map-scale: 1;
-	margin-top: 125px;
+	margin-top: 32px;
 	width: 100%;
 	display: flex;
 	justify-content: center;
@@ -499,12 +665,12 @@ body {
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	width: 1884px;
-	height: 1073px;
+	width: 1864px;
+	height: 1050px;
 	border: 3px solid #000000;
 	border-radius: 8px;
-	background-color: #AFD6EF;
-	padding: 16px;
+	background-color: transparent;
+	padding: 0;
 	overflow: hidden;
 	transform-origin: top center;
 	transform: scale(var(--landing-map-scale));
@@ -540,8 +706,9 @@ body {
 		display: none;
 	}
 
+	/* Mobile map CTA copy is rendered as an HTML overlay in `page.tsx`. */
 	.landing-map-copy--mobile {
-		display: inline;
+		display: none;
 	}
 
 	.landing-map-section {
@@ -566,13 +733,11 @@ body {
 }
 
 /* At 1582px and below, scale proportionally */
-/* Scale factor at 1582px: (1582-32)/1884 = 0.823 */
-/* Scale factor at 1200px: (1200-32)/1884 = 0.620 */
-/* Scale factor at 900px: (900-32)/1884 = 0.461 */
+/* Scale factor at 1582px: (1582-32)/1864 = 0.831 */
 @media (max-width: 1582px) {
 	.landing-map-wrapper {
 		/* Fallback if JS doesn't run: scale proportionally */
-		--landing-map-scale: calc((100vw - 32px) / 1884px);
+		--landing-map-scale: calc((100vw - 32px) / 1864px);
 	}
 }
 

@@ -16,9 +16,27 @@ export default function InboxPage() {
       footer.style.display = 'none';
     }
 
-    const compactMql = window.matchMedia('(min-width: 768px)');
+    // Defensive: if any prior view left inline scroll locks behind (overflow hidden, fixed body, etc),
+    // clear them so the marketing pages always remain scrollable on mobile Safari.
+    try {
+      document.body.style.overflow = '';
+      document.body.style.overflowX = '';
+      document.body.style.overflowY = '';
+      document.body.style.position = '';
+      document.body.style.width = '';
+      document.body.style.top = '';
+      document.body.style.touchAction = '';
+      document.documentElement.style.overflow = '';
+    } catch {
+      // ignore
+    }
+
+    // Only apply compact (zoom/scale) treatment on desktop *non-touch* devices.
+    // On mobile Safari, root-level scaling can break touch scrolling (and can fully lock scrolling).
+    const compactMql = window.matchMedia('(min-width: 1024px)');
+    const touchMql = window.matchMedia('(hover: none) and (pointer: coarse)');
     const syncCompactClass = () => {
-      if (compactMql.matches) {
+      if (compactMql.matches && !touchMql.matches) {
         document.documentElement.classList.add('murmur-inbox-compact');
       } else {
         document.documentElement.classList.remove('murmur-inbox-compact');
@@ -30,6 +48,11 @@ export default function InboxPage() {
       compactMql.addEventListener('change', syncCompactClass);
     } else {
       compactMql.addListener(syncCompactClass);
+    }
+    if (typeof touchMql.addEventListener === 'function') {
+      touchMql.addEventListener('change', syncCompactClass);
+    } else {
+      touchMql.addListener(syncCompactClass);
     }
     
     return () => {
@@ -44,21 +67,26 @@ export default function InboxPage() {
       } else {
         compactMql.removeListener(syncCompactClass);
       }
+      if (typeof touchMql.removeEventListener === 'function') {
+        touchMql.removeEventListener('change', syncCompactClass);
+      } else {
+        touchMql.removeListener(syncCompactClass);
+      }
     };
   }, []);
 
   return (
     <main className="relative bg-[#F5F5F7] overflow-x-hidden landing-page">
-      {/* Gradient overlay for first 1935px (offset by navbar spacer height, h-12 = 48px) */}
+      {/* Gradient overlay for first 1935px */}
       <div
-        className="absolute -top-12 left-0 w-full pointer-events-none z-0"
+        className="absolute top-0 left-0 w-full pointer-events-none z-0"
         style={{
           height: '1935px',
           background: 'linear-gradient(to bottom, #D3E9FF, #F5F5F7)',
         }}
       />
       <div className="relative z-10 min-h-screen">
-        <div className="relative flex justify-center pt-8 pb-6 lg:pt-[53px] lg:pb-0">
+        <div className="relative flex justify-center pt-16 pb-6 lg:pt-[100px] lg:pb-0">
           <FadeInUp className="w-[calc(100vw-32px)] max-w-[1160px] bg-[#F2FBFF] rounded-[22px] flex flex-col items-center gap-6 px-4 pt-6 pb-6 lg:w-[1160px] lg:h-[823px] lg:px-[46px] lg:pt-[30px] lg:pb-[30px]">
             <h1 className="font-inter font-extralight tracking-[0.19em] text-[#696969] text-center text-[40px] sm:text-[56px] lg:text-[65px] leading-none">
               Inbox
@@ -73,8 +101,10 @@ export default function InboxPage() {
       <div className="xl:hidden w-full mt-16 md:mt-[102px] px-4 sm:px-[8%] md:px-[14%]">
         <div className="mx-auto w-full max-w-[904px]">
           <FadeInUp className="bg-white rounded-[22px] px-6 xs:px-8 sm:px-10 pt-10 pb-12">
-            <p className="font-inter font-bold text-[24px] text-black text-left">Never miss a reply</p>
-            <p className="font-inter text-[21px] text-black text-left mt-8 leading-[57px] tracking-wide [word-spacing:5px] break-words">
+            <p className="font-inter font-bold text-[20px] text-black text-left leading-tight">
+              Never miss a reply
+            </p>
+            <p className="font-inter font-normal text-[16px] text-black text-left mt-5 leading-[1.75] tracking-wide [word-spacing:3px] break-words">
               Keep track of when venues reply to you. Each response is tagged to its corresponding campaign, so you&apos;ll always know where it came from.
             </p>
           </FadeInUp>
@@ -116,8 +146,10 @@ export default function InboxPage() {
       <div className="xl:hidden w-full mt-16 md:mt-[97px] px-4 sm:px-[8%] md:px-[14%]">
         <div className="mx-auto w-full max-w-[904px]">
           <FadeInUp className="bg-white rounded-[22px] px-6 xs:px-8 sm:px-10 pt-10 pb-12">
-            <p className="font-inter font-bold text-[24px] text-black text-left">Respond from Within Campaigns</p>
-            <p className="font-inter text-[21px] text-black text-left mt-8 leading-[57px] tracking-wide [word-spacing:5px] break-words">
+            <p className="font-inter font-bold text-[20px] text-black text-left leading-tight">
+              Respond from Within Campaigns
+            </p>
+            <p className="font-inter font-normal text-[16px] text-black text-left mt-5 leading-[1.75] tracking-wide [word-spacing:3px] break-words">
               Each campaign has its own inbox tab, showing just responses from that batch. Contact research is
               provided next to each reply so you can reply quickly without digging through notes. Since your inbox
               lives inside the campaign, you can see exactly what you sent alongside their reply.
