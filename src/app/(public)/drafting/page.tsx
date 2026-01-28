@@ -230,14 +230,14 @@ export default function DraftingPage() {
     <main className="relative bg-[#F5F5F7] overflow-x-hidden landing-page">
       {/* Gradient overlay for first 1935px */}
       <div
-        className="fixed top-0 left-0 w-full pointer-events-none z-0"
+        className="absolute top-0 left-0 w-full pointer-events-none z-0"
         style={{
           height: '1935px',
           background: 'linear-gradient(to bottom, #D2F2DE, #F5F5F7)',
         }}
       />
       <div className="relative z-10 min-h-screen">
-      <div className="relative flex justify-center pt-20 pb-6 lg:pt-[101px] lg:pb-0">
+      <div className="relative flex justify-center pt-16 pb-6 lg:pt-[100px] lg:pb-0">
         <FadeInUp className="w-[calc(100vw-32px)] max-w-[1352px] bg-[#F2FBFF] rounded-[22px] flex flex-col items-center gap-6 px-4 pt-6 pb-6 lg:w-[1352px] lg:h-[823px] lg:px-[46px] lg:pt-[30px] lg:pb-[30px]">
           <h1 className="font-inter font-extralight tracking-[0.19em] text-[#696969] text-center text-[40px] sm:text-[56px] lg:text-[65px] leading-none">
             Drafting
