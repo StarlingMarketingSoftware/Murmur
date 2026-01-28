@@ -9,7 +9,9 @@ import SampleEmail from '@/components/atoms/_svg/sampleEmail';
 import { FadeInUp } from '@/components/animations/FadeInUp';
 
 export default function ResearchPage() {
-  React.useEffect(() => {
+  // Use a layout effect so any leaked scroll locks (overflow hidden / fixed body)
+  // are cleared *before paint* on mobile, preventing the brief "stuck" state on load.
+  React.useLayoutEffect(() => {
     const footer = document.querySelector('footer') as HTMLElement | null;
     const prevFooterDisplay = footer?.style.display ?? '';
 
@@ -40,14 +42,20 @@ export default function ResearchPage() {
           'murmur-compact',
           'murmur-campaign-compact',
           'murmur-campaign-scrollable',
-          'murmur-campaign-force-transform'
+          'murmur-campaign-force-transform',
+          'murmur-dashboard-compact',
+          'murmur-dashboard-map-compact',
+          'murmur-research-compact',
+          'murmur-inbox-compact',
+          'murmur-drafting-compact'
         );
         // Lenis can toggle this when scrolling is stopped; if it leaks, scrolling can appear "frozen".
         document.documentElement.classList.remove('lenis-stopped');
         document.body.classList.remove('lenis-stopped');
 
-        // Campaign zoom var can also leak; clear it for this marketing page.
+        // Campaign/dashboard zoom vars can leak; clear them for this marketing page.
         document.documentElement.style.removeProperty('--murmur-campaign-zoom');
+        document.documentElement.style.removeProperty('--murmur-dashboard-zoom');
       } catch {
         // ignore
       }
@@ -60,6 +68,7 @@ export default function ResearchPage() {
       clearLeakedAppScrollClasses();
       // This page does not use inline body zoom; ensure nothing stale persists.
       document.body.style.removeProperty('zoom');
+      document.documentElement.style.removeProperty('--murmur-dashboard-zoom');
     } catch {
       // ignore
     }

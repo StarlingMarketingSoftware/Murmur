@@ -10,7 +10,9 @@ import { ScaledToFit } from '@/components/atoms/ScaledToFit';
 import { FadeInUp } from '@/components/animations/FadeInUp';
 
 export default function InboxPage() {
-  React.useEffect(() => {
+  // Use a layout effect so any leaked scroll locks (overflow hidden / fixed body)
+  // are cleared *before paint* on mobile, preventing the brief "stuck" state on load.
+  React.useLayoutEffect(() => {
     const footer = document.querySelector('footer') as HTMLElement | null;
     const prevFooterDisplay = footer?.style.display ?? '';
 
@@ -164,6 +166,8 @@ export default function InboxPage() {
       } catch {
         // ignore
       }
+      // Ensure we also don't accidentally re-apply compact scaling on touch devices.
+      syncCompactClass();
     };
 
     // Watch for any code leaving scroll locks behind after mount (e.g., modals/overlays).

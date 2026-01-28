@@ -40,7 +40,9 @@ const videoStyle = {
 } as React.CSSProperties;
 
 export default function MapPage() {
-  React.useEffect(() => {
+  // Use a layout effect so any leaked scroll locks (overflow hidden / fixed body)
+  // are cleared *before paint* on mobile, preventing the brief "stuck" state on load.
+  React.useLayoutEffect(() => {
     const clearInlineScrollLocks = () => {
       // Clear any common inline scroll locks (overflow hidden, fixed body, etc).
       document.body.style.overflow = '';
