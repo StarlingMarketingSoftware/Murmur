@@ -7149,11 +7149,14 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 										{!hideGenerateTestButton && selectedModeKey === 'full' && !showTestPreview && !compactLeftOnly && (
 											<div className={cn(
 												cn('absolute left-0 right-0 w-full flex items-center justify-center', !forceDesktop && 'max-[480px]:hidden'),
-												// When both Subject + Signature are in manual (expanded) mode, the top area grows
-												// and can cause this absolute-positioned button to overlap the Signature textarea.
-												(!form.watch('isAiSubject') && !isAutoSignature)
+												// This button is absolutely positioned; when Custom Instructions and/or Signature expand,
+												// the content can slide into this area. Prefer dropping the button lower (smaller `bottom`)
+												// to avoid overlap with the Signature box.
+												!isAutoSignature
 													? (isLocalCustomInstructionsOpen ? 'bottom-[58px]' : 'bottom-[128px]')
-													: (isLocalCustomInstructionsOpen ? 'bottom-[124px]' : 'bottom-[194px]')
+													: isManualSubject
+														? (isLocalCustomInstructionsOpen ? 'bottom-[82px]' : 'bottom-[152px]')
+														: (isLocalCustomInstructionsOpen ? 'bottom-[124px]' : 'bottom-[194px]')
 											)}>
 												<Button
 													type="button"
