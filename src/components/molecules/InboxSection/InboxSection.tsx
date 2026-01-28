@@ -171,6 +171,19 @@ interface InboxSectionProps {
 	 * is visible.
 	 */
 	demoMode?: boolean;
+
+	/**
+	 * Optional dashboard "Inbox" sub-tab selection (Messages vs Campaigns).
+	 * When provided, replaces the default Inbox/Sent toggle UI.
+	 */
+	inboxSubtab?: 'messages' | 'campaigns';
+	onInboxSubtabChange?: (next: 'messages' | 'campaigns') => void;
+
+	/**
+	 * Dashboard inbox mode: removes the top "window chrome" (white strip + dots)
+	 * and aligns the search bar + toggle to match the dashboard Campaigns tab.
+	 */
+	dashboardMode?: boolean;
 }
 
 /**
@@ -583,6 +596,9 @@ export const InboxSection: FC<InboxSectionProps> = ({
 	noOuterPadding = false,
 	forceDesktopLayout = false,
 	demoMode = false,
+	inboxSubtab = 'messages',
+	onInboxSubtabChange,
+	dashboardMode = false,
 }) => {
 	const detectedIsMobile = useIsMobile();
 	const isMobile = forceDesktopLayout ? false : Boolean(detectedIsMobile);
@@ -594,17 +610,32 @@ export const InboxSection: FC<InboxSectionProps> = ({
 	} =
 		useCampaignTopSearchHighlight();
 	const rootRef = useRef<HTMLDivElement | null>(null);
+	const isDashboardMode = Boolean(dashboardMode);
 
 	// Width constants based on narrow mode and mobile
 	// On mobile, we use calc() values for responsive sizing (4px margins on each side = 8px total)
 	const baseBoxWidth = isNarrow ? 516 : 907;
 	const boxWidth = desktopWidth ?? baseBoxWidth;
+	const showMessagesCampaignsToggle = !isMobile && Boolean(onInboxSubtabChange);
+	const topRightToggleWidthPx = showMessagesCampaignsToggle ? 260 : 148;
+	const topRightToggleGapPx = showMessagesCampaignsToggle ? 12 : 0;
+	const desktopSearchLeftInsetPx = 14;
+	const desktopSearchRightInsetPx = 14;
+	const outerBorderWidthPx = 3;
+	const absolutePositioningWidthPx = boxWidth - outerBorderWidthPx * 2; // padding box width
+	const desktopSearchTopPx = isDashboardMode ? 13 : 55;
+	const desktopPaddingTopPx = isDashboardMode ? 76 : 109;
 	// NOTE: Desktop rows must fit inside the scroll container's content box.
 	// With a 3px border and 16px left/right padding on the outer container (border-box),
 	// the available inner width is: boxWidth - (2 * 3) - (2 * 16).
 	// If rows are wider than that, their left/right borders get clipped.
 	const emailRowWidth = boxWidth - 38;
-	const searchBarWidth = boxWidth - 182;
+	const searchBarWidth =
+		absolutePositioningWidthPx -
+		(desktopSearchLeftInsetPx +
+			desktopSearchRightInsetPx +
+			topRightToggleWidthPx +
+			topRightToggleGapPx);
 	const expandedEmailWidth = boxWidth - 34;
 	const emailBodyWidth = isNarrow ? boxWidth - 55 : boxWidth - 79;
 
@@ -978,8 +1009,12 @@ export const InboxSection: FC<InboxSectionProps> = ({
 						border: '3px solid #000000',
 						borderRadius: '8px',
 						padding: isMobile ? '8px' : '16px',
-						paddingTop: isMobile ? '62px' : '109px',
+						paddingTop: isMobile ? '62px' : `${desktopPaddingTopPx}px`,
 						background: isMobile
+							? activeTab === 'sent'
+								? '#5AB477'
+								: '#6fa4e1'
+							: isDashboardMode
 							? activeTab === 'sent'
 								? '#5AB477'
 								: '#6fa4e1'
@@ -1070,7 +1105,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 					<div
 						style={{
 							position: 'absolute',
-							top: isMobile ? '12px' : '55px',
+							top: isMobile ? '12px' : `${desktopSearchTopPx}px`,
 							left: isMobile ? '8px' : '14px',
 							width: isMobile ? mobileSearchBarWidth : `${searchBarWidth}px`,
 							height: isMobile ? '42px' : '48px',
@@ -1090,41 +1125,77 @@ export const InboxSection: FC<InboxSectionProps> = ({
 						<div className="h-[14px] flex-1 rounded bg-[#E5E5E5]" />
 					</div>
 
-					{/* Inbox/Sent toggle skeleton */}
-					<div
-						style={{
-							position: 'absolute',
-							top: isMobile ? '12.5px' : '55.5px',
-							right: isMobile ? '8px' : '14px',
-							width: isMobile ? '100px' : '148px',
-							height: isMobile ? '40px' : '47px',
-							border: '3px solid #000000',
-							borderRadius: '8px',
-							backgroundColor: '#FFFFFF',
-							zIndex: 10,
-							display: 'flex',
-							alignItems: 'center',
-							padding: isMobile ? '3px' : '4px',
-							gap: isMobile ? '2px' : '4px',
-							pointerEvents: 'none',
-						}}
-						aria-hidden
-					>
+					{/* Top-right toggle skeleton */}
+					{showMessagesCampaignsToggle ? (
 						<div
-							className="rounded-[8px] bg-[#E5E5E5]"
 							style={{
-								width: isMobile ? '46px' : '70px',
-								height: isMobile ? '16px' : '19px',
+								position: 'absolute',
+								top: isMobile ? '12px' : `${desktopSearchTopPx}px`,
+								right: isMobile ? '8px' : '14px',
+								width: '260px',
+								height: '48px',
+								border: '3px solid #000000',
+								borderRadius: '8px',
+								overflow: 'hidden',
+								backgroundColor: '#FFFFFF',
+								zIndex: 10,
+								display: 'flex',
+								pointerEvents: 'none',
 							}}
-						/>
+							aria-hidden
+						>
+							<div
+								aria-hidden
+								style={{
+									position: 'absolute',
+									left: '50%',
+									top: 0,
+									bottom: 0,
+									width: '3px',
+									backgroundColor: '#000000',
+									transform: 'translateX(-1.5px)',
+									pointerEvents: 'none',
+								}}
+							/>
+							<div className="h-full flex-1 bg-[#E5E5E5]" />
+							<div className="h-full flex-1 bg-[#E5E5E5]" />
+						</div>
+					) : (
 						<div
-							className="rounded-[8px] bg-[#E5E5E5]"
 							style={{
-								width: isMobile ? '46px' : '70px',
-								height: isMobile ? '16px' : '19px',
+								position: 'absolute',
+								top: isMobile ? '12.5px' : '55.5px',
+								right: isMobile ? '8px' : '14px',
+								width: isMobile ? '100px' : '148px',
+								height: isMobile ? '40px' : '47px',
+								border: '3px solid #000000',
+								borderRadius: '8px',
+								backgroundColor: '#FFFFFF',
+								zIndex: 10,
+								display: 'flex',
+								alignItems: 'center',
+								padding: isMobile ? '3px' : '4px',
+								gap: isMobile ? '2px' : '4px',
+								pointerEvents: 'none',
 							}}
-						/>
-					</div>
+							aria-hidden
+						>
+							<div
+								className="rounded-[8px] bg-[#E5E5E5]"
+								style={{
+									width: isMobile ? '46px' : '70px',
+									height: isMobile ? '16px' : '19px',
+								}}
+							/>
+							<div
+								className="rounded-[8px] bg-[#E5E5E5]"
+								style={{
+									width: isMobile ? '46px' : '70px',
+									height: isMobile ? '16px' : '19px',
+								}}
+							/>
+						</div>
+					)}
 
 					{/* Email rows skeleton */}
 					{Array.from({ length: skeletonRowCount }).map((_, idx) => (
@@ -1207,7 +1278,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 						border: '3px solid #000000',
 						borderRadius: '8px',
 						padding: isMobile ? '8px' : '16px',
-						paddingTop: isMobile ? '98px' : '109px', // Adjusted for mobile
+						paddingTop: isMobile ? '98px' : `${desktopPaddingTopPx}px`, // Adjusted for mobile
 						background: '#84b9f5',
 					}}
 				>
@@ -1288,7 +1359,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 					<div
 						style={{
 							position: 'absolute',
-							top: isMobile ? '45px' : '55px',
+							top: isMobile ? '45px' : `${desktopSearchTopPx}px`,
 							left: isMobile ? '8px' : '14px',
 							width: isMobile ? mobileSearchBarWidth : `${searchBarWidth}px`,
 							height: isMobile ? '42px' : '48px',
@@ -1326,94 +1397,140 @@ export const InboxSection: FC<InboxSectionProps> = ({
 						/>
 					</div>
 
-					{/* New box - 148x47px, right-aligned with emails, centered with search bar */}
-					<div
-						style={{
-							position: 'absolute',
-							top: isMobile ? '45.5px' : '55.5px', // Centered with search bar
-							right: isMobile ? '8px' : '14px', // Right-aligned with emails
-							width: isMobile ? '100px' : '148px',
-							height: isMobile ? '40px' : '47px',
-							border: '3px solid #000000',
-							borderRadius: '8px',
-							backgroundColor: '#3277c6',
-							zIndex: 10,
-							display: 'flex',
-							alignItems: 'center',
-							padding: isMobile ? '3px' : '4px',
-							gap: isMobile ? '2px' : '4px',
-							pointerEvents: 'none',
-						}}
-					>
-						{/* Inbox tab */}
-						<button
-							type="button"
-							onClick={() => {}}
-							disabled
+					{/* Top-right toggle (disabled in empty state) */}
+					{showMessagesCampaignsToggle ? (
+						<div
 							style={{
-								width: isMobile ? '46px' : '70px',
-								height: isMobile ? '16px' : '19px',
+								position: 'absolute',
+								top: isMobile ? '45px' : `${desktopSearchTopPx}px`,
+								right: isMobile ? '8px' : '14px',
+							width: '260px',
+								height: '48px',
+								border: '3px solid #000000',
+								borderRadius: '8px',
+								overflow: 'hidden',
+								zIndex: 10,
+								display: 'flex',
+								pointerEvents: 'none',
+							}}
+							aria-hidden
+						>
+							<div
+								aria-hidden
+								style={{
+									position: 'absolute',
+									left: '50%',
+									top: 0,
+									bottom: 0,
+									width: '3px',
+									backgroundColor: '#000000',
+									transform: 'translateX(-1.5px)',
+								}}
+							/>
+							<div
+								className="h-full flex-1"
+								style={{
+									backgroundColor:
+										inboxSubtab === 'messages' ? '#B3E5FF' : '#4DA6D7',
+								}}
+							/>
+							<div
+								className="h-full flex-1"
+								style={{
+									backgroundColor:
+										inboxSubtab === 'campaigns' ? '#B3E5FF' : '#4DA6D7',
+								}}
+							/>
+						</div>
+					) : (
+						<div
+							style={{
+								position: 'absolute',
+								top: isMobile ? '45.5px' : '55.5px', // Centered with search bar
+								right: isMobile ? '8px' : '14px', // Right-aligned with emails
+								width: isMobile ? '100px' : '148px',
+								height: isMobile ? '40px' : '47px',
+								border: '3px solid #000000',
+								borderRadius: '8px',
+								backgroundColor: '#3277c6',
+								zIndex: 10,
 								display: 'flex',
 								alignItems: 'center',
-								justifyContent: 'center',
-								backgroundColor: activeTab === 'inbox' ? '#3277c6' : 'transparent',
-								borderRadius: '8px',
-								border: activeTab === 'inbox' ? '2px solid #000000' : 'none',
-								cursor: 'not-allowed',
-								padding: 0,
-								margin: 0,
-								outline: 'none',
-								boxShadow: 'none',
-								WebkitAppearance: 'none',
-								appearance: 'none',
+								padding: isMobile ? '3px' : '4px',
+								gap: isMobile ? '2px' : '4px',
+								pointerEvents: 'none',
 							}}
 						>
-							<span
+							{/* Inbox tab */}
+							<button
+								type="button"
+								onClick={() => {}}
+								disabled
 								style={{
-									fontSize: isMobile ? '11px' : '14px',
-									fontWeight: 500,
-									color: 'transparent',
-									fontFamily: 'Times New Roman, serif',
+									width: isMobile ? '46px' : '70px',
+									height: isMobile ? '16px' : '19px',
+									display: 'flex',
+									alignItems: 'center',
+									justifyContent: 'center',
+									backgroundColor: activeTab === 'inbox' ? '#3277c6' : 'transparent',
+									borderRadius: '8px',
+									border: activeTab === 'inbox' ? '2px solid #000000' : 'none',
+									cursor: 'not-allowed',
+									padding: 0,
+									margin: 0,
+									outline: 'none',
+									boxShadow: 'none',
+									WebkitAppearance: 'none',
+									appearance: 'none',
 								}}
 							>
-								Inbox
-							</span>
-						</button>
-						{/* Sent tab */}
-						<button
-							type="button"
-							onClick={() => {}}
-							disabled
-							style={{
-								width: isMobile ? '46px' : '70px',
-								height: isMobile ? '16px' : '19px',
-								display: 'flex',
-								alignItems: 'center',
-								justifyContent: 'center',
-								backgroundColor: activeTab === 'sent' ? '#3277c6' : 'transparent',
-								borderRadius: '8px',
-								border: activeTab === 'sent' ? '2px solid #000000' : 'none',
-								cursor: 'not-allowed',
-								padding: 0,
-								margin: 0,
-								outline: 'none',
-								boxShadow: 'none',
-								WebkitAppearance: 'none',
-								appearance: 'none',
-							}}
-						>
-							<span
+								<span
+									style={{
+										fontSize: isMobile ? '11px' : '14px',
+										fontWeight: 500,
+										color: 'transparent',
+										fontFamily: 'Times New Roman, serif',
+									}}
+								>
+									Inbox
+								</span>
+							</button>
+							{/* Sent tab */}
+							<button
+								type="button"
+								onClick={() => {}}
+								disabled
 								style={{
-									fontSize: isMobile ? '11px' : '14px',
-									fontWeight: 500,
-									color: 'transparent',
-									fontFamily: 'Times New Roman, serif',
+									width: isMobile ? '46px' : '70px',
+									height: isMobile ? '16px' : '19px',
+									display: 'flex',
+									alignItems: 'center',
+									justifyContent: 'center',
+									backgroundColor: activeTab === 'sent' ? '#3277c6' : 'transparent',
+									borderRadius: '8px',
+									border: activeTab === 'sent' ? '2px solid #000000' : 'none',
+									cursor: 'not-allowed',
+									padding: 0,
+									margin: 0,
+									outline: 'none',
+									boxShadow: 'none',
+									WebkitAppearance: 'none',
+									appearance: 'none',
 								}}
 							>
-								Sent
-							</span>
-						</button>
-					</div>
+								<span
+									style={{
+										fontSize: isMobile ? '11px' : '14px',
+										fontWeight: 500,
+										color: 'transparent',
+										fontFamily: 'Times New Roman, serif',
+									}}
+								>
+									Sent
+								</span>
+							</button>
+						</div>
+					)}
 
 					{Array.from({ length: isMobile ? 5 : 7 }).map((_, idx) => (
 						<div
@@ -1610,12 +1727,16 @@ export const InboxSection: FC<InboxSectionProps> = ({
 							: '21px'
 						: isMobile
 						? '62px'
-						: '109px', // Adjusted for mobile
+						: `${desktopPaddingTopPx}px`, // Adjusted for mobile
 					background: selectedEmail
 						? isReplySentThemeActive
 							? '#467842'
 							: '#437ec1'
 						: isMobile
+						? activeTab === 'sent'
+							? '#5AB477'
+							: '#6fa4e1'
+						: isDashboardMode
 						? activeTab === 'sent'
 							? '#5AB477'
 							: '#6fa4e1'
@@ -1654,7 +1775,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 						</button>
 					)}
 				{/* Header chrome with dots and Inbox pill - hidden on mobile */}
-				{!selectedEmail && !isMobile && (
+				{!selectedEmail && !isMobile && !isDashboardMode && (
 					<InboxSectionHeaderChrome
 						onContactsClick={onGoToContacts}
 						onWriteClick={onGoToWriting}
@@ -1666,7 +1787,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 					<div
 						style={{
 							position: 'absolute',
-							top: isMobile ? '12px' : '55px',
+							top: isMobile ? '12px' : `${desktopSearchTopPx}px`,
 							left: isMobile ? '8px' : '14px',
 							width: isMobile ? mobileSearchBarWidth : `${searchBarWidth}px`,
 							height: isMobile ? '42px' : '48px',
@@ -1701,95 +1822,186 @@ export const InboxSection: FC<InboxSectionProps> = ({
 						/>
 					</div>
 				)}
-				{/* New box - 148x47px, right-aligned with emails, centered with search bar */}
-				{!selectedEmail && (
-					<div
-						style={{
-							position: 'absolute',
-							top: isMobile ? '12.5px' : '55.5px', // Centered with search bar
-							right: isMobile ? '8px' : '14px', // Right-aligned with emails
-							width: isMobile ? '100px' : '148px',
-							height: isMobile ? '40px' : '47px',
-							border: '3px solid #000000',
-							borderRadius: '8px',
-							backgroundColor: '#FFFFFF',
-							zIndex: 10,
-							display: 'flex',
-							alignItems: 'center',
-							padding: isMobile ? '3px' : '4px',
-							gap: isMobile ? '2px' : '4px',
-						}}
-					>
-						{/* Inbox tab */}
-						<button
-							type="button"
-							onClick={() => handleTabChange('inbox')}
+				{/* Top-right toggle */}
+				{!selectedEmail &&
+					(showMessagesCampaignsToggle ? (
+						<div
 							style={{
-								width: isMobile ? '46px' : '70px',
-								height: isMobile ? '16px' : '19px',
-								display: 'flex',
-								alignItems: 'center',
-								justifyContent: 'center',
-								backgroundColor:
-									activeTab === 'inbox' ? 'rgba(93, 171, 104, 0.63)' : 'transparent',
+								position: 'absolute',
+								top: isMobile ? '12px' : `${desktopSearchTopPx}px`,
+								right: isMobile ? '8px' : '14px',
+								width: '260px',
+								height: '48px',
+								border: '3px solid #000000',
 								borderRadius: '8px',
-								border: activeTab === 'inbox' ? '2px solid #000000' : 'none',
-								cursor: 'pointer',
-								padding: 0,
-								margin: 0,
-								outline: 'none',
-								boxShadow: 'none',
-								WebkitAppearance: 'none',
-								appearance: 'none',
+								overflow: 'hidden',
+								zIndex: 10,
+								display: 'flex',
 							}}
 						>
-							<span
+							<div
+								aria-hidden
 								style={{
-									fontSize: isMobile ? '11px' : '14px',
-									fontWeight: 500,
+									position: 'absolute',
+									left: '50%',
+									top: 0,
+									bottom: 0,
+									width: '3px',
+									backgroundColor: '#000000',
+									transform: 'translateX(-1.5px)',
+									pointerEvents: 'none',
+								}}
+							/>
+							<button
+								type="button"
+								onClick={() => onInboxSubtabChange?.('messages')}
+								aria-pressed={inboxSubtab === 'messages'}
+								style={{
+									flex: 1,
+									height: '100%',
+									display: 'flex',
+									alignItems: 'center',
+									justifyContent: 'center',
+									padding: 0,
+									margin: 0,
+									lineHeight: 1,
+									border: 'none',
+									outline: 'none',
+									backgroundColor: inboxSubtab === 'messages' ? '#B3E5FF' : '#4DA6D7',
 									color: '#000000',
-									fontFamily: 'Times New Roman, serif',
+									fontFamily: 'Inter, sans-serif',
+									fontSize: '15px',
+									fontWeight: 500,
+									cursor: 'pointer',
+									boxShadow: 'none',
+									WebkitAppearance: 'none',
+									appearance: 'none',
 								}}
 							>
-								Inbox
-							</span>
-						</button>
-						{/* Sent tab */}
-						<button
-							type="button"
-							onClick={() => handleTabChange('sent')}
+								Messages
+							</button>
+							<button
+								type="button"
+								onClick={() => onInboxSubtabChange?.('campaigns')}
+								aria-pressed={inboxSubtab === 'campaigns'}
+								style={{
+									flex: 1,
+									height: '100%',
+									display: 'flex',
+									alignItems: 'center',
+									justifyContent: 'center',
+									padding: 0,
+									margin: 0,
+									lineHeight: 1,
+									border: 'none',
+									outline: 'none',
+									backgroundColor:
+										inboxSubtab === 'campaigns' ? '#B3E5FF' : '#4DA6D7',
+									color: '#000000',
+									fontFamily: 'Inter, sans-serif',
+									fontSize: '15px',
+									fontWeight: 500,
+									cursor: 'pointer',
+									boxShadow: 'none',
+									WebkitAppearance: 'none',
+									appearance: 'none',
+								}}
+							>
+								Campaigns
+							</button>
+						</div>
+					) : (
+						<div
 							style={{
-								width: isMobile ? '46px' : '70px',
-								height: isMobile ? '16px' : '19px',
+								position: 'absolute',
+								top: isMobile ? '12.5px' : '55.5px', // Centered with search bar
+								right: isMobile ? '8px' : '14px', // Right-aligned with emails
+								width: isMobile ? '100px' : '148px',
+								height: isMobile ? '40px' : '47px',
+								border: '3px solid #000000',
+								borderRadius: '8px',
+								backgroundColor: '#FFFFFF',
+								zIndex: 10,
 								display: 'flex',
 								alignItems: 'center',
-								justifyContent: 'center',
-								backgroundColor:
-									activeTab === 'sent' ? 'rgba(93, 171, 104, 0.63)' : 'transparent',
-								borderRadius: '8px',
-								border: activeTab === 'sent' ? '2px solid #000000' : 'none',
-								cursor: 'pointer',
-								padding: 0,
-								margin: 0,
-								outline: 'none',
-								boxShadow: 'none',
-								WebkitAppearance: 'none',
-								appearance: 'none',
+								padding: isMobile ? '3px' : '4px',
+								gap: isMobile ? '2px' : '4px',
 							}}
 						>
-							<span
+							{/* Inbox tab */}
+							<button
+								type="button"
+								onClick={() => handleTabChange('inbox')}
 								style={{
-									fontSize: isMobile ? '11px' : '14px',
-									fontWeight: 500,
-									color: '#000000',
-									fontFamily: 'Times New Roman, serif',
+									width: isMobile ? '46px' : '70px',
+									height: isMobile ? '16px' : '19px',
+									display: 'flex',
+									alignItems: 'center',
+									justifyContent: 'center',
+									backgroundColor:
+										activeTab === 'inbox'
+											? 'rgba(93, 171, 104, 0.63)'
+											: 'transparent',
+									borderRadius: '8px',
+									border: activeTab === 'inbox' ? '2px solid #000000' : 'none',
+									cursor: 'pointer',
+									padding: 0,
+									margin: 0,
+									outline: 'none',
+									boxShadow: 'none',
+									WebkitAppearance: 'none',
+									appearance: 'none',
 								}}
 							>
-								Sent
-							</span>
-						</button>
-					</div>
-				)}
+								<span
+									style={{
+										fontSize: isMobile ? '11px' : '14px',
+										fontWeight: 500,
+										color: '#000000',
+										fontFamily: 'Times New Roman, serif',
+									}}
+								>
+									Inbox
+								</span>
+							</button>
+							{/* Sent tab */}
+							<button
+								type="button"
+								onClick={() => handleTabChange('sent')}
+								style={{
+									width: isMobile ? '46px' : '70px',
+									height: isMobile ? '16px' : '19px',
+									display: 'flex',
+									alignItems: 'center',
+									justifyContent: 'center',
+									backgroundColor:
+										activeTab === 'sent'
+											? 'rgba(93, 171, 104, 0.63)'
+											: 'transparent',
+									borderRadius: '8px',
+									border: activeTab === 'sent' ? '2px solid #000000' : 'none',
+									cursor: 'pointer',
+									padding: 0,
+									margin: 0,
+									outline: 'none',
+									boxShadow: 'none',
+									WebkitAppearance: 'none',
+									appearance: 'none',
+								}}
+							>
+								<span
+									style={{
+										fontSize: isMobile ? '11px' : '14px',
+										fontWeight: 500,
+										color: '#000000',
+										fontFamily: 'Times New Roman, serif',
+									}}
+								>
+									Sent
+								</span>
+							</button>
+						</div>
+					))}
 
 				{selectedEmail ? (
 					/* Expanded Email View Inside Box */

@@ -1,6 +1,6 @@
 'use client';
 
-import { FC, useState, useRef, useEffect } from 'react';
+import { FC, useState, useRef, useEffect, type CSSProperties } from 'react';
 import { useRouter } from 'next/navigation';
 import { Campaign } from '@prisma/client';
 import { X } from 'lucide-react';
@@ -15,6 +15,14 @@ import EmptyMobile from '@/components/atoms/_svg/EmptyMobile';
 import { urls } from '@/constants/urls';
 import { mmdd } from '@/utils';
 
+type InboxSubtab = 'messages' | 'campaigns';
+
+const MESSAGES_CAMPAIGNS_TOGGLE_WIDTH_PX = 260;
+const MESSAGES_CAMPAIGNS_TOGGLE_HEIGHT_PX = 48;
+const MESSAGES_CAMPAIGNS_TOGGLE_GAP_PX = 12;
+const MESSAGES_CAMPAIGNS_SELECTED_FILL = '#B3E5FF';
+const MESSAGES_CAMPAIGNS_UNSELECTED_FILL = '#4DA6D7';
+
 // Type matching what the campaigns API returns (same as useCampaignsTable)
 type CampaignWithCounts = Campaign & {
 	draftCount?: number;
@@ -28,17 +36,129 @@ type CampaignsInboxViewProps = {
 	hideSearchBar?: boolean;
 	/** Override the outer container height (e.g. "600px" or "calc(100dvh - 120px)"). */
 	containerHeight?: string;
+	/**
+	 * Optional dashboard "Inbox" sub-tab selection (Messages vs Campaigns).
+	 * When provided, renders the Messages/Campaigns segmented toggle next to the search bar.
+	 */
+	inboxSubtab?: InboxSubtab;
+	onInboxSubtabChange?: (next: InboxSubtab) => void;
 };
 
 type CampaignsInboxViewSkeletonProps = {
 	hideSearchBar: boolean;
 	containerHeight: string;
+	inboxSubtab: InboxSubtab;
+	onInboxSubtabChange?: (next: InboxSubtab) => void;
+};
+
+const MessagesCampaignsToggle: FC<{
+	value: InboxSubtab;
+	onChange: (next: InboxSubtab) => void;
+	style?: CSSProperties;
+}> = ({ value, onChange, style }) => {
+	return (
+		<div
+			style={{
+				width: `${MESSAGES_CAMPAIGNS_TOGGLE_WIDTH_PX}px`,
+				height: `${MESSAGES_CAMPAIGNS_TOGGLE_HEIGHT_PX}px`,
+				border: '3px solid #000000',
+				borderRadius: '8px',
+				overflow: 'hidden',
+				display: 'flex',
+				position: 'relative',
+				...style,
+			}}
+		>
+			<div
+				aria-hidden
+				style={{
+					position: 'absolute',
+					left: '50%',
+					top: 0,
+					bottom: 0,
+					width: '3px',
+					backgroundColor: '#000000',
+					transform: 'translateX(-1.5px)',
+					pointerEvents: 'none',
+				}}
+			/>
+			<button
+				type="button"
+				onClick={() => onChange('messages')}
+				aria-pressed={value === 'messages'}
+				style={{
+					flex: 1,
+					height: '100%',
+					display: 'flex',
+					alignItems: 'center',
+					justifyContent: 'center',
+					padding: 0,
+					margin: 0,
+					lineHeight: 1,
+					border: 'none',
+					outline: 'none',
+					backgroundColor:
+						value === 'messages'
+							? MESSAGES_CAMPAIGNS_SELECTED_FILL
+							: MESSAGES_CAMPAIGNS_UNSELECTED_FILL,
+					color: '#000000',
+					fontFamily: 'Inter, sans-serif',
+					fontSize: '15px',
+					fontWeight: 500,
+					cursor: 'pointer',
+					boxShadow: 'none',
+					WebkitAppearance: 'none',
+					appearance: 'none',
+				}}
+			>
+				Messages
+			</button>
+			<button
+				type="button"
+				onClick={() => onChange('campaigns')}
+				aria-pressed={value === 'campaigns'}
+				style={{
+					flex: 1,
+					height: '100%',
+					display: 'flex',
+					alignItems: 'center',
+					justifyContent: 'center',
+					padding: 0,
+					margin: 0,
+					lineHeight: 1,
+					border: 'none',
+					outline: 'none',
+					backgroundColor:
+						value === 'campaigns'
+							? MESSAGES_CAMPAIGNS_SELECTED_FILL
+							: MESSAGES_CAMPAIGNS_UNSELECTED_FILL,
+					color: '#000000',
+					fontFamily: 'Inter, sans-serif',
+					fontSize: '15px',
+					fontWeight: 500,
+					cursor: 'pointer',
+					boxShadow: 'none',
+					WebkitAppearance: 'none',
+					appearance: 'none',
+				}}
+			>
+				Campaigns
+			</button>
+		</div>
+	);
 };
 
 const CampaignsInboxViewSkeleton: FC<CampaignsInboxViewSkeletonProps> = ({
 	hideSearchBar,
 	containerHeight,
+	inboxSubtab,
+	onInboxSubtabChange,
 }) => {
+	const showMessagesCampaignsToggle = Boolean(onInboxSubtabChange);
+	const searchBarRightOffset = showMessagesCampaignsToggle
+		? `${14 + MESSAGES_CAMPAIGNS_TOGGLE_WIDTH_PX + MESSAGES_CAMPAIGNS_TOGGLE_GAP_PX}px`
+		: '14px';
+
 	return (
 		<div className="w-full max-w-[907px] mx-auto px-4 flex justify-center">
 			<div
@@ -64,7 +184,7 @@ const CampaignsInboxViewSkeleton: FC<CampaignsInboxViewSkeletonProps> = ({
 							position: 'absolute',
 							top: '13px',
 							left: '14px',
-							right: '14px',
+							right: searchBarRightOffset,
 							maxWidth: '879px',
 							height: '48px',
 							border: '3px solid #000000',
@@ -79,6 +199,21 @@ const CampaignsInboxViewSkeleton: FC<CampaignsInboxViewSkeletonProps> = ({
 						<div className="w-[18px] h-[18px] rounded-[3px] bg-black/20" />
 						<div className="ml-4 h-[14px] w-[180px] rounded-[4px] bg-black/15" />
 					</div>
+				)}
+
+				{/* Messages/Campaigns toggle (dashboard inbox sub-tab) */}
+				{!hideSearchBar && showMessagesCampaignsToggle && (
+					<MessagesCampaignsToggle
+						value={inboxSubtab}
+						onChange={onInboxSubtabChange!}
+						style={{
+							position: 'absolute',
+							top: '13px',
+							right: '14px',
+							zIndex: 10,
+							pointerEvents: 'none',
+						}}
+					/>
 				)}
 
 				{/* Campaign row skeletons */}
@@ -193,6 +328,8 @@ const getCreatedFillColor = (createdAt: Date): string => {
 export const CampaignsInboxView: FC<CampaignsInboxViewProps> = ({
 	hideSearchBar = false,
 	containerHeight,
+	inboxSubtab = 'campaigns',
+	onInboxSubtabChange,
 }) => {
 	const router = useRouter();
 	const isMobile = useIsMobile();
@@ -202,6 +339,10 @@ export const CampaignsInboxView: FC<CampaignsInboxViewProps> = ({
 	const confirmationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
 	const resolvedContainerHeight = containerHeight ?? '535px';
+	const showMessagesCampaignsToggle = !hideSearchBar && Boolean(onInboxSubtabChange);
+	const searchBarRightOffset = showMessagesCampaignsToggle
+		? `${14 + MESSAGES_CAMPAIGNS_TOGGLE_WIDTH_PX + MESSAGES_CAMPAIGNS_TOGGLE_GAP_PX}px`
+		: '14px';
 
 	// Breakpoint state for 2x2 metric grid layout (≤ 880px)
 	const [isNarrowLayout, setIsNarrowLayout] = useState(false);
@@ -303,6 +444,8 @@ export const CampaignsInboxView: FC<CampaignsInboxViewProps> = ({
 			<CampaignsInboxViewSkeleton
 				hideSearchBar={hideSearchBar}
 				containerHeight={resolvedContainerHeight}
+				inboxSubtab={inboxSubtab}
+				onInboxSubtabChange={onInboxSubtabChange}
 			/>
 		);
 	}
@@ -333,7 +476,7 @@ export const CampaignsInboxView: FC<CampaignsInboxViewProps> = ({
 							position: 'absolute',
 							top: '13px',
 							left: '14px',
-							right: '14px',
+							right: searchBarRightOffset,
 							maxWidth: '879px',
 							height: '48px',
 							border: '3px solid #000000',
@@ -371,6 +514,20 @@ export const CampaignsInboxView: FC<CampaignsInboxViewProps> = ({
 							className="placeholder:text-[#737373]"
 						/>
 					</div>
+				)}
+
+				{/* Messages/Campaigns toggle (dashboard inbox sub-tab) */}
+				{showMessagesCampaignsToggle && (
+					<MessagesCampaignsToggle
+						value={inboxSubtab}
+						onChange={onInboxSubtabChange!}
+						style={{
+							position: 'absolute',
+							top: '13px',
+							right: '14px',
+							zIndex: 10,
+						}}
+					/>
 				)}
 
 				{/* Mobile Empty State - Show Murmur Logo */}
