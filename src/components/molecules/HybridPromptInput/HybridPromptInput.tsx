@@ -4513,7 +4513,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																					)}
 																				>
 																					<span className="font-inter font-semibold text-[17px] max-[480px]:text-[12px] whitespace-nowrap text-black subject-label">
-																						Subject
+																						Auto Subject
 																					</span>
 																				</div>
 
@@ -5990,7 +5990,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																		)}
 																	>
 																		<span className="font-inter font-semibold text-[14px] whitespace-nowrap text-black">
-																			Subject
+																			{isAiSubjectLocal ? 'Auto Subject' : 'Subject'}
 																		</span>
 																	</div>
 
