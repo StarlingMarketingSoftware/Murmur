@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import MuxPlayer from '@mux/mux-player-react';
 import Link from 'next/link';
 import { urls } from '@/constants/urls';
@@ -8,6 +8,74 @@ import MapDemo1 from '@/components/atoms/_svg/MapDemo1';
 import WhatDemo from '@/components/atoms/_svg/WhatDemo';
 import ZoomDemo from '@/components/atoms/_svg/ZoomDemo';
 import { FadeInUp } from '@/components/animations/FadeInUp';
+
+/**
+ * Individual skeleton overlay component that fades out when content is ready.
+ * Renders on top of the actual content and disappears smoothly.
+ * IMPORTANT: Always uses pointer-events-none to never block touch scrolling.
+ */
+const SkeletonOverlay: React.FC<{
+  isLoading: boolean;
+  children: React.ReactNode;
+  className?: string;
+  style?: React.CSSProperties;
+}> = ({ isLoading, children, className = '', style }) => {
+  const [shouldRender, setShouldRender] = useState(isLoading);
+
+  useEffect(() => {
+    if (!isLoading) {
+      // Keep rendering during fade-out animation
+      const timer = setTimeout(() => setShouldRender(false), 400);
+      return () => clearTimeout(timer);
+    } else {
+      setShouldRender(true);
+    }
+  }, [isLoading]);
+
+  if (!shouldRender) return null;
+
+  return (
+    <div
+      className={`absolute inset-0 z-10 transition-opacity duration-300 pointer-events-none ${
+        isLoading ? 'opacity-100' : 'opacity-0'
+      } ${className}`}
+      style={{ ...style, touchAction: 'pan-y' }}
+      aria-hidden="true"
+    >
+      {children}
+    </div>
+  );
+};
+
+/**
+ * Video skeleton - shows while video is loading
+ * Uses pointer-events-none and touch-action to never block scrolling
+ */
+const VideoSkeleton: React.FC = () => (
+  <div
+    className="w-full h-full rounded-[8px] bg-[#E8E8E8] flex items-center justify-center animate-pulse pointer-events-none"
+    style={{ touchAction: 'pan-y' }}
+  >
+    <div className="w-16 h-16 rounded-full bg-[#D0D0D0]" />
+  </div>
+);
+
+/**
+ * SVG demo skeleton - generic placeholder for SVG demos
+ * Uses pointer-events-none and touch-action to never block scrolling
+ */
+const SvgDemoSkeleton: React.FC<{ variant?: 'map' | 'what' | 'zoom' }> = ({ variant = 'map' }) => {
+  const bgColor = variant === 'what' 
+    ? 'bg-[rgba(255,255,255,0.4)]' 
+    : 'bg-gradient-to-br from-[#E8E8E8] to-[#D8D8D8]';
+  
+  return (
+    <div 
+      className={`w-full h-full ${bgColor} animate-pulse pointer-events-none`}
+      style={{ touchAction: 'pan-y' }}
+    />
+  );
+};
 
 const videoStyle = {
   '--controls': 'none',
@@ -37,9 +105,95 @@ const videoStyle = {
   border: 'none',
   outline: 'none',
   boxShadow: 'none',
+  // Ensure video doesn't block touch scrolling on mobile
+  touchAction: 'pan-y',
 } as React.CSSProperties;
 
 export default function MapPage() {
+  const [isMobile, setIsMobile] = useState<boolean | null>(null);
+  
+  // Progressive loading states for each section
+  const [videoReady, setVideoReady] = useState(false);
+  const [mapDemoReady, setMapDemoReady] = useState(false);
+  const [whatDemoReady, setWhatDemoReady] = useState(false);
+  const [zoomDemoReady, setZoomDemoReady] = useState(false);
+
+  // Detect mobile on mount and immediately enable scrolling
+  useEffect(() => {
+    const checkMobile = () => window.innerWidth < 768;
+    const mobile = checkMobile();
+    setIsMobile(mobile);
+
+    // Force enable scrolling function
+    const forceEnableScroll = () => {
+      document.documentElement.style.setProperty('overflow-y', 'auto', 'important');
+      document.documentElement.style.setProperty('overflow-x', 'hidden', 'important');
+      document.documentElement.style.setProperty('touch-action', 'pan-y', 'important');
+      document.body.style.setProperty('overflow-y', 'auto', 'important');
+      document.body.style.setProperty('overflow-x', 'hidden', 'important');
+      document.body.style.setProperty('touch-action', 'pan-y', 'important');
+      document.body.style.setProperty('position', 'static', 'important');
+      document.body.style.removeProperty('top');
+      document.body.style.removeProperty('height');
+      // Also remove any lenis-stopped classes
+      document.documentElement.classList.remove('lenis-stopped');
+      document.body.classList.remove('lenis-stopped');
+    };
+
+    // Immediately force scrolling to work on mobile
+    if (mobile) {
+      forceEnableScroll();
+      
+      // Keep forcing scroll for the first 2 seconds to catch any late scroll locks
+      const intervals = [100, 250, 500, 1000, 1500, 2000].map(delay =>
+        setTimeout(forceEnableScroll, delay)
+      );
+      
+      return () => {
+        intervals.forEach(clearTimeout);
+      };
+    }
+
+    // Also listen for resize to handle orientation changes
+    const handleResize = () => setIsMobile(checkMobile());
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Progressive loading for SVG demos - they load quickly but we stagger for smoothness
+  useEffect(() => {
+    if (isMobile === null) return;
+    
+    // Only apply progressive loading on mobile
+    if (!isMobile) {
+      setMapDemoReady(true);
+      setWhatDemoReady(true);
+      setZoomDemoReady(true);
+      return;
+    }
+
+    // Stagger the reveals for a smooth progressive effect
+    const timers = [
+      setTimeout(() => setMapDemoReady(true), 100),
+      setTimeout(() => setWhatDemoReady(true), 200),
+      setTimeout(() => setZoomDemoReady(true), 300),
+    ];
+
+    return () => timers.forEach(clearTimeout);
+  }, [isMobile]);
+
+  // Video ready handler with fallback
+  const handleVideoReady = useCallback(() => {
+    setVideoReady(true);
+  }, []);
+
+  // Fallback timeout for video
+  useEffect(() => {
+    if (videoReady) return;
+    const fallbackTimer = setTimeout(() => setVideoReady(true), 4000);
+    return () => clearTimeout(fallbackTimer);
+  }, [videoReady]);
+
   // Use a layout effect so any leaked scroll locks (overflow hidden / fixed body)
   // are cleared *before paint* on mobile, preventing the brief "stuck" state on load.
   React.useLayoutEffect(() => {
@@ -287,18 +441,29 @@ export default function MapPage() {
     return cleanup;
   }, []);
 
+  // Determine if we should show mobile skeletons
+  const showMobileSkeletons = isMobile === true;
+
   return (
-    <main className="relative bg-[#F5F5F7] overflow-x-hidden landing-page">
+    <main 
+      className="relative bg-[#F5F5F7] overflow-x-hidden landing-page"
+      style={{ 
+        // Ensure touch scrolling works on mobile
+        touchAction: 'pan-y',
+        WebkitOverflowScrolling: 'touch',
+      }}
+    >
       {/* Gradient overlay for first 1935px (outside `.landing-zoom-80` so it isn't scaled by `zoom`) */}
       <div
         className="absolute top-0 left-0 w-full pointer-events-none z-0"
         style={{
           height: '1935px',
           background: 'linear-gradient(to bottom, #E6D6C6, #F5F5F7)',
+          touchAction: 'pan-y',
         }}
       />
 
-      <div className="landing-zoom-80 relative z-10">
+      <div className="landing-zoom-80 relative z-10" style={{ touchAction: 'pan-y' }}>
         <div className="min-h-screen relative">
           <div className="relative flex justify-center pt-16 pb-6 lg:pt-[100px] lg:pb-0">
             <FadeInUp>
@@ -307,7 +472,16 @@ export default function MapPage() {
                   Mapping
                 </h1>
                 <div className="w-full flex justify-center lg:mt-auto">
-                  <div className="w-full max-w-[1372px] rounded-[8px] border border-black overflow-hidden flex">
+                  <div 
+                    className="w-full max-w-[1372px] rounded-[8px] border border-black overflow-hidden flex relative"
+                    style={{ touchAction: 'pan-y' }}
+                  >
+                    {/* Video skeleton overlay for mobile */}
+                    {showMobileSkeletons && (
+                      <SkeletonOverlay isLoading={!videoReady}>
+                        <VideoSkeleton />
+                      </SkeletonOverlay>
+                    )}
                     <MuxPlayer
                       className="pointer-events-none"
                       style={{
@@ -322,6 +496,8 @@ export default function MapPage() {
                       loop
                       playsInline
                       nohotkeys
+                      onCanPlay={handleVideoReady}
+                      onLoadedData={handleVideoReady}
                     />
                   </div>
                 </div>
@@ -348,7 +524,16 @@ export default function MapPage() {
                 </p>
               </FadeInUp>
 
-              <FadeInUp delay={0.05} className="bg-[#F1F1F1] rounded-[34px] overflow-hidden">
+              <FadeInUp delay={0.05} className="bg-[#F1F1F1] rounded-[34px] overflow-hidden relative">
+                {/* Skeleton overlay for mobile */}
+                {showMobileSkeletons && (
+                  <SkeletonOverlay 
+                    isLoading={!mapDemoReady}
+                    className="rounded-[34px]"
+                  >
+                    <SvgDemoSkeleton variant="map" />
+                  </SkeletonOverlay>
+                )}
                 <MapDemo1
                   className="w-full h-auto block"
                   viewBox="0 0 508 287"
@@ -395,11 +580,20 @@ export default function MapPage() {
 
               <FadeInUp
                 delay={0.05}
-                className="rounded-[34px] p-6 sm:p-8 flex justify-center overflow-visible"
+                className="rounded-[34px] p-6 sm:p-8 flex justify-center overflow-visible relative"
                 style={{
                   background: 'linear-gradient(180deg, #C3E8C9 0%, #AFF1B8 100%)',
                 }}
               >
+                {/* Skeleton overlay for mobile */}
+                {showMobileSkeletons && (
+                  <SkeletonOverlay 
+                    isLoading={!whatDemoReady}
+                    className="rounded-[34px]"
+                  >
+                    <SvgDemoSkeleton variant="what" />
+                  </SkeletonOverlay>
+                )}
                 <WhatDemo className="w-full h-auto max-w-[520px] -translate-x-[11.75%]" />
               </FadeInUp>
             </div>
@@ -444,7 +638,16 @@ export default function MapPage() {
                 </p>
               </FadeInUp>
 
-              <FadeInUp delay={0.05} className="rounded-[22px] overflow-hidden">
+              <FadeInUp delay={0.05} className="rounded-[22px] overflow-hidden relative">
+                {/* Skeleton overlay for mobile */}
+                {showMobileSkeletons && (
+                  <SkeletonOverlay 
+                    isLoading={!zoomDemoReady}
+                    className="rounded-[22px]"
+                  >
+                    <SvgDemoSkeleton variant="zoom" />
+                  </SkeletonOverlay>
+                )}
                 <ZoomDemo
                   className="w-full h-auto block"
                   viewBox="0 0 561 287"
