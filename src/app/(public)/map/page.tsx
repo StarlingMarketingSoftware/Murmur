@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import MuxPlayer from '@mux/mux-player-react';
 import Link from 'next/link';
 import { urls } from '@/constants/urls';
@@ -39,6 +40,168 @@ const videoStyle = {
 } as React.CSSProperties;
 
 export default function MapPage() {
+  // Use a layout effect so any leaked scroll locks (overflow hidden / fixed body)
+  // are cleared *before paint* on mobile, preventing the brief "stuck" state on load.
+  React.useLayoutEffect(() => {
+    const clearInlineScrollLocks = () => {
+      // Clear any common inline scroll locks (overflow hidden, fixed body, etc).
+      document.body.style.overflow = '';
+      document.body.style.overflowX = '';
+      document.body.style.overflowY = '';
+      document.body.style.position = '';
+      document.body.style.height = '';
+      document.body.style.minHeight = '';
+      document.body.style.maxHeight = '';
+      document.body.style.width = '';
+      document.body.style.top = '';
+      document.body.style.touchAction = '';
+      document.documentElement.style.overflow = '';
+      document.documentElement.style.overflowX = '';
+      document.documentElement.style.overflowY = '';
+    };
+
+    const clearLeakedAppScrollClasses = () => {
+      // Defensive: if a user navigates here from an app page (or via Safari BFCache),
+      // some root classes can leak and *hard lock* scrolling on mobile.
+      try {
+        document.documentElement.classList.remove(
+          'murmur-compact',
+          'murmur-campaign-compact',
+          'murmur-campaign-scrollable',
+          'murmur-campaign-force-transform',
+          'murmur-dashboard-compact',
+          'murmur-dashboard-map-compact',
+          'murmur-research-compact',
+          'murmur-inbox-compact',
+          'murmur-drafting-compact'
+        );
+        // Lenis can toggle this when scrolling is stopped; if it leaks, scrolling can appear "frozen".
+        document.documentElement.classList.remove('lenis-stopped');
+        document.body.classList.remove('lenis-stopped');
+
+        // Campaign/dashboard zoom vars can leak; clear them for this marketing page.
+        document.documentElement.style.removeProperty('--murmur-campaign-zoom');
+        document.documentElement.style.removeProperty('--murmur-dashboard-zoom');
+      } catch {
+        // ignore
+      }
+    };
+
+    // Defensive: if any prior view left inline scroll locks behind (overflow hidden, fixed body, etc),
+    // clear them so this marketing page always remains scrollable on mobile Safari.
+    try {
+      clearInlineScrollLocks();
+      clearLeakedAppScrollClasses();
+      // This page does not use inline body zoom; ensure nothing stale persists.
+      document.body.style.removeProperty('zoom');
+    } catch {
+      // ignore
+    }
+
+    const isAnyModalOpen = () => {
+      // Generic modal detection (covers Radix + most third-party modals, including Clerk).
+      try {
+        return Boolean(
+          document.querySelector(
+            '[aria-modal="true"], [data-slot="dialog-content"][data-state="open"]'
+          )
+        );
+      } catch {
+        return false;
+      }
+    };
+
+    const isMobileMenuOpen = () => {
+      // Navbar exposes this attribute; use it so we don't fight legitimate scroll locks.
+      try {
+        return Boolean(document.querySelector('[data-mobile-menu-open="true"]'));
+      } catch {
+        return false;
+      }
+    };
+
+    const isOverlayOpen = () => isAnyModalOpen() || isMobileMenuOpen();
+
+    const isHardScrollLocked = () => {
+      const bodyInline = document.body.style;
+      const htmlInline = document.documentElement.style;
+
+      const hasLeakedScrollClasses =
+        document.documentElement.classList.contains('murmur-compact') ||
+        document.documentElement.classList.contains('murmur-campaign-compact') ||
+        document.documentElement.classList.contains('lenis-stopped');
+
+      const overflowLockedInline =
+        bodyInline.overflow === 'hidden' ||
+        bodyInline.overflowY === 'hidden' ||
+        bodyInline.overflow === 'clip' ||
+        bodyInline.overflowY === 'clip' ||
+        htmlInline.overflow === 'hidden' ||
+        htmlInline.overflowY === 'hidden' ||
+        htmlInline.overflow === 'clip' ||
+        htmlInline.overflowY === 'clip';
+
+      const positionOrTouchLocked =
+        bodyInline.position === 'fixed' ||
+        bodyInline.top !== '' ||
+        bodyInline.touchAction === 'none';
+
+      // NOTE: Avoid `getComputedStyle()` here — it can introduce noticeable touch-scroll lag
+      // on iOS Safari. For this marketing page, hard locks have been observed to come from inline styles
+      // or leaked root classes (handled above), which MutationObservers also catch.
+      return hasLeakedScrollClasses || overflowLockedInline || positionOrTouchLocked;
+    };
+
+    const unlockIfStuck = () => {
+      if (isOverlayOpen()) return;
+      if (!isHardScrollLocked()) return;
+      try {
+        clearInlineScrollLocks();
+        clearLeakedAppScrollClasses();
+      } catch {
+        // ignore
+      }
+    };
+
+    // Watch for any code leaving scroll locks behind after mount (e.g., modals/overlays).
+    let rafId: number | null = null;
+    const scheduleUnlockCheck = () => {
+      if (rafId !== null) cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        rafId = null;
+        unlockIfStuck();
+      });
+    };
+
+    const bodyObserver = new MutationObserver(scheduleUnlockCheck);
+    const htmlObserver = new MutationObserver(scheduleUnlockCheck);
+    bodyObserver.observe(document.body, { attributes: true, attributeFilter: ['style', 'class'] });
+    htmlObserver.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['style', 'class'],
+    });
+
+    // Also re-check on common Safari lifecycle edges.
+    const onVisibilityChange = () => {
+      if (!document.hidden) unlockIfStuck();
+    };
+    window.addEventListener('pageshow', unlockIfStuck);
+    window.addEventListener('focus', unlockIfStuck);
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    // If the user tries to interact and we're locked, recover immediately.
+    window.addEventListener('touchstart', unlockIfStuck, { passive: true });
+
+    return () => {
+      window.removeEventListener('pageshow', unlockIfStuck);
+      window.removeEventListener('focus', unlockIfStuck);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      window.removeEventListener('touchstart', unlockIfStuck);
+      bodyObserver.disconnect();
+      htmlObserver.disconnect();
+      if (rafId !== null) cancelAnimationFrame(rafId);
+    };
+  }, []);
+
   return (
     <main className="relative bg-[#F5F5F7] overflow-x-hidden landing-page">
       {/* Gradient overlay for first 1935px (outside `.landing-zoom-80` so it isn't scaled by `zoom`) */}
