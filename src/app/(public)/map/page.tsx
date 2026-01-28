@@ -41,19 +41,18 @@ const videoStyle = {
 export default function MapPage() {
   return (
     <main className="relative bg-[#F5F5F7] overflow-x-hidden landing-page">
-      {/* Gradient overlay for first 1307px (outside `.landing-zoom-80` so it isn't scaled by `zoom`) */}
+      {/* Gradient overlay for first 1935px (outside `.landing-zoom-80` so it isn't scaled by `zoom`) */}
       <div
-        // Offset by the navbar spacer height (h-12 = 48px) so the gradient starts at the true top of the page.
-        className="absolute -top-12 left-0 w-full pointer-events-none z-0"
+        className="absolute top-0 left-0 w-full pointer-events-none z-0"
         style={{
-          height: '1307px',
+          height: '1935px',
           background: 'linear-gradient(to bottom, #E6D6C6, #F5F5F7)',
         }}
       />
 
       <div className="landing-zoom-80 relative z-10">
         <div className="min-h-screen relative">
-          <div className="relative flex justify-center pt-8 pb-6 lg:pt-[53px] lg:pb-0">
+          <div className="relative flex justify-center pt-16 pb-6 lg:pt-[100px] lg:pb-0">
             <FadeInUp>
               <div className="w-[calc(100vw-32px)] max-w-[1464px] bg-[#F2FBFF] rounded-[22px] flex flex-col items-center gap-6 px-4 pt-6 pb-6 lg:w-[1464px] lg:h-[975px] lg:px-[46px] lg:pt-[30px] lg:pb-[30px]">
                 <h1 className="font-inter font-extralight tracking-[0.19em] text-[#696969] text-center text-[40px] sm:text-[56px] lg:text-[65px] leading-none">

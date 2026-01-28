@@ -14,18 +14,187 @@ export default function DraftingPage() {
   React.useEffect(() => {
     const footer = document.querySelector('footer') as HTMLElement | null;
     const prevFooterDisplay = footer?.style.display ?? '';
-    const prevBodyZoom = document.body.style.getPropertyValue('zoom');
 
     if (footer) {
       footer.style.display = 'none';
     }
 
-    // Make this route render at ~80% browser zoom (desktop only).
-    // Mobile devices have touch scrolling issues with zoom, so skip it.
-    const isMobile = window.innerWidth < 768;
-    if (!isMobile) {
-      document.body.style.setProperty('zoom', '0.8');
+    const clearInlineScrollLocks = () => {
+      // Clear any common inline scroll locks (overflow hidden, fixed body, etc).
+      document.body.style.overflow = '';
+      document.body.style.overflowX = '';
+      document.body.style.overflowY = '';
+      document.body.style.position = '';
+      document.body.style.width = '';
+      document.body.style.top = '';
+      document.body.style.touchAction = '';
+      document.documentElement.style.overflow = '';
+      document.documentElement.style.overflowX = '';
+      document.documentElement.style.overflowY = '';
+    };
+
+    const clearLeakedAppScrollClasses = () => {
+      // Defensive: if a user navigates here from an app page (or via Safari BFCache),
+      // some root classes can leak and *hard lock* scrolling on mobile.
+      try {
+        document.documentElement.classList.remove(
+          'murmur-compact',
+          'murmur-campaign-compact',
+          'murmur-campaign-scrollable',
+          'murmur-campaign-force-transform'
+        );
+        // Lenis can toggle this when scrolling is stopped; if it leaks, scrolling can appear "frozen".
+        document.documentElement.classList.remove('lenis-stopped');
+        document.body.classList.remove('lenis-stopped');
+
+        // Campaign zoom var can also leak; clear it for this marketing page.
+        document.documentElement.style.removeProperty('--murmur-campaign-zoom');
+      } catch {
+        // ignore
+      }
+    };
+
+    // Defensive: if any prior view left inline scroll locks behind (overflow hidden, fixed body, etc),
+    // clear them so this marketing page always remains scrollable on mobile Safari.
+    try {
+      clearInlineScrollLocks();
+      clearLeakedAppScrollClasses();
+      // This page no longer uses inline body zoom; ensure nothing stale persists.
+      document.body.style.removeProperty('zoom');
+    } catch {
+      // ignore
     }
+
+    // Desktop "compact" (80%) scaling.
+    // On touch devices (iOS Safari/iPadOS), root-level scaling can break touch scrolling.
+    const compactMql = window.matchMedia('(min-width: 1024px)');
+    const touchMql = window.matchMedia('(hover: none) and (pointer: coarse)');
+    const syncCompactClass = () => {
+      // `hover/pointer` media queries are not fully reliable across Safari versions,
+      // so also fall back to touch-point detection.
+      const isTouchDevice =
+        touchMql.matches ||
+        (typeof navigator !== 'undefined' && navigator.maxTouchPoints > 0) ||
+        'ontouchstart' in window;
+
+      if (compactMql.matches && !isTouchDevice) {
+        document.documentElement.classList.add('murmur-drafting-compact');
+      } else {
+        document.documentElement.classList.remove('murmur-drafting-compact');
+      }
+    };
+
+    syncCompactClass();
+    // Safari < 14 uses addListener/removeListener.
+    if (typeof compactMql.addEventListener === 'function') {
+      compactMql.addEventListener('change', syncCompactClass);
+    } else {
+      compactMql.addListener(syncCompactClass);
+    }
+    if (typeof touchMql.addEventListener === 'function') {
+      touchMql.addEventListener('change', syncCompactClass);
+    } else {
+      touchMql.addListener(syncCompactClass);
+    }
+    // Extra redundancy: make sure rotation/resize never leaves compact scaling applied on touch devices.
+    window.addEventListener('resize', syncCompactClass, { passive: true });
+    window.addEventListener('orientationchange', syncCompactClass);
+
+    const isAnyModalOpen = () => {
+      // Generic modal detection (covers Radix + most third-party modals, including Clerk).
+      try {
+        return Boolean(
+          document.querySelector(
+            '[aria-modal="true"], [data-slot="dialog-content"][data-state="open"]'
+          )
+        );
+      } catch {
+        return false;
+      }
+    };
+
+    const isMobileMenuOpen = () => {
+      // Navbar exposes this attribute; use it so we don't fight legitimate scroll locks.
+      try {
+        return Boolean(document.querySelector('[data-mobile-menu-open="true"]'));
+      } catch {
+        return false;
+      }
+    };
+
+    const isOverlayOpen = () => isAnyModalOpen() || isMobileMenuOpen();
+
+    const isHardScrollLocked = () => {
+      const bodyInline = document.body.style;
+      const htmlInline = document.documentElement.style;
+
+      const hasLeakedScrollClasses =
+        document.documentElement.classList.contains('murmur-compact') ||
+        document.documentElement.classList.contains('murmur-campaign-compact') ||
+        document.documentElement.classList.contains('lenis-stopped');
+
+      const overflowLockedInline =
+        bodyInline.overflow === 'hidden' ||
+        bodyInline.overflowY === 'hidden' ||
+        bodyInline.overflow === 'clip' ||
+        bodyInline.overflowY === 'clip' ||
+        htmlInline.overflow === 'hidden' ||
+        htmlInline.overflowY === 'hidden' ||
+        htmlInline.overflow === 'clip' ||
+        htmlInline.overflowY === 'clip';
+
+      const positionOrTouchLocked =
+        bodyInline.position === 'fixed' ||
+        bodyInline.top !== '' ||
+        bodyInline.touchAction === 'none';
+
+      // NOTE: Avoid `getComputedStyle()` here — it can introduce noticeable touch-scroll lag
+      // on iOS Safari (especially at the very top/bottom where users do short gestures).
+      // For this marketing page, hard locks have been observed to come from inline styles
+      // or leaked root classes (handled above), which MutationObservers also catch.
+      return hasLeakedScrollClasses || overflowLockedInline || positionOrTouchLocked;
+    };
+
+    const unlockIfStuck = () => {
+      if (isOverlayOpen()) return;
+      if (!isHardScrollLocked()) return;
+      try {
+        clearInlineScrollLocks();
+        clearLeakedAppScrollClasses();
+      } catch {
+        // ignore
+      }
+      // Ensure we also don't accidentally re-apply compact scaling on touch devices.
+      syncCompactClass();
+    };
+
+    // Watch for any code leaving scroll locks behind after mount (e.g., modals/overlays).
+    let rafId: number | null = null;
+    const scheduleUnlockCheck = () => {
+      if (rafId !== null) cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        rafId = null;
+        unlockIfStuck();
+      });
+    };
+
+    const bodyObserver = new MutationObserver(scheduleUnlockCheck);
+    const htmlObserver = new MutationObserver(scheduleUnlockCheck);
+    bodyObserver.observe(document.body, { attributes: true, attributeFilter: ['style', 'class'] });
+    htmlObserver.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['style', 'class'],
+    });
+
+    // Also re-check on common Safari lifecycle edges.
+    const onVisibilityChange = () => {
+      if (!document.hidden) unlockIfStuck();
+    };
+    window.addEventListener('pageshow', unlockIfStuck);
+    window.addEventListener('focus', unlockIfStuck);
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    // If the user tries to interact and we're locked, recover immediately.
+    window.addEventListener('touchstart', unlockIfStuck, { passive: true });
 
     return () => {
       const footer = document.querySelector('footer') as HTMLElement | null;
@@ -33,26 +202,42 @@ export default function DraftingPage() {
         footer.style.display = prevFooterDisplay;
       }
 
-      if (prevBodyZoom) {
-        document.body.style.setProperty('zoom', prevBodyZoom);
+      if (typeof compactMql.removeEventListener === 'function') {
+        compactMql.removeEventListener('change', syncCompactClass);
       } else {
-        document.body.style.removeProperty('zoom');
+        compactMql.removeListener(syncCompactClass);
       }
+      if (typeof touchMql.removeEventListener === 'function') {
+        touchMql.removeEventListener('change', syncCompactClass);
+      } else {
+        touchMql.removeListener(syncCompactClass);
+      }
+      window.removeEventListener('resize', syncCompactClass);
+      window.removeEventListener('orientationchange', syncCompactClass);
+      window.removeEventListener('pageshow', unlockIfStuck);
+      window.removeEventListener('focus', unlockIfStuck);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      window.removeEventListener('touchstart', unlockIfStuck);
+      bodyObserver.disconnect();
+      htmlObserver.disconnect();
+      if (rafId !== null) cancelAnimationFrame(rafId);
+
+      document.documentElement.classList.remove('murmur-drafting-compact');
     };
   }, []);
 
   return (
     <main className="relative bg-[#F5F5F7] overflow-x-hidden landing-page">
-      {/* Gradient overlay for first 1935px (offset by navbar spacer height, h-12 = 48px) */}
+      {/* Gradient overlay for first 1935px */}
       <div
-        className="absolute -top-12 left-0 w-full pointer-events-none z-0"
+        className="absolute top-0 left-0 w-full pointer-events-none z-0"
         style={{
           height: '1935px',
           background: 'linear-gradient(to bottom, #D2F2DE, #F5F5F7)',
         }}
       />
       <div className="relative z-10 min-h-screen">
-      <div className="relative flex justify-center pt-8 pb-6 lg:pt-[53px] lg:pb-0">
+      <div className="relative flex justify-center pt-16 pb-6 lg:pt-[100px] lg:pb-0">
         <FadeInUp className="w-[calc(100vw-32px)] max-w-[1352px] bg-[#F2FBFF] rounded-[22px] flex flex-col items-center gap-6 px-4 pt-6 pb-6 lg:w-[1352px] lg:h-[823px] lg:px-[46px] lg:pt-[30px] lg:pb-[30px]">
           <h1 className="font-inter font-extralight tracking-[0.19em] text-[#696969] text-center text-[40px] sm:text-[56px] lg:text-[65px] leading-none">
             Drafting
@@ -64,7 +249,7 @@ export default function DraftingPage() {
       </div>
       {/* Tell your story */}
       {/* Narrow layout (stacked) */}
-      <div className="hidden max-[1193px]:block w-full mt-16 sm:mt-[192px] px-4 sm:px-6">
+      <div className="w-full mt-16 sm:mt-[192px] px-4 sm:px-6 min-[1194px]:hidden">
         <div className="mx-auto w-full max-w-[686px] flex flex-col gap-6">
           <FadeInUp className="bg-white rounded-[34px] px-8 pt-10 pb-12">
             <p className="font-inter font-bold text-[20px] text-black leading-tight">Tell your story</p>
@@ -76,17 +261,24 @@ export default function DraftingPage() {
 
           <FadeInUp
             delay={0.05}
-            className="rounded-[34px] bg-gradient-to-b from-[#E1D5FF] to-[#F1ECFB] px-8 pt-10 pb-12 flex justify-center"
+            className="w-full rounded-[22px] overflow-hidden flex items-center justify-center px-4 py-6"
+            style={{
+              background: 'linear-gradient(to bottom, #E1D5FF, #F1ECFB)',
+            }}
           >
-            <ScaledToFit baseWidth={394} baseHeight={366}>
-              <ProfileDemo />
-            </ScaledToFit>
+            {/* Avoid transform-scaling here: iOS Safari can drop SVG filter layers when scaled via CSS transforms. */}
+            <div className="w-full max-w-[394px] aspect-[394/366]">
+              <ProfileDemo
+                className="w-full h-full"
+                preserveAspectRatio="xMidYMid meet"
+              />
+            </div>
           </FadeInUp>
         </div>
       </div>
 
       {/* Wide layout */}
-      <div className="relative flex max-[1193px]:hidden justify-center mt-[192px] px-4 overflow-visible drafting-feature-scale-wrapper drafting-feature-scale-wrapper--tell">
+      <div className="relative hidden min-[1194px]:flex justify-center mt-[192px] px-4 overflow-visible drafting-feature-scale-wrapper drafting-feature-scale-wrapper--tell">
         <div className="drafting-feature-scale-inner flex w-[1355px] h-[424px] gap-[13px]">
           <FadeInUp className="w-[752px] h-[424px] rounded-[22px] bg-white px-[86px] pt-[74px]">
             <p className="font-inter font-bold text-[24px] text-black">Tell your story</p>
@@ -105,7 +297,7 @@ export default function DraftingPage() {
       </div>
       {/* Drafting Modes */}
       {/* Narrow layout (mobile) */}
-      <div className="hidden max-[1193px]:block w-full mt-14 sm:mt-[146px] px-4 sm:px-6">
+      <div className="w-full mt-14 sm:mt-[146px] px-4 sm:px-6 min-[1194px]:hidden">
         <div className="mx-auto w-full max-w-[686px] flex flex-col gap-6">
           <FadeInUp className="bg-white rounded-[34px] px-8 pt-10 pb-12">
             <p className="font-inter font-bold text-[20px] text-black leading-tight">
@@ -120,11 +312,14 @@ export default function DraftingPage() {
 
           <FadeInUp
             delay={0.05}
-            className="rounded-[34px] bg-gradient-to-b from-[#ECFFF9] to-[#BFEADC] px-8 pt-10 pb-12"
+            className="w-full rounded-[22px] overflow-hidden px-8 pt-10 pb-12"
+            style={{
+              background: 'linear-gradient(to bottom, #ECFFF9, #BFEADC)',
+            }}
           >
             <div className="space-y-16">
               <div>
-                <p className="font-inter font-bold text-[20px] xs:text-[22px] sm:text-[24px] text-black leading-tight">Auto</p>
+                <p className="relative top-[12px] font-inter font-bold text-[18px] xs:text-[20px] sm:text-[22px] text-black leading-tight">Auto</p>
                 <div className="mt-6">
                   <ScaledToFit baseWidth={329} baseHeight={466}>
                     <ModesDemo width={329} height={466} viewBox="0 0 329 466" preserveAspectRatio="xMinYMin meet" />
@@ -133,7 +328,7 @@ export default function DraftingPage() {
               </div>
 
               <div>
-                <p className="font-inter font-bold text-[20px] xs:text-[22px] sm:text-[24px] text-black leading-tight">Manual Mode</p>
+                <p className="relative top-[12px] font-inter font-bold text-[18px] xs:text-[20px] sm:text-[22px] text-black leading-tight">Manual Mode</p>
                 <div className="mt-6">
                   <ScaledToFit baseWidth={329} baseHeight={466}>
                     <ModesDemo width={329} height={466} viewBox="423 0 329 466" preserveAspectRatio="xMinYMin meet" />
@@ -142,7 +337,7 @@ export default function DraftingPage() {
               </div>
 
               <div>
-                <p className="font-inter font-bold text-[20px] xs:text-[22px] sm:text-[24px] text-black leading-tight">Hybrid Mode</p>
+                <p className="relative top-[12px] font-inter font-bold text-[18px] xs:text-[20px] sm:text-[22px] text-black leading-tight">Hybrid Mode</p>
                 <div className="mt-6">
                   <ScaledToFit baseWidth={329} baseHeight={466}>
                     <ModesDemo width={329} height={466} viewBox="846 0 329 466" preserveAspectRatio="xMinYMin meet" />
@@ -155,7 +350,7 @@ export default function DraftingPage() {
       </div>
 
       {/* Wide layout */}
-      <div className="relative flex max-[1193px]:hidden justify-center mt-[146px] px-4 overflow-visible drafting-feature-scale-wrapper drafting-feature-scale-wrapper--modes">
+      <div className="relative hidden min-[1194px]:flex justify-center mt-[146px] px-4 overflow-visible drafting-feature-scale-wrapper drafting-feature-scale-wrapper--modes">
         <div className="drafting-feature-scale-inner w-[1354px] h-[895px] flex flex-col gap-[13px]">
           <FadeInUp className="w-full h-[535px] rounded-[22px] bg-gradient-to-b from-[#ECFFF9] to-[#BFEADC] flex items-center justify-center overflow-hidden">
             <ModesDemo className="max-w-full max-h-full" />
@@ -173,7 +368,7 @@ export default function DraftingPage() {
       </div>
       {/* Built-in variation */}
       {/* Narrow layout (stacked, show both preview variants) */}
-      <div className="hidden max-[1193px]:block w-full mt-16 sm:mt-[181px] px-4 sm:px-6">
+      <div className="w-full mt-16 sm:mt-[181px] px-4 sm:px-6 min-[1194px]:hidden">
         <div className="mx-auto w-full max-w-[686px] flex flex-col gap-6">
           <FadeInUp className="bg-white rounded-[34px] px-8 pt-10 pb-12">
             <p className="font-inter font-bold text-[20px] text-black leading-tight">
@@ -187,7 +382,7 @@ export default function DraftingPage() {
 
           <FadeInUp
             delay={0.05}
-            className="rounded-[34px] px-8 pt-10 pb-12"
+            className="w-full rounded-[22px] px-8 pt-10 pb-12"
             style={{
               background: 'linear-gradient(229deg, #EFFDFF -10%, #C2E9EF 90%)',
             }}
@@ -206,7 +401,7 @@ export default function DraftingPage() {
       </div>
 
       {/* Wide layout (original design) */}
-      <div className="relative flex max-[1193px]:hidden justify-center mt-[181px] px-4 overflow-visible drafting-feature-scale-wrapper drafting-feature-scale-wrapper--variation">
+      <div className="relative hidden min-[1194px]:flex justify-center mt-[181px] px-4 overflow-visible drafting-feature-scale-wrapper drafting-feature-scale-wrapper--variation">
         <div className="drafting-feature-scale-inner flex w-[1354px] h-[627px] gap-[7px]">
           <FadeInUp className="w-[527px] h-[627px] rounded-[22px] bg-white px-[58px] pt-[58px]">
             <p className="font-inter font-bold text-[24px] text-black">Built-in variation</p>

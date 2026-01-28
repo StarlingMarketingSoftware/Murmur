@@ -45,23 +45,8 @@ export const Navbar = () => {
 	}, [canAccessApp, isSignedIn, pathname, router, searchParams]);
 
 	useEffect(() => {
-		const HERO_SECTION_ID = 'landing-hero';
-		const isLanding = pathname === urls.home.index;
-
 		const update = () => {
-			// Landing page: keep the navbar fully transparent until the hero/video section is passed.
-			if (isLanding) {
-				const hero = document.getElementById(HERO_SECTION_ID);
-				if (hero) {
-					const heroBottom = hero.getBoundingClientRect().bottom;
-					// Switch as soon as the hero is fully out of view.
-					// This prevents the "border line" from flashing while re-entering the hero on scroll up.
-					setScrolled(heroBottom <= 0);
-					return;
-				}
-			}
-
-			// Other pages: default behavior.
+			// Show navbar background once user scrolls past a small threshold
 			setScrolled(window.scrollY > 20);
 		};
 
@@ -84,10 +69,10 @@ export const Navbar = () => {
 		if (isMobileMenuOpen) {
 			document.body.style.overflow = 'hidden';
 		} else {
-			document.body.style.overflow = 'unset';
+			document.body.style.overflow = '';
 		}
 		return () => {
-			document.body.style.overflow = 'unset';
+			document.body.style.overflow = '';
 		};
 	}, [isMobileMenuOpen]);
 
@@ -126,10 +111,13 @@ export const Navbar = () => {
 	const isDraftingPage = pathname === '/drafting' || pathname.startsWith('/drafting/');
 	const showBackArrow = isMapPage || isResearchPage || isInboxPage || isDraftingPage;
 	const isLandingNavbarZoom80 = isLanding || isMapPage;
-	const isOverLandingHero = isLanding && !scrolled;
 	const isFreeTrial =
 		pathname === urls.freeTrial.index || pathname.startsWith(`${urls.freeTrial.index}/`);
-	const isTransparentHeader = isOverLandingHero || isFreeTrial;
+	// Navbar is transparent only at the very top of the landing page (before any scroll)
+	const isLandingAtTop = isLanding && !scrolled;
+	const isTransparentHeader = isFreeTrial || isLandingAtTop;
+	// Landing hero uses a light gradient background, so keep navbar text/icons dark.
+	const isHeaderTextLight = false;
 	// Map + Research + Inbox + Drafting pages: navbar should be fully invisible at the top (so the gradient shows behind it),
 	// then become visible once the user scrolls.
 	const isMapTopTransparent =
@@ -138,7 +126,7 @@ export const Navbar = () => {
 	// Force the hamburger/X icon to a dark color so we don't get a "double icon" feel through transparency.
 	const mobileMenuIconColor = isMobileMenuOpen
 		? 'bg-gray-700'
-		: isTransparentHeader
+		: isHeaderTextLight
 			? 'bg-white/90'
 			: 'bg-gray-700';
 
@@ -152,14 +140,19 @@ export const Navbar = () => {
 		<>
 			{/* Main Navigation Bar - Artistic Glass */}
 			<nav
+				data-mobile-menu-open={isMobileMenuOpen ? 'true' : 'false'}
 				className={cn(
 					'fixed z-50 font-secondary',
 					// Mobile: make the navbar "morph" into the dropdown card (so it doesn't feel split).
 					isMobileMenuOpen
 						? [
 								'top-4 left-4 right-4',
-								'rounded-lg bg-background/95 backdrop-blur-3xl',
-								'shadow-[0_18px_50px_rgba(0,0,0,0.18)]',
+								// Liquid glass - refractive blur with vivid colors
+								'rounded-2xl bg-white/[0.15] backdrop-blur-[12px] backdrop-saturate-[1.8] backdrop-brightness-[1.05]',
+								// Thin bright border stroke
+								'border border-white/30',
+								// Subtle depth shadow
+								'shadow-[0_12px_40px_-8px_rgba(0,0,0,0.15)]',
 								'overflow-hidden',
 								// Only animate vertical + visual properties (avoid "slides in from right" feel)
 								'transition-[top,background-color,box-shadow,border-radius] duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]',
@@ -174,15 +167,26 @@ export const Navbar = () => {
 										: isResourcesPage
 											? 'resources-navbar-zoom-80'
 										: 'left-0 right-0',
-								// Keep a smooth fade-in when leaving the hero, but snap to transparent when re-entering it.
-								isTransparentHeader ? 'transition-none' : 'transition-colors duration-700',
+								// Smooth transition for background color changes in both directions
+								'transition-[background-color,backdrop-filter,border-color,box-shadow] duration-500 ease-out',
 								isTransparentHeader
 									? 'bg-transparent'
 									: isMapTopTransparent
 										? 'bg-transparent'
 										: scrolled
-											? 'bg-background/70 backdrop-blur-xl border-b border-gray-200/20'
-											: 'bg-background/40 backdrop-blur-md',
+											? [
+												// Liquid glass - refractive blur that distorts but keeps colors vivid
+												'bg-white/[0.1] backdrop-blur-[10px] backdrop-saturate-[1.8] backdrop-brightness-[1.05]',
+												// Thin bright border line
+												'border-b border-white/25',
+												// Subtle inset highlight
+												'shadow-[inset_0_0.5px_0_0_rgba(255,255,255,0.25)]',
+											]
+											: [
+												// Resting state - lighter refractive effect
+												'bg-white/[0.06] backdrop-blur-[6px] backdrop-saturate-[1.5] backdrop-brightness-[1.02]',
+												'border-b border-white/15',
+											],
 							]
 				)}
 			>
@@ -265,15 +269,13 @@ export const Navbar = () => {
 										href={item.path}
 										className={cn(
 											'relative text-[13px] font-medium tracking-[0.02em] transition-all duration-300',
+											// Light gray with exclusion blend - darkens on light, lightens on dark
+											'mix-blend-exclusion',
 											pathname === item.path
-												? isTransparentHeader
-													? 'text-white drop-shadow-[0_1px_1px_rgba(0,0,0,0.55)]'
-													: 'text-gray-900'
-												: isTransparentHeader
-													? 'text-white/70 hover:text-white drop-shadow-[0_1px_1px_rgba(0,0,0,0.55)]'
-													: 'text-gray-700/70 hover:text-gray-900',
+												? 'text-[#a0a0a0]'
+												: 'text-[#909090] hover:text-[#b0b0b0]',
 											'after:absolute after:bottom-[-8px] after:left-0 after:right-0 after:h-[1px]',
-											isTransparentHeader ? 'after:bg-white' : 'after:bg-gray-900',
+											'after:bg-[#a0a0a0]',
 											pathname === item.path
 												? 'after:scale-x-100'
 												: 'after:scale-x-0 hover:after:scale-x-100',
@@ -324,13 +326,12 @@ export const Navbar = () => {
 											elements: {
 												avatarBox: cn(
 													'w-7 h-7 ring-1',
-													isTransparentHeader ? 'ring-white/25' : 'ring-black/10'
+													'ring-black/10'
 												),
 												userButtonTrigger:
 													cn(
 														'opacity-80 hover:opacity-100 transition-opacity duration-500',
-														isTransparentHeader &&
-															'drop-shadow-[0_1px_1px_rgba(0,0,0,0.55)]'
+														null
 													),
 											},
 										}}
@@ -356,9 +357,7 @@ export const Navbar = () => {
 													'relative px-4 text-[12px] font-medium tracking-[0.02em] transition-all duration-300',
 													'after:absolute after:bottom-[-8px] after:left-4 after:right-4 after:h-[1px]',
 													'after:scale-x-0 hover:after:scale-x-100 after:transition-transform after:duration-300 after:origin-center',
-													isTransparentHeader
-														? 'text-white/80 hover:text-white drop-shadow-[0_1px_1px_rgba(0,0,0,0.55)] after:bg-white'
-														: 'text-gray-700/70 hover:text-gray-900 after:bg-gray-900'
+													'text-gray-700/70 hover:text-gray-900 after:bg-gray-900'
 												)}
 											>
 												Sign in
@@ -367,7 +366,7 @@ export const Navbar = () => {
 										<div
 											className={cn(
 												'w-[1px] h-4 mx-3',
-												isTransparentHeader ? 'bg-white/30' : 'bg-gray-300/50'
+												'bg-gray-300/50'
 											)}
 										/>
 										<SignUpButton mode="modal">
@@ -376,9 +375,7 @@ export const Navbar = () => {
 													'relative px-4 text-[12px] font-medium tracking-[0.02em] transition-all duration-300',
 													'after:absolute after:bottom-[-8px] after:left-4 after:right-4 after:h-[1px]',
 													'after:scale-x-0 hover:after:scale-x-100 after:transition-transform after:duration-300 after:origin-center',
-													isTransparentHeader
-														? 'text-white/80 hover:text-white drop-shadow-[0_1px_1px_rgba(0,0,0,0.55)] after:bg-white'
-														: 'text-gray-700/70 hover:text-gray-900 after:bg-gray-900'
+													'text-gray-700/70 hover:text-gray-900 after:bg-gray-900'
 												)}
 											>
 												Sign up
@@ -471,8 +468,8 @@ export const Navbar = () => {
 				/>
 			</div>
 
-			{/* Spacer */}
-			{!(isLanding || isFreeTrial) && <div className="h-12" />}
+			{/* Spacer - skip on landing, free-trial, and marketing feature pages that want full-bleed gradients */}
+			{!(isLanding || isFreeTrial || isMapPage || isResearchPage || isInboxPage || isDraftingPage) && <div className="h-12" />}
 		</>
 	);
 };
