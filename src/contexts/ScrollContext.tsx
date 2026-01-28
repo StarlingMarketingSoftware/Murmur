@@ -58,17 +58,10 @@ export function ScrollProvider({ children }: ScrollProviderProps) {
 		// Disable Lenis smooth scrolling on:
 		// - all mobile devices (native scrolling only)
 		// - campaign pages (all devices)
-		const isDashboardPage =
-			typeof pathname === 'string' && pathname.startsWith('/murmur/dashboard');
 		const isCampaignPage =
 			typeof pathname === 'string' && pathname.startsWith('/murmur/campaign');
 		
-		if (
-			isCampaignPage ||
-			isMobile === true ||
-			// Redundant with `isMobile === true`, but keep intent explicit.
-			(isMobile === true && isDashboardPage)
-		) {
+		if (isCampaignPage || isMobile === true) {
 			// Ensure any existing Lenis instance is destroyed and classes updated
 			try {
 				if (lenisRef.current) {
