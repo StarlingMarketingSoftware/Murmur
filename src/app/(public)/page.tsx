@@ -713,19 +713,6 @@ export default function HomePage() {
 			setDisplayIndex(newIndex + 1);
 		}
 	}, [currentVideoIndex, videoIds.length]);
-	const heroVideoStyle = {
-		// Keep the full video visible (no cropping)
-		'--media-object-fit': 'contain',
-		'--media-object-position': 'center',
-		'--controls': 'none',
-		'--play-button': 'none',
-		'--center-play-button': 'none',
-		'--mute-button': 'none',
-		'--pip-button': 'none',
-		'--airplay-button': 'none',
-		'--cast-button': 'none',
-		'--fullscreen-button': 'none',
-	} as any;
 
 	// Swap the hero background video only for the mobile portrait breakpoint.
 	useEffect(() => {
@@ -1161,9 +1148,8 @@ export default function HomePage() {
 					<div className="landing-hero-inner">
 						<div className="landing-hero-headline-card">
 							<h1 className="landing-hero-headline">
-								Built to get you booked,
-								<br />
-								You deserve an audience.
+								<span className="landing-hero-headline-line">Built to get you booked,</span>
+								<span className="landing-hero-headline-line">You deserve an audience.</span>
 							</h1>
 							<Link href={urls.freeTrial.index} className="landing-hero-card-cta">
 								Start Free Trial
@@ -1174,7 +1160,6 @@ export default function HomePage() {
 							<MuxPlayer
 								ref={heroVideoRef}
 								className="landing-hero-video-player"
-								style={heroVideoStyle}
 								playbackId={heroPlaybackId}
 								poster={`https://image.mux.com/${heroPlaybackId}/thumbnail.jpg?time=0`}
 								streamType="on-demand"
