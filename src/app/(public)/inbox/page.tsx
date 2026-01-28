@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { urls } from '@/constants/urls';
 import InboxDemo from '@/components/atoms/_svg/InboxDemo';
@@ -10,6 +10,17 @@ import { ScaledToFit } from '@/components/atoms/ScaledToFit';
 import { FadeInUp } from '@/components/animations/FadeInUp';
 
 export default function InboxPage() {
+  const [isMobile, setIsMobile] = useState<boolean | null>(null);
+
+  // Detect mobile on mount
+  useEffect(() => {
+    const checkMobile = () => window.innerWidth < 768;
+    setIsMobile(checkMobile());
+
+    const handleResize = () => setIsMobile(checkMobile());
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
   // Use a layout effect so any leaked scroll locks (overflow hidden / fixed body)
   // are cleared *before paint* on mobile, preventing the brief "stuck" state on load.
   React.useLayoutEffect(() => {
@@ -237,7 +248,7 @@ export default function InboxPage() {
       />
       <div className="relative z-10 min-h-screen">
         <div className="relative flex justify-center pt-16 pb-6 lg:pt-[100px] lg:pb-0">
-          <FadeInUp className="w-[calc(100vw-32px)] max-w-[1160px] bg-[#F2FBFF] rounded-[22px] flex flex-col items-center gap-6 px-4 pt-6 pb-6 lg:w-[1160px] lg:h-[823px] lg:px-[46px] lg:pt-[30px] lg:pb-[30px]">
+          <FadeInUp disabled={isMobile === true} className="w-[calc(100vw-32px)] max-w-[1160px] bg-[#F2FBFF] rounded-[22px] flex flex-col items-center gap-6 px-4 pt-6 pb-6 lg:w-[1160px] lg:h-[823px] lg:px-[46px] lg:pt-[30px] lg:pb-[30px]">
             <h1 className="font-inter font-extralight tracking-[0.19em] text-[#696969] text-center text-[40px] sm:text-[56px] lg:text-[65px] leading-none">
               Inbox
             </h1>
@@ -250,7 +261,7 @@ export default function InboxPage() {
       {/* Narrow layout (stacked, keep the light #FAFAFA panel) */}
       <div className="xl:hidden w-full mt-16 md:mt-[102px] px-4 sm:px-[8%] md:px-[14%]">
         <div className="mx-auto w-full max-w-[904px]">
-          <FadeInUp className="bg-white rounded-[22px] px-6 xs:px-8 sm:px-10 pt-10 pb-12">
+          <FadeInUp disabled={isMobile === true} className="bg-white rounded-[22px] px-6 xs:px-8 sm:px-10 pt-10 pb-12">
             <p className="font-inter font-bold text-[20px] text-black text-left leading-tight">
               Never miss a reply
             </p>
@@ -260,6 +271,7 @@ export default function InboxPage() {
           </FadeInUp>
 
           <FadeInUp
+            disabled={isMobile === true}
             delay={0.05}
             className="mt-6 rounded-[22px] bg-gradient-to-b from-[#DFF2F4] to-[#B9EDFD] overflow-hidden flex items-center justify-center px-4 py-6"
           >
@@ -295,7 +307,7 @@ export default function InboxPage() {
       {/* Narrow layout (stacked) */}
       <div className="xl:hidden w-full mt-16 md:mt-[97px] px-4 sm:px-[8%] md:px-[14%]">
         <div className="mx-auto w-full max-w-[904px]">
-          <FadeInUp className="bg-white rounded-[22px] px-6 xs:px-8 sm:px-10 pt-10 pb-12">
+          <FadeInUp disabled={isMobile === true} className="bg-white rounded-[22px] px-6 xs:px-8 sm:px-10 pt-10 pb-12">
             <p className="font-inter font-bold text-[20px] text-black text-left leading-tight">
               Respond from Within Campaigns
             </p>
@@ -307,6 +319,7 @@ export default function InboxPage() {
           </FadeInUp>
 
           <FadeInUp
+            disabled={isMobile === true}
             delay={0.05}
             className="mt-6 rounded-[22px] bg-gradient-to-b from-[#C3E8C9] to-[#AFF1B8] overflow-hidden px-4 py-6"
           >
@@ -454,7 +467,7 @@ export default function InboxPage() {
           </FadeInUp>
         </div>
       </div>
-      <FadeInUp className="flex flex-col items-center justify-center pt-14 pb-16 sm:pt-16 sm:pb-20 lg:py-0 lg:h-[660px]">
+      <FadeInUp disabled={isMobile === true} className="flex flex-col items-center justify-center pt-14 pb-16 sm:pt-16 sm:pb-20 lg:py-0 lg:h-[660px]">
         <p className="font-inter font-normal text-[clamp(32px,9vw,62px)] text-black text-center leading-[1.05]">
           Try Murmur Now
         </p>

@@ -16,6 +16,7 @@ export const Navbar = () => {
 	const router = useRouter();
 	const [isMobileMenuOpen, setMobileMenuOpen] = useState(false);
 	const [scrolled, setScrolled] = useState(false);
+	const [scrolledPastHero, setScrolledPastHero] = useState(false);
 	const prevIsSignedInRef = useRef(isSignedIn);
 
 	const hasActiveSubscription =
@@ -48,6 +49,9 @@ export const Navbar = () => {
 		const update = () => {
 			// Show navbar background once user scrolls past a small threshold
 			setScrolled(window.scrollY > 20);
+			// Track when user has scrolled past the hero video section (full viewport height)
+			// This is used for mobile menu text color on the landing page
+			setScrolledPastHero(window.scrollY > window.innerHeight);
 		};
 
 		update();
@@ -116,19 +120,17 @@ export const Navbar = () => {
 	// Navbar is transparent only at the very top of the landing page (before any scroll)
 	const isLandingAtTop = isLanding && !scrolled;
 	const isTransparentHeader = isFreeTrial || isLandingAtTop;
-	// Landing hero uses a light gradient background, so keep navbar text/icons dark.
-	const isHeaderTextLight = false;
 	// Map + Research + Inbox + Drafting pages: navbar should be fully invisible at the top (so the gradient shows behind it),
 	// then become visible once the user scrolls.
 	const isMapTopTransparent =
 		(isMapPage || isResearchPage || isInboxPage || isDraftingPage) && !scrolled;
-	// When the mobile menu is open, the menu panel has a light background even on the landing hero.
-	// Force the hamburger/X icon to a dark color so we don't get a "double icon" feel through transparency.
-	const mobileMenuIconColor = isMobileMenuOpen
-		? 'bg-gray-700'
-		: isHeaderTextLight
-			? 'bg-white/90'
-			: 'bg-gray-700';
+	// Hamburger/X icon color based on page and scroll position:
+	// - Landing page over video hero: white icon for visibility
+	// - Scrolled past hero or other pages (lighter background): dark icon
+	const isLandingOverVideo = isLanding && !scrolledPastHero;
+	const mobileMenuIconColor = isLandingOverVideo ? 'bg-white/90' : 'bg-gray-700';
+	// Mobile menu text should be white while over the hero video, dark when scrolled past it
+	const isMobileMenuTextLight = isLandingOverVideo;
 
 	// On `/free-trial` we show either the Clerk auth flow or embedded Stripe checkout;
 	// hide the header entirely in both cases so it doesn't distract or clip.
@@ -397,7 +399,10 @@ export const Navbar = () => {
 								: 'max-h-0 opacity-0 -translate-y-2 overflow-hidden'
 						)}
 					>
-						<div className="border-t border-gray-200/20">
+						<div className={cn(
+							'border-t transition-colors duration-300',
+							isMobileMenuTextLight ? 'border-white/20' : 'border-gray-200/20'
+						)}>
 							{/* Mobile Navigation Links */}
 							<div className="px-5 pt-4 pb-3">
 								<nav>
@@ -407,11 +412,15 @@ export const Navbar = () => {
 												<Link
 													href={item.path}
 													className={cn(
-														'block py-3 text-[20px] text-gray-800 font-secondary',
-														'transition-colors duration-200',
-														pathname === item.path
-															? 'text-gray-900'
-															: 'hover:text-gray-900'
+														'block py-3 text-[20px] font-secondary',
+														'transition-colors duration-300',
+														isMobileMenuTextLight
+															? pathname === item.path
+																? 'text-white'
+																: 'text-white/90 hover:text-white'
+															: pathname === item.path
+																? 'text-gray-900'
+																: 'text-gray-800 hover:text-gray-900'
 													)}
 													onClick={() => setMobileMenuOpen(false)}
 												>
@@ -425,11 +434,19 @@ export const Navbar = () => {
 
 							{/* Mobile Auth Section */}
 							{!isSignedIn && (
-								<div className="px-5 py-4 border-t border-gray-200/20">
+								<div className={cn(
+									'px-5 py-4 border-t transition-colors duration-300',
+									isMobileMenuTextLight ? 'border-white/20' : 'border-gray-200/20'
+								)}>
 									<div className="flex space-x-6">
 										<SignInButton mode="modal">
 											<button
-												className="flex-1 py-2.5 text-center text-[14px] text-gray-600 hover:text-gray-900 transition-colors duration-200 font-secondary"
+												className={cn(
+													'flex-1 py-2.5 text-center text-[14px] font-secondary transition-colors duration-300',
+													isMobileMenuTextLight
+														? 'text-white/80 hover:text-white'
+														: 'text-gray-600 hover:text-gray-900'
+												)}
 												onClick={() => setMobileMenuOpen(false)}
 											>
 												Sign in
@@ -437,7 +454,12 @@ export const Navbar = () => {
 										</SignInButton>
 										<SignUpButton mode="modal">
 											<button
-												className="flex-1 py-2.5 text-center text-[14px] text-gray-600 hover:text-gray-900 transition-colors duration-200 font-secondary"
+												className={cn(
+													'flex-1 py-2.5 text-center text-[14px] font-secondary transition-colors duration-300',
+													isMobileMenuTextLight
+														? 'text-white/80 hover:text-white'
+														: 'text-gray-600 hover:text-gray-900'
+												)}
 												onClick={() => setMobileMenuOpen(false)}
 											>
 												Sign up

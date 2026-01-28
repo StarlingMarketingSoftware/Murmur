@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { urls } from '@/constants/urls';
 import DraftingDemo from '@/components/atoms/_svg/DraftingDemo';
@@ -11,6 +11,17 @@ import { ScaledToFit } from '@/components/atoms/ScaledToFit';
 import { FadeInUp } from '@/components/animations/FadeInUp';
 
 export default function DraftingPage() {
+  const [isMobile, setIsMobile] = useState<boolean | null>(null);
+
+  // Detect mobile on mount
+  useEffect(() => {
+    const checkMobile = () => window.innerWidth < 768;
+    setIsMobile(checkMobile());
+
+    const handleResize = () => setIsMobile(checkMobile());
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
   // Use a layout effect so any leaked scroll locks (overflow hidden / fixed body)
   // are cleared *before paint* on mobile, preventing the brief "stuck" state on load.
   React.useLayoutEffect(() => {
@@ -328,7 +339,7 @@ export default function DraftingPage() {
 
       <div className="relative z-10 min-h-screen">
           <div className="relative flex justify-center pt-16 pb-6 lg:pt-[100px] lg:pb-0">
-            <FadeInUp className="w-[calc(100vw-32px)] max-w-[1352px] bg-[#F2FBFF] rounded-[22px] flex flex-col items-center gap-6 px-4 pt-6 pb-6 lg:w-[1352px] lg:h-[823px] lg:px-[46px] lg:pt-[30px] lg:pb-[30px]">
+            <FadeInUp disabled={isMobile === true} className="w-[calc(100vw-32px)] max-w-[1352px] bg-[#F2FBFF] rounded-[22px] flex flex-col items-center gap-6 px-4 pt-6 pb-6 lg:w-[1352px] lg:h-[823px] lg:px-[46px] lg:pt-[30px] lg:pb-[30px]">
               <h1 className="font-inter font-extralight tracking-[0.19em] text-[#696969] text-center text-[40px] sm:text-[56px] lg:text-[65px] leading-none">
                 Drafting
               </h1>
@@ -341,7 +352,7 @@ export default function DraftingPage() {
           {/* Narrow layout (stacked) */}
           <div className="w-full mt-16 sm:mt-[192px] px-4 sm:px-6 min-[1194px]:hidden">
             <div className="mx-auto w-full max-w-[686px] flex flex-col gap-6">
-              <FadeInUp className="bg-white rounded-[34px] px-8 pt-10 pb-12">
+              <FadeInUp disabled={isMobile === true} className="bg-white rounded-[34px] px-8 pt-10 pb-12">
                 <p className="font-inter font-bold text-[20px] text-black leading-tight">Tell your story</p>
                 <p className="font-inter font-normal text-[16px] text-black mt-5 leading-[1.75] tracking-wide [word-spacing:3px] break-words">
                   When you add basic information to your profile, it gives context to the drafting. This creates much better results that incorporate
@@ -350,6 +361,7 @@ export default function DraftingPage() {
               </FadeInUp>
 
               <FadeInUp
+                disabled={isMobile === true}
                 delay={0.05}
                 className="w-full rounded-[22px] overflow-hidden flex items-center justify-center px-4 py-6"
                 style={{
@@ -389,7 +401,7 @@ export default function DraftingPage() {
           {/* Narrow layout (mobile) */}
           <div className="w-full mt-14 sm:mt-[146px] px-4 sm:px-6 min-[1194px]:hidden">
             <div className="mx-auto w-full max-w-[686px] flex flex-col gap-6">
-              <FadeInUp className="bg-white rounded-[34px] px-8 pt-10 pb-12">
+              <FadeInUp disabled={isMobile === true} className="bg-white rounded-[34px] px-8 pt-10 pb-12">
                 <p className="font-inter font-bold text-[20px] text-black leading-tight">
                   Drafting Modes
                 </p>
@@ -401,6 +413,7 @@ export default function DraftingPage() {
               </FadeInUp>
 
               <FadeInUp
+                disabled={isMobile === true}
                 delay={0.05}
                 className="w-full rounded-[22px] overflow-hidden px-8 pt-10 pb-12"
                 style={{
@@ -460,7 +473,7 @@ export default function DraftingPage() {
           {/* Narrow layout (stacked, show both preview variants) */}
           <div className="w-full mt-16 sm:mt-[181px] px-4 sm:px-6 min-[1194px]:hidden">
             <div className="mx-auto w-full max-w-[686px] flex flex-col gap-6">
-              <FadeInUp className="bg-white rounded-[34px] px-8 pt-10 pb-12">
+              <FadeInUp disabled={isMobile === true} className="bg-white rounded-[34px] px-8 pt-10 pb-12">
                 <p className="font-inter font-bold text-[20px] text-black leading-tight">
                   Built-in variation
                 </p>
@@ -471,6 +484,7 @@ export default function DraftingPage() {
               </FadeInUp>
 
               <FadeInUp
+                disabled={isMobile === true}
                 delay={0.05}
                 className="w-full rounded-[22px] px-8 pt-10 pb-12"
                 style={{
@@ -512,7 +526,7 @@ export default function DraftingPage() {
               </FadeInUp>
             </div>
           </div>
-        <FadeInUp className="flex flex-col items-center justify-center pt-14 pb-16 sm:pt-16 sm:pb-20 lg:py-0 lg:h-[660px]">
+        <FadeInUp disabled={isMobile === true} className="flex flex-col items-center justify-center pt-14 pb-16 sm:pt-16 sm:pb-20 lg:py-0 lg:h-[660px]">
           <p className="font-inter font-normal text-[clamp(32px,9vw,62px)] text-black text-center leading-[1.05]">
             Try Murmur Now
           </p>
