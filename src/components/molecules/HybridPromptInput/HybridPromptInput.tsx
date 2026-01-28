@@ -4532,16 +4532,16 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																				disabled={isHandwrittenMode}
 																				className={cn(
 																					'relative h-full flex items-center text-[12px] font-inter font-normal transition-colors shrink-0 subject-toggle',
-																					'w-[47px] px-2 justify-center text-black bg-[#4ADE80] hover:bg-[#3ECC72] active:bg-[#32BA64]',
+																					'w-[55px] px-2 justify-center text-black bg-[#91E193] hover:bg-[#91E193] active:bg-[#91E193]',
 																					isHandwrittenMode && 'opacity-50 cursor-not-allowed'
 																				)}
 																			>
-																				<span className="absolute left-0 h-full border-l border-black"></span>
+																				<span className="absolute left-0 h-full border-l-2 border-[#000000]"></span>
 																				<span>on</span>
-																				<span className="absolute right-0 h-full border-r border-black"></span>
+																				<span className="absolute right-0 h-full border-r-2 border-[#000000]"></span>
 																			</button>
 
-																			<div className={cn('flex-grow h-full', 'bg-white')}>
+																			<div className={cn('flex-grow h-full', 'bg-[#F0F0F0]')}>
 																				<Input
 																					{...field}
 																					className={cn(
@@ -4620,9 +4620,9 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																				isHandwrittenMode && 'opacity-50 cursor-not-allowed'
 																			)}
 																		>
-																			<span className="absolute left-0 h-full border-l border-black"></span>
+																			<span className="absolute left-0 h-full border-l-2 border-black"></span>
 																			<span>Auto off</span>
-																			<span className="absolute right-0 h-full border-r border-black"></span>
+																			<span className="absolute right-0 h-full border-r-2 border-black"></span>
 																		</button>
 
 																		<div className={cn('flex-grow h-full -ml-[24px]', 'bg-white')}>
@@ -6001,19 +6001,19 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																		className={cn(
 																			'relative h-full flex items-center text-[12px] font-inter font-normal shrink-0',
 																			isAiSubjectLocal
-																				? 'w-[47px] px-2 justify-center text-black bg-[#4ADE80]'
+																				? 'w-[55px] px-2 justify-center text-black bg-[#91E193]'
 																				: 'w-[80px] px-2 justify-center text-black bg-[#DADAFC]'
 																		)}
 																		aria-pressed={isAiSubjectLocal}
 																		aria-label={isAiSubjectLocal ? 'Auto on' : 'Auto off'}
 																	>
-																		<span className="absolute left-0 h-full border-l border-black" />
+																		<span className="absolute left-0 h-full border-l-2 border-[#000000]" />
 																		<span>{isAiSubjectLocal ? 'on' : 'Auto off'}</span>
-																		<span className="absolute right-0 h-full border-r border-black" />
+																		<span className="absolute right-0 h-full border-r-2 border-[#000000]" />
 																	</button>
 
 																	{/* Input */}
-																	<div className={cn('flex-grow h-full', 'bg-white')}>
+																	<div className={cn('flex-grow h-full', isAiSubjectLocal ? 'bg-[#F0F0F0]' : 'bg-white')}>
 																		<Input
 																			value={subjectText}
 																			onChange={(e) => {
@@ -6585,7 +6585,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																		<div className="hidden group-hover/hybrid-signature:flex items-center h-[28px] rounded-[8px] border-2 border-black overflow-hidden bg-white w-full">
 																			<div className="pl-2 flex items-center h-full shrink-0 w-[140px] bg-[#E0E0E0]">
 																				<span className="font-inter font-semibold text-[14px] whitespace-nowrap text-black">
-																					Signature
+																					Auto Signature
 																				</span>
 																			</div>
 																			<button
@@ -6594,15 +6594,15 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																				onClick={() => setIsAutoSignature(false)}
 																				className={cn(
 																					'relative h-full flex items-center text-[12px] font-inter font-normal shrink-0',
-																					'w-[47px] px-2 justify-center text-black bg-[#4ADE80]'
+																					'w-[55px] px-2 justify-center text-black bg-[#91E193]'
 																				)}
 																				aria-label="Auto Signature on"
 																			>
-																				<span className="absolute left-0 h-full border-l border-black" />
+																				<span className="absolute left-0 h-full border-l-2 border-[#000000]" />
 																				<span>on</span>
-																				<span className="absolute right-0 h-full border-r border-black" />
+																				<span className="absolute right-0 h-full border-r-2 border-[#000000]" />
 																			</button>
-																			<div className="flex-grow h-full bg-white">
+																			<div className="flex-grow h-full bg-[#F0F0F0]">
 																				<Input
 																					className={cn(
 																						'w-full h-full !bg-transparent pl-3 pr-3 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0',
@@ -6638,9 +6638,9 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																				)}
 																				aria-label="Auto Signature off"
 																			>
-																				<span className="absolute left-0 h-full border-l border-black" />
+																				<span className="absolute left-0 h-full border-l-2 border-black" />
 																				<span>Auto off</span>
-																				<span className="absolute right-0 h-full border-r border-black" />
+																				<span className="absolute right-0 h-full border-r-2 border-black" />
 																			</button>
 																			<div className="flex-grow h-full bg-[#E0E0E0]" />
 																		</div>
@@ -7040,7 +7040,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																	)}
 																>
 																	<span className="font-inter font-semibold text-[17px] max-[480px]:text-[12px] whitespace-nowrap text-black">
-																		Signature
+																		Auto Signature
 																	</span>
 																</div>
 
@@ -7050,15 +7050,15 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																onClick={() => setIsAutoSignature(false)}
 																className={cn(
 																	'relative h-full flex items-center text-[12px] font-inter font-normal transition-colors shrink-0',
-																	'w-[47px] px-2 justify-center text-black bg-[#4ADE80] hover:bg-[#3ECC72] active:bg-[#32BA64]'
+																	'w-[55px] px-2 justify-center text-black bg-[#91E193] hover:bg-[#91E193] active:bg-[#91E193]'
 																)}
 															>
-																<span className="absolute left-0 h-full border-l border-black"></span>
+																<span className="absolute left-0 h-full border-l-2 border-[#000000]"></span>
 																<span>on</span>
-																<span className="absolute right-0 h-full border-r border-black"></span>
+																<span className="absolute right-0 h-full border-r-2 border-[#000000]"></span>
 															</button>
 
-															<div className={cn('flex-grow h-full', 'bg-white')}>
+															<div className={cn('flex-grow h-full', 'bg-[#F0F0F0]')}>
 																<Input
 																	className={cn(
 																		cn('w-full h-full !bg-transparent pl-4 pr-3 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0', !forceDesktop && 'max-[480px]:placeholder:text-[10px] max-[480px]:!transition-none max-[480px]:!duration-0'),
@@ -7118,9 +7118,9 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																	'w-[70px] px-2 justify-center text-black bg-[#C3BCBC] hover:bg-[#B5AEAE] active:bg-[#A7A0A0]'
 																)}
 															>
-																<span className="absolute left-0 h-full border-l border-black"></span>
+																<span className="absolute left-0 h-full border-l-2 border-black"></span>
 																<span>Auto off</span>
-																<span className="absolute right-0 h-full border-r border-black"></span>
+																<span className="absolute right-0 h-full border-r-2 border-black"></span>
 															</button>
 
 															<div className="flex-grow h-full bg-[#E0E0E0]" />
