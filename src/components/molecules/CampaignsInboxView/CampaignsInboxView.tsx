@@ -720,7 +720,7 @@ export const CampaignsInboxView: FC<CampaignsInboxViewProps> = ({
 									display: 'flex',
 									flexDirection: 'column',
 									justifyContent: 'flex-start',
-									// 3px border + 9px padding ≈ 12px from the outer edge (matches Figma spacing)
+									// 3px border + 9px padding ≈ 12px from the outer edge (matches Figma spacing) figma spacing is 12px from the outer edge
 									padding: '6px 16px',
 									position: 'relative',
 								}}
