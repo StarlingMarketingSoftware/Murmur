@@ -4690,11 +4690,17 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 												</div>
 											</div>
 											{/* Body container (380px tall) - positioned 64px below the score line */}
-											<div className="flex-1 bg-[#92CE94] relative flex flex-col">
+											<div
+												className="flex-1 bg-[#305B31] relative flex flex-col cursor-pointer"
+												onClick={() => {
+													setActiveTab('main');
+													setHasLeftProfileTab(true);
+												}}
+											>
 												{/* Green top space box (122 x 34) */}
 												<div
 													aria-hidden="true"
-													className="absolute left-[15px] top-[14px] w-[122px] h-[34px] rounded-[8px] border-2 border-black bg-[#84CB86]"
+													className="absolute left-[15px] top-[14px] w-[122px] h-[34px] rounded-[8px] border-2 border-black bg-[#305B31]"
 												/>
 												<div className="w-full mt-[64px]">
 													<div
@@ -4702,6 +4708,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 															'relative w-full bg-[#4597DA] border-t-[3px] border-b-[3px] border-black rounded-[8px] overflow-hidden flex flex-col',
 															expandedProfileBox ? 'h-[414px]' : 'h-[380px]'
 														)}
+														onClick={(e) => e.stopPropagation()}
 													>
 														{/* Header band (30px fill + 3px divider) */}
 														<div className="shrink-0 h-[33px] bg-[#95CFFF] border-b-[3px] border-black flex items-center">
@@ -5126,7 +5133,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 												{/* New containers below Body box */}
 												<div className="w-full flex flex-col items-center mt-[9px]">
 													{/* 472 x 93 container */}
-													<div className="relative w-[472px] h-[93px] max-w-full rounded-[8px] bg-[#84CB86] border-2 border-black">
+													<div className="relative w-[472px] h-[93px] max-w-full rounded-[8px] bg-[#305B31] border-2 border-black">
 														{/* Decorative inner boxes (no fill) */}
 														<div
 															aria-hidden="true"
@@ -5158,7 +5165,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														<div className="w-[472px] max-w-full mt-[13px]">
 															<div
 																aria-hidden="true"
-																className="w-[229px] h-[34px] rounded-[8px] bg-[#84CB86] border-2 border-black"
+																className="w-[229px] h-[34px] rounded-[8px] bg-[#305B31] border-2 border-black"
 															/>
 														</div>
 													)}
