@@ -1,6 +1,16 @@
 'use client';
 
-import { FC, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import {
+	FC,
+	Suspense,
+	useCallback,
+	useEffect,
+	useLayoutEffect,
+	useMemo,
+	useRef,
+	useState,
+	type ReactNode,
+} from 'react';
 import { gsap } from 'gsap';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
@@ -76,6 +86,11 @@ const DEFAULT_STATE_SUGGESTIONS = [
 		generalDescription: 'contact venues, restaurants and more, to book shows',
 	},
 ];
+
+const TAB_PILL_COLORS = {
+	search: '#DAE6FE',
+	inbox: '#CBE7D1',
+} as const;
 
 const extractStateAbbrFromSearchQuery = (query: string): string | null => {
 	// Search queries are typically formatted like: "[Promotion] Radio Stations (Maine)"
@@ -562,7 +577,9 @@ const DashboardContent = () => {
 	}, [isWhereDropdownOpen]);
 	const initialTabFromQuery = searchParams.get('tab') === 'inbox' ? 'inbox' : 'search';
 	const [activeTab, setActiveTab] = useState<'search' | 'inbox'>(initialTabFromQuery);
+	const [hoveredTab, setHoveredTab] = useState<'search' | 'inbox' | null>(null);
 	const inboxView = activeTab === 'inbox';
+	const isTabPreviewingOther = hoveredTab != null && hoveredTab !== activeTab;
 	// Dashboard inbox deep-link (`?tab=inbox`) should land on the Campaigns sub-tab.
 	const [inboxSubtab, setInboxSubtab] = useState<'messages' | 'campaigns'>('campaigns');
 
@@ -577,6 +594,10 @@ const DashboardContent = () => {
 			setActiveTab(tabParam);
 		}
 	}, [tabParam]);
+	useEffect(() => {
+		// Clear any hover-preview state when the real tab changes.
+		setHoveredTab(null);
+	}, [activeTab]);
 	const [userLocationName, setUserLocationName] = useState<string | null>(null);
 	const [isLoadingLocation, setIsLoadingLocation] = useState(false);
 
@@ -1350,6 +1371,8 @@ const DashboardContent = () => {
 	useMe(); // Hook call for side effects
 	const tabToggleTrackRef = useRef<HTMLDivElement>(null);
 	const tabTogglePillRef = useRef<HTMLDivElement>(null);
+	const tabToggleHoverPillRef = useRef<HTMLDivElement>(null);
+	const tabToggleWhitePillRef = useRef<HTMLDivElement>(null);
 	const tabbedLandingBoxRef = useRef<HTMLDivElement>(null);
 	const dashboardContentRef = useRef<HTMLDivElement>(null);
 	const isTabSwitchAnimatingRef = useRef(false);
@@ -2397,18 +2420,14 @@ const DashboardContent = () => {
 		return mapPanelContacts.every((contact) => selectedContacts.includes(contact.id));
 	}, [mapPanelContacts, selectedContacts]);
 
-	const TAB_PILL_COLORS = {
-		search: '#DAE6FE',
-		inbox: '#CBE7D1',
-	} as const;
-
 	const getTabPillXFor = (tab: 'search' | 'inbox') => {
 		const track = tabToggleTrackRef.current;
 		const pill = tabTogglePillRef.current;
 
 		// Fallbacks match the fixed design values used in the markup below.
-		// Use offsetWidth to get unscaled width, ensuring correct positioning even when scaled via CSS transform
-		const trackWidth = track?.offsetWidth ?? 228;
+		// Use clientWidth (excludes border) to align with the flex button layout.
+		// Note: transforms (scale) do not affect these layout measurements.
+		const trackWidth = track?.clientWidth ?? 222;
 		const pillWidth = pill?.offsetWidth ?? 85;
 
 		const half = trackWidth / 2;
@@ -2444,6 +2463,37 @@ const DashboardContent = () => {
 		});
 	}, [activeTab, hasSearched]);
 
+	// Hover preview (matches Campaign Auto/Manual/Hybrid behavior):
+	// - When hovering the *other* tab, show its colored pill
+	// - Turn the selected pill white (overlay) + hide its label
+	useLayoutEffect(() => {
+		if (hasSearched) return;
+		if (isTabSwitchAnimatingRef.current) return;
+
+		const hoverPill = tabToggleHoverPillRef.current;
+		const whitePill = tabToggleWhitePillRef.current;
+		if (!hoverPill || !whitePill) return;
+
+		const isPreviewingOther = hoveredTab != null && hoveredTab !== activeTab;
+
+		if (!isPreviewingOther || !hoveredTab) {
+			// Let CSS handle the actual animation timing/curve (matches campaign UI).
+			gsap.set(hoverPill, { opacity: 0 });
+			gsap.set(whitePill, { opacity: 0 });
+			return;
+		}
+
+		// Set correct positions immediately; animate only opacity (snappier, matches campaign UI).
+		gsap.set(hoverPill, {
+			y: 0,
+			yPercent: -50,
+			x: getTabPillXFor(hoveredTab),
+			backgroundColor: TAB_PILL_COLORS[hoveredTab],
+			opacity: 1,
+		});
+		gsap.set(whitePill, { y: 0, yPercent: -50, x: getTabPillXFor(activeTab), opacity: 1 });
+	}, [activeTab, hoveredTab, hasSearched]);
+
 	useEffect(() => {
 		if (hasSearched) return;
 		const handleResize = () => {
@@ -2451,15 +2501,30 @@ const DashboardContent = () => {
 			const pill = tabTogglePillRef.current;
 			if (!pill) return;
 			gsap.set(pill, { x: getTabPillXFor(activeTab) });
+			const hoverPill = tabToggleHoverPillRef.current;
+			const whitePill = tabToggleWhitePillRef.current;
+			if (hoverPill && hoveredTab && hoveredTab !== activeTab) {
+				gsap.set(hoverPill, { y: 0, yPercent: -50, x: getTabPillXFor(hoveredTab) });
+			}
+			if (whitePill && hoveredTab && hoveredTab !== activeTab) {
+				gsap.set(whitePill, { y: 0, yPercent: -50, x: getTabPillXFor(activeTab) });
+			}
 		};
 		window.addEventListener('resize', handleResize);
 		return () => window.removeEventListener('resize', handleResize);
-	}, [activeTab, hasSearched]);
+	}, [activeTab, hasSearched, hoveredTab]);
 
 	const transitionToTab = (
 		nextTab: 'search' | 'inbox',
 		opts?: { animate?: boolean; after?: () => void }
 	) => {
+		// Always clear hover-preview state on click.
+		setHoveredTab(null);
+		const hoverPill = tabToggleHoverPillRef.current;
+		if (hoverPill) gsap.set(hoverPill, { opacity: 0 });
+		const whitePill = tabToggleWhitePillRef.current;
+		if (whitePill) gsap.set(whitePill, { opacity: 0 });
+
 		if (nextTab === activeTab) {
 			opts?.after?.();
 			return;
@@ -3712,6 +3777,7 @@ const DashboardContent = () => {
 							<div className="flex justify-center" style={{ marginTop: '92px' }}>
 								<div
 									ref={tabToggleTrackRef}
+									onMouseLeave={() => setHoveredTab(null)}
 									className="relative flex items-center origin-center scale-[0.8] sm:scale-[0.9] lg:scale-100"
 									style={{
 										width: '228px',
@@ -3723,6 +3789,28 @@ const DashboardContent = () => {
 										backgroundColor: '#FFFFFF',
 									}}
 								>
+									{/* Hover preview pill (shows the other tab on hover) */}
+									<div
+										ref={tabToggleHoverPillRef}
+										aria-hidden="true"
+										style={{
+											position: 'absolute',
+											top: '50%',
+											left: 0,
+											width: '85px',
+											height: '17px',
+											borderWidth: '2px',
+											borderStyle: 'solid',
+											borderColor: '#000000',
+											borderRadius: '10px',
+											backgroundColor: TAB_PILL_COLORS.inbox,
+											pointerEvents: 'none',
+											opacity: 0,
+											transform: 'translateX(124px) translateY(-50%)',
+											willChange: 'transform, opacity, background-color',
+											transition: 'opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1)',
+										}}
+									/>
 									{/* Sliding pill indicator - positioned at search (left) */}
 									<div
 										ref={tabTogglePillRef}
@@ -3738,25 +3826,67 @@ const DashboardContent = () => {
 											borderRadius: '10px',
 											backgroundColor: '#DAE6FE',
 											pointerEvents: 'none',
-											transform: 'translateX(14.5px) translateY(-50%)',
+											transform: 'translateX(13px) translateY(-50%)',
 											willChange: 'transform, background-color',
+										}}
+									/>
+									{/* White overlay pill (visible only during hover-preview) */}
+									<div
+										ref={tabToggleWhitePillRef}
+										aria-hidden="true"
+										style={{
+											position: 'absolute',
+											top: '50%',
+											left: 0,
+											width: '85px',
+											height: '17px',
+											borderWidth: '2px',
+											borderStyle: 'solid',
+											borderColor: '#000000',
+											borderRadius: '10px',
+											backgroundColor: '#FFFFFF',
+											pointerEvents: 'none',
+											opacity: 0,
+											transform: 'translateX(13px) translateY(-50%)',
+											willChange: 'transform, opacity',
+											transition: 'opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1)',
 										}}
 									/>
 									<button
 										type="button"
 										className="relative z-10 flex-1 h-full flex items-center justify-center font-medium"
+										style={{ fontSize: '14px' }}
+										onMouseEnter={() => setHoveredTab('search')}
 										onClick={() => transitionToTab('search')}
 										aria-pressed={true}
 									>
-										Search
+										<span
+											className={`inline-block ${isTabPreviewingOther ? 'opacity-0' : 'opacity-100'}`}
+											style={{
+												transition: 'opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1)',
+											}}
+										>
+											Search
+										</span>
 									</button>
 									<button
 										type="button"
 										className="relative z-10 flex-1 h-full flex items-center justify-center font-medium"
+										style={{ fontSize: '14px' }}
+										onMouseEnter={() => setHoveredTab('inbox')}
 										onClick={() => transitionToTab('inbox')}
 										aria-pressed={false}
 									>
-										Inbox
+										<span
+											className="inline-block opacity-100"
+											style={{
+												display: 'inline-block',
+												transform: 'translateX(2px)',
+												transition: 'opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1)',
+											}}
+										>
+											Inbox
+										</span>
 									</button>
 								</div>
 							</div>
@@ -3795,6 +3925,7 @@ const DashboardContent = () => {
 								<div className="flex justify-center" style={{ marginTop: '34px' }}>
 									<div
 										ref={tabToggleTrackRef}
+										onMouseLeave={() => setHoveredTab(null)}
 										className="relative flex items-center"
 										style={{
 											width: '228px',
@@ -3806,6 +3937,28 @@ const DashboardContent = () => {
 											backgroundColor: '#FFFFFF',
 										}}
 									>
+										{/* Hover preview pill (shows the other tab on hover) */}
+										<div
+											ref={tabToggleHoverPillRef}
+											aria-hidden="true"
+											style={{
+												position: 'absolute',
+												top: '50%',
+												left: 0,
+												width: '85px',
+												height: '17px',
+												borderWidth: '2px',
+												borderStyle: 'solid',
+												borderColor: '#000000',
+												borderRadius: '10px',
+												backgroundColor: TAB_PILL_COLORS.search,
+												pointerEvents: 'none',
+												opacity: 0,
+												transform: 'translateX(13px) translateY(-50%)',
+												willChange: 'transform, opacity, background-color',
+												transition: 'opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1)',
+											}}
+										/>
 										{/* Sliding pill indicator - positioned at inbox (right) */}
 										<div
 											ref={tabTogglePillRef}
@@ -3821,25 +3974,67 @@ const DashboardContent = () => {
 												borderRadius: '10px',
 												backgroundColor: '#CBE7D1',
 												pointerEvents: 'none',
-												transform: 'translateX(128.5px) translateY(-50%)',
+												transform: 'translateX(124px) translateY(-50%)',
 												willChange: 'transform, background-color',
+											}}
+										/>
+										{/* White overlay pill (visible only during hover-preview) */}
+										<div
+											ref={tabToggleWhitePillRef}
+											aria-hidden="true"
+											style={{
+												position: 'absolute',
+												top: '50%',
+												left: 0,
+												width: '85px',
+												height: '17px',
+												borderWidth: '2px',
+												borderStyle: 'solid',
+												borderColor: '#000000',
+												borderRadius: '10px',
+												backgroundColor: '#FFFFFF',
+												pointerEvents: 'none',
+												opacity: 0,
+												transform: 'translateX(124px) translateY(-50%)',
+												willChange: 'transform, opacity',
+												transition: 'opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1)',
 											}}
 										/>
 										<button
 											type="button"
 											className="relative z-10 flex-1 h-full flex items-center justify-center font-medium"
+											style={{ fontSize: '14px' }}
+											onMouseEnter={() => setHoveredTab('search')}
 											onClick={() => transitionToTab('search')}
 											aria-pressed={false}
 										>
-											Search
+											<span
+												className="inline-block opacity-100"
+												style={{
+													transition: 'opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1)',
+												}}
+											>
+												Search
+											</span>
 										</button>
 										<button
 											type="button"
 											className="relative z-10 flex-1 h-full flex items-center justify-center font-medium"
+											style={{ fontSize: '14px' }}
+											onMouseEnter={() => setHoveredTab('inbox')}
 											onClick={() => transitionToTab('inbox')}
 											aria-pressed={true}
 										>
-											Inbox
+											<span
+												className={`inline-block ${isTabPreviewingOther ? 'opacity-0' : 'opacity-100'}`}
+												style={{
+													display: 'inline-block',
+													transform: 'translateX(2px)',
+													transition: 'opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1)',
+												}}
+											>
+												Inbox
+											</span>
 										</button>
 									</div>
 								</div>

@@ -105,6 +105,7 @@ interface CustomTableProps<TData, TValue> extends DataTableProps<TData, TValue> 
 	tableRef?: (table: TableType<TData>) => void;
 	useAutoLayout?: boolean;
 	allowColumnOverflow?: boolean;
+	renderLoadingCell?: (args: { column: Column<TData, unknown>; columnIndex: number }) => ReactNode;
 	containerClassName?: string;
 	tableClassName?: string;
 	headerClassName?: string;
@@ -124,6 +125,7 @@ export function CustomTable<TData, TValue>({
 	data,
 	isLoading = false,
 	loadingRowCount = 8,
+	renderLoadingCell,
 	setSelectedRows,
 	singleSelection,
 	handleRowClick,
@@ -298,12 +300,18 @@ export function CustomTable<TData, TValue>({
 				>
 					{visibleLeafColumns.map((col, colIndex) => (
 						<TableCell key={col.id} variant={variant} className="whitespace-nowrap">
-							<div
-								className={cn(
-									'h-3 rounded bg-black/10 dark:bg-white/10 animate-pulse',
-									skeletonWidthClassByIndex(colIndex)
-								)}
-							/>
+							{(() => {
+								const custom = renderLoadingCell?.({ column: col, columnIndex: colIndex });
+								if (custom !== null && custom !== undefined) return custom;
+								return (
+									<div
+										className={cn(
+											'h-3 rounded bg-black/10 dark:bg-white/10 animate-pulse',
+											skeletonWidthClassByIndex(colIndex)
+										)}
+									/>
+								);
+							})()}
 						</TableCell>
 					))}
 				</TableRow>

@@ -7587,7 +7587,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										</div>
 									</div>
 								) : (
-								<div className="flex flex-row items-start" style={{ gap: '30px' }}>
+								<div
+									className={cn('flex flex-row items-start', !isAllTabNarrow && 'pb-[14px]')}
+									style={{ gap: '30px' }}
+								>
 									{/* Left column: Campaign Header + Contacts + Research (+ Preview in narrow mode) */}
 									<div className="flex flex-col items-center" style={{ gap: '39px' }}>
 										<CampaignHeaderBox
