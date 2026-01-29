@@ -230,14 +230,158 @@ const DashboardCampaignsInboxView = nextDynamic(
 		ssr: false,
 		loading: () => (
 			<div
+				className="relative flex flex-col items-center overflow-hidden"
 				style={{
 					width: '625px',
 					height: '561px',
 					border: '3px solid #000000',
 					borderRadius: '8px',
+					padding: '16px',
+					paddingTop: '76px',
 					backgroundColor: '#4ca9db',
 				}}
-			/>
+				aria-busy="true"
+				aria-label="Loading campaigns"
+			>
+				<span className="sr-only">Loading campaigns…</span>
+
+				{/* Search Bar skeleton */}
+				<div
+					className="animate-pulse"
+					style={{
+						position: 'absolute',
+						top: '13px',
+						left: '14px',
+						right: '286px', // 14px + 260px toggle + 12px gap
+						height: '48px',
+						border: '3px solid #000000',
+						borderRadius: '8px',
+						backgroundColor: '#FFFFFF',
+						zIndex: 10,
+						display: 'flex',
+						alignItems: 'center',
+						paddingLeft: '16px',
+					}}
+					aria-hidden
+				>
+					<div className="w-[18px] h-[18px] rounded-[3px] bg-black/20" />
+					<div className="ml-4 h-[14px] w-[180px] rounded-[4px] bg-black/15" />
+				</div>
+
+				{/* Messages/Campaigns toggle skeleton (Campaigns selected) */}
+				<div
+					style={{
+						position: 'absolute',
+						top: '13px',
+						right: '14px',
+						width: '260px',
+						height: '48px',
+						border: '3px solid #000000',
+						borderRadius: '8px',
+						overflow: 'hidden',
+						zIndex: 10,
+						display: 'flex',
+						pointerEvents: 'none',
+					}}
+					aria-hidden
+				>
+					<div
+						aria-hidden
+						style={{
+							position: 'absolute',
+							left: '50%',
+							top: 0,
+							bottom: 0,
+							width: '3px',
+							backgroundColor: '#000000',
+							transform: 'translateX(-1.5px)',
+							pointerEvents: 'none',
+						}}
+					/>
+					<div
+						style={{
+							flex: 1,
+							height: '100%',
+							display: 'flex',
+							alignItems: 'center',
+							justifyContent: 'center',
+							backgroundColor: '#4DA6D7',
+						}}
+					>
+						<span
+							style={{
+								fontFamily: 'Inter, sans-serif',
+								fontSize: '15px',
+								fontWeight: 500,
+								color: '#000000',
+								opacity: 0.55,
+								userSelect: 'none',
+							}}
+						>
+							Messages
+						</span>
+					</div>
+					<div
+						style={{
+							flex: 1,
+							height: '100%',
+							display: 'flex',
+							alignItems: 'center',
+							justifyContent: 'center',
+							backgroundColor: '#B3E5FF',
+						}}
+					>
+						<span
+							style={{
+								fontFamily: 'Inter, sans-serif',
+								fontSize: '15px',
+								fontWeight: 500,
+								color: '#000000',
+								opacity: 0.65,
+								userSelect: 'none',
+							}}
+						>
+							Campaigns
+						</span>
+					</div>
+				</div>
+
+				{/* Campaign row skeletons (campaign page inbox pill variant) */}
+				<div className="w-full flex flex-col items-center">
+					{Array.from({ length: 5 }).map((_, idx) => (
+						<div
+							key={`dashboard-campaigns-loading-${idx}`}
+							className="select-none mb-2 w-full overflow-hidden"
+							style={{
+								height: '66px',
+								minHeight: '66px',
+								border: '3px solid #000000',
+								borderRadius: '10px',
+								backgroundColor: '#EAEAEA',
+								display: 'flex',
+								alignItems: 'flex-start',
+								padding: '10px 16px',
+							}}
+							aria-hidden
+						>
+							<div className="flex flex-col w-full gap-2 animate-pulse">
+								{/* Campaign name */}
+								<div className="h-[16px] bg-black/20 rounded w-[60%]" />
+								{/* Pills row */}
+								<div className="flex items-center gap-3 w-full">
+									<div className="h-[15px] w-[121px] rounded-[7px] bg-black/10 border border-black/25" />
+									{Array.from({ length: 4 }).map((__, metricIdx) => (
+										<div
+											key={`dashboard-campaigns-loading-pill-${idx}-${metricIdx}`}
+											className="h-[20px] w-[92px] rounded-[6px] bg-black/10 border border-black/25"
+										/>
+									))}
+								</div>
+							</div>
+						</div>
+					))}
+				</div>
+			</div>
 		),
 	}
 );
