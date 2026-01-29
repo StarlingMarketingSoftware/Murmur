@@ -4,7 +4,7 @@ import { FC, useState, useRef, useEffect, type CSSProperties } from 'react';
 import { useRouter } from 'next/navigation';
 import { Campaign } from '@prisma/client';
 import { X } from 'lucide-react';
-import { useAuth, UserButton, SignInButton } from '@clerk/nextjs';
+import { useAuth, useUser, UserButton, SignInButton } from '@clerk/nextjs';
 import { useGetCampaigns, useDeleteCampaign } from '@/hooks/queryHooks/useCampaigns';
 import { useGetInboundEmails } from '@/hooks/queryHooks/useInboundEmails';
 import { SearchIconDesktop } from '@/components/atoms/_svg/SearchIconDesktop';
@@ -12,6 +12,7 @@ import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import MurmurLogoNew from '@/components/atoms/_svg/MurmurLogoNew';
 import EmptyMobile from '@/components/atoms/_svg/EmptyMobile';
+import { OutlinedInitialAvatar } from '@/components/atoms/OutlinedInitialAvatar/OutlinedInitialAvatar';
 import { urls } from '@/constants/urls';
 import { mmdd } from '@/utils';
 
@@ -395,6 +396,13 @@ export const CampaignsInboxView: FC<CampaignsInboxViewProps> = ({
 	const router = useRouter();
 	const isMobile = useIsMobile();
 	const { isSignedIn } = useAuth();
+	const { user } = useUser();
+	const outlinedInitial =
+		(user?.firstName?.trim()?.[0] ||
+			user?.lastName?.trim()?.[0] ||
+			user?.primaryEmailAddress?.emailAddress?.trim()?.[0] ||
+			user?.username?.trim()?.[0] ||
+			'')?.toUpperCase() ?? '';
 	const [searchQuery, setSearchQuery] = useState('');
 	const [confirmingCampaignId, setConfirmingCampaignId] = useState<number | null>(null);
 	const confirmationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -606,15 +614,22 @@ export const CampaignsInboxView: FC<CampaignsInboxViewProps> = ({
 						{/* Clerk button in top right of box */}
 						<div className="absolute top-3 right-3 z-10">
 							{isSignedIn ? (
-								<UserButton
-									appearance={{
-										elements: {
-											avatarBox: 'w-7 h-7 ring-1 ring-black/10',
-											userButtonTrigger:
-												'opacity-80 hover:opacity-100 transition-opacity duration-300',
-										},
-									}}
-								/>
+								<div className="group relative w-7 h-7 cursor-pointer">
+									<OutlinedInitialAvatar
+										initial={outlinedInitial}
+										className="pointer-events-none absolute inset-0 w-7 h-7 group-hover:border-black group-hover:text-black group-focus-within:border-black group-focus-within:text-black group-active:border-black group-active:text-black"
+									/>
+									<div className="absolute inset-0 opacity-0">
+										<UserButton
+											appearance={{
+												elements: {
+													avatarBox: 'w-7 h-7',
+													userButtonTrigger: 'w-7 h-7 p-0',
+												},
+											}}
+										/>
+									</div>
+								</div>
 							) : (
 								<SignInButton mode="modal">
 									<button className="px-3 py-1.5 text-[12px] font-medium tracking-[0.02em] text-white hover:text-gray-200 transition-all duration-300">
