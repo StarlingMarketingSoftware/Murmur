@@ -1,4 +1,3 @@
-/* eslint-disable no-console */
 'use client';
 
 import mapboxgl from 'mapbox-gl';
@@ -79,6 +78,18 @@ export default function FreeTrialPage() {
 	const freeTrialPriceId = process.env.NEXT_PUBLIC_STANDARD_MONTHLY_PRICE_ID;
 	const authMode = searchParams.get('auth');
 	const showSignIn = authMode === 'sign-in';
+
+	// Use a popup OAuth flow on desktop so the account chooser doesn't take over the page.
+	// On mobile/touch devices, use full-page redirects because popups are often blocked or unusable.
+	const oauthFlow: 'redirect' | 'popup' = (() => {
+		if (typeof window === 'undefined') return 'popup';
+		if (typeof window.matchMedia !== 'function') return 'popup';
+
+		const isMobileScreen = window.matchMedia('(max-width: 767px)').matches; // Tailwind md breakpoint
+		const isTouchDevice = window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+
+		return isMobileScreen || isTouchDevice ? 'redirect' : 'popup';
+	})();
 
 	const buildAuthUrl = (mode: 'sign-in' | 'sign-up') => {
 		const nextParams = new URLSearchParams(searchParams.toString());
@@ -347,6 +358,7 @@ export default function FreeTrialPage() {
 							{showSignIn ? (
 								<SignIn
 									routing="hash"
+									oauthFlow={oauthFlow}
 									signUpUrl={signUpUrl}
 									forceRedirectUrl={urls.freeTrial.index}
 									fallbackRedirectUrl={urls.freeTrial.index}
@@ -357,6 +369,7 @@ export default function FreeTrialPage() {
 							) : (
 								<SignUp
 									routing="hash"
+									oauthFlow={oauthFlow}
 									signInUrl={signInUrl}
 									forceRedirectUrl={urls.freeTrial.index}
 									fallbackRedirectUrl={urls.freeTrial.index}
