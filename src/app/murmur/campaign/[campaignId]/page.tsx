@@ -21,6 +21,7 @@ import { SearchIconDesktop } from '@/components/atoms/_svg/SearchIconDesktop';
 import SearchMap from '@/components/atoms/_svg/SearchMap';
 import BottomFolderIcon from '@/components/atoms/_svg/BottomFolderIcon';
 import BottomHomeIcon from '@/components/atoms/_svg/BottomHomeIcon';
+import { EnvelopeIcon } from '@/components/atoms/_svg/EnvelopeIcon';
 import nextDynamic from 'next/dynamic';
 import { CampaignsTable } from '@/components/organisms/_tables/CampaignsTable/CampaignsTable';
 import { CampaignHeaderBox } from '@/components/molecules/CampaignHeaderBox/CampaignHeaderBox';
@@ -109,6 +110,280 @@ const CampaignRightPanel = nextDynamic(
 			(mod) => mod.CampaignRightPanel
 		),
 	{}
+);
+
+// Dashboard inbox popover content (opened from the envelope icon in the campaign header)
+const DashboardInboxSection = nextDynamic(
+	() => import('@/components/molecules/InboxSection/InboxSection'),
+	{
+		ssr: false,
+		loading: () => (
+			<div
+				className="relative flex flex-col items-center overflow-hidden"
+				style={{
+					width: '625px',
+					height: '561px',
+					border: '3px solid #000000',
+					borderRadius: '8px',
+					padding: '16px',
+					paddingTop: '76px',
+					backgroundColor: '#6fa4e1',
+				}}
+				aria-busy="true"
+				aria-label="Loading inbox"
+			>
+				<span className="sr-only">Loading inbox…</span>
+
+				{/* Search Bar skeleton */}
+				<div
+					style={{
+						position: 'absolute',
+						top: '13px',
+						left: '14px',
+						right: '286px', // 14px + 260px toggle + 12px gap
+						height: '48px',
+						border: '3px solid #000000',
+						borderRadius: '8px',
+						backgroundColor: '#FFFFFF',
+						zIndex: 10,
+						display: 'flex',
+						alignItems: 'center',
+						paddingLeft: '16px',
+					}}
+					aria-hidden
+				>
+					<div className="w-[18px] h-[18px] rounded-[3px] bg-black/20" />
+					<div className="ml-4 h-[14px] w-[180px] rounded-[4px] bg-black/15" />
+				</div>
+
+				{/* Messages/Campaigns toggle skeleton */}
+				<div
+					style={{
+						position: 'absolute',
+						top: '13px',
+						right: '14px',
+						width: '260px',
+						height: '48px',
+						border: '3px solid #000000',
+						borderRadius: '8px',
+						overflow: 'hidden',
+						backgroundColor: '#FFFFFF',
+						zIndex: 10,
+						display: 'flex',
+					}}
+					aria-hidden
+				>
+					<div
+						aria-hidden
+						style={{
+							position: 'absolute',
+							left: '50%',
+							top: 0,
+							bottom: 0,
+							width: '3px',
+							backgroundColor: '#000000',
+							transform: 'translateX(-1.5px)',
+							pointerEvents: 'none',
+						}}
+					/>
+					<div className="h-full flex-1 bg-black/10" />
+					<div className="h-full flex-1 bg-black/10" />
+				</div>
+
+				{/* Email row skeletons */}
+				<div className="w-full flex flex-col items-center">
+					{Array.from({ length: 6 }).map((_, idx) => (
+						<div
+							key={`dashboard-inbox-loading-${idx}`}
+							className="select-none mb-2 overflow-hidden"
+							style={{
+								width: '587px',
+								height: '78px',
+								minHeight: '78px',
+								border: '3px solid #000000',
+								borderRadius: '8px',
+								backgroundColor: '#FFFFFF',
+								display: 'flex',
+								alignItems: 'center',
+								padding: '0 16px',
+							}}
+							aria-hidden
+						>
+							<div className="flex flex-col w-full">
+								<div className="flex items-center justify-between gap-3">
+									<div className="h-[14px] rounded bg-black/20 w-[180px]" />
+									<div className="h-[14px] rounded bg-black/20 w-[90px]" />
+								</div>
+								<div className="mt-2 h-[12px] rounded bg-black/15 w-[260px]" />
+								<div className="mt-2 h-[10px] rounded bg-black/15 w-[320px]" />
+							</div>
+						</div>
+					))}
+				</div>
+			</div>
+		),
+	}
+);
+const DashboardCampaignsInboxView = nextDynamic(
+	() => import('@/components/molecules/CampaignsInboxView/CampaignsInboxView'),
+	{
+		ssr: false,
+		loading: () => (
+			<div
+				className="relative flex flex-col items-center overflow-hidden"
+				style={{
+					width: '625px',
+					height: '561px',
+					border: '3px solid #000000',
+					borderRadius: '8px',
+					padding: '16px',
+					paddingTop: '76px',
+					backgroundColor: '#4ca9db',
+				}}
+				aria-busy="true"
+				aria-label="Loading campaigns"
+			>
+				<span className="sr-only">Loading campaigns…</span>
+
+				{/* Search Bar skeleton */}
+				<div
+					className="animate-pulse"
+					style={{
+						position: 'absolute',
+						top: '13px',
+						left: '14px',
+						right: '286px', // 14px + 260px toggle + 12px gap
+						height: '48px',
+						border: '3px solid #000000',
+						borderRadius: '8px',
+						backgroundColor: '#FFFFFF',
+						zIndex: 10,
+						display: 'flex',
+						alignItems: 'center',
+						paddingLeft: '16px',
+					}}
+					aria-hidden
+				>
+					<div className="w-[18px] h-[18px] rounded-[3px] bg-black/20" />
+					<div className="ml-4 h-[14px] w-[180px] rounded-[4px] bg-black/15" />
+				</div>
+
+				{/* Messages/Campaigns toggle skeleton (Campaigns selected) */}
+				<div
+					style={{
+						position: 'absolute',
+						top: '13px',
+						right: '14px',
+						width: '260px',
+						height: '48px',
+						border: '3px solid #000000',
+						borderRadius: '8px',
+						overflow: 'hidden',
+						zIndex: 10,
+						display: 'flex',
+						pointerEvents: 'none',
+					}}
+					aria-hidden
+				>
+					<div
+						aria-hidden
+						style={{
+							position: 'absolute',
+							left: '50%',
+							top: 0,
+							bottom: 0,
+							width: '3px',
+							backgroundColor: '#000000',
+							transform: 'translateX(-1.5px)',
+							pointerEvents: 'none',
+						}}
+					/>
+					<div
+						style={{
+							flex: 1,
+							height: '100%',
+							display: 'flex',
+							alignItems: 'center',
+							justifyContent: 'center',
+							backgroundColor: '#4DA6D7',
+						}}
+					>
+						<span
+							style={{
+								fontFamily: 'Inter, sans-serif',
+								fontSize: '15px',
+								fontWeight: 500,
+								color: '#000000',
+								opacity: 0.55,
+								userSelect: 'none',
+							}}
+						>
+							Messages
+						</span>
+					</div>
+					<div
+						style={{
+							flex: 1,
+							height: '100%',
+							display: 'flex',
+							alignItems: 'center',
+							justifyContent: 'center',
+							backgroundColor: '#B3E5FF',
+						}}
+					>
+						<span
+							style={{
+								fontFamily: 'Inter, sans-serif',
+								fontSize: '15px',
+								fontWeight: 500,
+								color: '#000000',
+								opacity: 0.65,
+								userSelect: 'none',
+							}}
+						>
+							Campaigns
+						</span>
+					</div>
+				</div>
+
+				{/* Campaign row skeletons (campaign page inbox pill variant) */}
+				<div className="w-full flex flex-col items-center">
+					{Array.from({ length: 5 }).map((_, idx) => (
+						<div
+							key={`dashboard-campaigns-loading-${idx}`}
+							className="select-none mb-2 w-full overflow-hidden"
+							style={{
+								height: '66px',
+								minHeight: '66px',
+								border: '3px solid #000000',
+								borderRadius: '10px',
+								backgroundColor: '#EAEAEA',
+								display: 'flex',
+								alignItems: 'flex-start',
+								padding: '10px 16px',
+							}}
+							aria-hidden
+						>
+							<div className="flex flex-col w-full gap-2 animate-pulse">
+								{/* Campaign name */}
+								<div className="h-[16px] bg-black/20 rounded w-[60%]" />
+								{/* Pills row */}
+								<div className="flex items-center gap-3 w-full">
+									<div className="h-[15px] w-[121px] rounded-[7px] bg-black/10 border border-black/25" />
+									{Array.from({ length: 4 }).map((__, metricIdx) => (
+										<div
+											key={`dashboard-campaigns-loading-pill-${idx}-${metricIdx}`}
+											className="h-[20px] w-[92px] rounded-[6px] bg-black/10 border border-black/25"
+										/>
+									))}
+								</div>
+							</div>
+						</div>
+					))}
+				</div>
+			</div>
+		),
+	}
 );
 
 const Murmur = () => {
@@ -895,6 +1170,85 @@ const Murmur = () => {
 	const [selectedRightBoxIcon, setSelectedRightBoxIcon] = useState<'info' | 'circle'>('info');
 	const topCampaignsDropdownRef = useRef<HTMLDivElement>(null);
 	const topCampaignsFolderButtonRef = useRef<HTMLButtonElement>(null);
+
+	// Dashboard Inbox popup (opened from the envelope icon in the top-right box)
+	const DASHBOARD_INBOX_POPUP_WIDTH_PX = 625;
+	const DASHBOARD_INBOX_POPUP_HEIGHT_PX = 561;
+	// Position relative to the top search bar (so it matches design specs).
+	const DASHBOARD_INBOX_POPUP_SEARCHBAR_LEFT_OFFSET_PX = 264;
+	const DASHBOARD_INBOX_POPUP_SEARCHBAR_BOTTOM_GAP_PX = 26;
+	const DASHBOARD_INBOX_POPUP_MARGIN_PX = 8;
+	const [isDashboardInboxOpen, setIsDashboardInboxOpen] = useState(false);
+	const [dashboardInboxSubtab, setDashboardInboxSubtab] = useState<'messages' | 'campaigns'>(
+		'messages'
+	);
+	const dashboardInboxSearchbarRef = useRef<HTMLButtonElement>(null);
+	const dashboardInboxTriggerRef = useRef<HTMLButtonElement>(null);
+	const dashboardInboxPopupRef = useRef<HTMLDivElement>(null);
+	const [dashboardInboxPosition, setDashboardInboxPosition] = useState<{
+		top: number;
+		left: number;
+	} | null>(null);
+
+	const getCampaignZoomFactor = useCallback(() => {
+		if (typeof window === 'undefined') return 1;
+		const html = document.documentElement;
+		// Only apply zoom when the campaign page is in its compact/scaled mode.
+		if (!html.classList.contains(CAMPAIGN_COMPACT_CLASS)) return 1;
+		const raw = getComputedStyle(html).getPropertyValue(CAMPAIGN_ZOOM_VAR).trim();
+		const parsed = Number.parseFloat(raw);
+		if (Number.isFinite(parsed) && parsed > 0) return parsed;
+		return DEFAULT_CAMPAIGN_ZOOM;
+	}, [CAMPAIGN_COMPACT_CLASS, CAMPAIGN_ZOOM_VAR, DEFAULT_CAMPAIGN_ZOOM]);
+
+	const updateDashboardInboxPosition = useCallback(() => {
+		if (typeof window === 'undefined') return;
+		const trigger = dashboardInboxTriggerRef.current;
+		if (!trigger) {
+			// If the trigger is unmounted (e.g. narrow breakpoint), close the popup.
+			setIsDashboardInboxOpen(false);
+			setDashboardInboxPosition(null);
+			return;
+		}
+
+		const anchor = dashboardInboxSearchbarRef.current ?? trigger;
+		const zoom = getCampaignZoomFactor();
+		const rect = anchor.getBoundingClientRect();
+		const rectTop = rect.top / zoom;
+		const rectLeft = rect.left / zoom;
+		const rectBottom = rect.bottom / zoom;
+
+		const viewportW = window.innerWidth / zoom;
+		const viewportH = window.innerHeight / zoom;
+
+		let left = rectLeft + DASHBOARD_INBOX_POPUP_SEARCHBAR_LEFT_OFFSET_PX;
+		let top = rectBottom + DASHBOARD_INBOX_POPUP_SEARCHBAR_BOTTOM_GAP_PX;
+
+		// If it would overflow below, try opening above the trigger.
+		if (top + DASHBOARD_INBOX_POPUP_HEIGHT_PX + DASHBOARD_INBOX_POPUP_MARGIN_PX > viewportH) {
+			const aboveTop =
+				rectTop - DASHBOARD_INBOX_POPUP_SEARCHBAR_BOTTOM_GAP_PX - DASHBOARD_INBOX_POPUP_HEIGHT_PX;
+			if (aboveTop >= DASHBOARD_INBOX_POPUP_MARGIN_PX) top = aboveTop;
+		}
+
+		left = Math.min(
+			Math.max(left, DASHBOARD_INBOX_POPUP_MARGIN_PX),
+			viewportW - DASHBOARD_INBOX_POPUP_WIDTH_PX - DASHBOARD_INBOX_POPUP_MARGIN_PX
+		);
+		top = Math.min(
+			Math.max(top, DASHBOARD_INBOX_POPUP_MARGIN_PX),
+			viewportH - DASHBOARD_INBOX_POPUP_HEIGHT_PX - DASHBOARD_INBOX_POPUP_MARGIN_PX
+		);
+
+		setDashboardInboxPosition({ top, left });
+	}, [
+		getCampaignZoomFactor,
+		DASHBOARD_INBOX_POPUP_HEIGHT_PX,
+		DASHBOARD_INBOX_POPUP_SEARCHBAR_BOTTOM_GAP_PX,
+		DASHBOARD_INBOX_POPUP_SEARCHBAR_LEFT_OFFSET_PX,
+		DASHBOARD_INBOX_POPUP_MARGIN_PX,
+		DASHBOARD_INBOX_POPUP_WIDTH_PX,
+	]);
 	
 	// Close dropdown when clicking outside (but not on the folder button itself)
 	useEffect(() => {
@@ -917,6 +1271,51 @@ const Murmur = () => {
 		document.addEventListener('mousedown', handleClickOutside);
 		return () => document.removeEventListener('mousedown', handleClickOutside);
 	}, [showTopCampaignsDropdown]);
+
+	// Position the dashboard inbox popup as soon as it opens (pre-paint).
+	useLayoutEffect(() => {
+		if (!isDashboardInboxOpen) return;
+		updateDashboardInboxPosition();
+	}, [isDashboardInboxOpen, updateDashboardInboxPosition]);
+
+	// Keep the dashboard inbox popup positioned on resize/scroll while open.
+	useEffect(() => {
+		if (!isDashboardInboxOpen) return;
+		const handleViewportChange = () => updateDashboardInboxPosition();
+		window.addEventListener('resize', handleViewportChange);
+		window.addEventListener('scroll', handleViewportChange, true);
+		return () => {
+			window.removeEventListener('resize', handleViewportChange);
+			window.removeEventListener('scroll', handleViewportChange, true);
+		};
+	}, [isDashboardInboxOpen, updateDashboardInboxPosition]);
+
+	// Close the dashboard inbox popup on outside click / Escape.
+	useEffect(() => {
+		if (!isDashboardInboxOpen) return;
+
+		const handleClickOutside = (event: MouseEvent) => {
+			const target = event.target as Node;
+			if (dashboardInboxTriggerRef.current?.contains(target)) return;
+			if (dashboardInboxPopupRef.current && !dashboardInboxPopupRef.current.contains(target)) {
+				setIsDashboardInboxOpen(false);
+				setDashboardInboxPosition(null);
+			}
+		};
+
+		const handleKeyDown = (event: KeyboardEvent) => {
+			if (event.key !== 'Escape') return;
+			setIsDashboardInboxOpen(false);
+			setDashboardInboxPosition(null);
+		};
+
+		document.addEventListener('mousedown', handleClickOutside);
+		window.addEventListener('keydown', handleKeyDown);
+		return () => {
+			document.removeEventListener('mousedown', handleClickOutside);
+			window.removeEventListener('keydown', handleKeyDown);
+		};
+	}, [isDashboardInboxOpen]);
 	
 	// Track previous view for crossfade transitions
 	const [previousView, setPreviousView] = useState<ViewType | null>(null);
@@ -1886,6 +2285,7 @@ const Murmur = () => {
 						<button
 							type="button"
 							data-slot="campaign-top-box"
+							ref={dashboardInboxSearchbarRef}
 							aria-label="Open dashboard search for this campaign"
 							title="Search for more contacts"
 							data-hover-description="Hop back in to the map, Add some more contacts to your campaign"
@@ -1921,44 +2321,90 @@ const Murmur = () => {
 						{/* Right box - 105 x 42px, 36px to the right of search box */}
 						<div
 							data-slot="campaign-right-box"
-							className="pointer-events-auto absolute left-full top-0 ml-[36px] w-[105px] h-[42px] box-border border border-[#929292] rounded-[10px] overflow-hidden flex items-center justify-center gap-[14px]"
+							className="group/box pointer-events-auto absolute left-full top-0 ml-[36px] w-[105px] h-[42px] box-border border border-[#929292] hover:border-black rounded-[10px] overflow-hidden flex items-center justify-center gap-[14px] transition-colors"
 						>
-							{/* Left icon - italic "i" in circle */}
+							{/* Left icon - italic "i" in circle (toggles info on/off) */}
 							<button
 								type="button"
-								onClick={() => setSelectedRightBoxIcon('info')}
-								className={cn(
-									"w-[35px] h-[35px] flex items-center justify-center bg-transparent border rounded-[8px] cursor-pointer transition-all",
-									selectedRightBoxIcon === 'info'
-										? "border-[#929292]"
-										: "border-transparent"
-								)}
-								aria-label="Turn info on"
+								onClick={() => setSelectedRightBoxIcon(selectedRightBoxIcon === 'info' ? 'circle' : 'info')}
+								className="w-[35px] h-[35px] flex items-center justify-center bg-transparent border border-transparent hover:border-[#929292] rounded-[8px] cursor-pointer transition-all"
+								aria-label={selectedRightBoxIcon === 'info' ? "Turn info off" : "Turn info on"}
 							>
-								<svg width="13" height="13" viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg">
-									<g opacity="0.4">
-										<path d="M6.22656 0.25C9.53383 0.250077 12.2029 2.85379 12.2031 6.05078C12.2031 9.24793 9.53396 11.8525 6.22656 11.8525C2.9191 11.8525 0.25 9.24798 0.25 6.05078C0.250198 2.85375 2.91922 0.25 6.22656 0.25Z" stroke="black" strokeWidth="0.5"/>
+								<svg width="13" height="13" viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg" className="opacity-40 group-hover/box:opacity-100 transition-opacity">
+									<g>
+										<circle cx="6.22656" cy="6.05078" r="5.80078" fill={selectedRightBoxIcon === 'info' ? "#ADADAD" : "none"} stroke="black" strokeWidth="0.5"/>
 										<path d="M8.05656 2.82696C7.8419 2.82696 7.68856 2.75796 7.59656 2.61996C7.53523 2.54329 7.50456 2.44363 7.50456 2.32096C7.50456 2.07563 7.61956 1.87629 7.84956 1.72296C8.01823 1.63096 8.17156 1.58496 8.30956 1.58496C8.53956 1.58496 8.70056 1.65396 8.79256 1.79196C8.8539 1.86863 8.88456 1.96829 8.88456 2.09096C8.88456 2.33629 8.7619 2.53563 8.51656 2.68896C8.37856 2.78096 8.22523 2.82696 8.05656 2.82696ZM4.05456 11.682C3.90123 11.682 3.7709 11.6513 3.66356 11.59C3.57156 11.5286 3.52556 11.4136 3.52556 11.245C3.52556 11.0303 3.57923 10.7773 3.68656 10.486C3.80923 10.1946 3.93956 9.90329 4.07756 9.61196C4.2309 9.32063 4.3459 9.08296 4.42256 8.89896C4.5299 8.68429 4.66023 8.40829 4.81356 8.07096C4.98223 7.71829 5.13556 7.38863 5.27356 7.08196C5.4269 6.75996 5.53423 6.53763 5.59556 6.41496C5.3809 6.64496 5.12023 6.93629 4.81356 7.28896C4.52223 7.62629 4.24623 7.95596 3.98556 8.27796C3.7249 8.59996 3.52556 8.85296 3.38756 9.03696C3.34156 9.09829 3.30323 9.12896 3.27256 9.12896C3.2419 9.12896 3.22656 9.09063 3.22656 9.01396C3.22656 8.89129 3.2649 8.77629 3.34156 8.66896C3.6329 8.30096 3.9549 7.88696 4.30756 7.42696C4.67556 6.96696 5.00523 6.54529 5.29656 6.16196C5.5879 5.76329 5.7719 5.50263 5.84856 5.37996C6.01723 5.34929 6.26256 5.30329 6.58456 5.24196C6.9219 5.18063 7.1519 5.09629 7.27456 4.98896C7.32056 4.94296 7.36656 4.91996 7.41256 4.91996C7.44323 4.91996 7.45856 4.95063 7.45856 5.01196C7.4739 5.05796 7.45856 5.11163 7.41256 5.17296C7.32056 5.28029 7.15956 5.54096 6.92956 5.95496C6.69956 6.36896 6.45423 6.82896 6.19356 7.33496C5.94823 7.82563 5.71823 8.27029 5.50356 8.66896C5.2889 9.08296 5.1049 9.48163 4.95156 9.86496C4.79823 10.2483 4.72156 10.5243 4.72156 10.693C4.72156 10.9076 4.8289 11.015 5.04356 11.015C5.2429 11.015 5.4959 10.8923 5.80256 10.647C6.12456 10.4016 6.44656 10.1103 6.76856 9.77296C7.09056 9.42029 7.37423 9.09829 7.61956 8.80696C7.69623 8.71496 7.78823 8.60763 7.89556 8.48496C8.01823 8.34696 8.0949 8.26263 8.12556 8.23196C8.15623 8.26263 8.17156 8.31629 8.17156 8.39296C8.15623 8.50029 8.1179 8.60763 8.05656 8.71496C7.99523 8.80696 7.9339 8.89129 7.87256 8.96796C7.55056 9.36663 7.1979 9.78063 6.81456 10.21C6.43123 10.624 6.00956 10.9766 5.54956 11.268C5.08956 11.544 4.59123 11.682 4.05456 11.682Z" fill="black"/>
 									</g>
 								</svg>
 							</button>
-							{/* Right icon - empty circle */}
+							{/* Right icon - envelope (opens dashboard inbox popup) */}
 							<button
 								type="button"
-								onClick={() => setSelectedRightBoxIcon('circle')}
-								className={cn(
-									"w-[35px] h-[35px] flex items-center justify-center bg-transparent border rounded-[8px] cursor-pointer transition-all",
-									selectedRightBoxIcon === 'circle'
-										? "border-[#929292]"
-										: "border-transparent"
-								)}
-								aria-label="Turn info off"
+								ref={dashboardInboxTriggerRef}
+								onClick={() => {
+									setIsDashboardInboxOpen((prev) => {
+										const next = !prev;
+										if (next) {
+											setDashboardInboxSubtab('messages');
+										} else {
+											setDashboardInboxPosition(null);
+										}
+										return next;
+									});
+								}}
+								className="w-[35px] h-[35px] flex items-center justify-center bg-transparent cursor-pointer transition-all"
+								aria-label={isDashboardInboxOpen ? 'Close inbox' : 'Open inbox'}
+								title={isDashboardInboxOpen ? 'Close inbox' : 'Open inbox'}
 							>
-								<svg width="13" height="13" viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg" opacity="0.4">
-									<path d="M6.22656 0.25C9.53383 0.250077 12.2029 2.85379 12.2031 6.05078C12.2031 9.24793 9.53396 11.8525 6.22656 11.8525C2.9191 11.8525 0.25 9.24798 0.25 6.05078C0.250198 2.85375 2.91922 0.25 6.22656 0.25Z" stroke="black" strokeWidth="0.5"/>
-								</svg>
+								<EnvelopeIcon
+									width={38}
+									height={27}
+									className={cn(
+										"translate-x-[-3px] transition-opacity",
+										isDashboardInboxOpen ? "opacity-100" : "opacity-40 group-hover/box:opacity-100"
+									)}
+									opacity={1}
+								/>
 							</button>
 						</div>
+
+						{/* Dashboard Inbox popup (625 x 561) */}
+						{isDashboardInboxOpen && dashboardInboxPosition && (
+							<div
+								ref={dashboardInboxPopupRef}
+								className="pointer-events-auto fixed z-[120]"
+								style={{
+									top: `${dashboardInboxPosition.top}px`,
+									left: `${dashboardInboxPosition.left}px`,
+									width: `${DASHBOARD_INBOX_POPUP_WIDTH_PX}px`,
+									height: `${DASHBOARD_INBOX_POPUP_HEIGHT_PX}px`,
+								}}
+							>
+								{dashboardInboxSubtab === 'messages' ? (
+									<DashboardInboxSection
+										desktopWidth={DASHBOARD_INBOX_POPUP_WIDTH_PX}
+										desktopHeight={DASHBOARD_INBOX_POPUP_HEIGHT_PX}
+										noOuterPadding
+										dashboardMode
+										scrollbarThumbColor="#FFFFFF"
+										scrollbarOffsetRight={8}
+										scrollbarAlignTrackToScrollContainer
+										emailRowHoverClassName="hover:bg-[#E8E8E8]"
+										inboxSubtab={dashboardInboxSubtab}
+										onInboxSubtabChange={setDashboardInboxSubtab}
+									/>
+								) : (
+									<DashboardCampaignsInboxView
+										variant="campaignPageInbox"
+										containerHeight={`${DASHBOARD_INBOX_POPUP_HEIGHT_PX}px`}
+										containerWidthPx={DASHBOARD_INBOX_POPUP_WIDTH_PX}
+										noOuterPadding
+										inboxSubtab={dashboardInboxSubtab}
+										onInboxSubtabChange={setDashboardInboxSubtab}
+									/>
+								)}
+							</div>
+						)}
 					</div>
 				</div>
 			)}

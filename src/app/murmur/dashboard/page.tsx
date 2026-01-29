@@ -53,6 +53,7 @@ import {
 	ContactResearchHorizontalStrip,
 } from '@/components/molecules/ContactResearchPanel/ContactResearchPanel';
 import { CampaignsInboxView } from '@/components/molecules/CampaignsInboxView/CampaignsInboxView';
+import InboxSection from '@/components/molecules/InboxSection/InboxSection';
 import { useGetCampaign, useGetCampaigns } from '@/hooks/queryHooks/useCampaigns';
 import { useEditUserContactList } from '@/hooks/queryHooks/useUserContactLists';
 import { useQueryClient } from '@tanstack/react-query';
@@ -562,6 +563,8 @@ const DashboardContent = () => {
 	const initialTabFromQuery = searchParams.get('tab') === 'inbox' ? 'inbox' : 'search';
 	const [activeTab, setActiveTab] = useState<'search' | 'inbox'>(initialTabFromQuery);
 	const inboxView = activeTab === 'inbox';
+	// Dashboard inbox deep-link (`?tab=inbox`) should land on the Campaigns sub-tab.
+	const [inboxSubtab, setInboxSubtab] = useState<'messages' | 'campaigns'>('campaigns');
 
 	// Handle tab query parameter
 	// Only react to *URL changes*. If we also depend on `activeTab`, this effect can run
@@ -3768,7 +3771,26 @@ const DashboardContent = () => {
 									willChange: 'transform, opacity',
 								}}
 							>
-								<CampaignsInboxView />
+								{/* 
+									Keep the inbox mounted so it can finish loading while the user views
+									the "Campaigns" sub-tab. (Do NOT change the campaign-page popup behavior.)
+								*/}
+								<div style={{ display: inboxSubtab === 'messages' ? 'block' : 'none' }}>
+									<InboxSection
+										desktopHeight={535}
+										dashboardMode
+										loadingVariant="dashboard"
+										inboxSubtab={inboxSubtab}
+										onInboxSubtabChange={setInboxSubtab}
+									/>
+								</div>
+
+								{inboxSubtab === 'campaigns' && (
+									<CampaignsInboxView
+										inboxSubtab={inboxSubtab}
+										onInboxSubtabChange={setInboxSubtab}
+									/>
+								)}
 								{/* Toggle below table for inbox tab */}
 								<div className="flex justify-center" style={{ marginTop: '34px' }}>
 									<div

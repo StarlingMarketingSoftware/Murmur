@@ -1,11 +1,21 @@
 'use client';
 
-import { FC, useState, useRef, useEffect } from 'react';
+import { FC, ReactNode, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { urls } from '@/constants/urls';
 import { useEditCampaign } from '@/hooks/queryHooks/useCampaigns';
 import { cn } from '@/utils';
 import { useHoverDescription } from '@/contexts/HoverDescriptionContext';
+import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
+import { FestivalsIcon } from '@/components/atoms/_svg/FestivalsIcon';
+import { MusicVenuesIcon } from '@/components/atoms/_svg/MusicVenuesIcon';
+import { RadioStationsIcon } from '@/components/atoms/_svg/RadioStationsIcon';
+import { RestaurantsIcon } from '@/components/atoms/_svg/RestaurantsIcon';
+import { WeddingPlannersIcon } from '@/components/atoms/_svg/WeddingPlannersIcon';
+import { WineBeerSpiritsIcon } from '@/components/atoms/_svg/WineBeerSpiritsIcon';
+import { US_STATES } from '@/constants/usStates';
+import { stateBadgeColorMap } from '@/constants/ui';
+import { getCityIconProps } from '@/utils/cityIcons';
 
 interface CampaignHeaderBoxProps {
 	campaignId: number;
@@ -29,6 +39,149 @@ interface CampaignHeaderBoxProps {
 const getContactsFillColor = (): string => '#F5DADA';
 const getDraftFillColor = (): string => '#FFE3AA';
 const getSentFillColor = (): string => '#B0E0A6';
+
+type CampaignTitlePillSpec = {
+	match: RegExp;
+	backgroundColor: string;
+	renderIcon: () => ReactNode;
+	iconWrapperClassName?: string;
+};
+
+const CAMPAIGN_TITLE_PILL_SPECS: CampaignTitlePillSpec[] = [
+	{
+		// "Wine, Beer, and Spirits" (and common punctuation variants)
+		match: /^wine\s*,?\s*beer\s*,?\s*(?:and\s*)?spirits(?=\s|$)/i,
+		backgroundColor: '#BFC4FF',
+		renderIcon: () => <WineBeerSpiritsIcon size={20} className="flex-shrink-0" />,
+	},
+	{
+		// "Wineries", "Breweries", "Distilleries", "Cideries" (and singular forms)
+		match: /^(?:winer(?:y|ies)|brewer(?:y|ies)|distiller(?:y|ies)|cider(?:y|ies))(?=\s|$)/i,
+		backgroundColor: '#BFC4FF',
+		renderIcon: () => <WineBeerSpiritsIcon size={20} className="flex-shrink-0" />,
+	},
+	{
+		match: /^restaurants?(?=\s|$)/i,
+		backgroundColor: '#C3FBD1',
+		renderIcon: () => <RestaurantsIcon size={20} className="flex-shrink-0" />,
+	},
+	{
+		match: /^coffee\s*shops?(?=\s|$)/i,
+		backgroundColor: '#D6F1BD',
+		renderIcon: () => <CoffeeShopsIcon size={13} className="flex-shrink-0" />,
+	},
+	{
+		match: /^music\s*venues?(?=\s|$)/i,
+		backgroundColor: '#B7E5FF',
+		renderIcon: () => <MusicVenuesIcon size={24} className="flex-shrink-0" />,
+	},
+	{
+		// Our UI sometimes uses "Festivals" and sometimes "Music Festivals"
+		match: /^(?:music\s*)?festivals?(?=\s|$)/i,
+		backgroundColor: '#C1D6FF',
+		renderIcon: () => <FestivalsIcon size={20} className="flex-shrink-0" />,
+	},
+	{
+		// "Wedding Planners", "Wedding Venues" (and singular forms)
+		match: /^wedding\s*(?:planners?|venues?)(?=\s|$)/i,
+		backgroundColor: '#FFF2BC',
+		renderIcon: () => <WeddingPlannersIcon size={20} className="flex-shrink-0" />,
+	},
+	{
+		match: /^radio\s*stations?(?=\s|$)/i,
+		backgroundColor: '#E8EFFF',
+		renderIcon: () => <RadioStationsIcon size={22} className="flex-shrink-0" />,
+		// The radio icon sits a hair low compared to the others.
+		iconWrapperClassName: 'translate-y-[-1px]',
+	},
+];
+
+const getUsStateAbbreviation = (stateOrAbbr: string): string | null => {
+	const normalized = (stateOrAbbr ?? '').trim();
+	if (!normalized) return null;
+
+	const lowered = normalized.toLowerCase();
+	const match = US_STATES.find(
+		(s) => s.name.toLowerCase() === lowered || s.abbr.toLowerCase() === lowered
+	);
+	return match?.abbr ?? null;
+};
+
+const renderCampaignTitleWithStatePill = (title: string): ReactNode => {
+	const safeTitle = title ?? '';
+	if (!safeTitle) return safeTitle;
+
+	// Split at the last " in " so we can wrap the trailing state name/abbr.
+	// Example: "Wineries in New York" -> prefix: "Wineries in ", location: "New York"
+	const match = safeTitle.match(/^(.*\bin\b\s+)(.+)$/i);
+	if (!match) return safeTitle;
+
+	const prefix = match[1] ?? '';
+	const locationRaw = match[2] ?? '';
+
+	// Keep trailing punctuation outside the pill.
+	const trimmedLocation = locationRaw.trim();
+	const punctuationMatch = trimmedLocation.match(/^(.+?)([.,;:]*)$/);
+	const locationBase = punctuationMatch?.[1]?.trim() ?? trimmedLocation;
+	const trailingPunctuation = punctuationMatch?.[2] ?? '';
+
+	const abbr = getUsStateAbbreviation(locationBase);
+	if (!abbr) return safeTitle;
+
+	// Use the same state icon + background used across "Where" and contact-row state boxes.
+	const { icon } = getCityIconProps('', locationBase);
+	const backgroundColor = stateBadgeColorMap[abbr] ?? 'transparent';
+
+	return (
+		<>
+			{prefix}
+			<span
+				className="inline-flex items-center gap-[10px] h-[26px] px-[8px] rounded-[5px] align-middle"
+				style={{ backgroundColor }}
+			>
+				<span className="leading-none">{abbr}</span>
+				<span className="inline-flex items-center justify-center translate-y-[1px] [&>svg]:w-[23px] [&>svg]:h-[18px]">
+					{icon}
+				</span>
+			</span>
+			{trailingPunctuation}
+		</>
+	);
+};
+
+const renderCampaignTitleWithCategoryPill = (title: string): ReactNode => {
+	const safeTitle = title ?? '';
+	if (!safeTitle) return safeTitle;
+
+	const leadingWhitespace = safeTitle.match(/^\s*/)?.[0] ?? '';
+	const restTitle = safeTitle.slice(leadingWhitespace.length);
+	if (!restTitle) return safeTitle;
+
+	for (const spec of CAMPAIGN_TITLE_PILL_SPECS) {
+		const match = restTitle.match(spec.match);
+		const matchedText = match?.[0];
+		if (!matchedText) continue;
+
+		const suffix = restTitle.slice(matchedText.length);
+		return (
+			<>
+				{leadingWhitespace}
+				<span
+					className="inline-flex items-center gap-[7px] h-[26px] px-[8px] rounded-[5px] align-middle"
+					style={{ backgroundColor: spec.backgroundColor }}
+				>
+					<span className="leading-none">{matchedText}</span>
+					<span className={cn('translate-y-[1px]', spec.iconWrapperClassName)}>
+						{spec.renderIcon()}
+					</span>
+				</span>
+				{renderCampaignTitleWithStatePill(suffix)}
+			</>
+		);
+	}
+
+	return renderCampaignTitleWithStatePill(safeTitle);
+};
 
 export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 	campaignId,
@@ -201,7 +354,7 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 				</div>
 			) : null}
 			{/* Campaign Title */}
-			<div className="h-[26px] overflow-hidden flex-shrink-0 mt-[6px]">
+			<div className="h-[28px] overflow-hidden flex-shrink-0 mt-[6px]">
 				{isEditing ? (
 					<input
 						ref={inputRef}
@@ -210,12 +363,12 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 						onChange={(e) => setEditedName(e.target.value)}
 						onBlur={handleSave}
 						onKeyDown={handleKeyDown}
-						className="font-normal text-[26px] leading-none text-black bg-transparent border-none outline-none p-0 m-0 w-full h-[26px]"
+						className="font-normal text-[26px] leading-none text-black bg-transparent border-none outline-none p-0 m-0 w-full h-[28px]"
 						style={{ fontFamily: 'Times New Roman, Times, serif' }}
 					/>
 				) : (
 					<div
-						className="font-normal text-[26px] leading-none whitespace-nowrap overflow-hidden text-black cursor-text h-[26px]"
+						className="font-normal text-[26px] leading-none whitespace-nowrap overflow-hidden text-black cursor-text h-[28px]"
 						style={{
 							fontFamily: 'Times New Roman, Times, serif',
 							maskImage: 'linear-gradient(to right, black 90%, transparent 100%)',
@@ -225,7 +378,7 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 						onClick={() => setIsEditing(true)}
 						title="Click to edit"
 					>
-						{campaignName}
+						{renderCampaignTitleWithCategoryPill(campaignName)}
 					</div>
 				)}
 			</div>
