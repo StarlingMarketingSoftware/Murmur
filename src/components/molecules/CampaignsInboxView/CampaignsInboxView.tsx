@@ -37,6 +37,16 @@ type CampaignsInboxViewProps = {
 	/** Override the outer container height (e.g. "600px" or "calc(100dvh - 120px)"). */
 	containerHeight?: string;
 	/**
+	 * Override the width used for responsive breakpoint decisions.
+	 * Helpful when embedding inside fixed-size popups/modals.
+	 */
+	containerWidthPx?: number;
+	/**
+	 * Removes the default outer horizontal padding used in app pages.
+	 * Useful when the parent container already controls spacing.
+	 */
+	noOuterPadding?: boolean;
+	/**
 	 * Optional dashboard "Inbox" sub-tab selection (Messages vs Campaigns).
 	 * When provided, renders the Messages/Campaigns segmented toggle next to the search bar.
 	 */
@@ -49,6 +59,7 @@ type CampaignsInboxViewSkeletonProps = {
 	containerHeight: string;
 	inboxSubtab: InboxSubtab;
 	onInboxSubtabChange?: (next: InboxSubtab) => void;
+	noOuterPadding: boolean;
 };
 
 const MessagesCampaignsToggle: FC<{
@@ -153,14 +164,17 @@ const CampaignsInboxViewSkeleton: FC<CampaignsInboxViewSkeletonProps> = ({
 	containerHeight,
 	inboxSubtab,
 	onInboxSubtabChange,
+	noOuterPadding,
 }) => {
 	const showMessagesCampaignsToggle = Boolean(onInboxSubtabChange);
 	const searchBarRightOffset = showMessagesCampaignsToggle
 		? `${14 + MESSAGES_CAMPAIGNS_TOGGLE_WIDTH_PX + MESSAGES_CAMPAIGNS_TOGGLE_GAP_PX}px`
 		: '14px';
 
+	const outerPaddingClass = noOuterPadding ? 'px-0' : 'px-4';
+
 	return (
-		<div className="w-full max-w-[907px] mx-auto px-4 flex justify-center">
+		<div className={`w-full max-w-[907px] mx-auto ${outerPaddingClass} flex justify-center`}>
 			<div
 				className="relative flex flex-col items-center w-full max-w-[907px] overflow-hidden"
 				style={{
@@ -328,6 +342,8 @@ const getCreatedFillColor = (createdAt: Date): string => {
 export const CampaignsInboxView: FC<CampaignsInboxViewProps> = ({
 	hideSearchBar = false,
 	containerHeight,
+	containerWidthPx,
+	noOuterPadding = false,
 	inboxSubtab = 'campaigns',
 	onInboxSubtabChange,
 }) => {
@@ -358,13 +374,15 @@ export const CampaignsInboxView: FC<CampaignsInboxViewProps> = ({
 	// Track window width for responsive layout
 	useEffect(() => {
 		const handleResize = () => {
-			setIsNarrowLayout(window.innerWidth <= 880);
-			setHideVerticalDividers(window.innerWidth <= 602);
+			const width = containerWidthPx ?? window.innerWidth;
+			setIsNarrowLayout(width <= 880);
+			setHideVerticalDividers(width <= 602);
 		};
 		handleResize();
+		if (containerWidthPx != null) return;
 		window.addEventListener('resize', handleResize);
 		return () => window.removeEventListener('resize', handleResize);
-	}, []);
+	}, [containerWidthPx]);
 
 	// Clear timeouts on unmount
 	useEffect(() => {
@@ -446,12 +464,15 @@ export const CampaignsInboxView: FC<CampaignsInboxViewProps> = ({
 				containerHeight={resolvedContainerHeight}
 				inboxSubtab={inboxSubtab}
 				onInboxSubtabChange={onInboxSubtabChange}
+				noOuterPadding={noOuterPadding}
 			/>
 		);
 	}
 
+	const outerPaddingClass = noOuterPadding ? 'px-0' : 'px-4';
+
 	return (
-		<div className="w-full max-w-[907px] mx-auto px-4 flex justify-center">
+		<div className={`w-full max-w-[907px] mx-auto ${outerPaddingClass} flex justify-center`}>
 			<CustomScrollbar
 				className="flex flex-col items-center relative w-full max-w-[907px]"
 				contentClassName="flex flex-col items-center w-full"

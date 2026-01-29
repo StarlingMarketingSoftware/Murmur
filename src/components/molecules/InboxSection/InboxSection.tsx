@@ -1001,7 +1001,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 			<div className={`w-full flex justify-center ${outerPaddingClass}`}>
 				<div
 					data-campaign-main-box="inbox"
-					className="flex flex-col items-center space-y-2 overflow-y-auto overflow-x-hidden relative animate-pulse"
+					className={`flex flex-col items-center space-y-2 overflow-y-auto overflow-x-hidden relative ${isDashboardMode ? '' : 'animate-pulse'}`}
 					style={{
 						width: isMobile ? mobileBoxWidth : `${boxWidth}px`,
 						maxWidth: isMobile ? undefined : `${boxWidth}px`,
