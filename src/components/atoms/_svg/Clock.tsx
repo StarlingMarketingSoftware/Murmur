@@ -141,14 +141,15 @@ const Clock: React.FC<ClockProps> = ({
         fill="#000"
 
       />
-			<ClockHands
-				aria-hidden="true"
-				focusable="false"
-				className="clock-large-hands"
-				transform={clockHandsTransform}
-				minuteHandAngleDeg={minuteHandAngleDeg}
-				hourHandAngleDeg={hourHandAngleDeg}
-			/>
+			<g transform={clockHandsTransform}>
+				<ClockHands
+					aria-hidden="true"
+					focusable="false"
+					className="clock-large-hands"
+					minuteHandAngleDeg={minuteHandAngleDeg}
+					hourHandAngleDeg={hourHandAngleDeg}
+				/>
+			</g>
       <path
         d="M284.229 213.58c-1.29 0-3.008.43-3.438 1.719L267.899 263c-2.149.43-3.868 2.578-3.868 5.157 0 2.578.43 3.008 1.719 3.868l-65.32 244.521c0 1.289.429 3.008 1.719 3.438h.859c1.289 0 2.149-.86 2.579-2.149l65.75-244.521c2.148-.43 3.867-2.579 3.867-5.157 0-2.579-.43-3.008-1.719-3.868l12.892-47.271c0-1.289-.429-3.008-1.719-3.438h-.429z"
         fill="#000"
