@@ -1,10 +1,10 @@
-/* eslint-disable no-console */
 'use client';
 
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { useEffect, useRef, useState } from 'react';
-import { SignUp, useAuth } from '@clerk/nextjs';
+import { SignIn, SignUp, useAuth } from '@clerk/nextjs';
+import { useSearchParams } from 'next/navigation';
 import { urls } from '@/constants/urls';
 import { _fetch } from '@/utils';
 import { StripeEmbeddedCheckoutModal } from '@/components/organisms/StripeEmbeddedCheckoutModal';
@@ -13,17 +13,97 @@ import { StripeEmbeddedCheckoutModal } from '@/components/organisms/StripeEmbedd
 const SIGNUP_ZOOM = 2.2;
 const CHECKOUT_ZOOM = 4;
 
+const CLERK_CARD_FILL = '#6FCF84';
+const CLERK_CARD_STROKE = '#000000';
+const CLERK_CONTINUE_BUTTON_FILL = '#8E8E8E';
+const CLERK_CONTINUE_BUTTON_HOVER_FILL = '#808080';
+const CLERK_SOCIAL_BUTTON_FILL = '#ffffff';
+const CLERK_SOCIAL_BUTTON_HOVER_FILL = '#e6e6e6';
+
+const FREE_TRIAL_CLERK_APPEARANCE = {
+	variables: {
+		colorPrimary: CLERK_CARD_STROKE,
+		colorText: CLERK_CARD_STROKE,
+		colorTextSecondary: CLERK_CARD_STROKE,
+		// Note: Clerk uses this as a base background for some surfaces.
+		// We still explicitly set the card's background below to ensure the exact fill.
+		colorBackground: CLERK_CARD_FILL,
+	},
+	elements: {
+		// Put the stroke on the outer container so it wraps the footer too.
+		cardBox: {
+			boxShadow: 'none',
+			backgroundColor: CLERK_CARD_FILL,
+			border: `3px solid ${CLERK_CARD_STROKE}`,
+			borderRadius: '12px',
+			overflow: 'hidden',
+		},
+		card: {
+			boxShadow: 'none',
+			backgroundColor: 'transparent',
+			border: 'none',
+			borderRadius: 0,
+		},
+		headerTitle: { color: CLERK_CARD_STROKE },
+		headerSubtitle: { color: CLERK_CARD_STROKE },
+		formFieldLabel: { color: CLERK_CARD_STROKE },
+		formFieldInput: {
+			border: `2px solid ${CLERK_CARD_STROKE}`,
+			boxShadow: 'none',
+			backgroundColor: '#ffffff',
+			color: CLERK_CARD_STROKE,
+		},
+		// Use a class so we can control :hover (Clerk adds a green-ish hover by default).
+		// The base styles are applied via CSS below.
+		socialButtonsBlockButton: 'free-trial-clerk-social-button',
+		dividerLine: { backgroundColor: CLERK_CARD_STROKE },
+		dividerText: { color: CLERK_CARD_STROKE },
+		footerActionLink: { color: CLERK_CARD_STROKE },
+		// Use a class so we can neutralize gradients/pseudo-elements with CSS.
+		formButtonPrimary: 'free-trial-clerk-primary-button',
+	},
+} as const;
+
 export default function FreeTrialPage() {
 	const mapContainerRef = useRef<HTMLDivElement | null>(null);
 	const mapRef = useRef<mapboxgl.Map | null>(null);
 	const checkoutAttemptKeyRef = useRef<string | null>(null);
 	const { isLoaded, isSignedIn, userId } = useAuth();
+	const searchParams = useSearchParams();
 	const [clientSecret, setClientSecret] = useState<string | null>(null);
 	const [checkoutError, setCheckoutError] = useState<string | null>(null);
 	const [checkoutLoadingText, setCheckoutLoadingText] = useState<string>('Preparing checkout…');
 	const [, setIsCreatingCheckoutSession] = useState(false);
 
 	const freeTrialPriceId = process.env.NEXT_PUBLIC_STANDARD_MONTHLY_PRICE_ID;
+	const authMode = searchParams.get('auth');
+	const showSignIn = authMode === 'sign-in';
+
+	// Use a popup OAuth flow on desktop so the account chooser doesn't take over the page.
+	// On mobile/touch devices, use full-page redirects because popups are often blocked or unusable.
+	const oauthFlow: 'redirect' | 'popup' = (() => {
+		if (typeof window === 'undefined') return 'popup';
+		if (typeof window.matchMedia !== 'function') return 'popup';
+
+		// Tailwind md breakpoint. Use it only in combination with `hover: none` to avoid treating
+		// narrow desktop windows as "mobile".
+		const isSmallScreen = window.matchMedia('(max-width: 767px)').matches;
+		const hasNoHover = window.matchMedia('(hover: none)').matches;
+		const hasCoarsePointer = window.matchMedia('(pointer: coarse)').matches;
+
+		const isProbablyMobile = hasNoHover && (hasCoarsePointer || isSmallScreen);
+		return isProbablyMobile ? 'redirect' : 'popup';
+	})();
+
+	const buildAuthUrl = (mode: 'sign-in' | 'sign-up') => {
+		const nextParams = new URLSearchParams(searchParams.toString());
+		nextParams.set('auth', mode);
+		const queryString = nextParams.toString();
+		return queryString ? `${urls.freeTrial.index}?${queryString}` : urls.freeTrial.index;
+	};
+
+	const signInUrl = buildAuthUrl('sign-in');
+	const signUpUrl = buildAuthUrl('sign-up');
 
 	useEffect(() => {
 		if (!isLoaded) return;
@@ -277,23 +357,31 @@ export default function FreeTrialPage() {
 					/>
 				)}
 				{isLoaded && !isSignedIn && (
-					<div className="absolute inset-0 flex items-center justify-center bg-transparent pointer-events-none">
-						<div className="pointer-events-auto">
-							<SignUp
-								routing="virtual"
-								signInUrl={urls.signIn.index}
-								forceRedirectUrl={urls.freeTrial.index}
-								fallbackRedirectUrl={urls.freeTrial.index}
-								signInForceRedirectUrl={urls.freeTrial.index}
-								signInFallbackRedirectUrl={urls.freeTrial.index}
-								appearance={{
-									elements: {
-										cardBox: { boxShadow: 'none' },
-										card: { boxShadow: 'none' },
-										formButtonPrimary: 'bg-black hover:bg-gray-800 text-sm normal-case',
-									},
-								}}
-							/>
+					<div className="absolute inset-0 z-50 flex flex-col overflow-y-auto bg-transparent pointer-events-auto">
+						<div className="m-auto p-4">
+							{showSignIn ? (
+								<SignIn
+									routing="hash"
+									oauthFlow={oauthFlow}
+									signUpUrl={signUpUrl}
+									forceRedirectUrl={urls.freeTrial.index}
+									fallbackRedirectUrl={urls.freeTrial.index}
+									signUpForceRedirectUrl={urls.freeTrial.index}
+									signUpFallbackRedirectUrl={urls.freeTrial.index}
+									appearance={FREE_TRIAL_CLERK_APPEARANCE}
+								/>
+							) : (
+								<SignUp
+									routing="hash"
+									oauthFlow={oauthFlow}
+									signInUrl={signInUrl}
+									forceRedirectUrl={urls.freeTrial.index}
+									fallbackRedirectUrl={urls.freeTrial.index}
+									signInForceRedirectUrl={urls.freeTrial.index}
+									signInFallbackRedirectUrl={urls.freeTrial.index}
+									appearance={FREE_TRIAL_CLERK_APPEARANCE}
+								/>
+							)}
 						</div>
 					</div>
 				)}
@@ -306,6 +394,63 @@ export default function FreeTrialPage() {
 				.free-trial-map .mapboxgl-ctrl-attrib {
 					display: none !important;
 				}
+			}
+
+			/* Clerk: force a truly flat primary button (no gradients/overlays). */
+			.free-trial-clerk-primary-button,
+			.free-trial-clerk-primary-button:focus,
+			.free-trial-clerk-primary-button:active {
+				background: ${CLERK_CONTINUE_BUTTON_FILL} !important;
+				background-image: none !important;
+				box-shadow: none !important;
+				filter: none !important;
+				border: 2px solid ${CLERK_CARD_STROKE} !important;
+				color: #ffffff !important;
+				text-shadow: none !important;
+				text-transform: none !important;
+			}
+
+			.free-trial-clerk-primary-button:hover {
+				background: ${CLERK_CONTINUE_BUTTON_HOVER_FILL} !important;
+				background-image: none !important;
+				box-shadow: none !important;
+				filter: none !important;
+			}
+
+			.free-trial-clerk-primary-button::before,
+			.free-trial-clerk-primary-button::after {
+				background: none !important;
+				background-image: none !important;
+				box-shadow: none !important;
+				filter: none !important;
+			}
+
+			/* Clerk: keep social buttons neutral on hover (no green tint). */
+			.free-trial-clerk-social-button,
+			.free-trial-clerk-social-button:focus,
+			.free-trial-clerk-social-button:active {
+				background: ${CLERK_SOCIAL_BUTTON_FILL} !important;
+				background-image: none !important;
+				box-shadow: none !important;
+				filter: none !important;
+				border: 2px solid ${CLERK_CARD_STROKE} !important;
+				color: ${CLERK_CARD_STROKE} !important;
+				text-shadow: none !important;
+			}
+
+			.free-trial-clerk-social-button:hover {
+				background: ${CLERK_SOCIAL_BUTTON_HOVER_FILL} !important;
+				background-image: none !important;
+				box-shadow: none !important;
+				filter: none !important;
+			}
+
+			.free-trial-clerk-social-button::before,
+			.free-trial-clerk-social-button::after {
+				background: none !important;
+				background-image: none !important;
+				box-shadow: none !important;
+				filter: none !important;
 			}
 		`}</style>
 		</div>

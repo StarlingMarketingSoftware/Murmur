@@ -1,4 +1,4 @@
-import { FC, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { FC, type CSSProperties, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Card, CardHeader, CardContent, CardTitle } from '@/components/ui/card';
 import { Spinner } from '@/components/atoms/Spinner/Spinner';
 import CustomTable from '../../../molecules/CustomTable/CustomTable';
@@ -6,6 +6,7 @@ import { useCampaignsTable } from './useCampaignsTable';
 import { X } from 'lucide-react';
 import { Campaign } from '@prisma/client';
 import { useIsMobile } from '@/hooks/useIsMobile';
+import { cn } from '@/utils';
 
 export const CampaignsTable: FC = () => {
 	// Treat all mobile orientations (portrait and landscape) as mobile for this table
@@ -73,6 +74,24 @@ export const CampaignsTable: FC = () => {
 		handleDeleteClick,
 		confirmingCampaignId,
 	} = useCampaignsTable({ compactMetrics: shouldUseCompactMetrics });
+
+	const metricsSkeletonContainerClassName = cn(
+		'metrics-grid-container w-full items-center text-left',
+		shouldUseCompactMetrics
+			? 'flex flex-nowrap gap-[7px] justify-start'
+			: 'flex flex-nowrap justify-start'
+	);
+	const metricsSkeletonContainerStyle: CSSProperties | undefined = shouldUseCompactMetrics
+		? undefined
+		: { gap: 'var(--campaign-metric-gap, 32px)' };
+	const metricSlotClassName = cn(
+		'campaign-metric-slot relative flex items-center',
+		shouldUseCompactMetrics
+			? 'w-auto flex-shrink-0 justify-start'
+			: 'h-[20px] w-[94px] flex-none justify-center'
+	);
+	const metricBoxSkeletonClassName =
+		'metric-box inline-flex items-center justify-center border border-[#8C8C8C] leading-none truncate h-[20px] w-[92px] min-w-[92px] max-w-[92px] rounded-[6px] px-0 flex-none bg-black/10 animate-pulse';
 
 	// No orientation gating; we rely on device detection so landscape uses mobile layout too
 
@@ -360,6 +379,55 @@ export const CampaignsTable: FC = () => {
 								containerClassName="my-campaigns-table mobile-table-no-scroll !bg-[#EDEDED]"
 								headerClassName="[&_tr]:!bg-[#EDEDED] [&_th]:!bg-[#EDEDED] [&_th]:!border-b-[#EDEDED] [&_th]:relative [&_th]:!overflow-visible"
 								rowClassName="!bg-[#EDEDED] !border-b-[#EDEDED] hover:!bg-[#E0E0E0] transition-colors duration-200"
+											renderLoadingCell={({ column }) => {
+												if (column.id === 'metrics') {
+													return (
+														<div
+															className={metricsSkeletonContainerClassName}
+															style={metricsSkeletonContainerStyle}
+														>
+															<div className={metricSlotClassName}>
+																<div
+																	data-draft-fill="skeleton"
+																	className={metricBoxSkeletonClassName}
+																/>
+															</div>
+															<div className={metricSlotClassName}>
+																<div
+																	data-sent-fill="skeleton"
+																	className={metricBoxSkeletonClassName}
+																/>
+															</div>
+															<div className={metricSlotClassName}>
+																<div
+																	data-updated-fill="skeleton"
+																	className={metricBoxSkeletonClassName}
+																/>
+															</div>
+															<div className={metricSlotClassName}>
+																<div
+																	data-created-fill="skeleton"
+																	className={metricBoxSkeletonClassName}
+																/>
+															</div>
+														</div>
+													);
+												}
+
+												if (column.id === 'delete') {
+													return (
+														<div className="flex justify-end">
+															<div className="h-[20px] w-[20px] rounded-[4px] bg-black/10 animate-pulse" />
+														</div>
+													);
+												}
+
+												return (
+													<div className="flex items-center">
+														<div className="h-[16px] w-[70%] rounded bg-black/10 animate-pulse" />
+													</div>
+												);
+											}}
 											handleRowClick={handleRowClick}
 											columns={
 												shouldUseExternalDeleteColumn
@@ -425,6 +493,55 @@ export const CampaignsTable: FC = () => {
 								}`}
 								headerClassName="[&_tr]:!bg-white [&_th]:!bg-white [&_th]:!border-0 [&_th]:!h-[28px] [&_tr]:!h-[28px] [&_th:first-child]:rounded-tl-[4px] [&_th:last-child]:rounded-tr-[4px] [&_th]:relative [&_th]:!overflow-visible"
 								rowClassName="!bg-[#EDEDED] !border-0 hover:!bg-[#E0E0E0] transition-colors duration-200"
+								renderLoadingCell={({ column }) => {
+									if (column.id === 'metrics') {
+										return (
+											<div
+												className={metricsSkeletonContainerClassName}
+												style={metricsSkeletonContainerStyle}
+											>
+												<div className={metricSlotClassName}>
+													<div
+														data-draft-fill="skeleton"
+														className={metricBoxSkeletonClassName}
+													/>
+												</div>
+												<div className={metricSlotClassName}>
+													<div
+														data-sent-fill="skeleton"
+														className={metricBoxSkeletonClassName}
+													/>
+												</div>
+												<div className={metricSlotClassName}>
+													<div
+														data-updated-fill="skeleton"
+														className={metricBoxSkeletonClassName}
+													/>
+												</div>
+												<div className={metricSlotClassName}>
+													<div
+														data-created-fill="skeleton"
+														className={metricBoxSkeletonClassName}
+													/>
+												</div>
+											</div>
+										);
+									}
+
+									if (column.id === 'delete') {
+										return (
+											<div className="flex justify-end">
+												<div className="h-[20px] w-[20px] rounded-[4px] bg-black/10 animate-pulse" />
+											</div>
+										);
+									}
+
+									return (
+										<div className="flex items-center">
+											<div className="h-[16px] w-[70%] rounded bg-black/10 animate-pulse" />
+										</div>
+									);
+								}}
 								handleRowClick={handleRowClick}
 								columns={columns}
 								data={data}

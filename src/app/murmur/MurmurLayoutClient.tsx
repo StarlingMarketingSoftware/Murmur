@@ -1,17 +1,30 @@
 'use client';
 import { useEffect } from 'react';
 import { useIsMobile } from '@/hooks/useIsMobile';
-import { useAuth, UserButton, SignInButton } from '@clerk/nextjs';
+import { useAuth, useUser, UserButton, SignInButton } from '@clerk/nextjs';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { urls } from '@/constants/urls';
 import HomeIcon from '@/components/atoms/_svg/HomeIcon';
+import { OutlinedInitialAvatar } from '@/components/atoms/OutlinedInitialAvatar/OutlinedInitialAvatar';
 
 export default function MurmurLayoutClient({ children }: { children: React.ReactNode }) {
 	const { isSignedIn } = useAuth();
+	const { user } = useUser();
 	const pathname = usePathname();
 	const isDashboard = pathname === urls.murmur.dashboard.index;
 	const showHomeButton = !isDashboard;
+	const isDashboardOrCampaign =
+		pathname === urls.murmur.dashboard.index ||
+		pathname === urls.murmur.campaign.index ||
+		pathname.startsWith(`${urls.murmur.campaign.index}/`);
+
+	const outlinedInitial =
+		(user?.firstName?.trim()?.[0] ||
+			user?.lastName?.trim()?.[0] ||
+			user?.primaryEmailAddress?.emailAddress?.trim()?.[0] ||
+			user?.username?.trim()?.[0] ||
+			'')?.toUpperCase() ?? '';
 	// Hide footer for murmur pages and apply animations
 	useEffect(() => {
 		document.body.classList.add('murmur-page');
@@ -65,18 +78,37 @@ export default function MurmurLayoutClient({ children }: { children: React.React
 			<div
 				className={`clerk-user-button fixed top-3 z-50 ${
 					isMobile && showHomeButton ? 'right-12' : 'right-4'
-				}`}
+				} ${isDashboardOrCampaign && !isMobile ? 'pt-3 pr-4' : ''}`}
 			>
 				{isSignedIn ? (
-					<UserButton
-						appearance={{
-							elements: {
-								avatarBox: 'w-7 h-7 ring-1 ring-black/10',
-								userButtonTrigger:
-									'opacity-80 hover:opacity-100 transition-opacity duration-300',
-							},
-						}}
-					/>
+					isDashboardOrCampaign ? (
+						<div className="group relative w-7 h-7 cursor-pointer">
+							<OutlinedInitialAvatar
+								initial={outlinedInitial}
+								className="pointer-events-none absolute inset-0 w-7 h-7 group-hover:border-black group-hover:text-black group-focus-within:border-black group-focus-within:text-black group-active:border-black group-active:text-black"
+							/>
+							<div className="absolute inset-0 opacity-0">
+								<UserButton
+									appearance={{
+										elements: {
+											avatarBox: 'w-7 h-7',
+											userButtonTrigger: 'w-7 h-7 p-0',
+										},
+									}}
+								/>
+							</div>
+						</div>
+					) : (
+						<UserButton
+							appearance={{
+								elements: {
+									avatarBox: 'w-7 h-7 ring-1 ring-black/10',
+									userButtonTrigger:
+										'opacity-80 hover:opacity-100 transition-opacity duration-300',
+								},
+							}}
+						/>
+					)
 				) : (
 					<SignInButton mode="modal">
 						<button className="px-3 py-1.5 text-[12px] font-medium tracking-[0.02em] text-gray-700 hover:text-gray-900 transition-all duration-300">

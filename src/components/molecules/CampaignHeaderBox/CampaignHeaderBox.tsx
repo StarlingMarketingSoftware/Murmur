@@ -208,6 +208,9 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 	const [isHoverDescriptionVisible, setIsHoverDescriptionVisible] = useState(false);
 	const hoverDescriptionTimeoutRef = useRef<number | null>(null);
 
+	// Track which metric box is hovered for chrome-style animation
+	const [hoveredMetric, setHoveredMetric] = useState<'contacts' | 'drafts' | 'sent' | null>(null);
+
 	const { mutate: editCampaign } = useEditCampaign({
 		suppressToasts: true,
 		onSuccess: () => {
@@ -443,51 +446,90 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 			{/* Spacer below To/From */}
 			<div className="flex-1" />
 
-			{/* Metrics Row */}
-			<div className={cn('flex items-center -mt-[6px]', fullWidth ? 'gap-[10px]' : 'gap-[20px]')}>
-				<button
-					type="button"
-					onClick={onContactsClick}
-					className="inline-flex items-center justify-center rounded-[8px] border border-black leading-none truncate font-inter font-semibold cursor-pointer hover:brightness-95 transition-all"
+		{/* Metrics Row */}
+		<div
+			className={cn('flex items-center -mt-[6px]', fullWidth ? 'gap-[10px]' : 'gap-[20px]')}
+			onMouseLeave={() => setHoveredMetric(null)}
+		>
+			<button
+				type="button"
+				onClick={onContactsClick}
+				onMouseEnter={() => setHoveredMetric('contacts')}
+				className="inline-flex items-center justify-center rounded-[8px] border border-black leading-none truncate font-inter font-semibold cursor-pointer hover:brightness-95"
+				style={{
+					backgroundColor:
+						hoveredMetric !== null && hoveredMetric !== 'contacts'
+							? '#FFFFFF'
+							: getContactsFillColor(),
+					borderWidth: '1px',
+					width: '80px',
+					height: '15px',
+					fontSize: '10px',
+					transition: 'background-color 0.6s cubic-bezier(0.22, 1, 0.36, 1)',
+				}}
+			>
+				<span
 					style={{
-						backgroundColor: getContactsFillColor(),
-						borderWidth: '1px',
-						width: '80px',
-						height: '15px',
-						fontSize: '10px',
+						opacity: hoveredMetric !== null && hoveredMetric !== 'contacts' ? 0 : 1,
+						transition: 'opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1)',
 					}}
 				>
 					{`${String(contactsCount).padStart(2, '0')} Contacts`}
-				</button>
-				<button
-					type="button"
-					onClick={onDraftsClick}
-					className="inline-flex items-center justify-center rounded-[8px] border border-black leading-none truncate font-inter font-semibold cursor-pointer hover:brightness-95 transition-all"
+				</span>
+			</button>
+			<button
+				type="button"
+				onClick={onDraftsClick}
+				onMouseEnter={() => setHoveredMetric('drafts')}
+				className="inline-flex items-center justify-center rounded-[8px] border border-black leading-none truncate font-inter font-semibold cursor-pointer hover:brightness-95"
+				style={{
+					backgroundColor:
+						hoveredMetric !== null && hoveredMetric !== 'drafts'
+							? '#FFFFFF'
+							: getDraftFillColor(),
+					borderWidth: '1px',
+					width: '80px',
+					height: '15px',
+					fontSize: '10px',
+					transition: 'background-color 0.6s cubic-bezier(0.22, 1, 0.36, 1)',
+				}}
+			>
+				<span
 					style={{
-						backgroundColor: getDraftFillColor(),
-						borderWidth: '1px',
-						width: '80px',
-						height: '15px',
-						fontSize: '10px',
+						opacity: hoveredMetric !== null && hoveredMetric !== 'drafts' ? 0 : 1,
+						transition: 'opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1)',
 					}}
 				>
 					{draftCount === 0 ? 'Drafts' : `${String(draftCount).padStart(2, '0')} Drafts`}
-				</button>
-				<button
-					type="button"
-					onClick={onSentClick}
-					className="inline-flex items-center justify-center rounded-[8px] border border-black leading-none truncate font-inter font-semibold cursor-pointer hover:brightness-95 transition-all"
+				</span>
+			</button>
+			<button
+				type="button"
+				onClick={onSentClick}
+				onMouseEnter={() => setHoveredMetric('sent')}
+				className="inline-flex items-center justify-center rounded-[8px] border border-black leading-none truncate font-inter font-semibold cursor-pointer hover:brightness-95"
+				style={{
+					backgroundColor:
+						hoveredMetric !== null && hoveredMetric !== 'sent'
+							? '#FFFFFF'
+							: getSentFillColor(),
+					borderWidth: '1px',
+					width: '80px',
+					height: '15px',
+					fontSize: '10px',
+					transition: 'background-color 0.6s cubic-bezier(0.22, 1, 0.36, 1)',
+				}}
+			>
+				<span
 					style={{
-						backgroundColor: getSentFillColor(),
-						borderWidth: '1px',
-						width: '80px',
-						height: '15px',
-						fontSize: '10px',
+						opacity: hoveredMetric !== null && hoveredMetric !== 'sent' ? 0 : 1,
+						transition: 'opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1)',
 					}}
 				>
 					{sentCount === 0 ? 'Sent' : `${String(sentCount).padStart(2, '0')} Sent`}
-				</button>
-			</div>
+				</span>
+			</button>
+		</div>
 		</div>
 	);
 };
