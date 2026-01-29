@@ -929,9 +929,21 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 										</div>
 									) : (
 										/* Normal view: 4-row layout */
-										<div className={cn("grid grid-cols-1 grid-rows-4 h-full pl-[22px]", isAllTab ? "pr-[170px]" : "pr-[180px]")}>
+										<div
+											className={cn(
+												"grid grid-cols-1 grid-rows-4 h-full pl-[22px]",
+												// In the All tab, only the top rows need to reserve space for the fixed
+												// top-right badges. Subject/body should be able to use the full right side.
+												isAllTab ? "pr-2" : "pr-[180px]"
+											)}
+										>
 											{/* Row 1: Name */}
-											<div className="row-start-1 col-start-1 flex items-center h-[16px] max-[480px]:h-[12px]">
+											<div
+												className={cn(
+													"row-start-1 col-start-1 flex items-center h-[16px] max-[480px]:h-[12px]",
+													isAllTab && "pr-[170px]"
+												)}
+											>
 												<div
 													className="font-bold text-[11px] leading-none whitespace-nowrap overflow-hidden w-full pr-2"
 													style={{
@@ -952,7 +964,12 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 														(contact?.lastName && contact.lastName.trim())
 												);
 												return (
-													<div className="row-start-2 col-start-1 flex items-center h-[16px] max-[480px]:h-[12px]">
+													<div
+														className={cn(
+															"row-start-2 col-start-1 flex items-center h-[16px] max-[480px]:h-[12px]",
+															isAllTab && "pr-[170px]"
+														)}
+													>
 														<div
 															className="text-[11px] text-black leading-none whitespace-nowrap overflow-hidden w-full pr-2"
 															style={{
@@ -968,9 +985,17 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 												);
 											})()}
 											{/* Row 3: Subject */}
-											<div className="row-start-3 col-span-1 flex items-center h-[16px] max-[480px]:h-[12px] max-[480px]:items-start max-[480px]:-mt-[2px] mt-[4px]">
+											<div
+												className={cn(
+													"row-start-3 col-span-1 flex items-start h-[16px] max-[480px]:h-[12px] max-[480px]:items-start max-[480px]:-mt-[2px]",
+													isAllTab ? "pt-[5px]" : "mt-[4px]"
+												)}
+											>
 												<div
-													className="text-[10px] text-black leading-none whitespace-nowrap overflow-hidden w-full pr-2"
+													className={cn(
+														"text-black leading-none whitespace-nowrap overflow-hidden w-full pr-2 font-bold",
+														isAllTab ? "text-[9px]" : "text-[10px]"
+													)}
 													style={{
 														WebkitMaskImage:
 															'linear-gradient(90deg, #000 96%, transparent 100%)',
@@ -982,9 +1007,17 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 												</div>
 											</div>
 											{/* Row 4: Message preview */}
-											<div className="row-start-4 col-span-1 flex items-center h-[16px] max-[480px]:h-[12px]">
+											<div
+												className={cn(
+													"row-start-4 col-span-1 flex items-start h-[16px] max-[480px]:h-[12px]",
+													isAllTab && "pt-[2px]"
+												)}
+											>
 												<div
-													className="text-[10px] text-gray-500 leading-none whitespace-nowrap overflow-hidden w-full pr-2"
+													className={cn(
+														"text-gray-500 leading-none whitespace-nowrap overflow-hidden w-full pr-2",
+														isAllTab ? "text-[9px]" : "text-[10px]"
+													)}
 													style={{
 														WebkitMaskImage:
 															'linear-gradient(90deg, #000 96%, transparent 100%)',
