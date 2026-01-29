@@ -2226,7 +2226,7 @@ const Murmur = () => {
 						{/* Left box - 124 x 42px, 30px to the left of search box */}
 						<div
 							data-slot="campaign-left-box"
-							className="pointer-events-auto absolute right-full top-0 mr-[30px] w-[124px] h-[42px] box-border border border-[#929292] rounded-[10px] overflow-hidden flex items-center justify-center gap-[33px]"
+							className="pointer-events-auto absolute right-full top-0 mr-[30px] w-[124px] h-[42px] box-border border border-[#929292] hover:border-black focus-within:border-black rounded-[10px] overflow-hidden flex items-center justify-center gap-[33px] transition-colors duration-150"
 						>
 							<button
 								ref={topCampaignsFolderButtonRef}
