@@ -85,10 +85,14 @@ export default function FreeTrialPage() {
 		if (typeof window === 'undefined') return 'popup';
 		if (typeof window.matchMedia !== 'function') return 'popup';
 
-		const isMobileScreen = window.matchMedia('(max-width: 767px)').matches; // Tailwind md breakpoint
-		const isTouchDevice = window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+		// Tailwind md breakpoint. Use it only in combination with `hover: none` to avoid treating
+		// narrow desktop windows as "mobile".
+		const isSmallScreen = window.matchMedia('(max-width: 767px)').matches;
+		const hasNoHover = window.matchMedia('(hover: none)').matches;
+		const hasCoarsePointer = window.matchMedia('(pointer: coarse)').matches;
 
-		return isMobileScreen || isTouchDevice ? 'redirect' : 'popup';
+		const isProbablyMobile = hasNoHover && (hasCoarsePointer || isSmallScreen);
+		return isProbablyMobile ? 'redirect' : 'popup';
 	})();
 
 	const buildAuthUrl = (mode: 'sign-in' | 'sign-up') => {
