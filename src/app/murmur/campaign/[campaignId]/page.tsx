@@ -2386,6 +2386,10 @@ const Murmur = () => {
 										desktopHeight={DASHBOARD_INBOX_POPUP_HEIGHT_PX}
 										noOuterPadding
 										dashboardMode
+										scrollbarThumbColor="#FFFFFF"
+										scrollbarOffsetRight={8}
+										scrollbarAlignTrackToScrollContainer
+										emailRowHoverClassName="hover:bg-[#E8E8E8]"
 										inboxSubtab={dashboardInboxSubtab}
 										onInboxSubtabChange={setDashboardInboxSubtab}
 									/>

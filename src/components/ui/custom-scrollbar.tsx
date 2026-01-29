@@ -20,6 +20,12 @@ interface CustomScrollbarProps
 	alwaysShow?: boolean;
 	/** When true, do not apply the Tailwind overflow-y-auto class to the inner container. */
 	disableOverflowClass?: boolean;
+	/**
+	 * When true, vertically align the track to the internal scroll container.
+	 * Useful when the outer wrapper has padding (e.g., space reserved for a header)
+	 * and the scrollbar should start at the top of the scrollable "grid" area.
+	 */
+	alignTrackToScrollContainer?: boolean;
 	onScroll?: (event: React.UIEvent<HTMLDivElement>) => void;
 	/** When true, fall back to the native browser scrollbar. */
 	nativeScroll?: boolean;
@@ -38,6 +44,7 @@ export function CustomScrollbar({
 	contentClassName,
 	alwaysShow = false,
 	disableOverflowClass = false,
+	alignTrackToScrollContainer = false,
 	onScroll,
 	nativeScroll = false,
 	lockHorizontalScroll = false,
@@ -48,6 +55,8 @@ export function CustomScrollbar({
 	const scrollThumbRef = useRef<HTMLDivElement>(null);
 	const [thumbHeight, setThumbHeight] = useState(0);
 	const [thumbTop, setThumbTop] = useState(0);
+	const [trackTop, setTrackTop] = useState(0);
+	const [trackHeight, setTrackHeight] = useState(0);
 	const [isDragging, setIsDragging] = useState(false);
 	const [dragStartY, setDragStartY] = useState(0);
 	const [scrollStartY, setScrollStartY] = useState(0);
@@ -58,6 +67,13 @@ export function CustomScrollbar({
 
 		const { scrollTop, scrollHeight, clientHeight } = container;
 		const scrollRatio = clientHeight / scrollHeight;
+
+		if (alignTrackToScrollContainer) {
+			const nextTrackTop = container.offsetTop;
+			const nextTrackHeight = clientHeight;
+			setTrackTop((prev) => (prev === nextTrackTop ? prev : nextTrackTop));
+			setTrackHeight((prev) => (prev === nextTrackHeight ? prev : nextTrackHeight));
+		}
 
 		// Hide scrollbar if content doesn't overflow
 		if (scrollRatio >= 1) {
@@ -78,7 +94,7 @@ export function CustomScrollbar({
 
 		setThumbHeight(calculatedThumbHeight);
 		setThumbTop(thumbPosition);
-	}, [alwaysShow]);
+	}, [alwaysShow, alignTrackToScrollContainer]);
 
 	const handleScroll = useCallback(() => {
 		updateScrollbar();
@@ -125,7 +141,7 @@ export function CustomScrollbar({
 		const maxScrollTop = scrollHeight - clientHeight;
 
 		// Calculate target scroll position
-		const targetRatio = clickY / clientHeight;
+		const targetRatio = rect.height ? clickY / rect.height : 0;
 		container.scrollTop = targetRatio * maxScrollTop;
 	}, []);
 
@@ -259,6 +275,8 @@ export function CustomScrollbar({
 						width: `${thumbWidth}px`,
 						backgroundColor: trackColor,
 						right: `${offsetRight}px`,
+						top: alignTrackToScrollContainer ? `${trackTop}px` : undefined,
+						height: alignTrackToScrollContainer ? `${trackHeight}px` : undefined,
 						zIndex: 50,
 					}}
 					onClick={handleTrackClick}

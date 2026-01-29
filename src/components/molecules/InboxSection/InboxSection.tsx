@@ -191,6 +191,23 @@ interface InboxSectionProps {
 	 * - **dashboard**: dashboard inbox tab skeleton (no top "window chrome")
 	 */
 	loadingVariant?: 'default' | 'dashboard';
+
+	/**
+	 * Optional Tailwind class override for the email row hover background in the
+	 * list view (e.g. `hover:bg-[#E8E8E8]`). Defaults to `hover:bg-gray-50`.
+	 *
+	 * This is intended for the campaign-page inbox dropdown so we can match
+	 * Figma without affecting other inbox views.
+	 */
+	emailRowHoverClassName?: string;
+
+	/**
+	 * Optional custom scrollbar overrides (used by the campaign-page inbox dropdown).
+	 * Defaults preserve the existing "outside + dark thumb" behavior.
+	 */
+	scrollbarThumbColor?: string;
+	scrollbarOffsetRight?: number;
+	scrollbarAlignTrackToScrollContainer?: boolean;
 }
 
 /**
@@ -607,6 +624,10 @@ export const InboxSection: FC<InboxSectionProps> = ({
 	onInboxSubtabChange,
 	dashboardMode = false,
 	loadingVariant = 'default',
+	emailRowHoverClassName = 'hover:bg-gray-50',
+	scrollbarThumbColor = '#000000',
+	scrollbarOffsetRight = -6,
+	scrollbarAlignTrackToScrollContainer = false,
 }) => {
 	const detectedIsMobile = useIsMobile();
 	const isMobile = forceDesktopLayout ? false : Boolean(detectedIsMobile);
@@ -1248,9 +1269,10 @@ export const InboxSection: FC<InboxSectionProps> = ({
 						}`}
 						contentClassName="flex flex-col items-center w-full space-y-2"
 						thumbWidth={2}
-						thumbColor="#000000"
+						thumbColor={scrollbarThumbColor}
 						trackColor="transparent"
-						offsetRight={-6}
+						offsetRight={scrollbarOffsetRight}
+						alignTrackToScrollContainer={scrollbarAlignTrackToScrollContainer}
 						disableOverflowClass
 						lockHorizontalScroll
 						style={loadingContainerStyle}
@@ -1742,9 +1764,10 @@ export const InboxSection: FC<InboxSectionProps> = ({
 				className="flex flex-col items-center relative"
 				contentClassName="flex flex-col items-center w-full"
 				thumbWidth={2}
-				thumbColor="#000000"
+				thumbColor={scrollbarThumbColor}
 				trackColor="transparent"
-				offsetRight={-6}
+				offsetRight={scrollbarOffsetRight}
+				alignTrackToScrollContainer={scrollbarAlignTrackToScrollContainer}
 				disableOverflowClass
 				style={{
 					width: isMobile ? mobileBoxWidth : `${boxWidth}px`,
@@ -2160,9 +2183,10 @@ export const InboxSection: FC<InboxSectionProps> = ({
 								className="flex-1 w-full min-h-0"
 								contentClassName={`flex flex-col ${isMobile ? 'pb-[14px]' : 'pb-[18px]'}`}
 								thumbWidth={2}
-								thumbColor="#000000"
+								thumbColor={scrollbarThumbColor}
 								trackColor="transparent"
-								offsetRight={-6}
+								offsetRight={scrollbarOffsetRight}
+								alignTrackToScrollContainer={scrollbarAlignTrackToScrollContainer}
 								disableOverflowClass
 								lockHorizontalScroll
 							>
@@ -2352,14 +2376,13 @@ export const InboxSection: FC<InboxSectionProps> = ({
 						{visibleEmails.map((email) => (
 							<div
 								key={email.id}
-								className="bg-white hover:bg-gray-50 cursor-pointer px-4 flex items-center mb-2 w-full max-[480px]:px-2"
+								className={`bg-white ${emailRowHoverClassName} cursor-pointer px-4 flex items-center mb-2 w-full max-[480px]:px-2`}
 								style={{
 									width: isMobile ? mobileEmailRowWidth : `${emailRowWidth}px`,
 									height: isMobile ? '100px' : '78px',
 									minHeight: isMobile ? '100px' : '78px',
 									border: '3px solid #000000',
 									borderRadius: '8px',
-									backgroundColor: '#FFFFFF',
 								}}
 								onClick={() => {
 									setSelectedEmailId(email.id);

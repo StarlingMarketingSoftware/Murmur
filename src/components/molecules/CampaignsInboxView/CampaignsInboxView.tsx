@@ -525,9 +525,10 @@ export const CampaignsInboxView: FC<CampaignsInboxViewProps> = ({
 				className="flex flex-col items-center relative w-full max-w-[907px]"
 				contentClassName="flex flex-col items-center w-full"
 				thumbWidth={2}
-				thumbColor="#000000"
+				thumbColor={isCampaignPageInboxVariant ? '#FFFFFF' : '#000000'}
 				trackColor="transparent"
-				offsetRight={-6}
+				offsetRight={isCampaignPageInboxVariant ? 8 : -6}
+				alignTrackToScrollContainer={isCampaignPageInboxVariant}
 				disableOverflowClass
 				style={{
 					height: resolvedContainerHeight,
