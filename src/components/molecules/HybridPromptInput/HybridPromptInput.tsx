@@ -5410,18 +5410,20 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 												{/* Left section (Font) - custom dropdown to avoid Radix zoom issues */}
 												<div 
 													ref={fontDropdownRef}
-													className="w-[109px] h-full flex items-center pl-[16px] pr-0 relative"
+													className="w-[109px] h-full flex items-center pl-[8px] pr-0 relative"
 												>
 													{/* Custom font trigger button */}
 													<button
 														type="button"
 														onClick={() => setIsFontDropdownOpen(!isFontDropdownOpen)}
 														className={cn(
-															'w-full h-full flex items-center',
-															'bg-transparent border-0 shadow-none rounded-none',
-															'px-0 py-0 relative cursor-pointer',
+															'h-[24px] flex items-center',
+															'bg-transparent border-0 shadow-none rounded-[4px]',
+															'pl-[8px] pr-[6px] relative cursor-pointer',
 															'font-inter font-normal text-[14px] leading-none text-black',
-															'hover:bg-transparent focus:bg-transparent focus:outline-none'
+															'transition-[background-color,transform] duration-[80ms] ease-out',
+															'hover:bg-[#c9d4e8] hover:scale-[1.01] active:scale-100 focus:outline-none',
+															isFontDropdownOpen && 'bg-[#c9d4e8]'
 														)}
 														style={{
 															fontFamily: form.watch('font') || DEFAULT_FONT,
@@ -5430,10 +5432,10 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														aria-expanded={isFontDropdownOpen}
 													>
 	<div
-		className="flex-1 flex items-center justify-center min-w-0 overflow-hidden pr-[24px] whitespace-nowrap text-center"
+		className="flex items-center min-w-0 overflow-hidden pr-[2px] whitespace-nowrap"
 		style={{
-			maskImage: 'linear-gradient(to right, black 50%, transparent 85%)',
-			WebkitMaskImage: 'linear-gradient(to right, black 50%, transparent 85%)',
+			maskImage: 'linear-gradient(to right, black 70%, transparent 95%)',
+			WebkitMaskImage: 'linear-gradient(to right, black 70%, transparent 95%)',
 		}}
 	>
 		<span>
@@ -5448,7 +5450,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 			})()}
 		</span>
 	</div>
-														<FontDropdownArrow className="!block pointer-events-none absolute right-[7px] bottom-[11px] !w-[8px] !h-[5px]" />
+														<FontDropdownArrow className="!block pointer-events-none ml-[6px] !w-[8px] !h-[5px]" />
 													</button>
 													
 													{/* Custom dropdown menu */}
@@ -5539,10 +5541,12 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														type="button"
 														onClick={() => setIsFontSizeDropdownOpen(!isFontSizeDropdownOpen)}
 														className={cn(
-															'w-full h-full flex items-center justify-center gap-[5px]',
-															'bg-transparent border-0 shadow-none rounded-none',
-															'px-0 py-0 cursor-pointer',
-															'hover:bg-transparent focus:bg-transparent focus:outline-none'
+															'h-[24px] flex items-center justify-center gap-[5px]',
+															'bg-transparent border-0 shadow-none rounded-[4px]',
+															'px-[6px] cursor-pointer',
+															'transition-[background-color,transform] duration-[80ms] ease-out',
+															'hover:bg-[#c9d4e8] hover:scale-[1.01] active:scale-100 focus:outline-none',
+															isFontSizeDropdownOpen && 'bg-[#c9d4e8]'
 														)}
 														aria-label="Font Size"
 														aria-expanded={isFontSizeDropdownOpen}
@@ -5625,10 +5629,11 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 													onMouseDown={(e) => e.preventDefault()}
 													onClick={() => applyManualFormatting('bold')}
 													className={cn(
-														"absolute left-[159px] top-[4px] w-[24px] h-[24px] flex items-center justify-center cursor-pointer transition-all rounded-[4px]",
+														"absolute left-[159px] top-[4px] w-[24px] h-[24px] flex items-center justify-center cursor-pointer rounded-[4px]",
+														"transition-[background-color,transform] duration-[80ms] ease-out",
 														activeFormatting.bold
 															? "bg-[#B8C8E0]"
-															: "hover:bg-[#C5D3E8]"
+															: "hover:bg-[#C5D3E8] hover:scale-[1.08] active:scale-100"
 													)}
 													aria-label="Bold"
 												>
@@ -5641,10 +5646,11 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 													onMouseDown={(e) => e.preventDefault()}
 													onClick={() => applyManualFormatting('italic')}
 													className={cn(
-														"absolute left-[183px] top-[4px] w-[24px] h-[24px] flex items-center justify-center cursor-pointer transition-all rounded-[4px]",
+														"absolute left-[183px] top-[4px] w-[24px] h-[24px] flex items-center justify-center cursor-pointer rounded-[4px]",
+														"transition-[background-color,transform] duration-[80ms] ease-out",
 														activeFormatting.italic
 															? "bg-[#B8C8E0]"
-															: "hover:bg-[#C5D3E8]"
+															: "hover:bg-[#C5D3E8] hover:scale-[1.08] active:scale-100"
 													)}
 													aria-label="Italic"
 												>
@@ -5657,10 +5663,11 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 													onMouseDown={(e) => e.preventDefault()}
 													onClick={() => applyManualFormatting('underline')}
 													className={cn(
-														"absolute left-[207px] top-[4px] w-[24px] h-[24px] flex items-center justify-center cursor-pointer transition-all rounded-[4px]",
+														"absolute left-[207px] top-[4px] w-[24px] h-[24px] flex items-center justify-center cursor-pointer rounded-[4px]",
+														"transition-[background-color,transform] duration-[80ms] ease-out",
 														activeFormatting.underline
 															? "bg-[#B8C8E0]"
-															: "hover:bg-[#C5D3E8]"
+															: "hover:bg-[#C5D3E8] hover:scale-[1.08] active:scale-100"
 													)}
 													aria-label="Underline"
 												>
@@ -5673,10 +5680,11 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 													onMouseDown={(e) => e.preventDefault()}
 													onClick={() => applyManualFormatting('insertUnorderedList')}
 													className={cn(
-														"absolute left-[236px] top-[4px] w-[24px] h-[24px] flex items-center justify-center cursor-pointer transition-all rounded-[4px]",
+														"absolute left-[236px] top-[4px] w-[24px] h-[24px] flex items-center justify-center cursor-pointer rounded-[4px]",
+														"transition-[background-color,transform] duration-[80ms] ease-out",
 														activeFormatting.bulletList
 															? "bg-[#B8C8E0]"
-															: "hover:bg-[#C5D3E8]"
+															: "hover:bg-[#C5D3E8] hover:scale-[1.08] active:scale-100"
 													)}
 													aria-label="Bullet list"
 												>
@@ -5698,8 +5706,9 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 															setIsColorPickerOpen((v) => !v);
 														}}
 														className={cn(
-															"w-[24px] h-[24px] flex items-center justify-center cursor-pointer transition-all rounded-[4px]",
-															isColorPickerOpen ? "bg-[#B8C8E0]" : "hover:bg-[#C5D3E8]"
+															"w-[24px] h-[24px] flex items-center justify-center cursor-pointer rounded-[4px]",
+															"transition-[background-color,transform] duration-[80ms] ease-out",
+															isColorPickerOpen ? "bg-[#B8C8E0]" : "hover:bg-[#C5D3E8] hover:scale-[1.08] active:scale-100"
 														)}
 														aria-label="Text & background color"
 														aria-expanded={isColorPickerOpen}
@@ -5782,10 +5791,11 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 													onMouseDown={(e) => e.preventDefault()}
 													onClick={openLinkPopover}
 													className={cn(
-														"absolute left-[295px] top-[4px] w-[24px] h-[24px] flex items-center justify-center cursor-pointer transition-all rounded-[4px]",
+														"absolute left-[295px] top-[4px] w-[24px] h-[24px] flex items-center justify-center cursor-pointer rounded-[4px]",
+														"transition-[background-color,transform] duration-[80ms] ease-out",
 														isLinkPopoverOpen
 															? "bg-[#B8C8E0]"
-															: "hover:bg-[#C5D3E8]"
+															: "hover:bg-[#C5D3E8] hover:scale-[1.08] active:scale-100"
 													)}
 													aria-label="Insert link"
 												>
@@ -5820,7 +5830,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 												{/* Fill-ins section */}
 												<div
 													ref={fillInsDropdownRef}
-													className="absolute right-[30px] top-0 h-full flex items-center"
+													className="absolute right-[24px] top-0 h-full flex items-center"
 												>
 													<button
 														type="button"
@@ -5832,7 +5842,12 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 															setIsColorPickerOpen(false);
 															setIsFillInsDropdownOpen(!isFillInsDropdownOpen);
 														}}
-														className="flex items-center cursor-pointer bg-transparent border-0 p-0"
+														className={cn(
+															"h-[24px] flex items-center cursor-pointer bg-transparent border-0 px-[8px] rounded-[4px]",
+															"transition-[background-color,transform] duration-[80ms] ease-out",
+															"hover:bg-[#c9d4e8] hover:scale-[1.01] active:scale-100",
+															isFillInsDropdownOpen && "bg-[#c9d4e8]"
+														)}
 														aria-label="Fill-ins"
 														aria-expanded={isFillInsDropdownOpen}
 													>
