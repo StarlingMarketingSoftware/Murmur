@@ -2277,7 +2277,7 @@ const Murmur = () => {
 								data-slot="campaign-top-dropdown"
 								className="pointer-events-auto fixed top-[116px] left-[300px] z-[60]"
 							>
-								<div className="bg-[#EDEDED] rounded-[12px] overflow-hidden w-[891px] h-[242px] border-2 border-[#8C8C8C]">
+								<div className="bg-[#EDEDED] rounded-[12px] overflow-hidden w-[895px] h-[242px] border-2 border-[#8C8C8C]">
 									<CampaignsTable />
 								</div>
 							</div>
