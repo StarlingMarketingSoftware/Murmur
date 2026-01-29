@@ -195,6 +195,7 @@ const SortableAIBlock = ({
 	showTestPreview,
 	onGetSuggestions,
 	promptQualityScore,
+	promptQualityLabel,
 	onUpscalePrompt,
 	isUpscalingPrompt,
 	hasPreviousPrompt,
@@ -1969,9 +1970,9 @@ const SortableAIBlock = ({
 																	/>
 																</div>
 																{/* Prompt rating + Upscale controls (same wiring as Writing tab) */}
-																<div className="h-[23px] bg-white px-3 flex items-start gap-[6px]">
+																<div className="h-[22px] bg-[#F0F0F0] px-3 flex items-start justify-end gap-[6px]">
 																	{/* Score (159 x 20) */}
-																	<div className="w-[159px] h-[20px] box-border bg-[#D7F0FF] border-2 border-black rounded-[8px] flex items-center gap-[6px] px-[6px]">
+																	<div className="w-[159px] h-[20px] box-border bg-transparent border-2 border-transparent rounded-[8px] flex items-center gap-[6px] px-[6px]">
 																		<div className="w-[92px] h-[12px] box-border bg-white border-2 border-black rounded-[8px] overflow-hidden shrink-0">
 																			<div
 																				className="h-full bg-[#36B24A] rounded-full transition-[width] duration-200"
@@ -1979,7 +1980,7 @@ const SortableAIBlock = ({
 																			/>
 																		</div>
 																		<span className="font-inter font-semibold text-[12px] leading-none text-black flex-1 text-center tabular-nums truncate">
-																			{clampedPromptScore ?? ''}
+																			{promptQualityLabel ?? clampedPromptScore ?? ''}
 																		</span>
 																	</div>
 
@@ -1993,7 +1994,7 @@ const SortableAIBlock = ({
 																		}}
 																		disabled={!hasPreviousPrompt}
 																		className={cn(
-																			'w-[20px] h-[20px] box-border rounded-[6px] border-2 border-black bg-[#D7F0FF] flex items-center justify-center p-0',
+																			'w-[20px] h-[20px] box-border rounded-[6px] border-2 border-transparent bg-transparent flex items-center justify-center p-0',
 																			hasPreviousPrompt
 																				? 'cursor-pointer hover:brightness-[0.98] active:brightness-[0.95]'
 																				: 'cursor-not-allowed'
@@ -2014,7 +2015,7 @@ const SortableAIBlock = ({
 																		}}
 																		disabled={!onUpscalePrompt || Boolean(isUpscalingPrompt)}
 																		className={cn(
-																			'w-[73px] h-[20px] box-border rounded-[8px] border-2 border-black bg-[#D7F0FF] flex items-center justify-between gap-[4px] px-[4px] py-0',
+																			'w-[73px] h-[20px] box-border rounded-[8px] border-2 border-transparent bg-transparent flex items-center justify-between gap-[4px] px-[4px] py-0',
 																			isUpscalingPrompt
 																				? 'cursor-wait opacity-80'
 																				: 'cursor-pointer hover:brightness-[0.98] active:brightness-[0.95]'
@@ -4513,7 +4514,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																					)}
 																				>
 																					<span className="font-inter font-semibold text-[17px] max-[480px]:text-[12px] whitespace-nowrap text-black subject-label">
-																						Subject
+																						Auto Subject
 																					</span>
 																				</div>
 
@@ -4532,16 +4533,16 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																				disabled={isHandwrittenMode}
 																				className={cn(
 																					'relative h-full flex items-center text-[12px] font-inter font-normal transition-colors shrink-0 subject-toggle',
-																					'w-[47px] px-2 justify-center text-black bg-[#4ADE80] hover:bg-[#3ECC72] active:bg-[#32BA64]',
+																					'w-[55px] px-2 justify-center text-black bg-[#91E193] hover:bg-[#91E193] active:bg-[#91E193]',
 																					isHandwrittenMode && 'opacity-50 cursor-not-allowed'
 																				)}
 																			>
-																				<span className="absolute left-0 h-full border-l border-black"></span>
+																				<span className="absolute left-0 h-full border-l-2 border-[#000000]"></span>
 																				<span>on</span>
-																				<span className="absolute right-0 h-full border-r border-black"></span>
+																				<span className="absolute right-0 h-full border-r-2 border-[#000000]"></span>
 																			</button>
 
-																			<div className={cn('flex-grow h-full', 'bg-white')}>
+																			<div className={cn('flex-grow h-full', 'bg-[#F0F0F0]')}>
 																				<Input
 																					{...field}
 																					className={cn(
@@ -4584,69 +4585,67 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																		</div>
 																	</div>
 																) : (
-																	// Full bar when auto mode is off
-																	<div
-																		className={cn(
-																			cn('flex items-center h-[31px] rounded-[8px] border-2 border-black overflow-hidden subject-bar bg-white', !forceDesktop && 'max-[480px]:h-[24px]')
-																		)}
-																	>
-																		<div
-																			className={cn(
-																				'pl-2 flex items-center h-full shrink-0 w-[120px]',
-																				'bg-white'
-																			)}
-																		>
-																			<span className="font-inter font-semibold text-[17px] max-[480px]:text-[12px] whitespace-nowrap text-black subject-label">
-																				Subject
-																			</span>
-																		</div>
+																	// Auto OFF: expand downward (matches the signature manual box pattern)
+																	<div className="w-full h-[97px] rounded-[8px] border-2 border-black overflow-hidden flex flex-col">
+																		{/* Header row */}
+																		<div className="flex items-center h-[31px] shrink-0 bg-[#8DDF90]">
+																			<div className="pl-2 flex items-center h-full shrink-0 w-[120px] bg-[#8DDF90]">
+																				<span className="font-inter font-semibold text-[17px] max-[480px]:text-[12px] whitespace-nowrap text-black subject-label">
+																					Subject
+																				</span>
+																			</div>
 
-																		<button
-																			type="button"
-																			data-hover-description="Turn back on automated drafting for here"
-																			onClick={() => {
-																				if (!isHandwrittenMode) {
-																					const newValue = !form.watch('isAiSubject');
-																					form.setValue('isAiSubject', newValue);
-																					if (newValue) {
-																						form.setValue('subject', '');
+																			<button
+																				type="button"
+																				data-hover-description="Turn back on automated drafting for here"
+																				onClick={() => {
+																					if (!isHandwrittenMode) {
+																						const newValue = !form.watch('isAiSubject');
+																						form.setValue('isAiSubject', newValue);
+																						if (newValue) {
+																							form.setValue('subject', '');
+																						}
 																					}
-																				}
-																			}}
-																			disabled={isHandwrittenMode}
-																			className={cn(
-																				'relative h-full flex items-center text-[12px] font-inter font-normal transition-colors shrink-0 subject-toggle',
-																				'w-[100px] px-2 justify-center text-black bg-[#DADAFC] hover:bg-[#C4C4F5] active:bg-[#B0B0E8] -translate-x-[30px]',
-																				isHandwrittenMode && 'opacity-50 cursor-not-allowed'
-																			)}
-																		>
-																			<span className="absolute left-0 h-full border-l border-black"></span>
-																			<span>Auto off</span>
-																			<span className="absolute right-0 h-full border-r border-black"></span>
-																		</button>
+																				}}
+																				disabled={isHandwrittenMode}
+																				className={cn(
+																					'relative h-full flex items-center text-[12px] font-inter font-normal transition-colors shrink-0 subject-toggle',
+																					'w-[80px] px-2 justify-center text-black bg-[#DADAFC] hover:bg-[#C4C4F5] active:bg-[#B0B0E8]',
+																					isHandwrittenMode && 'opacity-50 cursor-not-allowed'
+																				)}
+																			>
+																				<span className="absolute left-0 h-full border-l-2 border-black"></span>
+																				<span>Auto off</span>
+																				<span className="absolute right-0 h-full border-r-2 border-black"></span>
+																			</button>
 
-																		<div className={cn('flex-grow h-full -ml-[24px]', 'bg-white')}>
-																			<Input
+																			<div className="flex-grow h-full bg-[#8DDF90]" />
+																		</div>
+																		{/* Divider line */}
+																		<div className="w-full h-[2px] bg-black shrink-0" />
+																		{/* Text entry area */}
+																		<div className="flex-1 bg-white">
+																			<Textarea
 																				{...field}
 																				className={cn(
-																					cn('w-full h-full !bg-transparent pl-2 pr-3 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0', !forceDesktop && 'max-[480px]:placeholder:text-[10px] max-[480px]:!transition-none max-[480px]:!duration-0'),
+																					'w-full h-full !bg-transparent px-3 py-2 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 resize-none',
 																					shouldShowSubjectRedStyling
 																						? '!text-[#A20000] placeholder:!text-[#A20000]'
 																						: '!text-black placeholder:!text-black',
-																					'max-[480px]:pl-1'
+																					'max-[480px]:px-2 max-[480px]:py-1'
 																				)}
-																				placeholder="Write your subject here. *required"
-																				onFocus={(e) =>
-																					trackFocusedField?.('subject', e.target)
-																				}
+																				placeholder="Write manual subject here"
+																				onKeyDown={(e) => {
+																					// Prevent Enter from creating new lines (email subjects don't support newlines)
+																					if (e.key === 'Enter') e.preventDefault();
+																				}}
+																				onFocus={(e) => trackFocusedField?.('subject', e.target)}
 																				onBlur={() => {
 																					setHasSubjectBeenTouched(true);
 																					field.onBlur();
 																				}}
 																				onChange={(e) => {
-																					if (e.target.value) {
-																						setHasSubjectBeenTouched(true);
-																					}
+																					if (e.target.value) setHasSubjectBeenTouched(true);
 																					field.onChange(e);
 																				}}
 																			/>
@@ -4691,11 +4690,17 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 												</div>
 											</div>
 											{/* Body container (380px tall) - positioned 64px below the score line */}
-											<div className="flex-1 bg-[#92CE94] relative flex flex-col">
+											<div
+												className="flex-1 bg-[#305B31] relative flex flex-col cursor-pointer"
+												onClick={() => {
+													setActiveTab('main');
+													setHasLeftProfileTab(true);
+												}}
+											>
 												{/* Green top space box (122 x 34) */}
 												<div
 													aria-hidden="true"
-													className="absolute left-[15px] top-[14px] w-[122px] h-[34px] rounded-[8px] border-2 border-black bg-[#84CB86]"
+													className="absolute left-[15px] top-[14px] w-[122px] h-[34px] rounded-[8px] border-2 border-black bg-[#305B31]"
 												/>
 												<div className="w-full mt-[64px]">
 													<div
@@ -4703,6 +4708,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 															'relative w-full bg-[#4597DA] border-t-[3px] border-b-[3px] border-black rounded-[8px] overflow-hidden flex flex-col',
 															expandedProfileBox ? 'h-[414px]' : 'h-[380px]'
 														)}
+														onClick={(e) => e.stopPropagation()}
 													>
 														{/* Header band (30px fill + 3px divider) */}
 														<div className="shrink-0 h-[33px] bg-[#95CFFF] border-b-[3px] border-black flex items-center">
@@ -5127,7 +5133,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 												{/* New containers below Body box */}
 												<div className="w-full flex flex-col items-center mt-[9px]">
 													{/* 472 x 93 container */}
-													<div className="relative w-[472px] h-[93px] max-w-full rounded-[8px] bg-[#84CB86] border-2 border-black">
+													<div className="relative w-[472px] h-[93px] max-w-full rounded-[8px] bg-[#305B31] border-2 border-black">
 														{/* Decorative inner boxes (no fill) */}
 														<div
 															aria-hidden="true"
@@ -5159,7 +5165,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														<div className="w-[472px] max-w-full mt-[13px]">
 															<div
 																aria-hidden="true"
-																className="w-[229px] h-[34px] rounded-[8px] bg-[#84CB86] border-2 border-black"
+																className="w-[229px] h-[34px] rounded-[8px] bg-[#305B31] border-2 border-black"
 															/>
 														</div>
 													)}
@@ -5990,7 +5996,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																		)}
 																	>
 																		<span className="font-inter font-semibold text-[14px] whitespace-nowrap text-black">
-																			Subject
+																			{isAiSubjectLocal ? 'Auto Subject' : 'Subject'}
 																		</span>
 																	</div>
 
@@ -6001,19 +6007,19 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																		className={cn(
 																			'relative h-full flex items-center text-[12px] font-inter font-normal shrink-0',
 																			isAiSubjectLocal
-																				? 'w-[47px] px-2 justify-center text-black bg-[#4ADE80]'
+																				? 'w-[55px] px-2 justify-center text-black bg-[#91E193]'
 																				: 'w-[80px] px-2 justify-center text-black bg-[#DADAFC]'
 																		)}
 																		aria-pressed={isAiSubjectLocal}
 																		aria-label={isAiSubjectLocal ? 'Auto on' : 'Auto off'}
 																	>
-																		<span className="absolute left-0 h-full border-l border-black" />
+																		<span className="absolute left-0 h-full border-l-2 border-[#000000]" />
 																		<span>{isAiSubjectLocal ? 'on' : 'Auto off'}</span>
-																		<span className="absolute right-0 h-full border-r border-black" />
+																		<span className="absolute right-0 h-full border-r-2 border-[#000000]" />
 																	</button>
 
 																	{/* Input */}
-																	<div className={cn('flex-grow h-full', 'bg-white')}>
+																	<div className={cn('flex-grow h-full', isAiSubjectLocal ? 'bg-[#F0F0F0]' : 'bg-white')}>
 																		<Input
 																			value={subjectText}
 																			onChange={(e) => {
@@ -6585,7 +6591,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																		<div className="hidden group-hover/hybrid-signature:flex items-center h-[28px] rounded-[8px] border-2 border-black overflow-hidden bg-white w-full">
 																			<div className="pl-2 flex items-center h-full shrink-0 w-[140px] bg-[#E0E0E0]">
 																				<span className="font-inter font-semibold text-[14px] whitespace-nowrap text-black">
-																					Signature
+																					Auto Signature
 																				</span>
 																			</div>
 																			<button
@@ -6594,15 +6600,15 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																				onClick={() => setIsAutoSignature(false)}
 																				className={cn(
 																					'relative h-full flex items-center text-[12px] font-inter font-normal shrink-0',
-																					'w-[47px] px-2 justify-center text-black bg-[#4ADE80]'
+																					'w-[55px] px-2 justify-center text-black bg-[#91E193]'
 																				)}
 																				aria-label="Auto Signature on"
 																			>
-																				<span className="absolute left-0 h-full border-l border-black" />
+																				<span className="absolute left-0 h-full border-l-2 border-[#000000]" />
 																				<span>on</span>
-																				<span className="absolute right-0 h-full border-r border-black" />
+																				<span className="absolute right-0 h-full border-r-2 border-[#000000]" />
 																			</button>
-																			<div className="flex-grow h-full bg-white">
+																			<div className="flex-grow h-full bg-[#F0F0F0]">
 																				<Input
 																					className={cn(
 																						'w-full h-full !bg-transparent pl-3 pr-3 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0',
@@ -6619,9 +6625,9 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																	/* Manual signature mode: expanded downward with textarea */
 																	<div className="w-full rounded-[8px] border-2 border-black overflow-hidden flex flex-col bg-white">
 																		{/* Header row */}
-																		<div className="flex items-center h-[28px] shrink-0 bg-[#E0E0E0]">
-																			<div className="pl-2 flex items-center h-full shrink-0 w-[110px] bg-[#E0E0E0]">
-																				<span className="font-inter font-semibold text-[14px] whitespace-nowrap text-black">
+																		<div className="flex items-center h-[31px] shrink-0 bg-[#8DDF90]">
+																			<div className="pl-2 flex items-center h-full shrink-0 w-[120px] bg-[#8DDF90]">
+																				<span className="font-inter font-semibold text-[17px] max-[480px]:text-[12px] whitespace-nowrap text-black">
 																					Signature
 																				</span>
 																			</div>
@@ -6634,18 +6640,18 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																				}}
 																				className={cn(
 																					'relative h-full flex items-center text-[12px] font-inter font-normal shrink-0',
-																					'w-[80px] px-2 justify-center text-black bg-[#C3BCBC]'
+																					'w-[80px] px-2 justify-center text-black bg-[#DADAFC] hover:bg-[#C4C4F5] active:bg-[#B0B0E8]'
 																				)}
 																				aria-label="Auto Signature off"
 																			>
-																				<span className="absolute left-0 h-full border-l border-black" />
+																				<span className="absolute left-0 h-full border-l-2 border-black" />
 																				<span>Auto off</span>
-																				<span className="absolute right-0 h-full border-r border-black" />
+																				<span className="absolute right-0 h-full border-r-2 border-black" />
 																			</button>
-																			<div className="flex-grow h-full bg-[#E0E0E0]" />
+																			<div className="flex-grow h-full bg-[#8DDF90]" />
 																		</div>
 																		{/* Divider */}
-																		<div className="w-full h-[1px] bg-black shrink-0" />
+																		<div className="w-full h-[2px] bg-black shrink-0" />
 																		{/* Text entry */}
 																		<div className="bg-white">
 																			<Textarea
@@ -6656,7 +6662,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																					'!text-black placeholder:!text-[#9E9E9E] font-inter text-[14px]'
 																				)}
 																				style={{ height: 66 }}
-																				placeholder="Enter your signature..."
+																				placeholder="Write manual signature here"
 																			/>
 																		</div>
 																	</div>
@@ -6994,7 +7000,11 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 												className={cn(
 													showTestPreview
 														? cn('w-[426px]', !forceDesktop && 'max-[480px]:w-[89.33vw]')
-														: cn(!forceDesktop ? 'w-[89.33vw]' : 'w-full', 'max-w-[467px]'),
+														: cn(
+																!forceDesktop ? 'w-[89.33vw]' : 'w-[468px]',
+																'max-w-[468px]',
+																'mx-auto'
+														  ),
 													'h-[97px] flex flex-col'
 												)}
 												data-hpi-signature-auto
@@ -7040,7 +7050,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																	)}
 																>
 																	<span className="font-inter font-semibold text-[17px] max-[480px]:text-[12px] whitespace-nowrap text-black">
-																		Signature
+																		Auto Signature
 																	</span>
 																</div>
 
@@ -7050,15 +7060,15 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																onClick={() => setIsAutoSignature(false)}
 																className={cn(
 																	'relative h-full flex items-center text-[12px] font-inter font-normal transition-colors shrink-0',
-																	'w-[47px] px-2 justify-center text-black bg-[#4ADE80] hover:bg-[#3ECC72] active:bg-[#32BA64]'
+																	'w-[55px] px-2 justify-center text-black bg-[#91E193] hover:bg-[#91E193] active:bg-[#91E193]'
 																)}
 															>
-																<span className="absolute left-0 h-full border-l border-black"></span>
+																<span className="absolute left-0 h-full border-l-2 border-[#000000]"></span>
 																<span>on</span>
-																<span className="absolute right-0 h-full border-r border-black"></span>
+																<span className="absolute right-0 h-full border-r-2 border-[#000000]"></span>
 															</button>
 
-															<div className={cn('flex-grow h-full', 'bg-white')}>
+															<div className={cn('flex-grow h-full', 'bg-[#F0F0F0]')}>
 																<Input
 																	className={cn(
 																		cn('w-full h-full !bg-transparent pl-4 pr-3 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0', !forceDesktop && 'max-[480px]:placeholder:text-[10px] max-[480px]:!transition-none max-[480px]:!duration-0'),
@@ -7094,11 +7104,11 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														)}
 													>
 														{/* Header row */}
-														<div className="flex items-center h-[31px] shrink-0 bg-[#E0E0E0]">
+														<div className="flex items-center h-[31px] shrink-0 bg-[#8DDF90]">
 															<div
 																className={cn(
-																	'pl-2 flex items-center h-full shrink-0 w-[100px]',
-																	'bg-[#E0E0E0]'
+																	'pl-2 flex items-center h-full shrink-0 w-[120px]',
+																	'bg-[#8DDF90]'
 																)}
 															>
 																<span className="font-inter font-semibold text-[17px] max-[480px]:text-[12px] whitespace-nowrap text-black">
@@ -7115,18 +7125,18 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																}}
 																className={cn(
 																	'relative h-full flex items-center text-[12px] font-inter font-normal transition-colors shrink-0',
-																	'w-[70px] px-2 justify-center text-black bg-[#C3BCBC] hover:bg-[#B5AEAE] active:bg-[#A7A0A0]'
+																	'w-[80px] px-2 justify-center text-black bg-[#DADAFC] hover:bg-[#C4C4F5] active:bg-[#B0B0E8]'
 																)}
 															>
-																<span className="absolute left-0 h-full border-l border-black"></span>
+																<span className="absolute left-0 h-full border-l-2 border-black"></span>
 																<span>Auto off</span>
-																<span className="absolute right-0 h-full border-r border-black"></span>
+																<span className="absolute right-0 h-full border-r-2 border-black"></span>
 															</button>
 
-															<div className="flex-grow h-full bg-[#E0E0E0]" />
+															<div className="flex-grow h-full bg-[#8DDF90]" />
 														</div>
 														{/* Divider line */}
-														<div className="w-full h-[1px] bg-black shrink-0" />
+														<div className="w-full h-[2px] bg-black shrink-0" />
 														{/* Text entry area */}
 														<div className="flex-1 bg-white">
 															<Textarea
@@ -7136,7 +7146,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																	'w-full h-full !bg-transparent px-3 py-2 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 resize-none',
 																	'!text-black placeholder:!text-[#9E9E9E] font-inter text-[14px]'
 																)}
-																placeholder="Enter your signature..."
+																placeholder="Write manual signature here"
 															/>
 														</div>
 													</div>
@@ -7147,7 +7157,14 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 										{!hideGenerateTestButton && selectedModeKey === 'full' && !showTestPreview && !compactLeftOnly && (
 											<div className={cn(
 												cn('absolute left-0 right-0 w-full flex items-center justify-center', !forceDesktop && 'max-[480px]:hidden'),
-												isLocalCustomInstructionsOpen ? 'bottom-[124px]' : 'bottom-[194px]'
+												// This button is absolutely positioned; when Custom Instructions and/or Signature expand,
+												// the content can slide into this area. Prefer dropping the button lower (smaller `bottom`)
+												// to avoid overlap with the Signature box.
+												!isAutoSignature
+													? (isLocalCustomInstructionsOpen ? 'bottom-[58px]' : 'bottom-[128px]')
+													: isManualSubject
+														? (isLocalCustomInstructionsOpen ? 'bottom-[82px]' : 'bottom-[152px]')
+														: (isLocalCustomInstructionsOpen ? 'bottom-[124px]' : 'bottom-[194px]')
 											)}>
 												<Button
 													type="button"

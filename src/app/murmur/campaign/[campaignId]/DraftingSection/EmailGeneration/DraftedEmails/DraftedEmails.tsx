@@ -911,8 +911,8 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 						style={{
 							borderTopLeftRadius: '8px',
 							borderTopRightRadius: '8px',
-							borderBottomWidth: '2px',
-							borderBottomStyle: 'solid',
+							borderBottomWidth: isRegenSettingsPreviewOpen ? '0px' : '2px',
+							borderBottomStyle: isRegenSettingsPreviewOpen ? 'none' : 'solid',
 							borderBottomColor: '#000000',
 							// Keep header a consistent height in both cases (company-only vs company+name)
 							// while still giving enough vertical room so text doesn't get clipped.
@@ -1297,8 +1297,8 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 							padding: isRegenSettingsPreviewOpen
 								? '0'
 								: hasStatusBar
-									? '0 12px 12px 12px'
-									: '6px 12px 12px 12px',
+									? '0 4px 12px 4px'
+									: '6px 4px 12px 4px',
 							borderBottomLeftRadius: '5px',
 							borderBottomRightRadius: '5px',
 							backgroundColor: isRegenSettingsPreviewOpen ? '#FFE3B3' : '#FFDC9E',
@@ -1317,16 +1317,52 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 										backgroundColor: '#000000',
 									}}
 								/>
-								{/* Double divider between Delete and Send (two 1px lines) */}
+								{/* Bottom-left breadcrumb label (Drafts > Contact) */}
+								{!isMobile && !showBottomCounter && (
+									<div
+										className="absolute flex items-center font-inter font-normal text-[11px] text-black leading-none"
+										style={{
+											left: '12px',
+											right: '212px', // stop before the Send/Delete dividers
+											top: bottomStripTop,
+											bottom: 0,
+											paddingRight: '12px',
+											pointerEvents: 'none',
+											WebkitMaskImage:
+												'linear-gradient(90deg, #000 92%, transparent 100%)',
+											maskImage: 'linear-gradient(90deg, #000 92%, transparent 100%)',
+										}}
+									>
+										<span className="whitespace-nowrap">Drafts</span>
+										<span className="mx-[10px] whitespace-nowrap">{'>'}</span>
+										<span className="min-w-0 truncate">
+											{displayName || companyName || 'Unknown Contact'}
+										</span>
+									</div>
+								)}
+								{/* Double divider between Delete and Send (two equal-width lines) */}
 								<div
 									style={{
 										position: 'absolute',
-										right: '114px',
+										right: '114px', // flush with Delete's left edge
 										top: bottomStripTop,
 										bottom: 0,
-										width: '7px',
-										backgroundImage:
-											'linear-gradient(to right, #000000 0px, #000000 2px, transparent 2px, transparent 5px, #000000 5px, #000000 7px)',
+										width: '2px',
+										backgroundColor: '#000000',
+										pointerEvents: 'none',
+										zIndex: 5,
+									}}
+								/>
+								<div
+									style={{
+										position: 'absolute',
+										// Place the second line so its left edge aligns with Send's right edge (119px).
+										// With a 2px width, `right: 118px` yields left edge at 120px.
+										right: '118px',
+										top: bottomStripTop,
+										bottom: 0,
+										width: '2px',
+										backgroundColor: '#000000',
 										pointerEvents: 'none',
 										zIndex: 5,
 									}}
@@ -1355,7 +1391,7 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 								<div
 									style={{
 										position: 'absolute',
-										right: '211px',
+										right: '212px',
 										top: bottomStripTop,
 										bottom: 0,
 										width: '2px',
@@ -1377,7 +1413,7 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 									disabled={props.isSendingDisabled}
 									className="absolute font-inter text-[14px] font-normal text-black hover:bg-black/5 flex items-center justify-center transition-colors leading-none"
 									style={{
-										right: '119px',
+										right: '120px',
 										width: '92px',
 										top: bottomStripTop,
 										bottom: 0,
@@ -1444,6 +1480,32 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 								)}
 							</>
 						)}
+						{isRegenSettingsPreviewOpen && !isMobile && !showBottomCounter && (
+							<>
+								{/* Bottom-left breadcrumb label (Drafts > Contact > Regenerate) */}
+								<div
+									className="absolute flex items-center font-inter font-normal text-[11px] text-black leading-none"
+									style={{
+										left: '12px',
+										right: '12px',
+										top: bottomStripTop,
+										bottom: 0,
+										paddingRight: '12px',
+										pointerEvents: 'none',
+										overflow: 'hidden',
+										zIndex: 6,
+									}}
+								>
+									<span className="whitespace-nowrap flex-shrink-0">Drafts</span>
+									<span className="mx-[10px] whitespace-nowrap flex-shrink-0">{'>'}</span>
+									<span className="min-w-0 truncate">
+										{displayName || companyName || 'Unknown Contact'}
+									</span>
+									<span className="mx-[10px] whitespace-nowrap flex-shrink-0">{'>'}</span>
+									<span className="whitespace-nowrap flex-shrink-0">Regenerate</span>
+								</div>
+							</>
+						)}
 
 						{isRegenSettingsPreviewOpen ? (
 							<div className="flex justify-center flex-1">
@@ -1455,8 +1517,8 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 									hideGenerateTestButton
 									hideProfileBottomMiniBox
 									clipProfileTabOverflow
-									manualEntryHeightPx={560}
-									containerHeightPx={635}
+									manualEntryHeightPx={550}
+									containerHeightPx={625}
 									useStaticDropdownPosition
 									hideMobileStickyTestFooter
 									dataCampaignMainBox={null}
@@ -1476,8 +1538,8 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 										type="text"
 										value={editedSubject}
 										onChange={(e) => setEditedSubject(e.target.value)}
-										className="font-inter text-[14px] font-extrabold bg-white border-2 border-black rounded-[4px] px-2 focus:outline-none focus:ring-0"
-										style={{ width: isMobile ? '100%' : '469px', height: '39px' }}
+										className="font-inter text-[14px] font-extrabold bg-white border-2 border-black rounded-[7px] px-2 focus:outline-none focus:ring-0"
+										style={{ width: isMobile ? '100%' : '484px', height: '39px' }}
 									/>
 								</div>
 
@@ -1487,9 +1549,9 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 									style={{ padding: isMobile ? '0 8px' : undefined }}
 								>
 									<div
-										className="bg-white border-2 border-black rounded-[4px] overflow-visible draft-review-box"
+										className="bg-white border-2 border-black rounded-[7px] overflow-visible draft-review-box"
 										style={{
-											width: isMobile ? '100%' : '470px',
+											width: isMobile ? '100%' : '484px',
 											height: hasStatusBar ? '527px' : '572px',
 											flex: isMobile ? 1 : undefined,
 										}}

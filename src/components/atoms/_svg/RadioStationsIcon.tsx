@@ -1,8 +1,23 @@
-import React from 'react';
+import React, { FC } from 'react';
 
-export const RadioStationsIcon = () => {
+type RadioStationsIconProps = {
+	/** Width in px; height scales to preserve aspect ratio (31:27). */
+	size?: number;
+	className?: string;
+};
+
+export const RadioStationsIcon: FC<RadioStationsIconProps> = ({ size = 31, className }) => {
+	// Original aspect ratio is 31:27, so height = size * (27/31)
+	const height = size * (27 / 31);
 	return (
-		<svg width="31" height="27" viewBox="0 0 31 27" fill="none" xmlns="http://www.w3.org/2000/svg">
+		<svg
+			width={size}
+			height={height}
+			viewBox="0 0 31 27"
+			fill="none"
+			xmlns="http://www.w3.org/2000/svg"
+			className={className}
+		>
 			<mask id="path-1-inside-1_138_22" fill="white">
 				<path d="M31 26.9194H0V9.91943H31V26.9194ZM2.9248 22.8257C2.60188 22.8257 2.34002 23.0878 2.33984 23.4106C2.33984 23.7337 2.60177 23.9956 2.9248 23.9956H13.4531C13.7759 23.9954 14.0371 23.7335 14.0371 23.4106C14.0369 23.0879 13.7758 22.8259 13.4531 22.8257H2.9248ZM20.4717 16.9761C18.8565 16.9761 17.5469 18.2857 17.5469 19.9009V21.0708C17.547 22.6859 18.8566 23.9956 20.4717 23.9956H25.7354C27.3505 23.9956 28.6601 22.6859 28.6602 21.0708V19.9009C28.6602 18.2857 27.3505 16.9761 25.7354 16.9761H20.4717ZM2.92383 18.9019C2.60097 18.9019 2.3391 19.163 2.33887 19.4858C2.33887 19.8088 2.60083 20.0708 2.92383 20.0708H13.4521C13.7752 20.0708 14.0371 19.8089 14.0371 19.4858C14.0369 19.163 13.775 18.9019 13.4521 18.9019H2.92383ZM2.92383 14.9009C2.60083 14.9009 2.33887 15.1628 2.33887 15.4858C2.3389 15.8088 2.60085 16.0708 2.92383 16.0708H13.4521C13.7752 16.0708 14.0371 15.8088 14.0371 15.4858C14.0371 15.1628 13.7752 14.9009 13.4521 14.9009H2.92383Z" />
 			</mask>
