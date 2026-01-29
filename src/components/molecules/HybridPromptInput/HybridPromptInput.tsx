@@ -567,31 +567,31 @@ const SortableAIBlock = ({
 		chips.push({
 			key: 'profile-name',
 			text: name ? `Nme. ${truncate(name, 28)}` : 'Nme.',
-			bgClass: 'bg-[#DADAFC]',
+			bgClass: 'bg-[#CAE7FF]',
 			isEmpty: !name,
 		});
 		chips.push({
 			key: 'profile-genre',
 			text: genre ? `Gnre. ${truncate(genre, 22)}` : 'Gnre.',
-			bgClass: 'bg-[#DADAFC]',
+			bgClass: 'bg-[#BFE2FF]',
 			isEmpty: !genre,
 		});
 		chips.push({
 			key: 'profile-area',
 			text: area ? `Area. ${truncate(area, 30)}` : 'Area.',
-			bgClass: 'bg-[#DADAFC]',
+			bgClass: 'bg-[#CAFDFF]',
 			isEmpty: !area,
 		});
 		chips.push({
 			key: 'profile-band',
 			text: band ? `Artst Nme. ${truncate(band, 30)}` : 'Artst Nme.',
-			bgClass: 'bg-[#CFF5F5]',
+			bgClass: 'bg-[#C6FFFC]',
 			isEmpty: !band,
 		});
 		chips.push({
 			key: 'profile-bio',
 			text: bio ? `Bio. “${truncate(bio, 48)}”` : 'Bio.',
-			bgClass: 'bg-[#CFF5F5]',
+			bgClass: 'bg-[#C8FFE1]',
 			isEmpty: !bio,
 		});
 
@@ -604,7 +604,7 @@ const SortableAIBlock = ({
 			chips.push({
 				key: 'profile-link-0',
 				text: 'Link.',
-				bgClass: 'bg-[#C7F2C9]',
+				bgClass: 'bg-[#C5F7C9]',
 				isEmpty: true,
 			});
 		} else {
@@ -613,7 +613,7 @@ const SortableAIBlock = ({
 				chips.push({
 					key: `profile-link-${i}`,
 					text: `Link. ${truncate(link, 42)}`,
-					bgClass: 'bg-[#C7F2C9]',
+					bgClass: 'bg-[#C5F7C9]',
 					isEmpty: false,
 				});
 			}
@@ -3512,31 +3512,31 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		chips.push({
 			key: 'profile-name',
 			text: name ? `Nme. ${truncate(name, 28)}` : 'Nme.',
-			bgClass: 'bg-[#DADAFC]',
+			bgClass: 'bg-[#CAE7FF]',
 			isEmpty: !name,
 		});
 		chips.push({
 			key: 'profile-genre',
 			text: genre ? `Gnre. ${truncate(genre, 22)}` : 'Gnre.',
-			bgClass: 'bg-[#DADAFC]',
+			bgClass: 'bg-[#BFE2FF]',
 			isEmpty: !genre,
 		});
 		chips.push({
 			key: 'profile-area',
 			text: area ? `Area. ${truncate(area, 30)}` : 'Area.',
-			bgClass: 'bg-[#DADAFC]',
+			bgClass: 'bg-[#CAFDFF]',
 			isEmpty: !area,
 		});
 		chips.push({
 			key: 'profile-band',
 			text: band ? `Artst Nme. ${truncate(band, 30)}` : 'Artst Nme.',
-			bgClass: 'bg-[#CFF5F5]',
+			bgClass: 'bg-[#C6FFFC]',
 			isEmpty: !band,
 		});
 		chips.push({
 			key: 'profile-bio',
 			text: bio ? `Bio. “${truncate(bio, 48)}”` : 'Bio.',
-			bgClass: 'bg-[#CFF5F5]',
+			bgClass: 'bg-[#C8FFE1]',
 			isEmpty: !bio,
 		});
 
@@ -3549,7 +3549,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 			chips.push({
 				key: 'profile-link-0',
 				text: 'Link.',
-				bgClass: 'bg-[#C7F2C9]',
+				bgClass: 'bg-[#C5F7C9]',
 				isEmpty: true,
 			});
 		} else {
@@ -3558,7 +3558,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 				chips.push({
 					key: `profile-link-${i}`,
 					text: `Link. ${truncate(link, 42)}`,
-					bgClass: 'bg-[#C7F2C9]',
+					bgClass: 'bg-[#C5F7C9]',
 					isEmpty: false,
 				});
 			}
@@ -5895,7 +5895,8 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 												<div
 													className={cn(
 														cn('w-[448px]', !forceDesktop && 'max-w-[89.33vw]', 'rounded-[8px] border-2 border-black overflow-hidden flex flex-col'),
-														isHybridProfileExpanded ? 'h-[110px]' : 'h-[33px]'
+														// When expanded, allow the box to grow to fit content (no inner scrollbars).
+														isHybridProfileExpanded ? 'min-h-[110px]' : 'h-[33px]'
 													)}
 													data-hpi-hybrid-profile-bar
 												>
@@ -5926,7 +5927,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																	setActiveTab('profile');
 																}
 															}}
-															className="flex-1 bg-white px-2 py-2 overflow-y-auto overflow-x-hidden hide-native-scrollbar cursor-pointer"
+															className="flex-1 bg-white px-2 py-2 cursor-pointer"
 														>
 															<div className="flex flex-wrap gap-x-[6px] gap-y-[10px] content-start">
 																{hybridProfileChipItems.map((chip) => (
