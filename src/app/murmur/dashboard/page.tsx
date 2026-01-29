@@ -563,7 +563,8 @@ const DashboardContent = () => {
 	const initialTabFromQuery = searchParams.get('tab') === 'inbox' ? 'inbox' : 'search';
 	const [activeTab, setActiveTab] = useState<'search' | 'inbox'>(initialTabFromQuery);
 	const inboxView = activeTab === 'inbox';
-	const [inboxSubtab, setInboxSubtab] = useState<'messages' | 'campaigns'>('messages');
+	// Dashboard inbox deep-link (`?tab=inbox`) should land on the Campaigns sub-tab.
+	const [inboxSubtab, setInboxSubtab] = useState<'messages' | 'campaigns'>('campaigns');
 
 	// Handle tab query parameter
 	// Only react to *URL changes*. If we also depend on `activeTab`, this effect can run
@@ -3770,14 +3771,21 @@ const DashboardContent = () => {
 									willChange: 'transform, opacity',
 								}}
 							>
-								{inboxSubtab === 'messages' ? (
+								{/* 
+									Keep the inbox mounted so it can finish loading while the user views
+									the "Campaigns" sub-tab. (Do NOT change the campaign-page popup behavior.)
+								*/}
+								<div style={{ display: inboxSubtab === 'messages' ? 'block' : 'none' }}>
 									<InboxSection
 										desktopHeight={535}
 										dashboardMode
+										loadingVariant="dashboard"
 										inboxSubtab={inboxSubtab}
 										onInboxSubtabChange={setInboxSubtab}
 									/>
-								) : (
+								</div>
+
+								{inboxSubtab === 'campaigns' && (
 									<CampaignsInboxView
 										inboxSubtab={inboxSubtab}
 										onInboxSubtabChange={setInboxSubtab}

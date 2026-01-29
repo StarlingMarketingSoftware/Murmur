@@ -2247,6 +2247,7 @@ const Murmur = () => {
 									/>
 								) : (
 									<DashboardCampaignsInboxView
+										variant="campaignPageInbox"
 										containerHeight={`${DASHBOARD_INBOX_POPUP_HEIGHT_PX}px`}
 										containerWidthPx={DASHBOARD_INBOX_POPUP_WIDTH_PX}
 										noOuterPadding

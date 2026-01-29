@@ -184,6 +184,13 @@ interface InboxSectionProps {
 	 * and aligns the search bar + toggle to match the dashboard Campaigns tab.
 	 */
 	dashboardMode?: boolean;
+
+	/**
+	 * Controls the loading skeleton styling for different embedding contexts.
+	 * - **default**: current skeleton styling (used outside the dashboard tab)
+	 * - **dashboard**: dashboard inbox tab skeleton (no top "window chrome")
+	 */
+	loadingVariant?: 'default' | 'dashboard';
 }
 
 /**
@@ -599,6 +606,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 	inboxSubtab = 'messages',
 	onInboxSubtabChange,
 	dashboardMode = false,
+	loadingVariant = 'default',
 }) => {
 	const detectedIsMobile = useIsMobile();
 	const isMobile = forceDesktopLayout ? false : Boolean(detectedIsMobile);
@@ -997,243 +1005,275 @@ export const InboxSection: FC<InboxSectionProps> = ({
 
 	if (isLoading) {
 		const skeletonRowCount = isMobile ? 5 : 6;
-		return (
-			<div className={`w-full flex justify-center ${outerPaddingClass}`}>
+		const loadingContainerStyle = {
+			width: isMobile ? mobileBoxWidth : `${boxWidth}px`,
+			maxWidth: isMobile ? undefined : `${boxWidth}px`,
+			height: isMobile ? 'calc(100dvh - 160px)' : `${desktopBoxHeight}px`,
+			border: '3px solid #000000',
+			borderRadius: '8px',
+			padding: isMobile ? '8px' : '16px',
+			paddingTop: isMobile ? '62px' : `${desktopPaddingTopPx}px`,
+			background: isMobile
+				? activeTab === 'sent'
+					? '#5AB477'
+					: '#6fa4e1'
+				: isDashboardMode
+				? activeTab === 'sent'
+					? '#5AB477'
+					: '#6fa4e1'
+				: activeTab === 'sent'
+				? 'linear-gradient(to bottom, #FFFFFF 19px, #5AB477 19px)'
+				: 'linear-gradient(to bottom, #FFFFFF 19px, #6fa4e1 19px)',
+		};
+
+		const loadingContent = (
+			<>
+				<span className="sr-only">Loading emails…</span>
+
+				{/* Header ornaments (desktop only) */}
+				{!isMobile && loadingVariant !== 'dashboard' && (
+					<>
+						{/* Three circles at top */}
+						<svg
+							width="9"
+							height="9"
+							viewBox="0 0 9 9"
+							fill="none"
+							style={{
+								position: 'absolute',
+								top: '9.5px',
+								transform: 'translateY(-50%)',
+								left: '17px',
+								zIndex: 10,
+							}}
+						>
+							<circle cx="4.5" cy="4.5" r="4.5" fill="#D9D9D9" />
+						</svg>
+						<svg
+							width="9"
+							height="9"
+							viewBox="0 0 9 9"
+							fill="none"
+							style={{
+								position: 'absolute',
+								top: '9.5px',
+								transform: 'translateY(-50%)',
+								left: '78px',
+								zIndex: 10,
+							}}
+						>
+							<circle cx="4.5" cy="4.5" r="4.5" fill="#D9D9D9" />
+						</svg>
+						<svg
+							width="9"
+							height="9"
+							viewBox="0 0 9 9"
+							fill="none"
+							style={{
+								position: 'absolute',
+								top: '9.5px',
+								transform: 'translateY(-50%)',
+								left: '139px',
+								zIndex: 10,
+							}}
+						>
+							<circle cx="4.5" cy="4.5" r="4.5" fill="#D9D9D9" />
+						</svg>
+
+						{/* Inbox badge placeholder */}
+						<div
+							style={{
+								position: 'absolute',
+								top: '9.5px',
+								transform: 'translateY(-50%)',
+								left: '174px',
+								width: '69px',
+								height: '18px',
+								borderRadius: '11px',
+								border: '3px solid #000000',
+								backgroundColor: '#CCDFF4',
+								zIndex: 10,
+								display: 'flex',
+								alignItems: 'center',
+								justifyContent: 'center',
+							}}
+						>
+							<div className="h-[10px] w-[36px] rounded bg-[#D9D9D9]" />
+						</div>
+					</>
+				)}
+
+				{/* Search bar skeleton */}
 				<div
-					data-campaign-main-box="inbox"
-					className={`flex flex-col items-center space-y-2 overflow-y-auto overflow-x-hidden relative ${isDashboardMode ? '' : 'animate-pulse'}`}
 					style={{
-						width: isMobile ? mobileBoxWidth : `${boxWidth}px`,
-						maxWidth: isMobile ? undefined : `${boxWidth}px`,
-						height: isMobile ? 'calc(100dvh - 160px)' : `${desktopBoxHeight}px`,
+						position: 'absolute',
+						top: isMobile ? '12px' : `${desktopSearchTopPx}px`,
+						left: isMobile ? '8px' : '14px',
+						width: isMobile ? mobileSearchBarWidth : `${searchBarWidth}px`,
+						height: isMobile ? '42px' : '48px',
 						border: '3px solid #000000',
 						borderRadius: '8px',
-						padding: isMobile ? '8px' : '16px',
-						paddingTop: isMobile ? '62px' : `${desktopPaddingTopPx}px`,
-						background: isMobile
-							? activeTab === 'sent'
-								? '#5AB477'
-								: '#6fa4e1'
-							: isDashboardMode
-							? activeTab === 'sent'
-								? '#5AB477'
-								: '#6fa4e1'
-							: activeTab === 'sent'
-							? 'linear-gradient(to bottom, #FFFFFF 19px, #5AB477 19px)'
-							: 'linear-gradient(to bottom, #FFFFFF 19px, #6fa4e1 19px)',
+						backgroundColor: '#FFFFFF',
+						zIndex: 10,
+						display: 'flex',
+						alignItems: 'center',
+						paddingLeft: isMobile ? '12px' : '16px',
+						gap: isMobile ? '10px' : '16px',
+						pointerEvents: 'none',
 					}}
-					role="status"
-					aria-busy="true"
-					aria-label="Loading emails"
+					aria-hidden
 				>
-					<span className="sr-only">Loading emails…</span>
+					<div className="h-[14px] w-[14px] rounded bg-[#D9D9D9]" />
+					<div className="h-[14px] flex-1 rounded bg-[#E5E5E5]" />
+				</div>
 
-					{/* Header ornaments (desktop only) */}
-					{!isMobile && (
-						<>
-							{/* Three circles at top */}
-							<svg
-								width="9"
-								height="9"
-								viewBox="0 0 9 9"
-								fill="none"
-								style={{
-									position: 'absolute',
-									top: '9.5px',
-									transform: 'translateY(-50%)',
-									left: '17px',
-									zIndex: 10,
-								}}
-							>
-								<circle cx="4.5" cy="4.5" r="4.5" fill="#D9D9D9" />
-							</svg>
-							<svg
-								width="9"
-								height="9"
-								viewBox="0 0 9 9"
-								fill="none"
-								style={{
-									position: 'absolute',
-									top: '9.5px',
-									transform: 'translateY(-50%)',
-									left: '78px',
-									zIndex: 10,
-								}}
-							>
-								<circle cx="4.5" cy="4.5" r="4.5" fill="#D9D9D9" />
-							</svg>
-							<svg
-								width="9"
-								height="9"
-								viewBox="0 0 9 9"
-								fill="none"
-								style={{
-									position: 'absolute',
-									top: '9.5px',
-									transform: 'translateY(-50%)',
-									left: '139px',
-									zIndex: 10,
-								}}
-							>
-								<circle cx="4.5" cy="4.5" r="4.5" fill="#D9D9D9" />
-							</svg>
-
-							{/* Inbox badge placeholder */}
-							<div
-								style={{
-									position: 'absolute',
-									top: '9.5px',
-									transform: 'translateY(-50%)',
-									left: '174px',
-									width: '69px',
-									height: '18px',
-									borderRadius: '11px',
-									border: '3px solid #000000',
-									backgroundColor: '#CCDFF4',
-									zIndex: 10,
-									display: 'flex',
-									alignItems: 'center',
-									justifyContent: 'center',
-								}}
-							>
-								<div className="h-[10px] w-[36px] rounded bg-[#D9D9D9]" />
-							</div>
-						</>
-					)}
-
-					{/* Search bar skeleton */}
+				{/* Top-right toggle skeleton */}
+				{showMessagesCampaignsToggle ? (
 					<div
 						style={{
 							position: 'absolute',
 							top: isMobile ? '12px' : `${desktopSearchTopPx}px`,
-							left: isMobile ? '8px' : '14px',
-							width: isMobile ? mobileSearchBarWidth : `${searchBarWidth}px`,
-							height: isMobile ? '42px' : '48px',
+							right: isMobile ? '8px' : '14px',
+							width: '260px',
+							height: '48px',
+							border: '3px solid #000000',
+							borderRadius: '8px',
+							overflow: 'hidden',
+							backgroundColor: '#FFFFFF',
+							zIndex: 10,
+							display: 'flex',
+							pointerEvents: 'none',
+						}}
+						aria-hidden
+					>
+						<div
+							aria-hidden
+							style={{
+								position: 'absolute',
+								left: '50%',
+								top: 0,
+								bottom: 0,
+								width: '3px',
+								backgroundColor: '#000000',
+								transform: 'translateX(-1.5px)',
+								pointerEvents: 'none',
+							}}
+						/>
+						<div className="h-full flex-1 bg-[#E5E5E5]" />
+						<div className="h-full flex-1 bg-[#E5E5E5]" />
+					</div>
+				) : (
+					<div
+						style={{
+							position: 'absolute',
+							top: isMobile ? '12.5px' : '55.5px',
+							right: isMobile ? '8px' : '14px',
+							width: isMobile ? '100px' : '148px',
+							height: isMobile ? '40px' : '47px',
 							border: '3px solid #000000',
 							borderRadius: '8px',
 							backgroundColor: '#FFFFFF',
 							zIndex: 10,
 							display: 'flex',
 							alignItems: 'center',
-							paddingLeft: isMobile ? '12px' : '16px',
-							gap: isMobile ? '10px' : '16px',
+							padding: isMobile ? '3px' : '4px',
+							gap: isMobile ? '2px' : '4px',
 							pointerEvents: 'none',
 						}}
 						aria-hidden
 					>
-						<div className="h-[14px] w-[14px] rounded bg-[#D9D9D9]" />
-						<div className="h-[14px] flex-1 rounded bg-[#E5E5E5]" />
+						<div
+							className="rounded-[8px] bg-[#E5E5E5]"
+							style={{
+								width: isMobile ? '46px' : '70px',
+								height: isMobile ? '16px' : '19px',
+							}}
+						/>
+						<div
+							className="rounded-[8px] bg-[#E5E5E5]"
+							style={{
+								width: isMobile ? '46px' : '70px',
+								height: isMobile ? '16px' : '19px',
+							}}
+						/>
 					</div>
+				)}
 
-					{/* Top-right toggle skeleton */}
-					{showMessagesCampaignsToggle ? (
-						<div
-							style={{
-								position: 'absolute',
-								top: isMobile ? '12px' : `${desktopSearchTopPx}px`,
-								right: isMobile ? '8px' : '14px',
-								width: '260px',
-								height: '48px',
-								border: '3px solid #000000',
-								borderRadius: '8px',
-								overflow: 'hidden',
-								backgroundColor: '#FFFFFF',
-								zIndex: 10,
-								display: 'flex',
-								pointerEvents: 'none',
-							}}
-							aria-hidden
-						>
-							<div
-								aria-hidden
-								style={{
-									position: 'absolute',
-									left: '50%',
-									top: 0,
-									bottom: 0,
-									width: '3px',
-									backgroundColor: '#000000',
-									transform: 'translateX(-1.5px)',
-									pointerEvents: 'none',
-								}}
-							/>
-							<div className="h-full flex-1 bg-[#E5E5E5]" />
-							<div className="h-full flex-1 bg-[#E5E5E5]" />
-						</div>
-					) : (
-						<div
-							style={{
-								position: 'absolute',
-								top: isMobile ? '12.5px' : '55.5px',
-								right: isMobile ? '8px' : '14px',
-								width: isMobile ? '100px' : '148px',
-								height: isMobile ? '40px' : '47px',
-								border: '3px solid #000000',
-								borderRadius: '8px',
-								backgroundColor: '#FFFFFF',
-								zIndex: 10,
-								display: 'flex',
-								alignItems: 'center',
-								padding: isMobile ? '3px' : '4px',
-								gap: isMobile ? '2px' : '4px',
-								pointerEvents: 'none',
-							}}
-							aria-hidden
-						>
-							<div
-								className="rounded-[8px] bg-[#E5E5E5]"
-								style={{
-									width: isMobile ? '46px' : '70px',
-									height: isMobile ? '16px' : '19px',
-								}}
-							/>
-							<div
-								className="rounded-[8px] bg-[#E5E5E5]"
-								style={{
-									width: isMobile ? '46px' : '70px',
-									height: isMobile ? '16px' : '19px',
-								}}
-							/>
-						</div>
-					)}
-
-					{/* Email rows skeleton */}
-					{Array.from({ length: skeletonRowCount }).map((_, idx) => (
-						<div
-							key={`inbox-loading-${idx}`}
-							className="bg-white px-4 flex items-center w-full max-[480px]:px-2"
-							style={{
-								width: isMobile ? mobileEmailRowWidth : `${emailRowWidth}px`,
-								height: isMobile ? '100px' : '78px',
-								minHeight: isMobile ? '100px' : '78px',
-								border: '3px solid #000000',
-								borderRadius: '8px',
-								backgroundColor: '#FFFFFF',
-							}}
-						>
-							<div className="flex flex-col w-full">
-								<div className="flex items-center justify-between gap-3">
-									<div
-										className="h-[14px] rounded bg-[#D9D9D9]"
-										style={{ width: isMobile ? '55%' : '180px' }}
-									/>
-									<div
-										className="h-[14px] rounded bg-[#D9D9D9]"
-										style={{ width: isMobile ? '60px' : '90px' }}
-									/>
-								</div>
+				{/* Email rows skeleton */}
+				{Array.from({ length: skeletonRowCount }).map((_, idx) => (
+					<div
+						key={`inbox-loading-${idx}`}
+						className="bg-white px-4 flex items-center w-full max-[480px]:px-2"
+						style={{
+							width: isMobile ? mobileEmailRowWidth : `${emailRowWidth}px`,
+							height: isMobile ? '100px' : '78px',
+							minHeight: isMobile ? '100px' : '78px',
+							border: '3px solid #000000',
+							borderRadius: '8px',
+							backgroundColor: '#FFFFFF',
+						}}
+					>
+						<div className="flex flex-col w-full">
+							<div className="flex items-center justify-between gap-3">
 								<div
-									className="mt-2 h-[12px] rounded bg-[#E5E5E5]"
-									style={{ width: isMobile ? '85%' : '260px' }}
+									className="h-[14px] rounded bg-[#D9D9D9]"
+									style={{ width: isMobile ? '55%' : '180px' }}
 								/>
 								<div
-									className="mt-2 h-[10px] rounded bg-[#E5E5E5]"
-									style={{ width: isMobile ? '70%' : '320px' }}
+									className="h-[14px] rounded bg-[#D9D9D9]"
+									style={{ width: isMobile ? '60px' : '90px' }}
 								/>
 							</div>
+							<div
+								className="mt-2 h-[12px] rounded bg-[#E5E5E5]"
+								style={{ width: isMobile ? '85%' : '260px' }}
+							/>
+							<div
+								className="mt-2 h-[10px] rounded bg-[#E5E5E5]"
+								style={{ width: isMobile ? '70%' : '320px' }}
+							/>
 						</div>
-					))}
-				</div>
+					</div>
+				))}
+			</>
+		);
+
+		return (
+			<div className={`w-full flex justify-center ${outerPaddingClass}`}>
+				{loadingVariant === 'dashboard' ? (
+					<CustomScrollbar
+						data-campaign-main-box="inbox"
+						className={`flex flex-col items-center relative ${
+							isDashboardMode ? '' : 'animate-pulse'
+						}`}
+						contentClassName="flex flex-col items-center w-full space-y-2"
+						thumbWidth={2}
+						thumbColor="#000000"
+						trackColor="transparent"
+						offsetRight={-6}
+						disableOverflowClass
+						lockHorizontalScroll
+						style={loadingContainerStyle}
+						role="status"
+						aria-busy="true"
+						aria-label="Loading emails"
+					>
+						{loadingContent}
+					</CustomScrollbar>
+				) : (
+					<div
+						data-campaign-main-box="inbox"
+						className={`flex flex-col items-center space-y-2 overflow-y-auto overflow-x-hidden relative ${
+							isDashboardMode ? '' : 'animate-pulse'
+						}`}
+						style={loadingContainerStyle}
+						role="status"
+						aria-busy="true"
+						aria-label="Loading emails"
+					>
+						{loadingContent}
+					</div>
+				)}
 			</div>
 		);
 	}
