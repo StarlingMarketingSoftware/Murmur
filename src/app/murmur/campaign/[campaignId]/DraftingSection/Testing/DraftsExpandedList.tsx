@@ -38,6 +38,15 @@ export interface DraftsExpandedListProps {
 	contacts: ContactWithName[];
 	onHeaderClick?: () => void;
 	onOpenDrafts?: () => void;
+	/** Optional hover callback (used by Campaign "All" tab previews) */
+	onDraftHover?: (draft: EmailWithRelations | null) => void;
+	/**
+	 * When `allTab`, the component behaves like a dashboard preview:
+	 * - no row hover/selected background colors
+	 * - no header hover/click affordances
+	 * - rows still fire `onDraftHover` so the All tab can update Research + Preview
+	 */
+	interactionMode?: 'default' | 'allTab';
 	onSendingPreviewUpdate?: (args: { contactId: number; subject?: string }) => void;
 	onSendingPreviewReset?: () => void;
 	/**
@@ -167,6 +176,8 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 	contacts,
 	onHeaderClick,
 	onOpenDrafts,
+	onDraftHover,
+	interactionMode = 'default',
 	onSendingPreviewUpdate,
 	onSendingPreviewReset,
 	collapsed = false,
@@ -316,6 +327,7 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 	const isSendDisabled = selectedDraftIds.size === 0 || isSending;
 
 	const isAllTab = height === 347;
+	const isAllTabNavigation = interactionMode === 'allTab';
 	const whiteSectionHeight = customWhiteSectionHeight ?? (isAllTab ? 20 : 28);
 	const isBottomView = customWhiteSectionHeight === 15;
 	const resolvedRowWidth = rowWidth ?? 356;
@@ -502,7 +514,10 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 
 			{(isAllTab || isBottomView) && (
 				<div
-					className="absolute z-20 flex items-center gap-[12px] cursor-pointer"
+					className={cn(
+						'absolute z-20 flex items-center gap-[12px]',
+						isAllTabNavigation ? 'pointer-events-none cursor-default' : 'cursor-pointer'
+					)}
 					style={{ top: isBottomView ? 1 : -1, right: isBottomView ? 4 : 4 }}
 					onClick={onOpenDrafts}
 					role={onOpenDrafts ? 'button' : undefined}
@@ -539,13 +554,22 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 					>
 						{selectedDraftIds.size} Selected
 					</span>
-					<span
-						className="font-inter font-medium text-[10px] text-black cursor-pointer hover:underline"
-						style={{ position: 'absolute', right: '10px' }}
-						onClick={handleSelectAllToggle}
-					>
-						Select All
-					</span>
+					{isAllTabNavigation ? (
+						<span
+							className="font-inter font-medium text-[10px] text-black cursor-default"
+							style={{ position: 'absolute', right: '10px' }}
+						>
+							Select All
+						</span>
+					) : (
+						<span
+							className="font-inter font-medium text-[10px] text-black cursor-pointer hover:underline"
+							style={{ position: 'absolute', right: '10px' }}
+							onClick={handleSelectAllToggle}
+						>
+							Select All
+						</span>
+					)}
 				</div>
 			)}
 
@@ -582,6 +606,7 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 							}}
 							onMouseLeave={() => {
 								setHoveredDraftIndex(null);
+								onDraftHover?.(null);
 							}}
 						>
 						{drafts.map((draft, draftIndex) => {
@@ -602,13 +627,15 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 							// Keyboard focus shows hover UI independently of mouse hover
 							const isKeyboardFocused = hoveredDraftIndex === draftIndex;
 							// Final background: previewed > selected > keyboard focus > white (mouse hover handled by CSS)
-							const draftBgColor = isPreviewed
-								? 'bg-[#FDDEA5]'
-								: isSelected
-									? 'bg-[#FFDF9F]'
-									: isKeyboardFocused
-										? 'bg-[#F9E5BA]'
-										: 'bg-white hover:bg-[#F9E5BA]';
+							const draftBgColor = isAllTabNavigation
+								? 'bg-white'
+								: isPreviewed
+									? 'bg-[#FDDEA5]'
+									: isSelected
+										? 'bg-[#FFDF9F]'
+										: isKeyboardFocused
+											? 'bg-[#F9E5BA]'
+											: 'bg-white hover:bg-[#F9E5BA]';
 							return (
 								<div
 									key={draft.id}
@@ -620,7 +647,8 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 										}
 									}}
 									className={cn(
-										'cursor-pointer relative select-none overflow-visible rounded-[8px] border-2 border-[#000000]',
+										'relative select-none overflow-visible rounded-[8px] border-2 border-[#000000]',
+										isAllTabNavigation ? 'cursor-default' : 'cursor-pointer',
 										isBottomView
 											? 'w-[224px] h-[28px]'
 											: !hasCustomRowSize &&
@@ -640,9 +668,13 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 										if (e.shiftKey && !isPreviewMode) e.preventDefault();
 									}}
 									onMouseEnter={() => {
-										setHoveredDraftIndex(draftIndex);
+										if (!isAllTabNavigation) setHoveredDraftIndex(draftIndex);
+										onDraftHover?.(draft);
 									}}
-									onClick={(e) => handleDraftClick(draft, e)}
+									onClick={(e) => {
+										if (isAllTabNavigation) return;
+										handleDraftClick(draft, e);
+									}}
 								>
 									{/* Used-contact indicator - stacked above reject/approve when both present */}
 									{usedContactIdsSet.has(draft.contactId) && (

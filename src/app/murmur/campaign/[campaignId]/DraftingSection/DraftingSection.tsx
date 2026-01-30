@@ -351,6 +351,12 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const isDraftsHovered = hoveredAllTabBox === 'drafts';
 	const isSentHovered = hoveredAllTabBox === 'sent';
 	const isInboxHovered = hoveredAllTabBox === 'inbox';
+	// All tab: hovered email drives preview + research (hover-only, no row highlighting)
+	const [allTabHoveredEmailPreview, setAllTabHoveredEmailPreview] = useState<{
+		contactId: number;
+		subject?: string | null;
+		message?: string | null;
+	} | null>(null);
 	const shouldDimAllTabBoxes = view === 'all' && hoveredAllTabBox !== null;
 	const getAllTabBoxOpacityClassName = useCallback(
 		(box: AllTabBox) =>
@@ -2281,6 +2287,27 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			setHoveredContactForResearch(null);
 		}
 	};
+
+	// --- All tab: hover over Draft/Sent rows updates Research + Preview ---
+	const handleAllTabEmailHover = useCallback(
+		(email: EmailWithRelations | null) => {
+			if (!email) {
+				setAllTabHoveredEmailPreview(null);
+				handleResearchContactHover(null);
+				return;
+			}
+
+			setAllTabHoveredEmailPreview({
+				contactId: email.contactId,
+				subject: email.subject,
+				message: email.message,
+			});
+
+			const contactFromList = contacts?.find((c) => c.id === email.contactId) ?? null;
+			handleResearchContactHover(contactFromList);
+		},
+		[contacts, handleResearchContactHover]
+	);
 
 	const handleSendDrafts = async () => {
 		const selectedDrafts =
@@ -7021,7 +7048,31 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 
 						{/* All tab */}
 						{view === 'all' && (
-							<div ref={allTabContainerRef} className="mt-6 flex justify-center">
+							<div
+								ref={allTabContainerRef}
+								className="mt-6 flex justify-center murmur-all-tab-dashboard"
+							>
+								<style jsx global>{`
+									/* --- Campaign "All" tab: hover should NOT tint rows --- */
+									.murmur-all-tab-dashboard .bg-\\[\\#F5DADA\\],
+									.murmur-all-tab-dashboard .bg-\\[\\#EAAEAE\\],
+									.murmur-all-tab-dashboard .bg-\\[\\#F9E5BA\\],
+									.murmur-all-tab-dashboard .bg-\\[\\#FFDF9F\\],
+									.murmur-all-tab-dashboard .bg-\\[\\#FDDEA5\\],
+									.murmur-all-tab-dashboard .bg-\\[\\#A8E6A8\\] {
+										background-color: #ffffff !important;
+									}
+
+									.murmur-all-tab-dashboard .hover\\:bg-\\[\\#F5DADA\\]:hover,
+									.murmur-all-tab-dashboard .hover\\:bg-\\[\\#F9E5BA\\]:hover {
+										background-color: #ffffff !important;
+									}
+
+									/* Remove “this is clickable” affordance inside tiles (tiles themselves still navigate). */
+									.murmur-all-tab-dashboard .cursor-pointer {
+										cursor: default !important;
+									}
+								`}</style>
 								{/* Single column layout at narrowest breakpoint (< 952px) */}
 								{isNarrowestDesktop ? (
 									<div className="flex flex-col items-center" style={{ gap: '39px' }}>
@@ -7054,6 +7105,15 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											}}
 											onMouseEnter={() => handleAllTabBoxMouseEnter('contacts')}
 											onMouseLeave={() => handleAllTabBoxMouseLeave('contacts')}
+											onClickCapture={(e) => {
+												// In the All tab, clicks inside the tile should *only* navigate
+												// (disable internal list actions like Select All / row selection).
+												if (e.target === e.currentTarget) return;
+												e.preventDefault();
+												e.stopPropagation();
+												setHoveredAllTabBox(null);
+												goToContacts?.();
+											}}
 											onClick={() => {
 												setHoveredAllTabBox(null);
 												goToContacts?.();
@@ -7081,6 +7141,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													contacts={contactsAvailableForDrafting}
 													isLoading={isContactsLoading}
 													campaign={campaign}
+													interactionMode="allTab"
 													selectedContactIds={contactsTabSelectedIds}
 													onContactSelectionChange={(updater) =>
 														setContactsTabSelectedIds((prev) => updater(new Set(prev)))
@@ -7112,6 +7173,14 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											}}
 											onMouseEnter={() => handleAllTabBoxMouseEnter('writing')}
 											onMouseLeave={() => handleAllTabBoxMouseLeave('writing')}
+											onClickCapture={(e) => {
+												// All tab: disable interactions inside MiniEmailStructure (tile click navigates).
+												if (e.target === e.currentTarget) return;
+												e.preventDefault();
+												e.stopPropagation();
+												setHoveredAllTabBox(null);
+												goToWriting?.();
+											}}
 											onClick={() => {
 												setHoveredAllTabBox(null);
 												goToWriting?.();
@@ -7126,7 +7195,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																? sentSettingsPreviewForm
 																: form
 													}
-													readOnly={isDraftingView || isSentView}
+													readOnly={true}
 													variant={draftsMiniEmailTopHeaderHeight ? 'settings' : undefined}
 													settingsPrimaryLabel={draftsMiniEmailSettingsLabels.primary}
 													settingsSecondaryLabel={draftsMiniEmailSettingsLabels.secondary}
@@ -7167,6 +7236,13 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											}}
 											onMouseEnter={() => handleAllTabBoxMouseEnter('drafts')}
 											onMouseLeave={() => handleAllTabBoxMouseLeave('drafts')}
+											onClickCapture={(e) => {
+												if (e.target === e.currentTarget) return;
+												e.preventDefault();
+												e.stopPropagation();
+												setHoveredAllTabBox(null);
+												goToDrafting?.();
+											}}
 											onClick={() => {
 												setHoveredAllTabBox(null);
 												goToDrafting?.();
@@ -7176,6 +7252,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												<DraftsExpandedList
 													drafts={draftEmails}
 													contacts={contacts || []}
+													onDraftHover={handleAllTabEmailHover}
+													interactionMode="allTab"
 													width={330}
 													height={347}
 													hideSendButton
@@ -7195,6 +7273,13 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											}}
 											onMouseEnter={() => handleAllTabBoxMouseEnter('sent')}
 											onMouseLeave={() => handleAllTabBoxMouseLeave('sent')}
+											onClickCapture={(e) => {
+												if (e.target === e.currentTarget) return;
+												e.preventDefault();
+												e.stopPropagation();
+												setHoveredAllTabBox(null);
+												goToSent?.();
+											}}
 											onClick={() => {
 												setHoveredAllTabBox(null);
 												goToSent?.();
@@ -7204,6 +7289,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												<SentExpandedList
 													sent={sentEmails}
 													contacts={contacts || []}
+													onEmailHover={handleAllTabEmailHover}
+													interactionMode="allTab"
 													width={330}
 													height={347}
 													onOpenSent={goToSent}
@@ -7216,26 +7303,16 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											onMouseEnter={() => handleAllTabBoxMouseEnter('research')}
 											onMouseLeave={() => handleAllTabBoxMouseLeave('research')}
 										>
-											{isBatchDraftingInProgress ? (
-												<DraftPreviewExpandedList
-													contacts={contacts || []}
-													livePreview={liveDraftPreview}
-													fallbackDraft={draftPreviewFallbackDraft}
-													width={330}
-													height={347}
-												/>
-											) : (
-												<ContactResearchPanel
-													contact={displayedContactForResearch}
-													hideAllText={contactsAvailableForDrafting.length === 0}
-													hideSummaryIfBullets={true}
-													height={347}
-													width={330}
-													boxWidth={315}
-													compactHeader
-													className="!block"
-												/>
-											)}
+											<ContactResearchPanel
+												contact={displayedContactForResearch}
+												hideAllText={contactsAvailableForDrafting.length === 0}
+												hideSummaryIfBullets={true}
+												height={347}
+												width={330}
+												boxWidth={315}
+												compactHeader
+												className="!block"
+											/>
 										</div>
 										{/* 7. Suggestion Box */}
 										<div
@@ -7250,6 +7327,11 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											}}
 											onMouseEnter={() => handleAllTabBoxMouseEnter('suggestion')}
 											onMouseLeave={() => handleAllTabBoxMouseLeave('suggestion')}
+											onClickCapture={(e) => {
+												// All tab: suggestion tile is display-only (no clicks).
+												e.preventDefault();
+												e.stopPropagation();
+											}}
 										>
 											<div
 												style={{
@@ -7601,15 +7683,12 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										>
 											<DraftPreviewExpandedList
 												contacts={contacts || []}
-												fallbackDraft={
-													draftEmails[0]
-														? {
-																contactId: draftEmails[0].contactId,
-																subject: draftEmails[0].subject,
-																message: draftEmails[0].message,
-														  }
-														: null
+												livePreview={
+													allTabHoveredEmailPreview
+														? { ...liveDraftPreview, visible: false }
+														: liveDraftPreview
 												}
+												fallbackDraft={allTabHoveredEmailPreview ?? draftPreviewFallbackDraft}
 												width={330}
 												height={347}
 											/>
@@ -7626,6 +7705,13 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											}}
 											onMouseEnter={() => handleAllTabBoxMouseEnter('inbox')}
 											onMouseLeave={() => handleAllTabBoxMouseLeave('inbox')}
+											onClickCapture={(e) => {
+												if (e.target === e.currentTarget) return;
+												e.preventDefault();
+												e.stopPropagation();
+												setHoveredAllTabBox(null);
+												goToInbox?.();
+											}}
 											onClick={() => {
 												setHoveredAllTabBox(null);
 												goToInbox?.();
@@ -7678,6 +7764,13 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											}}
 											onMouseEnter={() => handleAllTabBoxMouseEnter('contacts')}
 											onMouseLeave={() => handleAllTabBoxMouseLeave('contacts')}
+											onClickCapture={(e) => {
+												if (e.target === e.currentTarget) return;
+												e.preventDefault();
+												e.stopPropagation();
+												setHoveredAllTabBox(null);
+												goToContacts?.();
+											}}
 											onClick={() => {
 												setHoveredAllTabBox(null);
 												goToContacts?.();
@@ -7706,6 +7799,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													contacts={contactsAvailableForDrafting}
 													isLoading={isContactsLoading}
 													campaign={campaign}
+													interactionMode="allTab"
 													selectedContactIds={contactsTabSelectedIds}
 													onContactSelectionChange={(updater) =>
 														setContactsTabSelectedIds((prev) => updater(new Set(prev)))
@@ -7738,6 +7832,13 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												}}
 												onMouseEnter={() => handleAllTabBoxMouseEnter('drafts')}
 												onMouseLeave={() => handleAllTabBoxMouseLeave('drafts')}
+												onClickCapture={(e) => {
+													if (e.target === e.currentTarget) return;
+													e.preventDefault();
+													e.stopPropagation();
+													setHoveredAllTabBox(null);
+													goToDrafting?.();
+												}}
 												onClick={() => {
 													setHoveredAllTabBox(null);
 													goToDrafting?.();
@@ -7748,6 +7849,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													<DraftsExpandedList
 														drafts={draftEmails}
 														contacts={contacts || []}
+														onDraftHover={handleAllTabEmailHover}
+														interactionMode="allTab"
 														width={330}
 														height={347}
 														hideSendButton
@@ -7762,26 +7865,16 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											onMouseEnter={() => handleAllTabBoxMouseEnter('research')}
 											onMouseLeave={() => handleAllTabBoxMouseLeave('research')}
 										>
-											{isBatchDraftingInProgress ? (
-												<DraftPreviewExpandedList
-													contacts={contacts || []}
-													livePreview={liveDraftPreview}
-													fallbackDraft={draftPreviewFallbackDraft}
-													width={330}
-													height={347}
-												/>
-											) : (
-												<ContactResearchPanel
-													contact={displayedContactForResearch}
-													hideAllText={contactsAvailableForDrafting.length === 0}
-													hideSummaryIfBullets={true}
-													height={347}
-													width={330}
-													boxWidth={315}
-													compactHeader
-													className="!block"
-												/>
-											)}
+											<ContactResearchPanel
+												contact={displayedContactForResearch}
+												hideAllText={contactsAvailableForDrafting.length === 0}
+												hideSummaryIfBullets={true}
+												height={347}
+												width={330}
+												boxWidth={315}
+												compactHeader
+												className="!block"
+											/>
 										</div>
 										{/* In narrow mode (2x4 grid), move Preview here */}
 										{isAllTabNarrow && (
@@ -7792,15 +7885,12 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											>
 												<DraftPreviewExpandedList
 													contacts={contacts || []}
-													fallbackDraft={
-														draftEmails[0]
-															? {
-																	contactId: draftEmails[0].contactId,
-																	subject: draftEmails[0].subject,
-																	message: draftEmails[0].message,
-															  }
-															: null
+													livePreview={
+														allTabHoveredEmailPreview
+															? { ...liveDraftPreview, visible: false }
+															: liveDraftPreview
 													}
+													fallbackDraft={allTabHoveredEmailPreview ?? draftPreviewFallbackDraft}
 													width={330}
 													height={347}
 												/>
@@ -7821,6 +7911,13 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											}}
 											onMouseEnter={() => handleAllTabBoxMouseEnter('writing')}
 											onMouseLeave={() => handleAllTabBoxMouseLeave('writing')}
+											onClickCapture={(e) => {
+												if (e.target === e.currentTarget) return;
+												e.preventDefault();
+												e.stopPropagation();
+												setHoveredAllTabBox(null);
+												goToWriting?.();
+											}}
 											onClick={() => {
 												setHoveredAllTabBox(null);
 												goToWriting?.();
@@ -7836,7 +7933,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																? sentSettingsPreviewForm
 																: form
 													}
-													readOnly={isDraftingView || isSentView}
+													readOnly={true}
 													variant={draftsMiniEmailTopHeaderHeight ? 'settings' : undefined}
 													settingsPrimaryLabel={draftsMiniEmailSettingsLabels.primary}
 													settingsSecondaryLabel={draftsMiniEmailSettingsLabels.secondary}
@@ -7878,6 +7975,13 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												}}
 												onMouseEnter={() => handleAllTabBoxMouseEnter('sent')}
 												onMouseLeave={() => handleAllTabBoxMouseLeave('sent')}
+												onClickCapture={(e) => {
+													if (e.target === e.currentTarget) return;
+													e.preventDefault();
+													e.stopPropagation();
+													setHoveredAllTabBox(null);
+													goToSent?.();
+												}}
 												onClick={() => {
 													setHoveredAllTabBox(null);
 													goToSent?.();
@@ -7888,6 +7992,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													<SentExpandedList
 														sent={sentEmails}
 														contacts={contacts || []}
+														onEmailHover={handleAllTabEmailHover}
+														interactionMode="allTab"
 														width={330}
 														height={347}
 														onOpenSent={goToSent}
@@ -8307,6 +8413,13 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											}}
 											onMouseEnter={() => handleAllTabBoxMouseEnter('drafts')}
 											onMouseLeave={() => handleAllTabBoxMouseLeave('drafts')}
+											onClickCapture={(e) => {
+												if (e.target === e.currentTarget) return;
+												e.preventDefault();
+												e.stopPropagation();
+												setHoveredAllTabBox(null);
+												goToDrafting?.();
+											}}
 											onClick={() => {
 												setHoveredAllTabBox(null);
 												goToDrafting?.();
@@ -8317,6 +8430,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												<DraftsExpandedList
 													drafts={draftEmails}
 													contacts={contacts || []}
+													onDraftHover={handleAllTabEmailHover}
+													interactionMode="allTab"
 													width={330}
 													height={347}
 													hideSendButton
@@ -8332,15 +8447,12 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										>
 											<DraftPreviewExpandedList
 												contacts={contacts || []}
-												fallbackDraft={
-													draftEmails[0]
-														? {
-																contactId: draftEmails[0].contactId,
-																subject: draftEmails[0].subject,
-																message: draftEmails[0].message,
-														  }
-														: null
+												livePreview={
+													allTabHoveredEmailPreview
+														? { ...liveDraftPreview, visible: false }
+														: liveDraftPreview
 												}
+												fallbackDraft={allTabHoveredEmailPreview ?? draftPreviewFallbackDraft}
 												width={330}
 												height={347}
 											/>
@@ -8361,6 +8473,13 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											}}
 											onMouseEnter={() => handleAllTabBoxMouseEnter('sent')}
 											onMouseLeave={() => handleAllTabBoxMouseLeave('sent')}
+											onClickCapture={(e) => {
+												if (e.target === e.currentTarget) return;
+												e.preventDefault();
+												e.stopPropagation();
+												setHoveredAllTabBox(null);
+												goToSent?.();
+											}}
 											onClick={() => {
 												setHoveredAllTabBox(null);
 												goToSent?.();
@@ -8371,6 +8490,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												<SentExpandedList
 													sent={sentEmails}
 													contacts={contacts || []}
+													onEmailHover={handleAllTabEmailHover}
+													interactionMode="allTab"
 													width={330}
 													height={347}
 													onOpenSent={goToSent}
@@ -8389,6 +8510,13 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											}}
 											onMouseEnter={() => handleAllTabBoxMouseEnter('inbox')}
 											onMouseLeave={() => handleAllTabBoxMouseLeave('inbox')}
+											onClickCapture={(e) => {
+												if (e.target === e.currentTarget) return;
+												e.preventDefault();
+												e.stopPropagation();
+												setHoveredAllTabBox(null);
+												goToInbox?.();
+											}}
 											onClick={() => {
 												setHoveredAllTabBox(null);
 												goToInbox?.();

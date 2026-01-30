@@ -130,6 +130,13 @@ export interface ContactsExpandedListProps {
 	 * When true, renders only the header chrome (no rows) for ultra-compact bottom panel layouts.
 	 */
 	collapsed?: boolean;
+	/**
+	 * When `allTab`, the component behaves like a dashboard preview:
+	 * - no row hover/selected background colors
+	 * - no header hover/click affordances
+	 * - rows still fire `onContactHover` so the All tab can update the Research panel
+	 */
+	interactionMode?: 'default' | 'allTab';
 }
 
 export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
@@ -148,6 +155,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 	whiteSectionHeight: customWhiteSectionHeight,
 	onOpenContacts,
 	collapsed = false,
+	interactionMode = 'default',
 }) => {
 	const router = useRouter();
 	const [internalSelectedContactIds, setInternalSelectedContactIds] = useState<
@@ -447,6 +455,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 	const innerWidth = typeof resolvedWidth === 'number' ? resolvedWidth - 10 : 370;
 
 	const isAllTab = height === 263;
+	const isAllTabNavigation = interactionMode === 'allTab';
 	const whiteSectionHeight = customWhiteSectionHeight ?? (isAllTab ? 20 : 28);
 	const isBottomView = customWhiteSectionHeight === 15;
 
@@ -498,7 +507,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 				// Also, when this list is rendered on the Write tab (tooltip-enabled), treat "Write"
 				// as the active tab so hovering "Write" shows the white-placeholder state.
 				activeTab={enableUsedContactTooltip ? 'write' : 'contacts'}
-				interactive={!isBottomView}
+				interactive={!isBottomView && !isAllTabNavigation}
 			/>
 			<div
 				className={cn(
@@ -520,7 +529,10 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 
 			{(isAllTab || isBottomView) && (
 				<div
-					className="absolute z-20 flex items-center gap-[12px] cursor-pointer"
+					className={cn(
+						'absolute z-20 flex items-center gap-[12px]',
+						isAllTabNavigation ? 'pointer-events-none cursor-default' : 'cursor-pointer'
+					)}
 					style={{ top: isBottomView ? 1 : -1, right: isBottomView ? 4 : 4 }}
 					onClick={onOpenContacts}
 					role={onOpenContacts ? 'button' : undefined}
@@ -547,17 +559,23 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 
 			{!collapsed && !isBottomView && (
 				<div className="px-3 mt-2 mb-0 flex items-center justify-center relative z-10 text-[13px] font-inter font-medium text-black/70">
-					<span>{selectedCount} Selected</span>
-					<button
-						type="button"
-						className="absolute right-3 bg-transparent border-none p-0 hover:text-black text-[13px] font-inter font-medium text-black/70 cursor-pointer"
-						onClick={(e) => {
-							e.stopPropagation();
-							handleSelectAllToggle();
-						}}
-					>
-						{areAllSelected ? 'Deselect All' : 'Select All'}
-					</button>
+					<span>{isAllTabNavigation ? 0 : selectedCount} Selected</span>
+					{isAllTabNavigation ? (
+						<span className="absolute right-3 bg-transparent border-none p-0 text-[13px] font-inter font-medium text-black/70 cursor-default">
+							Select All
+						</span>
+					) : (
+						<button
+							type="button"
+							className="absolute right-3 bg-transparent border-none p-0 hover:text-black text-[13px] font-inter font-medium text-black/70 cursor-pointer"
+							onClick={(e) => {
+								e.stopPropagation();
+								handleSelectAllToggle();
+							}}
+						>
+							{areAllSelected ? 'Deselect All' : 'Select All'}
+						</button>
+					)}
 				</div>
 			)}
 
@@ -709,11 +727,13 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 						// Keyboard focus shows hover UI independently of mouse hover
 						const isKeyboardFocused = hoveredContactIndex === contactIndex;
 						// Final background: selected > keyboard focus > white (mouse hover handled by CSS)
-						const contactBgColor = isSelected 
-							? 'bg-[#EAAEAE]' 
-							: isKeyboardFocused 
-								? 'bg-[#F5DADA]' 
-								: 'bg-white hover:bg-[#F5DADA]';
+						const contactBgColor = isAllTabNavigation
+							? 'bg-white'
+							: isSelected
+								? 'bg-[#EAAEAE]'
+								: isKeyboardFocused
+									? 'bg-[#F5DADA]'
+									: 'bg-white hover:bg-[#F5DADA]';
 						// Align the used-contact indicator with the top (Company) line in the standard (non-bottom) view.
 						// When the hover tooltip is visible, we center the tall pill so it stays inside the row.
 						const indicatorTop = isBottomView
@@ -733,7 +753,8 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 									}
 								}}
 						className={cn(
-							'cursor-pointer overflow-hidden rounded-[8px] border-2 border-[#000000] select-none relative grid grid-cols-2 grid-rows-2',
+							'overflow-hidden rounded-[8px] border-2 border-[#000000] select-none relative grid grid-cols-2 grid-rows-2',
+							isAllTabNavigation ? 'cursor-default' : 'cursor-pointer',
 							isBottomView
 								? 'w-[224px] h-[28px]'
 								: 'max-[480px]:w-[96.27vw] h-[49px] max-[480px]:h-[50px]',
@@ -744,10 +765,11 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 									if (e.shiftKey) e.preventDefault();
 								}}
 								onMouseEnter={() => {
-									setHoveredContactIndex(contactIndex);
+									if (!isAllTabNavigation) setHoveredContactIndex(contactIndex);
 									onContactHover?.(contact);
 								}}
 								onClick={(e) => {
+									if (isAllTabNavigation) return;
 									handleContactClick(contact, e);
 									onContactClick?.(contact);
 								}}
