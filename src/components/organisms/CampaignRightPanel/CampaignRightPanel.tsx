@@ -388,20 +388,20 @@ export const CampaignRightPanel: FC<CampaignRightPanelProps> = ({
 					<DraftsPanel style={{ display: 'block', position: 'relative', opacity: visualView === 'contacts' || visualView === 'testing' || visualView === 'sent' || visualView === 'inbox' ? 0.3 : 1 }} />
 				</div>
 				<div 
-					ref={sentRef}
-					className="relative z-10 flex items-center justify-center pointer-events-auto cursor-pointer"
-					style={{ marginTop: '25px' }}
-					onClick={() => onTabChange?.('sent')}
-				>
-					<SentPanel style={{ display: 'block', position: 'relative', opacity: visualView === 'contacts' || visualView === 'testing' || visualView === 'drafting' || visualView === 'inbox' ? 0.3 : 1 }} />
-				</div>
-				<div 
 					ref={inboxRef}
 					className="relative z-10 flex items-center justify-center pointer-events-auto cursor-pointer"
 					style={{ marginTop: '25px' }}
 					onClick={() => onTabChange?.('inbox')}
 				>
 					<InboxPanel style={{ display: 'block', position: 'relative', opacity: visualView === 'contacts' || visualView === 'testing' || visualView === 'drafting' || visualView === 'sent' ? 0.3 : 1 }} />
+				</div>
+				<div 
+					ref={sentRef}
+					className="relative z-10 flex items-center justify-center pointer-events-auto cursor-pointer"
+					style={{ marginTop: '25px' }}
+					onClick={() => onTabChange?.('sent')}
+				>
+					<SentPanel style={{ display: 'block', position: 'relative', opacity: visualView === 'contacts' || visualView === 'testing' || visualView === 'drafting' || visualView === 'inbox' ? 0.3 : 1 }} />
 				</div>
 			</div>
 		</div>

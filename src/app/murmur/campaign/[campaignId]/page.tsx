@@ -3379,7 +3379,12 @@ const Murmur = () => {
 				<CampaignRightPanel
 					view={activeView}
 					activeTab={activeView === 'inbox' ? (inboxSentTab === 'sent' ? 'sent' : 'inbox') : undefined}
-					onTabChange={setActiveView}
+					onTabChange={(tab) => {
+						// If the user explicitly clicks the Inbox icon, force the Inbox sub-tab.
+						// (Otherwise InboxSection can auto-default to "Sent" when there are no inbound replies yet.)
+						if (tab === 'inbox') requestInboxSentTab('inbox');
+						setActiveView(tab);
+					}}
 					transitionDurationMs={TRANSITION_DURATION}
 					isViewTransitionFading={isFadingOutPreviousView}
 					className={shouldApplyWritingTopShift ? 'translate-y-[81px]' : undefined}
