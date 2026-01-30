@@ -42,6 +42,7 @@ const getSentFillColor = (): string => '#B0E0A6';
 
 type CampaignTitlePillSpec = {
 	match: RegExp;
+	displayText?: string | ((matchedText: string) => string);
 	backgroundColor: string;
 	renderIcon: () => ReactNode;
 	iconWrapperClassName?: string;
@@ -51,6 +52,7 @@ const CAMPAIGN_TITLE_PILL_SPECS: CampaignTitlePillSpec[] = [
 	{
 		// "Wine, Beer, and Spirits" (and common punctuation variants)
 		match: /^wine\s*,?\s*beer\s*,?\s*(?:and\s*)?spirits(?=\s|$)/i,
+		displayText: 'W.B.S.',
 		backgroundColor: '#BFC4FF',
 		renderIcon: () => <WineBeerSpiritsIcon size={20} className="flex-shrink-0" />,
 	},
@@ -163,6 +165,10 @@ const renderCampaignTitleWithCategoryPill = (title: string): ReactNode => {
 		if (!matchedText) continue;
 
 		const suffix = restTitle.slice(matchedText.length);
+		const displayText =
+			typeof spec.displayText === 'function'
+				? spec.displayText(matchedText)
+				: (spec.displayText ?? matchedText);
 		return (
 			<>
 				{leadingWhitespace}
@@ -170,7 +176,7 @@ const renderCampaignTitleWithCategoryPill = (title: string): ReactNode => {
 					className="inline-flex items-center gap-[7px] h-[26px] px-[8px] rounded-[5px] align-middle"
 					style={{ backgroundColor: spec.backgroundColor }}
 				>
-					<span className="leading-none">{matchedText}</span>
+					<span className="leading-none">{displayText}</span>
 					<span className={cn('translate-y-[1px]', spec.iconWrapperClassName)}>
 						{spec.renderIcon()}
 					</span>
