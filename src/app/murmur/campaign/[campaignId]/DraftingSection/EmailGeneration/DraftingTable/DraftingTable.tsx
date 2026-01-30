@@ -417,9 +417,9 @@ export const ContactsHeaderChrome: FC<{
 export const DraftsHeaderChrome: FC<{
 	hasData?: boolean;
 	onContactsClick?: () => void;
-	onSentClick?: () => void;
+	onWriteClick?: () => void;
 	onInboxClick?: () => void;
-}> = ({ hasData = true, onContactsClick, onSentClick, onInboxClick }) => {
+}> = ({ hasData = true, onContactsClick, onWriteClick, onInboxClick }) => {
 	const [isDot1Hovered, setIsDot1Hovered] = useState(false);
 	const [isDot2Hovered, setIsDot2Hovered] = useState(false);
 	const [isDot3Hovered, setIsDot3Hovered] = useState(false);
@@ -435,9 +435,11 @@ export const DraftsHeaderChrome: FC<{
 	const dotTop = 11;
 	
 	// Existing positions
-	const dot1Left = 36; // The dot before the Drafts pill
-	const draftsPillLeft = 69; // Current position of Drafts pill
-	const dot2Left = 176;
+	// Order: dot (Contacts) – dot (Write) – Drafts pill – dot (Inbox)
+	// (Moves the Drafts pill one slot right and shifts the adjacent dot left of it.)
+	const dot1Left = 36;
+	const dot2Left = 102;
+	const draftsPillLeft = 137;
 	const dot3Left = 235;
 	
 	// Colors
@@ -470,13 +472,13 @@ export const DraftsHeaderChrome: FC<{
 	// Position Contacts pill centered where dot 1 was
 	const contactsPillLeft = dot1Left + dotSize / 2 - contactsPillWidth / 2;
 	
-	// Sent pill dimensions (shown when hovering dot 2)
-	const sentPillWidth = 73;
-	const sentPillHeight = pillHeight;
-	const sentPillBorderRadius = pillBorderRadius;
-	const sentPillFontSize = pillFontSize;
-	// Position Sent pill centered where dot 2 was
-	const sentPillLeft = dot2Left + dotSize / 2 - sentPillWidth / 2;
+	// Write pill dimensions (shown when hovering dot 2)
+	const writePillWidth = 73;
+	const writePillHeight = pillHeight;
+	const writePillBorderRadius = pillBorderRadius;
+	const writePillFontSize = pillFontSize;
+	// Position Write pill centered where dot 2 was
+	const writePillLeft = dot2Left + dotSize / 2 - writePillWidth / 2;
 	
 	// Inbox pill dimensions (shown when hovering dot 3)
 	const inboxPillWidth = 73;
@@ -487,13 +489,13 @@ export const DraftsHeaderChrome: FC<{
 	const inboxPillLeft = dot3Left + dotSize / 2 - inboxPillWidth / 2;
 	
 	// New position for Drafts pill when hovered
-	// Moves right when dot 1 is hovered (to make room for Contacts pill on left)
-	// Moves left when dot 2 or 3 is hovered (just a pinch to make room for Sent/Inbox pills)
+	// Moves right when dot 1 or 2 is hovered (to make room for Contacts/Write pills on left)
+	// Moves left when dot 3 is hovered (to make room for Inbox pill on right)
 	const draftsPillLeftHoveredRight = draftsPillLeft + 18;
-	const draftsPillLeftHoveredLeft = draftsPillLeft - 5;
+	const draftsPillLeftHoveredLeft = draftsPillLeft - 18;
 	const getDraftsPillLeft = () => {
-		if (isDot1Hovered) return draftsPillLeftHoveredRight;
-		if (isDot2Hovered || isDot3Hovered) return draftsPillLeftHoveredLeft;
+		if (isDot1Hovered || isDot2Hovered) return draftsPillLeftHoveredRight;
+		if (isDot3Hovered) return draftsPillLeftHoveredLeft;
 		return draftsPillLeft;
 	};
 	
@@ -603,17 +605,17 @@ export const DraftsHeaderChrome: FC<{
 				</span>
 			</div>
 
-			{/* Sent pill - shown when hovering dot 2 */}
+			{/* Write pill - shown when hovering dot 2 */}
 			<div
 				style={{
 					position: 'absolute',
 					top: `${pillTop}px`,
-					left: `${sentPillLeft}px`,
-					width: `${sentPillWidth}px`,
-					height: `${sentPillHeight}px`,
-					backgroundColor: '#B0E0A6',
+					left: `${writePillLeft}px`,
+					width: `${writePillWidth}px`,
+					height: `${writePillHeight}px`,
+					backgroundColor: '#A6E2A8',
 					border: '2px solid #000000',
-					borderRadius: `${sentPillBorderRadius}px`,
+					borderRadius: `${writePillBorderRadius}px`,
 					display: 'flex',
 					alignItems: 'center',
 					justifyContent: 'center',
@@ -621,18 +623,18 @@ export const DraftsHeaderChrome: FC<{
 					opacity: isDot2Hovered ? 1 : 0,
 					pointerEvents: isDot2Hovered ? 'auto' : 'none',
 					transition: `opacity ${pillOpacityTransition}`,
-					cursor: onSentClick ? 'pointer' : undefined,
+					cursor: onWriteClick ? 'pointer' : undefined,
 				}}
 				onClick={(e) => {
 					e.stopPropagation();
-					onSentClick?.();
+					onWriteClick?.();
 				}}
 			>
 				<span
 					className="font-semibold font-inter leading-none"
 					style={{ 
 						color: '#000000', 
-						fontSize: sentPillFontSize, 
+						fontSize: writePillFontSize, 
 						textAlign: 'center', 
 						width: '100%',
 						display: 'flex',
@@ -641,7 +643,7 @@ export const DraftsHeaderChrome: FC<{
 						height: '100%',
 					}}
 				>
-					Sent
+					Write
 				</span>
 			</div>
 
@@ -744,7 +746,7 @@ export const DraftsHeaderChrome: FC<{
 				onMouseLeave={() => setIsDot2Hovered(false)}
 				onClick={(e) => {
 					e.stopPropagation();
-					onSentClick?.();
+					onWriteClick?.();
 				}}
 				style={{
 					position: 'absolute',
@@ -753,7 +755,7 @@ export const DraftsHeaderChrome: FC<{
 					width: `${hoverZone2Width}px`,
 					height: `${hoverZoneHeight}px`,
 					zIndex: 20,
-					cursor: onSentClick ? 'pointer' : 'default',
+					cursor: onWriteClick ? 'pointer' : 'default',
 				}}
 			/>
 			
@@ -1321,7 +1323,7 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 				<DraftsHeaderChrome
 					hasData={hasData}
 					onContactsClick={goToContacts}
-					onSentClick={goToSent}
+					onWriteClick={goToWriting}
 					onInboxClick={goToInbox}
 				/>
 			)}
