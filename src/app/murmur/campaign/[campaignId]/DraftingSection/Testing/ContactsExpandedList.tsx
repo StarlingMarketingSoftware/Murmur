@@ -419,16 +419,17 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 		}
 	};
 
+	const allContactIds = useMemo(() => new Set(contacts.map((c) => c.id)), [contacts]);
 	const areAllSelected =
-		currentSelectedIds.size === contacts.length && contacts.length > 0;
-	const handleSelectAllToggle = () => {
+		allContactIds.size > 0 &&
+		currentSelectedIds.size === allContactIds.size &&
+		Array.from(allContactIds).every((id) => currentSelectedIds.has(id));
+	const handleSelectAllToggle = useCallback(() => {
 		updateSelection(() => {
-			if (areAllSelected) {
-				return new Set();
-			}
-			return new Set(contacts.map((c) => c.id));
+			if (areAllSelected) return new Set();
+			return new Set(allContactIds);
 		});
-	};
+	}, [allContactIds, areAllSelected, updateSelection]);
 
 	const selectedCount = currentSelectedIds.size;
 	const shouldShowLoadingWave = isLoading && contacts.length === 0;
@@ -540,12 +541,15 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 			)}
 
 			{!collapsed && !isBottomView && (
-				<div className="px-3 mt-1 mb-0 flex items-center justify-center relative top-1 text-[13px] font-inter font-medium text-black/70">
+				<div className="px-3 mt-2 mb-0 flex items-center justify-center relative z-10 text-[13px] font-inter font-medium text-black/70">
 					<span>{selectedCount} Selected</span>
 					<button
 						type="button"
 						className="absolute right-3 bg-transparent border-none p-0 hover:text-black text-[13px] font-inter font-medium text-black/70 cursor-pointer"
-						onClick={handleSelectAllToggle}
+						onClick={(e) => {
+							e.stopPropagation();
+							handleSelectAllToggle();
+						}}
 					>
 						{areAllSelected ? 'Deselect All' : 'Select All'}
 					</button>
