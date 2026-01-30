@@ -335,11 +335,67 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	]);
 
 	// All tab hover states
-	const [isContactsHovered, setIsContactsHovered] = useState(false);
-	const [isWritingHovered, setIsWritingHovered] = useState(false);
-	const [isDraftsHovered, setIsDraftsHovered] = useState(false);
-	const [isSentHovered, setIsSentHovered] = useState(false);
-	const [isInboxHovered, setIsInboxHovered] = useState(false);
+	type AllTabBox =
+		| 'header'
+		| 'contacts'
+		| 'writing'
+		| 'drafts'
+		| 'sent'
+		| 'research'
+		| 'suggestion'
+		| 'preview'
+		| 'inbox';
+	const [hoveredAllTabBox, setHoveredAllTabBox] = useState<AllTabBox | null>(null);
+	const isContactsHovered = hoveredAllTabBox === 'contacts';
+	const isWritingHovered = hoveredAllTabBox === 'writing';
+	const isDraftsHovered = hoveredAllTabBox === 'drafts';
+	const isSentHovered = hoveredAllTabBox === 'sent';
+	const isInboxHovered = hoveredAllTabBox === 'inbox';
+	const shouldDimAllTabBoxes = view === 'all' && hoveredAllTabBox !== null;
+	const getAllTabBoxOpacityClassName = useCallback(
+		(box: AllTabBox) =>
+			cn(
+				'transition-opacity duration-150 ease-out all-tab-box',
+				box !== 'research' && box !== 'suggestion' && box !== 'preview' && 'all-tab-box--scale',
+				shouldDimAllTabBoxes && hoveredAllTabBox !== box && 'opacity-90'
+			),
+		[hoveredAllTabBox, shouldDimAllTabBoxes]
+	);
+	const allTabHoverClearTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+	const allTabContainerRef = useRef<HTMLDivElement>(null);
+	const clearAllTabHoverClearTimeout = useCallback(() => {
+		if (!allTabHoverClearTimeoutRef.current) return;
+		clearTimeout(allTabHoverClearTimeoutRef.current);
+		allTabHoverClearTimeoutRef.current = null;
+	}, []);
+	const handleAllTabBoxMouseEnter = useCallback(
+		(box: AllTabBox) => {
+			// Cancel any pending "unhover" so moving between boxes doesn't flash.
+			clearAllTabHoverClearTimeout();
+			setHoveredAllTabBox(box);
+		},
+		[clearAllTabHoverClearTimeout]
+	);
+	const handleAllTabBoxMouseLeave = useCallback(
+		(box: AllTabBox) => {
+			// Keep the last-hovered box active briefly so gaps between panels don't
+			// cause a jarring fade-out/fade-in flash when moving to another box.
+			clearAllTabHoverClearTimeout();
+			allTabHoverClearTimeoutRef.current = setTimeout(() => {
+				setHoveredAllTabBox((prev) => (prev === box ? null : prev));
+				allTabHoverClearTimeoutRef.current = null;
+			}, 180);
+		},
+		[clearAllTabHoverClearTimeout]
+	);
+	useEffect(() => {
+		if (view === 'all') return;
+		clearAllTabHoverClearTimeout();
+		if (hoveredAllTabBox !== null) setHoveredAllTabBox(null);
+	}, [clearAllTabHoverClearTimeout, hoveredAllTabBox, view]);
+	useEffect(() => {
+		return () => clearAllTabHoverClearTimeout();
+	}, [clearAllTabHoverClearTimeout]);
 
 	// Narrow desktop detection for Writing tab compact layout.
 	// Note: widened upper bound from 1280 -> 1317 so the left pinned panel never clips
@@ -429,6 +485,45 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			window.removeEventListener(CAMPAIGN_ZOOM_EVENT, checkBreakpoints as EventListener);
 		};
 	}, [isMobile]);
+
+	useEffect(() => {
+		if (view !== 'all' || !allTabContainerRef.current) return;
+
+		const container = allTabContainerRef.current;
+		const allBoxes = Array.from(container.querySelectorAll<HTMLElement>('.all-tab-box'));
+
+		// Reset scale in case it was stuck from prior hovers.
+		allBoxes.forEach((box) => {
+			gsap.killTweensOf(box);
+			gsap.set(box, { scale: 1 });
+		});
+
+		// Only these boxes should scale on hover (exclude research/suggestion/preview).
+		const scaleBoxes = Array.from(container.querySelectorAll<HTMLElement>('.all-tab-box--scale'));
+		const listeners = scaleBoxes.map((box) => {
+			const onEnter = () => {
+				gsap.to(box, { scale: 1.02, duration: 0.7, ease: 'power3.out' });
+			};
+			const onLeave = () => {
+				gsap.to(box, { scale: 1, duration: 0.7, ease: 'power3.out' });
+			};
+			box.addEventListener('mouseenter', onEnter);
+			box.addEventListener('mouseleave', onLeave);
+			return { box, onEnter, onLeave };
+		});
+
+		return () => {
+			listeners.forEach(({ box, onEnter, onLeave }) => {
+				box.removeEventListener('mouseenter', onEnter);
+				box.removeEventListener('mouseleave', onLeave);
+			});
+
+			allBoxes.forEach((box) => {
+				gsap.killTweensOf(box);
+				gsap.set(box, { scale: 1 });
+			});
+		};
+	}, [view, isAllTabNarrow, isNarrowestDesktop]);
 
 	const bottomPanelBoxHeightPx = areBottomPanelsCollapsedAtCompactBreakpoint ? 31 : 117;
 	const bottomPanelCollapsed = areBottomPanelsCollapsedAtCompactBreakpoint;
@@ -6926,27 +7021,30 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 
 						{/* All tab */}
 						{view === 'all' && (
-							<div className="mt-6 flex justify-center">
+							<div ref={allTabContainerRef} className="mt-6 flex justify-center">
 								{/* Single column layout at narrowest breakpoint (< 952px) */}
 								{isNarrowestDesktop ? (
 									<div className="flex flex-col items-center" style={{ gap: '39px' }}>
 										{/* 1. Campaign Header */}
-										<CampaignHeaderBox
-											campaignId={campaign?.id}
-											campaignName={campaign?.name || 'Untitled Campaign'}
-											toListNames={toListNames}
-											fromName={fromName}
-											contactsCount={contactsCount}
-											draftCount={draftCount}
-											sentCount={sentCount}
-											onFromClick={onOpenIdentityDialog}
-											onContactsClick={goToContacts}
-											onDraftsClick={goToDrafting}
-											onSentClick={goToSent}
-											width={330}
-										/>
+										<div className={getAllTabBoxOpacityClassName('header')}>
+											<CampaignHeaderBox
+												campaignId={campaign?.id}
+												campaignName={campaign?.name || 'Untitled Campaign'}
+												toListNames={toListNames}
+												fromName={fromName}
+												contactsCount={contactsCount}
+												draftCount={draftCount}
+												sentCount={sentCount}
+												onFromClick={onOpenIdentityDialog}
+												onContactsClick={goToContacts}
+												onDraftsClick={goToDrafting}
+												onSentClick={goToSent}
+												width={330}
+											/>
+										</div>
 										{/* 2. Contacts */}
 										<div
+											className={getAllTabBoxOpacityClassName('contacts')}
 											style={{
 												width: '330px',
 												height: '263px',
@@ -6954,10 +7052,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												position: 'relative',
 												cursor: 'pointer',
 											}}
-											onMouseEnter={() => setIsContactsHovered(true)}
-											onMouseLeave={() => setIsContactsHovered(false)}
+											onMouseEnter={() => handleAllTabBoxMouseEnter('contacts')}
+											onMouseLeave={() => handleAllTabBoxMouseLeave('contacts')}
 											onClick={() => {
-												setIsContactsHovered(false);
+												setHoveredAllTabBox(null);
 												goToContacts?.();
 											}}
 										>
@@ -6971,7 +7069,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														width: '364px',
 														height: '278px',
 														backgroundColor: 'transparent',
-														border: '6px solid #D75152',
+														border: 'none',
 														borderRadius: '0px',
 														zIndex: 10,
 														pointerEvents: 'none',
@@ -7004,6 +7102,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										</div>
 										{/* 3. Writing */}
 										<div
+											className={getAllTabBoxOpacityClassName('writing')}
 											style={{
 												width: '330px',
 												height: '349px',
@@ -7011,30 +7110,13 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												position: 'relative',
 												cursor: 'pointer',
 											}}
-											onMouseEnter={() => setIsWritingHovered(true)}
-											onMouseLeave={() => setIsWritingHovered(false)}
+											onMouseEnter={() => handleAllTabBoxMouseEnter('writing')}
+											onMouseLeave={() => handleAllTabBoxMouseLeave('writing')}
 											onClick={() => {
-												setIsWritingHovered(false);
+												setHoveredAllTabBox(null);
 												goToWriting?.();
 											}}
 										>
-											{isWritingHovered && (
-												<div
-													style={{
-														position: 'absolute',
-														top: '50%',
-														left: '50%',
-														transform: 'translate(-50%, -50%)',
-														width: '364px',
-														height: '364px',
-														backgroundColor: 'transparent',
-														border: '6px solid #37B73B',
-														borderRadius: '0px',
-														zIndex: 10,
-														pointerEvents: 'none',
-													}}
-												/>
-											)}
 											<div style={{ position: 'relative', zIndex: 20 }}>
 												<MiniEmailStructure
 													form={
@@ -7075,6 +7157,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										</div>
 										{/* 4. Drafts */}
 										<div
+											className={getAllTabBoxOpacityClassName('drafts')}
 											style={{
 												width: '330px',
 												height: '347px',
@@ -7082,30 +7165,13 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												position: 'relative',
 												cursor: 'pointer',
 											}}
-											onMouseEnter={() => setIsDraftsHovered(true)}
-											onMouseLeave={() => setIsDraftsHovered(false)}
+											onMouseEnter={() => handleAllTabBoxMouseEnter('drafts')}
+											onMouseLeave={() => handleAllTabBoxMouseLeave('drafts')}
 											onClick={() => {
-												setIsDraftsHovered(false);
+												setHoveredAllTabBox(null);
 												goToDrafting?.();
 											}}
 										>
-											{isDraftsHovered && (
-												<div
-													style={{
-														position: 'absolute',
-														top: '50%',
-														left: '50%',
-														transform: 'translate(-50%, -50%)',
-														width: '364px',
-														height: '364px',
-														backgroundColor: 'transparent',
-														border: '6px solid #E6AF4D',
-														borderRadius: '0px',
-														zIndex: 10,
-														pointerEvents: 'none',
-													}}
-												/>
-											)}
 											<div style={{ position: 'relative', zIndex: 20 }}>
 												<DraftsExpandedList
 													drafts={draftEmails}
@@ -7119,6 +7185,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										</div>
 										{/* 5. Sent */}
 										<div
+											className={getAllTabBoxOpacityClassName('sent')}
 											style={{
 												width: '330px',
 												height: '347px',
@@ -7126,30 +7193,13 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												position: 'relative',
 												cursor: 'pointer',
 											}}
-											onMouseEnter={() => setIsSentHovered(true)}
-											onMouseLeave={() => setIsSentHovered(false)}
+											onMouseEnter={() => handleAllTabBoxMouseEnter('sent')}
+											onMouseLeave={() => handleAllTabBoxMouseLeave('sent')}
 											onClick={() => {
-												setIsSentHovered(false);
+												setHoveredAllTabBox(null);
 												goToSent?.();
 											}}
 										>
-											{isSentHovered && (
-												<div
-													style={{
-														position: 'absolute',
-														top: '50%',
-														left: '50%',
-														transform: 'translate(-50%, -50%)',
-														width: '364px',
-														height: '364px',
-														backgroundColor: 'transparent',
-														border: '6px solid #2CA954',
-														borderRadius: '0px',
-														zIndex: 10,
-														pointerEvents: 'none',
-													}}
-												/>
-											)}
 											<div style={{ position: 'relative', zIndex: 20 }}>
 												<SentExpandedList
 													sent={sentEmails}
@@ -7161,28 +7211,35 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											</div>
 										</div>
 										{/* 6. Research Panel */}
-										{isBatchDraftingInProgress ? (
-											<DraftPreviewExpandedList
-												contacts={contacts || []}
-												livePreview={liveDraftPreview}
-												fallbackDraft={draftPreviewFallbackDraft}
-												width={330}
-												height={347}
-											/>
-										) : (
-											<ContactResearchPanel
-												contact={displayedContactForResearch}
-												hideAllText={contactsAvailableForDrafting.length === 0}
-												hideSummaryIfBullets={true}
-												height={347}
-												width={330}
-												boxWidth={315}
-												compactHeader
-												className="!block"
-											/>
-										)}
+										<div
+											className={getAllTabBoxOpacityClassName('research')}
+											onMouseEnter={() => handleAllTabBoxMouseEnter('research')}
+											onMouseLeave={() => handleAllTabBoxMouseLeave('research')}
+										>
+											{isBatchDraftingInProgress ? (
+												<DraftPreviewExpandedList
+													contacts={contacts || []}
+													livePreview={liveDraftPreview}
+													fallbackDraft={draftPreviewFallbackDraft}
+													width={330}
+													height={347}
+												/>
+											) : (
+												<ContactResearchPanel
+													contact={displayedContactForResearch}
+													hideAllText={contactsAvailableForDrafting.length === 0}
+													hideSummaryIfBullets={true}
+													height={347}
+													width={330}
+													boxWidth={315}
+													compactHeader
+													className="!block"
+												/>
+											)}
+										</div>
 										{/* 7. Suggestion Box */}
 										<div
+											className={getAllTabBoxOpacityClassName('suggestion')}
 											style={{
 												width: '330px',
 												height: '347px',
@@ -7191,6 +7248,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												borderRadius: '7px',
 												position: 'relative',
 											}}
+											onMouseEnter={() => handleAllTabBoxMouseEnter('suggestion')}
+											onMouseLeave={() => handleAllTabBoxMouseLeave('suggestion')}
 										>
 											<div
 												style={{
@@ -7535,22 +7594,29 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											</div>
 										</div>
 										{/* 8. Draft Preview */}
-										<DraftPreviewExpandedList
-											contacts={contacts || []}
-											fallbackDraft={
-												draftEmails[0]
-													? {
-															contactId: draftEmails[0].contactId,
-															subject: draftEmails[0].subject,
-															message: draftEmails[0].message,
-													  }
-													: null
-											}
-											width={330}
-											height={347}
-										/>
+										<div
+											className={getAllTabBoxOpacityClassName('preview')}
+											onMouseEnter={() => handleAllTabBoxMouseEnter('preview')}
+											onMouseLeave={() => handleAllTabBoxMouseLeave('preview')}
+										>
+											<DraftPreviewExpandedList
+												contacts={contacts || []}
+												fallbackDraft={
+													draftEmails[0]
+														? {
+																contactId: draftEmails[0].contactId,
+																subject: draftEmails[0].subject,
+																message: draftEmails[0].message,
+														  }
+														: null
+												}
+												width={330}
+												height={347}
+											/>
+										</div>
 										{/* 9. Inbox */}
 										<div
+											className={getAllTabBoxOpacityClassName('inbox')}
 											style={{
 												width: '330px',
 												height: '347px',
@@ -7558,30 +7624,13 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												position: 'relative',
 												cursor: 'pointer',
 											}}
-											onMouseEnter={() => setIsInboxHovered(true)}
-											onMouseLeave={() => setIsInboxHovered(false)}
+											onMouseEnter={() => handleAllTabBoxMouseEnter('inbox')}
+											onMouseLeave={() => handleAllTabBoxMouseLeave('inbox')}
 											onClick={() => {
-												setIsInboxHovered(false);
+												setHoveredAllTabBox(null);
 												goToInbox?.();
 											}}
 										>
-											{isInboxHovered && (
-												<div
-													style={{
-														position: 'absolute',
-														top: '50%',
-														left: '50%',
-														transform: 'translate(-50%, -50%)',
-														width: '364px',
-														height: '364px',
-														backgroundColor: 'transparent',
-														border: '6px solid #5EB6D6',
-														borderRadius: '0px',
-														zIndex: 10,
-														pointerEvents: 'none',
-													}}
-												/>
-											)}
 											<div style={{ position: 'relative', zIndex: 20 }}>
 												<InboxExpandedList
 													contacts={contacts || []}
@@ -7601,21 +7650,24 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 								>
 									{/* Left column: Campaign Header + Contacts + Research (+ Preview in narrow mode) */}
 									<div className="flex flex-col items-center" style={{ gap: '39px' }}>
-										<CampaignHeaderBox
-											campaignId={campaign?.id}
-											campaignName={campaign?.name || 'Untitled Campaign'}
-											toListNames={toListNames}
-											fromName={fromName}
-											contactsCount={contactsCount}
-											draftCount={draftCount}
-											sentCount={sentCount}
-											onFromClick={onOpenIdentityDialog}
-											onContactsClick={goToContacts}
-											onDraftsClick={goToDrafting}
-											onSentClick={goToSent}
-											width={330}
-										/>
+										<div className={getAllTabBoxOpacityClassName('header')}>
+											<CampaignHeaderBox
+												campaignId={campaign?.id}
+												campaignName={campaign?.name || 'Untitled Campaign'}
+												toListNames={toListNames}
+												fromName={fromName}
+												contactsCount={contactsCount}
+												draftCount={draftCount}
+												sentCount={sentCount}
+												onFromClick={onOpenIdentityDialog}
+												onContactsClick={goToContacts}
+												onDraftsClick={goToDrafting}
+												onSentClick={goToSent}
+												width={330}
+											/>
+										</div>
 										<div
+											className={getAllTabBoxOpacityClassName('contacts')}
 											style={{
 												width: '330px',
 												height: '263px',
@@ -7624,10 +7676,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												position: 'relative',
 												cursor: 'pointer',
 											}}
-											onMouseEnter={() => setIsContactsHovered(true)}
-											onMouseLeave={() => setIsContactsHovered(false)}
+											onMouseEnter={() => handleAllTabBoxMouseEnter('contacts')}
+											onMouseLeave={() => handleAllTabBoxMouseLeave('contacts')}
 											onClick={() => {
-												setIsContactsHovered(false);
+												setHoveredAllTabBox(null);
 												goToContacts?.();
 											}}
 										>
@@ -7642,7 +7694,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														width: '364px',
 														height: '278px',
 														backgroundColor: 'transparent',
-														border: '6px solid #D75152',
+														border: 'none',
 														borderRadius: '0px',
 														zIndex: 10,
 														pointerEvents: 'none',
@@ -7676,6 +7728,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										{/* In narrow mode (2x4 grid), add Drafts here after Contacts */}
 										{isAllTabNarrow && (
 											<div
+												className={getAllTabBoxOpacityClassName('drafts')}
 												style={{
 													width: '330px',
 													height: '347px',
@@ -7683,31 +7736,14 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													position: 'relative',
 													cursor: 'pointer',
 												}}
-												onMouseEnter={() => setIsDraftsHovered(true)}
-												onMouseLeave={() => setIsDraftsHovered(false)}
+												onMouseEnter={() => handleAllTabBoxMouseEnter('drafts')}
+												onMouseLeave={() => handleAllTabBoxMouseLeave('drafts')}
 												onClick={() => {
-													setIsDraftsHovered(false);
+													setHoveredAllTabBox(null);
 													goToDrafting?.();
 												}}
 											>
 												{/* Hover box */}
-												{isDraftsHovered && (
-													<div
-														style={{
-															position: 'absolute',
-															top: '50%',
-															left: '50%',
-															transform: 'translate(-50%, -50%)',
-															width: '364px',
-															height: '364px',
-															backgroundColor: 'transparent',
-															border: '6px solid #E6AF4D',
-															borderRadius: '0px',
-															zIndex: 10,
-															pointerEvents: 'none',
-														}}
-													/>
-												)}
 												<div style={{ position: 'relative', zIndex: 20 }}>
 													<DraftsExpandedList
 														drafts={draftEmails}
@@ -7721,48 +7757,61 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											</div>
 										)}
 										{/* Research Panel */}
-										{isBatchDraftingInProgress ? (
-											<DraftPreviewExpandedList
-												contacts={contacts || []}
-												livePreview={liveDraftPreview}
-												fallbackDraft={draftPreviewFallbackDraft}
-												width={330}
-												height={347}
-											/>
-										) : (
-											<ContactResearchPanel
-												contact={displayedContactForResearch}
-												hideAllText={contactsAvailableForDrafting.length === 0}
-												hideSummaryIfBullets={true}
-												height={347}
-												width={330}
-												boxWidth={315}
-												compactHeader
-												className="!block"
-											/>
-										)}
+										<div
+											className={getAllTabBoxOpacityClassName('research')}
+											onMouseEnter={() => handleAllTabBoxMouseEnter('research')}
+											onMouseLeave={() => handleAllTabBoxMouseLeave('research')}
+										>
+											{isBatchDraftingInProgress ? (
+												<DraftPreviewExpandedList
+													contacts={contacts || []}
+													livePreview={liveDraftPreview}
+													fallbackDraft={draftPreviewFallbackDraft}
+													width={330}
+													height={347}
+												/>
+											) : (
+												<ContactResearchPanel
+													contact={displayedContactForResearch}
+													hideAllText={contactsAvailableForDrafting.length === 0}
+													hideSummaryIfBullets={true}
+													height={347}
+													width={330}
+													boxWidth={315}
+													compactHeader
+													className="!block"
+												/>
+											)}
+										</div>
 										{/* In narrow mode (2x4 grid), move Preview here */}
 										{isAllTabNarrow && (
-											<DraftPreviewExpandedList
-												contacts={contacts || []}
-												fallbackDraft={
-													draftEmails[0]
-														? {
-																contactId: draftEmails[0].contactId,
-																subject: draftEmails[0].subject,
-																message: draftEmails[0].message,
-														  }
-														: null
-												}
-												width={330}
-												height={347}
-											/>
+											<div
+												className={getAllTabBoxOpacityClassName('preview')}
+												onMouseEnter={() => handleAllTabBoxMouseEnter('preview')}
+												onMouseLeave={() => handleAllTabBoxMouseLeave('preview')}
+											>
+												<DraftPreviewExpandedList
+													contacts={contacts || []}
+													fallbackDraft={
+														draftEmails[0]
+															? {
+																	contactId: draftEmails[0].contactId,
+																	subject: draftEmails[0].subject,
+																	message: draftEmails[0].message,
+															  }
+															: null
+													}
+													width={330}
+													height={347}
+												/>
+											</div>
 										)}
 									</div>
 									{/* Column 2: Writing (Row 1) + Suggestion (Row 2) */}
 									<div className="flex flex-col items-center" style={{ gap: '39px' }}>
 										{/* Row 1: Mini Email Structure */}
 										<div
+											className={getAllTabBoxOpacityClassName('writing')}
 											style={{
 												width: '330px',
 												height: '349px',
@@ -7770,31 +7819,14 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												position: 'relative',
 												cursor: 'pointer',
 											}}
-											onMouseEnter={() => setIsWritingHovered(true)}
-											onMouseLeave={() => setIsWritingHovered(false)}
+											onMouseEnter={() => handleAllTabBoxMouseEnter('writing')}
+											onMouseLeave={() => handleAllTabBoxMouseLeave('writing')}
 											onClick={() => {
-												setIsWritingHovered(false);
+												setHoveredAllTabBox(null);
 												goToWriting?.();
 											}}
 										>
 											{/* Hover box */}
-											{isWritingHovered && (
-												<div
-													style={{
-														position: 'absolute',
-														top: '50%',
-														left: '50%',
-														transform: 'translate(-50%, -50%)',
-														width: '364px',
-														height: '364px',
-														backgroundColor: 'transparent',
-														border: '6px solid #37B73B',
-														borderRadius: '0px',
-														zIndex: 10,
-														pointerEvents: 'none',
-													}}
-												/>
-											)}
 											<div style={{ position: 'relative', zIndex: 20 }}>
 												<MiniEmailStructure
 													form={
@@ -7836,6 +7868,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										{/* In narrow mode, add Sent here (after Writing, before Suggestion) */}
 										{isAllTabNarrow && (
 											<div
+												className={getAllTabBoxOpacityClassName('sent')}
 												style={{
 													width: '330px',
 													height: '347px',
@@ -7843,31 +7876,14 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													position: 'relative',
 													cursor: 'pointer',
 												}}
-												onMouseEnter={() => setIsSentHovered(true)}
-												onMouseLeave={() => setIsSentHovered(false)}
+												onMouseEnter={() => handleAllTabBoxMouseEnter('sent')}
+												onMouseLeave={() => handleAllTabBoxMouseLeave('sent')}
 												onClick={() => {
-													setIsSentHovered(false);
+													setHoveredAllTabBox(null);
 													goToSent?.();
 												}}
 											>
 												{/* Hover box */}
-												{isSentHovered && (
-													<div
-														style={{
-															position: 'absolute',
-															top: '50%',
-															left: '50%',
-															transform: 'translate(-50%, -50%)',
-															width: '364px',
-															height: '364px',
-															backgroundColor: 'transparent',
-															border: '6px solid #2CA954',
-															borderRadius: '0px',
-															zIndex: 10,
-															pointerEvents: 'none',
-														}}
-													/>
-												)}
 												<div style={{ position: 'relative', zIndex: 20 }}>
 													<SentExpandedList
 														sent={sentEmails}
@@ -7881,6 +7897,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										)}
 										{/* Row 2: Suggestion Box */}
 										<div
+											className={getAllTabBoxOpacityClassName('suggestion')}
 											style={{
 												width: '330px',
 												height: '347px',
@@ -7889,6 +7906,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												borderRadius: '7px',
 												position: 'relative',
 											}}
+											onMouseEnter={() => handleAllTabBoxMouseEnter('suggestion')}
+											onMouseLeave={() => handleAllTabBoxMouseLeave('suggestion')}
 										>
 											<div
 												style={{
@@ -8240,6 +8259,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											<>
 												{/* Inbox */}
 												<div
+													className={getAllTabBoxOpacityClassName('inbox')}
 													style={{
 														width: '330px',
 														height: '347px',
@@ -8247,31 +8267,14 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														position: 'relative',
 														cursor: 'pointer',
 													}}
-													onMouseEnter={() => setIsInboxHovered(true)}
-													onMouseLeave={() => setIsInboxHovered(false)}
+													onMouseEnter={() => handleAllTabBoxMouseEnter('inbox')}
+													onMouseLeave={() => handleAllTabBoxMouseLeave('inbox')}
 													onClick={() => {
-														setIsInboxHovered(false);
+														setHoveredAllTabBox(null);
 														goToInbox?.();
 													}}
 												>
 													{/* Hover box */}
-													{isInboxHovered && (
-														<div
-															style={{
-																position: 'absolute',
-																top: '50%',
-																left: '50%',
-																transform: 'translate(-50%, -50%)',
-																width: '364px',
-																height: '364px',
-																backgroundColor: 'transparent',
-																border: '6px solid #5EB6D6',
-																borderRadius: '0px',
-																zIndex: 10,
-																pointerEvents: 'none',
-															}}
-														/>
-													)}
 													<div style={{ position: 'relative', zIndex: 20 }}>
 														<InboxExpandedList
 															contacts={contacts || []}
@@ -8294,6 +8297,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 									<div className="flex flex-col items-center" style={{ gap: '39px' }}>
 										{/* Row 1: Drafts */}
 										<div
+											className={getAllTabBoxOpacityClassName('drafts')}
 											style={{
 												width: '330px',
 												height: '347px',
@@ -8301,31 +8305,14 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												position: 'relative',
 												cursor: 'pointer',
 											}}
-											onMouseEnter={() => setIsDraftsHovered(true)}
-											onMouseLeave={() => setIsDraftsHovered(false)}
+											onMouseEnter={() => handleAllTabBoxMouseEnter('drafts')}
+											onMouseLeave={() => handleAllTabBoxMouseLeave('drafts')}
 											onClick={() => {
-												setIsDraftsHovered(false);
+												setHoveredAllTabBox(null);
 												goToDrafting?.();
 											}}
 										>
 											{/* Hover box */}
-											{isDraftsHovered && (
-												<div
-													style={{
-														position: 'absolute',
-														top: '50%',
-														left: '50%',
-														transform: 'translate(-50%, -50%)',
-														width: '364px',
-														height: '364px',
-														backgroundColor: 'transparent',
-														border: '6px solid #E6AF4D',
-														borderRadius: '0px',
-														zIndex: 10,
-														pointerEvents: 'none',
-													}}
-												/>
-											)}
 											<div style={{ position: 'relative', zIndex: 20 }}>
 												<DraftsExpandedList
 													drafts={draftEmails}
@@ -8338,26 +8325,33 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											</div>
 										</div>
 										{/* Row 2: Draft Preview */}
-										<DraftPreviewExpandedList
-											contacts={contacts || []}
-											fallbackDraft={
-												draftEmails[0]
-													? {
-															contactId: draftEmails[0].contactId,
-															subject: draftEmails[0].subject,
-															message: draftEmails[0].message,
-													  }
-													: null
-											}
-											width={330}
-											height={347}
-										/>
+										<div
+											className={getAllTabBoxOpacityClassName('preview')}
+											onMouseEnter={() => handleAllTabBoxMouseEnter('preview')}
+											onMouseLeave={() => handleAllTabBoxMouseLeave('preview')}
+										>
+											<DraftPreviewExpandedList
+												contacts={contacts || []}
+												fallbackDraft={
+													draftEmails[0]
+														? {
+																contactId: draftEmails[0].contactId,
+																subject: draftEmails[0].subject,
+																message: draftEmails[0].message,
+														  }
+														: null
+												}
+												width={330}
+												height={347}
+											/>
+										</div>
 									</div>
 
 									{/* Column 4: Sent (Row 1) + Inbox (Row 2) */}
 									<div className="flex flex-col items-center" style={{ gap: '39px' }}>
 										{/* Row 1: Sent */}
 										<div
+											className={getAllTabBoxOpacityClassName('sent')}
 											style={{
 												width: '330px',
 												height: '347px',
@@ -8365,31 +8359,14 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												position: 'relative',
 												cursor: 'pointer',
 											}}
-											onMouseEnter={() => setIsSentHovered(true)}
-											onMouseLeave={() => setIsSentHovered(false)}
+											onMouseEnter={() => handleAllTabBoxMouseEnter('sent')}
+											onMouseLeave={() => handleAllTabBoxMouseLeave('sent')}
 											onClick={() => {
-												setIsSentHovered(false);
+												setHoveredAllTabBox(null);
 												goToSent?.();
 											}}
 										>
 											{/* Hover box */}
-											{isSentHovered && (
-												<div
-													style={{
-														position: 'absolute',
-														top: '50%',
-														left: '50%',
-														transform: 'translate(-50%, -50%)',
-														width: '364px',
-														height: '364px',
-														backgroundColor: 'transparent',
-														border: '6px solid #2CA954',
-														borderRadius: '0px',
-														zIndex: 10,
-														pointerEvents: 'none',
-													}}
-												/>
-											)}
 											<div style={{ position: 'relative', zIndex: 20 }}>
 												<SentExpandedList
 													sent={sentEmails}
@@ -8402,6 +8379,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										</div>
 										{/* Row 2: Inbox */}
 										<div
+											className={getAllTabBoxOpacityClassName('inbox')}
 											style={{
 												width: '330px',
 												height: '347px',
@@ -8409,31 +8387,14 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												position: 'relative',
 												cursor: 'pointer',
 											}}
-											onMouseEnter={() => setIsInboxHovered(true)}
-											onMouseLeave={() => setIsInboxHovered(false)}
+											onMouseEnter={() => handleAllTabBoxMouseEnter('inbox')}
+											onMouseLeave={() => handleAllTabBoxMouseLeave('inbox')}
 											onClick={() => {
-												setIsInboxHovered(false);
+												setHoveredAllTabBox(null);
 												goToInbox?.();
 											}}
 										>
 											{/* Hover box */}
-											{isInboxHovered && (
-												<div
-													style={{
-														position: 'absolute',
-														top: '50%',
-														left: '50%',
-														transform: 'translate(-50%, -50%)',
-														width: '364px',
-														height: '364px',
-														backgroundColor: 'transparent',
-														border: '6px solid #5EB6D6',
-														borderRadius: '0px',
-														zIndex: 10,
-														pointerEvents: 'none',
-													}}
-												/>
-											)}
 											<div style={{ position: 'relative', zIndex: 20 }}>
 												<InboxExpandedList
 													contacts={contacts || []}
