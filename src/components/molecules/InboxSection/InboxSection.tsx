@@ -683,6 +683,8 @@ export const InboxSection: FC<InboxSectionProps> = ({
 	const isUsingSampleData = Boolean(sampleData);
 
 	const [activeTab, setActiveTab] = useState<'inbox' | 'sent'>('inbox');
+	const hasUserSelectedInboxSentTabRef = useRef(false);
+	const hasAutoInitializedInboxSentTabRef = useRef(false);
 	const {
 		data: inboundEmailsFromApi,
 		isLoading: isLoadingInbound,
@@ -733,6 +735,44 @@ export const InboxSection: FC<InboxSectionProps> = ({
 					return !!sender && normalizedAllowedSenders.has(sender);
 			  })
 			: inboundEmails;
+
+	const campaignReplyCount = Array.isArray(filteredBySender) ? filteredBySender.length : 0;
+	const shouldAutoDefaultInboxSentTab = typeof campaignId === 'number';
+
+	// Campaign page UX: if there are no replies yet, default to "Sent".
+	// Once a reply exists, default to "Inbox". Only auto-decide once per mount (or campaignId change),
+	// and never override the user's explicit tab selection.
+	useLayoutEffect(() => {
+		hasUserSelectedInboxSentTabRef.current = false;
+		hasAutoInitializedInboxSentTabRef.current = false;
+	}, [campaignId]);
+
+	useLayoutEffect(() => {
+		if (!shouldAutoDefaultInboxSentTab) return;
+		if (hasUserSelectedInboxSentTabRef.current) return;
+		if (hasAutoInitializedInboxSentTabRef.current) return;
+		// Don't auto-switch while the user is reading an email.
+		if (selectedEmailId !== null) return;
+
+		const nextTab: 'inbox' | 'sent' = campaignReplyCount > 0 ? 'inbox' : 'sent';
+		if (activeTab !== nextTab) {
+			setActiveTab(nextTab);
+			setSelectedEmailId(null);
+			setReplyMessage('');
+		}
+
+		const inboundLoaded = isUsingSampleData || inboundEmailsFromApi !== undefined;
+		if (inboundLoaded) {
+			hasAutoInitializedInboxSentTabRef.current = true;
+		}
+	}, [
+		shouldAutoDefaultInboxSentTab,
+		campaignReplyCount,
+		activeTab,
+		selectedEmailId,
+		isUsingSampleData,
+		inboundEmailsFromApi,
+	]);
 
 	// Convert sent emails to a format compatible with inbox display
 	const normalizedSentEmails: Array<InboundEmailWithRelations & { isSent?: boolean }> =
@@ -1322,6 +1362,8 @@ export const InboxSection: FC<InboxSectionProps> = ({
 
 	// Reset selected email when switching tabs
 	const handleTabChange = (tab: 'inbox' | 'sent') => {
+		hasUserSelectedInboxSentTabRef.current = true;
+		hasAutoInitializedInboxSentTabRef.current = true;
 		setActiveTab(tab);
 		setSelectedEmailId(null);
 		setReplyMessage('');
@@ -1459,23 +1501,22 @@ export const InboxSection: FC<InboxSectionProps> = ({
 						/>
 					</div>
 
-					{/* Top-right toggle (disabled in empty state) */}
+					{/* Top-right toggle */}
 					{showMessagesCampaignsToggle ? (
 						<div
 							style={{
 								position: 'absolute',
 								top: isMobile ? '45px' : `${desktopSearchTopPx}px`,
 								right: isMobile ? '8px' : '14px',
-							width: '260px',
+								width: '260px',
 								height: '48px',
 								border: '3px solid #000000',
 								borderRadius: '8px',
 								overflow: 'hidden',
 								zIndex: 10,
 								display: 'flex',
-								pointerEvents: 'none',
+								backgroundColor: '#FFFFFF',
 							}}
-							aria-hidden
 						>
 							<div
 								aria-hidden
@@ -1487,57 +1528,101 @@ export const InboxSection: FC<InboxSectionProps> = ({
 									width: '3px',
 									backgroundColor: '#000000',
 									transform: 'translateX(-1.5px)',
+									pointerEvents: 'none',
 								}}
 							/>
-							<div
-								className="h-full flex-1"
+							<button
+								type="button"
+								onClick={() => onInboxSubtabChange?.('messages')}
+								aria-pressed={inboxSubtab === 'messages'}
 								style={{
-									backgroundColor:
-										inboxSubtab === 'messages' ? '#B3E5FF' : '#4DA6D7',
+									flex: 1,
+									height: '100%',
+									display: 'flex',
+									alignItems: 'center',
+									justifyContent: 'center',
+									padding: 0,
+									margin: 0,
+									lineHeight: 1,
+									border: 'none',
+									outline: 'none',
+									backgroundColor: inboxSubtab === 'messages' ? '#B3E5FF' : '#4DA6D7',
+									color: '#000000',
+									fontFamily: 'Inter, sans-serif',
+									fontSize: '15px',
+									fontWeight: 500,
+									cursor: 'pointer',
+									boxShadow: 'none',
+									WebkitAppearance: 'none',
+									appearance: 'none',
 								}}
-							/>
-							<div
-								className="h-full flex-1"
+							>
+								Messages
+							</button>
+							<button
+								type="button"
+								onClick={() => onInboxSubtabChange?.('campaigns')}
+								aria-pressed={inboxSubtab === 'campaigns'}
 								style={{
-									backgroundColor:
-										inboxSubtab === 'campaigns' ? '#B3E5FF' : '#4DA6D7',
+									flex: 1,
+									height: '100%',
+									display: 'flex',
+									alignItems: 'center',
+									justifyContent: 'center',
+									padding: 0,
+									margin: 0,
+									lineHeight: 1,
+									border: 'none',
+									outline: 'none',
+									backgroundColor: inboxSubtab === 'campaigns' ? '#B3E5FF' : '#4DA6D7',
+									color: '#000000',
+									fontFamily: 'Inter, sans-serif',
+									fontSize: '15px',
+									fontWeight: 500,
+									cursor: 'pointer',
+									boxShadow: 'none',
+									WebkitAppearance: 'none',
+									appearance: 'none',
 								}}
-							/>
+							>
+								Campaigns
+							</button>
 						</div>
 					) : (
 						<div
 							style={{
 								position: 'absolute',
-								top: isMobile ? '45.5px' : '55.5px', // Centered with search bar
+								top: isMobile
+									? '45.5px'
+									: `${desktopSearchTopPx + 0.5}px`, // Centered with search bar
 								right: isMobile ? '8px' : '14px', // Right-aligned with emails
 								width: isMobile ? '100px' : '148px',
 								height: isMobile ? '40px' : '47px',
 								border: '3px solid #000000',
 								borderRadius: '8px',
-								backgroundColor: '#3277c6',
+								backgroundColor: '#FFFFFF',
 								zIndex: 10,
 								display: 'flex',
 								alignItems: 'center',
 								padding: isMobile ? '3px' : '4px',
 								gap: isMobile ? '2px' : '4px',
-								pointerEvents: 'none',
 							}}
 						>
 							{/* Inbox tab */}
 							<button
 								type="button"
-								onClick={() => {}}
-								disabled
+								onClick={() => handleTabChange('inbox')}
 								style={{
 									width: isMobile ? '46px' : '70px',
 									height: isMobile ? '16px' : '19px',
 									display: 'flex',
 									alignItems: 'center',
 									justifyContent: 'center',
-									backgroundColor: activeTab === 'inbox' ? '#3277c6' : 'transparent',
+									backgroundColor:
+										activeTab === 'inbox' ? 'rgba(93, 171, 104, 0.63)' : 'transparent',
 									borderRadius: '8px',
 									border: activeTab === 'inbox' ? '2px solid #000000' : 'none',
-									cursor: 'not-allowed',
+									cursor: 'pointer',
 									padding: 0,
 									margin: 0,
 									outline: 'none',
@@ -1550,7 +1635,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 									style={{
 										fontSize: isMobile ? '11px' : '14px',
 										fontWeight: 500,
-										color: 'transparent',
+										color: '#000000',
 										fontFamily: 'Times New Roman, serif',
 									}}
 								>
@@ -1560,18 +1645,18 @@ export const InboxSection: FC<InboxSectionProps> = ({
 							{/* Sent tab */}
 							<button
 								type="button"
-								onClick={() => {}}
-								disabled
+								onClick={() => handleTabChange('sent')}
 								style={{
 									width: isMobile ? '46px' : '70px',
 									height: isMobile ? '16px' : '19px',
 									display: 'flex',
 									alignItems: 'center',
 									justifyContent: 'center',
-									backgroundColor: activeTab === 'sent' ? '#3277c6' : 'transparent',
+									backgroundColor:
+										activeTab === 'sent' ? 'rgba(93, 171, 104, 0.63)' : 'transparent',
 									borderRadius: '8px',
 									border: activeTab === 'sent' ? '2px solid #000000' : 'none',
-									cursor: 'not-allowed',
+									cursor: 'pointer',
 									padding: 0,
 									margin: 0,
 									outline: 'none',
@@ -1584,7 +1669,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 									style={{
 										fontSize: isMobile ? '11px' : '14px',
 										fontWeight: 500,
-										color: 'transparent',
+										color: '#000000',
 										fontFamily: 'Times New Roman, serif',
 									}}
 								>
