@@ -649,8 +649,14 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 										<span
 											className={cn('absolute', indicatorLeftClass)}
 											style={{
-												top: (isRejected || isApproved) ? 'calc(50% - 16px)' : '50%',
-												transform: (isRejected || isApproved) ? 'none' : 'translateY(-50%)',
+												// Align used-contact dot with the Company line.
+												// Different positioning for Drafts tab vs All tab vs bottom view.
+												top: isBottomView
+													? '50%'
+													: isAllTab
+														? 'calc(50% - 16px)'
+														: 'calc(50% - 32px)', // Drafts tab - higher
+												transform: isBottomView ? 'translateY(-50%)' : 'none',
 												width: isBottomView ? '12px' : '13px',
 												height: isBottomView ? '12px' : '13px',
 												borderRadius: '50%',
@@ -666,7 +672,15 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 											title="Marked for rejection"
 											aria-label="Rejected draft"
 											style={{
-												top: usedContactIdsSet.has(draft.contactId) ? 'calc(50% + 3px)' : '50%',
+												// When stacked under the used-contact dot, align with the Subject line.
+												// Different positioning for Drafts tab vs All tab vs bottom view.
+												top: usedContactIdsSet.has(draft.contactId)
+													? (isBottomView
+														? 'calc(50% + 3px)'
+														: isAllTab
+															? 'calc(50% + 6px)'
+															: 'calc(50% - 10px)') // Drafts tab - higher
+													: '50%',
 												transform: usedContactIdsSet.has(draft.contactId) ? 'none' : 'translateY(-50%)',
 												width: isBottomView ? '12px' : '13px',
 												height: isBottomView ? '12px' : '13px',
@@ -682,7 +696,15 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 											title="Marked for approval"
 											aria-label="Approved draft"
 											style={{
-												top: usedContactIdsSet.has(draft.contactId) ? 'calc(50% + 3px)' : '50%',
+												// When stacked under the used-contact dot, align with the Subject line.
+												// Different positioning for Drafts tab vs All tab vs bottom view.
+												top: usedContactIdsSet.has(draft.contactId)
+													? (isBottomView
+														? 'calc(50% + 3px)'
+														: isAllTab
+															? 'calc(50% + 6px)'
+															: 'calc(50% - 10px)') // Drafts tab - higher
+													: '50%',
 												transform: usedContactIdsSet.has(draft.contactId) ? 'none' : 'translateY(-50%)',
 												width: isBottomView ? '12px' : '13px',
 												height: isBottomView ? '12px' : '13px',
@@ -931,16 +953,20 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 										/* Normal view: 4-row layout */
 										<div
 											className={cn(
-												"grid grid-cols-1 grid-rows-4 h-full pl-[22px]",
+												"grid grid-cols-1 pl-[22px]",
 												// In the All tab, only the top rows need to reserve space for the fixed
 												// top-right badges. Subject/body should be able to use the full right side.
 												isAllTab ? "pr-2" : "pr-[180px]"
 											)}
+											style={{ 
+												height: '100%',
+												gridTemplateRows: 'repeat(4, 1fr)'
+											}}
 										>
 											{/* Row 1: Name */}
 											<div
 												className={cn(
-													"row-start-1 col-start-1 flex items-center h-[16px] max-[480px]:h-[12px]",
+													"row-start-1 col-start-1 flex items-center min-h-0 max-[480px]:h-[12px]",
 													isAllTab && "pr-[170px]"
 												)}
 											>
@@ -966,7 +992,7 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 												return (
 													<div
 														className={cn(
-															"row-start-2 col-start-1 flex items-center h-[16px] max-[480px]:h-[12px]",
+															"row-start-2 col-start-1 flex items-center min-h-0 max-[480px]:h-[12px]",
 															isAllTab && "pr-[170px]"
 														)}
 													>
@@ -987,7 +1013,7 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 											{/* Row 3: Subject */}
 											<div
 												className={cn(
-													"row-start-3 col-span-1 flex items-start h-[16px] max-[480px]:h-[12px] max-[480px]:items-start max-[480px]:-mt-[2px]",
+													"row-start-3 col-span-1 flex items-start min-h-0 max-[480px]:h-[12px] max-[480px]:items-start max-[480px]:-mt-[2px]",
 													isAllTab ? "pt-[5px]" : "mt-[4px]"
 												)}
 											>
@@ -1009,7 +1035,7 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 											{/* Row 4: Message preview */}
 											<div
 												className={cn(
-													"row-start-4 col-span-1 flex items-start h-[16px] max-[480px]:h-[12px]",
+													"row-start-4 col-span-1 flex items-start min-h-0 max-[480px]:h-[12px]",
 													isAllTab && "pt-[2px]"
 												)}
 											>
