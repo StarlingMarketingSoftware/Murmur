@@ -1973,6 +1973,22 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 								  contact.company ||
 								  'Contact'
 								: 'Unknown Contact';
+
+							// Treat Company + Name as two distinct "slots" (rows).
+							// Company is always the top slot (aligned with the right-side title pill),
+							// and Name is the second slot just below. If Name is missing, we still
+							// reserve the slot so Company doesn't vertically center.
+							const displayName = contact
+								? (contact.name?.trim() ||
+										`${contact.firstName || ''} ${contact.lastName || ''}`.trim() ||
+										'')
+								: '';
+							const displayCompany = contact?.company?.trim() || '';
+							const draftRowCompany = displayCompany || displayName || contactName;
+							const draftRowName =
+								displayCompany && displayName && displayName !== draftRowCompany
+									? displayName
+									: '';
 							const isSelected = selectedDraftIds.has(draft.id);
 							const isRejected = props.rejectedDraftIds?.has(draft.id) ?? false;
 							const isApproved = props.approvedDraftIds?.has(draft.id) ?? false;
@@ -1981,13 +1997,6 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 								hoveredUsedContactId === draft.contactId &&
 								Boolean(usedContactTooltipPos) &&
 								Boolean(hoveredUsedContactCampaigns?.length);
-
-							// Check if we have a separate name to decide layout
-							const hasSeparateName = Boolean(
-								(contact?.name && contact.name.trim()) ||
-									(contact?.firstName && contact.firstName.trim()) ||
-									(contact?.lastName && contact.lastName.trim())
-							);
 
 							const contactTitle = contact?.headline || contact?.title || '';
 
@@ -2433,52 +2442,28 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 										"flex flex-col justify-center h-full gap-[2px]",
 										"pl-[30px] pr-[30px]"
 									)}>
-										{/* Row 1 & 2: Name / Company */}
+										{/* Row 1 & 2: Company / Name */}
 										{(() => {
 											const topRowMargin = contactTitle
 												? 'mr-[220px]'
 												: 'mr-[120px]';
-											if (hasSeparateName) {
-												return (
-													<>
-														{/* Name */}
-														<div
-															className={cn(
-																'flex items-center min-h-[20px]',
-																topRowMargin
-															)}
-														>
-															<div className="text-[15px] font-inter font-semibold truncate leading-none">
-																{contactName}
-															</div>
-														</div>
-														{/* Company */}
-														<div
-															className={cn(
-																'flex items-center min-h-[20px]',
-																topRowMargin
-															)}
-														>
-															<div className="text-[15px] font-inter font-medium text-black leading-tight line-clamp-2">
-																{contact?.company || ''}
-															</div>
-														</div>
-													</>
-												);
-											}
-
-											// No separate name - Company (in contactName) spans 2 rows height
 											return (
-												<div
-													className={cn(
-														'flex items-center min-h-[42px] pb-[6px]',
-														topRowMargin
-													)}
-												>
-													<div className="text-[15px] font-inter font-medium text-black leading-tight line-clamp-2">
-														{contactName}
+												<>
+													{/* Company slot (top row) */}
+													<div className={cn('flex items-center min-h-[20px]', topRowMargin)}>
+														<div className="text-[15px] font-inter font-semibold truncate leading-none">
+															{draftRowCompany}
+														</div>
 													</div>
-												</div>
+													{/* Name slot (second row) */}
+													<div className={cn('flex items-center min-h-[20px]', topRowMargin)}>
+														{draftRowName ? (
+															<div className="text-[15px] font-inter font-medium text-black truncate leading-none">
+																{draftRowName}
+															</div>
+														) : null}
+													</div>
+												</>
 											);
 										})()}
 

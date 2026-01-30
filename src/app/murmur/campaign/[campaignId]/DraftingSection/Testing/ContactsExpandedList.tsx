@@ -714,6 +714,14 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 							: isKeyboardFocused 
 								? 'bg-[#F5DADA]' 
 								: 'bg-white hover:bg-[#F5DADA]';
+						// Align the used-contact indicator with the top (Company) line in the standard (non-bottom) view.
+						// When the hover tooltip is visible, we center the tall pill so it stays inside the row.
+						const indicatorTop = isBottomView
+							? '50%'
+							: isUsedContactHoverCardVisible
+								? '50%'
+								: '16px';
+
 						return (
 							<div
 								key={contact.id}
@@ -792,7 +800,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 												style={{
 													position: 'absolute',
 													left: isBottomView ? '8px' : '12px',
-													top: '50%',
+													top: indicatorTop,
 													transform: 'translateY(-50%)',
 													boxSizing: 'border-box',
 													// Default state: circle. Hover state (single/multi): pill.
@@ -855,11 +863,12 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 									})() : (
 										<span
 											className={cn(
-												"absolute top-1/2 -translate-y-1/2",
+												"absolute -translate-y-1/2",
 												isBottomView ? "left-2" : "left-3"
 											)}
 											aria-label="Used in a previous campaign"
 											style={{
+												top: indicatorTop,
 												width: isBottomView ? '12px' : '16px',
 												height: isBottomView ? '12px' : '16px',
 												borderRadius: '50%',
@@ -1133,13 +1142,28 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 										</>
 									) : fullName ? (
 										<>
-											{/* Top Left - Name */}
-											<div className={cn(leftPadding, 'pr-1 flex items-center h-[23px]')}>
-												<div className="font-bold text-[11px] w-full truncate leading-tight">
-													{fullName}
+											{/* Top Left - Company (fixed top slot) */}
+											<div
+												className={cn(
+													leftPadding,
+													'col-start-1 row-start-1 pr-1 flex items-end pb-[2px] overflow-hidden'
+												)}
+											>
+												<div
+													className="font-bold text-[12px] font-inter text-black w-full overflow-hidden whitespace-nowrap leading-[1.1]"
+													style={{
+														maskImage:
+															'linear-gradient(to right, black calc(100% - 16px), transparent 100%)',
+														WebkitMaskImage:
+															'linear-gradient(to right, black calc(100% - 16px), transparent 100%)',
+													}}
+												>
+													{contact.company || ''}
 												</div>
 											</div>
-											<div className="pr-2 pl-1 flex items-center h-[23px]">
+
+											{/* Top Right - Title (aligned to top slot) */}
+											<div className="col-start-2 row-start-1 pr-2 pl-1 flex items-end pb-[2px] overflow-hidden">
 												{contactTitle ? (
 													<div
 														className="h-[17px] rounded-[6px] px-2 flex items-center gap-1 w-full border border-black overflow-hidden"
@@ -1152,24 +1176,22 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 																		? '#B7E5FF'
 																		: isMusicFestivalTitle(contactTitle)
 																			? '#C1D6FF'
-																			: (isWeddingPlannerTitle(contactTitle) || isWeddingVenueTitle(contactTitle))
+																			: (isWeddingPlannerTitle(contactTitle) ||
+																					  isWeddingVenueTitle(contactTitle))
 																				? '#FFF2BC'
 																				: '#E8EFFF',
 														}}
 													>
-														{isRestaurantTitle(contactTitle) && (
-															<RestaurantsIcon size={12} />
-														)}
-														{isCoffeeShopTitle(contactTitle) && (
-															<CoffeeShopsIcon size={7} />
-														)}
+														{isRestaurantTitle(contactTitle) && <RestaurantsIcon size={12} />}
+														{isCoffeeShopTitle(contactTitle) && <CoffeeShopsIcon size={7} />}
 														{isMusicVenueTitle(contactTitle) && (
 															<MusicVenuesIcon size={12} className="flex-shrink-0" />
 														)}
 														{isMusicFestivalTitle(contactTitle) && (
 															<FestivalsIcon size={12} className="flex-shrink-0" />
 														)}
-														{(isWeddingPlannerTitle(contactTitle) || isWeddingVenueTitle(contactTitle)) && (
+														{(isWeddingPlannerTitle(contactTitle) ||
+															isWeddingVenueTitle(contactTitle)) && (
 															<WeddingPlannersIcon size={12} />
 														)}
 														<ScrollableText
@@ -1196,20 +1218,21 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 													<div className="w-full" />
 												)}
 											</div>
-							{/* Bottom Left - Company */}
-							<div className={cn(leftPadding, 'pr-1 flex items-center h-[22px]')}>
-								<div
-									className="text-[11px] text-black w-full overflow-hidden whitespace-nowrap leading-tight"
-									style={{
-										maskImage: 'linear-gradient(to right, black calc(100% - 16px), transparent 100%)',
-										WebkitMaskImage: 'linear-gradient(to right, black calc(100% - 16px), transparent 100%)',
-									}}
-								>
-									{contact.company || ''}
-								</div>
-							</div>
-											{/* Bottom Right - Location */}
-											<div className="pr-2 pl-1 flex items-center h-[22px]">
+
+											{/* Bottom Left - Name (fixed bottom slot) */}
+											<div
+												className={cn(
+													leftPadding,
+													'col-start-1 row-start-2 pr-1 flex items-start pt-[2px] overflow-hidden'
+												)}
+											>
+												<div className="text-[12px] font-inter text-black w-full truncate leading-[1.1]">
+													{fullName}
+												</div>
+											</div>
+											
+											{/* Bottom Right - Location (aligned to bottom slot) */}
+											<div className="col-start-2 row-start-2 pr-2 pl-1 flex items-start pt-[2px] overflow-hidden">
 												{contact.city || contact.state ? (
 													<div className="flex items-center gap-1 w-full">
 														{(() => {
@@ -1278,23 +1301,32 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 										</>
 									) : (
 										<>
-								{/* Left column - Company vertically centered */}
-							<div className={cn('row-span-2 pr-1 flex items-center h-full', leftPadding)}>
-								<div
-									className="font-bold text-[11px] text-black w-full overflow-hidden whitespace-nowrap leading-tight"
-									style={{
-										maskImage: 'linear-gradient(to right, black calc(100% - 16px), transparent 100%)',
-										WebkitMaskImage: 'linear-gradient(to right, black calc(100% - 16px), transparent 100%)',
-									}}
-								>
-									{contact.company || 'Contact'}
-								</div>
-							</div>
+											{/* Top Left - Company (fixed top slot) */}
+											<div
+												className={cn(
+													leftPadding,
+													'col-start-1 row-start-1 pr-1 flex items-end pb-[2px] overflow-hidden'
+												)}
+											>
+												<div
+													className="font-bold text-[12px] font-inter text-black w-full overflow-hidden whitespace-nowrap leading-[1.1]"
+													style={{
+														maskImage:
+															'linear-gradient(to right, black calc(100% - 16px), transparent 100%)',
+														WebkitMaskImage:
+															'linear-gradient(to right, black calc(100% - 16px), transparent 100%)',
+													}}
+												>
+													{contact.company || 'Contact'}
+												</div>
+											</div>
+											{/* Bottom Left - (empty fixed bottom slot) */}
+											<div className="col-start-1 row-start-2" />
 
 											{contactTitle ? (
 												<>
 													{/* Top Right - Title */}
-													<div className="pr-2 pl-1 flex items-center h-[23px]">
+													<div className="col-start-2 row-start-1 pr-2 pl-1 flex items-end pb-[2px] overflow-hidden">
 														<div
 															className="h-[17px] rounded-[6px] px-2 flex items-center gap-1 w-full border border-black overflow-hidden"
 															style={{
@@ -1348,7 +1380,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 													</div>
 
 													{/* Bottom Right - Location */}
-													<div className="pr-2 pl-1 flex items-center h-[22px]">
+													<div className="col-start-2 row-start-2 pr-2 pl-1 flex items-start pt-[2px] overflow-hidden">
 														{contact.city || contact.state ? (
 															<div className="flex items-center gap-1 w-full">
 																{(() => {
@@ -1416,7 +1448,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 													</div>
 												</>
 											) : (
-												<div className="row-span-2 pr-2 pl-1 flex items-center h-full">
+												<div className="col-start-2 row-span-2 pr-2 pl-1 flex items-center h-full">
 													{contact.city || contact.state ? (
 														<div className="flex items-center gap-1 w-full">
 															{(() => {

@@ -1521,7 +1521,8 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 										style={{
 											position: 'absolute',
 											left: '12px',
-											top: '50%',
+											// Align circle with Company (top row). Keep the taller pill centered to avoid clipping.
+											top: isUsedContactHoverCardVisible ? '50%' : '14px',
 											transform: 'translateY(-50%)',
 											boxSizing: 'border-box',
 											// Default state: 16×16 circle. Hover state (single/multi): 14×37 pill.
@@ -1585,21 +1586,33 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 								const contactTitle = contact.title || contact.headline || '';
 								// Left padding: 12px base + 16px dot + 8px gap = 36px when used, else 12px
 								const leftPadding = isUsedContact ? 'pl-[36px]' : 'pl-3';
+								const hasLocation = Boolean(contact.city || contact.state);
+								const shouldSpanLocation = !contactTitle && hasLocation;
+								// Company is always top slot, Name always bottom slot (fixed positions).
+								const companyValue = contact.company || (!fullName ? 'Contact' : '');
 
-								// Left column - Name and Company
-								if (fullName) {
-									// Has name - show name in top, company in bottom
-									return (
-										<>
-											{/* Top Left - Name */}
-											<div className={cn(leftPadding, 'pr-1 flex items-center h-[24px]')}>
-												<div className="font-bold text-[11px] w-full truncate leading-tight">
-													{fullName}
-												</div>
+								return (
+									<>
+										{/* Top Left - Company */}
+										<div className={cn(leftPadding, 'pr-1 flex items-end pb-[2px] overflow-hidden')}>
+											<div
+												className="font-bold text-[15px] font-inter text-black w-full whitespace-nowrap overflow-hidden leading-[1.1]"
+												style={{
+													maskImage:
+														'linear-gradient(to right, black calc(100% - 16px), transparent 100%)',
+													WebkitMaskImage:
+														'linear-gradient(to right, black calc(100% - 16px), transparent 100%)',
+												}}
+											>
+												{companyValue}
 											</div>
+										</div>
 
-											{/* Top Right - Title */}
-											<div className="pr-1 pl-0 flex items-center h-[24px] justify-end">
+										{/* Top Right - Title (or empty when location spans both rows) */}
+										{shouldSpanLocation ? (
+											<div className="w-full" />
+										) : (
+											<div className="pr-1 pl-0 flex items-end pb-[2px] justify-end overflow-hidden">
 												{contactTitle ? (
 													<div
 														className="h-[21px] w-[240px] rounded-[6px] px-2 flex items-center gap-1 border border-black overflow-hidden"
@@ -1612,26 +1625,24 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 																		? '#B7E5FF'
 																		: isMusicFestivalTitle(contactTitle)
 																			? '#C1D6FF'
-																			: (isWeddingPlannerTitle(contactTitle) || isWeddingVenueTitle(contactTitle))
+																			: (isWeddingPlannerTitle(contactTitle) ||
+																					  isWeddingVenueTitle(contactTitle))
 																				? '#FFF2BC'
 																				: isWineBeerSpiritsTitle(contactTitle)
 																					? '#BFC4FF'
 																					: '#E8EFFF',
 														}}
 													>
-														{isRestaurantTitle(contactTitle) && (
-															<RestaurantsIcon size={14} />
-														)}
-														{isCoffeeShopTitle(contactTitle) && (
-															<CoffeeShopsIcon size={8} />
-														)}
+														{isRestaurantTitle(contactTitle) && <RestaurantsIcon size={14} />}
+														{isCoffeeShopTitle(contactTitle) && <CoffeeShopsIcon size={8} />}
 														{isMusicVenueTitle(contactTitle) && (
 															<MusicVenuesIcon size={14} className="flex-shrink-0" />
 														)}
 														{isMusicFestivalTitle(contactTitle) && (
 															<FestivalsIcon size={14} className="flex-shrink-0" />
 														)}
-														{(isWeddingPlannerTitle(contactTitle) || isWeddingVenueTitle(contactTitle)) && (
+														{(isWeddingPlannerTitle(contactTitle) ||
+															isWeddingVenueTitle(contactTitle)) && (
 															<WeddingPlannersIcon size={14} />
 														)}
 														{isWineBeerSpiritsTitle(contactTitle) && (
@@ -1652,7 +1663,8 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 																					: isWeddingVenueTitle(contactTitle)
 																						? 'Wedding Venue'
 																						: isWineBeerSpiritsTitle(contactTitle)
-																							? getWineBeerSpiritsLabel(contactTitle) ?? contactTitle
+																							? getWineBeerSpiritsLabel(contactTitle) ??
+																								contactTitle
 																							: contactTitle
 															}
 															className="text-[10px] text-black leading-none"
@@ -1663,23 +1675,72 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 													<div className="w-full" />
 												)}
 											</div>
+										)}
 
-											{/* Bottom Left - Company */}
-											<div className={cn(leftPadding, 'pr-1 flex items-center h-[24px]')}>
-												<div
-													className="text-[15px] font-medium text-black w-full whitespace-nowrap overflow-hidden leading-tight"
-													style={{
-														maskImage: 'linear-gradient(to right, black calc(100% - 12px), transparent 100%)',
-														WebkitMaskImage: 'linear-gradient(to right, black calc(100% - 12px), transparent 100%)',
-													}}
-												>
-													{contact.company || ''}
+										{/* Bottom Left - Name */}
+										<div className={cn(leftPadding, 'pr-1 flex items-start pt-[2px] overflow-hidden')}>
+											<div className="text-[15px] font-inter text-black w-full truncate leading-[1.1]">
+												{fullName}
+											</div>
+										</div>
+
+										{/* Bottom Right - Location (or spanning when no title) */}
+										{shouldSpanLocation ? (
+											<div className="row-span-2 pr-1 pl-0 flex items-center h-full justify-end">
+												<div className="flex items-center gap-1 w-[240px]">
+													{(() => {
+														const fullStateName = (contact.state as string) || '';
+														const stateAbbr = getStateAbbreviation(fullStateName) || '';
+														const normalizedState = fullStateName.trim();
+														const lowercaseCanadianProvinceNames =
+															canadianProvinceNames.map((s) => s.toLowerCase());
+														const isCanadianProvince =
+															lowercaseCanadianProvinceNames.includes(
+																normalizedState.toLowerCase()
+															) ||
+															canadianProvinceAbbreviations.includes(
+																normalizedState.toUpperCase()
+															) ||
+															canadianProvinceAbbreviations.includes(stateAbbr.toUpperCase());
+														const isUSAbbr = /^[A-Z]{2}$/.test(stateAbbr);
+
+														if (!stateAbbr) return null;
+														return isCanadianProvince ? (
+															<div
+																className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border overflow-hidden"
+																style={{ borderColor: '#000000' }}
+																title="Canadian province"
+															>
+																<CanadianFlag width="100%" height="100%" className="w-full h-full" />
+															</div>
+														) : isUSAbbr ? (
+															<span
+																className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border text-[12px] leading-none font-bold"
+																style={{
+																	backgroundColor:
+																		stateBadgeColorMap[stateAbbr] || 'transparent',
+																	borderColor: '#000000',
+																}}
+															>
+																{stateAbbr}
+															</span>
+														) : (
+															<span
+																className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border"
+																style={{ borderColor: '#000000' }}
+															/>
+														);
+													})()}
+													{contact.city ? (
+														<ScrollableText text={contact.city} className="text-xs text-black w-full" />
+													) : (
+														<div className="w-full" />
+													)}
 												</div>
 											</div>
-
-											{/* Bottom Right - Location */}
-											<div className="pr-1 pl-0 flex items-center h-[24px] justify-end">
-												{contact.city || contact.state ? (
+										) : (
+											<div className="pr-1 pl-0 flex items-start pt-[2px] justify-end overflow-hidden">
+												{hasLocation ? (
 													<div className="flex items-center gap-1 w-[240px]">
 														{(() => {
 															const fullStateName = (contact.state as string) || '';
@@ -1706,11 +1767,7 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 																	style={{ borderColor: '#000000' }}
 																	title="Canadian province"
 																>
-																	<CanadianFlag
-																		width="100%"
-																		height="100%"
-																		className="w-full h-full"
-																	/>
+																	<CanadianFlag width="100%" height="100%" className="w-full h-full" />
 																</div>
 															) : isUSAbbr ? (
 																<span
@@ -1743,228 +1800,9 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 													<div className="w-full" />
 												)}
 											</div>
-										</>
-									);
-								} else {
-									// No name - vertically center company on left side
-									return (
-										<>
-											{/* Left column - Company vertically centered */}
-											<div className={cn('row-span-2 pr-1 flex items-center h-full', leftPadding)}>
-												<div
-													className="font-medium text-[15px] text-black w-full whitespace-nowrap overflow-hidden leading-tight"
-													style={{
-														maskImage: 'linear-gradient(to right, black calc(100% - 12px), transparent 100%)',
-														WebkitMaskImage: 'linear-gradient(to right, black calc(100% - 12px), transparent 100%)',
-													}}
-												>
-													{contact.company || 'Contact'}
-												</div>
-											</div>
-
-											{/* Right column - Title or Location */}
-											{contactTitle ? (
-												<>
-													{/* Top Right - Title */}
-													<div className="pr-1 pl-0 flex items-center h-[24px] justify-end">
-														<div
-															className="h-[21px] w-[240px] rounded-[6px] px-2 flex items-center gap-1 border border-black overflow-hidden"
-															style={{
-																backgroundColor: isRestaurantTitle(contactTitle)
-																	? '#C3FBD1'
-																	: isCoffeeShopTitle(contactTitle)
-																		? '#D6F1BD'
-																		: isMusicVenueTitle(contactTitle)
-																			? '#B7E5FF'
-																			: isMusicFestivalTitle(contactTitle)
-																				? '#C1D6FF'
-																				: (isWeddingPlannerTitle(contactTitle) || isWeddingVenueTitle(contactTitle))
-																					? '#FFF2BC'
-																					: isWineBeerSpiritsTitle(contactTitle)
-																						? '#BFC4FF'
-																						: '#E8EFFF',
-															}}
-														>
-															{isRestaurantTitle(contactTitle) && (
-																<RestaurantsIcon size={14} />
-															)}
-															{isCoffeeShopTitle(contactTitle) && (
-																<CoffeeShopsIcon size={8} />
-															)}
-															{isMusicVenueTitle(contactTitle) && (
-																<MusicVenuesIcon size={14} className="flex-shrink-0" />
-															)}
-															{isMusicFestivalTitle(contactTitle) && (
-																<FestivalsIcon size={14} className="flex-shrink-0" />
-															)}
-															{(isWeddingPlannerTitle(contactTitle) || isWeddingVenueTitle(contactTitle)) && (
-																<WeddingPlannersIcon size={14} />
-															)}
-															{isWineBeerSpiritsTitle(contactTitle) && (
-																<WineBeerSpiritsIcon size={14} className="flex-shrink-0" />
-															)}
-															<ScrollableText
-																text={
-																	isRestaurantTitle(contactTitle)
-																		? 'Restaurant'
-																		: isCoffeeShopTitle(contactTitle)
-																			? 'Coffee Shop'
-																			: isMusicVenueTitle(contactTitle)
-																				? 'Music Venue'
-																				: isMusicFestivalTitle(contactTitle)
-																					? 'Music Festival'
-																					: isWeddingPlannerTitle(contactTitle)
-																						? 'Wedding Planner'
-																						: isWeddingVenueTitle(contactTitle)
-																							? 'Wedding Venue'
-																							: isWineBeerSpiritsTitle(contactTitle)
-																								? getWineBeerSpiritsLabel(contactTitle) ?? contactTitle
-																								: contactTitle
-																}
-																className="text-[10px] text-black leading-none"
-																scrollPixelsPerSecond={60}
-															/>
-														</div>
-													</div>
-
-													{/* Bottom Right - Location */}
-													<div className="pr-1 pl-0 flex items-center h-[24px] justify-end">
-														{contact.city || contact.state ? (
-															<div className="flex items-center gap-1 w-[240px]">
-																{(() => {
-																	const fullStateName = (contact.state as string) || '';
-																	const stateAbbr =
-																		getStateAbbreviation(fullStateName) || '';
-																	const normalizedState = fullStateName.trim();
-																	const lowercaseCanadianProvinceNames =
-																		canadianProvinceNames.map((s) => s.toLowerCase());
-																	const isCanadianProvince =
-																		lowercaseCanadianProvinceNames.includes(
-																			normalizedState.toLowerCase()
-																		) ||
-																		canadianProvinceAbbreviations.includes(
-																			normalizedState.toUpperCase()
-																		) ||
-																		canadianProvinceAbbreviations.includes(
-																			stateAbbr.toUpperCase()
-																		);
-																	const isUSAbbr = /^[A-Z]{2}$/.test(stateAbbr);
-
-																	if (!stateAbbr) return null;
-																	return isCanadianProvince ? (
-																		<div
-																			className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border overflow-hidden"
-																			style={{ borderColor: '#000000' }}
-																			title="Canadian province"
-																		>
-																			<CanadianFlag
-																				width="100%"
-																				height="100%"
-																				className="w-full h-full"
-																			/>
-																		</div>
-																	) : isUSAbbr ? (
-																		<span
-																			className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border text-[12px] leading-none font-bold"
-																			style={{
-																				backgroundColor:
-																					stateBadgeColorMap[stateAbbr] || 'transparent',
-																				borderColor: '#000000',
-																			}}
-																		>
-																			{stateAbbr}
-																		</span>
-																	) : (
-																		<span
-																			className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border"
-																			style={{ borderColor: '#000000' }}
-																		/>
-																	);
-																})()}
-																{contact.city ? (
-																	<ScrollableText
-																		text={contact.city}
-																		className="text-xs text-black w-full"
-																	/>
-																) : (
-																	<div className="w-full"></div>
-																)}
-															</div>
-														) : (
-															<div className="w-full"></div>
-														)}
-													</div>
-												</>
-											) : (
-												// No title - vertically center location
-												<div className="row-span-2 pr-1 pl-0 flex items-center h-full justify-end">
-													{contact.city || contact.state ? (
-														<div className="flex items-center gap-1 w-[240px]">
-															{(() => {
-																const fullStateName = (contact.state as string) || '';
-																const stateAbbr =
-																	getStateAbbreviation(fullStateName) || '';
-																const normalizedState = fullStateName.trim();
-																const isCanadianProvince =
-																	canadianProvinceNames.includes(
-																		normalizedState.toLowerCase()
-																	) ||
-																	canadianProvinceAbbreviations.includes(
-																		normalizedState.toUpperCase()
-																	) ||
-																	canadianProvinceAbbreviations.includes(
-																		stateAbbr.toUpperCase()
-																	);
-																const isUSAbbr = /^[A-Z]{2}$/.test(stateAbbr);
-
-																if (!stateAbbr) return null;
-																return isCanadianProvince ? (
-																	<div
-																		className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border overflow-hidden"
-																		style={{ borderColor: '#000000' }}
-																		title="Canadian province"
-																	>
-																		<CanadianFlag
-																			width="100%"
-																			height="100%"
-																			className="w-full h-full"
-																		/>
-																	</div>
-																) : isUSAbbr ? (
-																	<span
-																		className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border text-[12px] leading-none font-bold"
-																		style={{
-																			backgroundColor:
-																				stateBadgeColorMap[stateAbbr] || 'transparent',
-																			borderColor: '#000000',
-																		}}
-																	>
-																		{stateAbbr}
-																	</span>
-																) : (
-																	<span
-																		className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border"
-																		style={{ borderColor: '#000000' }}
-																	/>
-																);
-															})()}
-															{contact.city ? (
-																<ScrollableText
-																	text={contact.city}
-																	className="text-xs text-black w-full"
-																/>
-															) : (
-																<div className="w-full"></div>
-															)}
-														</div>
-													) : (
-														<div className="w-full"></div>
-													)}
-												</div>
-											)}
-										</>
-									);
-								}
+										)}
+									</>
+								);
 							})()}
 						</div>
 					);
