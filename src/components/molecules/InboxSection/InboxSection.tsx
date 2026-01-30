@@ -696,7 +696,9 @@ export const InboxSection: FC<InboxSectionProps> = ({
 	const outerPaddingClass = isMobile ? 'px-1' : noOuterPadding ? 'px-0' : 'px-4';
 	const isUsingSampleData = Boolean(sampleData);
 
-	const [activeTab, setActiveTab] = useState<'inbox' | 'sent'>('inbox');
+	const [activeTab, setActiveTab] = useState<'inbox' | 'sent'>(() =>
+		inboxSentTabRequest?.tab ?? 'inbox'
+	);
 	const lastHandledInboxSentTabRequestIdRef = useRef<number | null>(null);
 	const hasUserSelectedInboxSentTabRef = useRef(false);
 	const hasAutoInitializedInboxSentTabRef = useRef(false);
@@ -764,6 +766,8 @@ export const InboxSection: FC<InboxSectionProps> = ({
 
 	useLayoutEffect(() => {
 		if (!shouldAutoDefaultInboxSentTab) return;
+		// If the campaign page explicitly requested a tab (e.g. Inbox -> Sent), never auto-override it.
+		if (inboxSentTabRequest) return;
 		if (hasUserSelectedInboxSentTabRef.current) return;
 		if (hasAutoInitializedInboxSentTabRef.current) return;
 		// Don't auto-switch while the user is reading an email.
@@ -783,6 +787,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 		}
 	}, [
 		shouldAutoDefaultInboxSentTab,
+		inboxSentTabRequest,
 		campaignReplyCount,
 		activeTab,
 		selectedEmailId,
@@ -1091,7 +1096,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 	};
 
 	// External request (campaign navigation): switch Inbox/Sent tab on demand.
-	useEffect(() => {
+	useLayoutEffect(() => {
 		if (!inboxSentTabRequest) return;
 		if (lastHandledInboxSentTabRequestIdRef.current === inboxSentTabRequest.requestId) return;
 		lastHandledInboxSentTabRequestIdRef.current = inboxSentTabRequest.requestId;
