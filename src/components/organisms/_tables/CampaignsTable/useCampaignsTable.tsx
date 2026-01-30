@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { urls } from '@/constants/urls';
 import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import { cn, mmdd } from '@/utils';
+import { splitTrailingNumericSuffix } from '@/utils/string';
 import { useRowConfirmationAnimation } from '@/hooks/useRowConfirmationAnimation';
 
 type CampaignWithCounts = Campaign & {
@@ -316,6 +317,7 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 			cell: ({ row }) => {
 				const name: string = row.getValue('name');
 				const isConfirming = row.original.id === confirmingCampaignId;
+				const { base, suffixNumber } = splitTrailingNumericSuffix(name ?? '');
 				return name ? (
 					<div
 						className={cn(
@@ -323,7 +325,21 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 							isConfirming && 'text-white'
 						)}
 					>
-						{name}
+						{suffixNumber ? (
+							<>
+								<span>{base}</span>
+								<sup
+									className={cn(
+										'ml-[4px] relative top-[1px] align-super text-[0.65em] font-medium leading-none',
+										isConfirming ? 'text-white/80' : 'text-black/70'
+									)}
+								>
+									{suffixNumber}
+								</sup>
+							</>
+						) : (
+							name
+						)}
 					</div>
 				) : (
 					<Typography variant="muted" className="text-sm">

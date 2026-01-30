@@ -56,6 +56,31 @@ export const capitalize = (text: string): string => {
 };
 
 /**
+ * Splits a string that ends in a numeric suffix.
+ *
+ * Example: "Restaurants in Pennsylvania 5" → { base: "Restaurants in Pennsylvania", suffixNumber: "5" }
+ *
+ * Useful for rendering the suffix as a citation/footnote marker in the UI.
+ */
+export const splitTrailingNumericSuffix = (
+	input: string
+): { base: string; suffixNumber: string | null } => {
+	const trimmed = input.trimEnd();
+	const match = trimmed.match(/^(.*?)(?:\s+)(\d+)$/);
+	if (!match) {
+		return { base: input, suffixNumber: null };
+	}
+
+	const base = match[1].trimEnd();
+	const suffixNumber = match[2] ?? null;
+	if (!base || !suffixNumber) {
+		return { base: input, suffixNumber: null };
+	}
+
+	return { base, suffixNumber };
+};
+
+/**
  * Strips everything before the first { character
  * @param text - The text to strip
  * @returns The text with everything before the first { character removed

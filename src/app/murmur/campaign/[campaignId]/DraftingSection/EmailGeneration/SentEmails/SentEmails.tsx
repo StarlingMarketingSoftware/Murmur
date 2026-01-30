@@ -12,7 +12,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { EmailWithRelations } from '@/types/campaign';
 import { DraftingTable } from '../DraftingTable/DraftingTable';
 import { cn } from '@/utils';
-import { getStateAbbreviation } from '@/utils/string';
+import { getStateAbbreviation, splitTrailingNumericSuffix } from '@/utils/string';
 import { CanadianFlag } from '@/components/atoms/_svg/CanadianFlag';
 import { ScrollableText } from '@/components/atoms/ScrollableText/ScrollableText';
 import {
@@ -39,6 +39,7 @@ const FadeOverflowText: FC<{
 }> = ({ text, className, fadePx = 16, measureKey }) => {
 	const spanRef = useRef<HTMLSpanElement | null>(null);
 	const [isOverflowing, setIsOverflowing] = useState(false);
+	const { base, suffixNumber } = splitTrailingNumericSuffix(text);
 
 	const measure = useCallback(() => {
 		const el = spanRef.current;
@@ -80,7 +81,16 @@ const FadeOverflowText: FC<{
 			style={style}
 			title={text}
 		>
-			{text}
+			{suffixNumber ? (
+				<>
+					<span>{base}</span>
+					<sup className="ml-[4px] relative top-[1px] align-super text-[0.65em] font-medium leading-none opacity-70">
+						{suffixNumber}
+					</sup>
+				</>
+			) : (
+				text
+			)}
 		</span>
 	);
 };

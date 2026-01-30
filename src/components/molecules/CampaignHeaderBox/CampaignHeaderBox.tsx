@@ -109,6 +109,31 @@ const getUsStateAbbreviation = (stateOrAbbr: string): string | null => {
 	return match?.abbr ?? null;
 };
 
+type TitleStatePillLocationParse = {
+	locationForIcon: string;
+	abbr: string;
+	citationNumber: string | null;
+};
+
+const parseTitleStatePillLocation = (locationBase: string): TitleStatePillLocationParse | null => {
+	const directAbbr = getUsStateAbbreviation(locationBase);
+	if (directAbbr) {
+		return { locationForIcon: locationBase, abbr: directAbbr, citationNumber: null };
+	}
+
+	// Support titles like: "Wineries in NY 3" / "Wineries in New York 3"
+	const trailingNumberMatch = locationBase.match(/^(.+?)\s+(\d+)\s*$/);
+	if (!trailingNumberMatch) return null;
+
+	const stateCandidate = (trailingNumberMatch[1] ?? '').trim();
+	const citationNumber = trailingNumberMatch[2] ?? null;
+
+	const abbr = getUsStateAbbreviation(stateCandidate);
+	if (!abbr) return null;
+
+	return { locationForIcon: stateCandidate, abbr, citationNumber };
+};
+
 const renderCampaignTitleWithStatePill = (title: string): ReactNode => {
 	const safeTitle = title ?? '';
 	if (!safeTitle) return safeTitle;
@@ -127,11 +152,13 @@ const renderCampaignTitleWithStatePill = (title: string): ReactNode => {
 	const locationBase = punctuationMatch?.[1]?.trim() ?? trimmedLocation;
 	const trailingPunctuation = punctuationMatch?.[2] ?? '';
 
-	const abbr = getUsStateAbbreviation(locationBase);
-	if (!abbr) return safeTitle;
+	const parsedLocation = parseTitleStatePillLocation(locationBase);
+	if (!parsedLocation) return safeTitle;
+
+	const { abbr, locationForIcon, citationNumber } = parsedLocation;
 
 	// Use the same state icon + background used across "Where" and contact-row state boxes.
-	const { icon } = getCityIconProps('', locationBase);
+	const { icon } = getCityIconProps('', locationForIcon);
 	const backgroundColor = stateBadgeColorMap[abbr] ?? 'transparent';
 
 	return (
@@ -146,6 +173,9 @@ const renderCampaignTitleWithStatePill = (title: string): ReactNode => {
 					{icon}
 				</span>
 			</span>
+			{citationNumber ? (
+				<sup className="ml-[3px] text-[14px] leading-none">{citationNumber}</sup>
+			) : null}
 			{trailingPunctuation}
 		</>
 	);

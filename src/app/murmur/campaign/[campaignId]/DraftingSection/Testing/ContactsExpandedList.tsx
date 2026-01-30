@@ -8,7 +8,7 @@ import { CampaignWithRelations } from '@/types';
 import { cn } from '@/utils';
 import { ScrollableText } from '@/components/atoms/ScrollableText/ScrollableText';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
-import { getStateAbbreviation } from '@/utils/string';
+import { getStateAbbreviation, splitTrailingNumericSuffix } from '@/utils/string';
 import { CanadianFlag } from '@/components/atoms/_svg/CanadianFlag';
 import OpenIcon from '@/components/atoms/svg/OpenIcon';
 import {
@@ -38,6 +38,7 @@ const FadeOverflowText: FC<{
 }> = ({ text, className, fadePx = 16, measureKey }) => {
 	const spanRef = useRef<HTMLSpanElement | null>(null);
 	const [isOverflowing, setIsOverflowing] = useState(false);
+	const { base, suffixNumber } = splitTrailingNumericSuffix(text);
 
 	const measure = useCallback(() => {
 		const el = spanRef.current;
@@ -79,7 +80,16 @@ const FadeOverflowText: FC<{
 			style={style}
 			title={text}
 		>
-			{text}
+			{suffixNumber ? (
+				<>
+					<span>{base}</span>
+					<sup className="ml-[4px] relative top-[1px] align-super text-[0.65em] font-medium leading-none opacity-70">
+						{suffixNumber}
+					</sup>
+				</>
+			) : (
+				text
+			)}
 		</span>
 	);
 };
