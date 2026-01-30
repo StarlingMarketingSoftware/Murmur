@@ -52,6 +52,9 @@ export type DraftingSectionView =
 	| 'inbox'
 	| 'all';
 
+export type InboxSentTab = 'inbox' | 'sent';
+export type InboxSentTabRequest = { tab: InboxSentTab; requestId: number };
+
 export interface DraftingSectionProps {
 	campaign: CampaignWithRelations;
 	view?: DraftingSectionView;
@@ -88,6 +91,15 @@ export interface DraftingSectionProps {
 	 * Optional callback to switch the campaign page into the Sent tab.
 	 */
 	goToSent?: () => void;
+	/**
+	 * Optional request to switch the InboxSection's Inbox/Sent tab.
+	 * Used by the campaign page to route "Sent" navigation into the inbox's Sent view.
+	 */
+	inboxSentTabRequest?: InboxSentTabRequest | null;
+	/**
+	 * Optional callback fired whenever the InboxSection's Inbox/Sent tab changes.
+	 */
+	onInboxSentTabChange?: (next: InboxSentTab) => void;
 	/**
 	 * Optional callback to navigate to the previous tab.
 	 */

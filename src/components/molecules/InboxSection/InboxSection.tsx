@@ -208,6 +208,18 @@ interface InboxSectionProps {
 	scrollbarThumbColor?: string;
 	scrollbarOffsetRight?: number;
 	scrollbarAlignTrackToScrollContainer?: boolean;
+
+	/**
+	 * Optional request to switch between the Inbox and Sent tabs.
+	 * When `requestId` changes, the inbox will switch to the requested tab.
+	 *
+	 * This is used by the campaign page to route "Sent" navigation into the inbox's Sent view.
+	 */
+	inboxSentTabRequest?: { tab: 'inbox' | 'sent'; requestId: number } | null;
+	/**
+	 * Optional callback fired whenever the Inbox/Sent tab changes (user click or auto-default).
+	 */
+	onInboxSentTabChange?: (next: 'inbox' | 'sent') => void;
 }
 
 /**
@@ -628,6 +640,8 @@ export const InboxSection: FC<InboxSectionProps> = ({
 	scrollbarThumbColor = '#000000',
 	scrollbarOffsetRight = -6,
 	scrollbarAlignTrackToScrollContainer = false,
+	inboxSentTabRequest,
+	onInboxSentTabChange,
 }) => {
 	const detectedIsMobile = useIsMobile();
 	const isMobile = forceDesktopLayout ? false : Boolean(detectedIsMobile);
@@ -683,6 +697,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 	const isUsingSampleData = Boolean(sampleData);
 
 	const [activeTab, setActiveTab] = useState<'inbox' | 'sent'>('inbox');
+	const lastHandledInboxSentTabRequestIdRef = useRef<number | null>(null);
 	const hasUserSelectedInboxSentTabRef = useRef(false);
 	const hasAutoInitializedInboxSentTabRef = useRef(false);
 	const {
@@ -759,6 +774,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 			setActiveTab(nextTab);
 			setSelectedEmailId(null);
 			setReplyMessage('');
+			onInboxSentTabChange?.(nextTab);
 		}
 
 		const inboundLoaded = isUsingSampleData || inboundEmailsFromApi !== undefined;
@@ -1064,6 +1080,25 @@ export const InboxSection: FC<InboxSectionProps> = ({
 		};
 	}, [demoMode, activeTab, selectedEmailId]);
 
+	// Reset selected email when switching tabs
+	const handleTabChange = (tab: 'inbox' | 'sent') => {
+		hasUserSelectedInboxSentTabRef.current = true;
+		hasAutoInitializedInboxSentTabRef.current = true;
+		setActiveTab(tab);
+		setSelectedEmailId(null);
+		setReplyMessage('');
+		onInboxSentTabChange?.(tab);
+	};
+
+	// External request (campaign navigation): switch Inbox/Sent tab on demand.
+	useEffect(() => {
+		if (!inboxSentTabRequest) return;
+		if (lastHandledInboxSentTabRequestIdRef.current === inboxSentTabRequest.requestId) return;
+		lastHandledInboxSentTabRequestIdRef.current = inboxSentTabRequest.requestId;
+		handleTabChange(inboxSentTabRequest.tab);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [inboxSentTabRequest?.requestId]);
+
 	if (isLoading) {
 		const skeletonRowCount = isMobile ? 5 : 6;
 		const loadingContainerStyle = {
@@ -1359,15 +1394,6 @@ export const InboxSection: FC<InboxSectionProps> = ({
 			</div>
 		);
 	}
-
-	// Reset selected email when switching tabs
-	const handleTabChange = (tab: 'inbox' | 'sent') => {
-		hasUserSelectedInboxSentTabRef.current = true;
-		hasAutoInitializedInboxSentTabRef.current = true;
-		setActiveTab(tab);
-		setSelectedEmailId(null);
-		setReplyMessage('');
-	};
 
 	if (!visibleEmails || visibleEmails.length === 0) {
 		return (

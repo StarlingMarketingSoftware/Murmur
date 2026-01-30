@@ -4,7 +4,11 @@
 export const dynamic = 'force-dynamic';
 
 import { useCampaignDetail } from './useCampaignDetail';
-import type { DraftingSectionView } from './DraftingSection/useDraftingSection';
+import type {
+	DraftingSectionView,
+	InboxSentTab,
+	InboxSentTabRequest,
+} from './DraftingSection/useDraftingSection';
 import { CampaignPageSkeleton } from '@/components/molecules/CampaignPageSkeleton/CampaignPageSkeleton';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { urls } from '@/constants/urls';
@@ -1077,7 +1081,8 @@ const Murmur = () => {
 		if (tabParam === 'inbox') return 'inbox';
 		if (tabParam === 'contacts') return 'contacts';
 		if (tabParam === 'drafting') return 'drafting';
-		if (tabParam === 'sent') return 'sent';
+		// Sent is now a sub-view of Inbox (Inbox -> Sent)
+		if (tabParam === 'sent') return 'inbox';
 		// Legacy/deeplink support: the campaign no longer has an in-page Search tab.
 		// If someone lands on ?tab=search, fall back to Contacts.
 		if (tabParam === 'search') return 'contacts';
@@ -1086,6 +1091,21 @@ const Murmur = () => {
 	};
 	
 	const [activeView, setActiveViewInternal] = useState<ViewType>(getInitialView());
+	const getInitialInboxSentTab = (): InboxSentTab => {
+		if (tabParam === 'sent') return 'sent';
+		return 'inbox';
+	};
+	const [inboxSentTab, setInboxSentTab] = useState<InboxSentTab>(getInitialInboxSentTab());
+	const [inboxSentTabRequest, setInboxSentTabRequest] = useState<InboxSentTabRequest | null>(() =>
+		tabParam === 'sent' ? { tab: 'sent', requestId: 1 } : null
+	);
+	const requestInboxSentTab = useCallback((tab: InboxSentTab) => {
+		setInboxSentTab(tab);
+		setInboxSentTabRequest((prev) => ({
+			tab,
+			requestId: (prev?.requestId ?? 0) + 1,
+		}));
+	}, []);
 	// Track the tab we were on before pressing up arrow to go to "all" (so down arrow can return)
 	const [tabBeforeAll, setTabBeforeAll] = useState<ViewType | null>(null);
 	// Track if we navigated from inbox to sent via down arrow (so up arrow can return to inbox)
@@ -1330,10 +1350,9 @@ const Murmur = () => {
 
 	// Mobile never supports the Writing ("testing") or All tabs. Clamp immediately so we never mount
 	// HybridPromptInput on mobile (and never transition through it).
-	const MOBILE_ALLOWED_VIEWS: Array<'contacts' | 'drafting' | 'sent' | 'inbox'> = [
+	const MOBILE_ALLOWED_VIEWS: Array<'contacts' | 'drafting' | 'inbox'> = [
 		'contacts',
 		'drafting',
-		'sent',
 		'inbox',
 	];
 	useLayoutEffect(() => {
@@ -1360,6 +1379,11 @@ const Murmur = () => {
 	
 	// Wrapped setActiveView that handles transitions
 	const setActiveView = useCallback((newView: ViewType) => {
+		// Campaign "Sent" is now Inbox -> Sent. Route any "sent" navigation into the inbox's Sent tab.
+		if (newView === 'sent') {
+			requestInboxSentTab('sent');
+			newView = 'inbox';
+		}
 		// Never allow unsupported views on mobile.
 		if (
 			isMobile === true &&
@@ -1431,7 +1455,7 @@ const Murmur = () => {
 			}
 			setIsFadingOutPreviousView(true);
 		}, MAX_TRANSITION_WAIT_MS);
-	}, [activeView, isMobile, isSafari, MOBILE_ALLOWED_VIEWS]);
+	}, [activeView, isMobile, isSafari, MOBILE_ALLOWED_VIEWS, requestInboxSentTab]);
 
 	const handleActiveViewReady = useCallback(
 		(readyView: DraftingSectionView) => {
@@ -1988,7 +2012,6 @@ const Murmur = () => {
 		'contacts',
 		'testing',
 		'drafting',
-		'sent',
 		'inbox',
 	];
 
@@ -2023,15 +2046,14 @@ const Murmur = () => {
 	};
 
 	// Mobile-specific tab navigation (only the 4 visible tabs on mobile)
-	const mobileTabOrder: Array<'contacts' | 'drafting' | 'sent' | 'inbox'> = [
+	const mobileTabOrder: Array<'contacts' | 'drafting' | 'inbox'> = [
 		'contacts',
 		'drafting',
-		'sent',
 		'inbox',
 	];
 
 	const goToPreviousMobileTab = () => {
-		const currentIndex = mobileTabOrder.indexOf(activeView as 'contacts' | 'drafting' | 'sent' | 'inbox');
+		const currentIndex = mobileTabOrder.indexOf(activeView as 'contacts' | 'drafting' | 'inbox');
 		if (currentIndex > 0) {
 			setActiveView(mobileTabOrder[currentIndex - 1]);
 		} else {
@@ -2041,7 +2063,7 @@ const Murmur = () => {
 	};
 
 	const goToNextMobileTab = () => {
-		const currentIndex = mobileTabOrder.indexOf(activeView as 'contacts' | 'drafting' | 'sent' | 'inbox');
+		const currentIndex = mobileTabOrder.indexOf(activeView as 'contacts' | 'drafting' | 'inbox');
 		if (currentIndex >= 0 && currentIndex < mobileTabOrder.length - 1) {
 			setActiveView(mobileTabOrder[currentIndex + 1]);
 		} else {
@@ -2076,10 +2098,10 @@ const Murmur = () => {
 
 			// Handle up/down arrows for vertical tab navigation
 			if (e.key === 'ArrowUp') {
-				// Special case: if on sent tab and we got here from inbox via down arrow, go back to inbox
-				if (activeView === 'sent' && cameToSentFromInbox) {
+				// Special case: if on Inbox->Sent (entered via down arrow), go back to Inbox
+				if (activeView === 'inbox' && inboxSentTab === 'sent' && cameToSentFromInbox) {
 					setCameToSentFromInbox(false);
-					setActiveView('inbox');
+					requestInboxSentTab('inbox');
 					return;
 				}
 				// Go to "all" tab and remember current tab (unless already on "all")
@@ -2091,10 +2113,10 @@ const Murmur = () => {
 			}
 
 			if (e.key === 'ArrowDown') {
-				// Special case: inbox tab -> sent tab
+				// Special case: Inbox -> Sent (as an inbox sub-view)
 				if (activeView === 'inbox') {
 					setCameToSentFromInbox(true);
-					setActiveView('sent');
+					requestInboxSentTab('sent');
 					return;
 				}
 				// Return to the tab we were on before going to "all"
@@ -2123,7 +2145,17 @@ const Murmur = () => {
 
 		window.addEventListener('keydown', handleKeyDown);
 		return () => window.removeEventListener('keydown', handleKeyDown);
-	}, [isMobile, goToPreviousTab, goToNextTab, activeView, tabBeforeAll, cameToSentFromInbox, setActiveView]);
+	}, [
+		isMobile,
+		goToPreviousTab,
+		goToNextTab,
+		activeView,
+		tabBeforeAll,
+		cameToSentFromInbox,
+		setActiveView,
+		inboxSentTab,
+		requestInboxSentTab,
+	]);
 
 
 	if (isPendingCampaign || !campaign) {
@@ -2584,35 +2616,6 @@ const Murmur = () => {
 									</span>
 								</div>
 								</button>
-								{/* Hover bridge: keeps the "Sent" bubble open while moving the cursor down */}
-								<span
-								aria-hidden="true"
-								className={cn(
-									'absolute left-1/2 -translate-x-1/2 top-full z-40',
-									'hidden group-hover:block group-focus-within:block',
-									'w-[110px] h-[56px]',
-									'bg-transparent cursor-pointer'
-								)}
-							/>
-								<button
-								type="button"
-								aria-label="Sent"
-								title="Sent"
-								onClick={() => setActiveView('sent')}
-								className={cn(
-									'absolute left-1/2 -translate-x-1/2 top-full mt-[6px] z-50',
-									activeView === 'sent'
-										? 'flex'
-										: 'hidden group-hover:flex group-focus-within:flex',
-									'w-[54px] h-[27px] rounded-[8px]',
-									'bg-[#E4EBE6]',
-									'items-center justify-center cursor-pointer',
-									'font-inter text-[17px] font-medium',
-									activeView === 'sent' ? 'text-black' : 'text-[#929292]'
-								)}
-							>
-								Sent
-								</button>
 							</div>
 						</div>
 					</div>
@@ -2658,18 +2661,6 @@ const Murmur = () => {
 								onClick={() => setActiveView('drafting')}
 							>
 								{headerDraftCount.toString().padStart(2, '0')} Drafts
-							</button>
-							<button
-								type="button"
-								className={cn(
-									'font-inter text-[13px] font-medium leading-none bg-[#B0E0A6] border cursor-pointer rounded-full px-3 py-1',
-									activeView === 'sent'
-										? 'text-black border-black'
-										: 'text-[#6B6B6B] border-transparent hover:text-black hover:border-black'
-								)}
-								onClick={() => setActiveView('sent')}
-							>
-								{headerSentCount.toString().padStart(2, '0')} Sent
 							</button>
 							<button
 								type="button"
@@ -2830,35 +2821,6 @@ const Murmur = () => {
 									>
 										Inbox
 									</button>
-									{/* Hover bridge: keeps the "Sent" bubble open while moving the cursor down */}
-									<span
-										aria-hidden="true"
-										className={cn(
-											'absolute left-1/2 -translate-x-1/2 top-full z-40',
-											'hidden group-hover:block group-focus-within:block',
-											'w-[110px] h-[56px]',
-											'bg-transparent cursor-pointer'
-										)}
-									/>
-									<button
-										type="button"
-										aria-label="Sent"
-										title="Sent"
-										onClick={() => setActiveView('sent')}
-										className={cn(
-											'absolute left-1/2 -translate-x-1/2 top-full mt-[6px] z-50',
-											activeView === 'sent'
-												? 'flex'
-												: 'hidden group-hover:flex group-focus-within:flex',
-											'w-[54px] h-[27px] rounded-[8px]',
-											'bg-[#E4EBE6]',
-											'items-center justify-center cursor-pointer',
-											'font-inter text-[17px] font-medium',
-											activeView === 'sent' ? 'text-black' : 'text-[#929292]'
-										)}
-									>
-										Sent
-									</button>
 								</div>
 							</div>
 						</div>
@@ -2901,6 +2863,8 @@ const Murmur = () => {
 												renderGlobalOverlays
 												onViewReady={handleActiveViewReady}
 												autoOpenProfileTabWhenIncomplete={cameFromSearch}
+												inboxSentTabRequest={inboxSentTabRequest}
+												onInboxSentTabChange={setInboxSentTab}
 												goToDrafting={() => setActiveView('drafting')}
 												goToAll={() => setActiveView('all')}
 												goToWriting={() => setActiveView('testing')}
@@ -2940,6 +2904,8 @@ const Murmur = () => {
 													view={previousView}
 													renderGlobalOverlays={false}
 													autoOpenProfileTabWhenIncomplete={cameFromSearch}
+													inboxSentTabRequest={inboxSentTabRequest}
+													onInboxSentTabChange={setInboxSentTab}
 													goToDrafting={() => setActiveView('drafting')}
 													goToAll={() => setActiveView('all')}
 													goToWriting={() => setActiveView('testing')}
@@ -3412,6 +3378,7 @@ const Murmur = () => {
 			{!isMobile && !hideRightPanel && !(activeView === 'all' && hideRightPanelOnAll) && !(activeView === 'inbox' && hideRightPanelOnInbox) && (
 				<CampaignRightPanel
 					view={activeView}
+					activeTab={activeView === 'inbox' ? (inboxSentTab === 'sent' ? 'sent' : 'inbox') : undefined}
 					onTabChange={setActiveView}
 					transitionDurationMs={TRANSITION_DURATION}
 					isViewTransitionFading={isFadingOutPreviousView}

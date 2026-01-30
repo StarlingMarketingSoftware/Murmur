@@ -134,6 +134,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		goToInbox,
 		goToContacts,
 		goToSent,
+		inboxSentTabRequest,
+		onInboxSentTabChange,
 		goToPreviousTab,
 		goToNextTab,
 		hideHeaderBox,
@@ -6722,6 +6724,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											onGoToWriting={goToWriting}
 											onGoToContacts={goToContacts}
 											onGoToSearch={onGoToSearch}
+											inboxSentTabRequest={inboxSentTabRequest}
+											onInboxSentTabChange={onInboxSentTabChange}
 											onContactSelect={(contact) => {
 												if (contact) {
 													setSelectedContactForResearch(contact);
@@ -6807,6 +6811,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													onGoToWriting={goToWriting}
 													onGoToContacts={goToContacts}
 													onGoToSearch={onGoToSearch}
+													inboxSentTabRequest={inboxSentTabRequest}
+													onInboxSentTabChange={onInboxSentTabChange}
 													onContactSelect={(contact) => {
 														if (contact) {
 															setSelectedContactForResearch(contact);
@@ -6863,6 +6869,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											onGoToWriting={goToWriting}
 											onGoToContacts={goToContacts}
 											onGoToSearch={onGoToSearch}
+											inboxSentTabRequest={inboxSentTabRequest}
+											onInboxSentTabChange={onInboxSentTabChange}
 											onContactSelect={(contact) => {
 												if (contact) {
 													setSelectedContactForResearch(contact);

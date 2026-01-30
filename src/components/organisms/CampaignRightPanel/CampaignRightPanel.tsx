@@ -14,6 +14,12 @@ type CampaignRightPanelTab = 'contacts' | 'testing' | 'drafting' | 'sent' | 'inb
 interface CampaignRightPanelProps {
 	className?: string;
 	view?: 'contacts' | 'testing' | 'drafting' | 'sent' | 'inbox' | 'all';
+	/**
+	 * Optional override for which tab should be visually highlighted/active.
+	 * Useful when the main view is "inbox" but we want to highlight the "sent" icon
+	 * (Inbox -> Sent sub-view).
+	 */
+	activeTab?: CampaignRightPanelTab;
 	onTabChange?: (tab: CampaignRightPanelTab) => void;
 	/**
 	 * Duration (ms) used to animate the active highlight between tabs.
@@ -33,6 +39,7 @@ const ACTIVE_HIGHLIGHT_HEIGHT_PX = 72;
 export const CampaignRightPanel: FC<CampaignRightPanelProps> = ({
 	className,
 	view,
+	activeTab,
 	onTabChange,
 	transitionDurationMs = 180,
 	isViewTransitionFading,
@@ -72,6 +79,8 @@ export const CampaignRightPanel: FC<CampaignRightPanelProps> = ({
 	};
 	
 	const leftPosition = getLeftPosition();
+	// Visual state: allow overriding which icon is considered "active".
+	const visualView = activeTab ?? view;
 
 	// Animate position changes with the same timing/ease as the Inbox morphs (GSAP `power2.inOut`).
 	// We update `left` immediately, then use a FLIP-style `x` transform so motion stays crisp and
@@ -186,7 +195,7 @@ export const CampaignRightPanel: FC<CampaignRightPanelProps> = ({
 	}, [isViewTransitionFading, transitionDurationMs]);
 
 	const getActiveTabEl = useCallback((): HTMLDivElement | null => {
-		switch (view) {
+		switch (visualView) {
 			case 'contacts':
 				return contactsRef.current;
 			case 'testing':
@@ -200,7 +209,7 @@ export const CampaignRightPanel: FC<CampaignRightPanelProps> = ({
 			default:
 				return null;
 		}
-	}, [view]);
+	}, [visualView]);
 
 	const positionActiveHighlight = useCallback(
 		(shouldAnimate: boolean) => {
@@ -278,7 +287,7 @@ export const CampaignRightPanel: FC<CampaignRightPanelProps> = ({
 		const shouldAnimate = hasPositionedHighlightOnceRef.current;
 		positionActiveHighlight(shouldAnimate);
 		hasPositionedHighlightOnceRef.current = true;
-	}, [positionActiveHighlight, view]);
+	}, [positionActiveHighlight, visualView]);
 
 	useLayoutEffect(() => {
 		if (typeof window === 'undefined') return;
@@ -360,7 +369,7 @@ export const CampaignRightPanel: FC<CampaignRightPanelProps> = ({
 					className="relative z-10 flex items-center justify-center pointer-events-auto cursor-pointer"
 					onClick={() => onTabChange?.('contacts')}
 				>
-					<ContactsPanel style={{ display: 'block', position: 'relative', opacity: view === 'testing' || view === 'drafting' || view === 'sent' || view === 'inbox' ? 0.3 : 1 }} />
+					<ContactsPanel style={{ display: 'block', position: 'relative', opacity: visualView === 'testing' || visualView === 'drafting' || visualView === 'sent' || visualView === 'inbox' ? 0.3 : 1 }} />
 				</div>
 				<div 
 					ref={testingRef}
@@ -368,7 +377,7 @@ export const CampaignRightPanel: FC<CampaignRightPanelProps> = ({
 					style={{ marginTop: '25px' }}
 					onClick={() => onTabChange?.('testing')}
 				>
-					<WritingPanel style={{ display: 'block', position: 'relative', opacity: view === 'contacts' || view === 'drafting' || view === 'sent' || view === 'inbox' ? 0.3 : 1 }} />
+					<WritingPanel style={{ display: 'block', position: 'relative', opacity: visualView === 'contacts' || visualView === 'drafting' || visualView === 'sent' || visualView === 'inbox' ? 0.3 : 1 }} />
 				</div>
 				<div 
 					ref={draftingRef}
@@ -376,7 +385,7 @@ export const CampaignRightPanel: FC<CampaignRightPanelProps> = ({
 					style={{ marginTop: '25px' }}
 					onClick={() => onTabChange?.('drafting')}
 				>
-					<DraftsPanel style={{ display: 'block', position: 'relative', opacity: view === 'contacts' || view === 'testing' || view === 'sent' || view === 'inbox' ? 0.3 : 1 }} />
+					<DraftsPanel style={{ display: 'block', position: 'relative', opacity: visualView === 'contacts' || visualView === 'testing' || visualView === 'sent' || visualView === 'inbox' ? 0.3 : 1 }} />
 				</div>
 				<div 
 					ref={sentRef}
@@ -384,7 +393,7 @@ export const CampaignRightPanel: FC<CampaignRightPanelProps> = ({
 					style={{ marginTop: '25px' }}
 					onClick={() => onTabChange?.('sent')}
 				>
-					<SentPanel style={{ display: 'block', position: 'relative', opacity: view === 'contacts' || view === 'testing' || view === 'drafting' || view === 'inbox' ? 0.3 : 1 }} />
+					<SentPanel style={{ display: 'block', position: 'relative', opacity: visualView === 'contacts' || visualView === 'testing' || visualView === 'drafting' || visualView === 'inbox' ? 0.3 : 1 }} />
 				</div>
 				<div 
 					ref={inboxRef}
@@ -392,7 +401,7 @@ export const CampaignRightPanel: FC<CampaignRightPanelProps> = ({
 					style={{ marginTop: '25px' }}
 					onClick={() => onTabChange?.('inbox')}
 				>
-					<InboxPanel style={{ display: 'block', position: 'relative', opacity: view === 'contacts' || view === 'testing' || view === 'drafting' || view === 'sent' ? 0.3 : 1 }} />
+					<InboxPanel style={{ display: 'block', position: 'relative', opacity: visualView === 'contacts' || visualView === 'testing' || visualView === 'drafting' || visualView === 'sent' ? 0.3 : 1 }} />
 				</div>
 			</div>
 		</div>
