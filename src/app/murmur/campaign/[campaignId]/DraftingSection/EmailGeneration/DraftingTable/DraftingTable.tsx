@@ -18,6 +18,11 @@ export const ContactsHeaderChrome: FC<{
 	onDraftsClick?: () => void;
 	onInboxClick?: () => void;
 	/**
+	 * Which campaign tab is currently active.
+	 * Used to render the hovered pill as a "white placeholder" when it represents the active tab.
+	 */
+	activeTab?: 'contacts' | 'write' | 'drafts' | 'inbox';
+	/**
 	 * When false, renders a static header (no hover pill animation, no dot hover/click zones).
 	 * Useful for small preview/expanded-list variants where the full interaction feels noisy.
 	 */
@@ -30,6 +35,7 @@ export const ContactsHeaderChrome: FC<{
 	onWriteClick,
 	onDraftsClick,
 	onInboxClick,
+	activeTab = 'contacts',
 	interactive = true,
 }) => {
 	const [isDot1Hovered, setIsDot1Hovered] = useState(false);
@@ -37,6 +43,7 @@ export const ContactsHeaderChrome: FC<{
 	const [isDot3Hovered, setIsDot3Hovered] = useState(false);
 	const wasAnyDotHoveredRef = useRef(false);
 	const isBottomView = whiteSectionHeight === 15;
+	const isWriteActiveTab = activeTab === 'write';
 	const dotColor = hasData ? '#D9D9D9' : '#B0B0B0';
 	const pillBorderColor = hasData ? '#8D5B5B' : '#B0B0B0';
 	const pillTextColor = hasData ? '#000000' : '#B0B0B0';
@@ -177,7 +184,9 @@ export const ContactsHeaderChrome: FC<{
 							left: `${writePillLeft}px`,
 							width: `${writePillWidth}px`,
 							height: `${writePillHeight}px`,
-							backgroundColor: '#A6E2A8',
+							// If this header is rendered on the Write tab, hovering "Write" should
+							// show the same white-placeholder state as the active pill.
+							backgroundColor: isWriteActiveTab ? '#FFFFFF' : '#A6E2A8',
 							border: '2px solid #000000',
 							borderRadius: `${writePillBorderRadius}px`,
 							display: 'flex',
@@ -187,7 +196,7 @@ export const ContactsHeaderChrome: FC<{
 							opacity: isDot1Hovered ? 1 : 0,
 							pointerEvents: isDot1Hovered ? 'auto' : 'none',
 							transition: `opacity ${pillOpacityTransition}`,
-							cursor: onWriteClick ? 'pointer' : undefined,
+							cursor: isWriteActiveTab ? 'default' : onWriteClick ? 'pointer' : undefined,
 						}}
 						onClick={(e) => {
 							e.stopPropagation();
@@ -206,6 +215,8 @@ export const ContactsHeaderChrome: FC<{
 								alignItems: 'center',
 								height: '100%',
 								marginTop: isBottomView ? '-1px' : isAllTab ? '-1px' : 0,
+								opacity: isWriteActiveTab ? 0 : 1,
+								transition: `opacity ${pillOpacityTransition}`,
 							}}
 						>
 							Write

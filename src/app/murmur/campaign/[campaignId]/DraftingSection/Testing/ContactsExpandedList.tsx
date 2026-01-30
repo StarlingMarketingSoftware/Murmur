@@ -493,7 +493,12 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 			<ContactsHeaderChrome
 				isAllTab={isAllTab}
 				whiteSectionHeight={customWhiteSectionHeight}
-				interactive={false}
+				// Match the main Contacts tab header chrome animation, but keep the ultra-compact
+				// bottom view static so it doesn't interfere with the "Open" affordance.
+				// Also, when this list is rendered on the Write tab (tooltip-enabled), treat "Write"
+				// as the active tab so hovering "Write" shows the white-placeholder state.
+				activeTab={enableUsedContactTooltip ? 'write' : 'contacts'}
+				interactive={!isBottomView}
 			/>
 			<div
 				className={cn(
