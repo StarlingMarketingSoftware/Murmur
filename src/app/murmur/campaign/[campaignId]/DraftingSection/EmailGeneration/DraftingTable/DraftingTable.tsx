@@ -1259,6 +1259,10 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 	const [isDraftsCounterHovered, setIsDraftsCounterHovered] = useState(false);
 	const [isApprovedCounterHovered, setIsApprovedCounterHovered] = useState(false);
 	const [isRejectedCounterHovered, setIsRejectedCounterHovered] = useState(false);
+	// Chrome-style hover preview for Drafts filter pills (All Drafts / Approved / Rejected)
+	const [hoveredStatusFilterTab, setHoveredStatusFilterTab] = useState<
+		'all' | 'approved' | 'rejected' | null
+	>(null);
 	const isContacts = title === 'Contacts';
 	const isCompactHeader = isContacts || title === 'Drafts' || title === 'Sent';
 	const showTitle = !isContacts && title !== 'Drafts' && title !== 'Sent';
@@ -1379,6 +1383,7 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 			{/* Filter tabs in gray section for Drafts - hidden on mobile */}
 			{isDrafts && hasData && onStatusFilterChange && !isMobile && (
 				<div
+					onMouseLeave={() => setHoveredStatusFilterTab(null)}
 					style={{
 						position: 'absolute',
 						top: '32px',
@@ -1392,6 +1397,17 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 					<div style={{ display: 'flex', gap: '37px' }}>
 						{(['all', 'approved', 'rejected'] as const).map((tab) => {
 							const isActive = statusFilter === tab;
+							const isAnyTabHovered = hoveredStatusFilterTab !== null;
+							const isHovered = hoveredStatusFilterTab === tab;
+							// When hovering, only the hovered tab should look "selected"
+							const isVisuallyActive = isAnyTabHovered ? isHovered : isActive;
+							const activeBackgroundColor =
+								tab === 'approved'
+									? '#559855'
+									: tab === 'rejected'
+										? '#A03C3C'
+										: '#949494';
+							const chromeTransition = '0.6s cubic-bezier(0.22, 1, 0.36, 1)';
 							const labels: Record<typeof tab, string> = {
 								all: 'All Drafts',
 								approved: 'Approved',
@@ -1407,24 +1423,36 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 										fontSize: '10px',
 										fontWeight: 600,
 										borderRadius: '6px',
-										border: 'none',
-										backgroundColor: isActive
-											? tab === 'approved'
-												? '#559855'
-												: tab === 'rejected'
-												? '#A03C3C'
-												: '#949494'
-											: '#D9D9D9',
-										color: isActive ? '#FFFFFF' : '#000000',
+										borderWidth: '1px',
+										borderStyle: 'solid',
+										borderColor: isAnyTabHovered ? '#000000' : 'transparent',
+										backgroundColor: isVisuallyActive
+											? activeBackgroundColor
+											: isAnyTabHovered
+												? '#FFFFFF'
+												: '#D9D9D9',
+										color: isVisuallyActive ? '#FFFFFF' : '#000000',
 										cursor: 'pointer',
 										display: 'flex',
 										alignItems: 'center',
 										justifyContent: 'center',
 										padding: 0,
+										boxSizing: 'border-box',
+										transition: `background-color ${chromeTransition}, color ${chromeTransition}, border-color ${chromeTransition}`,
 									}}
+									onMouseEnter={() => setHoveredStatusFilterTab(tab)}
+									onFocus={() => setHoveredStatusFilterTab(tab)}
+									onBlur={() => setHoveredStatusFilterTab(null)}
 									onClick={() => onStatusFilterChange(tab)}
 								>
-									{labels[tab]}
+									<span
+										style={{
+											opacity: isAnyTabHovered && !isHovered ? 0 : 1,
+											transition: `opacity ${chromeTransition}`,
+										}}
+									>
+										{labels[tab]}
+									</span>
 								</button>
 							);
 						})}
