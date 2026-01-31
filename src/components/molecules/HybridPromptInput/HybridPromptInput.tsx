@@ -3995,6 +3995,10 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		// Close any expanded field (we are clearing values)
 		setExpandedProfileBox(null);
 
+		// Reset the "left profile tab" warning state so cleared fields go back to neutral/gray.
+		// If the user leaves the Profile tab and comes back, they'll be marked red again.
+		setHasLeftProfileTab(false);
+
 		// Name is required; keep it and clear the rest.
 		setProfileFields((prev) => ({
 			...prev,
