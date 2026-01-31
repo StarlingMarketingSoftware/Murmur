@@ -955,7 +955,12 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 		mainBoxId,
 		showSearchBar = true,
 		isLoading = false,
+		isAllContactsSelected,
+		onSelectAllContacts,
 	} = props;
+
+	// Use the provided onSelectAllContacts if available, otherwise fall back to handleClick
+	const handleAllButtonClick = onSelectAllContacts || handleClick;
 	const [isDrafting, setIsDrafting] = useState(false);
 	const router = useRouter();
 	const isMobile = useIsMobile();
@@ -1822,18 +1827,28 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 
 			{/* Draft Emails Button - below the table box */}
 			{!isDrafting && !hideButton && (
-				<div className="group relative w-[475px] h-[40px] mt-4 mx-auto">
-					{selectedCount > 0 ? (
-						<>
-							<button
-								type="button"
-								onClick={handleDraftEmails}
-								disabled={isButtonDisabled}
-								className={cn(
-									'w-full h-full rounded-[4px] border-[3px] text-black font-inter font-normal text-[17px]',
-									isButtonDisabled
-										? 'bg-[#E0E0E0] border-[#A0A0A0] cursor-not-allowed opacity-60'
+				<div data-draft-button-container className="group relative w-[475px] h-[40px] mt-4 mx-auto">
+					{selectedCount > 0 || isAllContactsSelected ? (
+						// Animated draft button with expanding "All" state
+						<button
+							type="button"
+							onClick={handleDraftEmails}
+							disabled={isButtonDisabled}
+							className={cn(
+								'w-full h-full rounded-[4px] border-[3px] text-black font-inter font-normal text-[17px] relative overflow-hidden transition-colors',
+								isAllContactsSelected ? 'duration-300' : 'duration-0',
+								isButtonDisabled
+									? 'bg-[#E0E0E0] border-[#A0A0A0] cursor-not-allowed opacity-60'
+									: isAllContactsSelected
+										? 'bg-[#4DC669] border-black hover:bg-[#45B85F] cursor-pointer'
 										: 'bg-[#F2C7C7] border-[#9A3434] hover:bg-[#E6B9B9] cursor-pointer'
+							)}
+						>
+							{/* Normal text - fades out when All selected */}
+							<span
+								className={cn(
+									'transition-opacity',
+									isAllContactsSelected ? 'duration-300 opacity-0' : 'duration-0 opacity-100'
 								)}
 							>
 								{isDrafting ? (
@@ -1844,21 +1859,29 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 								) : (
 									`Draft ${selectedCount} ${selectedCount === 1 ? 'Contact' : 'Contacts'}`
 								)}
-							</button>
-							{/* Right section "All" button */}
-							<button
-								type="button"
-								className="absolute right-[3px] top-[2.5px] bottom-[2.5px] w-[62px] bg-[#D17474] rounded-r-[1px] rounded-l-none flex items-center justify-center font-inter font-normal text-[17px] text-black hover:bg-[#C26666] cursor-pointer z-10"
-								onClick={(e) => {
-									e.stopPropagation();
-									handleClick();
-								}}
+							</span>
+							{/* "All" text - fades in when All selected */}
+							<span
+								className={cn(
+									'absolute inset-0 flex items-center justify-center transition-opacity',
+									isAllContactsSelected ? 'duration-300 opacity-100' : 'duration-0 opacity-0'
+								)}
 							>
-								{/* Vertical divider line - explicit element to avoid border rendering gaps */}
-								<div className="absolute left-0 -top-[0.5px] -bottom-[0.5px] w-[2px] bg-[#9A3434]" />
-								All
-							</button>
-						</>
+								Draft <span className="font-bold mx-1">All</span> {contacts.length} Contacts
+							</span>
+							{/* Expanding green overlay from right */}
+							<div
+								className={cn(
+									'absolute top-0 bottom-0 right-0 bg-[#4DC669] ease-out',
+									isAllContactsSelected
+										? 'w-full rounded-[1px] transition-all duration-300'
+										: 'w-[62px] rounded-r-[1px] transition-none'
+								)}
+								style={{
+									opacity: isAllContactsSelected ? 0 : 1,
+								}}
+							/>
+						</button>
 					) : (
 						<div className="relative w-full h-full rounded-[4px] border-[3px] border-transparent overflow-hidden transition-colors group-hover:bg-[#EEF5EF] group-hover:border-black">
 							<div className="w-full h-full flex items-center justify-center text-black font-inter font-normal text-[17px] cursor-default">
@@ -1870,13 +1893,28 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 								className="absolute right-0 top-0 bottom-0 w-[62px] bg-[#D17474] rounded-r-[1px] rounded-l-none flex items-center justify-center font-inter font-normal text-[17px] text-black hover:bg-[#C26666] cursor-pointer z-10 opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto"
 								onClick={(e) => {
 									e.stopPropagation();
-									handleClick();
+									handleAllButtonClick();
 								}}
 							>
 								<div className="absolute left-0 top-0 bottom-0 w-[3px] bg-black" />
 								All
 							</button>
 						</div>
+					)}
+					{/* "All" button overlay - only visible when not all selected */}
+					{(selectedCount > 0 || isAllContactsSelected) && !isAllContactsSelected && (
+						<button
+							type="button"
+							className="absolute right-[3px] top-[2.5px] bottom-[2.5px] w-[62px] bg-[#D17474] rounded-r-[1px] rounded-l-none flex items-center justify-center font-inter font-normal text-[17px] text-black hover:bg-[#C26666] cursor-pointer z-10"
+							onClick={(e) => {
+								e.stopPropagation();
+								handleAllButtonClick();
+							}}
+						>
+							{/* Vertical divider line - explicit element to avoid border rendering gaps */}
+							<div className="absolute left-0 -top-[0.5px] -bottom-[0.5px] w-[2px] bg-[#9A3434]" />
+							All
+						</button>
 					)}
 				</div>
 			)}

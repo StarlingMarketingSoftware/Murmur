@@ -1636,6 +1636,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const [contactsTabSelectedIds, setContactsTabSelectedIds] = useState<Set<number>>(
 		new Set()
 	);
+	// Ref for the draft button container to detect outside clicks
+	const draftButtonContainerRef = useRef<HTMLDivElement>(null);
+
 	const handleContactsTabSelection = (contactId: number) => {
 		setContactsTabSelectedIds((prev) => {
 			const next = new Set(prev);
@@ -2270,6 +2273,47 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			return next;
 		});
 	}, [contactsAvailableForDrafting, setContactsTabSelectedIds]);
+
+	// Compute whether all contacts are selected (regardless of how they were selected)
+	const areAllContactsSelected = useMemo(() => {
+		if (contactsAvailableForDrafting.length === 0) return false;
+		if (contactsTabSelectedIds.size !== contactsAvailableForDrafting.length) return false;
+		return contactsAvailableForDrafting.every((c) => contactsTabSelectedIds.has(c.id));
+	}, [contactsAvailableForDrafting, contactsTabSelectedIds]);
+
+	// Handle "All" button click - toggle all contacts
+	const handleSelectAllContacts = useCallback(() => {
+		if (areAllContactsSelected) {
+			// Clicking "All" when already all selected - deselect all
+			setContactsTabSelectedIds(new Set());
+		} else {
+			// Select all
+			const allIds = new Set(contactsAvailableForDrafting.map((c) => c.id));
+			setContactsTabSelectedIds(allIds);
+		}
+	}, [contactsAvailableForDrafting, areAllContactsSelected]);
+
+	// Click-outside handler to deselect when all contacts are selected
+	useEffect(() => {
+		if (!areAllContactsSelected) return;
+
+		const handleClickOutside = (event: MouseEvent) => {
+			const target = event.target as HTMLElement;
+			// Check if click is outside the draft button container
+			if (
+				draftButtonContainerRef.current &&
+				!draftButtonContainerRef.current.contains(target) &&
+				!target.closest('[data-draft-button-container]')
+			) {
+				setContactsTabSelectedIds(new Set());
+			}
+		};
+
+		document.addEventListener('mousedown', handleClickOutside);
+		return () => {
+			document.removeEventListener('mousedown', handleClickOutside);
+		};
+	}, [areAllContactsSelected]);
 
 	const handleResearchContactClick = (contact: ContactWithName | null) => {
 		if (!contact) return;
@@ -4039,18 +4083,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													isDraftDisabled={
 														isPendingGeneration || contactsTabSelectedIds.size === 0
 													}
-													onSelectAllContacts={() => {
-														const allIds = new Set(contactsAvailableForDrafting.map((c) => c.id));
-														const areAllSelected =
-															contactsTabSelectedIds.size === allIds.size &&
-															[...allIds].every((id) => contactsTabSelectedIds.has(id));
-
-														if (areAllSelected) {
-															setContactsTabSelectedIds(new Set());
-														} else {
-															setContactsTabSelectedIds(allIds);
-														}
-													}}
+													onSelectAllContacts={handleSelectAllContacts}
+													isAllContactsSelected={areAllContactsSelected}
+													totalContactCount={contactsAvailableForDrafting.length}
 													onGetSuggestions={handleGetSuggestions}
 													onUpscalePrompt={upscalePrompt}
 													isUpscalingPrompt={isUpscalingPrompt}
@@ -4083,52 +4118,66 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												</button>
 												{/* Draft button container */}
 												<div
+													ref={draftButtonContainerRef}
+													data-draft-button-container
 													className="group relative h-[40px] flex-1"
 													style={{ maxWidth: '691px' }}
 												>
-													{contactsTabSelectedIds.size > 0 ? (
-														<>
-															<button
-																type="button"
-																onClick={async () => {
-																	if (contactsTabSelectedIds.size === 0) {
-																		toast.error('Select at least one contact to draft emails.');
-																		return;
-																	}
-																	await handleGenerateDrafts(
-																		Array.from(contactsTabSelectedIds.values())
-																	);
-																}}
-																disabled={isPendingGeneration || contactsTabSelectedIds.size === 0}
-																className={cn(
-																	'w-full h-full rounded-[4px] border-[3px] text-black font-inter font-normal text-[17px]',
-																	isPendingGeneration || contactsTabSelectedIds.size === 0
-																		? 'bg-[#E0E0E0] border-[#A0A0A0] cursor-not-allowed opacity-60'
+													{contactsTabSelectedIds.size > 0 || areAllContactsSelected ? (
+														// Animated draft button with expanding "All" state
+														<button
+															type="button"
+															onClick={async () => {
+																if (contactsTabSelectedIds.size === 0) {
+																	toast.error('Select at least one contact to draft emails.');
+																	return;
+																}
+																await handleGenerateDrafts(
+																	Array.from(contactsTabSelectedIds.values())
+																);
+															}}
+															disabled={isPendingGeneration || contactsTabSelectedIds.size === 0}
+															className={cn(
+																'w-full h-full rounded-[4px] border-[3px] text-black font-inter font-normal text-[17px] relative overflow-hidden transition-colors duration-300',
+																isPendingGeneration || contactsTabSelectedIds.size === 0
+																	? 'bg-[#E0E0E0] border-[#A0A0A0] cursor-not-allowed opacity-60'
+																	: areAllContactsSelected
+																		? 'bg-[#4DC669] border-black hover:bg-[#45B85F] cursor-pointer'
 																		: 'bg-[#C7F2C9] border-[#349A37] hover:bg-[#B9E7BC] cursor-pointer'
+															)}
+														>
+															{/* Normal text - fades out when All selected */}
+															<span
+																className={cn(
+																	'transition-opacity duration-300',
+																	areAllContactsSelected ? 'opacity-0' : 'opacity-100'
 																)}
 															>
 																Draft {contactsTabSelectedIds.size} {contactsTabSelectedIds.size === 1 ? 'Contact' : 'Contacts'}
-															</button>
-															{/* Right section "All" button */}
-															<button
-																type="button"
-																className="absolute right-[3px] top-[3px] bottom-[3px] w-[62px] bg-[#74D178] rounded-r-[1px] flex items-center justify-center font-inter font-normal text-[17px] text-black hover:bg-[#65C269] cursor-pointer border-0 border-l-[2px] border-[#349A37] z-10"
-																onClick={() => {
-																	const allIds = new Set(contactsAvailableForDrafting.map((c) => c.id));
-																	const areAllSelected =
-																		contactsTabSelectedIds.size === allIds.size &&
-																		[...allIds].every((id) => contactsTabSelectedIds.has(id));
-
-																	if (areAllSelected) {
-																		setContactsTabSelectedIds(new Set());
-																	} else {
-																		setContactsTabSelectedIds(allIds);
-																	}
-																}}
+															</span>
+															{/* "All" text - fades in when All selected */}
+															<span
+																className={cn(
+																	'absolute inset-0 flex items-center justify-center transition-opacity duration-300',
+																	areAllContactsSelected ? 'opacity-100' : 'opacity-0'
+																)}
 															>
-																All
-															</button>
-														</>
+																Draft <span className="font-bold mx-1">All</span> {contactsAvailableForDrafting.length} Contacts
+															</span>
+															{/* Expanding green overlay from right */}
+															<div
+																className={cn(
+																	'absolute top-0 bottom-0 right-0 bg-[#4DC669] transition-all duration-300 ease-out',
+																	areAllContactsSelected
+																		? 'w-full rounded-[1px]'
+																		: 'w-[62px] rounded-r-[1px]'
+																)}
+																style={{
+																	opacity: areAllContactsSelected ? 0 : 1,
+																	transitionProperty: 'width, opacity',
+																}}
+															/>
+														</button>
 													) : (
 														<div className="relative w-full h-full rounded-[4px] border-[3px] border-transparent overflow-hidden transition-colors group-hover:bg-[#EEF5EF] group-hover:border-black">
 															<div className="w-full h-full flex items-center justify-center text-black font-inter font-normal text-[17px] cursor-default">
@@ -4138,27 +4187,25 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																type="button"
 																aria-label="Select all contacts"
 																className="absolute right-0 top-0 bottom-0 w-[62px] bg-[#74D178] rounded-r-[1px] flex items-center justify-center font-inter font-normal text-[17px] text-black hover:bg-[#65C269] cursor-pointer z-10 opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto"
-																onClick={() => {
-																	const allIds = new Set(
-																		contactsAvailableForDrafting.map((c) => c.id)
-																	);
-																	const areAllSelected =
-																		contactsTabSelectedIds.size === allIds.size &&
-																		[...allIds].every((id) =>
-																			contactsTabSelectedIds.has(id)
-																		);
-
-																	if (areAllSelected) {
-																		setContactsTabSelectedIds(new Set());
-																	} else {
-																		setContactsTabSelectedIds(allIds);
-																	}
-																}}
+																onClick={handleSelectAllContacts}
 															>
 																<div className="absolute left-0 top-0 bottom-0 w-[3px] bg-black" />
 																All
 															</button>
 														</div>
+													)}
+													{/* "All" button overlay - only visible when not all selected */}
+													{(contactsTabSelectedIds.size > 0 || areAllContactsSelected) && !areAllContactsSelected && (
+														<button
+															type="button"
+															className="absolute right-[3px] top-[3px] bottom-[3px] w-[62px] bg-[#74D178] rounded-r-[1px] flex items-center justify-center font-inter font-normal text-[17px] text-black hover:bg-[#65C269] cursor-pointer border-0 border-l-[2px] border-[#349A37] z-10"
+															onClick={(e) => {
+																e.stopPropagation();
+																handleSelectAllContacts();
+															}}
+														>
+															All
+														</button>
 													)}
 												</div>
 												{/* Right arrow */}
@@ -4201,18 +4248,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											isDraftDisabled={
 												isPendingGeneration || contactsTabSelectedIds.size === 0
 											}
-											onSelectAllContacts={() => {
-												const allIds = new Set(contactsAvailableForDrafting.map((c) => c.id));
-												const areAllSelected =
-													contactsTabSelectedIds.size === allIds.size &&
-													[...allIds].every((id) => contactsTabSelectedIds.has(id));
-
-												if (areAllSelected) {
-													setContactsTabSelectedIds(new Set());
-												} else {
-													setContactsTabSelectedIds(allIds);
-												}
-											}}
+											onSelectAllContacts={handleSelectAllContacts}
+											isAllContactsSelected={areAllContactsSelected}
+											totalContactCount={contactsAvailableForDrafting.length}
 											onGetSuggestions={handleGetSuggestions}
 											onUpscalePrompt={upscalePrompt}
 											isUpscalingPrompt={isUpscalingPrompt}
@@ -4244,51 +4282,64 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												</button>
 												{/* Draft button container */}
 												<div
+													data-draft-button-container
 													className="group relative h-[40px] w-full max-w-[407px]"
 												>
-													{contactsTabSelectedIds.size > 0 ? (
-														<>
-															<button
-																type="button"
-																onClick={async () => {
-																	if (contactsTabSelectedIds.size === 0) {
-																		toast.error('Select at least one contact to draft emails.');
-																		return;
-																	}
-																	await handleGenerateDrafts(
-																		Array.from(contactsTabSelectedIds.values())
-																	);
-																}}
-																disabled={isPendingGeneration || contactsTabSelectedIds.size === 0}
-																className={cn(
-																	'w-full h-full rounded-[4px] border-[3px] text-black font-inter font-normal text-[17px]',
-																	isPendingGeneration || contactsTabSelectedIds.size === 0
-																		? 'bg-[#E0E0E0] border-[#A0A0A0] cursor-not-allowed opacity-60'
+													{contactsTabSelectedIds.size > 0 || areAllContactsSelected ? (
+														// Animated draft button with expanding "All" state
+														<button
+															type="button"
+															onClick={async () => {
+																if (contactsTabSelectedIds.size === 0) {
+																	toast.error('Select at least one contact to draft emails.');
+																	return;
+																}
+																await handleGenerateDrafts(
+																	Array.from(contactsTabSelectedIds.values())
+																);
+															}}
+															disabled={isPendingGeneration || contactsTabSelectedIds.size === 0}
+															className={cn(
+																'w-full h-full rounded-[4px] border-[3px] text-black font-inter font-normal text-[17px] relative overflow-hidden transition-colors duration-300',
+																isPendingGeneration || contactsTabSelectedIds.size === 0
+																	? 'bg-[#E0E0E0] border-[#A0A0A0] cursor-not-allowed opacity-60'
+																	: areAllContactsSelected
+																		? 'bg-[#4DC669] border-black hover:bg-[#45B85F] cursor-pointer'
 																		: 'bg-[#C7F2C9] border-[#349A37] hover:bg-[#B9E7BC] cursor-pointer'
+															)}
+														>
+															{/* Normal text - fades out when All selected */}
+															<span
+																className={cn(
+																	'transition-opacity duration-300',
+																	areAllContactsSelected ? 'opacity-0' : 'opacity-100'
 																)}
 															>
 																Draft {contactsTabSelectedIds.size} {contactsTabSelectedIds.size === 1 ? 'Contact' : 'Contacts'}
-															</button>
-															{/* Right section "All" button */}
-															<button
-																type="button"
-																className="absolute right-[3px] top-[3px] bottom-[3px] w-[62px] bg-[#74D178] rounded-r-[1px] flex items-center justify-center font-inter font-normal text-[17px] text-black hover:bg-[#65C269] cursor-pointer border-0 border-l-[2px] border-[#349A37] z-10"
-																onClick={() => {
-																	const allIds = new Set(contactsAvailableForDrafting.map((c) => c.id));
-																	const areAllSelected =
-																		contactsTabSelectedIds.size === allIds.size &&
-																		[...allIds].every((id) => contactsTabSelectedIds.has(id));
-
-																	if (areAllSelected) {
-																		setContactsTabSelectedIds(new Set());
-																	} else {
-																		setContactsTabSelectedIds(allIds);
-																	}
-																}}
+															</span>
+															{/* "All" text - fades in when All selected */}
+															<span
+																className={cn(
+																	'absolute inset-0 flex items-center justify-center transition-opacity duration-300',
+																	areAllContactsSelected ? 'opacity-100' : 'opacity-0'
+																)}
 															>
-																All
-															</button>
-														</>
+																Draft <span className="font-bold mx-1">All</span> {contactsAvailableForDrafting.length} Contacts
+															</span>
+															{/* Expanding green overlay from right */}
+															<div
+																className={cn(
+																	'absolute top-0 bottom-0 right-0 bg-[#4DC669] transition-all duration-300 ease-out',
+																	areAllContactsSelected
+																		? 'w-full rounded-[1px]'
+																		: 'w-[62px] rounded-r-[1px]'
+																)}
+																style={{
+																	opacity: areAllContactsSelected ? 0 : 1,
+																	transitionProperty: 'width, opacity',
+																}}
+															/>
+														</button>
 													) : (
 														<div className="relative w-full h-full rounded-[4px] border-[3px] border-transparent overflow-hidden transition-colors group-hover:bg-[#EEF5EF] group-hover:border-black">
 															<div className="w-full h-full flex items-center justify-center text-black font-inter font-normal text-[17px] cursor-default">
@@ -4298,27 +4349,25 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																type="button"
 																aria-label="Select all contacts"
 																className="absolute right-0 top-0 bottom-0 w-[62px] bg-[#74D178] rounded-r-[1px] flex items-center justify-center font-inter font-normal text-[17px] text-black hover:bg-[#65C269] cursor-pointer z-10 opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto"
-																onClick={() => {
-																	const allIds = new Set(
-																		contactsAvailableForDrafting.map((c) => c.id)
-																	);
-																	const areAllSelected =
-																		contactsTabSelectedIds.size === allIds.size &&
-																		[...allIds].every((id) =>
-																			contactsTabSelectedIds.has(id)
-																		);
-
-																	if (areAllSelected) {
-																		setContactsTabSelectedIds(new Set());
-																	} else {
-																		setContactsTabSelectedIds(allIds);
-																	}
-																}}
+																onClick={handleSelectAllContacts}
 															>
 																<div className="absolute left-0 top-0 bottom-0 w-[3px] bg-black" />
 																All
 															</button>
 														</div>
+													)}
+													{/* "All" button overlay - only visible when not all selected */}
+													{(contactsTabSelectedIds.size > 0 || areAllContactsSelected) && !areAllContactsSelected && (
+														<button
+															type="button"
+															className="absolute right-[3px] top-[3px] bottom-[3px] w-[62px] bg-[#74D178] rounded-r-[1px] flex items-center justify-center font-inter font-normal text-[17px] text-black hover:bg-[#65C269] cursor-pointer border-0 border-l-[2px] border-[#349A37] z-10"
+															onClick={(e) => {
+																e.stopPropagation();
+																handleSelectAllContacts();
+															}}
+														>
+															All
+														</button>
 													)}
 												</div>
 												{/* Right arrow */}
@@ -4989,6 +5038,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										bottomPanelCollapsed={bottomPanelCollapsed}
 										hideBottomPanels
 										hideButton
+										isAllContactsSelected={areAllContactsSelected}
+										onSelectAllContacts={handleSelectAllContacts}
 									/>
 								</div>
 							) : isNarrowDesktop ? (
@@ -5102,6 +5153,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													bottomPanelCollapsed={bottomPanelCollapsed}
 													hideBottomPanels
 													hideButton
+													isAllContactsSelected={areAllContactsSelected}
+													onSelectAllContacts={handleSelectAllContacts}
 												/>
 											</div>
 										</div>
@@ -5118,53 +5171,64 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											</button>
 											{/* Draft button container */}
 											<div
+												data-draft-button-container
 												className="group relative h-[40px] flex-1"
 												style={{ maxWidth: '691px' }}
 											>
-												{contactsTabSelectedIds.size > 0 ? (
-													<>
-														<button
-															type="button"
-															onClick={() => {
-																if (contactsTabSelectedIds.size === 0) {
-																	return;
-																}
-																handleGenerateDrafts(
-																	Array.from(contactsTabSelectedIds.values())
-																);
-															}}
-															disabled={isPendingGeneration || contactsTabSelectedIds.size === 0}
-															className={cn(
-																'w-full h-full rounded-[4px] border-[3px] text-black font-inter font-normal text-[17px]',
-																isPendingGeneration || contactsTabSelectedIds.size === 0
-																	? 'bg-[#E0E0E0] border-[#A0A0A0] cursor-not-allowed opacity-60'
+												{contactsTabSelectedIds.size > 0 || areAllContactsSelected ? (
+													// Animated draft button with expanding "All" state
+													<button
+														type="button"
+														onClick={() => {
+															if (contactsTabSelectedIds.size === 0) {
+																return;
+															}
+															handleGenerateDrafts(
+																Array.from(contactsTabSelectedIds.values())
+															);
+														}}
+														disabled={isPendingGeneration || contactsTabSelectedIds.size === 0}
+														className={cn(
+															'w-full h-full rounded-[4px] border-[3px] text-black font-inter font-normal text-[17px] relative overflow-hidden transition-colors duration-300',
+															isPendingGeneration || contactsTabSelectedIds.size === 0
+																? 'bg-[#E0E0E0] border-[#A0A0A0] cursor-not-allowed opacity-60'
+																: areAllContactsSelected
+																	? 'bg-[#4DC669] border-black hover:bg-[#45B85F] cursor-pointer'
 																	: 'bg-[#F2C7C7] border-[#9A3434] hover:bg-[#E6B9B9] cursor-pointer'
+														)}
+													>
+														{/* Normal text - fades out when All selected */}
+														<span
+															className={cn(
+																'transition-opacity duration-300',
+																areAllContactsSelected ? 'opacity-0' : 'opacity-100'
 															)}
 														>
 															Draft {contactsTabSelectedIds.size} {contactsTabSelectedIds.size === 1 ? 'Contact' : 'Contacts'}
-														</button>
-														{/* Right section "All" button */}
-														<button
-															type="button"
-															className="absolute right-[3px] top-[2.5px] bottom-[2.5px] w-[62px] bg-[#D17474] rounded-r-[1px] rounded-l-none flex items-center justify-center font-inter font-normal text-[17px] text-black hover:bg-[#C26666] cursor-pointer z-10"
-															onClick={(e) => {
-																e.stopPropagation();
-																const allIds = new Set(contactsAvailableForDrafting.map((c) => c.id));
-																const isAllSelected =
-																	contactsTabSelectedIds.size === allIds.size &&
-																	[...allIds].every((id) => contactsTabSelectedIds.has(id));
-																if (isAllSelected) {
-																	setContactsTabSelectedIds(new Set());
-																} else {
-																	setContactsTabSelectedIds(allIds);
-																}
-															}}
+														</span>
+														{/* "All" text - fades in when All selected */}
+														<span
+															className={cn(
+																'absolute inset-0 flex items-center justify-center transition-opacity duration-300',
+																areAllContactsSelected ? 'opacity-100' : 'opacity-0'
+															)}
 														>
-															{/* Vertical divider line */}
-															<div className="absolute left-0 -top-[0.5px] -bottom-[0.5px] w-[2px] bg-[#9A3434]" />
-															All
-														</button>
-													</>
+															Draft <span className="font-bold mx-1">All</span> {contactsAvailableForDrafting.length} Contacts
+														</span>
+														{/* Expanding green overlay from right */}
+														<div
+															className={cn(
+																'absolute top-0 bottom-0 right-0 bg-[#4DC669] transition-all duration-300 ease-out',
+																areAllContactsSelected
+																	? 'w-full rounded-[1px]'
+																	: 'w-[62px] rounded-r-[1px]'
+															)}
+															style={{
+																opacity: areAllContactsSelected ? 0 : 1,
+																transitionProperty: 'width, opacity',
+															}}
+														/>
+													</button>
 												) : (
 													<div className="relative w-full h-full rounded-[4px] border-[3px] border-transparent overflow-hidden transition-colors group-hover:bg-[#EEF5EF] group-hover:border-black">
 														<div className="w-full h-full flex items-center justify-center text-black font-inter font-normal text-[17px] cursor-default">
@@ -5176,25 +5240,28 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 															className="absolute right-0 top-0 bottom-0 w-[62px] bg-[#D17474] rounded-r-[1px] rounded-l-none flex items-center justify-center font-inter font-normal text-[17px] text-black hover:bg-[#C26666] cursor-pointer z-10 opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto"
 															onClick={(e) => {
 																e.stopPropagation();
-																const allIds = new Set(
-																	contactsAvailableForDrafting.map((c) => c.id)
-																);
-																const isAllSelected =
-																	contactsTabSelectedIds.size === allIds.size &&
-																	[...allIds].every((id) =>
-																		contactsTabSelectedIds.has(id)
-																	);
-																if (isAllSelected) {
-																	setContactsTabSelectedIds(new Set());
-																} else {
-																	setContactsTabSelectedIds(allIds);
-																}
+																handleSelectAllContacts();
 															}}
 														>
 															<div className="absolute left-0 top-0 bottom-0 w-[3px] bg-black" />
 															All
 														</button>
 													</div>
+												)}
+												{/* "All" button overlay - only visible when not all selected */}
+												{(contactsTabSelectedIds.size > 0 || areAllContactsSelected) && !areAllContactsSelected && (
+													<button
+														type="button"
+														className="absolute right-[3px] top-[2.5px] bottom-[2.5px] w-[62px] bg-[#D17474] rounded-r-[1px] rounded-l-none flex items-center justify-center font-inter font-normal text-[17px] text-black hover:bg-[#C26666] cursor-pointer z-10"
+														onClick={(e) => {
+															e.stopPropagation();
+															handleSelectAllContacts();
+														}}
+													>
+														{/* Vertical divider line */}
+														<div className="absolute left-0 -top-[0.5px] -bottom-[0.5px] w-[2px] bg-[#9A3434]" />
+														All
+													</button>
 												)}
 											</div>
 											{/* Right arrow */}
@@ -5267,6 +5334,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											bottomPanelCollapsed={bottomPanelCollapsed}
 											hideBottomPanels={isNarrowestDesktop}
 											hideButton={isNarrowestDesktop}
+											isAllContactsSelected={areAllContactsSelected}
+											onSelectAllContacts={handleSelectAllContacts}
 										/>
 										{/* Navigation arrows with draft button at narrowest breakpoint */}
 										{isNarrowestDesktop && (
@@ -5282,53 +5351,64 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												</button>
 												{/* Draft button container */}
 												<div
+													data-draft-button-container
 													className="group relative h-[36px] flex-1"
 													style={{ maxWidth: '400px' }}
 												>
-													{contactsTabSelectedIds.size > 0 ? (
-														<>
-															<button
-																type="button"
-																onClick={() => {
-																	if (contactsTabSelectedIds.size === 0) {
-																		return;
-																	}
-																	handleGenerateDrafts(
-																		Array.from(contactsTabSelectedIds.values())
-																	);
-																}}
-																disabled={isPendingGeneration || contactsTabSelectedIds.size === 0}
-																className={cn(
-																	'w-full h-full rounded-[4px] border-[3px] text-black font-inter font-normal text-[15px]',
-																	isPendingGeneration || contactsTabSelectedIds.size === 0
-																		? 'bg-[#E0E0E0] border-[#A0A0A0] cursor-not-allowed opacity-60'
+													{contactsTabSelectedIds.size > 0 || areAllContactsSelected ? (
+														// Animated draft button with expanding "All" state
+														<button
+															type="button"
+															onClick={() => {
+																if (contactsTabSelectedIds.size === 0) {
+																	return;
+																}
+																handleGenerateDrafts(
+																	Array.from(contactsTabSelectedIds.values())
+																);
+															}}
+															disabled={isPendingGeneration || contactsTabSelectedIds.size === 0}
+															className={cn(
+																'w-full h-full rounded-[4px] border-[3px] text-black font-inter font-normal text-[15px] relative overflow-hidden transition-colors duration-300',
+																isPendingGeneration || contactsTabSelectedIds.size === 0
+																	? 'bg-[#E0E0E0] border-[#A0A0A0] cursor-not-allowed opacity-60'
+																	: areAllContactsSelected
+																		? 'bg-[#4DC669] border-black hover:bg-[#45B85F] cursor-pointer'
 																		: 'bg-[#F2C7C7] border-[#9A3434] hover:bg-[#E6B9B9] cursor-pointer'
+															)}
+														>
+															{/* Normal text - fades out when All selected */}
+															<span
+																className={cn(
+																	'transition-opacity duration-300',
+																	areAllContactsSelected ? 'opacity-0' : 'opacity-100'
 																)}
 															>
 																Draft {contactsTabSelectedIds.size} {contactsTabSelectedIds.size === 1 ? 'Contact' : 'Contacts'}
-															</button>
-															{/* Right section "All" button */}
-															<button
-																type="button"
-																className="absolute right-[3px] top-[2.5px] bottom-[2.5px] w-[52px] bg-[#D17474] rounded-r-[1px] rounded-l-none flex items-center justify-center font-inter font-normal text-[15px] text-black hover:bg-[#C26666] cursor-pointer z-10"
-																onClick={(e) => {
-																	e.stopPropagation();
-																	const allIds = new Set(contactsAvailableForDrafting.map((c) => c.id));
-																	const isAllSelected =
-																		contactsTabSelectedIds.size === allIds.size &&
-																		[...allIds].every((id) => contactsTabSelectedIds.has(id));
-																	if (isAllSelected) {
-																		setContactsTabSelectedIds(new Set());
-																	} else {
-																		setContactsTabSelectedIds(allIds);
-																	}
-																}}
+															</span>
+															{/* "All" text - fades in when All selected */}
+															<span
+																className={cn(
+																	'absolute inset-0 flex items-center justify-center transition-opacity duration-300',
+																	areAllContactsSelected ? 'opacity-100' : 'opacity-0'
+																)}
 															>
-																{/* Vertical divider line */}
-																<div className="absolute left-0 -top-[0.5px] -bottom-[0.5px] w-[2px] bg-[#9A3434]" />
-																All
-															</button>
-														</>
+																Draft <span className="font-bold mx-1">All</span> {contactsAvailableForDrafting.length} Contacts
+															</span>
+															{/* Expanding green overlay from right */}
+															<div
+																className={cn(
+																	'absolute top-0 bottom-0 right-0 bg-[#4DC669] transition-all duration-300 ease-out',
+																	areAllContactsSelected
+																		? 'w-full rounded-[1px]'
+																		: 'w-[52px] rounded-r-[1px]'
+																)}
+																style={{
+																	opacity: areAllContactsSelected ? 0 : 1,
+																	transitionProperty: 'width, opacity',
+																}}
+															/>
+														</button>
 													) : (
 														<div className="relative w-full h-full rounded-[4px] border-[3px] border-transparent overflow-hidden transition-colors group-hover:bg-[#EEF5EF] group-hover:border-black">
 															<div className="w-full h-full flex items-center justify-center text-black font-inter font-normal text-[15px] cursor-default">
@@ -5340,25 +5420,28 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																className="absolute right-0 top-0 bottom-0 w-[52px] bg-[#D17474] rounded-r-[1px] rounded-l-none flex items-center justify-center font-inter font-normal text-[15px] text-black hover:bg-[#C26666] cursor-pointer z-10 opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto"
 																onClick={(e) => {
 																	e.stopPropagation();
-																	const allIds = new Set(
-																		contactsAvailableForDrafting.map((c) => c.id)
-																	);
-																	const isAllSelected =
-																		contactsTabSelectedIds.size === allIds.size &&
-																		[...allIds].every((id) =>
-																			contactsTabSelectedIds.has(id)
-																		);
-																	if (isAllSelected) {
-																		setContactsTabSelectedIds(new Set());
-																	} else {
-																		setContactsTabSelectedIds(allIds);
-																	}
+																	handleSelectAllContacts();
 																}}
 															>
 																<div className="absolute left-0 top-0 bottom-0 w-[3px] bg-black" />
 																All
 															</button>
 														</div>
+													)}
+													{/* "All" button overlay - only visible when not all selected */}
+													{(contactsTabSelectedIds.size > 0 || areAllContactsSelected) && !areAllContactsSelected && (
+														<button
+															type="button"
+															className="absolute right-[3px] top-[2.5px] bottom-[2.5px] w-[52px] bg-[#D17474] rounded-r-[1px] rounded-l-none flex items-center justify-center font-inter font-normal text-[15px] text-black hover:bg-[#C26666] cursor-pointer z-10"
+															onClick={(e) => {
+																e.stopPropagation();
+																handleSelectAllContacts();
+															}}
+														>
+															{/* Vertical divider line */}
+															<div className="absolute left-0 -top-[0.5px] -bottom-[0.5px] w-[2px] bg-[#9A3434]" />
+															All
+														</button>
 													)}
 												</div>
 												{/* Right arrow */}
