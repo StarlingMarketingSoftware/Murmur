@@ -2822,6 +2822,29 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 	// Track if Custom Instructions is open (for adjusting Generate Test button position)
 	const [isLocalCustomInstructionsOpen, setIsLocalCustomInstructionsOpen] = useState(false);
 
+	// Add state for the sliding ghost button (Hybrid mode)
+	const [ghostTop, setGhostTop] = useState<number | null>(null);
+	const [isGhostVisible, setIsGhostVisible] = useState(false);
+	const hybridContainerRef = useRef<HTMLDivElement>(null);
+
+	const handleGapEnter = useCallback((el: HTMLDivElement) => {
+		if (!hybridContainerRef.current) return;
+		// Calculate relative top position
+		// We want the ghost centered on the gap.
+		// Gap element top relative to container:
+		const relativeTop = el.offsetTop;
+		const centeredTop = relativeTop + el.offsetHeight / 2;
+		// Center the 22px ghost:
+		const targetTop = centeredTop - 11; // 22/2 = 11
+
+		setGhostTop(targetTop);
+		setIsGhostVisible(true);
+	}, []);
+
+	const handleContainerLeave = useCallback(() => {
+		setIsGhostVisible(false);
+	}, []);
+
 	// Wrap the parent callback to also update local state
 	const handleCustomInstructionsOpenChange = useCallback(
 		(isOpen: boolean) => {
@@ -6222,36 +6245,52 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														const introText = getImmediateTextAfter(HybridBlock.introduction);
 														const researchText = getImmediateTextAfter(HybridBlock.research);
 														const actionText = getImmediateTextAfter(HybridBlock.action);
+														const shouldHideAddTextButtons = Boolean(
+															expandedHybridTextBlockId || expandedHybridCoreBlockId
+														);
 
 														const AddTextGap = ({
 															height,
 															onClick,
+															onHover,
 														}: {
 															height: number;
 															onClick: () => void;
+															onHover: (el: HTMLDivElement) => void;
 														}) => (
 															<div
 																className="group relative w-full overflow-visible"
 																style={{ height }}
+																onMouseEnter={(e) => {
+																	if (shouldHideAddTextButtons) return;
+																	onHover(e.currentTarget);
+																}}
+																onMouseLeave={() => setIsGhostVisible(false)}
 															>
 																{/* Larger hover target so the +Text button is easier to reveal (without changing spacing).
-																    Starts at the pill edge (150px) so it won't interfere with the pills themselves. */}
+																	Starts at the pill edge (150px) so it won't interfere with the pills themselves. */}
 																<div
 																	aria-hidden="true"
 																	className="absolute left-[150px] top-0 w-[140px] h-[36px] z-0"
 																/>
 																<button
 																	type="button"
-																	onClick={onClick}
+																	disabled={shouldHideAddTextButtons}
+																	onClick={() => {
+																		if (shouldHideAddTextButtons) return;
+																		setIsGhostVisible(false);
+																		onClick();
+																	}}
 																	className={cn(
 																		// Place the button 17px to the right of the 150px pill:
 																		// pillWidth (150) + gap (17) = 167px
 																		'absolute left-[167px] top-1/2 -translate-y-1/2 z-10',
 																		'w-[57px] h-[22px] rounded-[4px] border border-[#0B741A] bg-[#9EDDB6]',
 																		'flex items-center justify-center gap-[5px] box-border',
-																		'opacity-0 pointer-events-none',
-																		'group-hover:opacity-100 group-hover:pointer-events-auto',
-																		'transition-opacity duration-150',
+																		'opacity-0 pointer-events-none', // Always invisible, interaction handled by ghost or direct click if we keep it
+																		// 'group-hover:opacity-100 group-hover:pointer-events-auto', // REMOVED: Managed by ghost now
+																		'pointer-events-auto cursor-pointer', // Make it clickable even if invisible
+																		shouldHideAddTextButtons && 'pointer-events-none',
 																		'font-inter font-medium text-[12px] leading-none text-black'
 																	)}
 																	aria-label="Add Text"
@@ -6277,6 +6316,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																		role="button"
 																		tabIndex={0}
 																		onClick={() => {
+																			setIsGhostVisible(false);
 																			setHybridStructureSelection({ kind: 'block', blockId: id });
 																			setExpandedHybridCoreBlockId(null);
 																			setExpandedHybridTextBlockId(id);
@@ -6284,6 +6324,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																		onKeyDown={(e) => {
 																			if (e.key === 'Enter' || e.key === ' ') {
 																				e.preventDefault();
+																				setIsGhostVisible(false);
 																				setHybridStructureSelection({
 																					kind: 'block',
 																					blockId: id,
@@ -6321,6 +6362,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																				type="button"
 																				onClick={(e) => {
 																					e.stopPropagation();
+																					setIsGhostVisible(false);
 																					setHybridStructureSelection({
 																						kind: 'block',
 																						blockId: id,
@@ -6460,6 +6502,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																		role="button"
 																		tabIndex={0}
 																		onClick={() => {
+																			setIsGhostVisible(false);
 																			setHybridStructureSelection({ kind: 'block', blockId: id });
 																			setExpandedHybridTextBlockId(null);
 																			setExpandedHybridCoreBlockId(id);
@@ -6467,6 +6510,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																		onKeyDown={(e) => {
 																			if (e.key === 'Enter' || e.key === ' ') {
 																				e.preventDefault();
+																				setIsGhostVisible(false);
 																				setHybridStructureSelection({
 																					kind: 'block',
 																					blockId: id,
@@ -6497,6 +6541,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																				type="button"
 																				onClick={(e) => {
 																					e.stopPropagation();
+																					setIsGhostVisible(false);
 																					setHybridStructureSelection({ kind: 'block', blockId: id });
 																					setExpandedHybridTextBlockId(null);
 																					setExpandedHybridCoreBlockId(id);
@@ -6606,7 +6651,32 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														};
 
 														return (
-															<div className="w-full flex flex-col items-start">
+															<div 
+																ref={hybridContainerRef}
+																className="w-full flex flex-col items-start relative"
+																onMouseLeave={handleContainerLeave}
+															>
+																{/* Sliding Ghost Button */}
+																<div
+																	aria-hidden="true"
+																	className={cn(
+																		'absolute left-[167px] z-20 pointer-events-none',
+																		'w-[57px] h-[22px] rounded-[4px] border border-[#0B741A] bg-[#9EDDB6]',
+																		'flex items-center justify-center gap-[5px] box-border',
+																		'font-inter font-medium text-[12px] leading-none text-black',
+																		'transition-all duration-200 ease-out', // Smooth sliding
+																		!shouldHideAddTextButtons && isGhostVisible
+																			? 'opacity-100 scale-100'
+																			: 'opacity-0 scale-95'
+																	)}
+																	style={{
+																		top: ghostTop ?? 0,
+																	}}
+																>
+																	<span className="text-[12px] leading-[12px]">+</span>
+																	<span className="text-[12px] leading-[12px]">Text</span>
+																</div>
+
 																{/* Subject -> Intro gap: 17px (no +Text) */}
 																<div className="h-[17px]" />
 
@@ -6634,6 +6704,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																		onClick={() =>
 																			openOrCreateTextAfter(HybridBlock.introduction)
 																		}
+																		onHover={handleGapEnter}
 																	/>
 																)}
 
@@ -6659,6 +6730,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																	<AddTextGap
 																		height={12}
 																		onClick={() => openOrCreateTextAfter(HybridBlock.research)}
+																		onHover={handleGapEnter}
 																	/>
 																)}
 
@@ -6684,6 +6756,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																	<AddTextGap
 																		height={15}
 																		onClick={() => openOrCreateTextAfter(HybridBlock.action)}
+																		onHover={handleGapEnter}
 																	/>
 																)}
 															</div>
