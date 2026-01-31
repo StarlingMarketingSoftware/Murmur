@@ -69,6 +69,8 @@ interface MiniEmailStructureProps {
 	settingsPrimaryLabel?: string;
 	/** Settings variant: top contact/company row (right side). */
 	settingsSecondaryLabel?: string;
+	/** Settings variant: background color for the Name/Company row. */
+	settingsNameCompanyBgColor?: string;
 	/** When true, hides the floating top number/label chrome */
 	hideTopChrome?: boolean;
 	/** When true, hides the footer Draft/progress controls */
@@ -127,6 +129,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 	variant = 'default',
 	settingsPrimaryLabel,
 	settingsSecondaryLabel,
+	settingsNameCompanyBgColor,
 	hideTopChrome,
 	hideFooter,
 	fullWidthMobile,
@@ -1084,6 +1087,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 	const SettingsPanelContent = () => {
 		const primary = (settingsPrimaryLabel ?? '').trim();
 		const secondary = (settingsSecondaryLabel ?? '').trim();
+		const nameCompanyBgColor = settingsNameCompanyBgColor ?? '#C1D6FF';
 		const left = primary || secondary;
 		const right = primary && secondary ? secondary : '';
 		const modeLabel =
@@ -1233,7 +1237,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 				{/* Name / Company (28px) */}
 				<div
 					className="w-full flex items-center px-[9px]"
-					style={{ height: 28, backgroundColor: '#C1D6FF' }}
+					style={{ height: 28, backgroundColor: nameCompanyBgColor }}
 				>
 					<div className="w-full flex items-center justify-between gap-2 min-w-0">
 						<span className="font-inter font-medium text-[12px] leading-none text-black truncate min-w-0">

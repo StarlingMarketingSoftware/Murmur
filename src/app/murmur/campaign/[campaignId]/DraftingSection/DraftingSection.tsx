@@ -2258,6 +2258,27 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		if (!company) return { primary: name, secondary: '' };
 		return { primary: name, secondary: company };
 	}, [displayedContactForResearch, draftsMiniEmailTopHeaderHeight]);
+	const draftsMiniEmailSettingsNameCompanyBgColor = useMemo(() => {
+		const contact = displayedContactForResearch;
+		if (!draftsMiniEmailTopHeaderHeight || !contact) return undefined;
+
+		const headline = (contact.headline || contact.title || '').trim();
+		if (!headline) return '#C1D6FF';
+
+		return isRestaurantTitle(headline)
+			? '#C3FBD1'
+			: isCoffeeShopTitle(headline)
+				? '#D6F1BD'
+				: isMusicVenueTitle(headline)
+					? '#B7E5FF'
+					: isMusicFestivalTitle(headline)
+						? '#C1D6FF'
+						: isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline)
+							? '#FFF2BC'
+							: isWineBeerSpiritsTitle(headline)
+								? '#BFC4FF'
+								: '#E8EFFF';
+	}, [displayedContactForResearch, draftsMiniEmailTopHeaderHeight]);
 
 	useEffect(() => {
 		if (!selectedContactForResearch && contacts && contacts.length > 0) {
@@ -3129,6 +3150,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 															variant={draftsMiniEmailTopHeaderHeight ? 'settings' : undefined}
 															settingsPrimaryLabel={draftsMiniEmailSettingsLabels.primary}
 															settingsSecondaryLabel={draftsMiniEmailSettingsLabels.secondary}
+															settingsNameCompanyBgColor={draftsMiniEmailSettingsNameCompanyBgColor}
 															profileFields={profileFieldsForSettings}
 															identityProfile={campaign?.identity as IdentityProfileFields | null}
 															onIdentityUpdate={handleIdentityUpdate}
@@ -3610,6 +3632,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												variant={draftsMiniEmailTopHeaderHeight ? 'settings' : undefined}
 												settingsPrimaryLabel={draftsMiniEmailSettingsLabels.primary}
 												settingsSecondaryLabel={draftsMiniEmailSettingsLabels.secondary}
+												settingsNameCompanyBgColor={draftsMiniEmailSettingsNameCompanyBgColor}
 												profileFields={profileFieldsForSettings}
 												identityProfile={campaign?.identity as IdentityProfileFields | null}
 												onIdentityUpdate={handleIdentityUpdate}
@@ -4634,6 +4657,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 															variant={draftsMiniEmailTopHeaderHeight ? 'settings' : undefined}
 															settingsPrimaryLabel={draftsMiniEmailSettingsLabels.primary}
 															settingsSecondaryLabel={draftsMiniEmailSettingsLabels.secondary}
+															settingsNameCompanyBgColor={draftsMiniEmailSettingsNameCompanyBgColor}
 															profileFields={profileFieldsForSettings}
 															identityProfile={campaign?.identity as IdentityProfileFields | null}
 															onIdentityUpdate={handleIdentityUpdate}
@@ -4988,6 +5012,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														variant={draftsMiniEmailTopHeaderHeight ? 'settings' : undefined}
 														settingsPrimaryLabel={draftsMiniEmailSettingsLabels.primary}
 														settingsSecondaryLabel={draftsMiniEmailSettingsLabels.secondary}
+														settingsNameCompanyBgColor={draftsMiniEmailSettingsNameCompanyBgColor}
 														profileFields={profileFieldsForSettings}
 														identityProfile={campaign?.identity as IdentityProfileFields | null}
 														onIdentityUpdate={handleIdentityUpdate}
@@ -5129,6 +5154,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														variant={draftsMiniEmailTopHeaderHeight ? 'settings' : undefined}
 														settingsPrimaryLabel={draftsMiniEmailSettingsLabels.primary}
 														settingsSecondaryLabel={draftsMiniEmailSettingsLabels.secondary}
+														settingsNameCompanyBgColor={draftsMiniEmailSettingsNameCompanyBgColor}
 														profileFields={profileFieldsForSettings}
 														identityProfile={campaign?.identity as IdentityProfileFields | null}
 														onIdentityUpdate={handleIdentityUpdate}
@@ -5547,6 +5573,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														variant={draftsMiniEmailTopHeaderHeight ? 'settings' : undefined}
 														settingsPrimaryLabel={draftsMiniEmailSettingsLabels.primary}
 														settingsSecondaryLabel={draftsMiniEmailSettingsLabels.secondary}
+														settingsNameCompanyBgColor={draftsMiniEmailSettingsNameCompanyBgColor}
 														profileFields={profileFieldsForSettings}
 														identityProfile={campaign?.identity as IdentityProfileFields | null}
 														onIdentityUpdate={handleIdentityUpdate}
@@ -5631,6 +5658,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														variant={draftsMiniEmailTopHeaderHeight ? 'settings' : undefined}
 														settingsPrimaryLabel={draftsMiniEmailSettingsLabels.primary}
 														settingsSecondaryLabel={draftsMiniEmailSettingsLabels.secondary}
+														settingsNameCompanyBgColor={draftsMiniEmailSettingsNameCompanyBgColor}
 														profileFields={profileFieldsForSettings}
 														identityProfile={campaign?.identity as IdentityProfileFields | null}
 														onIdentityUpdate={handleIdentityUpdate}
@@ -5789,6 +5817,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														variant={draftsMiniEmailTopHeaderHeight ? 'settings' : undefined}
 														settingsPrimaryLabel={draftsMiniEmailSettingsLabels.primary}
 														settingsSecondaryLabel={draftsMiniEmailSettingsLabels.secondary}
+														settingsNameCompanyBgColor={draftsMiniEmailSettingsNameCompanyBgColor}
 														profileFields={profileFieldsForSettings}
 														identityProfile={campaign?.identity as IdentityProfileFields | null}
 														onIdentityUpdate={handleIdentityUpdate}
@@ -7333,6 +7362,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													variant={draftsMiniEmailTopHeaderHeight ? 'settings' : undefined}
 													settingsPrimaryLabel={draftsMiniEmailSettingsLabels.primary}
 													settingsSecondaryLabel={draftsMiniEmailSettingsLabels.secondary}
+													settingsNameCompanyBgColor={draftsMiniEmailSettingsNameCompanyBgColor}
 													profileFields={profileFieldsForSettings}
 													identityProfile={campaign?.identity as IdentityProfileFields | null}
 													onIdentityUpdate={handleIdentityUpdate}
@@ -8071,6 +8101,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													variant={draftsMiniEmailTopHeaderHeight ? 'settings' : undefined}
 													settingsPrimaryLabel={draftsMiniEmailSettingsLabels.primary}
 													settingsSecondaryLabel={draftsMiniEmailSettingsLabels.secondary}
+													settingsNameCompanyBgColor={draftsMiniEmailSettingsNameCompanyBgColor}
 													profileFields={profileFieldsForSettings}
 													identityProfile={campaign?.identity as IdentityProfileFields | null}
 													onIdentityUpdate={handleIdentityUpdate}
