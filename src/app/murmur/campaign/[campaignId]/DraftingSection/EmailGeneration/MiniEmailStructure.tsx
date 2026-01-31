@@ -1250,10 +1250,19 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 
 				{/* Mode used (27px) */}
 				<div
-					className="w-full flex items-center px-[9px]"
-					style={{ height: 27, backgroundColor: '#DAE6FE' }}
+					className="w-full flex items-center px-[9px] relative"
+					// The mode toggle highlight uses semi-transparent RGBA for Manual/Hybrid.
+					// In Settings preview, the panel background behind this row can be non-white
+					// (e.g. Drafts/Sent uses `#DAE6FE`), which would shift the perceived color.
+					// Force a white base so the fill matches the top mode toggle exactly.
+					style={{ height: 27, backgroundColor: '#FFFFFF' }}
 				>
-					<span className="font-inter font-semibold text-[12px] leading-none text-black truncate">
+					<div
+						aria-hidden="true"
+						className="absolute inset-0"
+						style={{ backgroundColor: getModeBackgroundColor() }}
+					/>
+					<span className="relative z-10 font-inter font-semibold text-[12px] leading-none text-black truncate">
 						{modeLabel}
 					</span>
 				</div>
