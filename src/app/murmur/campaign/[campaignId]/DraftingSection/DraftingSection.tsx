@@ -28,6 +28,7 @@ import { isSafariBrowser } from '@/utils/browserDetection';
 import {
 	extractMurmurDraftSettingsSnapshot,
 	injectMurmurDraftSettingsSnapshot,
+	type DraftProfileFields,
 } from '@/utils/draftSettings';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { useDebounce } from '@/hooks/useDebounce';
@@ -280,10 +281,14 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	// even if the user hovers other rows in the list.
 	const draftForSettingsPreview =
 		isDraftingView ? selectedDraft ?? hoveredDraftForSettings : null;
+	// Track the profile fields from the draft's snapshot (so we show what was used at generation time)
+	const [draftProfileFieldsForSettings, setDraftProfileFieldsForSettings] =
+		useState<DraftProfileFields | null>(null);
 	useEffect(() => {
 		if (!isDraftingView) {
 			// Avoid leaking hover state across tabs.
 			if (hoveredDraftForSettings) setHoveredDraftForSettings(null);
+			setDraftProfileFieldsForSettings(null);
 			return;
 		}
 
@@ -292,6 +297,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			: null;
 		const nextValues = snapshot?.values ?? form.getValues();
 		draftsSettingsPreviewForm.reset(nextValues);
+		// Store the profile fields from the draft's snapshot (may be undefined for old drafts)
+		setDraftProfileFieldsForSettings(snapshot?.profileFields ?? null);
 	}, [
 		view,
 		draftForSettingsPreview?.id,
@@ -313,10 +320,14 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		defaultValues: form.getValues(),
 	});
 	const sentForSettingsPreview = isSentView ? hoveredSentForSettings : null;
+	// Track the profile fields from the sent email's snapshot (so we show what was used at generation time)
+	const [sentProfileFieldsForSettings, setSentProfileFieldsForSettings] =
+		useState<DraftProfileFields | null>(null);
 	useEffect(() => {
 		if (!isSentView) {
 			// Avoid leaking hover state across tabs.
 			if (hoveredSentForSettings) setHoveredSentForSettings(null);
+			setSentProfileFieldsForSettings(null);
 			return;
 		}
 
@@ -325,6 +336,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			: null;
 		const nextValues = snapshot?.values ?? form.getValues();
 		sentSettingsPreviewForm.reset(nextValues);
+		// Store the profile fields from the sent email's snapshot (may be undefined for old emails)
+		setSentProfileFieldsForSettings(snapshot?.profileFields ?? null);
 	}, [
 		view,
 		sentForSettingsPreview?.id,
@@ -333,6 +346,20 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		sentSettingsPreviewForm,
 		hoveredSentForSettings,
 	]);
+
+	// Compute which profile fields to show in MiniEmailStructure:
+	// - Drafts tab: use the profile stored with the draft (fallback to current identity)
+	// - Sent tab: use the profile stored with the sent email (fallback to current identity)
+	// - Other tabs: use the current identity profile
+	const profileFieldsForSettings = useMemo(() => {
+		if (isDraftingView && draftProfileFieldsForSettings) {
+			return draftProfileFieldsForSettings;
+		}
+		if (isSentView && sentProfileFieldsForSettings) {
+			return sentProfileFieldsForSettings;
+		}
+		return miniProfileFields;
+	}, [isDraftingView, isSentView, draftProfileFieldsForSettings, sentProfileFieldsForSettings, miniProfileFields]);
 
 	// All tab hover states
 	type AllTabBox =
@@ -1512,6 +1539,15 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 					font,
 					signatureText
 				);
+				// Build profile fields from the current identity to store with the draft
+				const profileFieldsSnapshot: DraftProfileFields = {
+					name: campaign.identity?.name ?? '',
+					genre: campaign.identity?.genre ?? '',
+					area: campaign.identity?.area ?? '',
+					band: campaign.identity?.bandName ?? '',
+					bio: campaign.identity?.bio ?? '',
+					links: campaign.identity?.website ?? '',
+				};
 				const richTextMessageWithSettings = injectMurmurDraftSettingsSnapshot(
 					richTextMessage,
 					{
@@ -1520,6 +1556,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 							...values,
 							signature: signatureText,
 						},
+						profileFields: profileFieldsSnapshot,
 					}
 				);
 
@@ -3092,7 +3129,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 															variant={draftsMiniEmailTopHeaderHeight ? 'settings' : undefined}
 															settingsPrimaryLabel={draftsMiniEmailSettingsLabels.primary}
 															settingsSecondaryLabel={draftsMiniEmailSettingsLabels.secondary}
-															profileFields={miniProfileFields}
+															profileFields={profileFieldsForSettings}
 															identityProfile={campaign?.identity as IdentityProfileFields | null}
 															onIdentityUpdate={handleIdentityUpdate}
 															onDraft={() =>
@@ -3573,7 +3610,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												variant={draftsMiniEmailTopHeaderHeight ? 'settings' : undefined}
 												settingsPrimaryLabel={draftsMiniEmailSettingsLabels.primary}
 												settingsSecondaryLabel={draftsMiniEmailSettingsLabels.secondary}
-												profileFields={miniProfileFields}
+												profileFields={profileFieldsForSettings}
 												identityProfile={campaign?.identity as IdentityProfileFields | null}
 												onIdentityUpdate={handleIdentityUpdate}
 												onDraft={() =>
@@ -4597,7 +4634,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 															variant={draftsMiniEmailTopHeaderHeight ? 'settings' : undefined}
 															settingsPrimaryLabel={draftsMiniEmailSettingsLabels.primary}
 															settingsSecondaryLabel={draftsMiniEmailSettingsLabels.secondary}
-															profileFields={miniProfileFields}
+															profileFields={profileFieldsForSettings}
 															identityProfile={campaign?.identity as IdentityProfileFields | null}
 															onIdentityUpdate={handleIdentityUpdate}
 															onDraft={() =>
@@ -4951,7 +4988,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														variant={draftsMiniEmailTopHeaderHeight ? 'settings' : undefined}
 														settingsPrimaryLabel={draftsMiniEmailSettingsLabels.primary}
 														settingsSecondaryLabel={draftsMiniEmailSettingsLabels.secondary}
-														profileFields={miniProfileFields}
+														profileFields={profileFieldsForSettings}
 														identityProfile={campaign?.identity as IdentityProfileFields | null}
 														onIdentityUpdate={handleIdentityUpdate}
 														onDraft={() =>
@@ -5092,7 +5129,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														variant={draftsMiniEmailTopHeaderHeight ? 'settings' : undefined}
 														settingsPrimaryLabel={draftsMiniEmailSettingsLabels.primary}
 														settingsSecondaryLabel={draftsMiniEmailSettingsLabels.secondary}
-														profileFields={miniProfileFields}
+														profileFields={profileFieldsForSettings}
 														identityProfile={campaign?.identity as IdentityProfileFields | null}
 														onIdentityUpdate={handleIdentityUpdate}
 														onDraft={() =>
@@ -5510,7 +5547,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														variant={draftsMiniEmailTopHeaderHeight ? 'settings' : undefined}
 														settingsPrimaryLabel={draftsMiniEmailSettingsLabels.primary}
 														settingsSecondaryLabel={draftsMiniEmailSettingsLabels.secondary}
-														profileFields={miniProfileFields}
+														profileFields={profileFieldsForSettings}
 														identityProfile={campaign?.identity as IdentityProfileFields | null}
 														onIdentityUpdate={handleIdentityUpdate}
 														onDraft={() =>
@@ -5594,7 +5631,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														variant={draftsMiniEmailTopHeaderHeight ? 'settings' : undefined}
 														settingsPrimaryLabel={draftsMiniEmailSettingsLabels.primary}
 														settingsSecondaryLabel={draftsMiniEmailSettingsLabels.secondary}
-														profileFields={miniProfileFields}
+														profileFields={profileFieldsForSettings}
 														identityProfile={campaign?.identity as IdentityProfileFields | null}
 														onIdentityUpdate={handleIdentityUpdate}
 														onDraft={() =>
@@ -5752,7 +5789,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														variant={draftsMiniEmailTopHeaderHeight ? 'settings' : undefined}
 														settingsPrimaryLabel={draftsMiniEmailSettingsLabels.primary}
 														settingsSecondaryLabel={draftsMiniEmailSettingsLabels.secondary}
-														profileFields={miniProfileFields}
+														profileFields={profileFieldsForSettings}
 														identityProfile={campaign?.identity as IdentityProfileFields | null}
 														onIdentityUpdate={handleIdentityUpdate}
 														onDraft={() =>
@@ -7296,7 +7333,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													variant={draftsMiniEmailTopHeaderHeight ? 'settings' : undefined}
 													settingsPrimaryLabel={draftsMiniEmailSettingsLabels.primary}
 													settingsSecondaryLabel={draftsMiniEmailSettingsLabels.secondary}
-													profileFields={miniProfileFields}
+													profileFields={profileFieldsForSettings}
 													identityProfile={campaign?.identity as IdentityProfileFields | null}
 													onIdentityUpdate={handleIdentityUpdate}
 													onDraft={() =>
@@ -8034,7 +8071,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													variant={draftsMiniEmailTopHeaderHeight ? 'settings' : undefined}
 													settingsPrimaryLabel={draftsMiniEmailSettingsLabels.primary}
 													settingsSecondaryLabel={draftsMiniEmailSettingsLabels.secondary}
-													profileFields={miniProfileFields}
+													profileFields={profileFieldsForSettings}
 													identityProfile={campaign?.identity as IdentityProfileFields | null}
 													onIdentityUpdate={handleIdentityUpdate}
 													onDraft={() =>

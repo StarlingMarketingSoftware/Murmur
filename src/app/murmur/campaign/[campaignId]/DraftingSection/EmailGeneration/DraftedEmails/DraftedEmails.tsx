@@ -1602,7 +1602,7 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 										data-hover-description="Revise your draft here. Type out your revisions. Approve and Reject Drafts"
 									>
 										{/* Check if original message has links - if so, use RichTextEditor for proper link editing */}
-										{selectedDraft?.message && /<a\\s+[^>]*href=/i.test(selectedDraft.message) ? (
+										{selectedDraft?.message && /<a\s+[^>]*href=/i.test(selectedDraft.message) ? (
 											<div
 												data-hover-description="Revise your draft here. Type out your revisions. Approve and Reject Drafts"
 												className="w-full h-full"

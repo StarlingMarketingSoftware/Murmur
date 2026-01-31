@@ -31,7 +31,7 @@ import {
 	removeEmDashes,
 	stripEmailSignatureFromAiMessage,
 } from '@/utils';
-import { injectMurmurDraftSettingsSnapshot } from '@/utils/draftSettings';
+import { injectMurmurDraftSettingsSnapshot, type DraftProfileFields } from '@/utils/draftSettings';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Contact, HybridBlock, Identity, Signature } from '@prisma/client';
 import { DraftingMode, DraftingTone, EmailStatus } from '@/constants/prismaEnums';
@@ -783,6 +783,16 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			signatureTextForDraft || null
 		);
 
+		// Build profile fields from the current identity to store with the draft
+		const profileFieldsSnapshot: DraftProfileFields = {
+			name: campaign.identity?.name ?? '',
+			genre: campaign.identity?.genre ?? '',
+			area: campaign.identity?.area ?? '',
+			band: campaign.identity?.bandName ?? '',
+			bio: campaign.identity?.bio ?? '',
+			links: campaign.identity?.website ?? '',
+		};
+
 		const messageWithSettings = injectMurmurDraftSettingsSnapshot(messageHtml, {
 			version: 1,
 			values: {
@@ -790,6 +800,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 				// Ensure the stored snapshot always has a concrete signature string.
 				signature: signatureTextForDraft,
 			},
+			profileFields: profileFieldsSnapshot,
 		});
 
 		return {
@@ -1926,6 +1937,15 @@ EXAMPLES OF GOOD CUSTOM INSTRUCTIONS:
 							values.font,
 							signatureTextForDraft || null
 						);
+						// Build profile fields from the current identity to store with the draft
+						const profileFieldsSnapshot: DraftProfileFields = {
+							name: campaign.identity?.name ?? '',
+							genre: campaign.identity?.genre ?? '',
+							area: campaign.identity?.area ?? '',
+							band: campaign.identity?.bandName ?? '',
+							bio: campaign.identity?.bio ?? '',
+							links: campaign.identity?.website ?? '',
+						};
 						const draftMessageWithSettings = injectMurmurDraftSettingsSnapshot(
 							draftMessageHtml,
 							{
@@ -1934,6 +1954,7 @@ EXAMPLES OF GOOD CUSTOM INSTRUCTIONS:
 									...values,
 									signature: signatureTextForDraft,
 								},
+								profileFields: profileFieldsSnapshot,
 							}
 						);
 

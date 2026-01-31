@@ -9,9 +9,23 @@ import type { DraftingFormValues } from '@/app/murmur/campaign/[campaignId]/Draf
  *   <!--MURMUR_DRAFT_SETTINGS:{base64(json)}-->
  */
 
+/** Profile fields stored with the draft so the settings panel can reflect
+ * the profile used at generation time (not the current identity).
+ */
+export type DraftProfileFields = {
+	name: string;
+	genre: string;
+	area: string;
+	band: string;
+	bio: string;
+	links: string;
+};
+
 export type MurmurDraftSettingsSnapshotV1 = {
 	version: 1;
 	values: DraftingFormValues;
+	/** Profile fields used when this draft was generated. */
+	profileFields?: DraftProfileFields;
 };
 
 const SETTINGS_COMMENT_RE = /<!--\s*MURMUR_DRAFT_SETTINGS:([A-Za-z0-9+/=]+)\s*-->/;
