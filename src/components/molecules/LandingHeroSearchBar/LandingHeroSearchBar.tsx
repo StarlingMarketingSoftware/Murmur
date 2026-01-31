@@ -1032,7 +1032,6 @@ export const LandingHeroSearchBar = ({
 											borderBottomLeftRadius: '0',
 											border: '1px solid #5DAB68',
 											borderLeft: '1px solid #5DAB68',
-											transition: 'none',
 										}}
 										aria-label="Search"
 										onClick={(e) => {

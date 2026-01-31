@@ -388,7 +388,29 @@ body {
 /* Landing hero search button: 3/4 pulse (accent on beat 3) */
 .landing-search-waltz-pulse {
 	animation: landing-search-waltz-pulse 3s ease-in-out infinite;
-	will-change: background-color;
+	will-change: background-color, transform;
+	transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.landing-search-waltz-pulse:hover {
+	transform: translateY(-50%) scale(1.025);
+}
+
+/* Subtle bar stroke expansion when search button is hovered */
+.search-input-group:has(.landing-search-waltz-pulse:hover) .search-wave-input {
+	box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.15);
+	transition: box-shadow 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.search-input-group:has(.landing-search-waltz-pulse:hover) .search-sections-container {
+	box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.1);
+	transition: box-shadow 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Ensure smooth transition when not hovering */
+.search-input-group .search-wave-input,
+.search-input-group .search-sections-container {
+	transition: box-shadow 0.6s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 @keyframes landing-search-waltz-pulse {

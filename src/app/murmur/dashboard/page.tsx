@@ -3758,7 +3758,7 @@ const DashboardContent = () => {
 																	{/* Desktop Search Button */}
 																	<button
 																		type="submit"
-																		className={`flex absolute right-[6px] items-center justify-center w-[58px] ${
+																		className={`dashboard-search-button flex absolute right-[6px] items-center justify-center w-[58px] ${
 																			inboxView
 																				? 'h-[31px]'
 																				: 'h-[62px] max-[480px]:h-[50px] max-[480px]:w-[46px]'
@@ -3773,15 +3773,6 @@ const DashboardContent = () => {
 																			borderBottomLeftRadius: '0',
 																			border: '1px solid #5DAB68',
 																			borderLeft: '1px solid #5DAB68',
-																			transition: 'none',
-																		}}
-																		onMouseEnter={(e) => {
-																			e.currentTarget.style.backgroundColor =
-																				'rgba(93, 171, 104, 0.65)';
-																		}}
-																		onMouseLeave={(e) => {
-																			e.currentTarget.style.backgroundColor =
-																				'rgba(93, 171, 104, 0.49)';
 																		}}
 																	>
 																		<SearchIconDesktop width={inboxView ? 25 : 26} height={inboxView ? 25 : 28} />
