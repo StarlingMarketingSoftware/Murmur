@@ -458,6 +458,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 	const isAllTabNavigation = interactionMode === 'allTab';
 	const whiteSectionHeight = customWhiteSectionHeight ?? (isAllTab ? 20 : 28);
 	const isBottomView = customWhiteSectionHeight === 15;
+	const shouldShowScrollbar = !isBottomView && contacts.length >= 14;
 
 	return (
 		<div
@@ -694,12 +695,12 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 					{/* Scrollable list */}
 					<CustomScrollbar
 						className="flex-1 drafting-table-content"
-						thumbWidth={2}
-						thumbColor={isBottomView ? 'transparent' : '#000000'}
+						thumbWidth={shouldShowScrollbar ? 2 : 0}
+						thumbColor={shouldShowScrollbar ? '#000000' : 'transparent'}
 						trackColor="transparent"
 						offsetRight={isBottomView ? -7 : -6}
 						contentClassName="overflow-x-hidden"
-						alwaysShow={!isBottomView}
+						alwaysShow={false}
 					>
 						<div
 							className={cn(
