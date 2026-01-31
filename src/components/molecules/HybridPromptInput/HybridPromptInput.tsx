@@ -259,6 +259,9 @@ const SortableAIBlock = ({
 	);
 	const [bookingForTab, setBookingForTab] = useState<BookingForTab>('Anytime');
 	const [bookingForSeason, setBookingForSeason] = useState<BookingForSeason>('Spring');
+	const [hoveredBookingForSeason, setHoveredBookingForSeason] =
+		useState<BookingForSeason | null>(null);
+	const bookingForPreviewSeason = hoveredBookingForSeason ?? bookingForSeason;
 	const [bookingForCalendarBaseMonth, setBookingForCalendarBaseMonth] = useState<Date>(() => {
 		const now = new Date();
 		return new Date(now.getFullYear(), now.getMonth(), 1);
@@ -284,6 +287,11 @@ const SortableAIBlock = ({
 			setIsBookingForOpen(false);
 		}, 1000);
 	}, [clearBookingForCloseTimeout]);
+	useEffect(() => {
+		if (!isBookingForOpen || bookingForTab !== 'Season') {
+			setHoveredBookingForSeason(null);
+		}
+	}, [isBookingForOpen, bookingForTab]);
 	// Used to nudge the internal 3-way tab strip inside the Calendar dropdown so it aligns
 	// with where the strip sits in the narrower Anytime/Season dropdown.
 	const [bookingForTabStripLeft, setBookingForTabStripLeft] = useState<number | null>(null);
@@ -1448,13 +1456,16 @@ const SortableAIBlock = ({
 																	className={cn(
 																		'z-[9999] rounded-[6px]',
 																		bookingForTab === 'Season'
-																			? BOOKING_FOR_SEASON_STYLES[bookingForSeason].bgClass
+																			? BOOKING_FOR_SEASON_STYLES[bookingForPreviewSeason].bgClass
 																			: 'bg-[#F5F5F5]',
 																		'border-2 border-black',
 																		'flex flex-col overflow-hidden'
 																	)}
 																	onMouseEnter={clearBookingForCloseTimeout}
-																	onMouseLeave={scheduleBookingForCloseTimeout}
+																	onMouseLeave={() => {
+																		setHoveredBookingForSeason(null);
+																		scheduleBookingForCloseTimeout();
+																	}}
 																	role="dialog"
 																	aria-label="Booking For"
 																>
@@ -1527,7 +1538,9 @@ const SortableAIBlock = ({
 																	<div className="flex-1 flex flex-col items-center justify-center gap-[10px] pb-[10px]">
 																		{(['Spring', 'Summer', 'Fall', 'Winter'] as const).map(
 																			(season) => {
-																				const isSelectedSeason = bookingForSeason === season;
+																				const isSelectedSeason = bookingForSeasonFromValue === season;
+																				const isHoveredSeason = hoveredBookingForSeason === season;
+																				const isActiveSeason = isSelectedSeason || isHoveredSeason;
 																				return (
 																					<button
 																						key={season}
@@ -1538,9 +1551,11 @@ const SortableAIBlock = ({
 																							setBookingForCalendarStartDate(null);
 																							setBookingForCalendarEndDate(null);
 																						}}
+																						onMouseEnter={() => setHoveredBookingForSeason(season)}
+																						onMouseLeave={() => setHoveredBookingForSeason(null)}
 																						className={cn(
 																							'font-inter text-[14px] leading-[16px]',
-																							isSelectedSeason
+																							isActiveSeason
 																								? 'font-semibold text-white'
 																								: 'font-normal text-black opacity-90 hover:opacity-100'
 																						)}
@@ -2169,13 +2184,16 @@ const SortableAIBlock = ({
 																		className={cn(
 																			'z-[9999] rounded-[6px]',
 																			bookingForTab === 'Season'
-																				? BOOKING_FOR_SEASON_STYLES[bookingForSeason].bgClass
+																				? BOOKING_FOR_SEASON_STYLES[bookingForPreviewSeason].bgClass
 																				: 'bg-[#F5F5F5]',
 																			'border-2 border-black',
 																			'flex flex-col overflow-hidden'
 																		)}
 																		onMouseEnter={clearBookingForCloseTimeout}
-																		onMouseLeave={scheduleBookingForCloseTimeout}
+																		onMouseLeave={() => {
+																			setHoveredBookingForSeason(null);
+																			scheduleBookingForCloseTimeout();
+																		}}
 																		role="dialog"
 																		aria-label="Booking For"
 																	>
@@ -2247,7 +2265,9 @@ const SortableAIBlock = ({
 																		<div className="flex-1 flex flex-col items-center justify-center gap-[10px] pb-[10px]">
 																			{(['Spring', 'Summer', 'Fall', 'Winter'] as const).map(
 																				(season) => {
-																					const isSelectedSeason = bookingForSeason === season;
+																					const isSelectedSeason = bookingForSeasonFromValue === season;
+																					const isHoveredSeason = hoveredBookingForSeason === season;
+																					const isActiveSeason = isSelectedSeason || isHoveredSeason;
 																					return (
 																						<button
 																							key={season}
@@ -2258,9 +2278,11 @@ const SortableAIBlock = ({
 																								setBookingForCalendarStartDate(null);
 																								setBookingForCalendarEndDate(null);
 																							}}
+																							onMouseEnter={() => setHoveredBookingForSeason(season)}
+																							onMouseLeave={() => setHoveredBookingForSeason(null)}
 																							className={cn(
 																								'font-inter text-[14px] leading-[16px]',
-																								isSelectedSeason
+																								isActiveSeason
 																									? 'font-semibold text-white'
 																									: 'font-normal text-black opacity-90 hover:opacity-100'
 																							)}
