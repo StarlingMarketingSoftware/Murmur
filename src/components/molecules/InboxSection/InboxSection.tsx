@@ -645,6 +645,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 }) => {
 	const detectedIsMobile = useIsMobile();
 	const isMobile = forceDesktopLayout ? false : Boolean(detectedIsMobile);
+	const isCampaignInbox = typeof campaignId === 'number';
 	const {
 		setDraftsTabHighlighted,
 		setWriteTabHighlighted,
@@ -696,12 +697,6 @@ export const InboxSection: FC<InboxSectionProps> = ({
 	const outerPaddingClass = isMobile ? 'px-1' : noOuterPadding ? 'px-0' : 'px-4';
 	const isUsingSampleData = Boolean(sampleData);
 
-	const [activeTab, setActiveTab] = useState<'inbox' | 'sent'>(() =>
-		inboxSentTabRequest?.tab ?? 'inbox'
-	);
-	const lastHandledInboxSentTabRequestIdRef = useRef<number | null>(null);
-	const hasUserSelectedInboxSentTabRef = useRef(false);
-	const hasAutoInitializedInboxSentTabRef = useRef(false);
 	const {
 		data: inboundEmailsFromApi,
 		isLoading: isLoadingInbound,
@@ -718,6 +713,25 @@ export const InboxSection: FC<InboxSectionProps> = ({
 	const inboundEmails = isUsingSampleData ? sampleData?.inboundEmails ?? [] : inboundEmailsFromApi;
 	const emails = isUsingSampleData ? undefined : emailsFromApi;
 	const sentEmails = emails?.filter((email) => email.status === 'sent') || [];
+	const campaignSentCount = isUsingSampleData
+		? sampleData?.sentEmails?.length ?? 0
+		: sentEmails.length;
+	const isSentLoaded = isUsingSampleData || emailsFromApi !== undefined;
+	const isInboundLoaded = isUsingSampleData || inboundEmailsFromApi !== undefined;
+
+	// Campaign inbox UX:
+	// - Prefer "Sent" when something has actually been sent (and there are no replies yet).
+	// - If nothing has been sent, default to "Inbox" so opening the Inbox tab doesn't
+	//   briefly show "Sent" and then snap over to "Inbox".
+	const [activeTab, setActiveTab] = useState<'inbox' | 'sent'>(() => {
+		if (inboxSentTabRequest?.tab) return inboxSentTabRequest.tab;
+		if (!isCampaignInbox) return 'inbox';
+		return campaignSentCount > 0 ? 'sent' : 'inbox';
+	});
+	const lastHandledInboxSentTabRequestIdRef = useRef<number | null>(null);
+	const hasUserSelectedInboxSentTabRef = useRef(false);
+	const hasAutoInitializedInboxSentTabRef = useRef(false);
+	const hasNotifiedInitialInboxSentTabRef = useRef(false);
 	const [selectedEmailId, setSelectedEmailId] = useState<number | null>(null);
 	const [replyMessage, setReplyMessage] = useState('');
 	const [isSending, setIsSending] = useState(false);
@@ -743,7 +757,9 @@ export const InboxSection: FC<InboxSectionProps> = ({
 					.filter((email): email is string => Boolean(email))
 					.map((email) => email.toLowerCase().trim())
 		  )
-		: null;
+		: isCampaignInbox
+			? new Set<string>()
+			: null;
 
 	const filteredBySender =
 		normalizedAllowedSenders && inboundEmails
@@ -754,7 +770,7 @@ export const InboxSection: FC<InboxSectionProps> = ({
 			: inboundEmails;
 
 	const campaignReplyCount = Array.isArray(filteredBySender) ? filteredBySender.length : 0;
-	const shouldAutoDefaultInboxSentTab = typeof campaignId === 'number';
+	const shouldAutoDefaultInboxSentTab = isCampaignInbox;
 
 	// Campaign page UX: if there are no replies yet, default to "Sent".
 	// Once a reply exists, default to "Inbox". Only auto-decide once per mount (or campaignId change),
@@ -762,10 +778,23 @@ export const InboxSection: FC<InboxSectionProps> = ({
 	useLayoutEffect(() => {
 		hasUserSelectedInboxSentTabRef.current = false;
 		hasAutoInitializedInboxSentTabRef.current = false;
+		hasNotifiedInitialInboxSentTabRef.current = false;
 	}, [campaignId]);
+
+	// Ensure the parent (campaign page) knows which Inbox/Sent tab is active on first paint.
+	// This keeps the right-side SVG panel selection in sync even when the campaign inbox defaults to "Sent".
+	useLayoutEffect(() => {
+		if (!onInboxSentTabChange) return;
+		if (hasNotifiedInitialInboxSentTabRef.current) return;
+		hasNotifiedInitialInboxSentTabRef.current = true;
+		onInboxSentTabChange(activeTab);
+	}, [activeTab, onInboxSentTabChange]);
 
 	useLayoutEffect(() => {
 		if (!shouldAutoDefaultInboxSentTab) return;
+		// Wait until the campaign contact allowlist is available so we don't briefly
+		// compute reply counts against *unfiltered* inbound mail.
+		if (allowedSenderEmails === undefined) return;
 		// If the campaign page explicitly requested a tab (e.g. Inbox -> Sent), never auto-override it.
 		if (inboxSentTabRequest) return;
 		if (hasUserSelectedInboxSentTabRef.current) return;
@@ -773,7 +802,17 @@ export const InboxSection: FC<InboxSectionProps> = ({
 		// Don't auto-switch while the user is reading an email.
 		if (selectedEmailId !== null) return;
 
-		const nextTab: 'inbox' | 'sent' = campaignReplyCount > 0 ? 'inbox' : 'sent';
+		let nextTab: 'inbox' | 'sent' | null = null;
+		// Prefer Inbox when replies exist.
+		if (campaignReplyCount > 0) {
+			nextTab = 'inbox';
+		} else if (isSentLoaded) {
+			// If there are no replies, show Sent only when something has actually been sent.
+			// If neither Sent nor Inbox has anything, default to Inbox.
+			nextTab = campaignSentCount > 0 ? 'sent' : 'inbox';
+		}
+
+		if (!nextTab) return;
 		if (activeTab !== nextTab) {
 			setActiveTab(nextTab);
 			setSelectedEmailId(null);
@@ -781,18 +820,24 @@ export const InboxSection: FC<InboxSectionProps> = ({
 			onInboxSentTabChange?.(nextTab);
 		}
 
-		const inboundLoaded = isUsingSampleData || inboundEmailsFromApi !== undefined;
-		if (inboundLoaded) {
+		// Only lock in the auto-default once inbound mail has loaded.
+		// This ensures we can still switch to Inbox if replies arrive.
+		if (isInboundLoaded) {
 			hasAutoInitializedInboxSentTabRef.current = true;
 		}
 	}, [
 		shouldAutoDefaultInboxSentTab,
 		inboxSentTabRequest,
+		allowedSenderEmails,
 		campaignReplyCount,
+		campaignSentCount,
+		isSentLoaded,
 		activeTab,
 		selectedEmailId,
-		isUsingSampleData,
+		isInboundLoaded,
 		inboundEmailsFromApi,
+		emailsFromApi,
+		onInboxSentTabChange,
 	]);
 
 	// Convert sent emails to a format compatible with inbox display

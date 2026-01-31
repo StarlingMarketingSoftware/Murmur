@@ -1938,7 +1938,8 @@ const Murmur = () => {
 		const rightEl = rightFixedNavArrowButtonRef.current;
 		if (!leftEl || !rightEl) return { overlapping: false, panelFound: true };
 		
-		const paddingPx = 4;
+		// Treat "near touch" as overlap so we never visually collide.
+		const paddingPx = 12;
 		const panelRect = panelEl.getBoundingClientRect();
 		
 		const overlaps = (a: DOMRect, b: DOMRect) =>
@@ -1959,8 +1960,58 @@ const Murmur = () => {
 		
 		let raf = 0;
 		let retryInterval: number | null = null;
+		let observedPanelEl: HTMLElement | null = null;
+		let mutationObserver: MutationObserver | null = null;
+		let resizeObserver: ResizeObserver | null = null;
+
+		const disconnectObservers = () => {
+			if (mutationObserver) mutationObserver.disconnect();
+			mutationObserver = null;
+			if (resizeObserver) resizeObserver.disconnect();
+			resizeObserver = null;
+			observedPanelEl = null;
+		};
 		
-		const run = () => {
+		// Schedule a single overlap check on the next animation frame.
+		// This lets us coalesce repeated layout/transform changes (GSAP updates) into a single measurement per frame.
+		function schedule() {
+			window.cancelAnimationFrame(raf);
+			raf = window.requestAnimationFrame(run);
+		}
+
+		// Attach observers to the right panel so we react to GSAP transforms, class changes, and resizes.
+		// This is the key to making the chevron hiding logic work across all screen sizes and during transitions.
+		function ensurePanelObservers() {
+			if (!isRightPanelRendered) {
+				disconnectObservers();
+				return;
+			}
+
+			const panelEl = document.querySelector(
+				'[data-slot="campaign-right-panel"]'
+			) as HTMLElement | null;
+			if (!panelEl) return;
+			if (panelEl === observedPanelEl) return;
+
+			disconnectObservers();
+			observedPanelEl = panelEl;
+
+			// GSAP updates transforms via inline style; observe style/class to catch motion and layout shifts.
+			mutationObserver = new MutationObserver(() => schedule());
+			mutationObserver.observe(panelEl, {
+				attributes: true,
+				attributeFilter: ['style', 'class'],
+			});
+
+			// ResizeObserver catches cases where the panel's box changes (e.g. font load/layout shift).
+			if (typeof ResizeObserver !== 'undefined') {
+				resizeObserver = new ResizeObserver(() => schedule());
+				resizeObserver.observe(panelEl);
+			}
+		}
+
+		function run() {
+			ensurePanelObservers();
 			const { overlapping, panelFound } = getIsFixedNavArrowsOverlappingRightPanel();
 			setHideFixedNavArrowsBecauseOverlappingRightPanel(overlapping);
 			
@@ -1972,6 +2023,8 @@ const Murmur = () => {
 					attempts += 1;
 					const { overlapping, panelFound } = getIsFixedNavArrowsOverlappingRightPanel();
 					setHideFixedNavArrowsBecauseOverlappingRightPanel(overlapping);
+					// If the panel appears during retries, attach observers immediately so we track its animations.
+					if (panelFound) ensurePanelObservers();
 					
 					if (panelFound || !isRightPanelRendered || attempts >= 20) {
 						if (retryInterval != null) window.clearInterval(retryInterval);
@@ -1984,12 +2037,7 @@ const Murmur = () => {
 				window.clearInterval(retryInterval);
 				retryInterval = null;
 			}
-		};
-		
-		const schedule = () => {
-			window.cancelAnimationFrame(raf);
-			raf = window.requestAnimationFrame(run);
-		};
+		}
 		
 		schedule();
 		window.addEventListener('resize', schedule);
@@ -2000,6 +2048,7 @@ const Murmur = () => {
 			window.removeEventListener('resize', schedule);
 			window.removeEventListener(CAMPAIGN_ZOOM_EVENT, schedule as EventListener);
 			if (retryInterval != null) window.clearInterval(retryInterval);
+			disconnectObservers();
 		};
 	}, [activeView, getIsFixedNavArrowsOverlappingRightPanel, isRightPanelRendered]);
 	
