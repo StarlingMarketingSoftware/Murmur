@@ -4105,120 +4105,126 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											</div>
 										</div>
 										{/* Draft button with arrows - spans full width below both columns */}
-										{!isPendingGeneration && (
-											<div className="flex items-center justify-center gap-[29px] mt-4 w-full">
-												{/* Left arrow */}
-												<button
-													type="button"
-													onClick={goToPreviousTab}
-													className="bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0"
-													aria-label="Previous tab"
-												>
-													<LeftArrow width="20" height="39" />
-												</button>
-												{/* Draft button container */}
-												<div
-													ref={draftButtonContainerRef}
-													data-draft-button-container
-													className="group relative h-[40px] flex-1"
-													style={{ maxWidth: '691px' }}
-												>
-													{contactsTabSelectedIds.size > 0 || areAllContactsSelected ? (
-														// Animated draft button with expanding "All" state
-														<button
-															type="button"
-															onClick={async () => {
-																if (contactsTabSelectedIds.size === 0) {
-																	toast.error('Select at least one contact to draft emails.');
-																	return;
-																}
-																await handleGenerateDrafts(
-																	Array.from(contactsTabSelectedIds.values())
-																);
-															}}
-															disabled={isPendingGeneration || contactsTabSelectedIds.size === 0}
-															className={cn(
-																'w-full h-full rounded-[4px] border-[3px] text-black font-inter font-normal text-[17px] relative overflow-hidden transition-colors duration-300',
-																isPendingGeneration || contactsTabSelectedIds.size === 0
-																	? 'bg-[#E0E0E0] border-[#A0A0A0] cursor-not-allowed opacity-60'
-																	: areAllContactsSelected
-																		? 'bg-[#4DC669] border-black hover:bg-[#45B85F] cursor-pointer'
-																		: 'bg-[#C7F2C9] border-[#349A37] hover:bg-[#B9E7BC] cursor-pointer'
-															)}
-														>
-															{/* Normal text - fades out when All selected */}
-															<span
-																className={cn(
-																	'transition-opacity duration-300',
-																	areAllContactsSelected ? 'opacity-0' : 'opacity-100'
-																)}
-															>
-																Draft {contactsTabSelectedIds.size} {contactsTabSelectedIds.size === 1 ? 'Contact' : 'Contacts'}
-															</span>
-															{/* "All" text - fades in when All selected */}
-															<span
-																className={cn(
-																	'absolute inset-0 flex items-center justify-center transition-opacity duration-300',
-																	areAllContactsSelected ? 'opacity-100' : 'opacity-0'
-																)}
-															>
-																Draft <span className="font-bold mx-1">All</span> {contactsAvailableForDrafting.length} Contacts
-															</span>
-															{/* Expanding green overlay from right */}
-															<div
-																className={cn(
-																	'absolute top-0 bottom-0 right-0 bg-[#4DC669] transition-all duration-300 ease-out',
-																	areAllContactsSelected
-																		? 'w-full rounded-[1px]'
-																		: 'w-[62px] rounded-r-[1px]'
-																)}
-																style={{
-																	opacity: areAllContactsSelected ? 0 : 1,
-																	transitionProperty: 'width, opacity',
-																}}
-															/>
-														</button>
-													) : (
-														<div className="relative w-full h-full rounded-[4px] border-[3px] border-transparent overflow-hidden transition-colors group-hover:bg-[#EEF5EF] group-hover:border-black">
-															<div className="w-full h-full flex items-center justify-center text-black font-inter font-normal text-[17px] cursor-default">
-																Select Contacts and Draft Emails
-															</div>
+										<div className="mt-4 w-full">
+											{!isPendingGeneration ? (
+												<div className="flex items-center justify-center gap-[29px] w-full">
+													{/* Left arrow */}
+													<button
+														type="button"
+														onClick={goToPreviousTab}
+														className="bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0"
+														aria-label="Previous tab"
+													>
+														<LeftArrow width="20" height="39" />
+													</button>
+													{/* Draft button container */}
+													<div
+														ref={draftButtonContainerRef}
+														data-draft-button-container
+														className="group relative h-[40px] flex-1"
+														style={{ maxWidth: '691px' }}
+													>
+														{contactsTabSelectedIds.size > 0 || areAllContactsSelected ? (
+															// Animated draft button with expanding "All" state
 															<button
 																type="button"
-																aria-label="Select all contacts"
-																className="absolute right-0 top-0 bottom-0 w-[62px] bg-[#74D178] rounded-r-[1px] flex items-center justify-center font-inter font-normal text-[17px] text-black hover:bg-[#65C269] cursor-pointer z-10 opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto"
-																onClick={handleSelectAllContacts}
+																onClick={async () => {
+																	if (contactsTabSelectedIds.size === 0) {
+																		toast.error('Select at least one contact to draft emails.');
+																		return;
+																	}
+																	await handleGenerateDrafts(
+																		Array.from(contactsTabSelectedIds.values())
+																	);
+																}}
+																disabled={isPendingGeneration || contactsTabSelectedIds.size === 0}
+																className={cn(
+																	'w-full h-full rounded-[4px] border-[3px] text-black font-inter font-normal text-[17px] relative overflow-hidden transition-colors duration-300',
+																	isPendingGeneration || contactsTabSelectedIds.size === 0
+																		? 'bg-[#E0E0E0] border-[#A0A0A0] cursor-not-allowed opacity-60'
+																		: areAllContactsSelected
+																			? 'bg-[#4DC669] border-black hover:bg-[#45B85F] cursor-pointer'
+																			: 'bg-[#C7F2C9] border-[#349A37] hover:bg-[#B9E7BC] cursor-pointer'
+																)}
 															>
-																<div className="absolute left-0 top-0 bottom-0 w-[3px] bg-black" />
+																{/* Normal text - fades out when All selected */}
+																<span
+																	className={cn(
+																		'transition-opacity duration-300',
+																		areAllContactsSelected ? 'opacity-0' : 'opacity-100'
+																	)}
+																>
+																	Draft {contactsTabSelectedIds.size}{' '}
+																	{contactsTabSelectedIds.size === 1 ? 'Contact' : 'Contacts'}
+																</span>
+																{/* "All" text - fades in when All selected */}
+																<span
+																	className={cn(
+																		'absolute inset-0 flex items-center justify-center transition-opacity duration-300',
+																		areAllContactsSelected ? 'opacity-100' : 'opacity-0'
+																	)}
+																>
+																	Draft <span className="font-bold mx-1">All</span>{' '}
+																	{contactsAvailableForDrafting.length} Contacts
+																</span>
+																{/* Expanding green overlay from right */}
+																<div
+																	className={cn(
+																		'absolute top-0 bottom-0 right-0 bg-[#4DC669] transition-all duration-300 ease-out',
+																		areAllContactsSelected
+																			? 'w-full rounded-[1px]'
+																			: 'w-[62px] rounded-r-[1px]'
+																	)}
+																	style={{
+																		opacity: areAllContactsSelected ? 0 : 1,
+																		transitionProperty: 'width, opacity',
+																	}}
+																/>
+															</button>
+														) : (
+															<div className="relative w-full h-full rounded-[4px] border-[3px] border-transparent overflow-hidden transition-colors group-hover:bg-[#EEF5EF] group-hover:border-black">
+																<div className="w-full h-full flex items-center justify-center text-black font-inter font-normal text-[17px] cursor-default">
+																	Select Contacts and Draft Emails
+																</div>
+																<button
+																	type="button"
+																	aria-label="Select all contacts"
+																	className="absolute right-0 top-0 bottom-0 w-[62px] bg-[#74D178] rounded-r-[1px] flex items-center justify-center font-inter font-normal text-[17px] text-black hover:bg-[#65C269] cursor-pointer z-10 opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto"
+																	onClick={handleSelectAllContacts}
+																>
+																	<div className="absolute left-0 top-0 bottom-0 w-[3px] bg-black" />
+																	All
+																</button>
+															</div>
+														)}
+														{/* "All" button overlay - only visible when not all selected */}
+														{(contactsTabSelectedIds.size > 0 || areAllContactsSelected) && !areAllContactsSelected && (
+															<button
+																type="button"
+																className="absolute right-[3px] top-[3px] bottom-[3px] w-[62px] bg-[#74D178] rounded-r-[1px] flex items-center justify-center font-inter font-normal text-[17px] text-black hover:bg-[#65C269] cursor-pointer border-0 border-l-[2px] border-[#349A37] z-10"
+																onClick={(e) => {
+																	e.stopPropagation();
+																	handleSelectAllContacts();
+																}}
+															>
 																All
 															</button>
-														</div>
-													)}
-													{/* "All" button overlay - only visible when not all selected */}
-													{(contactsTabSelectedIds.size > 0 || areAllContactsSelected) && !areAllContactsSelected && (
-														<button
-															type="button"
-															className="absolute right-[3px] top-[3px] bottom-[3px] w-[62px] bg-[#74D178] rounded-r-[1px] flex items-center justify-center font-inter font-normal text-[17px] text-black hover:bg-[#65C269] cursor-pointer border-0 border-l-[2px] border-[#349A37] z-10"
-															onClick={(e) => {
-																e.stopPropagation();
-																handleSelectAllContacts();
-															}}
-														>
-															All
-														</button>
-													)}
+														)}
+													</div>
+													{/* Right arrow */}
+													<button
+														type="button"
+														onClick={goToNextTab}
+														className="bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0"
+														aria-label="Next tab"
+													>
+														<RightArrow width="20" height="39" />
+													</button>
 												</div>
-												{/* Right arrow */}
-												<button
-													type="button"
-													onClick={goToNextTab}
-													className="bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0"
-													aria-label="Next tab"
-												>
-													<RightArrow width="20" height="39" />
-												</button>
-											</div>
-										)}
+											) : (
+												<div className="h-[40px]" />
+											)}
+										</div>
 									</div>
 								) : (
 									/* Regular centered layout for wider viewports, or narrowest breakpoint with contacts below */
@@ -4269,116 +4275,124 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											}
 										/>
 										{/* Draft button with arrows at narrowest breakpoint */}
-										{isNarrowestDesktop && !isPendingGeneration && (
-											<div className="flex items-center justify-center gap-[20px] mt-4 w-full">
-												{/* Left arrow */}
-												<button
-													type="button"
-													onClick={goToPreviousTab}
-													className="bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0"
-													aria-label="Previous tab"
-												>
-													<LeftArrow width="20" height="39" />
-												</button>
-												{/* Draft button container */}
-												<div
-													data-draft-button-container
-													className="group relative h-[40px] w-full max-w-[407px]"
-												>
-													{contactsTabSelectedIds.size > 0 || areAllContactsSelected ? (
-														// Animated draft button with expanding "All" state
+										{isNarrowestDesktop && (
+											<div className="mt-4 w-full">
+												{!isPendingGeneration ? (
+													<div className="flex items-center justify-center gap-[20px] w-full">
+														{/* Left arrow */}
 														<button
 															type="button"
-															onClick={async () => {
-																if (contactsTabSelectedIds.size === 0) {
-																	toast.error('Select at least one contact to draft emails.');
-																	return;
-																}
-																await handleGenerateDrafts(
-																	Array.from(contactsTabSelectedIds.values())
-																);
-															}}
-															disabled={isPendingGeneration || contactsTabSelectedIds.size === 0}
-															className={cn(
-																'w-full h-full rounded-[4px] border-[3px] text-black font-inter font-normal text-[17px] relative overflow-hidden transition-colors duration-300',
-																isPendingGeneration || contactsTabSelectedIds.size === 0
-																	? 'bg-[#E0E0E0] border-[#A0A0A0] cursor-not-allowed opacity-60'
-																	: areAllContactsSelected
-																		? 'bg-[#4DC669] border-black hover:bg-[#45B85F] cursor-pointer'
-																		: 'bg-[#C7F2C9] border-[#349A37] hover:bg-[#B9E7BC] cursor-pointer'
+															onClick={goToPreviousTab}
+															className="bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0"
+															aria-label="Previous tab"
+														>
+															<LeftArrow width="20" height="39" />
+														</button>
+														{/* Draft button container */}
+														<div
+															data-draft-button-container
+															className="group relative h-[40px] w-full max-w-[407px]"
+														>
+															{contactsTabSelectedIds.size > 0 || areAllContactsSelected ? (
+																// Animated draft button with expanding "All" state
+																<button
+																	type="button"
+																	onClick={async () => {
+																		if (contactsTabSelectedIds.size === 0) {
+																			toast.error('Select at least one contact to draft emails.');
+																			return;
+																		}
+																		await handleGenerateDrafts(
+																			Array.from(contactsTabSelectedIds.values())
+																		);
+																	}}
+																	disabled={isPendingGeneration || contactsTabSelectedIds.size === 0}
+																	className={cn(
+																		'w-full h-full rounded-[4px] border-[3px] text-black font-inter font-normal text-[17px] relative overflow-hidden transition-colors duration-300',
+																		isPendingGeneration || contactsTabSelectedIds.size === 0
+																			? 'bg-[#E0E0E0] border-[#A0A0A0] cursor-not-allowed opacity-60'
+																			: areAllContactsSelected
+																				? 'bg-[#4DC669] border-black hover:bg-[#45B85F] cursor-pointer'
+																				: 'bg-[#C7F2C9] border-[#349A37] hover:bg-[#B9E7BC] cursor-pointer'
+																	)}
+																>
+																	{/* Normal text - fades out when All selected */}
+																	<span
+																		className={cn(
+																			'transition-opacity duration-300',
+																			areAllContactsSelected ? 'opacity-0' : 'opacity-100'
+																		)}
+																	>
+																		Draft {contactsTabSelectedIds.size}{' '}
+																		{contactsTabSelectedIds.size === 1 ? 'Contact' : 'Contacts'}
+																	</span>
+																	{/* "All" text - fades in when All selected */}
+																	<span
+																		className={cn(
+																			'absolute inset-0 flex items-center justify-center transition-opacity duration-300',
+																			areAllContactsSelected ? 'opacity-100' : 'opacity-0'
+																		)}
+																	>
+																		Draft <span className="font-bold mx-1">All</span>{' '}
+																		{contactsAvailableForDrafting.length} Contacts
+																	</span>
+																	{/* Expanding green overlay from right */}
+																	<div
+																		className={cn(
+																			'absolute top-0 bottom-0 right-0 bg-[#4DC669] transition-all duration-300 ease-out',
+																			areAllContactsSelected
+																				? 'w-full rounded-[1px]'
+																				: 'w-[62px] rounded-r-[1px]'
+																		)}
+																		style={{
+																			opacity: areAllContactsSelected ? 0 : 1,
+																			transitionProperty: 'width, opacity',
+																		}}
+																	/>
+																</button>
+															) : (
+																<div className="relative w-full h-full rounded-[4px] border-[3px] border-transparent overflow-hidden transition-colors group-hover:bg-[#EEF5EF] group-hover:border-black">
+																	<div className="w-full h-full flex items-center justify-center text-black font-inter font-normal text-[17px] cursor-default">
+																		Select Contacts and Draft Emails
+																	</div>
+																	<button
+																		type="button"
+																		aria-label="Select all contacts"
+																		className="absolute right-0 top-0 bottom-0 w-[62px] bg-[#74D178] rounded-r-[1px] flex items-center justify-center font-inter font-normal text-[17px] text-black hover:bg-[#65C269] cursor-pointer z-10 opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto"
+																		onClick={handleSelectAllContacts}
+																	>
+																		<div className="absolute left-0 top-0 bottom-0 w-[3px] bg-black" />
+																		All
+																	</button>
+																</div>
 															)}
-														>
-															{/* Normal text - fades out when All selected */}
-															<span
-																className={cn(
-																	'transition-opacity duration-300',
-																	areAllContactsSelected ? 'opacity-0' : 'opacity-100'
-																)}
-															>
-																Draft {contactsTabSelectedIds.size} {contactsTabSelectedIds.size === 1 ? 'Contact' : 'Contacts'}
-															</span>
-															{/* "All" text - fades in when All selected */}
-															<span
-																className={cn(
-																	'absolute inset-0 flex items-center justify-center transition-opacity duration-300',
-																	areAllContactsSelected ? 'opacity-100' : 'opacity-0'
-																)}
-															>
-																Draft <span className="font-bold mx-1">All</span> {contactsAvailableForDrafting.length} Contacts
-															</span>
-															{/* Expanding green overlay from right */}
-															<div
-																className={cn(
-																	'absolute top-0 bottom-0 right-0 bg-[#4DC669] transition-all duration-300 ease-out',
-																	areAllContactsSelected
-																		? 'w-full rounded-[1px]'
-																		: 'w-[62px] rounded-r-[1px]'
-																)}
-																style={{
-																	opacity: areAllContactsSelected ? 0 : 1,
-																	transitionProperty: 'width, opacity',
-																}}
-															/>
-														</button>
-													) : (
-														<div className="relative w-full h-full rounded-[4px] border-[3px] border-transparent overflow-hidden transition-colors group-hover:bg-[#EEF5EF] group-hover:border-black">
-															<div className="w-full h-full flex items-center justify-center text-black font-inter font-normal text-[17px] cursor-default">
-																Select Contacts and Draft Emails
-															</div>
-															<button
-																type="button"
-																aria-label="Select all contacts"
-																className="absolute right-0 top-0 bottom-0 w-[62px] bg-[#74D178] rounded-r-[1px] flex items-center justify-center font-inter font-normal text-[17px] text-black hover:bg-[#65C269] cursor-pointer z-10 opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto"
-																onClick={handleSelectAllContacts}
-															>
-																<div className="absolute left-0 top-0 bottom-0 w-[3px] bg-black" />
-																All
-															</button>
+															{/* "All" button overlay - only visible when not all selected */}
+															{(contactsTabSelectedIds.size > 0 || areAllContactsSelected) && !areAllContactsSelected && (
+																<button
+																	type="button"
+																	className="absolute right-[3px] top-[3px] bottom-[3px] w-[62px] bg-[#74D178] rounded-r-[1px] flex items-center justify-center font-inter font-normal text-[17px] text-black hover:bg-[#65C269] cursor-pointer border-0 border-l-[2px] border-[#349A37] z-10"
+																	onClick={(e) => {
+																		e.stopPropagation();
+																		handleSelectAllContacts();
+																	}}
+																>
+																	All
+																</button>
+															)}
 														</div>
-													)}
-													{/* "All" button overlay - only visible when not all selected */}
-													{(contactsTabSelectedIds.size > 0 || areAllContactsSelected) && !areAllContactsSelected && (
+														{/* Right arrow */}
 														<button
 															type="button"
-															className="absolute right-[3px] top-[3px] bottom-[3px] w-[62px] bg-[#74D178] rounded-r-[1px] flex items-center justify-center font-inter font-normal text-[17px] text-black hover:bg-[#65C269] cursor-pointer border-0 border-l-[2px] border-[#349A37] z-10"
-															onClick={(e) => {
-																e.stopPropagation();
-																handleSelectAllContacts();
-															}}
+															onClick={goToNextTab}
+															className="bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0"
+															aria-label="Next tab"
 														>
-															All
+															<RightArrow width="20" height="39" />
 														</button>
-													)}
-												</div>
-												{/* Right arrow */}
-												<button
-													type="button"
-													onClick={goToNextTab}
-													className="bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0"
-													aria-label="Next tab"
-												>
-													<RightArrow width="20" height="39" />
-												</button>
+													</div>
+												) : (
+													<div className="h-[40px]" />
+												)}
 											</div>
 										)}
 										{/* Contacts table below writing box at narrowest breakpoint */}
