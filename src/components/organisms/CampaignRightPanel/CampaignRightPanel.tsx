@@ -9,7 +9,7 @@ import SentPanel from '@/components/atoms/_svg/SentPanel';
 import InboxPanel from '@/components/atoms/_svg/InboxPanel';
 import { cn } from '@/utils';
 
-type CampaignRightPanelTab = 'contacts' | 'testing' | 'drafting' | 'sent' | 'inbox';
+type CampaignRightPanelTab = 'contacts' | 'testing' | 'drafting' | 'sent' | 'inbox' | 'all';
 
 interface CampaignRightPanelProps {
 	className?: string;
@@ -325,7 +325,7 @@ export const CampaignRightPanel: FC<CampaignRightPanelProps> = ({
 		>
 			<div
 				ref={listRef}
-				className="relative flex flex-col items-center overflow-visible pt-[140px]"
+				className="group relative flex flex-col items-center overflow-visible pt-[140px]"
 				data-hover-description="Side panel navigation; get to other tabs with this"
 			>
 				{/* Single active highlight that slides between tabs (instead of teleporting) */}
@@ -347,23 +347,26 @@ export const CampaignRightPanel: FC<CampaignRightPanelProps> = ({
 						opacity: 0,
 					}}
 				/>
-				{/* Border box for All tab - centered around the 6 SVG icons */}
-				{view === 'all' && (
-					<div
-						style={{
-							position: 'absolute',
-							top: '122px',
-							left: '50%',
-							transform: 'translateX(-50%)',
-							width: '112px',
-							height: '450px',
-							backgroundColor: 'transparent',
-							borderRadius: '8px',
-							border: '2px solid #D0D0D0',
-							zIndex: -1,
-						}}
-					/>
-				)}
+				{/* Hover hitbox so the border appears when hovering the *panel area* (not just icons) */}
+				<div
+					className="absolute top-[122px] left-1/2 -translate-x-1/2 w-[112px] h-[450px] bg-transparent pointer-events-auto cursor-pointer z-[1]"
+					onClick={() => onTabChange?.('all')}
+					title="All"
+				/>
+				{/* Border box (default in All, hover in any tab) */}
+				<div
+					aria-hidden="true"
+					className={cn(
+						'absolute top-[122px] left-1/2 -translate-x-1/2',
+						'w-[112px] h-[450px]',
+						'rounded-lg border-2 border-[#D0D0D0] bg-transparent',
+						'transition-opacity duration-150',
+						'pointer-events-none',
+						view === 'all' ? 'opacity-100' : 'opacity-0',
+						'group-hover:opacity-100'
+					)}
+					style={{ zIndex: -1 }}
+				/>
 				<div 
 					ref={contactsRef}
 					className="relative z-10 flex items-center justify-center pointer-events-auto cursor-pointer"
