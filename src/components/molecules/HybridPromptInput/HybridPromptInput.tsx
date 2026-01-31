@@ -258,6 +258,8 @@ const SortableAIBlock = ({
 		[form]
 	);
 	const [bookingForTab, setBookingForTab] = useState<BookingForTab>('Anytime');
+	const [hoveredBookingForTab, setHoveredBookingForTab] = useState<BookingForTab | null>(null);
+	const BOOKING_FOR_TAB_CHROME_TRANSITION = '0.6s cubic-bezier(0.22, 1, 0.36, 1)';
 	const [bookingForSeason, setBookingForSeason] = useState<BookingForSeason>('Spring');
 	const [hoveredBookingForSeason, setHoveredBookingForSeason] =
 		useState<BookingForSeason | null>(null);
@@ -288,6 +290,9 @@ const SortableAIBlock = ({
 		}, 1000);
 	}, [clearBookingForCloseTimeout]);
 	useEffect(() => {
+		if (!isBookingForOpen) {
+			setHoveredBookingForTab(null);
+		}
 		if (!isBookingForOpen || bookingForTab !== 'Season') {
 			setHoveredBookingForSeason(null);
 		}
@@ -1463,6 +1468,7 @@ const SortableAIBlock = ({
 																	)}
 																	onMouseEnter={clearBookingForCloseTimeout}
 																	onMouseLeave={() => {
+																		setHoveredBookingForTab(null);
 																		setHoveredBookingForSeason(null);
 																		scheduleBookingForCloseTimeout();
 																	}}
@@ -1488,14 +1494,22 @@ const SortableAIBlock = ({
 																		)}
 																		style={!useStaticDropdownPosition && bookingForTabStripLeft != null ? { paddingLeft: bookingForTabStripLeft } : undefined}
 																	>
-																		<div className="w-[284px] grid grid-cols-3 items-center gap-[8px]">
+																		<div
+																			className="w-[284px] grid grid-cols-3 items-center gap-[8px]"
+																			onMouseLeave={() => setHoveredBookingForTab(null)}
+																		>
 																			{(['Anytime', 'Season', 'Calendar'] as const).map(
 																				(opt) => {
 																					const isSelected = bookingForTab === opt;
+																					const isDimmed =
+																						hoveredBookingForTab !== null &&
+																						hoveredBookingForTab !== opt;
+																					const isHovered = hoveredBookingForTab === opt;
 																					return (
 																						<button
 																							key={opt}
 																							type="button"
+																							onMouseEnter={() => setHoveredBookingForTab(opt)}
 																							onClick={() => {
 																								if (opt === 'Season') {
 																									setBookingForTab('Season');
@@ -1516,16 +1530,35 @@ const SortableAIBlock = ({
 																							className={cn(
 																								'h-[28px] w-[81px] rounded-[6px] font-inter text-[14px] leading-[14px] text-black',
 																								'flex items-center justify-center text-center justify-self-center',
-																								isSelected
-																									? opt === 'Season'
-																										? 'bg-[#F5F5F5] font-semibold'
-																										: 'bg-[#C2C2C2] font-semibold'
-																									: 'bg-transparent font-normal hover:bg-black/5'
+																								isSelected ? 'font-semibold' : 'font-normal'
 																							)}
+																							style={{
+																								backgroundColor: isDimmed
+																									? '#FFFFFF'
+																									: isSelected
+																										? opt === 'Season'
+																											? '#F5F5F5'
+																											: '#C2C2C2'
+																										: isHovered
+																											? 'rgba(0,0,0,0.05)'
+																											: 'transparent',
+																								boxShadow:
+																									hoveredBookingForTab !== null
+																										? 'inset 0 0 0 1px #000000'
+																										: 'inset 0 0 0 1px rgba(0,0,0,0)',
+																								transition: `background-color ${BOOKING_FOR_TAB_CHROME_TRANSITION}, box-shadow ${BOOKING_FOR_TAB_CHROME_TRANSITION}`,
+																							}}
 																							role="button"
 																							aria-pressed={isSelected}
 																						>
-																							{opt}
+																							<span
+																								style={{
+																									opacity: isDimmed ? 0 : 1,
+																									transition: `opacity ${BOOKING_FOR_TAB_CHROME_TRANSITION}`,
+																								}}
+																							>
+																								{opt}
+																							</span>
 																						</button>
 																					);
 																				}
@@ -2191,6 +2224,7 @@ const SortableAIBlock = ({
 																		)}
 																		onMouseEnter={clearBookingForCloseTimeout}
 																		onMouseLeave={() => {
+																			setHoveredBookingForTab(null);
 																			setHoveredBookingForSeason(null);
 																			scheduleBookingForCloseTimeout();
 																		}}
@@ -2216,14 +2250,22 @@ const SortableAIBlock = ({
 																			)}
 																			style={!useStaticDropdownPosition && bookingForTabStripLeft != null ? { paddingLeft: bookingForTabStripLeft } : undefined}
 																		>
-																			<div className="w-[284px] grid grid-cols-3 items-center gap-[8px]">
+																			<div
+																				className="w-[284px] grid grid-cols-3 items-center gap-[8px]"
+																				onMouseLeave={() => setHoveredBookingForTab(null)}
+																			>
 																				{(['Anytime', 'Season', 'Calendar'] as const).map(
 																					(opt) => {
 																						const isSelected = bookingForTab === opt;
+																						const isDimmed =
+																							hoveredBookingForTab !== null &&
+																							hoveredBookingForTab !== opt;
+																						const isHovered = hoveredBookingForTab === opt;
 																						return (
 																							<button
 																								key={opt}
 																								type="button"
+																								onMouseEnter={() => setHoveredBookingForTab(opt)}
 																								onClick={() => {
 																									if (opt === 'Season') {
 																										setBookingForTab('Season');
@@ -2243,16 +2285,35 @@ const SortableAIBlock = ({
 																								className={cn(
 																									'h-[28px] w-[81px] rounded-[6px] font-inter text-[14px] leading-[14px] text-black',
 																									'flex items-center justify-center text-center justify-self-center',
-																									isSelected
-																										? opt === 'Season'
-																											? 'bg-[#F5F5F5] font-semibold'
-																											: 'bg-[#C2C2C2] font-semibold'
-																										: 'bg-transparent font-normal hover:bg-black/5'
+																									isSelected ? 'font-semibold' : 'font-normal'
 																								)}
+																								style={{
+																									backgroundColor: isDimmed
+																										? '#FFFFFF'
+																										: isSelected
+																											? opt === 'Season'
+																												? '#F5F5F5'
+																												: '#C2C2C2'
+																											: isHovered
+																												? 'rgba(0,0,0,0.05)'
+																												: 'transparent',
+																									boxShadow:
+																										hoveredBookingForTab !== null
+																											? 'inset 0 0 0 1px #000000'
+																											: 'inset 0 0 0 1px rgba(0,0,0,0)',
+																									transition: `background-color ${BOOKING_FOR_TAB_CHROME_TRANSITION}, box-shadow ${BOOKING_FOR_TAB_CHROME_TRANSITION}`,
+																								}}
 																								role="button"
 																								aria-pressed={isSelected}
 																							>
-																								{opt}
+																								<span
+																									style={{
+																										opacity: isDimmed ? 0 : 1,
+																										transition: `opacity ${BOOKING_FOR_TAB_CHROME_TRANSITION}`,
+																									}}
+																								>
+																									{opt}
+																								</span>
 																							</button>
 																						);
 																					}
