@@ -4295,7 +4295,14 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 													<button
 														type="button"
 														data-hover-description="Add information about yourself so you can pitch well to the contacts you're reaching out to"
-														onClick={() => setActiveTab('profile')}
+														onClick={() => {
+															if (activeTab === 'profile') {
+																setActiveTab('main');
+																setHasLeftProfileTab(true);
+															} else {
+																setActiveTab('profile');
+															}
+														}}
 														className={cn(
 															"absolute left-0 -top-[3px] h-[calc(100%+3px)] w-[130px] flex items-center justify-center font-inter font-semibold text-[13px] max-[480px]:text-[14px] z-30 cursor-pointer bg-transparent transition-colors border-r-[3px] border-r-black border-t-0 border-b-0 border-l-0",
 															activeTab === 'profile'
