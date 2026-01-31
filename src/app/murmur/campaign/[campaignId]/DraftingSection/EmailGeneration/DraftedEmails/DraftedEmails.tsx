@@ -1343,7 +1343,19 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 											maskImage: 'linear-gradient(90deg, #000 92%, transparent 100%)',
 										}}
 									>
-										<span className="whitespace-nowrap">Drafts</span>
+										<button
+											type="button"
+											aria-label="Back to drafts list"
+											className="whitespace-nowrap cursor-pointer underline-offset-2 hover:underline"
+											style={{ pointerEvents: 'auto' }}
+											onClick={(e) => {
+												e.preventDefault();
+												e.stopPropagation();
+												handleBack();
+											}}
+										>
+											Drafts
+										</button>
 										<span className="mx-[10px] whitespace-nowrap">{'>'}</span>
 										<span className="min-w-0 truncate">
 											{displayName || companyName || 'Unknown Contact'}
@@ -1506,11 +1518,33 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 										zIndex: 6,
 									}}
 								>
-									<span className="whitespace-nowrap flex-shrink-0">Drafts</span>
+									<button
+										type="button"
+										aria-label="Back to drafts list"
+										className="whitespace-nowrap flex-shrink-0 cursor-pointer underline-offset-2 hover:underline"
+										style={{ pointerEvents: 'auto' }}
+										onClick={(e) => {
+											e.preventDefault();
+											e.stopPropagation();
+											handleBack();
+										}}
+									>
+										Drafts
+									</button>
 									<span className="mx-[10px] whitespace-nowrap flex-shrink-0">{'>'}</span>
-									<span className="min-w-0 truncate">
+									<button
+										type="button"
+										aria-label="Back to draft review"
+										className="min-w-0 truncate cursor-pointer text-left underline-offset-2 hover:underline"
+										style={{ pointerEvents: 'auto' }}
+										onClick={(e) => {
+											e.preventDefault();
+											e.stopPropagation();
+											setIsRegenSettingsPreviewOpen(false);
+										}}
+									>
 										{displayName || companyName || 'Unknown Contact'}
-									</span>
+									</button>
 									<span className="mx-[10px] whitespace-nowrap flex-shrink-0">{'>'}</span>
 									<span className="whitespace-nowrap flex-shrink-0">Regenerate</span>
 								</div>
