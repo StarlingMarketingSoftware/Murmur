@@ -4741,7 +4741,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														{/* Header band (30px fill + 3px divider) */}
 														<div className="shrink-0 h-[33px] bg-[#95CFFF] border-b-[3px] border-black flex items-center">
 															<span className="pl-4 font-inter font-semibold text-[15px] leading-none text-black">
-																Body
+																Introduce yourself
 															</span>
 															{/* Right controls: divider @ 138px from right, "Clear all" segment (89px), divider @ 49px from right */}
 															<div className="ml-auto flex items-stretch h-full">
