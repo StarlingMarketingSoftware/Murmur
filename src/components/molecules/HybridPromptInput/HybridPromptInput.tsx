@@ -25,6 +25,7 @@ import { HybridPromptInputProps, useHybridPromptInput } from './useHybridPromptI
 import { WriteTabChromeHeader } from './WriteTabChromeHeader';
 import { cn } from '@/utils';
 import { DEFAULT_FONT, FONT_OPTIONS } from '@/constants/ui';
+import gsap from 'gsap';
 import React, {
 	useState,
 	FC,
@@ -3447,6 +3448,19 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		return isIncomplete ? 'profile' : 'main';
 	});
 
+	// Fade-in only the Profile tab's green chrome (NOT the blue main box).
+	const profileChromeRef = useRef<HTMLDivElement>(null);
+	useEffect(() => {
+		if (activeTab === 'profile' && profileChromeRef.current) {
+			gsap.killTweensOf(profileChromeRef.current);
+			gsap.fromTo(
+				profileChromeRef.current,
+				{ opacity: 0 },
+				{ opacity: 1, duration: 0.5, ease: 'power2.out' }
+			);
+		}
+	}, [activeTab]);
+
 	// Track if user has ever left the profile tab (to show red for incomplete fields after returning)
 	const [hasLeftProfileTab, setHasLeftProfileTab] = useState(false);
 
@@ -4698,18 +4712,25 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 											</div>
 											{/* Body container (380px tall) - positioned 64px below the score line */}
 											<div
-												className="flex-1 bg-[#305B31] relative flex flex-col cursor-pointer"
+												className="flex-1 relative flex flex-col cursor-pointer"
 												onClick={() => {
 													setActiveTab('main');
 													setHasLeftProfileTab(true);
 												}}
 											>
-												{/* Green top space box (122 x 34) */}
+												{/* Green chrome background fades in (blue main box does not). */}
 												<div
+													ref={profileChromeRef}
 													aria-hidden="true"
-													className="absolute left-[15px] top-[14px] w-[122px] h-[34px] rounded-[8px] border-2 border-black bg-[#305B31]"
+													className="absolute inset-0 z-0 bg-[#305B31] pointer-events-none opacity-0"
 												/>
-												<div className="w-full mt-[64px]">
+												<div className="relative z-10 flex flex-col flex-1">
+													{/* Green top space box (122 x 34) */}
+													<div
+														aria-hidden="true"
+														className="absolute left-[15px] top-[14px] w-[122px] h-[34px] rounded-[8px] border-2 border-black"
+													/>
+													<div className="w-full mt-[64px]">
 													<div
 														className={cn(
 															'relative w-full bg-[#4597DA] border-t-[3px] border-b-[3px] border-black rounded-[8px] overflow-hidden flex flex-col',
@@ -5140,7 +5161,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 												{/* New containers below Body box */}
 												<div className="w-full flex flex-col items-center mt-[9px]">
 													{/* 472 x 93 container */}
-													<div className="relative w-[472px] h-[93px] max-w-full rounded-[8px] bg-[#305B31] border-2 border-black">
+													<div className="relative w-[472px] h-[93px] max-w-full rounded-[8px] border-2 border-black">
 														{/* Decorative inner boxes (no fill) */}
 														<div
 															aria-hidden="true"
@@ -5172,10 +5193,11 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														<div className="w-[472px] max-w-full mt-[13px]">
 															<div
 																aria-hidden="true"
-																className="w-[229px] h-[34px] rounded-[8px] bg-[#305B31] border-2 border-black"
+																className="w-[229px] h-[34px] rounded-[8px] border-2 border-black"
 															/>
 														</div>
 													)}
+												</div>
 												</div>
 											</div>
 										</div>
