@@ -2356,7 +2356,8 @@ const Murmur = () => {
 							<div
 								ref={topCampaignsDropdownRef}
 								data-slot="campaign-top-dropdown"
-								className="pointer-events-auto fixed top-[116px] left-[300px] z-[60]"
+								className="pointer-events-auto fixed top-[116px] left-[300px] z-[60] animate-inbox-pop-in"
+								style={{ transformOrigin: 'top left' }}
 							>
 								<div className="bg-[#EDEDED] rounded-[12px] overflow-hidden w-[895px] h-[242px] border-2 border-[#8C8C8C]">
 									<CampaignsTable />
@@ -2453,12 +2454,13 @@ const Murmur = () => {
 						{isDashboardInboxOpen && dashboardInboxPosition && (
 							<div
 								ref={dashboardInboxPopupRef}
-								className="pointer-events-auto fixed z-[120]"
+								className="pointer-events-auto fixed z-[120] animate-inbox-pop-in"
 								style={{
 									top: `${dashboardInboxPosition.top}px`,
 									left: `${dashboardInboxPosition.left}px`,
 									width: `${DASHBOARD_INBOX_POPUP_WIDTH_PX}px`,
 									height: `${DASHBOARD_INBOX_POPUP_HEIGHT_PX}px`,
+									transformOrigin: 'top center',
 								}}
 							>
 								{dashboardInboxSubtab === 'messages' ? (

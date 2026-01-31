@@ -3258,6 +3258,22 @@ body.murmur-page.murmur-map-view .results-search-input-group .search-wave-contai
 	}
 }
 
+/* Dashboard inbox popup pop-in animation (Airbnb-style) */
+@keyframes inboxPopIn {
+	0% {
+		opacity: 0;
+		transform: scale(0.95) translateY(-8px);
+	}
+	100% {
+		opacity: 1;
+		transform: scale(1) translateY(0);
+	}
+}
+
+.animate-inbox-pop-in {
+	animation: inboxPopIn 0.25s cubic-bezier(0.32, 0.72, 0, 1) forwards;
+}
+
 /* Enhanced overlay with micro-interactions - no width change */
 .search-bar-active .search-wave-overlay {
 	opacity: 0.2;
