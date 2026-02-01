@@ -126,6 +126,9 @@ const MANUAL_EDITOR_COLOR_SWATCHES = [
 const HPI_GREEN_BG_GRADIENT =
 	'linear-gradient(to bottom, #7BDB7E 0%, #7BDB7E 25%, #A6E2A8 100%)';
 
+const HPI_GREEN_BG_GRADIENT_HOVER =
+	'linear-gradient(to bottom, #A6E2A8 0%, #A6E2A8 25%, #7BDB7E 100%)';
+
 interface SortableAIBlockProps {
 	block: {
 		value: HybridBlock;
@@ -2831,6 +2834,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 	const buildAutoSubjectHoverTimeline = useCallback(() => {
 		const pillEl = autoSubjectPillRef.current;
 		const autoWordEl = autoSubjectAutoWordRef.current;
+		
 		const controlsEl = autoSubjectControlsRef.current;
 		if (!pillEl || !autoWordEl) return;
 
@@ -3774,6 +3778,14 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		return isIncomplete ? 'profile' : 'main';
 	});
 
+	// Auto tab: background gradient wave on "Generate Test" hover (desktop)
+	const [isAutoGenerateTestHovered, setIsAutoGenerateTestHovered] = useState(false);
+	useEffect(() => {
+		if (selectedModeKey !== 'full' || activeTab !== 'main' || showTestPreview) {
+			setIsAutoGenerateTestHovered(false);
+		}
+	}, [activeTab, selectedModeKey, showTestPreview]);
+
 	// Fade-in only the Profile tab's green chrome (NOT the blue main box).
 	const profileChromeRef = useRef<HTMLDivElement>(null);
 	useEffect(() => {
@@ -4593,6 +4605,29 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 									className="pointer-events-none absolute -inset-[3px] z-[60] rounded-[8px] border-[3px] border-black"
 								/>
 							)}
+							{/* Auto: hover wave background shift (desktop only) */}
+							{!compactLeftOnly &&
+								!isMobile &&
+								activeTab === 'main' &&
+								selectedModeKey === 'full' &&
+								!showTestPreview && (
+									<div
+										aria-hidden="true"
+										className="pointer-events-none absolute inset-0 z-[-1] rounded-[8px]"
+										style={{
+											backgroundImage: HPI_GREEN_BG_GRADIENT_HOVER,
+											backgroundSize: '100% 140%',
+											backgroundPosition: isAutoGenerateTestHovered
+												? '50% 100%'
+												: '50% 0%',
+											opacity: isAutoGenerateTestHovered ? 1 : 0,
+											transition: isAutoGenerateTestHovered
+												? 'opacity 1200ms cubic-bezier(0.2, 0.8, 0.2, 1), background-position 3000ms cubic-bezier(0.2, 0.8, 0.2, 1)'
+												: 'opacity 2400ms cubic-bezier(0.2, 0.8, 0.2, 1), background-position 5000ms cubic-bezier(0.2, 0.8, 0.2, 1)',
+											willChange: 'opacity, background-position',
+										}}
+									/>
+								)}
 							{/* Mobile-only background overlay starting under Mode divider (match desktop fill) */}
 							{isMobile && activeTab === 'main' && !showTestPreview && overlayTopPx !== null && (
 								<div
@@ -7649,6 +7684,14 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														setHasAttemptedTest(true);
 													}}
 													disabled={isGenerationDisabled?.()}
+													onMouseEnter={() => {
+														if (!isGenerationDisabled?.()) setIsAutoGenerateTestHovered(true);
+													}}
+													onMouseLeave={() => setIsAutoGenerateTestHovered(false)}
+													onFocus={() => {
+														if (!isGenerationDisabled?.()) setIsAutoGenerateTestHovered(true);
+													}}
+													onBlur={() => setIsAutoGenerateTestHovered(false)}
 													className={cn(
 														'h-[28px] w-[232px] bg-[#DBF3DC] text-black font-inter font-normal text-[17px] leading-none rounded-[12px] cursor-pointer flex items-center justify-center p-0 border-2 border-transparent',
 														'transition-colors hover:bg-[#EAF9EB] hover:border-black active:bg-[#D1E9D2]',
