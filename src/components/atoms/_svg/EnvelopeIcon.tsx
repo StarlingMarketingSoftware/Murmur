@@ -17,7 +17,7 @@ export const EnvelopeIcon: FC<EnvelopeIconProps> = ({
 		<svg
 			width={width}
 			height={height}
-			viewBox="0 0 50 35"
+			viewBox="13 5 31 20"
 			fill="none"
 			xmlns="http://www.w3.org/2000/svg"
 			opacity={opacity}
