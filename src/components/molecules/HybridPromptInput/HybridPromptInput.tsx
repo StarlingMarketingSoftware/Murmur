@@ -4649,7 +4649,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																				<div
 																					className={cn(
 																						cn(
-																							'flex items-center justify-center h-[31px] rounded-[8px] border-2 border-black overflow-hidden subject-bar w-[110px]',
+																							'flex items-center justify-center h-[25px] rounded-[10px] border-2 border-black overflow-hidden subject-bar w-[110px]',
 																							!forceDesktop && 'max-[480px]:h-[24px]'
 																						)
 																					)}
@@ -4664,7 +4664,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																			<div
 																				className={cn(
 																					cn(
-																						'hidden group-hover/subject:flex items-center h-[31px] rounded-[8px] border-2 border-black overflow-hidden subject-bar bg-white w-full',
+																						'hidden group-hover/subject:flex items-center h-[25px] rounded-[10px] border-2 border-black overflow-hidden subject-bar bg-white w-full',
 																						!forceDesktop && 'max-[480px]:h-[24px]'
 																					)
 																				)}
@@ -4737,7 +4737,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																		<div
 																			aria-hidden="true"
 																			className={cn(
-																				'group/subject-auto flex items-center pl-2 w-[52px] h-[31px] shrink-0 select-none peer-hover/subject:hidden',
+																				'group/subject-auto flex items-center pl-2 w-[52px] h-[25px] shrink-0 select-none peer-hover/subject:hidden',
 																				!forceDesktop && 'max-[480px]:h-[24px]'
 																			)}
 																		>
@@ -7283,7 +7283,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																<div
 																	className={cn(
 																		cn(
-																			'flex items-center justify-center h-[31px] rounded-[8px] border-2 border-black overflow-hidden w-[122px]',
+																			'flex items-center justify-center h-[25px] rounded-[10px] border-2 border-black overflow-hidden w-[122px]',
 																			!forceDesktop && 'max-[480px]:h-[24px]'
 																		)
 																	)}
@@ -7298,7 +7298,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 															<div
 																className={cn(
 																	cn(
-																		'hidden group-hover/signature:flex items-center h-[31px] rounded-[8px] border-2 border-black overflow-hidden bg-white w-full',
+																		'hidden group-hover/signature:flex items-center h-[25px] rounded-[10px] border-2 border-black overflow-hidden bg-white w-full',
 																		!forceDesktop && 'max-[480px]:h-[24px]'
 																	)
 																)}
@@ -7347,7 +7347,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														<div
 															aria-hidden="true"
 															className={cn(
-																'group/signature-auto flex items-center pl-2 w-[52px] h-[31px] shrink-0 select-none peer-hover/signature:hidden',
+																'group/signature-auto flex items-center pl-2 w-[52px] h-[25px] shrink-0 select-none peer-hover/signature:hidden',
 																!forceDesktop && 'max-[480px]:h-[24px]'
 															)}
 														>
