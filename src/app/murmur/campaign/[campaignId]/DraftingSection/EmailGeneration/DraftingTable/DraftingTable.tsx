@@ -1237,7 +1237,6 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 	goToContacts,
 	goToSearch,
 	goToDrafts,
-	goToSent,
 	goToInbox,
 	selectedCount = 0,
 	statusFilter = 'all',

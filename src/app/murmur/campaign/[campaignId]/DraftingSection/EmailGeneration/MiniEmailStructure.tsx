@@ -1324,7 +1324,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 					<div
 						aria-hidden="true"
 						className="absolute inset-0"
-						style={{ backgroundColor: getModeBackgroundColor() }}
+						style={{ backgroundColor: getModeHighlightBackgroundColor(selectedModeKey) }}
 					/>
 					<span className="relative z-10 font-inter font-semibold text-[12px] leading-none text-black truncate">
 						{modeLabel}

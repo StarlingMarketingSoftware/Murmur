@@ -12,9 +12,10 @@ type SearchParams = Record<string, string | string[] | undefined>;
 export default async function HomePage({
 	searchParams,
 }: {
-	searchParams?: SearchParams;
+	searchParams?: Promise<SearchParams>;
 }) {
-	const activeLanding = searchParams?.activeLanding;
+	const resolvedSearchParams = await searchParams;
+	const activeLanding = resolvedSearchParams?.activeLanding;
 	const activeLandingFlag = Array.isArray(activeLanding) ? activeLanding[0] : activeLanding;
 
 	// Allow subscribed users to view the landing page only when explicitly requested.

@@ -10,6 +10,19 @@ type GeoStateResponse = {
 	stateName: string | null;
 };
 
+// Vercel-specific geo property (not in Next.js types)
+interface VercelGeo {
+	city?: string;
+	country?: string;
+	region?: string;
+	latitude?: string;
+	longitude?: string;
+}
+
+interface NextRequestWithGeo extends NextRequest {
+	geo?: VercelGeo;
+}
+
 function resolveUsState(
 	candidate: string | null
 ): { stateCode: string; stateName: string } | null {
@@ -33,7 +46,7 @@ function resolveUsState(
 	return byName ? { stateCode: byName.abbr, stateName: byName.name } : null;
 }
 
-export async function GET(req: NextRequest) {
+export async function GET(req: NextRequestWithGeo) {
 	// Best-effort: these headers are set by Vercel's geolocation (and some other proxies).
 	// When unavailable (e.g. local dev), we return nulls.
 	const geoRegion =

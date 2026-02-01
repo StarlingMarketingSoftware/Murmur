@@ -374,10 +374,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		| 'inbox';
 	const [hoveredAllTabBox, setHoveredAllTabBox] = useState<AllTabBox | null>(null);
 	const isContactsHovered = hoveredAllTabBox === 'contacts';
-	const isWritingHovered = hoveredAllTabBox === 'writing';
-	const isDraftsHovered = hoveredAllTabBox === 'drafts';
-	const isSentHovered = hoveredAllTabBox === 'sent';
-	const isInboxHovered = hoveredAllTabBox === 'inbox';
 	// All tab: hovered email drives preview + research (hover-only, no row highlighting)
 	const [allTabHoveredEmailPreview, setAllTabHoveredEmailPreview] = useState<{
 		contactId: number;
