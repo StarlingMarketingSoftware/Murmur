@@ -2226,9 +2226,14 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		return ids;
 	}, [draftEmails]);
 
-	const draftedContactIds = new Set(draftEmails.map((e) => e.contactId));
+	const contactedContactIds = useMemo(() => {
+		const ids = new Set<number>();
+		for (const email of draftEmails) ids.add(email.contactId);
+		for (const email of sentEmails) ids.add(email.contactId);
+		return ids;
+	}, [draftEmails, sentEmails]);
 	const contactsAvailableForDrafting = (contacts || []).filter(
-		(contact) => !draftedContactIds.has(contact.id)
+		(contact) => !contactedContactIds.has(contact.id)
 	);
 
 	const isSendingDisabled = isFreeTrial || (user?.sendingCredits || 0) === 0;
@@ -2411,14 +2416,19 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		[contacts, handleResearchContactHover]
 	);
 
-	const handleSendDrafts = async () => {
-		const selectedDrafts =
-			draftsTabSelectedIds.size > 0
+	const handleSendDrafts = async (draftIds?: Iterable<number>) => {
+		// If draftIds is provided, ONLY send those drafts (used by draft-review "Send" button).
+		// Otherwise, send the current selection (and never default to "all drafts" when selection is empty).
+		const explicitIds = draftIds ? new Set(Array.from(draftIds)) : null;
+
+		const selectedDrafts = explicitIds
+			? draftEmails.filter((d) => explicitIds.has(d.id))
+			: draftsTabSelectedIds.size > 0
 				? draftEmails.filter((d) => draftsTabSelectedIds.has(d.id))
-				: draftEmails;
+				: [];
 
 		if (selectedDrafts.length === 0) {
-			toast.error('No drafts selected to send.');
+			toast.error('Select emails to send.');
 			return;
 		}
 

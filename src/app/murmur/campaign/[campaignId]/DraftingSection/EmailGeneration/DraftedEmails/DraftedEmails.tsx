@@ -1185,14 +1185,10 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 										opacity: props.isSendingDisabled ? 0.6 : 1,
 									}}
 									disabled={props.isSendingDisabled}
-									onClick={async () => {
-										if (selectedDraft && !props.isSendingDisabled) {
-											// Select only the current draft and send it
-											props.setSelectedDraftIds(new Set([selectedDraft.id]));
-											// Small delay to ensure state is updated before sending
-											await new Promise((resolve) => setTimeout(resolve, 50));
-											await props.onSend();
-										}
+									onClick={() => {
+										if (!selectedDraft || props.isSendingDisabled) return;
+										props.setSelectedDraftIds(new Set([selectedDraft.id]));
+										void props.onSend([selectedDraft.id]);
 									}}
 								>
 									Send
@@ -1423,14 +1419,10 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 								{/* Send button between lines */}
 								<button
 									type="button"
-									onClick={async () => {
-										if (selectedDraft && !props.isSendingDisabled) {
-											// Select only the current draft and send it
-											props.setSelectedDraftIds(new Set([selectedDraft.id]));
-											// Small delay to ensure state is updated before sending
-											await new Promise((resolve) => setTimeout(resolve, 50));
-											await props.onSend();
-										}
+									onClick={() => {
+										if (!selectedDraft || props.isSendingDisabled) return;
+										props.setSelectedDraftIds(new Set([selectedDraft.id]));
+										void props.onSend([selectedDraft.id]);
 									}}
 									disabled={props.isSendingDisabled}
 									className="absolute font-inter text-[14px] font-normal text-black hover:bg-black/5 flex items-center justify-center transition-colors leading-none"
@@ -2646,7 +2638,7 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 												if (isRejectedTab) {
 													await handleRegenerateSelectedDrafts();
 												} else {
-													await props.onSend();
+											await props.onSend(selectedDraftIds);
 												}
 											}}
 										>
