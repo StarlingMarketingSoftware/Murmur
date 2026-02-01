@@ -3141,8 +3141,23 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 	const [linkPopoverPosition, setLinkPopoverPosition] = useState<{ top: number; left: number } | null>(null);
 
 	// Manual mode body editor ref (contentEditable)
+	const manualSubjectRef = useRef<HTMLTextAreaElement | null>(null);
 	const manualBodyEditorRef = useRef<HTMLDivElement>(null);
 	const manualBodyInitializedRef = useRef(false);
+
+	// When switching into Manual mode, start typing in Subject.
+	useEffect(() => {
+		if (selectedModeKey !== 'manual') return;
+		const el = manualSubjectRef.current;
+		if (!el) return;
+		el.focus();
+		try {
+			const len = el.value?.length ?? 0;
+			el.setSelectionRange(len, len);
+		} catch {
+			// ignore (some browsers can throw if element isn't focusable yet)
+		}
+	}, [selectedModeKey]);
 
 	// Track active formatting state
 	const [activeFormatting, setActiveFormatting] = useState({
@@ -5383,6 +5398,10 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																	<FormControl>
 																		<Textarea
 																			{...field}
+																			ref={(el) => {
+																				field.ref(el);
+																				manualSubjectRef.current = el;
+																			}}
 																			className={cn(
 																				// Auto-expanding textarea for subject (up to 4 lines)
 																				'w-full border-0 rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 !bg-transparent p-0 min-h-[20px] leading-[20px] resize-none overflow-hidden',
