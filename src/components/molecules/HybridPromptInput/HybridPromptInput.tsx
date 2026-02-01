@@ -3575,6 +3575,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 	// Track which profile box is expanded (null = none expanded)
 	const [expandedProfileBox, setExpandedProfileBox] = useState<string | null>(null);
 	const expandedProfileBoxRef = useRef<HTMLDivElement>(null);
+	const bioTextareaRef = useRef<HTMLTextAreaElement>(null);
 
 	type IdentityProfileFields = Identity & {
 		genre?: string | null;
@@ -3593,6 +3594,16 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		bio: identityProfile?.bio || '',
 		links: identityProfile?.website || '',
 	});
+
+	// Auto-grow the Bio textarea (so the whole blue box can expand downward)
+	useLayoutEffect(() => {
+		if (activeTab !== 'profile') return;
+		if (expandedProfileBox !== 'bio') return;
+		const el = bioTextareaRef.current;
+		if (!el) return;
+		el.style.height = 'auto';
+		el.style.height = `${el.scrollHeight}px`;
+	}, [activeTab, expandedProfileBox, profileFields.bio]);
 
 	// Sync profileFields when identity changes
 	useEffect(() => {
@@ -4799,9 +4810,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 								<div
 									className={cn(
 										'flex-1 min-h-0 flex flex-col hide-native-scrollbar relative',
-										props.clipProfileTabOverflow && activeTab === 'profile'
-											? 'overflow-y-hidden'
-											: 'overflow-y-auto',
+										activeTab === 'profile' ? 'overflow-y-hidden' : 'overflow-y-auto',
 										shouldEnableHybridPlusGutter && 'w-[calc(100%_+_90px)] -mr-[90px]'
 									)}
 									data-hpi-content
@@ -4849,7 +4858,13 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 													<div
 														className={cn(
 															'relative w-full bg-[#4597DA] border-t-[3px] border-b-[3px] border-black rounded-[8px] overflow-hidden flex flex-col',
-															expandedProfileBox ? 'h-[414px]' : 'h-[380px]'
+															props.clipProfileTabOverflow
+																? expandedProfileBox
+																	? 'h-[414px]'
+																	: 'h-[380px]'
+																: expandedProfileBox
+																? 'min-h-[414px]'
+																: 'min-h-[380px]'
 														)}
 														onClick={(e) => e.stopPropagation()}
 													>
@@ -4884,7 +4899,13 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														/>
 
 														{/* Profile fields live inside the 380px Body container */}
-														<div className="flex-1 min-h-0 overflow-y-auto hide-native-scrollbar">
+														<div
+															className={cn(
+																'flex-1',
+																props.clipProfileTabOverflow &&
+																	'min-h-0 overflow-y-auto hide-native-scrollbar'
+															)}
+														>
 															<div className="px-3 pt-[14px] pb-[14px] flex flex-col gap-[18px]">
 																<div
 																	ref={
@@ -5150,7 +5171,9 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																	}
 																	className={cn(
 																		'w-[413px] max-w-full mx-auto flex flex-col rounded-[8px] border-[3px] border-black cursor-pointer overflow-hidden',
-																		expandedProfileBox === 'bio' ? 'h-[68px]' : 'h-[34px]'
+																		expandedProfileBox === 'bio'
+																			? 'min-h-[68px]'
+																			: 'h-[34px]'
 																	)}
 																	onClick={() => handleProfileBoxToggle('bio')}
 																>
@@ -5178,9 +5201,9 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																		)}
 																	</div>
 																	{expandedProfileBox === 'bio' && (
-																		<input
-																			type="text"
-																			className="h-[34px] bg-white px-3 font-inter text-[14px] outline-none border-0"
+																		<textarea
+																			ref={bioTextareaRef}
+																			className="min-h-[34px] bg-white px-3 py-[7px] font-inter text-[14px] leading-[20px] outline-none border-0 resize-none overflow-hidden"
 																			value={profileFields.bio}
 																			onChange={(e) =>
 																				setProfileFields({
@@ -5188,6 +5211,13 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																					bio: e.target.value,
 																				})
 																			}
+																			onInput={(
+																				e: React.FormEvent<HTMLTextAreaElement>
+																			) => {
+																				const target = e.currentTarget;
+																				target.style.height = 'auto';
+																				target.style.height = `${target.scrollHeight}px`;
+																			}}
 																			onBlur={() => handleProfileFieldBlur('bio')}
 																			onKeyDown={(e) => {
 																				if (e.key === 'Enter') {
@@ -5198,6 +5228,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																			onClick={(e) => e.stopPropagation()}
 																			placeholder=""
 																			autoFocus
+																			rows={1}
 																		/>
 																	)}
 																</div>

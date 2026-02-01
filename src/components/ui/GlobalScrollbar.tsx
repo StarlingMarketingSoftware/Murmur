@@ -20,6 +20,10 @@ export function GlobalScrollbar() {
 	const isMobile = useIsMobile();
 	const [isMobileLandscape, setIsMobileLandscape] = useState<boolean | null>(null);
 	const pathname = usePathname();
+	// Hide the global scrollbar entirely on campaign pages.
+	// Campaign UI uses fixed-layout panels and should never show a page-level scrollbar.
+	const hideOnCampaignRoute =
+		typeof pathname === 'string' && pathname.startsWith('/murmur/campaign');
 	const hideOnMobileByRoute =
 		typeof pathname === 'string' &&
 		new Set(['/', '/map', '/research', '/inbox', '/drafting']).has(pathname);
@@ -234,7 +238,7 @@ export function GlobalScrollbar() {
 	// Keep these around for potential route-specific behavior, but the hide rule is now global.
 	void isCampaignPage;
 	void isDashboardPage;
-	if (isDialogOpen || isMobileLandscape) {
+	if (hideOnCampaignRoute || isDialogOpen || isMobileLandscape) {
 		return null;
 	}
 
