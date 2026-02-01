@@ -8,7 +8,7 @@ import { CampaignWithRelations } from '@/types';
 import { cn } from '@/utils';
 import { ScrollableText } from '@/components/atoms/ScrollableText/ScrollableText';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
-import { getStateAbbreviation } from '@/utils/string';
+import { getStateAbbreviation, splitTrailingNumericSuffix } from '@/utils/string';
 import { CanadianFlag } from '@/components/atoms/_svg/CanadianFlag';
 import OpenIcon from '@/components/atoms/svg/OpenIcon';
 import {
@@ -38,6 +38,7 @@ const FadeOverflowText: FC<{
 }> = ({ text, className, fadePx = 16, measureKey }) => {
 	const spanRef = useRef<HTMLSpanElement | null>(null);
 	const [isOverflowing, setIsOverflowing] = useState(false);
+	const { base, suffixNumber } = splitTrailingNumericSuffix(text);
 
 	const measure = useCallback(() => {
 		const el = spanRef.current;
@@ -79,7 +80,16 @@ const FadeOverflowText: FC<{
 			style={style}
 			title={text}
 		>
-			{text}
+			{suffixNumber ? (
+				<>
+					<span>{base}</span>
+					<sup className="ml-[4px] relative top-[1px] align-super text-[0.65em] font-medium leading-none opacity-70">
+						{suffixNumber}
+					</sup>
+				</>
+			) : (
+				text
+			)}
 		</span>
 	);
 };
@@ -120,6 +130,13 @@ export interface ContactsExpandedListProps {
 	 * When true, renders only the header chrome (no rows) for ultra-compact bottom panel layouts.
 	 */
 	collapsed?: boolean;
+	/**
+	 * When `allTab`, the component behaves like a dashboard preview:
+	 * - no row hover/selected background colors
+	 * - no header hover/click affordances
+	 * - rows still fire `onContactHover` so the All tab can update the Research panel
+	 */
+	interactionMode?: 'default' | 'allTab';
 }
 
 export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
@@ -138,6 +155,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 	whiteSectionHeight: customWhiteSectionHeight,
 	onOpenContacts,
 	collapsed = false,
+	interactionMode = 'default',
 }) => {
 	const router = useRouter();
 	const [internalSelectedContactIds, setInternalSelectedContactIds] = useState<
@@ -409,16 +427,17 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 		}
 	};
 
+	const allContactIds = useMemo(() => new Set(contacts.map((c) => c.id)), [contacts]);
 	const areAllSelected =
-		currentSelectedIds.size === contacts.length && contacts.length > 0;
-	const handleSelectAllToggle = () => {
+		allContactIds.size > 0 &&
+		currentSelectedIds.size === allContactIds.size &&
+		Array.from(allContactIds).every((id) => currentSelectedIds.has(id));
+	const handleSelectAllToggle = useCallback(() => {
 		updateSelection(() => {
-			if (areAllSelected) {
-				return new Set();
-			}
-			return new Set(contacts.map((c) => c.id));
+			if (areAllSelected) return new Set();
+			return new Set(allContactIds);
 		});
-	};
+	}, [allContactIds, areAllSelected, updateSelection]);
 
 	const selectedCount = currentSelectedIds.size;
 	const shouldShowLoadingWave = isLoading && contacts.length === 0;
@@ -436,8 +455,10 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 	const innerWidth = typeof resolvedWidth === 'number' ? resolvedWidth - 10 : 370;
 
 	const isAllTab = height === 263;
+	const isAllTabNavigation = interactionMode === 'allTab';
 	const whiteSectionHeight = customWhiteSectionHeight ?? (isAllTab ? 20 : 28);
 	const isBottomView = customWhiteSectionHeight === 15;
+	const shouldShowScrollbar = !isBottomView && contacts.length >= 14;
 
 	return (
 		<div
@@ -482,7 +503,12 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 			<ContactsHeaderChrome
 				isAllTab={isAllTab}
 				whiteSectionHeight={customWhiteSectionHeight}
-				interactive={false}
+				// Match the main Contacts tab header chrome animation, but keep the ultra-compact
+				// bottom view static so it doesn't interfere with the "Open" affordance.
+				// Also, when this list is rendered on the Write tab (tooltip-enabled), treat "Write"
+				// as the active tab so hovering "Write" shows the white-placeholder state.
+				activeTab={enableUsedContactTooltip ? 'write' : 'contacts'}
+				interactive={!isBottomView && !isAllTabNavigation}
 			/>
 			<div
 				className={cn(
@@ -504,7 +530,10 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 
 			{(isAllTab || isBottomView) && (
 				<div
-					className="absolute z-20 flex items-center gap-[12px] cursor-pointer"
+					className={cn(
+						'absolute z-20 flex items-center gap-[12px]',
+						isAllTabNavigation ? 'pointer-events-none cursor-default' : 'cursor-pointer'
+					)}
 					style={{ top: isBottomView ? 1 : -1, right: isBottomView ? 4 : 4 }}
 					onClick={onOpenContacts}
 					role={onOpenContacts ? 'button' : undefined}
@@ -530,15 +559,24 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 			)}
 
 			{!collapsed && !isBottomView && (
-				<div className="px-3 mt-1 mb-0 flex items-center justify-center relative top-1 text-[13px] font-inter font-medium text-black/70">
-					<span>{selectedCount} Selected</span>
-					<button
-						type="button"
-						className="absolute right-3 bg-transparent border-none p-0 hover:text-black text-[13px] font-inter font-medium text-black/70 cursor-pointer"
-						onClick={handleSelectAllToggle}
-					>
-						{areAllSelected ? 'Deselect All' : 'Select All'}
-					</button>
+				<div className="px-3 mt-2 mb-0 flex items-center justify-center relative z-10 text-[13px] font-inter font-medium text-black/70">
+					<span>{isAllTabNavigation ? 0 : selectedCount} Selected</span>
+					{isAllTabNavigation ? (
+						<span className="absolute right-3 bg-transparent border-none p-0 text-[13px] font-inter font-medium text-black/70 cursor-default">
+							Select All
+						</span>
+					) : (
+						<button
+							type="button"
+							className="absolute right-3 bg-transparent border-none p-0 hover:text-black text-[13px] font-inter font-medium text-black/70 cursor-pointer"
+							onClick={(e) => {
+								e.stopPropagation();
+								handleSelectAllToggle();
+							}}
+						>
+							{areAllSelected ? 'Deselect All' : 'Select All'}
+						</button>
+					)}
 				</div>
 			)}
 
@@ -657,12 +695,12 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 					{/* Scrollable list */}
 					<CustomScrollbar
 						className="flex-1 drafting-table-content"
-						thumbWidth={2}
-						thumbColor={isBottomView ? 'transparent' : '#000000'}
+						thumbWidth={shouldShowScrollbar ? 2 : 0}
+						thumbColor={shouldShowScrollbar ? '#000000' : 'transparent'}
 						trackColor="transparent"
 						offsetRight={isBottomView ? -7 : -6}
 						contentClassName="overflow-x-hidden"
-						alwaysShow={!isBottomView}
+						alwaysShow={false}
 					>
 						<div
 							className={cn(
@@ -690,11 +728,21 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 						// Keyboard focus shows hover UI independently of mouse hover
 						const isKeyboardFocused = hoveredContactIndex === contactIndex;
 						// Final background: selected > keyboard focus > white (mouse hover handled by CSS)
-						const contactBgColor = isSelected 
-							? 'bg-[#EAAEAE]' 
-							: isKeyboardFocused 
-								? 'bg-[#F5DADA]' 
-								: 'bg-white hover:bg-[#F5DADA]';
+						const contactBgColor = isAllTabNavigation
+							? 'bg-white'
+							: isSelected
+								? 'bg-[#EAAEAE]'
+								: isKeyboardFocused
+									? 'bg-[#F5DADA]'
+									: 'bg-white hover:bg-[#F5DADA]';
+						// Align the used-contact indicator with the top (Company) line in the standard (non-bottom) view.
+						// When the hover tooltip is visible, we center the tall pill so it stays inside the row.
+						const indicatorTop = isBottomView
+							? '50%'
+							: isUsedContactHoverCardVisible
+								? '50%'
+								: '16px';
+
 						return (
 							<div
 								key={contact.id}
@@ -706,7 +754,8 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 									}
 								}}
 						className={cn(
-							'cursor-pointer overflow-hidden rounded-[8px] border-2 border-[#000000] select-none relative grid grid-cols-2 grid-rows-2',
+							'overflow-hidden rounded-[8px] border-2 border-[#000000] select-none relative grid grid-cols-2 grid-rows-2',
+							isAllTabNavigation ? 'cursor-default' : 'cursor-pointer',
 							isBottomView
 								? 'w-[224px] h-[28px]'
 								: 'max-[480px]:w-[96.27vw] h-[49px] max-[480px]:h-[50px]',
@@ -717,10 +766,11 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 									if (e.shiftKey) e.preventDefault();
 								}}
 								onMouseEnter={() => {
-									setHoveredContactIndex(contactIndex);
+									if (!isAllTabNavigation) setHoveredContactIndex(contactIndex);
 									onContactHover?.(contact);
 								}}
 								onClick={(e) => {
+									if (isAllTabNavigation) return;
 									handleContactClick(contact, e);
 									onContactClick?.(contact);
 								}}
@@ -773,7 +823,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 												style={{
 													position: 'absolute',
 													left: isBottomView ? '8px' : '12px',
-													top: '50%',
+													top: indicatorTop,
 													transform: 'translateY(-50%)',
 													boxSizing: 'border-box',
 													// Default state: circle. Hover state (single/multi): pill.
@@ -836,11 +886,12 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 									})() : (
 										<span
 											className={cn(
-												"absolute top-1/2 -translate-y-1/2",
+												"absolute -translate-y-1/2",
 												isBottomView ? "left-2" : "left-3"
 											)}
 											aria-label="Used in a previous campaign"
 											style={{
+												top: indicatorTop,
 												width: isBottomView ? '12px' : '16px',
 												height: isBottomView ? '12px' : '16px',
 												borderRadius: '50%',
@@ -1114,13 +1165,28 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 										</>
 									) : fullName ? (
 										<>
-											{/* Top Left - Name */}
-											<div className={cn(leftPadding, 'pr-1 flex items-center h-[23px]')}>
-												<div className="font-bold text-[11px] w-full truncate leading-tight">
-													{fullName}
+											{/* Top Left - Company (fixed top slot) */}
+											<div
+												className={cn(
+													leftPadding,
+													'col-start-1 row-start-1 pr-1 flex items-end pb-[2px] overflow-hidden'
+												)}
+											>
+												<div
+													className="font-bold text-[12px] font-inter text-black w-full overflow-hidden whitespace-nowrap leading-[1.1]"
+													style={{
+														maskImage:
+															'linear-gradient(to right, black calc(100% - 16px), transparent 100%)',
+														WebkitMaskImage:
+															'linear-gradient(to right, black calc(100% - 16px), transparent 100%)',
+													}}
+												>
+													{contact.company || ''}
 												</div>
 											</div>
-											<div className="pr-2 pl-1 flex items-center h-[23px]">
+
+											{/* Top Right - Title (aligned to top slot) */}
+											<div className="col-start-2 row-start-1 pr-2 pl-1 flex items-end pb-[2px] overflow-hidden">
 												{contactTitle ? (
 													<div
 														className="h-[17px] rounded-[6px] px-2 flex items-center gap-1 w-full border border-black overflow-hidden"
@@ -1133,24 +1199,22 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 																		? '#B7E5FF'
 																		: isMusicFestivalTitle(contactTitle)
 																			? '#C1D6FF'
-																			: (isWeddingPlannerTitle(contactTitle) || isWeddingVenueTitle(contactTitle))
+																			: (isWeddingPlannerTitle(contactTitle) ||
+																					  isWeddingVenueTitle(contactTitle))
 																				? '#FFF2BC'
 																				: '#E8EFFF',
 														}}
 													>
-														{isRestaurantTitle(contactTitle) && (
-															<RestaurantsIcon size={12} />
-														)}
-														{isCoffeeShopTitle(contactTitle) && (
-															<CoffeeShopsIcon size={7} />
-														)}
+														{isRestaurantTitle(contactTitle) && <RestaurantsIcon size={12} />}
+														{isCoffeeShopTitle(contactTitle) && <CoffeeShopsIcon size={7} />}
 														{isMusicVenueTitle(contactTitle) && (
 															<MusicVenuesIcon size={12} className="flex-shrink-0" />
 														)}
 														{isMusicFestivalTitle(contactTitle) && (
 															<FestivalsIcon size={12} className="flex-shrink-0" />
 														)}
-														{(isWeddingPlannerTitle(contactTitle) || isWeddingVenueTitle(contactTitle)) && (
+														{(isWeddingPlannerTitle(contactTitle) ||
+															isWeddingVenueTitle(contactTitle)) && (
 															<WeddingPlannersIcon size={12} />
 														)}
 														<ScrollableText
@@ -1177,20 +1241,21 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 													<div className="w-full" />
 												)}
 											</div>
-							{/* Bottom Left - Company */}
-							<div className={cn(leftPadding, 'pr-1 flex items-center h-[22px]')}>
-								<div
-									className="text-[11px] text-black w-full overflow-hidden whitespace-nowrap leading-tight"
-									style={{
-										maskImage: 'linear-gradient(to right, black calc(100% - 16px), transparent 100%)',
-										WebkitMaskImage: 'linear-gradient(to right, black calc(100% - 16px), transparent 100%)',
-									}}
-								>
-									{contact.company || ''}
-								</div>
-							</div>
-											{/* Bottom Right - Location */}
-											<div className="pr-2 pl-1 flex items-center h-[22px]">
+
+											{/* Bottom Left - Name (fixed bottom slot) */}
+											<div
+												className={cn(
+													leftPadding,
+													'col-start-1 row-start-2 pr-1 flex items-start pt-[2px] overflow-hidden'
+												)}
+											>
+												<div className="text-[12px] font-inter text-black w-full truncate leading-[1.1]">
+													{fullName}
+												</div>
+											</div>
+											
+											{/* Bottom Right - Location (aligned to bottom slot) */}
+											<div className="col-start-2 row-start-2 pr-2 pl-1 flex items-start pt-[2px] overflow-hidden">
 												{contact.city || contact.state ? (
 													<div className="flex items-center gap-1 w-full">
 														{(() => {
@@ -1259,23 +1324,32 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 										</>
 									) : (
 										<>
-								{/* Left column - Company vertically centered */}
-							<div className={cn('row-span-2 pr-1 flex items-center h-full', leftPadding)}>
-								<div
-									className="font-bold text-[11px] text-black w-full overflow-hidden whitespace-nowrap leading-tight"
-									style={{
-										maskImage: 'linear-gradient(to right, black calc(100% - 16px), transparent 100%)',
-										WebkitMaskImage: 'linear-gradient(to right, black calc(100% - 16px), transparent 100%)',
-									}}
-								>
-									{contact.company || 'Contact'}
-								</div>
-							</div>
+											{/* Top Left - Company (fixed top slot) */}
+											<div
+												className={cn(
+													leftPadding,
+													'col-start-1 row-start-1 pr-1 flex items-end pb-[2px] overflow-hidden'
+												)}
+											>
+												<div
+													className="font-bold text-[12px] font-inter text-black w-full overflow-hidden whitespace-nowrap leading-[1.1]"
+													style={{
+														maskImage:
+															'linear-gradient(to right, black calc(100% - 16px), transparent 100%)',
+														WebkitMaskImage:
+															'linear-gradient(to right, black calc(100% - 16px), transparent 100%)',
+													}}
+												>
+													{contact.company || 'Contact'}
+												</div>
+											</div>
+											{/* Bottom Left - (empty fixed bottom slot) */}
+											<div className="col-start-1 row-start-2" />
 
 											{contactTitle ? (
 												<>
 													{/* Top Right - Title */}
-													<div className="pr-2 pl-1 flex items-center h-[23px]">
+													<div className="col-start-2 row-start-1 pr-2 pl-1 flex items-end pb-[2px] overflow-hidden">
 														<div
 															className="h-[17px] rounded-[6px] px-2 flex items-center gap-1 w-full border border-black overflow-hidden"
 															style={{
@@ -1329,7 +1403,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 													</div>
 
 													{/* Bottom Right - Location */}
-													<div className="pr-2 pl-1 flex items-center h-[22px]">
+													<div className="col-start-2 row-start-2 pr-2 pl-1 flex items-start pt-[2px] overflow-hidden">
 														{contact.city || contact.state ? (
 															<div className="flex items-center gap-1 w-full">
 																{(() => {
@@ -1397,7 +1471,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 													</div>
 												</>
 											) : (
-												<div className="row-span-2 pr-2 pl-1 flex items-center h-full">
+												<div className="col-start-2 row-span-2 pr-2 pl-1 flex items-center h-full">
 													{contact.city || contact.state ? (
 														<div className="flex items-center gap-1 w-full">
 															{(() => {

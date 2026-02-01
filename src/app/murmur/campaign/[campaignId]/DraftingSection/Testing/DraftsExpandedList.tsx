@@ -38,6 +38,15 @@ export interface DraftsExpandedListProps {
 	contacts: ContactWithName[];
 	onHeaderClick?: () => void;
 	onOpenDrafts?: () => void;
+	/** Optional hover callback (used by Campaign "All" tab previews) */
+	onDraftHover?: (draft: EmailWithRelations | null) => void;
+	/**
+	 * When `allTab`, the component behaves like a dashboard preview:
+	 * - no row hover/selected background colors
+	 * - no header hover/click affordances
+	 * - rows still fire `onDraftHover` so the All tab can update Research + Preview
+	 */
+	interactionMode?: 'default' | 'allTab';
 	onSendingPreviewUpdate?: (args: { contactId: number; subject?: string }) => void;
 	onSendingPreviewReset?: () => void;
 	/**
@@ -167,6 +176,8 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 	contacts,
 	onHeaderClick,
 	onOpenDrafts,
+	onDraftHover,
+	interactionMode = 'default',
 	onSendingPreviewUpdate,
 	onSendingPreviewReset,
 	collapsed = false,
@@ -316,6 +327,7 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 	const isSendDisabled = selectedDraftIds.size === 0 || isSending;
 
 	const isAllTab = height === 347;
+	const isAllTabNavigation = interactionMode === 'allTab';
 	const whiteSectionHeight = customWhiteSectionHeight ?? (isAllTab ? 20 : 28);
 	const isBottomView = customWhiteSectionHeight === 15;
 	const resolvedRowWidth = rowWidth ?? 356;
@@ -502,7 +514,10 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 
 			{(isAllTab || isBottomView) && (
 				<div
-					className="absolute z-20 flex items-center gap-[12px] cursor-pointer"
+					className={cn(
+						'absolute z-20 flex items-center gap-[12px]',
+						isAllTabNavigation ? 'pointer-events-none cursor-default' : 'cursor-pointer'
+					)}
 					style={{ top: isBottomView ? 1 : -1, right: isBottomView ? 4 : 4 }}
 					onClick={onOpenDrafts}
 					role={onOpenDrafts ? 'button' : undefined}
@@ -539,13 +554,22 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 					>
 						{selectedDraftIds.size} Selected
 					</span>
-					<span
-						className="font-inter font-medium text-[10px] text-black cursor-pointer hover:underline"
-						style={{ position: 'absolute', right: '10px' }}
-						onClick={handleSelectAllToggle}
-					>
-						Select All
-					</span>
+					{isAllTabNavigation ? (
+						<span
+							className="font-inter font-medium text-[10px] text-black cursor-default"
+							style={{ position: 'absolute', right: '10px' }}
+						>
+							Select All
+						</span>
+					) : (
+						<span
+							className="font-inter font-medium text-[10px] text-black cursor-pointer hover:underline"
+							style={{ position: 'absolute', right: '10px' }}
+							onClick={handleSelectAllToggle}
+						>
+							Select All
+						</span>
+					)}
 				</div>
 			)}
 
@@ -582,6 +606,7 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 							}}
 							onMouseLeave={() => {
 								setHoveredDraftIndex(null);
+								onDraftHover?.(null);
 							}}
 						>
 						{drafts.map((draft, draftIndex) => {
@@ -602,13 +627,15 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 							// Keyboard focus shows hover UI independently of mouse hover
 							const isKeyboardFocused = hoveredDraftIndex === draftIndex;
 							// Final background: previewed > selected > keyboard focus > white (mouse hover handled by CSS)
-							const draftBgColor = isPreviewed
-								? 'bg-[#FDDEA5]'
-								: isSelected
-									? 'bg-[#FFDF9F]'
-									: isKeyboardFocused
-										? 'bg-[#F9E5BA]'
-										: 'bg-white hover:bg-[#F9E5BA]';
+							const draftBgColor = isAllTabNavigation
+								? 'bg-white'
+								: isPreviewed
+									? 'bg-[#FDDEA5]'
+									: isSelected
+										? 'bg-[#FFDF9F]'
+										: isKeyboardFocused
+											? 'bg-[#F9E5BA]'
+											: 'bg-white hover:bg-[#F9E5BA]';
 							return (
 								<div
 									key={draft.id}
@@ -620,7 +647,8 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 										}
 									}}
 									className={cn(
-										'cursor-pointer relative select-none overflow-visible rounded-[8px] border-2 border-[#000000]',
+										'relative select-none overflow-visible rounded-[8px] border-2 border-[#000000]',
+										isAllTabNavigation ? 'cursor-default' : 'cursor-pointer',
 										isBottomView
 											? 'w-[224px] h-[28px]'
 											: !hasCustomRowSize &&
@@ -640,17 +668,27 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 										if (e.shiftKey && !isPreviewMode) e.preventDefault();
 									}}
 									onMouseEnter={() => {
-										setHoveredDraftIndex(draftIndex);
+										if (!isAllTabNavigation) setHoveredDraftIndex(draftIndex);
+										onDraftHover?.(draft);
 									}}
-									onClick={(e) => handleDraftClick(draft, e)}
+									onClick={(e) => {
+										if (isAllTabNavigation) return;
+										handleDraftClick(draft, e);
+									}}
 								>
 									{/* Used-contact indicator - stacked above reject/approve when both present */}
 									{usedContactIdsSet.has(draft.contactId) && (
 										<span
 											className={cn('absolute', indicatorLeftClass)}
 											style={{
-												top: (isRejected || isApproved) ? 'calc(50% - 16px)' : '50%',
-												transform: (isRejected || isApproved) ? 'none' : 'translateY(-50%)',
+												// Align used-contact dot with the Company line.
+												// Different positioning for Drafts tab vs All tab vs bottom view.
+												top: isBottomView
+													? '50%'
+													: isAllTab
+														? 'calc(50% - 16px)'
+														: 'calc(50% - 32px)', // Drafts tab - higher
+												transform: isBottomView ? 'translateY(-50%)' : 'none',
 												width: isBottomView ? '12px' : '13px',
 												height: isBottomView ? '12px' : '13px',
 												borderRadius: '50%',
@@ -666,7 +704,15 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 											title="Marked for rejection"
 											aria-label="Rejected draft"
 											style={{
-												top: usedContactIdsSet.has(draft.contactId) ? 'calc(50% + 3px)' : '50%',
+												// When stacked under the used-contact dot, align with the Subject line.
+												// Different positioning for Drafts tab vs All tab vs bottom view.
+												top: usedContactIdsSet.has(draft.contactId)
+													? (isBottomView
+														? 'calc(50% + 3px)'
+														: isAllTab
+															? 'calc(50% + 6px)'
+															: 'calc(50% - 10px)') // Drafts tab - higher
+													: '50%',
 												transform: usedContactIdsSet.has(draft.contactId) ? 'none' : 'translateY(-50%)',
 												width: isBottomView ? '12px' : '13px',
 												height: isBottomView ? '12px' : '13px',
@@ -682,7 +728,15 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 											title="Marked for approval"
 											aria-label="Approved draft"
 											style={{
-												top: usedContactIdsSet.has(draft.contactId) ? 'calc(50% + 3px)' : '50%',
+												// When stacked under the used-contact dot, align with the Subject line.
+												// Different positioning for Drafts tab vs All tab vs bottom view.
+												top: usedContactIdsSet.has(draft.contactId)
+													? (isBottomView
+														? 'calc(50% + 3px)'
+														: isAllTab
+															? 'calc(50% + 6px)'
+															: 'calc(50% - 10px)') // Drafts tab - higher
+													: '50%',
 												transform: usedContactIdsSet.has(draft.contactId) ? 'none' : 'translateY(-50%)',
 												width: isBottomView ? '12px' : '13px',
 												height: isBottomView ? '12px' : '13px',
@@ -931,16 +985,20 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 										/* Normal view: 4-row layout */
 										<div
 											className={cn(
-												"grid grid-cols-1 grid-rows-4 h-full pl-[22px]",
+												"grid grid-cols-1 pl-[22px]",
 												// In the All tab, only the top rows need to reserve space for the fixed
 												// top-right badges. Subject/body should be able to use the full right side.
 												isAllTab ? "pr-2" : "pr-[180px]"
 											)}
+											style={{ 
+												height: '100%',
+												gridTemplateRows: 'repeat(4, 1fr)'
+											}}
 										>
 											{/* Row 1: Name */}
 											<div
 												className={cn(
-													"row-start-1 col-start-1 flex items-center h-[16px] max-[480px]:h-[12px]",
+													"row-start-1 col-start-1 flex items-center min-h-0 max-[480px]:h-[12px]",
 													isAllTab && "pr-[170px]"
 												)}
 											>
@@ -966,7 +1024,7 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 												return (
 													<div
 														className={cn(
-															"row-start-2 col-start-1 flex items-center h-[16px] max-[480px]:h-[12px]",
+															"row-start-2 col-start-1 flex items-center min-h-0 max-[480px]:h-[12px]",
 															isAllTab && "pr-[170px]"
 														)}
 													>
@@ -987,7 +1045,7 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 											{/* Row 3: Subject */}
 											<div
 												className={cn(
-													"row-start-3 col-span-1 flex items-start h-[16px] max-[480px]:h-[12px] max-[480px]:items-start max-[480px]:-mt-[2px]",
+													"row-start-3 col-span-1 flex items-start min-h-0 max-[480px]:h-[12px] max-[480px]:items-start max-[480px]:-mt-[2px]",
 													isAllTab ? "pt-[5px]" : "mt-[4px]"
 												)}
 											>
@@ -1009,7 +1067,7 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 											{/* Row 4: Message preview */}
 											<div
 												className={cn(
-													"row-start-4 col-span-1 flex items-start h-[16px] max-[480px]:h-[12px]",
+													"row-start-4 col-span-1 flex items-start min-h-0 max-[480px]:h-[12px]",
 													isAllTab && "pt-[2px]"
 												)}
 											>

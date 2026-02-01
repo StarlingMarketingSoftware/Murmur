@@ -11,6 +11,63 @@ import {
 } from '@/app/api/_utils';
 import { z } from 'zod';
 
+function escapeRegExp(input: string) {
+	return input.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function normalizeCampaignName(input: string) {
+	return input.trim().replace(/\s+/g, ' ');
+}
+
+async function getUniqueCampaignName({
+	userId,
+	desiredName,
+}: {
+	userId: string;
+	desiredName: string;
+}) {
+	const baseName = normalizeCampaignName(desiredName);
+	if (!baseName) return desiredName;
+
+	// Only consider non-deleted campaigns so users can reuse names after deleting.
+	const existingNames = await prisma.campaign.findMany({
+		where: {
+			userId,
+			status: { not: Status.deleted },
+			name: { startsWith: baseName, mode: 'insensitive' },
+		},
+		select: { name: true },
+	});
+
+	const basePattern = new RegExp(`^${escapeRegExp(baseName)}(?:\\s+(\\d+))?$`, 'i');
+
+	let baseExists = false;
+	const usedSuffixes = new Set<number>();
+
+	for (const row of existingNames) {
+		const existing = normalizeCampaignName(row.name);
+		const match = basePattern.exec(existing);
+		if (!match) continue;
+
+		const suffix = match[1];
+		if (!suffix) {
+			baseExists = true;
+			continue;
+		}
+
+		const n = Number(suffix);
+		if (Number.isInteger(n) && n > 0) {
+			usedSuffixes.add(n);
+		}
+	}
+
+	if (!baseExists) return baseName;
+
+	let next = 1;
+	while (usedSuffixes.has(next)) next += 1;
+	return `${baseName} ${next}`;
+}
+
 const postCampaignSchema = z.object({
 	name: z.string().min(1),
 	status: z.nativeEnum(Status).optional(),
@@ -39,11 +96,13 @@ export async function POST(req: NextRequest) {
 		if (!validatedData.success) {
 			return apiBadRequest(validatedData.error);
 		}
-		const { contacts, contactLists, userContactLists } = validatedData.data;
+		const { contacts, contactLists, userContactLists, name } = validatedData.data;
+		const uniqueName = await getUniqueCampaignName({ userId, desiredName: name });
 
 		const campaign = await prisma.campaign.create({
 			data: {
 				...validatedData.data,
+				name: uniqueName,
 				userId,
 				contacts: {
 					connect: contacts?.map((id) => ({ id })),

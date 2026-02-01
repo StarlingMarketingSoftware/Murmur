@@ -25,6 +25,7 @@ import { HybridPromptInputProps, useHybridPromptInput } from './useHybridPromptI
 import { WriteTabChromeHeader } from './WriteTabChromeHeader';
 import { cn } from '@/utils';
 import { DEFAULT_FONT, FONT_OPTIONS } from '@/constants/ui';
+import gsap from 'gsap';
 import React, {
 	useState,
 	FC,
@@ -257,7 +258,12 @@ const SortableAIBlock = ({
 		[form]
 	);
 	const [bookingForTab, setBookingForTab] = useState<BookingForTab>('Anytime');
+	const [hoveredBookingForTab, setHoveredBookingForTab] = useState<BookingForTab | null>(null);
+	const BOOKING_FOR_TAB_CHROME_TRANSITION = '0.6s cubic-bezier(0.22, 1, 0.36, 1)';
 	const [bookingForSeason, setBookingForSeason] = useState<BookingForSeason>('Spring');
+	const [hoveredBookingForSeason, setHoveredBookingForSeason] =
+		useState<BookingForSeason | null>(null);
+	const bookingForPreviewSeason = hoveredBookingForSeason ?? bookingForSeason;
 	const [bookingForCalendarBaseMonth, setBookingForCalendarBaseMonth] = useState<Date>(() => {
 		const now = new Date();
 		return new Date(now.getFullYear(), now.getMonth(), 1);
@@ -283,6 +289,14 @@ const SortableAIBlock = ({
 			setIsBookingForOpen(false);
 		}, 1000);
 	}, [clearBookingForCloseTimeout]);
+	useEffect(() => {
+		if (!isBookingForOpen) {
+			setHoveredBookingForTab(null);
+		}
+		if (!isBookingForOpen || bookingForTab !== 'Season') {
+			setHoveredBookingForSeason(null);
+		}
+	}, [isBookingForOpen, bookingForTab]);
 	// Used to nudge the internal 3-way tab strip inside the Calendar dropdown so it aligns
 	// with where the strip sits in the narrower Anytime/Season dropdown.
 	const [bookingForTabStripLeft, setBookingForTabStripLeft] = useState<number | null>(null);
@@ -1447,13 +1461,17 @@ const SortableAIBlock = ({
 																	className={cn(
 																		'z-[9999] rounded-[6px]',
 																		bookingForTab === 'Season'
-																			? BOOKING_FOR_SEASON_STYLES[bookingForSeason].bgClass
+																			? BOOKING_FOR_SEASON_STYLES[bookingForPreviewSeason].bgClass
 																			: 'bg-[#F5F5F5]',
 																		'border-2 border-black',
 																		'flex flex-col overflow-hidden'
 																	)}
 																	onMouseEnter={clearBookingForCloseTimeout}
-																	onMouseLeave={scheduleBookingForCloseTimeout}
+																	onMouseLeave={() => {
+																		setHoveredBookingForTab(null);
+																		setHoveredBookingForSeason(null);
+																		scheduleBookingForCloseTimeout();
+																	}}
 																	role="dialog"
 																	aria-label="Booking For"
 																>
@@ -1476,14 +1494,22 @@ const SortableAIBlock = ({
 																		)}
 																		style={!useStaticDropdownPosition && bookingForTabStripLeft != null ? { paddingLeft: bookingForTabStripLeft } : undefined}
 																	>
-																		<div className="w-[284px] grid grid-cols-3 items-center gap-[8px]">
+																		<div
+																			className="w-[284px] grid grid-cols-3 items-center gap-[8px]"
+																			onMouseLeave={() => setHoveredBookingForTab(null)}
+																		>
 																			{(['Anytime', 'Season', 'Calendar'] as const).map(
 																				(opt) => {
 																					const isSelected = bookingForTab === opt;
+																					const isDimmed =
+																						hoveredBookingForTab !== null &&
+																						hoveredBookingForTab !== opt;
+																					const isHovered = hoveredBookingForTab === opt;
 																					return (
 																						<button
 																							key={opt}
 																							type="button"
+																							onMouseEnter={() => setHoveredBookingForTab(opt)}
 																							onClick={() => {
 																								if (opt === 'Season') {
 																									setBookingForTab('Season');
@@ -1504,16 +1530,35 @@ const SortableAIBlock = ({
 																							className={cn(
 																								'h-[28px] w-[81px] rounded-[6px] font-inter text-[14px] leading-[14px] text-black',
 																								'flex items-center justify-center text-center justify-self-center',
-																								isSelected
-																									? opt === 'Season'
-																										? 'bg-[#F5F5F5] font-semibold'
-																										: 'bg-[#C2C2C2] font-semibold'
-																									: 'bg-transparent font-normal hover:bg-black/5'
+																								isSelected ? 'font-semibold' : 'font-normal'
 																							)}
+																							style={{
+																								backgroundColor: isDimmed
+																									? '#FFFFFF'
+																									: isSelected
+																										? opt === 'Season'
+																											? '#F5F5F5'
+																											: '#C2C2C2'
+																										: isHovered
+																											? 'rgba(0,0,0,0.05)'
+																											: 'transparent',
+																								boxShadow:
+																									hoveredBookingForTab !== null
+																										? 'inset 0 0 0 1px #000000'
+																										: 'inset 0 0 0 1px rgba(0,0,0,0)',
+																								transition: `background-color ${BOOKING_FOR_TAB_CHROME_TRANSITION}, box-shadow ${BOOKING_FOR_TAB_CHROME_TRANSITION}`,
+																							}}
 																							role="button"
 																							aria-pressed={isSelected}
 																						>
-																							{opt}
+																							<span
+																								style={{
+																									opacity: isDimmed ? 0 : 1,
+																									transition: `opacity ${BOOKING_FOR_TAB_CHROME_TRANSITION}`,
+																								}}
+																							>
+																								{opt}
+																							</span>
 																						</button>
 																					);
 																				}
@@ -1526,7 +1571,9 @@ const SortableAIBlock = ({
 																	<div className="flex-1 flex flex-col items-center justify-center gap-[10px] pb-[10px]">
 																		{(['Spring', 'Summer', 'Fall', 'Winter'] as const).map(
 																			(season) => {
-																				const isSelectedSeason = bookingForSeason === season;
+																				const isSelectedSeason = bookingForSeasonFromValue === season;
+																				const isHoveredSeason = hoveredBookingForSeason === season;
+																				const isActiveSeason = isSelectedSeason || isHoveredSeason;
 																				return (
 																					<button
 																						key={season}
@@ -1537,9 +1584,11 @@ const SortableAIBlock = ({
 																							setBookingForCalendarStartDate(null);
 																							setBookingForCalendarEndDate(null);
 																						}}
+																						onMouseEnter={() => setHoveredBookingForSeason(season)}
+																						onMouseLeave={() => setHoveredBookingForSeason(null)}
 																						className={cn(
 																							'font-inter text-[14px] leading-[16px]',
-																							isSelectedSeason
+																							isActiveSeason
 																								? 'font-semibold text-white'
 																								: 'font-normal text-black opacity-90 hover:opacity-100'
 																						)}
@@ -2168,13 +2217,17 @@ const SortableAIBlock = ({
 																		className={cn(
 																			'z-[9999] rounded-[6px]',
 																			bookingForTab === 'Season'
-																				? BOOKING_FOR_SEASON_STYLES[bookingForSeason].bgClass
+																				? BOOKING_FOR_SEASON_STYLES[bookingForPreviewSeason].bgClass
 																				: 'bg-[#F5F5F5]',
 																			'border-2 border-black',
 																			'flex flex-col overflow-hidden'
 																		)}
 																		onMouseEnter={clearBookingForCloseTimeout}
-																		onMouseLeave={scheduleBookingForCloseTimeout}
+																		onMouseLeave={() => {
+																			setHoveredBookingForTab(null);
+																			setHoveredBookingForSeason(null);
+																			scheduleBookingForCloseTimeout();
+																		}}
 																		role="dialog"
 																		aria-label="Booking For"
 																	>
@@ -2197,14 +2250,22 @@ const SortableAIBlock = ({
 																			)}
 																			style={!useStaticDropdownPosition && bookingForTabStripLeft != null ? { paddingLeft: bookingForTabStripLeft } : undefined}
 																		>
-																			<div className="w-[284px] grid grid-cols-3 items-center gap-[8px]">
+																			<div
+																				className="w-[284px] grid grid-cols-3 items-center gap-[8px]"
+																				onMouseLeave={() => setHoveredBookingForTab(null)}
+																			>
 																				{(['Anytime', 'Season', 'Calendar'] as const).map(
 																					(opt) => {
 																						const isSelected = bookingForTab === opt;
+																						const isDimmed =
+																							hoveredBookingForTab !== null &&
+																							hoveredBookingForTab !== opt;
+																						const isHovered = hoveredBookingForTab === opt;
 																						return (
 																							<button
 																								key={opt}
 																								type="button"
+																								onMouseEnter={() => setHoveredBookingForTab(opt)}
 																								onClick={() => {
 																									if (opt === 'Season') {
 																										setBookingForTab('Season');
@@ -2224,16 +2285,35 @@ const SortableAIBlock = ({
 																								className={cn(
 																									'h-[28px] w-[81px] rounded-[6px] font-inter text-[14px] leading-[14px] text-black',
 																									'flex items-center justify-center text-center justify-self-center',
-																									isSelected
-																										? opt === 'Season'
-																											? 'bg-[#F5F5F5] font-semibold'
-																											: 'bg-[#C2C2C2] font-semibold'
-																										: 'bg-transparent font-normal hover:bg-black/5'
+																									isSelected ? 'font-semibold' : 'font-normal'
 																								)}
+																								style={{
+																									backgroundColor: isDimmed
+																										? '#FFFFFF'
+																										: isSelected
+																											? opt === 'Season'
+																												? '#F5F5F5'
+																												: '#C2C2C2'
+																											: isHovered
+																												? 'rgba(0,0,0,0.05)'
+																												: 'transparent',
+																									boxShadow:
+																										hoveredBookingForTab !== null
+																											? 'inset 0 0 0 1px #000000'
+																											: 'inset 0 0 0 1px rgba(0,0,0,0)',
+																									transition: `background-color ${BOOKING_FOR_TAB_CHROME_TRANSITION}, box-shadow ${BOOKING_FOR_TAB_CHROME_TRANSITION}`,
+																								}}
 																								role="button"
 																								aria-pressed={isSelected}
 																							>
-																								{opt}
+																								<span
+																									style={{
+																										opacity: isDimmed ? 0 : 1,
+																										transition: `opacity ${BOOKING_FOR_TAB_CHROME_TRANSITION}`,
+																									}}
+																								>
+																									{opt}
+																								</span>
 																							</button>
 																						);
 																					}
@@ -2246,7 +2326,9 @@ const SortableAIBlock = ({
 																		<div className="flex-1 flex flex-col items-center justify-center gap-[10px] pb-[10px]">
 																			{(['Spring', 'Summer', 'Fall', 'Winter'] as const).map(
 																				(season) => {
-																					const isSelectedSeason = bookingForSeason === season;
+																					const isSelectedSeason = bookingForSeasonFromValue === season;
+																					const isHoveredSeason = hoveredBookingForSeason === season;
+																					const isActiveSeason = isSelectedSeason || isHoveredSeason;
 																					return (
 																						<button
 																							key={season}
@@ -2257,9 +2339,11 @@ const SortableAIBlock = ({
 																								setBookingForCalendarStartDate(null);
 																								setBookingForCalendarEndDate(null);
 																							}}
+																							onMouseEnter={() => setHoveredBookingForSeason(season)}
+																							onMouseLeave={() => setHoveredBookingForSeason(null)}
 																							className={cn(
 																								'font-inter text-[14px] leading-[16px]',
-																								isSelectedSeason
+																								isActiveSeason
 																									? 'font-semibold text-white'
 																									: 'font-normal text-black opacity-90 hover:opacity-100'
 																							)}
@@ -2704,6 +2788,8 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		onDraftClick,
 		isDraftDisabled,
 		onSelectAllContacts,
+		isAllContactsSelected,
+		totalContactCount = 0,
 		isNarrowDesktop,
 		isNarrowestDesktop,
 		hideDraftButton,
@@ -2735,6 +2821,29 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 
 	// Track if Custom Instructions is open (for adjusting Generate Test button position)
 	const [isLocalCustomInstructionsOpen, setIsLocalCustomInstructionsOpen] = useState(false);
+
+	// Add state for the sliding ghost button (Hybrid mode)
+	const [ghostTop, setGhostTop] = useState<number | null>(null);
+	const [isGhostVisible, setIsGhostVisible] = useState(false);
+	const hybridContainerRef = useRef<HTMLDivElement>(null);
+
+	const handleGapEnter = useCallback((el: HTMLDivElement) => {
+		if (!hybridContainerRef.current) return;
+		// Calculate relative top position
+		// We want the ghost centered on the gap.
+		// Gap element top relative to container:
+		const relativeTop = el.offsetTop;
+		const centeredTop = relativeTop + el.offsetHeight / 2;
+		// Center the 22px ghost:
+		const targetTop = centeredTop - 11; // 22/2 = 11
+
+		setGhostTop(targetTop);
+		setIsGhostVisible(true);
+	}, []);
+
+	const handleContainerLeave = useCallback(() => {
+		setIsGhostVisible(false);
+	}, []);
 
 	// Wrap the parent callback to also update local state
 	const handleCustomInstructionsOpenChange = useCallback(
@@ -3032,8 +3141,23 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 	const [linkPopoverPosition, setLinkPopoverPosition] = useState<{ top: number; left: number } | null>(null);
 
 	// Manual mode body editor ref (contentEditable)
+	const manualSubjectRef = useRef<HTMLTextAreaElement | null>(null);
 	const manualBodyEditorRef = useRef<HTMLDivElement>(null);
 	const manualBodyInitializedRef = useRef(false);
+
+	// When switching into Manual mode, start typing in Subject.
+	useEffect(() => {
+		if (selectedModeKey !== 'manual') return;
+		const el = manualSubjectRef.current;
+		if (!el) return;
+		el.focus();
+		try {
+			const len = el.value?.length ?? 0;
+			el.setSelectionRange(len, len);
+		} catch {
+			// ignore (some browsers can throw if element isn't focusable yet)
+		}
+	}, [selectedModeKey]);
 
 	// Track active formatting state
 	const [activeFormatting, setActiveFormatting] = useState({
@@ -3447,12 +3571,26 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		return isIncomplete ? 'profile' : 'main';
 	});
 
+	// Fade-in only the Profile tab's green chrome (NOT the blue main box).
+	const profileChromeRef = useRef<HTMLDivElement>(null);
+	useEffect(() => {
+		if (activeTab === 'profile' && profileChromeRef.current) {
+			gsap.killTweensOf(profileChromeRef.current);
+			gsap.fromTo(
+				profileChromeRef.current,
+				{ opacity: 0 },
+				{ opacity: 1, duration: 0.5, ease: 'power2.out' }
+			);
+		}
+	}, [activeTab]);
+
 	// Track if user has ever left the profile tab (to show red for incomplete fields after returning)
 	const [hasLeftProfileTab, setHasLeftProfileTab] = useState(false);
 
 	// Track which profile box is expanded (null = none expanded)
 	const [expandedProfileBox, setExpandedProfileBox] = useState<string | null>(null);
 	const expandedProfileBoxRef = useRef<HTMLDivElement>(null);
+	const bioTextareaRef = useRef<HTMLTextAreaElement>(null);
 
 	type IdentityProfileFields = Identity & {
 		genre?: string | null;
@@ -3471,6 +3609,16 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		bio: identityProfile?.bio || '',
 		links: identityProfile?.website || '',
 	});
+
+	// Auto-grow the Bio textarea (so the whole blue box can expand downward)
+	useLayoutEffect(() => {
+		if (activeTab !== 'profile') return;
+		if (expandedProfileBox !== 'bio') return;
+		const el = bioTextareaRef.current;
+		if (!el) return;
+		el.style.height = 'auto';
+		el.style.height = `${el.scrollHeight}px`;
+	}, [activeTab, expandedProfileBox, profileFields.bio]);
 
 	// Sync profileFields when identity changes
 	useEffect(() => {
@@ -3834,8 +3982,11 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 	};
 
 	const getProfileHeaderBg = (field: ProfileField) => {
-		if (expandedProfileBox === field) return '#E0E0E0';
-		if (profileFields[field].trim()) return '#94DB96';
+		const isFilled = !!profileFields[field].trim();
+		// Gray only when the user is actively filling an empty field.
+		// If a field is already filled, keep the green header even when reopened/expanded.
+		if (expandedProfileBox === field) return isFilled ? '#94DB96' : '#E0E0E0';
+		if (isFilled) return '#94DB96';
 		// Show red only if user has left the profile tab before
 		return hasLeftProfileTab ? '#E47979' : '#E0E0E0';
 	};
@@ -3872,6 +4023,10 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 	const handleClearAllProfileFields = () => {
 		// Close any expanded field (we are clearing values)
 		setExpandedProfileBox(null);
+
+		// Reset the "left profile tab" warning state so cleared fields go back to neutral/gray.
+		// If the user leaves the Profile tab and comes back, they'll be marked red again.
+		setHasLeftProfileTab(false);
 
 		// Name is required; keep it and clear the rest.
 		setProfileFields((prev) => ({
@@ -4295,7 +4450,14 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 													<button
 														type="button"
 														data-hover-description="Add information about yourself so you can pitch well to the contacts you're reaching out to"
-														onClick={() => setActiveTab('profile')}
+														onClick={() => {
+															if (activeTab === 'profile') {
+																setActiveTab('main');
+																setHasLeftProfileTab(true);
+															} else {
+																setActiveTab('profile');
+															}
+														}}
 														className={cn(
 															"absolute left-0 -top-[3px] h-[calc(100%+3px)] w-[130px] flex items-center justify-center font-inter font-semibold text-[13px] max-[480px]:text-[14px] z-30 cursor-pointer bg-transparent transition-colors border-r-[3px] border-r-black border-t-0 border-b-0 border-l-0",
 															activeTab === 'profile'
@@ -4663,9 +4825,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 								<div
 									className={cn(
 										'flex-1 min-h-0 flex flex-col hide-native-scrollbar relative',
-										props.clipProfileTabOverflow && activeTab === 'profile'
-											? 'overflow-y-hidden'
-											: 'overflow-y-auto',
+										activeTab === 'profile' ? 'overflow-y-hidden' : 'overflow-y-auto',
 										shouldEnableHybridPlusGutter && 'w-[calc(100%_+_90px)] -mr-[90px]'
 									)}
 									data-hpi-content
@@ -4691,29 +4851,42 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 											</div>
 											{/* Body container (380px tall) - positioned 64px below the score line */}
 											<div
-												className="flex-1 bg-[#305B31] relative flex flex-col cursor-pointer"
+												className="flex-1 relative flex flex-col cursor-pointer"
 												onClick={() => {
 													setActiveTab('main');
 													setHasLeftProfileTab(true);
 												}}
 											>
-												{/* Green top space box (122 x 34) */}
+												{/* Green chrome background fades in (blue main box does not). */}
 												<div
+													ref={profileChromeRef}
 													aria-hidden="true"
-													className="absolute left-[15px] top-[14px] w-[122px] h-[34px] rounded-[8px] border-2 border-black bg-[#305B31]"
+													className="absolute inset-0 z-0 bg-[#305B31] pointer-events-none opacity-0"
 												/>
-												<div className="w-full mt-[64px]">
+												<div className="relative z-10 flex flex-col flex-1">
+													{/* Green top space box (122 x 34) */}
+													<div
+														aria-hidden="true"
+														className="absolute left-[15px] top-[14px] w-[122px] h-[34px] rounded-[8px] border-2 border-black"
+													/>
+													<div className="w-full mt-[64px]">
 													<div
 														className={cn(
 															'relative w-full bg-[#4597DA] border-t-[3px] border-b-[3px] border-black rounded-[8px] overflow-hidden flex flex-col',
-															expandedProfileBox ? 'h-[414px]' : 'h-[380px]'
+															props.clipProfileTabOverflow
+																? expandedProfileBox
+																	? 'h-[414px]'
+																	: 'h-[380px]'
+																: expandedProfileBox
+																? 'min-h-[414px]'
+																: 'min-h-[380px]'
 														)}
 														onClick={(e) => e.stopPropagation()}
 													>
 														{/* Header band (30px fill + 3px divider) */}
 														<div className="shrink-0 h-[33px] bg-[#95CFFF] border-b-[3px] border-black flex items-center">
 															<span className="pl-4 font-inter font-semibold text-[15px] leading-none text-black">
-																Body
+																Introduce yourself
 															</span>
 															{/* Right controls: divider @ 138px from right, "Clear all" segment (89px), divider @ 49px from right */}
 															<div className="ml-auto flex items-stretch h-full">
@@ -4741,7 +4914,13 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														/>
 
 														{/* Profile fields live inside the 380px Body container */}
-														<div className="flex-1 min-h-0 overflow-y-auto hide-native-scrollbar">
+														<div
+															className={cn(
+																'flex-1',
+																props.clipProfileTabOverflow &&
+																	'min-h-0 overflow-y-auto hide-native-scrollbar'
+															)}
+														>
 															<div className="px-3 pt-[14px] pb-[14px] flex flex-col gap-[18px]">
 																<div
 																	ref={
@@ -5007,7 +5186,9 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																	}
 																	className={cn(
 																		'w-[413px] max-w-full mx-auto flex flex-col rounded-[8px] border-[3px] border-black cursor-pointer overflow-hidden',
-																		expandedProfileBox === 'bio' ? 'h-[68px]' : 'h-[34px]'
+																		expandedProfileBox === 'bio'
+																			? 'min-h-[68px]'
+																			: 'h-[34px]'
 																	)}
 																	onClick={() => handleProfileBoxToggle('bio')}
 																>
@@ -5035,9 +5216,9 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																		)}
 																	</div>
 																	{expandedProfileBox === 'bio' && (
-																		<input
-																			type="text"
-																			className="h-[34px] bg-white px-3 font-inter text-[14px] outline-none border-0"
+																		<textarea
+																			ref={bioTextareaRef}
+																			className="min-h-[34px] bg-white px-3 py-[7px] font-inter text-[14px] leading-[20px] outline-none border-0 resize-none overflow-hidden"
 																			value={profileFields.bio}
 																			onChange={(e) =>
 																				setProfileFields({
@@ -5045,6 +5226,13 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																					bio: e.target.value,
 																				})
 																			}
+																			onInput={(
+																				e: React.FormEvent<HTMLTextAreaElement>
+																			) => {
+																				const target = e.currentTarget;
+																				target.style.height = 'auto';
+																				target.style.height = `${target.scrollHeight}px`;
+																			}}
 																			onBlur={() => handleProfileFieldBlur('bio')}
 																			onKeyDown={(e) => {
 																				if (e.key === 'Enter') {
@@ -5055,6 +5243,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																			onClick={(e) => e.stopPropagation()}
 																			placeholder=""
 																			autoFocus
+																			rows={1}
 																		/>
 																	)}
 																</div>
@@ -5133,7 +5322,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 												{/* New containers below Body box */}
 												<div className="w-full flex flex-col items-center mt-[9px]">
 													{/* 472 x 93 container */}
-													<div className="relative w-[472px] h-[93px] max-w-full rounded-[8px] bg-[#305B31] border-2 border-black">
+													<div className="relative w-[472px] h-[93px] max-w-full rounded-[8px] border-2 border-black">
 														{/* Decorative inner boxes (no fill) */}
 														<div
 															aria-hidden="true"
@@ -5165,10 +5354,11 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														<div className="w-[472px] max-w-full mt-[13px]">
 															<div
 																aria-hidden="true"
-																className="w-[229px] h-[34px] rounded-[8px] bg-[#305B31] border-2 border-black"
+																className="w-[229px] h-[34px] rounded-[8px] border-2 border-black"
 															/>
 														</div>
 													)}
+												</div>
 												</div>
 											</div>
 										</div>
@@ -5208,6 +5398,10 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																	<FormControl>
 																		<Textarea
 																			{...field}
+																			ref={(el) => {
+																				field.ref(el);
+																				manualSubjectRef.current = el;
+																			}}
 																			className={cn(
 																				// Auto-expanding textarea for subject (up to 4 lines)
 																				'w-full border-0 rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 !bg-transparent p-0 min-h-[20px] leading-[20px] resize-none overflow-hidden',
@@ -6108,36 +6302,52 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														const introText = getImmediateTextAfter(HybridBlock.introduction);
 														const researchText = getImmediateTextAfter(HybridBlock.research);
 														const actionText = getImmediateTextAfter(HybridBlock.action);
+														const shouldHideAddTextButtons = Boolean(
+															expandedHybridTextBlockId || expandedHybridCoreBlockId
+														);
 
 														const AddTextGap = ({
 															height,
 															onClick,
+															onHover,
 														}: {
 															height: number;
 															onClick: () => void;
+															onHover: (el: HTMLDivElement) => void;
 														}) => (
 															<div
 																className="group relative w-full overflow-visible"
 																style={{ height }}
+																onMouseEnter={(e) => {
+																	if (shouldHideAddTextButtons) return;
+																	onHover(e.currentTarget);
+																}}
+																onMouseLeave={() => setIsGhostVisible(false)}
 															>
 																{/* Larger hover target so the +Text button is easier to reveal (without changing spacing).
-																    Starts at the pill edge (150px) so it won't interfere with the pills themselves. */}
+																	Starts at the pill edge (150px) so it won't interfere with the pills themselves. */}
 																<div
 																	aria-hidden="true"
 																	className="absolute left-[150px] top-0 w-[140px] h-[36px] z-0"
 																/>
 																<button
 																	type="button"
-																	onClick={onClick}
+																	disabled={shouldHideAddTextButtons}
+																	onClick={() => {
+																		if (shouldHideAddTextButtons) return;
+																		setIsGhostVisible(false);
+																		onClick();
+																	}}
 																	className={cn(
 																		// Place the button 17px to the right of the 150px pill:
 																		// pillWidth (150) + gap (17) = 167px
 																		'absolute left-[167px] top-1/2 -translate-y-1/2 z-10',
 																		'w-[57px] h-[22px] rounded-[4px] border border-[#0B741A] bg-[#9EDDB6]',
 																		'flex items-center justify-center gap-[5px] box-border',
-																		'opacity-0 pointer-events-none',
-																		'group-hover:opacity-100 group-hover:pointer-events-auto',
-																		'transition-opacity duration-150',
+																		'opacity-0 pointer-events-none', // Always invisible, interaction handled by ghost or direct click if we keep it
+																		// 'group-hover:opacity-100 group-hover:pointer-events-auto', // REMOVED: Managed by ghost now
+																		'pointer-events-auto cursor-pointer', // Make it clickable even if invisible
+																		shouldHideAddTextButtons && 'pointer-events-none',
 																		'font-inter font-medium text-[12px] leading-none text-black'
 																	)}
 																	aria-label="Add Text"
@@ -6163,6 +6373,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																		role="button"
 																		tabIndex={0}
 																		onClick={() => {
+																			setIsGhostVisible(false);
 																			setHybridStructureSelection({ kind: 'block', blockId: id });
 																			setExpandedHybridCoreBlockId(null);
 																			setExpandedHybridTextBlockId(id);
@@ -6170,6 +6381,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																		onKeyDown={(e) => {
 																			if (e.key === 'Enter' || e.key === ' ') {
 																				e.preventDefault();
+																				setIsGhostVisible(false);
 																				setHybridStructureSelection({
 																					kind: 'block',
 																					blockId: id,
@@ -6207,6 +6419,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																				type="button"
 																				onClick={(e) => {
 																					e.stopPropagation();
+																					setIsGhostVisible(false);
 																					setHybridStructureSelection({
 																						kind: 'block',
 																						blockId: id,
@@ -6346,6 +6559,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																		role="button"
 																		tabIndex={0}
 																		onClick={() => {
+																			setIsGhostVisible(false);
 																			setHybridStructureSelection({ kind: 'block', blockId: id });
 																			setExpandedHybridTextBlockId(null);
 																			setExpandedHybridCoreBlockId(id);
@@ -6353,6 +6567,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																		onKeyDown={(e) => {
 																			if (e.key === 'Enter' || e.key === ' ') {
 																				e.preventDefault();
+																				setIsGhostVisible(false);
 																				setHybridStructureSelection({
 																					kind: 'block',
 																					blockId: id,
@@ -6383,6 +6598,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																				type="button"
 																				onClick={(e) => {
 																					e.stopPropagation();
+																					setIsGhostVisible(false);
 																					setHybridStructureSelection({ kind: 'block', blockId: id });
 																					setExpandedHybridTextBlockId(null);
 																					setExpandedHybridCoreBlockId(id);
@@ -6492,7 +6708,32 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														};
 
 														return (
-															<div className="w-full flex flex-col items-start">
+															<div 
+																ref={hybridContainerRef}
+																className="w-full flex flex-col items-start relative"
+																onMouseLeave={handleContainerLeave}
+															>
+																{/* Sliding Ghost Button */}
+																<div
+																	aria-hidden="true"
+																	className={cn(
+																		'absolute left-[167px] z-20 pointer-events-none',
+																		'w-[57px] h-[22px] rounded-[4px] border border-[#0B741A] bg-[#9EDDB6]',
+																		'flex items-center justify-center gap-[5px] box-border',
+																		'font-inter font-medium text-[12px] leading-none text-black',
+																		'transition-all duration-200 ease-out', // Smooth sliding
+																		!shouldHideAddTextButtons && isGhostVisible
+																			? 'opacity-100 scale-100'
+																			: 'opacity-0 scale-95'
+																	)}
+																	style={{
+																		top: ghostTop ?? 0,
+																	}}
+																>
+																	<span className="text-[12px] leading-[12px]">+</span>
+																	<span className="text-[12px] leading-[12px]">Text</span>
+																</div>
+
 																{/* Subject -> Intro gap: 17px (no +Text) */}
 																<div className="h-[17px]" />
 
@@ -6520,6 +6761,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																		onClick={() =>
 																			openOrCreateTextAfter(HybridBlock.introduction)
 																		}
+																		onHover={handleGapEnter}
 																	/>
 																)}
 
@@ -6545,6 +6787,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																	<AddTextGap
 																		height={12}
 																		onClick={() => openOrCreateTextAfter(HybridBlock.research)}
+																		onHover={handleGapEnter}
 																	/>
 																)}
 
@@ -6570,6 +6813,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																	<AddTextGap
 																		height={15}
 																		onClick={() => openOrCreateTextAfter(HybridBlock.action)}
+																		onHover={handleGapEnter}
 																	/>
 																)}
 															</div>
@@ -7460,65 +7704,109 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 										</div>
 								  )}
 						</div>
-						{!compactLeftOnly && !isPendingGeneration && !hideDraftButton && (
+						{!compactLeftOnly && !hideDraftButton && (
 							<div
+								data-draft-button-container
 								className={cn(
 									'group relative h-[40px] mt-4 mx-auto',
 									isNarrowDesktop
 										? 'w-full max-w-[691px] px-4'
 										: isNarrowestDesktop
-										? 'w-full max-w-[407px]'
-										: 'w-[475px]'
+											? 'w-full max-w-[407px]'
+											: 'w-[475px]'
 								)}
 							>
-								{draftCount > 0 ? (
+								{!isPendingGeneration && (
 									<>
-										<button
-											type="button"
-											onClick={() => {
-												if (!isDraftDisabled) {
-													onDraftClick?.();
-												}
-											}}
-											disabled={isDraftDisabled}
-											className={cn(
-												'w-full h-full rounded-[4px] border-[3px] text-black font-inter font-normal text-[17px]',
-												isDraftDisabled
-													? 'bg-[#E0E0E0] border-[#A0A0A0] cursor-not-allowed opacity-60'
-													: 'bg-[#C7F2C9] border-[#349A37] hover:bg-[#B9E7BC] cursor-pointer'
-											)}
-										>
-											Draft {draftCount} {draftCount === 1 ? 'Contact' : 'Contacts'}
-										</button>
-										{/* Right section "All" button */}
-										<button
-											type="button"
-											data-hover-description="See all the tabs here"
-											className="absolute right-[3px] top-[3px] bottom-[3px] w-[62px] bg-[#74D178] rounded-r-[1px] flex items-center justify-center font-inter font-normal text-[17px] text-black hover:bg-[#65C269] cursor-pointer border-0 border-l-[2px] border-[#349A37] z-10"
-											onClick={() => {
-												onSelectAllContacts?.();
-											}}
-										>
-											All
-										</button>
+										{draftCount > 0 || isAllContactsSelected ? (
+											// Animated draft button with expanding "All" state
+											<button
+												type="button"
+												onClick={() => {
+													if (!isDraftDisabled) {
+														onDraftClick?.();
+													}
+												}}
+												disabled={isDraftDisabled}
+												className={cn(
+													'w-full h-full rounded-[4px] border-[3px] text-black font-inter font-normal text-[17px] relative overflow-hidden transition-colors',
+													isAllContactsSelected ? 'duration-300' : 'duration-0',
+													isDraftDisabled
+														? 'bg-[#E0E0E0] border-[#A0A0A0] cursor-not-allowed opacity-60'
+														: isAllContactsSelected
+															? 'bg-[#4DC669] border-black hover:bg-[#45B85F] cursor-pointer'
+															: 'bg-[#C7F2C9] border-[#349A37] hover:bg-[#B9E7BC] cursor-pointer'
+												)}
+											>
+												{/* Normal text - fades out when All selected */}
+												<span
+													className={cn(
+														'transition-opacity',
+														isAllContactsSelected
+															? 'duration-300 opacity-0'
+															: 'duration-0 opacity-100'
+													)}
+												>
+													Draft {draftCount} {draftCount === 1 ? 'Contact' : 'Contacts'}
+												</span>
+												{/* "All" text - fades in when All selected */}
+												<span
+													className={cn(
+														'absolute inset-0 flex items-center justify-center transition-opacity',
+														isAllContactsSelected
+															? 'duration-300 opacity-100'
+															: 'duration-0 opacity-0'
+													)}
+												>
+													Draft <span className="font-bold mx-1">All</span> {totalContactCount}{' '}
+													Contacts
+												</span>
+												{/* Expanding green overlay from right - animates width */}
+												<div
+													className={cn(
+														'absolute top-0 bottom-0 right-0 bg-[#4DC669] ease-out',
+														isAllContactsSelected
+															? 'w-full rounded-[1px] transition-all duration-300'
+															: 'w-[62px] rounded-r-[1px] transition-none'
+													)}
+													style={{
+														opacity: isAllContactsSelected ? 0 : 1,
+													}}
+												/>
+											</button>
+										) : (
+											<div className="relative w-full h-full rounded-[4px] border-[3px] border-transparent overflow-hidden transition-colors group-hover:bg-[#EEF5EF] group-hover:border-black">
+												<div className="w-full h-full flex items-center justify-center text-black font-inter font-normal text-[17px] cursor-default">
+													Select Contacts and Draft Emails
+												</div>
+												<button
+													type="button"
+													aria-label="Select all contacts"
+													className="absolute right-0 top-0 bottom-0 w-[62px] bg-[#74D178] rounded-r-[1px] flex items-center justify-center font-inter font-normal text-[17px] text-black hover:bg-[#65C269] cursor-pointer z-10 opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto"
+													onClick={() => {
+														onSelectAllContacts?.();
+													}}
+												>
+													<div className="absolute left-0 top-0 bottom-0 w-[3px] bg-black" />
+													All
+												</button>
+											</div>
+										)}
+										{/* "All" button overlay - only visible when not all selected */}
+										{(draftCount > 0 || isAllContactsSelected) && !isAllContactsSelected && (
+											<button
+												type="button"
+												data-hover-description="Select all contacts"
+												className="absolute right-[3px] top-[3px] bottom-[3px] w-[62px] bg-[#74D178] rounded-r-[1px] flex items-center justify-center font-inter font-normal text-[17px] text-black hover:bg-[#65C269] cursor-pointer border-0 border-l-[2px] border-[#349A37] z-10"
+												onClick={(e) => {
+													e.stopPropagation();
+													onSelectAllContacts?.();
+												}}
+											>
+												All
+											</button>
+										)}
 									</>
-								) : (
-									<div className="relative w-full h-full rounded-[4px] border-[3px] border-transparent overflow-hidden transition-colors group-hover:bg-[#EEF5EF] group-hover:border-black">
-										<div className="w-full h-full flex items-center justify-center text-black font-inter font-normal text-[17px] cursor-default">
-											Select Contacts and Draft Emails
-										</div>
-										<button
-											type="button"
-											aria-label="Select all contacts"
-											className="absolute right-0 top-0 bottom-0 w-[62px] bg-[#74D178] rounded-r-[1px] flex items-center justify-center font-inter font-normal text-[17px] text-black hover:bg-[#65C269] cursor-pointer z-10 opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto"
-											onClick={() => {
-												onSelectAllContacts?.();
-											}}
-										>
-											<div className="absolute left-0 top-0 bottom-0 w-[3px] bg-black" />
-											All
-										</button>
-									</div>
 								)}
 							</div>
 						)}

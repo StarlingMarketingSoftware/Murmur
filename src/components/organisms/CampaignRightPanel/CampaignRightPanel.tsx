@@ -9,11 +9,17 @@ import SentPanel from '@/components/atoms/_svg/SentPanel';
 import InboxPanel from '@/components/atoms/_svg/InboxPanel';
 import { cn } from '@/utils';
 
-type CampaignRightPanelTab = 'contacts' | 'testing' | 'drafting' | 'sent' | 'inbox';
+type CampaignRightPanelTab = 'contacts' | 'testing' | 'drafting' | 'sent' | 'inbox' | 'all';
 
 interface CampaignRightPanelProps {
 	className?: string;
 	view?: 'contacts' | 'testing' | 'drafting' | 'sent' | 'inbox' | 'all';
+	/**
+	 * Optional override for which tab should be visually highlighted/active.
+	 * Useful when the main view is "inbox" but we want to highlight the "sent" icon
+	 * (Inbox -> Sent sub-view).
+	 */
+	activeTab?: CampaignRightPanelTab;
 	onTabChange?: (tab: CampaignRightPanelTab) => void;
 	/**
 	 * Duration (ms) used to animate the active highlight between tabs.
@@ -33,6 +39,7 @@ const ACTIVE_HIGHLIGHT_HEIGHT_PX = 72;
 export const CampaignRightPanel: FC<CampaignRightPanelProps> = ({
 	className,
 	view,
+	activeTab,
 	onTabChange,
 	transitionDurationMs = 180,
 	isViewTransitionFading,
@@ -72,6 +79,8 @@ export const CampaignRightPanel: FC<CampaignRightPanelProps> = ({
 	};
 	
 	const leftPosition = getLeftPosition();
+	// Visual state: allow overriding which icon is considered "active".
+	const visualView = activeTab ?? view;
 
 	// Animate position changes with the same timing/ease as the Inbox morphs (GSAP `power2.inOut`).
 	// We update `left` immediately, then use a FLIP-style `x` transform so motion stays crisp and
@@ -186,7 +195,7 @@ export const CampaignRightPanel: FC<CampaignRightPanelProps> = ({
 	}, [isViewTransitionFading, transitionDurationMs]);
 
 	const getActiveTabEl = useCallback((): HTMLDivElement | null => {
-		switch (view) {
+		switch (visualView) {
 			case 'contacts':
 				return contactsRef.current;
 			case 'testing':
@@ -200,7 +209,7 @@ export const CampaignRightPanel: FC<CampaignRightPanelProps> = ({
 			default:
 				return null;
 		}
-	}, [view]);
+	}, [visualView]);
 
 	const positionActiveHighlight = useCallback(
 		(shouldAnimate: boolean) => {
@@ -278,7 +287,7 @@ export const CampaignRightPanel: FC<CampaignRightPanelProps> = ({
 		const shouldAnimate = hasPositionedHighlightOnceRef.current;
 		positionActiveHighlight(shouldAnimate);
 		hasPositionedHighlightOnceRef.current = true;
-	}, [positionActiveHighlight, view]);
+	}, [positionActiveHighlight, visualView]);
 
 	useLayoutEffect(() => {
 		if (typeof window === 'undefined') return;
@@ -316,7 +325,7 @@ export const CampaignRightPanel: FC<CampaignRightPanelProps> = ({
 		>
 			<div
 				ref={listRef}
-				className="relative flex flex-col items-center overflow-visible pt-[140px]"
+				className="group relative flex flex-col items-center overflow-visible pt-[140px]"
 				data-hover-description="Side panel navigation; get to other tabs with this"
 			>
 				{/* Single active highlight that slides between tabs (instead of teleporting) */}
@@ -338,29 +347,32 @@ export const CampaignRightPanel: FC<CampaignRightPanelProps> = ({
 						opacity: 0,
 					}}
 				/>
-				{/* Border box for All tab - centered around the 6 SVG icons */}
-				{view === 'all' && (
-					<div
-						style={{
-							position: 'absolute',
-							top: '122px',
-							left: '50%',
-							transform: 'translateX(-50%)',
-							width: '112px',
-							height: '450px',
-							backgroundColor: 'transparent',
-							borderRadius: '8px',
-							border: '2px solid #D0D0D0',
-							zIndex: -1,
-						}}
-					/>
-				)}
+				{/* Hover hitbox so the border appears when hovering the *panel area* (not just icons) */}
+				<div
+					className="absolute top-[122px] left-1/2 -translate-x-1/2 w-[112px] h-[450px] bg-transparent pointer-events-auto cursor-pointer z-[1]"
+					onClick={() => onTabChange?.('all')}
+					title="All"
+				/>
+				{/* Border box (default in All, hover in any tab) */}
+				<div
+					aria-hidden="true"
+					className={cn(
+						'absolute top-[122px] left-1/2 -translate-x-1/2',
+						'w-[112px] h-[450px]',
+						'rounded-lg border-2 border-[#D0D0D0] bg-transparent',
+						'transition-opacity duration-150',
+						'pointer-events-none',
+						view === 'all' ? 'opacity-100' : 'opacity-0',
+						'group-hover:opacity-100'
+					)}
+					style={{ zIndex: -1 }}
+				/>
 				<div 
 					ref={contactsRef}
 					className="relative z-10 flex items-center justify-center pointer-events-auto cursor-pointer"
 					onClick={() => onTabChange?.('contacts')}
 				>
-					<ContactsPanel style={{ display: 'block', position: 'relative', opacity: view === 'testing' || view === 'drafting' || view === 'sent' || view === 'inbox' ? 0.3 : 1 }} />
+					<ContactsPanel style={{ display: 'block', position: 'relative', opacity: visualView === 'testing' || visualView === 'drafting' || visualView === 'sent' || visualView === 'inbox' ? 0.3 : 1 }} />
 				</div>
 				<div 
 					ref={testingRef}
@@ -368,7 +380,7 @@ export const CampaignRightPanel: FC<CampaignRightPanelProps> = ({
 					style={{ marginTop: '25px' }}
 					onClick={() => onTabChange?.('testing')}
 				>
-					<WritingPanel style={{ display: 'block', position: 'relative', opacity: view === 'contacts' || view === 'drafting' || view === 'sent' || view === 'inbox' ? 0.3 : 1 }} />
+					<WritingPanel style={{ display: 'block', position: 'relative', opacity: visualView === 'contacts' || visualView === 'drafting' || visualView === 'sent' || visualView === 'inbox' ? 0.3 : 1 }} />
 				</div>
 				<div 
 					ref={draftingRef}
@@ -376,15 +388,7 @@ export const CampaignRightPanel: FC<CampaignRightPanelProps> = ({
 					style={{ marginTop: '25px' }}
 					onClick={() => onTabChange?.('drafting')}
 				>
-					<DraftsPanel style={{ display: 'block', position: 'relative', opacity: view === 'contacts' || view === 'testing' || view === 'sent' || view === 'inbox' ? 0.3 : 1 }} />
-				</div>
-				<div 
-					ref={sentRef}
-					className="relative z-10 flex items-center justify-center pointer-events-auto cursor-pointer"
-					style={{ marginTop: '25px' }}
-					onClick={() => onTabChange?.('sent')}
-				>
-					<SentPanel style={{ display: 'block', position: 'relative', opacity: view === 'contacts' || view === 'testing' || view === 'drafting' || view === 'inbox' ? 0.3 : 1 }} />
+					<DraftsPanel style={{ display: 'block', position: 'relative', opacity: visualView === 'contacts' || visualView === 'testing' || visualView === 'sent' || visualView === 'inbox' ? 0.3 : 1 }} />
 				</div>
 				<div 
 					ref={inboxRef}
@@ -392,7 +396,15 @@ export const CampaignRightPanel: FC<CampaignRightPanelProps> = ({
 					style={{ marginTop: '25px' }}
 					onClick={() => onTabChange?.('inbox')}
 				>
-					<InboxPanel style={{ display: 'block', position: 'relative', opacity: view === 'contacts' || view === 'testing' || view === 'drafting' || view === 'sent' ? 0.3 : 1 }} />
+					<InboxPanel style={{ display: 'block', position: 'relative', opacity: visualView === 'contacts' || visualView === 'testing' || visualView === 'drafting' || visualView === 'sent' ? 0.3 : 1 }} />
+				</div>
+				<div 
+					ref={sentRef}
+					className="relative z-10 flex items-center justify-center pointer-events-auto cursor-pointer"
+					style={{ marginTop: '25px' }}
+					onClick={() => onTabChange?.('sent')}
+				>
+					<SentPanel style={{ display: 'block', position: 'relative', opacity: visualView === 'contacts' || visualView === 'testing' || visualView === 'drafting' || visualView === 'inbox' ? 0.3 : 1 }} />
 				</div>
 			</div>
 		</div>

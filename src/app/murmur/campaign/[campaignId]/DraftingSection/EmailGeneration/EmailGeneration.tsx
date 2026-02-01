@@ -238,11 +238,20 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 	);
 
 	// Custom send handler without dialog dependencies
-	const handleSend = async () => {
-		const selectedDrafts =
-			selectedDraftIds.size > 0
+	// If `draftIds` is provided, only those drafts are sent (used by draft-review "Send" buttons).
+	const handleSend = async (draftIds?: Iterable<number>) => {
+		const explicitIds = draftIds ? new Set(Array.from(draftIds)) : null;
+
+		const selectedDrafts = explicitIds
+			? draftEmails.filter((d) => explicitIds.has(d.id))
+			: selectedDraftIds.size > 0
 				? draftEmails.filter((d) => selectedDraftIds.has(d.id))
-				: draftEmails;
+				: [];
+
+		if (selectedDrafts.length === 0) {
+			toast.error('Select emails to send.');
+			return;
+		}
 
 		if (!campaign?.identity?.email || !campaign?.identity?.name) {
 			toast.error('Please create an Identity before sending emails.');
@@ -405,9 +414,11 @@ export const EmailGeneration: FC<EmailGenerationProps> = (props) => {
 						{/* Tables container - positioned at bottom; order-controlled swapping */}
 						<div className="absolute left-[19px] right-[19px] flex flex-row justify-center gap-x-10 top-[50px] overflow-visible">
 							{(() => {
-								const draftedContactIds = new Set(draftEmails.map((d) => d.contactId));
+								const contactedContactIds = new Set(
+									[...draftEmails, ...sentEmails].map((e) => e.contactId)
+								);
 								const availableContacts = contacts.filter(
-									(c) => !draftedContactIds.has(c.id)
+									(c) => !contactedContactIds.has(c.id)
 								);
 
 								const boxContentById = {

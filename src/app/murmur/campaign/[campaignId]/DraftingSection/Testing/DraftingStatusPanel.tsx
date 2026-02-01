@@ -149,13 +149,13 @@ export const DraftingStatusPanel: FC<DraftingStatusPanelProps> = (props) => {
 		[emails]
 	);
 
-	const draftedContactIds = useMemo(
-		() => new Set(draftedEmails.map((e) => e.contactId)),
-		[draftedEmails]
+	const contactedContactIds = useMemo(
+		() => new Set([...draftedEmails, ...sentEmails].map((e) => e.contactId)),
+		[draftedEmails, sentEmails]
 	);
 	const availableContacts = useMemo(
-		() => (contacts || []).filter((c) => !draftedContactIds.has(c.id)),
-		[contacts, draftedContactIds]
+		() => (contacts || []).filter((c) => !contactedContactIds.has(c.id)),
+		[contacts, contactedContactIds]
 	);
 	const contactsCount = availableContacts.length;
 	const draftsCount = draftedEmails.length;

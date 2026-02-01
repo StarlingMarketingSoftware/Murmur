@@ -75,6 +75,16 @@ export interface ContactsSelectionProps {
 	 * Defaults to true to preserve existing behavior in non-campaign contexts.
 	 */
 	showSearchBar?: boolean;
+	/**
+	 * Optional: indicates if "All" contacts are currently selected via the "All" button.
+	 * When true, the draft button shows the special green "Draft All X Contacts" state.
+	 */
+	isAllContactsSelected?: boolean;
+	/**
+	 * Optional: callback for when the "All" button is clicked.
+	 * This should handle the logic of selecting all contacts and setting the isAllContactsSelected state.
+	 */
+	onSelectAllContacts?: () => void;
 }
 
 export const useContactsSelection = (props: ContactsSelectionProps) => {

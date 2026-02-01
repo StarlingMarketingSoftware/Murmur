@@ -59,6 +59,16 @@ interface FullAutoBodyBlockProps {
 type BookingForTab = 'Anytime' | 'Season' | 'Calendar';
 type BookingForSeason = 'Spring' | 'Summer' | 'Fall' | 'Winter';
 
+const BOOKING_FOR_SEASON_STYLES: Record<BookingForSeason, { bgClass: string; textClass: string }> = {
+	Spring: { bgClass: 'bg-[#9BD2FF]', textClass: 'text-black' },
+	Summer: { bgClass: 'bg-[#7ADF85]', textClass: 'text-black' },
+	Fall: { bgClass: 'bg-[#D77C2C]', textClass: 'text-white' },
+	Winter: { bgClass: 'bg-[#1960AC]', textClass: 'text-white' },
+};
+
+const isBookingForSeason = (value: string): value is BookingForSeason =>
+	value === 'Spring' || value === 'Summer' || value === 'Fall' || value === 'Winter';
+
 type ProfileChipItem = {
 	key: string;
 	text: string;
@@ -98,6 +108,13 @@ export const FullAutoBodyBlock: FC<FullAutoBodyBlockProps> = ({
 	// Full Auto: Booking For dropdown
 	const [isBookingForOpen, setIsBookingForOpen] = useState(false);
 	const bookingForValue = form.watch('bookingFor') || 'Anytime';
+	const bookingForSeasonFromValue = isBookingForSeason(bookingForValue) ? bookingForValue : null;
+	const bookingForTriggerBgClass = bookingForSeasonFromValue
+		? BOOKING_FOR_SEASON_STYLES[bookingForSeasonFromValue].bgClass
+		: 'bg-white';
+	const bookingForTriggerTextClass = bookingForSeasonFromValue
+		? BOOKING_FOR_SEASON_STYLES[bookingForSeasonFromValue].textClass
+		: 'text-black';
 	const setBookingForValue = useCallback(
 		(value: string) => {
 			form.setValue('bookingFor', value, { shouldDirty: true });
@@ -424,7 +441,7 @@ export const FullAutoBodyBlock: FC<FullAutoBodyBlockProps> = ({
 	const promptScoreFillPercent = clampedPromptScore == null ? 0 : clampedPromptScore;
 
 	const BookingForControl = () => (
-		<div ref={bookingForContainerRef} className="relative mt-[10px]">
+		<div ref={bookingForContainerRef} className="relative mt-[10px] w-full">
 			<button
 				ref={bookingForButtonRef}
 				type="button"
@@ -462,16 +479,31 @@ export const FullAutoBodyBlock: FC<FullAutoBodyBlockProps> = ({
 
 					setIsBookingForOpen(true);
 				}}
-				className="min-w-[203px] h-[28px] bg-white rounded-[8px] border-2 border-black inline-flex items-center justify-between gap-2 px-4 whitespace-nowrap"
+				className={cn(
+					'w-full h-[28px] rounded-[8px] border-2 border-black flex items-center px-4 whitespace-nowrap',
+					bookingForTriggerBgClass
+				)}
 				aria-haspopup="dialog"
 				aria-expanded={isBookingForOpen}
 			>
-				<span className="font-inter font-normal text-[14px] leading-[14px] text-black whitespace-nowrap">
-					Booking For
-				</span>
-				<span className="font-inter font-bold text-[14px] leading-[14px] text-black mr-1 whitespace-nowrap">
-					{bookingForValue}
-				</span>
+				<div className="inline-flex min-w-[203px] items-center justify-between gap-2 pr-12">
+					<span
+						className={cn(
+							'font-inter font-normal text-[14px] leading-[14px] whitespace-nowrap',
+							bookingForTriggerTextClass
+						)}
+					>
+						Booking For
+					</span>
+					<span
+						className={cn(
+							'font-inter font-bold text-[14px] leading-[14px] mr-1 whitespace-nowrap',
+							bookingForTriggerTextClass
+						)}
+					>
+						{bookingForValue}
+					</span>
+				</div>
 			</button>
 
 			{isBookingForOpen &&
@@ -936,7 +968,7 @@ export const FullAutoBodyBlock: FC<FullAutoBodyBlockProps> = ({
 	return (
 		<div
 			className={cn(
-				'relative rounded-md overflow-visible border border-gray-300 bg-[#51A2E4]',
+				'relative rounded-md overflow-visible border border-[#51A2E4] bg-[#51A2E4]',
 				constrainHeight
 					? 'h-[233px] flex flex-col'
 					: isCustomInstructionsOpen
@@ -949,7 +981,12 @@ export const FullAutoBodyBlock: FC<FullAutoBodyBlockProps> = ({
 			{/* Header background fill (Body + power mode toggles) */}
 			<div className={cn('w-full', isEmbedded ? 'p-0' : 'px-1 pt-1 pb-1')}>
 				<div className={cn(!isEmbedded && 'rounded-t-[6px] overflow-hidden')}>
-					<div className="h-[27px] bg-[#B9DAF5] flex items-stretch">
+					<div
+						className={cn(
+							'h-[27px] flex items-stretch transition-colors duration-75 ease-out',
+							selectedPowerMode === 'high' ? 'bg-[#95CFFF]' : 'bg-[#58A6E5]'
+						)}
+					>
 						{/* Body label section */}
 						<div className="flex-1 flex items-center pl-[16px]">
 							<Typography
@@ -959,65 +996,51 @@ export const FullAutoBodyBlock: FC<FullAutoBodyBlockProps> = ({
 								Body
 							</Typography>
 						</div>
-						{/* Divider - black when Normal Power selected */}
-						<div
-							className={cn(
-								'w-[1px] flex-shrink-0 transition-colors',
-								selectedPowerMode === 'normal' ? 'bg-[#000000]' : 'bg-[#51A2E4]'
-							)}
-						/>
-						{/* Normal Power section */}
+						{/* Divider (only when Standard is selected) */}
+						{selectedPowerMode === 'normal' && (
+							<div className="w-[1px] flex-shrink-0 bg-[#000000]" />
+						)}
+						{/* Standard Power section */}
 						<button
 							type="button"
 							onClick={() => setSelectedPowerMode('normal')}
 							className={cn(
-								'w-[101px] flex items-center justify-center cursor-pointer border-0 p-0 m-0 transition-colors flex-shrink-0 outline-none focus:outline-none',
-								selectedPowerMode === 'normal' ? 'bg-[#8DBFE8]' : 'bg-transparent'
+								'h-full flex items-center justify-center cursor-pointer border-0 p-0 m-0 flex-shrink-0 outline-none focus:outline-none whitespace-nowrap transition-[background-color,width] duration-75 ease-out',
+								selectedPowerMode === 'high' ? 'w-[108px]' : 'w-[132px]',
+								selectedPowerMode === 'normal' ? 'bg-[#88C5F7]' : 'bg-transparent'
 							)}
 						>
 							<span
-								className={cn(
-									'font-inter font-normal italic text-[14px] transition-colors',
-									selectedPowerMode === 'normal' ? 'text-[#000000]' : 'text-[#9E9E9E]'
-								)}
+								className="font-inter font-normal italic text-[14px] max-[480px]:text-[12px] text-[#000000]"
 							>
-								Normal Power
+								{selectedPowerMode === 'high' ? 'Standard' : 'Standard Power'}
 							</span>
 						</button>
-						{/* Divider - black when either Normal Power or High selected */}
-						<div
-							className={cn(
-								'w-[1px] flex-shrink-0 transition-colors',
-								selectedPowerMode === 'normal' || selectedPowerMode === 'high'
-									? 'bg-[#000000]'
-									: 'bg-[#51A2E4]'
-							)}
-						/>
+						{/* Divider */}
+						<div className="w-[1px] flex-shrink-0 bg-[#000000]" />
 						{/* High section */}
 						<button
 							type="button"
 							onClick={() => setSelectedPowerMode('high')}
 							className={cn(
-								'w-[46px] flex items-center justify-center cursor-pointer border-0 p-0 m-0 transition-colors flex-shrink-0 outline-none focus:outline-none',
-								selectedPowerMode === 'high' ? 'bg-[#8DBFE8]' : 'bg-transparent'
+								'h-full flex items-center justify-center cursor-pointer border-0 p-0 m-0 flex-shrink-0 outline-none focus:outline-none whitespace-nowrap transition-[background-color,width] duration-75 ease-out',
+								selectedPowerMode === 'high' ? 'w-[100px]' : 'w-[46px]',
+								selectedPowerMode === 'high' ? 'bg-[#58A6E5]' : 'bg-transparent'
 							)}
 						>
 							<span
 								className={cn(
-									'font-inter font-normal italic text-[14px] transition-colors',
-									selectedPowerMode === 'high' ? 'text-[#000000]' : 'text-[#9E9E9E]'
+									'font-inter font-normal italic text-[14px] max-[480px]:text-[12px] transition-colors duration-75 ease-out',
+									selectedPowerMode === 'high' ? 'text-[#FFFFFF]' : 'text-[#000000]'
 								)}
 							>
-								High
+								{selectedPowerMode === 'high' ? 'High Power' : 'High'}
 							</span>
 						</button>
-						{/* Divider - black when High selected */}
-						<div
-							className={cn(
-								'w-[1px] flex-shrink-0 transition-colors',
-								selectedPowerMode === 'high' ? 'bg-[#000000]' : 'bg-[#51A2E4]'
-							)}
-						/>
+						{/* Divider (only when High is selected) */}
+						{selectedPowerMode === 'high' && (
+							<div className="w-[1px] flex-shrink-0 bg-[#000000]" />
+						)}
 						{/* Right empty section */}
 						<div className="w-[31px] flex-shrink-0" />
 					</div>
@@ -1027,13 +1050,16 @@ export const FullAutoBodyBlock: FC<FullAutoBodyBlockProps> = ({
 			{/* Body content */}
 			<div
 				className={cn(
-					'min-h-[60px] w-full px-1 pb-1',
+					'min-h-[60px] w-full',
+					isEmbedded ? 'px-0 pb-0' : 'px-1 pb-1',
 					constrainHeight && 'flex-1 min-h-0'
 				)}
 			>
 				<div
 					className={cn(
-						'w-full bg-[#58A6E5] rounded-b-[6px] p-2 flex justify-center',
+						'w-full p-2 flex justify-center transition-colors duration-75 ease-out',
+						!isEmbedded && 'rounded-b-[6px]',
+						selectedPowerMode === 'high' ? 'bg-[#58A6E5]' : 'bg-[#88C5F7]',
 						constrainHeight && 'h-full overflow-y-auto'
 					)}
 				>
@@ -1092,9 +1118,12 @@ export const FullAutoBodyBlock: FC<FullAutoBodyBlockProps> = ({
 											type="button"
 											onClick={() => setIsCustomInstructionsOpen(true)}
 											className={cn(
-												'w-[157px] h-[22px] bg-[#95CFFF] rounded-[8px] border-2 border-black',
-												'flex items-center justify-center gap-1 px-2',
-												'font-inter font-semibold text-[11px] leading-none text-black',
+												'w-full h-[22px] rounded-[8px] border-2 border-black transition-colors duration-75 ease-out',
+												selectedPowerMode === 'high'
+													? 'bg-[#58A6E5]'
+													: 'bg-[#88C5F7]',
+												'flex items-center justify-start gap-1 px-4 max-[480px]:gap-[2px] max-[480px]:px-3',
+												'font-inter font-semibold text-[11px] max-[480px]:text-[9px] leading-none text-black whitespace-nowrap',
 												'hover:brightness-[0.98] active:brightness-[0.95]'
 											)}
 											aria-label="Custom Instructions"
@@ -1110,12 +1139,15 @@ export const FullAutoBodyBlock: FC<FullAutoBodyBlockProps> = ({
 									<div
 										className={cn(
 											'w-full rounded-[8px] border-2 border-black overflow-hidden',
-											'flex flex-col bg-[#95CFFF]'
+											'flex flex-col transition-colors duration-75 ease-out',
+											selectedPowerMode === 'high'
+												? 'bg-[#58A6E5]'
+												: 'bg-[#88C5F7]'
 										)}
 										aria-label="Custom Instructions"
 									>
 										<div className="h-[22px] flex items-center justify-between px-2">
-											<span className="font-inter font-semibold text-[11px] leading-none text-black">
+											<span className="font-inter font-semibold text-[11px] max-[480px]:text-[9px] leading-none text-black whitespace-nowrap">
 												Custom Instructions
 											</span>
 											<button
@@ -1164,9 +1196,9 @@ export const FullAutoBodyBlock: FC<FullAutoBodyBlockProps> = ({
 											/>
 										</div>
 										{/* Prompt rating + Upscale controls */}
-										<div className="h-[23px] bg-white px-3 flex items-start gap-[6px]">
+										<div className="h-[22px] bg-[#F0F0F0] px-3 flex items-start justify-end gap-[6px]">
 											{/* Score (159 x 20) */}
-											<div className="w-[159px] h-[20px] box-border bg-[#D7F0FF] border-2 border-black rounded-[8px] flex items-center gap-[6px] px-[6px]">
+											<div className="w-[159px] h-[20px] box-border bg-transparent border-2 border-transparent rounded-[8px] flex items-center gap-[6px] px-[6px]">
 												<div className="w-[92px] h-[12px] box-border bg-white border-2 border-black rounded-[8px] overflow-hidden shrink-0">
 													<div
 														className="h-full bg-[#36B24A] rounded-full transition-[width] duration-200"
@@ -1188,7 +1220,7 @@ export const FullAutoBodyBlock: FC<FullAutoBodyBlockProps> = ({
 												}}
 												disabled={!hasPreviousPrompt}
 												className={cn(
-													'w-[20px] h-[20px] box-border rounded-[6px] border-2 border-black bg-[#D7F0FF] flex items-center justify-center p-0',
+													'w-[20px] h-[20px] box-border rounded-[6px] border-2 border-transparent bg-transparent flex items-center justify-center p-0',
 													hasPreviousPrompt
 														? 'cursor-pointer hover:brightness-[0.98] active:brightness-[0.95]'
 														: 'cursor-not-allowed'
@@ -1209,7 +1241,7 @@ export const FullAutoBodyBlock: FC<FullAutoBodyBlockProps> = ({
 												}}
 												disabled={!onUpscalePrompt || Boolean(isUpscalingPrompt)}
 												className={cn(
-													'w-[73px] h-[20px] box-border rounded-[8px] border-2 border-black bg-[#D7F0FF] flex items-center justify-between gap-[4px] px-[4px] py-0',
+													'w-[73px] h-[20px] box-border rounded-[8px] border-2 border-transparent bg-transparent flex items-center justify-between gap-[4px] px-[4px] py-0',
 													isUpscalingPrompt
 														? 'cursor-wait opacity-80'
 														: 'cursor-pointer hover:brightness-[0.98] active:brightness-[0.95]'
