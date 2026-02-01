@@ -658,7 +658,8 @@ export const ContactResearchPanel: FC<ContactResearchPanelProps> = ({
 top: isExpanded ? '28px' : '50%',
 								transform: isExpanded ? 'none' : 'translateY(-50%)',
 									right: '10px',
-									width: `${innerBoxWidth}px`,
+									left: isExpanded ? '10px' : undefined,
+									width: isExpanded ? 'auto' : `${innerBoxWidth}px`,
 									height: `${currentInnerHeight}px`,
 									// Treat the full bullet box (outer + inner) as ONE colored unit while loading:
 									// the inner box becomes transparent so the outer wave color fills everything.
@@ -869,7 +870,8 @@ top: isExpanded ? '28px' : '50%',
 									top: isExpanded ? '28px' : '50%',
 									transform: isExpanded ? 'none' : 'translateY(-50%)',
 									right: '10px',
-									width: `${innerBoxWidth}px`,
+									left: isExpanded ? '10px' : undefined,
+									width: isExpanded ? 'auto' : `${innerBoxWidth}px`,
 									height: `${currentInnerHeight}px`,
 									// Treat the full bullet box as ONE colored unit while loading:
 									// the inner box becomes transparent so the outer wave color fills everything.

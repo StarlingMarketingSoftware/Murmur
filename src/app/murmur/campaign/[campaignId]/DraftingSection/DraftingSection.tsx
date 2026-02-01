@@ -28,6 +28,7 @@ import { isSafariBrowser } from '@/utils/browserDetection';
 import {
 	extractMurmurDraftSettingsSnapshot,
 	injectMurmurDraftSettingsSnapshot,
+	type DraftProfileFields,
 } from '@/utils/draftSettings';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { useDebounce } from '@/hooks/useDebounce';
@@ -134,6 +135,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		goToInbox,
 		goToContacts,
 		goToSent,
+		inboxSentTabRequest,
+		onInboxSentTabChange,
 		goToPreviousTab,
 		goToNextTab,
 		hideHeaderBox,
@@ -278,10 +281,14 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	// even if the user hovers other rows in the list.
 	const draftForSettingsPreview =
 		isDraftingView ? selectedDraft ?? hoveredDraftForSettings : null;
+	// Track the profile fields from the draft's snapshot (so we show what was used at generation time)
+	const [draftProfileFieldsForSettings, setDraftProfileFieldsForSettings] =
+		useState<DraftProfileFields | null>(null);
 	useEffect(() => {
 		if (!isDraftingView) {
 			// Avoid leaking hover state across tabs.
 			if (hoveredDraftForSettings) setHoveredDraftForSettings(null);
+			setDraftProfileFieldsForSettings(null);
 			return;
 		}
 
@@ -290,6 +297,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			: null;
 		const nextValues = snapshot?.values ?? form.getValues();
 		draftsSettingsPreviewForm.reset(nextValues);
+		// Store the profile fields from the draft's snapshot (may be undefined for old drafts)
+		setDraftProfileFieldsForSettings(snapshot?.profileFields ?? null);
 	}, [
 		view,
 		draftForSettingsPreview?.id,
@@ -311,10 +320,14 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		defaultValues: form.getValues(),
 	});
 	const sentForSettingsPreview = isSentView ? hoveredSentForSettings : null;
+	// Track the profile fields from the sent email's snapshot (so we show what was used at generation time)
+	const [sentProfileFieldsForSettings, setSentProfileFieldsForSettings] =
+		useState<DraftProfileFields | null>(null);
 	useEffect(() => {
 		if (!isSentView) {
 			// Avoid leaking hover state across tabs.
 			if (hoveredSentForSettings) setHoveredSentForSettings(null);
+			setSentProfileFieldsForSettings(null);
 			return;
 		}
 
@@ -323,6 +336,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			: null;
 		const nextValues = snapshot?.values ?? form.getValues();
 		sentSettingsPreviewForm.reset(nextValues);
+		// Store the profile fields from the sent email's snapshot (may be undefined for old emails)
+		setSentProfileFieldsForSettings(snapshot?.profileFields ?? null);
 	}, [
 		view,
 		sentForSettingsPreview?.id,
@@ -332,12 +347,84 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		hoveredSentForSettings,
 	]);
 
+	// Compute which profile fields to show in MiniEmailStructure:
+	// - Drafts tab: use the profile stored with the draft (fallback to current identity)
+	// - Sent tab: use the profile stored with the sent email (fallback to current identity)
+	// - Other tabs: use the current identity profile
+	const profileFieldsForSettings = useMemo(() => {
+		if (isDraftingView && draftProfileFieldsForSettings) {
+			return draftProfileFieldsForSettings;
+		}
+		if (isSentView && sentProfileFieldsForSettings) {
+			return sentProfileFieldsForSettings;
+		}
+		return miniProfileFields;
+	}, [isDraftingView, isSentView, draftProfileFieldsForSettings, sentProfileFieldsForSettings, miniProfileFields]);
+
 	// All tab hover states
-	const [isContactsHovered, setIsContactsHovered] = useState(false);
-	const [isWritingHovered, setIsWritingHovered] = useState(false);
-	const [isDraftsHovered, setIsDraftsHovered] = useState(false);
-	const [isSentHovered, setIsSentHovered] = useState(false);
-	const [isInboxHovered, setIsInboxHovered] = useState(false);
+	type AllTabBox =
+		| 'header'
+		| 'contacts'
+		| 'writing'
+		| 'drafts'
+		| 'sent'
+		| 'research'
+		| 'suggestion'
+		| 'preview'
+		| 'inbox';
+	const [hoveredAllTabBox, setHoveredAllTabBox] = useState<AllTabBox | null>(null);
+	const isContactsHovered = hoveredAllTabBox === 'contacts';
+	// All tab: hovered email drives preview + research (hover-only, no row highlighting)
+	const [allTabHoveredEmailPreview, setAllTabHoveredEmailPreview] = useState<{
+		contactId: number;
+		subject?: string | null;
+		message?: string | null;
+	} | null>(null);
+	const shouldDimAllTabBoxes = view === 'all' && hoveredAllTabBox !== null;
+	const getAllTabBoxOpacityClassName = useCallback(
+		(box: AllTabBox) =>
+			cn(
+				'transition-opacity duration-150 ease-out all-tab-box',
+				box !== 'research' && box !== 'suggestion' && box !== 'preview' && 'all-tab-box--scale',
+				shouldDimAllTabBoxes && hoveredAllTabBox !== box && 'opacity-90'
+			),
+		[hoveredAllTabBox, shouldDimAllTabBoxes]
+	);
+	const allTabHoverClearTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+	const allTabContainerRef = useRef<HTMLDivElement>(null);
+	const clearAllTabHoverClearTimeout = useCallback(() => {
+		if (!allTabHoverClearTimeoutRef.current) return;
+		clearTimeout(allTabHoverClearTimeoutRef.current);
+		allTabHoverClearTimeoutRef.current = null;
+	}, []);
+	const handleAllTabBoxMouseEnter = useCallback(
+		(box: AllTabBox) => {
+			// Cancel any pending "unhover" so moving between boxes doesn't flash.
+			clearAllTabHoverClearTimeout();
+			setHoveredAllTabBox(box);
+		},
+		[clearAllTabHoverClearTimeout]
+	);
+	const handleAllTabBoxMouseLeave = useCallback(
+		(box: AllTabBox) => {
+			// Keep the last-hovered box active briefly so gaps between panels don't
+			// cause a jarring fade-out/fade-in flash when moving to another box.
+			clearAllTabHoverClearTimeout();
+			allTabHoverClearTimeoutRef.current = setTimeout(() => {
+				setHoveredAllTabBox((prev) => (prev === box ? null : prev));
+				allTabHoverClearTimeoutRef.current = null;
+			}, 180);
+		},
+		[clearAllTabHoverClearTimeout]
+	);
+	useEffect(() => {
+		if (view === 'all') return;
+		clearAllTabHoverClearTimeout();
+		if (hoveredAllTabBox !== null) setHoveredAllTabBox(null);
+	}, [clearAllTabHoverClearTimeout, hoveredAllTabBox, view]);
+	useEffect(() => {
+		return () => clearAllTabHoverClearTimeout();
+	}, [clearAllTabHoverClearTimeout]);
 
 	// Narrow desktop detection for Writing tab compact layout.
 	// Note: widened upper bound from 1280 -> 1317 so the left pinned panel never clips
@@ -427,6 +514,45 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			window.removeEventListener(CAMPAIGN_ZOOM_EVENT, checkBreakpoints as EventListener);
 		};
 	}, [isMobile]);
+
+	useEffect(() => {
+		if (view !== 'all' || !allTabContainerRef.current) return;
+
+		const container = allTabContainerRef.current;
+		const allBoxes = Array.from(container.querySelectorAll<HTMLElement>('.all-tab-box'));
+
+		// Reset scale in case it was stuck from prior hovers.
+		allBoxes.forEach((box) => {
+			gsap.killTweensOf(box);
+			gsap.set(box, { scale: 1 });
+		});
+
+		// Only these boxes should scale on hover (exclude research/suggestion/preview).
+		const scaleBoxes = Array.from(container.querySelectorAll<HTMLElement>('.all-tab-box--scale'));
+		const listeners = scaleBoxes.map((box) => {
+			const onEnter = () => {
+				gsap.to(box, { scale: 1.02, duration: 0.7, ease: 'power3.out' });
+			};
+			const onLeave = () => {
+				gsap.to(box, { scale: 1, duration: 0.7, ease: 'power3.out' });
+			};
+			box.addEventListener('mouseenter', onEnter);
+			box.addEventListener('mouseleave', onLeave);
+			return { box, onEnter, onLeave };
+		});
+
+		return () => {
+			listeners.forEach(({ box, onEnter, onLeave }) => {
+				box.removeEventListener('mouseenter', onEnter);
+				box.removeEventListener('mouseleave', onLeave);
+			});
+
+			allBoxes.forEach((box) => {
+				gsap.killTweensOf(box);
+				gsap.set(box, { scale: 1 });
+			});
+		};
+	}, [view, isAllTabNarrow, isNarrowestDesktop]);
 
 	const bottomPanelBoxHeightPx = areBottomPanelsCollapsedAtCompactBreakpoint ? 31 : 117;
 	const bottomPanelCollapsed = areBottomPanelsCollapsedAtCompactBreakpoint;
@@ -1409,6 +1535,15 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 					font,
 					signatureText
 				);
+				// Build profile fields from the current identity to store with the draft
+				const profileFieldsSnapshot: DraftProfileFields = {
+					name: campaign.identity?.name ?? '',
+					genre: campaign.identity?.genre ?? '',
+					area: campaign.identity?.area ?? '',
+					band: campaign.identity?.bandName ?? '',
+					bio: campaign.identity?.bio ?? '',
+					links: campaign.identity?.website ?? '',
+				};
 				const richTextMessageWithSettings = injectMurmurDraftSettingsSnapshot(
 					richTextMessage,
 					{
@@ -1417,6 +1552,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 							...values,
 							signature: signatureText,
 						},
+						profileFields: profileFieldsSnapshot,
 					}
 				);
 
@@ -1533,6 +1669,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const [contactsTabSelectedIds, setContactsTabSelectedIds] = useState<Set<number>>(
 		new Set()
 	);
+	// Ref for the draft button container to detect outside clicks
+	const draftButtonContainerRef = useRef<HTMLDivElement>(null);
+
 	const handleContactsTabSelection = (contactId: number) => {
 		setContactsTabSelectedIds((prev) => {
 			const next = new Set(prev);
@@ -2083,9 +2222,14 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		return ids;
 	}, [draftEmails]);
 
-	const draftedContactIds = new Set(draftEmails.map((e) => e.contactId));
+	const contactedContactIds = useMemo(() => {
+		const ids = new Set<number>();
+		for (const email of draftEmails) ids.add(email.contactId);
+		for (const email of sentEmails) ids.add(email.contactId);
+		return ids;
+	}, [draftEmails, sentEmails]);
 	const contactsAvailableForDrafting = (contacts || []).filter(
-		(contact) => !draftedContactIds.has(contact.id)
+		(contact) => !contactedContactIds.has(contact.id)
 	);
 
 	const isSendingDisabled = isFreeTrial || (user?.sendingCredits || 0) === 0;
@@ -2114,6 +2258,27 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		if (!name) return { primary: company, secondary: '' };
 		if (!company) return { primary: name, secondary: '' };
 		return { primary: name, secondary: company };
+	}, [displayedContactForResearch, draftsMiniEmailTopHeaderHeight]);
+	const draftsMiniEmailSettingsNameCompanyBgColor = useMemo(() => {
+		const contact = displayedContactForResearch;
+		if (!draftsMiniEmailTopHeaderHeight || !contact) return undefined;
+
+		const headline = (contact.headline || contact.title || '').trim();
+		if (!headline) return '#C1D6FF';
+
+		return isRestaurantTitle(headline)
+			? '#C3FBD1'
+			: isCoffeeShopTitle(headline)
+				? '#D6F1BD'
+				: isMusicVenueTitle(headline)
+					? '#B7E5FF'
+					: isMusicFestivalTitle(headline)
+						? '#C1D6FF'
+						: isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline)
+							? '#FFF2BC'
+							: isWineBeerSpiritsTitle(headline)
+								? '#BFC4FF'
+								: '#E8EFFF';
 	}, [displayedContactForResearch, draftsMiniEmailTopHeaderHeight]);
 
 	useEffect(() => {
@@ -2168,6 +2333,47 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		});
 	}, [contactsAvailableForDrafting, setContactsTabSelectedIds]);
 
+	// Compute whether all contacts are selected (regardless of how they were selected)
+	const areAllContactsSelected = useMemo(() => {
+		if (contactsAvailableForDrafting.length === 0) return false;
+		if (contactsTabSelectedIds.size !== contactsAvailableForDrafting.length) return false;
+		return contactsAvailableForDrafting.every((c) => contactsTabSelectedIds.has(c.id));
+	}, [contactsAvailableForDrafting, contactsTabSelectedIds]);
+
+	// Handle "All" button click - toggle all contacts
+	const handleSelectAllContacts = useCallback(() => {
+		if (areAllContactsSelected) {
+			// Clicking "All" when already all selected - deselect all
+			setContactsTabSelectedIds(new Set());
+		} else {
+			// Select all
+			const allIds = new Set(contactsAvailableForDrafting.map((c) => c.id));
+			setContactsTabSelectedIds(allIds);
+		}
+	}, [contactsAvailableForDrafting, areAllContactsSelected]);
+
+	// Click-outside handler to deselect when all contacts are selected
+	useEffect(() => {
+		if (!areAllContactsSelected) return;
+
+		const handleClickOutside = (event: MouseEvent) => {
+			const target = event.target as HTMLElement;
+			// Check if click is outside the draft button container
+			if (
+				draftButtonContainerRef.current &&
+				!draftButtonContainerRef.current.contains(target) &&
+				!target.closest('[data-draft-button-container]')
+			) {
+				setContactsTabSelectedIds(new Set());
+			}
+		};
+
+		document.addEventListener('mousedown', handleClickOutside);
+		return () => {
+			document.removeEventListener('mousedown', handleClickOutside);
+		};
+	}, [areAllContactsSelected]);
+
 	const handleResearchContactClick = (contact: ContactWithName | null) => {
 		if (!contact) return;
 		setSelectedContactForResearch(contact);
@@ -2185,14 +2391,40 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		}
 	};
 
-	const handleSendDrafts = async () => {
-		const selectedDrafts =
-			draftsTabSelectedIds.size > 0
+	// --- All tab: hover over Draft/Sent rows updates Research + Preview ---
+	const handleAllTabEmailHover = useCallback(
+		(email: EmailWithRelations | null) => {
+			if (!email) {
+				setAllTabHoveredEmailPreview(null);
+				handleResearchContactHover(null);
+				return;
+			}
+
+			setAllTabHoveredEmailPreview({
+				contactId: email.contactId,
+				subject: email.subject,
+				message: email.message,
+			});
+
+			const contactFromList = contacts?.find((c) => c.id === email.contactId) ?? null;
+			handleResearchContactHover(contactFromList);
+		},
+		[contacts, handleResearchContactHover]
+	);
+
+	const handleSendDrafts = async (draftIds?: Iterable<number>) => {
+		// If draftIds is provided, ONLY send those drafts (used by draft-review "Send" button).
+		// Otherwise, send the current selection (and never default to "all drafts" when selection is empty).
+		const explicitIds = draftIds ? new Set(Array.from(draftIds)) : null;
+
+		const selectedDrafts = explicitIds
+			? draftEmails.filter((d) => explicitIds.has(d.id))
+			: draftsTabSelectedIds.size > 0
 				? draftEmails.filter((d) => draftsTabSelectedIds.has(d.id))
-				: draftEmails;
+				: [];
 
 		if (selectedDrafts.length === 0) {
-			toast.error('No drafts selected to send.');
+			toast.error('Select emails to send.');
 			return;
 		}
 
@@ -2924,7 +3156,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 															variant={draftsMiniEmailTopHeaderHeight ? 'settings' : undefined}
 															settingsPrimaryLabel={draftsMiniEmailSettingsLabels.primary}
 															settingsSecondaryLabel={draftsMiniEmailSettingsLabels.secondary}
-															profileFields={miniProfileFields}
+															settingsNameCompanyBgColor={draftsMiniEmailSettingsNameCompanyBgColor}
+															profileFields={profileFieldsForSettings}
 															identityProfile={campaign?.identity as IdentityProfileFields | null}
 															onIdentityUpdate={handleIdentityUpdate}
 															onDraft={() =>
@@ -3405,7 +3638,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												variant={draftsMiniEmailTopHeaderHeight ? 'settings' : undefined}
 												settingsPrimaryLabel={draftsMiniEmailSettingsLabels.primary}
 												settingsSecondaryLabel={draftsMiniEmailSettingsLabels.secondary}
-												profileFields={miniProfileFields}
+												settingsNameCompanyBgColor={draftsMiniEmailSettingsNameCompanyBgColor}
+												profileFields={profileFieldsForSettings}
 												identityProfile={campaign?.identity as IdentityProfileFields | null}
 												onIdentityUpdate={handleIdentityUpdate}
 												onDraft={() =>
@@ -3915,18 +4149,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													isDraftDisabled={
 														isPendingGeneration || contactsTabSelectedIds.size === 0
 													}
-													onSelectAllContacts={() => {
-														const allIds = new Set(contactsAvailableForDrafting.map((c) => c.id));
-														const areAllSelected =
-															contactsTabSelectedIds.size === allIds.size &&
-															[...allIds].every((id) => contactsTabSelectedIds.has(id));
-
-														if (areAllSelected) {
-															setContactsTabSelectedIds(new Set());
-														} else {
-															setContactsTabSelectedIds(allIds);
-														}
-													}}
+													onSelectAllContacts={handleSelectAllContacts}
+													isAllContactsSelected={areAllContactsSelected}
+													totalContactCount={contactsAvailableForDrafting.length}
 													onGetSuggestions={handleGetSuggestions}
 													onUpscalePrompt={upscalePrompt}
 													isUpscalingPrompt={isUpscalingPrompt}
@@ -3946,24 +4171,27 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											</div>
 										</div>
 										{/* Draft button with arrows - spans full width below both columns */}
-										{!isPendingGeneration && (
-											<div className="flex items-center justify-center gap-[29px] mt-4 w-full">
-												{/* Left arrow */}
-												<button
-													type="button"
-													onClick={goToPreviousTab}
-													className="bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0"
-													aria-label="Previous tab"
-												>
-													<LeftArrow width="20" height="39" />
-												</button>
-												{/* Draft button container */}
-												<div
-													className="group relative h-[40px] flex-1"
-													style={{ maxWidth: '691px' }}
-												>
-													{contactsTabSelectedIds.size > 0 ? (
-														<>
+										<div className="mt-4 w-full">
+											{!isPendingGeneration ? (
+												<div className="flex items-center justify-center gap-[29px] w-full">
+													{/* Left arrow */}
+													<button
+														type="button"
+														onClick={goToPreviousTab}
+														className="bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0"
+														aria-label="Previous tab"
+													>
+														<LeftArrow width="20" height="39" />
+													</button>
+													{/* Draft button container */}
+													<div
+														ref={draftButtonContainerRef}
+														data-draft-button-container
+														className="group relative h-[40px] flex-1"
+														style={{ maxWidth: '691px' }}
+													>
+														{contactsTabSelectedIds.size > 0 || areAllContactsSelected ? (
+															// Animated draft button with expanding "All" state
 															<button
 																type="button"
 																onClick={async () => {
@@ -3977,77 +4205,92 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																}}
 																disabled={isPendingGeneration || contactsTabSelectedIds.size === 0}
 																className={cn(
-																	'w-full h-full rounded-[4px] border-[3px] text-black font-inter font-normal text-[17px]',
+																	'w-full h-full rounded-[4px] border-[3px] text-black font-inter font-normal text-[17px] relative overflow-hidden transition-colors duration-300',
 																	isPendingGeneration || contactsTabSelectedIds.size === 0
 																		? 'bg-[#E0E0E0] border-[#A0A0A0] cursor-not-allowed opacity-60'
-																		: 'bg-[#C7F2C9] border-[#349A37] hover:bg-[#B9E7BC] cursor-pointer'
+																		: areAllContactsSelected
+																			? 'bg-[#4DC669] border-black hover:bg-[#45B85F] cursor-pointer'
+																			: 'bg-[#C7F2C9] border-[#349A37] hover:bg-[#B9E7BC] cursor-pointer'
 																)}
 															>
-																Draft {contactsTabSelectedIds.size} {contactsTabSelectedIds.size === 1 ? 'Contact' : 'Contacts'}
+																{/* Normal text - fades out when All selected */}
+																<span
+																	className={cn(
+																		'transition-opacity duration-300',
+																		areAllContactsSelected ? 'opacity-0' : 'opacity-100'
+																	)}
+																>
+																	Draft {contactsTabSelectedIds.size}{' '}
+																	{contactsTabSelectedIds.size === 1 ? 'Contact' : 'Contacts'}
+																</span>
+																{/* "All" text - fades in when All selected */}
+																<span
+																	className={cn(
+																		'absolute inset-0 flex items-center justify-center transition-opacity duration-300',
+																		areAllContactsSelected ? 'opacity-100' : 'opacity-0'
+																	)}
+																>
+																	Draft <span className="font-bold mx-1">All</span>{' '}
+																	{contactsAvailableForDrafting.length} Contacts
+																</span>
+																{/* Expanding green overlay from right */}
+																<div
+																	className={cn(
+																		'absolute top-0 bottom-0 right-0 bg-[#4DC669] transition-all duration-300 ease-out',
+																		areAllContactsSelected
+																			? 'w-full rounded-[1px]'
+																			: 'w-[62px] rounded-r-[1px]'
+																	)}
+																	style={{
+																		opacity: areAllContactsSelected ? 0 : 1,
+																		transitionProperty: 'width, opacity',
+																	}}
+																/>
 															</button>
-															{/* Right section "All" button */}
+														) : (
+															<div className="relative w-full h-full rounded-[4px] border-[3px] border-transparent overflow-hidden transition-colors group-hover:bg-[#EEF5EF] group-hover:border-black">
+																<div className="w-full h-full flex items-center justify-center text-black font-inter font-normal text-[17px] cursor-default">
+																	Select Contacts and Draft Emails
+																</div>
+																<button
+																	type="button"
+																	aria-label="Select all contacts"
+																	className="absolute right-0 top-0 bottom-0 w-[62px] bg-[#74D178] rounded-r-[1px] flex items-center justify-center font-inter font-normal text-[17px] text-black hover:bg-[#65C269] cursor-pointer z-10 opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto"
+																	onClick={handleSelectAllContacts}
+																>
+																	<div className="absolute left-0 top-0 bottom-0 w-[3px] bg-black" />
+																	All
+																</button>
+															</div>
+														)}
+														{/* "All" button overlay - only visible when not all selected */}
+														{(contactsTabSelectedIds.size > 0 || areAllContactsSelected) && !areAllContactsSelected && (
 															<button
 																type="button"
 																className="absolute right-[3px] top-[3px] bottom-[3px] w-[62px] bg-[#74D178] rounded-r-[1px] flex items-center justify-center font-inter font-normal text-[17px] text-black hover:bg-[#65C269] cursor-pointer border-0 border-l-[2px] border-[#349A37] z-10"
-																onClick={() => {
-																	const allIds = new Set(contactsAvailableForDrafting.map((c) => c.id));
-																	const areAllSelected =
-																		contactsTabSelectedIds.size === allIds.size &&
-																		[...allIds].every((id) => contactsTabSelectedIds.has(id));
-
-																	if (areAllSelected) {
-																		setContactsTabSelectedIds(new Set());
-																	} else {
-																		setContactsTabSelectedIds(allIds);
-																	}
+																onClick={(e) => {
+																	e.stopPropagation();
+																	handleSelectAllContacts();
 																}}
 															>
 																All
 															</button>
-														</>
-													) : (
-														<div className="relative w-full h-full rounded-[4px] border-[3px] border-transparent overflow-hidden transition-colors group-hover:bg-[#EEF5EF] group-hover:border-black">
-															<div className="w-full h-full flex items-center justify-center text-black font-inter font-normal text-[17px] cursor-default">
-																Select Contacts and Draft Emails
-															</div>
-															<button
-																type="button"
-																aria-label="Select all contacts"
-																className="absolute right-0 top-0 bottom-0 w-[62px] bg-[#74D178] rounded-r-[1px] flex items-center justify-center font-inter font-normal text-[17px] text-black hover:bg-[#65C269] cursor-pointer z-10 opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto"
-																onClick={() => {
-																	const allIds = new Set(
-																		contactsAvailableForDrafting.map((c) => c.id)
-																	);
-																	const areAllSelected =
-																		contactsTabSelectedIds.size === allIds.size &&
-																		[...allIds].every((id) =>
-																			contactsTabSelectedIds.has(id)
-																		);
-
-																	if (areAllSelected) {
-																		setContactsTabSelectedIds(new Set());
-																	} else {
-																		setContactsTabSelectedIds(allIds);
-																	}
-																}}
-															>
-																<div className="absolute left-0 top-0 bottom-0 w-[3px] bg-black" />
-																All
-															</button>
-														</div>
-													)}
+														)}
+													</div>
+													{/* Right arrow */}
+													<button
+														type="button"
+														onClick={goToNextTab}
+														className="bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0"
+														aria-label="Next tab"
+													>
+														<RightArrow width="20" height="39" />
+													</button>
 												</div>
-												{/* Right arrow */}
-												<button
-													type="button"
-													onClick={goToNextTab}
-													className="bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0"
-													aria-label="Next tab"
-												>
-													<RightArrow width="20" height="39" />
-												</button>
-											</div>
-										)}
+											) : (
+												<div className="h-[40px]" />
+											)}
+										</div>
 									</div>
 								) : (
 									/* Regular centered layout for wider viewports, or narrowest breakpoint with contacts below */
@@ -4077,18 +4320,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											isDraftDisabled={
 												isPendingGeneration || contactsTabSelectedIds.size === 0
 											}
-											onSelectAllContacts={() => {
-												const allIds = new Set(contactsAvailableForDrafting.map((c) => c.id));
-												const areAllSelected =
-													contactsTabSelectedIds.size === allIds.size &&
-													[...allIds].every((id) => contactsTabSelectedIds.has(id));
-
-												if (areAllSelected) {
-													setContactsTabSelectedIds(new Set());
-												} else {
-													setContactsTabSelectedIds(allIds);
-												}
-											}}
+											onSelectAllContacts={handleSelectAllContacts}
+											isAllContactsSelected={areAllContactsSelected}
+											totalContactCount={contactsAvailableForDrafting.length}
 											onGetSuggestions={handleGetSuggestions}
 											onUpscalePrompt={upscalePrompt}
 											isUpscalingPrompt={isUpscalingPrompt}
@@ -4107,105 +4341,124 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											}
 										/>
 										{/* Draft button with arrows at narrowest breakpoint */}
-										{isNarrowestDesktop && !isPendingGeneration && (
-											<div className="flex items-center justify-center gap-[20px] mt-4 w-full">
-												{/* Left arrow */}
-												<button
-													type="button"
-													onClick={goToPreviousTab}
-													className="bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0"
-													aria-label="Previous tab"
-												>
-													<LeftArrow width="20" height="39" />
-												</button>
-												{/* Draft button container */}
-												<div
-													className="group relative h-[40px] w-full max-w-[407px]"
-												>
-													{contactsTabSelectedIds.size > 0 ? (
-														<>
-															<button
-																type="button"
-																onClick={async () => {
-																	if (contactsTabSelectedIds.size === 0) {
-																		toast.error('Select at least one contact to draft emails.');
-																		return;
-																	}
-																	await handleGenerateDrafts(
-																		Array.from(contactsTabSelectedIds.values())
-																	);
-																}}
-																disabled={isPendingGeneration || contactsTabSelectedIds.size === 0}
-																className={cn(
-																	'w-full h-full rounded-[4px] border-[3px] text-black font-inter font-normal text-[17px]',
-																	isPendingGeneration || contactsTabSelectedIds.size === 0
-																		? 'bg-[#E0E0E0] border-[#A0A0A0] cursor-not-allowed opacity-60'
-																		: 'bg-[#C7F2C9] border-[#349A37] hover:bg-[#B9E7BC] cursor-pointer'
-																)}
-															>
-																Draft {contactsTabSelectedIds.size} {contactsTabSelectedIds.size === 1 ? 'Contact' : 'Contacts'}
-															</button>
-															{/* Right section "All" button */}
-															<button
-																type="button"
-																className="absolute right-[3px] top-[3px] bottom-[3px] w-[62px] bg-[#74D178] rounded-r-[1px] flex items-center justify-center font-inter font-normal text-[17px] text-black hover:bg-[#65C269] cursor-pointer border-0 border-l-[2px] border-[#349A37] z-10"
-																onClick={() => {
-																	const allIds = new Set(contactsAvailableForDrafting.map((c) => c.id));
-																	const areAllSelected =
-																		contactsTabSelectedIds.size === allIds.size &&
-																		[...allIds].every((id) => contactsTabSelectedIds.has(id));
-
-																	if (areAllSelected) {
-																		setContactsTabSelectedIds(new Set());
-																	} else {
-																		setContactsTabSelectedIds(allIds);
-																	}
-																}}
-															>
-																All
-															</button>
-														</>
-													) : (
-														<div className="relative w-full h-full rounded-[4px] border-[3px] border-transparent overflow-hidden transition-colors group-hover:bg-[#EEF5EF] group-hover:border-black">
-															<div className="w-full h-full flex items-center justify-center text-black font-inter font-normal text-[17px] cursor-default">
-																Select Contacts and Draft Emails
-															</div>
-															<button
-																type="button"
-																aria-label="Select all contacts"
-																className="absolute right-0 top-0 bottom-0 w-[62px] bg-[#74D178] rounded-r-[1px] flex items-center justify-center font-inter font-normal text-[17px] text-black hover:bg-[#65C269] cursor-pointer z-10 opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto"
-																onClick={() => {
-																	const allIds = new Set(
-																		contactsAvailableForDrafting.map((c) => c.id)
-																	);
-																	const areAllSelected =
-																		contactsTabSelectedIds.size === allIds.size &&
-																		[...allIds].every((id) =>
-																			contactsTabSelectedIds.has(id)
+										{isNarrowestDesktop && (
+											<div className="mt-4 w-full">
+												{!isPendingGeneration ? (
+													<div className="flex items-center justify-center gap-[20px] w-full">
+														{/* Left arrow */}
+														<button
+															type="button"
+															onClick={goToPreviousTab}
+															className="bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0"
+															aria-label="Previous tab"
+														>
+															<LeftArrow width="20" height="39" />
+														</button>
+														{/* Draft button container */}
+														<div
+															data-draft-button-container
+															className="group relative h-[40px] w-full max-w-[407px]"
+														>
+															{contactsTabSelectedIds.size > 0 || areAllContactsSelected ? (
+																// Animated draft button with expanding "All" state
+																<button
+																	type="button"
+																	onClick={async () => {
+																		if (contactsTabSelectedIds.size === 0) {
+																			toast.error('Select at least one contact to draft emails.');
+																			return;
+																		}
+																		await handleGenerateDrafts(
+																			Array.from(contactsTabSelectedIds.values())
 																		);
-
-																	if (areAllSelected) {
-																		setContactsTabSelectedIds(new Set());
-																	} else {
-																		setContactsTabSelectedIds(allIds);
-																	}
-																}}
-															>
-																<div className="absolute left-0 top-0 bottom-0 w-[3px] bg-black" />
-																All
-															</button>
+																	}}
+																	disabled={isPendingGeneration || contactsTabSelectedIds.size === 0}
+																	className={cn(
+																		'w-full h-full rounded-[4px] border-[3px] text-black font-inter font-normal text-[17px] relative overflow-hidden transition-colors duration-300',
+																		isPendingGeneration || contactsTabSelectedIds.size === 0
+																			? 'bg-[#E0E0E0] border-[#A0A0A0] cursor-not-allowed opacity-60'
+																			: areAllContactsSelected
+																				? 'bg-[#4DC669] border-black hover:bg-[#45B85F] cursor-pointer'
+																				: 'bg-[#C7F2C9] border-[#349A37] hover:bg-[#B9E7BC] cursor-pointer'
+																	)}
+																>
+																	{/* Normal text - fades out when All selected */}
+																	<span
+																		className={cn(
+																			'transition-opacity duration-300',
+																			areAllContactsSelected ? 'opacity-0' : 'opacity-100'
+																		)}
+																	>
+																		Draft {contactsTabSelectedIds.size}{' '}
+																		{contactsTabSelectedIds.size === 1 ? 'Contact' : 'Contacts'}
+																	</span>
+																	{/* "All" text - fades in when All selected */}
+																	<span
+																		className={cn(
+																			'absolute inset-0 flex items-center justify-center transition-opacity duration-300',
+																			areAllContactsSelected ? 'opacity-100' : 'opacity-0'
+																		)}
+																	>
+																		Draft <span className="font-bold mx-1">All</span>{' '}
+																		{contactsAvailableForDrafting.length} Contacts
+																	</span>
+																	{/* Expanding green overlay from right */}
+																	<div
+																		className={cn(
+																			'absolute top-0 bottom-0 right-0 bg-[#4DC669] transition-all duration-300 ease-out',
+																			areAllContactsSelected
+																				? 'w-full rounded-[1px]'
+																				: 'w-[62px] rounded-r-[1px]'
+																		)}
+																		style={{
+																			opacity: areAllContactsSelected ? 0 : 1,
+																			transitionProperty: 'width, opacity',
+																		}}
+																	/>
+																</button>
+															) : (
+																<div className="relative w-full h-full rounded-[4px] border-[3px] border-transparent overflow-hidden transition-colors group-hover:bg-[#EEF5EF] group-hover:border-black">
+																	<div className="w-full h-full flex items-center justify-center text-black font-inter font-normal text-[17px] cursor-default">
+																		Select Contacts and Draft Emails
+																	</div>
+																	<button
+																		type="button"
+																		aria-label="Select all contacts"
+																		className="absolute right-0 top-0 bottom-0 w-[62px] bg-[#74D178] rounded-r-[1px] flex items-center justify-center font-inter font-normal text-[17px] text-black hover:bg-[#65C269] cursor-pointer z-10 opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto"
+																		onClick={handleSelectAllContacts}
+																	>
+																		<div className="absolute left-0 top-0 bottom-0 w-[3px] bg-black" />
+																		All
+																	</button>
+																</div>
+															)}
+															{/* "All" button overlay - only visible when not all selected */}
+															{(contactsTabSelectedIds.size > 0 || areAllContactsSelected) && !areAllContactsSelected && (
+																<button
+																	type="button"
+																	className="absolute right-[3px] top-[3px] bottom-[3px] w-[62px] bg-[#74D178] rounded-r-[1px] flex items-center justify-center font-inter font-normal text-[17px] text-black hover:bg-[#65C269] cursor-pointer border-0 border-l-[2px] border-[#349A37] z-10"
+																	onClick={(e) => {
+																		e.stopPropagation();
+																		handleSelectAllContacts();
+																	}}
+																>
+																	All
+																</button>
+															)}
 														</div>
-													)}
-												</div>
-												{/* Right arrow */}
-												<button
-													type="button"
-													onClick={goToNextTab}
-													className="bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0"
-													aria-label="Next tab"
-												>
-													<RightArrow width="20" height="39" />
-												</button>
+														{/* Right arrow */}
+														<button
+															type="button"
+															onClick={goToNextTab}
+															className="bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0"
+															aria-label="Next tab"
+														>
+															<RightArrow width="20" height="39" />
+														</button>
+													</div>
+												) : (
+													<div className="h-[40px]" />
+												)}
 											</div>
 										)}
 										{/* Contacts table below writing box at narrowest breakpoint */}
@@ -4410,7 +4663,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 															variant={draftsMiniEmailTopHeaderHeight ? 'settings' : undefined}
 															settingsPrimaryLabel={draftsMiniEmailSettingsLabels.primary}
 															settingsSecondaryLabel={draftsMiniEmailSettingsLabels.secondary}
-															profileFields={miniProfileFields}
+															settingsNameCompanyBgColor={draftsMiniEmailSettingsNameCompanyBgColor}
+															profileFields={profileFieldsForSettings}
 															identityProfile={campaign?.identity as IdentityProfileFields | null}
 															onIdentityUpdate={handleIdentityUpdate}
 															onDraft={() =>
@@ -4764,7 +5018,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														variant={draftsMiniEmailTopHeaderHeight ? 'settings' : undefined}
 														settingsPrimaryLabel={draftsMiniEmailSettingsLabels.primary}
 														settingsSecondaryLabel={draftsMiniEmailSettingsLabels.secondary}
-														profileFields={miniProfileFields}
+														settingsNameCompanyBgColor={draftsMiniEmailSettingsNameCompanyBgColor}
+														profileFields={profileFieldsForSettings}
 														identityProfile={campaign?.identity as IdentityProfileFields | null}
 														onIdentityUpdate={handleIdentityUpdate}
 														onDraft={() =>
@@ -4865,6 +5120,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										bottomPanelCollapsed={bottomPanelCollapsed}
 										hideBottomPanels
 										hideButton
+										isAllContactsSelected={areAllContactsSelected}
+										onSelectAllContacts={handleSelectAllContacts}
 									/>
 								</div>
 							) : isNarrowDesktop ? (
@@ -4903,7 +5160,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														variant={draftsMiniEmailTopHeaderHeight ? 'settings' : undefined}
 														settingsPrimaryLabel={draftsMiniEmailSettingsLabels.primary}
 														settingsSecondaryLabel={draftsMiniEmailSettingsLabels.secondary}
-														profileFields={miniProfileFields}
+														settingsNameCompanyBgColor={draftsMiniEmailSettingsNameCompanyBgColor}
+														profileFields={profileFieldsForSettings}
 														identityProfile={campaign?.identity as IdentityProfileFields | null}
 														onIdentityUpdate={handleIdentityUpdate}
 														onDraft={() =>
@@ -4978,6 +5236,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													bottomPanelCollapsed={bottomPanelCollapsed}
 													hideBottomPanels
 													hideButton
+													isAllContactsSelected={areAllContactsSelected}
+													onSelectAllContacts={handleSelectAllContacts}
 												/>
 											</div>
 										</div>
@@ -4994,53 +5254,64 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											</button>
 											{/* Draft button container */}
 											<div
+												data-draft-button-container
 												className="group relative h-[40px] flex-1"
 												style={{ maxWidth: '691px' }}
 											>
-												{contactsTabSelectedIds.size > 0 ? (
-													<>
-														<button
-															type="button"
-															onClick={() => {
-																if (contactsTabSelectedIds.size === 0) {
-																	return;
-																}
-																handleGenerateDrafts(
-																	Array.from(contactsTabSelectedIds.values())
-																);
-															}}
-															disabled={isPendingGeneration || contactsTabSelectedIds.size === 0}
-															className={cn(
-																'w-full h-full rounded-[4px] border-[3px] text-black font-inter font-normal text-[17px]',
-																isPendingGeneration || contactsTabSelectedIds.size === 0
-																	? 'bg-[#E0E0E0] border-[#A0A0A0] cursor-not-allowed opacity-60'
+												{contactsTabSelectedIds.size > 0 || areAllContactsSelected ? (
+													// Animated draft button with expanding "All" state
+													<button
+														type="button"
+														onClick={() => {
+															if (contactsTabSelectedIds.size === 0) {
+																return;
+															}
+															handleGenerateDrafts(
+																Array.from(contactsTabSelectedIds.values())
+															);
+														}}
+														disabled={isPendingGeneration || contactsTabSelectedIds.size === 0}
+														className={cn(
+															'w-full h-full rounded-[4px] border-[3px] text-black font-inter font-normal text-[17px] relative overflow-hidden transition-colors duration-300',
+															isPendingGeneration || contactsTabSelectedIds.size === 0
+																? 'bg-[#E0E0E0] border-[#A0A0A0] cursor-not-allowed opacity-60'
+																: areAllContactsSelected
+																	? 'bg-[#4DC669] border-black hover:bg-[#45B85F] cursor-pointer'
 																	: 'bg-[#F2C7C7] border-[#9A3434] hover:bg-[#E6B9B9] cursor-pointer'
+														)}
+													>
+														{/* Normal text - fades out when All selected */}
+														<span
+															className={cn(
+																'transition-opacity duration-300',
+																areAllContactsSelected ? 'opacity-0' : 'opacity-100'
 															)}
 														>
 															Draft {contactsTabSelectedIds.size} {contactsTabSelectedIds.size === 1 ? 'Contact' : 'Contacts'}
-														</button>
-														{/* Right section "All" button */}
-														<button
-															type="button"
-															className="absolute right-[3px] top-[2.5px] bottom-[2.5px] w-[62px] bg-[#D17474] rounded-r-[1px] rounded-l-none flex items-center justify-center font-inter font-normal text-[17px] text-black hover:bg-[#C26666] cursor-pointer z-10"
-															onClick={(e) => {
-																e.stopPropagation();
-																const allIds = new Set(contactsAvailableForDrafting.map((c) => c.id));
-																const isAllSelected =
-																	contactsTabSelectedIds.size === allIds.size &&
-																	[...allIds].every((id) => contactsTabSelectedIds.has(id));
-																if (isAllSelected) {
-																	setContactsTabSelectedIds(new Set());
-																} else {
-																	setContactsTabSelectedIds(allIds);
-																}
-															}}
+														</span>
+														{/* "All" text - fades in when All selected */}
+														<span
+															className={cn(
+																'absolute inset-0 flex items-center justify-center transition-opacity duration-300',
+																areAllContactsSelected ? 'opacity-100' : 'opacity-0'
+															)}
 														>
-															{/* Vertical divider line */}
-															<div className="absolute left-0 -top-[0.5px] -bottom-[0.5px] w-[2px] bg-[#9A3434]" />
-															All
-														</button>
-													</>
+															Draft <span className="font-bold mx-1">All</span> {contactsAvailableForDrafting.length} Contacts
+														</span>
+														{/* Expanding green overlay from right */}
+														<div
+															className={cn(
+																'absolute top-0 bottom-0 right-0 bg-[#4DC669] transition-all duration-300 ease-out',
+																areAllContactsSelected
+																	? 'w-full rounded-[1px]'
+																	: 'w-[62px] rounded-r-[1px]'
+															)}
+															style={{
+																opacity: areAllContactsSelected ? 0 : 1,
+																transitionProperty: 'width, opacity',
+															}}
+														/>
+													</button>
 												) : (
 													<div className="relative w-full h-full rounded-[4px] border-[3px] border-transparent overflow-hidden transition-colors group-hover:bg-[#EEF5EF] group-hover:border-black">
 														<div className="w-full h-full flex items-center justify-center text-black font-inter font-normal text-[17px] cursor-default">
@@ -5052,25 +5323,28 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 															className="absolute right-0 top-0 bottom-0 w-[62px] bg-[#D17474] rounded-r-[1px] rounded-l-none flex items-center justify-center font-inter font-normal text-[17px] text-black hover:bg-[#C26666] cursor-pointer z-10 opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto"
 															onClick={(e) => {
 																e.stopPropagation();
-																const allIds = new Set(
-																	contactsAvailableForDrafting.map((c) => c.id)
-																);
-																const isAllSelected =
-																	contactsTabSelectedIds.size === allIds.size &&
-																	[...allIds].every((id) =>
-																		contactsTabSelectedIds.has(id)
-																	);
-																if (isAllSelected) {
-																	setContactsTabSelectedIds(new Set());
-																} else {
-																	setContactsTabSelectedIds(allIds);
-																}
+																handleSelectAllContacts();
 															}}
 														>
 															<div className="absolute left-0 top-0 bottom-0 w-[3px] bg-black" />
 															All
 														</button>
 													</div>
+												)}
+												{/* "All" button overlay - only visible when not all selected */}
+												{(contactsTabSelectedIds.size > 0 || areAllContactsSelected) && !areAllContactsSelected && (
+													<button
+														type="button"
+														className="absolute right-[3px] top-[2.5px] bottom-[2.5px] w-[62px] bg-[#D17474] rounded-r-[1px] rounded-l-none flex items-center justify-center font-inter font-normal text-[17px] text-black hover:bg-[#C26666] cursor-pointer z-10"
+														onClick={(e) => {
+															e.stopPropagation();
+															handleSelectAllContacts();
+														}}
+													>
+														{/* Vertical divider line */}
+														<div className="absolute left-0 -top-[0.5px] -bottom-[0.5px] w-[2px] bg-[#9A3434]" />
+														All
+													</button>
 												)}
 											</div>
 											{/* Right arrow */}
@@ -5143,6 +5417,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											bottomPanelCollapsed={bottomPanelCollapsed}
 											hideBottomPanels={isNarrowestDesktop}
 											hideButton={isNarrowestDesktop}
+											isAllContactsSelected={areAllContactsSelected}
+											onSelectAllContacts={handleSelectAllContacts}
 										/>
 										{/* Navigation arrows with draft button at narrowest breakpoint */}
 										{isNarrowestDesktop && (
@@ -5158,53 +5434,64 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												</button>
 												{/* Draft button container */}
 												<div
+													data-draft-button-container
 													className="group relative h-[36px] flex-1"
 													style={{ maxWidth: '400px' }}
 												>
-													{contactsTabSelectedIds.size > 0 ? (
-														<>
-															<button
-																type="button"
-																onClick={() => {
-																	if (contactsTabSelectedIds.size === 0) {
-																		return;
-																	}
-																	handleGenerateDrafts(
-																		Array.from(contactsTabSelectedIds.values())
-																	);
-																}}
-																disabled={isPendingGeneration || contactsTabSelectedIds.size === 0}
-																className={cn(
-																	'w-full h-full rounded-[4px] border-[3px] text-black font-inter font-normal text-[15px]',
-																	isPendingGeneration || contactsTabSelectedIds.size === 0
-																		? 'bg-[#E0E0E0] border-[#A0A0A0] cursor-not-allowed opacity-60'
+													{contactsTabSelectedIds.size > 0 || areAllContactsSelected ? (
+														// Animated draft button with expanding "All" state
+														<button
+															type="button"
+															onClick={() => {
+																if (contactsTabSelectedIds.size === 0) {
+																	return;
+																}
+																handleGenerateDrafts(
+																	Array.from(contactsTabSelectedIds.values())
+																);
+															}}
+															disabled={isPendingGeneration || contactsTabSelectedIds.size === 0}
+															className={cn(
+																'w-full h-full rounded-[4px] border-[3px] text-black font-inter font-normal text-[15px] relative overflow-hidden transition-colors duration-300',
+																isPendingGeneration || contactsTabSelectedIds.size === 0
+																	? 'bg-[#E0E0E0] border-[#A0A0A0] cursor-not-allowed opacity-60'
+																	: areAllContactsSelected
+																		? 'bg-[#4DC669] border-black hover:bg-[#45B85F] cursor-pointer'
 																		: 'bg-[#F2C7C7] border-[#9A3434] hover:bg-[#E6B9B9] cursor-pointer'
+															)}
+														>
+															{/* Normal text - fades out when All selected */}
+															<span
+																className={cn(
+																	'transition-opacity duration-300',
+																	areAllContactsSelected ? 'opacity-0' : 'opacity-100'
 																)}
 															>
 																Draft {contactsTabSelectedIds.size} {contactsTabSelectedIds.size === 1 ? 'Contact' : 'Contacts'}
-															</button>
-															{/* Right section "All" button */}
-															<button
-																type="button"
-																className="absolute right-[3px] top-[2.5px] bottom-[2.5px] w-[52px] bg-[#D17474] rounded-r-[1px] rounded-l-none flex items-center justify-center font-inter font-normal text-[15px] text-black hover:bg-[#C26666] cursor-pointer z-10"
-																onClick={(e) => {
-																	e.stopPropagation();
-																	const allIds = new Set(contactsAvailableForDrafting.map((c) => c.id));
-																	const isAllSelected =
-																		contactsTabSelectedIds.size === allIds.size &&
-																		[...allIds].every((id) => contactsTabSelectedIds.has(id));
-																	if (isAllSelected) {
-																		setContactsTabSelectedIds(new Set());
-																	} else {
-																		setContactsTabSelectedIds(allIds);
-																	}
-																}}
+															</span>
+															{/* "All" text - fades in when All selected */}
+															<span
+																className={cn(
+																	'absolute inset-0 flex items-center justify-center transition-opacity duration-300',
+																	areAllContactsSelected ? 'opacity-100' : 'opacity-0'
+																)}
 															>
-																{/* Vertical divider line */}
-																<div className="absolute left-0 -top-[0.5px] -bottom-[0.5px] w-[2px] bg-[#9A3434]" />
-																All
-															</button>
-														</>
+																Draft <span className="font-bold mx-1">All</span> {contactsAvailableForDrafting.length} Contacts
+															</span>
+															{/* Expanding green overlay from right */}
+															<div
+																className={cn(
+																	'absolute top-0 bottom-0 right-0 bg-[#4DC669] transition-all duration-300 ease-out',
+																	areAllContactsSelected
+																		? 'w-full rounded-[1px]'
+																		: 'w-[52px] rounded-r-[1px]'
+																)}
+																style={{
+																	opacity: areAllContactsSelected ? 0 : 1,
+																	transitionProperty: 'width, opacity',
+																}}
+															/>
+														</button>
 													) : (
 														<div className="relative w-full h-full rounded-[4px] border-[3px] border-transparent overflow-hidden transition-colors group-hover:bg-[#EEF5EF] group-hover:border-black">
 															<div className="w-full h-full flex items-center justify-center text-black font-inter font-normal text-[15px] cursor-default">
@@ -5216,25 +5503,28 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																className="absolute right-0 top-0 bottom-0 w-[52px] bg-[#D17474] rounded-r-[1px] rounded-l-none flex items-center justify-center font-inter font-normal text-[15px] text-black hover:bg-[#C26666] cursor-pointer z-10 opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto"
 																onClick={(e) => {
 																	e.stopPropagation();
-																	const allIds = new Set(
-																		contactsAvailableForDrafting.map((c) => c.id)
-																	);
-																	const isAllSelected =
-																		contactsTabSelectedIds.size === allIds.size &&
-																		[...allIds].every((id) =>
-																			contactsTabSelectedIds.has(id)
-																		);
-																	if (isAllSelected) {
-																		setContactsTabSelectedIds(new Set());
-																	} else {
-																		setContactsTabSelectedIds(allIds);
-																	}
+																	handleSelectAllContacts();
 																}}
 															>
 																<div className="absolute left-0 top-0 bottom-0 w-[3px] bg-black" />
 																All
 															</button>
 														</div>
+													)}
+													{/* "All" button overlay - only visible when not all selected */}
+													{(contactsTabSelectedIds.size > 0 || areAllContactsSelected) && !areAllContactsSelected && (
+														<button
+															type="button"
+															className="absolute right-[3px] top-[2.5px] bottom-[2.5px] w-[52px] bg-[#D17474] rounded-r-[1px] rounded-l-none flex items-center justify-center font-inter font-normal text-[15px] text-black hover:bg-[#C26666] cursor-pointer z-10"
+															onClick={(e) => {
+																e.stopPropagation();
+																handleSelectAllContacts();
+															}}
+														>
+															{/* Vertical divider line */}
+															<div className="absolute left-0 -top-[0.5px] -bottom-[0.5px] w-[2px] bg-[#9A3434]" />
+															All
+														</button>
 													)}
 												</div>
 												{/* Right arrow */}
@@ -5289,7 +5579,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														variant={draftsMiniEmailTopHeaderHeight ? 'settings' : undefined}
 														settingsPrimaryLabel={draftsMiniEmailSettingsLabels.primary}
 														settingsSecondaryLabel={draftsMiniEmailSettingsLabels.secondary}
-														profileFields={miniProfileFields}
+														settingsNameCompanyBgColor={draftsMiniEmailSettingsNameCompanyBgColor}
+														profileFields={profileFieldsForSettings}
 														identityProfile={campaign?.identity as IdentityProfileFields | null}
 														onIdentityUpdate={handleIdentityUpdate}
 														onDraft={() =>
@@ -5373,7 +5664,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														variant={draftsMiniEmailTopHeaderHeight ? 'settings' : undefined}
 														settingsPrimaryLabel={draftsMiniEmailSettingsLabels.primary}
 														settingsSecondaryLabel={draftsMiniEmailSettingsLabels.secondary}
-														profileFields={miniProfileFields}
+														settingsNameCompanyBgColor={draftsMiniEmailSettingsNameCompanyBgColor}
+														profileFields={profileFieldsForSettings}
 														identityProfile={campaign?.identity as IdentityProfileFields | null}
 														onIdentityUpdate={handleIdentityUpdate}
 														onDraft={() =>
@@ -5531,7 +5823,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														variant={draftsMiniEmailTopHeaderHeight ? 'settings' : undefined}
 														settingsPrimaryLabel={draftsMiniEmailSettingsLabels.primary}
 														settingsSecondaryLabel={draftsMiniEmailSettingsLabels.secondary}
-														profileFields={miniProfileFields}
+														settingsNameCompanyBgColor={draftsMiniEmailSettingsNameCompanyBgColor}
+														profileFields={profileFieldsForSettings}
 														identityProfile={campaign?.identity as IdentityProfileFields | null}
 														onIdentityUpdate={handleIdentityUpdate}
 														onDraft={() =>
@@ -6722,6 +7015,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											onGoToWriting={goToWriting}
 											onGoToContacts={goToContacts}
 											onGoToSearch={onGoToSearch}
+											inboxSentTabRequest={inboxSentTabRequest}
+											onInboxSentTabChange={onInboxSentTabChange}
 											onContactSelect={(contact) => {
 												if (contact) {
 													setSelectedContactForResearch(contact);
@@ -6807,6 +7102,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													onGoToWriting={goToWriting}
 													onGoToContacts={goToContacts}
 													onGoToSearch={onGoToSearch}
+													inboxSentTabRequest={inboxSentTabRequest}
+													onInboxSentTabChange={onInboxSentTabChange}
 													onContactSelect={(contact) => {
 														if (contact) {
 															setSelectedContactForResearch(contact);
@@ -6863,6 +7160,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											onGoToWriting={goToWriting}
 											onGoToContacts={goToContacts}
 											onGoToSearch={onGoToSearch}
+											inboxSentTabRequest={inboxSentTabRequest}
+											onInboxSentTabChange={onInboxSentTabChange}
 											onContactSelect={(contact) => {
 												if (contact) {
 													setSelectedContactForResearch(contact);
@@ -6918,27 +7217,54 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 
 						{/* All tab */}
 						{view === 'all' && (
-							<div className="mt-6 flex justify-center">
+							<div
+								ref={allTabContainerRef}
+								className="mt-6 flex justify-center murmur-all-tab-dashboard"
+							>
+								<style jsx global>{`
+									/* --- Campaign "All" tab: hover should NOT tint rows --- */
+									.murmur-all-tab-dashboard .bg-\\[\\#F5DADA\\],
+									.murmur-all-tab-dashboard .bg-\\[\\#EAAEAE\\],
+									.murmur-all-tab-dashboard .bg-\\[\\#F9E5BA\\],
+									.murmur-all-tab-dashboard .bg-\\[\\#FFDF9F\\],
+									.murmur-all-tab-dashboard .bg-\\[\\#FDDEA5\\],
+									.murmur-all-tab-dashboard .bg-\\[\\#A8E6A8\\] {
+										background-color: #ffffff !important;
+									}
+
+									.murmur-all-tab-dashboard .hover\\:bg-\\[\\#F5DADA\\]:hover,
+									.murmur-all-tab-dashboard .hover\\:bg-\\[\\#F9E5BA\\]:hover {
+										background-color: #ffffff !important;
+									}
+
+									/* Remove “this is clickable” affordance inside tiles (tiles themselves still navigate). */
+									.murmur-all-tab-dashboard .cursor-pointer {
+										cursor: default !important;
+									}
+								`}</style>
 								{/* Single column layout at narrowest breakpoint (< 952px) */}
 								{isNarrowestDesktop ? (
 									<div className="flex flex-col items-center" style={{ gap: '39px' }}>
 										{/* 1. Campaign Header */}
-										<CampaignHeaderBox
-											campaignId={campaign?.id}
-											campaignName={campaign?.name || 'Untitled Campaign'}
-											toListNames={toListNames}
-											fromName={fromName}
-											contactsCount={contactsCount}
-											draftCount={draftCount}
-											sentCount={sentCount}
-											onFromClick={onOpenIdentityDialog}
-											onContactsClick={goToContacts}
-											onDraftsClick={goToDrafting}
-											onSentClick={goToSent}
-											width={330}
-										/>
+										<div className={getAllTabBoxOpacityClassName('header')}>
+											<CampaignHeaderBox
+												campaignId={campaign?.id}
+												campaignName={campaign?.name || 'Untitled Campaign'}
+												toListNames={toListNames}
+												fromName={fromName}
+												contactsCount={contactsCount}
+												draftCount={draftCount}
+												sentCount={sentCount}
+												onFromClick={onOpenIdentityDialog}
+												onContactsClick={goToContacts}
+												onDraftsClick={goToDrafting}
+												onSentClick={goToSent}
+												width={330}
+											/>
+										</div>
 										{/* 2. Contacts */}
 										<div
+											className={getAllTabBoxOpacityClassName('contacts')}
 											style={{
 												width: '330px',
 												height: '263px',
@@ -6946,10 +7272,19 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												position: 'relative',
 												cursor: 'pointer',
 											}}
-											onMouseEnter={() => setIsContactsHovered(true)}
-											onMouseLeave={() => setIsContactsHovered(false)}
+											onMouseEnter={() => handleAllTabBoxMouseEnter('contacts')}
+											onMouseLeave={() => handleAllTabBoxMouseLeave('contacts')}
+											onClickCapture={(e) => {
+												// In the All tab, clicks inside the tile should *only* navigate
+												// (disable internal list actions like Select All / row selection).
+												if (e.target === e.currentTarget) return;
+												e.preventDefault();
+												e.stopPropagation();
+												setHoveredAllTabBox(null);
+												goToContacts?.();
+											}}
 											onClick={() => {
-												setIsContactsHovered(false);
+												setHoveredAllTabBox(null);
 												goToContacts?.();
 											}}
 										>
@@ -6963,7 +7298,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														width: '364px',
 														height: '278px',
 														backgroundColor: 'transparent',
-														border: '6px solid #D75152',
+														border: 'none',
 														borderRadius: '0px',
 														zIndex: 10,
 														pointerEvents: 'none',
@@ -6975,6 +7310,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													contacts={contactsAvailableForDrafting}
 													isLoading={isContactsLoading}
 													campaign={campaign}
+													interactionMode="allTab"
 													selectedContactIds={contactsTabSelectedIds}
 													onContactSelectionChange={(updater) =>
 														setContactsTabSelectedIds((prev) => updater(new Set(prev)))
@@ -6996,6 +7332,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										</div>
 										{/* 3. Writing */}
 										<div
+											className={getAllTabBoxOpacityClassName('writing')}
 											style={{
 												width: '330px',
 												height: '349px',
@@ -7003,30 +7340,21 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												position: 'relative',
 												cursor: 'pointer',
 											}}
-											onMouseEnter={() => setIsWritingHovered(true)}
-											onMouseLeave={() => setIsWritingHovered(false)}
+											onMouseEnter={() => handleAllTabBoxMouseEnter('writing')}
+											onMouseLeave={() => handleAllTabBoxMouseLeave('writing')}
+											onClickCapture={(e) => {
+												// All tab: disable interactions inside MiniEmailStructure (tile click navigates).
+												if (e.target === e.currentTarget) return;
+												e.preventDefault();
+												e.stopPropagation();
+												setHoveredAllTabBox(null);
+												goToWriting?.();
+											}}
 											onClick={() => {
-												setIsWritingHovered(false);
+												setHoveredAllTabBox(null);
 												goToWriting?.();
 											}}
 										>
-											{isWritingHovered && (
-												<div
-													style={{
-														position: 'absolute',
-														top: '50%',
-														left: '50%',
-														transform: 'translate(-50%, -50%)',
-														width: '364px',
-														height: '364px',
-														backgroundColor: 'transparent',
-														border: '6px solid #37B73B',
-														borderRadius: '0px',
-														zIndex: 10,
-														pointerEvents: 'none',
-													}}
-												/>
-											)}
 											<div style={{ position: 'relative', zIndex: 20 }}>
 												<MiniEmailStructure
 													form={
@@ -7036,11 +7364,12 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																? sentSettingsPreviewForm
 																: form
 													}
-													readOnly={isDraftingView || isSentView}
+													readOnly={true}
 													variant={draftsMiniEmailTopHeaderHeight ? 'settings' : undefined}
 													settingsPrimaryLabel={draftsMiniEmailSettingsLabels.primary}
 													settingsSecondaryLabel={draftsMiniEmailSettingsLabels.secondary}
-													profileFields={miniProfileFields}
+													settingsNameCompanyBgColor={draftsMiniEmailSettingsNameCompanyBgColor}
+													profileFields={profileFieldsForSettings}
 													identityProfile={campaign?.identity as IdentityProfileFields | null}
 													onIdentityUpdate={handleIdentityUpdate}
 													onDraft={() =>
@@ -7067,6 +7396,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										</div>
 										{/* 4. Drafts */}
 										<div
+											className={getAllTabBoxOpacityClassName('drafts')}
 											style={{
 												width: '330px',
 												height: '347px',
@@ -7074,34 +7404,26 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												position: 'relative',
 												cursor: 'pointer',
 											}}
-											onMouseEnter={() => setIsDraftsHovered(true)}
-											onMouseLeave={() => setIsDraftsHovered(false)}
+											onMouseEnter={() => handleAllTabBoxMouseEnter('drafts')}
+											onMouseLeave={() => handleAllTabBoxMouseLeave('drafts')}
+											onClickCapture={(e) => {
+												if (e.target === e.currentTarget) return;
+												e.preventDefault();
+												e.stopPropagation();
+												setHoveredAllTabBox(null);
+												goToDrafting?.();
+											}}
 											onClick={() => {
-												setIsDraftsHovered(false);
+												setHoveredAllTabBox(null);
 												goToDrafting?.();
 											}}
 										>
-											{isDraftsHovered && (
-												<div
-													style={{
-														position: 'absolute',
-														top: '50%',
-														left: '50%',
-														transform: 'translate(-50%, -50%)',
-														width: '364px',
-														height: '364px',
-														backgroundColor: 'transparent',
-														border: '6px solid #E6AF4D',
-														borderRadius: '0px',
-														zIndex: 10,
-														pointerEvents: 'none',
-													}}
-												/>
-											)}
 											<div style={{ position: 'relative', zIndex: 20 }}>
 												<DraftsExpandedList
 													drafts={draftEmails}
 													contacts={contacts || []}
+													onDraftHover={handleAllTabEmailHover}
+													interactionMode="allTab"
 													width={330}
 													height={347}
 													hideSendButton
@@ -7111,6 +7433,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										</div>
 										{/* 5. Sent */}
 										<div
+											className={getAllTabBoxOpacityClassName('sent')}
 											style={{
 												width: '330px',
 												height: '347px',
@@ -7118,34 +7441,26 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												position: 'relative',
 												cursor: 'pointer',
 											}}
-											onMouseEnter={() => setIsSentHovered(true)}
-											onMouseLeave={() => setIsSentHovered(false)}
+											onMouseEnter={() => handleAllTabBoxMouseEnter('sent')}
+											onMouseLeave={() => handleAllTabBoxMouseLeave('sent')}
+											onClickCapture={(e) => {
+												if (e.target === e.currentTarget) return;
+												e.preventDefault();
+												e.stopPropagation();
+												setHoveredAllTabBox(null);
+												goToSent?.();
+											}}
 											onClick={() => {
-												setIsSentHovered(false);
+												setHoveredAllTabBox(null);
 												goToSent?.();
 											}}
 										>
-											{isSentHovered && (
-												<div
-													style={{
-														position: 'absolute',
-														top: '50%',
-														left: '50%',
-														transform: 'translate(-50%, -50%)',
-														width: '364px',
-														height: '364px',
-														backgroundColor: 'transparent',
-														border: '6px solid #2CA954',
-														borderRadius: '0px',
-														zIndex: 10,
-														pointerEvents: 'none',
-													}}
-												/>
-											)}
 											<div style={{ position: 'relative', zIndex: 20 }}>
 												<SentExpandedList
 													sent={sentEmails}
 													contacts={contacts || []}
+													onEmailHover={handleAllTabEmailHover}
+													interactionMode="allTab"
 													width={330}
 													height={347}
 													onOpenSent={goToSent}
@@ -7153,15 +7468,11 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											</div>
 										</div>
 										{/* 6. Research Panel */}
-										{isBatchDraftingInProgress ? (
-											<DraftPreviewExpandedList
-												contacts={contacts || []}
-												livePreview={liveDraftPreview}
-												fallbackDraft={draftPreviewFallbackDraft}
-												width={330}
-												height={347}
-											/>
-										) : (
+										<div
+											className={getAllTabBoxOpacityClassName('research')}
+											onMouseEnter={() => handleAllTabBoxMouseEnter('research')}
+											onMouseLeave={() => handleAllTabBoxMouseLeave('research')}
+										>
 											<ContactResearchPanel
 												contact={displayedContactForResearch}
 												hideAllText={contactsAvailableForDrafting.length === 0}
@@ -7172,9 +7483,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												compactHeader
 												className="!block"
 											/>
-										)}
+										</div>
 										{/* 7. Suggestion Box */}
 										<div
+											className={getAllTabBoxOpacityClassName('suggestion')}
 											style={{
 												width: '330px',
 												height: '347px',
@@ -7182,6 +7494,13 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												border: '3px solid #000000',
 												borderRadius: '7px',
 												position: 'relative',
+											}}
+											onMouseEnter={() => handleAllTabBoxMouseEnter('suggestion')}
+											onMouseLeave={() => handleAllTabBoxMouseLeave('suggestion')}
+											onClickCapture={(e) => {
+												// All tab: suggestion tile is display-only (no clicks).
+												e.preventDefault();
+												e.stopPropagation();
 											}}
 										>
 											<div
@@ -7527,22 +7846,26 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											</div>
 										</div>
 										{/* 8. Draft Preview */}
-										<DraftPreviewExpandedList
-											contacts={contacts || []}
-											fallbackDraft={
-												draftEmails[0]
-													? {
-															contactId: draftEmails[0].contactId,
-															subject: draftEmails[0].subject,
-															message: draftEmails[0].message,
-													  }
-													: null
-											}
-											width={330}
-											height={347}
-										/>
+										<div
+											className={getAllTabBoxOpacityClassName('preview')}
+											onMouseEnter={() => handleAllTabBoxMouseEnter('preview')}
+											onMouseLeave={() => handleAllTabBoxMouseLeave('preview')}
+										>
+											<DraftPreviewExpandedList
+												contacts={contacts || []}
+												livePreview={
+													allTabHoveredEmailPreview
+														? { ...liveDraftPreview, visible: false }
+														: liveDraftPreview
+												}
+												fallbackDraft={allTabHoveredEmailPreview ?? draftPreviewFallbackDraft}
+												width={330}
+												height={347}
+											/>
+										</div>
 										{/* 9. Inbox */}
 										<div
+											className={getAllTabBoxOpacityClassName('inbox')}
 											style={{
 												width: '330px',
 												height: '347px',
@@ -7550,30 +7873,20 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												position: 'relative',
 												cursor: 'pointer',
 											}}
-											onMouseEnter={() => setIsInboxHovered(true)}
-											onMouseLeave={() => setIsInboxHovered(false)}
+											onMouseEnter={() => handleAllTabBoxMouseEnter('inbox')}
+											onMouseLeave={() => handleAllTabBoxMouseLeave('inbox')}
+											onClickCapture={(e) => {
+												if (e.target === e.currentTarget) return;
+												e.preventDefault();
+												e.stopPropagation();
+												setHoveredAllTabBox(null);
+												goToInbox?.();
+											}}
 											onClick={() => {
-												setIsInboxHovered(false);
+												setHoveredAllTabBox(null);
 												goToInbox?.();
 											}}
 										>
-											{isInboxHovered && (
-												<div
-													style={{
-														position: 'absolute',
-														top: '50%',
-														left: '50%',
-														transform: 'translate(-50%, -50%)',
-														width: '364px',
-														height: '364px',
-														backgroundColor: 'transparent',
-														border: '6px solid #5EB6D6',
-														borderRadius: '0px',
-														zIndex: 10,
-														pointerEvents: 'none',
-													}}
-												/>
-											)}
 											<div style={{ position: 'relative', zIndex: 20 }}>
 												<InboxExpandedList
 													contacts={contacts || []}
@@ -7593,21 +7906,24 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 								>
 									{/* Left column: Campaign Header + Contacts + Research (+ Preview in narrow mode) */}
 									<div className="flex flex-col items-center" style={{ gap: '39px' }}>
-										<CampaignHeaderBox
-											campaignId={campaign?.id}
-											campaignName={campaign?.name || 'Untitled Campaign'}
-											toListNames={toListNames}
-											fromName={fromName}
-											contactsCount={contactsCount}
-											draftCount={draftCount}
-											sentCount={sentCount}
-											onFromClick={onOpenIdentityDialog}
-											onContactsClick={goToContacts}
-											onDraftsClick={goToDrafting}
-											onSentClick={goToSent}
-											width={330}
-										/>
+										<div className={getAllTabBoxOpacityClassName('header')}>
+											<CampaignHeaderBox
+												campaignId={campaign?.id}
+												campaignName={campaign?.name || 'Untitled Campaign'}
+												toListNames={toListNames}
+												fromName={fromName}
+												contactsCount={contactsCount}
+												draftCount={draftCount}
+												sentCount={sentCount}
+												onFromClick={onOpenIdentityDialog}
+												onContactsClick={goToContacts}
+												onDraftsClick={goToDrafting}
+												onSentClick={goToSent}
+												width={330}
+											/>
+										</div>
 										<div
+											className={getAllTabBoxOpacityClassName('contacts')}
 											style={{
 												width: '330px',
 												height: '263px',
@@ -7616,10 +7932,17 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												position: 'relative',
 												cursor: 'pointer',
 											}}
-											onMouseEnter={() => setIsContactsHovered(true)}
-											onMouseLeave={() => setIsContactsHovered(false)}
+											onMouseEnter={() => handleAllTabBoxMouseEnter('contacts')}
+											onMouseLeave={() => handleAllTabBoxMouseLeave('contacts')}
+											onClickCapture={(e) => {
+												if (e.target === e.currentTarget) return;
+												e.preventDefault();
+												e.stopPropagation();
+												setHoveredAllTabBox(null);
+												goToContacts?.();
+											}}
 											onClick={() => {
-												setIsContactsHovered(false);
+												setHoveredAllTabBox(null);
 												goToContacts?.();
 											}}
 										>
@@ -7634,7 +7957,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														width: '364px',
 														height: '278px',
 														backgroundColor: 'transparent',
-														border: '6px solid #D75152',
+														border: 'none',
 														borderRadius: '0px',
 														zIndex: 10,
 														pointerEvents: 'none',
@@ -7646,6 +7969,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													contacts={contactsAvailableForDrafting}
 													isLoading={isContactsLoading}
 													campaign={campaign}
+													interactionMode="allTab"
 													selectedContactIds={contactsTabSelectedIds}
 													onContactSelectionChange={(updater) =>
 														setContactsTabSelectedIds((prev) => updater(new Set(prev)))
@@ -7668,6 +7992,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										{/* In narrow mode (2x4 grid), add Drafts here after Contacts */}
 										{isAllTabNarrow && (
 											<div
+												className={getAllTabBoxOpacityClassName('drafts')}
 												style={{
 													width: '330px',
 													height: '347px',
@@ -7675,35 +8000,27 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													position: 'relative',
 													cursor: 'pointer',
 												}}
-												onMouseEnter={() => setIsDraftsHovered(true)}
-												onMouseLeave={() => setIsDraftsHovered(false)}
+												onMouseEnter={() => handleAllTabBoxMouseEnter('drafts')}
+												onMouseLeave={() => handleAllTabBoxMouseLeave('drafts')}
+												onClickCapture={(e) => {
+													if (e.target === e.currentTarget) return;
+													e.preventDefault();
+													e.stopPropagation();
+													setHoveredAllTabBox(null);
+													goToDrafting?.();
+												}}
 												onClick={() => {
-													setIsDraftsHovered(false);
+													setHoveredAllTabBox(null);
 													goToDrafting?.();
 												}}
 											>
 												{/* Hover box */}
-												{isDraftsHovered && (
-													<div
-														style={{
-															position: 'absolute',
-															top: '50%',
-															left: '50%',
-															transform: 'translate(-50%, -50%)',
-															width: '364px',
-															height: '364px',
-															backgroundColor: 'transparent',
-															border: '6px solid #E6AF4D',
-															borderRadius: '0px',
-															zIndex: 10,
-															pointerEvents: 'none',
-														}}
-													/>
-												)}
 												<div style={{ position: 'relative', zIndex: 20 }}>
 													<DraftsExpandedList
 														drafts={draftEmails}
 														contacts={contacts || []}
+														onDraftHover={handleAllTabEmailHover}
+														interactionMode="allTab"
 														width={330}
 														height={347}
 														hideSendButton
@@ -7713,15 +8030,11 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											</div>
 										)}
 										{/* Research Panel */}
-										{isBatchDraftingInProgress ? (
-											<DraftPreviewExpandedList
-												contacts={contacts || []}
-												livePreview={liveDraftPreview}
-												fallbackDraft={draftPreviewFallbackDraft}
-												width={330}
-												height={347}
-											/>
-										) : (
+										<div
+											className={getAllTabBoxOpacityClassName('research')}
+											onMouseEnter={() => handleAllTabBoxMouseEnter('research')}
+											onMouseLeave={() => handleAllTabBoxMouseLeave('research')}
+										>
 											<ContactResearchPanel
 												contact={displayedContactForResearch}
 												hideAllText={contactsAvailableForDrafting.length === 0}
@@ -7732,29 +8045,33 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												compactHeader
 												className="!block"
 											/>
-										)}
+										</div>
 										{/* In narrow mode (2x4 grid), move Preview here */}
 										{isAllTabNarrow && (
-											<DraftPreviewExpandedList
-												contacts={contacts || []}
-												fallbackDraft={
-													draftEmails[0]
-														? {
-																contactId: draftEmails[0].contactId,
-																subject: draftEmails[0].subject,
-																message: draftEmails[0].message,
-														  }
-														: null
-												}
-												width={330}
-												height={347}
-											/>
+											<div
+												className={getAllTabBoxOpacityClassName('preview')}
+												onMouseEnter={() => handleAllTabBoxMouseEnter('preview')}
+												onMouseLeave={() => handleAllTabBoxMouseLeave('preview')}
+											>
+												<DraftPreviewExpandedList
+													contacts={contacts || []}
+													livePreview={
+														allTabHoveredEmailPreview
+															? { ...liveDraftPreview, visible: false }
+															: liveDraftPreview
+													}
+													fallbackDraft={allTabHoveredEmailPreview ?? draftPreviewFallbackDraft}
+													width={330}
+													height={347}
+												/>
+											</div>
 										)}
 									</div>
 									{/* Column 2: Writing (Row 1) + Suggestion (Row 2) */}
 									<div className="flex flex-col items-center" style={{ gap: '39px' }}>
 										{/* Row 1: Mini Email Structure */}
 										<div
+											className={getAllTabBoxOpacityClassName('writing')}
 											style={{
 												width: '330px',
 												height: '349px',
@@ -7762,31 +8079,21 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												position: 'relative',
 												cursor: 'pointer',
 											}}
-											onMouseEnter={() => setIsWritingHovered(true)}
-											onMouseLeave={() => setIsWritingHovered(false)}
+											onMouseEnter={() => handleAllTabBoxMouseEnter('writing')}
+											onMouseLeave={() => handleAllTabBoxMouseLeave('writing')}
+											onClickCapture={(e) => {
+												if (e.target === e.currentTarget) return;
+												e.preventDefault();
+												e.stopPropagation();
+												setHoveredAllTabBox(null);
+												goToWriting?.();
+											}}
 											onClick={() => {
-												setIsWritingHovered(false);
+												setHoveredAllTabBox(null);
 												goToWriting?.();
 											}}
 										>
 											{/* Hover box */}
-											{isWritingHovered && (
-												<div
-													style={{
-														position: 'absolute',
-														top: '50%',
-														left: '50%',
-														transform: 'translate(-50%, -50%)',
-														width: '364px',
-														height: '364px',
-														backgroundColor: 'transparent',
-														border: '6px solid #37B73B',
-														borderRadius: '0px',
-														zIndex: 10,
-														pointerEvents: 'none',
-													}}
-												/>
-											)}
 											<div style={{ position: 'relative', zIndex: 20 }}>
 												<MiniEmailStructure
 													form={
@@ -7796,11 +8103,12 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																? sentSettingsPreviewForm
 																: form
 													}
-													readOnly={isDraftingView || isSentView}
+													readOnly={true}
 													variant={draftsMiniEmailTopHeaderHeight ? 'settings' : undefined}
 													settingsPrimaryLabel={draftsMiniEmailSettingsLabels.primary}
 													settingsSecondaryLabel={draftsMiniEmailSettingsLabels.secondary}
-													profileFields={miniProfileFields}
+													settingsNameCompanyBgColor={draftsMiniEmailSettingsNameCompanyBgColor}
+													profileFields={profileFieldsForSettings}
 													identityProfile={campaign?.identity as IdentityProfileFields | null}
 													onIdentityUpdate={handleIdentityUpdate}
 													onDraft={() =>
@@ -7828,6 +8136,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										{/* In narrow mode, add Sent here (after Writing, before Suggestion) */}
 										{isAllTabNarrow && (
 											<div
+												className={getAllTabBoxOpacityClassName('sent')}
 												style={{
 													width: '330px',
 													height: '347px',
@@ -7835,35 +8144,27 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													position: 'relative',
 													cursor: 'pointer',
 												}}
-												onMouseEnter={() => setIsSentHovered(true)}
-												onMouseLeave={() => setIsSentHovered(false)}
+												onMouseEnter={() => handleAllTabBoxMouseEnter('sent')}
+												onMouseLeave={() => handleAllTabBoxMouseLeave('sent')}
+												onClickCapture={(e) => {
+													if (e.target === e.currentTarget) return;
+													e.preventDefault();
+													e.stopPropagation();
+													setHoveredAllTabBox(null);
+													goToSent?.();
+												}}
 												onClick={() => {
-													setIsSentHovered(false);
+													setHoveredAllTabBox(null);
 													goToSent?.();
 												}}
 											>
 												{/* Hover box */}
-												{isSentHovered && (
-													<div
-														style={{
-															position: 'absolute',
-															top: '50%',
-															left: '50%',
-															transform: 'translate(-50%, -50%)',
-															width: '364px',
-															height: '364px',
-															backgroundColor: 'transparent',
-															border: '6px solid #2CA954',
-															borderRadius: '0px',
-															zIndex: 10,
-															pointerEvents: 'none',
-														}}
-													/>
-												)}
 												<div style={{ position: 'relative', zIndex: 20 }}>
 													<SentExpandedList
 														sent={sentEmails}
 														contacts={contacts || []}
+														onEmailHover={handleAllTabEmailHover}
+														interactionMode="allTab"
 														width={330}
 														height={347}
 														onOpenSent={goToSent}
@@ -7873,6 +8174,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										)}
 										{/* Row 2: Suggestion Box */}
 										<div
+											className={getAllTabBoxOpacityClassName('suggestion')}
 											style={{
 												width: '330px',
 												height: '347px',
@@ -7881,6 +8183,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												borderRadius: '7px',
 												position: 'relative',
 											}}
+											onMouseEnter={() => handleAllTabBoxMouseEnter('suggestion')}
+											onMouseLeave={() => handleAllTabBoxMouseLeave('suggestion')}
 										>
 											<div
 												style={{
@@ -8232,6 +8536,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											<>
 												{/* Inbox */}
 												<div
+													className={getAllTabBoxOpacityClassName('inbox')}
 													style={{
 														width: '330px',
 														height: '347px',
@@ -8239,31 +8544,14 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														position: 'relative',
 														cursor: 'pointer',
 													}}
-													onMouseEnter={() => setIsInboxHovered(true)}
-													onMouseLeave={() => setIsInboxHovered(false)}
+													onMouseEnter={() => handleAllTabBoxMouseEnter('inbox')}
+													onMouseLeave={() => handleAllTabBoxMouseLeave('inbox')}
 													onClick={() => {
-														setIsInboxHovered(false);
+														setHoveredAllTabBox(null);
 														goToInbox?.();
 													}}
 												>
 													{/* Hover box */}
-													{isInboxHovered && (
-														<div
-															style={{
-																position: 'absolute',
-																top: '50%',
-																left: '50%',
-																transform: 'translate(-50%, -50%)',
-																width: '364px',
-																height: '364px',
-																backgroundColor: 'transparent',
-																border: '6px solid #5EB6D6',
-																borderRadius: '0px',
-																zIndex: 10,
-																pointerEvents: 'none',
-															}}
-														/>
-													)}
 													<div style={{ position: 'relative', zIndex: 20 }}>
 														<InboxExpandedList
 															contacts={contacts || []}
@@ -8286,6 +8574,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 									<div className="flex flex-col items-center" style={{ gap: '39px' }}>
 										{/* Row 1: Drafts */}
 										<div
+											className={getAllTabBoxOpacityClassName('drafts')}
 											style={{
 												width: '330px',
 												height: '347px',
@@ -8293,35 +8582,27 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												position: 'relative',
 												cursor: 'pointer',
 											}}
-											onMouseEnter={() => setIsDraftsHovered(true)}
-											onMouseLeave={() => setIsDraftsHovered(false)}
+											onMouseEnter={() => handleAllTabBoxMouseEnter('drafts')}
+											onMouseLeave={() => handleAllTabBoxMouseLeave('drafts')}
+											onClickCapture={(e) => {
+												if (e.target === e.currentTarget) return;
+												e.preventDefault();
+												e.stopPropagation();
+												setHoveredAllTabBox(null);
+												goToDrafting?.();
+											}}
 											onClick={() => {
-												setIsDraftsHovered(false);
+												setHoveredAllTabBox(null);
 												goToDrafting?.();
 											}}
 										>
 											{/* Hover box */}
-											{isDraftsHovered && (
-												<div
-													style={{
-														position: 'absolute',
-														top: '50%',
-														left: '50%',
-														transform: 'translate(-50%, -50%)',
-														width: '364px',
-														height: '364px',
-														backgroundColor: 'transparent',
-														border: '6px solid #E6AF4D',
-														borderRadius: '0px',
-														zIndex: 10,
-														pointerEvents: 'none',
-													}}
-												/>
-											)}
 											<div style={{ position: 'relative', zIndex: 20 }}>
 												<DraftsExpandedList
 													drafts={draftEmails}
 													contacts={contacts || []}
+													onDraftHover={handleAllTabEmailHover}
+													interactionMode="allTab"
 													width={330}
 													height={347}
 													hideSendButton
@@ -8330,26 +8611,30 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											</div>
 										</div>
 										{/* Row 2: Draft Preview */}
-										<DraftPreviewExpandedList
-											contacts={contacts || []}
-											fallbackDraft={
-												draftEmails[0]
-													? {
-															contactId: draftEmails[0].contactId,
-															subject: draftEmails[0].subject,
-															message: draftEmails[0].message,
-													  }
-													: null
-											}
-											width={330}
-											height={347}
-										/>
+										<div
+											className={getAllTabBoxOpacityClassName('preview')}
+											onMouseEnter={() => handleAllTabBoxMouseEnter('preview')}
+											onMouseLeave={() => handleAllTabBoxMouseLeave('preview')}
+										>
+											<DraftPreviewExpandedList
+												contacts={contacts || []}
+												livePreview={
+													allTabHoveredEmailPreview
+														? { ...liveDraftPreview, visible: false }
+														: liveDraftPreview
+												}
+												fallbackDraft={allTabHoveredEmailPreview ?? draftPreviewFallbackDraft}
+												width={330}
+												height={347}
+											/>
+										</div>
 									</div>
 
 									{/* Column 4: Sent (Row 1) + Inbox (Row 2) */}
 									<div className="flex flex-col items-center" style={{ gap: '39px' }}>
 										{/* Row 1: Sent */}
 										<div
+											className={getAllTabBoxOpacityClassName('sent')}
 											style={{
 												width: '330px',
 												height: '347px',
@@ -8357,35 +8642,27 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												position: 'relative',
 												cursor: 'pointer',
 											}}
-											onMouseEnter={() => setIsSentHovered(true)}
-											onMouseLeave={() => setIsSentHovered(false)}
+											onMouseEnter={() => handleAllTabBoxMouseEnter('sent')}
+											onMouseLeave={() => handleAllTabBoxMouseLeave('sent')}
+											onClickCapture={(e) => {
+												if (e.target === e.currentTarget) return;
+												e.preventDefault();
+												e.stopPropagation();
+												setHoveredAllTabBox(null);
+												goToSent?.();
+											}}
 											onClick={() => {
-												setIsSentHovered(false);
+												setHoveredAllTabBox(null);
 												goToSent?.();
 											}}
 										>
 											{/* Hover box */}
-											{isSentHovered && (
-												<div
-													style={{
-														position: 'absolute',
-														top: '50%',
-														left: '50%',
-														transform: 'translate(-50%, -50%)',
-														width: '364px',
-														height: '364px',
-														backgroundColor: 'transparent',
-														border: '6px solid #2CA954',
-														borderRadius: '0px',
-														zIndex: 10,
-														pointerEvents: 'none',
-													}}
-												/>
-											)}
 											<div style={{ position: 'relative', zIndex: 20 }}>
 												<SentExpandedList
 													sent={sentEmails}
 													contacts={contacts || []}
+													onEmailHover={handleAllTabEmailHover}
+													interactionMode="allTab"
 													width={330}
 													height={347}
 													onOpenSent={goToSent}
@@ -8394,6 +8671,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										</div>
 										{/* Row 2: Inbox */}
 										<div
+											className={getAllTabBoxOpacityClassName('inbox')}
 											style={{
 												width: '330px',
 												height: '347px',
@@ -8401,31 +8679,21 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												position: 'relative',
 												cursor: 'pointer',
 											}}
-											onMouseEnter={() => setIsInboxHovered(true)}
-											onMouseLeave={() => setIsInboxHovered(false)}
+											onMouseEnter={() => handleAllTabBoxMouseEnter('inbox')}
+											onMouseLeave={() => handleAllTabBoxMouseLeave('inbox')}
+											onClickCapture={(e) => {
+												if (e.target === e.currentTarget) return;
+												e.preventDefault();
+												e.stopPropagation();
+												setHoveredAllTabBox(null);
+												goToInbox?.();
+											}}
 											onClick={() => {
-												setIsInboxHovered(false);
+												setHoveredAllTabBox(null);
 												goToInbox?.();
 											}}
 										>
 											{/* Hover box */}
-											{isInboxHovered && (
-												<div
-													style={{
-														position: 'absolute',
-														top: '50%',
-														left: '50%',
-														transform: 'translate(-50%, -50%)',
-														width: '364px',
-														height: '364px',
-														backgroundColor: 'transparent',
-														border: '6px solid #5EB6D6',
-														borderRadius: '0px',
-														zIndex: 10,
-														pointerEvents: 'none',
-													}}
-												/>
-											)}
 											<div style={{ position: 'relative', zIndex: 20 }}>
 												<InboxExpandedList
 													contacts={contacts || []}

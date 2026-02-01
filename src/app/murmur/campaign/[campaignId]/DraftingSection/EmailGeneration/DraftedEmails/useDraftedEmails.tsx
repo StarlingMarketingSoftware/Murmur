@@ -35,7 +35,7 @@ export interface DraftedEmailsProps {
 	draftEmails: EmailWithRelations[];
 	isPendingEmails: boolean;
 	setSelectedDraftIds: Dispatch<SetStateAction<Set<number>>>;
-	onSend: () => void | Promise<void>;
+	onSend: (draftIds?: Iterable<number>) => void | Promise<void>;
 	isSendingDisabled: boolean;
 	isFreeTrial: boolean;
 	fromName?: string;

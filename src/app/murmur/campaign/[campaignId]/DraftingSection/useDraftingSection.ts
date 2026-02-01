@@ -31,7 +31,7 @@ import {
 	removeEmDashes,
 	stripEmailSignatureFromAiMessage,
 } from '@/utils';
-import { injectMurmurDraftSettingsSnapshot } from '@/utils/draftSettings';
+import { injectMurmurDraftSettingsSnapshot, type DraftProfileFields } from '@/utils/draftSettings';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Contact, HybridBlock, Identity, Signature } from '@prisma/client';
 import { DraftingMode, DraftingTone, EmailStatus } from '@/constants/prismaEnums';
@@ -51,6 +51,9 @@ export type DraftingSectionView =
 	| 'sent'
 	| 'inbox'
 	| 'all';
+
+export type InboxSentTab = 'inbox' | 'sent';
+export type InboxSentTabRequest = { tab: InboxSentTab; requestId: number };
 
 export interface DraftingSectionProps {
 	campaign: CampaignWithRelations;
@@ -88,6 +91,15 @@ export interface DraftingSectionProps {
 	 * Optional callback to switch the campaign page into the Sent tab.
 	 */
 	goToSent?: () => void;
+	/**
+	 * Optional request to switch the InboxSection's Inbox/Sent tab.
+	 * Used by the campaign page to route "Sent" navigation into the inbox's Sent view.
+	 */
+	inboxSentTabRequest?: InboxSentTabRequest | null;
+	/**
+	 * Optional callback fired whenever the InboxSection's Inbox/Sent tab changes.
+	 */
+	onInboxSentTabChange?: (next: InboxSentTab) => void;
 	/**
 	 * Optional callback to navigate to the previous tab.
 	 */
@@ -771,6 +783,16 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			signatureTextForDraft || null
 		);
 
+		// Build profile fields from the current identity to store with the draft
+		const profileFieldsSnapshot: DraftProfileFields = {
+			name: campaign.identity?.name ?? '',
+			genre: campaign.identity?.genre ?? '',
+			area: campaign.identity?.area ?? '',
+			band: campaign.identity?.bandName ?? '',
+			bio: campaign.identity?.bio ?? '',
+			links: campaign.identity?.website ?? '',
+		};
+
 		const messageWithSettings = injectMurmurDraftSettingsSnapshot(messageHtml, {
 			version: 1,
 			values: {
@@ -778,6 +800,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 				// Ensure the stored snapshot always has a concrete signature string.
 				signature: signatureTextForDraft,
 			},
+			profileFields: profileFieldsSnapshot,
 		});
 
 		return {
@@ -1914,6 +1937,15 @@ EXAMPLES OF GOOD CUSTOM INSTRUCTIONS:
 							values.font,
 							signatureTextForDraft || null
 						);
+						// Build profile fields from the current identity to store with the draft
+						const profileFieldsSnapshot: DraftProfileFields = {
+							name: campaign.identity?.name ?? '',
+							genre: campaign.identity?.genre ?? '',
+							area: campaign.identity?.area ?? '',
+							band: campaign.identity?.bandName ?? '',
+							bio: campaign.identity?.bio ?? '',
+							links: campaign.identity?.website ?? '',
+						};
 						const draftMessageWithSettings = injectMurmurDraftSettingsSnapshot(
 							draftMessageHtml,
 							{
@@ -1922,6 +1954,7 @@ EXAMPLES OF GOOD CUSTOM INSTRUCTIONS:
 									...values,
 									signature: signatureTextForDraft,
 								},
+								profileFields: profileFieldsSnapshot,
 							}
 						);
 

@@ -18,6 +18,11 @@ export const ContactsHeaderChrome: FC<{
 	onDraftsClick?: () => void;
 	onInboxClick?: () => void;
 	/**
+	 * Which campaign tab is currently active.
+	 * Used to render the hovered pill as a "white placeholder" when it represents the active tab.
+	 */
+	activeTab?: 'contacts' | 'write' | 'drafts' | 'inbox';
+	/**
 	 * When false, renders a static header (no hover pill animation, no dot hover/click zones).
 	 * Useful for small preview/expanded-list variants where the full interaction feels noisy.
 	 */
@@ -30,6 +35,7 @@ export const ContactsHeaderChrome: FC<{
 	onWriteClick,
 	onDraftsClick,
 	onInboxClick,
+	activeTab = 'contacts',
 	interactive = true,
 }) => {
 	const [isDot1Hovered, setIsDot1Hovered] = useState(false);
@@ -37,6 +43,7 @@ export const ContactsHeaderChrome: FC<{
 	const [isDot3Hovered, setIsDot3Hovered] = useState(false);
 	const wasAnyDotHoveredRef = useRef(false);
 	const isBottomView = whiteSectionHeight === 15;
+	const isWriteActiveTab = activeTab === 'write';
 	const dotColor = hasData ? '#D9D9D9' : '#B0B0B0';
 	const pillBorderColor = hasData ? '#8D5B5B' : '#B0B0B0';
 	const pillTextColor = hasData ? '#000000' : '#B0B0B0';
@@ -177,7 +184,9 @@ export const ContactsHeaderChrome: FC<{
 							left: `${writePillLeft}px`,
 							width: `${writePillWidth}px`,
 							height: `${writePillHeight}px`,
-							backgroundColor: '#A6E2A8',
+							// If this header is rendered on the Write tab, hovering "Write" should
+							// show the same white-placeholder state as the active pill.
+							backgroundColor: isWriteActiveTab ? '#FFFFFF' : '#A6E2A8',
 							border: '2px solid #000000',
 							borderRadius: `${writePillBorderRadius}px`,
 							display: 'flex',
@@ -187,7 +196,7 @@ export const ContactsHeaderChrome: FC<{
 							opacity: isDot1Hovered ? 1 : 0,
 							pointerEvents: isDot1Hovered ? 'auto' : 'none',
 							transition: `opacity ${pillOpacityTransition}`,
-							cursor: onWriteClick ? 'pointer' : undefined,
+							cursor: isWriteActiveTab ? 'default' : onWriteClick ? 'pointer' : undefined,
 						}}
 						onClick={(e) => {
 							e.stopPropagation();
@@ -206,6 +215,8 @@ export const ContactsHeaderChrome: FC<{
 								alignItems: 'center',
 								height: '100%',
 								marginTop: isBottomView ? '-1px' : isAllTab ? '-1px' : 0,
+								opacity: isWriteActiveTab ? 0 : 1,
+								transition: `opacity ${pillOpacityTransition}`,
 							}}
 						>
 							Write
@@ -417,9 +428,9 @@ export const ContactsHeaderChrome: FC<{
 export const DraftsHeaderChrome: FC<{
 	hasData?: boolean;
 	onContactsClick?: () => void;
-	onSentClick?: () => void;
+	onWriteClick?: () => void;
 	onInboxClick?: () => void;
-}> = ({ hasData = true, onContactsClick, onSentClick, onInboxClick }) => {
+}> = ({ hasData = true, onContactsClick, onWriteClick, onInboxClick }) => {
 	const [isDot1Hovered, setIsDot1Hovered] = useState(false);
 	const [isDot2Hovered, setIsDot2Hovered] = useState(false);
 	const [isDot3Hovered, setIsDot3Hovered] = useState(false);
@@ -435,9 +446,11 @@ export const DraftsHeaderChrome: FC<{
 	const dotTop = 11;
 	
 	// Existing positions
-	const dot1Left = 36; // The dot before the Drafts pill
-	const draftsPillLeft = 69; // Current position of Drafts pill
-	const dot2Left = 176;
+	// Order: dot (Contacts) – dot (Write) – Drafts pill – dot (Inbox)
+	// (Moves the Drafts pill one slot right and shifts the adjacent dot left of it.)
+	const dot1Left = 36;
+	const dot2Left = 102;
+	const draftsPillLeft = 137;
 	const dot3Left = 235;
 	
 	// Colors
@@ -470,13 +483,13 @@ export const DraftsHeaderChrome: FC<{
 	// Position Contacts pill centered where dot 1 was
 	const contactsPillLeft = dot1Left + dotSize / 2 - contactsPillWidth / 2;
 	
-	// Sent pill dimensions (shown when hovering dot 2)
-	const sentPillWidth = 73;
-	const sentPillHeight = pillHeight;
-	const sentPillBorderRadius = pillBorderRadius;
-	const sentPillFontSize = pillFontSize;
-	// Position Sent pill centered where dot 2 was
-	const sentPillLeft = dot2Left + dotSize / 2 - sentPillWidth / 2;
+	// Write pill dimensions (shown when hovering dot 2)
+	const writePillWidth = 73;
+	const writePillHeight = pillHeight;
+	const writePillBorderRadius = pillBorderRadius;
+	const writePillFontSize = pillFontSize;
+	// Position Write pill centered where dot 2 was
+	const writePillLeft = dot2Left + dotSize / 2 - writePillWidth / 2;
 	
 	// Inbox pill dimensions (shown when hovering dot 3)
 	const inboxPillWidth = 73;
@@ -487,13 +500,13 @@ export const DraftsHeaderChrome: FC<{
 	const inboxPillLeft = dot3Left + dotSize / 2 - inboxPillWidth / 2;
 	
 	// New position for Drafts pill when hovered
-	// Moves right when dot 1 is hovered (to make room for Contacts pill on left)
-	// Moves left when dot 2 or 3 is hovered (just a pinch to make room for Sent/Inbox pills)
+	// Moves right when dot 1 or 2 is hovered (to make room for Contacts/Write pills on left)
+	// Moves left when dot 3 is hovered (to make room for Inbox pill on right)
 	const draftsPillLeftHoveredRight = draftsPillLeft + 18;
-	const draftsPillLeftHoveredLeft = draftsPillLeft - 5;
+	const draftsPillLeftHoveredLeft = draftsPillLeft - 18;
 	const getDraftsPillLeft = () => {
-		if (isDot1Hovered) return draftsPillLeftHoveredRight;
-		if (isDot2Hovered || isDot3Hovered) return draftsPillLeftHoveredLeft;
+		if (isDot1Hovered || isDot2Hovered) return draftsPillLeftHoveredRight;
+		if (isDot3Hovered) return draftsPillLeftHoveredLeft;
 		return draftsPillLeft;
 	};
 	
@@ -603,17 +616,17 @@ export const DraftsHeaderChrome: FC<{
 				</span>
 			</div>
 
-			{/* Sent pill - shown when hovering dot 2 */}
+			{/* Write pill - shown when hovering dot 2 */}
 			<div
 				style={{
 					position: 'absolute',
 					top: `${pillTop}px`,
-					left: `${sentPillLeft}px`,
-					width: `${sentPillWidth}px`,
-					height: `${sentPillHeight}px`,
-					backgroundColor: '#B0E0A6',
+					left: `${writePillLeft}px`,
+					width: `${writePillWidth}px`,
+					height: `${writePillHeight}px`,
+					backgroundColor: '#A6E2A8',
 					border: '2px solid #000000',
-					borderRadius: `${sentPillBorderRadius}px`,
+					borderRadius: `${writePillBorderRadius}px`,
 					display: 'flex',
 					alignItems: 'center',
 					justifyContent: 'center',
@@ -621,18 +634,18 @@ export const DraftsHeaderChrome: FC<{
 					opacity: isDot2Hovered ? 1 : 0,
 					pointerEvents: isDot2Hovered ? 'auto' : 'none',
 					transition: `opacity ${pillOpacityTransition}`,
-					cursor: onSentClick ? 'pointer' : undefined,
+					cursor: onWriteClick ? 'pointer' : undefined,
 				}}
 				onClick={(e) => {
 					e.stopPropagation();
-					onSentClick?.();
+					onWriteClick?.();
 				}}
 			>
 				<span
 					className="font-semibold font-inter leading-none"
 					style={{ 
 						color: '#000000', 
-						fontSize: sentPillFontSize, 
+						fontSize: writePillFontSize, 
 						textAlign: 'center', 
 						width: '100%',
 						display: 'flex',
@@ -641,7 +654,7 @@ export const DraftsHeaderChrome: FC<{
 						height: '100%',
 					}}
 				>
-					Sent
+					Write
 				</span>
 			</div>
 
@@ -744,7 +757,7 @@ export const DraftsHeaderChrome: FC<{
 				onMouseLeave={() => setIsDot2Hovered(false)}
 				onClick={(e) => {
 					e.stopPropagation();
-					onSentClick?.();
+					onWriteClick?.();
 				}}
 				style={{
 					position: 'absolute',
@@ -753,7 +766,7 @@ export const DraftsHeaderChrome: FC<{
 					width: `${hoverZone2Width}px`,
 					height: `${hoverZoneHeight}px`,
 					zIndex: 20,
-					cursor: onSentClick ? 'pointer' : 'default',
+					cursor: onWriteClick ? 'pointer' : 'default',
 				}}
 			/>
 			
@@ -1224,7 +1237,6 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 	goToContacts,
 	goToSearch,
 	goToDrafts,
-	goToSent,
 	goToInbox,
 	selectedCount = 0,
 	statusFilter = 'all',
@@ -1246,6 +1258,10 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 	const [isDraftsCounterHovered, setIsDraftsCounterHovered] = useState(false);
 	const [isApprovedCounterHovered, setIsApprovedCounterHovered] = useState(false);
 	const [isRejectedCounterHovered, setIsRejectedCounterHovered] = useState(false);
+	// Chrome-style hover preview for Drafts filter pills (All Drafts / Approved / Rejected)
+	const [hoveredStatusFilterTab, setHoveredStatusFilterTab] = useState<
+		'all' | 'approved' | 'rejected' | null
+	>(null);
 	const isContacts = title === 'Contacts';
 	const isCompactHeader = isContacts || title === 'Drafts' || title === 'Sent';
 	const showTitle = !isContacts && title !== 'Drafts' && title !== 'Sent';
@@ -1321,7 +1337,7 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 				<DraftsHeaderChrome
 					hasData={hasData}
 					onContactsClick={goToContacts}
-					onSentClick={goToSent}
+					onWriteClick={goToWriting}
 					onInboxClick={goToInbox}
 				/>
 			)}
@@ -1366,6 +1382,7 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 			{/* Filter tabs in gray section for Drafts - hidden on mobile */}
 			{isDrafts && hasData && onStatusFilterChange && !isMobile && (
 				<div
+					onMouseLeave={() => setHoveredStatusFilterTab(null)}
 					style={{
 						position: 'absolute',
 						top: '32px',
@@ -1379,6 +1396,17 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 					<div style={{ display: 'flex', gap: '37px' }}>
 						{(['all', 'approved', 'rejected'] as const).map((tab) => {
 							const isActive = statusFilter === tab;
+							const isAnyTabHovered = hoveredStatusFilterTab !== null;
+							const isHovered = hoveredStatusFilterTab === tab;
+							// When hovering, only the hovered tab should look "selected"
+							const isVisuallyActive = isAnyTabHovered ? isHovered : isActive;
+							const activeBackgroundColor =
+								tab === 'approved'
+									? '#559855'
+									: tab === 'rejected'
+										? '#A03C3C'
+										: '#949494';
+							const chromeTransition = '0.6s cubic-bezier(0.22, 1, 0.36, 1)';
 							const labels: Record<typeof tab, string> = {
 								all: 'All Drafts',
 								approved: 'Approved',
@@ -1394,24 +1422,36 @@ export const DraftingTable: FC<DraftingTableProps> = ({
 										fontSize: '10px',
 										fontWeight: 600,
 										borderRadius: '6px',
-										border: 'none',
-										backgroundColor: isActive
-											? tab === 'approved'
-												? '#559855'
-												: tab === 'rejected'
-												? '#A03C3C'
-												: '#949494'
-											: '#D9D9D9',
-										color: isActive ? '#FFFFFF' : '#000000',
+										borderWidth: '1px',
+										borderStyle: 'solid',
+										borderColor: isAnyTabHovered ? '#000000' : 'transparent',
+										backgroundColor: isVisuallyActive
+											? activeBackgroundColor
+											: isAnyTabHovered
+												? '#FFFFFF'
+												: '#D9D9D9',
+										color: isVisuallyActive ? '#FFFFFF' : '#000000',
 										cursor: 'pointer',
 										display: 'flex',
 										alignItems: 'center',
 										justifyContent: 'center',
 										padding: 0,
+										boxSizing: 'border-box',
+										transition: `background-color ${chromeTransition}, color ${chromeTransition}, border-color ${chromeTransition}`,
 									}}
+									onMouseEnter={() => setHoveredStatusFilterTab(tab)}
+									onFocus={() => setHoveredStatusFilterTab(tab)}
+									onBlur={() => setHoveredStatusFilterTab(null)}
 									onClick={() => onStatusFilterChange(tab)}
 								>
-									{labels[tab]}
+									<span
+										style={{
+											opacity: isAnyTabHovered && !isHovered ? 0 : 1,
+											transition: `opacity ${chromeTransition}`,
+										}}
+									>
+										{labels[tab]}
+									</span>
 								</button>
 							);
 						})}

@@ -28,6 +28,15 @@ export interface SentExpandedListProps {
 	contacts: ContactWithName[];
 	onHeaderClick?: () => void;
 	onOpenSent?: () => void;
+	/** Optional hover callback (used by Campaign "All" tab previews) */
+	onEmailHover?: (email: EmailWithRelations | null) => void;
+	/**
+	 * When `allTab`, the component behaves like a dashboard preview:
+	 * - no row selected background colors
+	 * - no header hover/click affordances
+	 * - rows still fire `onEmailHover` so the All tab can update Research + Preview
+	 */
+	interactionMode?: 'default' | 'allTab';
 	/**
 	 * When true, renders only the header chrome (no rows) for ultra-compact bottom panel layouts.
 	 */
@@ -154,6 +163,8 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 	contacts,
 	onHeaderClick,
 	onOpenSent,
+	onEmailHover,
+	interactionMode = 'default',
 	collapsed = false,
 	width = 376,
 	height = 426,
@@ -215,6 +226,7 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 	// Special hack for "All" tab: if height is exactly 347px, we apply a thicker 3px border
 	// to match the other elements in that layout. Otherwise standard 2px border.
 	const isAllTab = height === 347;
+	const isAllTabNavigation = interactionMode === 'allTab';
 	const whiteSectionHeight = customWhiteSectionHeight ?? (isAllTab ? 20 : 28);
 	const isBottomView = customWhiteSectionHeight === 15;
 	const isFullyEmpty = sent.length === 0;
@@ -281,7 +293,10 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 
 			{(isAllTab || isBottomView) && (
 				<div
-					className="absolute z-20 flex items-center gap-[12px] cursor-pointer"
+					className={cn(
+						'absolute z-20 flex items-center gap-[12px]',
+						isAllTabNavigation ? 'pointer-events-none cursor-default' : 'cursor-pointer'
+					)}
 					style={{ top: isBottomView ? 1 : -1, right: isBottomView ? 4 : 4 }}
 					onClick={onOpenSent}
 					role={onOpenSent ? 'button' : undefined}
@@ -318,13 +333,22 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 					>
 						{selectedSentIds.size} Selected
 					</span>
-					<span
-						className="font-inter font-medium text-[10px] text-black cursor-pointer hover:underline"
-						style={{ position: 'absolute', right: '10px' }}
-						onClick={handleSelectAllToggle}
-					>
-						Select All
-					</span>
+					{isAllTabNavigation ? (
+						<span
+							className="font-inter font-medium text-[10px] text-black cursor-default"
+							style={{ position: 'absolute', right: '10px' }}
+						>
+							Select All
+						</span>
+					) : (
+						<span
+							className="font-inter font-medium text-[10px] text-black cursor-pointer hover:underline"
+							style={{ position: 'absolute', right: '10px' }}
+							onClick={handleSelectAllToggle}
+						>
+							Select All
+						</span>
+					)}
 				</div>
 			)}
 
@@ -358,6 +382,9 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 										? `${39 - whiteSectionHeight}px`
 										: `${38 - whiteSectionHeight}px`,
 							}}
+							onMouseLeave={() => {
+								onEmailHover?.(null);
+							}}
 						>
 							{sent.map((email) => {
 							const contact = contacts?.find((c) => c.id === email.contactId);
@@ -373,17 +400,24 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 								<div
 									key={email.id}
 									className={cn(
-										'cursor-pointer transition-colors relative select-none overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white',
+										'transition-colors relative select-none overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white',
+										isAllTabNavigation ? 'cursor-default' : 'cursor-pointer',
 										isBottomView
 											? 'w-[224px] h-[28px]'
 											: 'w-full max-w-[356px] max-[480px]:max-w-none h-[64px] max-[480px]:h-[50px]',
 										!isBottomView && 'p-2',
-										isSelected && 'bg-[#A8E6A8]'
+										!isAllTabNavigation && isSelected && 'bg-[#A8E6A8]'
 									)}
 									onMouseDown={(e) => {
 										if (e.shiftKey) e.preventDefault();
 									}}
-									onClick={(e) => handleSentClick(email.id as number, e)}
+									onMouseEnter={() => {
+										onEmailHover?.(email);
+									}}
+									onClick={(e) => {
+										if (isAllTabNavigation) return;
+										handleSentClick(email.id as number, e);
+									}}
 								>
 									{/* Used-contact indicator - vertically centered */}
 									{usedContactIdsSet.has(email.contactId) && (

@@ -96,6 +96,16 @@ export interface HybridPromptInputProps {
 	 */
 	onSelectAllContacts?: () => void;
 	/**
+	 * Optional: indicates if "All" contacts are currently selected via the "All" button.
+	 * When true, the draft button shows the special green "Draft All X Contacts" state.
+	 */
+	isAllContactsSelected?: boolean;
+	/**
+	 * Optional: the total number of contacts available for drafting.
+	 * Used to display the count when "All" is selected.
+	 */
+	totalContactCount?: number;
+	/**
 	 * Optional: invoked when the user clicks the "Get Suggestions" button.
 	 * Triggers the prompt scoring and suggestions box.
 	 */

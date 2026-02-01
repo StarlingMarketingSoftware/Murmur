@@ -69,6 +69,8 @@ interface MiniEmailStructureProps {
 	settingsPrimaryLabel?: string;
 	/** Settings variant: top contact/company row (right side). */
 	settingsSecondaryLabel?: string;
+	/** Settings variant: background color for the Name/Company row. */
+	settingsNameCompanyBgColor?: string;
 	/** When true, hides the floating top number/label chrome */
 	hideTopChrome?: boolean;
 	/** When true, hides the footer Draft/progress controls */
@@ -127,6 +129,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 	variant = 'default',
 	settingsPrimaryLabel,
 	settingsSecondaryLabel,
+	settingsNameCompanyBgColor,
 	hideTopChrome,
 	hideFooter,
 	fullWidthMobile,
@@ -844,32 +847,94 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 
 	// Selected mode highlight (mirror main selector)
 	const MODE_HIGHLIGHT_WIDTH = 80.38;
+	type ModeKey = 'full' | 'hybrid' | 'manual';
+	const selectedModeKey: ModeKey =
+		draftingMode === 'ai' ? 'full' : draftingMode === 'handwritten' ? 'manual' : 'hybrid';
+
 	const modeContainerRef = useRef<HTMLDivElement>(null);
 	const aiButtonRef = useRef<HTMLButtonElement>(null);
 	const hybridButtonRef = useRef<HTMLButtonElement>(null);
 	const handwrittenButtonRef = useRef<HTMLButtonElement>(null);
-	const [highlightStyle, setHighlightStyle] = useState<{ left: number; opacity: number }>(
-		// Start hidden so it never flashes in the wrong spot during view transitions.
-		{ left: 0, opacity: 0 }
-	);
+	// Hide until we can measure and position it, so it never flashes off-center during view transitions.
+	const [highlightStyle, setHighlightStyle] = useState(() => ({
+		left: 0,
+		width: MODE_HIGHLIGHT_WIDTH,
+		opacity: 0,
+	}));
 	const [isInitialRender, setIsInitialRender] = useState(true);
+
+	// Chrome-style mode hover preview (active turns white, hovered mode appears)
+	const [hoveredModeKey, setHoveredModeKey] = useState<ModeKey | null>(null);
+	const isModePreviewingOther = hoveredModeKey !== null && hoveredModeKey !== selectedModeKey;
+
+	const wasModePreviewingRef = useRef(false);
+	const isSwitchingBetweenModePreviews = wasModePreviewingRef.current && isModePreviewingOther;
+	useEffect(() => {
+		wasModePreviewingRef.current = isModePreviewingOther;
+	}, [isModePreviewingOther]);
+
+	const modePreviewAnimatedTransition = '0.6s cubic-bezier(0.22, 1, 0.36, 1)';
+	const modePreviewInstantTransition = '0s';
+	const modePreviewOpacityTransition = isSwitchingBetweenModePreviews
+		? modePreviewInstantTransition
+		: modePreviewAnimatedTransition;
+
+	const [hoverPreviewHighlightStyle, setHoverPreviewHighlightStyle] = useState(() => ({
+		left: 0,
+		width: MODE_HIGHLIGHT_WIDTH,
+		opacity: 0,
+	}));
+
+	const getModeHighlightBackgroundColor = useCallback((mode: ModeKey) => {
+		switch (mode) {
+			case 'hybrid':
+				return 'rgba(74, 74, 217, 0.31)'; // #4A4AD9 at 31% opacity
+			case 'manual':
+				return 'rgba(109, 171, 104, 0.47)'; // #6DAB68 at 47% opacity
+			case 'full':
+			default:
+				return '#DAE6FE';
+		}
+	}, []);
+
+	useLayoutEffect(() => {
+		if (readOnly || !isModePreviewingOther || !hoveredModeKey) {
+			setHoverPreviewHighlightStyle((prev) => ({ ...prev, opacity: 0 }));
+			return;
+		}
+
+		let targetButton: HTMLButtonElement | null = null;
+		if (hoveredModeKey === 'full') targetButton = aiButtonRef.current;
+		else if (hoveredModeKey === 'hybrid') targetButton = hybridButtonRef.current;
+		else targetButton = handwrittenButtonRef.current;
+
+		if (!targetButton) return;
+
+		const newLeft =
+			targetButton.offsetLeft + targetButton.offsetWidth / 2 - MODE_HIGHLIGHT_WIDTH / 2;
+		setHoverPreviewHighlightStyle({
+			left: newLeft,
+			width: MODE_HIGHLIGHT_WIDTH,
+			opacity: 1,
+		});
+	}, [MODE_HIGHLIGHT_WIDTH, hoveredModeKey, isModePreviewingOther, fitScale, readOnly]);
 
 	// Use useLayoutEffect to calculate position BEFORE browser paints, preventing any visual jump
 	useLayoutEffect(() => {
 		let target: HTMLButtonElement | null = null;
-		if (draftingMode === 'ai') target = aiButtonRef.current;
-		else if (draftingMode === 'hybrid') target = hybridButtonRef.current;
+		if (selectedModeKey === 'full') target = aiButtonRef.current;
+		else if (selectedModeKey === 'hybrid') target = hybridButtonRef.current;
 		else target = handwrittenButtonRef.current;
 		if (target) {
 			const newLeft =
 				target.offsetLeft + target.offsetWidth / 2 - MODE_HIGHLIGHT_WIDTH / 2;
-			setHighlightStyle({ left: newLeft, opacity: 1 });
+			setHighlightStyle({ left: newLeft, width: MODE_HIGHLIGHT_WIDTH, opacity: 1 });
 		} else {
-			setHighlightStyle({ left: 0, opacity: 0 });
+			setHighlightStyle({ left: 0, width: MODE_HIGHLIGHT_WIDTH, opacity: 0 });
 		}
 		// When fit-to-height is enabled, the content can rescale which changes layout widths.
 		// Recompute on fitScale so the highlight stays aligned with the selected mode button.
-	}, [MODE_HIGHLIGHT_WIDTH, draftingMode, fitScale]);
+	}, [MODE_HIGHLIGHT_WIDTH, selectedModeKey, fitScale]);
 
 	// Delay enabling transitions until after the first paint
 	useEffect(() => {
@@ -880,11 +945,9 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 		}
 	}, [isInitialRender]);
 
-	const getModeBackgroundColor = () => {
-		if (draftingMode === 'hybrid') return 'rgba(74, 74, 217, 0.31)';
-		if (draftingMode === 'handwritten') return 'rgba(109, 171, 104, 0.47)';
-		return '#DAE6FE';
-	};
+	const selectedModeHighlightColor = isModePreviewingOther
+		? '#FFFFFF'
+		: getModeHighlightBackgroundColor(selectedModeKey);
 
 	const toggleSubject = () => {
 		const next = !form.getValues('isAiSubject');
@@ -1084,6 +1147,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 	const SettingsPanelContent = () => {
 		const primary = (settingsPrimaryLabel ?? '').trim();
 		const secondary = (settingsSecondaryLabel ?? '').trim();
+		const nameCompanyBgColor = settingsNameCompanyBgColor ?? '#C1D6FF';
 		const left = primary || secondary;
 		const right = primary && secondary ? secondary : '';
 		const modeLabel =
@@ -1233,7 +1297,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 				{/* Name / Company (28px) */}
 				<div
 					className="w-full flex items-center px-[9px]"
-					style={{ height: 28, backgroundColor: '#C1D6FF' }}
+					style={{ height: 28, backgroundColor: nameCompanyBgColor }}
 				>
 					<div className="w-full flex items-center justify-between gap-2 min-w-0">
 						<span className="font-inter font-medium text-[12px] leading-none text-black truncate min-w-0">
@@ -1250,10 +1314,19 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 
 				{/* Mode used (27px) */}
 				<div
-					className="w-full flex items-center px-[9px]"
-					style={{ height: 27, backgroundColor: '#DAE6FE' }}
+					className="w-full flex items-center px-[9px] relative"
+					// The mode toggle highlight uses semi-transparent RGBA for Manual/Hybrid.
+					// In Settings preview, the panel background behind this row can be non-white
+					// (e.g. Drafts/Sent uses `#DAE6FE`), which would shift the perceived color.
+					// Force a white base so the fill matches the top mode toggle exactly.
+					style={{ height: 27, backgroundColor: '#FFFFFF' }}
 				>
-					<span className="font-inter font-semibold text-[12px] leading-none text-black truncate">
+					<div
+						aria-hidden="true"
+						className="absolute inset-0"
+						style={{ backgroundColor: getModeHighlightBackgroundColor(selectedModeKey) }}
+					/>
+					<span className="relative z-10 font-inter font-semibold text-[12px] leading-none text-black truncate">
 						{modeLabel}
 					</span>
 				</div>
@@ -1274,7 +1347,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 				{/* Body area (209px) */}
 				<div
 					className="w-full overflow-hidden"
-					style={{ height: 209, backgroundColor: resolvedPageFillColor }}
+					style={{ height: 209, backgroundColor: '#A6E2A8', backgroundImage: resolvedPageFillColor }}
 				>
 					<div className="w-full h-full overflow-y-auto" data-mini-email-scroll="true">
 						{renderBody()}
@@ -1402,7 +1475,8 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 					position: 'relative',
 					display: 'flex',
 					flexDirection: 'column',
-					background: resolvedPageFillColor,
+					backgroundColor: '#A6E2A8',
+					backgroundImage: resolvedPageFillColor,
 					overflow: 'visible',
 					zIndex: 1,
 				}}
@@ -1494,7 +1568,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 											onClick={() => setActiveTab('profile')}
 											style={
 												activeTab === 'profile'
-													? { backgroundColor: resolvedPageFillColor }
+													? { backgroundColor: '#A6E2A8', backgroundImage: resolvedPageFillColor }
 													: undefined
 											}
 											className={cn(
@@ -1512,34 +1586,74 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 								})()}
 								<div
 									ref={modeContainerRef}
+									onMouseLeave={() => setHoveredModeKey(null)}
 									className="relative grid flex-1 grid-cols-3 items-center px-4"
 								>
+									{/* Hover preview pill (appears under hovered mode; selected pill turns white) */}
 									<div
-										className="absolute top-1/2 -translate-y-1/2 z-10 pointer-events-none"
+										aria-hidden="true"
+										className="absolute top-1/2 -translate-y-1/2 z-10 rounded-[8px] pointer-events-none"
 										style={{
-											left: highlightStyle.left,
-											transition: isInitialRender || readOnly ? 'none' : 'left 0.25s ease-in-out',
-											opacity: highlightStyle.opacity,
+											left: hoverPreviewHighlightStyle.left,
+											width: MODE_HIGHLIGHT_WIDTH,
+											opacity: hoverPreviewHighlightStyle.opacity,
+											transition: `opacity ${modePreviewOpacityTransition}`,
 										}}
 									>
 										<div
 											style={{
-												width: `${MODE_HIGHLIGHT_WIDTH}px`,
-												height: '17px',
-												backgroundColor: getModeBackgroundColor(),
+												width: MODE_HIGHLIGHT_WIDTH,
+												height: 19,
+												backgroundColor:
+													hoveredModeKey && isModePreviewingOther
+														? getModeHighlightBackgroundColor(hoveredModeKey)
+														: 'transparent',
 												border: '1.3px solid #000000',
 												borderRadius: '8px',
+												transition: `background-color ${modePreviewOpacityTransition}`,
+											}}
+										/>
+									</div>
+									{/* Selected mode pill */}
+									<div
+										aria-hidden="true"
+										className="absolute top-1/2 -translate-y-1/2 z-10 rounded-[8px] pointer-events-none"
+										style={{
+											left: highlightStyle.left,
+											width: highlightStyle.width,
+											opacity: highlightStyle.opacity,
+											transition:
+												isInitialRender || readOnly
+													? 'none'
+													: `left ${modePreviewAnimatedTransition}, width ${modePreviewAnimatedTransition}`,
+										}}
+									>
+										<div
+											style={{
+												width: MODE_HIGHLIGHT_WIDTH,
+												height: 19,
+												backgroundColor: selectedModeHighlightColor,
+												border: '1.3px solid #000000',
+												borderRadius: '8px',
+												transition: `background-color ${modePreviewAnimatedTransition}`,
 											}}
 										/>
 									</div>
 									<button
 										ref={aiButtonRef}
 										type="button"
+										onMouseEnter={() => {
+											if (!readOnly) setHoveredModeKey('full');
+										}}
+										style={{ transition: `opacity ${modePreviewAnimatedTransition}` }}
 										className={cn(
 											'text-[11px] font-inter font-semibold px-3 py-0.5 rounded-md cursor-pointer text-center relative z-20 justify-self-center',
 											draftingMode === 'ai'
 												? 'text-black'
-												: 'text-[#6B6B6B] hover:text-black'
+												: 'text-[#6B6B6B] hover:text-black',
+											isModePreviewingOther &&
+												selectedModeKey === 'full' &&
+												'opacity-0'
 										)}
 										onClick={() => {
 											if (activeTab !== 'main') {
@@ -1554,11 +1668,18 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 									<button
 										ref={handwrittenButtonRef}
 										type="button"
+										onMouseEnter={() => {
+											if (!readOnly) setHoveredModeKey('manual');
+										}}
+										style={{ transition: `opacity ${modePreviewAnimatedTransition}` }}
 										className={cn(
 											'text-[11px] font-inter font-semibold px-3 py-0.5 rounded-md cursor-pointer text-center relative z-20 justify-self-center',
 											draftingMode === 'handwritten'
 												? 'text-black'
-												: 'text-[#6B6B6B] hover:text-black'
+												: 'text-[#6B6B6B] hover:text-black',
+											isModePreviewingOther &&
+												selectedModeKey === 'manual' &&
+												'opacity-0'
 										)}
 										onClick={() => {
 											if (activeTab !== 'main') {
@@ -1573,11 +1694,18 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 									<button
 										ref={hybridButtonRef}
 										type="button"
+										onMouseEnter={() => {
+											if (!readOnly) setHoveredModeKey('hybrid');
+										}}
+										style={{ transition: `opacity ${modePreviewAnimatedTransition}` }}
 										className={cn(
 											'text-[11px] font-inter font-semibold px-3 py-0.5 rounded-md cursor-pointer text-center relative z-20 justify-self-center',
 											draftingMode === 'hybrid'
 												? 'text-black'
-												: 'text-[#6B6B6B] hover:text-black'
+												: 'text-[#6B6B6B] hover:text-black',
+											isModePreviewingOther &&
+												selectedModeKey === 'hybrid' &&
+												'opacity-0'
 										)}
 										onClick={() => {
 											if (activeTab !== 'main') {
@@ -1614,7 +1742,7 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 								{/* Blue fill */}
 								<div
 									className="relative flex flex-col flex-1 min-h-0 py-6"
-									style={{ backgroundColor: resolvedPageFillColor }}
+									style={{ backgroundColor: '#A6E2A8', backgroundImage: resolvedPageFillColor }}
 								>
 									{/* Top-right indicator line */}
 									<button

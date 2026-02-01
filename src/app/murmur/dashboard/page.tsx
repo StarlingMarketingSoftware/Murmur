@@ -665,15 +665,15 @@ const DashboardContent = () => {
 	};
 
 	// Helper to trigger search with current input values (called on Enter key in "Where" input)
-	const triggerSearchWithCurrentValues = () => {
+	const triggerSearchWithCurrentValues = async () => {
 		setActiveSection(null);
+
+		// If "Where" (or the entire bar) is blank, auto-fill before submitting.
+		await ensureNonEmptyDashboardSearchOnBlankSubmit();
 
 		// Build the combined search query
 		const formattedWhere = whereValue.trim() ? `(${whereValue.trim()})` : '';
-		const combinedSearch = [whyValue, whatValue, formattedWhere]
-			.filter(Boolean)
-			.join(' ')
-			.trim();
+		const combinedSearch = [whyValue, whatValue, formattedWhere].filter(Boolean).join(' ').trim();
 
 		// Set form value and submit
 		if (combinedSearch && form && onSubmit) {
@@ -681,6 +681,13 @@ const DashboardContent = () => {
 				shouldValidate: false,
 				shouldDirty: true,
 			});
+			form.handleSubmit(onSubmit)();
+			return;
+		}
+
+		// Fallback: submit whatever is currently in the form (e.g. after auto-fill setValue).
+		const currentSearchText = (form.getValues('searchText') ?? '').trim();
+		if (currentSearchText && onSubmit) {
 			form.handleSubmit(onSubmit)();
 		}
 	};
@@ -1436,6 +1443,165 @@ const DashboardContent = () => {
 		mapBboxFilter,
 		setMapBboxFilter,
 	} = useDashboard({ derivedTitle: derivedContactTitle, forceApplyDerivedTitle: shouldForceApplyDerivedTitle, fromHome: fromHomeParam });
+
+	// Best-effort: infer the user's US state **without** prompting for geolocation permission.
+	// This relies on hosting/proxy geolocation headers (e.g. Vercel). In local dev it returns null.
+	const inferredStateNameRef = useRef<string | null>(null);
+	const inferStatePromiseRef = useRef<Promise<string | null> | null>(null);
+	const inferUserUsStateName = useCallback(async (): Promise<string | null> => {
+		// If we've already inferred a state in this session, reuse it.
+		if (inferredStateNameRef.current) return inferredStateNameRef.current;
+
+		// Prefer a persisted value from a prior visit/session.
+		if (typeof window !== 'undefined') {
+			try {
+				const stored = window.localStorage.getItem('murmur_inferred_us_state');
+				const normalized = normalizeUsStateName(stored);
+				if (normalized) {
+					inferredStateNameRef.current = normalized;
+					return normalized;
+				}
+			} catch {
+				// Ignore storage errors
+			}
+		}
+
+		// If another call is already in-flight, await it.
+		if (inferStatePromiseRef.current) return await inferStatePromiseRef.current;
+
+		const run = (async (): Promise<string | null> => {
+			// Attempt 1: internal endpoint (Vercel/proxy geo headers; no browser prompt)
+			try {
+				const controller = new AbortController();
+				const timeout = setTimeout(() => controller.abort(), 650);
+				try {
+					const res = await fetch('/api/geo/state', {
+						method: 'GET',
+						cache: 'no-store',
+						signal: controller.signal,
+					});
+					if (res.ok) {
+						const json = (await res.json()) as { stateName?: unknown };
+						const stateName = typeof json?.stateName === 'string' ? json.stateName.trim() : '';
+						const normalized = normalizeUsStateName(stateName);
+						if (normalized) return normalized;
+					}
+				} finally {
+					clearTimeout(timeout);
+				}
+			} catch {
+				// ignore and fall through
+			}
+
+			// Attempt 2 (fallback): public IP geolocation (still no browser prompt).
+			// This works in local dev too, but depends on the 3rd-party service availability.
+			try {
+				const controller = new AbortController();
+				const timeout = setTimeout(() => controller.abort(), 900);
+				try {
+					const res = await fetch('https://ipapi.co/json/', {
+						method: 'GET',
+						cache: 'no-store',
+						signal: controller.signal,
+					});
+					if (!res.ok) return null;
+					const json = (await res.json()) as {
+						country_code?: unknown;
+						region?: unknown;
+						region_code?: unknown;
+					};
+
+					const country = typeof json.country_code === 'string' ? json.country_code.trim().toUpperCase() : '';
+					if (country && country !== 'US') return null;
+
+					const regionCode =
+						typeof json.region_code === 'string' ? json.region_code.trim().toUpperCase() : '';
+					const regionName = typeof json.region === 'string' ? json.region.trim() : '';
+
+					return normalizeUsStateName(regionCode) ?? normalizeUsStateName(regionName);
+				} finally {
+					clearTimeout(timeout);
+				}
+			} catch {
+				return null;
+			}
+		})();
+
+		inferStatePromiseRef.current = run;
+		const result = await run;
+		inferStatePromiseRef.current = null;
+
+		inferredStateNameRef.current = result;
+		if (result && typeof window !== 'undefined') {
+			try {
+				window.localStorage.setItem('murmur_inferred_us_state', result);
+			} catch {
+				// Ignore storage errors
+			}
+		}
+
+		return result;
+	}, []);
+
+	// If the user submits with missing segments, auto-fill sensible defaults
+	// and (when Where is blank) best-effort infer a US state so the search always runs.
+	const ensureNonEmptyDashboardSearchOnBlankSubmit = useCallback(async () => {
+		// Only apply this behavior on the initial (pre-results) dashboard screen.
+		if (hasSearched) return;
+
+		const trimmedWhy = whyValue.trim();
+		const trimmedWhat = whatValue.trim();
+		const trimmedWhere = whereValue.trim();
+
+		let nextWhy = trimmedWhy;
+		let nextWhat = trimmedWhat;
+		let nextWhere = trimmedWhere;
+
+		// If BOTH Why + What are empty, set a default "starter" search.
+		if (!nextWhy && !nextWhat) {
+			nextWhy = '[Booking]';
+			nextWhat = 'Wine, Beer, and Spirits';
+			setWhyValue(nextWhy);
+			setWhatValue(nextWhat);
+		}
+
+		// If Where is empty, try to infer the user's state (no permission prompt).
+		if (!nextWhere) {
+			const inferredWhere = await inferUserUsStateName();
+			if (inferredWhere) {
+				nextWhere = inferredWhere;
+				setWhereValue(inferredWhere);
+				setIsNearMeLocation(false);
+			}
+		}
+
+		// Ultimate fallback: if we still can't infer a state, pick a random lower-48 state
+		// so "Where" is never blank. (Exclude Alaska/Hawaii.)
+		if (!nextWhere) {
+			const lower48States = buildAllUsStateNames().filter(
+				(s) => s !== 'Alaska' && s !== 'Hawaii'
+			);
+			const fallback =
+				lower48States[Math.floor(Math.random() * lower48States.length)] ?? 'California';
+			nextWhere = fallback;
+			setWhereValue(fallback);
+			setIsNearMeLocation(false);
+		}
+
+		// Keep UI + form consistent
+		setActiveSection(null);
+
+		const formattedWhere = nextWhere ? `(${nextWhere})` : '';
+		const combinedSearch = [nextWhy, nextWhat, formattedWhere]
+			.filter(Boolean)
+			.join(' ')
+			.trim();
+		if (!combinedSearch) return;
+		form.setValue('searchText', combinedSearch, {
+			shouldValidate: false,
+			shouldDirty: true,
+		});
+	}, [form, hasSearched, inferUserUsStateName, whatValue, whereValue, whyValue]);
 
 	// Free trial CTA for fromHome demo mode
 	const handleStartFreeTrial = useCallback(() => {
@@ -3219,8 +3385,9 @@ const DashboardContent = () => {
 								{!hasSearched && (
 									<Form {...form}>
 										<form
-											onSubmit={(e) => {
+											onSubmit={async (e) => {
 												e.preventDefault();
+												await ensureNonEmptyDashboardSearchOnBlankSubmit();
 												if (!isSignedIn) {
 													if (hasProblematicBrowser) {
 														// For Edge/Safari, navigate to sign-in page
@@ -3514,7 +3681,7 @@ const DashboardContent = () => {
 																						onKeyDown={(e) => {
 																							if (e.key === 'Enter') {
 																								e.preventDefault();
-																								triggerSearchWithCurrentValues();
+																								void triggerSearchWithCurrentValues();
 																							}
 																						}}
 																					className="absolute z-20 left-[24px] max-[480px]:left-[12px] right-[8px] top-1/2 -translate-y-1/2 w-auto font-bold text-black text-[14px] bg-transparent outline-none border-none leading-none placeholder:text-black"
@@ -3550,7 +3717,7 @@ const DashboardContent = () => {
 																									onKeyDown={(e) => {
 																										if (e.key === 'Enter') {
 																											e.preventDefault();
-																											triggerSearchWithCurrentValues();
+																											void triggerSearchWithCurrentValues();
 																										}
 																									}}
 																								className="z-20 flex-1 font-semibold text-black text-[12px] bg-transparent outline-none border-none"
@@ -3591,7 +3758,7 @@ const DashboardContent = () => {
 																	{/* Desktop Search Button */}
 																	<button
 																		type="submit"
-																		className={`flex absolute right-[6px] items-center justify-center w-[58px] ${
+																		className={`dashboard-search-button flex absolute right-[6px] items-center justify-center w-[58px] ${
 																			inboxView
 																				? 'h-[31px]'
 																				: 'h-[62px] max-[480px]:h-[50px] max-[480px]:w-[46px]'
@@ -3606,15 +3773,6 @@ const DashboardContent = () => {
 																			borderBottomLeftRadius: '0',
 																			border: '1px solid #5DAB68',
 																			borderLeft: '1px solid #5DAB68',
-																			transition: 'none',
-																		}}
-																		onMouseEnter={(e) => {
-																			e.currentTarget.style.backgroundColor =
-																				'rgba(93, 171, 104, 0.65)';
-																		}}
-																		onMouseLeave={(e) => {
-																			e.currentTarget.style.backgroundColor =
-																				'rgba(93, 171, 104, 0.49)';
 																		}}
 																	>
 																		<SearchIconDesktop width={inboxView ? 25 : 26} height={inboxView ? 25 : 28} />
@@ -4671,8 +4829,9 @@ const DashboardContent = () => {
 							>
 								<Form {...form}>
 									<form
-										onSubmit={(e) => {
+										onSubmit={async (e) => {
 											e.preventDefault();
+											await ensureNonEmptyDashboardSearchOnBlankSubmit();
 											if (!isSignedIn) {
 												if (hasProblematicBrowser) {
 													console.log(
@@ -4822,7 +4981,7 @@ const DashboardContent = () => {
 																				onKeyDown={(e) => {
 																					if (e.key === 'Enter') {
 																						e.preventDefault();
-																						triggerSearchWithCurrentValues();
+																						void triggerSearchWithCurrentValues();
 																					}
 																				}}
 																				readOnly={isFromHomeDemoMode}

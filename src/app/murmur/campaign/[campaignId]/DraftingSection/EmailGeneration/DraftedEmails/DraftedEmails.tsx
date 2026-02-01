@@ -23,7 +23,7 @@ import ApproveCheckIcon from '@/components/atoms/svg/ApproveCheckIcon';
 import RejectXIcon from '@/components/atoms/svg/RejectXIcon';
 import LeftArrowReviewIcon from '@/components/atoms/svg/LeftArrowReviewIcon';
 import RightArrowReviewIcon from '@/components/atoms/svg/RightArrowReviewIcon';
-import { getStateAbbreviation } from '@/utils/string';
+import { getStateAbbreviation, splitTrailingNumericSuffix } from '@/utils/string';
 import { ScrollableText } from '@/components/atoms/ScrollableText/ScrollableText';
 import {
 	canadianProvinceAbbreviations,
@@ -54,6 +54,7 @@ const FadeOverflowText: FC<{
 }> = ({ text, className, fadePx = 16, measureKey }) => {
 	const spanRef = useRef<HTMLSpanElement | null>(null);
 	const [isOverflowing, setIsOverflowing] = useState(false);
+	const { base, suffixNumber } = splitTrailingNumericSuffix(text);
 
 	const measure = useCallback(() => {
 		const el = spanRef.current;
@@ -95,7 +96,16 @@ const FadeOverflowText: FC<{
 			style={style}
 			title={text}
 		>
-			{text}
+			{suffixNumber ? (
+				<>
+					<span>{base}</span>
+					<sup className="ml-[4px] relative top-[1px] align-super text-[0.65em] font-medium leading-none opacity-70">
+						{suffixNumber}
+					</sup>
+				</>
+			) : (
+				text
+			)}
 		</span>
 	);
 };
@@ -1175,14 +1185,10 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 										opacity: props.isSendingDisabled ? 0.6 : 1,
 									}}
 									disabled={props.isSendingDisabled}
-									onClick={async () => {
-										if (selectedDraft && !props.isSendingDisabled) {
-											// Select only the current draft and send it
-											props.setSelectedDraftIds(new Set([selectedDraft.id]));
-											// Small delay to ensure state is updated before sending
-											await new Promise((resolve) => setTimeout(resolve, 50));
-											await props.onSend();
-										}
+									onClick={() => {
+										if (!selectedDraft || props.isSendingDisabled) return;
+										props.setSelectedDraftIds(new Set([selectedDraft.id]));
+										void props.onSend([selectedDraft.id]);
 									}}
 								>
 									Send
@@ -1333,7 +1339,19 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 											maskImage: 'linear-gradient(90deg, #000 92%, transparent 100%)',
 										}}
 									>
-										<span className="whitespace-nowrap">Drafts</span>
+										<button
+											type="button"
+											aria-label="Back to drafts list"
+											className="whitespace-nowrap cursor-pointer underline-offset-2 hover:underline"
+											style={{ pointerEvents: 'auto' }}
+											onClick={(e) => {
+												e.preventDefault();
+												e.stopPropagation();
+												handleBack();
+											}}
+										>
+											Drafts
+										</button>
 										<span className="mx-[10px] whitespace-nowrap">{'>'}</span>
 										<span className="min-w-0 truncate">
 											{displayName || companyName || 'Unknown Contact'}
@@ -1401,14 +1419,10 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 								{/* Send button between lines */}
 								<button
 									type="button"
-									onClick={async () => {
-										if (selectedDraft && !props.isSendingDisabled) {
-											// Select only the current draft and send it
-											props.setSelectedDraftIds(new Set([selectedDraft.id]));
-											// Small delay to ensure state is updated before sending
-											await new Promise((resolve) => setTimeout(resolve, 50));
-											await props.onSend();
-										}
+									onClick={() => {
+										if (!selectedDraft || props.isSendingDisabled) return;
+										props.setSelectedDraftIds(new Set([selectedDraft.id]));
+										void props.onSend([selectedDraft.id]);
 									}}
 									disabled={props.isSendingDisabled}
 									className="absolute font-inter text-[14px] font-normal text-black hover:bg-black/5 flex items-center justify-center transition-colors leading-none"
@@ -1496,11 +1510,33 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 										zIndex: 6,
 									}}
 								>
-									<span className="whitespace-nowrap flex-shrink-0">Drafts</span>
+									<button
+										type="button"
+										aria-label="Back to drafts list"
+										className="whitespace-nowrap flex-shrink-0 cursor-pointer underline-offset-2 hover:underline"
+										style={{ pointerEvents: 'auto' }}
+										onClick={(e) => {
+											e.preventDefault();
+											e.stopPropagation();
+											handleBack();
+										}}
+									>
+										Drafts
+									</button>
 									<span className="mx-[10px] whitespace-nowrap flex-shrink-0">{'>'}</span>
-									<span className="min-w-0 truncate">
+									<button
+										type="button"
+										aria-label="Back to draft review"
+										className="min-w-0 truncate cursor-pointer text-left underline-offset-2 hover:underline"
+										style={{ pointerEvents: 'auto' }}
+										onClick={(e) => {
+											e.preventDefault();
+											e.stopPropagation();
+											setIsRegenSettingsPreviewOpen(false);
+										}}
+									>
 										{displayName || companyName || 'Unknown Contact'}
-									</span>
+									</button>
 									<span className="mx-[10px] whitespace-nowrap flex-shrink-0">{'>'}</span>
 									<span className="whitespace-nowrap flex-shrink-0">Regenerate</span>
 								</div>
@@ -1558,7 +1594,7 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 										data-hover-description="Revise your draft here. Type out your revisions. Approve and Reject Drafts"
 									>
 										{/* Check if original message has links - if so, use RichTextEditor for proper link editing */}
-										{selectedDraft?.message && /<a\\s+[^>]*href=/i.test(selectedDraft.message) ? (
+										{selectedDraft?.message && /<a\s+[^>]*href=/i.test(selectedDraft.message) ? (
 											<div
 												data-hover-description="Revise your draft here. Type out your revisions. Approve and Reject Drafts"
 												className="w-full h-full"
@@ -1963,6 +1999,22 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 								  contact.company ||
 								  'Contact'
 								: 'Unknown Contact';
+
+							// Treat Company + Name as two distinct "slots" (rows).
+							// Company is always the top slot (aligned with the right-side title pill),
+							// and Name is the second slot just below. If Name is missing, we still
+							// reserve the slot so Company doesn't vertically center.
+							const displayName = contact
+								? (contact.name?.trim() ||
+										`${contact.firstName || ''} ${contact.lastName || ''}`.trim() ||
+										'')
+								: '';
+							const displayCompany = contact?.company?.trim() || '';
+							const draftRowCompany = displayCompany || displayName || contactName;
+							const draftRowName =
+								displayCompany && displayName && displayName !== draftRowCompany
+									? displayName
+									: '';
 							const isSelected = selectedDraftIds.has(draft.id);
 							const isRejected = props.rejectedDraftIds?.has(draft.id) ?? false;
 							const isApproved = props.approvedDraftIds?.has(draft.id) ?? false;
@@ -1971,13 +2023,6 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 								hoveredUsedContactId === draft.contactId &&
 								Boolean(usedContactTooltipPos) &&
 								Boolean(hoveredUsedContactCampaigns?.length);
-
-							// Check if we have a separate name to decide layout
-							const hasSeparateName = Boolean(
-								(contact?.name && contact.name.trim()) ||
-									(contact?.firstName && contact.firstName.trim()) ||
-									(contact?.lastName && contact.lastName.trim())
-							);
 
 							const contactTitle = contact?.headline || contact?.title || '';
 
@@ -2423,52 +2468,28 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 										"flex flex-col justify-center h-full gap-[2px]",
 										"pl-[30px] pr-[30px]"
 									)}>
-										{/* Row 1 & 2: Name / Company */}
+										{/* Row 1 & 2: Company / Name */}
 										{(() => {
 											const topRowMargin = contactTitle
 												? 'mr-[220px]'
 												: 'mr-[120px]';
-											if (hasSeparateName) {
-												return (
-													<>
-														{/* Name */}
-														<div
-															className={cn(
-																'flex items-center min-h-[20px]',
-																topRowMargin
-															)}
-														>
-															<div className="text-[15px] font-inter font-semibold truncate leading-none">
-																{contactName}
-															</div>
-														</div>
-														{/* Company */}
-														<div
-															className={cn(
-																'flex items-center min-h-[20px]',
-																topRowMargin
-															)}
-														>
-															<div className="text-[15px] font-inter font-medium text-black leading-tight line-clamp-2">
-																{contact?.company || ''}
-															</div>
-														</div>
-													</>
-												);
-											}
-
-											// No separate name - Company (in contactName) spans 2 rows height
 											return (
-												<div
-													className={cn(
-														'flex items-center min-h-[42px] pb-[6px]',
-														topRowMargin
-													)}
-												>
-													<div className="text-[15px] font-inter font-medium text-black leading-tight line-clamp-2">
-														{contactName}
+												<>
+													{/* Company slot (top row) */}
+													<div className={cn('flex items-center min-h-[20px]', topRowMargin)}>
+														<div className="text-[15px] font-inter font-semibold truncate leading-none">
+															{draftRowCompany}
+														</div>
 													</div>
-												</div>
+													{/* Name slot (second row) */}
+													<div className={cn('flex items-center min-h-[20px]', topRowMargin)}>
+														{draftRowName ? (
+															<div className="text-[15px] font-inter font-medium text-black truncate leading-none">
+																{draftRowName}
+															</div>
+														) : null}
+													</div>
+												</>
 											);
 										})()}
 
@@ -2617,7 +2638,7 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 												if (isRejectedTab) {
 													await handleRegenerateSelectedDrafts();
 												} else {
-													await props.onSend();
+											await props.onSend(selectedDraftIds);
 												}
 											}}
 										>

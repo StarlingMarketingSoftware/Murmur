@@ -6,7 +6,7 @@ import { gsap } from 'gsap';
 import { useRouter } from 'next/navigation';
 import { ContactsSelectionProps, useContactsSelection } from './useContactsSelection';
 import { cn } from '@/utils';
-import { getStateAbbreviation } from '@/utils/string';
+import { getStateAbbreviation, splitTrailingNumericSuffix } from '@/utils/string';
 import { ScrollableText } from '@/components/atoms/ScrollableText/ScrollableText';
 import { CanadianFlag } from '@/components/atoms/_svg/CanadianFlag';
 import { DraftingTable } from '../DraftingTable/DraftingTable';
@@ -79,6 +79,7 @@ const FadeOverflowText: FC<{
 }> = ({ text, className, fadePx = 16, measureKey }) => {
 	const spanRef = useRef<HTMLSpanElement | null>(null);
 	const [isOverflowing, setIsOverflowing] = useState(false);
+	const { base, suffixNumber } = splitTrailingNumericSuffix(text);
 
 	const measure = useCallback(() => {
 		const el = spanRef.current;
@@ -120,7 +121,16 @@ const FadeOverflowText: FC<{
 			style={style}
 			title={text}
 		>
-			{text}
+			{suffixNumber ? (
+				<>
+					<span>{base}</span>
+					<sup className="ml-[4px] relative top-[1px] align-super text-[0.65em] font-medium leading-none opacity-70">
+						{suffixNumber}
+					</sup>
+				</>
+			) : (
+				text
+			)}
 		</span>
 	);
 };
@@ -945,7 +955,12 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 		mainBoxId,
 		showSearchBar = true,
 		isLoading = false,
+		isAllContactsSelected,
+		onSelectAllContacts,
 	} = props;
+
+	// Use the provided onSelectAllContacts if available, otherwise fall back to handleClick
+	const handleAllButtonClick = onSelectAllContacts || handleClick;
 	const [isDrafting, setIsDrafting] = useState(false);
 	const router = useRouter();
 	const isMobile = useIsMobile();
@@ -1511,7 +1526,8 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 										style={{
 											position: 'absolute',
 											left: '12px',
-											top: '50%',
+											// Align circle with Company (top row). Keep the taller pill centered to avoid clipping.
+											top: isUsedContactHoverCardVisible ? '50%' : '14px',
 											transform: 'translateY(-50%)',
 											boxSizing: 'border-box',
 											// Default state: 16×16 circle. Hover state (single/multi): 14×37 pill.
@@ -1575,21 +1591,33 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 								const contactTitle = contact.title || contact.headline || '';
 								// Left padding: 12px base + 16px dot + 8px gap = 36px when used, else 12px
 								const leftPadding = isUsedContact ? 'pl-[36px]' : 'pl-3';
+								const hasLocation = Boolean(contact.city || contact.state);
+								const shouldSpanLocation = !contactTitle && hasLocation;
+								// Company is always top slot, Name always bottom slot (fixed positions).
+								const companyValue = contact.company || (!fullName ? 'Contact' : '');
 
-								// Left column - Name and Company
-								if (fullName) {
-									// Has name - show name in top, company in bottom
-									return (
-										<>
-											{/* Top Left - Name */}
-											<div className={cn(leftPadding, 'pr-1 flex items-center h-[24px]')}>
-												<div className="font-bold text-[11px] w-full truncate leading-tight">
-													{fullName}
-												</div>
+								return (
+									<>
+										{/* Top Left - Company */}
+										<div className={cn(leftPadding, 'pr-1 flex items-end pb-[2px] overflow-hidden')}>
+											<div
+												className="font-bold text-[15px] font-inter text-black w-full whitespace-nowrap overflow-hidden leading-[1.1]"
+												style={{
+													maskImage:
+														'linear-gradient(to right, black calc(100% - 16px), transparent 100%)',
+													WebkitMaskImage:
+														'linear-gradient(to right, black calc(100% - 16px), transparent 100%)',
+												}}
+											>
+												{companyValue}
 											</div>
+										</div>
 
-											{/* Top Right - Title */}
-											<div className="pr-1 pl-0 flex items-center h-[24px] justify-end">
+										{/* Top Right - Title (or empty when location spans both rows) */}
+										{shouldSpanLocation ? (
+											<div className="w-full" />
+										) : (
+											<div className="pr-1 pl-0 flex items-end pb-[2px] justify-end overflow-hidden">
 												{contactTitle ? (
 													<div
 														className="h-[21px] w-[240px] rounded-[6px] px-2 flex items-center gap-1 border border-black overflow-hidden"
@@ -1602,26 +1630,24 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 																		? '#B7E5FF'
 																		: isMusicFestivalTitle(contactTitle)
 																			? '#C1D6FF'
-																			: (isWeddingPlannerTitle(contactTitle) || isWeddingVenueTitle(contactTitle))
+																			: (isWeddingPlannerTitle(contactTitle) ||
+																					  isWeddingVenueTitle(contactTitle))
 																				? '#FFF2BC'
 																				: isWineBeerSpiritsTitle(contactTitle)
 																					? '#BFC4FF'
 																					: '#E8EFFF',
 														}}
 													>
-														{isRestaurantTitle(contactTitle) && (
-															<RestaurantsIcon size={14} />
-														)}
-														{isCoffeeShopTitle(contactTitle) && (
-															<CoffeeShopsIcon size={8} />
-														)}
+														{isRestaurantTitle(contactTitle) && <RestaurantsIcon size={14} />}
+														{isCoffeeShopTitle(contactTitle) && <CoffeeShopsIcon size={8} />}
 														{isMusicVenueTitle(contactTitle) && (
 															<MusicVenuesIcon size={14} className="flex-shrink-0" />
 														)}
 														{isMusicFestivalTitle(contactTitle) && (
 															<FestivalsIcon size={14} className="flex-shrink-0" />
 														)}
-														{(isWeddingPlannerTitle(contactTitle) || isWeddingVenueTitle(contactTitle)) && (
+														{(isWeddingPlannerTitle(contactTitle) ||
+															isWeddingVenueTitle(contactTitle)) && (
 															<WeddingPlannersIcon size={14} />
 														)}
 														{isWineBeerSpiritsTitle(contactTitle) && (
@@ -1642,7 +1668,8 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 																					: isWeddingVenueTitle(contactTitle)
 																						? 'Wedding Venue'
 																						: isWineBeerSpiritsTitle(contactTitle)
-																							? getWineBeerSpiritsLabel(contactTitle) ?? contactTitle
+																							? getWineBeerSpiritsLabel(contactTitle) ??
+																								contactTitle
 																							: contactTitle
 															}
 															className="text-[10px] text-black leading-none"
@@ -1653,23 +1680,72 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 													<div className="w-full" />
 												)}
 											</div>
+										)}
 
-											{/* Bottom Left - Company */}
-											<div className={cn(leftPadding, 'pr-1 flex items-center h-[24px]')}>
-												<div
-													className="text-[15px] font-medium text-black w-full whitespace-nowrap overflow-hidden leading-tight"
-													style={{
-														maskImage: 'linear-gradient(to right, black calc(100% - 12px), transparent 100%)',
-														WebkitMaskImage: 'linear-gradient(to right, black calc(100% - 12px), transparent 100%)',
-													}}
-												>
-													{contact.company || ''}
+										{/* Bottom Left - Name */}
+										<div className={cn(leftPadding, 'pr-1 flex items-start pt-[2px] overflow-hidden')}>
+											<div className="text-[15px] font-inter text-black w-full truncate leading-[1.1]">
+												{fullName}
+											</div>
+										</div>
+
+										{/* Bottom Right - Location (or spanning when no title) */}
+										{shouldSpanLocation ? (
+											<div className="row-span-2 pr-1 pl-0 flex items-center h-full justify-end">
+												<div className="flex items-center gap-1 w-[240px]">
+													{(() => {
+														const fullStateName = (contact.state as string) || '';
+														const stateAbbr = getStateAbbreviation(fullStateName) || '';
+														const normalizedState = fullStateName.trim();
+														const lowercaseCanadianProvinceNames =
+															canadianProvinceNames.map((s) => s.toLowerCase());
+														const isCanadianProvince =
+															lowercaseCanadianProvinceNames.includes(
+																normalizedState.toLowerCase()
+															) ||
+															canadianProvinceAbbreviations.includes(
+																normalizedState.toUpperCase()
+															) ||
+															canadianProvinceAbbreviations.includes(stateAbbr.toUpperCase());
+														const isUSAbbr = /^[A-Z]{2}$/.test(stateAbbr);
+
+														if (!stateAbbr) return null;
+														return isCanadianProvince ? (
+															<div
+																className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border overflow-hidden"
+																style={{ borderColor: '#000000' }}
+																title="Canadian province"
+															>
+																<CanadianFlag width="100%" height="100%" className="w-full h-full" />
+															</div>
+														) : isUSAbbr ? (
+															<span
+																className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border text-[12px] leading-none font-bold"
+																style={{
+																	backgroundColor:
+																		stateBadgeColorMap[stateAbbr] || 'transparent',
+																	borderColor: '#000000',
+																}}
+															>
+																{stateAbbr}
+															</span>
+														) : (
+															<span
+																className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border"
+																style={{ borderColor: '#000000' }}
+															/>
+														);
+													})()}
+													{contact.city ? (
+														<ScrollableText text={contact.city} className="text-xs text-black w-full" />
+													) : (
+														<div className="w-full" />
+													)}
 												</div>
 											</div>
-
-											{/* Bottom Right - Location */}
-											<div className="pr-1 pl-0 flex items-center h-[24px] justify-end">
-												{contact.city || contact.state ? (
+										) : (
+											<div className="pr-1 pl-0 flex items-start pt-[2px] justify-end overflow-hidden">
+												{hasLocation ? (
 													<div className="flex items-center gap-1 w-[240px]">
 														{(() => {
 															const fullStateName = (contact.state as string) || '';
@@ -1696,11 +1772,7 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 																	style={{ borderColor: '#000000' }}
 																	title="Canadian province"
 																>
-																	<CanadianFlag
-																		width="100%"
-																		height="100%"
-																		className="w-full h-full"
-																	/>
+																	<CanadianFlag width="100%" height="100%" className="w-full h-full" />
 																</div>
 															) : isUSAbbr ? (
 																<span
@@ -1733,228 +1805,9 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 													<div className="w-full" />
 												)}
 											</div>
-										</>
-									);
-								} else {
-									// No name - vertically center company on left side
-									return (
-										<>
-											{/* Left column - Company vertically centered */}
-											<div className={cn('row-span-2 pr-1 flex items-center h-full', leftPadding)}>
-												<div
-													className="font-medium text-[15px] text-black w-full whitespace-nowrap overflow-hidden leading-tight"
-													style={{
-														maskImage: 'linear-gradient(to right, black calc(100% - 12px), transparent 100%)',
-														WebkitMaskImage: 'linear-gradient(to right, black calc(100% - 12px), transparent 100%)',
-													}}
-												>
-													{contact.company || 'Contact'}
-												</div>
-											</div>
-
-											{/* Right column - Title or Location */}
-											{contactTitle ? (
-												<>
-													{/* Top Right - Title */}
-													<div className="pr-1 pl-0 flex items-center h-[24px] justify-end">
-														<div
-															className="h-[21px] w-[240px] rounded-[6px] px-2 flex items-center gap-1 border border-black overflow-hidden"
-															style={{
-																backgroundColor: isRestaurantTitle(contactTitle)
-																	? '#C3FBD1'
-																	: isCoffeeShopTitle(contactTitle)
-																		? '#D6F1BD'
-																		: isMusicVenueTitle(contactTitle)
-																			? '#B7E5FF'
-																			: isMusicFestivalTitle(contactTitle)
-																				? '#C1D6FF'
-																				: (isWeddingPlannerTitle(contactTitle) || isWeddingVenueTitle(contactTitle))
-																					? '#FFF2BC'
-																					: isWineBeerSpiritsTitle(contactTitle)
-																						? '#BFC4FF'
-																						: '#E8EFFF',
-															}}
-														>
-															{isRestaurantTitle(contactTitle) && (
-																<RestaurantsIcon size={14} />
-															)}
-															{isCoffeeShopTitle(contactTitle) && (
-																<CoffeeShopsIcon size={8} />
-															)}
-															{isMusicVenueTitle(contactTitle) && (
-																<MusicVenuesIcon size={14} className="flex-shrink-0" />
-															)}
-															{isMusicFestivalTitle(contactTitle) && (
-																<FestivalsIcon size={14} className="flex-shrink-0" />
-															)}
-															{(isWeddingPlannerTitle(contactTitle) || isWeddingVenueTitle(contactTitle)) && (
-																<WeddingPlannersIcon size={14} />
-															)}
-															{isWineBeerSpiritsTitle(contactTitle) && (
-																<WineBeerSpiritsIcon size={14} className="flex-shrink-0" />
-															)}
-															<ScrollableText
-																text={
-																	isRestaurantTitle(contactTitle)
-																		? 'Restaurant'
-																		: isCoffeeShopTitle(contactTitle)
-																			? 'Coffee Shop'
-																			: isMusicVenueTitle(contactTitle)
-																				? 'Music Venue'
-																				: isMusicFestivalTitle(contactTitle)
-																					? 'Music Festival'
-																					: isWeddingPlannerTitle(contactTitle)
-																						? 'Wedding Planner'
-																						: isWeddingVenueTitle(contactTitle)
-																							? 'Wedding Venue'
-																							: isWineBeerSpiritsTitle(contactTitle)
-																								? getWineBeerSpiritsLabel(contactTitle) ?? contactTitle
-																								: contactTitle
-																}
-																className="text-[10px] text-black leading-none"
-																scrollPixelsPerSecond={60}
-															/>
-														</div>
-													</div>
-
-													{/* Bottom Right - Location */}
-													<div className="pr-1 pl-0 flex items-center h-[24px] justify-end">
-														{contact.city || contact.state ? (
-															<div className="flex items-center gap-1 w-[240px]">
-																{(() => {
-																	const fullStateName = (contact.state as string) || '';
-																	const stateAbbr =
-																		getStateAbbreviation(fullStateName) || '';
-																	const normalizedState = fullStateName.trim();
-																	const lowercaseCanadianProvinceNames =
-																		canadianProvinceNames.map((s) => s.toLowerCase());
-																	const isCanadianProvince =
-																		lowercaseCanadianProvinceNames.includes(
-																			normalizedState.toLowerCase()
-																		) ||
-																		canadianProvinceAbbreviations.includes(
-																			normalizedState.toUpperCase()
-																		) ||
-																		canadianProvinceAbbreviations.includes(
-																			stateAbbr.toUpperCase()
-																		);
-																	const isUSAbbr = /^[A-Z]{2}$/.test(stateAbbr);
-
-																	if (!stateAbbr) return null;
-																	return isCanadianProvince ? (
-																		<div
-																			className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border overflow-hidden"
-																			style={{ borderColor: '#000000' }}
-																			title="Canadian province"
-																		>
-																			<CanadianFlag
-																				width="100%"
-																				height="100%"
-																				className="w-full h-full"
-																			/>
-																		</div>
-																	) : isUSAbbr ? (
-																		<span
-																			className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border text-[12px] leading-none font-bold"
-																			style={{
-																				backgroundColor:
-																					stateBadgeColorMap[stateAbbr] || 'transparent',
-																				borderColor: '#000000',
-																			}}
-																		>
-																			{stateAbbr}
-																		</span>
-																	) : (
-																		<span
-																			className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border"
-																			style={{ borderColor: '#000000' }}
-																		/>
-																	);
-																})()}
-																{contact.city ? (
-																	<ScrollableText
-																		text={contact.city}
-																		className="text-xs text-black w-full"
-																	/>
-																) : (
-																	<div className="w-full"></div>
-																)}
-															</div>
-														) : (
-															<div className="w-full"></div>
-														)}
-													</div>
-												</>
-											) : (
-												// No title - vertically center location
-												<div className="row-span-2 pr-1 pl-0 flex items-center h-full justify-end">
-													{contact.city || contact.state ? (
-														<div className="flex items-center gap-1 w-[240px]">
-															{(() => {
-																const fullStateName = (contact.state as string) || '';
-																const stateAbbr =
-																	getStateAbbreviation(fullStateName) || '';
-																const normalizedState = fullStateName.trim();
-																const isCanadianProvince =
-																	canadianProvinceNames.includes(
-																		normalizedState.toLowerCase()
-																	) ||
-																	canadianProvinceAbbreviations.includes(
-																		normalizedState.toUpperCase()
-																	) ||
-																	canadianProvinceAbbreviations.includes(
-																		stateAbbr.toUpperCase()
-																	);
-																const isUSAbbr = /^[A-Z]{2}$/.test(stateAbbr);
-
-																if (!stateAbbr) return null;
-																return isCanadianProvince ? (
-																	<div
-																		className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border overflow-hidden"
-																		style={{ borderColor: '#000000' }}
-																		title="Canadian province"
-																	>
-																		<CanadianFlag
-																			width="100%"
-																			height="100%"
-																			className="w-full h-full"
-																		/>
-																	</div>
-																) : isUSAbbr ? (
-																	<span
-																		className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border text-[12px] leading-none font-bold"
-																		style={{
-																			backgroundColor:
-																				stateBadgeColorMap[stateAbbr] || 'transparent',
-																			borderColor: '#000000',
-																		}}
-																	>
-																		{stateAbbr}
-																	</span>
-																) : (
-																	<span
-																		className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border"
-																		style={{ borderColor: '#000000' }}
-																	/>
-																);
-															})()}
-															{contact.city ? (
-																<ScrollableText
-																	text={contact.city}
-																	className="text-xs text-black w-full"
-																/>
-															) : (
-																<div className="w-full"></div>
-															)}
-														</div>
-													) : (
-														<div className="w-full"></div>
-													)}
-												</div>
-											)}
-										</>
-									);
-								}
+										)}
+									</>
+								);
 							})()}
 						</div>
 					);
@@ -1973,65 +1826,100 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 			</DraftingTable>
 
 			{/* Draft Emails Button - below the table box */}
-			{!isDrafting && !hideButton && (
-				<div className="group relative w-[475px] h-[40px] mt-4 mx-auto">
-					{selectedCount > 0 ? (
-						<>
+			<div className="w-[475px] h-[40px] mt-4 mx-auto">
+				{!isDrafting && !hideButton && (
+					<div data-draft-button-container className="group relative w-full h-full">
+						{selectedCount > 0 || isAllContactsSelected ? (
+							// Animated draft button with expanding "All" state
 							<button
 								type="button"
 								onClick={handleDraftEmails}
 								disabled={isButtonDisabled}
 								className={cn(
-									'w-full h-full rounded-[4px] border-[3px] text-black font-inter font-normal text-[17px]',
+									'w-full h-full rounded-[4px] border-[3px] text-black font-inter font-normal text-[17px] relative overflow-hidden transition-colors',
+									isAllContactsSelected ? 'duration-300' : 'duration-0',
 									isButtonDisabled
 										? 'bg-[#E0E0E0] border-[#A0A0A0] cursor-not-allowed opacity-60'
-										: 'bg-[#F2C7C7] border-[#9A3434] hover:bg-[#E6B9B9] cursor-pointer'
+										: isAllContactsSelected
+											? 'bg-[#4DC669] border-black hover:bg-[#45B85F] cursor-pointer'
+											: 'bg-[#F2C7C7] border-[#9A3434] hover:bg-[#E6B9B9] cursor-pointer'
 								)}
 							>
-								{isDrafting ? (
-									<>
-										<div className="animate-spin rounded-full h-4 w-4 border-2 border-black border-t-transparent inline-block mr-2" />
-										Drafting...
-									</>
-								) : (
-									`Draft ${selectedCount} ${selectedCount === 1 ? 'Contact' : 'Contacts'}`
-								)}
+								{/* Normal text - fades out when All selected */}
+								<span
+									className={cn(
+										'transition-opacity',
+										isAllContactsSelected ? 'duration-300 opacity-0' : 'duration-0 opacity-100'
+									)}
+								>
+									{isDrafting ? (
+										<>
+											<div className="animate-spin rounded-full h-4 w-4 border-2 border-black border-t-transparent inline-block mr-2" />
+											Drafting...
+										</>
+									) : (
+										`Draft ${selectedCount} ${selectedCount === 1 ? 'Contact' : 'Contacts'}`
+									)}
+								</span>
+								{/* "All" text - fades in when All selected */}
+								<span
+									className={cn(
+										'absolute inset-0 flex items-center justify-center transition-opacity',
+										isAllContactsSelected ? 'duration-300 opacity-100' : 'duration-0 opacity-0'
+									)}
+								>
+									Draft <span className="font-bold mx-1">All</span> {contacts.length} Contacts
+								</span>
+								{/* Expanding green overlay from right */}
+								<div
+									className={cn(
+										'absolute top-0 bottom-0 right-0 bg-[#4DC669] ease-out',
+										isAllContactsSelected
+											? 'w-full rounded-[1px] transition-all duration-300'
+											: 'w-[62px] rounded-r-[1px] transition-none'
+									)}
+									style={{
+										opacity: isAllContactsSelected ? 0 : 1,
+									}}
+								/>
 							</button>
-							{/* Right section "All" button */}
+						) : (
+							<div className="relative w-full h-full rounded-[4px] border-[3px] border-transparent overflow-hidden transition-colors group-hover:bg-[#EEF5EF] group-hover:border-black">
+								<div className="w-full h-full flex items-center justify-center text-black font-inter font-normal text-[17px] cursor-default">
+									Select Contacts and Draft Emails
+								</div>
+								<button
+									type="button"
+									aria-label="Select all contacts"
+									className="absolute right-0 top-0 bottom-0 w-[62px] bg-[#D17474] rounded-r-[1px] rounded-l-none flex items-center justify-center font-inter font-normal text-[17px] text-black hover:bg-[#C26666] cursor-pointer z-10 opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto"
+									onClick={(e) => {
+										e.stopPropagation();
+										handleAllButtonClick();
+									}}
+								>
+									<div className="absolute left-0 top-0 bottom-0 w-[3px] bg-black" />
+									All
+								</button>
+							</div>
+						)}
+						{/* "All" button overlay - only visible when not all selected */}
+						{(selectedCount > 0 || isAllContactsSelected) && !isAllContactsSelected && (
 							<button
 								type="button"
 								className="absolute right-[3px] top-[2.5px] bottom-[2.5px] w-[62px] bg-[#D17474] rounded-r-[1px] rounded-l-none flex items-center justify-center font-inter font-normal text-[17px] text-black hover:bg-[#C26666] cursor-pointer z-10"
 								onClick={(e) => {
 									e.stopPropagation();
-									handleClick();
+									handleAllButtonClick();
 								}}
 							>
 								{/* Vertical divider line - explicit element to avoid border rendering gaps */}
 								<div className="absolute left-0 -top-[0.5px] -bottom-[0.5px] w-[2px] bg-[#9A3434]" />
 								All
 							</button>
-						</>
-					) : (
-						<div className="relative w-full h-full rounded-[4px] border-[3px] border-transparent overflow-hidden transition-colors group-hover:bg-[#EEF5EF] group-hover:border-black">
-							<div className="w-full h-full flex items-center justify-center text-black font-inter font-normal text-[17px] cursor-default">
-								Select Contacts and Draft Emails
-							</div>
-							<button
-								type="button"
-								aria-label="Select all contacts"
-								className="absolute right-0 top-0 bottom-0 w-[62px] bg-[#D17474] rounded-r-[1px] rounded-l-none flex items-center justify-center font-inter font-normal text-[17px] text-black hover:bg-[#C26666] cursor-pointer z-10 opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto"
-								onClick={(e) => {
-									e.stopPropagation();
-									handleClick();
-								}}
-							>
-								<div className="absolute left-0 top-0 bottom-0 w-[3px] bg-black" />
-								All
-							</button>
-						</div>
-					)}
-				</div>
-			)}
+						)}
+					</div>
+				)}
+			</div>
 
 			{/* Bottom Panels: Drafts, Sent, and Inbox */}
 			{!hideBottomPanels && (
