@@ -3956,8 +3956,11 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 	};
 
 	const getProfileHeaderBg = (field: ProfileField) => {
-		if (expandedProfileBox === field) return '#E0E0E0';
-		if (profileFields[field].trim()) return '#94DB96';
+		const isFilled = !!profileFields[field].trim();
+		// Gray only when the user is actively filling an empty field.
+		// If a field is already filled, keep the green header even when reopened/expanded.
+		if (expandedProfileBox === field) return isFilled ? '#94DB96' : '#E0E0E0';
+		if (isFilled) return '#94DB96';
 		// Show red only if user has left the profile tab before
 		return hasLeftProfileTab ? '#E47979' : '#E0E0E0';
 	};
