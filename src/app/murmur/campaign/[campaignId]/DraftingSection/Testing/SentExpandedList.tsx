@@ -3,6 +3,7 @@
 import { FC, MouseEvent, useMemo, useRef, useState } from 'react';
 import { EmailWithRelations } from '@/types';
 import { ContactWithName } from '@/types/contact';
+import { EmailStatus } from '@/constants/prismaEnums';
 import { cn } from '@/utils';
 import { ScrollableText } from '@/components/atoms/ScrollableText/ScrollableText';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
@@ -22,6 +23,35 @@ import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
 import { FestivalsIcon } from '@/components/atoms/_svg/FestivalsIcon';
 import { MusicVenuesIcon } from '@/components/atoms/_svg/MusicVenuesIcon';
 import { WineBeerSpiritsIcon } from '@/components/atoms/_svg/WineBeerSpiritsIcon';
+
+const isSameLocalDay = (a: Date, b: Date) =>
+	a.getFullYear() === b.getFullYear() &&
+	a.getMonth() === b.getMonth() &&
+	a.getDate() === b.getDate();
+
+const isSameLocalYesterday = (date: Date, now: Date) => {
+	const yesterday = new Date(now);
+	yesterday.setDate(now.getDate() - 1);
+	return isSameLocalDay(date, yesterday);
+};
+
+const formatBatchCount = (count: number) => `+${count < 10 ? `0${count}` : count}`;
+
+const formatBatchTimestamp = (date: Date) => {
+	const now = new Date();
+	if (isSameLocalDay(date, now)) {
+		const formatted = new Intl.DateTimeFormat('en-US', {
+			hour: 'numeric',
+			minute: '2-digit',
+			hour12: true,
+		}).format(date);
+		return formatted.replace(/\s+/g, '').toLowerCase();
+	}
+	if (isSameLocalYesterday(date, now)) return 'Yesterday';
+	const month = date.getMonth() + 1;
+	const day = String(date.getDate()).padStart(2, '0');
+	return `${month}/${day}`;
+};
 
 export interface SentExpandedListProps {
 	sent: EmailWithRelations[];
@@ -232,6 +262,46 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 	const isFullyEmpty = sent.length === 0;
 	const placeholderBgColor = isFullyEmpty ? '#3DAC61' : '#5AB477';
 
+	// Bottom view: show "batch" boxes instead of individual sent emails.
+	const bottomViewSentBatches = useMemo(() => {
+		// Heuristic sessionization: a new batch starts after a long gap.
+		const BATCH_GAP_MS = 2 * 60 * 60 * 1000; // 2 hours
+
+		const createdAts = sent
+			.filter((e) => e.status === EmailStatus.sent)
+			.map((e) => new Date(e.createdAt))
+			.filter((d) => !Number.isNaN(d.getTime()))
+			.sort((a, b) => a.getTime() - b.getTime());
+
+		if (createdAts.length === 0) return [] as Array<{ count: number; endAt: Date }>;
+
+		const batches: Array<{ count: number; endAt: Date }> = [];
+		let currentCount = 1;
+		let currentEndAt = createdAts[0];
+
+		for (let i = 1; i < createdAts.length; i++) {
+			const prev = createdAts[i - 1];
+			const curr = createdAts[i];
+			const gap = curr.getTime() - prev.getTime();
+
+			if (gap > BATCH_GAP_MS) {
+				batches.push({ count: currentCount, endAt: currentEndAt });
+				currentCount = 1;
+				currentEndAt = curr;
+			} else {
+				currentCount += 1;
+				currentEndAt = curr;
+			}
+		}
+
+		batches.push({ count: currentCount, endAt: currentEndAt });
+
+		// Keep only the most recent 3 batches, displayed newest → oldest (top-first).
+		return batches.slice(-3).reverse();
+	}, [sent]);
+
+	const bottomViewPlaceholderCount = Math.max(0, 3 - bottomViewSentBatches.length);
+
 	return (
 		<div
 			className={cn(
@@ -386,7 +456,32 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 								onEmailHover?.(null);
 							}}
 						>
-							{sent.map((email) => {
+							{isBottomView ? (
+								<>
+									{bottomViewSentBatches.map((batch, idx) => {
+										const countLabel = formatBatchCount(batch.count);
+										const timeLabel = formatBatchTimestamp(batch.endAt);
+										return (
+											<div
+												key={`${batch.endAt.getTime()}-${batch.count}-${idx}`}
+												className={cn(
+													'select-none overflow-hidden border-2 border-[#000000] flex items-center justify-between',
+													'w-[224px] h-[30px] rounded-[4.7px]'
+												)}
+												style={{ backgroundColor: '#C3E7BF' }}
+											>
+												<span className="pl-[18px] font-inter font-medium text-[15px] text-black leading-none">
+													{countLabel}
+												</span>
+												<span className="pr-[18px] font-inter font-medium text-[15px] text-black leading-none">
+													{timeLabel}
+												</span>
+											</div>
+										);
+									})}
+								</>
+							) : (
+								sent.map((email) => {
 							const contact = contacts?.find((c) => c.id === email.contactId);
 							const contactName = contact
 								? `${contact.firstName || ''} ${contact.lastName || ''}`.trim() ||
@@ -782,9 +877,10 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 									)}
 								</div>
 							);
-						})}
+						})
+							)}
 						{Array.from({
-							length: Math.max(0, (isBottomView ? 3 : 4) - sent.length),
+							length: isBottomView ? bottomViewPlaceholderCount : Math.max(0, 4 - sent.length),
 						}).map((_, idx) => (
 							<div
 								key={`sent-placeholder-${idx}`}
