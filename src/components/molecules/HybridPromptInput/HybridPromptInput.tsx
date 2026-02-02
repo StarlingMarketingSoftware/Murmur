@@ -126,6 +126,9 @@ const MANUAL_EDITOR_COLOR_SWATCHES = [
 const HPI_GREEN_BG_GRADIENT =
 	'linear-gradient(to bottom, #7BDB7E 0%, #7BDB7E 25%, #A6E2A8 100%)';
 
+const HPI_GREEN_BG_GRADIENT_HOVER =
+	'linear-gradient(to bottom, #A6E2A8 0%, #A6E2A8 25%, #7BDB7E 100%)';
+
 interface SortableAIBlockProps {
 	block: {
 		value: HybridBlock;
@@ -2819,6 +2822,210 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 	const [isAutoSignature, setIsAutoSignature] = useState(true);
 	const [manualSignatureValue, setManualSignatureValue] = useState('');
 
+	const subjectManualTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+	const signatureManualTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+	// Subject hover animation (Auto -> Auto Subject)
+	const autoSubjectPillRef = useRef<HTMLDivElement | null>(null);
+	const autoSubjectAutoWordRef = useRef<HTMLSpanElement | null>(null);
+	const autoSubjectControlsRef = useRef<HTMLDivElement | null>(null);
+	const autoSubjectHoverTimelineRef = useRef<gsap.core.Timeline | null>(null);
+
+	const buildAutoSubjectHoverTimeline = useCallback(() => {
+		const pillEl = autoSubjectPillRef.current;
+		const autoWordEl = autoSubjectAutoWordRef.current;
+		
+		const controlsEl = autoSubjectControlsRef.current;
+		if (!pillEl || !autoWordEl) return;
+
+		// Kill any prior timeline so we can restart cleanly
+		autoSubjectHoverTimelineRef.current?.kill();
+		autoSubjectHoverTimelineRef.current = null;
+
+		const collapsedWidthPx = 110;
+		const expandedWidthPx =
+			!forceDesktop &&
+			typeof window !== 'undefined' &&
+			window.matchMedia('(max-width: 480px)').matches
+				? 132
+				: 142;
+
+		// Keep Auto hidden while subject shifts right (via width expansion), then fade Auto in.
+		const autoWordTargetWidthPx = autoWordEl.scrollWidth;
+		const autoWordGapPx = 6;
+
+		gsap.set(pillEl, { width: collapsedWidthPx, willChange: 'width' });
+		gsap.set(autoWordEl, {
+			width: 0,
+			opacity: 0,
+			marginRight: 0,
+			willChange: 'width, opacity, margin-right',
+		});
+		if (controlsEl) {
+			gsap.set(controlsEl, { opacity: 0, willChange: 'opacity' });
+		}
+
+		autoSubjectHoverTimelineRef.current = gsap
+			.timeline({ paused: true })
+			.to(
+				pillEl,
+				{ width: expandedWidthPx, duration: 0.3, ease: 'power2.out', overwrite: 'auto' },
+				0
+			)
+			.to(
+				autoWordEl,
+				{
+					width: autoWordTargetWidthPx,
+					marginRight: autoWordGapPx,
+					duration: 0.3,
+					ease: 'power2.out',
+					overwrite: 'auto',
+				},
+				0
+			)
+			.to(
+				autoWordEl,
+				{ opacity: 1, duration: 0.3, ease: 'power2.out', overwrite: 'auto' },
+				0.15
+			);
+		if (controlsEl) {
+			autoSubjectHoverTimelineRef.current.to(
+				controlsEl,
+				{ opacity: 1, duration: 0.3, ease: 'power2.out', overwrite: 'auto' },
+				0.15
+			);
+		}
+	}, [forceDesktop]);
+
+	const handleSubjectHoverEnter = useCallback(() => {
+		buildAutoSubjectHoverTimeline();
+		autoSubjectHoverTimelineRef.current?.play(0);
+	}, [buildAutoSubjectHoverTimeline]);
+
+	const handleSubjectHoverLeave = useCallback(() => {
+		autoSubjectHoverTimelineRef.current?.reverse();
+	}, []);
+
+	useEffect(() => {
+		return () => {
+			autoSubjectHoverTimelineRef.current?.kill();
+			autoSubjectHoverTimelineRef.current = null;
+		};
+	}, []);
+
+	useEffect(() => {
+		// If we switch into manual subject, ensure we drop any stale DOM refs in the timeline.
+		if (isManualSubject) {
+			autoSubjectHoverTimelineRef.current?.kill();
+			autoSubjectHoverTimelineRef.current = null;
+		}
+	}, [isManualSubject]);
+
+	// Signature hover animation (Auto -> Auto Signature)
+	const autoSignaturePillRef = useRef<HTMLDivElement | null>(null);
+	const autoSignatureAutoWordRef = useRef<HTMLSpanElement | null>(null);
+	const autoSignatureControlsRef = useRef<HTMLDivElement | null>(null);
+	const autoSignatureHoverTimelineRef = useRef<gsap.core.Timeline | null>(null);
+
+	const buildAutoSignatureHoverTimeline = useCallback(() => {
+		const pillEl = autoSignaturePillRef.current;
+		const autoWordEl = autoSignatureAutoWordRef.current;
+		const controlsEl = autoSignatureControlsRef.current;
+		if (!pillEl || !autoWordEl) return;
+
+		autoSignatureHoverTimelineRef.current?.kill();
+		autoSignatureHoverTimelineRef.current = null;
+
+		const collapsedWidthPx = 122;
+		const expandedWidthPx =
+			!forceDesktop &&
+			typeof window !== 'undefined' &&
+			window.matchMedia('(max-width: 480px)').matches
+				? 150
+				: 160;
+
+		const autoWordTargetWidthPx = autoWordEl.scrollWidth;
+		const autoWordGapPx = 6;
+
+		gsap.set(pillEl, { width: collapsedWidthPx, willChange: 'width' });
+		gsap.set(autoWordEl, {
+			width: 0,
+			opacity: 0,
+			marginRight: 0,
+			willChange: 'width, opacity, margin-right',
+		});
+		if (controlsEl) {
+			gsap.set(controlsEl, { opacity: 0, willChange: 'opacity' });
+		}
+
+		autoSignatureHoverTimelineRef.current = gsap
+			.timeline({ paused: true })
+			.to(
+				pillEl,
+				{ width: expandedWidthPx, duration: 0.3, ease: 'power2.out', overwrite: 'auto' },
+				0
+			)
+			.to(
+				autoWordEl,
+				{
+					width: autoWordTargetWidthPx,
+					marginRight: autoWordGapPx,
+					duration: 0.3,
+					ease: 'power2.out',
+					overwrite: 'auto',
+				},
+				0
+			)
+			.to(
+				autoWordEl,
+				{ opacity: 1, duration: 0.3, ease: 'power2.out', overwrite: 'auto' },
+				0.15
+			);
+		if (controlsEl) {
+			autoSignatureHoverTimelineRef.current.to(
+				controlsEl,
+				{ opacity: 1, duration: 0.3, ease: 'power2.out', overwrite: 'auto' },
+				0.15
+			);
+		}
+	}, [forceDesktop]);
+
+	const handleSignatureHoverEnter = useCallback(() => {
+		buildAutoSignatureHoverTimeline();
+		autoSignatureHoverTimelineRef.current?.play(0);
+	}, [buildAutoSignatureHoverTimeline]);
+
+	const handleSignatureHoverLeave = useCallback(() => {
+		autoSignatureHoverTimelineRef.current?.reverse();
+	}, []);
+
+	useEffect(() => {
+		return () => {
+			autoSignatureHoverTimelineRef.current?.kill();
+			autoSignatureHoverTimelineRef.current = null;
+		};
+	}, []);
+
+	useEffect(() => {
+		if (!isAutoSignature) {
+			autoSignatureHoverTimelineRef.current?.kill();
+			autoSignatureHoverTimelineRef.current = null;
+		}
+	}, [isAutoSignature]);
+
+	// When manual views open, focus the text entry immediately.
+	useEffect(() => {
+		if (isManualSubject) {
+			requestAnimationFrame(() => subjectManualTextareaRef.current?.focus());
+		}
+	}, [isManualSubject]);
+
+	useEffect(() => {
+		if (!isAutoSignature) {
+			requestAnimationFrame(() => signatureManualTextareaRef.current?.focus());
+		}
+	}, [isAutoSignature]);
+
 	// Track if Custom Instructions is open (for adjusting Generate Test button position)
 	const [isLocalCustomInstructionsOpen, setIsLocalCustomInstructionsOpen] = useState(false);
 
@@ -3571,6 +3778,14 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		return isIncomplete ? 'profile' : 'main';
 	});
 
+	// Auto tab: background gradient wave on "Generate Test" hover (desktop)
+	const [isAutoGenerateTestHovered, setIsAutoGenerateTestHovered] = useState(false);
+	useEffect(() => {
+		if (selectedModeKey !== 'full' || activeTab !== 'main' || showTestPreview) {
+			setIsAutoGenerateTestHovered(false);
+		}
+	}, [activeTab, selectedModeKey, showTestPreview]);
+
 	// Fade-in only the Profile tab's green chrome (NOT the blue main box).
 	const profileChromeRef = useRef<HTMLDivElement>(null);
 	useEffect(() => {
@@ -3610,6 +3825,17 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		links: identityProfile?.website || '',
 	});
 
+	type ProfileFieldsSnapshot = Record<ProfileField, string>;
+	type ProfileUndoSnapshot = { fields: ProfileFieldsSnapshot; hasLeftProfileTab: boolean };
+
+	// Profile undo should be "commit-based" (blur/enter/toggle/clear-all), not per-keystroke.
+	const profileUndoStackRef = useRef<ProfileUndoSnapshot[]>([]);
+	const [profileUndoCount, setProfileUndoCount] = useState(0);
+	const canUndoProfile = profileUndoCount > 0;
+
+	// Last committed profile state (used to detect commits + prevent duplicate undo snapshots).
+	const profileCommittedFieldsRef = useRef<ProfileFieldsSnapshot>(profileFields);
+
 	// Auto-grow the Bio textarea (so the whole blue box can expand downward)
 	useLayoutEffect(() => {
 		if (activeTab !== 'profile') return;
@@ -3623,14 +3849,16 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 	// Sync profileFields when identity changes
 	useEffect(() => {
 		if (identityProfile) {
-			setProfileFields({
+			const nextProfileFields = {
 				name: identityProfile.name || '',
 				genre: identityProfile.genre || '',
 				area: identityProfile.area || '',
 				band: identityProfile.bandName || '',
 				bio: identityProfile.bio || '',
 				links: identityProfile.website || '',
-			});
+			};
+			setProfileFields(nextProfileFields);
+			profileCommittedFieldsRef.current = nextProfileFields;
 		}
 	}, [identityProfile]);
 
@@ -3895,6 +4123,18 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 
 	// Handle saving a profile field
 	const saveProfileField = (field: ProfileField) => {
+		// Commit-based undo snapshot: only when a field's committed value actually changes.
+		const committed = profileCommittedFieldsRef.current;
+		const current = profileFields;
+		if (committed?.[field] !== current?.[field]) {
+			profileUndoStackRef.current.push({
+				fields: { ...committed },
+				hasLeftProfileTab,
+			});
+			setProfileUndoCount(profileUndoStackRef.current.length);
+			profileCommittedFieldsRef.current = { ...current };
+		}
+
 		if (!onIdentityUpdate || !identityProfile) return;
 
 		// Name is required on Identity. If empty, skip saving.
@@ -4021,6 +4261,13 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 	};
 
 	const handleClearAllProfileFields = () => {
+		// Undo should restore the state exactly as it was pre-clear (including unsaved local edits).
+		profileUndoStackRef.current.push({
+			fields: { ...profileFields },
+			hasLeftProfileTab,
+		});
+		setProfileUndoCount(profileUndoStackRef.current.length);
+
 		// Close any expanded field (we are clearing values)
 		setExpandedProfileBox(null);
 
@@ -4029,14 +4276,16 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		setHasLeftProfileTab(false);
 
 		// Name is required; keep it and clear the rest.
-		setProfileFields((prev) => ({
-			...prev,
+		const nextProfileFields = {
+			...profileFields,
 			genre: '',
 			area: '',
 			band: '',
 			bio: '',
 			links: '',
-		}));
+		};
+		setProfileFields(nextProfileFields);
+		profileCommittedFieldsRef.current = nextProfileFields;
 
 		if (!onIdentityUpdate || !identityProfile) return;
 		onIdentityUpdate({
@@ -4045,6 +4294,30 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 			bandName: '',
 			bio: '',
 			website: '',
+		});
+	};
+
+	const handleUndoProfileFields = () => {
+		const snapshot = profileUndoStackRef.current.pop();
+		if (!snapshot) return;
+		setProfileUndoCount(profileUndoStackRef.current.length);
+
+		// Close any expanded field before restoring values.
+		setExpandedProfileBox(null);
+		setHasLeftProfileTab(snapshot.hasLeftProfileTab);
+		setProfileFields(snapshot.fields);
+		profileCommittedFieldsRef.current = snapshot.fields;
+
+		if (!onIdentityUpdate || !identityProfile) return;
+
+		const nextName = snapshot.fields.name.trim();
+		onIdentityUpdate({
+			...(nextName ? { name: nextName } : {}),
+			genre: snapshot.fields.genre,
+			area: snapshot.fields.area,
+			bandName: snapshot.fields.band,
+			bio: snapshot.fields.bio,
+			website: snapshot.fields.links,
 		});
 	};
 
@@ -4390,6 +4663,29 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 									className="pointer-events-none absolute -inset-[3px] z-[60] rounded-[8px] border-[3px] border-black"
 								/>
 							)}
+							{/* Auto: hover wave background shift (desktop only) */}
+							{!compactLeftOnly &&
+								!isMobile &&
+								activeTab === 'main' &&
+								selectedModeKey === 'full' &&
+								!showTestPreview && (
+									<div
+										aria-hidden="true"
+										className="pointer-events-none absolute inset-0 z-[-1] rounded-[8px]"
+										style={{
+											backgroundImage: HPI_GREEN_BG_GRADIENT_HOVER,
+											backgroundSize: '100% 140%',
+											backgroundPosition: isAutoGenerateTestHovered
+												? '50% 100%'
+												: '50% 0%',
+											opacity: isAutoGenerateTestHovered ? 1 : 0,
+											transition: isAutoGenerateTestHovered
+												? 'opacity 1200ms cubic-bezier(0.2, 0.8, 0.2, 1), background-position 3000ms cubic-bezier(0.2, 0.8, 0.2, 1)'
+												: 'opacity 2400ms cubic-bezier(0.2, 0.8, 0.2, 1), background-position 5000ms cubic-bezier(0.2, 0.8, 0.2, 1)',
+											willChange: 'opacity, background-position',
+										}}
+									/>
+								)}
 							{/* Mobile-only background overlay starting under Mode divider (match desktop fill) */}
 							{isMobile && activeTab === 'main' && !showTestPreview && overlayTopPx !== null && (
 								<div
@@ -4638,117 +4934,113 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																	// Compact bar that expands to full width on hover when auto mode is on
 																	<div className="flex items-center">
 																		<div
+																			onClick={() => {
+																				// Click anywhere on the hover UI -> switch to manual.
+																				// If the user doesn't type anything and moves away, we snap back to auto (handled in manual view).
+																				if (!isHandwrittenMode) {
+																					form.setValue('isAiSubject', false);
+																				}
+																			}}
+																			onMouseEnter={handleSubjectHoverEnter}
+																			onMouseLeave={handleSubjectHoverLeave}
 																			className={cn(
-																				// Default: only the 110px Subject box is hoverable (so it doesn't expand from the right-side area).
-																				// On hover: expand to full width so the user can interact with the expanded controls.
-																				'relative group/subject peer/subject w-[110px] hover:w-full transition-none'
+																				// Hover zone includes the gap + green box so the expanded controls stay open while moving across.
+																				'relative group/subject w-[465px] max-[480px]:w-full transition-none flex items-center'
 																			)}
 																		>
-																			{/* Collapsed state - shown by default, hidden on hover */}
-																			<div className="flex items-center group-hover/subject:hidden">
-																				<div
-																					className={cn(
-																						cn(
-																							'flex items-center justify-center h-[31px] rounded-[8px] border-2 border-black overflow-hidden subject-bar w-[110px]',
-																							!forceDesktop && 'max-[480px]:h-[24px]'
-																						)
-																					)}
-																					style={{ backgroundColor: '#E0E0E0' }}
-																				>
+																			{/* Auto Subject pill - animates on hover */}
+																			<div
+																				ref={autoSubjectPillRef}
+																				className={cn(
+																					cn(
+																						'flex items-center justify-center h-[25px] rounded-[10px] border-2 border-black overflow-hidden subject-bar w-[110px]',
+																						!forceDesktop && 'max-[480px]:h-[24px]'
+																					)
+																				)}
+																				style={{ backgroundColor: '#E0E0E0' }}
+																			>
+																				<div className="flex items-center justify-center">
+																					<span
+																						ref={autoSubjectAutoWordRef}
+																						aria-hidden="true"
+																						className={cn(
+																							'inline-block overflow-hidden whitespace-nowrap text-black subject-label',
+																							'font-inter font-medium text-[18px] max-[480px]:text-[12px]',
+																							'w-0 opacity-0'
+																						)}
+																					>
+																						Auto
+																					</span>
 																					<span className="font-inter font-medium text-[18px] max-[480px]:text-[12px] whitespace-nowrap text-black subject-label">
 																						Subject
 																					</span>
 																				</div>
 																			</div>
-																			{/* Expanded state - hidden by default, shown on hover */}
+
+																			{/* Expanded controls - hidden by default, shown on hover */}
 																			<div
-																				className={cn(
-																					cn(
-																						'hidden group-hover/subject:flex items-center h-[31px] rounded-[8px] border-2 border-black overflow-hidden subject-bar bg-white w-full',
-																						!forceDesktop && 'max-[480px]:h-[24px]'
-																					)
-																				)}
+																				ref={autoSubjectControlsRef}
+																				className="flex items-center h-[25px] ml-[31px] max-[480px]:ml-[12px] opacity-0 pointer-events-none group-hover/subject:pointer-events-auto"
 																			>
+																				{/* 292x25 manual subject bar (bg #74D177, r=5) */}
 																				<div
 																					className={cn(
-																						'pl-2 flex items-center h-full shrink-0 w-[130px]',
-																						'bg-[#E0E0E0]'
+																						'flex items-center h-[25px] w-[292px] rounded-[5px] bg-[#74D177] overflow-hidden subject-bar pl-[7px] pr-[10px]',
+																						'gap-[14px]',
+																						!forceDesktop && 'max-[480px]:h-[24px] max-[480px]:w-auto max-[480px]:flex-1 max-[480px]:min-w-0'
 																					)}
 																				>
-																					<span className="font-inter font-semibold text-[17px] max-[480px]:text-[12px] whitespace-nowrap text-black subject-label">
-																						Auto Subject
-																					</span>
+																					{/* 33x17 toggle pill (r=8, bg #79DF7C) */}
+																					<button
+																						type="button"
+																						data-hover-description="click to disable automatic drafting for this and write your own"
+																						onClick={() => {
+																							if (!isHandwrittenMode) {
+																								const newValue = !form.watch('isAiSubject');
+																								form.setValue('isAiSubject', newValue);
+																								if (newValue) {
+																									form.setValue('subject', '');
+																								}
+																							}
+																						}}
+																						disabled={isHandwrittenMode}
+																						className={cn(
+																							'flex items-center justify-center h-[17px] w-[33px] rounded-[8px] bg-[#79DF7C] border-2 border-black',
+																							'text-[11px] leading-none font-inter font-normal text-black subject-toggle',
+																							isHandwrittenMode && 'opacity-50 cursor-not-allowed'
+																						)}
+																						aria-pressed={Boolean(form.watch('isAiSubject'))}
+																					>
+																						on
+																					</button>
+
+																					<div className="flex-1 min-w-0 h-full flex items-center">
+																						<span
+																							className={cn(
+																								'text-black text-[13px] leading-none truncate relative -top-[1px]',
+																								!forceDesktop && 'max-[480px]:text-[10px]'
+																							)}
+																						>
+																							Write manual subject here
+																						</span>
+																					</div>
 																				</div>
-
-																			<button
-																				type="button"
-																				data-hover-description="click to disable automatic drafting for this and write your own"
-																				onClick={() => {
-																					if (!isHandwrittenMode) {
-																						const newValue = !form.watch('isAiSubject');
-																						form.setValue('isAiSubject', newValue);
-																						if (newValue) {
-																							form.setValue('subject', '');
-																						}
-																					}
-																				}}
-																				disabled={isHandwrittenMode}
-																				className={cn(
-																					'relative h-full flex items-center text-[12px] font-inter font-normal transition-colors shrink-0 subject-toggle',
-																					'w-[55px] px-2 justify-center text-black bg-[#91E193] hover:bg-[#91E193] active:bg-[#91E193]',
-																					isHandwrittenMode && 'opacity-50 cursor-not-allowed'
-																				)}
-																			>
-																				<span className="absolute left-0 h-full border-l-2 border-[#000000]"></span>
-																				<span>on</span>
-																				<span className="absolute right-0 h-full border-r-2 border-[#000000]"></span>
-																			</button>
-
-																			<div className={cn('flex-grow h-full', 'bg-[#F0F0F0]')}>
-																				<Input
-																					{...field}
-																					className={cn(
-																						cn('w-full h-full !bg-transparent pl-4 pr-3 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0', !forceDesktop && 'max-[480px]:placeholder:text-[10px] max-[480px]:!transition-none max-[480px]:!duration-0'),
-																						'!text-black placeholder:!text-[#9E9E9E]',
-																						'max-[480px]:pl-2'
-																					)}
-																					placeholder="Write manual subject here"
-																					onFocus={(e) =>
-																						trackFocusedField?.('subject', e.target)
-																					}
-																					onBlur={() => {
-																						setHasSubjectBeenTouched(true);
-																						field.onBlur();
-																					}}
-																					onChange={(e) => {
-																						if (e.target.value) {
-																							setHasSubjectBeenTouched(true);
-																						}
-																						field.onChange(e);
-																					}}
-																				/>
 																			</div>
-																		</div>
 																	</div>
-
-																		{/* Right-side hover zone (where "Auto" used to be).
-																		    - Does NOT trigger expansion.
-																		    - Reveals "AUTO" only while hovering this area. */}
-																		<div
-																			aria-hidden="true"
-																			className={cn(
-																				'group/subject-auto flex items-center pl-2 w-[52px] h-[31px] shrink-0 select-none peer-hover/subject:hidden',
-																				!forceDesktop && 'max-[480px]:h-[24px]'
-																			)}
-																		>
-																			<span className="font-inter font-normal text-[13px] text-[#000000] opacity-0 group-hover/subject-auto:opacity-100 transition-opacity">
-																				AUTO
-																			</span>
-																		</div>
 																	</div>
 																) : (
 																	// Auto OFF: expand downward (matches the signature manual box pattern)
-																	<div className="w-full h-[97px] rounded-[8px] border-2 border-black overflow-hidden flex flex-col">
+																	<div
+																		className="w-full h-[97px] rounded-[8px] border-2 border-black overflow-hidden flex flex-col"
+																		onMouseLeave={() => {
+																			// If user hasn't actually typed a manual subject, revert back to auto when leaving.
+																			const value = (form.getValues('subject') ?? '').trim();
+																			if (!value) {
+																				form.setValue('subject', '');
+																				form.setValue('isAiSubject', true);
+																			}
+																		}}
+																	>
 																		{/* Header row */}
 																		<div className="flex items-center h-[31px] shrink-0 bg-[#8DDF90]">
 																			<div className="pl-2 flex items-center h-full shrink-0 w-[120px] bg-[#8DDF90]">
@@ -4789,6 +5081,10 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																		<div className="flex-1 bg-white">
 																			<Textarea
 																				{...field}
+																				ref={(el) => {
+																					field.ref(el);
+																					subjectManualTextareaRef.current = el;
+																				}}
 																				className={cn(
 																					'w-full h-full !bg-transparent px-3 py-2 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 resize-none',
 																					shouldShowSubjectRedStyling
@@ -4888,7 +5184,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 															<span className="pl-4 font-inter font-semibold text-[15px] leading-none text-black">
 																Introduce yourself
 															</span>
-															{/* Right controls: divider @ 138px from right, "Clear all" segment (89px), divider @ 49px from right */}
+															{/* Right controls: "Clear all" + Undo (44px) + Close (44px) */}
 															<div className="ml-auto flex items-stretch h-full">
 																<button
 																	type="button"
@@ -4897,21 +5193,38 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																>
 																	Clear all
 																</button>
-																<div className="w-[49px] shrink-0 border-l-[3px] border-black" />
+																<button
+																	type="button"
+																	onClick={(e) => {
+																		e.stopPropagation();
+																		handleUndoProfileFields();
+																	}}
+																	disabled={!canUndoProfile}
+																	className={cn(
+																		'w-[44px] shrink-0 h-full border-l-[3px] border-black flex items-center justify-center p-0 bg-transparent text-black disabled:text-black disabled:opacity-100',
+																		canUndoProfile
+																			? 'cursor-pointer hover:brightness-[0.98] active:brightness-[0.95]'
+																			: 'cursor-not-allowed'
+																	)}
+																	aria-label="Undo last profile change"
+																>
+																	<UndoIcon width="20" height="20" />
+																</button>
+																<button
+																	type="button"
+																	aria-label="Back to Auto"
+																	onClick={(e) => {
+																		e.stopPropagation();
+																		setActiveTab('main');
+																		setHasLeftProfileTab(true);
+																		switchToFull();
+																	}}
+																	className="w-[44px] shrink-0 h-full border-l-[3px] border-black flex items-center justify-center bg-transparent cursor-pointer p-0 hover:brightness-[0.98] active:brightness-[0.95] focus:outline-none focus-visible:outline-none"
+																>
+																	<span className="block w-[18px] h-[3px] bg-black" />
+																</button>
 															</div>
 														</div>
-
-														{/* Top-right "-" button (positioned in the main Body area, not the header strip) */}
-														<button
-															type="button"
-															aria-label="Back to Auto"
-															onClick={() => {
-																setActiveTab('main');
-																setHasLeftProfileTab(true);
-																switchToFull();
-															}}
-															className="absolute right-[14px] top-[43px] w-[15px] h-[2px] bg-black cursor-pointer p-0 border-0 focus:outline-none"
-														/>
 
 														{/* Profile fields live inside the 380px Body container */}
 														<div
@@ -6917,6 +7230,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																			<Textarea
 																				value={manualSignatureValue}
 																				onChange={(e) => setManualSignatureValue(e.target.value)}
+																				ref={signatureManualTextareaRef}
 																				className={cn(
 																					'w-full !bg-transparent px-3 py-2 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 resize-none',
 																					'!text-black placeholder:!text-[#9E9E9E] font-inter text-[14px]'
@@ -6949,7 +7263,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 															}}
 															disabled={isGenerationDisabled?.()}
 															className={cn(
-																'h-[28px] w-[232px] bg-[#DBF3DC] text-black font-inter font-normal text-[17px] leading-none rounded-[4px] cursor-pointer flex items-center justify-center p-0 border-2 border-transparent',
+																'h-[28px] w-[232px] bg-[#DBF3DC] text-black font-inter font-normal text-[17px] leading-none rounded-[12px] cursor-pointer flex items-center justify-center p-0 border-2 border-transparent',
 																'transition-colors hover:bg-[#EAF9EB] hover:border-black active:bg-[#D1E9D2]',
 																isGenerationDisabled?.()
 																	? 'opacity-50 cursor-not-allowed'
@@ -7272,89 +7586,87 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 												{isAutoSignature ? (
 													<div className="flex items-center">
 														<div
+															onClick={() => {
+																// Click anywhere on the hover UI -> switch to manual.
+																// If the user doesn't type anything and moves away, we snap back to auto (handled in manual view).
+																setIsAutoSignature(false);
+															}}
+															onMouseEnter={handleSignatureHoverEnter}
+															onMouseLeave={handleSignatureHoverLeave}
 															className={cn(
-																// Default: only the 122px Signature box is hoverable (so it doesn't expand from the right-side area).
-																// On hover: expand to full width so the user can interact with the expanded controls.
-																'relative group/signature peer/signature w-[122px] hover:w-full transition-none'
+																// Hover zone includes the gap + green box so the expanded controls stay open while moving across.
+																'relative group/signature w-[465px] max-[480px]:w-full transition-none flex items-center'
 															)}
 														>
-															{/* Collapsed state - shown by default, hidden on hover */}
-															<div className="flex items-center group-hover/signature:hidden">
-																<div
-																	className={cn(
-																		cn(
-																			'flex items-center justify-center h-[31px] rounded-[8px] border-2 border-black overflow-hidden w-[122px]',
-																			!forceDesktop && 'max-[480px]:h-[24px]'
-																		)
-																	)}
-																	style={{ backgroundColor: '#E0E0E0' }}
-																>
+															{/* Auto Signature pill - animates on hover */}
+															<div
+																ref={autoSignaturePillRef}
+																className={cn(
+																	cn(
+																		'flex items-center justify-center h-[25px] rounded-[10px] border-2 border-black overflow-hidden w-[122px]',
+																		!forceDesktop && 'max-[480px]:h-[24px]'
+																	)
+																)}
+																style={{ backgroundColor: '#E0E0E0' }}
+															>
+																<div className="flex items-center justify-center">
+																	<span
+																		ref={autoSignatureAutoWordRef}
+																		aria-hidden="true"
+																		className={cn(
+																			'inline-block overflow-hidden whitespace-nowrap text-black',
+																			'font-inter font-medium text-[18px] max-[480px]:text-[12px]',
+																			'w-0 opacity-0'
+																		)}
+																	>
+																		Auto
+																	</span>
 																	<span className="font-inter font-medium text-[18px] max-[480px]:text-[12px] whitespace-nowrap text-black">
 																		Signature
 																	</span>
 																</div>
 															</div>
-															{/* Expanded state - hidden by default, shown on hover */}
+
+															{/* Expanded controls - fades in with "Auto" */}
 															<div
-																className={cn(
-																	cn(
-																		'hidden group-hover/signature:flex items-center h-[31px] rounded-[8px] border-2 border-black overflow-hidden bg-white w-full',
-																		!forceDesktop && 'max-[480px]:h-[24px]'
-																	)
-																)}
+																ref={autoSignatureControlsRef}
+																className="flex items-center h-[25px] ml-[13px] max-[480px]:ml-[12px] opacity-0 pointer-events-none group-hover/signature:pointer-events-auto"
 															>
+																{/* 292x25 manual signature bar (bg #74D177, r=5) */}
 																<div
 																	className={cn(
-																		'pl-2 flex items-center h-full shrink-0 w-[140px]',
-																		'bg-[#E0E0E0]'
+																		'flex items-center h-[25px] w-[292px] rounded-[5px] bg-[#74D177] overflow-hidden pl-[7px] pr-[10px]',
+																		'gap-[14px]',
+																		!forceDesktop && 'max-[480px]:h-[24px] max-[480px]:w-auto max-[480px]:flex-1 max-[480px]:min-w-0'
 																	)}
 																>
-																	<span className="font-inter font-semibold text-[17px] max-[480px]:text-[12px] whitespace-nowrap text-black">
-																		Auto Signature
-																	</span>
+																	{/* 33x17 toggle pill (r=8, bg #79DF7C) */}
+																	<button
+																		type="button"
+																		data-hover-description="click to disable automatic drafting for this and write your own"
+																		onClick={() => setIsAutoSignature(false)}
+																		className={cn(
+																			'flex items-center justify-center h-[17px] w-[33px] rounded-[8px] bg-[#79DF7C] border-2 border-black',
+																			'text-[11px] leading-none font-inter font-normal text-black subject-toggle'
+																		)}
+																		aria-label="Auto Signature on"
+																	>
+																		on
+																	</button>
+
+																	<div className="flex-1 min-w-0 h-full flex items-center">
+																		<span
+																			className={cn(
+																				'text-black text-[13px] leading-none truncate relative -top-[1px]',
+																				!forceDesktop && 'max-[480px]:text-[10px]'
+																			)}
+																		>
+																			Write manual signature here
+																		</span>
+																	</div>
 																</div>
-
-															<button
-																type="button"
-																data-hover-description="click to disable automatic drafting for this and write your own"
-																onClick={() => setIsAutoSignature(false)}
-																className={cn(
-																	'relative h-full flex items-center text-[12px] font-inter font-normal transition-colors shrink-0',
-																	'w-[55px] px-2 justify-center text-black bg-[#91E193] hover:bg-[#91E193] active:bg-[#91E193]'
-																)}
-															>
-																<span className="absolute left-0 h-full border-l-2 border-[#000000]"></span>
-																<span>on</span>
-																<span className="absolute right-0 h-full border-r-2 border-[#000000]"></span>
-															</button>
-
-															<div className={cn('flex-grow h-full', 'bg-[#F0F0F0]')}>
-																<Input
-																	className={cn(
-																		cn('w-full h-full !bg-transparent pl-4 pr-3 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0', !forceDesktop && 'max-[480px]:placeholder:text-[10px] max-[480px]:!transition-none max-[480px]:!duration-0'),
-																		'!text-black placeholder:!text-[#9E9E9E]',
-																		'max-[480px]:pl-2'
-																	)}
-																	placeholder="Write manual Signature here"
-																/>
 															</div>
-														</div>
 													</div>
-
-														{/* Right-side hover zone (where "Auto" used to be).
-														    - Does NOT trigger expansion.
-														    - Reveals "AUTO" only while hovering this area. */}
-														<div
-															aria-hidden="true"
-															className={cn(
-																'group/signature-auto flex items-center pl-2 w-[52px] h-[31px] shrink-0 select-none peer-hover/signature:hidden',
-																!forceDesktop && 'max-[480px]:h-[24px]'
-															)}
-														>
-															<span className="font-inter font-normal text-[13px] text-[#000000] opacity-0 group-hover/signature-auto:opacity-100 transition-opacity">
-																AUTO
-															</span>
-														</div>
 													</div>
 												) : (
 													/* Manual signature mode: 467x97px box with header and text area */
@@ -7362,6 +7674,13 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														className={cn(
 															'w-full h-[97px] rounded-[8px] border-2 border-black overflow-hidden flex flex-col'
 														)}
+														onMouseLeave={() => {
+															// If user hasn't actually typed a manual signature, revert back to auto when leaving.
+															if (!manualSignatureValue.trim()) {
+																setManualSignatureValue('');
+																setIsAutoSignature(true);
+															}
+														}}
 													>
 														{/* Header row */}
 														<div className="flex items-center h-[31px] shrink-0 bg-[#8DDF90]">
@@ -7402,6 +7721,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 															<Textarea
 																value={manualSignatureValue}
 																onChange={(e) => setManualSignatureValue(e.target.value)}
+																ref={signatureManualTextareaRef}
 																className={cn(
 																	'w-full h-full !bg-transparent px-3 py-2 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 resize-none',
 																	'!text-black placeholder:!text-[#9E9E9E] font-inter text-[14px]'
@@ -7439,8 +7759,16 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														setHasAttemptedTest(true);
 													}}
 													disabled={isGenerationDisabled?.()}
+													onMouseEnter={() => {
+														if (!isGenerationDisabled?.()) setIsAutoGenerateTestHovered(true);
+													}}
+													onMouseLeave={() => setIsAutoGenerateTestHovered(false)}
+													onFocus={() => {
+														if (!isGenerationDisabled?.()) setIsAutoGenerateTestHovered(true);
+													}}
+													onBlur={() => setIsAutoGenerateTestHovered(false)}
 													className={cn(
-														'h-[28px] w-[232px] bg-[#DBF3DC] text-black font-inter font-normal text-[17px] leading-none rounded-[4px] cursor-pointer flex items-center justify-center p-0 border-2 border-transparent',
+														'h-[28px] w-[232px] bg-[#DBF3DC] text-black font-inter font-normal text-[17px] leading-none rounded-[12px] cursor-pointer flex items-center justify-center p-0 border-2 border-transparent',
 														'transition-colors hover:bg-[#EAF9EB] hover:border-black active:bg-[#D1E9D2]',
 														isGenerationDisabled?.()
 															? 'opacity-50 cursor-not-allowed'
@@ -7589,7 +7917,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														}}
 														disabled={isGenerationDisabled?.()}
 														className={cn(
-															'h-[28px] bg-white border-[3px] border-[#349A37] text-black font-inter font-normal text-[17px] leading-none rounded-[4px] cursor-pointer flex items-center justify-center transition-all hover:bg-[#EAF9EB] hover:border-black active:bg-primary/20 p-0',
+															'h-[28px] bg-white border-[3px] border-[#349A37] text-black font-inter font-normal text-[17px] leading-none rounded-[12px] cursor-pointer flex items-center justify-center transition-all hover:bg-[#EAF9EB] hover:border-black active:bg-primary/20 p-0',
 															cn(!forceDesktop ? 'w-[93.7vw]' : 'w-full', 'max-w-[475px]'),
 															isGenerationDisabled?.()
 																? 'opacity-50 cursor-not-allowed'

@@ -13,6 +13,50 @@ import {
 import { ApiRouteParams } from '@/types';
 import { EmailVerificationStatus, Prisma } from '@prisma/client';
 
+const getCampaignContactsCount = async (campaignId: number) => {
+	return prisma.contact.count({
+		where: {
+			OR: [
+				// Legacy: direct campaign-to-contact relation
+				{ campaigns: { some: { id: campaignId } } },
+				// Primary: contacts via userContactLists connected to this campaign
+				{ userContactLists: { some: { campaigns: { some: { id: campaignId } } } } },
+				// Legacy: contacts via contactLists connected to this campaign
+				{ contactList: { campaigns: { some: { id: campaignId } } } },
+			],
+		},
+	});
+};
+
+const safeInsertCampaignContactEvent = async (args: {
+	campaignId: number;
+	createdAt: Date;
+	addedCount: number;
+	totalContacts: number;
+	source: string;
+}) => {
+	try {
+		await prisma.$executeRaw(Prisma.sql`
+			INSERT INTO "CampaignContactEvent" (
+				"campaignId",
+				"createdAt",
+				"addedCount",
+				"totalContacts",
+				"source"
+			)
+			VALUES (
+				${args.campaignId},
+				${args.createdAt},
+				${args.addedCount},
+				${args.totalContacts},
+				${args.source}
+			)
+		`);
+	} catch {
+		// Best-effort only (e.g., migration not applied yet).
+	}
+};
+
 const updateUserContactListSchema = z.object({
 	name: z.string().min(1).optional(),
 	contactOperation: z
@@ -46,10 +90,29 @@ export async function PATCH(req: NextRequest, { params }: { params: ApiRoutePara
 				id: Number(id),
 				userId, // Ensure user owns this list
 			},
+			select: {
+				id: true,
+				campaigns: { select: { id: true } },
+			},
 		});
 
 		if (!existingList) {
 			return apiNotFound();
+		}
+
+		const campaignsToLog =
+			contactOperation?.action === 'connect' && contactOperation.contactIds.length > 0
+				? existingList.campaigns.map((c) => c.id)
+				: [];
+
+		const preUpdateCountsByCampaign = new Map<number, number>();
+		if (campaignsToLog.length > 0) {
+			await Promise.all(
+				campaignsToLog.map(async (campaignId) => {
+					const count = await getCampaignContactsCount(campaignId);
+					preUpdateCountsByCampaign.set(campaignId, count);
+				})
+			);
 		}
 
 		// Prepare update data with proper typing
@@ -74,6 +137,24 @@ export async function PATCH(req: NextRequest, { params }: { params: ApiRoutePara
 				contacts: true,
 			},
 		});
+
+		if (campaignsToLog.length > 0) {
+			await Promise.all(
+				campaignsToLog.map(async (campaignId) => {
+					const before = preUpdateCountsByCampaign.get(campaignId) ?? 0;
+					const after = await getCampaignContactsCount(campaignId);
+					const addedCount = after - before;
+					if (addedCount <= 0) return;
+					await safeInsertCampaignContactEvent({
+						campaignId,
+						createdAt: new Date(),
+						addedCount,
+						totalContacts: after,
+						source: 'userContactList.connect',
+					});
+				})
+			);
+		}
 
 		return apiResponse(updatedUserContactList);
 	} catch (error) {

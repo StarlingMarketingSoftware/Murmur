@@ -1927,6 +1927,8 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 					<DraftsExpandedList
 						drafts={drafts || []}
 						contacts={props.allContacts || props.contacts}
+						generationProgress={props.generationProgress}
+						generationTotal={props.generationTotal}
 						width={233}
 						height={bottomPanelHeightPx ?? 117}
 						whiteSectionHeight={15}

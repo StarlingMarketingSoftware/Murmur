@@ -10,11 +10,52 @@ import {
 	handleApiError,
 	connectOrDisconnectId,
 } from '@/app/api/_utils';
-import { DraftingTone, HybridBlock, Status } from '@prisma/client';
+import { DraftingTone, HybridBlock, Prisma, Status } from '@prisma/client';
 import { ApiRouteParams } from '@/types';
 import { NextRequest } from 'next/server';
 
 import { z } from 'zod';
+
+const getCampaignContactsCount = async (campaignId: number) => {
+	return prisma.contact.count({
+		where: {
+			OR: [
+				{ campaigns: { some: { id: campaignId } } },
+				{ userContactLists: { some: { campaigns: { some: { id: campaignId } } } } },
+				{ contactList: { campaigns: { some: { id: campaignId } } } },
+			],
+		},
+	});
+};
+
+const safeInsertCampaignContactEvent = async (args: {
+	campaignId: number;
+	createdAt: Date;
+	addedCount: number;
+	totalContacts: number;
+	source: string;
+}) => {
+	try {
+		await prisma.$executeRaw(Prisma.sql`
+			INSERT INTO "CampaignContactEvent" (
+				"campaignId",
+				"createdAt",
+				"addedCount",
+				"totalContacts",
+				"source"
+			)
+			VALUES (
+				${args.campaignId},
+				${args.createdAt},
+				${args.addedCount},
+				${args.totalContacts},
+				${args.source}
+			)
+		`);
+	} catch {
+		// Best-effort only (e.g., migration not applied yet).
+	}
+};
 
 const patchCampaignSchema = z.object({
 	name: z.string().optional(),
@@ -107,6 +148,16 @@ export async function PATCH(req: Request, { params }: { params: ApiRouteParams }
 			...updateData
 		} = validatedData.data;
 
+		const campaignId = Number(id);
+		const shouldLogContactsAdded = Boolean(
+			(contactOperation?.action === 'connect' && contactOperation.contactIds.length > 0) ||
+				(userContactListOperation?.action === 'connect' &&
+					userContactListOperation.userContactListIds.length > 0)
+		);
+		const preUpdateContactCount = shouldLogContactsAdded
+			? await getCampaignContactsCount(campaignId)
+			: null;
+
 		// Verify that the identity belongs to the current user
 		if (identityId) {
 			const identity = await prisma.identity.findUnique({
@@ -152,7 +203,7 @@ export async function PATCH(req: Request, { params }: { params: ApiRouteParams }
 
 		const updatedCampaign = await prisma.campaign.update({
 			where: {
-				id: Number(id),
+				id: campaignId,
 				userId,
 			},
 			data: updatePayload,
@@ -161,6 +212,21 @@ export async function PATCH(req: Request, { params }: { params: ApiRouteParams }
 				userContactLists: true,
 			},
 		});
+
+		if (shouldLogContactsAdded) {
+			const afterCount = await getCampaignContactsCount(campaignId);
+			const beforeCount = preUpdateContactCount ?? 0;
+			const addedCount = afterCount - beforeCount;
+			if (addedCount > 0) {
+				await safeInsertCampaignContactEvent({
+					campaignId,
+					createdAt: new Date(),
+					addedCount,
+					totalContacts: afterCount,
+					source: 'campaign.patch',
+				});
+			}
+		}
 
 		return apiResponse(updatedCampaign);
 	} catch (error) {

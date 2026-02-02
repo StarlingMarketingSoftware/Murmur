@@ -12,9 +12,22 @@ const QUERY_KEYS = {
 	detail: (id: string | number) => [...QUERY_KEYS.all, 'detail', id.toString()] as const,
 } as const;
 
+const CONTACT_EVENTS_QUERY_KEY = (id: string | number) =>
+	[...QUERY_KEYS.detail(id), 'contact-events'] as const;
+
 interface EditCampaignData {
 	id: string | number;
 	data: PatchCampaignData;
+}
+
+export interface CampaignContactEventDto {
+	id: number;
+	campaignId: number;
+	createdAt: string;
+	addedCount: number;
+	totalContacts: number;
+	source: string | null;
+	metadata: unknown | null;
 }
 
 export const useGetCampaigns = () => {
@@ -41,6 +54,27 @@ export const useGetCampaign = (id: string) => {
 			return response.json();
 		},
 		enabled: !!id,
+	});
+};
+
+export const useGetCampaignContactEvents = (
+	campaignId?: string | number,
+	options: { enabled?: boolean } = {}
+) => {
+	const enabled = (options.enabled ?? true) && Boolean(campaignId);
+	return useQuery<CampaignContactEventDto[]>({
+		queryKey: CONTACT_EVENTS_QUERY_KEY(String(campaignId || '')),
+		queryFn: async () => {
+			const response = await _fetch(
+				urls.api.campaigns.contactEvents.index(campaignId as string | number)
+			);
+			if (!response.ok) {
+				throw new Error('Failed to fetch campaign contact events');
+			}
+			return response.json();
+		},
+		enabled,
+		staleTime: 1000 * 30,
 	});
 };
 

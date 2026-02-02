@@ -294,7 +294,9 @@ const ScrollableTextarea: FC<ScrollableTextareaProps> = ({
 type DraftRowHoverRegion = 'left' | 'middle' | 'right';
 
 const DRAFT_ROW_SELECT_ZONE_PX = 115;
-const DRAFT_ROW_DELETE_ZONE_PX = 80;
+// Keep the delete hover/click zone intentionally narrow to prevent accidental deletes,
+// while allowing the "open" (middle) zone to extend further right.
+const DRAFT_ROW_DELETE_ZONE_PX = 48;
 
 export type DraftedEmailsHandle = {
 	/** Exit the embedded regen settings preview (HybridPromptInput) and return to the normal draft editor / approve-reject view. */
@@ -2031,6 +2033,14 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 							const selectedBgColor = isRejectedTab ? 'bg-[#D99696]' : 'bg-[#8BDA76]';
 							const hoveredRegion =
 								hoveredDraftRow?.draftId === draft.id ? hoveredDraftRow.region : null;
+							const actionTitlePill =
+								hoveredRegion === 'left'
+									? { label: 'Select', backgroundColor: '#9DE9B0' }
+									: hoveredRegion === 'middle'
+										? { label: 'Open', backgroundColor: '#FFDE97' }
+										: hoveredRegion === 'right'
+											? { label: 'Delete', backgroundColor: '#FEA8A8' }
+											: null;
 							const hoveredBgColor = isHoveringAllButton
 								? 'bg-[#FFEDCA]'
 								: hoveredRegion === 'left'
@@ -2341,57 +2351,68 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 										className="absolute top-[6px] flex flex-col items-start gap-[2px] pointer-events-none"
 										style={{ right: '4px' }}
 									>
-										{contactTitle ? (
+										{(contactTitle || actionTitlePill) ? (
 											<div
-												className="h-[21px] w-[240px] rounded-[6px] px-2 flex items-center gap-1 border border-black overflow-hidden"
+												className="h-[21px] w-[240px] rounded-[6px] px-2 flex items-center gap-1 border border-black overflow-hidden transition-colors duration-150 ease-out"
 												style={{
-													backgroundColor: isRestaurantTitle(contactTitle)
-														? '#C3FBD1'
-														: isCoffeeShopTitle(contactTitle)
-															? '#D6F1BD'
-															: isMusicVenueTitle(contactTitle)
-																? '#B7E5FF'
-																: isMusicFestivalTitle(contactTitle)
-																	? '#C1D6FF'
-																	: (isWeddingPlannerTitle(contactTitle) || isWeddingVenueTitle(contactTitle))
-																		? '#FFF2BC'
-																		: '#E8EFFF',
+													backgroundColor: actionTitlePill
+														? actionTitlePill.backgroundColor
+														: isRestaurantTitle(contactTitle)
+															? '#C3FBD1'
+															: isCoffeeShopTitle(contactTitle)
+																? '#D6F1BD'
+																: isMusicVenueTitle(contactTitle)
+																	? '#B7E5FF'
+																	: isMusicFestivalTitle(contactTitle)
+																		? '#C1D6FF'
+																		: (isWeddingPlannerTitle(contactTitle) || isWeddingVenueTitle(contactTitle))
+																			? '#FFF2BC'
+																			: '#E8EFFF',
 												}}
 											>
-												{isRestaurantTitle(contactTitle) && (
-													<RestaurantsIcon size={14} />
+												{actionTitlePill ? (
+													<span className="text-[13px] font-inter font-medium text-black leading-[21px]">
+														{actionTitlePill.label}
+													</span>
+												) : (
+													<>
+														{isRestaurantTitle(contactTitle) && (
+															<RestaurantsIcon size={14} />
+														)}
+														{isCoffeeShopTitle(contactTitle) && (
+															<CoffeeShopsIcon size={8} />
+														)}
+														{isMusicVenueTitle(contactTitle) && (
+															<MusicVenuesIcon size={14} className="flex-shrink-0" />
+														)}
+														{isMusicFestivalTitle(contactTitle) && (
+															<FestivalsIcon size={14} className="flex-shrink-0" />
+														)}
+														{(isWeddingPlannerTitle(contactTitle) ||
+															isWeddingVenueTitle(contactTitle)) && (
+															<WeddingPlannersIcon size={14} />
+														)}
+														<ScrollableText
+															text={
+																isRestaurantTitle(contactTitle)
+																	? 'Restaurant'
+																	: isCoffeeShopTitle(contactTitle)
+																		? 'Coffee Shop'
+																		: isMusicVenueTitle(contactTitle)
+																			? 'Music Venue'
+																			: isMusicFestivalTitle(contactTitle)
+																				? 'Music Festival'
+																				: isWeddingPlannerTitle(contactTitle)
+																					? 'Wedding Planner'
+																					: isWeddingVenueTitle(contactTitle)
+																						? 'Wedding Venue'
+																						: contactTitle
+															}
+															className="text-[10px] text-black leading-none"
+															scrollPixelsPerSecond={60}
+														/>
+													</>
 												)}
-												{isCoffeeShopTitle(contactTitle) && (
-													<CoffeeShopsIcon size={8} />
-												)}
-												{isMusicVenueTitle(contactTitle) && (
-													<MusicVenuesIcon size={14} className="flex-shrink-0" />
-												)}
-												{isMusicFestivalTitle(contactTitle) && (
-													<FestivalsIcon size={14} className="flex-shrink-0" />
-												)}
-												{(isWeddingPlannerTitle(contactTitle) || isWeddingVenueTitle(contactTitle)) && (
-													<WeddingPlannersIcon size={14} />
-												)}
-												<ScrollableText
-													text={
-														isRestaurantTitle(contactTitle)
-															? 'Restaurant'
-															: isCoffeeShopTitle(contactTitle)
-																? 'Coffee Shop'
-																: isMusicVenueTitle(contactTitle)
-																	? 'Music Venue'
-																	: isMusicFestivalTitle(contactTitle)
-																		? 'Music Festival'
-																		: isWeddingPlannerTitle(contactTitle)
-																			? 'Wedding Planner'
-																			: isWeddingVenueTitle(contactTitle)
-																				? 'Wedding Venue'
-																				: contactTitle
-													}
-													className="text-[10px] text-black leading-none"
-													scrollPixelsPerSecond={60}
-												/>
 											</div>
 										) : null}
 

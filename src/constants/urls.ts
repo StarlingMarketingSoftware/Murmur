@@ -67,6 +67,9 @@ export const urls = {
 		campaigns: {
 			index: '/api/campaigns',
 			detail: ((id) => `/api/campaigns/${id}`) as DetailRoute,
+			contactEvents: {
+				index: ((id) => `/api/campaigns/${id}/contact-events`) as DetailRoute,
+			},
 		},
 		contactList: {
 			index: '/api/contact-list',
