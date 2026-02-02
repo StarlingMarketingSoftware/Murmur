@@ -21,6 +21,7 @@ import {
 	stateBadgeColorMap,
 } from '@/constants/ui';
 import { useGetUsedContactCampaigns, useGetUsedContactIds } from '@/hooks/queryHooks/useContacts';
+import { useGetCampaignContactEvents } from '@/hooks/queryHooks/useCampaigns';
 import { ContactsHeaderChrome } from '@/app/murmur/campaign/[campaignId]/DraftingSection/EmailGeneration/DraftingTable/DraftingTable';
 import { isRestaurantTitle, isCoffeeShopTitle, isMusicVenueTitle, isMusicFestivalTitle, isWeddingPlannerTitle, isWeddingVenueTitle, isWineBeerSpiritsTitle, getWineBeerSpiritsLabel } from '@/utils/restaurantTitle';
 import { WeddingPlannersIcon } from '@/components/atoms/_svg/WeddingPlannersIcon';
@@ -29,6 +30,28 @@ import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
 import { FestivalsIcon } from '@/components/atoms/_svg/FestivalsIcon';
 import { MusicVenuesIcon } from '@/components/atoms/_svg/MusicVenuesIcon';
 import { WineBeerSpiritsIcon } from '@/components/atoms/_svg/WineBeerSpiritsIcon';
+
+const isSameLocalDay = (a: Date, b: Date) =>
+	a.getFullYear() === b.getFullYear() &&
+	a.getMonth() === b.getMonth() &&
+	a.getDate() === b.getDate();
+
+const formatBatchCount = (count: number) => `+${count < 10 ? `0${count}` : count}`;
+
+const formatBatchTimestamp = (date: Date) => {
+	const now = new Date();
+	if (isSameLocalDay(date, now)) {
+		const formatted = new Intl.DateTimeFormat('en-US', {
+			hour: 'numeric',
+			minute: '2-digit',
+			hour12: true,
+		}).format(date);
+		return formatted.replace(/\s+/g, '').toLowerCase();
+	}
+	const month = date.getMonth() + 1;
+	const day = String(date.getDate()).padStart(2, '0');
+	return `${month}/${day}`;
+};
 
 const FadeOverflowText: FC<{
 	text: string;
@@ -460,6 +483,55 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 	const isBottomView = customWhiteSectionHeight === 15;
 	const shouldShowScrollbar = !isBottomView && contacts.length >= 14;
 
+	const { data: campaignContactEvents } = useGetCampaignContactEvents(campaign?.id, {
+		enabled: isBottomView && Boolean(campaign?.id),
+	});
+
+	// Bottom view: show contact-add "batch" boxes (mirrors Drafts bottom view).
+	// For now we at least show the initial campaign contact count at campaign creation time.
+	const bottomViewContactBatches = useMemo(() => {
+		if (!isBottomView) return [] as Array<{ addedCount: number; createdAt: Date }>;
+
+		const totalNow = contacts.length;
+		const createdAtRaw = (campaign as unknown as { createdAt?: string | Date } | undefined)
+			?.createdAt;
+		const campaignCreatedAt = createdAtRaw ? new Date(createdAtRaw) : null;
+		const hasValidCampaignCreatedAt =
+			Boolean(campaignCreatedAt) && !Number.isNaN(campaignCreatedAt?.getTime());
+
+		const parsedEvents = (campaignContactEvents ?? [])
+			.map((e) => {
+				const createdAt = new Date(e.createdAt);
+				if (Number.isNaN(createdAt.getTime())) return null;
+				return { addedCount: e.addedCount, createdAt };
+			})
+			.filter(Boolean) as Array<{ addedCount: number; createdAt: Date }>;
+
+		if (parsedEvents.length === 0) {
+			// Fallback: synthetic "campaign created" batch for older campaigns
+			// (or before the contact-event migration is applied).
+			if (!totalNow) return [];
+			if (!hasValidCampaignCreatedAt) return [];
+			return [{ addedCount: totalNow, createdAt: campaignCreatedAt as Date }];
+		}
+
+		// If we have space (fewer than 3 real events), try to include the campaign's creation
+		// as a trailing "initial contacts" batch. For campaigns created after this feature,
+		// this is already logged as a real event (`campaign.create`) so this will resolve to 0.
+		if (parsedEvents.length < 3 && totalNow > 0 && hasValidCampaignCreatedAt) {
+			const sumAdded = parsedEvents.reduce((sum, e) => sum + e.addedCount, 0);
+			const inferredInitial = Math.max(0, totalNow - sumAdded);
+			if (inferredInitial > 0) {
+				return [...parsedEvents, { addedCount: inferredInitial, createdAt: campaignCreatedAt as Date }];
+			}
+		}
+
+		return parsedEvents;
+	}, [campaign, campaignContactEvents, contacts.length, isBottomView]);
+
+	const bottomViewBatchesToShow = useMemo(() => bottomViewContactBatches.slice(0, 3), [bottomViewContactBatches]);
+	const bottomViewPlaceholderCount = Math.max(0, 3 - bottomViewBatchesToShow.length);
+
 	return (
 		<div
 			className={cn(
@@ -705,13 +777,46 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 						<div
 							className={cn(
 								'flex flex-col items-center',
-								isBottomView ? 'space-y-1 pb-0' : 'space-y-2 pb-2'
+								isBottomView ? 'space-y-[1px] pb-0' : 'space-y-2 pb-2'
 							)}
 							style={{
 								paddingTop: customWhiteSectionHeight !== undefined ? '2px' : undefined,
 							}}
 						>
-					{contacts.map((contact, contactIndex) => {
+					{isBottomView ? (
+						<>
+							{bottomViewBatchesToShow.map((batch, idx) => {
+								const countLabel = formatBatchCount(batch.addedCount);
+								const rightLabel = formatBatchTimestamp(batch.createdAt);
+								return (
+									<div
+										key={`${batch.createdAt.getTime()}-${batch.addedCount}-${idx}`}
+										className={cn(
+											'select-none overflow-hidden border-2 border-[#000000] flex items-center justify-between',
+											'w-[224px] h-[30px] rounded-[4.7px] bg-[#F5DADA]'
+										)}
+									>
+										<span className="pl-[18px] font-inter font-medium text-[15px] text-black leading-none">
+											{countLabel}
+										</span>
+										<span className="pr-[18px] font-inter font-medium text-[15px] text-black leading-none">
+											{rightLabel}
+										</span>
+									</div>
+								);
+							})}
+							{Array.from({ length: bottomViewPlaceholderCount }).map((_, idx) => (
+								<div
+									key={`contacts-batch-placeholder-${idx}`}
+									className={cn(
+										'select-none overflow-hidden border-2 border-[#000000]',
+										'w-[224px] h-[30px] rounded-[4.7px] bg-[#EB8586]'
+									)}
+								/>
+							))}
+						</>
+					) : (
+					contacts.map((contact, contactIndex) => {
 						const fullName =
 							contact.name ||
 							`${contact.firstName || ''} ${contact.lastName || ''}`.trim();
@@ -754,11 +859,11 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 									}
 								}}
 						className={cn(
-							'overflow-hidden rounded-[8px] border-2 border-[#000000] select-none relative grid grid-cols-2 grid-rows-2',
+							'overflow-hidden border-2 border-[#000000] select-none relative grid grid-cols-2 grid-rows-2',
 							isAllTabNavigation ? 'cursor-default' : 'cursor-pointer',
 							isBottomView
-								? 'w-[224px] h-[28px]'
-								: 'max-[480px]:w-[96.27vw] h-[49px] max-[480px]:h-[50px]',
+								? 'w-[224px] h-[30px] rounded-[4.7px]'
+								: 'max-[480px]:w-[96.27vw] h-[49px] max-[480px]:h-[50px] rounded-[8px]',
 							contactBgColor,
 						)}
 								style={!isBottomView ? { width: `${innerWidth}px` } : undefined}
@@ -1540,16 +1645,17 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 									)}
 								</div>
 							);
-						})}
-					{Array.from({ length: Math.max(0, (isBottomView ? 3 : minRows) - contacts.length) }).map(
+						})
+					)}
+					{Array.from({ length: Math.max(0, (!isBottomView ? minRows : 0) - contacts.length) }).map(
 						(_, idx) => (
 							<div
 								key={`placeholder-${idx}`}
 								className={cn(
-									'select-none overflow-hidden rounded-[8px] border-2 border-[#000000]',
+									'select-none overflow-hidden border-2 border-[#000000]',
 									isBottomView
-										? 'w-[224px] h-[28px]'
-										: 'max-[480px]:w-[96.27vw] h-[49px] max-[480px]:h-[50px]'
+										? 'w-[224px] h-[30px] rounded-[4.7px]'
+										: 'max-[480px]:w-[96.27vw] h-[49px] max-[480px]:h-[50px] rounded-[8px]'
 									,
 									shouldShowLoadingWave
 										? 'contacts-expanded-list-loading-wave-row'

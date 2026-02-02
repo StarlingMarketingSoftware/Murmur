@@ -170,9 +170,25 @@ model Campaign {
   contacts              Contact[]         @relation("CampaignToContact")
   contactLists          ContactList[]     @relation("CampaignToContactList")
   userContactLists      UserContactList[] @relation("CampaignToUserContactList")
+  contactEvents         CampaignContactEvent[]
   inboundEmails         InboundEmail[]
 
   @@index([userId])
+}
+
+model CampaignContactEvent {
+  id            Int      @id @default(autoincrement())
+  campaignId    Int
+  createdAt     DateTime @default(now())
+  addedCount    Int
+  totalContacts Int
+  source        String?
+  metadata      Json?
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@index([campaignId])
+  @@index([createdAt])
 }
 
 model Identity {
