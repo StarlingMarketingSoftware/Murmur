@@ -7197,7 +7197,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										{/* Bottom Panels: Contacts, Drafts, and Sent - hidden at narrowest breakpoint (< 952px) */}
 										{!isNarrowestDesktop && (
 											<div
-												className="mt-[35px] pb-[8px] flex justify-center gap-[15px]"
+												className="mt-[114px] pb-[8px] flex justify-center gap-[15px]"
 												data-campaign-bottom-anchor
 											>
 												<ContactsExpandedList

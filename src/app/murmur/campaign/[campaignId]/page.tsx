@@ -408,6 +408,8 @@ const Murmur = () => {
 	const CAMPAIGN_ZOOM_EVENT = 'murmur:campaign-zoom-changed';
 	const CAMPAIGN_SCROLLABLE_CLASS = 'murmur-campaign-scrollable';
 	const CAMPAIGN_FORCE_TRANSFORM_CLASS = 'murmur-campaign-force-transform';
+	// Allows other effects (e.g. tab switches) to re-register bottom anchors for zoom fitting.
+	const refreshCampaignZoomAnchorObserversRef = useRef<(() => void) | null>(null);
 
 	// Resolution-aware zoom calculation for campaign page
 	const updateCampaignZoomForViewport = useCallback(() => {
@@ -842,7 +844,70 @@ const Murmur = () => {
 		// Avoid running until we know whether this is a real mobile device.
 		if (isMobile === null) return;
 
-		const onResize = () => updateCampaignZoomForViewport();
+		let cancelled = false;
+		let scheduledRaf: number | null = null;
+		const scheduleZoomUpdate = () => {
+			if (cancelled) return;
+			if (scheduledRaf !== null) return;
+			scheduledRaf = window.requestAnimationFrame(() => {
+				scheduledRaf = null;
+				if (cancelled) return;
+				updateCampaignZoomForViewport();
+			});
+		};
+
+		const SAFE_BOTTOM_MARGIN_PX = (viewportH: number) => (viewportH <= 780 ? 8 : 24);
+
+		// Observe the campaign bottom anchor(s) and re-run zoom fitting if they become clipped.
+		// This fixes intermittent first-load cases where layout settles after our initial measurement
+		// (e.g., data/font-driven layout shifts), and the bottom panels end up slightly cut off until
+		// the user triggers a resize (browser zoom / monitor swap).
+		let io: IntersectionObserver | null = null;
+		const observedAnchors = new WeakSet<HTMLElement>();
+		const refreshBottomAnchors = () => {
+			if (cancelled) return;
+			if (!io) return;
+			const scope =
+				(document.querySelector('[data-campaign-view-layer="active"]') as HTMLElement | null) ??
+				document.body;
+			scope.querySelectorAll<HTMLElement>('[data-campaign-bottom-anchor]').forEach((el) => {
+				if (observedAnchors.has(el)) return;
+				observedAnchors.add(el);
+				io?.observe(el);
+			});
+		};
+
+		if (isMobile === false && typeof IntersectionObserver !== 'undefined') {
+			io = new IntersectionObserver(
+				(entries) => {
+					if (cancelled) return;
+					const html = document.documentElement;
+					// Only enforce "snug fit" in compact (non-scrollable) mode.
+					if (!html.classList.contains(CAMPAIGN_COMPACT_CLASS)) return;
+					if (html.classList.contains(CAMPAIGN_SCROLLABLE_CLASS)) return;
+
+					const viewportH = window.innerHeight;
+					const safeMargin = SAFE_BOTTOM_MARGIN_PX(viewportH);
+					for (const entry of entries) {
+						const rect = entry.boundingClientRect;
+						if (rect.width <= 0 || rect.height <= 0) continue;
+						// If the bottom anchor is below the safe area (or clipped), re-fit zoom.
+						if (rect.bottom > viewportH - safeMargin + 1) {
+							scheduleZoomUpdate();
+							break;
+						}
+					}
+				},
+				// Threshold 1 means we get callbacks when an anchor becomes fully visible / not fully visible.
+				{ threshold: [1] }
+			);
+		}
+
+		const onResize = () => {
+			// Ensure we register any newly-rendered anchors after responsive/layout changes.
+			refreshBottomAnchors();
+			scheduleZoomUpdate();
+		};
 		// Defensive: clear any stale campaign zoom (e.g. Safari BFCache restores).
 		try {
 			document.documentElement.style.removeProperty(CAMPAIGN_ZOOM_VAR);
@@ -853,17 +918,53 @@ const Murmur = () => {
 		updateCampaignZoomForViewport();
 		// Re-run on the next frame to catch late style/font application (especially Safari/WebKit).
 		const rafId = window.requestAnimationFrame(() => updateCampaignZoomForViewport());
+		// Register anchors immediately (in case DraftingSection was already loaded/cached).
+		refreshBottomAnchors();
+		// Expose refresh for view switches (DraftingSection swaps when tab changes).
+		refreshCampaignZoomAnchorObserversRef.current = refreshBottomAnchors;
 		// Re-run once the drafting UI mounts so the bottom-panels clamp can measure real DOM.
 		// (DraftingSection is dynamically imported, so it may not exist on the first call.)
 		let mo: MutationObserver | null = null;
 		if (isMobile === false && typeof MutationObserver !== 'undefined') {
 			mo = new MutationObserver(() => {
-				const hasAnchors = Boolean(document.querySelector('[data-campaign-bottom-anchor]'));
-				if (!hasAnchors) return;
+				// DraftingSection (and its bottom anchors) mount asynchronously; once present, observe them.
+				refreshBottomAnchors();
+				// IMPORTANT: CampaignPageSkeleton renders an invisible `[data-campaign-bottom-anchor]`
+				// to keep the initial zoom clamp stable while DraftingSection loads.
+				// Wait until the *real* campaign view layer exists (i.e. DraftingSection has mounted)
+				// before performing the "measure real DOM" zoom update + disconnecting this observer.
+				const activeLayer = document.querySelector(
+					'[data-campaign-view-layer="active"]'
+				) as HTMLElement | null;
+				if (!activeLayer) return;
+
+				// Only proceed once a *visible* anchor exists in the active layer.
+				// The DraftingSection dynamic import renders `CampaignPageSkeleton`, which includes an
+				// invisible bottom anchor for stability — but we still need to re-clamp once the real
+				// DraftingSection DOM is mounted (it can shift based on loaded data).
+				const anchors = Array.from(
+					activeLayer.querySelectorAll<HTMLElement>('[data-campaign-bottom-anchor]')
+				);
+				const hasVisibleAnchor = anchors.some((el) => {
+					try {
+						const cs = window.getComputedStyle(el);
+						if (cs.display === 'none') return false;
+						if (cs.visibility === 'hidden') return false;
+						if (cs.opacity === '0') return false;
+						const rect = el.getBoundingClientRect();
+						return rect.width > 0 && rect.height > 0;
+					} catch {
+						return false;
+					}
+				});
+				if (!hasVisibleAnchor) return;
 				requestAnimationFrame(() => updateCampaignZoomForViewport());
 				mo?.disconnect();
 			});
-			mo.observe(document.body, { childList: true, subtree: true });
+			const observeRoot =
+				(document.querySelector('[data-campaign-view-layer="active"]') as HTMLElement | null) ??
+				document.body;
+			mo.observe(observeRoot, { childList: true, subtree: true });
 		}
 		window.addEventListener('resize', onResize, { passive: true });
 		const onPageShow = (e: PageTransitionEvent) => {
@@ -872,10 +973,14 @@ const Murmur = () => {
 		window.addEventListener('pageshow', onPageShow);
 
 		return () => {
+			cancelled = true;
+			refreshCampaignZoomAnchorObserversRef.current = null;
 			document.documentElement.classList.remove(CAMPAIGN_COMPACT_CLASS);
 			document.documentElement.classList.remove(CAMPAIGN_SCROLLABLE_CLASS);
 			document.documentElement.classList.remove(CAMPAIGN_FORCE_TRANSFORM_CLASS);
 			document.documentElement.style.removeProperty(CAMPAIGN_ZOOM_VAR);
+			if (scheduledRaf !== null) window.cancelAnimationFrame(scheduledRaf);
+			io?.disconnect();
 			mo?.disconnect();
 			window.cancelAnimationFrame(rafId);
 			window.removeEventListener('resize', onResize);
@@ -1091,6 +1196,11 @@ const Murmur = () => {
 	};
 	
 	const [activeView, setActiveViewInternal] = useState<ViewType>(getInitialView());
+	// When the user switches tabs, DraftingSection swaps out and we need to (re)observe
+	// the new bottom anchor(s) so the zoom clamp can auto-correct if they become clipped.
+	useLayoutEffect(() => {
+		refreshCampaignZoomAnchorObserversRef.current?.();
+	}, [activeView]);
 	const getInitialInboxSentTab = (): InboxSentTab => {
 		if (tabParam === 'sent') return 'sent';
 		return 'inbox';
