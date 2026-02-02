@@ -372,7 +372,7 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 						<div
 							className={cn(
 								'flex flex-col items-center',
-								isBottomView ? 'space-y-[5px] pb-0' : 'space-y-2 pb-2'
+								isBottomView ? 'space-y-[2px] pb-0' : 'space-y-2 pb-2'
 							)}
 							style={{
 								paddingTop:
@@ -400,11 +400,11 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 								<div
 									key={email.id}
 									className={cn(
-										'transition-colors relative select-none overflow-hidden rounded-[8px] border-2 border-[#000000] bg-white',
+										'transition-colors relative select-none overflow-hidden border-2 border-[#000000] bg-white',
 										isAllTabNavigation ? 'cursor-default' : 'cursor-pointer',
 										isBottomView
-											? 'w-[224px] h-[28px]'
-											: 'w-full max-w-[356px] max-[480px]:max-w-none h-[64px] max-[480px]:h-[50px]',
+											? 'w-[224px] h-[30px] rounded-[4.7px]'
+											: 'w-full max-w-[356px] max-[480px]:max-w-none h-[64px] max-[480px]:h-[50px] rounded-[8px]',
 										!isBottomView && 'p-2',
 										!isAllTabNavigation && isSelected && 'bg-[#A8E6A8]'
 									)}
@@ -789,10 +789,10 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 							<div
 								key={`sent-placeholder-${idx}`}
 								className={cn(
-									'select-none overflow-hidden rounded-[8px] border-2 border-[#000000]',
+									'select-none overflow-hidden border-2 border-[#000000]',
 									isBottomView
-										? 'w-[224px] h-[28px]'
-										: 'w-full max-w-[356px] max-[480px]:max-w-none h-[64px] max-[480px]:h-[50px]',
+										? 'w-[224px] h-[30px] rounded-[4.7px]'
+										: 'w-full max-w-[356px] max-[480px]:max-w-none h-[64px] max-[480px]:h-[50px] rounded-[8px]',
 									!isBottomView && 'p-2'
 								)}
 								style={{ backgroundColor: placeholderBgColor }}

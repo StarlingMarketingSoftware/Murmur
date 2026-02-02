@@ -705,7 +705,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 						<div
 							className={cn(
 								'flex flex-col items-center',
-								isBottomView ? 'space-y-1 pb-0' : 'space-y-2 pb-2'
+								isBottomView ? 'space-y-[1px] pb-0' : 'space-y-2 pb-2'
 							)}
 							style={{
 								paddingTop: customWhiteSectionHeight !== undefined ? '2px' : undefined,
@@ -754,11 +754,11 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 									}
 								}}
 						className={cn(
-							'overflow-hidden rounded-[8px] border-2 border-[#000000] select-none relative grid grid-cols-2 grid-rows-2',
+							'overflow-hidden border-2 border-[#000000] select-none relative grid grid-cols-2 grid-rows-2',
 							isAllTabNavigation ? 'cursor-default' : 'cursor-pointer',
 							isBottomView
-								? 'w-[224px] h-[28px]'
-								: 'max-[480px]:w-[96.27vw] h-[49px] max-[480px]:h-[50px]',
+								? 'w-[224px] h-[30px] rounded-[4.7px]'
+								: 'max-[480px]:w-[96.27vw] h-[49px] max-[480px]:h-[50px] rounded-[8px]',
 							contactBgColor,
 						)}
 								style={!isBottomView ? { width: `${innerWidth}px` } : undefined}
@@ -1546,10 +1546,10 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 							<div
 								key={`placeholder-${idx}`}
 								className={cn(
-									'select-none overflow-hidden rounded-[8px] border-2 border-[#000000]',
+									'select-none overflow-hidden border-2 border-[#000000]',
 									isBottomView
-										? 'w-[224px] h-[28px]'
-										: 'max-[480px]:w-[96.27vw] h-[49px] max-[480px]:h-[50px]'
+										? 'w-[224px] h-[30px] rounded-[4.7px]'
+										: 'max-[480px]:w-[96.27vw] h-[49px] max-[480px]:h-[50px] rounded-[8px]'
 									,
 									shouldShowLoadingWave
 										? 'contacts-expanded-list-loading-wave-row'
