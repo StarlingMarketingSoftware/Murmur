@@ -3825,6 +3825,17 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		links: identityProfile?.website || '',
 	});
 
+	type ProfileFieldsSnapshot = Record<ProfileField, string>;
+	type ProfileUndoSnapshot = { fields: ProfileFieldsSnapshot; hasLeftProfileTab: boolean };
+
+	// Profile undo should be "commit-based" (blur/enter/toggle/clear-all), not per-keystroke.
+	const profileUndoStackRef = useRef<ProfileUndoSnapshot[]>([]);
+	const [profileUndoCount, setProfileUndoCount] = useState(0);
+	const canUndoProfile = profileUndoCount > 0;
+
+	// Last committed profile state (used to detect commits + prevent duplicate undo snapshots).
+	const profileCommittedFieldsRef = useRef<ProfileFieldsSnapshot>(profileFields);
+
 	// Auto-grow the Bio textarea (so the whole blue box can expand downward)
 	useLayoutEffect(() => {
 		if (activeTab !== 'profile') return;
@@ -3838,14 +3849,16 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 	// Sync profileFields when identity changes
 	useEffect(() => {
 		if (identityProfile) {
-			setProfileFields({
+			const nextProfileFields = {
 				name: identityProfile.name || '',
 				genre: identityProfile.genre || '',
 				area: identityProfile.area || '',
 				band: identityProfile.bandName || '',
 				bio: identityProfile.bio || '',
 				links: identityProfile.website || '',
-			});
+			};
+			setProfileFields(nextProfileFields);
+			profileCommittedFieldsRef.current = nextProfileFields;
 		}
 	}, [identityProfile]);
 
@@ -4110,6 +4123,18 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 
 	// Handle saving a profile field
 	const saveProfileField = (field: ProfileField) => {
+		// Commit-based undo snapshot: only when a field's committed value actually changes.
+		const committed = profileCommittedFieldsRef.current;
+		const current = profileFields;
+		if (committed?.[field] !== current?.[field]) {
+			profileUndoStackRef.current.push({
+				fields: { ...committed },
+				hasLeftProfileTab,
+			});
+			setProfileUndoCount(profileUndoStackRef.current.length);
+			profileCommittedFieldsRef.current = { ...current };
+		}
+
 		if (!onIdentityUpdate || !identityProfile) return;
 
 		// Name is required on Identity. If empty, skip saving.
@@ -4236,6 +4261,13 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 	};
 
 	const handleClearAllProfileFields = () => {
+		// Undo should restore the state exactly as it was pre-clear (including unsaved local edits).
+		profileUndoStackRef.current.push({
+			fields: { ...profileFields },
+			hasLeftProfileTab,
+		});
+		setProfileUndoCount(profileUndoStackRef.current.length);
+
 		// Close any expanded field (we are clearing values)
 		setExpandedProfileBox(null);
 
@@ -4244,14 +4276,16 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		setHasLeftProfileTab(false);
 
 		// Name is required; keep it and clear the rest.
-		setProfileFields((prev) => ({
-			...prev,
+		const nextProfileFields = {
+			...profileFields,
 			genre: '',
 			area: '',
 			band: '',
 			bio: '',
 			links: '',
-		}));
+		};
+		setProfileFields(nextProfileFields);
+		profileCommittedFieldsRef.current = nextProfileFields;
 
 		if (!onIdentityUpdate || !identityProfile) return;
 		onIdentityUpdate({
@@ -4260,6 +4294,30 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 			bandName: '',
 			bio: '',
 			website: '',
+		});
+	};
+
+	const handleUndoProfileFields = () => {
+		const snapshot = profileUndoStackRef.current.pop();
+		if (!snapshot) return;
+		setProfileUndoCount(profileUndoStackRef.current.length);
+
+		// Close any expanded field before restoring values.
+		setExpandedProfileBox(null);
+		setHasLeftProfileTab(snapshot.hasLeftProfileTab);
+		setProfileFields(snapshot.fields);
+		profileCommittedFieldsRef.current = snapshot.fields;
+
+		if (!onIdentityUpdate || !identityProfile) return;
+
+		const nextName = snapshot.fields.name.trim();
+		onIdentityUpdate({
+			...(nextName ? { name: nextName } : {}),
+			genre: snapshot.fields.genre,
+			area: snapshot.fields.area,
+			bandName: snapshot.fields.band,
+			bio: snapshot.fields.bio,
+			website: snapshot.fields.links,
 		});
 	};
 
@@ -5126,7 +5184,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 															<span className="pl-4 font-inter font-semibold text-[15px] leading-none text-black">
 																Introduce yourself
 															</span>
-															{/* Right controls: divider @ 138px from right, "Clear all" segment (89px), divider @ 49px from right */}
+															{/* Right controls: "Clear all" + Undo (44px) + Close (44px) */}
 															<div className="ml-auto flex items-stretch h-full">
 																<button
 																	type="button"
@@ -5135,21 +5193,38 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																>
 																	Clear all
 																</button>
-																<div className="w-[49px] shrink-0 border-l-[3px] border-black" />
+																<button
+																	type="button"
+																	onClick={(e) => {
+																		e.stopPropagation();
+																		handleUndoProfileFields();
+																	}}
+																	disabled={!canUndoProfile}
+																	className={cn(
+																		'w-[44px] shrink-0 h-full border-l-[3px] border-black flex items-center justify-center p-0 bg-transparent text-black disabled:text-black disabled:opacity-100',
+																		canUndoProfile
+																			? 'cursor-pointer hover:brightness-[0.98] active:brightness-[0.95]'
+																			: 'cursor-not-allowed'
+																	)}
+																	aria-label="Undo last profile change"
+																>
+																	<UndoIcon width="20" height="20" />
+																</button>
+																<button
+																	type="button"
+																	aria-label="Back to Auto"
+																	onClick={(e) => {
+																		e.stopPropagation();
+																		setActiveTab('main');
+																		setHasLeftProfileTab(true);
+																		switchToFull();
+																	}}
+																	className="w-[44px] shrink-0 h-full border-l-[3px] border-black flex items-center justify-center bg-transparent cursor-pointer p-0 hover:brightness-[0.98] active:brightness-[0.95] focus:outline-none focus-visible:outline-none"
+																>
+																	<span className="block w-[18px] h-[3px] bg-black" />
+																</button>
 															</div>
 														</div>
-
-														{/* Top-right "-" button (positioned in the main Body area, not the header strip) */}
-														<button
-															type="button"
-															aria-label="Back to Auto"
-															onClick={() => {
-																setActiveTab('main');
-																setHasLeftProfileTab(true);
-																switchToFull();
-															}}
-															className="absolute right-[14px] top-[43px] w-[15px] h-[2px] bg-black cursor-pointer p-0 border-0 focus:outline-none"
-														/>
 
 														{/* Profile fields live inside the 380px Body container */}
 														<div
