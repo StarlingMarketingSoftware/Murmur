@@ -33,9 +33,40 @@ import { FestivalsIcon } from '@/components/atoms/_svg/FestivalsIcon';
 import { MusicVenuesIcon } from '@/components/atoms/_svg/MusicVenuesIcon';
 import { WineBeerSpiritsIcon } from '@/components/atoms/_svg/WineBeerSpiritsIcon';
 
+const isSameLocalDay = (a: Date, b: Date) =>
+	a.getFullYear() === b.getFullYear() &&
+	a.getMonth() === b.getMonth() &&
+	a.getDate() === b.getDate();
+
+const formatBatchCount = (count: number) => `+${count < 10 ? `0${count}` : count}`;
+
+const formatBatchTimestamp = (date: Date) => {
+	const now = new Date();
+	if (isSameLocalDay(date, now)) {
+		const formatted = new Intl.DateTimeFormat('en-US', {
+			hour: 'numeric',
+			minute: '2-digit',
+			hour12: true,
+		}).format(date);
+		return formatted.replace(/\s+/g, '').toLowerCase();
+	}
+	const month = date.getMonth() + 1;
+	const day = String(date.getDate()).padStart(2, '0');
+	return `${month}/${day}`;
+};
+
 export interface DraftsExpandedListProps {
 	drafts: EmailWithRelations[];
 	contacts: ContactWithName[];
+	/**
+	 * Draft generation progress for the currently-running batch.
+	 * `-1` means idle; `0..generationTotal` while drafting.
+	 */
+	generationProgress?: number;
+	/**
+	 * Total drafts expected for the currently-running batch.
+	 */
+	generationTotal?: number;
 	onHeaderClick?: () => void;
 	onOpenDrafts?: () => void;
 	/** Optional hover callback (used by Campaign "All" tab previews) */
@@ -174,6 +205,8 @@ const DraftsHeaderChrome: FC<{
 export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 	drafts,
 	contacts,
+	generationProgress = -1,
+	generationTotal = 0,
 	onHeaderClick,
 	onOpenDrafts,
 	onDraftHover,
@@ -335,6 +368,69 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 	const hasCustomRowSize = Boolean(rowWidth || rowHeight);
 	const isFullyEmpty = drafts.length === 0;
 	const placeholderBgColor = isFullyEmpty ? '#FDCF7D' : '#FFDC9E';
+
+	// Bottom view: show "batch" boxes instead of individual drafts.
+	const bottomViewDraftBatches = useMemo(() => {
+		// Heuristic sessionization: a new batch starts after a long gap.
+		const BATCH_GAP_MS = 2 * 60 * 60 * 1000; // 2 hours
+
+		const createdAts = drafts
+			.filter((d) => d.status === EmailStatus.draft)
+			.map((d) => new Date(d.createdAt))
+			.filter((d) => !Number.isNaN(d.getTime()))
+			.sort((a, b) => a.getTime() - b.getTime());
+
+		if (createdAts.length === 0) return [] as Array<{ count: number; endAt: Date }>;
+
+		const batches: Array<{ count: number; endAt: Date }> = [];
+		let currentCount = 1;
+		let currentEndAt = createdAts[0];
+
+		for (let i = 1; i < createdAts.length; i++) {
+			const prev = createdAts[i - 1];
+			const curr = createdAts[i];
+			const gap = curr.getTime() - prev.getTime();
+
+			if (gap > BATCH_GAP_MS) {
+				batches.push({ count: currentCount, endAt: currentEndAt });
+				currentCount = 1;
+				currentEndAt = curr;
+			} else {
+				currentCount += 1;
+				currentEndAt = curr;
+			}
+		}
+
+		batches.push({ count: currentCount, endAt: currentEndAt });
+
+		// Keep only the most recent 3 batches, displayed newest → oldest (top-first).
+		return batches.slice(-3).reverse();
+	}, [drafts]);
+
+	const isDraftingBatchActive = isBottomView && generationProgress >= 0;
+	const resolvedGenerationTotal = generationTotal > 0 ? generationTotal : contacts.length;
+	const draftedCount = resolvedGenerationTotal > 0
+		? Math.min(Math.max(0, generationProgress), resolvedGenerationTotal)
+		: Math.max(0, generationProgress);
+	const draftingFillPct =
+		resolvedGenerationTotal > 0 ? draftedCount / resolvedGenerationTotal : 0;
+	const clampedDraftingFillPct = Math.max(0, Math.min(1, draftingFillPct));
+
+	const bottomViewBatchesToShow = useMemo(() => {
+		const maxBatches = isDraftingBatchActive ? 2 : 3;
+		// While drafting, the latest created-at batch is the "active" one; we show it as a progress bar instead.
+		const batches =
+			isDraftingBatchActive && generationProgress > 0
+				? bottomViewDraftBatches.slice(1)
+				: bottomViewDraftBatches;
+		return batches.slice(0, maxBatches);
+	}, [bottomViewDraftBatches, generationProgress, isDraftingBatchActive]);
+
+	const bottomViewRowCount =
+		(isDraftingBatchActive ? 1 : 0) + bottomViewBatchesToShow.length;
+	const bottomViewPlaceholderCount = Math.max(0, 3 - bottomViewRowCount);
+	const bottomViewPlaceholderBgColor = '#F7EBD3';
+
 	const horizontalPaddingClass = hasCustomRowSize
 		? 'px-0'
 		: isBottomView
@@ -609,367 +705,426 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 								onDraftHover?.(null);
 							}}
 						>
-						{drafts.map((draft, draftIndex) => {
-							const contact = contacts?.find((c) => c.id === draft.contactId);
-							const contactName = contact
-								? contact.name ||
-								  `${contact.firstName || ''} ${contact.lastName || ''}`.trim() ||
-								  contact.company ||
-								  'Contact'
-								: 'Unknown Contact';
-							// having a totally different selection view logic for preview and selected, where preview will show the selected state
-							const isSelected = !isPreviewMode && selectedDraftIds.has(draft.id as number);
-							const isRejected = rejectedDraftIds?.has(draft.id as number) ?? false;
-							const isApproved = approvedDraftIds?.has(draft.id as number) ?? false;
-							const isPreviewed = previewedDraftId === draft.id;
-							const contactTitle = contact?.headline || contact?.title || '';
-							const indicatorLeftClass = isBottomView ? 'left-2' : 'left-[8px]';
-							// Keyboard focus shows hover UI independently of mouse hover
-							const isKeyboardFocused = hoveredDraftIndex === draftIndex;
-							// Final background: previewed > selected > keyboard focus > white (mouse hover handled by CSS)
-							const draftBgColor = isAllTabNavigation
-								? 'bg-white'
-								: isPreviewed
-									? 'bg-[#FDDEA5]'
-									: isSelected
-										? 'bg-[#FFDF9F]'
-										: isKeyboardFocused
-											? 'bg-[#F9E5BA]'
-											: 'bg-white hover:bg-[#F9E5BA]';
-							return (
-								<div
-									key={draft.id}
-									ref={(el) => {
-										if (el) {
-											draftRowRefs.current.set(draft.id as number, el);
-										} else {
-											draftRowRefs.current.delete(draft.id as number);
-										}
-									}}
-									className={cn(
-										'relative select-none overflow-visible border-2 border-[#000000]',
-										isAllTabNavigation ? 'cursor-default' : 'cursor-pointer',
-										isBottomView
-											? 'w-[224px] h-[30px] rounded-[4.7px]'
-											: 'rounded-[8px]',
-										!isBottomView &&
-											!hasCustomRowSize &&
-											'w-full max-w-[356px] max-[480px]:max-w-none h-[64px] max-[480px]:h-[50px]',
-										!isBottomView && 'p-2',
-										draftBgColor,
-									)}
-									style={
-										isBottomView
-											? undefined
-											: {
-													width: hasCustomRowSize ? `${resolvedRowWidth}px` : undefined,
-													height: hasCustomRowSize ? `${resolvedRowHeight}px` : undefined,
-											  }
-									}
-									onMouseDown={(e) => {
-										if (e.shiftKey && !isPreviewMode) e.preventDefault();
-									}}
-									onMouseEnter={() => {
-										if (!isAllTabNavigation) setHoveredDraftIndex(draftIndex);
-										onDraftHover?.(draft);
-									}}
-									onClick={(e) => {
-										if (isAllTabNavigation) return;
-										handleDraftClick(draft, e);
-									}}
-								>
-									{/* Used-contact indicator - stacked above reject/approve when both present */}
-									{usedContactIdsSet.has(draft.contactId) && (
-										<span
-											className={cn('absolute', indicatorLeftClass)}
-											style={{
-												// Align used-contact dot with the Company line.
-												// Different positioning for Drafts tab vs All tab vs bottom view.
-												top: isBottomView
-													? '50%'
-													: isAllTab
-														? 'calc(50% - 16px)'
-														: 'calc(50% - 32px)', // Drafts tab - higher
-												transform: isBottomView ? 'translateY(-50%)' : 'none',
-												width: isBottomView ? '12px' : '13px',
-												height: isBottomView ? '12px' : '13px',
-												borderRadius: '50%',
-												border: '1px solid #000000',
-												backgroundColor: '#DAE6FE',
-											}}
-										/>
-									)}
-									{/* Rejected indicator - stacked below used-contact when both present */}
-									{isRejected && (
-										<span
-											className={cn('absolute', indicatorLeftClass)}
-											title="Marked for rejection"
-											aria-label="Rejected draft"
-											style={{
-												// When stacked under the used-contact dot, align with the Subject line.
-												// Different positioning for Drafts tab vs All tab vs bottom view.
-												top: usedContactIdsSet.has(draft.contactId)
-													? (isBottomView
-														? 'calc(50% + 3px)'
-														: isAllTab
-															? 'calc(50% + 6px)'
-															: 'calc(50% - 10px)') // Drafts tab - higher
-													: '50%',
-												transform: usedContactIdsSet.has(draft.contactId) ? 'none' : 'translateY(-50%)',
-												width: isBottomView ? '12px' : '13px',
-												height: isBottomView ? '12px' : '13px',
-												borderRadius: '50%',
-												border: '1px solid #000000',
-												backgroundColor: '#A03C3C',
-											}}
-										/>
-									)}
-									{isApproved && (
-										<span
-											className={cn('absolute', indicatorLeftClass)}
-											title="Marked for approval"
-											aria-label="Approved draft"
-											style={{
-												// When stacked under the used-contact dot, align with the Subject line.
-												// Different positioning for Drafts tab vs All tab vs bottom view.
-												top: usedContactIdsSet.has(draft.contactId)
-													? (isBottomView
-														? 'calc(50% + 3px)'
-														: isAllTab
-															? 'calc(50% + 6px)'
-															: 'calc(50% - 10px)') // Drafts tab - higher
-													: '50%',
-												transform: usedContactIdsSet.has(draft.contactId) ? 'none' : 'translateY(-50%)',
-												width: isBottomView ? '12px' : '13px',
-												height: isBottomView ? '12px' : '13px',
-												borderRadius: '50%',
-												border: '1px solid #000000',
-												backgroundColor: '#69AF69',
-											}}
-										/>
-									)}
-								{/* Fixed top-right info (Title + Location) - match Drafting tab */}
-								<div
-									className={cn(
-										'absolute flex flex-col items-end pointer-events-none',
-										isBottomView
-											? 'top-[4px] right-[4px] gap-[1px] w-[90px]'
-											: isAllTab
-											? 'top-[4px] right-[8px] gap-[2px] w-[158px]'
-											: 'top-[4px] right-[8px] gap-[2px] w-[169px]'
-									)}
-								>
-									{/* Title row - on top */}
-									{contactTitle ? (
+						{isBottomView
+							? (
+								<>
+									{isDraftingBatchActive && (
 										<div
+											key="drafts-progress"
 											className={cn(
-												'border border-black overflow-hidden flex items-center gap-0.5',
-												isBottomView
-													? 'h-[10px] rounded-[3px] px-1 w-full'
-													: isAllTab
-													? 'w-[158px] h-[15px] rounded-[5px] justify-center px-1'
-													: 'w-[169px] h-[21px] rounded-[5px] justify-center px-2'
+												'relative select-none overflow-hidden border-2 border-[#000000] flex items-center justify-between',
+												'w-[224px] h-[30px] rounded-[4.7px] bg-[#F7EBD3]'
 											)}
-											style={{
-												backgroundColor: isRestaurantTitle(contactTitle)
-													? '#C3FBD1'
-													: isCoffeeShopTitle(contactTitle)
-														? '#D6F1BD'
-														: isMusicVenueTitle(contactTitle)
-															? '#B7E5FF'
-															: isMusicFestivalTitle(contactTitle)
-																? '#C1D6FF'
-																: (isWeddingPlannerTitle(contactTitle) || isWeddingVenueTitle(contactTitle))
-																	? '#FFF2BC'
-																	: isWineBeerSpiritsTitle(contactTitle)
-																		? '#BFC4FF'
-																		: '#E8EFFF',
+										>
+											<div
+												aria-hidden
+												style={{
+													position: 'absolute',
+													top: 0,
+													bottom: 0,
+													left: 0,
+													width: `${clampedDraftingFillPct * 100}%`,
+													backgroundColor: '#FFDD9E',
+													borderRadius:
+														clampedDraftingFillPct >= 1
+															? '4.7px'
+															: '4.7px 0 0 4.7px',
+													transition: 'width 180ms ease-out',
+												}}
+											/>
+											{/* Divider at the current progress boundary (not fixed center) */}
+											{clampedDraftingFillPct > 0 && clampedDraftingFillPct < 1 && (
+												<div
+													aria-hidden
+													style={{
+														position: 'absolute',
+														top: 0,
+														bottom: 0,
+														left: `${clampedDraftingFillPct * 100}%`,
+														transform: 'translateX(-1px)',
+														width: '2px',
+														backgroundColor: '#000000',
+														zIndex: 5,
+													}}
+												/>
+											)}
+											<span className="relative z-10 pl-[18px] font-inter font-medium text-[15px] text-black leading-none">
+												{formatBatchCount(draftedCount)}
+											</span>
+											<span className="relative z-10 pr-[18px] font-inter font-medium text-[15px] text-black leading-none">
+												{resolvedGenerationTotal < 10
+													? `0${resolvedGenerationTotal}`
+													: String(resolvedGenerationTotal)}
+											</span>
+										</div>
+									)}
+									{bottomViewBatchesToShow.map((batch, idx) => {
+										const countLabel = formatBatchCount(batch.count);
+										const timeLabel = formatBatchTimestamp(batch.endAt);
+										return (
+											<div
+												key={`${batch.endAt.getTime()}-${batch.count}-${idx}`}
+												className={cn(
+													'select-none overflow-hidden border-2 border-[#000000] flex items-center justify-between',
+													'w-[224px] h-[30px] rounded-[4.7px] bg-[#F7EBD3]'
+												)}
+											>
+												<span className="pl-[18px] font-inter font-medium text-[15px] text-black leading-none">
+													{countLabel}
+												</span>
+												<span className="pr-[18px] font-inter font-medium text-[15px] text-black leading-none">
+													{timeLabel}
+												</span>
+											</div>
+										);
+									})}
+								</>
+							)
+							: drafts.map((draft, draftIndex) => {
+									const contact = contacts?.find((c) => c.id === draft.contactId);
+									const contactName = contact
+										? contact.name ||
+										  `${contact.firstName || ''} ${contact.lastName || ''}`.trim() ||
+										  contact.company ||
+										  'Contact'
+										: 'Unknown Contact';
+									// having a totally different selection view logic for preview and selected, where preview will show the selected state
+									const isSelected = !isPreviewMode && selectedDraftIds.has(draft.id as number);
+									const isRejected = rejectedDraftIds?.has(draft.id as number) ?? false;
+									const isApproved = approvedDraftIds?.has(draft.id as number) ?? false;
+									const isPreviewed = previewedDraftId === draft.id;
+									const contactTitle = contact?.headline || contact?.title || '';
+									const indicatorLeftClass = isBottomView ? 'left-2' : 'left-[8px]';
+									// Keyboard focus shows hover UI independently of mouse hover
+									const isKeyboardFocused = hoveredDraftIndex === draftIndex;
+									// Final background: previewed > selected > keyboard focus > white (mouse hover handled by CSS)
+									const draftBgColor = isAllTabNavigation
+										? 'bg-white'
+										: isPreviewed
+											? 'bg-[#FDDEA5]'
+											: isSelected
+												? 'bg-[#FFDF9F]'
+												: isKeyboardFocused
+													? 'bg-[#F9E5BA]'
+													: 'bg-white hover:bg-[#F9E5BA]';
+									return (
+										<div
+											key={draft.id}
+											ref={(el) => {
+												if (el) {
+													draftRowRefs.current.set(draft.id as number, el);
+												} else {
+													draftRowRefs.current.delete(draft.id as number);
+												}
+											}}
+											className={cn(
+												'relative select-none overflow-visible border-2 border-[#000000]',
+												isAllTabNavigation ? 'cursor-default' : 'cursor-pointer',
+												isBottomView
+													? 'w-[224px] h-[30px] rounded-[4.7px]'
+													: 'rounded-[8px]',
+												!isBottomView &&
+													!hasCustomRowSize &&
+													'w-full max-w-[356px] max-[480px]:max-w-none h-[64px] max-[480px]:h-[50px]',
+												!isBottomView && 'p-2',
+												draftBgColor,
+											)}
+											style={
+												isBottomView
+													? undefined
+													: {
+															width: hasCustomRowSize ? `${resolvedRowWidth}px` : undefined,
+															height: hasCustomRowSize ? `${resolvedRowHeight}px` : undefined,
+													  }
+											}
+											onMouseDown={(e) => {
+												if (e.shiftKey && !isPreviewMode) e.preventDefault();
+											}}
+											onMouseEnter={() => {
+												if (!isAllTabNavigation) setHoveredDraftIndex(draftIndex);
+												onDraftHover?.(draft);
+											}}
+											onClick={(e) => {
+												if (isAllTabNavigation) return;
+												handleDraftClick(draft, e);
 											}}
 										>
-											{isRestaurantTitle(contactTitle) && (
-												<RestaurantsIcon size={isBottomView ? 7 : isAllTab ? 10 : 14} />
+											{/* Used-contact indicator - stacked above reject/approve when both present */}
+											{usedContactIdsSet.has(draft.contactId) && (
+												<span
+													className={cn('absolute', indicatorLeftClass)}
+													style={{
+														// Align used-contact dot with the Company line.
+														// Different positioning for Drafts tab vs All tab vs bottom view.
+														top: isBottomView
+															? '50%'
+															: isAllTab
+																? 'calc(50% - 16px)'
+																: 'calc(50% - 32px)', // Drafts tab - higher
+														transform: isBottomView ? 'translateY(-50%)' : 'none',
+														width: isBottomView ? '12px' : '13px',
+														height: isBottomView ? '12px' : '13px',
+														borderRadius: '50%',
+														border: '1px solid #000000',
+														backgroundColor: '#DAE6FE',
+													}}
+												/>
 											)}
-											{isCoffeeShopTitle(contactTitle) && (
-												<CoffeeShopsIcon size={6} />
+											{/* Rejected indicator - stacked below used-contact when both present */}
+											{isRejected && (
+												<span
+													className={cn('absolute', indicatorLeftClass)}
+													title="Marked for rejection"
+													aria-label="Rejected draft"
+													style={{
+														// When stacked under the used-contact dot, align with the Subject line.
+														// Different positioning for Drafts tab vs All tab vs bottom view.
+														top: usedContactIdsSet.has(draft.contactId)
+															? (isBottomView
+																? 'calc(50% + 3px)'
+																: isAllTab
+																	? 'calc(50% + 6px)'
+																	: 'calc(50% - 10px)') // Drafts tab - higher
+															: '50%',
+														transform: usedContactIdsSet.has(draft.contactId)
+															? 'none'
+															: 'translateY(-50%)',
+														width: isBottomView ? '12px' : '13px',
+														height: isBottomView ? '12px' : '13px',
+														borderRadius: '50%',
+														border: '1px solid #000000',
+														backgroundColor: '#A03C3C',
+													}}
+												/>
 											)}
-											{isMusicVenueTitle(contactTitle) && (
-												<MusicVenuesIcon size={isBottomView ? 7 : isAllTab ? 10 : 14} className="flex-shrink-0" />
+											{isApproved && (
+												<span
+													className={cn('absolute', indicatorLeftClass)}
+													title="Marked for approval"
+													aria-label="Approved draft"
+													style={{
+														// When stacked under the used-contact dot, align with the Subject line.
+														// Different positioning for Drafts tab vs All tab vs bottom view.
+														top: usedContactIdsSet.has(draft.contactId)
+															? (isBottomView
+																? 'calc(50% + 3px)'
+																: isAllTab
+																	? 'calc(50% + 6px)'
+																	: 'calc(50% - 10px)') // Drafts tab - higher
+															: '50%',
+														transform: usedContactIdsSet.has(draft.contactId)
+															? 'none'
+															: 'translateY(-50%)',
+														width: isBottomView ? '12px' : '13px',
+														height: isBottomView ? '12px' : '13px',
+														borderRadius: '50%',
+														border: '1px solid #000000',
+														backgroundColor: '#69AF69',
+													}}
+												/>
 											)}
-											{isMusicFestivalTitle(contactTitle) && (
-												<FestivalsIcon size={isBottomView ? 7 : isAllTab ? 10 : 14} className="flex-shrink-0" />
+										{/* Fixed top-right info (Title + Location) - match Drafting tab */}
+										<div
+											className={cn(
+												'absolute flex flex-col items-end pointer-events-none',
+												isBottomView
+													? 'top-[4px] right-[4px] gap-[1px] w-[90px]'
+													: isAllTab
+													? 'top-[4px] right-[8px] gap-[2px] w-[158px]'
+													: 'top-[4px] right-[8px] gap-[2px] w-[169px]'
 											)}
-											{(isWeddingPlannerTitle(contactTitle) || isWeddingVenueTitle(contactTitle)) && (
-												<WeddingPlannersIcon size={isBottomView ? 7 : isAllTab ? 10 : 14} />
-											)}
-											{isWineBeerSpiritsTitle(contactTitle) && (
-												<WineBeerSpiritsIcon size={isBottomView ? 7 : isAllTab ? 10 : 14} className="flex-shrink-0" />
-											)}
-											{isBottomView ? (
-												<span className="text-[7px] text-black leading-none truncate">
-													{isRestaurantTitle(contactTitle)
-														? 'Restaurant'
-														: isCoffeeShopTitle(contactTitle)
-															? 'Coffee Shop'
-															: isMusicVenueTitle(contactTitle)
-																? 'Music Venue'
-																: isMusicFestivalTitle(contactTitle)
-																	? 'Music Festival'
-																	: isWeddingPlannerTitle(contactTitle)
-																		? 'Wedding Planner'
-																		: isWeddingVenueTitle(contactTitle)
-																			? 'Wedding Venue'
-																			: isWineBeerSpiritsTitle(contactTitle)
-																				? getWineBeerSpiritsLabel(contactTitle)
-																				: contactTitle}
-												</span>
-											) : (
-												<ScrollableText
-													text={
-														isRestaurantTitle(contactTitle)
-															? 'Restaurant'
+										>
+											{/* Title row - on top */}
+											{contactTitle ? (
+												<div
+													className={cn(
+														'border border-black overflow-hidden flex items-center gap-0.5',
+														isBottomView
+															? 'h-[10px] rounded-[3px] px-1 w-full'
+															: isAllTab
+															? 'w-[158px] h-[15px] rounded-[5px] justify-center px-1'
+															: 'w-[169px] h-[21px] rounded-[5px] justify-center px-2'
+													)}
+													style={{
+														backgroundColor: isRestaurantTitle(contactTitle)
+															? '#C3FBD1'
 															: isCoffeeShopTitle(contactTitle)
-																? 'Coffee Shop'
+																? '#D6F1BD'
 																: isMusicVenueTitle(contactTitle)
-																	? 'Music Venue'
+																	? '#B7E5FF'
 																	: isMusicFestivalTitle(contactTitle)
-																		? 'Music Festival'
-																		: isWeddingPlannerTitle(contactTitle)
-																			? 'Wedding Planner'
-																			: isWeddingVenueTitle(contactTitle)
-																				? 'Wedding Venue'
-																				: isWineBeerSpiritsTitle(contactTitle)
-																					? getWineBeerSpiritsLabel(contactTitle) ?? contactTitle
-																					: contactTitle
-													}
-													className="text-[11px] text-black leading-none"
-												/>
-											)}
-										</div>
-									) : null}
-
-									{/* Location row - below title */}
-									<div
-										className={cn(
-											'flex items-center justify-start',
-											isBottomView
-												? 'gap-0.5 h-[10px] w-[90px]'
-												: isAllTab
-												? 'gap-1 h-[14px] w-[158px]'
-												: 'gap-1 h-[19px] w-[169px]'
-										)}
-									>
-										{(() => {
-											const fullStateName = (contact?.state as string) || '';
-											const stateAbbr = getStateAbbreviation(fullStateName) || '';
-											const normalizedState = fullStateName.trim();
-											const lowercaseCanadianProvinceNames = canadianProvinceNames.map(
-												(s) => s.toLowerCase()
-											);
-											const isCanadianProvince =
-												lowercaseCanadianProvinceNames.includes(
-													normalizedState.toLowerCase()
-												) ||
-												canadianProvinceAbbreviations.includes(
-													normalizedState.toUpperCase()
-												) ||
-												canadianProvinceAbbreviations.includes(stateAbbr.toUpperCase());
-											const isUSAbbr = /^[A-Z]{2}$/.test(stateAbbr);
-
-											if (!stateAbbr) return null;
-											return isCanadianProvince ? (
-												<div
-													className={cn(
-														'inline-flex items-center justify-center border overflow-hidden',
-														isBottomView
-															? 'w-[20px] h-[10px] rounded-[2px]'
-															: isAllTab
-															? 'w-[27px] h-[14px] rounded-[4px]'
-															: 'w-[29px] h-[19px] rounded-[4px]'
-													)}
-													style={{ borderColor: '#000000' }}
-												>
-													<CanadianFlag
-														width="100%"
-														height="100%"
-														className="w-full h-full"
-													/>
-												</div>
-											) : isUSAbbr ? (
-												<span
-													className={cn(
-														'inline-flex items-center justify-center border leading-none font-bold',
-														isBottomView
-															? 'w-[20px] h-[10px] rounded-[2px] text-[7px]'
-															: isAllTab
-															? 'w-[27px] h-[14px] rounded-[4px] text-[9px]'
-															: 'w-[29px] h-[19px] rounded-[4px] text-[10px]'
-													)}
-													style={{
-														backgroundColor:
-															stateBadgeColorMap[stateAbbr] || 'transparent',
-														borderColor: '#000000',
+																		? '#C1D6FF'
+																		: (isWeddingPlannerTitle(contactTitle) ||
+																				isWeddingVenueTitle(contactTitle))
+																			? '#FFF2BC'
+																			: isWineBeerSpiritsTitle(contactTitle)
+																				? '#BFC4FF'
+																				: '#E8EFFF',
 													}}
 												>
-													{stateAbbr}
-												</span>
-											) : (
-												<span
-													className={cn(
-														'inline-flex items-center justify-center border',
-														isBottomView
-															? 'w-[20px] h-[10px] rounded-[2px]'
-															: isAllTab
-															? 'w-[27px] h-[14px] rounded-[4px]'
-															: 'w-[29px] h-[19px] rounded-[4px]'
+													{isRestaurantTitle(contactTitle) && (
+														<RestaurantsIcon size={isBottomView ? 7 : isAllTab ? 10 : 14} />
 													)}
-													style={{ borderColor: '#000000' }}
-												/>
-											);
-										})()}
-										{contact?.city ? (
-											isBottomView ? (
-												<span className="text-[7px] text-black leading-none truncate max-w-[50px]">
-													{contact.city}
-												</span>
-											) : (
-												<ScrollableText
-													text={contact.city}
-													className="text-[11px] text-black leading-none max-w-[130px]"
-												/>
-											)
-										) : null}
-									</div>
-								</div>
-
-									{/* Content grid */}
-									{isBottomView ? (
-										/* Bottom view: compact layout matching Contacts bottom view (no subject/body) */
-										<div className="grid grid-cols-1 grid-rows-2 h-full pr-[95px] pl-[22px]">
-											{/* Row 1: Name */}
-											<div className="flex items-center h-[12px] overflow-hidden">
-												<div
-													className="font-bold text-[9px] leading-none whitespace-nowrap overflow-hidden w-full pr-1"
-													style={{
-														WebkitMaskImage:
-															'linear-gradient(90deg, #000 96%, transparent 100%)',
-														maskImage:
-															'linear-gradient(90deg, #000 96%, transparent 100%)',
-													}}
-												>
-													{contactName}
+													{isCoffeeShopTitle(contactTitle) && <CoffeeShopsIcon size={6} />}
+													{isMusicVenueTitle(contactTitle) && (
+														<MusicVenuesIcon
+															size={isBottomView ? 7 : isAllTab ? 10 : 14}
+															className="flex-shrink-0"
+														/>
+													)}
+													{isMusicFestivalTitle(contactTitle) && (
+														<FestivalsIcon
+															size={isBottomView ? 7 : isAllTab ? 10 : 14}
+															className="flex-shrink-0"
+														/>
+													)}
+													{(isWeddingPlannerTitle(contactTitle) ||
+														isWeddingVenueTitle(contactTitle)) && (
+														<WeddingPlannersIcon size={isBottomView ? 7 : isAllTab ? 10 : 14} />
+													)}
+													{isWineBeerSpiritsTitle(contactTitle) && (
+														<WineBeerSpiritsIcon
+															size={isBottomView ? 7 : isAllTab ? 10 : 14}
+															className="flex-shrink-0"
+														/>
+													)}
+													{isBottomView ? (
+														<span className="text-[7px] text-black leading-none truncate">
+															{isRestaurantTitle(contactTitle)
+																? 'Restaurant'
+																: isCoffeeShopTitle(contactTitle)
+																	? 'Coffee Shop'
+																	: isMusicVenueTitle(contactTitle)
+																		? 'Music Venue'
+																		: isMusicFestivalTitle(contactTitle)
+																			? 'Music Festival'
+																			: isWeddingPlannerTitle(contactTitle)
+																				? 'Wedding Planner'
+																				: isWeddingVenueTitle(contactTitle)
+																					? 'Wedding Venue'
+																					: isWineBeerSpiritsTitle(contactTitle)
+																						? getWineBeerSpiritsLabel(contactTitle)
+																						: contactTitle}
+														</span>
+													) : (
+														<ScrollableText
+															text={
+																isRestaurantTitle(contactTitle)
+																	? 'Restaurant'
+																	: isCoffeeShopTitle(contactTitle)
+																		? 'Coffee Shop'
+																		: isMusicVenueTitle(contactTitle)
+																			? 'Music Venue'
+																			: isMusicFestivalTitle(contactTitle)
+																				? 'Music Festival'
+																				: isWeddingPlannerTitle(contactTitle)
+																					? 'Wedding Planner'
+																					: isWeddingVenueTitle(contactTitle)
+																						? 'Wedding Venue'
+																						: isWineBeerSpiritsTitle(contactTitle)
+																							? getWineBeerSpiritsLabel(contactTitle) ??
+																								contactTitle
+																							: contactTitle
+															}
+															className="text-[11px] text-black leading-none"
+														/>
+													)}
 												</div>
-											</div>
-											{/* Row 2: Company */}
-											<div className="flex items-center h-[12px] overflow-hidden">
+											) : null}
+
+											{/* Location row - below title */}
+											<div
+												className={cn(
+													'flex items-center justify-start',
+													isBottomView
+														? 'gap-0.5 h-[10px] w-[90px]'
+														: isAllTab
+														? 'gap-1 h-[14px] w-[158px]'
+														: 'gap-1 h-[19px] w-[169px]'
+												)}
+											>
 												{(() => {
-													const hasSeparateName = Boolean(
-														(contact?.name && contact.name.trim()) ||
-															(contact?.firstName && contact.firstName.trim()) ||
-															(contact?.lastName && contact.lastName.trim())
+													const fullStateName = (contact?.state as string) || '';
+													const stateAbbr = getStateAbbreviation(fullStateName) || '';
+													const normalizedState = fullStateName.trim();
+													const lowercaseCanadianProvinceNames = canadianProvinceNames.map((s) =>
+														s.toLowerCase()
 													);
-													return (
+													const isCanadianProvince =
+														lowercaseCanadianProvinceNames.includes(normalizedState.toLowerCase()) ||
+														canadianProvinceAbbreviations.includes(normalizedState.toUpperCase()) ||
+														canadianProvinceAbbreviations.includes(stateAbbr.toUpperCase());
+													const isUSAbbr = /^[A-Z]{2}$/.test(stateAbbr);
+
+													if (!stateAbbr) return null;
+													return isCanadianProvince ? (
 														<div
-															className="text-[8px] text-black leading-none whitespace-nowrap overflow-hidden w-full pr-1"
+															className={cn(
+																'inline-flex items-center justify-center border overflow-hidden',
+																isBottomView
+																	? 'w-[20px] h-[10px] rounded-[2px]'
+																	: isAllTab
+																	? 'w-[27px] h-[14px] rounded-[4px]'
+																	: 'w-[29px] h-[19px] rounded-[4px]'
+															)}
+															style={{ borderColor: '#000000' }}
+														>
+															<CanadianFlag width="100%" height="100%" className="w-full h-full" />
+														</div>
+													) : isUSAbbr ? (
+														<span
+															className={cn(
+																'inline-flex items-center justify-center border leading-none font-bold',
+																isBottomView
+																	? 'w-[20px] h-[10px] rounded-[2px] text-[7px]'
+																	: isAllTab
+																	? 'w-[27px] h-[14px] rounded-[4px] text-[9px]'
+																	: 'w-[29px] h-[19px] rounded-[4px] text-[10px]'
+															)}
+															style={{
+																backgroundColor: stateBadgeColorMap[stateAbbr] || 'transparent',
+																borderColor: '#000000',
+															}}
+														>
+															{stateAbbr}
+														</span>
+													) : (
+														<span
+															className={cn(
+																'inline-flex items-center justify-center border',
+																isBottomView
+																	? 'w-[20px] h-[10px] rounded-[2px]'
+																	: isAllTab
+																	? 'w-[27px] h-[14px] rounded-[4px]'
+																	: 'w-[29px] h-[19px] rounded-[4px]'
+															)}
+															style={{ borderColor: '#000000' }}
+														/>
+													);
+												})()}
+												{contact?.city ? (
+													isBottomView ? (
+														<span className="text-[7px] text-black leading-none truncate max-w-[50px]">
+															{contact.city}
+														</span>
+													) : (
+														<ScrollableText
+															text={contact.city}
+															className="text-[11px] text-black leading-none max-w-[130px]"
+														/>
+													)
+												) : null}
+											</div>
+										</div>
+
+											{/* Content grid */}
+											{isBottomView ? (
+												/* Bottom view: compact layout matching Contacts bottom view (no subject/body) */
+												<div className="grid grid-cols-1 grid-rows-2 h-full pr-[95px] pl-[22px]">
+													{/* Row 1: Name */}
+													<div className="flex items-center h-[12px] overflow-hidden">
+														<div
+															className="font-bold text-[9px] leading-none whitespace-nowrap overflow-hidden w-full pr-1"
 															style={{
 																WebkitMaskImage:
 																	'linear-gradient(90deg, #000 96%, transparent 100%)',
@@ -977,61 +1132,56 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 																	'linear-gradient(90deg, #000 96%, transparent 100%)',
 															}}
 														>
-															{hasSeparateName ? contact?.company || '' : ''}
+															{contactName}
 														</div>
-													);
-												})()}
-											</div>
-										</div>
-									) : (
-										/* Normal view: 4-row layout */
-										<div
-											className={cn(
-												"grid grid-cols-1 pl-[22px]",
-												// In the All tab, only the top rows need to reserve space for the fixed
-												// top-right badges. Subject/body should be able to use the full right side.
-												isAllTab ? "pr-2" : "pr-[180px]"
-											)}
-											style={{ 
-												height: '100%',
-												gridTemplateRows: 'repeat(4, 1fr)'
-											}}
-										>
-											{/* Row 1: Name */}
-											<div
-												className={cn(
-													"row-start-1 col-start-1 flex items-center min-h-0 max-[480px]:h-[12px]",
-													isAllTab && "pr-[170px]"
-												)}
-											>
+													</div>
+													{/* Row 2: Company */}
+													<div className="flex items-center h-[12px] overflow-hidden">
+														{(() => {
+															const hasSeparateName = Boolean(
+																(contact?.name && contact.name.trim()) ||
+																	(contact?.firstName && contact.firstName.trim()) ||
+																	(contact?.lastName && contact.lastName.trim())
+															);
+															return (
+																<div
+																	className="text-[8px] text-black leading-none whitespace-nowrap overflow-hidden w-full pr-1"
+																	style={{
+																		WebkitMaskImage:
+																			'linear-gradient(90deg, #000 96%, transparent 100%)',
+																		maskImage:
+																			'linear-gradient(90deg, #000 96%, transparent 100%)',
+																	}}
+																>
+																	{hasSeparateName ? contact?.company || '' : ''}
+																</div>
+															);
+														})()}
+													</div>
+												</div>
+											) : (
+												/* Normal view: 4-row layout */
 												<div
-													className="font-bold text-[11px] leading-none whitespace-nowrap overflow-hidden w-full pr-2"
+													className={cn(
+														'grid grid-cols-1 pl-[22px]',
+														// In the All tab, only the top rows need to reserve space for the fixed
+														// top-right badges. Subject/body should be able to use the full right side.
+														isAllTab ? 'pr-2' : 'pr-[180px]'
+													)}
 													style={{
-														WebkitMaskImage:
-															'linear-gradient(90deg, #000 96%, transparent 100%)',
-														maskImage:
-															'linear-gradient(90deg, #000 96%, transparent 100%)',
+														height: '100%',
+														gridTemplateRows: 'repeat(4, 1fr)',
 													}}
 												>
-													{contactName}
-												</div>
-											</div>
-											{/* Row 2: Company (when separate name exists) */}
-											{(() => {
-												const hasSeparateName = Boolean(
-													(contact?.name && contact.name.trim()) ||
-														(contact?.firstName && contact.firstName.trim()) ||
-														(contact?.lastName && contact.lastName.trim())
-												);
-												return (
+													{/* Row 1: Name */}
 													<div
 														className={cn(
-															"row-start-2 col-start-1 flex items-center min-h-0 max-[480px]:h-[12px]",
-															isAllTab && "pr-[170px]"
+															'row-start-1 col-start-1 flex items-center min-h-0 max-[480px]:h-[12px]',
+															isAllTab && 'pr-[170px]'
 														)}
 													>
 														<div
-															className="text-[11px] text-black leading-none whitespace-nowrap overflow-hidden w-full pr-2"
+															className="font-bold text-[11px] leading-none whitespace-nowrap overflow-hidden w-full pr-2"
 															style={{
 																WebkitMaskImage:
 																	'linear-gradient(90deg, #000 96%, transparent 100%)',
@@ -1039,64 +1189,94 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 																	'linear-gradient(90deg, #000 96%, transparent 100%)',
 															}}
 														>
-															{hasSeparateName ? contact?.company || '' : ''}
+															{contactName}
 														</div>
 													</div>
-												);
-											})()}
-											{/* Row 3: Subject */}
-											<div
-												className={cn(
-													"row-start-3 col-span-1 flex items-start min-h-0 max-[480px]:h-[12px] max-[480px]:items-start max-[480px]:-mt-[2px]",
-													isAllTab ? "pt-[5px]" : "mt-[4px]"
-												)}
-											>
-												<div
-													className={cn(
-														"text-black leading-none whitespace-nowrap overflow-hidden w-full pr-2 font-bold",
-														isAllTab ? "text-[9px]" : "text-[10px]"
-													)}
-													style={{
-														WebkitMaskImage:
-															'linear-gradient(90deg, #000 96%, transparent 100%)',
-														maskImage:
-															'linear-gradient(90deg, #000 96%, transparent 100%)',
-													}}
-												>
-													{draft.subject || 'No subject'}
+													{/* Row 2: Company (when separate name exists) */}
+													{(() => {
+														const hasSeparateName = Boolean(
+															(contact?.name && contact.name.trim()) ||
+																(contact?.firstName && contact.firstName.trim()) ||
+																(contact?.lastName && contact.lastName.trim())
+														);
+														return (
+															<div
+																className={cn(
+																	'row-start-2 col-start-1 flex items-center min-h-0 max-[480px]:h-[12px]',
+																	isAllTab && 'pr-[170px]'
+																)}
+															>
+																<div
+																	className="text-[11px] text-black leading-none whitespace-nowrap overflow-hidden w-full pr-2"
+																	style={{
+																		WebkitMaskImage:
+																			'linear-gradient(90deg, #000 96%, transparent 100%)',
+																		maskImage:
+																			'linear-gradient(90deg, #000 96%, transparent 100%)',
+																	}}
+																>
+																	{hasSeparateName ? contact?.company || '' : ''}
+																</div>
+															</div>
+														);
+													})()}
+													{/* Row 3: Subject */}
+													<div
+														className={cn(
+															'row-start-3 col-span-1 flex items-start min-h-0 max-[480px]:h-[12px] max-[480px]:items-start max-[480px]:-mt-[2px]',
+															isAllTab ? 'pt-[5px]' : 'mt-[4px]'
+														)}
+													>
+														<div
+															className={cn(
+																'text-black leading-none whitespace-nowrap overflow-hidden w-full pr-2 font-bold',
+																isAllTab ? 'text-[9px]' : 'text-[10px]'
+															)}
+															style={{
+																WebkitMaskImage:
+																	'linear-gradient(90deg, #000 96%, transparent 100%)',
+																maskImage:
+																	'linear-gradient(90deg, #000 96%, transparent 100%)',
+															}}
+														>
+															{draft.subject || 'No subject'}
+														</div>
+													</div>
+													{/* Row 4: Message preview */}
+													<div
+														className={cn(
+															'row-start-4 col-span-1 flex items-start min-h-0 max-[480px]:h-[12px]',
+															isAllTab && 'pt-[2px]'
+														)}
+													>
+														<div
+															className={cn(
+																'text-gray-500 leading-none whitespace-nowrap overflow-hidden w-full pr-2',
+																isAllTab ? 'text-[9px]' : 'text-[10px]'
+															)}
+															style={{
+																WebkitMaskImage:
+																	'linear-gradient(90deg, #000 96%, transparent 100%)',
+																maskImage:
+																	'linear-gradient(90deg, #000 96%, transparent 100%)',
+															}}
+														>
+															{draft.message
+																? draft.message.replace(/<[^>]*>/g, '')
+																: 'No content'}
+														</div>
+													</div>
 												</div>
-											</div>
-											{/* Row 4: Message preview */}
-											<div
-												className={cn(
-													"row-start-4 col-span-1 flex items-start min-h-0 max-[480px]:h-[12px]",
-													isAllTab && "pt-[2px]"
-												)}
-											>
-												<div
-													className={cn(
-														"text-gray-500 leading-none whitespace-nowrap overflow-hidden w-full pr-2",
-														isAllTab ? "text-[9px]" : "text-[10px]"
-													)}
-													style={{
-														WebkitMaskImage:
-															'linear-gradient(90deg, #000 96%, transparent 100%)',
-														maskImage:
-															'linear-gradient(90deg, #000 96%, transparent 100%)',
-													}}
-												>
-													{draft.message ? draft.message.replace(/<[^>]*>/g, '') : 'No content'}
-												</div>
-											</div>
+											)}
 										</div>
-									)}
-								</div>
-							);
-						})}
+									);
+							  })}
 						{Array.from({
 							length: Math.max(
 								0,
-								(isBottomView ? 3 : isPreviewMode ? 5 : 4) - drafts.length
+								(isBottomView
+									? bottomViewPlaceholderCount
+									: (isPreviewMode ? 5 : 4) - drafts.length)
 							),
 						}).map((_, idx) => (
 							<div
@@ -1113,7 +1293,7 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 								)}
 								style={
 									isBottomView
-										? { backgroundColor: placeholderBgColor }
+										? { backgroundColor: bottomViewPlaceholderBgColor }
 										: {
 												backgroundColor: placeholderBgColor,
 												width: hasCustomRowSize ? `${resolvedRowWidth}px` : undefined,

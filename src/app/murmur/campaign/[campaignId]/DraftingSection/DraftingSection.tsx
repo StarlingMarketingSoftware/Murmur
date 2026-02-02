@@ -4551,6 +4551,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										<DraftsExpandedList
 											drafts={draftEmails}
 											contacts={contacts || []}
+											generationProgress={generationProgress}
+											generationTotal={livePreviewTotal || contactsAvailableForDrafting.length}
 											width={233}
 											height={bottomPanelBoxHeightPx}
 											whiteSectionHeight={15}
@@ -5102,6 +5104,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										selectedContactIds={contactsTabSelectedIds}
 										setSelectedContactIds={setContactsTabSelectedIds}
 										handleContactSelection={handleContactsTabSelection}
+										generationProgress={generationProgress}
+										generationTotal={livePreviewTotal || contactsAvailableForDrafting.length}
 										campaign={campaign}
 										showSearchBar={false}
 										onDraftEmails={async (ids) => {
@@ -5218,6 +5222,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													selectedContactIds={contactsTabSelectedIds}
 													setSelectedContactIds={setContactsTabSelectedIds}
 													handleContactSelection={handleContactsTabSelection}
+													generationProgress={generationProgress}
+													generationTotal={livePreviewTotal || contactsAvailableForDrafting.length}
 													campaign={campaign}
 													showSearchBar={false}
 													onDraftEmails={async (ids) => {
@@ -5365,6 +5371,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											<DraftsExpandedList
 												drafts={draftEmails}
 												contacts={contacts || []}
+												generationProgress={generationProgress}
+												generationTotal={livePreviewTotal || contactsAvailableForDrafting.length}
 												width={233}
 												height={bottomPanelBoxHeightPx}
 												whiteSectionHeight={15}
@@ -5399,6 +5407,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											selectedContactIds={contactsTabSelectedIds}
 											setSelectedContactIds={setContactsTabSelectedIds}
 											handleContactSelection={handleContactsTabSelection}
+											generationProgress={generationProgress}
+											generationTotal={livePreviewTotal || contactsAvailableForDrafting.length}
 											campaign={campaign}
 											showSearchBar={false}
 											onDraftEmails={async (ids) => {
@@ -5747,6 +5757,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											<DraftsExpandedList
 												drafts={draftEmails}
 												contacts={contacts || []}
+												generationProgress={generationProgress}
+												generationTotal={livePreviewTotal || contactsAvailableForDrafting.length}
 												width={233}
 												height={bottomPanelBoxHeightPx}
 												whiteSectionHeight={15}
@@ -5865,6 +5877,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												<DraftsExpandedList
 													drafts={draftEmails}
 													contacts={contacts || []}
+													generationProgress={generationProgress}
+													generationTotal={livePreviewTotal || contactsAvailableForDrafting.length}
 													width={233}
 													height={bottomPanelBoxHeightPx}
 													whiteSectionHeight={15}
@@ -7131,6 +7145,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											<DraftsExpandedList
 												drafts={draftEmails}
 												contacts={contacts || []}
+												generationProgress={generationProgress}
+												generationTotal={livePreviewTotal || contactsAvailableForDrafting.length}
 												width={233}
 												height={bottomPanelBoxHeightPx}
 												whiteSectionHeight={15}
@@ -7192,6 +7208,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												<DraftsExpandedList
 													drafts={draftEmails}
 													contacts={contacts || []}
+													generationProgress={generationProgress}
+													generationTotal={livePreviewTotal || contactsAvailableForDrafting.length}
 													width={233}
 													height={bottomPanelBoxHeightPx}
 													whiteSectionHeight={15}
