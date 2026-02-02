@@ -23,6 +23,28 @@ import { FestivalsIcon } from '@/components/atoms/_svg/FestivalsIcon';
 import { MusicVenuesIcon } from '@/components/atoms/_svg/MusicVenuesIcon';
 import { WineBeerSpiritsIcon } from '@/components/atoms/_svg/WineBeerSpiritsIcon';
 
+const isSameLocalDay = (a: Date, b: Date) =>
+	a.getFullYear() === b.getFullYear() &&
+	a.getMonth() === b.getMonth() &&
+	a.getDate() === b.getDate();
+
+const formatBatchCount = (count: number) => `+${count < 10 ? `0${count}` : count}`;
+
+const formatBatchTimestamp = (date: Date) => {
+	const now = new Date();
+	if (isSameLocalDay(date, now)) {
+		const formatted = new Intl.DateTimeFormat('en-US', {
+			hour: 'numeric',
+			minute: '2-digit',
+			hour12: true,
+		}).format(date);
+		return formatted.replace(/\s+/g, '').toLowerCase();
+	}
+	const month = date.getMonth() + 1;
+	const day = String(date.getDate()).padStart(2, '0');
+	return `${month}/${day}`;
+};
+
 export interface InboxExpandedListProps {
 	contacts: ContactWithName[];
 	/** List of sender email addresses that should be visible (campaign contact emails) */
@@ -261,6 +283,45 @@ export const InboxExpandedList: FC<InboxExpandedListProps> = ({
 	const isFullyEmpty = inboundEmails.length === 0;
 	const placeholderBgColor = isFullyEmpty ? '#3D9DC0' : '#5EB6D6';
 
+	// Bottom view: show "batch" boxes instead of individual inbound emails.
+	const bottomViewInboundBatches = useMemo(() => {
+		// Heuristic sessionization: a new batch starts after a long gap.
+		const BATCH_GAP_MS = 2 * 60 * 60 * 1000; // 2 hours
+
+		const receivedAts = inboundEmails
+			.map((e) => new Date(e.receivedAt))
+			.filter((d) => !Number.isNaN(d.getTime()))
+			.sort((a, b) => a.getTime() - b.getTime());
+
+		if (receivedAts.length === 0) return [] as Array<{ count: number; endAt: Date }>;
+
+		const batches: Array<{ count: number; endAt: Date }> = [];
+		let currentCount = 1;
+		let currentEndAt = receivedAts[0];
+
+		for (let i = 1; i < receivedAts.length; i++) {
+			const prev = receivedAts[i - 1];
+			const curr = receivedAts[i];
+			const gap = curr.getTime() - prev.getTime();
+
+			if (gap > BATCH_GAP_MS) {
+				batches.push({ count: currentCount, endAt: currentEndAt });
+				currentCount = 1;
+				currentEndAt = curr;
+			} else {
+				currentCount += 1;
+				currentEndAt = curr;
+			}
+		}
+
+		batches.push({ count: currentCount, endAt: currentEndAt });
+
+		// Keep only the most recent 3 batches, displayed newest → oldest (top-first).
+		return batches.slice(-3).reverse();
+	}, [inboundEmails]);
+
+	const bottomViewPlaceholderCount = Math.max(0, 3 - bottomViewInboundBatches.length);
+
 	return (
 		<div
 			className={cn(
@@ -378,226 +439,238 @@ export const InboxExpandedList: FC<InboxExpandedListProps> = ({
 										: `${38 - whiteSectionHeight}px`,
 							}}
 						>
-							{inboundEmails.map((email) => {
-							const contact = resolveContactForEmail(email, effectiveContactByEmail);
-							const contactName = getCanonicalContactName(email, effectiveContactByEmail);
+							{isBottomView ? (
+								<>
+									{bottomViewInboundBatches.map((batch, idx) => {
+										const countLabel = formatBatchCount(batch.count);
+										const timeLabel = formatBatchTimestamp(batch.endAt);
+										return (
+											<div
+												key={`${batch.endAt.getTime()}-${batch.count}-${idx}`}
+												className={cn(
+													'select-none overflow-hidden border-2 border-[#000000] flex items-center justify-between',
+													'w-[224px] h-[30px] rounded-[4.7px] bg-white'
+												)}
+											>
+												<span className="pl-[18px] font-inter font-medium text-[15px] text-black leading-none">
+													{countLabel}
+												</span>
+												<span className="pr-[18px] font-inter font-medium text-[15px] text-black leading-none">
+													{timeLabel}
+												</span>
+											</div>
+										);
+									})}
+								</>
+							) : (
+								inboundEmails.map((email) => {
+									const contact = resolveContactForEmail(email, effectiveContactByEmail);
+									const contactName = getCanonicalContactName(email, effectiveContactByEmail);
 
-							return (
-								<div
-									key={email.id}
-									className={cn(
-										'transition-colors relative select-none overflow-hidden border-2 border-[#000000] bg-white',
-										isBottomView
-											? 'w-[224px] h-[30px] rounded-[4.7px]'
-											: 'w-full max-w-[356px] max-[480px]:max-w-none h-[64px] max-[480px]:h-[50px] rounded-[8px]',
-										!isBottomView && 'p-2'
-									)}
-								>
-									{/* Fixed top-right info (Title + Location) */}
-									<div className={cn(
-										"absolute flex flex-col items-end pointer-events-none",
-										isBottomView
-											? "top-[4px] right-[4px] gap-[1px] w-[90px]"
-											: "top-[6px] right-[6px] gap-[2px] w-[110px]"
-									)}>
-										{/* Title row - on top */}
-										{contact?.headline ? (
+									return (
+										<div
+											key={email.id}
+											className={cn(
+												'transition-colors relative select-none overflow-hidden border-2 border-[#000000] bg-white',
+												isBottomView
+													? 'w-[224px] h-[30px] rounded-[4.7px]'
+													: 'w-full max-w-[356px] max-[480px]:max-w-none h-[64px] max-[480px]:h-[50px] rounded-[8px]',
+												!isBottomView && 'p-2'
+											)}
+										>
+											{/* Fixed top-right info (Title + Location) */}
 											<div
 												className={cn(
-													"border border-black overflow-hidden flex items-center gap-0.5",
+													"absolute flex flex-col items-end pointer-events-none",
 													isBottomView
-														? "h-[10px] rounded-[3px] px-1 w-full"
-														: "w-[110px] h-[10px] rounded-[3.71px] justify-center"
+														? "top-[4px] right-[4px] gap-[1px] w-[90px]"
+														: "top-[6px] right-[6px] gap-[2px] w-[110px]"
 												)}
-												style={{
-													backgroundColor: isRestaurantTitle(contact.headline)
-														? '#C3FBD1'
-														: isCoffeeShopTitle(contact.headline)
-															? '#D6F1BD'
-															: isMusicVenueTitle(contact.headline)
-																? '#B7E5FF'
-																: isMusicFestivalTitle(contact.headline)
-																	? '#C1D6FF'
-																	: (isWeddingPlannerTitle(contact.headline) || isWeddingVenueTitle(contact.headline))
-																		? '#FFF2BC'
-																		: isWineBeerSpiritsTitle(contact.headline)
-																			? '#BFC4FF'
-																			: '#E8EFFF',
-												}}
 											>
-												{isRestaurantTitle(contact.headline) && (
-													<RestaurantsIcon size={isBottomView ? 7 : 8} />
-												)}
-												{isCoffeeShopTitle(contact.headline) && (
-													<CoffeeShopsIcon size={5} />
-												)}
-												{isMusicVenueTitle(contact.headline) && (
-													<MusicVenuesIcon size={isBottomView ? 7 : 8} className="flex-shrink-0" />
-												)}
-												{isMusicFestivalTitle(contact.headline) && (
-													<FestivalsIcon size={isBottomView ? 7 : 8} className="flex-shrink-0" />
-												)}
-												{(isWeddingPlannerTitle(contact.headline) || isWeddingVenueTitle(contact.headline)) && (
-													<WeddingPlannersIcon size={isBottomView ? 7 : 8} />
-												)}
-												{isWineBeerSpiritsTitle(contact.headline) && (
-													<WineBeerSpiritsIcon size={isBottomView ? 7 : 8} className="flex-shrink-0" />
-												)}
-												{isBottomView ? (
-													<span className="text-[7px] text-black leading-none truncate">
-														{isRestaurantTitle(contact.headline)
-															? 'Restaurant'
-															: isCoffeeShopTitle(contact.headline)
-																? 'Coffee Shop'
-																: isMusicVenueTitle(contact.headline)
-																	? 'Music Venue'
-																	: isMusicFestivalTitle(contact.headline)
-																		? 'Music Festival'
-																		: isWeddingPlannerTitle(contact.headline)
-																			? 'Wedding Planner'
-																			: isWeddingVenueTitle(contact.headline)
-																				? 'Wedding Venue'
-																				: isWineBeerSpiritsTitle(contact.headline)
-																					? getWineBeerSpiritsLabel(contact.headline)
-																					: contact.headline}
-													</span>
-												) : (
-													<ScrollableText
-														text={
-															isRestaurantTitle(contact.headline)
-																? 'Restaurant'
-																: isCoffeeShopTitle(contact.headline)
-																	? 'Coffee Shop'
-																	: isMusicVenueTitle(contact.headline)
-																		? 'Music Venue'
-																		: isMusicFestivalTitle(contact.headline)
-																			? 'Music Festival'
-																			: isWeddingPlannerTitle(contact.headline)
-																				? 'Wedding Planner'
-																				: isWeddingVenueTitle(contact.headline)
-																					? 'Wedding Venue'
-																					: isWineBeerSpiritsTitle(contact.headline)
-																						? getWineBeerSpiritsLabel(contact.headline) ?? contact.headline
-																						: contact.headline
-														}
-														className="text-[8px] text-black leading-none px-1"
-													/>
-												)}
-											</div>
-										) : null}
-
-										{/* Location row - below title */}
-										<div className={cn(
-											"flex items-center justify-start",
-											isBottomView ? "gap-0.5 h-[10px] w-[90px]" : "gap-1 h-[11.67px] w-full"
-										)}>
-											{(() => {
-												const fullStateName = (contact?.state as string) || '';
-												const stateAbbr = getStateAbbreviation(fullStateName) || '';
-												const normalizedState = fullStateName.trim();
-												const lowercaseCanadianProvinceNames = canadianProvinceNames.map(
-													(s) => s.toLowerCase()
-												);
-												const isCanadianProvince =
-													lowercaseCanadianProvinceNames.includes(
-														normalizedState.toLowerCase()
-													) ||
-													canadianProvinceAbbreviations.includes(
-														normalizedState.toUpperCase()
-													) ||
-													canadianProvinceAbbreviations.includes(stateAbbr.toUpperCase());
-												const isUSAbbr = /^[A-Z]{2}$/.test(stateAbbr);
-
-												if (!stateAbbr) return null;
-												return isCanadianProvince ? (
+												{/* Title row - on top */}
+												{contact?.headline ? (
 													<div
 														className={cn(
-															"inline-flex items-center justify-center border overflow-hidden",
+															"border border-black overflow-hidden flex items-center gap-0.5",
 															isBottomView
-																? "w-[20px] h-[10px] rounded-[2px]"
-																: "w-[17.81px] h-[11.67px] rounded-[3.44px]"
-														)}
-														style={{ borderColor: '#000000' }}
-														title="Canadian province"
-													>
-														<CanadianFlag
-															width="100%"
-															height="100%"
-															className="w-full h-full"
-														/>
-													</div>
-												) : isUSAbbr ? (
-													<span
-														className={cn(
-															"inline-flex items-center justify-center border leading-none font-bold",
-															isBottomView
-																? "w-[20px] h-[10px] rounded-[2px] text-[7px]"
-																: "w-[17.81px] h-[11.67px] rounded-[3.44px] text-[8px]"
+																? "h-[10px] rounded-[3px] px-1 w-full"
+																: "w-[110px] h-[10px] rounded-[3.71px] justify-center"
 														)}
 														style={{
-															backgroundColor:
-																stateBadgeColorMap[stateAbbr] || 'transparent',
-															borderColor: '#000000',
+															backgroundColor: isRestaurantTitle(contact.headline)
+																? '#C3FBD1'
+																: isCoffeeShopTitle(contact.headline)
+																	? '#D6F1BD'
+																	: isMusicVenueTitle(contact.headline)
+																		? '#B7E5FF'
+																		: isMusicFestivalTitle(contact.headline)
+																			? '#C1D6FF'
+																			: (isWeddingPlannerTitle(contact.headline) || isWeddingVenueTitle(contact.headline))
+																				? '#FFF2BC'
+																				: isWineBeerSpiritsTitle(contact.headline)
+																					? '#BFC4FF'
+																					: '#E8EFFF',
 														}}
 													>
-														{stateAbbr}
-													</span>
-												) : (
-													<span
-														className={cn(
-															"inline-flex items-center justify-center border",
-															isBottomView
-																? "w-[20px] h-[10px] rounded-[2px]"
-																: "w-[17.81px] h-[11.67px] rounded-[3.44px]"
+														{isRestaurantTitle(contact.headline) && (
+															<RestaurantsIcon size={isBottomView ? 7 : 8} />
 														)}
-														style={{ borderColor: '#000000' }}
-													/>
-												);
-											})()}
-											{contact?.city ? (
-												isBottomView ? (
-													<span className="text-[7px] text-black leading-none truncate max-w-[50px]">
-														{contact.city}
-													</span>
-												) : (
-													<ScrollableText
-														text={contact.city}
-														className="text-[10px] text-black leading-none max-w-[80px]"
-													/>
-												)
-											) : null}
-										</div>
-									</div>
+														{isCoffeeShopTitle(contact.headline) && (
+															<CoffeeShopsIcon size={5} />
+														)}
+														{isMusicVenueTitle(contact.headline) && (
+															<MusicVenuesIcon
+																size={isBottomView ? 7 : 8}
+																className="flex-shrink-0"
+															/>
+														)}
+														{isMusicFestivalTitle(contact.headline) && (
+															<FestivalsIcon size={isBottomView ? 7 : 8} className="flex-shrink-0" />
+														)}
+														{(isWeddingPlannerTitle(contact.headline) ||
+															isWeddingVenueTitle(contact.headline)) && (
+															<WeddingPlannersIcon size={isBottomView ? 7 : 8} />
+														)}
+														{isWineBeerSpiritsTitle(contact.headline) && (
+															<WineBeerSpiritsIcon size={isBottomView ? 7 : 8} className="flex-shrink-0" />
+														)}
+														{isBottomView ? (
+															<span className="text-[7px] text-black leading-none truncate">
+																{isRestaurantTitle(contact.headline)
+																	? 'Restaurant'
+																	: isCoffeeShopTitle(contact.headline)
+																		? 'Coffee Shop'
+																		: isMusicVenueTitle(contact.headline)
+																			? 'Music Venue'
+																			: isMusicFestivalTitle(contact.headline)
+																				? 'Music Festival'
+																				: isWeddingPlannerTitle(contact.headline)
+																					? 'Wedding Planner'
+																					: isWeddingVenueTitle(contact.headline)
+																						? 'Wedding Venue'
+																						: isWineBeerSpiritsTitle(contact.headline)
+																							? getWineBeerSpiritsLabel(contact.headline)
+																							: contact.headline}
+															</span>
+														) : (
+															<ScrollableText
+																text={
+																	isRestaurantTitle(contact.headline)
+																		? 'Restaurant'
+																		: isCoffeeShopTitle(contact.headline)
+																			? 'Coffee Shop'
+																			: isMusicVenueTitle(contact.headline)
+																				? 'Music Venue'
+																				: isMusicFestivalTitle(contact.headline)
+																					? 'Music Festival'
+																					: isWeddingPlannerTitle(contact.headline)
+																						? 'Wedding Planner'
+																						: isWeddingVenueTitle(contact.headline)
+																							? 'Wedding Venue'
+																							: isWineBeerSpiritsTitle(contact.headline)
+																								? getWineBeerSpiritsLabel(contact.headline) ??
+																								  contact.headline
+																								: contact.headline
+																}
+																className="text-[8px] text-black leading-none px-1"
+															/>
+														)}
+													</div>
+												) : null}
 
-									{/* Content grid */}
-									{isBottomView ? (
-										/* Bottom view: compact layout with name + company (no subject/body) */
-										<div className="grid grid-cols-1 grid-rows-2 h-full pr-[95px] pl-[22px]">
-											{/* Row 1: Name */}
-											<div className="flex items-center h-[12px] overflow-hidden">
+												{/* Location row - below title */}
 												<div
-													className="font-bold text-[9px] leading-none whitespace-nowrap overflow-hidden w-full pr-1"
-													style={{
-														WebkitMaskImage:
-															'linear-gradient(90deg, #000 96%, transparent 100%)',
-														maskImage:
-															'linear-gradient(90deg, #000 96%, transparent 100%)',
-													}}
+													className={cn(
+														"flex items-center justify-start",
+														isBottomView ? "gap-0.5 h-[10px] w-[90px]" : "gap-1 h-[11.67px] w-full"
+													)}
 												>
-													{contactName}
+													{(() => {
+														const fullStateName = (contact?.state as string) || '';
+														const stateAbbr = getStateAbbreviation(fullStateName) || '';
+														const normalizedState = fullStateName.trim();
+														const lowercaseCanadianProvinceNames = canadianProvinceNames.map(
+															(s) => s.toLowerCase()
+														);
+														const isCanadianProvince =
+															lowercaseCanadianProvinceNames.includes(
+																normalizedState.toLowerCase()
+															) ||
+															canadianProvinceAbbreviations.includes(
+																normalizedState.toUpperCase()
+															) ||
+															canadianProvinceAbbreviations.includes(stateAbbr.toUpperCase());
+														const isUSAbbr = /^[A-Z]{2}$/.test(stateAbbr);
+
+														if (!stateAbbr) return null;
+														return isCanadianProvince ? (
+															<div
+																className={cn(
+																	"inline-flex items-center justify-center border overflow-hidden",
+																	isBottomView
+																		? "w-[20px] h-[10px] rounded-[2px]"
+																		: "w-[17.81px] h-[11.67px] rounded-[3.44px]"
+																)}
+																style={{ borderColor: '#000000' }}
+																title="Canadian province"
+															>
+																<CanadianFlag
+																	width="100%"
+																	height="100%"
+																	className="w-full h-full"
+																/>
+															</div>
+														) : isUSAbbr ? (
+															<span
+																className={cn(
+																	"inline-flex items-center justify-center border leading-none font-bold",
+																	isBottomView
+																		? "w-[20px] h-[10px] rounded-[2px] text-[7px]"
+																		: "w-[17.81px] h-[11.67px] rounded-[3.44px] text-[8px]"
+																)}
+																style={{
+																	backgroundColor:
+																		stateBadgeColorMap[stateAbbr] || 'transparent',
+																	borderColor: '#000000',
+																}}
+															>
+																{stateAbbr}
+															</span>
+														) : (
+															<span
+																className={cn(
+																	"inline-flex items-center justify-center border",
+																	isBottomView
+																		? "w-[20px] h-[10px] rounded-[2px]"
+																		: "w-[17.81px] h-[11.67px] rounded-[3.44px]"
+																)}
+																style={{ borderColor: '#000000' }}
+															/>
+														);
+													})()}
+													{contact?.city ? (
+														isBottomView ? (
+															<span className="text-[7px] text-black leading-none truncate max-w-[50px]">
+																{contact.city}
+															</span>
+														) : (
+															<ScrollableText
+																text={contact.city}
+																className="text-[10px] text-black leading-none max-w-[80px]"
+															/>
+														)
+													) : null}
 												</div>
 											</div>
-											{/* Row 2: Company */}
-											<div className="flex items-center h-[12px] overflow-hidden">
-												{(() => {
-													const hasSeparateName = Boolean(
-														contact &&
-															((contact.firstName && contact.firstName.trim()) ||
-																(contact.lastName && contact.lastName.trim()))
-													);
-													return (
+
+											{/* Content grid */}
+											{isBottomView ? (
+												/* Bottom view: compact layout with name + company (no subject/body) */
+												<div className="grid grid-cols-1 grid-rows-2 h-full pr-[95px] pl-[22px]">
+													{/* Row 1: Name */}
+													<div className="flex items-center h-[12px] overflow-hidden">
 														<div
-															className="text-[8px] text-black leading-none whitespace-nowrap overflow-hidden w-full pr-1"
+															className="font-bold text-[9px] leading-none whitespace-nowrap overflow-hidden w-full pr-1"
 															style={{
 																WebkitMaskImage:
 																	'linear-gradient(90deg, #000 96%, transparent 100%)',
@@ -605,58 +678,84 @@ export const InboxExpandedList: FC<InboxExpandedListProps> = ({
 																	'linear-gradient(90deg, #000 96%, transparent 100%)',
 															}}
 														>
-															{hasSeparateName ? contact?.company || '' : ''}
-														</div>
-													);
-												})()}
-											</div>
-										</div>
-									) : (
-										/* Normal view: 4-row layout */
-										<div className="grid grid-cols-1 grid-rows-4 h-full pr-[120px] pl-[22px]">
-											{/* Row 1: Name */}
-											<div className="row-start-1 col-start-1 flex items-center h-[16px] max-[480px]:h-[12px]">
-												<div className="font-bold text-[11px] truncate leading-none">
-													{contactName}
-												</div>
-											</div>
-
-											{/* Row 2: Company (only when there is a separate name) */}
-											{(() => {
-												const hasSeparateName = Boolean(
-													contact &&
-														((contact.firstName && contact.firstName.trim()) ||
-															(contact.lastName && contact.lastName.trim()))
-												);
-												return (
-													<div className="row-start-2 col-start-1 flex items-center pr-2 h-[16px] max-[480px]:h-[12px]">
-														<div className="text-[11px] text-black truncate leading-none">
-															{hasSeparateName ? contact?.company || '' : ''}
+															{contactName}
 														</div>
 													</div>
-												);
-											})()}
+													{/* Row 2: Company */}
+													<div className="flex items-center h-[12px] overflow-hidden">
+														{(() => {
+															const hasSeparateName = Boolean(
+																contact &&
+																	((contact.firstName && contact.firstName.trim()) ||
+																		(contact.lastName && contact.lastName.trim()))
+															);
+															return (
+																<div
+																	className="text-[8px] text-black leading-none whitespace-nowrap overflow-hidden w-full pr-1"
+																	style={{
+																		WebkitMaskImage:
+																			'linear-gradient(90deg, #000 96%, transparent 100%)',
+																		maskImage:
+																			'linear-gradient(90deg, #000 96%, transparent 100%)',
+																	}}
+																>
+																	{hasSeparateName ? contact?.company || '' : ''}
+																</div>
+															);
+														})()}
+													</div>
+												</div>
+											) : (
+												/* Normal view: 4-row layout */
+												<div className="grid grid-cols-1 grid-rows-4 h-full pr-[120px] pl-[22px]">
+													{/* Row 1: Name */}
+													<div className="row-start-1 col-start-1 flex items-center h-[16px] max-[480px]:h-[12px]">
+														<div className="font-bold text-[11px] truncate leading-none">
+															{contactName}
+														</div>
+													</div>
 
-											{/* Row 3: Subject */}
-											<div className="row-start-3 col-span-1 text-[10px] text-black truncate leading-none flex items-center h-[16px] max-[480px]:h-[12px] max-[480px]:items-start max-[480px]:-mt-[2px]">
-												{email.subject || 'No subject'}
-											</div>
+													{/* Row 2: Company (only when there is a separate name) */}
+													{(() => {
+														const hasSeparateName = Boolean(
+															contact &&
+																((contact.firstName && contact.firstName.trim()) ||
+																	(contact.lastName && contact.lastName.trim()))
+														);
+														return (
+															<div className="row-start-2 col-start-1 flex items-center pr-2 h-[16px] max-[480px]:h-[12px]">
+																<div className="text-[11px] text-black truncate leading-none">
+																	{hasSeparateName ? contact?.company || '' : ''}
+																</div>
+															</div>
+														);
+													})()}
 
-											{/* Row 4: Message preview */}
-											<div className="row-start-4 col-span-1 text-[10px] text-gray-500 truncate leading-none flex items-center h-[16px] max-[480px]:h-[12px]">
-												{email.bodyPlain
-													? email.bodyPlain.substring(0, 60) + '...'
-													: email.bodyHtml
-													? email.bodyHtml.replace(/<[^>]*>/g, '').substring(0, 60) + '...'
-													: 'No content'}
-											</div>
+													{/* Row 3: Subject */}
+													<div className="row-start-3 col-span-1 text-[10px] text-black truncate leading-none flex items-center h-[16px] max-[480px]:h-[12px] max-[480px]:items-start max-[480px]:-mt-[2px]">
+														{email.subject || 'No subject'}
+													</div>
+
+													{/* Row 4: Message preview */}
+													<div className="row-start-4 col-span-1 text-[10px] text-gray-500 truncate leading-none flex items-center h-[16px] max-[480px]:h-[12px]">
+														{email.bodyPlain
+															? email.bodyPlain.substring(0, 60) + '...'
+															: email.bodyHtml
+																? email.bodyHtml
+																		.replace(/<[^>]*>/g, '')
+																		.substring(0, 60) + '...'
+																: 'No content'}
+													</div>
+												</div>
+											)}
 										</div>
-									)}
-								</div>
-							);
-							})}
+									);
+								})
+							)}
 							{Array.from({
-								length: Math.max(0, (isBottomView ? 3 : 4) - inboundEmails.length),
+								length: isBottomView
+									? bottomViewPlaceholderCount
+									: Math.max(0, 4 - inboundEmails.length),
 							}).map((_, idx) => (
 								<div
 									key={`inbox-placeholder-${idx}`}
