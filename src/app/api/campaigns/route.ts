@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import prisma from '@/lib/prisma';
-import { AiModel, Status } from '@prisma/client';
+import { AiModel, Prisma, Status } from '@prisma/client';
 import {
 	apiBadRequest,
 	apiCreated,
@@ -10,6 +10,47 @@ import {
 	handleApiError,
 } from '@/app/api/_utils';
 import { z } from 'zod';
+
+const getCampaignContactsCount = async (campaignId: number) => {
+	return prisma.contact.count({
+		where: {
+			OR: [
+				{ campaigns: { some: { id: campaignId } } },
+				{ userContactLists: { some: { campaigns: { some: { id: campaignId } } } } },
+				{ contactList: { campaigns: { some: { id: campaignId } } } },
+			],
+		},
+	});
+};
+
+const safeInsertCampaignContactEvent = async (args: {
+	campaignId: number;
+	createdAt: Date;
+	addedCount: number;
+	totalContacts: number;
+	source: string;
+}) => {
+	try {
+		await prisma.$executeRaw(Prisma.sql`
+			INSERT INTO "CampaignContactEvent" (
+				"campaignId",
+				"createdAt",
+				"addedCount",
+				"totalContacts",
+				"source"
+			)
+			VALUES (
+				${args.campaignId},
+				${args.createdAt},
+				${args.addedCount},
+				${args.totalContacts},
+				${args.source}
+			)
+		`);
+	} catch {
+		// Best-effort only (e.g., migration not applied yet).
+	}
+};
 
 function escapeRegExp(input: string) {
 	return input.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -118,6 +159,23 @@ export async function POST(req: NextRequest) {
 				contacts: true,
 			},
 		});
+
+		// Log initial contacts as a "batch" event for the bottom-view history.
+		// Best-effort: do not fail campaign creation if the event table isn't ready.
+		try {
+			const totalContacts = await getCampaignContactsCount(campaign.id);
+			if (totalContacts > 0) {
+				await safeInsertCampaignContactEvent({
+					campaignId: campaign.id,
+					createdAt: campaign.createdAt,
+					addedCount: totalContacts,
+					totalContacts,
+					source: 'campaign.create',
+				});
+			}
+		} catch {
+			// ignore
+		}
 
 		return apiCreated(campaign);
 	} catch (error) {

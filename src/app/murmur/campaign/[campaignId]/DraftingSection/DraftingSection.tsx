@@ -4839,6 +4839,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												>
 												<ContactsExpandedList
 													contacts={contactsAvailableForDrafting}
+												campaign={campaign}
 													width={232}
 													height={bottomPanelBoxHeightPx}
 													enableUsedContactTooltip={false}
@@ -5057,6 +5058,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											>
 												<ContactsExpandedList
 													contacts={contactsAvailableForDrafting}
+													campaign={campaign}
 													width={232}
 													height={bottomPanelBoxHeightPx}
 													enableUsedContactTooltip={false}
@@ -5746,6 +5748,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										>
 											<ContactsExpandedList
 												contacts={contactsAvailableForDrafting}
+												campaign={campaign}
 												width={232}
 												height={bottomPanelBoxHeightPx}
 												enableUsedContactTooltip={false}
@@ -5866,6 +5869,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											<div className="mt-[91px] pb-[8px] flex justify-center gap-[15px]">
 												<ContactsExpandedList
 													contacts={contactsAvailableForDrafting}
+													campaign={campaign}
 													width={232}
 													height={bottomPanelBoxHeightPx}
 													enableUsedContactTooltip={false}
@@ -7134,6 +7138,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										<div className="mt-[91px] pb-[8px] flex justify-center gap-[15px]">
 											<ContactsExpandedList
 												contacts={contactsAvailableForDrafting}
+												campaign={campaign}
 												width={232}
 												height={bottomPanelBoxHeightPx}
 												enableUsedContactTooltip={false}
@@ -7197,6 +7202,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											>
 												<ContactsExpandedList
 													contacts={contactsAvailableForDrafting}
+													campaign={campaign}
 													width={232}
 													height={bottomPanelBoxHeightPx}
 													enableUsedContactTooltip={false}
