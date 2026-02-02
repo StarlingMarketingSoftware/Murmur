@@ -89,6 +89,9 @@ import {
 import { Contact, Identity } from '@prisma/client';
 import LeftArrow from '@/components/atoms/_svg/LeftArrow';
 import RightArrow from '@/components/atoms/_svg/RightArrow';
+import { BottomPanelsContainer, type HistoryAction } from '@/components/atoms/BottomPanelsContainer';
+import { useGetInboundEmails } from '@/hooks/queryHooks/useInboundEmails';
+import { useGetCampaignContactEvents } from '@/hooks/queryHooks/useCampaigns';
 import { isRestaurantTitle, isCoffeeShopTitle, isMusicVenueTitle, isMusicFestivalTitle, isWeddingPlannerTitle, isWeddingVenueTitle, isWineBeerSpiritsTitle, getWineBeerSpiritsLabel } from '@/utils/restaurantTitle';
 
 type IdentityProfileFields = Identity & {
@@ -2231,6 +2234,109 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const contactsAvailableForDrafting = (contacts || []).filter(
 		(contact) => !contactedContactIds.has(contact.id)
 	);
+
+	// Fetch inbound emails for history panel
+	const { data: inboundEmails } = useGetInboundEmails({
+		filters: { campaignId: campaign?.id },
+		enabled: Boolean(campaign?.id),
+	});
+
+	// Fetch campaign contact events for history panel
+	const { data: campaignContactEvents } = useGetCampaignContactEvents(campaign?.id);
+
+	// Compute history actions for the history panel
+	const historyActions = useMemo<HistoryAction[]>(() => {
+		const BATCH_GAP_MS = 2 * 60 * 60 * 1000; // 2 hours
+
+		const computeBatches = <T extends { timestamp: Date }>(
+			items: T[],
+			type: HistoryAction['type']
+		): HistoryAction[] => {
+			if (items.length === 0) return [];
+
+			const sorted = [...items].sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+			const batches: HistoryAction[] = [];
+			let currentCount = 1;
+			let currentEndAt = sorted[0].timestamp;
+
+			for (let i = 1; i < sorted.length; i++) {
+				const prev = sorted[i - 1].timestamp;
+				const curr = sorted[i].timestamp;
+				const gap = curr.getTime() - prev.getTime();
+
+				if (gap > BATCH_GAP_MS) {
+					batches.push({
+						id: `${type}-${currentEndAt.getTime()}`,
+						type,
+						count: currentCount,
+						timestamp: currentEndAt,
+					});
+					currentCount = 1;
+					currentEndAt = curr;
+				} else {
+					currentCount += 1;
+					currentEndAt = curr;
+				}
+			}
+
+			batches.push({
+				id: `${type}-${currentEndAt.getTime()}`,
+				type,
+				count: currentCount,
+				timestamp: currentEndAt,
+			});
+
+			return batches;
+		};
+
+		// Contacts batches from campaign contact events
+		const contactsBatches = (campaignContactEvents || [])
+			.map((e) => {
+				const createdAt = new Date(e.createdAt);
+				if (Number.isNaN(createdAt.getTime())) return null;
+				return {
+					id: `contacts-${createdAt.getTime()}`,
+					type: 'contacts' as const,
+					count: e.addedCount,
+					timestamp: createdAt,
+				};
+			})
+			.filter(Boolean) as HistoryAction[];
+
+		// Drafts batches
+		const draftItems = draftEmails
+			.map((e) => {
+				const createdAt = new Date(e.createdAt);
+				if (Number.isNaN(createdAt.getTime())) return null;
+				return { timestamp: createdAt };
+			})
+			.filter(Boolean) as { timestamp: Date }[];
+		const draftsBatches = computeBatches(draftItems, 'drafts');
+
+		// Sent batches
+		const sentItems = sentEmails
+			.map((e) => {
+				const sentAt = e.sentAt ? new Date(e.sentAt) : null;
+				if (!sentAt || Number.isNaN(sentAt.getTime())) return null;
+				return { timestamp: sentAt };
+			})
+			.filter(Boolean) as { timestamp: Date }[];
+		const sentBatches = computeBatches(sentItems, 'sent');
+
+		// Received batches (inbound emails)
+		const receivedItems = (inboundEmails || [])
+			.map((e) => {
+				const receivedAt = new Date(e.createdAt);
+				if (Number.isNaN(receivedAt.getTime())) return null;
+				return { timestamp: receivedAt };
+			})
+			.filter(Boolean) as { timestamp: Date }[];
+		const receivedBatches = computeBatches(receivedItems, 'received');
+
+		// Combine all batches and sort by timestamp (newest first)
+		return [...contactsBatches, ...draftsBatches, ...sentBatches, ...receivedBatches]
+			.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+	}, [campaignContactEvents, draftEmails, sentEmails, inboundEmails]);
 
 	const isSendingDisabled = isFreeTrial || (user?.sendingCredits || 0) === 0;
 
@@ -4544,9 +4650,11 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 
 								{/* Bottom Panels: Drafts, Sent, and Inbox - hidden at narrowest breakpoint */}
 								{!hideHeaderBox && (
-									<div
+									<BottomPanelsContainer
 										className="mt-[35px] pb-[8px] flex justify-center gap-[15px]"
 										data-campaign-bottom-anchor
+										collapsed={bottomPanelCollapsed}
+										historyActions={historyActions}
 									>
 										<DraftsExpandedList
 											drafts={draftEmails}
@@ -4577,7 +4685,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											collapsed={bottomPanelCollapsed}
 											onOpenInbox={goToInbox}
 										/>
-									</div>
+									</BottomPanelsContainer>
 								)}
 							</div>
 						)}
@@ -4830,12 +4938,14 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											)}
 											{/* Bottom Panels: Contacts, Sent, and Inbox - centered relative to container - hidden at narrowest breakpoint */}
 											{!isNarrowestDesktop && (
-												<div
+												<BottomPanelsContainer
 													className={cn(
 														draftEmails.length === 0 ? 'mt-[91px]' : 'mt-[35px]',
 														'pb-[8px] flex justify-center gap-[15px]'
 													)}
 													data-campaign-bottom-anchor
+													collapsed={bottomPanelCollapsed}
+													historyActions={historyActions}
 												>
 												<ContactsExpandedList
 													contacts={contactsAvailableForDrafting}
@@ -4865,7 +4975,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													collapsed={bottomPanelCollapsed}
 													onOpenInbox={goToInbox}
 												/>
-												</div>
+												</BottomPanelsContainer>
 											)}
 										</div>
 									) : (
@@ -5049,12 +5159,14 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 
 										{/* Bottom Panels: Contacts, Sent, and Inbox - hidden at narrowest breakpoint */}
 										{!isNarrowestDesktop && (
-											<div
+											<BottomPanelsContainer
 												className={cn(
 													draftEmails.length === 0 ? 'mt-[91px]' : 'mt-[35px]',
 													'pb-[8px] flex justify-center gap-[15px]'
 												)}
 												data-campaign-bottom-anchor
+												collapsed={bottomPanelCollapsed}
+												historyActions={historyActions}
 											>
 												<ContactsExpandedList
 													contacts={contactsAvailableForDrafting}
@@ -5084,7 +5196,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													collapsed={bottomPanelCollapsed}
 													onOpenInbox={goToInbox}
 												/>
-											</div>
+											</BottomPanelsContainer>
 										)}
 									</div>
 								)}
@@ -5366,9 +5478,11 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											</button>
 										</div>
 										{/* Bottom Panels: Drafts, Sent, and Inbox - centered relative to 864px container */}
-										<div
+										<BottomPanelsContainer
 											className="mt-[35px] pb-[8px] flex justify-center gap-[15px]"
 											data-campaign-bottom-anchor
+											collapsed={bottomPanelCollapsed}
+											historyActions={historyActions}
 										>
 											<DraftsExpandedList
 												drafts={draftEmails}
@@ -5396,7 +5510,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												whiteSectionHeight={15}
 												collapsed={bottomPanelCollapsed}
 											/>
-										</div>
+										</BottomPanelsContainer>
 									</div>
 								) : (
 									/* Regular centered layout for wider viewports, hide bottom panels at narrowest breakpoint */
@@ -5742,9 +5856,11 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											</div>
 										</div>
 										{/* Bottom Panels: Contacts, Drafts, and Inbox - centered relative to container */}
-										<div
+										<BottomPanelsContainer
 											className="mt-[91px] pb-[8px] flex justify-center gap-[15px]"
 											data-campaign-bottom-anchor
+											collapsed={bottomPanelCollapsed}
+											historyActions={historyActions}
 										>
 											<ContactsExpandedList
 												contacts={contactsAvailableForDrafting}
@@ -5777,7 +5893,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												collapsed={bottomPanelCollapsed}
 												onOpenInbox={goToInbox}
 											/>
-										</div>
+										</BottomPanelsContainer>
 									</div>
 								) : (
 									// Regular centered layout for wider viewports
@@ -7196,9 +7312,11 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 
 										{/* Bottom Panels: Contacts, Drafts, and Sent - hidden at narrowest breakpoint (< 952px) */}
 										{!isNarrowestDesktop && (
-											<div
+											<BottomPanelsContainer
 												className="mt-[114px] pb-[8px] flex justify-center gap-[15px]"
 												data-campaign-bottom-anchor
+												collapsed={bottomPanelCollapsed}
+												historyActions={historyActions}
 											>
 												<ContactsExpandedList
 													contacts={contactsAvailableForDrafting}
@@ -7232,7 +7350,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													collapsed={bottomPanelCollapsed}
 													onOpenSent={goToSent}
 												/>
-											</div>
+											</BottomPanelsContainer>
 										)}
 									</>
 								)}
