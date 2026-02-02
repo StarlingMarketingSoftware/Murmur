@@ -480,7 +480,13 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 	const isAllTab = height === 263;
 	const isAllTabNavigation = interactionMode === 'allTab';
 	const whiteSectionHeight = customWhiteSectionHeight ?? (isAllTab ? 20 : 28);
-	const isBottomView = customWhiteSectionHeight === 15;
+	const isBottomView = customWhiteSectionHeight === 15 || customWhiteSectionHeight === 16;
+	// Compressed bottom panel spec: 40px total = 12px white + 28px color.
+	const effectiveWhiteSectionHeight = collapsed && isBottomView ? 12 : whiteSectionHeight;
+	const shouldRenderCollapsedTopBox = collapsed && isBottomView;
+	const collapsedTopBoxHeightPx = 22;
+	const collapsedTopBoxWidthPx = 224;
+	const collapsedTopBoxRadiusPx = 4.7;
 	const shouldShowScrollbar = !isBottomView && contacts.length >= 14;
 
 	const { data: campaignContactEvents } = useGetCampaignContactEvents(campaign?.id, {
@@ -536,8 +542,12 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 		<div
 			className={cn(
 				'relative max-[480px]:w-[96.27vw] rounded-md flex flex-col overflow-visible',
-				isBottomView
-					? 'border-2 border-black'
+				// In the compressed bottom-panel view we need exact internal pixel heights (16px white + 24px color).
+				// Use a stroke via box-shadow so it doesn't consume layout height.
+				shouldRenderCollapsedTopBox
+					? 'border-0'
+					: isBottomView
+						? 'border-2 border-black'
 					: isAllTab
 					? 'border-[3px] border-black'
 					: 'border border-black'
@@ -546,7 +556,10 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 				width: typeof resolvedWidth === 'number' ? `${resolvedWidth}px` : resolvedWidth,
 				height:
 					typeof resolvedHeight === 'number' ? `${resolvedHeight}px` : resolvedHeight,
-				background: `linear-gradient(to bottom, #ffffff ${whiteSectionHeight}px, #EB8586 ${whiteSectionHeight}px)`,
+				background: `linear-gradient(to bottom, #ffffff ${effectiveWhiteSectionHeight}px, #EB8586 ${effectiveWhiteSectionHeight}px)`,
+				boxShadow: shouldRenderCollapsedTopBox
+					? 'inset 0 0 0 2px #000000'
+					: undefined,
 				...(isBottomView ? { cursor: 'pointer' } : {}),
 			}}
 			data-hover-description="Contacts: This box displays all of the contacts in your campaign. Select contacts to generate drafts."
@@ -574,7 +587,9 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 			)}
 			<ContactsHeaderChrome
 				isAllTab={isAllTab}
-				whiteSectionHeight={customWhiteSectionHeight}
+				whiteSectionHeight={
+					shouldRenderCollapsedTopBox ? effectiveWhiteSectionHeight : customWhiteSectionHeight
+				}
 				// Match the main Contacts tab header chrome animation, but keep the ultra-compact
 				// bottom view static so it doesn't interfere with the "Open" affordance.
 				// Also, when this list is rendered on the Write tab (tooltip-enabled), treat "Write"
@@ -587,7 +602,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 					'flex items-center gap-2 px-3 shrink-0',
 					onHeaderClick ? 'cursor-pointer' : ''
 				)}
-				style={{ height: `${whiteSectionHeight}px` }}
+				style={{ height: `${effectiveWhiteSectionHeight}px` }}
 				role={onHeaderClick ? 'button' : undefined}
 				tabIndex={onHeaderClick ? 0 : undefined}
 				onClick={onHeaderClick}
@@ -627,6 +642,44 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 					<div className="flex items-center" style={{ marginTop: isBottomView ? 0 : '1px' }}>
 						<OpenIcon width={isBottomView ? 10 : undefined} height={isBottomView ? 10 : undefined} />
 					</div>
+				</div>
+			)}
+
+			{/* Collapsed bottom panels: show only the top "batch" box (22px) centered in the 24px color region */}
+			{shouldRenderCollapsedTopBox && (
+				<div className="flex-1 flex items-center justify-center px-[2px]">
+					{bottomViewBatchesToShow[0] ? (
+						<div
+							key="contacts-collapsed-batch"
+							className={cn(
+								'select-none overflow-hidden border-2 border-[#000000] flex items-center justify-between'
+							)}
+							style={{
+								width: `${collapsedTopBoxWidthPx}px`,
+								height: `${collapsedTopBoxHeightPx}px`,
+								borderRadius: `${collapsedTopBoxRadiusPx}px`,
+								backgroundColor: '#F5DADA',
+							}}
+						>
+							<span className="pl-[18px] font-inter font-medium text-[15px] text-black leading-none">
+								{formatBatchCount(bottomViewBatchesToShow[0].addedCount)}
+							</span>
+							<span className="pr-[18px] font-inter font-medium text-[15px] text-black leading-none">
+								{formatBatchTimestamp(bottomViewBatchesToShow[0].createdAt)}
+							</span>
+						</div>
+					) : (
+						<div
+							aria-hidden
+							className={cn('select-none overflow-hidden border-2 border-[#000000]')}
+							style={{
+								width: `${collapsedTopBoxWidthPx}px`,
+								height: `${collapsedTopBoxHeightPx}px`,
+								borderRadius: `${collapsedTopBoxRadiusPx}px`,
+								backgroundColor: '#EB8586',
+							}}
+						/>
+					)}
 				</div>
 			)}
 

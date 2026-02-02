@@ -554,7 +554,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		};
 	}, [view, isAllTabNarrow, isNarrowestDesktop]);
 
-	const bottomPanelBoxHeightPx = areBottomPanelsCollapsedAtCompactBreakpoint ? 31 : 117;
+	const bottomPanelBoxHeightPx = areBottomPanelsCollapsedAtCompactBreakpoint ? 40 : 117;
 	const bottomPanelCollapsed = areBottomPanelsCollapsedAtCompactBreakpoint;
 
 	// --- Pinned left panel (ContactsExpandedList <-> MiniEmailStructure) ---

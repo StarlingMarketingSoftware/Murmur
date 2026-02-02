@@ -105,7 +105,7 @@ const DraftsHeaderChrome: FC<{
 	isAllTab?: boolean;
 	whiteSectionHeight?: number;
 }> = ({ offsetY = 0, hasData = true, isAllTab = false, whiteSectionHeight }) => {
-	const isBottomView = whiteSectionHeight === 15;
+	const isBottomView = typeof whiteSectionHeight === 'number' && whiteSectionHeight <= 16;
 	const dotColor = hasData ? '#D9D9D9' : '#B0B0B0';
 	const pillBorderColor = hasData ? '#000000' : '#B0B0B0';
 	const pillTextColor = hasData ? '#000000' : '#B0B0B0';
@@ -362,7 +362,13 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 	const isAllTab = height === 347;
 	const isAllTabNavigation = interactionMode === 'allTab';
 	const whiteSectionHeight = customWhiteSectionHeight ?? (isAllTab ? 20 : 28);
-	const isBottomView = customWhiteSectionHeight === 15;
+	const isBottomView = customWhiteSectionHeight === 15 || customWhiteSectionHeight === 16;
+	// Compressed bottom panel spec: 40px total = 12px white + 28px color.
+	const effectiveWhiteSectionHeight = collapsed && isBottomView ? 12 : whiteSectionHeight;
+	const shouldRenderCollapsedTopBox = collapsed && isBottomView;
+	const collapsedTopBoxHeightPx = 22;
+	const collapsedTopBoxWidthPx = 224;
+	const collapsedTopBoxRadiusPx = 4.7;
 	const resolvedRowWidth = rowWidth ?? 356;
 	const resolvedRowHeight = rowHeight ?? 64;
 	const hasCustomRowSize = Boolean(rowWidth || rowHeight);
@@ -554,8 +560,12 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 		<div
 			className={cn(
 				'relative max-[480px]:w-[96.27vw] rounded-md flex flex-col overflow-visible',
-				isBottomView
-					? 'border-2 border-black'
+				// In the compressed bottom-panel view we need exact internal pixel heights (16px white + 24px color).
+				// Use a stroke via box-shadow so it doesn't consume layout height.
+				shouldRenderCollapsedTopBox
+					? 'border-0'
+					: isBottomView
+						? 'border-2 border-black'
 					: isAllTab
 					? 'border-[3px] border-black'
 					: 'border-2 border-black/30'
@@ -563,7 +573,10 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 			style={{
 				width: `${width}px`,
 				height: `${height}px`,
-				background: `linear-gradient(to bottom, #ffffff ${whiteSectionHeight}px, #FFDC9E ${whiteSectionHeight}px)`,
+				background: `linear-gradient(to bottom, #ffffff ${effectiveWhiteSectionHeight}px, #FFDC9E ${effectiveWhiteSectionHeight}px)`,
+				boxShadow: shouldRenderCollapsedTopBox
+					? 'inset 0 0 0 2px #000000'
+					: undefined,
 				...(isBottomView ? { cursor: 'pointer' } : {}),
 			}}
 			data-hover-description="Drafts: Emails you've generated but haven't sent yet. Select drafts to preview or send."
@@ -589,13 +602,16 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 					}}
 				/>
 			)}
-			<DraftsHeaderChrome isAllTab={isAllTab} whiteSectionHeight={customWhiteSectionHeight} />
+			<DraftsHeaderChrome
+				isAllTab={isAllTab}
+				whiteSectionHeight={shouldRenderCollapsedTopBox ? effectiveWhiteSectionHeight : customWhiteSectionHeight}
+			/>
 			<div
 				className={cn(
 					'flex items-center gap-2 px-3 shrink-0',
 					onHeaderClick ? 'cursor-pointer' : ''
 				)}
-				style={{ height: `${whiteSectionHeight}px` }}
+				style={{ height: `${effectiveWhiteSectionHeight}px` }}
 				role={onHeaderClick ? 'button' : undefined}
 				tabIndex={onHeaderClick ? 0 : undefined}
 				onClick={onHeaderClick}
@@ -635,6 +651,57 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 					<div className="flex items-center" style={{ marginTop: isBottomView ? 0 : '1px' }}>
 						<OpenIcon width={isBottomView ? 10 : undefined} height={isBottomView ? 10 : undefined} />
 					</div>
+				</div>
+			)}
+
+			{/* Collapsed bottom panels: show only the top "batch" box (22px) centered in the 24px color region */}
+			{shouldRenderCollapsedTopBox && (
+				<div className="flex-1 flex items-center justify-center px-[2px]">
+					{(() => {
+						// Compressed view uses a distinct "summary" top box:
+						// - Left: drafts count (live progress when generating)
+						// - Right: total contacts targeted for drafting
+						const draftCount = drafts.filter((d) => d.status === EmailStatus.draft).length;
+						const leftCount = isDraftingBatchActive ? draftedCount : draftCount;
+						const totalCount = Math.max(0, resolvedGenerationTotal);
+						const rightSegmentWidthPx = 80;
+
+						return (
+							<div
+								key="drafts-collapsed-summary"
+								className={cn('select-none overflow-hidden border-2 border-[#000000] flex')}
+								style={{
+									width: `${collapsedTopBoxWidthPx}px`,
+									height: `${collapsedTopBoxHeightPx}px`,
+									borderRadius: `${collapsedTopBoxRadiusPx}px`,
+									backgroundColor: '#F7EBD3',
+								}}
+							>
+								{/* Left segment */}
+								<div
+									className="flex-1 flex items-center"
+									style={{ backgroundColor: '#FFDD9E' }}
+								>
+									<span className="pl-[18px] font-inter font-medium text-[15px] text-black leading-none">
+										{formatBatchCount(leftCount)}
+									</span>
+								</div>
+								{/* Right segment */}
+								<div
+									className="flex items-center justify-center"
+									style={{
+										width: `${rightSegmentWidthPx}px`,
+										backgroundColor: '#FFFFFF',
+										borderLeft: '2px solid #000000',
+									}}
+								>
+									<span className="font-inter font-medium text-[15px] text-black leading-none">
+										{totalCount}
+									</span>
+								</div>
+							</div>
+						);
+					})()}
 				</div>
 			)}
 
