@@ -109,13 +109,18 @@ export const BottomPanelsContainer: React.FC<BottomPanelsContainerProps> = ({
 		.filter((action) => activeFilter === 'all' || action.type === activeFilter)
 		.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
 
-	const filterTabs: Array<{ key: HistoryActionType | 'all'; label: string }> = [
-		{ key: 'all', label: 'all' },
-		{ key: 'contacts', label: 'contacts' },
-		{ key: 'drafts', label: 'drafts' },
-		{ key: 'sent', label: 'sent' },
-		{ key: 'received', label: 'received' },
+	// Filter tabs - clicking a tab filters, clicking again deselects (shows all)
+	const filterTabs: Array<{ key: HistoryActionType; label: string; activeColor: string }> = [
+		{ key: 'contacts', label: 'contacts', activeColor: '#FC9798' },
+		{ key: 'drafts', label: 'drafts', activeColor: '#FEDD90' },
+		{ key: 'sent', label: 'sent', activeColor: '#91DBAA' },
+		{ key: 'received', label: 'received', activeColor: '#94D2E9' },
 	];
+
+	const handleTabClick = useCallback((key: HistoryActionType) => {
+		// If clicking the already-active filter, deselect it (show all)
+		setActiveFilter((current) => current === key ? 'all' : key);
+	}, []);
 
 	return (
 		<div
@@ -176,46 +181,72 @@ export const BottomPanelsContainer: React.FC<BottomPanelsContainerProps> = ({
 								width: HISTORY_PANEL_WIDTH,
 								height: HISTORY_PANEL_HEIGHT,
 								borderRadius: 8,
-								border: '3px solid #D66296',
+								border: '2px solid #000000',
 								backgroundColor: '#FFFFFF',
 								bottom: '100%',
 								marginBottom: 10,
+								// Align with the edge of the bottom boxes
 								...(cursorOnRightSide
-									? { right: -BUTTON_WIDTH - BUTTON_GAP - HISTORY_PANEL_WIDTH + BUTTON_WIDTH }
-									: { left: -BUTTON_WIDTH - BUTTON_GAP }),
+									? { right: 0 } // Right edge of panel aligns with right edge of rightmost box
+									: { left: 0 }), // Left edge of panel aligns with left edge of leftmost box
 							}}
 						>
-							{/* Header */}
+							{/* Header - white background */}
 							<div
-								className="flex items-center px-3"
+								className="flex items-center px-3 cursor-pointer"
 								style={{
-									height: 32,
-									backgroundColor: '#F9A8D4',
-									borderBottom: '2px solid #D66296',
+									height: 19,
+									backgroundColor: '#FFFFFF',
 								}}
+								onClick={() => setActiveFilter('all')}
 							>
 								<span className="text-[14px] font-inter font-medium text-black">History</span>
 							</div>
 
-							{/* Filter Tabs */}
+							{/* Filter Tabs - pink background */}
 							<div
-								className="flex items-center justify-between px-2"
+								className="flex items-center justify-around"
 								style={{
-									height: 28,
-									backgroundColor: '#FBCFE8',
-									borderBottom: '2px solid #D66296',
+									height: 25,
+									backgroundColor: '#D66296',
 								}}
 							>
 								{filterTabs.map((tab) => (
 									<button
 										key={tab.key}
 										type="button"
-										className={`text-[11px] font-inter px-2 py-1 rounded transition-colors ${
+										className={`text-[11px] font-inter transition-colors text-black text-center h-full ${
 											activeFilter === tab.key
-												? 'font-semibold text-black'
-												: 'font-normal text-gray-600 hover:text-black'
+												? 'font-semibold'
+												: 'font-normal'
 										}`}
-										onClick={() => setActiveFilter(tab.key)}
+										style={{
+											width: 68,
+											borderLeft: '2px solid transparent',
+											borderRight: '2px solid transparent',
+											...(activeFilter === tab.key
+												? {
+													backgroundColor: tab.activeColor,
+													borderLeft: '2px solid #000000',
+													borderRight: '2px solid #000000',
+												}
+												: {}),
+										}}
+										onMouseEnter={(e) => {
+											if (activeFilter !== tab.key) {
+												e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.3)';
+												e.currentTarget.style.borderLeft = '2px solid rgba(0,0,0,0.3)';
+												e.currentTarget.style.borderRight = '2px solid rgba(0,0,0,0.3)';
+											}
+										}}
+										onMouseLeave={(e) => {
+											if (activeFilter !== tab.key) {
+												e.currentTarget.style.backgroundColor = 'transparent';
+												e.currentTarget.style.borderLeft = '2px solid transparent';
+												e.currentTarget.style.borderRight = '2px solid transparent';
+											}
+										}}
+										onClick={() => handleTabClick(tab.key)}
 									>
 										{tab.label}
 									</button>
@@ -224,10 +255,16 @@ export const BottomPanelsContainer: React.FC<BottomPanelsContainerProps> = ({
 
 							{/* Action Rows */}
 							<div
-								className="overflow-y-auto p-[5px] flex flex-col gap-[4px]"
+								className="overflow-y-auto overflow-x-hidden p-[5px] flex flex-col gap-[4px]"
 								style={{
-									height: HISTORY_PANEL_HEIGHT - 32 - 28,
-									backgroundColor: '#F9A8D4',
+									height: HISTORY_PANEL_HEIGHT - 19 - 25,
+									backgroundColor: '#D66296',
+								}}
+								onClick={(e) => {
+									// Only reset if clicking directly on the container, not on a row
+									if (e.target === e.currentTarget) {
+										setActiveFilter('all');
+									}
 								}}
 							>
 								{filteredActions.length === 0 ? (
@@ -244,7 +281,7 @@ export const BottomPanelsContainer: React.FC<BottomPanelsContainerProps> = ({
 												height: HISTORY_ROW_HEIGHT,
 												borderRadius: 8,
 												backgroundColor: '#FDF2F8',
-												border: '2px solid #D66296',
+												border: '2px solid #000000',
 											}}
 										>
 											{/* Badge and action type */}
