@@ -231,8 +231,9 @@ export const BottomPanelsContainer: React.FC<BottomPanelsContainerProps> = ({
 				// Opening the panel - lock in the current side
 				setLockedSide(cursorOnRightSide ? 'right' : 'left');
 			} else {
-				// Closing the panel - clear the locked side
+				// Closing the panel - clear the locked side and hide button
 				setLockedSide(null);
+				setIsHovered(false);
 			}
 			return !prev;
 		});
@@ -241,6 +242,7 @@ export const BottomPanelsContainer: React.FC<BottomPanelsContainerProps> = ({
 	const handleCloseHistory = useCallback(() => {
 		setIsHistoryOpen(false);
 		setLockedSide(null);
+		setIsHovered(false); // Hide button at same time as panel
 	}, []);
 
 	// Filter and sort history actions (oldest at top, newest at bottom)
@@ -337,7 +339,7 @@ export const BottomPanelsContainer: React.FC<BottomPanelsContainerProps> = ({
 							onClick={handleCloseHistory}
 						/>
 						<div
-							className="absolute z-50 overflow-hidden"
+							className="absolute z-50 overflow-hidden animate-inbox-pop-in"
 							style={{
 								width: HISTORY_PANEL_WIDTH,
 								height: dynamicPanelHeight,
