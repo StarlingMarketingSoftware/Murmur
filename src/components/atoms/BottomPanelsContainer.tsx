@@ -209,6 +209,7 @@ export const BottomPanelsContainer: React.FC<BottomPanelsContainerProps> = ({
 								style={{
 									height: 25,
 									backgroundColor: '#D66296',
+									borderBottom: '2px solid #000000',
 								}}
 							>
 								{filterTabs.map((tab) => (
@@ -224,6 +225,7 @@ export const BottomPanelsContainer: React.FC<BottomPanelsContainerProps> = ({
 											width: 68,
 											borderLeft: '2px solid transparent',
 											borderRight: '2px solid transparent',
+											transform: 'none',
 											...(activeFilter === tab.key
 												? {
 													backgroundColor: tab.activeColor,
@@ -267,46 +269,41 @@ export const BottomPanelsContainer: React.FC<BottomPanelsContainerProps> = ({
 									}
 								}}
 							>
-								{filteredActions.length === 0 ? (
-									<div className="flex items-center justify-center h-full text-[13px] font-inter text-gray-600">
-										No history yet
-									</div>
-								) : (
-									filteredActions.map((action) => (
-										<div
-											key={action.id}
-											className="flex items-center justify-between px-3 shrink-0"
-											style={{
-												width: HISTORY_ROW_WIDTH,
-												height: HISTORY_ROW_HEIGHT,
-												borderRadius: 8,
-												backgroundColor: '#FDF2F8',
-												border: '2px solid #000000',
-											}}
-										>
-											{/* Badge and action type */}
-											<div className="flex items-center gap-2">
-												<span
-													className="text-[12px] font-inter font-medium px-2 py-0.5 rounded"
-													style={{
-														backgroundColor: BADGE_COLORS[action.type],
-														border: '1px solid rgba(0,0,0,0.1)',
-													}}
-												>
-													+{action.count.toString().padStart(2, '0')}
-												</span>
-												<span className="text-[13px] font-inter font-medium text-black">
-													{action.type}
-												</span>
-											</div>
-
-											{/* Timestamp */}
-											<span className="text-[12px] font-inter text-gray-600">
-												{formatTimestamp(action.timestamp)}
+								{/* Render action rows */}
+								{filteredActions.map((action) => (
+									<div
+										key={action.id}
+										className="flex items-center justify-between px-3 shrink-0"
+										style={{
+											width: HISTORY_ROW_WIDTH,
+											height: HISTORY_ROW_HEIGHT,
+											borderRadius: 8,
+											backgroundColor: '#FDF2F8',
+											border: '2px solid #000000',
+										}}
+									>
+										{/* Badge and action type */}
+										<div className="flex items-center gap-2">
+											<span
+												className="text-[12px] font-inter font-medium px-2 py-0.5 rounded"
+												style={{
+													backgroundColor: BADGE_COLORS[action.type],
+													border: '1px solid rgba(0,0,0,0.1)',
+												}}
+											>
+												+{action.count.toString().padStart(2, '0')}
+											</span>
+											<span className="text-[13px] font-inter font-medium text-black">
+												{action.type}
 											</span>
 										</div>
-									))
-								)}
+
+										{/* Timestamp */}
+										<span className="text-[12px] font-inter text-black">
+											{formatTimestamp(action.timestamp)}
+										</span>
+									</div>
+								))}
 							</div>
 						</div>
 					</>
