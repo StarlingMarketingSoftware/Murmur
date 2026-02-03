@@ -205,6 +205,7 @@ export const BottomPanelsContainer: React.FC<BottomPanelsContainerProps> = ({
 	const [isButtonHovered, setIsButtonHovered] = useState(false);
 	const [cursorOnRightSide, setCursorOnRightSide] = useState(false);
 	const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+	const [lockedSide, setLockedSide] = useState<'left' | 'right' | null>(null);
 	const [activeFilter, setActiveFilter] = useState<HistoryActionType | 'all'>('all');
 	const containerRef = useRef<HTMLDivElement>(null);
 	const innerRef = useRef<HTMLDivElement>(null);
@@ -225,11 +226,21 @@ export const BottomPanelsContainer: React.FC<BottomPanelsContainerProps> = ({
 	}, []);
 
 	const handleLogsClick = useCallback(() => {
-		setIsHistoryOpen((prev) => !prev);
-	}, []);
+		setIsHistoryOpen((prev) => {
+			if (!prev) {
+				// Opening the panel - lock in the current side
+				setLockedSide(cursorOnRightSide ? 'right' : 'left');
+			} else {
+				// Closing the panel - clear the locked side
+				setLockedSide(null);
+			}
+			return !prev;
+		});
+	}, [cursorOnRightSide]);
 
 	const handleCloseHistory = useCallback(() => {
 		setIsHistoryOpen(false);
+		setLockedSide(null);
 	}, []);
 
 	// Filter and sort history actions (oldest at top, newest at bottom)
@@ -304,7 +315,8 @@ export const BottomPanelsContainer: React.FC<BottomPanelsContainerProps> = ({
 							border: '2px solid #000000',
 							backgroundColor: isButtonHovered || isHistoryOpen ? '#D66296' : 'transparent',
 							top: 0,
-							...(cursorOnRightSide
+							// Use locked side when panel is open, otherwise follow cursor
+							...((lockedSide === 'right' || (lockedSide === null && cursorOnRightSide))
 								? { right: -BUTTON_WIDTH - BUTTON_GAP }
 								: { left: -BUTTON_WIDTH - BUTTON_GAP }),
 						}}
@@ -334,8 +346,8 @@ export const BottomPanelsContainer: React.FC<BottomPanelsContainerProps> = ({
 								backgroundColor: '#FFFFFF',
 								bottom: '100%',
 								marginBottom: 10,
-								// Align with the edge of the bottom boxes
-								...(cursorOnRightSide
+								// Align with the edge of the bottom boxes - use locked side
+								...(lockedSide === 'right'
 									? { right: 0 } // Right edge of panel aligns with right edge of rightmost box
 									: { left: 0 }), // Left edge of panel aligns with left edge of leftmost box
 							}}
