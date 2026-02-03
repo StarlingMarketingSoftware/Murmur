@@ -195,10 +195,10 @@ export const BottomPanelsContainer: React.FC<BottomPanelsContainerProps> = ({
 		setIsHistoryOpen(false);
 	}, []);
 
-	// Filter and sort history actions
+	// Filter and sort history actions (oldest at top, newest at bottom)
 	const filteredActions = historyActions
 		.filter((action) => activeFilter === 'all' || action.type === activeFilter)
-		.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+		.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
 
 	// Calculate dynamic panel height based on number of filtered actions
 	// Header: 19px, Tabs: 25px, Content padding: 5px top, 70px bottom
