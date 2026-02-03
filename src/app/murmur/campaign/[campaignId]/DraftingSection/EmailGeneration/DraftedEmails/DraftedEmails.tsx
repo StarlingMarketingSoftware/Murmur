@@ -342,6 +342,13 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 
 	const isMobile = useIsMobile();
 	const draftReviewContainerRef = useRef<HTMLDivElement | null>(null);
+	// Keep a ref to the currently-open draft id so async regen doesn't stomp UI state
+	// if the user navigates to another draft mid-request.
+	const selectedDraftIdRef = useRef<number | null>(null);
+
+	useEffect(() => {
+		selectedDraftIdRef.current = selectedDraft?.id ?? null;
+	}, [selectedDraft?.id]);
 
 	// Close the draft review UI when clicking anywhere outside of it.
 	// This should return the user back to the normal drafts table view.
@@ -761,16 +768,22 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 			return;
 		}
 		
+		const targetDraftId = selectedDraft.id;
 		setIsRegenerating(true);
+		let didUpdateDraft = false;
 		try {
 			const result = await onRegenerateDraft(selectedDraft);
 			if (result) {
+				// If the user switched drafts while regeneration was running, don't apply UI updates.
+				if (selectedDraftIdRef.current !== targetDraftId) return;
+
 				// Update the local state with the regenerated content
+				didUpdateDraft = true;
 				setEditedSubject(result.subject);
 				setEditedMessage(result.message);
 				// Also update the selectedDraft to reflect the new content
 				setSelectedDraft((prev) => {
-					if (!prev || prev.id !== selectedDraft.id) return prev;
+					if (!prev || prev.id !== targetDraftId) return prev;
 					return {
 						...prev,
 						subject: result.subject,
@@ -779,8 +792,12 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 				});
 			}
 		} finally {
+			// Only exit regen mode if we actually got regenerated content back.
+			// Close regen preview first to avoid briefly flashing the settings UI again.
+			if (didUpdateDraft) {
+				setIsRegenSettingsPreviewOpen(false);
+			}
 			setIsRegenerating(false);
-			setIsRegenSettingsPreviewOpen(false);
 		}
 	}, [selectedDraft, onRegenerateDraft, isRegenerating, isRegenSettingsPreviewOpen, setEditedSubject, setEditedMessage, setSelectedDraft]);
 
@@ -1546,22 +1563,51 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 						)}
 
 						{isRegenSettingsPreviewOpen ? (
-							<div className="flex justify-center flex-1">
-								<HybridPromptInput
-									contact={contact || null}
-									identity={props.identity ?? null}
-									onIdentityUpdate={props.onIdentityUpdate}
-									hideDraftButton
-									hideGenerateTestButton
-									hideProfileBottomMiniBox
-									clipProfileTabOverflow
-									manualEntryHeightPx={550}
-									containerHeightPx={625}
-									useStaticDropdownPosition
-									hideMobileStickyTestFooter
-									dataCampaignMainBox={null}
-								/>
-							</div>
+							isRegenerating ? (
+								// While regenerating, show the same "blank wave" animation style
+								// used by the Write tab Test Preview box (instead of a static settings UI).
+								<div
+									className="flex flex-col items-center flex-1"
+									style={{ paddingTop: '6px', paddingBottom: '12px' }}
+									aria-label="Regenerating draft"
+								>
+									{/* Subject placeholder */}
+									<div
+										className="border-2 border-black rounded-[7px] overflow-hidden test-preview-blank-wave-subject"
+										style={{
+											width: isMobile ? 'calc(100% - 16px)' : '484px',
+											height: '39px',
+											marginBottom: '8px',
+										}}
+									/>
+									{/* Body placeholder */}
+									<div
+										className="border-2 border-black rounded-[7px] overflow-hidden test-preview-blank-wave-body"
+										style={{
+											width: isMobile ? 'calc(100% - 16px)' : '484px',
+											height: '572px',
+											flex: isMobile ? 1 : undefined,
+										}}
+									/>
+								</div>
+							) : (
+								<div className="flex justify-center flex-1">
+									<HybridPromptInput
+										contact={contact || null}
+										identity={props.identity ?? null}
+										onIdentityUpdate={props.onIdentityUpdate}
+										hideDraftButton
+										hideGenerateTestButton
+										hideProfileBottomMiniBox
+										clipProfileTabOverflow
+										manualEntryHeightPx={550}
+										containerHeightPx={625}
+										useStaticDropdownPosition
+										hideMobileStickyTestFooter
+										dataCampaignMainBox={null}
+									/>
+								</div>
+							)
 						) : (
 							<>
 								{/* Subject input */}
@@ -1712,6 +1758,7 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 								variant="ghost"
 								className={cn(
 									"font-secondary font-semibold text-black border-[2px] border-black transition enabled:hover:brightness-95",
+									isRegenerating && "disabled:opacity-100",
 									isMobile ? "text-[12px]" : "text-[14px]"
 								)}
 								style={{
@@ -1719,13 +1766,17 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 									maxWidth: '397px',
 									height: isMobile ? '36px' : '40px',
 									borderRadius: '8px',
-									backgroundColor: '#FFDC9E',
+									backgroundColor: isRegenerating ? '#FEF3E0' : '#FFDC9E',
 								}}
 								data-hover-description="Regenerate this email using the settings shown above"
 								onClick={handleRegenerate}
 								disabled={isRegenerating || !onRegenerateDraft}
 							>
-								{isRegenerating ? <Spinner size="small" /> : 'Regenerate'}
+								{isRegenerating ? (
+									<span className="sr-only">Regenerating...</span>
+								) : (
+									'Regenerate'
+								)}
 							</Button>
 						</div>
 					) : (
@@ -1776,18 +1827,25 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 									variant="ghost"
 									className={cn(
 										"font-secondary font-semibold text-black border-[2px] border-black rounded-none transition enabled:hover:brightness-95",
+										isRegenerating && "disabled:opacity-100",
 										isMobile ? "text-[12px]" : "text-[14px]"
 									)}
 									style={{
 										width: isMobile ? '80px' : '124px',
 										height: isMobile ? '36px' : '40px',
-										backgroundColor: '#FFDC9E',
+										backgroundColor: isRegenerating ? '#FEF3E0' : '#FFDC9E',
 									}}
 									data-hover-description="Click to preview your prompt/settings before regenerating this draft"
 									onClick={handleRegenerate}
 									disabled={isRegenerating || !onRegenerateDraft}
 								>
-									{isRegenerating ? <Spinner size="small" /> : isMobile ? 'Regen' : 'Regenerate'}
+									{isRegenerating ? (
+										<span className="sr-only">Regenerating...</span>
+									) : isMobile ? (
+										'Regen'
+									) : (
+										'Regenerate'
+									)}
 								</Button>
 								<Button
 									type="button"

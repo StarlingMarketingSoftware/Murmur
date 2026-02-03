@@ -878,7 +878,7 @@ Do not include any other text or explanation outside the JSON object.
 `;
 
 export const GEMINI_HYBRID_PROMPT = applyDraftingOutputPhraseFilters(GEMINI_HYBRID_PROMPT_BASE, {
-	mode: 'templated',
+	mode: 'templated', 
 });
 
 const MISTRAL_FORMATTING_INSTRUCTIONS = `
