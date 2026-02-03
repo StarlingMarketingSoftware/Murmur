@@ -193,11 +193,11 @@ export const DraftPreviewExpandedList: FC<DraftPreviewExpandedListProps> = ({
 					<div className="flex items-center justify-between w-full h-full">
 						{/* Left side: Name and Company */}
 						<div className="flex flex-col justify-center min-w-0 flex-1">
-							<div className="font-inter font-bold text-[12px] leading-tight truncate">
+							<div className="font-inter font-bold text-[14px] leading-tight truncate">
 								{contactName}
 							</div>
 							{showCompanyLine && (
-								<div className="text-[10px] leading-tight truncate">
+								<div className="text-[11px] leading-tight truncate">
 									{contact?.company}
 								</div>
 							)}
@@ -209,9 +209,9 @@ export const DraftPreviewExpandedList: FC<DraftPreviewExpandedListProps> = ({
 									<span
 										className="inline-flex items-center justify-center font-inter font-normal leading-none"
 										style={{
-											width: '18px',
-											height: '11px',
-											borderRadius: '3px',
+											width: '22px',
+											height: '12px',
+											borderRadius: '5px',
 											border: '0.5px solid #000000',
 											backgroundColor: stateBadgeColorMap[stateAbbr] || 'transparent',
 											fontSize: '8px',
@@ -221,7 +221,7 @@ export const DraftPreviewExpandedList: FC<DraftPreviewExpandedListProps> = ({
 									</span>
 								) : null}
 								{contact?.city ? (
-									<span className="text-[8px] leading-none truncate max-w-[50px]">
+									<span className="text-[11px] leading-none truncate max-w-[70px]">
 										{contact.city}
 									</span>
 								) : null}
@@ -230,15 +230,15 @@ export const DraftPreviewExpandedList: FC<DraftPreviewExpandedListProps> = ({
 								<div
 									className="px-1 flex items-center bg-[#E8EFFF] overflow-hidden"
 									style={{
-										maxWidth: '100px',
-										height: '11px',
-										borderRadius: '3px',
+										maxWidth: '117px',
+										height: '14px',
+										borderRadius: '5px',
 										border: '0.5px solid #000000',
 									}}
 								>
 									<span
 										className="font-inter font-normal leading-none truncate"
-										style={{ fontSize: '7px' }}
+										style={{ fontSize: '9px' }}
 									>
 										{contact.title}
 									</span>
@@ -304,7 +304,7 @@ export const DraftPreviewExpandedList: FC<DraftPreviewExpandedListProps> = ({
 					)}
 				>
 					{!shouldWaveSubject && !isEmpty && (
-						<span className="font-inter font-bold text-[13px] leading-tight truncate">
+						<span className="font-inter font-bold text-[14px] leading-tight truncate">
 							{subjectLine || 'No subject'}
 						</span>
 					)}
@@ -337,12 +337,12 @@ export const DraftPreviewExpandedList: FC<DraftPreviewExpandedListProps> = ({
 					>
 						{hasLinks ? (
 							<div 
-								className="p-3 text-[11px] leading-[1.4] draft-preview-content"
+								className="p-3 text-[14px] leading-[1.6] draft-preview-content"
 								style={{ wordBreak: 'break-word' }}
 								dangerouslySetInnerHTML={{ __html: rawHtmlMessage || 'No content' }}
 							/>
 						) : (
-							<div className="p-3 whitespace-pre-wrap text-[11px] leading-[1.4]">
+							<div className="p-3 whitespace-pre-wrap text-[14px] leading-[1.6]">
 								{plainMessage || 'No content'}
 							</div>
 						)}

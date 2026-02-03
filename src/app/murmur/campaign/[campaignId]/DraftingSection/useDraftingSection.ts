@@ -336,11 +336,11 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	const draftOperationsRef = useRef<DraftingOperation[]>([]);
 	const updateDraftOperations = useCallback(
 		(updater: (prev: DraftingOperation[]) => DraftingOperation[]) => {
-			setDraftOperations((prev) => {
-				const next = updater(prev);
-				draftOperationsRef.current = next;
-				return next;
-			});
+			// Keep the ref in sync synchronously so async queue logic can reliably
+			// determine when operations have fully finished.
+			const next = updater(draftOperationsRef.current);
+			draftOperationsRef.current = next;
+			setDraftOperations(next);
 		},
 		[]
 	);

@@ -1291,6 +1291,48 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 
 	return (
 		<div className="flex flex-col items-center">
+			<style jsx global>{`
+				@keyframes murmur-actively-drafting-pulse {
+					/* 3/4 feel: gentle swell on beat 3 */
+					0%,
+					66% {
+						opacity: 0;
+					}
+					76% {
+						opacity: 0.18;
+					}
+					84% {
+						opacity: 0.5;
+					}
+					92% {
+						opacity: 0.18;
+					}
+					100% {
+						opacity: 0;
+					}
+				}
+
+				.murmur-actively-drafting {
+					background-color: #f5dada;
+				}
+
+				.murmur-actively-drafting::after {
+					content: '';
+					position: absolute;
+					inset: 0;
+					background: rgba(0, 0, 0, 0.06);
+					opacity: 0;
+					pointer-events: none;
+					will-change: opacity;
+					animation: murmur-actively-drafting-pulse 3.6s ease-in-out infinite;
+				}
+
+				@media (prefers-reduced-motion: reduce) {
+					.murmur-actively-drafting::after {
+						animation: none;
+					}
+				}
+			`}</style>
 			<DraftingTable
 				handleClick={handleClick}
 				areAllSelected={areAllSelected}
@@ -1472,12 +1514,12 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 						const isSelected = !isActivelyDrafting && selectedContactIds.has(contact.id);
 						// Final background: actively drafting > selected > keyboard focus > white (mouse hover handled by CSS)
 						const contactBgColor = isActivelyDrafting
-							? 'bg-[#F5DADA]'
+							? 'murmur-actively-drafting'
 							: isSelected
-							? 'bg-[#EAAEAE]'
+							? 'bg-[#F5DADA]'
 							: isKeyboardFocused
-								? 'bg-[#F5DADA]'
-								: 'bg-white hover:bg-[#F5DADA]';
+								? 'bg-[#FAE6E6]'
+								: 'bg-white hover:bg-[#FAE6E6]';
 						return (
 						<div
 							key={contact.id}
