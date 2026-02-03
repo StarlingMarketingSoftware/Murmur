@@ -113,6 +113,11 @@ export interface DraftingSectionProps {
 	 */
 	hideHeaderBox?: boolean;
 	/**
+	 * Optional callback to report live drafting progress for UI that lives outside the DraftingSection
+	 * (e.g. the CampaignHeaderBox rendered at the page level on the narrowest breakpoint).
+	 */
+	onLivePreviewProgress?: (progress: { visible: boolean; current: number; total: number }) => void;
+	/**
 	 * When true, this DraftingSection is fading out as part of a tab transition.
 	 * Used to hide elements that should remain stable (like research panel) in the exiting view.
 	 */

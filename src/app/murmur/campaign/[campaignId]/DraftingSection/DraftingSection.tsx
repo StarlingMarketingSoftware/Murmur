@@ -143,6 +143,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		goToPreviousTab,
 		goToNextTab,
 		hideHeaderBox,
+		onLivePreviewProgress,
 		isTransitioningOut,
 		isTransitioningIn,
 	} = props;
@@ -239,14 +240,37 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const isSafari = useMemo(() => isSafariBrowser(), []);
 	const [isClient, setIsClient] = useState(false);
 	useEffect(() => setIsClient(true), []);
-	const progressBarPortalTarget = useMemo(() => {
-		if (!isClient) return null;
-		// We want the bar to live at the top of the DOCUMENT (not the viewport),
-		// so it scrolls away naturally with the page.
-		return document.body;
-	}, [isClient]);
 	const isDraftingView = view === 'drafting';
 	const isSentView = view === 'sent';
+
+	const isDraftingProgressVisible =
+		renderGlobalOverlays && isLivePreviewVisible && livePreviewTotal > 0;
+	const draftingProgressForHeader = isDraftingProgressVisible
+		? { current: livePreviewDraftNumber, total: livePreviewTotal }
+		: null;
+
+	// Report live drafting progress upward for page-level header rendering (narrowest breakpoint).
+	useEffect(() => {
+		if (!renderGlobalOverlays) return;
+		onLivePreviewProgress?.({
+			visible: isDraftingProgressVisible,
+			current: livePreviewDraftNumber,
+			total: livePreviewTotal,
+		});
+	}, [
+		onLivePreviewProgress,
+		renderGlobalOverlays,
+		isDraftingProgressVisible,
+		livePreviewDraftNumber,
+		livePreviewTotal,
+	]);
+
+	// Ensure we clear state on unmount.
+	useEffect(() => {
+		return () => {
+			onLivePreviewProgress?.({ visible: false, current: 0, total: 0 });
+		};
+	}, [onLivePreviewProgress]);
 	const [selectedDraft, setSelectedDraft] = useState<EmailWithRelations | null>(null);
 	// Ref to the main DraftedEmails instance (center column) so side preview controls can exit regen mode.
 	const draftedEmailsRef = useRef<DraftedEmailsHandle | null>(null);
@@ -3092,6 +3116,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										contactsCount={contactsCount}
 										draftCount={draftCount}
 										sentCount={sentCount}
+										draftingProgress={draftingProgressForHeader}
 										onFromClick={onOpenIdentityDialog}
 										onContactsClick={goToContacts}
 										onDraftsClick={goToDrafting}
@@ -4169,6 +4194,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													contactsCount={contactsCount}
 													draftCount={draftCount}
 													sentCount={sentCount}
+													draftingProgress={draftingProgressForHeader}
 													onFromClick={onOpenIdentityDialog}
 													onContactsClick={goToContacts}
 													onDraftsClick={goToDrafting}
@@ -4759,6 +4785,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														contactsCount={contactsCount}
 														draftCount={draftCount}
 														sentCount={sentCount}
+														draftingProgress={draftingProgressForHeader}
 														onFromClick={onOpenIdentityDialog}
 														onContactsClick={goToContacts}
 														onDraftsClick={goToDrafting}
@@ -5258,6 +5285,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													contactsCount={contactsCount}
 													draftCount={draftCount}
 													sentCount={sentCount}
+													draftingProgress={draftingProgressForHeader}
 													onFromClick={onOpenIdentityDialog}
 													onContactsClick={goToContacts}
 													onDraftsClick={goToDrafting}
@@ -5771,6 +5799,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													contactsCount={contactsCount}
 													draftCount={draftCount}
 													sentCount={sentCount}
+													draftingProgress={draftingProgressForHeader}
 													onFromClick={onOpenIdentityDialog}
 													onContactsClick={goToContacts}
 													onDraftsClick={goToDrafting}
@@ -6038,6 +6067,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												contactsCount={contactsCount}
 												draftCount={draftCount}
 												sentCount={sentCount}
+												draftingProgress={draftingProgressForHeader}
 												onFromClick={onOpenIdentityDialog}
 												onContactsClick={goToContacts}
 												onDraftsClick={goToDrafting}
@@ -7202,6 +7232,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													contactsCount={contactsCount}
 													draftCount={draftCount}
 													sentCount={sentCount}
+													draftingProgress={draftingProgressForHeader}
 													onFromClick={onOpenIdentityDialog}
 													onContactsClick={goToContacts}
 													onDraftsClick={goToDrafting}
@@ -7398,6 +7429,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												contactsCount={contactsCount}
 												draftCount={draftCount}
 												sentCount={sentCount}
+												draftingProgress={draftingProgressForHeader}
 												onFromClick={onOpenIdentityDialog}
 												onContactsClick={goToContacts}
 												onDraftsClick={goToDrafting}
@@ -8058,6 +8090,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												contactsCount={contactsCount}
 												draftCount={draftCount}
 												sentCount={sentCount}
+												draftingProgress={draftingProgressForHeader}
 												onFromClick={onOpenIdentityDialog}
 												onContactsClick={goToContacts}
 												onDraftsClick={goToDrafting}
@@ -8887,66 +8920,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			</Form>
 
 			{/* Main-box ghost: portal to <body> so "fixed" aligns with viewport (avoid transformed-parent offsets) */}
-			{/* Top-of-page drafting progress bar (synced with the live Draft Preview playback) */}
-			{isClient &&
-				renderGlobalOverlays &&
-				isLivePreviewVisible &&
-				livePreviewTotal > 0 &&
-				progressBarPortalTarget &&
-				createPortal(
-					<div
-						aria-hidden="true"
-						style={{
-							position: 'absolute',
-							left: 0,
-							right: 0,
-							top: 'calc(env(safe-area-inset-top) + 6px)',
-							zIndex: 9999,
-							pointerEvents: 'none',
-							display: 'flex',
-							justifyContent: 'center',
-						}}
-					>
-						<div
-							className="flex items-center gap-3 font-inter font-medium text-black text-[14px]"
-							style={{ lineHeight: 1 }}
-						>
-							<span style={{ minWidth: 18, textAlign: 'right' }}>
-								{Math.min(Math.max(livePreviewDraftNumber, 0), livePreviewTotal)}
-							</span>
-							<div
-								style={{
-									width: 500,
-									maxWidth: 'calc(100vw - 120px)',
-									height: 9,
-									backgroundColor: '#D1D1D1',
-									position: 'relative',
-								}}
-							>
-								<div
-									style={{
-										position: 'absolute',
-										top: 0,
-										left: 0,
-										height: '100%',
-										width: `${Math.min(
-											100,
-											Math.max(
-												0,
-												(livePreviewDraftNumber / Math.max(1, livePreviewTotal)) * 100
-											)
-										)}%`,
-										backgroundColor: '#EDB552',
-									}}
-								/>
-							</div>
-							<span style={{ minWidth: 18, textAlign: 'left' }}>
-								{livePreviewTotal}
-							</span>
-						</div>
-					</div>,
-					progressBarPortalTarget
-				)}
 
 		{isClient &&
 			createPortal(
