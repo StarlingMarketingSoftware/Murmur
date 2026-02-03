@@ -2818,6 +2818,10 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		hasSubjectBeenTouched &&
 		(!subjectValue || subjectValue.trim() === '');
 
+	// Manual mode: only surface the Draft CTA once both subject + body have meaningful text.
+	// Keep this as a boolean so we don't re-render the entire component on every body keystroke.
+	const [manualBodyHasMeaningfulText, setManualBodyHasMeaningfulText] = useState(false);
+
 	// Signature auto/manual mode toggle (local state for Full Auto mode)
 	const [isAutoSignature, setIsAutoSignature] = useState(true);
 	const [manualSignatureValue, setManualSignatureValue] = useState('');
@@ -3352,6 +3356,12 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 	const manualBodyEditorRef = useRef<HTMLDivElement>(null);
 	const manualBodyInitializedRef = useRef(false);
 
+	const syncManualBodyHasMeaningfulText = useCallback(() => {
+		const text = (manualBodyEditorRef.current?.textContent ?? '').replace(/\u00A0/g, ' ');
+		const hasText = text.trim().length > 0;
+		setManualBodyHasMeaningfulText((prev) => (prev === hasText ? prev : hasText));
+	}, []);
+
 	// When switching into Manual mode, start typing in Subject.
 	useEffect(() => {
 		if (selectedModeKey !== 'manual') return;
@@ -3402,12 +3412,13 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 			const currentValue = form.getValues('hybridBlockPrompts.0.value') || '';
 			manualBodyEditorRef.current.innerHTML = currentValue;
 			manualBodyInitializedRef.current = true;
+			syncManualBodyHasMeaningfulText();
 		}
 		// Reset initialization flag when leaving manual mode
 		if (selectedModeKey !== 'manual') {
 			manualBodyInitializedRef.current = false;
 		}
-	}, [selectedModeKey, form]);
+	}, [selectedModeKey, form, syncManualBodyHasMeaningfulText]);
 
 	// Apply formatting to the manual mode body editor
 	const applyManualFormatting = useCallback(
@@ -3427,8 +3438,9 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		// Sync back to form after applying formatting
 		const html = editor.innerHTML || '';
 		form.setValue('hybridBlockPrompts.0.value', html, { shouldDirty: true });
+		syncManualBodyHasMeaningfulText();
 	},
-		[form, updateActiveFormatting]
+		[form, updateActiveFormatting, syncManualBodyHasMeaningfulText]
 	);
 
 	const applyManualColor = useCallback(
@@ -3464,8 +3476,9 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 			// Sync back to form after applying color
 			const html = editor.innerHTML || '';
 			form.setValue('hybridBlockPrompts.0.value', html, { shouldDirty: true });
+			syncManualBodyHasMeaningfulText();
 		},
-		[form, updateActiveFormatting]
+		[form, updateActiveFormatting, syncManualBodyHasMeaningfulText]
 	);
 
 	// Insert a fill-in placeholder at cursor position
@@ -3500,11 +3513,12 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 			// Sync back to form
 			const html = editor.innerHTML || '';
 			form.setValue('hybridBlockPrompts.0.value', html, { shouldDirty: true });
+			syncManualBodyHasMeaningfulText();
 
 			// Close the dropdown
 			setIsFillInsDropdownOpen(false);
 		},
-		[form]
+		[form, syncManualBodyHasMeaningfulText]
 	);
 
 	// Sanitize manual editor content to remove banned fill-ins ({{email}}, {{phone}})
@@ -3636,6 +3650,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		// Sync back to form
 		const html = editor.innerHTML || '';
 		form.setValue('hybridBlockPrompts.0.value', html, { shouldDirty: true });
+		syncManualBodyHasMeaningfulText();
 
 		// Reset and close popover
 		setLinkText('');
@@ -3643,7 +3658,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		setSavedRange(null);
 		setLinkPopoverPosition(null);
 		setIsLinkPopoverOpen(false);
-	}, [form, linkText, linkUrl, savedRange]);
+	}, [form, linkText, linkUrl, savedRange, syncManualBodyHasMeaningfulText]);
 
 	// Close link popover when clicking outside
 	useEffect(() => {
@@ -4597,6 +4612,19 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		}
 		return 'Writing: Build your email (subject + blocks + signature), then generate drafts for selected contacts.';
 	}, [activeTab, selectedModeKey]);
+
+	const manualSubjectHasMeaningfulText = Boolean((subjectValue ?? '').trim());
+	const canDraftInManualMode = manualSubjectHasMeaningfulText && manualBodyHasMeaningfulText;
+
+	const hasSelectedContactsForDrafting = draftCount > 0 || Boolean(isAllContactsSelected);
+	const shouldShowDraftCta =
+		hasSelectedContactsForDrafting && (!isManualModeSelected || canDraftInManualMode);
+
+	const draftPlaceholderText = !hasSelectedContactsForDrafting
+		? 'Select Contacts and Draft Emails'
+		: isManualModeSelected && !canDraftInManualMode
+			? 'Write Subject and Body to Draft Emails'
+			: 'Select Contacts and Draft Emails';
 
 	return (
 		<div
@@ -5818,6 +5846,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																manualBodyEditorRef.current.innerHTML = html;
 															}
 															form.setValue('hybridBlockPrompts.0.value', html, { shouldDirty: true });
+															syncManualBodyHasMeaningfulText();
 														}}
 														onInput={() => {
 															// Sync contentEditable HTML to form on every input (with banned fill-ins removed)
@@ -5837,6 +5866,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 															} catch {}
 															}
 															form.setValue('hybridBlockPrompts.0.value', html, { shouldDirty: true });
+															syncManualBodyHasMeaningfulText();
 														}}
 														onClick={(e) => {
 															// Allow clicking links with Ctrl/Cmd key
@@ -8045,7 +8075,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 								)}
 							>
 								<>
-									{draftCount > 0 || isAllContactsSelected ? (
+									{shouldShowDraftCta ? (
 										// Animated draft button with expanding "All" state
 										<button
 											type="button"
@@ -8112,7 +8142,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 									) : (
 										<div className="relative w-full h-full rounded-[4px] border-[3px] border-transparent overflow-hidden transition-colors group-hover:bg-[#EEF5EF] group-hover:border-black">
 											<div className="w-full h-full flex items-center justify-center text-black font-inter font-normal text-[17px] cursor-default">
-												Select Contacts and Draft Emails
+												{draftPlaceholderText}
 											</div>
 											<button
 												type="button"
@@ -8128,7 +8158,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 										</div>
 									)}
 									{/* "All" button overlay - only visible when not all selected */}
-									{(draftCount > 0 || isAllContactsSelected) && !isAllContactsSelected && (
+									{shouldShowDraftCta && !isAllContactsSelected && (
 										<button
 											type="button"
 											data-hover-description="Select all contacts"

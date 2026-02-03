@@ -390,26 +390,36 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	>([]);
 	const livePreviewIsTypingRef = useRef<boolean>(false);
 	const livePreviewAutoHideWhenIdleRef = useRef<boolean>(false);
+	// Invalidate scheduled typing ticks between drafts / on cancel.
+	const livePreviewRunIdRef = useRef(0);
+	// Bursty "human-ish" cadence state.
+	const livePreviewCadenceRef = useRef<{
+		segmentCharsRemaining: number;
+		segmentCps: number;
+	}>({
+		segmentCharsRemaining: 0,
+		segmentCps: 150,
+	});
 
-	// Typing animation tuning: fixed speed (chars/sec) regardless of backend timing.
-	const LIVE_PREVIEW_TICK_MS = 20;
-	const LIVE_PREVIEW_CHARS_PER_SECOND = 150;
-	const LIVE_PREVIEW_STEP_CHARS = Math.max(
-		1,
-		Math.round((LIVE_PREVIEW_CHARS_PER_SECOND * LIVE_PREVIEW_TICK_MS) / 1000)
-	);
-	const LIVE_PREVIEW_POST_DRAFT_DELAY_MS = 250;
+	// Typing animation tuning: highly variable bursty cadence.
+	// Wide speed range (20-120 CPS) creates natural rhythm with fast bursts and brief slowdowns.
+	const LIVE_PREVIEW_BASE_CPS = 55;
+	const LIVE_PREVIEW_MIN_DELAY_MS = 8;
+	const LIVE_PREVIEW_MAX_DELAY_MS = 280;
+	const LIVE_PREVIEW_POST_DRAFT_DELAY_MS = 200;
 
 	const stopLivePreviewTimers = useCallback(() => {
+		// Invalidate any scheduled ticks (prevents stray setTimeouts from rescheduling).
+		livePreviewRunIdRef.current += 1;
+		livePreviewIsTypingRef.current = false;
 		if (livePreviewTimerRef.current) {
-			clearInterval(livePreviewTimerRef.current);
+			clearTimeout(livePreviewTimerRef.current);
 			livePreviewTimerRef.current = null;
 		}
 		if (livePreviewDelayTimerRef.current) {
 			clearTimeout(livePreviewDelayTimerRef.current);
 			livePreviewDelayTimerRef.current = null;
 		}
-		livePreviewIsTypingRef.current = false;
 	}, []);
 
 	const hideLivePreview = useCallback(() => {
@@ -450,9 +460,9 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		const next = livePreviewQueueRef.current.shift();
 		if (!next) return;
 
-		// Clear any previous typing interval.
+		// Clear any previous typing timer.
 		if (livePreviewTimerRef.current) {
-			clearInterval(livePreviewTimerRef.current);
+			clearTimeout(livePreviewTimerRef.current);
 			livePreviewTimerRef.current = null;
 		}
 
@@ -464,8 +474,17 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		livePreviewFullTextRef.current = next.message || '';
 		livePreviewIndexRef.current = 0;
 		livePreviewIsTypingRef.current = true;
+		const runId = (livePreviewRunIdRef.current += 1);
+		// Reset cadence for a fresh draft.
+		livePreviewCadenceRef.current.segmentCharsRemaining = 0;
+		livePreviewCadenceRef.current.segmentCps = LIVE_PREVIEW_BASE_CPS;
 
-		livePreviewTimerRef.current = window.setInterval(() => {
+		const clamp = (value: number, min: number, max: number) =>
+			Math.min(max, Math.max(min, value));
+		const randBetween = (min: number, max: number) => min + Math.random() * (max - min);
+		const tick = () => {
+			if (livePreviewRunIdRef.current !== runId) return;
+
 			const full = livePreviewFullTextRef.current;
 			const i = livePreviewIndexRef.current;
 			if (i >= full.length) {
@@ -480,14 +499,119 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 				return;
 			}
 
-			const nextIndex = Math.min(i + LIVE_PREVIEW_STEP_CHARS, full.length);
-			livePreviewIndexRef.current = nextIndex;
-			setLivePreviewMessage(full.slice(0, nextIndex));
-		}, LIVE_PREVIEW_TICK_MS);
+			const cadence = livePreviewCadenceRef.current;
+			// Pick a new speed segment to create highly variable burstiness.
+			if (cadence.segmentCharsRemaining <= 0) {
+				const roll = Math.random();
+				const prevCps = cadence.segmentCps || LIVE_PREVIEW_BASE_CPS;
+				let nextCps: number;
+				let nextLen: number;
+
+				if (roll < 0.18) {
+					// Very fast burst (100-120 CPS) - short bursts of rapid typing.
+					nextCps = randBetween(100, 120);
+					nextLen = Math.round(randBetween(5, 15));
+				} else if (roll < 0.35) {
+					// Fast segment (70-95 CPS).
+					nextCps = randBetween(70, 95);
+					nextLen = Math.round(randBetween(8, 25));
+				} else if (roll < 0.50) {
+					// Slower patch (25-40 CPS) - brief slowdown.
+					nextCps = randBetween(25, 40);
+					nextLen = Math.round(randBetween(6, 18));
+				} else {
+					// Normal mid-range (45-70 CPS).
+					nextCps = clamp(prevCps + randBetween(-25, 25), 45, 70);
+					nextLen = Math.round(randBetween(12, 40));
+				}
+
+				// Quick blend so transitions feel natural but not sluggish.
+				cadence.segmentCps = clamp(prevCps * 0.3 + nextCps * 0.7, 20, 125);
+				cadence.segmentCharsRemaining = nextLen;
+			}
+
+			const cps = Math.max(1, cadence.segmentCps || LIVE_PREVIEW_BASE_CPS);
+			// Letter-by-letter typing: always advance 1 char at a time.
+			const end = Math.min(i + 1, full.length);
+			const typedCount = end - i; // always 1 (unless already at end)
+			livePreviewIndexRef.current = end;
+			
+			// Commit the typed character immediately.
+			const currentText = full.slice(0, end);
+			setLivePreviewMessage(currentText);
+			
+			cadence.segmentCharsRemaining -= typedCount;
+
+			const lastChar = full[end - 1] ?? '';
+			const prevChar = end >= 2 ? full[end - 2] : undefined;
+
+			let extraPauseMs = 0;
+			// Shorter pauses - keep things moving, thinking dots fill any longer gaps.
+			if (lastChar === '\n') {
+				const isParagraphBreak = prevChar === '\n';
+				extraPauseMs += isParagraphBreak ? randBetween(80, 140) : randBetween(40, 80);
+			} else if (lastChar === '.' || lastChar === '!' || lastChar === '?') {
+				extraPauseMs += randBetween(50, 90);
+			} else if (lastChar === ',' || lastChar === ';' || lastChar === ':') {
+				extraPauseMs += randBetween(15, 40);
+			} else if (lastChar === '—') {
+				extraPauseMs += randBetween(25, 55);
+			}
+
+			// Small natural pauses at word boundaries.
+			if (lastChar === ' ') {
+				extraPauseMs += randBetween(0, 8);
+				// Rare brief thinking pause.
+				if (Math.random() < 0.012) {
+					extraPauseMs += randBetween(60, 120);
+				}
+			}
+
+			const baseDelayMs = (1000 * typedCount) / cps;
+			const jitter = randBetween(0.85, 1.2);
+			const delayMs = clamp(
+				Math.round(baseDelayMs * jitter + extraPauseMs),
+				LIVE_PREVIEW_MIN_DELAY_MS,
+				LIVE_PREVIEW_MAX_DELAY_MS
+			);
+
+			// "Thinking" animation: if the pause is long enough, type dots ...
+			if (delayMs > 160) {
+				const startDotTime = 70;
+				setTimeout(() => {
+					if (livePreviewRunIdRef.current === runId) {
+						setLivePreviewMessage(currentText + '.');
+					}
+				}, startDotTime);
+
+				if (delayMs > startDotTime + 60) {
+					setTimeout(() => {
+						if (livePreviewRunIdRef.current === runId) {
+							setLivePreviewMessage(currentText + '..');
+						}
+					}, startDotTime + 60);
+				}
+
+				if (delayMs > startDotTime + 120) {
+					setTimeout(() => {
+						if (livePreviewRunIdRef.current === runId) {
+							setLivePreviewMessage(currentText + '...');
+						}
+					}, startDotTime + 120);
+				}
+			}
+
+			if (livePreviewRunIdRef.current !== runId) return;
+			livePreviewTimerRef.current = window.setTimeout(tick, delayMs);
+		};
+
+		// Small lead-in so the panel paints before typing starts.
+		livePreviewTimerRef.current = window.setTimeout(tick, Math.round(randBetween(20, 60)));
 	}, [
+		LIVE_PREVIEW_BASE_CPS,
+		LIVE_PREVIEW_MAX_DELAY_MS,
+		LIVE_PREVIEW_MIN_DELAY_MS,
 		LIVE_PREVIEW_POST_DRAFT_DELAY_MS,
-		LIVE_PREVIEW_STEP_CHARS,
-		LIVE_PREVIEW_TICK_MS,
 		hideLivePreview,
 		stopLivePreviewTimers,
 	]);
@@ -509,7 +633,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 
 	const enqueueLivePreviewDraft = useCallback(
 		(draftIndex: number, contactId: number, message: string, subject: string) => {
-			// Keep the backend ahead: enqueue completed drafts and let the UI play them at a fixed speed.
+			// Keep the backend ahead: enqueue completed drafts and let the UI play them back with a bursty cadence.
 			livePreviewQueueRef.current.push({
 				draftIndex,
 				contactId,
@@ -2111,7 +2235,7 @@ EXAMPLES OF GOOD CUSTOM INSTRUCTIONS:
 								`[Batch][Full AI] Saved draft#${draftIndex} contactId=${recipient.id} email=${recipient.email} model=${attemptModel}`
 							);
 						}
-						// Queue for the live typing preview (fixed speed, independent of backend timing).
+						// Queue for the live typing preview (bursty cadence, independent of backend timing).
 						enqueueLivePreviewDraft(
 							draftIndex,
 							recipient.id,
@@ -2717,7 +2841,7 @@ EXAMPLES OF GOOD CUSTOM INSTRUCTIONS:
 				controller.abort();
 			}
 			if (livePreviewTimerRef.current) {
-				clearInterval(livePreviewTimerRef.current);
+				clearTimeout(livePreviewTimerRef.current);
 				livePreviewTimerRef.current = null;
 			}
 			if (livePreviewDelayTimerRef.current) {
