@@ -255,6 +255,9 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 		(op) => typeof op.total === 'number' && op.total > 0 && typeof op.current === 'number'
 	);
 	const shouldShowDraftingProgress = draftingOperations.length > 0;
+	// Keep the header progress UI compact: render at most 2 stacked bars.
+	// When there are 3+ operations, the label communicates the full count.
+	const draftingOperationsForBars = draftingOperations.slice(0, 2);
 	const draftingLabel = shouldShowDraftingProgress
 		? draftingOperations.length === 1
 			? `${draftingOperations[0].total} email${
@@ -434,7 +437,7 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 						{draftingLabel}
 					</div>
 					<div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-						{draftingOperations.map((op, idx) => {
+						{draftingOperationsForBars.map((op, idx) => {
 							const pct = Math.min(
 								100,
 								Math.max(
@@ -443,6 +446,7 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 										100
 								)
 							);
+							const fillColor = idx === 0 ? '#EDB552' : '#5AB477';
 							return (
 								<div
 									key={`drafting-op-${idx}`}
@@ -462,7 +466,7 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 											left: 0,
 											height: '100%',
 											width: `${pct}%`,
-											backgroundColor: '#EDB552',
+											backgroundColor: fillColor,
 											borderRadius: '6px',
 										}}
 									/>
