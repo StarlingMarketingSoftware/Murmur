@@ -109,13 +109,34 @@ export const BottomPanelsContainer: React.FC<BottomPanelsContainerProps> = ({
 		.filter((action) => activeFilter === 'all' || action.type === activeFilter)
 		.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
 
+	// Calculate dynamic panel height based on number of filtered actions
+	// Header: 19px, Tabs: 25px, Content padding: 5px top, 70px bottom
+	// Each row: 34px height + 4px gap (except last row has no gap after)
+	const HEADER_HEIGHT = 19;
+	const TABS_HEIGHT = 25;
+	const CONTENT_PADDING_TOP = 5;
+	const CONTENT_PADDING_BOTTOM = 70;
+	const ROW_GAP = 4;
+	
+	const rowsHeight = filteredActions.length > 0 
+		? (filteredActions.length * HISTORY_ROW_HEIGHT) + ((filteredActions.length - 1) * ROW_GAP)
+		: 0;
+	const contentHeight = CONTENT_PADDING_TOP + rowsHeight + CONTENT_PADDING_BOTTOM;
+	const calculatedPanelHeight = HEADER_HEIGHT + TABS_HEIGHT + contentHeight;
+	const dynamicPanelHeight = Math.min(calculatedPanelHeight, HISTORY_PANEL_HEIGHT);
+
 	// Filter tabs - clicking a tab filters, clicking again deselects (shows all)
-	const filterTabs: Array<{ key: HistoryActionType; label: string; activeColor: string }> = [
+	// Only show tabs that have at least one item in historyActions
+	const allFilterTabs: Array<{ key: HistoryActionType; label: string; activeColor: string }> = [
 		{ key: 'contacts', label: 'contacts', activeColor: '#FC9798' },
 		{ key: 'drafts', label: 'drafts', activeColor: '#FEDD90' },
 		{ key: 'sent', label: 'sent', activeColor: '#91DBAA' },
 		{ key: 'received', label: 'received', activeColor: '#94D2E9' },
 	];
+	
+	const filterTabs = allFilterTabs.filter((tab) => 
+		historyActions.some((action) => action.type === tab.key)
+	);
 
 	const handleTabClick = useCallback((key: HistoryActionType) => {
 		// If clicking the already-active filter, deselect it (show all)
@@ -179,7 +200,7 @@ export const BottomPanelsContainer: React.FC<BottomPanelsContainerProps> = ({
 							className="absolute z-50 overflow-hidden"
 							style={{
 								width: HISTORY_PANEL_WIDTH,
-								height: HISTORY_PANEL_HEIGHT,
+								height: dynamicPanelHeight,
 								borderRadius: 8,
 								border: '2px solid #000000',
 								backgroundColor: '#FFFFFF',
@@ -205,7 +226,7 @@ export const BottomPanelsContainer: React.FC<BottomPanelsContainerProps> = ({
 
 							{/* Filter Tabs - pink background */}
 							<div
-								className="flex items-center justify-around"
+								className="flex items-center justify-center gap-[16px]"
 								style={{
 									height: 25,
 									backgroundColor: '#D66296',
@@ -264,10 +285,14 @@ export const BottomPanelsContainer: React.FC<BottomPanelsContainerProps> = ({
 
 							{/* Action Rows */}
 							<div
-								className="overflow-y-auto overflow-x-hidden p-[5px] flex flex-col gap-[4px]"
+								className="overflow-y-auto overflow-x-hidden flex flex-col gap-[4px]"
 								style={{
-									height: HISTORY_PANEL_HEIGHT - 19 - 25,
+									height: dynamicPanelHeight - HEADER_HEIGHT - TABS_HEIGHT,
 									backgroundColor: '#D66296',
+									paddingTop: CONTENT_PADDING_TOP,
+									paddingLeft: 5,
+									paddingRight: 5,
+									paddingBottom: CONTENT_PADDING_BOTTOM,
 								}}
 								onClick={(e) => {
 									// Only reset if clicking directly on the container, not on a row
