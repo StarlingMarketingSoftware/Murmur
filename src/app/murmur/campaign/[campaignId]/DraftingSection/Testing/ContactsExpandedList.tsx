@@ -628,7 +628,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 				}
 
 				.murmur-actively-drafting {
-					background-color: #f5dada;
+					background-color: #FFA5A5;
 				}
 
 				.murmur-actively-drafting::after {
