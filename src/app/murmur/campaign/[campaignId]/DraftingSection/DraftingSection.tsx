@@ -249,6 +249,15 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		() => (draftOperations || []).map((op) => ({ current: op.progress, total: op.total })),
 		[draftOperations]
 	);
+	const activelyDraftingContactIds = useMemo(() => {
+		const ids = new Set<number>();
+		for (const op of draftOperations || []) {
+			for (const target of op.targets || []) {
+				ids.add(target.id);
+			}
+		}
+		return ids;
+	}, [draftOperations]);
 	const isDraftingProgressVisible =
 		renderGlobalOverlays && draftingOperationsForHeader.length > 0;
 	const draftingProgressForHeader = isDraftingProgressVisible
@@ -3248,6 +3257,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																campaign={campaign}
 																enableUsedContactTooltip={view === 'testing'}
 																selectedContactIds={contactsTabSelectedIds}
+																activelyDraftingContactIds={activelyDraftingContactIds}
 																onContactSelectionChange={(updater) =>
 																	setContactsTabSelectedIds((prev) =>
 																		updater(new Set(prev))
@@ -4219,6 +4229,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														campaign={campaign}
 														enableUsedContactTooltip={view === 'testing'}
 														selectedContactIds={contactsTabSelectedIds}
+														activelyDraftingContactIds={activelyDraftingContactIds}
 														onContactSelectionChange={(updater) =>
 															setContactsTabSelectedIds((prev) => updater(new Set(prev)))
 														}
@@ -4616,6 +4627,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													campaign={campaign}
 													enableUsedContactTooltip={view === 'testing'}
 													selectedContactIds={contactsTabSelectedIds}
+													activelyDraftingContactIds={activelyDraftingContactIds}
 													onContactSelectionChange={(updater) =>
 														setContactsTabSelectedIds((prev) => updater(new Set(prev)))
 													}
@@ -4990,7 +5002,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												>
 												<ContactsExpandedList
 													contacts={contactsAvailableForDrafting}
-												campaign={campaign}
+													campaign={campaign}
+													activelyDraftingContactIds={activelyDraftingContactIds}
 													width={232}
 													height={bottomPanelBoxHeightPx}
 													enableUsedContactTooltip={false}
@@ -5212,6 +5225,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												<ContactsExpandedList
 													contacts={contactsAvailableForDrafting}
 													campaign={campaign}
+													activelyDraftingContactIds={activelyDraftingContactIds}
 													width={232}
 													height={bottomPanelBoxHeightPx}
 													enableUsedContactTooltip={false}
@@ -5257,6 +5271,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										contacts={contactsAvailableForDrafting}
 										allContacts={contacts}
 										isDraftQueueActive={isDraftQueueActive}
+										activelyDraftingContactIds={activelyDraftingContactIds}
 										selectedContactIds={contactsTabSelectedIds}
 										setSelectedContactIds={setContactsTabSelectedIds}
 										handleContactSelection={handleContactsTabSelection}
@@ -5377,6 +5392,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													contacts={contactsAvailableForDrafting}
 													allContacts={contacts}
 													isDraftQueueActive={isDraftQueueActive}
+													activelyDraftingContactIds={activelyDraftingContactIds}
 													selectedContactIds={contactsTabSelectedIds}
 													setSelectedContactIds={setContactsTabSelectedIds}
 													handleContactSelection={handleContactsTabSelection}
@@ -5576,6 +5592,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											contacts={contactsAvailableForDrafting}
 											allContacts={contacts}
 											isDraftQueueActive={isDraftQueueActive}
+											activelyDraftingContactIds={activelyDraftingContactIds}
 											selectedContactIds={contactsTabSelectedIds}
 											setSelectedContactIds={setContactsTabSelectedIds}
 											handleContactSelection={handleContactsTabSelection}
@@ -5934,6 +5951,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											<ContactsExpandedList
 												contacts={contactsAvailableForDrafting}
 												campaign={campaign}
+												activelyDraftingContactIds={activelyDraftingContactIds}
 												width={232}
 												height={bottomPanelBoxHeightPx}
 												enableUsedContactTooltip={false}
@@ -6055,6 +6073,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												<ContactsExpandedList
 													contacts={contactsAvailableForDrafting}
 													campaign={campaign}
+													activelyDraftingContactIds={activelyDraftingContactIds}
 													width={232}
 													height={bottomPanelBoxHeightPx}
 													enableUsedContactTooltip={false}
@@ -7326,6 +7345,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											<ContactsExpandedList
 												contacts={contactsAvailableForDrafting}
 												campaign={campaign}
+												activelyDraftingContactIds={activelyDraftingContactIds}
 												width={232}
 												height={bottomPanelBoxHeightPx}
 												enableUsedContactTooltip={false}
@@ -7392,6 +7412,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												<ContactsExpandedList
 													contacts={contactsAvailableForDrafting}
 													campaign={campaign}
+													activelyDraftingContactIds={activelyDraftingContactIds}
 													width={232}
 													height={bottomPanelBoxHeightPx}
 													enableUsedContactTooltip={false}
@@ -7524,6 +7545,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													contacts={contactsAvailableForDrafting}
 													isLoading={isContactsLoading}
 													campaign={campaign}
+													activelyDraftingContactIds={activelyDraftingContactIds}
 													interactionMode="allTab"
 													selectedContactIds={contactsTabSelectedIds}
 													onContactSelectionChange={(updater) =>
@@ -8184,6 +8206,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													contacts={contactsAvailableForDrafting}
 													isLoading={isContactsLoading}
 													campaign={campaign}
+													activelyDraftingContactIds={activelyDraftingContactIds}
 													interactionMode="allTab"
 													selectedContactIds={contactsTabSelectedIds}
 													onContactSelectionChange={(updater) =>

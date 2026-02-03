@@ -134,6 +134,11 @@ export interface ContactsExpandedListProps {
 	 * mirror and update the passed-in selection instead of managing its own.
 	 */
 	selectedContactIds?: Set<number>;
+	/**
+	 * Optional set of contact IDs that are currently being drafted (queued/running).
+	 * These should not be treated as "selected" in the UI.
+	 */
+	activelyDraftingContactIds?: Set<number>;
 	onContactSelectionChange?: (updater: (prev: Set<number>) => Set<number>) => void;
 	width?: number | string;
 	height?: number | string;
@@ -168,6 +173,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 	onContactClick,
 	onContactHover,
 	selectedContactIds,
+	activelyDraftingContactIds,
 	onContactSelectionChange,
 	isLoading = false,
 	width,
@@ -345,12 +351,23 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 	const currentSelectedIds = selectedContactIds ?? internalSelectedContactIds;
 
 	const updateSelection = useCallback((updater: (prev: Set<number>) => Set<number>) => {
+		const apply = (prev: Set<number>) => {
+			const next = updater(new Set(prev));
+			// Never keep actively drafting contacts selected.
+			if (activelyDraftingContactIds && activelyDraftingContactIds.size > 0) {
+				for (const id of activelyDraftingContactIds) {
+					next.delete(id);
+				}
+			}
+			return next;
+		};
+
 		if (isControlled && onContactSelectionChange) {
-			onContactSelectionChange(updater);
+			onContactSelectionChange(apply);
 		} else {
-			setInternalSelectedContactIds((prev) => updater(new Set(prev)));
+			setInternalSelectedContactIds((prev) => apply(prev));
 		}
-	}, [isControlled, onContactSelectionChange]);
+	}, [activelyDraftingContactIds, isControlled, onContactSelectionChange]);
 
 	// Keyboard navigation: up/down arrows move hover between rows, Enter selects hovered contact
 	const handleKeyboardNavigation = useCallback((e: KeyboardEvent) => {
@@ -380,15 +397,18 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 		if (e.key === 'Enter') {
 			const contact = contacts[hoveredContactIndex];
 			if (contact) {
-				updateSelection((prev) => {
-					const next = new Set(prev);
-					if (next.has(contact.id)) {
-						next.delete(contact.id);
-					} else {
-						next.add(contact.id);
-					}
-					return next;
-				});
+				// Don't allow selecting contacts that are actively drafting.
+				if (!activelyDraftingContactIds?.has(contact.id)) {
+					updateSelection((prev) => {
+						const next = new Set(prev);
+						if (next.has(contact.id)) {
+							next.delete(contact.id);
+						} else {
+							next.add(contact.id);
+						}
+						return next;
+					});
+				}
 			}
 			return;
 		}
@@ -402,7 +422,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 		
 		setHoveredContactIndex(newIndex);
 		onContactHover?.(contacts[newIndex]);
-	}, [hoveredContactIndex, contacts, onContactHover, updateSelection]);
+	}, [hoveredContactIndex, contacts, onContactHover, updateSelection, activelyDraftingContactIds]);
 
 	useEffect(() => {
 		// Only add listener if we have a hovered contact
@@ -450,19 +470,36 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 		}
 	};
 
-	const allContactIds = useMemo(() => new Set(contacts.map((c) => c.id)), [contacts]);
+	const selectableContactIds = useMemo(() => {
+		const next = new Set<number>();
+		for (const c of contacts) {
+			if (activelyDraftingContactIds?.has(c.id)) continue;
+			next.add(c.id);
+		}
+		return next;
+	}, [activelyDraftingContactIds, contacts]);
+
+	const selectedCount = useMemo(() => {
+		if (!activelyDraftingContactIds || activelyDraftingContactIds.size === 0) {
+			return currentSelectedIds.size;
+		}
+		let count = 0;
+		for (const id of currentSelectedIds) {
+			if (!activelyDraftingContactIds.has(id)) count += 1;
+		}
+		return count;
+	}, [activelyDraftingContactIds, currentSelectedIds]);
+
 	const areAllSelected =
-		allContactIds.size > 0 &&
-		currentSelectedIds.size === allContactIds.size &&
-		Array.from(allContactIds).every((id) => currentSelectedIds.has(id));
+		selectableContactIds.size > 0 &&
+		selectedCount === selectableContactIds.size &&
+		Array.from(selectableContactIds).every((id) => currentSelectedIds.has(id));
 	const handleSelectAllToggle = useCallback(() => {
 		updateSelection(() => {
 			if (areAllSelected) return new Set();
-			return new Set(allContactIds);
+			return new Set(selectableContactIds);
 		});
-	}, [allContactIds, areAllSelected, updateSelection]);
-
-	const selectedCount = currentSelectedIds.size;
+	}, [areAllSelected, selectableContactIds, updateSelection]);
 	const shouldShowLoadingWave = isLoading && contacts.length === 0;
 	const loadingWaveDurationSeconds = 4.5;
 	// Match MapResultsPanelSkeleton step delay exactly for consistent "fluid" feel
@@ -873,7 +910,8 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 						const fullName =
 							contact.name ||
 							`${contact.firstName || ''} ${contact.lastName || ''}`.trim();
-						const isSelected = currentSelectedIds.has(contact.id);
+						const isActivelyDrafting = Boolean(activelyDraftingContactIds?.has(contact.id));
+						const isSelected = !isActivelyDrafting && currentSelectedIds.has(contact.id);
 						const isUsed = usedContactIdsSet.has(contact.id);
 						const isUsedContactHoverCardVisible =
 							enableUsedContactTooltip &&
@@ -885,14 +923,16 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 						const leftPadding = isUsed ? 'pl-[36px]' : 'pl-3';
 						// Keyboard focus shows hover UI independently of mouse hover
 						const isKeyboardFocused = hoveredContactIndex === contactIndex;
-						// Final background: selected > keyboard focus > white (mouse hover handled by CSS)
+						// Final background: actively drafting > selected > keyboard focus > white (mouse hover handled by CSS)
 						const contactBgColor = isAllTabNavigation
 							? 'bg-white'
-							: isSelected
-								? 'bg-[#EAAEAE]'
-								: isKeyboardFocused
-									? 'bg-[#F5DADA]'
-									: 'bg-white hover:bg-[#F5DADA]';
+							: isActivelyDrafting
+								? 'bg-[#F5DADA]'
+								: isSelected
+									? 'bg-[#EAAEAE]'
+									: isKeyboardFocused
+										? 'bg-[#F5DADA]'
+										: 'bg-white hover:bg-[#F5DADA]';
 						// Align the used-contact indicator with the top (Company) line in the standard (non-bottom) view.
 						// When the hover tooltip is visible, we center the tall pill so it stays inside the row.
 						const indicatorTop = isBottomView
@@ -929,7 +969,10 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 								}}
 								onClick={(e) => {
 									if (isAllTabNavigation) return;
-									handleContactClick(contact, e);
+									// Don't allow selecting contacts that are actively drafting.
+									if (!isActivelyDrafting) {
+										handleContactClick(contact, e);
+									}
 									onContactClick?.(contact);
 								}}
 							>

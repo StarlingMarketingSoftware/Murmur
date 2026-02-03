@@ -10,6 +10,11 @@ export interface ContactsSelectionProps {
 	 * Used to render animated placeholder rows instead of the empty-state message.
 	 */
 	isLoading?: boolean;
+	/**
+	 * Optional set of contact IDs that are currently being drafted (queued/running).
+	 * These should not be treated as "selected" in the UI.
+	 */
+	activelyDraftingContactIds?: Set<number>;
 	selectedContactIds: Set<number>;
 	setSelectedContactIds: Dispatch<SetStateAction<Set<number>>>;
 	handleContactSelection: (contactId: number, event?: React.MouseEvent) => void;

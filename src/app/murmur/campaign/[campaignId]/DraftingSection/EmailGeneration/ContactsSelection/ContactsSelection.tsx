@@ -943,6 +943,7 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 		onDraftEmails,
 		onContactClick,
 		onContactHover,
+		activelyDraftingContactIds,
 		onSearchFromMiniBar,
 		goToSearch,
 		goToDrafts,
@@ -1000,7 +1001,10 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 		if (e.key === 'Enter') {
 			const contact = contacts[hoveredContactIndex];
 			if (contact) {
-				handleContactSelection(contact.id);
+				// Don't allow selecting contacts that are actively drafting.
+				if (!activelyDraftingContactIds?.has(contact.id)) {
+					handleContactSelection(contact.id);
+				}
 				onContactClick?.(contact);
 			}
 			return;
@@ -1015,7 +1019,14 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 		
 		setHoveredContactIndex(newIndex);
 		onContactHover?.(contacts[newIndex]);
-	}, [hoveredContactIndex, contacts, onContactHover, handleContactSelection, onContactClick]);
+	}, [
+		hoveredContactIndex,
+		contacts,
+		onContactHover,
+		handleContactSelection,
+		onContactClick,
+		activelyDraftingContactIds,
+	]);
 
 	useEffect(() => {
 		// Only add listener if we have a hovered contact
@@ -1255,14 +1266,20 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 		[allContacts]
 	);
 
-	const selectedCount = selectedContactIds.size;
+	// Treat actively drafting contacts as NOT selected (for count + draft action).
+	const draftableSelectedContactIds = useMemo(() => {
+		const selectedIds = Array.from(selectedContactIds);
+		if (!activelyDraftingContactIds || activelyDraftingContactIds.size === 0) return selectedIds;
+		return selectedIds.filter((id) => !activelyDraftingContactIds.has(id));
+	}, [activelyDraftingContactIds, selectedContactIds]);
+	const selectedCount = draftableSelectedContactIds.length;
 
 	const handleDraftEmails = async () => {
-		if (!onDraftEmails || selectedContactIds.size === 0) return;
+		if (!onDraftEmails || selectedCount === 0) return;
 
 		setIsDrafting(true);
 		try {
-			await onDraftEmails(Array.from(selectedContactIds));
+			await onDraftEmails(draftableSelectedContactIds);
 		} finally {
 			setIsDrafting(false);
 		}
@@ -1270,7 +1287,7 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 
 	// Only disable if no contacts selected or currently drafting
 	// Don't use isDraftingDisabled here - let the drafting action handle validation
-	const isButtonDisabled = isDrafting || selectedContactIds.size === 0;
+	const isButtonDisabled = isDrafting || selectedCount === 0;
 
 	return (
 		<div className="flex flex-col items-center">
@@ -1443,6 +1460,7 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 						})()}
 					{contacts.map((contact, contactIndex) => {
 						const isUsedContact = usedContactIdsSet.has(contact.id);
+						const isActivelyDrafting = Boolean(activelyDraftingContactIds?.has(contact.id));
 						const isUsedContactHoverCardVisible =
 							hoveredUsedContactId === contact.id &&
 							Boolean(usedContactTooltipPos) &&
@@ -1451,8 +1469,11 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 						const mobileContactRowWidth = 'calc(100vw - 24px)';
 						// Keyboard focus shows hover UI independently of mouse hover
 						const isKeyboardFocused = hoveredContactIndex === contactIndex;
-						// Final background: selected > keyboard focus > white (mouse hover handled by CSS)
-						const contactBgColor = selectedContactIds.has(contact.id)
+						const isSelected = !isActivelyDrafting && selectedContactIds.has(contact.id);
+						// Final background: actively drafting > selected > keyboard focus > white (mouse hover handled by CSS)
+						const contactBgColor = isActivelyDrafting
+							? 'bg-[#F5DADA]'
+							: isSelected
 							? 'bg-[#EAAEAE]'
 							: isKeyboardFocused
 								? 'bg-[#F5DADA]'
@@ -1484,7 +1505,10 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 								onContactHover?.(contact);
 							}}
 							onClick={(e) => {
-								handleContactSelection(contact.id, e);
+								// Don't allow selecting contacts that are actively drafting.
+								if (!isActivelyDrafting) {
+									handleContactSelection(contact.id, e);
+								}
 								onContactClick?.(contact);
 							}}
 						>
