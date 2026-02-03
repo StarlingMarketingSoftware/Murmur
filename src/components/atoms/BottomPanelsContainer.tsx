@@ -216,7 +216,7 @@ export const BottomPanelsContainer: React.FC<BottomPanelsContainerProps> = ({
 									<button
 										key={tab.key}
 										type="button"
-										className={`text-[11px] font-inter transition-colors text-black text-center h-full ${
+										className={`text-[11px] font-inter text-black text-center h-full ${
 											activeFilter === tab.key
 												? 'font-semibold'
 												: 'font-normal'
@@ -226,6 +226,7 @@ export const BottomPanelsContainer: React.FC<BottomPanelsContainerProps> = ({
 											borderLeft: '2px solid transparent',
 											borderRight: '2px solid transparent',
 											transform: 'none',
+											transition: 'background-color 200ms ease-in-out, border-color 200ms ease-in-out',
 											...(activeFilter === tab.key
 												? {
 													backgroundColor: tab.activeColor,
@@ -236,9 +237,15 @@ export const BottomPanelsContainer: React.FC<BottomPanelsContainerProps> = ({
 										}}
 										onMouseEnter={(e) => {
 											if (activeFilter !== tab.key) {
-												e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.3)';
-												e.currentTarget.style.borderLeft = '2px solid rgba(0,0,0,0.3)';
-												e.currentTarget.style.borderRight = '2px solid rgba(0,0,0,0.3)';
+												if (tab.key === 'contacts') {
+													e.currentTarget.style.backgroundColor = '#EF8EA3';
+												} else if (tab.key === 'drafts') {
+													e.currentTarget.style.backgroundColor = '#ECD08D';
+												} else if (tab.key === 'sent') {
+													e.currentTarget.style.backgroundColor = '#9FD0AF';
+												} else if (tab.key === 'received') {
+													e.currentTarget.style.backgroundColor = '#92BFD0';
+												}
 											}
 										}}
 										onMouseLeave={(e) => {
@@ -278,7 +285,7 @@ export const BottomPanelsContainer: React.FC<BottomPanelsContainerProps> = ({
 											width: HISTORY_ROW_WIDTH,
 											height: HISTORY_ROW_HEIGHT,
 											borderRadius: 8,
-											backgroundColor: '#FDF2F8',
+											backgroundColor: '#FFFFFF',
 											border: '2px solid #000000',
 										}}
 									>
