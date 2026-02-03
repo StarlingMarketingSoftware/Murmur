@@ -43,6 +43,43 @@ const BADGE_COLORS: Record<HistoryActionType, string> = {
 	received: '#BBF7D0', // light green
 };
 
+// Row background gradient colors - from white (bottom/newest) to pink (top/oldest)
+const ROW_GRADIENT_COLORS = [
+	'#FFFFFF',
+	'#FFF6FA',
+	'#FFEBF4',
+	'#FFE1EE',
+	'#FFCBE2',
+	'#FFC3DE',
+	'#FFBEDB',
+	'#FFA5CD',
+];
+
+// Get row background color based on position
+// After 3 entries total, rows start getting gradient colors from bottom to top
+// Newest 3 rows (at bottom) stay white, older rows get progressively more pink
+const getRowBackgroundColor = (rowIndex: number, totalRows: number): string => {
+	if (totalRows <= 3) {
+		return '#FFFFFF';
+	}
+	
+	// Position from the bottom (0 = last row/newest, increasing = older)
+	const positionFromBottom = totalRows - 1 - rowIndex;
+	
+	if (positionFromBottom < 3) {
+		// Newest 3 rows stay white
+		return '#FFFFFF';
+	}
+	
+	// How far above the white zone this row is (0 = just above, increasing = older/higher)
+	const positionAboveWhiteZone = positionFromBottom - 3;
+	
+	// Get color - higher position (older) gets more pink
+	const colorIndex = Math.min(positionAboveWhiteZone, ROW_GRADIENT_COLORS.length - 1);
+	
+	return ROW_GRADIENT_COLORS[colorIndex];
+};
+
 // Interpolate between two hex colors
 const interpolateColor = (color1: string, color2: string, factor: number): string => {
 	const hex1 = color1.replace('#', '');
@@ -393,7 +430,7 @@ export const BottomPanelsContainer: React.FC<BottomPanelsContainerProps> = ({
 								}}
 							>
 								{/* Render action rows */}
-								{filteredActions.map((action) => (
+								{filteredActions.map((action, index) => (
 									<div
 										key={action.id}
 										className="flex items-center justify-between px-3 shrink-0"
@@ -401,7 +438,7 @@ export const BottomPanelsContainer: React.FC<BottomPanelsContainerProps> = ({
 											width: HISTORY_ROW_WIDTH,
 											height: HISTORY_ROW_HEIGHT,
 											borderRadius: 8,
-											backgroundColor: '#FFFFFF',
+											backgroundColor: getRowBackgroundColor(index, filteredActions.length),
 											border: '2px solid #000000',
 										}}
 									>
