@@ -22,6 +22,11 @@ export interface ContactsSelectionProps {
 	onDraftEmails?: (contactIds: number[]) => Promise<void>;
 	isDraftingDisabled?: boolean;
 	/**
+	 * When true, drafting operations are currently running/queued.
+	 * Used to show "Add Emails to Queue" on the draft button.
+	 */
+	isDraftQueueActive?: boolean;
+	/**
 	 * Optional callback for when the search bar triggers a search.
 	 * When provided, this overrides the default dashboard navigation behavior.
 	 */

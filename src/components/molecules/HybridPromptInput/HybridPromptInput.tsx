@@ -8044,98 +8044,104 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 											: 'w-[475px]'
 								)}
 							>
-								{!isPendingGeneration && (
-									<>
-										{draftCount > 0 || isAllContactsSelected ? (
-											// Animated draft button with expanding "All" state
-											<button
-												type="button"
-												onClick={() => {
-													if (!isDraftDisabled) {
-														onDraftClick?.();
-													}
-												}}
-												disabled={isDraftDisabled}
+								<>
+									{draftCount > 0 || isAllContactsSelected ? (
+										// Animated draft button with expanding "All" state
+										<button
+											type="button"
+											onClick={() => {
+												if (!isDraftDisabled) {
+													onDraftClick?.();
+												}
+											}}
+											disabled={isDraftDisabled}
+											className={cn(
+												'w-full h-full rounded-[4px] border-[3px] text-black font-inter font-normal text-[17px] relative overflow-hidden transition-colors',
+												isAllContactsSelected ? 'duration-300' : 'duration-0',
+												isDraftDisabled
+													? 'bg-[#E0E0E0] border-[#A0A0A0] cursor-not-allowed opacity-60'
+													: isAllContactsSelected
+														? 'bg-[#4DC669] border-black hover:bg-[#45B85F] cursor-pointer'
+														: 'bg-[#C7F2C9] border-[#349A37] hover:bg-[#B9E7BC] cursor-pointer'
+											)}
+										>
+											{/* Normal text - fades out when All selected */}
+											<span
 												className={cn(
-													'w-full h-full rounded-[4px] border-[3px] text-black font-inter font-normal text-[17px] relative overflow-hidden transition-colors',
-													isAllContactsSelected ? 'duration-300' : 'duration-0',
-													isDraftDisabled
-														? 'bg-[#E0E0E0] border-[#A0A0A0] cursor-not-allowed opacity-60'
-														: isAllContactsSelected
-															? 'bg-[#4DC669] border-black hover:bg-[#45B85F] cursor-pointer'
-															: 'bg-[#C7F2C9] border-[#349A37] hover:bg-[#B9E7BC] cursor-pointer'
+													'transition-opacity',
+													isAllContactsSelected
+														? 'duration-300 opacity-0'
+														: 'duration-0 opacity-100'
 												)}
 											>
-												{/* Normal text - fades out when All selected */}
-												<span
-													className={cn(
-														'transition-opacity',
-														isAllContactsSelected
-															? 'duration-300 opacity-0'
-															: 'duration-0 opacity-100'
-													)}
-												>
-													Draft {draftCount} {draftCount === 1 ? 'Contact' : 'Contacts'}
-												</span>
-												{/* "All" text - fades in when All selected */}
-												<span
-													className={cn(
-														'absolute inset-0 flex items-center justify-center transition-opacity',
-														isAllContactsSelected
-															? 'duration-300 opacity-100'
-															: 'duration-0 opacity-0'
-													)}
-												>
-													Draft <span className="font-bold mx-1">All</span> {totalContactCount}{' '}
-													Contacts
-												</span>
-												{/* Expanding green overlay from right - animates width */}
-												<div
-													className={cn(
-														'absolute top-0 bottom-0 right-0 bg-[#4DC669] ease-out',
-														isAllContactsSelected
-															? 'w-full rounded-[1px] transition-all duration-300'
-															: 'w-[62px] rounded-r-[1px] transition-none'
-													)}
-													style={{
-														opacity: isAllContactsSelected ? 0 : 1,
-													}}
-												/>
-											</button>
-										) : (
-											<div className="relative w-full h-full rounded-[4px] border-[3px] border-transparent overflow-hidden transition-colors group-hover:bg-[#EEF5EF] group-hover:border-black">
-												<div className="w-full h-full flex items-center justify-center text-black font-inter font-normal text-[17px] cursor-default">
-													Select Contacts and Draft Emails
-												</div>
-												<button
-													type="button"
-													aria-label="Select all contacts"
-													className="absolute right-0 top-0 bottom-0 w-[62px] bg-[#74D178] rounded-r-[1px] flex items-center justify-center font-inter font-normal text-[17px] text-black hover:bg-[#65C269] cursor-pointer z-10 opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto"
-													onClick={() => {
-														onSelectAllContacts?.();
-													}}
-												>
-													<div className="absolute left-0 top-0 bottom-0 w-[3px] bg-black" />
-													All
-												</button>
+												{isPendingGeneration
+													? 'Add Emails to Queue'
+													: `Draft ${draftCount} ${draftCount === 1 ? 'Contact' : 'Contacts'}`}
+											</span>
+											{/* "All" text - fades in when All selected */}
+											<span
+												className={cn(
+													'absolute inset-0 flex items-center justify-center transition-opacity',
+													isAllContactsSelected
+														? 'duration-300 opacity-100'
+														: 'duration-0 opacity-0'
+												)}
+											>
+												{isPendingGeneration ? (
+													'Add Emails to Queue'
+												) : (
+													<>
+														Draft <span className="font-bold mx-1">All</span> {totalContactCount}{' '}
+														Contacts
+													</>
+												)}
+											</span>
+											{/* Expanding green overlay from right - animates width */}
+											<div
+												className={cn(
+													'absolute top-0 bottom-0 right-0 bg-[#4DC669] ease-out',
+													isAllContactsSelected
+														? 'w-full rounded-[1px] transition-all duration-300'
+														: 'w-[62px] rounded-r-[1px] transition-none'
+												)}
+												style={{
+													opacity: isAllContactsSelected ? 0 : 1,
+												}}
+											/>
+										</button>
+									) : (
+										<div className="relative w-full h-full rounded-[4px] border-[3px] border-transparent overflow-hidden transition-colors group-hover:bg-[#EEF5EF] group-hover:border-black">
+											<div className="w-full h-full flex items-center justify-center text-black font-inter font-normal text-[17px] cursor-default">
+												Select Contacts and Draft Emails
 											</div>
-										)}
-										{/* "All" button overlay - only visible when not all selected */}
-										{(draftCount > 0 || isAllContactsSelected) && !isAllContactsSelected && (
 											<button
 												type="button"
-												data-hover-description="Select all contacts"
-												className="absolute right-[3px] top-[3px] bottom-[3px] w-[62px] bg-[#74D178] rounded-r-[1px] flex items-center justify-center font-inter font-normal text-[17px] text-black hover:bg-[#65C269] cursor-pointer border-0 border-l-[2px] border-[#349A37] z-10"
-												onClick={(e) => {
-													e.stopPropagation();
+												aria-label="Select all contacts"
+												className="absolute right-0 top-0 bottom-0 w-[62px] bg-[#74D178] rounded-r-[1px] flex items-center justify-center font-inter font-normal text-[17px] text-black hover:bg-[#65C269] cursor-pointer z-10 opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto"
+												onClick={() => {
 													onSelectAllContacts?.();
 												}}
 											>
+												<div className="absolute left-0 top-0 bottom-0 w-[3px] bg-black" />
 												All
 											</button>
-										)}
-									</>
-								)}
+										</div>
+									)}
+									{/* "All" button overlay - only visible when not all selected */}
+									{(draftCount > 0 || isAllContactsSelected) && !isAllContactsSelected && (
+										<button
+											type="button"
+											data-hover-description="Select all contacts"
+											className="absolute right-[3px] top-[3px] bottom-[3px] w-[62px] bg-[#74D178] rounded-r-[1px] flex items-center justify-center font-inter font-normal text-[17px] text-black hover:bg-[#65C269] cursor-pointer border-0 border-l-[2px] border-[#349A37] z-10"
+											onClick={(e) => {
+												e.stopPropagation();
+												onSelectAllContacts?.();
+											}}
+										>
+											All
+										</button>
+									)}
+								</>
 							</div>
 						)}
 					</DraggableBox>

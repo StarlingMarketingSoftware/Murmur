@@ -956,6 +956,7 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 		mainBoxId,
 		showSearchBar = true,
 		isLoading = false,
+		isDraftQueueActive = false,
 		isAllContactsSelected,
 		onSelectAllContacts,
 		historyActions,
@@ -1829,7 +1830,7 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 
 			{/* Draft Emails Button - below the table box */}
 			<div className="w-[475px] h-[40px] mt-4 mx-auto">
-				{!isDrafting && !hideButton && (
+				{!hideButton && (
 					<div data-draft-button-container className="group relative w-full h-full">
 						{selectedCount > 0 || isAllContactsSelected ? (
 							// Animated draft button with expanding "All" state
@@ -1854,14 +1855,9 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 										isAllContactsSelected ? 'duration-300 opacity-0' : 'duration-0 opacity-100'
 									)}
 								>
-									{isDrafting ? (
-										<>
-											<div className="animate-spin rounded-full h-4 w-4 border-2 border-black border-t-transparent inline-block mr-2" />
-											Drafting...
-										</>
-									) : (
-										`Draft ${selectedCount} ${selectedCount === 1 ? 'Contact' : 'Contacts'}`
-									)}
+									{isDraftQueueActive
+										? 'Add Emails to Queue'
+										: `Draft ${selectedCount} ${selectedCount === 1 ? 'Contact' : 'Contacts'}`}
 								</span>
 								{/* "All" text - fades in when All selected */}
 								<span
@@ -1870,7 +1866,13 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 										isAllContactsSelected ? 'duration-300 opacity-100' : 'duration-0 opacity-0'
 									)}
 								>
-									Draft <span className="font-bold mx-1">All</span> {contacts.length} Contacts
+									{isDraftQueueActive ? (
+										'Add Emails to Queue'
+									) : (
+										<>
+											Draft <span className="font-bold mx-1">All</span> {contacts.length} Contacts
+										</>
+									)}
 								</span>
 								{/* Expanding green overlay from right */}
 								<div

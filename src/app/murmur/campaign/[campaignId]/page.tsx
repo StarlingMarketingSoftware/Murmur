@@ -1201,11 +1201,10 @@ const Murmur = () => {
 	useLayoutEffect(() => {
 		refreshCampaignZoomAnchorObserversRef.current?.();
 	}, [activeView]);
-	const [livePreviewProgress, setLivePreviewProgress] = useState<{
+	const [draftOperationsProgress, setDraftOperationsProgress] = useState<{
 		visible: boolean;
-		current: number;
-		total: number;
-	}>({ visible: false, current: 0, total: 0 });
+		operations: Array<{ current: number; total: number }>;
+	}>({ visible: false, operations: [] });
 	const getInitialInboxSentTab = (): InboxSentTab => {
 		if (tabParam === 'sent') return 'sent';
 		return 'inbox';
@@ -2900,9 +2899,9 @@ const Murmur = () => {
 								draftCount={headerDraftCount}
 								sentCount={headerSentCount}
 								draftingProgress={
-									livePreviewProgress.visible
-										? { current: livePreviewProgress.current, total: livePreviewProgress.total }
-										: null
+										draftOperationsProgress.visible
+											? draftOperationsProgress.operations
+											: null
 								}
 								onFromClick={() => {
 									setIdentityDialogOrigin('campaign');
@@ -3033,7 +3032,7 @@ const Murmur = () => {
 												view={activeView}
 												renderGlobalOverlays
 												onViewReady={handleActiveViewReady}
-												onLivePreviewProgress={setLivePreviewProgress}
+												onDraftOperationsProgress={setDraftOperationsProgress}
 												autoOpenProfileTabWhenIncomplete={cameFromSearch}
 												inboxSentTabRequest={inboxSentTabRequest}
 												onInboxSentTabChange={setInboxSentTab}

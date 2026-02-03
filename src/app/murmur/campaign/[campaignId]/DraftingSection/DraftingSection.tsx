@@ -89,7 +89,8 @@ import {
 import { Contact, Identity } from '@prisma/client';
 import LeftArrow from '@/components/atoms/_svg/LeftArrow';
 import RightArrow from '@/components/atoms/_svg/RightArrow';
-import { BottomPanelsContainer, type HistoryAction } from '@/components/atoms/BottomPanelsContainer';
+import { BottomPanelsContainer } from '../../../../../components/atoms/BottomPanelsContainer';
+import type { HistoryAction } from '../../../../../components/atoms/BottomPanelsContainer';
 import { useGetInboundEmails } from '@/hooks/queryHooks/useInboundEmails';
 import { useGetCampaignContactEvents } from '@/hooks/queryHooks/useCampaigns';
 import { isRestaurantTitle, isCoffeeShopTitle, isMusicVenueTitle, isMusicFestivalTitle, isWeddingPlannerTitle, isWeddingVenueTitle, isWineBeerSpiritsTitle, getWineBeerSpiritsLabel } from '@/utils/restaurantTitle';
@@ -143,7 +144,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		goToPreviousTab,
 		goToNextTab,
 		hideHeaderBox,
-		onLivePreviewProgress,
+		onDraftOperationsProgress,
 		isTransitioningOut,
 		isTransitioningIn,
 	} = props;
@@ -170,6 +171,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		isGenerationDisabled,
 		isOpenUpgradeSubscriptionDrawer,
 		isPendingGeneration,
+		isDraftQueueActive,
 		isTest,
 		isUpscalingPrompt,
 		upscalePrompt,
@@ -188,11 +190,11 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		// scrollToEmailStructure,
 		draftingRef,
 		emailStructureRef,
+		draftOperations,
 		isLivePreviewVisible,
 		livePreviewContactId,
 		livePreviewMessage,
 		livePreviewSubject,
-		livePreviewDraftNumber,
 		livePreviewTotal,
 	} = useDraftingSection(props);
 
@@ -243,34 +245,36 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const isDraftingView = view === 'drafting';
 	const isSentView = view === 'sent';
 
+	const draftingOperationsForHeader = useMemo(
+		() => (draftOperations || []).map((op) => ({ current: op.progress, total: op.total })),
+		[draftOperations]
+	);
 	const isDraftingProgressVisible =
-		renderGlobalOverlays && isLivePreviewVisible && livePreviewTotal > 0;
+		renderGlobalOverlays && draftingOperationsForHeader.length > 0;
 	const draftingProgressForHeader = isDraftingProgressVisible
-		? { current: livePreviewDraftNumber, total: livePreviewTotal }
+		? draftingOperationsForHeader
 		: null;
 
 	// Report live drafting progress upward for page-level header rendering (narrowest breakpoint).
 	useEffect(() => {
 		if (!renderGlobalOverlays) return;
-		onLivePreviewProgress?.({
+		onDraftOperationsProgress?.({
 			visible: isDraftingProgressVisible,
-			current: livePreviewDraftNumber,
-			total: livePreviewTotal,
+			operations: draftingOperationsForHeader,
 		});
 	}, [
-		onLivePreviewProgress,
+		onDraftOperationsProgress,
 		renderGlobalOverlays,
 		isDraftingProgressVisible,
-		livePreviewDraftNumber,
-		livePreviewTotal,
+		draftingOperationsForHeader,
 	]);
 
 	// Ensure we clear state on unmount.
 	useEffect(() => {
 		return () => {
-			onLivePreviewProgress?.({ visible: false, current: 0, total: 0 });
+			onDraftOperationsProgress?.({ visible: false, operations: [] });
 		};
-	}, [onLivePreviewProgress]);
+	}, [onDraftOperationsProgress]);
 	const [selectedDraft, setSelectedDraft] = useState<EmailWithRelations | null>(null);
 	// Ref to the main DraftedEmails instance (center column) so side preview controls can exit regen mode.
 	const draftedEmailsRef = useRef<DraftedEmailsHandle | null>(null);
@@ -3255,7 +3259,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																	await handleGenerateDrafts(ids);
 																}}
 																isDraftDisabled={
-																	isGenerationDisabled() || isPendingGeneration
+																	isGenerationDisabled()
 																}
 																isPendingGeneration={isPendingGeneration}
 																width={375}
@@ -3297,7 +3301,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																)
 															}
 															isDraftDisabled={
-																isGenerationDisabled() || isPendingGeneration
+																isGenerationDisabled()
 															}
 															isPendingGeneration={isPendingGeneration}
 															generationProgress={generationProgress}
@@ -3778,7 +3782,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														contactsAvailableForDrafting.map((c) => c.id)
 													)
 												}
-												isDraftDisabled={isGenerationDisabled() || isPendingGeneration}
+												isDraftDisabled={isGenerationDisabled()}
 												isPendingGeneration={isPendingGeneration}
 												generationProgress={generationProgress}
 												generationTotal={contactsAvailableForDrafting.length}
@@ -4223,7 +4227,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														onDraftSelected={async (ids) => {
 															await handleGenerateDrafts(ids);
 														}}
-														isDraftDisabled={isGenerationDisabled() || isPendingGeneration}
+														isDraftDisabled={isGenerationDisabled()}
 														isPendingGeneration={isPendingGeneration}
 														width={330}
 														height={263}
@@ -4279,7 +4283,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														);
 													}}
 													isDraftDisabled={
-														isPendingGeneration || contactsTabSelectedIds.size === 0
+														contactsTabSelectedIds.size === 0
 													}
 													onSelectAllContacts={handleSelectAllContacts}
 													isAllContactsSelected={areAllContactsSelected}
@@ -4304,8 +4308,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										</div>
 										{/* Draft button with arrows - spans full width below both columns */}
 										<div className="mt-4 w-full">
-											{!isPendingGeneration ? (
-												<div className="flex items-center justify-center gap-[29px] w-full">
+											<div className="flex items-center justify-center gap-[29px] w-full">
 													{/* Left arrow */}
 													<button
 														type="button"
@@ -4335,10 +4338,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																		Array.from(contactsTabSelectedIds.values())
 																	);
 																}}
-																disabled={isPendingGeneration || contactsTabSelectedIds.size === 0}
+																disabled={contactsTabSelectedIds.size === 0}
 																className={cn(
 																	'w-full h-full rounded-[4px] border-[3px] text-black font-inter font-normal text-[17px] relative overflow-hidden transition-colors duration-300',
-																	isPendingGeneration || contactsTabSelectedIds.size === 0
+																	contactsTabSelectedIds.size === 0
 																		? 'bg-[#E0E0E0] border-[#A0A0A0] cursor-not-allowed opacity-60'
 																		: areAllContactsSelected
 																			? 'bg-[#4DC669] border-black hover:bg-[#45B85F] cursor-pointer'
@@ -4352,8 +4355,11 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																		areAllContactsSelected ? 'opacity-0' : 'opacity-100'
 																	)}
 																>
-																	Draft {contactsTabSelectedIds.size}{' '}
-																	{contactsTabSelectedIds.size === 1 ? 'Contact' : 'Contacts'}
+																	{isDraftQueueActive
+																		? 'Add Emails to Queue'
+																		: `Draft ${contactsTabSelectedIds.size} ${
+																				contactsTabSelectedIds.size === 1 ? 'Contact' : 'Contacts'
+																		  }`}
 																</span>
 																{/* "All" text - fades in when All selected */}
 																<span
@@ -4362,8 +4368,14 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																		areAllContactsSelected ? 'opacity-100' : 'opacity-0'
 																	)}
 																>
-																	Draft <span className="font-bold mx-1">All</span>{' '}
-																	{contactsAvailableForDrafting.length} Contacts
+																	{isDraftQueueActive ? (
+																		'Add Emails to Queue'
+																	) : (
+																		<>
+																			Draft <span className="font-bold mx-1">All</span>{' '}
+																			{contactsAvailableForDrafting.length} Contacts
+																		</>
+																	)}
 																</span>
 																{/* Expanding green overlay from right */}
 																<div
@@ -4418,10 +4430,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													>
 														<RightArrow width="20" height="39" />
 													</button>
-												</div>
-											) : (
-												<div className="h-[40px]" />
-											)}
+											</div>
 										</div>
 									</div>
 								) : (
@@ -4450,7 +4459,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												);
 											}}
 											isDraftDisabled={
-												isPendingGeneration || contactsTabSelectedIds.size === 0
+												contactsTabSelectedIds.size === 0
 											}
 											onSelectAllContacts={handleSelectAllContacts}
 											isAllContactsSelected={areAllContactsSelected}
@@ -4475,8 +4484,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										{/* Draft button with arrows at narrowest breakpoint */}
 										{isNarrowestDesktop && (
 											<div className="mt-4 w-full">
-												{!isPendingGeneration ? (
-													<div className="flex items-center justify-center gap-[20px] w-full">
+												<div className="flex items-center justify-center gap-[20px] w-full">
 														{/* Left arrow */}
 														<button
 															type="button"
@@ -4504,10 +4512,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																			Array.from(contactsTabSelectedIds.values())
 																		);
 																	}}
-																	disabled={isPendingGeneration || contactsTabSelectedIds.size === 0}
+																	disabled={contactsTabSelectedIds.size === 0}
 																	className={cn(
 																		'w-full h-full rounded-[4px] border-[3px] text-black font-inter font-normal text-[17px] relative overflow-hidden transition-colors duration-300',
-																		isPendingGeneration || contactsTabSelectedIds.size === 0
+																		contactsTabSelectedIds.size === 0
 																			? 'bg-[#E0E0E0] border-[#A0A0A0] cursor-not-allowed opacity-60'
 																			: areAllContactsSelected
 																				? 'bg-[#4DC669] border-black hover:bg-[#45B85F] cursor-pointer'
@@ -4521,8 +4529,11 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																			areAllContactsSelected ? 'opacity-0' : 'opacity-100'
 																		)}
 																	>
-																		Draft {contactsTabSelectedIds.size}{' '}
-																		{contactsTabSelectedIds.size === 1 ? 'Contact' : 'Contacts'}
+																		{isDraftQueueActive
+																			? 'Add Emails to Queue'
+																			: `Draft ${contactsTabSelectedIds.size} ${
+																					contactsTabSelectedIds.size === 1 ? 'Contact' : 'Contacts'
+																			  }`}
 																	</span>
 																	{/* "All" text - fades in when All selected */}
 																	<span
@@ -4531,8 +4542,14 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																			areAllContactsSelected ? 'opacity-100' : 'opacity-0'
 																		)}
 																	>
-																		Draft <span className="font-bold mx-1">All</span>{' '}
-																		{contactsAvailableForDrafting.length} Contacts
+																		{isDraftQueueActive ? (
+																			'Add Emails to Queue'
+																		) : (
+																			<>
+																				Draft <span className="font-bold mx-1">All</span>{' '}
+																				{contactsAvailableForDrafting.length} Contacts
+																			</>
+																		)}
 																	</span>
 																	{/* Expanding green overlay from right */}
 																	<div
@@ -4587,10 +4604,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														>
 															<RightArrow width="20" height="39" />
 														</button>
-													</div>
-												) : (
-													<div className="h-[40px]" />
-												)}
+												</div>
 											</div>
 										)}
 										{/* Contacts table below writing box at narrowest breakpoint */}
@@ -4610,7 +4624,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													onDraftSelected={async (ids) => {
 														await handleGenerateDrafts(ids);
 													}}
-													isDraftDisabled={isGenerationDisabled() || isPendingGeneration}
+													isDraftDisabled={isGenerationDisabled()}
 													width={489}
 													height={349}
 													minRows={5}
@@ -4809,7 +4823,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																	contactsAvailableForDrafting.map((c) => c.id)
 																)
 															}
-															isDraftDisabled={isGenerationDisabled() || isPendingGeneration}
+															isDraftDisabled={isGenerationDisabled()}
 															isPendingGeneration={isPendingGeneration}
 															generationProgress={generationProgress}
 															generationTotal={contactsAvailableForDrafting.length}
@@ -5167,7 +5181,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																contactsAvailableForDrafting.map((c) => c.id)
 															)
 														}
-														isDraftDisabled={isGenerationDisabled() || isPendingGeneration}
+														isDraftDisabled={isGenerationDisabled()}
 														isPendingGeneration={isPendingGeneration}
 														generationProgress={generationProgress}
 														generationTotal={contactsAvailableForDrafting.length}
@@ -5242,6 +5256,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										isLoading={isContactsLoading}
 										contacts={contactsAvailableForDrafting}
 										allContacts={contacts}
+										isDraftQueueActive={isDraftQueueActive}
 										selectedContactIds={contactsTabSelectedIds}
 										setSelectedContactIds={setContactsTabSelectedIds}
 										handleContactSelection={handleContactsTabSelection}
@@ -5252,7 +5267,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										onDraftEmails={async (ids) => {
 											await handleGenerateDrafts(ids);
 										}}
-										isDraftingDisabled={isGenerationDisabled() || isPendingGeneration}
+										isDraftingDisabled={isGenerationDisabled()}
 										onContactClick={handleResearchContactClick}
 										onContactHover={handleResearchContactHover}
 										onSearchFromMiniBar={handleMiniContactsSearch}
@@ -5315,7 +5330,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																contactsAvailableForDrafting.map((c) => c.id)
 															)
 														}
-														isDraftDisabled={isGenerationDisabled() || isPendingGeneration}
+														isDraftDisabled={isGenerationDisabled()}
 														isPendingGeneration={isPendingGeneration}
 														generationProgress={generationProgress}
 														generationTotal={contactsAvailableForDrafting.length}
@@ -5361,6 +5376,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													isLoading={isContactsLoading}
 													contacts={contactsAvailableForDrafting}
 													allContacts={contacts}
+													isDraftQueueActive={isDraftQueueActive}
 													selectedContactIds={contactsTabSelectedIds}
 													setSelectedContactIds={setContactsTabSelectedIds}
 													handleContactSelection={handleContactsTabSelection}
@@ -5371,7 +5387,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													onDraftEmails={async (ids) => {
 														await handleGenerateDrafts(ids);
 													}}
-													isDraftingDisabled={isGenerationDisabled() || isPendingGeneration}
+													isDraftingDisabled={isGenerationDisabled()}
 													onContactClick={handleResearchContactClick}
 													onContactHover={handleResearchContactHover}
 													onSearchFromMiniBar={handleMiniContactsSearch}
@@ -5418,10 +5434,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																Array.from(contactsTabSelectedIds.values())
 															);
 														}}
-														disabled={isPendingGeneration || contactsTabSelectedIds.size === 0}
+														disabled={contactsTabSelectedIds.size === 0}
 														className={cn(
 															'w-full h-full rounded-[4px] border-[3px] text-black font-inter font-normal text-[17px] relative overflow-hidden transition-colors duration-300',
-															isPendingGeneration || contactsTabSelectedIds.size === 0
+															contactsTabSelectedIds.size === 0
 																? 'bg-[#E0E0E0] border-[#A0A0A0] cursor-not-allowed opacity-60'
 																: areAllContactsSelected
 																	? 'bg-[#4DC669] border-black hover:bg-[#45B85F] cursor-pointer'
@@ -5435,7 +5451,11 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																areAllContactsSelected ? 'opacity-0' : 'opacity-100'
 															)}
 														>
-															Draft {contactsTabSelectedIds.size} {contactsTabSelectedIds.size === 1 ? 'Contact' : 'Contacts'}
+															{isDraftQueueActive
+																? 'Add Emails to Queue'
+																: `Draft ${contactsTabSelectedIds.size} ${
+																		contactsTabSelectedIds.size === 1 ? 'Contact' : 'Contacts'
+																  }`}
 														</span>
 														{/* "All" text - fades in when All selected */}
 														<span
@@ -5444,7 +5464,14 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																areAllContactsSelected ? 'opacity-100' : 'opacity-0'
 															)}
 														>
-															Draft <span className="font-bold mx-1">All</span> {contactsAvailableForDrafting.length} Contacts
+															{isDraftQueueActive ? (
+																'Add Emails to Queue'
+															) : (
+																<>
+																	Draft <span className="font-bold mx-1">All</span>{' '}
+																	{contactsAvailableForDrafting.length} Contacts
+																</>
+															)}
 														</span>
 														{/* Expanding green overlay from right */}
 														<div
@@ -5548,6 +5575,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											isLoading={isContactsLoading}
 											contacts={contactsAvailableForDrafting}
 											allContacts={contacts}
+											isDraftQueueActive={isDraftQueueActive}
 											selectedContactIds={contactsTabSelectedIds}
 											setSelectedContactIds={setContactsTabSelectedIds}
 											handleContactSelection={handleContactsTabSelection}
@@ -5558,7 +5586,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											onDraftEmails={async (ids) => {
 												await handleGenerateDrafts(ids);
 											}}
-											isDraftingDisabled={isGenerationDisabled() || isPendingGeneration}
+											isDraftingDisabled={isGenerationDisabled()}
 											onContactClick={handleResearchContactClick}
 											onContactHover={handleResearchContactHover}
 											onSearchFromMiniBar={handleMiniContactsSearch}
@@ -5605,10 +5633,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																	Array.from(contactsTabSelectedIds.values())
 																);
 															}}
-															disabled={isPendingGeneration || contactsTabSelectedIds.size === 0}
+															disabled={contactsTabSelectedIds.size === 0}
 															className={cn(
 																'w-full h-full rounded-[4px] border-[3px] text-black font-inter font-normal text-[15px] relative overflow-hidden transition-colors duration-300',
-																isPendingGeneration || contactsTabSelectedIds.size === 0
+																contactsTabSelectedIds.size === 0
 																	? 'bg-[#E0E0E0] border-[#A0A0A0] cursor-not-allowed opacity-60'
 																	: areAllContactsSelected
 																		? 'bg-[#4DC669] border-black hover:bg-[#45B85F] cursor-pointer'
@@ -5622,7 +5650,11 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																	areAllContactsSelected ? 'opacity-0' : 'opacity-100'
 																)}
 															>
-																Draft {contactsTabSelectedIds.size} {contactsTabSelectedIds.size === 1 ? 'Contact' : 'Contacts'}
+																{isDraftQueueActive
+																	? 'Add Emails to Queue'
+																	: `Draft ${contactsTabSelectedIds.size} ${
+																			contactsTabSelectedIds.size === 1 ? 'Contact' : 'Contacts'
+																	  }`}
 															</span>
 															{/* "All" text - fades in when All selected */}
 															<span
@@ -5631,7 +5663,14 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																	areAllContactsSelected ? 'opacity-100' : 'opacity-0'
 																)}
 															>
-																Draft <span className="font-bold mx-1">All</span> {contactsAvailableForDrafting.length} Contacts
+																{isDraftQueueActive ? (
+																	'Add Emails to Queue'
+																) : (
+																	<>
+																		Draft <span className="font-bold mx-1">All</span>{' '}
+																		{contactsAvailableForDrafting.length} Contacts
+																	</>
+																)}
 															</span>
 															{/* Expanding green overlay from right */}
 															<div
@@ -5743,7 +5782,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																contactsAvailableForDrafting.map((c) => c.id)
 															)
 														}
-														isDraftDisabled={isGenerationDisabled() || isPendingGeneration}
+														isDraftDisabled={isGenerationDisabled()}
 														isPendingGeneration={isPendingGeneration}
 														generationProgress={generationProgress}
 														generationTotal={contactsAvailableForDrafting.length}
@@ -5829,7 +5868,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																contactsAvailableForDrafting.map((c) => c.id)
 															)
 														}
-														isDraftDisabled={isGenerationDisabled() || isPendingGeneration}
+														isDraftDisabled={isGenerationDisabled()}
 														isPendingGeneration={isPendingGeneration}
 														generationProgress={generationProgress}
 														generationTotal={contactsAvailableForDrafting.length}
@@ -5993,7 +6032,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																contactsAvailableForDrafting.map((c) => c.id)
 															)
 														}
-														isDraftDisabled={isGenerationDisabled() || isPendingGeneration}
+														isDraftDisabled={isGenerationDisabled()}
 														isPendingGeneration={isPendingGeneration}
 														generationProgress={generationProgress}
 														generationTotal={contactsAvailableForDrafting.length}
@@ -7495,7 +7534,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													onDraftSelected={async (ids) => {
 														await handleGenerateDrafts(ids);
 													}}
-													isDraftDisabled={isGenerationDisabled() || isPendingGeneration}
+													isDraftDisabled={isGenerationDisabled()}
 													isPendingGeneration={isPendingGeneration}
 													width={330}
 													height={263}
@@ -7552,7 +7591,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 															contactsAvailableForDrafting.map((c) => c.id)
 														)
 													}
-													isDraftDisabled={isGenerationDisabled() || isPendingGeneration}
+													isDraftDisabled={isGenerationDisabled()}
 													isPendingGeneration={isPendingGeneration}
 													generationProgress={generationProgress}
 													generationTotal={contactsAvailableForDrafting.length}
@@ -8155,7 +8194,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													onDraftSelected={async (ids) => {
 														await handleGenerateDrafts(ids);
 													}}
-													isDraftDisabled={isGenerationDisabled() || isPendingGeneration}
+													isDraftDisabled={isGenerationDisabled()}
 													isPendingGeneration={isPendingGeneration}
 													width={330}
 													height={263}
@@ -8292,7 +8331,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 															contactsAvailableForDrafting.map((c) => c.id)
 														)
 													}
-													isDraftDisabled={isGenerationDisabled() || isPendingGeneration}
+													isDraftDisabled={isGenerationDisabled()}
 													isPendingGeneration={isPendingGeneration}
 													generationProgress={generationProgress}
 													generationTotal={contactsAvailableForDrafting.length}

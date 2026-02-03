@@ -26,10 +26,10 @@ interface CampaignHeaderBoxProps {
 	draftCount: number;
 	sentCount: number;
 	/**
-	 * When provided, shows the "emails drafting" progress box 9px above the header.
-	 * `current` is 0-based progress count; `total` is total emails being drafted.
+	 * When provided, shows the drafting progress box 9px above the header.
+	 * Each entry represents one queued/running drafting operation.
 	 */
-	draftingProgress?: { current: number; total: number } | null;
+	draftingProgress?: Array<{ current: number; total: number }> | null;
 	onFromClick?: () => void;
 	onContactsClick?: () => void;
 	onDraftsClick?: () => void;
@@ -250,22 +250,17 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 	const [isHoverDescriptionVisible, setIsHoverDescriptionVisible] = useState(false);
 	const hoverDescriptionTimeoutRef = useRef<number | null>(null);
 
-	const draftingCurrent = draftingProgress?.current ?? -1;
-	const draftingTotal = draftingProgress?.total ?? 0;
-	const shouldShowDraftingProgress =
-		draftingTotal > 0 && draftingCurrent >= 0;
-	const draftingPct = shouldShowDraftingProgress
-		? Math.min(
-				100,
-				Math.max(
-					0,
-					(Math.min(Math.max(0, draftingCurrent), draftingTotal) / Math.max(1, draftingTotal)) *
-						100
-				)
-		  )
-		: 0;
+	const draftingOperationsRaw = draftingProgress ?? [];
+	const draftingOperations = draftingOperationsRaw.filter(
+		(op) => typeof op.total === 'number' && op.total > 0 && typeof op.current === 'number'
+	);
+	const shouldShowDraftingProgress = draftingOperations.length > 0;
 	const draftingLabel = shouldShowDraftingProgress
-		? `${draftingTotal} email${draftingTotal === 1 ? '' : 's'} drafting`
+		? draftingOperations.length === 1
+			? `${draftingOperations[0].total} email${
+					draftingOperations[0].total === 1 ? '' : 's'
+			  } drafting`
+			: `${draftingOperations.length} operations in progress`
 		: '';
 
 	// Track which metric box is hovered for chrome-style animation
@@ -410,8 +405,10 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 						// so this 374x35 box aligns with the header's outer border edges.
 						left: '-2px',
 						right: '-2px',
-						top: '-46px', // 35px height + 9px gap + 2px header border
-						height: '35px',
+						// Anchor the BOTTOM of the progress box 9px above the header border,
+						// while allowing the box to grow upward for multi-operation stacks.
+						top: '-11px', // 9px gap + 2px header border (padding-box origin)
+						transform: 'translateY(-100%)',
 						boxSizing: 'border-box',
 						border: '2px solid rgba(176, 176, 176, 0.2)',
 						borderRadius: '5px',
@@ -426,7 +423,7 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 						paddingBottom: '6px',
 						paddingLeft: '6px',
 						paddingRight: '5px',
-						gap: '2px',
+						gap: '6px',
 						zIndex: 90,
 					}}
 				>
@@ -436,27 +433,42 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 					>
 						{draftingLabel}
 					</div>
-					<div
-						style={{
-							width: '100%',
-							height: '6px',
-							backgroundColor: '#D1D1D1',
-							borderRadius: '6px',
-							overflow: 'hidden',
-							position: 'relative',
-						}}
-					>
-						<div
-							style={{
-								position: 'absolute',
-								top: 0,
-								left: 0,
-								height: '100%',
-								width: `${draftingPct}%`,
-								backgroundColor: '#EDB552',
-								borderRadius: '6px',
-							}}
-						/>
+					<div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+						{draftingOperations.map((op, idx) => {
+							const pct = Math.min(
+								100,
+								Math.max(
+									0,
+									(Math.min(Math.max(0, op.current), op.total) / Math.max(1, op.total)) *
+										100
+								)
+							);
+							return (
+								<div
+									key={`drafting-op-${idx}`}
+									style={{
+										width: '100%',
+										height: '6px',
+										backgroundColor: '#D1D1D1',
+										borderRadius: '6px',
+										overflow: 'hidden',
+										position: 'relative',
+									}}
+								>
+									<div
+										style={{
+											position: 'absolute',
+											top: 0,
+											left: 0,
+											height: '100%',
+											width: `${pct}%`,
+											backgroundColor: '#EDB552',
+											borderRadius: '6px',
+										}}
+									/>
+								</div>
+							);
+						})}
 					</div>
 				</div>
 			) : null}
