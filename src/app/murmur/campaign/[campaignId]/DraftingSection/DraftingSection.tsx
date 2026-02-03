@@ -5545,6 +5545,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											hideButton={isNarrowestDesktop}
 											isAllContactsSelected={areAllContactsSelected}
 											onSelectAllContacts={handleSelectAllContacts}
+											historyActions={historyActions}
 										/>
 										{/* Navigation arrows with draft button at narrowest breakpoint */}
 										{isNarrowestDesktop && (

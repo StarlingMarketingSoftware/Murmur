@@ -1,6 +1,7 @@
 import { ContactWithName } from '@/types/contact';
 import { CampaignWithRelations } from '@/types';
 import { Dispatch, MouseEvent, SetStateAction, useRef } from 'react';
+import { HistoryAction } from '@/components/atoms/BottomPanelsContainer';
 
 export interface ContactsSelectionProps {
 	contacts: ContactWithName[];
@@ -85,6 +86,10 @@ export interface ContactsSelectionProps {
 	 * This should handle the logic of selecting all contacts and setting the isAllContactsSelected state.
 	 */
 	onSelectAllContacts?: () => void;
+	/**
+	 * Optional: history actions to display in the logs panel.
+	 */
+	historyActions?: HistoryAction[];
 }
 
 export const useContactsSelection = (props: ContactsSelectionProps) => {

@@ -13,6 +13,7 @@ import { DraftingTable } from '../DraftingTable/DraftingTable';
 import { DraftsExpandedList } from '../../Testing/DraftsExpandedList';
 import { SentExpandedList } from '../../Testing/SentExpandedList';
 import { InboxExpandedList } from '../../Testing/InboxExpandedList';
+import { BottomPanelsContainer } from '@/components/atoms/BottomPanelsContainer';
 import { useGetEmails } from '@/hooks/queryHooks/useEmails';
 import { EmailStatus } from '@/constants/prismaEnums';
 import {
@@ -957,6 +958,7 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 		isLoading = false,
 		isAllContactsSelected,
 		onSelectAllContacts,
+		historyActions,
 	} = props;
 
 	// Use the provided onSelectAllContacts if available, otherwise fall back to handleClick
@@ -1923,7 +1925,11 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 
 			{/* Bottom Panels: Drafts, Sent, and Inbox */}
 			{!hideBottomPanels && (
-				<div className="mt-[35px] pb-[8px] flex justify-center gap-[15px]">
+				<BottomPanelsContainer
+					className="mt-[35px] pb-[8px] flex justify-center gap-[15px]"
+					collapsed={bottomPanelCollapsed}
+					historyActions={historyActions}
+				>
 					<DraftsExpandedList
 						drafts={drafts || []}
 						contacts={props.allContacts || props.contacts}
@@ -1955,7 +1961,7 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 						collapsed={bottomPanelCollapsed}
 						onOpenInbox={goToInbox}
 					/>
-				</div>
+				</BottomPanelsContainer>
 			)}
 		</div>
 	);
