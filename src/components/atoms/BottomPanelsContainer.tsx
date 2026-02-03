@@ -32,15 +32,106 @@ const BUTTON_HEIGHT_COLLAPSED = 40;
 // History panel dimensions
 const HISTORY_PANEL_WIDTH = 343;
 const HISTORY_PANEL_HEIGHT = 370;
-const HISTORY_ROW_WIDTH = 332;
+const HISTORY_ROW_WIDTH = 322;
 const HISTORY_ROW_HEIGHT = 34;
 
-// Badge colors by action type
+// Badge colors by action type (static colors for non-draft types)
 const BADGE_COLORS: Record<HistoryActionType, string> = {
 	contacts: '#FEF3C7', // light yellow
-	drafts: '#FECDD3', // light pink
+	drafts: '#F5DADA', // fallback, dynamic colors used instead
 	sent: '#BBF7D0', // light green
 	received: '#BBF7D0', // light green
+};
+
+// Interpolate between two hex colors
+const interpolateColor = (color1: string, color2: string, factor: number): string => {
+	const hex1 = color1.replace('#', '');
+	const hex2 = color2.replace('#', '');
+	
+	const r1 = parseInt(hex1.substring(0, 2), 16);
+	const g1 = parseInt(hex1.substring(2, 4), 16);
+	const b1 = parseInt(hex1.substring(4, 6), 16);
+	
+	const r2 = parseInt(hex2.substring(0, 2), 16);
+	const g2 = parseInt(hex2.substring(2, 4), 16);
+	const b2 = parseInt(hex2.substring(4, 6), 16);
+	
+	const r = Math.round(r1 + (r2 - r1) * factor);
+	const g = Math.round(g1 + (g2 - g1) * factor);
+	const b = Math.round(b1 + (b2 - b1) * factor);
+	
+	return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`.toUpperCase();
+};
+
+// Get dynamic badge color based on count with 3 color stops
+// Color stops: 0 -> low, 15 -> mid, 45+ -> high
+const getGradientBadgeColor = (count: number, colorLow: string, colorMid: string, colorHigh: string): string => {
+	if (count <= 0) {
+		return colorLow;
+	} else if (count >= 45) {
+		return colorHigh;
+	} else if (count <= 15) {
+		// Interpolate between LOW and MID (0 to 15)
+		const factor = count / 15;
+		return interpolateColor(colorLow, colorMid, factor);
+	} else {
+		// Interpolate between MID and HIGH (15 to 45)
+		const factor = (count - 15) / 30;
+		return interpolateColor(colorMid, colorHigh, factor);
+	}
+};
+
+// Contacts color stops: #F5DADA -> #F5A1A1 -> #EE7C7C
+const getContactsBadgeColor = (count: number): string => {
+	return getGradientBadgeColor(count, '#F5DADA', '#F5A1A1', '#EE7C7C');
+};
+
+// Drafts color stops: #FFECCA -> #FFDA97 -> #FFCE75
+const getDraftsBadgeColor = (count: number): string => {
+	return getGradientBadgeColor(count, '#FFECCA', '#FFDA97', '#FFCE75');
+};
+
+// Sent color stops: #DBF3D9 -> #BCEDB8 -> #64CE59
+const getSentBadgeColor = (count: number): string => {
+	return getGradientBadgeColor(count, '#DBF3D9', '#BCEDB8', '#64CE59');
+};
+
+// Received color stops: 1 -> #EAF2FA, 3-5 -> #C8E4FF, 6+ -> #83B5E7
+const getReceivedBadgeColor = (count: number): string => {
+	const COLOR_LOW = '#EAF2FA';    // 1 and below
+	const COLOR_MID = '#C8E4FF';    // 3-5 (using 4 as midpoint)
+	const COLOR_HIGH = '#83B5E7';   // 6 and above
+	
+	if (count <= 1) {
+		return COLOR_LOW;
+	} else if (count >= 6) {
+		return COLOR_HIGH;
+	} else if (count <= 4) {
+		// Interpolate between LOW and MID (1 to 4)
+		const factor = (count - 1) / 3;
+		return interpolateColor(COLOR_LOW, COLOR_MID, factor);
+	} else {
+		// Interpolate between MID and HIGH (4 to 6)
+		const factor = (count - 4) / 2;
+		return interpolateColor(COLOR_MID, COLOR_HIGH, factor);
+	}
+};
+
+// Get badge color based on action type and count
+const getBadgeColor = (type: HistoryActionType, count: number): string => {
+	if (type === 'contacts') {
+		return getContactsBadgeColor(count);
+	}
+	if (type === 'drafts') {
+		return getDraftsBadgeColor(count);
+	}
+	if (type === 'sent') {
+		return getSentBadgeColor(count);
+	}
+	if (type === 'received') {
+		return getReceivedBadgeColor(count);
+	}
+	return BADGE_COLORS[type];
 };
 
 // Format timestamp for display
@@ -317,9 +408,12 @@ export const BottomPanelsContainer: React.FC<BottomPanelsContainerProps> = ({
 										{/* Badge and action type */}
 										<div className="flex items-center gap-2">
 											<span
-												className="text-[12px] font-inter font-medium px-2 py-0.5 rounded"
+												className="text-[12px] font-inter font-medium flex items-center justify-center"
 												style={{
-													backgroundColor: BADGE_COLORS[action.type],
+													width: 46,
+													height: 18,
+													borderRadius: 4,
+													backgroundColor: getBadgeColor(action.type, action.count),
 													border: '1px solid rgba(0,0,0,0.1)',
 												}}
 											>
