@@ -56,6 +56,7 @@ export const TestPreviewPanel: FC<TestPreviewPanelProps> = ({
 	const [typedBody, setTypedBody] = useState<string>('');
 	const WORD_LIMIT = 100;
 	const [clipAtHeight, setClipAtHeight] = useState<number | null>(null);
+	const [isHovered, setIsHovered] = useState(false);
 
 	const fontFamily = form.watch('font') || 'Arial';
 
@@ -298,6 +299,8 @@ export const TestPreviewPanel: FC<TestPreviewPanelProps> = ({
 				backgroundColor: shouldBlankWave ? '#FCE392' : '#F5DE94',
 				...style,
 			}}
+			onMouseEnter={() => setIsHovered(true)}
+			onMouseLeave={() => setIsHovered(false)}
 		>
 			{/* Test label at the top - 22px total height with centered text */}
 			<div className="w-full flex items-center px-[9px]" style={{ height: '22px' }}>
@@ -437,13 +440,16 @@ export const TestPreviewPanel: FC<TestPreviewPanelProps> = ({
 											</>
 										)}
 									</div>
-									<button
-										type="button"
-										onClick={() => setShowTestPreview(false)}
-										className="absolute right-0 top-1/2 -translate-y-1/2 p-0.5 sm:p-1 transition-all hover:brightness-75"
-									>
-										<CloseButtonIcon />
-									</button>
+								<button
+									type="button"
+									onClick={() => setShowTestPreview(false)}
+									className={cn(
+										'absolute right-0 top-1/2 -translate-y-1/2 p-0.5 sm:p-1 transition-all hover:brightness-75',
+										isHovered ? 'opacity-100' : 'opacity-0 pointer-events-none'
+									)}
+								>
+									<CloseButtonIcon />
+								</button>
 								</div>
 							</div>
 						)}
@@ -515,6 +521,7 @@ export const TestPreviewPanel: FC<TestPreviewPanelProps> = ({
 									backgroundColor: '#EAEAEA',
 									borderRadius: '12px',
 									opacity: isKeeping || keepDisabled ? 0.6 : 1,
+									cursor: isKeeping || keepDisabled ? 'default' : 'pointer',
 								}}
 							>
 								{isKeeping ? '' : 'Keep'}
