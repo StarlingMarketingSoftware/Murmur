@@ -6721,64 +6721,73 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																	height: number;
 																	onClick: () => void;
 																	ghostOffsetY?: number;
-																}) => (
-																	<div
-																		className="group relative w-full overflow-visible"
-																		style={{ height }}
-																		onMouseEnter={(e) => {
-																			if (shouldHideAddTextButtons) return;
-																			handleGapEnter(e.currentTarget, ghostOffsetY);
-																		}}
-																	>
-																		{/* Larger hover target so the +Text button is easier to reveal (without changing spacing).
-																		   Starts at the pill edge (150px) so it won't interfere with the pills themselves. */}
+																}) => {
+																	const gapRef = useRef<HTMLDivElement | null>(null);
+
+																	return (
 																		<div
-																			aria-hidden="true"
-																			className="absolute left-[150px] top-0 w-[140px] h-[36px] z-0"
-																		/>
-																		<button
-																			type="button"
-																			disabled={shouldHideAddTextButtons}
-																			onClick={() => {
-																				if (shouldHideAddTextButtons) return;
-																				setIsGhostVisible(false);
-																				onClick();
-																			}}
-																			className={cn(
-																				// Place the button 17px to the right of the 150px pill:
-																				// pillWidth (150) + gap (17) = 167px
-																				'absolute left-[167px] top-1/2 -translate-y-1/2 z-10',
-																				'w-[57px] h-[22px] rounded-[4px] border border-[#0B741A] bg-[#9EDDB6]',
-																				'flex items-center justify-center gap-[5px] box-border',
-																				'opacity-0 pointer-events-none', // Always invisible, interaction handled by ghost
-																				'pointer-events-auto cursor-pointer', // Make it clickable even if invisible
-																				shouldHideAddTextButtons && 'pointer-events-none',
-																				'font-inter font-medium text-[12px] leading-none text-black'
-																			)}
-																			style={
-																				ghostOffsetY
-																					? { top: `calc(50% + ${ghostOffsetY}px)` }
-																					: undefined
-																			}
-																			aria-label="Add Text"
+																			ref={gapRef}
+																			className="group relative w-full overflow-visible"
+																			style={{ height }}
 																		>
-																			<span className="text-[12px] leading-[12px]">+</span>
-																			<span className="text-[12px] leading-[12px]">Text</span>
-																		</button>
-																	</div>
-																);
+																			{/* Hover target starts at pill edge (150px) so it won't interfere with pills.
+																			   This prevents the "+ Text" ghost from appearing when simply moving through vertical spacing. */}
+																			<div
+																				aria-hidden="true"
+																				className="absolute left-[150px] top-0 w-[140px] h-[36px] z-0"
+																				onMouseEnter={() => {
+																					if (shouldHideAddTextButtons) return;
+																					if (!gapRef.current) return;
+																					handleGapEnter(gapRef.current, ghostOffsetY);
+																				}}
+																				onMouseLeave={() => setIsGhostVisible(false)}
+																			>
+																				<button
+																					type="button"
+																					disabled={shouldHideAddTextButtons}
+																					onClick={() => {
+																						if (shouldHideAddTextButtons) return;
+																						setIsGhostVisible(false);
+																						onClick();
+																					}}
+																					className={cn(
+																						// Place the button 17px to the right of the 150px pill:
+																						// pillWidth (150) + gap (17) = 167px
+																						'absolute left-[17px] top-1/2 -translate-y-1/2 z-10',
+																						'w-[57px] h-[22px] rounded-[4px] border border-[#0B741A] bg-[#9EDDB6]',
+																						'flex items-center justify-center gap-[5px] box-border',
+																						'opacity-0 pointer-events-auto cursor-pointer', // Always invisible; ghost is the visible affordance
+																						shouldHideAddTextButtons && 'pointer-events-none',
+																						'font-inter font-medium text-[12px] leading-none text-black'
+																					)}
+																					style={
+																						ghostOffsetY
+																							? { top: `calc(50% + ${ghostOffsetY}px)` }
+																							: undefined
+																					}
+																					aria-label="Add Text"
+																				>
+																					<span className="text-[12px] leading-[12px]">+</span>
+																					<span className="text-[12px] leading-[12px]">Text</span>
+																				</button>
+																			</div>
+																		</div>
+																	);
+																};
 
 																const CoreBlockButton = ({
 																	id,
 																	label,
 																	bgColor,
 																	borderColor,
+																	advancedOffBadgeColor,
 																	placeholder,
 																}: {
 																	id: string;
 																	label: string;
 																	bgColor: string;
 																	borderColor: string;
+																	advancedOffBadgeColor: string;
 																	placeholder: string;
 																}) => {
 																	const isOpen = expandedHybridCoreBlockId === id;
@@ -6805,27 +6814,57 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 
 																	if (!isOpen) {
 																		return (
-																			<button
-																				type="button"
-																				onClick={() => {
-																					setIsGhostVisible(false);
-																					setExpandedHybridTextBlockId(null);
-																					setHybridStructureSelection({ kind: 'block', blockId: id });
-																					setExpandedHybridCoreBlockId(id);
-																				}}
-																				className={cn(
-																					'relative h-[28px] cursor-pointer select-none',
-																					// Keep the hover expansion *inside* the 448px inner area (which has padding),
-																					// so adjacent controls (like "+ Text") never get pushed outside and clipped.
-																					'w-[150px] max-w-full hover:w-[355px] transition-none',
-																					'rounded-[8px] border-[3px]',
-																					'flex items-center justify-start px-3',
-																					'font-inter font-medium text-[14px] leading-none text-black'
-																				)}
-																				style={{ backgroundColor: bgColor, borderColor }}
-																			>
-																				{label}
-																			</button>
+																			<div className="relative w-[150px] max-w-full h-[28px] overflow-visible">
+																				<button
+																					type="button"
+																					onMouseEnter={() => setIsGhostVisible(false)}
+																					onClick={() => {
+																						setIsGhostVisible(false);
+																						setExpandedHybridTextBlockId(null);
+																						setHybridStructureSelection({
+																							kind: 'block',
+																							blockId: id,
+																						});
+																						setExpandedHybridCoreBlockId(id);
+																					}}
+																					className={cn(
+																						'peer group relative h-[28px] w-full cursor-pointer select-none',
+																						'rounded-[8px] border-[3px]',
+																						'flex items-center justify-start pl-3 pr-[36px]',
+																						'font-inter font-medium text-[14px] leading-none text-black'
+																					)}
+																					style={{ backgroundColor: bgColor, borderColor }}
+																				>
+																					<span className="whitespace-nowrap">{label}</span>
+																					<span
+																						aria-hidden="true"
+																						className={cn(
+																							'absolute right-[8px] top-1/2 -translate-y-1/2',
+																							'opacity-0 group-hover:opacity-100',
+																							'transition-opacity'
+																						)}
+																					>
+																						<span
+																							className="flex h-[18px] w-[18px] items-center justify-center rounded-[5px]"
+																							style={{ backgroundColor: advancedOffBadgeColor }}
+																						>
+																							<span className="block w-[10px] h-[2px] bg-black rounded-[1px]" />
+																						</span>
+																					</span>
+																				</button>
+																				<span
+																					aria-hidden="true"
+																					className={cn(
+																						'pointer-events-none absolute left-full top-1/2 -translate-y-1/2',
+																						'ml-[28px]',
+																						'opacity-0 peer-hover:opacity-100',
+																						'transition-opacity',
+																						'font-inter font-medium text-[14px] leading-none text-black whitespace-nowrap'
+																					)}
+																				>
+																					Advanced off
+																				</span>
+																			</div>
 																		);
 																	}
 
@@ -7066,6 +7105,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																				label="Intro"
 																				bgColor="#DADAFC"
 																				borderColor="#6673FF"
+																				advancedOffBadgeColor="#CACAFF"
 																				placeholder="Automated Intro"
 																			/>
 																		) : null}
@@ -7093,6 +7133,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																				label="Research"
 																				bgColor="#C7C7FF"
 																				borderColor="#1010E7"
+																				advancedOffBadgeColor="#B6B6F6"
 																				placeholder="Automated Research on who you’re sending to"
 																			/>
 																		) : null}
@@ -7118,6 +7159,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																				label="Call to Action"
 																				bgColor="#A0A0D5"
 																				borderColor="#0E0E7F"
+																				advancedOffBadgeColor="#9797D6"
 																				placeholder="Automated Call to Action"
 																			/>
 																		) : null}
