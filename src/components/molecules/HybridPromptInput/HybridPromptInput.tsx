@@ -23,6 +23,10 @@ import { DraftingFormValues } from '@/app/murmur/campaign/[campaignId]/DraftingS
 import { HybridBlock, Identity } from '@prisma/client';
 import { HybridPromptInputProps, useHybridPromptInput } from './useHybridPromptInput';
 import { WriteTabChromeHeader } from './WriteTabChromeHeader';
+import {
+	BookingForDropdownControl,
+	useBookingForDropdownController,
+} from './BookingForDropdownControl';
 import { cn } from '@/utils';
 import { DEFAULT_FONT, FONT_OPTIONS } from '@/constants/ui';
 import gsap from 'gsap';
@@ -232,157 +236,41 @@ const SortableAIBlock = ({
 		Boolean(defaultOpenCustomInstructions) && block.value === HybridBlock.full_automated
 	);
 	// Full Auto: Booking For dropdown
-	type BookingForTab = 'Anytime' | 'Season' | 'Calendar';
+	const bookingForDropdown = useBookingForDropdownController({ form });
 	type BookingForSeason = 'Spring' | 'Summer' | 'Fall' | 'Winter';
-	const BOOKING_FOR_SEASON_STYLES: Record<
-		BookingForSeason,
-		{ bgClass: string; textClass: string }
-	> = {
-		Spring: { bgClass: 'bg-[#9BD2FF]', textClass: 'text-black' },
-		Summer: { bgClass: 'bg-[#7ADF85]', textClass: 'text-black' },
-		Fall: { bgClass: 'bg-[#D77C2C]', textClass: 'text-white' },
-		Winter: { bgClass: 'bg-[#1960AC]', textClass: 'text-white' },
-	};
-	const isBookingForSeason = (value: string): value is BookingForSeason =>
-		value === 'Spring' || value === 'Summer' || value === 'Fall' || value === 'Winter';
-	const [isBookingForOpen, setIsBookingForOpen] = useState(false);
-	const bookingForValue = form.watch('bookingFor') || 'Anytime';
-	const bookingForSeasonFromValue = isBookingForSeason(bookingForValue) ? bookingForValue : null;
-	const bookingForTriggerBgClass = bookingForSeasonFromValue
-		? BOOKING_FOR_SEASON_STYLES[bookingForSeasonFromValue].bgClass
-		: 'bg-white';
-	const bookingForTriggerTextClass = bookingForSeasonFromValue
-		? BOOKING_FOR_SEASON_STYLES[bookingForSeasonFromValue].textClass
-		: 'text-black';
-	const setBookingForValue = useCallback(
-		(value: string) => {
-			form.setValue('bookingFor', value);
-		},
-		[form]
-	);
-	const [bookingForTab, setBookingForTab] = useState<BookingForTab>('Anytime');
-	const [hoveredBookingForTab, setHoveredBookingForTab] = useState<BookingForTab | null>(null);
-	const BOOKING_FOR_TAB_CHROME_TRANSITION = '0.6s cubic-bezier(0.22, 1, 0.36, 1)';
-	const [bookingForSeason, setBookingForSeason] = useState<BookingForSeason>('Spring');
-	const [hoveredBookingForSeason, setHoveredBookingForSeason] =
-		useState<BookingForSeason | null>(null);
-	const bookingForPreviewSeason = hoveredBookingForSeason ?? bookingForSeason;
-	const [bookingForCalendarBaseMonth, setBookingForCalendarBaseMonth] = useState<Date>(() => {
-		const now = new Date();
-		return new Date(now.getFullYear(), now.getMonth(), 1);
-	});
-	const [bookingForCalendarStartDate, setBookingForCalendarStartDate] = useState<Date | null>(null);
-	const [bookingForCalendarEndDate, setBookingForCalendarEndDate] = useState<Date | null>(null);
-	const bookingForContainerRef = useRef<HTMLDivElement | null>(null);
-	const bookingForButtonRef = useRef<HTMLButtonElement | null>(null);
-	const bookingForDropdownRef = useRef<HTMLDivElement | null>(null);
-	const bookingForCloseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-	const [bookingForDropdownPosition, setBookingForDropdownPosition] = useState<{
-		top: number;
-		left: number;
-	} | null>(null);
-	const clearBookingForCloseTimeout = useCallback(() => {
-		if (bookingForCloseTimeoutRef.current == null) return;
-		clearTimeout(bookingForCloseTimeoutRef.current);
-		bookingForCloseTimeoutRef.current = null;
-	}, []);
-	const scheduleBookingForCloseTimeout = useCallback(() => {
-		clearBookingForCloseTimeout();
-		bookingForCloseTimeoutRef.current = setTimeout(() => {
-			setIsBookingForOpen(false);
-		}, 1000);
-	}, [clearBookingForCloseTimeout]);
-	useEffect(() => {
-		if (!isBookingForOpen) {
-			setHoveredBookingForTab(null);
-		}
-		if (!isBookingForOpen || bookingForTab !== 'Season') {
-			setHoveredBookingForSeason(null);
-		}
-	}, [isBookingForOpen, bookingForTab]);
-	// Used to nudge the internal 3-way tab strip inside the Calendar dropdown so it aligns
-	// with where the strip sits in the narrower Anytime/Season dropdown.
-	const [bookingForTabStripLeft, setBookingForTabStripLeft] = useState<number | null>(null);
-	const bookingForDropdownSize = useMemo(() => {
-		if (bookingForTab === 'Calendar') return { width: 829, height: 468 };
-		if (bookingForTab === 'Season') return { width: 317, height: 151 };
-		return { width: 317, height: 46 };
-	}, [bookingForTab]);
-	const updateBookingForDropdownPosition = useCallback(() => {
-		if (typeof window === 'undefined') return;
-		// Use the container's position to match static positioning (which uses left: 0 relative to container)
-		const container = bookingForContainerRef.current;
-		const button = bookingForButtonRef.current;
-		if (!container || !button) return;
-
-		// Get the page zoom factor. Murmur uses `zoom: 0.9` (or similar) on <html>.
-		// getBoundingClientRect() returns zoomed coordinates, but position: fixed uses unzoomed.
-		// We need to divide by zoom to convert.
-		const getZoomFactor = (): number => {
-			const html = document.documentElement;
-			const computed = window.getComputedStyle(html);
-			const zoom = computed.zoom;
-			if (zoom && zoom !== 'normal') {
-				const zoomValue = parseFloat(zoom);
-				if (Number.isFinite(zoomValue) && zoomValue > 0) return zoomValue;
-			}
-			return 1;
-		};
-		const zoom = getZoomFactor();
-
-		const containerRect = container.getBoundingClientRect();
-		const buttonRect = button.getBoundingClientRect();
-		const margin = 6;
-		const viewportPadding = 8;
-
-		// For Calendar, we want the tabs CENTERED in the Calendar box,
-		// but the whole Calendar shifted left so those centered tabs roughly align with Anytime/Season tabs.
-		// 
-		// Anytime/Season (317px): tabs (284px) centered = tab center at 158.5px from dropdown left
-		// Calendar (829px): tabs centered = tab center at 414.5px from dropdown left
-		// Base shift: (414.5 - 158.5) = 256px, but we offset 20px right for better visual balance
-		const tabStripWidth = 284;
-		const narrowDropdownWidth = 317;
-		const calendarWidth = bookingForDropdownSize.width; // 829
-		const narrowTabCenter = narrowDropdownWidth / 2; // 158.5
-		const calendarTabCenter = calendarWidth / 2; // 414.5
-		const calendarShift = calendarTabCenter - narrowTabCenter - 20; // 236 (20px less shift = 20px right)
-
-		// Convert zoomed coordinates to unzoomed for fixed positioning
-		const baseLeft = containerRect.left / zoom;
-		let left = bookingForTab === 'Calendar' ? baseLeft - calendarShift : baseLeft;
-		let top = (buttonRect.bottom + margin) / zoom;
-
-		// Make sure it doesn't overflow viewport edges (in unzoomed coordinates)
-		const viewportWidth = window.innerWidth / zoom;
-		const viewportHeight = window.innerHeight / zoom;
-		const maxLeft = Math.max(viewportPadding, viewportWidth - bookingForDropdownSize.width - viewportPadding);
-		left = Math.min(left, maxLeft);
-		left = Math.max(left, viewportPadding);
-
-		// For Calendar, adjust tab position to compensate for the 20px right shift of the box.
-		// Tabs centered in Calendar would be at (829-284)/2 = 272.5px from Calendar left.
-		// To shift tabs 20px LEFT (to align with Anytime/Season), use paddingLeft of 272.5 - 20 = 252.5px
-		if (bookingForTab === 'Calendar') {
-			const centeredTabsLeft = (calendarWidth - tabStripWidth) / 2; // 272.5
-			setBookingForTabStripLeft(Math.round(centeredTabsLeft - 20)); // 252.5, shifts tabs 20px left of center
-		} else {
-			setBookingForTabStripLeft(null);
-		}
-
-		// Check if would overflow bottom, flip above if possible
-		const wouldOverflowBottom =
-			top + bookingForDropdownSize.height > viewportHeight - viewportPadding;
-		const canOpenAbove = buttonRect.top / zoom - margin - bookingForDropdownSize.height >= viewportPadding;
-		if (wouldOverflowBottom && canOpenAbove) {
-			top = buttonRect.top / zoom - margin - bookingForDropdownSize.height;
-		}
-
-		setBookingForDropdownPosition({
-			top: Math.round(top),
-			left: Math.round(left),
-		});
-	}, [bookingForDropdownSize.height, bookingForDropdownSize.width, bookingForTab]);
+	const {
+		BOOKING_FOR_SEASON_STYLES,
+		BOOKING_FOR_TAB_CHROME_TRANSITION,
+		isBookingForOpen,
+		setIsBookingForOpen,
+		bookingForValue,
+		bookingForSeasonFromValue,
+		bookingForTriggerBgClass,
+		bookingForTriggerTextClass,
+		setBookingForValue,
+		bookingForTab,
+		setBookingForTab,
+		hoveredBookingForTab,
+		setHoveredBookingForTab,
+		setBookingForSeason,
+		hoveredBookingForSeason,
+		setHoveredBookingForSeason,
+		bookingForPreviewSeason,
+		bookingForCalendarBaseMonth,
+		setBookingForCalendarBaseMonth,
+		bookingForCalendarStartDate,
+		setBookingForCalendarStartDate,
+		bookingForCalendarEndDate,
+		setBookingForCalendarEndDate,
+		bookingForContainerRef,
+		bookingForButtonRef,
+		bookingForDropdownRef,
+		clearBookingForCloseTimeout,
+		scheduleBookingForCloseTimeout,
+		bookingForDropdownPosition,
+		bookingForDropdownSize,
+		bookingForTabStripLeft,
+	} = bookingForDropdown;
 	// Power mode from form (shared with MiniEmailStructure)
 	const selectedPowerMode = form.watch('powerMode') || 'normal';
 	const setSelectedPowerMode = (mode: 'normal' | 'high') => {
@@ -437,72 +325,6 @@ const SortableAIBlock = ({
 			document.removeEventListener('pointerdown', handlePointerDown);
 		};
 	}, [isCustomInstructionsOpen]);
-
-	// Close Booking For dropdown when clicking away
-	useEffect(() => {
-		if (!isBookingForOpen) return;
-
-		const handlePointerDown = (event: PointerEvent) => {
-			const target = event.target as Node | null;
-			if (!target) return;
-
-			const container = bookingForContainerRef.current;
-			const dropdown = bookingForDropdownRef.current;
-
-			if (container?.contains(target)) return;
-			if (dropdown?.contains(target)) return;
-			clearBookingForCloseTimeout();
-			setIsBookingForOpen(false);
-		};
-
-		document.addEventListener('pointerdown', handlePointerDown);
-		return () => {
-			document.removeEventListener('pointerdown', handlePointerDown);
-		};
-	}, [clearBookingForCloseTimeout, isBookingForOpen]);
-
-	useEffect(() => {
-		if (!isBookingForOpen) {
-			clearBookingForCloseTimeout();
-			setBookingForDropdownPosition(null);
-			setBookingForTabStripLeft(null);
-		}
-	}, [clearBookingForCloseTimeout, isBookingForOpen]);
-
-	useEffect(() => {
-		return () => clearBookingForCloseTimeout();
-	}, [clearBookingForCloseTimeout]);
-
-	// Prevent navigating the calendar into months that are entirely in the past.
-	useEffect(() => {
-		if (!isBookingForOpen) return;
-		if (bookingForTab !== 'Calendar') return;
-
-		const now = new Date();
-		const minBaseMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-		setBookingForCalendarBaseMonth((prev) =>
-			prev.getTime() < minBaseMonth.getTime() ? minBaseMonth : prev
-		);
-	}, [isBookingForOpen, bookingForTab]);
-
-	useLayoutEffect(() => {
-		if (!isBookingForOpen) return;
-		updateBookingForDropdownPosition();
-	}, [isBookingForOpen, bookingForTab, updateBookingForDropdownPosition]);
-
-	useEffect(() => {
-		if (!isBookingForOpen) return;
-		if (typeof window === 'undefined') return;
-
-		const handle = () => updateBookingForDropdownPosition();
-		window.addEventListener('resize', handle);
-		// capture=true so we also reposition when any scrollable ancestor scrolls
-		window.addEventListener('scroll', handle, true);
-		return () => {
-			window.removeEventListener('resize', handle);
-			window.removeEventListener('scroll', handle, true);
-		};
-	}, [isBookingForOpen, updateBookingForDropdownPosition]);
 
 	const style = {
 		transform: CSS.Transform.toString(transform),
@@ -1326,6 +1148,13 @@ const SortableAIBlock = ({
 
 												{/* Booking For box (203 x 28px) + dropdown - rendered before Custom Instructions when closed */}
 												{!isCustomInstructionsOpen && (
+													<BookingForDropdownControl
+														controller={bookingForDropdown}
+														useStaticDropdownPosition={useStaticDropdownPosition}
+													/>
+												)}
+
+												{false && !isCustomInstructionsOpen && (
 													<div ref={bookingForContainerRef} className="relative mt-[10px] w-full">
 														<button
 															ref={bookingForButtonRef}
@@ -1407,9 +1236,9 @@ const SortableAIBlock = ({
 																// If the panel isn't scaled, this should be ~1.
 																const anchor = bookingForButtonRef.current;
 																if (!anchor) return 1;
-																const unscaledWidth = anchor.offsetWidth;
+																const unscaledWidth = anchor!.offsetWidth;
 																if (!unscaledWidth) return 1;
-																const scaledWidth = anchor.getBoundingClientRect().width;
+																const scaledWidth = anchor!.getBoundingClientRect().width;
 																const scale = scaledWidth / unscaledWidth;
 																return Number.isFinite(scale) && scale > 0 ? scale : 1;
 															})();
@@ -1495,7 +1324,7 @@ const SortableAIBlock = ({
 																			// On campaign page, use paddingLeft to align tabs
 																			!useStaticDropdownPosition && bookingForTabStripLeft != null ? 'justify-start' : 'justify-center'
 																		)}
-																		style={!useStaticDropdownPosition && bookingForTabStripLeft != null ? { paddingLeft: bookingForTabStripLeft } : undefined}
+																		style={!useStaticDropdownPosition && bookingForTabStripLeft != null ? { paddingLeft: bookingForTabStripLeft ?? 0 } : undefined}
 																	>
 																		<div
 																			className="w-[284px] grid grid-cols-3 items-center gap-[8px]"
@@ -2087,6 +1916,14 @@ const SortableAIBlock = ({
 
 												{/* Booking For box - rendered AFTER Custom Instructions when it's open */}
 												{isCustomInstructionsOpen && (
+													<BookingForDropdownControl
+														controller={bookingForDropdown}
+														useStaticDropdownPosition={useStaticDropdownPosition}
+														triggerContentPaddingRightClassName="pr-16"
+													/>
+												)}
+
+												{false && isCustomInstructionsOpen && (
 													<div ref={bookingForContainerRef} className="relative mt-[10px] w-full">
 														<button
 															ref={bookingForButtonRef}
@@ -2163,9 +2000,9 @@ const SortableAIBlock = ({
 																const landingScale2 = (() => {
 																	const anchor = bookingForButtonRef.current;
 																	if (!anchor) return 1;
-																	const unscaledWidth = anchor.offsetWidth;
+																	const unscaledWidth = anchor!.offsetWidth;
 																	if (!unscaledWidth) return 1;
-																	const scaledWidth = anchor.getBoundingClientRect().width;
+																	const scaledWidth = anchor!.getBoundingClientRect().width;
 																	const scale = scaledWidth / unscaledWidth;
 																	return Number.isFinite(scale) && scale > 0 ? scale : 1;
 																})();
@@ -2251,7 +2088,7 @@ const SortableAIBlock = ({
 																				// On campaign page, use paddingLeft to align tabs
 																				!useStaticDropdownPosition && bookingForTabStripLeft != null ? 'justify-start' : 'justify-center'
 																			)}
-																			style={!useStaticDropdownPosition && bookingForTabStripLeft != null ? { paddingLeft: bookingForTabStripLeft } : undefined}
+																		style={!useStaticDropdownPosition && bookingForTabStripLeft != null ? { paddingLeft: bookingForTabStripLeft ?? 0 } : undefined}
 																		>
 																			<div
 																				className="w-[284px] grid grid-cols-3 items-center gap-[8px]"
@@ -2836,32 +2673,12 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 	);
 
 	// Hybrid tab: Booking For control (mirrors Auto tab placement)
-	type HybridBookingForSeason = 'Spring' | 'Summer' | 'Fall' | 'Winter';
-	const HYBRID_BOOKING_FOR_SEASON_STYLES: Record<
-		HybridBookingForSeason,
-		{ bgClass: string; textClass: string }
-	> = {
-		Spring: { bgClass: 'bg-[#9BD2FF]', textClass: 'text-black' },
-		Summer: { bgClass: 'bg-[#7ADF85]', textClass: 'text-black' },
-		Fall: { bgClass: 'bg-[#D77C2C]', textClass: 'text-white' },
-		Winter: { bgClass: 'bg-[#1960AC]', textClass: 'text-white' },
-	};
-	const isHybridBookingForSeason = (value: string): value is HybridBookingForSeason =>
-		value === 'Spring' || value === 'Summer' || value === 'Fall' || value === 'Winter';
-	const hybridBookingForValue = form.watch('bookingFor') || 'Anytime';
-	const hybridBookingForSeasonFromValue = isHybridBookingForSeason(hybridBookingForValue)
-		? hybridBookingForValue
-		: null;
-	const hybridBookingForTriggerBgClass = hybridBookingForSeasonFromValue
-		? HYBRID_BOOKING_FOR_SEASON_STYLES[hybridBookingForSeasonFromValue].bgClass
-		: 'bg-[#DADAFC]';
-	const hybridBookingForTriggerTextClass = hybridBookingForSeasonFromValue
-		? HYBRID_BOOKING_FOR_SEASON_STYLES[hybridBookingForSeasonFromValue].textClass
-		: 'text-black';
-	const [isHybridBookingForOpen, setIsHybridBookingForOpen] = useState(false);
-	const hybridBookingForContainerRef = useRef<HTMLDivElement | null>(null);
-	const hybridBookingForButtonRef = useRef<HTMLButtonElement | null>(null);
-	const hybridBookingForDropdownRef = useRef<HTMLDivElement | null>(null);
+	const hybridBookingForDropdown = useBookingForDropdownController({
+		form,
+		defaultTriggerBgClass: 'bg-[#DADAFC]',
+		shouldDirty: true,
+	});
+	const { closeBookingForDropdown: closeHybridBookingForDropdown } = hybridBookingForDropdown;
 
 	const subjectManualTextareaRef = useRef<HTMLTextAreaElement | null>(null);
 	const signatureManualTextareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -3088,28 +2905,6 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		setIsGhostVisible(false);
 	}, []);
 
-	// Hybrid Booking For: close dropdown on click-away
-	useEffect(() => {
-		if (!isHybridBookingForOpen) return;
-
-		const handlePointerDown = (event: PointerEvent) => {
-			const target = event.target as Node | null;
-			if (!target) return;
-
-			const container = hybridBookingForContainerRef.current;
-			const dropdown = hybridBookingForDropdownRef.current;
-			if (container?.contains(target)) return;
-			if (dropdown?.contains(target)) return;
-
-			setIsHybridBookingForOpen(false);
-		};
-
-		document.addEventListener('pointerdown', handlePointerDown);
-		return () => {
-			document.removeEventListener('pointerdown', handlePointerDown);
-		};
-	}, [isHybridBookingForOpen]);
-
 	// Wrap the parent callback to also update local state
 	const handleCustomInstructionsOpenChange = useCallback(
 		(isOpen: boolean) => {
@@ -3208,10 +3003,10 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 			setHybridStructureSelection({ kind: 'none' });
 			setExpandedHybridTextBlockId(null);
 			setExpandedHybridCoreBlockId(null);
-			setIsHybridBookingForOpen(false);
+			closeHybridBookingForDropdown();
 			setIsGhostVisible(false);
 		}
-	}, [selectedModeKey]);
+	}, [closeHybridBookingForDropdown, selectedModeKey]);
 
 	// If the selected block disappears, clear selection
 	useEffect(() => {
@@ -6585,87 +6380,10 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 															</div>
 
 															{/* Booking For */}
-															<div ref={hybridBookingForContainerRef} className="relative mt-[10px] w-full">
-																<button
-																	ref={hybridBookingForButtonRef}
-																	type="button"
-																	data-hover-description="What timeframe are you booking in."
-																	onClick={() => setIsHybridBookingForOpen((v) => !v)}
-																	className={cn(
-																		'w-full h-[28px] rounded-[8px] border-2 border-black flex items-center px-4 whitespace-nowrap',
-																		hybridBookingForTriggerBgClass
-																	)}
-																	aria-haspopup="listbox"
-																	aria-expanded={isHybridBookingForOpen}
-																>
-																	<div className="inline-flex min-w-[203px] items-center justify-between gap-2 pr-12">
-																		<span
-																			className={cn(
-																				'font-inter font-normal text-[14px] leading-[14px] whitespace-nowrap',
-																				hybridBookingForTriggerTextClass
-																			)}
-																		>
-																			Booking For
-																		</span>
-																		<span
-																			className={cn(
-																				'font-inter font-bold text-[14px] leading-[14px] mr-1 whitespace-nowrap',
-																				hybridBookingForTriggerTextClass
-																			)}
-																		>
-																			{hybridBookingForValue}
-																		</span>
-																	</div>
-																</button>
-
-																{isHybridBookingForOpen && (
-																	<div
-																		ref={hybridBookingForDropdownRef}
-																		className="absolute left-0 top-[calc(100%+6px)] z-[999] w-[317px] rounded-[6px] border-2 border-black bg-[#F5F5F5] overflow-hidden"
-																		role="listbox"
-																		aria-label="Booking For"
-																	>
-																		{(['Anytime', 'Spring', 'Summer', 'Fall', 'Winter'] as const).map(
-																			(opt) => (
-																				<button
-																					key={opt}
-																					type="button"
-																					role="option"
-																					aria-selected={hybridBookingForValue === opt}
-																					onClick={() => {
-																						form.setValue('bookingFor', opt, { shouldDirty: true });
-																						setIsHybridBookingForOpen(false);
-																					}}
-																					className={cn(
-																						'w-full h-[34px] px-3 text-left font-inter text-[14px] text-black flex items-center',
-																						'hover:bg-black/5'
-																					)}
-																					style={{
-																						backgroundColor:
-																							opt === 'Spring'
-																								? '#9BD2FF'
-																								: opt === 'Summer'
-																									? '#7ADF85'
-																									: opt === 'Fall'
-																										? '#D77C2C'
-																										: opt === 'Winter'
-																											? '#1960AC'
-																											: 'transparent',
-																						color:
-																							opt === 'Fall' || opt === 'Winter'
-																								? '#FFFFFF'
-																								: '#000000',
-																						borderTop:
-																							opt === 'Anytime' ? undefined : '1px solid rgba(0,0,0,0.15)',
-																					}}
-																				>
-																					{opt}
-																				</button>
-																			)
-																		)}
-																	</div>
-																)}
-															</div>
+															<BookingForDropdownControl
+																controller={hybridBookingForDropdown}
+																useStaticDropdownPosition={useStaticDropdownPosition}
+															/>
 														</div>
 													</div>
 
