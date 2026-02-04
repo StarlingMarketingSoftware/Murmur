@@ -2688,6 +2688,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 	const autoSubjectAutoWordRef = useRef<HTMLSpanElement | null>(null);
 	const autoSubjectControlsRef = useRef<HTMLDivElement | null>(null);
 	const autoSubjectHoverTimelineRef = useRef<gsap.core.Timeline | null>(null);
+	const isAutoSubjectHoverExpandedRef = useRef(false);
 
 	const buildAutoSubjectHoverTimeline = useCallback(() => {
 		const pillEl = autoSubjectPillRef.current;
@@ -2720,7 +2721,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 			willChange: 'width, opacity, margin-right',
 		});
 		if (controlsEl) {
-			gsap.set(controlsEl, { opacity: 0, willChange: 'opacity' });
+			gsap.set(controlsEl, { opacity: 0, pointerEvents: 'none', willChange: 'opacity' });
 		}
 
 		autoSubjectHoverTimelineRef.current = gsap
@@ -2749,18 +2750,27 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		if (controlsEl) {
 			autoSubjectHoverTimelineRef.current.to(
 				controlsEl,
-				{ opacity: 1, duration: 0.3, ease: 'power2.out', overwrite: 'auto' },
+				{
+					opacity: 1,
+					pointerEvents: 'auto',
+					duration: 0.3,
+					ease: 'power2.out',
+					overwrite: 'auto',
+				},
 				0.15
 			);
 		}
 	}, [forceDesktop]);
 
 	const handleSubjectHoverEnter = useCallback(() => {
+		if (isAutoSubjectHoverExpandedRef.current) return;
+		isAutoSubjectHoverExpandedRef.current = true;
 		buildAutoSubjectHoverTimeline();
 		autoSubjectHoverTimelineRef.current?.play(0);
 	}, [buildAutoSubjectHoverTimeline]);
 
 	const handleSubjectHoverLeave = useCallback(() => {
+		isAutoSubjectHoverExpandedRef.current = false;
 		autoSubjectHoverTimelineRef.current?.reverse();
 	}, []);
 
@@ -2774,6 +2784,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 	useEffect(() => {
 		// If we switch into manual subject, ensure we drop any stale DOM refs in the timeline.
 		if (isManualSubject) {
+			isAutoSubjectHoverExpandedRef.current = false;
 			autoSubjectHoverTimelineRef.current?.kill();
 			autoSubjectHoverTimelineRef.current = null;
 		}
@@ -2784,6 +2795,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 	const autoSignatureAutoWordRef = useRef<HTMLSpanElement | null>(null);
 	const autoSignatureControlsRef = useRef<HTMLDivElement | null>(null);
 	const autoSignatureHoverTimelineRef = useRef<gsap.core.Timeline | null>(null);
+	const isAutoSignatureHoverExpandedRef = useRef(false);
 
 	const buildAutoSignatureHoverTimeline = useCallback(() => {
 		const pillEl = autoSignaturePillRef.current;
@@ -2813,7 +2825,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 			willChange: 'width, opacity, margin-right',
 		});
 		if (controlsEl) {
-			gsap.set(controlsEl, { opacity: 0, willChange: 'opacity' });
+			gsap.set(controlsEl, { opacity: 0, pointerEvents: 'none', willChange: 'opacity' });
 		}
 
 		autoSignatureHoverTimelineRef.current = gsap
@@ -2842,18 +2854,27 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		if (controlsEl) {
 			autoSignatureHoverTimelineRef.current.to(
 				controlsEl,
-				{ opacity: 1, duration: 0.3, ease: 'power2.out', overwrite: 'auto' },
+				{
+					opacity: 1,
+					pointerEvents: 'auto',
+					duration: 0.3,
+					ease: 'power2.out',
+					overwrite: 'auto',
+				},
 				0.15
 			);
 		}
 	}, [forceDesktop]);
 
 	const handleSignatureHoverEnter = useCallback(() => {
+		if (isAutoSignatureHoverExpandedRef.current) return;
+		isAutoSignatureHoverExpandedRef.current = true;
 		buildAutoSignatureHoverTimeline();
 		autoSignatureHoverTimelineRef.current?.play(0);
 	}, [buildAutoSignatureHoverTimeline]);
 
 	const handleSignatureHoverLeave = useCallback(() => {
+		isAutoSignatureHoverExpandedRef.current = false;
 		autoSignatureHoverTimelineRef.current?.reverse();
 	}, []);
 
@@ -2866,6 +2887,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 
 	useEffect(() => {
 		if (!isAutoSignature) {
+			isAutoSignatureHoverExpandedRef.current = false;
 			autoSignatureHoverTimelineRef.current?.kill();
 			autoSignatureHoverTimelineRef.current = null;
 		}
@@ -4812,16 +4834,16 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																					form.setValue('isAiSubject', false);
 																				}
 																			}}
-																			onMouseEnter={handleSubjectHoverEnter}
 																			onMouseLeave={handleSubjectHoverLeave}
 																			className={cn(
-																				// Hover zone includes the gap + green box so the expanded controls stay open while moving across.
-																				'relative group/subject w-[465px] max-[480px]:w-full transition-none flex items-center'
+																				// Keep-open hover zone includes the gap + green box (but only the pill triggers expansion).
+																				'relative w-[465px] max-[480px]:w-full transition-none flex items-center'
 																			)}
 																		>
 																			{/* Auto Subject pill - animates on hover */}
 																			<div
 																				ref={autoSubjectPillRef}
+																				onMouseEnter={handleSubjectHoverEnter}
 																				className={cn(
 																					cn(
 																						'flex items-center justify-center h-[25px] rounded-[10px] border-2 border-black overflow-hidden subject-bar w-[110px]',
@@ -4851,7 +4873,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																			{/* Expanded controls - hidden by default, shown on hover */}
 																			<div
 																				ref={autoSubjectControlsRef}
-																				className="flex items-center h-[25px] ml-[31px] max-[480px]:ml-[12px] opacity-0 pointer-events-none group-hover/subject:pointer-events-auto"
+																				className="flex items-center h-[25px] ml-[31px] max-[480px]:ml-[12px] opacity-0 pointer-events-none"
 																			>
 																				{/* 292x25 manual subject bar (bg #74D177, r=5) */}
 																				<div
@@ -6926,12 +6948,12 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														<div className="flex items-center">
 															<div
 																onClick={() => setIsAutoSignature(false)}
-																onMouseEnter={handleSignatureHoverEnter}
 																onMouseLeave={handleSignatureHoverLeave}
-																className="relative group/signature w-[465px] max-[480px]:w-full transition-none flex items-center"
+																className="relative w-[465px] max-[480px]:w-full transition-none flex items-center"
 															>
 																<div
 																	ref={autoSignaturePillRef}
+																	onMouseEnter={handleSignatureHoverEnter}
 																	className={cn(
 																		'flex items-center justify-center h-[25px] rounded-[10px] border-2 border-black overflow-hidden w-[122px]',
 																		!forceDesktop && 'max-[480px]:h-[24px]'
@@ -6957,7 +6979,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																</div>
 																<div
 																	ref={autoSignatureControlsRef}
-																	className="flex items-center h-[25px] ml-[13px] max-[480px]:ml-[12px] opacity-0 pointer-events-none group-hover/signature:pointer-events-auto"
+																	className="flex items-center h-[25px] ml-[13px] max-[480px]:ml-[12px] opacity-0 pointer-events-none"
 																>
 																	<div
 																		className={cn(
@@ -7318,16 +7340,16 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																// If the user doesn't type anything and moves away, we snap back to auto (handled in manual view).
 																setIsAutoSignature(false);
 															}}
-															onMouseEnter={handleSignatureHoverEnter}
 															onMouseLeave={handleSignatureHoverLeave}
 															className={cn(
-																// Hover zone includes the gap + green box so the expanded controls stay open while moving across.
-																'relative group/signature w-[465px] max-[480px]:w-full transition-none flex items-center'
+																// Keep-open hover zone includes the gap + green box (but only the pill triggers expansion).
+																'relative w-[465px] max-[480px]:w-full transition-none flex items-center'
 															)}
 														>
 															{/* Auto Signature pill - animates on hover */}
 															<div
 																ref={autoSignaturePillRef}
+																onMouseEnter={handleSignatureHoverEnter}
 																className={cn(
 																	cn(
 																		'flex items-center justify-center h-[25px] rounded-[10px] border-2 border-black overflow-hidden w-[122px]',
@@ -7357,7 +7379,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 															{/* Expanded controls - fades in with "Auto" */}
 															<div
 																ref={autoSignatureControlsRef}
-																className="flex items-center h-[25px] ml-[13px] max-[480px]:ml-[12px] opacity-0 pointer-events-none group-hover/signature:pointer-events-auto"
+																className="flex items-center h-[25px] ml-[13px] max-[480px]:ml-[12px] opacity-0 pointer-events-none"
 															>
 																{/* 292x25 manual signature bar (bg #74D177, r=5) */}
 																<div
