@@ -2643,6 +2643,10 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		forceDesktop,
 	} = props;
 
+	const isGeneratingTest = Boolean(isPendingGeneration && isTest);
+	const isGenerateTestDisabled = Boolean(isGenerationDisabled?.());
+	const isGenerateTestButtonDisabled = isGenerateTestDisabled || isGeneratingTest;
+
 	// Track if the user has attempted to Test to control error styling
 	const [hasAttemptedTest, setHasAttemptedTest] = useState(false);
 
@@ -4626,69 +4630,22 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 									<div ref={headerSectionRef} className={cn('pt-0 pb-0')}>
 										<div className={cn(!compactLeftOnly ? 'bg-white' : '', 'relative')}>
 											<div className="relative h-[31px]">
-											{/* Left 130px gray background */}
-											{!compactLeftOnly && (
-												<div
-													className="absolute left-0 top-0 h-full w-[130px] bg-[#f8f8f8] z-0"
-													style={{ pointerEvents: 'none' }}
-												/>
-											)}
-											{/* Profile label centered in the 130px gray area - clickable to switch tabs */}
-											{!compactLeftOnly && (() => {
-												const isProfileIncomplete = !profileFields.name.trim() || !profileFields.genre.trim() || !profileFields.area.trim() || !profileFields.bio.trim();
-												const showRedWarning = hasLeftProfileTab && isProfileIncomplete;
-												return (
-													<button
-														type="button"
-														data-hover-description="Add information about yourself so you can pitch well to the contacts you're reaching out to"
-														onClick={() => {
-															if (activeTab === 'profile') {
-																setActiveTab('main');
-																setHasLeftProfileTab(true);
-															} else {
-																setActiveTab('profile');
-															}
-														}}
-														className={cn(
-															"absolute left-0 -top-[3px] h-[calc(100%+3px)] w-[130px] flex items-center justify-center font-inter font-semibold text-[13px] max-[480px]:text-[14px] z-30 cursor-pointer bg-transparent transition-colors border-r-[3px] border-r-black border-t-0 border-b-0 border-l-0",
-															activeTab === 'profile'
-																? 'text-black bg-[#A6E2A8] hover:bg-[#A6E2A8]'
-																: showRedWarning
-																	? 'text-black bg-[#E47979] hover:bg-[#E47979]'
-																	: 'text-black hover:bg-[#eeeeee]'
-														)}
-													>
-														Profile
-													</button>
-												);
-											})()}
 											<div
 												className={cn(
 													'h-[31px] flex items-center relative z-20',
-													cn(!forceDesktop ? 'w-[93.7vw]' : 'w-[475px]', 'max-w-[475px] mx-auto pl-[8px]', !forceDesktop && 'max-[480px]:pl-[6px]')
+													cn(!forceDesktop ? 'w-[93.7vw]' : 'w-[475px]', 'max-w-[475px] mx-auto px-[8px]', !forceDesktop && 'max-[480px]:px-[6px]')
 												)}
 												data-left-drag-handle
 												data-root-drag-handle
 											>
-												{compactLeftOnly && (
-													<span
-														className={cn(
-															cn('font-inter font-semibold text-[13px] ml-[8px] mr-[112px] text-black relative z-10', !forceDesktop && 'max-[480px]:text-[14px] max-[480px]:mr-[22px]')
-														)}
-													>
-														Profile
-													</span>
-												)}
-												{/* Spacer to keep toggles in position */}
-												{!compactLeftOnly && <div className="w-[130px] shrink-0" />}
 												<div
 													ref={modeContainerRef}
 													onMouseLeave={() => setHoveredModeKey(null)}
 													className={cn(
-														'relative flex items-center flex-1',
-														forceDesktop ? 'gap-[70px] ml-[30px]' : 'gap-[78px] ml-[42px]',
+														'relative flex items-center justify-center flex-1',
+														forceDesktop ? 'gap-[70px]' : 'gap-[78px]',
 														!forceDesktop &&
-															'max-[480px]:gap-0 max-[480px]:justify-between max-[480px]:ml-[2px] max-[480px]:w-auto max-[480px]:px-[24px]'
+															'max-[480px]:gap-0 max-[480px]:justify-between max-[480px]:w-full max-[480px]:px-[24px]'
 													)}
 													data-hover-description-suppress="true"
 												>
@@ -5053,22 +5010,28 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 													className="absolute inset-0 z-0 bg-[#305B31] pointer-events-none opacity-0"
 												/>
 												<div className="relative z-10 flex flex-col flex-1">
-													{/* Green top space box (122 x 34) */}
+													{/* Profile tab: align the decorative top pill with Auto/Hybrid Subject */}
 													<div
 														aria-hidden="true"
-														className="absolute left-[15px] top-[14px] w-[122px] h-[34px] rounded-[8px] border-2 border-black"
-													/>
-													<div className="w-full mt-[64px]">
+														className="absolute inset-x-0 top-0 pointer-events-none"
+													>
+														{/* Match Subject pill top offset: 38px below mode divider, minus 32px rating row */}
+														<div className="w-[465px] max-[480px]:w-full mx-auto pt-[6px]">
+															<div className="w-[110px] h-[25px] max-[480px]:h-[24px] rounded-[10px] border-2 border-black" />
+														</div>
+													</div>
+													{/* Match Full Auto Body box start: Subject height (38+25) + main content offset (20-8), minus 32px rating row */}
+													<div className="w-full mt-[43px] max-[480px]:mt-[39px]">
 													<div
 														className={cn(
-															'relative w-full bg-[#4597DA] border-t-[3px] border-b-[3px] border-black rounded-[8px] overflow-hidden flex flex-col',
+															'relative w-full max-w-[468px] mx-auto bg-[#4597DA] border-[3px] border-black rounded-[8px] overflow-hidden flex flex-col',
 															props.clipProfileTabOverflow
 																? expandedProfileBox
-																	? 'h-[414px]'
-																	: 'h-[380px]'
+																	? 'h-[438px]'
+																	: 'h-[404px]'
 																: expandedProfileBox
-																? 'min-h-[414px]'
-																: 'min-h-[380px]'
+																? 'min-h-[438px]'
+																: 'min-h-[404px]'
 														)}
 														onClick={(e) => e.stopPropagation()}
 													>
@@ -5122,12 +5085,12 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														{/* Profile fields live inside the 380px Body container */}
 														<div
 															className={cn(
-																'flex-1',
+																'flex-1 flex flex-col justify-center',
 																props.clipProfileTabOverflow &&
 																	'min-h-0 overflow-y-auto hide-native-scrollbar'
 															)}
 														>
-															<div className="px-3 pt-[14px] pb-[14px] flex flex-col gap-[18px]">
+															<div className="px-3 py-[16px] flex flex-col gap-[12px]">
 																<div
 																	ref={
 																		expandedProfileBox === 'name'
@@ -5135,13 +5098,13 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																			: undefined
 																	}
 																	className={cn(
-																		'w-[413px] max-w-full mx-auto flex flex-col rounded-[8px] border-[3px] border-black cursor-pointer overflow-hidden',
-																		expandedProfileBox === 'name' ? 'h-[68px]' : 'h-[34px]'
+																		'w-[380px] max-w-full mx-auto flex flex-col rounded-[8px] border-[3px] border-black cursor-pointer overflow-hidden',
+																		expandedProfileBox === 'name' ? 'h-[64px]' : 'h-[32px]'
 																	)}
 																	onClick={() => handleProfileBoxToggle('name')}
 																>
 																	<div
-																		className="h-[34px] flex items-center font-inter text-[14px] font-semibold overflow-hidden"
+																		className="h-[32px] flex items-center font-inter text-[14px] font-semibold overflow-hidden"
 																		style={{ backgroundColor: getProfileHeaderBg('name') }}
 																	>
 																		{expandedProfileBox !== 'name' &&
@@ -5170,7 +5133,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																	{expandedProfileBox === 'name' && (
 																		<input
 																			type="text"
-																			className="h-[34px] bg-white px-3 font-inter text-[14px] outline-none border-0"
+																			className="h-[32px] bg-white px-3 font-inter text-[14px] outline-none border-0"
 																			value={profileFields.name}
 																			onChange={(e) =>
 																				setProfileFields({
@@ -5199,13 +5162,13 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																			: undefined
 																	}
 																	className={cn(
-																		'w-[413px] max-w-full mx-auto flex flex-col rounded-[8px] border-[3px] border-black cursor-pointer overflow-hidden',
-																		expandedProfileBox === 'genre' ? 'h-[68px]' : 'h-[34px]'
+																		'w-[380px] max-w-full mx-auto flex flex-col rounded-[8px] border-[3px] border-black cursor-pointer overflow-hidden',
+																		expandedProfileBox === 'genre' ? 'h-[64px]' : 'h-[32px]'
 																	)}
 																	onClick={() => handleProfileBoxToggle('genre')}
 																>
 																	<div
-																		className="h-[34px] flex items-center font-inter text-[14px] font-semibold overflow-hidden"
+																		className="h-[32px] flex items-center font-inter text-[14px] font-semibold overflow-hidden"
 																		style={{ backgroundColor: getProfileHeaderBg('genre') }}
 																	>
 																		{expandedProfileBox !== 'genre' &&
@@ -5234,7 +5197,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																	{expandedProfileBox === 'genre' && (
 																		<input
 																			type="text"
-																			className="h-[34px] bg-white px-3 font-inter text-[14px] outline-none border-0"
+																			className="h-[32px] bg-white px-3 font-inter text-[14px] outline-none border-0"
 																			value={profileFields.genre}
 																			onChange={(e) =>
 																				setProfileFields({
@@ -5263,13 +5226,13 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																			: undefined
 																	}
 																	className={cn(
-																		'w-[413px] max-w-full mx-auto flex flex-col rounded-[8px] border-[3px] border-black cursor-pointer overflow-hidden',
-																		expandedProfileBox === 'area' ? 'h-[68px]' : 'h-[34px]'
+																		'w-[380px] max-w-full mx-auto flex flex-col rounded-[8px] border-[3px] border-black cursor-pointer overflow-hidden',
+																		expandedProfileBox === 'area' ? 'h-[64px]' : 'h-[32px]'
 																	)}
 																	onClick={() => handleProfileBoxToggle('area')}
 																>
 																	<div
-																		className="h-[34px] flex items-center font-inter text-[14px] font-semibold overflow-hidden"
+																		className="h-[32px] flex items-center font-inter text-[14px] font-semibold overflow-hidden"
 																		style={{ backgroundColor: getProfileHeaderBg('area') }}
 																	>
 																		{expandedProfileBox !== 'area' &&
@@ -5298,7 +5261,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																	{expandedProfileBox === 'area' && (
 																		<input
 																			type="text"
-																			className="h-[34px] bg-white px-3 font-inter text-[14px] outline-none border-0"
+																			className="h-[32px] bg-white px-3 font-inter text-[14px] outline-none border-0"
 																			value={profileFields.area}
 																			onChange={(e) =>
 																				setProfileFields({
@@ -5327,13 +5290,13 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																			: undefined
 																	}
 																	className={cn(
-																		'w-[413px] max-w-full mx-auto flex flex-col rounded-[8px] border-[3px] border-black cursor-pointer overflow-hidden',
-																		expandedProfileBox === 'band' ? 'h-[68px]' : 'h-[34px]'
+																		'w-[380px] max-w-full mx-auto flex flex-col rounded-[8px] border-[3px] border-black cursor-pointer overflow-hidden',
+																		expandedProfileBox === 'band' ? 'h-[64px]' : 'h-[32px]'
 																	)}
 																	onClick={() => handleProfileBoxToggle('band')}
 																>
 																	<div
-																		className="h-[34px] flex items-center font-inter text-[14px] font-semibold overflow-hidden"
+																		className="h-[32px] flex items-center font-inter text-[14px] font-semibold overflow-hidden"
 																		style={{ backgroundColor: getProfileHeaderBg('band') }}
 																	>
 																		{expandedProfileBox !== 'band' &&
@@ -5362,7 +5325,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																	{expandedProfileBox === 'band' && (
 																		<input
 																			type="text"
-																			className="h-[34px] bg-white px-3 font-inter text-[14px] outline-none border-0"
+																			className="h-[32px] bg-white px-3 font-inter text-[14px] outline-none border-0"
 																			value={profileFields.band}
 																			onChange={(e) =>
 																				setProfileFields({
@@ -5391,15 +5354,15 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																			: undefined
 																	}
 																	className={cn(
-																		'w-[413px] max-w-full mx-auto flex flex-col rounded-[8px] border-[3px] border-black cursor-pointer overflow-hidden',
+																		'w-[380px] max-w-full mx-auto flex flex-col rounded-[8px] border-[3px] border-black cursor-pointer overflow-hidden',
 																		expandedProfileBox === 'bio'
-																			? 'min-h-[68px]'
-																			: 'h-[34px]'
+																			? 'min-h-[64px]'
+																			: 'h-[32px]'
 																	)}
 																	onClick={() => handleProfileBoxToggle('bio')}
 																>
 																	<div
-																		className="h-[34px] flex items-center font-inter text-[14px] font-semibold overflow-hidden"
+																		className="h-[32px] flex items-center font-inter text-[14px] font-semibold overflow-hidden"
 																		style={{ backgroundColor: getProfileHeaderBg('bio') }}
 																	>
 																		{expandedProfileBox !== 'bio' &&
@@ -5424,7 +5387,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																	{expandedProfileBox === 'bio' && (
 																		<textarea
 																			ref={bioTextareaRef}
-																			className="min-h-[34px] bg-white px-3 py-[7px] font-inter text-[14px] leading-[20px] outline-none border-0 resize-none overflow-hidden"
+																			className="min-h-[32px] bg-white px-3 py-[6px] font-inter text-[14px] leading-[20px] outline-none border-0 resize-none overflow-hidden"
 																			value={profileFields.bio}
 																			onChange={(e) =>
 																				setProfileFields({
@@ -5461,13 +5424,13 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																			: undefined
 																	}
 																	className={cn(
-																		'w-[413px] max-w-full mx-auto flex flex-col rounded-[8px] border-[3px] border-black cursor-pointer overflow-hidden',
-																		expandedProfileBox === 'links' ? 'h-[68px]' : 'h-[34px]'
+																		'w-[380px] max-w-full mx-auto flex flex-col rounded-[8px] border-[3px] border-black cursor-pointer overflow-hidden',
+																		expandedProfileBox === 'links' ? 'h-[64px]' : 'h-[32px]'
 																	)}
 																	onClick={() => handleProfileBoxToggle('links')}
 																>
 																	<div
-																		className="h-[34px] flex items-center font-inter text-[14px] font-semibold overflow-hidden"
+																		className="h-[32px] flex items-center font-inter text-[14px] font-semibold overflow-hidden"
 																		style={{ backgroundColor: getProfileHeaderBg('links') }}
 																	>
 																		{expandedProfileBox !== 'links' &&
@@ -5496,7 +5459,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																	{expandedProfileBox === 'links' && (
 																		<input
 																			type="text"
-																			className="h-[34px] bg-white px-3 font-inter text-[14px] outline-none border-0"
+																			className="h-[32px] bg-white px-3 font-inter text-[14px] outline-none border-0"
 																			value={profileFields.links}
 																			onChange={(e) =>
 																				setProfileFields({
@@ -5519,6 +5482,29 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																</div>
 															</div>
 														</div>
+
+														{/* Bottom-right Continue CTA (matches mock) */}
+														<button
+															type="button"
+															onClick={(e) => {
+																e.stopPropagation();
+																setActiveTab('main');
+																setHasLeftProfileTab(true);
+															}}
+															className="shrink-0 h-[30px] pr-[18px] flex items-center justify-end gap-[8px] bg-transparent border-0 p-0 m-0 cursor-pointer focus:outline-none focus-visible:outline-none"
+															aria-label="Continue"
+														>
+															<span className="font-inter font-normal text-[16px] leading-none text-black">
+																Continue
+															</span>
+															<RightArrow
+																width={7}
+																height={14}
+																color="#000000"
+																opacity={1}
+																strokeWidth={4}
+															/>
+														</button>
 
 														{/* Bottom band (3px divider + 10px fill) */}
 														<div className="shrink-0 h-[13px] bg-[#58A6E5] border-t-[3px] border-black" />
@@ -7079,16 +7065,20 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																handleGenerateTestDrafts?.();
 																setHasAttemptedTest(true);
 															}}
-															disabled={isGenerationDisabled?.()}
+															disabled={isGenerateTestButtonDisabled}
 															className={cn(
 																'h-[28px] w-[232px] bg-[#DBF3DC] text-black font-inter font-normal text-[17px] leading-none rounded-[12px] cursor-pointer flex items-center justify-center p-0 border-2 border-transparent',
-																'transition-colors hover:bg-[#EAF9EB] hover:border-black active:bg-[#D1E9D2]',
-																isGenerationDisabled?.()
-																	? 'opacity-50 cursor-not-allowed'
+																isGeneratingTest
+																	? 'transition-colors bg-[#A2E9A4] hover:bg-[#A2E9A4] active:bg-[#A2E9A4] cursor-default'
+																	: 'transition-colors hover:bg-[#EAF9EB] hover:border-black active:bg-[#D1E9D2]',
+																isGenerateTestButtonDisabled
+																	? isGeneratingTest
+																		? '!opacity-100'
+																		: 'opacity-50 cursor-not-allowed'
 																	: 'opacity-100'
 															)}
 														>
-															{isPendingGeneration && isTest ? 'Testing...' : 'Generate Test'}
+															{isGeneratingTest ? null : 'Generate Test'}
 														</Button>
 													</div>
 												)}
@@ -7507,24 +7497,28 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														handleGenerateTestDrafts?.();
 														setHasAttemptedTest(true);
 													}}
-													disabled={isGenerationDisabled?.()}
+													disabled={isGenerateTestButtonDisabled}
 													onMouseEnter={() => {
-														if (!isGenerationDisabled?.()) setIsAutoGenerateTestHovered(true);
+														if (!isGenerateTestButtonDisabled) setIsAutoGenerateTestHovered(true);
 													}}
 													onMouseLeave={() => setIsAutoGenerateTestHovered(false)}
 													onFocus={() => {
-														if (!isGenerationDisabled?.()) setIsAutoGenerateTestHovered(true);
+														if (!isGenerateTestButtonDisabled) setIsAutoGenerateTestHovered(true);
 													}}
 													onBlur={() => setIsAutoGenerateTestHovered(false)}
 													className={cn(
 														'h-[28px] w-[232px] bg-[#DBF3DC] text-black font-inter font-normal text-[17px] leading-none rounded-[12px] cursor-pointer flex items-center justify-center p-0 border-2 border-transparent',
-														'transition-colors hover:bg-[#EAF9EB] hover:border-black active:bg-[#D1E9D2]',
-														isGenerationDisabled?.()
-															? 'opacity-50 cursor-not-allowed'
+														isGeneratingTest
+															? 'transition-colors bg-[#A2E9A4] hover:bg-[#A2E9A4] active:bg-[#A2E9A4] cursor-default'
+															: 'transition-colors hover:bg-[#EAF9EB] hover:border-black active:bg-[#D1E9D2]',
+														isGenerateTestButtonDisabled
+															? isGeneratingTest
+																? '!opacity-100'
+																: 'opacity-50 cursor-not-allowed'
 															: 'opacity-100'
 													)}
 												>
-													{isPendingGeneration && isTest ? 'Testing...' : 'Generate Test'}
+													{isGeneratingTest ? null : 'Generate Test'}
 												</Button>
 											</div>
 										)}
@@ -7664,16 +7658,21 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 															handleGenerateTestDrafts?.();
 															setHasAttemptedTest(true);
 														}}
-														disabled={isGenerationDisabled?.()}
+														disabled={isGenerateTestButtonDisabled}
 														className={cn(
 															'h-[28px] bg-white border-[3px] border-[#349A37] text-black font-inter font-normal text-[17px] leading-none rounded-[12px] cursor-pointer flex items-center justify-center transition-all hover:bg-[#EAF9EB] hover:border-black active:bg-primary/20 p-0',
 															cn(!forceDesktop ? 'w-[93.7vw]' : 'w-full', 'max-w-[475px]'),
-															isGenerationDisabled?.()
-																? 'opacity-50 cursor-not-allowed'
+															isGeneratingTest
+																? 'bg-[#A2E9A4] hover:bg-[#A2E9A4] active:bg-[#A2E9A4] cursor-default'
+																: null,
+															isGenerateTestButtonDisabled
+																? isGeneratingTest
+																	? '!opacity-100'
+																	: 'opacity-50 cursor-not-allowed'
 																: 'opacity-100'
 														)}
 													>
-														{isPendingGeneration && isTest ? 'Testing...' : 'Generate Test'}
+														{isGeneratingTest ? null : 'Generate Test'}
 													</Button>
 												</div>
 											</div>
@@ -7692,15 +7691,18 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																handleGenerateTestDrafts?.();
 																setHasAttemptedTest(true);
 															}}
-															disabled={isGenerationDisabled?.()}
+															disabled={isGenerateTestButtonDisabled}
 															className={cn(
 																'h-[53px] flex-1 rounded-none bg-[#5DAB68] text-white font-times font-bold cursor-pointer flex items-center justify-center font-primary border-2 border-black border-r-0',
-																isGenerationDisabled?.()
-																	? 'opacity-50 cursor-not-allowed'
+																isGeneratingTest ? 'bg-[#A2E9A4] cursor-default' : null,
+																isGenerateTestButtonDisabled
+																	? isGeneratingTest
+																		? '!opacity-100'
+																		: 'opacity-50 cursor-not-allowed'
 																	: 'opacity-100'
 															)}
 														>
-															{isPendingGeneration && isTest ? 'Testing...' : 'Test'}
+															{isGeneratingTest ? null : 'Test'}
 														</Button>
 														<button
 															type="button"
