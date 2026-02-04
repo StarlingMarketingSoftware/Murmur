@@ -36,7 +36,7 @@ import DraftingStatusPanel from '@/app/murmur/campaign/[campaignId]/DraftingSect
 import { CampaignHeaderBox } from '@/components/molecules/CampaignHeaderBox/CampaignHeaderBox';
 import { useGetContacts, useGetLocations } from '@/hooks/queryHooks/useContacts';
 import { useEditUserContactList } from '@/hooks/queryHooks/useUserContactLists';
-import { useEditEmail, useGetEmails } from '@/hooks/queryHooks/useEmails';
+import { useCreateEmail, useEditEmail, useGetEmails } from '@/hooks/queryHooks/useEmails';
 import { EmailStatus, EmailVerificationStatus, DraftingMode, ReviewStatus } from '@/constants/prismaEnums';
 import { resolveAutoSignatureText } from '@/constants/autoSignatures';
 import { ContactsSelection } from './EmailGeneration/ContactsSelection/ContactsSelection';
@@ -119,6 +119,71 @@ const DEFAULT_STATE_SUGGESTIONS = [
 		generalDescription: 'contact venues, restaurants and more, to book shows',
 	},
 ];
+
+const stripInjectedSubjectFromTestMessageHtml = (
+	rawHtml: string
+): { messageHtml: string; injectedSubject: string } => {
+	const html = (rawHtml || '').toString();
+	if (!html) return { messageHtml: html, injectedSubject: '' };
+
+	// DOM-based stripping is safest (preserves outer wrappers + signature markup).
+	// If we're not in a browser environment, keep as-is.
+	if (typeof window === 'undefined' || typeof DOMParser === 'undefined') {
+		return { messageHtml: html, injectedSubject: '' };
+	}
+
+	try {
+		const parser = new DOMParser();
+		const doc = parser.parseFromString(
+			`<div id="__murmur_test_preview_root">${html}</div>`,
+			'text/html'
+		);
+		const root = doc.getElementById('__murmur_test_preview_root');
+		if (!root) return { messageHtml: html, injectedSubject: '' };
+
+		// The AI/Hybrid test flow injects the subject as:
+		// <span style="font-family: Inter; font-weight: bold;">{subject}</span><br><br>
+		// We remove that subject span and the first two subsequent <br> tags only.
+		const subjectSpan = root.querySelector(
+			'span[style*="font-family: Inter"][style*="font-weight: bold"]'
+		) as HTMLSpanElement | null;
+		const injectedSubject = subjectSpan?.textContent?.trim() || '';
+
+		if (!subjectSpan) {
+			return { messageHtml: html, injectedSubject };
+		}
+
+		const parent = subjectSpan.parentNode;
+		let cursor: ChildNode | null = subjectSpan.nextSibling;
+		subjectSpan.remove();
+
+		let brsRemoved = 0;
+		while (parent && brsRemoved < 2 && cursor) {
+			const current = cursor;
+			cursor = cursor.nextSibling;
+
+			// Remove whitespace-only text nodes between nodes to ensure <br><br> is removed cleanly.
+			if (current.nodeType === Node.TEXT_NODE) {
+				if (!((current.textContent || '').trim())) {
+					current.parentNode?.removeChild(current);
+				}
+				continue;
+			}
+
+			if (current.nodeType === Node.ELEMENT_NODE) {
+				const el = current as Element;
+				if (el.tagName.toLowerCase() === 'br') {
+					el.parentNode?.removeChild(el);
+					brsRemoved += 1;
+				}
+			}
+		}
+
+		return { messageHtml: root.innerHTML, injectedSubject };
+	} catch {
+		return { messageHtml: html, injectedSubject: '' };
+	}
+};
 
 interface ExtendedDraftingSectionProps extends DraftingSectionProps {
 	onOpenIdentityDialog?: () => void;
@@ -204,6 +269,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		suppressToasts: true,
 	});
 	const { mutateAsync: updateEmail } = useEditEmail({ suppressToasts: true });
+	const { mutateAsync: createEmail } = useCreateEmail({ suppressToasts: true });
 	const { mutateAsync: editUser } = useEditUser({ suppressToasts: true });
 	const { mutateAsync: editIdentity } = useEditIdentity({ suppressToasts: true });
 
@@ -285,6 +351,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		};
 	}, [onDraftOperationsProgress]);
 	const [selectedDraft, setSelectedDraft] = useState<EmailWithRelations | null>(null);
+	const [isKeepingTestDraft, setIsKeepingTestDraft] = useState(false);
+	const [pendingKeptDraftContactId, setPendingKeptDraftContactId] = useState<number | null>(
+		null
+	);
 	// Ref to the main DraftedEmails instance (center column) so side preview controls can exit regen mode.
 	const draftedEmailsRef = useRef<DraftedEmailsHandle | null>(null);
 	// Tracks whether the DraftedEmails "regen settings preview" (HybridPromptInput) is open for the selected draft.
@@ -2215,6 +2285,16 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const sentEmails = (headerEmails || []).filter((e) => e.status === EmailStatus.sent);
 	const sentCount = sentEmails.length;
 
+	// If we just "Kept" a test draft, auto-open its draft in the Drafts tab once it exists.
+	useEffect(() => {
+		if (view !== 'drafting') return;
+		if (!pendingKeptDraftContactId) return;
+		const kept = draftEmails.find((e) => e.contactId === pendingKeptDraftContactId);
+		if (!kept) return;
+		setSelectedDraft(kept);
+		setPendingKeptDraftContactId(null);
+	}, [draftEmails, pendingKeptDraftContactId, view]);
+
 	// When batch drafting is in progress (or still animating queued drafts), swap the campaign
 	// research panel slot to a live "Draft Preview" so users can watch drafts type out from any tab.
 	const isBatchDraftingInProgress = isLivePreviewVisible;
@@ -2389,6 +2469,116 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const displayedContactForResearch = isDraftPreviewOpen
 		? selectedContactForResearch
 		: hoveredContactForResearch || selectedContactForResearch;
+
+	const handleKeepTestDraft = useCallback(
+		async (explicitContact?: ContactWithName | null) => {
+			if (isKeepingTestDraft) return false;
+			if (!campaign?.id) {
+				toast.error('Missing campaign.');
+				return false;
+			}
+
+			const contactForTest = explicitContact ?? contacts?.[0] ?? null;
+			if (!contactForTest) {
+				toast.error('No contact available to save this test draft.');
+				return false;
+			}
+
+			const rawTestMessage = (campaign.testMessage || '').trim();
+			if (!rawTestMessage) {
+				toast.error('Generate a test draft first.');
+				return false;
+			}
+
+			setIsKeepingTestDraft(true);
+			try {
+				const existingSnapshot = extractMurmurDraftSettingsSnapshot(rawTestMessage);
+				const { messageHtml, injectedSubject } =
+					stripInjectedSubjectFromTestMessageHtml(rawTestMessage);
+
+				const subject = (campaign.testSubject || '').trim() || injectedSubject.trim();
+				if (!subject) {
+					toast.error('Test draft is missing a subject.');
+					return false;
+				}
+
+				const cleanedMessageHtml = (messageHtml || '').trim();
+				if (!cleanedMessageHtml) {
+					toast.error('Test draft is missing content.');
+					return false;
+				}
+
+				const identityProfile = campaign.identity as IdentityProfileFields | null | undefined;
+				const computedProfileFields: DraftProfileFields = {
+					name: identityProfile?.name ?? '',
+					genre: identityProfile?.genre ?? '',
+					area: identityProfile?.area ?? '',
+					band: identityProfile?.bandName ?? '',
+					bio: identityProfile?.bio ?? '',
+					links: identityProfile?.website ?? '',
+				};
+
+				const baseValues = existingSnapshot?.values ?? form.getValues();
+				// Ensure the snapshot stores a concrete signature string (so Drafts settings reflect what was used).
+				const signatureForSnapshot =
+					resolveAutoSignatureText({
+						currentSignature: baseValues.signature ?? null,
+						fallbackSignature: `Thank you,\n${identityProfile?.name || ''}`,
+						context: {
+							name: identityProfile?.name ?? null,
+							bandName: identityProfile?.bandName ?? null,
+							website: identityProfile?.website ?? null,
+							email: identityProfile?.email ?? null,
+						},
+					}) ||
+					(typeof baseValues.signature === 'string' ? baseValues.signature : '') ||
+					'';
+
+				const valuesForSnapshot: DraftingFormValues = {
+					...baseValues,
+					signature: signatureForSnapshot,
+				};
+				const profileFieldsForSnapshot =
+					existingSnapshot?.profileFields ?? computedProfileFields;
+
+				const messageWithSettings = injectMurmurDraftSettingsSnapshot(cleanedMessageHtml, {
+					version: 1,
+					values: valuesForSnapshot,
+					profileFields: profileFieldsForSnapshot,
+				});
+
+				await createEmail({
+					subject,
+					message: messageWithSettings,
+					campaignId: campaign.id,
+					status: EmailStatus.draft,
+					contactId: contactForTest.id,
+				});
+
+				await queryClient.invalidateQueries({ queryKey: ['emails'] });
+
+				toast.success('Saved to Drafts.');
+				setPendingKeptDraftContactId(contactForTest.id);
+				goToDrafting?.();
+				return true;
+			} catch (error) {
+				console.error('Failed to keep test draft:', error);
+				toast.error('Failed to save draft. Please try again.');
+				return false;
+			} finally {
+				setIsKeepingTestDraft(false);
+			}
+		},
+		[
+			campaign,
+			contacts,
+			createEmail,
+			form,
+			goToDrafting,
+			isKeepingTestDraft,
+			queryClient,
+		]
+	);
 	const draftsMiniEmailTopHeaderLabel = draftsMiniEmailTopHeaderHeight ? 'Settings' : undefined;
 	const draftsMiniEmailSettingsLabels = useMemo(() => {
 		const contact = displayedContactForResearch;
@@ -3765,7 +3955,15 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											isDisabled={isGenerationDisabled()}
 											isTesting={Boolean(isTest)}
 											contact={contacts?.[0] || displayedContactForResearch}
-											style={{ width: 375, height: 670 }}
+											onKeep={() =>
+												handleKeepTestDraft(contacts?.[0] || displayedContactForResearch)
+											}
+											isKeeping={isKeepingTestDraft}
+											keepDisabled={
+												!campaign?.testMessage ||
+												!(contacts?.[0] || displayedContactForResearch)
+											}
+											style={{ width: 375, height: 672, marginTop: -8 }}
 										/>
 									) : view === 'drafting' && Boolean(selectedDraft) ? (
 										<div
@@ -4283,6 +4481,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													onGoToContacts={goToContacts}
 													onGoToInbox={goToInbox}
 													onTestPreviewToggle={setShowTestPreview}
+													onKeepTestDraft={() => handleKeepTestDraft(contacts?.[0] || null)}
+													isKeepingTestDraft={isKeepingTestDraft}
 													draftCount={contactsTabSelectedIds.size}
 													onDraftClick={async () => {
 														if (contactsTabSelectedIds.size === 0) {

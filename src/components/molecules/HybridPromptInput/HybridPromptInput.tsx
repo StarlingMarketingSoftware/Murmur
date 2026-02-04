@@ -2624,6 +2624,8 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 	const {
 		compactLeftOnly,
 		onTestPreviewToggle,
+		onKeepTestDraft,
+		isKeepingTestDraft,
 		draftCount = 0,
 		onDraftClick,
 		isDraftDisabled,
@@ -7751,6 +7753,14 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														isDisabled={isGenerationDisabled?.()}
 														isTesting={Boolean(isTest)}
 														contact={contact}
+														onKeep={onKeepTestDraft}
+														isKeeping={Boolean(isKeepingTestDraft)}
+														keepDisabled={
+															!onKeepTestDraft ||
+															!testMessage ||
+															!contact ||
+															Boolean(isTest)
+														}
 													/>
 												</DraggableBox>
 												{/* Mobile sticky footer with Back to Testing and Go to Drafting */}
