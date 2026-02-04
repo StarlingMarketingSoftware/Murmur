@@ -880,7 +880,7 @@ Do not include any other text or explanation outside the JSON object.
 export const GEMINI_HYBRID_PROMPT = applyDraftingOutputPhraseFilters(GEMINI_HYBRID_PROMPT_BASE, {
 	mode: 'templated', 
 });
-
+	
 const MISTRAL_FORMATTING_INSTRUCTIONS = `
 1. !IMPORTANT! Ensure that there is a line break character "\n" between each paragraph. Even after the first line, which is just a short greeting, there should be a line break character "\n". 
 2. Do not include a line break before the first line of text. 
