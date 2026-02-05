@@ -931,6 +931,7 @@ const MAPBOX_LAYER_IDS = {
 	promotionPinIcons: 'murmur-promo-pin-icons',
 	bookingPinHit: 'murmur-booking-pin-hit',
 	bookingPinIcons: 'murmur-booking-pin-icons',
+	bookingPinIconsHover: 'murmur-booking-pin-icons-hover',
 	promotionDotHit: 'murmur-promo-dot-hit',
 	promotionDotDots: 'murmur-promo-dot-dots',
 	baseHit: 'murmur-base-hit',
@@ -1327,6 +1328,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	isLoading,
 	skipAutoFit,
 }) => {
+	// Default to enabling state hover/click when a handler is provided.
+	// This mirrors the old Google Maps UX (hover highlight + click-to-search) without requiring
+	// every caller to pass an explicit `enableStateInteractions` flag.
+	const stateInteractionsEnabled = enableStateInteractions ?? typeof onStateSelect === 'function';
+
 	const [selectedMarker, setSelectedMarker] = useState<ContactWithName | null>(null);
 	const [hoveredMarkerId, setHoveredMarkerId] = useState<number | null>(null);
 	const hoveredMarkerIdRef = useRef<number | null>(null);
@@ -1509,13 +1515,22 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	}, [allContactsOverlayVisibleContacts]);
 	// When hovering a booking "extra" marker, highlight all other visible extra markers
 	// of the same booking category (e.g. hover a festival → highlight all festivals in view).
+
+	// Pre-compute id → category for O(1) lookups when resolving the hovered category.
+	const bookingExtraIdToCategory = useMemo(() => {
+		const m = new Map<number, string>();
+		for (const c of bookingExtraVisibleContacts) {
+			const cat = getBookingTitlePrefixFromContactTitle(c.title);
+			if (cat) m.set(c.id, cat);
+		}
+		return m;
+	}, [bookingExtraVisibleContacts]);
+
 	const hoveredBookingExtraCategory = useMemo(() => {
 		if (!isBookingSearch) return null;
 		if (hoveredMarkerId == null) return null;
-		const hovered = bookingExtraVisibleContacts.find((c) => c.id === hoveredMarkerId);
-		if (!hovered) return null;
-		return getBookingTitlePrefixFromContactTitle(hovered.title);
-	}, [isBookingSearch, hoveredMarkerId, bookingExtraVisibleContacts]);
+		return bookingExtraIdToCategory.get(hoveredMarkerId) ?? null;
+	}, [isBookingSearch, hoveredMarkerId, bookingExtraIdToCategory]);
 	useEffect(() => {
 		// Reset the overlay fetch window and any visible extra markers on search transitions.
 		lastBookingExtraFetchKeyRef.current = '';
@@ -2275,12 +2290,29 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				source?.setData({ type: 'FeatureCollection', features } as any);
 
 				// Build a point FeatureCollection with one centroid per state for labels.
+				// Some states have irregular shapes where the bbox centroid falls outside the
+				// state or looks visually off — override those with hand-tuned coordinates.
+				const STATE_LABEL_OVERRIDES: Record<string, [number, number]> = {
+					TX: [-99.5, 31.5],    // Texas: panhandle skews centroid north
+					OK: [-97.5, 35.5],    // Oklahoma: panhandle skews centroid west
+					MN: [-94.3, 46.0],    // Minnesota: NW angle skews centroid
+					NV: [-117.0, 39.0],   // Nevada: triangular shape skews centroid
+					CA: [-119.3, 36.5],   // California: long coast skews centroid east
+					ID: [-114.5, 44.4],   // Idaho: panhandle skews bbox centroid too far east
+					FL: [-81.7, 28.6],    // Florida: peninsula + panhandle
+					MI: [-85.4, 43.5],    // Michigan: Lower Peninsula center
+					LA: [-92.5, 31.0],    // Louisiana: boot shape
+					MD: [-76.8, 39.05],   // Maryland: narrow and wide
+					HI: [-157.5, 20.5],   // Hawaii: island chain
+					AK: [-153.0, 64.0],   // Alaska: massive bbox
+				};
 				const labelPoints: GeoJSON.Feature[] = [];
 				for (const [key, entry] of byKey) {
 					const b = entry.bbox;
 					if (!b) continue;
-					const lng = (b.minLng + b.maxLng) / 2;
-					const lat = (b.minLat + b.maxLat) / 2;
+					const override = STATE_LABEL_OVERRIDES[key];
+					const lng = override ? override[0] : (b.minLng + b.maxLng) / 2;
+					const lat = override ? override[1] : (b.minLat + b.maxLat) / 2;
 					labelPoints.push({
 						type: 'Feature',
 						properties: { key, name: entry.name },
@@ -2355,17 +2387,17 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			map.setLayoutProperty(
 				MAPBOX_LAYER_IDS.statesDividers,
 				'visibility',
-				enableStateInteractions ? 'none' : 'visible'
+				stateInteractionsEnabled ? 'none' : 'visible'
 			);
 		}
 		if (map.getLayer(MAPBOX_LAYER_IDS.statesBordersInteractive)) {
 			map.setLayoutProperty(
 				MAPBOX_LAYER_IDS.statesBordersInteractive,
 				'visibility',
-				enableStateInteractions ? 'visible' : 'none'
+				stateInteractionsEnabled ? 'visible' : 'none'
 			);
 		}
-	}, [map, isMapLoaded, enableStateInteractions]);
+	}, [map, isMapLoaded, stateInteractionsEnabled]);
 
 	// Keep the Mapbox "selected" feature-state for US states in sync with `selectedStateKey`.
 	const prevSelectedStateKeyOnMapRef = useRef<string | null>(null);
@@ -2414,7 +2446,15 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		};
 
 		// Core sources
-		ensureSource(MAPBOX_SOURCE_IDS.states);
+		// States source needs `promoteId` so Mapbox uses the string "key" property (e.g. "CA", "TX")
+		// as the feature identifier — required for setFeatureState with non-numeric IDs.
+		if (!mapInstance.getSource(MAPBOX_SOURCE_IDS.states)) {
+			mapInstance.addSource(MAPBOX_SOURCE_IDS.states, {
+				type: 'geojson',
+				data: emptyFc,
+				promoteId: 'key',
+			});
+		}
 		ensureSource(MAPBOX_SOURCE_IDS.resultsOutline);
 		ensureSource(MAPBOX_SOURCE_IDS.lockedOutline);
 		ensureSource(MAPBOX_SOURCE_IDS.selectedAreaRect);
@@ -2588,7 +2628,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			source: MAPBOX_SOURCE_IDS.states,
 			paint: {
 				'fill-color': '#000000',
-				'fill-opacity': 0,
+				// Tiny non-zero opacity ensures queryRenderedFeatures reliably returns features
+				// across all browsers/GPU drivers (some skip truly invisible geometry).
+				'fill-opacity': 0.01,
 			},
 		});
 		ensureLayer({
@@ -2711,7 +2753,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		});
 
 		// Booking extra pins — behind primary dots
-		// The circle layer doubles as hit area AND visual ring for selection / category hover.
+		// The circle layer doubles as hit area AND visual ring for selection.
 		ensureLayer({
 			id: MAPBOX_LAYER_IDS.bookingPinHit,
 			type: 'circle',
@@ -2722,13 +2764,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				'circle-stroke-width': [
 					'case',
 					['boolean', ['feature-state', 'selected'], false], 2.5,
-					['boolean', ['feature-state', 'categoryHover'], false], 2,
 					0,
 				],
 				'circle-stroke-color': [
 					'case',
 					['boolean', ['feature-state', 'selected'], false], RESULT_DOT_STROKE_COLOR_SELECTED,
-					['boolean', ['feature-state', 'categoryHover'], false], BOOKING_EXTRA_PIN_HOVER_STROKE_COLOR,
 					'transparent',
 				],
 			},
@@ -2739,6 +2779,23 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			source: MAPBOX_SOURCE_IDS.markersBookingPin,
 			layout: {
 				'icon-image': ['get', 'iconDefault'],
+				'icon-size': pinIconSizeExpr,
+				'icon-anchor': 'top-left',
+				'icon-offset': [-MAP_MARKER_PIN_CIRCLE_CENTER_X, -MAP_MARKER_PIN_CIRCLE_CENTER_Y],
+				'icon-allow-overlap': true,
+				'icon-ignore-placement': true,
+			},
+		});
+		// Hover variant: renders on top with the hover icon (black outline + tail).
+		// Visibility is controlled by a dynamic filter (setFilter) — one call instead of N
+		// setFeatureState calls — so highlight/un-highlight is instant regardless of pin count.
+		ensureLayer({
+			id: MAPBOX_LAYER_IDS.bookingPinIconsHover,
+			type: 'symbol',
+			source: MAPBOX_SOURCE_IDS.markersBookingPin,
+			filter: ['==', ['get', 'category'], ''],
+			layout: {
+				'icon-image': ['get', 'iconHover'],
 				'icon-size': pinIconSizeExpr,
 				'icon-anchor': 'top-left',
 				'icon-offset': [-MAP_MARKER_PIN_CIRCLE_CENTER_X, -MAP_MARKER_PIN_CIRCLE_CENTER_Y],
@@ -4035,7 +4092,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	]);
 
 	// Draw a black outline around the searched/locked state (even when state interactions are off).
-	// When state interactions are enabled, the Data layer already renders the selected state border.
+	// When state interactions are enabled, our interactive borders layer renders the selected state border.
 	useEffect(() => {
 		if (!map || !isMapLoaded || !isStateLayerReady) return;
 
@@ -4069,7 +4126,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		recomputeViewportDots(map, isLoadingRef.current);
 
 		clearSearchedStateOutline();
-		if (enableStateInteractions || !found) return;
+		if (stateInteractionsEnabled || !found) return;
 
 		const outlineFc = createOutlineGeoJsonFromMultiPolygon(found);
 		const source = map.getSource(MAPBOX_SOURCE_IDS.lockedOutline) as mapboxgl.GeoJSONSource | undefined;
@@ -4080,7 +4137,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		isStateLayerReady,
 		isLoading,
 		lockedStateKey,
-		enableStateInteractions,
+		stateInteractionsEnabled,
 		clearSearchedStateOutline,
 		recomputeViewportDots,
 	]);
@@ -4597,7 +4654,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			}
 
 			// Optional state hover highlight (only when state interactions are enabled).
-			if (!enableStateInteractions || !isStateLayerReady) {
+			if (!stateInteractionsEnabled || !isStateLayerReady) {
 				clearStateHover();
 				return;
 			}
@@ -4660,7 +4717,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			}
 
 			// State click (when enabled and zoomed out).
-			if (enableStateInteractions && isStateLayerReady) {
+			if (stateInteractionsEnabled && isStateLayerReady) {
 				const zoom = map.getZoom() ?? MAP_DEFAULT_ZOOM;
 				if (zoom <= STATE_HOVER_HIGHLIGHT_MAX_ZOOM + 0.001) {
 					const stateFeatures = map.queryRenderedFeatures(e.point, { layers: [MAPBOX_LAYER_IDS.statesFillHit] });
@@ -4699,7 +4756,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		isMapLoaded,
 		areaSelectionEnabled,
 		isAreaSelecting,
-		enableStateInteractions,
+		stateInteractionsEnabled,
 		isStateLayerReady,
 		visibleContactsById,
 		bookingExtraContactsById,
@@ -5052,7 +5109,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				features.push({
 					type: 'Feature',
 					id: contact.id,
-					properties: { iconDefault, iconHover, iconSelected },
+					properties: { iconDefault, iconHover, iconSelected, category: whatForMarker ?? '' },
 					geometry: { type: 'Point', coordinates: [coords.lng, coords.lat] },
 				});
 			}
@@ -5123,22 +5180,17 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	]);
 
 	// Booking UX: highlight all booking extra pins of the hovered category.
+	// Uses a single setFilter call on the hover layer instead of N setFeatureState calls,
+	// so highlight/un-highlight is O(1) regardless of how many pins are in view.
 	useEffect(() => {
 		if (!map || !isMapLoaded) return;
-		const hoveredCategory = hoveredBookingExtraCategory;
-		for (const contact of bookingExtraVisibleContacts) {
-			const category = getBookingTitlePrefixFromContactTitle(contact.title);
-			const categoryHover = Boolean(hoveredCategory && category && category === hoveredCategory);
-			try {
-				map.setFeatureState(
-					{ source: MAPBOX_SOURCE_IDS.markersBookingPin, id: contact.id },
-					{ categoryHover }
-				);
-			} catch {
-				// Ignore.
-			}
-		}
-	}, [map, isMapLoaded, hoveredBookingExtraCategory, bookingExtraVisibleContacts]);
+		const layer = MAPBOX_LAYER_IDS.bookingPinIconsHover;
+		if (!map.getLayer(layer)) return;
+		const cat = hoveredBookingExtraCategory;
+		// Match features whose `category` property equals the hovered category.
+		// When no category is hovered, match nothing (empty string never stored as a real category).
+		map.setFilter(layer, ['==', ['get', 'category'], cat ?? '']);
+	}, [map, isMapLoaded, hoveredBookingExtraCategory]);
 
 	// Larger leave buffer zone - how much extra padding below the tooltip for hysteresis
 	const hoverLeaveBufferPx = useMemo(() => {
