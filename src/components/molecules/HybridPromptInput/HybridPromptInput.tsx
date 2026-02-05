@@ -5011,7 +5011,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 													aria-hidden="true"
 													className="absolute inset-0 z-0 bg-[#305B31] pointer-events-none opacity-0"
 												/>
-												<div className="relative z-10 flex flex-col flex-1">
+												<div className="relative z-10 flex flex-col flex-1 mt-[18px]">
 													{/* Profile tab: align the decorative top pill with Auto/Hybrid Subject */}
 													<div
 														aria-hidden="true"
@@ -5026,14 +5026,14 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 													<div className="w-full mt-[43px] max-[480px]:mt-[39px]">
 													<div
 														className={cn(
-															'relative w-full max-w-[468px] mx-auto bg-[#4597DA] border-[3px] border-black rounded-[8px] overflow-hidden flex flex-col',
+															'relative z-10 w-[465px] max-w-full mx-auto bg-[#4597DA] border-[3px] border-black rounded-[8px] overflow-hidden flex flex-col',
 															props.clipProfileTabOverflow
 																? expandedProfileBox
-																	? 'h-[438px]'
-																	: 'h-[404px]'
+																	? 'h-[425px]'
+																	: 'h-[391px]'
 																: expandedProfileBox
-																? 'min-h-[438px]'
-																: 'min-h-[404px]'
+																? 'min-h-[425px]'
+																: 'min-h-[391px]'
 														)}
 														onClick={(e) => e.stopPropagation()}
 													>
@@ -5067,19 +5067,6 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																	aria-label="Undo last profile change"
 																>
 																	<UndoIcon width="20" height="20" />
-																</button>
-																<button
-																	type="button"
-																	aria-label="Back to Auto"
-																	onClick={(e) => {
-																		e.stopPropagation();
-																		setActiveTab('main');
-																		setHasLeftProfileTab(true);
-																		switchToFull();
-																	}}
-																	className="w-[44px] shrink-0 h-full border-l-[3px] border-black flex items-center justify-center bg-transparent cursor-pointer p-0 hover:brightness-[0.98] active:brightness-[0.95] focus:outline-none focus-visible:outline-none"
-																>
-																	<span className="block w-[18px] h-[3px] bg-black" />
 																</button>
 															</div>
 														</div>
@@ -5514,42 +5501,67 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 												</div>
 
 												{/* New containers below Body box */}
-												<div className="w-full flex flex-col items-center mt-[9px]">
-													{/* 472 x 93 container */}
-													<div className="relative w-[472px] h-[93px] max-w-full rounded-[8px] border-2 border-black">
-														{/* Decorative inner boxes (no fill) */}
+												<div className="relative w-full flex flex-col items-center mt-[9px] flex-1">
+													{/* 465px container positioned behind the Introduce yourself box */}
+													<div className="relative z-0 w-[465px] h-[93px] max-w-full rounded-[8px] border-[3px] border-black -mt-[20px]">
+														{/* Decorative inner boxes (448px wide, left aligned) */}
 														<div
 															aria-hidden="true"
-															className="pointer-events-none absolute left-[12px] top-[15px] w-[203px] h-[28px] rounded-[8px] border-2 border-black z-0"
+															className="pointer-events-none absolute left-[8px] top-[15px] w-[448px] h-[28px] rounded-[8px] border-2 border-black z-0"
 														/>
 														<div
 															aria-hidden="true"
-															className="pointer-events-none absolute left-[12px] top-[56px] w-[160px] h-[25px] rounded-[8px] border-2 border-black z-0"
+															className="pointer-events-none absolute left-[8px] top-[56px] w-[448px] h-[22px] rounded-[8px] border-2 border-black z-0"
 														/>
-														{/* Inner content wrapper: flush to top + centered (matches mock) */}
-														{/* Note: offset upward by the container border width so borders overlap (prevents “double line”). */}
-														<div className="absolute -top-[2px] left-1/2 -translate-x-1/2 flex flex-col items-center w-full z-10">
-															<button
-																type="button"
-																onClick={() => {
-																	setActiveTab('main');
-																	setHasLeftProfileTab(true);
-																}}
-																className="w-[298px] h-[26px] rounded-[6px] bg-[#B1B1B1] hover:bg-[#A7A7A7] active:bg-[#A1A1A1] transition-colors duration-150 border-2 border-black text-white font-inter font-medium text-[15px] leading-none flex items-center justify-center cursor-pointer"
-															>
-																back
-															</button>
-															{/* next prompt: we'll add the smaller inner boxes here */}
-														</div>
 													</div>
 
-													{/* 229 x 34 box, 13px below the 472 x 93 container */}
+													{/* 110 x 30 box, 58px from bottom, aligned with left of 465px box */}
 													{!props.hideProfileBottomMiniBox && (
-														<div className="w-[472px] max-w-full mt-[13px]">
+														<div className="absolute bottom-[63px] left-1/2 -translate-x-1/2 w-[465px] max-w-full">
 															<div
 																aria-hidden="true"
-																className="w-[229px] h-[34px] rounded-[8px] border-2 border-black"
+																className="w-[110px] h-[25px] rounded-[10px] border-2 border-black ml-[8px]"
 															/>
+														</div>
+													)}
+
+													{/* Profile: bottom Generate Test button */}
+													{!hideGenerateTestButton && !showTestPreview && !compactLeftOnly && (
+														<div
+															className={cn(
+																'mt-auto pb-[18px] w-[468px] flex items-center justify-center',
+																!forceDesktop && 'max-w-[89.33vw]'
+															)}
+															onClick={(e) => e.stopPropagation()}
+														>
+															<Button
+																type="button"
+																data-hover-description="This will show you a test draft, given all of what you provided"
+																onClick={(e) => {
+																	e.stopPropagation();
+																	if (isMobile) {
+																		setShowTestPreview?.(true);
+																	} else {
+																		onTestPreviewToggle?.(true);
+																	}
+																	handleGenerateTestDrafts?.();
+																	setHasAttemptedTest(true);
+																}}
+																disabled={isGenerateTestButtonDisabled}
+																className={cn(
+																	'h-[28px] w-[232px] bg-[#DBF3DC] text-black font-inter font-normal text-[17px] leading-none rounded-[12px] cursor-pointer flex items-center justify-center p-0 border-2 border-transparent',
+																	isGeneratingTest
+																		? 'transition-colors bg-[#A2E9A4] hover:bg-[#A2E9A4] active:bg-[#A2E9A4] cursor-default'
+																		: 'transition-colors hover:bg-[#EAF9EB] hover:border-black active:bg-[#D1E9D2]',
+																	isGenerateTestButtonDisabled
+																		? isGeneratingTest
+																			? '!opacity-100'
+																			: 'opacity-50 cursor-not-allowed'
+																		: 'opacity-100'
+																)}
+															>
+																{isGeneratingTest ? null : 'Generate Test'}
+															</Button>
 														</div>
 													)}
 												</div>
