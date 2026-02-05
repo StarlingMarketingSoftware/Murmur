@@ -113,6 +113,14 @@ export interface DraftingSectionProps {
 	 */
 	hideHeaderBox?: boolean;
 	/**
+	 * Optional callback to report drafting queue progress for UI that lives outside the DraftingSection
+	 * (e.g. the CampaignHeaderBox rendered at the page level on the narrowest breakpoint).
+	 */
+	onDraftOperationsProgress?: (progress: {
+		visible: boolean;
+		operations: Array<{ current: number; total: number }>;
+	}) => void;
+	/**
 	 * When true, this DraftingSection is fading out as part of a tab transition.
 	 * Used to hide elements that should remain stable (like research panel) in the exiting view.
 	 */
@@ -137,6 +145,36 @@ type BatchGenerationResult = {
 	success: boolean;
 	error?: string;
 	retries: number;
+};
+
+type DraftingOperationStatus = 'queued' | 'running';
+
+type DraftingIdentitySnapshot = {
+	name: string;
+	bandName?: string | null;
+	genre?: string | null;
+	area?: string | null;
+	bio?: string | null;
+	website?: string | null;
+	email?: string | null;
+};
+
+type DraftingOperation = {
+	id: string;
+	status: DraftingOperationStatus;
+	createdAtMs: number;
+	startedAtMs?: number;
+	/** Total number of contacts in this operation */
+	total: number;
+	/** Number of drafts completed (successfully created) */
+	progress: number;
+	mode: DraftingMode;
+	/** Settings snapshot at enqueue time (so edits during drafting don't affect queued ops) */
+	values: DraftingFormValues;
+	/** Identity snapshot at enqueue time (so profile changes don't affect queued ops) */
+	identity: DraftingIdentitySnapshot;
+	/** Snapshot of targets at enqueue time for deterministic drafting */
+	targets: ContactWithName[];
 };
 
 const FONT_VALUES: [Font, ...Font[]] = FONT_OPTIONS as [Font, ...Font[]];
@@ -248,6 +286,39 @@ export const draftingFormSchema = z.object({
 
 export type DraftingFormValues = z.infer<typeof draftingFormSchema>;
 
+const deepClone = <T,>(value: T): T => {
+	try {
+		// `structuredClone` keeps types like arrays/objects intact and avoids shared references.
+		// It’s available in modern browsers where this drafting UI runs.
+		return structuredClone(value);
+	} catch {
+		// Fallback for environments where structuredClone isn't available.
+		return JSON.parse(JSON.stringify(value)) as T;
+	}
+};
+
+const makeDraftOperationId = (): string => {
+	try {
+		if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+			return crypto.randomUUID();
+		}
+	} catch {
+		// ignore
+	}
+	return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+};
+
+const getDraftingModeForValues = (values: DraftingFormValues): DraftingMode => {
+	const blocks = values.hybridBlockPrompts;
+	const hasFullAutomatedBlock = blocks?.some((block) => block.type === 'full_automated');
+	if (hasFullAutomatedBlock) return DraftingMode.ai;
+
+	const isOnlyTextBlocks = blocks?.every((block) => block.type === HybridBlock.text);
+	if (isOnlyTextBlocks) return DraftingMode.handwritten;
+
+	return DraftingMode.hybrid;
+};
+
 export const useDraftingSection = (props: DraftingSectionProps) => {
 	const { campaign } = props;
 
@@ -260,7 +331,24 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		useState(false);
 	const [generationProgress, setGenerationProgress] = useState(-1);
 	const [isTest, setIsTest] = useState<boolean>(false);
-	const [isBatchGenerating, setIsBatchGenerating] = useState(false);
+	// Drafting queue: allow multiple drafting operations to be queued while one runs.
+	const [draftOperations, setDraftOperations] = useState<DraftingOperation[]>([]);
+	const draftOperationsRef = useRef<DraftingOperation[]>([]);
+	const updateDraftOperations = useCallback(
+		(updater: (prev: DraftingOperation[]) => DraftingOperation[]) => {
+			// Keep the ref in sync synchronously so async queue logic can reliably
+			// determine when operations have fully finished.
+			const next = updater(draftOperationsRef.current);
+			draftOperationsRef.current = next;
+			setDraftOperations(next);
+		},
+		[]
+	);
+	const isProcessingDraftQueueRef = useRef(false);
+	const isDraftQueuePausedForCreditsRef = useRef(false);
+	const activeDraftOperationIdRef = useRef<string | null>(null);
+	// Used to keep live-preview ordering stable across queued operations.
+	const globalDraftIndexBaseRef = useRef(0);
 	const [promptQualityScore, setPromptQualityScore] = useState<number | null>(null);
 	const [promptQualityLabel, setPromptQualityLabel] = useState<string | null>(null);
 	const [promptSuggestions, setPromptSuggestions] = useState<string[]>([]);
@@ -272,7 +360,6 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	const draftingRef = useRef<HTMLDivElement>(null);
 	const emailStructureRef = useRef<HTMLDivElement>(null);
 
-	const isBatchGeneratingRef = useRef(false);
 	const abortControllerRef = useRef<AbortController | null>(null);
 	const isGenerationCancelledRef = useRef(false);
 	const lastFocusedFieldRef = useRef<{
@@ -303,26 +390,36 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	>([]);
 	const livePreviewIsTypingRef = useRef<boolean>(false);
 	const livePreviewAutoHideWhenIdleRef = useRef<boolean>(false);
+	// Invalidate scheduled typing ticks between drafts / on cancel.
+	const livePreviewRunIdRef = useRef(0);
+	// Bursty "human-ish" cadence state.
+	const livePreviewCadenceRef = useRef<{
+		segmentCharsRemaining: number;
+		segmentCps: number;
+	}>({
+		segmentCharsRemaining: 0,
+		segmentCps: 150,
+	});
 
-	// Typing animation tuning: fixed speed (chars/sec) regardless of backend timing.
-	const LIVE_PREVIEW_TICK_MS = 20;
-	const LIVE_PREVIEW_CHARS_PER_SECOND = 150;
-	const LIVE_PREVIEW_STEP_CHARS = Math.max(
-		1,
-		Math.round((LIVE_PREVIEW_CHARS_PER_SECOND * LIVE_PREVIEW_TICK_MS) / 1000)
-	);
-	const LIVE_PREVIEW_POST_DRAFT_DELAY_MS = 250;
+	// Typing animation tuning: highly variable bursty cadence.
+	// Wide speed range (20-120 CPS) creates natural rhythm with fast bursts and brief slowdowns.
+	const LIVE_PREVIEW_BASE_CPS = 55;
+	const LIVE_PREVIEW_MIN_DELAY_MS = 8;
+	const LIVE_PREVIEW_MAX_DELAY_MS = 280;
+	const LIVE_PREVIEW_POST_DRAFT_DELAY_MS = 200;
 
 	const stopLivePreviewTimers = useCallback(() => {
+		// Invalidate any scheduled ticks (prevents stray setTimeouts from rescheduling).
+		livePreviewRunIdRef.current += 1;
+		livePreviewIsTypingRef.current = false;
 		if (livePreviewTimerRef.current) {
-			clearInterval(livePreviewTimerRef.current);
+			clearTimeout(livePreviewTimerRef.current);
 			livePreviewTimerRef.current = null;
 		}
 		if (livePreviewDelayTimerRef.current) {
 			clearTimeout(livePreviewDelayTimerRef.current);
 			livePreviewDelayTimerRef.current = null;
 		}
-		livePreviewIsTypingRef.current = false;
 	}, []);
 
 	const hideLivePreview = useCallback(() => {
@@ -363,9 +460,9 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		const next = livePreviewQueueRef.current.shift();
 		if (!next) return;
 
-		// Clear any previous typing interval.
+		// Clear any previous typing timer.
 		if (livePreviewTimerRef.current) {
-			clearInterval(livePreviewTimerRef.current);
+			clearTimeout(livePreviewTimerRef.current);
 			livePreviewTimerRef.current = null;
 		}
 
@@ -377,8 +474,17 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		livePreviewFullTextRef.current = next.message || '';
 		livePreviewIndexRef.current = 0;
 		livePreviewIsTypingRef.current = true;
+		const runId = (livePreviewRunIdRef.current += 1);
+		// Reset cadence for a fresh draft.
+		livePreviewCadenceRef.current.segmentCharsRemaining = 0;
+		livePreviewCadenceRef.current.segmentCps = LIVE_PREVIEW_BASE_CPS;
 
-		livePreviewTimerRef.current = window.setInterval(() => {
+		const clamp = (value: number, min: number, max: number) =>
+			Math.min(max, Math.max(min, value));
+		const randBetween = (min: number, max: number) => min + Math.random() * (max - min);
+		const tick = () => {
+			if (livePreviewRunIdRef.current !== runId) return;
+
 			const full = livePreviewFullTextRef.current;
 			const i = livePreviewIndexRef.current;
 			if (i >= full.length) {
@@ -393,14 +499,119 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 				return;
 			}
 
-			const nextIndex = Math.min(i + LIVE_PREVIEW_STEP_CHARS, full.length);
-			livePreviewIndexRef.current = nextIndex;
-			setLivePreviewMessage(full.slice(0, nextIndex));
-		}, LIVE_PREVIEW_TICK_MS);
+			const cadence = livePreviewCadenceRef.current;
+			// Pick a new speed segment to create highly variable burstiness.
+			if (cadence.segmentCharsRemaining <= 0) {
+				const roll = Math.random();
+				const prevCps = cadence.segmentCps || LIVE_PREVIEW_BASE_CPS;
+				let nextCps: number;
+				let nextLen: number;
+
+				if (roll < 0.18) {
+					// Very fast burst (100-120 CPS) - short bursts of rapid typing.
+					nextCps = randBetween(100, 120);
+					nextLen = Math.round(randBetween(5, 15));
+				} else if (roll < 0.35) {
+					// Fast segment (70-95 CPS).
+					nextCps = randBetween(70, 95);
+					nextLen = Math.round(randBetween(8, 25));
+				} else if (roll < 0.50) {
+					// Slower patch (25-40 CPS) - brief slowdown.
+					nextCps = randBetween(25, 40);
+					nextLen = Math.round(randBetween(6, 18));
+				} else {
+					// Normal mid-range (45-70 CPS).
+					nextCps = clamp(prevCps + randBetween(-25, 25), 45, 70);
+					nextLen = Math.round(randBetween(12, 40));
+				}
+
+				// Quick blend so transitions feel natural but not sluggish.
+				cadence.segmentCps = clamp(prevCps * 0.3 + nextCps * 0.7, 20, 125);
+				cadence.segmentCharsRemaining = nextLen;
+			}
+
+			const cps = Math.max(1, cadence.segmentCps || LIVE_PREVIEW_BASE_CPS);
+			// Letter-by-letter typing: always advance 1 char at a time.
+			const end = Math.min(i + 1, full.length);
+			const typedCount = end - i; // always 1 (unless already at end)
+			livePreviewIndexRef.current = end;
+			
+			// Commit the typed character immediately.
+			const currentText = full.slice(0, end);
+			setLivePreviewMessage(currentText);
+			
+			cadence.segmentCharsRemaining -= typedCount;
+
+			const lastChar = full[end - 1] ?? '';
+			const prevChar = end >= 2 ? full[end - 2] : undefined;
+
+			let extraPauseMs = 0;
+			// Shorter pauses - keep things moving, thinking dots fill any longer gaps.
+			if (lastChar === '\n') {
+				const isParagraphBreak = prevChar === '\n';
+				extraPauseMs += isParagraphBreak ? randBetween(80, 140) : randBetween(40, 80);
+			} else if (lastChar === '.' || lastChar === '!' || lastChar === '?') {
+				extraPauseMs += randBetween(50, 90);
+			} else if (lastChar === ',' || lastChar === ';' || lastChar === ':') {
+				extraPauseMs += randBetween(15, 40);
+			} else if (lastChar === '—') {
+				extraPauseMs += randBetween(25, 55);
+			}
+
+			// Small natural pauses at word boundaries.
+			if (lastChar === ' ') {
+				extraPauseMs += randBetween(0, 8);
+				// Rare brief thinking pause.
+				if (Math.random() < 0.012) {
+					extraPauseMs += randBetween(60, 120);
+				}
+			}
+
+			const baseDelayMs = (1000 * typedCount) / cps;
+			const jitter = randBetween(0.85, 1.2);
+			const delayMs = clamp(
+				Math.round(baseDelayMs * jitter + extraPauseMs),
+				LIVE_PREVIEW_MIN_DELAY_MS,
+				LIVE_PREVIEW_MAX_DELAY_MS
+			);
+
+			// "Thinking" animation: if the pause is long enough, type dots ...
+			if (delayMs > 160) {
+				const startDotTime = 70;
+				setTimeout(() => {
+					if (livePreviewRunIdRef.current === runId) {
+						setLivePreviewMessage(currentText + '.');
+					}
+				}, startDotTime);
+
+				if (delayMs > startDotTime + 60) {
+					setTimeout(() => {
+						if (livePreviewRunIdRef.current === runId) {
+							setLivePreviewMessage(currentText + '..');
+						}
+					}, startDotTime + 60);
+				}
+
+				if (delayMs > startDotTime + 120) {
+					setTimeout(() => {
+						if (livePreviewRunIdRef.current === runId) {
+							setLivePreviewMessage(currentText + '...');
+						}
+					}, startDotTime + 120);
+				}
+			}
+
+			if (livePreviewRunIdRef.current !== runId) return;
+			livePreviewTimerRef.current = window.setTimeout(tick, delayMs);
+		};
+
+		// Small lead-in so the panel paints before typing starts.
+		livePreviewTimerRef.current = window.setTimeout(tick, Math.round(randBetween(20, 60)));
 	}, [
+		LIVE_PREVIEW_BASE_CPS,
+		LIVE_PREVIEW_MAX_DELAY_MS,
+		LIVE_PREVIEW_MIN_DELAY_MS,
 		LIVE_PREVIEW_POST_DRAFT_DELAY_MS,
-		LIVE_PREVIEW_STEP_CHARS,
-		LIVE_PREVIEW_TICK_MS,
 		hideLivePreview,
 		stopLivePreviewTimers,
 	]);
@@ -422,7 +633,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 
 	const enqueueLivePreviewDraft = useCallback(
 		(draftIndex: number, contactId: number, message: string, subject: string) => {
-			// Keep the backend ahead: enqueue completed drafts and let the UI play them at a fixed speed.
+			// Keep the backend ahead: enqueue completed drafts and let the UI play them back with a bursty cadence.
 			livePreviewQueueRef.current.push({
 				draftIndex,
 				contactId,
@@ -442,6 +653,29 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		livePreviewAutoHideWhenIdleRef.current = true;
 		startNextQueuedLivePreview();
 	}, [startNextQueuedLivePreview]);
+
+	/**
+	 * When a user queues another drafting operation while a live preview batch is active,
+	 * extend the live preview "total" without resetting the typing queue.
+	 */
+	const ensureLivePreviewCapacityForQueuedDrafts = useCallback(
+		(additionalTotal: number) => {
+			if (!additionalTotal || additionalTotal <= 0) return;
+
+			// If no live preview is active, start a fresh batch.
+			if (!isLivePreviewVisible || livePreviewTotal <= 0) {
+				globalDraftIndexBaseRef.current = 0;
+				beginLivePreviewBatch(additionalTotal);
+				return;
+			}
+
+			// Prevent auto-hide when new work gets queued mid-typing.
+			livePreviewAutoHideWhenIdleRef.current = false;
+			setLivePreviewTotal((prev) => (prev > 0 ? prev + additionalTotal : additionalTotal));
+			setIsLivePreviewVisible(true);
+		},
+		[beginLivePreviewBatch, isLivePreviewVisible, livePreviewTotal]
+	);
 
 	const { data: signatures } = useGetSignatures();
 
@@ -530,6 +764,10 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	// VARIABLES
 
 	const draftCredits = user?.draftCredits;
+	const draftCreditsRef = useRef<number>(draftCredits || 0);
+	useEffect(() => {
+		draftCreditsRef.current = draftCredits || 0;
+	}, [draftCredits]);
 	const defaultAutoSignature = `Thank you,\n${campaign.identity?.name || ''}`;
 	// Full Auto: allow drafts even when user hasn't entered any custom prompt.
 	// We still pass a sensible default "User Goal" to the model so it produces useful output.
@@ -558,9 +796,9 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 
 	const draftingMode = getDraftingModeBasedOnBlocks();
 
+	const isDraftQueueActive = draftOperations.length > 0;
 	const isPendingGeneration =
-		isBatchGenerating ||
-		generationProgress > -1 ||
+		isDraftQueueActive ||
 		isPendingCallGemini ||
 		isPendingCallOpenRouter ||
 		isPendingCreateEmail;
@@ -612,14 +850,9 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 
 		// Full Auto prompt is optional: a blank prompt should still allow drafting.
 		// If the Full Auto block is present, we consider drafting "configured" as long
-		// as we're not currently generating and we have contacts.
+		// as we have contacts.
 		if (hasFullAutomatedBlock) {
-			return (
-				hasNoBlocks ||
-				generationProgress > -1 ||
-				contacts?.length === 0 ||
-				isPendingGeneration
-			);
+			return hasNoBlocks || contacts?.length === 0;
 		}
 
 		const hasAIBlocks = values.hybridBlockPrompts?.some((block) => {
@@ -629,14 +862,8 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			return block.value && block.value.trim() !== '';
 		});
 
-		return (
-			hasNoBlocks ||
-			!hasAIBlocks ||
-			generationProgress > -1 ||
-			contacts?.length === 0 ||
-			isPendingGeneration
-		);
-	}, [form, generationProgress, contacts?.length, isPendingGeneration]);
+		return hasNoBlocks || !hasAIBlocks || contacts?.length === 0;
+	}, [form, contacts?.length]);
 
 	const isDraftingContentReady = useCallback(() => {
 		const values = form.getValues();
@@ -700,30 +927,21 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		}
 	};
 
-	const batchGenerateHandWrittenDrafts = async (selectedIds?: number[]) => {
-		if (isBatchGeneratingRef.current) {
-			console.warn('[Batch] Handwritten generation already in progress; ignoring request.');
-			return [];
-		}
-
-		isBatchGeneratingRef.current = true;
-		setIsBatchGenerating(true);
-
+	const batchGenerateHandWrittenDrafts = async (operation: DraftingOperation) => {
 		const generatedEmails: GeneratedEmail[] = [];
 
+		if (!operation.targets || operation.targets.length === 0) {
+			toast.error('No contacts available to generate emails.');
+			return generatedEmails;
+		}
+
 		try {
-			if (!contacts || contacts.length === 0) {
-				toast.error('No contacts available to generate emails.');
-				return generatedEmails;
-			}
+			setGenerationProgress(0);
 
-			const targets =
-				selectedIds && selectedIds.length > 0
-					? contacts.filter((c: ContactWithName) => selectedIds.includes(c.id))
-					: contacts;
-
-			targets.forEach((contact: ContactWithName) => {
-				generatedEmails.push(generateHandwrittenDraft(contact));
+			operation.targets.forEach((contact: ContactWithName) => {
+				generatedEmails.push(
+					generateHandwrittenDraft(contact, operation.values, operation.identity)
+				);
 			});
 
 			await createEmail(generatedEmails);
@@ -733,25 +951,36 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 				queryKey: ['emails', { campaignId: campaign.id }],
 			});
 
-			toast.success('All handwritten drafts generated successfully!');
+			updateDraftOperations((prev) =>
+				prev.map((op) =>
+					op.id === operation.id ? { ...op, progress: op.total } : op
+				)
+			);
+			setGenerationProgress(operation.total);
 
-			return generatedEmails;
-		} finally {
-			isBatchGeneratingRef.current = false;
-			setIsBatchGenerating(false);
+			toast.success('All handwritten drafts generated successfully!');
+		} catch (error) {
+			console.error('Error generating handwritten drafts:', error);
+			toast.error('An error occurred while generating handwritten drafts.');
 		}
+
+		return generatedEmails;
 	};
 
-	const generateHandwrittenDraft = (contact: ContactWithName): GeneratedEmail => {
-		const values = getValues();
+	const generateHandwrittenDraft = (
+		contact: ContactWithName,
+		values: DraftingFormValues,
+		identity: DraftingIdentitySnapshot
+	): GeneratedEmail => {
+		const fallbackSignature = `Thank you,\n${identity.name || ''}`;
 		const signatureTextForDraft = resolveAutoSignatureText({
 			currentSignature: values.signature ?? null,
-			fallbackSignature: defaultAutoSignature,
+			fallbackSignature,
 			context: {
-				name: campaign.identity?.name ?? null,
-				bandName: campaign.identity?.bandName ?? null,
-				website: campaign.identity?.website ?? null,
-				email: campaign.identity?.email ?? null,
+				name: identity.name ?? null,
+				bandName: identity.bandName ?? null,
+				website: identity.website ?? null,
+				email: identity.email ?? null,
 			},
 		});
 		let combinedTextBlocks = values.hybridBlockPrompts
@@ -764,9 +993,9 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			let contactValue = '';
 
 			if (placeholder === '{{senderName}}') {
-				contactValue = campaign.identity?.name || '';
+				contactValue = identity.name || '';
 			} else if (placeholder === '{{senderWebsite}}') {
-				contactValue = campaign.identity?.website || '';
+				contactValue = identity.website || '';
 			} else {
 				contactValue = contact[value as keyof Contact]?.toString() || '';
 			}
@@ -785,12 +1014,12 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 
 		// Build profile fields from the current identity to store with the draft
 		const profileFieldsSnapshot: DraftProfileFields = {
-			name: campaign.identity?.name ?? '',
-			genre: campaign.identity?.genre ?? '',
-			area: campaign.identity?.area ?? '',
-			band: campaign.identity?.bandName ?? '',
-			bio: campaign.identity?.bio ?? '',
-			links: campaign.identity?.website ?? '',
+			name: identity.name ?? '',
+			genre: identity.genre ?? '',
+			area: identity.area ?? '',
+			band: identity.bandName ?? '',
+			bio: identity.bio ?? '',
+			links: identity.website ?? '',
 		};
 
 		const messageWithSettings = injectMurmurDraftSettingsSnapshot(messageHtml, {
@@ -817,11 +1046,15 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		prompt: string,
 		toneAgentType: MistralToneAgentType,
 		paragraphs: number,
+		values: DraftingFormValues,
+		identity: DraftingIdentitySnapshot,
 		signal?: AbortSignal,
 		model?: string,
 		draftIndex?: number
 	): Promise<DraftEmailResponse> => {
-		if (!campaign.identity) {
+		void toneAgentType;
+		void paragraphs;
+		if (!identity?.name) {
 			toast.error('Campaign identity is required');
 			throw new Error('Campaign identity is required');
 		}
@@ -836,17 +1069,16 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			recipient.firstName || ''
 		).replace('{company}', recipient.company || '');
 
-		const identityProfile = campaign.identity as IdentityProfileFields;
 		const senderProfile = {
-			name: identityProfile.name,
-			bandName: identityProfile.bandName ?? undefined,
-			genre: identityProfile.genre ?? undefined,
-			area: identityProfile.area ?? undefined,
-			bio: identityProfile.bio ?? undefined,
-			website: identityProfile.website ?? undefined,
+			name: identity.name,
+			bandName: identity.bandName ?? undefined,
+			genre: identity.genre ?? undefined,
+			area: identity.area ?? undefined,
+			bio: identity.bio ?? undefined,
+			website: identity.website ?? undefined,
 		};
 
-		const bookingForNormalized = (form.getValues('bookingFor') ?? '').trim();
+		const bookingForNormalized = (values.bookingFor ?? '').trim();
 		const bookingForContext =
 			bookingForNormalized && bookingForNormalized !== 'Anytime'
 				? `\n\nBooking For:\n${bookingForNormalized}`
@@ -972,8 +1204,8 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 
 		const cleanedSubject = removeEmDashes(parsedResponse.subject);
 		const cleanedMessage = stripEmailSignatureFromAiMessage(removeEmDashes(parsedResponse.message), {
-			senderName: identityProfile.name,
-			senderBandName: identityProfile.bandName ?? null,
+			senderName: identity.name,
+			senderBandName: identity.bandName ?? null,
 		});
 
 		return {
@@ -986,6 +1218,8 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		recipient: Contact,
 		hybridPrompt: string,
 		hybridBlocks: HybridBlockPrompt[],
+		values: DraftingFormValues,
+		identity: DraftingIdentitySnapshot,
 		signal?: AbortSignal
 	): Promise<DraftEmailResponse> => {
 		const stringifiedRecipient = stringifyJsonSubset<Contact>(recipient, [
@@ -1001,18 +1235,17 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			'metadata',
 		]);
 
-		if (!campaign.identity) {
+		if (!identity?.name) {
 			toast.error('Campaign identity is required');
 			throw new Error('Campaign identity is required');
 		}
-		const identityProfile = campaign.identity as IdentityProfileFields;
 		const senderProfile = {
-			name: identityProfile.name,
-			bandName: identityProfile.bandName ?? undefined,
-			genre: identityProfile.genre ?? undefined,
-			area: identityProfile.area ?? undefined,
-			bio: identityProfile.bio ?? undefined,
-			website: identityProfile.website ?? undefined,
+			name: identity.name,
+			bandName: identity.bandName ?? undefined,
+			genre: identity.genre ?? undefined,
+			area: identity.area ?? undefined,
+			bio: identity.bio ?? undefined,
+			website: identity.website ?? undefined,
 		};
 		const stringifiedSender = stringifyJsonSubset(senderProfile, [
 			'name',
@@ -1100,14 +1333,14 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		}
 
 		const cleanedMessageNoSignature = stripEmailSignatureFromAiMessage(cleanedMessage, {
-			senderName: identityProfile.name,
-			senderBandName: identityProfile.bandName ?? null,
+			senderName: identity.name,
+			senderBandName: identity.bandName ?? null,
 		});
 
 		return {
-			subject: isAiSubject
+			subject: values.isAiSubject
 				? removeEmDashes(geminiParsed.subject)
-				: form.getValues('subject'),
+				: values.subject,
 			message: cleanedMessageNoSignature,
 		};
 	};
@@ -1614,12 +1847,16 @@ EXAMPLES OF GOOD CUSTOM INSTRUCTIONS:
 
 	const cancelGeneration = () => {
 		isGenerationCancelledRef.current = true;
-		setGenerationProgress(-1);
 		const controller = abortControllerRef.current;
 		if (controller) {
 			controller.abort();
 			abortControllerRef.current = null;
 		}
+		// Clear any queued operations so drafting truly stops.
+		updateDraftOperations(() => []);
+		isDraftQueuePausedForCreditsRef.current = false;
+		activeDraftOperationIdRef.current = null;
+		setGenerationProgress(-1);
 		hideLivePreview();
 	};
 
@@ -1629,7 +1866,22 @@ EXAMPLES OF GOOD CUSTOM INSTRUCTIONS:
 			toast.error('No contacts available to send test email.');
 			return;
 		}
-		const draft = generateHandwrittenDraft(contacts[0]);
+		const identityProfile = campaign.identity as IdentityProfileFields | null | undefined;
+		if (!identityProfile) {
+			toast.error('Campaign identity is required');
+			setIsTest(false);
+			return;
+		}
+		const identitySnapshot: DraftingIdentitySnapshot = {
+			name: identityProfile.name ?? '',
+			bandName: identityProfile.bandName ?? null,
+			genre: identityProfile.genre ?? null,
+			area: identityProfile.area ?? null,
+			bio: identityProfile.bio ?? null,
+			website: identityProfile.website ?? null,
+			email: (identityProfile as any)?.email ?? null,
+		};
+		const draft = generateHandwrittenDraft(contacts[0], form.getValues(), identitySnapshot);
 		await saveTestEmail({
 			id: campaign.id,
 			data: {
@@ -1650,6 +1902,21 @@ EXAMPLES OF GOOD CUSTOM INSTRUCTIONS:
 			setIsOpenUpgradeSubscriptionDrawer(true);
 			return;
 		}
+
+		const identityProfile = campaign.identity as IdentityProfileFields | null | undefined;
+		if (!identityProfile) {
+			toast.error('Campaign identity is required');
+			return;
+		}
+		const identitySnapshot: DraftingIdentitySnapshot = {
+			name: identityProfile.name ?? '',
+			bandName: identityProfile.bandName ?? null,
+			genre: identityProfile.genre ?? null,
+			area: identityProfile.area ?? null,
+			bio: identityProfile.bio ?? null,
+			website: identityProfile.website ?? null,
+			email: (identityProfile as any)?.email ?? null,
+		};
 
 		const values = getValues();
 		console.log('[Test Generation] All form values:', values);
@@ -1719,6 +1986,8 @@ EXAMPLES OF GOOD CUSTOM INSTRUCTIONS:
 						fullAiPrompt,
 						values.draftingTone,
 						values.paragraphs,
+						values,
+						identitySnapshot,
 						undefined,
 						testModel,
 						1
@@ -1747,6 +2016,8 @@ EXAMPLES OF GOOD CUSTOM INSTRUCTIONS:
 						values.hybridPrompt ||
 							'Generate a professional email based on the template below.',
 						hybridBlocks,
+						values,
+						identitySnapshot,
 						undefined
 					);
 				} else {
@@ -1834,28 +2105,24 @@ EXAMPLES OF GOOD CUSTOM INSTRUCTIONS:
 	};
 
 	const generateBatchPromises = (
-		batchToProcess: Contact[],
+		operation: DraftingOperation,
+		batchToProcess: ContactWithName[],
 		controller: AbortController,
-		startIndex: number = 0
+		startIndex: number,
+		draftIndexBase: number,
+		signatureTextForDraft: string,
+		profileFieldsSnapshot: DraftProfileFields
 	) => {
-		const values = getValues();
+		const values = operation.values;
+		const identity = operation.identity;
 
 		return batchToProcess.map(async (recipient: Contact, batchIndex: number) => {
-			// Round-robin model selection based on overall position in generation
+			// Round-robin model selection based on overall position in generation (within this operation)
 			const overallIndex = startIndex + batchIndex;
-			const draftIndex = overallIndex + 1;
+			// Stable ordering across queued operations (avoid collisions when multiple ops run sequentially)
+			const draftIndex = draftIndexBase + overallIndex + 1;
 			const MAX_RETRIES = 5;
 			let lastError: Error | null = null;
-			const signatureTextForDraft = resolveAutoSignatureText({
-				currentSignature: values.signature ?? null,
-				fallbackSignature: defaultAutoSignature,
-				context: {
-					name: campaign.identity?.name ?? null,
-					bandName: campaign.identity?.bandName ?? null,
-					website: campaign.identity?.website ?? null,
-					email: campaign.identity?.email ?? null,
-				},
-			});
 
 			for (
 				let retryCount = 0;
@@ -1875,13 +2142,13 @@ EXAMPLES OF GOOD CUSTOM INSTRUCTIONS:
 						await new Promise((resolve) => setTimeout(resolve, delay));
 					}
 
-					let parsedDraft;
+					let parsedDraft: DraftEmailResponse | undefined;
 
 					const fullAutomatedBlock = values.hybridBlockPrompts?.find(
 						(block) => block.type === 'full_automated'
 					);
 
-					if (draftingMode === DraftingMode.ai) {
+					if (operation.mode === DraftingMode.ai) {
 						const fullAiPromptRaw = fullAutomatedBlock?.value || '';
 						const fullAiPrompt = fullAiPromptRaw.trim() || DEFAULT_FULL_AI_PROMPT;
 
@@ -1897,11 +2164,13 @@ EXAMPLES OF GOOD CUSTOM INSTRUCTIONS:
 							fullAiPrompt,
 							values.draftingTone,
 							values.paragraphs,
+							values,
+							identity,
 							controller.signal,
 							attemptModel,
 							draftIndex
 						);
-					} else if (draftingMode === DraftingMode.hybrid) {
+					} else if (operation.mode === DraftingMode.hybrid) {
 						// Filter out any full_automated blocks for hybrid processing
 						const hybridBlocks =
 							values.hybridBlockPrompts?.filter(
@@ -1917,6 +2186,8 @@ EXAMPLES OF GOOD CUSTOM INSTRUCTIONS:
 							values.hybridPrompt ||
 								'Generate a professional email based on the template below.',
 							hybridBlocks,
+							values,
+							identity,
 							controller.signal
 						);
 					}
@@ -1924,11 +2195,14 @@ EXAMPLES OF GOOD CUSTOM INSTRUCTIONS:
 					if (parsedDraft) {
 						// Insert website link phrase if identity has a website
 						let processedMessage = parsedDraft.message;
-						if (campaign.identity?.website) {
-							processedMessage = insertWebsiteLinkPhrase(processedMessage, campaign.identity.website);
+						if (identity.website) {
+							processedMessage = insertWebsiteLinkPhrase(
+								processedMessage,
+								identity.website
+							);
 						}
 
-						if (!isAiSubject) {
+						if (!values.isAiSubject) {
 							parsedDraft.subject = values.subject || parsedDraft.subject;
 						}
 
@@ -1937,15 +2211,6 @@ EXAMPLES OF GOOD CUSTOM INSTRUCTIONS:
 							values.font,
 							signatureTextForDraft || null
 						);
-						// Build profile fields from the current identity to store with the draft
-						const profileFieldsSnapshot: DraftProfileFields = {
-							name: campaign.identity?.name ?? '',
-							genre: campaign.identity?.genre ?? '',
-							area: campaign.identity?.area ?? '',
-							band: campaign.identity?.bandName ?? '',
-							bio: campaign.identity?.bio ?? '',
-							links: campaign.identity?.website ?? '',
-						};
 						const draftMessageWithSettings = injectMurmurDraftSettingsSnapshot(
 							draftMessageHtml,
 							{
@@ -1965,35 +2230,41 @@ EXAMPLES OF GOOD CUSTOM INSTRUCTIONS:
 							status: 'draft' as EmailStatus,
 							contactId: recipient.id,
 						});
-						if (draftingMode === DraftingMode.ai) {
+						if (operation.mode === DraftingMode.ai) {
 							console.log(
 								`[Batch][Full AI] Saved draft#${draftIndex} contactId=${recipient.id} email=${recipient.email} model=${attemptModel}`
 							);
 						}
-						// Queue for the live typing preview (fixed speed, independent of backend timing).
+						// Queue for the live typing preview (bursty cadence, independent of backend timing).
 						enqueueLivePreviewDraft(
 							draftIndex,
 							recipient.id,
 							processedMessage,
 							parsedDraft.subject
 						);
-						// Keep live preview visible while batch generation is running so the
-						// Campaign page can show the "draft typing" preview across tabs.
-						// Immediately reflect in UI
+
+						// Immediately reflect in UI + operation progress.
+						updateDraftOperations((prev) =>
+							prev.map((op) =>
+								op.id === operation.id
+									? { ...op, progress: Math.min(op.total, op.progress + 1) }
+									: op
+							)
+						);
 						setGenerationProgress((prev) => prev + 1);
+
 						queryClient.invalidateQueries({
 							queryKey: ['emails', { campaignId: campaign.id }],
 						});
-						// Live preview will be re-enabled for the next recipient when streaming starts
 
 						return {
 							success: true,
 							contactId: recipient.id,
 							retries: retryCount,
 						};
-					} else {
-						throw new Error('No draft generated - empty response');
 					}
+
+					throw new Error('No draft generated - empty response');
 				} catch (error) {
 					if (error instanceof Error && error.message === 'Request cancelled.') {
 						throw error; // Re-throw cancellation errors immediately
@@ -2039,16 +2310,10 @@ EXAMPLES OF GOOD CUSTOM INSTRUCTIONS:
 		});
 	};
 
-	const batchGenerateFullAiDrafts = async (selectedIds?: number[]) => {
-		if (isBatchGeneratingRef.current) {
-			console.warn('[Batch] Full AI generation already in progress; ignoring request.');
-			return;
-		}
-
-		isBatchGeneratingRef.current = true;
-		setIsBatchGenerating(true);
-
-		let remainingCredits = draftCredits || 0;
+	const batchGenerateFullAiDrafts = async (
+		operation: DraftingOperation
+	): Promise<{ blockedByCredits: boolean }> => {
+		let remainingCredits = draftCreditsRef.current;
 
 		const controller = new AbortController();
 		abortControllerRef.current = controller;
@@ -2057,37 +2322,58 @@ EXAMPLES OF GOOD CUSTOM INSTRUCTIONS:
 		let successfulEmails = 0;
 		let stoppedDueToCredits = false;
 
+		const values = operation.values;
+		const identity = operation.identity;
+		const targets = operation.targets || [];
+		const paragraphs = values.paragraphs;
+		const creditCost = paragraphs <= 3 ? 1 : 1.5;
+
+		// Reserve a stable index range so live-preview ordering never collides across queued ops.
+		const draftIndexBase = globalDraftIndexBaseRef.current;
+		globalDraftIndexBaseRef.current = draftIndexBase + targets.length;
+
+		const signatureTextForDraft =
+			resolveAutoSignatureText({
+				currentSignature: values.signature ?? null,
+				fallbackSignature: `Thank you,\n${identity.name || ''}`,
+				context: {
+					name: identity.name ?? null,
+					bandName: identity.bandName ?? null,
+					website: identity.website ?? null,
+					email: identity.email ?? null,
+				},
+			}) || '';
+
+		const profileFieldsSnapshot: DraftProfileFields = {
+			name: identity.name ?? '',
+			genre: identity.genre ?? '',
+			area: identity.area ?? '',
+			band: identity.bandName ?? '',
+			bio: identity.bio ?? '',
+			links: identity.website ?? '',
+		};
+
 		try {
-			if (!contacts || contacts.length === 0) {
+			if (!targets.length) {
 				toast.error('No contacts available to generate emails.');
-				return;
+				return { blockedByCredits: false };
 			}
 
-			const paragraphs = form.getValues('paragraphs');
-			const creditCost = paragraphs <= 3 ? 1 : 1.5;
-
-			if (!draftCredits || draftCredits < creditCost) {
+			if (remainingCredits < creditCost) {
 				setIsOpenUpgradeSubscriptionDrawer(true);
-				return;
+				return { blockedByCredits: true };
 			}
 
 			isGenerationCancelledRef.current = false;
 			setGenerationProgress(0);
-			const targets =
-				selectedIds && selectedIds.length > 0
-					? contacts.filter((c: ContactWithName) => selectedIds.includes(c.id))
-					: contacts;
 
-			if (draftingMode === DraftingMode.ai) {
+			if (operation.mode === DraftingMode.ai) {
 				console.log(
 					'[Batch][Full AI] OpenRouter model rotation order:',
 					OPENROUTER_DRAFTING_MODELS
 				);
 			}
 
-			// Show preview surface while generation is running. Drafts will be queued and
-			// typed out at a fixed speed independent of backend timing.
-			beginLivePreviewBatch(targets.length);
 			for (
 				let i = 0;
 				i < targets.length && !isGenerationCancelledRef.current;
@@ -2098,17 +2384,24 @@ EXAMPLES OF GOOD CUSTOM INSTRUCTIONS:
 
 				if (remainingCredits < creditCost) {
 					stoppedDueToCredits = true;
-					cancelGeneration();
 					break;
 				}
 
-				const batch: Contact[] = targets.slice(
+				const batch: ContactWithName[] = targets.slice(
 					i,
 					Math.min(i + adjustedBatchSize, targets.length)
 				);
 
 				const currentBatchPromises: Promise<BatchGenerationResult>[] =
-					generateBatchPromises(batch, controller, i);
+					generateBatchPromises(
+						operation,
+						batch,
+						controller,
+						i,
+						draftIndexBase,
+						signatureTextForDraft,
+						profileFieldsSnapshot
+					);
 
 				const batchResults = await Promise.allSettled(currentBatchPromises);
 
@@ -2123,24 +2416,22 @@ EXAMPLES OF GOOD CUSTOM INSTRUCTIONS:
 					}
 				}
 
-				// Check if we've run out of credits after processing this batch
+				// Stop once we're out of credits (preserve partial success).
 				if (remainingCredits < creditCost && successfulEmails < targets.length) {
 					stoppedDueToCredits = true;
-					setIsOpenUpgradeSubscriptionDrawer(true);
-					cancelGeneration();
 					break;
 				}
 			}
 
-			if (user && draftCredits && successfulEmails > 0) {
-				const newCreditBalance = Math.max(
-					0,
-					draftCredits - creditCost * successfulEmails
-				);
+			// Persist credits and keep an immediate local balance for subsequent queued ops.
+			if (user && successfulEmails > 0) {
+				const newCreditBalance = Math.max(0, remainingCredits);
+				draftCreditsRef.current = newCreditBalance;
 				editUser({
 					clerkId: user.clerkId,
 					data: { draftCredits: newCreditBalance },
 				});
+				queryClient.invalidateQueries({ queryKey: ['user'] });
 			}
 
 			// Invalidate emails query to refresh the drafts list
@@ -2161,7 +2452,6 @@ EXAMPLES OF GOOD CUSTOM INSTRUCTIONS:
 					toast.error('Email generation failed. Please try again.');
 				}
 			} else if (stoppedDueToCredits && successfulEmails > 0) {
-				// Show partial success message when stopped due to credits
 				toast.warning(
 					`Generated ${successfulEmails} emails before running out of credits. Please upgrade your plan to continue.`
 				);
@@ -2175,12 +2465,13 @@ EXAMPLES OF GOOD CUSTOM INSTRUCTIONS:
 			}
 		} finally {
 			abortControllerRef.current = null;
-			setGenerationProgress(-1);
-			// Keep the preview visible until queued drafts finish typing, then auto-hide.
-			endLivePreviewBatch();
-			isBatchGeneratingRef.current = false;
-			setIsBatchGenerating(false);
 		}
+
+		if (stoppedDueToCredits) {
+			setIsOpenUpgradeSubscriptionDrawer(true);
+		}
+
+		return { blockedByCredits: stoppedDueToCredits };
 	};
 
 	// HANDLERS
@@ -2193,50 +2484,220 @@ EXAMPLES OF GOOD CUSTOM INSTRUCTIONS:
 		}
 	};
 
-	const handleGenerateDrafts = async (contactIds?: number[]) => {
-		// Check if email template is set up before attempting to draft
-		const values = form.getValues();
-		const fullAutomatedBlock = values.hybridBlockPrompts?.find(
-			(block) => block.type === 'full_automated'
-		);
-		const hybridBlocks = values.hybridBlockPrompts?.filter(
-			(block) => block.type !== 'full_automated' && !block.isCollapsed
-		);
+	const processDraftQueue = useCallback(async () => {
+		if (isProcessingDraftQueueRef.current) return;
+		if (isDraftQueuePausedForCreditsRef.current) return;
 
-		if (draftingMode === DraftingMode.ai) {
-			const fullAiPromptRaw = fullAutomatedBlock?.value || '';
-			const fullAiPrompt = fullAiPromptRaw.trim();
+		isProcessingDraftQueueRef.current = true;
+		try {
+			while (!isGenerationCancelledRef.current) {
+				const next = draftOperationsRef.current.find((op) => op.status === 'queued');
+				if (!next) break;
 
-			// Don't block batch generation on scoring; run in background.
-			if (fullAiPrompt) {
-				console.log('[Batch][Full AI] Scoring prompt in background (Gemini)…');
-				scoreFullAutomatedPrompt(fullAiPrompt);
-			} else {
-				// If no custom instructions are provided, we still allow drafting using a default prompt.
-				setPromptQualityScore(null);
-				setPromptQualityLabel(null);
-				setPromptSuggestions([]);
+				// Pre-check credits to avoid an auto-retry loop that keeps popping upgrade UI.
+				if (next.mode !== DraftingMode.handwritten) {
+					const creditCost = next.values.paragraphs <= 3 ? 1 : 1.5;
+					if (draftCreditsRef.current < creditCost) {
+						isDraftQueuePausedForCreditsRef.current = true;
+						setIsOpenUpgradeSubscriptionDrawer(true);
+						break;
+					}
+				}
+
+				activeDraftOperationIdRef.current = next.id;
+				updateDraftOperations((prev) =>
+					prev.map((op) =>
+						op.id === next.id
+							? { ...op, status: 'running', startedAtMs: Date.now(), progress: 0 }
+							: op
+					)
+				);
+				setGenerationProgress(0);
+
+				if (next.mode === DraftingMode.handwritten) {
+					await batchGenerateHandWrittenDrafts(next);
+				} else {
+					const { blockedByCredits } = await batchGenerateFullAiDrafts(next);
+					if (blockedByCredits) {
+						// Pause processing until credits increase (e.g., user upgrades).
+						isDraftQueuePausedForCreditsRef.current = true;
+
+						// If we didn't make progress, revert this op to queued.
+						const latest = draftOperationsRef.current.find((op) => op.id === next.id);
+						const progressed = (latest?.progress ?? 0) > 0;
+						if (!progressed) {
+							updateDraftOperations((prev) =>
+								prev.map((op) =>
+									op.id === next.id
+										? { ...op, status: 'queued', startedAtMs: undefined }
+										: op
+								)
+							);
+						} else {
+							// Partial operation completed; drop it from the queue (matches existing behavior).
+							updateDraftOperations((prev) => prev.filter((op) => op.id !== next.id));
+						}
+
+						activeDraftOperationIdRef.current = null;
+						break;
+					}
+				}
+
+				// Operation finished; remove it.
+				updateDraftOperations((prev) => prev.filter((op) => op.id !== next.id));
+				activeDraftOperationIdRef.current = null;
 			}
-		} else if (draftingMode === DraftingMode.hybrid) {
+		} finally {
+			isProcessingDraftQueueRef.current = false;
+			activeDraftOperationIdRef.current = null;
+
+			// When nothing is actively running, hide the per-op progress bar.
+			const hasRunning = draftOperationsRef.current.some((op) => op.status === 'running');
+			if (!hasRunning) {
+				setGenerationProgress(-1);
+				// Let the live preview auto-hide after it finishes typing queued drafts.
+				endLivePreviewBatch();
+			}
+
+			// Reset the global live preview index base only when the queue is empty.
+			if (draftOperationsRef.current.length === 0) {
+				globalDraftIndexBaseRef.current = 0;
+				isDraftQueuePausedForCreditsRef.current = false;
+			}
+		}
+	}, [
+		batchGenerateFullAiDrafts,
+		batchGenerateHandWrittenDrafts,
+		endLivePreviewBatch,
+		updateDraftOperations,
+	]);
+
+	// Auto-start processing whenever a queued operation exists (unless paused).
+	useEffect(() => {
+		if (isDraftQueuePausedForCreditsRef.current) return;
+		if (isProcessingDraftQueueRef.current) return;
+		if (!draftOperations.some((op) => op.status === 'queued')) return;
+		void processDraftQueue();
+	}, [draftOperations, processDraftQueue]);
+
+	// Resume processing after credits increase.
+	useEffect(() => {
+		if (!isDraftQueuePausedForCreditsRef.current) return;
+		if (!draftOperations.length) {
+			isDraftQueuePausedForCreditsRef.current = false;
+			return;
+		}
+		const next = draftOperations.find((op) => op.status === 'queued');
+		if (!next) {
+			isDraftQueuePausedForCreditsRef.current = false;
+			return;
+		}
+		if (next.mode === DraftingMode.handwritten) {
+			isDraftQueuePausedForCreditsRef.current = false;
+			void processDraftQueue();
+			return;
+		}
+		const creditCost = next.values.paragraphs <= 3 ? 1 : 1.5;
+		if (draftCreditsRef.current >= creditCost) {
+			isDraftQueuePausedForCreditsRef.current = false;
+			void processDraftQueue();
+		}
+	}, [draftOperations, draftCredits, processDraftQueue]);
+
+	const handleGenerateDrafts = async (contactIds?: number[]) => {
+		// If the user cancelled a previous run, allow new queued operations to proceed.
+		isGenerationCancelledRef.current = false;
+
+		const identityProfile = campaign.identity as IdentityProfileFields | null | undefined;
+		if (!identityProfile) {
+			toast.error('Campaign identity is required');
+			return;
+		}
+
+		const identitySnapshot: DraftingIdentitySnapshot = {
+			name: identityProfile.name ?? '',
+			bandName: identityProfile.bandName ?? null,
+			genre: identityProfile.genre ?? null,
+			area: identityProfile.area ?? null,
+			bio: identityProfile.bio ?? null,
+			website: identityProfile.website ?? null,
+			email: (identityProfile as any)?.email ?? null,
+		};
+
+		const valuesSnapshot = deepClone(form.getValues());
+		const modeForOperation = getDraftingModeForValues(valuesSnapshot);
+
+		// Validate template for Hybrid mode before enqueueing.
+		if (modeForOperation === DraftingMode.hybrid) {
+			const hybridBlocks = valuesSnapshot.hybridBlockPrompts?.filter(
+				(block) => block.type !== 'full_automated' && !block.isCollapsed
+			);
 			if (!hybridBlocks || hybridBlocks.length === 0) {
 				toast.error('Please set up your email template on the Testing tab first.');
 				return;
 			}
+		}
 
-			setPromptQualityScore(null);
-			setPromptQualityLabel(null);
-			setPromptSuggestions([]);
+		// Score Full AI prompt in background for better UX (non-blocking).
+		if (modeForOperation === DraftingMode.ai) {
+			const fullAutomatedBlock = valuesSnapshot.hybridBlockPrompts?.find(
+				(block) => block.type === 'full_automated'
+			);
+			const fullAiPromptRaw = fullAutomatedBlock?.value || '';
+			const fullAiPrompt = fullAiPromptRaw.trim();
+			if (fullAiPrompt) {
+				console.log('[Queue][Full AI] Scoring prompt in background (Gemini)…');
+				scoreFullAutomatedPrompt(fullAiPrompt);
+			} else {
+				setPromptQualityScore(null);
+				setPromptQualityLabel(null);
+				setPromptSuggestions([]);
+			}
 		} else {
 			setPromptQualityScore(null);
 			setPromptQualityLabel(null);
 			setPromptSuggestions([]);
 		}
 
-		if (draftingMode === DraftingMode.ai || draftingMode === DraftingMode.hybrid) {
-			await batchGenerateFullAiDrafts(contactIds);
-		} else if (draftingMode === DraftingMode.handwritten) {
-			await batchGenerateHandWrittenDrafts(contactIds);
+		if (!contacts || contacts.length === 0) {
+			toast.error('No contacts available to generate emails.');
+			return;
 		}
+
+		const ids =
+			contactIds && contactIds.length > 0 ? Array.from(new Set(contactIds)) : [];
+		if (!ids.length) {
+			toast.error('Select at least one contact to draft emails.');
+			return;
+		}
+
+		const targets = contacts.filter((c: ContactWithName) => ids.includes(c.id));
+		if (!targets.length) {
+			toast.error('No contacts available to generate emails.');
+			return;
+		}
+
+		const operation: DraftingOperation = {
+			id: makeDraftOperationId(),
+			status: 'queued',
+			createdAtMs: Date.now(),
+			total: targets.length,
+			progress: 0,
+			mode: modeForOperation,
+			values: valuesSnapshot,
+			identity: identitySnapshot,
+			targets,
+		};
+
+		updateDraftOperations((prev) => [...prev, operation]);
+
+		// Extend the live preview total only for AI/Hybrid operations (handwritten drafts don't stream).
+		if (modeForOperation === DraftingMode.ai || modeForOperation === DraftingMode.hybrid) {
+			ensureLivePreviewCapacityForQueuedDrafts(targets.length);
+		}
+
+		// Kick the processor (it will no-op if already running or paused).
+		void processDraftQueue();
 	};
 
 	const insertPlaceholder = useCallback(
@@ -2380,7 +2841,7 @@ EXAMPLES OF GOOD CUSTOM INSTRUCTIONS:
 				controller.abort();
 			}
 			if (livePreviewTimerRef.current) {
-				clearInterval(livePreviewTimerRef.current);
+				clearTimeout(livePreviewTimerRef.current);
 				livePreviewTimerRef.current = null;
 			}
 			if (livePreviewDelayTimerRef.current) {
@@ -2410,6 +2871,7 @@ EXAMPLES OF GOOD CUSTOM INSTRUCTIONS:
 		contacts,
 		isContactsLoading,
 		draftingMode,
+		draftOperations,
 		form,
 		generationProgress,
 		promptQualityScore,
@@ -2424,6 +2886,7 @@ EXAMPLES OF GOOD CUSTOM INSTRUCTIONS:
 		isGenerationDisabled,
 		isOpenUpgradeSubscriptionDrawer,
 		isPendingGeneration,
+		isDraftQueueActive,
 		isTest,
 		isUpscalingPrompt,
 		upscalePrompt,

@@ -69,6 +69,16 @@ export interface HybridPromptInputProps {
 	compactLeftOnly?: boolean;
 	onGoToDrafting?: () => void;
 	/**
+	 * Optional: invoked when the user clicks "Keep" in the Test Preview.
+	 * Should persist the current test draft as a real draft email.
+	 */
+	onKeepTestDraft?: () => boolean | Promise<boolean>;
+	/**
+	 * Optional: indicates the Keep action is in progress.
+	 * Used to disable the Keep button and show a saving state.
+	 */
+	isKeepingTestDraft?: boolean;
+	/**
 	 * Optional: invoked when the user clicks to navigate to the Contacts tab.
 	 */
 	onGoToContacts?: () => void;

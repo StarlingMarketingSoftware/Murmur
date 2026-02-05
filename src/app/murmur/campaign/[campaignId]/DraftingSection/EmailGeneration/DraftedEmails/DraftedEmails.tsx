@@ -15,10 +15,9 @@ import { DraftedEmailsProps, useDraftedEmails } from './useDraftedEmails';
 import { Spinner } from '@/components/atoms/Spinner/Spinner';
 import { Button } from '@/components/ui/button';
 import { UpgradeSubscriptionDrawer } from '@/components/atoms/UpgradeSubscriptionDrawer/UpgradeSubscriptionDrawer';
-import { X } from 'lucide-react';
 import { cn } from '@/utils';
 import { DraftingTable } from '../DraftingTable/DraftingTable';
-import PreviewIcon from '@/components/atoms/_svg/PreviewIcon';
+import DeleteandOpenIcon from '@/components/atoms/_svg/DeleteandOpen';
 import ApproveCheckIcon from '@/components/atoms/svg/ApproveCheckIcon';
 import RejectXIcon from '@/components/atoms/svg/RejectXIcon';
 import LeftArrowReviewIcon from '@/components/atoms/svg/LeftArrowReviewIcon';
@@ -342,6 +341,13 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 
 	const isMobile = useIsMobile();
 	const draftReviewContainerRef = useRef<HTMLDivElement | null>(null);
+	// Keep a ref to the currently-open draft id so async regen doesn't stomp UI state
+	// if the user navigates to another draft mid-request.
+	const selectedDraftIdRef = useRef<number | null>(null);
+
+	useEffect(() => {
+		selectedDraftIdRef.current = selectedDraft?.id ?? null;
+	}, [selectedDraft?.id]);
 
 	// Close the draft review UI when clicking anywhere outside of it.
 	// This should return the user back to the normal drafts table view.
@@ -761,16 +767,22 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 			return;
 		}
 		
+		const targetDraftId = selectedDraft.id;
 		setIsRegenerating(true);
+		let didUpdateDraft = false;
 		try {
 			const result = await onRegenerateDraft(selectedDraft);
 			if (result) {
+				// If the user switched drafts while regeneration was running, don't apply UI updates.
+				if (selectedDraftIdRef.current !== targetDraftId) return;
+
 				// Update the local state with the regenerated content
+				didUpdateDraft = true;
 				setEditedSubject(result.subject);
 				setEditedMessage(result.message);
 				// Also update the selectedDraft to reflect the new content
 				setSelectedDraft((prev) => {
-					if (!prev || prev.id !== selectedDraft.id) return prev;
+					if (!prev || prev.id !== targetDraftId) return prev;
 					return {
 						...prev,
 						subject: result.subject,
@@ -779,8 +791,12 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 				});
 			}
 		} finally {
+			// Only exit regen mode if we actually got regenerated content back.
+			// Close regen preview first to avoid briefly flashing the settings UI again.
+			if (didUpdateDraft) {
+				setIsRegenSettingsPreviewOpen(false);
+			}
 			setIsRegenerating(false);
-			setIsRegenSettingsPreviewOpen(false);
 		}
 	}, [selectedDraft, onRegenerateDraft, isRegenerating, isRegenSettingsPreviewOpen, setEditedSubject, setEditedMessage, setSelectedDraft]);
 
@@ -1323,6 +1339,8 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 										bottom: 0,
 										width: '2px',
 										backgroundColor: '#000000',
+										pointerEvents: 'none',
+										zIndex: 6,
 									}}
 								/>
 								{/* Bottom-left breadcrumb label (Drafts > Contact) */}
@@ -1397,7 +1415,7 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 										}
 									}}
 									disabled={isPendingDeleteEmail}
-									className="absolute font-inter text-[14px] font-normal text-black hover:bg-black/5 flex items-center justify-center transition-colors leading-none"
+									className="absolute font-inter text-[14px] font-normal text-black hover:bg-[#E17272] hover:text-white flex items-center justify-center transition-colors leading-none"
 									style={{
 										right: '20px',
 										width: '94px',
@@ -1407,17 +1425,17 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 								>
 									{isPendingDeleteEmail ? '...' : 'Delete'}
 								</button>
-								{/* Fourth divider line 92px to the left of the third one (119 + 92 = 211) */}
-								<div
-									style={{
-										position: 'absolute',
-										right: '212px',
-										top: bottomStripTop,
-										bottom: 0,
-										width: '2px',
-										backgroundColor: '#000000',
-									}}
-								/>
+									{/* Fourth divider line 92px to the left of the third one (119 + 92 = 211) */}
+									<div
+										style={{
+											position: 'absolute',
+											right: '212px',
+											top: bottomStripTop,
+											bottom: 0,
+											width: '1.5px',
+											backgroundColor: '#000000',
+										}}
+									/>
 								{/* Send button between lines */}
 								<button
 									type="button"
@@ -1427,7 +1445,7 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 										void props.onSend([selectedDraft.id]);
 									}}
 									disabled={props.isSendingDisabled}
-									className="absolute font-inter text-[14px] font-normal text-black hover:bg-black/5 flex items-center justify-center transition-colors leading-none"
+									className="absolute font-inter text-[14px] font-normal text-black hover:bg-[#83C37C] hover:text-white flex items-center justify-center transition-colors leading-none"
 									style={{
 										right: '120px',
 										width: '92px',
@@ -1546,22 +1564,51 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 						)}
 
 						{isRegenSettingsPreviewOpen ? (
-							<div className="flex justify-center flex-1">
-								<HybridPromptInput
-									contact={contact || null}
-									identity={props.identity ?? null}
-									onIdentityUpdate={props.onIdentityUpdate}
-									hideDraftButton
-									hideGenerateTestButton
-									hideProfileBottomMiniBox
-									clipProfileTabOverflow
-									manualEntryHeightPx={550}
-									containerHeightPx={625}
-									useStaticDropdownPosition
-									hideMobileStickyTestFooter
-									dataCampaignMainBox={null}
-								/>
-							</div>
+							isRegenerating ? (
+								// While regenerating, show the same "blank wave" animation style
+								// used by the Write tab Test Preview box (instead of a static settings UI).
+								<div
+									className="flex flex-col items-center flex-1"
+									style={{ paddingTop: '6px', paddingBottom: '12px' }}
+									aria-label="Regenerating draft"
+								>
+									{/* Subject placeholder */}
+									<div
+										className="border-2 border-black rounded-[7px] overflow-hidden test-preview-blank-wave-subject"
+										style={{
+											width: isMobile ? 'calc(100% - 16px)' : '484px',
+											height: '39px',
+											marginBottom: '8px',
+										}}
+									/>
+									{/* Body placeholder */}
+									<div
+										className="border-2 border-black rounded-[7px] overflow-hidden test-preview-blank-wave-body"
+										style={{
+											width: isMobile ? 'calc(100% - 16px)' : '484px',
+											height: '572px',
+											flex: isMobile ? 1 : undefined,
+										}}
+									/>
+								</div>
+							) : (
+								<div className="flex justify-center flex-1">
+									<HybridPromptInput
+										contact={contact || null}
+										identity={props.identity ?? null}
+										onIdentityUpdate={props.onIdentityUpdate}
+										hideDraftButton
+										hideGenerateTestButton
+										hideProfileBottomMiniBox
+										clipProfileTabOverflow
+										manualEntryHeightPx={550}
+										containerHeightPx={625}
+										useStaticDropdownPosition
+										hideMobileStickyTestFooter
+										dataCampaignMainBox={null}
+									/>
+								</div>
+							)
 						) : (
 							<>
 								{/* Subject input */}
@@ -1712,6 +1759,7 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 								variant="ghost"
 								className={cn(
 									"font-secondary font-semibold text-black border-[2px] border-black transition enabled:hover:brightness-95",
+									isRegenerating && "disabled:opacity-100",
 									isMobile ? "text-[12px]" : "text-[14px]"
 								)}
 								style={{
@@ -1719,13 +1767,17 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 									maxWidth: '397px',
 									height: isMobile ? '36px' : '40px',
 									borderRadius: '8px',
-									backgroundColor: '#FFDC9E',
+									backgroundColor: isRegenerating ? '#FEF3E0' : '#FFDC9E',
 								}}
 								data-hover-description="Regenerate this email using the settings shown above"
 								onClick={handleRegenerate}
 								disabled={isRegenerating || !onRegenerateDraft}
 							>
-								{isRegenerating ? <Spinner size="small" /> : 'Regenerate'}
+								{isRegenerating ? (
+									<span className="sr-only">Regenerating...</span>
+								) : (
+									'Regenerate'
+								)}
 							</Button>
 						</div>
 					) : (
@@ -1776,18 +1828,25 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 									variant="ghost"
 									className={cn(
 										"font-secondary font-semibold text-black border-[2px] border-black rounded-none transition enabled:hover:brightness-95",
+										isRegenerating && "disabled:opacity-100",
 										isMobile ? "text-[12px]" : "text-[14px]"
 									)}
 									style={{
 										width: isMobile ? '80px' : '124px',
 										height: isMobile ? '36px' : '40px',
-										backgroundColor: '#FFDC9E',
+										backgroundColor: isRegenerating ? '#FEF3E0' : '#FFDC9E',
 									}}
 									data-hover-description="Click to preview your prompt/settings before regenerating this draft"
 									onClick={handleRegenerate}
 									disabled={isRegenerating || !onRegenerateDraft}
 								>
-									{isRegenerating ? <Spinner size="small" /> : isMobile ? 'Regen' : 'Regenerate'}
+									{isRegenerating ? (
+										<span className="sr-only">Regenerating...</span>
+									) : isMobile ? (
+										'Regen'
+									) : (
+										'Regenerate'
+									)}
 								</Button>
 								<Button
 									type="button"
@@ -2025,6 +2084,7 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 								hoveredUsedContactId === draft.contactId &&
 								Boolean(usedContactTooltipPos) &&
 								Boolean(hoveredUsedContactCampaigns?.length);
+							const shouldHighlightRowForUsedContact = isUsedContactHoverCardVisible;
 
 							const contactTitle = contact?.headline || contact?.title || '';
 
@@ -2033,23 +2093,26 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 							const selectedBgColor = isRejectedTab ? 'bg-[#D99696]' : 'bg-[#8BDA76]';
 							const hoveredRegion =
 								hoveredDraftRow?.draftId === draft.id ? hoveredDraftRow.region : null;
-							const actionTitlePill =
-								hoveredRegion === 'left'
+							const actionTitlePill = shouldHighlightRowForUsedContact
+								? null
+								: hoveredRegion === 'left'
 									? { label: 'Select', backgroundColor: '#9DE9B0' }
 									: hoveredRegion === 'middle'
 										? { label: 'Open', backgroundColor: '#FFDE97' }
 										: hoveredRegion === 'right'
-											? { label: 'Delete', backgroundColor: '#FEA8A8' }
+											? { label: 'Delete', backgroundColor: '#F78989' }
 											: null;
 							const hoveredBgColor = isHoveringAllButton
 								? 'bg-[#FFEDCA]'
-								: hoveredRegion === 'left'
-									? 'bg-[#ECFBF0]'
-									: hoveredRegion === 'right'
-										? 'bg-[#FFCACA]'
-										: hoveredRegion === 'middle'
-											? 'bg-[#F9E5BA]'
-											: null;
+								: shouldHighlightRowForUsedContact
+									? 'bg-[#DAE6FE]'
+									: hoveredRegion === 'left'
+										? 'bg-[#ECFBF0]'
+										: hoveredRegion === 'right'
+											? 'bg-[#F78989]'
+											: hoveredRegion === 'middle'
+												? 'bg-[#F9E5BA]'
+												: null;
 							const rowBgColor = isHoveringAllButton
 								? hoveredBgColor
 								: isSelected
@@ -2070,7 +2133,7 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 									{idx > 0 && <div className="h-[10px]" />}
 									<div
 										className={cn(
-											'cursor-pointer relative select-none overflow-visible border-2 p-2 group/draft rounded-[8px] transition-colors',
+											'cursor-pointer relative select-none overflow-visible border-2 p-2 group/draft rounded-[8px] transition-colors duration-200 ease-in-out',
 											isMobile ? 'h-[100px]' : 'h-[97px]',
 											'border-[#000000]',
 											rowBgColor,
@@ -2125,13 +2188,13 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 										}}
 									>
 									{/* Left-hover accent bar (156px x 5px) */}
-									{hoveredRegion === 'left' && (
+									{hoveredRegion === 'left' && !shouldHighlightRowForUsedContact && (
 										<span
 											className="absolute left-0 top-0 w-[156px] h-[5px] bg-[#CCECD4] pointer-events-none rounded-tl-[6px]"
 										/>
 									)}
 									{/* Middle-hover accent bar (from x=156px to right edge, 5px tall) */}
-									{hoveredRegion === 'middle' && (
+									{hoveredRegion === 'middle' && !shouldHighlightRowForUsedContact && (
 										<span
 											className="absolute left-[156px] right-0 top-0 h-[5px] bg-[#FFDE97] pointer-events-none rounded-tr-[6px]"
 										/>
@@ -2148,11 +2211,14 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 											// For multi-campaign: #A0C0FF with sliding dot
 											// For single-campaign: #B0EAA4 (green, no dot)
 											// For default (not hovered): #DAE6FE
-											const pillBg = isMultiCampaignIndicator
-												? '#A0C0FF'
-												: isSingleCampaignIndicator
-													? '#B0EAA4'
-													: '#DAE6FE';
+											const pillBg =
+												hoveredRegion === 'right'
+													? '#F78989'
+													: isMultiCampaignIndicator
+														? '#A0C0FF'
+														: isSingleCampaignIndicator
+															? '#B0EAA4'
+															: '#DAE6FE';
 
 											// Handle mouse move on the pill to drive campaign selection
 											const handlePillMouseMove = isMultiCampaignIndicator
@@ -2179,7 +2245,7 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 
 											return (
 												<span
-													className="absolute z-10 cursor-pointer transition-all duration-150 ease-out"
+													className="absolute z-10 cursor-pointer transition-all duration-200 ease-in-out"
 													style={{
 														left: '8px',
 														top: '11px',
@@ -2218,7 +2284,10 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 													{/* Sliding dot for multi-campaign */}
 													{isMultiCampaignIndicator && (
 														<span
-															className="rounded-full bg-[#DAE6FE] pointer-events-none transition-all duration-150 ease-out"
+															className={cn(
+																'rounded-full pointer-events-none transition-all duration-200 ease-in-out',
+																hoveredRegion === 'right' ? 'bg-[#F78989]' : 'bg-[#DAE6FE]'
+															)}
 															style={(() => {
 																// Spec: 14×37 pill, 14×14 circle, thin stroke.
 																const PILL_HEIGHT = 37;
@@ -2313,38 +2382,64 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 											)}
 										/>
 									</div>
-									{/* Delete button */}
-									<Button
-										type="button"
-										variant="icon"
-										onClick={(e) => handleDeleteDraft(e, draft.id)}
-										className="absolute top-[50px] right-[2px] p-1 transition-colors z-10 group hidden group-hover/draft:block"
+									{/* Delete + Preview icon (centered in the right "delete" zone) */}
+									<div
+										className="absolute right-[14px] top-[calc(50%+5px)] -translate-y-1/2 z-20 hidden group-hover/draft:block"
+										style={{ width: '16px', height: '29px' }}
 									>
-										<X size={16} className="text-gray-500 group-hover:text-red-500" />
-									</Button>
-
-									{/* Preview button */}
-									<Button
-										type="button"
-										variant="icon"
-										onClick={(e) => {
-											e.preventDefault();
-											e.stopPropagation();
-											if (props.onPreview) {
-												props.onPreview(draft);
-											} else {
-												handleDraftDoubleClick(draft);
-											}
-										}}
-										className="absolute top-[72px] right-[2px] p-1 transition-colors z-20 hidden group-hover/draft:block"
-										aria-label="Preview draft"
-									>
-										<PreviewIcon
-											width="16px"
-											height="16px"
-											pathClassName="fill-[#4A4A4A]"
+										<DeleteandOpenIcon
+											width={16}
+											height={29}
+											className="block"
+											style={{ pointerEvents: 'none' }}
+											aria-hidden="true"
 										/>
-									</Button>
+
+										{/* Top half: delete */}
+										<button
+											type="button"
+											className="absolute left-0 top-0 w-full h-[14px] bg-transparent border-0 p-0 cursor-pointer"
+											aria-label="Delete draft"
+											onMouseEnter={() => {
+												// Ensure hovering the top glyph keeps the row in "Delete" (red) mode.
+												setHoveredDraftRow({ draftId: draft.id, region: 'right' });
+											}}
+											onClick={(e) => {
+												e.preventDefault();
+												e.stopPropagation();
+												void handleDeleteDraft(e, draft.id);
+											}}
+										/>
+
+										{/* Bottom half: preview/open */}
+										<button
+											type="button"
+											className="absolute left-0 bottom-0 w-full h-[15px] bg-transparent border-0 p-0 cursor-pointer"
+											aria-label="Preview draft"
+											onMouseEnter={(e) => {
+												// Treat hovering the *eye* as "Open" (yellow), even though it's in the right zone.
+												e.stopPropagation();
+												setHoveredDraftRow({ draftId: draft.id, region: 'middle' });
+											}}
+											onMouseMove={(e) => {
+												// Prevent the row's mousemove handler from re-classifying this as "Delete".
+												e.stopPropagation();
+												setHoveredDraftRow((prev) => {
+													if (prev?.draftId === draft.id && prev.region === 'middle') return prev;
+													return { draftId: draft.id, region: 'middle' };
+												});
+											}}
+											onClick={(e) => {
+												e.preventDefault();
+												e.stopPropagation();
+												if (props.onPreview) {
+													props.onPreview(draft);
+												} else {
+													handleDraftDoubleClick(draft);
+												}
+											}}
+										/>
+									</div>
 
 									{/* Fixed top-right info (Title + Location) - matching contacts table design */}
 									<div 
@@ -2353,7 +2448,7 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 									>
 										{(contactTitle || actionTitlePill) ? (
 											<div
-												className="h-[21px] w-[240px] rounded-[6px] px-2 flex items-center gap-1 border border-black overflow-hidden transition-colors duration-150 ease-out"
+												className="h-[21px] w-[240px] rounded-[6px] px-2 flex items-center gap-1 border border-black overflow-hidden transition-colors duration-200 ease-in-out"
 												style={{
 													backgroundColor: actionTitlePill
 														? actionTitlePill.backgroundColor
@@ -2453,12 +2548,14 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 													</div>
 												) : isUSAbbr ? (
 													<span
-														className="inline-flex items-center justify-center rounded-[6px] border text-[12px] leading-none font-bold flex-shrink-0"
+														className="inline-flex items-center justify-center rounded-[6px] border text-[12px] leading-none font-bold flex-shrink-0 transition-colors duration-200 ease-in-out"
 														style={{
 															width: '39px',
 															height: '20px',
 															backgroundColor:
-																stateBadgeColorMap[stateAbbr] || 'transparent',
+																hoveredRegion === 'right'
+																	? '#F78989'
+																	: stateBadgeColorMap[stateAbbr] || 'transparent',
 															borderColor: '#000000',
 														}}
 													>
@@ -2670,10 +2767,13 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 										<button
 											type="button"
 											className={cn(
-												'w-[89px] h-full flex items-center justify-center font-inter font-normal text-[17px] text-black cursor-pointer border-l-[2px] border-[#000000]',
-												isRejectedTab
-													? 'bg-[#C76A6A] hover:bg-[#B34E4E]'
-													: 'bg-[#7CB67C] hover:bg-[#6FA36F]'
+												'w-[89px] h-full flex items-center justify-center font-inter font-normal text-[17px] text-black cursor-pointer border-l-[2px] border-[#000000] transition-colors duration-200 ease-in-out',
+												// When hovering the row's Delete region, tint the ancillary "All" control to match.
+												hoveredDraftRow?.region === 'right'
+													? 'bg-[#F78989] hover:bg-[#F78989]'
+													: isRejectedTab
+														? 'bg-[#C76A6A] hover:bg-[#B34E4E]'
+														: 'bg-[#7CB67C] hover:bg-[#6FA36F]'
 											)}
 											onMouseEnter={() => setIsHoveringAllButton(true)}
 											onMouseLeave={() => setIsHoveringAllButton(false)}

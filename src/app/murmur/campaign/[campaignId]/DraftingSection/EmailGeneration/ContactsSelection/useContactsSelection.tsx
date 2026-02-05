@@ -1,6 +1,7 @@
 import { ContactWithName } from '@/types/contact';
 import { CampaignWithRelations } from '@/types';
 import { Dispatch, MouseEvent, SetStateAction, useRef } from 'react';
+import { HistoryAction } from '@/components/atoms/BottomPanelsContainer';
 
 export interface ContactsSelectionProps {
 	contacts: ContactWithName[];
@@ -9,6 +10,11 @@ export interface ContactsSelectionProps {
 	 * Used to render animated placeholder rows instead of the empty-state message.
 	 */
 	isLoading?: boolean;
+	/**
+	 * Optional set of contact IDs that are currently being drafted (queued/running).
+	 * These should not be treated as "selected" in the UI.
+	 */
+	activelyDraftingContactIds?: Set<number>;
 	selectedContactIds: Set<number>;
 	setSelectedContactIds: Dispatch<SetStateAction<Set<number>>>;
 	handleContactSelection: (contactId: number, event?: React.MouseEvent) => void;
@@ -20,6 +26,11 @@ export interface ContactsSelectionProps {
 	campaign?: CampaignWithRelations;
 	onDraftEmails?: (contactIds: number[]) => Promise<void>;
 	isDraftingDisabled?: boolean;
+	/**
+	 * When true, drafting operations are currently running/queued.
+	 * Used to show "Add Emails to Queue" on the draft button.
+	 */
+	isDraftQueueActive?: boolean;
 	/**
 	 * Optional callback for when the search bar triggers a search.
 	 * When provided, this overrides the default dashboard navigation behavior.
@@ -85,6 +96,10 @@ export interface ContactsSelectionProps {
 	 * This should handle the logic of selecting all contacts and setting the isAllContactsSelected state.
 	 */
 	onSelectAllContacts?: () => void;
+	/**
+	 * Optional: history actions to display in the logs panel.
+	 */
+	historyActions?: HistoryAction[];
 }
 
 export const useContactsSelection = (props: ContactsSelectionProps) => {

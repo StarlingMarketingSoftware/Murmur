@@ -85,7 +85,7 @@ const SentHeaderChrome: FC<{
 	isAllTab?: boolean;
 	whiteSectionHeight?: number;
 }> = ({ offsetY = 0, hasData = true, isAllTab = false, whiteSectionHeight }) => {
-	const isBottomView = whiteSectionHeight === 15;
+	const isBottomView = typeof whiteSectionHeight === 'number' && whiteSectionHeight <= 16;
 	const dotColor = hasData ? '#D9D9D9' : '#B0B0B0';
 	const pillBorderColor = hasData ? '#000000' : '#B0B0B0';
 	const pillTextColor = hasData ? '#000000' : '#B0B0B0';
@@ -258,7 +258,13 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 	const isAllTab = height === 347;
 	const isAllTabNavigation = interactionMode === 'allTab';
 	const whiteSectionHeight = customWhiteSectionHeight ?? (isAllTab ? 20 : 28);
-	const isBottomView = customWhiteSectionHeight === 15;
+	const isBottomView = customWhiteSectionHeight === 15 || customWhiteSectionHeight === 16;
+	// Compressed bottom panel spec: 40px total = 12px white + 28px color.
+	const effectiveWhiteSectionHeight = collapsed && isBottomView ? 12 : whiteSectionHeight;
+	const shouldRenderCollapsedTopBox = collapsed && isBottomView;
+	const collapsedTopBoxHeightPx = 22;
+	const collapsedTopBoxWidthPx = 224;
+	const collapsedTopBoxRadiusPx = 4.7;
 	const isFullyEmpty = sent.length === 0;
 	const placeholderBgColor = isFullyEmpty ? '#3DAC61' : '#5AB477';
 
@@ -306,8 +312,12 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 		<div
 			className={cn(
 				'relative max-[480px]:w-[96.27vw] rounded-md flex flex-col overflow-visible',
-				isBottomView
-					? 'border-2 border-black'
+				// In the compressed bottom-panel view we need exact internal pixel heights (16px white + 24px color).
+				// Use a stroke via box-shadow so it doesn't consume layout height.
+				shouldRenderCollapsedTopBox
+					? 'border-0'
+					: isBottomView
+						? 'border-2 border-black'
 					: isAllTab
 					? 'border-[3px] border-black'
 					: 'border-2 border-black/30'
@@ -315,7 +325,10 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 			style={{
 				width: `${width}px`,
 				height: `${height}px`,
-				background: `linear-gradient(to bottom, #ffffff ${whiteSectionHeight}px, #5AB477 ${whiteSectionHeight}px)`,
+				background: `linear-gradient(to bottom, #ffffff ${effectiveWhiteSectionHeight}px, #5AB477 ${effectiveWhiteSectionHeight}px)`,
+				boxShadow: shouldRenderCollapsedTopBox
+					? 'inset 0 0 0 2px #000000'
+					: undefined,
 				...(isBottomView ? { cursor: 'pointer' } : {}),
 			}}
 			data-hover-description="Sent: Emails that have already been sent for this campaign."
@@ -342,13 +355,16 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 				/>
 			)}
 			{/* Header row (no explicit divider; let the background change from white to green like the main table) */}
-			<SentHeaderChrome isAllTab={isAllTab} whiteSectionHeight={customWhiteSectionHeight} />
+			<SentHeaderChrome
+				isAllTab={isAllTab}
+				whiteSectionHeight={shouldRenderCollapsedTopBox ? effectiveWhiteSectionHeight : customWhiteSectionHeight}
+			/>
 			<div
 				className={cn(
 					'flex items-center gap-2 px-3 shrink-0',
 					onHeaderClick ? 'cursor-pointer' : ''
 				)}
-				style={{ height: `${whiteSectionHeight}px` }}
+				style={{ height: `${effectiveWhiteSectionHeight}px` }}
 				role={onHeaderClick ? 'button' : undefined}
 				tabIndex={onHeaderClick ? 0 : undefined}
 				onClick={onHeaderClick}
@@ -388,6 +404,44 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 					<div className="flex items-center" style={{ marginTop: isBottomView ? 0 : '1px' }}>
 						<OpenIcon width={isBottomView ? 10 : undefined} height={isBottomView ? 10 : undefined} />
 					</div>
+				</div>
+			)}
+
+			{/* Collapsed bottom panels: show only the top "batch" box (22px) centered in the 24px color region */}
+			{shouldRenderCollapsedTopBox && (
+				<div className="flex-1 flex items-center justify-center px-[2px]">
+					{bottomViewSentBatches[0] ? (
+						<div
+							key="sent-collapsed-batch"
+							className={cn(
+								'select-none overflow-hidden border-2 border-[#000000] flex items-center justify-between'
+							)}
+							style={{
+								width: `${collapsedTopBoxWidthPx}px`,
+								height: `${collapsedTopBoxHeightPx}px`,
+								borderRadius: `${collapsedTopBoxRadiusPx}px`,
+								backgroundColor: '#C3E7BF',
+							}}
+						>
+							<span className="pl-[18px] font-inter font-medium text-[15px] text-black leading-none">
+								{formatBatchCount(bottomViewSentBatches[0].count)}
+							</span>
+							<span className="pr-[18px] font-inter font-medium text-[15px] text-black leading-none">
+								{formatBatchTimestamp(bottomViewSentBatches[0].endAt)}
+							</span>
+						</div>
+					) : (
+						<div
+							aria-hidden
+							className={cn('select-none overflow-hidden border-2 border-[#000000]')}
+							style={{
+								width: `${collapsedTopBoxWidthPx}px`,
+								height: `${collapsedTopBoxHeightPx}px`,
+								borderRadius: `${collapsedTopBoxRadiusPx}px`,
+								backgroundColor: placeholderBgColor,
+							}}
+						/>
+					)}
 				</div>
 			)}
 

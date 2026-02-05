@@ -115,7 +115,7 @@ export const DraftPreviewBox: FC<DraftPreviewBoxProps> = ({
 								<div className="font-inter font-bold text-[14px] leading-4 truncate">
 									{contactName}
 								</div>
-								<div className="text-[12px] leading-4 truncate">
+								<div className="text-[11px] leading-4 truncate">
 									{showCompanyLine ? contact?.company : ''}
 								</div>
 							</div>
@@ -130,14 +130,14 @@ export const DraftPreviewBox: FC<DraftPreviewBoxProps> = ({
 												borderRadius: '3.98px',
 												border: '0.5px solid #000000',
 												backgroundColor: stateBadgeColorMap[stateAbbr] || 'transparent',
-												fontSize: '11.22px',
+												fontSize: '8px',
 											}}
 										>
 											{stateAbbr}
 										</span>
 									) : null}
 									{contact?.city ? (
-										<span className="text-[10px] leading-none truncate max-w-[72px]">
+										<span className="text-[11px] leading-none truncate max-w-[72px]">
 											{contact.city}
 										</span>
 									) : null}
@@ -154,7 +154,7 @@ export const DraftPreviewBox: FC<DraftPreviewBoxProps> = ({
 									>
 										<span
 											className="font-inter font-normal leading-none truncate"
-											style={{ fontSize: '9.49px' }}
+											style={{ fontSize: '9px' }}
 										>
 											{contact.headline}
 										</span>
@@ -187,12 +187,12 @@ export const DraftPreviewBox: FC<DraftPreviewBoxProps> = ({
 						>
 							{hasLinks ? (
 								<div
-									className="p-3 text-[12px] leading-[1.5] draft-preview-content"
+									className="p-3 text-[14px] leading-[1.6] draft-preview-content"
 									style={{ wordBreak: 'break-word' }}
 									dangerouslySetInnerHTML={{ __html: draft.message || 'No content' }}
 								/>
 							) : (
-								<div className="p-3 whitespace-pre-wrap text-[12px] leading-[1.5]">
+								<div className="p-3 whitespace-pre-wrap text-[14px] leading-[1.6]">
 									{plainMessage || 'No content'}
 								</div>
 							)}
