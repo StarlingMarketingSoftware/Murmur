@@ -824,9 +824,11 @@ const defaultCenter = {
 	lng: -98.5795,
 };
 
-const MAP_MIN_ZOOM = 5;
-// Dashboard UX: allow state hover highlight one zoom step past minZoom.
-const STATE_HOVER_HIGHLIGHT_MAX_ZOOM = MAP_MIN_ZOOM + 1;
+const MAP_DEFAULT_ZOOM = 5;
+// Let users zoom out further than the default US-wide view.
+const MAP_MIN_ZOOM = 3;
+// Dashboard UX: allow state hover highlight one zoom step past the default zoom.
+const STATE_HOVER_HIGHLIGHT_MAX_ZOOM = MAP_DEFAULT_ZOOM + 1;
 // Auto-fit temporarily caps maxZoom to prevent a visible "zoom bounce", but we must restore
 // it afterward so the user can still zoom in normally.
 const AUTO_FIT_CONTACTS_MAX_ZOOM = 14;
@@ -834,6 +836,11 @@ const AUTO_FIT_STATE_MAX_ZOOM = 8;
 const DEFAULT_MAX_ZOOM_FALLBACK = 22;
 
 const MAPBOX_STYLE = 'mapbox://styles/mapbox/streets-v12';
+
+// Performance: the `within` filter is helpful when zoomed out (to hide Canada/Mexico labels/roads),
+// but it adds overhead at high zoom where there are many more road/label features.
+// Only apply the US-only basemap clipping up to this zoom level.
+const US_ONLY_BASEMAP_CLIP_MAX_ZOOM = 7;
 
 const MAPBOX_SOURCE_IDS = {
 	states: 'murmur-states',
@@ -846,6 +853,7 @@ const MAPBOX_SOURCE_IDS = {
 	markersAllOverlay: 'murmur-markers-all-overlay',
 	markersPromotionPin: 'murmur-markers-promo-pin',
 	markersBookingPin: 'murmur-markers-booking-pin',
+	stateLabels: 'murmur-state-labels',
 } as const;
 
 const MAPBOX_LAYER_IDS = {
@@ -854,6 +862,7 @@ const MAPBOX_LAYER_IDS = {
 	statesFillHover: 'murmur-states-fill-hover',
 	statesDividers: 'murmur-states-dividers',
 	statesBordersInteractive: 'murmur-states-borders-interactive',
+	statesLabels: 'murmur-states-labels',
 	// Outlines
 	resultsOutline: 'murmur-results-outline-line',
 	lockedOutline: 'murmur-locked-outline-line',
@@ -873,6 +882,87 @@ const MAPBOX_LAYER_IDS = {
 	selectionRectFill: 'murmur-selection-rect-fill',
 	selectionRectLine: 'murmur-selection-rect-line',
 } as const;
+
+type BasemapCartographyClipState = {
+	layerIds: string[];
+	originalFilters: Map<string, any | null>;
+};
+
+const getBasemapCartographyLayerIds = (mapInstance: mapboxgl.Map): string[] => {
+	const layers = mapInstance.getStyle()?.layers ?? [];
+	const ids: string[] = [];
+
+	for (const layer of layers as any[]) {
+		const id = layer?.id as string | undefined;
+		if (!id) continue;
+		// Never touch our custom layers.
+		if (id.startsWith('murmur-')) continue;
+
+		const type = layer?.type as string | undefined;
+		if (type === 'symbol') {
+			ids.push(id);
+			continue;
+		}
+		if (type === 'line') {
+			// Only clip *roads* (not coastlines/admin boundaries/etc) to avoid extra work.
+			const sourceLayer = (layer?.['source-layer'] as string | undefined) ?? '';
+			if (sourceLayer === 'road' || id.includes('road')) {
+				ids.push(id);
+			}
+		}
+	}
+
+	return ids;
+};
+
+/**
+ * Basemap clean-up: keep Mapbox's own cartography (roads + place labels) inside the US only.
+ *
+ * We do this by applying a `within` filter to every *base* `symbol` + `line` layer in the
+ * Mapbox style, while leaving our custom `murmur-*` layers untouched.
+ *
+ * Result:
+ * - Inside the US: normal Streets basemap detail (cities/roads) is visible as you zoom in.
+ * - Outside the US: basemap labels/roads are hidden (land/water fills can still render).
+ */
+const applyUsOnlyBasemapCartography = (
+	mapInstance: mapboxgl.Map,
+	usGeometry: Extract<GeoJsonGeometry, { type: 'MultiPolygon' }>,
+	clipState: BasemapCartographyClipState
+) => {
+	if (clipState.layerIds.length === 0) {
+		clipState.layerIds = getBasemapCartographyLayerIds(mapInstance);
+	}
+
+	for (const id of clipState.layerIds) {
+		try {
+			if (!clipState.originalFilters.has(id)) {
+				const original = mapInstance.getFilter(id) as any;
+				clipState.originalFilters.set(id, original ?? null);
+			}
+
+			const existingFilter = clipState.originalFilters.get(id) as any;
+			const withinFilter = ['within', usGeometry] as any;
+			const nextFilter = existingFilter ? (['all', existingFilter, withinFilter] as any) : withinFilter;
+			mapInstance.setFilter(id, nextFilter);
+		} catch {
+			// Ignore layers that disappear or can't be mutated.
+		}
+	}
+};
+
+const restoreBasemapCartography = (mapInstance: mapboxgl.Map, clipState: BasemapCartographyClipState) => {
+	if (clipState.layerIds.length === 0) return;
+	for (const id of clipState.layerIds) {
+		try {
+			if (!clipState.originalFilters.has(id)) continue;
+			const original = clipState.originalFilters.get(id) ?? null;
+			mapInstance.setFilter(id, original);
+		} catch {
+			// Ignore.
+		}
+	}
+};
 
 // Use our shipped GeoJSON so SearchResultsMap no longer depends on Google-hosted shapes.
 const STATE_GEOJSON_URL = '/geo/us-states.geojson';
@@ -1192,7 +1282,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const [isMapLoaded, setIsMapLoaded] = useState(false);
 	const [mapLoadError, setMapLoadError] = useState<string | null>(null);
 	const [selectedStateKey, setSelectedStateKey] = useState<string | null>(null);
-	const [zoomLevel, setZoomLevel] = useState(4); // Default zoom level
+	const [zoomLevel, setZoomLevel] = useState(MAP_DEFAULT_ZOOM);
 	const [visibleContacts, setVisibleContacts] = useState<ContactWithName[]>([]);
 	// Keep a "sticky" set of currently-rendered marker ids so zooming can rescale existing markers
 	// and only introduce *new* markers, instead of re-sampling a totally different set each time.
@@ -1248,6 +1338,15 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		>
 	>(new Map());
 	const hoveredStateIdRef = useRef<string | number | null>(null);
+	const usBasemapClipGeometryRef = useRef<Extract<GeoJsonGeometry, { type: 'MultiPolygon' }> | null>(
+		null
+	);
+	const usBasemapClipMultiPolygonRef = useRef<ClippingMultiPolygon | null>(null);
+	const basemapCartographyClipStateRef = useRef<BasemapCartographyClipState>({
+		layerIds: [],
+		originalFilters: new Map(),
+	});
+	const isUsBasemapClipActiveRef = useRef(false);
 	const lockedStateSelectionMultiPolygonRef = useRef<ClippingMultiPolygon | null>(null);
 	const lockedStateSelectionBboxRef = useRef<BoundingBox | null>(null);
 	const lockedStateSelectionKeyRef = useRef<string | null>(null);
@@ -1260,6 +1359,65 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const onStateSelectRef = useRef<SearchResultsMapProps['onStateSelect'] | null>(null);
 	const isLoadingRef = useRef<boolean>(false);
 	const [isStateLayerReady, setIsStateLayerReady] = useState(false);
+
+	const syncUsOnlyBasemapCartography = useCallback(
+		(mapInstance: mapboxgl.Map | null) => {
+			if (!mapInstance || !isMapLoaded) return;
+			const usGeometry = usBasemapClipGeometryRef.current;
+			if (!usGeometry) return;
+
+			const zoom = mapInstance.getZoom() ?? MAP_DEFAULT_ZOOM;
+			let shouldClip = zoom <= US_ONLY_BASEMAP_CLIP_MAX_ZOOM + 0.001;
+
+			// When zoomed in, disable the clip as long as the viewport still intersects the US.
+			// This avoids paying the `within`-filter cost on dense road/label tiles during normal city-level usage.
+			if (!shouldClip) {
+				const usPolys = usBasemapClipMultiPolygonRef.current;
+				if (usPolys && usPolys.length) {
+					try {
+						const bounds = mapInstance.getBounds();
+						const center = mapInstance.getCenter();
+						if (!bounds || !center) {
+							shouldClip = true;
+						} else {
+							const sw = bounds.getSouthWest();
+							const ne = bounds.getNorthEast();
+							const samples: Array<{ lng: number; lat: number }> = [
+								{ lng: center.lng, lat: center.lat },
+								{ lng: sw.lng, lat: sw.lat },
+								{ lng: ne.lng, lat: ne.lat },
+								{ lng: sw.lng, lat: ne.lat },
+								{ lng: ne.lng, lat: sw.lat },
+							];
+							const anyInUs = samples.some((p) =>
+								pointInMultiPolygon([p.lng, p.lat], usPolys)
+							);
+							if (!anyInUs) shouldClip = true;
+						}
+					} catch {
+						shouldClip = true;
+					}
+				} else {
+					shouldClip = true;
+				}
+			}
+			const clipState = basemapCartographyClipStateRef.current;
+
+			if (shouldClip) {
+				if (!isUsBasemapClipActiveRef.current) {
+					applyUsOnlyBasemapCartography(mapInstance, usGeometry, clipState);
+					isUsBasemapClipActiveRef.current = true;
+				}
+			} else {
+				if (isUsBasemapClipActiveRef.current) {
+					restoreBasemapCartography(mapInstance, clipState);
+					isUsBasemapClipActiveRef.current = false;
+				}
+			}
+		},
+		[isMapLoaded]
+	);
+
 	const baseContactIdSet = useMemo(
 		() => new Set<number>(contacts.map((c) => c.id)),
 		[contacts]
@@ -2058,6 +2216,58 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				const source = map.getSource(MAPBOX_SOURCE_IDS.states) as mapboxgl.GeoJSONSource | undefined;
 				source?.setData({ type: 'FeatureCollection', features } as any);
 
+				// Build a point FeatureCollection with one centroid per state for labels.
+				const labelPoints: GeoJSON.Feature[] = [];
+				for (const [key, entry] of byKey) {
+					const b = entry.bbox;
+					if (!b) continue;
+					const lng = (b.minLng + b.maxLng) / 2;
+					const lat = (b.minLat + b.maxLat) / 2;
+					labelPoints.push({
+						type: 'Feature',
+						properties: { key, name: entry.name },
+						geometry: { type: 'Point', coordinates: [lng, lat] },
+					});
+				}
+				const labelSource = map.getSource(MAPBOX_SOURCE_IDS.stateLabels) as mapboxgl.GeoJSONSource | undefined;
+				labelSource?.setData({ type: 'FeatureCollection', features: labelPoints } as any);
+
+				// Prepare a simplified US outline geometry for the low-zoom basemap clip.
+				// (Union all states to remove internal borders, then take only the outer rings.)
+				if (!usBasemapClipGeometryRef.current) {
+					try {
+						const allStateMultiPolygons: ClippingMultiPolygon[] = Array.from(byKey.values()).map(
+							(e) => e.multiPolygon
+						);
+
+						let unioned: ClippingMultiPolygon | null = null;
+						try {
+							const { default: polygonClipping } = await import('polygon-clipping');
+							unioned = polygonClipping.union(...allStateMultiPolygons);
+						} catch {
+							// Union is an optimization; safe to fall back to per-state polys.
+						}
+
+						const multiPolygonsToOutline: ClippingMultiPolygon =
+							unioned && Array.isArray(unioned) && unioned.length
+								? unioned
+								: allStateMultiPolygons.flat();
+
+						usBasemapClipMultiPolygonRef.current = multiPolygonsToOutline;
+
+						const outlineFc = createOutlineGeoJsonFromMultiPolygon(multiPolygonsToOutline);
+						const coordinates = outlineFc.features.map((f) => f.geometry.coordinates);
+						if (coordinates.length) {
+							usBasemapClipGeometryRef.current = { type: 'MultiPolygon', coordinates };
+						}
+					} catch {
+						// Non-fatal; fall back to default global basemap cartography.
+					}
+				}
+
+				// Apply/restore the clip based on current zoom (performance).
+				syncUsOnlyBasemapCartography(map);
+
 				setIsStateLayerReady(true);
 			} catch (err) {
 				if (cancelled) return;
@@ -2078,7 +2288,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			clearResultsOutline();
 			clearSearchedStateOutline();
 		};
-	}, [map, isMapLoaded, clearResultsOutline, clearSearchedStateOutline]);
+	}, [map, isMapLoaded, clearResultsOutline, clearSearchedStateOutline, syncUsOnlyBasemapCartography]);
 
 	// Toggle state border/divider layers depending on whether state interactions are enabled.
 	useEffect(() => {
@@ -2151,6 +2361,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		ensureSource(MAPBOX_SOURCE_IDS.lockedOutline);
 		ensureSource(MAPBOX_SOURCE_IDS.selectedAreaRect);
 		ensureSource(MAPBOX_SOURCE_IDS.selectionRect);
+
+		// State label centroids (one point per state — avoids duplicate labels on MultiPolygon states)
+		ensureSource(MAPBOX_SOURCE_IDS.stateLabels);
 
 		// Marker sources (all are point FeatureCollections keyed by contact.id)
 		ensureSource(MAPBOX_SOURCE_IDS.markersAllOverlay);
@@ -2235,6 +2448,68 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		];
 
 		// States: hover fill + hit fill (transparent) + divider lines + interactive borders
+		const isStateSelectedExpr = ['boolean', ['feature-state', 'selected'], false];
+
+		const stateDividerLineWidthExpr = [
+			'interpolate',
+			['linear'],
+			['zoom'],
+			MAP_MIN_ZOOM,
+			0.8,
+			5,
+			1.0,
+			STATE_DIVIDER_LINES_MAX_ZOOM,
+			1.4,
+		];
+		const stateDividerLineOpacityExpr = [
+			'interpolate',
+			['linear'],
+			['zoom'],
+			MAP_MIN_ZOOM,
+			0.6,
+			5,
+			0.75,
+			STATE_DIVIDER_LINES_MAX_ZOOM,
+			0.85,
+		];
+		const stateInteractiveBorderWidthExpr = [
+			'interpolate',
+			['linear'],
+			['zoom'],
+			MAP_MIN_ZOOM,
+			['case', isStateSelectedExpr, 2.0, 0.7],
+			5,
+			['case', isStateSelectedExpr, 2.2, 0.85],
+			9,
+			['case', isStateSelectedExpr, 2.2, 0.85],
+			14,
+			['case', isStateSelectedExpr, 2.0, 0.6],
+		];
+		const stateInteractiveBorderOpacityExpr = [
+			'interpolate',
+			['linear'],
+			['zoom'],
+			MAP_MIN_ZOOM,
+			['case', isStateSelectedExpr, 1, 0.6],
+			5,
+			['case', isStateSelectedExpr, 1, 0.75],
+			9,
+			['case', isStateSelectedExpr, 1, 0.82],
+			14,
+			['case', isStateSelectedExpr, 1, 0.7],
+		];
+		const stateInteractiveBorderColorExpr = [
+			'interpolate',
+			['linear'],
+			['zoom'],
+			MAP_MIN_ZOOM,
+			['case', isStateSelectedExpr, '#000000', '#94A3B8'],
+			6,
+			['case', isStateSelectedExpr, '#000000', '#94A3B8'],
+			14,
+			['case', isStateSelectedExpr, '#000000', STATE_BORDER_COLOR],
+		];
+
 		ensureLayer({
 			id: MAPBOX_LAYER_IDS.statesFillHover,
 			type: 'fill',
@@ -2263,35 +2538,42 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			type: 'line',
 			source: MAPBOX_SOURCE_IDS.states,
 			maxzoom: STATE_DIVIDER_LINES_MAX_ZOOM + 0.01,
+			layout: { 'line-join': 'round', 'line-cap': 'round' },
 			paint: {
-				'line-color': STATE_DIVIDER_LINES_COLOR,
-				'line-opacity': STATE_DIVIDER_LINES_STROKE_OPACITY,
-				'line-width': STATE_DIVIDER_LINES_STROKE_WEIGHT,
+				'line-color': '#64748B',
+				'line-opacity': stateDividerLineOpacityExpr,
+				'line-width': stateDividerLineWidthExpr,
 			},
 		});
 		ensureLayer({
 			id: MAPBOX_LAYER_IDS.statesBordersInteractive,
 			type: 'line',
 			source: MAPBOX_SOURCE_IDS.states,
+			layout: { 'line-join': 'round', 'line-cap': 'round' },
 			paint: {
-				'line-color': [
-					'case',
-					['boolean', ['feature-state', 'selected'], false],
-					'#000000',
-					STATE_BORDER_COLOR,
-				],
-				'line-opacity': [
-					'case',
-					['boolean', ['feature-state', 'selected'], false],
-					1,
-					0.7,
-				],
-				'line-width': [
-					'case',
-					['boolean', ['feature-state', 'selected'], false],
-					2,
-					0.6,
-				],
+				'line-color': stateInteractiveBorderColorExpr,
+				'line-opacity': stateInteractiveBorderOpacityExpr,
+				'line-width': stateInteractiveBorderWidthExpr,
+			},
+		});
+		ensureLayer({
+			id: MAPBOX_LAYER_IDS.statesLabels,
+			type: 'symbol',
+			source: MAPBOX_SOURCE_IDS.stateLabels,
+			minzoom: MAP_MIN_ZOOM,
+			layout: {
+				// Abbreviations when zoomed out, full names when zoomed in.
+				'text-field': ['step', ['zoom'], ['get', 'key'], 7, ['get', 'name']],
+				'text-size': ['interpolate', ['linear'], ['zoom'], 3, 12, 5, 13, 7, 15, 10, 18],
+				'text-font': ['DIN Pro Medium', 'Arial Unicode MS Bold'],
+				'text-allow-overlap': false,
+				'text-ignore-placement': false,
+				'text-padding': 2,
+			},
+			paint: {
+				'text-color': '#111827',
+				'text-halo-color': 'rgba(255, 255, 255, 0.92)',
+				'text-halo-width': ['interpolate', ['linear'], ['zoom'], 3, 1.9, 7, 1.5, 10, 1.25],
 			},
 		});
 
@@ -2495,7 +2777,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			container: mapContainerRef.current,
 			style: MAPBOX_STYLE,
 			center: [defaultCenter.lng, defaultCenter.lat],
-			zoom: MAP_MIN_ZOOM,
+			zoom: MAP_DEFAULT_ZOOM,
 			minZoom: MAP_MIN_ZOOM,
 			attributionControl: true,
 		});
@@ -2505,7 +2787,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 		const onLoad = () => {
 			setIsMapLoaded(true);
-			setZoomLevel(mapInstance.getZoom() ?? MAP_MIN_ZOOM);
+			setZoomLevel(mapInstance.getZoom() ?? MAP_DEFAULT_ZOOM);
 			setMapLoadError(null);
 			ensureMapboxSourcesAndLayers(mapInstance);
 		};
@@ -3508,8 +3790,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		if (!map) return;
 		if (!isMapLoaded) return;
 		const onMoveEnd = () => {
-			const zoom = map.getZoom() ?? MAP_MIN_ZOOM;
+			const zoom = map.getZoom() ?? MAP_DEFAULT_ZOOM;
 			setZoomLevel(zoom);
+			syncUsOnlyBasemapCartography(map);
 
 			updateBookingExtraFetchBbox(map);
 			updatePromotionOverlayFetchBbox(map);
@@ -3561,6 +3844,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	}, [
 		map,
 		isMapLoaded,
+		syncUsOnlyBasemapCartography,
 		recomputeViewportDots,
 		updateBookingExtraFetchBbox,
 		updatePromotionOverlayFetchBbox,
@@ -4204,7 +4488,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			if (areaSelectionEnabled || isAreaSelecting) return;
 
 			// Marker hover interactions only at sufficiently high zoom.
-			const zoom = map.getZoom() ?? MAP_MIN_ZOOM;
+			const zoom = map.getZoom() ?? MAP_DEFAULT_ZOOM;
 			if (zoom < HOVER_INTERACTION_MIN_ZOOM) {
 				const prevHovered = hoveredMarkerIdRef.current;
 				if (hoverSourceRef.current === 'map' && prevHovered != null) {
@@ -4311,7 +4595,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 			// State click (when enabled and zoomed out).
 			if (enableStateInteractions && isStateLayerReady) {
-				const zoom = map.getZoom() ?? MAP_MIN_ZOOM;
+				const zoom = map.getZoom() ?? MAP_DEFAULT_ZOOM;
 				if (zoom <= STATE_HOVER_HIGHLIGHT_MAX_ZOOM + 0.001) {
 					const stateFeatures = map.queryRenderedFeatures(e.point, { layers: [MAPBOX_LAYER_IDS.statesFillHit] });
 					const topState = stateFeatures[0];
