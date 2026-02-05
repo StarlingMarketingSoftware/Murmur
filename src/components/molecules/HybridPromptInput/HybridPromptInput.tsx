@@ -6518,8 +6518,11 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																	advancedOffBadgeColor: string;
 																	placeholder: string;
 																}) => {
-																	const isOpen = expandedHybridCoreBlockId === id;
 																	const idx = fields.findIndex((f) => f.id === id);
+																	const isDraftExcluded =
+																		idx >= 0 ? Boolean(fields[idx]?.isCollapsed) : false;
+																	const isOpen =
+																		expandedHybridCoreBlockId === id && !isDraftExcluded;
 																	const initialValue =
 																		idx >= 0
 																			? ((form.getValues(`hybridBlockPrompts.${idx}.value`) as string) || '')
@@ -6549,6 +6552,12 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																					onClick={() => {
 																						setIsGhostVisible(false);
 																						setExpandedHybridTextBlockId(null);
+																						// If this block is excluded from drafting, clicking anywhere re-enables it.
+																						if (isDraftExcluded) {
+																							setExpandedHybridCoreBlockId(null);
+																							handleToggleCollapse(id);
+																							return;
+																						}
 																						setHybridStructureSelection({
 																							kind: 'block',
 																							blockId: id,
@@ -6561,22 +6570,45 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																						'flex items-center justify-start pl-3 pr-[36px]',
 																						'font-inter font-medium text-[14px] leading-none text-black'
 																					)}
-																					style={{ backgroundColor: bgColor, borderColor }}
+																					style={{
+																						backgroundColor: isDraftExcluded ? 'transparent' : bgColor,
+																						borderColor: isDraftExcluded ? '#000000' : borderColor,
+																					}}
 																				>
 																					<span className="whitespace-nowrap">{label}</span>
 																					<span
 																						aria-hidden="true"
-																						className={cn(
-																							'absolute right-[8px] top-1/2 -translate-y-1/2',
-																							'opacity-0 group-hover:opacity-100',
-																							'transition-opacity'
-																						)}
+																						className="absolute right-[8px] top-1/2 -translate-y-1/2"
+																						onMouseDown={(e) => {
+																							// Prevent focus + click from triggering open/close on the parent button.
+																							e.preventDefault();
+																							e.stopPropagation();
+																						}}
+																						onClick={(e) => {
+																							e.preventDefault();
+																							e.stopPropagation();
+																							setIsGhostVisible(false);
+																							setExpandedHybridTextBlockId(null);
+																							setExpandedHybridCoreBlockId(null);
+																							handleToggleCollapse(id);
+																						}}
 																					>
 																						<span
 																							className="flex h-[18px] w-[18px] items-center justify-center rounded-[5px]"
-																							style={{ backgroundColor: advancedOffBadgeColor }}
+																							style={{
+																								backgroundColor: isDraftExcluded
+																									? '#CACAFF'
+																									: advancedOffBadgeColor,
+																							}}
 																						>
-																							<span className="block w-[10px] h-[2px] bg-black rounded-[1px]" />
+																							{isDraftExcluded ? (
+																								<span className="relative block w-[10px] h-[10px]">
+																									<span className="absolute left-0 right-0 top-1/2 -translate-y-1/2 h-[2px] bg-black rounded-[1px]" />
+																									<span className="absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-[2px] bg-black rounded-[1px]" />
+																								</span>
+																							) : (
+																								<span className="block w-[10px] h-[2px] bg-black rounded-[1px]" />
+																							)}
 																						</span>
 																					</span>
 																				</button>
@@ -6590,7 +6622,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																						'font-inter font-medium text-[14px] leading-none text-black whitespace-nowrap'
 																					)}
 																				>
-																					Advanced off
+																					{isDraftExcluded ? 'Removed' : 'Advanced off'}
 																				</span>
 																			</div>
 																		);
