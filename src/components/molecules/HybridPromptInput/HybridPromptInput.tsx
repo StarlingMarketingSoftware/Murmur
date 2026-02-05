@@ -6578,7 +6578,14 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																					<span className="whitespace-nowrap">{label}</span>
 																					<span
 																						aria-hidden="true"
-																						className="absolute right-[8px] top-1/2 -translate-y-1/2"
+																						className={cn(
+																							'absolute right-[8px] top-1/2 -translate-y-1/2',
+																							// Match other Hybrid pills: only show the badge on hover/focus.
+																							'opacity-0 pointer-events-none',
+																							'group-hover:opacity-100 group-hover:pointer-events-auto',
+																							'group-focus-visible:opacity-100 group-focus-visible:pointer-events-auto',
+																							'transition-opacity'
+																						)}
 																						onMouseDown={(e) => {
 																							// Prevent focus + click from triggering open/close on the parent button.
 																							e.preventDefault();
@@ -6596,15 +6603,17 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																						<span
 																							className="flex h-[18px] w-[18px] items-center justify-center rounded-[5px]"
 																							style={{
+																								// Disabled state: make the 18x18 badge much lower opacity,
+																								// while keeping the plus icon crisp/black.
 																								backgroundColor: isDraftExcluded
-																									? '#CACAFF'
+																									? 'rgba(202, 202, 255, 0.25)'
 																									: advancedOffBadgeColor,
 																							}}
 																						>
 																							{isDraftExcluded ? (
 																								<span className="relative block w-[10px] h-[10px]">
-																									<span className="absolute left-0 right-0 top-1/2 -translate-y-1/2 h-[2px] bg-black rounded-[1px]" />
-																									<span className="absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-[2px] bg-black rounded-[1px]" />
+																									<span className="absolute left-0 right-0 top-1/2 -translate-y-1/2 h-[2px] bg-black" />
+																									<span className="absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-[2px] bg-black" />
 																								</span>
 																							) : (
 																								<span className="block w-[10px] h-[2px] bg-black rounded-[1px]" />
@@ -6612,18 +6621,20 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																						</span>
 																					</span>
 																				</button>
-																				<span
-																					aria-hidden="true"
-																					className={cn(
-																						'pointer-events-none absolute left-full top-1/2 -translate-y-1/2',
-																						'ml-[28px]',
-																						'opacity-0 peer-hover:opacity-100',
-																						'transition-opacity',
-																						'font-inter font-medium text-[14px] leading-none text-black whitespace-nowrap'
-																					)}
-																				>
-																					{isDraftExcluded ? 'Removed' : 'Advanced off'}
-																				</span>
+																				{!isDraftExcluded && (
+																					<span
+																						aria-hidden="true"
+																						className={cn(
+																							'pointer-events-none absolute left-full top-1/2 -translate-y-1/2',
+																							'ml-[28px]',
+																							'opacity-0 peer-hover:opacity-100',
+																							'transition-opacity',
+																							'font-inter font-medium text-[14px] leading-none text-black whitespace-nowrap'
+																						)}
+																					>
+																						Advanced off
+																					</span>
+																				)}
 																			</div>
 																		);
 																	}
