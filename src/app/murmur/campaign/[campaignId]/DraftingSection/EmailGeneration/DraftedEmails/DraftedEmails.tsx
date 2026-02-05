@@ -2084,6 +2084,7 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 								hoveredUsedContactId === draft.contactId &&
 								Boolean(usedContactTooltipPos) &&
 								Boolean(hoveredUsedContactCampaigns?.length);
+							const shouldHighlightRowForUsedContact = isUsedContactHoverCardVisible;
 
 							const contactTitle = contact?.headline || contact?.title || '';
 
@@ -2092,8 +2093,9 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 							const selectedBgColor = isRejectedTab ? 'bg-[#D99696]' : 'bg-[#8BDA76]';
 							const hoveredRegion =
 								hoveredDraftRow?.draftId === draft.id ? hoveredDraftRow.region : null;
-							const actionTitlePill =
-								hoveredRegion === 'left'
+							const actionTitlePill = shouldHighlightRowForUsedContact
+								? null
+								: hoveredRegion === 'left'
 									? { label: 'Select', backgroundColor: '#9DE9B0' }
 									: hoveredRegion === 'middle'
 										? { label: 'Open', backgroundColor: '#FFDE97' }
@@ -2102,13 +2104,15 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 											: null;
 							const hoveredBgColor = isHoveringAllButton
 								? 'bg-[#FFEDCA]'
-								: hoveredRegion === 'left'
-									? 'bg-[#ECFBF0]'
-									: hoveredRegion === 'right'
-										? 'bg-[#F78989]'
-										: hoveredRegion === 'middle'
-											? 'bg-[#F9E5BA]'
-											: null;
+								: shouldHighlightRowForUsedContact
+									? 'bg-[#DAE6FE]'
+									: hoveredRegion === 'left'
+										? 'bg-[#ECFBF0]'
+										: hoveredRegion === 'right'
+											? 'bg-[#F78989]'
+											: hoveredRegion === 'middle'
+												? 'bg-[#F9E5BA]'
+												: null;
 							const rowBgColor = isHoveringAllButton
 								? hoveredBgColor
 								: isSelected
@@ -2184,13 +2188,13 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 										}}
 									>
 									{/* Left-hover accent bar (156px x 5px) */}
-									{hoveredRegion === 'left' && (
+									{hoveredRegion === 'left' && !shouldHighlightRowForUsedContact && (
 										<span
 											className="absolute left-0 top-0 w-[156px] h-[5px] bg-[#CCECD4] pointer-events-none rounded-tl-[6px]"
 										/>
 									)}
 									{/* Middle-hover accent bar (from x=156px to right edge, 5px tall) */}
-									{hoveredRegion === 'middle' && (
+									{hoveredRegion === 'middle' && !shouldHighlightRowForUsedContact && (
 										<span
 											className="absolute left-[156px] right-0 top-0 h-[5px] bg-[#FFDE97] pointer-events-none rounded-tr-[6px]"
 										/>
