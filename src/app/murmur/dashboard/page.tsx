@@ -2069,6 +2069,8 @@ const DashboardContent = () => {
 	// "Search this area" CTA timing + placement (map view).
 	const SEARCH_THIS_AREA_MIN_ZOOM = 8;
 	const SEARCH_THIS_AREA_DELAY_MS = 2000;
+	// Scale down fullscreen map UI chrome (buttons/panels) without scaling the Mapbox canvas.
+	const MAP_VIEW_UI_SCALE = isMobile ? 1 : 0.85;
 	const MAP_VIEW_SEARCH_BAR_TOP_PX = 33;
 	const MAP_VIEW_SEARCH_BAR_INPUT_HEIGHT_PX = 49;
 	const SEARCH_THIS_AREA_GAP_PX = 45;
@@ -4306,24 +4308,19 @@ const DashboardContent = () => {
 									icon: whereIconProps?.icon || <NearMeIcon />,
 							  };
 
-						const searchBar = (
+						const searchBarBase = (
 							<div
 					className={`results-search-bar-wrapper w-full max-w-[650px] mx-auto px-4 ${
 							// When the horizontal research strip is active (sm–lg desktop),
 							// hide the mini search bar + helper text so the strip owns this area.
 							showHorizontalResearchStrip ? 'sm:hidden xl:block' : ''
-						} ${isMapView ? '' : 'relative'}`}
+						} relative`}
 							style={
 								isMapView
 									? {
-											position: 'fixed',
-											// Overlay directly on the map (no header band).
-											// Map container is inset 9px from viewport; place bar 24px below map top.
-											top: '33px',
-											left: '50%',
-											transform: 'translateX(-50%)',
-											zIndex: 120,
-											// Leave room for the floating close button on the left.
+											// In fullscreen map view we render this via a portal + outer fixed wrapper,
+											// so keep this inner container relative for absolute children.
+											position: 'relative',
 											width: 'min(440px, calc(100vw - 120px))',
 											maxWidth: '440px',
 											padding: 0,
@@ -5437,32 +5434,62 @@ const DashboardContent = () => {
 						</div>
 						);
 
+						const searchBar = isMapView ? (
+							<div
+								className="fixed left-0 right-0 flex justify-center pointer-events-none"
+								style={{
+									// Overlay directly on the map (no header band).
+									// Map container is inset 9px from viewport; place bar 24px below map top.
+									top: `${MAP_VIEW_SEARCH_BAR_TOP_PX}px`,
+									zIndex: 120,
+								}}
+							>
+								<div
+									className="pointer-events-auto"
+									style={{
+										transform: `scale(${MAP_VIEW_UI_SCALE})`,
+										transformOrigin: 'top center',
+									}}
+								>
+									{searchBarBase}
+								</div>
+							</div>
+						) : (
+							searchBarBase
+						);
+
 						const searchThisAreaCta =
 							isMapView && isSearchThisAreaCtaVisible ? (
 								<div
-									className="fixed z-[9999] pointer-events-none"
+									className="fixed z-[9999] pointer-events-none left-0 right-0 flex justify-center"
 									style={{
 										top: `${SEARCH_THIS_AREA_BUTTON_TOP_PX}px`,
-										left: '50%',
-										transform: 'translateX(-50%)',
 									}}
 								>
-									<button
-										type="button"
-										className="pointer-events-auto flex items-center justify-center font-secondary font-medium text-[17px] leading-none text-black"
+									<div
+										className="pointer-events-auto"
 										style={{
-											width: '212px',
-											height: '39px',
-											opacity: 0.9,
-											backgroundColor: '#AFD6EF',
-											border: '2px solid #347AB3',
-											borderRadius: '11px',
-											boxSizing: 'border-box',
+											transform: `scale(${MAP_VIEW_UI_SCALE})`,
+											transformOrigin: 'top center',
 										}}
-										onClick={handleSearchThisAreaClick}
 									>
-										Search this area
-									</button>
+										<button
+											type="button"
+											className="flex items-center justify-center font-secondary font-medium text-[17px] leading-none text-black"
+											style={{
+												width: '212px',
+												height: '39px',
+												opacity: 0.9,
+												backgroundColor: '#AFD6EF',
+												border: '2px solid #347AB3',
+												borderRadius: '11px',
+												boxSizing: 'border-box',
+											}}
+											onClick={handleSearchThisAreaClick}
+										>
+											Search this area
+										</button>
+									</div>
 								</div>
 							) : null;
 
@@ -5470,7 +5497,7 @@ const DashboardContent = () => {
 							isMapView && isAddToCampaignMode ? (
 								<div
 									data-slot="campaign-map-top-tabs"
-									className="fixed z-[9999] flex items-center justify-center pointer-events-none"
+									className="fixed left-0 right-0 z-[9999] flex items-center justify-center pointer-events-none"
 									style={{
 										// The map search bar is fixed at top: 33px in map view.
 										// The map container is inset 9px from the viewport.
@@ -5478,14 +5505,19 @@ const DashboardContent = () => {
 										// and the search bar top (33px) so they never feel too high/low.
 										top: '9px',
 										height: '24px',
-										left: '50%',
-										// Optical nudge: align the tray with the visible search bar below.
-										transform: 'translateX(-50%) translateX(-5px)',
-										width: 'min(440px, calc(100vw - 120px))',
-										maxWidth: '440px',
 									}}
 								>
-									<div className="pointer-events-auto relative h-full w-full">
+									<div
+										className="pointer-events-auto relative"
+										style={{
+											width: 'min(440px, calc(100vw - 120px))',
+											maxWidth: '440px',
+											height: '24px',
+											// Optical nudge: align the tray with the visible search bar below.
+											transform: `translateX(-5px) scale(${MAP_VIEW_UI_SCALE})`,
+											transformOrigin: 'top center',
+										}}
+									>
 										{/* Background box behind tabs (matches search bar width & centering) */}
 										<div
 											aria-hidden="true"
@@ -5981,6 +6013,8 @@ const DashboardContent = () => {
 																				? '3px solid #000000'
 																				: '3px solid #143883',
 																			overflow: 'hidden',
+																			transform: `scale(${MAP_VIEW_UI_SCALE})`,
+																			transformOrigin: 'top right',
 																		}}
 																	>
 																		{/* Header area for right-hand panel (same color as panel) */}
@@ -6533,6 +6567,8 @@ const DashboardContent = () => {
 																			backgroundColor: '#AFD6EF',
 																			border: '3px solid #143883',
 																			overflow: 'hidden',
+																			transform: `scale(${MAP_VIEW_UI_SCALE})`,
+																			transformOrigin: 'bottom center',
 																		}}
 																	>
 																		{/* Header area */}
