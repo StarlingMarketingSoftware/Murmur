@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Crimson_Text, Inter, Zen_Antique } from 'next/font/google';
 import { Toaster } from '@/components/ui/toast';
+import 'mapbox-gl/dist/mapbox-gl.css';
 import './globals.css';
 import './advanced-scroll.css';
 import './hide-scrollbars.css';

@@ -1,7 +1,7 @@
 'use client';
 
 import { FC, Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { GoogleMap, useJsApiLoader, MarkerF, OverlayView, OverlayViewF } from '@react-google-maps/api';
+import mapboxgl from 'mapbox-gl';
 import { ContactWithName } from '@/types/contact';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 import { useGetContactsMapOverlay } from '@/hooks/queryHooks/useContacts';
@@ -49,6 +49,28 @@ type AreaSelectPayload = {
 	extraContacts: ContactWithName[];
 };
 
+type GeoJsonGeometry =
+	| {
+			type: 'Polygon';
+			// GeoJSON coords: [lng, lat]
+			coordinates: number[][][];
+	  }
+	| {
+			type: 'MultiPolygon';
+			// GeoJSON coords: [lng, lat]
+			coordinates: number[][][][];
+	  };
+
+type GeoJsonFeatureCollection = {
+	type: 'FeatureCollection';
+	features: Array<{
+		type: 'Feature';
+		id?: string | number;
+		properties?: Record<string, unknown>;
+		geometry: GeoJsonGeometry;
+	}>;
+};
+
 const closeRing = (ring: ClippingRing): ClippingRing => {
 	if (ring.length === 0) return ring;
 	const first = ring[0];
@@ -68,14 +90,23 @@ const absRingArea = (ring: ClippingRing): number => {
 	return Math.abs(area2 / 2);
 };
 
-const createOutlinePolygonsFromMultiPolygon = (
-	multiPolygon: ClippingMultiPolygon,
-	options: Pick<
-		google.maps.PolygonOptions,
-		'strokeColor' | 'strokeOpacity' | 'strokeWeight' | 'zIndex'
-	>
-): google.maps.Polygon[] => {
-	const polygons: google.maps.Polygon[] = [];
+type OutlinePolygonFeatureCollection = {
+	type: 'FeatureCollection';
+	features: Array<{
+		type: 'Feature';
+		properties: Record<string, unknown>;
+		geometry: {
+			type: 'Polygon';
+			// GeoJSON coords: [lng, lat]
+			coordinates: number[][][];
+		};
+	}>;
+};
+
+const createOutlineGeoJsonFromMultiPolygon = (
+	multiPolygon: ClippingMultiPolygon
+): OutlinePolygonFeatureCollection => {
+	const features: OutlinePolygonFeatureCollection['features'] = [];
 	for (const clippingPolygon of multiPolygon) {
 		if (!clippingPolygon?.length) continue;
 
@@ -87,64 +118,78 @@ const createOutlinePolygonsFromMultiPolygon = (
 
 		if (!outerRing) continue;
 
-		const path = outerRing
-			.filter(([lng, lat]) => Number.isFinite(lng) && Number.isFinite(lat))
-			.map(([lng, lat]) => ({ lat, lng }));
-
-		if (path.length < 3) continue;
-
-		polygons.push(
-			new google.maps.Polygon({
-				paths: path,
-				clickable: false,
-				fillOpacity: 0,
-				strokeColor: options.strokeColor,
-				strokeOpacity: options.strokeOpacity ?? 1,
-				strokeWeight: options.strokeWeight ?? 2,
-				zIndex: options.zIndex,
-			})
+		const coords = closeRing(
+			outerRing.filter(([lng, lat]) => Number.isFinite(lng) && Number.isFinite(lat))
 		);
+		if (coords.length < 4) continue;
+
+		features.push({
+			type: 'Feature',
+			properties: {},
+			geometry: {
+				type: 'Polygon',
+				coordinates: [coords.map(([lng, lat]) => [lng, lat])],
+			},
+		});
 	}
-	return polygons;
+	return { type: 'FeatureCollection', features };
 };
 
-const linearRingToClippingRing = (
-	linearRing: google.maps.Data.LinearRing
-): ClippingRing => {
-	const coords = linearRing
-		.getArray()
-		.map((latLng): ClippingCoord => [latLng.lng(), latLng.lat()])
+const geoJsonRingToClippingRing = (ring: number[][]): ClippingRing => {
+	const coords = ring
+		.map((pair): ClippingCoord => [pair?.[0] as number, pair?.[1] as number])
 		.filter(([lng, lat]) => Number.isFinite(lng) && Number.isFinite(lat));
-
-	// Polygon-clipping expects valid rings; skip obviously invalid ones.
 	if (coords.length < 3) return [];
 	return closeRing(coords);
 };
 
-const polygonToClippingPolygon = (polygon: google.maps.Data.Polygon): ClippingPolygon => {
-	const rings = polygon
-		.getArray()
-		.map((ring) => linearRingToClippingRing(ring))
+const geoJsonPolygonToClippingPolygon = (polygonCoords: number[][][]): ClippingPolygon => {
+	const rings = (polygonCoords ?? [])
+		.map((ring) => geoJsonRingToClippingRing(ring))
 		.filter((ring) => ring.length >= 4);
 	return rings;
 };
 
-const geometryToClippingMultiPolygon = (
-	geometry: google.maps.Data.Geometry
+const geoJsonGeometryToClippingMultiPolygon = (
+	geometry: GeoJsonGeometry | null | undefined
 ): ClippingMultiPolygon | null => {
-	const type = geometry.getType();
-	if (type === 'Polygon') {
-		const poly = polygonToClippingPolygon(geometry as google.maps.Data.Polygon);
+	if (!geometry) return null;
+	if (geometry.type === 'Polygon') {
+		const poly = geoJsonPolygonToClippingPolygon(geometry.coordinates);
 		return poly.length ? [poly] : null;
 	}
-	if (type === 'MultiPolygon') {
-		const polys = (geometry as google.maps.Data.MultiPolygon)
-			.getArray()
-			.map((poly) => polygonToClippingPolygon(poly))
+	if (geometry.type === 'MultiPolygon') {
+		const polys = (geometry.coordinates ?? [])
+			.map((polyCoords) => geoJsonPolygonToClippingPolygon(polyCoords))
 			.filter((poly) => poly.length);
 		return polys.length ? polys : null;
 	}
 	return null;
+};
+
+const EMPTY_POLYGON_FC: OutlinePolygonFeatureCollection = { type: 'FeatureCollection', features: [] };
+
+const boundsToPolygonFeatureCollection = (
+	bounds: MapSelectionBounds,
+	properties: Record<string, unknown> = {}
+): OutlinePolygonFeatureCollection => {
+	const ring: number[][] = [
+		[bounds.west, bounds.south],
+		[bounds.east, bounds.south],
+		[bounds.east, bounds.north],
+		[bounds.west, bounds.north],
+		[bounds.west, bounds.south],
+	];
+	return {
+		type: 'FeatureCollection',
+		features: [
+			{
+				type: 'Feature',
+				properties,
+				geometry: { type: 'Polygon', coordinates: [ring] },
+			},
+		],
+	};
 };
 
 const coerceFiniteNumber = (value: unknown): number | null => {
@@ -774,11 +819,6 @@ interface SearchResultsMapProps {
 	skipAutoFit?: boolean;
 }
 
-const mapContainerStyle = {
-	width: '100%',
-	height: '100%',
-};
-
 const defaultCenter = {
 	lat: 39.8283, // Center of US
 	lng: -98.5795,
@@ -793,43 +833,49 @@ const AUTO_FIT_CONTACTS_MAX_ZOOM = 14;
 const AUTO_FIT_STATE_MAX_ZOOM = 8;
 const DEFAULT_MAX_ZOOM_FALLBACK = 22;
 
-const mapOptions: google.maps.MapOptions = {
-	disableDefaultUI: true,
-	zoomControl: false,
-	streetViewControl: false,
-	mapTypeControl: false,
-	fullscreenControl: false,
-	gestureHandling: 'greedy',
-	// Enable finer scroll-wheel zoom steps (more "in-between" zoom levels).
-	isFractionalZoomEnabled: true,
-	minZoom: MAP_MIN_ZOOM,
-	styles: [
-		// Hide Google's default state/province border lines so our custom outline is the only
-		// prominent border. (When state interactions are enabled, we draw borders via GeoJSON.)
-		{
-			featureType: 'administrative.province',
-			elementType: 'geometry.stroke',
-			stylers: [{ visibility: 'off' }],
-		},
-		{
-			featureType: 'administrative.province',
-			elementType: 'geometry.fill',
-			stylers: [{ visibility: 'off' }],
-		},
-		{
-			featureType: 'poi',
-			elementType: 'labels',
-			stylers: [{ visibility: 'off' }],
-		},
-		{
-			featureType: 'transit',
-			elementType: 'labels',
-			stylers: [{ visibility: 'off' }],
-		},
-	],
-};
+const MAPBOX_STYLE = 'mapbox://styles/mapbox/streets-v12';
 
-const STATE_GEOJSON_URL = 'https://storage.googleapis.com/mapsdevsite/json/states.js';
+const MAPBOX_SOURCE_IDS = {
+	states: 'murmur-states',
+	resultsOutline: 'murmur-results-outline',
+	lockedOutline: 'murmur-locked-outline',
+	selectionRect: 'murmur-selection-rect',
+	selectedAreaRect: 'murmur-selected-area-rect',
+	markersBase: 'murmur-markers-base',
+	markersPromotionDot: 'murmur-markers-promo-dot',
+	markersAllOverlay: 'murmur-markers-all-overlay',
+	markersPromotionPin: 'murmur-markers-promo-pin',
+	markersBookingPin: 'murmur-markers-booking-pin',
+} as const;
+
+const MAPBOX_LAYER_IDS = {
+	// States
+	statesFillHit: 'murmur-states-fill-hit',
+	statesFillHover: 'murmur-states-fill-hover',
+	statesDividers: 'murmur-states-dividers',
+	statesBordersInteractive: 'murmur-states-borders-interactive',
+	// Outlines
+	resultsOutline: 'murmur-results-outline-line',
+	lockedOutline: 'murmur-locked-outline-line',
+	// Markers (hit layers are used for hover/click priority)
+	markersAllHit: 'murmur-markers-all-hit',
+	markersAllDots: 'murmur-markers-all-dots',
+	promotionPinHit: 'murmur-promo-pin-hit',
+	promotionPinIcons: 'murmur-promo-pin-icons',
+	bookingPinHit: 'murmur-booking-pin-hit',
+	bookingPinIcons: 'murmur-booking-pin-icons',
+	promotionDotHit: 'murmur-promo-dot-hit',
+	promotionDotDots: 'murmur-promo-dot-dots',
+	baseHit: 'murmur-base-hit',
+	baseDots: 'murmur-base-dots',
+	// Rectangles
+	selectedAreaRect: 'murmur-selected-area-rect-line',
+	selectionRectFill: 'murmur-selection-rect-fill',
+	selectionRectLine: 'murmur-selection-rect-line',
+} as const;
+
+// Use our shipped GeoJSON so SearchResultsMap no longer depends on Google-hosted shapes.
+const STATE_GEOJSON_URL = '/geo/us-states.geojson';
 const STATE_HIGHLIGHT_COLOR = '#5DAB68';
 const STATE_HIGHLIGHT_OPACITY = 0.68;
 const STATE_BORDER_COLOR = '#CFD8DC';
@@ -1094,6 +1140,16 @@ const washOutHexColor = (hex: string, mixToWhite: number): string => {
 	return `#${toHexByte(r)}${toHexByte(g)}${toHexByte(b)}`;
 };
 
+const hashStringToStableKey = (input: string): string => {
+	// Small deterministic hash for cache keys / image ids.
+	// (Not cryptographically secure; just stable and fast.)
+	let hash = 5381;
+	for (let i = 0; i < input.length; i++) {
+		hash = (hash * 33) ^ input.charCodeAt(i);
+	}
+	return (hash >>> 0).toString(36);
+};
+
 const normalizeStateKey = (state?: string | null): string | null => {
 	if (!state) return null;
 	const abbr = getStateAbbreviation(state);
@@ -1130,7 +1186,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	// Track tooltip that is fading out (for smooth transition)
 	const [fadingTooltipId, setFadingTooltipId] = useState<number | null>(null);
 	const fadingTooltipTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-	const [map, setMap] = useState<google.maps.Map | null>(null);
+	const mapContainerRef = useRef<HTMLDivElement | null>(null);
+	const mapRef = useRef<mapboxgl.Map | null>(null);
+	const [map, setMap] = useState<mapboxgl.Map | null>(null);
+	const [isMapLoaded, setIsMapLoaded] = useState(false);
+	const [mapLoadError, setMapLoadError] = useState<string | null>(null);
 	const [selectedStateKey, setSelectedStateKey] = useState<string | null>(null);
 	const [zoomLevel, setZoomLevel] = useState(4); // Default zoom level
 	const [visibleContacts, setVisibleContacts] = useState<ContactWithName[]>([]);
@@ -1167,27 +1227,33 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const [isAreaSelecting, setIsAreaSelecting] = useState(false);
 	const selectionStartLatLngRef = useRef<LatLngLiteral | null>(null);
 	const selectionStartClientRef = useRef<{ x: number; y: number } | null>(null);
-	const selectionRectRef = useRef<google.maps.Rectangle | null>(null);
-	const selectedAreaRectRef = useRef<google.maps.Rectangle | null>(null);
+	const selectionBoundsRef = useRef<MapSelectionBounds | null>(null);
 	const lastSelectAllInViewNonceRef = useRef<number>(0);
 	// Timeout ref for auto-hiding research panel
 	const researchPanelTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 	// Small delay when moving between marker layers (prevents hover flicker)
 	const hoverClearTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-	const stateLayerRef = useRef<google.maps.Data | null>(null);
-	// Track the currently hovered state feature to prevent "sticky" highlights
-	const hoveredStateFeatureRef = useRef<google.maps.Data.Feature | null>(null);
-	const resultsOutlinePolygonsRef = useRef<google.maps.Polygon[]>([]);
-	const searchedStateOutlinePolygonsRef = useRef<google.maps.Polygon[]>([]);
+	// US state geometry for outlines, hover/click selection, and point-in-polygon checks.
+	const usStatesGeoJsonRef = useRef<GeoJsonFeatureCollection | null>(null);
+	const usStatesByKeyRef = useRef<
+		Map<
+			string,
+			{
+				key: string;
+				name: string;
+				geometry: GeoJsonGeometry;
+				multiPolygon: ClippingMultiPolygon;
+				bbox: BoundingBox | null;
+			}
+		>
+	>(new Map());
+	const hoveredStateIdRef = useRef<string | number | null>(null);
 	const lockedStateSelectionMultiPolygonRef = useRef<ClippingMultiPolygon | null>(null);
 	const lockedStateSelectionBboxRef = useRef<BoundingBox | null>(null);
 	const lockedStateSelectionKeyRef = useRef<string | null>(null);
 	const resultsSelectionMultiPolygonRef = useRef<ClippingMultiPolygon | null>(null);
 	const resultsSelectionBboxRef = useRef<BoundingBox | null>(null);
 	const resultsSelectionSignatureRef = useRef<string>('');
-	const backgroundDotsLayerRef = useRef<google.maps.Data | null>(null);
-	const lastBackgroundDotsKeyRef = useRef<string>('');
-	const backgroundDotsBudgetRef = useRef<number>(MAX_TOTAL_DOTS);
 	const lastVisibleContactsKeyRef = useRef<string>('');
 	const usStatesPolygonsRef = useRef<PreparedClippingPolygon[] | null>(null);
 	const selectedStateKeyRef = useRef<string | null>(null);
@@ -1314,51 +1380,36 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		[activeTool, onAreaSelect]
 	);
 
+	const setPolygonSourceBounds = useCallback(
+		(sourceId: string, bounds: MapSelectionBounds | null) => {
+			if (!map || !isMapLoaded) return;
+			const source = map.getSource(sourceId) as mapboxgl.GeoJSONSource | undefined;
+			if (!source) return;
+			const data = bounds ? boundsToPolygonFeatureCollection(bounds) : EMPTY_POLYGON_FC;
+			source.setData(data as any);
+		},
+		[map, isMapLoaded]
+	);
+
 	const clearSelectionRect = useCallback(() => {
-		if (selectionRectRef.current) {
-			selectionRectRef.current.setMap(null);
-			selectionRectRef.current = null;
-		}
+		selectionBoundsRef.current = null;
+		setPolygonSourceBounds(MAPBOX_SOURCE_IDS.selectionRect, null);
 		selectionStartLatLngRef.current = null;
 		selectionStartClientRef.current = null;
 		setIsAreaSelecting(false);
-	}, []);
-
-	const ensureSelectionRect = useCallback((): google.maps.Rectangle | null => {
-		if (!map) return null;
-		if (selectionRectRef.current) return selectionRectRef.current;
-		const rect = new google.maps.Rectangle({
-			map,
-			clickable: false,
-			draggable: false,
-			editable: false,
-			strokeColor: '#143883',
-			strokeOpacity: 1,
-			strokeWeight: 2,
-			fillColor: '#143883',
-			fillOpacity: 0.08,
-			zIndex: 2_000_000,
-		});
-		selectionRectRef.current = rect;
-		return rect;
-	}, [map]);
+	}, [setPolygonSourceBounds]);
 
 	// Persist and display the last selected area (black outline) so it's clear what the current
 	// map-scoped search is using.
 	useEffect(() => {
 		// Hide the persisted rectangle while actively drawing a new one to avoid overlap/confusion.
 		if (isAreaSelecting) {
-			if (selectedAreaRectRef.current) {
-				selectedAreaRectRef.current.setMap(null);
-			}
+			setPolygonSourceBounds(MAPBOX_SOURCE_IDS.selectedAreaRect, null);
 			return;
 		}
 
-		if (!map || !selectedAreaBounds) {
-			if (selectedAreaRectRef.current) {
-				selectedAreaRectRef.current.setMap(null);
-				selectedAreaRectRef.current = null;
-			}
+		if (!map || !isMapLoaded || !selectedAreaBounds) {
+			setPolygonSourceBounds(MAPBOX_SOURCE_IDS.selectedAreaRect, null);
 			return;
 		}
 
@@ -1367,24 +1418,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			return;
 		}
 
-		const rect =
-			selectedAreaRectRef.current ??
-			new google.maps.Rectangle({
-				map,
-				clickable: false,
-				draggable: false,
-				editable: false,
-				strokeColor: '#000000',
-				strokeOpacity: 1,
-				strokeWeight: 3,
-				fillOpacity: 0,
-				zIndex: 1_900_000,
-			});
-
-		rect.setMap(map);
-		rect.setBounds({ south, west, north, east });
-		selectedAreaRectRef.current = rect;
-	}, [map, selectedAreaBounds, isAreaSelecting]);
+		setPolygonSourceBounds(MAPBOX_SOURCE_IDS.selectedAreaRect, { south, west, north, east });
+	}, [map, isMapLoaded, selectedAreaBounds, isAreaSelecting, setPolygonSourceBounds]);
 
 	// Cancel selection if the tool changes or the map unmounts.
 	useEffect(() => {
@@ -1396,14 +1431,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	useEffect(() => {
 		return () => {
 			// Defensive cleanup on unmount.
-			if (selectionRectRef.current) {
-				selectionRectRef.current.setMap(null);
-				selectionRectRef.current = null;
-			}
-			if (selectedAreaRectRef.current) {
-				selectedAreaRectRef.current.setMap(null);
-				selectedAreaRectRef.current = null;
-			}
+			selectionBoundsRef.current = null;
 		};
 	}, []);
 
@@ -1428,62 +1456,51 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		return () => window.removeEventListener('mouseup', onWindowMouseUp);
 	}, [isAreaSelecting, clearSelectionRect]);
 
-	const mapOptionsForTool: google.maps.MapOptions = useMemo(() => {
-		const tool = activeTool ?? 'grab';
-		return {
-			...mapOptions,
-			// When selecting, disable drag-to-pan so click-drag can be used to draw the box.
-			draggable: tool === 'grab',
-			draggableCursor: tool === 'select' ? 'crosshair' : 'grab',
-			draggingCursor: tool === 'select' ? 'crosshair' : 'grabbing',
-		};
-	}, [activeTool]);
-
 	const handleMapMouseDown = useCallback(
-		(e: google.maps.MapMouseEvent) => {
+		(e: mapboxgl.MapMouseEvent) => {
 			if (!areaSelectionEnabled) return;
-			if (!e.latLng) return;
 
 			// Only left-click starts a selection.
-			const domEv = e.domEvent as MouseEvent | undefined;
-			if (domEv && typeof domEv.button === 'number' && domEv.button !== 0) return;
+			const domEv = e.originalEvent;
+			if (domEv.button !== 0) return;
 
-			const start = e.latLng.toJSON();
+			const start = { lat: e.lngLat.lat, lng: e.lngLat.lng };
 			selectionStartLatLngRef.current = start;
-			selectionStartClientRef.current = getClientPointFromDomEvent(e.domEvent);
+			selectionStartClientRef.current = getClientPointFromDomEvent(domEv);
 			setIsAreaSelecting(true);
 
-			const rect = ensureSelectionRect();
-			rect?.setBounds({
+			const bounds: MapSelectionBounds = {
 				south: start.lat,
 				west: start.lng,
 				north: start.lat,
 				east: start.lng,
-			});
+			};
+			selectionBoundsRef.current = bounds;
+			setPolygonSourceBounds(MAPBOX_SOURCE_IDS.selectionRect, bounds);
 		},
-		[areaSelectionEnabled, ensureSelectionRect]
+		[areaSelectionEnabled, setPolygonSourceBounds]
 	);
 
 	const handleMapMouseMove = useCallback(
-		(e: google.maps.MapMouseEvent) => {
+		(e: mapboxgl.MapMouseEvent) => {
 			if (!isAreaSelecting) return;
 			const start = selectionStartLatLngRef.current;
 			if (!start) return;
-			if (!e.latLng) return;
-			const current = e.latLng.toJSON();
-			const rect = ensureSelectionRect();
-			rect?.setBounds({
+			const current = { lat: e.lngLat.lat, lng: e.lngLat.lng };
+			const bounds: MapSelectionBounds = {
 				south: Math.min(start.lat, current.lat),
 				west: Math.min(start.lng, current.lng),
 				north: Math.max(start.lat, current.lat),
 				east: Math.max(start.lng, current.lng),
-			});
+			};
+			selectionBoundsRef.current = bounds;
+			setPolygonSourceBounds(MAPBOX_SOURCE_IDS.selectionRect, bounds);
 		},
-		[isAreaSelecting, ensureSelectionRect]
+		[isAreaSelecting, setPolygonSourceBounds]
 	);
 
 	const updateBookingExtraFetchBbox = useCallback(
-		(mapInstance: google.maps.Map | null) => {
+		(mapInstance: mapboxgl.Map | null) => {
 			if (!mapInstance) return;
 
 			// Only run for booking-mode searches, and only once the user is zoomed in.
@@ -1506,13 +1523,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 			const bounds = mapInstance.getBounds();
 			if (!bounds) return;
-
 			const sw = bounds.getSouthWest();
 			const ne = bounds.getNorthEast();
-			const south = sw.lat();
-			const west = sw.lng();
-			const north = ne.lat();
-			const east = ne.lng();
+			const south = sw.lat;
+			const west = sw.lng;
+			const north = ne.lat;
+			const east = ne.lng;
 
 			// Skip antimeridian-crossing viewports (not relevant for our UI).
 			if (east < west) return;
@@ -1548,7 +1564,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	);
 
 	const updatePromotionOverlayFetchBbox = useCallback(
-		(mapInstance: google.maps.Map | null) => {
+		(mapInstance: mapboxgl.Map | null) => {
 			if (!mapInstance) return;
 
 			// Only run for promotion-mode searches.
@@ -1571,13 +1587,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 			const bounds = mapInstance.getBounds();
 			if (!bounds) return;
-
 			const sw = bounds.getSouthWest();
 			const ne = bounds.getNorthEast();
-			const south = sw.lat();
-			const west = sw.lng();
-			const north = ne.lat();
-			const east = ne.lng();
+			const south = sw.lat;
+			const west = sw.lng;
+			const north = ne.lat;
+			const east = ne.lng;
 
 			// Skip antimeridian-crossing viewports (not relevant for our UI).
 			if (east < west) return;
@@ -1612,7 +1627,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	);
 
 	const updateAllContactsOverlayFetchBbox = useCallback(
-		(mapInstance: google.maps.Map | null) => {
+		(mapInstance: mapboxgl.Map | null) => {
 			if (!mapInstance) return;
 
 			// Only run when an explicit search is active (avoid loading the entire dataset in non-search views).
@@ -1636,13 +1651,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 			const bounds = mapInstance.getBounds();
 			if (!bounds) return;
-
 			const sw = bounds.getSouthWest();
 			const ne = bounds.getNorthEast();
-			const south = sw.lat();
-			const west = sw.lng();
-			const north = ne.lat();
-			const east = ne.lng();
+			const south = sw.lat;
+			const west = sw.lng;
+			const north = ne.lat;
+			const east = ne.lng;
 
 			// Skip antimeridian-crossing viewports (not relevant for our UI).
 			if (east < west) return;
@@ -1946,279 +1960,169 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	}, []);
 
 	const clearResultsOutline = useCallback(() => {
-		for (const polygon of resultsOutlinePolygonsRef.current) {
-			polygon.setMap(null);
-		}
-		resultsOutlinePolygonsRef.current = [];
 		resultsSelectionMultiPolygonRef.current = null;
 		resultsSelectionBboxRef.current = null;
 		resultsSelectionSignatureRef.current = '';
-	}, []);
+		if (!map || !isMapLoaded) return;
+		const source = map.getSource(MAPBOX_SOURCE_IDS.resultsOutline) as mapboxgl.GeoJSONSource | undefined;
+		source?.setData(EMPTY_POLYGON_FC as any);
+	}, [map, isMapLoaded]);
 
 	const clearSearchedStateOutline = useCallback(() => {
-		for (const polygon of searchedStateOutlinePolygonsRef.current) {
-			polygon.setMap(null);
-		}
-		searchedStateOutlinePolygonsRef.current = [];
-	}, []);
+		if (!map || !isMapLoaded) return;
+		const source = map.getSource(MAPBOX_SOURCE_IDS.lockedOutline) as mapboxgl.GeoJSONSource | undefined;
+		source?.setData(EMPTY_POLYGON_FC as any);
+	}, [map, isMapLoaded]);
 
 	// Load US state shapes (used for outline + optional hover/click interactions)
 	useEffect(() => {
-		if (!map) return;
+		if (!map || !isMapLoaded) return;
 
-		// Reset any previous layer on map instance changes
-		if (stateLayerRef.current) {
-			stateLayerRef.current.setMap(null);
-			stateLayerRef.current = null;
-		}
+		let cancelled = false;
+		const controller = new AbortController();
 
-		const dataLayer = new google.maps.Data({ map });
-		stateLayerRef.current = dataLayer;
-		setIsStateLayerReady(false);
-
-		dataLayer.setStyle({
-			fillOpacity: 0,
-			strokeOpacity: 0,
-			strokeWeight: 0,
-			clickable: false,
-			zIndex: 0,
-		});
-
-		dataLayer.loadGeoJson(STATE_GEOJSON_URL, { idPropertyName: 'NAME' }, () => {
-			// Prepare state polygons for background dots point-in-polygon checks
-			const prepared: PreparedClippingPolygon[] = [];
-			dataLayer.forEach((feature) => {
-				const geometry = feature.getGeometry();
-				if (!geometry) return;
-				const mp = geometryToClippingMultiPolygon(geometry);
-				if (!mp) return;
-				for (const poly of mp) {
-					const bbox = bboxFromPolygon(poly);
-					if (bbox) {
-						prepared.push({ polygon: poly, bbox });
-					}
+		const loadStates = async () => {
+			setIsStateLayerReady(false);
+			try {
+				const res = await fetch(STATE_GEOJSON_URL, { signal: controller.signal });
+				if (!res.ok) {
+					throw new Error(`Failed to fetch state GeoJSON (${res.status})`);
 				}
-			});
-			usStatesPolygonsRef.current = prepared.length ? prepared : null;
-			setIsStateLayerReady(true);
-		});
+
+				const json = (await res.json()) as GeoJsonFeatureCollection;
+				if (cancelled) return;
+
+				const prepared: PreparedClippingPolygon[] = [];
+				const byKey = new Map<
+					string,
+					{
+						key: string;
+						name: string;
+						geometry: GeoJsonGeometry;
+						multiPolygon: ClippingMultiPolygon;
+						bbox: BoundingBox | null;
+					}
+				>();
+
+				const features: GeoJsonFeatureCollection['features'] = [];
+
+				for (const feature of json.features ?? []) {
+					const props = feature.properties ?? {};
+					const rawName =
+						(props.name ?? props.NAME ?? props.STATE_NAME ?? props.State ?? props.state ?? '') as unknown;
+					const name = String(rawName ?? '').trim();
+
+					const rawAbbr =
+						(props.abbr ??
+							props.ABBR ??
+							props.stusps ??
+							props.STUSPS ??
+							props.postal ??
+							props.POSTAL ??
+							'') as unknown;
+					const abbr = String(rawAbbr ?? '').trim();
+
+					const key = normalizeStateKey(abbr || name);
+					if (!key) continue;
+
+					const mp = geoJsonGeometryToClippingMultiPolygon(feature.geometry);
+					if (!mp) continue;
+
+					const bbox = bboxFromMultiPolygon(mp);
+					for (const poly of mp) {
+						const polyBbox = bboxFromPolygon(poly);
+						if (polyBbox) prepared.push({ polygon: poly, bbox: polyBbox });
+					}
+
+					const safeName = name || key;
+					byKey.set(key, {
+						key,
+						name: safeName,
+						geometry: feature.geometry,
+						multiPolygon: mp,
+						bbox,
+					});
+
+					features.push({
+						type: 'Feature',
+						id: key,
+						properties: { ...props, name: safeName, key },
+						geometry: feature.geometry,
+					});
+				}
+
+				usStatesGeoJsonRef.current = { type: 'FeatureCollection', features };
+				usStatesByKeyRef.current = byKey;
+				usStatesPolygonsRef.current = prepared.length ? prepared : null;
+
+				const source = map.getSource(MAPBOX_SOURCE_IDS.states) as mapboxgl.GeoJSONSource | undefined;
+				source?.setData({ type: 'FeatureCollection', features } as any);
+
+				setIsStateLayerReady(true);
+			} catch (err) {
+				if (cancelled) return;
+				console.error('Failed to load US states GeoJSON', err);
+				usStatesGeoJsonRef.current = null;
+				usStatesByKeyRef.current = new Map();
+				usStatesPolygonsRef.current = null;
+				setIsStateLayerReady(false);
+			}
+		};
+
+		void loadStates();
 
 		return () => {
-			dataLayer.setMap(null);
-			stateLayerRef.current = null;
+			cancelled = true;
+			controller.abort();
 			setIsStateLayerReady(false);
 			clearResultsOutline();
 			clearSearchedStateOutline();
 		};
-	}, [map, clearResultsOutline, clearSearchedStateOutline]);
+	}, [map, isMapLoaded, clearResultsOutline, clearSearchedStateOutline]);
 
-	// Add/remove hover highlight and optional click-to-select for states.
-	// Hover highlight: on dashboard, allow one zoom step past minZoom.
+	// Toggle state border/divider layers depending on whether state interactions are enabled.
 	useEffect(() => {
-		const dataLayer = stateLayerRef.current;
-		if (!map || !dataLayer || !isStateLayerReady) return;
-
-		const loading = isLoading ?? false;
-		// Keep campaign behavior strict (minZoom only) while loosening dashboard by +1.
-		const stateHoverMaxZoom = enableStateInteractions ? MAP_MIN_ZOOM : STATE_HOVER_HIGHLIGHT_MAX_ZOOM;
-		const isWithinStateHoverZoom = !loading && zoomLevel <= stateHoverMaxZoom + 0.001;
-		const hasStateInteractivity = !!enableStateInteractions || !!onStateSelect;
-		// When the dashboard "select" tool is active, the user is drawing a box. Disable any
-		// state hover/click interactivity so it doesn't distract or accidentally trigger selection.
-		const isSelectToolActive = activeTool === 'select';
-
-		// Hover highlight should only exist at low zoom and only when states are actionable.
-		const shouldEnableHoverHighlight =
-			isWithinStateHoverZoom && hasStateInteractivity && !isSelectToolActive;
-		// Click-to-select states:
-		// - Campaign page (enableStateInteractions): always clickable
-		// - Dashboard map view (no enableStateInteractions): clickable anywhere the hover highlight is shown
-		const shouldEnableClickSelect =
-			!isSelectToolActive &&
-			(!!enableStateInteractions || (!!onStateSelect && isWithinStateHoverZoom));
-
-		if (!shouldEnableHoverHighlight && !shouldEnableClickSelect) return;
-
-		let mouseoverListener: google.maps.MapsEventListener | null = null;
-		let mouseoutListener: google.maps.MapsEventListener | null = null;
-		let clickListener: google.maps.MapsEventListener | null = null;
-
-		if (shouldEnableHoverHighlight) {
-			mouseoverListener = dataLayer.addListener(
-				'mouseover',
-				(event: google.maps.Data.MouseEvent) => {
-					// Defensive: if zoom changed mid-hover, don't apply the fill.
-					const currentZoom = map.getZoom() ?? zoomLevel;
-					if (currentZoom > stateHoverMaxZoom + 0.001) return;
-					if (isLoadingRef.current) return;
-
-					// Global nuke of all hover overrides. This guarantees that no other state stays
-					// highlighted, even if mouseout events were missed or raced.
-					dataLayer.revertStyle();
-
-					hoveredStateFeatureRef.current = event.feature;
-
-					const hoveredKey = normalizeStateKey(
-						(event.feature.getProperty('NAME') as string) ||
-							(event.feature.getId() as string)
-					);
-					if (hoveredKey && hoveredKey === selectedStateKeyRef.current) {
-						return;
-					}
-					dataLayer.overrideStyle(event.feature, {
-						fillColor: STATE_HIGHLIGHT_COLOR,
-						fillOpacity: STATE_HIGHLIGHT_OPACITY,
-						strokeColor: STATE_HIGHLIGHT_COLOR,
-						strokeOpacity: 1,
-						strokeWeight: 1.2,
-					});
-				}
-			);
-
-			mouseoutListener = dataLayer.addListener(
-				'mouseout',
-				(event: google.maps.Data.MouseEvent) => {
-					// Only revert if we are leaving the currently highlighted feature.
-					if (hoveredStateFeatureRef.current === event.feature) {
-						dataLayer.revertStyle();
-						hoveredStateFeatureRef.current = null;
-					}
-				}
+		if (!map || !isMapLoaded) return;
+		if (map.getLayer(MAPBOX_LAYER_IDS.statesDividers)) {
+			map.setLayoutProperty(
+				MAPBOX_LAYER_IDS.statesDividers,
+				'visibility',
+				enableStateInteractions ? 'none' : 'visible'
 			);
 		}
-
-		if (shouldEnableClickSelect) {
-			clickListener = dataLayer.addListener(
-				'click',
-				(event: google.maps.Data.MouseEvent) => {
-					const stateName = (event.feature.getProperty('NAME') as string) || '';
-					const normalizedKey =
-						normalizeStateKey(stateName) ||
-						normalizeStateKey((event.feature.getId() as string) || undefined);
-					setSelectedStateKey(normalizedKey);
-
-					// IMPORTANT: Trigger the search FIRST, before any map animation.
-					// This ensures the search starts immediately regardless of whether
-					// the user interrupts the zoom animation by interacting with the map.
-					if (stateName) {
-						onStateSelectRef.current?.(stateName);
-					}
-
-					// Then focus the map on the clicked state so the viewport doesn't
-					// jump back to a US-wide view while the next state search loads.
-					// If the user interrupts this animation, the search will still complete.
-					const geometry = event.feature.getGeometry();
-					if (map && geometry) {
-						const bounds = new google.maps.LatLngBounds();
-						geometry.forEachLatLng((latLng) => {
-							bounds.extend(latLng);
-						});
-						// Avoid zoom "bounce" on small states by preventing fitBounds from overshooting the cap.
-						const prevMaxZoomRaw = map.get('maxZoom') as unknown;
-						const prevMaxZoomCandidate =
-							typeof prevMaxZoomRaw === 'number' && Number.isFinite(prevMaxZoomRaw)
-								? prevMaxZoomRaw
-								: null;
-						// Ignore our temporary auto-fit caps (8/14) so repeated fits don't permanently lock zoom-in.
-						const prevMaxZoom =
-							prevMaxZoomCandidate != null &&
-							prevMaxZoomCandidate > AUTO_FIT_CONTACTS_MAX_ZOOM + 0.001
-								? prevMaxZoomCandidate
-								: null;
-						map.setOptions({ maxZoom: AUTO_FIT_STATE_MAX_ZOOM });
-						map.fitBounds(bounds, {
-							top: 100,
-							right: 100,
-							bottom: 100,
-							left: 100,
-						});
-						google.maps.event.addListenerOnce(map, 'idle', () => {
-							const currentZoom = map.getZoom();
-							if (currentZoom && currentZoom > AUTO_FIT_STATE_MAX_ZOOM) {
-								map.setZoom(AUTO_FIT_STATE_MAX_ZOOM);
-							}
-							// Restore maxZoom so the user can zoom in further after the animation.
-							map.setOptions({ maxZoom: prevMaxZoom ?? DEFAULT_MAX_ZOOM_FALLBACK });
-						});
-					}
-				}
+		if (map.getLayer(MAPBOX_LAYER_IDS.statesBordersInteractive)) {
+			map.setLayoutProperty(
+				MAPBOX_LAYER_IDS.statesBordersInteractive,
+				'visibility',
+				enableStateInteractions ? 'visible' : 'none'
 			);
 		}
+	}, [map, isMapLoaded, enableStateInteractions]);
 
-		return () => {
-			mouseoverListener?.remove();
-			mouseoutListener?.remove();
-			clickListener?.remove();
-
-			// If the user zoomed in while hovering, ensure we clear any lingering fill override.
-			if (shouldEnableHoverHighlight) {
-				dataLayer.revertStyle();
-				hoveredStateFeatureRef.current = null;
+	// Keep the Mapbox "selected" feature-state for US states in sync with `selectedStateKey`.
+	const prevSelectedStateKeyOnMapRef = useRef<string | null>(null);
+	useEffect(() => {
+		if (!map || !isMapLoaded || !isStateLayerReady) return;
+		const prev = prevSelectedStateKeyOnMapRef.current;
+		if (prev && prev !== selectedStateKey) {
+			try {
+				map.setFeatureState({ source: MAPBOX_SOURCE_IDS.states, id: prev }, { selected: false });
+			} catch {
+				// Ignore (feature may not be present yet).
 			}
-		};
-	}, [
-		map,
-		activeTool,
-		enableStateInteractions,
-		isStateLayerReady,
-		zoomLevel,
-		isLoading,
-		onStateSelect,
-	]);
-
-	// When state interactions are off, show subtle divider lines at low zoom (US-wide view).
-	useEffect(() => {
-		const dataLayer = stateLayerRef.current;
-		if (!dataLayer || !isStateLayerReady) return;
-		if (enableStateInteractions) return;
-
-		const loading = isLoading ?? false;
-		const isWithinStateHoverZoom = !loading && zoomLevel <= STATE_HOVER_HIGHLIGHT_MAX_ZOOM + 0.001;
-		const shouldShowZoomedOutDividers = zoomLevel <= STATE_DIVIDER_LINES_MAX_ZOOM;
-		const isSelectToolActive = activeTool === 'select';
-		dataLayer.setStyle(
-			shouldShowZoomedOutDividers
-				? {
-						fillOpacity: 0,
-						strokeColor: STATE_DIVIDER_LINES_COLOR,
-						strokeOpacity: STATE_DIVIDER_LINES_STROKE_OPACITY,
-						strokeWeight: STATE_DIVIDER_LINES_STROKE_WEIGHT,
-						// Enable hover at low zoom (minZoom..minZoom+1) on the dashboard.
-						clickable: !isSelectToolActive && isWithinStateHoverZoom && !!onStateSelect,
-						zIndex: 0,
-					}
-				: {
-						fillOpacity: 0,
-						strokeOpacity: 0,
-						strokeWeight: 0,
-						clickable: false,
-						zIndex: 0,
-					}
-		);
-	}, [activeTool, enableStateInteractions, isStateLayerReady, zoomLevel, isLoading, onStateSelect]);
-
-	// When state interactions are on, render the state borders + selected-state outline.
-	useEffect(() => {
-		const dataLayer = stateLayerRef.current;
-		if (!dataLayer || !isStateLayerReady) return;
-		if (!enableStateInteractions) return;
-
-		const isSelectToolActive = activeTool === 'select';
-		dataLayer.setStyle((feature) => {
-			const featureKey = normalizeStateKey(
-				(feature.getProperty('NAME') as string) || (feature.getId() as string)
-			);
-			const isSelected = featureKey && featureKey === selectedStateKey;
-			return {
-				fillOpacity: 0,
-				clickable: !isSelectToolActive,
-				strokeColor: isSelected ? '#000000' : STATE_BORDER_COLOR,
-				strokeOpacity: isSelected ? 1 : 0.7,
-				strokeWeight: isSelected ? 2 : 0.6,
-				zIndex: 0,
-			};
-		});
-	}, [activeTool, selectedStateKey, enableStateInteractions, isStateLayerReady]);
+		}
+		if (selectedStateKey) {
+			try {
+				map.setFeatureState(
+					{ source: MAPBOX_SOURCE_IDS.states, id: selectedStateKey },
+					{ selected: true }
+				);
+			} catch {
+				// Ignore (feature may not be present yet).
+			}
+		}
+		prevSelectedStateKeyOnMapRef.current = selectedStateKey;
+	}, [map, isMapLoaded, isStateLayerReady, selectedStateKey]);
 
 	const handleResearchPanelMouseEnter = useCallback(() => {
 		if (researchPanelTimeoutRef.current) {
@@ -2233,10 +2137,430 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		}, 5000);
 	}, []);
 
-	const { isLoaded, loadError } = useJsApiLoader({
-		id: 'google-maps-loader',
-		googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '',
-	});
+	const ensureMapboxSourcesAndLayers = useCallback((mapInstance: mapboxgl.Map) => {
+		const emptyFc: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [] };
+
+		const ensureSource = (id: string) => {
+			if (mapInstance.getSource(id)) return;
+			mapInstance.addSource(id, { type: 'geojson', data: emptyFc });
+		};
+
+		// Core sources
+		ensureSource(MAPBOX_SOURCE_IDS.states);
+		ensureSource(MAPBOX_SOURCE_IDS.resultsOutline);
+		ensureSource(MAPBOX_SOURCE_IDS.lockedOutline);
+		ensureSource(MAPBOX_SOURCE_IDS.selectedAreaRect);
+		ensureSource(MAPBOX_SOURCE_IDS.selectionRect);
+
+		// Marker sources (all are point FeatureCollections keyed by contact.id)
+		ensureSource(MAPBOX_SOURCE_IDS.markersAllOverlay);
+		ensureSource(MAPBOX_SOURCE_IDS.markersPromotionPin);
+		ensureSource(MAPBOX_SOURCE_IDS.markersBookingPin);
+		ensureSource(MAPBOX_SOURCE_IDS.markersPromotionDot);
+		ensureSource(MAPBOX_SOURCE_IDS.markersBase);
+
+		const ensureLayer = (layer: any) => {
+			if (mapInstance.getLayer(layer.id)) return;
+			mapInstance.addLayer(layer);
+		};
+
+		const resultDotRadiusExpr = [
+			'interpolate',
+			['linear'],
+			['zoom'],
+			0,
+			RESULT_DOT_SCALE_MIN,
+			RESULT_DOT_ZOOM_MIN,
+			RESULT_DOT_SCALE_MIN,
+			RESULT_DOT_ZOOM_MAX,
+			RESULT_DOT_SCALE_MAX,
+			24,
+			RESULT_DOT_SCALE_MAX,
+		];
+		const resultDotStrokeExpr = [
+			'interpolate',
+			['linear'],
+			['zoom'],
+			0,
+			RESULT_DOT_STROKE_WEIGHT_MIN_PX,
+			RESULT_DOT_ZOOM_MIN,
+			RESULT_DOT_STROKE_WEIGHT_MIN_PX,
+			RESULT_DOT_ZOOM_MAX,
+			RESULT_DOT_STROKE_WEIGHT_MAX_PX,
+			24,
+			RESULT_DOT_STROKE_WEIGHT_MAX_PX,
+		];
+
+		// Mapbox requires ["zoom"] to appear only as the direct input of a top-level
+		// "interpolate" or "step" expression.  Pre-compute derived zoom stops so every
+		// expression is a flat interpolation rather than nesting zoom inside arithmetic.
+		const allOverlayRadiusLow = RESULT_DOT_SCALE_MIN * 0.72;
+		const allOverlayRadiusHigh = RESULT_DOT_SCALE_MAX * 0.72;
+		const allOverlayRadiusExpr = [
+			'interpolate', ['linear'], ['zoom'],
+			0, allOverlayRadiusLow,
+			RESULT_DOT_ZOOM_MIN, allOverlayRadiusLow,
+			RESULT_DOT_ZOOM_MAX, allOverlayRadiusHigh,
+			24, allOverlayRadiusHigh,
+		];
+
+		const allOverlayStrokeLow = Math.max(1, RESULT_DOT_STROKE_WEIGHT_MIN_PX * 0.85);
+		const allOverlayStrokeHigh = Math.max(1, RESULT_DOT_STROKE_WEIGHT_MAX_PX * 0.85);
+		const allOverlayStrokeExpr = [
+			'interpolate', ['linear'], ['zoom'],
+			0, allOverlayStrokeLow,
+			RESULT_DOT_ZOOM_MIN, allOverlayStrokeLow,
+			RESULT_DOT_ZOOM_MAX, allOverlayStrokeHigh,
+			24, allOverlayStrokeHigh,
+		];
+
+		const pinRadiusLow = Math.max(MIN_OVERLAY_PIN_CIRCLE_DIAMETER_PX, 2 * RESULT_DOT_SCALE_MIN) / 2;
+		const pinRadiusHigh = Math.max(MIN_OVERLAY_PIN_CIRCLE_DIAMETER_PX, 2 * RESULT_DOT_SCALE_MAX) / 2;
+		const pinRadiusExpr = [
+			'interpolate', ['linear'], ['zoom'],
+			0, pinRadiusLow,
+			RESULT_DOT_ZOOM_MIN, pinRadiusLow,
+			RESULT_DOT_ZOOM_MAX, pinRadiusHigh,
+			24, pinRadiusHigh,
+		];
+
+		const pinIconSizeLow = Math.max(MIN_OVERLAY_PIN_CIRCLE_DIAMETER_PX, 2 * RESULT_DOT_SCALE_MIN) / MAP_MARKER_PIN_CIRCLE_DIAMETER;
+		const pinIconSizeHigh = Math.max(MIN_OVERLAY_PIN_CIRCLE_DIAMETER_PX, 2 * RESULT_DOT_SCALE_MAX) / MAP_MARKER_PIN_CIRCLE_DIAMETER;
+		const pinIconSizeExpr = [
+			'interpolate', ['linear'], ['zoom'],
+			0, pinIconSizeLow,
+			RESULT_DOT_ZOOM_MIN, pinIconSizeLow,
+			RESULT_DOT_ZOOM_MAX, pinIconSizeHigh,
+			24, pinIconSizeHigh,
+		];
+
+		// States: hover fill + hit fill (transparent) + divider lines + interactive borders
+		ensureLayer({
+			id: MAPBOX_LAYER_IDS.statesFillHover,
+			type: 'fill',
+			source: MAPBOX_SOURCE_IDS.states,
+			paint: {
+				'fill-color': STATE_HIGHLIGHT_COLOR,
+				'fill-opacity': [
+					'case',
+					['boolean', ['feature-state', 'hover'], false],
+					STATE_HIGHLIGHT_OPACITY,
+					0,
+				],
+			},
+		});
+		ensureLayer({
+			id: MAPBOX_LAYER_IDS.statesFillHit,
+			type: 'fill',
+			source: MAPBOX_SOURCE_IDS.states,
+			paint: {
+				'fill-color': '#000000',
+				'fill-opacity': 0,
+			},
+		});
+		ensureLayer({
+			id: MAPBOX_LAYER_IDS.statesDividers,
+			type: 'line',
+			source: MAPBOX_SOURCE_IDS.states,
+			maxzoom: STATE_DIVIDER_LINES_MAX_ZOOM + 0.01,
+			paint: {
+				'line-color': STATE_DIVIDER_LINES_COLOR,
+				'line-opacity': STATE_DIVIDER_LINES_STROKE_OPACITY,
+				'line-width': STATE_DIVIDER_LINES_STROKE_WEIGHT,
+			},
+		});
+		ensureLayer({
+			id: MAPBOX_LAYER_IDS.statesBordersInteractive,
+			type: 'line',
+			source: MAPBOX_SOURCE_IDS.states,
+			paint: {
+				'line-color': [
+					'case',
+					['boolean', ['feature-state', 'selected'], false],
+					'#000000',
+					STATE_BORDER_COLOR,
+				],
+				'line-opacity': [
+					'case',
+					['boolean', ['feature-state', 'selected'], false],
+					1,
+					0.7,
+				],
+				'line-width': [
+					'case',
+					['boolean', ['feature-state', 'selected'], false],
+					2,
+					0.6,
+				],
+			},
+		});
+
+		// Outlines (results + locked state)
+		ensureLayer({
+			id: MAPBOX_LAYER_IDS.resultsOutline,
+			type: 'line',
+			source: MAPBOX_SOURCE_IDS.resultsOutline,
+			paint: { 'line-color': '#1277E1', 'line-opacity': 1, 'line-width': 2 },
+		});
+		ensureLayer({
+			id: MAPBOX_LAYER_IDS.lockedOutline,
+			type: 'line',
+			source: MAPBOX_SOURCE_IDS.lockedOutline,
+			paint: { 'line-color': '#000000', 'line-opacity': 1, 'line-width': 3 },
+		});
+
+		// All-contacts overlay (gray dots) — lowest marker priority
+		ensureLayer({
+			id: MAPBOX_LAYER_IDS.markersAllHit,
+			type: 'circle',
+			source: MAPBOX_SOURCE_IDS.markersAllOverlay,
+			paint: { 'circle-radius': allOverlayRadiusExpr, 'circle-opacity': 0, 'circle-stroke-width': 0 },
+		});
+		ensureLayer({
+			id: MAPBOX_LAYER_IDS.markersAllDots,
+			type: 'circle',
+			source: MAPBOX_SOURCE_IDS.markersAllOverlay,
+			paint: {
+				'circle-radius': allOverlayRadiusExpr,
+				'circle-color': ['get', 'fillColor'],
+				'circle-opacity': 1,
+				'circle-stroke-color': [
+					'case',
+					['boolean', ['feature-state', 'selected'], false],
+					RESULT_DOT_STROKE_COLOR_SELECTED,
+					RESULT_DOT_STROKE_COLOR_DEFAULT,
+				],
+				'circle-stroke-width': allOverlayStrokeExpr,
+			},
+		});
+
+		// Promotion overlay pins (outside locked state / no locked state) — behind primary dots
+		// The circle layer doubles as hit area AND visual ring for selection (feature-state in paint is allowed).
+		ensureLayer({
+			id: MAPBOX_LAYER_IDS.promotionPinHit,
+			type: 'circle',
+			source: MAPBOX_SOURCE_IDS.markersPromotionPin,
+			paint: {
+				'circle-radius': pinRadiusExpr,
+				'circle-opacity': 0,
+				'circle-stroke-width': [
+					'case',
+					['boolean', ['feature-state', 'selected'], false], 2.5,
+					0,
+				],
+				'circle-stroke-color': [
+					'case',
+					['boolean', ['feature-state', 'selected'], false], RESULT_DOT_STROKE_COLOR_SELECTED,
+					'transparent',
+				],
+			},
+		});
+		ensureLayer({
+			id: MAPBOX_LAYER_IDS.promotionPinIcons,
+			type: 'symbol',
+			source: MAPBOX_SOURCE_IDS.markersPromotionPin,
+			layout: {
+				'icon-image': ['get', 'iconDefault'],
+				'icon-size': pinIconSizeExpr,
+				'icon-anchor': 'top-left',
+				'icon-offset': [-MAP_MARKER_PIN_CIRCLE_CENTER_X, -MAP_MARKER_PIN_CIRCLE_CENTER_Y],
+				'icon-allow-overlap': true,
+				'icon-ignore-placement': true,
+			},
+		});
+
+		// Booking extra pins — behind primary dots
+		// The circle layer doubles as hit area AND visual ring for selection / category hover.
+		ensureLayer({
+			id: MAPBOX_LAYER_IDS.bookingPinHit,
+			type: 'circle',
+			source: MAPBOX_SOURCE_IDS.markersBookingPin,
+			paint: {
+				'circle-radius': pinRadiusExpr,
+				'circle-opacity': 0,
+				'circle-stroke-width': [
+					'case',
+					['boolean', ['feature-state', 'selected'], false], 2.5,
+					['boolean', ['feature-state', 'categoryHover'], false], 2,
+					0,
+				],
+				'circle-stroke-color': [
+					'case',
+					['boolean', ['feature-state', 'selected'], false], RESULT_DOT_STROKE_COLOR_SELECTED,
+					['boolean', ['feature-state', 'categoryHover'], false], BOOKING_EXTRA_PIN_HOVER_STROKE_COLOR,
+					'transparent',
+				],
+			},
+		});
+		ensureLayer({
+			id: MAPBOX_LAYER_IDS.bookingPinIcons,
+			type: 'symbol',
+			source: MAPBOX_SOURCE_IDS.markersBookingPin,
+			layout: {
+				'icon-image': ['get', 'iconDefault'],
+				'icon-size': pinIconSizeExpr,
+				'icon-anchor': 'top-left',
+				'icon-offset': [-MAP_MARKER_PIN_CIRCLE_CENTER_X, -MAP_MARKER_PIN_CIRCLE_CENTER_Y],
+				'icon-allow-overlap': true,
+				'icon-ignore-placement': true,
+			},
+		});
+
+		// Promotion overlay dots (inside locked state) — below primary dots
+		ensureLayer({
+			id: MAPBOX_LAYER_IDS.promotionDotHit,
+			type: 'circle',
+			source: MAPBOX_SOURCE_IDS.markersPromotionDot,
+			paint: { 'circle-radius': resultDotRadiusExpr, 'circle-opacity': 0, 'circle-stroke-width': 0 },
+		});
+		ensureLayer({
+			id: MAPBOX_LAYER_IDS.promotionDotDots,
+			type: 'circle',
+			source: MAPBOX_SOURCE_IDS.markersPromotionDot,
+			paint: {
+				'circle-radius': resultDotRadiusExpr,
+				'circle-color': ['get', 'fillColor'],
+				'circle-opacity': 1,
+				'circle-stroke-color': [
+					'case',
+					['boolean', ['feature-state', 'selected'], false],
+					RESULT_DOT_STROKE_COLOR_SELECTED,
+					RESULT_DOT_STROKE_COLOR_DEFAULT,
+				],
+				'circle-stroke-width': resultDotStrokeExpr,
+			},
+		});
+
+		// Primary result dots — top marker priority
+		ensureLayer({
+			id: MAPBOX_LAYER_IDS.baseHit,
+			type: 'circle',
+			source: MAPBOX_SOURCE_IDS.markersBase,
+			paint: { 'circle-radius': resultDotRadiusExpr, 'circle-opacity': 0, 'circle-stroke-width': 0 },
+		});
+		ensureLayer({
+			id: MAPBOX_LAYER_IDS.baseDots,
+			type: 'circle',
+			source: MAPBOX_SOURCE_IDS.markersBase,
+			paint: {
+				'circle-radius': resultDotRadiusExpr,
+				'circle-color': ['get', 'fillColor'],
+				'circle-opacity': 1,
+				'circle-stroke-color': [
+					'case',
+					['boolean', ['feature-state', 'selected'], false],
+					RESULT_DOT_STROKE_COLOR_SELECTED,
+					RESULT_DOT_STROKE_COLOR_DEFAULT,
+				],
+				'circle-stroke-width': resultDotStrokeExpr,
+			},
+		});
+
+		// Persisted selected area (black outline) — above markers
+		ensureLayer({
+			id: MAPBOX_LAYER_IDS.selectedAreaRect,
+			type: 'line',
+			source: MAPBOX_SOURCE_IDS.selectedAreaRect,
+			paint: { 'line-color': '#000000', 'line-opacity': 1, 'line-width': 3 },
+		});
+
+		// In-progress selection rectangle — above everything
+		ensureLayer({
+			id: MAPBOX_LAYER_IDS.selectionRectFill,
+			type: 'fill',
+			source: MAPBOX_SOURCE_IDS.selectionRect,
+			paint: { 'fill-color': '#143883', 'fill-opacity': 0.08 },
+		});
+		ensureLayer({
+			id: MAPBOX_LAYER_IDS.selectionRectLine,
+			type: 'line',
+			source: MAPBOX_SOURCE_IDS.selectionRect,
+			paint: { 'line-color': '#143883', 'line-opacity': 1, 'line-width': 2 },
+		});
+	}, []);
+
+	useEffect(() => {
+		if (!mapContainerRef.current) return;
+		if (mapRef.current) return;
+
+		const accessToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
+		if (!accessToken) {
+			setMapLoadError('Missing NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN');
+			return;
+		}
+
+		mapboxgl.accessToken = accessToken;
+
+		const mapInstance = new mapboxgl.Map({
+			container: mapContainerRef.current,
+			style: MAPBOX_STYLE,
+			center: [defaultCenter.lng, defaultCenter.lat],
+			zoom: MAP_MIN_ZOOM,
+			minZoom: MAP_MIN_ZOOM,
+			attributionControl: true,
+		});
+
+		mapRef.current = mapInstance;
+		setMap(mapInstance);
+
+		const onLoad = () => {
+			setIsMapLoaded(true);
+			setZoomLevel(mapInstance.getZoom() ?? MAP_MIN_ZOOM);
+			setMapLoadError(null);
+			ensureMapboxSourcesAndLayers(mapInstance);
+		};
+
+		const onError = (e: any) => {
+			const message =
+				typeof e?.error?.message === 'string'
+					? e.error.message
+					: typeof e?.error === 'string'
+						? e.error
+						: 'Error loading map';
+			setMapLoadError(message);
+		};
+
+		mapInstance.on('load', onLoad);
+		mapInstance.on('error', onError);
+
+		return () => {
+			mapInstance.off('load', onLoad);
+			mapInstance.off('error', onError);
+			mapInstance.remove();
+			mapRef.current = null;
+			setMap(null);
+			setIsMapLoaded(false);
+		};
+	}, [ensureMapboxSourcesAndLayers]);
+
+	// Keep the Mapbox canvas in sync with its container.
+	// In portal / fixed-position layouts the browser may not have the final height when
+	// mapbox-gl first reads it, so we:
+	//   1. Observe container resizes (covers window resize, sidebar toggle, etc.)
+	//   2. Fire a burst of resize() calls after mount to catch deferred CSS layout
+	useEffect(() => {
+		const container = mapContainerRef.current;
+		if (!container || !map) return;
+
+		const safeResize = () => {
+			try { map.resize(); } catch { /* map may be tearing down */ }
+		};
+
+		// ResizeObserver for ongoing size changes.
+		const ro = new ResizeObserver(() => safeResize());
+		ro.observe(container);
+
+		// Burst of retries to catch portal/fixed layout settling.
+		const timers: ReturnType<typeof setTimeout>[] = [];
+		for (const ms of [0, 50, 150, 300, 600]) {
+			timers.push(setTimeout(safeResize, ms));
+		}
+
+		return () => {
+			ro.disconnect();
+			for (const t of timers) clearTimeout(t);
+		};
+	}, [map]);
 
 	// Compute valid coords once and keep a per-contact lookup for stable rendering.
 	// Also apply a small deterministic offset for duplicate coordinate groups so every result is visible.
@@ -2325,18 +2649,18 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	);
 
 	const handleMapMouseUp = useCallback(
-		(e: google.maps.MapMouseEvent) => {
+		(e: mapboxgl.MapMouseEvent) => {
 			if (!isAreaSelecting) return;
 			const start = selectionStartLatLngRef.current;
 			if (!start) {
 				clearSelectionRect();
 				return;
 			}
-			const end = e.latLng ? e.latLng.toJSON() : start;
+			const end = { lat: e.lngLat.lat, lng: e.lngLat.lng };
 
 			// Ignore tiny "click" selections (treat as cancel).
 			const startClient = selectionStartClientRef.current;
-			const endClient = getClientPointFromDomEvent(e.domEvent);
+			const endClient = getClientPointFromDomEvent(e.originalEvent);
 			const dx = startClient && endClient ? Math.abs(endClient.x - startClient.x) : 0;
 			const dy = startClient && endClient ? Math.abs(endClient.y - startClient.y) : 0;
 			const movedEnough = dx >= 6 || dy >= 6;
@@ -2455,16 +2779,16 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		if (!viewportBounds) return;
 		const sw = viewportBounds.getSouthWest();
 		const ne = viewportBounds.getNorthEast();
-		const west = sw.lng();
-		const east = ne.lng();
+		const west = sw.lng;
+		const east = ne.lng;
 
 		// Skip in the unlikely case the viewport crosses the antimeridian (not relevant for our UI).
 		if (east < west) return;
 
 		const bounds: MapSelectionBounds = {
-			south: sw.lat(),
+			south: sw.lat,
 			west,
-			north: ne.lat(),
+			north: ne.lat,
 			east,
 		};
 
@@ -2538,7 +2862,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 	const updateBackgroundDots = useCallback(
 		(
-			mapInstance: google.maps.Map | null,
+			mapInstance: mapboxgl.Map | null,
 			loading?: boolean,
 			maxDotsInViewport: number = MAX_TOTAL_DOTS
 		) => {
@@ -2553,18 +2877,17 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	// Recompute which contact markers are rendered in the current viewport, and
 	// budget background dots so the combined total stays under MAX_TOTAL_DOTS.
 	const recomputeViewportDots = useCallback(
-		(mapInstance: google.maps.Map | null, loading?: boolean) => {
+		(mapInstance: mapboxgl.Map | null, loading?: boolean) => {
 			if (!mapInstance) return;
 
 			const bounds = mapInstance.getBounds();
 			if (!bounds) return;
-
 			const sw = bounds.getSouthWest();
 			const ne = bounds.getNorthEast();
-			const south = sw.lat();
-			const west = sw.lng();
-			const north = ne.lat();
-			const east = ne.lng();
+			const south = sw.lat;
+			const west = sw.lng;
+			const north = ne.lat;
+			const east = ne.lng;
 
 			// Skip in the unlikely case the viewport crosses the antimeridian (not relevant for our UI).
 			if (east < west) return;
@@ -2952,7 +3275,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 			const nextVisibleContacts: ContactWithName[] = picked;
 
-			// Stabilize ordering to reduce marker churn in @react-google-maps/api.
+			// Stabilize ordering to reduce churn in marker source updates.
 			nextVisibleContacts.sort((a, b) => a.id - b.id);
 
 			const nextKey = nextVisibleContacts.map((c) => c.id).join(',');
@@ -3153,10 +3476,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				setAllContactsOverlayVisibleContacts(nextAllContactsOverlayVisible);
 			}
 
-			const totalRendered = nextVisibleContacts.length + nextBookingExtraVisible.length;
-			const backgroundBudget = Math.max(0, MAX_TOTAL_DOTS - totalRendered);
-			backgroundDotsBudgetRef.current = backgroundBudget;
-			updateBackgroundDots(mapInstance, loading, backgroundBudget);
+			// Background dots are intentionally disabled (see `updateBackgroundDots`).
 		},
 		[
 			contactsWithCoords,
@@ -3165,7 +3485,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			selectedContacts,
 			lockedStateKey,
 			isCoordsInLockedState,
-			updateBackgroundDots,
 			isBookingSearch,
 			bookingExtraContactsWithCoords,
 			getBookingExtraContactCoords,
@@ -3179,35 +3498,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		]
 	);
 
-	// Background dots layer (non-interactive) to avoid the map feeling empty outside the selected region.
-	useEffect(() => {
-		if (!map) return;
-
-		// Reset any previous layer on map instance changes
-		if (backgroundDotsLayerRef.current) {
-			backgroundDotsLayerRef.current.setMap(null);
-			backgroundDotsLayerRef.current = null;
-		}
-
-		const layer = new google.maps.Data({ map });
-		backgroundDotsLayerRef.current = layer;
-		lastBackgroundDotsKeyRef.current = '';
-
-		// Ensure state divider lines render above the background dots layer.
-		// (Data layers are stacked by attach order; the dots layer is created later.)
-		const stateLayer = stateLayerRef.current;
-		if (stateLayer) {
-			stateLayer.setMap(null);
-			stateLayer.setMap(map);
-		}
-
-		return () => {
-			layer.setMap(null);
-			backgroundDotsLayerRef.current = null;
-			lastBackgroundDotsKeyRef.current = '';
-		};
-	}, [map]);
-
 	// Trigger background dots update when US state polygons become available or loading state changes
 	useEffect(() => {
 		if (!map) return;
@@ -3216,30 +3506,113 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 	useEffect(() => {
 		if (!map) return;
-		const onIdle = () => {
+		if (!isMapLoaded) return;
+		const onMoveEnd = () => {
+			const zoom = map.getZoom() ?? MAP_MIN_ZOOM;
+			setZoomLevel(zoom);
+
 			updateBookingExtraFetchBbox(map);
 			updatePromotionOverlayFetchBbox(map);
 			updateAllContactsOverlayFetchBbox(map);
 			recomputeViewportDots(map, isLoadingRef.current);
+
+			const bounds = map.getBounds();
+			const center = map.getCenter();
+			if (!bounds || !center) return;
+
+			const sw = bounds.getSouthWest();
+			const ne = bounds.getNorthEast();
+			const south = sw.lat;
+			const west = sw.lng;
+			const north = ne.lat;
+			const east = ne.lng;
+
+			// Skip antimeridian-crossing viewports (not relevant for our UI).
+			if (east < west) return;
+
+			const centerCoords = { lat: center.lat, lng: center.lng };
+
+			const selectedBounds = selectedAreaBoundsRef.current;
+			const isCenterInSelectedBounds = selectedBounds
+				? centerCoords.lat >= selectedBounds.south &&
+				  centerCoords.lat <= selectedBounds.north &&
+				  centerCoords.lng >= selectedBounds.west &&
+				  centerCoords.lng <= selectedBounds.east
+				: null;
+
+			const isCenterInSearchArea =
+				typeof isCenterInSelectedBounds === 'boolean'
+					? isCenterInSelectedBounds
+					: isCoordsInLockedState(centerCoords);
+
+			onViewportIdleRef.current?.({
+				bounds: { south, west, north, east },
+				center: centerCoords,
+				zoom,
+				isCenterInSearchArea,
+			});
 		};
-		const listener = map.addListener('idle', onIdle);
+		map.on('moveend', onMoveEnd);
 		// Initial fill
-		onIdle();
+		onMoveEnd();
 		return () => {
-			listener.remove();
+			map.off('moveend', onMoveEnd);
 		};
 	}, [
 		map,
+		isMapLoaded,
 		recomputeViewportDots,
 		updateBookingExtraFetchBbox,
 		updatePromotionOverlayFetchBbox,
 		updateAllContactsOverlayFetchBbox,
 	]);
 
-	// Draw a gray outline around the *group of states* that have results.
-	// This uses the state polygons we load via the Data layer and unions them so the outline is one shape.
+	// Notify the parent as soon as the user starts interacting with the viewport.
 	useEffect(() => {
-		if (!map || !isStateLayerReady) return;
+		if (!map || !isMapLoaded) return;
+		const onMoveStart = () => {
+			onViewportInteractionRef.current?.();
+		};
+		map.on('movestart', onMoveStart);
+		return () => {
+			map.off('movestart', onMoveStart);
+		};
+	}, [map, isMapLoaded]);
+
+	// Rectangle selection handlers (Mapbox mouse events).
+	useEffect(() => {
+		if (!map || !isMapLoaded) return;
+		map.on('mousedown', handleMapMouseDown);
+		map.on('mousemove', handleMapMouseMove);
+		map.on('mouseup', handleMapMouseUp);
+		return () => {
+			map.off('mousedown', handleMapMouseDown);
+			map.off('mousemove', handleMapMouseMove);
+			map.off('mouseup', handleMapMouseUp);
+		};
+	}, [map, isMapLoaded, handleMapMouseDown, handleMapMouseMove, handleMapMouseUp]);
+
+	// Toggle map interaction mode for rectangle selection.
+	useEffect(() => {
+		if (!map || !isMapLoaded) return;
+		const selecting = areaSelectionEnabled || isAreaSelecting;
+		try {
+			if (selecting) {
+				map.dragPan.disable();
+				map.dragRotate.disable();
+			} else {
+				map.dragPan.enable();
+				map.dragRotate.enable();
+			}
+		} catch {
+			// Ignore (handlers may not be ready yet).
+		}
+	}, [map, isMapLoaded, areaSelectionEnabled, isAreaSelecting]);
+
+	// Draw a gray outline around the *group of states* that have results.
+	// We union the result states' polygons so the outline is one shape.
+	useEffect(() => {
+		if (!map || !isMapLoaded || !isStateLayerReady) return;
 
 		// Hide state outlines when using rectangle selection (selectedAreaBounds is set)
 		// Clear outlines while loading or if no result states
@@ -3248,26 +3621,15 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			return;
 		}
 
-		const dataLayer = stateLayerRef.current;
-		if (!dataLayer) return;
-
 		let cancelled = false;
 
 		const run = async () => {
-			// Collect the state geometries we need
 			const wanted = new Set(resultStateKeys);
 			const stateMultiPolygons: ClippingMultiPolygon[] = [];
-
-			dataLayer.forEach((feature) => {
-				const featureKey = normalizeStateKey(
-					(feature.getProperty('NAME') as string) || (feature.getId() as string)
-				);
-				if (!featureKey || !wanted.has(featureKey)) return;
-				const geometry = feature.getGeometry();
-				if (!geometry) return;
-				const mp = geometryToClippingMultiPolygon(geometry);
-				if (mp) stateMultiPolygons.push(mp);
-			});
+			for (const key of wanted) {
+				const entry = usStatesByKeyRef.current.get(key);
+				if (entry?.multiPolygon) stateMultiPolygons.push(entry.multiPolygon);
+			}
 
 			// If we couldn't resolve any polygons, nothing to outline.
 			if (stateMultiPolygons.length === 0) {
@@ -3297,25 +3659,13 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					? unioned
 					: stateMultiPolygons.flat();
 
-			const polygonsToDraw = createOutlinePolygonsFromMultiPolygon(
-				multiPolygonsToRender,
-				{
-					strokeColor: '#1277E1',
-					strokeOpacity: 1,
-					strokeWeight: 2,
-					zIndex: 1,
-				}
-			);
-
-			for (const polygon of polygonsToDraw) polygon.setMap(map);
-			resultsOutlinePolygonsRef.current = polygonsToDraw;
+			const outlineFc = createOutlineGeoJsonFromMultiPolygon(multiPolygonsToRender);
+			const source = map.getSource(MAPBOX_SOURCE_IDS.resultsOutline) as mapboxgl.GeoJSONSource | undefined;
+			source?.setData(outlineFc as any);
 
 			// Store the selected region (used to exclude background dots inside the outline).
 			resultsSelectionMultiPolygonRef.current = multiPolygonsToRender;
 			resultsSelectionBboxRef.current = bboxFromMultiPolygon(multiPolygonsToRender);
-
-			// Refresh background dots now that the selected region is known.
-			updateBackgroundDots(map, isLoadingRef.current, backgroundDotsBudgetRef.current);
 		};
 
 		void run();
@@ -3325,19 +3675,19 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		};
 	}, [
 		map,
+		isMapLoaded,
 		isStateLayerReady,
 		isLoading,
 		resultStateKeys,
 		resultStateKeysSignature,
 		clearResultsOutline,
-		updateBackgroundDots,
 		selectedAreaBounds,
 	]);
 
 	// Draw a black outline around the searched/locked state (even when state interactions are off).
 	// When state interactions are enabled, the Data layer already renders the selected state border.
 	useEffect(() => {
-		if (!map || !isStateLayerReady) return;
+		if (!map || !isMapLoaded || !isStateLayerReady) return;
 
 		// Clear while loading
 		if (isLoading) {
@@ -3358,56 +3708,25 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			return;
 		}
 
-		const dataLayer = stateLayerRef.current;
-		if (!dataLayer) return;
+		const found = usStatesByKeyRef.current.get(lockedStateKey)?.multiPolygon ?? null;
 
-		let cancelled = false;
+		// Store polygon selection for marker "inside/outside" styling (even if we don't draw the outline).
+		lockedStateSelectionMultiPolygonRef.current = found;
+		lockedStateSelectionBboxRef.current = found ? bboxFromMultiPolygon(found) : null;
+		lockedStateSelectionKeyRef.current = lockedStateKey;
+		// The locked-state polygon is stored in refs (no rerender) — force a marker recompute
+		// so low-zoom bias toward the locked state applies immediately.
+		recomputeViewportDots(map, isLoadingRef.current);
 
-		const run = () => {
-			let found: ClippingMultiPolygon | null = null;
+		clearSearchedStateOutline();
+		if (enableStateInteractions || !found) return;
 
-			dataLayer.forEach((feature) => {
-				if (found) return;
-				const featureKey = normalizeStateKey(
-					(feature.getProperty('NAME') as string) || (feature.getId() as string)
-				);
-				if (!featureKey || featureKey !== lockedStateKey) return;
-				const geometry = feature.getGeometry();
-				if (!geometry) return;
-				found = geometryToClippingMultiPolygon(geometry);
-			});
-
-			if (cancelled) return;
-
-			// Store polygon selection for marker "inside/outside" styling (even if we don't draw the outline).
-			lockedStateSelectionMultiPolygonRef.current = found;
-			lockedStateSelectionBboxRef.current = found ? bboxFromMultiPolygon(found) : null;
-			lockedStateSelectionKeyRef.current = lockedStateKey;
-			// The locked-state polygon is stored in refs (no rerender) — force a marker recompute
-			// so low-zoom bias toward the locked state applies immediately.
-			recomputeViewportDots(map, isLoadingRef.current);
-
-			clearSearchedStateOutline();
-			if (enableStateInteractions || !found) return;
-
-			const polygonsToDraw = createOutlinePolygonsFromMultiPolygon(found, {
-				strokeColor: '#000000',
-				strokeOpacity: 1,
-				strokeWeight: 3,
-				zIndex: 2,
-			});
-
-			for (const polygon of polygonsToDraw) polygon.setMap(map);
-			searchedStateOutlinePolygonsRef.current = polygonsToDraw;
-		};
-
-		run();
-
-		return () => {
-			cancelled = true;
-		};
+		const outlineFc = createOutlineGeoJsonFromMultiPolygon(found);
+		const source = map.getSource(MAPBOX_SOURCE_IDS.lockedOutline) as mapboxgl.GeoJSONSource | undefined;
+		source?.setData(outlineFc as any);
 	}, [
 		map,
+		isMapLoaded,
 		isStateLayerReady,
 		isLoading,
 		lockedStateKey,
@@ -3436,213 +3755,54 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 	// Helper to fit map bounds with padding
 	const fitMapToBounds = useCallback(
-		(mapInstance: google.maps.Map, contactsList: ContactWithName[]) => {
+		(mapInstance: mapboxgl.Map, contactsList: ContactWithName[]) => {
 			if (contactsList.length === 0) return;
 
-			const bounds = new google.maps.LatLngBounds();
-			let hasValidCoords = false;
-
-			contactsList.forEach((contact) => {
+			let bounds: mapboxgl.LngLatBounds | null = null;
+			for (const contact of contactsList) {
 				const coords = getContactCoords(contact);
-				if (coords) {
-					bounds.extend(coords);
-					hasValidCoords = true;
-				}
-			});
+				if (!coords) continue;
+				const ll: [number, number] = [coords.lng, coords.lat];
+				if (!bounds) bounds = new mapboxgl.LngLatBounds(ll, ll);
+				else bounds.extend(ll);
+			}
 
-			if (!hasValidCoords) return;
+			if (!bounds) return;
 
-			// Avoid a visible "zoom in then zoom out" bounce:
-			// Temporarily cap maxZoom during fitBounds so the camera never overshoots our cap
-			// and then gets corrected in a second animation.
-			const prevMaxZoomRaw = mapInstance.get('maxZoom') as unknown;
-			const prevMaxZoomCandidate =
-				typeof prevMaxZoomRaw === 'number' && Number.isFinite(prevMaxZoomRaw)
-					? prevMaxZoomRaw
-					: null;
-			// Ignore our temporary auto-fit caps (8/14) so repeated fits don't permanently lock zoom-in.
-			const prevMaxZoom =
-				prevMaxZoomCandidate != null &&
-				prevMaxZoomCandidate > AUTO_FIT_CONTACTS_MAX_ZOOM + 0.001
-					? prevMaxZoomCandidate
-					: null;
-			mapInstance.setOptions({
-				maxZoom: AUTO_FIT_CONTACTS_MAX_ZOOM,
-			});
-
-			// Fit bounds with padding
 			mapInstance.fitBounds(bounds, {
-				top: 50,
-				right: 50,
-				bottom: 50,
-				left: 50,
-			});
-
-			// Prevent too much zoom on single marker or very close markers
-			const listener = google.maps.event.addListener(mapInstance, 'idle', () => {
-				const currentZoom = mapInstance.getZoom();
-				if (currentZoom && currentZoom > AUTO_FIT_CONTACTS_MAX_ZOOM) {
-					mapInstance.setZoom(AUTO_FIT_CONTACTS_MAX_ZOOM);
-				}
-				// Restore maxZoom so users can zoom in further after the auto-fit completes.
-				mapInstance.setOptions({
-					maxZoom: prevMaxZoom ?? DEFAULT_MAX_ZOOM_FALLBACK,
-				});
-				google.maps.event.removeListener(listener);
+				padding: { top: 50, right: 50, bottom: 50, left: 50 },
+				maxZoom: AUTO_FIT_CONTACTS_MAX_ZOOM,
+				duration: 650,
 			});
 		},
 		[getContactCoords]
 	);
 
 	// Helper to fit map to a state's bounds
-	const fitMapToState = useCallback((mapInstance: google.maps.Map, stateKey: string) => {
-		const dataLayer = stateLayerRef.current;
-		if (!dataLayer) return false;
+	const fitMapToState = useCallback((mapInstance: mapboxgl.Map, stateKey: string) => {
+		const entry = usStatesByKeyRef.current.get(stateKey);
+		const bbox = entry?.bbox;
+		if (!bbox) return false;
 
-		let stateBounds: google.maps.LatLngBounds | null = null;
-
-		dataLayer.forEach((feature) => {
-			if (stateBounds) return; // Already found
-			const featureKey = normalizeStateKey(
-				(feature.getProperty('NAME') as string) || (feature.getId() as string)
-			);
-			if (!featureKey || featureKey !== stateKey) return;
-
-			const geometry = feature.getGeometry();
-			if (!geometry) return;
-
-			stateBounds = new google.maps.LatLngBounds();
-			geometry.forEachLatLng((latLng) => {
-				stateBounds!.extend(latLng);
-			});
-		});
-
-		if (!stateBounds) return false;
-
-		// Avoid a visible "zoom in then zoom out" bounce on small states:
-		// temporarily cap maxZoom during fitBounds so the camera never overshoots the cap.
-		const prevMaxZoomRaw = mapInstance.get('maxZoom') as unknown;
-		const prevMaxZoomCandidate =
-			typeof prevMaxZoomRaw === 'number' && Number.isFinite(prevMaxZoomRaw)
-				? prevMaxZoomRaw
-				: null;
-		// Ignore our temporary auto-fit caps (8/14) so repeated fits don't permanently lock zoom-in.
-		const prevMaxZoom =
-			prevMaxZoomCandidate != null &&
-			prevMaxZoomCandidate > AUTO_FIT_CONTACTS_MAX_ZOOM + 0.001
-				? prevMaxZoomCandidate
-				: null;
-		mapInstance.setOptions({
-			maxZoom: AUTO_FIT_STATE_MAX_ZOOM,
-		});
-
-		// Fit to state bounds with padding for a comfortable zoomed view
-		mapInstance.fitBounds(stateBounds, {
-			top: 100,
-			right: 100,
-			bottom: 100,
-			left: 100,
-		});
-
-		// Ensure we don't zoom in too much (especially for small states like DC, RI)
-		const listener = google.maps.event.addListener(mapInstance, 'idle', () => {
-			const currentZoom = mapInstance.getZoom();
-			if (currentZoom && currentZoom > AUTO_FIT_STATE_MAX_ZOOM) {
-				mapInstance.setZoom(AUTO_FIT_STATE_MAX_ZOOM);
+		mapInstance.fitBounds(
+			[
+				[bbox.minLng, bbox.minLat],
+				[bbox.maxLng, bbox.maxLat],
+			],
+			{
+				padding: { top: 100, right: 100, bottom: 100, left: 100 },
+				maxZoom: AUTO_FIT_STATE_MAX_ZOOM,
+				duration: 650,
 			}
-			// Restore maxZoom so users can zoom in further after the auto-fit completes.
-			mapInstance.setOptions({
-				maxZoom: prevMaxZoom ?? DEFAULT_MAX_ZOOM_FALLBACK,
-			});
-			google.maps.event.removeListener(listener);
-		});
+		);
 
 		return true;
 	}, []);
 
-	const onLoad = useCallback((mapInstance: google.maps.Map) => {
-		setMap(mapInstance);
-		// Initialize zoomLevel immediately so styling reflects the real zoom on first render.
-		setZoomLevel(mapInstance.getZoom() ?? 4);
-
-		// Listen for zoom changes
-		mapInstance.addListener('zoom_changed', () => {
-			const newZoom = mapInstance.getZoom();
-			if (newZoom !== undefined) {
-				setZoomLevel(newZoom);
-			}
-			onViewportInteractionRef.current?.();
-		});
-
-		// Hide transient UI immediately when the user starts panning.
-		mapInstance.addListener('dragstart', () => {
-			onViewportInteractionRef.current?.();
-		});
-
-		// Report viewport state after the camera settles.
-		mapInstance.addListener('idle', () => {
-			const bounds = mapInstance.getBounds();
-			const center = mapInstance.getCenter();
-			if (!bounds || !center) return;
-
-			const sw = bounds.getSouthWest();
-			const ne = bounds.getNorthEast();
-			const south = sw.lat();
-			const west = sw.lng();
-			const north = ne.lat();
-			const east = ne.lng();
-
-			// Skip antimeridian-crossing viewports (not relevant for our UI).
-			if (east < west) return;
-
-			const zoom = mapInstance.getZoom() ?? 4;
-			const centerCoords = center.toJSON();
-
-			const selectedBounds = selectedAreaBoundsRef.current;
-			const isCenterInSelectedBounds = selectedBounds
-				? centerCoords.lat >= selectedBounds.south &&
-				  centerCoords.lat <= selectedBounds.north &&
-				  centerCoords.lng >= selectedBounds.west &&
-				  centerCoords.lng <= selectedBounds.east
-				: null;
-
-			const isCenterInSearchArea =
-				typeof isCenterInSelectedBounds === 'boolean'
-					? isCenterInSelectedBounds
-					: isCoordsInLockedState(centerCoords);
-
-			onViewportIdleRef.current?.({
-				bounds: { south, west, north, east },
-				center: centerCoords,
-				zoom,
-				isCenterInSearchArea,
-			});
-		});
-	}, []);
-
-	const onUnmount = useCallback(() => {
-		clearResultsOutline();
-		clearSearchedStateOutline();
-		lockedStateSelectionMultiPolygonRef.current = null;
-		lockedStateSelectionBboxRef.current = null;
-		lockedStateSelectionKeyRef.current = null;
-		setMap(null);
-		if (autoFitTimeoutRef.current) {
-			clearTimeout(autoFitTimeoutRef.current);
-			autoFitTimeoutRef.current = null;
-		}
-		hasFitBoundsRef.current = false;
-		lastContactsCountRef.current = 0;
-		lastFirstContactIdRef.current = null;
-		lastLockedStateKeyRef.current = null;
-		lastFitToLockedStateKeyRef.current = null;
-		lastSearchQueryKeyRef.current = null;
-	}, [clearResultsOutline, clearSearchedStateOutline]);
-
 	// Fit bounds when contacts with coordinates change (or when the locked state changes).
 	// Important: we still want to zoom to the locked state even if 0 contacts are geocoded yet.
 	useEffect(() => {
-		if (!map) return;
+		if (!map || !isMapLoaded) return;
 
 		// Skip auto-fit entirely if requested (e.g. for fromHome loading state)
 		if (skipAutoFit) return;
@@ -3763,6 +3923,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		};
 	}, [
 		map,
+		isMapLoaded,
 		contactsWithCoords,
 		fitMapToBounds,
 		fitMapToState,
@@ -3808,7 +3969,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	};
 
 	const handleMarkerMouseOver = useCallback(
-		(contact: ContactWithName, e?: google.maps.MapMouseEvent) => {
+		(contact: ContactWithName, domEvent?: MouseEvent | TouchEvent) => {
 			// Don't trigger hover interactions until sufficiently zoomed in
 			if (zoomLevel < HOVER_INTERACTION_MIN_ZOOM) return;
 
@@ -3827,21 +3988,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			hoveredMarkerIdRef.current = contact.id;
 			setHoveredMarkerId(contact.id);
 
-			const domEvent = e?.domEvent as MouseEvent | TouchEvent | undefined;
-			let meta: MarkerHoverMeta | undefined;
-			if (domEvent && 'clientX' in domEvent && 'clientY' in domEvent) {
-				meta = { clientX: domEvent.clientX, clientY: domEvent.clientY };
-			} else if (
-				domEvent &&
-				'touches' in domEvent &&
-				domEvent.touches &&
-				domEvent.touches.length > 0
-			) {
-				meta = {
-					clientX: domEvent.touches[0].clientX,
-					clientY: domEvent.touches[0].clientY,
-				};
-			}
+			const point = getClientPointFromDomEvent(domEvent);
+			const meta: MarkerHoverMeta | undefined = point ? { clientX: point.x, clientY: point.y } : undefined;
 
 			onMarkerHover?.(contact, meta);
 		},
@@ -3994,125 +4142,653 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		[defaultDotFillColor]
 	);
 
-	// Default red dot marker
-	const defaultMarkerIcon = useMemo(() => {
-		if (!isLoaded) return undefined;
-		return {
-			path: google.maps.SymbolPath.CIRCLE,
-			fillColor: defaultDotFillColor,
-			fillOpacity: 1,
-			strokeColor: RESULT_DOT_STROKE_COLOR_DEFAULT,
-			strokeWeight: strokeWeight,
-			scale: markerScale,
-		};
-	}, [isLoaded, markerScale, strokeWeight, defaultDotFillColor]);
-
-	const defaultMarkerIconOutside = useMemo(() => {
-		if (!isLoaded) return undefined;
-		return {
-			path: google.maps.SymbolPath.CIRCLE,
-			fillColor: outsideDefaultDotFillColor,
-			fillOpacity: 1,
-			strokeColor: RESULT_DOT_STROKE_COLOR_DEFAULT,
-			strokeWeight: strokeWeight,
-			scale: markerScale,
-		};
-	}, [isLoaded, markerScale, strokeWeight, outsideDefaultDotFillColor]);
-
-	// Selected dot marker (same fill, different stroke)
-	const selectedMarkerIcon = useMemo(() => {
-		if (!isLoaded) return undefined;
-		return {
-			path: google.maps.SymbolPath.CIRCLE,
-			fillColor: defaultDotFillColor,
-			fillOpacity: 1,
-			strokeColor: RESULT_DOT_STROKE_COLOR_SELECTED,
-			strokeWeight: strokeWeight,
-			scale: markerScale,
-		};
-	}, [isLoaded, markerScale, strokeWeight, defaultDotFillColor]);
-
-	const selectedMarkerIconOutside = useMemo(() => {
-		if (!isLoaded) return undefined;
-		return {
-			path: google.maps.SymbolPath.CIRCLE,
-			fillColor: outsideDefaultDotFillColor,
-			fillOpacity: 1,
-			strokeColor: RESULT_DOT_STROKE_COLOR_SELECTED,
-			strokeWeight: strokeWeight,
-			scale: markerScale,
-		};
-	}, [isLoaded, markerScale, strokeWeight, outsideDefaultDotFillColor]);
-
-	// Invisible marker for hover hit area - same size as visible dot for enter trigger.
-	// The larger leave area is provided by the tooltip overlay's extended bounds below.
-	const invisibleHitAreaIcon = useMemo(() => {
-		if (!isLoaded) return undefined;
-		return {
-			path: google.maps.SymbolPath.CIRCLE,
-			fillColor: 'transparent',
-			fillOpacity: 0,
-			strokeColor: 'transparent',
-			strokeWeight: 0,
-			scale: markerScale, // Same size as visible dot for precise enter detection
-		};
-	}, [isLoaded, markerScale]);
-
-	// All-contacts gray dot markers (only shown at very high zoom levels).
-	const allContactsOverlayDotScale = useMemo(() => markerScale * 0.72, [markerScale]);
-	const allContactsOverlayDotStrokeWeight = useMemo(
-		() => Math.max(1, strokeWeight * 0.85),
-		[strokeWeight]
+	// Build fast id->contact lookups for Mapbox interactions/tooltips.
+	const visibleContactsById = useMemo(
+		() => new Map<number, ContactWithName>(visibleContacts.map((c) => [c.id, c])),
+		[visibleContacts]
+	);
+	const bookingExtraContactsById = useMemo(
+		() => new Map<number, ContactWithName>(bookingExtraVisibleContacts.map((c) => [c.id, c])),
+		[bookingExtraVisibleContacts]
+	);
+	const promotionOverlayContactsById = useMemo(
+		() =>
+			new Map<number, ContactWithName>(promotionOverlayVisibleContacts.map((c) => [c.id, c])),
+		[promotionOverlayVisibleContacts]
+	);
+	const allOverlayContactsById = useMemo(
+		() => new Map<number, ContactWithName>(allContactsOverlayVisibleContacts.map((c) => [c.id, c])),
+		[allContactsOverlayVisibleContacts]
 	);
 
-	const allContactsOverlayMarkerIcon = useMemo(() => {
-		if (!isLoaded) return undefined;
-		return {
-			path: google.maps.SymbolPath.CIRCLE,
-			fillColor: ALL_CONTACTS_OVERLAY_DOT_FILL_COLOR,
-			fillOpacity: 1,
-			strokeColor: RESULT_DOT_STROKE_COLOR_DEFAULT,
-			strokeWeight: allContactsOverlayDotStrokeWeight,
-			scale: allContactsOverlayDotScale,
-		};
-	}, [isLoaded, allContactsOverlayDotScale, allContactsOverlayDotStrokeWeight]);
+	// Marker hover/click + (optional) state hover/click interactions.
+	useEffect(() => {
+		if (!map || !isMapLoaded) return;
 
-	const allContactsOverlayMarkerIconSelected = useMemo(() => {
-		if (!isLoaded) return undefined;
-		return {
-			path: google.maps.SymbolPath.CIRCLE,
-			fillColor: ALL_CONTACTS_OVERLAY_DOT_FILL_COLOR,
-			fillOpacity: 1,
-			strokeColor: RESULT_DOT_STROKE_COLOR_SELECTED,
-			strokeWeight: allContactsOverlayDotStrokeWeight,
-			scale: allContactsOverlayDotScale,
-		};
-	}, [isLoaded, allContactsOverlayDotScale, allContactsOverlayDotStrokeWeight]);
+		const markerHitLayers = [
+			MAPBOX_LAYER_IDS.baseHit,
+			MAPBOX_LAYER_IDS.promotionDotHit,
+			MAPBOX_LAYER_IDS.bookingPinHit,
+			MAPBOX_LAYER_IDS.promotionPinHit,
+			MAPBOX_LAYER_IDS.markersAllHit,
+		];
 
-	const invisibleAllContactsOverlayHitAreaIcon = useMemo(() => {
-		if (!isLoaded) return undefined;
-		return {
-			path: google.maps.SymbolPath.CIRCLE,
-			fillColor: 'transparent',
-			fillOpacity: 0,
-			strokeColor: 'transparent',
-			strokeWeight: 0,
-			scale: allContactsOverlayDotScale,
+		const getContactForHit = (layerId: string, id: number): ContactWithName | null => {
+			if (layerId === MAPBOX_LAYER_IDS.baseHit) return visibleContactsById.get(id) ?? null;
+			if (layerId === MAPBOX_LAYER_IDS.bookingPinHit) return bookingExtraContactsById.get(id) ?? null;
+			if (layerId === MAPBOX_LAYER_IDS.promotionDotHit || layerId === MAPBOX_LAYER_IDS.promotionPinHit) {
+				return promotionOverlayContactsById.get(id) ?? null;
+			}
+			if (layerId === MAPBOX_LAYER_IDS.markersAllHit) return allOverlayContactsById.get(id) ?? null;
+			return null;
 		};
-	}, [isLoaded, allContactsOverlayDotScale]);
 
-	// Invisible hit area sized to match the pin circle (pins are clamped larger at low zoom).
-	const invisiblePinHitAreaIcon = useMemo(() => {
-		if (!isLoaded) return undefined;
-		return {
-			path: google.maps.SymbolPath.CIRCLE,
-			fillColor: 'transparent',
-			fillOpacity: 0,
-			strokeColor: 'transparent',
-			strokeWeight: 0,
-			scale: markerPinCircleRadiusPx,
+		const setCursor = (cursor: string) => {
+			// Avoid fighting the rectangle-selection cursor.
+			if (areaSelectionEnabled || isAreaSelecting) return;
+			map.getCanvas().style.cursor = cursor;
 		};
-	}, [isLoaded, markerPinCircleRadiusPx]);
+
+		const clearStateHover = () => {
+			const prev = hoveredStateIdRef.current;
+			if (prev == null) return;
+			try {
+				map.setFeatureState({ source: MAPBOX_SOURCE_IDS.states, id: prev }, { hover: false });
+			} catch {
+				// Ignore.
+			}
+			hoveredStateIdRef.current = null;
+		};
+
+		const onMouseMove = (e: mapboxgl.MapMouseEvent) => {
+			if (areaSelectionEnabled || isAreaSelecting) return;
+
+			// Marker hover interactions only at sufficiently high zoom.
+			const zoom = map.getZoom() ?? MAP_MIN_ZOOM;
+			if (zoom < HOVER_INTERACTION_MIN_ZOOM) {
+				const prevHovered = hoveredMarkerIdRef.current;
+				if (hoverSourceRef.current === 'map' && prevHovered != null) {
+					handleMarkerMouseOut(prevHovered);
+				}
+				setCursor('');
+			} else {
+				const features = map.queryRenderedFeatures(e.point, { layers: markerHitLayers });
+				const top = features[0];
+				const layerId = top?.layer?.id;
+				const rawId = top?.id;
+				const id =
+					typeof rawId === 'number'
+						? rawId
+						: typeof rawId === 'string'
+							? Number.parseInt(rawId, 10)
+							: NaN;
+
+				if (layerId && Number.isFinite(id)) {
+					const contact = getContactForHit(layerId, id);
+					if (contact) {
+						setCursor('pointer');
+						if (hoverSourceRef.current !== 'map' || hoveredMarkerIdRef.current !== id) {
+							handleMarkerMouseOver(contact, e.originalEvent as unknown as MouseEvent | TouchEvent);
+						}
+					} else {
+						const prevHovered = hoveredMarkerIdRef.current;
+						if (hoverSourceRef.current === 'map' && prevHovered != null) {
+							handleMarkerMouseOut(prevHovered);
+						}
+						setCursor('');
+					}
+				} else {
+					const prevHovered = hoveredMarkerIdRef.current;
+					if (hoverSourceRef.current === 'map' && prevHovered != null) {
+						handleMarkerMouseOut(prevHovered);
+					}
+					setCursor('');
+				}
+			}
+
+			// Optional state hover highlight (only when state interactions are enabled).
+			if (!enableStateInteractions || !isStateLayerReady) {
+				clearStateHover();
+				return;
+			}
+			if (zoom > STATE_HOVER_HIGHLIGHT_MAX_ZOOM + 0.001) {
+				clearStateHover();
+				return;
+			}
+
+			// If a marker is hovered, don't also hover-highlight the state underneath.
+			if (hoverSourceRef.current === 'map' && hoveredMarkerIdRef.current != null) {
+				clearStateHover();
+				return;
+			}
+
+			const stateFeatures = map.queryRenderedFeatures(e.point, { layers: [MAPBOX_LAYER_IDS.statesFillHit] });
+			const topState = stateFeatures[0];
+			const nextStateId = topState?.id ?? null;
+			const prev = hoveredStateIdRef.current;
+			if (prev != null && prev !== nextStateId) {
+				try {
+					map.setFeatureState({ source: MAPBOX_SOURCE_IDS.states, id: prev }, { hover: false });
+				} catch {
+					// Ignore.
+				}
+			}
+			if (nextStateId != null && nextStateId !== prev) {
+				try {
+					map.setFeatureState({ source: MAPBOX_SOURCE_IDS.states, id: nextStateId }, { hover: true });
+				} catch {
+					// Ignore.
+				}
+			}
+			hoveredStateIdRef.current = nextStateId;
+			if (nextStateId != null) {
+				setCursor('pointer');
+			}
+		};
+
+		const onClick = (e: mapboxgl.MapMouseEvent) => {
+			// In select mode, clicks are part of drawing/finishing a rectangle selection.
+			if (areaSelectionEnabled || isAreaSelecting) return;
+
+			// Marker click takes priority over state click.
+			const markerFeatures = map.queryRenderedFeatures(e.point, { layers: markerHitLayers });
+			const top = markerFeatures[0];
+			const layerId = top?.layer?.id;
+			const rawId = top?.id;
+			const id =
+				typeof rawId === 'number'
+					? rawId
+					: typeof rawId === 'string'
+						? Number.parseInt(rawId, 10)
+						: NaN;
+			if (layerId && Number.isFinite(id)) {
+				const contact = getContactForHit(layerId, id);
+				if (contact) {
+					handleMarkerClick(contact);
+					return;
+				}
+			}
+
+			// State click (when enabled and zoomed out).
+			if (enableStateInteractions && isStateLayerReady) {
+				const zoom = map.getZoom() ?? MAP_MIN_ZOOM;
+				if (zoom <= STATE_HOVER_HIGHLIGHT_MAX_ZOOM + 0.001) {
+					const stateFeatures = map.queryRenderedFeatures(e.point, { layers: [MAPBOX_LAYER_IDS.statesFillHit] });
+					const topState = stateFeatures[0];
+					const key = typeof topState?.id === 'string' ? topState.id : null;
+					if (key) {
+						const nameRaw = (topState.properties as any)?.name;
+						const name =
+							typeof nameRaw === 'string' && nameRaw.trim().length > 0 ? nameRaw.trim() : key;
+						setSelectedStateKey(key);
+						onStateSelectRef.current?.(name);
+						return;
+					}
+				}
+			}
+
+			// Click on empty map clears any selected marker panel.
+			setSelectedMarker(null);
+		};
+
+		map.on('mousemove', onMouseMove);
+		map.on('click', onClick);
+
+		return () => {
+			map.off('mousemove', onMouseMove);
+			map.off('click', onClick);
+			try {
+				map.getCanvas().style.cursor = '';
+			} catch {
+				// Ignore.
+			}
+			clearStateHover();
+		};
+	}, [
+		map,
+		isMapLoaded,
+		areaSelectionEnabled,
+		isAreaSelecting,
+		enableStateInteractions,
+		isStateLayerReady,
+		visibleContactsById,
+		bookingExtraContactsById,
+		promotionOverlayContactsById,
+		allOverlayContactsById,
+		handleMarkerMouseOver,
+		handleMarkerMouseOut,
+		handleMarkerClick,
+	]);
+
+	// ---- Mapbox marker sources (rendered via layers) ----
+	const pendingMapImageLoadsRef = useRef<Map<string, Promise<void>>>(new Map());
+
+	// Rasterize an SVG data-URI to an ImageData via an off-screen canvas.
+	// Mapbox GL's `map.loadImage()` doesn't reliably handle `data:image/svg+xml` URIs,
+	// so we render the SVG into an <img> → canvas → ImageData and then call `addImage`.
+	const rasterizeSvgDataUri = useCallback(
+		(
+			dataUri: string,
+			width: number,
+			height: number
+		): Promise<{ width: number; height: number; data: Uint8ClampedArray }> => {
+			return new Promise((resolve, reject) => {
+				const img = new Image();
+				img.onload = () => {
+					const canvas = document.createElement('canvas');
+					canvas.width = width;
+					canvas.height = height;
+					const ctx = canvas.getContext('2d');
+					if (!ctx) {
+						reject(new Error('Canvas 2D context unavailable'));
+						return;
+					}
+					ctx.drawImage(img, 0, 0, width, height);
+					const imageData = ctx.getImageData(0, 0, width, height);
+					resolve({ width, height, data: imageData.data });
+				};
+				img.onerror = (e) => reject(e);
+				img.src = dataUri;
+			});
+		},
+		[]
+	);
+
+	const ensureMapImageFromUrl = useCallback(
+		(imageName: string, url: string): Promise<void> => {
+			const mapInstance = mapRef.current;
+			if (!mapInstance || !isMapLoaded) return Promise.resolve();
+			if (mapInstance.hasImage(imageName)) return Promise.resolve();
+
+			const pending = pendingMapImageLoadsRef.current.get(imageName);
+			if (pending) return pending;
+
+			// SVG data-URIs need manual rasterization; raster URLs can use loadImage directly.
+			const isSvgDataUri = url.startsWith('data:image/svg');
+
+			const promise = isSvgDataUri
+				? (async () => {
+						try {
+							// Render at 2× for retina crispness.
+							const scale = 2;
+							const w = MAP_MARKER_PIN_VIEWBOX_WIDTH * scale;
+							const h = MAP_MARKER_PIN_VIEWBOX_HEIGHT * scale;
+							const imgData = await rasterizeSvgDataUri(url, w, h);
+							const latestMap = mapRef.current;
+							if (!latestMap || latestMap !== mapInstance) return;
+							if (!latestMap.hasImage(imageName)) {
+								latestMap.addImage(imageName, imgData, { pixelRatio: scale });
+							}
+						} catch (err) {
+							console.error('Failed to rasterize SVG marker image', { imageName, err });
+						} finally {
+							pendingMapImageLoadsRef.current.delete(imageName);
+						}
+					})()
+				: new Promise<void>((resolve) => {
+						mapInstance.loadImage(url, (err, image) => {
+							pendingMapImageLoadsRef.current.delete(imageName);
+							const latestMap = mapRef.current;
+							if (!latestMap || latestMap !== mapInstance) {
+								resolve();
+								return;
+							}
+							if (err || !image) {
+								console.error('Failed to load Mapbox marker image', { imageName, err });
+								resolve();
+								return;
+							}
+							try {
+								if (!latestMap.hasImage(imageName)) {
+									latestMap.addImage(imageName, image);
+								}
+							} catch {
+								// Ignore.
+							}
+							resolve();
+						});
+					});
+
+			pendingMapImageLoadsRef.current.set(imageName, promise);
+			return promise;
+		},
+		[isMapLoaded, rasterizeSvgDataUri]
+	);
+
+	const imageNameFromUrl = useCallback((url: string) => `murmur-marker-${hashStringToStableKey(url)}`, []);
+
+	const promotionPinIdsRef = useRef<Set<number>>(new Set());
+	const promotionDotIdsRef = useRef<Set<number>>(new Set());
+
+	// Base result dots
+	useEffect(() => {
+		if (!map || !isMapLoaded) return;
+		const source = map.getSource(MAPBOX_SOURCE_IDS.markersBase) as mapboxgl.GeoJSONSource | undefined;
+		if (!source) return;
+
+		if (isLoading) {
+			source.setData({ type: 'FeatureCollection', features: [] } as any);
+			return;
+		}
+
+		const hasLockedStateSelection = Boolean(
+			lockedStateKey && lockedStateSelectionKeyRef.current === lockedStateKey
+		);
+
+		const features: any[] = [];
+		for (const contact of visibleContacts) {
+			const coords = getContactCoords(contact);
+			if (!coords) continue;
+			const isOutsideLockedState = hasLockedStateSelection ? !isCoordsInLockedState(coords) : false;
+			features.push({
+				type: 'Feature',
+				id: contact.id,
+				properties: {
+					fillColor: isOutsideLockedState ? outsideDefaultDotFillColor : defaultDotFillColor,
+				},
+				geometry: { type: 'Point', coordinates: [coords.lng, coords.lat] },
+			});
+		}
+
+		source.setData({ type: 'FeatureCollection', features } as any);
+	}, [
+		map,
+		isMapLoaded,
+		isLoading,
+		visibleContacts,
+		getContactCoords,
+		defaultDotFillColor,
+		outsideDefaultDotFillColor,
+		lockedStateKey,
+		isStateLayerReady,
+		isCoordsInLockedState,
+	]);
+
+	// All-contacts overlay (gray dots)
+	useEffect(() => {
+		if (!map || !isMapLoaded) return;
+		const source = map.getSource(MAPBOX_SOURCE_IDS.markersAllOverlay) as mapboxgl.GeoJSONSource | undefined;
+		if (!source) return;
+
+		if (isLoading) {
+			source.setData({ type: 'FeatureCollection', features: [] } as any);
+			return;
+		}
+
+		const features: any[] = [];
+		for (const contact of allContactsOverlayVisibleContacts) {
+			const coords = getAllContactsOverlayContactCoords(contact);
+			if (!coords) continue;
+			features.push({
+				type: 'Feature',
+				id: contact.id,
+				properties: { fillColor: ALL_CONTACTS_OVERLAY_DOT_FILL_COLOR },
+				geometry: { type: 'Point', coordinates: [coords.lng, coords.lat] },
+			});
+		}
+
+		source.setData({ type: 'FeatureCollection', features } as any);
+	}, [map, isMapLoaded, isLoading, allContactsOverlayVisibleContacts, getAllContactsOverlayContactCoords]);
+
+	// Promotion overlay: split into in-state dots vs out-of-state pins
+	useEffect(() => {
+		if (!map || !isMapLoaded) return;
+		const dotSource = map.getSource(MAPBOX_SOURCE_IDS.markersPromotionDot) as mapboxgl.GeoJSONSource | undefined;
+		const pinSource = map.getSource(MAPBOX_SOURCE_IDS.markersPromotionPin) as mapboxgl.GeoJSONSource | undefined;
+		if (!dotSource || !pinSource) return;
+
+		if (isLoading) {
+			dotSource.setData({ type: 'FeatureCollection', features: [] } as any);
+			pinSource.setData({ type: 'FeatureCollection', features: [] } as any);
+			promotionDotIdsRef.current = new Set();
+			promotionPinIdsRef.current = new Set();
+			return;
+		}
+
+		let cancelled = false;
+
+		const run = async () => {
+			const hasLockedStateSelection = Boolean(
+				lockedStateKey && lockedStateSelectionKeyRef.current === lockedStateKey
+			);
+
+			const dotFeatures: any[] = [];
+			const pinFeatures: any[] = [];
+			const dotIds = new Set<number>();
+			const pinIds = new Set<number>();
+			const imagesToEnsure = new Map<string, string>(); // name -> url
+
+			for (const contact of promotionOverlayVisibleContacts) {
+				const coords = getPromotionOverlayContactCoords(contact);
+				if (!coords) continue;
+
+				const isOutsideLockedState = hasLockedStateSelection ? !isCoordsInLockedState(coords) : false;
+				const shouldUsePinStyle = !hasLockedStateSelection || isOutsideLockedState;
+
+				const whatForMarker = getPromotionOverlayWhatFromContactTitle(contact.title) ?? null;
+				const dotFillColor = getResultDotColorForWhat(whatForMarker);
+				const dotFillColorOutside = washOutHexColor(
+					dotFillColor,
+					OUTSIDE_LOCKED_STATE_WASHOUT_TO_WHITE
+				);
+				const pinFillColor = isOutsideLockedState ? dotFillColorOutside : dotFillColor;
+
+				if (!shouldUsePinStyle) {
+					dotIds.add(contact.id);
+					dotFeatures.push({
+						type: 'Feature',
+						id: contact.id,
+						properties: { fillColor: dotFillColor },
+						geometry: { type: 'Point', coordinates: [coords.lng, coords.lat] },
+					});
+					continue;
+				}
+
+				pinIds.add(contact.id);
+				const defaultUrl = getMarkerPinUrl(
+					pinFillColor,
+					RESULT_DOT_STROKE_COLOR_DEFAULT,
+					whatForMarker
+				);
+				const selectedUrl = getMarkerPinUrl(
+					pinFillColor,
+					RESULT_DOT_STROKE_COLOR_SELECTED,
+					whatForMarker
+				);
+				const iconDefault = imageNameFromUrl(defaultUrl);
+				const iconSelected = imageNameFromUrl(selectedUrl);
+				imagesToEnsure.set(iconDefault, defaultUrl);
+				imagesToEnsure.set(iconSelected, selectedUrl);
+
+				pinFeatures.push({
+					type: 'Feature',
+					id: contact.id,
+					properties: { iconDefault, iconSelected },
+					geometry: { type: 'Point', coordinates: [coords.lng, coords.lat] },
+				});
+			}
+
+			await Promise.all(
+				Array.from(imagesToEnsure.entries()).map(([name, url]) => ensureMapImageFromUrl(name, url))
+			);
+
+			if (cancelled) return;
+
+			dotSource.setData({ type: 'FeatureCollection', features: dotFeatures } as any);
+			pinSource.setData({ type: 'FeatureCollection', features: pinFeatures } as any);
+			promotionDotIdsRef.current = dotIds;
+			promotionPinIdsRef.current = pinIds;
+		};
+
+		void run();
+
+		return () => {
+			cancelled = true;
+		};
+	}, [
+		map,
+		isMapLoaded,
+		isLoading,
+		promotionOverlayVisibleContacts,
+		lockedStateKey,
+		isStateLayerReady,
+		getPromotionOverlayContactCoords,
+		isCoordsInLockedState,
+		getMarkerPinUrl,
+		imageNameFromUrl,
+		ensureMapImageFromUrl,
+	]);
+
+	// Booking extra pins
+	useEffect(() => {
+		if (!map || !isMapLoaded) return;
+		const source = map.getSource(MAPBOX_SOURCE_IDS.markersBookingPin) as mapboxgl.GeoJSONSource | undefined;
+		if (!source) return;
+
+		if (isLoading) {
+			source.setData({ type: 'FeatureCollection', features: [] } as any);
+			return;
+		}
+
+		let cancelled = false;
+
+		const run = async () => {
+			const hasLockedStateSelection = Boolean(
+				lockedStateKey && lockedStateSelectionKeyRef.current === lockedStateKey
+			);
+
+			const features: any[] = [];
+			const imagesToEnsure = new Map<string, string>(); // name -> url
+
+			for (const contact of bookingExtraVisibleContacts) {
+				const coords = getBookingExtraContactCoords(contact);
+				if (!coords) continue;
+
+				const isOutsideLockedState = hasLockedStateSelection ? !isCoordsInLockedState(coords) : false;
+				const whatForMarker = getBookingTitlePrefixFromContactTitle(contact.title) ?? null;
+				const dotFillColor = getResultDotColorForWhat(whatForMarker);
+				const dotFillColorOutside = washOutHexColor(
+					dotFillColor,
+					OUTSIDE_LOCKED_STATE_WASHOUT_TO_WHITE
+				);
+				const pinFillColor = isOutsideLockedState ? dotFillColorOutside : dotFillColor;
+
+				const defaultUrl = getMarkerPinUrl(
+					pinFillColor,
+					RESULT_DOT_STROKE_COLOR_DEFAULT,
+					whatForMarker,
+					RESULT_DOT_STROKE_COLOR_DEFAULT
+				);
+				const hoverUrl = getMarkerPinUrl(
+					pinFillColor,
+					BOOKING_EXTRA_PIN_HOVER_STROKE_COLOR,
+					whatForMarker,
+					BOOKING_EXTRA_PIN_HOVER_STROKE_COLOR
+				);
+				const selectedUrl = getMarkerPinUrl(
+					pinFillColor,
+					RESULT_DOT_STROKE_COLOR_SELECTED,
+					whatForMarker,
+					RESULT_DOT_STROKE_COLOR_SELECTED
+				);
+
+				const iconDefault = imageNameFromUrl(defaultUrl);
+				const iconHover = imageNameFromUrl(hoverUrl);
+				const iconSelected = imageNameFromUrl(selectedUrl);
+				imagesToEnsure.set(iconDefault, defaultUrl);
+				imagesToEnsure.set(iconHover, hoverUrl);
+				imagesToEnsure.set(iconSelected, selectedUrl);
+
+				features.push({
+					type: 'Feature',
+					id: contact.id,
+					properties: { iconDefault, iconHover, iconSelected },
+					geometry: { type: 'Point', coordinates: [coords.lng, coords.lat] },
+				});
+			}
+
+			await Promise.all(
+				Array.from(imagesToEnsure.entries()).map(([name, url]) => ensureMapImageFromUrl(name, url))
+			);
+
+			if (cancelled) return;
+			source.setData({ type: 'FeatureCollection', features } as any);
+		};
+
+		void run();
+
+		return () => {
+			cancelled = true;
+		};
+	}, [
+		map,
+		isMapLoaded,
+		isLoading,
+		bookingExtraVisibleContacts,
+		lockedStateKey,
+		isStateLayerReady,
+		getBookingExtraContactCoords,
+		isCoordsInLockedState,
+		getMarkerPinUrl,
+		imageNameFromUrl,
+		ensureMapImageFromUrl,
+	]);
+
+	// Keep Mapbox marker "selected" feature-state in sync with `selectedContacts`.
+	useEffect(() => {
+		if (!map || !isMapLoaded) return;
+		const selectedSet = new Set<number>(selectedContacts);
+
+		const setSelectedSafe = (sourceId: string, id: number, selected: boolean) => {
+			try {
+				map.setFeatureState({ source: sourceId, id }, { selected });
+			} catch {
+				// Ignore (feature may not exist yet in the source).
+			}
+		};
+
+		for (const c of visibleContacts) {
+			setSelectedSafe(MAPBOX_SOURCE_IDS.markersBase, c.id, selectedSet.has(c.id));
+		}
+		for (const c of bookingExtraVisibleContacts) {
+			setSelectedSafe(MAPBOX_SOURCE_IDS.markersBookingPin, c.id, selectedSet.has(c.id));
+		}
+		for (const id of promotionDotIdsRef.current) {
+			setSelectedSafe(MAPBOX_SOURCE_IDS.markersPromotionDot, id, selectedSet.has(id));
+		}
+		for (const id of promotionPinIdsRef.current) {
+			setSelectedSafe(MAPBOX_SOURCE_IDS.markersPromotionPin, id, selectedSet.has(id));
+		}
+		for (const c of allContactsOverlayVisibleContacts) {
+			setSelectedSafe(MAPBOX_SOURCE_IDS.markersAllOverlay, c.id, selectedSet.has(c.id));
+		}
+	}, [
+		map,
+		isMapLoaded,
+		selectedContacts,
+		visibleContacts,
+		bookingExtraVisibleContacts,
+		allContactsOverlayVisibleContacts,
+		promotionOverlayVisibleContacts,
+	]);
+
+	// Booking UX: highlight all booking extra pins of the hovered category.
+	useEffect(() => {
+		if (!map || !isMapLoaded) return;
+		const hoveredCategory = hoveredBookingExtraCategory;
+		for (const contact of bookingExtraVisibleContacts) {
+			const category = getBookingTitlePrefixFromContactTitle(contact.title);
+			const categoryHover = Boolean(hoveredCategory && category && category === hoveredCategory);
+			try {
+				map.setFeatureState(
+					{ source: MAPBOX_SOURCE_IDS.markersBookingPin, id: contact.id },
+					{ categoryHover }
+				);
+			} catch {
+				// Ignore.
+			}
+		}
+	}, [map, isMapLoaded, hoveredBookingExtraCategory, bookingExtraVisibleContacts]);
 
 	// Larger leave buffer zone - how much extra padding below the tooltip for hysteresis
 	const hoverLeaveBufferPx = useMemo(() => {
@@ -4121,637 +4797,241 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		return markerScale * 2;
 	}, [markerScale]);
 
-	// Background gray dot icon (same design as result dots, lower emphasis)
-	const backgroundDotIcon = useMemo(() => {
-		if (!isLoaded) return undefined;
-		return {
-			path: google.maps.SymbolPath.CIRCLE,
-			fillColor: '#9CA3AF',
-			fillOpacity: 0.55,
-			strokeColor: RESULT_DOT_STROKE_COLOR_DEFAULT,
-			strokeWeight: Math.max(1, strokeWeight * 0.85),
-			scale: markerScale * 0.78,
-		};
-	}, [isLoaded, markerScale, strokeWeight]);
+	const selectedContactIdSet = useMemo(() => new Set<number>(selectedContacts), [selectedContacts]);
 
-	// Keep the background dots styled appropriately as zoom changes.
-	useEffect(() => {
-		const layer = backgroundDotsLayerRef.current;
-		if (!layer || !backgroundDotIcon) return;
-		layer.setStyle({
-			clickable: false,
-			zIndex: -1,
-			icon: backgroundDotIcon,
-		});
-	}, [backgroundDotIcon]);
-
-	if (loadError) {
-		return (
-			<div className="w-full h-full flex items-center justify-center bg-gray-100 rounded-lg">
-				<p className="text-gray-500">Error loading map</p>
-			</div>
-		);
-	}
-
-	if (!isLoaded) {
-		return (
-			<div className="w-full h-full flex items-center justify-center bg-gray-100 rounded-lg">
-				<div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-			</div>
-		);
-	}
-
-	// Get position for selected marker
+	// Selected marker "Research" panel anchoring (HTML overlay positioned with map.project).
 	const selectedMarkerCoords = selectedMarker ? getContactCoords(selectedMarker) : null;
+	const selectedMarkerOverlayRef = useRef<HTMLDivElement | null>(null);
+	useEffect(() => {
+		if (!map || !isMapLoaded) return;
+		if (isLoading) return;
+		const el = selectedMarkerOverlayRef.current;
+		if (!el || !selectedMarkerCoords) return;
+
+		const update = () => {
+			const p = map.project([selectedMarkerCoords.lng, selectedMarkerCoords.lat]);
+			const rect = el.getBoundingClientRect();
+			const x = p.x - rect.width / 2;
+			const y = p.y - rect.height - 20;
+			el.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
+		};
+
+		update();
+		map.on('move', update);
+		return () => {
+			map.off('move', update);
+		};
+	}, [map, isMapLoaded, isLoading, selectedMarkerCoords?.lat, selectedMarkerCoords?.lng]);
+
+	// Hover tooltip anchoring (single overlay).
+	const hoverTooltipContactId = hoveredMarkerId ?? fadingTooltipId;
+	const hoverTooltipEntry = useMemo(() => {
+		if (hoverTooltipContactId == null) return null;
+		const base = visibleContactsById.get(hoverTooltipContactId);
+		if (base) return { kind: 'base' as const, contact: base };
+		const booking = bookingExtraContactsById.get(hoverTooltipContactId);
+		if (booking) return { kind: 'booking' as const, contact: booking };
+		const promo = promotionOverlayContactsById.get(hoverTooltipContactId);
+		if (promo) return { kind: 'promotion' as const, contact: promo };
+		const all = allOverlayContactsById.get(hoverTooltipContactId);
+		if (all) return { kind: 'all' as const, contact: all };
+		return null;
+	}, [
+		hoverTooltipContactId,
+		visibleContactsById,
+		bookingExtraContactsById,
+		promotionOverlayContactsById,
+		allOverlayContactsById,
+	]);
+
+	const hoverTooltipCoords = useMemo(() => {
+		if (!hoverTooltipEntry) return null;
+		const c = hoverTooltipEntry.contact;
+		switch (hoverTooltipEntry.kind) {
+			case 'base':
+				return getContactCoords(c);
+			case 'booking':
+				return getBookingExtraContactCoords(c);
+			case 'promotion':
+				return getPromotionOverlayContactCoords(c);
+			case 'all':
+				return getAllContactsOverlayContactCoords(c);
+			default:
+				return null;
+		}
+	}, [
+		hoverTooltipEntry,
+		getContactCoords,
+		getBookingExtraContactCoords,
+		getPromotionOverlayContactCoords,
+		getAllContactsOverlayContactCoords,
+	]);
+
+	const hoverTooltipData = useMemo(() => {
+		if (!hoverTooltipEntry) return null;
+		const contact = hoverTooltipEntry.contact;
+		const kind = hoverTooltipEntry.kind;
+		const isSelected = selectedContactIdSet.has(contact.id);
+
+		const fullName = `${contact.firstName || ''} ${contact.lastName || ''}`.trim();
+		const nameForTooltip = fullName || contact.name || '';
+		const companyForTooltip = contact.company || '';
+		const titleForTooltip = (contact.title || contact.headline || '').trim();
+
+		if (kind === 'all') {
+			const tooltipFillColor = isSelected
+				? TOOLTIP_FILL_COLOR_SELECTED
+				: ALL_CONTACTS_OVERLAY_TOOLTIP_FILL_COLOR;
+			const width = calculateTooltipWidth(nameForTooltip, companyForTooltip, titleForTooltip);
+			const height = calculateTooltipHeight(nameForTooltip, companyForTooltip);
+			const anchorY = calculateTooltipAnchorY(nameForTooltip, companyForTooltip);
+			return {
+				url: generateMapTooltipIconUrl(
+					nameForTooltip,
+					companyForTooltip,
+					titleForTooltip,
+					tooltipFillColor
+				),
+				width,
+				height,
+				anchorY,
+			};
+		}
+
+		const whatForMarker =
+			kind === 'base'
+				? searchWhat ?? null
+				: kind === 'booking'
+					? getBookingTitlePrefixFromContactTitle(contact.title) ?? null
+					: getPromotionOverlayWhatFromContactTitle(contact.title) ?? null;
+
+		// Even if the marker dot is "washed out" outside the locked/selected state, keep the hover tooltip
+		// using the base category color so it consistently communicates the search intent.
+		const dotFillColor =
+			kind === 'base' ? defaultDotFillColor : getResultDotColorForWhat(whatForMarker);
+
+		const normalizedWhat = whatForMarker ? normalizeWhatKey(whatForMarker) : null;
+		const baseTooltipFillColor = normalizedWhat
+			? WHAT_TO_HOVER_TOOLTIP_FILL_COLOR[normalizedWhat] ?? dotFillColor
+			: dotFillColor;
+
+		const tooltipFillColor = isSelected ? TOOLTIP_FILL_COLOR_SELECTED : baseTooltipFillColor;
+
+		const width = calculateTooltipWidth(
+			nameForTooltip,
+			companyForTooltip,
+			titleForTooltip,
+			whatForMarker
+		);
+		const height = calculateTooltipHeight(nameForTooltip, companyForTooltip);
+		const anchorY = calculateTooltipAnchorY(nameForTooltip, companyForTooltip);
+
+		return {
+			url: generateMapTooltipIconUrl(
+				nameForTooltip,
+				companyForTooltip,
+				titleForTooltip,
+				tooltipFillColor,
+				whatForMarker
+			),
+			width,
+			height,
+			anchorY,
+		};
+	}, [hoverTooltipEntry, selectedContactIdSet, searchWhat, defaultDotFillColor]);
+
+	const hoverTooltipOverlayRef = useRef<HTMLDivElement | null>(null);
+	useEffect(() => {
+		if (!map || !isMapLoaded) return;
+		if (isLoading) return;
+		const el = hoverTooltipOverlayRef.current;
+		if (!el || !hoverTooltipCoords || !hoverTooltipData) return;
+
+		const update = () => {
+			const p = map.project([hoverTooltipCoords.lng, hoverTooltipCoords.lat]);
+			el.style.transform = `translate(${Math.round(p.x - MAP_TOOLTIP_ANCHOR_X)}px, ${Math.round(
+				p.y - hoverTooltipData.anchorY
+			)}px)`;
+		};
+
+		update();
+		map.on('move', update);
+		return () => {
+			map.off('move', update);
+		};
+	}, [
+		map,
+		isMapLoaded,
+		isLoading,
+		hoverTooltipContactId,
+		hoverTooltipCoords?.lat,
+		hoverTooltipCoords?.lng,
+		hoverTooltipData?.anchorY,
+	]);
 
 	return (
-		<GoogleMap
-			mapContainerStyle={mapContainerStyle}
-			// Keep these stable so the map doesn't jump back to a US-wide view
-			// when `contacts` temporarily empties during a new search fetch.
-			center={defaultCenter}
-			zoom={MAP_MIN_ZOOM}
-			onLoad={onLoad}
-			onUnmount={onUnmount}
-			options={mapOptionsForTool}
-			onClick={() => {
-				// In select mode, a click-drag is used for box selection.
-				// Avoid clearing marker state on clicks that are part of drawing.
-				if (areaSelectionEnabled) return;
-				setSelectedMarker(null);
-			}}
-			onMouseDown={handleMapMouseDown}
-			onMouseMove={handleMapMouseMove}
-			onMouseUp={handleMapMouseUp}
-		>
-			{/* Only render markers when not loading */}
-			{!isLoading &&
-				allContactsOverlayVisibleContacts.map((contact) => {
-					const coords = getAllContactsOverlayContactCoords(contact);
-					if (!coords) return null;
-					const isHovered = hoveredMarkerId === contact.id;
-					const isSelected = selectedContacts.includes(contact.id);
+		<div style={{ width: '100%', height: '100%', position: 'relative', borderRadius: '0.5rem', overflow: 'hidden' }}>
+			<div ref={mapContainerRef} style={{ width: '100%', height: '100%' }} />
+			{mapLoadError && (
+				<div className="absolute inset-0 flex items-center justify-center bg-gray-100">
+					<p className="text-gray-500">{mapLoadError}</p>
+				</div>
+			)}
+			{!mapLoadError && !isMapLoaded && (
+				<div className="absolute inset-0 flex items-center justify-center bg-gray-100">
+					<div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" />
+				</div>
+			)}
 
-					const dotIcon = isSelected ? allContactsOverlayMarkerIconSelected : allContactsOverlayMarkerIcon;
-
-					// Show tooltip if hovered or if this marker is fading out
-					const isFading = fadingTooltipId === contact.id;
-					const shouldShowTooltip = isHovered || isFading;
-					const hoverTooltip = shouldShowTooltip
-						? (() => {
-								const fullName = `${contact.firstName || ''} ${
-									contact.lastName || ''
-								}`.trim();
-								const nameForTooltip = fullName || contact.name || '';
-								const companyForTooltip = contact.company || '';
-								const titleForTooltip = (contact.title || contact.headline || '').trim();
-								const tooltipFillColor = isSelected
-									? TOOLTIP_FILL_COLOR_SELECTED
-									: ALL_CONTACTS_OVERLAY_TOOLTIP_FILL_COLOR;
-								const width = calculateTooltipWidth(
-									nameForTooltip,
-									companyForTooltip,
-									titleForTooltip
-								);
-								const height = calculateTooltipHeight(nameForTooltip, companyForTooltip);
-								const anchorY = calculateTooltipAnchorY(nameForTooltip, companyForTooltip);
-								return {
-									url: generateMapTooltipIconUrl(
-										nameForTooltip,
-										companyForTooltip,
-										titleForTooltip,
-										tooltipFillColor
-									),
-									width,
-									height,
-									anchorY,
-								};
-							})()
-						: null;
-
-					return (
-						<Fragment key={`allOverlay-${contact.id}`}>
-							{/* Low z-index hit area so primary/overlay pins win when overlapping */}
-							<MarkerF
-								position={coords}
-								icon={invisibleAllContactsOverlayHitAreaIcon}
-								onMouseOver={(e) => handleMarkerMouseOver(contact, e)}
-								onMouseOut={() => handleMarkerMouseOut(contact.id)}
-								onClick={() => handleMarkerClick(contact)}
-								clickable={true}
-								zIndex={-1}
-							/>
-							{/* Gray dot marker */}
-							<MarkerF position={coords} icon={dotIcon} clickable={false} zIndex={-2} />
-							{/* Hover SVG tooltip */}
-							{shouldShowTooltip && hoverTooltip && (
-								<OverlayViewF
-									position={coords}
-									mapPaneName={OverlayView.FLOAT_PANE}
-									zIndex={HOVER_TOOLTIP_Z_INDEX}
-									getPixelPositionOffset={() => ({
-										x: -MAP_TOOLTIP_ANCHOR_X,
-										y: -hoverTooltip.anchorY,
-									})}
-								>
-									<div
-										style={{
-											width: `${hoverTooltip.width}px`,
-											height: `${hoverTooltip.height + hoverLeaveBufferPx}px`,
-											pointerEvents: isHovered ? 'auto' : 'none',
-											display: 'flex',
-											flexDirection: 'column',
-										}}
-										onMouseEnter={() => handleMarkerMouseOver(contact)}
-										onMouseLeave={() => handleMarkerMouseOut(contact.id)}
-										onClick={() => handleMarkerClick(contact)}
-									>
-										<div
-											style={{
-												width: '100%',
-												height: `${hoverTooltip.height}px`,
-												opacity: isHovered ? 1 : 0,
-												transition: 'opacity 150ms ease-in-out',
-												flexShrink: 0,
-											}}
-										>
-											<img
-												src={hoverTooltip.url}
-												alt=""
-												draggable={false}
-												style={{ width: '100%', height: '100%', display: 'block' }}
-											/>
-										</div>
-									</div>
-								</OverlayViewF>
-							)}
-						</Fragment>
-					);
-				})}
-			{!isLoading &&
-				promotionOverlayVisibleContacts.map((contact) => {
-					const coords = getPromotionOverlayContactCoords(contact);
-					if (!coords) return null;
-					const isHovered = hoveredMarkerId === contact.id;
-					const isSelected = selectedContacts.includes(contact.id);
-					const hasLockedStateSelection =
-						lockedStateKey && lockedStateSelectionKeyRef.current === lockedStateKey;
-					const isOutsideLockedState = hasLockedStateSelection
-						? !isCoordsInLockedState(coords)
-						: false;
-					// In promotion mode, keep markers *inside* the searched/locked state as regular dots.
-					// Only render the overlay "pin" UI for contacts outside the searched area.
-					const shouldUseOverlayPinStyle = !hasLockedStateSelection || isOutsideLockedState;
-
-					const whatForMarker = getPromotionOverlayWhatFromContactTitle(contact.title) ?? null;
-					const dotFillColor = getResultDotColorForWhat(whatForMarker);
-					const dotFillColorOutside = washOutHexColor(
-						dotFillColor,
-						OUTSIDE_LOCKED_STATE_WASHOUT_TO_WHITE
-					);
-					const pinFillColor = isOutsideLockedState ? dotFillColorOutside : dotFillColor;
-					const pinStrokeColor = isSelected
-						? RESULT_DOT_STROKE_COLOR_SELECTED
-						: RESULT_DOT_STROKE_COLOR_DEFAULT;
-
-					const dotIcon =
-						isSelected
-							? isOutsideLockedState
-								? selectedMarkerIconOutside
-								: selectedMarkerIcon
-							: isOutsideLockedState
-								? defaultMarkerIconOutside
-								: defaultMarkerIcon;
-
-					// Show tooltip if hovered or if this marker is fading out
-					const isFading = fadingTooltipId === contact.id;
-					const shouldShowTooltip = isHovered || isFading;
-					const hoverTooltip = shouldShowTooltip
-						? (() => {
-								const fullName = `${contact.firstName || ''} ${
-									contact.lastName || ''
-								}`.trim();
-								const nameForTooltip = fullName || contact.name || '';
-								const companyForTooltip = contact.company || '';
-								const titleForTooltip = (contact.title || contact.headline || '').trim();
-								const normalizedWhat = whatForMarker ? normalizeWhatKey(whatForMarker) : null;
-								const baseTooltipFillColor = normalizedWhat
-									? WHAT_TO_HOVER_TOOLTIP_FILL_COLOR[normalizedWhat] ?? dotFillColor
-									: dotFillColor;
-								// Use selected color when contact is selected.
-								const tooltipFillColor = isSelected
-									? TOOLTIP_FILL_COLOR_SELECTED
-									: baseTooltipFillColor;
-								const width = calculateTooltipWidth(
-									nameForTooltip,
-									companyForTooltip,
-									titleForTooltip,
-									whatForMarker
-								);
-								const height = calculateTooltipHeight(nameForTooltip, companyForTooltip);
-								const anchorY = calculateTooltipAnchorY(nameForTooltip, companyForTooltip);
-								return {
-									url: generateMapTooltipIconUrl(
-										nameForTooltip,
-										companyForTooltip,
-										titleForTooltip,
-										tooltipFillColor,
-										whatForMarker
-									),
-									width,
-									height,
-									anchorY,
-								};
-							})()
-						: null;
-
-					return (
-						<Fragment key={`promotionOverlay-${contact.id}`}>
-							<MarkerF
-								position={coords}
-								icon={shouldUseOverlayPinStyle ? invisiblePinHitAreaIcon : invisibleHitAreaIcon}
-								onMouseOver={(e) => handleMarkerMouseOver(contact, e)}
-								onMouseOut={() => handleMarkerMouseOut(contact.id)}
-								onClick={() => handleMarkerClick(contact)}
-								clickable={true}
-								// Keep in-state promotion markers behaving like primary dots; out-of-state pins sit behind.
-								zIndex={shouldUseOverlayPinStyle ? 0 : MARKER_HIT_AREA_Z_INDEX}
-							/>
-							{/* Non-pin markers use MarkerF for consistency */}
-							{!shouldUseOverlayPinStyle && (
-								<MarkerF
-									position={coords}
-									icon={dotIcon}
-									clickable={false}
-									zIndex={MARKER_DOT_Z_INDEX}
-								/>
-							)}
-							{/* Pin markers use OverlayViewF with CSS transform for smooth zoom scaling */}
-							{shouldUseOverlayPinStyle && (
-								<OverlayViewF
-									position={coords}
-									mapPaneName={OverlayView.OVERLAY_LAYER}
-									getPixelPositionOffset={() => ({
-										x: -MAP_MARKER_PIN_CIRCLE_CENTER_X,
-										y: -MAP_MARKER_PIN_CIRCLE_CENTER_Y,
-									})}
-								>
-									<img
-										src={getMarkerPinUrl(pinFillColor, pinStrokeColor, whatForMarker)}
-										alt=""
-										draggable={false}
-										style={{
-											width: MAP_MARKER_PIN_VIEWBOX_WIDTH,
-											height: MAP_MARKER_PIN_VIEWBOX_HEIGHT,
-											pointerEvents: 'none',
-											transform: `scale(${markerPinScaleFactor})`,
-											transformOrigin: `${MAP_MARKER_PIN_CIRCLE_CENTER_X}px ${MAP_MARKER_PIN_CIRCLE_CENTER_Y}px`,
-											transition: `transform ${OVERLAY_PIN_SCALE_TRANSITION_MS}ms ease-out`,
-										}}
-									/>
-								</OverlayViewF>
-							)}
-							{shouldShowTooltip && hoverTooltip && (
-								<OverlayViewF
-									position={coords}
-									mapPaneName={OverlayView.FLOAT_PANE}
-									zIndex={HOVER_TOOLTIP_Z_INDEX}
-									getPixelPositionOffset={() => ({
-										x: -MAP_TOOLTIP_ANCHOR_X,
-										y: -hoverTooltip.anchorY,
-									})}
-								>
-									<div
-										style={{
-											width: `${hoverTooltip.width}px`,
-											height: `${hoverTooltip.height + hoverLeaveBufferPx}px`,
-											pointerEvents: isHovered ? 'auto' : 'none',
-											display: 'flex',
-											flexDirection: 'column',
-										}}
-										onMouseEnter={() => handleMarkerMouseOver(contact)}
-										onMouseLeave={() => handleMarkerMouseOut(contact.id)}
-										onClick={() => handleMarkerClick(contact)}
-									>
-										<div
-											style={{
-												width: '100%',
-												height: `${hoverTooltip.height}px`,
-												opacity: isHovered ? 1 : 0,
-												transition: 'opacity 150ms ease-in-out',
-												flexShrink: 0,
-											}}
-										>
-											<img
-												src={hoverTooltip.url}
-												alt=""
-												draggable={false}
-												style={{ width: '100%', height: '100%', display: 'block' }}
-											/>
-										</div>
-									</div>
-								</OverlayViewF>
-							)}
-						</Fragment>
-					);
-				})}
-			{!isLoading &&
-				bookingExtraVisibleContacts.map((contact) => {
-					const coords = getBookingExtraContactCoords(contact);
-					if (!coords) return null;
-					const isHovered = hoveredMarkerId === contact.id;
-					const isSelected = selectedContacts.includes(contact.id);
-					const hasLockedStateSelection =
-						lockedStateKey && lockedStateSelectionKeyRef.current === lockedStateKey;
-					const isOutsideLockedState = hasLockedStateSelection
-						? !isCoordsInLockedState(coords)
-						: false;
-
-					const whatForMarker = getBookingTitlePrefixFromContactTitle(contact.title) ?? null;
-					const isCategoryHovered = Boolean(
-						hoveredBookingExtraCategory && whatForMarker === hoveredBookingExtraCategory
-					);
-					const dotFillColor = getResultDotColorForWhat(whatForMarker);
-					const dotFillColorOutside = washOutHexColor(
-						dotFillColor,
-						OUTSIDE_LOCKED_STATE_WASHOUT_TO_WHITE
-					);
-					const pinFillColor = isOutsideLockedState ? dotFillColorOutside : dotFillColor;
-					// "Chrome" = the stroke ring + the base tail. Default = white, hover = black, selected = green.
-					// Selected always wins so we never end up with a "selected but black" marker.
-					const chromeColor = isSelected
-						? RESULT_DOT_STROKE_COLOR_SELECTED
-						: isCategoryHovered
-							? BOOKING_EXTRA_PIN_HOVER_STROKE_COLOR
-							: RESULT_DOT_STROKE_COLOR_DEFAULT;
-
-					// Show tooltip if hovered or if this marker is fading out
-					const isFading = fadingTooltipId === contact.id;
-					const shouldShowTooltip = isHovered || isFading;
-					const hoverTooltip = shouldShowTooltip
-						? (() => {
-								const fullName = `${contact.firstName || ''} ${
-									contact.lastName || ''
-								}`.trim();
-								const nameForTooltip = fullName || contact.name || '';
-								const companyForTooltip = contact.company || '';
-								const titleForTooltip = (contact.title || contact.headline || '').trim();
-								const normalizedWhat = whatForMarker ? normalizeWhatKey(whatForMarker) : null;
-								const baseTooltipFillColor = normalizedWhat
-									? WHAT_TO_HOVER_TOOLTIP_FILL_COLOR[normalizedWhat] ?? dotFillColor
-									: dotFillColor;
-								// Use selected color when contact is selected.
-								const tooltipFillColor = isSelected
-									? TOOLTIP_FILL_COLOR_SELECTED
-									: baseTooltipFillColor;
-								const width = calculateTooltipWidth(
-									nameForTooltip,
-									companyForTooltip,
-									titleForTooltip,
-									whatForMarker
-								);
-								const height = calculateTooltipHeight(nameForTooltip, companyForTooltip);
-								const anchorY = calculateTooltipAnchorY(nameForTooltip, companyForTooltip);
-								return {
-									url: generateMapTooltipIconUrl(
-										nameForTooltip,
-										companyForTooltip,
-										titleForTooltip,
-										tooltipFillColor,
-										whatForMarker
-									),
-									width,
-									height,
-									anchorY,
-								};
-							})()
-						: null;
-
-					// Calculate effective scale multiplier for hover effect
-					const pinScaleMultiplier = isCategoryHovered ? BOOKING_EXTRA_PIN_HOVER_SCALE : 1;
-					const effectivePinScaleFactor = markerPinScaleFactor * pinScaleMultiplier;
-
-					return (
-						<Fragment key={`bookingExtra-${contact.id}`}>
-							{/* Lower z-index hit area so primary markers win when overlapping */}
-							<MarkerF
-								position={coords}
-								icon={invisiblePinHitAreaIcon}
-								onMouseOver={(e) => handleMarkerMouseOver(contact, e)}
-								onMouseOut={() => handleMarkerMouseOut(contact.id)}
-								onClick={() => handleMarkerClick(contact)}
-								clickable={true}
-								zIndex={0}
-							/>
-							{/* Pin markers use OverlayViewF with CSS transform for smooth zoom scaling */}
-							<OverlayViewF
-								position={coords}
-								mapPaneName={OverlayView.OVERLAY_LAYER}
-								getPixelPositionOffset={() => ({
-									x: -MAP_MARKER_PIN_CIRCLE_CENTER_X,
-									y: -MAP_MARKER_PIN_CIRCLE_CENTER_Y,
-								})}
-							>
-								<img
-									src={getMarkerPinUrl(pinFillColor, chromeColor, whatForMarker, chromeColor)}
-									alt=""
-									draggable={false}
-									style={{
-										width: MAP_MARKER_PIN_VIEWBOX_WIDTH,
-										height: MAP_MARKER_PIN_VIEWBOX_HEIGHT,
-										pointerEvents: 'none',
-										transform: `scale(${effectivePinScaleFactor})`,
-										transformOrigin: `${MAP_MARKER_PIN_CIRCLE_CENTER_X}px ${MAP_MARKER_PIN_CIRCLE_CENTER_Y}px`,
-										transition: `transform ${OVERLAY_PIN_SCALE_TRANSITION_MS}ms ease-out`,
-									}}
-								/>
-							</OverlayViewF>
-							{shouldShowTooltip && hoverTooltip && (
-								<OverlayViewF
-									position={coords}
-									mapPaneName={OverlayView.FLOAT_PANE}
-									zIndex={HOVER_TOOLTIP_Z_INDEX}
-									getPixelPositionOffset={() => ({
-										x: -MAP_TOOLTIP_ANCHOR_X,
-										y: -hoverTooltip.anchorY,
-									})}
-								>
-									<div
-										style={{
-											width: `${hoverTooltip.width}px`,
-											height: `${hoverTooltip.height + hoverLeaveBufferPx}px`,
-											pointerEvents: isHovered ? 'auto' : 'none',
-											display: 'flex',
-											flexDirection: 'column',
-										}}
-										onMouseEnter={() => handleMarkerMouseOver(contact)}
-										onMouseLeave={() => handleMarkerMouseOut(contact.id)}
-										onClick={() => handleMarkerClick(contact)}
-									>
-										<div
-											style={{
-												width: '100%',
-												height: `${hoverTooltip.height}px`,
-												opacity: isHovered ? 1 : 0,
-												transition: 'opacity 150ms ease-in-out',
-												flexShrink: 0,
-											}}
-										>
-											<img
-												src={hoverTooltip.url}
-												alt=""
-												draggable={false}
-												style={{ width: '100%', height: '100%', display: 'block' }}
-											/>
-										</div>
-									</div>
-								</OverlayViewF>
-							)}
-						</Fragment>
-					);
-				})}
-			{!isLoading &&
-				visibleContacts.map((contact) => {
-					const coords = getContactCoords(contact);
-					if (!coords) return null;
-					const isHovered = hoveredMarkerId === contact.id;
-					const isSelected = selectedContacts.includes(contact.id);
-					const hasLockedStateSelection =
-						lockedStateKey && lockedStateSelectionKeyRef.current === lockedStateKey;
-					const isOutsideLockedState = hasLockedStateSelection
-						? !isCoordsInLockedState(coords)
-						: false;
-					const dotIcon = isSelected
-						? isOutsideLockedState
-							? selectedMarkerIconOutside
-							: selectedMarkerIcon
-						: isOutsideLockedState
-							? defaultMarkerIconOutside
-							: defaultMarkerIcon;
-
-					// Show tooltip if hovered or if this marker is fading out
-					const isFading = fadingTooltipId === contact.id;
-					const shouldShowTooltip = isHovered || isFading;
-					const hoverTooltip = shouldShowTooltip
-						? (() => {
-								const fullName = `${contact.firstName || ''} ${
-									contact.lastName || ''
-								}`.trim();
-								const nameForTooltip = fullName || contact.name || '';
-								const companyForTooltip = contact.company || '';
-								const titleForTooltip = (contact.title || contact.headline || '').trim();
-								// Even if the marker dot is "washed out" outside the locked/selected state,
-								// keep the hover tooltip using the base search color so it consistently
-								// communicates the search category.
-								const normalizedWhat = searchWhat ? normalizeWhatKey(searchWhat) : null;
-								const baseTooltipFillColor = normalizedWhat
-									? WHAT_TO_HOVER_TOOLTIP_FILL_COLOR[normalizedWhat] ?? defaultDotFillColor
-									: defaultDotFillColor;
-								// Use selected color when contact is selected.
-								const tooltipFillColor = isSelected
-									? TOOLTIP_FILL_COLOR_SELECTED
-									: baseTooltipFillColor;
-								const width = calculateTooltipWidth(
-									nameForTooltip,
-									companyForTooltip,
-									titleForTooltip,
-									searchWhat
-								);
-								const height = calculateTooltipHeight(nameForTooltip, companyForTooltip);
-								const anchorY = calculateTooltipAnchorY(nameForTooltip, companyForTooltip);
-								return {
-									url: generateMapTooltipIconUrl(
-										nameForTooltip,
-										companyForTooltip,
-										titleForTooltip,
-										tooltipFillColor,
-										searchWhat
-									),
-									width,
-									height,
-									anchorY,
-								};
-							})()
-						: null;
-					return (
-						<Fragment key={contact.id}>
-							{/* Invisible larger hit area for hover detection - this controls all hover state */}
-							<MarkerF
-								position={coords}
-								icon={invisibleHitAreaIcon}
-								onMouseOver={(e) => handleMarkerMouseOver(contact, e)}
-								onMouseOut={() => handleMarkerMouseOut(contact.id)}
-								onClick={() => handleMarkerClick(contact)}
-								clickable={true}
-								zIndex={MARKER_HIT_AREA_Z_INDEX}
-							/>
-							{/* Dot marker (fixed size; hover shows SVG tooltip instead of scaling) */}
-							<MarkerF
-								position={coords}
-								icon={dotIcon}
-								clickable={false}
-								zIndex={MARKER_DOT_Z_INDEX}
-							/>
-							{/* Hover SVG tooltip (rendered as an overlay so it's always above markers) */}
-							{shouldShowTooltip && hoverTooltip && (
-								<OverlayViewF
-									position={coords}
-									mapPaneName={OverlayView.FLOAT_PANE}
-									zIndex={HOVER_TOOLTIP_Z_INDEX}
-									getPixelPositionOffset={() => ({
-										x: -MAP_TOOLTIP_ANCHOR_X,
-										// Align the tooltip tip to the marker's LatLng pixel point.
-										y: -hoverTooltip.anchorY,
-									})}
-								>
-									{/* Outer wrapper extends below tooltip for larger leave area (hysteresis) */}
-									<div
-										style={{
-											width: `${hoverTooltip.width}px`,
-											// Extend height to include buffer below for easier hover exit
-											height: `${hoverTooltip.height + hoverLeaveBufferPx}px`,
-											pointerEvents: isHovered ? 'auto' : 'none',
-											// Use flex to keep content at top, buffer at bottom
-											display: 'flex',
-											flexDirection: 'column',
-										}}
-										onMouseEnter={() => handleMarkerMouseOver(contact)}
-										onMouseLeave={() => handleMarkerMouseOut(contact.id)}
-										onClick={() => handleMarkerClick(contact)}
-									>
-										<div
-											style={{
-												width: '100%',
-												height: `${hoverTooltip.height}px`,
-												opacity: isHovered ? 1 : 0,
-												transition: 'opacity 150ms ease-in-out',
-												flexShrink: 0,
-											}}
-										>
-											<img
-												src={hoverTooltip.url}
-												alt=""
-												draggable={false}
-												style={{ width: '100%', height: '100%', display: 'block' }}
-											/>
-										</div>
-										{/* Invisible buffer zone below tooltip for hysteresis */}
-									</div>
-								</OverlayViewF>
-							)}
-						</Fragment>
-					);
-				})}
+			{/* Hover SVG tooltip (single overlay; positioned via map.project) */}
+			{!isLoading && hoverTooltipEntry && hoverTooltipCoords && hoverTooltipData && (
+				<div
+					ref={hoverTooltipOverlayRef}
+					style={{
+						position: 'absolute',
+						left: 0,
+						top: 0,
+						width: `${hoverTooltipData.width}px`,
+						height: `${hoverTooltipData.height + hoverLeaveBufferPx}px`,
+						pointerEvents:
+							hoverTooltipContactId != null && hoveredMarkerId === hoverTooltipContactId
+								? 'auto'
+								: 'none',
+						display: 'flex',
+						flexDirection: 'column',
+						zIndex: HOVER_TOOLTIP_Z_INDEX,
+					}}
+					onMouseEnter={() => handleMarkerMouseOver(hoverTooltipEntry.contact)}
+					onMouseLeave={() => handleMarkerMouseOut(hoverTooltipEntry.contact.id)}
+					onClick={() => handleMarkerClick(hoverTooltipEntry.contact)}
+				>
+					<div
+						style={{
+							width: '100%',
+							height: `${hoverTooltipData.height}px`,
+							opacity:
+								hoverTooltipContactId != null && hoveredMarkerId === hoverTooltipContactId
+									? 1
+									: 0,
+							transition: 'opacity 150ms ease-in-out',
+							flexShrink: 0,
+						}}
+					>
+						<img
+							src={hoverTooltipData.url}
+							alt=""
+							draggable={false}
+							style={{ width: '100%', height: '100%', display: 'block' }}
+						/>
+					</div>
+				</div>
+			)}
 
 			{/* Only show selected marker overlay when not loading */}
 			{!isLoading && selectedMarker && selectedMarkerCoords && (
-				<OverlayView
-					position={selectedMarkerCoords}
-					mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
-					getPixelPositionOffset={(width, height) => ({
-						x: -(width / 2),
-						y: -height - 20,
-					})}
+				<div
+					ref={selectedMarkerOverlayRef}
+					style={{ position: 'absolute', left: 0, top: 0, zIndex: HOVER_TOOLTIP_Z_INDEX + 10 }}
 				>
 					<div
 						className="relative"
@@ -4901,13 +5181,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						/>
 						{/* Research boxes */}
 						{(() => {
-							// Debug: log the metadata to console
-							console.log('Contact metadata:', {
-								id: selectedMarker.id,
-								metadata: selectedMarker.metadata,
-								hasMetadata: !!selectedMarker.metadata,
-							});
-
 							const metadataSections = parseMetadataSections(selectedMarker.metadata);
 							const boxConfigs = [
 								{ key: '1', color: 'rgba(21, 139, 207, 0.8)' },
@@ -5071,9 +5344,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 							}}
 						/>
 					</div>
-				</OverlayView>
+				</div>
 			)}
-		</GoogleMap>
+		</div>
 	);
 };
 

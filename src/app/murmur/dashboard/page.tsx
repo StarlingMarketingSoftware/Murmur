@@ -1630,26 +1630,32 @@ const DashboardContent = () => {
 		};
 	}, [isMobile]);
 
-	// Make the fullscreen dashboard map view render slightly "zoomed out" on desktop (85%),
-	// mirroring the campaign page's extra-compact scaling.
-	useEffect(() => {
+	// Mapbox GL doesn't reliably size/position its WebGL canvas under CSS zoom/transform scaling.
+	// While in fullscreen map view, force 1x scaling so the map always fills the stroked container.
+	useLayoutEffect(() => {
 		// Avoid running until we know whether this is a real mobile device.
 		if (isMobile === null) return;
 
 		// Never shrink the mobile map UI (it's already heavily tuned).
 		if (isMobile) {
 			document.documentElement.classList.remove(DASHBOARD_MAP_COMPACT_CLASS);
+			document.documentElement.style.removeProperty(DASHBOARD_ZOOM_VAR);
 			return;
 		}
 
 		if (isMapView) {
 			document.documentElement.classList.add(DASHBOARD_MAP_COMPACT_CLASS);
+			// Force 1x scaling to avoid Mapbox canvas layout drift (especially in browsers that
+			// fall back to transform-based scaling when CSS `zoom` is unsupported).
+			document.documentElement.style.setProperty(DASHBOARD_ZOOM_VAR, '1');
 		} else {
 			document.documentElement.classList.remove(DASHBOARD_MAP_COMPACT_CLASS);
+			document.documentElement.style.removeProperty(DASHBOARD_ZOOM_VAR);
 		}
 
 		return () => {
 			document.documentElement.classList.remove(DASHBOARD_MAP_COMPACT_CLASS);
+			document.documentElement.style.removeProperty(DASHBOARD_ZOOM_VAR);
 		};
 	}, [isMapView, isMobile]);
 
