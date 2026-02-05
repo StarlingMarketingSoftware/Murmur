@@ -837,6 +837,64 @@ const DEFAULT_MAX_ZOOM_FALLBACK = 22;
 
 const MAPBOX_STYLE = 'mapbox://styles/mapbox/streets-v12';
 
+/**
+ * Match the marketing `/free-trial` globe look:
+ * - Globe projection
+ * - Black "space" + stars
+ * - No atmospheric glow/halo
+ * - Hide base labels + admin boundaries (keep our `murmur-*` layers)
+ */
+const applyFreeTrialMapVisualTuning = (mapInstance: mapboxgl.Map) => {
+	// Projection
+	try {
+		mapInstance.setProjection({ name: 'globe' } as any);
+	} catch {
+		// Non-fatal.
+	}
+
+	// Fog / atmosphere (remove glow)
+	try {
+		const existingFog = (mapInstance as any).getFog?.() ?? {};
+		(mapInstance as any).setFog?.({
+			...existingFog,
+			color: 'rgb(0, 0, 0)',
+			'high-color': 'rgb(0, 0, 0)',
+			'space-color': 'rgb(0, 0, 0)',
+			'star-intensity': 0.9,
+			'horizon-blend': 0,
+		});
+	} catch {
+		// Non-fatal.
+	}
+
+	// Basemap layer cleanup (hide words + borders; keep our layers)
+	try {
+		const style = mapInstance.getStyle();
+		for (const layer of style.layers ?? []) {
+			const id = (layer as any)?.id as string | undefined;
+			if (!id) continue;
+			if (id.startsWith('murmur-')) continue;
+
+			// Text/icon labels
+			if ((layer as any).type === 'symbol') {
+				mapInstance.setLayoutProperty(id, 'visibility', 'none');
+				continue;
+			}
+
+			// Political/administrative boundaries (borders)
+			const idLower = id.toLowerCase();
+			if (
+				(layer as any).type === 'line' &&
+				(idLower.includes('admin') || idLower.includes('boundary') || idLower.includes('border'))
+			) {
+				mapInstance.setLayoutProperty(id, 'visibility', 'none');
+			}
+		}
+	} catch {
+		// Non-fatal.
+	}
+};
+
 // Performance: the `within` filter is helpful when zoomed out (to hide Canada/Mexico labels/roads),
 // but it adds overhead at high zoom where there are many more road/label features.
 // Only apply the US-only basemap clipping up to this zoom level.
@@ -2572,8 +2630,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			},
 			paint: {
 				'text-color': '#111827',
-				'text-halo-color': 'rgba(255, 255, 255, 0.92)',
-				'text-halo-width': ['interpolate', ['linear'], ['zoom'], 3, 1.9, 7, 1.5, 10, 1.25],
+				// Keep labels flat (no glow) to match `/free-trial`.
+				'text-halo-color': 'rgba(0, 0, 0, 0)',
+				'text-halo-width': 0,
 			},
 		});
 
@@ -2785,7 +2844,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		mapRef.current = mapInstance;
 		setMap(mapInstance);
 
+		const onStyleLoad = () => {
+			applyFreeTrialMapVisualTuning(mapInstance);
+		};
+
 		const onLoad = () => {
+			applyFreeTrialMapVisualTuning(mapInstance);
 			setIsMapLoaded(true);
 			setZoomLevel(mapInstance.getZoom() ?? MAP_DEFAULT_ZOOM);
 			setMapLoadError(null);
@@ -2803,10 +2867,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		};
 
 		mapInstance.on('load', onLoad);
+		mapInstance.on('style.load', onStyleLoad);
 		mapInstance.on('error', onError);
 
 		return () => {
 			mapInstance.off('load', onLoad);
+			mapInstance.off('style.load', onStyleLoad);
 			mapInstance.off('error', onError);
 			mapInstance.remove();
 			mapRef.current = null;
