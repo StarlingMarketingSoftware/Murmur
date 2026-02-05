@@ -15,10 +15,9 @@ import { DraftedEmailsProps, useDraftedEmails } from './useDraftedEmails';
 import { Spinner } from '@/components/atoms/Spinner/Spinner';
 import { Button } from '@/components/ui/button';
 import { UpgradeSubscriptionDrawer } from '@/components/atoms/UpgradeSubscriptionDrawer/UpgradeSubscriptionDrawer';
-import { X } from 'lucide-react';
 import { cn } from '@/utils';
 import { DraftingTable } from '../DraftingTable/DraftingTable';
-import PreviewIcon from '@/components/atoms/_svg/PreviewIcon';
+import DeleteandOpenIcon from '@/components/atoms/_svg/DeleteandOpen';
 import ApproveCheckIcon from '@/components/atoms/svg/ApproveCheckIcon';
 import RejectXIcon from '@/components/atoms/svg/RejectXIcon';
 import LeftArrowReviewIcon from '@/components/atoms/svg/LeftArrowReviewIcon';
@@ -2099,14 +2098,14 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 									: hoveredRegion === 'middle'
 										? { label: 'Open', backgroundColor: '#FFDE97' }
 										: hoveredRegion === 'right'
-											? { label: 'Delete', backgroundColor: '#FEA8A8' }
+											? { label: 'Delete', backgroundColor: '#F78989' }
 											: null;
 							const hoveredBgColor = isHoveringAllButton
 								? 'bg-[#FFEDCA]'
 								: hoveredRegion === 'left'
 									? 'bg-[#ECFBF0]'
 									: hoveredRegion === 'right'
-										? 'bg-[#FFCACA]'
+										? 'bg-[#F78989]'
 										: hoveredRegion === 'middle'
 											? 'bg-[#F9E5BA]'
 											: null;
@@ -2130,7 +2129,7 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 									{idx > 0 && <div className="h-[10px]" />}
 									<div
 										className={cn(
-											'cursor-pointer relative select-none overflow-visible border-2 p-2 group/draft rounded-[8px] transition-colors',
+											'cursor-pointer relative select-none overflow-visible border-2 p-2 group/draft rounded-[8px] transition-colors duration-200 ease-in-out',
 											isMobile ? 'h-[100px]' : 'h-[97px]',
 											'border-[#000000]',
 											rowBgColor,
@@ -2208,11 +2207,14 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 											// For multi-campaign: #A0C0FF with sliding dot
 											// For single-campaign: #B0EAA4 (green, no dot)
 											// For default (not hovered): #DAE6FE
-											const pillBg = isMultiCampaignIndicator
-												? '#A0C0FF'
-												: isSingleCampaignIndicator
-													? '#B0EAA4'
-													: '#DAE6FE';
+											const pillBg =
+												hoveredRegion === 'right'
+													? '#F78989'
+													: isMultiCampaignIndicator
+														? '#A0C0FF'
+														: isSingleCampaignIndicator
+															? '#B0EAA4'
+															: '#DAE6FE';
 
 											// Handle mouse move on the pill to drive campaign selection
 											const handlePillMouseMove = isMultiCampaignIndicator
@@ -2239,7 +2241,7 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 
 											return (
 												<span
-													className="absolute z-10 cursor-pointer transition-all duration-150 ease-out"
+													className="absolute z-10 cursor-pointer transition-all duration-200 ease-in-out"
 													style={{
 														left: '8px',
 														top: '11px',
@@ -2278,7 +2280,10 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 													{/* Sliding dot for multi-campaign */}
 													{isMultiCampaignIndicator && (
 														<span
-															className="rounded-full bg-[#DAE6FE] pointer-events-none transition-all duration-150 ease-out"
+															className={cn(
+																'rounded-full pointer-events-none transition-all duration-200 ease-in-out',
+																hoveredRegion === 'right' ? 'bg-[#F78989]' : 'bg-[#DAE6FE]'
+															)}
 															style={(() => {
 																// Spec: 14×37 pill, 14×14 circle, thin stroke.
 																const PILL_HEIGHT = 37;
@@ -2373,38 +2378,64 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 											)}
 										/>
 									</div>
-									{/* Delete button */}
-									<Button
-										type="button"
-										variant="icon"
-										onClick={(e) => handleDeleteDraft(e, draft.id)}
-										className="absolute top-[50px] right-[2px] p-1 transition-colors z-10 group hidden group-hover/draft:block"
+									{/* Delete + Preview icon (centered in the right "delete" zone) */}
+									<div
+										className="absolute right-[14px] top-[calc(50%+5px)] -translate-y-1/2 z-20 hidden group-hover/draft:block"
+										style={{ width: '16px', height: '29px' }}
 									>
-										<X size={16} className="text-gray-500 group-hover:text-red-500" />
-									</Button>
-
-									{/* Preview button */}
-									<Button
-										type="button"
-										variant="icon"
-										onClick={(e) => {
-											e.preventDefault();
-											e.stopPropagation();
-											if (props.onPreview) {
-												props.onPreview(draft);
-											} else {
-												handleDraftDoubleClick(draft);
-											}
-										}}
-										className="absolute top-[72px] right-[2px] p-1 transition-colors z-20 hidden group-hover/draft:block"
-										aria-label="Preview draft"
-									>
-										<PreviewIcon
-											width="16px"
-											height="16px"
-											pathClassName="fill-[#4A4A4A]"
+										<DeleteandOpenIcon
+											width={16}
+											height={29}
+											className="block"
+											style={{ pointerEvents: 'none' }}
+											aria-hidden="true"
 										/>
-									</Button>
+
+										{/* Top half: delete */}
+										<button
+											type="button"
+											className="absolute left-0 top-0 w-full h-[14px] bg-transparent border-0 p-0 cursor-pointer"
+											aria-label="Delete draft"
+											onMouseEnter={() => {
+												// Ensure hovering the top glyph keeps the row in "Delete" (red) mode.
+												setHoveredDraftRow({ draftId: draft.id, region: 'right' });
+											}}
+											onClick={(e) => {
+												e.preventDefault();
+												e.stopPropagation();
+												void handleDeleteDraft(e, draft.id);
+											}}
+										/>
+
+										{/* Bottom half: preview/open */}
+										<button
+											type="button"
+											className="absolute left-0 bottom-0 w-full h-[15px] bg-transparent border-0 p-0 cursor-pointer"
+											aria-label="Preview draft"
+											onMouseEnter={(e) => {
+												// Treat hovering the *eye* as "Open" (yellow), even though it's in the right zone.
+												e.stopPropagation();
+												setHoveredDraftRow({ draftId: draft.id, region: 'middle' });
+											}}
+											onMouseMove={(e) => {
+												// Prevent the row's mousemove handler from re-classifying this as "Delete".
+												e.stopPropagation();
+												setHoveredDraftRow((prev) => {
+													if (prev?.draftId === draft.id && prev.region === 'middle') return prev;
+													return { draftId: draft.id, region: 'middle' };
+												});
+											}}
+											onClick={(e) => {
+												e.preventDefault();
+												e.stopPropagation();
+												if (props.onPreview) {
+													props.onPreview(draft);
+												} else {
+													handleDraftDoubleClick(draft);
+												}
+											}}
+										/>
+									</div>
 
 									{/* Fixed top-right info (Title + Location) - matching contacts table design */}
 									<div 
@@ -2413,7 +2444,7 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 									>
 										{(contactTitle || actionTitlePill) ? (
 											<div
-												className="h-[21px] w-[240px] rounded-[6px] px-2 flex items-center gap-1 border border-black overflow-hidden transition-colors duration-150 ease-out"
+												className="h-[21px] w-[240px] rounded-[6px] px-2 flex items-center gap-1 border border-black overflow-hidden transition-colors duration-200 ease-in-out"
 												style={{
 													backgroundColor: actionTitlePill
 														? actionTitlePill.backgroundColor
@@ -2513,12 +2544,14 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 													</div>
 												) : isUSAbbr ? (
 													<span
-														className="inline-flex items-center justify-center rounded-[6px] border text-[12px] leading-none font-bold flex-shrink-0"
+														className="inline-flex items-center justify-center rounded-[6px] border text-[12px] leading-none font-bold flex-shrink-0 transition-colors duration-200 ease-in-out"
 														style={{
 															width: '39px',
 															height: '20px',
 															backgroundColor:
-																stateBadgeColorMap[stateAbbr] || 'transparent',
+																hoveredRegion === 'right'
+																	? '#F78989'
+																	: stateBadgeColorMap[stateAbbr] || 'transparent',
 															borderColor: '#000000',
 														}}
 													>
@@ -2730,10 +2763,13 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 										<button
 											type="button"
 											className={cn(
-												'w-[89px] h-full flex items-center justify-center font-inter font-normal text-[17px] text-black cursor-pointer border-l-[2px] border-[#000000]',
-												isRejectedTab
-													? 'bg-[#C76A6A] hover:bg-[#B34E4E]'
-													: 'bg-[#7CB67C] hover:bg-[#6FA36F]'
+												'w-[89px] h-full flex items-center justify-center font-inter font-normal text-[17px] text-black cursor-pointer border-l-[2px] border-[#000000] transition-colors duration-200 ease-in-out',
+												// When hovering the row's Delete region, tint the ancillary "All" control to match.
+												hoveredDraftRow?.region === 'right'
+													? 'bg-[#F78989] hover:bg-[#F78989]'
+													: isRejectedTab
+														? 'bg-[#C76A6A] hover:bg-[#B34E4E]'
+														: 'bg-[#7CB67C] hover:bg-[#6FA36F]'
 											)}
 											onMouseEnter={() => setIsHoveringAllButton(true)}
 											onMouseLeave={() => setIsHoveringAllButton(false)}
