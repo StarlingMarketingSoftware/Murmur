@@ -13,6 +13,7 @@ import { DraftingTable } from '../DraftingTable/DraftingTable';
 import { DraftsExpandedList } from '../../Testing/DraftsExpandedList';
 import { SentExpandedList } from '../../Testing/SentExpandedList';
 import { InboxExpandedList } from '../../Testing/InboxExpandedList';
+import { BottomPanelsContainer } from '@/components/atoms/BottomPanelsContainer';
 import { useGetEmails } from '@/hooks/queryHooks/useEmails';
 import { EmailStatus } from '@/constants/prismaEnums';
 import {
@@ -942,6 +943,7 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 		onDraftEmails,
 		onContactClick,
 		onContactHover,
+		activelyDraftingContactIds,
 		onSearchFromMiniBar,
 		goToSearch,
 		goToDrafts,
@@ -955,8 +957,10 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 		mainBoxId,
 		showSearchBar = true,
 		isLoading = false,
+		isDraftQueueActive = false,
 		isAllContactsSelected,
 		onSelectAllContacts,
+		historyActions,
 	} = props;
 
 	// Use the provided onSelectAllContacts if available, otherwise fall back to handleClick
@@ -997,7 +1001,10 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 		if (e.key === 'Enter') {
 			const contact = contacts[hoveredContactIndex];
 			if (contact) {
-				handleContactSelection(contact.id);
+				// Don't allow selecting contacts that are actively drafting.
+				if (!activelyDraftingContactIds?.has(contact.id)) {
+					handleContactSelection(contact.id);
+				}
 				onContactClick?.(contact);
 			}
 			return;
@@ -1012,7 +1019,14 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 		
 		setHoveredContactIndex(newIndex);
 		onContactHover?.(contacts[newIndex]);
-	}, [hoveredContactIndex, contacts, onContactHover, handleContactSelection, onContactClick]);
+	}, [
+		hoveredContactIndex,
+		contacts,
+		onContactHover,
+		handleContactSelection,
+		onContactClick,
+		activelyDraftingContactIds,
+	]);
 
 	useEffect(() => {
 		// Only add listener if we have a hovered contact
@@ -1252,14 +1266,20 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 		[allContacts]
 	);
 
-	const selectedCount = selectedContactIds.size;
+	// Treat actively drafting contacts as NOT selected (for count + draft action).
+	const draftableSelectedContactIds = useMemo(() => {
+		const selectedIds = Array.from(selectedContactIds);
+		if (!activelyDraftingContactIds || activelyDraftingContactIds.size === 0) return selectedIds;
+		return selectedIds.filter((id) => !activelyDraftingContactIds.has(id));
+	}, [activelyDraftingContactIds, selectedContactIds]);
+	const selectedCount = draftableSelectedContactIds.length;
 
 	const handleDraftEmails = async () => {
-		if (!onDraftEmails || selectedContactIds.size === 0) return;
+		if (!onDraftEmails || selectedCount === 0) return;
 
 		setIsDrafting(true);
 		try {
-			await onDraftEmails(Array.from(selectedContactIds));
+			await onDraftEmails(draftableSelectedContactIds);
 		} finally {
 			setIsDrafting(false);
 		}
@@ -1267,10 +1287,52 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 
 	// Only disable if no contacts selected or currently drafting
 	// Don't use isDraftingDisabled here - let the drafting action handle validation
-	const isButtonDisabled = isDrafting || selectedContactIds.size === 0;
+	const isButtonDisabled = isDrafting || selectedCount === 0;
 
 	return (
 		<div className="flex flex-col items-center">
+			<style jsx global>{`
+				@keyframes murmur-actively-drafting-pulse {
+					/* 3/4 feel: gentle swell on beat 3 */
+					0%,
+					66% {
+						opacity: 0;
+					}
+					76% {
+						opacity: 0.18;
+					}
+					84% {
+						opacity: 0.5;
+					}
+					92% {
+						opacity: 0.18;
+					}
+					100% {
+						opacity: 0;
+					}
+				}
+
+				.murmur-actively-drafting {
+					background-color: #FFA5A5;
+				}
+
+				.murmur-actively-drafting::after {
+					content: '';
+					position: absolute;
+					inset: 0;
+					background: rgba(0, 0, 0, 0.06);
+					opacity: 0;
+					pointer-events: none;
+					will-change: opacity;
+					animation: murmur-actively-drafting-pulse 3.6s ease-in-out infinite;
+				}
+
+				@media (prefers-reduced-motion: reduce) {
+					.murmur-actively-drafting::after {
+						animation: none;
+					}
+				}
+			`}</style>
 			<DraftingTable
 				handleClick={handleClick}
 				areAllSelected={areAllSelected}
@@ -1440,6 +1502,7 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 						})()}
 					{contacts.map((contact, contactIndex) => {
 						const isUsedContact = usedContactIdsSet.has(contact.id);
+						const isActivelyDrafting = Boolean(activelyDraftingContactIds?.has(contact.id));
 						const isUsedContactHoverCardVisible =
 							hoveredUsedContactId === contact.id &&
 							Boolean(usedContactTooltipPos) &&
@@ -1448,12 +1511,15 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 						const mobileContactRowWidth = 'calc(100vw - 24px)';
 						// Keyboard focus shows hover UI independently of mouse hover
 						const isKeyboardFocused = hoveredContactIndex === contactIndex;
-						// Final background: selected > keyboard focus > white (mouse hover handled by CSS)
-						const contactBgColor = selectedContactIds.has(contact.id)
-							? 'bg-[#EAAEAE]'
+						const isSelected = !isActivelyDrafting && selectedContactIds.has(contact.id);
+						// Final background: actively drafting > selected > keyboard focus > white (mouse hover handled by CSS)
+						const contactBgColor = isActivelyDrafting
+							? 'murmur-actively-drafting'
+							: isSelected
+							? 'bg-[#F5DADA]'
 							: isKeyboardFocused
-								? 'bg-[#F5DADA]'
-								: 'bg-white hover:bg-[#F5DADA]';
+								? 'bg-[#FAE6E6]'
+								: 'bg-white hover:bg-[#FAE6E6]';
 						return (
 						<div
 							key={contact.id}
@@ -1481,7 +1547,10 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 								onContactHover?.(contact);
 							}}
 							onClick={(e) => {
-								handleContactSelection(contact.id, e);
+								// Don't allow selecting contacts that are actively drafting.
+								if (!isActivelyDrafting) {
+									handleContactSelection(contact.id, e);
+								}
 								onContactClick?.(contact);
 							}}
 						>
@@ -1827,7 +1896,7 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 
 			{/* Draft Emails Button - below the table box */}
 			<div className="w-[475px] h-[40px] mt-4 mx-auto">
-				{!isDrafting && !hideButton && (
+				{!hideButton && (
 					<div data-draft-button-container className="group relative w-full h-full">
 						{selectedCount > 0 || isAllContactsSelected ? (
 							// Animated draft button with expanding "All" state
@@ -1852,14 +1921,9 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 										isAllContactsSelected ? 'duration-300 opacity-0' : 'duration-0 opacity-100'
 									)}
 								>
-									{isDrafting ? (
-										<>
-											<div className="animate-spin rounded-full h-4 w-4 border-2 border-black border-t-transparent inline-block mr-2" />
-											Drafting...
-										</>
-									) : (
-										`Draft ${selectedCount} ${selectedCount === 1 ? 'Contact' : 'Contacts'}`
-									)}
+									{isDraftQueueActive
+										? 'Add Emails to Queue'
+										: `Draft ${selectedCount} ${selectedCount === 1 ? 'Contact' : 'Contacts'}`}
 								</span>
 								{/* "All" text - fades in when All selected */}
 								<span
@@ -1868,7 +1932,13 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 										isAllContactsSelected ? 'duration-300 opacity-100' : 'duration-0 opacity-0'
 									)}
 								>
-									Draft <span className="font-bold mx-1">All</span> {contacts.length} Contacts
+									{isDraftQueueActive ? (
+										'Add Emails to Queue'
+									) : (
+										<>
+											Draft <span className="font-bold mx-1">All</span> {contacts.length} Contacts
+										</>
+									)}
 								</span>
 								{/* Expanding green overlay from right */}
 								<div
@@ -1923,7 +1993,11 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 
 			{/* Bottom Panels: Drafts, Sent, and Inbox */}
 			{!hideBottomPanels && (
-				<div className="mt-[35px] pb-[8px] flex justify-center gap-[15px]">
+				<BottomPanelsContainer
+					className="mt-[35px] pb-[8px] flex justify-center gap-[15px]"
+					collapsed={bottomPanelCollapsed}
+					historyActions={historyActions}
+				>
 					<DraftsExpandedList
 						drafts={drafts || []}
 						contacts={props.allContacts || props.contacts}
@@ -1955,7 +2029,7 @@ export const ContactsSelection: FC<ContactsSelectionProps> = (props) => {
 						collapsed={bottomPanelCollapsed}
 						onOpenInbox={goToInbox}
 					/>
-				</div>
+				</BottomPanelsContainer>
 			)}
 		</div>
 	);

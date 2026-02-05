@@ -134,6 +134,11 @@ export interface ContactsExpandedListProps {
 	 * mirror and update the passed-in selection instead of managing its own.
 	 */
 	selectedContactIds?: Set<number>;
+	/**
+	 * Optional set of contact IDs that are currently being drafted (queued/running).
+	 * These should not be treated as "selected" in the UI.
+	 */
+	activelyDraftingContactIds?: Set<number>;
 	onContactSelectionChange?: (updater: (prev: Set<number>) => Set<number>) => void;
 	width?: number | string;
 	height?: number | string;
@@ -168,6 +173,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 	onContactClick,
 	onContactHover,
 	selectedContactIds,
+	activelyDraftingContactIds,
 	onContactSelectionChange,
 	isLoading = false,
 	width,
@@ -345,12 +351,23 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 	const currentSelectedIds = selectedContactIds ?? internalSelectedContactIds;
 
 	const updateSelection = useCallback((updater: (prev: Set<number>) => Set<number>) => {
+		const apply = (prev: Set<number>) => {
+			const next = updater(new Set(prev));
+			// Never keep actively drafting contacts selected.
+			if (activelyDraftingContactIds && activelyDraftingContactIds.size > 0) {
+				for (const id of activelyDraftingContactIds) {
+					next.delete(id);
+				}
+			}
+			return next;
+		};
+
 		if (isControlled && onContactSelectionChange) {
-			onContactSelectionChange(updater);
+			onContactSelectionChange(apply);
 		} else {
-			setInternalSelectedContactIds((prev) => updater(new Set(prev)));
+			setInternalSelectedContactIds((prev) => apply(prev));
 		}
-	}, [isControlled, onContactSelectionChange]);
+	}, [activelyDraftingContactIds, isControlled, onContactSelectionChange]);
 
 	// Keyboard navigation: up/down arrows move hover between rows, Enter selects hovered contact
 	const handleKeyboardNavigation = useCallback((e: KeyboardEvent) => {
@@ -380,15 +397,18 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 		if (e.key === 'Enter') {
 			const contact = contacts[hoveredContactIndex];
 			if (contact) {
-				updateSelection((prev) => {
-					const next = new Set(prev);
-					if (next.has(contact.id)) {
-						next.delete(contact.id);
-					} else {
-						next.add(contact.id);
-					}
-					return next;
-				});
+				// Don't allow selecting contacts that are actively drafting.
+				if (!activelyDraftingContactIds?.has(contact.id)) {
+					updateSelection((prev) => {
+						const next = new Set(prev);
+						if (next.has(contact.id)) {
+							next.delete(contact.id);
+						} else {
+							next.add(contact.id);
+						}
+						return next;
+					});
+				}
 			}
 			return;
 		}
@@ -402,7 +422,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 		
 		setHoveredContactIndex(newIndex);
 		onContactHover?.(contacts[newIndex]);
-	}, [hoveredContactIndex, contacts, onContactHover, updateSelection]);
+	}, [hoveredContactIndex, contacts, onContactHover, updateSelection, activelyDraftingContactIds]);
 
 	useEffect(() => {
 		// Only add listener if we have a hovered contact
@@ -450,19 +470,36 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 		}
 	};
 
-	const allContactIds = useMemo(() => new Set(contacts.map((c) => c.id)), [contacts]);
+	const selectableContactIds = useMemo(() => {
+		const next = new Set<number>();
+		for (const c of contacts) {
+			if (activelyDraftingContactIds?.has(c.id)) continue;
+			next.add(c.id);
+		}
+		return next;
+	}, [activelyDraftingContactIds, contacts]);
+
+	const selectedCount = useMemo(() => {
+		if (!activelyDraftingContactIds || activelyDraftingContactIds.size === 0) {
+			return currentSelectedIds.size;
+		}
+		let count = 0;
+		for (const id of currentSelectedIds) {
+			if (!activelyDraftingContactIds.has(id)) count += 1;
+		}
+		return count;
+	}, [activelyDraftingContactIds, currentSelectedIds]);
+
 	const areAllSelected =
-		allContactIds.size > 0 &&
-		currentSelectedIds.size === allContactIds.size &&
-		Array.from(allContactIds).every((id) => currentSelectedIds.has(id));
+		selectableContactIds.size > 0 &&
+		selectedCount === selectableContactIds.size &&
+		Array.from(selectableContactIds).every((id) => currentSelectedIds.has(id));
 	const handleSelectAllToggle = useCallback(() => {
 		updateSelection(() => {
 			if (areAllSelected) return new Set();
-			return new Set(allContactIds);
+			return new Set(selectableContactIds);
 		});
-	}, [allContactIds, areAllSelected, updateSelection]);
-
-	const selectedCount = currentSelectedIds.size;
+	}, [areAllSelected, selectableContactIds, updateSelection]);
 	const shouldShowLoadingWave = isLoading && contacts.length === 0;
 	const loadingWaveDurationSeconds = 4.5;
 	// Match MapResultsPanelSkeleton step delay exactly for consistent "fluid" feel
@@ -480,7 +517,13 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 	const isAllTab = height === 263;
 	const isAllTabNavigation = interactionMode === 'allTab';
 	const whiteSectionHeight = customWhiteSectionHeight ?? (isAllTab ? 20 : 28);
-	const isBottomView = customWhiteSectionHeight === 15;
+	const isBottomView = customWhiteSectionHeight === 15 || customWhiteSectionHeight === 16;
+	// Compressed bottom panel spec: 40px total = 12px white + 28px color.
+	const effectiveWhiteSectionHeight = collapsed && isBottomView ? 12 : whiteSectionHeight;
+	const shouldRenderCollapsedTopBox = collapsed && isBottomView;
+	const collapsedTopBoxHeightPx = 22;
+	const collapsedTopBoxWidthPx = 224;
+	const collapsedTopBoxRadiusPx = 4.7;
 	const shouldShowScrollbar = !isBottomView && contacts.length >= 14;
 
 	const { data: campaignContactEvents } = useGetCampaignContactEvents(campaign?.id, {
@@ -536,8 +579,12 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 		<div
 			className={cn(
 				'relative max-[480px]:w-[96.27vw] rounded-md flex flex-col overflow-visible',
-				isBottomView
-					? 'border-2 border-black'
+				// In the compressed bottom-panel view we need exact internal pixel heights (16px white + 24px color).
+				// Use a stroke via box-shadow so it doesn't consume layout height.
+				shouldRenderCollapsedTopBox
+					? 'border-0'
+					: isBottomView
+						? 'border-2 border-black'
 					: isAllTab
 					? 'border-[3px] border-black'
 					: 'border border-black'
@@ -546,7 +593,10 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 				width: typeof resolvedWidth === 'number' ? `${resolvedWidth}px` : resolvedWidth,
 				height:
 					typeof resolvedHeight === 'number' ? `${resolvedHeight}px` : resolvedHeight,
-				background: `linear-gradient(to bottom, #ffffff ${whiteSectionHeight}px, #EB8586 ${whiteSectionHeight}px)`,
+				background: `linear-gradient(to bottom, #ffffff ${effectiveWhiteSectionHeight}px, #EB8586 ${effectiveWhiteSectionHeight}px)`,
+				boxShadow: shouldRenderCollapsedTopBox
+					? 'inset 0 0 0 2px #000000'
+					: undefined,
 				...(isBottomView ? { cursor: 'pointer' } : {}),
 			}}
 			data-hover-description="Contacts: This box displays all of the contacts in your campaign. Select contacts to generate drafts."
@@ -556,6 +606,48 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 			onMouseLeave={() => isBottomView && setIsContainerHovered(false)}
 			onClick={() => isBottomView && onOpenContacts?.()}
 		>
+			<style jsx global>{`
+				@keyframes murmur-actively-drafting-pulse {
+					/* 3/4 feel: gentle swell on beat 3 */
+					0%,
+					66% {
+						opacity: 0;
+					}
+					76% {
+						opacity: 0.18;
+					}
+					84% {
+						opacity: 0.5;
+					}
+					92% {
+						opacity: 0.18;
+					}
+					100% {
+						opacity: 0;
+					}
+				}
+
+				.murmur-actively-drafting {
+					background-color: #FFA5A5;
+				}
+
+				.murmur-actively-drafting::after {
+					content: '';
+					position: absolute;
+					inset: 0;
+					background: rgba(0, 0, 0, 0.06);
+					opacity: 0;
+					pointer-events: none;
+					will-change: opacity;
+					animation: murmur-actively-drafting-pulse 3.6s ease-in-out infinite;
+				}
+
+				@media (prefers-reduced-motion: reduce) {
+					.murmur-actively-drafting::after {
+						animation: none;
+					}
+				}
+			`}</style>
 			{/* Hover outline for bottom view - 3px gap top/bottom, 2px gap sides, 4px thick */}
 			{isBottomView && isContainerHovered && (
 				<div
@@ -574,7 +666,9 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 			)}
 			<ContactsHeaderChrome
 				isAllTab={isAllTab}
-				whiteSectionHeight={customWhiteSectionHeight}
+				whiteSectionHeight={
+					shouldRenderCollapsedTopBox ? effectiveWhiteSectionHeight : customWhiteSectionHeight
+				}
 				// Match the main Contacts tab header chrome animation, but keep the ultra-compact
 				// bottom view static so it doesn't interfere with the "Open" affordance.
 				// Also, when this list is rendered on the Write tab (tooltip-enabled), treat "Write"
@@ -587,7 +681,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 					'flex items-center gap-2 px-3 shrink-0',
 					onHeaderClick ? 'cursor-pointer' : ''
 				)}
-				style={{ height: `${whiteSectionHeight}px` }}
+				style={{ height: `${effectiveWhiteSectionHeight}px` }}
 				role={onHeaderClick ? 'button' : undefined}
 				tabIndex={onHeaderClick ? 0 : undefined}
 				onClick={onHeaderClick}
@@ -627,6 +721,44 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 					<div className="flex items-center" style={{ marginTop: isBottomView ? 0 : '1px' }}>
 						<OpenIcon width={isBottomView ? 10 : undefined} height={isBottomView ? 10 : undefined} />
 					</div>
+				</div>
+			)}
+
+			{/* Collapsed bottom panels: show only the top "batch" box (22px) centered in the 24px color region */}
+			{shouldRenderCollapsedTopBox && (
+				<div className="flex-1 flex items-center justify-center px-[2px]">
+					{bottomViewBatchesToShow[0] ? (
+						<div
+							key="contacts-collapsed-batch"
+							className={cn(
+								'select-none overflow-hidden border-2 border-[#000000] flex items-center justify-between'
+							)}
+							style={{
+								width: `${collapsedTopBoxWidthPx}px`,
+								height: `${collapsedTopBoxHeightPx}px`,
+								borderRadius: `${collapsedTopBoxRadiusPx}px`,
+								backgroundColor: '#F5DADA',
+							}}
+						>
+							<span className="pl-[18px] font-inter font-medium text-[15px] text-black leading-none">
+								{formatBatchCount(bottomViewBatchesToShow[0].addedCount)}
+							</span>
+							<span className="pr-[18px] font-inter font-medium text-[15px] text-black leading-none">
+								{formatBatchTimestamp(bottomViewBatchesToShow[0].createdAt)}
+							</span>
+						</div>
+					) : (
+						<div
+							aria-hidden
+							className={cn('select-none overflow-hidden border-2 border-[#000000]')}
+							style={{
+								width: `${collapsedTopBoxWidthPx}px`,
+								height: `${collapsedTopBoxHeightPx}px`,
+								borderRadius: `${collapsedTopBoxRadiusPx}px`,
+								backgroundColor: '#EB8586',
+							}}
+						/>
+					)}
 				</div>
 			)}
 
@@ -820,7 +952,8 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 						const fullName =
 							contact.name ||
 							`${contact.firstName || ''} ${contact.lastName || ''}`.trim();
-						const isSelected = currentSelectedIds.has(contact.id);
+						const isActivelyDrafting = Boolean(activelyDraftingContactIds?.has(contact.id));
+						const isSelected = !isActivelyDrafting && currentSelectedIds.has(contact.id);
 						const isUsed = usedContactIdsSet.has(contact.id);
 						const isUsedContactHoverCardVisible =
 							enableUsedContactTooltip &&
@@ -832,14 +965,16 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 						const leftPadding = isUsed ? 'pl-[36px]' : 'pl-3';
 						// Keyboard focus shows hover UI independently of mouse hover
 						const isKeyboardFocused = hoveredContactIndex === contactIndex;
-						// Final background: selected > keyboard focus > white (mouse hover handled by CSS)
-						const contactBgColor = isAllTabNavigation
-							? 'bg-white'
-							: isSelected
-								? 'bg-[#EAAEAE]'
-								: isKeyboardFocused
+						// Final background: actively drafting > selected > keyboard focus > white (mouse hover handled by CSS)
+						const contactBgColor = isActivelyDrafting
+							? 'murmur-actively-drafting'
+							: isAllTabNavigation
+								? 'bg-white'
+								: isSelected
 									? 'bg-[#F5DADA]'
-									: 'bg-white hover:bg-[#F5DADA]';
+									: isKeyboardFocused
+										? 'bg-[#FAE6E6]'
+										: 'bg-white hover:bg-[#FAE6E6]';
 						// Align the used-contact indicator with the top (Company) line in the standard (non-bottom) view.
 						// When the hover tooltip is visible, we center the tall pill so it stays inside the row.
 						const indicatorTop = isBottomView
@@ -876,7 +1011,10 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 								}}
 								onClick={(e) => {
 									if (isAllTabNavigation) return;
-									handleContactClick(contact, e);
+									// Don't allow selecting contacts that are actively drafting.
+									if (!isActivelyDrafting) {
+										handleContactClick(contact, e);
+									}
 									onContactClick?.(contact);
 								}}
 							>

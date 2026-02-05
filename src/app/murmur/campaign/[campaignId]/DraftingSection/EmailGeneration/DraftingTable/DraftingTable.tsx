@@ -42,7 +42,7 @@ export const ContactsHeaderChrome: FC<{
 	const [isDot2Hovered, setIsDot2Hovered] = useState(false);
 	const [isDot3Hovered, setIsDot3Hovered] = useState(false);
 	const wasAnyDotHoveredRef = useRef(false);
-	const isBottomView = whiteSectionHeight === 15;
+	const isBottomView = typeof whiteSectionHeight === 'number' && whiteSectionHeight <= 16;
 	const isWriteActiveTab = activeTab === 'write';
 	const dotColor = hasData ? '#D9D9D9' : '#B0B0B0';
 	const pillBorderColor = hasData ? '#8D5B5B' : '#B0B0B0';

@@ -23,6 +23,10 @@ import { DraftingFormValues } from '@/app/murmur/campaign/[campaignId]/DraftingS
 import { HybridBlock, Identity } from '@prisma/client';
 import { HybridPromptInputProps, useHybridPromptInput } from './useHybridPromptInput';
 import { WriteTabChromeHeader } from './WriteTabChromeHeader';
+import {
+	BookingForDropdownControl,
+	useBookingForDropdownController,
+} from './BookingForDropdownControl';
 import { cn } from '@/utils';
 import { DEFAULT_FONT, FONT_OPTIONS } from '@/constants/ui';
 import gsap from 'gsap';
@@ -232,157 +236,41 @@ const SortableAIBlock = ({
 		Boolean(defaultOpenCustomInstructions) && block.value === HybridBlock.full_automated
 	);
 	// Full Auto: Booking For dropdown
-	type BookingForTab = 'Anytime' | 'Season' | 'Calendar';
+	const bookingForDropdown = useBookingForDropdownController({ form });
 	type BookingForSeason = 'Spring' | 'Summer' | 'Fall' | 'Winter';
-	const BOOKING_FOR_SEASON_STYLES: Record<
-		BookingForSeason,
-		{ bgClass: string; textClass: string }
-	> = {
-		Spring: { bgClass: 'bg-[#9BD2FF]', textClass: 'text-black' },
-		Summer: { bgClass: 'bg-[#7ADF85]', textClass: 'text-black' },
-		Fall: { bgClass: 'bg-[#D77C2C]', textClass: 'text-white' },
-		Winter: { bgClass: 'bg-[#1960AC]', textClass: 'text-white' },
-	};
-	const isBookingForSeason = (value: string): value is BookingForSeason =>
-		value === 'Spring' || value === 'Summer' || value === 'Fall' || value === 'Winter';
-	const [isBookingForOpen, setIsBookingForOpen] = useState(false);
-	const bookingForValue = form.watch('bookingFor') || 'Anytime';
-	const bookingForSeasonFromValue = isBookingForSeason(bookingForValue) ? bookingForValue : null;
-	const bookingForTriggerBgClass = bookingForSeasonFromValue
-		? BOOKING_FOR_SEASON_STYLES[bookingForSeasonFromValue].bgClass
-		: 'bg-white';
-	const bookingForTriggerTextClass = bookingForSeasonFromValue
-		? BOOKING_FOR_SEASON_STYLES[bookingForSeasonFromValue].textClass
-		: 'text-black';
-	const setBookingForValue = useCallback(
-		(value: string) => {
-			form.setValue('bookingFor', value);
-		},
-		[form]
-	);
-	const [bookingForTab, setBookingForTab] = useState<BookingForTab>('Anytime');
-	const [hoveredBookingForTab, setHoveredBookingForTab] = useState<BookingForTab | null>(null);
-	const BOOKING_FOR_TAB_CHROME_TRANSITION = '0.6s cubic-bezier(0.22, 1, 0.36, 1)';
-	const [bookingForSeason, setBookingForSeason] = useState<BookingForSeason>('Spring');
-	const [hoveredBookingForSeason, setHoveredBookingForSeason] =
-		useState<BookingForSeason | null>(null);
-	const bookingForPreviewSeason = hoveredBookingForSeason ?? bookingForSeason;
-	const [bookingForCalendarBaseMonth, setBookingForCalendarBaseMonth] = useState<Date>(() => {
-		const now = new Date();
-		return new Date(now.getFullYear(), now.getMonth(), 1);
-	});
-	const [bookingForCalendarStartDate, setBookingForCalendarStartDate] = useState<Date | null>(null);
-	const [bookingForCalendarEndDate, setBookingForCalendarEndDate] = useState<Date | null>(null);
-	const bookingForContainerRef = useRef<HTMLDivElement | null>(null);
-	const bookingForButtonRef = useRef<HTMLButtonElement | null>(null);
-	const bookingForDropdownRef = useRef<HTMLDivElement | null>(null);
-	const bookingForCloseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-	const [bookingForDropdownPosition, setBookingForDropdownPosition] = useState<{
-		top: number;
-		left: number;
-	} | null>(null);
-	const clearBookingForCloseTimeout = useCallback(() => {
-		if (bookingForCloseTimeoutRef.current == null) return;
-		clearTimeout(bookingForCloseTimeoutRef.current);
-		bookingForCloseTimeoutRef.current = null;
-	}, []);
-	const scheduleBookingForCloseTimeout = useCallback(() => {
-		clearBookingForCloseTimeout();
-		bookingForCloseTimeoutRef.current = setTimeout(() => {
-			setIsBookingForOpen(false);
-		}, 1000);
-	}, [clearBookingForCloseTimeout]);
-	useEffect(() => {
-		if (!isBookingForOpen) {
-			setHoveredBookingForTab(null);
-		}
-		if (!isBookingForOpen || bookingForTab !== 'Season') {
-			setHoveredBookingForSeason(null);
-		}
-	}, [isBookingForOpen, bookingForTab]);
-	// Used to nudge the internal 3-way tab strip inside the Calendar dropdown so it aligns
-	// with where the strip sits in the narrower Anytime/Season dropdown.
-	const [bookingForTabStripLeft, setBookingForTabStripLeft] = useState<number | null>(null);
-	const bookingForDropdownSize = useMemo(() => {
-		if (bookingForTab === 'Calendar') return { width: 829, height: 468 };
-		if (bookingForTab === 'Season') return { width: 317, height: 151 };
-		return { width: 317, height: 46 };
-	}, [bookingForTab]);
-	const updateBookingForDropdownPosition = useCallback(() => {
-		if (typeof window === 'undefined') return;
-		// Use the container's position to match static positioning (which uses left: 0 relative to container)
-		const container = bookingForContainerRef.current;
-		const button = bookingForButtonRef.current;
-		if (!container || !button) return;
-
-		// Get the page zoom factor. Murmur uses `zoom: 0.9` (or similar) on <html>.
-		// getBoundingClientRect() returns zoomed coordinates, but position: fixed uses unzoomed.
-		// We need to divide by zoom to convert.
-		const getZoomFactor = (): number => {
-			const html = document.documentElement;
-			const computed = window.getComputedStyle(html);
-			const zoom = computed.zoom;
-			if (zoom && zoom !== 'normal') {
-				const zoomValue = parseFloat(zoom);
-				if (Number.isFinite(zoomValue) && zoomValue > 0) return zoomValue;
-			}
-			return 1;
-		};
-		const zoom = getZoomFactor();
-
-		const containerRect = container.getBoundingClientRect();
-		const buttonRect = button.getBoundingClientRect();
-		const margin = 6;
-		const viewportPadding = 8;
-
-		// For Calendar, we want the tabs CENTERED in the Calendar box,
-		// but the whole Calendar shifted left so those centered tabs roughly align with Anytime/Season tabs.
-		// 
-		// Anytime/Season (317px): tabs (284px) centered = tab center at 158.5px from dropdown left
-		// Calendar (829px): tabs centered = tab center at 414.5px from dropdown left
-		// Base shift: (414.5 - 158.5) = 256px, but we offset 20px right for better visual balance
-		const tabStripWidth = 284;
-		const narrowDropdownWidth = 317;
-		const calendarWidth = bookingForDropdownSize.width; // 829
-		const narrowTabCenter = narrowDropdownWidth / 2; // 158.5
-		const calendarTabCenter = calendarWidth / 2; // 414.5
-		const calendarShift = calendarTabCenter - narrowTabCenter - 20; // 236 (20px less shift = 20px right)
-
-		// Convert zoomed coordinates to unzoomed for fixed positioning
-		const baseLeft = containerRect.left / zoom;
-		let left = bookingForTab === 'Calendar' ? baseLeft - calendarShift : baseLeft;
-		let top = (buttonRect.bottom + margin) / zoom;
-
-		// Make sure it doesn't overflow viewport edges (in unzoomed coordinates)
-		const viewportWidth = window.innerWidth / zoom;
-		const viewportHeight = window.innerHeight / zoom;
-		const maxLeft = Math.max(viewportPadding, viewportWidth - bookingForDropdownSize.width - viewportPadding);
-		left = Math.min(left, maxLeft);
-		left = Math.max(left, viewportPadding);
-
-		// For Calendar, adjust tab position to compensate for the 20px right shift of the box.
-		// Tabs centered in Calendar would be at (829-284)/2 = 272.5px from Calendar left.
-		// To shift tabs 20px LEFT (to align with Anytime/Season), use paddingLeft of 272.5 - 20 = 252.5px
-		if (bookingForTab === 'Calendar') {
-			const centeredTabsLeft = (calendarWidth - tabStripWidth) / 2; // 272.5
-			setBookingForTabStripLeft(Math.round(centeredTabsLeft - 20)); // 252.5, shifts tabs 20px left of center
-		} else {
-			setBookingForTabStripLeft(null);
-		}
-
-		// Check if would overflow bottom, flip above if possible
-		const wouldOverflowBottom =
-			top + bookingForDropdownSize.height > viewportHeight - viewportPadding;
-		const canOpenAbove = buttonRect.top / zoom - margin - bookingForDropdownSize.height >= viewportPadding;
-		if (wouldOverflowBottom && canOpenAbove) {
-			top = buttonRect.top / zoom - margin - bookingForDropdownSize.height;
-		}
-
-		setBookingForDropdownPosition({
-			top: Math.round(top),
-			left: Math.round(left),
-		});
-	}, [bookingForDropdownSize.height, bookingForDropdownSize.width, bookingForTab]);
+	const {
+		BOOKING_FOR_SEASON_STYLES,
+		BOOKING_FOR_TAB_CHROME_TRANSITION,
+		isBookingForOpen,
+		setIsBookingForOpen,
+		bookingForValue,
+		bookingForSeasonFromValue,
+		bookingForTriggerBgClass,
+		bookingForTriggerTextClass,
+		setBookingForValue,
+		bookingForTab,
+		setBookingForTab,
+		hoveredBookingForTab,
+		setHoveredBookingForTab,
+		setBookingForSeason,
+		hoveredBookingForSeason,
+		setHoveredBookingForSeason,
+		bookingForPreviewSeason,
+		bookingForCalendarBaseMonth,
+		setBookingForCalendarBaseMonth,
+		bookingForCalendarStartDate,
+		setBookingForCalendarStartDate,
+		bookingForCalendarEndDate,
+		setBookingForCalendarEndDate,
+		bookingForContainerRef,
+		bookingForButtonRef,
+		bookingForDropdownRef,
+		clearBookingForCloseTimeout,
+		scheduleBookingForCloseTimeout,
+		bookingForDropdownPosition,
+		bookingForDropdownSize,
+		bookingForTabStripLeft,
+	} = bookingForDropdown;
 	// Power mode from form (shared with MiniEmailStructure)
 	const selectedPowerMode = form.watch('powerMode') || 'normal';
 	const setSelectedPowerMode = (mode: 'normal' | 'high') => {
@@ -437,72 +325,6 @@ const SortableAIBlock = ({
 			document.removeEventListener('pointerdown', handlePointerDown);
 		};
 	}, [isCustomInstructionsOpen]);
-
-	// Close Booking For dropdown when clicking away
-	useEffect(() => {
-		if (!isBookingForOpen) return;
-
-		const handlePointerDown = (event: PointerEvent) => {
-			const target = event.target as Node | null;
-			if (!target) return;
-
-			const container = bookingForContainerRef.current;
-			const dropdown = bookingForDropdownRef.current;
-
-			if (container?.contains(target)) return;
-			if (dropdown?.contains(target)) return;
-			clearBookingForCloseTimeout();
-			setIsBookingForOpen(false);
-		};
-
-		document.addEventListener('pointerdown', handlePointerDown);
-		return () => {
-			document.removeEventListener('pointerdown', handlePointerDown);
-		};
-	}, [clearBookingForCloseTimeout, isBookingForOpen]);
-
-	useEffect(() => {
-		if (!isBookingForOpen) {
-			clearBookingForCloseTimeout();
-			setBookingForDropdownPosition(null);
-			setBookingForTabStripLeft(null);
-		}
-	}, [clearBookingForCloseTimeout, isBookingForOpen]);
-
-	useEffect(() => {
-		return () => clearBookingForCloseTimeout();
-	}, [clearBookingForCloseTimeout]);
-
-	// Prevent navigating the calendar into months that are entirely in the past.
-	useEffect(() => {
-		if (!isBookingForOpen) return;
-		if (bookingForTab !== 'Calendar') return;
-
-		const now = new Date();
-		const minBaseMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-		setBookingForCalendarBaseMonth((prev) =>
-			prev.getTime() < minBaseMonth.getTime() ? minBaseMonth : prev
-		);
-	}, [isBookingForOpen, bookingForTab]);
-
-	useLayoutEffect(() => {
-		if (!isBookingForOpen) return;
-		updateBookingForDropdownPosition();
-	}, [isBookingForOpen, bookingForTab, updateBookingForDropdownPosition]);
-
-	useEffect(() => {
-		if (!isBookingForOpen) return;
-		if (typeof window === 'undefined') return;
-
-		const handle = () => updateBookingForDropdownPosition();
-		window.addEventListener('resize', handle);
-		// capture=true so we also reposition when any scrollable ancestor scrolls
-		window.addEventListener('scroll', handle, true);
-		return () => {
-			window.removeEventListener('resize', handle);
-			window.removeEventListener('scroll', handle, true);
-		};
-	}, [isBookingForOpen, updateBookingForDropdownPosition]);
 
 	const style = {
 		transform: CSS.Transform.toString(transform),
@@ -1326,6 +1148,13 @@ const SortableAIBlock = ({
 
 												{/* Booking For box (203 x 28px) + dropdown - rendered before Custom Instructions when closed */}
 												{!isCustomInstructionsOpen && (
+													<BookingForDropdownControl
+														controller={bookingForDropdown}
+														useStaticDropdownPosition={useStaticDropdownPosition}
+													/>
+												)}
+
+												{false && !isCustomInstructionsOpen && (
 													<div ref={bookingForContainerRef} className="relative mt-[10px] w-full">
 														<button
 															ref={bookingForButtonRef}
@@ -1407,9 +1236,9 @@ const SortableAIBlock = ({
 																// If the panel isn't scaled, this should be ~1.
 																const anchor = bookingForButtonRef.current;
 																if (!anchor) return 1;
-																const unscaledWidth = anchor.offsetWidth;
+																const unscaledWidth = anchor!.offsetWidth;
 																if (!unscaledWidth) return 1;
-																const scaledWidth = anchor.getBoundingClientRect().width;
+																const scaledWidth = anchor!.getBoundingClientRect().width;
 																const scale = scaledWidth / unscaledWidth;
 																return Number.isFinite(scale) && scale > 0 ? scale : 1;
 															})();
@@ -1495,7 +1324,7 @@ const SortableAIBlock = ({
 																			// On campaign page, use paddingLeft to align tabs
 																			!useStaticDropdownPosition && bookingForTabStripLeft != null ? 'justify-start' : 'justify-center'
 																		)}
-																		style={!useStaticDropdownPosition && bookingForTabStripLeft != null ? { paddingLeft: bookingForTabStripLeft } : undefined}
+																		style={!useStaticDropdownPosition && bookingForTabStripLeft != null ? { paddingLeft: bookingForTabStripLeft ?? 0 } : undefined}
 																	>
 																		<div
 																			className="w-[284px] grid grid-cols-3 items-center gap-[8px]"
@@ -2087,6 +1916,14 @@ const SortableAIBlock = ({
 
 												{/* Booking For box - rendered AFTER Custom Instructions when it's open */}
 												{isCustomInstructionsOpen && (
+													<BookingForDropdownControl
+														controller={bookingForDropdown}
+														useStaticDropdownPosition={useStaticDropdownPosition}
+														triggerContentPaddingRightClassName="pr-16"
+													/>
+												)}
+
+												{false && isCustomInstructionsOpen && (
 													<div ref={bookingForContainerRef} className="relative mt-[10px] w-full">
 														<button
 															ref={bookingForButtonRef}
@@ -2163,9 +2000,9 @@ const SortableAIBlock = ({
 																const landingScale2 = (() => {
 																	const anchor = bookingForButtonRef.current;
 																	if (!anchor) return 1;
-																	const unscaledWidth = anchor.offsetWidth;
+																	const unscaledWidth = anchor!.offsetWidth;
 																	if (!unscaledWidth) return 1;
-																	const scaledWidth = anchor.getBoundingClientRect().width;
+																	const scaledWidth = anchor!.getBoundingClientRect().width;
 																	const scale = scaledWidth / unscaledWidth;
 																	return Number.isFinite(scale) && scale > 0 ? scale : 1;
 																})();
@@ -2251,7 +2088,7 @@ const SortableAIBlock = ({
 																				// On campaign page, use paddingLeft to align tabs
 																				!useStaticDropdownPosition && bookingForTabStripLeft != null ? 'justify-start' : 'justify-center'
 																			)}
-																			style={!useStaticDropdownPosition && bookingForTabStripLeft != null ? { paddingLeft: bookingForTabStripLeft } : undefined}
+																		style={!useStaticDropdownPosition && bookingForTabStripLeft != null ? { paddingLeft: bookingForTabStripLeft ?? 0 } : undefined}
 																		>
 																			<div
 																				className="w-[284px] grid grid-cols-3 items-center gap-[8px]"
@@ -2787,6 +2624,8 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 	const {
 		compactLeftOnly,
 		onTestPreviewToggle,
+		onKeepTestDraft,
+		isKeepingTestDraft,
 		draftCount = 0,
 		onDraftClick,
 		isDraftDisabled,
@@ -2806,6 +2645,10 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		forceDesktop,
 	} = props;
 
+	const isGeneratingTest = Boolean(isPendingGeneration && isTest);
+	const isGenerateTestDisabled = Boolean(isGenerationDisabled?.());
+	const isGenerateTestButtonDisabled = isGenerateTestDisabled || isGeneratingTest;
+
 	// Track if the user has attempted to Test to control error styling
 	const [hasAttemptedTest, setHasAttemptedTest] = useState(false);
 
@@ -2818,9 +2661,30 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		hasSubjectBeenTouched &&
 		(!subjectValue || subjectValue.trim() === '');
 
+	// Manual mode: only surface the Draft CTA once both subject + body have meaningful text.
+	// Keep this as a boolean so we don't re-render the entire component on every body keystroke.
+	const [manualBodyHasMeaningfulText, setManualBodyHasMeaningfulText] = useState(false);
+
 	// Signature auto/manual mode toggle (local state for Full Auto mode)
 	const [isAutoSignature, setIsAutoSignature] = useState(true);
 	const [manualSignatureValue, setManualSignatureValue] = useState('');
+
+	// Power mode from form (shared across Auto + Hybrid)
+	const selectedPowerMode = form.watch('powerMode') || 'normal';
+	const setSelectedPowerMode = useCallback(
+		(mode: 'normal' | 'high') => {
+			form.setValue('powerMode', mode, { shouldDirty: true });
+		},
+		[form]
+	);
+
+	// Hybrid tab: Booking For control (mirrors Auto tab placement)
+	const hybridBookingForDropdown = useBookingForDropdownController({
+		form,
+		defaultTriggerBgClass: 'bg-[#DADAFC]',
+		shouldDirty: true,
+	});
+	const { closeBookingForDropdown: closeHybridBookingForDropdown } = hybridBookingForDropdown;
 
 	const subjectManualTextareaRef = useRef<HTMLTextAreaElement | null>(null);
 	const signatureManualTextareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -2830,6 +2694,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 	const autoSubjectAutoWordRef = useRef<HTMLSpanElement | null>(null);
 	const autoSubjectControlsRef = useRef<HTMLDivElement | null>(null);
 	const autoSubjectHoverTimelineRef = useRef<gsap.core.Timeline | null>(null);
+	const isAutoSubjectHoverExpandedRef = useRef(false);
 
 	const buildAutoSubjectHoverTimeline = useCallback(() => {
 		const pillEl = autoSubjectPillRef.current;
@@ -2862,7 +2727,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 			willChange: 'width, opacity, margin-right',
 		});
 		if (controlsEl) {
-			gsap.set(controlsEl, { opacity: 0, willChange: 'opacity' });
+			gsap.set(controlsEl, { opacity: 0, pointerEvents: 'none', willChange: 'opacity' });
 		}
 
 		autoSubjectHoverTimelineRef.current = gsap
@@ -2891,18 +2756,27 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		if (controlsEl) {
 			autoSubjectHoverTimelineRef.current.to(
 				controlsEl,
-				{ opacity: 1, duration: 0.3, ease: 'power2.out', overwrite: 'auto' },
+				{
+					opacity: 1,
+					pointerEvents: 'auto',
+					duration: 0.3,
+					ease: 'power2.out',
+					overwrite: 'auto',
+				},
 				0.15
 			);
 		}
 	}, [forceDesktop]);
 
 	const handleSubjectHoverEnter = useCallback(() => {
+		if (isAutoSubjectHoverExpandedRef.current) return;
+		isAutoSubjectHoverExpandedRef.current = true;
 		buildAutoSubjectHoverTimeline();
 		autoSubjectHoverTimelineRef.current?.play(0);
 	}, [buildAutoSubjectHoverTimeline]);
 
 	const handleSubjectHoverLeave = useCallback(() => {
+		isAutoSubjectHoverExpandedRef.current = false;
 		autoSubjectHoverTimelineRef.current?.reverse();
 	}, []);
 
@@ -2916,6 +2790,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 	useEffect(() => {
 		// If we switch into manual subject, ensure we drop any stale DOM refs in the timeline.
 		if (isManualSubject) {
+			isAutoSubjectHoverExpandedRef.current = false;
 			autoSubjectHoverTimelineRef.current?.kill();
 			autoSubjectHoverTimelineRef.current = null;
 		}
@@ -2926,6 +2801,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 	const autoSignatureAutoWordRef = useRef<HTMLSpanElement | null>(null);
 	const autoSignatureControlsRef = useRef<HTMLDivElement | null>(null);
 	const autoSignatureHoverTimelineRef = useRef<gsap.core.Timeline | null>(null);
+	const isAutoSignatureHoverExpandedRef = useRef(false);
 
 	const buildAutoSignatureHoverTimeline = useCallback(() => {
 		const pillEl = autoSignaturePillRef.current;
@@ -2955,7 +2831,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 			willChange: 'width, opacity, margin-right',
 		});
 		if (controlsEl) {
-			gsap.set(controlsEl, { opacity: 0, willChange: 'opacity' });
+			gsap.set(controlsEl, { opacity: 0, pointerEvents: 'none', willChange: 'opacity' });
 		}
 
 		autoSignatureHoverTimelineRef.current = gsap
@@ -2984,18 +2860,27 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		if (controlsEl) {
 			autoSignatureHoverTimelineRef.current.to(
 				controlsEl,
-				{ opacity: 1, duration: 0.3, ease: 'power2.out', overwrite: 'auto' },
+				{
+					opacity: 1,
+					pointerEvents: 'auto',
+					duration: 0.3,
+					ease: 'power2.out',
+					overwrite: 'auto',
+				},
 				0.15
 			);
 		}
 	}, [forceDesktop]);
 
 	const handleSignatureHoverEnter = useCallback(() => {
+		if (isAutoSignatureHoverExpandedRef.current) return;
+		isAutoSignatureHoverExpandedRef.current = true;
 		buildAutoSignatureHoverTimeline();
 		autoSignatureHoverTimelineRef.current?.play(0);
 	}, [buildAutoSignatureHoverTimeline]);
 
 	const handleSignatureHoverLeave = useCallback(() => {
+		isAutoSignatureHoverExpandedRef.current = false;
 		autoSignatureHoverTimelineRef.current?.reverse();
 	}, []);
 
@@ -3008,6 +2893,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 
 	useEffect(() => {
 		if (!isAutoSignature) {
+			isAutoSignatureHoverExpandedRef.current = false;
 			autoSignatureHoverTimelineRef.current?.kill();
 			autoSignatureHoverTimelineRef.current = null;
 		}
@@ -3029,25 +2915,20 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 	// Track if Custom Instructions is open (for adjusting Generate Test button position)
 	const [isLocalCustomInstructionsOpen, setIsLocalCustomInstructionsOpen] = useState(false);
 
-	// Add state for the sliding ghost button (Hybrid mode)
+	// Hybrid mode: sliding "+ Text" ghost between gaps (see develop branch reference)
 	const [ghostTop, setGhostTop] = useState<number | null>(null);
 	const [isGhostVisible, setIsGhostVisible] = useState(false);
 	const hybridContainerRef = useRef<HTMLDivElement>(null);
-
-	const handleGapEnter = useCallback((el: HTMLDivElement) => {
+	const handleGapEnter = useCallback((el: HTMLDivElement, offsetY = 0) => {
 		if (!hybridContainerRef.current) return;
-		// Calculate relative top position
-		// We want the ghost centered on the gap.
-		// Gap element top relative to container:
+		// `offsetTop` is relative to the positioned container (hybridContainerRef).
+		// Center the 22px ghost on the hovered gap.
 		const relativeTop = el.offsetTop;
 		const centeredTop = relativeTop + el.offsetHeight / 2;
-		// Center the 22px ghost:
 		const targetTop = centeredTop - 11; // 22/2 = 11
-
-		setGhostTop(targetTop);
+		setGhostTop(targetTop + offsetY);
 		setIsGhostVisible(true);
 	}, []);
-
 	const handleContainerLeave = useCallback(() => {
 		setIsGhostVisible(false);
 	}, []);
@@ -3141,7 +3022,8 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		useState<HybridStructureSelection>({ kind: 'none' });
 	const [expandedHybridTextBlockId, setExpandedHybridTextBlockId] = useState<string | null>(null);
 	const [expandedHybridCoreBlockId, setExpandedHybridCoreBlockId] = useState<string | null>(null);
-	const [isHybridProfileExpanded, setIsHybridProfileExpanded] = useState(false);
+	const isHybridStructureExpanded =
+		expandedHybridTextBlockId !== null || expandedHybridCoreBlockId !== null;
 
 	// Reset hybrid-only UI when switching modes
 	useEffect(() => {
@@ -3149,9 +3031,10 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 			setHybridStructureSelection({ kind: 'none' });
 			setExpandedHybridTextBlockId(null);
 			setExpandedHybridCoreBlockId(null);
-			setIsHybridProfileExpanded(false);
+			closeHybridBookingForDropdown();
+			setIsGhostVisible(false);
 		}
-	}, [selectedModeKey]);
+	}, [closeHybridBookingForDropdown, selectedModeKey]);
 
 	// If the selected block disappears, clear selection
 	useEffect(() => {
@@ -3173,21 +3056,6 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		const exists = fields.some((f) => f.id === expandedHybridCoreBlockId);
 		if (!exists) setExpandedHybridCoreBlockId(null);
 	}, [expandedHybridCoreBlockId, fields]);
-
-	const getHybridStructureLabel = useCallback((type: HybridBlock) => {
-		switch (type) {
-			case HybridBlock.introduction:
-				return 'Intro';
-			case HybridBlock.research:
-				return 'Research';
-			case HybridBlock.action:
-				return 'Call to Action';
-			case HybridBlock.text:
-				return 'Text';
-			default:
-				return 'Block';
-		}
-	}, []);
 
 	// Manual tab redesign assumes a single unified body editor. If multiple manual Text blocks exist,
 	// collapse them into one so the editor can display/edit everything.
@@ -3352,6 +3220,12 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 	const manualBodyEditorRef = useRef<HTMLDivElement>(null);
 	const manualBodyInitializedRef = useRef(false);
 
+	const syncManualBodyHasMeaningfulText = useCallback(() => {
+		const text = (manualBodyEditorRef.current?.textContent ?? '').replace(/\u00A0/g, ' ');
+		const hasText = text.trim().length > 0;
+		setManualBodyHasMeaningfulText((prev) => (prev === hasText ? prev : hasText));
+	}, []);
+
 	// When switching into Manual mode, start typing in Subject.
 	useEffect(() => {
 		if (selectedModeKey !== 'manual') return;
@@ -3402,12 +3276,13 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 			const currentValue = form.getValues('hybridBlockPrompts.0.value') || '';
 			manualBodyEditorRef.current.innerHTML = currentValue;
 			manualBodyInitializedRef.current = true;
+			syncManualBodyHasMeaningfulText();
 		}
 		// Reset initialization flag when leaving manual mode
 		if (selectedModeKey !== 'manual') {
 			manualBodyInitializedRef.current = false;
 		}
-	}, [selectedModeKey, form]);
+	}, [selectedModeKey, form, syncManualBodyHasMeaningfulText]);
 
 	// Apply formatting to the manual mode body editor
 	const applyManualFormatting = useCallback(
@@ -3427,8 +3302,9 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		// Sync back to form after applying formatting
 		const html = editor.innerHTML || '';
 		form.setValue('hybridBlockPrompts.0.value', html, { shouldDirty: true });
+		syncManualBodyHasMeaningfulText();
 	},
-		[form, updateActiveFormatting]
+		[form, updateActiveFormatting, syncManualBodyHasMeaningfulText]
 	);
 
 	const applyManualColor = useCallback(
@@ -3464,8 +3340,9 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 			// Sync back to form after applying color
 			const html = editor.innerHTML || '';
 			form.setValue('hybridBlockPrompts.0.value', html, { shouldDirty: true });
+			syncManualBodyHasMeaningfulText();
 		},
-		[form, updateActiveFormatting]
+		[form, updateActiveFormatting, syncManualBodyHasMeaningfulText]
 	);
 
 	// Insert a fill-in placeholder at cursor position
@@ -3500,11 +3377,12 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 			// Sync back to form
 			const html = editor.innerHTML || '';
 			form.setValue('hybridBlockPrompts.0.value', html, { shouldDirty: true });
+			syncManualBodyHasMeaningfulText();
 
 			// Close the dropdown
 			setIsFillInsDropdownOpen(false);
 		},
-		[form]
+		[form, syncManualBodyHasMeaningfulText]
 	);
 
 	// Sanitize manual editor content to remove banned fill-ins ({{email}}, {{phone}})
@@ -3636,6 +3514,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		// Sync back to form
 		const html = editor.innerHTML || '';
 		form.setValue('hybridBlockPrompts.0.value', html, { shouldDirty: true });
+		syncManualBodyHasMeaningfulText();
 
 		// Reset and close popover
 		setLinkText('');
@@ -3643,7 +3522,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		setSavedRange(null);
 		setLinkPopoverPosition(null);
 		setIsLinkPopoverOpen(false);
-	}, [form, linkText, linkUrl, savedRange]);
+	}, [form, linkText, linkUrl, savedRange, syncManualBodyHasMeaningfulText]);
 
 	// Close link popover when clicking outside
 	useEffect(() => {
@@ -4538,11 +4417,8 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		})
 	);
 
-	// In Hybrid mode, the "+ Text" buttons intentionally sit slightly outside the main box.
-	// The scroll container (`overflow-y-auto`) will clip horizontal overflow, so we add a
-	// Hybrid-only right gutter to the scroll container so those buttons remain visible.
-	const shouldEnableHybridPlusGutter =
-		!compactLeftOnly && activeTab === 'main' && selectedModeKey === 'hybrid' && !showTestPreview;
+	// Hybrid tab layout keeps controls inside the main box, so no extra gutter is needed.
+	const shouldEnableHybridPlusGutter = false;
 
 	// Mobile-only: measure to start overlay exactly at the big divider line under Mode
 	useLayoutEffect(() => {
@@ -4598,6 +4474,19 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		return 'Writing: Build your email (subject + blocks + signature), then generate drafts for selected contacts.';
 	}, [activeTab, selectedModeKey]);
 
+	const manualSubjectHasMeaningfulText = Boolean((subjectValue ?? '').trim());
+	const canDraftInManualMode = manualSubjectHasMeaningfulText && manualBodyHasMeaningfulText;
+
+	const hasSelectedContactsForDrafting = draftCount > 0 || Boolean(isAllContactsSelected);
+	const shouldShowDraftCta =
+		hasSelectedContactsForDrafting && (!isManualModeSelected || canDraftInManualMode);
+
+	const draftPlaceholderText = !hasSelectedContactsForDrafting
+		? 'Select Contacts and Draft Emails'
+		: isManualModeSelected && !canDraftInManualMode
+			? 'Write Subject and Body to Draft Emails'
+			: 'Select Contacts and Draft Emails';
+
 	return (
 		<div
 			className={cn(
@@ -4606,6 +4495,18 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 			)}
 			data-hpi-root
 		>
+			{/* Hide the HPI scroll container's visible scrollbar (esp. Firefox "thin" black scrollbar). */}
+			<style jsx global>{`
+				[data-hpi-content].overflow-y-auto {
+					scrollbar-width: none !important;
+					scrollbar-color: transparent transparent !important;
+				}
+				[data-hpi-content].overflow-y-auto::-webkit-scrollbar {
+					display: none !important;
+					width: 0 !important;
+					height: 0 !important;
+				}
+			`}</style>
 			<DndContext onDragEnd={handleDragEnd} collisionDetection={closestCenter}>
 				<Droppable id="droppable">
 					<DraggableBox
@@ -4731,69 +4632,22 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 									<div ref={headerSectionRef} className={cn('pt-0 pb-0')}>
 										<div className={cn(!compactLeftOnly ? 'bg-white' : '', 'relative')}>
 											<div className="relative h-[31px]">
-											{/* Left 130px gray background */}
-											{!compactLeftOnly && (
-												<div
-													className="absolute left-0 top-0 h-full w-[130px] bg-[#f8f8f8] z-0"
-													style={{ pointerEvents: 'none' }}
-												/>
-											)}
-											{/* Profile label centered in the 130px gray area - clickable to switch tabs */}
-											{!compactLeftOnly && (() => {
-												const isProfileIncomplete = !profileFields.name.trim() || !profileFields.genre.trim() || !profileFields.area.trim() || !profileFields.bio.trim();
-												const showRedWarning = hasLeftProfileTab && isProfileIncomplete;
-												return (
-													<button
-														type="button"
-														data-hover-description="Add information about yourself so you can pitch well to the contacts you're reaching out to"
-														onClick={() => {
-															if (activeTab === 'profile') {
-																setActiveTab('main');
-																setHasLeftProfileTab(true);
-															} else {
-																setActiveTab('profile');
-															}
-														}}
-														className={cn(
-															"absolute left-0 -top-[3px] h-[calc(100%+3px)] w-[130px] flex items-center justify-center font-inter font-semibold text-[13px] max-[480px]:text-[14px] z-30 cursor-pointer bg-transparent transition-colors border-r-[3px] border-r-black border-t-0 border-b-0 border-l-0",
-															activeTab === 'profile'
-																? 'text-black bg-[#A6E2A8] hover:bg-[#A6E2A8]'
-																: showRedWarning
-																	? 'text-black bg-[#E47979] hover:bg-[#E47979]'
-																	: 'text-black hover:bg-[#eeeeee]'
-														)}
-													>
-														Profile
-													</button>
-												);
-											})()}
 											<div
 												className={cn(
 													'h-[31px] flex items-center relative z-20',
-													cn(!forceDesktop ? 'w-[93.7vw]' : 'w-[475px]', 'max-w-[475px] mx-auto pl-[8px]', !forceDesktop && 'max-[480px]:pl-[6px]')
+													cn(!forceDesktop ? 'w-[93.7vw]' : 'w-[475px]', 'max-w-[475px] mx-auto px-[8px]', !forceDesktop && 'max-[480px]:px-[6px]')
 												)}
 												data-left-drag-handle
 												data-root-drag-handle
 											>
-												{compactLeftOnly && (
-													<span
-														className={cn(
-															cn('font-inter font-semibold text-[13px] ml-[8px] mr-[112px] text-black relative z-10', !forceDesktop && 'max-[480px]:text-[14px] max-[480px]:mr-[22px]')
-														)}
-													>
-														Profile
-													</span>
-												)}
-												{/* Spacer to keep toggles in position */}
-												{!compactLeftOnly && <div className="w-[130px] shrink-0" />}
 												<div
 													ref={modeContainerRef}
 													onMouseLeave={() => setHoveredModeKey(null)}
 													className={cn(
-														'relative flex items-center flex-1',
-														forceDesktop ? 'gap-[70px] ml-[30px]' : 'gap-[78px] ml-[42px]',
+														'relative flex items-center justify-center flex-1',
+														forceDesktop ? 'gap-[70px]' : 'gap-[78px]',
 														!forceDesktop &&
-															'max-[480px]:gap-0 max-[480px]:justify-between max-[480px]:ml-[2px] max-[480px]:w-auto max-[480px]:px-[24px]'
+															'max-[480px]:gap-0 max-[480px]:justify-between max-[480px]:w-full max-[480px]:px-[24px]'
 													)}
 													data-hover-description-suppress="true"
 												>
@@ -4911,9 +4765,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 												</>
 											)}
 										</div>
-										{activeTab !== 'profile' &&
-											selectedModeKey !== 'manual' &&
-											selectedModeKey !== 'hybrid' && (
+										{activeTab !== 'profile' && selectedModeKey !== 'manual' && (
 											<div className="flex flex-col items-center pt-[38px] max-[480px]:pt-[38px]">
 												<FormField
 													control={form.control}
@@ -4941,16 +4793,16 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																					form.setValue('isAiSubject', false);
 																				}
 																			}}
-																			onMouseEnter={handleSubjectHoverEnter}
 																			onMouseLeave={handleSubjectHoverLeave}
 																			className={cn(
-																				// Hover zone includes the gap + green box so the expanded controls stay open while moving across.
-																				'relative group/subject w-[465px] max-[480px]:w-full transition-none flex items-center'
+																				// Keep-open hover zone includes the gap + green box (but only the pill triggers expansion).
+																				'relative w-[465px] max-[480px]:w-full transition-none flex items-center'
 																			)}
 																		>
 																			{/* Auto Subject pill - animates on hover */}
 																			<div
 																				ref={autoSubjectPillRef}
+																				onMouseEnter={handleSubjectHoverEnter}
 																				className={cn(
 																					cn(
 																						'flex items-center justify-center h-[25px] rounded-[10px] border-2 border-black overflow-hidden subject-bar w-[110px]',
@@ -4980,7 +4832,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																			{/* Expanded controls - hidden by default, shown on hover */}
 																			<div
 																				ref={autoSubjectControlsRef}
-																				className="flex items-center h-[25px] ml-[31px] max-[480px]:ml-[12px] opacity-0 pointer-events-none group-hover/subject:pointer-events-auto"
+																				className="flex items-center h-[25px] ml-[31px] max-[480px]:ml-[12px] opacity-0 pointer-events-none"
 																			>
 																				{/* 292x25 manual subject bar (bg #74D177, r=5) */}
 																				<div
@@ -5120,7 +4972,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 									</div>
 								<div
 									className={cn(
-										'flex-1 min-h-0 flex flex-col hide-native-scrollbar relative',
+										'flex-1 min-h-0 flex flex-col hide-native-scrollbar relative overflow-x-hidden',
 										activeTab === 'profile' ? 'overflow-y-hidden' : 'overflow-y-auto',
 										shouldEnableHybridPlusGutter && 'w-[calc(100%_+_90px)] -mr-[90px]'
 									)}
@@ -5159,23 +5011,29 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 													aria-hidden="true"
 													className="absolute inset-0 z-0 bg-[#305B31] pointer-events-none opacity-0"
 												/>
-												<div className="relative z-10 flex flex-col flex-1">
-													{/* Green top space box (122 x 34) */}
+												<div className="relative z-10 flex flex-col flex-1 mt-[18px]">
+													{/* Profile tab: align the decorative top pill with Auto/Hybrid Subject */}
 													<div
 														aria-hidden="true"
-														className="absolute left-[15px] top-[14px] w-[122px] h-[34px] rounded-[8px] border-2 border-black"
-													/>
-													<div className="w-full mt-[64px]">
+														className="absolute inset-x-0 top-0 pointer-events-none"
+													>
+														{/* Match Subject pill top offset: 38px below mode divider, minus 32px rating row */}
+														<div className="w-[465px] max-[480px]:w-full mx-auto pt-[6px]">
+															<div className="w-[110px] h-[25px] max-[480px]:h-[24px] rounded-[10px] border-2 border-black" />
+														</div>
+													</div>
+													{/* Match Full Auto Body box start: Subject height (38+25) + main content offset (20-8), minus 32px rating row */}
+													<div className="w-full mt-[43px] max-[480px]:mt-[39px]">
 													<div
 														className={cn(
-															'relative w-full bg-[#4597DA] border-t-[3px] border-b-[3px] border-black rounded-[8px] overflow-hidden flex flex-col',
+															'relative z-10 w-[465px] max-w-full mx-auto bg-[#4597DA] border-[3px] border-black rounded-[8px] overflow-hidden flex flex-col',
 															props.clipProfileTabOverflow
 																? expandedProfileBox
-																	? 'h-[414px]'
-																	: 'h-[380px]'
+																	? 'h-[425px]'
+																	: 'h-[391px]'
 																: expandedProfileBox
-																? 'min-h-[414px]'
-																: 'min-h-[380px]'
+																? 'min-h-[425px]'
+																: 'min-h-[391px]'
 														)}
 														onClick={(e) => e.stopPropagation()}
 													>
@@ -5210,31 +5068,18 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																>
 																	<UndoIcon width="20" height="20" />
 																</button>
-																<button
-																	type="button"
-																	aria-label="Back to Auto"
-																	onClick={(e) => {
-																		e.stopPropagation();
-																		setActiveTab('main');
-																		setHasLeftProfileTab(true);
-																		switchToFull();
-																	}}
-																	className="w-[44px] shrink-0 h-full border-l-[3px] border-black flex items-center justify-center bg-transparent cursor-pointer p-0 hover:brightness-[0.98] active:brightness-[0.95] focus:outline-none focus-visible:outline-none"
-																>
-																	<span className="block w-[18px] h-[3px] bg-black" />
-																</button>
 															</div>
 														</div>
 
 														{/* Profile fields live inside the 380px Body container */}
 														<div
 															className={cn(
-																'flex-1',
+																'flex-1 flex flex-col justify-center',
 																props.clipProfileTabOverflow &&
 																	'min-h-0 overflow-y-auto hide-native-scrollbar'
 															)}
 														>
-															<div className="px-3 pt-[14px] pb-[14px] flex flex-col gap-[18px]">
+															<div className="px-3 py-[16px] flex flex-col gap-[12px]">
 																<div
 																	ref={
 																		expandedProfileBox === 'name'
@@ -5242,13 +5087,13 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																			: undefined
 																	}
 																	className={cn(
-																		'w-[413px] max-w-full mx-auto flex flex-col rounded-[8px] border-[3px] border-black cursor-pointer overflow-hidden',
-																		expandedProfileBox === 'name' ? 'h-[68px]' : 'h-[34px]'
+																		'w-[380px] max-w-full mx-auto flex flex-col rounded-[8px] border-[3px] border-black cursor-pointer overflow-hidden',
+																		expandedProfileBox === 'name' ? 'h-[64px]' : 'h-[32px]'
 																	)}
 																	onClick={() => handleProfileBoxToggle('name')}
 																>
 																	<div
-																		className="h-[34px] flex items-center font-inter text-[14px] font-semibold overflow-hidden"
+																		className="h-[32px] flex items-center font-inter text-[14px] font-semibold overflow-hidden"
 																		style={{ backgroundColor: getProfileHeaderBg('name') }}
 																	>
 																		{expandedProfileBox !== 'name' &&
@@ -5277,7 +5122,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																	{expandedProfileBox === 'name' && (
 																		<input
 																			type="text"
-																			className="h-[34px] bg-white px-3 font-inter text-[14px] outline-none border-0"
+																			className="h-[32px] bg-white px-3 font-inter text-[14px] outline-none border-0"
 																			value={profileFields.name}
 																			onChange={(e) =>
 																				setProfileFields({
@@ -5306,13 +5151,13 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																			: undefined
 																	}
 																	className={cn(
-																		'w-[413px] max-w-full mx-auto flex flex-col rounded-[8px] border-[3px] border-black cursor-pointer overflow-hidden',
-																		expandedProfileBox === 'genre' ? 'h-[68px]' : 'h-[34px]'
+																		'w-[380px] max-w-full mx-auto flex flex-col rounded-[8px] border-[3px] border-black cursor-pointer overflow-hidden',
+																		expandedProfileBox === 'genre' ? 'h-[64px]' : 'h-[32px]'
 																	)}
 																	onClick={() => handleProfileBoxToggle('genre')}
 																>
 																	<div
-																		className="h-[34px] flex items-center font-inter text-[14px] font-semibold overflow-hidden"
+																		className="h-[32px] flex items-center font-inter text-[14px] font-semibold overflow-hidden"
 																		style={{ backgroundColor: getProfileHeaderBg('genre') }}
 																	>
 																		{expandedProfileBox !== 'genre' &&
@@ -5341,7 +5186,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																	{expandedProfileBox === 'genre' && (
 																		<input
 																			type="text"
-																			className="h-[34px] bg-white px-3 font-inter text-[14px] outline-none border-0"
+																			className="h-[32px] bg-white px-3 font-inter text-[14px] outline-none border-0"
 																			value={profileFields.genre}
 																			onChange={(e) =>
 																				setProfileFields({
@@ -5370,13 +5215,13 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																			: undefined
 																	}
 																	className={cn(
-																		'w-[413px] max-w-full mx-auto flex flex-col rounded-[8px] border-[3px] border-black cursor-pointer overflow-hidden',
-																		expandedProfileBox === 'area' ? 'h-[68px]' : 'h-[34px]'
+																		'w-[380px] max-w-full mx-auto flex flex-col rounded-[8px] border-[3px] border-black cursor-pointer overflow-hidden',
+																		expandedProfileBox === 'area' ? 'h-[64px]' : 'h-[32px]'
 																	)}
 																	onClick={() => handleProfileBoxToggle('area')}
 																>
 																	<div
-																		className="h-[34px] flex items-center font-inter text-[14px] font-semibold overflow-hidden"
+																		className="h-[32px] flex items-center font-inter text-[14px] font-semibold overflow-hidden"
 																		style={{ backgroundColor: getProfileHeaderBg('area') }}
 																	>
 																		{expandedProfileBox !== 'area' &&
@@ -5405,7 +5250,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																	{expandedProfileBox === 'area' && (
 																		<input
 																			type="text"
-																			className="h-[34px] bg-white px-3 font-inter text-[14px] outline-none border-0"
+																			className="h-[32px] bg-white px-3 font-inter text-[14px] outline-none border-0"
 																			value={profileFields.area}
 																			onChange={(e) =>
 																				setProfileFields({
@@ -5434,13 +5279,13 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																			: undefined
 																	}
 																	className={cn(
-																		'w-[413px] max-w-full mx-auto flex flex-col rounded-[8px] border-[3px] border-black cursor-pointer overflow-hidden',
-																		expandedProfileBox === 'band' ? 'h-[68px]' : 'h-[34px]'
+																		'w-[380px] max-w-full mx-auto flex flex-col rounded-[8px] border-[3px] border-black cursor-pointer overflow-hidden',
+																		expandedProfileBox === 'band' ? 'h-[64px]' : 'h-[32px]'
 																	)}
 																	onClick={() => handleProfileBoxToggle('band')}
 																>
 																	<div
-																		className="h-[34px] flex items-center font-inter text-[14px] font-semibold overflow-hidden"
+																		className="h-[32px] flex items-center font-inter text-[14px] font-semibold overflow-hidden"
 																		style={{ backgroundColor: getProfileHeaderBg('band') }}
 																	>
 																		{expandedProfileBox !== 'band' &&
@@ -5469,7 +5314,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																	{expandedProfileBox === 'band' && (
 																		<input
 																			type="text"
-																			className="h-[34px] bg-white px-3 font-inter text-[14px] outline-none border-0"
+																			className="h-[32px] bg-white px-3 font-inter text-[14px] outline-none border-0"
 																			value={profileFields.band}
 																			onChange={(e) =>
 																				setProfileFields({
@@ -5498,15 +5343,15 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																			: undefined
 																	}
 																	className={cn(
-																		'w-[413px] max-w-full mx-auto flex flex-col rounded-[8px] border-[3px] border-black cursor-pointer overflow-hidden',
+																		'w-[380px] max-w-full mx-auto flex flex-col rounded-[8px] border-[3px] border-black cursor-pointer overflow-hidden',
 																		expandedProfileBox === 'bio'
-																			? 'min-h-[68px]'
-																			: 'h-[34px]'
+																			? 'min-h-[64px]'
+																			: 'h-[32px]'
 																	)}
 																	onClick={() => handleProfileBoxToggle('bio')}
 																>
 																	<div
-																		className="h-[34px] flex items-center font-inter text-[14px] font-semibold overflow-hidden"
+																		className="h-[32px] flex items-center font-inter text-[14px] font-semibold overflow-hidden"
 																		style={{ backgroundColor: getProfileHeaderBg('bio') }}
 																	>
 																		{expandedProfileBox !== 'bio' &&
@@ -5531,7 +5376,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																	{expandedProfileBox === 'bio' && (
 																		<textarea
 																			ref={bioTextareaRef}
-																			className="min-h-[34px] bg-white px-3 py-[7px] font-inter text-[14px] leading-[20px] outline-none border-0 resize-none overflow-hidden"
+																			className="min-h-[32px] bg-white px-3 py-[6px] font-inter text-[14px] leading-[20px] outline-none border-0 resize-none overflow-hidden"
 																			value={profileFields.bio}
 																			onChange={(e) =>
 																				setProfileFields({
@@ -5568,13 +5413,13 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																			: undefined
 																	}
 																	className={cn(
-																		'w-[413px] max-w-full mx-auto flex flex-col rounded-[8px] border-[3px] border-black cursor-pointer overflow-hidden',
-																		expandedProfileBox === 'links' ? 'h-[68px]' : 'h-[34px]'
+																		'w-[380px] max-w-full mx-auto flex flex-col rounded-[8px] border-[3px] border-black cursor-pointer overflow-hidden',
+																		expandedProfileBox === 'links' ? 'h-[64px]' : 'h-[32px]'
 																	)}
 																	onClick={() => handleProfileBoxToggle('links')}
 																>
 																	<div
-																		className="h-[34px] flex items-center font-inter text-[14px] font-semibold overflow-hidden"
+																		className="h-[32px] flex items-center font-inter text-[14px] font-semibold overflow-hidden"
 																		style={{ backgroundColor: getProfileHeaderBg('links') }}
 																	>
 																		{expandedProfileBox !== 'links' &&
@@ -5603,7 +5448,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																	{expandedProfileBox === 'links' && (
 																		<input
 																			type="text"
-																			className="h-[34px] bg-white px-3 font-inter text-[14px] outline-none border-0"
+																			className="h-[32px] bg-white px-3 font-inter text-[14px] outline-none border-0"
 																			value={profileFields.links}
 																			onChange={(e) =>
 																				setProfileFields({
@@ -5627,48 +5472,96 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 															</div>
 														</div>
 
+														{/* Bottom-right Continue CTA (matches mock) */}
+														<button
+															type="button"
+															onClick={(e) => {
+																e.stopPropagation();
+																setActiveTab('main');
+																setHasLeftProfileTab(true);
+															}}
+															className="shrink-0 h-[30px] pr-[18px] flex items-center justify-end gap-[8px] bg-transparent border-0 p-0 m-0 cursor-pointer focus:outline-none focus-visible:outline-none"
+															aria-label="Continue"
+														>
+															<span className="font-inter font-normal text-[16px] leading-none text-black">
+																Continue
+															</span>
+															<RightArrow
+																width={7}
+																height={14}
+																color="#000000"
+																opacity={1}
+																strokeWidth={4}
+															/>
+														</button>
+
 														{/* Bottom band (3px divider + 10px fill) */}
 														<div className="shrink-0 h-[13px] bg-[#58A6E5] border-t-[3px] border-black" />
 													</div>
 												</div>
 
 												{/* New containers below Body box */}
-												<div className="w-full flex flex-col items-center mt-[9px]">
-													{/* 472 x 93 container */}
-													<div className="relative w-[472px] h-[93px] max-w-full rounded-[8px] border-2 border-black">
-														{/* Decorative inner boxes (no fill) */}
+												<div className="relative w-full flex flex-col items-center mt-[9px] flex-1">
+													{/* 465px container positioned behind the Introduce yourself box */}
+													<div className="relative z-0 w-[465px] h-[93px] max-w-full rounded-[8px] border-[3px] border-black -mt-[20px]">
+														{/* Decorative inner boxes (448px wide, left aligned) */}
 														<div
 															aria-hidden="true"
-															className="pointer-events-none absolute left-[12px] top-[15px] w-[203px] h-[28px] rounded-[8px] border-2 border-black z-0"
+															className="pointer-events-none absolute left-[8px] top-[15px] w-[448px] h-[28px] rounded-[8px] border-2 border-black z-0"
 														/>
 														<div
 															aria-hidden="true"
-															className="pointer-events-none absolute left-[12px] top-[56px] w-[160px] h-[25px] rounded-[8px] border-2 border-black z-0"
+															className="pointer-events-none absolute left-[8px] top-[56px] w-[448px] h-[22px] rounded-[8px] border-2 border-black z-0"
 														/>
-														{/* Inner content wrapper: flush to top + centered (matches mock) */}
-														{/* Note: offset upward by the container border width so borders overlap (prevents “double line”). */}
-														<div className="absolute -top-[2px] left-1/2 -translate-x-1/2 flex flex-col items-center w-full z-10">
-															<button
-																type="button"
-																onClick={() => {
-																	setActiveTab('main');
-																	setHasLeftProfileTab(true);
-																}}
-																className="w-[298px] h-[26px] rounded-[6px] bg-[#B1B1B1] hover:bg-[#A7A7A7] active:bg-[#A1A1A1] transition-colors duration-150 border-2 border-black text-white font-inter font-medium text-[15px] leading-none flex items-center justify-center cursor-pointer"
-															>
-																back
-															</button>
-															{/* next prompt: we'll add the smaller inner boxes here */}
-														</div>
 													</div>
 
-													{/* 229 x 34 box, 13px below the 472 x 93 container */}
+													{/* 110 x 30 box, 58px from bottom, aligned with left of 465px box */}
 													{!props.hideProfileBottomMiniBox && (
-														<div className="w-[472px] max-w-full mt-[13px]">
+														<div className="absolute bottom-[63px] left-1/2 -translate-x-1/2 w-[465px] max-w-full">
 															<div
 																aria-hidden="true"
-																className="w-[229px] h-[34px] rounded-[8px] border-2 border-black"
+																className="w-[110px] h-[25px] rounded-[10px] border-2 border-black ml-[8px]"
 															/>
+														</div>
+													)}
+
+													{/* Profile: bottom Generate Test button */}
+													{!hideGenerateTestButton && !showTestPreview && !compactLeftOnly && (
+														<div
+															className={cn(
+																'mt-auto pb-[18px] w-[468px] flex items-center justify-center',
+																!forceDesktop && 'max-w-[89.33vw]'
+															)}
+															onClick={(e) => e.stopPropagation()}
+														>
+															<Button
+																type="button"
+																data-hover-description="This will show you a test draft, given all of what you provided"
+																onClick={(e) => {
+																	e.stopPropagation();
+																	if (isMobile) {
+																		setShowTestPreview?.(true);
+																	} else {
+																		onTestPreviewToggle?.(true);
+																	}
+																	handleGenerateTestDrafts?.();
+																	setHasAttemptedTest(true);
+																}}
+																disabled={isGenerateTestButtonDisabled}
+																className={cn(
+																	'h-[28px] w-[232px] bg-[#DBF3DC] text-black font-inter font-normal text-[17px] leading-none rounded-[12px] cursor-pointer flex items-center justify-center p-0 border-2 border-transparent',
+																	isGeneratingTest
+																		? 'transition-colors bg-[#A2E9A4] hover:bg-[#A2E9A4] active:bg-[#A2E9A4] cursor-default'
+																		: 'transition-colors hover:bg-[#EAF9EB] hover:border-black active:bg-[#D1E9D2]',
+																	isGenerateTestButtonDisabled
+																		? isGeneratingTest
+																			? '!opacity-100'
+																			: 'opacity-50 cursor-not-allowed'
+																		: 'opacity-100'
+																)}
+															>
+																{isGeneratingTest ? null : 'Generate Test'}
+															</Button>
 														</div>
 													)}
 												</div>
@@ -5818,6 +5711,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																manualBodyEditorRef.current.innerHTML = html;
 															}
 															form.setValue('hybridBlockPrompts.0.value', html, { shouldDirty: true });
+															syncManualBodyHasMeaningfulText();
 														}}
 														onInput={() => {
 															// Sync contentEditable HTML to form on every input (with banned fill-ins removed)
@@ -5837,6 +5731,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 															} catch {}
 															}
 															form.setValue('hybridBlockPrompts.0.value', html, { shouldDirty: true });
+															syncManualBodyHasMeaningfulText();
 														}}
 														onClick={(e) => {
 															// Allow clicking links with Ctrl/Cmd key
@@ -6397,858 +6292,824 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 										)}
 
 										{selectedModeKey === 'hybrid' && (
-											<div className="w-full flex flex-col items-center mt-[14px]">
-												{/* Profile box (collapsed 33px; expands to 110px) */}
+											<div className="w-full flex flex-col items-center -mt-2 max-[480px]:mt-0">
+												{/* Main content: 468 x 364 box (r=8) */}
 												<div
 													className={cn(
-														cn('w-[448px]', !forceDesktop && 'max-w-[89.33vw]', 'rounded-[8px] border-2 border-black overflow-hidden flex flex-col'),
-														// When expanded, allow the box to grow to fit content (no inner scrollbars).
-														isHybridProfileExpanded ? 'min-h-[110px]' : 'h-[33px]'
+														showTestPreview
+															? cn('w-[426px]', !forceDesktop && 'max-[480px]:w-[89.33vw]')
+															: cn(!forceDesktop ? 'w-[89.33vw]' : 'w-[468px]', 'max-w-[468px]'),
+														'min-h-[364px] rounded-[8px] border-[3px] border-black bg-[#8989E1] flex flex-col overflow-visible'
 													)}
-													data-hpi-hybrid-profile-bar
+													data-hpi-hybrid-main-box
 												>
-													<button
-														type="button"
-														onClick={() => setIsHybridProfileExpanded((v) => !v)}
+													{/* Header: Body + power mode toggles */}
+													<div
 														className={cn(
-															'w-full h-[33px] flex items-center px-3 bg-[#BCBCF2]',
-															'font-inter font-semibold text-[14px] text-black text-left',
-															isHybridProfileExpanded && 'border-b-2 border-black'
+															'h-[27px] flex items-stretch rounded-t-[8px] overflow-hidden',
+															'bg-[#DADAFC]'
 														)}
-														style={{ backgroundColor: '#BCBCF2' }}
-														aria-expanded={isHybridProfileExpanded}
-														aria-label="Toggle Profile"
+														data-hpi-hybrid-body-header
 													>
-														Profile
-													</button>
-
-													{isHybridProfileExpanded && (
-														<div
-															role="button"
-															tabIndex={0}
-															aria-label="Open Profile tab"
-															onClick={() => setActiveTab('profile')}
-															onKeyDown={(e) => {
-																if (e.key === 'Enter' || e.key === ' ') {
-																	e.preventDefault();
-																	setActiveTab('profile');
-																}
-															}}
-															className="flex-1 bg-white px-2 py-2 cursor-pointer"
-														>
-															<div className="flex flex-wrap gap-x-[6px] gap-y-[10px] content-start">
-																{hybridProfileChipItems.map((chip) => (
-																	<span
-																		key={chip.key}
-																		className={cn(
-																			'inline-flex items-center rounded-[5px] px-[5px] py-[0.5px] font-inter font-normal text-[10px] leading-[12px] text-black max-w-full whitespace-nowrap',
-																			chip.bgClass,
-																			chip.isEmpty && 'opacity-50'
-																		)}
-																	>
-																		{chip.text}
-																	</span>
-																))}
-															</div>
+														<div className="flex-1 flex items-center pl-[16px]">
+															<Typography
+																variant="h4"
+																className="font-inter font-semibold text-[17px] text-black"
+															>
+																Body
+															</Typography>
 														</div>
-													)}
-												</div>
-
-												{/* Hybrid (compressed) structure box */}
-												<div
-													className={cn(
-														cn('w-[448px]', !forceDesktop && 'max-w-[89.33vw]', 'min-h-[230px] rounded-[8px] border-2 border-black bg-[#8989E1] flex flex-col'),
-														// Left inset is 10px as requested; right inset is tuned so a 429px hover width fits cleanly.
-														'pl-[10px] pr-[5px] py-[14px]',
-														'mt-[14px]'
-													)}
-													style={{ backgroundColor: '#8989E1' }}
-													data-hpi-hybrid-structure
-												>
-													{/* Subject (matches Auto-tab toggle behavior) */}
-													{(() => {
-														const isAiSubjectLocal = form.watch('isAiSubject');
-														const subjectText = form.watch('subject') || '';
-
-														const toggleAiSubject = () => {
-															const next = !form.getValues('isAiSubject');
-															form.setValue('isAiSubject', next, { shouldDirty: true });
-															// When turning Auto back on, clear manual subject (matches Auto tab behavior)
-															if (next) form.setValue('subject', '', { shouldDirty: true });
-														};
-
-														// Auto ON: compact by default, expands on hover.
-														// Auto OFF: stays expanded so the user can type.
-														return (
-															<div
+														{selectedPowerMode === 'normal' && (
+															<div className="w-[1px] flex-shrink-0 bg-black" />
+														)}
+														<button
+															type="button"
+															onClick={() => setSelectedPowerMode('normal')}
+															className={cn(
+																'h-full flex items-center justify-center cursor-pointer border-0 p-0 m-0 flex-shrink-0 outline-none focus:outline-none whitespace-nowrap transition-[background-color,width] duration-75 ease-out',
+																selectedPowerMode === 'high' ? 'w-[108px]' : 'w-[132px]',
+																selectedPowerMode === 'normal' ? 'bg-[#BCBCF2]' : 'bg-transparent'
+															)}
+															aria-pressed={selectedPowerMode === 'normal'}
+														>
+															<span className="font-inter font-normal italic text-[14px] text-black">
+																{selectedPowerMode === 'high' ? 'Standard' : 'Standard Power'}
+															</span>
+														</button>
+														<div className="w-[1px] flex-shrink-0 bg-black" />
+														<button
+															type="button"
+															onClick={() => setSelectedPowerMode('high')}
+															className={cn(
+																'h-full flex items-center justify-center cursor-pointer border-0 p-0 m-0 flex-shrink-0 outline-none focus:outline-none whitespace-nowrap transition-[background-color,width] duration-75 ease-out',
+																selectedPowerMode === 'high' ? 'w-[100px]' : 'w-[46px]',
+																selectedPowerMode === 'high' ? 'bg-[#8989E1]' : 'bg-transparent'
+															)}
+															aria-pressed={selectedPowerMode === 'high'}
+														>
+															<span
 																className={cn(
-																	'relative group/hybrid-subject transition-none',
-																	isAiSubjectLocal ? 'w-[150px] hover:w-[429px]' : 'w-[429px]'
+																	'font-inter font-normal italic text-[14px] transition-colors duration-75 ease-out',
+																	selectedPowerMode === 'high' ? 'text-white' : 'text-black'
 																)}
 															>
-																{/* Collapsed pill (Auto ON only) */}
-																{isAiSubjectLocal && (
-																	<button
-																		type="button"
-																		className={cn(
-																			'w-[150px] h-[28px] rounded-[8px] border-[3px] border-black bg-[#E0E0E0]',
-																			'flex items-center justify-start px-3',
-																			'font-inter font-medium text-[14px] text-black',
-																			'group-hover/hybrid-subject:hidden'
-																		)}
-																		aria-label="Subject"
-																	>
-																		Subject
-																	</button>
-																)}
+																{selectedPowerMode === 'high' ? 'High Power' : 'High'}
+															</span>
+														</button>
+														{selectedPowerMode === 'high' && (
+															<div className="w-[1px] flex-shrink-0 bg-black" />
+														)}
+														<div className="w-[31px] flex-shrink-0" />
+													</div>
 
-																{/* Expanded bar (Auto ON on hover; Auto OFF always) */}
-																<div
-																	className={cn(
-																		'items-center h-[28px] rounded-[8px] border-2 border-black overflow-hidden bg-white w-full',
-																		isAiSubjectLocal
-																			? 'hidden group-hover/hybrid-subject:flex'
-																			: 'flex'
-																	)}
-																>
-																	{/* Left label */}
-																	<div
-																		className={cn(
-																			'pl-2 flex items-center h-full shrink-0',
-																			isAiSubjectLocal ? 'w-[130px] bg-[#E0E0E0]' : 'w-[110px] bg-white'
-																		)}
-																	>
-																		<span className="font-inter font-semibold text-[14px] whitespace-nowrap text-black">
-																			{isAiSubjectLocal ? 'Auto Subject' : 'Subject'}
-																		</span>
-																	</div>
-
-																	{/* Toggle */}
-																	<button
-																		type="button"
-																		onClick={toggleAiSubject}
-																		className={cn(
-																			'relative h-full flex items-center text-[12px] font-inter font-normal shrink-0',
-																			isAiSubjectLocal
-																				? 'w-[55px] px-2 justify-center text-black bg-[#91E193]'
-																				: 'w-[80px] px-2 justify-center text-black bg-[#DADAFC]'
-																		)}
-																		aria-pressed={isAiSubjectLocal}
-																		aria-label={isAiSubjectLocal ? 'Auto on' : 'Auto off'}
-																	>
-																		<span className="absolute left-0 h-full border-l-2 border-[#000000]" />
-																		<span>{isAiSubjectLocal ? 'on' : 'Auto off'}</span>
-																		<span className="absolute right-0 h-full border-r-2 border-[#000000]" />
-																	</button>
-
-																	{/* Input */}
-																	<div className={cn('flex-grow h-full', isAiSubjectLocal ? 'bg-[#F0F0F0]' : 'bg-white')}>
-																		<Input
-																			value={subjectText}
-																			onChange={(e) => {
-																				if (e.target.value) setHasSubjectBeenTouched(true);
-																				form.setValue('subject', e.target.value, { shouldDirty: true });
-																			}}
-																			onFocus={(e) => trackFocusedField?.('subject', e.target)}
-																			onBlur={() => setHasSubjectBeenTouched(true)}
-																			disabled={isAiSubjectLocal}
+													{/* Top content: Profile + Booking For */}
+													<div className="w-full px-[10px] pt-[14px] pb-[12px]">
+														<div className="w-[448px] max-w-full mx-auto flex flex-col items-start">
+															<div
+																className="w-full h-[104px] bg-white rounded-[8px] border-2 border-black px-2 pt-1 pb-2 overflow-y-auto overflow-x-hidden hide-native-scrollbar cursor-pointer"
+																role="button"
+																tabIndex={0}
+																aria-label="Open Profile"
+																onClick={(e) => {
+																	e.stopPropagation();
+																	setActiveTab('profile');
+																}}
+																onKeyDown={(e) => {
+																	if (e.key === 'Enter' || e.key === ' ') {
+																		e.preventDefault();
+																		e.stopPropagation();
+																		setActiveTab('profile');
+																	}
+																}}
+															>
+																<div className="font-inter font-normal text-[13px] leading-[16px] text-black mb-[7px]">
+																	Profile
+																</div>
+																<div className="flex flex-wrap gap-x-[6px] gap-y-[10px] content-start">
+																	{hybridProfileChipItems.map((chip) => (
+																		<span
+																			key={chip.key}
 																			className={cn(
-																				'w-full h-full !bg-transparent pl-3 pr-3 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0',
-																				shouldShowSubjectRedStyling
-																					? '!text-[#A20000] placeholder:!text-[#A20000]'
-																					: '!text-black placeholder:!text-[#9E9E9E]',
-																				isAiSubjectLocal && 'cursor-not-allowed'
+																				'inline-flex items-center rounded-[5px] px-[5px] py-[0.5px] font-inter font-normal text-[10px] leading-[12px] text-black max-w-full whitespace-nowrap',
+																				chip.bgClass,
+																				chip.isEmpty && 'opacity-50'
 																			)}
-																			placeholder={
-																				isAiSubjectLocal
-																					? 'Write manual subject here'
-																					: 'Write your subject here. *required'
-																			}
-																		/>
-																	</div>
+																		>
+																			{chip.text}
+																		</span>
+																	))}
 																</div>
 															</div>
-														);
-													})()}
 
-													{(() => {
-														// NOTE: `useFieldArray` uses `id` as an internal key by default, so we must
-														// use the field-array ids here (not the block type string).
-														const introField = fields.find(
-															(f) => f.type === HybridBlock.introduction
-														);
-														const researchField = fields.find(
-															(f) => f.type === HybridBlock.research
-														);
-														const actionField = fields.find((f) => f.type === HybridBlock.action);
+															{/* Booking For */}
+															<BookingForDropdownControl
+																controller={hybridBookingForDropdown}
+																useStaticDropdownPosition={useStaticDropdownPosition}
+															/>
+														</div>
+													</div>
 
-														const introId = introField?.id;
-														const researchId = researchField?.id;
-														const actionId = actionField?.id;
+													{/* Intro/Research/CTA area (153px tall; expands with content) */}
+													{/* Divider lines:
+													   - Bottom divider is 37px from the box bottom
+													   - Next divider is 153px above that (i.e., top of this region) */}
+													<div className="w-full bg-[#7D7DE7] min-h-[153px] border-t-[3px] border-[#0E0E7F]">
+														{/* Match the original Hybrid proportions: 448px inner box with 10px left inset */}
+														<div className="w-[448px] max-w-full mx-auto pl-[10px] pr-[5px] py-[14px]">
+															{(() => {
+																const introField = fields.find((f) => f.type === HybridBlock.introduction);
+																const researchField = fields.find((f) => f.type === HybridBlock.research);
+																const actionField = fields.find((f) => f.type === HybridBlock.action);
 
-														const openOrCreateTextAfter = (coreType: HybridBlock) => {
-															// Only allow one expanded block at a time in the structure UI
-															setExpandedHybridCoreBlockId(null);
-															const coreIndex = fields.findIndex((f) => f.type === coreType);
-															if (coreIndex === -1) return;
-															const next = fields[coreIndex + 1];
-															if (next?.type === HybridBlock.text) {
-																setHybridStructureSelection({
-																	kind: 'block',
-																	blockId: next.id,
-																});
-																setExpandedHybridTextBlockId(next.id);
-																return;
-															}
-															const newId = handleAddTextBlockAt(coreIndex);
-															setHybridStructureSelection({ kind: 'block', blockId: newId });
-															setExpandedHybridTextBlockId(newId);
-														};
+																const introId = introField?.id;
+																const researchId = researchField?.id;
+																const actionId = actionField?.id;
 
-														const getImmediateTextAfter = (coreType: HybridBlock) => {
-															const coreIndex = fields.findIndex((f) => f.type === coreType);
-															if (coreIndex === -1) return null;
-															const next = fields[coreIndex + 1];
-															return next?.type === HybridBlock.text ? next : null;
-														};
+																const openOrCreateTextAfter = (coreType: HybridBlock) => {
+																	setExpandedHybridCoreBlockId(null);
+																	const coreIndex = fields.findIndex((f) => f.type === coreType);
+																	if (coreIndex === -1) return;
+																	const next = fields[coreIndex + 1];
+																	if (next?.type === HybridBlock.text) {
+																		setHybridStructureSelection({ kind: 'block', blockId: next.id });
+																		setExpandedHybridTextBlockId(next.id);
+																		return;
+																	}
+																	const newId = handleAddTextBlockAt(coreIndex);
+																	setHybridStructureSelection({ kind: 'block', blockId: newId });
+																	setExpandedHybridTextBlockId(newId);
+																};
 
-														const introText = getImmediateTextAfter(HybridBlock.introduction);
-														const researchText = getImmediateTextAfter(HybridBlock.research);
-														const actionText = getImmediateTextAfter(HybridBlock.action);
-														const shouldHideAddTextButtons = Boolean(
-															expandedHybridTextBlockId || expandedHybridCoreBlockId
-														);
+																const getImmediateTextAfter = (coreType: HybridBlock) => {
+																	const coreIndex = fields.findIndex((f) => f.type === coreType);
+																	if (coreIndex === -1) return null;
+																	const next = fields[coreIndex + 1];
+																	return next?.type === HybridBlock.text ? next : null;
+																};
 
-														const AddTextGap = ({
-															height,
-															onClick,
-															onHover,
-														}: {
-															height: number;
-															onClick: () => void;
-															onHover: (el: HTMLDivElement) => void;
-														}) => (
-															<div
-																className="group relative w-full overflow-visible"
-																style={{ height }}
-																onMouseEnter={(e) => {
-																	if (shouldHideAddTextButtons) return;
-																	onHover(e.currentTarget);
-																}}
-																onMouseLeave={() => setIsGhostVisible(false)}
-															>
-																{/* Larger hover target so the +Text button is easier to reveal (without changing spacing).
-																	Starts at the pill edge (150px) so it won't interfere with the pills themselves. */}
-																<div
-																	aria-hidden="true"
-																	className="absolute left-[150px] top-0 w-[140px] h-[36px] z-0"
-																/>
-																<button
-																	type="button"
-																	disabled={shouldHideAddTextButtons}
-																	onClick={() => {
-																		if (shouldHideAddTextButtons) return;
-																		setIsGhostVisible(false);
-																		onClick();
-																	}}
-																	className={cn(
-																		// Place the button 17px to the right of the 150px pill:
-																		// pillWidth (150) + gap (17) = 167px
-																		'absolute left-[167px] top-1/2 -translate-y-1/2 z-10',
-																		'w-[57px] h-[22px] rounded-[4px] border border-[#0B741A] bg-[#9EDDB6]',
-																		'flex items-center justify-center gap-[5px] box-border',
-																		'opacity-0 pointer-events-none', // Always invisible, interaction handled by ghost or direct click if we keep it
-																		// 'group-hover:opacity-100 group-hover:pointer-events-auto', // REMOVED: Managed by ghost now
-																		'pointer-events-auto cursor-pointer', // Make it clickable even if invisible
-																		shouldHideAddTextButtons && 'pointer-events-none',
-																		'font-inter font-medium text-[12px] leading-none text-black'
-																	)}
-																	aria-label="Add Text"
-																>
-																	<span className="text-[12px] leading-[12px]">+</span>
-																	<span className="text-[12px] leading-[12px]">Text</span>
-																</button>
-															</div>
-														);
+																const introText = getImmediateTextAfter(HybridBlock.introduction);
+																const researchText = getImmediateTextAfter(HybridBlock.research);
+																const actionText = getImmediateTextAfter(HybridBlock.action);
 
-														const TextPill = ({ id }: { id: string }) => {
-															const isOpen = expandedHybridTextBlockId === id;
-															const idx = fields.findIndex((f) => f.id === id);
-															// Use getValues (snapshot) instead of watch to avoid re-renders on each keystroke
-															const initialTextValue =
-																idx >= 0
-																	? ((form.getValues(`hybridBlockPrompts.${idx}.value`) as string) || '')
-																	: '';
+																const shouldHideAddTextButtons = isHybridStructureExpanded;
 
-															if (!isOpen) {
-																return (
-																	<div
-																		role="button"
-																		tabIndex={0}
-																		onClick={() => {
-																			setIsGhostVisible(false);
-																			setHybridStructureSelection({ kind: 'block', blockId: id });
-																			setExpandedHybridCoreBlockId(null);
-																			setExpandedHybridTextBlockId(id);
-																		}}
-																		onKeyDown={(e) => {
-																			if (e.key === 'Enter' || e.key === ' ') {
-																				e.preventDefault();
-																				setIsGhostVisible(false);
-																				setHybridStructureSelection({
-																					kind: 'block',
-																					blockId: id,
-																				});
-																				setExpandedHybridCoreBlockId(null);
-																				setExpandedHybridTextBlockId(id);
-																			}
-																		}}
-																		className={cn(
-																			'relative h-[28px] cursor-pointer select-none',
-																			// IMPORTANT: keep the hover hitbox to the pill itself (150px),
-																			// so it doesn't cover the "+ Text" buttons at x=167px.
-																			'w-[150px] hover:w-[429px] transition-none',
-																			'rounded-[8px] border-[3px] bg-[#A6E2A8] border-[#0B741A]',
-																			'flex items-center justify-start px-3',
-																			'font-inter font-medium text-[14px] text-black',
-																			'group/hybrid-structure-text-pill'
-																		)}
-																	>
-																		<span className="pr-[56px]">Text</span>
-																		<div className="hidden group-hover/hybrid-structure-text-pill:flex items-center gap-[8px] absolute right-[8px] top-1/2 -translate-y-1/2">
-																			<button
-																				type="button"
-																				onClick={(e) => {
-																					e.stopPropagation();
-																					setExpandedHybridTextBlockId(null);
-																					handleRemoveBlock(id);
+																const AddTextGap = ({
+																	height,
+																	onClick,
+																	ghostOffsetY = 0,
+																}: {
+																	height: number;
+																	onClick: () => void;
+																	ghostOffsetY?: number;
+																}) => {
+																	const gapRef = useRef<HTMLDivElement | null>(null);
+
+																	return (
+																		<div
+																			ref={gapRef}
+																			className="group relative w-full overflow-visible"
+																			style={{ height }}
+																		>
+																			{/* Hover target starts at pill edge (150px) so it won't interfere with pills.
+																			   This prevents the "+ Text" ghost from appearing when simply moving through vertical spacing. */}
+																			<div
+																				aria-hidden="true"
+																				className="absolute left-[150px] top-0 w-[140px] h-[36px] z-0"
+																				onMouseEnter={() => {
+																					if (shouldHideAddTextButtons) return;
+																					if (!gapRef.current) return;
+																					handleGapEnter(gapRef.current, ghostOffsetY);
 																				}}
-																				className="h-[18px] w-[18px] flex items-center justify-center bg-transparent border-0 p-0 text-black"
-																				aria-label="Delete Text block"
+																				onMouseLeave={() => setIsGhostVisible(false)}
 																			>
-																				<CloseIcon width={7} height={7} />
-																			</button>
-																			<button
-																				type="button"
-																				onClick={(e) => {
-																					e.stopPropagation();
-																					setIsGhostVisible(false);
-																					setHybridStructureSelection({
-																						kind: 'block',
-																						blockId: id,
-																					});
-																					setExpandedHybridTextBlockId(id);
-																				}}
-																				className="h-[18px] w-[18px] flex items-center justify-center bg-transparent border-0 p-0"
-																				aria-label="Expand Text block"
-																			>
-																				<svg
-																					width="7"
-																					height="5"
-																					viewBox="0 0 7 5"
-																					fill="none"
-																					xmlns="http://www.w3.org/2000/svg"
+																				<button
+																					type="button"
+																					disabled={shouldHideAddTextButtons}
+																					onClick={() => {
+																						if (shouldHideAddTextButtons) return;
+																						setIsGhostVisible(false);
+																						onClick();
+																					}}
+																					className={cn(
+																						// Place the button 17px to the right of the 150px pill:
+																						// pillWidth (150) + gap (17) = 167px
+																						'absolute left-[17px] top-1/2 -translate-y-1/2 z-10',
+																						'w-[57px] h-[22px] rounded-[4px] border border-[#0B741A] bg-[#9EDDB6]',
+																						'flex items-center justify-center gap-[5px] box-border',
+																						'opacity-0 pointer-events-auto cursor-pointer', // Always invisible; ghost is the visible affordance
+																						shouldHideAddTextButtons && 'pointer-events-none',
+																						'font-inter font-medium text-[12px] leading-none text-black'
+																					)}
+																					style={
+																						ghostOffsetY
+																							? { top: `calc(50% + ${ghostOffsetY}px)` }
+																							: undefined
+																					}
+																					aria-label="Add Text"
 																				>
-																					<path
-																						d="M0.796875 0.796875L3.12021 3.34412L5.44355 0.796875"
-																						stroke="black"
-																						strokeWidth="1.59374"
-																						strokeLinecap="round"
-																						strokeLinejoin="round"
-																					/>
-																				</svg>
-																			</button>
+																					<span className="text-[12px] leading-[12px]">+</span>
+																					<span className="text-[12px] leading-[12px]">Text</span>
+																				</button>
+																			</div>
 																		</div>
-																	</div>
-																);
-															}
+																	);
+																};
 
-															return (
-																<div
-																	className={cn(
-																		'relative group/hybrid-structure-text-open',
-																		'w-[429px] rounded-[8px] border-[3px] border-[#0B741A] overflow-hidden bg-[#A6E2A8]'
-																	)}
-																>
-																	{/* Header row */}
-																	<div
-																		role="button"
-																		tabIndex={0}
-																		onMouseDown={() => setExpandedHybridTextBlockId(null)}
-																		onKeyDown={(e) => {
-																			if (e.key === 'Enter' || e.key === ' ') {
-																				e.preventDefault();
-																				setExpandedHybridTextBlockId(null);
-																			}
-																		}}
-																		className="h-[28px] flex items-center justify-between px-3 relative cursor-pointer select-none"
-																		aria-label="Collapse Text"
-																	>
-																		<span className="font-inter font-medium text-[14px] text-black">
-																			Text
-																		</span>
-																		<div className="hidden group-hover/hybrid-structure-text-open:flex items-center gap-[8px] absolute right-[8px] top-1/2 -translate-y-1/2">
+																const CoreBlockButton = ({
+																	id,
+																	label,
+																	bgColor,
+																	borderColor,
+																	advancedOffBadgeColor,
+																	placeholder,
+																}: {
+																	id: string;
+																	label: string;
+																	bgColor: string;
+																	borderColor: string;
+																	advancedOffBadgeColor: string;
+																	placeholder: string;
+																}) => {
+																	const idx = fields.findIndex((f) => f.id === id);
+																	const isDraftExcluded =
+																		idx >= 0 ? Boolean(fields[idx]?.isCollapsed) : false;
+																	const isOpen =
+																		expandedHybridCoreBlockId === id && !isDraftExcluded;
+																	const initialValue =
+																		idx >= 0
+																			? ((form.getValues(`hybridBlockPrompts.${idx}.value`) as string) || '')
+																			: '';
+																	const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+																	const commitCoreValue = () => {
+																		if (idx < 0) return;
+																		const nextValue = textareaRef.current?.value;
+																		if (nextValue === undefined) return;
+																		form.setValue(`hybridBlockPrompts.${idx}.value`, nextValue, {
+																			shouldDirty: true,
+																		});
+																	};
+																	const collapseCoreBlock = () => {
+																		// The textarea is intentionally uncontrolled (defaultValue + onBlur).
+																		// Collapsing on pointer down can unmount before blur fires, so commit first.
+																		commitCoreValue();
+																		setExpandedHybridCoreBlockId(null);
+																	};
+
+																	if (!isOpen) {
+																		return (
+																			<div className="relative w-[150px] max-w-full h-[28px] overflow-visible">
+																				<button
+																					type="button"
+																					onMouseEnter={() => setIsGhostVisible(false)}
+																					onClick={() => {
+																						setIsGhostVisible(false);
+																						setExpandedHybridTextBlockId(null);
+																						// If this block is excluded from drafting, clicking anywhere re-enables it.
+																						if (isDraftExcluded) {
+																							setExpandedHybridCoreBlockId(null);
+																							handleToggleCollapse(id);
+																							return;
+																						}
+																						setHybridStructureSelection({
+																							kind: 'block',
+																							blockId: id,
+																						});
+																						setExpandedHybridCoreBlockId(id);
+																					}}
+																					className={cn(
+																						'peer group relative h-[28px] w-full cursor-pointer select-none',
+																						'rounded-[8px] border-[3px]',
+																						'flex items-center justify-start pl-3 pr-[36px]',
+																						'font-inter font-medium text-[14px] leading-none text-black'
+																					)}
+																					style={{
+																						backgroundColor: isDraftExcluded ? 'transparent' : bgColor,
+																						borderColor: isDraftExcluded ? '#000000' : borderColor,
+																					}}
+																				>
+																					<span className="whitespace-nowrap">{label}</span>
+																					<span
+																						aria-hidden="true"
+																						className={cn(
+																							'absolute right-[8px] top-1/2 -translate-y-1/2',
+																							// Match other Hybrid pills: only show the badge on hover/focus.
+																							'opacity-0 pointer-events-none',
+																							'group-hover:opacity-100 group-hover:pointer-events-auto',
+																							'group-focus-visible:opacity-100 group-focus-visible:pointer-events-auto',
+																							'transition-opacity'
+																						)}
+																						onMouseDown={(e) => {
+																							// Prevent focus + click from triggering open/close on the parent button.
+																							e.preventDefault();
+																							e.stopPropagation();
+																						}}
+																						onClick={(e) => {
+																							e.preventDefault();
+																							e.stopPropagation();
+																							setIsGhostVisible(false);
+																							setExpandedHybridTextBlockId(null);
+																							setExpandedHybridCoreBlockId(null);
+																							handleToggleCollapse(id);
+																						}}
+																					>
+																						<span
+																							className="flex h-[18px] w-[18px] items-center justify-center rounded-[5px]"
+																							style={{
+																								// Disabled state: make the 18x18 badge much lower opacity,
+																								// while keeping the plus icon crisp/black.
+																								backgroundColor: isDraftExcluded
+																									? 'rgba(202, 202, 255, 0.25)'
+																									: advancedOffBadgeColor,
+																							}}
+																						>
+																							{isDraftExcluded ? (
+																								<span className="relative block w-[10px] h-[10px]">
+																									<span className="absolute left-0 right-0 top-1/2 -translate-y-1/2 h-[2px] bg-black" />
+																									<span className="absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-[2px] bg-black" />
+																								</span>
+																							) : (
+																								<span className="block w-[10px] h-[2px] bg-black rounded-[1px]" />
+																							)}
+																						</span>
+																					</span>
+																				</button>
+																				{!isDraftExcluded && (
+																					<span
+																						aria-hidden="true"
+																						className={cn(
+																							'pointer-events-none absolute left-full top-1/2 -translate-y-1/2',
+																							'ml-[28px]',
+																							'opacity-0 peer-hover:opacity-100',
+																							'transition-opacity',
+																							'font-inter font-medium text-[14px] leading-none text-black whitespace-nowrap'
+																						)}
+																					>
+																						Advanced off
+																					</span>
+																				)}
+																			</div>
+																		);
+																	}
+
+																	return (
+																		<div
+																			className="w-[429px] max-w-full rounded-[8px] border-[3px] overflow-hidden"
+																			style={{ backgroundColor: bgColor, borderColor }}
+																		>
 																			<button
 																				type="button"
 																				onMouseDown={(e) => {
 																					e.stopPropagation();
-																					setExpandedHybridTextBlockId(null);
-																					handleRemoveBlock(id);
+																					collapseCoreBlock();
 																				}}
-																				className="h-[18px] w-[18px] flex items-center justify-center bg-transparent border-0 p-0 text-black"
-																				aria-label="Delete Text block"
-																			>
-																				<CloseIcon width={7} height={7} />
-																			</button>
-																			<button
-																				type="button"
-																				onMouseDown={(e) => {
+																				onClick={(e) => {
+																					// Keep keyboard activation working (Enter/Space triggers click, not mousedown).
 																					e.stopPropagation();
-																					setExpandedHybridTextBlockId(null);
+																					collapseCoreBlock();
 																				}}
-																				className="h-[18px] w-[18px] flex items-center justify-center bg-transparent border-0 p-0"
-																				aria-label="Collapse Text block"
+																				className="w-full h-[28px] flex items-center justify-between px-3 cursor-pointer select-none"
+																				aria-label={`Collapse ${label}`}
 																			>
+																				<span className="font-inter font-medium text-[14px] leading-none text-black">
+																					{label}
+																				</span>
 																				<span
 																					aria-hidden="true"
 																					className="block w-[12px] h-[2px] bg-black rounded-[1px]"
 																				/>
 																			</button>
-																		</div>
-																	</div>
-																	{/* Divider */}
-																	<div className="h-[2px] bg-black" />
-																	{/* Text area (limited height) */}
-																	<div className="bg-white">
-																		<Textarea
-																			placeholder="Type anything you want to include"
-																			className={cn(
-																				'h-[72px] w-full border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0',
-																				'bg-white',
-																				'px-3 py-2 resize-none overflow-y-auto',
-																				'font-inter text-[12px] leading-[14px] text-black'
-																			)}
-																			onMouseDown={(e) => e.stopPropagation()}
-																			autoFocus
-																			defaultValue={initialTextValue}
-																			onBlur={(e) => {
-																				if (idx < 0) return;
-																				form.setValue(
-																					`hybridBlockPrompts.${idx}.value`,
-																					e.target.value,
-																					{ shouldDirty: true }
-																				);
-																			}}
-																		/>
-																	</div>
-																</div>
-															);
-														};
-
-														const HybridCoreBlock = ({
-															id,
-															label,
-															bgClass,
-															borderClass,
-															placeholder,
-														}: {
-															id: string;
-															label: string;
-															bgClass: string;
-															borderClass: string;
-															placeholder: string;
-														}) => {
-															const isOpen = expandedHybridCoreBlockId === id;
-															const idx = fields.findIndex((f) => f.id === id);
-															// Use getValues (snapshot) instead of watch to avoid re-renders on each keystroke
-															const initialValue =
-																idx >= 0
-																	? ((form.getValues(`hybridBlockPrompts.${idx}.value`) as string) || '')
-																	: '';
-
-															if (!isOpen) {
-																return (
-																	<div
-																		role="button"
-																		tabIndex={0}
-																		onClick={() => {
-																			setIsGhostVisible(false);
-																			setHybridStructureSelection({ kind: 'block', blockId: id });
-																			setExpandedHybridTextBlockId(null);
-																			setExpandedHybridCoreBlockId(id);
-																		}}
-																		onKeyDown={(e) => {
-																			if (e.key === 'Enter' || e.key === ' ') {
-																				e.preventDefault();
-																				setIsGhostVisible(false);
-																				setHybridStructureSelection({
-																					kind: 'block',
-																					blockId: id,
-																				});
-																				setExpandedHybridTextBlockId(null);
-																				setExpandedHybridCoreBlockId(id);
-																			}
-																		}}
-																		className={cn(
-																			'relative h-[28px] cursor-pointer select-none',
-																			// IMPORTANT: keep the hover hitbox to the pill itself (150px),
-																			// so it doesn't cover the "+ Text" buttons at x=167px.
-																			'w-[150px] hover:w-[429px] transition-none',
-																			'rounded-[8px] border-[3px]',
-																			bgClass,
-																			borderClass,
-																			'flex items-center justify-start px-3 max-[480px]:px-2',
-																			'font-inter font-medium text-[14px] max-[480px]:text-[12px] max-[480px]:leading-none text-black',
-																			'group/hybrid-core'
-																		)}
-																	>
-																		<span className="pr-3 group-hover/hybrid-core:pr-[130px] whitespace-nowrap">
-																			{label}
-																		</span>
-																		{/* Expand chevron (matches Text pill) */}
-																		<div className="hidden group-hover/hybrid-core:flex items-center absolute right-[8px] top-1/2 -translate-y-1/2 z-10">
-																			<button
-																				type="button"
-																				onClick={(e) => {
-																					e.stopPropagation();
-																					setIsGhostVisible(false);
-																					setHybridStructureSelection({ kind: 'block', blockId: id });
-																					setExpandedHybridTextBlockId(null);
-																					setExpandedHybridCoreBlockId(id);
-																				}}
-																				className="h-[18px] w-[18px] flex items-center justify-center bg-transparent border-0 p-0"
-																				aria-label={`Expand ${label}`}
-																			>
-																				<svg
-																					width="7"
-																					height="5"
-																					viewBox="0 0 7 5"
-																					fill="none"
-																					xmlns="http://www.w3.org/2000/svg"
-																				>
-																					<path
-																						d="M0.796875 0.796875L3.12021 3.34412L5.44355 0.796875"
-																						stroke="black"
-																						strokeWidth="1.59374"
-																						strokeLinecap="round"
-																						strokeLinejoin="round"
-																					/>
-																				</svg>
-																			</button>
-																		</div>
-																		{/* Advanced chrome (hover-only) */}
-																		<div className="hidden group-hover/hybrid-core:block absolute inset-0 pointer-events-none">
-																			<div className="absolute top-0 bottom-0 w-px bg-black right-[32px]" />
-																			<div className="absolute top-0 bottom-0 w-px bg-black right-[112px]" />
-																			<div className="absolute top-0 bottom-0 right-[32px] w-[80px] flex items-center justify-center">
-																				<span className="font-inter font-medium text-[14px] text-black">
-																					Advanced
-																				</span>
-																			</div>
-																		</div>
-																	</div>
-																);
-															}
-
-															return (
-																<div
-																	className={cn(
-																		'w-[429px] rounded-[8px] border-[3px] overflow-hidden',
-																		bgClass,
-																		borderClass
-																	)}
-																>
-																	{/* Header row (click anywhere to collapse) */}
-																	<div
-																		role="button"
-																		tabIndex={0}
-																		onMouseDown={() => setExpandedHybridCoreBlockId(null)}
-																		onKeyDown={(e) => {
-																			if (e.key === 'Enter' || e.key === ' ') {
-																				e.preventDefault();
-																				setExpandedHybridCoreBlockId(null);
-																			}
-																		}}
-																		className="h-[28px] flex items-center justify-start px-3 relative cursor-pointer select-none"
-																		aria-label={`Collapse ${label}`}
-																	>
-																		<span className="pr-[130px] font-inter font-medium text-[14px] max-[480px]:text-[12px] max-[480px]:leading-none text-black whitespace-nowrap">
-																			{label}
-																		</span>
-																		{/* Advanced chrome (always visible while expanded) */}
-																		<div className="absolute top-0 bottom-0 w-px bg-black right-[32px]" />
-																		<div className="absolute top-0 bottom-0 w-px bg-black right-[112px]" />
-																		<div className="absolute top-0 bottom-0 right-[32px] w-[80px] flex items-center justify-center">
-																			<span className="font-inter font-medium text-[14px] text-black">
-																				Advanced
-																			</span>
-																		</div>
-																		{/* Collapse indicator in the rightmost 32px region */}
-																		<div className="absolute top-0 bottom-0 right-0 w-[32px] flex items-center justify-center">
-																			<span
-																				aria-hidden="true"
-																				className="block w-[12px] h-[2px] bg-black rounded-[1px]"
-																			/>
-																		</div>
-																	</div>
-																	{/* Divider */}
-																	<div className="h-[2px] bg-black" />
-																	{/* Text area (limited height) */}
-																	<div className="bg-white">
-																		<Textarea
-																			placeholder={placeholder}
-																			className={cn(
-																				'h-[72px] w-full border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0',
-																				'bg-white',
-																				'px-3 py-2 resize-none overflow-y-auto',
-																				'font-inter text-[12px] leading-[14px] text-black'
-																			)}
-																			onMouseDown={(e) => e.stopPropagation()}
-																			autoFocus
-																			defaultValue={initialValue}
-																			onBlur={(e) => {
-																				if (idx < 0) return;
-																				form.setValue(
-																					`hybridBlockPrompts.${idx}.value`,
-																					e.target.value,
-																					{ shouldDirty: true }
-																				);
-																			}}
-																		/>
-																	</div>
-																</div>
-															);
-														};
-
-														return (
-															<div 
-																ref={hybridContainerRef}
-																className="w-full flex flex-col items-start relative"
-																onMouseLeave={handleContainerLeave}
-															>
-																{/* Sliding Ghost Button */}
-																<div
-																	aria-hidden="true"
-																	className={cn(
-																		'absolute left-[167px] z-20 pointer-events-none',
-																		'w-[57px] h-[22px] rounded-[4px] border border-[#0B741A] bg-[#9EDDB6]',
-																		'flex items-center justify-center gap-[5px] box-border',
-																		'font-inter font-medium text-[12px] leading-none text-black',
-																		'transition-all duration-200 ease-out', // Smooth sliding
-																		!shouldHideAddTextButtons && isGhostVisible
-																			? 'opacity-100 scale-100'
-																			: 'opacity-0 scale-95'
-																	)}
-																	style={{
-																		top: ghostTop ?? 0,
-																	}}
-																>
-																	<span className="text-[12px] leading-[12px]">+</span>
-																	<span className="text-[12px] leading-[12px]">Text</span>
-																</div>
-
-																{/* Subject -> Intro gap: 17px (no +Text) */}
-																<div className="h-[17px]" />
-
-																{/* Intro */}
-																{introId ? (
-																	<HybridCoreBlock
-																		id={introId}
-																		label="Intro"
-																		bgClass="bg-[#DADAFC]"
-																		borderClass="border-[#6673FF]"
-																		placeholder="Automated Intro"
-																	/>
-																) : null}
-
-																{/* Intro -> Research slot */}
-																{introText ? (
-																	<>
-																		<div className="h-[12px]" />
-																		<TextPill id={introText.id} />
-																		<div className="h-[12px]" />
-																	</>
-																) : (
-																	<AddTextGap
-																		height={12}
-																		onClick={() =>
-																			openOrCreateTextAfter(HybridBlock.introduction)
-																		}
-																		onHover={handleGapEnter}
-																	/>
-																)}
-
-																{/* Research */}
-																{researchId ? (
-																	<HybridCoreBlock
-																		id={researchId}
-																		label="Research"
-																		bgClass="bg-[#C7C7FF]"
-																		borderClass="border-[#1010E7]"
-																		placeholder="Automated Research on who you’re sending to"
-																	/>
-																) : null}
-
-																{/* Research -> CTA slot */}
-																{researchText ? (
-																	<>
-																		<div className="h-[12px]" />
-																		<TextPill id={researchText.id} />
-																		<div className="h-[12px]" />
-																	</>
-																) : (
-																	<AddTextGap
-																		height={12}
-																		onClick={() => openOrCreateTextAfter(HybridBlock.research)}
-																		onHover={handleGapEnter}
-																	/>
-																)}
-
-																{/* Call to Action */}
-																{actionId ? (
-																	<HybridCoreBlock
-																		id={actionId}
-																		label="Call to Action"
-																		bgClass="bg-[#A0A0D5]"
-																		borderClass="border-[#0E0E7F]"
-																		placeholder="Automated Call to Action"
-																	/>
-																) : null}
-
-																{/* CTA -> Signature slot */}
-																{actionText ? (
-																	<>
-																		<div className="h-[15px]" />
-																		<TextPill id={actionText.id} />
-																		<div className="h-[15px]" />
-																	</>
-																) : (
-																	<AddTextGap
-																		height={15}
-																		onClick={() => openOrCreateTextAfter(HybridBlock.action)}
-																		onHover={handleGapEnter}
-																	/>
-																)}
-															</div>
-														);
-													})()}
-
-													{/* Signature (matches Auto-tab signature behavior) */}
-													{(() => {
-														// Auto ON: compact pill by default, expands on hover.
-														// Auto OFF: stays expanded and reveals textarea (expands downward).
-														return (
-															<div
-																className={cn(
-																	'relative group/hybrid-signature transition-none',
-																	isAutoSignature ? 'w-[150px] hover:w-[429px]' : 'w-[429px]'
-																)}
-															>
-																{isAutoSignature ? (
-																	<>
-																		{/* Collapsed pill (shown by default, hidden on hover) */}
-																		<div className="group-hover/hybrid-signature:hidden">
-																			<div
-																				className={cn(
-																					'w-[150px] h-[28px] rounded-[8px] border-[3px] border-black bg-[#E0E0E0]',
-																					'flex items-center justify-start px-3',
-																					'font-inter font-medium text-[14px] text-black'
-																				)}
-																				aria-label="Signature"
-																			>
-																				Signature
-																			</div>
-																		</div>
-
-																		{/* Expanded bar (shown on hover) */}
-																		<div className="hidden group-hover/hybrid-signature:flex items-center h-[28px] rounded-[8px] border-2 border-black overflow-hidden bg-white w-full">
-																			<div className="pl-2 flex items-center h-full shrink-0 w-[140px] bg-[#E0E0E0]">
-																				<span className="font-inter font-semibold text-[14px] whitespace-nowrap text-black">
-																					Auto Signature
-																				</span>
-																			</div>
-																			<button
-																				type="button"
-																				data-hover-description="click to disable automatic drafting for this and write your own"
-																				onClick={() => setIsAutoSignature(false)}
-																				className={cn(
-																					'relative h-full flex items-center text-[12px] font-inter font-normal shrink-0',
-																					'w-[55px] px-2 justify-center text-black bg-[#91E193]'
-																				)}
-																				aria-label="Auto Signature on"
-																			>
-																				<span className="absolute left-0 h-full border-l-2 border-[#000000]" />
-																				<span>on</span>
-																				<span className="absolute right-0 h-full border-r-2 border-[#000000]" />
-																			</button>
-																			<div className="flex-grow h-full bg-[#F0F0F0]">
-																				<Input
+																			<div className="h-[2px] bg-black" />
+																			<div className="bg-white">
+																				<Textarea
+																					ref={textareaRef}
+																					placeholder={placeholder}
 																					className={cn(
-																						'w-full h-full !bg-transparent pl-3 pr-3 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0',
-																						'!text-black placeholder:!text-[#9E9E9E]',
-																						'cursor-not-allowed'
+																						'h-[72px] w-full border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0',
+																						'bg-white px-3 py-2 resize-none overflow-y-auto',
+																						'font-inter text-[12px] leading-[14px] text-black'
 																					)}
-																					placeholder="Write manual Signature here"
-																					disabled
+																					onMouseDown={(e) => e.stopPropagation()}
+																					autoFocus
+																					defaultValue={initialValue}
+																					onBlur={(e) => {
+																						if (idx < 0) return;
+																						form.setValue(
+																							`hybridBlockPrompts.${idx}.value`,
+																							e.target.value,
+																							{ shouldDirty: true }
+																						);
+																					}}
 																				/>
 																			</div>
 																		</div>
-																	</>
-																) : (
-																	/* Manual signature mode: expanded downward with textarea */
-																	<div className="w-full rounded-[8px] border-2 border-black overflow-hidden flex flex-col bg-white">
-																		{/* Header row */}
-																		<div className="flex items-center h-[31px] shrink-0 bg-[#8DDF90]">
-																			<div className="pl-2 flex items-center h-full shrink-0 w-[120px] bg-[#8DDF90]">
-																				<span className="font-inter font-semibold text-[17px] max-[480px]:text-[12px] whitespace-nowrap text-black">
-																					Signature
-																				</span>
-																			</div>
-																			<button
-																				type="button"
-																				data-hover-description="Turn back on automated drafting for here"
+																	);
+																};
+
+																const TextBlock = ({ id }: { id: string }) => {
+																	const isOpen = expandedHybridTextBlockId === id;
+																	const idx = fields.findIndex((f) => f.id === id);
+																	const initialValue =
+																		idx >= 0
+																			? ((form.getValues(`hybridBlockPrompts.${idx}.value`) as string) || '')
+																			: '';
+
+																	if (!isOpen) {
+																		return (
+																			<div
+																				role="button"
+																				tabIndex={0}
 																				onClick={() => {
-																					setIsAutoSignature(true);
-																					setManualSignatureValue('');
+																					setIsGhostVisible(false);
+																					setExpandedHybridCoreBlockId(null);
+																					setHybridStructureSelection({ kind: 'block', blockId: id });
+																					setExpandedHybridTextBlockId(id);
+																				}}
+																				onKeyDown={(e) => {
+																					if (e.key === 'Enter' || e.key === ' ') {
+																						e.preventDefault();
+																						setIsGhostVisible(false);
+																						setExpandedHybridCoreBlockId(null);
+																						setHybridStructureSelection({
+																							kind: 'block',
+																							blockId: id,
+																						});
+																						setExpandedHybridTextBlockId(id);
+																					}
 																				}}
 																				className={cn(
-																					'relative h-full flex items-center text-[12px] font-inter font-normal shrink-0',
-																					'w-[80px] px-2 justify-center text-black bg-[#DADAFC] hover:bg-[#C4C4F5] active:bg-[#B0B0E8]'
+																					'relative h-[28px] cursor-pointer select-none',
+																					'w-[150px] hover:w-[429px] transition-none',
+																					'rounded-[8px] border-[3px] border-[#0B741A] bg-[#A6E2A8]',
+																					'flex items-center justify-start px-3',
+																					'font-inter font-medium text-[14px] leading-none text-black',
+																					'group/hybrid-structure-text-pill'
 																				)}
-																				aria-label="Auto Signature off"
 																			>
-																				<span className="absolute left-0 h-full border-l-2 border-black" />
-																				<span>Auto off</span>
-																				<span className="absolute right-0 h-full border-r-2 border-black" />
-																			</button>
-																			<div className="flex-grow h-full bg-[#8DDF90]" />
+																				<span className="pr-[56px]">Text</span>
+																				<div className="hidden group-hover/hybrid-structure-text-pill:flex items-center gap-[8px] absolute right-[8px] top-1/2 -translate-y-1/2">
+																					<button
+																						type="button"
+																						onClick={(e) => {
+																							e.stopPropagation();
+																							handleRemoveBlock(id);
+																						}}
+																						className="h-[18px] w-[18px] flex items-center justify-center bg-transparent border-0 p-0 text-black"
+																						aria-label="Delete Text block"
+																					>
+																						<CloseIcon width={7} height={7} />
+																					</button>
+																					<button
+																						type="button"
+																						onClick={(e) => {
+																							e.stopPropagation();
+																							setExpandedHybridCoreBlockId(null);
+																							setHybridStructureSelection({
+																								kind: 'block',
+																								blockId: id,
+																							});
+																							setExpandedHybridTextBlockId(id);
+																						}}
+																						className="h-[18px] w-[18px] flex items-center justify-center bg-transparent border-0 p-0"
+																						aria-label="Expand Text block"
+																					>
+																						<svg
+																							width="7"
+																							height="5"
+																							viewBox="0 0 7 5"
+																							fill="none"
+																							xmlns="http://www.w3.org/2000/svg"
+																						>
+																							<path
+																								d="M0.796875 0.796875L3.12021 3.34412L5.44355 0.796875"
+																								stroke="black"
+																								strokeWidth="1.59374"
+																								strokeLinecap="round"
+																								strokeLinejoin="round"
+																							/>
+																						</svg>
+																					</button>
+																				</div>
+																			</div>
+																		);
+																	}
+
+																	return (
+																		<div className="w-[429px] max-w-full rounded-[8px] border-[3px] border-[#0B741A] overflow-hidden bg-[#A6E2A8]">
+																			<div className="h-[28px] flex items-center justify-between px-3">
+																				<span className="font-inter font-medium text-[14px] text-black">
+																					Text
+																				</span>
+																				<div className="flex items-center gap-[8px]">
+																					<button
+																						type="button"
+																						onMouseDown={(e) => {
+																							e.stopPropagation();
+																							setExpandedHybridTextBlockId(null);
+																							handleRemoveBlock(id);
+																						}}
+																						className="h-[18px] w-[18px] flex items-center justify-center bg-transparent border-0 p-0 text-black"
+																						aria-label="Delete Text block"
+																					>
+																						<CloseIcon width={7} height={7} />
+																					</button>
+																					<button
+																						type="button"
+																						onMouseDown={(e) => {
+																							e.stopPropagation();
+																							setExpandedHybridTextBlockId(null);
+																						}}
+																						className="h-[18px] w-[18px] flex items-center justify-center bg-transparent border-0 p-0"
+																						aria-label="Collapse Text block"
+																					>
+																						<span
+																							aria-hidden="true"
+																							className="block w-[12px] h-[2px] bg-black rounded-[1px]"
+																						/>
+																					</button>
+																				</div>
+																			</div>
+																			<div className="h-[2px] bg-black" />
+																			<div className="bg-white">
+																				<Textarea
+																					placeholder="Type anything you want to include"
+																					className={cn(
+																						'h-[72px] w-full border-0 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0',
+																						'bg-white px-3 py-2 resize-none overflow-y-auto',
+																						'font-inter text-[12px] leading-[14px] text-black'
+																					)}
+																					onMouseDown={(e) => e.stopPropagation()}
+																					autoFocus
+																					defaultValue={initialValue}
+																					onBlur={(e) => {
+																						if (idx < 0) return;
+																						form.setValue(
+																							`hybridBlockPrompts.${idx}.value`,
+																							e.target.value,
+																							{ shouldDirty: true }
+																						);
+																					}}
+																				/>
+																			</div>
 																		</div>
-																		{/* Divider */}
-																		<div className="w-full h-[2px] bg-black shrink-0" />
-																		{/* Text entry */}
-																		<div className="bg-white">
-																			<Textarea
-																				value={manualSignatureValue}
-																				onChange={(e) => setManualSignatureValue(e.target.value)}
-																				ref={signatureManualTextareaRef}
-																				className={cn(
-																					'w-full !bg-transparent px-3 py-2 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 resize-none',
-																					'!text-black placeholder:!text-[#9E9E9E] font-inter text-[14px]'
-																				)}
-																				style={{ height: 66 }}
-																				placeholder="Write manual signature here"
+																	);
+																};
+
+																return (
+																	<div
+																		ref={hybridContainerRef}
+																		className="w-full flex flex-col items-start relative"
+																		onMouseLeave={handleContainerLeave}
+																	>
+																		{/* Sliding Ghost Button */}
+																		<div
+																			aria-hidden="true"
+																			className={cn(
+																				'absolute left-[167px] z-20 pointer-events-none',
+																				'w-[57px] h-[22px] rounded-[4px] border border-[#0B741A] bg-[#9EDDB6]',
+																				'flex items-center justify-center gap-[5px] box-border',
+																				'font-inter font-medium text-[12px] leading-none text-black',
+																				'transition-all duration-200 ease-out', // Smooth sliding
+																				!shouldHideAddTextButtons && isGhostVisible
+																					? 'opacity-100 scale-100'
+																					: 'opacity-0 scale-95'
+																			)}
+																			style={{
+																				top: ghostTop ?? 0,
+																			}}
+																		>
+																			<span className="text-[12px] leading-[12px]">+</span>
+																			<span className="text-[12px] leading-[12px]">Text</span>
+																		</div>
+
+																		{/* Intro */}
+																		{introId ? (
+																			<CoreBlockButton
+																				id={introId}
+																				label="Intro"
+																				bgColor="#DADAFC"
+																				borderColor="#6673FF"
+																				advancedOffBadgeColor="#CACAFF"
+																				placeholder="Automated Intro"
 																			/>
-																		</div>
+																		) : null}
+
+																		{/* Intro -> Research slot */}
+																		{introText ? (
+																			<>
+																				<div className="h-[12px]" />
+																				<TextBlock id={introText.id} />
+																				<div className="h-[12px]" />
+																			</>
+																		) : (
+																			<AddTextGap
+																				height={12}
+																				onClick={() =>
+																					openOrCreateTextAfter(HybridBlock.introduction)
+																				}
+																			/>
+																		)}
+
+																		{/* Research */}
+																		{researchId ? (
+																			<CoreBlockButton
+																				id={researchId}
+																				label="Research"
+																				bgColor="#C7C7FF"
+																				borderColor="#1010E7"
+																				advancedOffBadgeColor="#B6B6F6"
+																				placeholder="Automated Research on who you’re sending to"
+																			/>
+																		) : null}
+
+																		{/* Research -> Call to Action slot */}
+																		{researchText ? (
+																			<>
+																				<div className="h-[12px]" />
+																				<TextBlock id={researchText.id} />
+																				<div className="h-[12px]" />
+																			</>
+																		) : (
+																			<AddTextGap
+																				height={12}
+																				onClick={() => openOrCreateTextAfter(HybridBlock.research)}
+																			/>
+																		)}
+
+																		{/* Call to Action */}
+																		{actionId ? (
+																			<CoreBlockButton
+																				id={actionId}
+																				label="Call to Action"
+																				bgColor="#A0A0D5"
+																				borderColor="#0E0E7F"
+																				advancedOffBadgeColor="#9797D6"
+																				placeholder="Automated Call to Action"
+																			/>
+																		) : null}
+
+																		{/* CTA -> Signature slot */}
+																		{actionText ? (
+																			<>
+																				<div className="h-[15px]" />
+																				<TextBlock id={actionText.id} />
+																				<div className="h-[15px]" />
+																			</>
+																		) : (
+																			<AddTextGap
+																				height={15}
+																				ghostOffsetY={-4}
+																				onClick={() => openOrCreateTextAfter(HybridBlock.action)}
+																			/>
+																		)}
 																	</div>
-																)}
-															</div>
-														);
-													})()}
+																);
+															})()}
+														</div>
+													</div>
+
+													{/* Bottom buffer strip (keeps the panel from needing to scroll when blocks expand) */}
+													<div
+														className={cn(
+															'w-full bg-[#8989E1] border-t-[3px] border-[#0E0E7F] rounded-b-[8px]',
+															'h-[37px]'
+														)}
+													/>
 												</div>
 
-												{/* Hybrid: Generate Test button (Auto-tab style) — 26px below the main box (desktop) */}
+												{/* Signature (Auto-tab UI; outside the Body box) */}
+												{!showTestPreview && (
+												<div
+													className={cn(
+														!forceDesktop ? 'w-[89.33vw]' : 'w-[468px]',
+														'max-w-[468px] mx-auto',
+														'mt-[16px]',
+														'h-[97px] flex flex-col'
+													)}
+													data-hpi-hybrid-signature-auto
+												>
+													{isAutoSignature ? (
+														<div className="flex items-center">
+															<div
+																onClick={() => setIsAutoSignature(false)}
+																onMouseLeave={handleSignatureHoverLeave}
+																className="relative w-[465px] max-[480px]:w-full transition-none flex items-center"
+															>
+																<div
+																	ref={autoSignaturePillRef}
+																	onMouseEnter={handleSignatureHoverEnter}
+																	className={cn(
+																		'flex items-center justify-center h-[25px] rounded-[10px] border-2 border-black overflow-hidden w-[122px]',
+																		!forceDesktop && 'max-[480px]:h-[24px]'
+																	)}
+																	style={{ backgroundColor: '#E0E0E0' }}
+																>
+																	<div className="flex items-center justify-center">
+																		<span
+																			ref={autoSignatureAutoWordRef}
+																			aria-hidden="true"
+																			className={cn(
+																				'inline-block overflow-hidden whitespace-nowrap text-black',
+																				'font-inter font-medium text-[18px] max-[480px]:text-[12px]',
+																				'w-0 opacity-0'
+																			)}
+																		>
+																			Auto
+																		</span>
+																		<span className="font-inter font-medium text-[18px] max-[480px]:text-[12px] whitespace-nowrap text-black">
+																			Signature
+																		</span>
+																	</div>
+																</div>
+																<div
+																	ref={autoSignatureControlsRef}
+																	className="flex items-center h-[25px] ml-[13px] max-[480px]:ml-[12px] opacity-0 pointer-events-none"
+																>
+																	<div
+																		className={cn(
+																			'flex items-center h-[25px] w-[292px] rounded-[5px] bg-[#74D177] overflow-hidden pl-[7px] pr-[10px]',
+																			'gap-[14px]',
+																			!forceDesktop &&
+																				'max-[480px]:h-[24px] max-[480px]:w-auto max-[480px]:flex-1 max-[480px]:min-w-0'
+																		)}
+																	>
+																		<button
+																			type="button"
+																			data-hover-description="click to disable automatic drafting for this and write your own"
+																			onClick={() => setIsAutoSignature(false)}
+																			className="flex items-center justify-center h-[17px] w-[33px] rounded-[8px] bg-[#79DF7C] border-2 border-black text-[11px] leading-none font-inter font-normal text-black"
+																			aria-label="Auto Signature on"
+																		>
+																			on
+																		</button>
+																		<div className="flex-1 min-w-0 h-full flex items-center">
+																			<span
+																				className={cn(
+																					'text-black text-[13px] leading-none truncate relative -top-[1px]',
+																					!forceDesktop && 'max-[480px]:text-[10px]'
+																				)}
+																			>
+																				Write manual signature here
+																			</span>
+																		</div>
+																	</div>
+																</div>
+															</div>
+														</div>
+													) : (
+														<div
+															className="w-full h-[97px] rounded-[8px] border-2 border-black overflow-hidden flex flex-col"
+															onMouseLeave={() => {
+																if (!manualSignatureValue.trim()) {
+																	setManualSignatureValue('');
+																	setIsAutoSignature(true);
+																}
+															}}
+														>
+															<div className="flex items-center h-[31px] shrink-0 bg-[#8DDF90]">
+																<div className="pl-2 flex items-center h-full shrink-0 w-[120px] bg-[#8DDF90]">
+																	<span className="font-inter font-semibold text-[17px] max-[480px]:text-[12px] whitespace-nowrap text-black">
+																		Signature
+																	</span>
+																</div>
+																<button
+																	type="button"
+																	data-hover-description="Turn back on automated drafting for here"
+																	onClick={() => {
+																		setIsAutoSignature(true);
+																		setManualSignatureValue('');
+																	}}
+																	className="relative h-full flex items-center text-[12px] font-inter font-normal transition-colors shrink-0 w-[80px] px-2 justify-center text-black bg-[#DADAFC] hover:bg-[#C4C4F5] active:bg-[#B0B0E8]"
+																>
+																	<span className="absolute left-0 h-full border-l-2 border-black" />
+																	<span>Auto off</span>
+																	<span className="absolute right-0 h-full border-r-2 border-black" />
+																</button>
+																<div className="flex-grow h-full bg-[#8DDF90]" />
+															</div>
+															<div className="w-full h-[2px] bg-black shrink-0" />
+															<div className="flex-1 bg-white">
+																<Textarea
+																	value={manualSignatureValue}
+																	onChange={(e) => setManualSignatureValue(e.target.value)}
+																	ref={signatureManualTextareaRef}
+																	className="w-full h-full !bg-transparent px-3 py-2 border-none rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 resize-none !text-black placeholder:!text-[#9E9E9E] font-inter text-[14px]"
+																	placeholder="Write manual signature here"
+																/>
+															</div>
+														</div>
+													)}
+												</div>
+												)}
+
+												{/* Hybrid: Generate Test button — 26px below Signature (desktop) */}
 												{!hideGenerateTestButton && !showTestPreview && !compactLeftOnly && (
-													<div className={cn('mt-[26px] w-[448px] flex items-center justify-center', !forceDesktop && 'max-w-[89.33vw] max-[480px]:hidden')}>
+													<div
+														className={cn(
+															'mt-[26px]',
+															'w-[468px] flex items-center justify-center',
+															!forceDesktop && 'max-w-[89.33vw] max-[480px]:hidden'
+														)}
+													>
 														<Button
 															type="button"
 															data-hover-description="This will show you a test draft, given all of what you provided"
@@ -7261,86 +7122,21 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																handleGenerateTestDrafts?.();
 																setHasAttemptedTest(true);
 															}}
-															disabled={isGenerationDisabled?.()}
+															disabled={isGenerateTestButtonDisabled}
 															className={cn(
 																'h-[28px] w-[232px] bg-[#DBF3DC] text-black font-inter font-normal text-[17px] leading-none rounded-[12px] cursor-pointer flex items-center justify-center p-0 border-2 border-transparent',
-																'transition-colors hover:bg-[#EAF9EB] hover:border-black active:bg-[#D1E9D2]',
-																isGenerationDisabled?.()
-																	? 'opacity-50 cursor-not-allowed'
+																isGeneratingTest
+																	? 'transition-colors bg-[#A2E9A4] hover:bg-[#A2E9A4] active:bg-[#A2E9A4] cursor-default'
+																	: 'transition-colors hover:bg-[#EAF9EB] hover:border-black active:bg-[#D1E9D2]',
+																isGenerateTestButtonDisabled
+																	? isGeneratingTest
+																		? '!opacity-100'
+																		: 'opacity-50 cursor-not-allowed'
 																	: 'opacity-100'
 															)}
 														>
-															{isPendingGeneration && isTest ? 'Testing...' : 'Generate Test'}
+															{isGeneratingTest ? null : 'Generate Test'}
 														</Button>
-													</div>
-												)}
-
-												{/* Hybrid editor panel (legacy): hidden for Intro/Research/CTA/Text (now inline-expanded) */}
-												{hybridStructureSelection.kind === 'block' &&
-													(() => {
-														const idx = fields.findIndex(
-															(f) => f.id === hybridStructureSelection.blockId
-														);
-														if (idx === -1) return false;
-														const t = fields[idx].type;
-														return (
-															t !== HybridBlock.text &&
-															t !== HybridBlock.introduction &&
-															t !== HybridBlock.research &&
-															t !== HybridBlock.action
-														);
-													})() && (
-													<div
-														className={cn(
-															cn('w-[448px] rounded-[8px] border-2 border-black bg-white', !forceDesktop && 'max-w-[89.33vw]'),
-															'px-4 py-3',
-															'mt-3'
-														)}
-														data-hpi-hybrid-structure-editor
-													>
-														{(() => {
-															if (hybridStructureSelection.kind === 'block') {
-																const idx = fields.findIndex(
-																	(f) => f.id === hybridStructureSelection.blockId
-																);
-																if (idx === -1) return null;
-																const field = fields[idx];
-																const fieldProps = form.register(
-																	`hybridBlockPrompts.${idx}.value`
-																);
-																const meta = getBlock(field.type as HybridBlock);
-																const label = getHybridStructureLabel(field.type as HybridBlock);
-
-																return (
-																	<div className="flex flex-col gap-2">
-																		<span className="font-inter font-semibold text-[14px] text-black">
-																			{label}
-																		</span>
-																		{field.type === HybridBlock.text ? (
-																			<Textarea
-																				placeholder={meta.placeholder || ''}
-																				className={cn(
-																					'min-h-[120px] border-2 border-black rounded-[8px] bg-white',
-																					'font-inter text-[14px] text-black'
-																				)}
-																				{...fieldProps}
-																			/>
-																		) : (
-																			<Input
-																				placeholder={meta.placeholder || ''}
-																				className={cn(
-																					'h-[34px] border-2 border-black rounded-[8px] bg-white',
-																					'font-inter text-[14px] text-black'
-																				)}
-																				{...fieldProps}
-																			/>
-																		)}
-																	</div>
-																);
-															}
-
-															return null;
-														})()}
 													</div>
 												)}
 											</div>
@@ -7591,16 +7387,16 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																// If the user doesn't type anything and moves away, we snap back to auto (handled in manual view).
 																setIsAutoSignature(false);
 															}}
-															onMouseEnter={handleSignatureHoverEnter}
 															onMouseLeave={handleSignatureHoverLeave}
 															className={cn(
-																// Hover zone includes the gap + green box so the expanded controls stay open while moving across.
-																'relative group/signature w-[465px] max-[480px]:w-full transition-none flex items-center'
+																// Keep-open hover zone includes the gap + green box (but only the pill triggers expansion).
+																'relative w-[465px] max-[480px]:w-full transition-none flex items-center'
 															)}
 														>
 															{/* Auto Signature pill - animates on hover */}
 															<div
 																ref={autoSignaturePillRef}
+																onMouseEnter={handleSignatureHoverEnter}
 																className={cn(
 																	cn(
 																		'flex items-center justify-center h-[25px] rounded-[10px] border-2 border-black overflow-hidden w-[122px]',
@@ -7630,7 +7426,7 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 															{/* Expanded controls - fades in with "Auto" */}
 															<div
 																ref={autoSignatureControlsRef}
-																className="flex items-center h-[25px] ml-[13px] max-[480px]:ml-[12px] opacity-0 pointer-events-none group-hover/signature:pointer-events-auto"
+																className="flex items-center h-[25px] ml-[13px] max-[480px]:ml-[12px] opacity-0 pointer-events-none"
 															>
 																{/* 292x25 manual signature bar (bg #74D177, r=5) */}
 																<div
@@ -7758,24 +7554,28 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														handleGenerateTestDrafts?.();
 														setHasAttemptedTest(true);
 													}}
-													disabled={isGenerationDisabled?.()}
+													disabled={isGenerateTestButtonDisabled}
 													onMouseEnter={() => {
-														if (!isGenerationDisabled?.()) setIsAutoGenerateTestHovered(true);
+														if (!isGenerateTestButtonDisabled) setIsAutoGenerateTestHovered(true);
 													}}
 													onMouseLeave={() => setIsAutoGenerateTestHovered(false)}
 													onFocus={() => {
-														if (!isGenerationDisabled?.()) setIsAutoGenerateTestHovered(true);
+														if (!isGenerateTestButtonDisabled) setIsAutoGenerateTestHovered(true);
 													}}
 													onBlur={() => setIsAutoGenerateTestHovered(false)}
 													className={cn(
 														'h-[28px] w-[232px] bg-[#DBF3DC] text-black font-inter font-normal text-[17px] leading-none rounded-[12px] cursor-pointer flex items-center justify-center p-0 border-2 border-transparent',
-														'transition-colors hover:bg-[#EAF9EB] hover:border-black active:bg-[#D1E9D2]',
-														isGenerationDisabled?.()
-															? 'opacity-50 cursor-not-allowed'
+														isGeneratingTest
+															? 'transition-colors bg-[#A2E9A4] hover:bg-[#A2E9A4] active:bg-[#A2E9A4] cursor-default'
+															: 'transition-colors hover:bg-[#EAF9EB] hover:border-black active:bg-[#D1E9D2]',
+														isGenerateTestButtonDisabled
+															? isGeneratingTest
+																? '!opacity-100'
+																: 'opacity-50 cursor-not-allowed'
 															: 'opacity-100'
 													)}
 												>
-													{isPendingGeneration && isTest ? 'Testing...' : 'Generate Test'}
+													{isGeneratingTest ? null : 'Generate Test'}
 												</Button>
 											</div>
 										)}
@@ -7915,16 +7715,21 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 															handleGenerateTestDrafts?.();
 															setHasAttemptedTest(true);
 														}}
-														disabled={isGenerationDisabled?.()}
+														disabled={isGenerateTestButtonDisabled}
 														className={cn(
 															'h-[28px] bg-white border-[3px] border-[#349A37] text-black font-inter font-normal text-[17px] leading-none rounded-[12px] cursor-pointer flex items-center justify-center transition-all hover:bg-[#EAF9EB] hover:border-black active:bg-primary/20 p-0',
 															cn(!forceDesktop ? 'w-[93.7vw]' : 'w-full', 'max-w-[475px]'),
-															isGenerationDisabled?.()
-																? 'opacity-50 cursor-not-allowed'
+															isGeneratingTest
+																? 'bg-[#A2E9A4] hover:bg-[#A2E9A4] active:bg-[#A2E9A4] cursor-default'
+																: null,
+															isGenerateTestButtonDisabled
+																? isGeneratingTest
+																	? '!opacity-100'
+																	: 'opacity-50 cursor-not-allowed'
 																: 'opacity-100'
 														)}
 													>
-														{isPendingGeneration && isTest ? 'Testing...' : 'Generate Test'}
+														{isGeneratingTest ? null : 'Generate Test'}
 													</Button>
 												</div>
 											</div>
@@ -7943,15 +7748,18 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 																handleGenerateTestDrafts?.();
 																setHasAttemptedTest(true);
 															}}
-															disabled={isGenerationDisabled?.()}
+															disabled={isGenerateTestButtonDisabled}
 															className={cn(
 																'h-[53px] flex-1 rounded-none bg-[#5DAB68] text-white font-times font-bold cursor-pointer flex items-center justify-center font-primary border-2 border-black border-r-0',
-																isGenerationDisabled?.()
-																	? 'opacity-50 cursor-not-allowed'
+																isGeneratingTest ? 'bg-[#A2E9A4] cursor-default' : null,
+																isGenerateTestButtonDisabled
+																	? isGeneratingTest
+																		? '!opacity-100'
+																		: 'opacity-50 cursor-not-allowed'
 																	: 'opacity-100'
 															)}
 														>
-															{isPendingGeneration && isTest ? 'Testing...' : 'Test'}
+															{isGeneratingTest ? null : 'Test'}
 														</Button>
 														<button
 															type="button"
@@ -8000,6 +7808,14 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 														isDisabled={isGenerationDisabled?.()}
 														isTesting={Boolean(isTest)}
 														contact={contact}
+														onKeep={onKeepTestDraft}
+														isKeeping={Boolean(isKeepingTestDraft)}
+														keepDisabled={
+															!onKeepTestDraft ||
+															!testMessage ||
+															!contact ||
+															Boolean(isTest)
+														}
 													/>
 												</DraggableBox>
 												{/* Mobile sticky footer with Back to Testing and Go to Drafting */}
@@ -8044,98 +7860,104 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 											: 'w-[475px]'
 								)}
 							>
-								{!isPendingGeneration && (
-									<>
-										{draftCount > 0 || isAllContactsSelected ? (
-											// Animated draft button with expanding "All" state
-											<button
-												type="button"
-												onClick={() => {
-													if (!isDraftDisabled) {
-														onDraftClick?.();
-													}
-												}}
-												disabled={isDraftDisabled}
+								<>
+									{shouldShowDraftCta ? (
+										// Animated draft button with expanding "All" state
+										<button
+											type="button"
+											onClick={() => {
+												if (!isDraftDisabled) {
+													onDraftClick?.();
+												}
+											}}
+											disabled={isDraftDisabled}
+											className={cn(
+												'w-full h-full rounded-[4px] border-[3px] text-black font-inter font-normal text-[17px] relative overflow-hidden transition-colors',
+												isAllContactsSelected ? 'duration-300' : 'duration-0',
+												isDraftDisabled
+													? 'bg-[#E0E0E0] border-[#A0A0A0] cursor-not-allowed opacity-60'
+													: isAllContactsSelected
+														? 'bg-[#4DC669] border-black hover:bg-[#45B85F] cursor-pointer'
+														: 'bg-[#C7F2C9] border-[#349A37] hover:bg-[#B9E7BC] cursor-pointer'
+											)}
+										>
+											{/* Normal text - fades out when All selected */}
+											<span
 												className={cn(
-													'w-full h-full rounded-[4px] border-[3px] text-black font-inter font-normal text-[17px] relative overflow-hidden transition-colors',
-													isAllContactsSelected ? 'duration-300' : 'duration-0',
-													isDraftDisabled
-														? 'bg-[#E0E0E0] border-[#A0A0A0] cursor-not-allowed opacity-60'
-														: isAllContactsSelected
-															? 'bg-[#4DC669] border-black hover:bg-[#45B85F] cursor-pointer'
-															: 'bg-[#C7F2C9] border-[#349A37] hover:bg-[#B9E7BC] cursor-pointer'
+													'transition-opacity',
+													isAllContactsSelected
+														? 'duration-300 opacity-0'
+														: 'duration-0 opacity-100'
 												)}
 											>
-												{/* Normal text - fades out when All selected */}
-												<span
-													className={cn(
-														'transition-opacity',
-														isAllContactsSelected
-															? 'duration-300 opacity-0'
-															: 'duration-0 opacity-100'
-													)}
-												>
-													Draft {draftCount} {draftCount === 1 ? 'Contact' : 'Contacts'}
-												</span>
-												{/* "All" text - fades in when All selected */}
-												<span
-													className={cn(
-														'absolute inset-0 flex items-center justify-center transition-opacity',
-														isAllContactsSelected
-															? 'duration-300 opacity-100'
-															: 'duration-0 opacity-0'
-													)}
-												>
-													Draft <span className="font-bold mx-1">All</span> {totalContactCount}{' '}
-													Contacts
-												</span>
-												{/* Expanding green overlay from right - animates width */}
-												<div
-													className={cn(
-														'absolute top-0 bottom-0 right-0 bg-[#4DC669] ease-out',
-														isAllContactsSelected
-															? 'w-full rounded-[1px] transition-all duration-300'
-															: 'w-[62px] rounded-r-[1px] transition-none'
-													)}
-													style={{
-														opacity: isAllContactsSelected ? 0 : 1,
-													}}
-												/>
-											</button>
-										) : (
-											<div className="relative w-full h-full rounded-[4px] border-[3px] border-transparent overflow-hidden transition-colors group-hover:bg-[#EEF5EF] group-hover:border-black">
-												<div className="w-full h-full flex items-center justify-center text-black font-inter font-normal text-[17px] cursor-default">
-													Select Contacts and Draft Emails
-												</div>
-												<button
-													type="button"
-													aria-label="Select all contacts"
-													className="absolute right-0 top-0 bottom-0 w-[62px] bg-[#74D178] rounded-r-[1px] flex items-center justify-center font-inter font-normal text-[17px] text-black hover:bg-[#65C269] cursor-pointer z-10 opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto"
-													onClick={() => {
-														onSelectAllContacts?.();
-													}}
-												>
-													<div className="absolute left-0 top-0 bottom-0 w-[3px] bg-black" />
-													All
-												</button>
+												{isPendingGeneration
+													? 'Add Emails to Queue'
+													: `Draft ${draftCount} ${draftCount === 1 ? 'Contact' : 'Contacts'}`}
+											</span>
+											{/* "All" text - fades in when All selected */}
+											<span
+												className={cn(
+													'absolute inset-0 flex items-center justify-center transition-opacity',
+													isAllContactsSelected
+														? 'duration-300 opacity-100'
+														: 'duration-0 opacity-0'
+												)}
+											>
+												{isPendingGeneration ? (
+													'Add Emails to Queue'
+												) : (
+													<>
+														Draft <span className="font-bold mx-1">All</span> {totalContactCount}{' '}
+														Contacts
+													</>
+												)}
+											</span>
+											{/* Expanding green overlay from right - animates width */}
+											<div
+												className={cn(
+													'absolute top-0 bottom-0 right-0 bg-[#4DC669] ease-out',
+													isAllContactsSelected
+														? 'w-full rounded-[1px] transition-all duration-300'
+														: 'w-[62px] rounded-r-[1px] transition-none'
+												)}
+												style={{
+													opacity: isAllContactsSelected ? 0 : 1,
+												}}
+											/>
+										</button>
+									) : (
+										<div className="relative w-full h-full rounded-[4px] border-[3px] border-transparent overflow-hidden transition-colors group-hover:bg-[#EEF5EF] group-hover:border-black">
+											<div className="w-full h-full flex items-center justify-center text-black font-inter font-normal text-[17px] cursor-default">
+												{draftPlaceholderText}
 											</div>
-										)}
-										{/* "All" button overlay - only visible when not all selected */}
-										{(draftCount > 0 || isAllContactsSelected) && !isAllContactsSelected && (
 											<button
 												type="button"
-												data-hover-description="Select all contacts"
-												className="absolute right-[3px] top-[3px] bottom-[3px] w-[62px] bg-[#74D178] rounded-r-[1px] flex items-center justify-center font-inter font-normal text-[17px] text-black hover:bg-[#65C269] cursor-pointer border-0 border-l-[2px] border-[#349A37] z-10"
-												onClick={(e) => {
-													e.stopPropagation();
+												aria-label="Select all contacts"
+												className="absolute right-0 top-0 bottom-0 w-[62px] bg-[#74D178] rounded-r-[1px] flex items-center justify-center font-inter font-normal text-[17px] text-black hover:bg-[#65C269] cursor-pointer z-10 opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto"
+												onClick={() => {
 													onSelectAllContacts?.();
 												}}
 											>
+												<div className="absolute left-0 top-0 bottom-0 w-[3px] bg-black" />
 												All
 											</button>
-										)}
-									</>
-								)}
+										</div>
+									)}
+									{/* "All" button overlay - only visible when not all selected */}
+									{shouldShowDraftCta && !isAllContactsSelected && (
+										<button
+											type="button"
+											data-hover-description="Select all contacts"
+											className="absolute right-[3px] top-[3px] bottom-[3px] w-[62px] bg-[#74D178] rounded-r-[1px] flex items-center justify-center font-inter font-normal text-[17px] text-black hover:bg-[#65C269] cursor-pointer border-0 border-l-[2px] border-[#349A37] z-10"
+											onClick={(e) => {
+												e.stopPropagation();
+												onSelectAllContacts?.();
+											}}
+										>
+											All
+										</button>
+									)}
+								</>
 							</div>
 						)}
 					</DraggableBox>

@@ -25,6 +25,11 @@ interface CampaignHeaderBoxProps {
 	contactsCount: number;
 	draftCount: number;
 	sentCount: number;
+	/**
+	 * When provided, shows the drafting progress box 9px above the header.
+	 * Each entry represents one queued/running drafting operation.
+	 */
+	draftingProgress?: Array<{ current: number; total: number }> | null;
 	onFromClick?: () => void;
 	onContactsClick?: () => void;
 	onDraftsClick?: () => void;
@@ -227,6 +232,7 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 	contactsCount,
 	draftCount,
 	sentCount,
+	draftingProgress,
 	onFromClick,
 	onContactsClick,
 	onDraftsClick,
@@ -243,6 +249,22 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 	const [renderedHoverDescription, setRenderedHoverDescription] = useState('');
 	const [isHoverDescriptionVisible, setIsHoverDescriptionVisible] = useState(false);
 	const hoverDescriptionTimeoutRef = useRef<number | null>(null);
+
+	const draftingOperationsRaw = draftingProgress ?? [];
+	const draftingOperations = draftingOperationsRaw.filter(
+		(op) => typeof op.total === 'number' && op.total > 0 && typeof op.current === 'number'
+	);
+	const shouldShowDraftingProgress = draftingOperations.length > 0;
+	// Keep the header progress UI compact: render at most 2 stacked bars.
+	// When there are 3+ operations, the label communicates the full count.
+	const draftingOperationsForBars = draftingOperations.slice(0, 2);
+	const draftingLabel = shouldShowDraftingProgress
+		? draftingOperations.length === 1
+			? `${draftingOperations[0].total} email${
+					draftingOperations[0].total === 1 ? '' : 's'
+			  } drafting`
+			: `${draftingOperations.length} operations in progress`
+		: '';
 
 	// Track which metric box is hovered for chrome-style animation
 	const [hoveredMetric, setHoveredMetric] = useState<'contacts' | 'drafts' | 'sent' | null>(null);
@@ -376,7 +398,86 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 					  }
 			}
 		>
-			{renderedHoverDescription ? (
+			{/* Drafting progress box (shown above the header; must NOT shift layout) */}
+			{shouldShowDraftingProgress ? (
+				<div
+					aria-hidden="true"
+					style={{
+						position: 'absolute',
+						// Absolute children position against the padding box; offset by the 2px header border
+						// so this 374x35 box aligns with the header's outer border edges.
+						left: '-2px',
+						right: '-2px',
+						// Anchor the BOTTOM of the progress box 9px above the header border,
+						// while allowing the box to grow upward for multi-operation stacks.
+						top: '-11px', // 9px gap + 2px header border (padding-box origin)
+						transform: 'translateY(-100%)',
+						boxSizing: 'border-box',
+						border: '2px solid rgba(176, 176, 176, 0.2)',
+						borderRadius: '5px',
+						background: 'transparent',
+						pointerEvents: 'none',
+						display: 'flex',
+						flexDirection: 'column',
+						justifyContent: 'flex-start',
+						// Keep the progress bar exactly 6px from the stroke without affecting layout.
+						// (Asymmetric right padding preserves the 359px bar width at the 374px header size.)
+						paddingTop: '6px',
+						paddingBottom: '6px',
+						paddingLeft: '6px',
+						paddingRight: '5px',
+						gap: '6px',
+						zIndex: 90,
+					}}
+				>
+					<div
+						className="font-inter font-medium text-black"
+						style={{ fontSize: '11px', lineHeight: '11px', transform: 'translateY(-1px)' }}
+					>
+						{draftingLabel}
+					</div>
+					<div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+						{draftingOperationsForBars.map((op, idx) => {
+							const pct = Math.min(
+								100,
+								Math.max(
+									0,
+									(Math.min(Math.max(0, op.current), op.total) / Math.max(1, op.total)) *
+										100
+								)
+							);
+							const fillColor = idx === 0 ? '#EDB552' : '#5AB477';
+							return (
+								<div
+									key={`drafting-op-${idx}`}
+									style={{
+										width: '100%',
+										height: '6px',
+										backgroundColor: '#D1D1D1',
+										borderRadius: '6px',
+										overflow: 'hidden',
+										position: 'relative',
+									}}
+								>
+									<div
+										style={{
+											position: 'absolute',
+											top: 0,
+											left: 0,
+											height: '100%',
+											width: `${pct}%`,
+											backgroundColor: fillColor,
+											borderRadius: '6px',
+										}}
+									/>
+								</div>
+							);
+						})}
+					</div>
+				</div>
+			) : null}
+
+			{renderedHoverDescription && !shouldShowDraftingProgress ? (
 				<div
 					data-hover-description-ignore="true"
 					className={cn(

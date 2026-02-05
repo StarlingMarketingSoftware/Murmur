@@ -8,7 +8,6 @@ import {
 	useState,
 } from 'react';
 import { useFormContext } from 'react-hook-form';
-import { Button } from '@/components/ui/button';
 import { gsap } from 'gsap';
 import { convertHtmlToPlainText } from '@/utils/html';
 import { ContactWithName } from '@/types/contact';
@@ -25,6 +24,9 @@ export interface TestPreviewPanelProps {
 	onTest?: () => void;
 	isDisabled?: boolean;
 	isTesting?: boolean;
+	onKeep?: () => boolean | Promise<boolean>;
+	isKeeping?: boolean;
+	keepDisabled?: boolean;
 	contact?: ContactWithName | null;
 	className?: string;
 	style?: React.CSSProperties;
@@ -34,9 +36,9 @@ export const TestPreviewPanel: FC<TestPreviewPanelProps> = ({
 	setShowTestPreview,
 	testMessage,
 	isLoading = false,
-	onTest,
-	isDisabled,
-	isTesting,
+	onKeep,
+	isKeeping = false,
+	keepDisabled = false,
 	contact,
 	className,
 	style,
@@ -54,6 +56,7 @@ export const TestPreviewPanel: FC<TestPreviewPanelProps> = ({
 	const [typedBody, setTypedBody] = useState<string>('');
 	const WORD_LIMIT = 100;
 	const [clipAtHeight, setClipAtHeight] = useState<number | null>(null);
+	const [isHovered, setIsHovered] = useState(false);
 
 	const fontFamily = form.watch('font') || 'Arial';
 
@@ -296,6 +299,8 @@ export const TestPreviewPanel: FC<TestPreviewPanelProps> = ({
 				backgroundColor: shouldBlankWave ? '#FCE392' : '#F5DE94',
 				...style,
 			}}
+			onMouseEnter={() => setIsHovered(true)}
+			onMouseLeave={() => setIsHovered(false)}
 		>
 			{/* Test label at the top - 22px total height with centered text */}
 			<div className="w-full flex items-center px-[9px]" style={{ height: '22px' }}>
@@ -311,7 +316,7 @@ export const TestPreviewPanel: FC<TestPreviewPanelProps> = ({
 					<div
 						className={cn(
 							'relative px-3 sm:px-5',
-							shouldBlankWave ? 'test-preview-blank-wave-identity' : 'bg-white'
+							shouldBlankWave ? 'test-preview-blank-wave-identity' : 'bg-[#FFEEB7]'
 						)}
 						style={{ height: '40px' }}
 						data-test-preview-header
@@ -323,8 +328,8 @@ export const TestPreviewPanel: FC<TestPreviewPanelProps> = ({
 										{fullName ? (
 											<>
 												{/* Left Column - Name and Company */}
-												<div className="flex flex-col">
-													<div className="p-0.5 sm:p-1 pl-2 sm:pl-3 pb-0 sm:pb-[1.5px] flex items-start">
+												<div className="flex flex-col justify-center h-full">
+													<div className="pl-2 sm:pl-3 flex items-start">
 														<div
 															className="font-inter font-bold text-[14px] sm:text-[15.45px] w-full leading-[1.15] sm:leading-4 overflow-hidden"
 															style={{
@@ -336,7 +341,7 @@ export const TestPreviewPanel: FC<TestPreviewPanelProps> = ({
 															{fullName}
 														</div>
 													</div>
-													<div className="p-0.5 sm:p-1 pl-2 sm:pl-3 pt-0 flex items-start">
+													<div className="pl-2 sm:pl-3 -mt-[1px] flex items-start">
 														<div
 															className="text-[11px] sm:text-xs text-black w-full leading-[1.2] sm:leading-4 overflow-hidden whitespace-nowrap"
 															style={{
@@ -435,13 +440,16 @@ export const TestPreviewPanel: FC<TestPreviewPanelProps> = ({
 											</>
 										)}
 									</div>
-									<button
-										type="button"
-										onClick={() => setShowTestPreview(false)}
-										className="absolute right-0 top-1/2 -translate-y-1/2 p-0.5 sm:p-1 transition-all hover:brightness-75"
-									>
-										<CloseButtonIcon />
-									</button>
+								<button
+									type="button"
+									onClick={() => setShowTestPreview(false)}
+									className={cn(
+										'absolute right-0 top-1/2 -translate-y-1/2 p-0.5 sm:p-1 transition-all hover:brightness-75',
+										isHovered ? 'opacity-100' : 'opacity-0 pointer-events-none'
+									)}
+								>
+									<CloseButtonIcon />
+								</button>
 								</div>
 							</div>
 						)}
@@ -466,7 +474,7 @@ export const TestPreviewPanel: FC<TestPreviewPanelProps> = ({
 						</span>
 					</div>
 
-					{/* Email body box - 355x504px, 4px below the subject box */}
+					{/* Email body box - 355x542px, 4px below the subject box */}
 					<div
 						ref={boxRef}
 						className={cn(
@@ -475,7 +483,7 @@ export const TestPreviewPanel: FC<TestPreviewPanelProps> = ({
 						)}
 						style={{
 							width: '355px',
-							height: '504px',
+							height: '542px',
 							marginTop: '4px',
 						}}
 					>
@@ -486,35 +494,40 @@ export const TestPreviewPanel: FC<TestPreviewPanelProps> = ({
 							thumbWidth={2}
 							offsetRight={-5}
 						>
-							<div ref={contentRef} className="max-w-none text-[14px] p-4">
+							<div ref={contentRef} className="max-w-none text-[14px] p-4 pb-[64px]">
 								<div className="whitespace-pre-wrap leading-[1.6]" style={{ fontFamily }}>
 									{typedBody}
 								</div>
 							</div>
 						</CustomScrollbar>
+						{!isLoading && !shouldBlankWave && (
+							<button
+								type="button"
+								onClick={async () => {
+									if (isKeeping || keepDisabled) return;
+									if (onKeep) {
+										const kept = await onKeep();
+										if (kept) setShowTestPreview(false);
+										return;
+									}
+									setShowTestPreview(false);
+								}}
+								disabled={isKeeping || keepDisabled}
+								className="absolute left-1/2 -translate-x-1/2 flex items-center justify-center text-black"
+								style={{
+									width: '168px',
+									height: '28px',
+									bottom: '18px',
+									backgroundColor: '#EAEAEA',
+									borderRadius: '12px',
+									opacity: isKeeping || keepDisabled ? 0.6 : 1,
+									cursor: isKeeping || keepDisabled ? 'default' : 'pointer',
+								}}
+							>
+								{isKeeping ? '' : 'Keep'}
+							</button>
+						)}
 					</div>
-
-					{/* Test Again button - 355x28px, 10px below the email body box */}
-					<Button
-						type="button"
-						onClick={onTest}
-						disabled={isDisabled}
-						className={
-							'border-2 border-black text-black font-inter font-normal text-[17px] leading-none rounded-[4px] cursor-pointer flex items-center justify-center transition-all hover:brightness-95 active:brightness-90 mx-auto max-[480px]:hidden mobile-landscape-hide disabled:opacity-100' +
-							(isDisabled ? ' cursor-not-allowed' : '')
-						}
-						style={{
-							width: '355px',
-							height: '28px',
-							marginTop: '10px',
-							backgroundColor: '#E6E6E6',
-							lineHeight: '28px',
-						}}
-					>
-						<span style={{ marginTop: '-2px' }}>
-							{isTesting ? 'Testing...' : 'Regenerate'}
-						</span>
-					</Button>
 				</div>
 			</div>
 		</div>

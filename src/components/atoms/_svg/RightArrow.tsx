@@ -4,10 +4,18 @@ import { FC } from 'react';
 interface RightArrowProps extends CommonIconProps {
 	color?: string;
 	opacity?: number;
+	strokeWidth?: number;
 }
 
 const RightArrow: FC<RightArrowProps> = (props) => {
-	const { width = 45, height = 85, className, color = '#A0A0A0', opacity = 0.6 } = props;
+	const {
+		width = 45,
+		height = 85,
+		className,
+		color = '#A0A0A0',
+		opacity = 0.6,
+		strokeWidth = 3,
+	} = props;
 	return (
 		<svg
 			width={width}
@@ -24,7 +32,7 @@ const RightArrow: FC<RightArrowProps> = (props) => {
 					y2="-1.5"
 					transform="matrix(0.705683 0.708528 0.708528 -0.705683 2.16016 0)"
 					stroke={color}
-					strokeWidth="3"
+					strokeWidth={strokeWidth}
 				/>
 				<line
 					y1="-1.5"
@@ -32,7 +40,7 @@ const RightArrow: FC<RightArrowProps> = (props) => {
 					y2="-1.5"
 					transform="matrix(-0.708487 0.705723 0.705723 0.708487 44.3633 42.4453)"
 					stroke={color}
-					strokeWidth="3"
+					strokeWidth={strokeWidth}
 				/>
 			</g>
 		</svg>

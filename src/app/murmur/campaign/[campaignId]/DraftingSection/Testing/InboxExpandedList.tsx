@@ -71,7 +71,7 @@ const InboxHeaderChrome: FC<{
 	isAllTab?: boolean;
 	whiteSectionHeight?: number;
 }> = ({ offsetY = 0, hasData = true, isAllTab = false, whiteSectionHeight }) => {
-	const isBottomView = whiteSectionHeight === 15;
+	const isBottomView = typeof whiteSectionHeight === 'number' && whiteSectionHeight <= 16;
 	const dotColor = hasData ? '#D9D9D9' : '#B0B0B0';
 	const pillBorderColor = hasData ? '#000000' : '#B0B0B0';
 	const pillTextColor = hasData ? '#000000' : '#B0B0B0';
@@ -261,7 +261,13 @@ export const InboxExpandedList: FC<InboxExpandedListProps> = ({
 	// to match the other elements in that layout. Otherwise standard 2px border.
 	const isAllTab = height === 347;
 	const whiteSectionHeight = customWhiteSectionHeight ?? (isAllTab ? 20 : 28);
-	const isBottomView = customWhiteSectionHeight === 15;
+	const isBottomView = customWhiteSectionHeight === 15 || customWhiteSectionHeight === 16;
+	// Compressed bottom panel spec: 40px total = 12px white + 28px color.
+	const effectiveWhiteSectionHeight = collapsed && isBottomView ? 12 : whiteSectionHeight;
+	const shouldRenderCollapsedTopBox = collapsed && isBottomView;
+	const collapsedTopBoxHeightPx = 22;
+	const collapsedTopBoxWidthPx = 224;
+	const collapsedTopBoxRadiusPx = 4.7;
 
 	// Filter to only show emails from campaign contacts
 	const inboundEmails = useMemo(() => {
@@ -326,8 +332,12 @@ export const InboxExpandedList: FC<InboxExpandedListProps> = ({
 		<div
 			className={cn(
 				'relative max-[480px]:w-[96.27vw] rounded-md flex flex-col overflow-visible',
-				isBottomView
-					? 'border-2 border-black'
+				// In the compressed bottom-panel view we need exact internal pixel heights (16px white + 24px color).
+				// Use a stroke via box-shadow so it doesn't consume layout height.
+				shouldRenderCollapsedTopBox
+					? 'border-0'
+					: isBottomView
+						? 'border-2 border-black'
 					: isAllTab
 					? 'border-[3px] border-black'
 					: 'border-2 border-black/30'
@@ -335,7 +345,10 @@ export const InboxExpandedList: FC<InboxExpandedListProps> = ({
 			style={{
 				width: `${width}px`,
 				height: `${height}px`,
-				background: `linear-gradient(to bottom, #ffffff ${whiteSectionHeight}px, #5EB6D6 ${whiteSectionHeight}px)`,
+				background: `linear-gradient(to bottom, #ffffff ${effectiveWhiteSectionHeight}px, #5EB6D6 ${effectiveWhiteSectionHeight}px)`,
+				boxShadow: shouldRenderCollapsedTopBox
+					? 'inset 0 0 0 2px #000000'
+					: undefined,
 				...(isBottomView ? { cursor: 'pointer' } : {}),
 			}}
 			data-hover-description="Inbox: Replies and inbound messages from contacts in this campaign."
@@ -362,13 +375,16 @@ export const InboxExpandedList: FC<InboxExpandedListProps> = ({
 				/>
 			)}
 			{/* Header row (no explicit divider; let the background change from white to blue like the main table) */}
-			<InboxHeaderChrome isAllTab={isAllTab} whiteSectionHeight={customWhiteSectionHeight} />
+			<InboxHeaderChrome
+				isAllTab={isAllTab}
+				whiteSectionHeight={shouldRenderCollapsedTopBox ? effectiveWhiteSectionHeight : customWhiteSectionHeight}
+			/>
 			<div
 				className={cn(
 					'flex items-center gap-2 px-3 shrink-0',
 					onHeaderClick ? 'cursor-pointer' : ''
 				)}
-				style={{ height: `${whiteSectionHeight}px` }}
+				style={{ height: `${effectiveWhiteSectionHeight}px` }}
 				role={onHeaderClick ? 'button' : undefined}
 				tabIndex={onHeaderClick ? 0 : undefined}
 				onClick={onHeaderClick}
@@ -405,6 +421,44 @@ export const InboxExpandedList: FC<InboxExpandedListProps> = ({
 					<div className="flex items-center" style={{ marginTop: isBottomView ? 0 : '1px' }}>
 						<OpenIcon width={isBottomView ? 10 : undefined} height={isBottomView ? 10 : undefined} />
 					</div>
+				</div>
+			)}
+
+			{/* Collapsed bottom panels: show only the top "batch" box (22px) centered in the 24px color region */}
+			{shouldRenderCollapsedTopBox && (
+				<div className="flex-1 flex items-center justify-center px-[2px]">
+					{bottomViewInboundBatches[0] ? (
+						<div
+							key="inbox-collapsed-batch"
+							className={cn(
+								'select-none overflow-hidden border-2 border-[#000000] flex items-center justify-between'
+							)}
+							style={{
+								width: `${collapsedTopBoxWidthPx}px`,
+								height: `${collapsedTopBoxHeightPx}px`,
+								borderRadius: `${collapsedTopBoxRadiusPx}px`,
+								backgroundColor: '#CCDFF4',
+							}}
+						>
+							<span className="pl-[18px] font-inter font-medium text-[15px] text-black leading-none">
+								{formatBatchCount(bottomViewInboundBatches[0].count)}
+							</span>
+							<span className="pr-[18px] font-inter font-medium text-[15px] text-black leading-none">
+								{formatBatchTimestamp(bottomViewInboundBatches[0].endAt)}
+							</span>
+						</div>
+					) : (
+						<div
+							aria-hidden
+							className={cn('select-none overflow-hidden border-2 border-[#000000]')}
+							style={{
+								width: `${collapsedTopBoxWidthPx}px`,
+								height: `${collapsedTopBoxHeightPx}px`,
+								borderRadius: `${collapsedTopBoxRadiusPx}px`,
+								backgroundColor: placeholderBgColor,
+							}}
+						/>
+					)}
 				</div>
 			)}
 
@@ -449,8 +503,9 @@ export const InboxExpandedList: FC<InboxExpandedListProps> = ({
 												key={`${batch.endAt.getTime()}-${batch.count}-${idx}`}
 												className={cn(
 													'select-none overflow-hidden border-2 border-[#000000] flex items-center justify-between',
-													'w-[224px] h-[30px] rounded-[4.7px] bg-white'
+													'w-[224px] h-[30px] rounded-[4.7px]'
 												)}
+												style={{ backgroundColor: '#CCDFF4' }}
 											>
 												<span className="pl-[18px] font-inter font-medium text-[15px] text-black leading-none">
 													{countLabel}

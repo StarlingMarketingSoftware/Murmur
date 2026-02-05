@@ -36,7 +36,7 @@ import DraftingStatusPanel from '@/app/murmur/campaign/[campaignId]/DraftingSect
 import { CampaignHeaderBox } from '@/components/molecules/CampaignHeaderBox/CampaignHeaderBox';
 import { useGetContacts, useGetLocations } from '@/hooks/queryHooks/useContacts';
 import { useEditUserContactList } from '@/hooks/queryHooks/useUserContactLists';
-import { useEditEmail, useGetEmails } from '@/hooks/queryHooks/useEmails';
+import { useCreateEmail, useEditEmail, useGetEmails } from '@/hooks/queryHooks/useEmails';
 import { EmailStatus, EmailVerificationStatus, DraftingMode, ReviewStatus } from '@/constants/prismaEnums';
 import { resolveAutoSignatureText } from '@/constants/autoSignatures';
 import { ContactsSelection } from './EmailGeneration/ContactsSelection/ContactsSelection';
@@ -89,6 +89,10 @@ import {
 import { Contact, Identity } from '@prisma/client';
 import LeftArrow from '@/components/atoms/_svg/LeftArrow';
 import RightArrow from '@/components/atoms/_svg/RightArrow';
+import { BottomPanelsContainer } from '../../../../../components/atoms/BottomPanelsContainer';
+import type { HistoryAction } from '../../../../../components/atoms/BottomPanelsContainer';
+import { useGetInboundEmails } from '@/hooks/queryHooks/useInboundEmails';
+import { useGetCampaignContactEvents } from '@/hooks/queryHooks/useCampaigns';
 import { isRestaurantTitle, isCoffeeShopTitle, isMusicVenueTitle, isMusicFestivalTitle, isWeddingPlannerTitle, isWeddingVenueTitle, isWineBeerSpiritsTitle, getWineBeerSpiritsLabel } from '@/utils/restaurantTitle';
 
 type IdentityProfileFields = Identity & {
@@ -116,6 +120,71 @@ const DEFAULT_STATE_SUGGESTIONS = [
 	},
 ];
 
+const stripInjectedSubjectFromTestMessageHtml = (
+	rawHtml: string
+): { messageHtml: string; injectedSubject: string } => {
+	const html = (rawHtml || '').toString();
+	if (!html) return { messageHtml: html, injectedSubject: '' };
+
+	// DOM-based stripping is safest (preserves outer wrappers + signature markup).
+	// If we're not in a browser environment, keep as-is.
+	if (typeof window === 'undefined' || typeof DOMParser === 'undefined') {
+		return { messageHtml: html, injectedSubject: '' };
+	}
+
+	try {
+		const parser = new DOMParser();
+		const doc = parser.parseFromString(
+			`<div id="__murmur_test_preview_root">${html}</div>`,
+			'text/html'
+		);
+		const root = doc.getElementById('__murmur_test_preview_root');
+		if (!root) return { messageHtml: html, injectedSubject: '' };
+
+		// The AI/Hybrid test flow injects the subject as:
+		// <span style="font-family: Inter; font-weight: bold;">{subject}</span><br><br>
+		// We remove that subject span and the first two subsequent <br> tags only.
+		const subjectSpan = root.querySelector(
+			'span[style*="font-family: Inter"][style*="font-weight: bold"]'
+		) as HTMLSpanElement | null;
+		const injectedSubject = subjectSpan?.textContent?.trim() || '';
+
+		if (!subjectSpan) {
+			return { messageHtml: html, injectedSubject };
+		}
+
+		const parent = subjectSpan.parentNode;
+		let cursor: ChildNode | null = subjectSpan.nextSibling;
+		subjectSpan.remove();
+
+		let brsRemoved = 0;
+		while (parent && brsRemoved < 2 && cursor) {
+			const current = cursor;
+			cursor = cursor.nextSibling;
+
+			// Remove whitespace-only text nodes between nodes to ensure <br><br> is removed cleanly.
+			if (current.nodeType === Node.TEXT_NODE) {
+				if (!((current.textContent || '').trim())) {
+					current.parentNode?.removeChild(current);
+				}
+				continue;
+			}
+
+			if (current.nodeType === Node.ELEMENT_NODE) {
+				const el = current as Element;
+				if (el.tagName.toLowerCase() === 'br') {
+					el.parentNode?.removeChild(el);
+					brsRemoved += 1;
+				}
+			}
+		}
+
+		return { messageHtml: root.innerHTML, injectedSubject };
+	} catch {
+		return { messageHtml: html, injectedSubject: '' };
+	}
+};
+
 interface ExtendedDraftingSectionProps extends DraftingSectionProps {
 	onOpenIdentityDialog?: () => void;
 	autoOpenProfileTabWhenIncomplete?: boolean;
@@ -140,6 +209,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		goToPreviousTab,
 		goToNextTab,
 		hideHeaderBox,
+		onDraftOperationsProgress,
 		isTransitioningOut,
 		isTransitioningIn,
 	} = props;
@@ -166,6 +236,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		isGenerationDisabled,
 		isOpenUpgradeSubscriptionDrawer,
 		isPendingGeneration,
+		isDraftQueueActive,
 		isTest,
 		isUpscalingPrompt,
 		upscalePrompt,
@@ -184,11 +255,11 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		// scrollToEmailStructure,
 		draftingRef,
 		emailStructureRef,
+		draftOperations,
 		isLivePreviewVisible,
 		livePreviewContactId,
 		livePreviewMessage,
 		livePreviewSubject,
-		livePreviewDraftNumber,
 		livePreviewTotal,
 	} = useDraftingSection(props);
 
@@ -198,6 +269,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		suppressToasts: true,
 	});
 	const { mutateAsync: updateEmail } = useEditEmail({ suppressToasts: true });
+	const { mutateAsync: createEmail } = useCreateEmail({ suppressToasts: true });
 	const { mutateAsync: editUser } = useEditUser({ suppressToasts: true });
 	const { mutateAsync: editIdentity } = useEditIdentity({ suppressToasts: true });
 
@@ -236,15 +308,53 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const isSafari = useMemo(() => isSafariBrowser(), []);
 	const [isClient, setIsClient] = useState(false);
 	useEffect(() => setIsClient(true), []);
-	const progressBarPortalTarget = useMemo(() => {
-		if (!isClient) return null;
-		// We want the bar to live at the top of the DOCUMENT (not the viewport),
-		// so it scrolls away naturally with the page.
-		return document.body;
-	}, [isClient]);
 	const isDraftingView = view === 'drafting';
 	const isSentView = view === 'sent';
+
+	const draftingOperationsForHeader = useMemo(
+		() => (draftOperations || []).map((op) => ({ current: op.progress, total: op.total })),
+		[draftOperations]
+	);
+	const activelyDraftingContactIds = useMemo(() => {
+		const ids = new Set<number>();
+		for (const op of draftOperations || []) {
+			for (const target of op.targets || []) {
+				ids.add(target.id);
+			}
+		}
+		return ids;
+	}, [draftOperations]);
+	const isDraftingProgressVisible =
+		renderGlobalOverlays && draftingOperationsForHeader.length > 0;
+	const draftingProgressForHeader = isDraftingProgressVisible
+		? draftingOperationsForHeader
+		: null;
+
+	// Report live drafting progress upward for page-level header rendering (narrowest breakpoint).
+	useEffect(() => {
+		if (!renderGlobalOverlays) return;
+		onDraftOperationsProgress?.({
+			visible: isDraftingProgressVisible,
+			operations: draftingOperationsForHeader,
+		});
+	}, [
+		onDraftOperationsProgress,
+		renderGlobalOverlays,
+		isDraftingProgressVisible,
+		draftingOperationsForHeader,
+	]);
+
+	// Ensure we clear state on unmount.
+	useEffect(() => {
+		return () => {
+			onDraftOperationsProgress?.({ visible: false, operations: [] });
+		};
+	}, [onDraftOperationsProgress]);
 	const [selectedDraft, setSelectedDraft] = useState<EmailWithRelations | null>(null);
+	const [isKeepingTestDraft, setIsKeepingTestDraft] = useState(false);
+	const [pendingKeptDraftContactId, setPendingKeptDraftContactId] = useState<number | null>(
+		null
+	);
 	// Ref to the main DraftedEmails instance (center column) so side preview controls can exit regen mode.
 	const draftedEmailsRef = useRef<DraftedEmailsHandle | null>(null);
 	// Tracks whether the DraftedEmails "regen settings preview" (HybridPromptInput) is open for the selected draft.
@@ -554,7 +664,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		};
 	}, [view, isAllTabNarrow, isNarrowestDesktop]);
 
-	const bottomPanelBoxHeightPx = areBottomPanelsCollapsedAtCompactBreakpoint ? 31 : 117;
+	const bottomPanelBoxHeightPx = areBottomPanelsCollapsedAtCompactBreakpoint ? 40 : 117;
 	const bottomPanelCollapsed = areBottomPanelsCollapsedAtCompactBreakpoint;
 
 	// --- Pinned left panel (ContactsExpandedList <-> MiniEmailStructure) ---
@@ -2175,6 +2285,16 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const sentEmails = (headerEmails || []).filter((e) => e.status === EmailStatus.sent);
 	const sentCount = sentEmails.length;
 
+	// If we just "Kept" a test draft, auto-open its draft in the Drafts tab once it exists.
+	useEffect(() => {
+		if (view !== 'drafting') return;
+		if (!pendingKeptDraftContactId) return;
+		const kept = draftEmails.find((e) => e.contactId === pendingKeptDraftContactId);
+		if (!kept) return;
+		setSelectedDraft(kept);
+		setPendingKeptDraftContactId(null);
+	}, [draftEmails, pendingKeptDraftContactId, view]);
+
 	// When batch drafting is in progress (or still animating queued drafts), swap the campaign
 	// research panel slot to a live "Draft Preview" so users can watch drafts type out from any tab.
 	const isBatchDraftingInProgress = isLivePreviewVisible;
@@ -2232,6 +2352,109 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		(contact) => !contactedContactIds.has(contact.id)
 	);
 
+	// Fetch inbound emails for history panel
+	const { data: inboundEmails } = useGetInboundEmails({
+		filters: { campaignId: campaign?.id },
+		enabled: Boolean(campaign?.id),
+	});
+
+	// Fetch campaign contact events for history panel
+	const { data: campaignContactEvents } = useGetCampaignContactEvents(campaign?.id);
+
+	// Compute history actions for the history panel
+	const historyActions = useMemo<HistoryAction[]>(() => {
+		const BATCH_GAP_MS = 2 * 60 * 60 * 1000; // 2 hours
+
+		const computeBatches = <T extends { timestamp: Date }>(
+			items: T[],
+			type: HistoryAction['type']
+		): HistoryAction[] => {
+			if (items.length === 0) return [];
+
+			const sorted = [...items].sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+			const batches: HistoryAction[] = [];
+			let currentCount = 1;
+			let currentEndAt = sorted[0].timestamp;
+
+			for (let i = 1; i < sorted.length; i++) {
+				const prev = sorted[i - 1].timestamp;
+				const curr = sorted[i].timestamp;
+				const gap = curr.getTime() - prev.getTime();
+
+				if (gap > BATCH_GAP_MS) {
+					batches.push({
+						id: `${type}-${currentEndAt.getTime()}`,
+						type,
+						count: currentCount,
+						timestamp: currentEndAt,
+					});
+					currentCount = 1;
+					currentEndAt = curr;
+				} else {
+					currentCount += 1;
+					currentEndAt = curr;
+				}
+			}
+
+			batches.push({
+				id: `${type}-${currentEndAt.getTime()}`,
+				type,
+				count: currentCount,
+				timestamp: currentEndAt,
+			});
+
+			return batches;
+		};
+
+		// Contacts batches from campaign contact events
+		const contactsBatches = (campaignContactEvents || [])
+			.map((e) => {
+				const createdAt = new Date(e.createdAt);
+				if (Number.isNaN(createdAt.getTime())) return null;
+				return {
+					id: `contacts-${createdAt.getTime()}`,
+					type: 'contacts' as const,
+					count: e.addedCount,
+					timestamp: createdAt,
+				};
+			})
+			.filter(Boolean) as HistoryAction[];
+
+		// Drafts batches
+		const draftItems = draftEmails
+			.map((e) => {
+				const createdAt = new Date(e.createdAt);
+				if (Number.isNaN(createdAt.getTime())) return null;
+				return { timestamp: createdAt };
+			})
+			.filter(Boolean) as { timestamp: Date }[];
+		const draftsBatches = computeBatches(draftItems, 'drafts');
+
+		// Sent batches
+		const sentItems = sentEmails
+			.map((e) => {
+				const sentAt = e.sentAt ? new Date(e.sentAt) : null;
+				if (!sentAt || Number.isNaN(sentAt.getTime())) return null;
+				return { timestamp: sentAt };
+			})
+			.filter(Boolean) as { timestamp: Date }[];
+		const sentBatches = computeBatches(sentItems, 'sent');
+
+		// Received batches (inbound emails)
+		const receivedItems = (inboundEmails || [])
+			.map((e) => {
+				const receivedAt = new Date(e.createdAt);
+				if (Number.isNaN(receivedAt.getTime())) return null;
+				return { timestamp: receivedAt };
+			})
+			.filter(Boolean) as { timestamp: Date }[];
+		const receivedBatches = computeBatches(receivedItems, 'received');
+
+		// Combine all batches and sort by timestamp (newest first)
+		return [...contactsBatches, ...draftsBatches, ...sentBatches, ...receivedBatches]
+			.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+	}, [campaignContactEvents, draftEmails, sentEmails, inboundEmails]);
+
 	const isSendingDisabled = isFreeTrial || (user?.sendingCredits || 0) === 0;
 
 	const [selectedContactForResearch, setSelectedContactForResearch] =
@@ -2246,6 +2469,116 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const displayedContactForResearch = isDraftPreviewOpen
 		? selectedContactForResearch
 		: hoveredContactForResearch || selectedContactForResearch;
+
+	const handleKeepTestDraft = useCallback(
+		async (explicitContact?: ContactWithName | null) => {
+			if (isKeepingTestDraft) return false;
+			if (!campaign?.id) {
+				toast.error('Missing campaign.');
+				return false;
+			}
+
+			const contactForTest = explicitContact ?? contacts?.[0] ?? null;
+			if (!contactForTest) {
+				toast.error('No contact available to save this test draft.');
+				return false;
+			}
+
+			const rawTestMessage = (campaign.testMessage || '').trim();
+			if (!rawTestMessage) {
+				toast.error('Generate a test draft first.');
+				return false;
+			}
+
+			setIsKeepingTestDraft(true);
+			try {
+				const existingSnapshot = extractMurmurDraftSettingsSnapshot(rawTestMessage);
+				const { messageHtml, injectedSubject } =
+					stripInjectedSubjectFromTestMessageHtml(rawTestMessage);
+
+				const subject = (campaign.testSubject || '').trim() || injectedSubject.trim();
+				if (!subject) {
+					toast.error('Test draft is missing a subject.');
+					return false;
+				}
+
+				const cleanedMessageHtml = (messageHtml || '').trim();
+				if (!cleanedMessageHtml) {
+					toast.error('Test draft is missing content.');
+					return false;
+				}
+
+				const identityProfile = campaign.identity as IdentityProfileFields | null | undefined;
+				const computedProfileFields: DraftProfileFields = {
+					name: identityProfile?.name ?? '',
+					genre: identityProfile?.genre ?? '',
+					area: identityProfile?.area ?? '',
+					band: identityProfile?.bandName ?? '',
+					bio: identityProfile?.bio ?? '',
+					links: identityProfile?.website ?? '',
+				};
+
+				const baseValues = existingSnapshot?.values ?? form.getValues();
+				// Ensure the snapshot stores a concrete signature string (so Drafts settings reflect what was used).
+				const signatureForSnapshot =
+					resolveAutoSignatureText({
+						currentSignature: baseValues.signature ?? null,
+						fallbackSignature: `Thank you,\n${identityProfile?.name || ''}`,
+						context: {
+							name: identityProfile?.name ?? null,
+							bandName: identityProfile?.bandName ?? null,
+							website: identityProfile?.website ?? null,
+							email: identityProfile?.email ?? null,
+						},
+					}) ||
+					(typeof baseValues.signature === 'string' ? baseValues.signature : '') ||
+					'';
+
+				const valuesForSnapshot: DraftingFormValues = {
+					...baseValues,
+					signature: signatureForSnapshot,
+				};
+				const profileFieldsForSnapshot =
+					existingSnapshot?.profileFields ?? computedProfileFields;
+
+				const messageWithSettings = injectMurmurDraftSettingsSnapshot(cleanedMessageHtml, {
+					version: 1,
+					values: valuesForSnapshot,
+					profileFields: profileFieldsForSnapshot,
+				});
+
+				await createEmail({
+					subject,
+					message: messageWithSettings,
+					campaignId: campaign.id,
+					status: EmailStatus.draft,
+					contactId: contactForTest.id,
+				});
+
+				await queryClient.invalidateQueries({ queryKey: ['emails'] });
+
+				toast.success('Saved to Drafts.');
+				setPendingKeptDraftContactId(contactForTest.id);
+				goToDrafting?.();
+				return true;
+			} catch (error) {
+				console.error('Failed to keep test draft:', error);
+				toast.error('Failed to save draft. Please try again.');
+				return false;
+			} finally {
+				setIsKeepingTestDraft(false);
+			}
+		},
+		[
+			campaign,
+			contacts,
+			createEmail,
+			form,
+			goToDrafting,
+			isKeepingTestDraft,
+			queryClient,
+		]
+	);
 	const draftsMiniEmailTopHeaderLabel = draftsMiniEmailTopHeaderHeight ? 'Settings' : undefined;
 	const draftsMiniEmailSettingsLabels = useMemo(() => {
 		const contact = displayedContactForResearch;
@@ -2986,6 +3319,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										contactsCount={contactsCount}
 										draftCount={draftCount}
 										sentCount={sentCount}
+										draftingProgress={draftingProgressForHeader}
 										onFromClick={onOpenIdentityDialog}
 										onContactsClick={goToContacts}
 										onDraftsClick={goToDrafting}
@@ -3113,6 +3447,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																campaign={campaign}
 																enableUsedContactTooltip={view === 'testing'}
 																selectedContactIds={contactsTabSelectedIds}
+																activelyDraftingContactIds={activelyDraftingContactIds}
 																onContactSelectionChange={(updater) =>
 																	setContactsTabSelectedIds((prev) =>
 																		updater(new Set(prev))
@@ -3124,7 +3459,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																	await handleGenerateDrafts(ids);
 																}}
 																isDraftDisabled={
-																	isGenerationDisabled() || isPendingGeneration
+																	isGenerationDisabled()
 																}
 																isPendingGeneration={isPendingGeneration}
 																width={375}
@@ -3166,7 +3501,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																)
 															}
 															isDraftDisabled={
-																isGenerationDisabled() || isPendingGeneration
+																isGenerationDisabled()
 															}
 															isPendingGeneration={isPendingGeneration}
 															generationProgress={generationProgress}
@@ -3620,7 +3955,15 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											isDisabled={isGenerationDisabled()}
 											isTesting={Boolean(isTest)}
 											contact={contacts?.[0] || displayedContactForResearch}
-											style={{ width: 375, height: 670 }}
+											onKeep={() =>
+												handleKeepTestDraft(contacts?.[0] || displayedContactForResearch)
+											}
+											isKeeping={isKeepingTestDraft}
+											keepDisabled={
+												!campaign?.testMessage ||
+												!(contacts?.[0] || displayedContactForResearch)
+											}
+											style={{ width: 375, height: 672, marginTop: -8 }}
 										/>
 									) : view === 'drafting' && Boolean(selectedDraft) ? (
 										<div
@@ -3647,7 +3990,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														contactsAvailableForDrafting.map((c) => c.id)
 													)
 												}
-												isDraftDisabled={isGenerationDisabled() || isPendingGeneration}
+												isDraftDisabled={isGenerationDisabled()}
 												isPendingGeneration={isPendingGeneration}
 												generationProgress={generationProgress}
 												generationTotal={contactsAvailableForDrafting.length}
@@ -4063,6 +4406,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													contactsCount={contactsCount}
 													draftCount={draftCount}
 													sentCount={sentCount}
+													draftingProgress={draftingProgressForHeader}
 													onFromClick={onOpenIdentityDialog}
 													onContactsClick={goToContacts}
 													onDraftsClick={goToDrafting}
@@ -4083,6 +4427,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														campaign={campaign}
 														enableUsedContactTooltip={view === 'testing'}
 														selectedContactIds={contactsTabSelectedIds}
+														activelyDraftingContactIds={activelyDraftingContactIds}
 														onContactSelectionChange={(updater) =>
 															setContactsTabSelectedIds((prev) => updater(new Set(prev)))
 														}
@@ -4091,7 +4436,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														onDraftSelected={async (ids) => {
 															await handleGenerateDrafts(ids);
 														}}
-														isDraftDisabled={isGenerationDisabled() || isPendingGeneration}
+														isDraftDisabled={isGenerationDisabled()}
 														isPendingGeneration={isPendingGeneration}
 														width={330}
 														height={263}
@@ -4136,6 +4481,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													onGoToContacts={goToContacts}
 													onGoToInbox={goToInbox}
 													onTestPreviewToggle={setShowTestPreview}
+													onKeepTestDraft={() => handleKeepTestDraft(contacts?.[0] || null)}
+													isKeepingTestDraft={isKeepingTestDraft}
 													draftCount={contactsTabSelectedIds.size}
 													onDraftClick={async () => {
 														if (contactsTabSelectedIds.size === 0) {
@@ -4147,7 +4494,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														);
 													}}
 													isDraftDisabled={
-														isPendingGeneration || contactsTabSelectedIds.size === 0
+														contactsTabSelectedIds.size === 0
 													}
 													onSelectAllContacts={handleSelectAllContacts}
 													isAllContactsSelected={areAllContactsSelected}
@@ -4172,8 +4519,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										</div>
 										{/* Draft button with arrows - spans full width below both columns */}
 										<div className="mt-4 w-full">
-											{!isPendingGeneration ? (
-												<div className="flex items-center justify-center gap-[29px] w-full">
+											<div className="flex items-center justify-center gap-[29px] w-full">
 													{/* Left arrow */}
 													<button
 														type="button"
@@ -4203,10 +4549,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																		Array.from(contactsTabSelectedIds.values())
 																	);
 																}}
-																disabled={isPendingGeneration || contactsTabSelectedIds.size === 0}
+																disabled={contactsTabSelectedIds.size === 0}
 																className={cn(
 																	'w-full h-full rounded-[4px] border-[3px] text-black font-inter font-normal text-[17px] relative overflow-hidden transition-colors duration-300',
-																	isPendingGeneration || contactsTabSelectedIds.size === 0
+																	contactsTabSelectedIds.size === 0
 																		? 'bg-[#E0E0E0] border-[#A0A0A0] cursor-not-allowed opacity-60'
 																		: areAllContactsSelected
 																			? 'bg-[#4DC669] border-black hover:bg-[#45B85F] cursor-pointer'
@@ -4220,8 +4566,11 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																		areAllContactsSelected ? 'opacity-0' : 'opacity-100'
 																	)}
 																>
-																	Draft {contactsTabSelectedIds.size}{' '}
-																	{contactsTabSelectedIds.size === 1 ? 'Contact' : 'Contacts'}
+																	{isDraftQueueActive
+																		? 'Add Emails to Queue'
+																		: `Draft ${contactsTabSelectedIds.size} ${
+																				contactsTabSelectedIds.size === 1 ? 'Contact' : 'Contacts'
+																		  }`}
 																</span>
 																{/* "All" text - fades in when All selected */}
 																<span
@@ -4230,8 +4579,14 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																		areAllContactsSelected ? 'opacity-100' : 'opacity-0'
 																	)}
 																>
-																	Draft <span className="font-bold mx-1">All</span>{' '}
-																	{contactsAvailableForDrafting.length} Contacts
+																	{isDraftQueueActive ? (
+																		'Add Emails to Queue'
+																	) : (
+																		<>
+																			Draft <span className="font-bold mx-1">All</span>{' '}
+																			{contactsAvailableForDrafting.length} Contacts
+																		</>
+																	)}
 																</span>
 																{/* Expanding green overlay from right */}
 																<div
@@ -4286,10 +4641,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													>
 														<RightArrow width="20" height="39" />
 													</button>
-												</div>
-											) : (
-												<div className="h-[40px]" />
-											)}
+											</div>
 										</div>
 									</div>
 								) : (
@@ -4318,7 +4670,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												);
 											}}
 											isDraftDisabled={
-												isPendingGeneration || contactsTabSelectedIds.size === 0
+												contactsTabSelectedIds.size === 0
 											}
 											onSelectAllContacts={handleSelectAllContacts}
 											isAllContactsSelected={areAllContactsSelected}
@@ -4343,8 +4695,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										{/* Draft button with arrows at narrowest breakpoint */}
 										{isNarrowestDesktop && (
 											<div className="mt-4 w-full">
-												{!isPendingGeneration ? (
-													<div className="flex items-center justify-center gap-[20px] w-full">
+												<div className="flex items-center justify-center gap-[20px] w-full">
 														{/* Left arrow */}
 														<button
 															type="button"
@@ -4372,10 +4723,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																			Array.from(contactsTabSelectedIds.values())
 																		);
 																	}}
-																	disabled={isPendingGeneration || contactsTabSelectedIds.size === 0}
+																	disabled={contactsTabSelectedIds.size === 0}
 																	className={cn(
 																		'w-full h-full rounded-[4px] border-[3px] text-black font-inter font-normal text-[17px] relative overflow-hidden transition-colors duration-300',
-																		isPendingGeneration || contactsTabSelectedIds.size === 0
+																		contactsTabSelectedIds.size === 0
 																			? 'bg-[#E0E0E0] border-[#A0A0A0] cursor-not-allowed opacity-60'
 																			: areAllContactsSelected
 																				? 'bg-[#4DC669] border-black hover:bg-[#45B85F] cursor-pointer'
@@ -4389,8 +4740,11 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																			areAllContactsSelected ? 'opacity-0' : 'opacity-100'
 																		)}
 																	>
-																		Draft {contactsTabSelectedIds.size}{' '}
-																		{contactsTabSelectedIds.size === 1 ? 'Contact' : 'Contacts'}
+																		{isDraftQueueActive
+																			? 'Add Emails to Queue'
+																			: `Draft ${contactsTabSelectedIds.size} ${
+																					contactsTabSelectedIds.size === 1 ? 'Contact' : 'Contacts'
+																			  }`}
 																	</span>
 																	{/* "All" text - fades in when All selected */}
 																	<span
@@ -4399,8 +4753,14 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																			areAllContactsSelected ? 'opacity-100' : 'opacity-0'
 																		)}
 																	>
-																		Draft <span className="font-bold mx-1">All</span>{' '}
-																		{contactsAvailableForDrafting.length} Contacts
+																		{isDraftQueueActive ? (
+																			'Add Emails to Queue'
+																		) : (
+																			<>
+																				Draft <span className="font-bold mx-1">All</span>{' '}
+																				{contactsAvailableForDrafting.length} Contacts
+																			</>
+																		)}
 																	</span>
 																	{/* Expanding green overlay from right */}
 																	<div
@@ -4455,10 +4815,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														>
 															<RightArrow width="20" height="39" />
 														</button>
-													</div>
-												) : (
-													<div className="h-[40px]" />
-												)}
+												</div>
 											</div>
 										)}
 										{/* Contacts table below writing box at narrowest breakpoint */}
@@ -4470,6 +4827,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													campaign={campaign}
 													enableUsedContactTooltip={view === 'testing'}
 													selectedContactIds={contactsTabSelectedIds}
+													activelyDraftingContactIds={activelyDraftingContactIds}
 													onContactSelectionChange={(updater) =>
 														setContactsTabSelectedIds((prev) => updater(new Set(prev)))
 													}
@@ -4478,7 +4836,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													onDraftSelected={async (ids) => {
 														await handleGenerateDrafts(ids);
 													}}
-													isDraftDisabled={isGenerationDisabled() || isPendingGeneration}
+													isDraftDisabled={isGenerationDisabled()}
 													width={489}
 													height={349}
 													minRows={5}
@@ -4544,9 +4902,11 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 
 								{/* Bottom Panels: Drafts, Sent, and Inbox - hidden at narrowest breakpoint */}
 								{!hideHeaderBox && (
-									<div
+									<BottomPanelsContainer
 										className="mt-[35px] pb-[8px] flex justify-center gap-[15px]"
 										data-campaign-bottom-anchor
+										collapsed={bottomPanelCollapsed}
+										historyActions={historyActions}
 									>
 										<DraftsExpandedList
 											drafts={draftEmails}
@@ -4577,7 +4937,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											collapsed={bottomPanelCollapsed}
 											onOpenInbox={goToInbox}
 										/>
-									</div>
+									</BottomPanelsContainer>
 								)}
 							</div>
 						)}
@@ -4651,6 +5011,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														contactsCount={contactsCount}
 														draftCount={draftCount}
 														sentCount={sentCount}
+														draftingProgress={draftingProgressForHeader}
 														onFromClick={onOpenIdentityDialog}
 														onContactsClick={goToContacts}
 														onDraftsClick={goToDrafting}
@@ -4674,7 +5035,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																	contactsAvailableForDrafting.map((c) => c.id)
 																)
 															}
-															isDraftDisabled={isGenerationDisabled() || isPendingGeneration}
+															isDraftDisabled={isGenerationDisabled()}
 															isPendingGeneration={isPendingGeneration}
 															generationProgress={generationProgress}
 															generationTotal={contactsAvailableForDrafting.length}
@@ -4830,16 +5191,19 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											)}
 											{/* Bottom Panels: Contacts, Sent, and Inbox - centered relative to container - hidden at narrowest breakpoint */}
 											{!isNarrowestDesktop && (
-												<div
+												<BottomPanelsContainer
 													className={cn(
 														draftEmails.length === 0 ? 'mt-[91px]' : 'mt-[35px]',
 														'pb-[8px] flex justify-center gap-[15px]'
 													)}
 													data-campaign-bottom-anchor
+													collapsed={bottomPanelCollapsed}
+													historyActions={historyActions}
 												>
 												<ContactsExpandedList
 													contacts={contactsAvailableForDrafting}
-												campaign={campaign}
+													campaign={campaign}
+													activelyDraftingContactIds={activelyDraftingContactIds}
 													width={232}
 													height={bottomPanelBoxHeightPx}
 													enableUsedContactTooltip={false}
@@ -4865,7 +5229,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													collapsed={bottomPanelCollapsed}
 													onOpenInbox={goToInbox}
 												/>
-												</div>
+												</BottomPanelsContainer>
 											)}
 										</div>
 									) : (
@@ -5030,7 +5394,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																contactsAvailableForDrafting.map((c) => c.id)
 															)
 														}
-														isDraftDisabled={isGenerationDisabled() || isPendingGeneration}
+														isDraftDisabled={isGenerationDisabled()}
 														isPendingGeneration={isPendingGeneration}
 														generationProgress={generationProgress}
 														generationTotal={contactsAvailableForDrafting.length}
@@ -5049,16 +5413,19 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 
 										{/* Bottom Panels: Contacts, Sent, and Inbox - hidden at narrowest breakpoint */}
 										{!isNarrowestDesktop && (
-											<div
+											<BottomPanelsContainer
 												className={cn(
 													draftEmails.length === 0 ? 'mt-[91px]' : 'mt-[35px]',
 													'pb-[8px] flex justify-center gap-[15px]'
 												)}
 												data-campaign-bottom-anchor
+												collapsed={bottomPanelCollapsed}
+												historyActions={historyActions}
 											>
 												<ContactsExpandedList
 													contacts={contactsAvailableForDrafting}
 													campaign={campaign}
+													activelyDraftingContactIds={activelyDraftingContactIds}
 													width={232}
 													height={bottomPanelBoxHeightPx}
 													enableUsedContactTooltip={false}
@@ -5084,7 +5451,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													collapsed={bottomPanelCollapsed}
 													onOpenInbox={goToInbox}
 												/>
-											</div>
+											</BottomPanelsContainer>
 										)}
 									</div>
 								)}
@@ -5103,6 +5470,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										isLoading={isContactsLoading}
 										contacts={contactsAvailableForDrafting}
 										allContacts={contacts}
+										isDraftQueueActive={isDraftQueueActive}
+										activelyDraftingContactIds={activelyDraftingContactIds}
 										selectedContactIds={contactsTabSelectedIds}
 										setSelectedContactIds={setContactsTabSelectedIds}
 										handleContactSelection={handleContactsTabSelection}
@@ -5113,7 +5482,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										onDraftEmails={async (ids) => {
 											await handleGenerateDrafts(ids);
 										}}
-										isDraftingDisabled={isGenerationDisabled() || isPendingGeneration}
+										isDraftingDisabled={isGenerationDisabled()}
 										onContactClick={handleResearchContactClick}
 										onContactHover={handleResearchContactHover}
 										onSearchFromMiniBar={handleMiniContactsSearch}
@@ -5146,6 +5515,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													contactsCount={contactsCount}
 													draftCount={draftCount}
 													sentCount={sentCount}
+													draftingProgress={draftingProgressForHeader}
 													onFromClick={onOpenIdentityDialog}
 													onContactsClick={goToContacts}
 													onDraftsClick={goToDrafting}
@@ -5175,7 +5545,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																contactsAvailableForDrafting.map((c) => c.id)
 															)
 														}
-														isDraftDisabled={isGenerationDisabled() || isPendingGeneration}
+														isDraftDisabled={isGenerationDisabled()}
 														isPendingGeneration={isPendingGeneration}
 														generationProgress={generationProgress}
 														generationTotal={contactsAvailableForDrafting.length}
@@ -5221,6 +5591,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													isLoading={isContactsLoading}
 													contacts={contactsAvailableForDrafting}
 													allContacts={contacts}
+													isDraftQueueActive={isDraftQueueActive}
+													activelyDraftingContactIds={activelyDraftingContactIds}
 													selectedContactIds={contactsTabSelectedIds}
 													setSelectedContactIds={setContactsTabSelectedIds}
 													handleContactSelection={handleContactsTabSelection}
@@ -5231,7 +5603,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													onDraftEmails={async (ids) => {
 														await handleGenerateDrafts(ids);
 													}}
-													isDraftingDisabled={isGenerationDisabled() || isPendingGeneration}
+													isDraftingDisabled={isGenerationDisabled()}
 													onContactClick={handleResearchContactClick}
 													onContactHover={handleResearchContactHover}
 													onSearchFromMiniBar={handleMiniContactsSearch}
@@ -5278,10 +5650,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																Array.from(contactsTabSelectedIds.values())
 															);
 														}}
-														disabled={isPendingGeneration || contactsTabSelectedIds.size === 0}
+														disabled={contactsTabSelectedIds.size === 0}
 														className={cn(
 															'w-full h-full rounded-[4px] border-[3px] text-black font-inter font-normal text-[17px] relative overflow-hidden transition-colors duration-300',
-															isPendingGeneration || contactsTabSelectedIds.size === 0
+															contactsTabSelectedIds.size === 0
 																? 'bg-[#E0E0E0] border-[#A0A0A0] cursor-not-allowed opacity-60'
 																: areAllContactsSelected
 																	? 'bg-[#4DC669] border-black hover:bg-[#45B85F] cursor-pointer'
@@ -5295,7 +5667,11 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																areAllContactsSelected ? 'opacity-0' : 'opacity-100'
 															)}
 														>
-															Draft {contactsTabSelectedIds.size} {contactsTabSelectedIds.size === 1 ? 'Contact' : 'Contacts'}
+															{isDraftQueueActive
+																? 'Add Emails to Queue'
+																: `Draft ${contactsTabSelectedIds.size} ${
+																		contactsTabSelectedIds.size === 1 ? 'Contact' : 'Contacts'
+																  }`}
 														</span>
 														{/* "All" text - fades in when All selected */}
 														<span
@@ -5304,7 +5680,14 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																areAllContactsSelected ? 'opacity-100' : 'opacity-0'
 															)}
 														>
-															Draft <span className="font-bold mx-1">All</span> {contactsAvailableForDrafting.length} Contacts
+															{isDraftQueueActive ? (
+																'Add Emails to Queue'
+															) : (
+																<>
+																	Draft <span className="font-bold mx-1">All</span>{' '}
+																	{contactsAvailableForDrafting.length} Contacts
+																</>
+															)}
 														</span>
 														{/* Expanding green overlay from right */}
 														<div
@@ -5366,9 +5749,11 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											</button>
 										</div>
 										{/* Bottom Panels: Drafts, Sent, and Inbox - centered relative to 864px container */}
-										<div
+										<BottomPanelsContainer
 											className="mt-[35px] pb-[8px] flex justify-center gap-[15px]"
 											data-campaign-bottom-anchor
+											collapsed={bottomPanelCollapsed}
+											historyActions={historyActions}
 										>
 											<DraftsExpandedList
 												drafts={draftEmails}
@@ -5396,7 +5781,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												whiteSectionHeight={15}
 												collapsed={bottomPanelCollapsed}
 											/>
-										</div>
+										</BottomPanelsContainer>
 									</div>
 								) : (
 									/* Regular centered layout for wider viewports, hide bottom panels at narrowest breakpoint */
@@ -5406,6 +5791,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											isLoading={isContactsLoading}
 											contacts={contactsAvailableForDrafting}
 											allContacts={contacts}
+											isDraftQueueActive={isDraftQueueActive}
+											activelyDraftingContactIds={activelyDraftingContactIds}
 											selectedContactIds={contactsTabSelectedIds}
 											setSelectedContactIds={setContactsTabSelectedIds}
 											handleContactSelection={handleContactsTabSelection}
@@ -5416,7 +5803,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											onDraftEmails={async (ids) => {
 												await handleGenerateDrafts(ids);
 											}}
-											isDraftingDisabled={isGenerationDisabled() || isPendingGeneration}
+											isDraftingDisabled={isGenerationDisabled()}
 											onContactClick={handleResearchContactClick}
 											onContactHover={handleResearchContactHover}
 											onSearchFromMiniBar={handleMiniContactsSearch}
@@ -5431,6 +5818,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											hideButton={isNarrowestDesktop}
 											isAllContactsSelected={areAllContactsSelected}
 											onSelectAllContacts={handleSelectAllContacts}
+											historyActions={historyActions}
 										/>
 										{/* Navigation arrows with draft button at narrowest breakpoint */}
 										{isNarrowestDesktop && (
@@ -5462,10 +5850,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																	Array.from(contactsTabSelectedIds.values())
 																);
 															}}
-															disabled={isPendingGeneration || contactsTabSelectedIds.size === 0}
+															disabled={contactsTabSelectedIds.size === 0}
 															className={cn(
 																'w-full h-full rounded-[4px] border-[3px] text-black font-inter font-normal text-[15px] relative overflow-hidden transition-colors duration-300',
-																isPendingGeneration || contactsTabSelectedIds.size === 0
+																contactsTabSelectedIds.size === 0
 																	? 'bg-[#E0E0E0] border-[#A0A0A0] cursor-not-allowed opacity-60'
 																	: areAllContactsSelected
 																		? 'bg-[#4DC669] border-black hover:bg-[#45B85F] cursor-pointer'
@@ -5479,7 +5867,11 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																	areAllContactsSelected ? 'opacity-0' : 'opacity-100'
 																)}
 															>
-																Draft {contactsTabSelectedIds.size} {contactsTabSelectedIds.size === 1 ? 'Contact' : 'Contacts'}
+																{isDraftQueueActive
+																	? 'Add Emails to Queue'
+																	: `Draft ${contactsTabSelectedIds.size} ${
+																			contactsTabSelectedIds.size === 1 ? 'Contact' : 'Contacts'
+																	  }`}
 															</span>
 															{/* "All" text - fades in when All selected */}
 															<span
@@ -5488,7 +5880,14 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																	areAllContactsSelected ? 'opacity-100' : 'opacity-0'
 																)}
 															>
-																Draft <span className="font-bold mx-1">All</span> {contactsAvailableForDrafting.length} Contacts
+																{isDraftQueueActive ? (
+																	'Add Emails to Queue'
+																) : (
+																	<>
+																		Draft <span className="font-bold mx-1">All</span>{' '}
+																		{contactsAvailableForDrafting.length} Contacts
+																	</>
+																)}
 															</span>
 															{/* Expanding green overlay from right */}
 															<div
@@ -5600,7 +5999,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																contactsAvailableForDrafting.map((c) => c.id)
 															)
 														}
-														isDraftDisabled={isGenerationDisabled() || isPendingGeneration}
+														isDraftDisabled={isGenerationDisabled()}
 														isPendingGeneration={isPendingGeneration}
 														generationProgress={generationProgress}
 														generationTotal={contactsAvailableForDrafting.length}
@@ -5656,6 +6055,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													contactsCount={contactsCount}
 													draftCount={draftCount}
 													sentCount={sentCount}
+													draftingProgress={draftingProgressForHeader}
 													onFromClick={onOpenIdentityDialog}
 													onContactsClick={goToContacts}
 													onDraftsClick={goToDrafting}
@@ -5685,7 +6085,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																contactsAvailableForDrafting.map((c) => c.id)
 															)
 														}
-														isDraftDisabled={isGenerationDisabled() || isPendingGeneration}
+														isDraftDisabled={isGenerationDisabled()}
 														isPendingGeneration={isPendingGeneration}
 														generationProgress={generationProgress}
 														generationTotal={contactsAvailableForDrafting.length}
@@ -5742,13 +6142,16 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											</div>
 										</div>
 										{/* Bottom Panels: Contacts, Drafts, and Inbox - centered relative to container */}
-										<div
+										<BottomPanelsContainer
 											className="mt-[91px] pb-[8px] flex justify-center gap-[15px]"
 											data-campaign-bottom-anchor
+											collapsed={bottomPanelCollapsed}
+											historyActions={historyActions}
 										>
 											<ContactsExpandedList
 												contacts={contactsAvailableForDrafting}
 												campaign={campaign}
+												activelyDraftingContactIds={activelyDraftingContactIds}
 												width={232}
 												height={bottomPanelBoxHeightPx}
 												enableUsedContactTooltip={false}
@@ -5777,7 +6180,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												collapsed={bottomPanelCollapsed}
 												onOpenInbox={goToInbox}
 											/>
-										</div>
+										</BottomPanelsContainer>
 									</div>
 								) : (
 									// Regular centered layout for wider viewports
@@ -5847,7 +6250,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																contactsAvailableForDrafting.map((c) => c.id)
 															)
 														}
-														isDraftDisabled={isGenerationDisabled() || isPendingGeneration}
+														isDraftDisabled={isGenerationDisabled()}
 														isPendingGeneration={isPendingGeneration}
 														generationProgress={generationProgress}
 														generationTotal={contactsAvailableForDrafting.length}
@@ -5870,6 +6273,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												<ContactsExpandedList
 													contacts={contactsAvailableForDrafting}
 													campaign={campaign}
+													activelyDraftingContactIds={activelyDraftingContactIds}
 													width={232}
 													height={bottomPanelBoxHeightPx}
 													enableUsedContactTooltip={false}
@@ -5921,6 +6325,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												contactsCount={contactsCount}
 												draftCount={draftCount}
 												sentCount={sentCount}
+												draftingProgress={draftingProgressForHeader}
 												onFromClick={onOpenIdentityDialog}
 												onContactsClick={goToContacts}
 												onDraftsClick={goToDrafting}
@@ -7085,6 +7490,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													contactsCount={contactsCount}
 													draftCount={draftCount}
 													sentCount={sentCount}
+													draftingProgress={draftingProgressForHeader}
 													onFromClick={onOpenIdentityDialog}
 													onContactsClick={goToContacts}
 													onDraftsClick={goToDrafting}
@@ -7139,6 +7545,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											<ContactsExpandedList
 												contacts={contactsAvailableForDrafting}
 												campaign={campaign}
+												activelyDraftingContactIds={activelyDraftingContactIds}
 												width={232}
 												height={bottomPanelBoxHeightPx}
 												enableUsedContactTooltip={false}
@@ -7196,13 +7603,16 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 
 										{/* Bottom Panels: Contacts, Drafts, and Sent - hidden at narrowest breakpoint (< 952px) */}
 										{!isNarrowestDesktop && (
-											<div
-												className="mt-[35px] pb-[8px] flex justify-center gap-[15px]"
+											<BottomPanelsContainer
+												className="mt-[114px] pb-[8px] flex justify-center gap-[15px]"
 												data-campaign-bottom-anchor
+												collapsed={bottomPanelCollapsed}
+												historyActions={historyActions}
 											>
 												<ContactsExpandedList
 													contacts={contactsAvailableForDrafting}
 													campaign={campaign}
+													activelyDraftingContactIds={activelyDraftingContactIds}
 													width={232}
 													height={bottomPanelBoxHeightPx}
 													enableUsedContactTooltip={false}
@@ -7232,7 +7642,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													collapsed={bottomPanelCollapsed}
 													onOpenSent={goToSent}
 												/>
-											</div>
+											</BottomPanelsContainer>
 										)}
 									</>
 								)}
@@ -7279,6 +7689,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												contactsCount={contactsCount}
 												draftCount={draftCount}
 												sentCount={sentCount}
+												draftingProgress={draftingProgressForHeader}
 												onFromClick={onOpenIdentityDialog}
 												onContactsClick={goToContacts}
 												onDraftsClick={goToDrafting}
@@ -7334,6 +7745,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													contacts={contactsAvailableForDrafting}
 													isLoading={isContactsLoading}
 													campaign={campaign}
+													activelyDraftingContactIds={activelyDraftingContactIds}
 													interactionMode="allTab"
 													selectedContactIds={contactsTabSelectedIds}
 													onContactSelectionChange={(updater) =>
@@ -7344,7 +7756,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													onDraftSelected={async (ids) => {
 														await handleGenerateDrafts(ids);
 													}}
-													isDraftDisabled={isGenerationDisabled() || isPendingGeneration}
+													isDraftDisabled={isGenerationDisabled()}
 													isPendingGeneration={isPendingGeneration}
 													width={330}
 													height={263}
@@ -7401,7 +7813,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 															contactsAvailableForDrafting.map((c) => c.id)
 														)
 													}
-													isDraftDisabled={isGenerationDisabled() || isPendingGeneration}
+													isDraftDisabled={isGenerationDisabled()}
 													isPendingGeneration={isPendingGeneration}
 													generationProgress={generationProgress}
 													generationTotal={contactsAvailableForDrafting.length}
@@ -7939,6 +8351,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												contactsCount={contactsCount}
 												draftCount={draftCount}
 												sentCount={sentCount}
+												draftingProgress={draftingProgressForHeader}
 												onFromClick={onOpenIdentityDialog}
 												onContactsClick={goToContacts}
 												onDraftsClick={goToDrafting}
@@ -7993,6 +8406,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													contacts={contactsAvailableForDrafting}
 													isLoading={isContactsLoading}
 													campaign={campaign}
+													activelyDraftingContactIds={activelyDraftingContactIds}
 													interactionMode="allTab"
 													selectedContactIds={contactsTabSelectedIds}
 													onContactSelectionChange={(updater) =>
@@ -8003,7 +8417,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													onDraftSelected={async (ids) => {
 														await handleGenerateDrafts(ids);
 													}}
-													isDraftDisabled={isGenerationDisabled() || isPendingGeneration}
+													isDraftDisabled={isGenerationDisabled()}
 													isPendingGeneration={isPendingGeneration}
 													width={330}
 													height={263}
@@ -8140,7 +8554,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 															contactsAvailableForDrafting.map((c) => c.id)
 														)
 													}
-													isDraftDisabled={isGenerationDisabled() || isPendingGeneration}
+													isDraftDisabled={isGenerationDisabled()}
 													isPendingGeneration={isPendingGeneration}
 													generationProgress={generationProgress}
 													generationTotal={contactsAvailableForDrafting.length}
@@ -8768,66 +9182,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			</Form>
 
 			{/* Main-box ghost: portal to <body> so "fixed" aligns with viewport (avoid transformed-parent offsets) */}
-			{/* Top-of-page drafting progress bar (synced with the live Draft Preview playback) */}
-			{isClient &&
-				renderGlobalOverlays &&
-				isLivePreviewVisible &&
-				livePreviewTotal > 0 &&
-				progressBarPortalTarget &&
-				createPortal(
-					<div
-						aria-hidden="true"
-						style={{
-							position: 'absolute',
-							left: 0,
-							right: 0,
-							top: 'calc(env(safe-area-inset-top) + 6px)',
-							zIndex: 9999,
-							pointerEvents: 'none',
-							display: 'flex',
-							justifyContent: 'center',
-						}}
-					>
-						<div
-							className="flex items-center gap-3 font-inter font-medium text-black text-[14px]"
-							style={{ lineHeight: 1 }}
-						>
-							<span style={{ minWidth: 18, textAlign: 'right' }}>
-								{Math.min(Math.max(livePreviewDraftNumber, 0), livePreviewTotal)}
-							</span>
-							<div
-								style={{
-									width: 500,
-									maxWidth: 'calc(100vw - 120px)',
-									height: 9,
-									backgroundColor: '#D1D1D1',
-									position: 'relative',
-								}}
-							>
-								<div
-									style={{
-										position: 'absolute',
-										top: 0,
-										left: 0,
-										height: '100%',
-										width: `${Math.min(
-											100,
-											Math.max(
-												0,
-												(livePreviewDraftNumber / Math.max(1, livePreviewTotal)) * 100
-											)
-										)}%`,
-										backgroundColor: '#EDB552',
-									}}
-								/>
-							</div>
-							<span style={{ minWidth: 18, textAlign: 'left' }}>
-								{livePreviewTotal}
-							</span>
-						</div>
-					</div>,
-					progressBarPortalTarget
-				)}
 
 		{isClient &&
 			createPortal(
