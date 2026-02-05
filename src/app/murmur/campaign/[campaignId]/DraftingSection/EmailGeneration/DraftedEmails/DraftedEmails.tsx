@@ -1340,6 +1340,8 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 										bottom: 0,
 										width: '2px',
 										backgroundColor: '#000000',
+										pointerEvents: 'none',
+										zIndex: 6,
 									}}
 								/>
 								{/* Bottom-left breadcrumb label (Drafts > Contact) */}
@@ -1414,7 +1416,7 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 										}
 									}}
 									disabled={isPendingDeleteEmail}
-									className="absolute font-inter text-[14px] font-normal text-black hover:bg-black/5 flex items-center justify-center transition-colors leading-none"
+									className="absolute font-inter text-[14px] font-normal text-black hover:bg-[#E17272] hover:text-white flex items-center justify-center transition-colors leading-none"
 									style={{
 										right: '20px',
 										width: '94px',
@@ -1424,17 +1426,17 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 								>
 									{isPendingDeleteEmail ? '...' : 'Delete'}
 								</button>
-								{/* Fourth divider line 92px to the left of the third one (119 + 92 = 211) */}
-								<div
-									style={{
-										position: 'absolute',
-										right: '212px',
-										top: bottomStripTop,
-										bottom: 0,
-										width: '2px',
-										backgroundColor: '#000000',
-									}}
-								/>
+									{/* Fourth divider line 92px to the left of the third one (119 + 92 = 211) */}
+									<div
+										style={{
+											position: 'absolute',
+											right: '212px',
+											top: bottomStripTop,
+											bottom: 0,
+											width: '1.5px',
+											backgroundColor: '#000000',
+										}}
+									/>
 								{/* Send button between lines */}
 								<button
 									type="button"
@@ -1444,7 +1446,7 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 										void props.onSend([selectedDraft.id]);
 									}}
 									disabled={props.isSendingDisabled}
-									className="absolute font-inter text-[14px] font-normal text-black hover:bg-black/5 flex items-center justify-center transition-colors leading-none"
+									className="absolute font-inter text-[14px] font-normal text-black hover:bg-[#83C37C] hover:text-white flex items-center justify-center transition-colors leading-none"
 									style={{
 										right: '120px',
 										width: '92px',
