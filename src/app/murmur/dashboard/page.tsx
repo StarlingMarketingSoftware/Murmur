@@ -70,6 +70,7 @@ import {
 import { CampaignsInboxView } from '@/components/molecules/CampaignsInboxView/CampaignsInboxView';
 import InboxSection from '@/components/molecules/InboxSection/InboxSection';
 import { InboundEmailNotificationList } from '@/components/molecules/InboundEmailNotificationList/InboundEmailNotificationList';
+import DashboardResponsesWidget from '@/components/molecules/DashboardResponsesWidget/DashboardResponsesWidget';
 import { useGetCampaign, useGetCampaigns } from '@/hooks/queryHooks/useCampaigns';
 import { useEditUserContactList } from '@/hooks/queryHooks/useUserContactLists';
 import { useQueryClient } from '@tanstack/react-query';
@@ -7507,13 +7508,7 @@ const DashboardContent = () => {
 									key: 'responses',
 									label: 'Responses',
 									render: () => (
-										<InboxSection
-											desktopHeight={535}
-											dashboardMode
-											loadingVariant="dashboard"
-											inboxSubtab="messages"
-											onInboxSubtabChange={() => {}}
-										/>
+										<DashboardResponsesWidget enabled={isSignedIn === true} />
 									),
 								},
 							] as const;
