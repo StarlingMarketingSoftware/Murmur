@@ -613,7 +613,12 @@ const DashboardContent = () => {
 			document.removeEventListener('mousedown', handleClickOutside);
 		};
 	}, [isWhereDropdownOpen]);
-	const initialTabFromQuery = searchParams.get('tab') === 'inbox' ? 'inbox' : 'search';
+
+	// NOTE: Keep Inbox tab code intact, but hide it for now.
+	const ENABLE_DASHBOARD_INBOX_TAB = false;
+
+	const initialTabFromQuery =
+		ENABLE_DASHBOARD_INBOX_TAB && searchParams.get('tab') === 'inbox' ? 'inbox' : 'search';
 	const [activeTab, setActiveTab] = useState<'search' | 'inbox'>(initialTabFromQuery);
 	const [hoveredTab, setHoveredTab] = useState<'search' | 'inbox' | null>(null);
 	const inboxView = activeTab === 'inbox';
@@ -627,9 +632,20 @@ const DashboardContent = () => {
 	// momentarily forcing the UI back to the previous tab (the "flash" you were seeing).
 	const tabParam = searchParams.get('tab');
 	useEffect(() => {
-		if (tabParam === 'search' || tabParam === 'inbox') {
+		if (tabParam === 'search') {
 			// URL is the source of truth when it changes externally (back/forward, deep link)
-			setActiveTab(tabParam);
+			setActiveTab('search');
+			return;
+		}
+
+		if (tabParam === 'inbox') {
+			if (ENABLE_DASHBOARD_INBOX_TAB) {
+				setActiveTab('inbox');
+			} else {
+				// Normalize old deep-links back to Search while Inbox is disabled.
+				setActiveTab('search');
+				updateTabQueryParam('search');
+			}
 		}
 	}, [tabParam]);
 	useEffect(() => {
@@ -2648,6 +2664,7 @@ const DashboardContent = () => {
 	};
 
 	const updateTabQueryParam = (tab: 'search' | 'inbox') => {
+		if (!ENABLE_DASHBOARD_INBOX_TAB && tab === 'inbox') return;
 		const current = searchParams.get('tab');
 		if (current === tab) return;
 		const params = new URLSearchParams(searchParams.toString());
@@ -2729,6 +2746,12 @@ const DashboardContent = () => {
 		nextTab: 'search' | 'inbox',
 		opts?: { animate?: boolean; after?: () => void }
 	) => {
+		if (!ENABLE_DASHBOARD_INBOX_TAB && nextTab === 'inbox') {
+			// Inbox is intentionally disabled on the Dashboard for now.
+			opts?.after?.();
+			return;
+		}
+
 		// Always clear hover-preview state on click.
 		setHoveredTab(null);
 		const hoverPill = tabToggleHoverPillRef.current;
@@ -4295,8 +4318,8 @@ const DashboardContent = () => {
 						)}
 						*/}
 
-						{/* Search/Inbox tab toggle - only shown here for search tab */}
-						{!hasSearched && activeTab === 'search' && (
+						{/* Search/Inbox tab toggle - disabled for now (keep code for later) */}
+						{ENABLE_DASHBOARD_INBOX_TAB && !hasSearched && activeTab === 'search' && (
 							<div className="flex justify-center" style={{ marginTop: '92px' }}>
 								<div
 									ref={tabToggleTrackRef}
@@ -4415,8 +4438,8 @@ const DashboardContent = () => {
 							</div>
 						)}
 
-						{/* Inbox tab: CampaignsInboxView + toggle - inside hero-wrapper for proper positioning */}
-						{!hasSearched && activeTab === 'inbox' && (
+						{/* Inbox tab: CampaignsInboxView + toggle - disabled for now (keep code for later) */}
+						{ENABLE_DASHBOARD_INBOX_TAB && !hasSearched && activeTab === 'inbox' && (
 							<div
 								ref={tabbedLandingBoxRef}
 								style={{
