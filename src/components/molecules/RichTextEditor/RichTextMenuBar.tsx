@@ -92,7 +92,7 @@ export const RichTextMenuBar: FC<RichTextMenuBarProps> = ({
 			icon: <ListOrdered className="size-4" />,
 			onClick: () => editor.chain().focus().toggleOrderedList().run(),
 			pressed: editor.isActive('orderedList'),
-		},
+		},  
 	];
 
 	return (

@@ -3588,8 +3588,8 @@ body.murmur-mobile .results-align {
 .hero-wrapper {
 	width: 100%;
 	max-width: 100%;
-	min-height: 720px !important; /* Fixed height that approximates viewport at 100% zoom */
-	height: 720px !important; /* Prevent expansion with zoom */
+	min-height: 540px !important; /* Balanced height to keep everything feeling centered */
+	height: 540px !important; /* Balanced height to keep everything feeling centered */
 }
 
 .search-bar-wrapper {
@@ -3665,7 +3665,7 @@ body.murmur-mobile .results-align {
 
 /* Keep table in normal flow with consistent spacing */
 .campaigns-table-wrapper {
-	margin-top: 35px; /* Push table down for better positioning on desktop */
+	margin-top: 0px; /* Tight spacing to keep email list close to search bar */
 	position: relative;
 	z-index: 30; /* Ensure table is above other elements */
 }
@@ -3694,7 +3694,7 @@ body.murmur-mobile .results-align {
 /* Override negative margin on mobile to prevent white space */
 @media (max-width: 640px) {
 	.campaigns-table-wrapper {
-		margin-top: 20px; /* Positive margin for mobile */
+		margin-top: 0px; /* Tight spacing for mobile */
 	}
 }
 
@@ -3723,7 +3723,7 @@ body.murmur-mobile .results-align {
 /* Adjust table position for portrait orientation screens to prevent overlap */
 @media (orientation: portrait) {
 	.campaigns-table-wrapper {
-		margin-top: 20px; /* Positive margin for proper spacing on portrait screens */
+		margin-top: 0px; /* Tight spacing for portrait screens */
 	}
 
 	/* Add extra spacing between search area and table on portrait */
@@ -3741,14 +3741,14 @@ body.murmur-mobile .results-align {
 /* Additional fix for tall portrait monitors (aspect ratio taller than 3:4) */
 @media (orientation: portrait) and (min-aspect-ratio: 3/4) {
 	.campaigns-table-wrapper {
-		margin-top: 20px; /* Consistent positive margin for tall portrait screens */
+		margin-top: 0px; /* Tight spacing for tall portrait screens */
 	}
 }
 
 /* Mobile portrait specific fix to ensure no white margin */
 @media (max-width: 640px) and (orientation: portrait) {
 	.campaigns-table-wrapper {
-		margin-top: 20px !important; /* Override any negative margins */
+		margin-top: 0px !important; /* Tight spacing */
 	}
 
 	/* Ensure the dashboard offset doesn't interfere */
@@ -3971,7 +3971,7 @@ body.murmur-page.murmur-map-view .clerk-user-button {
 /* Also ensure the hero wrapper can contain the growing search bar */
 .dashboard-container:not(.search-active) .hero-wrapper {
 	/* Allow hero to grow with viewport height to contain search bar */
-	min-height: calc(320px + max(0px, 10vh - 80px));
+	min-height: calc(280px + max(0px, 5vh - 40px));
 	height: auto;
 }
 

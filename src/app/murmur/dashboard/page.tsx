@@ -22,6 +22,7 @@ import { urls } from '@/constants/urls';
 import { isProblematicBrowser } from '@/utils/browserDetection';
 import { AppLayout } from '@/components/molecules/_layouts/AppLayout/AppLayout';
 import MurmurLogoNew from '@/components/atoms/_svg/MurmurLogoNew';
+import CampaignsDropdownIcon from '@/components/atoms/_svg/CampaignsDropdownIcon';
 import { PromotionIcon } from '@/components/atoms/_svg/PromotionIcon';
 import { BookingIcon } from '@/components/atoms/_svg/BookingIcon';
 import { SearchIconDesktop } from '@/components/atoms/_svg/SearchIconDesktop';
@@ -68,6 +69,7 @@ import {
 } from '@/components/molecules/ContactResearchPanel/ContactResearchPanel';
 import { CampaignsInboxView } from '@/components/molecules/CampaignsInboxView/CampaignsInboxView';
 import InboxSection from '@/components/molecules/InboxSection/InboxSection';
+import { InboundEmailNotificationList } from '@/components/molecules/InboundEmailNotificationList/InboundEmailNotificationList';
 import { useGetCampaign, useGetCampaigns } from '@/hooks/queryHooks/useCampaigns';
 import { useEditUserContactList } from '@/hooks/queryHooks/useUserContactLists';
 import { useQueryClient } from '@tanstack/react-query';
@@ -625,6 +627,9 @@ const DashboardContent = () => {
 	const isTabPreviewingOther = hoveredTab != null && hoveredTab !== activeTab;
 	// Dashboard inbox deep-link (`?tab=inbox`) should land on the Campaigns sub-tab.
 	const [inboxSubtab, setInboxSubtab] = useState<'messages' | 'campaigns'>('campaigns');
+	const [dashboardLandingPanel, setDashboardLandingPanel] = useState<
+		'new' | 'campaigns' | 'responses'
+	>('new');
 
 	// Handle tab query parameter
 	// Only react to *URL changes*. If we also depend on `activeTab`, this effect can run
@@ -3739,7 +3744,7 @@ const DashboardContent = () => {
 							className="flex justify-center items-center w-full px-4"
 							style={{
 								marginBottom: '0.75rem',
-								marginTop: activeTab === 'inbox' ? '136px' : '50px',
+								marginTop: activeTab === 'inbox' ? '136px' : '320px',
 							}}
 						>
 							<div className="premium-hero-section flex flex-col items-center justify-center w-full max-w-[600px]">
@@ -7484,7 +7489,78 @@ const DashboardContent = () => {
 							willChange: 'transform, opacity',
 						}}
 					>
-						<CampaignsTable />
+						{(() => {
+							const panels = [
+								{
+									key: 'new',
+									label: 'New',
+									render: () => (
+										<InboundEmailNotificationList enabled={isSignedIn === true} />
+									),
+								},
+								{
+									key: 'campaigns',
+									label: 'Campaigns',
+									render: () => <CampaignsTable />,
+								},
+								{
+									key: 'responses',
+									label: 'Responses',
+									render: () => (
+										<InboxSection
+											desktopHeight={535}
+											dashboardMode
+											loadingVariant="dashboard"
+											inboxSubtab="messages"
+											onInboxSubtabChange={() => {}}
+										/>
+									),
+								},
+							] as const;
+
+							const activePanel =
+								panels.find((panel) => panel.key === dashboardLandingPanel) ??
+								panels[0];
+							const inactivePanels = panels.filter(
+								(panel) => panel.key !== activePanel.key
+							);
+
+							return (
+								<>
+									<div className="mt-[18px] mb-[18px] w-full flex flex-col items-center">
+										{activePanel.render()}
+									</div>
+
+									{inactivePanels.map((panel) => (
+										<div
+											key={panel.key}
+											className="w-[603px] max-w-full mx-auto"
+											style={{ opacity: 0.6 }}
+										>
+											<button
+												type="button"
+												onClick={() => setDashboardLandingPanel(panel.key)}
+												className="flex items-center justify-center gap-[6px] cursor-pointer hover:opacity-80 transition-opacity"
+												style={{
+													width: '127px',
+													height: '26px',
+													borderRadius: '12px',
+													border: '1px solid #ccc',
+													backgroundColor: '#fff',
+													fontSize: '13px',
+													fontWeight: 500,
+													color: '#333',
+													marginBottom: '12px',
+												}}
+											>
+												<CampaignsDropdownIcon style={{ flexShrink: 0 }} />
+												{panel.label}
+											</button>
+										</div>
+									))}
+								</>
+							);
+						})()}
 					</div>
 				)}
 
