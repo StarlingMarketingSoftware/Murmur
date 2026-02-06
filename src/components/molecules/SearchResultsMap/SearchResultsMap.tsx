@@ -817,6 +817,13 @@ interface SearchResultsMapProps {
 	isLoading?: boolean;
 	/** When true, prevents the map from auto-zooming to fit contacts or the locked state. */
 	skipAutoFit?: boolean;
+	/**
+	 * Controls whether the map should behave like a decorative dashboard background (no interactions,
+	 * optional auto-rotation), or the full interactive results map.
+	 */
+	presentation?: 'background' | 'interactive';
+	/** When true (and `presentation="background"`), auto-rotate the globe. */
+	autoSpin?: boolean;
 }
 
 const defaultCenter = {
@@ -834,6 +841,12 @@ const STATE_HOVER_HIGHLIGHT_MAX_ZOOM = MAP_DEFAULT_ZOOM + 1;
 const AUTO_FIT_CONTACTS_MAX_ZOOM = 14;
 const AUTO_FIT_STATE_MAX_ZOOM = 8;
 const DEFAULT_MAX_ZOOM_FALLBACK = 22;
+
+// Dashboard background → interactive map-view transition.
+// Keep these values in sync with the dashboard "frame" animation so the whole moment feels unified.
+export const DASHBOARD_TO_INTERACTIVE_TRANSITION_MS = 2400;
+export const DASHBOARD_TO_INTERACTIVE_TRANSITION_CSS_EASING =
+	'cubic-bezier(0.22, 1, 0.36, 1)';
 
 const MAPBOX_STYLE = 'mapbox://styles/mapbox/streets-v12';
 
@@ -1299,6 +1312,50 @@ const hashStringToStableKey = (input: string): string => {
 	return (hash >>> 0).toString(36);
 };
 
+/**
+ * Scale all numeric opacity values inside a Mapbox style expression by a multiplier,
+ * keeping `["zoom"]` at the top level of `interpolate` / `step` expressions (as Mapbox requires).
+ *
+ * Handles plain numbers, `interpolate`, `step`, and `case` expressions (recursively).
+ */
+const scaleMapboxOpacityExpr = (expr: any, mul: number): any => {
+	if (typeof expr === 'number') return expr * mul;
+	if (!Array.isArray(expr) || expr.length === 0) return expr;
+
+	const op = expr[0];
+
+	if (op === 'interpolate') {
+		// ['interpolate', method, input, z1, v1, z2, v2, ...]
+		const result = [...expr];
+		for (let i = 4; i < result.length; i += 2) {
+			result[i] = scaleMapboxOpacityExpr(result[i], mul);
+		}
+		return result;
+	}
+
+	if (op === 'step') {
+		// ['step', input, defaultVal, z1, v1, z2, v2, ...]
+		const result = [...expr];
+		result[2] = scaleMapboxOpacityExpr(result[2], mul);
+		for (let i = 4; i < result.length; i += 2) {
+			result[i] = scaleMapboxOpacityExpr(result[i], mul);
+		}
+		return result;
+	}
+
+	if (op === 'case') {
+		// ['case', cond1, val1, cond2, val2, ..., fallback]
+		const result = [...expr];
+		for (let i = 2; i < result.length - 1; i += 2) {
+			result[i] = scaleMapboxOpacityExpr(result[i], mul);
+		}
+		result[result.length - 1] = scaleMapboxOpacityExpr(result[result.length - 1], mul);
+		return result;
+	}
+
+	return expr;
+};
+
 const normalizeStateKey = (state?: string | null): string | null => {
 	if (!state) return null;
 	const abbr = getStateAbbreviation(state);
@@ -1327,11 +1384,30 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	lockedStateName,
 	isLoading,
 	skipAutoFit,
+	presentation = 'interactive',
+	autoSpin = false,
 }) => {
+	const isBackgroundPresentation = presentation === 'background';
+	const shouldAutoSpin = isBackgroundPresentation && autoSpin;
+	// Keep the latest presentation value available to async Mapbox callbacks (moveend, etc).
+	const presentationRef = useRef<'background' | 'interactive'>(presentation);
+	presentationRef.current = presentation;
+
 	// Default to enabling state hover/click when a handler is provided.
 	// This mirrors the old Google Maps UX (hover highlight + click-to-search) without requiring
 	// every caller to pass an explicit `enableStateInteractions` flag.
 	const stateInteractionsEnabled = enableStateInteractions ?? typeof onStateSelect === 'function';
+
+	// Smooth fade for state overlays (borders + labels) when switching presentations.
+	// This prevents the "pause then pop" feeling when transitioning from the decorative globe
+	// into the interactive results map.
+	const stateOverlayOpacityRef = useRef<number>(0);
+	// 0 = divider lines, 1 = interactive borders
+	const stateOverlayModeRef = useRef<number>(stateInteractionsEnabled ? 1 : 0);
+	const stateOverlayAnimRafRef = useRef<number | null>(null);
+	const prevIsBackgroundPresentationRef = useRef<boolean>(isBackgroundPresentation);
+	// Capture the base Mapbox paint values once, then we apply a multiplier for fading.
+	const stateLineOpacityBaseRef = useRef<{ dividers: any; borders: any } | null>(null);
 
 	const [selectedMarker, setSelectedMarker] = useState<ContactWithName | null>(null);
 	const [hoveredMarkerId, setHoveredMarkerId] = useState<number | null>(null);
@@ -1344,6 +1420,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const mapRef = useRef<mapboxgl.Map | null>(null);
 	const [map, setMap] = useState<mapboxgl.Map | null>(null);
 	const [isMapLoaded, setIsMapLoaded] = useState(false);
+	const initialZoomConstraintsRef = useRef<{ minZoom: number; maxZoom: number } | null>(null);
+	const backgroundSpinCleanupRef = useRef<(() => void) | null>(null);
 	const [mapLoadError, setMapLoadError] = useState<string | null>(null);
 	const [selectedStateKey, setSelectedStateKey] = useState<string | null>(null);
 	const [zoomLevel, setZoomLevel] = useState(MAP_DEFAULT_ZOOM);
@@ -1421,7 +1499,20 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const usStatesPolygonsRef = useRef<PreparedClippingPolygon[] | null>(null);
 	const selectedStateKeyRef = useRef<string | null>(null);
 	const onStateSelectRef = useRef<SearchResultsMapProps['onStateSelect'] | null>(null);
+	// When the user clicks a state outline, we want the subsequent auto-fit-to-locked-state
+	// camera move to use the same cinematic timing as the dashboard transition.
+	// Without this, the state zoom feels like a snap compared to the cinematic sweep.
+	const pendingStateClickCinematicRef = useRef<{ key: string; at: number } | null>(null);
+	// When the user executes a brand-new search while already in interactive map mode
+	// (e.g. using the top search bar in fullscreen map view), match the dashboard/state
+	// cinematic timing instead of the default quick auto-fit.
+	const pendingSearchQueryCinematicRef = useRef<{ key: string; at: number } | null>(null);
 	const isLoadingRef = useRef<boolean>(false);
+	// When a user clicks a state (to trigger a search + cinematic zoom), we suppress state-hover
+	// highlights while the camera is easing so other states don't flash "hovered" under the cursor.
+	const stateClickZoomInFlightRef = useRef(false);
+	const stateClickZoomInFlightNonceRef = useRef(0);
+	const stateClickZoomInFlightTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 	const [isStateLayerReady, setIsStateLayerReady] = useState(false);
 
 	const syncUsOnlyBasemapCartography = useCallback(
@@ -2209,6 +2300,13 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	useEffect(() => {
 		if (!map || !isMapLoaded) return;
 
+		// If we've already loaded the shapes for this map instance, don't refetch.
+		// Presentation toggles should only affect visibility/interaction, not data loading.
+		if (usStatesGeoJsonRef.current?.features?.length) {
+			setIsStateLayerReady(true);
+			return;
+		}
+
 		let cancelled = false;
 		const controller = new AbortController();
 
@@ -2378,26 +2476,132 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			clearResultsOutline();
 			clearSearchedStateOutline();
 		};
-	}, [map, isMapLoaded, clearResultsOutline, clearSearchedStateOutline, syncUsOnlyBasemapCartography]);
+	}, [
+		map,
+		isMapLoaded,
+		clearResultsOutline,
+		clearSearchedStateOutline,
+		syncUsOnlyBasemapCartography,
+	]);
 
-	// Toggle state border/divider layers depending on whether state interactions are enabled.
+	const applyStateOverlayOpacity = useCallback(
+		(nextOverlayOpacity: number, nextModeT: number) => {
+			if (!map || !isMapLoaded) return;
+			const base = stateLineOpacityBaseRef.current;
+			if (!base || base.dividers == null || base.borders == null) return;
+
+			const overlay = clamp(nextOverlayOpacity, 0, 1);
+			const modeT = clamp(nextModeT, 0, 1);
+			const dividersMul = overlay * (1 - modeT);
+			const bordersMul = overlay * modeT;
+
+			const setLineOpacity = (layerId: string, baseOpacity: any, mul: number) => {
+				if (!map.getLayer(layerId)) return;
+				if (baseOpacity == null) return;
+				try {
+					if (mul <= 0.001) {
+						map.setPaintProperty(layerId, 'line-opacity', 0);
+						return;
+					}
+					if (mul >= 0.999) {
+						map.setPaintProperty(layerId, 'line-opacity', baseOpacity);
+						return;
+					}
+					map.setPaintProperty(layerId, 'line-opacity', scaleMapboxOpacityExpr(baseOpacity, mul));
+				} catch {
+					// Ignore.
+				}
+			};
+
+			setLineOpacity(MAPBOX_LAYER_IDS.statesDividers, base.dividers, dividersMul);
+			setLineOpacity(MAPBOX_LAYER_IDS.statesBordersInteractive, base.borders, bordersMul);
+
+			// Labels fade with the overall overlay opacity (mode doesn't matter).
+			if (map.getLayer(MAPBOX_LAYER_IDS.statesLabels)) {
+				try {
+					map.setPaintProperty(MAPBOX_LAYER_IDS.statesLabels, 'text-opacity', overlay);
+				} catch {
+					// Ignore.
+				}
+			}
+		},
+		[map, isMapLoaded]
+	);
+
+	// Fade state borders/labels based on presentation + data readiness, and crossfade divider ↔ interactive borders.
 	useEffect(() => {
 		if (!map || !isMapLoaded) return;
-		if (map.getLayer(MAPBOX_LAYER_IDS.statesDividers)) {
-			map.setLayoutProperty(
-				MAPBOX_LAYER_IDS.statesDividers,
-				'visibility',
-				stateInteractionsEnabled ? 'none' : 'visible'
-			);
+
+		const wasBackgroundPresentation = prevIsBackgroundPresentationRef.current;
+		prevIsBackgroundPresentationRef.current = isBackgroundPresentation;
+		const isEnteringInteractiveFromDashboard = wasBackgroundPresentation && !isBackgroundPresentation;
+
+		// Overall: state overlays are hidden in decorative background mode, and until GeoJSON is loaded.
+		const targetOverlayOpacity = !isBackgroundPresentation && isStateLayerReady ? 1 : 0;
+		// Mode: divider lines when state interactions are disabled; interactive borders when enabled.
+		const targetModeT = stateInteractionsEnabled ? 1 : 0;
+
+		const fromOverlay = stateOverlayOpacityRef.current;
+		const fromModeT = stateOverlayModeRef.current;
+
+		const needsOverlay = Math.abs(targetOverlayOpacity - fromOverlay) > 0.001;
+		const needsMode = Math.abs(targetModeT - fromModeT) > 0.001;
+
+		// Cancel any in-flight animation.
+		if (stateOverlayAnimRafRef.current != null) {
+			cancelAnimationFrame(stateOverlayAnimRafRef.current);
+			stateOverlayAnimRafRef.current = null;
 		}
-		if (map.getLayer(MAPBOX_LAYER_IDS.statesBordersInteractive)) {
-			map.setLayoutProperty(
-				MAPBOX_LAYER_IDS.statesBordersInteractive,
-				'visibility',
-				stateInteractionsEnabled ? 'visible' : 'none'
-			);
+
+		// Always apply once so we stay in sync even if the map style reloads.
+		if (!needsOverlay && !needsMode) {
+			stateOverlayOpacityRef.current = targetOverlayOpacity;
+			stateOverlayModeRef.current = targetModeT;
+			applyStateOverlayOpacity(targetOverlayOpacity, targetModeT);
+			return;
 		}
-	}, [map, isMapLoaded, stateInteractionsEnabled]);
+
+		const durationMs =
+			needsOverlay && isEnteringInteractiveFromDashboard
+				? DASHBOARD_TO_INTERACTIVE_TRANSITION_MS
+				: needsOverlay
+					? 600
+					: 350;
+		const start = performance.now();
+		const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
+
+		const tick = (now: number) => {
+			const t = clamp((now - start) / durationMs, 0, 1);
+			const e = easeOutCubic(t);
+			const overlay = fromOverlay + (targetOverlayOpacity - fromOverlay) * e;
+			const modeT = fromModeT + (targetModeT - fromModeT) * e;
+
+			stateOverlayOpacityRef.current = overlay;
+			stateOverlayModeRef.current = modeT;
+			applyStateOverlayOpacity(overlay, modeT);
+
+			if (t < 1) {
+				stateOverlayAnimRafRef.current = requestAnimationFrame(tick);
+			} else {
+				stateOverlayAnimRafRef.current = null;
+			}
+		};
+
+		stateOverlayAnimRafRef.current = requestAnimationFrame(tick);
+		return () => {
+			if (stateOverlayAnimRafRef.current != null) {
+				cancelAnimationFrame(stateOverlayAnimRafRef.current);
+				stateOverlayAnimRafRef.current = null;
+			}
+		};
+	}, [
+		map,
+		isMapLoaded,
+		isBackgroundPresentation,
+		isStateLayerReady,
+		stateInteractionsEnabled,
+		applyStateOverlayOpacity,
+	]);
 
 	// Keep the Mapbox "selected" feature-state for US states in sync with `selectedStateKey`.
 	const prevSelectedStateKeyOnMapRef = useRef<string | null>(null);
@@ -2900,6 +3104,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 		mapRef.current = mapInstance;
 		setMap(mapInstance);
+		try {
+			initialZoomConstraintsRef.current = {
+				minZoom: mapInstance.getMinZoom(),
+				maxZoom: mapInstance.getMaxZoom(),
+			};
+		} catch {
+			// Non-fatal.
+		}
 
 		const onStyleLoad = () => {
 			applyFreeTrialMapVisualTuning(mapInstance);
@@ -2911,6 +3123,37 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			setZoomLevel(mapInstance.getZoom() ?? MAP_DEFAULT_ZOOM);
 			setMapLoadError(null);
 			ensureMapboxSourcesAndLayers(mapInstance);
+
+			// Capture the base state-layer opacity expressions once, then start them hidden.
+			// We will fade them in/out via paint-property multipliers as presentation changes.
+			try {
+				if (!stateLineOpacityBaseRef.current) {
+					const dividers = mapInstance.getPaintProperty(
+						MAPBOX_LAYER_IDS.statesDividers,
+						'line-opacity'
+					) as any;
+					const borders = mapInstance.getPaintProperty(
+						MAPBOX_LAYER_IDS.statesBordersInteractive,
+						'line-opacity'
+					) as any;
+					stateLineOpacityBaseRef.current = { dividers, borders };
+				}
+			} catch {
+				// Ignore.
+			}
+			try {
+				if (mapInstance.getLayer(MAPBOX_LAYER_IDS.statesDividers)) {
+					mapInstance.setPaintProperty(MAPBOX_LAYER_IDS.statesDividers, 'line-opacity', 0);
+				}
+				if (mapInstance.getLayer(MAPBOX_LAYER_IDS.statesBordersInteractive)) {
+					mapInstance.setPaintProperty(MAPBOX_LAYER_IDS.statesBordersInteractive, 'line-opacity', 0);
+				}
+				if (mapInstance.getLayer(MAPBOX_LAYER_IDS.statesLabels)) {
+					mapInstance.setPaintProperty(MAPBOX_LAYER_IDS.statesLabels, 'text-opacity', 0);
+				}
+			} catch {
+				// Ignore.
+			}
 		};
 
 		const onError = (e: any) => {
@@ -2931,12 +3174,262 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			mapInstance.off('load', onLoad);
 			mapInstance.off('style.load', onStyleLoad);
 			mapInstance.off('error', onError);
+			backgroundSpinCleanupRef.current?.();
+			backgroundSpinCleanupRef.current = null;
 			mapInstance.remove();
 			mapRef.current = null;
 			setMap(null);
 			setIsMapLoaded(false);
 		};
 	}, [ensureMapboxSourcesAndLayers]);
+
+	// Configure decorative vs interactive behavior without remounting the map.
+	const prevPresentationRef = useRef<'background' | 'interactive'>(presentation);
+	// When switching from the decorative dashboard globe into interactive results mode,
+	// use a slightly more cinematic auto-fit so the camera move stays in sync with the
+	// dashboard frame animation (and avoids fighting portal inset transitions / resizes).
+	const cinematicAutoFitRef = useRef(false);
+	// While a cinematic camera animation is in flight, suppress `map.resize()` and
+	// duplicate `fitBounds` calls that would interrupt the smooth sweep.
+	const cinematicInFlightRef = useRef(false);
+	const cinematicInFlightTimerRef = useRef<NodeJS.Timeout | null>(null);
+	// When easing from interactive → decorative background, we attach a one-off `moveend`
+	// handler (lock zoom + optionally start auto-spin). Keep a ref so we can cancel it if
+	// the user flips back to interactive mid-animation.
+	const backgroundCinematicMoveEndHandlerRef = useRef<(() => void) | null>(null);
+	// While leaving the decorative globe we temporarily allow zoom < MAP_MIN_ZOOM so the
+	// animation can start exactly from the dashboard view. After the first fit completes,
+	// restore MAP_MIN_ZOOM so users can’t zoom back out to the full globe.
+	const pendingMinZoomRestoreRef = useRef(false);
+	const hasAttachedMinZoomRestoreRef = useRef(false);
+	useEffect(() => {
+		if (!map || !isMapLoaded) return;
+
+		const wasBackground = prevPresentationRef.current === 'background';
+		prevPresentationRef.current = presentation;
+
+		// Stop any prior background spin when presentation changes.
+		backgroundSpinCleanupRef.current?.();
+		backgroundSpinCleanupRef.current = null;
+
+		const safeEnableInteractions = () => {
+			try { map.scrollZoom.enable(); } catch {}
+			try { map.boxZoom.enable(); } catch {}
+			try { map.doubleClickZoom.enable(); } catch {}
+			try { map.dragPan.enable(); } catch {}
+			try { map.dragRotate.enable(); } catch {}
+			try { map.keyboard.enable(); } catch {}
+			try { map.touchZoomRotate.enable(); } catch {}
+		};
+
+		const safeDisableInteractions = () => {
+			try { map.scrollZoom.disable(); } catch {}
+			try { map.boxZoom.disable(); } catch {}
+			try { map.doubleClickZoom.disable(); } catch {}
+			try { map.dragPan.disable(); } catch {}
+			try { map.dragRotate.disable(); } catch {}
+			try { map.keyboard.disable(); } catch {}
+			try { map.touchZoomRotate.disable(); } catch {}
+		};
+
+		if (isBackgroundPresentation) {
+			// Decorative dashboard background: fixed zoom, no interactions, optional slow globe spin.
+			safeDisableInteractions();
+
+			// Tune these to match the homepage "globe peeking from the top" framing.
+			// Key trick: use `offset` (screen-space pan) rather than changing geo center a lot.
+			const DECORATIVE_ZOOM = 4.0;
+			const DECORATIVE_PITCH = 15;
+			const DECORATIVE_OFFSET: [number, number] = [0, 140]; // push center down -> see more top/horizon
+			const DECORATIVE_CENTER: [number, number] = [defaultCenter.lng, defaultCenter.lat];
+			const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
+
+			const lockDecorativeZoom = () => {
+				try {
+					map.setMinZoom(DECORATIVE_ZOOM);
+					map.setMaxZoom(DECORATIVE_ZOOM);
+				} catch {
+					// Ignore.
+				}
+			};
+
+			const startBackgroundSpin = () => {
+				if (!shouldAutoSpin) return;
+				const secondsPerRevolution = 300;
+				const distancePerSecond = 360 / secondsPerRevolution;
+				const animationDurationMs = 1000;
+
+				const normalizeLng = (lng: number) => ((((lng + 180) % 360) + 360) % 360) - 180;
+
+				const spinGlobe = () => {
+					try {
+						const center = map.getCenter();
+						center.lng = normalizeLng(center.lng - distancePerSecond);
+						center.lat = DECORATIVE_CENTER[1]; // keep latitude locked
+						map.easeTo({
+							center,
+							zoom: DECORATIVE_ZOOM,
+							pitch: DECORATIVE_PITCH,
+							bearing: 0,
+							offset: DECORATIVE_OFFSET,
+							duration: animationDurationMs,
+							easing: (n) => n,
+						});
+					} catch {
+						// Ignore (map may be tearing down).
+					}
+				};
+
+				map.on('moveend', spinGlobe);
+				// Kick off the loop.
+				spinGlobe();
+
+				backgroundSpinCleanupRef.current = () => {
+					try { map.off('moveend', spinGlobe); } catch {}
+					try { map.stop(); } catch {}
+				};
+			};
+
+			const isEnteringBackgroundFromInteractive = !wasBackground;
+			if (isEnteringBackgroundFromInteractive) {
+				// Cinematic interactive → dashboard background transition: ease back out instead of snapping.
+				try { map.stop(); } catch {}
+
+				// Prevent zoom clamping from snapping the camera before the ease starts.
+				try {
+					const currentZoom = map.getZoom() ?? DECORATIVE_ZOOM;
+					map.setMinZoom(Math.min(currentZoom, DECORATIVE_ZOOM));
+					map.setMaxZoom(Math.max(currentZoom, DECORATIVE_ZOOM));
+				} catch {
+					// Ignore.
+				}
+
+				// Cancel any prior pending "lock decorative zoom" handler.
+				if (backgroundCinematicMoveEndHandlerRef.current) {
+					try { map.off('moveend', backgroundCinematicMoveEndHandlerRef.current as any); } catch {}
+					backgroundCinematicMoveEndHandlerRef.current = null;
+				}
+
+				// Guard against resize() / other camera ops interrupting the sweep.
+				cinematicInFlightRef.current = true;
+				if (cinematicInFlightTimerRef.current) clearTimeout(cinematicInFlightTimerRef.current);
+				cinematicInFlightTimerRef.current = null;
+
+				const dur = DASHBOARD_TO_INTERACTIVE_TRANSITION_MS;
+				const onCinematicEnd = () => {
+					backgroundCinematicMoveEndHandlerRef.current = null;
+					// If the user already flipped back to interactive, don't lock/override anything.
+					if (presentationRef.current !== 'background') return;
+
+					lockDecorativeZoom();
+					startBackgroundSpin();
+
+					cinematicInFlightRef.current = false;
+					if (cinematicInFlightTimerRef.current) clearTimeout(cinematicInFlightTimerRef.current);
+					cinematicInFlightTimerRef.current = null;
+				};
+				backgroundCinematicMoveEndHandlerRef.current = onCinematicEnd;
+				try { map.once('moveend', onCinematicEnd as any); } catch {}
+
+				// Fallback: ensure we don't get stuck in "in flight" if moveend never fires.
+				cinematicInFlightTimerRef.current = setTimeout(() => {
+					cinematicInFlightRef.current = false;
+					cinematicInFlightTimerRef.current = null;
+				}, dur + 150);
+
+				try {
+					map.easeTo({
+						center: DECORATIVE_CENTER,
+						zoom: DECORATIVE_ZOOM,
+						pitch: DECORATIVE_PITCH,
+						bearing: 0,
+						offset: DECORATIVE_OFFSET,
+						duration: dur,
+						easing: easeOutCubic,
+					});
+				} catch {
+					// Ignore.
+				}
+
+				return;
+			}
+
+			// No transition (initial mount / already background): snap to decorative framing.
+			try {
+				lockDecorativeZoom();
+				// `jumpTo` typings don't accept `offset` in our Mapbox version; use a 0ms `easeTo`.
+				map.easeTo({
+					center: DECORATIVE_CENTER,
+					zoom: DECORATIVE_ZOOM,
+					pitch: DECORATIVE_PITCH,
+					bearing: 0,
+					offset: DECORATIVE_OFFSET,
+					duration: 0,
+				});
+			} catch {
+				// Ignore.
+			}
+
+			startBackgroundSpin();
+
+			return;
+		}
+
+		// If we were easing back into the background and the user flipped to interactive mid-sweep,
+		// cancel the pending "lock decorative zoom" handler + clear the in-flight guard.
+		if (backgroundCinematicMoveEndHandlerRef.current) {
+			try { map.off('moveend', backgroundCinematicMoveEndHandlerRef.current as any); } catch {}
+			backgroundCinematicMoveEndHandlerRef.current = null;
+			cinematicInFlightRef.current = false;
+			if (cinematicInFlightTimerRef.current) clearTimeout(cinematicInFlightTimerRef.current);
+			cinematicInFlightTimerRef.current = null;
+		}
+
+		// Interactive results mode: stop any ongoing animation, restore zoom constraints
+		// and re-enable all user interactions.
+		try { map.stop(); } catch {}
+		// Restore interactive zoom constraints. If we're coming from the decorative globe (zoom < MAP_MIN_ZOOM),
+		// temporarily allow that starting zoom so the camera move begins exactly from the dashboard view.
+		try {
+			const currentZoom = map.getZoom() ?? MAP_DEFAULT_ZOOM;
+			const safeMinZoom = Math.min(MAP_MIN_ZOOM, currentZoom);
+			map.setMinZoom(safeMinZoom);
+			map.setMaxZoom(DEFAULT_MAX_ZOOM_FALLBACK);
+			if (safeMinZoom < MAP_MIN_ZOOM) {
+				pendingMinZoomRestoreRef.current = true;
+			}
+		} catch {
+			// Ignore.
+		}
+		safeEnableInteractions();
+
+		// When transitioning *from* background → interactive, reset the auto-fit tracking
+		// so the map correctly zooms to the search results / locked state.
+		if (wasBackground) {
+			cinematicAutoFitRef.current = true;
+			hasFitBoundsRef.current = false;
+			lastContactsCountRef.current = 0;
+			lastFirstContactIdRef.current = null;
+			lastLockedStateKeyRef.current = null;
+			lastFitToLockedStateKeyRef.current = null;
+			lastSearchQueryKeyRef.current = null;
+
+			// Force a resize so the canvas matches the (potentially new) portal container size.
+			try { map.resize(); } catch {}
+		}
+	}, [map, isMapLoaded, isBackgroundPresentation, shouldAutoSpin, presentation]);
+
+	// When used as a decorative background, clear any interactive UI state so we don't
+	// "carry" selected/hovered marker panels across view transitions.
+	useEffect(() => {
+		if (!isBackgroundPresentation) return;
+		setSelectedMarker(null);
+		setHoveredMarkerId(null);
+		setFadingTooltipId(null);
+		hoveredMarkerIdRef.current = null;
+		hoverSourceRef.current = null;
+		onMarkerHover?.(null);
+	}, [isBackgroundPresentation, onMarkerHover]);
 
 	// Keep the Mapbox canvas in sync with its container.
 	// In portal / fixed-position layouts the browser may not have the final height when
@@ -2947,12 +3440,25 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		const container = mapContainerRef.current;
 		if (!container || !map) return;
 
+		let resizeDebounce: ReturnType<typeof setTimeout> | null = null;
 		const safeResize = () => {
+			// During the cinematic background→interactive sweep, the container isn't truly
+			// resizing (we animate via clip-path). Skip resize to avoid interrupting fitBounds.
+			if (cinematicInFlightRef.current) return;
 			try { map.resize(); } catch { /* map may be tearing down */ }
 		};
 
+		const scheduleResize = () => {
+			// Debounce aggressive resize loops (e.g. CSS inset transitions) to avoid WebGL canvas flicker.
+			if (resizeDebounce) clearTimeout(resizeDebounce);
+			resizeDebounce = setTimeout(() => {
+				resizeDebounce = null;
+				safeResize();
+			}, 120);
+		};
+
 		// ResizeObserver for ongoing size changes.
-		const ro = new ResizeObserver(() => safeResize());
+		const ro = new ResizeObserver(() => scheduleResize());
 		ro.observe(container);
 
 		// Burst of retries to catch portal/fixed layout settling.
@@ -2964,6 +3470,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		return () => {
 			ro.disconnect();
 			for (const t of timers) clearTimeout(t);
+			if (resizeDebounce) clearTimeout(resizeDebounce);
 		};
 	}, [map]);
 
@@ -3305,7 +3812,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			// Ensure *hovered* dots also won't overlap.
 			const minSeparationPx = 2 * (markerScale * 1.18) + dotStrokeWeight + 1.5;
 			const minSeparationSq = minSeparationPx * minSeparationPx;
-			const worldSize = 256 * Math.pow(2, zoomRaw);
+			// Mapbox GL's internal "world" is 512px wide at zoom 0 (tileSize=512).
+			// Use the same scale so our world-pixel distances match on-screen pixels.
+			const worldSize = 512 * Math.pow(2, zoomRaw);
 
 			// Keep the seed quantized so marker sampling stays stable while panning/zooming.
 			const zoomKey = Math.round(zoomRaw);
@@ -3906,12 +4415,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	// Trigger background dots update when US state polygons become available or loading state changes
 	useEffect(() => {
 		if (!map) return;
+		if (isBackgroundPresentation) return;
 		recomputeViewportDots(map, isLoading);
-	}, [map, isStateLayerReady, isLoading, recomputeViewportDots]);
+	}, [map, isBackgroundPresentation, isStateLayerReady, isLoading, recomputeViewportDots]);
 
 	useEffect(() => {
 		if (!map) return;
 		if (!isMapLoaded) return;
+		if (isBackgroundPresentation) return;
 		const onMoveEnd = () => {
 			const zoom = map.getZoom() ?? MAP_DEFAULT_ZOOM;
 			setZoomLevel(zoom);
@@ -3967,6 +4478,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	}, [
 		map,
 		isMapLoaded,
+		isBackgroundPresentation,
 		syncUsOnlyBasemapCartography,
 		recomputeViewportDots,
 		updateBookingExtraFetchBbox,
@@ -3977,6 +4489,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	// Notify the parent as soon as the user starts interacting with the viewport.
 	useEffect(() => {
 		if (!map || !isMapLoaded) return;
+		if (isBackgroundPresentation) return;
 		const onMoveStart = () => {
 			onViewportInteractionRef.current?.();
 		};
@@ -3984,11 +4497,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		return () => {
 			map.off('movestart', onMoveStart);
 		};
-	}, [map, isMapLoaded]);
+	}, [map, isMapLoaded, isBackgroundPresentation]);
 
 	// Rectangle selection handlers (Mapbox mouse events).
 	useEffect(() => {
 		if (!map || !isMapLoaded) return;
+		if (isBackgroundPresentation) return;
 		map.on('mousedown', handleMapMouseDown);
 		map.on('mousemove', handleMapMouseMove);
 		map.on('mouseup', handleMapMouseUp);
@@ -3997,11 +4511,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			map.off('mousemove', handleMapMouseMove);
 			map.off('mouseup', handleMapMouseUp);
 		};
-	}, [map, isMapLoaded, handleMapMouseDown, handleMapMouseMove, handleMapMouseUp]);
+	}, [map, isMapLoaded, isBackgroundPresentation, handleMapMouseDown, handleMapMouseMove, handleMapMouseUp]);
 
 	// Toggle map interaction mode for rectangle selection.
 	useEffect(() => {
 		if (!map || !isMapLoaded) return;
+		if (isBackgroundPresentation) return;
 		const selecting = areaSelectionEnabled || isAreaSelecting;
 		try {
 			if (selecting) {
@@ -4014,7 +4529,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		} catch {
 			// Ignore (handlers may not be ready yet).
 		}
-	}, [map, isMapLoaded, areaSelectionEnabled, isAreaSelecting]);
+	}, [map, isMapLoaded, isBackgroundPresentation, areaSelectionEnabled, isAreaSelecting]);
 
 	// Draw a gray outline around the *group of states* that have results.
 	// We union the result states' polygons so the outline is one shape.
@@ -4162,7 +4677,13 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 	// Helper to fit map bounds with padding
 	const fitMapToBounds = useCallback(
-		(mapInstance: mapboxgl.Map, contactsList: ContactWithName[]) => {
+		(
+			mapInstance: mapboxgl.Map,
+			contactsList: ContactWithName[],
+			opts?: {
+				durationMs?: number;
+			}
+		) => {
 			if (contactsList.length === 0) return;
 
 			let bounds: mapboxgl.LngLatBounds | null = null;
@@ -4176,21 +4697,31 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 			if (!bounds) return;
 
+			const dur = opts?.durationMs ?? 650;
 			mapInstance.fitBounds(bounds, {
 				padding: { top: 50, right: 50, bottom: 50, left: 50 },
 				maxZoom: AUTO_FIT_CONTACTS_MAX_ZOOM,
-				duration: 650,
+				duration: dur,
+				// Smooth ease-out for cinematic transitions (default Mapbox ease is too stiff at long durations).
+				...(dur > 1000 ? { easing: (t: number) => 1 - Math.pow(1 - t, 3) } : {}),
 			});
 		},
 		[getContactCoords]
 	);
 
 	// Helper to fit map to a state's bounds
-	const fitMapToState = useCallback((mapInstance: mapboxgl.Map, stateKey: string) => {
+	const fitMapToState = useCallback((
+		mapInstance: mapboxgl.Map,
+		stateKey: string,
+		opts?: {
+			durationMs?: number;
+		}
+	) => {
 		const entry = usStatesByKeyRef.current.get(stateKey);
 		const bbox = entry?.bbox;
 		if (!bbox) return false;
 
+		const dur = opts?.durationMs ?? 650;
 		mapInstance.fitBounds(
 			[
 				[bbox.minLng, bbox.minLat],
@@ -4199,7 +4730,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			{
 				padding: { top: 100, right: 100, bottom: 100, left: 100 },
 				maxZoom: AUTO_FIT_STATE_MAX_ZOOM,
-				duration: 650,
+				duration: dur,
+				// Smooth ease-out for cinematic transitions.
+				...(dur > 1000 ? { easing: (t: number) => 1 - Math.pow(1 - t, 3) } : {}),
 			}
 		);
 
@@ -4211,7 +4744,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	useEffect(() => {
 		if (!map || !isMapLoaded) return;
 
-		// Skip auto-fit entirely if requested (e.g. for fromHome loading state)
+		// Skip auto-fit when in background/decorative mode or when explicitly requested.
+		if (isBackgroundPresentation) return;
 		if (skipAutoFit) return;
 
 		// If no locked state is active, allow the next locked-state search to refit to its state.
@@ -4229,6 +4763,15 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		const isNewSearch = isSearchMode
 			? searchQueryKey !== lastSearchQueryKeyRef.current
 			: currentFirstId !== lastFirstContactIdRef.current;
+
+		// If a *new* search query was executed while already in interactive mode, mark it as
+		// pending-cinematic so the eventual first auto-fit for that query uses the longer duration
+		// (even if contacts/state geometry arrive a moment later).
+		if (isSearchMode && isNewSearch) {
+			pendingSearchQueryCinematicRef.current = { key: searchQueryKey, at: Date.now() };
+		} else if (!isSearchMode) {
+			pendingSearchQueryCinematicRef.current = null;
+		}
 
 		// Check if the locked state changed (indicating a new search in a different state)
 		const isNewStateSearch = lockedStateKey !== lastLockedStateKeyRef.current;
@@ -4282,8 +4825,34 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			autoFitTimeoutRef.current = null;
 		}
 
+		const pendingSearch = pendingSearchQueryCinematicRef.current;
+		const isSearchQueryCinematic =
+			!!pendingSearch &&
+			pendingSearch.key === searchQueryKey &&
+			Date.now() - pendingSearch.at < 10_000;
+
+		const autoFitDebounceMs = cinematicAutoFitRef.current || isSearchQueryCinematic ? 0 : 180;
 		autoFitTimeoutRef.current = setTimeout(() => {
+			// If a cinematic fly-in is already underway, don't restart the camera animation.
+			if (cinematicInFlightRef.current) return;
+
 			let didFit = false;
+			const cinematicNow = cinematicAutoFitRef.current;
+			const pendingClick = pendingStateClickCinematicRef.current;
+			const isUserStateClickCinematic =
+				!!pendingClick &&
+				!!lockedStateKey &&
+				pendingClick.key === lockedStateKey &&
+				Date.now() - pendingClick.at < 10_000;
+			const pendingSearchNow = pendingSearchQueryCinematicRef.current;
+			const isSearchQueryCinematicNow =
+				!!pendingSearchNow &&
+				pendingSearchNow.key === searchQueryKey &&
+				Date.now() - pendingSearchNow.at < 10_000;
+			const durationMs =
+				cinematicNow || isUserStateClickCinematic || isSearchQueryCinematicNow
+					? DASHBOARD_TO_INTERACTIVE_TRANSITION_MS
+					: 650;
 
 			// If there's a locked state (searched state) and this is a new search or new state,
 			// zoom to that state first for a better initial view (works even with 0 geocoded contacts).
@@ -4295,32 +4864,70 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				isStateLayerReady &&
 				(isNewSearch || isNewStateSearch || !hasFitBoundsRef.current || shouldFitLockedState)
 			) {
-				const didFitToState = fitMapToState(map, lockedStateKey);
+				const didFitToState = fitMapToState(map, lockedStateKey, { durationMs });
 				// Mark as attempted so we never loop (even if something unexpected prevents a fit).
 				lastFitToLockedStateKeyRef.current = lockedStateKey;
 				if (didFitToState) {
 					didFit = true;
 				} else if (contactsWithCoords.length > 0) {
 					// Fallback to fitting to contacts if state geometry not found
-					fitMapToBounds(map, contactsWithCoords);
+					fitMapToBounds(map, contactsWithCoords, { durationMs });
 					didFit = true;
 				}
 			} else if (contactsWithCoords.length > 0) {
-				fitMapToBounds(map, contactsWithCoords);
+				fitMapToBounds(map, contactsWithCoords, { durationMs });
 				didFit = true;
 			}
 
 			// Only mark as "fit" if we actually moved the camera.
 			if (didFit) {
+				// Clear the user-click flag once we successfully kicked off the cinematic state zoom.
+				if (isUserStateClickCinematic) {
+					pendingStateClickCinematicRef.current = null;
+				}
+				// Clear the pending search flag once we successfully kicked off the cinematic search sweep.
+				if (isSearchQueryCinematicNow) {
+					pendingSearchQueryCinematicRef.current = null;
+				}
 				hasFitBoundsRef.current = true;
 				lastContactsCountRef.current = contactsWithCoords.length;
+
+				// If we temporarily allowed zoom < MAP_MIN_ZOOM to start the animation from the
+				// decorative globe, restore the normal constraint once the camera settles.
+				if (pendingMinZoomRestoreRef.current && !hasAttachedMinZoomRestoreRef.current) {
+					hasAttachedMinZoomRestoreRef.current = true;
+					try {
+						map.once('moveend', () => {
+							hasAttachedMinZoomRestoreRef.current = false;
+							pendingMinZoomRestoreRef.current = false;
+							try { map.setMinZoom(MAP_MIN_ZOOM); } catch {}
+						});
+					} catch {
+						// Non-fatal.
+						hasAttachedMinZoomRestoreRef.current = false;
+						pendingMinZoomRestoreRef.current = false;
+					}
+				}
+
+				// After the first fly-in from the dashboard globe, revert to normal timings.
+				if (cinematicNow) {
+					cinematicAutoFitRef.current = false;
+					// Lock out resize/re-fit calls for the full duration of the camera sweep
+					// so nothing interrupts the smooth animation.
+					cinematicInFlightRef.current = true;
+					if (cinematicInFlightTimerRef.current) clearTimeout(cinematicInFlightTimerRef.current);
+					cinematicInFlightTimerRef.current = setTimeout(() => {
+						cinematicInFlightRef.current = false;
+						cinematicInFlightTimerRef.current = null;
+					}, durationMs + 100); // small buffer past the animation end
+				}
 			}
 
 			if (autoFitTimeoutRef.current) {
 				clearTimeout(autoFitTimeoutRef.current);
 				autoFitTimeoutRef.current = null;
 			}
-		}, 180);
+		}, autoFitDebounceMs);
 
 		return () => {
 			if (autoFitTimeoutRef.current) {
@@ -4331,6 +4938,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	}, [
 		map,
 		isMapLoaded,
+		isBackgroundPresentation,
 		contactsWithCoords,
 		fitMapToBounds,
 		fitMapToState,
@@ -4668,6 +5276,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				clearStateHover();
 				return;
 			}
+			// While zooming-to-state after a state click (or while results are loading), don't show
+			// hover overlays on other states as the camera sweeps.
+			if (stateClickZoomInFlightRef.current || isLoadingRef.current) {
+				clearStateHover();
+				return;
+			}
 
 			const stateFeatures = map.queryRenderedFeatures(e.point, { layers: [MAPBOX_LAYER_IDS.statesFillHit] });
 			const topState = stateFeatures[0];
@@ -4724,6 +5338,37 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					const topState = stateFeatures[0];
 					const key = typeof topState?.id === 'string' ? topState.id : null;
 					if (key) {
+						// Prevent other states from briefly showing hover-fill while we zoom/search.
+						stateClickZoomInFlightNonceRef.current += 1;
+						const nonce = stateClickZoomInFlightNonceRef.current;
+						stateClickZoomInFlightRef.current = true;
+						clearStateHover();
+						if (stateClickZoomInFlightTimeoutRef.current) {
+							clearTimeout(stateClickZoomInFlightTimeoutRef.current);
+							stateClickZoomInFlightTimeoutRef.current = null;
+						}
+						// Safety: never let this suppression get "stuck" if the camera doesn't move.
+						stateClickZoomInFlightTimeoutRef.current = setTimeout(() => {
+							if (stateClickZoomInFlightNonceRef.current !== nonce) return;
+							stateClickZoomInFlightRef.current = false;
+							stateClickZoomInFlightTimeoutRef.current = null;
+						}, DASHBOARD_TO_INTERACTIVE_TRANSITION_MS + 2500);
+						try {
+							map.once('moveend', () => {
+								if (stateClickZoomInFlightNonceRef.current !== nonce) return;
+								stateClickZoomInFlightRef.current = false;
+								if (stateClickZoomInFlightTimeoutRef.current) {
+									clearTimeout(stateClickZoomInFlightTimeoutRef.current);
+									stateClickZoomInFlightTimeoutRef.current = null;
+								}
+							});
+						} catch {
+							// Ignore.
+						}
+
+						// Mark this as a user-initiated state zoom so our subsequent fit-to-locked-state
+						// uses the longer cinematic duration.
+						pendingStateClickCinematicRef.current = { key, at: Date.now() };
 						const nameRaw = (topState.properties as any)?.name;
 						const name =
 							typeof nameRaw === 'string' && nameRaw.trim().length > 0 ? nameRaw.trim() : key;
@@ -5372,16 +6017,37 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	]);
 
 	return (
-		<div style={{ width: '100%', height: '100%', position: 'relative', borderRadius: '0.5rem', overflow: 'hidden' }}>
+		<div
+			style={{
+				width: '100%',
+				height: '100%',
+				position: 'relative',
+				backgroundColor: '#000',
+				borderRadius: isBackgroundPresentation ? 0 : '0.5rem',
+				overflow: 'hidden',
+			}}
+		>
 			<div ref={mapContainerRef} style={{ width: '100%', height: '100%' }} />
 			{mapLoadError && (
-				<div className="absolute inset-0 flex items-center justify-center bg-gray-100">
+				<div
+					className={`absolute inset-0 flex items-center justify-center ${
+						isBackgroundPresentation ? 'bg-black/80' : 'bg-gray-100'
+					}`}
+				>
 					<p className="text-gray-500">{mapLoadError}</p>
 				</div>
 			)}
 			{!mapLoadError && !isMapLoaded && (
-				<div className="absolute inset-0 flex items-center justify-center bg-gray-100">
-					<div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900" />
+				<div
+					className={`absolute inset-0 flex items-center justify-center ${
+						isBackgroundPresentation ? 'bg-black' : 'bg-gray-100'
+					}`}
+				>
+					<div
+						className={`animate-spin rounded-full h-8 w-8 border-b-2 ${
+							isBackgroundPresentation ? 'border-white' : 'border-gray-900'
+						}`}
+					/>
 				</div>
 			)}
 
