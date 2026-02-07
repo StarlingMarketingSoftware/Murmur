@@ -377,7 +377,7 @@ export const CampaignsTable: FC = () => {
 							<CustomTable
 								variant="secondary"
 								containerClassName="my-campaigns-table mobile-table-no-scroll !bg-[#F8F8F8]"
-								headerClassName="[&_tr]:!bg-[#F8F8F8] [&_th]:!border-b-[#F8F8F8] [&_th]:relative [&_th]:!overflow-visible"
+								headerClassName="!bg-white [&_tr]:!bg-white [&_th]:!bg-white [&_th]:!border-b-[#F8F8F8] [&_th]:relative [&_th]:!overflow-visible"
 								rowClassName="!bg-transparent !border-b-[#F8F8F8] hover:!bg-[#F0F0F0] transition-colors duration-200"
 											renderLoadingCell={({ column }) => {
 												if (column.id === 'metrics') {
@@ -485,7 +485,7 @@ export const CampaignsTable: FC = () => {
 								containerClassName={`border-none rounded-[12px] my-campaigns-table !bg-[#F8F8F8] !mx-auto !p-[8px] ${
 									isNarrowDesktop ? 'narrow-desktop-table' : ''
 								}`}
-								headerClassName="[&_tr]:!bg-transparent [&_th]:!border-0 [&_th]:!h-[28px] [&_tr]:!h-[28px] [&_th:first-child]:rounded-tl-[8px] [&_th:last-child]:rounded-tr-[8px] [&_th]:relative [&_th]:!overflow-visible"
+								headerClassName="!bg-white [&_tr]:!bg-white [&_th]:!bg-white [&_th]:!border-0 [&_th]:!h-[28px] [&_tr]:!h-[28px] [&_th:first-child]:rounded-tl-[8px] [&_th:last-child]:rounded-tr-[8px] [&_th]:relative [&_th]:!overflow-visible"
 								rowClassName="!bg-transparent !border-0 hover:!bg-[#F0F0F0] transition-colors duration-200"
 								renderLoadingCell={({ column }) => {
 									if (column.id === 'metrics') {

@@ -7519,6 +7519,11 @@ const DashboardContent = () => {
 							const inactivePanels = panels.filter(
 								(panel) => panel.key !== activePanel.key
 							);
+							// UX tweak: when viewing Responses, show Campaigns above New.
+							const inactivePanelsToRender =
+								activePanel.key === 'responses'
+									? inactivePanels.slice().reverse()
+									: inactivePanels;
 
 							return (
 								<>
@@ -7526,16 +7531,15 @@ const DashboardContent = () => {
 										{activePanel.render()}
 									</div>
 
-									{inactivePanels.map((panel) => (
+									{inactivePanelsToRender.map((panel) => (
 										<div
 											key={panel.key}
 											className="w-[603px] max-w-full mx-auto"
-											style={{ opacity: 0.6 }}
 										>
 											<button
 												type="button"
 												onClick={() => setDashboardLandingPanel(panel.key)}
-												className="flex items-center justify-center gap-[6px] cursor-pointer hover:opacity-80 transition-opacity"
+												className="flex items-center justify-center gap-[6px] cursor-pointer opacity-60 hover:opacity-100 transition-opacity"
 												style={{
 													width: '127px',
 													height: '26px',

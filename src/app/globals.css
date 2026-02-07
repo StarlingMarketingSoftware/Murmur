@@ -4100,8 +4100,18 @@ main {
 /* Removed - Using custom GlobalScrollbar component instead */
 
 /* Specific styles for My Campaigns table header */
+.my-campaigns-table thead,
+.my-campaigns-table thead tr,
 .my-campaigns-table thead th {
-	background-color: #f8f8f8 !important;
+	background-color: #ffffff !important;
+}
+
+/* Campaigns table: keep body on the container fill (#F8F8F8)
+   The shared "secondary" table styles give tbody a white background; for this table we want
+   the wrapper/container background to show through behind rows. */
+.my-campaigns-table [data-slot='table'],
+.my-campaigns-table [data-slot='table-body'] {
+	background-color: transparent !important;
 }
 
 /* Drafts sort indicators (Campaigns table)
