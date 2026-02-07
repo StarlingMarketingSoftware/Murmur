@@ -23,7 +23,15 @@ import {
 import { RestaurantsIcon } from '@/components/atoms/_svg/RestaurantsIcon';
 import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
 import { MusicVenuesIcon } from '@/components/atoms/_svg/MusicVenuesIcon';
-import { isRestaurantTitle, isCoffeeShopTitle, isMusicVenueTitle, isWeddingPlannerTitle, isWeddingVenueTitle, isWineBeerSpiritsTitle, getWineBeerSpiritsLabel } from '@/utils/restaurantTitle';
+import {
+	isRestaurantTitle,
+	isCoffeeShopTitle,
+	isMusicVenueTitle,
+	isWeddingPlannerTitle,
+	isWeddingVenueTitle,
+	isWineBeerSpiritsTitle,
+	getWineBeerSpiritsLabel,
+} from '@/utils/restaurantTitle';
 import { WeddingPlannersIcon } from '@/components/atoms/_svg/WeddingPlannersIcon';
 import { WineBeerSpiritsIcon } from '@/components/atoms/_svg/WineBeerSpiritsIcon';
 
@@ -143,7 +151,9 @@ const geoJsonRingToClippingRing = (ring: number[][]): ClippingRing => {
 	return closeRing(coords);
 };
 
-const geoJsonPolygonToClippingPolygon = (polygonCoords: number[][][]): ClippingPolygon => {
+const geoJsonPolygonToClippingPolygon = (
+	polygonCoords: number[][][]
+): ClippingPolygon => {
 	const rings = (polygonCoords ?? [])
 		.map((ring) => geoJsonRingToClippingRing(ring))
 		.filter((ring) => ring.length >= 4);
@@ -167,7 +177,10 @@ const geoJsonGeometryToClippingMultiPolygon = (
 	return null;
 };
 
-const EMPTY_POLYGON_FC: OutlinePolygonFeatureCollection = { type: 'FeatureCollection', features: [] };
+const EMPTY_POLYGON_FC: OutlinePolygonFeatureCollection = {
+	type: 'FeatureCollection',
+	features: [],
+};
 
 const boundsToPolygonFeatureCollection = (
 	bounds: MapSelectionBounds,
@@ -255,10 +268,15 @@ const jitterDuplicateCoords = (base: LatLngLiteral, index: number): LatLngLitera
 
 const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n));
 
-const getClientPointFromDomEvent = (domEvent: unknown): { x: number; y: number } | null => {
+const getClientPointFromDomEvent = (
+	domEvent: unknown
+): { x: number; y: number } | null => {
 	const ev = domEvent as Partial<MouseEvent & TouchEvent & PointerEvent> | null;
 	if (!ev) return null;
-	if (typeof (ev as MouseEvent).clientX === 'number' && typeof (ev as MouseEvent).clientY === 'number') {
+	if (
+		typeof (ev as MouseEvent).clientX === 'number' &&
+		typeof (ev as MouseEvent).clientY === 'number'
+	) {
 		return { x: (ev as MouseEvent).clientX, y: (ev as MouseEvent).clientY };
 	}
 	const touches = (ev as TouchEvent).touches;
@@ -336,7 +354,12 @@ const stableViewportSampleContacts = (
 
 	const latSpan = viewportBbox.maxLat - viewportBbox.minLat;
 	const lngSpan = viewportBbox.maxLng - viewportBbox.minLng;
-	if (!Number.isFinite(latSpan) || !Number.isFinite(lngSpan) || latSpan <= 0 || lngSpan <= 0) {
+	if (
+		!Number.isFinite(latSpan) ||
+		!Number.isFinite(lngSpan) ||
+		latSpan <= 0 ||
+		lngSpan <= 0
+	) {
 		// Fallback: deterministic sample by hash order.
 		return contacts
 			.map((contact) => ({
@@ -352,7 +375,12 @@ const stableViewportSampleContacts = (
 	const grid = Math.max(8, Math.min(64, Math.round(Math.sqrt(slots) * 1.15)));
 	const latStep = latSpan / grid;
 	const lngStep = lngSpan / grid;
-	if (!Number.isFinite(latStep) || !Number.isFinite(lngStep) || latStep <= 0 || lngStep <= 0) {
+	if (
+		!Number.isFinite(latStep) ||
+		!Number.isFinite(lngStep) ||
+		latStep <= 0 ||
+		lngStep <= 0
+	) {
 		return contacts
 			.map((contact) => ({
 				contact,
@@ -414,7 +442,10 @@ const stableViewportSampleContacts = (
 	const remainingSlots = slots - picked.length;
 	if (remainingSlots <= 0) return picked;
 
-	const totalRemaining = cells.reduce((sum, cell) => sum + Math.max(0, cell.items.length - 1), 0);
+	const totalRemaining = cells.reduce(
+		(sum, cell) => sum + Math.max(0, cell.items.length - 1),
+		0
+	);
 	if (totalRemaining <= 0) return picked;
 
 	const allocs = cells.map((cell) => {
@@ -464,7 +495,10 @@ type WorldSegment = {
 	maxY: number;
 };
 
-const latLngToWorldPixel = (coords: LatLngLiteral, worldSize: number): { x: number; y: number } => {
+const latLngToWorldPixel = (
+	coords: LatLngLiteral,
+	worldSize: number
+): { x: number; y: number } => {
 	// Web Mercator world pixel coords at the current zoom.
 	const latClamped = clamp(coords.lat, -85, 85);
 	const siny = Math.sin((latClamped * Math.PI) / 180);
@@ -516,7 +550,12 @@ const buildOuterRingWorldSegments = (
 			if (!a || !b) continue;
 			const [lngA, latA] = a;
 			const [lngB, latB] = b;
-			if (!Number.isFinite(lngA) || !Number.isFinite(latA) || !Number.isFinite(lngB) || !Number.isFinite(latB))
+			if (
+				!Number.isFinite(lngA) ||
+				!Number.isFinite(latA) ||
+				!Number.isFinite(lngB) ||
+				!Number.isFinite(latB)
+			)
 				continue;
 			const wa = latLngToWorldPixel({ lat: latA, lng: lngA }, worldSize);
 			const wb = latLngToWorldPixel({ lat: latB, lng: lngB }, worldSize);
@@ -898,7 +937,9 @@ const applyFreeTrialMapVisualTuning = (mapInstance: mapboxgl.Map) => {
 			const idLower = id.toLowerCase();
 			if (
 				(layer as any).type === 'line' &&
-				(idLower.includes('admin') || idLower.includes('boundary') || idLower.includes('border'))
+				(idLower.includes('admin') ||
+					idLower.includes('boundary') ||
+					idLower.includes('border'))
 			) {
 				mapInstance.setLayoutProperty(id, 'visibility', 'none');
 			}
@@ -1015,7 +1056,9 @@ const applyUsOnlyBasemapCartography = (
 
 			const existingFilter = clipState.originalFilters.get(id) as any;
 			const withinFilter = ['within', usGeometry] as any;
-			const nextFilter = existingFilter ? (['all', existingFilter, withinFilter] as any) : withinFilter;
+			const nextFilter = existingFilter
+				? (['all', existingFilter, withinFilter] as any)
+				: withinFilter;
 			mapInstance.setFilter(id, nextFilter);
 		} catch {
 			// Ignore layers that disappear or can't be mutated.
@@ -1023,7 +1066,10 @@ const applyUsOnlyBasemapCartography = (
 	}
 };
 
-const restoreBasemapCartography = (mapInstance: mapboxgl.Map, clipState: BasemapCartographyClipState) => {
+const restoreBasemapCartography = (
+	mapInstance: mapboxgl.Map,
+	clipState: BasemapCartographyClipState
+) => {
 	if (clipState.layerIds.length === 0) return;
 	for (const id of clipState.layerIds) {
 		try {
@@ -1108,14 +1154,19 @@ const BOOKING_EXTRA_TITLE_PREFIXES = [
 
 const PROMOTION_OVERLAY_TITLE_PREFIXES = ['Radio Stations', 'College Radio'] as const;
 
-const startsWithCaseInsensitive = (value: string | null | undefined, prefix: string): boolean => {
+const startsWithCaseInsensitive = (
+	value: string | null | undefined,
+	prefix: string
+): boolean => {
 	if (!value) return false;
 	const p = prefix.trim().toLowerCase();
 	if (!p) return false;
 	return value.trim().toLowerCase().startsWith(p);
 };
 
-const getBookingTitlePrefixFromContactTitle = (title: string | null | undefined): string | null => {
+const getBookingTitlePrefixFromContactTitle = (
+	title: string | null | undefined
+): string | null => {
 	if (!title) return null;
 	for (const prefix of BOOKING_EXTRA_TITLE_PREFIXES) {
 		if (startsWithCaseInsensitive(title, prefix)) return prefix;
@@ -1125,12 +1176,15 @@ const getBookingTitlePrefixFromContactTitle = (title: string | null | undefined)
 
 const isPromotionOverlayListTitle = (title: string | null | undefined): boolean => {
 	if (!title) return false;
-	return PROMOTION_OVERLAY_TITLE_PREFIXES.some((p) => startsWithCaseInsensitive(title, p));
+	return PROMOTION_OVERLAY_TITLE_PREFIXES.some((p) =>
+		startsWithCaseInsensitive(title, p)
+	);
 };
 
 // Promotion overlay pins should use the Radio Stations visual language (icon + color).
-const getPromotionOverlayWhatFromContactTitle = (title: string | null | undefined): string | null =>
-	isPromotionOverlayListTitle(title) ? 'Radio Stations' : null;
+const getPromotionOverlayWhatFromContactTitle = (
+	title: string | null | undefined
+): string | null => (isPromotionOverlayListTitle(title) ? 'Radio Stations' : null);
 
 const isBookingSearchQuery = (query: string | null | undefined): boolean =>
 	(query ?? '').trim().toLowerCase().startsWith('[booking]');
@@ -1224,7 +1278,9 @@ const getResultDotColorForWhat = (searchWhat?: string | null): string => {
 
 const getResultDotTForZoom = (zoom: number): number => {
 	const clampedZoom = clamp(zoom, RESULT_DOT_ZOOM_MIN, RESULT_DOT_ZOOM_MAX);
-	return (clampedZoom - RESULT_DOT_ZOOM_MIN) / (RESULT_DOT_ZOOM_MAX - RESULT_DOT_ZOOM_MIN);
+	return (
+		(clampedZoom - RESULT_DOT_ZOOM_MIN) / (RESULT_DOT_ZOOM_MAX - RESULT_DOT_ZOOM_MIN)
+	);
 };
 
 const getResultDotScaleForZoom = (zoom: number): number => {
@@ -1396,7 +1452,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	// Default to enabling state hover/click when a handler is provided.
 	// This mirrors the old Google Maps UX (hover highlight + click-to-search) without requiring
 	// every caller to pass an explicit `enableStateInteractions` flag.
-	const stateInteractionsEnabled = enableStateInteractions ?? typeof onStateSelect === 'function';
+	const stateInteractionsEnabled =
+		enableStateInteractions ?? typeof onStateSelect === 'function';
 
 	// Smooth fade for state overlays (borders + labels) when switching presentations.
 	// This prevents the "pause then pop" feeling when transitioning from the decorative globe
@@ -1420,7 +1477,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const mapRef = useRef<mapboxgl.Map | null>(null);
 	const [map, setMap] = useState<mapboxgl.Map | null>(null);
 	const [isMapLoaded, setIsMapLoaded] = useState(false);
-	const initialZoomConstraintsRef = useRef<{ minZoom: number; maxZoom: number } | null>(null);
+	const initialZoomConstraintsRef = useRef<{ minZoom: number; maxZoom: number } | null>(
+		null
+	);
 	const backgroundSpinCleanupRef = useRef<(() => void) | null>(null);
 	const [mapLoadError, setMapLoadError] = useState<string | null>(null);
 	const [selectedStateKey, setSelectedStateKey] = useState<string | null>(null);
@@ -1429,32 +1488,31 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	// Keep a "sticky" set of currently-rendered marker ids so zooming can rescale existing markers
 	// and only introduce *new* markers, instead of re-sampling a totally different set each time.
 	const visibleContactIdSetRef = useRef<Set<number>>(new Set());
-	const [bookingExtraVisibleContacts, setBookingExtraVisibleContacts] = useState<ContactWithName[]>(
-		[]
-	);
+	const [bookingExtraVisibleContacts, setBookingExtraVisibleContacts] = useState<
+		ContactWithName[]
+	>([]);
 	const bookingExtraVisibleIdSetRef = useRef<Set<number>>(new Set());
 	const lastBookingExtraVisibleContactsKeyRef = useRef<string>('');
 	const lastBookingExtraFetchKeyRef = useRef<string>('');
-	const [bookingExtraFetchBbox, setBookingExtraFetchBbox] = useState<BoundingBox | null>(null);
+	const [bookingExtraFetchBbox, setBookingExtraFetchBbox] = useState<BoundingBox | null>(
+		null
+	);
 	const [promotionOverlayVisibleContacts, setPromotionOverlayVisibleContacts] = useState<
 		ContactWithName[]
 	>([]);
 	const lastPromotionOverlayVisibleContactsKeyRef = useRef<string>('');
 	const lastPromotionOverlayFetchKeyRef = useRef<string>('');
-	const [promotionOverlayFetchBbox, setPromotionOverlayFetchBbox] = useState<BoundingBox | null>(
-		null
-	);
+	const [promotionOverlayFetchBbox, setPromotionOverlayFetchBbox] =
+		useState<BoundingBox | null>(null);
 
 	// High-zoom "all contacts" overlay (gray dots)
-	const [allContactsOverlayVisibleContacts, setAllContactsOverlayVisibleContacts] = useState<
-		ContactWithName[]
-	>([]);
+	const [allContactsOverlayVisibleContacts, setAllContactsOverlayVisibleContacts] =
+		useState<ContactWithName[]>([]);
 	const allContactsOverlayVisibleIdSetRef = useRef<Set<number>>(new Set());
 	const lastAllContactsOverlayVisibleContactsKeyRef = useRef<string>('');
 	const lastAllContactsOverlayFetchKeyRef = useRef<string>('');
-	const [allContactsOverlayFetchBbox, setAllContactsOverlayFetchBbox] = useState<BoundingBox | null>(
-		null
-	);
+	const [allContactsOverlayFetchBbox, setAllContactsOverlayFetchBbox] =
+		useState<BoundingBox | null>(null);
 	// Rectangle selection state (dashboard map select tool)
 	const [isAreaSelecting, setIsAreaSelecting] = useState(false);
 	const selectionStartLatLngRef = useRef<LatLngLiteral | null>(null);
@@ -1480,9 +1538,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		>
 	>(new Map());
 	const hoveredStateIdRef = useRef<string | number | null>(null);
-	const usBasemapClipGeometryRef = useRef<Extract<GeoJsonGeometry, { type: 'MultiPolygon' }> | null>(
-		null
-	);
+	const usBasemapClipGeometryRef = useRef<Extract<
+		GeoJsonGeometry,
+		{ type: 'MultiPolygon' }
+	> | null>(null);
 	const usBasemapClipMultiPolygonRef = useRef<ClippingMultiPolygon | null>(null);
 	const basemapCartographyClipStateRef = useRef<BasemapCartographyClipState>({
 		layerIds: [],
@@ -1579,9 +1638,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	);
 
 	const isBookingSearch = useMemo(() => isBookingSearchQuery(searchQuery), [searchQuery]);
-	const isPromotionSearch = useMemo(() => isPromotionSearchQuery(searchQuery), [searchQuery]);
+	const isPromotionSearch = useMemo(
+		() => isPromotionSearchQuery(searchQuery),
+		[searchQuery]
+	);
 	const isAnySearch = useMemo(() => Boolean((searchQuery ?? '').trim()), [searchQuery]);
-	const onViewportInteractionRef = useRef<SearchResultsMapProps['onViewportInteraction'] | null>(null);
+	const onViewportInteractionRef = useRef<
+		SearchResultsMapProps['onViewportInteraction'] | null
+	>(null);
 	const onViewportIdleRef = useRef<SearchResultsMapProps['onViewportIdle'] | null>(null);
 	const selectedAreaBoundsRef = useRef<MapSelectionBounds | null>(null);
 	useEffect(() => {
@@ -1597,7 +1661,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		visibleContactIdSetRef.current = new Set(visibleContacts.map((c) => c.id));
 	}, [visibleContacts]);
 	useEffect(() => {
-		bookingExtraVisibleIdSetRef.current = new Set(bookingExtraVisibleContacts.map((c) => c.id));
+		bookingExtraVisibleIdSetRef.current = new Set(
+			bookingExtraVisibleContacts.map((c) => c.id)
+		);
 	}, [bookingExtraVisibleContacts]);
 	useEffect(() => {
 		allContactsOverlayVisibleIdSetRef.current = new Set(
@@ -1645,9 +1711,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 	// Check if the current search is for a specific category (to apply labels to all results)
 	const searchWhatLower = searchWhat?.toLowerCase() || '';
-	const isMusicVenuesSearch = searchWhatLower.includes('music venue') || searchWhatLower.includes('venues');
+	const isMusicVenuesSearch =
+		searchWhatLower.includes('music venue') || searchWhatLower.includes('venues');
 	const isRestaurantsSearch = searchWhatLower.includes('restaurant');
-	const isCoffeeShopsSearch = searchWhatLower.includes('coffee shop') || searchWhatLower.includes('coffee shops');
+	const isCoffeeShopsSearch =
+		searchWhatLower.includes('coffee shop') || searchWhatLower.includes('coffee shops');
 	const isWeddingPlannersSearch = searchWhatLower.includes('wedding planner');
 
 	// Booking/promotion overlay pins can contain multiple "What" categories at once; only surface
@@ -1661,7 +1729,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			for (const contact of bookingExtraVisibleContacts) {
 				const prefix = getBookingTitlePrefixFromContactTitle(contact.title);
 				if (!prefix) continue;
-				if (!bookingTitlePrefixMatchesSearchWhatKey(prefix, normalizedSearchWhatKey)) continue;
+				if (!bookingTitlePrefixMatchesSearchWhatKey(prefix, normalizedSearchWhatKey))
+					continue;
 				byId.set(contact.id, contact);
 			}
 		}
@@ -1670,8 +1739,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			for (const contact of promotionOverlayVisibleContacts) {
 				const title = contact.title ?? '';
 				const matchedPrefix =
-					PROMOTION_OVERLAY_TITLE_PREFIXES.find((p) => startsWithCaseInsensitive(title, p)) ??
-					null;
+					PROMOTION_OVERLAY_TITLE_PREFIXES.find((p) =>
+						startsWithCaseInsensitive(title, p)
+					) ?? null;
 				if (!matchedPrefix) continue;
 				if (normalizeWhatKey(matchedPrefix) !== normalizedSearchWhatKey) continue;
 				byId.set(contact.id, contact);
@@ -1736,11 +1806,20 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		}
 
 		const { south, west, north, east } = selectedAreaBounds;
-		if (![south, west, north, east].every((n) => typeof n === 'number' && Number.isFinite(n))) {
+		if (
+			![south, west, north, east].every(
+				(n) => typeof n === 'number' && Number.isFinite(n)
+			)
+		) {
 			return;
 		}
 
-		setPolygonSourceBounds(MAPBOX_SOURCE_IDS.selectedAreaRect, { south, west, north, east });
+		setPolygonSourceBounds(MAPBOX_SOURCE_IDS.selectedAreaRect, {
+			south,
+			west,
+			north,
+			east,
+		});
 	}, [map, isMapLoaded, selectedAreaBounds, isAreaSelecting, setPolygonSourceBounds]);
 
 	// Cancel selection if the tool changes or the map unmounts.
@@ -1880,7 +1959,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 			if (nextKey === lastBookingExtraFetchKeyRef.current) return;
 			lastBookingExtraFetchKeyRef.current = nextKey;
-			setBookingExtraFetchBbox({ minLat: qSouth, minLng: qWest, maxLat: qNorth, maxLng: qEast });
+			setBookingExtraFetchBbox({
+				minLat: qSouth,
+				minLng: qWest,
+				maxLat: qNorth,
+				maxLng: qEast,
+			});
 		},
 		[isBookingSearch]
 	);
@@ -1943,7 +2027,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			)}|${qEast.toFixed(4)}`;
 			if (nextKey === lastPromotionOverlayFetchKeyRef.current) return;
 			lastPromotionOverlayFetchKeyRef.current = nextKey;
-			setPromotionOverlayFetchBbox({ minLat: qSouth, minLng: qWest, maxLat: qNorth, maxLng: qEast });
+			setPromotionOverlayFetchBbox({
+				minLat: qSouth,
+				minLng: qWest,
+				maxLat: qNorth,
+				maxLng: qEast,
+			});
 		},
 		[isPromotionSearch]
 	);
@@ -2008,7 +2097,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			if (nextKey === lastAllContactsOverlayFetchKeyRef.current) return;
 
 			lastAllContactsOverlayFetchKeyRef.current = nextKey;
-			setAllContactsOverlayFetchBbox({ minLat: qSouth, minLng: qWest, maxLat: qNorth, maxLng: qEast });
+			setAllContactsOverlayFetchBbox({
+				minLat: qSouth,
+				minLng: qWest,
+				maxLat: qNorth,
+				maxLng: qEast,
+			});
 		},
 		[isAnySearch]
 	);
@@ -2076,44 +2170,47 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	}, [bookingExtraRawContacts, baseContactIdSet]);
 
 	const promotionOverlayContacts = useMemo(() => {
-		if (!promotionOverlayRawContacts || promotionOverlayRawContacts.length === 0) return [];
+		if (!promotionOverlayRawContacts || promotionOverlayRawContacts.length === 0)
+			return [];
 		return promotionOverlayRawContacts.filter((c) => {
 			// Client-side safety: only keep state-wide list titles.
 			return isPromotionOverlayListTitle(c.title);
 		});
 	}, [promotionOverlayRawContacts]);
 
-	const { contactsWithCoords: bookingExtraContactsWithCoords, coordsByContactId: bookingExtraCoordsByContactId } =
-		useMemo(() => {
-			const coordsByContactId = new Map<number, LatLngLiteral>();
-			const contactsWithCoords: ContactWithName[] = [];
-			const groups = new Map<string, number[]>();
+	const {
+		contactsWithCoords: bookingExtraContactsWithCoords,
+		coordsByContactId: bookingExtraCoordsByContactId,
+	} = useMemo(() => {
+		const coordsByContactId = new Map<number, LatLngLiteral>();
+		const contactsWithCoords: ContactWithName[] = [];
+		const groups = new Map<string, number[]>();
 
-			for (const contact of bookingExtraContacts) {
-				const coords = getLatLngFromContact(contact);
-				if (!coords) continue;
-				coordsByContactId.set(contact.id, coords);
-				contactsWithCoords.push(contact);
-				const key = coordinateKey(coords);
-				const existing = groups.get(key);
-				if (existing) existing.push(contact.id);
-				else groups.set(key, [contact.id]);
+		for (const contact of bookingExtraContacts) {
+			const coords = getLatLngFromContact(contact);
+			if (!coords) continue;
+			coordsByContactId.set(contact.id, coords);
+			contactsWithCoords.push(contact);
+			const key = coordinateKey(coords);
+			const existing = groups.get(key);
+			if (existing) existing.push(contact.id);
+			else groups.set(key, [contact.id]);
+		}
+
+		// Offset duplicates (keep the smallest id at the true coordinate for accuracy)
+		for (const ids of groups.values()) {
+			if (ids.length <= 1) continue;
+			ids.sort((a, b) => a - b);
+			for (let i = 1; i < ids.length; i++) {
+				const id = ids[i];
+				const base = coordsByContactId.get(id);
+				if (!base) continue;
+				coordsByContactId.set(id, jitterDuplicateCoords(base, i));
 			}
+		}
 
-			// Offset duplicates (keep the smallest id at the true coordinate for accuracy)
-			for (const ids of groups.values()) {
-				if (ids.length <= 1) continue;
-				ids.sort((a, b) => a - b);
-				for (let i = 1; i < ids.length; i++) {
-					const id = ids[i];
-					const base = coordsByContactId.get(id);
-					if (!base) continue;
-					coordsByContactId.set(id, jitterDuplicateCoords(base, i));
-				}
-			}
-
-			return { contactsWithCoords, coordsByContactId };
-		}, [bookingExtraContacts]);
+		return { contactsWithCoords, coordsByContactId };
+	}, [bookingExtraContacts]);
 
 	const {
 		contactsWithCoords: promotionOverlayContactsWithCoords,
@@ -2286,13 +2383,17 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		resultsSelectionBboxRef.current = null;
 		resultsSelectionSignatureRef.current = '';
 		if (!map || !isMapLoaded) return;
-		const source = map.getSource(MAPBOX_SOURCE_IDS.resultsOutline) as mapboxgl.GeoJSONSource | undefined;
+		const source = map.getSource(MAPBOX_SOURCE_IDS.resultsOutline) as
+			| mapboxgl.GeoJSONSource
+			| undefined;
 		source?.setData(EMPTY_POLYGON_FC as any);
 	}, [map, isMapLoaded]);
 
 	const clearSearchedStateOutline = useCallback(() => {
 		if (!map || !isMapLoaded) return;
-		const source = map.getSource(MAPBOX_SOURCE_IDS.lockedOutline) as mapboxgl.GeoJSONSource | undefined;
+		const source = map.getSource(MAPBOX_SOURCE_IDS.lockedOutline) as
+			| mapboxgl.GeoJSONSource
+			| undefined;
 		source?.setData(EMPTY_POLYGON_FC as any);
 	}, [map, isMapLoaded]);
 
@@ -2337,18 +2438,21 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 				for (const feature of json.features ?? []) {
 					const props = feature.properties ?? {};
-					const rawName =
-						(props.name ?? props.NAME ?? props.STATE_NAME ?? props.State ?? props.state ?? '') as unknown;
+					const rawName = (props.name ??
+						props.NAME ??
+						props.STATE_NAME ??
+						props.State ??
+						props.state ??
+						'') as unknown;
 					const name = String(rawName ?? '').trim();
 
-					const rawAbbr =
-						(props.abbr ??
-							props.ABBR ??
-							props.stusps ??
-							props.STUSPS ??
-							props.postal ??
-							props.POSTAL ??
-							'') as unknown;
+					const rawAbbr = (props.abbr ??
+						props.ABBR ??
+						props.stusps ??
+						props.STUSPS ??
+						props.postal ??
+						props.POSTAL ??
+						'') as unknown;
 					const abbr = String(rawAbbr ?? '').trim();
 
 					const key = normalizeStateKey(abbr || name);
@@ -2384,25 +2488,27 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				usStatesByKeyRef.current = byKey;
 				usStatesPolygonsRef.current = prepared.length ? prepared : null;
 
-				const source = map.getSource(MAPBOX_SOURCE_IDS.states) as mapboxgl.GeoJSONSource | undefined;
+				const source = map.getSource(MAPBOX_SOURCE_IDS.states) as
+					| mapboxgl.GeoJSONSource
+					| undefined;
 				source?.setData({ type: 'FeatureCollection', features } as any);
 
 				// Build a point FeatureCollection with one centroid per state for labels.
 				// Some states have irregular shapes where the bbox centroid falls outside the
 				// state or looks visually off — override those with hand-tuned coordinates.
 				const STATE_LABEL_OVERRIDES: Record<string, [number, number]> = {
-					TX: [-99.5, 31.5],    // Texas: panhandle skews centroid north
-					OK: [-97.5, 35.5],    // Oklahoma: panhandle skews centroid west
-					MN: [-94.3, 46.0],    // Minnesota: NW angle skews centroid
-					NV: [-117.0, 39.0],   // Nevada: triangular shape skews centroid
-					CA: [-119.3, 36.5],   // California: long coast skews centroid east
-					ID: [-114.5, 44.4],   // Idaho: panhandle skews bbox centroid too far east
-					FL: [-81.7, 28.6],    // Florida: peninsula + panhandle
-					MI: [-85.4, 43.5],    // Michigan: Lower Peninsula center
-					LA: [-92.5, 31.0],    // Louisiana: boot shape
-					MD: [-76.8, 39.05],   // Maryland: narrow and wide
-					HI: [-157.5, 20.5],   // Hawaii: island chain
-					AK: [-153.0, 64.0],   // Alaska: massive bbox
+					TX: [-99.5, 31.5], // Texas: panhandle skews centroid north
+					OK: [-97.5, 35.5], // Oklahoma: panhandle skews centroid west
+					MN: [-94.3, 46.0], // Minnesota: NW angle skews centroid
+					NV: [-117.0, 39.0], // Nevada: triangular shape skews centroid
+					CA: [-119.3, 36.5], // California: long coast skews centroid east
+					ID: [-114.5, 44.4], // Idaho: panhandle skews bbox centroid too far east
+					FL: [-81.7, 28.6], // Florida: peninsula + panhandle
+					MI: [-85.4, 43.5], // Michigan: Lower Peninsula center
+					LA: [-92.5, 31.0], // Louisiana: boot shape
+					MD: [-76.8, 39.05], // Maryland: narrow and wide
+					HI: [-157.5, 20.5], // Hawaii: island chain
+					AK: [-153.0, 64.0], // Alaska: massive bbox
 				};
 				const labelPoints: GeoJSON.Feature[] = [];
 				for (const [key, entry] of byKey) {
@@ -2417,16 +2523,18 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						geometry: { type: 'Point', coordinates: [lng, lat] },
 					});
 				}
-				const labelSource = map.getSource(MAPBOX_SOURCE_IDS.stateLabels) as mapboxgl.GeoJSONSource | undefined;
+				const labelSource = map.getSource(MAPBOX_SOURCE_IDS.stateLabels) as
+					| mapboxgl.GeoJSONSource
+					| undefined;
 				labelSource?.setData({ type: 'FeatureCollection', features: labelPoints } as any);
 
 				// Prepare a simplified US outline geometry for the low-zoom basemap clip.
 				// (Union all states to remove internal borders, then take only the outer rings.)
 				if (!usBasemapClipGeometryRef.current) {
 					try {
-						const allStateMultiPolygons: ClippingMultiPolygon[] = Array.from(byKey.values()).map(
-							(e) => e.multiPolygon
-						);
+						const allStateMultiPolygons: ClippingMultiPolygon[] = Array.from(
+							byKey.values()
+						).map((e) => e.multiPolygon);
 
 						let unioned: ClippingMultiPolygon | null = null;
 						try {
@@ -2443,7 +2551,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 						usBasemapClipMultiPolygonRef.current = multiPolygonsToOutline;
 
-						const outlineFc = createOutlineGeoJsonFromMultiPolygon(multiPolygonsToOutline);
+						const outlineFc =
+							createOutlineGeoJsonFromMultiPolygon(multiPolygonsToOutline);
 						const coordinates = outlineFc.features.map((f) => f.geometry.coordinates);
 						if (coordinates.length) {
 							usBasemapClipGeometryRef.current = { type: 'MultiPolygon', coordinates };
@@ -2507,7 +2616,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						map.setPaintProperty(layerId, 'line-opacity', baseOpacity);
 						return;
 					}
-					map.setPaintProperty(layerId, 'line-opacity', scaleMapboxOpacityExpr(baseOpacity, mul));
+					map.setPaintProperty(
+						layerId,
+						'line-opacity',
+						scaleMapboxOpacityExpr(baseOpacity, mul)
+					);
 				} catch {
 					// Ignore.
 				}
@@ -2534,7 +2647,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 		const wasBackgroundPresentation = prevIsBackgroundPresentationRef.current;
 		prevIsBackgroundPresentationRef.current = isBackgroundPresentation;
-		const isEnteringInteractiveFromDashboard = wasBackgroundPresentation && !isBackgroundPresentation;
+		const isEnteringInteractiveFromDashboard =
+			wasBackgroundPresentation && !isBackgroundPresentation;
 
 		// Overall: state overlays are hidden in decorative background mode, and until GeoJSON is loaded.
 		const targetOverlayOpacity = !isBackgroundPresentation && isStateLayerReady ? 1 : 0;
@@ -2610,7 +2724,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		const prev = prevSelectedStateKeyOnMapRef.current;
 		if (prev && prev !== selectedStateKey) {
 			try {
-				map.setFeatureState({ source: MAPBOX_SOURCE_IDS.states, id: prev }, { selected: false });
+				map.setFeatureState(
+					{ source: MAPBOX_SOURCE_IDS.states, id: prev },
+					{ selected: false }
+				);
 			} catch {
 				// Ignore (feature may not be present yet).
 			}
@@ -2642,7 +2759,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	}, []);
 
 	const ensureMapboxSourcesAndLayers = useCallback((mapInstance: mapboxgl.Map) => {
-		const emptyFc: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [] };
+		const emptyFc: GeoJSON.FeatureCollection = {
+			type: 'FeatureCollection',
+			features: [],
+		};
 
 		const ensureSource = (id: string) => {
 			if (mapInstance.getSource(id)) return;
@@ -2712,41 +2832,71 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		const allOverlayRadiusLow = RESULT_DOT_SCALE_MIN * 0.72;
 		const allOverlayRadiusHigh = RESULT_DOT_SCALE_MAX * 0.72;
 		const allOverlayRadiusExpr = [
-			'interpolate', ['linear'], ['zoom'],
-			0, allOverlayRadiusLow,
-			RESULT_DOT_ZOOM_MIN, allOverlayRadiusLow,
-			RESULT_DOT_ZOOM_MAX, allOverlayRadiusHigh,
-			24, allOverlayRadiusHigh,
+			'interpolate',
+			['linear'],
+			['zoom'],
+			0,
+			allOverlayRadiusLow,
+			RESULT_DOT_ZOOM_MIN,
+			allOverlayRadiusLow,
+			RESULT_DOT_ZOOM_MAX,
+			allOverlayRadiusHigh,
+			24,
+			allOverlayRadiusHigh,
 		];
 
 		const allOverlayStrokeLow = Math.max(1, RESULT_DOT_STROKE_WEIGHT_MIN_PX * 0.85);
 		const allOverlayStrokeHigh = Math.max(1, RESULT_DOT_STROKE_WEIGHT_MAX_PX * 0.85);
 		const allOverlayStrokeExpr = [
-			'interpolate', ['linear'], ['zoom'],
-			0, allOverlayStrokeLow,
-			RESULT_DOT_ZOOM_MIN, allOverlayStrokeLow,
-			RESULT_DOT_ZOOM_MAX, allOverlayStrokeHigh,
-			24, allOverlayStrokeHigh,
+			'interpolate',
+			['linear'],
+			['zoom'],
+			0,
+			allOverlayStrokeLow,
+			RESULT_DOT_ZOOM_MIN,
+			allOverlayStrokeLow,
+			RESULT_DOT_ZOOM_MAX,
+			allOverlayStrokeHigh,
+			24,
+			allOverlayStrokeHigh,
 		];
 
-		const pinRadiusLow = Math.max(MIN_OVERLAY_PIN_CIRCLE_DIAMETER_PX, 2 * RESULT_DOT_SCALE_MIN) / 2;
-		const pinRadiusHigh = Math.max(MIN_OVERLAY_PIN_CIRCLE_DIAMETER_PX, 2 * RESULT_DOT_SCALE_MAX) / 2;
+		const pinRadiusLow =
+			Math.max(MIN_OVERLAY_PIN_CIRCLE_DIAMETER_PX, 2 * RESULT_DOT_SCALE_MIN) / 2;
+		const pinRadiusHigh =
+			Math.max(MIN_OVERLAY_PIN_CIRCLE_DIAMETER_PX, 2 * RESULT_DOT_SCALE_MAX) / 2;
 		const pinRadiusExpr = [
-			'interpolate', ['linear'], ['zoom'],
-			0, pinRadiusLow,
-			RESULT_DOT_ZOOM_MIN, pinRadiusLow,
-			RESULT_DOT_ZOOM_MAX, pinRadiusHigh,
-			24, pinRadiusHigh,
+			'interpolate',
+			['linear'],
+			['zoom'],
+			0,
+			pinRadiusLow,
+			RESULT_DOT_ZOOM_MIN,
+			pinRadiusLow,
+			RESULT_DOT_ZOOM_MAX,
+			pinRadiusHigh,
+			24,
+			pinRadiusHigh,
 		];
 
-		const pinIconSizeLow = Math.max(MIN_OVERLAY_PIN_CIRCLE_DIAMETER_PX, 2 * RESULT_DOT_SCALE_MIN) / MAP_MARKER_PIN_CIRCLE_DIAMETER;
-		const pinIconSizeHigh = Math.max(MIN_OVERLAY_PIN_CIRCLE_DIAMETER_PX, 2 * RESULT_DOT_SCALE_MAX) / MAP_MARKER_PIN_CIRCLE_DIAMETER;
+		const pinIconSizeLow =
+			Math.max(MIN_OVERLAY_PIN_CIRCLE_DIAMETER_PX, 2 * RESULT_DOT_SCALE_MIN) /
+			MAP_MARKER_PIN_CIRCLE_DIAMETER;
+		const pinIconSizeHigh =
+			Math.max(MIN_OVERLAY_PIN_CIRCLE_DIAMETER_PX, 2 * RESULT_DOT_SCALE_MAX) /
+			MAP_MARKER_PIN_CIRCLE_DIAMETER;
 		const pinIconSizeExpr = [
-			'interpolate', ['linear'], ['zoom'],
-			0, pinIconSizeLow,
-			RESULT_DOT_ZOOM_MIN, pinIconSizeLow,
-			RESULT_DOT_ZOOM_MAX, pinIconSizeHigh,
-			24, pinIconSizeHigh,
+			'interpolate',
+			['linear'],
+			['zoom'],
+			0,
+			pinIconSizeLow,
+			RESULT_DOT_ZOOM_MIN,
+			pinIconSizeLow,
+			RESULT_DOT_ZOOM_MAX,
+			pinIconSizeHigh,
+			24,
+			pinIconSizeHigh,
 		];
 
 		// States: hover fill + hit fill (transparent) + divider lines + interactive borders
@@ -2901,7 +3051,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			id: MAPBOX_LAYER_IDS.markersAllHit,
 			type: 'circle',
 			source: MAPBOX_SOURCE_IDS.markersAllOverlay,
-			paint: { 'circle-radius': allOverlayRadiusExpr, 'circle-opacity': 0, 'circle-stroke-width': 0 },
+			paint: {
+				'circle-radius': allOverlayRadiusExpr,
+				'circle-opacity': 0,
+				'circle-stroke-width': 0,
+			},
 		});
 		ensureLayer({
 			id: MAPBOX_LAYER_IDS.markersAllDots,
@@ -2932,12 +3086,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				'circle-opacity': 0,
 				'circle-stroke-width': [
 					'case',
-					['boolean', ['feature-state', 'selected'], false], 2.5,
+					['boolean', ['feature-state', 'selected'], false],
+					2.5,
 					0,
 				],
 				'circle-stroke-color': [
 					'case',
-					['boolean', ['feature-state', 'selected'], false], RESULT_DOT_STROKE_COLOR_SELECTED,
+					['boolean', ['feature-state', 'selected'], false],
+					RESULT_DOT_STROKE_COLOR_SELECTED,
 					'transparent',
 				],
 			},
@@ -2967,12 +3123,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				'circle-opacity': 0,
 				'circle-stroke-width': [
 					'case',
-					['boolean', ['feature-state', 'selected'], false], 2.5,
+					['boolean', ['feature-state', 'selected'], false],
+					2.5,
 					0,
 				],
 				'circle-stroke-color': [
 					'case',
-					['boolean', ['feature-state', 'selected'], false], RESULT_DOT_STROKE_COLOR_SELECTED,
+					['boolean', ['feature-state', 'selected'], false],
+					RESULT_DOT_STROKE_COLOR_SELECTED,
 					'transparent',
 				],
 			},
@@ -3013,7 +3171,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			id: MAPBOX_LAYER_IDS.promotionDotHit,
 			type: 'circle',
 			source: MAPBOX_SOURCE_IDS.markersPromotionDot,
-			paint: { 'circle-radius': resultDotRadiusExpr, 'circle-opacity': 0, 'circle-stroke-width': 0 },
+			paint: {
+				'circle-radius': resultDotRadiusExpr,
+				'circle-opacity': 0,
+				'circle-stroke-width': 0,
+			},
 		});
 		ensureLayer({
 			id: MAPBOX_LAYER_IDS.promotionDotDots,
@@ -3038,7 +3200,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			id: MAPBOX_LAYER_IDS.baseHit,
 			type: 'circle',
 			source: MAPBOX_SOURCE_IDS.markersBase,
-			paint: { 'circle-radius': resultDotRadiusExpr, 'circle-opacity': 0, 'circle-stroke-width': 0 },
+			paint: {
+				'circle-radius': resultDotRadiusExpr,
+				'circle-opacity': 0,
+				'circle-stroke-width': 0,
+			},
 		});
 		ensureLayer({
 			id: MAPBOX_LAYER_IDS.baseDots,
@@ -3143,10 +3309,18 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			}
 			try {
 				if (mapInstance.getLayer(MAPBOX_LAYER_IDS.statesDividers)) {
-					mapInstance.setPaintProperty(MAPBOX_LAYER_IDS.statesDividers, 'line-opacity', 0);
+					mapInstance.setPaintProperty(
+						MAPBOX_LAYER_IDS.statesDividers,
+						'line-opacity',
+						0
+					);
 				}
 				if (mapInstance.getLayer(MAPBOX_LAYER_IDS.statesBordersInteractive)) {
-					mapInstance.setPaintProperty(MAPBOX_LAYER_IDS.statesBordersInteractive, 'line-opacity', 0);
+					mapInstance.setPaintProperty(
+						MAPBOX_LAYER_IDS.statesBordersInteractive,
+						'line-opacity',
+						0
+					);
 				}
 				if (mapInstance.getLayer(MAPBOX_LAYER_IDS.statesLabels)) {
 					mapInstance.setPaintProperty(MAPBOX_LAYER_IDS.statesLabels, 'text-opacity', 0);
@@ -3213,23 +3387,51 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		backgroundSpinCleanupRef.current = null;
 
 		const safeEnableInteractions = () => {
-			try { map.scrollZoom.enable(); } catch {}
-			try { map.boxZoom.enable(); } catch {}
-			try { map.doubleClickZoom.enable(); } catch {}
-			try { map.dragPan.enable(); } catch {}
-			try { map.dragRotate.enable(); } catch {}
-			try { map.keyboard.enable(); } catch {}
-			try { map.touchZoomRotate.enable(); } catch {}
+			try {
+				map.scrollZoom.enable();
+			} catch {}
+			try {
+				map.boxZoom.enable();
+			} catch {}
+			try {
+				map.doubleClickZoom.enable();
+			} catch {}
+			try {
+				map.dragPan.enable();
+			} catch {}
+			try {
+				map.dragRotate.enable();
+			} catch {}
+			try {
+				map.keyboard.enable();
+			} catch {}
+			try {
+				map.touchZoomRotate.enable();
+			} catch {}
 		};
 
 		const safeDisableInteractions = () => {
-			try { map.scrollZoom.disable(); } catch {}
-			try { map.boxZoom.disable(); } catch {}
-			try { map.doubleClickZoom.disable(); } catch {}
-			try { map.dragPan.disable(); } catch {}
-			try { map.dragRotate.disable(); } catch {}
-			try { map.keyboard.disable(); } catch {}
-			try { map.touchZoomRotate.disable(); } catch {}
+			try {
+				map.scrollZoom.disable();
+			} catch {}
+			try {
+				map.boxZoom.disable();
+			} catch {}
+			try {
+				map.doubleClickZoom.disable();
+			} catch {}
+			try {
+				map.dragPan.disable();
+			} catch {}
+			try {
+				map.dragRotate.disable();
+			} catch {}
+			try {
+				map.keyboard.disable();
+			} catch {}
+			try {
+				map.touchZoomRotate.disable();
+			} catch {}
 		};
 
 		if (isBackgroundPresentation) {
@@ -3255,7 +3457,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 			const startBackgroundSpin = () => {
 				if (!shouldAutoSpin) return;
-				const secondsPerRevolution = 300;
+				// Slow the decorative spin so the background feels calmer.
+				const secondsPerRevolution = 1500;
 				const distancePerSecond = 360 / secondsPerRevolution;
 				const animationDurationMs = 1000;
 
@@ -3285,15 +3488,21 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				spinGlobe();
 
 				backgroundSpinCleanupRef.current = () => {
-					try { map.off('moveend', spinGlobe); } catch {}
-					try { map.stop(); } catch {}
+					try {
+						map.off('moveend', spinGlobe);
+					} catch {}
+					try {
+						map.stop();
+					} catch {}
 				};
 			};
 
 			const isEnteringBackgroundFromInteractive = !wasBackground;
 			if (isEnteringBackgroundFromInteractive) {
 				// Cinematic interactive → dashboard background transition: ease back out instead of snapping.
-				try { map.stop(); } catch {}
+				try {
+					map.stop();
+				} catch {}
 
 				// Prevent zoom clamping from snapping the camera before the ease starts.
 				try {
@@ -3306,13 +3515,16 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 				// Cancel any prior pending "lock decorative zoom" handler.
 				if (backgroundCinematicMoveEndHandlerRef.current) {
-					try { map.off('moveend', backgroundCinematicMoveEndHandlerRef.current as any); } catch {}
+					try {
+						map.off('moveend', backgroundCinematicMoveEndHandlerRef.current as any);
+					} catch {}
 					backgroundCinematicMoveEndHandlerRef.current = null;
 				}
 
 				// Guard against resize() / other camera ops interrupting the sweep.
 				cinematicInFlightRef.current = true;
-				if (cinematicInFlightTimerRef.current) clearTimeout(cinematicInFlightTimerRef.current);
+				if (cinematicInFlightTimerRef.current)
+					clearTimeout(cinematicInFlightTimerRef.current);
 				cinematicInFlightTimerRef.current = null;
 
 				const dur = DASHBOARD_TO_INTERACTIVE_TRANSITION_MS;
@@ -3325,11 +3537,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					startBackgroundSpin();
 
 					cinematicInFlightRef.current = false;
-					if (cinematicInFlightTimerRef.current) clearTimeout(cinematicInFlightTimerRef.current);
+					if (cinematicInFlightTimerRef.current)
+						clearTimeout(cinematicInFlightTimerRef.current);
 					cinematicInFlightTimerRef.current = null;
 				};
 				backgroundCinematicMoveEndHandlerRef.current = onCinematicEnd;
-				try { map.once('moveend', onCinematicEnd as any); } catch {}
+				try {
+					map.once('moveend', onCinematicEnd as any);
+				} catch {}
 
 				// Fallback: ensure we don't get stuck in "in flight" if moveend never fires.
 				cinematicInFlightTimerRef.current = setTimeout(() => {
@@ -3378,16 +3593,21 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		// If we were easing back into the background and the user flipped to interactive mid-sweep,
 		// cancel the pending "lock decorative zoom" handler + clear the in-flight guard.
 		if (backgroundCinematicMoveEndHandlerRef.current) {
-			try { map.off('moveend', backgroundCinematicMoveEndHandlerRef.current as any); } catch {}
+			try {
+				map.off('moveend', backgroundCinematicMoveEndHandlerRef.current as any);
+			} catch {}
 			backgroundCinematicMoveEndHandlerRef.current = null;
 			cinematicInFlightRef.current = false;
-			if (cinematicInFlightTimerRef.current) clearTimeout(cinematicInFlightTimerRef.current);
+			if (cinematicInFlightTimerRef.current)
+				clearTimeout(cinematicInFlightTimerRef.current);
 			cinematicInFlightTimerRef.current = null;
 		}
 
 		// Interactive results mode: stop any ongoing animation, restore zoom constraints
 		// and re-enable all user interactions.
-		try { map.stop(); } catch {}
+		try {
+			map.stop();
+		} catch {}
 		// Restore interactive zoom constraints. If we're coming from the decorative globe (zoom < MAP_MIN_ZOOM),
 		// temporarily allow that starting zoom so the camera move begins exactly from the dashboard view.
 		try {
@@ -3415,7 +3635,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			lastSearchQueryKeyRef.current = null;
 
 			// Force a resize so the canvas matches the (potentially new) portal container size.
-			try { map.resize(); } catch {}
+			try {
+				map.resize();
+			} catch {}
 		}
 	}, [map, isMapLoaded, isBackgroundPresentation, shouldAutoSpin, presentation]);
 
@@ -3445,7 +3667,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			// During the cinematic background→interactive sweep, the container isn't truly
 			// resizing (we animate via clip-path). Skip resize to avoid interrupting fitBounds.
 			if (cinematicInFlightRef.current) return;
-			try { map.resize(); } catch { /* map may be tearing down */ }
+			try {
+				map.resize();
+			} catch {
+				/* map may be tearing down */
+			}
 		};
 
 		const scheduleResize = () => {
@@ -3611,11 +3837,16 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			const extraContactsById = new Map<number, ContactWithName>();
 
 			// Include booking overlay pins only when they match the active "What" (category) and are visible.
-			if (isBookingSearch && normalizedSearchWhat && bookingExtraVisibleContacts.length > 0) {
+			if (
+				isBookingSearch &&
+				normalizedSearchWhat &&
+				bookingExtraVisibleContacts.length > 0
+			) {
 				for (const contact of bookingExtraVisibleContacts) {
 					const prefix = getBookingTitlePrefixFromContactTitle(contact.title);
 					if (!prefix) continue;
-					if (!bookingTitlePrefixMatchesSearchWhatKey(prefix, normalizedSearchWhat)) continue;
+					if (!bookingTitlePrefixMatchesSearchWhatKey(prefix, normalizedSearchWhat))
+						continue;
 					const coords = bookingExtraCoordsByContactId.get(contact.id) ?? null;
 					if (!isCoordsInBounds(coords)) continue;
 					selectedIds.add(contact.id);
@@ -3626,12 +3857,17 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			}
 
 			// Include promotion overlay pins only when they match the active "What" (category) and are visible.
-			if (isPromotionSearch && normalizedSearchWhat && promotionOverlayVisibleContacts.length > 0) {
+			if (
+				isPromotionSearch &&
+				normalizedSearchWhat &&
+				promotionOverlayVisibleContacts.length > 0
+			) {
 				for (const contact of promotionOverlayVisibleContacts) {
 					const title = contact.title ?? '';
 					const matchedPrefix =
-						PROMOTION_OVERLAY_TITLE_PREFIXES.find((p) => startsWithCaseInsensitive(title, p)) ??
-						null;
+						PROMOTION_OVERLAY_TITLE_PREFIXES.find((p) =>
+							startsWithCaseInsensitive(title, p)
+						) ?? null;
 					if (!matchedPrefix) continue;
 					if (normalizeWhatKey(matchedPrefix) !== normalizedSearchWhat) continue;
 					const coords = promotionOverlayCoordsByContactId.get(contact.id) ?? null;
@@ -3713,11 +3949,16 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		const extraContactsById = new Map<number, ContactWithName>();
 
 		// Booking overlay pins: select only the visible pins that match the active category.
-		if (isBookingSearch && normalizedSearchWhat && bookingExtraVisibleContacts.length > 0) {
+		if (
+			isBookingSearch &&
+			normalizedSearchWhat &&
+			bookingExtraVisibleContacts.length > 0
+		) {
 			for (const contact of bookingExtraVisibleContacts) {
 				const prefix = getBookingTitlePrefixFromContactTitle(contact.title);
 				if (!prefix) continue;
-				if (!bookingTitlePrefixMatchesSearchWhatKey(prefix, normalizedSearchWhat)) continue;
+				if (!bookingTitlePrefixMatchesSearchWhatKey(prefix, normalizedSearchWhat))
+					continue;
 				selectedIds.add(contact.id);
 				if (!baseContactIdSet.has(contact.id)) {
 					extraContactsById.set(contact.id, contact);
@@ -3726,12 +3967,17 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		}
 
 		// Promotion overlay pins: select only the visible pins that match the active category.
-		if (isPromotionSearch && normalizedSearchWhat && promotionOverlayVisibleContacts.length > 0) {
+		if (
+			isPromotionSearch &&
+			normalizedSearchWhat &&
+			promotionOverlayVisibleContacts.length > 0
+		) {
 			for (const contact of promotionOverlayVisibleContacts) {
 				const title = contact.title ?? '';
 				const matchedPrefix =
-					PROMOTION_OVERLAY_TITLE_PREFIXES.find((p) => startsWithCaseInsensitive(title, p)) ??
-					null;
+					PROMOTION_OVERLAY_TITLE_PREFIXES.find((p) =>
+						startsWithCaseInsensitive(title, p)
+					) ?? null;
 				if (!matchedPrefix) continue;
 				if (normalizeWhatKey(matchedPrefix) !== normalizedSearchWhat) continue;
 				selectedIds.add(contact.id);
@@ -3825,7 +4071,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			const qEast = Math.round(east / quant);
 			const seed = `${zoomKey}|${qSouth}|${qWest}|${qNorth}|${qEast}`;
 
-			const viewportBbox: BoundingBox = { minLat: south, maxLat: north, minLng: west, maxLng: east };
+			const viewportBbox: BoundingBox = {
+				minLat: south,
+				maxLat: north,
+				minLng: west,
+				maxLng: east,
+			};
 
 			// Promotion overlay pins: state-wide "Radio Stations <State>" / "College Radio <State>"
 			// lists should all be visible together at low zoom.
@@ -3899,13 +4150,15 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					// and only fall back to polygon containment when state is missing/unknown.
 					const contactStateKey = normalizeStateKey(contact.state ?? null);
 					if (contactStateKey) {
-						if (contactStateKey === lockedStateKey) inLockedUnpriorityInBounds.push(contact);
+						if (contactStateKey === lockedStateKey)
+							inLockedUnpriorityInBounds.push(contact);
 						else outLockedUnpriorityInBounds.push(contact);
 						continue;
 					}
 
 					const coords = getContactCoords(contact);
-					if (coords && isCoordsInLockedState(coords)) inLockedUnpriorityInBounds.push(contact);
+					if (coords && isCoordsInLockedState(coords))
+						inLockedUnpriorityInBounds.push(contact);
 					else outLockedUnpriorityInBounds.push(contact);
 					continue;
 				}
@@ -3951,7 +4204,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			}
 
 			// Reserve budget for promotion overlay pins so they always render.
-			const maxPrimaryDots = Math.max(0, MAX_TOTAL_DOTS - nextPromotionOverlayVisible.length);
+			const maxPrimaryDots = Math.max(
+				0,
+				MAX_TOTAL_DOTS - nextPromotionOverlayVisible.length
+			);
 
 			// Build a stable "candidate pool" larger than what we render, then pick a
 			// non-overlapping subset so dots never visually stack on top of each other.
@@ -3975,7 +4231,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				if (hasLockedStateSelection) {
 					const share = getLockedStateMarkerShareForZoom(zoomRaw);
 					const desiredLockedSlots = Math.round(remainingSlots * share);
-					const lockedSlots = Math.min(inLockedUnpriorityInBounds.length, desiredLockedSlots);
+					const lockedSlots = Math.min(
+						inLockedUnpriorityInBounds.length,
+						desiredLockedSlots
+					);
 					let outsideSlots = remainingSlots - lockedSlots;
 					const lockedSamplingBbox = lockedStateSelectionBboxRef.current ?? viewportBbox;
 
@@ -4083,7 +4342,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				let isInLockedState = true;
 				if (hasLockedStateSelection) {
 					const contactStateKey = normalizeStateKey(contact.state ?? null);
-					isInLockedState = contactStateKey ? contactStateKey === lockedStateKey : isCoordsInLockedState(coords);
+					isInLockedState = contactStateKey
+						? contactStateKey === lockedStateKey
+						: isCoordsInLockedState(coords);
 				}
 				candidates.push({
 					contact,
@@ -4115,7 +4376,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				return a.contact.id - b.contact.id;
 			});
 			inLockedCandidates.sort((a, b) => {
-				if (shouldInsetLockedStateMarkers && a.isNearLockedBorder !== b.isNearLockedBorder) {
+				if (
+					shouldInsetLockedStateMarkers &&
+					a.isNearLockedBorder !== b.isNearLockedBorder
+				) {
 					return a.isNearLockedBorder ? 1 : -1;
 				}
 				return a.key - b.key;
@@ -4128,7 +4392,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			const picked: ContactWithName[] = [];
 			let pickedInLockedStateCount = 0;
 
-			const hasNeighborWithin = (cx: number, cy: number, x: number, y: number): boolean => {
+			const hasNeighborWithin = (
+				cx: number,
+				cy: number,
+				x: number,
+				y: number
+			): boolean => {
 				for (let dx = -1; dx <= 1; dx++) {
 					for (let dy = -1; dy <= 1; dy++) {
 						const arr = grid.get(`${cx + dx},${cy + dy}`);
@@ -4223,7 +4492,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					// Always prefer explicitly selected extra markers (so they don't disappear due to sampling).
 					const priorityExtraIdSet = new Set<number>(selectedSet);
 					if (hoveredId != null) priorityExtraIdSet.add(hoveredId);
-					for (const id of bookingExtraVisibleIdSetRef.current) priorityExtraIdSet.add(id);
+					for (const id of bookingExtraVisibleIdSetRef.current)
+						priorityExtraIdSet.add(id);
 					const priorityExtraInBounds: ContactWithName[] = [];
 					const unpriorityExtraInBounds: ContactWithName[] = [];
 					for (const contact of extraInBounds) {
@@ -4276,9 +4546,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						const siny = Math.sin((latClamped * Math.PI) / 180);
 						const x = ((coords.lng + 180) / 360) * worldSize;
 						const y =
-							(0.5 -
-								Math.log((1 + siny) / (1 - siny)) / (4 * Math.PI)) *
-							worldSize;
+							(0.5 - Math.log((1 + siny) / (1 - siny)) / (4 * Math.PI)) * worldSize;
 						candidates.push({
 							contact,
 							x,
@@ -4295,7 +4563,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					const cellSize = Math.max(6, minSeparationPx);
 					const grid = new Map<string, Array<{ x: number; y: number }>>();
 					const pickedExtra: ContactWithName[] = [];
-					const hasNeighborWithin = (cx: number, cy: number, x: number, y: number): boolean => {
+					const hasNeighborWithin = (
+						cx: number,
+						cy: number,
+						x: number,
+						y: number
+					): boolean => {
 						for (let dx = -1; dx <= 1; dx++) {
 							for (let dy = -1; dy <= 1; dy++) {
 								const arr = grid.get(`${cx + dx},${cy + dy}`);
@@ -4417,7 +4690,13 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		if (!map) return;
 		if (isBackgroundPresentation) return;
 		recomputeViewportDots(map, isLoading);
-	}, [map, isBackgroundPresentation, isStateLayerReady, isLoading, recomputeViewportDots]);
+	}, [
+		map,
+		isBackgroundPresentation,
+		isStateLayerReady,
+		isLoading,
+		recomputeViewportDots,
+	]);
 
 	useEffect(() => {
 		if (!map) return;
@@ -4452,9 +4731,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			const selectedBounds = selectedAreaBoundsRef.current;
 			const isCenterInSelectedBounds = selectedBounds
 				? centerCoords.lat >= selectedBounds.south &&
-				  centerCoords.lat <= selectedBounds.north &&
-				  centerCoords.lng >= selectedBounds.west &&
-				  centerCoords.lng <= selectedBounds.east
+					centerCoords.lat <= selectedBounds.north &&
+					centerCoords.lng >= selectedBounds.west &&
+					centerCoords.lng <= selectedBounds.east
 				: null;
 
 			const isCenterInSearchArea =
@@ -4511,7 +4790,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			map.off('mousemove', handleMapMouseMove);
 			map.off('mouseup', handleMapMouseUp);
 		};
-	}, [map, isMapLoaded, isBackgroundPresentation, handleMapMouseDown, handleMapMouseMove, handleMapMouseUp]);
+	}, [
+		map,
+		isMapLoaded,
+		isBackgroundPresentation,
+		handleMapMouseDown,
+		handleMapMouseMove,
+		handleMapMouseUp,
+	]);
 
 	// Toggle map interaction mode for rectangle selection.
 	useEffect(() => {
@@ -4582,7 +4868,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					: stateMultiPolygons.flat();
 
 			const outlineFc = createOutlineGeoJsonFromMultiPolygon(multiPolygonsToRender);
-			const source = map.getSource(MAPBOX_SOURCE_IDS.resultsOutline) as mapboxgl.GeoJSONSource | undefined;
+			const source = map.getSource(MAPBOX_SOURCE_IDS.resultsOutline) as
+				| mapboxgl.GeoJSONSource
+				| undefined;
 			source?.setData(outlineFc as any);
 
 			// Store the selected region (used to exclude background dots inside the outline).
@@ -4644,7 +4932,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		if (stateInteractionsEnabled || !found) return;
 
 		const outlineFc = createOutlineGeoJsonFromMultiPolygon(found);
-		const source = map.getSource(MAPBOX_SOURCE_IDS.lockedOutline) as mapboxgl.GeoJSONSource | undefined;
+		const source = map.getSource(MAPBOX_SOURCE_IDS.lockedOutline) as
+			| mapboxgl.GeoJSONSource
+			| undefined;
 		source?.setData(outlineFc as any);
 	}, [
 		map,
@@ -4710,34 +5000,37 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	);
 
 	// Helper to fit map to a state's bounds
-	const fitMapToState = useCallback((
-		mapInstance: mapboxgl.Map,
-		stateKey: string,
-		opts?: {
-			durationMs?: number;
-		}
-	) => {
-		const entry = usStatesByKeyRef.current.get(stateKey);
-		const bbox = entry?.bbox;
-		if (!bbox) return false;
-
-		const dur = opts?.durationMs ?? 650;
-		mapInstance.fitBounds(
-			[
-				[bbox.minLng, bbox.minLat],
-				[bbox.maxLng, bbox.maxLat],
-			],
-			{
-				padding: { top: 100, right: 100, bottom: 100, left: 100 },
-				maxZoom: AUTO_FIT_STATE_MAX_ZOOM,
-				duration: dur,
-				// Smooth ease-out for cinematic transitions.
-				...(dur > 1000 ? { easing: (t: number) => 1 - Math.pow(1 - t, 3) } : {}),
+	const fitMapToState = useCallback(
+		(
+			mapInstance: mapboxgl.Map,
+			stateKey: string,
+			opts?: {
+				durationMs?: number;
 			}
-		);
+		) => {
+			const entry = usStatesByKeyRef.current.get(stateKey);
+			const bbox = entry?.bbox;
+			if (!bbox) return false;
 
-		return true;
-	}, []);
+			const dur = opts?.durationMs ?? 650;
+			mapInstance.fitBounds(
+				[
+					[bbox.minLng, bbox.minLat],
+					[bbox.maxLng, bbox.maxLat],
+				],
+				{
+					padding: { top: 100, right: 100, bottom: 100, left: 100 },
+					maxZoom: AUTO_FIT_STATE_MAX_ZOOM,
+					duration: dur,
+					// Smooth ease-out for cinematic transitions.
+					...(dur > 1000 ? { easing: (t: number) => 1 - Math.pow(1 - t, 3) } : {}),
+				}
+			);
+
+			return true;
+		},
+		[]
+	);
 
 	// Fit bounds when contacts with coordinates change (or when the locked state changes).
 	// Important: we still want to zoom to the locked state even if 0 contacts are geocoded yet.
@@ -4779,13 +5072,15 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		// Only treat the locked state as a *real* US state if it's a known state abbreviation.
 		// This prevents endless "fit to locked state" attempts for values like "Near Me" or city strings.
 		const lockedStateKeyIsUsState =
-			!!lockedStateKey && Object.prototype.hasOwnProperty.call(stateBadgeColorMap, lockedStateKey);
+			!!lockedStateKey &&
+			Object.prototype.hasOwnProperty.call(stateBadgeColorMap, lockedStateKey);
 
 		const hasFitLockedStateForKey =
 			lockedStateKeyIsUsState && lastFitToLockedStateKeyRef.current === lockedStateKey;
 		// Even if we've already fit to contacts, we still want to zoom to the locked state
 		// once the state layer finishes loading (prevents "random" fallback viewports).
-		const shouldFitLockedState = lockedStateKeyIsUsState && isStateLayerReady && !hasFitLockedStateForKey;
+		const shouldFitLockedState =
+			lockedStateKeyIsUsState && isStateLayerReady && !hasFitLockedStateForKey;
 
 		// Fit bounds if:
 		// 1. We haven't fit bounds yet (initial load after geocoding)
@@ -4815,7 +5110,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		if (!shouldFitBounds && !shouldFitLockedState) return;
 
 		// If we can't fit to anything yet (no coords and no state geometry ready), wait for the next update.
-		const canFitToStateNow = lockedStateKeyIsUsState && !!lockedStateKey && isStateLayerReady;
+		const canFitToStateNow =
+			lockedStateKeyIsUsState && !!lockedStateKey && isStateLayerReady;
 		const canFitToBoundsNow = contactsWithCoords.length > 0;
 		if (!canFitToStateNow && !canFitToBoundsNow) return;
 
@@ -4831,7 +5127,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			pendingSearch.key === searchQueryKey &&
 			Date.now() - pendingSearch.at < 10_000;
 
-		const autoFitDebounceMs = cinematicAutoFitRef.current || isSearchQueryCinematic ? 0 : 180;
+		const autoFitDebounceMs =
+			cinematicAutoFitRef.current || isSearchQueryCinematic ? 0 : 180;
 		autoFitTimeoutRef.current = setTimeout(() => {
 			// If a cinematic fly-in is already underway, don't restart the camera animation.
 			if (cinematicInFlightRef.current) return;
@@ -4862,7 +5159,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				lockedStateKeyIsUsState &&
 				lockedStateKey &&
 				isStateLayerReady &&
-				(isNewSearch || isNewStateSearch || !hasFitBoundsRef.current || shouldFitLockedState)
+				(isNewSearch ||
+					isNewStateSearch ||
+					!hasFitBoundsRef.current ||
+					shouldFitLockedState)
 			) {
 				const didFitToState = fitMapToState(map, lockedStateKey, { durationMs });
 				// Mark as attempted so we never loop (even if something unexpected prevents a fit).
@@ -4900,7 +5200,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						map.once('moveend', () => {
 							hasAttachedMinZoomRestoreRef.current = false;
 							pendingMinZoomRestoreRef.current = false;
-							try { map.setMinZoom(MAP_MIN_ZOOM); } catch {}
+							try {
+								map.setMinZoom(MAP_MIN_ZOOM);
+							} catch {}
 						});
 					} catch {
 						// Non-fatal.
@@ -4915,7 +5217,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					// Lock out resize/re-fit calls for the full duration of the camera sweep
 					// so nothing interrupts the smooth animation.
 					cinematicInFlightRef.current = true;
-					if (cinematicInFlightTimerRef.current) clearTimeout(cinematicInFlightTimerRef.current);
+					if (cinematicInFlightTimerRef.current)
+						clearTimeout(cinematicInFlightTimerRef.current);
 					cinematicInFlightTimerRef.current = setTimeout(() => {
 						cinematicInFlightRef.current = false;
 						cinematicInFlightTimerRef.current = null;
@@ -4977,7 +5280,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		const isBookingExtraResult =
 			isBookingSearch && bookingExtraVisibleContacts.some((c) => c.id === contact.id);
 		// - At extremely high zoom, also allow toggling for the "all contacts" gray-dot overlay.
-		const isAllContactsOverlayResult = allContactsOverlayVisibleIdSetRef.current.has(contact.id);
+		const isAllContactsOverlayResult = allContactsOverlayVisibleIdSetRef.current.has(
+			contact.id
+		);
 		if (isPrimaryResult || isBookingExtraResult || isAllContactsOverlayResult) {
 			onToggleSelection?.(contact.id);
 		}
@@ -5004,7 +5309,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			setHoveredMarkerId(contact.id);
 
 			const point = getClientPointFromDomEvent(domEvent);
-			const meta: MarkerHoverMeta | undefined = point ? { clientX: point.x, clientY: point.y } : undefined;
+			const meta: MarkerHoverMeta | undefined = point
+				? { clientX: point.x, clientY: point.y }
+				: undefined;
 
 			onMarkerHover?.(contact, meta);
 		},
@@ -5048,7 +5355,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			setHoveredMarkerId(null);
 			if (prevId != null) {
 				setFadingTooltipId(prevId);
-				if (fadingTooltipTimeoutRef.current) clearTimeout(fadingTooltipTimeoutRef.current);
+				if (fadingTooltipTimeoutRef.current)
+					clearTimeout(fadingTooltipTimeoutRef.current);
 				fadingTooltipTimeoutRef.current = setTimeout(() => setFadingTooltipId(null), 150);
 			} else {
 				setFadingTooltipId(null);
@@ -5073,7 +5381,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			setHoveredMarkerId(null);
 			if (prevId != null) {
 				setFadingTooltipId(prevId);
-				if (fadingTooltipTimeoutRef.current) clearTimeout(fadingTooltipTimeoutRef.current);
+				if (fadingTooltipTimeoutRef.current)
+					clearTimeout(fadingTooltipTimeoutRef.current);
 				fadingTooltipTimeoutRef.current = setTimeout(() => setFadingTooltipId(null), 150);
 			} else {
 				setFadingTooltipId(null);
@@ -5082,7 +5391,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		}
 
 		// No-op if already externally hovering this id.
-		if (hoverSourceRef.current === 'external' && hoveredMarkerIdRef.current === nextId) return;
+		if (hoverSourceRef.current === 'external' && hoveredMarkerIdRef.current === nextId)
+			return;
 
 		if (hoverClearTimeoutRef.current) {
 			clearTimeout(hoverClearTimeoutRef.current);
@@ -5124,7 +5434,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		return Math.max(markerScale * 2, MIN_OVERLAY_PIN_CIRCLE_DIAMETER_PX);
 	}, [markerScale]);
 
-	const markerPinCircleRadiusPx = useMemo(() => markerPinCircleDiameterPx / 2, [markerPinCircleDiameterPx]);
+	const markerPinCircleRadiusPx = useMemo(
+		() => markerPinCircleDiameterPx / 2,
+		[markerPinCircleDiameterPx]
+	);
 
 	// Scale factor for the full SVG viewbox.
 	const markerPinScaleFactor = useMemo(() => {
@@ -5133,11 +5446,21 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 	const markerPinUrlCacheRef = useRef<Map<string, string>>(new Map());
 	const getMarkerPinUrl = useCallback(
-		(fillColor: string, strokeColor: string, searchWhat?: string | null, baseColor?: string): string => {
+		(
+			fillColor: string,
+			strokeColor: string,
+			searchWhat?: string | null,
+			baseColor?: string
+		): string => {
 			const key = `${fillColor}|${strokeColor}|${searchWhat ?? ''}|${baseColor ?? ''}`;
 			const cached = markerPinUrlCacheRef.current.get(key);
 			if (cached) return cached;
-			const url = generateMapMarkerPinIconUrl(fillColor, strokeColor, searchWhat, baseColor);
+			const url = generateMapMarkerPinIconUrl(
+				fillColor,
+				strokeColor,
+				searchWhat,
+				baseColor
+			);
 			markerPinUrlCacheRef.current.set(key, url);
 			return url;
 		},
@@ -5149,11 +5472,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	}, [searchWhat]);
 
 	const outsideDefaultDotFillColor = useMemo(
-		() =>
-			washOutHexColor(
-				defaultDotFillColor,
-				OUTSIDE_LOCKED_STATE_WASHOUT_TO_WHITE
-			),
+		() => washOutHexColor(defaultDotFillColor, OUTSIDE_LOCKED_STATE_WASHOUT_TO_WHITE),
 		[defaultDotFillColor]
 	);
 
@@ -5163,16 +5482,22 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		[visibleContacts]
 	);
 	const bookingExtraContactsById = useMemo(
-		() => new Map<number, ContactWithName>(bookingExtraVisibleContacts.map((c) => [c.id, c])),
+		() =>
+			new Map<number, ContactWithName>(bookingExtraVisibleContacts.map((c) => [c.id, c])),
 		[bookingExtraVisibleContacts]
 	);
 	const promotionOverlayContactsById = useMemo(
 		() =>
-			new Map<number, ContactWithName>(promotionOverlayVisibleContacts.map((c) => [c.id, c])),
+			new Map<number, ContactWithName>(
+				promotionOverlayVisibleContacts.map((c) => [c.id, c])
+			),
 		[promotionOverlayVisibleContacts]
 	);
 	const allOverlayContactsById = useMemo(
-		() => new Map<number, ContactWithName>(allContactsOverlayVisibleContacts.map((c) => [c.id, c])),
+		() =>
+			new Map<number, ContactWithName>(
+				allContactsOverlayVisibleContacts.map((c) => [c.id, c])
+			),
 		[allContactsOverlayVisibleContacts]
 	);
 
@@ -5189,12 +5514,18 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		];
 
 		const getContactForHit = (layerId: string, id: number): ContactWithName | null => {
-			if (layerId === MAPBOX_LAYER_IDS.baseHit) return visibleContactsById.get(id) ?? null;
-			if (layerId === MAPBOX_LAYER_IDS.bookingPinHit) return bookingExtraContactsById.get(id) ?? null;
-			if (layerId === MAPBOX_LAYER_IDS.promotionDotHit || layerId === MAPBOX_LAYER_IDS.promotionPinHit) {
+			if (layerId === MAPBOX_LAYER_IDS.baseHit)
+				return visibleContactsById.get(id) ?? null;
+			if (layerId === MAPBOX_LAYER_IDS.bookingPinHit)
+				return bookingExtraContactsById.get(id) ?? null;
+			if (
+				layerId === MAPBOX_LAYER_IDS.promotionDotHit ||
+				layerId === MAPBOX_LAYER_IDS.promotionPinHit
+			) {
 				return promotionOverlayContactsById.get(id) ?? null;
 			}
-			if (layerId === MAPBOX_LAYER_IDS.markersAllHit) return allOverlayContactsById.get(id) ?? null;
+			if (layerId === MAPBOX_LAYER_IDS.markersAllHit)
+				return allOverlayContactsById.get(id) ?? null;
 			return null;
 		};
 
@@ -5208,7 +5539,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			const prev = hoveredStateIdRef.current;
 			if (prev == null) return;
 			try {
-				map.setFeatureState({ source: MAPBOX_SOURCE_IDS.states, id: prev }, { hover: false });
+				map.setFeatureState(
+					{ source: MAPBOX_SOURCE_IDS.states, id: prev },
+					{ hover: false }
+				);
 			} catch {
 				// Ignore.
 			}
@@ -5243,7 +5577,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					if (contact) {
 						setCursor('pointer');
 						if (hoverSourceRef.current !== 'map' || hoveredMarkerIdRef.current !== id) {
-							handleMarkerMouseOver(contact, e.originalEvent as unknown as MouseEvent | TouchEvent);
+							handleMarkerMouseOver(
+								contact,
+								e.originalEvent as unknown as MouseEvent | TouchEvent
+							);
 						}
 					} else {
 						const prevHovered = hoveredMarkerIdRef.current;
@@ -5283,20 +5620,28 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				return;
 			}
 
-			const stateFeatures = map.queryRenderedFeatures(e.point, { layers: [MAPBOX_LAYER_IDS.statesFillHit] });
+			const stateFeatures = map.queryRenderedFeatures(e.point, {
+				layers: [MAPBOX_LAYER_IDS.statesFillHit],
+			});
 			const topState = stateFeatures[0];
 			const nextStateId = topState?.id ?? null;
 			const prev = hoveredStateIdRef.current;
 			if (prev != null && prev !== nextStateId) {
 				try {
-					map.setFeatureState({ source: MAPBOX_SOURCE_IDS.states, id: prev }, { hover: false });
+					map.setFeatureState(
+						{ source: MAPBOX_SOURCE_IDS.states, id: prev },
+						{ hover: false }
+					);
 				} catch {
 					// Ignore.
 				}
 			}
 			if (nextStateId != null && nextStateId !== prev) {
 				try {
-					map.setFeatureState({ source: MAPBOX_SOURCE_IDS.states, id: nextStateId }, { hover: true });
+					map.setFeatureState(
+						{ source: MAPBOX_SOURCE_IDS.states, id: nextStateId },
+						{ hover: true }
+					);
 				} catch {
 					// Ignore.
 				}
@@ -5312,7 +5657,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			if (areaSelectionEnabled || isAreaSelecting) return;
 
 			// Marker click takes priority over state click.
-			const markerFeatures = map.queryRenderedFeatures(e.point, { layers: markerHitLayers });
+			const markerFeatures = map.queryRenderedFeatures(e.point, {
+				layers: markerHitLayers,
+			});
 			const top = markerFeatures[0];
 			const layerId = top?.layer?.id;
 			const rawId = top?.id;
@@ -5334,7 +5681,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			if (stateInteractionsEnabled && isStateLayerReady) {
 				const zoom = map.getZoom() ?? MAP_DEFAULT_ZOOM;
 				if (zoom <= STATE_HOVER_HIGHLIGHT_MAX_ZOOM + 0.001) {
-					const stateFeatures = map.queryRenderedFeatures(e.point, { layers: [MAPBOX_LAYER_IDS.statesFillHit] });
+					const stateFeatures = map.queryRenderedFeatures(e.point, {
+						layers: [MAPBOX_LAYER_IDS.statesFillHit],
+					});
 					const topState = stateFeatures[0];
 					const key = typeof topState?.id === 'string' ? topState.id : null;
 					if (key) {
@@ -5371,7 +5720,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						pendingStateClickCinematicRef.current = { key, at: Date.now() };
 						const nameRaw = (topState.properties as any)?.name;
 						const name =
-							typeof nameRaw === 'string' && nameRaw.trim().length > 0 ? nameRaw.trim() : key;
+							typeof nameRaw === 'string' && nameRaw.trim().length > 0
+								? nameRaw.trim()
+								: key;
 						setSelectedStateKey(key);
 						onStateSelectRef.current?.(name);
 						return;
@@ -5507,7 +5858,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		[isMapLoaded, rasterizeSvgDataUri]
 	);
 
-	const imageNameFromUrl = useCallback((url: string) => `murmur-marker-${hashStringToStableKey(url)}`, []);
+	const imageNameFromUrl = useCallback(
+		(url: string) => `murmur-marker-${hashStringToStableKey(url)}`,
+		[]
+	);
 
 	const promotionPinIdsRef = useRef<Set<number>>(new Set());
 	const promotionDotIdsRef = useRef<Set<number>>(new Set());
@@ -5515,7 +5869,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	// Base result dots
 	useEffect(() => {
 		if (!map || !isMapLoaded) return;
-		const source = map.getSource(MAPBOX_SOURCE_IDS.markersBase) as mapboxgl.GeoJSONSource | undefined;
+		const source = map.getSource(MAPBOX_SOURCE_IDS.markersBase) as
+			| mapboxgl.GeoJSONSource
+			| undefined;
 		if (!source) return;
 
 		if (isLoading) {
@@ -5531,12 +5887,16 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		for (const contact of visibleContacts) {
 			const coords = getContactCoords(contact);
 			if (!coords) continue;
-			const isOutsideLockedState = hasLockedStateSelection ? !isCoordsInLockedState(coords) : false;
+			const isOutsideLockedState = hasLockedStateSelection
+				? !isCoordsInLockedState(coords)
+				: false;
 			features.push({
 				type: 'Feature',
 				id: contact.id,
 				properties: {
-					fillColor: isOutsideLockedState ? outsideDefaultDotFillColor : defaultDotFillColor,
+					fillColor: isOutsideLockedState
+						? outsideDefaultDotFillColor
+						: defaultDotFillColor,
 				},
 				geometry: { type: 'Point', coordinates: [coords.lng, coords.lat] },
 			});
@@ -5559,7 +5919,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	// All-contacts overlay (gray dots)
 	useEffect(() => {
 		if (!map || !isMapLoaded) return;
-		const source = map.getSource(MAPBOX_SOURCE_IDS.markersAllOverlay) as mapboxgl.GeoJSONSource | undefined;
+		const source = map.getSource(MAPBOX_SOURCE_IDS.markersAllOverlay) as
+			| mapboxgl.GeoJSONSource
+			| undefined;
 		if (!source) return;
 
 		if (isLoading) {
@@ -5580,13 +5942,23 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		}
 
 		source.setData({ type: 'FeatureCollection', features } as any);
-	}, [map, isMapLoaded, isLoading, allContactsOverlayVisibleContacts, getAllContactsOverlayContactCoords]);
+	}, [
+		map,
+		isMapLoaded,
+		isLoading,
+		allContactsOverlayVisibleContacts,
+		getAllContactsOverlayContactCoords,
+	]);
 
 	// Promotion overlay: split into in-state dots vs out-of-state pins
 	useEffect(() => {
 		if (!map || !isMapLoaded) return;
-		const dotSource = map.getSource(MAPBOX_SOURCE_IDS.markersPromotionDot) as mapboxgl.GeoJSONSource | undefined;
-		const pinSource = map.getSource(MAPBOX_SOURCE_IDS.markersPromotionPin) as mapboxgl.GeoJSONSource | undefined;
+		const dotSource = map.getSource(MAPBOX_SOURCE_IDS.markersPromotionDot) as
+			| mapboxgl.GeoJSONSource
+			| undefined;
+		const pinSource = map.getSource(MAPBOX_SOURCE_IDS.markersPromotionPin) as
+			| mapboxgl.GeoJSONSource
+			| undefined;
 		if (!dotSource || !pinSource) return;
 
 		if (isLoading) {
@@ -5614,10 +5986,13 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				const coords = getPromotionOverlayContactCoords(contact);
 				if (!coords) continue;
 
-				const isOutsideLockedState = hasLockedStateSelection ? !isCoordsInLockedState(coords) : false;
+				const isOutsideLockedState = hasLockedStateSelection
+					? !isCoordsInLockedState(coords)
+					: false;
 				const shouldUsePinStyle = !hasLockedStateSelection || isOutsideLockedState;
 
-				const whatForMarker = getPromotionOverlayWhatFromContactTitle(contact.title) ?? null;
+				const whatForMarker =
+					getPromotionOverlayWhatFromContactTitle(contact.title) ?? null;
 				const dotFillColor = getResultDotColorForWhat(whatForMarker);
 				const dotFillColorOutside = washOutHexColor(
 					dotFillColor,
@@ -5661,7 +6036,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			}
 
 			await Promise.all(
-				Array.from(imagesToEnsure.entries()).map(([name, url]) => ensureMapImageFromUrl(name, url))
+				Array.from(imagesToEnsure.entries()).map(([name, url]) =>
+					ensureMapImageFromUrl(name, url)
+				)
 			);
 
 			if (cancelled) return;
@@ -5694,7 +6071,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	// Booking extra pins
 	useEffect(() => {
 		if (!map || !isMapLoaded) return;
-		const source = map.getSource(MAPBOX_SOURCE_IDS.markersBookingPin) as mapboxgl.GeoJSONSource | undefined;
+		const source = map.getSource(MAPBOX_SOURCE_IDS.markersBookingPin) as
+			| mapboxgl.GeoJSONSource
+			| undefined;
 		if (!source) return;
 
 		if (isLoading) {
@@ -5716,8 +6095,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				const coords = getBookingExtraContactCoords(contact);
 				if (!coords) continue;
 
-				const isOutsideLockedState = hasLockedStateSelection ? !isCoordsInLockedState(coords) : false;
-				const whatForMarker = getBookingTitlePrefixFromContactTitle(contact.title) ?? null;
+				const isOutsideLockedState = hasLockedStateSelection
+					? !isCoordsInLockedState(coords)
+					: false;
+				const whatForMarker =
+					getBookingTitlePrefixFromContactTitle(contact.title) ?? null;
 				const dotFillColor = getResultDotColorForWhat(whatForMarker);
 				const dotFillColorOutside = washOutHexColor(
 					dotFillColor,
@@ -5754,13 +6136,20 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				features.push({
 					type: 'Feature',
 					id: contact.id,
-					properties: { iconDefault, iconHover, iconSelected, category: whatForMarker ?? '' },
+					properties: {
+						iconDefault,
+						iconHover,
+						iconSelected,
+						category: whatForMarker ?? '',
+					},
 					geometry: { type: 'Point', coordinates: [coords.lng, coords.lat] },
 				});
 			}
 
 			await Promise.all(
-				Array.from(imagesToEnsure.entries()).map(([name, url]) => ensureMapImageFromUrl(name, url))
+				Array.from(imagesToEnsure.entries()).map(([name, url]) =>
+					ensureMapImageFromUrl(name, url)
+				)
 			);
 
 			if (cancelled) return;
@@ -5844,7 +6233,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		return markerScale * 2;
 	}, [markerScale]);
 
-	const selectedContactIdSet = useMemo(() => new Set<number>(selectedContacts), [selectedContacts]);
+	const selectedContactIdSet = useMemo(
+		() => new Set<number>(selectedContacts),
+		[selectedContacts]
+	);
 
 	// Selected marker "Research" panel anchoring (HTML overlay positioned with map.project).
 	const selectedMarkerCoords = selectedMarker ? getContactCoords(selectedMarker) : null;
@@ -5929,7 +6321,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			const tooltipFillColor = isSelected
 				? TOOLTIP_FILL_COLOR_SELECTED
 				: ALL_CONTACTS_OVERLAY_TOOLTIP_FILL_COLOR;
-			const width = calculateTooltipWidth(nameForTooltip, companyForTooltip, titleForTooltip);
+			const width = calculateTooltipWidth(
+				nameForTooltip,
+				companyForTooltip,
+				titleForTooltip
+			);
 			const height = calculateTooltipHeight(nameForTooltip, companyForTooltip);
 			const anchorY = calculateTooltipAnchorY(nameForTooltip, companyForTooltip);
 			return {
@@ -5947,10 +6343,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 		const whatForMarker =
 			kind === 'base'
-				? searchWhat ?? null
+				? (searchWhat ?? null)
 				: kind === 'booking'
-					? getBookingTitlePrefixFromContactTitle(contact.title) ?? null
-					: getPromotionOverlayWhatFromContactTitle(contact.title) ?? null;
+					? (getBookingTitlePrefixFromContactTitle(contact.title) ?? null)
+					: (getPromotionOverlayWhatFromContactTitle(contact.title) ?? null);
 
 		// Even if the marker dot is "washed out" outside the locked/selected state, keep the hover tooltip
 		// using the base category color so it consistently communicates the search intent.
@@ -5959,10 +6355,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 		const normalizedWhat = whatForMarker ? normalizeWhatKey(whatForMarker) : null;
 		const baseTooltipFillColor = normalizedWhat
-			? WHAT_TO_HOVER_TOOLTIP_FILL_COLOR[normalizedWhat] ?? dotFillColor
+			? (WHAT_TO_HOVER_TOOLTIP_FILL_COLOR[normalizedWhat] ?? dotFillColor)
 			: dotFillColor;
 
-		const tooltipFillColor = isSelected ? TOOLTIP_FILL_COLOR_SELECTED : baseTooltipFillColor;
+		const tooltipFillColor = isSelected
+			? TOOLTIP_FILL_COLOR_SELECTED
+			: baseTooltipFillColor;
 
 		const width = calculateTooltipWidth(
 			nameForTooltip,
@@ -6099,7 +6497,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			{!isLoading && selectedMarker && selectedMarkerCoords && (
 				<div
 					ref={selectedMarkerOverlayRef}
-					style={{ position: 'absolute', left: 0, top: 0, zIndex: HOVER_TOOLTIP_Z_INDEX + 10 }}
+					style={{
+						position: 'absolute',
+						left: 0,
+						top: 0,
+						zIndex: HOVER_TOOLTIP_Z_INDEX + 10,
+					}}
 				>
 					<div
 						className="relative"
@@ -6192,53 +6595,74 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 												</span>
 											)}
 										</div>
-										{(selectedMarker.title || selectedMarker.headline || isMusicVenuesSearch || isRestaurantsSearch || isCoffeeShopsSearch || isWeddingPlannersSearch) && (() => {
-											const titleText = selectedMarker.title || selectedMarker.headline || '';
-											const isRestaurant = isRestaurantsSearch || isRestaurantTitle(titleText);
-											const isCoffeeShop = isCoffeeShopsSearch || isCoffeeShopTitle(titleText);
-											const isMusicVenue = isMusicVenuesSearch || isMusicVenueTitle(titleText);
-											const isWeddingPlanner = isWeddingPlannersSearch || isWeddingPlannerTitle(titleText);
-											const isWeddingVenue = isWeddingVenueTitle(titleText);
-											const isWineBeerSpirits = isWineBeerSpiritsTitle(titleText);
-											const wineBeerSpiritsLabel = getWineBeerSpiritsLabel(titleText);
-											return (
-												<div
-													className="px-1.5 py-[1px] rounded-[6px] border border-black max-w-full flex items-center gap-1"
-													style={{
-														backgroundColor: isRestaurant
-															? '#C3FBD1'
-															: isCoffeeShop
-																? '#D6F1BD'
-																: isMusicVenue
-																	? '#B7E5FF'
-																	: (isWeddingPlanner || isWeddingVenue)
-																		? '#FFF8DC'
-																		: isWineBeerSpirits
-																			? '#BFC4FF'
-																			: '#E8EFFF',
-													}}
-												>
-													{isRestaurant && (
-														<RestaurantsIcon size={10} className="flex-shrink-0" />
-													)}
-													{isCoffeeShop && (
-														<CoffeeShopsIcon size={6} />
-													)}
-													{isMusicVenue && (
-														<MusicVenuesIcon size={10} className="flex-shrink-0" />
-													)}
-													{(isWeddingPlanner || isWeddingVenue) && (
-														<WeddingPlannersIcon size={10} />
-													)}
-													{isWineBeerSpirits && (
-														<WineBeerSpiritsIcon size={10} className="flex-shrink-0" />
-													)}
-													<span className="text-[9px] leading-none text-black block truncate">
-														{isRestaurant ? 'Restaurant' : isCoffeeShop ? 'Coffee Shop' : isMusicVenue ? 'Music Venue' : isWeddingVenue ? 'Wedding Venue' : isWeddingPlanner ? 'Wedding Planner' : isWineBeerSpirits ? wineBeerSpiritsLabel : titleText}
-													</span>
-												</div>
-											);
-										})()}
+										{(selectedMarker.title ||
+											selectedMarker.headline ||
+											isMusicVenuesSearch ||
+											isRestaurantsSearch ||
+											isCoffeeShopsSearch ||
+											isWeddingPlannersSearch) &&
+											(() => {
+												const titleText =
+													selectedMarker.title || selectedMarker.headline || '';
+												const isRestaurant =
+													isRestaurantsSearch || isRestaurantTitle(titleText);
+												const isCoffeeShop =
+													isCoffeeShopsSearch || isCoffeeShopTitle(titleText);
+												const isMusicVenue =
+													isMusicVenuesSearch || isMusicVenueTitle(titleText);
+												const isWeddingPlanner =
+													isWeddingPlannersSearch || isWeddingPlannerTitle(titleText);
+												const isWeddingVenue = isWeddingVenueTitle(titleText);
+												const isWineBeerSpirits = isWineBeerSpiritsTitle(titleText);
+												const wineBeerSpiritsLabel = getWineBeerSpiritsLabel(titleText);
+												return (
+													<div
+														className="px-1.5 py-[1px] rounded-[6px] border border-black max-w-full flex items-center gap-1"
+														style={{
+															backgroundColor: isRestaurant
+																? '#C3FBD1'
+																: isCoffeeShop
+																	? '#D6F1BD'
+																	: isMusicVenue
+																		? '#B7E5FF'
+																		: isWeddingPlanner || isWeddingVenue
+																			? '#FFF8DC'
+																			: isWineBeerSpirits
+																				? '#BFC4FF'
+																				: '#E8EFFF',
+														}}
+													>
+														{isRestaurant && (
+															<RestaurantsIcon size={10} className="flex-shrink-0" />
+														)}
+														{isCoffeeShop && <CoffeeShopsIcon size={6} />}
+														{isMusicVenue && (
+															<MusicVenuesIcon size={10} className="flex-shrink-0" />
+														)}
+														{(isWeddingPlanner || isWeddingVenue) && (
+															<WeddingPlannersIcon size={10} />
+														)}
+														{isWineBeerSpirits && (
+															<WineBeerSpiritsIcon size={10} className="flex-shrink-0" />
+														)}
+														<span className="text-[9px] leading-none text-black block truncate">
+															{isRestaurant
+																? 'Restaurant'
+																: isCoffeeShop
+																	? 'Coffee Shop'
+																	: isMusicVenue
+																		? 'Music Venue'
+																		: isWeddingVenue
+																			? 'Wedding Venue'
+																			: isWeddingPlanner
+																				? 'Wedding Planner'
+																				: isWineBeerSpirits
+																					? wineBeerSpiritsLabel
+																					: titleText}
+														</span>
+													</div>
+												);
+											})()}
 									</div>
 								</div>
 							</div>

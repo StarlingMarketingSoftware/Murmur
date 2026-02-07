@@ -115,6 +115,6 @@ export const connectOrDisconnectId = (
 	return id === undefined
 		? undefined
 		: id === null
-		? { disconnect: true }
-		: { connect: { id: Number(id) } };
+			? { disconnect: true }
+			: { connect: { id: Number(id) } };
 };
