@@ -1,6 +1,6 @@
 'use client';
 
-import { FC, Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import { ContactWithName } from '@/types/contact';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
@@ -1090,9 +1090,6 @@ const STATE_BORDER_COLOR = '#CFD8DC';
 // When zoomed out to a US-wide view, show subtle state divider lines (like Zillow).
 // Keep these behind the blue/black search-area outlines.
 const STATE_DIVIDER_LINES_MAX_ZOOM = 8;
-const STATE_DIVIDER_LINES_COLOR = '#90A4AE';
-const STATE_DIVIDER_LINES_STROKE_OPACITY = 1;
-const STATE_DIVIDER_LINES_STROKE_WEIGHT = 1.7;
 
 // Marker dot colors by search "What" value (dashboard/drafting search).
 const DEFAULT_RESULT_DOT_COLOR = '#D21E1F';
@@ -1103,8 +1100,6 @@ const RESULT_DOT_SCALE_MAX = 11;
 // Overlay pins look too small when zoomed out; keep their circle readable without
 // overpowering the search tray/category icons.
 const MIN_OVERLAY_PIN_CIRCLE_DIAMETER_PX = 16;
-// CSS transition duration for smooth overlay pin scaling during zoom.
-const OVERLAY_PIN_SCALE_TRANSITION_MS = 120;
 // Stroke weight should be thinner when zoomed out and approach ~3px when zoomed in.
 const RESULT_DOT_STROKE_WEIGHT_MIN_PX = 1.5;
 const RESULT_DOT_STROKE_WEIGHT_MAX_PX = 3;
@@ -1112,14 +1107,10 @@ const RESULT_DOT_STROKE_COLOR_DEFAULT = '#FFFFFF';
 const RESULT_DOT_STROKE_COLOR_SELECTED = '#15C948';
 // Fill color for the hover tooltip SVG when the contact is selected.
 const TOOLTIP_FILL_COLOR_SELECTED = '#258530';
-// Booking "extra" pin markers: on hover, slightly enlarge and switch the white ring to black.
-const BOOKING_EXTRA_PIN_HOVER_SCALE = 1.12;
 const BOOKING_EXTRA_PIN_HOVER_STROKE_COLOR = '#000000';
 
 // Keep hover tooltip above all map markers so it never gets covered.
 const HOVER_TOOLTIP_Z_INDEX = 1_000_000;
-const MARKER_HIT_AREA_Z_INDEX = 2;
-const MARKER_DOT_Z_INDEX = 1;
 // Minimum zoom level required to trigger hover tooltips and research highlights on markers.
 // Below this zoom level, markers are too dense and small for hover interactions to be useful.
 const HOVER_INTERACTION_MIN_ZOOM = 8;
@@ -4030,24 +4021,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		baseContactIdSet,
 	]);
 
-	const updateBackgroundDots = useCallback(
-		(
-			mapInstance: mapboxgl.Map | null,
-			loading?: boolean,
-			maxDotsInViewport: number = MAX_TOTAL_DOTS
-		) => {
-			void mapInstance;
-			void loading;
-			void maxDotsInViewport;
-		},
-		[]
-	);
-
 	// Recompute which contact markers are rendered in the current viewport, and
 	// budget background dots so the combined total stays under MAX_TOTAL_DOTS.
-	const recomputeViewportDots = useCallback(
-		(mapInstance: mapboxgl.Map | null, loading?: boolean) => {
-			if (!mapInstance) return;
+	const recomputeViewportDots = useCallback((mapInstance: mapboxgl.Map | null) => {
+		if (!mapInstance) return;
 
 			const bounds = mapInstance.getBounds();
 			if (!bounds) return;
@@ -4674,7 +4651,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				setAllContactsOverlayVisibleContacts(nextAllContactsOverlayVisible);
 			}
 
-			// Background dots are intentionally disabled (see `updateBackgroundDots`).
+			// Background dots are intentionally disabled.
 		},
 		[
 			contactsWithCoords,
@@ -4700,7 +4677,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	useEffect(() => {
 		if (!map) return;
 		if (isBackgroundPresentation) return;
-		recomputeViewportDots(map, isLoading);
+		recomputeViewportDots(map);
 	}, [
 		map,
 		isBackgroundPresentation,
@@ -4721,7 +4698,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			updateBookingExtraFetchBbox(map);
 			updatePromotionOverlayFetchBbox(map);
 			updateAllContactsOverlayFetchBbox(map);
-			recomputeViewportDots(map, isLoadingRef.current);
+			recomputeViewportDots(map);
 
 			const bounds = map.getBounds();
 			const center = map.getCenter();
@@ -4916,7 +4893,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			lockedStateSelectionMultiPolygonRef.current = null;
 			lockedStateSelectionBboxRef.current = null;
 			lockedStateSelectionKeyRef.current = null;
-			recomputeViewportDots(map, isLoadingRef.current);
+			recomputeViewportDots(map);
 			return;
 		}
 
@@ -4925,7 +4902,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			lockedStateSelectionMultiPolygonRef.current = null;
 			lockedStateSelectionBboxRef.current = null;
 			lockedStateSelectionKeyRef.current = null;
-			recomputeViewportDots(map, isLoadingRef.current);
+			recomputeViewportDots(map);
 			return;
 		}
 
@@ -4937,7 +4914,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		lockedStateSelectionKeyRef.current = lockedStateKey;
 		// The locked-state polygon is stored in refs (no rerender) — force a marker recompute
 		// so low-zoom bias toward the locked state applies immediately.
-		recomputeViewportDots(map, isLoadingRef.current);
+		recomputeViewportDots(map);
 
 		clearSearchedStateOutline();
 		if (stateInteractionsEnabled || !found) return;
@@ -5425,7 +5402,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			!bookingExtraVisibleIdSetRef.current.has(nextId) &&
 			!allContactsOverlayVisibleIdSetRef.current.has(nextId)
 		) {
-			recomputeViewportDots(map, isLoadingRef.current);
+			recomputeViewportDots(map);
 		}
 	}, [externallyHoveredContactId, map, recomputeViewportDots, zoomLevel]);
 
@@ -5434,26 +5411,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const markerScale = useMemo(() => {
 		return getResultDotScaleForZoom(zoomLevel);
 	}, [zoomLevel]);
-
-	const strokeWeight = useMemo(() => {
-		return getResultDotStrokeWeightForZoom(zoomLevel);
-	}, [zoomLevel]);
-
-	// Marker pin (SVG) sizing: scale so the 36px circle area matches our dot diameter (2*markerScale),
-	// but clamp to a minimum so pins remain readable at low zoom.
-	const markerPinCircleDiameterPx = useMemo(() => {
-		return Math.max(markerScale * 2, MIN_OVERLAY_PIN_CIRCLE_DIAMETER_PX);
-	}, [markerScale]);
-
-	const markerPinCircleRadiusPx = useMemo(
-		() => markerPinCircleDiameterPx / 2,
-		[markerPinCircleDiameterPx]
-	);
-
-	// Scale factor for the full SVG viewbox.
-	const markerPinScaleFactor = useMemo(() => {
-		return markerPinCircleDiameterPx / MAP_MARKER_PIN_CIRCLE_DIAMETER;
-	}, [markerPinCircleDiameterPx]);
 
 	const markerPinUrlCacheRef = useRef<Map<string, string>>(new Map());
 	const getMarkerPinUrl = useCallback(
