@@ -1918,7 +1918,8 @@ body {
 	--campaign-metric-gap: clamp(18px, 2.5vw, 31px);
 }
 
-/* Give the metrics column a touch more usable width on desktop by reducing cell padding */
+/* Give the metrics column a touch more usable width on desktop by reducing cell padding.
+   Also allow visible overflow so justify-end pill groups don't clip on the left. */
 .my-campaigns-table:not(.narrow-desktop-table):not(.mobile-table-no-scroll)
 	thead
 	th:nth-child(2),
@@ -1927,6 +1928,8 @@ body {
 	td:nth-child(2) {
 	padding-left: 0px !important;
 	padding-right: 0px !important;
+	overflow: visible !important;
+	text-overflow: unset !important;
 }
 
 /* Desktop campaigns table: ticks centered between 92px metric pills */
@@ -4008,11 +4011,13 @@ body.murmur-page.murmur-map-view .clerk-user-button {
 	height: auto;
 }
 
-.custom-scroll:not(.my-campaigns-table),
-.overflow-auto:not(.my-campaigns-table),
-.overflow-y-auto:not(.my-campaigns-table),
-.overflow-x-auto:not(.my-campaigns-table),
-.overflow-scroll:not(.my-campaigns-table) {
+/* Firefox-only native scrollbar styling for generic overflow containers.
+   IMPORTANT: exclude containers that explicitly hide native scrollbars (e.g. CustomScrollbar). */
+.custom-scroll:not(.my-campaigns-table):not(.scrollbar-hide):not(.hide-native-scrollbar),
+.overflow-auto:not(.my-campaigns-table):not(.scrollbar-hide):not(.hide-native-scrollbar),
+.overflow-y-auto:not(.my-campaigns-table):not(.scrollbar-hide):not(.hide-native-scrollbar),
+.overflow-x-auto:not(.my-campaigns-table):not(.scrollbar-hide):not(.hide-native-scrollbar),
+.overflow-scroll:not(.my-campaigns-table):not(.scrollbar-hide):not(.hide-native-scrollbar) {
 	scrollbar-width: thin !important;
 	scrollbar-color: #000000 transparent !important;
 }

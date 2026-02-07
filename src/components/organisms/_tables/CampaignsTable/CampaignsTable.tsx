@@ -79,7 +79,7 @@ export const CampaignsTable: FC = () => {
 		'metrics-grid-container w-full items-center text-left',
 		shouldUseCompactMetrics
 			? 'flex flex-nowrap gap-[7px] justify-start'
-			: 'flex flex-nowrap justify-start'
+			: 'flex flex-nowrap justify-end'
 	);
 	const metricsSkeletonContainerStyle: CSSProperties | undefined = shouldUseCompactMetrics
 		? undefined
