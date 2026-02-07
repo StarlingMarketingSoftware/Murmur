@@ -904,7 +904,7 @@ const applyFreeTrialMapVisualTuning = (mapInstance: mapboxgl.Map) => {
 		// Non-fatal.
 	}
 
-	// Fog / atmosphere (remove glow)
+	// Fog / atmosphere (subtle glow)
 	try {
 		const existingFog = (mapInstance as any).getFog?.() ?? {};
 		(mapInstance as any).setFog?.({
@@ -4023,8 +4023,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 	// Recompute which contact markers are rendered in the current viewport, and
 	// budget background dots so the combined total stays under MAX_TOTAL_DOTS.
-	const recomputeViewportDots = useCallback((mapInstance: mapboxgl.Map | null) => {
-		if (!mapInstance) return;
+	const recomputeViewportDots = useCallback(
+		(mapInstance: mapboxgl.Map | null) => {
+			if (!mapInstance) return;
 
 			const bounds = mapInstance.getBounds();
 			if (!bounds) return;
