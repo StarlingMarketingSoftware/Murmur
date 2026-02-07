@@ -1,6 +1,5 @@
 import { Campaign } from '@prisma/client';
 import { ColumnDef } from '@tanstack/react-table';
-import { X } from 'lucide-react';
 import { Typography } from '@/components/ui/typography';
 import { CampaignTitlePills } from '@/components/molecules/CampaignTitlePills/CampaignTitlePills';
 import { useDeleteCampaign, useGetCampaigns } from '@/hooks/queryHooks/useCampaigns';
@@ -9,6 +8,7 @@ import { urls } from '@/constants/urls';
 import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import { cn, mmdd } from '@/utils';
 import { useRowConfirmationAnimation } from '@/hooks/useRowConfirmationAnimation';
+import DeleteXIcon from '@/components/atoms/svg/DeleteXIcon';
 
 type CampaignWithCounts = Campaign & {
 	draftCount?: number;
@@ -678,8 +678,7 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 							}}
 							aria-label="Delete campaign"
 						>
-							<X
-								className="w-[20px] h-[20px]"
+							<DeleteXIcon
 								style={{ color: isConfirming ? 'white' : '#000000' }}
 							/>
 						</button>
