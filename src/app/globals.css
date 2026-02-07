@@ -3691,6 +3691,13 @@ body.murmur-mobile .results-align {
 .dashboard-recent-campaigns
 	.mobile-campaigns-wrapper:not(.mobile-portrait-mode)
 	.campaigns-table-container
+	.my-campaigns-table {
+	/* Slightly more spread than the default clamp */
+	--campaign-metric-gap: 44px;
+}
+.dashboard-recent-campaigns
+	.mobile-campaigns-wrapper:not(.mobile-portrait-mode)
+	.campaigns-table-container
 	.my-campaigns-table
 	thead
 	th:first-child,
@@ -3700,7 +3707,7 @@ body.murmur-mobile .results-align {
 	.my-campaigns-table
 	tbody
 	td:first-child {
-	width: 260px !important;
+	width: 240px !important;
 }
 
 /* Mobile landscape: scale campaigns table wrapper width proportionally

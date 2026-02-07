@@ -481,7 +481,7 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 						className={cn(
 							'metrics-header-label relative z-[1] cursor-pointer select-none border-0 bg-transparent p-0 m-0',
 							!compactMetrics &&
-									'flex w-[80px] min-w-[80px] max-w-[80px] items-center justify-center text-center text-[11px] font-medium',
+								'flex w-[80px] min-w-[80px] max-w-[80px] items-center justify-start pl-2 text-left text-[11px] font-medium',
 							compactMetrics &&
 								'flex metric-width-long items-center justify-center text-center text-[10px] font-medium leading-[1.05] tracking-[0.01em] metrics-header-label-compact'
 						)}
@@ -611,7 +611,7 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 								<div
 									{...dataAttr}
 									className={cn(
-										'metric-box inline-flex box-border items-center justify-center border border-black leading-none truncate h-[20px] w-[80px] min-w-[80px] max-w-[80px] rounded-[6px] px-0 flex-none'
+										'metric-box inline-flex box-border items-center justify-center border border-black leading-none truncate h-[20px] w-[80px] min-w-[80px] max-w-[80px] rounded-[6.5px] px-0 flex-none'
 									)}
 									style={
 										{

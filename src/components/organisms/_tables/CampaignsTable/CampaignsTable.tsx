@@ -91,7 +91,7 @@ export const CampaignsTable: FC = () => {
 			: 'h-[20px] w-[80px] flex-none justify-center'
 	);
 	const metricBoxSkeletonClassName =
-		'metric-box inline-flex box-border items-center justify-center border border-black leading-none truncate h-[20px] w-[80px] min-w-[80px] max-w-[80px] rounded-[6px] px-0 flex-none bg-black/10 animate-pulse';
+		'metric-box inline-flex box-border items-center justify-center border border-black leading-none truncate h-[20px] w-[80px] min-w-[80px] max-w-[80px] rounded-[6.5px] px-0 flex-none bg-black/10 animate-pulse';
 
 	// No orientation gating; we rely on device detection so landscape uses mobile layout too
 
