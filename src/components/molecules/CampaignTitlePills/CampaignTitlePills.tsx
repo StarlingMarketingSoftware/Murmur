@@ -16,6 +16,8 @@ export type CampaignTitlePillsSize = 'header' | 'table';
 type CampaignTitlePillSpec = {
 	match: RegExp;
 	displayText?: string | ((matchedText: string) => string);
+	// Optional shorter label for compact table rendering (dashboard campaigns table)
+	displayTextTable?: string | ((matchedText: string) => string);
 	backgroundColor: string;
 	iconBaseSize: number;
 	renderIcon: (size: number) => ReactNode;
@@ -46,12 +48,16 @@ const CAMPAIGN_TITLE_PILL_SPECS: CampaignTitlePillSpec[] = [
 	},
 	{
 		match: /^coffee\s*shops?(?=\s|$)/i,
+		// In the dashboard Campaigns table we use a fixed-width category pill for alignment,
+		// so keep this label compact to avoid truncation.
+		displayTextTable: 'Coffee',
 		backgroundColor: '#D6F1BD',
 		iconBaseSize: 13,
 		renderIcon: (size) => <CoffeeShopsIcon size={size} className="flex-shrink-0" />,
 	},
 	{
 		match: /^music\s*venues?(?=\s|$)/i,
+		displayTextTable: 'Venues',
 		backgroundColor: '#B7E5FF',
 		iconBaseSize: 24,
 		renderIcon: (size) => <MusicVenuesIcon size={size} className="flex-shrink-0" />,
@@ -64,14 +70,23 @@ const CAMPAIGN_TITLE_PILL_SPECS: CampaignTitlePillSpec[] = [
 		renderIcon: (size) => <FestivalsIcon size={size} className="flex-shrink-0" />,
 	},
 	{
-		// "Wedding Planners", "Wedding Venues" (and singular forms)
-		match: /^wedding\s*(?:planners?|venues?)(?=\s|$)/i,
+		// "Wedding Planner(s)" (and singular forms)
+		match: /^wedding\s*planners?(?=\s|$)/i,
+		displayTextTable: 'Wedding',
+		backgroundColor: '#FFF2BC',
+		iconBaseSize: 20,
+		renderIcon: (size) => <WeddingPlannersIcon size={size} className="flex-shrink-0" />,
+	},
+	{
+		// "Wedding Venue(s)" (and singular forms)
+		match: /^wedding\s*venues?(?=\s|$)/i,
 		backgroundColor: '#FFF2BC',
 		iconBaseSize: 20,
 		renderIcon: (size) => <WeddingPlannersIcon size={size} className="flex-shrink-0" />,
 	},
 	{
 		match: /^radio\s*stations?(?=\s|$)/i,
+		displayTextTable: 'Radio',
 		backgroundColor: '#E8EFFF',
 		iconBaseSize: 22,
 		renderIcon: (size) => <RadioStationsIcon size={size} className="flex-shrink-0" />,
@@ -122,10 +137,26 @@ const sizeStyles = (size: CampaignTitlePillsSize) => {
 			pillHeight: 'h-[20px]',
 			pillPx: 'px-[6px]',
 			categoryGap: 'gap-[6px]',
-			stateGap: 'gap-[8px]',
-			stateIconSize: '[&>svg]:w-[18px] [&>svg]:h-[14px]',
+			// Dashboard Campaigns table: keep category pills a consistent width
+			// so the trailing "in" + state pill align row-to-row.
+			categoryPillWidthClassName: 'w-[111px] min-w-[111px] max-w-[111px]',
+			categoryTextClassName: 'flex-1 min-w-0 truncate',
+			// Reserve a fixed icon "slot" so different SVGs don't appear to drift left/right.
+			categoryIconWrapperClassName:
+				'ml-auto flex-none w-[18px] h-[18px] inline-flex items-center justify-center translate-x-[1px] [&>svg]:block',
+			// Dashboard Campaigns table: keep state pills a consistent width
+			// so every row lines up cleanly.
+			statePillWidthClassName: 'w-[49px] min-w-[49px] max-w-[49px]',
+			// Slightly tighter padding so 2-letter states + icon fit in 49px.
+			statePillPxClassName: 'px-[4px]',
+			// Use justify-between (instead of a fixed gap) inside a fixed-width pill.
+			stateGap: 'justify-between',
+			// Slightly smaller icon so it breathes in the 49px pill.
+			stateIconSize: '[&>svg]:w-[16px] [&>svg]:h-[12px] [&>svg]:block',
 			supClassName: 'ml-[3px] text-[10px] leading-none',
-			inWordSpacingClassName: 'mx-[4px]',
+			// Fixed spacing region between category pill and state pill.
+			// This makes the Campaigns table titles feel uniform row-to-row.
+			inWordSpacingClassName: 'w-[33px] mx-0 text-center flex-none',
 			iconScale: 20 / 26,
 		} as const;
 	}
@@ -134,8 +165,13 @@ const sizeStyles = (size: CampaignTitlePillsSize) => {
 		pillHeight: 'h-[26px]',
 		pillPx: 'px-[8px]',
 		categoryGap: 'gap-[7px]',
+		categoryPillWidthClassName: '',
+		categoryTextClassName: '',
+		categoryIconWrapperClassName: '',
+		statePillWidthClassName: '',
+		statePillPxClassName: '',
 		stateGap: 'gap-[10px]',
-		stateIconSize: '[&>svg]:w-[23px] [&>svg]:h-[18px]',
+		stateIconSize: '[&>svg]:w-[23px] [&>svg]:h-[18px] [&>svg]:block',
 		supClassName: 'ml-[3px] text-[14px] leading-none',
 		inWordSpacingClassName: 'mx-[6px]',
 		iconScale: 1,
@@ -169,8 +205,16 @@ const renderCampaignTitleWithStatePill = (title: string, size: CampaignTitlePill
 	const parsedLocation = parseTitleStatePillLocation(locationBase);
 	if (!parsedLocation) return safeTitle;
 
-	const { pillHeight, pillPx, stateGap, stateIconSize, supClassName, inWordSpacingClassName } =
-		sizeStyles(size);
+	const {
+		pillHeight,
+		pillPx,
+		stateGap,
+		statePillWidthClassName,
+		statePillPxClassName,
+		stateIconSize,
+		supClassName,
+		inWordSpacingClassName,
+	} = sizeStyles(size);
 	const { abbr, locationForIcon, citationNumber } = parsedLocation;
 
 	// Use the same state icon + background used across "Where" and contact-row state boxes.
@@ -200,17 +244,19 @@ const renderCampaignTitleWithStatePill = (title: string, size: CampaignTitlePill
 			})()}
 			<span
 				className={cn(
-					'inline-flex items-center rounded-[5px] align-middle',
+					'inline-flex items-center rounded-[5px] align-middle flex-none',
 					pillHeight,
 					pillPx,
+					statePillPxClassName,
+					statePillWidthClassName,
 					stateGap
 				)}
 				style={{ backgroundColor }}
 			>
-				<span className="leading-none">{abbr}</span>
+				<span className="leading-none flex-none">{abbr}</span>
 				<span
 					className={cn(
-						'inline-flex items-center justify-center translate-y-[1px]',
+						'inline-flex items-center justify-center translate-y-[1px] flex-none',
 						stateIconSize
 					)}
 				>
@@ -234,7 +280,14 @@ const renderCampaignTitleWithCategoryPill = (
 	const restTitle = safeTitle.slice(leadingWhitespace.length);
 	if (!restTitle) return safeTitle;
 
-	const { pillHeight, pillPx, categoryGap } = sizeStyles(size);
+	const {
+		pillHeight,
+		pillPx,
+		categoryGap,
+		categoryPillWidthClassName,
+		categoryTextClassName,
+		categoryIconWrapperClassName,
+	} = sizeStyles(size);
 
 	for (const spec of CAMPAIGN_TITLE_PILL_SPECS) {
 		const match = restTitle.match(spec.match);
@@ -242,25 +295,37 @@ const renderCampaignTitleWithCategoryPill = (
 		if (!matchedText) continue;
 
 		const suffix = restTitle.slice(matchedText.length);
-		const displayText =
-			typeof spec.displayText === 'function'
-				? spec.displayText(matchedText)
-				: (spec.displayText ?? matchedText);
+		const displayText = (() => {
+			const next =
+				size === 'table' && spec.displayTextTable !== undefined
+					? spec.displayTextTable
+					: spec.displayText;
+			return typeof next === 'function'
+				? next(matchedText)
+				: (next ?? matchedText);
+		})();
 		const iconSize = scaledIconSize(spec.iconBaseSize, size);
 		return (
 			<>
 				{leadingWhitespace}
 				<span
 					className={cn(
-						'inline-flex items-center rounded-[5px] align-middle',
+						'inline-flex items-center rounded-[5px] align-middle min-w-0 flex-none',
 						pillHeight,
 						pillPx,
-						categoryGap
+						categoryGap,
+						categoryPillWidthClassName
 					)}
 					style={{ backgroundColor: spec.backgroundColor }}
 				>
-					<span className="leading-none">{displayText}</span>
-					<span className={cn('translate-y-[1px]', spec.iconWrapperClassName)}>
+					<span className={cn('leading-none', categoryTextClassName)}>{displayText}</span>
+					<span
+						className={cn(
+							'translate-y-[1px]',
+							categoryIconWrapperClassName,
+							spec.iconWrapperClassName
+						)}
+					>
 						{spec.renderIcon(iconSize)}
 					</span>
 				</span>

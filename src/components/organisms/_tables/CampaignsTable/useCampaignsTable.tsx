@@ -296,9 +296,10 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 					<div className="text-left pr-2">
 						<div
 							className={cn(
-								'inline-flex box-border h-[20px] w-[204px] items-center rounded-[6px] px-[8px] font-primary font-medium campaign-name-text text-[14px] leading-[20px] text-black bg-white truncate',
+								'inline-flex box-border h-[20px] w-[204px] items-center rounded-[6px] pl-0 pr-[8px] campaign-name-text text-[15px] leading-[20px] font-normal text-black bg-white truncate',
 								isConfirming && 'bg-transparent text-white'
 							)}
+							style={{ fontFamily: '"Times New Roman", Times, serif' }}
 						>
 							{isConfirming ? (
 								<span className="truncate">{name}</span>
