@@ -3457,20 +3457,32 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 			const startBackgroundSpin = () => {
 				if (!shouldAutoSpin) return;
-				// Slow the decorative spin so the background feels calmer.
+				// Slow decorative spin and keep the US in view with a gentle back-and-forth sway.
 				const secondsPerRevolution = 1500;
 				const distancePerSecond = 360 / secondsPerRevolution;
 				const animationDurationMs = 1000;
 
 				const normalizeLng = (lng: number) => ((((lng + 180) % 360) + 360) % 360) - 180;
 
+				const baseLng = DECORATIVE_CENTER[0];
+				const maxDriftDeg = 35; // keep camera within a US-visible band
+				let direction: 1 | -1 = 1;
+				let currentLng = normalizeLng(map.getCenter()?.lng ?? baseLng);
+
 				const spinGlobe = () => {
 					try {
-						const center = map.getCenter();
-						center.lng = normalizeLng(center.lng - distancePerSecond);
-						center.lat = DECORATIVE_CENTER[1]; // keep latitude locked
+						currentLng = normalizeLng(currentLng + direction * distancePerSecond);
+						const drift = normalizeLng(currentLng - baseLng);
+						if (drift > maxDriftDeg) {
+							currentLng = normalizeLng(baseLng + maxDriftDeg);
+							direction = -1;
+						} else if (drift < -maxDriftDeg) {
+							currentLng = normalizeLng(baseLng - maxDriftDeg);
+							direction = 1;
+						}
+
 						map.easeTo({
-							center,
+							center: [currentLng, DECORATIVE_CENTER[1]],
 							zoom: DECORATIVE_ZOOM,
 							pitch: DECORATIVE_PITCH,
 							bearing: 0,
@@ -4024,7 +4036,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			loading?: boolean,
 			maxDotsInViewport: number = MAX_TOTAL_DOTS
 		) => {
-			// Background dots have been disabled - no longer rendering fake gray dots
 			void mapInstance;
 			void loading;
 			void maxDotsInViewport;
