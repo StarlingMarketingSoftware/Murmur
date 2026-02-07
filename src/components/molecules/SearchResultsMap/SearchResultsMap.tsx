@@ -883,7 +883,7 @@ const DEFAULT_MAX_ZOOM_FALLBACK = 22;
 
 // Dashboard background → interactive map-view transition.
 // Keep these values in sync with the dashboard "frame" animation so the whole moment feels unified.
-export const DASHBOARD_TO_INTERACTIVE_TRANSITION_MS = 2400;
+export const DASHBOARD_TO_INTERACTIVE_TRANSITION_MS = 7200;
 export const DASHBOARD_TO_INTERACTIVE_TRANSITION_CSS_EASING =
 	'cubic-bezier(0.22, 1, 0.36, 1)';
 
@@ -3458,7 +3458,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			const startBackgroundSpin = () => {
 				if (!shouldAutoSpin) return;
 				// Slow decorative spin and keep the US in view with a gentle back-and-forth sway.
-				const secondsPerRevolution = 1500;
+				const secondsPerRevolution = 3000;
 				const distancePerSecond = 360 / secondsPerRevolution;
 				const animationDurationMs = 1000;
 
