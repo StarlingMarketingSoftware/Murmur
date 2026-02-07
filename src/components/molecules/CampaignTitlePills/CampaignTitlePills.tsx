@@ -134,7 +134,7 @@ const parseTitleStatePillLocation = (locationBase: string): TitleStatePillLocati
 const sizeStyles = (size: CampaignTitlePillsSize) => {
 	if (size === 'table') {
 		return {
-			pillHeight: 'h-[20px]',
+			pillHeight: 'h-[16px]',
 			pillPx: 'px-[6px]',
 			categoryGap: 'gap-[6px]',
 			// Dashboard Campaigns table: keep category pills a consistent width
@@ -143,7 +143,7 @@ const sizeStyles = (size: CampaignTitlePillsSize) => {
 			categoryTextClassName: 'flex-1 min-w-0 truncate',
 			// Reserve a fixed icon "slot" so different SVGs don't appear to drift left/right.
 			categoryIconWrapperClassName:
-				'ml-auto flex-none w-[18px] h-[18px] inline-flex items-center justify-center translate-x-[1px] [&>svg]:block',
+				'ml-auto flex-none w-[15px] h-[15px] inline-flex items-center justify-center translate-x-[1px] [&>svg]:block',
 			// Dashboard Campaigns table: keep state pills a consistent width
 			// so every row lines up cleanly.
 			statePillWidthClassName: 'w-[49px] min-w-[49px] max-w-[49px]',
@@ -152,12 +152,12 @@ const sizeStyles = (size: CampaignTitlePillsSize) => {
 			// Use justify-between (instead of a fixed gap) inside a fixed-width pill.
 			stateGap: 'justify-between',
 			// Slightly smaller icon so it breathes in the 49px pill.
-			stateIconSize: '[&>svg]:w-[16px] [&>svg]:h-[12px] [&>svg]:block',
+			stateIconSize: '[&>svg]:w-[14px] [&>svg]:h-[11px] [&>svg]:block',
 			supClassName: 'ml-[3px] text-[10px] leading-none',
 			// Fixed spacing region between category pill and state pill.
 			// This makes the Campaigns table titles feel uniform row-to-row.
 			inWordSpacingClassName: 'w-[33px] mx-0 text-center flex-none',
-			iconScale: 20 / 26,
+			iconScale: 16 / 26,
 		} as const;
 	}
 
