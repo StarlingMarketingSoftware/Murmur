@@ -88,10 +88,10 @@ export const CampaignsTable: FC = () => {
 		'campaign-metric-slot relative flex items-center',
 		shouldUseCompactMetrics
 			? 'w-auto flex-shrink-0 justify-start'
-			: 'h-[20px] w-[94px] flex-none justify-center'
+			: 'h-[20px] w-[80px] flex-none justify-center'
 	);
 	const metricBoxSkeletonClassName =
-		'metric-box inline-flex items-center justify-center border border-[#8C8C8C] leading-none truncate h-[20px] w-[92px] min-w-[92px] max-w-[92px] rounded-[6px] px-0 flex-none bg-black/10 animate-pulse';
+		'metric-box inline-flex box-border items-center justify-center border border-black leading-none truncate h-[20px] w-[80px] min-w-[80px] max-w-[80px] rounded-[6px] px-0 flex-none bg-black/10 animate-pulse';
 
 	// No orientation gating; we rely on device detection so landscape uses mobile layout too
 
@@ -343,7 +343,7 @@ export const CampaignsTable: FC = () => {
 						className="text-left text-[10px] font-secondary font-medium"
 						variant="secondary"
 					>
-						Your Campaigns
+						Campaigns
 					</CardTitle>
 				</CardHeader>
 			)}
@@ -376,9 +376,9 @@ export const CampaignsTable: FC = () => {
 									<div className="mobile-table-wrapper" ref={mobileTableWrapperRef}>
 							<CustomTable
 								variant="secondary"
-								containerClassName="my-campaigns-table mobile-table-no-scroll !bg-[#EDEDED]"
-								headerClassName="[&_tr]:!bg-[#EDEDED] [&_th]:!bg-[#EDEDED] [&_th]:!border-b-[#EDEDED] [&_th]:relative [&_th]:!overflow-visible"
-								rowClassName="!bg-[#EDEDED] !border-b-[#EDEDED] hover:!bg-[#E0E0E0] transition-colors duration-200"
+								containerClassName="my-campaigns-table mobile-table-no-scroll !bg-[#F8F8F8]"
+								headerClassName="[&_tr]:!bg-[#F8F8F8] [&_th]:!border-b-[#F8F8F8] [&_th]:relative [&_th]:!overflow-visible"
+								rowClassName="!bg-transparent !border-b-[#F8F8F8] hover:!bg-[#F0F0F0] transition-colors duration-200"
 											renderLoadingCell={({ column }) => {
 												if (column.id === 'metrics') {
 													return (
@@ -401,12 +401,6 @@ export const CampaignsTable: FC = () => {
 															<div className={metricSlotClassName}>
 																<div
 																	data-updated-fill="skeleton"
-																	className={metricBoxSkeletonClassName}
-																/>
-															</div>
-															<div className={metricSlotClassName}>
-																<div
-																	data-created-fill="skeleton"
 																	className={metricBoxSkeletonClassName}
 																/>
 															</div>
@@ -488,11 +482,11 @@ export const CampaignsTable: FC = () => {
 							// Desktop mode: normal table with delete column
 							<CustomTable
 								variant="secondary"
-								containerClassName={`border-none rounded-[8px] my-campaigns-table !bg-[#EDEDED] !mx-auto !p-[6px] ${
-									isNarrowDesktop ? 'narrow-desktop-table' : '!w-[891px]'
+								containerClassName={`border-none rounded-[12px] my-campaigns-table !bg-[#F8F8F8] !mx-auto !p-[8px] ${
+									isNarrowDesktop ? 'narrow-desktop-table' : ''
 								}`}
-								headerClassName="[&_tr]:!bg-white [&_th]:!bg-white [&_th]:!border-0 [&_th]:!h-[28px] [&_tr]:!h-[28px] [&_th:first-child]:rounded-tl-[4px] [&_th:last-child]:rounded-tr-[4px] [&_th]:relative [&_th]:!overflow-visible"
-								rowClassName="!bg-[#EDEDED] !border-0 hover:!bg-[#E0E0E0] transition-colors duration-200"
+								headerClassName="[&_tr]:!bg-transparent [&_th]:!border-0 [&_th]:!h-[28px] [&_tr]:!h-[28px] [&_th:first-child]:rounded-tl-[8px] [&_th:last-child]:rounded-tr-[8px] [&_th]:relative [&_th]:!overflow-visible"
+								rowClassName="!bg-transparent !border-0 hover:!bg-[#F0F0F0] transition-colors duration-200"
 								renderLoadingCell={({ column }) => {
 									if (column.id === 'metrics') {
 										return (
@@ -515,12 +509,6 @@ export const CampaignsTable: FC = () => {
 												<div className={metricSlotClassName}>
 													<div
 														data-updated-fill="skeleton"
-														className={metricBoxSkeletonClassName}
-													/>
-												</div>
-												<div className={metricSlotClassName}>
-													<div
-														data-created-fill="skeleton"
 														className={metricBoxSkeletonClassName}
 													/>
 												</div>

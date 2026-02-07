@@ -83,8 +83,7 @@
 	/* Metric boxes themselves */
 	.mobile-portrait-mode .my-campaigns-table .metric-box[data-draft-fill],
 	.mobile-portrait-mode .my-campaigns-table .metric-box[data-sent-fill],
-	.mobile-portrait-mode .my-campaigns-table .metric-box[data-updated-fill],
-	.mobile-portrait-mode .my-campaigns-table .metric-box[data-created-fill] {
+	.mobile-portrait-mode .my-campaigns-table .metric-box[data-updated-fill] {
 		width: 50px !important;
 		min-width: 50px !important;
 		max-width: 50px !important;
@@ -103,8 +102,7 @@
 	/* Header label widths to match boxes */
 	.mobile-portrait-mode .metrics-header-grid .metrics-header-label[data-label='drafts'],
 	.mobile-portrait-mode .metrics-header-grid .metrics-header-label[data-label='sent'],
-	.mobile-portrait-mode .metrics-header-grid .metrics-header-label[data-label='updated'],
-	.mobile-portrait-mode .metrics-header-grid .metrics-header-label[data-label='created'] {
+	.mobile-portrait-mode .metrics-header-grid .metrics-header-label[data-label='updated'] {
 		width: 50px !important;
 		min-width: 50px !important;
 		max-width: 50px !important;
@@ -2445,7 +2443,7 @@ body.murmur-page.murmur-map-view .results-search-input-group .search-wave-contai
 @media (max-width: 640px) {
 	.campaign-name-text {
 		font-family: 'Times New Roman', 'Times', serif !important;
-		font-weight: 700 !important;
+		font-weight: 600 !important;
 		font-size: 14px !important;
 		line-height: 1.2 !important;
 	}
@@ -3672,9 +3670,37 @@ body.murmur-mobile .results-align {
 
 /* Dashboard: show only 3 visible rows, but keep internal scroll + custom scrollbar */
 .dashboard-recent-campaigns .campaigns-table-container .my-campaigns-table {
-	height: 180px !important;
-	max-height: 180px !important;
-	min-height: 180px !important;
+	height: 184px !important;
+	max-height: 184px !important;
+	min-height: 184px !important;
+	width: 100% !important;
+	max-width: 654px !important;
+	margin-left: auto !important;
+	margin-right: auto !important;
+}
+
+/* Dashboard Campaigns table: nudge metrics group left a bit
+   (desktop only; mobile has its own layout rules) */
+.dashboard-recent-campaigns
+	.mobile-campaigns-wrapper:not(.mobile-portrait-mode)
+	.campaigns-table-container
+	.my-campaigns-table
+	table {
+	table-layout: fixed !important;
+}
+.dashboard-recent-campaigns
+	.mobile-campaigns-wrapper:not(.mobile-portrait-mode)
+	.campaigns-table-container
+	.my-campaigns-table
+	thead
+	th:first-child,
+.dashboard-recent-campaigns
+	.mobile-campaigns-wrapper:not(.mobile-portrait-mode)
+	.campaigns-table-container
+	.my-campaigns-table
+	tbody
+	td:first-child {
+	width: 260px !important;
 }
 
 /* Mobile landscape: scale campaigns table wrapper width proportionally
@@ -4079,7 +4105,7 @@ main {
 	content: '';
 	position: absolute;
 	left: var(--drafts-sort-indicator-left, 0px);
-	width: var(--drafts-sort-indicator-width, 92px);
+	width: var(--drafts-sort-indicator-width, 80px);
 	height: 2px;
 	bottom: 2px;
 	background: #8d8a8a;
@@ -5346,7 +5372,7 @@ body.murmur-mobile .search-input-icon-btn {
 	}
 
 	.mobile-portrait-mode .my-campaigns-table .campaign-name-text {
-		font-weight: bold;
+		font-weight: 600;
 		margin: 0 !important;
 		line-height: 15px !important; /* Match metric box height */
 		display: inline-flex !important;
@@ -5739,7 +5765,7 @@ body.murmur-mobile .search-input-icon-btn {
 	.mobile-portrait-mode .my-campaigns-table thead th:nth-child(2) .metrics-header-grid,
 	.mobile-portrait-mode .my-campaigns-table td:nth-child(2) .metrics-grid-container {
 		display: grid !important;
-		grid-template-columns: repeat(4, 50px) !important;
+		grid-template-columns: repeat(3, 50px) !important;
 		column-gap: 7px !important;
 		justify-content: start !important;
 		align-items: center !important;
@@ -5765,14 +5791,14 @@ body.murmur-mobile .search-input-icon-btn {
 }
 
 /* Final spacing/layout fix for mobile landscape metrics
-   - Reserve three fixed 50px columns on the right for metrics 2-4
+   - Reserve two fixed 50px columns on the right for metrics 2-3
    - Let the left-most metric expand leftward (auto column)
    - Keep the whole metrics group right-aligned via margin-left:auto above
    - Add explicit 8px gaps so boxes never touch */
 @media (orientation: landscape) {
 	.mobile-landscape-mode .my-campaigns-table .metrics-grid-container {
 		display: grid !important;
-		grid-template-columns: auto 50px 50px 50px !important;
+		grid-template-columns: auto 50px 50px !important;
 		column-gap: 8px !important;
 		margin-left: 0 !important;
 		/* Pull the entire metrics group left so it's clear of the delete icon */
@@ -5871,7 +5897,7 @@ body.murmur-mobile .search-input-icon-btn {
 		padding-right: 8px !important;
 	}
 
-	/* Compact metrics: distribute the 4 boxes across the available space (and scale down cleanly). */
+	/* Compact metrics: distribute the 3 boxes across the available space (and scale down cleanly). */
 	.narrow-desktop-table .metrics-grid-container,
 	.narrow-desktop-table .metrics-header-grid {
 		gap: var(--narrow-metric-gap) !important;
@@ -5881,8 +5907,8 @@ body.murmur-mobile .search-input-icon-btn {
 		/* Per-slot width derived from the available column width (clamped to a sensible range). */
 		--narrow-metric-slot: clamp(
 			40px,
-			calc((100% - (3 * var(--narrow-metric-gap))) / 4),
-			92px
+			calc((100% - (2 * var(--narrow-metric-gap))) / 3),
+			80px
 		);
 	}
 
