@@ -641,9 +641,9 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 			cell: ({ row }) => {
 				const isConfirming = row.original.id === confirmingCampaignId;
 				return (
-					<div className="flex justify-end">
-						<button
-							className="campaign-delete-btn w-[20px] h-[20px] flex items-center justify-center hover:opacity-70 transition-opacity"
+				<div className={cn("flex justify-end transition-opacity duration-75", !isConfirming && "opacity-0 group-hover:opacity-100")}>
+					<button
+						className="campaign-delete-btn w-[20px] h-[20px] flex items-center justify-center hover:opacity-70 transition-opacity"
 							style={{
 								background: 'transparent',
 								border: 'none',

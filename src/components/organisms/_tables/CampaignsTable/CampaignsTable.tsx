@@ -378,7 +378,7 @@ export const CampaignsTable: FC = () => {
 								variant="secondary"
 								containerClassName="my-campaigns-table mobile-table-no-scroll !bg-[#F8F8F8]"
 								headerClassName="!bg-white [&_tr]:!bg-white [&_th]:!bg-white [&_th]:!border-b-[#F8F8F8] [&_th]:relative [&_th]:!overflow-visible"
-								rowClassName="!bg-transparent !border-b-[#F8F8F8] hover:!bg-[#F0F0F0] transition-colors duration-200"
+								rowClassName="!bg-transparent !border-b-[#F8F8F8] hover:!bg-[#F0F0F0] transition-colors duration-200 group"
 											renderLoadingCell={({ column }) => {
 												if (column.id === 'metrics') {
 													return (
@@ -486,7 +486,7 @@ export const CampaignsTable: FC = () => {
 									isNarrowDesktop ? 'narrow-desktop-table' : ''
 								}`}
 								headerClassName="!bg-white [&_tr]:!bg-white [&_th]:!bg-white [&_th]:!border-0 [&_th]:!h-[28px] [&_tr]:!h-[28px] [&_th:first-child]:rounded-tl-[8px] [&_th:last-child]:rounded-tr-[8px] [&_th]:relative [&_th]:!overflow-visible"
-								rowClassName="!bg-transparent !border-0 hover:!bg-[#F0F0F0] transition-colors duration-200"
+								rowClassName="!bg-transparent !border-0 hover:!bg-[#F0F0F0] transition-colors duration-200 group"
 								renderLoadingCell={({ column }) => {
 									if (column.id === 'metrics') {
 										return (
