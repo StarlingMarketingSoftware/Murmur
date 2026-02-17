@@ -161,6 +161,9 @@ fullAiPrompt String?  @map("message") @db.Text
 
 - Create a .tsx file in the scripts folder following the format of export-embeddings.tsx.
 - Run with `npx tsx scripts/export-embeddings.tsx`
+- US map state geometry is derived from `public/geo/us-states.geojson`.
+- If you update that source GeoJSON, run `npm run preprocess-geo` to regenerate the derived files in `public/geo/`.
+- `npm run build` and `npm run vercel-build` run this preprocessing step automatically.
 
 ### Generating Seed Data for Local Vector Embeddings
 

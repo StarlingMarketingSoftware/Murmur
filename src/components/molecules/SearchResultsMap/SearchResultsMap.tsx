@@ -34,6 +34,7 @@ import {
 } from '@/utils/restaurantTitle';
 import { WeddingPlannersIcon } from '@/components/atoms/_svg/WeddingPlannersIcon';
 import { WineBeerSpiritsIcon } from '@/components/atoms/_svg/WineBeerSpiritsIcon';
+import { unionClippingMultiPolygons } from '@/utils/polygonClipping';
 
 type LatLngLiteral = { lat: number; lng: number };
 type MarkerHoverMeta = { clientX: number; clientY: number };
@@ -832,31 +833,6 @@ const pointInMultiPolygon = (
 	return false;
 };
 
-const bboxFromPolygon = (polygon: ClippingPolygon): BoundingBox | null => {
-	let minLat = Infinity;
-	let maxLat = -Infinity;
-	let minLng = Infinity;
-	let maxLng = -Infinity;
-	for (const ring of polygon) {
-		for (const [lng, lat] of ring) {
-			if (!Number.isFinite(lng) || !Number.isFinite(lat)) continue;
-			minLat = Math.min(minLat, lat);
-			maxLat = Math.max(maxLat, lat);
-			minLng = Math.min(minLng, lng);
-			maxLng = Math.max(maxLng, lng);
-		}
-	}
-	if (
-		!Number.isFinite(minLat) ||
-		!Number.isFinite(maxLat) ||
-		!Number.isFinite(minLng) ||
-		!Number.isFinite(maxLng)
-	) {
-		return null;
-	}
-	return { minLat, maxLat, minLng, maxLng };
-};
-
 // State badge colors matching dashboard
 const stateBadgeColorMap: Record<string, string> = {
 	AL: '#E57373',
@@ -1280,8 +1256,11 @@ const restoreBasemapCartography = (
 	}
 };
 
-// Use our shipped GeoJSON so SearchResultsMap no longer depends on Google-hosted shapes.
-const STATE_GEOJSON_URL = '/geo/us-states.geojson';
+const STATE_PROCESSED_GEOJSON_URL = '/geo/us-states-processed.json';
+const STATE_META_URL = '/geo/us-states-meta.json';
+const STATE_LABELS_URL = '/geo/us-states-labels.json';
+const STATE_OUTLINE_URL = '/geo/us-states-outline.json';
+const STATE_PREPARED_POLYGONS_URL = '/geo/us-states-prepared-polygons.json';
 const STATE_HIGHLIGHT_COLOR = '#5DAB68';
 const STATE_HIGHLIGHT_OPACITY = 0.68;
 const STATE_BORDER_COLOR = '#CFD8DC';
@@ -2590,7 +2569,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		source?.setData(EMPTY_POLYGON_FC as any);
 	}, [map, isMapLoaded]);
 
-	// Load US state shapes (used for outline + optional hover/click interactions)
+	// Load preprocessed US state shapes/metadata generated at build-time.
 	useEffect(() => {
 		if (!map || !isMapLoaded) return;
 
@@ -2607,15 +2586,61 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		const loadStates = async () => {
 			setIsStateLayerReady(false);
 			try {
-				const res = await fetch(STATE_GEOJSON_URL, { signal: controller.signal });
-				if (!res.ok) {
-					throw new Error(`Failed to fetch state GeoJSON (${res.status})`);
-				}
+				const fetchJson = async <T,>(url: string): Promise<T> => {
+					const res = await fetch(url, { signal: controller.signal });
+					if (!res.ok) throw new Error(`Failed to fetch ${url} (${res.status})`);
+					return (await res.json()) as T;
+				};
 
-				const json = (await res.json()) as GeoJsonFeatureCollection;
+				const [
+					processedGeoJson,
+					statesMetaByKey,
+					stateLabels,
+					usOutlineGeometry,
+					preparedPolygons,
+				] = await Promise.all([
+					fetchJson<GeoJsonFeatureCollection>(STATE_PROCESSED_GEOJSON_URL),
+					fetchJson<
+						Record<
+							string,
+							{
+								key: string;
+								name: string;
+								bbox: BoundingBox | null;
+							}
+						>
+					>(STATE_META_URL),
+					fetchJson<GeoJSON.FeatureCollection>(STATE_LABELS_URL),
+					fetchJson<Extract<GeoJsonGeometry, { type: 'MultiPolygon' }>>(STATE_OUTLINE_URL),
+					fetchJson<PreparedClippingPolygon[]>(STATE_PREPARED_POLYGONS_URL),
+				]);
+
 				if (cancelled) return;
 
-				const prepared: PreparedClippingPolygon[] = [];
+				const features = Array.isArray(processedGeoJson?.features)
+					? processedGeoJson.features
+					: [];
+				const processed: GeoJsonFeatureCollection = { type: 'FeatureCollection', features };
+
+				const geometryByKey = new Map<string, GeoJsonGeometry>();
+				const nameByKey = new Map<string, string>();
+				for (const feature of features) {
+					const props = feature.properties ?? {};
+					const rawKey =
+						typeof props.key === 'string' || typeof props.key === 'number'
+							? props.key
+							: feature.id;
+					const key = normalizeStateKey(rawKey != null ? String(rawKey) : null);
+					if (!key) continue;
+
+					const rawName = props.name;
+					const safeName =
+						typeof rawName === 'string' && rawName.trim().length ? rawName.trim() : key;
+
+					geometryByKey.set(key, feature.geometry);
+					nameByKey.set(key, safeName);
+				}
+
 				const byKey = new Map<
 					string,
 					{
@@ -2627,133 +2652,68 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					}
 				>();
 
-				const features: GeoJsonFeatureCollection['features'] = [];
-
-				for (const feature of json.features ?? []) {
-					const props = feature.properties ?? {};
-					const rawName = (props.name ??
-						props.NAME ??
-						props.STATE_NAME ??
-						props.State ??
-						props.state ??
-						'') as unknown;
-					const name = String(rawName ?? '').trim();
-
-					const rawAbbr = (props.abbr ??
-						props.ABBR ??
-						props.stusps ??
-						props.STUSPS ??
-						props.postal ??
-						props.POSTAL ??
-						'') as unknown;
-					const abbr = String(rawAbbr ?? '').trim();
-
-					const key = normalizeStateKey(abbr || name);
+				for (const [rawMetaKey, metaEntry] of Object.entries(statesMetaByKey ?? {})) {
+					const key = normalizeStateKey(metaEntry?.key ?? rawMetaKey);
 					if (!key) continue;
 
-					const mp = geoJsonGeometryToClippingMultiPolygon(feature.geometry);
-					if (!mp) continue;
+					const geometry = geometryByKey.get(key);
+					if (!geometry) continue;
 
-					const bbox = bboxFromMultiPolygon(mp);
-					for (const poly of mp) {
-						const polyBbox = bboxFromPolygon(poly);
-						if (polyBbox) prepared.push({ polygon: poly, bbox: polyBbox });
-					}
+					const multiPolygon = geoJsonGeometryToClippingMultiPolygon(geometry);
+					if (!multiPolygon) continue;
 
-					const safeName = name || key;
+					const name =
+						typeof metaEntry?.name === 'string' && metaEntry.name.trim().length
+							? metaEntry.name.trim()
+							: (nameByKey.get(key) ?? key);
+
+					const bbox = metaEntry?.bbox ?? bboxFromMultiPolygon(multiPolygon);
+					byKey.set(key, { key, name, geometry, multiPolygon, bbox });
+				}
+
+				// Ensure by-key metadata remains usable even if a key is missing from meta payload.
+				for (const [key, geometry] of geometryByKey.entries()) {
+					if (byKey.has(key)) continue;
+					const multiPolygon = geoJsonGeometryToClippingMultiPolygon(geometry);
+					if (!multiPolygon) continue;
 					byKey.set(key, {
 						key,
-						name: safeName,
-						geometry: feature.geometry,
-						multiPolygon: mp,
-						bbox,
-					});
-
-					features.push({
-						type: 'Feature',
-						id: key,
-						properties: { ...props, name: safeName, key },
-						geometry: feature.geometry,
+						name: nameByKey.get(key) ?? key,
+						geometry,
+						multiPolygon,
+						bbox: bboxFromMultiPolygon(multiPolygon),
 					});
 				}
 
-				usStatesGeoJsonRef.current = { type: 'FeatureCollection', features };
+				usStatesGeoJsonRef.current = processed;
 				usStatesByKeyRef.current = byKey;
+				const prepared = Array.isArray(preparedPolygons) ? preparedPolygons : [];
 				usStatesPolygonsRef.current = prepared.length ? prepared : null;
 
 				const source = map.getSource(MAPBOX_SOURCE_IDS.states) as
 					| mapboxgl.GeoJSONSource
 					| undefined;
-				source?.setData({ type: 'FeatureCollection', features } as any);
+				source?.setData(processed as any);
 
-				// Build a point FeatureCollection with one centroid per state for labels.
-				// Some states have irregular shapes where the bbox centroid falls outside the
-				// state or looks visually off — override those with hand-tuned coordinates.
-				const STATE_LABEL_OVERRIDES: Record<string, [number, number]> = {
-					TX: [-99.5, 31.5], // Texas: panhandle skews centroid north
-					OK: [-97.5, 35.5], // Oklahoma: panhandle skews centroid west
-					MN: [-94.3, 46.0], // Minnesota: NW angle skews centroid
-					NV: [-117.0, 39.0], // Nevada: triangular shape skews centroid
-					CA: [-119.3, 36.5], // California: long coast skews centroid east
-					ID: [-114.5, 44.4], // Idaho: panhandle skews bbox centroid too far east
-					FL: [-81.7, 28.6], // Florida: peninsula + panhandle
-					MI: [-85.4, 43.5], // Michigan: Lower Peninsula center
-					LA: [-92.5, 31.0], // Louisiana: boot shape
-					MD: [-76.8, 39.05], // Maryland: narrow and wide
-					HI: [-157.5, 20.5], // Hawaii: island chain
-					AK: [-153.0, 64.0], // Alaska: massive bbox
-				};
-				const labelPoints: GeoJSON.Feature[] = [];
-				for (const [key, entry] of byKey) {
-					const b = entry.bbox;
-					if (!b) continue;
-					const override = STATE_LABEL_OVERRIDES[key];
-					const lng = override ? override[0] : (b.minLng + b.maxLng) / 2;
-					const lat = override ? override[1] : (b.minLat + b.maxLat) / 2;
-					labelPoints.push({
-						type: 'Feature',
-						properties: { key, name: entry.name },
-						geometry: { type: 'Point', coordinates: [lng, lat] },
-					});
-				}
+				const labels: GeoJSON.FeatureCollection =
+					stateLabels?.type === 'FeatureCollection' &&
+					Array.isArray(stateLabels.features)
+						? stateLabels
+						: { type: 'FeatureCollection', features: [] };
 				const labelSource = map.getSource(MAPBOX_SOURCE_IDS.stateLabels) as
 					| mapboxgl.GeoJSONSource
 					| undefined;
-				labelSource?.setData({ type: 'FeatureCollection', features: labelPoints } as any);
+				labelSource?.setData(labels as any);
 
-				// Prepare a simplified US outline geometry for the low-zoom basemap clip.
-				// (Union all states to remove internal borders, then take only the outer rings.)
-				if (!usBasemapClipGeometryRef.current) {
-					try {
-						const allStateMultiPolygons: ClippingMultiPolygon[] = Array.from(
-							byKey.values()
-						).map((e) => e.multiPolygon);
-
-						let unioned: ClippingMultiPolygon | null = null;
-						try {
-							const { default: polygonClipping } = await import('polygon-clipping');
-							unioned = polygonClipping.union(...allStateMultiPolygons);
-						} catch {
-							// Union is an optimization; safe to fall back to per-state polys.
-						}
-
-						const multiPolygonsToOutline: ClippingMultiPolygon =
-							unioned && Array.isArray(unioned) && unioned.length
-								? unioned
-								: allStateMultiPolygons.flat();
-
-						usBasemapClipMultiPolygonRef.current = multiPolygonsToOutline;
-
-						const outlineFc =
-							createOutlineGeoJsonFromMultiPolygon(multiPolygonsToOutline);
-						const coordinates = outlineFc.features.map((f) => f.geometry.coordinates);
-						if (coordinates.length) {
-							usBasemapClipGeometryRef.current = { type: 'MultiPolygon', coordinates };
-						}
-					} catch {
-						// Non-fatal; fall back to default global basemap cartography.
-					}
-				}
+				const outline =
+					usOutlineGeometry?.type === 'MultiPolygon' &&
+					Array.isArray(usOutlineGeometry.coordinates)
+						? usOutlineGeometry
+						: null;
+				usBasemapClipGeometryRef.current = outline;
+				usBasemapClipMultiPolygonRef.current = outline
+					? geoJsonGeometryToClippingMultiPolygon(outline)
+					: null;
 
 				// Apply/restore the clip based on current zoom (performance).
 				syncUsOnlyBasemapCartography(map);
@@ -2761,10 +2721,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				setIsStateLayerReady(true);
 			} catch (err) {
 				if (cancelled) return;
-				console.error('Failed to load US states GeoJSON', err);
+				console.error('Failed to load preprocessed US states geometry', err);
 				usStatesGeoJsonRef.current = null;
 				usStatesByKeyRef.current = new Map();
 				usStatesPolygonsRef.current = null;
+				usBasemapClipGeometryRef.current = null;
+				usBasemapClipMultiPolygonRef.current = null;
 				setIsStateLayerReady(false);
 			}
 		};
@@ -5086,8 +5048,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			// Union all selected state polygons into one (or multiple if disjoint) outline.
 			let unioned: ClippingMultiPolygon | null = null;
 			try {
-				const { default: polygonClipping } = await import('polygon-clipping');
-				unioned = polygonClipping.union(...stateMultiPolygons);
+				unioned = unionClippingMultiPolygons(...stateMultiPolygons);
 			} catch (err) {
 				console.error(
 					'Failed to build state outline union; falling back to per-state outline',
