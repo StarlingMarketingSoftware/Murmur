@@ -2587,8 +2587,27 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const applyStateOverlayOpacity = useCallback(
 		(nextOverlayOpacity: number, nextModeT: number) => {
 			if (!map || !isMapLoaded) return;
-			const base = stateLineOpacityBaseRef.current;
-			if (!base || base.dividers == null || base.borders == null) return;
+			let base = stateLineOpacityBaseRef.current;
+			// Style/layer timing can occasionally race on load; lazily recover base paint values
+			// so state lines don't get stuck at 0 opacity.
+			if (!base || base.dividers == null || base.borders == null) {
+				try {
+					const dividers = map.getPaintProperty(
+						MAPBOX_LAYER_IDS.statesDividers,
+						'line-opacity'
+					) as any;
+					const borders = map.getPaintProperty(
+						MAPBOX_LAYER_IDS.statesBordersInteractive,
+						'line-opacity'
+					) as any;
+					if (dividers != null && borders != null) {
+						base = { dividers, borders };
+						stateLineOpacityBaseRef.current = base;
+					}
+				} catch {
+					// Ignore and fall back to numeric opacity below.
+				}
+			}
 
 			const overlay = clamp(nextOverlayOpacity, 0, 1);
 			const modeT = clamp(nextModeT, 0, 1);
@@ -2597,10 +2616,15 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 			const setLineOpacity = (layerId: string, baseOpacity: any, mul: number) => {
 				if (!map.getLayer(layerId)) return;
-				if (baseOpacity == null) return;
 				try {
 					if (mul <= 0.001) {
 						map.setPaintProperty(layerId, 'line-opacity', 0);
+						return;
+					}
+					// If we couldn't recover the original expression, still render lines
+					// with a numeric fallback so overlays remain visible.
+					if (baseOpacity == null) {
+						map.setPaintProperty(layerId, 'line-opacity', mul);
 						return;
 					}
 					if (mul >= 0.999) {
@@ -2617,8 +2641,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				}
 			};
 
-			setLineOpacity(MAPBOX_LAYER_IDS.statesDividers, base.dividers, dividersMul);
-			setLineOpacity(MAPBOX_LAYER_IDS.statesBordersInteractive, base.borders, bordersMul);
+			setLineOpacity(MAPBOX_LAYER_IDS.statesDividers, base?.dividers, dividersMul);
+			setLineOpacity(MAPBOX_LAYER_IDS.statesBordersInteractive, base?.borders, bordersMul);
 
 			// Labels fade with the overall overlay opacity (mode doesn't matter).
 			if (map.getLayer(MAPBOX_LAYER_IDS.statesLabels)) {
@@ -3009,8 +3033,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			layout: {
 				// Abbreviations when zoomed out, full names when zoomed in.
 				'text-field': ['step', ['zoom'], ['get', 'key'], 7, ['get', 'name']],
-				'text-size': ['interpolate', ['linear'], ['zoom'], 3, 12, 5, 13, 7, 15, 10, 18],
-				'text-font': ['DIN Pro Medium', 'Arial Unicode MS Bold'],
+				'text-size': ['interpolate', ['linear'], ['zoom'], 3, 9, 5, 10, 7, 12, 10, 14],
+				'text-font': ['Inter Medium', 'Arial Unicode MS Regular'],
 				'text-allow-overlap': false,
 				'text-ignore-placement': false,
 				'text-padding': 2,
@@ -3283,6 +3307,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 			// Capture the base state-layer opacity expressions once, then start them hidden.
 			// We will fade them in/out via paint-property multipliers as presentation changes.
+			let capturedStateLineOpacityBase = false;
 			try {
 				if (!stateLineOpacityBaseRef.current) {
 					const dividers = mapInstance.getPaintProperty(
@@ -3293,27 +3318,33 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						MAPBOX_LAYER_IDS.statesBordersInteractive,
 						'line-opacity'
 					) as any;
-					stateLineOpacityBaseRef.current = { dividers, borders };
+					if (dividers != null && borders != null) {
+						stateLineOpacityBaseRef.current = { dividers, borders };
+						capturedStateLineOpacityBase = true;
+					}
+				} else {
+					capturedStateLineOpacityBase = true;
 				}
 			} catch {
 				// Ignore.
 			}
 			try {
-				if (mapInstance.getLayer(MAPBOX_LAYER_IDS.statesDividers)) {
-					mapInstance.setPaintProperty(
-						MAPBOX_LAYER_IDS.statesDividers,
-						'line-opacity',
-						0
-					);
+				// Only force-hide on load when we have a recoverable base expression.
+				// Otherwise leave defaults in place so overlays do not get stuck invisible.
+				if (capturedStateLineOpacityBase && mapInstance.getLayer(MAPBOX_LAYER_IDS.statesDividers)) {
+					mapInstance.setPaintProperty(MAPBOX_LAYER_IDS.statesDividers, 'line-opacity', 0);
 				}
-				if (mapInstance.getLayer(MAPBOX_LAYER_IDS.statesBordersInteractive)) {
+				if (
+					capturedStateLineOpacityBase &&
+					mapInstance.getLayer(MAPBOX_LAYER_IDS.statesBordersInteractive)
+				) {
 					mapInstance.setPaintProperty(
 						MAPBOX_LAYER_IDS.statesBordersInteractive,
 						'line-opacity',
 						0
 					);
 				}
-				if (mapInstance.getLayer(MAPBOX_LAYER_IDS.statesLabels)) {
+				if (capturedStateLineOpacityBase && mapInstance.getLayer(MAPBOX_LAYER_IDS.statesLabels)) {
 					mapInstance.setPaintProperty(MAPBOX_LAYER_IDS.statesLabels, 'text-opacity', 0);
 				}
 			} catch {

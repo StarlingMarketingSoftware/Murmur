@@ -2352,6 +2352,89 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		(contact) => !contactedContactIds.has(contact.id)
 	);
 
+	// --- Write tab visual pacing (UI-only) ---
+	// Backend draft rows can be created faster than the Draft Preview panel "types" them out.
+	// For visual alignment, keep newly-drafted contacts visible in the Contacts list until the
+	// live preview advances past them. This does NOT affect the actual drafting backend logic.
+	const shouldPaceContactsList = view === 'testing';
+	const [visualContactedBaselineIds, setVisualContactedBaselineIds] = useState<Set<number>>(
+		() => new Set(contactedContactIds)
+	);
+	const [visualContactedCompletedIds, setVisualContactedCompletedIds] = useState<Set<number>>(
+		() => new Set()
+	);
+	const wasLivePreviewVisibleRef = useRef(false);
+	const lastLivePreviewContactIdRef = useRef<number | null>(null);
+
+	useEffect(() => {
+		const wasLive = wasLivePreviewVisibleRef.current;
+
+		if (isLivePreviewVisible && !wasLive) {
+			// Batch started: snapshot "already contacted" contacts so we only pace *new* drafts.
+			setVisualContactedBaselineIds(new Set(contactedContactIds));
+			setVisualContactedCompletedIds(new Set());
+			lastLivePreviewContactIdRef.current = null;
+		} else if (!isLivePreviewVisible && wasLive) {
+			// Batch ended/hidden: snap baseline to reality so the list reflects actual state.
+			setVisualContactedBaselineIds(new Set(contactedContactIds));
+			setVisualContactedCompletedIds(new Set());
+			lastLivePreviewContactIdRef.current = null;
+		} else if (!isLivePreviewVisible) {
+			// When no live preview playback is active, keep baseline synced with actual data.
+			setVisualContactedBaselineIds(new Set(contactedContactIds));
+		}
+
+		wasLivePreviewVisibleRef.current = isLivePreviewVisible;
+	}, [contactedContactIds, isLivePreviewVisible]);
+
+	useEffect(() => {
+		if (!isLivePreviewVisible) return;
+
+		const currentId = livePreviewContactId ?? null;
+		const prevId = lastLivePreviewContactIdRef.current;
+
+		// When the preview advances to the next contact, mark the previous one as "completed"
+		// so it can visually leave the Contacts list.
+		if (prevId && currentId && prevId !== currentId) {
+			setVisualContactedCompletedIds((prev) => {
+				if (prev.has(prevId)) return prev;
+				const next = new Set(prev);
+				next.add(prevId);
+				return next;
+			});
+		}
+
+		lastLivePreviewContactIdRef.current = currentId;
+	}, [isLivePreviewVisible, livePreviewContactId]);
+
+	const visualContactedContactIds = useMemo(() => {
+		if (!shouldPaceContactsList) return contactedContactIds;
+		if (!isLivePreviewVisible) return contactedContactIds;
+
+		const ids = new Set<number>(visualContactedBaselineIds);
+		for (const id of visualContactedCompletedIds) ids.add(id);
+		return ids;
+	}, [
+		contactedContactIds,
+		isLivePreviewVisible,
+		shouldPaceContactsList,
+		visualContactedBaselineIds,
+		visualContactedCompletedIds,
+	]);
+
+	const contactsForContactsExpandedList = useMemo(() => {
+		if (!shouldPaceContactsList) return contactsAvailableForDrafting;
+		return (contacts || []).filter((c) => !visualContactedContactIds.has(c.id));
+	}, [contacts, contactsAvailableForDrafting, shouldPaceContactsList, visualContactedContactIds]);
+
+	const activelyDraftingContactIdsForContactsExpandedList = useMemo(() => {
+		if (!shouldPaceContactsList) return activelyDraftingContactIds;
+		// While a newly-drafted contact remains visible for pacing, keep it non-selectable.
+		const ids = new Set<number>(activelyDraftingContactIds);
+		for (const id of contactedContactIds) ids.add(id);
+		return ids;
+	}, [activelyDraftingContactIds, contactedContactIds, shouldPaceContactsList]);
+
 	// Fetch inbound emails for history panel
 	const { data: inboundEmails } = useGetInboundEmails({
 		filters: { campaignId: campaign?.id },
@@ -3442,12 +3525,12 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 															}}
 														>
 															<ContactsExpandedList
-																contacts={contactsAvailableForDrafting}
+																contacts={contactsForContactsExpandedList}
 																isLoading={isContactsLoading}
 																campaign={campaign}
 																enableUsedContactTooltip={view === 'testing'}
 																selectedContactIds={contactsTabSelectedIds}
-																activelyDraftingContactIds={activelyDraftingContactIds}
+																activelyDraftingContactIds={activelyDraftingContactIdsForContactsExpandedList}
 																onContactSelectionChange={(updater) =>
 																	setContactsTabSelectedIds((prev) =>
 																		updater(new Set(prev))
@@ -4422,12 +4505,12 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													}}
 												>
 													<ContactsExpandedList
-														contacts={contactsAvailableForDrafting}
+														contacts={contactsForContactsExpandedList}
 														isLoading={isContactsLoading}
 														campaign={campaign}
 														enableUsedContactTooltip={view === 'testing'}
 														selectedContactIds={contactsTabSelectedIds}
-														activelyDraftingContactIds={activelyDraftingContactIds}
+														activelyDraftingContactIds={activelyDraftingContactIdsForContactsExpandedList}
 														onContactSelectionChange={(updater) =>
 															setContactsTabSelectedIds((prev) => updater(new Set(prev)))
 														}
@@ -4822,12 +4905,12 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										{isNarrowestDesktop && (
 											<div className="mt-[20px] w-full flex justify-center">
 												<ContactsExpandedList
-													contacts={contactsAvailableForDrafting}
+													contacts={contactsForContactsExpandedList}
 													isLoading={isContactsLoading}
 													campaign={campaign}
 													enableUsedContactTooltip={view === 'testing'}
 													selectedContactIds={contactsTabSelectedIds}
-													activelyDraftingContactIds={activelyDraftingContactIds}
+													activelyDraftingContactIds={activelyDraftingContactIdsForContactsExpandedList}
 													onContactSelectionChange={(updater) =>
 														setContactsTabSelectedIds((prev) => updater(new Set(prev)))
 													}
@@ -5201,9 +5284,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													historyActions={historyActions}
 												>
 												<ContactsExpandedList
-													contacts={contactsAvailableForDrafting}
+													contacts={contactsForContactsExpandedList}
 													campaign={campaign}
-													activelyDraftingContactIds={activelyDraftingContactIds}
+													activelyDraftingContactIds={activelyDraftingContactIdsForContactsExpandedList}
 													width={232}
 													height={bottomPanelBoxHeightPx}
 													enableUsedContactTooltip={false}
@@ -5423,9 +5506,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												historyActions={historyActions}
 											>
 												<ContactsExpandedList
-													contacts={contactsAvailableForDrafting}
+													contacts={contactsForContactsExpandedList}
 													campaign={campaign}
-													activelyDraftingContactIds={activelyDraftingContactIds}
+													activelyDraftingContactIds={activelyDraftingContactIdsForContactsExpandedList}
 													width={232}
 													height={bottomPanelBoxHeightPx}
 													enableUsedContactTooltip={false}
@@ -6149,9 +6232,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											historyActions={historyActions}
 										>
 											<ContactsExpandedList
-												contacts={contactsAvailableForDrafting}
+												contacts={contactsForContactsExpandedList}
 												campaign={campaign}
-												activelyDraftingContactIds={activelyDraftingContactIds}
+												activelyDraftingContactIds={activelyDraftingContactIdsForContactsExpandedList}
 												width={232}
 												height={bottomPanelBoxHeightPx}
 												enableUsedContactTooltip={false}
@@ -6271,9 +6354,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										{!isNarrowestDesktop && (
 											<div className="mt-[91px] pb-[8px] flex justify-center gap-[15px]">
 												<ContactsExpandedList
-													contacts={contactsAvailableForDrafting}
+													contacts={contactsForContactsExpandedList}
 													campaign={campaign}
-													activelyDraftingContactIds={activelyDraftingContactIds}
+													activelyDraftingContactIds={activelyDraftingContactIdsForContactsExpandedList}
 													width={232}
 													height={bottomPanelBoxHeightPx}
 													enableUsedContactTooltip={false}
@@ -7543,9 +7626,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										{/* Bottom Panels: Contacts, Drafts, and Sent */}
 										<div className="mt-[91px] pb-[8px] flex justify-center gap-[15px]">
 											<ContactsExpandedList
-												contacts={contactsAvailableForDrafting}
+												contacts={contactsForContactsExpandedList}
 												campaign={campaign}
-												activelyDraftingContactIds={activelyDraftingContactIds}
+												activelyDraftingContactIds={activelyDraftingContactIdsForContactsExpandedList}
 												width={232}
 												height={bottomPanelBoxHeightPx}
 												enableUsedContactTooltip={false}
@@ -7610,9 +7693,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												historyActions={historyActions}
 											>
 												<ContactsExpandedList
-													contacts={contactsAvailableForDrafting}
+													contacts={contactsForContactsExpandedList}
 													campaign={campaign}
-													activelyDraftingContactIds={activelyDraftingContactIds}
+													activelyDraftingContactIds={activelyDraftingContactIdsForContactsExpandedList}
 													width={232}
 													height={bottomPanelBoxHeightPx}
 													enableUsedContactTooltip={false}
@@ -7742,10 +7825,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											)}
 											<div style={{ position: 'relative', zIndex: 20 }}>
 												<ContactsExpandedList
-													contacts={contactsAvailableForDrafting}
+													contacts={contactsForContactsExpandedList}
 													isLoading={isContactsLoading}
 													campaign={campaign}
-													activelyDraftingContactIds={activelyDraftingContactIds}
+													activelyDraftingContactIds={activelyDraftingContactIdsForContactsExpandedList}
 													interactionMode="allTab"
 													selectedContactIds={contactsTabSelectedIds}
 													onContactSelectionChange={(updater) =>
@@ -8403,10 +8486,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											)}
 											<div style={{ position: 'relative', zIndex: 20 }}>
 												<ContactsExpandedList
-													contacts={contactsAvailableForDrafting}
+													contacts={contactsForContactsExpandedList}
 													isLoading={isContactsLoading}
 													campaign={campaign}
-													activelyDraftingContactIds={activelyDraftingContactIds}
+													activelyDraftingContactIds={activelyDraftingContactIdsForContactsExpandedList}
 													interactionMode="allTab"
 													selectedContactIds={contactsTabSelectedIds}
 													onContactSelectionChange={(updater) =>

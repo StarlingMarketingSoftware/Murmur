@@ -2,11 +2,20 @@ export const fetchOpenRouter = async (
 	model: string,
 	prompt: string,
 	content: string,
-	options?: { timeoutMs?: number; temperature?: number }
+	options?: { timeoutMs?: number; temperature?: number; signal?: AbortSignal }
 ): Promise<string> => {
 	const controller = new AbortController();
 	const timeoutMs = options?.timeoutMs ?? 30000; // 30s default timeout for OpenRouter
 	const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+	const externalSignal = options?.signal;
+	const onExternalAbort = () => controller.abort();
+	if (externalSignal) {
+		if (externalSignal.aborted) {
+			controller.abort();
+		} else {
+			externalSignal.addEventListener('abort', onExternalAbort, { once: true });
+		}
+	}
 	const apiKey = process.env.OPENROUTER_API_KEY;
 	if (!apiKey) {
 		throw new Error('OPENROUTER_API_KEY environment variable is not set');
@@ -61,7 +70,15 @@ export const fetchOpenRouter = async (
 				res?.message ||
 				(raw ? raw.slice(0, 500) : null) ||
 				'OpenRouter request failed';
-			throw new Error(msg);
+			const statusCode = response.status;
+			const error = new Error(msg) as Error & { code?: string; status?: number };
+			error.status = statusCode;
+			if (statusCode === 429) {
+				error.code = 'rate_limited';
+			} else if (statusCode >= 500) {
+				error.code = 'upstream';
+			}
+			throw error;
 		}
 
 		const choice0 = res?.choices?.[0];
@@ -129,7 +146,32 @@ export const fetchOpenRouter = async (
 		}
 
 		return messageText;
+	} catch (error) {
+		// Respect caller cancellations so upstream orchestration can halt quickly.
+		if (externalSignal?.aborted) {
+			throw new Error('Request cancelled.');
+		}
+		if (error instanceof Error && error.name === 'AbortError') {
+			const timeoutError = new Error('OpenRouter request timed out') as Error & {
+				code?: string;
+				status?: number;
+			};
+			timeoutError.name = 'AbortError';
+			timeoutError.code = 'timeout';
+			throw timeoutError;
+		}
+		if (error instanceof TypeError) {
+			const networkError = new Error(error.message || 'Network error') as Error & {
+				code?: string;
+			};
+			networkError.code = 'network';
+			throw networkError;
+		}
+		throw error;
 	} finally {
 		clearTimeout(timeoutId);
+		if (externalSignal) {
+			externalSignal.removeEventListener('abort', onExternalAbort);
+		}
 	}
 };
