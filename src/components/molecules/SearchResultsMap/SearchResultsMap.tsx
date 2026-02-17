@@ -1194,6 +1194,50 @@ const MAPBOX_LAYER_IDS = {
 	selectionRectLine: 'murmur-selection-rect-line',
 } as const;
 
+// --- Dot reveal animation (search results) ---
+// Compute a per-dot reveal delay (ms) based on longitude so dots fade in as a smooth left→right wave.
+// We drive the animation by updating a single paint expression over time.
+const DOT_WAVE_DELAY_PROP = '__murmurWaveDelayMs';
+const DOT_WAVE_TRAVEL_MS_MIN = 650;
+const DOT_WAVE_TRAVEL_MS_MAX = 1150;
+// Each dot fades up over this duration once the wave reaches it.
+const DOT_WAVE_FADE_MS = 420;
+// Tiny deterministic jitter breaks up "curtain" columns while keeping the wave direction.
+const DOT_WAVE_JITTER_MS = 70;
+// Throttle paint updates (~60fps) for smoothness.
+const DOT_WAVE_FRAME_MS = 16;
+
+type DotWaveMeta = {
+	maxDelayMs: number;
+};
+
+const computeDotWaveTravelMs = (featureCount: number): number => {
+	if (!Number.isFinite(featureCount) || featureCount <= 0) return DOT_WAVE_TRAVEL_MS_MIN;
+	const raw = 620 + Math.sqrt(featureCount) * 18;
+	return clamp(Math.round(raw), DOT_WAVE_TRAVEL_MS_MIN, DOT_WAVE_TRAVEL_MS_MAX);
+};
+
+const computeDotWaveDelayMs = (
+	featureId: number,
+	lng: number,
+	minLng: number,
+	maxLng: number,
+	travelMs: number
+): number => {
+	const denom = maxLng - minLng;
+	const t =
+		!Number.isFinite(denom) || denom <= 1e-9
+			? 0
+			: clamp((lng - minLng) / denom, 0, 1);
+
+	// Deterministic tiny jitter (0..DOT_WAVE_JITTER_MS) so dots don't all pop as vertical stripes.
+	// Knuth multiplicative hash; stable for numeric ids.
+	const h = (featureId * 2654435761) >>> 0;
+	const jitter = DOT_WAVE_JITTER_MS > 0 ? h % (DOT_WAVE_JITTER_MS + 1) : 0;
+
+	return t * travelMs + jitter;
+};
+
 type BasemapCartographyClipState = {
 	layerIds: string[];
 	originalFilters: Map<string, any | null>;
@@ -1759,6 +1803,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	// cinematic timing instead of the default quick auto-fit.
 	const pendingSearchQueryCinematicRef = useRef<{ key: string; at: number } | null>(null);
 	const isLoadingRef = useRef<boolean>(false);
+	// Keep `isLoadingRef` synced during render so async Mapbox handlers can read it immediately.
+	isLoadingRef.current = isLoading ?? false;
 	// When a user clicks a state (to trigger a search + cinematic zoom), we suppress state-hover
 	// highlights while the camera is easing so other states don't flash "hovered" under the cursor.
 	const stateClickZoomInFlightRef = useRef(false);
@@ -2506,10 +2552,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		onStateSelectRef.current = onStateSelect ?? null;
 	}, [onStateSelect]);
 
-	useEffect(() => {
-		isLoadingRef.current = isLoading ?? false;
-	}, [isLoading]);
-
 	// If a hovered marker is removed due to viewport sampling, clear hover state
 	// to avoid the UI getting "stuck" on a now-nonexistent marker.
 	useEffect(() => {
@@ -3132,13 +3174,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			['linear'],
 			['zoom'],
 			MAP_MIN_ZOOM,
-			['case', isStateSelectedExpr, 2.0, 0.7],
+			// Selected state should be only subtly emphasized.
+			['case', isStateSelectedExpr, 1.2, 0.7],
 			5,
-			['case', isStateSelectedExpr, 2.2, 0.85],
+			['case', isStateSelectedExpr, 1.4, 0.85],
 			9,
-			['case', isStateSelectedExpr, 2.2, 0.85],
+			['case', isStateSelectedExpr, 1.4, 0.85],
 			14,
-			['case', isStateSelectedExpr, 2.0, 0.6],
+			['case', isStateSelectedExpr, 1.2, 0.6],
 		];
 		const stateInteractiveBorderOpacityExpr = [
 			'interpolate',
@@ -3158,11 +3201,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			['linear'],
 			['zoom'],
 			MAP_MIN_ZOOM,
-			['case', isStateSelectedExpr, '#000000', '#94A3B8'],
+			['case', isStateSelectedExpr, '#8896AB', '#94A3B8'],
 			6,
-			['case', isStateSelectedExpr, '#000000', '#94A3B8'],
+			['case', isStateSelectedExpr, '#8896AB', '#94A3B8'],
 			14,
-			['case', isStateSelectedExpr, '#000000', STATE_BORDER_COLOR],
+			['case', isStateSelectedExpr, '#C3CED3', STATE_BORDER_COLOR],
 		];
 
 		ensureLayer({
@@ -3235,19 +3278,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			},
 		});
 
-		// Outlines (results + locked state)
-		ensureLayer({
-			id: MAPBOX_LAYER_IDS.resultsOutline,
-			type: 'line',
-			source: MAPBOX_SOURCE_IDS.resultsOutline,
-			paint: { 'line-color': '#1277E1', 'line-opacity': 1, 'line-width': 2 },
-		});
-		ensureLayer({
-			id: MAPBOX_LAYER_IDS.lockedOutline,
-			type: 'line',
-			source: MAPBOX_SOURCE_IDS.lockedOutline,
-			paint: { 'line-color': '#000000', 'line-opacity': 1, 'line-width': 3 },
-		});
+		// Search-results outlines (blue + black) intentionally removed.
 
 		// All-contacts overlay (gray dots) — lowest marker priority
 		ensureLayer({
@@ -4245,6 +4276,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const recomputeViewportDots = useCallback(
 		(mapInstance: mapboxgl.Map | null) => {
 			if (!mapInstance) return;
+			// Preserve currently-rendered markers while results are loading/refetching.
+			// The dashboard parent can momentarily pass `contacts=[]` during refetch; if we sample
+			// against that, we end up clearing and then repopulating the marker sources (visible flicker).
+			if (isLoadingRef.current) return;
 
 			const bounds = mapInstance.getBounds();
 			if (!bounds) return;
@@ -6068,6 +6103,13 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 	const promotionPinIdsRef = useRef<Set<number>>(new Set());
 	const promotionDotIdsRef = useRef<Set<number>>(new Set());
+	const baseDotsWaveMetaRef = useRef<DotWaveMeta | null>(null);
+	const baseDotsWaveCancelRef = useRef<(() => void) | null>(null);
+	const baseDotsWavePrevIsLoadingRef = useRef<boolean>(false);
+	// Track the query key for which a wave should run (set when a *new* search starts loading).
+	const baseDotsWavePendingSearchKeyRef = useRef<string | null>(null);
+	// Tracks the last query key that actually played the base-dot wave animation.
+	const baseDotsWaveLastSearchKeyRef = useRef<string>('');
 
 	// Base result dots
 	useEffect(() => {
@@ -6078,7 +6120,13 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		if (!source) return;
 
 		if (isLoading) {
-			source.setData({ type: 'FeatureCollection', features: [] } as any);
+			// Stop any in-flight reveal animation while loading/refetching.
+			if (baseDotsWaveCancelRef.current) {
+				baseDotsWaveCancelRef.current();
+				baseDotsWaveCancelRef.current = null;
+			}
+			baseDotsWaveMetaRef.current = null;
+			// Keep currently-rendered dots visible during refetches to avoid zoom flicker.
 			return;
 		}
 
@@ -6086,25 +6134,96 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			lockedStateKey && lockedStateSelectionKeyRef.current === lockedStateKey
 		);
 
-		const features: any[] = [];
+		type DotSeed = { id: number; lng: number; lat: number; fillColor: string };
+		const dots: DotSeed[] = [];
+		let minLng = Number.POSITIVE_INFINITY;
+		let maxLng = Number.NEGATIVE_INFINITY;
+
 		for (const contact of visibleContacts) {
 			const coords = getContactCoords(contact);
 			if (!coords) continue;
 			const isOutsideLockedState = hasLockedStateSelection
 				? !isCoordsInLockedState(coords)
 				: false;
-			features.push({
-				type: 'Feature',
-				id: contact.id,
-				properties: {
-					fillColor: isOutsideLockedState
-						? outsideDefaultDotFillColor
-						: defaultDotFillColor,
-				},
-				geometry: { type: 'Point', coordinates: [coords.lng, coords.lat] },
-			});
+			const fillColor = isOutsideLockedState
+				? outsideDefaultDotFillColor
+				: defaultDotFillColor;
+			dots.push({ id: contact.id, lng: coords.lng, lat: coords.lat, fillColor });
+			minLng = Math.min(minLng, coords.lng);
+			maxLng = Math.max(maxLng, coords.lng);
 		}
 
+		const travelMs = computeDotWaveTravelMs(dots.length);
+		let maxDelayMs = 0;
+		const features: any[] = dots.map((dot) => {
+			const delayMs = computeDotWaveDelayMs(dot.id, dot.lng, minLng, maxLng, travelMs);
+			maxDelayMs = Math.max(maxDelayMs, delayMs);
+			return {
+				type: 'Feature',
+				id: dot.id,
+				properties: {
+					fillColor: dot.fillColor,
+					[DOT_WAVE_DELAY_PROP]: delayMs,
+				},
+				geometry: { type: 'Point', coordinates: [dot.lng, dot.lat] },
+			};
+		});
+
+		baseDotsWaveMetaRef.current = features.length > 0 ? { maxDelayMs } : null;
+
+		// Prevent "show -> hide -> reveal" flicker: if the wave reveal is about to start
+		// on this render, pre-prime frame 0 before updating source data so dots don't
+		// flash visible for one frame and then disappear.
+		let prefersReducedMotion = false;
+		try {
+			prefersReducedMotion =
+				typeof window !== 'undefined' &&
+				typeof window.matchMedia === 'function' &&
+				window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+		} catch {
+			prefersReducedMotion = false;
+		}
+		const searchKey = (searchQuery ?? '').trim();
+		const shouldPrimeWaveFrameZero =
+			baseDotsWavePrevIsLoadingRef.current &&
+			searchKey.length > 0 &&
+			!isBackgroundPresentation &&
+			!prefersReducedMotion &&
+			baseDotsWavePendingSearchKeyRef.current === searchKey &&
+			features.length > 0;
+		if (shouldPrimeWaveFrameZero) {
+			const expr0 = [
+				'interpolate',
+				['linear'],
+				['-', 0, ['coalesce', ['get', DOT_WAVE_DELAY_PROP], 0]],
+				0,
+				0,
+				DOT_WAVE_FADE_MS,
+				1,
+			] as any;
+			try {
+				if (map.getLayer(MAPBOX_LAYER_IDS.baseDots)) {
+					(map as any).setPaintProperty(MAPBOX_LAYER_IDS.baseDots, 'circle-opacity', expr0);
+					(map as any).setPaintProperty(
+						MAPBOX_LAYER_IDS.baseDots,
+						'circle-stroke-opacity',
+						expr0
+					);
+				}
+			} catch {
+				// Ignore.
+			}
+			try {
+				if (map.getLayer(MAPBOX_LAYER_IDS.baseHit)) {
+					map.setFilter(
+						MAPBOX_LAYER_IDS.baseHit,
+						['<=', ['coalesce', ['get', DOT_WAVE_DELAY_PROP], 0], -1] as any
+					);
+				}
+			} catch {
+				// Ignore.
+			}
+		}
 		source.setData({ type: 'FeatureCollection', features } as any);
 	}, [
 		map,
@@ -6117,7 +6236,208 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		lockedStateKey,
 		isStateLayerReady,
 		isCoordsInLockedState,
+		searchQuery,
+		isBackgroundPresentation,
 	]);
+
+	// Wave reveal for base dots on each completed search (left → right).
+	useEffect(() => {
+		if (!map || !isMapLoaded) return;
+
+		const safeSetFilter = (layerId: string, filter: any) => {
+			try {
+				if (!map.getLayer(layerId)) return;
+				map.setFilter(layerId, filter);
+			} catch {
+				// Ignore.
+			}
+		};
+		const safeClearFilter = (layerId: string) => {
+			try {
+				if (!map.getLayer(layerId)) return;
+				map.setFilter(layerId, null as any);
+			} catch {
+				// Ignore.
+			}
+		};
+		const safeSetPaint = (layerId: string, prop: string, value: any) => {
+			try {
+				if (!map.getLayer(layerId)) return;
+				// Mapbox types are a strict union of paint keys; we intentionally set a small dynamic set.
+				(map as any).setPaintProperty(layerId, prop, value);
+			} catch {
+				// Ignore.
+			}
+		};
+
+		const stopRunningWave = () => {
+			if (baseDotsWaveCancelRef.current) {
+				baseDotsWaveCancelRef.current();
+				baseDotsWaveCancelRef.current = null;
+			}
+		};
+
+		const restoreBaseDotsRendering = () => {
+			// Reset base dots to normal rendering (no animated expression).
+			// IMPORTANT: set transitions *before* opacity to avoid a visible "pulse" at the end
+			// of the wave when Mapbox applies the previous transition settings for one frame.
+			const instant = { duration: 0, delay: 0 } as any;
+			safeSetPaint(MAPBOX_LAYER_IDS.baseDots, 'circle-opacity-transition', instant);
+			safeSetPaint(MAPBOX_LAYER_IDS.baseDots, 'circle-stroke-opacity-transition', instant);
+			safeSetPaint(MAPBOX_LAYER_IDS.baseDots, 'circle-opacity', 1);
+			safeSetPaint(MAPBOX_LAYER_IDS.baseDots, 'circle-stroke-opacity', 1);
+			safeClearFilter(MAPBOX_LAYER_IDS.baseHit);
+		};
+
+		const loading = Boolean(isLoading);
+		const searchKey = (searchQuery ?? '').trim();
+		const isSearchMode = searchKey.length > 0;
+		const prevLoading = baseDotsWavePrevIsLoadingRef.current;
+		const isNewSearchKey =
+			isSearchMode && baseDotsWaveLastSearchKeyRef.current !== searchKey;
+
+		let prefersReducedMotion = false;
+		try {
+			prefersReducedMotion =
+				typeof window !== 'undefined' &&
+				typeof window.matchMedia === 'function' &&
+				window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+		} catch {
+			prefersReducedMotion = false;
+		}
+
+		// During loading (or in decorative mode), keep everything stable and avoid running reveal.
+		if (loading || isBackgroundPresentation || !isSearchMode || prefersReducedMotion) {
+			// Only schedule a wave when a *new* search actually enters a loading state.
+			// This prevents zoom/viewport refetches from triggering a full hide→reveal cycle.
+			if (loading && isNewSearchKey) {
+				baseDotsWavePendingSearchKeyRef.current = searchKey;
+			}
+
+			stopRunningWave();
+			restoreBaseDotsRendering();
+			baseDotsWavePrevIsLoadingRef.current = loading;
+			// When not in search mode, allow future searches to animate again.
+			if (!isSearchMode) {
+				baseDotsWaveLastSearchKeyRef.current = '';
+				baseDotsWavePendingSearchKeyRef.current = null;
+			} else if (!loading && baseDotsWavePendingSearchKeyRef.current === searchKey) {
+				// If we decided not to animate for this search (decorative mode / reduced motion),
+				// mark it as handled so it doesn't unexpectedly animate later.
+				baseDotsWaveLastSearchKeyRef.current = searchKey;
+				baseDotsWavePendingSearchKeyRef.current = null;
+			}
+			return;
+		}
+
+		const shouldStartWave =
+			prevLoading &&
+			!loading &&
+			baseDotsWavePendingSearchKeyRef.current === searchKey;
+		baseDotsWavePrevIsLoadingRef.current = loading;
+
+		if (!shouldStartWave) return;
+
+		stopRunningWave();
+
+		const meta = baseDotsWaveMetaRef.current;
+		if (!meta || !Number.isFinite(meta.maxDelayMs) || meta.maxDelayMs <= 0) {
+			restoreBaseDotsRendering();
+			baseDotsWaveLastSearchKeyRef.current = searchKey;
+			baseDotsWavePendingSearchKeyRef.current = null;
+			return;
+		}
+		baseDotsWaveLastSearchKeyRef.current = searchKey;
+		baseDotsWavePendingSearchKeyRef.current = null;
+
+		// Temporarily enable smooth transitions between our throttled updates.
+		safeSetPaint(
+			MAPBOX_LAYER_IDS.baseDots,
+			'circle-opacity-transition',
+			{ duration: DOT_WAVE_FRAME_MS, delay: 0 } as any
+		);
+		safeSetPaint(
+			MAPBOX_LAYER_IDS.baseDots,
+			'circle-stroke-opacity-transition',
+			{ duration: DOT_WAVE_FRAME_MS, delay: 0 } as any
+		);
+
+		const buildOpacityExpr = (nowMs: number) => {
+			return [
+				'interpolate',
+				['linear'],
+				['-', nowMs, ['coalesce', ['get', DOT_WAVE_DELAY_PROP], 0]],
+				0,
+				0,
+				DOT_WAVE_FADE_MS,
+				1,
+			] as any;
+		};
+
+		// Start non-interactive; we'll enable hits as the wave reaches dots.
+		safeSetFilter(
+			MAPBOX_LAYER_IDS.baseHit,
+			['<=', ['coalesce', ['get', DOT_WAVE_DELAY_PROP], 0], -1] as any
+		);
+
+		let cancelled = false;
+		let rafId: number | null = null;
+		let lastPaintUpdateAt = -Infinity;
+		let lastHitUpdateAt = -Infinity;
+		const start = performance.now();
+		const totalMs = meta.maxDelayMs + DOT_WAVE_FADE_MS + 120;
+
+		const cancel = () => {
+			cancelled = true;
+			if (rafId != null) cancelAnimationFrame(rafId);
+			rafId = null;
+		};
+
+		const tick = () => {
+			if (cancelled) return;
+			const now = performance.now();
+			const t = now - start;
+
+			if (t - lastPaintUpdateAt >= DOT_WAVE_FRAME_MS) {
+				const expr = buildOpacityExpr(t);
+				safeSetPaint(MAPBOX_LAYER_IDS.baseDots, 'circle-opacity', expr);
+				safeSetPaint(MAPBOX_LAYER_IDS.baseDots, 'circle-stroke-opacity', expr);
+				lastPaintUpdateAt = t;
+			}
+
+			// Don't churn filters at 60fps; updating every ~90ms is plenty for hit gating.
+			if (t - lastHitUpdateAt >= 90) {
+				safeSetFilter(
+					MAPBOX_LAYER_IDS.baseHit,
+					['<=', ['coalesce', ['get', DOT_WAVE_DELAY_PROP], 0], t] as any
+				);
+				lastHitUpdateAt = t;
+			}
+
+			if (t < totalMs) {
+				rafId = requestAnimationFrame(tick);
+				return;
+			}
+
+			// Finished: restore normal rendering and full interactivity.
+			restoreBaseDotsRendering();
+			cancel();
+			if (baseDotsWaveCancelRef.current === cancel) baseDotsWaveCancelRef.current = null;
+		};
+		baseDotsWaveCancelRef.current = cancel;
+
+		// Prime frame 0 (all hidden) before the first rAF callback.
+		const expr0 = buildOpacityExpr(0);
+		safeSetPaint(MAPBOX_LAYER_IDS.baseDots, 'circle-opacity', expr0);
+		safeSetPaint(MAPBOX_LAYER_IDS.baseDots, 'circle-stroke-opacity', expr0);
+
+		rafId = requestAnimationFrame(tick);
+
+		return () => {
+			cancel();
+			if (baseDotsWaveCancelRef.current === cancel) baseDotsWaveCancelRef.current = null;
+		};
+	}, [map, isMapLoaded, isLoading, isBackgroundPresentation, searchQuery]);
 
 	// All-contacts overlay (gray dots)
 	useEffect(() => {
@@ -6128,7 +6448,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		if (!source) return;
 
 		if (isLoading) {
-			source.setData({ type: 'FeatureCollection', features: [] } as any);
+			// Preserve existing overlay dots while parent data is refetching.
 			return;
 		}
 
@@ -6165,10 +6485,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		if (!dotSource || !pinSource) return;
 
 		if (isLoading) {
-			dotSource.setData({ type: 'FeatureCollection', features: [] } as any);
-			pinSource.setData({ type: 'FeatureCollection', features: [] } as any);
-			promotionDotIdsRef.current = new Set();
-			promotionPinIdsRef.current = new Set();
+			// Preserve existing promotion markers while parent data is refetching.
 			return;
 		}
 
@@ -6280,7 +6597,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		if (!source) return;
 
 		if (isLoading) {
-			source.setData({ type: 'FeatureCollection', features: [] } as any);
+			// Preserve existing booking markers while parent data is refetching.
 			return;
 		}
 
