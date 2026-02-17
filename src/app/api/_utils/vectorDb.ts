@@ -336,6 +336,75 @@ export type QueryJson = {
 	restOfQuery: string;
 };
 
+export type SearchSimilarContactsOptions = {
+	penaltyCities?: string[];
+	forceCityExactCity?: string;
+	forceStateAny?: string[];
+	forceCityAny?: string[];
+	penaltyTerms?: string[];
+	strictPenalty?: boolean;
+};
+
+type WasmScoringHitInput = {
+	id: string;
+	score: number;
+	city: string | null;
+	state: string | null;
+	country: string | null;
+	headline: string | null;
+	title: string | null;
+	company: string | null;
+};
+
+type WasmScoringConfig = {
+	query_city: string | null;
+	query_state: string | null;
+	query_country: string | null;
+	exact_boost: number;
+	fuzzy_boost: number;
+	skip_boosts: boolean;
+	penalty_cities: string[];
+	penalty_terms: string[];
+	strict_penalty: boolean;
+	limit: number;
+};
+
+type WasmScoringOutput = {
+	id: string;
+	score: number;
+};
+
+type WasmScoreHitsFunction = (
+	hits: WasmScoringHitInput[],
+	config: WasmScoringConfig
+) => WasmScoringOutput[];
+
+let wasmScoreHitsPromise: Promise<WasmScoreHitsFunction | null> | null = null;
+
+const getWasmScoreHitsFunction = async (): Promise<WasmScoreHitsFunction | null> => {
+	if (process.env.USE_WASM_SCORER !== 'true') return null;
+	if (!wasmScoreHitsPromise) {
+		wasmScoreHitsPromise = import('../../../../rust-scorer/pkg-node')
+			.catch(() => import('../../../../rust-scorer/pkg'))
+			.then((module) => {
+				const maybeScoreHits =
+					(module as { score_hits?: unknown }).score_hits ||
+					(module as { default?: { score_hits?: unknown } }).default?.score_hits;
+				if (typeof maybeScoreHits !== 'function') {
+					console.error('[vectorDb] score_hits export missing from rust-scorer pkg');
+					return null;
+				}
+				return maybeScoreHits as WasmScoreHitsFunction;
+			})
+			.catch((error: unknown) => {
+				console.error('[vectorDb] failed to load WASM scorer, using TypeScript fallback', error);
+				return null;
+			});
+	}
+
+	return wasmScoreHitsPromise;
+};
+
 export const normalizeQueryEmbeddingKey = (input: string): string => {
 	return input.toLowerCase().trim().replace(/\s+/g, ' ');
 };
@@ -398,14 +467,7 @@ export const searchSimilarContacts = async (
 	queryJson: QueryJson,
 	limit: number = 10,
 	locationStrategy: 'strict' | 'flexible' | 'broad' = 'flexible',
-	options?: {
-		penaltyCities?: string[];
-		forceCityExactCity?: string;
-		forceStateAny?: string[];
-		forceCityAny?: string[];
-		penaltyTerms?: string[];
-		strictPenalty?: boolean;
-	}
+	options?: SearchSimilarContactsOptions
 ) => {
 	const normalizedQueryEmbeddingKey = normalizeQueryEmbeddingKey(queryJson.restOfQuery);
 	const shouldUseQueryEmbeddingCache = normalizedQueryEmbeddingKey.length > 0;
@@ -529,7 +591,7 @@ export const searchSimilarContacts = async (
 	});
 
 	// Post-process results with optional location boosts and institutional penalties
-	const processResultsWithLocationBoost = (
+	const processResultsWithLocationBoostTs = (
 		hits: estypes.SearchHit[]
 	): estypes.SearchHit[] => {
 		const skipBoosts = locationStrategy === 'strict' || boosts.exact === 0;
@@ -610,7 +672,72 @@ export const searchSimilarContacts = async (
 			.slice(0, limit); // Apply final limit
 	};
 
-	const processedHits = processResultsWithLocationBoost(results.hits.hits);
+	const getFieldValueAsString = (
+		hit: estypes.SearchHit,
+		fieldName: string
+	): string | null => {
+		const fields = hit.fields as Record<string, Array<unknown> | undefined> | undefined;
+		const value = fields?.[fieldName]?.[0];
+		return value === undefined || value === null ? null : String(value);
+	};
+
+	const processResultsWithLocationBoost = async (
+		hits: estypes.SearchHit[]
+	): Promise<estypes.SearchHit[]> => {
+		const scoreHits = await getWasmScoreHitsFunction();
+		if (!scoreHits) {
+			return processResultsWithLocationBoostTs(hits);
+		}
+
+		const serializedHits: WasmScoringHitInput[] = hits.map((hit, index) => ({
+			id: String(hit._id ?? `missing-id-${index}`),
+			score: hit._score || 0,
+			city: getFieldValueAsString(hit, 'city'),
+			state: getFieldValueAsString(hit, 'state'),
+			country: getFieldValueAsString(hit, 'country'),
+			headline: getFieldValueAsString(hit, 'headline'),
+			title: getFieldValueAsString(hit, 'title'),
+			company: getFieldValueAsString(hit, 'company'),
+		}));
+
+		const hitById = new Map<string, estypes.SearchHit>();
+		serializedHits.forEach((serializedHit, index) => {
+			hitById.set(serializedHit.id, hits[index]);
+		});
+
+		try {
+			const wasmScoredHits = scoreHits(serializedHits, {
+				query_city: queryJson.city,
+				query_state: queryJson.state,
+				query_country: queryJson.country,
+				exact_boost: boosts.exact,
+				fuzzy_boost: boosts.fuzzy,
+				skip_boosts: locationStrategy === 'strict' || boosts.exact === 0,
+				penalty_cities: options?.penaltyCities || [],
+				penalty_terms: options?.penaltyTerms || [],
+				strict_penalty: Boolean(options?.strictPenalty),
+				limit,
+			});
+
+			const reconstructedHits: estypes.SearchHit[] = [];
+			for (const scoredHit of wasmScoredHits) {
+				const originalHit = hitById.get(scoredHit.id);
+				if (!originalHit) continue;
+
+				reconstructedHits.push({
+					...originalHit,
+					_score: scoredHit.score,
+				});
+			}
+
+			return reconstructedHits;
+		} catch (error) {
+			console.error('[vectorDb] WASM scoring failed, using TypeScript fallback', error);
+			return processResultsWithLocationBoostTs(hits);
+		}
+	};
+
+	const processedHits = await processResultsWithLocationBoost(results.hits.hits);
 
 	return {
 		matches: processedHits.map((hit) => ({

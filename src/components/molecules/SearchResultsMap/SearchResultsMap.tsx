@@ -268,6 +268,106 @@ const jitterDuplicateCoords = (base: LatLngLiteral, index: number): LatLngLitera
 
 const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n));
 
+type WasmGeoModule = {
+	lat_lng_to_world_pixel: (
+		lat: number,
+		lng: number,
+		worldSize: number
+	) => Float64Array | ArrayLike<number>;
+	distance_point_to_segment_sq: (
+		px: number,
+		py: number,
+		ax: number,
+		ay: number,
+		bx: number,
+		by: number
+	) => number;
+	point_in_ring: (px: number, py: number, ring: Float64Array) => boolean;
+	is_point_near_segments: (
+		x: number,
+		y: number,
+		segments: Float64Array,
+		thresholdPx: number
+	) => boolean;
+	batch_lat_lng_to_world_pixel: (
+		coords: Float64Array,
+		worldSize: number
+	) => Float64Array | ArrayLike<number>;
+};
+
+const USE_WASM_GEO = process.env.NEXT_PUBLIC_USE_WASM_GEO === 'true';
+
+let cachedWasmGeoModule: WasmGeoModule | null = null;
+let wasmGeoModulePromise: Promise<WasmGeoModule | null> | null = null;
+let hasLoggedWasmGeoLoadError = false;
+let hasLoggedWasmGeoRuntimeError = false;
+
+const logWasmGeoLoadError = (error: unknown): void => {
+	if (hasLoggedWasmGeoLoadError) return;
+	hasLoggedWasmGeoLoadError = true;
+	console.error(
+		'[SearchResultsMap] failed to load WASM geo module, using TypeScript fallback',
+		error
+	);
+};
+
+const logWasmGeoRuntimeError = (error: unknown): void => {
+	if (hasLoggedWasmGeoRuntimeError) return;
+	hasLoggedWasmGeoRuntimeError = true;
+	console.error('[SearchResultsMap] WASM geo call failed, using TypeScript fallback', error);
+};
+
+const toFloat64Array = (value: Float64Array | ArrayLike<number>): Float64Array =>
+	value instanceof Float64Array ? value : Float64Array.from(value);
+
+const getWasmGeoModuleSync = (): WasmGeoModule | null => cachedWasmGeoModule;
+
+const ensureWasmGeoModuleLoaded = async (): Promise<WasmGeoModule | null> => {
+	if (!USE_WASM_GEO) return null;
+	if (cachedWasmGeoModule) return cachedWasmGeoModule;
+
+	if (!wasmGeoModulePromise) {
+		wasmGeoModulePromise = import('../../../../rust-scorer/pkg-web')
+			.then((module) => {
+				const maybeModule = (
+					((module as { default?: unknown }).default ?? module) as Partial<WasmGeoModule>
+				);
+				if (
+					typeof maybeModule.lat_lng_to_world_pixel !== 'function' ||
+					typeof maybeModule.distance_point_to_segment_sq !== 'function' ||
+					typeof maybeModule.point_in_ring !== 'function' ||
+					typeof maybeModule.is_point_near_segments !== 'function' ||
+					typeof maybeModule.batch_lat_lng_to_world_pixel !== 'function'
+				) {
+					return null;
+				}
+				cachedWasmGeoModule = maybeModule as WasmGeoModule;
+				return cachedWasmGeoModule;
+			})
+			.catch((error: unknown) => {
+				logWasmGeoLoadError(error);
+				return null;
+			});
+	}
+
+	return wasmGeoModulePromise;
+};
+
+const ringFlatCache = new WeakMap<ClippingRing, Float64Array>();
+
+const flattenRing = (ring: ClippingRing): Float64Array => {
+	const cached = ringFlatCache.get(ring);
+	if (cached) return cached;
+	const flat = new Float64Array(ring.length * 2);
+	for (let i = 0; i < ring.length; i++) {
+		const [x, y] = ring[i];
+		flat[i * 2] = x;
+		flat[i * 2 + 1] = y;
+	}
+	ringFlatCache.set(ring, flat);
+	return flat;
+};
+
 const getClientPointFromDomEvent = (
 	domEvent: unknown
 ): { x: number; y: number } | null => {
@@ -495,16 +595,86 @@ type WorldSegment = {
 	maxY: number;
 };
 
+const worldSegmentsFlatCache = new WeakMap<WorldSegment[], Float64Array>();
+
+const flattenWorldSegments = (segments: WorldSegment[]): Float64Array => {
+	const cached = worldSegmentsFlatCache.get(segments);
+	if (cached) return cached;
+	const flat = new Float64Array(segments.length * 8);
+	for (let i = 0; i < segments.length; i++) {
+		const s = segments[i];
+		const baseIdx = i * 8;
+		flat[baseIdx] = s.ax;
+		flat[baseIdx + 1] = s.ay;
+		flat[baseIdx + 2] = s.bx;
+		flat[baseIdx + 3] = s.by;
+		flat[baseIdx + 4] = s.minX;
+		flat[baseIdx + 5] = s.maxX;
+		flat[baseIdx + 6] = s.minY;
+		flat[baseIdx + 7] = s.maxY;
+	}
+	worldSegmentsFlatCache.set(segments, flat);
+	return flat;
+};
+
 const latLngToWorldPixel = (
 	coords: LatLngLiteral,
 	worldSize: number
 ): { x: number; y: number } => {
+	const wasmGeo = getWasmGeoModuleSync();
+	if (wasmGeo) {
+		try {
+			const projected = toFloat64Array(
+				wasmGeo.lat_lng_to_world_pixel(coords.lat, coords.lng, worldSize)
+			);
+			if (projected.length >= 2) {
+				const x = projected[0];
+				const y = projected[1];
+				if (Number.isFinite(x) && Number.isFinite(y)) return { x, y };
+			}
+		} catch (error: unknown) {
+			logWasmGeoRuntimeError(error);
+		}
+	}
+
 	// Web Mercator world pixel coords at the current zoom.
 	const latClamped = clamp(coords.lat, -85, 85);
 	const siny = Math.sin((latClamped * Math.PI) / 180);
 	const x = ((coords.lng + 180) / 360) * worldSize;
 	const y = (0.5 - Math.log((1 + siny) / (1 - siny)) / (4 * Math.PI)) * worldSize;
 	return { x, y };
+};
+
+const batchLatLngToWorldPixels = (
+	coordsList: LatLngLiteral[],
+	worldSize: number
+): Array<{ x: number; y: number }> => {
+	if (coordsList.length === 0) return [];
+
+	const wasmGeo = getWasmGeoModuleSync();
+	if (wasmGeo) {
+		const flat = new Float64Array(coordsList.length * 2);
+		for (let i = 0; i < coordsList.length; i++) {
+			const coords = coordsList[i];
+			flat[i * 2] = coords.lat;
+			flat[i * 2 + 1] = coords.lng;
+		}
+
+		try {
+			const projected = toFloat64Array(wasmGeo.batch_lat_lng_to_world_pixel(flat, worldSize));
+			if (projected.length >= coordsList.length * 2) {
+				const out = new Array<{ x: number; y: number }>(coordsList.length);
+				for (let i = 0; i < coordsList.length; i++) {
+					out[i] = { x: projected[i * 2], y: projected[i * 2 + 1] };
+				}
+				return out;
+			}
+		} catch (error: unknown) {
+			logWasmGeoRuntimeError(error);
+		}
+	}
+
+	return coordsList.map((coords) => latLngToWorldPixel(coords, worldSize));
 };
 
 const distancePointToSegmentSq = (
@@ -515,6 +685,16 @@ const distancePointToSegmentSq = (
 	bx: number,
 	by: number
 ): number => {
+	const wasmGeo = getWasmGeoModuleSync();
+	if (wasmGeo) {
+		try {
+			const distSq = wasmGeo.distance_point_to_segment_sq(px, py, ax, ay, bx, by);
+			if (Number.isFinite(distSq)) return distSq;
+		} catch (error: unknown) {
+			logWasmGeoRuntimeError(error);
+		}
+	}
+
 	const abx = bx - ax;
 	const aby = by - ay;
 	const apx = px - ax;
@@ -580,6 +760,15 @@ const isWorldPointNearSegments = (
 	segments: WorldSegment[],
 	thresholdPx: number
 ): boolean => {
+	const wasmGeo = getWasmGeoModuleSync();
+	if (wasmGeo && segments.length > 0) {
+		try {
+			return wasmGeo.is_point_near_segments(x, y, flattenWorldSegments(segments), thresholdPx);
+		} catch (error: unknown) {
+			logWasmGeoRuntimeError(error);
+		}
+	}
+
 	const t = Math.max(0, thresholdPx);
 	const tSq = t * t;
 	for (const s of segments) {
@@ -593,6 +782,15 @@ const isWorldPointNearSegments = (
 
 const pointInRing = (point: ClippingCoord, ring: ClippingRing): boolean => {
 	const [x, y] = point;
+	const wasmGeo = getWasmGeoModuleSync();
+	if (wasmGeo) {
+		try {
+			return wasmGeo.point_in_ring(x, y, flattenRing(ring));
+		} catch (error: unknown) {
+			logWasmGeoRuntimeError(error);
+		}
+	}
+
 	let inside = false;
 	for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
 		const [xi, yi] = ring[i];
@@ -1564,6 +1762,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const stateClickZoomInFlightNonceRef = useRef(0);
 	const stateClickZoomInFlightTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 	const [isStateLayerReady, setIsStateLayerReady] = useState(false);
+
+	useEffect(() => {
+		void ensureWasmGeoModuleLoaded();
+	}, []);
 
 	const syncUsOnlyBasemapCartography = useCallback(
 		(mapInstance: mapboxgl.Map | null) => {
@@ -4355,10 +4557,21 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			};
 
 			const candidates: Candidate[] = [];
+			const candidateContacts: ContactWithName[] = [];
+			const candidateCoords: LatLngLiteral[] = [];
 			for (const contact of pool) {
 				const coords = getContactCoords(contact);
 				if (!coords) continue;
-				const { x, y } = latLngToWorldPixel(coords, worldSize);
+				candidateContacts.push(contact);
+				candidateCoords.push(coords);
+			}
+			const projectedCandidates = batchLatLngToWorldPixels(candidateCoords, worldSize);
+			for (let i = 0; i < candidateContacts.length; i++) {
+				const contact = candidateContacts[i];
+				const coords = candidateCoords[i];
+				const projected = projectedCandidates[i];
+				if (!coords || !projected) continue;
+				const { x, y } = projected;
 				let isInLockedState = true;
 				if (hasLockedStateSelection) {
 					const contactStateKey = normalizeStateKey(contact.state ?? null);
@@ -4559,18 +4772,23 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						isPriority: boolean;
 					};
 					const candidates: Candidate[] = [];
+					const candidateContacts: ContactWithName[] = [];
+					const candidateCoords: LatLngLiteral[] = [];
 					for (const contact of pool) {
 						const coords = getBookingExtraContactCoords(contact);
 						if (!coords) continue;
-						const latClamped = clamp(coords.lat, -85, 85);
-						const siny = Math.sin((latClamped * Math.PI) / 180);
-						const x = ((coords.lng + 180) / 360) * worldSize;
-						const y =
-							(0.5 - Math.log((1 + siny) / (1 - siny)) / (4 * Math.PI)) * worldSize;
+						candidateContacts.push(contact);
+						candidateCoords.push(coords);
+					}
+					const projectedCandidates = batchLatLngToWorldPixels(candidateCoords, worldSize);
+					for (let i = 0; i < candidateContacts.length; i++) {
+						const contact = candidateContacts[i];
+						const projected = projectedCandidates[i];
+						if (!projected) continue;
 						candidates.push({
 							contact,
-							x,
-							y,
+							x: projected.x,
+							y: projected.y,
 							key: hashStringToUint32(`${seed}|bookingExtra|${contact.id}`),
 							isSelected: selectedSet.has(contact.id),
 							isPriority: priorityExtraIdSet.has(contact.id),

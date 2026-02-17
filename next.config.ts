@@ -21,6 +21,20 @@ const nextConfig: NextConfig = {
 	compiler: {
 		removeConsole: process.env.NODE_ENV === 'production',
 	},
+	// Include WASM binaries in serverless function bundles on Vercel.
+	// Next.js output file tracing detects the JS glue code but misses the
+	// .wasm binaries that are loaded via fs.readFileSync at runtime.
+	outputFileTracingIncludes: {
+		'/api/*': ['./rust-scorer/pkg-node/**/*', './rust-scorer/pkg/**/*'],
+		'/murmur/*': ['./rust-scorer/pkg-node/**/*'],
+	},
+	webpack: (config) => {
+		config.experiments = {
+			...(config.experiments || {}),
+			asyncWebAssembly: true,
+		};
+		return config;
+	},
 	// Reduce serverless function size and provisioning time
 	experimental: {
 		optimizePackageImports: [

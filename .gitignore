@@ -46,3 +46,6 @@ next-env.d.ts
 # seeding data
 public/contactLists/*
 public/exports/*
+
+# rust wasm build artifacts
+/rust-scorer/target/

@@ -4,6 +4,9 @@
 	"private": true,
 	"scripts": {
 		"dev": "next dev --port 3000",
+		"build:wasm:node": "wasm-pack build rust-scorer --target nodejs --out-dir pkg-node && rm -f rust-scorer/pkg-node/.gitignore",
+		"build:wasm:web": "wasm-pack build rust-scorer --target web --out-dir pkg-web && rm -f rust-scorer/pkg-web/.gitignore",
+		"build:wasm": "npm run build:wasm:node && npm run build:wasm:web",
 		"build": "cross-env NODE_OPTIONS=--max-old-space-size=8192 next build",
 		"start": "next start",
 		"lint": "next lint",
@@ -119,6 +122,7 @@
 		"tailwindcss": "^4.1.11",
 		"ts-node": "^10.9.2",
 		"tsx": "^4.19.3",
-		"typescript": "5.9.2"
+		"typescript": "5.9.2",
+		"wasm-pack": "^0.14.0"
 	}
 }
