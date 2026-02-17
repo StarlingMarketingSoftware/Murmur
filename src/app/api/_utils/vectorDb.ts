@@ -7,6 +7,19 @@ type MappingProperty = estypes.MappingProperty;
 
 const VECTOR_DIMENSION = 1536;
 const INDEX_NAME = 'contacts';
+const QUERY_EMBEDDING_CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
+const QUERY_EMBEDDING_MAX_SIZE = 1000;
+
+type QueryEmbeddingCacheEntry = {
+	embedding: number[];
+	timestamp: number;
+};
+
+const queryEmbeddingCache = new Map<string, QueryEmbeddingCacheEntry>();
+const queryEmbeddingCacheStats = {
+	hits: 0,
+	misses: 0,
+};
 
 const openai = new OpenAI({
 	apiKey: process.env.OPEN_AI_API_KEY!,
@@ -322,6 +335,65 @@ export type QueryJson = {
 	country: string | null;
 	restOfQuery: string;
 };
+
+export const normalizeQueryEmbeddingKey = (input: string): string => {
+	return input.toLowerCase().trim().replace(/\s+/g, ' ');
+};
+
+export const getCachedQueryEmbedding = (key: string): number[] | null => {
+	if (!key) return null;
+
+	const cached = queryEmbeddingCache.get(key);
+	if (!cached) {
+		queryEmbeddingCacheStats.misses += 1;
+		return null;
+	}
+
+	if (Date.now() - cached.timestamp > QUERY_EMBEDDING_CACHE_TTL_MS) {
+		queryEmbeddingCache.delete(key);
+		queryEmbeddingCacheStats.misses += 1;
+		return null;
+	}
+
+	// Maintain simple LRU behavior by moving accessed entries to the end.
+	queryEmbeddingCache.delete(key);
+	queryEmbeddingCache.set(key, cached);
+	queryEmbeddingCacheStats.hits += 1;
+
+	return [...cached.embedding];
+};
+
+export const setCachedQueryEmbedding = (key: string, embedding: number[]): void => {
+	if (!key || embedding.length === 0) return;
+
+	if (queryEmbeddingCache.has(key)) {
+		queryEmbeddingCache.delete(key);
+	}
+
+	queryEmbeddingCache.set(key, {
+		embedding: [...embedding],
+		timestamp: Date.now(),
+	});
+
+	while (queryEmbeddingCache.size > QUERY_EMBEDDING_MAX_SIZE) {
+		const oldestKey = queryEmbeddingCache.keys().next().value;
+		if (!oldestKey) break;
+		queryEmbeddingCache.delete(oldestKey);
+	}
+};
+
+export const getQueryEmbeddingCacheStats = () => {
+	const totalLookups = queryEmbeddingCacheStats.hits + queryEmbeddingCacheStats.misses;
+	return {
+		size: queryEmbeddingCache.size,
+		hits: queryEmbeddingCacheStats.hits,
+		misses: queryEmbeddingCacheStats.misses,
+		hitRate: totalLookups === 0 ? 0 : queryEmbeddingCacheStats.hits / totalLookups,
+		ttlMs: QUERY_EMBEDDING_CACHE_TTL_MS,
+		maxSize: QUERY_EMBEDDING_MAX_SIZE,
+	};
+};
+
 export const searchSimilarContacts = async (
 	queryJson: QueryJson,
 	limit: number = 10,
@@ -335,11 +407,35 @@ export const searchSimilarContacts = async (
 		strictPenalty?: boolean;
 	}
 ) => {
-	const response = await openai.embeddings.create({
-		input: queryJson.restOfQuery,
-		model: 'text-embedding-3-small',
-	});
-	const queryEmbedding = response.data[0].embedding;
+	const normalizedQueryEmbeddingKey = normalizeQueryEmbeddingKey(queryJson.restOfQuery);
+	const shouldUseQueryEmbeddingCache = normalizedQueryEmbeddingKey.length > 0;
+	let queryEmbedding: number[];
+
+	if (shouldUseQueryEmbeddingCache) {
+		const cachedEmbedding = getCachedQueryEmbedding(normalizedQueryEmbeddingKey);
+		if (cachedEmbedding) {
+			console.log('[vectorDb] query embedding cache hit');
+			queryEmbedding = cachedEmbedding;
+		} else {
+			console.log('[vectorDb] query embedding cache miss');
+			const embeddingStartMs = Date.now();
+			const response = await openai.embeddings.create({
+				input: queryJson.restOfQuery,
+				model: 'text-embedding-3-small',
+			});
+			queryEmbedding = response.data[0].embedding;
+			setCachedQueryEmbedding(normalizedQueryEmbeddingKey, queryEmbedding);
+			console.log(
+				`[vectorDb] query embedding generated in ${Date.now() - embeddingStartMs}ms`
+			);
+		}
+	} else {
+		const response = await openai.embeddings.create({
+			input: queryJson.restOfQuery,
+			model: 'text-embedding-3-small',
+		});
+		queryEmbedding = response.data[0].embedding;
+	}
 
 	// Configure location boost strategy for post-processing
 	const locationBoosts = {

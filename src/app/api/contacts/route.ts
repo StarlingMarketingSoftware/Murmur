@@ -103,6 +103,417 @@ const filterContactsByTitlePrefix = <T extends { title?: string | null }>(
 const normalizeSearchText = (value: string | null | undefined): string =>
 	(value ?? '').toLowerCase().replace(/\s+/g, ' ').trim();
 
+type VectorEsMatch = {
+	id: string;
+	score?: number;
+	metadata?: Record<string, unknown> | null;
+};
+
+const hasText = (value: string | null | undefined): boolean =>
+	typeof value === 'string' && value.trim().length > 0;
+
+const toStringArray = (value: unknown): string[] =>
+	Array.isArray(value)
+		? value.map((entry) => String(entry).trim()).filter(Boolean)
+		: value != null
+		? String(value)
+				.split(',')
+				.map((entry) => entry.trim())
+				.filter(Boolean)
+		: [];
+
+const asNullableString = (value: unknown): string | null =>
+	value == null ? null : String(value);
+
+const asFiniteNumber = (value: unknown): number | null => {
+	if (typeof value === 'number' && Number.isFinite(value)) return value;
+	if (typeof value === 'string' && value.trim().length > 0) {
+		const parsed = Number(value);
+		return Number.isFinite(parsed) ? parsed : null;
+	}
+	return null;
+};
+
+type EsContactDefaults = Pick<
+	Contact,
+	| 'apolloPersonId'
+	| 'phone'
+	| 'linkedInUrl'
+	| 'photoUrl'
+	| 'companyLinkedInUrl'
+	| 'companyPostalCode'
+	| 'isPrivate'
+	| 'hasVectorEmbedding'
+	| 'userContactListCount'
+	| 'manualDeselections'
+	| 'lastResearchedDate'
+	| 'emailValidationStatus'
+	| 'emailValidationSubStatus'
+	| 'emailValidatedAt'
+	| 'createdAt'
+	| 'updatedAt'
+	| 'userId'
+	| 'contactListId'
+> & {
+	idFallback?: number | null;
+};
+
+const buildContactFromEsMetadata = (
+	match: VectorEsMatch,
+	defaults: EsContactDefaults
+): Contact | null => {
+	const md = (match.metadata ?? {}) as Record<string, unknown>;
+	const parsedId = asFiniteNumber(md.contactId ?? match.id);
+	const normalizedId =
+		parsedId != null ? Math.trunc(parsedId) : defaults.idFallback ?? null;
+	if (normalizedId == null || !Number.isFinite(normalizedId)) return null;
+
+	const coords = md.coordinates as { lat?: unknown; lon?: unknown } | null | undefined;
+	const latitude = asFiniteNumber(coords?.lat);
+	const longitude = asFiniteNumber(coords?.lon);
+
+	return {
+		id: normalizedId,
+		apolloPersonId: defaults.apolloPersonId,
+		firstName: asNullableString(md.firstName),
+		lastName: asNullableString(md.lastName),
+		email: asNullableString(md.email) ?? '',
+		company: asNullableString(md.company),
+		city: asNullableString(md.city),
+		state: asNullableString(md.state),
+		country: asNullableString(md.country),
+		address: asNullableString(md.address),
+		phone: defaults.phone,
+		website: asNullableString(md.website),
+		title: asNullableString(md.title),
+		headline: asNullableString(md.headline),
+		linkedInUrl: defaults.linkedInUrl,
+		photoUrl: defaults.photoUrl,
+		metadata: asNullableString(md.metadata),
+		companyLinkedInUrl: defaults.companyLinkedInUrl,
+		companyFoundedYear: asNullableString(md.companyFoundedYear),
+		companyType: asNullableString(md.companyType),
+		companyTechStack: toStringArray(md.companyTechStack),
+		companyPostalCode: defaults.companyPostalCode,
+		companyKeywords: toStringArray(md.companyKeywords),
+		companyIndustry: asNullableString(md.companyIndustry),
+		latitude,
+		longitude,
+		isPrivate: defaults.isPrivate,
+		hasVectorEmbedding: defaults.hasVectorEmbedding,
+		userContactListCount: defaults.userContactListCount,
+		manualDeselections: defaults.manualDeselections,
+		lastResearchedDate: defaults.lastResearchedDate,
+		emailValidationStatus: defaults.emailValidationStatus,
+		emailValidationSubStatus: defaults.emailValidationSubStatus,
+		emailValidatedAt: defaults.emailValidatedAt,
+		createdAt: defaults.createdAt,
+		updatedAt: defaults.updatedAt,
+		userId: defaults.userId,
+		contactListId: defaults.contactListId,
+	};
+};
+
+const computeMissingPrismaIds = (
+	esOrderedIds: number[],
+	contactsFromEs: Map<number, Contact>
+): number[] => {
+	const missingIds: number[] = [];
+	for (const id of esOrderedIds) {
+		const esContact = contactsFromEs.get(id);
+		if (!esContact) {
+			missingIds.push(id);
+			continue;
+		}
+		const missingEmail = !hasText(esContact.email);
+		const missingPrimarySignal =
+			!hasText(esContact.company) && !hasText(esContact.title) && !hasText(esContact.headline);
+		if (missingEmail || missingPrimarySignal) {
+			missingIds.push(id);
+		}
+	}
+	return missingIds;
+};
+
+const VECTOR_PRISMA_HYDRATION_SELECT = {
+	id: true,
+	apolloPersonId: true,
+	firstName: true,
+	lastName: true,
+	email: true,
+	company: true,
+	city: true,
+	state: true,
+	country: true,
+	address: true,
+	phone: true,
+	website: true,
+	title: true,
+	headline: true,
+	linkedInUrl: true,
+	photoUrl: true,
+	metadata: true,
+	companyLinkedInUrl: true,
+	companyFoundedYear: true,
+	companyType: true,
+	companyTechStack: true,
+	companyPostalCode: true,
+	companyKeywords: true,
+	companyIndustry: true,
+	latitude: true,
+	longitude: true,
+	isPrivate: true,
+	hasVectorEmbedding: true,
+	userContactListCount: true,
+	manualDeselections: true,
+	lastResearchedDate: true,
+	emailValidationStatus: true,
+	emailValidationSubStatus: true,
+	emailValidatedAt: true,
+	createdAt: true,
+	updatedAt: true,
+	userId: true,
+	contactListId: true,
+} satisfies Prisma.ContactSelect;
+
+type PrismaHydrationContact = Prisma.ContactGetPayload<{
+	select: typeof VECTOR_PRISMA_HYDRATION_SELECT;
+}>;
+
+const mergeEsAndPrismaContact = (
+	esContact: Contact,
+	prismaContact: PrismaHydrationContact
+): Contact => ({
+	...esContact,
+	apolloPersonId: prismaContact.apolloPersonId,
+	firstName: hasText(esContact.firstName) ? esContact.firstName : prismaContact.firstName,
+	lastName: hasText(esContact.lastName) ? esContact.lastName : prismaContact.lastName,
+	email: hasText(esContact.email) ? esContact.email : prismaContact.email,
+	company: hasText(esContact.company) ? esContact.company : prismaContact.company,
+	city: hasText(esContact.city) ? esContact.city : prismaContact.city,
+	state: hasText(esContact.state) ? esContact.state : prismaContact.state,
+	country: hasText(esContact.country) ? esContact.country : prismaContact.country,
+	address: hasText(esContact.address) ? esContact.address : prismaContact.address,
+	phone: prismaContact.phone,
+	website: hasText(esContact.website) ? esContact.website : prismaContact.website,
+	title: hasText(esContact.title) ? esContact.title : prismaContact.title,
+	headline: hasText(esContact.headline) ? esContact.headline : prismaContact.headline,
+	linkedInUrl: prismaContact.linkedInUrl,
+	photoUrl: prismaContact.photoUrl,
+	metadata: hasText(esContact.metadata) ? esContact.metadata : prismaContact.metadata,
+	companyLinkedInUrl: prismaContact.companyLinkedInUrl,
+	companyFoundedYear: hasText(esContact.companyFoundedYear)
+		? esContact.companyFoundedYear
+		: prismaContact.companyFoundedYear,
+	companyType: hasText(esContact.companyType) ? esContact.companyType : prismaContact.companyType,
+	companyTechStack:
+		esContact.companyTechStack.length > 0
+			? esContact.companyTechStack
+			: prismaContact.companyTechStack,
+	companyPostalCode: prismaContact.companyPostalCode,
+	companyKeywords:
+		esContact.companyKeywords.length > 0
+			? esContact.companyKeywords
+			: prismaContact.companyKeywords,
+	companyIndustry: hasText(esContact.companyIndustry)
+		? esContact.companyIndustry
+		: prismaContact.companyIndustry,
+	latitude: esContact.latitude ?? prismaContact.latitude,
+	longitude: esContact.longitude ?? prismaContact.longitude,
+	isPrivate: prismaContact.isPrivate,
+	hasVectorEmbedding: prismaContact.hasVectorEmbedding,
+	userContactListCount: prismaContact.userContactListCount,
+	manualDeselections: prismaContact.manualDeselections,
+	lastResearchedDate: prismaContact.lastResearchedDate,
+	emailValidationStatus: prismaContact.emailValidationStatus,
+	emailValidationSubStatus: prismaContact.emailValidationSubStatus,
+	emailValidatedAt: prismaContact.emailValidatedAt,
+	createdAt: prismaContact.createdAt,
+	updatedAt: prismaContact.updatedAt,
+	userId: prismaContact.userId,
+	contactListId: prismaContact.contactListId,
+});
+
+type PostTrainingTerms = {
+	excludeTerms: string[];
+	demoteTerms: string[];
+	includeCompanyTerms: string[];
+	includeTitleTerms: string[];
+	includeWebsiteTerms: string[];
+	includeIndustryTerms: string[];
+	includeCompanyOrTitleTerms: string[];
+	auxCompanyTerms: string[];
+	auxTitleTerms: string[];
+	auxWebsiteTerms: string[];
+	auxIndustryTerms: string[];
+	auxCompanyOrTitleTerms: string[];
+	requirePositive: boolean;
+};
+
+const normalizeTerms = (terms: string[] | undefined): string[] =>
+	(terms ?? [])
+		.map((term) => term.toLowerCase().trim())
+		.filter(Boolean);
+
+const metadataValue = (
+	metadata: Record<string, unknown> | null | undefined,
+	key: string
+): string | null => {
+	if (!metadata) return null;
+	const value = metadata[key];
+	if (value == null) return null;
+	if (typeof value === 'string') return value;
+	if (Array.isArray(value)) {
+		const first = value.find((entry) => entry != null);
+		return first == null ? null : String(first);
+	}
+	return String(value);
+};
+
+const containsAny = (text: unknown, terms: string[]): boolean => {
+	if (text == null || terms.length === 0) return false;
+	const lc = String(text).toLowerCase();
+	return terms.some((term) => term.length > 0 && lc.includes(term));
+};
+
+const buildPostTrainingTerms = (profile: PostTrainingProfile): PostTrainingTerms => {
+	const includeCompanyTerms = normalizeTerms(profile.includeCompanyTerms);
+	const includeTitleTerms = normalizeTerms(profile.includeTitleTerms);
+	const auxCompanyTerms = normalizeTerms(profile.auxCompanyTerms);
+	const auxTitleTerms = normalizeTerms(profile.auxTitleTerms);
+
+	return {
+		excludeTerms: normalizeTerms(profile.excludeTerms),
+		demoteTerms: normalizeTerms(profile.demoteTerms),
+		includeCompanyTerms,
+		includeTitleTerms,
+		includeWebsiteTerms: normalizeTerms(profile.includeWebsiteTerms),
+		includeIndustryTerms: normalizeTerms(profile.includeIndustryTerms),
+		includeCompanyOrTitleTerms: [...includeCompanyTerms, ...includeTitleTerms],
+		auxCompanyTerms,
+		auxTitleTerms,
+		auxWebsiteTerms: normalizeTerms(profile.auxWebsiteTerms),
+		auxIndustryTerms: normalizeTerms(profile.auxIndustryTerms),
+		auxCompanyOrTitleTerms: [...auxCompanyTerms, ...auxTitleTerms],
+		requirePositive: Boolean(profile.requirePositive),
+	};
+};
+
+const passesPositive = (
+	metadata: Record<string, unknown> | null | undefined,
+	terms: PostTrainingTerms
+): boolean => {
+	if (!terms.requirePositive) return true;
+	return (
+		containsAny(metadataValue(metadata, 'company'), terms.includeCompanyTerms) ||
+		containsAny(metadataValue(metadata, 'title'), terms.includeTitleTerms) ||
+		containsAny(metadataValue(metadata, 'headline'), terms.includeCompanyOrTitleTerms) ||
+		containsAny(metadataValue(metadata, 'website'), terms.includeWebsiteTerms) ||
+		containsAny(metadataValue(metadata, 'companyIndustry'), terms.includeIndustryTerms) ||
+		containsAny(metadataValue(metadata, 'metadata'), terms.includeCompanyOrTitleTerms)
+	);
+};
+
+const passesAux = (
+	metadata: Record<string, unknown> | null | undefined,
+	terms: PostTrainingTerms
+): boolean => {
+	return (
+		containsAny(metadataValue(metadata, 'company'), terms.auxCompanyTerms) ||
+		containsAny(metadataValue(metadata, 'title'), terms.auxTitleTerms) ||
+		containsAny(metadataValue(metadata, 'headline'), terms.auxCompanyOrTitleTerms) ||
+		containsAny(metadataValue(metadata, 'website'), terms.auxWebsiteTerms) ||
+		containsAny(metadataValue(metadata, 'companyIndustry'), terms.auxIndustryTerms) ||
+		containsAny(metadataValue(metadata, 'metadata'), terms.auxCompanyOrTitleTerms)
+	);
+};
+
+const hasDemoteSignal = (
+	metadata: Record<string, unknown> | null | undefined,
+	terms: PostTrainingTerms
+): boolean => {
+	return (
+		containsAny(metadataValue(metadata, 'company'), terms.demoteTerms) ||
+		containsAny(metadataValue(metadata, 'title'), terms.demoteTerms) ||
+		containsAny(metadataValue(metadata, 'headline'), terms.demoteTerms)
+	);
+};
+
+const applyPostTrainingToEsMatches = (
+	matches: VectorEsMatch[],
+	profile: PostTrainingProfile,
+	finalLimit: number
+): VectorEsMatch[] => {
+	if (!profile.active || matches.length === 0) return matches;
+	const terms = buildPostTrainingTerms(profile);
+
+	// Keep hard excludes at the ES stage so hydration and downstream ranking
+	// only process relevant candidates.
+	const strictlyAllowed = matches.filter((match) => {
+		const metadata = match.metadata ?? {};
+		return !(
+			containsAny(metadataValue(metadata, 'company'), terms.excludeTerms) ||
+			containsAny(metadataValue(metadata, 'title'), terms.excludeTerms) ||
+			containsAny(metadataValue(metadata, 'headline'), terms.excludeTerms)
+		);
+	});
+
+	if (!terms.requirePositive) {
+		return strictlyAllowed.slice(0, finalLimit);
+	}
+
+	const classified = strictlyAllowed.map((match) => {
+		const positive = passesPositive(match.metadata, terms);
+		const aux = !positive && passesAux(match.metadata, terms);
+		return {
+			match,
+			positive,
+			aux,
+			demotedPositive: positive && hasDemoteSignal(match.metadata, terms),
+		};
+	});
+
+	const seen = new Set<string>();
+	const keyOf = (match: VectorEsMatch): string =>
+		metadataValue(match.metadata, 'contactId') || String(match.id || '');
+	const ordered: VectorEsMatch[] = [];
+	const pushIfNew = (match: VectorEsMatch) => {
+		const key = keyOf(match);
+		if (!key || seen.has(key)) return;
+		seen.add(key);
+		ordered.push(match);
+	};
+
+	for (const entry of classified) {
+		if (entry.positive) pushIfNew(entry.match);
+		if (ordered.length >= finalLimit) break;
+	}
+
+	// Preserve existing filler behavior: demoted positives, then aux, then remaining.
+	if (ordered.length < finalLimit) {
+		for (const entry of classified) {
+			if (entry.demotedPositive) pushIfNew(entry.match);
+			if (ordered.length >= finalLimit) break;
+		}
+	}
+
+	if (ordered.length < finalLimit) {
+		for (const entry of classified) {
+			if (!entry.positive && entry.aux) pushIfNew(entry.match);
+			if (ordered.length >= finalLimit) break;
+		}
+	}
+
+	if (ordered.length < finalLimit) {
+		for (const entry of classified) {
+			if (!entry.positive && !entry.aux) pushIfNew(entry.match);
+			if (ordered.length >= finalLimit) break;
+		}
+	}
+
+	return ordered.slice(0, finalLimit);
+};
+
 // Coffee-shop search refinements:
 // - Filter out obvious non-coffee businesses that match "coffee" loosely (e.g., "Coffee Marketing Agency")
 // - Demote marketing-oriented roles so "Coffee Shops" searches skew toward operators/owners
@@ -3894,9 +4305,12 @@ export async function GET(req: NextRequest) {
 			};
 
 			let vectorSearchResults;
+			const esSearchStartMs = Date.now();
 			try {
 				vectorSearchResults = await vectorSearchWithTimeout();
+				console.info(`[contacts] es_search_ms=${Date.now() - esSearchStartMs}`);
 			} catch (e) {
+				console.info(`[contacts] es_search_ms=${Date.now() - esSearchStartMs}`);
 				console.warn(
 					'Vector search timed out or failed, falling back to substring search.',
 					e
@@ -3916,294 +4330,151 @@ export async function GET(req: NextRequest) {
 				const fallback = await substringSearch();
 				return apiResponse(fallback);
 			}
-			// Pre-filter ES matches using post-training to remove academic institutions early,
-			// but allow a lenient tail to fill close-to-limit venue searches
-			const prePostProfile = postTrainingProfile;
-			let esMatches = vectorSearchResults.matches;
-			if (prePostProfile.active && esMatches.length > 0) {
-				type EsMatch = { id: string; score: number; metadata: Record<string, unknown> };
-				const excludeTerms = prePostProfile.excludeTerms.map((t) => t.toLowerCase());
-				const includeCompany = (prePostProfile.includeCompanyTerms || []).map((t) =>
-					t.toLowerCase()
-				);
-				const includeTitle = (prePostProfile.includeTitleTerms || []).map((t) =>
-					t.toLowerCase()
-				);
-				const includeWebsite = (prePostProfile.includeWebsiteTerms || []).map((t) =>
-					t.toLowerCase()
-				);
-				const includeIndustry = (prePostProfile.includeIndustryTerms || []).map((t) =>
-					t.toLowerCase()
-				);
-				const auxCompany = (prePostProfile.auxCompanyTerms || []).map((t) =>
-					t.toLowerCase()
-				);
-				const auxTitle = (prePostProfile.auxTitleTerms || []).map((t) => t.toLowerCase());
-				const auxWebsite = (prePostProfile.auxWebsiteTerms || []).map((t) =>
-					t.toLowerCase()
-				);
-				const auxIndustry = (prePostProfile.auxIndustryTerms || []).map((t) =>
-					t.toLowerCase()
-				);
-				const containsAny = (text: string | null | undefined, terms: string[]) => {
-					if (!text) return false;
-					const lc = String(text).toLowerCase();
-					return terms.some((t) => lc.includes(t));
-				};
-				const metaValue = (
-					md: Record<string, unknown> | undefined,
-					key: string
-				): string | null => {
-					if (!md) return null;
-					const value = (md as Record<string, unknown>)[key];
-					if (value == null) return null;
-					if (typeof value === 'string') return value;
-					if (Array.isArray(value)) {
-						const first = value[0] as unknown;
-						return first == null ? null : String(first);
-					}
-					return String(value);
-				};
-				const passesPositive = (md: Record<string, unknown>) => {
-					if (!prePostProfile.requirePositive) return true;
-					return (
-						containsAny(metaValue(md, 'company'), includeCompany) ||
-						containsAny(metaValue(md, 'title'), includeTitle) ||
-						containsAny(metaValue(md, 'headline'), [
-							...includeCompany,
-							...includeTitle,
-						]) ||
-						containsAny(metaValue(md, 'website'), includeWebsite) ||
-						containsAny(metaValue(md, 'companyIndustry'), includeIndustry) ||
-						containsAny(metaValue(md, 'metadata'), [...includeCompany, ...includeTitle])
-					);
-				};
-				const passesAux = (md: Record<string, unknown>) => {
-					// Lower-priority inclusions to fill tail (e.g., bars/restaurants)
-					return (
-						containsAny(metaValue(md, 'company'), auxCompany) ||
-						containsAny(metaValue(md, 'title'), auxTitle) ||
-						containsAny(metaValue(md, 'headline'), [...auxCompany, ...auxTitle]) ||
-						containsAny(metaValue(md, 'website'), auxWebsite) ||
-						containsAny(metaValue(md, 'companyIndustry'), auxIndustry) ||
-						containsAny(metaValue(md, 'metadata'), [...auxCompany, ...auxTitle])
-					);
-				};
-
-				// Always enforce hard excludes first
-				const strictlyAllowed = esMatches.filter((m) => {
-					const md: Record<string, unknown> = m.metadata || {};
-					return !(
-						containsAny(md.company as string | null, excludeTerms) ||
-						containsAny(md.title as string | null, excludeTerms) ||
-						containsAny(md.headline as string | null, excludeTerms)
-					);
-				});
-
-				// Require positives for primary set when configured, then prefer aux (bars/restaurants) for tail fill
-				const strictlyAllowedTyped = strictlyAllowed as unknown as EsMatch[];
-				const positivesOnly = prePostProfile.requirePositive
-					? strictlyAllowedTyped.filter((m) => passesPositive(m.metadata || {}))
-					: strictlyAllowed;
-
-				const finalLimit = limit ?? VECTOR_SEARCH_LIMIT_DEFAULT;
-
-				if (prePostProfile.requirePositive) {
-					// Prioritize: positives -> aux -> remaining non-excluded
-					const seen = new Set<string>();
-					const keyOf = (m: EsMatch) =>
-						String((m.metadata as Record<string, unknown>)['contactId'] || m.id || '');
-					const ordered: EsMatch[] = [];
-					const pushIfNew = (m: EsMatch) => {
-						const k = keyOf(m);
-						if (!k || seen.has(k)) return false;
-						seen.add(k);
-						ordered.push(m);
-						return true;
-					};
-
-					for (const m of positivesOnly as unknown as EsMatch[]) pushIfNew(m);
-					for (const m of strictlyAllowedTyped) {
-						if (!passesPositive(m.metadata || {}) && passesAux(m.metadata || {}))
-							pushIfNew(m);
-						if (ordered.length >= finalLimit) break;
-					}
-					if (ordered.length < finalLimit) {
-						for (const m of strictlyAllowedTyped) {
-							if (!passesPositive(m.metadata || {}) && !passesAux(m.metadata || {}))
-								pushIfNew(m);
-							if (ordered.length >= finalLimit) break;
-						}
-					}
-					esMatches = ordered.slice(0, finalLimit) as unknown as typeof esMatches;
-				} else {
-					esMatches = positivesOnly.slice(0, finalLimit) as unknown as typeof esMatches;
-				}
-			}
-			const vectorSearchContactIds = esMatches
-				.map((match) => Number(match.metadata.contactId ?? match.id))
-				.filter((n) => Number.isFinite(n));
+			const finalPostTrainingLimit = limit ?? VECTOR_SEARCH_LIMIT_DEFAULT;
+			const postTrainingApplyStartMs = Date.now();
+			const esCandidateCountBefore = vectorSearchResults.matches.length;
+			const esMatches = applyPostTrainingToEsMatches(
+				vectorSearchResults.matches as VectorEsMatch[],
+				postTrainingProfile,
+				finalPostTrainingLimit
+			);
+			console.info(
+				`[contacts] post-training-filter=${Date.now() - postTrainingApplyStartMs}ms candidates=${esCandidateCountBefore}->${esMatches.length}`
+			);
 			const esRankByContactId = new Map<number, number>();
-			for (let i = 0; i < esMatches.length; i++) {
-				const match = esMatches[i] as unknown as {
-					id: string;
-					score?: number;
-					metadata?: Record<string, unknown>;
-				};
-				const md = (match?.metadata || {}) as Record<string, unknown>;
-				const idNum = Number(md.contactId ?? match.id);
-				if (!Number.isFinite(idNum)) continue;
-				if (!esRankByContactId.has(idNum)) esRankByContactId.set(idNum, i);
-			}
 			const addedContactIdsSet = new Set(addedContactIds);
+			const esOrderedIds: number[] = [];
+			const esContactsById = new Map<number, Contact>();
+			const seenEsContactIds = new Set<number>();
+			const esHydrationDefaults: EsContactDefaults = {
+				apolloPersonId: null,
+				phone: null,
+				linkedInUrl: null,
+				photoUrl: null,
+				companyLinkedInUrl: null,
+				companyPostalCode: null,
+				isPrivate: false,
+				hasVectorEmbedding: true,
+				userContactListCount: 0,
+				manualDeselections: 0,
+				lastResearchedDate: null,
+				emailValidationStatus: EmailVerificationStatus.valid,
+				emailValidationSubStatus: null,
+				emailValidatedAt: null,
+				createdAt: new Date(),
+				updatedAt: new Date(),
+				userId: null,
+				contactListId: null,
+				idFallback: null,
+			};
 
-			// const vectorSearchContactEmails = vectorSearchResults.matches.map(
-			// 	(match) => match.metadata.email
-			// ); // for testing production data locally
+			for (let i = 0; i < esMatches.length; i++) {
+				const match = esMatches[i];
+				const contactFromEs = buildContactFromEsMetadata(match, esHydrationDefaults);
+				if (!contactFromEs) continue;
+				if (!esRankByContactId.has(contactFromEs.id)) {
+					esRankByContactId.set(contactFromEs.id, i);
+				}
+				if (addedContactIdsSet.has(contactFromEs.id) || seenEsContactIds.has(contactFromEs.id)) {
+					continue;
+				}
+				seenEsContactIds.add(contactFromEs.id);
+				esOrderedIds.push(contactFromEs.id);
+				esContactsById.set(contactFromEs.id, contactFromEs);
+			}
 
-			contacts = await prisma.contact.findMany({
-				where: {
-					id: {
-						in: vectorSearchContactIds,
-						notIn: addedContactIds,
+			const coffeeRefineActive = queryMentionsCoffeeTerms(rawQueryForParsing);
+			const coffeeAllowMarketing = coffeeRefineActive
+				? coffeeQueryWantsMarketing(rawQueryForParsing)
+				: false;
+			const strictLocationRequiresStateCity =
+				effectiveLocationStrategy === 'strict' &&
+				(forceCityExactCity || (forceCityAny && forceCityAny.length > 0)) &&
+				(queryJson.state || forceStateAny);
+
+			const hydrationIdsSet = new Set<number>(
+				computeMissingPrismaIds(esOrderedIds, esContactsById)
+			);
+
+			for (const id of esOrderedIds) {
+				const esContact = esContactsById.get(id);
+				if (!esContact) {
+					hydrationIdsSet.add(id);
+					continue;
+				}
+
+				if (
+					strictLocationRequiresStateCity &&
+					(!hasText(esContact.city) || !hasText(esContact.state))
+				) {
+					hydrationIdsSet.add(id);
+				}
+
+				if (shouldFilterBookingTitles && !hasText(esContact.title)) {
+					hydrationIdsSet.add(id);
+				}
+
+				const hasCoffeeContext =
+					hasText(esContact.title) ||
+					hasText(esContact.headline) ||
+					hasText(esContact.company) ||
+					hasText(esContact.companyIndustry) ||
+					hasText(esContact.metadata) ||
+					hasText(esContact.website) ||
+					esContact.companyKeywords.length > 0;
+				if (coffeeRefineActive && !hasCoffeeContext) {
+					hydrationIdsSet.add(id);
+				}
+			}
+
+			const allowEsOnlyVectorResponse = !verificationStatus;
+			if (!allowEsOnlyVectorResponse) {
+				for (const id of esOrderedIds) hydrationIdsSet.add(id);
+			}
+
+			const hydrationIds = Array.from(hydrationIdsSet);
+			let prismaHydrationMs = 0;
+			let hydratedContacts: PrismaHydrationContact[] = [];
+			if (hydrationIds.length > 0) {
+				const prismaHydrationStartMs = Date.now();
+				hydratedContacts = await prisma.contact.findMany({
+					where: {
+						id: {
+							in: hydrationIds,
+							notIn: addedContactIds,
+						},
+						emailValidationStatus: verificationStatus
+							? {
+									equals: verificationStatus,
+							  }
+							: undefined,
 					},
-					// email: { // for testing production data locally
-					// 	in: vectorSearchContactEmails,
-					// },
-					emailValidationStatus: verificationStatus
-						? {
-								equals: verificationStatus,
-						  }
-						: undefined,
-				},
-			});
-
-			// Enrich missing names from Elasticsearch metadata
-			if (contacts && contacts.length > 0) {
-				const idToEsName = new Map<
-					number,
-					{ firstName: string | null; lastName: string | null }
-				>();
-				for (const m of esMatches as Array<{
-					id: string;
-					metadata: Record<string, unknown>;
-				}>) {
-					const meta = (m?.metadata || {}) as Record<string, unknown>;
-					const idNum = Number(meta.contactId ?? m.id);
-					if (!Number.isFinite(idNum)) continue;
-					const firstName = (meta.firstName as string | null | undefined) ?? null;
-					const lastName = (meta.lastName as string | null | undefined) ?? null;
-					if (
-						(firstName && String(firstName).trim()) ||
-						(lastName && String(lastName).trim())
-					) {
-						idToEsName.set(idNum, {
-							firstName: firstName ? String(firstName) : null,
-							lastName: lastName ? String(lastName) : null,
-						});
-					}
-				}
-
-				contacts = contacts.map((c) => {
-					const hasDbName =
-						(c.firstName && c.firstName.trim()) || (c.lastName && c.lastName.trim());
-					if (hasDbName) return c;
-					const meta = idToEsName.get(c.id);
-					if (!meta) return c;
-					return {
-						...c,
-						firstName: meta.firstName ?? c.firstName,
-						lastName: meta.lastName ?? c.lastName,
-					};
+					select: VECTOR_PRISMA_HYDRATION_SELECT,
 				});
+				prismaHydrationMs = Date.now() - prismaHydrationStartMs;
 			}
 
-			// Re-order (and partially fill) results to match Elasticsearch relevance order
-			// so the UI can show "most relevant first" consistently.
-			if (esMatches && esMatches.length > 0) {
-				const idToContact = new Map<number, Contact>();
-				for (const c of contacts) idToContact.set(c.id, c);
+			const hydratedById = new Map<number, PrismaHydrationContact>();
+			for (const hydrated of hydratedContacts) hydratedById.set(hydrated.id, hydrated);
 
-				const toArray = (val: unknown): string[] =>
-					Array.isArray(val)
-						? val.map((v) => String(v)).filter(Boolean)
-						: val
-						? String(val)
-								.split(',')
-								.map((s) => s.trim())
-								.filter(Boolean)
-						: [];
-
-				const ordered: Contact[] = [];
-				for (const match of esMatches as Array<{
-					id: string;
-					metadata: Record<string, unknown>;
-				}>) {
-					const md: Record<string, unknown> = match.metadata || {};
-					const parsedId = Number(md.contactId ?? match.id);
-					if (!Number.isFinite(parsedId)) continue;
-					if (addedContactIdsSet.has(parsedId)) continue;
-
-					const existing = idToContact.get(parsedId);
-					if (existing) {
-						ordered.push(existing);
-						continue;
-					}
-
-					// Build a minimal fallback contact from ES metadata when local DB doesn't have it
-					const coords = md.coordinates as
-						| { lat?: number; lon?: number }
-						| null
-						| undefined;
-					const latitude =
-						coords?.lat != null && Number.isFinite(coords.lat) ? coords.lat : null;
-					const longitude =
-						coords?.lon != null && Number.isFinite(coords.lon) ? coords.lon : null;
-
-					ordered.push({
-						id: parsedId,
-						apolloPersonId: null,
-						firstName: (md.firstName as string) ?? null,
-						lastName: (md.lastName as string) ?? null,
-						email: (md.email as string) ?? '',
-						company: (md.company as string) ?? null,
-						city: (md.city as string) ?? null,
-						state: (md.state as string) ?? null,
-						country: (md.country as string) ?? null,
-						address: (md.address as string) ?? null,
-						phone: null,
-						website: (md.website as string) ?? null,
-						title: (md.title as string) ?? null,
-						headline: (md.headline as string) ?? null,
-						linkedInUrl: null,
-						photoUrl: null,
-						metadata: (md.metadata as string) ?? null,
-						companyLinkedInUrl: null,
-						companyFoundedYear: (md.companyFoundedYear as string) ?? null,
-						companyType: (md.companyType as string) ?? null,
-						companyTechStack: toArray(md.companyTechStack),
-						companyPostalCode: null,
-						companyKeywords: toArray(md.companyKeywords),
-						companyIndustry: (md.companyIndustry as string) ?? null,
-						latitude,
-						longitude,
-						isPrivate: false,
-						hasVectorEmbedding: true,
-						userContactListCount: 0,
-						manualDeselections: 0,
-						lastResearchedDate: null,
-						emailValidationStatus: EmailVerificationStatus.valid,
-						emailValidationSubStatus: null,
-						emailValidatedAt: null,
-						createdAt: new Date().toISOString() as unknown as Date,
-						updatedAt: new Date().toISOString() as unknown as Date,
-						userId: null,
-						contactListId: null,
-					} as Contact);
+			let usedEsOnlyCount = 0;
+			const ordered: Contact[] = [];
+			for (const id of esOrderedIds) {
+				const esContact = esContactsById.get(id);
+				if (!esContact) continue;
+				const hydrated = hydratedById.get(id);
+				if (verificationStatus && !hydrated) continue;
+				if (hydrated) {
+					ordered.push(mergeEsAndPrismaContact(esContact, hydrated));
+				} else {
+					ordered.push(esContact);
+					usedEsOnlyCount += 1;
 				}
-
-				contacts = ordered.length > 0 ? ordered : contacts;
 			}
+			contacts = ordered;
+			console.info(
+				`[contacts] prisma_hydration_ms=${prismaHydrationMs} hydration_ids_count=${hydrationIds.length} used_es_only_count=${usedEsOnlyCount}`
+			);
 
 			// Defensive strict-location enforcement for vector results
 			if (
@@ -4231,146 +4502,11 @@ export async function GET(req: NextRequest) {
 					return cityOk && stateOk;
 				});
 			}
-
-			// Posttraining step: reuse earlier postTrainingProfile to avoid a second LLM call
-			const postProfile = postTrainingProfile || {
-				active: false,
-				excludeTerms: [],
-				demoteTerms: [],
-			};
-			if (postProfile.active && contacts.length > 0) {
-				const excludeTerms = postProfile.excludeTerms.map((t) => t.toLowerCase());
-				const demoteTerms = postProfile.demoteTerms.map((t) => t.toLowerCase());
-				const includeCompany = (postProfile.includeCompanyTerms || []).map((t) =>
-					t.toLowerCase()
-				);
-				const includeTitle = (postProfile.includeTitleTerms || []).map((t) =>
-					t.toLowerCase()
-				);
-				const includeWebsite = (postProfile.includeWebsiteTerms || []).map((t) =>
-					t.toLowerCase()
-				);
-				const includeIndustry = (postProfile.includeIndustryTerms || []).map((t) =>
-					t.toLowerCase()
-				);
-				const auxCompany = (postProfile.auxCompanyTerms || []).map((t) =>
-					t.toLowerCase()
-				);
-				const auxTitle = (postProfile.auxTitleTerms || []).map((t) => t.toLowerCase());
-				const auxWebsite = (postProfile.auxWebsiteTerms || []).map((t) =>
-					t.toLowerCase()
-				);
-				const auxIndustry = (postProfile.auxIndustryTerms || []).map((t) =>
-					t.toLowerCase()
-				);
-
-				const containsAny = (text: string | null | undefined, terms: string[]) => {
-					if (!text) return false;
-					const lc = text.toLowerCase();
-					return terms.some((t) => lc.includes(t));
-				};
-				const passesPositive = (c: Contact) => {
-					if (!postProfile.requirePositive) return true;
-					return (
-						containsAny(c.company, includeCompany) ||
-						containsAny(c.title, includeTitle) ||
-						containsAny(c.headline, [...includeCompany, ...includeTitle]) ||
-						containsAny(c.website, includeWebsite) ||
-						containsAny(c.companyIndustry, includeIndustry) ||
-						containsAny(c.metadata, [...includeCompany, ...includeTitle])
-					);
-				};
-				const passesAux = (c: Contact) => {
-					return (
-						containsAny(c.company, auxCompany) ||
-						containsAny(c.title, auxTitle) ||
-						containsAny(c.headline, [...auxCompany, ...auxTitle]) ||
-						containsAny(c.website, auxWebsite) ||
-						containsAny(c.companyIndustry, auxIndustry) ||
-						containsAny(c.metadata, [...auxCompany, ...auxTitle])
-					);
-				};
-
-				// Exclude (hard if strictExclude=true), then require positive signals if configured
-				const strictlyAllowed = postProfile.strictExclude
-					? contacts.filter(
-							(c) =>
-								!containsAny(c.company, excludeTerms) &&
-								!containsAny(c.title, excludeTerms) &&
-								!containsAny(c.headline, excludeTerms)
-					  )
-					: contacts;
-
-				let filtered = postProfile.requirePositive
-					? strictlyAllowed.filter(passesPositive)
-					: strictlyAllowed;
-
-				// If exclusion removed too many (e.g., fewer than limit), fill with demoted ones first;
-				// when near the cap, allow a lenient tail of non-excluded items even without positives
-				const finalLimit = limit ?? VECTOR_SEARCH_LIMIT_DEFAULT;
-				if (filtered.length < finalLimit) {
-					// Prefer demoted positives first
-					const demotedPositives = strictlyAllowed.filter(
-						(c) =>
-							(containsAny(c.company, demoteTerms) ||
-								containsAny(c.title, demoteTerms) ||
-								containsAny(c.headline, demoteTerms)) &&
-							(!postProfile.requirePositive || passesPositive(c))
-					);
-
-					const existingIds = new Set(filtered.map((c) => c.id));
-					const filler: Contact[] = [];
-					for (const c of demotedPositives) {
-						if (existingIds.has(c.id)) continue;
-						filler.push(c);
-						existingIds.add(c.id);
-						if (filtered.length + filler.length >= finalLimit) break;
-					}
-
-					// If still short and we're requiring positives, prioritize AUX (bars/restaurants)
-					if (
-						postProfile.requirePositive &&
-						filtered.length + filler.length < finalLimit
-					) {
-						for (const c of strictlyAllowed) {
-							if (existingIds.has(c.id)) continue;
-							if (!passesPositive(c) && passesAux(c)) {
-								filler.push(c);
-								existingIds.add(c.id);
-								if (filtered.length + filler.length >= finalLimit) break;
-							}
-						}
-					}
-
-					// Finally, fill with remaining non-excluded if still short
-					if (
-						postProfile.requirePositive &&
-						filtered.length + filler.length < finalLimit
-					) {
-						for (const c of strictlyAllowed) {
-							if (existingIds.has(c.id)) continue;
-							if (!passesPositive(c) && !passesAux(c)) {
-								filler.push(c);
-								existingIds.add(c.id);
-								if (filtered.length + filler.length >= finalLimit) break;
-							}
-						}
-					}
-
-					filtered = [...filtered, ...filler].slice(0, finalLimit);
-				}
-
-				contacts = filtered;
-			}
+			// Post-training is already applied at the ES stage to avoid duplicate filtering.
 
 			if (shouldFilterBookingTitles && contacts.length > 0) {
 				contacts = filterContactsByTitlePrefix(contacts, bookingTitlePrefix);
 			}
-
-			const coffeeRefineActive = queryMentionsCoffeeTerms(rawQueryForParsing);
-			const coffeeAllowMarketing = coffeeRefineActive
-				? coffeeQueryWantsMarketing(rawQueryForParsing)
-				: false;
 
 			// Coffee Shops refinement for vector results: remove obvious non-coffee hits (e.g., theaters, agencies)
 			// and push marketing roles down without disturbing state-distance ordering too much.
@@ -4441,84 +4577,26 @@ export async function GET(req: NextRequest) {
 
 			// Fallback: if local Postgres doesn't have these contacts, return minimal data from Elasticsearch directly
 			if (!contacts || contacts.length === 0) {
-				const fallbackContacts = esMatches.map((match) => {
-					const md: Record<string, unknown> = match.metadata || {};
-					const parsedId = Number(md.contactId);
-					const toArray = (val: unknown) =>
-						Array.isArray(val)
-							? val
-							: val
-							? String(val)
-									.split(',')
-									.map((s) => s.trim())
-									.filter(Boolean)
-							: [];
+				// Preserve verification-status correctness: when status filtering is active,
+				// only hydrated Prisma rows are eligible and ES-only fallback stays disabled.
+				if (verificationStatus) {
+					return apiResponse([]);
+				}
 
-					// Extract coordinates from ES metadata (stored as coordinates: { lat, lon })
-					const coords = md.coordinates as
-						| { lat?: number; lon?: number }
-						| null
-						| undefined;
-					const latitude =
-						coords?.lat != null && Number.isFinite(coords.lat) ? coords.lat : null;
-					const longitude =
-						coords?.lon != null && Number.isFinite(coords.lon) ? coords.lon : null;
-
-					return {
-						id: Number.isFinite(parsedId)
-							? parsedId
-							: Math.floor(Math.random() * 1_000_000_000),
-						apolloPersonId: null,
-						firstName: (md.firstName as string) ?? null,
-						lastName: (md.lastName as string) ?? null,
-						email: (md.email as string) ?? '',
-						company: (md.company as string) ?? null,
-						city: (md.city as string) ?? null,
-						state: (md.state as string) ?? null,
-						country: (md.country as string) ?? null,
-						address: (md.address as string) ?? null,
-						phone: null,
-						website: (md.website as string) ?? null,
-						title: (md.title as string) ?? null,
-						headline: (md.headline as string) ?? null,
-						linkedInUrl: null,
-						photoUrl: null,
-						metadata: (md.metadata as string) ?? null,
-						companyLinkedInUrl: null,
-						companyFoundedYear: (md.companyFoundedYear as string) ?? null,
-						companyType: (md.companyType as string) ?? null,
-						companyTechStack: toArray(md.companyTechStack),
-						companyPostalCode: null,
-						companyKeywords: toArray(md.companyKeywords),
-						companyIndustry: (md.companyIndustry as string) ?? null,
-						latitude,
-						longitude,
-						isPrivate: false,
-						hasVectorEmbedding: true,
-						userContactListCount: 0,
-						manualDeselections: 0,
-						lastResearchedDate: null,
-						emailValidationStatus: EmailVerificationStatus.valid,
-						emailValidationSubStatus: null,
-						emailValidatedAt: null,
-						createdAt: new Date().toISOString() as unknown as Date,
-						updatedAt: new Date().toISOString() as unknown as Date,
-						userId: null,
-						contactListId: null,
-					};
-				});
+				const fallbackContacts = esOrderedIds
+					.map((id) => esContactsById.get(id))
+					.filter((contact): contact is Contact => Boolean(contact));
 
 				const filteredFallbackContacts = shouldFilterBookingTitles
 					? filterContactsByTitlePrefix(fallbackContacts, bookingTitlePrefix)
 					: fallbackContacts;
 
 				let refinedFallback = filteredFallbackContacts;
-				if (queryMentionsCoffeeTerms(rawQueryForParsing) && refinedFallback.length > 0) {
-					const allowMarketing = coffeeQueryWantsMarketing(rawQueryForParsing);
+				if (coffeeRefineActive && refinedFallback.length > 0) {
 					refinedFallback = refinedFallback.filter(
-						(c) => !contactLooksLikeNonCoffeeBusinessForCoffeeSearch(c, allowMarketing)
+						(c) => !contactLooksLikeNonCoffeeBusinessForCoffeeSearch(c, coffeeAllowMarketing)
 					);
-					if (!allowMarketing && refinedFallback.length > 1) {
+					if (!coffeeAllowMarketing && refinedFallback.length > 1) {
 						const nonMarketing = refinedFallback.filter(
 							(c) => !contactLooksLikeCoffeeMarketingRole(c)
 						);
