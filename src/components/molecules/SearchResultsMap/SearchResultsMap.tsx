@@ -329,10 +329,20 @@ const ensureWasmGeoModuleLoaded = async (): Promise<WasmGeoModule | null> => {
 
 	if (!wasmGeoModulePromise) {
 		wasmGeoModulePromise = import('../../../../rust-scorer/pkg-web')
-			.then((module) => {
-				const maybeModule = (
-					((module as { default?: unknown }).default ?? module) as Partial<WasmGeoModule>
-				);
+			.then(async (module) => {
+				// wasm-pack `--target web` exports an async init function as the default export.
+				// We must call it (once) before using the named wrapper exports.
+				const maybeInit = (module as { default?: unknown }).default;
+				if (typeof maybeInit === 'function') {
+					try {
+						await (maybeInit as () => Promise<unknown>)();
+					} catch (error: unknown) {
+						logWasmGeoLoadError(error);
+						return null;
+					}
+				}
+
+				const maybeModule = module as Partial<WasmGeoModule>;
 				if (
 					typeof maybeModule.lat_lng_to_world_pixel !== 'function' ||
 					typeof maybeModule.distance_point_to_segment_sq !== 'function' ||
@@ -342,7 +352,21 @@ const ensureWasmGeoModuleLoaded = async (): Promise<WasmGeoModule | null> => {
 				) {
 					return null;
 				}
+
+				// Smoke test: confirm calls don't throw post-init.
+				try {
+					const projected = toFloat64Array(maybeModule.lat_lng_to_world_pixel(0, 0, 256));
+					if (projected.length < 2 || !Number.isFinite(projected[0]) || !Number.isFinite(projected[1]))
+						return null;
+				} catch (error: unknown) {
+					logWasmGeoLoadError(error);
+					return null;
+				}
+
 				cachedWasmGeoModule = maybeModule as WasmGeoModule;
+				if (process.env.NODE_ENV !== 'production') {
+					console.info('[SearchResultsMap] WASM geo module loaded');
+				}
 				return cachedWasmGeoModule;
 			})
 			.catch((error: unknown) => {

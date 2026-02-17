@@ -14,6 +14,8 @@ declare module '../../../../rust-scorer/pkg-web' {
 		lng: number,
 		worldSize: number
 	): Float64Array;
+	/** wasm-pack `--target web` default export: async init */
+	export default function __wbg_init(module_or_path?: unknown): Promise<unknown>;
 	export function distance_point_to_segment_sq(
 		px: number,
 		py: number,
