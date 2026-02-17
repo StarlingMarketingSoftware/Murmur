@@ -11,7 +11,10 @@ import {
 } from '@/app/api/_utils';
 import { stripBothSidesOfBraces } from '@/utils/string';
 import { getValidatedParamsFromUrl } from '@/utils';
-import { getPostTrainingForQuery } from '@/app/api/_utils/postTraining';
+import {
+	getPostTrainingForQuery,
+	type PostTrainingProfile,
+} from '@/app/api/_utils/postTraining';
 import { applyHardcodedLocationOverrides } from '@/app/api/_utils/searchPreprocess';
 import { Contact, EmailVerificationStatus, Prisma } from '@prisma/client';
 import { searchSimilarContacts, upsertContactToVectorDb } from '../_utils/vectorDb';
@@ -1042,6 +1045,32 @@ export async function GET(req: NextRequest) {
 
 		let locationResponse: string | null = null;
 		const rawQuery = query || '';
+		const preVectorPrepStartMs = Date.now();
+		const defaultPostTrainingProfile: PostTrainingProfile = {
+			active: false,
+			excludeTerms: [],
+			demoteTerms: [],
+		};
+		const postTrainingPromise: Promise<PostTrainingProfile> =
+			useVectorSearch && rawQuery
+				? (() => {
+						const postTrainingStartMs = Date.now();
+						return getPostTrainingForQuery(rawQuery)
+							.then((profile) => {
+								console.info(
+									`[contacts] post-training-llm=${Date.now() - postTrainingStartMs}ms`
+								);
+								return profile;
+							})
+							.catch((error) => {
+								console.error('Error getting post training profile:', error);
+								console.info(
+									`[contacts] post-training-llm-fallback=${Date.now() - postTrainingStartMs}ms`
+								);
+								return defaultPostTrainingProfile;
+							});
+				  })()
+				: Promise.resolve(defaultPostTrainingProfile);
 		// Special directives
 		const _trimmedLc = rawQuery.trim().toLowerCase();
 		const isPromotionSearch = _trimmedLc.startsWith('[promotion]');
@@ -1086,6 +1115,7 @@ export async function GET(req: NextRequest) {
 		};
 
 		if (process.env.GEMINI_API_KEY && queryForLocationParsing) {
+			const locationParsingStartMs = Date.now();
 			try {
 				locationResponse = await fetchGemini(
 					GEMINI_MODEL_OPTIONS.gemini25FlashLite,
@@ -1104,8 +1134,14 @@ export async function GET(req: NextRequest) {
 					queryForLocationParsing,
 					{ timeoutMs: 10000 } // 10s timeout for location parsing
 				);
+				console.info(
+					`[contacts] location-parsing-llm=${Date.now() - locationParsingStartMs}ms`
+				);
 			} catch (geminiError) {
 				console.error('Gemini location parsing failed:', geminiError);
+				console.info(
+					`[contacts] location-parsing-llm-fallback=${Date.now() - locationParsingStartMs}ms`
+				);
 				// Continue without location parsing if Gemini fails
 				locationResponse = null;
 			}
@@ -3829,13 +3865,8 @@ export async function GET(req: NextRequest) {
 		// If vector search is enabled and we have a query, use vector search
 		if (useVectorSearch && query) {
 			// Determine if this is a venue-like query that uses positive signals; overshoot to allow a lenient tail
-			let postTrainingProfile;
-			try {
-				postTrainingProfile = await getPostTrainingForQuery(query || '');
-			} catch (error) {
-				console.error('Error getting post training profile:', error);
-				postTrainingProfile = { active: false, excludeTerms: [], demoteTerms: [] };
-			}
+			const postTrainingProfile = await postTrainingPromise;
+			console.info(`[contacts] pre-vector-search-prep=${Date.now() - preVectorPrepStartMs}ms`);
 			const effectiveVectorLimit = postTrainingProfile.requirePositive
 				? Math.min(Math.max(requestedLimit + 20, Math.ceil(requestedLimit * 1.2)), 200)
 				: requestedLimit;
