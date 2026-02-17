@@ -369,6 +369,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	const [isOpenUpgradeSubscriptionDrawer, setIsOpenUpgradeSubscriptionDrawer] =
 		useState(false);
 	const [generationProgress, setGenerationProgress] = useState(-1);
+	const [generationTotal, setGenerationTotal] = useState(0);
 	const [isTest, setIsTest] = useState<boolean>(false);
 	// Drafting queue: allow multiple drafting operations to be queued while one runs.
 	const [draftOperations, setDraftOperations] = useState<DraftingOperation[]>([]);
@@ -415,6 +416,9 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	// Live preview progress (drives the top-of-page progress bar; stays in sync with Draft Preview playback)
 	const [livePreviewDraftNumber, setLivePreviewDraftNumber] = useState(0);
 	const [livePreviewTotal, setLivePreviewTotal] = useState(0);
+	const livePreviewDraftNumberRef = useRef(0);
+	const livePreviewTotalRef = useRef(0);
+	const livePreviewIsShowingFinalPlaceholderRef = useRef(false);
 	const livePreviewTimerRef = useRef<number | null>(null);
 	const livePreviewDelayTimerRef = useRef<number | null>(null);
 	// Store full text and an index to preserve original whitespace and paragraph breaks
@@ -472,6 +476,9 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		setLivePreviewSubject('');
 		setLivePreviewDraftNumber(0);
 		setLivePreviewTotal(0);
+		livePreviewDraftNumberRef.current = 0;
+		livePreviewTotalRef.current = 0;
+		livePreviewIsShowingFinalPlaceholderRef.current = false;
 		livePreviewFullTextRef.current = '';
 		livePreviewIndexRef.current = 0;
 		livePreviewQueueRef.current = [];
@@ -494,6 +501,18 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 					livePreviewDelayTimerRef.current = null;
 					hideLivePreview();
 				}, LIVE_PREVIEW_POST_DRAFT_DELAY_MS);
+			} else {
+				// UX: if we're waiting on the *final* draft to arrive, don't leave the UI
+				// looking "stuck" on the previous email. Show an explicit "final email" drafting state.
+				const total = livePreviewTotalRef.current;
+				const typed = livePreviewDraftNumberRef.current;
+				const isWaitingForFinal = total > 0 && typed === total - 1;
+				if (isWaitingForFinal && !livePreviewIsShowingFinalPlaceholderRef.current) {
+					livePreviewIsShowingFinalPlaceholderRef.current = true;
+					setIsLivePreviewVisible(true);
+					setLivePreviewSubject('Drafting final email...');
+					setLivePreviewMessage('Drafting final email...');
+				}
 			}
 			return;
 		}
@@ -509,7 +528,12 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			livePreviewTimerRef.current = null;
 		}
 
-		setLivePreviewDraftNumber((prev) => prev + 1);
+		livePreviewIsShowingFinalPlaceholderRef.current = false;
+		setLivePreviewDraftNumber((prev) => {
+			const nextNumber = prev + 1;
+			livePreviewDraftNumberRef.current = nextNumber;
+			return nextNumber;
+		});
 		setIsLivePreviewVisible(true);
 		setLivePreviewContactId(next.contactId);
 		setLivePreviewSubject(next.subject);
@@ -669,15 +693,19 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 
 	const beginLivePreviewBatch = useCallback((total?: number) => {
 		// Reset any previous playback and show the preview surface immediately.
+		const nextTotal = typeof total === 'number' && total > 0 ? total : 0;
 		stopLivePreviewTimers();
 		livePreviewQueueRef.current = [];
 		livePreviewAutoHideWhenIdleRef.current = false;
+		livePreviewIsShowingFinalPlaceholderRef.current = false;
 		setIsLivePreviewVisible(true);
 		setLivePreviewContactId(null);
 		setLivePreviewSubject('');
 		setLivePreviewMessage('Drafting...');
 		setLivePreviewDraftNumber(0);
-		setLivePreviewTotal(typeof total === 'number' && total > 0 ? total : 0);
+		setLivePreviewTotal(nextTotal);
+		livePreviewDraftNumberRef.current = 0;
+		livePreviewTotalRef.current = nextTotal;
 		livePreviewFullTextRef.current = '';
 		livePreviewIndexRef.current = 0;
 		livePreviewHasStartedRef.current = false;
@@ -728,7 +756,12 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 
 			// Prevent auto-hide when new work gets queued mid-typing.
 			livePreviewAutoHideWhenIdleRef.current = false;
-			setLivePreviewTotal((prev) => (prev > 0 ? prev + additionalTotal : additionalTotal));
+			livePreviewIsShowingFinalPlaceholderRef.current = false;
+			setLivePreviewTotal((prev) => {
+				const next = prev > 0 ? prev + additionalTotal : additionalTotal;
+				livePreviewTotalRef.current = next;
+				return next;
+			});
 			setIsLivePreviewVisible(true);
 		},
 		[beginLivePreviewBatch, isLivePreviewVisible, livePreviewTotal]
@@ -1915,6 +1948,7 @@ EXAMPLES OF GOOD CUSTOM INSTRUCTIONS:
 		activeDraftOperationIdRef.current = null;
 		processedStreamDraftKeysRef.current.clear();
 		setGenerationProgress(-1);
+		setGenerationTotal(0);
 		hideLivePreview();
 	};
 
@@ -2892,6 +2926,7 @@ EXAMPLES OF GOOD CUSTOM INSTRUCTIONS:
 					)
 				);
 				setGenerationProgress(0);
+				setGenerationTotal(next.total);
 
 				if (next.mode === DraftingMode.handwritten) {
 					await batchGenerateHandWrittenDrafts(next);
@@ -2937,6 +2972,7 @@ EXAMPLES OF GOOD CUSTOM INSTRUCTIONS:
 			const hasRunning = draftOperationsRef.current.some((op) => op.status === 'running');
 			if (!hasRunning) {
 				setGenerationProgress(-1);
+				setGenerationTotal(0);
 				// Let the live preview auto-hide after it finishes typing queued drafts.
 				endLivePreviewBatch();
 			}
@@ -3258,6 +3294,7 @@ EXAMPLES OF GOOD CUSTOM INSTRUCTIONS:
 		draftOperations,
 		form,
 		generationProgress,
+		generationTotal,
 		promptQualityScore,
 		promptQualityLabel,
 		promptSuggestions,

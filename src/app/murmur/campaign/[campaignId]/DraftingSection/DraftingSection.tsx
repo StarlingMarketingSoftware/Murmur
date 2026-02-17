@@ -246,6 +246,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		trackFocusedField,
 		handleGenerateDrafts,
 		generationProgress,
+		generationTotal,
 		scoreFullAutomatedPrompt,
 		critiqueManualEmailText,
 		// These are kept available for future use but not in current view:
@@ -260,7 +261,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		livePreviewContactId,
 		livePreviewMessage,
 		livePreviewSubject,
-		livePreviewTotal,
 	} = useDraftingSection(props);
 
 	const { user, subscriptionTier, isFreeTrial } = useMe();
@@ -3588,7 +3588,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 															}
 															isPendingGeneration={isPendingGeneration}
 															generationProgress={generationProgress}
-															generationTotal={contactsAvailableForDrafting.length}
+															generationTotal={generationTotal}
 															hideTopChrome
 															hideFooter
 															fullWidthMobile
@@ -4076,7 +4076,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												isDraftDisabled={isGenerationDisabled()}
 												isPendingGeneration={isPendingGeneration}
 												generationProgress={generationProgress}
-												generationTotal={contactsAvailableForDrafting.length}
+												generationTotal={generationTotal}
 												hideTopChrome
 												hideFooter
 												hideAddTextButtons
@@ -4995,7 +4995,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											drafts={draftEmails}
 											contacts={contacts || []}
 											generationProgress={generationProgress}
-											generationTotal={livePreviewTotal || contactsAvailableForDrafting.length}
+											generationTotal={generationTotal}
 											width={233}
 											height={bottomPanelBoxHeightPx}
 											whiteSectionHeight={15}
@@ -5121,7 +5121,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 															isDraftDisabled={isGenerationDisabled()}
 															isPendingGeneration={isPendingGeneration}
 															generationProgress={generationProgress}
-															generationTotal={contactsAvailableForDrafting.length}
+															generationTotal={generationTotal}
 															hideTopChrome
 															hideFooter
 															fullWidthMobile
@@ -5480,7 +5480,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														isDraftDisabled={isGenerationDisabled()}
 														isPendingGeneration={isPendingGeneration}
 														generationProgress={generationProgress}
-														generationTotal={contactsAvailableForDrafting.length}
+														generationTotal={generationTotal}
 														hideTopChrome
 														hideFooter
 														fullWidthMobile
@@ -5559,7 +5559,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										setSelectedContactIds={setContactsTabSelectedIds}
 										handleContactSelection={handleContactsTabSelection}
 										generationProgress={generationProgress}
-										generationTotal={livePreviewTotal || contactsAvailableForDrafting.length}
+										generationTotal={generationTotal}
 										campaign={campaign}
 										showSearchBar={false}
 										onDraftEmails={async (ids) => {
@@ -5631,7 +5631,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														isDraftDisabled={isGenerationDisabled()}
 														isPendingGeneration={isPendingGeneration}
 														generationProgress={generationProgress}
-														generationTotal={contactsAvailableForDrafting.length}
+														generationTotal={generationTotal}
 														hideTopChrome
 														hideFooter
 														fullWidthMobile
@@ -5680,7 +5680,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													setSelectedContactIds={setContactsTabSelectedIds}
 													handleContactSelection={handleContactsTabSelection}
 													generationProgress={generationProgress}
-													generationTotal={livePreviewTotal || contactsAvailableForDrafting.length}
+													generationTotal={generationTotal}
 													campaign={campaign}
 													showSearchBar={false}
 													onDraftEmails={async (ids) => {
@@ -5842,7 +5842,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												drafts={draftEmails}
 												contacts={contacts || []}
 												generationProgress={generationProgress}
-												generationTotal={livePreviewTotal || contactsAvailableForDrafting.length}
+												generationTotal={generationTotal}
 												width={233}
 												height={bottomPanelBoxHeightPx}
 												whiteSectionHeight={15}
@@ -5880,7 +5880,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											setSelectedContactIds={setContactsTabSelectedIds}
 											handleContactSelection={handleContactsTabSelection}
 											generationProgress={generationProgress}
-											generationTotal={livePreviewTotal || contactsAvailableForDrafting.length}
+											generationTotal={generationTotal}
 											campaign={campaign}
 											showSearchBar={false}
 											onDraftEmails={async (ids) => {
@@ -6085,7 +6085,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														isDraftDisabled={isGenerationDisabled()}
 														isPendingGeneration={isPendingGeneration}
 														generationProgress={generationProgress}
-														generationTotal={contactsAvailableForDrafting.length}
+														generationTotal={generationTotal}
 														hideTopChrome
 														hideFooter
 														fullWidthMobile
@@ -6171,7 +6171,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														isDraftDisabled={isGenerationDisabled()}
 														isPendingGeneration={isPendingGeneration}
 														generationProgress={generationProgress}
-														generationTotal={contactsAvailableForDrafting.length}
+														generationTotal={generationTotal}
 														hideTopChrome
 														hideFooter
 														fullWidthMobile
@@ -6247,7 +6247,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												drafts={draftEmails}
 												contacts={contacts || []}
 												generationProgress={generationProgress}
-												generationTotal={livePreviewTotal || contactsAvailableForDrafting.length}
+												generationTotal={generationTotal}
 												width={233}
 												height={bottomPanelBoxHeightPx}
 												whiteSectionHeight={15}
@@ -6336,7 +6336,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														isDraftDisabled={isGenerationDisabled()}
 														isPendingGeneration={isPendingGeneration}
 														generationProgress={generationProgress}
-														generationTotal={contactsAvailableForDrafting.length}
+														generationTotal={generationTotal}
 														hideTopChrome
 														hideFooter
 														fullWidthMobile
@@ -6369,7 +6369,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													drafts={draftEmails}
 													contacts={contacts || []}
 													generationProgress={generationProgress}
-													generationTotal={livePreviewTotal || contactsAvailableForDrafting.length}
+													generationTotal={generationTotal}
 													width={233}
 													height={bottomPanelBoxHeightPx}
 													whiteSectionHeight={15}
@@ -7641,7 +7641,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												drafts={draftEmails}
 												contacts={contacts || []}
 												generationProgress={generationProgress}
-												generationTotal={livePreviewTotal || contactsAvailableForDrafting.length}
+												generationTotal={generationTotal}
 												width={233}
 												height={bottomPanelBoxHeightPx}
 												whiteSectionHeight={15}
@@ -7708,7 +7708,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													drafts={draftEmails}
 													contacts={contacts || []}
 													generationProgress={generationProgress}
-													generationTotal={livePreviewTotal || contactsAvailableForDrafting.length}
+													generationTotal={generationTotal}
 													width={233}
 													height={bottomPanelBoxHeightPx}
 													whiteSectionHeight={15}
@@ -7899,7 +7899,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													isDraftDisabled={isGenerationDisabled()}
 													isPendingGeneration={isPendingGeneration}
 													generationProgress={generationProgress}
-													generationTotal={contactsAvailableForDrafting.length}
+													generationTotal={generationTotal}
 													hideTopChrome
 													hideFooter
 													fullWidthMobile
@@ -8640,7 +8640,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													isDraftDisabled={isGenerationDisabled()}
 													isPendingGeneration={isPendingGeneration}
 													generationProgress={generationProgress}
-													generationTotal={contactsAvailableForDrafting.length}
+													generationTotal={generationTotal}
 													hideTopChrome
 													hideFooter
 													fullWidthMobile

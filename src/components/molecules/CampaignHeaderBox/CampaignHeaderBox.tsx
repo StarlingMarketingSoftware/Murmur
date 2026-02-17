@@ -72,9 +72,11 @@ export const CampaignHeaderBox: FC<CampaignHeaderBoxProps> = ({
 	const draftingOperationsForBars = draftingOperations.slice(0, 2);
 	const draftingLabel = shouldShowDraftingProgress
 		? draftingOperations.length === 1
-			? `${draftingOperations[0].total} email${
-					draftingOperations[0].total === 1 ? '' : 's'
-			  } drafting`
+			? (() => {
+					const op = draftingOperations[0];
+					const step = Math.min(op.total, Math.max(0, op.current) + 1);
+					return `Drafting ${step}/${op.total} email${op.total === 1 ? '' : 's'}`;
+			  })()
 			: `${draftingOperations.length} operations in progress`
 		: '';
 
