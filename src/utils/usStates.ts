@@ -1,5 +1,7 @@
 import { US_STATES } from '@/constants/usStates';
 
+declare const __non_webpack_require__: NodeRequire | undefined;
+
 type WasmGeoModule = {
 	batch_haversine_km: (
 		originLat: number,
@@ -35,18 +37,16 @@ const getNodeWasmGeoModule = (): WasmGeoModule | null => {
 	if (cachedNodeWasmGeo !== undefined) return cachedNodeWasmGeo;
 
 	try {
-		const maybeGlobal = globalThis as {
-			__non_webpack_require__?: NodeRequire;
-			require?: NodeRequire;
-		};
-		const dynamicRequire =
-			maybeGlobal.__non_webpack_require__ ??
-			maybeGlobal.require ??
-			(typeof require === 'function' ? (require as NodeRequire) : null);
-		if (!dynamicRequire) {
-			cachedNodeWasmGeo = null;
-			return cachedNodeWasmGeo;
-		}
+		// Use __non_webpack_require__ so webpack does not attempt to bundle or
+		// statically analyse the dynamic require call.  In Next.js server
+		// bundles this global is always available.  The eval('require')
+		// fallback covers plain Node.js execution outside of webpack.
+		// eslint-disable-next-line @typescript-eslint/no-require-imports
+		const dynamicRequire: NodeRequire =
+			// eslint-disable-next-line no-underscore-dangle
+			(typeof __non_webpack_require__ !== 'undefined'
+				? __non_webpack_require__
+				: eval('require')) as NodeRequire;
 
 		const loaded = dynamicRequire(
 			`${process.cwd()}/rust-scorer/pkg-node`
