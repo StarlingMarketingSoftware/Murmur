@@ -2119,6 +2119,97 @@ const DashboardContent = () => {
 	const hasNoSearchResults =
 		hasSearched && !isMapResultsLoading && (contacts?.length ?? 0) === 0;
 
+	// ── Search-results row cascade animation ─────────────────────────────────
+	// Rows start as placeholder-coloured rectangles (matching the panel bg).
+	// One by one from top to bottom each row flips to its normal white state
+	// with content, like the list is being populated in real-time.
+	const mapPanelRowsDesktopRef = useRef<HTMLDivElement>(null);
+	const mapPanelRowsNarrowRef = useRef<HTMLDivElement>(null);
+	const prevMapResultsLoadingRef = useRef(isMapResultsLoading);
+	const cascadeTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+	// Match the map panel skeleton wave animation so the cascade feels like it
+	// "resolves" the wave into real results.
+	const WAVE_BASE_BG = '#C5F0FF';
+	const WAVE_DURATION_SECONDS = 2.5;
+	const WAVE_ROW_STEP_DELAY_SECONDS = 0.1;
+	const CASCADE_INITIAL_DELAY_MS = 120;
+	const CASCADE_STAGGER_MS = 100;
+	const CASCADE_MAX_ROWS = 14;
+
+	// useLayoutEffect: runs synchronously BEFORE the browser paints so the user
+	// never sees a flash of white rows — they start as placeholders.
+	useLayoutEffect(() => {
+		const wasLoading = prevMapResultsLoadingRef.current;
+		prevMapResultsLoadingRef.current = isMapResultsLoading;
+		if (!wasLoading || isMapResultsLoading) return;
+
+		// Clear any in-flight timers from a previous cascade.
+		for (const t of cascadeTimersRef.current) clearTimeout(t);
+		cascadeTimersRef.current = [];
+
+		const refs = [mapPanelRowsDesktopRef.current, mapPanelRowsNarrowRef.current];
+		for (const container of refs) {
+			if (!container) continue;
+			const rows = Array.from(container.children).slice(0, CASCADE_MAX_ROWS) as HTMLElement[];
+			if (rows.length === 0) continue;
+
+			// Set every row to the placeholder wave state before the browser paints.
+			rows.forEach((row, idx) => {
+				// Preserve the *real* background (set by React) so we can restore it.
+				row.dataset.cascadeBg = row.style.backgroundColor;
+				// Keep the normal outline; remove any stale inline override.
+				row.style.borderColor = '';
+
+				// Continue the wave background animation used by the skeleton rows.
+				row.style.backgroundColor = WAVE_BASE_BG;
+				row.style.animation = `mapResultsPanelLoadingWave ${WAVE_DURATION_SECONDS}s ease-in-out infinite`;
+				row.style.animationDelay = `${-(WAVE_DURATION_SECONDS - idx * WAVE_ROW_STEP_DELAY_SECONDS)}s`;
+				row.style.willChange = 'background-color';
+
+				for (const child of Array.from(row.children) as HTMLElement[]) {
+					// Ensure we don't keep any stale visibility settings from a previous run.
+					child.style.visibility = '';
+					child.style.opacity = '0';
+				}
+			});
+
+			// Schedule the cascade: each row flips to its real appearance one at a time.
+			rows.forEach((row, idx) => {
+				const timer = setTimeout(() => {
+					const targetBg =
+						row.dataset.cascadeBg && row.dataset.cascadeBg.length > 0 ? row.dataset.cascadeBg : '#FFFFFF';
+					delete row.dataset.cascadeBg;
+
+					// Freeze the wave at its current color, then tween to the final bg.
+					const waveBg = getComputedStyle(row).backgroundColor;
+					row.style.animation = '';
+					row.style.animationDelay = '';
+					row.style.willChange = '';
+					row.style.backgroundColor = waveBg;
+
+					const children = Array.from(row.children) as HTMLElement[];
+					gsap.killTweensOf(row);
+					gsap.killTweensOf(children);
+
+					gsap.to(row, {
+						backgroundColor: targetBg,
+						duration: 0.26,
+						ease: 'power1.out',
+					});
+					gsap.to(children, {
+						opacity: 1,
+						duration: 0.22,
+						delay: 0.02,
+						ease: 'power1.out',
+						clearProps: 'opacity',
+					});
+				}, CASCADE_INITIAL_DELAY_MS + idx * CASCADE_STAGGER_MS);
+				cascadeTimersRef.current.push(timer);
+			});
+		}
+	}, [isMapResultsLoading]);
+
 	type SearchThisAreaViewportIdlePayload = {
 		bounds: { south: number; west: number; north: number; east: number };
 		zoom: number;
@@ -6454,7 +6545,8 @@ const DashboardContent = () => {
 																					rows={Math.max(mapPanelContacts.length, 14)}
 																				/>
 																			) : (
-																				mapPanelContacts.map((contact) => {
+																				<div ref={mapPanelRowsDesktopRef} className="space-y-[7px]">
+																				{mapPanelContacts.map((contact) => {
 																				const isSelected = selectedContacts.includes(
 																					contact.id
 																				);
@@ -6796,7 +6888,8 @@ const DashboardContent = () => {
 																						)}
 																					</div>
 																				);
-																				})
+																				})}
+																				</div>
 																			)}
 																		</CustomScrollbar>
 																		{!isMapResultsLoading && isMapPanelCreateCampaignVisible && !fromHomeParam && (
@@ -7006,7 +7099,8 @@ const DashboardContent = () => {
 																			rows={Math.max(mapPanelContacts.length, 8)}
 																		/>
 																	) : (
-																		mapPanelContacts.map((contact) => {
+																		<div ref={mapPanelRowsNarrowRef} className="space-y-[7px]">
+																		{mapPanelContacts.map((contact) => {
 																		const isSelected = selectedContacts.includes(
 																			contact.id
 																		);
@@ -7239,7 +7333,8 @@ const DashboardContent = () => {
 																				</div>
 																			</div>
 																		);
-																		})
+																		})}
+																		</div>
 																	)}
 														</CustomScrollbar>
 															{!isMapResultsLoading && !fromHomeParam && (

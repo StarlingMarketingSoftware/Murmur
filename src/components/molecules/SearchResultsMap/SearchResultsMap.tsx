@@ -1198,14 +1198,21 @@ const MAPBOX_LAYER_IDS = {
 // Compute a per-dot reveal delay (ms) based on longitude so dots fade in as a smooth left→right wave.
 // We drive the animation by updating a single paint expression over time.
 const DOT_WAVE_DELAY_PROP = '__murmurWaveDelayMs';
-const DOT_WAVE_TRAVEL_MS_MIN = 650;
-const DOT_WAVE_TRAVEL_MS_MAX = 1150;
+const DOT_WAVE_TRAVEL_MS_MIN = 900;
+const DOT_WAVE_TRAVEL_MS_MAX = 1600;
 // Each dot fades up over this duration once the wave reaches it.
-const DOT_WAVE_FADE_MS = 420;
-// Tiny deterministic jitter breaks up "curtain" columns while keeping the wave direction.
-const DOT_WAVE_JITTER_MS = 70;
+// A wide band means many dots coexist at different partial opacities, so no visible "edge".
+const DOT_WAVE_FADE_MS = 1200;
+// Per-dot jitter range (ms). Large enough to separate dots at the same longitude into
+// individually-timed reveals rather than batches that pop in together.
+const DOT_WAVE_JITTER_MS = 350;
 // Throttle paint updates (~60fps) for smoothness.
 const DOT_WAVE_FRAME_MS = 16;
+// Mapbox transition duration between throttled paint updates. Keep short so individual dot
+// timings stay crisp rather than being temporally blurred into batches.
+const DOT_WAVE_SMOOTH_TRANSITION_MS = 25;
+// Ease-out curve for per-dot opacity ramp. Dots gently emerge then settle into full opacity.
+const DOT_WAVE_EASING: any = ['cubic-bezier', 0.33, 0, 0.2, 1];
 
 type DotWaveMeta = {
 	maxDelayMs: number;
@@ -1213,29 +1220,42 @@ type DotWaveMeta = {
 
 const computeDotWaveTravelMs = (featureCount: number): number => {
 	if (!Number.isFinite(featureCount) || featureCount <= 0) return DOT_WAVE_TRAVEL_MS_MIN;
-	const raw = 620 + Math.sqrt(featureCount) * 18;
+	const raw = 800 + Math.sqrt(featureCount) * 22;
 	return clamp(Math.round(raw), DOT_WAVE_TRAVEL_MS_MIN, DOT_WAVE_TRAVEL_MS_MAX);
 };
 
 const computeDotWaveDelayMs = (
 	featureId: number,
 	lng: number,
+	lat: number,
 	minLng: number,
 	maxLng: number,
+	minLat: number,
+	maxLat: number,
 	travelMs: number
 ): number => {
-	const denom = maxLng - minLng;
-	const t =
-		!Number.isFinite(denom) || denom <= 1e-9
+	const denomLng = maxLng - minLng;
+	const tLng =
+		!Number.isFinite(denomLng) || denomLng <= 1e-9
 			? 0
-			: clamp((lng - minLng) / denom, 0, 1);
+			: clamp((lng - minLng) / denomLng, 0, 1);
 
-	// Deterministic tiny jitter (0..DOT_WAVE_JITTER_MS) so dots don't all pop as vertical stripes.
-	// Knuth multiplicative hash; stable for numeric ids.
+	// Subtle latitude-based wavefront undulation creates an organic, curved leading edge
+	// instead of a rigid vertical curtain. Sine produces a gentle bulge in the middle.
+	const denomLat = maxLat - minLat;
+	const tLat =
+		!Number.isFinite(denomLat) || denomLat <= 1e-9
+			? 0.5
+			: clamp((lat - minLat) / denomLat, 0, 1);
+	const latUndulation = (Math.sin(tLat * Math.PI) - 0.5) * 0.14 * travelMs;
+
+	// Deterministic float-precision jitter so each dot gets a practically unique offset.
+	// Knuth multiplicative hash → 16-bit fractional value → scaled to [0, DOT_WAVE_JITTER_MS).
+	// 65536 distinct values eliminates the sub-batching caused by integer modulo quantization.
 	const h = (featureId * 2654435761) >>> 0;
-	const jitter = DOT_WAVE_JITTER_MS > 0 ? h % (DOT_WAVE_JITTER_MS + 1) : 0;
+	const jitter = DOT_WAVE_JITTER_MS > 0 ? ((h & 0xffff) / 0x10000) * DOT_WAVE_JITTER_MS : 0;
 
-	return t * travelMs + jitter;
+	return Math.max(0, tLng * travelMs + latUndulation + jitter);
 };
 
 type BasemapCartographyClipState = {
@@ -6103,6 +6123,16 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 	const promotionPinIdsRef = useRef<Set<number>>(new Set());
 	const promotionDotIdsRef = useRef<Set<number>>(new Set());
+	const baseDotsLastDataKeyRef = useRef<string>('');
+	// Sync contacts prop length into a ref so the base-dots effect can detect
+	// a stale-empty visibleContacts without adding contacts to its dep array.
+	const contactsPropLengthRef = useRef(contacts.length);
+	contactsPropLengthRef.current = contacts.length;
+	// Guard transient empty-contact renders around query/refetch transitions.
+	const baseDotsLastSearchKeyRef = useRef<string>((searchQuery ?? '').trim());
+	const baseDotsPendingDataSearchKeyRef = useRef<string | null>(null);
+	const baseDotsPendingDataSawLoadingRef = useRef<boolean>(false);
+	const baseDotsPrevContactsPropLengthRef = useRef<number>(contacts.length);
 	const baseDotsWaveMetaRef = useRef<DotWaveMeta | null>(null);
 	const baseDotsWaveCancelRef = useRef<(() => void) | null>(null);
 	const baseDotsWavePrevIsLoadingRef = useRef<boolean>(false);
@@ -6110,6 +6140,57 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const baseDotsWavePendingSearchKeyRef = useRef<string | null>(null);
 	// Tracks the last query key that actually played the base-dot wave animation.
 	const baseDotsWaveLastSearchKeyRef = useRef<string>('');
+	const stopBaseDotsWaveAndRestoreSteadyRendering = useCallback(() => {
+		if (!map || !isMapLoaded) return;
+
+		const cancel = baseDotsWaveCancelRef.current;
+		if (cancel) {
+			cancel();
+			baseDotsWaveCancelRef.current = null;
+		}
+
+		try {
+			if (map.getLayer(MAPBOX_LAYER_IDS.baseDots)) {
+				const transition = { duration: 0, delay: 0 } as any;
+				(map as any).setPaintProperty(
+					MAPBOX_LAYER_IDS.baseDots,
+					'circle-opacity-transition',
+					transition
+				);
+				(map as any).setPaintProperty(
+					MAPBOX_LAYER_IDS.baseDots,
+					'circle-stroke-opacity-transition',
+					transition
+				);
+				(map as any).setPaintProperty(MAPBOX_LAYER_IDS.baseDots, 'circle-opacity', 1);
+				(map as any).setPaintProperty(MAPBOX_LAYER_IDS.baseDots, 'circle-stroke-opacity', 1);
+			}
+		} catch {
+			// Ignore style timing races.
+		}
+
+		try {
+			if (map.getLayer(MAPBOX_LAYER_IDS.baseHit)) {
+				map.setFilter(MAPBOX_LAYER_IDS.baseHit, null as any);
+			}
+		} catch {
+			// Ignore style timing races.
+		}
+	}, [map, isMapLoaded]);
+
+	// If the user starts panning/zooming while the post-search reveal wave is running,
+	// switch back to steady rendering so newly sampled viewport dots don't appear to vanish.
+	useEffect(() => {
+		if (!map || !isMapLoaded) return;
+		const onMoveStart = () => {
+			if (!baseDotsWaveCancelRef.current) return;
+			stopBaseDotsWaveAndRestoreSteadyRendering();
+		};
+		map.on('movestart', onMoveStart);
+		return () => {
+			map.off('movestart', onMoveStart);
+		};
+	}, [map, isMapLoaded, stopBaseDotsWaveAndRestoreSteadyRendering]);
 
 	// Base result dots
 	useEffect(() => {
@@ -6118,8 +6199,31 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			| mapboxgl.GeoJSONSource
 			| undefined;
 		if (!source) return;
+		const searchKey = (searchQuery ?? '').trim();
+		const loading = Boolean(isLoading);
+		const hasLoadingSignal = typeof isLoading === 'boolean';
+		const prevContactsLen = baseDotsPrevContactsPropLengthRef.current;
+		baseDotsPrevContactsPropLengthRef.current = contacts.length;
 
-		if (isLoading) {
+		if (searchKey !== baseDotsLastSearchKeyRef.current) {
+			baseDotsLastSearchKeyRef.current = searchKey;
+			baseDotsPendingDataSearchKeyRef.current = searchKey;
+			baseDotsPendingDataSawLoadingRef.current = loading;
+		} else if (loading && baseDotsPendingDataSearchKeyRef.current === searchKey) {
+			baseDotsPendingDataSawLoadingRef.current = true;
+		} else if (
+			!loading &&
+			searchKey.length > 0 &&
+			prevContactsLen > 0 &&
+			contacts.length === 0
+		) {
+			// Same-query refetch path: parent can momentarily clear contacts before
+			// loading flips true. Arm the same empty-commit guard used for new queries.
+			baseDotsPendingDataSearchKeyRef.current = searchKey;
+			baseDotsPendingDataSawLoadingRef.current = false;
+		}
+
+		if (loading) {
 			// Stop any in-flight reveal animation while loading/refetching.
 			if (baseDotsWaveCancelRef.current) {
 				baseDotsWaveCancelRef.current();
@@ -6138,6 +6242,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		const dots: DotSeed[] = [];
 		let minLng = Number.POSITIVE_INFINITY;
 		let maxLng = Number.NEGATIVE_INFINITY;
+		let minLat = Number.POSITIVE_INFINITY;
+		let maxLat = Number.NEGATIVE_INFINITY;
 
 		for (const contact of visibleContacts) {
 			const coords = getContactCoords(contact);
@@ -6151,12 +6257,51 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			dots.push({ id: contact.id, lng: coords.lng, lat: coords.lat, fillColor });
 			minLng = Math.min(minLng, coords.lng);
 			maxLng = Math.max(maxLng, coords.lng);
+			minLat = Math.min(minLat, coords.lat);
+			maxLat = Math.max(maxLat, coords.lat);
+		}
+
+		// For a newly issued query/refetch, ignore transient empty pushes until
+		// we've observed a loading phase for that same query key.
+		if (
+			dots.length === 0 &&
+			hasLoadingSignal &&
+			baseDotsPendingDataSearchKeyRef.current === searchKey &&
+			!baseDotsPendingDataSawLoadingRef.current
+		) {
+			return;
+		}
+
+		// Guard against the one-render gap where isLoading just turned false but
+		// visibleContacts hasn't been repopulated by recomputeViewportDots yet.
+		// Without this, setData would briefly clear all dots before the next render
+		// fills them back in, producing a visible disappear/reappear flicker.
+		if (dots.length === 0 && contactsPropLengthRef.current > 0) {
+			return;
+		}
+
+		// Fingerprint the data so we skip redundant setData calls that cause
+		// Mapbox to briefly clear and re-render the same features (flicker).
+		let dataKey = '';
+		for (let i = 0; i < dots.length; i++) {
+			const d = dots[i];
+			dataKey += (i > 0 ? ',' : '') + d.id + ':' + d.fillColor;
+		}
+		if (dataKey === baseDotsLastDataKeyRef.current) {
+			return;
+		}
+		baseDotsLastDataKeyRef.current = dataKey;
+
+		// Interrupt the reveal wave before swapping source data; otherwise the in-flight
+		// opacity expression can keep newly sampled dots hidden until old delays elapse.
+		if (baseDotsWaveCancelRef.current) {
+			stopBaseDotsWaveAndRestoreSteadyRendering();
 		}
 
 		const travelMs = computeDotWaveTravelMs(dots.length);
 		let maxDelayMs = 0;
 		const features: any[] = dots.map((dot) => {
-			const delayMs = computeDotWaveDelayMs(dot.id, dot.lng, minLng, maxLng, travelMs);
+			const delayMs = computeDotWaveDelayMs(dot.id, dot.lng, dot.lat, minLng, maxLng, minLat, maxLat, travelMs);
 			maxDelayMs = Math.max(maxDelayMs, delayMs);
 			return {
 				type: 'Feature',
@@ -6183,7 +6328,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		} catch {
 			prefersReducedMotion = false;
 		}
-		const searchKey = (searchQuery ?? '').trim();
 		const shouldPrimeWaveFrameZero =
 			baseDotsWavePrevIsLoadingRef.current &&
 			searchKey.length > 0 &&
@@ -6194,7 +6338,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		if (shouldPrimeWaveFrameZero) {
 			const expr0 = [
 				'interpolate',
-				['linear'],
+				DOT_WAVE_EASING,
 				['-', 0, ['coalesce', ['get', DOT_WAVE_DELAY_PROP], 0]],
 				0,
 				0,
@@ -6225,10 +6369,15 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			}
 		}
 		source.setData({ type: 'FeatureCollection', features } as any);
+		if (baseDotsPendingDataSearchKeyRef.current === searchKey) {
+			baseDotsPendingDataSearchKeyRef.current = null;
+			baseDotsPendingDataSawLoadingRef.current = false;
+		}
 	}, [
 		map,
 		isMapLoaded,
 		isLoading,
+		contacts.length,
 		visibleContacts,
 		getContactCoords,
 		defaultDotFillColor,
@@ -6238,6 +6387,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		isCoordsInLockedState,
 		searchQuery,
 		isBackgroundPresentation,
+		stopBaseDotsWaveAndRestoreSteadyRendering,
 	]);
 
 	// Wave reveal for base dots on each completed search (left → right).
@@ -6277,13 +6427,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			}
 		};
 
-		const restoreBaseDotsRendering = () => {
+		const restoreBaseDotsRendering = (transitionMs = 0) => {
 			// Reset base dots to normal rendering (no animated expression).
-			// IMPORTANT: set transitions *before* opacity to avoid a visible "pulse" at the end
-			// of the wave when Mapbox applies the previous transition settings for one frame.
-			const instant = { duration: 0, delay: 0 } as any;
-			safeSetPaint(MAPBOX_LAYER_IDS.baseDots, 'circle-opacity-transition', instant);
-			safeSetPaint(MAPBOX_LAYER_IDS.baseDots, 'circle-stroke-opacity-transition', instant);
+			// IMPORTANT: set transitions *before* opacity changes.
+			const transition = { duration: transitionMs, delay: 0 } as any;
+			safeSetPaint(MAPBOX_LAYER_IDS.baseDots, 'circle-opacity-transition', transition);
+			safeSetPaint(MAPBOX_LAYER_IDS.baseDots, 'circle-stroke-opacity-transition', transition);
 			safeSetPaint(MAPBOX_LAYER_IDS.baseDots, 'circle-opacity', 1);
 			safeSetPaint(MAPBOX_LAYER_IDS.baseDots, 'circle-stroke-opacity', 1);
 			safeClearFilter(MAPBOX_LAYER_IDS.baseHit);
@@ -6315,7 +6464,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			}
 
 			stopRunningWave();
-			restoreBaseDotsRendering();
+			restoreBaseDotsRendering(0);
 			baseDotsWavePrevIsLoadingRef.current = loading;
 			// When not in search mode, allow future searches to animate again.
 			if (!isSearchMode) {
@@ -6342,7 +6491,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 		const meta = baseDotsWaveMetaRef.current;
 		if (!meta || !Number.isFinite(meta.maxDelayMs) || meta.maxDelayMs <= 0) {
-			restoreBaseDotsRendering();
+			restoreBaseDotsRendering(0);
 			baseDotsWaveLastSearchKeyRef.current = searchKey;
 			baseDotsWavePendingSearchKeyRef.current = null;
 			return;
@@ -6350,22 +6499,24 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		baseDotsWaveLastSearchKeyRef.current = searchKey;
 		baseDotsWavePendingSearchKeyRef.current = null;
 
-		// Temporarily enable smooth transitions between our throttled updates.
+		// Enable smooth transitions between throttled paint updates.
+		// A duration slightly longer than the frame interval lets Mapbox interpolate
+		// between our discrete expression snapshots, eliminating visible stepping.
 		safeSetPaint(
 			MAPBOX_LAYER_IDS.baseDots,
 			'circle-opacity-transition',
-			{ duration: DOT_WAVE_FRAME_MS, delay: 0 } as any
+			{ duration: DOT_WAVE_SMOOTH_TRANSITION_MS, delay: 0 } as any
 		);
 		safeSetPaint(
 			MAPBOX_LAYER_IDS.baseDots,
 			'circle-stroke-opacity-transition',
-			{ duration: DOT_WAVE_FRAME_MS, delay: 0 } as any
+			{ duration: DOT_WAVE_SMOOTH_TRANSITION_MS, delay: 0 } as any
 		);
 
 		const buildOpacityExpr = (nowMs: number) => {
 			return [
 				'interpolate',
-				['linear'],
+				DOT_WAVE_EASING,
 				['-', nowMs, ['coalesce', ['get', DOT_WAVE_DELAY_PROP], 0]],
 				0,
 				0,
@@ -6419,8 +6570,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				return;
 			}
 
-			// Finished: restore normal rendering and full interactivity.
-			restoreBaseDotsRendering();
+			// Finished: hand off smoothly to steady-state rendering/interactivity.
+			restoreBaseDotsRendering(90);
 			cancel();
 			if (baseDotsWaveCancelRef.current === cancel) baseDotsWaveCancelRef.current = null;
 		};

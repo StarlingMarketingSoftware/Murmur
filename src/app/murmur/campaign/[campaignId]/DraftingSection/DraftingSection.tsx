@@ -7043,6 +7043,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														? searchResults || [] // Search tab with query - show results
 														: [] // Empty search tab - show nothing (zoomed out view)
 												}
+												isLoading={activeSearchTabId !== null ? isSearching : false}
 												selectedContacts={
 													activeSearchTabId !== null
 														? searchResultsSelectedContacts
