@@ -1,6 +1,7 @@
-import { apiBadRequest, apiUnauthorized } from '@/app/api/_utils';
+import { apiBadRequest, apiForbidden, apiUnauthorized } from '@/app/api/_utils';
 import { fetchOpenRouter } from '@/app/api/_utils/openrouter';
 import { OPENROUTER_DRAFTING_MODELS, getRandomDraftingSystemPrompt } from '@/constants/ai';
+import prisma from '@/lib/prisma';
 import { stripEmailSignatureFromAiMessage } from '@/utils/email';
 import { removeEmDashes, stringifyJsonSubset } from '@/utils/string';
 import { auth } from '@clerk/nextjs/server';
@@ -12,6 +13,39 @@ const DEFAULT_OPENROUTER_DRAFTING_MODEL = OPENROUTER_DRAFTING_MODELS[0];
 const DEFAULT_CONCURRENCY = 5;
 const MAX_RETRIES = 5;
 const HEARTBEAT_MS = 15000;
+
+const packMetadataForPrompt = (metadata: string): string => {
+	const normalized = metadata
+		.replace(/\r\n?/g, '\n')
+		.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '')
+		.replace(/\t/g, ' ');
+
+	const lines = normalized.split('\n');
+	const dedupedLines: string[] = [];
+	let previousLine: string | null = null;
+	for (const rawLine of lines) {
+		const cleanedLine = rawLine.replace(/ {2,}/g, ' ').replace(/[ \u00A0]+$/g, '');
+		if (previousLine !== null && cleanedLine === previousLine) {
+			continue;
+		}
+		dedupedLines.push(cleanedLine);
+		previousLine = cleanedLine;
+	}
+
+	const text = dedupedLines.join('\n');
+	const paragraphs = text.split(/\n{2,}/);
+	const dedupedParagraphs: string[] = [];
+	let previousParagraph: string | null = null;
+	for (const paragraph of paragraphs) {
+		if (previousParagraph !== null && paragraph === previousParagraph) {
+			continue;
+		}
+		dedupedParagraphs.push(paragraph);
+		previousParagraph = paragraph;
+	}
+
+	return dedupedParagraphs.join('\n\n').trim();
+};
 
 const contactSchema = z.object({
 	id: z.number().int().positive(),
@@ -37,16 +71,27 @@ const identitySchema = z.object({
 	website: z.string().nullable().optional(),
 });
 
-const postGenerateDraftsSchema = z.object({
-	operationId: z.string().min(1),
-	campaignId: z.number().int().positive().optional(),
-	prompt: z.string().min(1),
-	bookingFor: z.string().optional(),
-	identity: identitySchema,
-	contacts: z.array(contactSchema).min(1),
-	models: z.array(z.string().min(1)).optional(),
-	concurrency: z.number().int().min(1).max(20).optional(),
-});
+const postGenerateDraftsSchema = z
+	.object({
+		operationId: z.string().min(1),
+		campaignId: z.number().int().positive(),
+		prompt: z.string().min(1),
+		bookingFor: z.string().optional(),
+		identity: identitySchema,
+		contactIds: z.array(z.number().int().positive()).min(1).optional(),
+		contacts: z.array(contactSchema).min(1).optional(),
+		models: z.array(z.string().min(1)).optional(),
+		concurrency: z.number().int().min(1).max(20).optional(),
+	})
+	.superRefine((value, ctx) => {
+		if (!value.contactIds?.length && !value.contacts?.length) {
+			ctx.addIssue({
+				code: z.ZodIssueCode.custom,
+				message: 'Must provide either contactIds or contacts',
+				path: ['contactIds'],
+			});
+		}
+	});
 
 export const maxDuration = 120;
 
@@ -245,6 +290,8 @@ const createSseEvent = (event: string, payload: object): string =>
 	`event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`;
 
 export async function POST(request: NextRequest) {
+	const requestReceivedAt = performance.now();
+
 	const { userId } = await auth();
 	if (!userId) {
 		return apiUnauthorized();
@@ -254,11 +301,29 @@ export async function POST(request: NextRequest) {
 		unknown,
 		z.infer<typeof postGenerateDraftsSchema>
 	>;
+	let parseDurationMs: number | null = null;
 	try {
+		const parseStartedAt = performance.now();
 		const body = await request.json();
+		parseDurationMs = performance.now() - parseStartedAt;
 		parsedBody = postGenerateDraftsSchema.safeParse(body);
 	} catch {
 		return apiBadRequest('Invalid JSON body');
+	}
+
+	if (parseDurationMs !== null) {
+		if (parsedBody.success) {
+			console.log(`[Draft Stream][${parsedBody.data.operationId}] parsed request body`, {
+				parseDurationMs: Math.round(parseDurationMs),
+				campaignId: parsedBody.data.campaignId,
+				contactIdsCount: parsedBody.data.contactIds?.length ?? 0,
+				legacyContactsCount: parsedBody.data.contacts?.length ?? 0,
+			});
+		} else {
+			console.log('[Draft Stream] parsed request body (invalid)', {
+				parseDurationMs: Math.round(parseDurationMs),
+			});
+		}
 	}
 
 	if (!parsedBody.success) {
@@ -268,13 +333,95 @@ export async function POST(request: NextRequest) {
 	const {
 		operationId,
 		campaignId,
-		contacts,
+		contactIds,
+		contacts: legacyContacts,
 		concurrency: requestedConcurrency,
 		identity,
 		prompt,
 		bookingFor,
 		models,
 	} = parsedBody.data;
+
+	const requestedContactIds =
+		(contactIds?.length ? contactIds : legacyContacts?.map((contact) => contact.id)) ?? [];
+
+	if (!requestedContactIds.length) {
+		return apiBadRequest('Must provide at least one contact ID');
+	}
+
+	const fetchContactsStartedAt = performance.now();
+	const uniqueRequestedContactIds = Array.from(new Set(requestedContactIds));
+	const contactsFromDb = await prisma.contact.findMany({
+		where: {
+			id: { in: uniqueRequestedContactIds },
+			userId,
+			userContactLists: {
+				some: {
+					campaigns: {
+						some: {
+							id: campaignId,
+							userId,
+						},
+					},
+				},
+			},
+		},
+		select: {
+			id: true,
+			firstName: true,
+			lastName: true,
+			email: true,
+			company: true,
+			address: true,
+			city: true,
+			state: true,
+			country: true,
+			website: true,
+			phone: true,
+			metadata: true,
+		},
+	});
+	const fetchContactsDurationMs = performance.now() - fetchContactsStartedAt;
+
+	console.log(`[Draft Stream][${operationId}] fetched contacts`, {
+		fetchContactsDurationMs: Math.round(fetchContactsDurationMs),
+		requested: requestedContactIds.length,
+		uniqueRequested: uniqueRequestedContactIds.length,
+		authorizedFetched: contactsFromDb.length,
+		campaignId,
+	});
+
+	const authorizedById = new Map<number, ContactInput>();
+	for (const contact of contactsFromDb) {
+		authorizedById.set(contact.id, {
+			id: contact.id,
+			firstName: contact.firstName ?? null,
+			lastName: contact.lastName ?? null,
+			email: contact.email ?? null,
+			company: contact.company ?? null,
+			address: contact.address ?? null,
+			city: contact.city ?? null,
+			state: contact.state ?? null,
+			country: contact.country ?? null,
+			website: contact.website ?? null,
+			phone: contact.phone ?? null,
+			metadata: contact.metadata ?? null,
+		});
+	}
+
+	const missingIds = uniqueRequestedContactIds.filter((id) => !authorizedById.has(id));
+	if (missingIds.length) {
+		console.warn(`[Draft Stream][${operationId}] unauthorized/missing contacts requested`, {
+			campaignId,
+			requested: requestedContactIds.length,
+			uniqueRequested: uniqueRequestedContactIds.length,
+			missingCount: missingIds.length,
+			sampleMissingIds: missingIds.slice(0, 10),
+		});
+		return apiForbidden('One or more contacts are not authorized for this campaign');
+	}
+
+	const contacts: ContactInput[] = requestedContactIds.map((id) => authorizedById.get(id)!);
 
 	const concurrencyFromEnv = Number(process.env.DRAFTS_GENERATE_CONCURRENCY || DEFAULT_CONCURRENCY);
 	const concurrency = Math.max(
@@ -287,6 +434,7 @@ export async function POST(request: NextRequest) {
 		start(controller) {
 			const encoder = new TextEncoder();
 			const startedAt = Date.now();
+			let firstDraftEmittedAt: number | null = null;
 			let completed = 0;
 			let succeeded = 0;
 			let failed = 0;
@@ -303,6 +451,13 @@ export async function POST(request: NextRequest) {
 			const emit = (event: string, payload: object) => {
 				if (closed) return;
 				controller.enqueue(encoder.encode(createSseEvent(event, payload)));
+				if (event === 'draft' && firstDraftEmittedAt === null) {
+					firstDraftEmittedAt = performance.now();
+					console.log(`[Draft Stream][${operationId}] first draft emitted`, {
+						timeToFirstDraftMs: Math.round(firstDraftEmittedAt - requestReceivedAt),
+						campaignId,
+					});
+				}
 			};
 
 			const emitProgress = () => {
@@ -334,6 +489,10 @@ export async function POST(request: NextRequest) {
 
 			const processSingleContact = async (contact: ContactInput, index: number) => {
 				const draftIndex = index + 1;
+				const contactForPrompt: ContactInput =
+					typeof contact.metadata === 'string'
+						? { ...contact, metadata: packMetadataForPrompt(contact.metadata) }
+						: contact;
 				let lastError: Error & { code?: string; status?: number } | null = null;
 
 				for (let retryCount = 0; retryCount <= MAX_RETRIES; retryCount++) {
@@ -351,7 +510,7 @@ export async function POST(request: NextRequest) {
 						.replace('{recipient_first_name}', contact.firstName || '')
 						.replace('{company}', contact.company || '');
 					const userPrompt = buildUserPrompt({
-						contact,
+						contact: contactForPrompt,
 						identity,
 						prompt,
 						bookingFor,
