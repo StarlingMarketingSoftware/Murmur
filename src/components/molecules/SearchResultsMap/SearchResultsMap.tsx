@@ -1115,14 +1115,11 @@ const MAP_DEFAULT_ZOOM = 5;
 const MAP_MIN_ZOOM = 3;
 // Dashboard UX: allow state hover highlight one zoom step past the default zoom.
 const STATE_HOVER_HIGHLIGHT_MAX_ZOOM = MAP_DEFAULT_ZOOM + 1;
-// Auto-fit temporarily caps maxZoom to prevent a visible "zoom bounce", but we must restore
-// it afterward so the user can still zoom in normally.
+
 const AUTO_FIT_CONTACTS_MAX_ZOOM = 10;
 const AUTO_FIT_STATE_MAX_ZOOM = 5;
 const DEFAULT_MAX_ZOOM_FALLBACK = 22;
 
-// Dashboard background → interactive map-view transition.
-// Keep these values in sync with the dashboard "frame" animation so the whole moment feels unified.
 export const DASHBOARD_TO_INTERACTIVE_TRANSITION_MS = 7200;
 export const DASHBOARD_TO_INTERACTIVE_TRANSITION_CSS_EASING =
 	'cubic-bezier(0.22, 1, 0.36, 1)';
