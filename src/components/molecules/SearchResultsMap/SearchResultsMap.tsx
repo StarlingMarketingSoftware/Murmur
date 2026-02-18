@@ -1077,35 +1077,9 @@ interface SearchResultsMapProps {
 	 * Useful for dismissing transient UI (e.g. "Search this area" CTA).
 	 */
 	onViewportInteraction?: () => void;
-	/**
-	 * Called when the map becomes idle after a pan/zoom gesture, with the exact current
-	 * viewport bounds and a precomputed "is center inside current search area" signal.
-	 *
-	 * Search area is interpreted as:
-	 * - `selectedAreaBounds` when provided, otherwise
-	 * - the locked state polygon (when present), otherwise
-	 * - "in area" (so callers won't show CTAs without a known search area)
-	 */
-	onViewportIdle?: (payload: {
-		bounds: MapSelectionBounds;
-		center: LatLngLiteral;
-		zoom: number;
-		isCenterInSearchArea: boolean;
-	}) => void;
-	/** Map interaction mode controlled by the dashboard (grab = pan/zoom, select = draw rectangle). */
-	activeTool?: 'select' | 'grab';
-	/**
-	 * When incremented, selects all currently-visible markers within the current map viewport
-	 * that match the active search category (including visible overlay pins).
-	 */
-	selectAllInViewNonce?: number;
-	/** Called when the user completes a rectangle selection (south/west/north/east). */
+
 	onAreaSelect?: (bounds: MapSelectionBounds, payload?: AreaSelectPayload) => void;
-	/**
-	 * Called whenever the currently-visible booking/promotion overlay pins that match the active
-	 * `searchWhat` category change (used to keep the right-side results panel feeling interactive
-	 * as the user pans/zooms, Zillow-style).
-	 */
+	
 	onVisibleOverlayContactsChange?: (contacts: ContactWithName[]) => void;
 	onMarkerClick?: (contact: ContactWithName) => void;
 	onMarkerHover?: (contact: ContactWithName | null, meta?: MarkerHoverMeta) => void;
@@ -1143,8 +1117,8 @@ const MAP_MIN_ZOOM = 3;
 const STATE_HOVER_HIGHLIGHT_MAX_ZOOM = MAP_DEFAULT_ZOOM + 1;
 // Auto-fit temporarily caps maxZoom to prevent a visible "zoom bounce", but we must restore
 // it afterward so the user can still zoom in normally.
-const AUTO_FIT_CONTACTS_MAX_ZOOM = 14;
-const AUTO_FIT_STATE_MAX_ZOOM = 8;
+const AUTO_FIT_CONTACTS_MAX_ZOOM = 10;
+const AUTO_FIT_STATE_MAX_ZOOM = 5;
 const DEFAULT_MAX_ZOOM_FALLBACK = 22;
 
 // Dashboard background → interactive map-view transition.
@@ -1155,13 +1129,6 @@ export const DASHBOARD_TO_INTERACTIVE_TRANSITION_CSS_EASING =
 
 const MAPBOX_STYLE = 'mapbox://styles/mapbox/streets-v12';
 
-/**
- * Match the marketing `/free-trial` globe look:
- * - Globe projection
- * - Black "space" + stars
- * - No atmospheric glow/halo
- * - Hide base labels + admin boundaries (keep our `murmur-*` layers)
- */
 const applyFreeTrialMapVisualTuning = (mapInstance: mapboxgl.Map) => {
 	// Projection
 	try {
@@ -1308,8 +1275,6 @@ const computeDotWaveDelayMs = (
 			? 0
 			: clamp((lng - minLng) / denomLng, 0, 1);
 
-	// Subtle latitude-based wavefront undulation creates an organic, curved leading edge
-	// instead of a rigid vertical curtain. Sine produces a gentle bulge in the middle.
 	const denomLat = maxLat - minLat;
 	const tLat =
 		!Number.isFinite(denomLat) || denomLat <= 1e-9
@@ -1317,9 +1282,6 @@ const computeDotWaveDelayMs = (
 			: clamp((lat - minLat) / denomLat, 0, 1);
 	const latUndulation = (Math.sin(tLat * Math.PI) - 0.5) * 0.14 * travelMs;
 
-	// Deterministic float-precision jitter so each dot gets a practically unique offset.
-	// Knuth multiplicative hash → 16-bit fractional value → scaled to [0, DOT_WAVE_JITTER_MS).
-	// 65536 distinct values eliminates the sub-batching caused by integer modulo quantization.
 	const h = (featureId * 2654435761) >>> 0;
 	const jitter = DOT_WAVE_JITTER_MS > 0 ? ((h & 0xffff) / 0x10000) * DOT_WAVE_JITTER_MS : 0;
 
@@ -1358,16 +1320,7 @@ const getBasemapCartographyLayerIds = (mapInstance: mapboxgl.Map): string[] => {
 	return ids;
 };
 
-/**
- * Basemap clean-up: keep Mapbox's own cartography (roads + place labels) inside the US only.
- *
- * We do this by applying a `within` filter to every *base* `symbol` + `line` layer in the
- * Mapbox style, while leaving our custom `murmur-*` layers untouched.
- *
- * Result:
- * - Inside the US: normal Streets basemap detail (cities/roads) is visible as you zoom in.
- * - Outside the US: basemap labels/roads are hidden (land/water fills can still render).
- */
+
 const applyUsOnlyBasemapCartography = (
 	mapInstance: mapboxgl.Map,
 	usGeometry: Extract<GeoJsonGeometry, { type: 'MultiPolygon' }>,
@@ -1692,12 +1645,6 @@ const hashStringToStableKey = (input: string): string => {
 	return (hash >>> 0).toString(36);
 };
 
-/**
- * Scale all numeric opacity values inside a Mapbox style expression by a multiplier,
- * keeping `["zoom"]` at the top level of `interpolate` / `step` expressions (as Mapbox requires).
- *
- * Handles plain numbers, `interpolate`, `step`, and `case` expressions (recursively).
- */
 const scaleMapboxOpacityExpr = (expr: any, mul: number): any => {
 	if (typeof expr === 'number') return expr * mul;
 	if (!Array.isArray(expr) || expr.length === 0) return expr;
@@ -1883,19 +1830,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const usStatesPolygonsRef = useRef<PreparedClippingPolygon[] | null>(null);
 	const selectedStateKeyRef = useRef<string | null>(null);
 	const onStateSelectRef = useRef<SearchResultsMapProps['onStateSelect'] | null>(null);
-	// When the user clicks a state outline, we want the subsequent auto-fit-to-locked-state
-	// camera move to use the same cinematic timing as the dashboard transition.
-	// Without this, the state zoom feels like a snap compared to the cinematic sweep.
+
 	const pendingStateClickCinematicRef = useRef<{ key: string; at: number } | null>(null);
-	// When the user executes a brand-new search while already in interactive map mode
-	// (e.g. using the top search bar in fullscreen map view), match the dashboard/state
-	// cinematic timing instead of the default quick auto-fit.
+	
 	const pendingSearchQueryCinematicRef = useRef<{ key: string; at: number } | null>(null);
 	const isLoadingRef = useRef<boolean>(false);
 	// Keep `isLoadingRef` synced during render so async Mapbox handlers can read it immediately.
 	isLoadingRef.current = isLoading ?? false;
-	// When a user clicks a state (to trigger a search + cinematic zoom), we suppress state-hover
-	// highlights while the camera is easing so other states don't flash "hovered" under the cursor.
+
 	const stateClickZoomInFlightRef = useRef(false);
 	const stateClickZoomInFlightNonceRef = useRef(0);
 	const stateClickZoomInFlightTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -2907,8 +2849,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		(nextOverlayOpacity: number, nextModeT: number) => {
 			if (!map || !isMapLoaded) return;
 			let base = stateLineOpacityBaseRef.current;
-			// Style/layer timing can occasionally race on load; lazily recover base paint values
-			// so state lines don't get stuck at 0 opacity.
+		
 			if (!base || base.dividers == null || base.borders == null) {
 				try {
 					const dividers = map.getPaintProperty(
@@ -2940,8 +2881,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						map.setPaintProperty(layerId, 'line-opacity', 0);
 						return;
 					}
-					// If we couldn't recover the original expression, still render lines
-					// with a numeric fallback so overlays remain visible.
+				
 					if (baseOpacity == null) {
 						map.setPaintProperty(layerId, 'line-opacity', mul);
 						return;
@@ -3160,9 +3100,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			RESULT_DOT_STROKE_WEIGHT_MAX_PX,
 		];
 
-		// Mapbox requires ["zoom"] to appear only as the direct input of a top-level
-		// "interpolate" or "step" expression.  Pre-compute derived zoom stops so every
-		// expression is a flat interpolation rather than nesting zoom inside arithmetic.
 		const allOverlayRadiusLow = RESULT_DOT_SCALE_MIN * 0.72;
 		const allOverlayRadiusHigh = RESULT_DOT_SCALE_MAX * 0.72;
 		const allOverlayRadiusExpr = [
@@ -3687,23 +3624,16 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		};
 	}, [ensureMapboxSourcesAndLayers]);
 
-	// Configure decorative vs interactive behavior without remounting the map.
+	
 	const prevPresentationRef = useRef<'background' | 'interactive'>(presentation);
-	// When switching from the decorative dashboard globe into interactive results mode,
-	// use a slightly more cinematic auto-fit so the camera move stays in sync with the
-	// dashboard frame animation (and avoids fighting portal inset transitions / resizes).
+
 	const cinematicAutoFitRef = useRef(false);
-	// While a cinematic camera animation is in flight, suppress `map.resize()` and
-	// duplicate `fitBounds` calls that would interrupt the smooth sweep.
+	
 	const cinematicInFlightRef = useRef(false);
 	const cinematicInFlightTimerRef = useRef<NodeJS.Timeout | null>(null);
-	// When easing from interactive → decorative background, we attach a one-off `moveend`
-	// handler (lock zoom + optionally start auto-spin). Keep a ref so we can cancel it if
-	// the user flips back to interactive mid-animation.
+
 	const backgroundCinematicMoveEndHandlerRef = useRef<(() => void) | null>(null);
-	// While leaving the decorative globe we temporarily allow zoom < MAP_MIN_ZOOM so the
-	// animation can start exactly from the dashboard view. After the first fit completes,
-	// restore MAP_MIN_ZOOM so users can’t zoom back out to the full globe.
+
 	const pendingMinZoomRestoreRef = useRef(false);
 	const hasAttachedMinZoomRestoreRef = useRef(false);
 	useEffect(() => {
