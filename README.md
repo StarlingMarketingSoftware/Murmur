@@ -164,6 +164,7 @@ fullAiPrompt String?  @map("message") @db.Text
 - US map state geometry is derived from `public/geo/us-states.geojson`.
 - If you update that source GeoJSON, run `npm run preprocess-geo` to regenerate the derived files in `public/geo/`.
 - `npm run build` and `npm run vercel-build` run this preprocessing step automatically.
+- WASM workflow (Vercel-safe): run `npm run build:wasm:web` locally/CI when Rust WASM code changes, then commit updated artifacts in `rust-scorer/pkg-web/` (`.wasm` + JS glue + `.d.ts`). Vercel consumes committed artifacts and does not need Rust or `wasm-pack` during deploy.
 
 ### Generating Seed Data for Local Vector Embeddings
 

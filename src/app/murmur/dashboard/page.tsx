@@ -3475,6 +3475,7 @@ const DashboardContent = () => {
 								externallyHoveredContactId={hoveredMapPanelContactId}
 								searchQuery={activeSearchQuery}
 								searchWhat={searchWhatForMap}
+								disableDotWaveReveal={isMapView}
 								selectAllInViewNonce={isMapView ? selectAllInViewNonce : undefined}
 								onVisibleOverlayContactsChange={
 									isMapView

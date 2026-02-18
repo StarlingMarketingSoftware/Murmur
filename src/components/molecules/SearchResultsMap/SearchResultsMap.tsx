@@ -294,6 +294,28 @@ type WasmGeoModule = {
 		coords: Float64Array,
 		worldSize: number
 	) => Float64Array | ArrayLike<number>;
+	pick_non_overlapping_indices: (
+		xy: Float64Array,
+		priority_order: Uint32Array,
+		in_locked_order: Uint32Array,
+		out_locked_order: Uint32Array,
+		in_locked_mask: Uint8Array,
+		max_primary_dots: number,
+		in_locked_share: number,
+		hard_cap_outside_by_in_locked: boolean,
+		min_separation_sq: number,
+		cell_size: number
+	) => Uint32Array;
+	stable_viewport_sample: (
+		coords: Float64Array,
+		ids: Uint32Array,
+		minLat: number,
+		maxLat: number,
+		minLng: number,
+		maxLng: number,
+		slots: number,
+		seed: number
+	) => Uint32Array;
 };
 
 const USE_WASM_GEO = process.env.NEXT_PUBLIC_USE_WASM_GEO === 'true';
@@ -348,7 +370,9 @@ const ensureWasmGeoModuleLoaded = async (): Promise<WasmGeoModule | null> => {
 					typeof maybeModule.distance_point_to_segment_sq !== 'function' ||
 					typeof maybeModule.point_in_ring !== 'function' ||
 					typeof maybeModule.is_point_near_segments !== 'function' ||
-					typeof maybeModule.batch_lat_lng_to_world_pixel !== 'function'
+					typeof maybeModule.batch_lat_lng_to_world_pixel !== 'function' ||
+					typeof maybeModule.pick_non_overlapping_indices !== 'function' ||
+					typeof maybeModule.stable_viewport_sample !== 'function'
 				) {
 					return null;
 				}
@@ -476,6 +500,45 @@ const stableViewportSampleContacts = (
 ): ContactWithName[] => {
 	if (slots <= 0 || contacts.length === 0) return [];
 	if (contacts.length <= slots) return contacts;
+
+	const wasm = getWasmGeoModuleSync();
+	if (wasm) {
+		try {
+			// Build flat typed arrays from contacts
+			const n = contacts.length;
+			const coordsFlat = new Float64Array(n * 2);
+			const idsFlat = new Uint32Array(n);
+			for (let i = 0; i < n; i++) {
+				const c = getCoords(contacts[i]);
+				if (c) {
+					coordsFlat[i * 2] = c.lat;
+					coordsFlat[i * 2 + 1] = c.lng;
+				} else {
+					coordsFlat[i * 2] = NaN;
+					coordsFlat[i * 2 + 1] = NaN;
+				}
+				idsFlat[i] = contacts[i].id;
+			}
+			const seedHash = hashStringToUint32(seed);
+			const indices = wasm.stable_viewport_sample(
+				coordsFlat,
+				idsFlat,
+				viewportBbox.minLat,
+				viewportBbox.maxLat,
+				viewportBbox.minLng,
+				viewportBbox.maxLng,
+				slots,
+				seedHash
+			);
+			const result: ContactWithName[] = [];
+			for (let i = 0; i < indices.length; i++) {
+				result.push(contacts[indices[i]]!);
+			}
+			return result;
+		} catch (err) {
+			logWasmGeoRuntimeError(err);
+		}
+	}
 
 	const latSpan = viewportBbox.maxLat - viewportBbox.minLat;
 	const lngSpan = viewportBbox.maxLng - viewportBbox.minLng;
@@ -1052,6 +1115,11 @@ interface SearchResultsMapProps {
 	lockedStateName?: string | null;
 	/** When true, hides the state outlines (useful while search is loading). */
 	isLoading?: boolean;
+	/**
+	 * When true, disables the base-dot "wave reveal" animation.
+	 * Useful in fullscreen/cinematic map transitions where hiding dots causes visible flicker.
+	 */
+	disableDotWaveReveal?: boolean;
 	/** When true, prevents the map from auto-zooming to fit contacts or the locked state. */
 	skipAutoFit?: boolean;
 	/**
@@ -1695,6 +1763,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	enableStateInteractions,
 	lockedStateName,
 	isLoading,
+	disableDotWaveReveal = false,
 	skipAutoFit,
 	presentation = 'interactive',
 	autoSpin = false,
@@ -4660,73 +4729,151 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			});
 			outLockedCandidates.sort((a, b) => a.key - b.key);
 
-			// Poisson-disc style selection using a grid acceleration structure.
-			const cellSize = Math.max(6, minSeparationPx); // avoid tiny/degenerate cells
-			const grid = new Map<string, Array<{ x: number; y: number }>>();
 			const picked: ContactWithName[] = [];
-			let pickedInLockedStateCount = 0;
+			let didPickWithWasm = false;
 
-			const hasNeighborWithin = (
-				cx: number,
-				cy: number,
-				x: number,
-				y: number
-			): boolean => {
-				for (let dx = -1; dx <= 1; dx++) {
-					for (let dy = -1; dy <= 1; dy++) {
-						const arr = grid.get(`${cx + dx},${cy + dy}`);
-						if (!arr) continue;
-						for (const p of arr) {
-							const ddx = x - p.x;
-							const ddy = y - p.y;
-							if (ddx * ddx + ddy * ddy < minSeparationSq) return true;
+			// Prefer the Rust/WASM picker when available.
+			{
+				const wasmGeo = getWasmGeoModuleSync();
+				if (wasmGeo && typeof wasmGeo.pick_non_overlapping_indices === 'function') {
+					try {
+						const xy = new Float64Array(candidates.length * 2);
+						const inLockedMask = new Uint8Array(candidates.length);
+						for (let i = 0; i < candidates.length; i++) {
+							const c = candidates[i];
+							xy[i * 2] = c.x;
+							xy[i * 2 + 1] = c.y;
+							inLockedMask[i] = c.isInLockedState ? 1 : 0;
+						}
+
+						const candidateIndexByRef = new Map<Candidate, number>();
+						for (let i = 0; i < candidates.length; i++)
+							candidateIndexByRef.set(candidates[i], i);
+
+						const priorityOrder = new Uint32Array(priorityCandidates.length);
+						for (let i = 0; i < priorityCandidates.length; i++) {
+							const idx = candidateIndexByRef.get(priorityCandidates[i]);
+							if (idx == null)
+								throw new Error('[SearchResultsMap] missing candidate index (priority)');
+							priorityOrder[i] = idx;
+						}
+
+						const inLockedOrder = new Uint32Array(inLockedCandidates.length);
+						for (let i = 0; i < inLockedCandidates.length; i++) {
+							const idx = candidateIndexByRef.get(inLockedCandidates[i]);
+							if (idx == null)
+								throw new Error('[SearchResultsMap] missing candidate index (inLocked)');
+							inLockedOrder[i] = idx;
+						}
+
+						const outLockedOrder = new Uint32Array(outLockedCandidates.length);
+						for (let i = 0; i < outLockedCandidates.length; i++) {
+							const idx = candidateIndexByRef.get(outLockedCandidates[i]);
+							if (idx == null)
+								throw new Error('[SearchResultsMap] missing candidate index (outLocked)');
+							outLockedOrder[i] = idx;
+						}
+
+						const inLockedShare = hasLockedStateSelection
+							? getLockedStateMarkerShareForZoom(zoomRaw)
+							: 1.0;
+						const hardCapOutsideByInLocked = hasLockedStateSelection && zoomRaw <= 6;
+						const cellSize = Math.max(6, minSeparationPx);
+
+						const wasmResult = wasmGeo.pick_non_overlapping_indices(
+							xy,
+							priorityOrder,
+							inLockedOrder,
+							outLockedOrder,
+							inLockedMask,
+							maxPrimaryDots,
+							inLockedShare,
+							hardCapOutsideByInLocked,
+							minSeparationSq,
+							cellSize
+						);
+
+						const pickedIndices = wasmResult;
+						for (let i = 0; i < pickedIndices.length; i++) {
+							picked.push(candidates[pickedIndices[i]].contact);
+						}
+						didPickWithWasm = true;
+					} catch (error: unknown) {
+						// Ensure we don't fall through with a partial pick set.
+						picked.length = 0;
+						logWasmGeoRuntimeError(error);
+					}
+				}
+			}
+
+			if (!didPickWithWasm) {
+				// Poisson-disc style selection using a grid acceleration structure.
+				const cellSize = Math.max(6, minSeparationPx); // avoid tiny/degenerate cells
+				const grid = new Map<string, Array<{ x: number; y: number }>>();
+				let pickedInLockedStateCount = 0;
+
+				const hasNeighborWithin = (
+					cx: number,
+					cy: number,
+					x: number,
+					y: number
+				): boolean => {
+					for (let dx = -1; dx <= 1; dx++) {
+						for (let dy = -1; dy <= 1; dy++) {
+							const arr = grid.get(`${cx + dx},${cy + dy}`);
+							if (!arr) continue;
+							for (const p of arr) {
+								const ddx = x - p.x;
+								const ddy = y - p.y;
+								if (ddx * ddx + ddy * ddy < minSeparationSq) return true;
+							}
 						}
 					}
-				}
-				return false;
-			};
+					return false;
+				};
 
-			const pickFromCandidates = (cands: Candidate[], maxToPick: number) => {
-				if (maxToPick <= 0) return;
-				for (const c of cands) {
-					if (picked.length >= maxPrimaryDots) break;
-					if (maxToPick <= 0) break;
-					const cx = Math.floor(c.x / cellSize);
-					const cy = Math.floor(c.y / cellSize);
-					if (hasNeighborWithin(cx, cy, c.x, c.y)) continue;
+				const pickFromCandidates = (cands: Candidate[], maxToPick: number) => {
+					if (maxToPick <= 0) return;
+					for (const c of cands) {
+						if (picked.length >= maxPrimaryDots) break;
+						if (maxToPick <= 0) break;
+						const cx = Math.floor(c.x / cellSize);
+						const cy = Math.floor(c.y / cellSize);
+						if (hasNeighborWithin(cx, cy, c.x, c.y)) continue;
 
-					picked.push(c.contact);
-					if (c.isInLockedState) pickedInLockedStateCount += 1;
-					maxToPick -= 1;
-					const k = `${cx},${cy}`;
-					const arr = grid.get(k);
-					if (arr) arr.push({ x: c.x, y: c.y });
-					else grid.set(k, [{ x: c.x, y: c.y }]);
-				}
-			};
-
-			// Keep already-visible markers (plus any explicitly selected ones) stable while zooming:
-			// rescale what’s already there, then add more markers as density allows.
-			pickFromCandidates(priorityCandidates, maxPrimaryDots);
-
-			// Then pick unselected markers, biasing toward the searched/locked state when zoomed out.
-			const remainingBudget = maxPrimaryDots - picked.length;
-			if (remainingBudget > 0) {
-				if (hasLockedStateSelection) {
-					const share = getLockedStateMarkerShareForZoom(zoomRaw);
-					const inLockedBudget = Math.round(remainingBudget * share);
-					let outLockedBudget = remainingBudget - inLockedBudget;
-
-					const shouldHardCapOutside = zoomRaw <= 6;
-					pickFromCandidates(inLockedCandidates, inLockedBudget);
-					if (shouldHardCapOutside) {
-						// Ensure the locked state visually "wins" when zoomed out.
-						outLockedBudget = Math.min(outLockedBudget, pickedInLockedStateCount);
+						picked.push(c.contact);
+						if (c.isInLockedState) pickedInLockedStateCount += 1;
+						maxToPick -= 1;
+						const k = `${cx},${cy}`;
+						const arr = grid.get(k);
+						if (arr) arr.push({ x: c.x, y: c.y });
+						else grid.set(k, [{ x: c.x, y: c.y }]);
 					}
-					pickFromCandidates(outLockedCandidates, outLockedBudget);
-				} else {
-					// Default behavior: just keep a stable Poisson-disc subset.
-					pickFromCandidates(inLockedCandidates, remainingBudget);
+				};
+
+				// Keep already-visible markers (plus any explicitly selected ones) stable while zooming:
+				// rescale what’s already there, then add more markers as density allows.
+				pickFromCandidates(priorityCandidates, maxPrimaryDots);
+
+				// Then pick unselected markers, biasing toward the searched/locked state when zoomed out.
+				const remainingBudget = maxPrimaryDots - picked.length;
+				if (remainingBudget > 0) {
+					if (hasLockedStateSelection) {
+						const share = getLockedStateMarkerShareForZoom(zoomRaw);
+						const inLockedBudget = Math.round(remainingBudget * share);
+						let outLockedBudget = remainingBudget - inLockedBudget;
+
+						const shouldHardCapOutside = zoomRaw <= 6;
+						pickFromCandidates(inLockedCandidates, inLockedBudget);
+						if (shouldHardCapOutside) {
+							// Ensure the locked state visually "wins" when zoomed out.
+							outLockedBudget = Math.min(outLockedBudget, pickedInLockedStateCount);
+						}
+						pickFromCandidates(outLockedCandidates, outLockedBudget);
+					} else {
+						// Default behavior: just keep a stable Poisson-disc subset.
+						pickFromCandidates(inLockedCandidates, remainingBudget);
+					}
 				}
 			}
 
@@ -6328,13 +6475,24 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		} catch {
 			prefersReducedMotion = false;
 		}
+		prefersReducedMotion = prefersReducedMotion || disableDotWaveReveal;
+		// During long camera eases (e.g. cinematic fitBounds after a top-search),
+		// avoid priming the "hide then reveal" wave frame. Otherwise dots can
+		// disappear mid-flight and then reappear as the wave runs.
+		let isCameraMoving = false;
+		try {
+			isCameraMoving = map.isMoving();
+		} catch {
+			isCameraMoving = false;
+		}
 		const shouldPrimeWaveFrameZero =
 			baseDotsWavePrevIsLoadingRef.current &&
 			searchKey.length > 0 &&
 			!isBackgroundPresentation &&
 			!prefersReducedMotion &&
 			baseDotsWavePendingSearchKeyRef.current === searchKey &&
-			features.length > 0;
+			features.length > 0 &&
+			!isCameraMoving;
 		if (shouldPrimeWaveFrameZero) {
 			const expr0 = [
 				'interpolate',
@@ -6454,13 +6612,28 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		} catch {
 			prefersReducedMotion = false;
 		}
+		prefersReducedMotion = prefersReducedMotion || disableDotWaveReveal;
 
 		// During loading (or in decorative mode), keep everything stable and avoid running reveal.
 		if (loading || isBackgroundPresentation || !isSearchMode || prefersReducedMotion) {
 			// Only schedule a wave when a *new* search actually enters a loading state.
 			// This prevents zoom/viewport refetches from triggering a full hide→reveal cycle.
 			if (loading && isNewSearchKey) {
-				baseDotsWavePendingSearchKeyRef.current = searchKey;
+				const pendingCinematic = pendingSearchQueryCinematicRef.current;
+				const isCinematicSearchKey =
+					!!pendingCinematic &&
+					pendingCinematic.key === searchKey &&
+					Date.now() - pendingCinematic.at < 10_000;
+
+				// In fullscreen map-view searches we often kick off a long cinematic camera ease.
+				// Running the hide→reveal wave during that sweep causes dots to disappear/reappear.
+				// Mark the search as "handled" so we keep dots steady instead.
+				if (isCinematicSearchKey) {
+					baseDotsWaveLastSearchKeyRef.current = searchKey;
+					baseDotsWavePendingSearchKeyRef.current = null;
+				} else {
+					baseDotsWavePendingSearchKeyRef.current = searchKey;
+				}
 			}
 
 			stopRunningWave();
@@ -6486,6 +6659,22 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		baseDotsWavePrevIsLoadingRef.current = loading;
 
 		if (!shouldStartWave) return;
+
+		// If the map camera is still moving/easing (common in cinematic search sweeps),
+		// keep dots steady. Starting the wave now causes a visible disappear/reappear flicker.
+		let isCameraMoving = false;
+		try {
+			isCameraMoving = map.isMoving();
+		} catch {
+			isCameraMoving = false;
+		}
+		if (isCameraMoving) {
+			stopRunningWave();
+			restoreBaseDotsRendering(0);
+			baseDotsWaveLastSearchKeyRef.current = searchKey;
+			baseDotsWavePendingSearchKeyRef.current = null;
+			return;
+		}
 
 		stopRunningWave();
 

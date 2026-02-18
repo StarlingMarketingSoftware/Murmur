@@ -35,4 +35,26 @@ declare module '../../../../rust-scorer/pkg-web' {
 		coords: Float64Array,
 		worldSize: number
 	): Float64Array;
+	export function pick_non_overlapping_indices(
+		xy: Float64Array,
+		priorityOrder: Uint32Array,
+		inLockedOrder: Uint32Array,
+		outLockedOrder: Uint32Array,
+		inLockedMask: Uint8Array,
+		maxPrimaryDots: number,
+		inLockedShare: number,
+		hardCapOutsideByInLocked: boolean,
+		minSeparationSq: number,
+		cellSize: number
+	): Uint32Array;
+	export function stable_viewport_sample(
+		coords: Float64Array,
+		ids: Uint32Array,
+		minLat: number,
+		maxLat: number,
+		minLng: number,
+		maxLng: number,
+		slots: number,
+		seed: number
+	): Uint32Array;
 }
