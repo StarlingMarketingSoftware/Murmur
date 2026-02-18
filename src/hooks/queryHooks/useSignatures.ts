@@ -78,10 +78,7 @@ export const useEditSignature = (options: CustomMutationOptions = {}) => {
 
 	return useMutation({
 		mutationFn: async ({ data, id }: EditSignatureData) => {
-			let formattedContent = data.content;
-			if (!data.content.includes('<span style="font-family')) {
-				formattedContent = addFontToHtml(data.content, DEFAULT_FONT);
-			}
+			const formattedContent = addFontToHtml(data.content, DEFAULT_FONT);
 			const response = await _fetch(urls.api.signatures.detail(id), 'PATCH', {
 				...data,
 				content: formattedContent,
