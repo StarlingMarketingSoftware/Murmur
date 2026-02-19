@@ -3,6 +3,8 @@
 
 export function apply_hardcoded_location_overrides(raw_query: string, parsed: any): any;
 
+export function apply_post_training_to_es_matches(matches: any, profile: any, final_limit: any): any;
+
 export function batch_haversine_km(origin_lat: number, origin_lng: number, targets: Float64Array): Float64Array;
 
 export function batch_lat_lng_to_world_pixel(coords: Float64Array, world_size: number): Float64Array;
@@ -42,8 +44,9 @@ export interface InitOutput {
     readonly point_in_ring: (a: number, b: number, c: any) => number;
     readonly stable_viewport_sample: (a: any, b: any, c: number, d: number, e: number, f: number, g: number, h: number) => any;
     readonly union_multi_polygons: (a: any) => [number, number, number];
-    readonly apply_hardcoded_location_overrides: (a: number, b: number, c: any) => [number, number, number];
+    readonly apply_post_training_to_es_matches: (a: any, b: any, c: any) => [number, number, number];
     readonly score_hits: (a: any, b: any) => [number, number, number];
+    readonly apply_hardcoded_location_overrides: (a: number, b: number, c: any) => [number, number, number];
     readonly __wbindgen_malloc: (a: number, b: number) => number;
     readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
     readonly __wbindgen_exn_store: (a: number) => void;

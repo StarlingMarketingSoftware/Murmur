@@ -16,6 +16,20 @@ export function apply_hardcoded_location_overrides(raw_query, parsed) {
 }
 
 /**
+ * @param {any} matches
+ * @param {any} profile
+ * @param {any} final_limit
+ * @returns {any}
+ */
+export function apply_post_training_to_es_matches(matches, profile, final_limit) {
+    const ret = wasm.apply_post_training_to_es_matches(matches, profile, final_limit);
+    if (ret[2]) {
+        throw takeFromExternrefTable0(ret[1]);
+    }
+    return takeFromExternrefTable0(ret[0]);
+}
+
+/**
  * @param {number} origin_lat
  * @param {number} origin_lng
  * @param {Float64Array} targets
@@ -180,6 +194,10 @@ function __wbg_get_imports() {
             const ret = Number(arg0);
             return ret;
         },
+        __wbg_String_4d38963e4c3a2599: function(arg0) {
+            const ret = String(arg0);
+            return ret;
+        },
         __wbg_String_8f0eb39a4a4c2f66: function(arg0, arg1) {
             const ret = String(arg1);
             const ptr1 = passStringToWasm0(ret, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
@@ -215,6 +233,10 @@ function __wbg_get_imports() {
         },
         __wbg___wbindgen_is_function_0095a73b8b156f76: function(arg0) {
             const ret = typeof(arg0) === 'function';
+            return ret;
+        },
+        __wbg___wbindgen_is_null_ac34f5003991759a: function(arg0) {
+            const ret = arg0 === null;
             return ret;
         },
         __wbg___wbindgen_is_object_5ae8e5880f2c1fbd: function(arg0) {

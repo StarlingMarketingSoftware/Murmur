@@ -1,5 +1,10 @@
 declare module '../../../../rust-scorer/pkg-node' {
 	export function score_hits(hits: unknown, config: unknown): unknown;
+	export function apply_post_training_to_es_matches(
+		matches: unknown,
+		profile: unknown,
+		finalLimit: unknown
+	): unknown;
 	export function apply_hardcoded_location_overrides(
 		rawQuery: string,
 		parsed: {
