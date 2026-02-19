@@ -23,6 +23,8 @@ export function score_hits(hits: any, config: any): any;
 
 export function stable_viewport_sample(coords: Float64Array, ids: Uint32Array, min_lat: number, max_lat: number, min_lng: number, max_lng: number, slots: number, seed: number): Uint32Array;
 
+export function union_multi_polygons(multi_polygons: any): any;
+
 export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
 
 export interface InitOutput {
@@ -37,6 +39,7 @@ export interface InitOutput {
     readonly pick_non_overlapping_indices: (a: any, b: any, c: any, d: any, e: any, f: number, g: number, h: number, i: number, j: number) => any;
     readonly point_in_ring: (a: number, b: number, c: any) => number;
     readonly stable_viewport_sample: (a: any, b: any, c: number, d: number, e: number, f: number, g: number, h: number) => any;
+    readonly union_multi_polygons: (a: any) => [number, number, number];
     readonly score_hits: (a: any, b: any) => [number, number, number];
     readonly __wbindgen_malloc: (a: number, b: number) => number;
     readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;

@@ -34,7 +34,6 @@ import {
 } from '@/utils/restaurantTitle';
 import { WeddingPlannersIcon } from '@/components/atoms/_svg/WeddingPlannersIcon';
 import { WineBeerSpiritsIcon } from '@/components/atoms/_svg/WineBeerSpiritsIcon';
-import { unionClippingMultiPolygons } from '@/utils/polygonClipping';
 
 type LatLngLiteral = { lat: number; lng: number };
 type MarkerHoverMeta = { clientX: number; clientY: number };
@@ -316,6 +315,7 @@ type WasmGeoModule = {
 		slots: number,
 		seed: number
 	) => Uint32Array;
+	union_multi_polygons?: (multiPolygons: ClippingMultiPolygon[]) => ClippingMultiPolygon;
 };
 
 const USE_WASM_GEO = process.env.NEXT_PUBLIC_USE_WASM_GEO === 'true';
@@ -1077,6 +1077,20 @@ interface SearchResultsMapProps {
 	 * Useful for dismissing transient UI (e.g. "Search this area" CTA).
 	 */
 	onViewportInteraction?: () => void;
+	/**
+	 * Called when the viewport becomes idle after panning/zooming (Mapbox `moveend`).
+	 * Useful for syncing viewport-derived state in the parent.
+	 */
+	onViewportIdle?: (payload: {
+		bounds: MapSelectionBounds;
+		center: LatLngLiteral;
+		zoom: number;
+		isCenterInSearchArea: boolean;
+	}) => void;
+	/** Dashboard/tooling mode (e.g. `"select"` enables rectangle selection). */
+	activeTool?: string | null;
+	/** Changes when the dashboard triggers "select all in view". */
+	selectAllInViewNonce?: number;
 
 	onAreaSelect?: (bounds: MapSelectionBounds, payload?: AreaSelectPayload) => void;
 	
@@ -5200,13 +5214,27 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 			// Union all selected state polygons into one (or multiple if disjoint) outline.
 			let unioned: ClippingMultiPolygon | null = null;
-			try {
-				unioned = unionClippingMultiPolygons(...stateMultiPolygons);
-			} catch (err) {
-				console.error(
-					'Failed to build state outline union; falling back to per-state outline',
-					err
-				);
+			const wasmGeo = await ensureWasmGeoModuleLoaded();
+			if (typeof wasmGeo?.union_multi_polygons === 'function') {
+				try {
+					const out = wasmGeo.union_multi_polygons(stateMultiPolygons);
+					if (Array.isArray(out) && out.length) unioned = out;
+				} catch (err) {
+					logWasmGeoRuntimeError(err);
+				}
+			}
+
+			// TypeScript fallback: lazy-load polygon-clipping only if needed.
+			if (!unioned) {
+				try {
+					const { unionClippingMultiPolygons } = await import('@/utils/polygonClipping');
+					unioned = unionClippingMultiPolygons(...stateMultiPolygons);
+				} catch (err) {
+					console.error(
+						'Failed to build state outline union; falling back to per-state outline',
+						err
+					);
+				}
 			}
 
 			if (cancelled) return;

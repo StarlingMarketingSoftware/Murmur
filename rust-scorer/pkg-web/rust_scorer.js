@@ -142,6 +142,18 @@ export function stable_viewport_sample(coords, ids, min_lat, max_lat, min_lng, m
     return ret;
 }
 
+/**
+ * @param {any} multi_polygons
+ * @returns {any}
+ */
+export function union_multi_polygons(multi_polygons) {
+    const ret = wasm.union_multi_polygons(multi_polygons);
+    if (ret[2]) {
+        throw takeFromExternrefTable0(ret[1]);
+    }
+    return takeFromExternrefTable0(ret[0]);
+}
+
 function __wbg_get_imports() {
     const import0 = {
         __proto__: null,

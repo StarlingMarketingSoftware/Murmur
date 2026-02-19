@@ -1,3 +1,6 @@
+use ::geo::algorithm::bool_ops::unary_union;
+use ::geo::orient::{Direction, Orient};
+use ::geo::{Coord, LineString, Polygon};
 use js_sys::{Float64Array, Uint32Array, Uint8Array};
 use std::cmp::Ordering;
 use std::collections::HashMap;
@@ -5,6 +8,126 @@ use wasm_bindgen::prelude::*;
 
 const EARTH_RADIUS_KM: f64 = 6371.0;
 const MAX_MERCATOR_LAT: f64 = 85.0;
+
+// polygon-clipping compatible geometry format (x/y = lng/lat in this project)
+type ClippingCoord = [f64; 2];
+type ClippingRing = Vec<ClippingCoord>;
+type ClippingPolygon = Vec<ClippingRing>;
+type ClippingMultiPolygon = Vec<ClippingPolygon>;
+
+#[inline]
+fn coord_eq(a: &ClippingCoord, b: &ClippingCoord) -> bool {
+    a[0] == b[0] && a[1] == b[1]
+}
+
+fn to_js_error(prefix: &str, err: impl std::fmt::Display) -> JsValue {
+    JsValue::from_str(&format!("{prefix}: {err}"))
+}
+
+fn ring_abs_area(ring: &ClippingRing) -> f64 {
+    if ring.len() < 3 {
+        return 0.0;
+    }
+    let mut area2 = 0.0;
+    for i in 0..ring.len() {
+        let [x1, y1] = ring[i];
+        let [x2, y2] = ring[(i + 1) % ring.len()];
+        area2 += x1 * y2 - x2 * y1;
+    }
+    (area2 / 2.0).abs()
+}
+
+fn normalize_ring(raw: &ClippingRing) -> Option<ClippingRing> {
+    let mut out: ClippingRing = Vec::with_capacity(raw.len());
+    for p in raw {
+        let [x, y] = *p;
+        if !x.is_finite() || !y.is_finite() {
+            continue;
+        }
+        if out.last().is_some_and(|last| coord_eq(last, p)) {
+            continue;
+        }
+        out.push([x, y]);
+    }
+
+    if out.len() < 3 {
+        return None;
+    }
+
+    // Drop any closure points from the tail; we add exactly one closure point below.
+    while out.len() >= 2 && coord_eq(&out[0], out.last().unwrap()) {
+        out.pop();
+    }
+
+    if out.len() < 3 {
+        return None;
+    }
+
+    out.push(out[0]); // close ring
+    if out.len() < 4 {
+        return None;
+    }
+
+    Some(out)
+}
+
+fn ring_to_linestring(ring: &ClippingRing) -> LineString<f64> {
+    LineString(ring.iter().map(|[x, y]| Coord { x: *x, y: *y }).collect())
+}
+
+fn clipping_polygon_to_geo_polygon(raw: &ClippingPolygon) -> Option<Polygon<f64>> {
+    let mut rings: Vec<ClippingRing> = raw.iter().filter_map(normalize_ring).collect();
+    if rings.is_empty() {
+        return None;
+    }
+
+    // Be tolerant of unexpected ring ordering: choose the largest ring as the exterior.
+    let mut best_idx = 0_usize;
+    let mut best_area = ring_abs_area(&rings[0]);
+    for (idx, ring) in rings.iter().enumerate().skip(1) {
+        let area = ring_abs_area(ring);
+        if area > best_area {
+            best_idx = idx;
+            best_area = area;
+        }
+    }
+
+    let exterior_ring = rings.swap_remove(best_idx);
+    let exterior = ring_to_linestring(&exterior_ring);
+    let interiors = rings.iter().map(ring_to_linestring).collect::<Vec<_>>();
+
+    Some(Polygon::new(exterior, interiors).orient(Direction::Default))
+}
+
+fn linestring_to_clipping_ring(ls: &LineString<f64>) -> Option<ClippingRing> {
+    let raw: ClippingRing = ls.0.iter().map(|c| [c.x, c.y]).collect();
+    normalize_ring(&raw)
+}
+
+fn geo_multi_polygon_to_clipping(mp: ::geo::MultiPolygon<f64>) -> ClippingMultiPolygon {
+    let mut out: ClippingMultiPolygon = Vec::with_capacity(mp.0.len());
+    for poly in mp.0 {
+        let poly = poly.orient(Direction::Default);
+        let Some(exterior) = linestring_to_clipping_ring(poly.exterior()) else {
+            continue;
+        };
+        if exterior.len() < 4 {
+            continue;
+        }
+
+        let mut rings: ClippingPolygon = Vec::with_capacity(1 + poly.interiors().len());
+        rings.push(exterior);
+        for hole in poly.interiors() {
+            if let Some(ring) = linestring_to_clipping_ring(hole) {
+                if ring.len() >= 4 {
+                    rings.push(ring);
+                }
+            }
+        }
+        out.push(rings);
+    }
+    out
+}
 
 // name, abbreviation, centroid latitude, centroid longitude
 const US_STATES: [(&str, &str, f64, f64); 50] = [
@@ -496,7 +619,8 @@ pub fn stable_viewport_sample(
 
     let lat_span = max_lat - min_lat;
     let lng_span = max_lng - min_lng;
-    let degenerate_bbox = !lat_span.is_finite() || !lng_span.is_finite() || lat_span <= 0.0 || lng_span <= 0.0;
+    let degenerate_bbox =
+        !lat_span.is_finite() || !lng_span.is_finite() || lat_span <= 0.0 || lng_span <= 0.0;
     if degenerate_bbox {
         let mut scored: Vec<(u32, u32)> = Vec::with_capacity(n);
         for i in 0..n {
@@ -594,7 +718,10 @@ pub fn stable_viewport_sample(
         }
 
         let score = fnv1a_u32s(&[seed, 0x636f6e74, ids_data[i]]); // "cont"
-        cell_items[cell_idx_usize].push(ScoredIdx { idx: i as u32, score });
+        cell_items[cell_idx_usize].push(ScoredIdx {
+            idx: i as u32,
+            score,
+        });
     }
 
     if non_empty_cells.is_empty() {
@@ -750,6 +877,32 @@ pub fn stable_viewport_sample(
         picked.truncate(slots);
     }
     Uint32Array::from(picked.as_slice())
+}
+
+#[wasm_bindgen]
+pub fn union_multi_polygons(multi_polygons: JsValue) -> Result<JsValue, JsValue> {
+    let inputs: Vec<ClippingMultiPolygon> = serde_wasm_bindgen::from_value(multi_polygons)
+        .map_err(|err| to_js_error("invalid multipolygon payload", err))?;
+
+    let mut polygons: Vec<Polygon<f64>> = Vec::new();
+    for mp in inputs {
+        for raw_poly in mp {
+            if let Some(poly) = clipping_polygon_to_geo_polygon(&raw_poly) {
+                polygons.push(poly);
+            }
+        }
+    }
+
+    if polygons.is_empty() {
+        let empty: ClippingMultiPolygon = Vec::new();
+        return serde_wasm_bindgen::to_value(&empty)
+            .map_err(|err| to_js_error("failed to serialize union output", err));
+    }
+
+    let unioned = unary_union(&polygons);
+    let output = geo_multi_polygon_to_clipping(unioned);
+    serde_wasm_bindgen::to_value(&output)
+        .map_err(|err| to_js_error("failed to serialize union output", err))
 }
 
 #[wasm_bindgen]

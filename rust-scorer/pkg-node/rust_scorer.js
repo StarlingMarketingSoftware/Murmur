@@ -92,6 +92,25 @@ function nearest_us_states(state_name, count) {
 exports.nearest_us_states = nearest_us_states;
 
 /**
+ * @param {Float64Array} xy
+ * @param {Uint32Array} priority_order
+ * @param {Uint32Array} in_locked_order
+ * @param {Uint32Array} out_locked_order
+ * @param {Uint8Array} in_locked_mask
+ * @param {number} max_primary_dots
+ * @param {number} in_locked_share
+ * @param {boolean} hard_cap_outside_by_in_locked
+ * @param {number} min_separation_sq
+ * @param {number} cell_size
+ * @returns {Uint32Array}
+ */
+function pick_non_overlapping_indices(xy, priority_order, in_locked_order, out_locked_order, in_locked_mask, max_primary_dots, in_locked_share, hard_cap_outside_by_in_locked, min_separation_sq, cell_size) {
+    const ret = wasm.pick_non_overlapping_indices(xy, priority_order, in_locked_order, out_locked_order, in_locked_mask, max_primary_dots, in_locked_share, hard_cap_outside_by_in_locked, min_separation_sq, cell_size);
+    return ret;
+}
+exports.pick_non_overlapping_indices = pick_non_overlapping_indices;
+
+/**
  * @param {number} px
  * @param {number} py
  * @param {Float64Array} ring
@@ -116,6 +135,36 @@ function score_hits(hits, config) {
     return takeFromExternrefTable0(ret[0]);
 }
 exports.score_hits = score_hits;
+
+/**
+ * @param {Float64Array} coords
+ * @param {Uint32Array} ids
+ * @param {number} min_lat
+ * @param {number} max_lat
+ * @param {number} min_lng
+ * @param {number} max_lng
+ * @param {number} slots
+ * @param {number} seed
+ * @returns {Uint32Array}
+ */
+function stable_viewport_sample(coords, ids, min_lat, max_lat, min_lng, max_lng, slots, seed) {
+    const ret = wasm.stable_viewport_sample(coords, ids, min_lat, max_lat, min_lng, max_lng, slots, seed);
+    return ret;
+}
+exports.stable_viewport_sample = stable_viewport_sample;
+
+/**
+ * @param {any} multi_polygons
+ * @returns {any}
+ */
+function union_multi_polygons(multi_polygons) {
+    const ret = wasm.union_multi_polygons(multi_polygons);
+    if (ret[2]) {
+        throw takeFromExternrefTable0(ret[1]);
+    }
+    return takeFromExternrefTable0(ret[0]);
+}
+exports.union_multi_polygons = union_multi_polygons;
 
 function __wbg_get_imports() {
     const import0 = {
@@ -251,6 +300,10 @@ function __wbg_get_imports() {
             const ret = Symbol.iterator;
             return ret;
         },
+        __wbg_length_1e8b0a6e52c08b9a: function(arg0) {
+            const ret = arg0.length;
+            return ret;
+        },
         __wbg_length_32ed9a279acd054c: function(arg0) {
             const ret = arg0.length;
             return ret;
@@ -275,8 +328,16 @@ function __wbg_get_imports() {
             const ret = new Uint8Array(arg0);
             return ret;
         },
+        __wbg_new_from_slice_19d21922ff3c0ae6: function(arg0, arg1) {
+            const ret = new Uint32Array(getArrayU32FromWasm0(arg0, arg1));
+            return ret;
+        },
         __wbg_new_from_slice_38c66b2d6c31f4b7: function(arg0, arg1) {
             const ret = new Float64Array(getArrayF64FromWasm0(arg0, arg1));
+            return ret;
+        },
+        __wbg_new_with_length_5c8e05184c8a2d70: function(arg0) {
+            const ret = new Uint32Array(arg0 >>> 0);
             return ret;
         },
         __wbg_next_3482f54c49e8af19: function() { return handleError(function (arg0) {
@@ -286,6 +347,9 @@ function __wbg_get_imports() {
         __wbg_next_418f80d8f5303233: function(arg0) {
             const ret = arg0.next;
             return ret;
+        },
+        __wbg_prototypesetcall_4846d4aa386c936f: function(arg0, arg1, arg2) {
+            Uint32Array.prototype.set.call(getArrayU32FromWasm0(arg0, arg1), arg2);
         },
         __wbg_prototypesetcall_aefe6319f589ab4b: function(arg0, arg1, arg2) {
             Float64Array.prototype.set.call(getArrayF64FromWasm0(arg0, arg1), arg2);
@@ -421,6 +485,11 @@ function getArrayJsValueFromWasm0(ptr, len) {
     return result;
 }
 
+function getArrayU32FromWasm0(ptr, len) {
+    ptr = ptr >>> 0;
+    return getUint32ArrayMemory0().subarray(ptr / 4, ptr / 4 + len);
+}
+
 function getArrayU8FromWasm0(ptr, len) {
     ptr = ptr >>> 0;
     return getUint8ArrayMemory0().subarray(ptr / 1, ptr / 1 + len);
@@ -445,6 +514,14 @@ function getFloat64ArrayMemory0() {
 function getStringFromWasm0(ptr, len) {
     ptr = ptr >>> 0;
     return decodeText(ptr, len);
+}
+
+let cachedUint32ArrayMemory0 = null;
+function getUint32ArrayMemory0() {
+    if (cachedUint32ArrayMemory0 === null || cachedUint32ArrayMemory0.byteLength === 0) {
+        cachedUint32ArrayMemory0 = new Uint32Array(wasm.memory.buffer);
+    }
+    return cachedUint32ArrayMemory0;
 }
 
 let cachedUint8ArrayMemory0 = null;

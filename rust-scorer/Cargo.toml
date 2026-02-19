@@ -7,8 +7,14 @@ edition = "2021"
 crate-type = ["cdylib"]
 
 [dependencies]
+geo = { version = "0.32.0", default-features = false }
 js-sys = "0.3"
 regex = "1"
 serde = { version = "1", features = ["derive"] }
 serde-wasm-bindgen = "0.6"
 wasm-bindgen = "0.2"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+# Some transitive deps (e.g. `geo`/overlay stack) pull in `rand`, which in turn
+# requires `getrandom` to use the JS runtime on wasm32-unknown-unknown targets.
+getrandom = { version = "0.2", features = ["js"] }

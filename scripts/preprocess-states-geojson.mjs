@@ -1,7 +1,6 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import polygonClipping from 'polygon-clipping';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -395,6 +394,24 @@ const run = async () => {
 
 	if (allStateMultiPolygons.length) {
 		try {
+			const wasmModule = await import('../rust-scorer/pkg-node').catch(() =>
+				import('../rust-scorer/pkg')
+			);
+			const maybeUnion =
+				wasmModule.union_multi_polygons || wasmModule.default?.union_multi_polygons;
+			if (typeof maybeUnion === 'function') {
+				const out = maybeUnion(allStateMultiPolygons);
+				if (Array.isArray(out) && out.length) unioned = out;
+			}
+		} catch {
+			// Keep preprocessing resilient; fallback keeps behavior matching runtime fallback.
+		}
+	}
+
+	if (!unioned && allStateMultiPolygons.length) {
+		try {
+			const module = await import('polygon-clipping');
+			const polygonClipping = module.default ?? module;
 			unioned = polygonClipping.union(...allStateMultiPolygons);
 		} catch {
 			// Keep preprocessing resilient; fallback keeps behavior matching runtime fallback.

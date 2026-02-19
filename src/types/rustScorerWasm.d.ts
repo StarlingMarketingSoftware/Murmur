@@ -6,6 +6,9 @@ declare module '../../../../rust-scorer/pkg-node' {
 		targets: Float64Array
 	): Float64Array;
 	export function nearest_us_states(stateName: string, count: number): string[];
+	export function union_multi_polygons(
+		multiPolygons: import('polygon-clipping').ClippingMultiPolygon[]
+	): import('polygon-clipping').ClippingMultiPolygon;
 }
 
 declare module '../../../../rust-scorer/pkg-web' {
@@ -57,4 +60,7 @@ declare module '../../../../rust-scorer/pkg-web' {
 		slots: number,
 		seed: number
 	): Uint32Array;
+	export function union_multi_polygons(
+		multiPolygons: import('polygon-clipping').ClippingMultiPolygon[]
+	): import('polygon-clipping').ClippingMultiPolygon;
 }

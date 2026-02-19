@@ -41,6 +41,7 @@ Outputs:
 - `batch_haversine_km(origin_lat, origin_lng, flat_lat_lng_targets)`
 - `is_point_near_segments(x, y, flat_segments, threshold_px)`
 - `nearest_us_states(state_name, count)`
+- `union_multi_polygons(multi_polygons)`
 
 ## TypeScript usage
 
