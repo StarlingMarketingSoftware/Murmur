@@ -332,9 +332,6 @@ const mergeEsAndPrismaContact = (
 	contactListId: prismaContact.contactListId,
 });
 
-// Coffee-shop search refinements:
-// - Filter out obvious non-coffee businesses that match "coffee" loosely (e.g., "Coffee Marketing Agency")
-// - Demote marketing-oriented roles so "Coffee Shops" searches skew toward operators/owners
 const queryMentionsCoffeeTerms = (rawQuery: string | null | undefined): boolean => {
 	const q = normalizeSearchText(rawQuery);
 	if (!q) return false;
