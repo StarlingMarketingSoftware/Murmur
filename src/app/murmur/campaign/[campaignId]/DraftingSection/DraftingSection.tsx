@@ -261,6 +261,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		livePreviewContactId,
 		livePreviewMessage,
 		livePreviewSubject,
+		livePreviewDraftNumber,
+		livePreviewTotal,
 	} = useDraftingSection(props);
 
 	const { user, subscriptionTier, isFreeTrial } = useMe();
@@ -311,10 +313,17 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const isDraftingView = view === 'drafting';
 	const isSentView = view === 'sent';
 
-	const draftingOperationsForHeader = useMemo(
-		() => (draftOperations || []).map((op) => ({ current: op.progress, total: op.total })),
-		[draftOperations]
-	);
+	const draftingOperationsForHeader = useMemo(() => {
+		// Prefer the live preview counters while a batch is visually "playing back" so the
+		// CampaignHeaderBox progress stays in sync with the Contacts pacing + Draft Preview panel.
+		if (isLivePreviewVisible && livePreviewTotal > 0) {
+			const clampedDraftNumber = Math.max(0, Math.min(livePreviewTotal, livePreviewDraftNumber));
+			const current = Math.max(0, clampedDraftNumber - 1);
+			return [{ current, total: livePreviewTotal }];
+		}
+
+		return (draftOperations || []).map((op) => ({ current: op.progress, total: op.total }));
+	}, [draftOperations, isLivePreviewVisible, livePreviewDraftNumber, livePreviewTotal]);
 	const activelyDraftingContactIds = useMemo(() => {
 		const ids = new Set<number>();
 		for (const op of draftOperations || []) {

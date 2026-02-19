@@ -13,7 +13,7 @@ import { EmailStatus } from '@/constants/prismaEnums';
 import { useGetCampaign } from '@/hooks/queryHooks/useCampaigns';
 import { EmailWithRelations } from '@/types';
 import { ContactWithName } from '@/types/contact';
-import { cn } from '@/utils';
+import { cn, convertHtmlToPlainText } from '@/utils';
 import { ScrollableText } from '@/components/atoms/ScrollableText/ScrollableText';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 import { getStateAbbreviation } from '@/utils/string';
@@ -1329,7 +1329,7 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 															}}
 														>
 															{draft.message
-																? draft.message.replace(/<[^>]*>/g, '')
+																? convertHtmlToPlainText(draft.message)
 																: 'No content'}
 														</div>
 													</div>

@@ -2,7 +2,12 @@ export const fetchOpenRouter = async (
 	model: string,
 	prompt: string,
 	content: string,
-	options?: { timeoutMs?: number; temperature?: number; signal?: AbortSignal }
+	options?: {
+		timeoutMs?: number;
+		temperature?: number;
+		signal?: AbortSignal;
+		onToken?: (token: string) => void;
+	}
 ): Promise<string> => {
 	const controller = new AbortController();
 	const timeoutMs = options?.timeoutMs ?? 30000; // 30s default timeout for OpenRouter
@@ -41,7 +46,7 @@ export const fetchOpenRouter = async (
 			},
 			body: JSON.stringify({
 				model,
-				stream: false,
+				stream: true,
 				temperature,
 				top_p: 0.95,
 				max_tokens: 1200,
@@ -56,15 +61,15 @@ export const fetchOpenRouter = async (
 			signal: controller.signal,
 		});
 
-		const raw = await response.text();
-		let res: any = null;
-		try {
-			res = raw ? JSON.parse(raw) : null;
-		} catch {
-			res = null;
-		}
-
 		if (!response.ok) {
+			const raw = await response.text();
+			let res: any = null;
+			try {
+				res = raw ? JSON.parse(raw) : null;
+			} catch {
+				res = null;
+			}
+
 			const msg =
 				res?.error?.message ||
 				res?.message ||
@@ -81,70 +86,98 @@ export const fetchOpenRouter = async (
 			throw error;
 		}
 
-		const choice0 = res?.choices?.[0];
-		const contentValue = choice0?.message?.content;
+		const reader = response.body?.getReader();
+		if (!reader) {
+			throw new Error('Empty response from OpenRouter streaming');
+		}
 
-		let messageText: string | null = null;
-		if (typeof contentValue === 'string') {
-			messageText = contentValue;
-		} else if (
-			contentValue &&
-			typeof contentValue === 'object' &&
-			typeof (contentValue as any).text === 'string'
-		) {
-			messageText = (contentValue as any).text;
-		} else if (
-			contentValue &&
-			typeof contentValue === 'object' &&
-			typeof (contentValue as any).content === 'string'
-		) {
-			messageText = (contentValue as any).content;
-		} else if (Array.isArray(contentValue)) {
-			// OpenAI-style "content parts" array
-			const joined = contentValue
-				.map((part: any) => {
-					if (typeof part === 'string') return part;
-					if (part && typeof part === 'object') {
-						if (typeof part.text === 'string') return part.text;
-						if (typeof part.content === 'string') return part.content;
+		const decoder = new TextDecoder();
+		let buffer = '';
+		let messageText = '';
+		let streamEnded = false;
+
+		const appendDeltaContent = (deltaContent: any) => {
+			if (typeof deltaContent === 'string') {
+				messageText += deltaContent;
+				if (options?.onToken) {
+					try {
+						options.onToken(deltaContent);
+					} catch {
+						// Ignore callback errors so streaming completion remains intact.
 					}
-					return '';
-				})
-				.join('');
-			if (joined.trim().length > 0) {
-				messageText = joined;
+				}
+				return;
 			}
-		} else if (typeof choice0?.text === 'string' && choice0.text.trim().length > 0) {
-			messageText = choice0.text;
-		} else if (typeof res?.output_text === 'string' && res.output_text.trim().length > 0) {
-			messageText = res.output_text;
+			if (Array.isArray(deltaContent)) {
+				const joined = deltaContent
+					.map((part: any) => {
+						if (typeof part === 'string') return part;
+						if (part && typeof part === 'object') {
+							if (typeof part.text === 'string') return part.text;
+							if (typeof part.content === 'string') return part.content;
+						}
+						return '';
+					})
+					.join('');
+				if (joined.length > 0) {
+					messageText += joined;
+					if (options?.onToken) {
+						try {
+							options.onToken(joined);
+						} catch {
+							// Ignore callback errors so streaming completion remains intact.
+						}
+					}
+				}
+			}
+		};
+
+		const processSseLine = (rawLine: string) => {
+			const line = rawLine.trim();
+			if (!line || !line.startsWith('data:')) return;
+
+			const data = line.slice(5).trim();
+			if (!data) return;
+			if (data === '[DONE]') {
+				streamEnded = true;
+				return;
+			}
+
+			let chunk: any = null;
+			try {
+				chunk = JSON.parse(data);
+			} catch {
+				return;
+			}
+
+			appendDeltaContent(chunk?.choices?.[0]?.delta?.content);
+		};
+
+		while (!streamEnded) {
+			const { done, value } = await reader.read();
+			if (done) break;
+
+			buffer += decoder.decode(value, { stream: true });
+			const lines = buffer.split(/\r?\n/);
+			buffer = lines.pop() ?? '';
+			for (const line of lines) {
+				processSseLine(line);
+				if (streamEnded) break;
+			}
 		}
 
-		if (typeof messageText !== 'string' || messageText.trim().length === 0) {
-			const finishReason =
-				choice0?.finish_reason ||
-				choice0?.finishReason ||
-				choice0?.finish_reason_detail ||
-				choice0?.finishReasonDetail;
-
-			console.error('[OpenRouter] Unexpected response shape:', {
-				model,
-				status: response.status,
-				finishReason,
-				topLevelKeys: res ? Object.keys(res) : null,
-				choiceKeys: choice0 ? Object.keys(choice0) : null,
-				messageKeys: choice0?.message ? Object.keys(choice0.message) : null,
-				contentType: typeof contentValue,
-				isContentArray: Array.isArray(contentValue),
-			});
-
-			throw new Error(
-				`Invalid response from OpenRouter${
-					finishReason ? ` (finishReason: ${String(finishReason)})` : ''
-				}`
-			);
+		buffer += decoder.decode();
+		if (buffer.length > 0) {
+			const remainingLines = buffer.split(/\r?\n/);
+			for (const line of remainingLines) {
+				processSseLine(line);
+				if (streamEnded) break;
+			}
 		}
 
+		if (messageText.length === 0) {
+			throw new Error('Empty response from OpenRouter streaming');
+		}
 		return messageText;
 	} catch (error) {
 		// Respect caller cancellations so upstream orchestration can halt quickly.

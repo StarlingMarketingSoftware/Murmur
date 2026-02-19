@@ -156,6 +156,15 @@ type DraftStreamDraftEvent = {
 	message: string;
 };
 
+type DraftStreamPartialEvent = {
+	operationId: string;
+	contactId: number;
+	draftIndex: number;
+	model: string;
+	message: string;
+	subject?: string;
+};
+
 type DraftStreamErrorEvent = {
 	operationId: string;
 	contactId: number;
@@ -2648,6 +2657,7 @@ EXAMPLES OF GOOD CUSTOM INSTRUCTIONS:
 			isGenerationCancelledRef.current = false;
 			setGenerationProgress(0);
 
+			const firstStreamingContact = streamingTargets[0];
 			const response = await fetch('/api/drafts/generate', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
@@ -2666,6 +2676,20 @@ EXAMPLES OF GOOD CUSTOM INSTRUCTIONS:
 						website: identity.website ?? null,
 					},
 					contactIds: streamingTargets.map((contact) => contact.id),
+					firstContact: {
+						id: firstStreamingContact.id,
+						firstName: firstStreamingContact.firstName ?? null,
+						lastName: firstStreamingContact.lastName ?? null,
+						email: firstStreamingContact.email ?? null,
+						company: firstStreamingContact.company ?? null,
+						address: firstStreamingContact.address ?? null,
+						city: firstStreamingContact.city ?? null,
+						state: firstStreamingContact.state ?? null,
+						country: firstStreamingContact.country ?? null,
+						website: firstStreamingContact.website ?? null,
+						phone: firstStreamingContact.phone ?? null,
+						metadata: firstStreamingContact.metadata ?? null,
+					},
 					models: OPENROUTER_DRAFTING_MODELS,
 				}),
 			});
@@ -2783,6 +2807,24 @@ EXAMPLES OF GOOD CUSTOM INSTRUCTIONS:
 								);
 							});
 							pendingDraftPersistence.push(persistPromise);
+						} else if (parsed.event === 'draft_partial') {
+							const partialPayload = JSON.parse(parsed.data) as DraftStreamPartialEvent;
+							if (partialPayload.operationId !== operation.id) continue;
+							if (!partialPayload.message) continue;
+
+							// Show partial text only while no queued/active typing playback is running.
+							const hasActiveQueuedPlayback =
+								livePreviewIsTypingRef.current || livePreviewQueueRef.current.length > 0;
+							if (hasActiveQueuedPlayback) continue;
+
+							setIsLivePreviewVisible(true);
+							setLivePreviewContactId(partialPayload.contactId);
+							setLivePreviewSubject(
+								partialPayload.subject && partialPayload.subject.trim().length > 0
+									? partialPayload.subject
+									: 'Drafting first email...'
+							);
+							setLivePreviewMessage(partialPayload.message);
 						} else if (parsed.event === 'error') {
 							const errorPayload = JSON.parse(parsed.data) as DraftStreamErrorEvent;
 							console.warn(

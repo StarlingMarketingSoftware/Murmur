@@ -15,7 +15,7 @@ import { DraftedEmailsProps, useDraftedEmails } from './useDraftedEmails';
 import { Spinner } from '@/components/atoms/Spinner/Spinner';
 import { Button } from '@/components/ui/button';
 import { UpgradeSubscriptionDrawer } from '@/components/atoms/UpgradeSubscriptionDrawer/UpgradeSubscriptionDrawer';
-import { cn } from '@/utils';
+import { cn, convertHtmlToPlainText } from '@/utils';
 import { DraftingTable } from '../DraftingTable/DraftingTable';
 import DeleteandOpenIcon from '@/components/atoms/_svg/DeleteandOpen';
 import ApproveCheckIcon from '@/components/atoms/svg/ApproveCheckIcon';
@@ -2636,7 +2636,7 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 												}}
 											>
 												{draft.message
-													? draft.message.replace(/<[^>]*>/g, '')
+													? convertHtmlToPlainText(draft.message)
 													: 'No content'}
 											</div>
 										</div>

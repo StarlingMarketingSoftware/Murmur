@@ -257,8 +257,15 @@ export const convertHtmlToPlainText = (html: string): string => {
 	// Remove any other HTML tags
 	plainMessage = plainMessage.replace(/<[^>]*>/g, '');
 
-	// Decode minimal entities
-	plainMessage = plainMessage.replace(/&nbsp;/gi, ' ');
+	// Decode HTML entities (order: &amp; last to avoid double-decoding)
+	plainMessage = plainMessage
+		.replace(/&nbsp;/gi, ' ')
+		.replace(/&lt;/gi, '<')
+		.replace(/&gt;/gi, '>')
+		.replace(/&quot;/gi, '"')
+		.replace(/&#39;/g, "'")
+		.replace(/&apos;/gi, "'")
+		.replace(/&amp;/gi, '&');
 
 	// Replace markers with actual line breaks
 	plainMessage = plainMessage.replace(/§PARA§/g, '\n\n');
