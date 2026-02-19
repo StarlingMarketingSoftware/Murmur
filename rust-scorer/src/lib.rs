@@ -160,6 +160,18 @@ fn metadata_value(metadata: &JsValue, key: &str) -> Option<String> {
     Some(js_to_string(&value))
 }
 
+fn extract_title_value(item: &JsValue) -> Option<String> {
+    // Contacts store `title` directly; ES/vector matches store `metadata.title`.
+    // Treat empty/whitespace-only strings as missing and fall back to `metadata.title`.
+    let direct = metadata_value(item, "title").filter(|value| !value.trim().is_empty());
+    if direct.is_some() {
+        return direct;
+    }
+
+    let metadata = reflect_get(item, "metadata").unwrap_or(JsValue::UNDEFINED);
+    metadata_value(&metadata, "title")
+}
+
 fn match_id_or_empty(match_obj: &JsValue) -> String {
     let value = reflect_get(match_obj, "id").unwrap_or(JsValue::UNDEFINED);
     if is_js_truthy(&value) {
@@ -534,6 +546,87 @@ pub fn apply_post_training_to_es_matches(
     let out = Array::new();
     for js_match in ordered.iter().take(end) {
         out.push(js_match);
+    }
+
+    Ok(out.into())
+}
+
+#[wasm_bindgen]
+pub fn filter_items_by_title_prefixes(
+    items: JsValue,
+    prefixes: JsValue,
+    keep_null_titles: bool,
+) -> Result<JsValue, JsValue> {
+    if !Array::is_array(&items) {
+        return Err(to_js_error("invalid items payload", "expected array"));
+    }
+    if !Array::is_array(&prefixes) {
+        return Err(to_js_error("invalid prefixes payload", "expected array"));
+    }
+
+    let items_array: Array = items
+        .clone()
+        .dyn_into()
+        .map_err(|_| to_js_error("invalid items payload", "expected array"))?;
+    let prefixes_array: Array = prefixes
+        .clone()
+        .dyn_into()
+        .map_err(|_| to_js_error("invalid prefixes payload", "expected array"))?;
+
+    // Normalize prefixes once: trim + lowercase; ignore empty prefixes.
+    let mut normalized_prefixes: Vec<String> = Vec::with_capacity(prefixes_array.length() as usize);
+    for i in 0..prefixes_array.length() {
+        let entry = prefixes_array.get(i);
+        if is_nullish(&entry) {
+            continue;
+        }
+        let normalized = js_to_string(&entry).trim().to_lowercase();
+        if !normalized.is_empty() {
+            normalized_prefixes.push(normalized);
+        }
+    }
+
+    // When no usable prefixes are provided, treat this as "no filter".
+    let out = Array::new();
+    if normalized_prefixes.is_empty() {
+        for i in 0..items_array.length() {
+            out.push(&items_array.get(i));
+        }
+        return Ok(out.into());
+    }
+
+    for i in 0..items_array.length() {
+        let item = items_array.get(i);
+        let title_opt = extract_title_value(&item);
+        let title = match title_opt {
+            Some(t) => t,
+            None => {
+                if keep_null_titles {
+                    out.push(&item);
+                }
+                continue;
+            }
+        };
+
+        let title_norm = title.trim().to_lowercase();
+        if title_norm.is_empty() {
+            if keep_null_titles {
+                out.push(&item);
+            }
+            continue;
+        }
+
+        let mut matched = false;
+        for prefix in &normalized_prefixes {
+            if title_norm.starts_with(prefix) {
+                matched = true;
+                break;
+            }
+        }
+
+        if matched {
+            out.push(&item);
+        }
     }
 
     Ok(out.into())

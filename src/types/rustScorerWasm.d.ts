@@ -1,5 +1,10 @@
 declare module '../../../../rust-scorer/pkg-node' {
 	export function score_hits(hits: unknown, config: unknown): unknown;
+	export function filter_items_by_title_prefixes(
+		items: unknown,
+		prefixes: unknown,
+		keepNullTitles: boolean
+	): unknown;
 	export function apply_post_training_to_es_matches(
 		matches: unknown,
 		profile: unknown,
@@ -39,6 +44,11 @@ declare module '../../../../rust-scorer/pkg-node' {
 }
 
 declare module '../../../../rust-scorer/pkg-web' {
+	export function filter_items_by_title_prefixes(
+		items: unknown,
+		prefixes: unknown,
+		keepNullTitles: boolean
+	): unknown;
 	export function lat_lng_to_world_pixel(
 		lat: number,
 		lng: number,
@@ -90,4 +100,15 @@ declare module '../../../../rust-scorer/pkg-web' {
 	export function union_multi_polygons(
 		multiPolygons: import('polygon-clipping').ClippingMultiPolygon[]
 	): import('polygon-clipping').ClippingMultiPolygon;
+}
+
+// `src/utils/categoryFilterWasm.ts` imports the wasm-pack web bundle from a different relative depth.
+declare module '../../rust-scorer/pkg-web' {
+	export function filter_items_by_title_prefixes(
+		items: unknown,
+		prefixes: unknown,
+		keepNullTitles: boolean
+	): unknown;
+	/** wasm-pack `--target web` default export: async init */
+	export default function __wbg_init(module_or_path?: unknown): Promise<unknown>;
 }

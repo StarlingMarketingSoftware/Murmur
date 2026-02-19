@@ -11,6 +11,8 @@ export function batch_lat_lng_to_world_pixel(coords: Float64Array, world_size: n
 
 export function distance_point_to_segment_sq(px: number, py: number, ax: number, ay: number, bx: number, by: number): number;
 
+export function filter_items_by_title_prefixes(items: any, prefixes: any, keep_null_titles: boolean): any;
+
 export function haversine_km(lat1: number, lng1: number, lat2: number, lng2: number): number;
 
 export function is_point_near_segments(x: number, y: number, segments: Float64Array, threshold_px: number): boolean;
@@ -45,6 +47,7 @@ export interface InitOutput {
     readonly stable_viewport_sample: (a: any, b: any, c: number, d: number, e: number, f: number, g: number, h: number) => any;
     readonly union_multi_polygons: (a: any) => [number, number, number];
     readonly apply_post_training_to_es_matches: (a: any, b: any, c: any) => [number, number, number];
+    readonly filter_items_by_title_prefixes: (a: any, b: any, c: number) => [number, number, number];
     readonly score_hits: (a: any, b: any) => [number, number, number];
     readonly apply_hardcoded_location_overrides: (a: number, b: number, c: any) => [number, number, number];
     readonly __wbindgen_malloc: (a: number, b: number) => number;

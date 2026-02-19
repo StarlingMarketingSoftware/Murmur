@@ -65,6 +65,20 @@ export function distance_point_to_segment_sq(px, py, ax, ay, bx, by) {
 }
 
 /**
+ * @param {any} items
+ * @param {any} prefixes
+ * @param {boolean} keep_null_titles
+ * @returns {any}
+ */
+export function filter_items_by_title_prefixes(items, prefixes, keep_null_titles) {
+    const ret = wasm.filter_items_by_title_prefixes(items, prefixes, keep_null_titles);
+    if (ret[2]) {
+        throw takeFromExternrefTable0(ret[1]);
+    }
+    return takeFromExternrefTable0(ret[0]);
+}
+
+/**
  * @param {number} lat1
  * @param {number} lng1
  * @param {number} lat2

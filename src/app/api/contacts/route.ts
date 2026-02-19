@@ -12,6 +12,10 @@ import {
 import { stripBothSidesOfBraces } from '@/utils/string';
 import { getValidatedParamsFromUrl } from '@/utils';
 import {
+	filterItemsByTitlePrefixes,
+	USE_WASM_CATEGORY_FILTERS,
+} from '@/utils/categoryFilterWasm';
+import {
 	getPostTrainingForQuery,
 	type PostTrainingProfile,
 } from '@/app/api/_utils/postTraining';
@@ -56,6 +60,8 @@ const createContactSchema = z.object({
 
 const contactFilterSchema = z.object({
 	query: z.string().optional(),
+	// Optional explicit search mode (preferred over embedding "[Booking]/[Promotion]" in `query`)
+	mode: z.enum(['booking', 'promotion']).optional(),
 	limit: z.coerce.number().optional(),
 	verificationStatus: z.nativeEnum(EmailVerificationStatus).optional(),
 	contactListIds: z.array(z.number()).optional(),
@@ -83,29 +89,99 @@ export type PostContactData = z.infer<typeof createContactSchema>;
 
 export const maxDuration = 60;
 
-const startsWithCaseInsensitive = (
-	value: string | null | undefined,
-	prefix: string
-): boolean => {
-	if (!value) return false;
-	const normalizedPrefix = prefix.trim().toLowerCase();
-	if (!normalizedPrefix) return false;
-	return value.trim().toLowerCase().startsWith(normalizedPrefix);
-};
-
-const filterContactsByTitlePrefix = <T extends { title?: string | null }>(
-	items: T[],
-	prefix: string
-): T[] => {
-	const normalizedPrefix = prefix.trim();
-	if (!normalizedPrefix) return items;
-	return items.filter((item) =>
-		startsWithCaseInsensitive(item.title ?? null, normalizedPrefix)
-	);
-};
-
 const normalizeSearchText = (value: string | null | undefined): string =>
 	(value ?? '').toLowerCase().replace(/\s+/g, ' ').trim();
+
+type ContactSearchMode = 'booking' | 'promotion';
+
+const stripLeadingBracketTag = (value: string | null | undefined): string =>
+	(value ?? '').replace(/^\s*\[[^\]]+\]\s*/i, '').trim();
+
+const BOOKING_TITLE_PREFIXES = [
+	'Music Venues',
+	'Restaurants',
+	'Coffee Shops',
+	'Music Festivals',
+	'Breweries',
+	'Distilleries',
+	'Wineries',
+	'Cideries',
+	'Wedding Planners',
+	'Wedding Venues',
+] as const;
+
+const PROMOTION_TITLE_PREFIXES = ['Radio Stations', 'College Radio'] as const;
+
+// Map user-facing "What" labels to the DB title prefixes used for filtering.
+const WHAT_TO_TITLE_PREFIX_ALIASES: Record<string, string> = {
+	venues: 'Music Venues',
+	venue: 'Music Venues',
+	'music venues': 'Music Venues',
+	'music venue': 'Music Venues',
+
+	restaurants: 'Restaurants',
+	restaurant: 'Restaurants',
+
+	'coffee shops': 'Coffee Shops',
+	'coffee shop': 'Coffee Shops',
+
+	festivals: 'Music Festivals',
+	festival: 'Music Festivals',
+	'music festivals': 'Music Festivals',
+	'music festival': 'Music Festivals',
+
+	breweries: 'Breweries',
+	brewery: 'Breweries',
+	wineries: 'Wineries',
+	winery: 'Wineries',
+	distilleries: 'Distilleries',
+	distillery: 'Distilleries',
+	cideries: 'Cideries',
+	cidery: 'Cideries',
+
+	'wedding planners': 'Wedding Planners',
+	'wedding planner': 'Wedding Planners',
+	'wedding venues': 'Wedding Venues',
+	'wedding venue': 'Wedding Venues',
+
+	'radio stations': 'Radio Stations',
+	'radio station': 'Radio Stations',
+	'college radio': 'College Radio',
+};
+
+const BOOKING_TITLE_PREFIX_KEY_SET = new Set(BOOKING_TITLE_PREFIXES.map(normalizeSearchText));
+const PROMOTION_TITLE_PREFIX_KEY_SET = new Set(PROMOTION_TITLE_PREFIXES.map(normalizeSearchText));
+
+const normalizeWhatToTitlePrefix = (value: string | null | undefined): string => {
+	const trimmed = (value ?? '').trim();
+	if (!trimmed) return '';
+	const key = normalizeSearchText(trimmed);
+	return WHAT_TO_TITLE_PREFIX_ALIASES[key] ?? trimmed;
+};
+
+const inferSearchModeFromRestOfQuery = (
+	restOfQuery: string | null | undefined
+): ContactSearchMode | null => {
+	const normalized = normalizeSearchText(restOfQuery);
+	if (!normalized) return null;
+	const canonicalPrefix = normalizeWhatToTitlePrefix(restOfQuery);
+	const canonicalKey = normalizeSearchText(canonicalPrefix);
+	if (PROMOTION_TITLE_PREFIX_KEY_SET.has(canonicalKey)) return 'promotion';
+	if (BOOKING_TITLE_PREFIX_KEY_SET.has(canonicalKey)) return 'booking';
+	return null;
+};
+
+const extractExplicitSearchModeFromQueryPrefix = (
+	query: string | null | undefined
+): ContactSearchMode | null => {
+	const s = (query ?? '').trim();
+	if (!s) return null;
+	const m = /^\[([^\]]+)\]/.exec(s);
+	const tag = m?.[1]?.trim().toLowerCase();
+	if (tag === 'booking') return 'booking';
+	if (tag === 'promotion') return 'promotion';
+	return null;
+};
 
 const hasText = (value: string | null | undefined): boolean =>
 	typeof value === 'string' && value.trim().length > 0;
@@ -1131,6 +1207,7 @@ export async function GET(req: NextRequest) {
 			contactListIds,
 			verificationStatus,
 			query,
+			mode,
 			limit,
 			useVectorSearch,
 			location,
@@ -1144,9 +1221,12 @@ export async function GET(req: NextRequest) {
 		} = validatedFilters.data;
 
 		// Check if this is a valid "from home" demo search (allows one specific search without subscription)
+		const normalizeFromHomeDemoQuery = (value: string | null | undefined): string =>
+			stripLeadingBracketTag(value).toLowerCase();
 		const isFromHomeDemoSearch =
 			fromHome === true &&
-			query?.trim().toLowerCase() === FROM_HOME_ALLOWED_QUERY.toLowerCase();
+			normalizeFromHomeDemoQuery(query) ===
+				normalizeFromHomeDemoQuery(FROM_HOME_ALLOWED_QUERY);
 
 		// Check subscription status
 		const user = await prisma.user.findUnique({
@@ -1271,6 +1351,10 @@ export async function GET(req: NextRequest) {
 
 		let locationResponse: string | null = null;
 		const rawQuery = query || '';
+		const explicitModeFromQuery = extractExplicitSearchModeFromQueryPrefix(rawQuery);
+		// Strip the leading "[Booking]" / "[Promotion]" (or any future bracket tag) for parsing + ES/LLM logic.
+		const rawQueryForParsing = stripLeadingBracketTag(rawQuery);
+		const rawQueryForPostTraining = rawQueryForParsing.length > 0 ? rawQueryForParsing : rawQuery;
 		const preVectorPrepStartMs = Date.now();
 		const defaultPostTrainingProfile: PostTrainingProfile = {
 			active: false,
@@ -1278,10 +1362,10 @@ export async function GET(req: NextRequest) {
 			demoteTerms: [],
 		};
 		const postTrainingPromise: Promise<PostTrainingProfile> =
-			useVectorSearch && rawQuery
+			useVectorSearch && rawQueryForPostTraining
 				? (() => {
 						const postTrainingStartMs = Date.now();
-						return getPostTrainingForQuery(rawQuery)
+						return getPostTrainingForQuery(rawQueryForPostTraining)
 							.then((profile) => {
 								console.info(
 									`[contacts] post-training-llm=${Date.now() - postTrainingStartMs}ms`
@@ -1297,15 +1381,6 @@ export async function GET(req: NextRequest) {
 							});
 				  })()
 				: Promise.resolve(defaultPostTrainingProfile);
-		// Special directives
-		const _trimmedLc = rawQuery.trim().toLowerCase();
-		const isPromotionSearch = _trimmedLc.startsWith('[promotion]');
-		const isBookingSearch = _trimmedLc.startsWith('[booking]');
-		const rawQueryForParsing = isPromotionSearch
-			? rawQuery.replace(/^\s*\[promotion\]\s*/i, '')
-			: isBookingSearch
-			? rawQuery.replace(/^\s*\[booking\]\s*/i, '')
-			: rawQuery;
 		const isWineBeerSpiritsQuery = (() => {
 			const normalized = rawQueryForParsing.toLowerCase();
 			const hasWine = /\bwine\b/.test(normalized);
@@ -1403,10 +1478,17 @@ export async function GET(req: NextRequest) {
 			forceCityAny,
 			penaltyTerms,
 			strictPenalty,
-		} = applyHardcodedLocationOverrides(query || '', queryJson);
+		} = applyHardcodedLocationOverrides(rawQueryForParsing, queryJson);
 		queryJson = overrides;
+
+		const inferredModeFromRestOfQuery = inferSearchModeFromRestOfQuery(queryJson.restOfQuery);
+		const effectiveMode: ContactSearchMode | null =
+			mode ?? explicitModeFromQuery ?? inferredModeFromRestOfQuery;
+		const isPromotionSearch = effectiveMode === 'promotion';
+		const isBookingSearch = effectiveMode === 'booking';
+
 		const bookingTitlePrefix = isBookingSearch
-			? (queryJson.restOfQuery ?? '').trim()
+			? normalizeWhatToTitlePrefix(queryJson.restOfQuery).trim()
 			: '';
 		const shouldFilterBookingTitles = bookingTitlePrefix.length > 0;
 		const requestedLimit = Math.max(1, Math.min(limit ?? VECTOR_SEARCH_LIMIT_DEFAULT, 500));
@@ -3631,22 +3713,8 @@ export async function GET(req: NextRequest) {
 				});
 			}
 
-			const defaultTitlePrefixes = [
-				'Music Venues',
-				'Restaurants',
-				'Coffee Shops',
-				'Music Festivals',
-				'Breweries',
-				'Distilleries',
-				'Wineries',
-				'Cideries',
-				'Wedding Planners',
-				'Wedding Venues',
-			];
-
-			const cleanQuery = queryJson.restOfQuery.trim();
 			const effectivePrefixes =
-				cleanQuery.length > 0 ? [cleanQuery] : defaultTitlePrefixes;
+				bookingTitlePrefix.length > 0 ? [bookingTitlePrefix] : [...BOOKING_TITLE_PREFIXES];
 
 			const primary = await prisma.contact.findMany({
 				where: {
@@ -3694,7 +3762,9 @@ export async function GET(req: NextRequest) {
 			}
 
 			const filteredResults = shouldFilterBookingTitles
-				? filterContactsByTitlePrefix(results, bookingTitlePrefix)
+				? await filterItemsByTitlePrefixes(results, [bookingTitlePrefix], {
+						keepNullTitles: false,
+				  })
 				: results;
 			
 			// Reorder to put exact city matches first when a target city is known
@@ -3775,7 +3845,9 @@ export async function GET(req: NextRequest) {
 						{
 							OR: [
 								{ title: radioTitleWhere },
+								{ title: { mode: 'insensitive', startsWith: 'College Radio' } },
 								{ company: { mode: 'insensitive', contains: 'radio station' } },
+								{ company: { mode: 'insensitive', contains: 'college radio' } },
 							],
 						},
 					],
@@ -3838,6 +3910,8 @@ export async function GET(req: NextRequest) {
 				OR: [
 					{ title: radioTitleWhere },
 					{ company: { mode: 'insensitive', contains: 'radio station' } },
+					{ title: { mode: 'insensitive', startsWith: 'College Radio' } },
+					{ company: { mode: 'insensitive', contains: 'college radio' } },
 				],
 			};
 
@@ -4132,7 +4206,9 @@ export async function GET(req: NextRequest) {
 				);
 				const fallback = await substringSearch();
 				const filteredFallback = shouldFilterBookingTitles
-					? filterContactsByTitlePrefix(fallback, bookingTitlePrefix)
+					? await filterItemsByTitlePrefixes(fallback, [bookingTitlePrefix], {
+							keepNullTitles: false,
+					  })
 					: fallback;
 				return apiResponse(filteredFallback);
 			}
@@ -4143,19 +4219,42 @@ export async function GET(req: NextRequest) {
 					'Vector search returned no matches, falling back to substring search.'
 				);
 				const fallback = await substringSearch();
-				return apiResponse(fallback);
+				const filteredFallback = shouldFilterBookingTitles
+					? await filterItemsByTitlePrefixes(fallback, [bookingTitlePrefix], {
+							keepNullTitles: false,
+					  })
+					: fallback;
+				return apiResponse(filteredFallback);
 			}
 			const finalPostTrainingLimit = limit ?? VECTOR_SEARCH_LIMIT_DEFAULT;
 			const postTrainingApplyStartMs = Date.now();
 			const esCandidateCountBefore = vectorSearchResults.matches.length;
-			const esMatches = applyPostTrainingToEsMatches(
+			const esMatchesPostTraining = applyPostTrainingToEsMatches(
 				vectorSearchResults.matches as VectorEsMatch[],
 				postTrainingProfile,
 				finalPostTrainingLimit
 			);
 			console.info(
-				`[contacts] post-training-filter=${Date.now() - postTrainingApplyStartMs}ms candidates=${esCandidateCountBefore}->${esMatches.length}`
+				`[contacts] post-training-filter=${Date.now() - postTrainingApplyStartMs}ms candidates=${esCandidateCountBefore}->${esMatchesPostTraining.length}`
 			);
+
+			// Early booking category filter at the ES stage: reduces Prisma hydration work.
+			// Keep missing titles so Prisma hydration can fill them without false negatives.
+			let esMatches = esMatchesPostTraining;
+			if (USE_WASM_CATEGORY_FILTERS && shouldFilterBookingTitles) {
+				const titlePrefixFilterStartMs = Date.now();
+				esMatches = await filterItemsByTitlePrefixes(
+					esMatchesPostTraining,
+					[bookingTitlePrefix],
+					{
+						keepNullTitles: true,
+					}
+				);
+				console.info(
+					`[contacts] title-prefix-filter=${Date.now() - titlePrefixFilterStartMs}ms candidates=${esMatchesPostTraining.length}->${esMatches.length}`
+				);
+			}
+
 			const esRankByContactId = new Map<number, number>();
 			const addedContactIdsSet = new Set(addedContactIds);
 			const esOrderedIds: number[] = [];
@@ -4320,7 +4419,9 @@ export async function GET(req: NextRequest) {
 			// Post-training is already applied at the ES stage to avoid duplicate filtering.
 
 			if (shouldFilterBookingTitles && contacts.length > 0) {
-				contacts = filterContactsByTitlePrefix(contacts, bookingTitlePrefix);
+				contacts = await filterItemsByTitlePrefixes(contacts, [bookingTitlePrefix], {
+					keepNullTitles: false,
+				});
 			}
 
 			// Coffee Shops refinement for vector results: remove obvious non-coffee hits (e.g., theaters, agencies)
@@ -4403,7 +4504,9 @@ export async function GET(req: NextRequest) {
 					.filter((contact): contact is Contact => Boolean(contact));
 
 				const filteredFallbackContacts = shouldFilterBookingTitles
-					? filterContactsByTitlePrefix(fallbackContacts, bookingTitlePrefix)
+					? await filterItemsByTitlePrefixes(fallbackContacts, [bookingTitlePrefix], {
+							keepNullTitles: false,
+					  })
 					: fallbackContacts;
 
 				let refinedFallback = filteredFallbackContacts;

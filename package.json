@@ -9,6 +9,7 @@
 		"build:wasm:web": "wasm-pack build rust-scorer --target web --out-dir pkg-web && rm -f rust-scorer/pkg-web/.gitignore",
 		"build:wasm": "npm run build:wasm:node && npm run build:wasm:web",
 		"parity:post-training": "tsx --tsconfig tsconfig.json scripts/post-training-parity.ts",
+		"parity:category-filter": "tsx --tsconfig tsconfig.json scripts/category-filter-parity.ts",
 		"preprocess-geo": "node scripts/preprocess-states-geojson.mjs",
 		"build": "npm run preprocess-geo && cross-env NODE_OPTIONS=--max-old-space-size=8192 next build",
 		"start": "next start",

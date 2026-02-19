@@ -1474,10 +1474,54 @@ const getPromotionOverlayWhatFromContactTitle = (
 	title: string | null | undefined
 ): string | null => (isPromotionOverlayListTitle(title) ? 'Radio Stations' : null);
 
-const isBookingSearchQuery = (query: string | null | undefined): boolean =>
-	(query ?? '').trim().toLowerCase().startsWith('[booking]');
-const isPromotionSearchQuery = (query: string | null | undefined): boolean =>
-	(query ?? '').trim().toLowerCase().startsWith('[promotion]');
+type SearchMode = 'booking' | 'promotion';
+
+const extractSearchModeFromQueryPrefix = (
+	query: string | null | undefined
+): SearchMode | null => {
+	const s = (query ?? '').trim().toLowerCase();
+	if (s.startsWith('[booking]')) return 'booking';
+	if (s.startsWith('[promotion]')) return 'promotion';
+	return null;
+};
+
+// When the query string no longer embeds "[Booking]"/"[Promotion]", infer mode from the
+// dashboard's structured "What" input so overlays + pin styling behave the same.
+const inferSearchModeFromSearchWhat = (
+	searchWhat: string | null | undefined
+): SearchMode | null => {
+	const w = (searchWhat ?? '').trim().toLowerCase();
+	if (!w) return null;
+
+	// Promotion modes (radio outreach)
+	if (w.includes('radio station') || w.includes('radio stations') || w.includes('college radio')) {
+		return 'promotion';
+	}
+
+	// Booking modes (venues/restaurants/etc.)
+	if (
+		w === 'venues' ||
+		w === 'venue' ||
+		w.includes('music venue') ||
+		w.includes('restaurant') ||
+		w.includes('coffee shop') ||
+		w === 'festivals' ||
+		w === 'festival' ||
+		w.includes('music festival') ||
+		w.includes('brewery') ||
+		w.includes('winery') ||
+		w.includes('distillery') ||
+		w.includes('cidery') ||
+		w.includes('wedding planner') ||
+		w.includes('wedding venue') ||
+		w.includes('wine, beer') ||
+		w.includes('wine beer')
+	) {
+		return 'booking';
+	}
+
+	return null;
+};
 const normalizeWhatKey = (value: string): string =>
 	value
 		.trim()
@@ -1921,11 +1965,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		[contacts]
 	);
 
-	const isBookingSearch = useMemo(() => isBookingSearchQuery(searchQuery), [searchQuery]);
-	const isPromotionSearch = useMemo(
-		() => isPromotionSearchQuery(searchQuery),
-		[searchQuery]
+	const searchMode = useMemo(
+		() =>
+			extractSearchModeFromQueryPrefix(searchQuery) ??
+			inferSearchModeFromSearchWhat(searchWhat),
+		[searchQuery, searchWhat]
 	);
+	const isBookingSearch = searchMode === 'booking';
+	const isPromotionSearch = searchMode === 'promotion';
 	const isAnySearch = useMemo(() => Boolean((searchQuery ?? '').trim()), [searchQuery]);
 	const onViewportInteractionRef = useRef<
 		SearchResultsMapProps['onViewportInteraction'] | null
@@ -2926,7 +2973,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		[map, isMapLoaded]
 	);
 
-	// Fade state borders/labels based on presentation + data readiness, and crossfade divider ↔ interactive borders.
 	useEffect(() => {
 		if (!map || !isMapLoaded) return;
 
@@ -3419,9 +3465,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				'icon-ignore-placement': true,
 			},
 		});
-		// Hover variant: renders on top with the hover icon (black outline + tail).
-		// Visibility is controlled by a dynamic filter (setFilter) — one call instead of N
-		// setFeatureState calls — so highlight/un-highlight is instant regardless of pin count.
+
 		ensureLayer({
 			id: MAPBOX_LAYER_IDS.bookingPinIconsHover,
 			type: 'symbol',
@@ -3561,8 +3605,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			setMapLoadError(null);
 			ensureMapboxSourcesAndLayers(mapInstance);
 
-			// Capture the base state-layer opacity expressions once, then start them hidden.
-			// We will fade them in/out via paint-property multipliers as presentation changes.
 			let capturedStateLineOpacityBase = false;
 			try {
 				if (!stateLineOpacityBaseRef.current) {

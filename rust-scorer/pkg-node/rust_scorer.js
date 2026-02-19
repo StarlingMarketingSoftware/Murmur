@@ -70,6 +70,21 @@ function distance_point_to_segment_sq(px, py, ax, ay, bx, by) {
 exports.distance_point_to_segment_sq = distance_point_to_segment_sq;
 
 /**
+ * @param {any} items
+ * @param {any} prefixes
+ * @param {boolean} keep_null_titles
+ * @returns {any}
+ */
+function filter_items_by_title_prefixes(items, prefixes, keep_null_titles) {
+    const ret = wasm.filter_items_by_title_prefixes(items, prefixes, keep_null_titles);
+    if (ret[2]) {
+        throw takeFromExternrefTable0(ret[1]);
+    }
+    return takeFromExternrefTable0(ret[0]);
+}
+exports.filter_items_by_title_prefixes = filter_items_by_title_prefixes;
+
+/**
  * @param {number} lat1
  * @param {number} lng1
  * @param {number} lat2

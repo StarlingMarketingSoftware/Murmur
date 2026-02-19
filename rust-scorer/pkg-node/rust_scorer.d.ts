@@ -11,6 +11,8 @@ export function batch_lat_lng_to_world_pixel(coords: Float64Array, world_size: n
 
 export function distance_point_to_segment_sq(px: number, py: number, ax: number, ay: number, bx: number, by: number): number;
 
+export function filter_items_by_title_prefixes(items: any, prefixes: any, keep_null_titles: boolean): any;
+
 export function haversine_km(lat1: number, lng1: number, lat2: number, lng2: number): number;
 
 export function is_point_near_segments(x: number, y: number, segments: Float64Array, threshold_px: number): boolean;
