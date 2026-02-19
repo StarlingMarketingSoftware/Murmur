@@ -3,6 +3,8 @@ import { OpenAI } from 'openai';
 import { Client, estypes } from '@elastic/elasticsearch';
 import prisma from '@/lib/prisma';
 
+declare const __non_webpack_require__: NodeRequire | undefined;
+
 type MappingProperty = estypes.MappingProperty;
 
 const VECTOR_DIMENSION = 1536;
@@ -379,30 +381,42 @@ type WasmScoreHitsFunction = (
 	config: WasmScoringConfig
 ) => WasmScoringOutput[];
 
-let wasmScoreHitsPromise: Promise<WasmScoreHitsFunction | null> | null = null;
+let cachedNodeWasmScoreHits: WasmScoreHitsFunction | null | undefined;
 
 const getWasmScoreHitsFunction = async (): Promise<WasmScoreHitsFunction | null> => {
 	if (process.env.USE_WASM_SCORER !== 'true') return null;
-	if (!wasmScoreHitsPromise) {
-		wasmScoreHitsPromise = import('../../../../rust-scorer/pkg-node')
-			.catch(() => import('../../../../rust-scorer/pkg'))
-			.then((module) => {
-				const maybeScoreHits =
-					(module as { score_hits?: unknown }).score_hits ||
-					(module as { default?: { score_hits?: unknown } }).default?.score_hits;
-				if (typeof maybeScoreHits !== 'function') {
-					console.error('[vectorDb] score_hits export missing from rust-scorer pkg');
-					return null;
-				}
-				return maybeScoreHits as WasmScoreHitsFunction;
-			})
-			.catch((error: unknown) => {
-				console.error('[vectorDb] failed to load WASM scorer, using TypeScript fallback', error);
-				return null;
-			});
-	}
+	if (cachedNodeWasmScoreHits !== undefined) return cachedNodeWasmScoreHits;
 
-	return wasmScoreHitsPromise;
+	try {
+		// Use __non_webpack_require__ so webpack does not attempt to bundle or
+		// statically analyse the dynamic require call. In Next.js server bundles
+		// this global is always available. The eval('require') fallback covers
+		// plain Node.js execution outside of webpack.
+		// eslint-disable-next-line @typescript-eslint/no-require-imports
+		const dynamicRequire: NodeRequire =
+			// eslint-disable-next-line no-underscore-dangle
+			(typeof __non_webpack_require__ !== 'undefined'
+				? __non_webpack_require__
+				: eval('require')) as NodeRequire;
+
+		const loaded = dynamicRequire(
+			`${process.cwd()}/rust-scorer/pkg-node`
+		) as Partial<{ score_hits: unknown }> & { default?: Partial<{ score_hits: unknown }> };
+		const maybeModule = (loaded.default ?? loaded) as Partial<{ score_hits: unknown }>;
+
+		if (typeof maybeModule.score_hits !== 'function') {
+			console.error('[vectorDb] score_hits export missing from rust-scorer pkg-node');
+			cachedNodeWasmScoreHits = null;
+			return cachedNodeWasmScoreHits;
+		}
+
+		cachedNodeWasmScoreHits = maybeModule.score_hits as WasmScoreHitsFunction;
+		return cachedNodeWasmScoreHits;
+	} catch (error: unknown) {
+		console.error('[vectorDb] failed to load WASM scorer, using TypeScript fallback', error);
+		cachedNodeWasmScoreHits = null;
+		return cachedNodeWasmScoreHits;
+	}
 };
 
 export const normalizeQueryEmbeddingKey = (input: string): string => {

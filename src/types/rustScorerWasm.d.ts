@@ -1,5 +1,27 @@
 declare module '../../../../rust-scorer/pkg-node' {
 	export function score_hits(hits: unknown, config: unknown): unknown;
+	export function apply_hardcoded_location_overrides(
+		rawQuery: string,
+		parsed: {
+			city: string | null;
+			state: string | null;
+			country: string | null;
+			restOfQuery: string;
+		}
+	): {
+		overrides: {
+			city: string | null;
+			state: string | null;
+			country: string | null;
+			restOfQuery: string;
+		};
+		penaltyCities: string[];
+		forceCityExactCity?: string;
+		forceStateAny?: string[];
+		forceCityAny?: string[];
+		penaltyTerms: string[];
+		strictPenalty?: boolean;
+	};
 	export function batch_haversine_km(
 		originLat: number,
 		originLng: number,

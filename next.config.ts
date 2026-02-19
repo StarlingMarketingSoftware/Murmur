@@ -25,8 +25,9 @@ const nextConfig: NextConfig = {
 	// Next.js output file tracing detects the JS glue code but misses the
 	// .wasm binaries that are loaded via fs.readFileSync at runtime.
 	outputFileTracingIncludes: {
-		'/api/*': ['./rust-scorer/pkg-node/**/*', './rust-scorer/pkg/**/*'],
-		'/murmur/*': ['./rust-scorer/pkg-node/**/*'],
+		// IMPORTANT: use `**` so nested routes (e.g. `/api/vector-search/...`) also match.
+		'/api/**': ['./rust-scorer/pkg-node/**/*'],
+		'/murmur/**': ['./rust-scorer/pkg-node/**/*'],
 	},
 	webpack: (config) => {
 		config.experiments = {

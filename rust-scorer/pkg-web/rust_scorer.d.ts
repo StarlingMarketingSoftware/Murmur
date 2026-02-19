@@ -1,6 +1,8 @@
 /* tslint:disable */
 /* eslint-disable */
 
+export function apply_hardcoded_location_overrides(raw_query: string, parsed: any): any;
+
 export function batch_haversine_km(origin_lat: number, origin_lng: number, targets: Float64Array): Float64Array;
 
 export function batch_lat_lng_to_world_pixel(coords: Float64Array, world_size: number): Float64Array;
@@ -40,15 +42,16 @@ export interface InitOutput {
     readonly point_in_ring: (a: number, b: number, c: any) => number;
     readonly stable_viewport_sample: (a: any, b: any, c: number, d: number, e: number, f: number, g: number, h: number) => any;
     readonly union_multi_polygons: (a: any) => [number, number, number];
+    readonly apply_hardcoded_location_overrides: (a: number, b: number, c: any) => [number, number, number];
     readonly score_hits: (a: any, b: any) => [number, number, number];
     readonly __wbindgen_malloc: (a: number, b: number) => number;
     readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;
     readonly __wbindgen_exn_store: (a: number) => void;
     readonly __externref_table_alloc: () => number;
     readonly __wbindgen_externrefs: WebAssembly.Table;
+    readonly __externref_table_dealloc: (a: number) => void;
     readonly __externref_drop_slice: (a: number, b: number) => void;
     readonly __wbindgen_free: (a: number, b: number, c: number) => void;
-    readonly __externref_table_dealloc: (a: number) => void;
     readonly __wbindgen_start: () => void;
 }
 

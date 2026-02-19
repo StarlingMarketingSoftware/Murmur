@@ -5,6 +5,7 @@ use std::collections::HashSet;
 use wasm_bindgen::prelude::*;
 
 mod geo;
+mod search_preprocess;
 
 #[derive(Debug, Deserialize)]
 struct HitInput {

@@ -1,6 +1,21 @@
 /* @ts-self-types="./rust_scorer.d.ts" */
 
 /**
+ * @param {string} raw_query
+ * @param {any} parsed
+ * @returns {any}
+ */
+export function apply_hardcoded_location_overrides(raw_query, parsed) {
+    const ptr0 = passStringToWasm0(raw_query, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+    const len0 = WASM_VECTOR_LEN;
+    const ret = wasm.apply_hardcoded_location_overrides(ptr0, len0, parsed);
+    if (ret[2]) {
+        throw takeFromExternrefTable0(ret[1]);
+    }
+    return takeFromExternrefTable0(ret[0]);
+}
+
+/**
  * @param {number} origin_lat
  * @param {number} origin_lng
  * @param {Float64Array} targets
@@ -345,9 +360,17 @@ function __wbg_get_imports() {
         __wbg_prototypesetcall_bdcdcc5842e4d77d: function(arg0, arg1, arg2) {
             Uint8Array.prototype.set.call(getArrayU8FromWasm0(arg0, arg1), arg2);
         },
+        __wbg_push_8ffdcb2063340ba5: function(arg0, arg1) {
+            const ret = arg0.push(arg1);
+            return ret;
+        },
         __wbg_set_3f1d0b984ed272ed: function(arg0, arg1, arg2) {
             arg0[arg1] = arg2;
         },
+        __wbg_set_6cb8631f80447a67: function() { return handleError(function (arg0, arg1, arg2) {
+            const ret = Reflect.set(arg0, arg1, arg2);
+            return ret;
+        }, arguments); },
         __wbg_set_f43e577aea94465b: function(arg0, arg1, arg2) {
             arg0[arg1 >>> 0] = arg2;
         },

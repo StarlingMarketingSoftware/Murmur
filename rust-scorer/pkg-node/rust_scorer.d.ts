@@ -1,6 +1,8 @@
 /* tslint:disable */
 /* eslint-disable */
 
+export function apply_hardcoded_location_overrides(raw_query: string, parsed: any): any;
+
 export function batch_haversine_km(origin_lat: number, origin_lng: number, targets: Float64Array): Float64Array;
 
 export function batch_lat_lng_to_world_pixel(coords: Float64Array, world_size: number): Float64Array;
