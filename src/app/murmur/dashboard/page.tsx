@@ -526,6 +526,10 @@ const DashboardContent = () => {
 				width: 100% !important;
 				height: 100% !important;
 			}
+			/* Map-view fills the viewport edge-to-edge — no rounded corners */
+			.dashboard-globe-bg .murmur-search-results-map {
+				border-radius: 0 !important;
+			}
 			/* Counteract root-level dashboard zoom so the globe fills the real viewport */
 			html.murmur-compact .dashboard-globe-bg {
 				zoom: calc(1 / var(--murmur-dashboard-zoom, 0.85));
@@ -3424,9 +3428,9 @@ const DashboardContent = () => {
 	// Key goal: keep the Mapbox container size stable during the transition.
 	// Resizing the container causes canvas reflow + debounced `map.resize()` calls, which looks jittery.
 	// We instead animate a clipped viewport + overlay border, so the frame slides in without displacing the map.
-	const MAP_VIEW_FRAME_INSET_PX = 9;
-	const MAP_VIEW_FRAME_RADIUS_PX = 8;
-	const MAP_VIEW_FRAME_BORDER_PX = 3;
+	const MAP_VIEW_FRAME_INSET_PX = 0;
+	const MAP_VIEW_FRAME_RADIUS_PX = 0;
+	const MAP_VIEW_FRAME_BORDER_PX = 0;
 	const mapViewFrameTransition = `${DASHBOARD_TO_INTERACTIVE_TRANSITION_MS}ms ${DASHBOARD_TO_INTERACTIVE_TRANSITION_CSS_EASING}`;
 	const mapViewInnerInsetPx = MAP_VIEW_FRAME_INSET_PX + MAP_VIEW_FRAME_BORDER_PX;
 	const mapViewInnerRadiusPx = Math.max(0, MAP_VIEW_FRAME_RADIUS_PX - MAP_VIEW_FRAME_BORDER_PX);
