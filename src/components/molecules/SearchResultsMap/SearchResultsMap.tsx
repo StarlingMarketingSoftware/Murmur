@@ -7273,6 +7273,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 	return (
 		<div
+			className={
+				isBackgroundPresentation
+					? 'murmur-search-results-map murmur-search-results-map--background'
+					: 'murmur-search-results-map murmur-search-results-map--interactive'
+			}
 			style={{
 				width: '100%',
 				height: '100%',
@@ -7282,6 +7287,19 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				overflow: 'hidden',
 			}}
 		>
+			{!isBackgroundPresentation && (
+				<style>{`
+					.murmur-search-results-map--interactive .mapboxgl-ctrl-bottom-left {
+						left: 8px !important;
+						bottom: 6px !important;
+					}
+					.murmur-search-results-map--interactive .mapboxgl-ctrl-bottom-left .mapboxgl-ctrl-logo {
+						display: block !important;
+						transform: scale(0.6);
+						opacity: 0.8;
+					}
+				`}</style>
+			)}
 			<div ref={mapContainerRef} style={{ width: '100%', height: '100%' }} />
 			{mapLoadError && (
 				<div
