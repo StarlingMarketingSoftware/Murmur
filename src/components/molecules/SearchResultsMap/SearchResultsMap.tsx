@@ -1153,11 +1153,11 @@ const applyFreeTrialMapVisualTuning = (mapInstance: mapboxgl.Map) => {
 		const existingFog = (mapInstance as any).getFog?.() ?? {};
 		(mapInstance as any).setFog?.({
 			...existingFog,
-			color: 'rgb(0, 0, 0)',
-			'high-color': 'rgb(0, 0, 0)',
+			color: 'rgba(140, 190, 240, 0.38)',
+			'high-color': 'rgb(14, 40, 92)',
 			'space-color': 'rgb(0, 0, 0)',
 			'star-intensity': 0.9,
-			'horizon-blend': 0,
+			'horizon-blend': 0.022,
 		});
 	} catch {
 		// Non-fatal.
