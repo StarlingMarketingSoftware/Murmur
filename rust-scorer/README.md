@@ -33,6 +33,7 @@ Outputs:
 ## Exported WASM API
 
 - `score_hits(hits, config)`
+- `apply_post_training_to_es_matches(matches, profile, final_limit)`
 - `haversine_km(lat1, lng1, lat2, lng2)`
 - `lat_lng_to_world_pixel(lat, lng, world_size)`
 - `distance_point_to_segment_sq(px, py, ax, ay, bx, by)`
@@ -40,7 +41,8 @@ Outputs:
 - `batch_lat_lng_to_world_pixel(flat_lat_lng, world_size)`
 - `batch_haversine_km(origin_lat, origin_lng, flat_lat_lng_targets)`
 - `is_point_near_segments(x, y, flat_segments, threshold_px)`
-- `nearest_us_states(state_name, count)`
+- `pick_non_overlapping_indices(...)`
+- `stable_viewport_sample(...)`
 - `union_multi_polygons(multi_polygons)`
 
 ## TypeScript usage
