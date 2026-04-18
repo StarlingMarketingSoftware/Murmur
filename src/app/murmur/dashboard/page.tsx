@@ -527,7 +527,10 @@ const DashboardContent = () => {
 				height: 100% !important;
 			}
 			/* Map-view fills the viewport edge-to-edge — no rounded corners */
-			.dashboard-globe-bg .murmur-search-results-map {
+			.dashboard-globe-bg .murmur-search-results-map,
+			.dashboard-globe-bg .mapboxgl-map,
+			.dashboard-globe-bg .mapboxgl-canvas-container,
+			.dashboard-globe-bg .mapboxgl-canvas {
 				border-radius: 0 !important;
 			}
 			/* Counteract root-level dashboard zoom so the globe fills the real viewport */
@@ -6128,10 +6131,10 @@ const DashboardContent = () => {
 													<div
 														style={{
 															position: 'fixed',
-															top: '9px',
-															left: '9px',
-															right: '9px',
-															bottom: '9px',
+															top: 0,
+															left: 0,
+															right: 0,
+															bottom: 0,
 															zIndex: 99,
 															pointerEvents: 'none',
 														}}
@@ -6139,7 +6142,7 @@ const DashboardContent = () => {
 														<div
 															// Frame is drawn/animated by the shared map portal.
 															// This wrapper exists only to clip/anchor map-view overlays.
-															className="w-full h-full rounded-[8px] overflow-hidden relative pointer-events-none"
+															className="w-full h-full overflow-hidden relative pointer-events-none"
 														>
 															{/* Map is rendered by the shared portal */}
 															{false && (
@@ -6468,7 +6471,7 @@ const DashboardContent = () => {
 															    so the UI doesn't disappear between state searches. */}
 															{!isNarrowestDesktop && !hasNoSearchResults && (
 																	<div
-																		className="absolute top-[97px] right-[10px] rounded-[12px] flex flex-col pointer-events-auto"
+																		className="absolute top-[97px] right-[10px] flex flex-col pointer-events-auto"
 																		onMouseEnter={() => {
 																			if (!shouldUseDynamicMapCreateCampaignCta) return;
 																			setIsPointerInMapSidePanel(true);
@@ -7040,7 +7043,7 @@ const DashboardContent = () => {
 															{/* Keep mounted during loading so UI doesn't disappear between state searches. */}
 															{isNarrowestDesktop && !hasNoSearchResults && (
 																	<div
-																		className="absolute left-[10px] right-[10px] bottom-[10px] rounded-[12px] shadow-lg flex flex-col"
+																		className="absolute left-[10px] right-[10px] bottom-[10px] shadow-lg flex flex-col"
 																		style={{
 																			height: '45%',
 																			maxHeight: 'calc(100% - 20px)',

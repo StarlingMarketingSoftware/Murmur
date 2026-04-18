@@ -7283,7 +7283,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				height: '100%',
 				position: 'relative',
 				backgroundColor: '#000',
-				borderRadius: isBackgroundPresentation ? 0 : '0.5rem',
+				borderRadius: 0,
 				overflow: 'hidden',
 			}}
 		>
