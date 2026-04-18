@@ -7296,6 +7296,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					.murmur-search-results-map--interactive .mapboxgl-ctrl-bottom-left .mapboxgl-ctrl-logo {
 						display: block !important;
 						transform: scale(0.6);
+						transform-origin: 0 100%;
 						opacity: 0.8;
 					}
 				`}</style>
