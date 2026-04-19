@@ -822,112 +822,13 @@ export const FULL_AI_DRAFTING_SYSTEM_PROMPTS = [
 	FULL_AI_DRAFTING_SYSTEM_PROMPT_12,
 ] as const;
 
-export const SUBJECT_LINE_BASE_RULES = `The subject should read like a human wrote it to one specific recipient, not a template or a form letter. It is the first thing the recipient sees, so treat it with the same care as the body.
-
-- Keep it under 60 characters.
-- Start with a capital letter on the first word. Do NOT title-case the whole line and do NOT start with a lowercase letter.
-- Write like a musician casually messaging a venue booker, not a formal business inquiry. Fragments, questions, and conversational phrasing are all welcome. Polished, corporate, or stiff-sounding language is NOT what we want - keep it loose and conversational, the way a working musician would actually talk.
-- Do not include the sender's website, exclamation points, or emojis.
-- Avoid generic verb phrases - these read as mass-mailed. Examples to avoid: "Quick question about booking", "Booking inquiry", "Reaching out about...", "Inquiry: [venue]", "[Artist] - available to play", "[Artist] booking request".
-- Pick one angle. Don't stuff multiple hooks into a single subject.
-- Stay in the music-booking lane. The hook must relate to the venue's programming, calendar, rooms, scene, audience, or what they book - NOT to food, menu items, ingredients, drinks, decor, hours, or other operational details that happen to appear in the metadata. A subject line about ingredients or the menu makes no sense in a booking email.
-- If the recipient's metadata does not contain enough music-relevant context to execute the assigned angle well, do NOT force it or invent details. Fall back to a plain, direct ask about their calendar or availability.`;
-
-// Per-draft subject-line angles. One is picked at random per draft so subjects
-// stay varied instead of converging on a single style across the batch.
-export const SUBJECT_LINE_ARCHETYPES = [
-	{
-		name: 'season-or-series',
-		hint: 'Anchor the subject to a season or a recurring series the venue runs, inferred from metadata.',
-		example: 'Summer series - would love to be considered',
-	},
-	{
-		name: 'venue-and-ask',
-		hint: 'Name the venue directly and pair it with a short casual ask. Fragments and questions are welcome.',
-		example: 'Acoustic set at The Pearl?',
-	},
-	{
-		name: 'origin-and-timing',
-		hint: "Lead with the sender's city or scene and reference a specific slice of the recipient's calendar.",
-		example: 'Philly folk duo eyeing your fall calendar',
-	},
-	{
-		name: 'specific-programming',
-		hint: 'Reference a specific recurring night, program, or theme the venue already runs.',
-		example: 'Thinking about your Thursday jazz nights',
-	},
-	{
-		name: 'direct-ask',
-		hint: 'Ask a plain, specific question about availability with no preamble.',
-		example: 'Any open Fridays in August?',
-	},
-	{
-		name: 'genre-to-room-fit',
-		hint: "Name the sender's genre and tie it to what suits the room or vibe.",
-		example: 'Indie-folk for your back patio',
-	},
-	{
-		name: 'quiet-curiosity',
-		hint: 'Understated, low-pressure phrasing that reads more like a personal note than a pitch.',
-		example: 'Curious about your fall booking',
-	},
-	{
-		name: 'appreciation-first',
-		hint: 'Acknowledge something specific the venue is known for musically (the kind of acts they book, their listening-room reputation, a series, their programming), then turn toward the ask. Warm but not fawning. Do not reference food, drinks, or decor.',
-		example: 'Longtime fan of what you do at the Basement',
-	},
-	{
-		name: 'booking-for-hook',
-		hint: 'Lead with the occasion, holiday, season, or event the sender is booking for (from bookingFor). Make that the first thing the recipient sees.',
-		example: 'July 4th weekend - any openings?',
-	},
-	{
-		name: 'scene-observation',
-		hint: "Lead with a small, specific observation about the venue's music vibe or reputation in the scene (the room, the crowd, the programming). Not flowery. Must be music-related.",
-		example: 'Best listening room in the neighborhood?',
-	},
-	{
-		name: 'oblique-angle',
-		hint: 'Approach sideways - reference something small and true about the recipient\'s music programming, room, or calendar that a mass-mailer would never know. Must be music-booking-related, never about food, menu, or decor.',
-		example: 'Your back room and a Wednesday in October',
-	},
-	{
-		name: 'plainspoken',
-		hint: 'No clever framing. State what this email is about in five or six ordinary words, the way a friend would. Not salesy.',
-		example: 'A band asking about your calendar',
-	},
-] as const;
-
-export const buildSubjectLineGuidance = (): { guidance: string; archetype: string } => {
-	const archetype =
-		SUBJECT_LINE_ARCHETYPES[Math.floor(Math.random() * SUBJECT_LINE_ARCHETYPES.length)];
-	const guidance = `
-SUBJECT LINE GUIDANCE:
-${SUBJECT_LINE_BASE_RULES}
-
-For this particular draft, write the subject using this specific angle:
-> ${archetype.hint}
-
-Illustrative example of the angle (do not copy this wording; adapt to the actual sender and recipient data): "${archetype.example}"
-
-`;
-	return { guidance, archetype: archetype.name };
-};
-
 // Helper function to get a random drafting system prompt with its index for logging
-export const getRandomDraftingSystemPrompt = (): {
-	prompt: string;
-	promptIndex: number;
-	subjectArchetype: string;
-} => {
+export const getRandomDraftingSystemPrompt = (): { prompt: string; promptIndex: number } => {
 	const promptIndex = Math.floor(Math.random() * FULL_AI_DRAFTING_SYSTEM_PROMPTS.length);
 	const basePrompt = FULL_AI_DRAFTING_SYSTEM_PROMPTS[promptIndex];
-	const filtered = applyDraftingOutputPhraseFilters(basePrompt, { mode: 'freeform' });
-	const { guidance, archetype } = buildSubjectLineGuidance();
 	return {
-		prompt: `${guidance}\n${filtered}`,
+		prompt: applyDraftingOutputPhraseFilters(basePrompt, { mode: 'freeform' }),
 		promptIndex: promptIndex + 1, // 1-indexed for logging (Prompt #1, #2, etc.)
-		subjectArchetype: archetype,
 	};
 };
 

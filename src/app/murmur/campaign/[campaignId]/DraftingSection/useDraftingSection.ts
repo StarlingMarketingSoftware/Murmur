@@ -25,7 +25,6 @@ import {
 
 import {
 	convertAiResponseToRichTextEmail,
-	capitalizeFirstLetter,
 	generateEmailTemplateFromBlocks,
 	generatePromptsFromBlocks,
 	stringifyJsonSubset,
@@ -1302,7 +1301,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			throw new Error('No message or subject generated');
 		}
 
-		const cleanedSubject = capitalizeFirstLetter(removeEmDashes(parsedResponse.subject));
+		const cleanedSubject = removeEmDashes(parsedResponse.subject);
 		const cleanedMessage = stripEmailSignatureFromAiMessage(removeEmDashes(parsedResponse.message), {
 			senderName: identity.name,
 			senderBandName: identity.bandName ?? null,
@@ -1439,7 +1438,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 
 		return {
 			subject: values.isAiSubject
-				? capitalizeFirstLetter(removeEmDashes(geminiParsed.subject))
+				? removeEmDashes(geminiParsed.subject)
 				: values.subject,
 			message: cleanedMessageNoSignature,
 		};
