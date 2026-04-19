@@ -3,7 +3,7 @@ import { fetchOpenRouter } from '@/app/api/_utils/openrouter';
 import { OPENROUTER_DRAFTING_MODELS, getRandomDraftingSystemPrompt } from '@/constants/ai';
 import prisma from '@/lib/prisma';
 import { stripEmailSignatureFromAiMessage } from '@/utils/email';
-import { removeEmDashes, stringifyJsonSubset } from '@/utils/string';
+import { capitalizeFirstLetter, removeEmDashes, stringifyJsonSubset } from '@/utils/string';
 import { auth } from '@clerk/nextjs/server';
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
@@ -326,7 +326,7 @@ const parseDraftResponse = (rawResponse: string, identity: IdentityInput) => {
 		throw new Error('Prompt parsing failed');
 	}
 
-	const cleanedSubject = removeEmDashes(subject);
+	const cleanedSubject = capitalizeFirstLetter(removeEmDashes(subject));
 	const cleanedMessage = stripEmailSignatureFromAiMessage(removeEmDashes(message), {
 		senderName: identity.name,
 		senderBandName: identity.bandName ?? null,
@@ -722,7 +722,9 @@ export async function POST(request: NextRequest) {
 							if (!sanitizedMessage) return;
 
 							const partialSubject = extractPartialField(streamedRawResponse, 'subject');
-							const sanitizedSubject = partialSubject ? removeEmDashes(partialSubject) : '';
+							const sanitizedSubject = partialSubject
+								? capitalizeFirstLetter(removeEmDashes(partialSubject))
+								: '';
 							if (
 								!force &&
 								sanitizedMessage === lastPreviewMessage &&

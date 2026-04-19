@@ -130,6 +130,20 @@ export const removeEmDashes = (text: string): string => {
 };
 
 /**
+ * Capitalizes the first letter of the string while preserving any leading
+ * whitespace. Non-letter first chars are left alone. Used to enforce
+ * sentence-case on AI-generated subject lines, where prompt-level rules
+ * aren't reliably followed.
+ */
+export const capitalizeFirstLetter = (text: string): string => {
+	if (!text) return text;
+	const match = text.match(/^(\s*)(\S)(.*)$/s);
+	if (!match) return text;
+	const [, leading, first, rest] = match;
+	return `${leading}${first.toUpperCase()}${rest}`;
+};
+
+/**
  * Encodes a user ID into a unique code using base64 encoding
  * @param userId - The user ID to encode (e.g., "user_2uWz1PD000PHE2v7WO5rsRqgmWt")
  * @returns The encoded string
