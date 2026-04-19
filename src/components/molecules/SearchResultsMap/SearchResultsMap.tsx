@@ -242,7 +242,7 @@ const getLatLngFromContact = (contact: ContactWithName): LatLngLiteral | null =>
 	// Treat (0,0) as "unknown" coordinates (common placeholder) to avoid the map jumping to Africa.
 	// This product is US-focused; a true (0,0) contact would be in the Gulf of Guinea.
 	if (Math.abs(lat) < 1e-9 && Math.abs(lng) < 1e-9) return null;
-	// Defensive sanity bounds: Google Maps won't render invalid ranges reliably.
+	// Defensive sanity bounds: out-of-range coords render unpredictably.
 	if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
 	return { lat, lng };
 };
@@ -1776,9 +1776,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const presentationRef = useRef<'background' | 'interactive'>(presentation);
 	presentationRef.current = presentation;
 
-	// Default to enabling state hover/click when a handler is provided.
-	// This mirrors the old Google Maps UX (hover highlight + click-to-search) without requiring
-	// every caller to pass an explicit `enableStateInteractions` flag.
+	// Default to enabling state hover/click (hover highlight + click-to-search) when a handler is
+	// provided, so callers don't have to pass an explicit `enableStateInteractions` flag.
 	const stateInteractionsEnabled =
 		enableStateInteractions ?? typeof onStateSelect === 'function';
 
@@ -4367,7 +4366,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 			const zoomRaw = mapInstance.getZoom() ?? 4;
 			// Compute marker size at this zoom so we can enforce min spacing in screen pixels.
-			// Note: Google Maps can report fractional zoom; use the raw value for accurate scaling.
+			// Zoom can be fractional, so use the raw value for accurate scaling.
 			const markerScale = getResultDotScaleForZoom(zoomRaw);
 			const dotStrokeWeight = getResultDotStrokeWeightForZoom(zoomRaw);
 			// Ensure *hovered* dots also won't overlap.
