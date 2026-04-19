@@ -137,7 +137,7 @@ export const removeEmDashes = (text: string): string => {
  */
 export const capitalizeFirstLetter = (text: string): string => {
 	if (!text) return text;
-	const match = text.match(/^(\s*)(\S)([\s\S]*)$/);
+	const match = text.match(/^(\s*)(\S)(.*)$/s);
 	if (!match) return text;
 	const [, leading, first, rest] = match;
 	return `${leading}${first.toUpperCase()}${rest}`;
