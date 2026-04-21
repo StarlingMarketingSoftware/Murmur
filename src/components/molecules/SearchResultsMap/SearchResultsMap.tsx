@@ -3037,10 +3037,23 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				bordersMul
 			);
 
-			// Labels fade with the overall overlay opacity (mode doesn't matter).
+			// Labels fade with the overall overlay opacity (mode doesn't matter), and
+			// additionally fade out near MAP_MIN_ZOOM so they're invisible when fully zoomed out.
 			if (map.getLayer(MAPBOX_LAYER_IDS.statesLabels)) {
 				try {
-					map.setPaintProperty(MAPBOX_LAYER_IDS.statesLabels, 'text-opacity', overlay);
+					if (overlay <= 0.001) {
+						map.setPaintProperty(MAPBOX_LAYER_IDS.statesLabels, 'text-opacity', 0);
+					} else {
+						map.setPaintProperty(MAPBOX_LAYER_IDS.statesLabels, 'text-opacity', [
+							'interpolate',
+							['linear'],
+							['zoom'],
+							MAP_MIN_ZOOM,
+							0,
+							MAP_MIN_ZOOM + 1.25,
+							overlay,
+						]);
+					}
 				} catch {
 					// Ignore.
 				}
@@ -3322,6 +3335,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			['linear'],
 			['zoom'],
 			MAP_MIN_ZOOM,
+			0,
+			MAP_MIN_ZOOM + 1.25,
 			0.6,
 			5,
 			0.75,
@@ -3347,6 +3362,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			['linear'],
 			['zoom'],
 			MAP_MIN_ZOOM,
+			['case', isStateSelectedExpr, 0, 0],
+			MAP_MIN_ZOOM + 1.25,
 			['case', isStateSelectedExpr, 1, 0.6],
 			5,
 			['case', isStateSelectedExpr, 1, 0.75],
