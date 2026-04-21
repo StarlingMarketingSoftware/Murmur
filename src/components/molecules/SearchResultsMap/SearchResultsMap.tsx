@@ -7590,7 +7590,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					// "eye" of shadow in the corner. Peaks are strong to keep the
 					// shaded hemisphere readable at globe zoom.
 					background:
-						'radial-gradient(ellipse 160% 160% at 115% 115%, rgba(6, 10, 28, 0.88) 0%, rgba(6, 10, 28, 0.65) 28%, rgba(10, 16, 36, 0.38) 55%, rgba(20, 28, 56, 0.12) 78%, rgba(0, 0, 0, 0) 100%)',
+						'radial-gradient(ellipse 160% 160% at 115% 115%, rgba(6, 10, 28, 0.70) 0%, rgba(6, 10, 28, 0.50) 28%, rgba(10, 16, 36, 0.28) 55%, rgba(20, 28, 56, 0.08) 78%, rgba(0, 0, 0, 0) 100%)',
 					mixBlendMode: 'multiply',
 					opacity: lightingOverlayOpacity,
 					zIndex: 1,
