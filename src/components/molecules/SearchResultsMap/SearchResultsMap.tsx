@@ -1144,6 +1144,24 @@ const MAP_MIN_ZOOM = 2.25;
 // Dashboard UX: allow state hover highlight one zoom step past the default zoom.
 const STATE_HOVER_HIGHLIGHT_MAX_ZOOM = MAP_DEFAULT_ZOOM + 1;
 
+// Softbox lighting overlay fades out as the user zooms in — the "lit sphere"
+// read only makes sense at globe/continent distance. Fully on at globe zoom,
+// linearly off by the time we're into state-level detail.
+// Anchor the fade to the globe→flat-map transition: full at globe zoom, gone
+// by the time the viewport is filled with flat map (no visible curvature).
+const LIGHTING_OVERLAY_FADE_START_ZOOM = 2.5;
+const LIGHTING_OVERLAY_FADE_END_ZOOM = 5;
+
+const computeLightingOverlayOpacity = (zoom: number) => {
+	if (zoom <= LIGHTING_OVERLAY_FADE_START_ZOOM) return 1;
+	if (zoom >= LIGHTING_OVERLAY_FADE_END_ZOOM) return 0;
+	const t =
+		(zoom - LIGHTING_OVERLAY_FADE_START_ZOOM) /
+		(LIGHTING_OVERLAY_FADE_END_ZOOM - LIGHTING_OVERLAY_FADE_START_ZOOM);
+	// Ease-in cubic: stays near full, then drops off fast near the end.
+	return 1 - t * t * t;
+};
+
 const AUTO_FIT_CONTACTS_MAX_ZOOM = 10;
 const AUTO_FIT_STATE_MAX_ZOOM = 5;
 const DEFAULT_MAX_ZOOM_FALLBACK = 22;
@@ -1940,6 +1958,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const [mapLoadError, setMapLoadError] = useState<string | null>(null);
 	const [selectedStateKey, setSelectedStateKey] = useState<string | null>(null);
 	const [zoomLevel, setZoomLevel] = useState(MAP_DEFAULT_ZOOM);
+	// Live-updated softbox overlay refs. zoomLevel only updates on `moveend`, so
+	// we drive these imperatively from the map's `zoom` event to keep the lighting
+	// fade in lockstep with pinch/scroll/wheel interactions.
+	const lightingOverlayKeyRef = useRef<HTMLDivElement | null>(null);
+	const lightingOverlayShadowRef = useRef<HTMLDivElement | null>(null);
 	const [visibleContacts, setVisibleContacts] = useState<ContactWithName[]>([]);
 	// Keep a "sticky" set of currently-rendered marker ids so zooming can rescale existing markers
 	// and only introduce *new* markers, instead of re-sampling a totally different set each time.
@@ -6021,6 +6044,35 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		return getResultDotScaleForZoom(zoomLevel);
 	}, [zoomLevel]);
 
+	// Fade the softbox lighting overlays as the user zooms past the globe view.
+	// zoomLevel only seeds the initial opacity; the live `zoom` listener below
+	// keeps the overlays in lockstep with ongoing pinch/scroll/wheel gestures.
+	const lightingOverlayOpacity = useMemo(
+		() => computeLightingOverlayOpacity(zoomLevel),
+		[zoomLevel]
+	);
+
+	useEffect(() => {
+		if (!map) return;
+		if (!isMapLoaded) return;
+		if (isBackgroundPresentation) return;
+
+		const applyOpacity = () => {
+			const zoom = map.getZoom() ?? MAP_DEFAULT_ZOOM;
+			const opacity = String(computeLightingOverlayOpacity(zoom));
+			if (lightingOverlayKeyRef.current)
+				lightingOverlayKeyRef.current.style.opacity = opacity;
+			if (lightingOverlayShadowRef.current)
+				lightingOverlayShadowRef.current.style.opacity = opacity;
+		};
+
+		applyOpacity();
+		map.on('zoom', applyOpacity);
+		return () => {
+			map.off('zoom', applyOpacity);
+		};
+	}, [map, isMapLoaded, isBackgroundPresentation]);
+
 	const markerPinUrlCacheRef = useRef<Map<string, string>>(new Map());
 	const getMarkerPinUrl = useCallback(
 		(
@@ -7510,26 +7562,37 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			  terminator. Darkens the unlit hemisphere without tinting the lit side.
 			*/}
 			<div
+				ref={lightingOverlayKeyRef}
 				aria-hidden
 				style={{
 					position: 'absolute',
 					inset: 0,
 					pointerEvents: 'none',
+					// Anchor the radial "hot spot" offscreen past the upper-left so the
+					// visible gradient reads as ambient warm wash rather than a disc.
+					// Peaks are cranked up because the hot center is offscreen.
 					background:
-						'radial-gradient(circle at 36% 40%, rgba(255, 238, 205, 0.30) 0%, rgba(255, 238, 205, 0.22) 24%, rgba(255, 238, 205, 0.12) 48%, rgba(255, 238, 205, 0.04) 68%, rgba(255, 238, 205, 0) 85%)',
+						'radial-gradient(ellipse 150% 150% at -10% -10%, rgba(255, 238, 205, 0.55) 0%, rgba(255, 238, 205, 0.42) 28%, rgba(255, 238, 205, 0.24) 52%, rgba(255, 238, 205, 0.08) 78%, rgba(255, 238, 205, 0) 100%)',
 					mixBlendMode: 'screen',
+					opacity: lightingOverlayOpacity,
 					zIndex: 1,
 				}}
 			/>
 			<div
+				ref={lightingOverlayShadowRef}
 				aria-hidden
 				style={{
 					position: 'absolute',
 					inset: 0,
 					pointerEvents: 'none',
+					// Push the dark pool offscreen past the lower-right corner so only
+					// the broad outer falloff is in the viewport — no obvious radial
+					// "eye" of shadow in the corner. Peaks are strong to keep the
+					// shaded hemisphere readable at globe zoom.
 					background:
-						'radial-gradient(circle at 88% 90%, rgba(6, 10, 28, 0.72) 0%, rgba(6, 10, 28, 0.48) 20%, rgba(10, 16, 36, 0.22) 42%, rgba(20, 28, 56, 0.04) 62%, rgba(0, 0, 0, 0) 78%)',
+						'radial-gradient(ellipse 160% 160% at 115% 115%, rgba(6, 10, 28, 0.88) 0%, rgba(6, 10, 28, 0.65) 28%, rgba(10, 16, 36, 0.38) 55%, rgba(20, 28, 56, 0.12) 78%, rgba(0, 0, 0, 0) 100%)',
 					mixBlendMode: 'multiply',
+					opacity: lightingOverlayOpacity,
 					zIndex: 1,
 				}}
 			/>
