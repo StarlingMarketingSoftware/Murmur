@@ -1177,6 +1177,34 @@ const applyFreeTrialMapVisualTuning = (mapInstance: mapboxgl.Map) => {
 		// Non-fatal.
 	}
 
+	// Dramatic directional lighting: key light from the west (azimuth 270°) so the right
+	// hemisphere falls into shadow while the left stays bright. Low ambient amplifies contrast.
+	try {
+		(mapInstance as any).setLights?.([
+			{
+				id: 'murmur-ambient',
+				type: 'ambient',
+				properties: {
+					color: 'rgb(215, 226, 240)',
+					intensity: 0.6,
+				},
+			},
+			{
+				id: 'murmur-key',
+				type: 'directional',
+				properties: {
+					color: 'rgb(255, 244, 222)',
+					intensity: 0.85,
+					direction: [270, 55],
+					'cast-shadows': true,
+					'shadow-intensity': 0.7,
+				},
+			},
+		]);
+	} catch {
+		// Non-fatal on older Mapbox styles that don't support setLights.
+	}
+
 	// Basemap layer cleanup (hide words + borders; keep our layers) + cooler palette recolor.
 	try {
 		const style = mapInstance.getStyle();
@@ -7427,6 +7455,18 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				`}</style>
 			)}
 			<div ref={mapContainerRef} style={{ width: '100%', height: '100%' }} />
+			<div
+				aria-hidden
+				style={{
+					position: 'absolute',
+					inset: 0,
+					pointerEvents: 'none',
+					background:
+						'linear-gradient(100deg, rgba(255, 240, 210, 0.14) 0%, rgba(255, 240, 210, 0.05) 28%, rgba(0, 0, 0, 0) 52%, rgba(0, 0, 0, 0.18) 78%, rgba(0, 0, 0, 0.34) 100%)',
+					mixBlendMode: 'multiply',
+					zIndex: 1,
+				}}
+			/>
 			{mapLoadError && (
 				<div
 					className={`absolute inset-0 flex items-center justify-center ${
