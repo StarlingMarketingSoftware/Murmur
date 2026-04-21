@@ -1186,6 +1186,7 @@ const applyFreeTrialMapVisualTuning = (mapInstance: mapboxgl.Map) => {
 			if (id.startsWith('murmur-')) continue;
 
 			const type = (layer as any).type as string | undefined;
+			const sourceLayer = (layer as any)['source-layer'] as string | undefined;
 			const idLower = id.toLowerCase();
 
 			// Text/icon labels
@@ -1202,6 +1203,24 @@ const applyFreeTrialMapVisualTuning = (mapInstance: mapboxgl.Map) => {
 					idLower.includes('border'))
 			) {
 				mapInstance.setLayoutProperty(id, 'visibility', 'none');
+				continue;
+			}
+
+			// Roads / highways — recolor to a soft light gray (lighter than state borders).
+			if (
+				type === 'line' &&
+				(sourceLayer === 'road' ||
+					idLower.includes('road') ||
+					idLower.includes('motorway') ||
+					idLower.includes('highway') ||
+					idLower.includes('bridge') ||
+					idLower.includes('tunnel'))
+			) {
+				try {
+					mapInstance.setPaintProperty(id, 'line-color', '#E5E9EC');
+				} catch {
+					// Data-driven color expression we can't override — skip.
+				}
 				continue;
 			}
 
@@ -3403,7 +3422,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			minzoom: MAP_MIN_ZOOM,
 			layout: {
 				// Abbreviations when zoomed out, full names when zoomed in.
-				'text-field': ['step', ['zoom'], ['get', 'key'], 7, ['get', 'name']],
+				'text-field': ['step', ['zoom'], ['get', 'key'], 8.5, ['get', 'name']],
 				'text-size': ['interpolate', ['linear'], ['zoom'], 3, 9, 5, 10, 7, 12, 10, 14],
 				'text-font': ['Inter Medium', 'Arial Unicode MS Regular'],
 				'text-allow-overlap': false,
