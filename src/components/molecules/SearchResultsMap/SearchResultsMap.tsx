@@ -337,7 +337,10 @@ const logWasmGeoLoadError = (error: unknown): void => {
 const logWasmGeoRuntimeError = (error: unknown): void => {
 	if (hasLoggedWasmGeoRuntimeError) return;
 	hasLoggedWasmGeoRuntimeError = true;
-	console.error('[SearchResultsMap] WASM geo call failed, using TypeScript fallback', error);
+	console.error(
+		'[SearchResultsMap] WASM geo call failed, using TypeScript fallback',
+		error
+	);
 };
 
 const toFloat64Array = (value: Float64Array | ArrayLike<number>): Float64Array =>
@@ -380,7 +383,11 @@ const ensureWasmGeoModuleLoaded = async (): Promise<WasmGeoModule | null> => {
 				// Smoke test: confirm calls don't throw post-init.
 				try {
 					const projected = toFloat64Array(maybeModule.lat_lng_to_world_pixel(0, 0, 256));
-					if (projected.length < 2 || !Number.isFinite(projected[0]) || !Number.isFinite(projected[1]))
+					if (
+						projected.length < 2 ||
+						!Number.isFinite(projected[0]) ||
+						!Number.isFinite(projected[1])
+					)
 						return null;
 				} catch (error: unknown) {
 					logWasmGeoLoadError(error);
@@ -749,7 +756,9 @@ const batchLatLngToWorldPixels = (
 		}
 
 		try {
-			const projected = toFloat64Array(wasmGeo.batch_lat_lng_to_world_pixel(flat, worldSize));
+			const projected = toFloat64Array(
+				wasmGeo.batch_lat_lng_to_world_pixel(flat, worldSize)
+			);
 			if (projected.length >= coordsList.length * 2) {
 				const out = new Array<{ x: number; y: number }>(coordsList.length);
 				for (let i = 0; i < coordsList.length; i++) {
@@ -851,7 +860,12 @@ const isWorldPointNearSegments = (
 	const wasmGeo = getWasmGeoModuleSync();
 	if (wasmGeo && segments.length > 0) {
 		try {
-			return wasmGeo.is_point_near_segments(x, y, flattenWorldSegments(segments), thresholdPx);
+			return wasmGeo.is_point_near_segments(
+				x,
+				y,
+				flattenWorldSegments(segments),
+				thresholdPx
+			);
 		} catch (error: unknown) {
 			logWasmGeoRuntimeError(error);
 		}
@@ -1093,7 +1107,7 @@ interface SearchResultsMapProps {
 	selectAllInViewNonce?: number;
 
 	onAreaSelect?: (bounds: MapSelectionBounds, payload?: AreaSelectPayload) => void;
-	
+
 	onVisibleOverlayContactsChange?: (contacts: ContactWithName[]) => void;
 	onMarkerClick?: (contact: ContactWithName) => void;
 	onMarkerHover?: (contact: ContactWithName | null, meta?: MarkerHoverMeta) => void;
@@ -1126,7 +1140,7 @@ const defaultCenter = {
 
 const MAP_DEFAULT_ZOOM = 5;
 // Let users zoom out further than the default US-wide view.
-const MAP_MIN_ZOOM = 3;
+const MAP_MIN_ZOOM = 2.25;
 // Dashboard UX: allow state hover highlight one zoom step past the default zoom.
 const STATE_HOVER_HIGHLIGHT_MAX_ZOOM = MAP_DEFAULT_ZOOM + 1;
 
@@ -1197,7 +1211,10 @@ const applyFreeTrialMapVisualTuning = (mapInstance: mapboxgl.Map) => {
 			try {
 				if (type === 'background') {
 					mapInstance.setPaintProperty(id, 'background-color', '#F1EDE2');
-				} else if (type === 'fill' && (idLower === 'water' || idLower.startsWith('water'))) {
+				} else if (
+					type === 'fill' &&
+					(idLower === 'water' || idLower.startsWith('water'))
+				) {
 					mapInstance.setPaintProperty(id, 'fill-color', '#62C7E3');
 				} else if (
 					type === 'fill' &&
@@ -1323,7 +1340,8 @@ const computeDotWaveDelayMs = (
 	const latUndulation = (Math.sin(tLat * Math.PI) - 0.5) * 0.14 * travelMs;
 
 	const h = (featureId * 2654435761) >>> 0;
-	const jitter = DOT_WAVE_JITTER_MS > 0 ? ((h & 0xffff) / 0x10000) * DOT_WAVE_JITTER_MS : 0;
+	const jitter =
+		DOT_WAVE_JITTER_MS > 0 ? ((h & 0xffff) / 0x10000) * DOT_WAVE_JITTER_MS : 0;
 
 	return Math.max(0, tLng * travelMs + latUndulation + jitter);
 };
@@ -1359,7 +1377,6 @@ const getBasemapCartographyLayerIds = (mapInstance: mapboxgl.Map): string[] => {
 
 	return ids;
 };
-
 
 const applyUsOnlyBasemapCartography = (
 	mapInstance: mapboxgl.Map,
@@ -1523,7 +1540,11 @@ const inferSearchModeFromSearchWhat = (
 	if (!w) return null;
 
 	// Promotion modes (radio outreach)
-	if (w.includes('radio station') || w.includes('radio stations') || w.includes('college radio')) {
+	if (
+		w.includes('radio station') ||
+		w.includes('radio stations') ||
+		w.includes('college radio')
+	) {
 		return 'promotion';
 	}
 
@@ -1915,7 +1936,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const onStateSelectRef = useRef<SearchResultsMapProps['onStateSelect'] | null>(null);
 
 	const pendingStateClickCinematicRef = useRef<{ key: string; at: number } | null>(null);
-	
+
 	const pendingSearchQueryCinematicRef = useRef<{ key: string; at: number } | null>(null);
 	const isLoadingRef = useRef<boolean>(false);
 	// Keep `isLoadingRef` synced during render so async Mapbox handlers can read it immediately.
@@ -2794,7 +2815,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						>
 					>(STATE_META_URL),
 					fetchJson<GeoJSON.FeatureCollection>(STATE_LABELS_URL),
-					fetchJson<Extract<GeoJsonGeometry, { type: 'MultiPolygon' }>>(STATE_OUTLINE_URL),
+					fetchJson<Extract<GeoJsonGeometry, { type: 'MultiPolygon' }>>(
+						STATE_OUTLINE_URL
+					),
 					fetchJson<PreparedClippingPolygon[]>(STATE_PREPARED_POLYGONS_URL),
 				]);
 
@@ -2803,7 +2826,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				const features = Array.isArray(processedGeoJson?.features)
 					? processedGeoJson.features
 					: [];
-				const processed: GeoJsonFeatureCollection = { type: 'FeatureCollection', features };
+				const processed: GeoJsonFeatureCollection = {
+					type: 'FeatureCollection',
+					features,
+				};
 
 				const geometryByKey = new Map<string, GeoJsonGeometry>();
 				const nameByKey = new Map<string, string>();
@@ -2879,8 +2905,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				source?.setData(processed as any);
 
 				const labels: GeoJSON.FeatureCollection =
-					stateLabels?.type === 'FeatureCollection' &&
-					Array.isArray(stateLabels.features)
+					stateLabels?.type === 'FeatureCollection' && Array.isArray(stateLabels.features)
 						? stateLabels
 						: { type: 'FeatureCollection', features: [] };
 				const labelSource = map.getSource(MAPBOX_SOURCE_IDS.stateLabels) as
@@ -2935,7 +2960,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		(nextOverlayOpacity: number, nextModeT: number) => {
 			if (!map || !isMapLoaded) return;
 			let base = stateLineOpacityBaseRef.current;
-		
+
 			if (!base || base.dividers == null || base.borders == null) {
 				try {
 					const dividers = map.getPaintProperty(
@@ -2967,7 +2992,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						map.setPaintProperty(layerId, 'line-opacity', 0);
 						return;
 					}
-				
+
 					if (baseOpacity == null) {
 						map.setPaintProperty(layerId, 'line-opacity', mul);
 						return;
@@ -2987,7 +3012,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			};
 
 			setLineOpacity(MAPBOX_LAYER_IDS.statesDividers, base?.dividers, dividersMul);
-			setLineOpacity(MAPBOX_LAYER_IDS.statesBordersInteractive, base?.borders, bordersMul);
+			setLineOpacity(
+				MAPBOX_LAYER_IDS.statesBordersInteractive,
+				base?.borders,
+				bordersMul
+			);
 
 			// Labels fade with the overall overlay opacity (mode doesn't matter).
 			if (map.getLayer(MAPBOX_LAYER_IDS.statesLabels)) {
@@ -3657,8 +3686,15 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			try {
 				// Only force-hide on load when we have a recoverable base expression.
 				// Otherwise leave defaults in place so overlays do not get stuck invisible.
-				if (capturedStateLineOpacityBase && mapInstance.getLayer(MAPBOX_LAYER_IDS.statesDividers)) {
-					mapInstance.setPaintProperty(MAPBOX_LAYER_IDS.statesDividers, 'line-opacity', 0);
+				if (
+					capturedStateLineOpacityBase &&
+					mapInstance.getLayer(MAPBOX_LAYER_IDS.statesDividers)
+				) {
+					mapInstance.setPaintProperty(
+						MAPBOX_LAYER_IDS.statesDividers,
+						'line-opacity',
+						0
+					);
 				}
 				if (
 					capturedStateLineOpacityBase &&
@@ -3670,7 +3706,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						0
 					);
 				}
-				if (capturedStateLineOpacityBase && mapInstance.getLayer(MAPBOX_LAYER_IDS.statesLabels)) {
+				if (
+					capturedStateLineOpacityBase &&
+					mapInstance.getLayer(MAPBOX_LAYER_IDS.statesLabels)
+				) {
 					mapInstance.setPaintProperty(MAPBOX_LAYER_IDS.statesLabels, 'text-opacity', 0);
 				}
 			} catch {
@@ -3705,11 +3744,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		};
 	}, [ensureMapboxSourcesAndLayers]);
 
-	
 	const prevPresentationRef = useRef<'background' | 'interactive'>(presentation);
 
 	const cinematicAutoFitRef = useRef(false);
-	
+
 	const cinematicInFlightRef = useRef(false);
 	const cinematicInFlightTimerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -4979,7 +5017,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						candidateContacts.push(contact);
 						candidateCoords.push(coords);
 					}
-					const projectedCandidates = batchLatLngToWorldPixels(candidateCoords, worldSize);
+					const projectedCandidates = batchLatLngToWorldPixels(
+						candidateCoords,
+						worldSize
+					);
 					for (let i = 0; i < candidateContacts.length; i++) {
 						const contact = candidateContacts[i];
 						const projected = projectedCandidates[i];
@@ -6335,7 +6376,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					transition
 				);
 				(map as any).setPaintProperty(MAPBOX_LAYER_IDS.baseDots, 'circle-opacity', 1);
-				(map as any).setPaintProperty(MAPBOX_LAYER_IDS.baseDots, 'circle-stroke-opacity', 1);
+				(map as any).setPaintProperty(
+					MAPBOX_LAYER_IDS.baseDots,
+					'circle-stroke-opacity',
+					1
+				);
 			}
 		} catch {
 			// Ignore style timing races.
@@ -6473,7 +6518,16 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		const travelMs = computeDotWaveTravelMs(dots.length);
 		let maxDelayMs = 0;
 		const features: any[] = dots.map((dot) => {
-			const delayMs = computeDotWaveDelayMs(dot.id, dot.lng, dot.lat, minLng, maxLng, minLat, maxLat, travelMs);
+			const delayMs = computeDotWaveDelayMs(
+				dot.id,
+				dot.lng,
+				dot.lat,
+				minLng,
+				maxLng,
+				minLat,
+				maxLat,
+				travelMs
+			);
 			maxDelayMs = Math.max(maxDelayMs, delayMs);
 			return {
 				type: 'Feature',
@@ -6530,7 +6584,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			] as any;
 			try {
 				if (map.getLayer(MAPBOX_LAYER_IDS.baseDots)) {
-					(map as any).setPaintProperty(MAPBOX_LAYER_IDS.baseDots, 'circle-opacity', expr0);
+					(map as any).setPaintProperty(
+						MAPBOX_LAYER_IDS.baseDots,
+						'circle-opacity',
+						expr0
+					);
 					(map as any).setPaintProperty(
 						MAPBOX_LAYER_IDS.baseDots,
 						'circle-stroke-opacity',
@@ -6542,10 +6600,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			}
 			try {
 				if (map.getLayer(MAPBOX_LAYER_IDS.baseHit)) {
-					map.setFilter(
-						MAPBOX_LAYER_IDS.baseHit,
-						['<=', ['coalesce', ['get', DOT_WAVE_DELAY_PROP], 0], -1] as any
-					);
+					map.setFilter(MAPBOX_LAYER_IDS.baseHit, [
+						'<=',
+						['coalesce', ['get', DOT_WAVE_DELAY_PROP], 0],
+						-1,
+					] as any);
 				}
 			} catch {
 				// Ignore.
@@ -6615,7 +6674,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			// IMPORTANT: set transitions *before* opacity changes.
 			const transition = { duration: transitionMs, delay: 0 } as any;
 			safeSetPaint(MAPBOX_LAYER_IDS.baseDots, 'circle-opacity-transition', transition);
-			safeSetPaint(MAPBOX_LAYER_IDS.baseDots, 'circle-stroke-opacity-transition', transition);
+			safeSetPaint(
+				MAPBOX_LAYER_IDS.baseDots,
+				'circle-stroke-opacity-transition',
+				transition
+			);
 			safeSetPaint(MAPBOX_LAYER_IDS.baseDots, 'circle-opacity', 1);
 			safeSetPaint(MAPBOX_LAYER_IDS.baseDots, 'circle-stroke-opacity', 1);
 			safeClearFilter(MAPBOX_LAYER_IDS.baseHit);
@@ -6678,9 +6741,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		}
 
 		const shouldStartWave =
-			prevLoading &&
-			!loading &&
-			baseDotsWavePendingSearchKeyRef.current === searchKey;
+			prevLoading && !loading && baseDotsWavePendingSearchKeyRef.current === searchKey;
 		baseDotsWavePrevIsLoadingRef.current = loading;
 
 		if (!shouldStartWave) return;
@@ -6716,16 +6777,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		// Enable smooth transitions between throttled paint updates.
 		// A duration slightly longer than the frame interval lets Mapbox interpolate
 		// between our discrete expression snapshots, eliminating visible stepping.
-		safeSetPaint(
-			MAPBOX_LAYER_IDS.baseDots,
-			'circle-opacity-transition',
-			{ duration: DOT_WAVE_SMOOTH_TRANSITION_MS, delay: 0 } as any
-		);
-		safeSetPaint(
-			MAPBOX_LAYER_IDS.baseDots,
-			'circle-stroke-opacity-transition',
-			{ duration: DOT_WAVE_SMOOTH_TRANSITION_MS, delay: 0 } as any
-		);
+		safeSetPaint(MAPBOX_LAYER_IDS.baseDots, 'circle-opacity-transition', {
+			duration: DOT_WAVE_SMOOTH_TRANSITION_MS,
+			delay: 0,
+		} as any);
+		safeSetPaint(MAPBOX_LAYER_IDS.baseDots, 'circle-stroke-opacity-transition', {
+			duration: DOT_WAVE_SMOOTH_TRANSITION_MS,
+			delay: 0,
+		} as any);
 
 		const buildOpacityExpr = (nowMs: number) => {
 			return [
@@ -6740,10 +6799,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		};
 
 		// Start non-interactive; we'll enable hits as the wave reaches dots.
-		safeSetFilter(
-			MAPBOX_LAYER_IDS.baseHit,
-			['<=', ['coalesce', ['get', DOT_WAVE_DELAY_PROP], 0], -1] as any
-		);
+		safeSetFilter(MAPBOX_LAYER_IDS.baseHit, [
+			'<=',
+			['coalesce', ['get', DOT_WAVE_DELAY_PROP], 0],
+			-1,
+		] as any);
 
 		let cancelled = false;
 		let rafId: number | null = null;
@@ -6772,10 +6832,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 			// Don't churn filters at 60fps; updating every ~90ms is plenty for hit gating.
 			if (t - lastHitUpdateAt >= 90) {
-				safeSetFilter(
-					MAPBOX_LAYER_IDS.baseHit,
-					['<=', ['coalesce', ['get', DOT_WAVE_DELAY_PROP], 0], t] as any
-				);
+				safeSetFilter(MAPBOX_LAYER_IDS.baseHit, [
+					'<=',
+					['coalesce', ['get', DOT_WAVE_DELAY_PROP], 0],
+					t,
+				] as any);
 				lastHitUpdateAt = t;
 			}
 
