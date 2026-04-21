@@ -7572,7 +7572,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					// visible gradient reads as ambient warm wash rather than a disc.
 					// Peaks are cranked up because the hot center is offscreen.
 					background:
-						'radial-gradient(ellipse 150% 150% at -10% -10%, rgba(255, 238, 205, 0.55) 0%, rgba(255, 238, 205, 0.42) 28%, rgba(255, 238, 205, 0.24) 52%, rgba(255, 238, 205, 0.08) 78%, rgba(255, 238, 205, 0) 100%)',
+						'radial-gradient(ellipse 150% 150% at -10% -10%, rgba(255, 238, 205, 0.38) 0%, rgba(255, 238, 205, 0.28) 28%, rgba(255, 238, 205, 0.16) 52%, rgba(255, 238, 205, 0.05) 78%, rgba(255, 238, 205, 0) 100%)',
 					mixBlendMode: 'screen',
 					opacity: lightingOverlayOpacity,
 					zIndex: 1,
