@@ -1154,6 +1154,62 @@ export const DASHBOARD_TO_INTERACTIVE_TRANSITION_CSS_EASING =
 
 const MAPBOX_STYLE = 'mapbox://styles/mapbox/streets-v12';
 
+// Viewer-anchored softbox lighting for the globe.
+//
+// Mapbox directional-light `direction: [azimuth, polar]` is defined in WORLD space
+// (azimuth 0 = north, 90 = east, 180 = south, 270 = west). If we leave it static,
+// rotating the camera's bearing makes the lit hemisphere drift across the screen.
+//
+// To make the "softbox" feel like it lives in the viewer's room (upper-left, slightly
+// behind the viewer) instead of bolted to the Earth, we re-derive the world azimuth
+// each time the camera bearing changes. At bearing 0, viewer-left = world-west (270°).
+// When bearing rotates clockwise by B degrees, viewer-left in world space rotates by
+// +B, so: azimuth = (270 + bearing) mod 360.
+//
+// Panning (changing center lat/lng) in globe projection doesn't rotate the viewport's
+// up-axis relative to world-north, so no compensation is needed there — the light
+// already stays on the viewer's left for free.
+const MURMUR_GLOBE_LIGHT_VIEWER_AZIMUTH_OFFSET_DEG = 270;
+// Polar is measured from straight-up (0 = overhead). 75° sits the softbox low
+// and side-on — this is what creates a clearly visible terminator across the
+// globe rather than a flat, evenly-lit disc.
+const MURMUR_GLOBE_LIGHT_POLAR_DEG = 75;
+
+const applyMurmurGlobeLighting = (mapInstance: mapboxgl.Map) => {
+	try {
+		const bearing =
+			typeof mapInstance.getBearing === 'function' ? mapInstance.getBearing() : 0;
+		const azimuth =
+			(MURMUR_GLOBE_LIGHT_VIEWER_AZIMUTH_OFFSET_DEG + (bearing || 0) + 360) % 360;
+
+		(mapInstance as any).setLights?.([
+			{
+				id: 'murmur-ambient',
+				type: 'ambient',
+				properties: {
+					// Deep cool fill — the shadow side should clearly read as shadow.
+					color: 'rgb(120, 150, 185)',
+					intensity: 0.18,
+				},
+			},
+			{
+				id: 'murmur-key',
+				type: 'directional',
+				properties: {
+					// Bright warm softbox, punched hard so the lit hemisphere glows.
+					color: 'rgb(255, 244, 220)',
+					intensity: 1.6,
+					direction: [azimuth, MURMUR_GLOBE_LIGHT_POLAR_DEG],
+					'cast-shadows': true,
+					'shadow-intensity': 0.95,
+				},
+			},
+		]);
+	} catch {
+		// Non-fatal on older Mapbox styles that don't support setLights.
+	}
+};
+
 const applyFreeTrialMapVisualTuning = (mapInstance: mapboxgl.Map) => {
 	// Projection
 	try {
@@ -1177,33 +1233,10 @@ const applyFreeTrialMapVisualTuning = (mapInstance: mapboxgl.Map) => {
 		// Non-fatal.
 	}
 
-	// Dramatic directional lighting: key light from the west (azimuth 270°) so the right
-	// hemisphere falls into shadow while the left stays bright. Low ambient amplifies contrast.
-	try {
-		(mapInstance as any).setLights?.([
-			{
-				id: 'murmur-ambient',
-				type: 'ambient',
-				properties: {
-					color: 'rgb(215, 226, 240)',
-					intensity: 0.6,
-				},
-			},
-			{
-				id: 'murmur-key',
-				type: 'directional',
-				properties: {
-					color: 'rgb(255, 244, 222)',
-					intensity: 0.85,
-					direction: [270, 55],
-					'cast-shadows': true,
-					'shadow-intensity': 0.7,
-				},
-			},
-		]);
-	} catch {
-		// Non-fatal on older Mapbox styles that don't support setLights.
-	}
+	// Softbox key light, anchored to the viewer (not to the world). See
+	// applyMurmurGlobeLighting for the bearing-compensation trick that keeps the
+	// light on the viewer's upper-left regardless of how the globe is spun.
+	applyMurmurGlobeLighting(mapInstance);
 
 	// Basemap layer cleanup (hide words + borders; keep our layers) + cooler palette recolor.
 	try {
@@ -3791,14 +3824,23 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			setMapLoadError(message);
 		};
 
+		// Keep the softbox anchored to the viewer as the camera bearing changes.
+		// `rotate` fires continuously during interaction; the call is cheap (no
+		// layer reshuffling) because setLights only updates the existing light defs.
+		const onRotate = () => {
+			applyMurmurGlobeLighting(mapInstance);
+		};
+
 		mapInstance.on('load', onLoad);
 		mapInstance.on('style.load', onStyleLoad);
 		mapInstance.on('error', onError);
+		mapInstance.on('rotate', onRotate);
 
 		return () => {
 			mapInstance.off('load', onLoad);
 			mapInstance.off('style.load', onStyleLoad);
 			mapInstance.off('error', onError);
+			mapInstance.off('rotate', onRotate);
 			backgroundSpinCleanupRef.current?.();
 			backgroundSpinCleanupRef.current = null;
 			mapInstance.remove();
@@ -7455,6 +7497,18 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				`}</style>
 			)}
 			<div ref={mapContainerRef} style={{ width: '100%', height: '100%' }} />
+			{/*
+			  Softbox lighting overlay. Two stacked viewport-anchored radial gradients
+			  paint the "lit sphere" feel directly on top of the map. Because these
+			  are DOM layers on the container, they stay locked to the viewer no
+			  matter how the globe is panned, zoomed, or rotated.
+
+			  Layer 1 (screen): warm highlight radiating from the upper-left — the
+			  softbox key. Brightens only where it's opaque, fades to nothing past
+			  the mid-sphere.
+			  Layer 2 (multiply): cool deep-shadow pooling in the lower-right — the
+			  terminator. Darkens the unlit hemisphere without tinting the lit side.
+			*/}
 			<div
 				aria-hidden
 				style={{
@@ -7462,7 +7516,19 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					inset: 0,
 					pointerEvents: 'none',
 					background:
-						'linear-gradient(100deg, rgba(255, 240, 210, 0.14) 0%, rgba(255, 240, 210, 0.05) 28%, rgba(0, 0, 0, 0) 52%, rgba(0, 0, 0, 0.18) 78%, rgba(0, 0, 0, 0.34) 100%)',
+						'radial-gradient(circle at 36% 40%, rgba(255, 238, 205, 0.30) 0%, rgba(255, 238, 205, 0.22) 24%, rgba(255, 238, 205, 0.12) 48%, rgba(255, 238, 205, 0.04) 68%, rgba(255, 238, 205, 0) 85%)',
+					mixBlendMode: 'screen',
+					zIndex: 1,
+				}}
+			/>
+			<div
+				aria-hidden
+				style={{
+					position: 'absolute',
+					inset: 0,
+					pointerEvents: 'none',
+					background:
+						'radial-gradient(circle at 88% 90%, rgba(6, 10, 28, 0.72) 0%, rgba(6, 10, 28, 0.48) 20%, rgba(10, 16, 36, 0.22) 42%, rgba(20, 28, 56, 0.04) 62%, rgba(0, 0, 0, 0) 78%)',
 					mixBlendMode: 'multiply',
 					zIndex: 1,
 				}}
