@@ -1148,13 +1148,13 @@ const applyFreeTrialMapVisualTuning = (mapInstance: mapboxgl.Map) => {
 		// Non-fatal.
 	}
 
-	// Fog / atmosphere (subtle glow)
+	// Fog / atmosphere (subtle glow) — cooler, less saturated to match a Google-Earth-style tone.
 	try {
 		const existingFog = (mapInstance as any).getFog?.() ?? {};
 		(mapInstance as any).setFog?.({
 			...existingFog,
-			color: 'rgba(140, 190, 240, 0.38)',
-			'high-color': 'rgb(14, 40, 92)',
+			color: 'rgba(180, 210, 215, 0.32)',
+			'high-color': 'rgb(18, 44, 78)',
 			'space-color': 'rgb(0, 0, 0)',
 			'star-intensity': 0.9,
 			'horizon-blend': 0.022,
@@ -1163,7 +1163,7 @@ const applyFreeTrialMapVisualTuning = (mapInstance: mapboxgl.Map) => {
 		// Non-fatal.
 	}
 
-	// Basemap layer cleanup (hide words + borders; keep our layers)
+	// Basemap layer cleanup (hide words + borders; keep our layers) + cooler palette recolor.
 	try {
 		const style = mapInstance.getStyle();
 		for (const layer of style.layers ?? []) {
@@ -1171,21 +1171,50 @@ const applyFreeTrialMapVisualTuning = (mapInstance: mapboxgl.Map) => {
 			if (!id) continue;
 			if (id.startsWith('murmur-')) continue;
 
+			const type = (layer as any).type as string | undefined;
+			const idLower = id.toLowerCase();
+
 			// Text/icon labels
-			if ((layer as any).type === 'symbol') {
+			if (type === 'symbol') {
 				mapInstance.setLayoutProperty(id, 'visibility', 'none');
 				continue;
 			}
 
 			// Political/administrative boundaries (borders)
-			const idLower = id.toLowerCase();
 			if (
-				(layer as any).type === 'line' &&
+				type === 'line' &&
 				(idLower.includes('admin') ||
 					idLower.includes('boundary') ||
 					idLower.includes('border'))
 			) {
 				mapInstance.setLayoutProperty(id, 'visibility', 'none');
+				continue;
+			}
+
+			// Tone: shift the base palette toward a cooler, softer look (muted teal water,
+			// warm cream land, sage vegetation). Wrapped per-layer so data-driven expressions
+			// we can't overwrite just get skipped.
+			try {
+				if (type === 'background') {
+					mapInstance.setPaintProperty(id, 'background-color', '#F1EDE2');
+				} else if (type === 'fill' && (idLower === 'water' || idLower.startsWith('water'))) {
+					mapInstance.setPaintProperty(id, 'fill-color', '#62C7E3');
+				} else if (
+					type === 'fill' &&
+					(idLower.includes('landcover') ||
+						idLower.includes('national-park') ||
+						idLower.includes('pitch') ||
+						idLower === 'park' ||
+						idLower.startsWith('park'))
+				) {
+					mapInstance.setPaintProperty(id, 'fill-color', '#B3E6D7');
+				} else if (type === 'fill' && idLower.includes('landuse')) {
+					mapInstance.setPaintProperty(id, 'fill-color', '#F1EDE2');
+				} else if (type === 'fill' && idLower === 'land') {
+					mapInstance.setPaintProperty(id, 'fill-color', '#F1EDE2');
+				}
+			} catch {
+				// Layer color isn't a plain literal — leave as-is.
 			}
 		}
 	} catch {
