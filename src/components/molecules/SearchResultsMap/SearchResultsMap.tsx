@@ -1162,6 +1162,18 @@ const computeLightingOverlayOpacity = (zoom: number) => {
 	return 1 - t * t * t;
 };
 
+// Clouds overlay: subtle, static patchy clouds for the zoomed-out globe view.
+// Implemented as a local raster tile source so it stays glued to the globe as it rotates.
+// NOTE: include a version query param to bust browser caches when we regenerate tiles.
+const CLOUDS_TILES_URL_TEMPLATE = '/maps/clouds/{z}/{x}/{y}.png?v=8';
+const CLOUDS_TILES_MAX_ZOOM = 3;
+// Tune for "hint of atmosphere" rather than a satellite layer.
+const CLOUDS_OVERLAY_OPACITY_AT_GLOBE_ZOOM = 0.62;
+const CLOUDS_OVERLAY_OPACITY_AT_DECORATIVE_ZOOM = 0.48;
+// Keep clouds around slightly past the initial interactive view; fade by state-level zoom.
+const CLOUDS_OVERLAY_FADE_OUT_START_ZOOM = 6.1;
+const CLOUDS_OVERLAY_FADE_OUT_END_ZOOM = 7.6;
+
 const AUTO_FIT_CONTACTS_MAX_ZOOM = 10;
 const AUTO_FIT_STATE_MAX_ZOOM = 5;
 const DEFAULT_MAX_ZOOM_FALLBACK = 22;
@@ -1343,6 +1355,7 @@ const applyFreeTrialMapVisualTuning = (mapInstance: mapboxgl.Map) => {
 const US_ONLY_BASEMAP_CLIP_MAX_ZOOM = 7;
 
 const MAPBOX_SOURCE_IDS = {
+	clouds: 'murmur-clouds',
 	states: 'murmur-states',
 	resultsOutline: 'murmur-results-outline',
 	lockedOutline: 'murmur-locked-outline',
@@ -1357,6 +1370,8 @@ const MAPBOX_SOURCE_IDS = {
 } as const;
 
 const MAPBOX_LAYER_IDS = {
+	// Globe overlays
+	clouds: 'murmur-clouds-raster',
 	// States
 	statesFillHit: 'murmur-states-fill-hit',
 	statesFillHover: 'murmur-states-fill-hover',
@@ -3274,6 +3289,17 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		};
 
 		// Core sources
+		// Clouds: subtle raster overlay (local tiles). Added first so all interactive overlays
+		// (states/markers) render above it.
+		if (!mapInstance.getSource(MAPBOX_SOURCE_IDS.clouds)) {
+			mapInstance.addSource(MAPBOX_SOURCE_IDS.clouds, {
+				type: 'raster',
+				tiles: [CLOUDS_TILES_URL_TEMPLATE],
+				tileSize: 512,
+				maxzoom: CLOUDS_TILES_MAX_ZOOM,
+			} as any);
+		}
+
 		// States source needs `promoteId` so Mapbox uses the string "key" property (e.g. "CA", "TX")
 		// as the feature identifier — required for setFeatureState with non-numeric IDs.
 		if (!mapInstance.getSource(MAPBOX_SOURCE_IDS.states)) {
@@ -3302,6 +3328,38 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			if (mapInstance.getLayer(layer.id)) return;
 			mapInstance.addLayer(layer);
 		};
+
+		const cloudsOpacityExpr = [
+			'interpolate',
+			['linear'],
+			['zoom'],
+			0,
+			CLOUDS_OVERLAY_OPACITY_AT_GLOBE_ZOOM,
+			MAP_MIN_ZOOM,
+			CLOUDS_OVERLAY_OPACITY_AT_GLOBE_ZOOM,
+			4,
+			CLOUDS_OVERLAY_OPACITY_AT_DECORATIVE_ZOOM,
+			CLOUDS_OVERLAY_FADE_OUT_START_ZOOM,
+			CLOUDS_OVERLAY_OPACITY_AT_DECORATIVE_ZOOM,
+			CLOUDS_OVERLAY_FADE_OUT_END_ZOOM,
+			0,
+		];
+
+		ensureLayer({
+			id: MAPBOX_LAYER_IDS.clouds,
+			type: 'raster',
+			source: MAPBOX_SOURCE_IDS.clouds,
+			// Disable entirely once we're zoomed into state-level detail.
+			maxzoom: CLOUDS_OVERLAY_FADE_OUT_END_ZOOM + 0.01,
+			paint: {
+				'raster-opacity': cloudsOpacityExpr,
+				'raster-brightness-min': 0.94,
+				'raster-brightness-max': 1,
+				'raster-contrast': 0.14,
+				'raster-saturation': 0,
+				'raster-resampling': 'linear',
+			},
+		});
 
 		const resultDotRadiusExpr = [
 			'interpolate',
