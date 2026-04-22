@@ -319,6 +319,15 @@ class CloudParams:
 	cutoff: float = 0.61
 	# Width of the post-cutoff ramp. Smaller -> clouds reach high opacity sooner (stronger cores).
 	ramp_width: float = 0.18
+	# Spatial variability: modulate cutoff/ramp so different ocean regions have
+	# noticeably different cloud density (without globally increasing coverage).
+	density_scale: float = 0.95
+	density_octaves: int = 4
+	cutoff_variability: float = 0.14  # +/- around `cutoff`
+	cutoff_min: float = 0.52
+	cutoff_max: float = 0.70
+	ramp_min: float = 0.14
+	ramp_max: float = 0.26
 	coverage_scale: float = 2.2
 	coverage_octaves: int = 5
 	detail_scale: float = 6.0
@@ -329,6 +338,12 @@ class CloudParams:
 	power: float = 1.85  # higher = puffier, less haze
 	# Remove low-alpha haze so clouds read as scattered puffs instead of a milky veil.
 	haze_floor: float = 0.07
+	# Extra scattered cumulus fields (adds random larger + smaller puffs across oceans).
+	ocean_cells_scale: float = 1.15
+	ocean_cells_octaves: int = 3
+	ocean_cells_detail_scale: float = 2.7
+	ocean_cells_detail_octaves: int = 2
+	ocean_cells_strength: float = 0.26
 	# Domain warp: breaks up "FBM blob" look into more weather-like fields.
 	warp_scale: float = 1.4
 	warp_octaves: int = 3
@@ -598,6 +613,82 @@ def _generate_front_bands_alpha(
 	return np.clip(out, 0.0, 1.0).astype(np.float32)
 
 
+def _generate_ocean_cells_alpha(
+	sx: np.ndarray,
+	sy: np.ndarray,
+	sz: np.ndarray,
+	sx_d: np.ndarray,
+	sy_d: np.ndarray,
+	sz_d: np.ndarray,
+	detail01: np.ndarray,
+	micro01: np.ndarray,
+	density01: np.ndarray,
+	land_factor: np.ndarray,
+	params: CloudParams,
+) -> np.ndarray:
+	"""
+	Scattered ocean cumulus fields: adds variability so some ocean regions have
+	a few larger puffs and lots of smaller faint puffs, with different fade levels.
+	"""
+	detail01 = np.clip(detail01.astype(np.float32), 0.0, 1.0)
+	micro01 = np.clip(micro01.astype(np.float32), 0.0, 1.0)
+	density01 = np.clip(density01.astype(np.float32), 0.0, 1.0)
+	land_factor = np.clip(land_factor.astype(np.float32), 0.0, 1.0)
+
+	# 1 over open ocean, 0 over land (and the NA carve-out).
+	ocean_only = np.clip((land_factor - np.float32(0.6)) / np.float32(0.4), 0.0, 1.0).astype(
+		np.float32
+	)
+
+	base = ((_fbm_3d(
+		sx * np.float32(params.ocean_cells_scale),
+		sy * np.float32(params.ocean_cells_scale),
+		sz * np.float32(params.ocean_cells_scale),
+		seed=params.seed + 65000,
+		octaves=params.ocean_cells_octaves,
+	) + 1.0) * 0.5).astype(np.float32)
+
+	detail = ((_fbm_3d(
+		sx_d * np.float32(params.ocean_cells_detail_scale),
+		sy_d * np.float32(params.ocean_cells_detail_scale),
+		sz_d * np.float32(params.ocean_cells_detail_scale),
+		seed=params.seed + 65200,
+		octaves=params.ocean_cells_detail_octaves,
+	) + 1.0) * 0.5).astype(np.float32)
+
+	# Big sparse patches (larger clouds) + smaller higher-threshold speckle.
+	big = _smoothstep(0.66, 0.90, base).astype(np.float32)
+	small = _smoothstep(0.80, 0.97, detail).astype(np.float32)
+	# Emphasize "randomness": push towards isolated blobs.
+	big = np.power(big, np.float32(1.10)).astype(np.float32)
+	small = np.power(small, np.float32(1.35)).astype(np.float32)
+
+	# Fluff texture for cumulus.
+	fluff = (np.float32(1.0) - np.abs(np.float32(2.0) * micro01 - np.float32(1.0))).astype(
+		np.float32
+	)
+	fluff = np.power(fluff, np.float32(2.6)).astype(np.float32)
+
+	patch = np.clip((detail01 - np.float32(0.32)) / np.float32(0.68), 0.0, 1.0).astype(np.float32)
+	patch = np.power(patch, np.float32(1.25)).astype(np.float32)
+
+	# Different fade levels: some cells are barely-there, others stronger.
+	strength = (np.float32(0.25) + np.float32(0.75) * np.power(base, np.float32(1.15))).astype(
+		np.float32
+	)
+	# Prefer adding cells in regions already "weatherier", but still allow surprises.
+	weather = (np.float32(0.35) + np.float32(0.65) * density01).astype(np.float32)
+
+	cells = (np.float32(0.62) * big + np.float32(0.38) * small).astype(np.float32)
+	cells *= (np.float32(0.38) + np.float32(0.62) * fluff).astype(np.float32)
+	cells *= (np.float32(0.45) + np.float32(0.55) * patch).astype(np.float32)
+	cells *= strength * weather
+	cells *= np.float32(params.ocean_cells_strength)
+	cells *= ocean_only
+
+	return np.clip(cells, 0.0, 1.0).astype(np.float32)
+
+
 def _generate_storm_alpha(
 	lon_deg: np.ndarray,
 	lat_deg: np.ndarray,
@@ -774,13 +865,42 @@ def generate_cloud_alpha(
 		octaves=1,
 	) + 1.0) * 0.5
 
+	# Lon/lat degrees (reused by multiple passes).
+	lon_deg = (lon_rad * np.float32(180.0 / np.pi)).astype(np.float32)
+	lat_deg = (lat_rad * np.float32(180.0 / np.pi)).astype(np.float32)
+	land_factor = _compute_land_factor(lon_deg, lat_deg)
+
+	# Spatial density field: modulates cutoff/ramp so some ocean regions have
+	# higher cloud coverage and others stay sparse (more natural variability).
+	density01 = ((_fbm_3d(
+		sx * np.float32(params.density_scale),
+		sy * np.float32(params.density_scale),
+		sz * np.float32(params.density_scale),
+		seed=params.seed + 61000,
+		octaves=params.density_octaves,
+	) + 1.0) * 0.5).astype(np.float32)
+	density01 = np.clip(density01, 0.0, 1.0).astype(np.float32)
+	density01 = np.power(density01, np.float32(1.12)).astype(np.float32)
+
 	# Weighted sum: big patches + a touch of internal texture.
 	v = (0.72 * coverage + 0.28 * detail).astype(np.float32)
 	# Increase contrast so a smaller % of pixels become clouds, but with a stronger peak opacity.
 	v = np.clip((v - 0.5) * params.contrast + 0.5, 0.0, 1.0).astype(np.float32)
 
 	# Shape into discrete puffs: threshold + eased ramp.
-	alpha_puffs = np.clip((v - params.cutoff) / max(1e-6, params.ramp_width), 0.0, 1.0)
+	cutoff_local = (np.float32(params.cutoff) - (density01 - np.float32(0.5)) * np.float32(params.cutoff_variability)).astype(
+		np.float32
+	)
+	cutoff_local = np.clip(
+		cutoff_local, np.float32(params.cutoff_min), np.float32(params.cutoff_max)
+	).astype(np.float32)
+	ramp_local = (np.float32(params.ramp_width) * (np.float32(0.90) + np.float32(0.65) * (np.float32(1.0) - density01))).astype(
+		np.float32
+	)
+	ramp_local = np.clip(ramp_local, np.float32(params.ramp_min), np.float32(params.ramp_max)).astype(
+		np.float32
+	)
+	alpha_puffs = np.clip((v - cutoff_local) / np.maximum(np.float32(1e-6), ramp_local), 0.0, 1.0)
 	alpha_puffs = np.power(alpha_puffs, params.power).astype(np.float32)
 
 	# Break up large sheets so it doesn't feel like uniform haze.
@@ -798,8 +918,6 @@ def generate_cloud_alpha(
 		+ breakup * np.float32(0.28)
 		+ micro * np.float32(0.14)
 	).astype(np.float32)
-	lon_deg = (lon_rad * np.float32(180.0 / np.pi)).astype(np.float32)
-	lat_deg = (lat_rad * np.float32(180.0 / np.pi)).astype(np.float32)
 	storms = _generate_storm_alpha(lon_deg, lat_deg, noise01, micro01=micro, storms=DEFAULT_STORMS)
 	alpha_puffs = (
 		np.float32(1.0) - (np.float32(1.0) - alpha_puffs) * (np.float32(1.0) - storms)
@@ -862,8 +980,25 @@ def generate_cloud_alpha(
 
 	# Land suppression (stylized). Apply after haze-cut so we reduce clouds over land
 	# without nuking them entirely (except North America, which is intentionally cleared).
-	land_factor = _compute_land_factor(lon_deg, lat_deg)
 	alpha *= land_factor
+
+	# Add scattered ocean cumulus fields (adds local variability + occasional larger puffs).
+	ocean_cells = _generate_ocean_cells_alpha(
+		sx=sx,
+		sy=sy,
+		sz=sz,
+		sx_d=sx_d,
+		sy_d=sy_d,
+		sz_d=sz_d,
+		detail01=detail,
+		micro01=micro,
+		density01=density01,
+		land_factor=land_factor,
+		params=params,
+	)
+	alpha = (np.float32(1.0) - (np.float32(1.0) - alpha) * (np.float32(1.0) - ocean_cells)).astype(
+		np.float32
+	)
 
 	# Add a couple massive ocean cloud systems to complement the smaller puff field.
 	# Use the same land_factor to constrain these to open ocean.
