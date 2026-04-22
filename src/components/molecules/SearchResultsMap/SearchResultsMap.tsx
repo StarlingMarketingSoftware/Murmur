@@ -3975,6 +3975,18 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					: typeof e?.error === 'string'
 						? e.error
 						: 'Error loading map';
+
+			// Suppress transient style-validation warnings that are non-fatal and otherwise show
+			// up as a brief fullscreen overlay during initial load.
+			if (
+				typeof message === 'string' &&
+				/(^|\b)(shadow-)?intensity:\s*\d+(?:\.\d+)?\s+is greater than the maximum value 1\b/i.test(
+					message
+				)
+			) {
+				return;
+			}
+
 			setMapLoadError(message);
 		};
 
