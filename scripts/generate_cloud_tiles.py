@@ -220,7 +220,7 @@ def _compute_land_factor(lon_deg: np.ndarray, lat_deg: np.ndarray) -> np.ndarray
 
 	Goals:
 	- Zero clouds over North America (per product UX preference: keep the US hemisphere clean).
-	- Reduce clouds over other continents, but keep some (so it doesn't look unnaturally "ocean only").
+	- Do not suppress clouds elsewhere (other landmasses are allowed).
 
 	This is intentionally approximate; it's only used at globe zoom levels.
 	"""
@@ -277,38 +277,22 @@ def _compute_land_factor(lon_deg: np.ndarray, lat_deg: np.ndarray) -> np.ndarray
 	na_factor = np.clip(na_factor + spill * np.float32(0.12), 0.0, 1.0).astype(np.float32)
 	factor *= na_factor
 
-	# Other continents: reduce but don't eliminate.
-	other_land_factor = np.float32(0.45)
-	other_ellipses: tuple[tuple[float, float, float, float], ...] = (
-		(-60, -15, 23, 30),  # South America
-		(20, 2, 24, 32),  # Africa
-		# Eurasia (coarse but not "ocean-eating"): a few overlapping blobs.
-		(15, 52, 25, 15),  # Europe
-		(45, 30, 22, 12),  # Middle East
-		(80, 35, 45, 22),  # Central/South Asia
-		(120, 35, 45, 18),  # East Asia
-		(105, 10, 35, 16),  # SE Asia
-		(100, 62, 60, 16),  # Russia / north band
-		(134, -25, 20, 14),  # Australia
-	)
-	other_min = np.full_like(lon_deg, np.float32(1e9), dtype=np.float32)
-	for clon, clat, rx, ry in other_ellipses:
-		other_min = np.minimum(
-			other_min, _ellipse_norm(lon_deg, lat_deg, clon, clat, rx, ry)
-		).astype(np.float32)
-
-	# Reduce clouds over non-NA land, with a feathered edge so boundaries don't show.
-	other_t = _smoothstep(0.98, 1.33, other_min).astype(np.float32)  # 0 inside, 1 outside
-	other_factor = (other_land_factor + (np.float32(1.0) - other_land_factor) * other_t).astype(
-		np.float32
-	)
-	factor *= other_factor
-
-	# Antarctica: avoid a hard horizontal cutoff at -60°.
-	ant = _smoothstep(-55.0, -68.0, lat_deg).astype(np.float32)  # 0 north, 1 far south
-	factor *= (np.float32(1.0) - ant * (np.float32(1.0) - other_land_factor)).astype(np.float32)
-
 	return factor.astype(np.float32)
+
+
+def _ocean_only_weight(land_factor: np.ndarray) -> np.ndarray:
+	"""
+	Weight for cloud systems that should strongly prefer open ocean (mega systems,
+	frontal bands, scattered ocean cells).
+
+	Important: we intentionally avoid a hard cutoff so the field doesn't create
+	visible "cleared" patches just offshore when the coarse land mask feathers out.
+	"""
+	land_factor = np.clip(land_factor.astype(np.float32), 0.0, 1.0).astype(np.float32)
+	# Start fading in shortly above the "other land" baseline (0.45), and only become
+	# meaningfully strong once we're close to true open-ocean values.
+	w = _smoothstep(0.34, 0.94, land_factor).astype(np.float32)
+	return np.power(w, np.float32(2.2)).astype(np.float32)
 
 
 @dataclass(frozen=True)
@@ -490,10 +474,7 @@ def _generate_mega_cloud_alpha(
 	detail01 = np.clip(detail01.astype(np.float32), 0.0, 1.0)
 	land_factor = np.clip(land_factor.astype(np.float32), 0.0, 1.0)
 
-	# 1 over ocean, 0 over "other land" (0.45) and also 0 over North America (0.0).
-	ocean_only = np.clip((land_factor - np.float32(0.6)) / np.float32(0.4), 0.0, 1.0).astype(
-		np.float32
-	)
+	ocean_only = _ocean_only_weight(land_factor)
 
 	# Low-frequency internal texture so the massive sheets don't read as flat blobs.
 	tex = (np.float32(0.72) * coverage01 + np.float32(0.28) * detail01).astype(np.float32)
@@ -555,9 +536,7 @@ def _generate_front_bands_alpha(
 	detail01 = np.clip(detail01.astype(np.float32), 0.0, 1.0)
 	micro01 = np.clip(micro01.astype(np.float32), 0.0, 1.0)
 	land_factor = np.clip(land_factor.astype(np.float32), 0.0, 1.0)
-	ocean_only = np.clip((land_factor - np.float32(0.6)) / np.float32(0.4), 0.0, 1.0).astype(
-		np.float32
-	)
+	ocean_only = _ocean_only_weight(land_factor)
 
 	# Ridged micro for fibrous streak texture.
 	ridge = (np.float32(1.0) - np.abs(np.float32(2.0) * micro01 - np.float32(1.0))).astype(
@@ -635,10 +614,7 @@ def _generate_ocean_cells_alpha(
 	density01 = np.clip(density01.astype(np.float32), 0.0, 1.0)
 	land_factor = np.clip(land_factor.astype(np.float32), 0.0, 1.0)
 
-	# 1 over open ocean, 0 over land (and the NA carve-out).
-	ocean_only = np.clip((land_factor - np.float32(0.6)) / np.float32(0.4), 0.0, 1.0).astype(
-		np.float32
-	)
+	ocean_only = _ocean_only_weight(land_factor)
 
 	base = ((_fbm_3d(
 		sx * np.float32(params.ocean_cells_scale),

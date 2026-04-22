@@ -1165,7 +1165,7 @@ const computeLightingOverlayOpacity = (zoom: number) => {
 // Clouds overlay: subtle patchy clouds for the zoomed-out globe view.
 // Implemented as a local raster tile source so it stays glued to the globe as it rotates.
 // NOTE: include a version query param to bust browser caches when we regenerate tiles.
-const CLOUDS_TILES_URL_TEMPLATE = '/maps/clouds/{z}/{x}/{y}.png?v=16';
+const CLOUDS_TILES_URL_TEMPLATE = '/maps/clouds/{z}/{x}/{y}.png?v=18';
 const CLOUDS_TILES_MAX_ZOOM = 3;
 // Tune for "hint of atmosphere" rather than a satellite layer.
 const CLOUDS_OVERLAY_OPACITY_AT_GLOBE_ZOOM = 0.62;
