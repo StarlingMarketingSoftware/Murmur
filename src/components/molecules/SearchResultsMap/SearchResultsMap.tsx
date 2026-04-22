@@ -1162,10 +1162,10 @@ const computeLightingOverlayOpacity = (zoom: number) => {
 	return 1 - t * t * t;
 };
 
-// Clouds overlay: subtle, static patchy clouds for the zoomed-out globe view.
+// Clouds overlay: subtle patchy clouds for the zoomed-out globe view.
 // Implemented as a local raster tile source so it stays glued to the globe as it rotates.
 // NOTE: include a version query param to bust browser caches when we regenerate tiles.
-const CLOUDS_TILES_URL_TEMPLATE = '/maps/clouds/{z}/{x}/{y}.png?v=8';
+const CLOUDS_TILES_URL_TEMPLATE = '/maps/clouds/{z}/{x}/{y}.png?v=15';
 const CLOUDS_TILES_MAX_ZOOM = 3;
 // Tune for "hint of atmosphere" rather than a satellite layer.
 const CLOUDS_OVERLAY_OPACITY_AT_GLOBE_ZOOM = 0.62;
@@ -1173,6 +1173,11 @@ const CLOUDS_OVERLAY_OPACITY_AT_DECORATIVE_ZOOM = 0.48;
 // Keep clouds around slightly past the initial interactive view; fade by state-level zoom.
 const CLOUDS_OVERLAY_FADE_OUT_START_ZOOM = 6.1;
 const CLOUDS_OVERLAY_FADE_OUT_END_ZOOM = 7.6;
+// Subtle drift so the clouds don't read as a static sticker.
+// Units are Mapbox "raster-translate" pixels; keep tiny to avoid looking like a weather layer.
+const CLOUDS_DRIFT_LOOP_MS = 190_000;
+const CLOUDS_DRIFT_AMPLITUDE_X_PX = 28;
+const CLOUDS_DRIFT_AMPLITUDE_Y_PX = 14;
 
 const AUTO_FIT_CONTACTS_MAX_ZOOM = 10;
 const AUTO_FIT_STATE_MAX_ZOOM = 5;
@@ -1951,6 +1956,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	// 0 = divider lines, 1 = interactive borders
 	const stateOverlayModeRef = useRef<number>(stateInteractionsEnabled ? 1 : 0);
 	const stateOverlayAnimRafRef = useRef<number | null>(null);
+	const cloudsDriftIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 	const prevIsBackgroundPresentationRef = useRef<boolean>(isBackgroundPresentation);
 	// Capture the base Mapbox paint values once, then we apply a multiplier for fading.
 	const stateLineOpacityBaseRef = useRef<{ dividers: any; borders: any } | null>(null);
@@ -3236,6 +3242,71 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		applyStateOverlayOpacity,
 	]);
 
+	// Subtle cloud drift so the overlay feels "alive" (especially in background globe mode).
+	useEffect(() => {
+		if (!map || !isMapLoaded) return;
+
+		let prefersReducedMotion = false;
+		try {
+			prefersReducedMotion =
+				typeof window !== 'undefined' &&
+				typeof window.matchMedia === 'function' &&
+				window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+		} catch {
+			prefersReducedMotion = false;
+		}
+		if (prefersReducedMotion) return;
+
+		const layerId = MAPBOX_LAYER_IDS.clouds;
+		const start = performance.now();
+		const twoPi = Math.PI * 2;
+		const transition = { duration: 1200, delay: 0 } as any;
+
+		const updateTranslate = () => {
+			const now = performance.now();
+			const a = ((now - start) / CLOUDS_DRIFT_LOOP_MS) * twoPi;
+
+			// A gentle "meander" loop (two sinusoids) reads organic without looking like a weather sim.
+			const dx =
+				CLOUDS_DRIFT_AMPLITUDE_X_PX * Math.sin(a) +
+				CLOUDS_DRIFT_AMPLITUDE_X_PX * 0.24 * Math.sin(a * 0.43 + 1.1);
+			const dy =
+				CLOUDS_DRIFT_AMPLITUDE_Y_PX * Math.cos(a * 0.83) +
+				CLOUDS_DRIFT_AMPLITUDE_Y_PX * 0.22 * Math.cos(a * 0.31 + 2.4);
+
+			try {
+				if (!map.getLayer(layerId)) return;
+				(map as any).setPaintProperty(layerId, 'raster-translate-transition', transition);
+				(map as any).setPaintProperty(layerId, 'raster-translate', [dx, dy]);
+			} catch {
+				// Ignore (style may be mid-reload).
+			}
+		};
+
+		// Cancel any in-flight drift loop before starting.
+		if (cloudsDriftIntervalRef.current) {
+			clearInterval(cloudsDriftIntervalRef.current);
+			cloudsDriftIntervalRef.current = null;
+		}
+
+		updateTranslate();
+		cloudsDriftIntervalRef.current = setInterval(updateTranslate, 1200);
+
+		return () => {
+			if (cloudsDriftIntervalRef.current) {
+				clearInterval(cloudsDriftIntervalRef.current);
+				cloudsDriftIntervalRef.current = null;
+			}
+			try {
+				if (map.getLayer(layerId)) {
+					(map as any).setPaintProperty(layerId, 'raster-translate', [0, 0]);
+				}
+			} catch {
+				// Ignore.
+			}
+		};
+	}, [map, isMapLoaded]);
+
 	// Keep the Mapbox "selected" feature-state for US states in sync with `selectedStateKey`.
 	const prevSelectedStateKeyOnMapRef = useRef<string | null>(null);
 	useEffect(() => {
@@ -3353,10 +3424,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			maxzoom: CLOUDS_OVERLAY_FADE_OUT_END_ZOOM + 0.01,
 			paint: {
 				'raster-opacity': cloudsOpacityExpr,
-				'raster-brightness-min': 0.94,
+				'raster-brightness-min': 0.92,
 				'raster-brightness-max': 1,
-				'raster-contrast': 0.14,
+				'raster-contrast': 0.16,
 				'raster-saturation': 0,
+				'raster-translate': [0, 0],
+				'raster-translate-anchor': 'map',
 				'raster-resampling': 'linear',
 			},
 		});
