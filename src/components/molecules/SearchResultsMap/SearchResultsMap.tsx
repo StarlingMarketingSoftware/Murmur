@@ -1245,6 +1245,21 @@ const applyMurmurGlobeLighting = (mapInstance: mapboxgl.Map) => {
 	}
 };
 
+// Mapbox Streets v12 has no "land" fill layer covering every continent — the cream land
+// tone is just the background layer showing through gaps in landuse/landcover/water.
+// That means *any* time tiles are streaming in (initial load, a sudden zoom-out, a pan
+// into untiled territory), the background is all the user sees, and there is no single
+// color that reads correctly for both land and water.
+//
+// Fix: paint the background permanently ocean-blue (so untiled sphere reads as water)
+// and add a separate cream-colored fill layer sourced from Mapbox's free vector tileset
+// `mapbox.country-boundaries-v1`, which has complete world coverage (every country, plus
+// Antarctica) and is extremely lightweight. Country tiles cache at all zooms, so after
+// the first paint the continents stay cream through every subsequent zoom/pan; water
+// fills still draw blue on top, so lakes/rivers inside countries look right.
+const MAP_OCEAN_BLUE = '#62C7E3';
+const MAP_LAND_CREAM = '#F1EDE2';
+
 const applyFreeTrialMapVisualTuning = (mapInstance: mapboxgl.Map) => {
 	// Projection
 	try {
@@ -1325,12 +1340,15 @@ const applyFreeTrialMapVisualTuning = (mapInstance: mapboxgl.Map) => {
 			// we can't overwrite just get skipped.
 			try {
 				if (type === 'background') {
-					mapInstance.setPaintProperty(id, 'background-color', '#F1EDE2');
+					// Permanently ocean-blue so any untiled sphere (initial load, zoom-outs,
+					// pans into untiled areas) reads as water. The cream land tone comes
+					// from the `murmur-world-land-fill` layer added in ensureMapboxSourcesAndLayers.
+					mapInstance.setPaintProperty(id, 'background-color', MAP_OCEAN_BLUE);
 				} else if (
 					type === 'fill' &&
 					(idLower === 'water' || idLower.startsWith('water'))
 				) {
-					mapInstance.setPaintProperty(id, 'fill-color', '#62C7E3');
+					mapInstance.setPaintProperty(id, 'fill-color', MAP_OCEAN_BLUE);
 				} else if (
 					type === 'fill' &&
 					(idLower.includes('landcover') ||
@@ -1341,14 +1359,78 @@ const applyFreeTrialMapVisualTuning = (mapInstance: mapboxgl.Map) => {
 				) {
 					mapInstance.setPaintProperty(id, 'fill-color', '#B3E6D7');
 				} else if (type === 'fill' && idLower.includes('landuse')) {
-					mapInstance.setPaintProperty(id, 'fill-color', '#F1EDE2');
+					mapInstance.setPaintProperty(id, 'fill-color', MAP_LAND_CREAM);
 				} else if (type === 'fill' && idLower === 'land') {
-					mapInstance.setPaintProperty(id, 'fill-color', '#F1EDE2');
+					mapInstance.setPaintProperty(id, 'fill-color', MAP_LAND_CREAM);
 				}
 			} catch {
 				// Layer color isn't a plain literal — leave as-is.
 			}
 		}
+	} catch {
+		// Non-fatal.
+	}
+};
+
+// IDs for the world-land fill layer (cream land coverage) sourced from Mapbox's
+// free `country-boundaries-v1` tileset. Adding this layer means the background
+// layer can stay permanently ocean-blue without blue leaking through in "bare
+// land" areas between landuse/landcover polygons — on initial load, during
+// zoom-outs, and during pans into untiled territory.
+const MAP_WORLD_LAND_SOURCE_ID = 'murmur-world-land';
+const MAP_WORLD_LAND_LAYER_ID = 'murmur-world-land-fill';
+const MAP_WORLD_LAND_TILESET_URL = 'mapbox://mapbox.country-boundaries-v1';
+const MAP_WORLD_LAND_SOURCE_LAYER = 'country_boundaries';
+
+const ensureWorldLandFill = (mapInstance: mapboxgl.Map) => {
+	try {
+		if (!mapInstance.getSource(MAP_WORLD_LAND_SOURCE_ID)) {
+			mapInstance.addSource(MAP_WORLD_LAND_SOURCE_ID, {
+				type: 'vector',
+				url: MAP_WORLD_LAND_TILESET_URL,
+			} as any);
+		}
+	} catch {
+		// If source add fails (offline / token scoped out) the background stays
+		// ocean-blue everywhere, which is a graceful degradation.
+		return;
+	}
+
+	if (mapInstance.getLayer(MAP_WORLD_LAND_LAYER_ID)) return;
+
+	// Insert the land fill as the first layer above `background` so every other
+	// Mapbox layer (water, landuse, roads, labels) draws on top. We can't assume
+	// any particular layer name exists, so we look up the first non-background,
+	// non-`murmur-` layer and insert before it.
+	let beforeId: string | undefined;
+	try {
+		const style = mapInstance.getStyle();
+		for (const layer of style?.layers ?? []) {
+			const id = (layer as any)?.id as string | undefined;
+			if (!id) continue;
+			if (id.startsWith('murmur-')) continue;
+			if ((layer as any)?.type === 'background') continue;
+			beforeId = id;
+			break;
+		}
+	} catch {
+		// Fall through — we'll just append without a `before` target.
+	}
+
+	try {
+		mapInstance.addLayer(
+			{
+				id: MAP_WORLD_LAND_LAYER_ID,
+				type: 'fill',
+				source: MAP_WORLD_LAND_SOURCE_ID,
+				'source-layer': MAP_WORLD_LAND_SOURCE_LAYER,
+				paint: {
+					'fill-color': MAP_LAND_CREAM,
+					'fill-antialias': true,
+				},
+			} as any,
+			beforeId
+		);
 	} catch {
 		// Non-fatal.
 	}
@@ -3349,6 +3431,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	}, []);
 
 	const ensureMapboxSourcesAndLayers = useCallback((mapInstance: mapboxgl.Map) => {
+		// World-land fill (cream continents under the ocean-blue background). Idempotent;
+		// safe if style.load already added it earlier.
+		ensureWorldLandFill(mapInstance);
+
 		const emptyFc: GeoJSON.FeatureCollection = {
 			type: 'FeatureCollection',
 			features: [],
@@ -3904,6 +3990,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 		const onStyleLoad = () => {
 			applyFreeTrialMapVisualTuning(mapInstance);
+			// Kick off the world-land fill (country polygons in cream) as early as
+			// possible — sooner these tiles arrive, sooner the continents read as land
+			// rather than ocean. Safe to call in `style.load` because the Mapbox style
+			// is fully parsed at that point.
+			ensureWorldLandFill(mapInstance);
 		};
 
 		const onLoad = () => {
