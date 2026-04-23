@@ -219,21 +219,26 @@ def _compute_land_factor(lon_deg: np.ndarray, lat_deg: np.ndarray) -> np.ndarray
 	Very coarse land/ocean heuristic for stylized clouds.
 
 	Goals:
-	- Zero clouds over North America (per product UX preference: keep the US hemisphere clean).
+	- Strongly suppress clouds over the US/Canada region (per product UX preference: keep the
+	  "US hemisphere" mostly clean), while allowing Mexico to carry some cloud cover so the
+	  transition doesn't feel artificial.
 	- Do not suppress clouds elsewhere (other landmasses are allowed).
 
 	This is intentionally approximate; it's only used at globe zoom levels.
 	"""
 	factor = np.ones_like(lon_deg, dtype=np.float32)
 
-	# North America: we still strongly suppress clouds here for product UX, but we
+	# US/Canada: we still strongly suppress clouds here for product UX, but we
 	# feather the boundary so it fades out smoothly instead of producing a hard arc.
+	#
+	# Important: keep the NA mask relatively tight. If it's too large, we accidentally
+	# clear adjacent Pacific/Atlantic ocean where we actually want clouds to read.
 	na_ellipses: tuple[tuple[float, float, float, float], ...] = (
-		(-102, 49, 52, 26),  # US/Canada bulk
-		(-150, 62, 22, 12),  # Alaska
-		(-103, 21, 22, 14),  # Mexico/Central America
-		(-60, 56, 26, 16),  # East Canada
-		(-42, 73, 15, 9),  # Greenland
+		(-98, 39, 30, 18),  # Continental US (keep coasts readable, don't nuke oceans)
+		(-106, 56, 40, 18),  # Canada bulk
+		(-150, 62, 18, 10),  # Alaska
+		(-64, 54, 16, 10),  # East Canada / Labrador
+		(-42, 73, 12, 8),  # Greenland
 	)
 	na_norms = []
 	for clon, clat, rx, ry in na_ellipses:
@@ -252,30 +257,60 @@ def _compute_land_factor(lon_deg: np.ndarray, lat_deg: np.ndarray) -> np.ndarray
 	sx = (cos_lat * np.cos(lon_rad)).astype(np.float32)
 	sy = np.sin(lat_rad).astype(np.float32)
 	sz = (cos_lat * np.sin(lon_rad)).astype(np.float32)
-	edge01 = ((_fbm_3d(sx * 2.2, sy * 2.2, sz * 2.2, seed=7781, octaves=2) + 1.0) * 0.5).astype(
+	# Higher-frequency edge noise so the NA boundary doesn't read like a clean ellipse.
+	edge01 = ((_fbm_3d(sx * 2.65, sy * 2.65, sz * 2.65, seed=7781, octaves=3) + 1.0) * 0.5).astype(
 		np.float32
 	)
-	jitter = ((edge01 - np.float32(0.5)) * np.float32(0.10)).astype(np.float32)
+	jitter = ((edge01 - np.float32(0.5)) * np.float32(0.18)).astype(np.float32)
 	na_rj = (na_r + jitter).astype(np.float32)
 
 	# Main clear-out: broadened feather so it's hard to perceive the boundary.
 	# 0 inside, 1 outside.
-	na_clear = _smoothstep(1.0 - 0.28, 1.0 + 0.85, na_rj).astype(np.float32)
+	# Use an asymmetric band: deeper feather *into* North America (so the coast doesn't
+	# read like a hard cut) but a faster return to full strength over adjacent ocean.
+	na_clear = _smoothstep(1.0 - 0.30, 1.0 + 0.18, na_rj).astype(np.float32)
 
 	# Allow a *tiny* amount of cloud spill into North America near the boundary
 	# so it feels atmospheric rather than "clipped".
 	na_min_factor = np.float32(0.02)
 	na_factor = (na_min_factor + (np.float32(1.0) - na_min_factor) * na_clear).astype(np.float32)
 	# Shoulder: only inside the boundary, peaking near the edge.
-	shoulder = (_smoothstep(1.0 - 0.62, 1.0 - 0.10, na_rj) * (np.float32(1.0) - na_clear)).astype(
+	shoulder = (_smoothstep(1.0 - 0.40, 1.0 - 0.02, na_rj) * (np.float32(1.0) - na_clear)).astype(
 		np.float32
 	)
 	# Patchy spill pattern.
-	spill = (shoulder * (np.float32(0.30) + np.float32(0.70) * np.power(edge01, 1.8))).astype(
+	spill = (shoulder * (np.float32(0.18) + np.float32(0.82) * np.power(edge01, 1.55))).astype(
 		np.float32
 	)
-	na_factor = np.clip(na_factor + spill * np.float32(0.12), 0.0, 1.0).astype(np.float32)
+	# More spill now that clouds are larger; keeps the edge from feeling like a hard mask.
+	na_factor = np.clip(na_factor + spill * np.float32(0.22), 0.0, 1.0).astype(np.float32)
 	factor *= na_factor
+
+	# Ocean restore windows: our coarse NA ellipses inevitably include some nearby ocean.
+	# Bring back clouds over open water (while keeping the landmass mostly clear) so the
+	# globe doesn't read "vacant" in the Pacific/Atlantic adjacent to North America.
+	restore_ellipses: tuple[tuple[float, float, float, float], ...] = (
+		(-140, 34, 14, 10),  # E Pacific off CA/OR (keeps west-coast ocean alive)
+		(-62, 36, 10, 7),  # W Atlantic off the US east coast (kept off the shoreline)
+	)
+	restore = np.zeros_like(factor, dtype=np.float32)
+	for clon, clat, rx, ry in restore_ellipses:
+		r = np.sqrt(
+			np.maximum(_ellipse_norm(lon_deg, lat_deg, clon, clat, rx, ry).astype(np.float32), 0.0)
+		).astype(np.float32)
+		# Soft mask: 1 inside, fades out just beyond the boundary.
+		m = (np.float32(1.0) - _smoothstep(1.0 - 0.10, 1.0 + 0.34, r)).astype(np.float32)
+		restore = np.maximum(restore, m).astype(np.float32)
+	# Only restore near/outside the NA boundary (based on radial distance), so we
+	# don't accidentally reintroduce clouds over inland land due to coarse shapes.
+	# 0 deep inside, 1 near/outside the edge.
+	# Start restoring slightly deeper inside the NA mask so offshore water (which the
+	# coarse ellipses accidentally include) doesn't get wiped out.
+	restore_gate = _smoothstep(0.60, 0.94, na_rj).astype(np.float32)
+	# Patch it so restore doesn't read like a clean ellipse window.
+	restore_patch = (np.float32(0.35) + np.float32(0.65) * np.power(edge01, 1.35)).astype(np.float32)
+	restore = (restore * restore_gate * restore_patch).astype(np.float32)
+	factor = np.maximum(factor, restore * np.float32(0.92)).astype(np.float32)
 
 	return factor.astype(np.float32)
 
@@ -300,9 +335,9 @@ class CloudParams:
 	seed: int = 1337
 	# Higher cutoff -> fewer clouds. We keep this fairly high and then remove low-alpha haze
 	# after shaping so the result reads as distinct puffs (Google Earth-ish) without being dense.
-	cutoff: float = 0.61
+	cutoff: float = 0.575
 	# Width of the post-cutoff ramp. Smaller -> clouds reach high opacity sooner (stronger cores).
-	ramp_width: float = 0.18
+	ramp_width: float = 0.165
 	# Spatial variability: modulate cutoff/ramp so different ocean regions have
 	# noticeably different cloud density (without globally increasing coverage).
 	density_scale: float = 0.95
@@ -318,16 +353,16 @@ class CloudParams:
 	detail_octaves: int = 3
 	breakup_scale: float = 12.0
 	breakup_octaves: int = 2
-	contrast: float = 1.8  # widen noise range so we get actual cloud "puffs" (not haze)
-	power: float = 1.85  # higher = puffier, less haze
+	contrast: float = 1.95  # widen noise range so we get actual cloud "puffs" (not haze)
+	power: float = 1.75  # higher = puffier, less haze
 	# Remove low-alpha haze so clouds read as scattered puffs instead of a milky veil.
-	haze_floor: float = 0.07
+	haze_floor: float = 0.05
 	# Extra scattered cumulus fields (adds random larger + smaller puffs across oceans).
 	ocean_cells_scale: float = 1.15
 	ocean_cells_octaves: int = 3
 	ocean_cells_detail_scale: float = 2.7
 	ocean_cells_detail_octaves: int = 2
-	ocean_cells_strength: float = 0.26
+	ocean_cells_strength: float = 0.36
 	# Domain warp: breaks up "FBM blob" look into more weather-like fields.
 	warp_scale: float = 1.4
 	warp_octaves: int = 3
@@ -342,7 +377,7 @@ class CloudParams:
 	cirrus_fiber_octaves: int = 2
 	cirrus_cutoff: float = 0.62
 	cirrus_ramp_width: float = 0.20
-	cirrus_strength: float = 0.30
+	cirrus_strength: float = 0.38
 	cirrus_haze_floor: float = 0.02
 
 
@@ -519,7 +554,7 @@ def _generate_mega_cloud_alpha(
 	# Keep it subtle: massive sheets should be present but not overpower everything.
 	out = np.clip(out, 0.0, 1.0).astype(np.float32)
 	out = np.power(out, np.float32(1.05)).astype(np.float32)
-	out *= np.float32(0.66)
+	out *= np.float32(0.88)
 	return out
 
 
@@ -1019,9 +1054,14 @@ def render_tile_rgba(z: int, x: int, y: int, size: int, params: CloudParams) -> 
 
 	alpha = generate_cloud_alpha(lon, lat, params)
 
-	# Keep it subtle in the texture itself: cap alpha so the layer opacity can be higher
-	# without ever looking like an "overlay sticker".
+	# Boost mid-alpha a bit so clouds read clearly at globe zoom. We still cap so the
+	# Mapbox layer can run a higher overall opacity without becoming a "sticker".
 	alpha = np.clip(alpha, 0.0, 1.0).astype(np.float32)
+	alpha = np.clip(
+		np.power(alpha, np.float32(0.78)) * np.float32(1.16),
+		np.float32(0.0),
+		np.float32(1.0),
+	).astype(np.float32)
 	alpha_u8 = (alpha * 255.0).astype(np.uint8)
 
 	rgba = np.zeros((size, size, 4), dtype=np.uint8)
@@ -1029,7 +1069,7 @@ def render_tile_rgba(z: int, x: int, y: int, size: int, params: CloudParams) -> 
 	# Note: the map layer desaturates this raster; we rely on luminance variation.
 	thickness = np.power(alpha, np.float32(0.65)).astype(np.float32)
 	# 0..1 -> subtle brightness variation (kept small to avoid looking like a sticker).
-	bright = (np.float32(0.90) + np.float32(0.10) * thickness).astype(np.float32)
+	bright = (np.float32(0.87) + np.float32(0.13) * thickness).astype(np.float32)
 	r = (np.float32(244.0) * bright).astype(np.uint8)
 	g = (np.float32(250.0) * bright).astype(np.uint8)
 	b = (np.float32(255.0) * bright).astype(np.uint8)
@@ -1046,7 +1086,7 @@ def main() -> None:
 	parser.add_argument("--tile-size", type=int, default=512)
 	parser.add_argument("--max-zoom", type=int, default=3)
 	parser.add_argument("--seed", type=int, default=1337)
-	parser.add_argument("--cutoff", type=float, default=0.61)
+	parser.add_argument("--cutoff", type=float, default=0.575)
 	parser.add_argument("--dry-run", action="store_true")
 	args = parser.parse_args()
 

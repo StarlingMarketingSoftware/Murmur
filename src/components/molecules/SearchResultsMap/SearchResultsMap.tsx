@@ -1165,11 +1165,11 @@ const computeLightingOverlayOpacity = (zoom: number) => {
 // Clouds overlay: subtle patchy clouds for the zoomed-out globe view.
 // Implemented as a local raster tile source so it stays glued to the globe as it rotates.
 // NOTE: include a version query param to bust browser caches when we regenerate tiles.
-const CLOUDS_TILES_URL_TEMPLATE = '/maps/clouds/{z}/{x}/{y}.png?v=18';
+const CLOUDS_TILES_URL_TEMPLATE = '/maps/clouds/{z}/{x}/{y}.png?v=23';
 const CLOUDS_TILES_MAX_ZOOM = 3;
-// Tune for "hint of atmosphere" rather than a satellite layer.
-const CLOUDS_OVERLAY_OPACITY_AT_GLOBE_ZOOM = 0.62;
-const CLOUDS_OVERLAY_OPACITY_AT_DECORATIVE_ZOOM = 0.48;
+// Tune for "satellite-read" clarity without becoming a weather overlay.
+const CLOUDS_OVERLAY_OPACITY_AT_GLOBE_ZOOM = 0.78;
+const CLOUDS_OVERLAY_OPACITY_AT_DECORATIVE_ZOOM = 0.66;
 // Keep clouds around slightly past the initial interactive view; fade by state-level zoom.
 const CLOUDS_OVERLAY_FADE_OUT_START_ZOOM = 6.1;
 const CLOUDS_OVERLAY_FADE_OUT_END_ZOOM = 7.6;
@@ -3510,9 +3510,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			maxzoom: CLOUDS_OVERLAY_FADE_OUT_END_ZOOM + 0.01,
 			paint: {
 				'raster-opacity': cloudsOpacityExpr,
-				'raster-brightness-min': 0.92,
+				'raster-brightness-min': 0.84,
 				'raster-brightness-max': 1,
-				'raster-contrast': 0.16,
+				'raster-contrast': 0.36,
 				'raster-saturation': 0,
 				'raster-translate': [0, 0],
 				'raster-translate-anchor': 'map',
