@@ -1144,6 +1144,13 @@ const MAP_MIN_ZOOM = 2.25;
 // Dashboard UX: allow state hover highlight one zoom step past the default zoom.
 const STATE_HOVER_HIGHLIGHT_MAX_ZOOM = MAP_DEFAULT_ZOOM + 1;
 
+// Decorative dashboard background framing. Keep these in sync with the background-mode
+// camera settings so the initial mount doesn't "pop" after the map loads.
+const DASHBOARD_DECORATIVE_ZOOM = 4.0;
+const DASHBOARD_DECORATIVE_PITCH = 15;
+const DASHBOARD_DECORATIVE_OFFSET_PX: [number, number] = [0, 140]; // push center down -> see more top/horizon
+const DASHBOARD_DECORATIVE_CENTER: [number, number] = [defaultCenter.lng, defaultCenter.lat];
+
 // Softbox lighting overlay fades out as the user zooms in — the "lit sphere"
 // read only makes sense at globe/continent distance. Fully on at globe zoom,
 // linearly off by the time we're into state-level detail.
@@ -3968,11 +3975,27 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 		mapboxgl.accessToken = accessToken;
 
+		const initialPresentation = presentationRef.current;
+		const initialCenter: [number, number] =
+			initialPresentation === 'background'
+				? DASHBOARD_DECORATIVE_CENTER
+				: [defaultCenter.lng, defaultCenter.lat];
+		const initialZoom =
+			initialPresentation === 'background'
+				? DASHBOARD_DECORATIVE_ZOOM
+				: MAP_DEFAULT_ZOOM;
+		const initialPitch =
+			initialPresentation === 'background'
+				? DASHBOARD_DECORATIVE_PITCH
+				: 0;
+
 		const mapInstance = new mapboxgl.Map({
 			container: mapContainerRef.current,
 			style: MAPBOX_STYLE,
-			center: [defaultCenter.lng, defaultCenter.lat],
-			zoom: MAP_DEFAULT_ZOOM,
+			center: initialCenter,
+			zoom: initialZoom,
+			pitch: initialPitch,
+			bearing: 0,
 			minZoom: MAP_MIN_ZOOM,
 			attributionControl: true,
 		});
@@ -3990,19 +4013,36 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 		const onStyleLoad = () => {
 			applyFreeTrialMapVisualTuning(mapInstance);
-			// Kick off the world-land fill (country polygons in cream) as early as
-			// possible — sooner these tiles arrive, sooner the continents read as land
-			// rather than ocean. Safe to call in `style.load` because the Mapbox style
-			// is fully parsed at that point.
-			ensureWorldLandFill(mapInstance);
+			// Add Murmur sources/layers (including clouds + world-land fill) as early as
+			// possible so they can begin loading before the first reveal.
+			ensureMapboxSourcesAndLayers(mapInstance);
 		};
 
 		const onLoad = () => {
 			applyFreeTrialMapVisualTuning(mapInstance);
+			ensureMapboxSourcesAndLayers(mapInstance);
+
+			// Ensure the decorative dashboard framing (offset) is applied before we
+			// drop the loading mask, so the globe doesn't "jump" into position.
+			if (presentationRef.current === 'background') {
+				try {
+					// `jumpTo` typings don't accept `offset` in our Mapbox version; use 0ms `easeTo`.
+					mapInstance.easeTo({
+						center: DASHBOARD_DECORATIVE_CENTER,
+						zoom: DASHBOARD_DECORATIVE_ZOOM,
+						pitch: DASHBOARD_DECORATIVE_PITCH,
+						bearing: 0,
+						offset: DASHBOARD_DECORATIVE_OFFSET_PX,
+						duration: 0,
+					});
+				} catch {
+					// Ignore.
+				}
+			}
+
 			setIsMapLoaded(true);
 			setZoomLevel(mapInstance.getZoom() ?? MAP_DEFAULT_ZOOM);
 			setMapLoadError(null);
-			ensureMapboxSourcesAndLayers(mapInstance);
 
 			let capturedStateLineOpacityBase = false;
 			try {
@@ -4093,6 +4133,17 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		mapInstance.on('error', onError);
 		mapInstance.on('rotate', onRotate);
 
+		// Mapbox can occasionally load a cached style before event handlers are attached.
+		// Run the handler once if the style is already ready so the dashboard never misses
+		// clouds/shading on the first paint.
+		try {
+			if (typeof (mapInstance as any).isStyleLoaded === 'function') {
+				if ((mapInstance as any).isStyleLoaded()) onStyleLoad();
+			}
+		} catch {
+			// Ignore.
+		}
+
 		return () => {
 			mapInstance.off('load', onLoad);
 			mapInstance.off('style.load', onStyleLoad);
@@ -4182,16 +4233,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 			// Tune these to match the homepage "globe peeking from the top" framing.
 			// Key trick: use `offset` (screen-space pan) rather than changing geo center a lot.
-			const DECORATIVE_ZOOM = 4.0;
-			const DECORATIVE_PITCH = 15;
-			const DECORATIVE_OFFSET: [number, number] = [0, 140]; // push center down -> see more top/horizon
-			const DECORATIVE_CENTER: [number, number] = [defaultCenter.lng, defaultCenter.lat];
 			const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
 
 			const lockDecorativeZoom = () => {
 				try {
-					map.setMinZoom(DECORATIVE_ZOOM);
-					map.setMaxZoom(DECORATIVE_ZOOM);
+					map.setMinZoom(DASHBOARD_DECORATIVE_ZOOM);
+					map.setMaxZoom(DASHBOARD_DECORATIVE_ZOOM);
 				} catch {
 					// Ignore.
 				}
@@ -4206,7 +4253,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 				const normalizeLng = (lng: number) => ((((lng + 180) % 360) + 360) % 360) - 180;
 
-				const baseLng = DECORATIVE_CENTER[0];
+				const baseLng = DASHBOARD_DECORATIVE_CENTER[0];
 				const maxDriftDeg = 35; // keep camera within a US-visible band
 				let direction: 1 | -1 = 1;
 				let currentLng = normalizeLng(map.getCenter()?.lng ?? baseLng);
@@ -4224,11 +4271,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						}
 
 						map.easeTo({
-							center: [currentLng, DECORATIVE_CENTER[1]],
-							zoom: DECORATIVE_ZOOM,
-							pitch: DECORATIVE_PITCH,
+							center: [currentLng, DASHBOARD_DECORATIVE_CENTER[1]],
+							zoom: DASHBOARD_DECORATIVE_ZOOM,
+							pitch: DASHBOARD_DECORATIVE_PITCH,
 							bearing: 0,
-							offset: DECORATIVE_OFFSET,
+							offset: DASHBOARD_DECORATIVE_OFFSET_PX,
 							duration: animationDurationMs,
 							easing: (n) => n,
 						});
@@ -4260,9 +4307,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 				// Prevent zoom clamping from snapping the camera before the ease starts.
 				try {
-					const currentZoom = map.getZoom() ?? DECORATIVE_ZOOM;
-					map.setMinZoom(Math.min(currentZoom, DECORATIVE_ZOOM));
-					map.setMaxZoom(Math.max(currentZoom, DECORATIVE_ZOOM));
+					const currentZoom = map.getZoom() ?? DASHBOARD_DECORATIVE_ZOOM;
+					map.setMinZoom(Math.min(currentZoom, DASHBOARD_DECORATIVE_ZOOM));
+					map.setMaxZoom(Math.max(currentZoom, DASHBOARD_DECORATIVE_ZOOM));
 				} catch {
 					// Ignore.
 				}
@@ -4308,11 +4355,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 				try {
 					map.easeTo({
-						center: DECORATIVE_CENTER,
-						zoom: DECORATIVE_ZOOM,
-						pitch: DECORATIVE_PITCH,
+						center: DASHBOARD_DECORATIVE_CENTER,
+						zoom: DASHBOARD_DECORATIVE_ZOOM,
+						pitch: DASHBOARD_DECORATIVE_PITCH,
 						bearing: 0,
-						offset: DECORATIVE_OFFSET,
+						offset: DASHBOARD_DECORATIVE_OFFSET_PX,
 						duration: dur,
 						easing: easeOutCubic,
 					});
@@ -4328,11 +4375,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				lockDecorativeZoom();
 				// `jumpTo` typings don't accept `offset` in our Mapbox version; use a 0ms `easeTo`.
 				map.easeTo({
-					center: DECORATIVE_CENTER,
-					zoom: DECORATIVE_ZOOM,
-					pitch: DECORATIVE_PITCH,
+					center: DASHBOARD_DECORATIVE_CENTER,
+					zoom: DASHBOARD_DECORATIVE_ZOOM,
+					pitch: DASHBOARD_DECORATIVE_PITCH,
 					bearing: 0,
-					offset: DECORATIVE_OFFSET,
+					offset: DASHBOARD_DECORATIVE_OFFSET_PX,
 					duration: 0,
 				});
 			} catch {
@@ -6289,7 +6336,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	useEffect(() => {
 		if (!map) return;
 		if (!isMapLoaded) return;
-		if (isBackgroundPresentation) return;
 
 		const applyOpacity = () => {
 			const zoom = map.getZoom() ?? MAP_DEFAULT_ZOOM;
@@ -6305,7 +6351,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		return () => {
 			map.off('zoom', applyOpacity);
 		};
-	}, [map, isMapLoaded, isBackgroundPresentation]);
+	}, [map, isMapLoaded]);
 
 	const markerPinUrlCacheRef = useRef<Map<string, string>>(new Map());
 	const getMarkerPinUrl = useCallback(
