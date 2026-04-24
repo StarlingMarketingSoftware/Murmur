@@ -1175,16 +1175,34 @@ const computeLightingOverlayOpacity = (zoom: number) => {
 const CLOUDS_TILES_URL_TEMPLATE = '/maps/clouds/{z}/{x}/{y}.png?v=23';
 const CLOUDS_TILES_MAX_ZOOM = 3;
 // Tune for "satellite-read" clarity without becoming a weather overlay.
-const CLOUDS_OVERLAY_OPACITY_AT_GLOBE_ZOOM = 0.78;
-const CLOUDS_OVERLAY_OPACITY_AT_DECORATIVE_ZOOM = 0.66;
-// Keep clouds around slightly past the initial interactive view; fade by state-level zoom.
-const CLOUDS_OVERLAY_FADE_OUT_START_ZOOM = 6.1;
-const CLOUDS_OVERLAY_FADE_OUT_END_ZOOM = 7.6;
-// Subtle drift so the clouds don't read as a static sticker.
-// Units are Mapbox "raster-translate" pixels; keep tiny to avoid looking like a weather layer.
-const CLOUDS_DRIFT_LOOP_MS = 190_000;
-const CLOUDS_DRIFT_AMPLITUDE_X_PX = 28;
-const CLOUDS_DRIFT_AMPLITUDE_Y_PX = 14;
+	const CLOUDS_OVERLAY_OPACITY_AT_GLOBE_ZOOM = 0.78;
+	const CLOUDS_OVERLAY_OPACITY_AT_DECORATIVE_ZOOM = 0.66;
+	// Keep clouds around slightly past the initial interactive view; fade by state-level zoom.
+	const CLOUDS_OVERLAY_FADE_OUT_START_ZOOM = 8.0;
+	const CLOUDS_OVERLAY_FADE_OUT_END_ZOOM = 10.5;
+const CLOUDS_CANVAS_TEXTURE_URL = '/maps/clouds/0/0/0.png?v=23';
+const CLOUDS_CANVAS_SIZE_PX = 512;
+// Full WebMercator bounds (lat clamp) so the texture maps cleanly across the globe.
+const CLOUDS_CANVAS_COORDINATES: [[number, number], [number, number], [number, number], [number, number]] =
+	[
+		[-180, 85.051129],
+		[180, 85.051129],
+		[180, -85.051129],
+		[-180, -85.051129],
+	];
+// Clouds drift animation parameters.
+// We animate the *canvas source* (not Mapbox raster paint), so units are in the canvas'
+// pixel grid. We apply a light zoom-based scale so drift stays noticeable while clouds
+// are still visible, without getting overly fast near fade-out.
+	const CLOUDS_DRIFT_UPDATE_MS = 33;
+	const CLOUDS_DRIFT_LOOP_MS = 180_000;
+	const CLOUDS_DRIFT_BASE_ZOOM = 4.0;
+	const CLOUDS_DRIFT_AMPLITUDE_X_PX = 18;
+	const CLOUDS_DRIFT_SPEED_X_PX_PER_S = 2.5;
+	const CLOUDS_DRIFT_SPEED_Y_PX_PER_S = 0.0;
+	const CLOUDS_DRIFT_ZOOM_SCALE_EXP = 0.2;
+	const CLOUDS_DRIFT_ZOOM_SCALE_MIN = 0.85;
+	const CLOUDS_DRIFT_ZOOM_SCALE_MAX = 1.25;
 
 const AUTO_FIT_CONTACTS_MAX_ZOOM = 10;
 const AUTO_FIT_STATE_MAX_ZOOM = 5;
@@ -2041,14 +2059,19 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	// Smooth fade for state overlays (borders + labels) when switching presentations.
 	// This prevents the "pause then pop" feeling when transitioning from the decorative globe
 	// into the interactive results map.
-	const stateOverlayOpacityRef = useRef<number>(0);
-	// 0 = divider lines, 1 = interactive borders
-	const stateOverlayModeRef = useRef<number>(stateInteractionsEnabled ? 1 : 0);
-	const stateOverlayAnimRafRef = useRef<number | null>(null);
-	const cloudsDriftIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-	const prevIsBackgroundPresentationRef = useRef<boolean>(isBackgroundPresentation);
-	// Capture the base Mapbox paint values once, then we apply a multiplier for fading.
-	const stateLineOpacityBaseRef = useRef<{ dividers: any; borders: any } | null>(null);
+		const stateOverlayOpacityRef = useRef<number>(0);
+		// 0 = divider lines, 1 = interactive borders
+		const stateOverlayModeRef = useRef<number>(stateInteractionsEnabled ? 1 : 0);
+		const stateOverlayAnimRafRef = useRef<number | null>(null);
+		const cloudsCanvasRef = useRef<HTMLCanvasElement | null>(null);
+		const cloudsCanvasCtxRef = useRef<CanvasRenderingContext2D | null>(null);
+		const cloudsTextureImageRef = useRef<HTMLImageElement | null>(null);
+		const cloudsTextureLoadPromiseRef = useRef<Promise<HTMLImageElement> | null>(null);
+		const cloudsDriftRafRef = useRef<number | null>(null);
+		const cloudsDriftLastFrameMsRef = useRef<number>(0);
+		const prevIsBackgroundPresentationRef = useRef<boolean>(isBackgroundPresentation);
+		// Capture the base Mapbox paint values once, then we apply a multiplier for fading.
+		const stateLineOpacityBaseRef = useRef<{ dividers: any; borders: any } | null>(null);
 
 	const [selectedMarker, setSelectedMarker] = useState<ContactWithName | null>(null);
 	const [hoveredMarkerId, setHoveredMarkerId] = useState<number | null>(null);
@@ -3322,79 +3345,189 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				stateOverlayAnimRafRef.current = null;
 			}
 		};
-	}, [
-		map,
-		isMapLoaded,
-		isBackgroundPresentation,
-		isStateLayerReady,
-		stateInteractionsEnabled,
-		applyStateOverlayOpacity,
-	]);
+		}, [
+			map,
+			isMapLoaded,
+			isBackgroundPresentation,
+			isStateLayerReady,
+			stateInteractionsEnabled,
+			applyStateOverlayOpacity,
+		]);
 
-	// Subtle cloud drift so the overlay feels "alive" (especially in background globe mode).
-	useEffect(() => {
-		if (!map || !isMapLoaded) return;
+		// Subtle cloud drift so the overlay feels "alive" (especially in background globe mode).
+		useEffect(() => {
+			if (!map || !isMapLoaded) return;
 
-		let prefersReducedMotion = false;
-		try {
-			prefersReducedMotion =
-				typeof window !== 'undefined' &&
-				typeof window.matchMedia === 'function' &&
-				window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-		} catch {
-			prefersReducedMotion = false;
-		}
-		if (prefersReducedMotion) return;
-
-		const layerId = MAPBOX_LAYER_IDS.clouds;
-		const start = performance.now();
-		const twoPi = Math.PI * 2;
-		const transition = { duration: 1200, delay: 0 } as any;
-
-		const updateTranslate = () => {
-			const now = performance.now();
-			const a = ((now - start) / CLOUDS_DRIFT_LOOP_MS) * twoPi;
-
-			// A gentle "meander" loop (two sinusoids) reads organic without looking like a weather sim.
-			const dx =
-				CLOUDS_DRIFT_AMPLITUDE_X_PX * Math.sin(a) +
-				CLOUDS_DRIFT_AMPLITUDE_X_PX * 0.24 * Math.sin(a * 0.43 + 1.1);
-			const dy =
-				CLOUDS_DRIFT_AMPLITUDE_Y_PX * Math.cos(a * 0.83) +
-				CLOUDS_DRIFT_AMPLITUDE_Y_PX * 0.22 * Math.cos(a * 0.31 + 2.4);
-
+			let prefersReducedMotion = false;
 			try {
-				if (!map.getLayer(layerId)) return;
-				(map as any).setPaintProperty(layerId, 'raster-translate-transition', transition);
-				(map as any).setPaintProperty(layerId, 'raster-translate', [dx, dy]);
+				prefersReducedMotion =
+					typeof window !== 'undefined' &&
+					typeof window.matchMedia === 'function' &&
+					window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 			} catch {
-				// Ignore (style may be mid-reload).
+				prefersReducedMotion = false;
 			}
-		};
 
-		// Cancel any in-flight drift loop before starting.
-		if (cloudsDriftIntervalRef.current) {
-			clearInterval(cloudsDriftIntervalRef.current);
-			cloudsDriftIntervalRef.current = null;
-		}
+			// Respect Reduce Motion by slowing the drift instead of fully disabling it.
+			const motionScale = prefersReducedMotion ? 0.5 : 1;
 
-		updateTranslate();
-		cloudsDriftIntervalRef.current = setInterval(updateTranslate, 1200);
+			const cloudsCanvas = cloudsCanvasRef.current;
+			const cloudsCtx = cloudsCanvasCtxRef.current;
+			if (!cloudsCanvas || !cloudsCtx) return;
 
-		return () => {
-			if (cloudsDriftIntervalRef.current) {
-				clearInterval(cloudsDriftIntervalRef.current);
-				cloudsDriftIntervalRef.current = null;
-			}
-			try {
-				if (map.getLayer(layerId)) {
-					(map as any).setPaintProperty(layerId, 'raster-translate', [0, 0]);
+			// If we fell back to raster tiles (no canvas source), there is nothing to animate.
+			const cloudsSource: any = (() => {
+				try {
+					return map.getSource(MAPBOX_SOURCE_IDS.clouds);
+				} catch {
+					return null;
 				}
+			})();
+			const isCanvasSource = Boolean(
+				cloudsSource && typeof cloudsSource.getCanvas === 'function'
+			);
+			if (!isCanvasSource) return;
+
+			// Ensure Mapbox is actively sampling the canvas each frame.
+			try {
+				cloudsSource.play?.();
 			} catch {
 				// Ignore.
 			}
-		};
-	}, [map, isMapLoaded]);
+
+				const loadTexture = (): Promise<HTMLImageElement> => {
+					if (cloudsTextureImageRef.current) return Promise.resolve(cloudsTextureImageRef.current);
+					if (cloudsTextureLoadPromiseRef.current) return cloudsTextureLoadPromiseRef.current;
+
+					cloudsTextureLoadPromiseRef.current = new Promise((resolve, reject) => {
+						try {
+							const img = new Image();
+							img.crossOrigin = 'anonymous';
+							img.decoding = 'async';
+							img.onload = () => {
+								cloudsTextureImageRef.current = img;
+								resolve(img);
+							};
+						img.onerror = () => reject(new Error('Failed to load clouds texture'));
+						img.src = CLOUDS_CANVAS_TEXTURE_URL;
+					} catch (e) {
+						reject(e);
+					}
+				});
+
+				return cloudsTextureLoadPromiseRef.current;
+			};
+
+			let canceled = false;
+			const start = performance.now();
+			const twoPi = Math.PI * 2;
+
+			const draw = (img: HTMLImageElement, now: number) => {
+				const elapsedS = Math.max(0, (now - start) / 1000);
+
+				let zoomForScale = CLOUDS_DRIFT_BASE_ZOOM;
+				try {
+					const z =
+						typeof map.getZoom === 'function' ? map.getZoom() : CLOUDS_DRIFT_BASE_ZOOM;
+					zoomForScale = clamp(z, MAP_MIN_ZOOM, CLOUDS_OVERLAY_FADE_OUT_START_ZOOM);
+				} catch {
+					zoomForScale = CLOUDS_DRIFT_BASE_ZOOM;
+				}
+				const zoomScaleRaw = Math.pow(
+					2,
+					(zoomForScale - CLOUDS_DRIFT_BASE_ZOOM) * CLOUDS_DRIFT_ZOOM_SCALE_EXP
+				);
+				const zoomScale = clamp(
+					zoomScaleRaw,
+					CLOUDS_DRIFT_ZOOM_SCALE_MIN,
+					CLOUDS_DRIFT_ZOOM_SCALE_MAX
+				);
+
+				const a = ((now - start) / CLOUDS_DRIFT_LOOP_MS) * twoPi;
+				const meanderX =
+					CLOUDS_DRIFT_AMPLITUDE_X_PX * zoomScale * motionScale * Math.sin(a) +
+					CLOUDS_DRIFT_AMPLITUDE_X_PX *
+						zoomScale *
+						motionScale *
+						0.24 *
+						Math.sin(a * 0.43 + 1.1);
+
+				const driftX =
+					elapsedS * CLOUDS_DRIFT_SPEED_X_PX_PER_S * zoomScale * motionScale + meanderX;
+				const driftY = elapsedS * CLOUDS_DRIFT_SPEED_Y_PX_PER_S * zoomScale * motionScale;
+
+				const w = cloudsCanvas.width || CLOUDS_CANVAS_SIZE_PX;
+				const h = cloudsCanvas.height || CLOUDS_CANVAS_SIZE_PX;
+
+				const wrapX = ((driftX % w) + w) % w;
+				const wrapY = ((driftY % h) + h) % h;
+
+				cloudsCtx.clearRect(0, 0, w, h);
+				const x0 = -wrapX;
+				const y0 = -wrapY;
+
+				// Fill the canvas with wrapped draws.
+						for (let x = x0; x < w; x += w) {
+							for (let y = y0; y < h; y += h) {
+								cloudsCtx.drawImage(img, x, y, w, h);
+							}
+						}
+
+						// In some Mapbox GL configurations `animate: true` is not enough to force
+						// continuous sampling; explicitly request a repaint after each draw.
+						try {
+							map.triggerRepaint();
+						} catch {
+							// Ignore.
+						}
+					};
+
+			const tick = (now: number, img: HTMLImageElement) => {
+				if (canceled) return;
+
+				const last = cloudsDriftLastFrameMsRef.current;
+				if (!last || now - last >= CLOUDS_DRIFT_UPDATE_MS) {
+					cloudsDriftLastFrameMsRef.current = now;
+					try {
+						draw(img, now);
+					} catch {
+						// Ignore.
+					}
+				}
+
+				cloudsDriftRafRef.current = requestAnimationFrame((t) => tick(t, img));
+			};
+
+			// Cancel any in-flight drift loop before starting.
+			if (cloudsDriftRafRef.current != null) {
+				cancelAnimationFrame(cloudsDriftRafRef.current);
+				cloudsDriftRafRef.current = null;
+			}
+
+			loadTexture()
+				.then((img) => {
+					if (canceled) return;
+					cloudsDriftLastFrameMsRef.current = 0;
+					draw(img, performance.now());
+					cloudsDriftRafRef.current = requestAnimationFrame((t) => tick(t, img));
+				})
+				.catch(() => {
+					// If the texture fails to load, just leave clouds static.
+				});
+
+			return () => {
+				canceled = true;
+				try {
+					cloudsSource.pause?.();
+				} catch {
+					// Ignore.
+				}
+				if (cloudsDriftRafRef.current != null) {
+					cancelAnimationFrame(cloudsDriftRafRef.current);
+					cloudsDriftRafRef.current = null;
+				}
+			};
+		}, [map, isMapLoaded]);
 
 	// Keep the Mapbox "selected" feature-state for US states in sync with `selectedStateKey`.
 	const prevSelectedStateKeyOnMapRef = useRef<string | null>(null);
@@ -3452,17 +3585,35 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			mapInstance.addSource(id, { type: 'geojson', data: emptyFc });
 		};
 
-		// Core sources
-		// Clouds: subtle raster overlay (local tiles). Added first so all interactive overlays
-		// (states/markers) render above it.
-		if (!mapInstance.getSource(MAPBOX_SOURCE_IDS.clouds)) {
-			mapInstance.addSource(MAPBOX_SOURCE_IDS.clouds, {
-				type: 'raster',
-				tiles: [CLOUDS_TILES_URL_TEMPLATE],
-				tileSize: 512,
-				maxzoom: CLOUDS_TILES_MAX_ZOOM,
-			} as any);
-		}
+			// Core sources
+			// Clouds: subtle overlay (existing local cloud PNGs), animated via a canvas source so
+			// we can drift the texture (Mapbox raster layers do not support translate).
+			// Added first so all interactive overlays (states/markers) render above it.
+				if (!mapInstance.getSource(MAPBOX_SOURCE_IDS.clouds)) {
+					const cloudsCanvas = cloudsCanvasRef.current;
+					if (cloudsCanvas) {
+						mapInstance.addSource(MAPBOX_SOURCE_IDS.clouds, {
+							type: 'canvas',
+							canvas: cloudsCanvas,
+							animate: true,
+							coordinates: CLOUDS_CANVAS_COORDINATES,
+						} as any);
+						// Start sampling immediately (the drift loop will draw once the texture loads).
+						try {
+							(mapInstance.getSource(MAPBOX_SOURCE_IDS.clouds) as any)?.play?.();
+						} catch {
+							// Ignore.
+						}
+					} else {
+						// Fallback: static raster tiles (no drift).
+						mapInstance.addSource(MAPBOX_SOURCE_IDS.clouds, {
+							type: 'raster',
+							tiles: [CLOUDS_TILES_URL_TEMPLATE],
+						tileSize: 512,
+						maxzoom: CLOUDS_TILES_MAX_ZOOM,
+					} as any);
+				}
+			}
 
 		// States source needs `promoteId` so Mapbox uses the string "key" property (e.g. "CA", "TX")
 		// as the feature identifier — required for setFeatureState with non-numeric IDs.
@@ -3515,17 +3666,15 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			source: MAPBOX_SOURCE_IDS.clouds,
 			// Disable entirely once we're zoomed into state-level detail.
 			maxzoom: CLOUDS_OVERLAY_FADE_OUT_END_ZOOM + 0.01,
-			paint: {
-				'raster-opacity': cloudsOpacityExpr,
-				'raster-brightness-min': 0.84,
-				'raster-brightness-max': 1,
-				'raster-contrast': 0.36,
-				'raster-saturation': 0,
-				'raster-translate': [0, 0],
-				'raster-translate-anchor': 'map',
-				'raster-resampling': 'linear',
-			},
-		});
+				paint: {
+					'raster-opacity': cloudsOpacityExpr,
+					'raster-brightness-min': 0.84,
+					'raster-brightness-max': 1,
+					'raster-contrast': 0.36,
+					'raster-saturation': 0,
+					'raster-resampling': 'linear',
+				},
+			});
 
 		const resultDotRadiusExpr = [
 			'interpolate',
@@ -3966,6 +4115,23 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	useEffect(() => {
 		if (!mapContainerRef.current) return;
 		if (mapRef.current) return;
+
+		// Ensure the clouds canvas exists before the style loads so the Mapbox source can
+		// bind to a stable canvas element (and begin animating immediately).
+		try {
+			if (!cloudsCanvasRef.current && typeof document !== 'undefined') {
+				const canvas = document.createElement('canvas');
+				canvas.width = CLOUDS_CANVAS_SIZE_PX;
+				canvas.height = CLOUDS_CANVAS_SIZE_PX;
+				const ctx = canvas.getContext('2d');
+				if (ctx) {
+					cloudsCanvasRef.current = canvas;
+					cloudsCanvasCtxRef.current = ctx;
+				}
+			}
+		} catch {
+			// Non-fatal; we'll fall back to static raster tiles.
+		}
 
 		const accessToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
 		if (!accessToken) {
