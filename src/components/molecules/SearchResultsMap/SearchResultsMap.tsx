@@ -1177,6 +1177,7 @@ const CLOUDS_TILES_MAX_ZOOM = 3;
 // Tune for "satellite-read" clarity without becoming a weather overlay.
 const CLOUDS_OVERLAY_OPACITY_AT_GLOBE_ZOOM = 0.78;
 const CLOUDS_OVERLAY_OPACITY_AT_DECORATIVE_ZOOM = 0.66;
+// Keep clouds around slightly past the initial interactive view; fade by state-level zoom.
 const CLOUDS_OVERLAY_FADE_OUT_START_ZOOM = 8.0;
 const CLOUDS_OVERLAY_FADE_OUT_END_ZOOM = 10.5;
 const CLOUDS_CANVAS_TEXTURE_URL = '/maps/clouds/0/0/0.png?v=23';
