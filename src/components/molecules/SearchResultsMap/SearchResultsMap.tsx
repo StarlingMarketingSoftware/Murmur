@@ -1145,6 +1145,11 @@ interface SearchResultsMapProps {
 	 * additional brightness lift so hot weather "feels hot."
 	 */
 	weatherTemperatureF?: number | null;
+	/**
+	 * 0 = full day, 1 = deep night. Drives the moonlit rear-lighting overlay
+	 * system so night feels organic (not a basemap "dark mode" toggle).
+	 */
+	nightT?: number | null;
 }
 
 const defaultCenter = {
@@ -1307,12 +1312,26 @@ const MURMUR_GLOBE_LIGHT_VIEWER_AZIMUTH_OFFSET_DEG = 270;
 // globe rather than a flat, evenly-lit disc.
 const MURMUR_GLOBE_LIGHT_POLAR_DEG = 75;
 
-const applyMurmurGlobeLighting = (mapInstance: mapboxgl.Map) => {
+const applyMurmurGlobeLighting = (
+	mapInstance: mapboxgl.Map,
+	opts?: { nightT?: number }
+) => {
 	try {
+		const nightT = clamp(opts?.nightT ?? 0, 0, 1);
+		const lerp = (a: number, b: number) => a + (b - a) * nightT;
+		const lerpRgb = (a: [number, number, number], b: [number, number, number]) =>
+			`rgb(${Math.round(lerp(a[0], b[0]))}, ${Math.round(lerp(a[1], b[1]))}, ${Math.round(
+				lerp(a[2], b[2])
+			)})`;
+
 		const bearing =
 			typeof mapInstance.getBearing === 'function' ? mapInstance.getBearing() : 0;
-		const azimuth =
+		const azimuthBase =
 			(MURMUR_GLOBE_LIGHT_VIEWER_AZIMUTH_OFFSET_DEG + (bearing || 0) + 360) % 360;
+		// At night, bias the key a touch so the backlight doesn't feel perfectly centered.
+		const nightAzimuthOffsetDeg = -18;
+		const azimuth = (azimuthBase + nightAzimuthOffsetDeg * nightT + 360) % 360;
+		const polar = lerp(MURMUR_GLOBE_LIGHT_POLAR_DEG, 82);
 
 		(mapInstance as any).setLights?.([
 			{
@@ -1320,20 +1339,21 @@ const applyMurmurGlobeLighting = (mapInstance: mapboxgl.Map) => {
 				type: 'ambient',
 				properties: {
 					// Deep cool fill — the shadow side should clearly read as shadow.
-					color: 'rgb(120, 150, 185)',
-					intensity: 0.18,
+					color: lerpRgb([120, 150, 185], [85, 110, 160]),
+					intensity: lerp(0.18, 0.125),
 				},
 			},
 			{
 				id: 'murmur-key',
 				type: 'directional',
 				properties: {
-					// Bright warm softbox, punched hard so the lit hemisphere glows.
-					color: 'rgb(255, 244, 220)',
-					intensity: 1.6,
-					direction: [azimuth, MURMUR_GLOBE_LIGHT_POLAR_DEG],
+					// Bright warm softbox by day; cooler moonlight by night. Keep intensity
+					// lower at night so the DOM rim light can own the "rear lit" read.
+					color: lerpRgb([255, 244, 220], [235, 245, 255]),
+					intensity: lerp(1.6, 0.62),
+					direction: [azimuth, polar],
 					'cast-shadows': true,
-					'shadow-intensity': 0.95,
+					'shadow-intensity': lerp(0.95, 0.98),
 				},
 			},
 		]);
@@ -1540,6 +1560,7 @@ const US_ONLY_BASEMAP_CLIP_MAX_ZOOM = 7;
 
 const MAPBOX_SOURCE_IDS = {
 	clouds: 'murmur-clouds',
+	nightLights: 'murmur-night-lights',
 	states: 'murmur-states',
 	resultsOutline: 'murmur-results-outline',
 	lockedOutline: 'murmur-locked-outline',
@@ -1556,6 +1577,7 @@ const MAPBOX_SOURCE_IDS = {
 const MAPBOX_LAYER_IDS = {
 	// Globe overlays
 	clouds: 'murmur-clouds-raster',
+	nightLights: 'murmur-night-lights-heatmap',
 	// States
 	statesFillHit: 'murmur-states-fill-hit',
 	statesFillHover: 'murmur-states-fill-hover',
@@ -2102,6 +2124,11 @@ const MANUAL_WEATHER_MOOD_OVERRIDE: WeatherMood | null = null;
 // Set back to null to use the real temperature from the user's region.
 const MANUAL_WEATHER_TEMPERATURE_OVERRIDE_F: number | null = null;
 
+// MANUAL NIGHT OVERRIDE FOR TESTING.
+// Set to a number between 0 and 1 (e.g. 1 for deep night, 0 for full day).
+// Set back to null to use the real regional day/night cycle.
+const MANUAL_NIGHT_T_OVERRIDE: number | null = null;
+
 // Threshold above which the globe gets a uniform warm brightness lift on top
 // of the active mood (only applies when the mood uses a bright screen-blend
 // softbox — applying a brightening wash to the dark-pool moods would defeat
@@ -2110,6 +2137,159 @@ const HOT_TEMPERATURE_THRESHOLD_F = 80;
 // Uniform warm-white wash opacity when "hot". Multiplied by the same zoom
 // fade as the other lighting overlays so the wash disappears at city zoom.
 const HOT_WASH_OPACITY = 0.13;
+
+// Night lighting (moon backlight).
+// Implemented as DOM overlays (screen + multiply) so the lighting stays viewer-anchored
+// and can be art-directed independently of the basemap.
+const NIGHT_GLOOM_WASH_OPACITY = 0.1;
+const NIGHT_FACE_SHADE_OPACITY = 0.72;
+// US night visibility: subtle "city lights" heatmap to keep the globe readable.
+// Kept but de-emphasized so it does not become a hard, continent-shaped glow.
+const NIGHT_US_LIGHTS_OPACITY = 0;
+const NIGHT_MOON_RIM_OPACITY = 0.92;
+
+// City-lights persistence: keep visible through the default interactive zoom (5) and
+// fade out as the map becomes more "street level".
+const NIGHT_LIGHTS_FADE_START_ZOOM = 5.75;
+const NIGHT_LIGHTS_FADE_END_ZOOM = 7.75;
+
+const computeNightLightsFade = (zoom: number) => {
+	if (zoom <= NIGHT_LIGHTS_FADE_START_ZOOM) return 1;
+	if (zoom >= NIGHT_LIGHTS_FADE_END_ZOOM) return 0;
+	const t =
+		(zoom - NIGHT_LIGHTS_FADE_START_ZOOM) /
+		(NIGHT_LIGHTS_FADE_END_ZOOM - NIGHT_LIGHTS_FADE_START_ZOOM);
+	// Ease-out quad: mostly stable, then drifts away as you zoom in.
+	return 1 - t * t;
+};
+
+// Front-face silhouette: deepen the globe's visible face while keeping the rim readable.
+// Center matches the rim's bias so the bright limb is stronger on the moon side.
+const NIGHT_FACE_SHADE_BG =
+	'radial-gradient(ellipse 145% 145% at 58% 60%, rgba(6, 10, 28, 0.72) 0%, rgba(8, 12, 32, 0.62) 28%, rgba(12, 18, 40, 0.38) 52%, rgba(14, 20, 44, 0.18) 68%, rgba(0, 0, 0, 0) 82%, rgba(0, 0, 0, 0) 100%)';
+
+// Rear rim light: edge-weighted cool-white glow that reads as the moon sitting
+// behind the Earth (not perfectly centered, shifted toward upper-left bias).
+const NIGHT_MOON_RIM_BG = [
+	'radial-gradient(ellipse 165% 165% at 58% 60%, rgba(235, 248, 255, 0) 0%, rgba(235, 248, 255, 0) 58%, rgba(235, 248, 255, 0.06) 72%, rgba(235, 248, 255, 0.20) 84%, rgba(245, 252, 255, 0.40) 93%, rgba(245, 252, 255, 0.14) 100%)',
+	'radial-gradient(ellipse 130% 130% at 58% 60%, rgba(235, 248, 255, 0) 0%, rgba(235, 248, 255, 0) 67%, rgba(235, 248, 255, 0.10) 78%, rgba(235, 248, 255, 0.26) 88%, rgba(235, 248, 255, 0) 100%)',
+	'radial-gradient(ellipse 120% 120% at 14% 16%, rgba(255, 255, 255, 0.16) 0%, rgba(255, 255, 255, 0.08) 34%, rgba(255, 255, 255, 0) 62%)',
+].join(', ');
+
+type NightLightsPoint = { lat: number; lng: number; w: number };
+
+const NIGHT_LIGHTS_US_POINTS: NightLightsPoint[] = [
+	{ lat: 40.7128, lng: -74.006, w: 1.0 }, // NYC
+	{ lat: 34.0522, lng: -118.2437, w: 0.95 }, // LA
+	{ lat: 41.8781, lng: -87.6298, w: 0.82 }, // Chicago
+	{ lat: 29.7604, lng: -95.3698, w: 0.72 }, // Houston
+	{ lat: 33.4484, lng: -112.074, w: 0.62 }, // Phoenix
+	{ lat: 39.9526, lng: -75.1652, w: 0.6 }, // Philadelphia
+	{ lat: 32.7767, lng: -96.797, w: 0.56 }, // Dallas
+	{ lat: 37.7749, lng: -122.4194, w: 0.58 }, // SF
+	{ lat: 47.6062, lng: -122.3321, w: 0.48 }, // Seattle
+	{ lat: 25.7617, lng: -80.1918, w: 0.56 }, // Miami
+	{ lat: 33.749, lng: -84.388, w: 0.56 }, // Atlanta
+	{ lat: 38.9072, lng: -77.0369, w: 0.5 }, // DC
+	{ lat: 42.3601, lng: -71.0589, w: 0.48 }, // Boston
+	{ lat: 39.7392, lng: -104.9903, w: 0.46 }, // Denver
+	{ lat: 36.1699, lng: -115.1398, w: 0.5 }, // Las Vegas
+	{ lat: 32.7157, lng: -117.1611, w: 0.44 }, // San Diego
+	{ lat: 30.2672, lng: -97.7431, w: 0.44 }, // Austin
+	{ lat: 29.4241, lng: -98.4936, w: 0.42 }, // San Antonio
+	{ lat: 44.9778, lng: -93.265, w: 0.42 }, // Minneapolis
+	{ lat: 42.3314, lng: -83.0458, w: 0.44 }, // Detroit
+	{ lat: 39.9612, lng: -82.9988, w: 0.4 }, // Columbus
+	{ lat: 35.2271, lng: -80.8431, w: 0.38 }, // Charlotte
+	{ lat: 36.1627, lng: -86.7816, w: 0.35 }, // Nashville
+	{ lat: 38.627, lng: -90.1994, w: 0.34 }, // St Louis
+	{ lat: 39.0997, lng: -94.5786, w: 0.34 }, // Kansas City
+	{ lat: 45.5152, lng: -122.6784, w: 0.36 }, // Portland
+	{ lat: 37.3382, lng: -121.8863, w: 0.36 }, // San Jose
+	{ lat: 39.7684, lng: -86.1581, w: 0.34 }, // Indianapolis
+	{ lat: 30.3322, lng: -81.6557, w: 0.32 }, // Jacksonville
+	{ lat: 29.9511, lng: -90.0715, w: 0.32 }, // New Orleans
+	// Fill in a little extra density for the Northeast corridor + Great Lakes.
+	{ lat: 39.2904, lng: -76.6122, w: 0.32 }, // Baltimore
+	{ lat: 41.4993, lng: -81.6944, w: 0.3 }, // Cleveland
+	{ lat: 42.8864, lng: -78.8784, w: 0.26 }, // Buffalo
+	{ lat: 43.1566, lng: -77.6088, w: 0.24 }, // Rochester
+	{ lat: 40.4406, lng: -79.9959, w: 0.28 }, // Pittsburgh
+];
+
+type NightLightsRegion = {
+	lat: number;
+	lng: number;
+	spreadLat: number;
+	spreadLng: number;
+	w: number;
+	count: number;
+};
+
+const NIGHT_LIGHTS_US_REGIONS: NightLightsRegion[] = [
+	// Background low-density glow across the lower 48.
+	{ lat: 39.2, lng: -98.6, spreadLat: 16.5, spreadLng: 28, w: 0.08, count: 360 },
+	// Northeast corridor + Mid-Atlantic.
+	{ lat: 40.7, lng: -74.8, spreadLat: 3.8, spreadLng: 6.2, w: 0.22, count: 360 },
+	// Great Lakes / Midwest industrial belt.
+	{ lat: 41.9, lng: -86.5, spreadLat: 4.6, spreadLng: 7.2, w: 0.18, count: 300 },
+	// Southeast.
+	{ lat: 33.3, lng: -84.0, spreadLat: 5.2, spreadLng: 8.2, w: 0.16, count: 240 },
+	// Florida peninsula.
+	{ lat: 28.2, lng: -82.2, spreadLat: 3.4, spreadLng: 5.6, w: 0.18, count: 200 },
+	// Texas triangle.
+	{ lat: 30.2, lng: -97.2, spreadLat: 4.9, spreadLng: 8.6, w: 0.16, count: 260 },
+	// California (SoCal + Bay) elongated.
+	{ lat: 35.8, lng: -120.8, spreadLat: 4.8, spreadLng: 8.4, w: 0.17, count: 260 },
+	// Pacific Northwest.
+	{ lat: 45.8, lng: -121.8, spreadLat: 3.8, spreadLng: 6.6, w: 0.14, count: 150 },
+	// Mountain West (sparser).
+	{ lat: 39.4, lng: -108.6, spreadLat: 6.2, spreadLng: 10.5, w: 0.11, count: 140 },
+	// Southwest desert metros.
+	{ lat: 34.2, lng: -112.3, spreadLat: 4.2, spreadLng: 7.2, w: 0.12, count: 140 },
+];
+
+const stableRand = (seed: number): number => {
+	// Deterministic pseudo-random in [0, 1).
+	const x = Math.sin(seed) * 10000;
+	return x - Math.floor(x);
+};
+
+const buildNightLightsGeoJson = (): GeoJSON.FeatureCollection<GeoJSON.Point> => {
+	const points: NightLightsPoint[] = [...NIGHT_LIGHTS_US_POINTS];
+	let cursor = 0;
+	for (let r = 0; r < NIGHT_LIGHTS_US_REGIONS.length; r++) {
+		const region = NIGHT_LIGHTS_US_REGIONS[r]!;
+		const baseSeed = 1907 + r * 997;
+		for (let i = 0; i < region.count; i++) {
+			const s = baseSeed + i * 13;
+			const u = stableRand(s);
+			const v = stableRand(s + 1);
+			const a = stableRand(s + 2) * Math.PI * 2;
+			// Bias density slightly toward the center (more "urban core" feel).
+			const radius = Math.pow(u, 0.62);
+			const lat = region.lat + Math.cos(a) * radius * region.spreadLat;
+			const lng = region.lng + Math.sin(a) * radius * region.spreadLng;
+			const jitter = 0.65 + v * 0.55;
+			const sparkle = stableRand(s + 3) > 0.985 ? 1.9 : 1;
+			points.push({ lat, lng, w: region.w * jitter * sparkle });
+		}
+		cursor += region.count;
+	}
+
+	return {
+		type: 'FeatureCollection',
+		features: points.map((p, i) => ({
+			type: 'Feature',
+			id: `night-light-${i}`,
+			properties: { w: p.w },
+			geometry: { type: 'Point', coordinates: [p.lng, p.lat] },
+		})),
+	};
+};
+
+const NIGHT_LIGHTS_US_GEOJSON: GeoJSON.FeatureCollection<GeoJSON.Point> =
+	buildNightLightsGeoJson();
 
 export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	contacts,
@@ -2137,10 +2317,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	autoSpin = false,
 	weatherMood: weatherMoodProp = 'normal',
 	weatherTemperatureF = null,
+	nightT: nightTProp = null,
 }) => {
 	const weatherMood = MANUAL_WEATHER_MOOD_OVERRIDE ?? weatherMoodProp;
 	const effectiveTemperatureF =
 		MANUAL_WEATHER_TEMPERATURE_OVERRIDE_F ?? weatherTemperatureF;
+	const nightT = clamp(MANUAL_NIGHT_T_OVERRIDE ?? nightTProp ?? 0, 0, 1);
 	const isBackgroundPresentation = presentation === 'background';
 	const shouldAutoSpin = isBackgroundPresentation && autoSpin;
 	// Keep the latest presentation value available to async Mapbox callbacks (moveend, etc).
@@ -2202,6 +2384,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	// Mutated by the temperature effect; read by `applyLightingOverlayOpacity`
 	// on every zoom event so the hot lift survives zoom-driven recalculations.
 	const isHotRef = useRef<boolean>(false);
+	// Night factor (0=day, 1=deep night). Stored in a ref so zoom-driven opacity
+	// updates can stay fully imperative without React re-render jitter.
+	const nightTRef = useRef<number>(nightT);
+	nightTRef.current = nightT;
 	// Capture the base Mapbox paint values once, then we apply a multiplier for fading.
 	const stateLineOpacityBaseRef = useRef<{ dividers: any; borders: any } | null>(null);
 
@@ -2230,6 +2416,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const lightingOverlayShadowRef = useRef<HTMLDivElement | null>(null);
 	const lightingOverlayHotWashRef = useRef<HTMLDivElement | null>(null);
 	const lightingOverlayGloomWashRef = useRef<HTMLDivElement | null>(null);
+	const lightingOverlayNightShadeRef = useRef<HTMLDivElement | null>(null);
+	const lightingOverlayMoonRimRef = useRef<HTMLDivElement | null>(null);
 	const [visibleContacts, setVisibleContacts] = useState<ContactWithName[]>([]);
 	// Keep a "sticky" set of currently-rendered marker ids so zooming can rescale existing markers
 	// and only introduce *new* markers, instead of re-sampling a totally different set each time.
@@ -4469,6 +4657,18 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			}
 		}
 
+		// US night lights: small static heatmap points so the globe stays readable at night.
+		try {
+			if (!mapInstance.getSource(MAPBOX_SOURCE_IDS.nightLights)) {
+				mapInstance.addSource(MAPBOX_SOURCE_IDS.nightLights, {
+					type: 'geojson',
+					data: NIGHT_LIGHTS_US_GEOJSON,
+				} as any);
+			}
+		} catch {
+			// Non-fatal.
+		}
+
 		// States source needs `promoteId` so Mapbox uses the string "key" property (e.g. "CA", "TX")
 		// as the feature identifier — required for setFeatureState with non-numeric IDs.
 		if (!mapInstance.getSource(MAPBOX_SOURCE_IDS.states)) {
@@ -4522,6 +4722,64 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				'raster-resampling': 'linear',
 			},
 		});
+
+		// Night lights heatmap. Default opacity is 0; we drive visibility from
+		// applyLightingOverlayOpacity based on zoom + `nightT`.
+		try {
+			if (mapInstance.getSource(MAPBOX_SOURCE_IDS.nightLights)) {
+				ensureLayer({
+					id: MAPBOX_LAYER_IDS.nightLights,
+					type: 'heatmap',
+					source: MAPBOX_SOURCE_IDS.nightLights,
+					maxzoom: LIGHTING_OVERLAY_FADE_END_ZOOM + 0.01,
+					paint: {
+						'heatmap-weight': ['coalesce', ['get', 'w'], 1],
+						'heatmap-intensity': [
+							'interpolate',
+							['linear'],
+							['zoom'],
+							2,
+							0.6,
+							4,
+							1.0,
+							5,
+							1.18,
+						],
+						'heatmap-radius': [
+							'interpolate',
+							['linear'],
+							['zoom'],
+							2,
+							70,
+							4,
+							105,
+							5,
+							130,
+						],
+						'heatmap-opacity': 0,
+						'heatmap-color': [
+							'interpolate',
+							['linear'],
+							['heatmap-density'],
+							0,
+							'rgba(0, 0, 0, 0)',
+							0.16,
+							'rgba(170, 214, 255, 0.10)',
+							0.32,
+							'rgba(205, 235, 255, 0.22)',
+							0.55,
+							'rgba(240, 250, 255, 0.36)',
+							0.78,
+							'rgba(255, 255, 255, 0.48)',
+							1,
+							'rgba(255, 255, 255, 0.56)',
+						],
+					},
+				} as any);
+			}
+		} catch {
+			// Non-fatal.
+		}
 
 		const resultDotRadiusExpr = [
 			'interpolate',
@@ -5028,6 +5286,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 		const onStyleLoad = () => {
 			applyFreeTrialMapVisualTuning(mapInstance);
+			applyMurmurGlobeLighting(mapInstance, { nightT: nightTRef.current });
 			// Add Murmur sources/layers (including clouds + world-land fill) as early as
 			// possible so they can begin loading before the first reveal.
 			ensureMapboxSourcesAndLayers(mapInstance);
@@ -5035,6 +5294,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 		const onLoad = () => {
 			applyFreeTrialMapVisualTuning(mapInstance);
+			applyMurmurGlobeLighting(mapInstance, { nightT: nightTRef.current });
 			ensureMapboxSourcesAndLayers(mapInstance);
 
 			// Ensure the decorative dashboard framing (offset) is applied before we
@@ -5140,7 +5400,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		// `rotate` fires continuously during interaction; the call is cheap (no
 		// layer reshuffling) because setLights only updates the existing light defs.
 		const onRotate = () => {
-			applyMurmurGlobeLighting(mapInstance);
+			applyMurmurGlobeLighting(mapInstance, { nightT: nightTRef.current });
 		};
 
 		mapInstance.on('load', onLoad);
@@ -7350,19 +7610,60 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		if (!mapRef.current) return;
 		const zoom = mapRef.current.getZoom() ?? MAP_DEFAULT_ZOOM;
 		const base = computeLightingOverlayOpacity(zoom);
+		const night = clamp(nightTRef.current, 0, 1);
 		const cfg = weatherMoodConfigRef.current;
-		const keyOpacity = clamp(base * cfg.softboxOpacityMultiplier, 0, 1);
-		const shadowOpacity = clamp(base * cfg.shadowOpacityMultiplier, 0, 1);
+
+		// Weather softbox overlays: suppress bright warm wash at night so the moonlight
+		// rear-lighting can own the read. (Rainy/stormy use a dark-pool softbox, so
+		// we keep more of it.)
+		const keyNightMul = cfg.softboxBlendMode === 'screen' ? 1 - night : 1 - night * 0.6;
+		const shadowNightMul = 1 - night * 0.5;
+
+		const keyOpacity = clamp(base * cfg.softboxOpacityMultiplier * keyNightMul, 0, 1);
+		const shadowOpacity = clamp(
+			base * cfg.shadowOpacityMultiplier * shadowNightMul,
+			0,
+			1
+		);
 		if (lightingOverlayKeyRef.current)
 			lightingOverlayKeyRef.current.style.opacity = String(keyOpacity);
 		if (lightingOverlayShadowRef.current)
 			lightingOverlayShadowRef.current.style.opacity = String(shadowOpacity);
 
+		// Night rear-lighting: deep silhouette + moon rim.
+		const nightBase = base * night;
+		const shadeOpacity = clamp(nightBase * NIGHT_FACE_SHADE_OPACITY, 0, 1);
+		const rimOpacity = clamp(nightBase * NIGHT_MOON_RIM_OPACITY, 0, 1);
+		if (lightingOverlayNightShadeRef.current)
+			lightingOverlayNightShadeRef.current.style.opacity = String(shadeOpacity);
+		if (lightingOverlayMoonRimRef.current)
+			lightingOverlayMoonRimRef.current.style.opacity = String(rimOpacity);
+
+		// US night lights (Mapbox heatmap layer) — helps keep the globe readable at night
+		// without turning the whole basemap into a "night mode" style.
+		const usLightsOpacity = clamp(
+			nightBase * NIGHT_US_LIGHTS_OPACITY * computeNightLightsFade(zoom),
+			0,
+			0.62
+		);
+		try {
+			const m = mapRef.current;
+			if (m && m.getLayer(MAPBOX_LAYER_IDS.nightLights)) {
+				(m as any).setPaintProperty(
+					MAPBOX_LAYER_IDS.nightLights,
+					'heatmap-opacity',
+					usLightsOpacity
+				);
+			}
+		} catch {
+			// Non-fatal.
+		}
+
 		// Hot wash — uniform warm-white screen-blend overlay that brightens the
 		// whole globe. Only active for bright moods so the rainy/stormy dark
 		// pool stays gloomy.
 		const isBrightSoftbox = cfg.softboxBlendMode === 'screen';
-		const hotActive = isHotRef.current && isBrightSoftbox;
+		const hotActive = isHotRef.current && isBrightSoftbox && night < 0.12;
 		const washOpacity = hotActive ? base * HOT_WASH_OPACITY : 0;
 		if (lightingOverlayHotWashRef.current)
 			lightingOverlayHotWashRef.current.style.opacity = String(washOpacity);
@@ -7371,7 +7672,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		// persists into city zoom (longer fade curve than the softbox/shadow).
 		// Bright moods have gloomWashOpacity=0 so this is a no-op for them.
 		const gloomFade = computeGloomWashFade(zoom);
-		const gloomOpacity = clamp(cfg.gloomWashOpacity * gloomFade, 0, 1);
+		const gloomOpacity = clamp(
+			(cfg.gloomWashOpacity + night * NIGHT_GLOOM_WASH_OPACITY) * gloomFade,
+			0,
+			0.62
+		);
 		if (lightingOverlayGloomWashRef.current)
 			lightingOverlayGloomWashRef.current.style.opacity = String(gloomOpacity);
 	}, []);
@@ -7386,6 +7691,20 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			map.off('zoom', applyLightingOverlayOpacity);
 		};
 	}, [map, isMapLoaded, applyLightingOverlayOpacity]);
+
+	// Update overlays when the day/night factor changes (e.g. dusk progression).
+	useEffect(() => {
+		if (!map) return;
+		if (!isMapLoaded) return;
+		applyLightingOverlayOpacity();
+	}, [nightT, map, isMapLoaded, applyLightingOverlayOpacity]);
+
+	// Keep Mapbox globe lights in sync with day/night so the underlying sphere reads as moonlit.
+	useEffect(() => {
+		if (!map) return;
+		if (!isMapLoaded) return;
+		applyMurmurGlobeLighting(map, { nightT });
+	}, [nightT, map, isMapLoaded]);
 
 	const applyWeatherMood = useCallback(
 		(mood: WeatherMood) => {
@@ -8997,6 +9316,35 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					inset: 0,
 					pointerEvents: 'none',
 					background: 'rgb(255, 240, 215)',
+					mixBlendMode: 'screen',
+					zIndex: 1,
+				}}
+			/>
+			{/*
+			  Night silhouette (multiply). Darkens the visible face of the globe so the
+			  moon backlight can read as true rear lighting instead of a generic glow.
+			  Opacity owned by applyLightingOverlayOpacity.
+			*/}
+			<div
+				ref={lightingOverlayNightShadeRef}
+				aria-hidden
+				style={{
+					position: 'absolute',
+					inset: 0,
+					pointerEvents: 'none',
+					background: NIGHT_FACE_SHADE_BG,
+					mixBlendMode: 'multiply',
+					zIndex: 1,
+				}}
+			/>
+			<div
+				ref={lightingOverlayMoonRimRef}
+				aria-hidden
+				style={{
+					position: 'absolute',
+					inset: 0,
+					pointerEvents: 'none',
+					background: NIGHT_MOON_RIM_BG,
 					mixBlendMode: 'screen',
 					zIndex: 1,
 				}}

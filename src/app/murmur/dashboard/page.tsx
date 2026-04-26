@@ -61,6 +61,7 @@ import SearchResultsMap, {
 	DASHBOARD_TO_INTERACTIVE_TRANSITION_MS,
 } from '@/components/molecules/SearchResultsMap/SearchResultsMap';
 import { useGlobeWeatherMood } from '@/hooks/useGlobeWeatherMood';
+import { useGlobeNightLighting } from '@/hooks/useGlobeNightLighting';
 import { ContactWithName } from '@/types/contact';
 import { MapResultsPanelSkeleton } from '@/components/molecules/MapResultsPanelSkeleton/MapResultsPanelSkeleton';
 import { buildAllUsStateNames, getNearestUsStateNames, normalizeUsStateName } from '@/utils/usStates';
@@ -368,6 +369,7 @@ const DashboardContent = () => {
 	const queryClient = useQueryClient();
 	const { mood: globeWeatherMood, temperatureF: globeWeatherTemperatureF } =
 		useGlobeWeatherMood();
+	const { nightT: globeNightT } = useGlobeNightLighting();
 
 	// If we navigated here from a campaign, enable "Add to Campaign" mode.
 	const fromCampaignIdParam = searchParams.get('fromCampaignId')?.trim() || '';
@@ -3480,6 +3482,7 @@ const DashboardContent = () => {
 							<SearchResultsMap
 								weatherMood={globeWeatherMood}
 								weatherTemperatureF={globeWeatherTemperatureF}
+								nightT={globeNightT}
 								presentation={mapPresentation}
 								autoSpin={shouldSpinBackgroundMap}
 								contacts={contactsForMap}
