@@ -59,6 +59,7 @@ import { DraftPreviewExpandedList } from '@/app/murmur/campaign/[campaignId]/Dra
 import { SentExpandedList } from '@/app/murmur/campaign/[campaignId]/DraftingSection/Testing/SentExpandedList';
 import { InboxExpandedList } from '@/app/murmur/campaign/[campaignId]/DraftingSection/Testing/InboxExpandedList';
 import SearchResultsMap from '@/components/molecules/SearchResultsMap/SearchResultsMap';
+import { useGlobeWeatherMood } from '@/hooks/useGlobeWeatherMood';
 import InboxSection from '@/components/molecules/InboxSection/InboxSection';
 import { SearchIconDesktop } from '@/components/atoms/_svg/SearchIconDesktop';
 import { PromotionIcon } from '@/components/atoms/_svg/PromotionIcon';
@@ -213,6 +214,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		isTransitioningOut,
 		isTransitioningIn,
 	} = props;
+
+	const { mood: globeWeatherMood, temperatureF: globeWeatherTemperatureF } =
+		useGlobeWeatherMood();
 
 	// Let the campaign page know when the destination view has actually rendered,
 	// so we can avoid ending the tab crossfade before heavy UI (e.g. HybridPromptInput) is painted.
@@ -7045,6 +7049,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											}}
 										>
 											<SearchResultsMap
+												weatherMood={globeWeatherMood}
+												weatherTemperatureF={globeWeatherTemperatureF}
 												contacts={
 													activeSearchTabId === null
 														? contacts || [] // Original tab - show campaign contacts

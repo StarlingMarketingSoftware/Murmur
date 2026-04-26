@@ -34,6 +34,9 @@ import {
 } from '@/utils/restaurantTitle';
 import { WeddingPlannersIcon } from '@/components/atoms/_svg/WeddingPlannersIcon';
 import { WineBeerSpiritsIcon } from '@/components/atoms/_svg/WineBeerSpiritsIcon';
+import { WeatherMood } from '@/lib/weather/regions';
+import { getMoodConfig, MoodVisualConfig } from '@/lib/weather/moodConfig';
+import { LightningOverlay } from './precipitation/LightningOverlay';
 
 type LatLngLiteral = { lat: number; lng: number };
 type MarkerHoverMeta = { clientX: number; clientY: number };
@@ -1131,6 +1134,17 @@ interface SearchResultsMapProps {
 	presentation?: 'background' | 'interactive';
 	/** When true (and `presentation="background"`), auto-rotate the globe. */
 	autoSpin?: boolean;
+	/**
+	 * Drives the globe's atmospheric mood (clouds, fog, lighting, precipitation).
+	 * Defaults to `"normal"` which preserves the historical visual tuning.
+	 */
+	weatherMood?: WeatherMood;
+	/**
+	 * Current Fahrenheit temperature for the user's region. When > 80°F and the
+	 * active mood uses a bright (screen-blend) softbox, the globe gets a small
+	 * additional brightness lift so hot weather "feels hot."
+	 */
+	weatherTemperatureF?: number | null;
 }
 
 const defaultCenter = {
@@ -1149,7 +1163,10 @@ const STATE_HOVER_HIGHLIGHT_MAX_ZOOM = MAP_DEFAULT_ZOOM + 1;
 const DASHBOARD_DECORATIVE_ZOOM = 4.0;
 const DASHBOARD_DECORATIVE_PITCH = 15;
 const DASHBOARD_DECORATIVE_OFFSET_PX: [number, number] = [0, 140]; // push center down -> see more top/horizon
-const DASHBOARD_DECORATIVE_CENTER: [number, number] = [defaultCenter.lng, defaultCenter.lat];
+const DASHBOARD_DECORATIVE_CENTER: [number, number] = [
+	defaultCenter.lng,
+	defaultCenter.lat,
+];
 
 // Softbox lighting overlay fades out as the user zooms in — the "lit sphere"
 // read only makes sense at globe/continent distance. Fully on at globe zoom,
@@ -1169,27 +1186,47 @@ const computeLightingOverlayOpacity = (zoom: number) => {
 	return 1 - t * t * t;
 };
 
+// Dark "gloom wash" persists much further than the softbox/shadow overlays so
+// rainy/stormy still feel overcast when the user zooms in to city detail.
+// Held at full strength through country zoom, then linearly fades out as the
+// clouds themselves disappear.
+const GLOOM_WASH_FADE_START_ZOOM = 8;
+const GLOOM_WASH_FADE_END_ZOOM = 10.5;
+const computeGloomWashFade = (zoom: number) => {
+	if (zoom <= GLOOM_WASH_FADE_START_ZOOM) return 1;
+	if (zoom >= GLOOM_WASH_FADE_END_ZOOM) return 0;
+	return (
+		1 -
+		(zoom - GLOOM_WASH_FADE_START_ZOOM) /
+			(GLOOM_WASH_FADE_END_ZOOM - GLOOM_WASH_FADE_START_ZOOM)
+	);
+};
+
 // Clouds overlay: subtle patchy clouds for the zoomed-out globe view.
 // Implemented as a local raster tile source so it stays glued to the globe as it rotates.
 // NOTE: include a version query param to bust browser caches when we regenerate tiles.
 const CLOUDS_TILES_URL_TEMPLATE = '/maps/clouds/{z}/{x}/{y}.png?v=23';
 const CLOUDS_TILES_MAX_ZOOM = 3;
 // Tune for "satellite-read" clarity without becoming a weather overlay.
-const CLOUDS_OVERLAY_OPACITY_AT_GLOBE_ZOOM = 0.78;
-const CLOUDS_OVERLAY_OPACITY_AT_DECORATIVE_ZOOM = 0.66;
+// (Per-mood opacities now live in src/lib/weather/moodConfig.ts; the `normal`
+// mood preserves the historical 0.78 / 0.66 values.)
 // Keep clouds around slightly past the initial interactive view; fade by state-level zoom.
 const CLOUDS_OVERLAY_FADE_OUT_START_ZOOM = 8.0;
 const CLOUDS_OVERLAY_FADE_OUT_END_ZOOM = 10.5;
 const CLOUDS_CANVAS_TEXTURE_URL = '/maps/clouds/0/0/0.png?v=23';
 const CLOUDS_CANVAS_SIZE_PX = 512;
 // Full WebMercator bounds (lat clamp) so the texture maps cleanly across the globe.
-const CLOUDS_CANVAS_COORDINATES: [[number, number], [number, number], [number, number], [number, number]] =
-	[
-		[-180, 85.051129],
-		[180, 85.051129],
-		[180, -85.051129],
-		[-180, -85.051129],
-	];
+const CLOUDS_CANVAS_COORDINATES: [
+	[number, number],
+	[number, number],
+	[number, number],
+	[number, number],
+] = [
+	[-180, 85.051129],
+	[180, 85.051129],
+	[180, -85.051129],
+	[-180, -85.051129],
+];
 // Clouds drift animation parameters.
 // We animate the *canvas source* (not Mapbox raster paint), so units are in the canvas'
 // pixel grid. We apply a light zoom-based scale so drift stays noticeable while clouds
@@ -1203,6 +1240,8 @@ const CLOUDS_DRIFT_AMPLITUDE_X_PX = 12;
 const CLOUDS_DRIFT_AMPLITUDE_Y_PX = 4;
 const CLOUDS_DRIFT_SPEED_X_PX_PER_S = 0.35;
 const CLOUDS_DRIFT_SPEED_Y_PX_PER_S = 0.0;
+// Global tuning knob: < 1 = slower clouds, > 1 = faster clouds.
+const CLOUDS_DRIFT_TIME_SCALE = 0.8;
 // Inverse zoom scaling: at higher zoom levels the same world-distance covers more
 // screen pixels, so we slow the underlying texture drift so on-screen speed stays
 // roughly consistent (and doesn't feel "too fast" when zoomed in).
@@ -1214,6 +1253,28 @@ const CLOUDS_DRIFT_ZOOM_SCALE_MAX = 4.0;
 const CLOUDS_TURBULENCE_STRIP_PX = 32;
 const CLOUDS_TURBULENCE_LOOP_MS = 90_000;
 const CLOUDS_TURBULENCE_AMPLITUDE_X_PX = 1.3;
+
+const buildCloudsOpacityExpr = (
+	globeZoomOpacity: number,
+	decorativeZoomOpacity: number,
+	deepZoomFloor: number = 0
+) => [
+	'interpolate',
+	['linear'],
+	['zoom'],
+	0,
+	globeZoomOpacity,
+	MAP_MIN_ZOOM,
+	globeZoomOpacity,
+	4,
+	decorativeZoomOpacity,
+	CLOUDS_OVERLAY_FADE_OUT_START_ZOOM,
+	decorativeZoomOpacity,
+	CLOUDS_OVERLAY_FADE_OUT_END_ZOOM,
+	deepZoomFloor,
+	22,
+	deepZoomFloor,
+];
 
 const AUTO_FIT_CONTACTS_MAX_ZOOM = 10;
 const AUTO_FIT_STATE_MAX_ZOOM = 5;
@@ -2031,6 +2092,25 @@ const normalizeStateKey = (state?: string | null): string | null => {
 	return state.trim().toUpperCase();
 };
 
+// MANUAL WEATHER MOOD OVERRIDE FOR TESTING.
+// Set to one of: 'sunny' | 'normal' | 'cloudy' | 'rainy' | 'stormy' | 'snowy'
+// Set back to null to use the real weather mood from the user's region.
+const MANUAL_WEATHER_MOOD_OVERRIDE: WeatherMood | null = null;
+
+// MANUAL TEMPERATURE OVERRIDE FOR TESTING (Fahrenheit).
+// Set to a number (e.g. 92) to test the > 80°F brightness lift.
+// Set back to null to use the real temperature from the user's region.
+const MANUAL_WEATHER_TEMPERATURE_OVERRIDE_F: number | null = null;
+
+// Threshold above which the globe gets a uniform warm brightness lift on top
+// of the active mood (only applies when the mood uses a bright screen-blend
+// softbox — applying a brightening wash to the dark-pool moods would defeat
+// the rainy/stormy gloom).
+const HOT_TEMPERATURE_THRESHOLD_F = 80;
+// Uniform warm-white wash opacity when "hot". Multiplied by the same zoom
+// fade as the other lighting overlays so the wash disappears at city zoom.
+const HOT_WASH_OPACITY = 0.13;
+
 export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	contacts,
 	selectedContacts,
@@ -2055,7 +2135,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	skipAutoFit,
 	presentation = 'interactive',
 	autoSpin = false,
+	weatherMood: weatherMoodProp = 'normal',
+	weatherTemperatureF = null,
 }) => {
+	const weatherMood = MANUAL_WEATHER_MOOD_OVERRIDE ?? weatherMoodProp;
+	const effectiveTemperatureF =
+		MANUAL_WEATHER_TEMPERATURE_OVERRIDE_F ?? weatherTemperatureF;
 	const isBackgroundPresentation = presentation === 'background';
 	const shouldAutoSpin = isBackgroundPresentation && autoSpin;
 	// Keep the latest presentation value available to async Mapbox callbacks (moveend, etc).
@@ -2070,47 +2155,55 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	// Smooth fade for state overlays (borders + labels) when switching presentations.
 	// This prevents the "pause then pop" feeling when transitioning from the decorative globe
 	// into the interactive results map.
-		const stateOverlayOpacityRef = useRef<number>(0);
-		// 0 = divider lines, 1 = interactive borders
-			const stateOverlayModeRef = useRef<number>(stateInteractionsEnabled ? 1 : 0);
-			const stateOverlayAnimRafRef = useRef<number | null>(null);
-				const cloudsCanvasRef = useRef<HTMLCanvasElement | null>(null);
-				const cloudsCanvasCtxRef = useRef<CanvasRenderingContext2D | null>(null);
-						const cloudsTextureImageRef = useRef<HTMLImageElement | null>(null);
-							const cloudsTextureLoadPromiseRef = useRef<Promise<HTMLImageElement> | null>(null);
-							const cloudsTextureScratchCanvasRef = useRef<HTMLCanvasElement | null>(null);
-							const cloudsTextureHazeCanvasRef = useRef<HTMLCanvasElement | null>(null);
-							const cloudsTexturePatternHazeRef = useRef<CanvasPattern | null>(null);
-							const cloudsTexturePatternRef = useRef<CanvasPattern | null>(null);
-							const cloudsTexturePatternSecondaryRef = useRef<CanvasPattern | null>(null);
-						const cloudsTextureSecondaryCanvasRef = useRef<HTMLCanvasElement | null>(null);
-						const cloudsTextureSecondaryReadyRef = useRef<boolean>(false);
-							const cloudsTextureGroupPatternsRef = useRef<(CanvasPattern | null)[] | null>(null);
-							const cloudsTextureGroupCanvasesRef = useRef<HTMLCanvasElement[] | null>(null);
-							const cloudsTextureGroupReadyRef = useRef<boolean>(false);
-							const cloudsTextureGroupDebugLoggedRef = useRef<boolean>(false);
-							const cloudsTextureGroupDebugActiveLoggedRef = useRef<boolean>(false);
-							const cloudsDriftGroupOffsetsRef = useRef<{ x: number; y: number }[]>([
-								{ x: 0, y: 0 },
-								{ x: 0, y: 0 },
-								{ x: 0, y: 0 },
-								{ x: 0, y: 0 },
-								{ x: 0, y: 0 },
-								{ x: 0, y: 0 },
-								{ x: 0, y: 0 },
-								{ x: 0, y: 0 },
-							]);
-						const cloudsDriftRafRef = useRef<number | null>(null);
-					const cloudsDriftLastFrameMsRef = useRef<number>(0);
-					const cloudsDriftOffsetRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
-					const cloudsDriftOffsetSecondaryRef = useRef<{ x: number; y: number }>({
-						x: 0,
-						y: 0,
-					});
-					const cloudsDriftSimTimeMsRef = useRef<number>(0);
-					const prevIsBackgroundPresentationRef = useRef<boolean>(isBackgroundPresentation);
-		// Capture the base Mapbox paint values once, then we apply a multiplier for fading.
-		const stateLineOpacityBaseRef = useRef<{ dividers: any; borders: any } | null>(null);
+	const stateOverlayOpacityRef = useRef<number>(0);
+	// 0 = divider lines, 1 = interactive borders
+	const stateOverlayModeRef = useRef<number>(stateInteractionsEnabled ? 1 : 0);
+	const stateOverlayAnimRafRef = useRef<number | null>(null);
+	const cloudsCanvasRef = useRef<HTMLCanvasElement | null>(null);
+	const cloudsCanvasCtxRef = useRef<CanvasRenderingContext2D | null>(null);
+	const cloudsTextureImageRef = useRef<HTMLImageElement | null>(null);
+	const cloudsTextureLoadPromiseRef = useRef<Promise<HTMLImageElement> | null>(null);
+	const cloudsTextureScratchCanvasRef = useRef<HTMLCanvasElement | null>(null);
+	const cloudsTextureHazeCanvasRef = useRef<HTMLCanvasElement | null>(null);
+	const cloudsTexturePatternHazeRef = useRef<CanvasPattern | null>(null);
+	const cloudsTexturePatternRef = useRef<CanvasPattern | null>(null);
+	const cloudsTexturePatternSecondaryRef = useRef<CanvasPattern | null>(null);
+	const cloudsTextureSecondaryCanvasRef = useRef<HTMLCanvasElement | null>(null);
+	const cloudsTextureSecondaryReadyRef = useRef<boolean>(false);
+	const cloudsTextureGroupPatternsRef = useRef<(CanvasPattern | null)[] | null>(null);
+	const cloudsTextureGroupCanvasesRef = useRef<HTMLCanvasElement[] | null>(null);
+	const cloudsTextureGroupReadyRef = useRef<boolean>(false);
+	const cloudsTextureGroupDebugLoggedRef = useRef<boolean>(false);
+	const cloudsTextureGroupDebugActiveLoggedRef = useRef<boolean>(false);
+	const cloudsDriftGroupOffsetsRef = useRef<{ x: number; y: number }[]>([
+		{ x: 0, y: 0 },
+		{ x: 0, y: 0 },
+		{ x: 0, y: 0 },
+		{ x: 0, y: 0 },
+		{ x: 0, y: 0 },
+		{ x: 0, y: 0 },
+		{ x: 0, y: 0 },
+		{ x: 0, y: 0 },
+	]);
+	const cloudsDriftRafRef = useRef<number | null>(null);
+	const cloudsDriftLastFrameMsRef = useRef<number>(0);
+	const cloudsDriftOffsetRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+	const cloudsDriftOffsetSecondaryRef = useRef<{ x: number; y: number }>({
+		x: 0,
+		y: 0,
+	});
+	const cloudsDriftSimTimeMsRef = useRef<number>(0);
+	const prevIsBackgroundPresentationRef = useRef<boolean>(isBackgroundPresentation);
+	// Live weather-mood config — read by the cloud animation tick and the lighting
+	// overlay opacity calc. Initialized to `normal` so behavior matches pre-weather
+	// visuals until applyWeatherMood() runs.
+	const weatherMoodConfigRef = useRef<MoodVisualConfig>(getMoodConfig('normal'));
+	const appliedWeatherMoodRef = useRef<WeatherMood>('normal');
+	// Mutated by the temperature effect; read by `applyLightingOverlayOpacity`
+	// on every zoom event so the hot lift survives zoom-driven recalculations.
+	const isHotRef = useRef<boolean>(false);
+	// Capture the base Mapbox paint values once, then we apply a multiplier for fading.
+	const stateLineOpacityBaseRef = useRef<{ dividers: any; borders: any } | null>(null);
 
 	const [selectedMarker, setSelectedMarker] = useState<ContactWithName | null>(null);
 	const [hoveredMarkerId, setHoveredMarkerId] = useState<number | null>(null);
@@ -2135,6 +2228,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	// fade in lockstep with pinch/scroll/wheel interactions.
 	const lightingOverlayKeyRef = useRef<HTMLDivElement | null>(null);
 	const lightingOverlayShadowRef = useRef<HTMLDivElement | null>(null);
+	const lightingOverlayHotWashRef = useRef<HTMLDivElement | null>(null);
+	const lightingOverlayGloomWashRef = useRef<HTMLDivElement | null>(null);
 	const [visibleContacts, setVisibleContacts] = useState<ContactWithName[]>([]);
 	// Keep a "sticky" set of currently-rendered marker ids so zooming can rescale existing markers
 	// and only introduce *new* markers, instead of re-sampling a totally different set each time.
@@ -3384,880 +3479,909 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				stateOverlayAnimRafRef.current = null;
 			}
 		};
-		}, [
-			map,
-			isMapLoaded,
-			isBackgroundPresentation,
-			isStateLayerReady,
-			stateInteractionsEnabled,
-			applyStateOverlayOpacity,
-		]);
+	}, [
+		map,
+		isMapLoaded,
+		isBackgroundPresentation,
+		isStateLayerReady,
+		stateInteractionsEnabled,
+		applyStateOverlayOpacity,
+	]);
 
-		// Subtle cloud drift so the overlay feels "alive" (especially in background globe mode).
-		useEffect(() => {
-			if (!map || !isMapLoaded) return;
+	// Subtle cloud drift so the overlay feels "alive" (especially in background globe mode).
+	useEffect(() => {
+		if (!map || !isMapLoaded) return;
 
-			let prefersReducedMotion = false;
+		let prefersReducedMotion = false;
+		try {
+			prefersReducedMotion =
+				typeof window !== 'undefined' &&
+				typeof window.matchMedia === 'function' &&
+				window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+		} catch {
+			prefersReducedMotion = false;
+		}
+
+		// Respect Reduce Motion by slowing the drift instead of fully disabling it.
+		const motionScale = prefersReducedMotion ? 0.5 : 1;
+
+		const cloudsCanvas = cloudsCanvasRef.current;
+		const cloudsCtx = cloudsCanvasCtxRef.current;
+		if (!cloudsCanvas || !cloudsCtx) return;
+
+		// If we fell back to raster tiles (no canvas source), there is nothing to animate.
+		const cloudsSource: any = (() => {
 			try {
-				prefersReducedMotion =
-					typeof window !== 'undefined' &&
-					typeof window.matchMedia === 'function' &&
-					window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+				return map.getSource(MAPBOX_SOURCE_IDS.clouds);
 			} catch {
-				prefersReducedMotion = false;
+				return null;
 			}
+		})();
+		const isCanvasSource = Boolean(
+			cloudsSource && typeof cloudsSource.getCanvas === 'function'
+		);
+		if (!isCanvasSource) return;
 
-			// Respect Reduce Motion by slowing the drift instead of fully disabling it.
-			const motionScale = prefersReducedMotion ? 0.5 : 1;
+		// Ensure Mapbox is actively sampling the canvas each frame.
+		try {
+			cloudsSource.play?.();
+		} catch {
+			// Ignore.
+		}
 
-			const cloudsCanvas = cloudsCanvasRef.current;
-			const cloudsCtx = cloudsCanvasCtxRef.current;
-			if (!cloudsCanvas || !cloudsCtx) return;
+		const loadTexture = (): Promise<HTMLImageElement> => {
+			if (cloudsTextureImageRef.current)
+				return Promise.resolve(cloudsTextureImageRef.current);
+			if (cloudsTextureLoadPromiseRef.current) return cloudsTextureLoadPromiseRef.current;
 
-			// If we fell back to raster tiles (no canvas source), there is nothing to animate.
-			const cloudsSource: any = (() => {
+			cloudsTextureLoadPromiseRef.current = new Promise((resolve, reject) => {
 				try {
-					return map.getSource(MAPBOX_SOURCE_IDS.clouds);
-				} catch {
-					return null;
+					const img = new Image();
+					img.crossOrigin = 'anonymous';
+					img.decoding = 'async';
+					img.onload = () => {
+						const finalize = () => {
+							cloudsTextureImageRef.current = img;
+							resolve(img);
+						};
+						try {
+							if (typeof img.decode === 'function') {
+								img.decode().then(finalize).catch(finalize);
+							} else {
+								finalize();
+							}
+						} catch {
+							finalize();
+						}
+					};
+					img.onerror = () => reject(new Error('Failed to load clouds texture'));
+					img.src = CLOUDS_CANVAS_TEXTURE_URL;
+				} catch (e) {
+					reject(e);
 				}
-			})();
-			const isCanvasSource = Boolean(
-				cloudsSource && typeof cloudsSource.getCanvas === 'function'
-			);
-			if (!isCanvasSource) return;
+			});
 
-			// Ensure Mapbox is actively sampling the canvas each frame.
+			return cloudsTextureLoadPromiseRef.current;
+		};
+
+		let canceled = false;
+		cloudsDriftOffsetRef.current = { x: 0, y: 0 };
+		cloudsDriftOffsetSecondaryRef.current = { x: 0, y: 0 };
+		cloudsDriftSimTimeMsRef.current = 0;
+		// Lightweight deterministic noise helpers (shader-style hash + smooth interpolation).
+		// Used to add gentle randomness without introducing pulsing opacity.
+		const fract = (x: number) => x - Math.floor(x);
+		const smoothstep01 = (t: number) => t * t * (3 - 2 * t);
+		const hash01 = (n: number) => fract(Math.sin(n * 127.1 + 311.7) * 43758.5453123);
+		const noise1D = (x: number) => {
+			const i = Math.floor(x);
+			const f = x - i;
+			const a = hash01(i);
+			const b = hash01(i + 1);
+			const u = smoothstep01(f);
+			return a + (b - a) * u;
+		};
+
+		const driftLoopS = CLOUDS_DRIFT_LOOP_MS / 1000;
+		const meanderSpeedBaseX =
+			driftLoopS > 0 ? (CLOUDS_DRIFT_AMPLITUDE_X_PX / driftLoopS) * 2.2 : 0;
+		const meanderSpeedBaseY =
+			driftLoopS > 0 ? (CLOUDS_DRIFT_AMPLITUDE_Y_PX / driftLoopS) * 2.2 : 0;
+
+		// Secondary clouds texture: a thinner/sparser variant so we can composite a second
+		// independently-drifting layer without it reading like two identical "blankets".
+		const ensureSecondaryCloudsTexture = (img: HTMLImageElement) => {
+			// If we've already built the secondary texture/pattern, don't redo work.
+			if (cloudsTexturePatternSecondaryRef.current) return;
+			if (
+				cloudsTextureSecondaryReadyRef.current &&
+				cloudsTextureSecondaryCanvasRef.current
+			)
+				return;
+
+			cloudsTextureSecondaryReadyRef.current = false;
+
 			try {
-				cloudsSource.play?.();
+				let secondaryCanvas = cloudsTextureSecondaryCanvasRef.current;
+				if (!secondaryCanvas && typeof document !== 'undefined') {
+					secondaryCanvas = document.createElement('canvas');
+					secondaryCanvas.width = CLOUDS_CANVAS_SIZE_PX;
+					secondaryCanvas.height = CLOUDS_CANVAS_SIZE_PX;
+					cloudsTextureSecondaryCanvasRef.current = secondaryCanvas;
+				}
+				if (!secondaryCanvas) return;
+
+				const w = secondaryCanvas.width || CLOUDS_CANVAS_SIZE_PX;
+				const h = secondaryCanvas.height || CLOUDS_CANVAS_SIZE_PX;
+				const ctx2 = secondaryCanvas.getContext('2d');
+				if (!ctx2) return;
+
+				try {
+					ctx2.imageSmoothingEnabled = true;
+					ctx2.imageSmoothingQuality = 'high';
+				} catch {
+					// Ignore.
+				}
+
+				ctx2.clearRect(0, 0, w, h);
+				ctx2.drawImage(img, 0, 0, w, h);
+
+				let imageData: ImageData | null = null;
+				try {
+					imageData = ctx2.getImageData(0, 0, w, h);
+				} catch {
+					imageData = null;
+				}
+				if (!imageData) return;
+
+				// Tileable coarse mask noise (wraps on a small grid) so the secondary layer
+				// doesn't add uniform density everywhere.
+				// Coarse, tileable mask (wraps at the texture boundary). Keep this fairly low
+				// frequency so it reads as distinct cloud systems rather than fine noise.
+				const maskGrid = 10;
+				const maskVals = new Float32Array(maskGrid * maskGrid);
+				for (let gy = 0; gy < maskGrid; gy++) {
+					for (let gx = 0; gx < maskGrid; gx++) {
+						const n = gx * 127.1 + gy * 311.7 + 74.7;
+						maskVals[gy * maskGrid + gx] = hash01(n);
+					}
+				}
+				const maskNoise2D = (u: number, v: number) => {
+					// u/v in "grid space" (0..maskGrid).
+					const x0 = Math.floor(u);
+					const y0 = Math.floor(v);
+					const fx = u - x0;
+					const fy = v - y0;
+					const ix0 = ((x0 % maskGrid) + maskGrid) % maskGrid;
+					const iy0 = ((y0 % maskGrid) + maskGrid) % maskGrid;
+					const ix1 = (ix0 + 1) % maskGrid;
+					const iy1 = (iy0 + 1) % maskGrid;
+					const a00 = maskVals[iy0 * maskGrid + ix0];
+					const a10 = maskVals[iy0 * maskGrid + ix1];
+					const a01 = maskVals[iy1 * maskGrid + ix0];
+					const a11 = maskVals[iy1 * maskGrid + ix1];
+					const sx = smoothstep01(fx);
+					const sy = smoothstep01(fy);
+					const xA = a00 + (a10 - a00) * sx;
+					const xB = a01 + (a11 - a01) * sx;
+					return xA + (xB - xA) * sy;
+				};
+
+				const data = imageData.data;
+				// Keep only denser cores (removes haze), then gate by the coarse mask.
+				const alphaFloor = 0.08;
+				const alphaPower = 2.2;
+				const maskThreshold = 0.52;
+				const maskPower = 1.35;
+				const invAlphaDenom = 1 / Math.max(1e-6, 1 - alphaFloor);
+				const invMaskDenom = 1 / Math.max(1e-6, 1 - maskThreshold);
+
+				for (let y = 0; y < h; y++) {
+					const v = (y / h) * maskGrid;
+					for (let x = 0; x < w; x++) {
+						const idx = (y * w + x) * 4;
+						const a = data[idx + 3] / 255;
+						let a2 = Math.max(0, (a - alphaFloor) * invAlphaDenom);
+						a2 = Math.pow(a2, alphaPower);
+
+						const n = maskNoise2D((x / w) * maskGrid, v);
+						let g = Math.max(0, (n - maskThreshold) * invMaskDenom);
+						g = Math.pow(g, maskPower);
+
+						const outA = Math.min(1, a2 * g * 1.15);
+						data[idx + 3] = Math.round(outA * 255);
+					}
+				}
+
+				let applied = false;
+				try {
+					ctx2.putImageData(imageData, 0, 0);
+					applied = true;
+				} catch {
+					applied = false;
+				}
+				cloudsTextureSecondaryReadyRef.current = applied;
+
+				try {
+					cloudsTexturePatternSecondaryRef.current = cloudsCtx.createPattern(
+						secondaryCanvas,
+						'repeat'
+					);
+				} catch {
+					cloudsTexturePatternSecondaryRef.current = null;
+				}
 			} catch {
 				// Ignore.
 			}
+		};
 
-				const loadTexture = (): Promise<HTMLImageElement> => {
-					if (cloudsTextureImageRef.current) return Promise.resolve(cloudsTextureImageRef.current);
-					if (cloudsTextureLoadPromiseRef.current) return cloudsTextureLoadPromiseRef.current;
+		// Split the base clouds texture into multiple tileable "groups" so different
+		// cloud structures can drift at noticeably different speeds without the
+		// whole layer reading like a single translating sheet.
+		const ensureCloudsGroupPatterns = (img: HTMLImageElement) => {
+			const existingPatterns = cloudsTextureGroupPatternsRef.current;
+			const desiredGroupCount = cloudsDriftGroupOffsetsRef.current.length;
+			if (
+				cloudsTextureGroupReadyRef.current &&
+				Array.isArray(existingPatterns) &&
+				existingPatterns.length === desiredGroupCount &&
+				cloudsTexturePatternHazeRef.current
+			)
+				return;
 
-					cloudsTextureLoadPromiseRef.current = new Promise((resolve, reject) => {
-						try {
-							const img = new Image();
-							img.crossOrigin = 'anonymous';
-							img.decoding = 'async';
-							img.onload = () => {
-								const finalize = () => {
-									cloudsTextureImageRef.current = img;
-									resolve(img);
-								};
-								try {
-									if (typeof img.decode === 'function') {
-										img.decode().then(finalize).catch(finalize);
-									} else {
-										finalize();
-									}
-								} catch {
-									finalize();
-								}
-							};
-						img.onerror = () => reject(new Error('Failed to load clouds texture'));
-						img.src = CLOUDS_CANVAS_TEXTURE_URL;
-					} catch (e) {
-						reject(e);
+			cloudsTextureGroupReadyRef.current = false;
+
+			try {
+				// Use (and reuse) a scratch canvas to read pixels from the base texture.
+				// Important: do NOT reuse the secondary texture canvas (it has different pixels).
+				let scratchCanvas = cloudsTextureScratchCanvasRef.current;
+				if (!scratchCanvas && typeof document !== 'undefined') {
+					scratchCanvas = document.createElement('canvas');
+					scratchCanvas.width = CLOUDS_CANVAS_SIZE_PX;
+					scratchCanvas.height = CLOUDS_CANVAS_SIZE_PX;
+					cloudsTextureScratchCanvasRef.current = scratchCanvas;
+				}
+				if (!scratchCanvas) return;
+
+				const w = scratchCanvas.width || CLOUDS_CANVAS_SIZE_PX;
+				const h = scratchCanvas.height || CLOUDS_CANVAS_SIZE_PX;
+				const scratchCtx = scratchCanvas.getContext('2d');
+				if (!scratchCtx) return;
+
+				try {
+					scratchCtx.imageSmoothingEnabled = true;
+					scratchCtx.imageSmoothingQuality = 'high';
+				} catch {
+					// Ignore.
+				}
+
+				scratchCtx.clearRect(0, 0, w, h);
+				scratchCtx.drawImage(img, 0, 0, w, h);
+
+				let imageData: ImageData | null = null;
+				try {
+					imageData = scratchCtx.getImageData(0, 0, w, h);
+				} catch {
+					imageData = null;
+				}
+				if (!imageData) return;
+
+				const src = imageData.data;
+				// Exclude the very faint haze from the motion groups; it tends to connect
+				// distant clouds into a single structure and makes group motion read uniform.
+				const alphaGate = 18;
+
+				// Build a "haze-only" texture (alpha below alphaGate). This lets us keep
+				// slow global motion without anchoring the dense cloud cores.
+				try {
+					let hazeCanvas = cloudsTextureHazeCanvasRef.current;
+					if (!hazeCanvas && typeof document !== 'undefined') {
+						hazeCanvas = document.createElement('canvas');
+						hazeCanvas.width = w;
+						hazeCanvas.height = h;
+						cloudsTextureHazeCanvasRef.current = hazeCanvas;
 					}
-				});
-
-				return cloudsTextureLoadPromiseRef.current;
-			};
-
-						let canceled = false;
-						cloudsDriftOffsetRef.current = { x: 0, y: 0 };
-						cloudsDriftOffsetSecondaryRef.current = { x: 0, y: 0 };
-						cloudsDriftSimTimeMsRef.current = 0;
-						// Lightweight deterministic noise helpers (shader-style hash + smooth interpolation).
-					// Used to add gentle randomness without introducing pulsing opacity.
-					const fract = (x: number) => x - Math.floor(x);
-					const smoothstep01 = (t: number) => t * t * (3 - 2 * t);
-				const hash01 = (n: number) => fract(Math.sin(n * 127.1 + 311.7) * 43758.5453123);
-				const noise1D = (x: number) => {
-					const i = Math.floor(x);
-					const f = x - i;
-					const a = hash01(i);
-					const b = hash01(i + 1);
-					const u = smoothstep01(f);
-						return a + (b - a) * u;
-					};
-
-					const driftLoopS = CLOUDS_DRIFT_LOOP_MS / 1000;
-					const meanderSpeedBaseX =
-						driftLoopS > 0 ? (CLOUDS_DRIFT_AMPLITUDE_X_PX / driftLoopS) * 2.2 : 0;
-						const meanderSpeedBaseY =
-							driftLoopS > 0 ? (CLOUDS_DRIFT_AMPLITUDE_Y_PX / driftLoopS) * 2.2 : 0;
-
-							// Secondary clouds texture: a thinner/sparser variant so we can composite a second
-							// independently-drifting layer without it reading like two identical "blankets".
-							const ensureSecondaryCloudsTexture = (img: HTMLImageElement) => {
-								// If we've already built the secondary texture/pattern, don't redo work.
-								if (cloudsTexturePatternSecondaryRef.current) return;
-								if (
-									cloudsTextureSecondaryReadyRef.current &&
-									cloudsTextureSecondaryCanvasRef.current
-								)
-									return;
-
-								cloudsTextureSecondaryReadyRef.current = false;
-
-								try {
-									let secondaryCanvas = cloudsTextureSecondaryCanvasRef.current;
-									if (!secondaryCanvas && typeof document !== 'undefined') {
-									secondaryCanvas = document.createElement('canvas');
-									secondaryCanvas.width = CLOUDS_CANVAS_SIZE_PX;
-									secondaryCanvas.height = CLOUDS_CANVAS_SIZE_PX;
-									cloudsTextureSecondaryCanvasRef.current = secondaryCanvas;
-								}
-								if (!secondaryCanvas) return;
-
-								const w = secondaryCanvas.width || CLOUDS_CANVAS_SIZE_PX;
-								const h = secondaryCanvas.height || CLOUDS_CANVAS_SIZE_PX;
-								const ctx2 = secondaryCanvas.getContext('2d');
-								if (!ctx2) return;
-
-								try {
-									ctx2.imageSmoothingEnabled = true;
-									ctx2.imageSmoothingQuality = 'high';
-								} catch {
-									// Ignore.
-								}
-
-								ctx2.clearRect(0, 0, w, h);
-								ctx2.drawImage(img, 0, 0, w, h);
-
-								let imageData: ImageData | null = null;
-								try {
-									imageData = ctx2.getImageData(0, 0, w, h);
-								} catch {
-									imageData = null;
-								}
-								if (!imageData) return;
-
-								// Tileable coarse mask noise (wraps on a small grid) so the secondary layer
-								// doesn't add uniform density everywhere.
-									// Coarse, tileable mask (wraps at the texture boundary). Keep this fairly low
-									// frequency so it reads as distinct cloud systems rather than fine noise.
-									const maskGrid = 10;
-								const maskVals = new Float32Array(maskGrid * maskGrid);
-								for (let gy = 0; gy < maskGrid; gy++) {
-									for (let gx = 0; gx < maskGrid; gx++) {
-										const n = gx * 127.1 + gy * 311.7 + 74.7;
-										maskVals[gy * maskGrid + gx] = hash01(n);
-									}
-								}
-								const maskNoise2D = (u: number, v: number) => {
-									// u/v in "grid space" (0..maskGrid).
-									const x0 = Math.floor(u);
-									const y0 = Math.floor(v);
-									const fx = u - x0;
-									const fy = v - y0;
-									const ix0 = ((x0 % maskGrid) + maskGrid) % maskGrid;
-									const iy0 = ((y0 % maskGrid) + maskGrid) % maskGrid;
-									const ix1 = (ix0 + 1) % maskGrid;
-									const iy1 = (iy0 + 1) % maskGrid;
-									const a00 = maskVals[iy0 * maskGrid + ix0];
-									const a10 = maskVals[iy0 * maskGrid + ix1];
-									const a01 = maskVals[iy1 * maskGrid + ix0];
-									const a11 = maskVals[iy1 * maskGrid + ix1];
-									const sx = smoothstep01(fx);
-									const sy = smoothstep01(fy);
-									const xA = a00 + (a10 - a00) * sx;
-									const xB = a01 + (a11 - a01) * sx;
-									return xA + (xB - xA) * sy;
-								};
-
-								const data = imageData.data;
-								// Keep only denser cores (removes haze), then gate by the coarse mask.
-								const alphaFloor = 0.08;
-								const alphaPower = 2.2;
-								const maskThreshold = 0.52;
-								const maskPower = 1.35;
-								const invAlphaDenom = 1 / Math.max(1e-6, 1 - alphaFloor);
-								const invMaskDenom = 1 / Math.max(1e-6, 1 - maskThreshold);
-
-									for (let y = 0; y < h; y++) {
-										const v = (y / h) * maskGrid;
-										for (let x = 0; x < w; x++) {
-										const idx = (y * w + x) * 4;
-										const a = data[idx + 3] / 255;
-										let a2 = Math.max(0, (a - alphaFloor) * invAlphaDenom);
-										a2 = Math.pow(a2, alphaPower);
-
-										const n = maskNoise2D((x / w) * maskGrid, v);
-										let g = Math.max(0, (n - maskThreshold) * invMaskDenom);
-										g = Math.pow(g, maskPower);
-
-										const outA = Math.min(1, a2 * g * 1.15);
-										data[idx + 3] = Math.round(outA * 255);
-										}
-									}
-
-									let applied = false;
-									try {
-										ctx2.putImageData(imageData, 0, 0);
-										applied = true;
-									} catch {
-										applied = false;
-									}
-									cloudsTextureSecondaryReadyRef.current = applied;
-
-									try {
-										cloudsTexturePatternSecondaryRef.current = cloudsCtx.createPattern(
-											secondaryCanvas,
-										'repeat'
-									);
-								} catch {
-									cloudsTexturePatternSecondaryRef.current = null;
-								}
-								} catch {
-									// Ignore.
-								}
-							};
-
-							// Split the base clouds texture into multiple tileable "groups" so different
-							// cloud structures can drift at noticeably different speeds without the
-							// whole layer reading like a single translating sheet.
-								const ensureCloudsGroupPatterns = (img: HTMLImageElement) => {
-									const existingPatterns = cloudsTextureGroupPatternsRef.current;
-									const desiredGroupCount = cloudsDriftGroupOffsetsRef.current.length;
-									if (
-										cloudsTextureGroupReadyRef.current &&
-										Array.isArray(existingPatterns) &&
-										existingPatterns.length === desiredGroupCount &&
-										cloudsTexturePatternHazeRef.current
-									)
-										return;
-
-									cloudsTextureGroupReadyRef.current = false;
-
-									try {
-										// Use (and reuse) a scratch canvas to read pixels from the base texture.
-										// Important: do NOT reuse the secondary texture canvas (it has different pixels).
-										let scratchCanvas = cloudsTextureScratchCanvasRef.current;
-										if (!scratchCanvas && typeof document !== 'undefined') {
-											scratchCanvas = document.createElement('canvas');
-											scratchCanvas.width = CLOUDS_CANVAS_SIZE_PX;
-											scratchCanvas.height = CLOUDS_CANVAS_SIZE_PX;
-											cloudsTextureScratchCanvasRef.current = scratchCanvas;
-										}
-										if (!scratchCanvas) return;
-
-									const w = scratchCanvas.width || CLOUDS_CANVAS_SIZE_PX;
-									const h = scratchCanvas.height || CLOUDS_CANVAS_SIZE_PX;
-									const scratchCtx = scratchCanvas.getContext('2d');
-									if (!scratchCtx) return;
-
-									try {
-										scratchCtx.imageSmoothingEnabled = true;
-										scratchCtx.imageSmoothingQuality = 'high';
-									} catch {
-										// Ignore.
-									}
-
-									scratchCtx.clearRect(0, 0, w, h);
-									scratchCtx.drawImage(img, 0, 0, w, h);
-
-									let imageData: ImageData | null = null;
-									try {
-										imageData = scratchCtx.getImageData(0, 0, w, h);
-									} catch {
-										imageData = null;
-									}
-									if (!imageData) return;
-
-										const src = imageData.data;
-										// Exclude the very faint haze from the motion groups; it tends to connect
-										// distant clouds into a single structure and makes group motion read uniform.
-										const alphaGate = 18;
-
-										// Build a "haze-only" texture (alpha below alphaGate). This lets us keep
-										// slow global motion without anchoring the dense cloud cores.
-										try {
-											let hazeCanvas = cloudsTextureHazeCanvasRef.current;
-											if (!hazeCanvas && typeof document !== 'undefined') {
-												hazeCanvas = document.createElement('canvas');
-												hazeCanvas.width = w;
-												hazeCanvas.height = h;
-												cloudsTextureHazeCanvasRef.current = hazeCanvas;
-											}
-											const hazeCtx = hazeCanvas ? hazeCanvas.getContext('2d') : null;
-											if (hazeCanvas && hazeCtx) {
-												const hazeData = new Uint8ClampedArray(new ArrayBuffer(src.length));
-												for (let i = 0; i < src.length; i += 4) {
-													const a = src[i + 3];
-													if (a && a < alphaGate) {
-														hazeData[i] = src[i];
-														hazeData[i + 1] = src[i + 1];
-														hazeData[i + 2] = src[i + 2];
-														hazeData[i + 3] = a;
-													}
-												}
-
-												try {
-													hazeCtx.putImageData(new ImageData(hazeData, w, h), 0, 0);
-													cloudsTexturePatternHazeRef.current = cloudsCtx.createPattern(
-														hazeCanvas,
-														'repeat'
-													);
-												} catch {
-													cloudsTexturePatternHazeRef.current = null;
-												}
-											}
-										} catch {
-											cloudsTexturePatternHazeRef.current = null;
-										}
-
-										const groupCount = Math.max(1, cloudsDriftGroupOffsetsRef.current.length);
-										const groupDatas: Uint8ClampedArray<ArrayBuffer>[] = Array.from(
-											{ length: groupCount },
-											() => new Uint8ClampedArray(new ArrayBuffer(src.length))
-										);
-										const groupPixelCounts = new Uint32Array(groupCount);
-
-										// Connected-components over alphaGate pixels (with wraparound) so each cloud
-										// structure is assigned to a single speed group (cloud-to-cloud variation).
-										const pixelCount = w * h;
-										const visited = new Uint8Array(pixelCount);
-										const stack = new Int32Array(pixelCount);
-										const componentPixels: number[] = [];
-
-										const halfIndex = Math.floor(groupCount / 2);
-										const slowMax = Math.max(0, halfIndex - 1);
-										const fastMin = Math.min(groupCount - 1, halfIndex);
-
-										let compId = 0;
-										for (let start = 0; start < pixelCount; start++) {
-											if (visited[start]) continue;
-											const a0 = src[start * 4 + 3];
-											if (a0 < alphaGate) continue;
-
-											let sp = 0;
-											stack[sp++] = start;
-											visited[start] = 1;
-											componentPixels.length = 0;
-
-											while (sp > 0) {
-												const p = stack[--sp];
-												componentPixels.push(p);
-
-												const x = p % w;
-												const y = (p / w) | 0;
-
-												const left = x > 0 ? p - 1 : p + (w - 1);
-												const right = x + 1 < w ? p + 1 : p - (w - 1);
-												const up = y > 0 ? p - w : p + (h - 1) * w;
-												const down = y + 1 < h ? p + w : p - (h - 1) * w;
-
-												if (!visited[left] && src[left * 4 + 3] >= alphaGate) {
-													visited[left] = 1;
-													stack[sp++] = left;
-												}
-												if (!visited[right] && src[right * 4 + 3] >= alphaGate) {
-													visited[right] = 1;
-													stack[sp++] = right;
-												}
-												if (!visited[up] && src[up * 4 + 3] >= alphaGate) {
-													visited[up] = 1;
-													stack[sp++] = up;
-												}
-												if (!visited[down] && src[down * 4 + 3] >= alphaGate) {
-													visited[down] = 1;
-													stack[sp++] = down;
-												}
-											}
-
-												const size = componentPixels.length;
-												const r = hash01(compId * 91.7 + size * 0.013 + 501.9);
-												const r2 = hash01(compId * 37.1 + size * 0.021 + 911.3);
-												let bucket = 0;
-												// Keep big cloud masses biased toward the slower half, but still distribute
-												// across multiple buckets so the motion reads as cloud-to-cloud variation.
-												if (size >= 9000) {
-													// Small chance that a big cloud system is part of a faster flow.
-													if (r2 < 0.15) {
-														const span = Math.max(1, groupCount - fastMin);
-														bucket = fastMin + Math.min(span - 1, Math.floor(r * span));
-													} else {
-														const span = Math.max(1, slowMax + 1);
-														bucket = Math.min(slowMax, Math.floor(r * span));
-													}
-												} else if (size <= 420) {
-													const span = Math.max(1, groupCount - fastMin);
-													bucket = fastMin + Math.min(span - 1, Math.floor(r * span));
-												} else {
-													bucket = Math.min(groupCount - 1, Math.floor(r * groupCount));
-												}
-
-											const out = groupDatas[bucket];
-											for (let i = 0; i < size; i++) {
-												const p = componentPixels[i];
-												const idx = p * 4;
-												out[idx] = src[idx];
-												out[idx + 1] = src[idx + 1];
-												out[idx + 2] = src[idx + 2];
-												out[idx + 3] = src[idx + 3];
-											}
-											groupPixelCounts[bucket] += size;
-											compId++;
-										}
-
-										const groupCanvases: HTMLCanvasElement[] = [];
-										const groupPatterns: (CanvasPattern | null)[] = [];
-
-										for (let g = 0; g < groupCount; g++) {
-											if (typeof document === 'undefined') {
-												groupPatterns.push(null);
-												continue;
-											}
-											if (!groupPixelCounts[g]) {
-												groupPatterns.push(null);
-												continue;
-											}
-
-											const c = document.createElement('canvas');
-											c.width = w;
-											c.height = h;
-											const ctx = c.getContext('2d');
-											if (!ctx) {
-												groupPatterns.push(null);
-												continue;
-											}
-
-											let applied = false;
-											try {
-												ctx.putImageData(new ImageData(groupDatas[g], w, h), 0, 0);
-												applied = true;
-											} catch {
-												applied = false;
-											}
-											if (!applied) {
-												groupPatterns.push(null);
-												continue;
-											}
-
-											groupCanvases.push(c);
-											try {
-												groupPatterns.push(cloudsCtx.createPattern(c, 'repeat'));
-											} catch {
-												groupPatterns.push(null);
-											}
-										}
-
-										cloudsTextureGroupCanvasesRef.current = groupCanvases;
-										cloudsTextureGroupPatternsRef.current = groupPatterns;
-										cloudsTextureGroupReadyRef.current = groupPatterns.some(Boolean);
-										if (
-											cloudsTextureGroupReadyRef.current &&
-											!cloudsTextureGroupDebugLoggedRef.current &&
-											typeof process !== 'undefined' &&
-											process.env?.NODE_ENV !== 'production'
-										) {
-											cloudsTextureGroupDebugLoggedRef.current = true;
-											try {
-												console.info('[SearchResultsMap] clouds groups ready', {
-													groups: groupCount,
-													nonEmpty: Array.from(groupPixelCounts).filter(Boolean).length,
-													pixels: Array.from(groupPixelCounts),
-													haze: Boolean(cloudsTexturePatternHazeRef.current),
-												});
-											} catch {
-												// Ignore.
-											}
-										}
-								} catch {
-									cloudsTextureGroupReadyRef.current = false;
-								}
-							};
-
-							const draw = (
-								img: HTMLImageElement,
-								pattern: CanvasPattern | null,
-						tMs: number,
-						dt: number
-					) => {
-						let zoomForScale = CLOUDS_DRIFT_BASE_ZOOM;
-						try {
-							const z =
-								typeof map.getZoom === 'function' ? map.getZoom() : CLOUDS_DRIFT_BASE_ZOOM;
-							zoomForScale = clamp(z, MAP_MIN_ZOOM, CLOUDS_OVERLAY_FADE_OUT_END_ZOOM);
-						} catch {
-							zoomForScale = CLOUDS_DRIFT_BASE_ZOOM;
+					const hazeCtx = hazeCanvas ? hazeCanvas.getContext('2d') : null;
+					if (hazeCanvas && hazeCtx) {
+						const hazeData = new Uint8ClampedArray(new ArrayBuffer(src.length));
+						for (let i = 0; i < src.length; i += 4) {
+							const a = src[i + 3];
+							if (a && a < alphaGate) {
+								hazeData[i] = src[i];
+								hazeData[i + 1] = src[i + 1];
+								hazeData[i + 2] = src[i + 2];
+								hazeData[i + 3] = a;
+							}
 						}
-						const zoomScaleRaw = Math.pow(
-							2,
-							(CLOUDS_DRIFT_BASE_ZOOM - zoomForScale) * CLOUDS_DRIFT_ZOOM_SCALE_EXP
-						);
-						const zoomScale = clamp(
-							zoomScaleRaw,
-							CLOUDS_DRIFT_ZOOM_SCALE_MIN,
-							CLOUDS_DRIFT_ZOOM_SCALE_MAX
+
+						try {
+							hazeCtx.putImageData(new ImageData(hazeData, w, h), 0, 0);
+							cloudsTexturePatternHazeRef.current = cloudsCtx.createPattern(
+								hazeCanvas,
+								'repeat'
 							);
-							const speedScale = zoomScale * motionScale;
-
-							// Drift is implemented as a canvas-source animation. We composite two
-							// independently-drifting layers so some cloud structures move at different speeds.
-							const w = cloudsCanvas.width || CLOUDS_CANVAS_SIZE_PX;
-							const h = cloudsCanvas.height || CLOUDS_CANVAS_SIZE_PX;
-
-							// Macro meander (base layer): smooth randomness applied as velocity so zoom changes
-							// do not introduce positional jumps.
-							const meanderT = tMs / CLOUDS_DRIFT_LOOP_MS;
-							const meanderNoiseX1 =
-								noise1D(meanderT + 10.3) * 0.72 + noise1D(meanderT * 1.9 + 33.7) * 0.28;
-							const meanderNoiseY1 =
-								noise1D(meanderT + 50.3) * 0.72 + noise1D(meanderT * 1.9 + 73.7) * 0.28;
-							const meanderUnitX1 = (meanderNoiseX1 - 0.5) * 2;
-							const meanderUnitY1 = (meanderNoiseY1 - 0.5) * 2;
-
-							const velX1 =
-								(CLOUDS_DRIFT_SPEED_X_PX_PER_S + meanderUnitX1 * meanderSpeedBaseX) * speedScale;
-							const velY1 =
-								(CLOUDS_DRIFT_SPEED_Y_PX_PER_S + meanderUnitY1 * meanderSpeedBaseY) * speedScale;
-
-							const offset1 = cloudsDriftOffsetRef.current;
-							offset1.x += velX1 * dt;
-							offset1.y += velY1 * dt;
-							offset1.x = ((offset1.x % w) + w) % w;
-							offset1.y = ((offset1.y % h) + h) % h;
-
-								const x0 = -offset1.x;
-								const y0 = -offset1.y;
-
-								const groupPatterns = cloudsTextureGroupReadyRef.current
-									? cloudsTextureGroupPatternsRef.current
-									: null;
-								const groupOffsets = cloudsDriftGroupOffsetsRef.current;
-								const groupCount = Array.isArray(groupPatterns)
-									? Math.min(groupPatterns.length, groupOffsets.length)
-									: 0;
-								const useGroups =
-									groupCount > 0 && Array.isArray(groupPatterns) && groupPatterns.some(Boolean);
-								const hazePattern = cloudsTexturePatternHazeRef.current;
-								const useHazeSplit = useGroups && Boolean(hazePattern);
-
-								if (
-									useGroups &&
-									!cloudsTextureGroupDebugActiveLoggedRef.current &&
-									typeof process !== 'undefined' &&
-									process.env?.NODE_ENV !== 'production'
-								) {
-									cloudsTextureGroupDebugActiveLoggedRef.current = true;
-									try {
-										console.info('[SearchResultsMap] clouds groups active', {
-											useHazeSplit,
-											groupCount,
-											speedMults: [0.06, 0.18, 0.42, 0.85, 1.4, 2.2, 3.2, 4.6],
-										});
-									} catch {
-										// Ignore.
-									}
-								}
-
-								// When groups are active we shift most of the visible cloud density into the
-								// group layers (so motion is structure-to-structure), and keep a lighter base
-								// layer underneath for continuity.
-								const baseLayerAlpha = useHazeSplit ? 1 : useGroups ? 0.22 : 1;
-								const groupsLayerAlpha = useHazeSplit ? 1 : useGroups ? 1 - baseLayerAlpha : 0;
-
-								if (useGroups) {
-									// Per-group velocity fields (different speeds + slight direction offsets).
-									const speedMults = [0.06, 0.18, 0.42, 0.85, 1.4, 2.2, 3.2, 4.6];
-									const meanderMults = [0.35, 0.55, 0.8, 1.0, 1.25, 1.6, 2.0, 2.4];
-									const ySpeeds = [-0.06, -0.03, -0.015, 0.0, 0.02, 0.04, 0.07, 0.1];
-
-									for (let g = 0; g < groupCount; g++) {
-										const off = groupOffsets[g];
-										const seed = 410.3 + g * 97.7;
-										const meanderNoiseX =
-											noise1D(meanderT + seed) * 0.72 +
-											noise1D(meanderT * 1.9 + seed * 0.7) * 0.28;
-										const meanderNoiseY =
-											noise1D(meanderT + seed + 40.0) * 0.72 +
-											noise1D(meanderT * 1.9 + seed * 0.7 + 80.0) * 0.28;
-										const meanderUnitX = (meanderNoiseX - 0.5) * 2;
-										const meanderUnitY = (meanderNoiseY - 0.5) * 2;
-
-										const speedMult = speedMults[g] ?? 1;
-										const meanderMult = meanderMults[g] ?? 1;
-										const ySpeed = ySpeeds[g] ?? 0;
-
-										const velX =
-											(
-												CLOUDS_DRIFT_SPEED_X_PX_PER_S * speedMult +
-												meanderUnitX * meanderSpeedBaseX * meanderMult
-											) * speedScale;
-										const velY =
-											(ySpeed + meanderUnitY * meanderSpeedBaseY * meanderMult) * speedScale;
-
-										off.x += velX * dt;
-										off.y += velY * dt;
-										off.x = ((off.x % w) + w) % w;
-										off.y = ((off.y % h) + h) % h;
-									}
-								}
-
-								// Secondary layer: slightly faster + different meander phase so the motion reads
-								// as multiple cloud structures moving independently.
-									// Make the secondary layer noticeably different in motion so the eye can
-									// separate cloud systems moving at different speeds.
-								const L2_SPEED_MULT = 2.85;
-								const L2_MEANDER_MULT = 1.6;
-								const L2_SPEED_Y_PX_PER_S = 0.07;
-							const meanderNoiseX2 =
-								noise1D(meanderT + 210.3) * 0.72 + noise1D(meanderT * 1.9 + 233.7) * 0.28;
-							const meanderNoiseY2 =
-								noise1D(meanderT + 250.3) * 0.72 + noise1D(meanderT * 1.9 + 273.7) * 0.28;
-							const meanderUnitX2 = (meanderNoiseX2 - 0.5) * 2;
-							const meanderUnitY2 = (meanderNoiseY2 - 0.5) * 2;
-
-							const velX2 =
-								(
-									CLOUDS_DRIFT_SPEED_X_PX_PER_S * L2_SPEED_MULT +
-									meanderUnitX2 * meanderSpeedBaseX * L2_MEANDER_MULT
-								) * speedScale;
-							const velY2 =
-								(L2_SPEED_Y_PX_PER_S + meanderUnitY2 * meanderSpeedBaseY * L2_MEANDER_MULT) *
-								speedScale;
-
-							const offset2 = cloudsDriftOffsetSecondaryRef.current;
-							offset2.x += velX2 * dt;
-							offset2.y += velY2 * dt;
-							offset2.x = ((offset2.x % w) + w) % w;
-							offset2.y = ((offset2.y % h) + h) % h;
-
-							const x1 = -offset2.x;
-							const y1 = -offset2.y;
-
-							// Ensure canvas ops are in screen-space coordinates for clear/clip.
-							try {
-								cloudsCtx.setTransform(1, 0, 0, 1, 0, 0);
-								cloudsCtx.globalAlpha = 1;
-								cloudsCtx.globalCompositeOperation = 'source-over';
-							} catch {
-								// Ignore.
-							}
-							cloudsCtx.clearRect(0, 0, w, h);
-
-							const secondaryPattern = cloudsTexturePatternSecondaryRef.current;
-								const secondaryCanvas = cloudsTextureSecondaryCanvasRef.current;
-								const secondaryReady =
-									Boolean(secondaryPattern) || cloudsTextureSecondaryReadyRef.current;
-								const layer2Alpha = useGroups ? 0 : secondaryReady ? 0.52 : 0.22;
-								const layer2Pattern = secondaryReady ? secondaryPattern : pattern;
-								const layer2Source: CanvasImageSource =
-									secondaryReady && secondaryCanvas ? secondaryCanvas : img;
-
-							// Micro turbulence: subtly warp the texture so the cloud shapes feel "alive".
-							// Implemented as a gentle X-shear field that changes smoothly over time.
-							const stripH = CLOUDS_TURBULENCE_STRIP_PX;
-							const stripCount = Math.max(1, Math.ceil(h / stripH));
-
-							const turbulenceUnit = (
-								boundaryIndex: number,
-								t: number,
-								seedA: number,
-								seedB: number
-							) => {
-								const n1 = noise1D(boundaryIndex * 0.91 + t + seedA);
-								const n2 = noise1D(boundaryIndex * 1.77 + t * 0.37 + seedB);
-								const n = n1 * 0.72 + n2 * 0.28;
-								return (n - 0.5) * 2;
-							};
-
-							const turbulenceT1 = tMs / CLOUDS_TURBULENCE_LOOP_MS;
-							const turbulenceAmp1 = CLOUDS_TURBULENCE_AMPLITUDE_X_PX * speedScale * 0.75;
-							// Phase + slightly stronger turbulence on the faster layer so it doesn't feel locked
-							// to the base drift field.
-							const turbulenceT2 = (tMs + 17_000) / CLOUDS_TURBULENCE_LOOP_MS;
-							const turbulenceAmp2 =
-								CLOUDS_TURBULENCE_AMPLITUDE_X_PX * speedScale * 0.75 * 1.25;
-
-							for (let stripIndex = 0; stripIndex < stripCount; stripIndex++) {
-								const yStart = stripIndex * stripH;
-								const stripHeight = Math.min(stripH, h - yStart);
-								if (stripHeight <= 0) continue;
-
-								cloudsCtx.save();
-								cloudsCtx.beginPath();
-								cloudsCtx.rect(0, yStart, w, stripHeight);
-								cloudsCtx.clip();
-
-								// Base layer
-								{
-									const dxTop =
-										turbulenceUnit(stripIndex, turbulenceT1, 10.7, 97.2) * turbulenceAmp1;
-									const dxBottom =
-										turbulenceUnit(stripIndex + 1, turbulenceT1, 10.7, 97.2) * turbulenceAmp1;
-										const shear = (dxBottom - dxTop) / stripHeight;
-										const translateX = dxTop - shear * yStart;
-
-										cloudsCtx.setTransform(1, 0, shear, 1, translateX, 0);
-										cloudsCtx.globalAlpha = baseLayerAlpha;
-
-										const basePattern = useHazeSplit ? hazePattern : pattern;
-										if (basePattern) {
-											// CanvasPattern repeat is much cheaper than multiple drawImage calls and
-											// helps keep the animation smooth under load.
-											cloudsCtx.translate(x0, y0);
-											cloudsCtx.fillStyle = basePattern;
-											cloudsCtx.fillRect(-w * 2, -h * 2, w * 5, h * 5);
-										} else {
-											// Fill the canvas with wrapped draws (extra copy in X to avoid edge gaps under shear).
-											for (let x = x0 - w; x < w + w; x += w) {
-												for (let y = y0; y < h; y += h) {
-													cloudsCtx.drawImage(img, x, y, w, h);
-												}
-											}
-										}
-
-										// Group overlays: independently-drifting subsets of the same texture so
-										// different cloud structures move at different speeds.
-										if (useGroups && Array.isArray(groupPatterns)) {
-											for (let g = 0; g < groupCount; g++) {
-												const gp = groupPatterns[g];
-												if (!gp) continue;
-												const off = groupOffsets[g];
-												const xg = -off.x;
-												const yg = -off.y;
-
-												cloudsCtx.setTransform(1, 0, shear, 1, translateX, 0);
-												cloudsCtx.globalAlpha = groupsLayerAlpha;
-												cloudsCtx.translate(xg, yg);
-												cloudsCtx.fillStyle = gp;
-												cloudsCtx.fillRect(-w * 2, -h * 2, w * 5, h * 5);
-											}
-										}
-									}
-
-								// Faster secondary layer (subtle)
-								if (layer2Alpha > 0.001) {
-									const dxTop =
-										turbulenceUnit(stripIndex, turbulenceT2, 110.7, 197.2) * turbulenceAmp2;
-									const dxBottom =
-										turbulenceUnit(stripIndex + 1, turbulenceT2, 110.7, 197.2) * turbulenceAmp2;
-									const shear = (dxBottom - dxTop) / stripHeight;
-									const translateX = dxTop - shear * yStart;
-
-									cloudsCtx.setTransform(1, 0, shear, 1, translateX, 0);
-									cloudsCtx.globalAlpha = layer2Alpha;
-
-									if (layer2Pattern) {
-										cloudsCtx.translate(x1, y1);
-										cloudsCtx.fillStyle = layer2Pattern;
-										cloudsCtx.fillRect(-w * 2, -h * 2, w * 5, h * 5);
-									} else {
-										for (let x = x1 - w; x < w + w; x += w) {
-											for (let y = y1; y < h; y += h) {
-												cloudsCtx.drawImage(layer2Source, x, y, w, h);
-											}
-										}
-									}
-								}
-
-								cloudsCtx.restore();
-							}
-
-							// In some Mapbox GL configurations `animate: true` is not enough to force
-							// continuous sampling; explicitly request a repaint after each draw.
-							try {
-								map.triggerRepaint();
-							} catch {
-								// Ignore.
-							}
-						};
-
-				const tick = (now: number, img: HTMLImageElement, pattern: CanvasPattern | null) => {
-					if (canceled) return;
-
-					const last = cloudsDriftLastFrameMsRef.current;
-					if (!last || now - last >= CLOUDS_DRIFT_UPDATE_MS) {
-						const dtS = last ? (now - last) / 1000 : 0;
-						cloudsDriftLastFrameMsRef.current = now;
-						const dt = clamp(dtS, 0, 0.25);
-						cloudsDriftSimTimeMsRef.current += dt * 1000;
-						try {
-							draw(img, pattern, cloudsDriftSimTimeMsRef.current, dt);
 						} catch {
-							// Ignore.
+							cloudsTexturePatternHazeRef.current = null;
+						}
+					}
+				} catch {
+					cloudsTexturePatternHazeRef.current = null;
+				}
+
+				const groupCount = Math.max(1, cloudsDriftGroupOffsetsRef.current.length);
+				const groupDatas: Uint8ClampedArray<ArrayBuffer>[] = Array.from(
+					{ length: groupCount },
+					() => new Uint8ClampedArray(new ArrayBuffer(src.length))
+				);
+				const groupPixelCounts = new Uint32Array(groupCount);
+
+				// Connected-components over alphaGate pixels (with wraparound) so each cloud
+				// structure is assigned to a single speed group (cloud-to-cloud variation).
+				const pixelCount = w * h;
+				const visited = new Uint8Array(pixelCount);
+				const stack = new Int32Array(pixelCount);
+				const componentPixels: number[] = [];
+
+				const halfIndex = Math.floor(groupCount / 2);
+				const slowMax = Math.max(0, halfIndex - 1);
+				const fastMin = Math.min(groupCount - 1, halfIndex);
+
+				let compId = 0;
+				for (let start = 0; start < pixelCount; start++) {
+					if (visited[start]) continue;
+					const a0 = src[start * 4 + 3];
+					if (a0 < alphaGate) continue;
+
+					let sp = 0;
+					stack[sp++] = start;
+					visited[start] = 1;
+					componentPixels.length = 0;
+
+					while (sp > 0) {
+						const p = stack[--sp];
+						componentPixels.push(p);
+
+						const x = p % w;
+						const y = (p / w) | 0;
+
+						const left = x > 0 ? p - 1 : p + (w - 1);
+						const right = x + 1 < w ? p + 1 : p - (w - 1);
+						const up = y > 0 ? p - w : p + (h - 1) * w;
+						const down = y + 1 < h ? p + w : p - (h - 1) * w;
+
+						if (!visited[left] && src[left * 4 + 3] >= alphaGate) {
+							visited[left] = 1;
+							stack[sp++] = left;
+						}
+						if (!visited[right] && src[right * 4 + 3] >= alphaGate) {
+							visited[right] = 1;
+							stack[sp++] = right;
+						}
+						if (!visited[up] && src[up * 4 + 3] >= alphaGate) {
+							visited[up] = 1;
+							stack[sp++] = up;
+						}
+						if (!visited[down] && src[down * 4 + 3] >= alphaGate) {
+							visited[down] = 1;
+							stack[sp++] = down;
 						}
 					}
 
-				cloudsDriftRafRef.current = requestAnimationFrame((t) => tick(t, img, pattern));
+					const size = componentPixels.length;
+					const r = hash01(compId * 91.7 + size * 0.013 + 501.9);
+					const r2 = hash01(compId * 37.1 + size * 0.021 + 911.3);
+					let bucket = 0;
+					// Keep big cloud masses biased toward the slower half, but still distribute
+					// across multiple buckets so the motion reads as cloud-to-cloud variation.
+					if (size >= 9000) {
+						// Small chance that a big cloud system is part of a faster flow.
+						if (r2 < 0.15) {
+							const span = Math.max(1, groupCount - fastMin);
+							bucket = fastMin + Math.min(span - 1, Math.floor(r * span));
+						} else {
+							const span = Math.max(1, slowMax + 1);
+							bucket = Math.min(slowMax, Math.floor(r * span));
+						}
+					} else if (size <= 420) {
+						const span = Math.max(1, groupCount - fastMin);
+						bucket = fastMin + Math.min(span - 1, Math.floor(r * span));
+					} else {
+						bucket = Math.min(groupCount - 1, Math.floor(r * groupCount));
+					}
+
+					const out = groupDatas[bucket];
+					for (let i = 0; i < size; i++) {
+						const p = componentPixels[i];
+						const idx = p * 4;
+						out[idx] = src[idx];
+						out[idx + 1] = src[idx + 1];
+						out[idx + 2] = src[idx + 2];
+						out[idx + 3] = src[idx + 3];
+					}
+					groupPixelCounts[bucket] += size;
+					compId++;
+				}
+
+				const groupCanvases: HTMLCanvasElement[] = [];
+				const groupPatterns: (CanvasPattern | null)[] = [];
+
+				for (let g = 0; g < groupCount; g++) {
+					if (typeof document === 'undefined') {
+						groupPatterns.push(null);
+						continue;
+					}
+					if (!groupPixelCounts[g]) {
+						groupPatterns.push(null);
+						continue;
+					}
+
+					const c = document.createElement('canvas');
+					c.width = w;
+					c.height = h;
+					const ctx = c.getContext('2d');
+					if (!ctx) {
+						groupPatterns.push(null);
+						continue;
+					}
+
+					let applied = false;
+					try {
+						ctx.putImageData(new ImageData(groupDatas[g], w, h), 0, 0);
+						applied = true;
+					} catch {
+						applied = false;
+					}
+					if (!applied) {
+						groupPatterns.push(null);
+						continue;
+					}
+
+					groupCanvases.push(c);
+					try {
+						groupPatterns.push(cloudsCtx.createPattern(c, 'repeat'));
+					} catch {
+						groupPatterns.push(null);
+					}
+				}
+
+				cloudsTextureGroupCanvasesRef.current = groupCanvases;
+				cloudsTextureGroupPatternsRef.current = groupPatterns;
+				cloudsTextureGroupReadyRef.current = groupPatterns.some(Boolean);
+				if (
+					cloudsTextureGroupReadyRef.current &&
+					!cloudsTextureGroupDebugLoggedRef.current &&
+					typeof process !== 'undefined' &&
+					process.env?.NODE_ENV !== 'production'
+				) {
+					cloudsTextureGroupDebugLoggedRef.current = true;
+					try {
+						console.info('[SearchResultsMap] clouds groups ready', {
+							groups: groupCount,
+							nonEmpty: Array.from(groupPixelCounts).filter(Boolean).length,
+							pixels: Array.from(groupPixelCounts),
+							haze: Boolean(cloudsTexturePatternHazeRef.current),
+						});
+					} catch {
+						// Ignore.
+					}
+				}
+			} catch {
+				cloudsTextureGroupReadyRef.current = false;
+			}
+		};
+
+		const draw = (
+			img: HTMLImageElement,
+			pattern: CanvasPattern | null,
+			tMs: number,
+			dt: number
+		) => {
+			let zoomForScale = CLOUDS_DRIFT_BASE_ZOOM;
+			try {
+				const z =
+					typeof map.getZoom === 'function' ? map.getZoom() : CLOUDS_DRIFT_BASE_ZOOM;
+				zoomForScale = clamp(z, MAP_MIN_ZOOM, CLOUDS_OVERLAY_FADE_OUT_END_ZOOM);
+			} catch {
+				zoomForScale = CLOUDS_DRIFT_BASE_ZOOM;
+			}
+			const zoomScaleRaw = Math.pow(
+				2,
+				(CLOUDS_DRIFT_BASE_ZOOM - zoomForScale) * CLOUDS_DRIFT_ZOOM_SCALE_EXP
+			);
+			const zoomScale = clamp(
+				zoomScaleRaw,
+				CLOUDS_DRIFT_ZOOM_SCALE_MIN,
+				CLOUDS_DRIFT_ZOOM_SCALE_MAX
+			);
+			const speedScale = zoomScale * motionScale;
+
+			// Drift is implemented as a canvas-source animation. We composite two
+			// independently-drifting layers so some cloud structures move at different speeds.
+			const w = cloudsCanvas.width || CLOUDS_CANVAS_SIZE_PX;
+			const h = cloudsCanvas.height || CLOUDS_CANVAS_SIZE_PX;
+
+			// Macro meander (base layer): smooth randomness applied as velocity so zoom changes
+			// do not introduce positional jumps.
+			const meanderT = tMs / CLOUDS_DRIFT_LOOP_MS;
+			const meanderNoiseX1 =
+				noise1D(meanderT + 10.3) * 0.72 + noise1D(meanderT * 1.9 + 33.7) * 0.28;
+			const meanderNoiseY1 =
+				noise1D(meanderT + 50.3) * 0.72 + noise1D(meanderT * 1.9 + 73.7) * 0.28;
+			const meanderUnitX1 = (meanderNoiseX1 - 0.5) * 2;
+			const meanderUnitY1 = (meanderNoiseY1 - 0.5) * 2;
+
+			const moodDriftMult = weatherMoodConfigRef.current.cloudDriftSpeedMultiplier;
+			const velX1 =
+				(CLOUDS_DRIFT_SPEED_X_PX_PER_S * moodDriftMult +
+					meanderUnitX1 * meanderSpeedBaseX) *
+				speedScale;
+			const velY1 =
+				(CLOUDS_DRIFT_SPEED_Y_PX_PER_S * moodDriftMult +
+					meanderUnitY1 * meanderSpeedBaseY) *
+				speedScale;
+
+			const offset1 = cloudsDriftOffsetRef.current;
+			offset1.x += velX1 * dt;
+			offset1.y += velY1 * dt;
+			offset1.x = ((offset1.x % w) + w) % w;
+			offset1.y = ((offset1.y % h) + h) % h;
+
+			const x0 = -offset1.x;
+			const y0 = -offset1.y;
+
+			const groupPatterns = cloudsTextureGroupReadyRef.current
+				? cloudsTextureGroupPatternsRef.current
+				: null;
+			const groupOffsets = cloudsDriftGroupOffsetsRef.current;
+			const groupCount = Array.isArray(groupPatterns)
+				? Math.min(groupPatterns.length, groupOffsets.length)
+				: 0;
+			const useGroups =
+				groupCount > 0 && Array.isArray(groupPatterns) && groupPatterns.some(Boolean);
+			const hazePattern = cloudsTexturePatternHazeRef.current;
+			const useHazeSplit = useGroups && Boolean(hazePattern);
+
+			if (
+				useGroups &&
+				!cloudsTextureGroupDebugActiveLoggedRef.current &&
+				typeof process !== 'undefined' &&
+				process.env?.NODE_ENV !== 'production'
+			) {
+				cloudsTextureGroupDebugActiveLoggedRef.current = true;
+				try {
+					console.info('[SearchResultsMap] clouds groups active', {
+						useHazeSplit,
+						groupCount,
+						speedMults: [0.06, 0.18, 0.42, 0.85, 1.4, 2.2, 3.2, 4.6],
+					});
+				} catch {
+					// Ignore.
+				}
+			}
+
+			// When groups are active we shift most of the visible cloud density into the
+			// group layers (so motion is structure-to-structure), and keep a lighter base
+			// layer underneath for continuity.
+			const baseLayerAlpha = useHazeSplit ? 1 : useGroups ? 0.22 : 1;
+			const groupsLayerAlpha = useHazeSplit ? 1 : useGroups ? 1 - baseLayerAlpha : 0;
+
+			if (useGroups) {
+				// Per-group velocity fields (different speeds + slight direction offsets).
+				const speedMults = [0.06, 0.18, 0.42, 0.85, 1.4, 2.2, 3.2, 4.6];
+				const meanderMults = [0.35, 0.55, 0.8, 1.0, 1.25, 1.6, 2.0, 2.4];
+				const ySpeeds = [-0.06, -0.03, -0.015, 0.0, 0.02, 0.04, 0.07, 0.1];
+
+				for (let g = 0; g < groupCount; g++) {
+					const off = groupOffsets[g];
+					const seed = 410.3 + g * 97.7;
+					const meanderNoiseX =
+						noise1D(meanderT + seed) * 0.72 + noise1D(meanderT * 1.9 + seed * 0.7) * 0.28;
+					const meanderNoiseY =
+						noise1D(meanderT + seed + 40.0) * 0.72 +
+						noise1D(meanderT * 1.9 + seed * 0.7 + 80.0) * 0.28;
+					const meanderUnitX = (meanderNoiseX - 0.5) * 2;
+					const meanderUnitY = (meanderNoiseY - 0.5) * 2;
+
+					const speedMult = speedMults[g] ?? 1;
+					const meanderMult = meanderMults[g] ?? 1;
+					const ySpeed = ySpeeds[g] ?? 0;
+
+					const groupMoodDriftMult =
+						weatherMoodConfigRef.current.cloudDriftSpeedMultiplier;
+					const velX =
+						(CLOUDS_DRIFT_SPEED_X_PX_PER_S * speedMult * groupMoodDriftMult +
+							meanderUnitX * meanderSpeedBaseX * meanderMult) *
+						speedScale;
+					const velY =
+						(ySpeed * groupMoodDriftMult +
+							meanderUnitY * meanderSpeedBaseY * meanderMult) *
+						speedScale;
+
+					off.x += velX * dt;
+					off.y += velY * dt;
+					off.x = ((off.x % w) + w) % w;
+					off.y = ((off.y % h) + h) % h;
+				}
+			}
+
+			// Secondary layer: slightly faster + different meander phase so the motion reads
+			// as multiple cloud structures moving independently.
+			// Make the secondary layer noticeably different in motion so the eye can
+			// separate cloud systems moving at different speeds.
+			const L2_SPEED_MULT = 2.85;
+			const L2_MEANDER_MULT = 1.6;
+			const L2_SPEED_Y_PX_PER_S = 0.07;
+			const meanderNoiseX2 =
+				noise1D(meanderT + 210.3) * 0.72 + noise1D(meanderT * 1.9 + 233.7) * 0.28;
+			const meanderNoiseY2 =
+				noise1D(meanderT + 250.3) * 0.72 + noise1D(meanderT * 1.9 + 273.7) * 0.28;
+			const meanderUnitX2 = (meanderNoiseX2 - 0.5) * 2;
+			const meanderUnitY2 = (meanderNoiseY2 - 0.5) * 2;
+
+			const layer2MoodDriftMult = weatherMoodConfigRef.current.cloudDriftSpeedMultiplier;
+			const velX2 =
+				(CLOUDS_DRIFT_SPEED_X_PX_PER_S * L2_SPEED_MULT * layer2MoodDriftMult +
+					meanderUnitX2 * meanderSpeedBaseX * L2_MEANDER_MULT) *
+				speedScale;
+			const velY2 =
+				(L2_SPEED_Y_PX_PER_S * layer2MoodDriftMult +
+					meanderUnitY2 * meanderSpeedBaseY * L2_MEANDER_MULT) *
+				speedScale;
+
+			const offset2 = cloudsDriftOffsetSecondaryRef.current;
+			offset2.x += velX2 * dt;
+			offset2.y += velY2 * dt;
+			offset2.x = ((offset2.x % w) + w) % w;
+			offset2.y = ((offset2.y % h) + h) % h;
+
+			const x1 = -offset2.x;
+			const y1 = -offset2.y;
+
+			// Ensure canvas ops are in screen-space coordinates for clear/clip.
+			try {
+				cloudsCtx.setTransform(1, 0, 0, 1, 0, 0);
+				cloudsCtx.globalAlpha = 1;
+				cloudsCtx.globalCompositeOperation = 'source-over';
+			} catch {
+				// Ignore.
+			}
+			cloudsCtx.clearRect(0, 0, w, h);
+
+			const secondaryPattern = cloudsTexturePatternSecondaryRef.current;
+			const secondaryCanvas = cloudsTextureSecondaryCanvasRef.current;
+			const secondaryReady =
+				Boolean(secondaryPattern) || cloudsTextureSecondaryReadyRef.current;
+			const layer2Alpha = useGroups ? 0 : secondaryReady ? 0.52 : 0.22;
+			const layer2Pattern = secondaryReady ? secondaryPattern : pattern;
+			const layer2Source: CanvasImageSource =
+				secondaryReady && secondaryCanvas ? secondaryCanvas : img;
+
+			// Micro turbulence: subtly warp the texture so the cloud shapes feel "alive".
+			// Implemented as a gentle X-shear field that changes smoothly over time.
+			const stripH = CLOUDS_TURBULENCE_STRIP_PX;
+			const stripCount = Math.max(1, Math.ceil(h / stripH));
+
+			const turbulenceUnit = (
+				boundaryIndex: number,
+				t: number,
+				seedA: number,
+				seedB: number
+			) => {
+				const n1 = noise1D(boundaryIndex * 0.91 + t + seedA);
+				const n2 = noise1D(boundaryIndex * 1.77 + t * 0.37 + seedB);
+				const n = n1 * 0.72 + n2 * 0.28;
+				return (n - 0.5) * 2;
 			};
 
-			// Cancel any in-flight drift loop before starting.
+			const turbulenceT1 = tMs / CLOUDS_TURBULENCE_LOOP_MS;
+			const moodTurbMult = weatherMoodConfigRef.current.cloudTurbulenceMultiplier;
+			const turbulenceAmp1 =
+				CLOUDS_TURBULENCE_AMPLITUDE_X_PX * speedScale * 0.75 * moodTurbMult;
+			// Phase + slightly stronger turbulence on the faster layer so it doesn't feel locked
+			// to the base drift field.
+			const turbulenceT2 = (tMs + 17_000) / CLOUDS_TURBULENCE_LOOP_MS;
+			const turbulenceAmp2 =
+				CLOUDS_TURBULENCE_AMPLITUDE_X_PX * speedScale * 0.75 * 1.25 * moodTurbMult;
+
+			for (let stripIndex = 0; stripIndex < stripCount; stripIndex++) {
+				const yStart = stripIndex * stripH;
+				const stripHeight = Math.min(stripH, h - yStart);
+				if (stripHeight <= 0) continue;
+
+				cloudsCtx.save();
+				cloudsCtx.beginPath();
+				cloudsCtx.rect(0, yStart, w, stripHeight);
+				cloudsCtx.clip();
+
+				// Base layer
+				{
+					const dxTop =
+						turbulenceUnit(stripIndex, turbulenceT1, 10.7, 97.2) * turbulenceAmp1;
+					const dxBottom =
+						turbulenceUnit(stripIndex + 1, turbulenceT1, 10.7, 97.2) * turbulenceAmp1;
+					const shear = (dxBottom - dxTop) / stripHeight;
+					const translateX = dxTop - shear * yStart;
+
+					cloudsCtx.setTransform(1, 0, shear, 1, translateX, 0);
+					cloudsCtx.globalAlpha = baseLayerAlpha;
+
+					const basePattern = useHazeSplit ? hazePattern : pattern;
+					if (basePattern) {
+						// CanvasPattern repeat is much cheaper than multiple drawImage calls and
+						// helps keep the animation smooth under load.
+						cloudsCtx.translate(x0, y0);
+						cloudsCtx.fillStyle = basePattern;
+						cloudsCtx.fillRect(-w * 2, -h * 2, w * 5, h * 5);
+						// Mood-driven extra density: re-fill the same pattern with offsets so the
+						// same texture covers more of the canvas (no Python re-bake needed).
+						const extraPasses = weatherMoodConfigRef.current.cloudExtraPasses;
+						for (let p = 0; p < extraPasses; p++) {
+							const ox = p === 0 ? w * 0.5 : p === 1 ? -w * 0.31 : w * 0.18;
+							const oy = p === 0 ? h * 0.5 : p === 1 ? h * 0.37 : -h * 0.29;
+							cloudsCtx.translate(ox, oy);
+							cloudsCtx.fillRect(-w * 2, -h * 2, w * 5, h * 5);
+						}
+					} else {
+						// Fill the canvas with wrapped draws (extra copy in X to avoid edge gaps under shear).
+						for (let x = x0 - w; x < w + w; x += w) {
+							for (let y = y0; y < h; y += h) {
+								cloudsCtx.drawImage(img, x, y, w, h);
+							}
+						}
+					}
+
+					// Group overlays: independently-drifting subsets of the same texture so
+					// different cloud structures move at different speeds.
+					if (useGroups && Array.isArray(groupPatterns)) {
+						for (let g = 0; g < groupCount; g++) {
+							const gp = groupPatterns[g];
+							if (!gp) continue;
+							const off = groupOffsets[g];
+							const xg = -off.x;
+							const yg = -off.y;
+
+							cloudsCtx.setTransform(1, 0, shear, 1, translateX, 0);
+							cloudsCtx.globalAlpha = groupsLayerAlpha;
+							cloudsCtx.translate(xg, yg);
+							cloudsCtx.fillStyle = gp;
+							cloudsCtx.fillRect(-w * 2, -h * 2, w * 5, h * 5);
+							// Mood-driven extra density (matches base layer pass count).
+							const extraPasses = weatherMoodConfigRef.current.cloudExtraPasses;
+							for (let p = 0; p < extraPasses; p++) {
+								const ox = p === 0 ? w * 0.5 : -w * 0.31;
+								const oy = p === 0 ? h * 0.5 : h * 0.37;
+								cloudsCtx.translate(ox, oy);
+								cloudsCtx.fillRect(-w * 2, -h * 2, w * 5, h * 5);
+							}
+						}
+					}
+				}
+
+				// Faster secondary layer (subtle)
+				if (layer2Alpha > 0.001) {
+					const dxTop =
+						turbulenceUnit(stripIndex, turbulenceT2, 110.7, 197.2) * turbulenceAmp2;
+					const dxBottom =
+						turbulenceUnit(stripIndex + 1, turbulenceT2, 110.7, 197.2) * turbulenceAmp2;
+					const shear = (dxBottom - dxTop) / stripHeight;
+					const translateX = dxTop - shear * yStart;
+
+					cloudsCtx.setTransform(1, 0, shear, 1, translateX, 0);
+					cloudsCtx.globalAlpha = layer2Alpha;
+
+					if (layer2Pattern) {
+						cloudsCtx.translate(x1, y1);
+						cloudsCtx.fillStyle = layer2Pattern;
+						cloudsCtx.fillRect(-w * 2, -h * 2, w * 5, h * 5);
+					} else {
+						for (let x = x1 - w; x < w + w; x += w) {
+							for (let y = y1; y < h; y += h) {
+								cloudsCtx.drawImage(layer2Source, x, y, w, h);
+							}
+						}
+					}
+				}
+
+				cloudsCtx.restore();
+			}
+
+			// In some Mapbox GL configurations `animate: true` is not enough to force
+			// continuous sampling; explicitly request a repaint after each draw.
+			try {
+				map.triggerRepaint();
+			} catch {
+				// Ignore.
+			}
+		};
+
+		const tick = (now: number, img: HTMLImageElement, pattern: CanvasPattern | null) => {
+			if (canceled) return;
+
+			const last = cloudsDriftLastFrameMsRef.current;
+			if (!last || now - last >= CLOUDS_DRIFT_UPDATE_MS) {
+				const dtS = last ? (now - last) / 1000 : 0;
+				cloudsDriftLastFrameMsRef.current = now;
+				const dtReal = clamp(dtS, 0, 0.25);
+				const dt = dtReal * CLOUDS_DRIFT_TIME_SCALE;
+				cloudsDriftSimTimeMsRef.current += dt * 1000;
+				try {
+					draw(img, pattern, cloudsDriftSimTimeMsRef.current, dt);
+				} catch {
+					// Ignore.
+				}
+			}
+
+			cloudsDriftRafRef.current = requestAnimationFrame((t) => tick(t, img, pattern));
+		};
+
+		// Cancel any in-flight drift loop before starting.
+		if (cloudsDriftRafRef.current != null) {
+			cancelAnimationFrame(cloudsDriftRafRef.current);
+			cloudsDriftRafRef.current = null;
+		}
+
+		loadTexture()
+			.then((img) => {
+				if (canceled) return;
+				const initialNow = performance.now();
+				cloudsDriftOffsetRef.current = { x: 0, y: 0 };
+				// Seed a non-zero initial offset so the secondary layer reads as a distinct
+				// cloud system immediately (rather than starting perfectly aligned and only
+				// diverging after minutes of drift).
+				{
+					const w = cloudsCanvas.width || CLOUDS_CANVAS_SIZE_PX;
+					const h = cloudsCanvas.height || CLOUDS_CANVAS_SIZE_PX;
+					const sx = hash01(901.7);
+					const sy = hash01(1902.3);
+					cloudsDriftOffsetSecondaryRef.current = { x: sx * w, y: sy * h };
+				}
+				cloudsDriftSimTimeMsRef.current = 0;
+				cloudsDriftLastFrameMsRef.current = initialNow;
+				if (!cloudsTexturePatternRef.current) {
+					try {
+						cloudsTexturePatternRef.current = cloudsCtx.createPattern(img, 'repeat');
+					} catch {
+						cloudsTexturePatternRef.current = null;
+					}
+				}
+				// Build the secondary (sparser) texture once so the second drift layer is ready
+				// for the first painted frame.
+				ensureSecondaryCloudsTexture(img);
+				ensureCloudsGroupPatterns(img);
+				// Seed group offsets so the independently-drifting structures start de-phased
+				// immediately (no initial "locked" look).
+				{
+					const w = cloudsCanvas.width || CLOUDS_CANVAS_SIZE_PX;
+					const h = cloudsCanvas.height || CLOUDS_CANVAS_SIZE_PX;
+					const groupOffsets = cloudsDriftGroupOffsetsRef.current;
+					for (let g = 0; g < groupOffsets.length; g++) {
+						const sx = hash01(5000.7 + g * 91.3);
+						const sy = hash01(6000.2 + g * 113.9);
+						groupOffsets[g].x = sx * w;
+						groupOffsets[g].y = sy * h;
+					}
+				}
+				const pattern = cloudsTexturePatternRef.current;
+				draw(img, pattern, 0, 0);
+				cloudsDriftRafRef.current = requestAnimationFrame((t) => tick(t, img, pattern));
+			})
+			.catch(() => {
+				// If the texture fails to load, just leave clouds static.
+			});
+
+		return () => {
+			canceled = true;
+			try {
+				cloudsSource.pause?.();
+			} catch {
+				// Ignore.
+			}
 			if (cloudsDriftRafRef.current != null) {
 				cancelAnimationFrame(cloudsDriftRafRef.current);
 				cloudsDriftRafRef.current = null;
 			}
-
-			loadTexture()
-					.then((img) => {
-							if (canceled) return;
-							const initialNow = performance.now();
-							cloudsDriftOffsetRef.current = { x: 0, y: 0 };
-							// Seed a non-zero initial offset so the secondary layer reads as a distinct
-							// cloud system immediately (rather than starting perfectly aligned and only
-							// diverging after minutes of drift).
-							{
-								const w = cloudsCanvas.width || CLOUDS_CANVAS_SIZE_PX;
-								const h = cloudsCanvas.height || CLOUDS_CANVAS_SIZE_PX;
-								const sx = hash01(901.7);
-								const sy = hash01(1902.3);
-								cloudsDriftOffsetSecondaryRef.current = { x: sx * w, y: sy * h };
-							}
-							cloudsDriftSimTimeMsRef.current = 0;
-							cloudsDriftLastFrameMsRef.current = initialNow;
-							if (!cloudsTexturePatternRef.current) {
-								try {
-								cloudsTexturePatternRef.current = cloudsCtx.createPattern(img, 'repeat');
-							} catch {
-								cloudsTexturePatternRef.current = null;
-								}
-							}
-								// Build the secondary (sparser) texture once so the second drift layer is ready
-								// for the first painted frame.
-								ensureSecondaryCloudsTexture(img);
-								ensureCloudsGroupPatterns(img);
-								// Seed group offsets so the independently-drifting structures start de-phased
-								// immediately (no initial "locked" look).
-								{
-									const w = cloudsCanvas.width || CLOUDS_CANVAS_SIZE_PX;
-									const h = cloudsCanvas.height || CLOUDS_CANVAS_SIZE_PX;
-									const groupOffsets = cloudsDriftGroupOffsetsRef.current;
-									for (let g = 0; g < groupOffsets.length; g++) {
-										const sx = hash01(5000.7 + g * 91.3);
-										const sy = hash01(6000.2 + g * 113.9);
-										groupOffsets[g].x = sx * w;
-										groupOffsets[g].y = sy * h;
-									}
-								}
-								const pattern = cloudsTexturePatternRef.current;
-								draw(img, pattern, 0, 0);
-								cloudsDriftRafRef.current = requestAnimationFrame((t) => tick(t, img, pattern));
-							})
-				.catch(() => {
-					// If the texture fails to load, just leave clouds static.
-				});
-
-			return () => {
-				canceled = true;
-				try {
-					cloudsSource.pause?.();
-				} catch {
-					// Ignore.
-				}
-				if (cloudsDriftRafRef.current != null) {
-					cancelAnimationFrame(cloudsDriftRafRef.current);
-					cloudsDriftRafRef.current = null;
-				}
-			};
-		}, [map, isMapLoaded]);
+		};
+	}, [map, isMapLoaded]);
 
 	// Keep the Mapbox "selected" feature-state for US states in sync with `selectedStateKey`.
 	const prevSelectedStateKeyOnMapRef = useRef<string | null>(null);
@@ -4315,35 +4439,35 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			mapInstance.addSource(id, { type: 'geojson', data: emptyFc });
 		};
 
-			// Core sources
-			// Clouds: subtle overlay (existing local cloud PNGs), animated via a canvas source so
-			// we can drift the texture (Mapbox raster layers do not support translate).
-			// Added first so all interactive overlays (states/markers) render above it.
-				if (!mapInstance.getSource(MAPBOX_SOURCE_IDS.clouds)) {
-					const cloudsCanvas = cloudsCanvasRef.current;
-					if (cloudsCanvas) {
-						mapInstance.addSource(MAPBOX_SOURCE_IDS.clouds, {
-							type: 'canvas',
-							canvas: cloudsCanvas,
-							animate: true,
-							coordinates: CLOUDS_CANVAS_COORDINATES,
-						} as any);
-						// Start sampling immediately (the drift loop will draw once the texture loads).
-						try {
-							(mapInstance.getSource(MAPBOX_SOURCE_IDS.clouds) as any)?.play?.();
-						} catch {
-							// Ignore.
-						}
-					} else {
-						// Fallback: static raster tiles (no drift).
-						mapInstance.addSource(MAPBOX_SOURCE_IDS.clouds, {
-							type: 'raster',
-							tiles: [CLOUDS_TILES_URL_TEMPLATE],
-						tileSize: 512,
-						maxzoom: CLOUDS_TILES_MAX_ZOOM,
-					} as any);
+		// Core sources
+		// Clouds: subtle overlay (existing local cloud PNGs), animated via a canvas source so
+		// we can drift the texture (Mapbox raster layers do not support translate).
+		// Added first so all interactive overlays (states/markers) render above it.
+		if (!mapInstance.getSource(MAPBOX_SOURCE_IDS.clouds)) {
+			const cloudsCanvas = cloudsCanvasRef.current;
+			if (cloudsCanvas) {
+				mapInstance.addSource(MAPBOX_SOURCE_IDS.clouds, {
+					type: 'canvas',
+					canvas: cloudsCanvas,
+					animate: true,
+					coordinates: CLOUDS_CANVAS_COORDINATES,
+				} as any);
+				// Start sampling immediately (the drift loop will draw once the texture loads).
+				try {
+					(mapInstance.getSource(MAPBOX_SOURCE_IDS.clouds) as any)?.play?.();
+				} catch {
+					// Ignore.
 				}
+			} else {
+				// Fallback: static raster tiles (no drift).
+				mapInstance.addSource(MAPBOX_SOURCE_IDS.clouds, {
+					type: 'raster',
+					tiles: [CLOUDS_TILES_URL_TEMPLATE],
+					tileSize: 512,
+					maxzoom: CLOUDS_TILES_MAX_ZOOM,
+				} as any);
 			}
+		}
 
 		// States source needs `promoteId` so Mapbox uses the string "key" property (e.g. "CA", "TX")
 		// as the feature identifier — required for setFeatureState with non-numeric IDs.
@@ -4374,37 +4498,30 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			mapInstance.addLayer(layer);
 		};
 
-		const cloudsOpacityExpr = [
-			'interpolate',
-			['linear'],
-			['zoom'],
-			0,
-			CLOUDS_OVERLAY_OPACITY_AT_GLOBE_ZOOM,
-			MAP_MIN_ZOOM,
-			CLOUDS_OVERLAY_OPACITY_AT_GLOBE_ZOOM,
-			4,
-			CLOUDS_OVERLAY_OPACITY_AT_DECORATIVE_ZOOM,
-			CLOUDS_OVERLAY_FADE_OUT_START_ZOOM,
-			CLOUDS_OVERLAY_OPACITY_AT_DECORATIVE_ZOOM,
-			CLOUDS_OVERLAY_FADE_OUT_END_ZOOM,
-			0,
-		];
+		const cfg = weatherMoodConfigRef.current;
+		const cloudsOpacityExpr = buildCloudsOpacityExpr(
+			cfg.cloudOpacityGlobeZoom,
+			cfg.cloudOpacityDecorativeZoom,
+			cfg.cloudDeepZoomOpacity
+		);
 
 		ensureLayer({
 			id: MAPBOX_LAYER_IDS.clouds,
 			type: 'raster',
 			source: MAPBOX_SOURCE_IDS.clouds,
-			// Disable entirely once we're zoomed into state-level detail.
-			maxzoom: CLOUDS_OVERLAY_FADE_OUT_END_ZOOM + 0.01,
-				paint: {
-					'raster-opacity': cloudsOpacityExpr,
-					'raster-brightness-min': 0.84,
-					'raster-brightness-max': 1,
-					'raster-contrast': 0.36,
-					'raster-saturation': 0,
-					'raster-resampling': 'linear',
-				},
-			});
+			// Layer is registered at all zooms; the opacity expression handles
+			// fade-out. Most moods drive opacity to 0 by zoom 10.5 (no draw cost),
+			// but stormy keeps a small `cloudDeepZoomOpacity` floor so a faint
+			// haze persists into city zoom.
+			paint: {
+				'raster-opacity': cloudsOpacityExpr,
+				'raster-brightness-min': cfg.cloudBrightnessMin,
+				'raster-brightness-max': cfg.cloudBrightnessMax,
+				'raster-contrast': 0.36,
+				'raster-saturation': 0,
+				'raster-resampling': 'linear',
+			},
+		});
 
 		const resultDotRadiusExpr = [
 			'interpolate',
@@ -4883,13 +5000,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				? DASHBOARD_DECORATIVE_CENTER
 				: [defaultCenter.lng, defaultCenter.lat];
 		const initialZoom =
-			initialPresentation === 'background'
-				? DASHBOARD_DECORATIVE_ZOOM
-				: MAP_DEFAULT_ZOOM;
+			initialPresentation === 'background' ? DASHBOARD_DECORATIVE_ZOOM : MAP_DEFAULT_ZOOM;
 		const initialPitch =
-			initialPresentation === 'background'
-				? DASHBOARD_DECORATIVE_PITCH
-				: 0;
+			initialPresentation === 'background' ? DASHBOARD_DECORATIVE_PITCH : 0;
 
 		const mapInstance = new mapboxgl.Map({
 			container: mapContainerRef.current,
@@ -7227,33 +7340,123 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		return getResultDotScaleForZoom(zoomLevel);
 	}, [zoomLevel]);
 
-	// Fade the softbox lighting overlays as the user zooms past the globe view.
-	// zoomLevel only seeds the initial opacity; the live `zoom` listener below
-	// keeps the overlays in lockstep with ongoing pinch/scroll/wheel gestures.
-	const lightingOverlayOpacity = useMemo(
-		() => computeLightingOverlayOpacity(zoomLevel),
-		[zoomLevel]
-	);
+	// Softbox lighting overlay opacity is owned entirely by `applyLightingOverlayOpacity`
+	// below, which fires on every `zoom` event and on mood changes. We deliberately do
+	// NOT render an `opacity` value into the JSX style: any React re-render during a
+	// zoom gesture would otherwise overwrite the smooth imperative update with the stale
+	// `zoomLevel`-derived value (zoomLevel only updates on `moveend`).
+
+	const applyLightingOverlayOpacity = useCallback(() => {
+		if (!mapRef.current) return;
+		const zoom = mapRef.current.getZoom() ?? MAP_DEFAULT_ZOOM;
+		const base = computeLightingOverlayOpacity(zoom);
+		const cfg = weatherMoodConfigRef.current;
+		const keyOpacity = clamp(base * cfg.softboxOpacityMultiplier, 0, 1);
+		const shadowOpacity = clamp(base * cfg.shadowOpacityMultiplier, 0, 1);
+		if (lightingOverlayKeyRef.current)
+			lightingOverlayKeyRef.current.style.opacity = String(keyOpacity);
+		if (lightingOverlayShadowRef.current)
+			lightingOverlayShadowRef.current.style.opacity = String(shadowOpacity);
+
+		// Hot wash — uniform warm-white screen-blend overlay that brightens the
+		// whole globe. Only active for bright moods so the rainy/stormy dark
+		// pool stays gloomy.
+		const isBrightSoftbox = cfg.softboxBlendMode === 'screen';
+		const hotActive = isHotRef.current && isBrightSoftbox;
+		const washOpacity = hotActive ? base * HOT_WASH_OPACITY : 0;
+		if (lightingOverlayHotWashRef.current)
+			lightingOverlayHotWashRef.current.style.opacity = String(washOpacity);
+
+		// Gloom wash — uniform dark multiply-blend overlay for rainy/stormy that
+		// persists into city zoom (longer fade curve than the softbox/shadow).
+		// Bright moods have gloomWashOpacity=0 so this is a no-op for them.
+		const gloomFade = computeGloomWashFade(zoom);
+		const gloomOpacity = clamp(cfg.gloomWashOpacity * gloomFade, 0, 1);
+		if (lightingOverlayGloomWashRef.current)
+			lightingOverlayGloomWashRef.current.style.opacity = String(gloomOpacity);
+	}, []);
 
 	useEffect(() => {
 		if (!map) return;
 		if (!isMapLoaded) return;
 
-		const applyOpacity = () => {
-			const zoom = map.getZoom() ?? MAP_DEFAULT_ZOOM;
-			const opacity = String(computeLightingOverlayOpacity(zoom));
-			if (lightingOverlayKeyRef.current)
-				lightingOverlayKeyRef.current.style.opacity = opacity;
-			if (lightingOverlayShadowRef.current)
-				lightingOverlayShadowRef.current.style.opacity = opacity;
-		};
-
-		applyOpacity();
-		map.on('zoom', applyOpacity);
+		applyLightingOverlayOpacity();
+		map.on('zoom', applyLightingOverlayOpacity);
 		return () => {
-			map.off('zoom', applyOpacity);
+			map.off('zoom', applyLightingOverlayOpacity);
 		};
-	}, [map, isMapLoaded]);
+	}, [map, isMapLoaded, applyLightingOverlayOpacity]);
+
+	const applyWeatherMood = useCallback(
+		(mood: WeatherMood) => {
+			const cfg = getMoodConfig(mood);
+			weatherMoodConfigRef.current = cfg;
+			appliedWeatherMoodRef.current = mood;
+
+			const m = mapRef.current;
+			if (!m) return;
+
+			// Cloud raster paint — opacity expression + brightness clamp.
+			try {
+				const opacityExpr = buildCloudsOpacityExpr(
+					cfg.cloudOpacityGlobeZoom,
+					cfg.cloudOpacityDecorativeZoom,
+					cfg.cloudDeepZoomOpacity
+				);
+				if (m.getLayer(MAPBOX_LAYER_IDS.clouds)) {
+					m.setPaintProperty(
+						MAPBOX_LAYER_IDS.clouds,
+						'raster-opacity',
+						opacityExpr as any
+					);
+					m.setPaintProperty(
+						MAPBOX_LAYER_IDS.clouds,
+						'raster-brightness-min',
+						cfg.cloudBrightnessMin
+					);
+					m.setPaintProperty(
+						MAPBOX_LAYER_IDS.clouds,
+						'raster-brightness-max',
+						cfg.cloudBrightnessMax
+					);
+				}
+			} catch {
+				// Non-fatal.
+			}
+
+			// Atmosphere fog tint.
+			try {
+				const existingFog = (m as any).getFog?.() ?? {};
+				(m as any).setFog?.({
+					...existingFog,
+					color: cfg.fogColor,
+					'high-color': cfg.fogHighColor,
+				});
+			} catch {
+				// Non-fatal.
+			}
+
+			applyLightingOverlayOpacity();
+		},
+		[applyLightingOverlayOpacity]
+	);
+
+	useEffect(() => {
+		if (!map) return;
+		if (!isMapLoaded) return;
+		if (appliedWeatherMoodRef.current === weatherMood) return;
+		applyWeatherMood(weatherMood);
+	}, [map, isMapLoaded, weatherMood, applyWeatherMood]);
+
+	useEffect(() => {
+		const nextHot =
+			typeof effectiveTemperatureF === 'number' &&
+			effectiveTemperatureF > HOT_TEMPERATURE_THRESHOLD_F;
+		if (nextHot === isHotRef.current) return;
+		isHotRef.current = nextHot;
+		if (!map || !isMapLoaded) return;
+		applyLightingOverlayOpacity();
+	}, [effectiveTemperatureF, map, isMapLoaded, applyLightingOverlayOpacity]);
 
 	const markerPinUrlCacheRef = useRef<Map<string, string>>(new Map());
 	const getMarkerPinUrl = useCallback(
@@ -8753,10 +8956,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					// Anchor the radial "hot spot" offscreen past the upper-left so the
 					// visible gradient reads as ambient warm wash rather than a disc.
 					// Peaks are cranked up because the hot center is offscreen.
-					background:
-						'radial-gradient(ellipse 150% 150% at -10% -10%, rgba(255, 238, 205, 0.38) 0%, rgba(255, 238, 205, 0.28) 28%, rgba(255, 238, 205, 0.16) 52%, rgba(255, 238, 205, 0.05) 78%, rgba(255, 238, 205, 0) 100%)',
-					mixBlendMode: 'screen',
-					opacity: lightingOverlayOpacity,
+					// Bright moods use a warm cream key + screen blend; rainy/stormy swap
+					// to a deep navy pool + multiply blend so the upper-left also reads
+					// as gloom (bracketing the lower-right shadow on both corners).
+					background: getMoodConfig(weatherMood).softboxBackground,
+					mixBlendMode: getMoodConfig(weatherMood).softboxBlendMode,
+					// opacity intentionally unset — see applyLightingOverlayOpacity above.
 					zIndex: 1,
 				}}
 			/>
@@ -8774,10 +8979,52 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					background:
 						'radial-gradient(ellipse 160% 160% at 115% 115%, rgba(6, 10, 28, 0.70) 0%, rgba(6, 10, 28, 0.50) 28%, rgba(10, 16, 36, 0.28) 55%, rgba(20, 28, 56, 0.08) 78%, rgba(0, 0, 0, 0) 100%)',
 					mixBlendMode: 'multiply',
-					opacity: lightingOverlayOpacity,
+					// opacity intentionally unset — see applyLightingOverlayOpacity above.
 					zIndex: 1,
 				}}
 			/>
+			{/*
+			  Hot-weather wash. Uniform warm-white screen-blend overlay that
+			  brightens the entire globe. Opacity is owned by
+			  applyLightingOverlayOpacity (0 when temp is below the hot
+			  threshold OR when the mood is a dark-pool variant).
+			*/}
+			<div
+				ref={lightingOverlayHotWashRef}
+				aria-hidden
+				style={{
+					position: 'absolute',
+					inset: 0,
+					pointerEvents: 'none',
+					background: 'rgb(255, 240, 215)',
+					mixBlendMode: 'screen',
+					zIndex: 1,
+				}}
+			/>
+			{/*
+			  Gloom wash. Uniform dark multiply-blend overlay for rainy/stormy
+			  that persists into city zoom (longer fade curve than the softbox/
+			  shadow). Opacity owned by applyLightingOverlayOpacity; bright
+			  moods set gloomWashOpacity=0 so this is a no-op for them.
+			*/}
+			<div
+				ref={lightingOverlayGloomWashRef}
+				aria-hidden
+				style={{
+					position: 'absolute',
+					inset: 0,
+					pointerEvents: 'none',
+					background: 'rgb(20, 28, 50)',
+					mixBlendMode: 'multiply',
+					zIndex: 1,
+				}}
+			/>
+			{getMoodConfig(weatherMood).lightning && (
+				<LightningOverlay
+					map={map}
+					hideAtOrAboveZoom={CLOUDS_OVERLAY_FADE_OUT_START_ZOOM}
+				/>
+			)}
 			{mapLoadError && (
 				<div
 					className={`absolute inset-0 flex items-center justify-center ${
