@@ -1319,42 +1319,31 @@ const applyMurmurGlobeLighting = (
 	try {
 		const nightT = clamp(opts?.nightT ?? 0, 0, 1);
 		const lerp = (a: number, b: number) => a + (b - a) * nightT;
-		const lerpRgb = (a: [number, number, number], b: [number, number, number]) =>
-			`rgb(${Math.round(lerp(a[0], b[0]))}, ${Math.round(lerp(a[1], b[1]))}, ${Math.round(
-				lerp(a[2], b[2])
-			)})`;
 
 		const bearing =
 			typeof mapInstance.getBearing === 'function' ? mapInstance.getBearing() : 0;
-		const azimuthBase =
+		const azimuth =
 			(MURMUR_GLOBE_LIGHT_VIEWER_AZIMUTH_OFFSET_DEG + (bearing || 0) + 360) % 360;
-		// At night, push the key farther around the limb so the globe reads as
-		// backlit instead of front-washed.
-		const nightAzimuthOffsetDeg = -38;
-		const azimuth = (azimuthBase + nightAzimuthOffsetDeg * nightT + 360) % 360;
-		const polar = lerp(MURMUR_GLOBE_LIGHT_POLAR_DEG, 87);
+		const polar = MURMUR_GLOBE_LIGHT_POLAR_DEG;
 
 		(mapInstance as any).setLights?.([
 			{
 				id: 'murmur-ambient',
 				type: 'ambient',
 				properties: {
-					// Deep cool fill — the shadow side should clearly read as shadow.
-					color: lerpRgb([120, 150, 185], [85, 110, 160]),
-					intensity: lerp(0.18, 0.14),
+					color: 'rgb(120, 150, 185)',
+					intensity: lerp(0.18, 0.144),
 				},
 			},
 			{
 				id: 'murmur-key',
 				type: 'directional',
 				properties: {
-					// Bright warm softbox by day; cooler moonlight by night. Keep intensity
-					// lower at night so the DOM rim light can own the "rear lit" read.
-					color: lerpRgb([255, 244, 220], [235, 245, 255]),
-					intensity: lerp(1.6, 0.56),
+					color: 'rgb(255, 244, 220)',
+					intensity: lerp(1.6, 1.04),
 					direction: [azimuth, polar],
 					'cast-shadows': true,
-					'shadow-intensity': lerp(0.95, 0.98),
+					'shadow-intensity': 0.95,
 				},
 			},
 		]);
@@ -1379,6 +1368,18 @@ const MAP_OCEAN_BLUE = '#62C7E3';
 const MAP_LAND_CREAM = '#F1EDE2';
 const MAP_LANDCOVER_GREEN = '#B3E6D7';
 
+// Night mode should preserve the daytime palette (same hues) and simply darken it.
+// Implemented as an RGB mix-to-black so the hue stays consistent.
+const NIGHT_BASEMAP_DARKEN_MAX = 0.5;
+// As the user zooms in to "street-level" detail, ease up on the darken slightly so the
+// basemap stays readable (we already fade out the viewer-anchored softbox at high zoom).
+const NIGHT_BASEMAP_DARKEN_MAX_ZOOMED_IN = 0.38;
+const NIGHT_BASEMAP_ZOOM_BRIGHTEN_START_ZOOM = 5.25;
+const NIGHT_BASEMAP_ZOOM_BRIGHTEN_END_ZOOM = 9.5;
+
+const NIGHT_HIDE_ROADS_START_T = 0.18;
+const NIGHT_HIDE_ROADS_END_T = 0.42;
+
 const mixCssRgb = (
 	from: [number, number, number],
 	to: [number, number, number],
@@ -1390,17 +1391,64 @@ const mixCssRgb = (
 	)}, ${Math.round(from[2] + (to[2] - from[2]) * p)})`;
 };
 
-const getMapPaletteForNight = (nightT: number) => {
+const getNightBasemapZoomBrightenT = (zoom: number) => {
+	if (zoom <= NIGHT_BASEMAP_ZOOM_BRIGHTEN_START_ZOOM) return 0;
+	if (zoom >= NIGHT_BASEMAP_ZOOM_BRIGHTEN_END_ZOOM) return 1;
+	const t =
+		(zoom - NIGHT_BASEMAP_ZOOM_BRIGHTEN_START_ZOOM) /
+		(NIGHT_BASEMAP_ZOOM_BRIGHTEN_END_ZOOM - NIGHT_BASEMAP_ZOOM_BRIGHTEN_START_ZOOM);
+	return t * t * (3 - 2 * t);
+};
+
+const getMapPaletteForNight = (nightT: number, zoom: number) => {
 	const night = clamp(nightT, 0, 1);
+	const zoomBrightenT = getNightBasemapZoomBrightenT(zoom);
+	const darkenMax =
+		NIGHT_BASEMAP_DARKEN_MAX +
+		(NIGHT_BASEMAP_DARKEN_MAX_ZOOMED_IN - NIGHT_BASEMAP_DARKEN_MAX) * zoomBrightenT;
+	const darkenT = clamp(night * darkenMax, 0, 1);
 	return {
-		ocean: mixCssRgb([98, 199, 227], [6, 14, 30], night),
-		land: mixCssRgb([241, 237, 226], [204, 224, 203], night),
-		landcover: mixCssRgb([179, 230, 215], [184, 224, 199], night),
+		ocean: mixCssRgb([98, 199, 227], [0, 0, 0], darkenT),
+		land: mixCssRgb([241, 237, 226], [0, 0, 0], darkenT),
+		landcover: mixCssRgb([179, 230, 215], [0, 0, 0], darkenT),
 	};
 };
 
+const getNightRoadHideT = (nightT: number) => {
+	const night = clamp(nightT, 0, 1);
+	if (night <= NIGHT_HIDE_ROADS_START_T) return 0;
+	if (night >= NIGHT_HIDE_ROADS_END_T) return 1;
+	const t =
+		(night - NIGHT_HIDE_ROADS_START_T) /
+		(NIGHT_HIDE_ROADS_END_T - NIGHT_HIDE_ROADS_START_T);
+	return t * t * (3 - 2 * t);
+};
+
+const basemapRoadOpacityBaseByMap = new WeakMap<mapboxgl.Map, Map<string, any | null>>();
+
+const getBasemapRoadOpacityBase = (mapInstance: mapboxgl.Map, layerId: string) => {
+	let byLayerId = basemapRoadOpacityBaseByMap.get(mapInstance);
+	if (!byLayerId) {
+		byLayerId = new Map();
+		basemapRoadOpacityBaseByMap.set(mapInstance, byLayerId);
+	}
+
+	if (byLayerId.has(layerId)) return byLayerId.get(layerId) ?? null;
+
+	try {
+		const base = mapInstance.getPaintProperty(layerId, 'line-opacity') as any;
+		byLayerId.set(layerId, base == null ? null : base);
+		return base == null ? null : base;
+	} catch {
+		byLayerId.set(layerId, null);
+		return null;
+	}
+};
+
 const applyNightLandPalette = (mapInstance: mapboxgl.Map, nightT: number) => {
-	const palette = getMapPaletteForNight(nightT);
+	const zoom = mapInstance.getZoom() ?? MAP_DEFAULT_ZOOM;
+	const palette = getMapPaletteForNight(nightT, zoom);
+	const roadOpacityMul = 1 - getNightRoadHideT(nightT);
 
 	try {
 		if (mapInstance.getLayer(MAP_WORLD_LAND_LAYER_ID)) {
@@ -1417,6 +1465,7 @@ const applyNightLandPalette = (mapInstance: mapboxgl.Map, nightT: number) => {
 			if (!id || id.startsWith('murmur-')) continue;
 
 			const type = (layer as any).type as string | undefined;
+			const sourceLayer = (layer as any)['source-layer'] as string | undefined;
 			const idLower = id.toLowerCase();
 
 			try {
@@ -1441,6 +1490,29 @@ const applyNightLandPalette = (mapInstance: mapboxgl.Map, nightT: number) => {
 					(idLower.includes('landuse') || idLower === 'land')
 				) {
 					mapInstance.setPaintProperty(id, 'fill-color', palette.land);
+				} else if (
+					type === 'line' &&
+					(sourceLayer === 'road' ||
+						idLower.includes('road') ||
+						idLower.includes('motorway') ||
+						idLower.includes('highway') ||
+						idLower.includes('bridge') ||
+						idLower.includes('tunnel'))
+				) {
+					const baseOpacity = getBasemapRoadOpacityBase(mapInstance, id);
+					if (roadOpacityMul <= 0.001) {
+						mapInstance.setPaintProperty(id, 'line-opacity', 0);
+					} else if (baseOpacity == null) {
+						mapInstance.setPaintProperty(id, 'line-opacity', roadOpacityMul);
+					} else if (roadOpacityMul >= 0.999) {
+						mapInstance.setPaintProperty(id, 'line-opacity', baseOpacity);
+					} else {
+						mapInstance.setPaintProperty(
+							id,
+							'line-opacity',
+							scaleMapboxOpacityExpr(baseOpacity, roadOpacityMul)
+						);
+					}
 				}
 			} catch {
 				// Data-driven color expression we can't override — skip.
@@ -1827,29 +1899,29 @@ const STATE_LABEL_COLOR = '#111827';
 // When zoomed out to a US-wide view, show subtle state divider lines (like Zillow).
 // Keep these behind the blue/black search-area outlines.
 const STATE_DIVIDER_LINES_MAX_ZOOM = 8;
+// Night mode: keep state boundaries readable but less bright on the darker basemap.
+const NIGHT_STATE_LINE_OPACITY_MUL_MIN = 0.55;
+const NIGHT_STATE_LINE_DARKEN_MAX = 0.72;
 
-const mixNumber = (from: number, to: number, t: number) => {
-	const p = clamp(t, 0, 1);
-	return from + (to - from) * p;
+const getNightStateLineDarkenT = (nightT: number) => {
+	const night = clamp(nightT, 0, 1);
+	const eased = night * night * (3 - 2 * night);
+	return clamp(eased * NIGHT_STATE_LINE_DARKEN_MAX, 0, 1);
 };
 
-const buildStateDividerLineWidthExpr = (nightT: number) => {
-	const night = clamp(nightT, 0, 1);
-	return [
-		'interpolate',
-		['linear'],
-		['zoom'],
-		MAP_MIN_ZOOM,
-		mixNumber(0.8, 1.2, night),
-		5,
-		mixNumber(1.0, 1.55, night),
-		STATE_DIVIDER_LINES_MAX_ZOOM,
-		mixNumber(1.4, 2.15, night),
-	];
-};
+const buildStateDividerLineWidthExpr = (_nightT: number) => [
+	'interpolate',
+	['linear'],
+	['zoom'],
+	MAP_MIN_ZOOM,
+	0.8,
+	5,
+	1.0,
+	STATE_DIVIDER_LINES_MAX_ZOOM,
+	1.4,
+];
 
-const buildStateInteractiveBorderWidthExpr = (nightT: number) => {
-	const night = clamp(nightT, 0, 1);
+const buildStateInteractiveBorderWidthExpr = (_nightT: number) => {
 	const isSelected = ['boolean', ['feature-state', 'selected'], false];
 	return [
 		'interpolate',
@@ -1857,56 +1929,40 @@ const buildStateInteractiveBorderWidthExpr = (nightT: number) => {
 		['zoom'],
 		MAP_MIN_ZOOM,
 		// Selected state should be only subtly emphasized.
-		['case', isSelected, mixNumber(1.2, 1.8, night), mixNumber(0.7, 1.2, night)],
+		['case', isSelected, 1.2, 0.7],
 		5,
-		['case', isSelected, mixNumber(1.4, 2.05, night), mixNumber(0.85, 1.5, night)],
+		['case', isSelected, 1.4, 0.85],
 		9,
-		['case', isSelected, mixNumber(1.4, 2.05, night), mixNumber(0.85, 1.5, night)],
+		['case', isSelected, 1.4, 0.85],
 		14,
-		['case', isSelected, mixNumber(1.2, 1.65, night), mixNumber(0.6, 1.05, night)],
+		['case', isSelected, 1.2, 0.6],
 	];
 };
 
 const buildStateInteractiveBorderColorExpr = (nightT: number) => {
-	const night = clamp(nightT, 0, 1);
+	const darkenT = getNightStateLineDarkenT(nightT);
+	const darken = (rgb: [number, number, number]) =>
+		mixCssRgb(rgb, [0, 0, 0], darkenT);
 	const isSelected = ['boolean', ['feature-state', 'selected'], false];
 	return [
 		'interpolate',
 		['linear'],
 		['zoom'],
 		MAP_MIN_ZOOM,
-		[
-			'case',
-			isSelected,
-			mixCssRgb([136, 150, 171], [255, 255, 255], night),
-			mixCssRgb([148, 163, 184], [255, 255, 255], night),
-		],
+		['case', isSelected, darken([136, 150, 171]), darken([148, 163, 184])],
 		6,
-		[
-			'case',
-			isSelected,
-			mixCssRgb([136, 150, 171], [255, 255, 255], night),
-			mixCssRgb([148, 163, 184], [255, 255, 255], night),
-		],
+		['case', isSelected, darken([136, 150, 171]), darken([148, 163, 184])],
 		14,
-		[
-			'case',
-			isSelected,
-			mixCssRgb([195, 206, 211], [255, 255, 255], night),
-			mixCssRgb([207, 216, 220], [255, 255, 255], night),
-		],
+		['case', isSelected, darken([195, 206, 211]), darken([207, 216, 220])],
 	];
 };
 
 const applyStateOverlayNightColors = (mapInstance: mapboxgl.Map, nightT: number) => {
-	const night = clamp(nightT, 0, 1);
-	const dividerColor = mixCssRgb([100, 116, 139], [255, 255, 255], night);
-	const borderColor =
-		night > 0.001
-			? mixCssRgb([148, 163, 184], [255, 255, 255], night)
-			: buildStateInteractiveBorderColorExpr(0);
-	const labelColor = mixCssRgb([17, 24, 39], [255, 255, 255], night);
-	const labelHaloOpacity = 0.72 * night;
+	const darkenT = getNightStateLineDarkenT(nightT);
+	const dividerColor = mixCssRgb([100, 116, 139], [0, 0, 0], darkenT);
+	const borderColor = buildStateInteractiveBorderColorExpr(nightT);
+	const labelColor = STATE_LABEL_COLOR;
+	const labelHaloOpacity = 0;
 
 	try {
 		if (mapInstance.getLayer(MAPBOX_LAYER_IDS.statesDividers)) {
@@ -1918,7 +1974,7 @@ const applyStateOverlayNightColors = (mapInstance: mapboxgl.Map, nightT: number)
 			mapInstance.setPaintProperty(
 				MAPBOX_LAYER_IDS.statesDividers,
 				'line-width',
-				buildStateDividerLineWidthExpr(night)
+				buildStateDividerLineWidthExpr(0)
 			);
 		}
 		if (mapInstance.getLayer(MAPBOX_LAYER_IDS.statesBordersInteractive)) {
@@ -1930,7 +1986,7 @@ const applyStateOverlayNightColors = (mapInstance: mapboxgl.Map, nightT: number)
 			mapInstance.setPaintProperty(
 				MAPBOX_LAYER_IDS.statesBordersInteractive,
 				'line-width',
-				buildStateInteractiveBorderWidthExpr(night)
+				buildStateInteractiveBorderWidthExpr(0)
 			);
 		}
 		if (mapInstance.getLayer(MAPBOX_LAYER_IDS.statesLabels)) {
@@ -1944,16 +2000,8 @@ const applyStateOverlayNightColors = (mapInstance: mapboxgl.Map, nightT: number)
 				'text-halo-color',
 				`rgba(2, 8, 23, ${labelHaloOpacity.toFixed(3)})`
 			);
-			mapInstance.setPaintProperty(
-				MAPBOX_LAYER_IDS.statesLabels,
-				'text-halo-width',
-				night > 0.001 ? 1.25 * night : 0
-			);
-			mapInstance.setPaintProperty(
-				MAPBOX_LAYER_IDS.statesLabels,
-				'text-halo-blur',
-				night > 0.001 ? 0.25 * night : 0
-			);
+			mapInstance.setPaintProperty(MAPBOX_LAYER_IDS.statesLabels, 'text-halo-width', 0);
+			mapInstance.setPaintProperty(MAPBOX_LAYER_IDS.statesLabels, 'text-halo-blur', 0);
 		}
 	} catch {
 		// Non-fatal.
@@ -2348,12 +2396,12 @@ const HOT_WASH_OPACITY = 0.13;
 // Night lighting (moon backlight).
 // Implemented as DOM overlays (screen + multiply) so the lighting stays viewer-anchored
 // and can be art-directed independently of the basemap.
-const NIGHT_GLOOM_WASH_OPACITY = 0.1;
-const NIGHT_FACE_SHADE_OPACITY = 0.68;
+const NIGHT_GLOOM_WASH_OPACITY = 0;
+const NIGHT_FACE_SHADE_OPACITY = 0.35;
 // US night visibility: subtle "city lights" heatmap to keep the globe readable.
 // Kept but de-emphasized so it does not become a hard, continent-shaped glow.
 const NIGHT_US_LIGHTS_OPACITY = 0;
-const NIGHT_MOON_RIM_OPACITY = 1;
+const NIGHT_MOON_RIM_OPACITY = 0;
 
 // City-lights persistence: keep visible through the default interactive zoom (5) and
 // fade out as the map becomes more "street level".
@@ -2373,7 +2421,7 @@ const computeNightLightsFade = (zoom: number) => {
 // Front-face silhouette: deepen the globe's visible face while keeping the rim readable.
 // Center matches the rim's bias so the bright limb is stronger on the moon side.
 const NIGHT_FACE_SHADE_BG =
-	'radial-gradient(ellipse 145% 145% at 58% 60%, rgba(5, 9, 26, 0.62) 0%, rgba(7, 11, 31, 0.54) 30%, rgba(10, 16, 38, 0.34) 54%, rgba(12, 18, 42, 0.14) 70%, rgba(0, 0, 0, 0) 84%, rgba(0, 0, 0, 0) 100%)';
+	'radial-gradient(ellipse 145% 145% at 58% 60%, rgba(0, 0, 0, 0.62) 0%, rgba(0, 0, 0, 0.54) 30%, rgba(0, 0, 0, 0.34) 54%, rgba(0, 0, 0, 0.14) 70%, rgba(0, 0, 0, 0) 84%, rgba(0, 0, 0, 0) 100%)';
 
 // Rear rim light: edge-weighted cool-white glow that reads as the moon sitting
 // behind the Earth (not perfectly centered, shifted toward upper-left bias).
@@ -3745,8 +3793,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 			const overlay = clamp(nextOverlayOpacity, 0, 1);
 			const modeT = clamp(nextModeT, 0, 1);
-			const dividersMul = overlay * (1 - modeT);
-			const bordersMul = overlay * modeT;
+			const night = clamp(nightTRef.current, 0, 1);
+			const nightEase = night * night * (3 - 2 * night);
+			const nightMul =
+				1 - nightEase * (1 - clamp(NIGHT_STATE_LINE_OPACITY_MUL_MIN, 0, 1));
+			const dividersMul = overlay * (1 - modeT) * nightMul;
+			const bordersMul = overlay * modeT * nightMul;
 
 			const setLineOpacity = (layerId: string, baseOpacity: any, mul: number) => {
 				if (!map.getLayer(layerId)) return;
@@ -3880,6 +3932,15 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		stateInteractionsEnabled,
 		applyStateOverlayOpacity,
 	]);
+
+	// Keep state boundary visibility in sync with night darkening.
+	useEffect(() => {
+		if (!map || !isMapLoaded) return;
+		applyStateOverlayOpacity(
+			stateOverlayOpacityRef.current,
+			stateOverlayModeRef.current
+		);
+	}, [nightT, map, isMapLoaded, applyStateOverlayOpacity]);
 
 	// Subtle cloud drift so the overlay feels "alive" (especially in background globe mode).
 	useEffect(() => {
@@ -5087,9 +5148,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		// States: hover fill + hit fill (transparent) + divider lines + interactive borders
 		const isStateSelectedExpr = ['boolean', ['feature-state', 'selected'], false];
 
-		const stateDividerLineWidthExpr = buildStateDividerLineWidthExpr(
-			nightTRef.current
-		);
+		const stateDividerLineWidthExpr = buildStateDividerLineWidthExpr(nightTRef.current);
 		const stateDividerLineOpacityExpr = [
 			'interpolate',
 			['linear'],
@@ -7793,11 +7852,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		const night = clamp(nightTRef.current, 0, 1);
 		const cfg = weatherMoodConfigRef.current;
 
-		// Weather softbox overlays: suppress bright warm wash at night so the moonlight
-		// rear-lighting can own the read. (Rainy/stormy use a dark-pool softbox, so
-		// we keep more of it.)
-		const keyNightMul = cfg.softboxBlendMode === 'screen' ? 1 - night : 1 - night * 0.6;
-		const shadowNightMul = 1 - night * 0.5;
+		// Preserve the daytime palette and softbox tuning at night; night mode should
+		// read as the same map, just darker (no hue shift).
+		const keyNightMul = 1;
+		const shadowNightMul = 1;
 
 		const keyOpacity = clamp(base * cfg.softboxOpacityMultiplier * keyNightMul, 0, 1);
 		const shadowOpacity = clamp(
@@ -7887,6 +7945,18 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		applyNightLandPalette(map, nightT);
 		applyStateOverlayNightColors(map, nightT);
 	}, [nightT, map, isMapLoaded]);
+
+	// Re-apply the night palette when zoom changes so the "zoomed in" view can be
+	// slightly brighter without changing the low-zoom globe read.
+	useEffect(() => {
+		if (!map) return;
+		if (!isMapLoaded) return;
+		const onZoomEnd = () => applyNightLandPalette(map, nightTRef.current);
+		map.on('zoomend', onZoomEnd);
+		return () => {
+			map.off('zoomend', onZoomEnd);
+		};
+	}, [map, isMapLoaded]);
 
 	const applyWeatherMood = useCallback(
 		(mood: WeatherMood) => {
