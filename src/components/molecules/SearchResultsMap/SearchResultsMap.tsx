@@ -1220,6 +1220,23 @@ const CLOUDS_OVERLAY_FADE_OUT_START_ZOOM = 8.0;
 const CLOUDS_OVERLAY_FADE_OUT_END_ZOOM = 10.5;
 const CLOUDS_CANVAS_TEXTURE_URL = '/maps/clouds/0/0/0.png?v=23';
 const CLOUDS_CANVAS_SIZE_PX = 512;
+
+// Contact-lights overlay: dot-only night lights derived from contact coordinates.
+// Implemented as local raster tiles (like clouds) so it stays glued to the globe.
+// NOTE: include a version query param to bust browser caches when tiles regenerate.
+const CONTACT_LIGHTS_TILES_URL_TEMPLATE = '/maps/contact_lights/{z}/{x}/{y}.png?v=9';
+// "Intro reveal" tiles: same dots, but alpha is biased west->east so a global fade-in reads
+// like dots revealing left-to-right. We crossfade to the real tiles after the intro.
+const CONTACT_LIGHTS_REVEAL_TILES_URL_TEMPLATE =
+	'/maps/contact_lights_reveal/{z}/{x}/{y}.png?v=9';
+const CONTACT_LIGHTS_TILES_MAX_ZOOM = 6;
+// CONUS-ish bounds (limits Mapbox tile requests).
+const CONTACT_LIGHTS_TILES_BOUNDS: [number, number, number, number] = [
+	-125.5, // lon min
+	24.0, // lat min
+	-66.0, // lon max
+	50.0, // lat max
+];
 // Full WebMercator bounds (lat clamp) so the texture maps cleanly across the globe.
 const CLOUDS_CANVAS_COORDINATES: [
 	[number, number],
@@ -1373,12 +1390,24 @@ const MAP_LANDCOVER_GREEN = '#B3E6D7';
 const NIGHT_BASEMAP_DARKEN_MAX = 0.5;
 // As the user zooms in to "street-level" detail, ease up on the darken slightly so the
 // basemap stays readable (we already fade out the viewer-anchored softbox at high zoom).
-const NIGHT_BASEMAP_DARKEN_MAX_ZOOMED_IN = 0.38;
+const NIGHT_BASEMAP_DARKEN_MAX_ZOOMED_IN = 0.28;
 const NIGHT_BASEMAP_ZOOM_BRIGHTEN_START_ZOOM = 5.25;
 const NIGHT_BASEMAP_ZOOM_BRIGHTEN_END_ZOOM = 9.5;
 
 const NIGHT_HIDE_ROADS_START_T = 0.18;
 const NIGHT_HIDE_ROADS_END_T = 0.42;
+// Roads compete with the contact-lights overlay at globe zoom, but they matter for
+// legibility at city zoom. Fade the road-hiding back out as the user zooms in.
+const NIGHT_HIDE_ROADS_RESTORE_START_ZOOM = 5.5;
+const NIGHT_HIDE_ROADS_RESTORE_END_ZOOM = 9.0;
+
+// At low zoom in night mode, terrain/landcover variation can compete with the
+// dot-only night-lights overlay. Flatten landcover + hillshade slightly while
+// zoomed out so the lights read more clearly.
+const NIGHT_TERRAIN_FLATTEN_START_T = 0.12;
+const NIGHT_TERRAIN_FLATTEN_END_T = 0.55;
+const NIGHT_TERRAIN_FLATTEN_END_ZOOM = 5.25;
+const NIGHT_TERRAIN_FLATTEN_LAND_KEEP_ZOOM = 3.6;
 
 const mixCssRgb = (
 	from: [number, number, number],
@@ -1414,14 +1443,48 @@ const getMapPaletteForNight = (nightT: number, zoom: number) => {
 	};
 };
 
-const getNightRoadHideT = (nightT: number) => {
+const getNightRoadHideT = (nightT: number, zoom: number) => {
 	const night = clamp(nightT, 0, 1);
 	if (night <= NIGHT_HIDE_ROADS_START_T) return 0;
-	if (night >= NIGHT_HIDE_ROADS_END_T) return 1;
+
 	const t =
-		(night - NIGHT_HIDE_ROADS_START_T) /
-		(NIGHT_HIDE_ROADS_END_T - NIGHT_HIDE_ROADS_START_T);
-	return t * t * (3 - 2 * t);
+		night >= NIGHT_HIDE_ROADS_END_T
+			? 1
+			: (night - NIGHT_HIDE_ROADS_START_T) /
+				(NIGHT_HIDE_ROADS_END_T - NIGHT_HIDE_ROADS_START_T);
+	const nightHideT = t * t * (3 - 2 * t);
+
+	if (zoom <= NIGHT_HIDE_ROADS_RESTORE_START_ZOOM) return nightHideT;
+	if (zoom >= NIGHT_HIDE_ROADS_RESTORE_END_ZOOM) return 0;
+	const zt =
+		(zoom - NIGHT_HIDE_ROADS_RESTORE_START_ZOOM) /
+		(NIGHT_HIDE_ROADS_RESTORE_END_ZOOM - NIGHT_HIDE_ROADS_RESTORE_START_ZOOM);
+	const z2 = clamp(zt, 0, 1);
+	const restoreT = z2 * z2 * (3 - 2 * z2);
+	return nightHideT * (1 - restoreT);
+};
+
+const getNightTerrainFlattenT = (nightT: number, zoom: number) => {
+	const night = clamp(nightT, 0, 1);
+	if (night <= NIGHT_TERRAIN_FLATTEN_START_T) return 0;
+	if (zoom >= NIGHT_TERRAIN_FLATTEN_END_ZOOM) return 0;
+
+	const nightT2 =
+		night >= NIGHT_TERRAIN_FLATTEN_END_T
+			? 1
+			: (night - NIGHT_TERRAIN_FLATTEN_START_T) /
+				(NIGHT_TERRAIN_FLATTEN_END_T - NIGHT_TERRAIN_FLATTEN_START_T);
+	const nightEased = nightT2 * nightT2 * (3 - 2 * nightT2);
+
+	const zoomT =
+		zoom <= MAP_MIN_ZOOM
+			? 0
+			: (zoom - MAP_MIN_ZOOM) / (NIGHT_TERRAIN_FLATTEN_END_ZOOM - MAP_MIN_ZOOM);
+	const zoomEased = clamp(zoomT, 0, 1);
+	// Reverse smoothstep: 1 at MAP_MIN_ZOOM, 0 by end zoom.
+	const inv = 1 - zoomEased * zoomEased * (3 - 2 * zoomEased);
+
+	return clamp(nightEased * inv, 0, 1);
 };
 
 const basemapRoadOpacityBaseByMap = new WeakMap<mapboxgl.Map, Map<string, any | null>>();
@@ -1445,10 +1508,38 @@ const getBasemapRoadOpacityBase = (mapInstance: mapboxgl.Map, layerId: string) =
 	}
 };
 
+const basemapHillshadeExaggerationBaseByMap = new WeakMap<
+	mapboxgl.Map,
+	Map<string, any | null>
+>();
+
+const getBasemapHillshadeExaggerationBase = (
+	mapInstance: mapboxgl.Map,
+	layerId: string
+) => {
+	let byLayerId = basemapHillshadeExaggerationBaseByMap.get(mapInstance);
+	if (!byLayerId) {
+		byLayerId = new Map();
+		basemapHillshadeExaggerationBaseByMap.set(mapInstance, byLayerId);
+	}
+
+	if (byLayerId.has(layerId)) return byLayerId.get(layerId) ?? null;
+
+	try {
+		const base = mapInstance.getPaintProperty(layerId, 'hillshade-exaggeration') as any;
+		byLayerId.set(layerId, base == null ? null : base);
+		return base == null ? null : base;
+	} catch {
+		byLayerId.set(layerId, null);
+		return null;
+	}
+};
+
 const applyNightLandPalette = (mapInstance: mapboxgl.Map, nightT: number) => {
 	const zoom = mapInstance.getZoom() ?? MAP_DEFAULT_ZOOM;
 	const palette = getMapPaletteForNight(nightT, zoom);
-	const roadOpacityMul = 1 - getNightRoadHideT(nightT);
+	const roadOpacityMul = 1 - getNightRoadHideT(nightT, zoom);
+	const terrainFlattenT = getNightTerrainFlattenT(nightT, zoom);
 
 	try {
 		if (mapInstance.getLayer(MAP_WORLD_LAND_LAYER_ID)) {
@@ -1484,12 +1575,45 @@ const applyNightLandPalette = (mapInstance: mapboxgl.Map, nightT: number) => {
 						idLower === 'park' ||
 						idLower.startsWith('park'))
 				) {
-					mapInstance.setPaintProperty(id, 'fill-color', palette.landcover);
+					if (terrainFlattenT <= 0.001) {
+						mapInstance.setPaintProperty(id, 'fill-color', palette.landcover);
+					} else {
+						// Keep landcover nearly identical to land at far zoom, then blend back in.
+						mapInstance.setPaintProperty(id, 'fill-color', [
+							'interpolate',
+							['linear'],
+							['zoom'],
+							MAP_MIN_ZOOM,
+							palette.land,
+							NIGHT_TERRAIN_FLATTEN_LAND_KEEP_ZOOM,
+							palette.land,
+							NIGHT_TERRAIN_FLATTEN_END_ZOOM,
+							palette.landcover,
+						]);
+					}
 				} else if (
 					type === 'fill' &&
 					(idLower.includes('landuse') || idLower === 'land')
 				) {
 					mapInstance.setPaintProperty(id, 'fill-color', palette.land);
+				} else if (type === 'hillshade' || idLower.includes('hillshade')) {
+					// Terrain shading adds "busy" value noise at low zoom. Reduce it at night
+					// while zoomed out so dot lights stay legible.
+					const mul = clamp(1 - terrainFlattenT, 0, 1);
+					const baseEx = getBasemapHillshadeExaggerationBase(mapInstance, id);
+					if (mul <= 0.001) {
+						mapInstance.setPaintProperty(id, 'hillshade-exaggeration', 0);
+					} else if (baseEx == null) {
+						mapInstance.setPaintProperty(id, 'hillshade-exaggeration', mul);
+					} else if (mul >= 0.999) {
+						mapInstance.setPaintProperty(id, 'hillshade-exaggeration', baseEx);
+					} else {
+						mapInstance.setPaintProperty(
+							id,
+							'hillshade-exaggeration',
+							scaleMapboxOpacityExpr(baseEx, mul)
+						);
+					}
 				} else if (
 					type === 'line' &&
 					(sourceLayer === 'road' ||
@@ -1707,6 +1831,7 @@ const US_ONLY_BASEMAP_CLIP_MAX_ZOOM = 7;
 const MAPBOX_SOURCE_IDS = {
 	clouds: 'murmur-clouds',
 	nightLights: 'murmur-night-lights',
+	nightLightsReveal: 'murmur-night-lights-reveal',
 	states: 'murmur-states',
 	resultsOutline: 'murmur-results-outline',
 	lockedOutline: 'murmur-locked-outline',
@@ -1723,7 +1848,13 @@ const MAPBOX_SOURCE_IDS = {
 const MAPBOX_LAYER_IDS = {
 	// Globe overlays
 	clouds: 'murmur-clouds-raster',
-	nightLights: 'murmur-night-lights-heatmap',
+	nightLightsSpaceGlow: 'murmur-night-lights-space-glow',
+	nightLightsSpaceGlow2: 'murmur-night-lights-space-glow-2',
+	nightLightsGlow: 'murmur-night-lights-glow',
+	nightLightsCloseGlow: 'murmur-night-lights-close-glow',
+	nightLights: 'murmur-night-lights-raster',
+	nightLightsRevealGlow: 'murmur-night-lights-reveal-glow',
+	nightLightsReveal: 'murmur-night-lights-reveal-raster',
 	// States
 	statesFillHit: 'murmur-states-fill-hit',
 	statesFillHover: 'murmur-states-fill-hover',
@@ -1909,7 +2040,7 @@ const getNightStateLineDarkenT = (nightT: number) => {
 	return clamp(eased * NIGHT_STATE_LINE_DARKEN_MAX, 0, 1);
 };
 
-const buildStateDividerLineWidthExpr = (_nightT: number) => [
+const buildStateDividerLineWidthExpr = () => [
 	'interpolate',
 	['linear'],
 	['zoom'],
@@ -1921,7 +2052,7 @@ const buildStateDividerLineWidthExpr = (_nightT: number) => [
 	1.4,
 ];
 
-const buildStateInteractiveBorderWidthExpr = (_nightT: number) => {
+const buildStateInteractiveBorderWidthExpr = () => {
 	const isSelected = ['boolean', ['feature-state', 'selected'], false];
 	return [
 		'interpolate',
@@ -1941,8 +2072,7 @@ const buildStateInteractiveBorderWidthExpr = (_nightT: number) => {
 
 const buildStateInteractiveBorderColorExpr = (nightT: number) => {
 	const darkenT = getNightStateLineDarkenT(nightT);
-	const darken = (rgb: [number, number, number]) =>
-		mixCssRgb(rgb, [0, 0, 0], darkenT);
+	const darken = (rgb: [number, number, number]) => mixCssRgb(rgb, [0, 0, 0], darkenT);
 	const isSelected = ['boolean', ['feature-state', 'selected'], false];
 	return [
 		'interpolate',
@@ -1974,7 +2104,7 @@ const applyStateOverlayNightColors = (mapInstance: mapboxgl.Map, nightT: number)
 			mapInstance.setPaintProperty(
 				MAPBOX_LAYER_IDS.statesDividers,
 				'line-width',
-				buildStateDividerLineWidthExpr(0)
+				buildStateDividerLineWidthExpr()
 			);
 		}
 		if (mapInstance.getLayer(MAPBOX_LAYER_IDS.statesBordersInteractive)) {
@@ -1986,7 +2116,7 @@ const applyStateOverlayNightColors = (mapInstance: mapboxgl.Map, nightT: number)
 			mapInstance.setPaintProperty(
 				MAPBOX_LAYER_IDS.statesBordersInteractive,
 				'line-width',
-				buildStateInteractiveBorderWidthExpr(0)
+				buildStateInteractiveBorderWidthExpr()
 			);
 		}
 		if (mapInstance.getLayer(MAPBOX_LAYER_IDS.statesLabels)) {
@@ -2382,7 +2512,7 @@ const MANUAL_WEATHER_TEMPERATURE_OVERRIDE_F: number | null = null;
 // MANUAL NIGHT OVERRIDE FOR TESTING.
 // Set to a number between 0 and 1 (e.g. 1 for deep night, 0 for full day).
 // Set back to null to use the real regional day/night cycle.
-const MANUAL_NIGHT_T_OVERRIDE: number | null = 1;
+const MANUAL_NIGHT_T_OVERRIDE: number | null = null;
 
 // Threshold above which the globe gets a uniform warm brightness lift on top
 // of the active mood (only applies when the mood uses a bright screen-blend
@@ -2398,15 +2528,30 @@ const HOT_WASH_OPACITY = 0.13;
 // and can be art-directed independently of the basemap.
 const NIGHT_GLOOM_WASH_OPACITY = 0;
 const NIGHT_FACE_SHADE_OPACITY = 0.35;
-// US night visibility: subtle "city lights" heatmap to keep the globe readable.
-// Kept but de-emphasized so it does not become a hard, continent-shaped glow.
-const NIGHT_US_LIGHTS_OPACITY = 0;
+// US night visibility: dot-only contact-lights tiles (not a heatmap).
+const NIGHT_US_LIGHTS_OPACITY = 0.9;
 const NIGHT_MOON_RIM_OPACITY = 0;
 
-// City-lights persistence: keep visible through the default interactive zoom (5) and
-// fade out as the map becomes more "street level".
-const NIGHT_LIGHTS_FADE_START_ZOOM = 5.75;
-const NIGHT_LIGHTS_FADE_END_ZOOM = 7.75;
+// City-lights persistence: this is primarily a "zoomed out / from space" aesthetic.
+// Fade out aggressively as we approach state/city zoom so it doesn't compete with markers.
+const NIGHT_LIGHTS_FADE_START_ZOOM = 3.7;
+// Keep visible through a "medium" multi-state view, then drop off quickly before city-level zoom.
+const NIGHT_LIGHTS_FADE_END_ZOOM = 6.65;
+// When the map first mounts, the lights tiles can appear in patches as they stream
+// in. We keep the overlay hidden until the raster source reports "loaded", then
+// fade it in so the first impression feels deliberate.
+const NIGHT_LIGHTS_LOAD_POLL_MS = 120;
+const NIGHT_LIGHTS_LOAD_FADE_MS = 750;
+// Zoom interaction: hide while tiles stream, then fade back in quickly.
+const NIGHT_LIGHTS_ZOOM_LOAD_POLL_MS = 90;
+const NIGHT_LIGHTS_ZOOM_LOAD_FADE_MS = 320;
+const NIGHT_LIGHTS_ZOOM_LOAD_OUT_FADE_MS = 140;
+// Keep lights present during zoom gestures (no "blink"), but dim slightly so
+// intermediate overzoomed raster state is less noticeable.
+const NIGHT_LIGHTS_ZOOM_LOAD_DIM_FLOOR = 0.72;
+// Intro animation: reveal left-to-right, then crossfade to the real tiles.
+const NIGHT_LIGHTS_INTRO_REVEAL_MS = 900;
+const NIGHT_LIGHTS_INTRO_CROSSFADE_MS = 260;
 
 const computeNightLightsFade = (zoom: number) => {
 	if (zoom <= NIGHT_LIGHTS_FADE_START_ZOOM) return 1;
@@ -2414,8 +2559,96 @@ const computeNightLightsFade = (zoom: number) => {
 	const t =
 		(zoom - NIGHT_LIGHTS_FADE_START_ZOOM) /
 		(NIGHT_LIGHTS_FADE_END_ZOOM - NIGHT_LIGHTS_FADE_START_ZOOM);
-	// Ease-out quad: mostly stable, then drifts away as you zoom in.
+	const inv = 1 - clamp(t, 0, 1);
+	// Steep fade: drops quickly after the start zoom so the overlay doesn't read as texture.
+	return Math.pow(inv, 2.25);
+};
+
+// Zoomed-out visibility: at the minimum zoom the US is only a few screen pixels wide,
+// so we apply a small opacity lift so the dots still read as a faint glow.
+const NIGHT_LIGHTS_ZOOM_OUT_LIFT_START_ZOOM = MAP_MIN_ZOOM;
+const NIGHT_LIGHTS_ZOOM_OUT_LIFT_END_ZOOM = NIGHT_LIGHTS_FADE_START_ZOOM;
+const NIGHT_LIGHTS_ZOOM_OUT_LIFT_MAX = 0.62;
+// Extra "bloom" pass: a low-zoom glow layer that makes the US read as sparkling
+// from far zoom without turning the crisp dot layer into a blur.
+const NIGHT_LIGHTS_GLOW_OPACITY_MULT = 0.75;
+// Fade the glow out by "medium" zoom so the pattern reads as city clusters, not
+// a noisy texture. (We still keep the crisp dot layer.)
+const NIGHT_LIGHTS_GLOW_FADE_START_ZOOM = 3.2;
+const NIGHT_LIGHTS_GLOW_FADE_END_ZOOM = 4.2;
+// Extra "space" glow: a short-lived boost that makes the US read from fully zoomed-out
+// view, then disappears before any state-level interaction.
+const NIGHT_LIGHTS_SPACE_GLOW_OPACITY_MULT = 1.55;
+// A second space-only pass (same tiles) to push the glow to be visible from "space"
+// without changing the dot tile generation.
+const NIGHT_LIGHTS_SPACE_GLOW_EXTRA_PASS_OPACITY_MUL = 0.85;
+const NIGHT_LIGHTS_SPACE_GLOW_FADE_START_ZOOM = MAP_MIN_ZOOM;
+const NIGHT_LIGHTS_SPACE_GLOW_FADE_END_ZOOM = 3.55;
+
+// Zoomed-in behavior: instead of many crisp points at mid zoom (which can read as "hair"),
+// crossfade toward a very subtle, local glow pass.
+const NIGHT_LIGHTS_CRISP_FADE_OUT_START_ZOOM = 4.05;
+const NIGHT_LIGHTS_CRISP_FADE_OUT_END_ZOOM = 4.55;
+const NIGHT_LIGHTS_CLOSE_GLOW_FADE_IN_START_ZOOM = 4.05;
+const NIGHT_LIGHTS_CLOSE_GLOW_FADE_IN_END_ZOOM = 4.35;
+const NIGHT_LIGHTS_CLOSE_GLOW_OPACITY_MULT = 0.55;
+
+const computeNightLightsZoomOutLift = (zoom: number) => {
+	if (zoom <= NIGHT_LIGHTS_ZOOM_OUT_LIFT_START_ZOOM) {
+		return NIGHT_LIGHTS_ZOOM_OUT_LIFT_MAX;
+	}
+	if (zoom >= NIGHT_LIGHTS_ZOOM_OUT_LIFT_END_ZOOM) return 0;
+	const t =
+		(zoom - NIGHT_LIGHTS_ZOOM_OUT_LIFT_START_ZOOM) /
+		(NIGHT_LIGHTS_ZOOM_OUT_LIFT_END_ZOOM - NIGHT_LIGHTS_ZOOM_OUT_LIFT_START_ZOOM);
+	const inv = 1 - Math.max(0, Math.min(1, t));
+	// Reverse ease-out: keep some lift up through the decorative globe range,
+	// then taper off by the default interactive zoom.
+	return NIGHT_LIGHTS_ZOOM_OUT_LIFT_MAX * Math.pow(inv, 1.35);
+};
+
+const computeNightLightsGlowFade = (zoom: number) => {
+	if (zoom <= NIGHT_LIGHTS_GLOW_FADE_START_ZOOM) return 1;
+	if (zoom >= NIGHT_LIGHTS_GLOW_FADE_END_ZOOM) return 0;
+	const t =
+		(zoom - NIGHT_LIGHTS_GLOW_FADE_START_ZOOM) /
+		(NIGHT_LIGHTS_GLOW_FADE_END_ZOOM - NIGHT_LIGHTS_GLOW_FADE_START_ZOOM);
+	// Ease-out: hold most of the glow, then drop off as we approach state-level zoom.
 	return 1 - t * t;
+};
+
+const computeNightLightsSpaceGlowFade = (zoom: number) => {
+	if (zoom <= NIGHT_LIGHTS_SPACE_GLOW_FADE_START_ZOOM) return 1;
+	if (zoom >= NIGHT_LIGHTS_SPACE_GLOW_FADE_END_ZOOM) return 0;
+	const t =
+		(zoom - NIGHT_LIGHTS_SPACE_GLOW_FADE_START_ZOOM) /
+		(NIGHT_LIGHTS_SPACE_GLOW_FADE_END_ZOOM - NIGHT_LIGHTS_SPACE_GLOW_FADE_START_ZOOM);
+	const inv = 1 - clamp(t, 0, 1);
+	// Space-only: keep it present across the fully zoomed-out "US from space" range,
+	// then drop quickly before state-level interaction.
+	return inv * inv;
+};
+
+const computeNightLightsCrispMul = (zoom: number) => {
+	if (zoom <= NIGHT_LIGHTS_CRISP_FADE_OUT_START_ZOOM) return 1;
+	if (zoom >= NIGHT_LIGHTS_CRISP_FADE_OUT_END_ZOOM) return 0;
+	const t =
+		(zoom - NIGHT_LIGHTS_CRISP_FADE_OUT_START_ZOOM) /
+		(NIGHT_LIGHTS_CRISP_FADE_OUT_END_ZOOM - NIGHT_LIGHTS_CRISP_FADE_OUT_START_ZOOM);
+	const inv = 1 - clamp(t, 0, 1);
+	// Ease-out: hold crisp longer, then drop as we approach state-level zoom.
+	return inv * inv;
+};
+
+const computeNightLightsCloseGlowMul = (zoom: number) => {
+	if (zoom <= NIGHT_LIGHTS_CLOSE_GLOW_FADE_IN_START_ZOOM) return 0;
+	if (zoom >= NIGHT_LIGHTS_CLOSE_GLOW_FADE_IN_END_ZOOM) return 1;
+	const t =
+		(zoom - NIGHT_LIGHTS_CLOSE_GLOW_FADE_IN_START_ZOOM) /
+		(NIGHT_LIGHTS_CLOSE_GLOW_FADE_IN_END_ZOOM -
+			NIGHT_LIGHTS_CLOSE_GLOW_FADE_IN_START_ZOOM);
+	// Ease-in: let dots dominate, then let glow take over smoothly.
+	return clamp(t, 0, 1) * clamp(t, 0, 1);
 };
 
 // Front-face silhouette: deepen the globe's visible face while keeping the rim readable.
@@ -2431,118 +2664,7 @@ const NIGHT_MOON_RIM_BG = [
 	'radial-gradient(ellipse 78% 78% at 14% 14%, rgba(255, 255, 255, 0.14) 0%, rgba(230, 246, 255, 0.06) 26%, rgba(255, 255, 255, 0) 48%)',
 ].join(', ');
 
-type NightLightsPoint = { lat: number; lng: number; w: number };
-
-const NIGHT_LIGHTS_US_POINTS: NightLightsPoint[] = [
-	{ lat: 40.7128, lng: -74.006, w: 1.0 }, // NYC
-	{ lat: 34.0522, lng: -118.2437, w: 0.95 }, // LA
-	{ lat: 41.8781, lng: -87.6298, w: 0.82 }, // Chicago
-	{ lat: 29.7604, lng: -95.3698, w: 0.72 }, // Houston
-	{ lat: 33.4484, lng: -112.074, w: 0.62 }, // Phoenix
-	{ lat: 39.9526, lng: -75.1652, w: 0.6 }, // Philadelphia
-	{ lat: 32.7767, lng: -96.797, w: 0.56 }, // Dallas
-	{ lat: 37.7749, lng: -122.4194, w: 0.58 }, // SF
-	{ lat: 47.6062, lng: -122.3321, w: 0.48 }, // Seattle
-	{ lat: 25.7617, lng: -80.1918, w: 0.56 }, // Miami
-	{ lat: 33.749, lng: -84.388, w: 0.56 }, // Atlanta
-	{ lat: 38.9072, lng: -77.0369, w: 0.5 }, // DC
-	{ lat: 42.3601, lng: -71.0589, w: 0.48 }, // Boston
-	{ lat: 39.7392, lng: -104.9903, w: 0.46 }, // Denver
-	{ lat: 36.1699, lng: -115.1398, w: 0.5 }, // Las Vegas
-	{ lat: 32.7157, lng: -117.1611, w: 0.44 }, // San Diego
-	{ lat: 30.2672, lng: -97.7431, w: 0.44 }, // Austin
-	{ lat: 29.4241, lng: -98.4936, w: 0.42 }, // San Antonio
-	{ lat: 44.9778, lng: -93.265, w: 0.42 }, // Minneapolis
-	{ lat: 42.3314, lng: -83.0458, w: 0.44 }, // Detroit
-	{ lat: 39.9612, lng: -82.9988, w: 0.4 }, // Columbus
-	{ lat: 35.2271, lng: -80.8431, w: 0.38 }, // Charlotte
-	{ lat: 36.1627, lng: -86.7816, w: 0.35 }, // Nashville
-	{ lat: 38.627, lng: -90.1994, w: 0.34 }, // St Louis
-	{ lat: 39.0997, lng: -94.5786, w: 0.34 }, // Kansas City
-	{ lat: 45.5152, lng: -122.6784, w: 0.36 }, // Portland
-	{ lat: 37.3382, lng: -121.8863, w: 0.36 }, // San Jose
-	{ lat: 39.7684, lng: -86.1581, w: 0.34 }, // Indianapolis
-	{ lat: 30.3322, lng: -81.6557, w: 0.32 }, // Jacksonville
-	{ lat: 29.9511, lng: -90.0715, w: 0.32 }, // New Orleans
-	// Fill in a little extra density for the Northeast corridor + Great Lakes.
-	{ lat: 39.2904, lng: -76.6122, w: 0.32 }, // Baltimore
-	{ lat: 41.4993, lng: -81.6944, w: 0.3 }, // Cleveland
-	{ lat: 42.8864, lng: -78.8784, w: 0.26 }, // Buffalo
-	{ lat: 43.1566, lng: -77.6088, w: 0.24 }, // Rochester
-	{ lat: 40.4406, lng: -79.9959, w: 0.28 }, // Pittsburgh
-];
-
-type NightLightsRegion = {
-	lat: number;
-	lng: number;
-	spreadLat: number;
-	spreadLng: number;
-	w: number;
-	count: number;
-};
-
-const NIGHT_LIGHTS_US_REGIONS: NightLightsRegion[] = [
-	// Background low-density glow across the lower 48.
-	{ lat: 39.2, lng: -98.6, spreadLat: 16.5, spreadLng: 28, w: 0.08, count: 360 },
-	// Northeast corridor + Mid-Atlantic.
-	{ lat: 40.7, lng: -74.8, spreadLat: 3.8, spreadLng: 6.2, w: 0.22, count: 360 },
-	// Great Lakes / Midwest industrial belt.
-	{ lat: 41.9, lng: -86.5, spreadLat: 4.6, spreadLng: 7.2, w: 0.18, count: 300 },
-	// Southeast.
-	{ lat: 33.3, lng: -84.0, spreadLat: 5.2, spreadLng: 8.2, w: 0.16, count: 240 },
-	// Florida peninsula.
-	{ lat: 28.2, lng: -82.2, spreadLat: 3.4, spreadLng: 5.6, w: 0.18, count: 200 },
-	// Texas triangle.
-	{ lat: 30.2, lng: -97.2, spreadLat: 4.9, spreadLng: 8.6, w: 0.16, count: 260 },
-	// California (SoCal + Bay) elongated.
-	{ lat: 35.8, lng: -120.8, spreadLat: 4.8, spreadLng: 8.4, w: 0.17, count: 260 },
-	// Pacific Northwest.
-	{ lat: 45.8, lng: -121.8, spreadLat: 3.8, spreadLng: 6.6, w: 0.14, count: 150 },
-	// Mountain West (sparser).
-	{ lat: 39.4, lng: -108.6, spreadLat: 6.2, spreadLng: 10.5, w: 0.11, count: 140 },
-	// Southwest desert metros.
-	{ lat: 34.2, lng: -112.3, spreadLat: 4.2, spreadLng: 7.2, w: 0.12, count: 140 },
-];
-
-const stableRand = (seed: number): number => {
-	// Deterministic pseudo-random in [0, 1).
-	const x = Math.sin(seed) * 10000;
-	return x - Math.floor(x);
-};
-
-const buildNightLightsGeoJson = (): GeoJSON.FeatureCollection<GeoJSON.Point> => {
-	const points: NightLightsPoint[] = [...NIGHT_LIGHTS_US_POINTS];
-	for (let r = 0; r < NIGHT_LIGHTS_US_REGIONS.length; r++) {
-		const region = NIGHT_LIGHTS_US_REGIONS[r]!;
-		const baseSeed = 1907 + r * 997;
-		for (let i = 0; i < region.count; i++) {
-			const s = baseSeed + i * 13;
-			const u = stableRand(s);
-			const v = stableRand(s + 1);
-			const a = stableRand(s + 2) * Math.PI * 2;
-			// Bias density slightly toward the center (more "urban core" feel).
-			const radius = Math.pow(u, 0.62);
-			const lat = region.lat + Math.cos(a) * radius * region.spreadLat;
-			const lng = region.lng + Math.sin(a) * radius * region.spreadLng;
-			const jitter = 0.65 + v * 0.55;
-			const sparkle = stableRand(s + 3) > 0.985 ? 1.9 : 1;
-			points.push({ lat, lng, w: region.w * jitter * sparkle });
-		}
-	}
-
-	return {
-		type: 'FeatureCollection',
-		features: points.map((p, i) => ({
-			type: 'Feature',
-			id: `night-light-${i}`,
-			properties: { w: p.w },
-			geometry: { type: 'Point', coordinates: [p.lng, p.lat] },
-		})),
-	};
-};
-
-const NIGHT_LIGHTS_US_GEOJSON: GeoJSON.FeatureCollection<GeoJSON.Point> =
-	buildNightLightsGeoJson();
+// NOTE: Night lights are generated offline as raster dot tiles (see scripts/generate_contact_lights_tiles.py).
 
 export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	contacts,
@@ -2572,6 +2694,23 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	weatherTemperatureF = null,
 	nightT: nightTProp = null,
 }) => {
+	const contactLightsTilesEnabled = useMemo(() => {
+		// Enabled by default (it's a lightweight raster overlay), but allow a
+		// URL escape hatch to disable while tuning: `?devContactLights=0`.
+		if (typeof window === 'undefined') return true;
+		const raw = new URLSearchParams(window.location.search).get('devContactLights');
+		return !(raw === '0' || raw === 'false');
+	}, []);
+
+	const contactLightsDebugEnabled = useMemo(() => {
+		// Debug helper: logs tile errors + shows tile boundaries so we can diagnose
+		// "missing ranges" (404s vs opacity gating vs empty tiles).
+		// Enable with: `?devContactLightsDebug=1`
+		if (typeof window === 'undefined') return false;
+		const raw = new URLSearchParams(window.location.search).get('devContactLightsDebug');
+		return raw === '1' || raw === 'true';
+	}, []);
+
 	const weatherMood = MANUAL_WEATHER_MOOD_OVERRIDE ?? weatherMoodProp;
 	const effectiveTemperatureF =
 		MANUAL_WEATHER_TEMPERATURE_OVERRIDE_F ?? weatherTemperatureF;
@@ -2641,6 +2780,17 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	// updates can stay fully imperative without React re-render jitter.
 	const nightTRef = useRef<number>(nightT);
 	nightTRef.current = nightT;
+	// 0..1 fade that suppresses the lights overlay until tiles are ready, avoiding
+	// the half-loaded "patchy" initial look.
+	const nightLightsLoadTRef = useRef<number>(0);
+	const nightLightsLoadStartedRef = useRef<boolean>(false);
+	// 0..1 fade used during zoom interactions; we hide the overlay while raster tiles
+	// are streaming to avoid the "hairy" intermediate look.
+	const nightLightsZoomLoadTRef = useRef<number>(1);
+	// Intro reveal animation state (west->east dot reveal, then crossfade to real tiles).
+	const nightLightsIntroRevealTRef = useRef<number>(0);
+	const nightLightsIntroCrossfadeTRef = useRef<number>(0);
+	const nightLightsIntroDoneRef = useRef<boolean>(false);
 	// Capture the base Mapbox paint values once, then we apply a multiplier for fading.
 	const stateLineOpacityBaseRef = useRef<{ dividers: any; borders: any } | null>(null);
 
@@ -3936,10 +4086,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	// Keep state boundary visibility in sync with night darkening.
 	useEffect(() => {
 		if (!map || !isMapLoaded) return;
-		applyStateOverlayOpacity(
-			stateOverlayOpacityRef.current,
-			stateOverlayModeRef.current
-		);
+		applyStateOverlayOpacity(stateOverlayOpacityRef.current, stateOverlayModeRef.current);
 	}, [nightT, map, isMapLoaded, applyStateOverlayOpacity]);
 
 	// Subtle cloud drift so the overlay feels "alive" (especially in background globe mode).
@@ -4924,16 +5071,30 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			}
 		}
 
-		// US night lights: small static heatmap points so the globe stays readable at night.
-		try {
-			if (!mapInstance.getSource(MAPBOX_SOURCE_IDS.nightLights)) {
-				mapInstance.addSource(MAPBOX_SOURCE_IDS.nightLights, {
-					type: 'geojson',
-					data: NIGHT_LIGHTS_US_GEOJSON,
-				} as any);
+		if (contactLightsTilesEnabled) {
+			// Contact lights: dot-only raster tiles derived from contact coords.
+			try {
+				if (!mapInstance.getSource(MAPBOX_SOURCE_IDS.nightLights)) {
+					mapInstance.addSource(MAPBOX_SOURCE_IDS.nightLights, {
+						type: 'raster',
+						tiles: [CONTACT_LIGHTS_TILES_URL_TEMPLATE],
+						tileSize: 512,
+						maxzoom: CONTACT_LIGHTS_TILES_MAX_ZOOM,
+						bounds: CONTACT_LIGHTS_TILES_BOUNDS,
+					} as any);
+				}
+				if (!mapInstance.getSource(MAPBOX_SOURCE_IDS.nightLightsReveal)) {
+					mapInstance.addSource(MAPBOX_SOURCE_IDS.nightLightsReveal, {
+						type: 'raster',
+						tiles: [CONTACT_LIGHTS_REVEAL_TILES_URL_TEMPLATE],
+						tileSize: 512,
+						maxzoom: CONTACT_LIGHTS_TILES_MAX_ZOOM,
+						bounds: CONTACT_LIGHTS_TILES_BOUNDS,
+					} as any);
+				}
+			} catch {
+				// Non-fatal.
 			}
-		} catch {
-			// Non-fatal.
 		}
 
 		// States source needs `promoteId` so Mapbox uses the string "key" property (e.g. "CA", "TX")
@@ -4972,6 +5133,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			cfg.cloudDeepZoomOpacity
 		);
 
+		// Clouds (baseline globe texture).
 		ensureLayer({
 			id: MAPBOX_LAYER_IDS.clouds,
 			type: 'raster',
@@ -4990,57 +5152,103 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			},
 		});
 
-		// Night lights heatmap. Default opacity is 0; we drive visibility from
+		// Contact lights (dot tiles). Default opacity is 0; we drive visibility from
 		// applyLightingOverlayOpacity based on zoom + `nightT`.
+		//
+		// Note: this sits above clouds so it reads at globe zoom (clouds can wash out
+		// tiny dots when fully zoomed out). We render a subtle low-zoom glow pass under
+		// a crisp dot pass so it reads as "sparkling", not blurred.
 		try {
 			if (mapInstance.getSource(MAPBOX_SOURCE_IDS.nightLights)) {
 				ensureLayer({
-					id: MAPBOX_LAYER_IDS.nightLights,
-					type: 'heatmap',
+					id: MAPBOX_LAYER_IDS.nightLightsSpaceGlow,
+					type: 'raster',
 					source: MAPBOX_SOURCE_IDS.nightLights,
-					maxzoom: LIGHTING_OVERLAY_FADE_END_ZOOM + 0.01,
+					// Only relevant for the "from space" view.
+					maxzoom: NIGHT_LIGHTS_SPACE_GLOW_FADE_END_ZOOM + 0.01,
 					paint: {
-						'heatmap-weight': ['coalesce', ['get', 'w'], 1],
-						'heatmap-intensity': [
-							'interpolate',
-							['linear'],
-							['zoom'],
-							2,
-							0.6,
-							4,
-							1.0,
-							5,
-							1.18,
-						],
-						'heatmap-radius': [
-							'interpolate',
-							['linear'],
-							['zoom'],
-							2,
-							70,
-							4,
-							105,
-							5,
-							130,
-						],
-						'heatmap-opacity': 0,
-						'heatmap-color': [
-							'interpolate',
-							['linear'],
-							['heatmap-density'],
-							0,
-							'rgba(0, 0, 0, 0)',
-							0.16,
-							'rgba(170, 214, 255, 0.10)',
-							0.32,
-							'rgba(205, 235, 255, 0.22)',
-							0.55,
-							'rgba(240, 250, 255, 0.36)',
-							0.78,
-							'rgba(255, 255, 255, 0.48)',
-							1,
-							'rgba(255, 255, 255, 0.56)',
-						],
+						'raster-opacity': 0,
+						// Avoid Mapbox's per-tile crossfade (it can look like a "hair texture"
+						// while zooming). We do our own deliberate fade via raster-opacity.
+						'raster-fade-duration': 0,
+						// Slight bloom: linear resampling.
+						'raster-resampling': 'linear',
+					},
+				} as any);
+				// Second space-only pass: pushes visibility when fully zoomed out without touching tiles.
+				ensureLayer({
+					id: MAPBOX_LAYER_IDS.nightLightsSpaceGlow2,
+					type: 'raster',
+					source: MAPBOX_SOURCE_IDS.nightLights,
+					maxzoom: NIGHT_LIGHTS_SPACE_GLOW_FADE_END_ZOOM + 0.01,
+					paint: {
+						'raster-opacity': 0,
+						'raster-fade-duration': 0,
+						'raster-resampling': 'linear',
+					},
+				} as any);
+				// Intro reveal layers (alpha-biased tiles). These are crossfaded away once the
+				// real tiles are fully visible.
+				if (mapInstance.getSource(MAPBOX_SOURCE_IDS.nightLightsReveal)) {
+					ensureLayer({
+						id: MAPBOX_LAYER_IDS.nightLightsRevealGlow,
+						type: 'raster',
+						source: MAPBOX_SOURCE_IDS.nightLightsReveal,
+						maxzoom: NIGHT_LIGHTS_FADE_END_ZOOM + 0.01,
+						paint: {
+							'raster-opacity': 0,
+							'raster-fade-duration': 0,
+							'raster-resampling': 'linear',
+						},
+					} as any);
+					ensureLayer({
+						id: MAPBOX_LAYER_IDS.nightLightsReveal,
+						type: 'raster',
+						source: MAPBOX_SOURCE_IDS.nightLightsReveal,
+						maxzoom: NIGHT_LIGHTS_FADE_END_ZOOM + 0.01,
+						paint: {
+							'raster-opacity': 0,
+							'raster-fade-duration': 0,
+							'raster-resampling': 'nearest',
+						},
+					} as any);
+				}
+				ensureLayer({
+					id: MAPBOX_LAYER_IDS.nightLightsGlow,
+					type: 'raster',
+					source: MAPBOX_SOURCE_IDS.nightLights,
+					maxzoom: NIGHT_LIGHTS_FADE_END_ZOOM + 0.01,
+					paint: {
+						'raster-opacity': 0,
+						// Avoid Mapbox's per-tile crossfade (it can look like a "hair texture"
+						// while zooming). We do our own deliberate fade via raster-opacity.
+						'raster-fade-duration': 0,
+						// Linear resampling = tiny bloom at far zoom.
+						'raster-resampling': 'linear',
+					},
+				} as any);
+				ensureLayer({
+					id: MAPBOX_LAYER_IDS.nightLightsCloseGlow,
+					type: 'raster',
+					source: MAPBOX_SOURCE_IDS.nightLights,
+					maxzoom: NIGHT_LIGHTS_FADE_END_ZOOM + 0.01,
+					paint: {
+						'raster-opacity': 0,
+						'raster-fade-duration': 0,
+						// Linear resampling so dots read as a soft local glow at mid zoom.
+						'raster-resampling': 'linear',
+					},
+				} as any);
+				ensureLayer({
+					id: MAPBOX_LAYER_IDS.nightLights,
+					type: 'raster',
+					source: MAPBOX_SOURCE_IDS.nightLights,
+					maxzoom: NIGHT_LIGHTS_FADE_END_ZOOM + 0.01,
+					paint: {
+						'raster-opacity': 0,
+						'raster-fade-duration': 0,
+						// Keep it dotty: nearest resampling avoids a low-zoom blur smear.
+						'raster-resampling': 'nearest',
 					},
 				} as any);
 			}
@@ -5148,7 +5356,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		// States: hover fill + hit fill (transparent) + divider lines + interactive borders
 		const isStateSelectedExpr = ['boolean', ['feature-state', 'selected'], false];
 
-		const stateDividerLineWidthExpr = buildStateDividerLineWidthExpr(nightTRef.current);
+		const stateDividerLineWidthExpr = buildStateDividerLineWidthExpr();
 		const stateDividerLineOpacityExpr = [
 			'interpolate',
 			['linear'],
@@ -5162,9 +5370,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			STATE_DIVIDER_LINES_MAX_ZOOM,
 			0.85,
 		];
-		const stateInteractiveBorderWidthExpr = buildStateInteractiveBorderWidthExpr(
-			nightTRef.current
-		);
+		const stateInteractiveBorderWidthExpr = buildStateInteractiveBorderWidthExpr();
 		const stateInteractiveBorderOpacityExpr = [
 			'interpolate',
 			['linear'],
@@ -5510,6 +5716,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			bearing: 0,
 			minZoom: MAP_MIN_ZOOM,
 			attributionControl: true,
+			...(contactLightsDebugEnabled ? { showTileBoundaries: true } : {}),
 		});
 
 		mapRef.current = mapInstance;
@@ -5670,7 +5877,201 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			setMap(null);
 			setIsMapLoaded(false);
 		};
-	}, [ensureMapboxSourcesAndLayers]);
+	}, [ensureMapboxSourcesAndLayers, contactLightsDebugEnabled]);
+
+	// Debug: detect missing tiles / error events for the contact-lights raster overlay.
+	useEffect(() => {
+		if (!map) return;
+		if (!isMapLoaded) return;
+		if (!contactLightsDebugEnabled) return;
+		if (typeof window === 'undefined') return;
+
+		const isContactLightsUrl = (url: unknown) =>
+			typeof url === 'string' &&
+			(url.includes('/maps/contact_lights/') ||
+				url.includes('/maps/contact_lights_reveal/'));
+
+		const logLoadState = (tag: string) => {
+			try {
+				const zoom = map.getZoom();
+				const night = clamp(nightTRef.current, 0, 1);
+				const zoomOutLift = computeNightLightsZoomOutLift(zoom);
+				const loadT =
+					clamp(nightLightsLoadTRef.current, 0, 1) *
+					clamp(nightLightsZoomLoadTRef.current, 0, 1);
+				const nightForLights = Math.pow(night, 0.65);
+				const lightsBase =
+					nightForLights *
+					(NIGHT_US_LIGHTS_OPACITY + zoomOutLift) *
+					computeNightLightsFade(zoom) *
+					loadT;
+
+				const introDone = nightLightsIntroDoneRef.current;
+				const introRevealT = clamp(nightLightsIntroRevealTRef.current, 0, 1);
+				const introCrossT = clamp(nightLightsIntroCrossfadeTRef.current, 0, 1);
+				let introFinalMul = 1;
+				let introRevealMul = 0;
+				if (!introDone) {
+					if (introCrossT > 0) {
+						introFinalMul = introCrossT;
+						introRevealMul = 1 - introCrossT;
+					} else {
+						introFinalMul = 0;
+						introRevealMul = introRevealT;
+					}
+				}
+
+				const crispMul = computeNightLightsCrispMul(zoom);
+				const closeGlowMul = computeNightLightsCloseGlowMul(zoom);
+				const finalCrispOpacity = clamp(lightsBase * introFinalMul * crispMul, 0, 1);
+				const finalGlowOpacity = clamp(
+					lightsBase *
+						NIGHT_LIGHTS_GLOW_OPACITY_MULT *
+						computeNightLightsGlowFade(zoom) *
+						introFinalMul,
+					0,
+					1
+				);
+				const finalCloseGlowOpacity = clamp(
+					lightsBase *
+						NIGHT_LIGHTS_CLOSE_GLOW_OPACITY_MULT *
+						closeGlowMul *
+						introFinalMul,
+					0,
+					1
+				);
+				const finalSpaceGlowOpacity = clamp(
+					lightsBase *
+						NIGHT_LIGHTS_SPACE_GLOW_OPACITY_MULT *
+						computeNightLightsSpaceGlowFade(zoom) *
+						introFinalMul,
+					0,
+					1
+				);
+				const revealCrispOpacity = clamp(lightsBase * introRevealMul * crispMul, 0, 1);
+
+				let finalLoaded = false;
+				let revealLoaded: boolean | null = null;
+				try {
+					finalLoaded = map.isSourceLoaded(MAPBOX_SOURCE_IDS.nightLights);
+				} catch {
+					finalLoaded = false;
+				}
+				try {
+					if ((map as any).getSource?.(MAPBOX_SOURCE_IDS.nightLightsReveal)) {
+						revealLoaded = map.isSourceLoaded(MAPBOX_SOURCE_IDS.nightLightsReveal);
+					}
+				} catch {
+					revealLoaded = null;
+				}
+				// eslint-disable-next-line no-console
+				console.debug('[contact-lights]', tag, {
+					zoom: typeof zoom === 'number' ? Number(zoom.toFixed(2)) : zoom,
+					nightT: Number(night.toFixed(2)),
+					finalLoaded,
+					revealLoaded,
+					fadeT: Number(clamp(computeNightLightsFade(zoom), 0, 1).toFixed(2)),
+					zoomOutLift: Number(zoomOutLift.toFixed(2)),
+					loadT: Number(clamp(nightLightsLoadTRef.current, 0, 1).toFixed(2)),
+					zoomLoadT: Number(clamp(nightLightsZoomLoadTRef.current, 0, 1).toFixed(2)),
+					lightsBase: Number(clamp(lightsBase, 0, 1).toFixed(2)),
+					crispMul: Number(clamp(crispMul, 0, 1).toFixed(2)),
+					closeGlowMul: Number(clamp(closeGlowMul, 0, 1).toFixed(2)),
+					finalCrispOpacity: Number(finalCrispOpacity.toFixed(2)),
+					finalGlowOpacity: Number(finalGlowOpacity.toFixed(2)),
+					finalCloseGlowOpacity: Number(finalCloseGlowOpacity.toFixed(2)),
+					finalSpaceGlowOpacity: Number(finalSpaceGlowOpacity.toFixed(2)),
+					revealCrispOpacity: Number(revealCrispOpacity.toFixed(2)),
+					introDone: nightLightsIntroDoneRef.current,
+					introRevealT: Number(
+						clamp(nightLightsIntroRevealTRef.current, 0, 1).toFixed(2)
+					),
+					introCrossT: Number(
+						clamp(nightLightsIntroCrossfadeTRef.current, 0, 1).toFixed(2)
+					),
+				});
+			} catch {
+				// Ignore.
+			}
+		};
+
+		const onError = (e: any) => {
+			const sourceId = e?.sourceId;
+			const url =
+				e?.error?.url ??
+				e?.url ??
+				e?.error?.request?.url ??
+				e?.error?.resource?.url ??
+				e?.error?.resourceUrl;
+			if (
+				sourceId === MAPBOX_SOURCE_IDS.nightLights ||
+				sourceId === MAPBOX_SOURCE_IDS.nightLightsReveal ||
+				isContactLightsUrl(url)
+			) {
+				// eslint-disable-next-line no-console
+				console.warn('[contact-lights] tile error', {
+					sourceId,
+					url,
+					tile: e?.tile,
+					status: e?.error?.status,
+					message: e?.error?.message ?? e?.message,
+				});
+			}
+		};
+
+		let lastFinalLoaded: boolean | null = null;
+		let lastRevealLoaded: boolean | null = null;
+		const onSourceData = (e: any) => {
+			const sid = e?.sourceId;
+			if (
+				sid !== MAPBOX_SOURCE_IDS.nightLights &&
+				sid !== MAPBOX_SOURCE_IDS.nightLightsReveal
+			)
+				return;
+			try {
+				const finalLoaded = map.isSourceLoaded(MAPBOX_SOURCE_IDS.nightLights);
+				const revealLoaded =
+					(map as any).getSource?.(MAPBOX_SOURCE_IDS.nightLightsReveal) != null
+						? map.isSourceLoaded(MAPBOX_SOURCE_IDS.nightLightsReveal)
+						: null;
+				if (finalLoaded !== lastFinalLoaded || revealLoaded !== lastRevealLoaded) {
+					lastFinalLoaded = finalLoaded;
+					lastRevealLoaded = revealLoaded;
+					logLoadState('sourcedata');
+				}
+			} catch {
+				// Ignore.
+			}
+		};
+
+		try {
+			(map as any).showTileBoundaries = true;
+			(map as any).triggerRepaint?.();
+		} catch {
+			// Ignore.
+		}
+
+		map.on('error', onError);
+		map.on('sourcedata', onSourceData);
+		const onZoomEnd = () => logLoadState('zoomend');
+		const onMoveEnd = () => logLoadState('moveend');
+		map.on('zoomend', onZoomEnd);
+		map.on('moveend', onMoveEnd);
+		logLoadState('init');
+
+		return () => {
+			try {
+				(map as any).showTileBoundaries = false;
+				(map as any).triggerRepaint?.();
+			} catch {
+				// Ignore.
+			}
+			map.off('error', onError);
+			map.off('sourcedata', onSourceData);
+			map.off('zoomend', onZoomEnd);
+			map.off('moveend', onMoveEnd);
+		};
+	}, [map, isMapLoaded, contactLightsDebugEnabled]);
 
 	const prevPresentationRef = useRef<'background' | 'interactive'>(presentation);
 
@@ -7877,20 +8278,126 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		if (lightingOverlayMoonRimRef.current)
 			lightingOverlayMoonRimRef.current.style.opacity = String(rimOpacity);
 
-		// US night lights (Mapbox heatmap layer) — helps keep the globe readable at night
+		// US night lights (Mapbox raster dot-tiles layer) — helps keep the globe readable at night
 		// without turning the whole basemap into a "night mode" style.
-		const usLightsOpacity = clamp(
-			nightBase * NIGHT_US_LIGHTS_OPACITY * computeNightLightsFade(zoom),
+		const zoomOutLift = computeNightLightsZoomOutLift(zoom);
+		const loadT =
+			clamp(nightLightsLoadTRef.current, 0, 1) *
+			clamp(nightLightsZoomLoadTRef.current, 0, 1);
+		// Make lights appear earlier in dusk/dawn (and feel more "present" at night)
+		// without showing them during full daylight.
+		const nightForLights = Math.pow(night, 0.65);
+		const lightsBase =
+			nightForLights *
+			(NIGHT_US_LIGHTS_OPACITY + zoomOutLift) *
+			computeNightLightsFade(zoom) *
+			loadT;
+
+		// Intro: reveal alpha-biased tiles first (reads as dot-by-dot sweep), then crossfade
+		// to the real tiles so final brightness/density is correct.
+		const introDone = nightLightsIntroDoneRef.current;
+		const introRevealT = clamp(nightLightsIntroRevealTRef.current, 0, 1);
+		const introCrossT = clamp(nightLightsIntroCrossfadeTRef.current, 0, 1);
+		let introFinalMul = 1;
+		let introRevealMul = 0;
+		if (!introDone) {
+			if (introCrossT > 0) {
+				introFinalMul = introCrossT;
+				introRevealMul = 1 - introCrossT;
+			} else {
+				introFinalMul = 0;
+				introRevealMul = introRevealT;
+			}
+		}
+
+		const crispMul = computeNightLightsCrispMul(zoom);
+		const closeGlowMul = computeNightLightsCloseGlowMul(zoom);
+
+		const finalCrispOpacity = clamp(lightsBase * introFinalMul * crispMul, 0, 1);
+		const finalSpaceGlowOpacity = clamp(
+			lightsBase *
+				NIGHT_LIGHTS_SPACE_GLOW_OPACITY_MULT *
+				computeNightLightsSpaceGlowFade(zoom) *
+				introFinalMul,
 			0,
-			0.62
+			1
+		);
+		const finalSpaceGlowOpacity2 = clamp(
+			finalSpaceGlowOpacity * NIGHT_LIGHTS_SPACE_GLOW_EXTRA_PASS_OPACITY_MUL,
+			0,
+			1
+		);
+		const finalGlowOpacity = clamp(
+			lightsBase *
+				NIGHT_LIGHTS_GLOW_OPACITY_MULT *
+				computeNightLightsGlowFade(zoom) *
+				introFinalMul,
+			0,
+			1
+		);
+		const finalCloseGlowOpacity = clamp(
+			lightsBase * NIGHT_LIGHTS_CLOSE_GLOW_OPACITY_MULT * closeGlowMul * introFinalMul,
+			0,
+			1
+		);
+		const revealCrispOpacity = clamp(lightsBase * introRevealMul * crispMul, 0, 1);
+		const revealGlowOpacity = clamp(
+			lightsBase *
+				NIGHT_LIGHTS_GLOW_OPACITY_MULT *
+				computeNightLightsGlowFade(zoom) *
+				introRevealMul,
+			0,
+			1
 		);
 		try {
 			const m = mapRef.current;
+			if (m && m.getLayer(MAPBOX_LAYER_IDS.nightLightsSpaceGlow)) {
+				(m as any).setPaintProperty(
+					MAPBOX_LAYER_IDS.nightLightsSpaceGlow,
+					'raster-opacity',
+					finalSpaceGlowOpacity
+				);
+			}
+			if (m && m.getLayer(MAPBOX_LAYER_IDS.nightLightsSpaceGlow2)) {
+				(m as any).setPaintProperty(
+					MAPBOX_LAYER_IDS.nightLightsSpaceGlow2,
+					'raster-opacity',
+					finalSpaceGlowOpacity2
+				);
+			}
+			if (m && m.getLayer(MAPBOX_LAYER_IDS.nightLightsRevealGlow)) {
+				(m as any).setPaintProperty(
+					MAPBOX_LAYER_IDS.nightLightsRevealGlow,
+					'raster-opacity',
+					revealGlowOpacity
+				);
+			}
+			if (m && m.getLayer(MAPBOX_LAYER_IDS.nightLightsReveal)) {
+				(m as any).setPaintProperty(
+					MAPBOX_LAYER_IDS.nightLightsReveal,
+					'raster-opacity',
+					revealCrispOpacity
+				);
+			}
+			if (m && m.getLayer(MAPBOX_LAYER_IDS.nightLightsGlow)) {
+				(m as any).setPaintProperty(
+					MAPBOX_LAYER_IDS.nightLightsGlow,
+					'raster-opacity',
+					finalGlowOpacity
+				);
+			}
+			if (m && m.getLayer(MAPBOX_LAYER_IDS.nightLightsCloseGlow)) {
+				(m as any).setPaintProperty(
+					MAPBOX_LAYER_IDS.nightLightsCloseGlow,
+					'raster-opacity',
+					finalCloseGlowOpacity
+				);
+			}
 			if (m && m.getLayer(MAPBOX_LAYER_IDS.nightLights)) {
 				(m as any).setPaintProperty(
 					MAPBOX_LAYER_IDS.nightLights,
-					'heatmap-opacity',
-					usLightsOpacity
+					'raster-opacity',
+					finalCrispOpacity
 				);
 			}
 		} catch {
@@ -7929,6 +8436,227 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			map.off('zoom', applyLightingOverlayOpacity);
 		};
 	}, [map, isMapLoaded, applyLightingOverlayOpacity]);
+
+	// Fade in night lights once their tiles are ready to avoid the initial "patchy" look.
+	useEffect(() => {
+		if (!map) return;
+		if (!isMapLoaded) return;
+		if (!contactLightsTilesEnabled) return;
+		if (typeof window === 'undefined') return;
+
+		nightLightsLoadTRef.current = 0;
+		nightLightsLoadStartedRef.current = false;
+		nightLightsZoomLoadTRef.current = 1;
+		nightLightsIntroRevealTRef.current = 0;
+		nightLightsIntroCrossfadeTRef.current = 0;
+		nightLightsIntroDoneRef.current = false;
+		applyLightingOverlayOpacity();
+
+		let cancelled = false;
+		let rafId: number | null = null;
+		let intervalId: number | null = null;
+		let attempts = 0;
+
+		const clearTimers = () => {
+			if (intervalId != null) window.clearInterval(intervalId);
+			if (rafId != null) window.cancelAnimationFrame(rafId);
+			intervalId = null;
+			rafId = null;
+		};
+
+		const startFallbackFade = () => {
+			if (nightLightsLoadStartedRef.current) return;
+			nightLightsLoadStartedRef.current = true;
+			nightLightsIntroDoneRef.current = true;
+			const start = performance.now();
+			const tick = () => {
+				if (cancelled) return;
+				const now = performance.now();
+				const t = clamp((now - start) / NIGHT_LIGHTS_LOAD_FADE_MS, 0, 1);
+				const inv = 1 - t;
+				const eased = 1 - inv * inv * inv;
+				nightLightsLoadTRef.current = eased;
+				applyLightingOverlayOpacity();
+				if (t < 1) rafId = window.requestAnimationFrame(tick);
+			};
+			rafId = window.requestAnimationFrame(tick);
+		};
+
+		const startIntroReveal = () => {
+			if (nightLightsLoadStartedRef.current) return;
+			nightLightsLoadStartedRef.current = true;
+			// Once tiles are ready, unlock visibility and run the west->east reveal.
+			nightLightsLoadTRef.current = 1;
+			nightLightsIntroRevealTRef.current = 0;
+			nightLightsIntroCrossfadeTRef.current = 0;
+			nightLightsIntroDoneRef.current = false;
+
+			const startReveal = performance.now();
+			const tickReveal = () => {
+				if (cancelled) return;
+				const now = performance.now();
+				const t = clamp((now - startReveal) / NIGHT_LIGHTS_INTRO_REVEAL_MS, 0, 1);
+				// Ease-in-out: lets the left edge "sparkle" before ramping across.
+				const eased = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+				nightLightsIntroRevealTRef.current = eased;
+				applyLightingOverlayOpacity();
+				if (t < 1) {
+					rafId = window.requestAnimationFrame(tickReveal);
+					return;
+				}
+
+				// Crossfade to the real tiles so final brightness is correct everywhere.
+				const startCross = performance.now();
+				const tickCross = () => {
+					if (cancelled) return;
+					const now2 = performance.now();
+					const t2 = clamp((now2 - startCross) / NIGHT_LIGHTS_INTRO_CROSSFADE_MS, 0, 1);
+					// Ease-out cubic.
+					const inv = 1 - t2;
+					const eased2 = 1 - inv * inv * inv;
+					nightLightsIntroCrossfadeTRef.current = eased2;
+					applyLightingOverlayOpacity();
+					if (t2 < 1) {
+						rafId = window.requestAnimationFrame(tickCross);
+						return;
+					}
+					nightLightsIntroDoneRef.current = true;
+					applyLightingOverlayOpacity();
+				};
+				rafId = window.requestAnimationFrame(tickCross);
+			};
+
+			rafId = window.requestAnimationFrame(tickReveal);
+		};
+
+		const poll = () => {
+			if (cancelled) return;
+			attempts++;
+			const m = mapRef.current;
+			if (!m) return;
+			let readyFinal = false;
+			let readyReveal = false;
+			const hasRevealSource = Boolean(
+				(m as any).getSource?.(MAPBOX_SOURCE_IDS.nightLightsReveal)
+			);
+			try {
+				readyFinal = m.isSourceLoaded(MAPBOX_SOURCE_IDS.nightLights);
+			} catch {
+				readyFinal = false;
+			}
+			if (hasRevealSource) {
+				try {
+					readyReveal = m.isSourceLoaded(MAPBOX_SOURCE_IDS.nightLightsReveal);
+				} catch {
+					readyReveal = false;
+				}
+			}
+
+			const ready = hasRevealSource ? readyFinal && readyReveal : readyFinal;
+
+			// If we can't confirm readiness quickly, still start after a short grace period.
+			if (ready || attempts >= 28) {
+				clearTimers();
+				if (hasRevealSource) startIntroReveal();
+				else startFallbackFade();
+			}
+		};
+
+		intervalId = window.setInterval(poll, NIGHT_LIGHTS_LOAD_POLL_MS);
+		poll();
+
+		return () => {
+			cancelled = true;
+			clearTimers();
+		};
+	}, [map, isMapLoaded, contactLightsTilesEnabled, applyLightingOverlayOpacity]);
+
+	// During zooming, Mapbox will temporarily resample/scale raster tiles while new tiles stream in.
+	// For this dot overlay that can read as a "hairy" texture, we dim it slightly during the
+	// interaction and ease it back in once the source reports loaded.
+	useEffect(() => {
+		if (!map) return;
+		if (!isMapLoaded) return;
+		if (!contactLightsTilesEnabled) return;
+		if (typeof window === 'undefined') return;
+
+		let cancelled = false;
+		let rafId: number | null = null;
+		let intervalId: number | null = null;
+		let attempts = 0;
+
+		const clearTimers = () => {
+			if (intervalId != null) window.clearInterval(intervalId);
+			if (rafId != null) window.cancelAnimationFrame(rafId);
+			intervalId = null;
+			rafId = null;
+		};
+
+		const fadeTo = (target: number, ms: number) => {
+			clearTimers();
+			const startT = performance.now();
+			const from = clamp(nightLightsZoomLoadTRef.current, 0, 1);
+			const to = clamp(target, 0, 1);
+			const tick = () => {
+				if (cancelled) return;
+				const now = performance.now();
+				const t = clamp((now - startT) / ms, 0, 1);
+				// Ease-out cubic.
+				const inv = 1 - t;
+				const eased = 1 - inv * inv * inv;
+				nightLightsZoomLoadTRef.current = from + (to - from) * eased;
+				applyLightingOverlayOpacity();
+				if (t < 1) rafId = window.requestAnimationFrame(tick);
+			};
+			rafId = window.requestAnimationFrame(tick);
+		};
+
+		const startFadeInWhenReady = () => {
+			clearTimers();
+			attempts = 0;
+
+			const poll = () => {
+				if (cancelled) return;
+				attempts++;
+				const m = mapRef.current;
+				if (!m) return;
+				let ready = false;
+				try {
+					ready = m.isSourceLoaded(MAPBOX_SOURCE_IDS.nightLights);
+				} catch {
+					ready = false;
+				}
+				if (ready || attempts >= 16) {
+					fadeTo(1, NIGHT_LIGHTS_ZOOM_LOAD_FADE_MS);
+				}
+			};
+
+			intervalId = window.setInterval(poll, NIGHT_LIGHTS_ZOOM_LOAD_POLL_MS);
+			poll();
+		};
+
+		const handleZoomStart = () => {
+			// Dim quickly so we don't stare at the scaled/intermediate raster state,
+			// but keep the lights present so they feel "part of the map".
+			fadeTo(NIGHT_LIGHTS_ZOOM_LOAD_DIM_FLOOR, NIGHT_LIGHTS_ZOOM_LOAD_OUT_FADE_MS);
+		};
+
+		const handleZoomEnd = () => {
+			nightLightsZoomLoadTRef.current = NIGHT_LIGHTS_ZOOM_LOAD_DIM_FLOOR;
+			applyLightingOverlayOpacity();
+			startFadeInWhenReady();
+		};
+
+		map.on('zoomstart', handleZoomStart);
+		map.on('zoomend', handleZoomEnd);
+
+		return () => {
+			cancelled = true;
+			clearTimers();
+			map.off('zoomstart', handleZoomStart);
+			map.off('zoomend', handleZoomEnd);
+		};
+	}, [map, isMapLoaded, contactLightsTilesEnabled, applyLightingOverlayOpacity]);
 
 	// Update overlays when the day/night factor changes (e.g. dusk progression).
 	useEffect(() => {
