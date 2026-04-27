@@ -6354,6 +6354,31 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			try {
 				map.resize();
 			} catch {}
+
+			// Background presentation uses a screen-space offset to create the "globe peeking"
+			// framing on the dashboard. If the user transitions into interactive search before
+			// an auto-fit camera move runs (e.g. hydration races / empty results), that offset
+			// can visually persist and leave the globe too low in the viewport.
+			try {
+				const container = map.getContainer?.() as HTMLElement | undefined;
+				const w = container?.clientWidth ?? 0;
+				const h = container?.clientHeight ?? 0;
+				let center: [number, number] = DASHBOARD_DECORATIVE_CENTER;
+				if (w > 0 && h > 0) {
+					const target = map.unproject([
+						w / 2 + DASHBOARD_DECORATIVE_OFFSET_PX[0],
+						h / 2 + DASHBOARD_DECORATIVE_OFFSET_PX[1],
+					]);
+					center = [target.lng, target.lat];
+				}
+				map.easeTo({
+					center,
+					zoom: MAP_DEFAULT_ZOOM,
+					pitch: 0,
+					bearing: 0,
+					duration: 0,
+				});
+			} catch {}
 		}
 	}, [map, isMapLoaded, isBackgroundPresentation, shouldAutoSpin, presentation]);
 
