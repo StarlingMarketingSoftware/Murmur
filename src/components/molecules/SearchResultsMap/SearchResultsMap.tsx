@@ -1328,10 +1328,11 @@ const applyMurmurGlobeLighting = (
 			typeof mapInstance.getBearing === 'function' ? mapInstance.getBearing() : 0;
 		const azimuthBase =
 			(MURMUR_GLOBE_LIGHT_VIEWER_AZIMUTH_OFFSET_DEG + (bearing || 0) + 360) % 360;
-		// At night, bias the key a touch so the backlight doesn't feel perfectly centered.
-		const nightAzimuthOffsetDeg = -18;
+		// At night, push the key farther around the limb so the globe reads as
+		// backlit instead of front-washed.
+		const nightAzimuthOffsetDeg = -38;
 		const azimuth = (azimuthBase + nightAzimuthOffsetDeg * nightT + 360) % 360;
-		const polar = lerp(MURMUR_GLOBE_LIGHT_POLAR_DEG, 82);
+		const polar = lerp(MURMUR_GLOBE_LIGHT_POLAR_DEG, 87);
 
 		(mapInstance as any).setLights?.([
 			{
@@ -1340,7 +1341,7 @@ const applyMurmurGlobeLighting = (
 				properties: {
 					// Deep cool fill — the shadow side should clearly read as shadow.
 					color: lerpRgb([120, 150, 185], [85, 110, 160]),
-					intensity: lerp(0.18, 0.125),
+					intensity: lerp(0.18, 0.14),
 				},
 			},
 			{
@@ -1350,7 +1351,7 @@ const applyMurmurGlobeLighting = (
 					// Bright warm softbox by day; cooler moonlight by night. Keep intensity
 					// lower at night so the DOM rim light can own the "rear lit" read.
 					color: lerpRgb([255, 244, 220], [235, 245, 255]),
-					intensity: lerp(1.6, 0.62),
+					intensity: lerp(1.6, 0.56),
 					direction: [azimuth, polar],
 					'cast-shadows': true,
 					'shadow-intensity': lerp(0.95, 0.98),
@@ -1376,6 +1377,79 @@ const applyMurmurGlobeLighting = (
 // fills still draw blue on top, so lakes/rivers inside countries look right.
 const MAP_OCEAN_BLUE = '#62C7E3';
 const MAP_LAND_CREAM = '#F1EDE2';
+const MAP_LANDCOVER_GREEN = '#B3E6D7';
+
+const mixCssRgb = (
+	from: [number, number, number],
+	to: [number, number, number],
+	t: number
+) => {
+	const p = clamp(t, 0, 1);
+	return `rgb(${Math.round(from[0] + (to[0] - from[0]) * p)}, ${Math.round(
+		from[1] + (to[1] - from[1]) * p
+	)}, ${Math.round(from[2] + (to[2] - from[2]) * p)})`;
+};
+
+const getMapPaletteForNight = (nightT: number) => {
+	const night = clamp(nightT, 0, 1);
+	return {
+		ocean: mixCssRgb([98, 199, 227], [6, 14, 30], night),
+		land: mixCssRgb([241, 237, 226], [246, 244, 229], night),
+		landcover: mixCssRgb([179, 230, 215], [216, 232, 207], night),
+	};
+};
+
+const applyNightLandPalette = (mapInstance: mapboxgl.Map, nightT: number) => {
+	const palette = getMapPaletteForNight(nightT);
+
+	try {
+		if (mapInstance.getLayer(MAP_WORLD_LAND_LAYER_ID)) {
+			mapInstance.setPaintProperty(MAP_WORLD_LAND_LAYER_ID, 'fill-color', palette.land);
+		}
+	} catch {
+		// Non-fatal.
+	}
+
+	try {
+		const style = mapInstance.getStyle();
+		for (const layer of style.layers ?? []) {
+			const id = (layer as any)?.id as string | undefined;
+			if (!id || id.startsWith('murmur-')) continue;
+
+			const type = (layer as any).type as string | undefined;
+			const idLower = id.toLowerCase();
+
+			try {
+				if (type === 'background') {
+					mapInstance.setPaintProperty(id, 'background-color', palette.ocean);
+				} else if (
+					type === 'fill' &&
+					(idLower === 'water' || idLower.startsWith('water'))
+				) {
+					mapInstance.setPaintProperty(id, 'fill-color', palette.ocean);
+				} else if (
+					type === 'fill' &&
+					(idLower.includes('landcover') ||
+						idLower.includes('national-park') ||
+						idLower.includes('pitch') ||
+						idLower === 'park' ||
+						idLower.startsWith('park'))
+				) {
+					mapInstance.setPaintProperty(id, 'fill-color', palette.landcover);
+				} else if (
+					type === 'fill' &&
+					(idLower.includes('landuse') || idLower === 'land')
+				) {
+					mapInstance.setPaintProperty(id, 'fill-color', palette.land);
+				}
+			} catch {
+				// Data-driven color expression we can't override — skip.
+			}
+		}
+	} catch {
+		// Non-fatal.
+	}
+};
 
 const applyFreeTrialMapVisualTuning = (mapInstance: mapboxgl.Map) => {
 	// Projection
@@ -1474,7 +1548,7 @@ const applyFreeTrialMapVisualTuning = (mapInstance: mapboxgl.Map) => {
 						idLower === 'park' ||
 						idLower.startsWith('park'))
 				) {
-					mapInstance.setPaintProperty(id, 'fill-color', '#B3E6D7');
+					mapInstance.setPaintProperty(id, 'fill-color', MAP_LANDCOVER_GREEN);
 				} else if (type === 'fill' && idLower.includes('landuse')) {
 					mapInstance.setPaintProperty(id, 'fill-color', MAP_LAND_CREAM);
 				} else if (type === 'fill' && idLower === 'land') {
@@ -1748,10 +1822,143 @@ const STATE_OUTLINE_URL = '/geo/us-states-outline.json';
 const STATE_PREPARED_POLYGONS_URL = '/geo/us-states-prepared-polygons.json';
 const STATE_HIGHLIGHT_COLOR = '#5DAB68';
 const STATE_HIGHLIGHT_OPACITY = 0.68;
-const STATE_BORDER_COLOR = '#CFD8DC';
+const STATE_DIVIDER_COLOR = '#64748B';
+const STATE_LABEL_COLOR = '#111827';
 // When zoomed out to a US-wide view, show subtle state divider lines (like Zillow).
 // Keep these behind the blue/black search-area outlines.
 const STATE_DIVIDER_LINES_MAX_ZOOM = 8;
+
+const mixNumber = (from: number, to: number, t: number) => {
+	const p = clamp(t, 0, 1);
+	return from + (to - from) * p;
+};
+
+const buildStateDividerLineWidthExpr = (nightT: number) => {
+	const night = clamp(nightT, 0, 1);
+	return [
+		'interpolate',
+		['linear'],
+		['zoom'],
+		MAP_MIN_ZOOM,
+		mixNumber(0.8, 1.2, night),
+		5,
+		mixNumber(1.0, 1.55, night),
+		STATE_DIVIDER_LINES_MAX_ZOOM,
+		mixNumber(1.4, 2.15, night),
+	];
+};
+
+const buildStateInteractiveBorderWidthExpr = (nightT: number) => {
+	const night = clamp(nightT, 0, 1);
+	const isSelected = ['boolean', ['feature-state', 'selected'], false];
+	return [
+		'interpolate',
+		['linear'],
+		['zoom'],
+		MAP_MIN_ZOOM,
+		// Selected state should be only subtly emphasized.
+		['case', isSelected, mixNumber(1.2, 1.8, night), mixNumber(0.7, 1.2, night)],
+		5,
+		['case', isSelected, mixNumber(1.4, 2.05, night), mixNumber(0.85, 1.5, night)],
+		9,
+		['case', isSelected, mixNumber(1.4, 2.05, night), mixNumber(0.85, 1.5, night)],
+		14,
+		['case', isSelected, mixNumber(1.2, 1.65, night), mixNumber(0.6, 1.05, night)],
+	];
+};
+
+const buildStateInteractiveBorderColorExpr = (nightT: number) => {
+	const night = clamp(nightT, 0, 1);
+	const isSelected = ['boolean', ['feature-state', 'selected'], false];
+	return [
+		'interpolate',
+		['linear'],
+		['zoom'],
+		MAP_MIN_ZOOM,
+		[
+			'case',
+			isSelected,
+			mixCssRgb([136, 150, 171], [255, 255, 255], night),
+			mixCssRgb([148, 163, 184], [255, 255, 255], night),
+		],
+		6,
+		[
+			'case',
+			isSelected,
+			mixCssRgb([136, 150, 171], [255, 255, 255], night),
+			mixCssRgb([148, 163, 184], [255, 255, 255], night),
+		],
+		14,
+		[
+			'case',
+			isSelected,
+			mixCssRgb([195, 206, 211], [255, 255, 255], night),
+			mixCssRgb([207, 216, 220], [255, 255, 255], night),
+		],
+	];
+};
+
+const applyStateOverlayNightColors = (mapInstance: mapboxgl.Map, nightT: number) => {
+	const night = clamp(nightT, 0, 1);
+	const dividerColor = mixCssRgb([100, 116, 139], [255, 255, 255], night);
+	const borderColor =
+		night > 0.001
+			? mixCssRgb([148, 163, 184], [255, 255, 255], night)
+			: buildStateInteractiveBorderColorExpr(0);
+	const labelColor = mixCssRgb([17, 24, 39], [255, 255, 255], night);
+	const labelHaloOpacity = 0.72 * night;
+
+	try {
+		if (mapInstance.getLayer(MAPBOX_LAYER_IDS.statesDividers)) {
+			mapInstance.setPaintProperty(
+				MAPBOX_LAYER_IDS.statesDividers,
+				'line-color',
+				dividerColor
+			);
+			mapInstance.setPaintProperty(
+				MAPBOX_LAYER_IDS.statesDividers,
+				'line-width',
+				buildStateDividerLineWidthExpr(night)
+			);
+		}
+		if (mapInstance.getLayer(MAPBOX_LAYER_IDS.statesBordersInteractive)) {
+			mapInstance.setPaintProperty(
+				MAPBOX_LAYER_IDS.statesBordersInteractive,
+				'line-color',
+				borderColor
+			);
+			mapInstance.setPaintProperty(
+				MAPBOX_LAYER_IDS.statesBordersInteractive,
+				'line-width',
+				buildStateInteractiveBorderWidthExpr(night)
+			);
+		}
+		if (mapInstance.getLayer(MAPBOX_LAYER_IDS.statesLabels)) {
+			mapInstance.setPaintProperty(
+				MAPBOX_LAYER_IDS.statesLabels,
+				'text-color',
+				labelColor
+			);
+			mapInstance.setPaintProperty(
+				MAPBOX_LAYER_IDS.statesLabels,
+				'text-halo-color',
+				`rgba(2, 8, 23, ${labelHaloOpacity.toFixed(3)})`
+			);
+			mapInstance.setPaintProperty(
+				MAPBOX_LAYER_IDS.statesLabels,
+				'text-halo-width',
+				night > 0.001 ? 1.25 * night : 0
+			);
+			mapInstance.setPaintProperty(
+				MAPBOX_LAYER_IDS.statesLabels,
+				'text-halo-blur',
+				night > 0.001 ? 0.25 * night : 0
+			);
+		}
+	} catch {
+		// Non-fatal.
+	}
+};
 
 // Marker dot colors by search "What" value (dashboard/drafting search).
 const DEFAULT_RESULT_DOT_COLOR = '#D21E1F';
@@ -2127,7 +2334,7 @@ const MANUAL_WEATHER_TEMPERATURE_OVERRIDE_F: number | null = null;
 // MANUAL NIGHT OVERRIDE FOR TESTING.
 // Set to a number between 0 and 1 (e.g. 1 for deep night, 0 for full day).
 // Set back to null to use the real regional day/night cycle.
-const MANUAL_NIGHT_T_OVERRIDE: number | null = null;
+const MANUAL_NIGHT_T_OVERRIDE: number | null = 1;
 
 // Threshold above which the globe gets a uniform warm brightness lift on top
 // of the active mood (only applies when the mood uses a bright screen-blend
@@ -2142,11 +2349,11 @@ const HOT_WASH_OPACITY = 0.13;
 // Implemented as DOM overlays (screen + multiply) so the lighting stays viewer-anchored
 // and can be art-directed independently of the basemap.
 const NIGHT_GLOOM_WASH_OPACITY = 0.1;
-const NIGHT_FACE_SHADE_OPACITY = 0.72;
+const NIGHT_FACE_SHADE_OPACITY = 0.68;
 // US night visibility: subtle "city lights" heatmap to keep the globe readable.
 // Kept but de-emphasized so it does not become a hard, continent-shaped glow.
 const NIGHT_US_LIGHTS_OPACITY = 0;
-const NIGHT_MOON_RIM_OPACITY = 0.92;
+const NIGHT_MOON_RIM_OPACITY = 1;
 
 // City-lights persistence: keep visible through the default interactive zoom (5) and
 // fade out as the map becomes more "street level".
@@ -2166,14 +2373,14 @@ const computeNightLightsFade = (zoom: number) => {
 // Front-face silhouette: deepen the globe's visible face while keeping the rim readable.
 // Center matches the rim's bias so the bright limb is stronger on the moon side.
 const NIGHT_FACE_SHADE_BG =
-	'radial-gradient(ellipse 145% 145% at 58% 60%, rgba(6, 10, 28, 0.72) 0%, rgba(8, 12, 32, 0.62) 28%, rgba(12, 18, 40, 0.38) 52%, rgba(14, 20, 44, 0.18) 68%, rgba(0, 0, 0, 0) 82%, rgba(0, 0, 0, 0) 100%)';
+	'radial-gradient(ellipse 145% 145% at 58% 60%, rgba(5, 9, 26, 0.62) 0%, rgba(7, 11, 31, 0.54) 30%, rgba(10, 16, 38, 0.34) 54%, rgba(12, 18, 42, 0.14) 70%, rgba(0, 0, 0, 0) 84%, rgba(0, 0, 0, 0) 100%)';
 
 // Rear rim light: edge-weighted cool-white glow that reads as the moon sitting
 // behind the Earth (not perfectly centered, shifted toward upper-left bias).
 const NIGHT_MOON_RIM_BG = [
-	'radial-gradient(ellipse 165% 165% at 58% 60%, rgba(235, 248, 255, 0) 0%, rgba(235, 248, 255, 0) 58%, rgba(235, 248, 255, 0.06) 72%, rgba(235, 248, 255, 0.20) 84%, rgba(245, 252, 255, 0.40) 93%, rgba(245, 252, 255, 0.14) 100%)',
-	'radial-gradient(ellipse 130% 130% at 58% 60%, rgba(235, 248, 255, 0) 0%, rgba(235, 248, 255, 0) 67%, rgba(235, 248, 255, 0.10) 78%, rgba(235, 248, 255, 0.26) 88%, rgba(235, 248, 255, 0) 100%)',
-	'radial-gradient(ellipse 120% 120% at 14% 16%, rgba(255, 255, 255, 0.16) 0%, rgba(255, 255, 255, 0.08) 34%, rgba(255, 255, 255, 0) 62%)',
+	'radial-gradient(ellipse 178% 178% at 58% 60%, rgba(235, 248, 255, 0) 0%, rgba(235, 248, 255, 0) 62%, rgba(225, 242, 255, 0.05) 76%, rgba(232, 247, 255, 0.18) 86%, rgba(248, 253, 255, 0.62) 94%, rgba(248, 253, 255, 0.14) 100%)',
+	'radial-gradient(ellipse 128% 128% at 58% 60%, rgba(235, 248, 255, 0) 0%, rgba(235, 248, 255, 0) 72%, rgba(226, 244, 255, 0.08) 82%, rgba(242, 251, 255, 0.50) 91%, rgba(255, 255, 255, 0.06) 97%, rgba(235, 248, 255, 0) 100%)',
+	'radial-gradient(ellipse 78% 78% at 14% 14%, rgba(255, 255, 255, 0.14) 0%, rgba(230, 246, 255, 0.06) 26%, rgba(255, 255, 255, 0) 48%)',
 ].join(', ');
 
 type NightLightsPoint = { lat: number; lng: number; w: number };
@@ -2257,7 +2464,6 @@ const stableRand = (seed: number): number => {
 
 const buildNightLightsGeoJson = (): GeoJSON.FeatureCollection<GeoJSON.Point> => {
 	const points: NightLightsPoint[] = [...NIGHT_LIGHTS_US_POINTS];
-	let cursor = 0;
 	for (let r = 0; r < NIGHT_LIGHTS_US_REGIONS.length; r++) {
 		const region = NIGHT_LIGHTS_US_REGIONS[r]!;
 		const baseSeed = 1907 + r * 997;
@@ -2274,7 +2480,6 @@ const buildNightLightsGeoJson = (): GeoJSON.FeatureCollection<GeoJSON.Point> => 
 			const sparkle = stableRand(s + 3) > 0.985 ? 1.9 : 1;
 			points.push({ lat, lng, w: region.w * jitter * sparkle });
 		}
-		cursor += region.count;
 	}
 
 	return {
@@ -4616,6 +4821,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		// World-land fill (cream continents under the ocean-blue background). Idempotent;
 		// safe if style.load already added it earlier.
 		ensureWorldLandFill(mapInstance);
+		applyNightLandPalette(mapInstance, nightTRef.current);
 
 		const emptyFc: GeoJSON.FeatureCollection = {
 			type: 'FeatureCollection',
@@ -4881,17 +5087,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		// States: hover fill + hit fill (transparent) + divider lines + interactive borders
 		const isStateSelectedExpr = ['boolean', ['feature-state', 'selected'], false];
 
-		const stateDividerLineWidthExpr = [
-			'interpolate',
-			['linear'],
-			['zoom'],
-			MAP_MIN_ZOOM,
-			0.8,
-			5,
-			1.0,
-			STATE_DIVIDER_LINES_MAX_ZOOM,
-			1.4,
-		];
+		const stateDividerLineWidthExpr = buildStateDividerLineWidthExpr(
+			nightTRef.current
+		);
 		const stateDividerLineOpacityExpr = [
 			'interpolate',
 			['linear'],
@@ -4905,20 +5103,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			STATE_DIVIDER_LINES_MAX_ZOOM,
 			0.85,
 		];
-		const stateInteractiveBorderWidthExpr = [
-			'interpolate',
-			['linear'],
-			['zoom'],
-			MAP_MIN_ZOOM,
-			// Selected state should be only subtly emphasized.
-			['case', isStateSelectedExpr, 1.2, 0.7],
-			5,
-			['case', isStateSelectedExpr, 1.4, 0.85],
-			9,
-			['case', isStateSelectedExpr, 1.4, 0.85],
-			14,
-			['case', isStateSelectedExpr, 1.2, 0.6],
-		];
+		const stateInteractiveBorderWidthExpr = buildStateInteractiveBorderWidthExpr(
+			nightTRef.current
+		);
 		const stateInteractiveBorderOpacityExpr = [
 			'interpolate',
 			['linear'],
@@ -4934,17 +5121,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			14,
 			['case', isStateSelectedExpr, 1, 0.7],
 		];
-		const stateInteractiveBorderColorExpr = [
-			'interpolate',
-			['linear'],
-			['zoom'],
-			MAP_MIN_ZOOM,
-			['case', isStateSelectedExpr, '#8896AB', '#94A3B8'],
-			6,
-			['case', isStateSelectedExpr, '#8896AB', '#94A3B8'],
-			14,
-			['case', isStateSelectedExpr, '#C3CED3', STATE_BORDER_COLOR],
-		];
+		const stateInteractiveBorderColorExpr = buildStateInteractiveBorderColorExpr(
+			nightTRef.current
+		);
 
 		ensureLayer({
 			id: MAPBOX_LAYER_IDS.statesFillHover,
@@ -4978,7 +5157,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			maxzoom: STATE_DIVIDER_LINES_MAX_ZOOM + 0.01,
 			layout: { 'line-join': 'round', 'line-cap': 'round' },
 			paint: {
-				'line-color': '#64748B',
+				'line-color': STATE_DIVIDER_COLOR,
 				'line-opacity': stateDividerLineOpacityExpr,
 				'line-width': stateDividerLineWidthExpr,
 			},
@@ -5009,12 +5188,13 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				'text-padding': 2,
 			},
 			paint: {
-				'text-color': '#111827',
+				'text-color': STATE_LABEL_COLOR,
 				// Keep labels flat (no glow) to match `/free-trial`.
 				'text-halo-color': 'rgba(0, 0, 0, 0)',
 				'text-halo-width': 0,
 			},
 		});
+		applyStateOverlayNightColors(mapInstance, nightTRef.current);
 
 		// Search-results outlines (blue + black) intentionally removed.
 
@@ -7699,11 +7879,13 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		applyLightingOverlayOpacity();
 	}, [nightT, map, isMapLoaded, applyLightingOverlayOpacity]);
 
-	// Keep Mapbox globe lights in sync with day/night so the underlying sphere reads as moonlit.
+	// Keep Mapbox globe lights and land/water palette in sync with day/night.
 	useEffect(() => {
 		if (!map) return;
 		if (!isMapLoaded) return;
 		applyMurmurGlobeLighting(map, { nightT });
+		applyNightLandPalette(map, nightT);
+		applyStateOverlayNightColors(map, nightT);
 	}, [nightT, map, isMapLoaded]);
 
 	const applyWeatherMood = useCallback(
