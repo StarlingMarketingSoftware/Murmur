@@ -1394,8 +1394,8 @@ const getMapPaletteForNight = (nightT: number) => {
 	const night = clamp(nightT, 0, 1);
 	return {
 		ocean: mixCssRgb([98, 199, 227], [6, 14, 30], night),
-		land: mixCssRgb([241, 237, 226], [246, 244, 229], night),
-		landcover: mixCssRgb([179, 230, 215], [216, 232, 207], night),
+		land: mixCssRgb([241, 237, 226], [204, 224, 203], night),
+		landcover: mixCssRgb([179, 230, 215], [184, 224, 199], night),
 	};
 };
 
