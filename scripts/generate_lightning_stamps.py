@@ -3,8 +3,8 @@
 Generate small RGBA "lightning flash" stamp images used by the stormy globe mood.
 
 These stamps are intended to be composited additively/screen on top of the clouds
-canvas source at runtime. The look targets "cloud illumination" (diffuse, internal
-glow with a faint branching core) rather than a sharp visible channel.
+canvas source at runtime. The look targets a crisp branching lightning channel
+with a restrained cloud glow so small localized strikes still read as sharp bolts.
 
 Output defaults to: public/maps/lightning_stamps/flash_{NN}.png
 """
@@ -86,9 +86,11 @@ def _render_stamp(size: int, seed: int) -> np.ndarray:
 		max_depth=10,
 	)
 
-	# Core + faint wider pass.
-	draw.line(main, fill=255, width=max(1, size // 140), joint="curve")
-	draw.line(main, fill=170, width=max(2, size // 88), joint="curve")
+	# Glow pass first, then bright cores on top. Drawing the wide pass after the
+	# core would replace the white channel with gray in Pillow's L mode.
+	draw.line(main, fill=105, width=max(2, size // 92), joint="curve")
+	draw.line(main, fill=235, width=max(1, size // 155), joint="curve")
+	draw.line(main, fill=255, width=1, joint="curve")
 
 	# Branches: smaller offshoots in the mid/lower section.
 	branch_count = rng.randint(1, 3)
@@ -107,7 +109,8 @@ def _render_stamp(size: int, seed: int) -> np.ndarray:
 			rng=rng,
 			max_depth=8,
 		)
-		draw.line(branch, fill=200, width=max(1, size // 170), joint="curve")
+		draw.line(branch, fill=120, width=max(1, size // 135), joint="curve")
+		draw.line(branch, fill=240, width=1, joint="curve")
 
 	# Convert intensity to float and build a diffuse "cloud illumination" envelope.
 	core = (np.asarray(intensity, dtype=np.float32) / 255.0).astype(np.float32)
@@ -132,16 +135,16 @@ def _render_stamp(size: int, seed: int) -> np.ndarray:
 	noise_blur = np.asarray(noise_img.filter(ImageFilter.GaussianBlur(radius=max(2, size * 0.06))), dtype=np.float32) / 255.0
 	blob *= (0.55 + 0.45 * noise_blur) * patch
 
-	# Combine: keep a tight core, but emphasize diffuse glow (cloud illumination).
-	combined = _clamp01(core * 0.85 + blur1 * 0.70 + blur2 * 0.35 + blob * 0.55)
+	# Combine: prioritize the tight core, with only enough glow to feel luminous.
+	combined = _clamp01(core * 1.25 + blur1 * 0.32 + blur2 * 0.12 + blob * 0.26)
 
-	# Shape alpha a bit so the stamp has a strong center without huge halos.
-	alpha = _clamp01(np.power(combined, np.float32(1.18)) * np.float32(1.08))
+	# Shape alpha so the channel stays crisp and the halo falls off quickly.
+	alpha = _clamp01(np.maximum(core * 0.98, np.power(combined, np.float32(1.32)) * np.float32(0.95)))
 
 	# Store straight-alpha PNG pixels. Browsers/canvas premultiply at draw time;
 	# writing premultiplied RGB here makes the soft halo carry low-RGB alpha,
 	# which reads as gray/dark blotches when Mapbox samples the canvas raster.
-	color = np.array([238.0, 246.0, 255.0], dtype=np.float32)
+	color = np.array([248.0, 252.0, 255.0], dtype=np.float32)
 	rgba = np.zeros((size, size, 4), dtype=np.uint8)
 	rgba[..., 0:3] = color.astype(np.uint8)
 	rgba[..., 3] = np.clip(alpha * 255.0, 0.0, 255.0).astype(np.uint8)

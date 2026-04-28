@@ -1251,7 +1251,7 @@ const CLOUDS_CANVAS_SIZE_PX = 512;
 // Storm lightning assets: small "flash stamps" + a low-res potential mask to bias
 // flashes toward storm cores.
 const LIGHTNING_STAMPS_COUNT = 12;
-const LIGHTNING_STAMPS_VERSION = 2;
+const LIGHTNING_STAMPS_VERSION = 3;
 const LIGHTNING_POTENTIAL_VERSION = 1;
 const LIGHTNING_STAMPS_URL = (i: number) =>
 	`/maps/lightning_stamps/flash_${String(i).padStart(2, '0')}.png?v=${LIGHTNING_STAMPS_VERSION}`;
@@ -1279,13 +1279,13 @@ const LIGHTNING_BURST_MAX_INTERVAL_MS = 220;
 const LIGHTNING_SCALE_ZOOM_START = 5.2;
 const LIGHTNING_SCALE_ZOOM_END = CLOUDS_OVERLAY_FADE_OUT_END_ZOOM;
 const LIGHTNING_US_BOUNDS: [number, number, number, number] = [-125.5, 24.0, -66.0, 50.0];
-const LIGHTNING_REGION_BIAS_CHANCE = 0.6;
-const LIGHTNING_REGION_RADIUS_GLOBE_PX = 38;
-const LIGHTNING_REGION_RADIUS_CLOSE_PX = 9;
-const LIGHTNING_SCALE_GLOBE_MIN = 0.16;
-const LIGHTNING_SCALE_GLOBE_MAX = 0.36;
-const LIGHTNING_SCALE_CLOSE_MIN = 0.024;
-const LIGHTNING_SCALE_CLOSE_MAX = 0.065;
+const LIGHTNING_REGION_BIAS_CHANCE = 0.92;
+const LIGHTNING_REGION_RADIUS_GLOBE_PX = 16;
+const LIGHTNING_REGION_RADIUS_CLOSE_PX = 3.5;
+const LIGHTNING_SCALE_GLOBE_MIN = 0.07;
+const LIGHTNING_SCALE_GLOBE_MAX = 0.18;
+const LIGHTNING_SCALE_CLOSE_MIN = 0.01;
+const LIGHTNING_SCALE_CLOSE_MAX = 0.028;
 const LIGHTNING_US_POSITION_TRIES = 36;
 
 const getLightningZoomedOutBoostT = (zoom: number) => {
@@ -4622,9 +4622,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					}
 					const lngLat = lightningCanvasPointToLngLat(x, y, w, h);
 					if (!lngLat || !isLngLatInLightningUsRegion(lngLat.lng, lngLat.lat)) {
-						const point = randomLightningUsCanvasPoint(w, h);
-						x = point.x;
-						y = point.y;
+						continue;
 					}
 				} else {
 					const point = randomLightningUsCanvasPoint(w, h);
