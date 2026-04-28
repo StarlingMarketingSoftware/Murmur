@@ -36,7 +36,6 @@ import { WeddingPlannersIcon } from '@/components/atoms/_svg/WeddingPlannersIcon
 import { WineBeerSpiritsIcon } from '@/components/atoms/_svg/WineBeerSpiritsIcon';
 import { WeatherMood } from '@/lib/weather/regions';
 import { getMoodConfig, MoodVisualConfig } from '@/lib/weather/moodConfig';
-import { LightningOverlay } from './precipitation/LightningOverlay';
 
 type LatLngLiteral = { lat: number; lng: number };
 type MarkerHoverMeta = { clientX: number; clientY: number };
@@ -80,6 +79,27 @@ type GeoJsonFeatureCollection = {
 		properties?: Record<string, unknown>;
 		geometry: GeoJsonGeometry;
 	}>;
+};
+
+type StormLightningPulse = {
+	offsetMs: number;
+	peakOpacity: number;
+	rampUpMs: number;
+	holdMs: number;
+	rampDownMs: number;
+};
+
+type StormLightningEvent = {
+	id: number;
+	startMs: number;
+	endMs: number;
+	// Position in the clouds canvas coordinate system (0..CLOUDS_CANVAS_SIZE_PX).
+	x: number;
+	y: number;
+	scale: number;
+	rotationRad: number;
+	stampIndex: number;
+	pulses: StormLightningPulse[];
 };
 
 const closeRing = (ring: ClippingRing): ClippingRing => {
@@ -1220,6 +1240,26 @@ const CLOUDS_OVERLAY_FADE_OUT_START_ZOOM = 8.0;
 const CLOUDS_OVERLAY_FADE_OUT_END_ZOOM = 10.5;
 const CLOUDS_CANVAS_TEXTURE_URL = '/maps/clouds/0/0/0.png?v=23';
 const CLOUDS_CANVAS_SIZE_PX = 512;
+// Storm lightning assets: small "flash stamps" + a low-res potential mask to bias
+// flashes toward storm cores.
+const LIGHTNING_STAMPS_COUNT = 12;
+const LIGHTNING_STAMPS_VERSION = 2;
+const LIGHTNING_POTENTIAL_VERSION = 1;
+const LIGHTNING_STAMPS_URL = (i: number) =>
+	`/maps/lightning_stamps/flash_${String(i).padStart(2, '0')}.png?v=${LIGHTNING_STAMPS_VERSION}`;
+const LIGHTNING_POTENTIAL_TEXTURE_URL = `/maps/lightning_potential/0/0/0.png?v=${LIGHTNING_POTENTIAL_VERSION}`;
+// Keep lightning visible through the full clouds fade-out band so it's still present
+// in typical "interactive" zoom ranges (it will naturally dim with raster-opacity).
+const LIGHTNING_HIDE_AT_OR_ABOVE_ZOOM = CLOUDS_OVERLAY_FADE_OUT_END_ZOOM;
+// Show a first flash quickly when stormy lightning turns on so it reads as "connected".
+const LIGHTNING_FIRST_FLASH_MIN_INTERVAL_MS = 120;
+const LIGHTNING_FIRST_FLASH_MAX_INTERVAL_MS = 650;
+const LIGHTNING_MIN_INTERVAL_MS = 450;
+const LIGHTNING_MAX_INTERVAL_MS = 1400;
+const LIGHTNING_MAX_ACTIVE_EVENTS = 6;
+const LIGHTNING_VISIBLE_POSITION_CHANCE = 0.9;
+const LIGHTNING_VISIBLE_POSITION_TRIES = 24;
+const LIGHTNING_MERCATOR_MAX_LAT = 85.051129;
 
 // Contact-lights overlay: dot-only night lights derived from contact coordinates.
 // Implemented as local raster tiles (like clouds) so it stays glued to the globe.
@@ -2104,19 +2144,19 @@ const applyStateOverlayNightColors = (mapInstance: mapboxgl.Map, nightT: number)
 			mapInstance.setPaintProperty(
 				MAPBOX_LAYER_IDS.statesDividers,
 				'line-width',
-				buildStateDividerLineWidthExpr()
+				buildStateDividerLineWidthExpr() as any
 			);
 		}
 		if (mapInstance.getLayer(MAPBOX_LAYER_IDS.statesBordersInteractive)) {
 			mapInstance.setPaintProperty(
 				MAPBOX_LAYER_IDS.statesBordersInteractive,
 				'line-color',
-				borderColor
+				borderColor as any
 			);
 			mapInstance.setPaintProperty(
 				MAPBOX_LAYER_IDS.statesBordersInteractive,
 				'line-width',
-				buildStateInteractiveBorderWidthExpr()
+				buildStateInteractiveBorderWidthExpr() as any
 			);
 		}
 		if (mapInstance.getLayer(MAPBOX_LAYER_IDS.statesLabels)) {
@@ -2502,7 +2542,7 @@ const normalizeStateKey = (state?: string | null): string | null => {
 // MANUAL WEATHER MOOD OVERRIDE FOR TESTING.
 // Set to one of: 'sunny' | 'normal' | 'cloudy' | 'rainy' | 'stormy' | 'snowy'
 // Set back to null to use the real weather mood from the user's region.
-const MANUAL_WEATHER_MOOD_OVERRIDE: WeatherMood | null = null;
+const MANUAL_WEATHER_MOOD_OVERRIDE: WeatherMood | null = 'stormy';
 
 // MANUAL TEMPERATURE OVERRIDE FOR TESTING (Fahrenheit).
 // Set to a number (e.g. 92) to test the > 80°F brightness lift.
@@ -2767,6 +2807,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		y: 0,
 	});
 	const cloudsDriftSimTimeMsRef = useRef<number>(0);
+	const lightningStampImagesRef = useRef<HTMLImageElement[] | null>(null);
+	const lightningStampLoadPromiseRef = useRef<Promise<HTMLImageElement[]> | null>(null);
+	const lightningPotentialU8Ref = useRef<Uint8Array | null>(null);
+	const lightningPotentialLoadPromiseRef = useRef<Promise<Uint8Array> | null>(null);
+	const lightningEventsRef = useRef<StormLightningEvent[]>([]);
+	const lightningNextFlashAtMsRef = useRef<number>(0);
+	const lightningEventIdRef = useRef<number>(1);
+	const lightningWasEnabledRef = useRef<boolean>(false);
 	const prevIsBackgroundPresentationRef = useRef<boolean>(isBackgroundPresentation);
 	// Live weather-mood config — read by the cloud animation tick and the lighting
 	// overlay opacity calc. Initialized to `normal` so behavior matches pre-weather
@@ -4165,6 +4213,111 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			return cloudsTextureLoadPromiseRef.current;
 		};
 
+		const loadImage = (src: string): Promise<HTMLImageElement> =>
+			new Promise((resolve, reject) => {
+				try {
+					const img = new Image();
+					img.crossOrigin = 'anonymous';
+					img.decoding = 'async';
+					img.onload = () => {
+						const finalize = () => resolve(img);
+						try {
+							if (typeof img.decode === 'function') {
+								img.decode().then(finalize).catch(finalize);
+							} else {
+								finalize();
+							}
+						} catch {
+							finalize();
+						}
+					};
+					img.onerror = () => reject(new Error(`Failed to load image: ${src}`));
+					img.src = src;
+				} catch (e) {
+					reject(e);
+				}
+			});
+
+		const loadLightningStamps = (): Promise<HTMLImageElement[]> => {
+			if (lightningStampImagesRef.current) {
+				return Promise.resolve(lightningStampImagesRef.current);
+			}
+			if (lightningStampLoadPromiseRef.current)
+				return lightningStampLoadPromiseRef.current;
+
+			lightningStampLoadPromiseRef.current = Promise.all(
+				Array.from({ length: LIGHTNING_STAMPS_COUNT }, (_, i) =>
+					loadImage(LIGHTNING_STAMPS_URL(i))
+				)
+			).then((imgs) => {
+				lightningStampImagesRef.current = imgs;
+				return imgs;
+			});
+
+			return lightningStampLoadPromiseRef.current;
+		};
+
+		const loadLightningPotential = (): Promise<Uint8Array> => {
+			if (lightningPotentialU8Ref.current) {
+				return Promise.resolve(lightningPotentialU8Ref.current);
+			}
+			if (lightningPotentialLoadPromiseRef.current)
+				return lightningPotentialLoadPromiseRef.current;
+
+			lightningPotentialLoadPromiseRef.current = loadImage(
+				LIGHTNING_POTENTIAL_TEXTURE_URL
+			)
+				.then((img) => {
+					if (typeof document === 'undefined') throw new Error('no document');
+
+					let scratchCanvas = cloudsTextureScratchCanvasRef.current;
+					if (!scratchCanvas) {
+						scratchCanvas = document.createElement('canvas');
+						scratchCanvas.width = CLOUDS_CANVAS_SIZE_PX;
+						scratchCanvas.height = CLOUDS_CANVAS_SIZE_PX;
+						cloudsTextureScratchCanvasRef.current = scratchCanvas;
+					}
+
+					const w = scratchCanvas.width || CLOUDS_CANVAS_SIZE_PX;
+					const h = scratchCanvas.height || CLOUDS_CANVAS_SIZE_PX;
+					const ctx = scratchCanvas.getContext('2d');
+					if (!ctx) throw new Error('no 2d ctx');
+
+					try {
+						ctx.imageSmoothingEnabled = true;
+						ctx.imageSmoothingQuality = 'high';
+					} catch {
+						// Ignore.
+					}
+
+					ctx.clearRect(0, 0, w, h);
+					ctx.drawImage(img, 0, 0, w, h);
+
+					let imageData: ImageData | null = null;
+					try {
+						imageData = ctx.getImageData(0, 0, w, h);
+					} catch {
+						imageData = null;
+					}
+					if (!imageData) throw new Error('no image data');
+
+					const src = imageData.data;
+					const out = new Uint8Array(w * h);
+					for (let p = 0, j = 3; p < out.length; p++, j += 4) out[p] = src[j];
+					lightningPotentialU8Ref.current = out;
+					return out;
+				})
+				.catch(() => {
+					// Non-fatal; fall back to a uniform field (flashes can occur anywhere).
+					const fallback = new Uint8Array(CLOUDS_CANVAS_SIZE_PX * CLOUDS_CANVAS_SIZE_PX);
+					fallback.fill(255);
+					lightningPotentialU8Ref.current = fallback;
+					return fallback;
+				});
+
+			return lightningPotentialLoadPromiseRef.current;
+		};
+
 		let canceled = false;
 		cloudsDriftOffsetRef.current = { x: 0, y: 0 };
 		cloudsDriftOffsetSecondaryRef.current = { x: 0, y: 0 };
@@ -4181,6 +4334,251 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			const b = hash01(i + 1);
 			const u = smoothstep01(f);
 			return a + (b - a) * u;
+		};
+
+		const computePulseOpacity = (tMs: number, pulse: StormLightningPulse): number => {
+			if (tMs < pulse.offsetMs) return 0;
+			const local = tMs - pulse.offsetMs;
+			if (local <= pulse.rampUpMs) {
+				const t = pulse.rampUpMs > 0 ? local / pulse.rampUpMs : 1;
+				return pulse.peakOpacity * clamp(t, 0, 1);
+			}
+			if (local <= pulse.rampUpMs + pulse.holdMs) return pulse.peakOpacity;
+			const downT = local - pulse.rampUpMs - pulse.holdMs;
+			if (downT >= pulse.rampDownMs) return 0;
+			const t = pulse.rampDownMs > 0 ? 1 - downT / pulse.rampDownMs : 0;
+			return pulse.peakOpacity * clamp(t, 0, 1);
+		};
+
+		const scheduleNextLightning = (nowMs: number, opts?: { fast?: boolean }) => {
+			const fast = Boolean(opts?.fast);
+			const min = fast
+				? LIGHTNING_FIRST_FLASH_MIN_INTERVAL_MS
+				: LIGHTNING_MIN_INTERVAL_MS;
+			const max = fast
+				? LIGHTNING_FIRST_FLASH_MAX_INTERVAL_MS
+				: LIGHTNING_MAX_INTERVAL_MS;
+			const wait = min + Math.random() * Math.max(0, max - min);
+			lightningNextFlashAtMsRef.current = nowMs + wait;
+		};
+
+			const lightningPotentialAlphaAt = (x: number, y: number, w: number, h: number) => {
+				const potential = lightningPotentialU8Ref.current;
+				if (!potential) return 255;
+				const xi = ((Math.floor(x) % w) + w) % w;
+				const yi = clamp(Math.floor(y), 0, h - 1);
+				return potential[yi * w + xi] ?? 0;
+			};
+
+			const lngLatToLightningCanvasPoint = (
+				lng: number,
+				lat: number,
+				w: number,
+				h: number
+			): { x: number; y: number } | null => {
+				if (!Number.isFinite(lng) || !Number.isFinite(lat)) return null;
+				const xNorm = ((((lng + 180) / 360) % 1) + 1) % 1;
+				const latClamped = clamp(
+					lat,
+					-LIGHTNING_MERCATOR_MAX_LAT,
+					LIGHTNING_MERCATOR_MAX_LAT
+				);
+				const latRad = (latClamped * Math.PI) / 180;
+				const mercatorY =
+					(1 - Math.log(Math.tan(Math.PI / 4 + latRad / 2)) / Math.PI) / 2;
+				if (!Number.isFinite(mercatorY)) return null;
+				return { x: xNorm * w, y: clamp(mercatorY, 0, 1) * h };
+			};
+
+			const pickVisibleLightningPosition = (
+				w: number,
+				h: number
+			): { x: number; y: number } | null => {
+				let mapCanvas: HTMLCanvasElement | null = null;
+				try {
+					mapCanvas = map.getCanvas?.() ?? null;
+				} catch {
+					mapCanvas = null;
+				}
+				const viewportW = mapCanvas?.clientWidth || mapCanvas?.width || 0;
+				const viewportH = mapCanvas?.clientHeight || mapCanvas?.height || 0;
+				if (viewportW <= 0 || viewportH <= 0) return null;
+
+				const insetX = Math.min(viewportW * 0.18, 160);
+				const insetY = Math.min(viewportH * 0.18, 120);
+				const sampleW = Math.max(1, viewportW - insetX * 2);
+				const sampleH = Math.max(1, viewportH - insetY * 2);
+				let best: { x: number; y: number; alpha: number } | null = null;
+
+				for (let i = 0; i < LIGHTNING_VISIBLE_POSITION_TRIES; i++) {
+					const sx = insetX + Math.random() * sampleW;
+					const sy = insetY + Math.random() * sampleH;
+					let lngLat: mapboxgl.LngLat | null = null;
+					try {
+						lngLat = map.unproject([sx, sy]);
+					} catch {
+						lngLat = null;
+					}
+					if (!lngLat) continue;
+
+					const point = lngLatToLightningCanvasPoint(lngLat.lng, lngLat.lat, w, h);
+					if (!point) continue;
+
+					const alpha = lightningPotentialAlphaAt(point.x, point.y, w, h);
+					if (!best || alpha > best.alpha) best = { ...point, alpha };
+
+					const acceptance = 0.22 + Math.pow(alpha / 255, 1.15) * 0.78;
+					if (alpha >= 8 && Math.random() < acceptance) return point;
+				}
+
+				return best ? { x: best.x, y: best.y } : null;
+			};
+
+			const pickLightningPosition = (w: number, h: number): { x: number; y: number } => {
+				if (Math.random() < LIGHTNING_VISIBLE_POSITION_CHANCE) {
+					const visible = pickVisibleLightningPosition(w, h);
+					if (visible) return visible;
+				}
+
+				const tries = 28;
+				for (let i = 0; i < tries; i++) {
+					const x = Math.floor(Math.random() * w);
+					const y = Math.floor(Math.random() * h);
+					const a = lightningPotentialAlphaAt(x, y, w, h);
+					// Bias toward storm cores but still allow occasional "surprise" flashes.
+					if (a < 20) continue;
+					const p = Math.pow(a / 255, 1.6);
+					if (Math.random() < p) return { x, y };
+				}
+				return { x: Math.random() * w, y: Math.random() * h };
+			};
+
+		const spawnLightningEvent = (nowMs: number, w: number, h: number) => {
+			const stamps = lightningStampImagesRef.current;
+			if (!Array.isArray(stamps) || stamps.length === 0) return;
+
+			const events = lightningEventsRef.current;
+			if (events.length >= LIGHTNING_MAX_ACTIVE_EVENTS) return;
+
+			const { x, y } = pickLightningPosition(w, h);
+			const stampIndex = Math.floor(Math.random() * stamps.length);
+			const scale = 0.45 + Math.random() * 0.85;
+			const rotationRad = (Math.random() - 0.5) * 0.55;
+
+			const pulseCount = Math.random() < 0.35 ? 3 : 2;
+			const pulses: StormLightningPulse[] = [];
+			for (let p = 0; p < pulseCount; p++) {
+				const offsetMs = p === 0 ? 0 : 55 + p * 55 + Math.random() * 20;
+				const peakOpacity = p === 0 ? 0.55 : p === 1 ? 0.35 : 0.22;
+				pulses.push({
+					offsetMs,
+					peakOpacity,
+					rampUpMs: 28,
+					holdMs: 14,
+					rampDownMs: 180,
+				});
+			}
+			const endMs =
+				nowMs +
+				Math.max(
+					0,
+					...pulses.map((p) => p.offsetMs + p.rampUpMs + p.holdMs + p.rampDownMs)
+				);
+
+			events.push({
+				id: lightningEventIdRef.current++,
+				startMs: nowMs,
+				endMs,
+				x,
+				y,
+				scale,
+				rotationRad,
+				stampIndex,
+				pulses,
+			});
+		};
+
+		const drawLightning = (nowMs: number) => {
+			let zoomOk = true;
+			try {
+				const z = map.getZoom?.() ?? 0;
+				zoomOk = z < LIGHTNING_HIDE_AT_OR_ABOVE_ZOOM;
+			} catch {
+				zoomOk = true;
+			}
+
+			const enabled =
+				!prefersReducedMotion &&
+				Boolean(weatherMoodConfigRef.current.lightning) &&
+				zoomOk;
+
+			if (!enabled) {
+				lightningWasEnabledRef.current = false;
+				lightningEventsRef.current = [];
+				lightningNextFlashAtMsRef.current = 0;
+				return;
+			}
+
+			const justEnabled = !lightningWasEnabledRef.current;
+			lightningWasEnabledRef.current = true;
+
+			const stamps = lightningStampImagesRef.current;
+			if (!Array.isArray(stamps) || stamps.length === 0) return;
+
+			const w = cloudsCanvas.width || CLOUDS_CANVAS_SIZE_PX;
+			const h = cloudsCanvas.height || CLOUDS_CANVAS_SIZE_PX;
+
+			// Expire old events (tiny list; mutate in place).
+			{
+				const events = lightningEventsRef.current;
+				for (let i = events.length - 1; i >= 0; i--) {
+					if (events[i].endMs <= nowMs) events.splice(i, 1);
+				}
+			}
+
+			if (!lightningNextFlashAtMsRef.current) {
+				scheduleNextLightning(nowMs, { fast: justEnabled });
+			}
+			if (nowMs >= lightningNextFlashAtMsRef.current) {
+				spawnLightningEvent(nowMs, w, h);
+				scheduleNextLightning(nowMs);
+			}
+
+			const events = lightningEventsRef.current;
+			if (events.length === 0) return;
+
+			cloudsCtx.save();
+			try {
+				cloudsCtx.setTransform(1, 0, 0, 1, 0, 0);
+			} catch {
+				// Ignore.
+			}
+			const prevOp = cloudsCtx.globalCompositeOperation;
+			cloudsCtx.globalCompositeOperation = 'lighter';
+
+			for (const e of events) {
+				const t = nowMs - e.startMs;
+				let a = 0;
+				for (const p of e.pulses) a += computePulseOpacity(t, p);
+				if (a <= 0.001) continue;
+				a = clamp(a, 0, 0.9);
+
+				const stamp = stamps[e.stampIndex % stamps.length];
+				const sw = stamp.naturalWidth || stamp.width || 256;
+				const sh = stamp.naturalHeight || stamp.height || 256;
+				const dw = sw * e.scale;
+				const dh = sh * e.scale;
+
+				cloudsCtx.globalAlpha = a;
+				cloudsCtx.translate(e.x, e.y);
+				cloudsCtx.rotate(e.rotationRad);
+				cloudsCtx.drawImage(stamp, -dw * 0.5, -dh * 0.5, dw, dh);
+				// Reset for next event (cheaper than save/restore per event at this scale).
+				cloudsCtx.setTransform(1, 0, 0, 1, 0, 0);
+			}
+
+			cloudsCtx.globalCompositeOperation = prevOp;
+			cloudsCtx.restore();
 		};
 
 		const driftLoopS = CLOUDS_DRIFT_LOOP_MS / 1000;
@@ -4910,6 +5308,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				} catch {
 					// Ignore.
 				}
+				try {
+					drawLightning(now);
+				} catch {
+					// Ignore.
+				}
 			}
 
 			cloudsDriftRafRef.current = requestAnimationFrame((t) => tick(t, img, pattern));
@@ -4925,6 +5328,13 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			.then((img) => {
 				if (canceled) return;
 				const initialNow = performance.now();
+				// Preload lightning assets so the first storm flash doesn't hitch.
+				loadLightningStamps().catch(() => {
+					// Non-fatal.
+				});
+				loadLightningPotential().catch(() => {
+					// Non-fatal.
+				});
 				cloudsDriftOffsetRef.current = { x: 0, y: 0 };
 				// Seed a non-zero initial offset so the secondary layer reads as a distinct
 				// cloud system immediately (rather than starting perfectly aligned and only
@@ -4972,6 +5382,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 		return () => {
 			canceled = true;
+			lightningWasEnabledRef.current = false;
+			lightningEventsRef.current = [];
+			lightningNextFlashAtMsRef.current = 0;
 			try {
 				cloudsSource.pause?.();
 			} catch {
@@ -10372,12 +10785,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					zIndex: 1,
 				}}
 			/>
-			{getMoodConfig(weatherMood).lightning && (
-				<LightningOverlay
-					map={map}
-					hideAtOrAboveZoom={CLOUDS_OVERLAY_FADE_OUT_START_ZOOM}
-				/>
-			)}
 			{mapLoadError && (
 				<div
 					className={`absolute inset-0 flex items-center justify-center ${
