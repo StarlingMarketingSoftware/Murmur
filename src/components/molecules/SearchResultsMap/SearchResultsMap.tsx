@@ -2572,7 +2572,7 @@ const HOT_WASH_OPACITY = 0.13;
 const NIGHT_GLOOM_WASH_OPACITY = 0;
 // Neutral night-only dimmer. This darkens the normal day-colored basemap without
 // shifting land/ocean hues back toward a separate night palette.
-const NIGHT_DARK_WASH_OPACITY = 0.085;
+const NIGHT_DARK_WASH_OPACITY = 0.17;
 // Keep the night basemap visually matched to the normal day map.
 const NIGHT_FACE_SHADE_OPACITY = 0;
 // US night visibility: dot-only contact-lights tiles (not a heatmap). Kept
