@@ -1492,11 +1492,17 @@ const MAP_LAND_CREAM = '#F1EDE2';
 const MAP_LANDCOVER_GREEN = '#B3E6D7';
 
 // Night mode should preserve the daytime palette (same hues) and simply darken it.
-// Implemented as an RGB mix-to-black so the hue stays consistent.
-const NIGHT_BASEMAP_DARKEN_MAX = 0.5;
+// We mix toward a soft twilight blue (not pure black) so the desaturation reads
+// "moonlit dusk" rather than "lights out" — keeps a hint of cool atmosphere in
+// the land/landcover colors instead of draining them to corpse-grey.
+const NIGHT_BASEMAP_DARKEN_MAX = 0.28;
 // As the user zooms in to "street-level" detail, ease up on the darken slightly so the
 // basemap stays readable (we already fade out the viewer-anchored softbox at high zoom).
-const NIGHT_BASEMAP_DARKEN_MAX_ZOOMED_IN = 0.28;
+const NIGHT_BASEMAP_DARKEN_MAX_ZOOMED_IN = 0.14;
+// Tint we mix the daytime palette toward at deep night. Soft twilight navy —
+// keeps the daytime hues recognizable while signaling "evening" rather than
+// "blackout". Tweak to taste; pure black ([0,0,0]) is the legacy "spooky" look.
+const NIGHT_BASEMAP_DARKEN_TARGET: [number, number, number] = [28, 40, 70];
 const NIGHT_BASEMAP_ZOOM_BRIGHTEN_START_ZOOM = 5.25;
 const NIGHT_BASEMAP_ZOOM_BRIGHTEN_END_ZOOM = 9.5;
 
@@ -1543,9 +1549,9 @@ const getMapPaletteForNight = (nightT: number, zoom: number) => {
 		(NIGHT_BASEMAP_DARKEN_MAX_ZOOMED_IN - NIGHT_BASEMAP_DARKEN_MAX) * zoomBrightenT;
 	const darkenT = clamp(night * darkenMax, 0, 1);
 	return {
-		ocean: mixCssRgb([98, 199, 227], [0, 0, 0], darkenT),
-		land: mixCssRgb([241, 237, 226], [0, 0, 0], darkenT),
-		landcover: mixCssRgb([179, 230, 215], [0, 0, 0], darkenT),
+		ocean: mixCssRgb([98, 199, 227], NIGHT_BASEMAP_DARKEN_TARGET, darkenT),
+		land: mixCssRgb([241, 237, 226], NIGHT_BASEMAP_DARKEN_TARGET, darkenT),
+		landcover: mixCssRgb([179, 230, 215], NIGHT_BASEMAP_DARKEN_TARGET, darkenT),
 	};
 };
 
@@ -2608,7 +2614,7 @@ const normalizeStateKey = (state?: string | null): string | null => {
 // MANUAL WEATHER MOOD OVERRIDE FOR TESTING.
 // Set to one of: 'sunny' | 'normal' | 'cloudy' | 'rainy' | 'stormy' | 'snowy'
 // Set back to null to use the real weather mood from the user's region.
-const MANUAL_WEATHER_MOOD_OVERRIDE: WeatherMood | null = 'stormy';
+const MANUAL_WEATHER_MOOD_OVERRIDE: WeatherMood | null = null;
 
 // MANUAL TEMPERATURE OVERRIDE FOR TESTING (Fahrenheit).
 // Set to a number (e.g. 92) to test the > 80°F brightness lift.
@@ -2618,7 +2624,7 @@ const MANUAL_WEATHER_TEMPERATURE_OVERRIDE_F: number | null = null;
 // MANUAL NIGHT OVERRIDE FOR TESTING.
 // Set to a number between 0 and 1 (e.g. 1 for deep night, 0 for full day).
 // Set back to null to use the real regional day/night cycle.
-const MANUAL_NIGHT_T_OVERRIDE: number | null = null;
+const MANUAL_NIGHT_T_OVERRIDE: number | null = 1;
 
 // Threshold above which the globe gets a uniform warm brightness lift on top
 // of the active mood (only applies when the mood uses a bright screen-blend
@@ -2633,10 +2639,22 @@ const HOT_WASH_OPACITY = 0.13;
 // Implemented as DOM overlays (screen + multiply) so the lighting stays viewer-anchored
 // and can be art-directed independently of the basemap.
 const NIGHT_GLOOM_WASH_OPACITY = 0;
-const NIGHT_FACE_SHADE_OPACITY = 0.35;
-// US night visibility: dot-only contact-lights tiles (not a heatmap).
-const NIGHT_US_LIGHTS_OPACITY = 0.9;
+// Front-face vignette opacity. Very gentle — the basemap palette darken does
+// most of the night-mood work; this just adds a barely-there cool wash so the
+// face doesn't read flat. Set to 0 to disable entirely.
+const NIGHT_FACE_SHADE_OPACITY = 0.08;
+// US night visibility: dot-only contact-lights tiles (not a heatmap). Kept
+// well below 1 so the lights read as a soft glow rather than a stark
+// NASA-earth-at-night photo (which feels eerie/lonely on its own).
+const NIGHT_US_LIGHTS_OPACITY = 0.55;
 const NIGHT_MOON_RIM_OPACITY = 0;
+// At deep night, attenuate the daytime "shadow softbox" (the dark pool in the
+// lower-right that represents the globe's terminator). On a fully-lit daytime
+// globe it reads as proper sphericality; at night the basemap is already
+// darker, so leaving the shadow at full strength stacks gloom on gloom and
+// gives the lower-right corner an ominous black-hole feel. Ramp from 1 (day)
+// down to this floor (deep night).
+const NIGHT_SHADOW_OVERLAY_MUL_MIN = 0.5;
 
 // City-lights persistence: this is primarily a "zoomed out / from space" aesthetic.
 // Fade out aggressively as we approach state/city zoom so it doesn't compete with markers.
@@ -2757,10 +2775,14 @@ const computeNightLightsCloseGlowMul = (zoom: number) => {
 	return clamp(t, 0, 1) * clamp(t, 0, 1);
 };
 
-// Front-face silhouette: deepen the globe's visible face while keeping the rim readable.
-// Center matches the rim's bias so the bright limb is stronger on the moon side.
+// Front-face silhouette: a gentle twilight wash on the visible face, keeping the
+// rim readable. Tinted with a hint of cool blue (rather than pure black) so the
+// shade composites as "moonlit shadow" instead of an ominous vignette. Alphas are
+// roughly half the legacy "deep night" values so the daytime palette underneath
+// stays recognizable. Center matches the rim's bias so the bright limb is stronger
+// on the moon side.
 const NIGHT_FACE_SHADE_BG =
-	'radial-gradient(ellipse 145% 145% at 58% 60%, rgba(0, 0, 0, 0.62) 0%, rgba(0, 0, 0, 0.54) 30%, rgba(0, 0, 0, 0.34) 54%, rgba(0, 0, 0, 0.14) 70%, rgba(0, 0, 0, 0) 84%, rgba(0, 0, 0, 0) 100%)';
+	'radial-gradient(ellipse 145% 145% at 58% 60%, rgba(14, 22, 42, 0.32) 0%, rgba(14, 22, 42, 0.27) 30%, rgba(14, 22, 42, 0.17) 54%, rgba(14, 22, 42, 0.07) 70%, rgba(14, 22, 42, 0) 84%, rgba(14, 22, 42, 0) 100%)';
 
 // Rear rim light: edge-weighted cool-white glow that reads as the moon sitting
 // behind the Earth (not perfectly centered, shifted toward upper-left bias).
@@ -8916,9 +8938,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		const night = computeMoodVisualNightT(nightTRef.current, cfg);
 
 		// Preserve the daytime palette and softbox tuning at night; night mode should
-		// read as the same map, just darker (no hue shift).
+		// read as the same map, just darker (no hue shift). The key (warm wash on the
+		// lit hemisphere) stays at full strength so the lit side still feels lit.
+		// The shadow side eases off at deep night because the basemap is already darker
+		// — stacking the daytime terminator shadow on top creates an ominous corner.
 		const keyNightMul = 1;
-		const shadowNightMul = 1;
+		const nightEaseForShadow = night * night * (3 - 2 * night);
+		const shadowNightMul =
+			1 - nightEaseForShadow * (1 - clamp(NIGHT_SHADOW_OVERLAY_MUL_MIN, 0, 1));
 
 		const keyOpacity = clamp(base * cfg.softboxOpacityMultiplier * keyNightMul, 0, 1);
 		const shadowOpacity = clamp(
