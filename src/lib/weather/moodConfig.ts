@@ -37,10 +37,16 @@ export type MoodVisualConfig = {
 	cloudDeepZoomOpacity: number;
 	fogColor: string;
 	fogHighColor: string;
+	fogHorizonBlend: number;
 	softboxOpacityMultiplier: number;
 	shadowOpacityMultiplier: number;
 	softboxBackground: string;
 	softboxBlendMode: SoftboxBlendMode;
+	/**
+	 * Visual-only night influence. This lets storm/rain moods borrow the darker,
+	 * quieter night palette without turning on the actual night-lights overlay.
+	 */
+	nightVisualBlend: number;
 	/**
 	 * Strength of the dark "gloom wash" — a uniform multiply-blend overlay that
 	 * darkens the entire viewport. Persists into city zoom (unlike the softbox
@@ -62,10 +68,12 @@ const NORMAL: MoodVisualConfig = {
 	cloudDeepZoomOpacity: 0,
 	fogColor: 'rgba(180, 210, 215, 0.32)',
 	fogHighColor: 'rgb(18, 44, 78)',
+	fogHorizonBlend: 0.022,
 	softboxOpacityMultiplier: 1.0,
 	shadowOpacityMultiplier: 1.0,
 	softboxBackground: SOFTBOX_WARM_KEY_BG,
 	softboxBlendMode: 'screen',
+	nightVisualBlend: 0,
 	gloomWashOpacity: 0,
 	lightning: false,
 };
@@ -81,10 +89,12 @@ const SUNNY: MoodVisualConfig = {
 	cloudDeepZoomOpacity: 0,
 	fogColor: 'rgba(220, 215, 200, 0.28)',
 	fogHighColor: 'rgb(18, 44, 78)',
+	fogHorizonBlend: 0.022,
 	softboxOpacityMultiplier: 1.28,
 	shadowOpacityMultiplier: 0.92,
 	softboxBackground: SOFTBOX_WARM_KEY_BG,
 	softboxBlendMode: 'screen',
+	nightVisualBlend: 0,
 	gloomWashOpacity: 0,
 	lightning: false,
 };
@@ -100,10 +110,12 @@ const CLOUDY: MoodVisualConfig = {
 	cloudDeepZoomOpacity: 0,
 	fogColor: 'rgba(165, 180, 190, 0.40)',
 	fogHighColor: 'rgb(18, 44, 78)',
+	fogHorizonBlend: 0.035,
 	softboxOpacityMultiplier: 0.6,
 	shadowOpacityMultiplier: 1.2,
 	softboxBackground: SOFTBOX_WARM_KEY_BG,
 	softboxBlendMode: 'screen',
+	nightVisualBlend: 0,
 	gloomWashOpacity: 0,
 	lightning: false,
 };
@@ -119,30 +131,34 @@ const RAINY: MoodVisualConfig = {
 	cloudDeepZoomOpacity: 0,
 	fogColor: 'rgba(150, 175, 195, 0.40)',
 	fogHighColor: 'rgb(15, 35, 65)',
+	fogHorizonBlend: 0.06,
 	softboxOpacityMultiplier: 1.0,
 	shadowOpacityMultiplier: 1.3,
 	softboxBackground: SOFTBOX_DARK_POOL_BG,
 	softboxBlendMode: 'multiply',
+	nightVisualBlend: 0.18,
 	gloomWashOpacity: 0.22,
 	lightning: false,
 };
 
 const STORMY: MoodVisualConfig = {
-	cloudOpacityGlobeZoom: 0.97,
-	cloudOpacityDecorativeZoom: 0.9,
+	cloudOpacityGlobeZoom: 1.0,
+	cloudOpacityDecorativeZoom: 0.98,
 	cloudDriftSpeedMultiplier: 1.5,
 	cloudTurbulenceMultiplier: 2.0,
-	cloudBrightnessMin: 0.22,
-	cloudBrightnessMax: 0.78,
-	cloudExtraPasses: 3,
-	cloudDeepZoomOpacity: 0.18,
-	fogColor: 'rgba(100, 120, 145, 0.50)',
-	fogHighColor: 'rgb(15, 25, 50)',
-	softboxOpacityMultiplier: 1.2,
-	shadowOpacityMultiplier: 1.5,
-	softboxBackground: SOFTBOX_DARK_POOL_BG,
-	softboxBlendMode: 'multiply',
-	gloomWashOpacity: 0.34,
+	cloudBrightnessMin: 0.58,
+	cloudBrightnessMax: 0.86,
+	cloudExtraPasses: 6,
+	cloudDeepZoomOpacity: 0.32,
+	fogColor: 'rgba(165, 184, 198, 0.42)',
+	fogHighColor: 'rgb(30, 54, 82)',
+	fogHorizonBlend: 0.035,
+	softboxOpacityMultiplier: 1.0,
+	shadowOpacityMultiplier: 1.0,
+	softboxBackground: SOFTBOX_WARM_KEY_BG,
+	softboxBlendMode: 'screen',
+	nightVisualBlend: 0,
+	gloomWashOpacity: 0,
 	lightning: true,
 };
 
@@ -157,10 +173,12 @@ const SNOWY: MoodVisualConfig = {
 	cloudDeepZoomOpacity: 0,
 	fogColor: 'rgba(225, 232, 238, 0.42)',
 	fogHighColor: 'rgb(35, 60, 90)',
+	fogHorizonBlend: 0.035,
 	softboxOpacityMultiplier: 0.95,
 	shadowOpacityMultiplier: 0.78,
 	softboxBackground: SOFTBOX_WARM_KEY_BG,
 	softboxBlendMode: 'screen',
+	nightVisualBlend: 0,
 	gloomWashOpacity: 0,
 	lightning: false,
 };

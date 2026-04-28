@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { isValidMood, WeatherMood } from '@/lib/weather/regions';
+import { isValidMood, SAMPLE_CITIES, WeatherMood } from '@/lib/weather/regions';
 
 type GlobeMoodResponse = {
 	regionKey: string;
@@ -9,6 +9,11 @@ type GlobeMoodResponse = {
 	mood: WeatherMood;
 	temperatureF: number | null;
 	fetchedAt: number | null;
+};
+
+type WeatherRegionCenter = {
+	lat: number;
+	lng: number;
 };
 
 const QUERY_KEY = ['globe-weather-mood'] as const;
@@ -20,6 +25,12 @@ const FALLBACK: GlobeMoodResponse = {
 	temperatureF: null,
 	fetchedAt: null,
 };
+
+function centerForRegionKey(regionKey: string | null | undefined): WeatherRegionCenter | null {
+	if (!regionKey) return null;
+	const match = SAMPLE_CITIES.find((city) => city.key === regionKey);
+	return match ? { lat: match.lat, lng: match.lng } : null;
+}
 
 function getBrowserTimezone(): string | null {
 	if (typeof Intl === 'undefined') return null;
@@ -68,6 +79,7 @@ export function useGlobeWeatherMood() {
 	return {
 		mood: query.data?.mood ?? 'normal',
 		regionLabel: query.data?.regionLabel ?? null,
+		regionCenter: centerForRegionKey(query.data?.regionKey),
 		temperatureF: query.data?.temperatureF ?? null,
 		isLoading: query.isLoading,
 	};

@@ -367,7 +367,11 @@ const DashboardContent = () => {
 	const { data: campaigns } = useGetCampaigns();
 	const hasCampaigns = campaigns && campaigns.length > 0;
 	const queryClient = useQueryClient();
-	const { mood: globeWeatherMood, temperatureF: globeWeatherTemperatureF } =
+	const {
+		mood: globeWeatherMood,
+		temperatureF: globeWeatherTemperatureF,
+		regionCenter: globeWeatherRegionCenter,
+	} =
 		useGlobeWeatherMood();
 	const { nightT: globeNightT } = useGlobeNightLighting();
 
@@ -3481,6 +3485,7 @@ const DashboardContent = () => {
 						>
 							<SearchResultsMap
 								weatherMood={globeWeatherMood}
+								weatherRegionCenter={globeWeatherRegionCenter}
 								weatherTemperatureF={globeWeatherTemperatureF}
 								nightT={globeNightT}
 								presentation={mapPresentation}

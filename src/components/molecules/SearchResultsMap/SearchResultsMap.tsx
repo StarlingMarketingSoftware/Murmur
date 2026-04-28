@@ -290,6 +290,9 @@ const jitterDuplicateCoords = (base: LatLngLiteral, index: number): LatLngLitera
 };
 
 const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n));
+const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+const computeMoodVisualNightT = (nightT: number, cfg: MoodVisualConfig) =>
+	clamp(Math.max(nightT, cfg.nightVisualBlend), 0, 1);
 
 type WasmGeoModule = {
 	lat_lng_to_world_pixel: (
@@ -1160,6 +1163,11 @@ interface SearchResultsMapProps {
 	 */
 	weatherMood?: WeatherMood;
 	/**
+	 * Approximate center of the region driving `weatherMood`. Storm lightning is
+	 * localized around this point instead of spawning globally.
+	 */
+	weatherRegionCenter?: LatLngLiteral | null;
+	/**
 	 * Current Fahrenheit temperature for the user's region. When > 80°F and the
 	 * active mood uses a bright (screen-blend) softbox, the globe gets a small
 	 * additional brightness lift so hot weather "feels hot."
@@ -1254,12 +1262,54 @@ const LIGHTNING_HIDE_AT_OR_ABOVE_ZOOM = CLOUDS_OVERLAY_FADE_OUT_END_ZOOM;
 // Show a first flash quickly when stormy lightning turns on so it reads as "connected".
 const LIGHTNING_FIRST_FLASH_MIN_INTERVAL_MS = 120;
 const LIGHTNING_FIRST_FLASH_MAX_INTERVAL_MS = 650;
-const LIGHTNING_MIN_INTERVAL_MS = 450;
-const LIGHTNING_MAX_INTERVAL_MS = 1400;
-const LIGHTNING_MAX_ACTIVE_EVENTS = 6;
-const LIGHTNING_VISIBLE_POSITION_CHANCE = 0.9;
-const LIGHTNING_VISIBLE_POSITION_TRIES = 24;
+const LIGHTNING_MIN_INTERVAL_MS = 300;
+const LIGHTNING_MAX_INTERVAL_MS = 950;
+const LIGHTNING_MAX_ACTIVE_EVENTS = 8;
+const LIGHTNING_ZOOMED_OUT_MAX_ACTIVE_EVENTS = 11;
 const LIGHTNING_MERCATOR_MAX_LAT = 85.051129;
+const LIGHTNING_ZOOMED_OUT_BOOST_FULL_ZOOM = MAP_MIN_ZOOM + 0.35;
+const LIGHTNING_ZOOMED_OUT_BOOST_END_ZOOM = 4.35;
+const LIGHTNING_ZOOMED_OUT_MIN_INTERVAL_MS = 150;
+const LIGHTNING_ZOOMED_OUT_MAX_INTERVAL_MS = 460;
+const LIGHTNING_SCALE_ZOOM_START = 5.2;
+const LIGHTNING_SCALE_ZOOM_END = CLOUDS_OVERLAY_FADE_OUT_END_ZOOM;
+const LIGHTNING_US_BOUNDS: [number, number, number, number] = [-125.5, 24.0, -66.0, 50.0];
+const LIGHTNING_REGION_BIAS_CHANCE = 0.6;
+const LIGHTNING_REGION_RADIUS_GLOBE_PX = 38;
+const LIGHTNING_REGION_RADIUS_CLOSE_PX = 9;
+const LIGHTNING_SCALE_GLOBE_MIN = 0.16;
+const LIGHTNING_SCALE_GLOBE_MAX = 0.36;
+const LIGHTNING_SCALE_CLOSE_MIN = 0.024;
+const LIGHTNING_SCALE_CLOSE_MAX = 0.065;
+const LIGHTNING_US_POSITION_TRIES = 36;
+
+const getLightningZoomedOutBoostT = (zoom: number) => {
+	if (zoom <= LIGHTNING_ZOOMED_OUT_BOOST_FULL_ZOOM) return 1;
+	if (zoom >= LIGHTNING_ZOOMED_OUT_BOOST_END_ZOOM) return 0;
+	const t =
+		(LIGHTNING_ZOOMED_OUT_BOOST_END_ZOOM - zoom) /
+		(LIGHTNING_ZOOMED_OUT_BOOST_END_ZOOM - LIGHTNING_ZOOMED_OUT_BOOST_FULL_ZOOM);
+	const clamped = clamp(t, 0, 1);
+	return clamped * clamped * (3 - 2 * clamped);
+};
+
+const getLightningZoomedInT = (zoom: number) => {
+	if (zoom <= LIGHTNING_SCALE_ZOOM_START) return 0;
+	if (zoom >= LIGHTNING_SCALE_ZOOM_END) return 1;
+	const t =
+		(zoom - LIGHTNING_SCALE_ZOOM_START) /
+		(LIGHTNING_SCALE_ZOOM_END - LIGHTNING_SCALE_ZOOM_START);
+	const clamped = clamp(t, 0, 1);
+	return clamped * clamped * (3 - 2 * clamped);
+};
+
+const getLightningSpawnCount = (zoom: number) => {
+	const boostT = getLightningZoomedOutBoostT(zoom);
+	let count = 1;
+	if (Math.random() < 0.85 * boostT) count += 1;
+	if (Math.random() < 0.45 * boostT) count += 1;
+	return count;
+};
 
 // Contact-lights overlay: dot-only night lights derived from contact coordinates.
 // Implemented as local raster tiles (like clouds) so it stays glued to the globe.
@@ -1315,6 +1365,16 @@ const CLOUDS_DRIFT_ZOOM_SCALE_MAX = 4.0;
 const CLOUDS_TURBULENCE_STRIP_PX = 32;
 const CLOUDS_TURBULENCE_LOOP_MS = 90_000;
 const CLOUDS_TURBULENCE_AMPLITUDE_X_PX = 1.3;
+const CLOUDS_EXTRA_PASS_OFFSETS: Array<[number, number]> = [
+	[0.5, 0.5],
+	[-0.31, 0.37],
+	[0.18, -0.29],
+	[-0.58, -0.14],
+	[0.36, -0.47],
+	[-0.12, 0.72],
+	[0.64, -0.18],
+	[-0.42, -0.54],
+];
 
 const buildCloudsOpacityExpr = (
 	globeZoomOpacity: number,
@@ -2731,6 +2791,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	presentation = 'interactive',
 	autoSpin = false,
 	weatherMood: weatherMoodProp = 'normal',
+	weatherRegionCenter = null,
 	weatherTemperatureF = null,
 	nightT: nightTProp = null,
 }) => {
@@ -2821,6 +2882,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	// visuals until applyWeatherMood() runs.
 	const weatherMoodConfigRef = useRef<MoodVisualConfig>(getMoodConfig('normal'));
 	const appliedWeatherMoodRef = useRef<WeatherMood>('normal');
+	const weatherRegionCenterRef = useRef<LatLngLiteral | null>(weatherRegionCenter);
+	weatherRegionCenterRef.current = weatherRegionCenter;
 	// Mutated by the temperature effect; read by `applyLightingOverlayOpacity`
 	// on every zoom event so the hot lift survives zoom-driven recalculations.
 	const isHotRef = useRef<boolean>(false);
@@ -3991,7 +4054,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 			const overlay = clamp(nextOverlayOpacity, 0, 1);
 			const modeT = clamp(nextModeT, 0, 1);
-			const night = clamp(nightTRef.current, 0, 1);
+			const night = computeMoodVisualNightT(
+				nightTRef.current,
+				weatherMoodConfigRef.current
+			);
 			const nightEase = night * night * (3 - 2 * night);
 			const nightMul =
 				1 - nightEase * (1 - clamp(NIGHT_STATE_LINE_OPACITY_MUL_MIN, 0, 1));
@@ -4350,119 +4416,231 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			return pulse.peakOpacity * clamp(t, 0, 1);
 		};
 
-		const scheduleNextLightning = (nowMs: number, opts?: { fast?: boolean }) => {
+		const getCurrentLightningZoom = () => {
+			try {
+				return map.getZoom?.() ?? MAP_DEFAULT_ZOOM;
+			} catch {
+				return MAP_DEFAULT_ZOOM;
+			}
+		};
+
+		const scheduleNextLightning = (
+			nowMs: number,
+			opts?: { fast?: boolean; zoom?: number }
+		) => {
 			const fast = Boolean(opts?.fast);
-			const min = fast
+			const baseMin = fast
 				? LIGHTNING_FIRST_FLASH_MIN_INTERVAL_MS
 				: LIGHTNING_MIN_INTERVAL_MS;
-			const max = fast
+			const baseMax = fast
 				? LIGHTNING_FIRST_FLASH_MAX_INTERVAL_MS
 				: LIGHTNING_MAX_INTERVAL_MS;
+			const boostT = getLightningZoomedOutBoostT(opts?.zoom ?? getCurrentLightningZoom());
+			const min = baseMin + (LIGHTNING_ZOOMED_OUT_MIN_INTERVAL_MS - baseMin) * boostT;
+			const max = baseMax + (LIGHTNING_ZOOMED_OUT_MAX_INTERVAL_MS - baseMax) * boostT;
 			const wait = min + Math.random() * Math.max(0, max - min);
 			lightningNextFlashAtMsRef.current = nowMs + wait;
 		};
 
-			const lightningPotentialAlphaAt = (x: number, y: number, w: number, h: number) => {
-				const potential = lightningPotentialU8Ref.current;
-				if (!potential) return 255;
-				const xi = ((Math.floor(x) % w) + w) % w;
-				const yi = clamp(Math.floor(y), 0, h - 1);
-				return potential[yi * w + xi] ?? 0;
-			};
+		const lightningPotentialAlphaAt = (x: number, y: number, w: number, h: number) => {
+			const potential = lightningPotentialU8Ref.current;
+			if (!potential) return 255;
+			const xi = ((Math.floor(x) % w) + w) % w;
+			const yi = clamp(Math.floor(y), 0, h - 1);
+			return potential[yi * w + xi] ?? 0;
+		};
 
-			const lngLatToLightningCanvasPoint = (
-				lng: number,
-				lat: number,
-				w: number,
-				h: number
-			): { x: number; y: number } | null => {
-				if (!Number.isFinite(lng) || !Number.isFinite(lat)) return null;
-				const xNorm = ((((lng + 180) / 360) % 1) + 1) % 1;
-				const latClamped = clamp(
-					lat,
-					-LIGHTNING_MERCATOR_MAX_LAT,
-					LIGHTNING_MERCATOR_MAX_LAT
+		const lngLatToLightningCanvasPoint = (
+			lng: number,
+			lat: number,
+			w: number,
+			h: number
+		): { x: number; y: number } | null => {
+			if (!Number.isFinite(lng) || !Number.isFinite(lat)) return null;
+			const xNorm = ((((lng + 180) / 360) % 1) + 1) % 1;
+			const latClamped = clamp(
+				lat,
+				-LIGHTNING_MERCATOR_MAX_LAT,
+				LIGHTNING_MERCATOR_MAX_LAT
+			);
+			const latRad = (latClamped * Math.PI) / 180;
+			const mercatorY = (1 - Math.log(Math.tan(Math.PI / 4 + latRad / 2)) / Math.PI) / 2;
+			if (!Number.isFinite(mercatorY)) return null;
+			return { x: xNorm * w, y: clamp(mercatorY, 0, 1) * h };
+		};
+
+		const lightningCanvasPointToLngLat = (
+			x: number,
+			y: number,
+			w: number,
+			h: number
+		): { lng: number; lat: number } | null => {
+			if (!Number.isFinite(x) || !Number.isFinite(y) || w <= 0 || h <= 0) return null;
+			const lng = ((((x / w) * 360 - 180 + 180) % 360) + 360) % 360 - 180;
+			const mercatorY = clamp(y / h, 0, 1);
+			const latRad = 2 * Math.atan(Math.exp((1 - 2 * mercatorY) * Math.PI)) - Math.PI / 2;
+			const lat = (latRad * 180) / Math.PI;
+			return Number.isFinite(lat) && Number.isFinite(lng) ? { lng, lat } : null;
+		};
+
+		const isLngLatInLightningUsBounds = (lng: number, lat: number) => {
+			const [west, south, east, north] = LIGHTNING_US_BOUNDS;
+			return lng >= west && lng <= east && lat >= south && lat <= north;
+		};
+
+		const isLngLatInLightningUsRegion = (lng: number, lat: number) => {
+			if (!isLngLatInLightningUsBounds(lng, lat)) return false;
+			const prepared = usStatesPolygonsRef.current;
+			if (!prepared || prepared.length === 0) return true;
+
+			const point: ClippingCoord = [lng, lat];
+			for (const { polygon, bbox } of prepared) {
+				if (bbox && !isLatLngInBbox(lat, lng, bbox)) continue;
+				if (pointInClippingPolygon(point, polygon)) return true;
+			}
+			return false;
+		};
+
+		const randomLightningUsCanvasPoint = (
+			w: number,
+			h: number
+		): { x: number; y: number } => {
+			const [west, south, east, north] = LIGHTNING_US_BOUNDS;
+			for (let i = 0; i < 20; i++) {
+				const lng = lerp(west, east, Math.random());
+				const lat = lerp(south, north, Math.random());
+				if (!isLngLatInLightningUsRegion(lng, lat)) continue;
+				const point = lngLatToLightningCanvasPoint(lng, lat, w, h);
+				if (point) return point;
+			}
+			const lng = lerp(west, east, Math.random());
+			const lat = lerp(south, north, Math.random());
+			return lngLatToLightningCanvasPoint(lng, lat, w, h) ?? { x: w * 0.5, y: h * 0.5 };
+		};
+
+		const getLightningUsCanvasBounds = (w: number, h: number) => {
+			const [west, south, east, north] = LIGHTNING_US_BOUNDS;
+			const nw = lngLatToLightningCanvasPoint(west, north, w, h);
+			const se = lngLatToLightningCanvasPoint(east, south, w, h);
+			if (!nw || !se) return null;
+			return {
+				minX: Math.min(nw.x, se.x),
+				maxX: Math.max(nw.x, se.x),
+				minY: Math.min(nw.y, se.y),
+				maxY: Math.max(nw.y, se.y),
+			};
+		};
+
+		const getLightningAnchorCanvasPoint = (
+			w: number,
+			h: number
+		): { x: number; y: number } | null => {
+			const weatherCenter = weatherRegionCenterRef.current;
+			if (
+				weatherCenter &&
+				Number.isFinite(weatherCenter.lat) &&
+				Number.isFinite(weatherCenter.lng) &&
+				isLngLatInLightningUsBounds(weatherCenter.lng, weatherCenter.lat)
+			) {
+				const point = lngLatToLightningCanvasPoint(
+					weatherCenter.lng,
+					weatherCenter.lat,
+					w,
+					h
 				);
-				const latRad = (latClamped * Math.PI) / 180;
-				const mercatorY =
-					(1 - Math.log(Math.tan(Math.PI / 4 + latRad / 2)) / Math.PI) / 2;
-				if (!Number.isFinite(mercatorY)) return null;
-				return { x: xNorm * w, y: clamp(mercatorY, 0, 1) * h };
-			};
+				if (point) return point;
+			}
 
-			const pickVisibleLightningPosition = (
-				w: number,
-				h: number
-			): { x: number; y: number } | null => {
-				let mapCanvas: HTMLCanvasElement | null = null;
-				try {
-					mapCanvas = map.getCanvas?.() ?? null;
-				} catch {
-					mapCanvas = null;
-				}
-				const viewportW = mapCanvas?.clientWidth || mapCanvas?.width || 0;
-				const viewportH = mapCanvas?.clientHeight || mapCanvas?.height || 0;
-				if (viewportW <= 0 || viewportH <= 0) return null;
+			return lngLatToLightningCanvasPoint(defaultCenter.lng, defaultCenter.lat, w, h);
+		};
 
-				const insetX = Math.min(viewportW * 0.18, 160);
-				const insetY = Math.min(viewportH * 0.18, 120);
-				const sampleW = Math.max(1, viewportW - insetX * 2);
-				const sampleH = Math.max(1, viewportH - insetY * 2);
-				let best: { x: number; y: number; alpha: number } | null = null;
+		const pickLocalizedLightningPosition = (
+			w: number,
+			h: number,
+			zoom: number
+		): { x: number; y: number } => {
+			const anchor = getLightningAnchorCanvasPoint(w, h);
+			if (!anchor) return { x: Math.random() * w, y: Math.random() * h };
 
-				for (let i = 0; i < LIGHTNING_VISIBLE_POSITION_TRIES; i++) {
-					const sx = insetX + Math.random() * sampleW;
-					const sy = insetY + Math.random() * sampleH;
-					let lngLat: mapboxgl.LngLat | null = null;
-					try {
-						lngLat = map.unproject([sx, sy]);
-					} catch {
-						lngLat = null;
+			const zoomT = getLightningZoomedInT(zoom);
+			const radius = lerp(
+				LIGHTNING_REGION_RADIUS_GLOBE_PX,
+				LIGHTNING_REGION_RADIUS_CLOSE_PX,
+				zoomT
+			);
+			const usBounds = getLightningUsCanvasBounds(w, h);
+			let best: { x: number; y: number; alpha: number } | null = null;
+
+			for (let i = 0; i < LIGHTNING_US_POSITION_TRIES; i++) {
+				const useRegionBias = Math.random() < LIGHTNING_REGION_BIAS_CHANCE;
+				let x: number;
+				let y: number;
+				if (useRegionBias) {
+					const angle = Math.random() * Math.PI * 2;
+					const distance = Math.sqrt(Math.random()) * radius;
+					x = anchor.x + Math.cos(angle) * distance;
+					y = anchor.y + Math.sin(angle) * distance;
+					if (usBounds) {
+						x = clamp(x, usBounds.minX, usBounds.maxX);
+						y = clamp(y, usBounds.minY, usBounds.maxY);
+					} else {
+						x = ((x % w) + w) % w;
+						y = clamp(y, 0, h - 1);
 					}
-					if (!lngLat) continue;
-
-					const point = lngLatToLightningCanvasPoint(lngLat.lng, lngLat.lat, w, h);
-					if (!point) continue;
-
-					const alpha = lightningPotentialAlphaAt(point.x, point.y, w, h);
-					if (!best || alpha > best.alpha) best = { ...point, alpha };
-
-					const acceptance = 0.22 + Math.pow(alpha / 255, 1.15) * 0.78;
-					if (alpha >= 8 && Math.random() < acceptance) return point;
+					const lngLat = lightningCanvasPointToLngLat(x, y, w, h);
+					if (!lngLat || !isLngLatInLightningUsRegion(lngLat.lng, lngLat.lat)) {
+						const point = randomLightningUsCanvasPoint(w, h);
+						x = point.x;
+						y = point.y;
+					}
+				} else {
+					const point = randomLightningUsCanvasPoint(w, h);
+					x = point.x;
+					y = point.y;
 				}
+				const alpha = lightningPotentialAlphaAt(x, y, w, h);
+				if (!best || alpha > best.alpha) best = { x, y, alpha };
 
-				return best ? { x: best.x, y: best.y } : null;
-			};
+				const acceptance = 0.18 + Math.pow(alpha / 255, 1.2) * 0.82;
+				if (alpha >= 8 && Math.random() < acceptance) return { x, y };
+			}
 
-			const pickLightningPosition = (w: number, h: number): { x: number; y: number } => {
-				if (Math.random() < LIGHTNING_VISIBLE_POSITION_CHANCE) {
-					const visible = pickVisibleLightningPosition(w, h);
-					if (visible) return visible;
-				}
+			return best ? { x: best.x, y: best.y } : anchor;
+		};
 
-				const tries = 28;
-				for (let i = 0; i < tries; i++) {
-					const x = Math.floor(Math.random() * w);
-					const y = Math.floor(Math.random() * h);
-					const a = lightningPotentialAlphaAt(x, y, w, h);
-					// Bias toward storm cores but still allow occasional "surprise" flashes.
-					if (a < 20) continue;
-					const p = Math.pow(a / 255, 1.6);
-					if (Math.random() < p) return { x, y };
-				}
-				return { x: Math.random() * w, y: Math.random() * h };
-			};
+		const pickLightningPosition = (
+			w: number,
+			h: number,
+			zoom: number
+		): { x: number; y: number } => {
+			return pickLocalizedLightningPosition(w, h, zoom);
+		};
 
 		const spawnLightningEvent = (nowMs: number, w: number, h: number) => {
 			const stamps = lightningStampImagesRef.current;
 			if (!Array.isArray(stamps) || stamps.length === 0) return;
 
+			const zoom = getCurrentLightningZoom();
+			const boostT = getLightningZoomedOutBoostT(zoom);
+			const maxActiveEvents = Math.round(
+				LIGHTNING_MAX_ACTIVE_EVENTS +
+					(LIGHTNING_ZOOMED_OUT_MAX_ACTIVE_EVENTS - LIGHTNING_MAX_ACTIVE_EVENTS) *
+						boostT
+			);
 			const events = lightningEventsRef.current;
-			if (events.length >= LIGHTNING_MAX_ACTIVE_EVENTS) return;
+			if (events.length >= maxActiveEvents) return;
 
-			const { x, y } = pickLightningPosition(w, h);
+			const { x, y } = pickLightningPosition(w, h, zoom);
 			const stampIndex = Math.floor(Math.random() * stamps.length);
-			const scale = 0.45 + Math.random() * 0.85;
+			const zoomT = getLightningZoomedInT(zoom);
+			const scale =
+				lerp(LIGHTNING_SCALE_GLOBE_MIN, LIGHTNING_SCALE_CLOSE_MIN, zoomT) +
+				Math.random() *
+					lerp(
+						LIGHTNING_SCALE_GLOBE_MAX - LIGHTNING_SCALE_GLOBE_MIN,
+						LIGHTNING_SCALE_CLOSE_MAX - LIGHTNING_SCALE_CLOSE_MIN,
+						zoomT
+					);
 			const rotationRad = (Math.random() - 0.5) * 0.55;
 
 			const pulseCount = Math.random() < 0.35 ? 3 : 2;
@@ -4499,13 +4677,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		};
 
 		const drawLightning = (nowMs: number) => {
-			let zoomOk = true;
-			try {
-				const z = map.getZoom?.() ?? 0;
-				zoomOk = z < LIGHTNING_HIDE_AT_OR_ABOVE_ZOOM;
-			} catch {
-				zoomOk = true;
-			}
+			const currentZoom = getCurrentLightningZoom();
+			const zoomOk = currentZoom < LIGHTNING_HIDE_AT_OR_ABOVE_ZOOM;
 
 			const enabled =
 				!prefersReducedMotion &&
@@ -4537,11 +4710,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			}
 
 			if (!lightningNextFlashAtMsRef.current) {
-				scheduleNextLightning(nowMs, { fast: justEnabled });
+				scheduleNextLightning(nowMs, { fast: justEnabled, zoom: currentZoom });
 			}
 			if (nowMs >= lightningNextFlashAtMsRef.current) {
-				spawnLightningEvent(nowMs, w, h);
-				scheduleNextLightning(nowMs);
+				const spawnCount = getLightningSpawnCount(currentZoom);
+				for (let i = 0; i < spawnCount; i++) {
+					spawnLightningEvent(nowMs + i * (30 + Math.random() * 45), w, h);
+				}
+				scheduleNextLightning(nowMs, { zoom: currentZoom });
 			}
 
 			const events = lightningEventsRef.current;
@@ -5215,8 +5391,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						// same texture covers more of the canvas (no Python re-bake needed).
 						const extraPasses = weatherMoodConfigRef.current.cloudExtraPasses;
 						for (let p = 0; p < extraPasses; p++) {
-							const ox = p === 0 ? w * 0.5 : p === 1 ? -w * 0.31 : w * 0.18;
-							const oy = p === 0 ? h * 0.5 : p === 1 ? h * 0.37 : -h * 0.29;
+							const [oxT, oyT] =
+								CLOUDS_EXTRA_PASS_OFFSETS[p % CLOUDS_EXTRA_PASS_OFFSETS.length];
+							const ox = w * oxT;
+							const oy = h * oyT;
 							cloudsCtx.translate(ox, oy);
 							cloudsCtx.fillRect(-w * 2, -h * 2, w * 5, h * 5);
 						}
@@ -5247,8 +5425,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 							// Mood-driven extra density (matches base layer pass count).
 							const extraPasses = weatherMoodConfigRef.current.cloudExtraPasses;
 							for (let p = 0; p < extraPasses; p++) {
-								const ox = p === 0 ? w * 0.5 : -w * 0.31;
-								const oy = p === 0 ? h * 0.5 : h * 0.37;
+								const [oxT, oyT] =
+									CLOUDS_EXTRA_PASS_OFFSETS[(p + g) % CLOUDS_EXTRA_PASS_OFFSETS.length];
+								const ox = w * oxT;
+								const oy = h * oyT;
 								cloudsCtx.translate(ox, oy);
 								cloudsCtx.fillRect(-w * 2, -h * 2, w * 5, h * 5);
 							}
@@ -5442,7 +5622,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		// World-land fill (cream continents under the ocean-blue background). Idempotent;
 		// safe if style.load already added it earlier.
 		ensureWorldLandFill(mapInstance);
-		applyNightLandPalette(mapInstance, nightTRef.current);
+		applyNightLandPalette(
+			mapInstance,
+			computeMoodVisualNightT(nightTRef.current, weatherMoodConfigRef.current)
+		);
 
 		const emptyFc: GeoJSON.FeatureCollection = {
 			type: 'FeatureCollection',
@@ -5800,7 +5983,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			['case', isStateSelectedExpr, 1, 0.7],
 		];
 		const stateInteractiveBorderColorExpr = buildStateInteractiveBorderColorExpr(
-			nightTRef.current
+			computeMoodVisualNightT(nightTRef.current, weatherMoodConfigRef.current)
 		);
 
 		ensureLayer({
@@ -5872,7 +6055,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				'text-halo-width': 0,
 			},
 		});
-		applyStateOverlayNightColors(mapInstance, nightTRef.current);
+		applyStateOverlayNightColors(
+			mapInstance,
+			computeMoodVisualNightT(nightTRef.current, weatherMoodConfigRef.current)
+		);
 
 		// Search-results outlines (blue + black) intentionally removed.
 
@@ -6145,7 +6331,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 		const onStyleLoad = () => {
 			applyFreeTrialMapVisualTuning(mapInstance);
-			applyMurmurGlobeLighting(mapInstance, { nightT: nightTRef.current });
+			applyMurmurGlobeLighting(mapInstance, {
+				nightT: computeMoodVisualNightT(nightTRef.current, weatherMoodConfigRef.current),
+			});
 			// Add Murmur sources/layers (including clouds + world-land fill) as early as
 			// possible so they can begin loading before the first reveal.
 			ensureMapboxSourcesAndLayers(mapInstance);
@@ -6153,7 +6341,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 		const onLoad = () => {
 			applyFreeTrialMapVisualTuning(mapInstance);
-			applyMurmurGlobeLighting(mapInstance, { nightT: nightTRef.current });
+			applyMurmurGlobeLighting(mapInstance, {
+				nightT: computeMoodVisualNightT(nightTRef.current, weatherMoodConfigRef.current),
+			});
 			ensureMapboxSourcesAndLayers(mapInstance);
 
 			// Ensure the decorative dashboard framing (offset) is applied before we
@@ -6259,7 +6449,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		// `rotate` fires continuously during interaction; the call is cheap (no
 		// layer reshuffling) because setLights only updates the existing light defs.
 		const onRotate = () => {
-			applyMurmurGlobeLighting(mapInstance, { nightT: nightTRef.current });
+			applyMurmurGlobeLighting(mapInstance, {
+				nightT: computeMoodVisualNightT(nightTRef.current, weatherMoodConfigRef.current),
+			});
 		};
 
 		mapInstance.on('load', onLoad);
@@ -8688,8 +8880,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		if (!mapRef.current) return;
 		const zoom = mapRef.current.getZoom() ?? MAP_DEFAULT_ZOOM;
 		const base = computeLightingOverlayOpacity(zoom);
-		const night = clamp(nightTRef.current, 0, 1);
 		const cfg = weatherMoodConfigRef.current;
+		const night = computeMoodVisualNightT(nightTRef.current, cfg);
 
 		// Preserve the daytime palette and softbox tuning at night; night mode should
 		// read as the same map, just darker (no hue shift).
@@ -9107,17 +9299,22 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	useEffect(() => {
 		if (!map) return;
 		if (!isMapLoaded) return;
-		applyMurmurGlobeLighting(map, { nightT });
-		applyNightLandPalette(map, nightT);
-		applyStateOverlayNightColors(map, nightT);
-	}, [nightT, map, isMapLoaded]);
+		const visualNightT = computeMoodVisualNightT(nightT, weatherMoodConfigRef.current);
+		applyMurmurGlobeLighting(map, { nightT: visualNightT });
+		applyNightLandPalette(map, visualNightT);
+		applyStateOverlayNightColors(map, visualNightT);
+	}, [nightT, weatherMood, map, isMapLoaded]);
 
 	// Re-apply the night palette when zoom changes so the "zoomed in" view can be
 	// slightly brighter without changing the low-zoom globe read.
 	useEffect(() => {
 		if (!map) return;
 		if (!isMapLoaded) return;
-		const onZoomEnd = () => applyNightLandPalette(map, nightTRef.current);
+		const onZoomEnd = () =>
+			applyNightLandPalette(
+				map,
+				computeMoodVisualNightT(nightTRef.current, weatherMoodConfigRef.current)
+			);
 		map.on('zoomend', onZoomEnd);
 		return () => {
 			map.off('zoomend', onZoomEnd);
@@ -9168,12 +9365,17 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					...existingFog,
 					color: cfg.fogColor,
 					'high-color': cfg.fogHighColor,
+					'horizon-blend': cfg.fogHorizonBlend,
 				});
 			} catch {
 				// Non-fatal.
 			}
 
 			applyLightingOverlayOpacity();
+			const visualNightT = computeMoodVisualNightT(nightTRef.current, cfg);
+			applyMurmurGlobeLighting(m, { nightT: visualNightT });
+			applyNightLandPalette(m, visualNightT);
+			applyStateOverlayNightColors(m, visualNightT);
 		},
 		[applyLightingOverlayOpacity]
 	);

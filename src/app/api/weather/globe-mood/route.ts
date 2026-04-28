@@ -45,23 +45,21 @@ export async function GET(req: NextRequestWithGeo) {
 	const tz = url.searchParams.get('tz');
 	const devMood = url.searchParams.get('devMood');
 
-	if (devMood && isValidMood(devMood)) {
-		return jsonResponse({
-			regionKey: 'dev',
-			regionLabel: 'Dev Override',
-			mood: devMood,
-			temperatureF: null,
-			fetchedAt: null,
-		});
-	}
-
 	const weather = await getCachedWeather();
 	if (!weather || weather.length === 0) {
-		return jsonResponse(NORMAL_FALLBACK);
+		return jsonResponse(
+			devMood && isValidMood(devMood)
+				? { ...NORMAL_FALLBACK, mood: devMood, regionLabel: 'Dev Override' }
+				: NORMAL_FALLBACK
+		);
 	}
 
 	const region = resolveRegion(req, tz, weather);
-	return jsonResponse(region ? toResponse(region) : NORMAL_FALLBACK);
+	if (!region) return jsonResponse(NORMAL_FALLBACK);
+	const response = toResponse(region);
+	return jsonResponse(
+		devMood && isValidMood(devMood) ? { ...response, mood: devMood } : response
+	);
 }
 
 function resolveRegion(

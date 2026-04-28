@@ -216,7 +216,11 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		isTransitioningIn,
 	} = props;
 
-	const { mood: globeWeatherMood, temperatureF: globeWeatherTemperatureF } =
+	const {
+		mood: globeWeatherMood,
+		temperatureF: globeWeatherTemperatureF,
+		regionCenter: globeWeatherRegionCenter,
+	} =
 		useGlobeWeatherMood();
 	const { nightT: globeNightT } = useGlobeNightLighting();
 
@@ -7052,6 +7056,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										>
 											<SearchResultsMap
 												weatherMood={globeWeatherMood}
+												weatherRegionCenter={globeWeatherRegionCenter}
 												weatherTemperatureF={globeWeatherTemperatureF}
 												nightT={globeNightT}
 												contacts={
