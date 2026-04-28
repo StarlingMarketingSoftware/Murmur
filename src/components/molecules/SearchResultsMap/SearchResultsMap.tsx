@@ -1440,8 +1440,7 @@ const applyMurmurGlobeLighting = (
 	opts?: { nightT?: number }
 ) => {
 	try {
-		const nightT = clamp(opts?.nightT ?? 0, 0, 1);
-		const lerp = (a: number, b: number) => a + (b - a) * nightT;
+		void opts;
 
 		const bearing =
 			typeof mapInstance.getBearing === 'function' ? mapInstance.getBearing() : 0;
@@ -1455,7 +1454,7 @@ const applyMurmurGlobeLighting = (
 				type: 'ambient',
 				properties: {
 					color: 'rgb(120, 150, 185)',
-					intensity: lerp(0.18, 0.144),
+					intensity: 0.18,
 				},
 			},
 			{
@@ -1463,7 +1462,7 @@ const applyMurmurGlobeLighting = (
 				type: 'directional',
 				properties: {
 					color: 'rgb(255, 244, 220)',
-					intensity: lerp(1.6, 1.04),
+					intensity: 1.6,
 					direction: [azimuth, polar],
 					'cast-shadows': true,
 					'shadow-intensity': 0.95,
@@ -1491,35 +1490,12 @@ const MAP_OCEAN_BLUE = '#62C7E3';
 const MAP_LAND_CREAM = '#F1EDE2';
 const MAP_LANDCOVER_GREEN = '#B3E6D7';
 
-// Night mode should preserve the daytime palette (same hues) and simply darken it.
-// We mix toward a soft twilight blue (not pure black) so the desaturation reads
-// "moonlit dusk" rather than "lights out" — keeps a hint of cool atmosphere in
-// the land/landcover colors instead of draining them to corpse-grey.
-const NIGHT_BASEMAP_DARKEN_MAX = 0.28;
-// As the user zooms in to "street-level" detail, ease up on the darken slightly so the
-// basemap stays readable (we already fade out the viewer-anchored softbox at high zoom).
-const NIGHT_BASEMAP_DARKEN_MAX_ZOOMED_IN = 0.14;
-// Tint we mix the daytime palette toward at deep night. Soft twilight navy —
-// keeps the daytime hues recognizable while signaling "evening" rather than
-// "blackout". Tweak to taste; pure black ([0,0,0]) is the legacy "spooky" look.
-const NIGHT_BASEMAP_DARKEN_TARGET: [number, number, number] = [28, 40, 70];
-const NIGHT_BASEMAP_ZOOM_BRIGHTEN_START_ZOOM = 5.25;
-const NIGHT_BASEMAP_ZOOM_BRIGHTEN_END_ZOOM = 9.5;
-
 const NIGHT_HIDE_ROADS_START_T = 0.18;
 const NIGHT_HIDE_ROADS_END_T = 0.42;
 // Roads compete with the contact-lights overlay at globe zoom, but they matter for
 // legibility at city zoom. Fade the road-hiding back out as the user zooms in.
 const NIGHT_HIDE_ROADS_RESTORE_START_ZOOM = 5.5;
 const NIGHT_HIDE_ROADS_RESTORE_END_ZOOM = 9.0;
-
-// At low zoom in night mode, terrain/landcover variation can compete with the
-// dot-only night-lights overlay. Flatten landcover + hillshade slightly while
-// zoomed out so the lights read more clearly.
-const NIGHT_TERRAIN_FLATTEN_START_T = 0.12;
-const NIGHT_TERRAIN_FLATTEN_END_T = 0.55;
-const NIGHT_TERRAIN_FLATTEN_END_ZOOM = 5.25;
-const NIGHT_TERRAIN_FLATTEN_LAND_KEEP_ZOOM = 3.6;
 
 const mixCssRgb = (
 	from: [number, number, number],
@@ -1532,26 +1508,13 @@ const mixCssRgb = (
 	)}, ${Math.round(from[2] + (to[2] - from[2]) * p)})`;
 };
 
-const getNightBasemapZoomBrightenT = (zoom: number) => {
-	if (zoom <= NIGHT_BASEMAP_ZOOM_BRIGHTEN_START_ZOOM) return 0;
-	if (zoom >= NIGHT_BASEMAP_ZOOM_BRIGHTEN_END_ZOOM) return 1;
-	const t =
-		(zoom - NIGHT_BASEMAP_ZOOM_BRIGHTEN_START_ZOOM) /
-		(NIGHT_BASEMAP_ZOOM_BRIGHTEN_END_ZOOM - NIGHT_BASEMAP_ZOOM_BRIGHTEN_START_ZOOM);
-	return t * t * (3 - 2 * t);
-};
-
 const getMapPaletteForNight = (nightT: number, zoom: number) => {
-	const night = clamp(nightT, 0, 1);
-	const zoomBrightenT = getNightBasemapZoomBrightenT(zoom);
-	const darkenMax =
-		NIGHT_BASEMAP_DARKEN_MAX +
-		(NIGHT_BASEMAP_DARKEN_MAX_ZOOMED_IN - NIGHT_BASEMAP_DARKEN_MAX) * zoomBrightenT;
-	const darkenT = clamp(night * darkenMax, 0, 1);
+	void nightT;
+	void zoom;
 	return {
-		ocean: mixCssRgb([98, 199, 227], NIGHT_BASEMAP_DARKEN_TARGET, darkenT),
-		land: mixCssRgb([241, 237, 226], NIGHT_BASEMAP_DARKEN_TARGET, darkenT),
-		landcover: mixCssRgb([179, 230, 215], NIGHT_BASEMAP_DARKEN_TARGET, darkenT),
+		ocean: MAP_OCEAN_BLUE,
+		land: MAP_LAND_CREAM,
+		landcover: MAP_LANDCOVER_GREEN,
 	};
 };
 
@@ -1577,26 +1540,9 @@ const getNightRoadHideT = (nightT: number, zoom: number) => {
 };
 
 const getNightTerrainFlattenT = (nightT: number, zoom: number) => {
-	const night = clamp(nightT, 0, 1);
-	if (night <= NIGHT_TERRAIN_FLATTEN_START_T) return 0;
-	if (zoom >= NIGHT_TERRAIN_FLATTEN_END_ZOOM) return 0;
-
-	const nightT2 =
-		night >= NIGHT_TERRAIN_FLATTEN_END_T
-			? 1
-			: (night - NIGHT_TERRAIN_FLATTEN_START_T) /
-				(NIGHT_TERRAIN_FLATTEN_END_T - NIGHT_TERRAIN_FLATTEN_START_T);
-	const nightEased = nightT2 * nightT2 * (3 - 2 * nightT2);
-
-	const zoomT =
-		zoom <= MAP_MIN_ZOOM
-			? 0
-			: (zoom - MAP_MIN_ZOOM) / (NIGHT_TERRAIN_FLATTEN_END_ZOOM - MAP_MIN_ZOOM);
-	const zoomEased = clamp(zoomT, 0, 1);
-	// Reverse smoothstep: 1 at MAP_MIN_ZOOM, 0 by end zoom.
-	const inv = 1 - zoomEased * zoomEased * (3 - 2 * zoomEased);
-
-	return clamp(nightEased * inv, 0, 1);
+	void nightT;
+	void zoom;
+	return 0;
 };
 
 const basemapRoadOpacityBaseByMap = new WeakMap<mapboxgl.Map, Map<string, any | null>>();
@@ -1687,30 +1633,15 @@ const applyNightLandPalette = (mapInstance: mapboxgl.Map, nightT: number) => {
 						idLower === 'park' ||
 						idLower.startsWith('park'))
 				) {
-					if (terrainFlattenT <= 0.001) {
-						mapInstance.setPaintProperty(id, 'fill-color', palette.landcover);
-					} else {
-						// Keep landcover nearly identical to land at far zoom, then blend back in.
-						mapInstance.setPaintProperty(id, 'fill-color', [
-							'interpolate',
-							['linear'],
-							['zoom'],
-							MAP_MIN_ZOOM,
-							palette.land,
-							NIGHT_TERRAIN_FLATTEN_LAND_KEEP_ZOOM,
-							palette.land,
-							NIGHT_TERRAIN_FLATTEN_END_ZOOM,
-							palette.landcover,
-						]);
-					}
+					mapInstance.setPaintProperty(id, 'fill-color', palette.landcover);
 				} else if (
 					type === 'fill' &&
 					(idLower.includes('landuse') || idLower === 'land')
 				) {
 					mapInstance.setPaintProperty(id, 'fill-color', palette.land);
 				} else if (type === 'hillshade' || idLower.includes('hillshade')) {
-					// Terrain shading adds "busy" value noise at low zoom. Reduce it at night
-					// while zoomed out so dot lights stay legible.
+					// Keep terrain shading at its daytime strength; night mode should not
+					// visually flatten or recolor the normal map.
 					const mul = clamp(1 - terrainFlattenT, 0, 1);
 					const baseEx = getBasemapHillshadeExaggerationBase(mapInstance, id);
 					if (mul <= 0.001) {
@@ -2142,9 +2073,9 @@ const STATE_LABEL_COLOR = '#111827';
 // When zoomed out to a US-wide view, show subtle state divider lines (like Zillow).
 // Keep these behind the blue/black search-area outlines.
 const STATE_DIVIDER_LINES_MAX_ZOOM = 8;
-// Night mode: keep state boundaries readable but less bright on the darker basemap.
-const NIGHT_STATE_LINE_OPACITY_MUL_MIN = 0.55;
-const NIGHT_STATE_LINE_DARKEN_MAX = 0.72;
+// Night mode keeps the same map palette as day, so state boundaries keep day contrast.
+const NIGHT_STATE_LINE_OPACITY_MUL_MIN = 1;
+const NIGHT_STATE_LINE_DARKEN_MAX = 0;
 
 const getNightStateLineDarkenT = (nightT: number) => {
 	const night = clamp(nightT, 0, 1);
@@ -2639,22 +2570,17 @@ const HOT_WASH_OPACITY = 0.13;
 // Implemented as DOM overlays (screen + multiply) so the lighting stays viewer-anchored
 // and can be art-directed independently of the basemap.
 const NIGHT_GLOOM_WASH_OPACITY = 0;
-// Front-face vignette opacity. Very gentle — the basemap palette darken does
-// most of the night-mood work; this just adds a barely-there cool wash so the
-// face doesn't read flat. Set to 0 to disable entirely.
-const NIGHT_FACE_SHADE_OPACITY = 0.08;
+// Neutral night-only dimmer. This darkens the normal day-colored basemap without
+// shifting land/ocean hues back toward a separate night palette.
+const NIGHT_DARK_WASH_OPACITY = 0.085;
+// Keep the night basemap visually matched to the normal day map.
+const NIGHT_FACE_SHADE_OPACITY = 0;
 // US night visibility: dot-only contact-lights tiles (not a heatmap). Kept
 // well below 1 so the lights read as a soft glow rather than a stark
 // NASA-earth-at-night photo (which feels eerie/lonely on its own).
 const NIGHT_US_LIGHTS_OPACITY = 0.55;
 const NIGHT_MOON_RIM_OPACITY = 0;
-// At deep night, attenuate the daytime "shadow softbox" (the dark pool in the
-// lower-right that represents the globe's terminator). On a fully-lit daytime
-// globe it reads as proper sphericality; at night the basemap is already
-// darker, so leaving the shadow at full strength stacks gloom on gloom and
-// gives the lower-right corner an ominous black-hole feel. Ramp from 1 (day)
-// down to this floor (deep night).
-const NIGHT_SHADOW_OVERLAY_MUL_MIN = 0.5;
+const NIGHT_SHADOW_OVERLAY_MUL_MIN = 1;
 
 // City-lights persistence: this is primarily a "zoomed out / from space" aesthetic.
 // Fade out aggressively as we approach state/city zoom so it doesn't compete with markers.
@@ -2775,12 +2701,8 @@ const computeNightLightsCloseGlowMul = (zoom: number) => {
 	return clamp(t, 0, 1) * clamp(t, 0, 1);
 };
 
-// Front-face silhouette: a gentle twilight wash on the visible face, keeping the
-// rim readable. Tinted with a hint of cool blue (rather than pure black) so the
-// shade composites as "moonlit shadow" instead of an ominous vignette. Alphas are
-// roughly half the legacy "deep night" values so the daytime palette underneath
-// stays recognizable. Center matches the rim's bias so the bright limb is stronger
-// on the moon side.
+// Standby shade paint for the night overlay. The overlay opacity is kept at 0 so
+// the visible night map stays matched to the normal daytime palette.
 const NIGHT_FACE_SHADE_BG =
 	'radial-gradient(ellipse 145% 145% at 58% 60%, rgba(14, 22, 42, 0.32) 0%, rgba(14, 22, 42, 0.27) 30%, rgba(14, 22, 42, 0.17) 54%, rgba(14, 22, 42, 0.07) 70%, rgba(14, 22, 42, 0) 84%, rgba(14, 22, 42, 0) 100%)';
 
@@ -2959,6 +2881,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const lightingOverlayShadowRef = useRef<HTMLDivElement | null>(null);
 	const lightingOverlayHotWashRef = useRef<HTMLDivElement | null>(null);
 	const lightingOverlayGloomWashRef = useRef<HTMLDivElement | null>(null);
+	const lightingOverlayNightDarkWashRef = useRef<HTMLDivElement | null>(null);
 	const lightingOverlayNightShadeRef = useRef<HTMLDivElement | null>(null);
 	const lightingOverlayMoonRimRef = useRef<HTMLDivElement | null>(null);
 	const [visibleContacts, setVisibleContacts] = useState<ContactWithName[]>([]);
@@ -8937,11 +8860,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		const cfg = weatherMoodConfigRef.current;
 		const night = computeMoodVisualNightT(nightTRef.current, cfg);
 
-		// Preserve the daytime palette and softbox tuning at night; night mode should
-		// read as the same map, just darker (no hue shift). The key (warm wash on the
-		// lit hemisphere) stays at full strength so the lit side still feels lit.
-		// The shadow side eases off at deep night because the basemap is already darker
-		// — stacking the daytime terminator shadow on top creates an ominous corner.
+		// Preserve the daytime palette and softbox tuning at night; the night cue comes
+		// from the lights overlay, not from tinting or dimming the basemap.
 		const keyNightMul = 1;
 		const nightEaseForShadow = night * night * (3 - 2 * night);
 		const shadowNightMul =
@@ -9113,6 +9033,15 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		);
 		if (lightingOverlayGloomWashRef.current)
 			lightingOverlayGloomWashRef.current.style.opacity = String(gloomOpacity);
+
+		const nightDarkT = night * night * (3 - 2 * night);
+		const nightDarkOpacity = clamp(
+			nightDarkT * NIGHT_DARK_WASH_OPACITY * gloomFade,
+			0,
+			NIGHT_DARK_WASH_OPACITY
+		);
+		if (lightingOverlayNightDarkWashRef.current)
+			lightingOverlayNightDarkWashRef.current.style.opacity = String(nightDarkOpacity);
 	}, []);
 
 	useEffect(() => {
@@ -10996,6 +10925,23 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					pointerEvents: 'none',
 					background: 'rgb(255, 240, 215)',
 					mixBlendMode: 'screen',
+					zIndex: 1,
+				}}
+			/>
+			{/*
+			  Night dark wash. A neutral overlay that slightly lowers value while
+			  preserving the normal day map hues. Opacity is owned by
+			  applyLightingOverlayOpacity.
+			*/}
+			<div
+				ref={lightingOverlayNightDarkWashRef}
+				aria-hidden
+				style={{
+					position: 'absolute',
+					inset: 0,
+					pointerEvents: 'none',
+					background: 'rgb(0, 0, 0)',
+					mixBlendMode: 'multiply',
 					zIndex: 1,
 				}}
 			/>
