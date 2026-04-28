@@ -154,11 +154,11 @@ const STORMY: MoodVisualConfig = {
 	fogHighColor: 'rgb(30, 54, 82)',
 	fogHorizonBlend: 0.035,
 	softboxOpacityMultiplier: 1.0,
-	shadowOpacityMultiplier: 1.0,
+	shadowOpacityMultiplier: 1.08,
 	softboxBackground: SOFTBOX_WARM_KEY_BG,
 	softboxBlendMode: 'screen',
-	nightVisualBlend: 0,
-	gloomWashOpacity: 0,
+	nightVisualBlend: 0.08,
+	gloomWashOpacity: 0.08,
 	lightning: true,
 };
 

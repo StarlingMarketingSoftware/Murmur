@@ -1262,15 +1262,20 @@ const LIGHTNING_HIDE_AT_OR_ABOVE_ZOOM = CLOUDS_OVERLAY_FADE_OUT_END_ZOOM;
 // Show a first flash quickly when stormy lightning turns on so it reads as "connected".
 const LIGHTNING_FIRST_FLASH_MIN_INTERVAL_MS = 120;
 const LIGHTNING_FIRST_FLASH_MAX_INTERVAL_MS = 650;
-const LIGHTNING_MIN_INTERVAL_MS = 300;
-const LIGHTNING_MAX_INTERVAL_MS = 950;
+const LIGHTNING_MIN_INTERVAL_MS = 650;
+const LIGHTNING_MAX_INTERVAL_MS = 2200;
 const LIGHTNING_MAX_ACTIVE_EVENTS = 8;
 const LIGHTNING_ZOOMED_OUT_MAX_ACTIVE_EVENTS = 11;
 const LIGHTNING_MERCATOR_MAX_LAT = 85.051129;
 const LIGHTNING_ZOOMED_OUT_BOOST_FULL_ZOOM = MAP_MIN_ZOOM + 0.35;
 const LIGHTNING_ZOOMED_OUT_BOOST_END_ZOOM = 4.35;
-const LIGHTNING_ZOOMED_OUT_MIN_INTERVAL_MS = 150;
-const LIGHTNING_ZOOMED_OUT_MAX_INTERVAL_MS = 460;
+const LIGHTNING_ZOOMED_OUT_MIN_INTERVAL_MS = 420;
+const LIGHTNING_ZOOMED_OUT_MAX_INTERVAL_MS = 1350;
+const LIGHTNING_BURST_CHANCE = 0.46;
+const LIGHTNING_BURST_MIN_REMAINING_FLASHES = 1;
+const LIGHTNING_BURST_MAX_REMAINING_FLASHES = 3;
+const LIGHTNING_BURST_MIN_INTERVAL_MS = 75;
+const LIGHTNING_BURST_MAX_INTERVAL_MS = 220;
 const LIGHTNING_SCALE_ZOOM_START = 5.2;
 const LIGHTNING_SCALE_ZOOM_END = CLOUDS_OVERLAY_FADE_OUT_END_ZOOM;
 const LIGHTNING_US_BOUNDS: [number, number, number, number] = [-125.5, 24.0, -66.0, 50.0];
@@ -2874,6 +2879,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const lightningPotentialLoadPromiseRef = useRef<Promise<Uint8Array> | null>(null);
 	const lightningEventsRef = useRef<StormLightningEvent[]>([]);
 	const lightningNextFlashAtMsRef = useRef<number>(0);
+	const lightningBurstRemainingRef = useRef<number>(0);
 	const lightningEventIdRef = useRef<number>(1);
 	const lightningWasEnabledRef = useRef<boolean>(false);
 	const prevIsBackgroundPresentationRef = useRef<boolean>(isBackgroundPresentation);
@@ -4429,6 +4435,33 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			opts?: { fast?: boolean; zoom?: number }
 		) => {
 			const fast = Boolean(opts?.fast);
+			if (fast) lightningBurstRemainingRef.current = 0;
+			if (!fast && lightningBurstRemainingRef.current > 0) {
+				lightningBurstRemainingRef.current -= 1;
+				const wait =
+					LIGHTNING_BURST_MIN_INTERVAL_MS +
+					Math.random() *
+						(LIGHTNING_BURST_MAX_INTERVAL_MS - LIGHTNING_BURST_MIN_INTERVAL_MS);
+				lightningNextFlashAtMsRef.current = nowMs + wait;
+				return;
+			}
+			if (!fast && Math.random() < LIGHTNING_BURST_CHANCE) {
+				lightningBurstRemainingRef.current =
+					LIGHTNING_BURST_MIN_REMAINING_FLASHES +
+					Math.floor(
+						Math.random() *
+							(LIGHTNING_BURST_MAX_REMAINING_FLASHES -
+								LIGHTNING_BURST_MIN_REMAINING_FLASHES +
+								1)
+					);
+				const wait =
+					LIGHTNING_BURST_MIN_INTERVAL_MS +
+					Math.random() *
+						(LIGHTNING_BURST_MAX_INTERVAL_MS - LIGHTNING_BURST_MIN_INTERVAL_MS);
+				lightningNextFlashAtMsRef.current = nowMs + wait;
+				return;
+			}
+
 			const baseMin = fast
 				? LIGHTNING_FIRST_FLASH_MIN_INTERVAL_MS
 				: LIGHTNING_MIN_INTERVAL_MS;
@@ -4476,7 +4509,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			h: number
 		): { lng: number; lat: number } | null => {
 			if (!Number.isFinite(x) || !Number.isFinite(y) || w <= 0 || h <= 0) return null;
-			const lng = ((((x / w) * 360 - 180 + 180) % 360) + 360) % 360 - 180;
+			const lng = (((((x / w) * 360 - 180 + 180) % 360) + 360) % 360) - 180;
 			const mercatorY = clamp(y / h, 0, 1);
 			const latRad = 2 * Math.atan(Math.exp((1 - 2 * mercatorY) * Math.PI)) - Math.PI / 2;
 			const lat = (latRad * 180) / Math.PI;
@@ -4624,8 +4657,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			const boostT = getLightningZoomedOutBoostT(zoom);
 			const maxActiveEvents = Math.round(
 				LIGHTNING_MAX_ACTIVE_EVENTS +
-					(LIGHTNING_ZOOMED_OUT_MAX_ACTIVE_EVENTS - LIGHTNING_MAX_ACTIVE_EVENTS) *
-						boostT
+					(LIGHTNING_ZOOMED_OUT_MAX_ACTIVE_EVENTS - LIGHTNING_MAX_ACTIVE_EVENTS) * boostT
 			);
 			const events = lightningEventsRef.current;
 			if (events.length >= maxActiveEvents) return;
@@ -4689,6 +4721,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				lightningWasEnabledRef.current = false;
 				lightningEventsRef.current = [];
 				lightningNextFlashAtMsRef.current = 0;
+				lightningBurstRemainingRef.current = 0;
 				return;
 			}
 
