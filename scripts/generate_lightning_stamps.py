@@ -88,8 +88,8 @@ def _render_stamp(size: int, seed: int) -> np.ndarray:
 
 	# Glow pass first, then bright cores on top. Drawing the wide pass after the
 	# core would replace the white channel with gray in Pillow's L mode.
-	draw.line(main, fill=105, width=max(2, size // 92), joint="curve")
-	draw.line(main, fill=235, width=max(1, size // 155), joint="curve")
+	draw.line(main, fill=58, width=max(2, size // 92), joint="curve")
+	draw.line(main, fill=250, width=max(1, size // 155), joint="curve")
 	draw.line(main, fill=255, width=1, joint="curve")
 
 	# Branches: smaller offshoots in the mid/lower section.
@@ -109,8 +109,8 @@ def _render_stamp(size: int, seed: int) -> np.ndarray:
 			rng=rng,
 			max_depth=8,
 		)
-		draw.line(branch, fill=120, width=max(1, size // 135), joint="curve")
-		draw.line(branch, fill=240, width=1, joint="curve")
+		draw.line(branch, fill=68, width=max(1, size // 135), joint="curve")
+		draw.line(branch, fill=250, width=1, joint="curve")
 
 	# Convert intensity to float and build a diffuse "cloud illumination" envelope.
 	core = (np.asarray(intensity, dtype=np.float32) / 255.0).astype(np.float32)
@@ -136,10 +136,10 @@ def _render_stamp(size: int, seed: int) -> np.ndarray:
 	blob *= (0.55 + 0.45 * noise_blur) * patch
 
 	# Combine: prioritize the tight core, with only enough glow to feel luminous.
-	combined = _clamp01(core * 1.25 + blur1 * 0.32 + blur2 * 0.12 + blob * 0.26)
+	combined = _clamp01(core * 1.45 + blur1 * 0.18 + blur2 * 0.04 + blob * 0.12)
 
 	# Shape alpha so the channel stays crisp and the halo falls off quickly.
-	alpha = _clamp01(np.maximum(core * 0.98, np.power(combined, np.float32(1.32)) * np.float32(0.95)))
+	alpha = _clamp01(np.maximum(core * 1.0, np.power(combined, np.float32(1.75)) * np.float32(0.78)))
 
 	# Store straight-alpha PNG pixels. Browsers/canvas premultiply at draw time;
 	# writing premultiplied RGB here makes the soft halo carry low-RGB alpha,

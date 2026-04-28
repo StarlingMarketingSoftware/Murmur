@@ -1251,7 +1251,7 @@ const CLOUDS_CANVAS_SIZE_PX = 512;
 // Storm lightning assets: small "flash stamps" + a low-res potential mask to bias
 // flashes toward storm cores.
 const LIGHTNING_STAMPS_COUNT = 12;
-const LIGHTNING_STAMPS_VERSION = 3;
+const LIGHTNING_STAMPS_VERSION = 4;
 const LIGHTNING_POTENTIAL_VERSION = 1;
 const LIGHTNING_STAMPS_URL = (i: number) =>
 	`/maps/lightning_stamps/flash_${String(i).padStart(2, '0')}.png?v=${LIGHTNING_STAMPS_VERSION}`;
@@ -1287,6 +1287,7 @@ const LIGHTNING_SCALE_GLOBE_MAX = 0.18;
 const LIGHTNING_SCALE_CLOSE_MIN = 0.01;
 const LIGHTNING_SCALE_CLOSE_MAX = 0.028;
 const LIGHTNING_US_POSITION_TRIES = 36;
+const LIGHTNING_OPACITY_MULTIPLIER = 1.12;
 
 const getLightningZoomedOutBoostT = (zoom: number) => {
 	if (zoom <= LIGHTNING_ZOOMED_OUT_BOOST_FULL_ZOOM) return 1;
@@ -4677,7 +4678,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			const pulses: StormLightningPulse[] = [];
 			for (let p = 0; p < pulseCount; p++) {
 				const offsetMs = p === 0 ? 0 : 55 + p * 55 + Math.random() * 20;
-				const peakOpacity = p === 0 ? 0.55 : p === 1 ? 0.35 : 0.22;
+				const peakOpacity = p === 0 ? 0.6 : p === 1 ? 0.38 : 0.24;
 				pulses.push({
 					offsetMs,
 					peakOpacity,
@@ -4768,7 +4769,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				let a = 0;
 				for (const p of e.pulses) a += computePulseOpacity(t, p);
 				if (a <= 0.001) continue;
-				a = clamp(a, 0, 0.9);
+				a = clamp(a * LIGHTNING_OPACITY_MULTIPLIER, 0, 0.95);
 
 				const stamp = stamps[e.stampIndex % stamps.length];
 				const sw = stamp.naturalWidth || stamp.width || 256;
