@@ -291,8 +291,6 @@ const jitterDuplicateCoords = (base: LatLngLiteral, index: number): LatLngLitera
 
 const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n));
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
-const computeMoodVisualNightT = (nightT: number, cfg: MoodVisualConfig) =>
-	clamp(Math.max(nightT, cfg.nightVisualBlend), 0, 1);
 
 type WasmGeoModule = {
 	lat_lng_to_world_pixel: (
