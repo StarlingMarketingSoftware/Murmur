@@ -222,7 +222,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		regionCenter: globeWeatherRegionCenter,
 	} =
 		useGlobeWeatherMood();
-	const { nightT: globeNightT } = useGlobeNightLighting();
+	const globeNightLighting = useGlobeNightLighting();
 
 	// Let the campaign page know when the destination view has actually rendered,
 	// so we can avoid ending the tab crossfade before heavy UI (e.g. HybridPromptInput) is painted.
@@ -7058,7 +7058,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												weatherMood={globeWeatherMood}
 												weatherRegionCenter={globeWeatherRegionCenter}
 												weatherTemperatureF={globeWeatherTemperatureF}
-												nightT={globeNightT}
+												nightLighting={globeNightLighting}
 												contacts={
 													activeSearchTabId === null
 														? contacts || [] // Original tab - show campaign contacts

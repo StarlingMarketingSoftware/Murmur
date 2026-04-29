@@ -36,6 +36,7 @@ import { WeddingPlannersIcon } from '@/components/atoms/_svg/WeddingPlannersIcon
 import { WineBeerSpiritsIcon } from '@/components/atoms/_svg/WineBeerSpiritsIcon';
 import { WeatherMood } from '@/lib/weather/regions';
 import { getMoodConfig, MoodVisualConfig } from '@/lib/weather/moodConfig';
+import type { GlobeNightLightingState, GlobeSunPhase } from '@/hooks/useGlobeNightLighting';
 
 type LatLngLiteral = { lat: number; lng: number };
 type MarkerHoverMeta = { clientX: number; clientY: number };
@@ -1176,6 +1177,12 @@ interface SearchResultsMapProps {
 	 * system so night feels organic (not a basemap "dark mode" toggle).
 	 */
 	nightT?: number | null;
+	/**
+	 * Structured day/night cycle (phase + timing window) for smooth sunrise/sunset
+	 * transitions during a session. When provided, this drives the internal night
+	 * factor imperatively (avoids React re-render jitter during the animation).
+	 */
+	nightLighting?: GlobeNightLightingState | null;
 }
 
 const defaultCenter = {
@@ -2580,7 +2587,7 @@ const MANUAL_WEATHER_TEMPERATURE_OVERRIDE_F: number | null = null;
 // MANUAL NIGHT OVERRIDE FOR TESTING.
 // Set to a number between 0 and 1 (e.g. 1 for deep night, 0 for full day).
 // Set back to null to use the real regional day/night cycle.
-const MANUAL_NIGHT_T_OVERRIDE: number | null = 1;
+const MANUAL_NIGHT_T_OVERRIDE: number | null = null;
 
 // Threshold above which the globe gets a uniform warm brghtness lift on top
 // of the active mood (only applies when the mood uses a bright screen-blend
@@ -2591,14 +2598,21 @@ const HOT_TEMPERATURE_THRESHOLD_F = 80;
 // fade as the other lighting overlays so the wash disappears at city zoom.
 const HOT_WASH_OPACITY = 0.13;
 
+// Twilight wash: warm horizon glow that peaks during sunrise/sunset transitions
+// (peak at nightT ≈ 0.5) and fades to 0 at full day or full night. Drives the
+// "burning horizon" feel so transitions don't read as just a dimmer.
+const TWILIGHT_WASH_OPACITY = 0.55;
+
 // Night lighting (rear sun).
 // Implemented as DOM overlays (screen + multiply) so the lighting stays viewer-anchored
 // and can be art-directed independently of the basemap.
 const NIGHT_GLOOM_WASH_OPACITY = 0;
 // Neutral night-only dimmer. This darkens the normal day-colored basemap without
-// shifting land/ocean hues back toward a separate night palette.
-// Keep intentionally subtle — the front face should stay nearly the same.
-const NIGHT_DARK_WASH_OPACITY = 0.085;
+// shifting land/ocean hues back toward a separate night palette. Tuned strong
+// enough that the globe-brightness change is visible while the sunrise/sunset
+// animation is running (the wash alone wasn't enough to read as "the globe is
+// also getting brighter/darker through the transition").
+const NIGHT_DARK_WASH_OPACITY = 0.18;
 	// Rear-light stack: a barely-there face occlusion, plus a halo + thin limb rim.
 	const NIGHT_FACE_OCCLUSION_OPACITY = 0.1;
 	const NIGHT_REAR_SUN_HALO_OPACITY = 0.66;
@@ -2756,6 +2770,23 @@ const NIGHT_REAR_LIMB_RIM_BG = [
 	'radial-gradient(ellipse 108% 108% at 66% 20%, rgba(255, 255, 255, 0.28) 0%, rgba(255, 252, 240, 0.16) 26%, rgba(255, 255, 255, 0) 54%)',
 ].join(', ');
 
+// Twilight wash backgrounds. Sunset glow is anchored at the top (sky-side
+// fading down) and sunrise glow is anchored at the bottom (horizon-side rising
+// up). Screen-blended so both brighten + warm-tint the basemap.
+const TWILIGHT_WASH_SUNSET_BG = [
+	'radial-gradient(ellipse 180% 110% at 50% -10%, rgba(255, 158, 90, 0.95) 0%, rgba(255, 138, 80, 0.70) 25%, rgba(255, 122, 90, 0.36) 55%, rgba(255, 110, 110, 0.10) 80%, rgba(0, 0, 0, 0) 100%)',
+	// Subtle lower band so the warmth bleeds gently downward across the globe
+	// rather than cutting hard at the upper edge — feels more atmospheric.
+	'radial-gradient(ellipse 140% 70% at 50% 20%, rgba(255, 188, 130, 0.30) 0%, rgba(255, 170, 120, 0.18) 35%, rgba(255, 160, 130, 0.06) 70%, rgba(0, 0, 0, 0) 100%)',
+].join(', ');
+
+const TWILIGHT_WASH_SUNRISE_BG = [
+	'radial-gradient(ellipse 180% 110% at 50% 110%, rgba(255, 158, 90, 0.95) 0%, rgba(255, 138, 80, 0.70) 25%, rgba(255, 122, 90, 0.36) 55%, rgba(255, 110, 110, 0.10) 80%, rgba(0, 0, 0, 0) 100%)',
+	// Subtle upper band — mirror of the sunset secondary so the warmth bleeds
+	// upward toward the sky rather than cutting hard at the horizon.
+	'radial-gradient(ellipse 140% 70% at 50% 80%, rgba(255, 188, 130, 0.30) 0%, rgba(255, 170, 120, 0.18) 35%, rgba(255, 160, 130, 0.06) 70%, rgba(0, 0, 0, 0) 100%)',
+].join(', ');
+
 // NOTE: Night lights are generated offline as raster dot tiles (see scripts/generate_contact_lights_tiles.py).
 
 export const SearchResultsMap: FC<SearchResultsMapProps> = ({
@@ -2786,6 +2817,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	weatherRegionCenter = null,
 	weatherTemperatureF = null,
 	nightT: nightTProp = null,
+	nightLighting: nightLightingProp = null,
 }) => {
 	const contactLightsTilesEnabled = useMemo(() => {
 		// Enabled by default (it's a lightweight raster overlay), but allow a
@@ -2807,7 +2839,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const weatherMood = MANUAL_WEATHER_MOOD_OVERRIDE ?? weatherMoodProp;
 	const effectiveTemperatureF =
 		MANUAL_WEATHER_TEMPERATURE_OVERRIDE_F ?? weatherTemperatureF;
-	const nightT = clamp(MANUAL_NIGHT_T_OVERRIDE ?? nightTProp ?? 0, 0, 1);
+	const nightTInput = clamp(
+		MANUAL_NIGHT_T_OVERRIDE ?? nightTProp ?? nightLightingProp?.nightT ?? 0,
+		0,
+		1
+	);
 	const isBackgroundPresentation = presentation === 'background';
 	const shouldAutoSpin = isBackgroundPresentation && autoSpin;
 	// Keep the latest presentation value available to async Mapbox callbacks (moveend, etc).
@@ -2882,8 +2918,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const isHotRef = useRef<boolean>(false);
 	// Night factor (0=day, 1=deep night). Stored in a ref so zoom-driven opacity
 	// updates can stay fully imperative without React re-render jitter.
-	const nightTRef = useRef<number>(nightT);
-	nightTRef.current = nightT;
+	const nightTRef = useRef<number>(nightTInput);
+	// Day/night transition animation (sunrise/sunset) — cancels on phase change/unmount.
+	const nightLightingAnimRafRef = useRef<number | null>(null);
 	// 0..1 fade that suppresses the lights overlay until tiles are ready, avoiding
 	// the half-loaded "patchy" initial look.
 	const nightLightsLoadTRef = useRef<number>(0);
@@ -2924,6 +2961,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const lightingOverlayHotWashRef = useRef<HTMLDivElement | null>(null);
 	const lightingOverlayGloomWashRef = useRef<HTMLDivElement | null>(null);
 	const lightingOverlayNightDarkWashRef = useRef<HTMLDivElement | null>(null);
+	const lightingOverlayTwilightWashSunsetRef = useRef<HTMLDivElement | null>(null);
+	const lightingOverlayTwilightWashSunriseRef = useRef<HTMLDivElement | null>(null);
+	// Tracks the current sun phase so the lighting overlay knows which twilight
+	// gradient to show (sunset = top-anchored, sunrise = bottom-anchored).
+	const sunPhaseRef = useRef<GlobeSunPhase>('day');
 	const lightingOverlayNightFaceOcclusionRef = useRef<HTMLDivElement | null>(null);
 	const lightingOverlayNightRearHaloRef = useRef<HTMLDivElement | null>(null);
 	const lightingOverlayNightRearRimRef = useRef<HTMLDivElement | null>(null);
@@ -4188,12 +4230,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		stateInteractionsEnabled,
 		applyStateOverlayOpacity,
 	]);
-
-	// Keep state boundary visibility in sync with night darkening.
-	useEffect(() => {
-		if (!map || !isMapLoaded) return;
-		applyStateOverlayOpacity(stateOverlayOpacityRef.current, stateOverlayModeRef.current);
-	}, [nightT, map, isMapLoaded, applyStateOverlayOpacity]);
 
 	// Subtle cloud drift so the overlay feels "alive" (especially in background globe mode).
 	useEffect(() => {
@@ -9094,6 +9130,28 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		);
 		if (lightingOverlayNightDarkWashRef.current)
 			lightingOverlayNightDarkWashRef.current.style.opacity = String(nightDarkOpacity);
+
+		// Twilight wash — warm glow that peaks at the midpoint of the transition
+		// (sin(π·night) = 0 at endpoints, 1 at night=0.5). Sunset glow comes from
+		// the top (sky), sunrise glow comes from the bottom (horizon). Only one
+		// gradient is visible at a time; the other is held at 0. Dark-pool moods
+		// damp it so rainy/stormy don't suddenly turn warm at dusk.
+		const twilightT = Math.sin(clamp(night, 0, 1) * Math.PI);
+		const twilightMoodMul = cfg.softboxBlendMode === 'multiply' ? 0.45 : 1;
+		const twilightOpacity = clamp(
+			base * twilightT * TWILIGHT_WASH_OPACITY * twilightMoodMul,
+			0,
+			TWILIGHT_WASH_OPACITY
+		);
+		const phase = sunPhaseRef.current;
+		const sunsetWashOpacity = phase === 'sunset' ? twilightOpacity : 0;
+		const sunriseWashOpacity = phase === 'sunrise' ? twilightOpacity : 0;
+		if (lightingOverlayTwilightWashSunsetRef.current)
+			lightingOverlayTwilightWashSunsetRef.current.style.opacity =
+				String(sunsetWashOpacity);
+		if (lightingOverlayTwilightWashSunriseRef.current)
+			lightingOverlayTwilightWashSunriseRef.current.style.opacity =
+				String(sunriseWashOpacity);
 	}, []);
 
 	useEffect(() => {
@@ -9328,22 +9386,87 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		};
 	}, [map, isMapLoaded, contactLightsTilesEnabled, applyLightingOverlayOpacity]);
 
-	// Update overlays when the day/night factor changes (e.g. dusk progression).
-	useEffect(() => {
-		if (!map) return;
-		if (!isMapLoaded) return;
-		applyLightingOverlayOpacity();
-	}, [nightT, map, isMapLoaded, applyLightingOverlayOpacity]);
+	const applyNightFactor = useCallback(
+		(nextNightT: number) => {
+			const night = clamp(nextNightT, 0, 1);
+			nightTRef.current = night;
 
-	// Keep Mapbox globe lights and land/water palette in sync with day/night.
+			applyLightingOverlayOpacity();
+			applyStateOverlayOpacity(stateOverlayOpacityRef.current, stateOverlayModeRef.current);
+
+			const m = mapRef.current;
+			if (!m || !isMapLoaded) return;
+
+			applyMurmurGlobeLighting(m, { nightT: night });
+			applyNightLandPalette(m, night);
+			applyStateOverlayNightColors(m, night);
+		},
+		[applyLightingOverlayOpacity, applyStateOverlayOpacity, isMapLoaded]
+	);
+
+	// Drive sunrise/sunset transitions (and static day/night) imperatively so we don't
+	// have to React-re-render on every animation frame.
 	useEffect(() => {
-		if (!map) return;
-		if (!isMapLoaded) return;
-		const night = clamp(nightT, 0, 1);
-		applyMurmurGlobeLighting(map, { nightT: night });
-		applyNightLandPalette(map, night);
-		applyStateOverlayNightColors(map, night);
-	}, [nightT, weatherMood, map, isMapLoaded]);
+		if (nightLightingAnimRafRef.current != null) {
+			cancelAnimationFrame(nightLightingAnimRafRef.current);
+			nightLightingAnimRafRef.current = null;
+		}
+
+		// External numeric override (or hardcoded dev override) takes precedence.
+		const hasNumericNightOverride =
+			MANUAL_NIGHT_T_OVERRIDE != null || typeof nightTProp === 'number';
+
+		if (hasNumericNightOverride || !nightLightingProp) {
+			nightTRef.current = nightTInput;
+			sunPhaseRef.current = nightTInput >= 0.5 ? 'night' : 'day';
+			if (map && isMapLoaded) applyNightFactor(nightTRef.current);
+			return;
+		}
+
+		const { phase, phaseStartMs, phaseEndMs } = nightLightingProp;
+		sunPhaseRef.current = phase;
+		const durationMs = Math.max(1, phaseEndMs - phaseStartMs);
+
+		const computeNight = (nowMs: number) => {
+			if (phase === 'day') return 0;
+			if (phase === 'night') return 1;
+			const t = clamp((nowMs - phaseStartMs) / durationMs, 0, 1);
+			const eased = t * t * (3 - 2 * t);
+			return phase === 'sunrise' ? 1 - eased : eased;
+		};
+
+		nightTRef.current = computeNight(Date.now());
+
+		if (!map || !isMapLoaded) return;
+
+		if (phase !== 'sunrise' && phase !== 'sunset') {
+			applyNightFactor(nightTRef.current);
+			return;
+		}
+
+		let cancelled = false;
+		const tick = () => {
+			if (cancelled) return;
+			const nowMs = Date.now();
+			applyNightFactor(computeNight(nowMs));
+
+			if (nowMs < phaseEndMs) {
+				nightLightingAnimRafRef.current = requestAnimationFrame(tick);
+			} else {
+				nightLightingAnimRafRef.current = null;
+			}
+		};
+
+		nightLightingAnimRafRef.current = requestAnimationFrame(tick);
+
+		return () => {
+			cancelled = true;
+			if (nightLightingAnimRafRef.current != null) {
+				cancelAnimationFrame(nightLightingAnimRafRef.current);
+				nightLightingAnimRafRef.current = null;
+			}
+		};
+	}, [map, isMapLoaded, nightTProp, nightTInput, nightLightingProp, applyNightFactor]);
 
 	// Re-apply the night palette when zoom changes so the "zoomed in" view can be
 	// slightly brighter without changing the low-zoom globe read.
@@ -10990,6 +11113,41 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					pointerEvents: 'none',
 					background: 'rgb(0, 0, 0)',
 					mixBlendMode: 'multiply',
+					zIndex: 1,
+				}}
+			/>
+			{/*
+			  Twilight wash — sunset variant. Warm glow anchored at the top (sky-
+			  side) that peaks mid-transition and is invisible outside the sunset
+			  phase. Sits above the dark wash so the screen-blend warmth reads on
+			  top of the partial dim. Opacity is owned by applyLightingOverlayOpacity.
+			*/}
+			<div
+				ref={lightingOverlayTwilightWashSunsetRef}
+				aria-hidden
+				style={{
+					position: 'absolute',
+					inset: 0,
+					pointerEvents: 'none',
+					background: TWILIGHT_WASH_SUNSET_BG,
+					mixBlendMode: 'screen',
+					zIndex: 1,
+				}}
+			/>
+			{/*
+			  Twilight wash — sunrise variant. Same as above but anchored at the
+			  bottom (horizon-side) so dawn light feels like it's rising into the
+			  scene. Only visible during the sunrise phase.
+			*/}
+			<div
+				ref={lightingOverlayTwilightWashSunriseRef}
+				aria-hidden
+				style={{
+					position: 'absolute',
+					inset: 0,
+					pointerEvents: 'none',
+					background: TWILIGHT_WASH_SUNRISE_BG,
+					mixBlendMode: 'screen',
 					zIndex: 1,
 				}}
 			/>

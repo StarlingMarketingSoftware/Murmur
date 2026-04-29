@@ -373,7 +373,7 @@ const DashboardContent = () => {
 		regionCenter: globeWeatherRegionCenter,
 	} =
 		useGlobeWeatherMood();
-	const { nightT: globeNightT } = useGlobeNightLighting();
+	const globeNightLighting = useGlobeNightLighting();
 
 	// If we navigated here from a campaign, enable "Add to Campaign" mode.
 	const fromCampaignIdParam = searchParams.get('fromCampaignId')?.trim() || '';
@@ -3487,7 +3487,7 @@ const DashboardContent = () => {
 								weatherMood={globeWeatherMood}
 								weatherRegionCenter={globeWeatherRegionCenter}
 								weatherTemperatureF={globeWeatherTemperatureF}
-								nightT={globeNightT}
+								nightLighting={globeNightLighting}
 								presentation={mapPresentation}
 								autoSpin={shouldSpinBackgroundMap}
 								contacts={contactsForMap}
