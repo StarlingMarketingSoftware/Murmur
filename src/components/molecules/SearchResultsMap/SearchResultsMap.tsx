@@ -1219,6 +1219,21 @@ const computeLightingOverlayOpacity = (zoom: number) => {
 	return 1 - t * t * t;
 };
 
+// Night rear-light overlays need to persist slightly past the "softbox lighting"
+// fade end. In fullscreen/"big" interactive map framing, the default zoom is
+// typically ~5, and we still want the subtle halo/rim to read at night even as
+// the day softbox has faded out.
+const NIGHT_REAR_LIGHT_FADE_END_ZOOM = LIGHTING_OVERLAY_FADE_END_ZOOM + 0.2;
+const computeNightRearLightOpacity = (zoom: number) => {
+	if (zoom <= LIGHTING_OVERLAY_FADE_START_ZOOM) return 1;
+	if (zoom >= NIGHT_REAR_LIGHT_FADE_END_ZOOM) return 0;
+	const t =
+		(zoom - LIGHTING_OVERLAY_FADE_START_ZOOM) /
+		(NIGHT_REAR_LIGHT_FADE_END_ZOOM - LIGHTING_OVERLAY_FADE_START_ZOOM);
+	// Match the softbox easing curve so the transition feels consistent.
+	return 1 - t * t * t;
+};
+
 // Dark "gloom wash" persists much further than the softbox/shadow overlays so
 // rainy/stormy still feel overcast when the user zooms in to city detail.
 // Held at full strength through country zoom, then linearly fades out as the
@@ -2567,9 +2582,9 @@ const MANUAL_WEATHER_TEMPERATURE_OVERRIDE_F: number | null = null;
 // MANUAL NIGHT OVERRIDE FOR TESTING.
 // Set to a number between 0 and 1 (e.g. 1 for deep night, 0 for full day).
 // Set back to null to use the real regional day/night cycle.
-const MANUAL_NIGHT_T_OVERRIDE: number | null = null;
+const MANUAL_NIGHT_T_OVERRIDE: number | null = 1;
 
-// Threshold above which the globe gets a uniform warm brightness lift on top
+// Threshold above which the globe gets a uniform warm brghtness lift on top
 // of the active mood (only applies when the mood uses a bright screen-blend
 // softbox — applying a brightening wash to the dark-pool moods would defeat
 // the rainy/stormy gloom).
@@ -2586,10 +2601,10 @@ const NIGHT_GLOOM_WASH_OPACITY = 0;
 // shifting land/ocean hues back toward a separate night palette.
 // Keep intentionally subtle — the front face should stay nearly the same.
 const NIGHT_DARK_WASH_OPACITY = 0.085;
-// Rear-light stack: a barely-there face occlusion, plus a halo + thin limb rim.
-const NIGHT_FACE_OCCLUSION_OPACITY = 0.1;
-const NIGHT_REAR_SUN_HALO_OPACITY = 0.62;
-const NIGHT_REAR_LIMB_RIM_OPACITY = 1.05;
+	// Rear-light stack: a barely-there face occlusion, plus a halo + thin limb rim.
+	const NIGHT_FACE_OCCLUSION_OPACITY = 0.1;
+	const NIGHT_REAR_SUN_HALO_OPACITY = 0.66;
+	const NIGHT_REAR_LIMB_RIM_OPACITY = 1.18;
 // US night visibility: dot-only contact-lights tiles (not a heatmap). Kept
 // well below 1 so the lights read as a soft glow rather than a stark
 // NASA-earth-at-night photo (which feels eerie/lonely on its own).
@@ -2726,19 +2741,19 @@ const computeNightLightsCloseGlowMul = (zoom: number) => {
 // 1) Face occlusion: a barely-there darkening to give the rim contrast without
 //    turning the map into “dark mode.”
 const NIGHT_FACE_OCCLUSION_BG =
-	'radial-gradient(ellipse 165% 165% at 56% 62%, rgba(8, 12, 28, 0.22) 0%, rgba(8, 12, 28, 0.16) 30%, rgba(8, 12, 28, 0.10) 54%, rgba(8, 12, 28, 0.05) 72%, rgba(8, 12, 28, 0) 86%, rgba(8, 12, 28, 0) 100%)';
+	'radial-gradient(ellipse 165% 165% at 52% 56%, rgba(8, 12, 28, 0) 0%, rgba(8, 12, 28, 0) 54%, rgba(8, 12, 28, 0.06) 68%, rgba(8, 12, 28, 0.14) 82%, rgba(8, 12, 28, 0.12) 90%, rgba(8, 12, 28, 0) 100%)';
 
 // 2) Rear halo: broad atmospheric glow that lives mostly outside the limb.
 const NIGHT_REAR_SUN_HALO_BG = [
 	// Cool outer atmosphere.
-	'radial-gradient(ellipse 190% 190% at 52% 54%, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0) 60%, rgba(185, 235, 255, 0.08) 74%, rgba(205, 246, 255, 0.20) 86%, rgba(255, 255, 255, 0.14) 94%, rgba(255, 255, 255, 0) 100%)',
+	'radial-gradient(ellipse 190% 190% at 52% 54%, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0) 56%, rgba(185, 235, 255, 0.08) 70%, rgba(205, 246, 255, 0.18) 82%, rgba(255, 255, 255, 0.12) 92%, rgba(255, 255, 255, 0) 100%)',
 	// Warm-ish inner bloom so it reads as “sun,” not “neon.”
 	'radial-gradient(ellipse 165% 165% at 52% 54%, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0) 70%, rgba(255, 250, 236, 0.09) 82%, rgba(255, 252, 245, 0.20) 92%, rgba(255, 255, 255, 0) 100%)',
 ].join(', ');
 
 // 3) Limb rim: a thin bright edge with a subtle “sun-side” bias.
 const NIGHT_REAR_LIMB_RIM_BG = [
-	'radial-gradient(ellipse 150% 150% at 52% 54%, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0) 76%, rgba(230, 248, 255, 0.14) 84%, rgba(255, 255, 255, 0.72) 92%, rgba(255, 255, 255, 0.10) 97%, rgba(255, 255, 255, 0) 100%)',
+	'radial-gradient(ellipse 150% 150% at 52% 54%, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0) 72%, rgba(230, 248, 255, 0.16) 82%, rgba(255, 255, 255, 0.78) 90%, rgba(255, 255, 255, 0.12) 96%, rgba(255, 255, 255, 0) 100%)',
 	// Slight hot spot near the top so the rear light feels “placed,” not uniform.
 	'radial-gradient(ellipse 108% 108% at 66% 20%, rgba(255, 255, 255, 0.28) 0%, rgba(255, 252, 240, 0.16) 26%, rgba(255, 255, 255, 0) 54%)',
 ].join(', ');
@@ -5626,10 +5641,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		// World-land fill (cream continents under the ocean-blue background). Idempotent;
 		// safe if style.load already added it earlier.
 		ensureWorldLandFill(mapInstance);
-		applyNightLandPalette(
-			mapInstance,
-			clamp(nightTRef.current, 0, 1)
-		);
+		applyNightLandPalette(mapInstance, clamp(nightTRef.current, 0, 1));
 
 		const emptyFc: GeoJSON.FeatureCollection = {
 			type: 'FeatureCollection',
@@ -6059,10 +6071,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				'text-halo-width': 0,
 			},
 		});
-		applyStateOverlayNightColors(
-			mapInstance,
-			clamp(nightTRef.current, 0, 1)
-		);
+		applyStateOverlayNightColors(mapInstance, clamp(nightTRef.current, 0, 1));
 
 		// Search-results outlines (blue + black) intentionally removed.
 
@@ -8917,16 +8926,16 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		// Dark-pool moods already push the value down; cap the rear-light so it doesn't
 		// fight the intended overcast feeling.
 		const rearMoodMul = cfg.softboxBlendMode === 'multiply' ? 0.78 : 1;
-		const rearZoomMul = clamp(base * 1.25, 0, 1);
+		const rearZoomBase = computeNightRearLightOpacity(zoom);
+		const rearZoomMul = clamp(rearZoomBase * 1.25, 0, 1);
 		const rearBase = rearZoomMul * rearT * rearMoodMul;
 
 		const faceOcclusionOpacity = clamp(rearBase * NIGHT_FACE_OCCLUSION_OPACITY, 0, 1);
 		const rearHaloOpacity = clamp(rearBase * NIGHT_REAR_SUN_HALO_OPACITY, 0, 1);
 		const rearRimOpacity = clamp(rearBase * NIGHT_REAR_LIMB_RIM_OPACITY, 0, 1);
 		if (lightingOverlayNightFaceOcclusionRef.current)
-			lightingOverlayNightFaceOcclusionRef.current.style.opacity = String(
-				faceOcclusionOpacity
-			);
+			lightingOverlayNightFaceOcclusionRef.current.style.opacity =
+				String(faceOcclusionOpacity);
 		if (lightingOverlayNightRearHaloRef.current)
 			lightingOverlayNightRearHaloRef.current.style.opacity = String(rearHaloOpacity);
 		if (lightingOverlayNightRearRimRef.current)
@@ -9343,8 +9352,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	useEffect(() => {
 		if (!map) return;
 		if (!isMapLoaded) return;
-		const onZoomEnd = () =>
-			applyNightLandPalette(map, clamp(nightTRef.current, 0, 1));
+		const onZoomEnd = () => applyNightLandPalette(map, clamp(nightTRef.current, 0, 1));
 		map.on('zoomend', onZoomEnd);
 		return () => {
 			map.off('zoomend', onZoomEnd);
