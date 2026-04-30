@@ -1488,6 +1488,9 @@ const DAY_FAR_SIDE_SHADE_MAX_ALPHA = 0.32;
 const DAY_FAR_SIDE_SHADE_OPACITY_MULTIPLIER = 1.0;
 const DAY_FAR_SIDE_SHADE_CENTER_LNG = normalizeLngDeg(defaultCenter.lng + 180);
 const DAY_FAR_SIDE_SHADE_DAYTIME_DRIFT_DEG = 76;
+const DAY_FAR_SIDE_SHADE_FADE_START_DEG = 24;
+const DAY_FAR_SIDE_SHADE_FADE_END_DEG = 154;
+const DAY_FAR_SIDE_SHADE_FADE_POWER = 1.32;
 const DAY_FAR_SIDE_SHADE_REPAINT_MS = 4_000;
 const DAY_FAR_SIDE_SHADE_MIN_REPAINT_DELTA_DEG = 0.02;
 const getDayFarSideShadeDayProgress = (
@@ -1538,7 +1541,15 @@ const paintDayFarSideShadeCanvas = (
 				9 * Math.sin(latRad * 2.1 + lngRad * 1.15) +
 				5 * Math.sin(lngRad * 2.7 - latRad * 0.8);
 			const distToAsiaSide = angularLngDistanceDeg(lng + wobble, centerLng);
-			const farSideT = Math.pow(1 - smoothstep(40, 150, distToAsiaSide), 1.05);
+			const farSideT = Math.pow(
+				1 -
+					smoothstep(
+						DAY_FAR_SIDE_SHADE_FADE_START_DEG,
+						DAY_FAR_SIDE_SHADE_FADE_END_DEG,
+						distToAsiaSide
+					),
+				DAY_FAR_SIDE_SHADE_FADE_POWER
+			);
 			const usProtectionT = smoothstep(
 				40,
 				78,
