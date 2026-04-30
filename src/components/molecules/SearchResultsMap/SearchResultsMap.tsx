@@ -36,7 +36,6 @@ import { WeddingPlannersIcon } from '@/components/atoms/_svg/WeddingPlannersIcon
 import { WineBeerSpiritsIcon } from '@/components/atoms/_svg/WineBeerSpiritsIcon';
 import { WeatherMood } from '@/lib/weather/regions';
 import { getMoodConfig, MoodVisualConfig } from '@/lib/weather/moodConfig';
-import type { GlobeNightLightingState, GlobeSunPhase } from '@/hooks/useGlobeNightLighting';
 
 type LatLngLiteral = { lat: number; lng: number };
 type MarkerHoverMeta = { clientX: number; clientY: number };
@@ -292,109 +291,15 @@ const jitterDuplicateCoords = (base: LatLngLiteral, index: number): LatLngLitera
 
 const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n));
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
-
-type RgbaColor = { r: number; g: number; b: number; a: number };
-
-const parseCssColorToRgba = (raw: string): RgbaColor | null => {
-	const s = raw.trim();
-	if (!s) return null;
-
-	if (s.startsWith('#')) {
-		const hex = s.slice(1);
-		if (hex.length === 3) {
-			const r = Number.parseInt(hex[0] + hex[0], 16);
-			const g = Number.parseInt(hex[1] + hex[1], 16);
-			const b = Number.parseInt(hex[2] + hex[2], 16);
-			if (![r, g, b].every(Number.isFinite)) return null;
-			return { r, g, b, a: 1 };
-		}
-		if (hex.length === 6) {
-			const r = Number.parseInt(hex.slice(0, 2), 16);
-			const g = Number.parseInt(hex.slice(2, 4), 16);
-			const b = Number.parseInt(hex.slice(4, 6), 16);
-			if (![r, g, b].every(Number.isFinite)) return null;
-			return { r, g, b, a: 1 };
-		}
-		return null;
-	}
-
-	const m = s.match(/^rgba?\((.+)\)$/i);
-	if (!m) return null;
-	const parts = m[1]
-		.split(',')
-		.map((p) => p.trim())
-		.filter(Boolean);
-	if (parts.length !== 3 && parts.length !== 4) return null;
-	const r = Number(parts[0]);
-	const g = Number(parts[1]);
-	const b = Number(parts[2]);
-	const a = parts.length === 4 ? Number(parts[3]) : 1;
-	if (![r, g, b, a].every(Number.isFinite)) return null;
-	return {
-		r: clamp(Math.round(r), 0, 255),
-		g: clamp(Math.round(g), 0, 255),
-		b: clamp(Math.round(b), 0, 255),
-		a: clamp(a, 0, 1),
-	};
+const smoothstep = (edge0: number, edge1: number, x: number) => {
+	const t = clamp((x - edge0) / (edge1 - edge0), 0, 1);
+	return t * t * (3 - 2 * t);
 };
-
-const blendCssColors = (from: string, to: string, t: number): string => {
-	const a = parseCssColorToRgba(from);
-	const b = parseCssColorToRgba(to);
-	if (!a || !b) return t < 0.5 ? from : to;
-	const r = lerp(a.r, b.r, t);
-	const g = lerp(a.g, b.g, t);
-	const b2 = lerp(a.b, b.b, t);
-	const alpha = lerp(a.a, b.a, t);
-	return `rgba(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b2)}, ${alpha.toFixed(3)})`;
-};
-
-const blendMoodVisualConfig = (
-	from: MoodVisualConfig,
-	to: MoodVisualConfig,
-	t: number
-): MoodVisualConfig => {
-	const softboxBlendMode = t < 0.5 ? from.softboxBlendMode : to.softboxBlendMode;
-	const softboxBackground = t < 0.5 ? from.softboxBackground : to.softboxBackground;
-	return {
-		cloudOpacityGlobeZoom: lerp(from.cloudOpacityGlobeZoom, to.cloudOpacityGlobeZoom, t),
-		cloudOpacityDecorativeZoom: lerp(
-			from.cloudOpacityDecorativeZoom,
-			to.cloudOpacityDecorativeZoom,
-			t
-		),
-		cloudDriftSpeedMultiplier: lerp(
-			from.cloudDriftSpeedMultiplier,
-			to.cloudDriftSpeedMultiplier,
-			t
-		),
-		cloudTurbulenceMultiplier: lerp(
-			from.cloudTurbulenceMultiplier,
-			to.cloudTurbulenceMultiplier,
-			t
-		),
-		cloudBrightnessMin: lerp(from.cloudBrightnessMin, to.cloudBrightnessMin, t),
-		cloudBrightnessMax: lerp(from.cloudBrightnessMax, to.cloudBrightnessMax, t),
-		cloudExtraPasses: Math.round(lerp(from.cloudExtraPasses, to.cloudExtraPasses, t)),
-		cloudDeepZoomOpacity: lerp(from.cloudDeepZoomOpacity, to.cloudDeepZoomOpacity, t),
-		fogColor: blendCssColors(from.fogColor, to.fogColor, t),
-		fogHighColor: blendCssColors(from.fogHighColor, to.fogHighColor, t),
-		fogHorizonBlend: lerp(from.fogHorizonBlend, to.fogHorizonBlend, t),
-		softboxOpacityMultiplier: lerp(
-			from.softboxOpacityMultiplier,
-			to.softboxOpacityMultiplier,
-			t
-		),
-		shadowOpacityMultiplier: lerp(from.shadowOpacityMultiplier, to.shadowOpacityMultiplier, t),
-		softboxBackground,
-		softboxBlendMode,
-		nightVisualBlend: lerp(from.nightVisualBlend, to.nightVisualBlend, t),
-		gloomWashOpacity: lerp(from.gloomWashOpacity, to.gloomWashOpacity, t),
-		// Lightning reads as a discrete effect; only flip it on once the transition is
-		// visibly in the new state.
-		lightning: Boolean(to.lightning) && t > 0.6,
-	};
-};
+const normalizeLngDeg = (lng: number) => ((((lng + 180) % 360) + 360) % 360) - 180;
+const angularLngDistanceDeg = (a: number, b: number) =>
+	Math.abs(normalizeLngDeg(a - b));
+const computeMoodVisualNightT = (nightT: number, cfg: MoodVisualConfig) =>
+	clamp(Math.max(nightT, cfg.nightVisualBlend), 0, 1);
 
 type WasmGeoModule = {
 	lat_lng_to_world_pixel: (
@@ -1280,12 +1185,6 @@ interface SearchResultsMapProps {
 	 * system so night feels organic (not a basemap "dark mode" toggle).
 	 */
 	nightT?: number | null;
-	/**
-	 * Structured day/night cycle (phase + timing window) for smooth sunrise/sunset
-	 * transitions during a session. When provided, this drives the internal night
-	 * factor imperatively (avoids React re-render jitter during the animation).
-	 */
-	nightLighting?: GlobeNightLightingState | null;
 }
 
 const defaultCenter = {
@@ -1324,21 +1223,6 @@ const computeLightingOverlayOpacity = (zoom: number) => {
 		(zoom - LIGHTING_OVERLAY_FADE_START_ZOOM) /
 		(LIGHTING_OVERLAY_FADE_END_ZOOM - LIGHTING_OVERLAY_FADE_START_ZOOM);
 	// Ease-in cubic: stays near full, then drops off fast near the end.
-	return 1 - t * t * t;
-};
-
-// Night rear-light overlays need to persist slightly past the "softbox lighting"
-// fade end. In fullscreen/"big" interactive map framing, the default zoom is
-// typically ~5, and we still want the subtle halo/rim to read at night even as
-// the day softbox has faded out.
-const NIGHT_REAR_LIGHT_FADE_END_ZOOM = LIGHTING_OVERLAY_FADE_END_ZOOM + 0.2;
-const computeNightRearLightOpacity = (zoom: number) => {
-	if (zoom <= LIGHTING_OVERLAY_FADE_START_ZOOM) return 1;
-	if (zoom >= NIGHT_REAR_LIGHT_FADE_END_ZOOM) return 0;
-	const t =
-		(zoom - LIGHTING_OVERLAY_FADE_START_ZOOM) /
-		(NIGHT_REAR_LIGHT_FADE_END_ZOOM - LIGHTING_OVERLAY_FADE_START_ZOOM);
-	// Match the softbox easing curve so the transition feels consistent.
 	return 1 - t * t * t;
 };
 
@@ -1456,6 +1340,7 @@ const CONTACT_LIGHTS_TILES_BOUNDS: [number, number, number, number] = [
 	-66.0, // lon max
 	50.0, // lat max
 ];
+const WEB_MERCATOR_MAX_LAT = 85.051129;
 // Full WebMercator bounds (lat clamp) so the texture maps cleanly across the globe.
 const CLOUDS_CANVAS_COORDINATES: [
 	[number, number],
@@ -1463,11 +1348,78 @@ const CLOUDS_CANVAS_COORDINATES: [
 	[number, number],
 	[number, number],
 ] = [
-	[-180, 85.051129],
-	[180, 85.051129],
-	[180, -85.051129],
-	[-180, -85.051129],
+	[-180, WEB_MERCATOR_MAX_LAT],
+	[180, WEB_MERCATOR_MAX_LAT],
+	[180, -WEB_MERCATOR_MAX_LAT],
+	[-180, -WEB_MERCATOR_MAX_LAT],
 ];
+const DAY_FAR_SIDE_SHADE_CANVAS_SIZE_PX = 512;
+// Stored in the texture alpha; tuned to read as a clear "this side is in shadow"
+// without becoming a night-mode look. The opacity multiplier below stacks on top.
+const DAY_FAR_SIDE_SHADE_MAX_ALPHA = 0.32;
+const DAY_FAR_SIDE_SHADE_OPACITY_MULTIPLIER = 1.0;
+const DAY_FAR_SIDE_SHADE_CENTER_LNG = normalizeLngDeg(defaultCenter.lng + 180);
+const paintDayFarSideShadeCanvas = (canvas: HTMLCanvasElement) => {
+	canvas.width = DAY_FAR_SIDE_SHADE_CANVAS_SIZE_PX;
+	canvas.height = DAY_FAR_SIDE_SHADE_CANVAS_SIZE_PX;
+
+	const ctx = canvas.getContext('2d');
+	if (!ctx) return false;
+
+	const w = canvas.width;
+	const h = canvas.height;
+	const imageData = ctx.createImageData(w, h);
+	const data = imageData.data;
+
+	for (let y = 0; y < h; y += 1) {
+		const mercatorY = (y + 0.5) / h;
+		const lat =
+			(Math.atan(Math.sinh(Math.PI * (1 - 2 * mercatorY))) * 180) / Math.PI;
+		const latRad = (lat * Math.PI) / 180;
+
+		for (let x = 0; x < w; x += 1) {
+			const lng = ((x + 0.5) / w) * 360 - 180;
+			const lngRad = (lng * Math.PI) / 180;
+			const wobble =
+				9 * Math.sin(latRad * 2.1 + lngRad * 1.15) +
+				5 * Math.sin(lngRad * 2.7 - latRad * 0.8);
+			const distToAsiaSide = angularLngDistanceDeg(
+				lng + wobble,
+				DAY_FAR_SIDE_SHADE_CENTER_LNG
+			);
+			const farSideT = Math.pow(1 - smoothstep(40, 150, distToAsiaSide), 1.05);
+			const usProtectionT = smoothstep(
+				40,
+				78,
+				angularLngDistanceDeg(lng, defaultCenter.lng)
+			);
+			const polarTaperT = 1 - smoothstep(62, 80, Math.abs(lat));
+			const northTopTaperT = 1 - smoothstep(50, 74, lat) * 0.5;
+			const alpha =
+				DAY_FAR_SIDE_SHADE_MAX_ALPHA *
+				farSideT *
+				usProtectionT *
+				polarTaperT *
+				northTopTaperT;
+
+			const idx = (y * w + x) * 4;
+			data[idx] = 4;
+			data[idx + 1] = 8;
+			data[idx + 2] = 22;
+			data[idx + 3] = Math.round(clamp(alpha, 0, DAY_FAR_SIDE_SHADE_MAX_ALPHA) * 255);
+		}
+	}
+
+	ctx.putImageData(imageData, 0, 0);
+	return true;
+};
+const createDayFarSideShadeCanvas = (): HTMLCanvasElement | null => {
+	if (typeof document === 'undefined') return null;
+
+	const canvas = document.createElement('canvas');
+	if (!paintDayFarSideShadeCanvas(canvas)) return null;
+	return canvas;
+};
 // Clouds drift animation parameters.
 // We animate the *canvas source* (not Mapbox raster paint), so units are in the canvas'
 // pixel grid. We apply a light zoom-based scale so drift stays noticeable while clouds
@@ -1563,44 +1515,32 @@ const applyMurmurGlobeLighting = (
 	opts?: { nightT?: number }
 ) => {
 	try {
-		const nightT = clamp(opts?.nightT ?? 0, 0, 1);
-		const nightEase = nightT * nightT * (3 - 2 * nightT);
+		void opts;
 
 		const bearing =
 			typeof mapInstance.getBearing === 'function' ? mapInstance.getBearing() : 0;
 		const azimuth =
 			(MURMUR_GLOBE_LIGHT_VIEWER_AZIMUTH_OFFSET_DEG + (bearing || 0) + 360) % 360;
-		// At night we intentionally flatten the “front key” so the globe stops reading
-		// as lit from the upper-left (the rear halo/rim carries the drama).
-		const polar = lerp(MURMUR_GLOBE_LIGHT_POLAR_DEG, 38, nightEase);
-
-		const ambientIntensity = lerp(0.18, 0.42, nightEase);
-		const ambientColor = 'rgb(120, 150, 185)';
-
-		const keyIntensity = lerp(1.6, 0.36, nightEase);
-		const keyColor = `rgb(${Math.round(255 + (225 - 255) * nightEase)}, ${Math.round(
-			244 + (238 - 244) * nightEase
-		)}, ${Math.round(220 + (255 - 220) * nightEase)})`;
-		const shadowIntensity = lerp(0.95, 0.28, nightEase);
+		const polar = MURMUR_GLOBE_LIGHT_POLAR_DEG;
 
 		(mapInstance as any).setLights?.([
 			{
 				id: 'murmur-ambient',
 				type: 'ambient',
 				properties: {
-					color: ambientColor,
-					intensity: ambientIntensity,
+					color: 'rgb(120, 150, 185)',
+					intensity: 0.18,
 				},
 			},
 			{
 				id: 'murmur-key',
 				type: 'directional',
 				properties: {
-					color: keyColor,
-					intensity: keyIntensity,
+					color: 'rgb(255, 244, 220)',
+					intensity: 1.6,
 					direction: [azimuth, polar],
 					'cast-shadows': true,
-					'shadow-intensity': shadowIntensity,
+					'shadow-intensity': 0.95,
 				},
 			},
 		]);
@@ -2008,6 +1948,7 @@ const US_ONLY_BASEMAP_CLIP_MAX_ZOOM = 7;
 
 const MAPBOX_SOURCE_IDS = {
 	clouds: 'murmur-clouds',
+	dayFarSideShade: 'murmur-day-far-side-shade',
 	nightLights: 'murmur-night-lights',
 	nightLightsReveal: 'murmur-night-lights-reveal',
 	states: 'murmur-states',
@@ -2026,6 +1967,7 @@ const MAPBOX_SOURCE_IDS = {
 const MAPBOX_LAYER_IDS = {
 	// Globe overlays
 	clouds: 'murmur-clouds-raster',
+	dayFarSideShade: 'murmur-day-far-side-shade-raster',
 	nightLightsSpaceGlow: 'murmur-night-lights-space-glow',
 	nightLightsSpaceGlow2: 'murmur-night-lights-space-glow-2',
 	nightLightsGlow: 'murmur-night-lights-glow',
@@ -2682,10 +2624,6 @@ const normalizeStateKey = (state?: string | null): string | null => {
 // Set back to null to use the real weather mood from the user's region.
 const MANUAL_WEATHER_MOOD_OVERRIDE: WeatherMood | null = null;
 
-// Weather mood transitions are intentionally short so weather shifts feel
-// "alive" during long sessions without calling attention to themselves.
-const WEATHER_MOOD_TRANSITION_MS = 3500;
-
 // MANUAL TEMPERATURE OVERRIDE FOR TESTING (Fahrenheit).
 // Set to a number (e.g. 92) to test the > 80°F brightness lift.
 // Set back to null to use the real temperature from the user's region.
@@ -2694,9 +2632,9 @@ const MANUAL_WEATHER_TEMPERATURE_OVERRIDE_F: number | null = null;
 // MANUAL NIGHT OVERRIDE FOR TESTING.
 // Set to a number between 0 and 1 (e.g. 1 for deep night, 0 for full day).
 // Set back to null to use the real regional day/night cycle.
-const MANUAL_NIGHT_T_OVERRIDE: number | null = null;
+const MANUAL_NIGHT_T_OVERRIDE: number | null = 0;
 
-// Threshold above which the globe gets a uniform warm brghtness lift on top
+// Threshold above which the globe gets a uniform warm brightness lift on top
 // of the active mood (only applies when the mood uses a bright screen-blend
 // softbox — applying a brightening wash to the dark-pool moods would defeat
 // the rainy/stormy gloom).
@@ -2705,29 +2643,20 @@ const HOT_TEMPERATURE_THRESHOLD_F = 80;
 // fade as the other lighting overlays so the wash disappears at city zoom.
 const HOT_WASH_OPACITY = 0.13;
 
-// Twilight wash: warm horizon glow that peaks during sunrise/sunset transitions
-// (peak at nightT ≈ 0.5) and fades to 0 at full day or full night. Drives the
-// "burning horizon" feel so transitions don't read as just a dimmer.
-const TWILIGHT_WASH_OPACITY = 0.55;
-
-// Night lighting (rear sun).
+// Night lighting (moon backlight).
 // Implemented as DOM overlays (screen + multiply) so the lighting stays viewer-anchored
 // and can be art-directed independently of the basemap.
 const NIGHT_GLOOM_WASH_OPACITY = 0;
 // Neutral night-only dimmer. This darkens the normal day-colored basemap without
-// shifting land/ocean hues back toward a separate night palette. Tuned strong
-// enough that the globe-brightness change is visible while the sunrise/sunset
-// animation is running (the wash alone wasn't enough to read as "the globe is
-// also getting brighter/darker through the transition").
-const NIGHT_DARK_WASH_OPACITY = 0.18;
-	// Rear-light stack: a barely-there face occlusion, plus a halo + thin limb rim.
-	const NIGHT_FACE_OCCLUSION_OPACITY = 0.1;
-	const NIGHT_REAR_SUN_HALO_OPACITY = 0.66;
-	const NIGHT_REAR_LIMB_RIM_OPACITY = 1.18;
+// shifting land/ocean hues back toward a separate night palette.
+const NIGHT_DARK_WASH_OPACITY = 0.17;
+// Keep the night basemap visually matched to the normal day map.
+const NIGHT_FACE_SHADE_OPACITY = 0;
 // US night visibility: dot-only contact-lights tiles (not a heatmap). Kept
 // well below 1 so the lights read as a soft glow rather than a stark
 // NASA-earth-at-night photo (which feels eerie/lonely on its own).
 const NIGHT_US_LIGHTS_OPACITY = 0.55;
+const NIGHT_MOON_RIM_OPACITY = 0;
 const NIGHT_SHADOW_OVERLAY_MUL_MIN = 1;
 
 // City-lights persistence: this is primarily a "zoomed out / from space" aesthetic.
@@ -2849,49 +2778,17 @@ const computeNightLightsCloseGlowMul = (zoom: number) => {
 	return clamp(t, 0, 1) * clamp(t, 0, 1);
 };
 
-// Night rear-light stack.
-//
-// These are intentionally *not* tied to the world-space globe lighting so they
-// remain viewer-anchored and art-directable (feels like a hidden sun behind the
-// Earth). Because this is a full-viewport overlay (not a globe shader), all
-// shapes are tuned for the known “globe zoom” framings and are faded out before
-// flat/city zoom.
-//
-// 1) Face occlusion: a barely-there darkening to give the rim contrast without
-//    turning the map into “dark mode.”
-const NIGHT_FACE_OCCLUSION_BG =
-	'radial-gradient(ellipse 165% 165% at 52% 56%, rgba(8, 12, 28, 0) 0%, rgba(8, 12, 28, 0) 54%, rgba(8, 12, 28, 0.06) 68%, rgba(8, 12, 28, 0.14) 82%, rgba(8, 12, 28, 0.12) 90%, rgba(8, 12, 28, 0) 100%)';
+// Standby shade paint for the night overlay. The overlay opacity is kept at 0 so
+// the visible night map stays matched to the normal daytime palette.
+const NIGHT_FACE_SHADE_BG =
+	'radial-gradient(ellipse 145% 145% at 58% 60%, rgba(14, 22, 42, 0.32) 0%, rgba(14, 22, 42, 0.27) 30%, rgba(14, 22, 42, 0.17) 54%, rgba(14, 22, 42, 0.07) 70%, rgba(14, 22, 42, 0) 84%, rgba(14, 22, 42, 0) 100%)';
 
-// 2) Rear halo: broad atmospheric glow that lives mostly outside the limb.
-const NIGHT_REAR_SUN_HALO_BG = [
-	// Cool outer atmosphere.
-	'radial-gradient(ellipse 190% 190% at 52% 54%, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0) 56%, rgba(185, 235, 255, 0.08) 70%, rgba(205, 246, 255, 0.18) 82%, rgba(255, 255, 255, 0.12) 92%, rgba(255, 255, 255, 0) 100%)',
-	// Warm-ish inner bloom so it reads as “sun,” not “neon.”
-	'radial-gradient(ellipse 165% 165% at 52% 54%, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0) 70%, rgba(255, 250, 236, 0.09) 82%, rgba(255, 252, 245, 0.20) 92%, rgba(255, 255, 255, 0) 100%)',
-].join(', ');
-
-// 3) Limb rim: a thin bright edge with a subtle “sun-side” bias.
-const NIGHT_REAR_LIMB_RIM_BG = [
-	'radial-gradient(ellipse 150% 150% at 52% 54%, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0) 72%, rgba(230, 248, 255, 0.16) 82%, rgba(255, 255, 255, 0.78) 90%, rgba(255, 255, 255, 0.12) 96%, rgba(255, 255, 255, 0) 100%)',
-	// Slight hot spot near the top so the rear light feels “placed,” not uniform.
-	'radial-gradient(ellipse 108% 108% at 66% 20%, rgba(255, 255, 255, 0.28) 0%, rgba(255, 252, 240, 0.16) 26%, rgba(255, 255, 255, 0) 54%)',
-].join(', ');
-
-// Twilight wash backgrounds. Sunset glow is anchored at the top (sky-side
-// fading down) and sunrise glow is anchored at the bottom (horizon-side rising
-// up). Screen-blended so both brighten + warm-tint the basemap.
-const TWILIGHT_WASH_SUNSET_BG = [
-	'radial-gradient(ellipse 180% 110% at 50% -10%, rgba(255, 158, 90, 0.95) 0%, rgba(255, 138, 80, 0.70) 25%, rgba(255, 122, 90, 0.36) 55%, rgba(255, 110, 110, 0.10) 80%, rgba(0, 0, 0, 0) 100%)',
-	// Subtle lower band so the warmth bleeds gently downward across the globe
-	// rather than cutting hard at the upper edge — feels more atmospheric.
-	'radial-gradient(ellipse 140% 70% at 50% 20%, rgba(255, 188, 130, 0.30) 0%, rgba(255, 170, 120, 0.18) 35%, rgba(255, 160, 130, 0.06) 70%, rgba(0, 0, 0, 0) 100%)',
-].join(', ');
-
-const TWILIGHT_WASH_SUNRISE_BG = [
-	'radial-gradient(ellipse 180% 110% at 50% 110%, rgba(255, 158, 90, 0.95) 0%, rgba(255, 138, 80, 0.70) 25%, rgba(255, 122, 90, 0.36) 55%, rgba(255, 110, 110, 0.10) 80%, rgba(0, 0, 0, 0) 100%)',
-	// Subtle upper band — mirror of the sunset secondary so the warmth bleeds
-	// upward toward the sky rather than cutting hard at the horizon.
-	'radial-gradient(ellipse 140% 70% at 50% 80%, rgba(255, 188, 130, 0.30) 0%, rgba(255, 170, 120, 0.18) 35%, rgba(255, 160, 130, 0.06) 70%, rgba(0, 0, 0, 0) 100%)',
+// Rear rim light: edge-weighted cool-white glow that reads as the moon sitting
+// behind the Earth (not perfectly centered, shifted toward upper-left bias).
+const NIGHT_MOON_RIM_BG = [
+	'radial-gradient(ellipse 178% 178% at 58% 60%, rgba(235, 248, 255, 0) 0%, rgba(235, 248, 255, 0) 62%, rgba(225, 242, 255, 0.05) 76%, rgba(232, 247, 255, 0.18) 86%, rgba(248, 253, 255, 0.62) 94%, rgba(248, 253, 255, 0.14) 100%)',
+	'radial-gradient(ellipse 128% 128% at 58% 60%, rgba(235, 248, 255, 0) 0%, rgba(235, 248, 255, 0) 72%, rgba(226, 244, 255, 0.08) 82%, rgba(242, 251, 255, 0.50) 91%, rgba(255, 255, 255, 0.06) 97%, rgba(235, 248, 255, 0) 100%)',
+	'radial-gradient(ellipse 78% 78% at 14% 14%, rgba(255, 255, 255, 0.14) 0%, rgba(230, 246, 255, 0.06) 26%, rgba(255, 255, 255, 0) 48%)',
 ].join(', ');
 
 // NOTE: Night lights are generated offline as raster dot tiles (see scripts/generate_contact_lights_tiles.py).
@@ -2924,7 +2821,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	weatherRegionCenter = null,
 	weatherTemperatureF = null,
 	nightT: nightTProp = null,
-	nightLighting: nightLightingProp = null,
 }) => {
 	const contactLightsTilesEnabled = useMemo(() => {
 		// Enabled by default (it's a lightweight raster overlay), but allow a
@@ -2946,11 +2842,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const weatherMood = MANUAL_WEATHER_MOOD_OVERRIDE ?? weatherMoodProp;
 	const effectiveTemperatureF =
 		MANUAL_WEATHER_TEMPERATURE_OVERRIDE_F ?? weatherTemperatureF;
-	const nightTInput = clamp(
-		MANUAL_NIGHT_T_OVERRIDE ?? nightTProp ?? nightLightingProp?.nightT ?? 0,
-		0,
-		1
-	);
+	const nightT = clamp(MANUAL_NIGHT_T_OVERRIDE ?? nightTProp ?? 0, 0, 1);
 	const isBackgroundPresentation = presentation === 'background';
 	const shouldAutoSpin = isBackgroundPresentation && autoSpin;
 	// Keep the latest presentation value available to async Mapbox callbacks (moveend, etc).
@@ -2969,6 +2861,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	// 0 = divider lines, 1 = interactive borders
 	const stateOverlayModeRef = useRef<number>(stateInteractionsEnabled ? 1 : 0);
 	const stateOverlayAnimRafRef = useRef<number | null>(null);
+	const dayFarSideShadeCanvasRef = useRef<HTMLCanvasElement | null>(null);
 	const cloudsCanvasRef = useRef<HTMLCanvasElement | null>(null);
 	const cloudsCanvasCtxRef = useRef<CanvasRenderingContext2D | null>(null);
 	const cloudsTextureImageRef = useRef<HTMLImageElement | null>(null);
@@ -3018,9 +2911,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	// visuals until applyWeatherMood() runs.
 	const weatherMoodConfigRef = useRef<MoodVisualConfig>(getMoodConfig('normal'));
 	const appliedWeatherMoodRef = useRef<WeatherMood>('normal');
-	// Weather-mood crossfade animation — cancels on mood change/unmount.
-	const weatherMoodTransitionRafRef = useRef<number | null>(null);
-	const weatherMoodTransitionNonceRef = useRef<number>(0);
 	const weatherRegionCenterRef = useRef<LatLngLiteral | null>(weatherRegionCenter);
 	weatherRegionCenterRef.current = weatherRegionCenter;
 	// Mutated by the temperature effect; read by `applyLightingOverlayOpacity`
@@ -3028,9 +2918,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const isHotRef = useRef<boolean>(false);
 	// Night factor (0=day, 1=deep night). Stored in a ref so zoom-driven opacity
 	// updates can stay fully imperative without React re-render jitter.
-	const nightTRef = useRef<number>(nightTInput);
-	// Day/night transition animation (sunrise/sunset) — cancels on phase change/unmount.
-	const nightLightingAnimRafRef = useRef<number | null>(null);
+	const nightTRef = useRef<number>(nightT);
+	nightTRef.current = nightT;
 	// 0..1 fade that suppresses the lights overlay until tiles are ready, avoiding
 	// the half-loaded "patchy" initial look.
 	const nightLightsLoadTRef = useRef<number>(0);
@@ -3071,14 +2960,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const lightingOverlayHotWashRef = useRef<HTMLDivElement | null>(null);
 	const lightingOverlayGloomWashRef = useRef<HTMLDivElement | null>(null);
 	const lightingOverlayNightDarkWashRef = useRef<HTMLDivElement | null>(null);
-	const lightingOverlayTwilightWashSunsetRef = useRef<HTMLDivElement | null>(null);
-	const lightingOverlayTwilightWashSunriseRef = useRef<HTMLDivElement | null>(null);
-	// Tracks the current sun phase so the lighting overlay knows which twilight
-	// gradient to show (sunset = top-anchored, sunrise = bottom-anchored).
-	const sunPhaseRef = useRef<GlobeSunPhase>('day');
-	const lightingOverlayNightFaceOcclusionRef = useRef<HTMLDivElement | null>(null);
-	const lightingOverlayNightRearHaloRef = useRef<HTMLDivElement | null>(null);
-	const lightingOverlayNightRearRimRef = useRef<HTMLDivElement | null>(null);
+	const lightingOverlayNightShadeRef = useRef<HTMLDivElement | null>(null);
+	const lightingOverlayMoonRimRef = useRef<HTMLDivElement | null>(null);
 	const [visibleContacts, setVisibleContacts] = useState<ContactWithName[]>([]);
 	// Keep a "sticky" set of currently-rendered marker ids so zooming can rescale existing markers
 	// and only introduce *new* markers, instead of re-sampling a totally different set each time.
@@ -4201,7 +4084,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 			const overlay = clamp(nextOverlayOpacity, 0, 1);
 			const modeT = clamp(nextModeT, 0, 1);
-			const night = clamp(nightTRef.current, 0, 1);
+			const night = computeMoodVisualNightT(
+				nightTRef.current,
+				weatherMoodConfigRef.current
+			);
 			const nightEase = night * night * (3 - 2 * night);
 			const nightMul =
 				1 - nightEase * (1 - clamp(NIGHT_STATE_LINE_OPACITY_MUL_MIN, 0, 1));
@@ -4340,6 +4226,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		stateInteractionsEnabled,
 		applyStateOverlayOpacity,
 	]);
+
+	// Keep state boundary visibility in sync with night darkening.
+	useEffect(() => {
+		if (!map || !isMapLoaded) return;
+		applyStateOverlayOpacity(stateOverlayOpacityRef.current, stateOverlayModeRef.current);
+	}, [nightT, map, isMapLoaded, applyStateOverlayOpacity]);
 
 	// Subtle cloud drift so the overlay feels "alive" (especially in background globe mode).
 	useEffect(() => {
@@ -5785,7 +5677,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		// World-land fill (cream continents under the ocean-blue background). Idempotent;
 		// safe if style.load already added it earlier.
 		ensureWorldLandFill(mapInstance);
-		applyNightLandPalette(mapInstance, clamp(nightTRef.current, 0, 1));
+		applyNightLandPalette(
+			mapInstance,
+			computeMoodVisualNightT(nightTRef.current, weatherMoodConfigRef.current)
+		);
 
 		const emptyFc: GeoJSON.FeatureCollection = {
 			type: 'FeatureCollection',
@@ -5824,6 +5719,32 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					tileSize: 512,
 					maxzoom: CLOUDS_TILES_MAX_ZOOM,
 				} as any);
+			}
+		}
+
+		if (!mapInstance.getSource(MAPBOX_SOURCE_IDS.dayFarSideShade)) {
+			const shadeCanvas = dayFarSideShadeCanvasRef.current;
+			if (shadeCanvas) {
+				try {
+					mapInstance.addSource(MAPBOX_SOURCE_IDS.dayFarSideShade, {
+						type: 'canvas',
+						canvas: shadeCanvas,
+						// `animate: true` + `play()` matches the clouds source pattern. Even
+						// though the shade texture itself is static, this guarantees Mapbox
+						// uploads the canvas to a GPU texture (a static `animate: false`
+						// canvas source can fail to sample in some Mapbox versions, leaving
+						// the layer empty — which makes the whole effect appear "off").
+						animate: true,
+						coordinates: CLOUDS_CANVAS_COORDINATES,
+					} as unknown as mapboxgl.AnySourceData);
+					(
+						mapInstance.getSource(MAPBOX_SOURCE_IDS.dayFarSideShade) as
+							| { play?: () => void }
+							| undefined
+					)?.play?.();
+				} catch {
+					// Non-fatal; the background globe simply renders without the extra shade.
+				}
 			}
 		}
 
@@ -5907,6 +5828,19 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				'raster-resampling': 'linear',
 			},
 		});
+
+		if (mapInstance.getSource(MAPBOX_SOURCE_IDS.dayFarSideShade)) {
+			ensureLayer({
+				id: MAPBOX_LAYER_IDS.dayFarSideShade,
+				type: 'raster',
+				source: MAPBOX_SOURCE_IDS.dayFarSideShade,
+				paint: {
+					'raster-opacity': 0,
+					'raster-fade-duration': 0,
+					'raster-resampling': 'linear',
+				},
+			});
+		}
 
 		// Contact lights (dot tiles). Default opacity is 0; we drive visibility from
 		// applyLightingOverlayOpacity based on zoom + `nightT`.
@@ -6143,7 +6077,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			['case', isStateSelectedExpr, 1, 0.7],
 		];
 		const stateInteractiveBorderColorExpr = buildStateInteractiveBorderColorExpr(
-			clamp(nightTRef.current, 0, 1)
+			computeMoodVisualNightT(nightTRef.current, weatherMoodConfigRef.current)
 		);
 
 		ensureLayer({
@@ -6215,7 +6149,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				'text-halo-width': 0,
 			},
 		});
-		applyStateOverlayNightColors(mapInstance, clamp(nightTRef.current, 0, 1));
+		applyStateOverlayNightColors(
+			mapInstance,
+			computeMoodVisualNightT(nightTRef.current, weatherMoodConfigRef.current)
+		);
 
 		// Search-results outlines (blue + black) intentionally removed.
 
@@ -6425,6 +6362,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		// Ensure the clouds canvas exists before the style loads so the Mapbox source can
 		// bind to a stable canvas element (and begin animating immediately).
 		try {
+			if (!dayFarSideShadeCanvasRef.current && typeof document !== 'undefined') {
+				dayFarSideShadeCanvasRef.current = createDayFarSideShadeCanvas();
+			}
+
 			if (!cloudsCanvasRef.current && typeof document !== 'undefined') {
 				const canvas = document.createElement('canvas');
 				canvas.width = CLOUDS_CANVAS_SIZE_PX;
@@ -6489,7 +6430,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		const onStyleLoad = () => {
 			applyFreeTrialMapVisualTuning(mapInstance);
 			applyMurmurGlobeLighting(mapInstance, {
-				nightT: clamp(nightTRef.current, 0, 1),
+				nightT: computeMoodVisualNightT(nightTRef.current, weatherMoodConfigRef.current),
 			});
 			// Add Murmur sources/layers (including clouds + world-land fill) as early as
 			// possible so they can begin loading before the first reveal.
@@ -6499,7 +6440,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		const onLoad = () => {
 			applyFreeTrialMapVisualTuning(mapInstance);
 			applyMurmurGlobeLighting(mapInstance, {
-				nightT: clamp(nightTRef.current, 0, 1),
+				nightT: computeMoodVisualNightT(nightTRef.current, weatherMoodConfigRef.current),
 			});
 			ensureMapboxSourcesAndLayers(mapInstance);
 
@@ -6607,7 +6548,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		// layer reshuffling) because setLights only updates the existing light defs.
 		const onRotate = () => {
 			applyMurmurGlobeLighting(mapInstance, {
-				nightT: clamp(nightTRef.current, 0, 1),
+				nightT: computeMoodVisualNightT(nightTRef.current, weatherMoodConfigRef.current),
 			});
 		};
 
@@ -6834,32 +6775,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			map.off('moveend', onMoveEnd);
 		};
 	}, [map, isMapLoaded, contactLightsDebugEnabled]);
-
-	// Block right-click map dragging without changing Mapbox's default left-drag pan path.
-	useEffect(() => {
-		if (!map || !isMapLoaded) return;
-
-		const canvasContainer = map.getCanvasContainer();
-		const stopRightClickMapInput = (event: MouseEvent) => {
-			if (event.button !== 2) return;
-			event.preventDefault();
-			event.stopPropagation();
-			event.stopImmediatePropagation();
-		};
-		const stopContextMenu = (event: MouseEvent) => {
-			event.preventDefault();
-			event.stopPropagation();
-			event.stopImmediatePropagation();
-		};
-
-		canvasContainer.addEventListener('mousedown', stopRightClickMapInput, { capture: true });
-		canvasContainer.addEventListener('contextmenu', stopContextMenu, { capture: true });
-
-		return () => {
-			canvasContainer.removeEventListener('mousedown', stopRightClickMapInput, { capture: true });
-			canvasContainer.removeEventListener('contextmenu', stopContextMenu, { capture: true });
-		};
-	}, [map, isMapLoaded]);
 
 	const prevPresentationRef = useRef<'background' | 'interactive'>(presentation);
 
@@ -9064,23 +8979,19 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		const zoom = mapRef.current.getZoom() ?? MAP_DEFAULT_ZOOM;
 		const base = computeLightingOverlayOpacity(zoom);
 		const cfg = weatherMoodConfigRef.current;
-		const night = clamp(nightTRef.current, 0, 1);
+		const rawNight = clamp(nightTRef.current, 0, 1);
+		const night = computeMoodVisualNightT(nightTRef.current, cfg);
 
-		// Suppress the viewer-anchored *front* key/shadow at night so the scene doesn't
-		// read as “lit from the upper-left.” The backlight (halo + rim) should carry
-		// the nighttime story.
-		const suppressT = clamp((night - 0.12) / 0.32, 0, 1);
-		const suppressEase = suppressT * suppressT * (3 - 2 * suppressT);
-		const frontKeyMul = 1 - suppressEase;
-		const frontShadowMul = 1 - suppressEase;
-
+		// Preserve the daytime palette and softbox tuning at night; the night cue comes
+		// from the lights overlay, not from tinting or dimming the basemap.
+		const keyNightMul = 1;
 		const nightEaseForShadow = night * night * (3 - 2 * night);
 		const shadowNightMul =
 			1 - nightEaseForShadow * (1 - clamp(NIGHT_SHADOW_OVERLAY_MUL_MIN, 0, 1));
 
-		const keyOpacity = clamp(base * cfg.softboxOpacityMultiplier * frontKeyMul, 0, 1);
+		const keyOpacity = clamp(base * cfg.softboxOpacityMultiplier * keyNightMul, 0, 1);
 		const shadowOpacity = clamp(
-			base * cfg.shadowOpacityMultiplier * shadowNightMul * frontShadowMul,
+			base * cfg.shadowOpacityMultiplier * shadowNightMul,
 			0,
 			1
 		);
@@ -9089,27 +9000,38 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		if (lightingOverlayShadowRef.current)
 			lightingOverlayShadowRef.current.style.opacity = String(shadowOpacity);
 
-		// Night rear-light stack: tiny face occlusion + rear halo + thin limb rim.
-		// Bias to “mostly off until night is clearly present,” then ramp up.
-		const nightRearEase = night * night * (3 - 2 * night);
-		const rearT = Math.pow(clamp(nightRearEase, 0, 1), 1.25);
-		// Dark-pool moods already push the value down; cap the rear-light so it doesn't
-		// fight the intended overcast feeling.
-		const rearMoodMul = cfg.softboxBlendMode === 'multiply' ? 0.78 : 1;
-		const rearZoomBase = computeNightRearLightOpacity(zoom);
-		const rearZoomMul = clamp(rearZoomBase * 1.25, 0, 1);
-		const rearBase = rearZoomMul * rearT * rearMoodMul;
+		// Globe-zoom only via `base` (full at zoom ≤2.5, gone by zoom 5), and only
+		// during true full day. Intentionally NOT gated on presentation: the shade is
+		// a globe-surface effect that's just as valid in the interactive results map
+		// when the user is zoomed all the way out to the globe view.
+		const dayShadeOpacity = clamp(
+			base *
+				DAY_FAR_SIDE_SHADE_OPACITY_MULTIPLIER *
+				(1 - smoothstep(0.02, 0.22, rawNight)),
+			0,
+			1
+		);
+		try {
+			const m = mapRef.current;
+			if (m?.getLayer(MAPBOX_LAYER_IDS.dayFarSideShade)) {
+				m.setPaintProperty(
+					MAPBOX_LAYER_IDS.dayFarSideShade,
+					'raster-opacity',
+					dayShadeOpacity
+				);
+			}
+		} catch {
+			// Non-fatal.
+		}
 
-		const faceOcclusionOpacity = clamp(rearBase * NIGHT_FACE_OCCLUSION_OPACITY, 0, 1);
-		const rearHaloOpacity = clamp(rearBase * NIGHT_REAR_SUN_HALO_OPACITY, 0, 1);
-		const rearRimOpacity = clamp(rearBase * NIGHT_REAR_LIMB_RIM_OPACITY, 0, 1);
-		if (lightingOverlayNightFaceOcclusionRef.current)
-			lightingOverlayNightFaceOcclusionRef.current.style.opacity =
-				String(faceOcclusionOpacity);
-		if (lightingOverlayNightRearHaloRef.current)
-			lightingOverlayNightRearHaloRef.current.style.opacity = String(rearHaloOpacity);
-		if (lightingOverlayNightRearRimRef.current)
-			lightingOverlayNightRearRimRef.current.style.opacity = String(rearRimOpacity);
+		// Night rear-lighting: deep silhouette + moon rim.
+		const nightBase = base * night;
+		const shadeOpacity = clamp(nightBase * NIGHT_FACE_SHADE_OPACITY, 0, 1);
+		const rimOpacity = clamp(nightBase * NIGHT_MOON_RIM_OPACITY, 0, 1);
+		if (lightingOverlayNightShadeRef.current)
+			lightingOverlayNightShadeRef.current.style.opacity = String(shadeOpacity);
+		if (lightingOverlayMoonRimRef.current)
+			lightingOverlayMoonRimRef.current.style.opacity = String(rimOpacity);
 
 		// US night lights (Mapbox raster dot-tiles layer) — helps keep the globe readable at night
 		// without turning the whole basemap into a "night mode" style.
@@ -9266,29 +9188,25 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		);
 		if (lightingOverlayNightDarkWashRef.current)
 			lightingOverlayNightDarkWashRef.current.style.opacity = String(nightDarkOpacity);
-
-		// Twilight wash — warm glow that peaks at the midpoint of the transition
-		// (sin(π·night) = 0 at endpoints, 1 at night=0.5). Sunset glow comes from
-		// the top (sky), sunrise glow comes from the bottom (horizon). Only one
-		// gradient is visible at a time; the other is held at 0. Dark-pool moods
-		// damp it so rainy/stormy don't suddenly turn warm at dusk.
-		const twilightT = Math.sin(clamp(night, 0, 1) * Math.PI);
-		const twilightMoodMul = cfg.softboxBlendMode === 'multiply' ? 0.45 : 1;
-		const twilightOpacity = clamp(
-			base * twilightT * TWILIGHT_WASH_OPACITY * twilightMoodMul,
-			0,
-			TWILIGHT_WASH_OPACITY
-		);
-		const phase = sunPhaseRef.current;
-		const sunsetWashOpacity = phase === 'sunset' ? twilightOpacity : 0;
-		const sunriseWashOpacity = phase === 'sunrise' ? twilightOpacity : 0;
-		if (lightingOverlayTwilightWashSunsetRef.current)
-			lightingOverlayTwilightWashSunsetRef.current.style.opacity =
-				String(sunsetWashOpacity);
-		if (lightingOverlayTwilightWashSunriseRef.current)
-			lightingOverlayTwilightWashSunriseRef.current.style.opacity =
-				String(sunriseWashOpacity);
 	}, []);
+
+	useEffect(() => {
+		const shadeCanvas = dayFarSideShadeCanvasRef.current;
+		if (!shadeCanvas) return;
+		if (!paintDayFarSideShadeCanvas(shadeCanvas)) return;
+
+		try {
+			const source = map?.getSource(MAPBOX_SOURCE_IDS.dayFarSideShade) as
+				| { play?: () => void }
+				| undefined;
+			source?.play?.();
+			map?.triggerRepaint();
+		} catch {
+			// Non-fatal.
+		}
+
+		if (map && isMapLoaded) applyLightingOverlayOpacity();
+	}, [map, isMapLoaded, applyLightingOverlayOpacity]);
 
 	useEffect(() => {
 		if (!map) return;
@@ -9522,94 +9440,33 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		};
 	}, [map, isMapLoaded, contactLightsTilesEnabled, applyLightingOverlayOpacity]);
 
-	const applyNightFactor = useCallback(
-		(nextNightT: number) => {
-			const night = clamp(nextNightT, 0, 1);
-			nightTRef.current = night;
-
-			applyLightingOverlayOpacity();
-			applyStateOverlayOpacity(stateOverlayOpacityRef.current, stateOverlayModeRef.current);
-
-			const m = mapRef.current;
-			if (!m || !isMapLoaded) return;
-
-			applyMurmurGlobeLighting(m, { nightT: night });
-			applyNightLandPalette(m, night);
-			applyStateOverlayNightColors(m, night);
-		},
-		[applyLightingOverlayOpacity, applyStateOverlayOpacity, isMapLoaded]
-	);
-
-	// Drive sunrise/sunset transitions (and static day/night) imperatively so we don't
-	// have to React-re-render on every animation frame.
+	// Update overlays when the day/night factor changes (e.g. dusk progression).
 	useEffect(() => {
-		if (nightLightingAnimRafRef.current != null) {
-			cancelAnimationFrame(nightLightingAnimRafRef.current);
-			nightLightingAnimRafRef.current = null;
-		}
+		if (!map) return;
+		if (!isMapLoaded) return;
+		applyLightingOverlayOpacity();
+	}, [nightT, presentation, map, isMapLoaded, applyLightingOverlayOpacity]);
 
-		// External numeric override (or hardcoded dev override) takes precedence.
-		const hasNumericNightOverride =
-			MANUAL_NIGHT_T_OVERRIDE != null || typeof nightTProp === 'number';
-
-		if (hasNumericNightOverride || !nightLightingProp) {
-			nightTRef.current = nightTInput;
-			sunPhaseRef.current = nightTInput >= 0.5 ? 'night' : 'day';
-			if (map && isMapLoaded) applyNightFactor(nightTRef.current);
-			return;
-		}
-
-		const { phase, phaseStartMs, phaseEndMs } = nightLightingProp;
-		sunPhaseRef.current = phase;
-		const durationMs = Math.max(1, phaseEndMs - phaseStartMs);
-
-		const computeNight = (nowMs: number) => {
-			if (phase === 'day') return 0;
-			if (phase === 'night') return 1;
-			const t = clamp((nowMs - phaseStartMs) / durationMs, 0, 1);
-			const eased = t * t * (3 - 2 * t);
-			return phase === 'sunrise' ? 1 - eased : eased;
-		};
-
-		nightTRef.current = computeNight(Date.now());
-
-		if (!map || !isMapLoaded) return;
-
-		if (phase !== 'sunrise' && phase !== 'sunset') {
-			applyNightFactor(nightTRef.current);
-			return;
-		}
-
-		let cancelled = false;
-		const tick = () => {
-			if (cancelled) return;
-			const nowMs = Date.now();
-			applyNightFactor(computeNight(nowMs));
-
-			if (nowMs < phaseEndMs) {
-				nightLightingAnimRafRef.current = requestAnimationFrame(tick);
-			} else {
-				nightLightingAnimRafRef.current = null;
-			}
-		};
-
-		nightLightingAnimRafRef.current = requestAnimationFrame(tick);
-
-		return () => {
-			cancelled = true;
-			if (nightLightingAnimRafRef.current != null) {
-				cancelAnimationFrame(nightLightingAnimRafRef.current);
-				nightLightingAnimRafRef.current = null;
-			}
-		};
-	}, [map, isMapLoaded, nightTProp, nightTInput, nightLightingProp, applyNightFactor]);
+	// Keep Mapbox globe lights and land/water palette in sync with day/night.
+	useEffect(() => {
+		if (!map) return;
+		if (!isMapLoaded) return;
+		const visualNightT = computeMoodVisualNightT(nightT, weatherMoodConfigRef.current);
+		applyMurmurGlobeLighting(map, { nightT: visualNightT });
+		applyNightLandPalette(map, visualNightT);
+		applyStateOverlayNightColors(map, visualNightT);
+	}, [nightT, weatherMood, map, isMapLoaded]);
 
 	// Re-apply the night palette when zoom changes so the "zoomed in" view can be
 	// slightly brighter without changing the low-zoom globe read.
 	useEffect(() => {
 		if (!map) return;
 		if (!isMapLoaded) return;
-		const onZoomEnd = () => applyNightLandPalette(map, clamp(nightTRef.current, 0, 1));
+		const onZoomEnd = () =>
+			applyNightLandPalette(
+				map,
+				computeMoodVisualNightT(nightTRef.current, weatherMoodConfigRef.current)
+			);
 		map.on('zoomend', onZoomEnd);
 		return () => {
 			map.off('zoomend', onZoomEnd);
@@ -9618,133 +9475,59 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 	const applyWeatherMood = useCallback(
 		(mood: WeatherMood) => {
-			const m = mapRef.current;
-			const nextCfg = getMoodConfig(mood);
-
-			// Keep refs in sync even if the map isn't ready yet — the first
-			// loaded apply will pick up the latest mood.
-			if (!m) {
-				weatherMoodConfigRef.current = nextCfg;
-				appliedWeatherMoodRef.current = mood;
-				return;
-			}
-
-			const isFirstApply =
-				appliedWeatherMoodRef.current === 'normal' &&
-				weatherMoodConfigRef.current === getMoodConfig('normal');
-
-			// Cancel any in-flight crossfade before starting a new one.
-			if (weatherMoodTransitionRafRef.current != null) {
-				cancelAnimationFrame(weatherMoodTransitionRafRef.current);
-				weatherMoodTransitionRafRef.current = null;
-			}
-			weatherMoodTransitionNonceRef.current += 1;
-			const nonce = weatherMoodTransitionNonceRef.current;
-
-			let prefersReducedMotion = false;
-			try {
-				prefersReducedMotion =
-					typeof window !== 'undefined' &&
-					typeof window.matchMedia === 'function' &&
-					window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-			} catch {
-				prefersReducedMotion = false;
-			}
-
-			const existingFog = (() => {
-				try {
-					return (m as any).getFog?.() ?? {};
-				} catch {
-					return {};
-				}
-			})();
-
-			const applyCfgToMap = (cfg: MoodVisualConfig) => {
-				// Cloud raster paint — opacity expression + brightness clamp.
-				try {
-					const opacityExpr = buildCloudsOpacityExpr(
-						cfg.cloudOpacityGlobeZoom,
-						cfg.cloudOpacityDecorativeZoom,
-						cfg.cloudDeepZoomOpacity
-					);
-					if (m.getLayer(MAPBOX_LAYER_IDS.clouds)) {
-						m.setPaintProperty(
-							MAPBOX_LAYER_IDS.clouds,
-							'raster-opacity',
-							opacityExpr as any
-						);
-						m.setPaintProperty(
-							MAPBOX_LAYER_IDS.clouds,
-							'raster-brightness-min',
-							cfg.cloudBrightnessMin
-						);
-						m.setPaintProperty(
-							MAPBOX_LAYER_IDS.clouds,
-							'raster-brightness-max',
-							cfg.cloudBrightnessMax
-						);
-					}
-				} catch {
-					// Non-fatal.
-				}
-
-				// Atmosphere fog tint.
-				try {
-					(m as any).setFog?.({
-						...existingFog,
-						color: cfg.fogColor,
-						'high-color': cfg.fogHighColor,
-						'horizon-blend': cfg.fogHorizonBlend,
-					});
-				} catch {
-					// Non-fatal.
-				}
-			};
-
-			const finish = (cfg: MoodVisualConfig) => {
-				weatherMoodConfigRef.current = cfg;
-				appliedWeatherMoodRef.current = mood;
-				applyCfgToMap(cfg);
-				applyLightingOverlayOpacity();
-
-				const night = clamp(nightTRef.current, 0, 1);
-				applyMurmurGlobeLighting(m, { nightT: night });
-				applyNightLandPalette(m, night);
-				applyStateOverlayNightColors(m, night);
-			};
-
-			// First apply should be immediate so the map doesn't "boot in normal and then shift".
-			if (prefersReducedMotion || isFirstApply || WEATHER_MOOD_TRANSITION_MS <= 0) {
-				finish(nextCfg);
-				return;
-			}
-
-			const fromCfg = weatherMoodConfigRef.current;
+			const cfg = getMoodConfig(mood);
+			weatherMoodConfigRef.current = cfg;
 			appliedWeatherMoodRef.current = mood;
 
-			const startMs = performance.now();
-			const durationMs = WEATHER_MOOD_TRANSITION_MS;
+			const m = mapRef.current;
+			if (!m) return;
 
-			const tick = () => {
-				if (weatherMoodTransitionNonceRef.current !== nonce) return;
-				const now = performance.now();
-				const t = clamp((now - startMs) / durationMs, 0, 1);
-				// Smoothstep (ease-in-out).
-				const eased = t * t * (3 - 2 * t);
-				const blended = blendMoodVisualConfig(fromCfg, nextCfg, eased);
-				weatherMoodConfigRef.current = blended;
-				applyCfgToMap(blended);
-				applyLightingOverlayOpacity();
-
-				if (t < 1) {
-					weatherMoodTransitionRafRef.current = requestAnimationFrame(tick);
-				} else {
-					weatherMoodTransitionRafRef.current = null;
-					finish(nextCfg);
+			// Cloud raster paint — opacity expression + brightness clamp.
+			try {
+				const opacityExpr = buildCloudsOpacityExpr(
+					cfg.cloudOpacityGlobeZoom,
+					cfg.cloudOpacityDecorativeZoom,
+					cfg.cloudDeepZoomOpacity
+				);
+				if (m.getLayer(MAPBOX_LAYER_IDS.clouds)) {
+					m.setPaintProperty(
+						MAPBOX_LAYER_IDS.clouds,
+						'raster-opacity',
+						opacityExpr as any
+					);
+					m.setPaintProperty(
+						MAPBOX_LAYER_IDS.clouds,
+						'raster-brightness-min',
+						cfg.cloudBrightnessMin
+					);
+					m.setPaintProperty(
+						MAPBOX_LAYER_IDS.clouds,
+						'raster-brightness-max',
+						cfg.cloudBrightnessMax
+					);
 				}
-			};
+			} catch {
+				// Non-fatal.
+			}
 
-			weatherMoodTransitionRafRef.current = requestAnimationFrame(tick);
+			// Atmosphere fog tint.
+			try {
+				const existingFog = (m as any).getFog?.() ?? {};
+				(m as any).setFog?.({
+					...existingFog,
+					color: cfg.fogColor,
+					'high-color': cfg.fogHighColor,
+					'horizon-blend': cfg.fogHorizonBlend,
+				});
+			} catch {
+				// Non-fatal.
+			}
+
+			applyLightingOverlayOpacity();
+			const visualNightT = computeMoodVisualNightT(nightTRef.current, cfg);
+			applyMurmurGlobeLighting(m, { nightT: visualNightT });
+			applyNightLandPalette(m, visualNightT);
+			applyStateOverlayNightColors(m, visualNightT);
 		},
 		[applyLightingOverlayOpacity]
 	);
@@ -9755,15 +9538,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		if (appliedWeatherMoodRef.current === weatherMood) return;
 		applyWeatherMood(weatherMood);
 	}, [map, isMapLoaded, weatherMood, applyWeatherMood]);
-
-	useEffect(() => {
-		return () => {
-			if (weatherMoodTransitionRafRef.current != null) {
-				cancelAnimationFrame(weatherMoodTransitionRafRef.current);
-				weatherMoodTransitionRafRef.current = null;
-			}
-		};
-	}, []);
 
 	useEffect(() => {
 		const nextHot =
@@ -11336,83 +11110,30 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				}}
 			/>
 			{/*
-			  Twilight wash — sunset variant. Warm glow anchored at the top (sky-
-			  side) that peaks mid-transition and is invisible outside the sunset
-			  phase. Sits above the dark wash so the screen-blend warmth reads on
-			  top of the partial dim. Opacity is owned by applyLightingOverlayOpacity.
-			*/}
-			<div
-				ref={lightingOverlayTwilightWashSunsetRef}
-				aria-hidden
-				style={{
-					position: 'absolute',
-					inset: 0,
-					pointerEvents: 'none',
-					background: TWILIGHT_WASH_SUNSET_BG,
-					mixBlendMode: 'screen',
-					zIndex: 1,
-				}}
-			/>
-			{/*
-			  Twilight wash — sunrise variant. Same as above but anchored at the
-			  bottom (horizon-side) so dawn light feels like it's rising into the
-			  scene. Only visible during the sunrise phase.
-			*/}
-			<div
-				ref={lightingOverlayTwilightWashSunriseRef}
-				aria-hidden
-				style={{
-					position: 'absolute',
-					inset: 0,
-					pointerEvents: 'none',
-					background: TWILIGHT_WASH_SUNRISE_BG,
-					mixBlendMode: 'screen',
-					zIndex: 1,
-				}}
-			/>
-			{/*
-			  Night rear-light stack. These layers are tuned to make the globe read as
-			  rear-lit (hidden sun behind the Earth) without visibly changing the front
-			  basemap palette.
-
-			  - Face occlusion (multiply): barely darkens the face for rim contrast.
-			  - Rear halo (screen): broad atmospheric glow.
-			  - Rear rim (screen): thin bright limb.
-
+			  Night silhouette (multiply). Darkens the visible face of the globe so the
+			  moon backlight can read as true rear lighting instead of a generic glow.
 			  Opacity owned by applyLightingOverlayOpacity.
 			*/}
 			<div
-				ref={lightingOverlayNightFaceOcclusionRef}
+				ref={lightingOverlayNightShadeRef}
 				aria-hidden
 				style={{
 					position: 'absolute',
 					inset: 0,
 					pointerEvents: 'none',
-					background: NIGHT_FACE_OCCLUSION_BG,
+					background: NIGHT_FACE_SHADE_BG,
 					mixBlendMode: 'multiply',
 					zIndex: 1,
 				}}
 			/>
 			<div
-				ref={lightingOverlayNightRearHaloRef}
+				ref={lightingOverlayMoonRimRef}
 				aria-hidden
 				style={{
 					position: 'absolute',
 					inset: 0,
 					pointerEvents: 'none',
-					background: NIGHT_REAR_SUN_HALO_BG,
-					mixBlendMode: 'screen',
-					zIndex: 1,
-				}}
-			/>
-			<div
-				ref={lightingOverlayNightRearRimRef}
-				aria-hidden
-				style={{
-					position: 'absolute',
-					inset: 0,
-					pointerEvents: 'none',
-					background: NIGHT_REAR_LIMB_RIM_BG,
+					background: NIGHT_MOON_RIM_BG,
 					mixBlendMode: 'screen',
 					zIndex: 1,
 				}}
