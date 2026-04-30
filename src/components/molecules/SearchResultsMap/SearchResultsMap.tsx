@@ -6835,6 +6835,32 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		};
 	}, [map, isMapLoaded, contactLightsDebugEnabled]);
 
+	// Block right-click map dragging without changing Mapbox's default left-drag pan path.
+	useEffect(() => {
+		if (!map || !isMapLoaded) return;
+
+		const canvasContainer = map.getCanvasContainer();
+		const stopRightClickMapInput = (event: MouseEvent) => {
+			if (event.button !== 2) return;
+			event.preventDefault();
+			event.stopPropagation();
+			event.stopImmediatePropagation();
+		};
+		const stopContextMenu = (event: MouseEvent) => {
+			event.preventDefault();
+			event.stopPropagation();
+			event.stopImmediatePropagation();
+		};
+
+		canvasContainer.addEventListener('mousedown', stopRightClickMapInput, { capture: true });
+		canvasContainer.addEventListener('contextmenu', stopContextMenu, { capture: true });
+
+		return () => {
+			canvasContainer.removeEventListener('mousedown', stopRightClickMapInput, { capture: true });
+			canvasContainer.removeEventListener('contextmenu', stopContextMenu, { capture: true });
+		};
+	}, [map, isMapLoaded]);
+
 	const prevPresentationRef = useRef<'background' | 'interactive'>(presentation);
 
 	const cinematicAutoFitRef = useRef(false);
