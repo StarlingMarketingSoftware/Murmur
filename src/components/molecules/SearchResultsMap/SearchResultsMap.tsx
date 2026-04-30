@@ -39,6 +39,15 @@ import { getMoodConfig, MoodVisualConfig } from '@/lib/weather/moodConfig';
 
 type LatLngLiteral = { lat: number; lng: number };
 type MarkerHoverMeta = { clientX: number; clientY: number };
+type GlobeSunPhase = 'night' | 'sunrise' | 'day' | 'sunset';
+type GlobeNightLightingLike = {
+	nightT?: number | null;
+	phase: GlobeSunPhase;
+	phaseStartMs: number;
+	phaseEndMs: number;
+	transitionMs?: number;
+	isLoading?: boolean;
+};
 
 type ClippingCoord = [number, number]; // [lng, lat]
 type ClippingRing = ClippingCoord[];
@@ -1185,6 +1194,11 @@ interface SearchResultsMapProps {
 	 * system so night feels organic (not a basemap "dark mode" toggle).
 	 */
 	nightT?: number | null;
+	/**
+	 * Full sun-phase timing for globe lighting. When present, the daytime shade
+	 * uses this to drift slowly from sunrise to sunset.
+	 */
+	nightLighting?: GlobeNightLightingLike | null;
 }
 
 const defaultCenter = {
@@ -1359,7 +1373,33 @@ const DAY_FAR_SIDE_SHADE_CANVAS_SIZE_PX = 512;
 const DAY_FAR_SIDE_SHADE_MAX_ALPHA = 0.32;
 const DAY_FAR_SIDE_SHADE_OPACITY_MULTIPLIER = 1.0;
 const DAY_FAR_SIDE_SHADE_CENTER_LNG = normalizeLngDeg(defaultCenter.lng + 180);
-const paintDayFarSideShadeCanvas = (canvas: HTMLCanvasElement) => {
+const DAY_FAR_SIDE_SHADE_DAYTIME_DRIFT_DEG = 76;
+const DAY_FAR_SIDE_SHADE_REPAINT_MS = 4_000;
+const DAY_FAR_SIDE_SHADE_MIN_REPAINT_DELTA_DEG = 0.02;
+const getDayFarSideShadeDayProgress = (
+	nightLighting: GlobeNightLightingLike | null | undefined,
+	nowMs: number
+) => {
+	if (!nightLighting) return 0;
+	if (nightLighting.phase === 'sunrise') return 0;
+	if (nightLighting.phase === 'sunset') return 1;
+	if (nightLighting.phase !== 'day') return 0;
+
+	const startMs = nightLighting.phaseStartMs;
+	const endMs = nightLighting.phaseEndMs;
+	const durationMs = endMs - startMs;
+	if (!Number.isFinite(durationMs) || durationMs <= 0) return 0;
+	return clamp((nowMs - startMs) / durationMs, 0, 1);
+};
+const getDayFarSideShadeCenterLng = (dayProgress: number) =>
+	normalizeLngDeg(
+		DAY_FAR_SIDE_SHADE_CENTER_LNG +
+			clamp(dayProgress, 0, 1) * DAY_FAR_SIDE_SHADE_DAYTIME_DRIFT_DEG
+	);
+const paintDayFarSideShadeCanvas = (
+	canvas: HTMLCanvasElement,
+	centerLng: number = DAY_FAR_SIDE_SHADE_CENTER_LNG
+) => {
 	canvas.width = DAY_FAR_SIDE_SHADE_CANVAS_SIZE_PX;
 	canvas.height = DAY_FAR_SIDE_SHADE_CANVAS_SIZE_PX;
 
@@ -1383,10 +1423,7 @@ const paintDayFarSideShadeCanvas = (canvas: HTMLCanvasElement) => {
 			const wobble =
 				9 * Math.sin(latRad * 2.1 + lngRad * 1.15) +
 				5 * Math.sin(lngRad * 2.7 - latRad * 0.8);
-			const distToAsiaSide = angularLngDistanceDeg(
-				lng + wobble,
-				DAY_FAR_SIDE_SHADE_CENTER_LNG
-			);
+			const distToAsiaSide = angularLngDistanceDeg(lng + wobble, centerLng);
 			const farSideT = Math.pow(1 - smoothstep(40, 150, distToAsiaSide), 1.05);
 			const usProtectionT = smoothstep(
 				40,
@@ -2820,6 +2857,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	weatherMood: weatherMoodProp = 'normal',
 	weatherRegionCenter = null,
 	weatherTemperatureF = null,
+	nightLighting = null,
 	nightT: nightTProp = null,
 }) => {
 	const contactLightsTilesEnabled = useMemo(() => {
@@ -2842,7 +2880,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const weatherMood = MANUAL_WEATHER_MOOD_OVERRIDE ?? weatherMoodProp;
 	const effectiveTemperatureF =
 		MANUAL_WEATHER_TEMPERATURE_OVERRIDE_F ?? weatherTemperatureF;
-	const nightT = clamp(MANUAL_NIGHT_T_OVERRIDE ?? nightTProp ?? 0, 0, 1);
+	const nightT = clamp(
+		MANUAL_NIGHT_T_OVERRIDE ?? nightLighting?.nightT ?? nightTProp ?? 0,
+		0,
+		1
+	);
+	const dayFarSideShadePhase = nightLighting?.phase ?? null;
+	const dayFarSideShadePhaseStartMs = nightLighting?.phaseStartMs ?? null;
+	const dayFarSideShadePhaseEndMs = nightLighting?.phaseEndMs ?? null;
 	const isBackgroundPresentation = presentation === 'background';
 	const shouldAutoSpin = isBackgroundPresentation && autoSpin;
 	// Keep the latest presentation value available to async Mapbox callbacks (moveend, etc).
@@ -2862,6 +2907,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const stateOverlayModeRef = useRef<number>(stateInteractionsEnabled ? 1 : 0);
 	const stateOverlayAnimRafRef = useRef<number | null>(null);
 	const dayFarSideShadeCanvasRef = useRef<HTMLCanvasElement | null>(null);
+	const dayFarSideShadeCenterLngRef = useRef<number>(DAY_FAR_SIDE_SHADE_CENTER_LNG);
+	const dayFarSideShadeLightingRef = useRef<GlobeNightLightingLike | null>(
+		nightLighting ?? null
+	);
+	dayFarSideShadeLightingRef.current = nightLighting ?? null;
 	const cloudsCanvasRef = useRef<HTMLCanvasElement | null>(null);
 	const cloudsCanvasCtxRef = useRef<CanvasRenderingContext2D | null>(null);
 	const cloudsTextureImageRef = useRef<HTMLImageElement | null>(null);
@@ -9191,22 +9241,78 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	}, []);
 
 	useEffect(() => {
-		const shadeCanvas = dayFarSideShadeCanvasRef.current;
-		if (!shadeCanvas) return;
-		if (!paintDayFarSideShadeCanvas(shadeCanvas)) return;
+		const refreshSource = () => {
+			try {
+				const source = map?.getSource(MAPBOX_SOURCE_IDS.dayFarSideShade) as
+					| { play?: () => void }
+					| undefined;
+				source?.play?.();
+				map?.triggerRepaint();
+			} catch {
+				// Non-fatal.
+			}
+		};
 
-		try {
-			const source = map?.getSource(MAPBOX_SOURCE_IDS.dayFarSideShade) as
-				| { play?: () => void }
-				| undefined;
-			source?.play?.();
-			map?.triggerRepaint();
-		} catch {
-			// Non-fatal.
-		}
+		const repaint = (nowMs: number) => {
+			const shadeCanvas = dayFarSideShadeCanvasRef.current;
+			if (!shadeCanvas) return false;
 
-		if (map && isMapLoaded) applyLightingOverlayOpacity();
-	}, [map, isMapLoaded, applyLightingOverlayOpacity]);
+			const nextCenterLng = getDayFarSideShadeCenterLng(
+				getDayFarSideShadeDayProgress(dayFarSideShadeLightingRef.current, nowMs)
+			);
+			const centerDelta = angularLngDistanceDeg(
+				nextCenterLng,
+				dayFarSideShadeCenterLngRef.current
+			);
+			const needsPaint =
+				centerDelta >= DAY_FAR_SIDE_SHADE_MIN_REPAINT_DELTA_DEG ||
+				shadeCanvas.width !== DAY_FAR_SIDE_SHADE_CANVAS_SIZE_PX ||
+				shadeCanvas.height !== DAY_FAR_SIDE_SHADE_CANVAS_SIZE_PX;
+
+			if (needsPaint) {
+				if (!paintDayFarSideShadeCanvas(shadeCanvas, nextCenterLng)) return false;
+				dayFarSideShadeCenterLngRef.current = nextCenterLng;
+			}
+
+			refreshSource();
+			if (map && isMapLoaded) applyLightingOverlayOpacity();
+			return true;
+		};
+
+		repaint(Date.now());
+		if (!map || !isMapLoaded || typeof window === 'undefined') return;
+
+		let timeoutId: number | null = null;
+		let rafId: number | null = null;
+		let canceled = false;
+
+		const schedule = () => {
+			if (canceled) return;
+			timeoutId = window.setTimeout(() => {
+				timeoutId = null;
+				rafId = window.requestAnimationFrame(() => {
+					rafId = null;
+					if (canceled) return;
+					repaint(Date.now());
+					schedule();
+				});
+			}, DAY_FAR_SIDE_SHADE_REPAINT_MS);
+		};
+
+		schedule();
+		return () => {
+			canceled = true;
+			if (timeoutId != null) window.clearTimeout(timeoutId);
+			if (rafId != null) window.cancelAnimationFrame(rafId);
+		};
+	}, [
+		map,
+		isMapLoaded,
+		applyLightingOverlayOpacity,
+		dayFarSideShadePhase,
+		dayFarSideShadePhaseStartMs,
+		dayFarSideShadePhaseEndMs,
+	]);
 
 	useEffect(() => {
 		if (!map) return;
