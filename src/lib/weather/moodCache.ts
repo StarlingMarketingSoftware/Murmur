@@ -1,7 +1,9 @@
 import { fetchSampleCitiesWeather } from './fetchOpenMeteo';
 import { RegionWeather } from './regions';
 
-const CACHE_TTL_MS = 4 * 60 * 60 * 1000;
+// Open-Meteo current conditions can shift throughout the day; keep the globe
+// mood reasonably fresh during longer sessions without hammering the API.
+const CACHE_TTL_MS = 60 * 60 * 1000;
 
 type CacheEntry = {
 	data: RegionWeather[];

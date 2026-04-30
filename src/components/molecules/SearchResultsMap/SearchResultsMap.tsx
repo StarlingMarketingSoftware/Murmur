@@ -293,6 +293,109 @@ const jitterDuplicateCoords = (base: LatLngLiteral, index: number): LatLngLitera
 const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n));
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 
+type RgbaColor = { r: number; g: number; b: number; a: number };
+
+const parseCssColorToRgba = (raw: string): RgbaColor | null => {
+	const s = raw.trim();
+	if (!s) return null;
+
+	if (s.startsWith('#')) {
+		const hex = s.slice(1);
+		if (hex.length === 3) {
+			const r = Number.parseInt(hex[0] + hex[0], 16);
+			const g = Number.parseInt(hex[1] + hex[1], 16);
+			const b = Number.parseInt(hex[2] + hex[2], 16);
+			if (![r, g, b].every(Number.isFinite)) return null;
+			return { r, g, b, a: 1 };
+		}
+		if (hex.length === 6) {
+			const r = Number.parseInt(hex.slice(0, 2), 16);
+			const g = Number.parseInt(hex.slice(2, 4), 16);
+			const b = Number.parseInt(hex.slice(4, 6), 16);
+			if (![r, g, b].every(Number.isFinite)) return null;
+			return { r, g, b, a: 1 };
+		}
+		return null;
+	}
+
+	const m = s.match(/^rgba?\((.+)\)$/i);
+	if (!m) return null;
+	const parts = m[1]
+		.split(',')
+		.map((p) => p.trim())
+		.filter(Boolean);
+	if (parts.length !== 3 && parts.length !== 4) return null;
+	const r = Number(parts[0]);
+	const g = Number(parts[1]);
+	const b = Number(parts[2]);
+	const a = parts.length === 4 ? Number(parts[3]) : 1;
+	if (![r, g, b, a].every(Number.isFinite)) return null;
+	return {
+		r: clamp(Math.round(r), 0, 255),
+		g: clamp(Math.round(g), 0, 255),
+		b: clamp(Math.round(b), 0, 255),
+		a: clamp(a, 0, 1),
+	};
+};
+
+const blendCssColors = (from: string, to: string, t: number): string => {
+	const a = parseCssColorToRgba(from);
+	const b = parseCssColorToRgba(to);
+	if (!a || !b) return t < 0.5 ? from : to;
+	const r = lerp(a.r, b.r, t);
+	const g = lerp(a.g, b.g, t);
+	const b2 = lerp(a.b, b.b, t);
+	const alpha = lerp(a.a, b.a, t);
+	return `rgba(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b2)}, ${alpha.toFixed(3)})`;
+};
+
+const blendMoodVisualConfig = (
+	from: MoodVisualConfig,
+	to: MoodVisualConfig,
+	t: number
+): MoodVisualConfig => {
+	const softboxBlendMode = t < 0.5 ? from.softboxBlendMode : to.softboxBlendMode;
+	const softboxBackground = t < 0.5 ? from.softboxBackground : to.softboxBackground;
+	return {
+		cloudOpacityGlobeZoom: lerp(from.cloudOpacityGlobeZoom, to.cloudOpacityGlobeZoom, t),
+		cloudOpacityDecorativeZoom: lerp(
+			from.cloudOpacityDecorativeZoom,
+			to.cloudOpacityDecorativeZoom,
+			t
+		),
+		cloudDriftSpeedMultiplier: lerp(
+			from.cloudDriftSpeedMultiplier,
+			to.cloudDriftSpeedMultiplier,
+			t
+		),
+		cloudTurbulenceMultiplier: lerp(
+			from.cloudTurbulenceMultiplier,
+			to.cloudTurbulenceMultiplier,
+			t
+		),
+		cloudBrightnessMin: lerp(from.cloudBrightnessMin, to.cloudBrightnessMin, t),
+		cloudBrightnessMax: lerp(from.cloudBrightnessMax, to.cloudBrightnessMax, t),
+		cloudExtraPasses: Math.round(lerp(from.cloudExtraPasses, to.cloudExtraPasses, t)),
+		cloudDeepZoomOpacity: lerp(from.cloudDeepZoomOpacity, to.cloudDeepZoomOpacity, t),
+		fogColor: blendCssColors(from.fogColor, to.fogColor, t),
+		fogHighColor: blendCssColors(from.fogHighColor, to.fogHighColor, t),
+		fogHorizonBlend: lerp(from.fogHorizonBlend, to.fogHorizonBlend, t),
+		softboxOpacityMultiplier: lerp(
+			from.softboxOpacityMultiplier,
+			to.softboxOpacityMultiplier,
+			t
+		),
+		shadowOpacityMultiplier: lerp(from.shadowOpacityMultiplier, to.shadowOpacityMultiplier, t),
+		softboxBackground,
+		softboxBlendMode,
+		nightVisualBlend: lerp(from.nightVisualBlend, to.nightVisualBlend, t),
+		gloomWashOpacity: lerp(from.gloomWashOpacity, to.gloomWashOpacity, t),
+		// Lightning reads as a discrete effect; only flip it on once the transition is
+		// visibly in the new state.
+		lightning: Boolean(to.lightning) && t > 0.6,
+	};
+};
+
 type WasmGeoModule = {
 	lat_lng_to_world_pixel: (
 		lat: number,
@@ -2579,6 +2682,10 @@ const normalizeStateKey = (state?: string | null): string | null => {
 // Set back to null to use the real weather mood from the user's region.
 const MANUAL_WEATHER_MOOD_OVERRIDE: WeatherMood | null = null;
 
+// Weather mood transitions are intentionally short so weather shifts feel
+// "alive" during long sessions without calling attention to themselves.
+const WEATHER_MOOD_TRANSITION_MS = 3500;
+
 // MANUAL TEMPERATURE OVERRIDE FOR TESTING (Fahrenheit).
 // Set to a number (e.g. 92) to test the > 80°F brightness lift.
 // Set back to null to use the real temperature from the user's region.
@@ -2911,6 +3018,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	// visuals until applyWeatherMood() runs.
 	const weatherMoodConfigRef = useRef<MoodVisualConfig>(getMoodConfig('normal'));
 	const appliedWeatherMoodRef = useRef<WeatherMood>('normal');
+	// Weather-mood crossfade animation — cancels on mood change/unmount.
+	const weatherMoodTransitionRafRef = useRef<number | null>(null);
+	const weatherMoodTransitionNonceRef = useRef<number>(0);
 	const weatherRegionCenterRef = useRef<LatLngLiteral | null>(weatherRegionCenter);
 	weatherRegionCenterRef.current = weatherRegionCenter;
 	// Mutated by the temperature effect; read by `applyLightingOverlayOpacity`
@@ -9482,59 +9592,133 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 	const applyWeatherMood = useCallback(
 		(mood: WeatherMood) => {
-			const cfg = getMoodConfig(mood);
-			weatherMoodConfigRef.current = cfg;
+			const m = mapRef.current;
+			const nextCfg = getMoodConfig(mood);
+
+			// Keep refs in sync even if the map isn't ready yet — the first
+			// loaded apply will pick up the latest mood.
+			if (!m) {
+				weatherMoodConfigRef.current = nextCfg;
+				appliedWeatherMoodRef.current = mood;
+				return;
+			}
+
+			const isFirstApply =
+				appliedWeatherMoodRef.current === 'normal' &&
+				weatherMoodConfigRef.current === getMoodConfig('normal');
+
+			// Cancel any in-flight crossfade before starting a new one.
+			if (weatherMoodTransitionRafRef.current != null) {
+				cancelAnimationFrame(weatherMoodTransitionRafRef.current);
+				weatherMoodTransitionRafRef.current = null;
+			}
+			weatherMoodTransitionNonceRef.current += 1;
+			const nonce = weatherMoodTransitionNonceRef.current;
+
+			let prefersReducedMotion = false;
+			try {
+				prefersReducedMotion =
+					typeof window !== 'undefined' &&
+					typeof window.matchMedia === 'function' &&
+					window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+			} catch {
+				prefersReducedMotion = false;
+			}
+
+			const existingFog = (() => {
+				try {
+					return (m as any).getFog?.() ?? {};
+				} catch {
+					return {};
+				}
+			})();
+
+			const applyCfgToMap = (cfg: MoodVisualConfig) => {
+				// Cloud raster paint — opacity expression + brightness clamp.
+				try {
+					const opacityExpr = buildCloudsOpacityExpr(
+						cfg.cloudOpacityGlobeZoom,
+						cfg.cloudOpacityDecorativeZoom,
+						cfg.cloudDeepZoomOpacity
+					);
+					if (m.getLayer(MAPBOX_LAYER_IDS.clouds)) {
+						m.setPaintProperty(
+							MAPBOX_LAYER_IDS.clouds,
+							'raster-opacity',
+							opacityExpr as any
+						);
+						m.setPaintProperty(
+							MAPBOX_LAYER_IDS.clouds,
+							'raster-brightness-min',
+							cfg.cloudBrightnessMin
+						);
+						m.setPaintProperty(
+							MAPBOX_LAYER_IDS.clouds,
+							'raster-brightness-max',
+							cfg.cloudBrightnessMax
+						);
+					}
+				} catch {
+					// Non-fatal.
+				}
+
+				// Atmosphere fog tint.
+				try {
+					(m as any).setFog?.({
+						...existingFog,
+						color: cfg.fogColor,
+						'high-color': cfg.fogHighColor,
+						'horizon-blend': cfg.fogHorizonBlend,
+					});
+				} catch {
+					// Non-fatal.
+				}
+			};
+
+			const finish = (cfg: MoodVisualConfig) => {
+				weatherMoodConfigRef.current = cfg;
+				appliedWeatherMoodRef.current = mood;
+				applyCfgToMap(cfg);
+				applyLightingOverlayOpacity();
+
+				const night = clamp(nightTRef.current, 0, 1);
+				applyMurmurGlobeLighting(m, { nightT: night });
+				applyNightLandPalette(m, night);
+				applyStateOverlayNightColors(m, night);
+			};
+
+			// First apply should be immediate so the map doesn't "boot in normal and then shift".
+			if (prefersReducedMotion || isFirstApply || WEATHER_MOOD_TRANSITION_MS <= 0) {
+				finish(nextCfg);
+				return;
+			}
+
+			const fromCfg = weatherMoodConfigRef.current;
 			appliedWeatherMoodRef.current = mood;
 
-			const m = mapRef.current;
-			if (!m) return;
+			const startMs = performance.now();
+			const durationMs = WEATHER_MOOD_TRANSITION_MS;
 
-			// Cloud raster paint — opacity expression + brightness clamp.
-			try {
-				const opacityExpr = buildCloudsOpacityExpr(
-					cfg.cloudOpacityGlobeZoom,
-					cfg.cloudOpacityDecorativeZoom,
-					cfg.cloudDeepZoomOpacity
-				);
-				if (m.getLayer(MAPBOX_LAYER_IDS.clouds)) {
-					m.setPaintProperty(
-						MAPBOX_LAYER_IDS.clouds,
-						'raster-opacity',
-						opacityExpr as any
-					);
-					m.setPaintProperty(
-						MAPBOX_LAYER_IDS.clouds,
-						'raster-brightness-min',
-						cfg.cloudBrightnessMin
-					);
-					m.setPaintProperty(
-						MAPBOX_LAYER_IDS.clouds,
-						'raster-brightness-max',
-						cfg.cloudBrightnessMax
-					);
+			const tick = () => {
+				if (weatherMoodTransitionNonceRef.current !== nonce) return;
+				const now = performance.now();
+				const t = clamp((now - startMs) / durationMs, 0, 1);
+				// Smoothstep (ease-in-out).
+				const eased = t * t * (3 - 2 * t);
+				const blended = blendMoodVisualConfig(fromCfg, nextCfg, eased);
+				weatherMoodConfigRef.current = blended;
+				applyCfgToMap(blended);
+				applyLightingOverlayOpacity();
+
+				if (t < 1) {
+					weatherMoodTransitionRafRef.current = requestAnimationFrame(tick);
+				} else {
+					weatherMoodTransitionRafRef.current = null;
+					finish(nextCfg);
 				}
-			} catch {
-				// Non-fatal.
-			}
+			};
 
-			// Atmosphere fog tint.
-			try {
-				const existingFog = (m as any).getFog?.() ?? {};
-				(m as any).setFog?.({
-					...existingFog,
-					color: cfg.fogColor,
-					'high-color': cfg.fogHighColor,
-					'horizon-blend': cfg.fogHorizonBlend,
-				});
-			} catch {
-				// Non-fatal.
-			}
-
-			applyLightingOverlayOpacity();
-			const night = clamp(nightTRef.current, 0, 1);
-			applyMurmurGlobeLighting(m, { nightT: night });
-			applyNightLandPalette(m, night);
-			applyStateOverlayNightColors(m, night);
+			weatherMoodTransitionRafRef.current = requestAnimationFrame(tick);
 		},
 		[applyLightingOverlayOpacity]
 	);
@@ -9545,6 +9729,15 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		if (appliedWeatherMoodRef.current === weatherMood) return;
 		applyWeatherMood(weatherMood);
 	}, [map, isMapLoaded, weatherMood, applyWeatherMood]);
+
+	useEffect(() => {
+		return () => {
+			if (weatherMoodTransitionRafRef.current != null) {
+				cancelAnimationFrame(weatherMoodTransitionRafRef.current);
+				weatherMoodTransitionRafRef.current = null;
+			}
+		};
+	}, []);
 
 	useEffect(() => {
 		const nextHot =
