@@ -35,7 +35,12 @@ import {
 import { WeddingPlannersIcon } from '@/components/atoms/_svg/WeddingPlannersIcon';
 import { WineBeerSpiritsIcon } from '@/components/atoms/_svg/WineBeerSpiritsIcon';
 import { WeatherMood } from '@/lib/weather/regions';
-import { getMoodConfig, MoodVisualConfig } from '@/lib/weather/moodConfig';
+import {
+	getMoodConfig,
+	MoodVisualConfig,
+	SOFTBOX_DARK_POOL_BG,
+	SOFTBOX_WARM_KEY_BG,
+} from '@/lib/weather/moodConfig';
 
 type LatLngLiteral = { lat: number; lng: number };
 type MarkerHoverMeta = { clientX: number; clientY: number };
@@ -309,6 +314,115 @@ const angularLngDistanceDeg = (a: number, b: number) =>
 	Math.abs(normalizeLngDeg(a - b));
 const computeMoodVisualNightT = (nightT: number, cfg: MoodVisualConfig) =>
 	clamp(Math.max(nightT, cfg.nightVisualBlend), 0, 1);
+
+type RuntimeMoodVisualConfig = MoodVisualConfig & {
+	warmSoftboxOpacityMultiplier: number;
+	darkSoftboxOpacityMultiplier: number;
+	lightningIntensity: number;
+};
+
+type ParsedCssColor = [number, number, number, number];
+
+const parseCssColor = (value: string): ParsedCssColor | null => {
+	const match = value
+		.trim()
+		.match(/^rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)(?:\s*,\s*([\d.]+))?\s*\)$/i);
+	if (!match) return null;
+	const r = clamp(Number(match[1]), 0, 255);
+	const g = clamp(Number(match[2]), 0, 255);
+	const b = clamp(Number(match[3]), 0, 255);
+	const a = match[4] == null ? 1 : clamp(Number(match[4]), 0, 1);
+	if (![r, g, b, a].every(Number.isFinite)) return null;
+	return [r, g, b, a];
+};
+
+const formatCssColor = ([r, g, b, a]: ParsedCssColor) =>
+	a >= 0.999
+		? `rgb(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)})`
+		: `rgba(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)}, ${Number(a.toFixed(3))})`;
+
+const mixCssColorString = (from: string, to: string, t: number) => {
+	const a = parseCssColor(from);
+	const b = parseCssColor(to);
+	if (!a || !b) return t < 0.5 ? from : to;
+	const p = clamp(t, 0, 1);
+	return formatCssColor([
+		lerp(a[0], b[0], p),
+		lerp(a[1], b[1], p),
+		lerp(a[2], b[2], p),
+		lerp(a[3], b[3], p),
+	]);
+};
+
+const toRuntimeMoodConfig = (cfg: MoodVisualConfig): RuntimeMoodVisualConfig => ({
+	...cfg,
+	warmSoftboxOpacityMultiplier:
+		cfg.softboxBlendMode === 'screen' ? cfg.softboxOpacityMultiplier : 0,
+	darkSoftboxOpacityMultiplier:
+		cfg.softboxBlendMode === 'multiply' ? cfg.softboxOpacityMultiplier : 0,
+	lightningIntensity: cfg.lightning ? 1 : 0,
+});
+
+const blendRuntimeMoodConfig = (
+	from: RuntimeMoodVisualConfig,
+	to: RuntimeMoodVisualConfig,
+	continuousT: number,
+	discreteT: number
+): RuntimeMoodVisualConfig => {
+	const c = clamp(continuousT, 0, 1);
+	const d = clamp(discreteT, 0, 1);
+
+	return {
+		...to,
+		cloudOpacityGlobeZoom: lerp(from.cloudOpacityGlobeZoom, to.cloudOpacityGlobeZoom, c),
+		cloudOpacityDecorativeZoom: lerp(
+			from.cloudOpacityDecorativeZoom,
+			to.cloudOpacityDecorativeZoom,
+			c
+		),
+		cloudDriftSpeedMultiplier: lerp(
+			from.cloudDriftSpeedMultiplier,
+			to.cloudDriftSpeedMultiplier,
+			c
+		),
+		cloudTurbulenceMultiplier: lerp(
+			from.cloudTurbulenceMultiplier,
+			to.cloudTurbulenceMultiplier,
+			c
+		),
+		cloudBrightnessMin: lerp(from.cloudBrightnessMin, to.cloudBrightnessMin, c),
+		cloudBrightnessMax: lerp(from.cloudBrightnessMax, to.cloudBrightnessMax, c),
+		cloudExtraPasses: lerp(from.cloudExtraPasses, to.cloudExtraPasses, d),
+		cloudDeepZoomOpacity: lerp(from.cloudDeepZoomOpacity, to.cloudDeepZoomOpacity, d),
+		fogColor: mixCssColorString(from.fogColor, to.fogColor, c),
+		fogHighColor: mixCssColorString(from.fogHighColor, to.fogHighColor, c),
+		fogHorizonBlend: lerp(from.fogHorizonBlend, to.fogHorizonBlend, c),
+		softboxOpacityMultiplier: lerp(
+			from.softboxOpacityMultiplier,
+			to.softboxOpacityMultiplier,
+			c
+		),
+		shadowOpacityMultiplier: lerp(
+			from.shadowOpacityMultiplier,
+			to.shadowOpacityMultiplier,
+			c
+		),
+		nightVisualBlend: lerp(from.nightVisualBlend, to.nightVisualBlend, c),
+		gloomWashOpacity: lerp(from.gloomWashOpacity, to.gloomWashOpacity, c),
+		warmSoftboxOpacityMultiplier: lerp(
+			from.warmSoftboxOpacityMultiplier,
+			to.warmSoftboxOpacityMultiplier,
+			c
+		),
+		darkSoftboxOpacityMultiplier: lerp(
+			from.darkSoftboxOpacityMultiplier,
+			to.darkSoftboxOpacityMultiplier,
+			c
+		),
+		lightningIntensity: lerp(from.lightningIntensity, to.lightningIntensity, d),
+		lightning: to.lightning,
+	};
+};
 
 type WasmGeoModule = {
 	lat_lng_to_world_pixel: (
@@ -1494,6 +1608,34 @@ const CLOUDS_EXTRA_PASS_OFFSETS: Array<[number, number]> = [
 	[-0.42, -0.54],
 ];
 
+const drawCloudExtraPasses = (
+	ctx: CanvasRenderingContext2D,
+	w: number,
+	h: number,
+	extraPasses: number,
+	offsetShift = 0
+) => {
+	const count = clamp(extraPasses, 0, CLOUDS_EXTRA_PASS_OFFSETS.length);
+	const fullPasses = Math.floor(count);
+	const fractionalPass = count - fullPasses;
+	const totalPasses = fullPasses + (fractionalPass > 0.001 ? 1 : 0);
+	if (totalPasses <= 0) return;
+
+	const baseAlpha = ctx.globalAlpha;
+	for (let p = 0; p < totalPasses; p++) {
+		const alphaMul = p < fullPasses ? 1 : fractionalPass;
+		if (alphaMul <= 0.001) continue;
+		const [oxT, oyT] =
+			CLOUDS_EXTRA_PASS_OFFSETS[
+				(p + offsetShift) % CLOUDS_EXTRA_PASS_OFFSETS.length
+			];
+		ctx.globalAlpha = baseAlpha * alphaMul;
+		ctx.translate(w * oxT, h * oyT);
+		ctx.fillRect(-w * 2, -h * 2, w * 5, h * 5);
+	}
+	ctx.globalAlpha = baseAlpha;
+};
+
 const buildCloudsOpacityExpr = (
 	globeZoomOpacity: number,
 	decorativeZoomOpacity: number,
@@ -2669,7 +2811,49 @@ const MANUAL_WEATHER_TEMPERATURE_OVERRIDE_F: number | null = null;
 // MANUAL NIGHT OVERRIDE FOR TESTING.
 // Set to a number between 0 and 1 (e.g. 1 for deep night, 0 for full day).
 // Set back to null to use the real regional day/night cycle.
-const MANUAL_NIGHT_T_OVERRIDE: number | null = 0;
+const MANUAL_NIGHT_T_OVERRIDE: number | null = null;
+
+const MOOD_CONTINUOUS_TRANSITION_MS = 90_000;
+const MOOD_DISCRETE_EFFECT_FADE_MS = 8_000;
+const MOOD_TRANSITION_PAINT_FRAME_MS = 16;
+
+const getDevMoodTransitionMs = (): number | null => {
+	if (typeof window === 'undefined') return null;
+	try {
+		const raw = new URLSearchParams(window.location.search).get('devMoodTransitionMs');
+		if (!raw) return null;
+		const n = Number(raw);
+		if (!Number.isFinite(n)) return null;
+		return clamp(Math.round(n), 1_000, 15 * 60_000);
+	} catch {
+		return null;
+	}
+};
+
+const easeInOutCubic = (t: number): number => {
+	const x = clamp(t, 0, 1);
+	return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+};
+
+const computeRuntimeNightT = (
+	nightLighting: GlobeNightLightingLike | null | undefined,
+	fallbackNightT: number,
+	nowMs: number = Date.now()
+) => {
+	if (!nightLighting) return clamp(fallbackNightT, 0, 1);
+
+	if (nightLighting.phase === 'sunrise' || nightLighting.phase === 'sunset') {
+		const durationMs = nightLighting.phaseEndMs - nightLighting.phaseStartMs;
+		if (!Number.isFinite(durationMs) || durationMs <= 0) {
+			return clamp(fallbackNightT, 0, 1);
+		}
+		const t = clamp((nowMs - nightLighting.phaseStartMs) / durationMs, 0, 1);
+		const eased = easeInOutCubic(t);
+		return nightLighting.phase === 'sunrise' ? 1 - eased : eased;
+	}
+
+	return clamp(nightLighting.nightT ?? fallbackNightT, 0, 1);
+};
 
 // Threshold above which the globe gets a uniform warm brightness lift on top
 // of the active mood (only applies when the mood uses a bright screen-blend
@@ -2959,8 +3143,19 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	// Live weather-mood config — read by the cloud animation tick and the lighting
 	// overlay opacity calc. Initialized to `normal` so behavior matches pre-weather
 	// visuals until applyWeatherMood() runs.
-	const weatherMoodConfigRef = useRef<MoodVisualConfig>(getMoodConfig('normal'));
+	const weatherMoodConfigRef = useRef<RuntimeMoodVisualConfig>(
+		toRuntimeMoodConfig(getMoodConfig('normal'))
+	);
 	const appliedWeatherMoodRef = useRef<WeatherMood>('normal');
+	const moodTransitionRef = useRef<{
+		from: RuntimeMoodVisualConfig;
+		to: RuntimeMoodVisualConfig;
+		startMs: number;
+		continuousMs: number;
+		discreteMs: number;
+	} | null>(null);
+	const moodTransitionRafRef = useRef<number | null>(null);
+	const moodTransitionLastPaintMsRef = useRef<number>(0);
 	const weatherRegionCenterRef = useRef<LatLngLiteral | null>(weatherRegionCenter);
 	weatherRegionCenterRef.current = weatherRegionCenter;
 	// Mutated by the temperature effect; read by `applyLightingOverlayOpacity`
@@ -3005,7 +3200,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	// Live-updated softbox overlay refs. zoomLevel only updates on `moveend`, so
 	// we drive these imperatively from the map's `zoom` event to keep the lighting
 	// fade in lockstep with pinch/scroll/wheel interactions.
-	const lightingOverlayKeyRef = useRef<HTMLDivElement | null>(null);
+	const lightingOverlayWarmKeyRef = useRef<HTMLDivElement | null>(null);
+	const lightingOverlayDarkKeyRef = useRef<HTMLDivElement | null>(null);
 	const lightingOverlayShadowRef = useRef<HTMLDivElement | null>(null);
 	const lightingOverlayHotWashRef = useRef<HTMLDivElement | null>(null);
 	const lightingOverlayGloomWashRef = useRef<HTMLDivElement | null>(null);
@@ -4783,17 +4979,26 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		const drawLightning = (nowMs: number) => {
 			const currentZoom = getCurrentLightningZoom();
 			const zoomOk = currentZoom < LIGHTNING_HIDE_AT_OR_ABOVE_ZOOM;
+			const lightningIntensity = clamp(
+				weatherMoodConfigRef.current.lightningIntensity,
+				0,
+				1
+			);
+			const canSpawnLightning =
+				Boolean(weatherMoodConfigRef.current.lightning) && lightningIntensity > 0.001;
 
 			const enabled =
 				!prefersReducedMotion &&
-				Boolean(weatherMoodConfigRef.current.lightning) &&
+				lightningIntensity > 0.001 &&
 				zoomOk;
 
 			if (!enabled) {
 				lightningWasEnabledRef.current = false;
-				lightningEventsRef.current = [];
-				lightningNextFlashAtMsRef.current = 0;
-				lightningBurstRemainingRef.current = 0;
+				if (lightningIntensity <= 0.001) {
+					lightningEventsRef.current = [];
+					lightningNextFlashAtMsRef.current = 0;
+					lightningBurstRemainingRef.current = 0;
+				}
 				return;
 			}
 
@@ -4814,11 +5019,20 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				}
 			}
 
-			if (!lightningNextFlashAtMsRef.current) {
+			if (!canSpawnLightning) {
+				lightningNextFlashAtMsRef.current = 0;
+				lightningBurstRemainingRef.current = 0;
+			} else if (!lightningNextFlashAtMsRef.current) {
 				scheduleNextLightning(nowMs, { fast: justEnabled, zoom: currentZoom });
 			}
-			if (nowMs >= lightningNextFlashAtMsRef.current) {
-				const spawnCount = getLightningSpawnCount(currentZoom);
+			if (canSpawnLightning && nowMs >= lightningNextFlashAtMsRef.current) {
+				const spawnCount = Math.max(
+					1,
+					Math.round(
+						getLightningSpawnCount(currentZoom) *
+							clamp(0.35 + lightningIntensity * 0.65, 0, 1)
+					)
+				);
 				for (let i = 0; i < spawnCount; i++) {
 					spawnLightningEvent(nowMs + i * (30 + Math.random() * 45), w, h);
 				}
@@ -4842,7 +5056,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				let a = 0;
 				for (const p of e.pulses) a += computePulseOpacity(t, p);
 				if (a <= 0.001) continue;
-				a = clamp(a * LIGHTNING_OPACITY_MULTIPLIER, 0, 0.95);
+				a = clamp(a * LIGHTNING_OPACITY_MULTIPLIER * lightningIntensity, 0, 0.95);
 
 				const stamp = stamps[e.stampIndex % stamps.length];
 				const sw = stamp.naturalWidth || stamp.width || 256;
@@ -5495,14 +5709,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						// Mood-driven extra density: re-fill the same pattern with offsets so the
 						// same texture covers more of the canvas (no Python re-bake needed).
 						const extraPasses = weatherMoodConfigRef.current.cloudExtraPasses;
-						for (let p = 0; p < extraPasses; p++) {
-							const [oxT, oyT] =
-								CLOUDS_EXTRA_PASS_OFFSETS[p % CLOUDS_EXTRA_PASS_OFFSETS.length];
-							const ox = w * oxT;
-							const oy = h * oyT;
-							cloudsCtx.translate(ox, oy);
-							cloudsCtx.fillRect(-w * 2, -h * 2, w * 5, h * 5);
-						}
+						drawCloudExtraPasses(cloudsCtx, w, h, extraPasses);
 					} else {
 						// Fill the canvas with wrapped draws (extra copy in X to avoid edge gaps under shear).
 						for (let x = x0 - w; x < w + w; x += w) {
@@ -5529,14 +5736,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 							cloudsCtx.fillRect(-w * 2, -h * 2, w * 5, h * 5);
 							// Mood-driven extra density (matches base layer pass count).
 							const extraPasses = weatherMoodConfigRef.current.cloudExtraPasses;
-							for (let p = 0; p < extraPasses; p++) {
-								const [oxT, oyT] =
-									CLOUDS_EXTRA_PASS_OFFSETS[(p + g) % CLOUDS_EXTRA_PASS_OFFSETS.length];
-								const ox = w * oxT;
-								const oy = h * oyT;
-								cloudsCtx.translate(ox, oy);
-								cloudsCtx.fillRect(-w * 2, -h * 2, w * 5, h * 5);
-							}
+							drawCloudExtraPasses(cloudsCtx, w, h, extraPasses, g);
 						}
 					}
 				}
@@ -9039,14 +9239,25 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		const shadowNightMul =
 			1 - nightEaseForShadow * (1 - clamp(NIGHT_SHADOW_OVERLAY_MUL_MIN, 0, 1));
 
-		const keyOpacity = clamp(base * cfg.softboxOpacityMultiplier * keyNightMul, 0, 1);
+		const warmKeyOpacity = clamp(
+			base * cfg.warmSoftboxOpacityMultiplier * keyNightMul,
+			0,
+			1
+		);
+		const darkKeyOpacity = clamp(
+			base * cfg.darkSoftboxOpacityMultiplier * keyNightMul,
+			0,
+			1
+		);
 		const shadowOpacity = clamp(
 			base * cfg.shadowOpacityMultiplier * shadowNightMul,
 			0,
 			1
 		);
-		if (lightingOverlayKeyRef.current)
-			lightingOverlayKeyRef.current.style.opacity = String(keyOpacity);
+		if (lightingOverlayWarmKeyRef.current)
+			lightingOverlayWarmKeyRef.current.style.opacity = String(warmKeyOpacity);
+		if (lightingOverlayDarkKeyRef.current)
+			lightingOverlayDarkKeyRef.current.style.opacity = String(darkKeyOpacity);
 		if (lightingOverlayShadowRef.current)
 			lightingOverlayShadowRef.current.style.opacity = String(shadowOpacity);
 
@@ -9212,9 +9423,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		// Hot wash — uniform warm-white screen-blend overlay that brightens the
 		// whole globe. Only active for bright moods so the rainy/stormy dark
 		// pool stays gloomy.
-		const isBrightSoftbox = cfg.softboxBlendMode === 'screen';
-		const hotActive = isHotRef.current && isBrightSoftbox && night < 0.12;
-		const washOpacity = hotActive ? base * HOT_WASH_OPACITY : 0;
+		const brightSoftboxStrength = clamp(cfg.warmSoftboxOpacityMultiplier, 0, 1);
+		const hotActive = isHotRef.current && brightSoftboxStrength > 0.001 && night < 0.12;
+		const washOpacity = hotActive ? base * HOT_WASH_OPACITY * brightSoftboxStrength : 0;
 		if (lightingOverlayHotWashRef.current)
 			lightingOverlayHotWashRef.current.style.opacity = String(washOpacity);
 
@@ -9563,6 +9774,75 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		applyStateOverlayNightColors(map, visualNightT);
 	}, [nightT, weatherMood, map, isMapLoaded]);
 
+	// During sunrise/sunset, `useGlobeNightLighting` intentionally avoids React
+	// re-rendering every frame. Drive the visual night factor imperatively so
+	// lights, dimming, and mood-night blends move continuously through the phase.
+	useEffect(() => {
+		if (!map) return;
+		if (!isMapLoaded) return;
+		if (MANUAL_NIGHT_T_OVERRIDE !== null) {
+			nightTRef.current = nightT;
+			return;
+		}
+
+		const phase = nightLighting?.phase ?? null;
+		if (phase !== 'sunrise' && phase !== 'sunset') {
+			nightTRef.current = nightT;
+			return;
+		}
+
+		let cancelled = false;
+		let rafId: number | null = null;
+		let lastMapPaintAt = 0;
+
+		const applyMapNightState = (runtimeNightT: number, force = false) => {
+			const now = performance.now();
+			const shouldPaintMap = force || now - lastMapPaintAt >= 250;
+			if (!shouldPaintMap) return;
+			lastMapPaintAt = now;
+			const visualNightT = computeMoodVisualNightT(
+				runtimeNightT,
+				weatherMoodConfigRef.current
+			);
+			applyMurmurGlobeLighting(map, { nightT: visualNightT });
+			applyNightLandPalette(map, visualNightT);
+			applyStateOverlayNightColors(map, visualNightT);
+			applyStateOverlayOpacity(
+				stateOverlayOpacityRef.current,
+				stateOverlayModeRef.current
+			);
+		};
+
+		const tick = () => {
+			if (cancelled) return;
+			const nowMs = Date.now();
+			const runtimeNightT = computeRuntimeNightT(nightLighting, nightT, nowMs);
+			nightTRef.current = runtimeNightT;
+			applyLightingOverlayOpacity();
+			applyMapNightState(runtimeNightT, nowMs >= (nightLighting?.phaseEndMs ?? 0));
+
+			if (nowMs < (nightLighting?.phaseEndMs ?? 0)) {
+				rafId = requestAnimationFrame(tick);
+				return;
+			}
+
+			applyMapNightState(runtimeNightT, true);
+		};
+
+		tick();
+		return () => {
+			cancelled = true;
+			if (rafId != null) cancelAnimationFrame(rafId);
+		};
+	}, [
+		map,
+		isMapLoaded,
+		nightLighting,
+		nightT,
+		applyLightingOverlayOpacity,
+		applyStateOverlayOpacity,
+	]);
+
 	// Re-apply the night palette when zoom changes so the "zoomed in" view can be
 	// slightly brighter without changing the low-zoom globe read.
 	useEffect(() => {
@@ -9579,11 +9859,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		};
 	}, [map, isMapLoaded]);
 
-	const applyWeatherMood = useCallback(
-		(mood: WeatherMood) => {
-			const cfg = getMoodConfig(mood);
+	const applyWeatherMoodConfig = useCallback(
+		(cfg: RuntimeMoodVisualConfig) => {
 			weatherMoodConfigRef.current = cfg;
-			appliedWeatherMoodRef.current = mood;
 
 			const m = mapRef.current;
 			if (!m) return;
@@ -9634,16 +9912,117 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			applyMurmurGlobeLighting(m, { nightT: visualNightT });
 			applyNightLandPalette(m, visualNightT);
 			applyStateOverlayNightColors(m, visualNightT);
+			applyStateOverlayOpacity(
+				stateOverlayOpacityRef.current,
+				stateOverlayModeRef.current
+			);
+			try {
+				m.triggerRepaint();
+			} catch {
+				// Non-fatal.
+			}
 		},
-		[applyLightingOverlayOpacity]
+		[applyLightingOverlayOpacity, applyStateOverlayOpacity]
+	);
+
+	const startWeatherMoodTransition = useCallback(
+		(mood: WeatherMood) => {
+			const to = toRuntimeMoodConfig(getMoodConfig(mood));
+			const from = weatherMoodConfigRef.current;
+			appliedWeatherMoodRef.current = mood;
+			moodTransitionRef.current = {
+				from,
+				to,
+				startMs: performance.now(),
+				continuousMs: getDevMoodTransitionMs() ?? MOOD_CONTINUOUS_TRANSITION_MS,
+				discreteMs: Math.min(
+					MOOD_DISCRETE_EFFECT_FADE_MS,
+					getDevMoodTransitionMs() ?? MOOD_DISCRETE_EFFECT_FADE_MS
+				),
+			};
+			moodTransitionLastPaintMsRef.current = 0;
+
+			if (moodTransitionRafRef.current != null) {
+				cancelAnimationFrame(moodTransitionRafRef.current);
+				moodTransitionRafRef.current = null;
+			}
+
+			const tick = (now: number) => {
+				const transition = moodTransitionRef.current;
+				if (!transition) {
+					moodTransitionRafRef.current = null;
+					return;
+				}
+
+				const continuousT = clamp(
+					(now - transition.startMs) / transition.continuousMs,
+					0,
+					1
+				);
+				const discreteT = clamp(
+					(now - transition.startMs) / transition.discreteMs,
+					0,
+					1
+				);
+				const cfg = blendRuntimeMoodConfig(
+					transition.from,
+					transition.to,
+					continuousT,
+					discreteT
+				);
+
+				if (
+					now - moodTransitionLastPaintMsRef.current >=
+						MOOD_TRANSITION_PAINT_FRAME_MS ||
+					continuousT >= 1
+				) {
+					moodTransitionLastPaintMsRef.current = now;
+					applyWeatherMoodConfig(cfg);
+				} else {
+					weatherMoodConfigRef.current = cfg;
+					applyLightingOverlayOpacity();
+				}
+
+				if (continuousT < 1 || discreteT < 1) {
+					moodTransitionRafRef.current = requestAnimationFrame(tick);
+					return;
+				}
+
+				moodTransitionRef.current = null;
+				moodTransitionRafRef.current = null;
+				applyWeatherMoodConfig(transition.to);
+			};
+
+			moodTransitionRafRef.current = requestAnimationFrame(tick);
+		},
+		[applyLightingOverlayOpacity, applyWeatherMoodConfig]
 	);
 
 	useEffect(() => {
 		if (!map) return;
 		if (!isMapLoaded) return;
-		if (appliedWeatherMoodRef.current === weatherMood) return;
-		applyWeatherMood(weatherMood);
-	}, [map, isMapLoaded, weatherMood, applyWeatherMood]);
+		if (appliedWeatherMoodRef.current === weatherMood) {
+			applyWeatherMoodConfig(weatherMoodConfigRef.current);
+			return;
+		}
+		startWeatherMoodTransition(weatherMood);
+	}, [
+		map,
+		isMapLoaded,
+		weatherMood,
+		applyWeatherMoodConfig,
+		startWeatherMoodTransition,
+	]);
+
+	useEffect(() => {
+		return () => {
+			if (moodTransitionRafRef.current != null) {
+				cancelAnimationFrame(moodTransitionRafRef.current);
+				moodTransitionRafRef.current = null;
+			}
+			moodTransitionRef.current = null;
+		};
+	}, []);
 
 	useEffect(() => {
 		const nextHot =
@@ -11137,14 +11516,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			  are DOM layers on the container, they stay locked to the viewer no
 			  matter how the globe is panned, zoomed, or rotated.
 
-			  Layer 1 (screen): warm highlight radiating from the upper-left — the
-			  softbox key. Brightens only where it's opaque, fades to nothing past
-			  the mid-sphere.
-			  Layer 2 (multiply): cool deep-shadow pooling in the lower-right — the
-			  terminator. Darkens the unlit hemisphere without tinting the lit side.
+			  Layer 1a (screen): warm highlight radiating from the upper-left.
+			  Layer 1b (multiply): rainy dark-pool key in the same upper-left slot.
+			  Keeping both layers mounted lets mood transitions crossfade instead of
+			  swapping an un-animatable mix-blend-mode.
+			  Layer 2 (multiply): cool deep-shadow pooling in the lower-right.
 			*/}
 			<div
-				ref={lightingOverlayKeyRef}
+				ref={lightingOverlayWarmKeyRef}
 				aria-hidden
 				style={{
 					position: 'absolute',
@@ -11153,11 +11532,21 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					// Anchor the radial "hot spot" offscreen past the upper-left so the
 					// visible gradient reads as ambient warm wash rather than a disc.
 					// Peaks are cranked up because the hot center is offscreen.
-					// Bright moods use a warm cream key + screen blend; rainy/stormy swap
-					// to a deep navy pool + multiply blend so the upper-left also reads
-					// as gloom (bracketing the lower-right shadow on both corners).
-					background: getMoodConfig(weatherMood).softboxBackground,
-					mixBlendMode: getMoodConfig(weatherMood).softboxBlendMode,
+					background: SOFTBOX_WARM_KEY_BG,
+					mixBlendMode: 'screen',
+					// opacity intentionally unset — see applyLightingOverlayOpacity above.
+					zIndex: 1,
+				}}
+			/>
+			<div
+				ref={lightingOverlayDarkKeyRef}
+				aria-hidden
+				style={{
+					position: 'absolute',
+					inset: 0,
+					pointerEvents: 'none',
+					background: SOFTBOX_DARK_POOL_BG,
+					mixBlendMode: 'multiply',
 					// opacity intentionally unset — see applyLightingOverlayOpacity above.
 					zIndex: 1,
 				}}
