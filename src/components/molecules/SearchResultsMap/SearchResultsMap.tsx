@@ -1571,6 +1571,200 @@ const createDayFarSideShadeCanvas = (): HTMLCanvasElement | null => {
 	if (!paintDayFarSideShadeCanvas(canvas)) return null;
 	return canvas;
 };
+
+type SunTransitionVisualState = {
+	phase: 'sunrise' | 'sunset';
+	progress: number;
+	intensity: number;
+	centerLng: number;
+	direction: 1 | -1;
+};
+
+const SUN_TRANSITION_CANVAS_SIZE_PX = 512;
+const SUN_TRANSITION_LAYER_MAX_OPACITY = 0.96;
+const SUN_TRANSITION_CLOUD_CATCHLIGHT_OPACITY_MULT = 0.28;
+const SUN_TRANSITION_SPACE_GLOW_OPACITY_MULT = 0.16;
+const SUN_TRANSITION_MAX_PIXEL_ALPHA = 0.62;
+const SUN_TRANSITION_COLOR_ALPHA_MULT = 1.42;
+const SUN_TRANSITION_CLOSE_FADE_START_ZOOM = 4.8;
+const SUN_TRANSITION_CLOSE_FADE_END_ZOOM = 6.1;
+const SUN_TRANSITION_PROGRESS_PAINT_STEPS = 520;
+const SUN_TRANSITION_SUNRISE_START_OFFSET_DEG = 54;
+const SUN_TRANSITION_SUNRISE_END_OFFSET_DEG = -48;
+const SUN_TRANSITION_SUNSET_START_OFFSET_DEG = -48;
+const SUN_TRANSITION_SUNSET_END_OFFSET_DEG = 54;
+
+const getSunTransitionVisualState = (
+	nightLighting: GlobeNightLightingLike | null | undefined,
+	nowMs: number
+): SunTransitionVisualState | null => {
+	if (!nightLighting) return null;
+	const phase = nightLighting?.phase;
+	if (phase !== 'sunrise' && phase !== 'sunset') return null;
+
+	const startMs = nightLighting.phaseStartMs;
+	const endMs = nightLighting.phaseEndMs;
+	const durationMs = endMs - startMs;
+	if (!Number.isFinite(durationMs) || durationMs <= 0) return null;
+
+	const progress = clamp((nowMs - startMs) / durationMs, 0, 1);
+	const sweepT = smoothstep(0, 1, progress);
+	const [startOffset, endOffset] =
+		phase === 'sunrise'
+			? [SUN_TRANSITION_SUNRISE_START_OFFSET_DEG, SUN_TRANSITION_SUNRISE_END_OFFSET_DEG]
+			: [SUN_TRANSITION_SUNSET_START_OFFSET_DEG, SUN_TRANSITION_SUNSET_END_OFFSET_DEG];
+	const centerLng = normalizeLngDeg(defaultCenter.lng + lerp(startOffset, endOffset, sweepT));
+	const bell = Math.sin(progress * Math.PI);
+	const intensity = Math.pow(Math.max(0, bell), 0.62);
+
+	if (intensity <= 0.001) return null;
+
+	return {
+		phase,
+		progress,
+		intensity,
+		centerLng,
+		direction: phase === 'sunrise' ? 1 : -1,
+	};
+};
+
+const computeSunTransitionZoomOpacity = (zoom: number) => {
+	const globeFade = computeLightingOverlayOpacity(zoom);
+	const closeFade =
+		1 -
+		smoothstep(
+			SUN_TRANSITION_CLOSE_FADE_START_ZOOM,
+			SUN_TRANSITION_CLOSE_FADE_END_ZOOM,
+			zoom
+		);
+	return clamp(globeFade * closeFade, 0, 1);
+};
+
+const computeSunTransitionLayerOpacity = (
+	visual: SunTransitionVisualState | null,
+	zoom: number
+) => {
+	if (!visual) return 0;
+	return clamp(
+		computeSunTransitionZoomOpacity(zoom) *
+			SUN_TRANSITION_LAYER_MAX_OPACITY *
+			visual.intensity,
+		0,
+		1
+	);
+};
+
+const addSunTransitionColor = (
+	acc: { r: number; g: number; b: number; a: number },
+	signedDistDeg: number,
+	centerDeg: number,
+	widthDeg: number,
+	rgb: [number, number, number],
+	alpha: number
+) => {
+	if (alpha <= 0) return;
+	const x = (signedDistDeg - centerDeg) / widthDeg;
+	const a = alpha * Math.exp(-x * x);
+	if (a <= 0.0001) return;
+	acc.r += rgb[0] * a;
+	acc.g += rgb[1] * a;
+	acc.b += rgb[2] * a;
+	acc.a += a;
+};
+
+const paintSunTransitionCanvas = (
+	canvas: HTMLCanvasElement,
+	visual: SunTransitionVisualState | null
+) => {
+	canvas.width = SUN_TRANSITION_CANVAS_SIZE_PX;
+	canvas.height = SUN_TRANSITION_CANVAS_SIZE_PX;
+
+	const ctx = canvas.getContext('2d');
+	if (!ctx) return false;
+	ctx.clearRect(0, 0, canvas.width, canvas.height);
+	if (!visual) return true;
+
+	const w = canvas.width;
+	const h = canvas.height;
+	const imageData = ctx.createImageData(w, h);
+	const data = imageData.data;
+	const p = visual.progress;
+	const sunriseT = visual.phase === 'sunrise' ? p : 1 - p;
+	const violetGate =
+		visual.phase === 'sunrise'
+			? 1 - smoothstep(0.52, 0.98, p) * 0.66
+			: smoothstep(0.14, 0.82, p);
+	const roseGate =
+		visual.phase === 'sunrise'
+			? 1 - smoothstep(0.72, 1, p) * 0.28
+			: smoothstep(0.06, 0.72, p);
+	const warmGate =
+		visual.phase === 'sunrise'
+			? smoothstep(0.12, 0.66, p)
+			: 1 - smoothstep(0.44, 0.98, p) * 0.52;
+	const goldGate =
+		visual.phase === 'sunrise'
+			? smoothstep(0.32, 0.88, p)
+			: 1 - smoothstep(0.16, 0.78, p);
+	const paleGate =
+		visual.phase === 'sunrise'
+			? smoothstep(0.52, 0.96, p)
+			: 1 - smoothstep(0.08, 0.6, p);
+
+	for (let y = 0; y < h; y += 1) {
+		const mercatorY = (y + 0.5) / h;
+		const lat =
+			(Math.atan(Math.sinh(Math.PI * (1 - 2 * mercatorY))) * 180) / Math.PI;
+		const latRad = (lat * Math.PI) / 180;
+		const absLat = Math.abs(lat);
+		const polarTaper = 1 - smoothstep(62, 84, absLat);
+		const midLatLift = 0.72 + 0.28 * (1 - smoothstep(8, 58, absLat));
+
+		for (let x = 0; x < w; x += 1) {
+			const lng = ((x + 0.5) / w) * 360 - 180;
+			const lngRad = (lng * Math.PI) / 180;
+			const wobble =
+				8.5 * Math.sin(latRad * 1.55 + lngRad * 0.74 + sunriseT * 1.8) +
+				4.25 * Math.sin(lngRad * 2.2 - latRad * 0.9 - sunriseT * 2.4);
+			const arrowTilt = lat * 0.16 * visual.direction;
+			const signedDist =
+				normalizeLngDeg(lng + wobble + arrowTilt - visual.centerLng) *
+				visual.direction;
+			const latAlpha = polarTaper * midLatLift;
+			if (latAlpha <= 0.001) continue;
+
+			const acc = { r: 0, g: 0, b: 0, a: 0 };
+			const intensity = visual.intensity * latAlpha * SUN_TRANSITION_COLOR_ALPHA_MULT;
+			addSunTransitionColor(acc, signedDist, -62, 34, [12, 24, 72], 0.08 * intensity);
+			addSunTransitionColor(acc, signedDist, -43, 25, [78, 55, 145], 0.13 * intensity * violetGate);
+			addSunTransitionColor(acc, signedDist, -28, 20, [178, 62, 142], 0.16 * intensity * violetGate);
+			addSunTransitionColor(acc, signedDist, -13, 19, [238, 94, 116], 0.2 * intensity * roseGate);
+			addSunTransitionColor(acc, signedDist, 4, 17, [255, 137, 82], 0.18 * intensity * warmGate);
+			addSunTransitionColor(acc, signedDist, 18, 14, [255, 188, 82], 0.15 * intensity * goldGate);
+			addSunTransitionColor(acc, signedDist, 31, 12, [255, 236, 172], 0.1 * intensity * paleGate);
+
+			const alpha = clamp(acc.a, 0, SUN_TRANSITION_MAX_PIXEL_ALPHA);
+			if (alpha <= 0.001) continue;
+
+			const idx = (y * w + x) * 4;
+			data[idx] = Math.round(clamp(acc.r / acc.a, 0, 255));
+			data[idx + 1] = Math.round(clamp(acc.g / acc.a, 0, 255));
+			data[idx + 2] = Math.round(clamp(acc.b / acc.a, 0, 255));
+			data[idx + 3] = Math.round(alpha * 255);
+		}
+	}
+
+	ctx.putImageData(imageData, 0, 0);
+	return true;
+};
+
+const createSunTransitionCanvas = (): HTMLCanvasElement | null => {
+	if (typeof document === 'undefined') return null;
+
+	const canvas = document.createElement('canvas');
+	if (!paintSunTransitionCanvas(canvas, null)) return null;
+	return canvas;
+};
 // Clouds drift animation parameters.
 // We animate the *canvas source* (not Mapbox raster paint), so units are in the canvas'
 // pixel grid. We apply a light zoom-based scale so drift stays noticeable while clouds
@@ -2128,6 +2322,7 @@ const US_ONLY_BASEMAP_CLIP_MAX_ZOOM = 7;
 const MAPBOX_SOURCE_IDS = {
 	clouds: 'murmur-clouds',
 	dayFarSideShade: 'murmur-day-far-side-shade',
+	sunTransition: 'murmur-sun-transition',
 	nightLights: 'murmur-night-lights',
 	nightLightsReveal: 'murmur-night-lights-reveal',
 	states: 'murmur-states',
@@ -2147,6 +2342,8 @@ const MAPBOX_LAYER_IDS = {
 	// Globe overlays
 	clouds: 'murmur-clouds-raster',
 	dayFarSideShade: 'murmur-day-far-side-shade-raster',
+	sunTransition: 'murmur-sun-transition-raster',
+	sunTransitionCloudCatchlight: 'murmur-sun-transition-cloud-catchlight-raster',
 	nightLightsSpaceGlow: 'murmur-night-lights-space-glow',
 	nightLightsSpaceGlow2: 'murmur-night-lights-space-glow-2',
 	nightLightsGlow: 'murmur-night-lights-glow',
@@ -3012,6 +3209,12 @@ const NIGHT_MOON_RIM_BG = [
 	'radial-gradient(ellipse 78% 78% at 14% 14%, rgba(255, 255, 255, 0.14) 0%, rgba(230, 246, 255, 0.06) 26%, rgba(255, 255, 255, 0) 48%)',
 ].join(', ');
 
+const SUN_TRANSITION_SPACE_GLOW_BG = [
+	'radial-gradient(ellipse 78% 58% at 8% 6%, rgba(255, 198, 116, 0.34) 0%, rgba(255, 162, 102, 0.18) 28%, rgba(255, 162, 102, 0.06) 54%, rgba(255, 162, 102, 0) 76%)',
+	'radial-gradient(ellipse 58% 44% at 18% 14%, rgba(217, 86, 184, 0.18) 0%, rgba(142, 88, 210, 0.09) 42%, rgba(142, 88, 210, 0) 78%)',
+	'radial-gradient(ellipse 120% 84% at -18% -14%, rgba(255, 238, 182, 0.13) 0%, rgba(255, 210, 150, 0.06) 48%, rgba(255, 210, 150, 0) 82%)',
+].join(', ');
+
 // NOTE: Night lights are generated offline as raster dot tiles (see scripts/generate_contact_lights_tiles.py).
 
 export const SearchResultsMap: FC<SearchResultsMapProps> = ({
@@ -3072,6 +3275,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const dayFarSideShadePhase = nightLighting?.phase ?? null;
 	const dayFarSideShadePhaseStartMs = nightLighting?.phaseStartMs ?? null;
 	const dayFarSideShadePhaseEndMs = nightLighting?.phaseEndMs ?? null;
+	const sunTransitionPhase = nightLighting?.phase ?? null;
+	const sunTransitionPhaseStartMs = nightLighting?.phaseStartMs ?? null;
+	const sunTransitionPhaseEndMs = nightLighting?.phaseEndMs ?? null;
 	const isBackgroundPresentation = presentation === 'background';
 	const shouldAutoSpin = isBackgroundPresentation && autoSpin;
 	// Keep the latest presentation value available to async Mapbox callbacks (moveend, etc).
@@ -3090,12 +3296,16 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	// 0 = divider lines, 1 = interactive borders
 	const stateOverlayModeRef = useRef<number>(stateInteractionsEnabled ? 1 : 0);
 	const stateOverlayAnimRafRef = useRef<number | null>(null);
+	const nightLightingRef = useRef<GlobeNightLightingLike | null>(nightLighting ?? null);
+	nightLightingRef.current = nightLighting ?? null;
 	const dayFarSideShadeCanvasRef = useRef<HTMLCanvasElement | null>(null);
 	const dayFarSideShadeCenterLngRef = useRef<number>(DAY_FAR_SIDE_SHADE_CENTER_LNG);
 	const dayFarSideShadeLightingRef = useRef<GlobeNightLightingLike | null>(
 		nightLighting ?? null
 	);
 	dayFarSideShadeLightingRef.current = nightLighting ?? null;
+	const sunTransitionCanvasRef = useRef<HTMLCanvasElement | null>(null);
+	const sunTransitionPaintKeyRef = useRef<string>('');
 	const cloudsCanvasRef = useRef<HTMLCanvasElement | null>(null);
 	const cloudsCanvasCtxRef = useRef<CanvasRenderingContext2D | null>(null);
 	const cloudsTextureImageRef = useRef<HTMLImageElement | null>(null);
@@ -3203,6 +3413,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const lightingOverlayWarmKeyRef = useRef<HTMLDivElement | null>(null);
 	const lightingOverlayDarkKeyRef = useRef<HTMLDivElement | null>(null);
 	const lightingOverlayShadowRef = useRef<HTMLDivElement | null>(null);
+	const lightingOverlaySunSpaceGlowRef = useRef<HTMLDivElement | null>(null);
 	const lightingOverlayHotWashRef = useRef<HTMLDivElement | null>(null);
 	const lightingOverlayGloomWashRef = useRef<HTMLDivElement | null>(null);
 	const lightingOverlayNightDarkWashRef = useRef<HTMLDivElement | null>(null);
@@ -5924,6 +6135,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	}, []);
 
 	const ensureMapboxSourcesAndLayers = useCallback((mapInstance: mapboxgl.Map) => {
+		if (!sunTransitionCanvasRef.current && typeof document !== 'undefined') {
+			sunTransitionCanvasRef.current = createSunTransitionCanvas();
+		}
+
 		// World-land fill (cream continents under the ocean-blue background). Idempotent;
 		// safe if style.load already added it earlier.
 		ensureWorldLandFill(mapInstance);
@@ -5998,6 +6213,27 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			}
 		}
 
+		if (!mapInstance.getSource(MAPBOX_SOURCE_IDS.sunTransition)) {
+			const sunCanvas = sunTransitionCanvasRef.current;
+			if (sunCanvas) {
+				try {
+					mapInstance.addSource(MAPBOX_SOURCE_IDS.sunTransition, {
+						type: 'canvas',
+						canvas: sunCanvas,
+						animate: true,
+						coordinates: CLOUDS_CANVAS_COORDINATES,
+					} as unknown as mapboxgl.AnySourceData);
+					(
+						mapInstance.getSource(MAPBOX_SOURCE_IDS.sunTransition) as
+							| { play?: () => void }
+							| undefined
+					)?.play?.();
+				} catch {
+					// Non-fatal; sunrise still falls back to the normal day/night fade.
+				}
+			}
+		}
+
 		if (contactLightsTilesEnabled) {
 			// Contact lights: dot-only raster tiles derived from contact coords.
 			try {
@@ -6048,8 +6284,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		ensureSource(MAPBOX_SOURCE_IDS.markersPromotionDot);
 		ensureSource(MAPBOX_SOURCE_IDS.markersBase);
 
-		const ensureLayer = (layer: any) => {
+		const ensureLayer = (layer: any, beforeId?: string) => {
 			if (mapInstance.getLayer(layer.id)) return;
+			if (beforeId && mapInstance.getLayer(beforeId)) {
+				mapInstance.addLayer(layer, beforeId);
+				return;
+			}
 			mapInstance.addLayer(layer);
 		};
 
@@ -6060,7 +6300,34 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			cfg.cloudDeepZoomOpacity
 		);
 
-		// Clouds (baseline globe texture).
+		if (mapInstance.getSource(MAPBOX_SOURCE_IDS.dayFarSideShade)) {
+			ensureLayer({
+				id: MAPBOX_LAYER_IDS.dayFarSideShade,
+				type: 'raster',
+				source: MAPBOX_SOURCE_IDS.dayFarSideShade,
+				paint: {
+					'raster-opacity': 0,
+					'raster-fade-duration': 0,
+					'raster-resampling': 'linear',
+				},
+			});
+		}
+
+		if (mapInstance.getSource(MAPBOX_SOURCE_IDS.sunTransition)) {
+			ensureLayer({
+				id: MAPBOX_LAYER_IDS.sunTransition,
+				type: 'raster',
+				source: MAPBOX_SOURCE_IDS.sunTransition,
+				paint: {
+					'raster-opacity': 0,
+					'raster-fade-duration': 0,
+					'raster-resampling': 'linear',
+				},
+			});
+		}
+
+		// Clouds (baseline globe texture). Added above the dawn band so clouds
+		// interrupt the color instead of the sunrise reading as a flat wash.
 		ensureLayer({
 			id: MAPBOX_LAYER_IDS.clouds,
 			type: 'raster',
@@ -6079,11 +6346,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			},
 		});
 
-		if (mapInstance.getSource(MAPBOX_SOURCE_IDS.dayFarSideShade)) {
+		if (mapInstance.getSource(MAPBOX_SOURCE_IDS.sunTransition)) {
 			ensureLayer({
-				id: MAPBOX_LAYER_IDS.dayFarSideShade,
+				id: MAPBOX_LAYER_IDS.sunTransitionCloudCatchlight,
 				type: 'raster',
-				source: MAPBOX_SOURCE_IDS.dayFarSideShade,
+				source: MAPBOX_SOURCE_IDS.sunTransition,
 				paint: {
 					'raster-opacity': 0,
 					'raster-fade-duration': 0,
@@ -6614,6 +6881,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		try {
 			if (!dayFarSideShadeCanvasRef.current && typeof document !== 'undefined') {
 				dayFarSideShadeCanvasRef.current = createDayFarSideShadeCanvas();
+			}
+
+			if (!sunTransitionCanvasRef.current && typeof document !== 'undefined') {
+				sunTransitionCanvasRef.current = createSunTransitionCanvas();
 			}
 
 			if (!cloudsCanvasRef.current && typeof document !== 'undefined') {
@@ -9231,6 +9502,26 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		const cfg = weatherMoodConfigRef.current;
 		const rawNight = clamp(nightTRef.current, 0, 1);
 		const night = computeMoodVisualNightT(nightTRef.current, cfg);
+		const sunTransitionVisual = getSunTransitionVisualState(
+			nightLightingRef.current,
+			Date.now()
+		);
+		const sunTransitionOpacity = computeSunTransitionLayerOpacity(
+			sunTransitionVisual,
+			zoom
+		);
+		const sunTransitionCatchlightOpacity = clamp(
+			sunTransitionOpacity * SUN_TRANSITION_CLOUD_CATCHLIGHT_OPACITY_MULT,
+			0,
+			1
+		);
+		const sunSpaceGlowOpacity = clamp(
+			sunTransitionOpacity * SUN_TRANSITION_SPACE_GLOW_OPACITY_MULT,
+			0,
+			0.18
+		);
+		const sunWashSuppression = smoothstep(0.02, 0.22, sunTransitionOpacity);
+		const foregroundSunMul = 1 - sunWashSuppression * 0.78;
 
 		// Preserve the daytime palette and softbox tuning at night; the night cue comes
 		// from the lights overlay, not from tinting or dimming the basemap.
@@ -9240,7 +9531,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			1 - nightEaseForShadow * (1 - clamp(NIGHT_SHADOW_OVERLAY_MUL_MIN, 0, 1));
 
 		const warmKeyOpacity = clamp(
-			base * cfg.warmSoftboxOpacityMultiplier * keyNightMul,
+			base * cfg.warmSoftboxOpacityMultiplier * keyNightMul * foregroundSunMul,
 			0,
 			1
 		);
@@ -9250,7 +9541,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			1
 		);
 		const shadowOpacity = clamp(
-			base * cfg.shadowOpacityMultiplier * shadowNightMul,
+			base * cfg.shadowOpacityMultiplier * shadowNightMul * (1 - sunWashSuppression * 0.9),
 			0,
 			1
 		);
@@ -9260,6 +9551,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			lightingOverlayDarkKeyRef.current.style.opacity = String(darkKeyOpacity);
 		if (lightingOverlayShadowRef.current)
 			lightingOverlayShadowRef.current.style.opacity = String(shadowOpacity);
+		if (lightingOverlaySunSpaceGlowRef.current)
+			lightingOverlaySunSpaceGlowRef.current.style.opacity = String(sunSpaceGlowOpacity);
 
 		// Globe-zoom only via `base` (full at zoom ≤2.5, gone by zoom 5), and only
 		// during true full day. Intentionally NOT gated on presentation: the shade is
@@ -9279,6 +9572,20 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					MAPBOX_LAYER_IDS.dayFarSideShade,
 					'raster-opacity',
 					dayShadeOpacity
+				);
+			}
+			if (m?.getLayer(MAPBOX_LAYER_IDS.sunTransition)) {
+				m.setPaintProperty(
+					MAPBOX_LAYER_IDS.sunTransition,
+					'raster-opacity',
+					sunTransitionOpacity
+				);
+			}
+			if (m?.getLayer(MAPBOX_LAYER_IDS.sunTransitionCloudCatchlight)) {
+				m.setPaintProperty(
+					MAPBOX_LAYER_IDS.sunTransitionCloudCatchlight,
+					'raster-opacity',
+					sunTransitionCatchlightOpacity
 				);
 			}
 		} catch {
@@ -9425,7 +9732,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		// pool stays gloomy.
 		const brightSoftboxStrength = clamp(cfg.warmSoftboxOpacityMultiplier, 0, 1);
 		const hotActive = isHotRef.current && brightSoftboxStrength > 0.001 && night < 0.12;
-		const washOpacity = hotActive ? base * HOT_WASH_OPACITY * brightSoftboxStrength : 0;
+		const washOpacity = hotActive
+			? base * HOT_WASH_OPACITY * brightSoftboxStrength * foregroundSunMul
+			: 0;
 		if (lightingOverlayHotWashRef.current)
 			lightingOverlayHotWashRef.current.style.opacity = String(washOpacity);
 
@@ -9449,6 +9758,38 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		);
 		if (lightingOverlayNightDarkWashRef.current)
 			lightingOverlayNightDarkWashRef.current.style.opacity = String(nightDarkOpacity);
+	}, []);
+
+	const repaintSunTransitionCanvas = useCallback((nowMs: number, force = false) => {
+		const sunCanvas = sunTransitionCanvasRef.current;
+		if (!sunCanvas) return false;
+
+		const visual = getSunTransitionVisualState(nightLightingRef.current, nowMs);
+		const paintKey = visual
+			? [
+					visual.phase,
+					Math.round(visual.progress * SUN_TRANSITION_PROGRESS_PAINT_STEPS),
+					Math.round(visual.centerLng * 10),
+				].join(':')
+			: 'off';
+
+		if (force || paintKey !== sunTransitionPaintKeyRef.current) {
+			if (!paintSunTransitionCanvas(sunCanvas, visual)) return false;
+			sunTransitionPaintKeyRef.current = paintKey;
+			try {
+				const m = mapRef.current;
+				(
+					m?.getSource(MAPBOX_SOURCE_IDS.sunTransition) as
+						| { play?: () => void }
+						| undefined
+				)?.play?.();
+				m?.triggerRepaint();
+			} catch {
+				// Non-fatal.
+			}
+		}
+
+		return Boolean(visual);
 	}, []);
 
 	useEffect(() => {
@@ -9523,6 +9864,22 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		dayFarSideShadePhase,
 		dayFarSideShadePhaseStartMs,
 		dayFarSideShadePhaseEndMs,
+	]);
+
+	useEffect(() => {
+		if (!map || !isMapLoaded) return;
+		ensureMapboxSourcesAndLayers(map);
+		repaintSunTransitionCanvas(Date.now(), true);
+		applyLightingOverlayOpacity();
+	}, [
+		map,
+		isMapLoaded,
+		ensureMapboxSourcesAndLayers,
+		repaintSunTransitionCanvas,
+		applyLightingOverlayOpacity,
+		sunTransitionPhase,
+		sunTransitionPhaseStartMs,
+		sunTransitionPhaseEndMs,
 	]);
 
 	useEffect(() => {
@@ -9782,12 +10139,16 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		if (!isMapLoaded) return;
 		if (MANUAL_NIGHT_T_OVERRIDE !== null) {
 			nightTRef.current = nightT;
+			repaintSunTransitionCanvas(Date.now(), true);
+			applyLightingOverlayOpacity();
 			return;
 		}
 
 		const phase = nightLighting?.phase ?? null;
 		if (phase !== 'sunrise' && phase !== 'sunset') {
 			nightTRef.current = nightT;
+			repaintSunTransitionCanvas(Date.now(), true);
+			applyLightingOverlayOpacity();
 			return;
 		}
 
@@ -9818,6 +10179,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			const nowMs = Date.now();
 			const runtimeNightT = computeRuntimeNightT(nightLighting, nightT, nowMs);
 			nightTRef.current = runtimeNightT;
+			repaintSunTransitionCanvas(nowMs);
 			applyLightingOverlayOpacity();
 			applyMapNightState(runtimeNightT, nowMs >= (nightLighting?.phaseEndMs ?? 0));
 
@@ -9839,6 +10201,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		isMapLoaded,
 		nightLighting,
 		nightT,
+		repaintSunTransitionCanvas,
 		applyLightingOverlayOpacity,
 		applyStateOverlayOpacity,
 	]);
@@ -11566,6 +11929,23 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						'radial-gradient(ellipse 160% 160% at 115% 115%, rgba(6, 10, 28, 0.70) 0%, rgba(6, 10, 28, 0.50) 28%, rgba(10, 16, 36, 0.28) 55%, rgba(20, 28, 56, 0.08) 78%, rgba(0, 0, 0, 0) 100%)',
 					mixBlendMode: 'multiply',
 					// opacity intentionally unset — see applyLightingOverlayOpacity above.
+					zIndex: 1,
+				}}
+			/>
+			{/*
+			  Sunrise space glow. A very faint screen-blend bloom in the surrounding
+			  "space" so dawn feels present on the page without becoming a full wash.
+			  Opacity is owned by applyLightingOverlayOpacity.
+			*/}
+			<div
+				ref={lightingOverlaySunSpaceGlowRef}
+				aria-hidden
+				style={{
+					position: 'absolute',
+					inset: 0,
+					pointerEvents: 'none',
+					background: SUN_TRANSITION_SPACE_GLOW_BG,
+					mixBlendMode: 'screen',
 					zIndex: 1,
 				}}
 			/>
