@@ -55,6 +55,10 @@ export type MoodVisualConfig = {
 	 */
 	gloomWashOpacity: number;
 	lightning: boolean;
+	lightningIntensity: number;
+	lightningSpread: number;
+	lightningBurstiness: number;
+	lightningTint: [number, number, number];
 };
 
 const NORMAL: MoodVisualConfig = {
@@ -76,6 +80,10 @@ const NORMAL: MoodVisualConfig = {
 	nightVisualBlend: 0,
 	gloomWashOpacity: 0,
 	lightning: false,
+	lightningIntensity: 0,
+	lightningSpread: 0,
+	lightningBurstiness: 0,
+	lightningTint: [210, 232, 255],
 };
 
 const SUNNY: MoodVisualConfig = {
@@ -97,6 +105,10 @@ const SUNNY: MoodVisualConfig = {
 	nightVisualBlend: 0,
 	gloomWashOpacity: 0,
 	lightning: false,
+	lightningIntensity: 0,
+	lightningSpread: 0,
+	lightningBurstiness: 0,
+	lightningTint: [210, 232, 255],
 };
 
 const CLOUDY: MoodVisualConfig = {
@@ -118,6 +130,10 @@ const CLOUDY: MoodVisualConfig = {
 	nightVisualBlend: 0,
 	gloomWashOpacity: 0,
 	lightning: false,
+	lightningIntensity: 0,
+	lightningSpread: 0,
+	lightningBurstiness: 0,
+	lightningTint: [210, 232, 255],
 };
 
 const RAINY: MoodVisualConfig = {
@@ -139,6 +155,10 @@ const RAINY: MoodVisualConfig = {
 	nightVisualBlend: 0.18,
 	gloomWashOpacity: 0.22,
 	lightning: false,
+	lightningIntensity: 0,
+	lightningSpread: 0,
+	lightningBurstiness: 0,
+	lightningTint: [210, 232, 255],
 };
 
 const STORMY: MoodVisualConfig = {
@@ -160,6 +180,10 @@ const STORMY: MoodVisualConfig = {
 	nightVisualBlend: 0.08,
 	gloomWashOpacity: 0.08,
 	lightning: true,
+	lightningIntensity: 1,
+	lightningSpread: 0.86,
+	lightningBurstiness: 0.34,
+	lightningTint: [242, 246, 255],
 };
 
 const SNOWY: MoodVisualConfig = {
@@ -181,6 +205,10 @@ const SNOWY: MoodVisualConfig = {
 	nightVisualBlend: 0,
 	gloomWashOpacity: 0,
 	lightning: false,
+	lightningIntensity: 0,
+	lightningSpread: 0,
+	lightningBurstiness: 0,
+	lightningTint: [210, 232, 255],
 };
 
 export const MOOD_CONFIG: Record<WeatherMood, MoodVisualConfig> = {

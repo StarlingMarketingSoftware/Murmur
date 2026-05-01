@@ -67,7 +67,31 @@ def _jagged_polyline(
 	return left[:-1] + right
 
 
-def _render_stamp(size: int, seed: int) -> np.ndarray:
+def _parse_rgb(value: str) -> tuple[float, float, float]:
+	parts = [p.strip() for p in value.split(",")]
+	if len(parts) != 3:
+		raise argparse.ArgumentTypeError("RGB color must be formatted as r,g,b")
+	try:
+		r, g, b = (float(p) for p in parts)
+	except ValueError as exc:
+		raise argparse.ArgumentTypeError("RGB color must contain numeric channels") from exc
+	return (
+		float(max(0, min(255, r))),
+		float(max(0, min(255, g))),
+		float(max(0, min(255, b))),
+	)
+
+
+def _render_stamp(
+	size: int,
+	seed: int,
+	color: tuple[float, float, float],
+	branch_min: int,
+	branch_max: int,
+	branchiness: float,
+	halo_strength: float,
+	core_width_mul: float,
+) -> np.ndarray:
 	rng = random.Random(seed)
 
 	# 8-bit intensity canvas; we'll build the final premultiplied RGBA via numpy.
@@ -88,28 +112,28 @@ def _render_stamp(size: int, seed: int) -> np.ndarray:
 
 	# Glow pass first, then bright cores on top. Drawing the wide pass after the
 	# core would replace the white channel with gray in Pillow's L mode.
-	draw.line(main, fill=58, width=max(2, size // 92), joint="curve")
-	draw.line(main, fill=250, width=max(1, size // 155), joint="curve")
+	draw.line(main, fill=58, width=max(2, round((size / 92) * core_width_mul)), joint="curve")
+	draw.line(main, fill=250, width=max(1, round((size / 155) * core_width_mul)), joint="curve")
 	draw.line(main, fill=255, width=1, joint="curve")
 
 	# Branches: smaller offshoots in the mid/lower section.
-	branch_count = rng.randint(1, 3)
+	branch_count = rng.randint(max(0, branch_min), max(branch_min, branch_max))
 	for _ in range(branch_count):
 		i = rng.randint(int(len(main) * 0.25), int(len(main) * 0.8))
 		p = main[i]
 		# Branch direction: mostly sideways, slightly downward.
 		ang = rng.uniform(-math.pi * 0.85, math.pi * 0.85)
-		length = rng.uniform(size * 0.10, size * 0.26)
+		length = rng.uniform(size * 0.10, size * 0.26) * branchiness
 		b_end = (p[0] + math.cos(ang) * length, p[1] + abs(math.sin(ang)) * length * 0.55)
 		branch = _jagged_polyline(
 			p,
 			b_end,
-			displace=size * 0.08,
+			displace=size * 0.08 * branchiness,
 			roughness=0.58,
 			rng=rng,
 			max_depth=8,
 		)
-		draw.line(branch, fill=68, width=max(1, size // 135), joint="curve")
+		draw.line(branch, fill=68, width=max(1, round((size / 135) * core_width_mul)), joint="curve")
 		draw.line(branch, fill=250, width=1, joint="curve")
 
 	# Convert intensity to float and build a diffuse "cloud illumination" envelope.
@@ -136,17 +160,18 @@ def _render_stamp(size: int, seed: int) -> np.ndarray:
 	blob *= (0.55 + 0.45 * noise_blur) * patch
 
 	# Combine: prioritize the tight core, with only enough glow to feel luminous.
-	combined = _clamp01(core * 1.45 + blur1 * 0.18 + blur2 * 0.04 + blob * 0.12)
+	combined = _clamp01(core * 1.45 + blur1 * 0.2 + blur2 * 0.06 + blob * halo_strength)
 
 	# Shape alpha so the channel stays crisp and the halo falls off quickly.
 	alpha = _clamp01(np.maximum(core * 1.0, np.power(combined, np.float32(1.75)) * np.float32(0.78)))
+	alpha = np.where(alpha < np.float32(0.018), np.float32(0.0), alpha).astype(np.float32)
 
 	# Store straight-alpha PNG pixels. Browsers/canvas premultiply at draw time;
 	# writing premultiplied RGB here makes the soft halo carry low-RGB alpha,
 	# which reads as gray/dark blotches when Mapbox samples the canvas raster.
-	color = np.array([248.0, 252.0, 255.0], dtype=np.float32)
+	color_arr = np.array(color, dtype=np.float32)
 	rgba = np.zeros((size, size, 4), dtype=np.uint8)
-	rgba[..., 0:3] = color.astype(np.uint8)
+	rgba[..., 0:3] = color_arr.astype(np.uint8)
 	rgba[..., 3] = np.clip(alpha * 255.0, 0.0, 255.0).astype(np.uint8)
 	return rgba
 
@@ -154,9 +179,15 @@ def _render_stamp(size: int, seed: int) -> np.ndarray:
 def main() -> None:
 	parser = argparse.ArgumentParser()
 	parser.add_argument("--out-dir", default="public/maps/lightning_stamps")
-	parser.add_argument("--count", type=int, default=12)
-	parser.add_argument("--size", type=int, default=256)
+	parser.add_argument("--count", type=int, default=24)
+	parser.add_argument("--size", type=int, default=320)
 	parser.add_argument("--seed", type=int, default=4242)
+	parser.add_argument("--color", type=_parse_rgb, default=(250.0, 252.0, 255.0))
+	parser.add_argument("--branch-min", type=int, default=2)
+	parser.add_argument("--branch-max", type=int, default=5)
+	parser.add_argument("--branchiness", type=float, default=1.08)
+	parser.add_argument("--halo-strength", type=float, default=0.15)
+	parser.add_argument("--core-width-mul", type=float, default=1.12)
 	parser.add_argument("--dry-run", action="store_true")
 	args = parser.parse_args()
 
@@ -166,6 +197,11 @@ def main() -> None:
 	count = int(args.count)
 	size = int(args.size)
 	seed = int(args.seed)
+	branch_min = max(0, int(args.branch_min))
+	branch_max = max(branch_min, int(args.branch_max))
+	branchiness = max(0.25, float(args.branchiness))
+	halo_strength = max(0.0, float(args.halo_strength))
+	core_width_mul = max(0.25, float(args.core_width_mul))
 
 	for i in range(count):
 		name = f"flash_{i:02d}.png"
@@ -173,7 +209,16 @@ def main() -> None:
 		if args.dry_run:
 			print(f"[dry-run] would write {path}")
 			continue
-		rgba = _render_stamp(size=size, seed=seed + i * 97)
+		rgba = _render_stamp(
+			size=size,
+			seed=seed + i * 97,
+			color=args.color,
+			branch_min=branch_min,
+			branch_max=branch_max,
+			branchiness=branchiness,
+			halo_strength=halo_strength,
+			core_width_mul=core_width_mul,
+		)
 		Image.fromarray(rgba, mode="RGBA").save(path, format="PNG", optimize=True, compress_level=9)
 		print(f"wrote {path}")
 

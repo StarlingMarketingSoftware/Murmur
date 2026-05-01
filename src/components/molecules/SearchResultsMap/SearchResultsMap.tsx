@@ -101,19 +101,42 @@ type StormLightningPulse = {
 	rampUpMs: number;
 	holdMs: number;
 	rampDownMs: number;
+	glowOpacityMultiplier: number;
 };
+
+type StormLightningEventKind = 'sheet' | 'strike' | 'dramatic';
 
 type StormLightningEvent = {
 	id: number;
 	startMs: number;
 	endMs: number;
-	// Position in the clouds canvas coordinate system (0..CLOUDS_CANVAS_SIZE_PX).
+	kind: StormLightningEventKind;
+	// Position in the dedicated lightning canvas coordinate system.
 	x: number;
 	y: number;
-	scale: number;
+	coreScale: number;
+	glowScale: number;
+	sheetScaleX: number;
+	sheetScaleY: number;
 	rotationRad: number;
+	sheetRotationRad: number;
 	stampIndex: number;
+	cellIndex: number;
+	jitterX: number;
+	jitterY: number;
+	altitudePx: number;
+	parallaxPhase: number;
+	cloudOcclusion: number;
+	sheetDriftX: number;
+	sheetDriftY: number;
 	pulses: StormLightningPulse[];
+};
+
+type StormLightningCell = {
+	x: number;
+	y: number;
+	weight: number;
+	radiusPx: number;
 };
 
 const closeRing = (ring: ClippingRing): ClippingRing => {
@@ -360,7 +383,7 @@ const toRuntimeMoodConfig = (cfg: MoodVisualConfig): RuntimeMoodVisualConfig => 
 		cfg.softboxBlendMode === 'screen' ? cfg.softboxOpacityMultiplier : 0,
 	darkSoftboxOpacityMultiplier:
 		cfg.softboxBlendMode === 'multiply' ? cfg.softboxOpacityMultiplier : 0,
-	lightningIntensity: cfg.lightning ? 1 : 0,
+	lightningIntensity: cfg.lightning ? cfg.lightningIntensity : 0,
 });
 
 const blendRuntimeMoodConfig = (
@@ -409,6 +432,13 @@ const blendRuntimeMoodConfig = (
 		),
 		nightVisualBlend: lerp(from.nightVisualBlend, to.nightVisualBlend, c),
 		gloomWashOpacity: lerp(from.gloomWashOpacity, to.gloomWashOpacity, c),
+		lightningSpread: lerp(from.lightningSpread, to.lightningSpread, c),
+		lightningBurstiness: lerp(from.lightningBurstiness, to.lightningBurstiness, c),
+		lightningTint: [
+			lerp(from.lightningTint[0], to.lightningTint[0], c),
+			lerp(from.lightningTint[1], to.lightningTint[1], c),
+			lerp(from.lightningTint[2], to.lightningTint[2], c),
+		],
 		warmSoftboxOpacityMultiplier: lerp(
 			from.warmSoftboxOpacityMultiplier,
 			to.warmSoftboxOpacityMultiplier,
@@ -1383,46 +1413,76 @@ const CLOUDS_OVERLAY_FADE_OUT_START_ZOOM = 8.0;
 const CLOUDS_OVERLAY_FADE_OUT_END_ZOOM = 10.5;
 const CLOUDS_CANVAS_TEXTURE_URL = '/maps/clouds/0/0/0.png?v=23';
 const CLOUDS_CANVAS_SIZE_PX = 512;
-// Storm lightning assets: small "flash stamps" + a low-res potential mask to bias
+// Storm lightning assets: flash stamps + a low-res potential mask to bias
 // flashes toward storm cores.
-const LIGHTNING_STAMPS_COUNT = 12;
-const LIGHTNING_STAMPS_VERSION = 4;
+const LIGHTNING_STAMPS_COUNT = 24;
+const LIGHTNING_STAMPS_VERSION = 5;
 const LIGHTNING_POTENTIAL_VERSION = 1;
 const LIGHTNING_STAMPS_URL = (i: number) =>
 	`/maps/lightning_stamps/flash_${String(i).padStart(2, '0')}.png?v=${LIGHTNING_STAMPS_VERSION}`;
 const LIGHTNING_POTENTIAL_TEXTURE_URL = `/maps/lightning_potential/0/0/0.png?v=${LIGHTNING_POTENTIAL_VERSION}`;
+const LIGHTNING_CANVAS_WIDTH_PX = 1024;
+const LIGHTNING_CANVAS_HEIGHT_PX = 1024;
 // Keep lightning visible through the full clouds fade-out band so it's still present
 // in typical "interactive" zoom ranges (it will naturally dim with raster-opacity).
 const LIGHTNING_HIDE_AT_OR_ABOVE_ZOOM = CLOUDS_OVERLAY_FADE_OUT_END_ZOOM;
 // Show a first flash quickly when stormy lightning turns on so it reads as "connected".
-const LIGHTNING_FIRST_FLASH_MIN_INTERVAL_MS = 120;
-const LIGHTNING_FIRST_FLASH_MAX_INTERVAL_MS = 650;
-const LIGHTNING_MIN_INTERVAL_MS = 650;
-const LIGHTNING_MAX_INTERVAL_MS = 2200;
-const LIGHTNING_MAX_ACTIVE_EVENTS = 8;
-const LIGHTNING_ZOOMED_OUT_MAX_ACTIVE_EVENTS = 11;
+const LIGHTNING_FIRST_FLASH_MIN_INTERVAL_MS = 180;
+const LIGHTNING_FIRST_FLASH_MAX_INTERVAL_MS = 950;
+const LIGHTNING_MIN_INTERVAL_MS = 1400;
+const LIGHTNING_MAX_INTERVAL_MS = 4200;
+const LIGHTNING_MAX_ACTIVE_EVENTS = 10;
+const LIGHTNING_ZOOMED_OUT_MAX_ACTIVE_EVENTS = 14;
 const LIGHTNING_MERCATOR_MAX_LAT = 85.051129;
 const LIGHTNING_ZOOMED_OUT_BOOST_FULL_ZOOM = MAP_MIN_ZOOM + 0.35;
 const LIGHTNING_ZOOMED_OUT_BOOST_END_ZOOM = 4.35;
-const LIGHTNING_ZOOMED_OUT_MIN_INTERVAL_MS = 420;
-const LIGHTNING_ZOOMED_OUT_MAX_INTERVAL_MS = 1350;
-const LIGHTNING_BURST_CHANCE = 0.46;
-const LIGHTNING_BURST_MIN_REMAINING_FLASHES = 1;
-const LIGHTNING_BURST_MAX_REMAINING_FLASHES = 3;
-const LIGHTNING_BURST_MIN_INTERVAL_MS = 75;
-const LIGHTNING_BURST_MAX_INTERVAL_MS = 220;
+const LIGHTNING_ZOOMED_OUT_MIN_INTERVAL_MS = 900;
+const LIGHTNING_ZOOMED_OUT_MAX_INTERVAL_MS = 2600;
+const LIGHTNING_CLUSTER_CHANCE_MIN = 0.08;
+const LIGHTNING_CLUSTER_CHANCE_MAX = 0.18;
+const LIGHTNING_RESTRIKE_MIN_INTERVAL_MS = 95;
+const LIGHTNING_RESTRIKE_MAX_INTERVAL_MS = 320;
+const LIGHTNING_RESTRIKE_MIN_REMAINING_FLASHES = 1;
+const LIGHTNING_RESTRIKE_MAX_REMAINING_FLASHES = 2;
 const LIGHTNING_SCALE_ZOOM_START = 5.2;
 const LIGHTNING_SCALE_ZOOM_END = CLOUDS_OVERLAY_FADE_OUT_END_ZOOM;
 const LIGHTNING_US_BOUNDS: [number, number, number, number] = [-125.5, 24.0, -66.0, 50.0];
-const LIGHTNING_REGION_BIAS_CHANCE = 0.92;
-const LIGHTNING_REGION_RADIUS_GLOBE_PX = 16;
-const LIGHTNING_REGION_RADIUS_CLOSE_PX = 3.5;
-const LIGHTNING_SCALE_GLOBE_MIN = 0.07;
-const LIGHTNING_SCALE_GLOBE_MAX = 0.18;
-const LIGHTNING_SCALE_CLOSE_MIN = 0.01;
-const LIGHTNING_SCALE_CLOSE_MAX = 0.028;
-const LIGHTNING_US_POSITION_TRIES = 36;
-const LIGHTNING_OPACITY_MULTIPLIER = 1.12;
+// Use the same world-Mercator geometry as the clouds canvas. Canvas sources only
+// reliably render in this map when they span the full Mercator world (small
+// regional canvases can fall out of the globe-projection sample path).
+const LIGHTNING_CANVAS_COORDINATES: [
+	[number, number],
+	[number, number],
+	[number, number],
+	[number, number],
+] = [
+	[-180, 85.051129],
+	[180, 85.051129],
+	[180, -85.051129],
+	[-180, -85.051129],
+];
+const LIGHTNING_STORM_CELL_COUNT = 6;
+const LIGHTNING_REGION_BIAS_CHANCE = 0.34;
+// Cell radii in lightning-canvas pixels. The lightning canvas is full-world
+// Mercator (LIGHTNING_CANVAS_WIDTH_PX × LIGHTNING_CANVAS_HEIGHT_PX), so CONUS
+// occupies roughly 165 px wide × 80 px tall at 1024×1024.
+const LIGHTNING_CELL_RADIUS_GLOBE_PX = 28;
+const LIGHTNING_CELL_RADIUS_CLOSE_PX = 9;
+const LIGHTNING_DRAMATIC_STRIKE_CHANCE = 0.08;
+const LIGHTNING_SHEET_FLASH_CHANCE = 0.68;
+const LIGHTNING_ALTITUDE_GLOBE_PX = 13;
+const LIGHTNING_ALTITUDE_CLOSE_PX = 4;
+const LIGHTNING_CATCHLIGHT_OPACITY = 0.22;
+// Stamp scale is relative to the full lightning canvas. The new stamps are 320 px
+// wide; with these values a globe-zoom dramatic strike paints ~80 px wide across
+// the whole world canvas — roughly half the CONUS footprint.
+const LIGHTNING_SCALE_GLOBE_MIN = 0.16;
+const LIGHTNING_SCALE_GLOBE_MAX = 0.32;
+const LIGHTNING_SCALE_CLOSE_MIN = 0.05;
+const LIGHTNING_SCALE_CLOSE_MAX = 0.11;
+const LIGHTNING_US_POSITION_TRIES = 72;
+const LIGHTNING_OPACITY_MULTIPLIER = 1.08;
+const LIGHTNING_LAYER_OPACITY = 0.92;
 
 const getLightningZoomedOutBoostT = (zoom: number) => {
 	if (zoom <= LIGHTNING_ZOOMED_OUT_BOOST_FULL_ZOOM) return 1;
@@ -1442,14 +1502,6 @@ const getLightningZoomedInT = (zoom: number) => {
 		(LIGHTNING_SCALE_ZOOM_END - LIGHTNING_SCALE_ZOOM_START);
 	const clamped = clamp(t, 0, 1);
 	return clamped * clamped * (3 - 2 * clamped);
-};
-
-const getLightningSpawnCount = (zoom: number) => {
-	const boostT = getLightningZoomedOutBoostT(zoom);
-	let count = 1;
-	if (Math.random() < 0.85 * boostT) count += 1;
-	if (Math.random() < 0.45 * boostT) count += 1;
-	return count;
 };
 
 // Contact-lights overlay: dot-only night lights derived from contact coordinates.
@@ -1861,6 +1913,24 @@ const buildCloudsOpacityExpr = (
 	deepZoomFloor,
 	22,
 	deepZoomFloor,
+];
+
+const buildLightningOpacityExpr = (intensity: number) => [
+	'interpolate',
+	['linear'],
+	['zoom'],
+	0,
+	intensity,
+	MAP_MIN_ZOOM,
+	intensity,
+	4,
+	intensity,
+	CLOUDS_OVERLAY_FADE_OUT_START_ZOOM,
+	intensity * 0.9,
+	CLOUDS_OVERLAY_FADE_OUT_END_ZOOM,
+	0,
+	22,
+	0,
 ];
 
 const AUTO_FIT_CONTACTS_MAX_ZOOM = 10;
@@ -2332,6 +2402,7 @@ const US_ONLY_BASEMAP_CLIP_MAX_ZOOM = 7;
 
 const MAPBOX_SOURCE_IDS = {
 	clouds: 'murmur-clouds',
+	lightning: 'murmur-lightning',
 	dayFarSideShade: 'murmur-day-far-side-shade',
 	sunTransition: 'murmur-sun-transition',
 	nightLights: 'murmur-night-lights',
@@ -2352,6 +2423,7 @@ const MAPBOX_SOURCE_IDS = {
 const MAPBOX_LAYER_IDS = {
 	// Globe overlays
 	clouds: 'murmur-clouds-raster',
+	lightning: 'murmur-lightning-raster',
 	dayFarSideShade: 'murmur-day-far-side-shade-raster',
 	sunTransition: 'murmur-sun-transition-raster',
 	sunTransitionCloudCatchlight: 'murmur-sun-transition-cloud-catchlight-raster',
@@ -3009,7 +3081,7 @@ const normalizeStateKey = (state?: string | null): string | null => {
 // MANUAL WEATHER MOOD OVERRIDE FOR TESTING.
 // Set to one of: 'sunny' | 'normal' | 'cloudy' | 'rainy' | 'stormy' | 'snowy'
 // Set back to null to use the real weather mood from the user's region.
-const MANUAL_WEATHER_MOOD_OVERRIDE: WeatherMood | null = null;
+const MANUAL_WEATHER_MOOD_OVERRIDE: WeatherMood | null = 'stormy';
 
 // MANUAL TEMPERATURE OVERRIDE FOR TESTING (Fahrenheit).
 // Set to a number (e.g. 92) to test the > 80°F brightness lift.
@@ -3351,13 +3423,18 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		y: 0,
 	});
 	const cloudsDriftSimTimeMsRef = useRef<number>(0);
+	const lightningCanvasRef = useRef<HTMLCanvasElement | null>(null);
+	const lightningCanvasCtxRef = useRef<CanvasRenderingContext2D | null>(null);
 	const lightningStampImagesRef = useRef<HTMLImageElement[] | null>(null);
 	const lightningStampLoadPromiseRef = useRef<Promise<HTMLImageElement[]> | null>(null);
 	const lightningPotentialU8Ref = useRef<Uint8Array | null>(null);
 	const lightningPotentialLoadPromiseRef = useRef<Promise<Uint8Array> | null>(null);
 	const lightningEventsRef = useRef<StormLightningEvent[]>([]);
+	const lightningStormCellsRef = useRef<StormLightningCell[] | null>(null);
+	const lightningStormCellsKeyRef = useRef<string>('');
 	const lightningNextFlashAtMsRef = useRef<number>(0);
 	const lightningBurstRemainingRef = useRef<number>(0);
+	const lightningRestrikeCellRef = useRef<StormLightningCell | null>(null);
 	const lightningEventIdRef = useRef<number>(1);
 	const lightningWasEnabledRef = useRef<boolean>(false);
 	const prevIsBackgroundPresentationRef = useRef<boolean>(isBackgroundPresentation);
@@ -4742,6 +4819,22 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			// Ignore.
 		}
 
+		// Mirror the same play() guarantee for the dedicated lightning canvas source.
+		try {
+			const lightningSource: { play?: () => void } | null = (() => {
+				try {
+					return map.getSource(MAPBOX_SOURCE_IDS.lightning) as
+						| { play?: () => void }
+						| null;
+				} catch {
+					return null;
+				}
+			})();
+			lightningSource?.play?.();
+		} catch {
+			// Ignore.
+		}
+
 		const loadTexture = (): Promise<HTMLImageElement> => {
 			if (cloudsTextureImageRef.current)
 				return Promise.resolve(cloudsTextureImageRef.current);
@@ -4927,32 +5020,21 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			opts?: { fast?: boolean; zoom?: number }
 		) => {
 			const fast = Boolean(opts?.fast);
-			if (fast) lightningBurstRemainingRef.current = 0;
+			const cfg = weatherMoodConfigRef.current;
+			if (fast) {
+				lightningBurstRemainingRef.current = 0;
+				lightningRestrikeCellRef.current = null;
+			}
 			if (!fast && lightningBurstRemainingRef.current > 0) {
 				lightningBurstRemainingRef.current -= 1;
 				const wait =
-					LIGHTNING_BURST_MIN_INTERVAL_MS +
+					LIGHTNING_RESTRIKE_MIN_INTERVAL_MS +
 					Math.random() *
-						(LIGHTNING_BURST_MAX_INTERVAL_MS - LIGHTNING_BURST_MIN_INTERVAL_MS);
+						(LIGHTNING_RESTRIKE_MAX_INTERVAL_MS - LIGHTNING_RESTRIKE_MIN_INTERVAL_MS);
 				lightningNextFlashAtMsRef.current = nowMs + wait;
 				return;
 			}
-			if (!fast && Math.random() < LIGHTNING_BURST_CHANCE) {
-				lightningBurstRemainingRef.current =
-					LIGHTNING_BURST_MIN_REMAINING_FLASHES +
-					Math.floor(
-						Math.random() *
-							(LIGHTNING_BURST_MAX_REMAINING_FLASHES -
-								LIGHTNING_BURST_MIN_REMAINING_FLASHES +
-								1)
-					);
-				const wait =
-					LIGHTNING_BURST_MIN_INTERVAL_MS +
-					Math.random() *
-						(LIGHTNING_BURST_MAX_INTERVAL_MS - LIGHTNING_BURST_MIN_INTERVAL_MS);
-				lightningNextFlashAtMsRef.current = nowMs + wait;
-				return;
-			}
+			lightningRestrikeCellRef.current = null;
 
 			const baseMin = fast
 				? LIGHTNING_FIRST_FLASH_MIN_INTERVAL_MS
@@ -4964,6 +5046,21 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			const min = baseMin + (LIGHTNING_ZOOMED_OUT_MIN_INTERVAL_MS - baseMin) * boostT;
 			const max = baseMax + (LIGHTNING_ZOOMED_OUT_MAX_INTERVAL_MS - baseMax) * boostT;
 			const wait = min + Math.random() * Math.max(0, max - min);
+			const clusterChance = lerp(
+				LIGHTNING_CLUSTER_CHANCE_MIN,
+				LIGHTNING_CLUSTER_CHANCE_MAX,
+				clamp(cfg.lightningBurstiness, 0, 1)
+			);
+			if (!fast && Math.random() < clusterChance) {
+				lightningBurstRemainingRef.current =
+					LIGHTNING_RESTRIKE_MIN_REMAINING_FLASHES +
+					Math.floor(
+						Math.random() *
+							(LIGHTNING_RESTRIKE_MAX_REMAINING_FLASHES -
+								LIGHTNING_RESTRIKE_MIN_REMAINING_FLASHES +
+								1)
+					);
+			}
 			lightningNextFlashAtMsRef.current = nowMs + wait;
 		};
 
@@ -5029,31 +5126,28 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		const randomLightningUsCanvasPoint = (
 			w: number,
 			h: number
-		): { x: number; y: number } => {
+		): { x: number; y: number; alpha: number } => {
 			const [west, south, east, north] = LIGHTNING_US_BOUNDS;
-			for (let i = 0; i < 20; i++) {
+			let best: { x: number; y: number; alpha: number } | null = null;
+			for (let i = 0; i < LIGHTNING_US_POSITION_TRIES; i++) {
 				const lng = lerp(west, east, Math.random());
 				const lat = lerp(south, north, Math.random());
 				if (!isLngLatInLightningUsRegion(lng, lat)) continue;
 				const point = lngLatToLightningCanvasPoint(lng, lat, w, h);
-				if (point) return point;
+				if (!point) continue;
+				const alpha = lightningPotentialAlphaAt(
+					point.x,
+					point.y,
+					CLOUDS_CANVAS_SIZE_PX,
+					CLOUDS_CANVAS_SIZE_PX
+				);
+				if (!best || alpha > best.alpha) best = { ...point, alpha };
+				const acceptance = 0.12 + Math.pow(alpha / 255, 1.35) * 0.88;
+				if (alpha >= 8 && Math.random() < acceptance) {
+					return { ...point, alpha };
+				}
 			}
-			const lng = lerp(west, east, Math.random());
-			const lat = lerp(south, north, Math.random());
-			return lngLatToLightningCanvasPoint(lng, lat, w, h) ?? { x: w * 0.5, y: h * 0.5 };
-		};
-
-		const getLightningUsCanvasBounds = (w: number, h: number) => {
-			const [west, south, east, north] = LIGHTNING_US_BOUNDS;
-			const nw = lngLatToLightningCanvasPoint(west, north, w, h);
-			const se = lngLatToLightningCanvasPoint(east, south, w, h);
-			if (!nw || !se) return null;
-			return {
-				minX: Math.min(nw.x, se.x),
-				maxX: Math.max(nw.x, se.x),
-				minY: Math.min(nw.y, se.y),
-				maxY: Math.max(nw.y, se.y),
-			};
+			return best ?? { x: w * 0.5, y: h * 0.5, alpha: 128 };
 		};
 
 		const getLightningAnchorCanvasPoint = (
@@ -5079,69 +5173,145 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			return lngLatToLightningCanvasPoint(defaultCenter.lng, defaultCenter.lat, w, h);
 		};
 
+		const buildLightningStormCells = (w: number, h: number): StormLightningCell[] => {
+			const weatherCenter = weatherRegionCenterRef.current;
+			const key = `${w}x${h}:${weatherCenter?.lat?.toFixed(2) ?? 'none'}:${
+				weatherCenter?.lng?.toFixed(2) ?? 'none'
+			}`;
+			if (lightningStormCellsKeyRef.current === key && lightningStormCellsRef.current) {
+				return lightningStormCellsRef.current;
+			}
+
+			const cells: StormLightningCell[] = [];
+			const anchor = getLightningAnchorCanvasPoint(w, h);
+			if (anchor) {
+				cells.push({
+					x: anchor.x,
+					y: anchor.y,
+					weight: 1.25,
+					radiusPx: LIGHTNING_CELL_RADIUS_GLOBE_PX * 0.92,
+				});
+			}
+
+			while (cells.length < LIGHTNING_STORM_CELL_COUNT) {
+				const point = randomLightningUsCanvasPoint(w, h);
+				cells.push({
+					x: point.x,
+					y: point.y,
+					weight: 0.55 + (point.alpha / 255) * 1.35 + Math.random() * 0.35,
+					radiusPx: lerp(LIGHTNING_CELL_RADIUS_GLOBE_PX * 0.7, LIGHTNING_CELL_RADIUS_GLOBE_PX * 1.4, Math.random()),
+				});
+			}
+
+			lightningStormCellsKeyRef.current = key;
+			lightningStormCellsRef.current = cells;
+			return cells;
+		};
+
+		const pickLightningCell = (
+			w: number,
+			h: number
+		): { cell: StormLightningCell; index: number } => {
+			const restrikeCell = lightningRestrikeCellRef.current;
+			if (lightningBurstRemainingRef.current > 0 && restrikeCell) {
+				return { cell: restrikeCell, index: -1 };
+			}
+
+			const cfg = weatherMoodConfigRef.current;
+			const cells = buildLightningStormCells(w, h);
+			const weatherBiasChance =
+				LIGHTNING_REGION_BIAS_CHANCE * (1 - clamp(cfg.lightningSpread, 0, 1) * 0.72);
+			if (cells[0] && Math.random() < weatherBiasChance) {
+				return { cell: cells[0], index: 0 };
+			}
+
+			const total = cells.reduce((sum, cell, index) => {
+				const weatherPenalty = index === 0 ? 0.8 : 1;
+				return sum + Math.max(0.01, cell.weight * weatherPenalty);
+			}, 0);
+			let r = Math.random() * Math.max(0.01, total);
+			for (let i = 0; i < cells.length; i++) {
+				const weight = cells[i].weight * (i === 0 ? 0.8 : 1);
+				r -= weight;
+				if (r <= 0) return { cell: cells[i], index: i };
+			}
+			return { cell: cells[cells.length - 1], index: cells.length - 1 };
+		};
+
 		const pickLocalizedLightningPosition = (
 			w: number,
 			h: number,
 			zoom: number
-		): { x: number; y: number } => {
-			const anchor = getLightningAnchorCanvasPoint(w, h);
-			if (!anchor) return { x: Math.random() * w, y: Math.random() * h };
+		): {
+			x: number;
+			y: number;
+			cell: StormLightningCell;
+			cellIndex: number;
+			potentialAlpha: number;
+		} => {
+			const { cell, index: cellIndex } = pickLightningCell(w, h);
 
 			const zoomT = getLightningZoomedInT(zoom);
-			const radius = lerp(
-				LIGHTNING_REGION_RADIUS_GLOBE_PX,
-				LIGHTNING_REGION_RADIUS_CLOSE_PX,
-				zoomT
-			);
-			const usBounds = getLightningUsCanvasBounds(w, h);
+			const spread = clamp(weatherMoodConfigRef.current.lightningSpread, 0, 1);
+			const radius =
+				lerp(LIGHTNING_CELL_RADIUS_GLOBE_PX, LIGHTNING_CELL_RADIUS_CLOSE_PX, zoomT) *
+				lerp(0.88, 1.34, spread) *
+				lerp(0.75, 1.15, Math.random()) *
+				lerp(0.85, 1.15, clamp(cell.radiusPx / LIGHTNING_CELL_RADIUS_GLOBE_PX, 0, 1.4));
 			let best: { x: number; y: number; alpha: number } | null = null;
 
 			for (let i = 0; i < LIGHTNING_US_POSITION_TRIES; i++) {
-				const useRegionBias = Math.random() < LIGHTNING_REGION_BIAS_CHANCE;
-				let x: number;
-				let y: number;
-				if (useRegionBias) {
-					const angle = Math.random() * Math.PI * 2;
-					const distance = Math.sqrt(Math.random()) * radius;
-					x = anchor.x + Math.cos(angle) * distance;
-					y = anchor.y + Math.sin(angle) * distance;
-					if (usBounds) {
-						x = clamp(x, usBounds.minX, usBounds.maxX);
-						y = clamp(y, usBounds.minY, usBounds.maxY);
-					} else {
-						x = ((x % w) + w) % w;
-						y = clamp(y, 0, h - 1);
-					}
-					const lngLat = lightningCanvasPointToLngLat(x, y, w, h);
-					if (!lngLat || !isLngLatInLightningUsRegion(lngLat.lng, lngLat.lat)) {
-						continue;
-					}
-				} else {
-					const point = randomLightningUsCanvasPoint(w, h);
-					x = point.x;
-					y = point.y;
-				}
-				const alpha = lightningPotentialAlphaAt(x, y, w, h);
+				const angle = Math.random() * Math.PI * 2;
+				const distance = Math.sqrt(Math.random()) * Math.max(4, radius);
+				const x = clamp(cell.x + Math.cos(angle) * distance, 0, w);
+				const y = clamp(cell.y + Math.sin(angle) * distance, 0, h);
+				const lngLat = lightningCanvasPointToLngLat(x, y, w, h);
+				if (!lngLat || !isLngLatInLightningUsRegion(lngLat.lng, lngLat.lat)) continue;
+				const alpha = lightningPotentialAlphaAt(
+					(((x / w) * CLOUDS_CANVAS_SIZE_PX) % CLOUDS_CANVAS_SIZE_PX),
+					((y / h) * CLOUDS_CANVAS_SIZE_PX),
+					CLOUDS_CANVAS_SIZE_PX,
+					CLOUDS_CANVAS_SIZE_PX
+				);
 				if (!best || alpha > best.alpha) best = { x, y, alpha };
 
-				const acceptance = 0.18 + Math.pow(alpha / 255, 1.2) * 0.82;
-				if (alpha >= 8 && Math.random() < acceptance) return { x, y };
+				const acceptance = 0.1 + Math.pow(alpha / 255, 1.2) * 0.9;
+				if (alpha >= 8 && Math.random() < acceptance) {
+					return { x, y, cell, cellIndex, potentialAlpha: alpha };
+				}
 			}
 
-			return best ? { x: best.x, y: best.y } : anchor;
+			const fallback = best ?? cell;
+			return {
+				x: fallback.x,
+				y: fallback.y,
+				cell,
+				cellIndex,
+				potentialAlpha: 'alpha' in fallback ? fallback.alpha : 128,
+			};
 		};
 
 		const pickLightningPosition = (
 			w: number,
 			h: number,
 			zoom: number
-		): { x: number; y: number } => {
+		): {
+			x: number;
+			y: number;
+			cell: StormLightningCell;
+			cellIndex: number;
+			potentialAlpha: number;
+		} => {
 			return pickLocalizedLightningPosition(w, h, zoom);
 		};
 
-		const spawnLightningEvent = (nowMs: number, w: number, h: number) => {
+		const spawnLightningEvent = (
+			nowMs: number,
+			w: number,
+			h: number
+		): StormLightningCell | null => {
 			const stamps = lightningStampImagesRef.current;
-			if (!Array.isArray(stamps) || stamps.length === 0) return;
+			if (!Array.isArray(stamps) || stamps.length === 0) return null;
 
 			const zoom = getCurrentLightningZoom();
 			const boostT = getLightningZoomedOutBoostT(zoom);
@@ -5150,12 +5320,13 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					(LIGHTNING_ZOOMED_OUT_MAX_ACTIVE_EVENTS - LIGHTNING_MAX_ACTIVE_EVENTS) * boostT
 			);
 			const events = lightningEventsRef.current;
-			if (events.length >= maxActiveEvents) return;
+			if (events.length >= maxActiveEvents) return null;
 
-			const { x, y } = pickLightningPosition(w, h, zoom);
+			const { x, y, cell, cellIndex, potentialAlpha } = pickLightningPosition(w, h, zoom);
 			const stampIndex = Math.floor(Math.random() * stamps.length);
 			const zoomT = getLightningZoomedInT(zoom);
-			const scale =
+			const cloudOcclusion = clamp(potentialAlpha / 255, 0, 1);
+			const baseScale =
 				lerp(LIGHTNING_SCALE_GLOBE_MIN, LIGHTNING_SCALE_CLOSE_MIN, zoomT) +
 				Math.random() *
 					lerp(
@@ -5163,19 +5334,44 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						LIGHTNING_SCALE_CLOSE_MAX - LIGHTNING_SCALE_CLOSE_MIN,
 						zoomT
 					);
+			const kindRoll = Math.random();
+			const kind: StormLightningEventKind =
+				kindRoll < LIGHTNING_DRAMATIC_STRIKE_CHANCE
+					? 'dramatic'
+					: kindRoll < LIGHTNING_DRAMATIC_STRIKE_CHANCE + LIGHTNING_SHEET_FLASH_CHANCE
+						? 'sheet'
+						: 'strike';
+			const kindScale = kind === 'dramatic' ? 1.46 : kind === 'sheet' ? 1.28 : 1;
+			const coreScale = baseScale * kindScale;
+			const glowScale =
+				coreScale * (kind === 'dramatic' ? 3.3 : kind === 'sheet' ? 4.6 : 2.75);
+			const altitudePx =
+				lerp(LIGHTNING_ALTITUDE_GLOBE_PX, LIGHTNING_ALTITUDE_CLOSE_PX, zoomT) *
+				(kind === 'dramatic' ? 1.15 : kind === 'sheet' ? 1.35 : 0.85) *
+				lerp(0.75, 1.25, Math.random());
 			const rotationRad = (Math.random() - 0.5) * 0.55;
+			const sheetRotationRad = (Math.random() - 0.5) * 0.9;
+			const sheetScaleX =
+				glowScale * (kind === 'sheet' ? lerp(1.85, 2.65, Math.random()) : 1.45);
+			const sheetScaleY =
+				glowScale * (kind === 'sheet' ? lerp(0.62, 0.95, Math.random()) : 0.86);
+			const parallaxPhase = Math.random() * Math.PI * 2;
 
-			const pulseCount = Math.random() < 0.35 ? 3 : 2;
+			const pulseCount = kind === 'dramatic' || Math.random() < 0.28 ? 3 : 2;
 			const pulses: StormLightningPulse[] = [];
 			for (let p = 0; p < pulseCount; p++) {
-				const offsetMs = p === 0 ? 0 : 55 + p * 55 + Math.random() * 20;
-				const peakOpacity = p === 0 ? 0.6 : p === 1 ? 0.38 : 0.24;
+				const offsetMs = p === 0 ? 0 : 82 + p * (62 + Math.random() * 48);
+				const basePeak =
+					kind === 'dramatic' ? 0.78 : kind === 'sheet' ? 0.5 : 0.62;
+				const peakOpacity = p === 0 ? basePeak : basePeak * (p === 1 ? 0.48 : 0.28);
 				pulses.push({
 					offsetMs,
 					peakOpacity,
-					rampUpMs: 28,
-					holdMs: 14,
-					rampDownMs: 180,
+					rampUpMs: p === 0 ? 12 : 22,
+					holdMs: p === 0 ? 18 : 8,
+					rampDownMs: kind === 'sheet' ? 640 : kind === 'dramatic' ? 500 : 400,
+					glowOpacityMultiplier:
+						kind === 'sheet' ? 1.55 : kind === 'dramatic' ? 1.36 : 1.08,
 				});
 			}
 			const endMs =
@@ -5189,16 +5385,46 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				id: lightningEventIdRef.current++,
 				startMs: nowMs,
 				endMs,
+				kind,
 				x,
 				y,
-				scale,
+				coreScale,
+				glowScale,
+				sheetScaleX,
+				sheetScaleY,
 				rotationRad,
+				sheetRotationRad,
 				stampIndex,
+				cellIndex,
+				jitterX: (Math.random() - 0.5) * 5,
+				jitterY: (Math.random() - 0.5) * 5,
+				altitudePx,
+				parallaxPhase,
+				cloudOcclusion,
+				sheetDriftX: (Math.random() - 0.5) * altitudePx * 0.9,
+				sheetDriftY: -altitudePx * lerp(0.6, 1.15, Math.random()),
 				pulses,
 			});
+			if (lightningBurstRemainingRef.current > 0) {
+				lightningRestrikeCellRef.current = cell;
+			}
+			return cell;
 		};
 
 		const drawLightning = (nowMs: number) => {
+			const lightningCanvas = lightningCanvasRef.current;
+			const lightningCtx = lightningCanvasCtxRef.current;
+			if (!lightningCanvas || !lightningCtx) return;
+
+			const w = lightningCanvas.width || LIGHTNING_CANVAS_WIDTH_PX;
+			const h = lightningCanvas.height || LIGHTNING_CANVAS_HEIGHT_PX;
+			try {
+				lightningCtx.setTransform(1, 0, 0, 1, 0, 0);
+			} catch {
+				// Ignore.
+			}
+			lightningCtx.clearRect(0, 0, w, h);
+
 			const currentZoom = getCurrentLightningZoom();
 			const zoomOk = currentZoom < LIGHTNING_HIDE_AT_OR_ABOVE_ZOOM;
 			const lightningIntensity = clamp(
@@ -5220,6 +5446,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					lightningEventsRef.current = [];
 					lightningNextFlashAtMsRef.current = 0;
 					lightningBurstRemainingRef.current = 0;
+					lightningRestrikeCellRef.current = null;
 				}
 				return;
 			}
@@ -5229,9 +5456,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 			const stamps = lightningStampImagesRef.current;
 			if (!Array.isArray(stamps) || stamps.length === 0) return;
-
-			const w = cloudsCanvas.width || CLOUDS_CANVAS_SIZE_PX;
-			const h = cloudsCanvas.height || CLOUDS_CANVAS_SIZE_PX;
 
 			// Expire old events (tiny list; mutate in place).
 			{
@@ -5248,54 +5472,234 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				scheduleNextLightning(nowMs, { fast: justEnabled, zoom: currentZoom });
 			}
 			if (canSpawnLightning && nowMs >= lightningNextFlashAtMsRef.current) {
-				const spawnCount = Math.max(
-					1,
-					Math.round(
-						getLightningSpawnCount(currentZoom) *
-							clamp(0.35 + lightningIntensity * 0.65, 0, 1)
-					)
-				);
+				const spawnCount =
+					Math.random() < 0.08 * getLightningZoomedOutBoostT(currentZoom) ? 2 : 1;
+				let lastCell: StormLightningCell | null = null;
 				for (let i = 0; i < spawnCount; i++) {
-					spawnLightningEvent(nowMs + i * (30 + Math.random() * 45), w, h);
+					const spawnedCell = spawnLightningEvent(
+						nowMs + i * (55 + Math.random() * 70),
+						w,
+						h
+					);
+					if (spawnedCell) lastCell = spawnedCell;
 				}
 				scheduleNextLightning(nowMs, { zoom: currentZoom });
+				if (lightningBurstRemainingRef.current > 0 && lastCell) {
+					lightningRestrikeCellRef.current = lastCell;
+				}
 			}
 
 			const events = lightningEventsRef.current;
 			if (events.length === 0) return;
 
-			cloudsCtx.save();
+			const drawStamp = (
+				stamp: HTMLImageElement,
+				x: number,
+				y: number,
+				scale: number,
+				rotation: number,
+				alpha: number
+			) => {
+				const sw = stamp.naturalWidth || stamp.width || 256;
+				const sh = stamp.naturalHeight || stamp.height || 256;
+				const dw = sw * scale;
+				const dh = sh * scale;
+
+				lightningCtx.globalAlpha = alpha;
+				lightningCtx.translate(x, y);
+				lightningCtx.rotate(rotation);
+				lightningCtx.drawImage(stamp, -dw * 0.5, -dh * 0.5, dw, dh);
+				lightningCtx.setTransform(1, 0, 0, 1, 0, 0);
+			};
+
+			const drawEllipticalGlow = (
+				ctx: CanvasRenderingContext2D,
+				x: number,
+				y: number,
+				radiusX: number,
+				radiusY: number,
+				rotation: number,
+				alpha: number,
+				color: [number, number, number]
+			) => {
+				if (alpha <= 0.001 || radiusX <= 0 || radiusY <= 0) return;
+				ctx.save();
+				try {
+					ctx.translate(x, y);
+					ctx.rotate(rotation);
+					ctx.scale(radiusX, radiusY);
+					const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
+					const r = Math.round(color[0]);
+					const g = Math.round(color[1]);
+					const b = Math.round(color[2]);
+					gradient.addColorStop(0, `rgba(${r}, ${g}, ${b}, ${alpha})`);
+					gradient.addColorStop(0.28, `rgba(${r}, ${g}, ${b}, ${alpha * 0.48})`);
+					gradient.addColorStop(0.68, `rgba(${r}, ${g}, ${b}, ${alpha * 0.12})`);
+					gradient.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
+					ctx.fillStyle = gradient;
+					ctx.beginPath();
+					ctx.arc(0, 0, 1, 0, Math.PI * 2);
+					ctx.fill();
+				} catch {
+					// Ignore.
+				} finally {
+					ctx.restore();
+				}
+			};
+
+			const drawCloudCatchlight = (
+				x: number,
+				y: number,
+				radiusX: number,
+				radiusY: number,
+				rotation: number,
+				alpha: number,
+				color: [number, number, number]
+			) => {
+				if (alpha <= 0.001) return;
+				const cw = cloudsCanvas.width || CLOUDS_CANVAS_SIZE_PX;
+				const ch = cloudsCanvas.height || CLOUDS_CANVAS_SIZE_PX;
+				const cx = (x / w) * cw;
+				const cy = (y / h) * ch;
+				const rx = (radiusX / w) * cw;
+				const ry = (radiusY / h) * ch;
+				const prevOp = cloudsCtx.globalCompositeOperation;
+				const prevAlpha = cloudsCtx.globalAlpha;
+				cloudsCtx.globalCompositeOperation = 'lighter';
+				cloudsCtx.globalAlpha = 1;
+				drawEllipticalGlow(cloudsCtx, cx, cy, rx, ry, rotation, alpha, color);
+				cloudsCtx.globalCompositeOperation = prevOp;
+				cloudsCtx.globalAlpha = prevAlpha;
+			};
+
+			lightningCtx.save();
 			try {
-				cloudsCtx.setTransform(1, 0, 0, 1, 0, 0);
+				lightningCtx.setTransform(1, 0, 0, 1, 0, 0);
 			} catch {
 				// Ignore.
 			}
-			const prevOp = cloudsCtx.globalCompositeOperation;
-			cloudsCtx.globalCompositeOperation = 'lighter';
+			const prevOp = lightningCtx.globalCompositeOperation;
+			const prevFilter = lightningCtx.filter;
+			const prevShadowBlur = lightningCtx.shadowBlur;
+			const prevShadowColor = lightningCtx.shadowColor;
+			const tint = weatherMoodConfigRef.current.lightningTint;
+			const tintColor = `rgba(${Math.round(tint[0])}, ${Math.round(
+				tint[1]
+			)}, ${Math.round(tint[2])}, 0.72)`;
+			lightningCtx.globalCompositeOperation = 'lighter';
 
 			for (const e of events) {
 				const t = nowMs - e.startMs;
 				let a = 0;
-				for (const p of e.pulses) a += computePulseOpacity(t, p);
+				let glowA = 0;
+				for (const p of e.pulses) {
+					const pulseA = computePulseOpacity(t, p);
+					a += pulseA;
+					glowA += pulseA * p.glowOpacityMultiplier;
+				}
 				if (a <= 0.001) continue;
 				a = clamp(a * LIGHTNING_OPACITY_MULTIPLIER * lightningIntensity, 0, 0.95);
+				const occlusion = clamp(e.cloudOcclusion, 0, 1);
+				glowA = clamp(
+					glowA * (0.34 + occlusion * 0.38) * lightningIntensity,
+					0,
+					0.86
+				);
 
 				const stamp = stamps[e.stampIndex % stamps.length];
 				const sw = stamp.naturalWidth || stamp.width || 256;
-				const sh = stamp.naturalHeight || stamp.height || 256;
-				const dw = sw * e.scale;
-				const dh = sh * e.scale;
+				const pulseDriftT = clamp(t / Math.max(1, e.endMs - e.startMs), 0, 1);
+				const altitudeX =
+					Math.cos(e.parallaxPhase) * e.altitudePx * 0.32 + e.altitudePx * 0.24;
+				const altitudeY = -e.altitudePx * (0.72 + Math.sin(e.parallaxPhase) * 0.18);
+				const sheetX = e.x + altitudeX + e.sheetDriftX * pulseDriftT;
+				const sheetY = e.y + altitudeY + e.sheetDriftY * pulseDriftT;
+				const coreX = e.x + altitudeX * 0.42 + e.jitterX * pulseDriftT;
+				const coreY = e.y + altitudeY * 0.34 + e.jitterY * pulseDriftT;
+				const sheetRadiusX = sw * e.sheetScaleX;
+				const sheetRadiusY = sw * e.sheetScaleY;
+				const sheetAlpha =
+					glowA * (e.kind === 'sheet' ? 1.12 : e.kind === 'dramatic' ? 0.9 : 0.72);
+				const boltAlpha =
+					e.kind === 'sheet'
+						? a * 0.06 * (1 - occlusion * 0.45)
+						: a * lerp(0.86, 0.42, occlusion);
 
-				cloudsCtx.globalAlpha = a;
-				cloudsCtx.translate(e.x, e.y);
-				cloudsCtx.rotate(e.rotationRad);
-				cloudsCtx.drawImage(stamp, -dw * 0.5, -dh * 0.5, dw, dh);
-				// Reset for next event (cheaper than save/restore per event at this scale).
-				cloudsCtx.setTransform(1, 0, 0, 1, 0, 0);
+				drawCloudCatchlight(
+					sheetX,
+					sheetY,
+					sheetRadiusX * 0.58,
+					sheetRadiusY * 0.7,
+					e.sheetRotationRad,
+					sheetAlpha * LIGHTNING_CATCHLIGHT_OPACITY,
+					tint
+				);
+
+				drawEllipticalGlow(
+					lightningCtx,
+					sheetX,
+					sheetY,
+					sheetRadiusX,
+					sheetRadiusY,
+					e.sheetRotationRad,
+					sheetAlpha * 0.72,
+					tint
+				);
+				drawEllipticalGlow(
+					lightningCtx,
+					sheetX + altitudeX * 0.35,
+					sheetY + altitudeY * 0.25,
+					sheetRadiusX * 0.46,
+					sheetRadiusY * 0.55,
+					e.sheetRotationRad + 0.2,
+					sheetAlpha * 0.45,
+					[255, 252, 242]
+				);
+
+				try {
+					lightningCtx.filter = 'blur(2.4px)';
+				} catch {
+					// Ignore.
+				}
+				lightningCtx.shadowBlur = e.kind === 'dramatic' ? 18 : 10;
+				lightningCtx.shadowColor = tintColor;
+				if (e.kind !== 'sheet') {
+					drawStamp(stamp, coreX, coreY, e.glowScale, e.rotationRad, glowA * 0.42);
+				}
+				try {
+					lightningCtx.filter = 'blur(0.7px)';
+				} catch {
+					// Ignore.
+				}
+				lightningCtx.shadowBlur = e.kind === 'dramatic' ? 10 : 5;
+				if (e.kind !== 'sheet') {
+					drawStamp(
+						stamp,
+						coreX,
+						coreY,
+						e.glowScale * 0.54,
+						e.rotationRad,
+						glowA * 0.5
+					);
+				}
+				try {
+					lightningCtx.filter = 'none';
+				} catch {
+					// Ignore.
+				}
+				lightningCtx.shadowBlur = e.kind === 'dramatic' ? 4 : 1.5;
+				drawStamp(stamp, coreX, coreY, e.coreScale, e.rotationRad, boltAlpha);
 			}
 
-			cloudsCtx.globalCompositeOperation = prevOp;
-			cloudsCtx.restore();
+			lightningCtx.globalCompositeOperation = prevOp;
+			try {
+				lightningCtx.filter = prevFilter;
+			} catch {
+				// Ignore.
+			}
+			lightningCtx.shadowBlur = prevShadowBlur;
+			lightningCtx.shadowColor = prevShadowColor;
+			lightningCtx.restore();
 		};
 
 		const driftLoopS = CLOUDS_DRIFT_LOOP_MS / 1000;
@@ -6198,6 +6602,27 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			}
 		}
 
+		if (!mapInstance.getSource(MAPBOX_SOURCE_IDS.lightning)) {
+			const lightningCanvas = lightningCanvasRef.current;
+			if (lightningCanvas) {
+				try {
+					mapInstance.addSource(MAPBOX_SOURCE_IDS.lightning, {
+						type: 'canvas',
+						canvas: lightningCanvas,
+						animate: true,
+						coordinates: LIGHTNING_CANVAS_COORDINATES,
+					} as unknown as mapboxgl.AnySourceData);
+					(
+						mapInstance.getSource(MAPBOX_SOURCE_IDS.lightning) as
+							| { play?: () => void }
+							| undefined
+					)?.play?.();
+				} catch {
+					// Non-fatal; storm mood simply renders without the dedicated lightning layer.
+				}
+			}
+		}
+
 		if (!mapInstance.getSource(MAPBOX_SOURCE_IDS.dayFarSideShade)) {
 			const shadeCanvas = dayFarSideShadeCanvasRef.current;
 			if (shadeCanvas) {
@@ -6356,6 +6781,21 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				'raster-resampling': 'linear',
 			},
 		});
+
+		if (mapInstance.getSource(MAPBOX_SOURCE_IDS.lightning)) {
+			ensureLayer({
+				id: MAPBOX_LAYER_IDS.lightning,
+				type: 'raster',
+				source: MAPBOX_SOURCE_IDS.lightning,
+				paint: {
+					'raster-opacity': buildLightningOpacityExpr(
+						cfg.lightningIntensity * LIGHTNING_LAYER_OPACITY
+					),
+					'raster-fade-duration': 0,
+					'raster-resampling': 'linear',
+				},
+			});
+		}
 
 		if (mapInstance.getSource(MAPBOX_SOURCE_IDS.sunTransition)) {
 			ensureLayer({
@@ -6912,6 +7352,23 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					}
 					cloudsCanvasRef.current = canvas;
 					cloudsCanvasCtxRef.current = ctx;
+				}
+			}
+
+			if (!lightningCanvasRef.current && typeof document !== 'undefined') {
+				const canvas = document.createElement('canvas');
+				canvas.width = LIGHTNING_CANVAS_WIDTH_PX;
+				canvas.height = LIGHTNING_CANVAS_HEIGHT_PX;
+				const ctx = canvas.getContext('2d');
+				if (ctx) {
+					try {
+						ctx.imageSmoothingEnabled = true;
+						ctx.imageSmoothingQuality = 'high';
+					} catch {
+						// Ignore.
+					}
+					lightningCanvasRef.current = canvas;
+					lightningCanvasCtxRef.current = ctx;
 				}
 			}
 		} catch {
@@ -10262,6 +10719,15 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						MAPBOX_LAYER_IDS.clouds,
 						'raster-brightness-max',
 						cfg.cloudBrightnessMax
+					);
+				}
+				if (m.getLayer(MAPBOX_LAYER_IDS.lightning)) {
+					m.setPaintProperty(
+						MAPBOX_LAYER_IDS.lightning,
+						'raster-opacity',
+						buildLightningOpacityExpr(
+							cfg.lightningIntensity * LIGHTNING_LAYER_OPACITY
+						) as unknown as mapboxgl.Expression
 					);
 				}
 			} catch {
