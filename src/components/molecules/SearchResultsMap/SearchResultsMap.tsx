@@ -2227,6 +2227,67 @@ const getBasemapHillshadeExaggerationBase = (
 	}
 };
 
+// Night-aware atmosphere — layered on top of the mood-driven fog so the
+// existing Mapbox stars/atmosphere read differently when night falls without
+// adding any new overlay. Three coupled adjustments, all subtle:
+//
+//   * `star-intensity` ramps 0.9 → 1.0. Mapbox caps at 1, so we use the full
+//     remaining headroom; the perceived glow comes from the stars hitting their
+//     ceiling while the surrounding palette darkens.
+//   * Close-fog `color` keeps the mood's hue but its alpha scales down at
+//     night. This pulls the limb-hugging mist *off* the globe so the haze
+//     stops reading as exhalation from the planet's surface.
+//   * `space-color` lifts a hair from pure black toward a deeply cool void.
+//     This is the atmospheric scatter the user wants — it sits in the space
+//     around the globe (driven by Mapbox's camera/projection, so it adapts
+//     to zoom and panning automatically — not an overlay we'd have to mask
+//     against the earth).
+const NIGHT_STAR_INTENSITY_DAY = 0.85;
+const NIGHT_STAR_INTENSITY_NIGHT = 1.0;
+const NIGHT_SPACE_COLOR_DAY: ParsedCssColor = [0, 0, 0, 1];
+const NIGHT_SPACE_COLOR_NIGHT: ParsedCssColor = [7, 13, 24, 1];
+const NIGHT_CLOSE_FOG_ALPHA_DAY = 1.0;
+const NIGHT_CLOSE_FOG_ALPHA_NIGHT = 0.42;
+
+const applyMapboxFogForMoodAndNight = (
+	mapInstance: mapboxgl.Map,
+	cfg: { fogColor: string; fogHighColor: string; fogHorizonBlend: number },
+	nightT: number
+) => {
+	try {
+		const t = clamp(nightT, 0, 1);
+		const existingFog = (mapInstance as any).getFog?.() ?? {};
+
+		const starIntensity = lerp(NIGHT_STAR_INTENSITY_DAY, NIGHT_STAR_INTENSITY_NIGHT, t);
+		const spaceColor = formatCssColor([
+			lerp(NIGHT_SPACE_COLOR_DAY[0], NIGHT_SPACE_COLOR_NIGHT[0], t),
+			lerp(NIGHT_SPACE_COLOR_DAY[1], NIGHT_SPACE_COLOR_NIGHT[1], t),
+			lerp(NIGHT_SPACE_COLOR_DAY[2], NIGHT_SPACE_COLOR_NIGHT[2], t),
+			1,
+		]);
+
+		// Scale only the alpha of the mood's chosen close-fog color so the hue
+		// remains the mood's; we are dialing how *present* the limb mist is, not
+		// recoloring it.
+		const baseClose = parseCssColor(cfg.fogColor);
+		const alphaScale = lerp(NIGHT_CLOSE_FOG_ALPHA_DAY, NIGHT_CLOSE_FOG_ALPHA_NIGHT, t);
+		const closeFogColor = baseClose
+			? formatCssColor([baseClose[0], baseClose[1], baseClose[2], baseClose[3] * alphaScale])
+			: cfg.fogColor;
+
+		(mapInstance as any).setFog?.({
+			...existingFog,
+			color: closeFogColor,
+			'high-color': cfg.fogHighColor,
+			'horizon-blend': cfg.fogHorizonBlend,
+			'star-intensity': starIntensity,
+			'space-color': spaceColor,
+		});
+	} catch {
+		// Non-fatal.
+	}
+};
+
 const applyNightLandPalette = (mapInstance: mapboxgl.Map, nightT: number) => {
 	const zoom = mapInstance.getZoom() ?? MAP_DEFAULT_ZOOM;
 	const palette = getMapPaletteForNight(nightT, zoom);
@@ -3198,7 +3259,7 @@ const MANUAL_WEATHER_TEMPERATURE_OVERRIDE_F: number | null = null;
 // MANUAL NIGHT OVERRIDE FOR TESTING.
 // Set to a number between 0 and 1 (e.g. 1 for deep night, 0 for full day).
 // Set back to null to use the real regional day/night cycle.
-const MANUAL_NIGHT_T_OVERRIDE: number | null = null;
+const MANUAL_NIGHT_T_OVERRIDE: number | null = 1;
 
 const MOOD_CONTINUOUS_TRANSITION_MS = 90_000;
 const MOOD_DISCRETE_EFFECT_FADE_MS = 8_000;
@@ -3408,6 +3469,14 @@ const NIGHT_LOWER_LEFT_SHADOW_BG = [
 // the visible night map stays matched to the normal daytime palette.
 const NIGHT_FACE_SHADE_BG =
 	'radial-gradient(ellipse 145% 145% at 58% 60%, rgba(14, 22, 42, 0.32) 0%, rgba(14, 22, 42, 0.27) 30%, rgba(14, 22, 42, 0.17) 54%, rgba(14, 22, 42, 0.07) 70%, rgba(14, 22, 42, 0) 84%, rgba(14, 22, 42, 0) 100%)';
+
+// Cinematic vignette: a viewport-anchored darkening at the corners that pulls the
+// eye toward the globe at night. Multiplied so it composites with the deep-space
+// color and the night map without crushing to pure black. The center is fully
+// transparent for ~40% of the radius so the globe itself stays untouched.
+const NIGHT_VIGNETTE_OPACITY = 0.95;
+const NIGHT_VIGNETTE_BG =
+	'radial-gradient(ellipse 110% 110% at 50% 50%, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0) 38%, rgba(2, 6, 16, 0.10) 58%, rgba(1, 4, 12, 0.26) 78%, rgba(0, 2, 8, 0.46) 92%, rgba(0, 1, 5, 0.58) 100%)';
 
 // Rear rim light: edge-weighted cool-white glow that reads as the moon sitting
 // behind the Earth (not perfectly centered, shifted toward upper-left bias).
@@ -3676,6 +3745,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const lightingOverlayNightMoonlightRef = useRef<HTMLDivElement | null>(null);
 	const lightingOverlayNightShadeRef = useRef<HTMLDivElement | null>(null);
 	const lightingOverlayMoonRimRef = useRef<HTMLDivElement | null>(null);
+	const lightingOverlayNightVignetteRef = useRef<HTMLDivElement | null>(null);
 	const [visibleContacts, setVisibleContacts] = useState<ContactWithName[]>([]);
 	// Keep a "sticky" set of currently-rendered marker ids so zooming can rescale existing markers
 	// and only introduce *new* markers, instead of re-sampling a totally different set each time.
@@ -8508,9 +8578,16 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 		const onStyleLoad = () => {
 			applyFreeTrialMapVisualTuning(mapInstance);
-			applyMurmurGlobeLighting(mapInstance, {
-				nightT: computeMoodVisualNightT(nightTRef.current, weatherMoodConfigRef.current),
-			});
+			const initialVisualNightT = computeMoodVisualNightT(
+				nightTRef.current,
+				weatherMoodConfigRef.current
+			);
+			applyMurmurGlobeLighting(mapInstance, { nightT: initialVisualNightT });
+			applyMapboxFogForMoodAndNight(
+				mapInstance,
+				weatherMoodConfigRef.current,
+				initialVisualNightT
+			);
 			// Add Murmur sources/layers (including clouds + world-land fill) as early as
 			// possible so they can begin loading before the first reveal.
 			ensureMapboxSourcesAndLayers(mapInstance);
@@ -8518,9 +8595,16 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 		const onLoad = () => {
 			applyFreeTrialMapVisualTuning(mapInstance);
-			applyMurmurGlobeLighting(mapInstance, {
-				nightT: computeMoodVisualNightT(nightTRef.current, weatherMoodConfigRef.current),
-			});
+			const initialVisualNightT = computeMoodVisualNightT(
+				nightTRef.current,
+				weatherMoodConfigRef.current
+			);
+			applyMurmurGlobeLighting(mapInstance, { nightT: initialVisualNightT });
+			applyMapboxFogForMoodAndNight(
+				mapInstance,
+				weatherMoodConfigRef.current,
+				initialVisualNightT
+			);
 			ensureMapboxSourcesAndLayers(mapInstance);
 
 			// Ensure the decorative dashboard framing (offset) is applied before we
@@ -11186,6 +11270,13 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		if (lightingOverlayMoonRimRef.current)
 			lightingOverlayMoonRimRef.current.style.opacity = String(rimOpacity);
 
+		// Night vignette: drives off `trueNightEase` (ignores the per-mood visual
+		// floor used for `night`) so it only appears in true full night, then
+		// holds steady across all zooms — vignettes shouldn't fade as you zoom in.
+		const vignetteOpacity = clamp(trueNightEase * NIGHT_VIGNETTE_OPACITY, 0, 1);
+		if (lightingOverlayNightVignetteRef.current)
+			lightingOverlayNightVignetteRef.current.style.opacity = String(vignetteOpacity);
+
 		// US night lights (Mapbox raster dot-tiles layer) — helps keep the globe readable at night
 		// without turning the whole basemap into a "night mode" style.
 		const zoomOutLift = computeNightLightsZoomOutLift(zoom);
@@ -11714,6 +11805,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		applyMurmurGlobeLighting(map, { nightT: visualNightT });
 		applyNightLandPalette(map, visualNightT);
 		applyStateOverlayNightColors(map, visualNightT);
+		applyMapboxFogForMoodAndNight(map, weatherMoodConfigRef.current, visualNightT);
 	}, [nightT, weatherMood, map, isMapLoaded]);
 
 	// During sunrise/sunset, `useGlobeNightLighting` intentionally avoids React
@@ -11753,6 +11845,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			applyMurmurGlobeLighting(map, { nightT: visualNightT });
 			applyNightLandPalette(map, visualNightT);
 			applyStateOverlayNightColors(map, visualNightT);
+			applyMapboxFogForMoodAndNight(map, weatherMoodConfigRef.current, visualNightT);
 			applyStateOverlayOpacity(
 				stateOverlayOpacityRef.current,
 				stateOverlayModeRef.current
@@ -11858,21 +11951,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				// Non-fatal.
 			}
 
-			// Atmosphere fog tint.
-			try {
-				const existingFog = (m as any).getFog?.() ?? {};
-				(m as any).setFog?.({
-					...existingFog,
-					color: cfg.fogColor,
-					'high-color': cfg.fogHighColor,
-					'horizon-blend': cfg.fogHorizonBlend,
-				});
-			} catch {
-				// Non-fatal.
-			}
-
 			applyLightingOverlayOpacity();
 			const visualNightT = computeMoodVisualNightT(nightTRef.current, cfg);
+			// Atmosphere fog tint — combined with night-aware modulation so the
+			// star glow / space haze / muted limb-mist react in a single pass.
+			applyMapboxFogForMoodAndNight(m, cfg, visualNightT);
 			applyMurmurGlobeLighting(m, { nightT: visualNightT });
 			applyNightLandPalette(m, visualNightT);
 			applyStateOverlayNightColors(m, visualNightT);
@@ -13657,6 +13740,25 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					inset: 0,
 					pointerEvents: 'none',
 					background: 'rgb(20, 28, 50)',
+					mixBlendMode: 'multiply',
+					zIndex: 1,
+				}}
+			/>
+			{/*
+			  Night vignette. Soft viewport-anchored darkening at the corners that
+			  pulls the eye toward the globe and gives the night sky an intimate,
+			  cinematic frame. Sits on top of the night lighting overlays so the
+			  cornering applies even where moonlight or rim light brightens. Opacity
+			  is owned by applyLightingOverlayOpacity and is gated on true night.
+			*/}
+			<div
+				ref={lightingOverlayNightVignetteRef}
+				aria-hidden
+				style={{
+					position: 'absolute',
+					inset: 0,
+					pointerEvents: 'none',
+					background: NIGHT_VIGNETTE_BG,
 					mixBlendMode: 'multiply',
 					zIndex: 1,
 				}}
