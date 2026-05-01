@@ -54,6 +54,15 @@ export type MoodVisualConfig = {
 	 * keeps a small floor so the storm "feels present" even when zoomed in.
 	 */
 	cloudDeepZoomOpacity: number;
+	/**
+	 * Snow-only world-canvas particle layer. Non-snow moods keep these at 0 so the
+	 * layer can stay mounted and crossfade without affecting other moods.
+	 */
+	snowOpacity: number;
+	snowDensity: number;
+	snowFallSpeed: number;
+	snowWind: number;
+	snowDepthParallax: number;
 	fogColor: string;
 	fogHighColor: string;
 	fogHorizonBlend: number;
@@ -93,6 +102,11 @@ const NORMAL: MoodVisualConfig = {
 	cloudCoreShadowOpacity: 0,
 	cloudEdgeLiftOpacity: 0,
 	cloudDeepZoomOpacity: 0,
+	snowOpacity: 0,
+	snowDensity: 0,
+	snowFallSpeed: 0,
+	snowWind: 0,
+	snowDepthParallax: 0,
 	fogColor: 'rgba(180, 210, 215, 0.32)',
 	fogHighColor: 'rgb(18, 44, 78)',
 	fogHorizonBlend: 0.022,
@@ -122,6 +136,11 @@ const SUNNY: MoodVisualConfig = {
 	cloudCoreShadowOpacity: 0,
 	cloudEdgeLiftOpacity: 0,
 	cloudDeepZoomOpacity: 0,
+	snowOpacity: 0,
+	snowDensity: 0,
+	snowFallSpeed: 0,
+	snowWind: 0,
+	snowDepthParallax: 0,
 	fogColor: 'rgba(220, 215, 200, 0.16)',
 	fogHighColor: 'rgb(18, 44, 78)',
 	fogHorizonBlend: 0.016,
@@ -151,6 +170,11 @@ const CLOUDY: MoodVisualConfig = {
 	cloudCoreShadowOpacity: 0,
 	cloudEdgeLiftOpacity: 0,
 	cloudDeepZoomOpacity: 0,
+	snowOpacity: 0,
+	snowDensity: 0,
+	snowFallSpeed: 0,
+	snowWind: 0,
+	snowDepthParallax: 0,
 	fogColor: 'rgba(165, 180, 190, 0.46)',
 	fogHighColor: 'rgb(18, 44, 78)',
 	fogHorizonBlend: 0.042,
@@ -180,6 +204,11 @@ const STORMY: MoodVisualConfig = {
 	cloudCoreShadowOpacity: 0.56,
 	cloudEdgeLiftOpacity: 0.2,
 	cloudDeepZoomOpacity: 0.12,
+	snowOpacity: 0,
+	snowDensity: 0,
+	snowFallSpeed: 0,
+	snowWind: 0,
+	snowDepthParallax: 0,
 	fogColor: 'rgba(138, 160, 178, 0.44)',
 	fogHighColor: 'rgb(22, 42, 66)',
 	fogHorizonBlend: 0.048,
@@ -197,23 +226,28 @@ const STORMY: MoodVisualConfig = {
 };
 
 const SNOWY: MoodVisualConfig = {
-	cloudOpacityGlobeZoom: 0.85,
-	cloudOpacityDecorativeZoom: 0.78,
+	cloudOpacityGlobeZoom: 0.58,
+	cloudOpacityDecorativeZoom: 0.46,
 	cloudDriftSpeedMultiplier: 0.6,
 	cloudTurbulenceMultiplier: 0.8,
 	cloudBrightnessMin: 0.95,
 	cloudBrightnessMax: 1.0,
-	cloudExtraPasses: 1,
+	cloudExtraPasses: 0,
 	cloudExtraPassAlpha: 1,
 	cloudStormWindMultiplier: 1,
 	cloudCoreShadowOpacity: 0,
 	cloudEdgeLiftOpacity: 0,
 	cloudDeepZoomOpacity: 0,
-	fogColor: 'rgba(225, 232, 238, 0.42)',
-	fogHighColor: 'rgb(35, 60, 90)',
-	fogHorizonBlend: 0.035,
-	softboxOpacityMultiplier: 0.95,
-	shadowOpacityMultiplier: 0.78,
+	snowOpacity: 1,
+	snowDensity: 1,
+	snowFallSpeed: 0.48,
+	snowWind: 0.24,
+	snowDepthParallax: 0.48,
+	fogColor: 'rgba(232, 240, 246, 0.48)',
+	fogHighColor: 'rgb(42, 66, 96)',
+	fogHorizonBlend: 0.044,
+	softboxOpacityMultiplier: 0.9,
+	shadowOpacityMultiplier: 0.72,
 	softboxBackground: SOFTBOX_WARM_KEY_BG,
 	softboxBlendMode: 'screen',
 	nightVisualBlend: 0,

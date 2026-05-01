@@ -139,6 +139,26 @@ type StormLightningCell = {
 	radiusPx: number;
 };
 
+type SnowParticle = {
+	x: number;
+	y: number;
+	depth: number;
+	size: number;
+	opacity: number;
+	fallSpeed: number;
+	windSpeed: number;
+	wobble: number;
+	wobblePhase: number;
+	stampIndex: number;
+	turbulenceSeed: number;
+	gustSeed: number;
+	densitySeed: number;
+	scaleJitter: number;
+	stretch: number;
+	rotation: number;
+	rotationSpeed: number;
+};
+
 const closeRing = (ring: ClippingRing): ClippingRing => {
 	if (ring.length === 0) return ring;
 	const first = ring[0];
@@ -429,6 +449,11 @@ const blendRuntimeMoodConfig = (
 		),
 		cloudEdgeLiftOpacity: lerp(from.cloudEdgeLiftOpacity, to.cloudEdgeLiftOpacity, c),
 		cloudDeepZoomOpacity: lerp(from.cloudDeepZoomOpacity, to.cloudDeepZoomOpacity, d),
+		snowOpacity: lerp(from.snowOpacity, to.snowOpacity, d),
+		snowDensity: lerp(from.snowDensity, to.snowDensity, d),
+		snowFallSpeed: lerp(from.snowFallSpeed, to.snowFallSpeed, c),
+		snowWind: lerp(from.snowWind, to.snowWind, c),
+		snowDepthParallax: lerp(from.snowDepthParallax, to.snowDepthParallax, c),
 		fogColor: mixCssColorString(from.fogColor, to.fogColor, c),
 		fogHighColor: mixCssColorString(from.fogHighColor, to.fogHighColor, c),
 		fogHorizonBlend: lerp(from.fogHorizonBlend, to.fogHorizonBlend, c),
@@ -1495,6 +1520,22 @@ const LIGHTNING_SCALE_CLOSE_MAX = 0.11;
 const LIGHTNING_US_POSITION_TRIES = 72;
 const LIGHTNING_OPACITY_MULTIPLIER = 1.08;
 const LIGHTNING_LAYER_OPACITY = 0.92;
+const SNOWFLAKE_STAMPS_COUNT = 20;
+const SNOWFLAKE_STAMPS_VERSION = 6;
+const SNOWFLAKE_STAMPS_URL = (i: number) =>
+	`/maps/snowflake_stamps/drop_${String(i).padStart(2, '0')}.png?v=${SNOWFLAKE_STAMPS_VERSION}`;
+const SNOW_CANVAS_SIZE_PX = 1024;
+const SNOW_MAX_PARTICLES = 2400;
+const SNOW_LAYER_OPACITY = 1.0;
+const SNOW_HIDE_AT_OR_ABOVE_ZOOM = CLOUDS_OVERLAY_FADE_OUT_END_ZOOM;
+const SNOW_BASE_FALL_PX_PER_S = 9.2;
+const SNOW_BASE_WIND_PX_PER_S = 1.2;
+const SNOW_TURBULENCE_LOOP_MS = 37_000;
+const SNOW_GUST_BAND_LOOP_MS = 29_000;
+const SNOW_DENSITY_BAND_LOOP_MS = 46_000;
+const SNOW_STAMP_MIN_SIZE_PX = 8;
+const SNOW_STAMP_MAX_SIZE_PX = 23;
+const SNOW_STAMP_ALPHA_MULTIPLIER = 1.25;
 
 const getLightningZoomedOutBoostT = (zoom: number) => {
 	if (zoom <= LIGHTNING_ZOOMED_OUT_BOOST_FULL_ZOOM) return 1;
@@ -1928,6 +1969,27 @@ const buildCloudsOpacityExpr = (
 	22,
 	deepZoomFloor,
 ];
+
+const buildSnowOpacityExpr = (opacity: number) => {
+	const o = clamp(opacity * SNOW_LAYER_OPACITY, 0, 1);
+	return [
+		'interpolate',
+		['linear'],
+		['zoom'],
+		0,
+		o,
+		MAP_MIN_ZOOM,
+		o,
+		DASHBOARD_DECORATIVE_ZOOM,
+		o * 0.92,
+		CLOUDS_OVERLAY_FADE_OUT_START_ZOOM,
+		o * 0.48,
+		SNOW_HIDE_AT_OR_ABOVE_ZOOM,
+		0,
+		22,
+		0,
+	];
+};
 
 const buildLightningOpacityExpr = (intensity: number) => [
 	'interpolate',
@@ -2417,6 +2479,7 @@ const US_ONLY_BASEMAP_CLIP_MAX_ZOOM = 7;
 const MAPBOX_SOURCE_IDS = {
 	clouds: 'murmur-clouds',
 	lightning: 'murmur-lightning',
+	snow: 'murmur-snow',
 	dayFarSideShade: 'murmur-day-far-side-shade',
 	sunTransition: 'murmur-sun-transition',
 	nightLights: 'murmur-night-lights',
@@ -2438,6 +2501,7 @@ const MAPBOX_LAYER_IDS = {
 	// Globe overlays
 	clouds: 'murmur-clouds-raster',
 	lightning: 'murmur-lightning-raster',
+	snow: 'murmur-snow-raster',
 	dayFarSideShade: 'murmur-day-far-side-shade-raster',
 	sunTransition: 'murmur-sun-transition-raster',
 	sunTransitionCloudCatchlight: 'murmur-sun-transition-cloud-catchlight-raster',
@@ -3095,7 +3159,7 @@ const normalizeStateKey = (state?: string | null): string | null => {
 // MANUAL WEATHER MOOD OVERRIDE FOR TESTING.
 // Set to one of: 'sunny' | 'normal' | 'cloudy' | 'stormy' | 'snowy'
 // Set back to null to use the real weather mood from the user's region.
-const MANUAL_WEATHER_MOOD_OVERRIDE: WeatherMood | null = null;
+const MANUAL_WEATHER_MOOD_OVERRIDE: WeatherMood | null = 'snowy';
 
 // MANUAL TEMPERATURE OVERRIDE FOR TESTING (Fahrenheit).
 // Set to a number (e.g. 92) to test the > 80°F brightness lift.
@@ -3462,6 +3526,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const lightningRestrikeCellRef = useRef<StormLightningCell | null>(null);
 	const lightningEventIdRef = useRef<number>(1);
 	const lightningWasEnabledRef = useRef<boolean>(false);
+	const snowCanvasRef = useRef<HTMLCanvasElement | null>(null);
+	const snowCanvasCtxRef = useRef<CanvasRenderingContext2D | null>(null);
+	const snowStampImagesRef = useRef<HTMLImageElement[] | null>(null);
+	const snowStampLoadPromiseRef = useRef<Promise<HTMLImageElement[]> | null>(null);
+	const snowParticlesRef = useRef<SnowParticle[] | null>(null);
 	const prevIsBackgroundPresentationRef = useRef<boolean>(isBackgroundPresentation);
 	// Live weather-mood config — read by the cloud animation tick and the lighting
 	// overlay opacity calc. Initialized to `normal` so behavior matches pre-weather
@@ -4860,6 +4929,21 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			// Ignore.
 		}
 
+		try {
+			const snowSource: { play?: () => void } | null = (() => {
+				try {
+					return map.getSource(MAPBOX_SOURCE_IDS.snow) as
+						| { play?: () => void }
+						| null;
+				} catch {
+					return null;
+				}
+			})();
+			snowSource?.play?.();
+		} catch {
+			// Ignore.
+		}
+
 		const loadTexture = (): Promise<HTMLImageElement> => {
 			if (cloudsTextureImageRef.current)
 				return Promise.resolve(cloudsTextureImageRef.current);
@@ -4939,6 +5023,24 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			return lightningStampLoadPromiseRef.current;
 		};
 
+		const loadSnowStamps = (): Promise<HTMLImageElement[]> => {
+			if (snowStampImagesRef.current) {
+				return Promise.resolve(snowStampImagesRef.current);
+			}
+			if (snowStampLoadPromiseRef.current) return snowStampLoadPromiseRef.current;
+
+			snowStampLoadPromiseRef.current = Promise.all(
+				Array.from({ length: SNOWFLAKE_STAMPS_COUNT }, (_, i) =>
+					loadImage(SNOWFLAKE_STAMPS_URL(i))
+				)
+			).then((imgs) => {
+				snowStampImagesRef.current = imgs;
+				return imgs;
+			});
+
+			return snowStampLoadPromiseRef.current;
+		};
+
 		const loadLightningPotential = (): Promise<Uint8Array> => {
 			if (lightningPotentialU8Ref.current) {
 				return Promise.resolve(lightningPotentialU8Ref.current);
@@ -4966,8 +5068,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					if (!ctx) throw new Error('no 2d ctx');
 
 					try {
-						ctx.imageSmoothingEnabled = true;
-						ctx.imageSmoothingQuality = 'high';
+						ctx.imageSmoothingEnabled = false;
 					} catch {
 						// Ignore.
 					}
@@ -5725,6 +5826,199 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			lightningCtx.shadowBlur = prevShadowBlur;
 			lightningCtx.shadowColor = prevShadowColor;
 			lightningCtx.restore();
+		};
+
+		const buildSnowParticles = (): SnowParticle[] => {
+			if (snowParticlesRef.current) return snowParticlesRef.current;
+
+			const particles = Array.from({ length: SNOW_MAX_PARTICLES }, (_, i) => {
+				const seed = 9000.5 + i * 131.7;
+				const depth = Math.pow(hash01(seed + 3.1), 0.72);
+				return {
+					x: hash01(seed + 11.3) * SNOW_CANVAS_SIZE_PX,
+					y: hash01(seed + 23.7) * SNOW_CANVAS_SIZE_PX,
+					depth,
+					size: lerp(0.56, 1.42, depth) * lerp(0.78, 1.14, hash01(seed + 37.9)),
+					opacity: lerp(0.22, 0.58, depth) * lerp(0.66, 1.0, hash01(seed + 49.2)),
+					fallSpeed: lerp(0.52, 1.45, depth) * lerp(0.8, 1.16, hash01(seed + 61.5)),
+					windSpeed:
+						lerp(0.18, 0.95, hash01(seed + 73.4)) *
+						(hash01(seed + 83.9) < 0.44 ? -1 : 1),
+					wobble: lerp(0.7, 4.2, depth) * lerp(0.7, 1.2, hash01(seed + 97.6)),
+					wobblePhase: hash01(seed + 109.8) * Math.PI * 2,
+					stampIndex: Math.floor(hash01(seed + 121.1) * SNOWFLAKE_STAMPS_COUNT),
+					turbulenceSeed: hash01(seed + 133.6) * 900,
+					gustSeed: hash01(seed + 147.4) * 900,
+					densitySeed: hash01(seed + 159.8),
+					scaleJitter: lerp(0.86, 1.16, hash01(seed + 171.2)),
+					stretch: lerp(0.92, 1.08, hash01(seed + 183.5)),
+					rotation: hash01(seed + 197.1) * Math.PI * 2,
+					rotationSpeed: lerp(-0.018, 0.018, hash01(seed + 211.6)),
+				};
+			});
+
+			snowParticlesRef.current = particles;
+			return particles;
+		};
+
+		const drawSnow = (tMs: number) => {
+			const snowCanvas = snowCanvasRef.current;
+			const snowCtx = snowCanvasCtxRef.current;
+			if (!snowCanvas || !snowCtx) return;
+
+			const w = snowCanvas.width || SNOW_CANVAS_SIZE_PX;
+			const h = snowCanvas.height || SNOW_CANVAS_SIZE_PX;
+			try {
+				snowCtx.setTransform(1, 0, 0, 1, 0, 0);
+				snowCtx.imageSmoothingEnabled = true;
+				snowCtx.imageSmoothingQuality = 'high';
+			} catch {
+				// Ignore.
+			}
+			snowCtx.clearRect(0, 0, w, h);
+
+			const cfg = weatherMoodConfigRef.current;
+			if (cfg.snowOpacity <= 0.001 || cfg.snowDensity <= 0.001) return;
+			const stamps = snowStampImagesRef.current;
+			const hasStamps = Array.isArray(stamps) && stamps.length > 0;
+
+			let currentZoom = MAP_DEFAULT_ZOOM;
+			try {
+				currentZoom = map.getZoom?.() ?? MAP_DEFAULT_ZOOM;
+			} catch {
+				currentZoom = MAP_DEFAULT_ZOOM;
+			}
+			if (currentZoom >= SNOW_HIDE_AT_OR_ABOVE_ZOOM) return;
+
+			const particles = buildSnowParticles();
+			const densityScale = prefersReducedMotion ? 0.55 : 1;
+			const visibleCount = Math.min(
+				particles.length,
+				Math.max(0, Math.round(particles.length * clamp(cfg.snowDensity, 0, 1) * densityScale))
+			);
+			if (visibleCount <= 0) return;
+
+			const tS = tMs / 1000;
+			const motionMul = prefersReducedMotion ? 0.42 : 1;
+			const turbulenceMul = prefersReducedMotion ? 0.36 : 1;
+			const fallPx = SNOW_BASE_FALL_PX_PER_S * clamp(cfg.snowFallSpeed, 0, 2) * motionMul;
+			const windPx = SNOW_BASE_WIND_PX_PER_S * clamp(cfg.snowWind, -2, 2) * motionMul;
+			const parallax = clamp(cfg.snowDepthParallax, 0, 1.5);
+			const turbulenceT = tMs / SNOW_TURBULENCE_LOOP_MS;
+			const gustT = tMs / SNOW_GUST_BAND_LOOP_MS;
+			const densityT = tMs / SNOW_DENSITY_BAND_LOOP_MS;
+			const wrap = (value: number, span: number, margin: number) =>
+				(((value + margin) % (span + margin * 2)) + span + margin * 2) %
+					(span + margin * 2) -
+				margin;
+
+			snowCtx.save();
+			try {
+				snowCtx.globalCompositeOperation = 'source-over';
+				try {
+					snowCtx.filter = 'none';
+				} catch {
+					// Ignore.
+				}
+
+				for (let i = 0; i < visibleCount; i++) {
+					const p = particles[i];
+					const stamp = hasStamps ? stamps[p.stampIndex % stamps.length] : null;
+					const depthScale = lerp(0.86, 1.12, p.depth * parallax);
+					const pointRadius = p.size * depthScale;
+					const stampSize = clamp(
+						pointRadius * 11.2 * p.scaleJitter,
+						SNOW_STAMP_MIN_SIZE_PX,
+						SNOW_STAMP_MAX_SIZE_PX
+					);
+					const drawW = stampSize;
+					const drawH = stampSize * p.stretch;
+					const margin = Math.max(drawW, drawH) * 0.6 + 6;
+
+					const baseX = wrap(
+						p.x + tS * windPx * p.windSpeed * (0.55 + p.depth),
+						w,
+						margin
+					);
+					const baseY = wrap(
+						p.y + tS * fallPx * p.fallSpeed * (0.62 + p.depth * 0.76),
+						h,
+						margin
+					);
+
+					const localDriftA =
+						(noise1D(turbulenceT * lerp(0.72, 1.55, p.depth) + p.turbulenceSeed) - 0.5) *
+						2;
+					const localDriftB =
+						(noise1D(turbulenceT * lerp(1.35, 2.35, p.depth) + p.gustSeed + 17.3) -
+							0.5) *
+						2;
+					const gustBand =
+						(noise1D(baseY * 0.0042 + baseX * 0.0014 + gustT * 1.2 + 210.3) - 0.5) *
+						2;
+					const gustFine =
+						(noise1D(baseY * 0.011 - baseX * 0.002 + gustT * 2.1 + p.gustSeed) - 0.5) *
+						2;
+					const verticalFlutter =
+						(noise1D(turbulenceT * lerp(1.1, 2.1, p.depth) + p.turbulenceSeed + 43.8) -
+							0.5) *
+						2;
+					const driftX =
+						((localDriftA * 0.68 + localDriftB * 0.32) *
+							p.wobble *
+							(0.28 + parallax * 0.36) +
+							gustBand * lerp(0.35, 2.2, p.depth) * (0.34 + parallax * 0.38) +
+							gustFine * lerp(0.12, 0.65, p.depth)) *
+						turbulenceMul;
+					const x = wrap(baseX + driftX, w, margin);
+					const y = wrap(
+						baseY + verticalFlutter * lerp(0.12, 0.78, p.depth) * turbulenceMul,
+						h,
+						margin
+					);
+
+					const densityCoord = y * 0.0056 + x * 0.0018 + densityT;
+					const densityField =
+						noise1D(densityCoord + 31.7) * 0.68 +
+						noise1D(densityCoord * 1.9 + 409.1) * 0.32;
+					const particlePresence = clamp(
+						(densityField + 0.42 - p.densitySeed * 0.7) / 0.38,
+						0,
+						1
+					);
+					const densityAlpha = clamp(
+						lerp(0.55, 1.12, densityField) * particlePresence,
+						0,
+						1.12
+					);
+					const flakeAlpha = clamp(
+						p.opacity * lerp(0.72, 1.08, p.depth) * densityAlpha * SNOW_STAMP_ALPHA_MULTIPLIER,
+						0,
+						0.78
+					);
+					if (flakeAlpha <= 0.006) continue;
+
+					snowCtx.globalAlpha = flakeAlpha;
+					snowCtx.translate(x, y);
+					snowCtx.rotate(
+						p.rotation + p.wobblePhase * 0.04 + tS * p.rotationSpeed * turbulenceMul
+					);
+					if (stamp) {
+						snowCtx.drawImage(stamp, -drawW * 0.5, -drawH * 0.5, drawW, drawH);
+					} else {
+						const fallbackSize = clamp(stampSize * 0.16, 1.1, 2.8);
+						snowCtx.fillStyle = 'rgb(246, 252, 255)';
+						snowCtx.beginPath();
+						snowCtx.ellipse(0, 0, fallbackSize * 0.55, fallbackSize, 0, 0, Math.PI * 2);
+						snowCtx.fill();
+					}
+					snowCtx.setTransform(1, 0, 0, 1, 0, 0);
+				}
+			} catch {
+				// Non-fatal; the snowy mood can render as just cold clouds/fog.
+			} finally {
+				snowCtx.restore();
+			}
 		};
 
 		const driftLoopS = CLOUDS_DRIFT_LOOP_MS / 1000;
@@ -6699,6 +6993,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				} catch {
 					// Ignore.
 				}
+				try {
+					drawSnow(cloudsDriftSimTimeMsRef.current);
+				} catch {
+					// Ignore.
+				}
 			}
 
 			cloudsDriftRafRef.current = requestAnimationFrame((t) => tick(t, img, pattern));
@@ -6719,6 +7018,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					// Non-fatal.
 				});
 				loadLightningPotential().catch(() => {
+					// Non-fatal.
+				});
+				loadSnowStamps().catch(() => {
 					// Non-fatal.
 				});
 				cloudsDriftOffsetRef.current = { x: 0, y: 0 };
@@ -6774,6 +7076,15 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			lightningNextFlashAtMsRef.current = 0;
 			try {
 				cloudsSource.pause?.();
+			} catch {
+				// Ignore.
+			}
+			try {
+				(
+					map.getSource(MAPBOX_SOURCE_IDS.snow) as
+						| { pause?: () => void }
+						| undefined
+				)?.pause?.();
 			} catch {
 				// Ignore.
 			}
@@ -6899,6 +7210,27 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			}
 		}
 
+		if (!mapInstance.getSource(MAPBOX_SOURCE_IDS.snow)) {
+			const snowCanvas = snowCanvasRef.current;
+			if (snowCanvas) {
+				try {
+					mapInstance.addSource(MAPBOX_SOURCE_IDS.snow, {
+						type: 'canvas',
+						canvas: snowCanvas,
+						animate: true,
+						coordinates: CLOUDS_CANVAS_COORDINATES,
+					} as unknown as mapboxgl.AnySourceData);
+					(
+						mapInstance.getSource(MAPBOX_SOURCE_IDS.snow) as
+							| { play?: () => void }
+							| undefined
+					)?.play?.();
+				} catch {
+					// Non-fatal; snowy mood simply renders without the particle layer.
+				}
+			}
+		}
+
 		if (!mapInstance.getSource(MAPBOX_SOURCE_IDS.dayFarSideShade)) {
 			const shadeCanvas = dayFarSideShadeCanvasRef.current;
 			if (shadeCanvas) {
@@ -6997,7 +7329,16 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		ensureSource(MAPBOX_SOURCE_IDS.markersBase);
 
 		const ensureLayer = (layer: any, beforeId?: string) => {
-			if (mapInstance.getLayer(layer.id)) return;
+			if (mapInstance.getLayer(layer.id)) {
+				if (beforeId && mapInstance.getLayer(beforeId)) {
+					try {
+						mapInstance.moveLayer(layer.id, beforeId);
+					} catch {
+						// Ignore; layer order will be corrected on the next style rebuild.
+					}
+				}
+				return;
+			}
 			if (beforeId && mapInstance.getLayer(beforeId)) {
 				mapInstance.addLayer(layer, beforeId);
 				return;
@@ -7038,8 +7379,26 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			});
 		}
 
+		if (mapInstance.getSource(MAPBOX_SOURCE_IDS.snow)) {
+			ensureLayer(
+				{
+					id: MAPBOX_LAYER_IDS.snow,
+					type: 'raster',
+					source: MAPBOX_SOURCE_IDS.snow,
+					paint: {
+						'raster-opacity': buildSnowOpacityExpr(cfg.snowOpacity),
+						'raster-fade-duration': 0,
+						'raster-resampling': 'linear',
+					},
+				},
+				MAPBOX_LAYER_IDS.clouds
+			);
+		}
+
 		// Clouds (baseline globe texture). Added above the dawn band so clouds
 		// interrupt the color instead of the sunrise reading as a flat wash.
+		// Snow is inserted before this layer so flakes feel suspended below the
+		// cloud deck, visible mainly through breaks and feathered cloud edges.
 		ensureLayer({
 			id: MAPBOX_LAYER_IDS.clouds,
 			type: 'raster',
@@ -7645,6 +8004,22 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					}
 					lightningCanvasRef.current = canvas;
 					lightningCanvasCtxRef.current = ctx;
+				}
+			}
+
+			if (!snowCanvasRef.current && typeof document !== 'undefined') {
+				const canvas = document.createElement('canvas');
+				canvas.width = SNOW_CANVAS_SIZE_PX;
+				canvas.height = SNOW_CANVAS_SIZE_PX;
+				const ctx = canvas.getContext('2d');
+				if (ctx) {
+					try {
+						ctx.imageSmoothingEnabled = false;
+					} catch {
+						// Ignore.
+					}
+					snowCanvasRef.current = canvas;
+					snowCanvasCtxRef.current = ctx;
 				}
 			}
 		} catch {
@@ -11004,6 +11379,13 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						buildLightningOpacityExpr(
 							cfg.lightningIntensity * LIGHTNING_LAYER_OPACITY
 						) as unknown as mapboxgl.Expression
+					);
+				}
+				if (m.getLayer(MAPBOX_LAYER_IDS.snow)) {
+					m.setPaintProperty(
+						MAPBOX_LAYER_IDS.snow,
+						'raster-opacity',
+						buildSnowOpacityExpr(cfg.snowOpacity) as unknown as mapboxgl.Expression
 					);
 				}
 			} catch {
