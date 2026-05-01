@@ -34,6 +34,27 @@ export type MoodVisualConfig = {
 	 */
 	cloudExtraPassAlpha: number;
 	/**
+	 * Scales the shifted extra cloud passes. Values above 1 spread repeated
+	 * texture fills farther apart, making dense moods feel more dispersed.
+	 */
+	cloudLayerSpread: number;
+	/**
+	 * Grouped-mode opacity for the faster, sparser secondary cloud layer. This
+	 * gives specific moods visible cloud-to-cloud layering without relying on
+	 * storm wind as a proxy.
+	 */
+	cloudSecondaryLayerOpacity: number;
+	/**
+	 * Additional haze-only pass layered over the normal haze split. Used by
+	 * overcast moods to make the cloud deck feel softer and more continuous.
+	 */
+	cloudHazeLayerOpacity: number;
+	/**
+	 * Extra light veil sampled from existing cloud textures, shifted separately
+	 * from the main deck so cloudy can reveal a distinct high cloud layer.
+	 */
+	cloudFineVeilOpacity: number;
+	/**
 	 * Extra wind applied to storm-specific layers and turbulence. 1 preserves
 	 * the normal drift field.
 	 */
@@ -104,6 +125,10 @@ const NORMAL: MoodVisualConfig = {
 	cloudBrightnessMax: 1.0,
 	cloudExtraPasses: 0,
 	cloudExtraPassAlpha: 1,
+	cloudLayerSpread: 1,
+	cloudSecondaryLayerOpacity: 0,
+	cloudHazeLayerOpacity: 0,
+	cloudFineVeilOpacity: 0,
 	cloudStormWindMultiplier: 1,
 	cloudCoreShadowOpacity: 0,
 	cloudEdgeLiftOpacity: 0,
@@ -139,6 +164,10 @@ const SUNNY: MoodVisualConfig = {
 	cloudBrightnessMax: 1.0,
 	cloudExtraPasses: 0,
 	cloudExtraPassAlpha: 1,
+	cloudLayerSpread: 1,
+	cloudSecondaryLayerOpacity: 0,
+	cloudHazeLayerOpacity: 0,
+	cloudFineVeilOpacity: 0,
 	cloudStormWindMultiplier: 1,
 	cloudCoreShadowOpacity: 0,
 	cloudEdgeLiftOpacity: 0,
@@ -166,18 +195,22 @@ const SUNNY: MoodVisualConfig = {
 };
 
 const CLOUDY: MoodVisualConfig = {
-	cloudOpacityGlobeZoom: 0.88,
-	cloudOpacityDecorativeZoom: 0.76,
-	cloudDriftSpeedMultiplier: 0.7,
-	cloudTurbulenceMultiplier: 1.0,
-	cloudBrightnessMin: 0.8,
+	cloudOpacityGlobeZoom: 0.94,
+	cloudOpacityDecorativeZoom: 0.84,
+	cloudDriftSpeedMultiplier: 0.74,
+	cloudTurbulenceMultiplier: 1.24,
+	cloudBrightnessMin: 0.76,
 	cloudBrightnessMax: 1.0,
-	cloudExtraPasses: 3.25,
-	cloudExtraPassAlpha: 0.72,
+	cloudExtraPasses: 4.35,
+	cloudExtraPassAlpha: 0.62,
+	cloudLayerSpread: 1.38,
+	cloudSecondaryLayerOpacity: 0.32,
+	cloudHazeLayerOpacity: 0.3,
+	cloudFineVeilOpacity: 0.24,
 	cloudStormWindMultiplier: 1,
 	cloudCoreShadowOpacity: 0,
-	cloudEdgeLiftOpacity: 0,
-	cloudDeepZoomOpacity: 0,
+	cloudEdgeLiftOpacity: 0.1,
+	cloudDeepZoomOpacity: 0.055,
 	snowOpacity: 0,
 	snowDensity: 0,
 	snowFallSpeed: 0,
@@ -209,6 +242,10 @@ const STORMY: MoodVisualConfig = {
 	cloudBrightnessMax: 0.96,
 	cloudExtraPasses: 2.35,
 	cloudExtraPassAlpha: 0.34,
+	cloudLayerSpread: 0.92,
+	cloudSecondaryLayerOpacity: 0.18,
+	cloudHazeLayerOpacity: 0.06,
+	cloudFineVeilOpacity: 0,
 	cloudStormWindMultiplier: 1.38,
 	cloudCoreShadowOpacity: 0.56,
 	cloudEdgeLiftOpacity: 0.2,
@@ -246,6 +283,10 @@ const SNOWY: MoodVisualConfig = {
 	cloudBrightnessMax: 1.0,
 	cloudExtraPasses: 1.6,
 	cloudExtraPassAlpha: 0.5,
+	cloudLayerSpread: 1,
+	cloudSecondaryLayerOpacity: 0,
+	cloudHazeLayerOpacity: 0,
+	cloudFineVeilOpacity: 0,
 	cloudStormWindMultiplier: 1,
 	cloudCoreShadowOpacity: 0,
 	cloudEdgeLiftOpacity: 0,

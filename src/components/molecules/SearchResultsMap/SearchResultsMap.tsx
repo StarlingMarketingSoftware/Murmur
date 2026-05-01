@@ -453,6 +453,18 @@ const blendRuntimeMoodConfig = (
 		cloudBrightnessMax: lerp(from.cloudBrightnessMax, to.cloudBrightnessMax, c),
 		cloudExtraPasses: lerp(from.cloudExtraPasses, to.cloudExtraPasses, d),
 		cloudExtraPassAlpha: lerp(from.cloudExtraPassAlpha, to.cloudExtraPassAlpha, c),
+		cloudLayerSpread: lerp(from.cloudLayerSpread, to.cloudLayerSpread, c),
+		cloudSecondaryLayerOpacity: lerp(
+			from.cloudSecondaryLayerOpacity,
+			to.cloudSecondaryLayerOpacity,
+			c
+		),
+		cloudHazeLayerOpacity: lerp(from.cloudHazeLayerOpacity, to.cloudHazeLayerOpacity, c),
+		cloudFineVeilOpacity: lerp(
+			from.cloudFineVeilOpacity,
+			to.cloudFineVeilOpacity,
+			c
+		),
 		cloudStormWindMultiplier: lerp(
 			from.cloudStormWindMultiplier,
 			to.cloudStormWindMultiplier,
@@ -1953,10 +1965,12 @@ const drawCloudExtraPasses = (
 	h: number,
 	extraPasses: number,
 	offsetShift = 0,
-	passAlphaMultiplier = 1
+	passAlphaMultiplier = 1,
+	passSpreadMultiplier = 1
 ) => {
 	const count = clamp(extraPasses, 0, CLOUDS_EXTRA_PASS_OFFSETS.length);
 	const passAlpha = clamp(passAlphaMultiplier, 0, 1);
+	const passSpread = clamp(passSpreadMultiplier, 0.35, 2.5);
 	const fullPasses = Math.floor(count);
 	const fractionalPass = count - fullPasses;
 	const totalPasses = fullPasses + (fractionalPass > 0.001 ? 1 : 0);
@@ -1971,7 +1985,7 @@ const drawCloudExtraPasses = (
 				(p + offsetShift) % CLOUDS_EXTRA_PASS_OFFSETS.length
 			];
 		ctx.globalAlpha = baseAlpha * alphaMul * passAlpha;
-		ctx.translate(w * oxT, h * oyT);
+		ctx.translate(w * oxT * passSpread, h * oyT * passSpread);
 		ctx.fillRect(-w * 2, -h * 2, w * 5, h * 5);
 	}
 	ctx.globalAlpha = baseAlpha;
@@ -3191,7 +3205,7 @@ const normalizeStateKey = (state?: string | null): string | null => {
 // MANUAL WEATHER MOOD OVERRIDE FOR TESTING.
 // Set to one of: 'sunny' | 'normal' | 'cloudy' | 'stormy' | 'snowy'
 // Set back to null to use the real weather mood from the user's region.
-const MANUAL_WEATHER_MOOD_OVERRIDE: WeatherMood | null = null;
+const MANUAL_WEATHER_MOOD_OVERRIDE: WeatherMood | null = 'cloudy';
 
 // MANUAL TEMPERATURE OVERRIDE FOR TESTING (Fahrenheit).
 // Set to a number (e.g. 92) to test the > 80°F brightness lift.
@@ -7076,6 +7090,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			const stormWindMult = clamp(moodCfg.cloudStormWindMultiplier, 0.25, 3);
 			const extraPasses = moodCfg.cloudExtraPasses;
 			const extraPassAlpha = moodCfg.cloudExtraPassAlpha;
+			const extraPassSpread = clamp(moodCfg.cloudLayerSpread, 0.35, 2.5);
+			const configuredSecondaryAlpha = clamp(moodCfg.cloudSecondaryLayerOpacity, 0, 1);
+			const hazeLayerAlpha = clamp(moodCfg.cloudHazeLayerOpacity, 0, 1);
+			const fineVeilAlpha = clamp(moodCfg.cloudFineVeilOpacity, 0, 1);
 			const stormCoreOpacity = clamp(moodCfg.cloudCoreShadowOpacity, 0, 1);
 			const stormEdgeOpacity = clamp(moodCfg.cloudEdgeLiftOpacity, 0, 1);
 
@@ -7230,12 +7248,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			const secondaryReady =
 				Boolean(secondaryPattern) || cloudsTextureSecondaryReadyRef.current;
 			const layer2Alpha = useGroups
-				? secondaryReady && stormWindMult > 1.001
-					? 0.18
+				? secondaryReady
+					? configuredSecondaryAlpha
 					: 0
 				: secondaryReady
-					? 0.52
-					: 0.22;
+					? Math.max(0.52, configuredSecondaryAlpha)
+					: Math.max(0.22, configuredSecondaryAlpha);
 			const layer2Pattern = secondaryReady ? secondaryPattern : pattern;
 			const layer2Source: CanvasImageSource =
 				secondaryReady && secondaryCanvas ? secondaryCanvas : img;
@@ -7296,7 +7314,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						y: number,
 						alpha: number,
 						extraPassCount = 0,
-						extraPassOffset = 0
+						extraPassOffset = 0,
+						passSpread = extraPassSpread
 					) => {
 						if (alpha <= 0.001) return;
 						cloudsCtx.setTransform(1, 0, shear, 1, translateX, 0);
@@ -7310,7 +7329,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 							h,
 							extraPassCount,
 							extraPassOffset,
-							extraPassAlpha
+							extraPassAlpha,
+							passSpread
 						);
 					};
 
@@ -7330,6 +7350,31 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 								cloudsCtx.drawImage(img, x, y, w, h);
 							}
 						}
+					}
+
+					if (useHazeSplit && hazePattern && hazeLayerAlpha > 0.001) {
+						fillPatternAt(
+							hazePattern,
+							x0 + w * 0.37,
+							y0 - h * 0.22,
+							hazeLayerAlpha,
+							Math.min(extraPasses, 2),
+							3,
+							extraPassSpread * 1.18
+						);
+					}
+
+					const fineVeilPattern = hazePattern ?? secondaryPattern ?? pattern;
+					if (fineVeilPattern && fineVeilAlpha > 0.001) {
+						fillPatternAt(
+							fineVeilPattern,
+							x0 - w * 0.19,
+							y0 + h * 0.31,
+							fineVeilAlpha,
+							Math.min(extraPasses * 0.35, 1.65),
+							5,
+							extraPassSpread * 1.28
+						);
 					}
 
 					if (!useGroups) {
