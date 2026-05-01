@@ -1627,6 +1627,14 @@ const CLOUDS_CANVAS_COORDINATES: [
 	[180, -WEB_MERCATOR_MAX_LAT],
 	[-180, -WEB_MERCATOR_MAX_LAT],
 ];
+// Latitude band over which the cloud/snow canvas alpha tapers to zero. Hides
+// the Mercator-vs-globe distortion that otherwise smears the polar rows of the
+// flat canvas into a visible ring around each pole. Mirrors the day-shade
+// `polarTaperT` (see paintDayFarSideShadeCanvas) but starts a little earlier,
+// since cloud texture detail makes the smear more visible than the shade's
+// flat fill does.
+const CLOUDS_POLAR_TAPER_START_DEG = 55;
+const CLOUDS_POLAR_TAPER_END_DEG = 82;
 const DAY_FAR_SIDE_SHADE_CANVAS_SIZE_PX = 512;
 // Stored in the texture alpha; tuned to read as a clear "this side is in shadow"
 // without becoming a night-mode look. The opacity multiplier below stacks on top.
@@ -1727,6 +1735,51 @@ const createDayFarSideShadeCanvas = (): HTMLCanvasElement | null => {
 	const canvas = document.createElement('canvas');
 	if (!paintDayFarSideShadeCanvas(canvas)) return null;
 	return canvas;
+};
+
+// Vertical 1px-wide alpha mask whose alpha follows the inverse Mercator
+// formula, so the taper is geographically correct (latitude-pinned) rather
+// than just a screen-space gradient. Cached at module scope and reused as a
+// `destination-in` source in the cloud and snow draw loops.
+let cloudsPolarFadeMaskCanvas: HTMLCanvasElement | null = null;
+const buildCloudsPolarFadeMaskCanvas = (
+	sizePx: number
+): HTMLCanvasElement | null => {
+	if (typeof document === 'undefined') return null;
+	const mask = document.createElement('canvas');
+	mask.width = 1;
+	mask.height = sizePx;
+	const ctx = mask.getContext('2d');
+	if (!ctx) return null;
+	const img = ctx.createImageData(1, sizePx);
+	const data = img.data;
+	for (let y = 0; y < sizePx; y += 1) {
+		const mercatorY = (y + 0.5) / sizePx;
+		const lat =
+			(Math.atan(Math.sinh(Math.PI * (1 - 2 * mercatorY))) * 180) / Math.PI;
+		const t =
+			1 -
+			smoothstep(
+				CLOUDS_POLAR_TAPER_START_DEG,
+				CLOUDS_POLAR_TAPER_END_DEG,
+				Math.abs(lat)
+			);
+		const a = Math.round(clamp(t, 0, 1) * 255);
+		const i = y * 4;
+		data[i] = 255;
+		data[i + 1] = 255;
+		data[i + 2] = 255;
+		data[i + 3] = a;
+	}
+	ctx.putImageData(img, 0, 0);
+	return mask;
+};
+const getCloudsPolarFadeMask = (sizePx: number): HTMLCanvasElement | null => {
+	const existing = cloudsPolarFadeMaskCanvas;
+	if (existing && existing.height === sizePx) return existing;
+	const next = buildCloudsPolarFadeMaskCanvas(sizePx);
+	cloudsPolarFadeMaskCanvas = next;
+	return next;
 };
 
 type SunTransitionVisualState = {
@@ -6484,6 +6537,22 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			} finally {
 				snowCtx.restore();
 			}
+
+			// Polar fade: same Mercator-vs-globe distortion the cloud canvas
+			// gets, since snow shares CLOUDS_CANVAS_COORDINATES. Reuses the
+			// shared mask so flakes near the poles fade out cleanly.
+			const polarMask = getCloudsPolarFadeMask(h);
+			if (polarMask) {
+				try {
+					snowCtx.setTransform(1, 0, 0, 1, 0, 0);
+					snowCtx.globalAlpha = 1;
+					snowCtx.globalCompositeOperation = 'destination-in';
+					snowCtx.drawImage(polarMask, 0, 0, w, h);
+					snowCtx.globalCompositeOperation = 'source-over';
+				} catch {
+					// Ignore.
+				}
+			}
 		};
 
 		const driftLoopS = CLOUDS_DRIFT_LOOP_MS / 1000;
@@ -7460,6 +7529,22 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				cloudsCtx.restore();
 			}
 
+			// Polar fade: zero out alpha in the rows that the globe projection
+			// would otherwise smear into a distortion ring around each pole.
+			// `destination-in` preserves the existing cloud composite exactly,
+			// just attenuated where the projection breaks down.
+			const polarMask = getCloudsPolarFadeMask(h);
+			if (polarMask) {
+				try {
+					cloudsCtx.setTransform(1, 0, 0, 1, 0, 0);
+					cloudsCtx.globalAlpha = 1;
+					cloudsCtx.globalCompositeOperation = 'destination-in';
+					cloudsCtx.drawImage(polarMask, 0, 0, w, h);
+					cloudsCtx.globalCompositeOperation = 'source-over';
+				} catch {
+					// Ignore.
+				}
+			}
 		};
 
 		const tick = (now: number, img: HTMLImageElement, pattern: CanvasPattern | null) => {
