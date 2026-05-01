@@ -11345,8 +11345,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 		// Hot wash — uniform warm-white screen-blend overlay that brightens the
 		// whole globe. Gated on the mood's `hotWashEligible` flag (only sunny/normal)
-		// so cloudy/rainy/stormy/snowy don't get a brightening lift, and on the
-		// raw clock night so a mood's `nightVisualBlend` floor doesn't suppress it.
+		// so cloudy/stormy/snowy don't get a brightening lift, and on the raw
+		// clock night so a mood's `nightVisualBlend` floor doesn't suppress it.
 		const brightSoftboxStrength = clamp(cfg.warmSoftboxOpacityMultiplier, 0, 1);
 		const hotActive = isHotRef.current && cfg.hotWashEligible && rawNight < 0.12;
 		const washOpacity = hotActive

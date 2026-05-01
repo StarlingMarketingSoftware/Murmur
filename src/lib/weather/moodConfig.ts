@@ -84,7 +84,7 @@ export type MoodVisualConfig = {
 	gloomWashOpacity: number;
 	/**
 	 * Whether this mood gets the warm-white "hot wash" overlay when it's >80°F.
-	 * Sunny/normal: yes (clear hot day reads brighter). Cloudy/rainy/stormy/snowy:
+	 * Sunny/normal: yes (clear hot day reads brighter). Cloudy/stormy/snowy:
 	 * no — adding a brightening wash to overcast/wet/snowy weather looks wrong.
 	 */
 	hotWashEligible: boolean;
