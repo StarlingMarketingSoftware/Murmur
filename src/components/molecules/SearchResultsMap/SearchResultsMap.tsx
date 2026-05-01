@@ -3188,7 +3188,7 @@ const normalizeStateKey = (state?: string | null): string | null => {
 // MANUAL WEATHER MOOD OVERRIDE FOR TESTING.
 // Set to one of: 'sunny' | 'normal' | 'cloudy' | 'stormy' | 'snowy'
 // Set back to null to use the real weather mood from the user's region.
-const MANUAL_WEATHER_MOOD_OVERRIDE: WeatherMood | null = 'snowy';
+const MANUAL_WEATHER_MOOD_OVERRIDE: WeatherMood | null = null;
 
 // MANUAL TEMPERATURE OVERRIDE FOR TESTING (Fahrenheit).
 // Set to a number (e.g. 92) to test the > 80°F brightness lift.
@@ -3255,6 +3255,9 @@ const HOT_WASH_OPACITY = 0.13;
 // Implemented as DOM overlays (screen + multiply) so the lighting stays viewer-anchored
 // and can be art-directed independently of the basemap.
 const NIGHT_GLOOM_WASH_OPACITY = 0;
+const NIGHT_MOONLIGHT_KEY_OPACITY = 0.48;
+const NIGHT_LOWER_LEFT_SHADOW_OPACITY = 0.94;
+const NIGHT_WARM_KEY_MIN_MUL = 0.04;
 // Neutral night-only dimmer. This darkens the normal day-colored basemap without
 // shifting land/ocean hues back toward a separate night palette.
 const NIGHT_DARK_WASH_OPACITY = 0.17;
@@ -3265,7 +3268,7 @@ const NIGHT_FACE_SHADE_OPACITY = 0;
 // NASA-earth-at-night photo (which feels eerie/lonely on its own).
 const NIGHT_US_LIGHTS_OPACITY = 0.55;
 const NIGHT_MOON_RIM_OPACITY = 0;
-const NIGHT_SHADOW_OVERLAY_MUL_MIN = 1;
+const NIGHT_SHADOW_OVERLAY_MUL_MIN = 0.18;
 
 // City-lights persistence: this is primarily a "zoomed out / from space" aesthetic.
 // Fade out aggressively as we approach state/city zoom so it doesn't compete with markers.
@@ -3385,6 +3388,21 @@ const computeNightLightsCloseGlowMul = (zoom: number) => {
 	// Ease-in: let dots dominate, then let glow take over smoothly.
 	return clamp(t, 0, 1) * clamp(t, 0, 1);
 };
+
+// Night key light: a cool, white-blue ambient wash from the upper-right so full
+// night has its own moonlit direction instead of borrowing the daytime sun wash.
+const NIGHT_MOONLIGHT_KEY_BG = [
+	'radial-gradient(ellipse 178% 150% at 112% -18%, rgba(255, 255, 255, 0.20) 0%, rgba(240, 250, 255, 0.15) 28%, rgba(219, 237, 255, 0.09) 55%, rgba(191, 216, 244, 0.035) 84%, rgba(191, 216, 244, 0) 100%)',
+	'radial-gradient(ellipse 124% 104% at 86% 8%, rgba(247, 252, 255, 0.07) 0%, rgba(224, 240, 255, 0.052) 46%, rgba(206, 226, 248, 0.024) 78%, rgba(206, 226, 248, 0) 100%)',
+	'radial-gradient(ellipse 152% 112% at 74% 30%, rgba(214, 231, 255, 0.034) 0%, rgba(186, 210, 238, 0.02) 58%, rgba(186, 210, 238, 0) 92%)',
+].join(', ');
+
+// Night counter-shade: a broad lower-left dark pool, opposite the daytime
+// upper-left key / lower-right shadow so night reads as a distinct composition.
+const NIGHT_LOWER_LEFT_SHADOW_BG = [
+	'radial-gradient(ellipse 162% 154% at -20% 114%, rgba(0, 3, 14, 0.80) 0%, rgba(2, 8, 26, 0.61) 28%, rgba(6, 15, 38, 0.38) 54%, rgba(10, 22, 50, 0.15) 78%, rgba(10, 22, 50, 0) 100%)',
+	'radial-gradient(ellipse 100% 86% at 14% 80%, rgba(1, 5, 18, 0.32) 0%, rgba(5, 13, 34, 0.18) 48%, rgba(5, 13, 34, 0) 84%)',
+].join(', ');
 
 // Standby shade paint for the night overlay. The overlay opacity is kept at 0 so
 // the visible night map stays matched to the normal daytime palette.
@@ -3654,6 +3672,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const lightingOverlayHotWashRef = useRef<HTMLDivElement | null>(null);
 	const lightingOverlayGloomWashRef = useRef<HTMLDivElement | null>(null);
 	const lightingOverlayNightDarkWashRef = useRef<HTMLDivElement | null>(null);
+	const lightingOverlayNightLowerLeftShadowRef = useRef<HTMLDivElement | null>(null);
+	const lightingOverlayNightMoonlightRef = useRef<HTMLDivElement | null>(null);
 	const lightingOverlayNightShadeRef = useRef<HTMLDivElement | null>(null);
 	const lightingOverlayMoonRimRef = useRef<HTMLDivElement | null>(null);
 	const [visibleContacts, setVisibleContacts] = useState<ContactWithName[]>([]);
@@ -11061,12 +11081,13 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		const sunWashSuppression = smoothstep(0.02, 0.22, sunTransitionOpacity);
 		const foregroundSunMul = 1 - sunWashSuppression * 0.78;
 
-		// Preserve the daytime palette and softbox tuning at night; the night cue comes
-		// from the lights overlay, not from tinting or dimming the basemap.
-		const keyNightMul = 1;
-		const nightEaseForShadow = night * night * (3 - 2 * night);
+		const trueNightEase = rawNight * rawNight * (3 - 2 * rawNight);
+		// Let night take over the lighting direction: the warm daytime key fades
+		// out while the moonlit upper-right key and lower-left shadow fade in.
+		const keyNightMul =
+			1 - trueNightEase * (1 - clamp(NIGHT_WARM_KEY_MIN_MUL, 0, 1));
 		const shadowNightMul =
-			1 - nightEaseForShadow * (1 - clamp(NIGHT_SHADOW_OVERLAY_MUL_MIN, 0, 1));
+			1 - trueNightEase * (1 - clamp(NIGHT_SHADOW_OVERLAY_MUL_MIN, 0, 1));
 
 		const warmKeyOpacity = clamp(
 			base * cfg.warmSoftboxOpacityMultiplier * keyNightMul * foregroundSunMul,
@@ -11091,6 +11112,32 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			lightingOverlayShadowRef.current.style.opacity = String(shadowOpacity);
 		if (lightingOverlaySunSpaceGlowRef.current)
 			lightingOverlaySunSpaceGlowRef.current.style.opacity = String(sunSpaceGlowOpacity);
+
+		const nightMoonlightOpacity = clamp(
+			base *
+				trueNightEase *
+				NIGHT_MOONLIGHT_KEY_OPACITY *
+				(1 - sunWashSuppression * 0.72),
+			0,
+			1
+		);
+		const nightLowerLeftShadowOpacity = clamp(
+			base *
+				trueNightEase *
+				NIGHT_LOWER_LEFT_SHADOW_OPACITY *
+				(1 - sunWashSuppression * 0.55),
+			0,
+			1
+		);
+		if (lightingOverlayNightMoonlightRef.current) {
+			lightingOverlayNightMoonlightRef.current.style.opacity =
+				String(nightMoonlightOpacity);
+		}
+		if (lightingOverlayNightLowerLeftShadowRef.current) {
+			lightingOverlayNightLowerLeftShadowRef.current.style.opacity = String(
+				nightLowerLeftShadowOpacity
+			);
+		}
 
 		// Globe-zoom only via `base` (full at zoom ≤2.5, gone by zoom 5), and only
 		// during true full day. Intentionally NOT gated on presentation: the shade is
@@ -13535,6 +13582,35 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					pointerEvents: 'none',
 					background: 'rgb(0, 0, 0)',
 					mixBlendMode: 'multiply',
+					zIndex: 1,
+				}}
+			/>
+			{/*
+			  Night composition. The moon key comes from the upper-right while the
+			  counter-shade pools in the lower-left, opposite the daytime lighting.
+			  Opacity is owned by applyLightingOverlayOpacity.
+			*/}
+			<div
+				ref={lightingOverlayNightLowerLeftShadowRef}
+				aria-hidden
+				style={{
+					position: 'absolute',
+					inset: 0,
+					pointerEvents: 'none',
+					background: NIGHT_LOWER_LEFT_SHADOW_BG,
+					mixBlendMode: 'multiply',
+					zIndex: 1,
+				}}
+			/>
+			<div
+				ref={lightingOverlayNightMoonlightRef}
+				aria-hidden
+				style={{
+					position: 'absolute',
+					inset: 0,
+					pointerEvents: 'none',
+					background: NIGHT_MOONLIGHT_KEY_BG,
+					mixBlendMode: 'screen',
 					zIndex: 1,
 				}}
 			/>
