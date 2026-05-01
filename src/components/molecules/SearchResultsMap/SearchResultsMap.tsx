@@ -416,6 +416,18 @@ const blendRuntimeMoodConfig = (
 		cloudBrightnessMin: lerp(from.cloudBrightnessMin, to.cloudBrightnessMin, c),
 		cloudBrightnessMax: lerp(from.cloudBrightnessMax, to.cloudBrightnessMax, c),
 		cloudExtraPasses: lerp(from.cloudExtraPasses, to.cloudExtraPasses, d),
+		cloudExtraPassAlpha: lerp(from.cloudExtraPassAlpha, to.cloudExtraPassAlpha, c),
+		cloudStormWindMultiplier: lerp(
+			from.cloudStormWindMultiplier,
+			to.cloudStormWindMultiplier,
+			c
+		),
+		cloudCoreShadowOpacity: lerp(
+			from.cloudCoreShadowOpacity,
+			to.cloudCoreShadowOpacity,
+			c
+		),
+		cloudEdgeLiftOpacity: lerp(from.cloudEdgeLiftOpacity, to.cloudEdgeLiftOpacity, c),
 		cloudDeepZoomOpacity: lerp(from.cloudDeepZoomOpacity, to.cloudDeepZoomOpacity, d),
 		fogColor: mixCssColorString(from.fogColor, to.fogColor, c),
 		fogHighColor: mixCssColorString(from.fogHighColor, to.fogHighColor, c),
@@ -1870,13 +1882,15 @@ const drawCloudExtraPasses = (
 	w: number,
 	h: number,
 	extraPasses: number,
-	offsetShift = 0
+	offsetShift = 0,
+	passAlphaMultiplier = 1
 ) => {
 	const count = clamp(extraPasses, 0, CLOUDS_EXTRA_PASS_OFFSETS.length);
+	const passAlpha = clamp(passAlphaMultiplier, 0, 1);
 	const fullPasses = Math.floor(count);
 	const fractionalPass = count - fullPasses;
 	const totalPasses = fullPasses + (fractionalPass > 0.001 ? 1 : 0);
-	if (totalPasses <= 0) return;
+	if (totalPasses <= 0 || passAlpha <= 0.001) return;
 
 	const baseAlpha = ctx.globalAlpha;
 	for (let p = 0; p < totalPasses; p++) {
@@ -1886,7 +1900,7 @@ const drawCloudExtraPasses = (
 			CLOUDS_EXTRA_PASS_OFFSETS[
 				(p + offsetShift) % CLOUDS_EXTRA_PASS_OFFSETS.length
 			];
-		ctx.globalAlpha = baseAlpha * alphaMul;
+		ctx.globalAlpha = baseAlpha * alphaMul * passAlpha;
 		ctx.translate(w * oxT, h * oyT);
 		ctx.fillRect(-w * 2, -h * 2, w * 5, h * 5);
 	}
@@ -3400,6 +3414,17 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const cloudsTexturePatternSecondaryRef = useRef<CanvasPattern | null>(null);
 	const cloudsTextureSecondaryCanvasRef = useRef<HTMLCanvasElement | null>(null);
 	const cloudsTextureSecondaryReadyRef = useRef<boolean>(false);
+	const cloudsTextureStormCorePatternRef = useRef<CanvasPattern | null>(null);
+	const cloudsTextureStormCoreCanvasRef = useRef<HTMLCanvasElement | null>(null);
+	const cloudsTextureStormEdgePatternRef = useRef<CanvasPattern | null>(null);
+	const cloudsTextureStormEdgeCanvasRef = useRef<HTMLCanvasElement | null>(null);
+	const cloudsTextureStormReadyRef = useRef<boolean>(false);
+	const cloudsTextureStormCoreGroupPatternsRef = useRef<(CanvasPattern | null)[] | null>(
+		null
+	);
+	const cloudsTextureStormEdgeGroupPatternsRef = useRef<(CanvasPattern | null)[] | null>(
+		null
+	);
 	const cloudsTextureGroupPatternsRef = useRef<(CanvasPattern | null)[] | null>(null);
 	const cloudsTextureGroupCanvasesRef = useRef<HTMLCanvasElement[] | null>(null);
 	const cloudsTextureGroupReadyRef = useRef<boolean>(false);
@@ -5708,6 +5733,151 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		const meanderSpeedBaseY =
 			driftLoopS > 0 ? (CLOUDS_DRIFT_AMPLITUDE_Y_PX / driftLoopS) * 2.2 : 0;
 
+		const buildStormCloudMaskData = (
+			src: Uint8ClampedArray,
+			w: number,
+			h: number
+		): {
+			coreData: Uint8ClampedArray<ArrayBuffer>;
+			edgeData: Uint8ClampedArray<ArrayBuffer>;
+			corePixels: number;
+			edgePixels: number;
+		} => {
+			const coreData = new Uint8ClampedArray(new ArrayBuffer(src.length));
+			const edgeData = new Uint8ClampedArray(new ArrayBuffer(src.length));
+			let corePixels = 0;
+			let edgePixels = 0;
+
+			for (let y = 0; y < h; y++) {
+				for (let x = 0; x < w; x++) {
+					const idx = (y * w + x) * 4;
+					const a = src[idx + 3] / 255;
+					if (a <= 0.001) continue;
+
+					// Dense cloud centers become localized storm shadows; feathered
+					// mid-alpha edges become a light rim so storm clouds are not flat black.
+					const core = Math.pow(smoothstep(0.42, 0.92, a), 1.28);
+					const edge =
+						Math.pow(smoothstep(0.07, 0.34, a), 0.9) *
+						(1 - smoothstep(0.48, 0.86, a));
+
+					if (core > 0.002) {
+						const coreNoise = 0.78 + hash01(x * 13.17 + y * 31.73 + 204.9) * 0.22;
+						const c = core * coreNoise;
+						const v = Math.round(82 - c * 42);
+						coreData[idx] = v;
+						coreData[idx + 1] = Math.max(0, v + 4);
+						coreData[idx + 2] = Math.min(255, v + 14);
+						coreData[idx + 3] = Math.round(clamp(c * 255, 0, 255));
+						corePixels++;
+					}
+
+					if (edge > 0.002) {
+						const edgeNoise = 0.82 + hash01(x * 19.23 + y * 7.91 + 603.1) * 0.18;
+						const e = edge * edgeNoise;
+						const v = Math.round(222 + e * 26);
+						edgeData[idx] = Math.min(255, v - 4);
+						edgeData[idx + 1] = Math.min(255, v + 1);
+						edgeData[idx + 2] = Math.min(255, v + 6);
+						edgeData[idx + 3] = Math.round(clamp(e * 210, 0, 255));
+						edgePixels++;
+					}
+				}
+			}
+
+			return { coreData, edgeData, corePixels, edgePixels };
+		};
+
+		const putStormMaskPattern = (
+			canvas: HTMLCanvasElement,
+			data: Uint8ClampedArray<ArrayBuffer>,
+			w: number,
+			h: number
+		): CanvasPattern | null => {
+			const ctx = canvas.getContext('2d');
+			if (!ctx) return null;
+			try {
+				ctx.putImageData(new ImageData(data, w, h), 0, 0);
+				return cloudsCtx.createPattern(canvas, 'repeat');
+			} catch {
+				return null;
+			}
+		};
+
+		const ensureStormCloudTextures = (img: HTMLImageElement) => {
+			if (cloudsTextureStormReadyRef.current) return;
+			cloudsTextureStormReadyRef.current = false;
+
+			try {
+				if (typeof document === 'undefined') return;
+
+				let scratchCanvas = cloudsTextureScratchCanvasRef.current;
+				if (!scratchCanvas) {
+					scratchCanvas = document.createElement('canvas');
+					scratchCanvas.width = CLOUDS_CANVAS_SIZE_PX;
+					scratchCanvas.height = CLOUDS_CANVAS_SIZE_PX;
+					cloudsTextureScratchCanvasRef.current = scratchCanvas;
+				}
+
+				const w = scratchCanvas.width || CLOUDS_CANVAS_SIZE_PX;
+				const h = scratchCanvas.height || CLOUDS_CANVAS_SIZE_PX;
+				const scratchCtx = scratchCanvas.getContext('2d');
+				if (!scratchCtx) return;
+
+				try {
+					scratchCtx.imageSmoothingEnabled = true;
+					scratchCtx.imageSmoothingQuality = 'high';
+				} catch {
+					// Ignore.
+				}
+
+				scratchCtx.clearRect(0, 0, w, h);
+				scratchCtx.drawImage(img, 0, 0, w, h);
+
+				let imageData: ImageData | null = null;
+				try {
+					imageData = scratchCtx.getImageData(0, 0, w, h);
+				} catch {
+					imageData = null;
+				}
+				if (!imageData) return;
+
+				let coreCanvas = cloudsTextureStormCoreCanvasRef.current;
+				if (!coreCanvas) {
+					coreCanvas = document.createElement('canvas');
+					coreCanvas.width = w;
+					coreCanvas.height = h;
+					cloudsTextureStormCoreCanvasRef.current = coreCanvas;
+				}
+
+				let edgeCanvas = cloudsTextureStormEdgeCanvasRef.current;
+				if (!edgeCanvas) {
+					edgeCanvas = document.createElement('canvas');
+					edgeCanvas.width = w;
+					edgeCanvas.height = h;
+					cloudsTextureStormEdgeCanvasRef.current = edgeCanvas;
+				}
+
+				const { coreData, edgeData, corePixels, edgePixels } = buildStormCloudMaskData(
+					imageData.data,
+					w,
+					h
+				);
+				cloudsTextureStormCorePatternRef.current =
+					corePixels > 0 ? putStormMaskPattern(coreCanvas, coreData, w, h) : null;
+				cloudsTextureStormEdgePatternRef.current =
+					edgePixels > 0 ? putStormMaskPattern(edgeCanvas, edgeData, w, h) : null;
+				cloudsTextureStormReadyRef.current = Boolean(
+					cloudsTextureStormCorePatternRef.current ||
+						cloudsTextureStormEdgePatternRef.current
+				);
+			} catch {
+				cloudsTextureStormReadyRef.current = false;
+				cloudsTextureStormCorePatternRef.current = null;
+				cloudsTextureStormEdgePatternRef.current = null;
+			}
+		};
+
 		// Secondary clouds texture: a thinner/sparser variant so we can composite a second
 		// independently-drifting layer without it reading like two identical "blankets".
 		const ensureSecondaryCloudsTexture = (img: HTMLImageElement) => {
@@ -6024,14 +6194,20 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 				const groupCanvases: HTMLCanvasElement[] = [];
 				const groupPatterns: (CanvasPattern | null)[] = [];
+				const stormCoreGroupPatterns: (CanvasPattern | null)[] = [];
+				const stormEdgeGroupPatterns: (CanvasPattern | null)[] = [];
 
 				for (let g = 0; g < groupCount; g++) {
 					if (typeof document === 'undefined') {
 						groupPatterns.push(null);
+						stormCoreGroupPatterns.push(null);
+						stormEdgeGroupPatterns.push(null);
 						continue;
 					}
 					if (!groupPixelCounts[g]) {
 						groupPatterns.push(null);
+						stormCoreGroupPatterns.push(null);
+						stormEdgeGroupPatterns.push(null);
 						continue;
 					}
 
@@ -6041,6 +6217,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					const ctx = c.getContext('2d');
 					if (!ctx) {
 						groupPatterns.push(null);
+						stormCoreGroupPatterns.push(null);
+						stormEdgeGroupPatterns.push(null);
 						continue;
 					}
 
@@ -6053,6 +6231,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					}
 					if (!applied) {
 						groupPatterns.push(null);
+						stormCoreGroupPatterns.push(null);
+						stormEdgeGroupPatterns.push(null);
 						continue;
 					}
 
@@ -6062,10 +6242,36 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					} catch {
 						groupPatterns.push(null);
 					}
+
+					try {
+						const { coreData, edgeData, corePixels, edgePixels } = buildStormCloudMaskData(
+							groupDatas[g],
+							w,
+							h
+						);
+						const coreCanvas = document.createElement('canvas');
+						coreCanvas.width = w;
+						coreCanvas.height = h;
+						stormCoreGroupPatterns.push(
+							corePixels > 0 ? putStormMaskPattern(coreCanvas, coreData, w, h) : null
+						);
+
+						const edgeCanvas = document.createElement('canvas');
+						edgeCanvas.width = w;
+						edgeCanvas.height = h;
+						stormEdgeGroupPatterns.push(
+							edgePixels > 0 ? putStormMaskPattern(edgeCanvas, edgeData, w, h) : null
+						);
+					} catch {
+						stormCoreGroupPatterns.push(null);
+						stormEdgeGroupPatterns.push(null);
+					}
 				}
 
 				cloudsTextureGroupCanvasesRef.current = groupCanvases;
 				cloudsTextureGroupPatternsRef.current = groupPatterns;
+				cloudsTextureStormCoreGroupPatternsRef.current = stormCoreGroupPatterns;
+				cloudsTextureStormEdgeGroupPatternsRef.current = stormEdgeGroupPatterns;
 				cloudsTextureGroupReadyRef.current = groupPatterns.some(Boolean);
 				if (
 					cloudsTextureGroupReadyRef.current &&
@@ -6087,6 +6293,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				}
 			} catch {
 				cloudsTextureGroupReadyRef.current = false;
+				cloudsTextureStormCoreGroupPatternsRef.current = null;
+				cloudsTextureStormEdgeGroupPatternsRef.current = null;
 			}
 		};
 
@@ -6119,6 +6327,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			// independently-drifting layers so some cloud structures move at different speeds.
 			const w = cloudsCanvas.width || CLOUDS_CANVAS_SIZE_PX;
 			const h = cloudsCanvas.height || CLOUDS_CANVAS_SIZE_PX;
+			const moodCfg = weatherMoodConfigRef.current;
+			const stormWindMult = clamp(moodCfg.cloudStormWindMultiplier, 0.25, 3);
+			const extraPasses = moodCfg.cloudExtraPasses;
+			const extraPassAlpha = moodCfg.cloudExtraPassAlpha;
+			const stormCoreOpacity = clamp(moodCfg.cloudCoreShadowOpacity, 0, 1);
+			const stormEdgeOpacity = clamp(moodCfg.cloudEdgeLiftOpacity, 0, 1);
 
 			// Macro meander (base layer): smooth randomness applied as velocity so zoom changes
 			// do not introduce positional jumps.
@@ -6130,7 +6344,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			const meanderUnitX1 = (meanderNoiseX1 - 0.5) * 2;
 			const meanderUnitY1 = (meanderNoiseY1 - 0.5) * 2;
 
-			const moodDriftMult = weatherMoodConfigRef.current.cloudDriftSpeedMultiplier;
+			const moodDriftMult = moodCfg.cloudDriftSpeedMultiplier * stormWindMult;
 			const velX1 =
 				(CLOUDS_DRIFT_SPEED_X_PX_PER_S * moodDriftMult +
 					meanderUnitX1 * meanderSpeedBaseX) *
@@ -6206,8 +6420,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					const meanderMult = meanderMults[g] ?? 1;
 					const ySpeed = ySpeeds[g] ?? 0;
 
-					const groupMoodDriftMult =
-						weatherMoodConfigRef.current.cloudDriftSpeedMultiplier;
+					const groupMoodDriftMult = moodCfg.cloudDriftSpeedMultiplier * stormWindMult;
 					const velX =
 						(CLOUDS_DRIFT_SPEED_X_PX_PER_S * speedMult * groupMoodDriftMult +
 							meanderUnitX * meanderSpeedBaseX * meanderMult) *
@@ -6238,7 +6451,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			const meanderUnitX2 = (meanderNoiseX2 - 0.5) * 2;
 			const meanderUnitY2 = (meanderNoiseY2 - 0.5) * 2;
 
-			const layer2MoodDriftMult = weatherMoodConfigRef.current.cloudDriftSpeedMultiplier;
+			const layer2MoodDriftMult = moodCfg.cloudDriftSpeedMultiplier * stormWindMult;
 			const velX2 =
 				(CLOUDS_DRIFT_SPEED_X_PX_PER_S * L2_SPEED_MULT * layer2MoodDriftMult +
 					meanderUnitX2 * meanderSpeedBaseX * L2_MEANDER_MULT) *
@@ -6271,7 +6484,13 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			const secondaryCanvas = cloudsTextureSecondaryCanvasRef.current;
 			const secondaryReady =
 				Boolean(secondaryPattern) || cloudsTextureSecondaryReadyRef.current;
-			const layer2Alpha = useGroups ? 0 : secondaryReady ? 0.52 : 0.22;
+			const layer2Alpha = useGroups
+				? secondaryReady && stormWindMult > 1.001
+					? 0.18
+					: 0
+				: secondaryReady
+					? 0.52
+					: 0.22;
 			const layer2Pattern = secondaryReady ? secondaryPattern : pattern;
 			const layer2Source: CanvasImageSource =
 				secondaryReady && secondaryCanvas ? secondaryCanvas : img;
@@ -6294,7 +6513,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			};
 
 			const turbulenceT1 = tMs / CLOUDS_TURBULENCE_LOOP_MS;
-			const moodTurbMult = weatherMoodConfigRef.current.cloudTurbulenceMultiplier;
+			const moodTurbMult = moodCfg.cloudTurbulenceMultiplier * stormWindMult;
 			const turbulenceAmp1 =
 				CLOUDS_TURBULENCE_AMPLITUDE_X_PX * speedScale * 0.75 * moodTurbMult;
 			// Phase + slightly stronger turbulence on the faster layer so it doesn't feel locked
@@ -6302,6 +6521,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			const turbulenceT2 = (tMs + 17_000) / CLOUDS_TURBULENCE_LOOP_MS;
 			const turbulenceAmp2 =
 				CLOUDS_TURBULENCE_AMPLITUDE_X_PX * speedScale * 0.75 * 1.25 * moodTurbMult;
+			const stormCorePattern = cloudsTextureStormCorePatternRef.current;
+			const stormEdgePattern = cloudsTextureStormEdgePatternRef.current;
+			const stormCoreGroupPatterns = cloudsTextureStormCoreGroupPatternsRef.current;
+			const stormEdgeGroupPatterns = cloudsTextureStormEdgeGroupPatternsRef.current;
 
 			for (let stripIndex = 0; stripIndex < stripCount; stripIndex++) {
 				const yStart = stripIndex * stripH;
@@ -6322,26 +6545,64 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					const shear = (dxBottom - dxTop) / stripHeight;
 					const translateX = dxTop - shear * yStart;
 
-					cloudsCtx.setTransform(1, 0, shear, 1, translateX, 0);
-					cloudsCtx.globalAlpha = baseLayerAlpha;
+					const fillPatternAt = (
+						fillPattern: CanvasPattern,
+						x: number,
+						y: number,
+						alpha: number,
+						extraPassCount = 0,
+						extraPassOffset = 0
+					) => {
+						if (alpha <= 0.001) return;
+						cloudsCtx.setTransform(1, 0, shear, 1, translateX, 0);
+						cloudsCtx.globalAlpha = alpha;
+						cloudsCtx.translate(x, y);
+						cloudsCtx.fillStyle = fillPattern;
+						cloudsCtx.fillRect(-w * 2, -h * 2, w * 5, h * 5);
+						drawCloudExtraPasses(
+							cloudsCtx,
+							w,
+							h,
+							extraPassCount,
+							extraPassOffset,
+							extraPassAlpha
+						);
+					};
 
 					const basePattern = useHazeSplit ? hazePattern : pattern;
 					if (basePattern) {
 						// CanvasPattern repeat is much cheaper than multiple drawImage calls and
 						// helps keep the animation smooth under load.
-						cloudsCtx.translate(x0, y0);
-						cloudsCtx.fillStyle = basePattern;
-						cloudsCtx.fillRect(-w * 2, -h * 2, w * 5, h * 5);
 						// Mood-driven extra density: re-fill the same pattern with offsets so the
 						// same texture covers more of the canvas (no Python re-bake needed).
-						const extraPasses = weatherMoodConfigRef.current.cloudExtraPasses;
-						drawCloudExtraPasses(cloudsCtx, w, h, extraPasses);
+						fillPatternAt(basePattern, x0, y0, baseLayerAlpha, extraPasses);
 					} else {
 						// Fill the canvas with wrapped draws (extra copy in X to avoid edge gaps under shear).
+						cloudsCtx.setTransform(1, 0, shear, 1, translateX, 0);
+						cloudsCtx.globalAlpha = baseLayerAlpha;
 						for (let x = x0 - w; x < w + w; x += w) {
 							for (let y = y0; y < h; y += h) {
 								cloudsCtx.drawImage(img, x, y, w, h);
 							}
+						}
+					}
+
+					if (!useGroups) {
+						if (stormEdgePattern) {
+							fillPatternAt(
+								stormEdgePattern,
+								x0,
+								y0,
+								stormEdgeOpacity * baseLayerAlpha
+							);
+						}
+						if (stormCorePattern) {
+							fillPatternAt(
+								stormCorePattern,
+								x0,
+								y0,
+								stormCoreOpacity * baseLayerAlpha
+							);
 						}
 					}
 
@@ -6355,14 +6616,28 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 							const xg = -off.x;
 							const yg = -off.y;
 
-							cloudsCtx.setTransform(1, 0, shear, 1, translateX, 0);
-							cloudsCtx.globalAlpha = groupsLayerAlpha;
-							cloudsCtx.translate(xg, yg);
-							cloudsCtx.fillStyle = gp;
-							cloudsCtx.fillRect(-w * 2, -h * 2, w * 5, h * 5);
 							// Mood-driven extra density (matches base layer pass count).
-							const extraPasses = weatherMoodConfigRef.current.cloudExtraPasses;
-							drawCloudExtraPasses(cloudsCtx, w, h, extraPasses, g);
+							fillPatternAt(gp, xg, yg, groupsLayerAlpha, extraPasses, g);
+
+							const stormEdgeGroupPattern = stormEdgeGroupPatterns?.[g];
+							if (stormEdgeGroupPattern) {
+								fillPatternAt(
+									stormEdgeGroupPattern,
+									xg,
+									yg,
+									stormEdgeOpacity * groupsLayerAlpha
+								);
+							}
+
+							const stormCoreGroupPattern = stormCoreGroupPatterns?.[g];
+							if (stormCoreGroupPattern) {
+								fillPatternAt(
+									stormCoreGroupPattern,
+									xg,
+									yg,
+									stormCoreOpacity * groupsLayerAlpha
+								);
+							}
 						}
 					}
 				}
@@ -6469,6 +6744,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				// Build the secondary (sparser) texture once so the second drift layer is ready
 				// for the first painted frame.
 				ensureSecondaryCloudsTexture(img);
+				ensureStormCloudTextures(img);
 				ensureCloudsGroupPatterns(img);
 				// Seed group offsets so the independently-drifting structures start de-phased
 				// immediately (no initial "locked" look).

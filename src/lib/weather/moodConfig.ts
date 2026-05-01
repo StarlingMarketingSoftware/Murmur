@@ -24,11 +24,30 @@ export type MoodVisualConfig = {
 	/**
 	 * Extra pattern fills layered on top of the base/group cloud passes, each
 	 * shifted by a different offset so the same texture covers more of the
-	 * canvas. 0 = current density. 1–3 = progressively denser. Each pass
-	 * uses the same `globalAlpha` as the underlying draw, so coverage stacks
-	 * additively (no extra Mapbox layers required).
+	 * canvas. 0 = current density. 1–3 = progressively denser.
 	 */
 	cloudExtraPasses: number;
+	/**
+	 * Multiplier for each extra pass' alpha. Most moods use 1 so the historical
+	 * density behavior is preserved; stormy uses less so repeated structure
+	 * doesn't read as stacked black sheets.
+	 */
+	cloudExtraPassAlpha: number;
+	/**
+	 * Extra wind applied to storm-specific layers and turbulence. 1 preserves
+	 * the normal drift field.
+	 */
+	cloudStormWindMultiplier: number;
+	/**
+	 * Localized darkening for dense storm cores. This is separate from global
+	 * brightness/gloom so cloud edges can stay lighter.
+	 */
+	cloudCoreShadowOpacity: number;
+	/**
+	 * Localized lift for feathered cloud edges, keeping storm clouds from being
+	 * uniformly dark.
+	 */
+	cloudEdgeLiftOpacity: number;
 	/**
 	 * Residual cloud opacity past the normal fade-out band (zoom > 10.5). Most
 	 * moods set this to 0 — clouds disappear once you're at city detail. Stormy
@@ -69,6 +88,10 @@ const NORMAL: MoodVisualConfig = {
 	cloudBrightnessMin: 0.84,
 	cloudBrightnessMax: 1.0,
 	cloudExtraPasses: 0,
+	cloudExtraPassAlpha: 1,
+	cloudStormWindMultiplier: 1,
+	cloudCoreShadowOpacity: 0,
+	cloudEdgeLiftOpacity: 0,
 	cloudDeepZoomOpacity: 0,
 	fogColor: 'rgba(180, 210, 215, 0.32)',
 	fogHighColor: 'rgb(18, 44, 78)',
@@ -94,6 +117,10 @@ const SUNNY: MoodVisualConfig = {
 	cloudBrightnessMin: 0.93,
 	cloudBrightnessMax: 1.0,
 	cloudExtraPasses: 0,
+	cloudExtraPassAlpha: 1,
+	cloudStormWindMultiplier: 1,
+	cloudCoreShadowOpacity: 0,
+	cloudEdgeLiftOpacity: 0,
 	cloudDeepZoomOpacity: 0,
 	fogColor: 'rgba(220, 215, 200, 0.28)',
 	fogHighColor: 'rgb(18, 44, 78)',
@@ -119,6 +146,10 @@ const CLOUDY: MoodVisualConfig = {
 	cloudBrightnessMin: 0.75,
 	cloudBrightnessMax: 1.0,
 	cloudExtraPasses: 2,
+	cloudExtraPassAlpha: 1,
+	cloudStormWindMultiplier: 1,
+	cloudCoreShadowOpacity: 0,
+	cloudEdgeLiftOpacity: 0,
 	cloudDeepZoomOpacity: 0,
 	fogColor: 'rgba(165, 180, 190, 0.40)',
 	fogHighColor: 'rgb(18, 44, 78)',
@@ -144,6 +175,10 @@ const RAINY: MoodVisualConfig = {
 	cloudBrightnessMin: 0.34,
 	cloudBrightnessMax: 0.9,
 	cloudExtraPasses: 1,
+	cloudExtraPassAlpha: 1,
+	cloudStormWindMultiplier: 1,
+	cloudCoreShadowOpacity: 0,
+	cloudEdgeLiftOpacity: 0,
 	cloudDeepZoomOpacity: 0,
 	fogColor: 'rgba(150, 175, 195, 0.40)',
 	fogHighColor: 'rgb(15, 35, 65)',
@@ -162,23 +197,27 @@ const RAINY: MoodVisualConfig = {
 };
 
 const STORMY: MoodVisualConfig = {
-	cloudOpacityGlobeZoom: 1.0,
-	cloudOpacityDecorativeZoom: 0.98,
-	cloudDriftSpeedMultiplier: 1.5,
-	cloudTurbulenceMultiplier: 2.0,
-	cloudBrightnessMin: 0.58,
-	cloudBrightnessMax: 0.86,
-	cloudExtraPasses: 6,
-	cloudDeepZoomOpacity: 0.32,
-	fogColor: 'rgba(165, 184, 198, 0.42)',
-	fogHighColor: 'rgb(30, 54, 82)',
-	fogHorizonBlend: 0.035,
-	softboxOpacityMultiplier: 1.0,
-	shadowOpacityMultiplier: 1.08,
-	softboxBackground: SOFTBOX_WARM_KEY_BG,
-	softboxBlendMode: 'screen',
-	nightVisualBlend: 0.08,
-	gloomWashOpacity: 0.08,
+	cloudOpacityGlobeZoom: 0.94,
+	cloudOpacityDecorativeZoom: 0.84,
+	cloudDriftSpeedMultiplier: 1.6,
+	cloudTurbulenceMultiplier: 2.45,
+	cloudBrightnessMin: 0.48,
+	cloudBrightnessMax: 0.96,
+	cloudExtraPasses: 2.35,
+	cloudExtraPassAlpha: 0.34,
+	cloudStormWindMultiplier: 1.38,
+	cloudCoreShadowOpacity: 0.56,
+	cloudEdgeLiftOpacity: 0.2,
+	cloudDeepZoomOpacity: 0.12,
+	fogColor: 'rgba(138, 160, 178, 0.44)',
+	fogHighColor: 'rgb(22, 42, 66)',
+	fogHorizonBlend: 0.048,
+	softboxOpacityMultiplier: 0.58,
+	shadowOpacityMultiplier: 1.2,
+	softboxBackground: SOFTBOX_DARK_POOL_BG,
+	softboxBlendMode: 'multiply',
+	nightVisualBlend: 0.13,
+	gloomWashOpacity: 0.05,
 	lightning: true,
 	lightningIntensity: 1,
 	lightningSpread: 0.86,
@@ -194,6 +233,10 @@ const SNOWY: MoodVisualConfig = {
 	cloudBrightnessMin: 0.95,
 	cloudBrightnessMax: 1.0,
 	cloudExtraPasses: 1,
+	cloudExtraPassAlpha: 1,
+	cloudStormWindMultiplier: 1,
+	cloudCoreShadowOpacity: 0,
+	cloudEdgeLiftOpacity: 0,
 	cloudDeepZoomOpacity: 0,
 	fogColor: 'rgba(225, 232, 238, 0.42)',
 	fogHighColor: 'rgb(35, 60, 90)',
