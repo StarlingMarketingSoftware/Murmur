@@ -120,29 +120,29 @@ def _render_crystal(size: int, seed: int, index: int) -> np.ndarray:
 			+ ((ny - rng.uniform(-0.035, 0.035)) ** 2) / 0.008
 		)
 	).astype(np.float32)
-	halo = np.exp(-r2 / np.float32(0.42)).astype(np.float32) * np.float32(0.045)
-	alpha_strength = np.float32(rng.uniform(0.58, 0.74))
+	halo = np.exp(-r2 / np.float32(0.28)).astype(np.float32) * np.float32(0.012)
+	alpha_strength = np.float32(rng.uniform(0.46, 0.60))
 	alpha = np.clip(
 		arms * alpha_strength
-		+ branches * np.float32(0.33)
-		+ shards * np.float32(0.16)
-		+ core * np.float32(0.48)
-		+ glint * np.float32(0.14)
+		+ branches * np.float32(0.26)
+		+ shards * np.float32(0.11)
+		+ core * np.float32(0.34)
+		+ glint * np.float32(0.08)
 		+ halo,
 		0.0,
-		0.72,
+		0.56,
 	).astype(np.float32)
-	alpha = np.where(alpha < np.float32(0.018), np.float32(0.0), alpha)
+	alpha = np.where(alpha < np.float32(0.024), np.float32(0.0), alpha)
 
 	img_alpha = Image.fromarray(np.clip(alpha * 255.0, 0, 255).astype(np.uint8))
-	blur_radius = float(rng.uniform(0.0, 0.12))
+	blur_radius = float(rng.uniform(0.0, 0.06))
 	img_alpha = img_alpha.filter(ImageFilter.GaussianBlur(radius=blur_radius))
 	alpha_u8 = np.asarray(img_alpha, dtype=np.uint8)
 
 	tint = np.array(
 		[
-			rng.integers(246, 256),
-			rng.integers(250, 256),
+			rng.integers(238, 250),
+			rng.integers(246, 254),
 			rng.integers(252, 256),
 		],
 		dtype=np.uint8,

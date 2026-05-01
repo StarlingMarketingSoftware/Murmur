@@ -147,6 +147,9 @@ type SnowParticle = {
 	opacity: number;
 	fallSpeed: number;
 	windSpeed: number;
+	windSway: number;
+	windPhase: number;
+	gustResponsiveness: number;
 	wobble: number;
 	wobblePhase: number;
 	stampIndex: number;
@@ -157,6 +160,19 @@ type SnowParticle = {
 	stretch: number;
 	rotation: number;
 	rotationSpeed: number;
+};
+
+type SnowCloudInteractionImpact = {
+	// Snow-canvas coordinate system (full-world Mercator, SNOW_CANVAS_SIZE_PX²).
+	x: number;
+	y: number;
+	// Radius in snow-canvas pixels (converted to clouds-canvas pixels at draw time).
+	radiusPx: number;
+	// 0..1 normalized strength derived from particle alpha.
+	alpha01: number;
+	// Horizontal drift proxy (snow-canvas px). Used to bias the refraction direction.
+	driftXPx: number;
+	depth: number;
 };
 
 const closeRing = (ring: ClippingRing): ClippingRing => {
@@ -1521,7 +1537,7 @@ const LIGHTNING_US_POSITION_TRIES = 72;
 const LIGHTNING_OPACITY_MULTIPLIER = 1.08;
 const LIGHTNING_LAYER_OPACITY = 0.92;
 const SNOWFLAKE_STAMPS_COUNT = 20;
-const SNOWFLAKE_STAMPS_VERSION = 6;
+const SNOWFLAKE_STAMPS_VERSION = 7;
 const SNOWFLAKE_STAMPS_URL = (i: number) =>
 	`/maps/snowflake_stamps/drop_${String(i).padStart(2, '0')}.png?v=${SNOWFLAKE_STAMPS_VERSION}`;
 const SNOW_CANVAS_SIZE_PX = 1024;
@@ -1530,16 +1546,25 @@ const SNOW_LAYER_OPACITY = 1.0;
 const SNOW_HIDE_AT_OR_ABOVE_ZOOM = CLOUDS_OVERLAY_FADE_OUT_END_ZOOM;
 const SNOW_BASE_FALL_PX_PER_S = 9.2;
 const SNOW_BASE_WIND_PX_PER_S = 1.2;
+const SNOW_WIND_SWAY_BASE_PX = 3.4;
+const SNOW_GUST_PUSH_BASE_PX = 4.8;
+const SNOW_EDDY_DRIFT_BASE_PX = 2.2;
 const SNOW_TURBULENCE_LOOP_MS = 37_000;
 const SNOW_GUST_BAND_LOOP_MS = 29_000;
 const SNOW_DENSITY_BAND_LOOP_MS = 46_000;
-const SNOW_STAMP_MIN_SIZE_PX = 8;
-const SNOW_STAMP_MAX_SIZE_PX = 23;
-const SNOW_STAMP_ALPHA_MULTIPLIER = 1.25;
+const SNOW_STAMP_MIN_SIZE_PX = 10;
+const SNOW_STAMP_MAX_SIZE_PX = 28;
+const SNOW_STAMP_ALPHA_MULTIPLIER = 1.45;
+const SNOW_STAMP_MAX_ALPHA = 0.88;
 const SNOW_ROTATED_PARTICLE_DEPTH_MIN = 0.82;
 const SNOW_US_SIDE_CENTER_LNG = defaultCenter.lng;
 const SNOW_US_SIDE_FADE_START_DEG = 78;
 const SNOW_US_SIDE_FADE_END_DEG = 94;
+// Snow→cloud interaction: keep subtle (reads as atmospheric refraction, not holes).
+const CLOUDS_SNOW_INTERACTION_STAMP_SIZE_PX = 96;
+const CLOUDS_SNOW_INTERACTION_TARGET_IMPACTS = 360;
+const CLOUDS_SNOW_INTERACTION_TARGET_IMPACTS_REDUCED = 140;
+const CLOUDS_SNOW_INTERACTION_MAX_REFRACT_SHIFT_PX = 3.2;
 
 const getLightningZoomedOutBoostT = (zoom: number) => {
 	if (zoom <= LIGHTNING_ZOOMED_OUT_BOOST_FULL_ZOOM) return 1;
@@ -3429,6 +3454,28 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		return raw === '1' || raw === 'true';
 	}, []);
 
+	const snowCloudInteractionMultiplier = useMemo(() => {
+		// Debug/tuning helper: scale the snow→cloud interaction strength.
+		// Examples:
+		// - `?devSnowCloud=0` disables interaction
+		// - `?devSnowCloud=3` exaggerates it (useful to confirm it’s working)
+		if (typeof window === 'undefined') return 1;
+		const raw = new URLSearchParams(window.location.search).get('devSnowCloud');
+		if (raw == null) return 1;
+		const n = Number(raw);
+		if (!Number.isFinite(n)) return 1;
+		return clamp(n, 0, 6);
+	}, []);
+
+	const snowDebugEnabled = useMemo(() => {
+		// Visual debug: paints snow as bright magenta dots + highlights interaction impact
+		// centers on the clouds canvas so you can immediately confirm snow + interaction
+		// are running. Enable with `?devSnowDebug=1`.
+		if (typeof window === 'undefined') return false;
+		const raw = new URLSearchParams(window.location.search).get('devSnowDebug');
+		return raw === '1' || raw === 'true';
+	}, []);
+
 	const weatherMood = MANUAL_WEATHER_MOOD_OVERRIDE ?? weatherMoodProp;
 	const effectiveTemperatureF =
 		MANUAL_WEATHER_TEMPERATURE_OVERRIDE_F ?? weatherTemperatureF;
@@ -3535,6 +3582,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const snowStampImagesRef = useRef<HTMLImageElement[] | null>(null);
 	const snowStampLoadPromiseRef = useRef<Promise<HTMLImageElement[]> | null>(null);
 	const snowParticlesRef = useRef<SnowParticle[] | null>(null);
+	const cloudsSnowInteractionScratchCanvasRef = useRef<HTMLCanvasElement | null>(null);
+	const cloudsSnowInteractionScratchCtxRef = useRef<CanvasRenderingContext2D | null>(null);
+	const cloudsSnowInteractionThinStampRef = useRef<HTMLCanvasElement | null>(null);
+	const cloudsSnowInteractionGlowStampRef = useRef<HTMLCanvasElement | null>(null);
 	const prevIsBackgroundPresentationRef = useRef<boolean>(isBackgroundPresentation);
 	// Live weather-mood config — read by the cloud animation tick and the lighting
 	// overlay opacity calc. Initialized to `normal` so behavior matches pre-weather
@@ -5848,6 +5899,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					windSpeed:
 						lerp(0.18, 0.95, hash01(seed + 73.4)) *
 						(hash01(seed + 83.9) < 0.44 ? -1 : 1),
+					windSway: lerp(0.45, 1.4, hash01(seed + 89.6)) * lerp(0.72, 1.28, depth),
+					windPhase: hash01(seed + 92.8) * Math.PI * 2,
+					gustResponsiveness:
+						lerp(0.34, 1.18, hash01(seed + 94.2)) * lerp(0.78, 1.24, depth),
 					wobble: lerp(0.7, 4.2, depth) * lerp(0.7, 1.2, hash01(seed + 97.6)),
 					wobblePhase: hash01(seed + 109.8) * Math.PI * 2,
 					stampIndex: Math.floor(hash01(seed + 121.1) * SNOWFLAKE_STAMPS_COUNT),
@@ -5863,6 +5918,265 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 			snowParticlesRef.current = particles;
 			return particles;
+		};
+
+		const ensureCloudsSnowInteractionAssets = (cw: number, ch: number) => {
+			if (typeof document === 'undefined') return null;
+
+			let scratchCanvas = cloudsSnowInteractionScratchCanvasRef.current;
+			if (!scratchCanvas) {
+				scratchCanvas = document.createElement('canvas');
+				cloudsSnowInteractionScratchCanvasRef.current = scratchCanvas;
+				cloudsSnowInteractionScratchCtxRef.current = scratchCanvas.getContext('2d');
+			}
+			if (!scratchCanvas) return null;
+			if (scratchCanvas.width !== cw) scratchCanvas.width = cw;
+			if (scratchCanvas.height !== ch) scratchCanvas.height = ch;
+
+			let scratchCtx = cloudsSnowInteractionScratchCtxRef.current;
+			if (!scratchCtx) {
+				scratchCtx = scratchCanvas.getContext('2d');
+				cloudsSnowInteractionScratchCtxRef.current = scratchCtx;
+			}
+			if (!scratchCtx) return null;
+
+			try {
+				scratchCtx.setTransform(1, 0, 0, 1, 0, 0);
+				scratchCtx.imageSmoothingEnabled = true;
+				scratchCtx.imageSmoothingQuality = 'high';
+			} catch {
+				// Ignore.
+			}
+
+			const createRadialStamp = (rgb: [number, number, number]) => {
+				const canvas = document.createElement('canvas');
+				canvas.width = CLOUDS_SNOW_INTERACTION_STAMP_SIZE_PX;
+				canvas.height = CLOUDS_SNOW_INTERACTION_STAMP_SIZE_PX;
+				const ctx = canvas.getContext('2d');
+				if (!ctx) return null;
+				const s = CLOUDS_SNOW_INTERACTION_STAMP_SIZE_PX;
+				const [r, g, b] = rgb;
+				const gradient = ctx.createRadialGradient(s * 0.5, s * 0.5, 0, s * 0.5, s * 0.5, s * 0.5);
+				gradient.addColorStop(0, `rgba(${r}, ${g}, ${b}, 1)`);
+				gradient.addColorStop(0.24, `rgba(${r}, ${g}, ${b}, 0.58)`);
+				gradient.addColorStop(0.62, `rgba(${r}, ${g}, ${b}, 0.16)`);
+				gradient.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
+				ctx.clearRect(0, 0, s, s);
+				ctx.fillStyle = gradient;
+				ctx.fillRect(0, 0, s, s);
+				return canvas;
+			};
+
+			if (!cloudsSnowInteractionThinStampRef.current) {
+				cloudsSnowInteractionThinStampRef.current = createRadialStamp([0, 0, 0]);
+			}
+			if (!cloudsSnowInteractionGlowStampRef.current) {
+				cloudsSnowInteractionGlowStampRef.current = createRadialStamp([250, 252, 255]);
+			}
+
+			const thinStamp = cloudsSnowInteractionThinStampRef.current;
+			const glowStamp = cloudsSnowInteractionGlowStampRef.current;
+			if (!thinStamp || !glowStamp) return null;
+			return { scratchCanvas, scratchCtx, thinStamp, glowStamp };
+		};
+
+		const applySnowCloudInteraction = (
+			impacts: SnowCloudInteractionImpact[],
+			snowW: number,
+			snowH: number,
+			strength: number
+		) => {
+			if (impacts.length === 0) return;
+			if (strength <= 0.001) return;
+
+			const cw = cloudsCanvas.width || CLOUDS_CANVAS_SIZE_PX;
+			const ch = cloudsCanvas.height || CLOUDS_CANVAS_SIZE_PX;
+			const assets = ensureCloudsSnowInteractionAssets(cw, ch);
+			if (!assets) return;
+			const { scratchCanvas, scratchCtx, thinStamp, glowStamp } = assets;
+
+			// Snapshot clouds so we can re-sample without feedback while distorting.
+			scratchCtx.clearRect(0, 0, cw, ch);
+			scratchCtx.drawImage(cloudsCanvas, 0, 0, cw, ch);
+
+			const scaleX = cw / Math.max(1, snowW);
+			const scaleY = ch / Math.max(1, snowH);
+			const scale = (scaleX + scaleY) * 0.5;
+			const maxShift = CLOUDS_SNOW_INTERACTION_MAX_REFRACT_SHIFT_PX;
+
+			const prevAlpha = cloudsCtx.globalAlpha;
+			const prevOp = cloudsCtx.globalCompositeOperation;
+			let prevFilter: string | null = null;
+			try {
+				prevFilter = cloudsCtx.filter;
+			} catch {
+				prevFilter = null;
+			}
+
+			try {
+				cloudsCtx.setTransform(1, 0, 0, 1, 0, 0);
+			} catch {
+				// Ignore.
+			}
+
+			// Pass 1: tiny refraction shear in-place (keeps it feeling like distortion, not a reveal).
+			try {
+				cloudsCtx.globalCompositeOperation = 'source-over';
+			} catch {
+				// Ignore.
+			}
+			try {
+				cloudsCtx.filter = 'blur(0.95px)';
+			} catch {
+				// Ignore.
+			}
+			for (const impact of impacts) {
+				const alpha = clamp(
+					strength * Math.pow(clamp(impact.alpha01, 0, 1), 0.55),
+					0,
+					1
+				);
+				const a = alpha * 0.18;
+				if (a <= 0.001) continue;
+
+				const cx = impact.x * scaleX;
+				const cy = impact.y * scaleY;
+				const r = clamp(impact.radiusPx * scale, 8, 38);
+				const driftBias = Math.tanh((impact.driftXPx * scaleX) / 6);
+				const warpX = clamp(driftBias * maxShift, -maxShift, maxShift);
+				const warpY = -clamp((0.65 + impact.depth) * 0.9, 0.6, 1.9);
+
+				const srcX0 = cx - r;
+				const srcY0 = cy - r;
+				const srcW = r * 2;
+				const srcH = r * 2;
+				const srcX = clamp(srcX0, 0, cw - srcW);
+				const srcY = clamp(srcY0, 0, ch - srcH);
+				const srcDx = srcX - srcX0;
+				const srcDy = srcY - srcY0;
+
+				cloudsCtx.save();
+				cloudsCtx.beginPath();
+				cloudsCtx.ellipse(cx, cy, r * 0.95, r * 0.72, 0, 0, Math.PI * 2);
+				cloudsCtx.clip();
+				cloudsCtx.globalAlpha = a;
+				cloudsCtx.drawImage(
+					scratchCanvas,
+					srcX,
+					srcY,
+					srcW,
+					srcH,
+					cx - r + warpX + srcDx,
+					cy - r + warpY + srcDy,
+					srcW,
+					srcH
+				);
+				cloudsCtx.restore();
+			}
+
+			// Pass 2: feathered thinning so the snow layer reads through cloud density.
+			// We draw a trailing column per impact (from impact up into the cloud deck) so the
+			// entire fall path of each flake reads as a gentle, vertical parting of clouds.
+			try {
+				cloudsCtx.globalCompositeOperation = 'destination-out';
+			} catch {
+				// Ignore.
+			}
+			try {
+				cloudsCtx.filter = 'none';
+			} catch {
+				// Ignore.
+			}
+			for (const impact of impacts) {
+				const alpha = clamp(
+					strength * Math.pow(clamp(impact.alpha01, 0, 1), 0.55),
+					0,
+					1
+				);
+				const a = alpha * 0.42;
+				if (a <= 0.001) continue;
+
+				const cx = impact.x * scaleX;
+				const cy = impact.y * scaleY;
+				const r = clamp(impact.radiusPx * scale, 9, 44);
+				const drift = clamp(
+					Math.tanh((impact.driftXPx * scaleX) / 12) * 1.8,
+					-1.8,
+					1.8
+				);
+
+				// Trailing vertical column — three staggered stamps so the wake feels
+				// continuous and "snow-shaped" rather than a circular punch.
+				const columnW = r * 2.15;
+				const columnHBase = r * 3.2;
+				const columns = [
+					{ dyMul: -0.25, alphaMul: 1.0, scaleMul: 1.0 },
+					{ dyMul: -1.1, alphaMul: 0.78, scaleMul: 1.08 },
+					{ dyMul: -2.0, alphaMul: 0.52, scaleMul: 1.18 },
+					{ dyMul: -2.9, alphaMul: 0.3, scaleMul: 1.28 },
+				];
+				for (const seg of columns) {
+					cloudsCtx.globalAlpha = a * seg.alphaMul;
+					const segW = columnW * seg.scaleMul;
+					const segH = columnHBase * seg.scaleMul;
+					const segX = cx + drift * Math.abs(seg.dyMul) * 0.45;
+					const segY = cy + r * seg.dyMul;
+					cloudsCtx.drawImage(
+						thinStamp,
+						segX - segW * 0.5,
+						segY - segH * 0.5,
+						segW,
+						segH
+					);
+				}
+			}
+
+			// Pass 3: a faint cool bloom so the “through-cloud” snow reads without getting literal.
+			try {
+				cloudsCtx.globalCompositeOperation = 'lighter';
+			} catch {
+				// Ignore.
+			}
+			try {
+				cloudsCtx.filter = 'blur(1.25px)';
+			} catch {
+				// Ignore.
+			}
+			for (const impact of impacts) {
+				const alpha = clamp(
+					strength * Math.pow(clamp(impact.alpha01, 0, 1), 0.55),
+					0,
+					1
+				);
+				const a = alpha * 0.09;
+				if (a <= 0.001) continue;
+
+				const cx = impact.x * scaleX;
+				const cy = impact.y * scaleY;
+				const r = clamp(impact.radiusPx * scale, 8, 38);
+
+				cloudsCtx.globalAlpha = a;
+				const glowW = r * 2.4;
+				const glowH = r * 3.65;
+				const glowY = cy - r * 0.62;
+				cloudsCtx.drawImage(
+					glowStamp,
+					cx - glowW * 0.5,
+					glowY - glowH * 0.5,
+					glowW,
+					glowH
+				);
+			}
+
+			cloudsCtx.globalAlpha = prevAlpha;
+			cloudsCtx.globalCompositeOperation = prevOp;
+			if (prevFilter != null) {
+				try {
+					cloudsCtx.filter = prevFilter;
+				} catch {
+					// Ignore.
+				}
+			}
 		};
 
 		const drawSnow = (tMs: number) => {
@@ -5901,6 +6215,15 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				Math.max(0, Math.round(particles.length * clamp(cfg.snowDensity, 0, 1) * densityScale))
 			);
 			if (visibleCount <= 0) return;
+
+			const interactionTarget = prefersReducedMotion
+				? CLOUDS_SNOW_INTERACTION_TARGET_IMPACTS_REDUCED
+				: CLOUDS_SNOW_INTERACTION_TARGET_IMPACTS;
+			const interactionStride = Math.max(
+				1,
+				Math.floor(visibleCount / Math.max(1, interactionTarget))
+			);
+			const impacts: SnowCloudInteractionImpact[] = [];
 
 			const tS = tMs / 1000;
 			const motionMul = prefersReducedMotion ? 0.42 : 1;
@@ -5963,6 +6286,26 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					const gustFine =
 						(noise1D(baseY * 0.011 - baseX * 0.002 + gustT * 2.1 + p.gustSeed) - 0.5) *
 						2;
+					const windSway =
+						Math.sin(
+							tS * lerp(0.42, 0.95, p.depth) +
+								baseY * lerp(0.006, 0.014, p.depth) +
+								p.windPhase
+						) *
+						SNOW_WIND_SWAY_BASE_PX *
+						p.windSway *
+						(0.52 + parallax * 0.42);
+					const gustPush =
+						gustBand *
+						SNOW_GUST_PUSH_BASE_PX *
+						p.gustResponsiveness *
+						lerp(0.45, 1.18, p.depth) *
+						(0.46 + parallax * 0.36);
+					const eddyDrift =
+						(localDriftA - localDriftB) *
+						SNOW_EDDY_DRIFT_BASE_PX *
+						p.windSway *
+						lerp(0.35, 1.05, p.depth);
 					const verticalFlutter =
 						(noise1D(turbulenceT * lerp(1.1, 2.1, p.depth) + p.turbulenceSeed + 43.8) -
 							0.5) *
@@ -5972,7 +6315,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 							p.wobble *
 							(0.28 + parallax * 0.36) +
 							gustBand * lerp(0.35, 2.2, p.depth) * (0.34 + parallax * 0.38) +
-							gustFine * lerp(0.12, 0.65, p.depth)) *
+							gustFine * lerp(0.12, 0.65, p.depth) +
+							windSway +
+							gustPush +
+							eddyDrift) *
 						turbulenceMul;
 					const x = wrap(baseX + driftX, w, margin);
 					const y = wrap(
@@ -6011,11 +6357,41 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 							usSideAlpha *
 							SNOW_STAMP_ALPHA_MULTIPLIER,
 						0,
-						0.78
+						SNOW_STAMP_MAX_ALPHA
 					);
 					if (flakeAlpha <= 0.006) continue;
 
-					if (stamp) {
+					if (
+						impacts.length < interactionTarget &&
+						i % interactionStride === 0 &&
+						x >= 0 &&
+						x <= w &&
+						y >= 0 &&
+						y <= h
+					) {
+						const alpha01 = clamp(flakeAlpha / Math.max(0.001, SNOW_STAMP_MAX_ALPHA), 0, 1);
+						const radiusPx = clamp(
+							Math.max(drawW, drawH) * (1.25 + p.depth * 1.55),
+							16,
+							72
+						);
+						impacts.push({
+							x,
+							y,
+							radiusPx,
+							alpha01,
+							driftXPx: driftX,
+							depth: p.depth,
+						});
+					}
+
+					if (snowDebugEnabled) {
+						snowCtx.globalAlpha = 1;
+						snowCtx.fillStyle = 'rgb(255, 0, 200)';
+						snowCtx.beginPath();
+						snowCtx.arc(x, y, Math.max(3, drawW * 0.35), 0, Math.PI * 2);
+						snowCtx.fill();
+					} else if (stamp) {
 						snowCtx.globalAlpha = flakeAlpha;
 						if (p.depth >= SNOW_ROTATED_PARTICLE_DEPTH_MIN) {
 							snowCtx.translate(x, y);
@@ -6035,6 +6411,27 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						snowCtx.ellipse(x, y, fallbackSize * 0.55, fallbackSize, 0, 0, Math.PI * 2);
 						snowCtx.fill();
 					}
+				}
+
+				// Snow is intentionally layered under clouds; to avoid it feeling “buried,”
+				// we add a subtle, snow-driven distortion/thinning pass to the clouds canvas.
+				const cloudsPresence =
+					1 -
+					smoothstep(
+						CLOUDS_OVERLAY_FADE_OUT_START_ZOOM,
+						CLOUDS_OVERLAY_FADE_OUT_END_ZOOM,
+						currentZoom
+					);
+				const interactionStrength =
+					clamp(cfg.snowOpacity, 0, 1) *
+					clamp(cfg.snowDensity, 0, 1) *
+					clamp(cloudsPresence, 0, 1) *
+					(prefersReducedMotion ? 0.6 : 1) *
+					snowCloudInteractionMultiplier;
+				try {
+					applySnowCloudInteraction(impacts, w, h, interactionStrength);
+				} catch {
+					// Non-fatal; snowy mood can still render as just particles under clouds.
 				}
 			} catch {
 				// Non-fatal; the snowy mood can render as just cold clouds/fog.
