@@ -5,7 +5,6 @@ import { isValidMood, SAMPLE_CITIES, WeatherMood } from '@/lib/weather/regions';
 
 type GlobeMoodResponse = {
 	regionKey: string;
-	regionLabel: string;
 	mood: WeatherMood;
 	temperatureF: number | null;
 	fetchedAt: number | null;
@@ -17,15 +16,14 @@ type WeatherRegionCenter = {
 };
 
 const QUERY_KEY = ['globe-weather-mood'] as const;
-// Keep the globe's weather-driven mood feeling "alive" during long sessions.
-// This is intentionally slower than typical polling UIs; weather shifts are
-// gradual, and the map visuals themselves interpolate when the mood flips.
-const REFRESH_INTERVAL_MS = 10 * 60_000;
-const STALE_TIME_MS = 5 * 60_000;
+// Keep the globe's weather-driven mood feeling "alive" during long sessions
+// without thrashing. Aligned with the server-side moodCache TTL so most polls
+// are hits, with the occasional refresh actually surfacing new data.
+const REFRESH_INTERVAL_MS = 15 * 60_000;
+const STALE_TIME_MS = 10 * 60_000;
 
 const FALLBACK: GlobeMoodResponse = {
 	regionKey: 'normal',
-	regionLabel: 'Normal',
 	mood: 'normal',
 	temperatureF: null,
 	fetchedAt: null,
@@ -62,10 +60,14 @@ export function useGlobeWeatherMood() {
 	const query = useQuery<GlobeMoodResponse>({
 		queryKey: [...QUERY_KEY, devOverride ?? null],
 		queryFn: async () => {
+			// Dev override is a pure visual override — no real-region resolution
+			// needed, so skip the network round trip entirely.
+			if (devOverride) {
+				return { ...FALLBACK, mood: devOverride };
+			}
 			const tz = getBrowserTimezone();
 			const params = new URLSearchParams();
 			if (tz) params.set('tz', tz);
-			if (devOverride) params.set('devMood', devOverride);
 			const url = `/api/weather/globe-mood${params.toString() ? `?${params.toString()}` : ''}`;
 			try {
 				// Bypass browser HTTP caching so periodic refreshes can actually observe
@@ -87,7 +89,6 @@ export function useGlobeWeatherMood() {
 
 	return {
 		mood: query.data?.mood ?? 'normal',
-		regionLabel: query.data?.regionLabel ?? null,
 		regionCenter: centerForRegionKey(query.data?.regionKey),
 		temperatureF: query.data?.temperatureF ?? null,
 		isLoading: query.isLoading,

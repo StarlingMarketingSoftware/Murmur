@@ -2069,13 +2069,8 @@ const MURMUR_GLOBE_LIGHT_VIEWER_AZIMUTH_OFFSET_DEG = 270;
 // globe rather than a flat, evenly-lit disc.
 const MURMUR_GLOBE_LIGHT_POLAR_DEG = 75;
 
-const applyMurmurGlobeLighting = (
-	mapInstance: mapboxgl.Map,
-	opts?: { nightT?: number }
-) => {
+const applyMurmurGlobeLighting = (mapInstance: mapboxgl.Map) => {
 	try {
-		void opts;
-
 		const bearing =
 			typeof mapInstance.getBearing === 'function' ? mapInstance.getBearing() : 0;
 		const azimuth =
@@ -2142,15 +2137,14 @@ const mixCssRgb = (
 	)}, ${Math.round(from[2] + (to[2] - from[2]) * p)})`;
 };
 
-const getMapPaletteForNight = (nightT: number, zoom: number) => {
-	void nightT;
-	void zoom;
-	return {
-		ocean: MAP_OCEAN_BLUE,
-		land: MAP_LAND_CREAM,
-		landcover: MAP_LANDCOVER_GREEN,
-	};
-};
+// Visual night intentionally keeps the day basemap palette — the night look is
+// driven by DOM overlays + globe lighting, not by recoloring tiles. This getter
+// stays as a single source of truth for the basemap colors.
+const getMapPalette = () => ({
+	ocean: MAP_OCEAN_BLUE,
+	land: MAP_LAND_CREAM,
+	landcover: MAP_LANDCOVER_GREEN,
+});
 
 const getNightRoadHideT = (nightT: number, zoom: number) => {
 	const night = clamp(nightT, 0, 1);
@@ -2173,12 +2167,6 @@ const getNightRoadHideT = (nightT: number, zoom: number) => {
 	return nightHideT * (1 - restoreT);
 };
 
-const getNightTerrainFlattenT = (nightT: number, zoom: number) => {
-	void nightT;
-	void zoom;
-	return 0;
-};
-
 const basemapRoadOpacityBaseByMap = new WeakMap<mapboxgl.Map, Map<string, any | null>>();
 
 const getBasemapRoadOpacityBase = (mapInstance: mapboxgl.Map, layerId: string) => {
@@ -2192,33 +2180,6 @@ const getBasemapRoadOpacityBase = (mapInstance: mapboxgl.Map, layerId: string) =
 
 	try {
 		const base = mapInstance.getPaintProperty(layerId, 'line-opacity') as any;
-		byLayerId.set(layerId, base == null ? null : base);
-		return base == null ? null : base;
-	} catch {
-		byLayerId.set(layerId, null);
-		return null;
-	}
-};
-
-const basemapHillshadeExaggerationBaseByMap = new WeakMap<
-	mapboxgl.Map,
-	Map<string, any | null>
->();
-
-const getBasemapHillshadeExaggerationBase = (
-	mapInstance: mapboxgl.Map,
-	layerId: string
-) => {
-	let byLayerId = basemapHillshadeExaggerationBaseByMap.get(mapInstance);
-	if (!byLayerId) {
-		byLayerId = new Map();
-		basemapHillshadeExaggerationBaseByMap.set(mapInstance, byLayerId);
-	}
-
-	if (byLayerId.has(layerId)) return byLayerId.get(layerId) ?? null;
-
-	try {
-		const base = mapInstance.getPaintProperty(layerId, 'hillshade-exaggeration') as any;
 		byLayerId.set(layerId, base == null ? null : base);
 		return base == null ? null : base;
 	} catch {
@@ -2290,9 +2251,8 @@ const applyMapboxFogForMoodAndNight = (
 
 const applyNightLandPalette = (mapInstance: mapboxgl.Map, nightT: number) => {
 	const zoom = mapInstance.getZoom() ?? MAP_DEFAULT_ZOOM;
-	const palette = getMapPaletteForNight(nightT, zoom);
+	const palette = getMapPalette();
 	const roadOpacityMul = 1 - getNightRoadHideT(nightT, zoom);
-	const terrainFlattenT = getNightTerrainFlattenT(nightT, zoom);
 
 	try {
 		if (mapInstance.getLayer(MAP_WORLD_LAND_LAYER_ID)) {
@@ -2334,24 +2294,6 @@ const applyNightLandPalette = (mapInstance: mapboxgl.Map, nightT: number) => {
 					(idLower.includes('landuse') || idLower === 'land')
 				) {
 					mapInstance.setPaintProperty(id, 'fill-color', palette.land);
-				} else if (type === 'hillshade' || idLower.includes('hillshade')) {
-					// Keep terrain shading at its daytime strength; night mode should not
-					// visually flatten or recolor the normal map.
-					const mul = clamp(1 - terrainFlattenT, 0, 1);
-					const baseEx = getBasemapHillshadeExaggerationBase(mapInstance, id);
-					if (mul <= 0.001) {
-						mapInstance.setPaintProperty(id, 'hillshade-exaggeration', 0);
-					} else if (baseEx == null) {
-						mapInstance.setPaintProperty(id, 'hillshade-exaggeration', mul);
-					} else if (mul >= 0.999) {
-						mapInstance.setPaintProperty(id, 'hillshade-exaggeration', baseEx);
-					} else {
-						mapInstance.setPaintProperty(
-							id,
-							'hillshade-exaggeration',
-							scaleMapboxOpacityExpr(baseEx, mul)
-						);
-					}
 				} else if (
 					type === 'line' &&
 					(sourceLayer === 'road' ||
@@ -3259,7 +3201,7 @@ const MANUAL_WEATHER_TEMPERATURE_OVERRIDE_F: number | null = null;
 // MANUAL NIGHT OVERRIDE FOR TESTING.
 // Set to a number between 0 and 1 (e.g. 1 for deep night, 0 for full day).
 // Set back to null to use the real regional day/night cycle.
-const MANUAL_NIGHT_T_OVERRIDE: number | null = 1;
+const MANUAL_NIGHT_T_OVERRIDE: number | null = null;
 
 const MOOD_CONTINUOUS_TRANSITION_MS = 90_000;
 const MOOD_DISCRETE_EFFECT_FADE_MS = 8_000;
@@ -8582,7 +8524,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				nightTRef.current,
 				weatherMoodConfigRef.current
 			);
-			applyMurmurGlobeLighting(mapInstance, { nightT: initialVisualNightT });
+			applyMurmurGlobeLighting(mapInstance);
 			applyMapboxFogForMoodAndNight(
 				mapInstance,
 				weatherMoodConfigRef.current,
@@ -8599,7 +8541,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				nightTRef.current,
 				weatherMoodConfigRef.current
 			);
-			applyMurmurGlobeLighting(mapInstance, { nightT: initialVisualNightT });
+			applyMurmurGlobeLighting(mapInstance);
 			applyMapboxFogForMoodAndNight(
 				mapInstance,
 				weatherMoodConfigRef.current,
@@ -8710,9 +8652,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		// `rotate` fires continuously during interaction; the call is cheap (no
 		// layer reshuffling) because setLights only updates the existing light defs.
 		const onRotate = () => {
-			applyMurmurGlobeLighting(mapInstance, {
-				nightT: computeMoodVisualNightT(nightTRef.current, weatherMoodConfigRef.current),
-			});
+			applyMurmurGlobeLighting(mapInstance);
 		};
 
 		mapInstance.on('load', onLoad);
@@ -11404,10 +11344,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		}
 
 		// Hot wash — uniform warm-white screen-blend overlay that brightens the
-		// whole globe. Only active for bright moods so the stormy dark
-		// pool stays gloomy.
+		// whole globe. Gated on the mood's `hotWashEligible` flag (only sunny/normal)
+		// so cloudy/rainy/stormy/snowy don't get a brightening lift, and on the
+		// raw clock night so a mood's `nightVisualBlend` floor doesn't suppress it.
 		const brightSoftboxStrength = clamp(cfg.warmSoftboxOpacityMultiplier, 0, 1);
-		const hotActive = isHotRef.current && brightSoftboxStrength > 0.001 && night < 0.12;
+		const hotActive = isHotRef.current && cfg.hotWashEligible && rawNight < 0.12;
 		const washOpacity = hotActive
 			? base * HOT_WASH_OPACITY * brightSoftboxStrength * foregroundSunMul
 			: 0;
@@ -11802,7 +11743,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		if (!map) return;
 		if (!isMapLoaded) return;
 		const visualNightT = computeMoodVisualNightT(nightT, weatherMoodConfigRef.current);
-		applyMurmurGlobeLighting(map, { nightT: visualNightT });
+		applyMurmurGlobeLighting(map);
 		applyNightLandPalette(map, visualNightT);
 		applyStateOverlayNightColors(map, visualNightT);
 		applyMapboxFogForMoodAndNight(map, weatherMoodConfigRef.current, visualNightT);
@@ -11842,7 +11783,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				runtimeNightT,
 				weatherMoodConfigRef.current
 			);
-			applyMurmurGlobeLighting(map, { nightT: visualNightT });
+			applyMurmurGlobeLighting(map);
 			applyNightLandPalette(map, visualNightT);
 			applyStateOverlayNightColors(map, visualNightT);
 			applyMapboxFogForMoodAndNight(map, weatherMoodConfigRef.current, visualNightT);
@@ -11956,7 +11897,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			// Atmosphere fog tint — combined with night-aware modulation so the
 			// star glow / space haze / muted limb-mist react in a single pass.
 			applyMapboxFogForMoodAndNight(m, cfg, visualNightT);
-			applyMurmurGlobeLighting(m, { nightT: visualNightT });
+			applyMurmurGlobeLighting(m);
 			applyNightLandPalette(m, visualNightT);
 			applyStateOverlayNightColors(m, visualNightT);
 			applyStateOverlayOpacity(

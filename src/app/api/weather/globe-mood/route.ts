@@ -26,7 +26,6 @@ interface NextRequestWithGeo extends NextRequest {
 
 type GlobeMoodResponse = {
 	regionKey: string;
-	regionLabel: string;
 	mood: WeatherMood;
 	temperatureF: number | null;
 	fetchedAt: number | null;
@@ -34,7 +33,6 @@ type GlobeMoodResponse = {
 
 const NORMAL_FALLBACK: GlobeMoodResponse = {
 	regionKey: 'normal',
-	regionLabel: 'Normal',
 	mood: 'normal',
 	temperatureF: null,
 	fetchedAt: null,
@@ -49,7 +47,7 @@ export async function GET(req: NextRequestWithGeo) {
 	if (!weather || weather.length === 0) {
 		return jsonResponse(
 			devMood && isValidMood(devMood)
-				? { ...NORMAL_FALLBACK, mood: devMood, regionLabel: 'Dev Override' }
+				? { ...NORMAL_FALLBACK, mood: devMood }
 				: NORMAL_FALLBACK
 		);
 	}
@@ -89,7 +87,6 @@ function resolveRegion(
 function toResponse(region: RegionWeather): GlobeMoodResponse {
 	return {
 		regionKey: region.regionKey,
-		regionLabel: region.regionLabel,
 		mood: region.mood,
 		temperatureF: region.temperatureF,
 		fetchedAt: region.fetchedAt,

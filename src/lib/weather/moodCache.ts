@@ -1,9 +1,10 @@
 import { fetchSampleCitiesWeather } from './fetchOpenMeteo';
 import { RegionWeather } from './regions';
 
-// Open-Meteo current conditions can shift throughout the day; keep the globe
-// mood reasonably fresh during longer sessions without hammering the API.
-const CACHE_TTL_MS = 60 * 60 * 1000;
+// Aligned with the hook's poll cadence (~15 min). Most polls hit cache; each
+// fresh fetch actually delivers new conditions. Open-Meteo current data only
+// updates on the order of tens of minutes, so going faster wouldn't help.
+const CACHE_TTL_MS = 15 * 60_000;
 
 type CacheEntry = {
 	data: RegionWeather[];

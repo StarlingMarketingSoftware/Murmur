@@ -82,6 +82,12 @@ export type MoodVisualConfig = {
 	 * overcast when the user zooms in. 0 disables it (default for bright moods).
 	 */
 	gloomWashOpacity: number;
+	/**
+	 * Whether this mood gets the warm-white "hot wash" overlay when it's >80°F.
+	 * Sunny/normal: yes (clear hot day reads brighter). Cloudy/rainy/stormy/snowy:
+	 * no — adding a brightening wash to overcast/wet/snowy weather looks wrong.
+	 */
+	hotWashEligible: boolean;
 	lightning: boolean;
 	lightningIntensity: number;
 	lightningSpread: number;
@@ -116,6 +122,7 @@ const NORMAL: MoodVisualConfig = {
 	softboxBlendMode: 'screen',
 	nightVisualBlend: 0,
 	gloomWashOpacity: 0,
+	hotWashEligible: true,
 	lightning: false,
 	lightningIntensity: 0,
 	lightningSpread: 0,
@@ -150,6 +157,7 @@ const SUNNY: MoodVisualConfig = {
 	softboxBlendMode: 'screen',
 	nightVisualBlend: 0,
 	gloomWashOpacity: 0,
+	hotWashEligible: true,
 	lightning: false,
 	lightningIntensity: 0,
 	lightningSpread: 0,
@@ -184,6 +192,7 @@ const CLOUDY: MoodVisualConfig = {
 	softboxBlendMode: 'screen',
 	nightVisualBlend: 0,
 	gloomWashOpacity: 0,
+	hotWashEligible: false,
 	lightning: false,
 	lightningIntensity: 0,
 	lightningSpread: 0,
@@ -216,8 +225,11 @@ const STORMY: MoodVisualConfig = {
 	shadowOpacityMultiplier: 1.2,
 	softboxBackground: SOFTBOX_DARK_POOL_BG,
 	softboxBlendMode: 'multiply',
-	nightVisualBlend: 0.13,
+	// Bumped from 0.13 so the night-palette borrow actually shows up in
+	// the moonlight overlay and fog/space-color tint at full daylight.
+	nightVisualBlend: 0.2,
 	gloomWashOpacity: 0.05,
+	hotWashEligible: false,
 	lightning: true,
 	lightningIntensity: 1,
 	lightningSpread: 0.86,
@@ -252,6 +264,7 @@ const SNOWY: MoodVisualConfig = {
 	softboxBlendMode: 'screen',
 	nightVisualBlend: 0,
 	gloomWashOpacity: 0,
+	hotWashEligible: false,
 	lightning: false,
 	lightningIntensity: 0,
 	lightningSpread: 0,

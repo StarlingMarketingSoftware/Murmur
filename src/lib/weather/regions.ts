@@ -19,32 +19,29 @@ export function isValidMood(value: unknown): value is WeatherMood {
 
 export type SampleCity = {
 	key: string;
-	label: string;
 	lat: number;
 	lng: number;
 };
 
 export const SAMPLE_CITIES: SampleCity[] = [
-	{ key: 'pacific-northwest', label: 'Pacific Northwest', lat: 47.61, lng: -122.33 },
-	{ key: 'pacific-southwest', label: 'Pacific Southwest', lat: 34.05, lng: -118.24 },
-	{ key: 'mountain', label: 'Mountain', lat: 39.74, lng: -104.99 },
-	{ key: 'southwest', label: 'Southwest', lat: 33.45, lng: -112.07 },
-	{ key: 'plains', label: 'Plains', lat: 39.1, lng: -94.58 },
-	{ key: 'midwest', label: 'Midwest', lat: 41.88, lng: -87.63 },
-	{ key: 'south', label: 'South', lat: 29.76, lng: -95.37 },
-	{ key: 'southeast', label: 'Southeast', lat: 33.75, lng: -84.39 },
-	{ key: 'northeast', label: 'Northeast', lat: 40.71, lng: -74.0 },
+	{ key: 'pacific-northwest', lat: 47.61, lng: -122.33 },
+	{ key: 'pacific-southwest', lat: 34.05, lng: -118.24 },
+	{ key: 'mountain', lat: 39.74, lng: -104.99 },
+	{ key: 'southwest', lat: 33.45, lng: -112.07 },
+	{ key: 'plains', lat: 39.1, lng: -94.58 },
+	{ key: 'midwest', lat: 41.88, lng: -87.63 },
+	{ key: 'south', lat: 29.76, lng: -95.37 },
+	{ key: 'southeast', lat: 33.75, lng: -84.39 },
+	{ key: 'northeast', lat: 40.71, lng: -74.0 },
 ];
 
 export type RegionWeather = {
 	regionKey: string;
-	regionLabel: string;
 	mood: WeatherMood;
 	weatherCode: number;
 	temperatureF: number;
 	precipitationMm: number;
 	windSpeedMph: number;
-	isDay: boolean;
 	fetchedAt: number;
 };
 
