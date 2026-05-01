@@ -1525,7 +1525,7 @@ const SNOWFLAKE_STAMPS_VERSION = 6;
 const SNOWFLAKE_STAMPS_URL = (i: number) =>
 	`/maps/snowflake_stamps/drop_${String(i).padStart(2, '0')}.png?v=${SNOWFLAKE_STAMPS_VERSION}`;
 const SNOW_CANVAS_SIZE_PX = 1024;
-const SNOW_MAX_PARTICLES = 2400;
+const SNOW_MAX_PARTICLES = 1800;
 const SNOW_LAYER_OPACITY = 1.0;
 const SNOW_HIDE_AT_OR_ABOVE_ZOOM = CLOUDS_OVERLAY_FADE_OUT_END_ZOOM;
 const SNOW_BASE_FALL_PX_PER_S = 9.2;
@@ -1536,6 +1536,7 @@ const SNOW_DENSITY_BAND_LOOP_MS = 46_000;
 const SNOW_STAMP_MIN_SIZE_PX = 8;
 const SNOW_STAMP_MAX_SIZE_PX = 23;
 const SNOW_STAMP_ALPHA_MULTIPLIER = 1.25;
+const SNOW_ROTATED_PARTICLE_DEPTH_MIN = 0.82;
 const SNOW_US_SIDE_CENTER_LNG = defaultCenter.lng;
 const SNOW_US_SIDE_FADE_START_DEG = 78;
 const SNOW_US_SIDE_FADE_END_DEG = 94;
@@ -6014,21 +6015,26 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					);
 					if (flakeAlpha <= 0.006) continue;
 
-					snowCtx.globalAlpha = flakeAlpha;
-					snowCtx.translate(x, y);
-					snowCtx.rotate(
-						p.rotation + p.wobblePhase * 0.04 + tS * p.rotationSpeed * turbulenceMul
-					);
 					if (stamp) {
-						snowCtx.drawImage(stamp, -drawW * 0.5, -drawH * 0.5, drawW, drawH);
+						snowCtx.globalAlpha = flakeAlpha;
+						if (p.depth >= SNOW_ROTATED_PARTICLE_DEPTH_MIN) {
+							snowCtx.translate(x, y);
+							snowCtx.rotate(
+								p.rotation + p.wobblePhase * 0.04 + tS * p.rotationSpeed * turbulenceMul
+							);
+							snowCtx.drawImage(stamp, -drawW * 0.5, -drawH * 0.5, drawW, drawH);
+							snowCtx.setTransform(1, 0, 0, 1, 0, 0);
+						} else {
+							snowCtx.drawImage(stamp, x - drawW * 0.5, y - drawH * 0.5, drawW, drawH);
+						}
 					} else {
 						const fallbackSize = clamp(stampSize * 0.16, 1.1, 2.8);
+						snowCtx.globalAlpha = flakeAlpha;
 						snowCtx.fillStyle = 'rgb(246, 252, 255)';
 						snowCtx.beginPath();
-						snowCtx.ellipse(0, 0, fallbackSize * 0.55, fallbackSize, 0, 0, Math.PI * 2);
+						snowCtx.ellipse(x, y, fallbackSize * 0.55, fallbackSize, 0, 0, Math.PI * 2);
 						snowCtx.fill();
 					}
-					snowCtx.setTransform(1, 0, 0, 1, 0, 0);
 				}
 			} catch {
 				// Non-fatal; the snowy mood can render as just cold clouds/fog.
@@ -6980,13 +6986,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				cloudsCtx.restore();
 			}
 
-			// In some Mapbox GL configurations `animate: true` is not enough to force
-			// continuous sampling; explicitly request a repaint after each draw.
-			try {
-				map.triggerRepaint();
-			} catch {
-				// Ignore.
-			}
 		};
 
 		const tick = (now: number, img: HTMLImageElement, pattern: CanvasPattern | null) => {
@@ -7011,6 +7010,13 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				}
 				try {
 					drawSnow(cloudsDriftSimTimeMsRef.current);
+				} catch {
+					// Ignore.
+				}
+				// In some Mapbox GL configurations `animate: true` is not enough to force
+				// continuous sampling; request repaint after every animated canvas is current.
+				try {
+					map.triggerRepaint();
 				} catch {
 					// Ignore.
 				}
