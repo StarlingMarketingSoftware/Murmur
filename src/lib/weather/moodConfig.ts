@@ -5,7 +5,7 @@ import { WeatherMood } from './regions';
 export const SOFTBOX_WARM_KEY_BG =
 	'radial-gradient(ellipse 150% 150% at -10% -10%, rgba(255, 238, 205, 0.38) 0%, rgba(255, 238, 205, 0.28) 28%, rgba(255, 238, 205, 0.16) 52%, rgba(255, 238, 205, 0.05) 78%, rgba(255, 238, 205, 0) 100%)';
 
-// Dark pool anchored to the upper-left for storm/rain moods. Same falloff
+// Dark pool anchored to the upper-left for storm moods. Same falloff
 // shape as the warm key but cool-deep colors. Pairs with `mix-blend-mode:
 // multiply` so the upper-left is darkened rather than brightened — bracketing
 // the existing lower-right shadow so both corners read as gloom.
@@ -62,14 +62,14 @@ export type MoodVisualConfig = {
 	softboxBackground: string;
 	softboxBlendMode: SoftboxBlendMode;
 	/**
-	 * Visual-only night influence. This lets storm/rain moods borrow the darker,
+	 * Visual-only night influence. This lets storm moods borrow the darker,
 	 * quieter night palette without turning on the actual night-lights overlay.
 	 */
 	nightVisualBlend: number;
 	/**
 	 * Strength of the dark "gloom wash" — a uniform multiply-blend overlay that
 	 * darkens the entire viewport. Persists into city zoom (unlike the softbox
-	 * + shadow overlays which fade by zoom 5), so rainy/stormy still feel
+	 * + shadow overlays which fade by zoom 5), so stormy still feels
 	 * overcast when the user zooms in. 0 disables it (default for bright moods).
 	 */
 	gloomWashOpacity: number;
@@ -110,11 +110,11 @@ const NORMAL: MoodVisualConfig = {
 };
 
 const SUNNY: MoodVisualConfig = {
-	cloudOpacityGlobeZoom: 0.45,
-	cloudOpacityDecorativeZoom: 0.4,
+	cloudOpacityGlobeZoom: 0.32,
+	cloudOpacityDecorativeZoom: 0.28,
 	cloudDriftSpeedMultiplier: 0.85,
 	cloudTurbulenceMultiplier: 1.0,
-	cloudBrightnessMin: 0.93,
+	cloudBrightnessMin: 0.96,
 	cloudBrightnessMax: 1.0,
 	cloudExtraPasses: 0,
 	cloudExtraPassAlpha: 1,
@@ -122,11 +122,11 @@ const SUNNY: MoodVisualConfig = {
 	cloudCoreShadowOpacity: 0,
 	cloudEdgeLiftOpacity: 0,
 	cloudDeepZoomOpacity: 0,
-	fogColor: 'rgba(220, 215, 200, 0.28)',
+	fogColor: 'rgba(220, 215, 200, 0.16)',
 	fogHighColor: 'rgb(18, 44, 78)',
-	fogHorizonBlend: 0.022,
-	softboxOpacityMultiplier: 1.28,
-	shadowOpacityMultiplier: 0.92,
+	fogHorizonBlend: 0.016,
+	softboxOpacityMultiplier: 1.06,
+	shadowOpacityMultiplier: 0.82,
 	softboxBackground: SOFTBOX_WARM_KEY_BG,
 	softboxBlendMode: 'screen',
 	nightVisualBlend: 0,
@@ -139,56 +139,27 @@ const SUNNY: MoodVisualConfig = {
 };
 
 const CLOUDY: MoodVisualConfig = {
-	cloudOpacityGlobeZoom: 0.92,
-	cloudOpacityDecorativeZoom: 0.82,
+	cloudOpacityGlobeZoom: 0.88,
+	cloudOpacityDecorativeZoom: 0.76,
 	cloudDriftSpeedMultiplier: 0.7,
 	cloudTurbulenceMultiplier: 1.0,
-	cloudBrightnessMin: 0.75,
+	cloudBrightnessMin: 0.8,
 	cloudBrightnessMax: 1.0,
-	cloudExtraPasses: 2,
-	cloudExtraPassAlpha: 1,
+	cloudExtraPasses: 3.25,
+	cloudExtraPassAlpha: 0.72,
 	cloudStormWindMultiplier: 1,
 	cloudCoreShadowOpacity: 0,
 	cloudEdgeLiftOpacity: 0,
 	cloudDeepZoomOpacity: 0,
-	fogColor: 'rgba(165, 180, 190, 0.40)',
+	fogColor: 'rgba(165, 180, 190, 0.46)',
 	fogHighColor: 'rgb(18, 44, 78)',
-	fogHorizonBlend: 0.035,
+	fogHorizonBlend: 0.042,
 	softboxOpacityMultiplier: 0.6,
 	shadowOpacityMultiplier: 1.2,
 	softboxBackground: SOFTBOX_WARM_KEY_BG,
 	softboxBlendMode: 'screen',
 	nightVisualBlend: 0,
 	gloomWashOpacity: 0,
-	lightning: false,
-	lightningIntensity: 0,
-	lightningSpread: 0,
-	lightningBurstiness: 0,
-	lightningTint: [210, 232, 255],
-};
-
-const RAINY: MoodVisualConfig = {
-	cloudOpacityGlobeZoom: 0.95,
-	cloudOpacityDecorativeZoom: 0.85,
-	cloudDriftSpeedMultiplier: 1.1,
-	cloudTurbulenceMultiplier: 1.2,
-	cloudBrightnessMin: 0.34,
-	cloudBrightnessMax: 0.9,
-	cloudExtraPasses: 1,
-	cloudExtraPassAlpha: 1,
-	cloudStormWindMultiplier: 1,
-	cloudCoreShadowOpacity: 0,
-	cloudEdgeLiftOpacity: 0,
-	cloudDeepZoomOpacity: 0,
-	fogColor: 'rgba(150, 175, 195, 0.40)',
-	fogHighColor: 'rgb(15, 35, 65)',
-	fogHorizonBlend: 0.06,
-	softboxOpacityMultiplier: 1.0,
-	shadowOpacityMultiplier: 1.3,
-	softboxBackground: SOFTBOX_DARK_POOL_BG,
-	softboxBlendMode: 'multiply',
-	nightVisualBlend: 0.18,
-	gloomWashOpacity: 0.22,
 	lightning: false,
 	lightningIntensity: 0,
 	lightningSpread: 0,
@@ -258,7 +229,6 @@ export const MOOD_CONFIG: Record<WeatherMood, MoodVisualConfig> = {
 	normal: NORMAL,
 	sunny: SUNNY,
 	cloudy: CLOUDY,
-	rainy: RAINY,
 	stormy: STORMY,
 	snowy: SNOWY,
 };

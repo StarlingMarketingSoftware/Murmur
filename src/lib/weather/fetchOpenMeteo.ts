@@ -51,11 +51,7 @@ export async function fetchSampleCitiesWeather(): Promise<RegionWeather[] | null
 			out.push({
 				regionKey: city.key,
 				regionLabel: city.label,
-				mood: wmoCodeToMood(
-					current.weather_code,
-					current.precipitation,
-					current.wind_speed_10m
-				),
+				mood: wmoCodeToMood(current.weather_code, current.precipitation),
 				weatherCode: current.weather_code,
 				temperatureF: current.temperature_2m,
 				precipitationMm: current.precipitation,

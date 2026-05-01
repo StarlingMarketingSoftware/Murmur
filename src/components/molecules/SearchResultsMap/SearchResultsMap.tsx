@@ -1397,7 +1397,7 @@ const computeLightingOverlayOpacity = (zoom: number) => {
 };
 
 // Dark "gloom wash" persists much further than the softbox/shadow overlays so
-// rainy/stormy still feel overcast when the user zooms in to city detail.
+// stormy still feels overcast when the user zooms in to city detail.
 // Held at full strength through country zoom, then linearly fades out as the
 // clouds themselves disappear.
 const GLOOM_WASH_FADE_START_ZOOM = 8;
@@ -3093,9 +3093,9 @@ const normalizeStateKey = (state?: string | null): string | null => {
 };
 
 // MANUAL WEATHER MOOD OVERRIDE FOR TESTING.
-// Set to one of: 'sunny' | 'normal' | 'cloudy' | 'rainy' | 'stormy' | 'snowy'
+// Set to one of: 'sunny' | 'normal' | 'cloudy' | 'stormy' | 'snowy'
 // Set back to null to use the real weather mood from the user's region.
-const MANUAL_WEATHER_MOOD_OVERRIDE: WeatherMood | null = 'stormy';
+const MANUAL_WEATHER_MOOD_OVERRIDE: WeatherMood | null = null;
 
 // MANUAL TEMPERATURE OVERRIDE FOR TESTING (Fahrenheit).
 // Set to a number (e.g. 92) to test the > 80°F brightness lift.
@@ -3152,7 +3152,7 @@ const computeRuntimeNightT = (
 // Threshold above which the globe gets a uniform warm brightness lift on top
 // of the active mood (only applies when the mood uses a bright screen-blend
 // softbox — applying a brightening wash to the dark-pool moods would defeat
-// the rainy/stormy gloom).
+// the stormy gloom).
 const HOT_TEMPERATURE_THRESHOLD_F = 80;
 // Uniform warm-white wash opacity when "hot". Multiplied by the same zoom
 // fade as the other lighting overlays so the wash disappears at city zoom.
@@ -10472,7 +10472,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		}
 
 		// Hot wash — uniform warm-white screen-blend overlay that brightens the
-		// whole globe. Only active for bright moods so the rainy/stormy dark
+		// whole globe. Only active for bright moods so the stormy dark
 		// pool stays gloomy.
 		const brightSoftboxStrength = clamp(cfg.warmSoftboxOpacityMultiplier, 0, 1);
 		const hotActive = isHotRef.current && brightSoftboxStrength > 0.001 && night < 0.12;
@@ -10482,7 +10482,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		if (lightingOverlayHotWashRef.current)
 			lightingOverlayHotWashRef.current.style.opacity = String(washOpacity);
 
-		// Gloom wash — uniform dark multiply-blend overlay for rainy/stormy that
+		// Gloom wash — uniform dark multiply-blend overlay for stormy that
 		// persists into city zoom (longer fade curve than the softbox/shadow).
 		// Bright moods have gloomWashOpacity=0 so this is a no-op for them.
 		const gloomFade = computeGloomWashFade(zoom);
@@ -12633,7 +12633,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			  matter how the globe is panned, zoomed, or rotated.
 
 			  Layer 1a (screen): warm highlight radiating from the upper-left.
-			  Layer 1b (multiply): rainy dark-pool key in the same upper-left slot.
+			  Layer 1b (multiply): stormy dark-pool key in the same upper-left slot.
 			  Keeping both layers mounted lets mood transitions crossfade instead of
 			  swapping an un-animatable mix-blend-mode.
 			  Layer 2 (multiply): cool deep-shadow pooling in the lower-right.
@@ -12767,7 +12767,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				}}
 			/>
 			{/*
-			  Gloom wash. Uniform dark multiply-blend overlay for rainy/stormy
+			  Gloom wash. Uniform dark multiply-blend overlay for stormy
 			  that persists into city zoom (longer fade curve than the softbox/
 			  shadow). Opacity owned by applyLightingOverlayOpacity; bright
 			  moods set gloomWashOpacity=0 so this is a no-op for them.

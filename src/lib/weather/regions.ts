@@ -2,7 +2,6 @@ export type WeatherMood =
 	| 'sunny'
 	| 'normal'
 	| 'cloudy'
-	| 'rainy'
 	| 'stormy'
 	| 'snowy';
 
@@ -10,7 +9,6 @@ const VALID_MOODS = new Set<WeatherMood>([
 	'sunny',
 	'normal',
 	'cloudy',
-	'rainy',
 	'stormy',
 	'snowy',
 ]);
