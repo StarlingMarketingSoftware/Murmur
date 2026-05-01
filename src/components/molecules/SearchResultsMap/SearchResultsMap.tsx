@@ -1552,10 +1552,10 @@ const SNOW_EDDY_DRIFT_BASE_PX = 2.2;
 const SNOW_TURBULENCE_LOOP_MS = 37_000;
 const SNOW_GUST_BAND_LOOP_MS = 29_000;
 const SNOW_DENSITY_BAND_LOOP_MS = 46_000;
-const SNOW_STAMP_MIN_SIZE_PX = 10;
-const SNOW_STAMP_MAX_SIZE_PX = 28;
-const SNOW_STAMP_ALPHA_MULTIPLIER = 1.45;
-const SNOW_STAMP_MAX_ALPHA = 0.88;
+const SNOW_STAMP_MIN_SIZE_PX = 12;
+const SNOW_STAMP_MAX_SIZE_PX = 34;
+const SNOW_STAMP_ALPHA_MULTIPLIER = 1.72;
+const SNOW_STAMP_MAX_ALPHA = 0.96;
 const SNOW_ROTATED_PARTICLE_DEPTH_MIN = 0.82;
 const SNOW_US_SIDE_CENTER_LNG = defaultCenter.lng;
 const SNOW_US_SIDE_FADE_START_DEG = 78;
@@ -2010,9 +2010,9 @@ const buildSnowOpacityExpr = (opacity: number) => {
 		MAP_MIN_ZOOM,
 		o,
 		DASHBOARD_DECORATIVE_ZOOM,
-		o * 0.92,
+		o * 0.98,
 		CLOUDS_OVERLAY_FADE_OUT_START_ZOOM,
-		o * 0.48,
+		o * 0.62,
 		SNOW_HIDE_AT_OR_ABOVE_ZOOM,
 		0,
 		22,
@@ -6093,7 +6093,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					0,
 					1
 				);
-				const a = alpha * 0.42;
+				const a = alpha * 0.56;
 				if (a <= 0.001) continue;
 
 				const cx = impact.x * scaleX;
@@ -6148,7 +6148,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					0,
 					1
 				);
-				const a = alpha * 0.09;
+				const a = alpha * 0.13;
 				if (a <= 0.001) continue;
 
 				const cx = impact.x * scaleX;
