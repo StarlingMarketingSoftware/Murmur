@@ -1536,6 +1536,9 @@ const SNOW_DENSITY_BAND_LOOP_MS = 46_000;
 const SNOW_STAMP_MIN_SIZE_PX = 8;
 const SNOW_STAMP_MAX_SIZE_PX = 23;
 const SNOW_STAMP_ALPHA_MULTIPLIER = 1.25;
+const SNOW_US_SIDE_CENTER_LNG = defaultCenter.lng;
+const SNOW_US_SIDE_FADE_START_DEG = 78;
+const SNOW_US_SIDE_FADE_END_DEG = 94;
 
 const getLightningZoomedOutBoostT = (zoom: number) => {
 	if (zoom <= LIGHTNING_ZOOMED_OUT_BOOST_FULL_ZOOM) return 1;
@@ -5976,6 +5979,15 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						h,
 						margin
 					);
+					const lng = normalizeLngDeg((x / w) * 360 - 180);
+					const usSideAlpha =
+						1 -
+						smoothstep(
+							SNOW_US_SIDE_FADE_START_DEG,
+							SNOW_US_SIDE_FADE_END_DEG,
+							angularLngDistanceDeg(lng, SNOW_US_SIDE_CENTER_LNG)
+						);
+					if (usSideAlpha <= 0.006) continue;
 
 					const densityCoord = y * 0.0056 + x * 0.0018 + densityT;
 					const densityField =
@@ -5992,7 +6004,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						1.12
 					);
 					const flakeAlpha = clamp(
-						p.opacity * lerp(0.72, 1.08, p.depth) * densityAlpha * SNOW_STAMP_ALPHA_MULTIPLIER,
+						p.opacity *
+							lerp(0.72, 1.08, p.depth) *
+							densityAlpha *
+							usSideAlpha *
+							SNOW_STAMP_ALPHA_MULTIPLIER,
 						0,
 						0.78
 					);
