@@ -11,10 +11,6 @@ import {
 import { getValidatedParamsFromUrl } from '@/utils';
 import { Prisma } from '@prisma/client';
 import { StripeSubscriptionStatus } from '@/types';
-import {
-	BOOKING_CONTACT_TITLE_PREFIXES,
-	PROMOTION_CONTACT_TITLE_PREFIXES,
-} from '@/constants/contactCategories';
 
 export const maxDuration = 60;
 
@@ -26,6 +22,24 @@ const mapOverlaySchema = z.object({
 	east: z.coerce.number(),
 	limit: z.coerce.number().optional(),
 });
+
+const BOOKING_TITLE_PREFIXES = [
+	'Music Venues',
+	'Restaurants',
+	'Coffee Shops',
+	'Music Festivals',
+	'Breweries',
+	'Distilleries',
+	'Wineries',
+	'Cideries',
+	'Wedding Planners',
+	'Wedding Venues',
+] as const;
+
+const PROMOTION_TITLE_PREFIXES = [
+	'Radio Stations',
+	'College Radio',
+] as const;
 
 const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n));
 
@@ -120,7 +134,7 @@ export async function GET(req: NextRequest) {
 					bboxWhere,
 					{ title: { not: null } },
 					{
-						OR: BOOKING_CONTACT_TITLE_PREFIXES.map((p) => ({
+						OR: BOOKING_TITLE_PREFIXES.map((p) => ({
 							title: { mode: 'insensitive', startsWith: p },
 						})),
 					},
@@ -132,7 +146,7 @@ export async function GET(req: NextRequest) {
 					bboxWhere,
 					{ title: { not: null } },
 					{
-						OR: PROMOTION_CONTACT_TITLE_PREFIXES.map((p) => ({
+						OR: PROMOTION_TITLE_PREFIXES.map((p) => ({
 							title: { mode: 'insensitive', startsWith: p },
 						})),
 					},
@@ -151,3 +165,4 @@ export async function GET(req: NextRequest) {
 		return handleApiError(error);
 	}
 }
+

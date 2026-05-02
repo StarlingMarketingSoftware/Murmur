@@ -6,10 +6,6 @@ import { ContactWithName } from '@/types/contact';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 import { useGetContactsMapOverlay } from '@/hooks/queryHooks/useContacts';
 import {
-	BOOKING_CONTACT_TITLE_PREFIXES,
-	PROMOTION_CONTACT_TITLE_PREFIXES,
-} from '@/constants/contactCategories';
-import {
 	calculateTooltipWidth,
 	calculateTooltipHeight,
 	calculateTooltipAnchorY,
@@ -2936,9 +2932,21 @@ const ALL_CONTACTS_OVERLAY_LIMIT = 2000;
 const ALL_CONTACTS_OVERLAY_DOT_FILL_COLOR = '#9CA3AF';
 const ALL_CONTACTS_OVERLAY_TOOLTIP_FILL_COLOR = '#6B7280';
 
-const BOOKING_EXTRA_TITLE_PREFIXES = BOOKING_CONTACT_TITLE_PREFIXES;
+const BOOKING_EXTRA_TITLE_PREFIXES = [
+	'Music Venues',
+	'Coffee Shops',
+	'Restaurants',
+	'Music Festivals',
+	'Breweries',
+	'Wineries',
+	'Wedding Planners',
+	'Wedding Venues',
+	// Also supported by the booking search backend; include if present.
+	'Distilleries',
+	'Cideries',
+] as const;
 
-const PROMOTION_OVERLAY_TITLE_PREFIXES = PROMOTION_CONTACT_TITLE_PREFIXES;
+const PROMOTION_OVERLAY_TITLE_PREFIXES = ['Radio Stations', 'College Radio'] as const;
 
 const startsWithCaseInsensitive = (
 	value: string | null | undefined,

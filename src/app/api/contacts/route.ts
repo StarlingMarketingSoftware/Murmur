@@ -27,10 +27,6 @@ import { applyHardcodedLocationOverrides } from '@/app/api/_utils/searchPreproce
 import { Contact, EmailVerificationStatus, Prisma } from '@prisma/client';
 import { searchSimilarContacts, upsertContactToVectorDb } from '../_utils/vectorDb';
 import { GEMINI_MODEL_OPTIONS } from '@/constants';
-import {
-	BOOKING_CONTACT_TITLE_PREFIXES,
-	PROMOTION_CONTACT_TITLE_PREFIXES,
-} from '@/constants/contactCategories';
 import { StripeSubscriptionStatus } from '@/types';
 
 const VECTOR_SEARCH_LIMIT_DEFAULT = 500;
@@ -101,9 +97,20 @@ type ContactSearchMode = 'booking' | 'promotion';
 const stripLeadingBracketTag = (value: string | null | undefined): string =>
 	(value ?? '').replace(/^\s*\[[^\]]+\]\s*/i, '').trim();
 
-const BOOKING_TITLE_PREFIXES = BOOKING_CONTACT_TITLE_PREFIXES;
+const BOOKING_TITLE_PREFIXES = [
+	'Music Venues',
+	'Restaurants',
+	'Coffee Shops',
+	'Music Festivals',
+	'Breweries',
+	'Distilleries',
+	'Wineries',
+	'Cideries',
+	'Wedding Planners',
+	'Wedding Venues',
+] as const;
 
-const PROMOTION_TITLE_PREFIXES = PROMOTION_CONTACT_TITLE_PREFIXES;
+const PROMOTION_TITLE_PREFIXES = ['Radio Stations', 'College Radio'] as const;
 
 // Map user-facing "What" labels to the DB title prefixes used for filtering.
 const WHAT_TO_TITLE_PREFIX_ALIASES: Record<string, string> = {
