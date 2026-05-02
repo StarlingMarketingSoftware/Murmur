@@ -1,16 +1,24 @@
 export const replacePTagsInSignature = (html: string): string => {
-	// First capture group is everything before the signature div
-	// Second capture group is the content within signature div
-	// Third capture group is everything after
-	const regex = /^([\s\S]*<div>)([\s\S]*?)(<\/div>[\s\S]*)$/;
+	/**
+	 * Best-effort: if the email ends with a signature block wrapped in a <div>,
+	 * convert any <p> tags inside that block to <div> tags to avoid "paragraph margin"
+	 * surprises in email clients.
+	 *
+	 * NOTE: This is intentionally conservative and only targets a trailing <div>...</div>.
+	 */
+	if (!html) return html;
 
-	return html.replace(regex, (_, before, signatureContent, after) => {
-		const updatedSignatureContent = signatureContent
-			.replace(/<p/g, '<div')
-			.replace(/<\/p>/g, '</div>');
+	const match = html.match(/^([\s\S]*?)(<div\b[^>]*>[\s\S]*<\/div>)\s*$/i);
+	if (!match?.[2]) return html;
 
-		return `${before}${updatedSignatureContent}${after}`;
-	});
+	const before = match[1] ?? '';
+	const signatureBlock = match[2];
+
+	const updatedSignatureBlock = signatureBlock
+		.replace(/<p(\s|>)/gi, '<div$1')
+		.replace(/<\/p>/gi, '</div>');
+
+	return `${before}${updatedSignatureBlock}`;
 };
 
 export const stripHtmlTags = (html: string): string => {
@@ -20,47 +28,182 @@ export const stripHtmlTags = (html: string): string => {
 };
 
 export const addFontToHtml = (html: string, font: string): string => {
-	return html
-		.replace(/<p/g, `<p><span style="font-family: ${font}"`)
-		.replace(/<\/p>/g, '</span></p>');
+	if (!html) return html;
+	// Declare font-family once on a single wrapper.
+	if (/font-family\s*:/i.test(html)) return html;
+	return `<div style="font-family: ${font};">${html}</div>`;
 };
 
 export const formatHTMLForEmailClients = (html: string): string => {
-	return html
-		.replace(
-			/<p(?![^>]*min-height)/g,
-			`<p style="margin: 0; min-height: 1.2em; line-height: 1.5; font-size: 12pt"`
-		)
-		.replace(
-			/<p([^>]*?)style="([^"]*)"/g,
-			`<p$1style="$2; min-height: 1.2em; line-height: 1.5; font-size: 12pt"`
-		)
-		.replace(/<\/p>/g, '</p>');
+	if (!html) return html;
+
+	// Strip Murmur's internal draft-settings snapshot comment before sending.
+	// (It's useful for in-app UX, but shouldn't be included in outbound emails.)
+	const MURMUR_DRAFT_SETTINGS_COMMENT_RE =
+		/<!--\s*MURMUR_DRAFT_SETTINGS:[A-Za-z0-9+/=]+\s*-->/g;
+	let out = html.replace(MURMUR_DRAFT_SETTINGS_COMMENT_RE, '').trimStart();
+
+	// Normalize line breaks (helps with plain-text fallbacks).
+	out = out.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
+	// TipTap's hardBreaks render as <br class="br-spacing"> for in-app spacing.
+	// Email clients ignore CSS classes, so strip the class to avoid odd HTML.
+	out = out.replace(/<br\s+class="br-spacing"\s*\/?>/gi, '<br>');
+
+	const escapeHtml = (text: string): string =>
+		text
+			.replace(/&/g, '&amp;')
+			.replace(/</g, '&lt;')
+			.replace(/>/g, '&gt;')
+			.replace(/"/g, '&quot;')
+			.replace(/'/g, '&#39;');
+
+	const looksLikeHtml = /<\/?[a-z][\s>]/i.test(out);
+	if (!looksLikeHtml) {
+		// Convert plain text (with \n) into Gmail-like HTML with <br> breaks.
+		const normalized = out.trim();
+		if (!normalized) return '';
+
+		const paragraphs = normalized.split(/\n{2,}/);
+		out = paragraphs
+			.map((paragraph) => escapeHtml(paragraph).replace(/\n/g, '<br>'))
+			.join('<br><br>');
+	} else {
+		// Flatten common "webby" paragraphs into Gmail-like breaks.
+		out = out
+			.replace(/<\/p>\s*<p\b[^>]*>/gi, '<br><br>')
+			.replace(/<p\b[^>]*>/gi, '')
+			.replace(/<\/p>/gi, '');
+	}
+
+	type StyleMap = Record<string, string>;
+	const parseStyle = (style: string): StyleMap => {
+		const map: StyleMap = {};
+		style
+			.split(';')
+			.map((decl) => decl.trim())
+			.filter(Boolean)
+			.forEach((decl) => {
+				const idx = decl.indexOf(':');
+				if (idx === -1) return;
+				const prop = decl.slice(0, idx).trim().toLowerCase();
+				const value = decl.slice(idx + 1).trim();
+				if (!prop) return;
+				map[prop] = value;
+			});
+		return map;
+	};
+
+	const stringifyStyle = (map: StyleMap): string => {
+		const entries = Object.entries(map);
+		if (!entries.length) return '';
+		return `${entries.map(([k, v]) => `${k}: ${v}`).join('; ')};`;
+	};
+
+	const upsertStyleAttr = (tag: string, updater: (existing: string) => string): string => {
+		const match = tag.match(/\sstyle=("([^"]*)"|'([^']*)')/i);
+		if (match) {
+			const existing = match[2] ?? match[3] ?? '';
+			const updated = updater(existing);
+			return tag.replace(match[0], ` style="${updated}"`);
+		}
+		const updated = updater('');
+		return tag.replace(/^<([a-z0-9]+)/i, `<$1 style="${updated}"`);
+	};
+
+	const OUTER_FONT_FAMILY = 'Arial, sans-serif';
+	const OUTER_TEXT_COLOR = '#000000';
+
+	// TipTap renders signature blocks as <div class="mt-6">…</div>.
+	// Tailwind classes don't exist in email clients; mimic Gmail spacing using <br><br>.
+	out = out.replace(/<div\b[^>]*>/gi, (tag) => {
+		const classMatch = tag.match(/\sclass=("([^"]*)"|'([^']*)')/i);
+		const classValue = classMatch?.[2] ?? classMatch?.[3] ?? '';
+		if (!/\bmt-6\b/i.test(classValue)) return tag;
+
+		let cleanedTag = tag;
+		if (classMatch?.[0]) {
+			const cleanedClassValue = classValue
+				.split(/\s+/)
+				.filter(Boolean)
+				.filter((c) => !/^mt-\d+$/i.test(c))
+				.join(' ');
+
+			if (cleanedClassValue) {
+				cleanedTag = cleanedTag.replace(classMatch[0], ` class="${cleanedClassValue}"`);
+			} else {
+				cleanedTag = cleanedTag.replace(classMatch[0], '');
+			}
+		}
+
+		return `<br><br>${cleanedTag}`;
+	});
+
+	// Wrap snippets (most of our drafts) in a Gmail-like baseline container.
+	// Don't force a px font-size here: Gmail applies device-specific sizing.
+	const looksLikeFullDoc = /<html\b/i.test(out) || /<body\b/i.test(out) || /<!doctype\b/i.test(out);
+	if (!looksLikeFullDoc) {
+		const desiredOuterStyle = `font-family: ${OUTER_FONT_FAMILY}; color: ${OUTER_TEXT_COLOR};`;
+		const singleDivWrapper = /^\s*<div\b[^>]*>[\s\S]*<\/div>\s*$/i.test(out);
+
+		if (singleDivWrapper) {
+			out = out.replace(/^\s*<div\b[^>]*>/i, (tag) =>
+				upsertStyleAttr(tag, (existing) => {
+					const style = parseStyle(existing);
+					style['font-family'] = OUTER_FONT_FAMILY;
+					style['color'] = OUTER_TEXT_COLOR;
+					delete style['font-size'];
+					delete style['line-height'];
+					return stringifyStyle(style);
+				})
+			);
+		} else {
+			out = `<div style="${desiredOuterStyle}">${out}</div>`;
+		}
+	}
+
+	return out;
 };
 
 export const addSignatureToHtml = (html: string, signature: string | null): string => {
 	const signatureContent = signature || '';
-	// Convert line breaks in signature to <br> tags for proper HTML rendering
 	const formattedSignature = signatureContent.replace(/\n/g, '<br>');
-	// Add proper spacing between body and signature with styled div
-	return `${html}<br><br><div style="margin-top: 1em;">${formattedSignature}</div>`;
+	if (!formattedSignature.trim()) return html;
+
+	// Append signature using Gmail-like spacing (<br><br>) without artificial wrappers.
+	const insertion = `<br><br>${formattedSignature}`;
+
+	// If the body is already wrapped in a single trailing </div>, keep everything inside it.
+	if (/<\/div>\s*$/i.test(html)) {
+		return html.replace(/<\/div>\s*$/i, `${insertion}</div>`);
+	}
+
+	if (!html?.trim()) {
+		return `<div>${formattedSignature}</div>`;
+	}
+
+	return `${html}${insertion}`;
 };
 
 export const replaceLineBreaksWithRichTextTags = (text: string, font: string): string => {
-	const fontStyle = `style="font-family: ${font}"`;
-	// Split by double newlines to create paragraphs
-	const paragraphs = text.split(/\n\n+/);
-	// Process each paragraph, converting single newlines to <br> within paragraphs
-	const htmlParagraphs = paragraphs
-		.filter((paragraph) => paragraph.trim() !== '') // Remove empty paragraphs
-		.map((paragraph, index, array) => {
-			// Replace single newlines with <br> tags within each paragraph
-			const withLineBreaks = paragraph.replace(/\n/g, '<br>');
-			// Add margin-bottom to all paragraphs except the last one
-			const marginStyle = index < array.length - 1 ? 'margin-bottom: 1em;' : '';
-			return `<p style="${marginStyle}"><span ${fontStyle}>${withLineBreaks}</span></p>`;
-		});
-	return htmlParagraphs.join('');
+	const escapeHtml = (s: string): string =>
+		s
+			.replace(/&/g, '&amp;')
+			.replace(/</g, '&lt;')
+			.replace(/>/g, '&gt;')
+			.replace(/"/g, '&quot;')
+			.replace(/'/g, '&#39;');
+
+	// Gmail-style structure: a single wrapper with paragraphs separated by <br><br>.
+	const normalized = (text || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
+	if (!normalized) return `<div style="font-family: ${font};"></div>`;
+
+	const paragraphs = normalized.split(/\n{2,}/).filter((p) => p.trim() !== '');
+	const content = paragraphs
+		.map((paragraph) => escapeHtml(paragraph).replace(/\n/g, '<br>'))
+		.join('<br><br>');
+
+	return `<div style="font-family: ${font};">${content}</div>`;
 };
 
 // Convert AI response text to rich HTML email with proper paragraph and line break handling
@@ -69,13 +212,8 @@ export const convertAiResponseToRichTextEmail = (
 	font: string,
 	signature: string | null
 ): string => {
-	// Process the text to create proper HTML with paragraphs and line breaks
-	const htmlWithFont = replaceLineBreaksWithRichTextTags(html, font);
-	// Apply font styling to signature as well
-	const styledSignature = signature
-		? `<span style="font-family: ${font}">${signature}</span>`
-		: null;
-	return addSignatureToHtml(htmlWithFont, styledSignature);
+	const htmlWithWrapper = replaceLineBreaksWithRichTextTags(html, font);
+	return addSignatureToHtml(htmlWithWrapper, signature);
 };
 
 export const extractJsonFromPseudoHTML = (
@@ -119,8 +257,15 @@ export const convertHtmlToPlainText = (html: string): string => {
 	// Remove any other HTML tags
 	plainMessage = plainMessage.replace(/<[^>]*>/g, '');
 
-	// Decode minimal entities
-	plainMessage = plainMessage.replace(/&nbsp;/gi, ' ');
+	// Decode HTML entities (order: &amp; last to avoid double-decoding)
+	plainMessage = plainMessage
+		.replace(/&nbsp;/gi, ' ')
+		.replace(/&lt;/gi, '<')
+		.replace(/&gt;/gi, '>')
+		.replace(/&quot;/gi, '"')
+		.replace(/&#39;/g, "'")
+		.replace(/&apos;/gi, "'")
+		.replace(/&amp;/gi, '&');
 
 	// Replace markers with actual line breaks
 	plainMessage = plainMessage.replace(/§PARA§/g, '\n\n');

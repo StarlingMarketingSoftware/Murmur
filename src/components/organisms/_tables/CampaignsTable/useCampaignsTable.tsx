@@ -1,14 +1,14 @@
 import { Campaign } from '@prisma/client';
 import { ColumnDef } from '@tanstack/react-table';
-import { X } from 'lucide-react';
 import { Typography } from '@/components/ui/typography';
+import { CampaignTitlePills } from '@/components/molecules/CampaignTitlePills/CampaignTitlePills';
 import { useDeleteCampaign, useGetCampaigns } from '@/hooks/queryHooks/useCampaigns';
 import { useRouter } from 'next/navigation';
 import { urls } from '@/constants/urls';
 import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import { cn, mmdd } from '@/utils';
-import { splitTrailingNumericSuffix } from '@/utils/string';
 import { useRowConfirmationAnimation } from '@/hooks/useRowConfirmationAnimation';
+import DeleteXIcon from '@/components/atoms/svg/DeleteXIcon';
 
 type CampaignWithCounts = Campaign & {
 	draftCount?: number;
@@ -18,9 +18,15 @@ type CampaignWithCounts = Campaign & {
 const useIsomorphicLayoutEffect =
 	typeof window !== 'undefined' ? useLayoutEffect : useEffect;
 
-type MetricSortKey = 'drafts' | 'sent' | 'updated' | 'created';
+type MetricSortKey = 'drafts' | 'sent' | 'updated';
 type MetricSortMode = 'desc' | 'asc';
 type MetricSortState = { key: MetricSortKey; mode: MetricSortMode } | null;
+
+const startOfDay = (d: Date) => {
+	const x = new Date(d);
+	x.setHours(0, 0, 0, 0);
+	return x;
+};
 
 const getDraftFillColor = (value: number): string => {
 	const v = Math.max(0, Math.min(value, 50));
@@ -42,11 +48,6 @@ const getSentFillColor = (value: number): string => {
 };
 
 const getUpdatedFillColor = (updatedAt: Date): string => {
-	const startOfDay = (d: Date) => {
-		const x = new Date(d);
-		x.setHours(0, 0, 0, 0);
-		return x;
-	};
 	const now = startOfDay(new Date());
 	const then = startOfDay(updatedAt);
 	const msInDay = 24 * 60 * 60 * 1000;
@@ -62,25 +63,10 @@ const getUpdatedFillColor = (updatedAt: Date): string => {
 	return '#E58787'; // 3+ months ago
 };
 
-const getCreatedFillColor = (createdAt: Date): string => {
-	const startOfDay = (d: Date) => {
-		const x = new Date(d);
-		x.setHours(0, 0, 0, 0);
-		return x;
-	};
+const getUpdatedLabel = (updatedAt: Date): string => {
 	const now = startOfDay(new Date());
-	const then = startOfDay(createdAt);
-	const msInDay = 24 * 60 * 60 * 1000;
-	const days = Math.max(0, Math.floor((now.getTime() - then.getTime()) / msInDay));
-
-	if (days === 0) return '#FFFFFF'; // Today
-	if (days === 1) return '#F4F7FF'; // Yesterday
-	if (days <= 3) return '#E9F0FF'; // Up to 3 days ago
-	if (days <= 7) return '#DEE8FF'; // 1 week ago
-	if (days <= 14) return '#D3E0FF'; // 2 weeks ago
-	if (days <= 30) return '#C8D8FF'; // 1 month ago
-	if (days <= 60) return '#BDD1FF'; // 2 months ago
-	return '#B2C9FF'; // 3+ months ago
+	const then = startOfDay(updatedAt);
+	return now.getTime() === then.getTime() ? 'Today' : mmdd(updatedAt);
 };
 
 export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
@@ -109,10 +95,6 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 	const updatedHeaderButtonRef = useRef<HTMLButtonElement | null>(null);
 	const setUpdatedHeaderButtonRef = useCallback((el: HTMLButtonElement | null) => {
 		updatedHeaderButtonRef.current = el;
-	}, []);
-	const createdHeaderButtonRef = useRef<HTMLButtonElement | null>(null);
-	const setCreatedHeaderButtonRef = useCallback((el: HTMLButtonElement | null) => {
-		createdHeaderButtonRef.current = el;
 	}, []);
 
 	// Use the custom animation hook
@@ -149,8 +131,6 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 					? sentHeaderButtonRef.current
 					: metricSortKey === 'updated'
 						? updatedHeaderButtonRef.current
-						: metricSortKey === 'created'
-							? createdHeaderButtonRef.current
 					: metricSortKey === 'drafts'
 						? draftsHeaderButtonRef.current
 						: null;
@@ -184,8 +164,6 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 					? ".metric-box[data-sent-fill]"
 					: metricSortKey === 'updated'
 						? ".metric-box[data-updated-fill]"
-						: metricSortKey === 'created'
-							? ".metric-box[data-created-fill]"
 					: ".metric-box[data-draft-fill]";
 			const metricBox =
 				compactMetrics
@@ -238,8 +216,7 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 			const btn =
 				draftsHeaderButtonRef.current ??
 				sentHeaderButtonRef.current ??
-				updatedHeaderButtonRef.current ??
-				createdHeaderButtonRef.current;
+				updatedHeaderButtonRef.current;
 			const container = btn
 				? (btn.closest('.my-campaigns-table') as HTMLElement | null)
 				: null;
@@ -265,8 +242,6 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 				? sentHeaderButtonRef.current
 				: metricSortKey === 'updated'
 					? updatedHeaderButtonRef.current
-					: metricSortKey === 'created'
-						? createdHeaderButtonRef.current
 				: metricSortKey === 'drafts'
 					? draftsHeaderButtonRef.current
 					: null;
@@ -310,36 +285,28 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 		{
 			accessorKey: 'name',
 			header: () => (
-				<div className="text-left pl-0 font-secondary font-medium text-[14px] text-black">
-					Your Campaigns
+				<div className="text-left pl-0 font-inter font-medium text-[13px] text-black">
+					Campaigns
 				</div>
 			),
 			cell: ({ row }) => {
 				const name: string = row.getValue('name');
 				const isConfirming = row.original.id === confirmingCampaignId;
-				const { base, suffixNumber } = splitTrailingNumericSuffix(name ?? '');
 				return name ? (
-					<div
-						className={cn(
-							'text-left pr-8 font-bold font-primary campaign-name-text text-[14px] sm:text-[18px]',
-							isConfirming && 'text-white'
-						)}
-					>
-						{suffixNumber ? (
-							<>
-								<span>{base}</span>
-								<sup
-									className={cn(
-										'ml-[4px] relative top-[1px] align-super text-[0.65em] font-medium leading-none',
-										isConfirming ? 'text-white/80' : 'text-black/70'
-									)}
-								>
-									{suffixNumber}
-								</sup>
-							</>
-						) : (
-							name
-						)}
+					<div className="text-left pr-2">
+						<div
+							className={cn(
+								'inline-flex box-border h-[20px] w-[204px] items-center rounded-[6px] pl-0 pr-[8px] campaign-name-text text-[15px] leading-[20px] font-normal text-black bg-white truncate',
+								isConfirming && 'bg-transparent text-white'
+							)}
+							style={{ fontFamily: '"Times New Roman", Times, serif' }}
+						>
+							{isConfirming ? (
+								<span className="truncate">{name}</span>
+							) : (
+								<CampaignTitlePills title={name} size="table" />
+							)}
+						</div>
 					</div>
 				) : (
 					<Typography variant="muted" className="text-sm">
@@ -359,9 +326,6 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 					: metricSortKey === 'updated'
 						? new Date((row as CampaignWithCounts)?.updatedAt as unknown as string | number | Date)
 								.getTime()
-						: metricSortKey === 'created'
-							? new Date((row as CampaignWithCounts)?.createdAt as unknown as string | number | Date)
-									.getTime()
 					: (row as CampaignWithCounts)?.draftCount) ?? 0,
 			enableSorting: true,
 			// Sort campaigns by Drafts or Sent, depending on which header is active.
@@ -374,18 +338,12 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 						? aRow?.sentCount ?? 0
 						: sortKey === 'updated'
 							? new Date(aRow?.updatedAt as unknown as string | number | Date).getTime() || 0
-							: sortKey === 'created'
-								? new Date(aRow?.createdAt as unknown as string | number | Date).getTime() ||
-									0
 							: aRow?.draftCount ?? 0;
 				const b =
 					sortKey === 'sent'
 						? bRow?.sentCount ?? 0
 						: sortKey === 'updated'
 							? new Date(bRow?.updatedAt as unknown as string | number | Date).getTime() || 0
-							: sortKey === 'created'
-								? new Date(bRow?.createdAt as unknown as string | number | Date).getTime() ||
-									0
 							: bRow?.draftCount ?? 0;
 				return a === b ? 0 : a > b ? 1 : -1;
 			},
@@ -393,8 +351,6 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 				const highlightColor =
 					metricSortKey === 'updated'
 						? '#FFA3A3'
-						: metricSortKey === 'created'
-							? '#BED2FF'
 						: metricSortKey === 'sent'
 							? '#B4E8A8'
 							: '#FFDA8F';
@@ -408,7 +364,7 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 							style={
 								{
 									left: 'var(--drafts-sort-highlight-left, 0px)',
-									width: 'var(--drafts-sort-highlight-width, 94px)',
+									width: 'var(--drafts-sort-highlight-width, 80px)',
 									backgroundColor: highlightColor,
 								} as React.CSSProperties
 							}
@@ -419,7 +375,7 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 							'metrics-header-grid w-full h-full items-center relative z-[1]',
 							compactMetrics
 								? 'flex flex-nowrap gap-[7px] justify-start'
-								: 'flex flex-nowrap justify-start'
+								: 'flex flex-nowrap justify-end'
 						)}
 						style={
 							compactMetrics
@@ -454,7 +410,7 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 						className={cn(
 							'metrics-header-label relative z-[1] cursor-pointer select-none border-0 bg-transparent p-0 m-0',
 							!compactMetrics &&
-								'flex w-[94px] min-w-[94px] max-w-[94px] items-center justify-start pl-2 text-left text-[11px] font-medium',
+									'flex w-[80px] min-w-[80px] max-w-[80px] items-center justify-start pl-2 text-left text-[13px] font-inter font-medium',
 							compactMetrics &&
 								'flex metric-width-short items-center justify-center text-[10px] font-medium tracking-[0.01em] metrics-header-label-compact'
 						)}
@@ -490,7 +446,7 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 						className={cn(
 							'metrics-header-label relative z-[1] cursor-pointer select-none border-0 bg-transparent p-0 m-0',
 							!compactMetrics &&
-								'flex w-[94px] min-w-[94px] max-w-[94px] items-center justify-start pl-2 text-left text-[11px] font-medium',
+									'flex w-[80px] min-w-[80px] max-w-[80px] items-center justify-start pl-2 text-left text-[13px] font-inter font-medium',
 							compactMetrics &&
 								'flex metric-width-short items-center justify-center text-[10px] font-medium tracking-[0.01em] metrics-header-label-compact'
 						)}
@@ -504,7 +460,7 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 						ref={setUpdatedHeaderButtonRef}
 						onClick={(e) => {
 							e.stopPropagation();
-							// Toggle (Updated Last):
+							// Toggle (Updated):
 							// 1) desc (most recent → oldest)
 							// 2) asc (oldest → most recent)
 							// 3) default state (no sorting)
@@ -526,58 +482,14 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 						className={cn(
 							'metrics-header-label relative z-[1] cursor-pointer select-none border-0 bg-transparent p-0 m-0',
 							!compactMetrics &&
-								'flex w-[94px] min-w-[94px] max-w-[94px] items-center justify-center text-center text-[11px] font-medium',
+								'flex w-[80px] min-w-[80px] max-w-[80px] items-center justify-start pl-2 text-left text-[13px] font-inter font-medium',
 							compactMetrics &&
 								'flex metric-width-long items-center justify-center text-center text-[10px] font-medium leading-[1.05] tracking-[0.01em] metrics-header-label-compact'
 						)}
 						data-label="updated"
 						aria-pressed={metricSortKey === 'updated'}
 					>
-						<span className="metrics-two-line-label">
-							<span>Updated</span>
-							<br className="metrics-force-br" />
-							<span>Last</span>
-						</span>
-					</button>
-					<button
-						type="button"
-						ref={setCreatedHeaderButtonRef}
-						onClick={(e) => {
-							e.stopPropagation();
-							// Toggle (Created On):
-							// 1) desc (newest → oldest)
-							// 2) asc (oldest → newest)
-							// 3) default state (no sorting)
-							const next: MetricSortState =
-								metricSortKey !== 'created'
-									? { key: 'created', mode: 'desc' }
-									: metricSortMode === 'desc'
-										? { key: 'created', mode: 'asc' }
-										: null;
-
-							metricSortRef.current = next;
-							setMetricSort(next);
-							if (next === null) {
-								table.setSorting([]);
-							} else {
-								table.setSorting([{ id: column.id, desc: next.mode === 'desc' }]);
-							}
-						}}
-						className={cn(
-							'metrics-header-label relative z-[1] cursor-pointer select-none border-0 bg-transparent p-0 m-0',
-							!compactMetrics &&
-								'flex w-[94px] min-w-[94px] max-w-[94px] items-center justify-center text-center text-[11px] font-medium',
-							compactMetrics &&
-								'flex metric-width-long items-center justify-center text-center text-[10px] font-medium leading-[1.05] tracking-[0.01em] metrics-header-label-compact'
-						)}
-						data-label="created"
-						aria-pressed={metricSortKey === 'created'}
-					>
-						<span className="metrics-two-line-label">
-							<span>Created</span>
-							<br className="metrics-force-br" />
-							<span>On</span>
-						</span>
+						Updated
 					</button>
 					</div>
 				</>
@@ -601,7 +513,7 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 									? undefined
 									: {
 											gridTemplateColumns:
-												'minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1.25fr)',
+												'minmax(0,1fr) minmax(0,1fr) minmax(0,1fr)',
 									  }
 							}
 						>
@@ -622,13 +534,13 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 									Click to confirm <span className="ml-2">{countdown}</span>
 								</div>
 							</div>
-							{[0, 1, 2].map((index) => (
+							{[0, 1].map((index) => (
 								<div
 									key={index}
 									className={cn(
 										'flex items-center',
 										compactMetrics
-											? 'h-[20px] w-[94px] flex-none justify-center'
+											? 'h-[20px] w-[80px] flex-none justify-center'
 											: 'w-full'
 									)}
 								/>
@@ -639,7 +551,6 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 
 				const draftCount = campaign.draftCount ?? 0;
 				const sentCount = campaign.sentCount ?? 0;
-				const createdAt = new Date(campaign.createdAt);
 				const updatedAt = new Date(campaign.updatedAt);
 
 				const draftLabel =
@@ -656,7 +567,7 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 				const draftFill = getDraftFillColor(draftCount);
 				const sentFill = getSentFillColor(sentCount);
 				const updatedFill = getUpdatedFillColor(updatedAt);
-				const createdFill = getCreatedFillColor(createdAt);
+				const updatedLabel = getUpdatedLabel(updatedAt);
 
 				return (
 					<div
@@ -664,7 +575,7 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 							'metrics-grid-container w-full items-center text-left',
 							compactMetrics
 								? 'flex flex-nowrap gap-[7px] justify-start'
-								: 'flex flex-nowrap justify-start'
+								: 'flex flex-nowrap justify-end'
 						)}
 						style={
 							compactMetrics
@@ -684,14 +595,9 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 								dataAttr: { 'data-sent-fill': sentFill } as Record<string, string>,
 							},
 							{
-								label: mmdd(updatedAt),
+								label: updatedLabel,
 								fill: updatedFill,
 								dataAttr: { 'data-updated-fill': updatedFill } as Record<string, string>,
-							},
-							{
-								label: mmdd(createdAt),
-								fill: createdFill,
-								dataAttr: { 'data-created-fill': createdFill } as Record<string, string>,
 							},
 						].map(({ label, fill, dataAttr }, index) => (
 							<div
@@ -700,13 +606,13 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 									'campaign-metric-slot relative flex items-center',
 									compactMetrics
 										? 'w-auto flex-shrink-0 justify-start'
-										: 'h-[20px] w-[94px] flex-none justify-center'
+										: 'h-[20px] w-[80px] flex-none justify-center'
 								)}
 							>
 								<div
 									{...dataAttr}
 									className={cn(
-										'metric-box inline-flex items-center justify-center border border-[#8C8C8C] leading-none truncate h-[20px] w-[92px] min-w-[92px] max-w-[92px] rounded-[6px] px-0 flex-none'
+										'metric-box inline-flex box-border items-center justify-center border border-black leading-none truncate h-[20px] w-[80px] min-w-[80px] max-w-[80px] rounded-[6.5px] px-0 flex-none'
 									)}
 									style={
 										{
@@ -714,9 +620,7 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 											color: isConfirming ? 'white' : 'inherit',
 											borderColor: isConfirming
 												? '#A20000'
-												: compactMetrics
-												? '#000000'
-												: '#8C8C8C',
+												: '#000000',
 											...(compactMetrics
 												? ({ fontSize: '12px' } as React.CSSProperties)
 												: {}),
@@ -737,9 +641,9 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 			cell: ({ row }) => {
 				const isConfirming = row.original.id === confirmingCampaignId;
 				return (
-					<div className="flex justify-end">
-						<button
-							className="campaign-delete-btn w-[20px] h-[20px] flex items-center justify-center hover:opacity-70 transition-opacity"
+				<div className={cn("flex justify-end transition-opacity duration-75", !isConfirming && "opacity-0 group-hover:opacity-100")}>
+					<button
+						className="campaign-delete-btn w-[20px] h-[20px] flex items-center justify-center hover:opacity-70 transition-opacity"
 							style={{
 								background: 'transparent',
 								border: 'none',
@@ -774,8 +678,7 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 							}}
 							aria-label="Delete campaign"
 						>
-							<X
-								className="w-[20px] h-[20px]"
+							<DeleteXIcon
 								style={{ color: isConfirming ? 'white' : '#000000' }}
 							/>
 						</button>

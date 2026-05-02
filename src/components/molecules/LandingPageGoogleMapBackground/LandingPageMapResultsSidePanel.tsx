@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState, type CSSProperties } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 import { MapResultsPanelSkeleton } from '@/components/molecules/MapResultsPanelSkeleton/MapResultsPanelSkeleton';
 import { getStateAbbreviation } from '@/utils/string';
@@ -71,6 +71,76 @@ export function LandingPageMapResultsSidePanel({
 	// Once the user hits "Select all", keep counting down from the marketing total instead of
 	// snapping back to the small demo list count.
 	const [isSelectAllCountMode, setIsSelectAllCountMode] = useState(false);
+
+	// ── Row cascade animation ────────────────────────────────────────────────
+	const panelRowsRef = useRef<HTMLDivElement>(null);
+	const prevIsLoadingRef = useRef(isLoading);
+	const cascadeTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+	// Match the map panel skeleton wave animation so the cascade feels like it
+	// "resolves" the wave into real results.
+	const WAVE_BASE_BG = '#C5F0FF';
+	const WAVE_DURATION_SECONDS = 2.5;
+	const WAVE_ROW_STEP_DELAY_SECONDS = 0.1;
+	const CASCADE_INITIAL_DELAY_MS = 120;
+	const CASCADE_STAGGER_MS = 100;
+	const CASCADE_MAX_ROWS = 14;
+
+	useLayoutEffect(() => {
+		const wasLoading = prevIsLoadingRef.current;
+		prevIsLoadingRef.current = isLoading;
+		if (!wasLoading || isLoading) return;
+
+		for (const t of cascadeTimersRef.current) clearTimeout(t);
+		cascadeTimersRef.current = [];
+
+		const container = panelRowsRef.current;
+		if (!container) return;
+		const rows = Array.from(container.children).slice(0, CASCADE_MAX_ROWS) as HTMLElement[];
+		if (rows.length === 0) return;
+
+		rows.forEach((row, idx) => {
+			// Preserve the real background (set by React) so we can restore it.
+			row.dataset.cascadeBg = row.style.backgroundColor;
+			// Keep the normal outline; remove any stale inline override.
+			row.style.borderColor = '';
+
+			// Continue the wave background animation used by the skeleton rows.
+			row.style.backgroundColor = WAVE_BASE_BG;
+			row.style.animation = `mapResultsPanelLoadingWave ${WAVE_DURATION_SECONDS}s ease-in-out infinite`;
+			row.style.animationDelay = `${-(WAVE_DURATION_SECONDS - idx * WAVE_ROW_STEP_DELAY_SECONDS)}s`;
+			row.style.willChange = 'background-color';
+
+			for (const child of Array.from(row.children) as HTMLElement[]) {
+				child.style.visibility = '';
+				child.style.transition = 'opacity 200ms ease-out';
+				child.style.opacity = '0';
+			}
+		});
+
+		rows.forEach((row, idx) => {
+			const timer = setTimeout(() => {
+				const targetBg =
+					row.dataset.cascadeBg && row.dataset.cascadeBg.length > 0 ? row.dataset.cascadeBg : '#FFFFFF';
+				delete row.dataset.cascadeBg;
+
+				const waveBg = getComputedStyle(row).backgroundColor;
+				row.style.animation = '';
+				row.style.animationDelay = '';
+				row.style.willChange = '';
+				row.style.backgroundColor = waveBg;
+
+				// Let the browser register the frozen wave bg, then transition to final.
+				requestAnimationFrame(() => {
+					row.style.backgroundColor = targetBg;
+					for (const child of Array.from(row.children) as HTMLElement[]) {
+						child.style.opacity = '1';
+					}
+				});
+			}, CASCADE_INITIAL_DELAY_MS + idx * CASCADE_STAGGER_MS);
+			cascadeTimersRef.current.push(timer);
+		});
+	}, [isLoading]);
 
 	// If the caller provides initial selections later (after mount), sync once.
 	useEffect(() => {
@@ -184,7 +254,8 @@ export function LandingPageMapResultsSidePanel({
 				{isLoading ? (
 					<MapResultsPanelSkeleton variant="desktop" rows={Math.max(contacts.length, 14)} />
 				) : (
-					contacts.map((contact) => {
+					<div ref={panelRowsRef} className="space-y-[7px]">
+					{contacts.map((contact) => {
 						const isSelected = selectedContacts.includes(contact.id);
 						const isHovered = hoveredMapPanelContactId === contact.id;
 						const isUsed = Boolean(contact.isUsed);
@@ -534,7 +605,8 @@ export function LandingPageMapResultsSidePanel({
 								)}
 							</div>
 						);
-					})
+					})}
+					</div>
 				)}
 			</CustomScrollbar>
 		</div>

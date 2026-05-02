@@ -1,6 +1,6 @@
 import FormData from 'form-data';
 import Mailgun from 'mailgun.js';
-import { formatHTMLForEmailClients, replacePTagsInSignature } from '@/utils';
+import { convertHtmlToPlainText, formatHTMLForEmailClients } from '@/utils';
 import { apiBadRequest, apiResponse, handleApiError } from '@/app/api/_utils';
 import { z } from 'zod';
 
@@ -37,7 +37,8 @@ export async function POST(request: Request) {
 			key: process.env.MAILGUN_API_KEY || '',
 		});
 
-		const messageNoMargin = formatHTMLForEmailClients(message);
+		const formattedHtml = formatHTMLForEmailClients(message);
+		const formattedText = convertHtmlToPlainText(formattedHtml);
 
 		const originEmail = specifiedOriginEmail ?? 'postmaster@murmurmailbox.com';
 
@@ -51,8 +52,8 @@ export async function POST(request: Request) {
 			from: `"${senderName}" <${originEmail}>`,
 			to: [recipientEmail],
 			subject: subject,
-			html: replacePTagsInSignature(messageNoMargin),
-			text: message,
+			html: formattedHtml,
+			text: formattedText,
 		});
 
 		return apiResponse({ success: true, data: mailgunData });

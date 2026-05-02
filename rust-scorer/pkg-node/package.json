@@ -1,0 +1,11 @@
+{
+  "name": "rust-scorer",
+  "version": "0.1.0",
+  "files": [
+    "rust_scorer_bg.wasm",
+    "rust_scorer.js",
+    "rust_scorer.d.ts"
+  ],
+  "main": "rust_scorer.js",
+  "types": "rust_scorer.d.ts"
+}
