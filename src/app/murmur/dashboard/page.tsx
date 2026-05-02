@@ -3947,7 +3947,10 @@ const DashboardContent = () => {
 																			? 'search-wave-loading'
 																			: ''
 																	}`}
-																	style={{ transition: 'none' }}
+																	style={{
+																		transition: 'none',
+																		opacity: inboxView ? undefined : 0.8,
+																	}}
 																>
 																<Input
 																		className={`search-wave-input !focus-visible:ring-0 !focus-visible:ring-offset-0 !focus:ring-0 !focus:ring-offset-0 !ring-0 !outline-none !accent-transparent ${
@@ -4261,6 +4264,27 @@ const DashboardContent = () => {
 																			)}
 																		</div>
 																	</div>
+																	{!inboxView && (
+																		<button
+																			type="submit"
+																			aria-label="Search"
+																			className="absolute left-[4px] right-[68px] max-[480px]:right-[56px] top-1/2 -translate-y-1/2 h-[64px] max-[480px]:h-[52px] rounded-[8px] z-30 flex items-center justify-center cursor-pointer"
+																			style={{
+																				background:
+																					'linear-gradient(90deg, #DA29B4 1.69%, #EA1F1F 34.7%, #E122F2 65.83%, #F00404 98.97%)',
+																				border: '1px solid #000000',
+																				color: '#FFFFFF',
+																				fontFamily:
+																					'var(--font-secondary), Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
+																				fontSize: '25px',
+																				fontWeight: 600,
+																				lineHeight: 1,
+																			}}
+																			onClick={() => setActiveSection(null)}
+																		>
+																			Search
+																		</button>
+																	)}
 																	{/* Desktop Search Button */}
 																	<button
 																		type="submit"
