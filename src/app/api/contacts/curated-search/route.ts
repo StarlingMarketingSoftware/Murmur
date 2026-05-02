@@ -25,7 +25,12 @@ import {
 
 export const maxDuration = 60;
 
-const DEFAULT_RESULT_COUNT = 50;
+// When the caller doesn't pin an explicit `limit`, the curated panel returns a
+// random size in [DEFAULT_RESULT_COUNT_MIN, DEFAULT_RESULT_COUNT_MAX] each call
+// — so consecutive clicks vary in length too, not just in content. Explicit
+// `limit` overrides this (capped at MAX_RESULT_COUNT).
+const DEFAULT_RESULT_COUNT_MIN = 30;
+const DEFAULT_RESULT_COUNT_MAX = 50;
 const MAX_RESULT_COUNT = 100;
 const DEFAULT_RADIUS_KM = 250;
 // Bbox buffer factor — fetch slightly wider than the requested radius so we
@@ -321,8 +326,12 @@ export async function GET(req: NextRequest) {
 			url.searchParams.get('category')
 		);
 		const requestedLimit = (() => {
-			const parsed = Number(url.searchParams.get('limit'));
-			if (!Number.isFinite(parsed)) return DEFAULT_RESULT_COUNT;
+			const rawParam = url.searchParams.get('limit');
+			const parsed = Number(rawParam);
+			if (rawParam === null || !Number.isFinite(parsed)) {
+				const span = DEFAULT_RESULT_COUNT_MAX - DEFAULT_RESULT_COUNT_MIN + 1;
+				return DEFAULT_RESULT_COUNT_MIN + Math.floor(Math.random() * span);
+			}
 			return Math.max(1, Math.min(Math.trunc(parsed), MAX_RESULT_COUNT));
 		})();
 

@@ -312,7 +312,8 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 					lon: overrides?.lon ?? undefined,
 					radiusKm: overrides?.radiusKm ?? undefined,
 					category: overrides?.category ?? undefined,
-					limit: 50,
+					// Omit `limit` so the route returns a varying size in [30, 50]
+					// per click — keeps the panel feeling fresh between clicks.
 				});
 				setCuratedContacts(result.contacts);
 				const where = result.city ?? result.region ?? 'your area';
