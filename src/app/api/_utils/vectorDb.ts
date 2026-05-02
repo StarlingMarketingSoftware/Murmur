@@ -3,10 +3,25 @@ import { OpenAI } from 'openai';
 import { Client, estypes } from '@elastic/elasticsearch';
 import prisma from '@/lib/prisma';
 
+declare const __non_webpack_require__: NodeRequire | undefined;
+
 type MappingProperty = estypes.MappingProperty;
 
 const VECTOR_DIMENSION = 1536;
 const INDEX_NAME = 'contacts';
+const QUERY_EMBEDDING_CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
+const QUERY_EMBEDDING_MAX_SIZE = 1000;
+
+type QueryEmbeddingCacheEntry = {
+	embedding: number[];
+	timestamp: number;
+};
+
+const queryEmbeddingCache = new Map<string, QueryEmbeddingCacheEntry>();
+const queryEmbeddingCacheStats = {
+	hits: 0,
+	misses: 0,
+};
 
 const openai = new OpenAI({
 	apiKey: process.env.OPEN_AI_API_KEY!,
@@ -322,24 +337,181 @@ export type QueryJson = {
 	country: string | null;
 	restOfQuery: string;
 };
+
+export type SearchSimilarContactsOptions = {
+	penaltyCities?: string[];
+	forceCityExactCity?: string;
+	forceStateAny?: string[];
+	forceCityAny?: string[];
+	penaltyTerms?: string[];
+	strictPenalty?: boolean;
+};
+
+type WasmScoringHitInput = {
+	id: string;
+	score: number;
+	city: string | null;
+	state: string | null;
+	country: string | null;
+	headline: string | null;
+	title: string | null;
+	company: string | null;
+};
+
+type WasmScoringConfig = {
+	query_city: string | null;
+	query_state: string | null;
+	query_country: string | null;
+	exact_boost: number;
+	fuzzy_boost: number;
+	skip_boosts: boolean;
+	penalty_cities: string[];
+	penalty_terms: string[];
+	strict_penalty: boolean;
+	limit: number;
+};
+
+type WasmScoringOutput = {
+	id: string;
+	score: number;
+};
+
+type WasmScoreHitsFunction = (
+	hits: WasmScoringHitInput[],
+	config: WasmScoringConfig
+) => WasmScoringOutput[];
+
+let cachedNodeWasmScoreHits: WasmScoreHitsFunction | null | undefined;
+
+const getWasmScoreHitsFunction = async (): Promise<WasmScoreHitsFunction | null> => {
+	if (process.env.USE_WASM_SCORER !== 'true') return null;
+	if (cachedNodeWasmScoreHits !== undefined) return cachedNodeWasmScoreHits;
+
+	try {
+		// Use __non_webpack_require__ so webpack does not attempt to bundle or
+		// statically analyse the dynamic require call. In Next.js server bundles
+		// this global is always available. The eval('require') fallback covers
+		// plain Node.js execution outside of webpack.
+		// eslint-disable-next-line @typescript-eslint/no-require-imports
+		const dynamicRequire: NodeRequire =
+			// eslint-disable-next-line no-underscore-dangle
+			(typeof __non_webpack_require__ !== 'undefined'
+				? __non_webpack_require__
+				: eval('require')) as NodeRequire;
+
+		const loaded = dynamicRequire(
+			`${process.cwd()}/rust-scorer/pkg-node`
+		) as Partial<{ score_hits: unknown }> & { default?: Partial<{ score_hits: unknown }> };
+		const maybeModule = (loaded.default ?? loaded) as Partial<{ score_hits: unknown }>;
+
+		if (typeof maybeModule.score_hits !== 'function') {
+			console.error('[vectorDb] score_hits export missing from rust-scorer pkg-node');
+			cachedNodeWasmScoreHits = null;
+			return cachedNodeWasmScoreHits;
+		}
+
+		cachedNodeWasmScoreHits = maybeModule.score_hits as WasmScoreHitsFunction;
+		return cachedNodeWasmScoreHits;
+	} catch (error: unknown) {
+		console.error('[vectorDb] failed to load WASM scorer, using TypeScript fallback', error);
+		cachedNodeWasmScoreHits = null;
+		return cachedNodeWasmScoreHits;
+	}
+};
+
+export const normalizeQueryEmbeddingKey = (input: string): string => {
+	return input.toLowerCase().trim().replace(/\s+/g, ' ');
+};
+
+export const getCachedQueryEmbedding = (key: string): number[] | null => {
+	if (!key) return null;
+
+	const cached = queryEmbeddingCache.get(key);
+	if (!cached) {
+		queryEmbeddingCacheStats.misses += 1;
+		return null;
+	}
+
+	if (Date.now() - cached.timestamp > QUERY_EMBEDDING_CACHE_TTL_MS) {
+		queryEmbeddingCache.delete(key);
+		queryEmbeddingCacheStats.misses += 1;
+		return null;
+	}
+
+	// Maintain simple LRU behavior by moving accessed entries to the end.
+	queryEmbeddingCache.delete(key);
+	queryEmbeddingCache.set(key, cached);
+	queryEmbeddingCacheStats.hits += 1;
+
+	return [...cached.embedding];
+};
+
+export const setCachedQueryEmbedding = (key: string, embedding: number[]): void => {
+	if (!key || embedding.length === 0) return;
+
+	if (queryEmbeddingCache.has(key)) {
+		queryEmbeddingCache.delete(key);
+	}
+
+	queryEmbeddingCache.set(key, {
+		embedding: [...embedding],
+		timestamp: Date.now(),
+	});
+
+	while (queryEmbeddingCache.size > QUERY_EMBEDDING_MAX_SIZE) {
+		const oldestKey = queryEmbeddingCache.keys().next().value;
+		if (!oldestKey) break;
+		queryEmbeddingCache.delete(oldestKey);
+	}
+};
+
+export const getQueryEmbeddingCacheStats = () => {
+	const totalLookups = queryEmbeddingCacheStats.hits + queryEmbeddingCacheStats.misses;
+	return {
+		size: queryEmbeddingCache.size,
+		hits: queryEmbeddingCacheStats.hits,
+		misses: queryEmbeddingCacheStats.misses,
+		hitRate: totalLookups === 0 ? 0 : queryEmbeddingCacheStats.hits / totalLookups,
+		ttlMs: QUERY_EMBEDDING_CACHE_TTL_MS,
+		maxSize: QUERY_EMBEDDING_MAX_SIZE,
+	};
+};
+
 export const searchSimilarContacts = async (
 	queryJson: QueryJson,
 	limit: number = 10,
 	locationStrategy: 'strict' | 'flexible' | 'broad' = 'flexible',
-	options?: {
-		penaltyCities?: string[];
-		forceCityExactCity?: string;
-		forceStateAny?: string[];
-		forceCityAny?: string[];
-		penaltyTerms?: string[];
-		strictPenalty?: boolean;
-	}
+	options?: SearchSimilarContactsOptions
 ) => {
-	const response = await openai.embeddings.create({
-		input: queryJson.restOfQuery,
-		model: 'text-embedding-3-small',
-	});
-	const queryEmbedding = response.data[0].embedding;
+	const normalizedQueryEmbeddingKey = normalizeQueryEmbeddingKey(queryJson.restOfQuery);
+	const shouldUseQueryEmbeddingCache = normalizedQueryEmbeddingKey.length > 0;
+	let queryEmbedding: number[];
+
+	if (shouldUseQueryEmbeddingCache) {
+		const cachedEmbedding = getCachedQueryEmbedding(normalizedQueryEmbeddingKey);
+		if (cachedEmbedding) {
+			console.log('[vectorDb] query embedding cache hit');
+			queryEmbedding = cachedEmbedding;
+		} else {
+			console.log('[vectorDb] query embedding cache miss');
+			const embeddingStartMs = Date.now();
+			const response = await openai.embeddings.create({
+				input: queryJson.restOfQuery,
+				model: 'text-embedding-3-small',
+			});
+			queryEmbedding = response.data[0].embedding;
+			setCachedQueryEmbedding(normalizedQueryEmbeddingKey, queryEmbedding);
+			console.log(
+				`[vectorDb] query embedding generated in ${Date.now() - embeddingStartMs}ms`
+			);
+		}
+	} else {
+		const response = await openai.embeddings.create({
+			input: queryJson.restOfQuery,
+			model: 'text-embedding-3-small',
+		});
+		queryEmbedding = response.data[0].embedding;
+	}
 
 	// Configure location boost strategy for post-processing
 	const locationBoosts = {
@@ -433,7 +605,7 @@ export const searchSimilarContacts = async (
 	});
 
 	// Post-process results with optional location boosts and institutional penalties
-	const processResultsWithLocationBoost = (
+	const processResultsWithLocationBoostTs = (
 		hits: estypes.SearchHit[]
 	): estypes.SearchHit[] => {
 		const skipBoosts = locationStrategy === 'strict' || boosts.exact === 0;
@@ -514,7 +686,72 @@ export const searchSimilarContacts = async (
 			.slice(0, limit); // Apply final limit
 	};
 
-	const processedHits = processResultsWithLocationBoost(results.hits.hits);
+	const getFieldValueAsString = (
+		hit: estypes.SearchHit,
+		fieldName: string
+	): string | null => {
+		const fields = hit.fields as Record<string, Array<unknown> | undefined> | undefined;
+		const value = fields?.[fieldName]?.[0];
+		return value === undefined || value === null ? null : String(value);
+	};
+
+	const processResultsWithLocationBoost = async (
+		hits: estypes.SearchHit[]
+	): Promise<estypes.SearchHit[]> => {
+		const scoreHits = await getWasmScoreHitsFunction();
+		if (!scoreHits) {
+			return processResultsWithLocationBoostTs(hits);
+		}
+
+		const serializedHits: WasmScoringHitInput[] = hits.map((hit, index) => ({
+			id: String(hit._id ?? `missing-id-${index}`),
+			score: hit._score || 0,
+			city: getFieldValueAsString(hit, 'city'),
+			state: getFieldValueAsString(hit, 'state'),
+			country: getFieldValueAsString(hit, 'country'),
+			headline: getFieldValueAsString(hit, 'headline'),
+			title: getFieldValueAsString(hit, 'title'),
+			company: getFieldValueAsString(hit, 'company'),
+		}));
+
+		const hitById = new Map<string, estypes.SearchHit>();
+		serializedHits.forEach((serializedHit, index) => {
+			hitById.set(serializedHit.id, hits[index]);
+		});
+
+		try {
+			const wasmScoredHits = scoreHits(serializedHits, {
+				query_city: queryJson.city,
+				query_state: queryJson.state,
+				query_country: queryJson.country,
+				exact_boost: boosts.exact,
+				fuzzy_boost: boosts.fuzzy,
+				skip_boosts: locationStrategy === 'strict' || boosts.exact === 0,
+				penalty_cities: options?.penaltyCities || [],
+				penalty_terms: options?.penaltyTerms || [],
+				strict_penalty: Boolean(options?.strictPenalty),
+				limit,
+			});
+
+			const reconstructedHits: estypes.SearchHit[] = [];
+			for (const scoredHit of wasmScoredHits) {
+				const originalHit = hitById.get(scoredHit.id);
+				if (!originalHit) continue;
+
+				reconstructedHits.push({
+					...originalHit,
+					_score: scoredHit.score,
+				});
+			}
+
+			return reconstructedHits;
+		} catch (error) {
+			console.error('[vectorDb] WASM scoring failed, using TypeScript fallback', error);
+			return processResultsWithLocationBoostTs(hits);
+		}
+	};
+
+	const processedHits = await processResultsWithLocationBoost(results.hits.hits);
 
 	return {
 		matches: processedHits.map((hit) => ({

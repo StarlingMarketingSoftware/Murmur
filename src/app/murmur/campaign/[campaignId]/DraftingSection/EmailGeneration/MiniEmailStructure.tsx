@@ -2965,7 +2965,10 @@ export const MiniEmailStructure: FC<MiniEmailStructureProps> = ({
 														generationProgress,
 														generationTotal || 0
 												  )}/${generationTotal}`
-												: `Drafting ${generationProgress}/${generationTotal}`}
+												: `Drafting ${Math.min(
+														generationProgress + 1,
+														generationTotal || 0
+												  )}/${generationTotal}`}
 										</div>
 										<div className="flex-1 h-[7px] bg-[rgba(93,171,104,0.49)] border-0 relative">
 											<div

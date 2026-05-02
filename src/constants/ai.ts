@@ -987,10 +987,10 @@ export const GEMINI_MODEL_OPTIONS = {
 // OpenRouter model rotation for Full AI drafting (round-robin order)
 export const OPENROUTER_DRAFTING_MODELS = [
 	'google/gemini-3-flash-preview',
-	'deepseek/deepseek-v3.2',
 	'x-ai/grok-4.1-fast',
-	'anthropic/claude-sonnet-4.5',
+	'deepseek/deepseek-v3.2',
 	'meta-llama/llama-4-maverick',
+	'anthropic/claude-sonnet-4.5',
 	'openai/gpt-5.2',
 ] as const;
 

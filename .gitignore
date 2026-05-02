@@ -23,6 +23,8 @@
 # misc
 .DS_Store
 *.pem
+__pycache__/
+*.pyc
 
 # debug
 npm-debug.log*
@@ -46,3 +48,6 @@ next-env.d.ts
 # seeding data
 public/contactLists/*
 public/exports/*
+
+# rust wasm build artifacts
+/rust-scorer/target/

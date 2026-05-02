@@ -147,6 +147,50 @@ type BatchGenerationResult = {
 	retries: number;
 };
 
+type DraftStreamDraftEvent = {
+	operationId: string;
+	contactId: number;
+	draftIndex: number;
+	model: string;
+	subject: string;
+	message: string;
+};
+
+type DraftStreamPartialEvent = {
+	operationId: string;
+	contactId: number;
+	draftIndex: number;
+	model: string;
+	message: string;
+	subject?: string;
+};
+
+type DraftStreamErrorEvent = {
+	operationId: string;
+	contactId: number;
+	draftIndex: number;
+	model: string;
+	code: string;
+	message: string;
+	retryCount: number;
+};
+
+type DraftStreamProgressEvent = {
+	operationId: string;
+	completed: number;
+	total: number;
+	succeeded: number;
+	failed: number;
+};
+
+type DraftStreamDoneEvent = {
+	operationId: string;
+	total: number;
+	succeeded: number;
+	failed: number;
+	durationMs: number;
+};
+
 type DraftingOperationStatus = 'queued' | 'running';
 
 type DraftingIdentitySnapshot = {
@@ -319,6 +363,10 @@ const getDraftingModeForValues = (values: DraftingFormValues): DraftingMode => {
 	return DraftingMode.hybrid;
 };
 
+const ENABLE_SERVER_DRAFT_STREAMING =
+	process.env.NEXT_PUBLIC_ENABLE_SERVER_DRAFT_STREAMING === 'true' ||
+	process.env.NEXT_PUBLIC_ENABLE_SERVER_DRAFT_STREAMING === '1';
+
 export const useDraftingSection = (props: DraftingSectionProps) => {
 	const { campaign } = props;
 
@@ -330,6 +378,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	const [isOpenUpgradeSubscriptionDrawer, setIsOpenUpgradeSubscriptionDrawer] =
 		useState(false);
 	const [generationProgress, setGenerationProgress] = useState(-1);
+	const [generationTotal, setGenerationTotal] = useState(0);
 	const [isTest, setIsTest] = useState<boolean>(false);
 	// Drafting queue: allow multiple drafting operations to be queued while one runs.
 	const [draftOperations, setDraftOperations] = useState<DraftingOperation[]>([]);
@@ -347,6 +396,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	const isProcessingDraftQueueRef = useRef(false);
 	const isDraftQueuePausedForCreditsRef = useRef(false);
 	const activeDraftOperationIdRef = useRef<string | null>(null);
+	const processedStreamDraftKeysRef = useRef<Set<string>>(new Set());
 	// Used to keep live-preview ordering stable across queued operations.
 	const globalDraftIndexBaseRef = useRef(0);
 	const [promptQualityScore, setPromptQualityScore] = useState<number | null>(null);
@@ -375,6 +425,9 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	// Live preview progress (drives the top-of-page progress bar; stays in sync with Draft Preview playback)
 	const [livePreviewDraftNumber, setLivePreviewDraftNumber] = useState(0);
 	const [livePreviewTotal, setLivePreviewTotal] = useState(0);
+	const livePreviewDraftNumberRef = useRef(0);
+	const livePreviewTotalRef = useRef(0);
+	const livePreviewIsShowingFinalPlaceholderRef = useRef(false);
 	const livePreviewTimerRef = useRef<number | null>(null);
 	const livePreviewDelayTimerRef = useRef<number | null>(null);
 	// Store full text and an index to preserve original whitespace and paragraph breaks
@@ -390,6 +443,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	>([]);
 	const livePreviewIsTypingRef = useRef<boolean>(false);
 	const livePreviewAutoHideWhenIdleRef = useRef<boolean>(false);
+	const livePreviewHasStartedRef = useRef<boolean>(false);
 	// Invalidate scheduled typing ticks between drafts / on cancel.
 	const livePreviewRunIdRef = useRef(0);
 	// Bursty "human-ish" cadence state.
@@ -406,6 +460,7 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 	const LIVE_PREVIEW_BASE_CPS = 55;
 	const LIVE_PREVIEW_MIN_DELAY_MS = 8;
 	const LIVE_PREVIEW_MAX_DELAY_MS = 280;
+	const LIVE_PREVIEW_QUEUED_TRANSITION_DELAY_MS = 0;
 	const LIVE_PREVIEW_POST_DRAFT_DELAY_MS = 200;
 
 	const stopLivePreviewTimers = useCallback(() => {
@@ -430,10 +485,14 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		setLivePreviewSubject('');
 		setLivePreviewDraftNumber(0);
 		setLivePreviewTotal(0);
+		livePreviewDraftNumberRef.current = 0;
+		livePreviewTotalRef.current = 0;
+		livePreviewIsShowingFinalPlaceholderRef.current = false;
 		livePreviewFullTextRef.current = '';
 		livePreviewIndexRef.current = 0;
 		livePreviewQueueRef.current = [];
 		livePreviewAutoHideWhenIdleRef.current = false;
+		livePreviewHasStartedRef.current = false;
 	}, [stopLivePreviewTimers]);
 
 	const startNextQueuedLivePreview = useCallback(() => {
@@ -451,6 +510,18 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 					livePreviewDelayTimerRef.current = null;
 					hideLivePreview();
 				}, LIVE_PREVIEW_POST_DRAFT_DELAY_MS);
+			} else {
+				// UX: if we're waiting on the *final* draft to arrive, don't leave the UI
+				// looking "stuck" on the previous email. Show an explicit "final email" drafting state.
+				const total = livePreviewTotalRef.current;
+				const typed = livePreviewDraftNumberRef.current;
+				const isWaitingForFinal = total > 0 && typed === total - 1;
+				if (isWaitingForFinal && !livePreviewIsShowingFinalPlaceholderRef.current) {
+					livePreviewIsShowingFinalPlaceholderRef.current = true;
+					setIsLivePreviewVisible(true);
+					setLivePreviewSubject('Drafting final email...');
+					setLivePreviewMessage('Drafting final email...');
+				}
 			}
 			return;
 		}
@@ -466,7 +537,12 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			livePreviewTimerRef.current = null;
 		}
 
-		setLivePreviewDraftNumber((prev) => prev + 1);
+		livePreviewIsShowingFinalPlaceholderRef.current = false;
+		setLivePreviewDraftNumber((prev) => {
+			const nextNumber = prev + 1;
+			livePreviewDraftNumberRef.current = nextNumber;
+			return nextNumber;
+		});
 		setIsLivePreviewVisible(true);
 		setLivePreviewContactId(next.contactId);
 		setLivePreviewSubject(next.subject);
@@ -474,6 +550,8 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		livePreviewFullTextRef.current = next.message || '';
 		livePreviewIndexRef.current = 0;
 		livePreviewIsTypingRef.current = true;
+		const addLeadIn = !livePreviewHasStartedRef.current;
+		livePreviewHasStartedRef.current = true;
 		const runId = (livePreviewRunIdRef.current += 1);
 		// Reset cadence for a fresh draft.
 		livePreviewCadenceRef.current.segmentCharsRemaining = 0;
@@ -492,10 +570,14 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 				stopLivePreviewTimers();
 				// Ensure we render the full message before moving on / hiding.
 				setLivePreviewMessage(full);
+				const transitionDelayMs =
+					livePreviewQueueRef.current.length > 0
+						? LIVE_PREVIEW_QUEUED_TRANSITION_DELAY_MS
+						: LIVE_PREVIEW_POST_DRAFT_DELAY_MS;
 				livePreviewDelayTimerRef.current = window.setTimeout(() => {
 					livePreviewDelayTimerRef.current = null;
 					startNextQueuedLivePreview();
-				}, LIVE_PREVIEW_POST_DRAFT_DELAY_MS);
+				}, transitionDelayMs);
 				return;
 			}
 
@@ -606,11 +688,13 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 		};
 
 		// Small lead-in so the panel paints before typing starts.
-		livePreviewTimerRef.current = window.setTimeout(tick, Math.round(randBetween(20, 60)));
+		const leadInMs = addLeadIn ? Math.round(randBetween(20, 60)) : 0;
+		livePreviewTimerRef.current = window.setTimeout(tick, leadInMs);
 	}, [
 		LIVE_PREVIEW_BASE_CPS,
 		LIVE_PREVIEW_MAX_DELAY_MS,
 		LIVE_PREVIEW_MIN_DELAY_MS,
+		LIVE_PREVIEW_QUEUED_TRANSITION_DELAY_MS,
 		LIVE_PREVIEW_POST_DRAFT_DELAY_MS,
 		hideLivePreview,
 		stopLivePreviewTimers,
@@ -618,17 +702,22 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 
 	const beginLivePreviewBatch = useCallback((total?: number) => {
 		// Reset any previous playback and show the preview surface immediately.
+		const nextTotal = typeof total === 'number' && total > 0 ? total : 0;
 		stopLivePreviewTimers();
 		livePreviewQueueRef.current = [];
 		livePreviewAutoHideWhenIdleRef.current = false;
+		livePreviewIsShowingFinalPlaceholderRef.current = false;
 		setIsLivePreviewVisible(true);
 		setLivePreviewContactId(null);
 		setLivePreviewSubject('');
 		setLivePreviewMessage('Drafting...');
 		setLivePreviewDraftNumber(0);
-		setLivePreviewTotal(typeof total === 'number' && total > 0 ? total : 0);
+		setLivePreviewTotal(nextTotal);
+		livePreviewDraftNumberRef.current = 0;
+		livePreviewTotalRef.current = nextTotal;
 		livePreviewFullTextRef.current = '';
 		livePreviewIndexRef.current = 0;
+		livePreviewHasStartedRef.current = false;
 	}, [stopLivePreviewTimers]);
 
 	const enqueueLivePreviewDraft = useCallback(
@@ -642,6 +731,11 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 			});
 			// Ensure the panel stays visible even if user navigated across tabs mid-generation.
 			setIsLivePreviewVisible(true);
+			// If we were waiting to hide/transition, cancel that delay and continue immediately.
+			if (livePreviewDelayTimerRef.current) {
+				clearTimeout(livePreviewDelayTimerRef.current);
+				livePreviewDelayTimerRef.current = null;
+			}
 			startNextQueuedLivePreview();
 		},
 		[startNextQueuedLivePreview]
@@ -671,7 +765,12 @@ export const useDraftingSection = (props: DraftingSectionProps) => {
 
 			// Prevent auto-hide when new work gets queued mid-typing.
 			livePreviewAutoHideWhenIdleRef.current = false;
-			setLivePreviewTotal((prev) => (prev > 0 ? prev + additionalTotal : additionalTotal));
+			livePreviewIsShowingFinalPlaceholderRef.current = false;
+			setLivePreviewTotal((prev) => {
+				const next = prev > 0 ? prev + additionalTotal : additionalTotal;
+				livePreviewTotalRef.current = next;
+				return next;
+			});
 			setIsLivePreviewVisible(true);
 		},
 		[beginLivePreviewBatch, isLivePreviewVisible, livePreviewTotal]
@@ -1856,7 +1955,9 @@ EXAMPLES OF GOOD CUSTOM INSTRUCTIONS:
 		updateDraftOperations(() => []);
 		isDraftQueuePausedForCreditsRef.current = false;
 		activeDraftOperationIdRef.current = null;
+		processedStreamDraftKeysRef.current.clear();
 		setGenerationProgress(-1);
+		setGenerationTotal(0);
 		hideLivePreview();
 	};
 
@@ -2474,6 +2575,347 @@ EXAMPLES OF GOOD CUSTOM INSTRUCTIONS:
 		return { blockedByCredits: stoppedDueToCredits };
 	};
 
+	const batchGenerateFullAiDraftsViaServerStream = async (
+		operation: DraftingOperation
+	): Promise<{ blockedByCredits: boolean }> => {
+		let remainingCredits = draftCreditsRef.current;
+		const controller = new AbortController();
+		abortControllerRef.current = controller;
+		let successfulEmails = 0;
+		let stoppedDueToCredits = false;
+
+		const values = operation.values;
+		const identity = operation.identity;
+		const targets = operation.targets || [];
+		const paragraphs = values.paragraphs;
+		const creditCost = paragraphs <= 3 ? 1 : 1.5;
+		const maxDraftsByCredits = Math.floor(remainingCredits / creditCost);
+
+		if (maxDraftsByCredits <= 0) {
+			setIsOpenUpgradeSubscriptionDrawer(true);
+			abortControllerRef.current = null;
+			return { blockedByCredits: true };
+		}
+
+		const streamingTargets =
+			maxDraftsByCredits >= targets.length ? targets : targets.slice(0, maxDraftsByCredits);
+		stoppedDueToCredits = streamingTargets.length < targets.length;
+
+		// Reserve a stable index range so live-preview ordering never collides across queued ops.
+		const draftIndexBase = globalDraftIndexBaseRef.current;
+		globalDraftIndexBaseRef.current = draftIndexBase + targets.length;
+
+		const signatureTextForDraft =
+			resolveAutoSignatureText({
+				currentSignature: values.signature ?? null,
+				fallbackSignature: `Thank you,\n${identity.name || ''}`,
+				context: {
+					name: identity.name ?? null,
+					bandName: identity.bandName ?? null,
+					website: identity.website ?? null,
+					email: identity.email ?? null,
+				},
+			}) || '';
+
+		const profileFieldsSnapshot: DraftProfileFields = {
+			name: identity.name ?? '',
+			genre: identity.genre ?? '',
+			area: identity.area ?? '',
+			band: identity.bandName ?? '',
+			bio: identity.bio ?? '',
+			links: identity.website ?? '',
+		};
+
+		const fullAutomatedBlock = values.hybridBlockPrompts?.find(
+			(block) => block.type === 'full_automated'
+		);
+		const fullAiPromptRaw = fullAutomatedBlock?.value || '';
+		const fullAiPrompt = fullAiPromptRaw.trim() || DEFAULT_FULL_AI_PROMPT;
+
+		const parseSseBlock = (block: string): { event: string; data: string } | null => {
+			const lines = block.split('\n');
+			let event = '';
+			const dataLines: string[] = [];
+			for (const line of lines) {
+				if (line.startsWith(':')) continue; // heartbeat comments
+				if (line.startsWith('event:')) {
+					event = line.slice('event:'.length).trim();
+				} else if (line.startsWith('data:')) {
+					dataLines.push(line.slice('data:'.length).trim());
+				}
+			}
+			if (!event || !dataLines.length) return null;
+			return { event, data: dataLines.join('\n') };
+		};
+
+		try {
+			if (!streamingTargets.length) {
+				toast.error('No contacts available to generate emails.');
+				return { blockedByCredits: false };
+			}
+
+			isGenerationCancelledRef.current = false;
+			setGenerationProgress(0);
+
+			const firstStreamingContact = streamingTargets[0];
+			const response = await fetch('/api/drafts/generate', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				signal: controller.signal,
+				body: JSON.stringify({
+					operationId: operation.id,
+					campaignId: campaign.id,
+					prompt: fullAiPrompt,
+					bookingFor: values.bookingFor,
+					identity: {
+						name: identity.name,
+						bandName: identity.bandName ?? null,
+						genre: identity.genre ?? null,
+						area: identity.area ?? null,
+						bio: identity.bio ?? null,
+						website: identity.website ?? null,
+					},
+					contactIds: streamingTargets.map((contact) => contact.id),
+					firstContact: {
+						id: firstStreamingContact.id,
+						firstName: firstStreamingContact.firstName ?? null,
+						lastName: firstStreamingContact.lastName ?? null,
+						email: firstStreamingContact.email ?? null,
+						company: firstStreamingContact.company ?? null,
+						address: firstStreamingContact.address ?? null,
+						city: firstStreamingContact.city ?? null,
+						state: firstStreamingContact.state ?? null,
+						country: firstStreamingContact.country ?? null,
+						website: firstStreamingContact.website ?? null,
+						phone: firstStreamingContact.phone ?? null,
+						metadata: firstStreamingContact.metadata ?? null,
+					},
+					models: OPENROUTER_DRAFTING_MODELS,
+				}),
+			});
+
+			if (!response.ok) {
+				let message = 'Failed to start server-side draft generation.';
+				try {
+					const body = await response.json();
+					message = body?.error || body?.message || message;
+				} catch {
+					// keep default message
+				}
+				throw new Error(message);
+			}
+
+			if (!response.body) {
+				throw new Error('Draft stream response has no body.');
+			}
+
+			const decoder = new TextDecoder();
+			const reader = response.body.getReader();
+			let buffer = '';
+			const pendingDraftPersistence: Promise<void>[] = [];
+
+			const prepareDraftForUi = (
+				payload: DraftStreamDraftEvent
+			): { processedMessage: string; finalSubject: string } => {
+				let processedMessage = payload.message;
+				if (identity.website) {
+					processedMessage = insertWebsiteLinkPhrase(processedMessage, identity.website);
+				}
+
+				const finalSubject = values.isAiSubject
+					? payload.subject
+					: values.subject || payload.subject;
+				return { processedMessage, finalSubject };
+			};
+
+			const persistDraftEvent = async (
+				payload: DraftStreamDraftEvent,
+				processedMessage: string,
+				finalSubject: string
+			) => {
+				if (isGenerationCancelledRef.current || controller.signal.aborted) {
+					return;
+				}
+				const draftMessageHtml = convertAiResponseToRichTextEmail(
+					processedMessage,
+					values.font,
+					signatureTextForDraft || null
+				);
+				const draftMessageWithSettings = injectMurmurDraftSettingsSnapshot(draftMessageHtml, {
+					version: 1,
+					values: {
+						...values,
+						signature: signatureTextForDraft,
+					},
+					profileFields: profileFieldsSnapshot,
+				});
+
+				await createEmail({
+					subject: finalSubject,
+					message: draftMessageWithSettings,
+					campaignId: campaign.id,
+					status: 'draft' as EmailStatus,
+					contactId: payload.contactId,
+				});
+
+				if (isGenerationCancelledRef.current || controller.signal.aborted) {
+					return;
+				}
+
+				successfulEmails++;
+				remainingCredits = Math.max(0, remainingCredits - creditCost);
+			};
+
+			while (!isGenerationCancelledRef.current) {
+				const { value, done } = await reader.read();
+				if (done) break;
+				buffer += decoder.decode(value, { stream: true });
+
+				const blocks = buffer.split('\n\n');
+				buffer = blocks.pop() ?? '';
+				for (const block of blocks) {
+					const parsed = parseSseBlock(block);
+					if (!parsed) continue;
+					try {
+						if (parsed.event === 'draft') {
+							const draftPayload = JSON.parse(parsed.data) as DraftStreamDraftEvent;
+							if (draftPayload.operationId !== operation.id) continue;
+							const dedupeKey = `${draftPayload.operationId}:${draftPayload.contactId}`;
+							if (processedStreamDraftKeysRef.current.has(dedupeKey)) {
+								continue;
+							}
+							processedStreamDraftKeysRef.current.add(dedupeKey);
+
+							const { processedMessage, finalSubject } = prepareDraftForUi(draftPayload);
+
+							// Push to the right-side live preview immediately so UI playback stays ahead.
+							enqueueLivePreviewDraft(
+								draftIndexBase + draftPayload.draftIndex,
+								draftPayload.contactId,
+								processedMessage,
+								finalSubject
+							);
+
+							const persistPromise = persistDraftEvent(
+								draftPayload,
+								processedMessage,
+								finalSubject
+							).catch((persistError) => {
+								console.error(
+									`[Batch][Server Stream] Failed to persist draft for contactId=${draftPayload.contactId}:`,
+									persistError
+								);
+							});
+							pendingDraftPersistence.push(persistPromise);
+						} else if (parsed.event === 'draft_partial') {
+							const partialPayload = JSON.parse(parsed.data) as DraftStreamPartialEvent;
+							if (partialPayload.operationId !== operation.id) continue;
+							if (!partialPayload.message) continue;
+
+							// Show partial text only while no queued/active typing playback is running.
+							const hasActiveQueuedPlayback =
+								livePreviewIsTypingRef.current || livePreviewQueueRef.current.length > 0;
+							if (hasActiveQueuedPlayback) continue;
+
+							setIsLivePreviewVisible(true);
+							setLivePreviewContactId(partialPayload.contactId);
+							setLivePreviewSubject(
+								partialPayload.subject && partialPayload.subject.trim().length > 0
+									? partialPayload.subject
+									: 'Drafting first email...'
+							);
+							setLivePreviewMessage(partialPayload.message);
+						} else if (parsed.event === 'error') {
+							const errorPayload = JSON.parse(parsed.data) as DraftStreamErrorEvent;
+							console.warn(
+								`[Batch][Server Stream] contactId=${errorPayload.contactId} draft#${errorPayload.draftIndex} retry=${errorPayload.retryCount} model=${errorPayload.model} code=${errorPayload.code}: ${errorPayload.message}`
+							);
+						} else if (parsed.event === 'progress') {
+							const progressPayload = JSON.parse(parsed.data) as DraftStreamProgressEvent;
+							if (progressPayload.operationId !== operation.id) continue;
+							updateDraftOperations((prev) =>
+								prev.map((op) =>
+									op.id === operation.id
+										? {
+												...op,
+												progress: Math.min(op.total, progressPayload.succeeded),
+										  }
+										: op
+								)
+							);
+							setGenerationProgress(
+								Math.min(operation.total, Math.max(0, progressPayload.succeeded))
+							);
+						} else if (parsed.event === 'done') {
+							const donePayload = JSON.parse(parsed.data) as DraftStreamDoneEvent;
+							console.log(
+								`[Batch][Server Stream] operation=${donePayload.operationId} complete: ${donePayload.succeeded}/${donePayload.total} in ${donePayload.durationMs}ms`
+							);
+						}
+					} catch (eventError) {
+						console.error('[Batch][Server Stream] Failed to process stream event:', eventError);
+					}
+				}
+			}
+
+			// Ensure all createEmail writes settle before final credit and completion bookkeeping.
+			if (!isGenerationCancelledRef.current && pendingDraftPersistence.length > 0) {
+				await Promise.allSettled(pendingDraftPersistence);
+			}
+
+			// Persist credits and keep an immediate local balance for subsequent queued ops.
+			if (user && successfulEmails > 0) {
+				const newCreditBalance = Math.max(0, remainingCredits);
+				draftCreditsRef.current = newCreditBalance;
+				editUser({
+					clerkId: user.clerkId,
+					data: { draftCredits: newCreditBalance },
+				});
+				queryClient.invalidateQueries({ queryKey: ['user'] });
+			}
+
+			if (successfulEmails > 0) {
+				queryClient.invalidateQueries({
+					queryKey: ['emails', { campaignId: campaign.id }],
+				});
+			}
+
+			if (!isGenerationCancelledRef.current && !stoppedDueToCredits) {
+				if (successfulEmails === streamingTargets.length) {
+					toast.success('All emails generated successfully!');
+				} else if (successfulEmails > 0) {
+					toast.success(
+						`Email generation completed! ${successfulEmails}/${streamingTargets.length} emails generated successfully.`
+					);
+				} else {
+					toast.error('Email generation failed. Please try again.');
+				}
+			} else if (stoppedDueToCredits && successfulEmails > 0) {
+				toast.warning(
+					`Generated ${successfulEmails} emails before running out of credits. Please upgrade your plan to continue.`
+				);
+			}
+		} catch (error) {
+			if (
+				error instanceof Error &&
+				(error.name === 'AbortError' || error.message === 'Request cancelled.')
+			) {
+				console.log('Email generation was cancelled by user');
+			} else {
+				console.error('Unexpected error during server-stream batch processing:', error);
+				toast.error('An error occurred during email generation.');
+			}
+		} finally {
+			abortControllerRef.current = null;
+		}
+
+		if (stoppedDueToCredits) {
+			setIsOpenUpgradeSubscriptionDrawer(true);
+		}
+
+		return { blockedByCredits: stoppedDueToCredits };
+	};
+
 	// HANDLERS
 
 	const handleGenerateTestDrafts = async () => {
@@ -2513,11 +2955,15 @@ EXAMPLES OF GOOD CUSTOM INSTRUCTIONS:
 					)
 				);
 				setGenerationProgress(0);
+				setGenerationTotal(next.total);
 
 				if (next.mode === DraftingMode.handwritten) {
 					await batchGenerateHandWrittenDrafts(next);
 				} else {
-					const { blockedByCredits } = await batchGenerateFullAiDrafts(next);
+					const { blockedByCredits } =
+						next.mode === DraftingMode.ai && ENABLE_SERVER_DRAFT_STREAMING
+							? await batchGenerateFullAiDraftsViaServerStream(next)
+							: await batchGenerateFullAiDrafts(next);
 					if (blockedByCredits) {
 						// Pause processing until credits increase (e.g., user upgrades).
 						isDraftQueuePausedForCreditsRef.current = true;
@@ -2555,6 +3001,7 @@ EXAMPLES OF GOOD CUSTOM INSTRUCTIONS:
 			const hasRunning = draftOperationsRef.current.some((op) => op.status === 'running');
 			if (!hasRunning) {
 				setGenerationProgress(-1);
+				setGenerationTotal(0);
 				// Let the live preview auto-hide after it finishes typing queued drafts.
 				endLivePreviewBatch();
 			}
@@ -2563,9 +3010,11 @@ EXAMPLES OF GOOD CUSTOM INSTRUCTIONS:
 			if (draftOperationsRef.current.length === 0) {
 				globalDraftIndexBaseRef.current = 0;
 				isDraftQueuePausedForCreditsRef.current = false;
+				processedStreamDraftKeysRef.current.clear();
 			}
 		}
 	}, [
+		batchGenerateFullAiDraftsViaServerStream,
 		batchGenerateFullAiDrafts,
 		batchGenerateHandWrittenDrafts,
 		endLivePreviewBatch,
@@ -2874,6 +3323,7 @@ EXAMPLES OF GOOD CUSTOM INSTRUCTIONS:
 		draftOperations,
 		form,
 		generationProgress,
+		generationTotal,
 		promptQualityScore,
 		promptQualityLabel,
 		promptSuggestions,

@@ -1,5 +1,7 @@
 import { normalizeTextCaseAndWhitespace } from '@/utils';
 
+declare const __non_webpack_require__: NodeRequire | undefined;
+
 export type HardcodedLocation = {
 	city?: string | null;
 	state?: string | null;
@@ -580,7 +582,85 @@ const STATE_SYNONYMS: Record<string, string[]> = {
 	wy: ['Wyoming', 'WY'],
 };
 
-export function applyHardcodedLocationOverrides(
+type WasmSearchPreprocessModule = {
+	apply_hardcoded_location_overrides: (
+		rawQuery: string,
+		parsed: {
+			city: string | null;
+			state: string | null;
+			country: string | null;
+			restOfQuery: string;
+		}
+	) => LocationOverrideResult;
+};
+
+const USE_WASM_SEARCH_PREPROCESS = process.env.USE_WASM_SEARCH_PREPROCESS === 'true';
+
+let cachedNodeWasmSearchPreprocess: WasmSearchPreprocessModule | null | undefined;
+let hasLoggedWasmSearchPreprocessLoadError = false;
+let hasLoggedWasmSearchPreprocessExportMissingError = false;
+let hasLoggedWasmSearchPreprocessRuntimeError = false;
+
+const logWasmSearchPreprocessLoadError = (error: unknown): void => {
+	if (hasLoggedWasmSearchPreprocessLoadError) return;
+	hasLoggedWasmSearchPreprocessLoadError = true;
+	console.error(
+		'[searchPreprocess] failed to load node WASM search preprocess module, using TypeScript fallback',
+		error
+	);
+};
+
+const logWasmSearchPreprocessExportMissingError = (): void => {
+	if (hasLoggedWasmSearchPreprocessExportMissingError) return;
+	hasLoggedWasmSearchPreprocessExportMissingError = true;
+	console.error(
+		'[searchPreprocess] apply_hardcoded_location_overrides export missing from rust-scorer pkg, using TypeScript fallback'
+	);
+};
+
+const logWasmSearchPreprocessRuntimeError = (error: unknown): void => {
+	if (hasLoggedWasmSearchPreprocessRuntimeError) return;
+	hasLoggedWasmSearchPreprocessRuntimeError = true;
+	console.error('[searchPreprocess] WASM call failed, using TypeScript fallback', error);
+};
+
+const getNodeWasmSearchPreprocessModule = (): WasmSearchPreprocessModule | null => {
+	if (!USE_WASM_SEARCH_PREPROCESS || typeof window !== 'undefined') return null;
+	if (cachedNodeWasmSearchPreprocess !== undefined) return cachedNodeWasmSearchPreprocess;
+
+	try {
+		// Use __non_webpack_require__ so webpack does not attempt to bundle or
+		// statically analyse the dynamic require call. In Next.js server bundles
+		// this global is always available. The eval('require') fallback covers
+		// plain Node.js execution outside of webpack.
+		// eslint-disable-next-line @typescript-eslint/no-require-imports
+		const dynamicRequire: NodeRequire =
+			// eslint-disable-next-line no-underscore-dangle
+			(typeof __non_webpack_require__ !== 'undefined'
+				? __non_webpack_require__
+				: eval('require')) as NodeRequire;
+
+		const loaded = dynamicRequire(
+			`${process.cwd()}/rust-scorer/pkg-node`
+		) as Partial<WasmSearchPreprocessModule> & { default?: Partial<WasmSearchPreprocessModule> };
+		const maybeModule = (loaded.default ?? loaded) as Partial<WasmSearchPreprocessModule>;
+
+		if (typeof maybeModule.apply_hardcoded_location_overrides !== 'function') {
+			logWasmSearchPreprocessExportMissingError();
+			cachedNodeWasmSearchPreprocess = null;
+			return cachedNodeWasmSearchPreprocess;
+		}
+
+		cachedNodeWasmSearchPreprocess = maybeModule as WasmSearchPreprocessModule;
+		return cachedNodeWasmSearchPreprocess;
+	} catch (error: unknown) {
+		logWasmSearchPreprocessLoadError(error);
+		cachedNodeWasmSearchPreprocess = null;
+		return cachedNodeWasmSearchPreprocess;
+	}
+};
+
+export function applyHardcodedLocationOverridesTs(
 	rawQuery: string,
 	parsed: {
 		city: string | null;
@@ -714,4 +794,25 @@ export function applyHardcodedLocationOverrides(
 		penaltyTerms: [],
 		strictPenalty: false,
 	};
+}
+
+export function applyHardcodedLocationOverrides(
+	rawQuery: string,
+	parsed: {
+		city: string | null;
+		state: string | null;
+		country: string | null;
+		restOfQuery: string;
+	}
+): LocationOverrideResult {
+	const wasm = getNodeWasmSearchPreprocessModule();
+	if (wasm) {
+		try {
+			return wasm.apply_hardcoded_location_overrides(rawQuery, parsed);
+		} catch (error: unknown) {
+			logWasmSearchPreprocessRuntimeError(error);
+		}
+	}
+
+	return applyHardcodedLocationOverridesTs(rawQuery, parsed);
 }

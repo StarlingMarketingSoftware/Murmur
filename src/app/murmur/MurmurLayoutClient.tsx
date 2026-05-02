@@ -1,5 +1,5 @@
 'use client';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { useAuth, useUser, UserButton, SignInButton } from '@clerk/nextjs';
 import Link from 'next/link';
@@ -25,6 +25,11 @@ export default function MurmurLayoutClient({ children }: { children: React.React
 			user?.primaryEmailAddress?.emailAddress?.trim()?.[0] ||
 			user?.username?.trim()?.[0] ||
 			'')?.toUpperCase() ?? '';
+
+	// Defer auth-dependent UI to avoid hydration mismatch (server may not know auth state).
+	const [mounted, setMounted] = useState(false);
+	useEffect(() => setMounted(true), []);
+
 	// Hide footer for murmur pages and apply animations
 	useEffect(() => {
 		document.body.classList.add('murmur-page');
@@ -80,7 +85,8 @@ export default function MurmurLayoutClient({ children }: { children: React.React
 					isMobile && showHomeButton ? 'right-12' : 'right-4'
 				} ${isDashboardOrCampaign && !isMobile ? 'pt-3 pr-4' : ''}`}
 			>
-				{isSignedIn ? (
+			{mounted ? (
+				isSignedIn ? (
 					isDashboardOrCampaign ? (
 						<div className="group relative w-7 h-7 cursor-pointer">
 							<OutlinedInitialAvatar
@@ -115,7 +121,8 @@ export default function MurmurLayoutClient({ children }: { children: React.React
 							Sign in
 						</button>
 					</SignInButton>
-				)}
+				)
+			) : null}
 			</div>
 			{/* Home button - mobile only, not on dashboard */}
 			{isMobile && showHomeButton && (

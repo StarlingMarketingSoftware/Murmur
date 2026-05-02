@@ -11,6 +11,7 @@ import {
 	useState,
 	type ReactNode,
 } from 'react';
+import 'mapbox-gl/dist/mapbox-gl.css';
 import { gsap } from 'gsap';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
@@ -21,6 +22,7 @@ import { urls } from '@/constants/urls';
 import { isProblematicBrowser } from '@/utils/browserDetection';
 import { AppLayout } from '@/components/molecules/_layouts/AppLayout/AppLayout';
 import MurmurLogoNew from '@/components/atoms/_svg/MurmurLogoNew';
+import CampaignsDropdownIcon from '@/components/atoms/_svg/CampaignsDropdownIcon';
 import { PromotionIcon } from '@/components/atoms/_svg/PromotionIcon';
 import { BookingIcon } from '@/components/atoms/_svg/BookingIcon';
 import { SearchIconDesktop } from '@/components/atoms/_svg/SearchIconDesktop';
@@ -54,7 +56,12 @@ import { useMe } from '@/hooks/useMe';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 import { getStateAbbreviation } from '@/utils/string';
 import { stateBadgeColorMap } from '@/constants/ui';
-import SearchResultsMap from '@/components/molecules/SearchResultsMap/SearchResultsMap';
+import SearchResultsMap, {
+	DASHBOARD_TO_INTERACTIVE_TRANSITION_CSS_EASING,
+	DASHBOARD_TO_INTERACTIVE_TRANSITION_MS,
+} from '@/components/molecules/SearchResultsMap/SearchResultsMap';
+import { useGlobeWeatherMood } from '@/hooks/useGlobeWeatherMood';
+import { useGlobeNightLighting } from '@/hooks/useGlobeNightLighting';
 import { ContactWithName } from '@/types/contact';
 import { MapResultsPanelSkeleton } from '@/components/molecules/MapResultsPanelSkeleton/MapResultsPanelSkeleton';
 import { buildAllUsStateNames, getNearestUsStateNames, normalizeUsStateName } from '@/utils/usStates';
@@ -64,6 +71,8 @@ import {
 } from '@/components/molecules/ContactResearchPanel/ContactResearchPanel';
 import { CampaignsInboxView } from '@/components/molecules/CampaignsInboxView/CampaignsInboxView';
 import InboxSection from '@/components/molecules/InboxSection/InboxSection';
+import { InboundEmailNotificationList } from '@/components/molecules/InboundEmailNotificationList/InboundEmailNotificationList';
+import DashboardResponsesWidget from '@/components/molecules/DashboardResponsesWidget/DashboardResponsesWidget';
 import { useGetCampaign, useGetCampaigns } from '@/hooks/queryHooks/useCampaigns';
 import { useEditUserContactList } from '@/hooks/queryHooks/useUserContactLists';
 import { useQueryClient } from '@tanstack/react-query';
@@ -358,6 +367,13 @@ const DashboardContent = () => {
 	const { data: campaigns } = useGetCampaigns();
 	const hasCampaigns = campaigns && campaigns.length > 0;
 	const queryClient = useQueryClient();
+	const {
+		mood: globeWeatherMood,
+		temperatureF: globeWeatherTemperatureF,
+		regionCenter: globeWeatherRegionCenter,
+	} =
+		useGlobeWeatherMood();
+	const globeNightLighting = useGlobeNightLighting();
 
 	// If we navigated here from a campaign, enable "Add to Campaign" mode.
 	const fromCampaignIdParam = searchParams.get('fromCampaignId')?.trim() || '';
@@ -503,6 +519,47 @@ const DashboardContent = () => {
 	const { mutateAsync: editUserContactList, isPending: isPendingAddToCampaign } =
 		useEditUserContactList({ suppressToasts: true });
 
+	// ── Mapbox globe styles (shared background + results map) ──
+	// Inject globe-related styles (hide Mapbox controls, transparent body bg).
+	useEffect(() => {
+		const style = document.createElement('style');
+		style.setAttribute('data-dashboard-globe', '');
+		style.textContent = `
+			.dashboard-globe-bg .mapboxgl-ctrl-logo,
+			.dashboard-globe-bg .mapboxgl-ctrl-attrib {
+				display: none !important;
+			}
+			.dashboard-globe-bg .mapboxgl-map,
+			.dashboard-globe-bg .mapboxgl-canvas-container,
+			.dashboard-globe-bg .mapboxgl-canvas {
+				width: 100% !important;
+				height: 100% !important;
+			}
+			/* Map-view fills the viewport edge-to-edge — no rounded corners */
+			.dashboard-globe-bg .murmur-search-results-map,
+			.dashboard-globe-bg .mapboxgl-map,
+			.dashboard-globe-bg .mapboxgl-canvas-container,
+			.dashboard-globe-bg .mapboxgl-canvas {
+				border-radius: 0 !important;
+			}
+			/* Counteract root-level dashboard zoom so the globe fills the real viewport */
+			html.murmur-compact .dashboard-globe-bg {
+				zoom: calc(1 / var(--murmur-dashboard-zoom, 0.85));
+			}
+			html:has(.dashboard-globe-bg),
+			body:has(.dashboard-globe-bg),
+			body:has(.dashboard-globe-bg) > main,
+			body:has(.dashboard-globe-bg) main.flex-1 {
+				background: transparent !important;
+				background-color: transparent !important;
+			}
+		`;
+		document.head.appendChild(style);
+		return () => {
+			style.remove();
+		};
+	}, []);
+
 	// Add body class when on mobile with empty dashboard to hide global Clerk button
 	useEffect(() => {
 		if (isMobile && !hasCampaigns) {
@@ -575,13 +632,21 @@ const DashboardContent = () => {
 			document.removeEventListener('mousedown', handleClickOutside);
 		};
 	}, [isWhereDropdownOpen]);
-	const initialTabFromQuery = searchParams.get('tab') === 'inbox' ? 'inbox' : 'search';
+
+	// NOTE: Keep Inbox tab code intact, but hide it for now.
+	const ENABLE_DASHBOARD_INBOX_TAB = false;
+
+	const initialTabFromQuery =
+		ENABLE_DASHBOARD_INBOX_TAB && searchParams.get('tab') === 'inbox' ? 'inbox' : 'search';
 	const [activeTab, setActiveTab] = useState<'search' | 'inbox'>(initialTabFromQuery);
 	const [hoveredTab, setHoveredTab] = useState<'search' | 'inbox' | null>(null);
 	const inboxView = activeTab === 'inbox';
 	const isTabPreviewingOther = hoveredTab != null && hoveredTab !== activeTab;
 	// Dashboard inbox deep-link (`?tab=inbox`) should land on the Campaigns sub-tab.
 	const [inboxSubtab, setInboxSubtab] = useState<'messages' | 'campaigns'>('campaigns');
+	const [dashboardLandingPanel, setDashboardLandingPanel] = useState<
+		'new' | 'campaigns' | 'responses'
+	>('new');
 
 	// Handle tab query parameter
 	// Only react to *URL changes*. If we also depend on `activeTab`, this effect can run
@@ -589,9 +654,20 @@ const DashboardContent = () => {
 	// momentarily forcing the UI back to the previous tab (the "flash" you were seeing).
 	const tabParam = searchParams.get('tab');
 	useEffect(() => {
-		if (tabParam === 'search' || tabParam === 'inbox') {
+		if (tabParam === 'search') {
 			// URL is the source of truth when it changes externally (back/forward, deep link)
-			setActiveTab(tabParam);
+			setActiveTab('search');
+			return;
+		}
+
+		if (tabParam === 'inbox') {
+			if (ENABLE_DASHBOARD_INBOX_TAB) {
+				setActiveTab('inbox');
+			} else {
+				// Normalize old deep-links back to Search while Inbox is disabled.
+				setActiveTab('search');
+				updateTabQueryParam('search');
+			}
 		}
 	}, [tabParam]);
 	useEffect(() => {
@@ -1630,26 +1706,32 @@ const DashboardContent = () => {
 		};
 	}, [isMobile]);
 
-	// Make the fullscreen dashboard map view render slightly "zoomed out" on desktop (85%),
-	// mirroring the campaign page's extra-compact scaling.
-	useEffect(() => {
+	// Mapbox GL doesn't reliably size/position its WebGL canvas under CSS zoom/transform scaling.
+	// While in fullscreen map view, force 1x scaling so the map always fills the stroked container.
+	useLayoutEffect(() => {
 		// Avoid running until we know whether this is a real mobile device.
 		if (isMobile === null) return;
 
 		// Never shrink the mobile map UI (it's already heavily tuned).
 		if (isMobile) {
 			document.documentElement.classList.remove(DASHBOARD_MAP_COMPACT_CLASS);
+			document.documentElement.style.removeProperty(DASHBOARD_ZOOM_VAR);
 			return;
 		}
 
 		if (isMapView) {
 			document.documentElement.classList.add(DASHBOARD_MAP_COMPACT_CLASS);
+			// Force 1x scaling to avoid Mapbox canvas layout drift (especially in browsers that
+			// fall back to transform-based scaling when CSS `zoom` is unsupported).
+			document.documentElement.style.setProperty(DASHBOARD_ZOOM_VAR, '1');
 		} else {
 			document.documentElement.classList.remove(DASHBOARD_MAP_COMPACT_CLASS);
+			document.documentElement.style.removeProperty(DASHBOARD_ZOOM_VAR);
 		}
 
 		return () => {
 			document.documentElement.classList.remove(DASHBOARD_MAP_COMPACT_CLASS);
+			document.documentElement.style.removeProperty(DASHBOARD_ZOOM_VAR);
 		};
 	}, [isMapView, isMobile]);
 
@@ -2036,7 +2118,6 @@ const DashboardContent = () => {
 	const [selectedContactStickyHeadlineById, setSelectedContactStickyHeadlineById] = useState<
 		Record<number, string>
 	>({});
-	const mapViewContainerRef = useRef<HTMLDivElement | null>(null);
 	const [activeMapTool, setActiveMapTool] = useState<'select' | 'grab'>('grab');
 	const [selectAllInViewNonce, setSelectAllInViewNonce] = useState(0);
 	const [hoveredMapMarkerContact, setHoveredMapMarkerContact] = useState<ContactWithName | null>(
@@ -2054,6 +2135,97 @@ const DashboardContent = () => {
 	const hasNoSearchResults =
 		hasSearched && !isMapResultsLoading && (contacts?.length ?? 0) === 0;
 
+	// ── Search-results row cascade animation ─────────────────────────────────
+	// Rows start as placeholder-coloured rectangles (matching the panel bg).
+	// One by one from top to bottom each row flips to its normal white state
+	// with content, like the list is being populated in real-time.
+	const mapPanelRowsDesktopRef = useRef<HTMLDivElement>(null);
+	const mapPanelRowsNarrowRef = useRef<HTMLDivElement>(null);
+	const prevMapResultsLoadingRef = useRef(isMapResultsLoading);
+	const cascadeTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+	// Match the map panel skeleton wave animation so the cascade feels like it
+	// "resolves" the wave into real results.
+	const WAVE_BASE_BG = '#C5F0FF';
+	const WAVE_DURATION_SECONDS = 2.5;
+	const WAVE_ROW_STEP_DELAY_SECONDS = 0.1;
+	const CASCADE_INITIAL_DELAY_MS = 120;
+	const CASCADE_STAGGER_MS = 100;
+	const CASCADE_MAX_ROWS = 14;
+
+	// useLayoutEffect: runs synchronously BEFORE the browser paints so the user
+	// never sees a flash of white rows — they start as placeholders.
+	useLayoutEffect(() => {
+		const wasLoading = prevMapResultsLoadingRef.current;
+		prevMapResultsLoadingRef.current = isMapResultsLoading;
+		if (!wasLoading || isMapResultsLoading) return;
+
+		// Clear any in-flight timers from a previous cascade.
+		for (const t of cascadeTimersRef.current) clearTimeout(t);
+		cascadeTimersRef.current = [];
+
+		const refs = [mapPanelRowsDesktopRef.current, mapPanelRowsNarrowRef.current];
+		for (const container of refs) {
+			if (!container) continue;
+			const rows = Array.from(container.children).slice(0, CASCADE_MAX_ROWS) as HTMLElement[];
+			if (rows.length === 0) continue;
+
+			// Set every row to the placeholder wave state before the browser paints.
+			rows.forEach((row, idx) => {
+				// Preserve the *real* background (set by React) so we can restore it.
+				row.dataset.cascadeBg = row.style.backgroundColor;
+				// Keep the normal outline; remove any stale inline override.
+				row.style.borderColor = '';
+
+				// Continue the wave background animation used by the skeleton rows.
+				row.style.backgroundColor = WAVE_BASE_BG;
+				row.style.animation = `mapResultsPanelLoadingWave ${WAVE_DURATION_SECONDS}s ease-in-out infinite`;
+				row.style.animationDelay = `${-(WAVE_DURATION_SECONDS - idx * WAVE_ROW_STEP_DELAY_SECONDS)}s`;
+				row.style.willChange = 'background-color';
+
+				for (const child of Array.from(row.children) as HTMLElement[]) {
+					// Ensure we don't keep any stale visibility settings from a previous run.
+					child.style.visibility = '';
+					child.style.opacity = '0';
+				}
+			});
+
+			// Schedule the cascade: each row flips to its real appearance one at a time.
+			rows.forEach((row, idx) => {
+				const timer = setTimeout(() => {
+					const targetBg =
+						row.dataset.cascadeBg && row.dataset.cascadeBg.length > 0 ? row.dataset.cascadeBg : '#FFFFFF';
+					delete row.dataset.cascadeBg;
+
+					// Freeze the wave at its current color, then tween to the final bg.
+					const waveBg = getComputedStyle(row).backgroundColor;
+					row.style.animation = '';
+					row.style.animationDelay = '';
+					row.style.willChange = '';
+					row.style.backgroundColor = waveBg;
+
+					const children = Array.from(row.children) as HTMLElement[];
+					gsap.killTweensOf(row);
+					gsap.killTweensOf(children);
+
+					gsap.to(row, {
+						backgroundColor: targetBg,
+						duration: 0.26,
+						ease: 'power1.out',
+					});
+					gsap.to(children, {
+						opacity: 1,
+						duration: 0.22,
+						delay: 0.02,
+						ease: 'power1.out',
+						clearProps: 'opacity',
+					});
+				}, CASCADE_INITIAL_DELAY_MS + idx * CASCADE_STAGGER_MS);
+				cascadeTimersRef.current.push(timer);
+			});
+		}
+	}, [isMapResultsLoading]);
+
 	type SearchThisAreaViewportIdlePayload = {
 		bounds: { south: number; west: number; north: number; east: number };
 		zoom: number;
@@ -2063,6 +2235,8 @@ const DashboardContent = () => {
 	// "Search this area" CTA timing + placement (map view).
 	const SEARCH_THIS_AREA_MIN_ZOOM = 8;
 	const SEARCH_THIS_AREA_DELAY_MS = 2000;
+	// Scale down fullscreen map UI chrome (buttons/panels) without scaling the Mapbox canvas.
+	const MAP_VIEW_UI_SCALE = isMobile ? 1 : 0.85;
 	const MAP_VIEW_SEARCH_BAR_TOP_PX = 33;
 	const MAP_VIEW_SEARCH_BAR_INPUT_HEIGHT_PX = 49;
 	const SEARCH_THIS_AREA_GAP_PX = 45;
@@ -2603,6 +2777,7 @@ const DashboardContent = () => {
 	};
 
 	const updateTabQueryParam = (tab: 'search' | 'inbox') => {
+		if (!ENABLE_DASHBOARD_INBOX_TAB && tab === 'inbox') return;
 		const current = searchParams.get('tab');
 		if (current === tab) return;
 		const params = new URLSearchParams(searchParams.toString());
@@ -2684,6 +2859,12 @@ const DashboardContent = () => {
 		nextTab: 'search' | 'inbox',
 		opts?: { animate?: boolean; after?: () => void }
 	) => {
+		if (!ENABLE_DASHBOARD_INBOX_TAB && nextTab === 'inbox') {
+			// Inbox is intentionally disabled on the Dashboard for now.
+			opts?.after?.();
+			return;
+		}
+
 		// Always clear hover-preview state on click.
 		setHoveredTab(null);
 		const hoverPill = tabToggleHoverPillRef.current;
@@ -3219,15 +3400,334 @@ const DashboardContent = () => {
 		};
 	}, [isMapView]);
 
+	// Shared Mapbox layer (background globe + interactive results) — one map instance.
+	const mapPresentation: 'background' | 'interactive' =
+		!fromHomeParam && !hasSearched ? 'background' : 'interactive';
+	const shouldSpinBackgroundMap = mapPresentation === 'background';
+
+	const contactsForMap =
+		fromHomeParam && (!isSignedIn || !hasSearched)
+			? fromHomePlaceholderContacts
+			: (contacts || []);
+
+	const searchWhatForMap =
+		fromHomeParam && (!isSignedIn || !hasSearched) ? FROM_HOME_WHAT : searchedWhat;
+
+	const lockedStateNameForMap =
+		mapPresentation === 'background'
+			? null
+			: mapBboxFilter
+				? null
+				: fromHomeParam && (!isSignedIn || !hasSearched)
+					? 'CA'
+					: searchedStateAbbrForMap;
+
+	const skipAutoFitForMap =
+		mapPresentation === 'background'
+			? true
+			: (fromHomeParam && (!isSignedIn || !hasSearched)) || Boolean(mapBboxFilter);
+
+	const selectedAreaBoundsForMap = mapBboxFilter
+		? {
+				south: mapBboxFilter.south,
+				west: mapBboxFilter.west,
+				north: mapBboxFilter.north,
+				east: mapBboxFilter.east,
+		  }
+		: null;
+
+	// Fullscreen map view "frame" animation.
+	// Key goal: keep the Mapbox container size stable during the transition.
+	// Resizing the container causes canvas reflow + debounced `map.resize()` calls, which looks jittery.
+	// We instead animate a clipped viewport + overlay border, so the frame slides in without displacing the map.
+	const MAP_VIEW_FRAME_INSET_PX = 0;
+	const MAP_VIEW_FRAME_RADIUS_PX = 0;
+	const MAP_VIEW_FRAME_BORDER_PX = 0;
+	const mapViewFrameTransition = `${DASHBOARD_TO_INTERACTIVE_TRANSITION_MS}ms ${DASHBOARD_TO_INTERACTIVE_TRANSITION_CSS_EASING}`;
+	const mapViewInnerInsetPx = MAP_VIEW_FRAME_INSET_PX + MAP_VIEW_FRAME_BORDER_PX;
+	const mapViewInnerRadiusPx = Math.max(0, MAP_VIEW_FRAME_RADIUS_PX - MAP_VIEW_FRAME_BORDER_PX);
+	const mapViewClip = isMapView
+		? `inset(${mapViewInnerInsetPx}px round ${mapViewInnerRadiusPx}px)`
+		: 'inset(0px round 0px)';
+	const mapPortal =
+		typeof window !== 'undefined'
+			? createPortal(
+					<div
+						className="dashboard-globe-bg"
+						style={{
+							position: 'fixed',
+							inset: 0,
+							// Important: this portal is appended to <body>, so with zIndex 0 it can paint
+							// above the dashboard content. Keep it behind the normal dashboard UI, and
+							// raise it only when entering fullscreen map view.
+							zIndex: isMapView ? 98 : -1,
+							pointerEvents: isMapView ? 'auto' : 'none',
+						}}
+					>
+					<div
+						style={{
+							width: '100%',
+							height: '100%',
+							position: 'relative',
+						}}
+					>
+						{/* Map viewport (clipped; animates insets without resizing the map container) */}
+						<div
+							style={{
+								width: '100%',
+								height: '100%',
+								WebkitClipPath: mapViewClip,
+								clipPath: mapViewClip,
+								transition: `-webkit-clip-path ${mapViewFrameTransition}, clip-path ${mapViewFrameTransition}`,
+								willChange: 'clip-path',
+								overflow: 'hidden',
+							}}
+						>
+							<SearchResultsMap
+								weatherMood={globeWeatherMood}
+								weatherRegionCenter={globeWeatherRegionCenter}
+								weatherTemperatureF={globeWeatherTemperatureF}
+								nightLighting={globeNightLighting}
+								presentation={mapPresentation}
+								autoSpin={shouldSpinBackgroundMap}
+								contacts={contactsForMap}
+								selectedContacts={selectedContacts}
+								externallyHoveredContactId={hoveredMapPanelContactId}
+								searchQuery={activeSearchQuery}
+								searchWhat={searchWhatForMap}
+								disableDotWaveReveal={isMapView}
+								selectAllInViewNonce={isMapView ? selectAllInViewNonce : undefined}
+								onVisibleOverlayContactsChange={
+									isMapView
+										? (overlayContacts) => {
+												setMapPanelVisibleOverlayContacts(overlayContacts);
+
+												// Cache overlay-only contacts so if the user selects one, it can remain
+												// renderable in the side panel even after panning away.
+												if (overlayContacts.length > 0) {
+													setMapPanelExtraContacts((prev) => {
+														const byId = new Map<number, ContactWithName>();
+														for (const c of prev) byId.set(c.id, c);
+														for (const c of overlayContacts) {
+															if (!byId.has(c.id)) byId.set(c.id, c);
+														}
+														return Array.from(byId.values());
+													});
+												}
+										  }
+										: undefined
+								}
+								activeTool={isMapView ? activeMapTool : undefined}
+								selectedAreaBounds={selectedAreaBoundsForMap}
+								onViewportInteraction={isMapView ? handleMapViewportInteraction : undefined}
+								onViewportIdle={isMapView ? handleMapViewportIdle : undefined}
+								onAreaSelect={
+									isMapView
+										? (bounds, payload) => {
+												const ids = payload?.contactIds ?? [];
+												const extraContacts = payload?.extraContacts ?? [];
+
+												if (ids.length > 0) {
+													setSelectedContacts((prev) => {
+														const next = new Set(prev);
+														for (const id of ids) next.add(id);
+														return Array.from(next);
+													});
+												}
+
+												// Ensure overlay-only contacts (booking/promotion map overlays) can appear
+												// as rows in the right-hand panel.
+												if (extraContacts.length > 0) {
+													setMapPanelExtraContacts((prev) => {
+														const byId = new Map<number, ContactWithName>();
+														for (const c of prev) byId.set(c.id, c);
+														for (const c of extraContacts) {
+															if (!byId.has(c.id)) byId.set(c.id, c);
+														}
+														return Array.from(byId.values());
+													});
+												}
+
+												// If selected contacts are outside the searched state (or are overlay-only),
+												// include them in the panel list so the user sees what was selected.
+												if (ids.length > 0) {
+													const nextExtraIds: number[] = [];
+													const byId = new Map<number, ContactWithName>();
+													for (const c of contacts || []) byId.set(c.id, c);
+
+													for (const id of ids) {
+														if (!baseContactIdSet.has(id)) {
+															nextExtraIds.push(id);
+															continue;
+														}
+														if (!searchedStateAbbrForMap) continue;
+														const c = byId.get(id);
+														if (!c) continue;
+														const contactStateAbbr = getStateAbbreviation(c.state || '')
+															.trim()
+															.toUpperCase();
+														if (contactStateAbbr && contactStateAbbr !== searchedStateAbbrForMap) {
+															nextExtraIds.push(id);
+														}
+													}
+
+													for (const c of extraContacts) nextExtraIds.push(c.id);
+
+													if (nextExtraIds.length > 0) {
+														setMapPanelExtraContactIds((prev) => {
+															const next = new Set(prev);
+															for (const id of nextExtraIds) next.add(id);
+															return Array.from(next);
+														});
+													}
+												}
+
+												// After selecting an area, immediately switch back to Grab mode
+												// so the user can pan/zoom without extra clicks.
+												setActiveMapTool('grab');
+										  }
+										: undefined
+								}
+								onMarkerHover={isMapView ? handleMapMarkerHover : undefined}
+								lockedStateName={lockedStateNameForMap}
+								skipAutoFit={skipAutoFitForMap}
+								onStateSelect={
+									isMapView
+										? (stateName) => {
+												// In demo mode, show the free trial prompt instead of searching
+												if (isFromHomeDemoMode) {
+													setShowFreeTrialPrompt(true);
+													return;
+												}
+
+												const nextState = (stateName || '').trim();
+												if (!nextState) return;
+
+												// Keep the last executed Why/What (the map is showing results for this query),
+												// and only swap the state for the next search.
+												const baseWhy =
+													(extractWhyFromSearchQuery(activeSearchQuery) || whyValue).trim();
+												const baseWhat =
+													(extractWhatFromSearchQuery(activeSearchQuery) || whatValue).trim();
+												triggerSearchWithWhere(nextState, false, { why: baseWhy, what: baseWhat });
+										  }
+										: undefined
+								}
+								isLoading={isSearchPending || isLoadingContacts || isRefetchingContacts}
+								onMarkerClick={
+									isMapView
+										? (contact) => {
+												// Ensure map-only overlay markers (e.g. Booking extra pins) can show up as
+												// rows in the right-hand panel when selected/clicked.
+												const isInBaseResults = baseContactIdSet.has(contact.id);
+												if (!isInBaseResults) {
+													setMapPanelExtraContacts((prev) =>
+														prev.some((c) => c.id === contact.id) ? prev : [contact, ...prev]
+													);
+													setMapPanelExtraContactIds((prev) =>
+														prev.includes(contact.id) ? prev : [...prev, contact.id]
+													);
+													return;
+												}
+
+												// If the marker is outside the searched state, include it in the
+												// right-hand map panel list (without changing what the map shows).
+												if (!searchedStateAbbrForMap) return;
+												const contactStateAbbr = getStateAbbreviation(contact.state || '')
+													.trim()
+													.toUpperCase();
+												if (contactStateAbbr === searchedStateAbbrForMap) return;
+												setMapPanelExtraContactIds((prev) =>
+													prev.includes(contact.id) ? prev : [...prev, contact.id]
+												);
+										  }
+										: undefined
+								}
+								onToggleSelection={
+									isMapView
+										? (contactId) => {
+												const wasSelected = selectedContacts.includes(contactId);
+
+												// Ensure the selected contact stays renderable in the side panel across
+												// subsequent searches by caching the full object.
+												if (!wasSelected) {
+													const fromBase = (contacts || []).find((c) => c.id === contactId);
+													const fromOverlay = mapPanelVisibleOverlayContacts.find((c) => c.id === contactId);
+													const fromExtra = mapPanelExtraContacts.find((c) => c.id === contactId);
+													const selectedContact = fromBase ?? fromOverlay ?? fromExtra;
+													if (selectedContact) {
+														setMapPanelExtraContacts((prev) =>
+															prev.some((c) => c.id === contactId) ? prev : [selectedContact, ...prev]
+														);
+													}
+												}
+
+												setSelectedContacts((prev) => {
+													if (prev.includes(contactId)) {
+														return prev.filter((id) => id !== contactId);
+													}
+													return [...prev, contactId];
+												});
+												// Scroll to the contact in the side panel
+												const tryScroll = (attempt = 0) => {
+													const contactElement = document.querySelector(
+														`[data-contact-id="${contactId}"]`
+													);
+													if (contactElement) {
+														contactElement.scrollIntoView({
+															behavior: 'smooth',
+															block: 'center',
+														});
+														return;
+													}
+													if (attempt < 10) {
+														setTimeout(() => tryScroll(attempt + 1), 50);
+													}
+												};
+												setTimeout(() => tryScroll(0), 0);
+										  }
+										: undefined
+								}
+							/>
+						</div>
+
+						{/* Decorative frame (slides in; does not affect map layout) */}
+						<div
+							aria-hidden="true"
+							style={{
+								position: 'absolute',
+								top: isMapView ? MAP_VIEW_FRAME_INSET_PX : 0,
+								left: isMapView ? MAP_VIEW_FRAME_INSET_PX : 0,
+								right: isMapView ? MAP_VIEW_FRAME_INSET_PX : 0,
+								bottom: isMapView ? MAP_VIEW_FRAME_INSET_PX : 0,
+								// Animate radius + width together so the inner edge stays perfectly aligned
+								// with the clipped map viewport throughout the transition.
+								borderRadius: isMapView ? MAP_VIEW_FRAME_RADIUS_PX : 0,
+								borderStyle: 'solid',
+								borderColor: '#143883',
+								borderWidth: isMapView ? MAP_VIEW_FRAME_BORDER_PX : 0,
+								boxSizing: 'border-box',
+								pointerEvents: 'none',
+								transition: `top ${mapViewFrameTransition}, left ${mapViewFrameTransition}, right ${mapViewFrameTransition}, bottom ${mapViewFrameTransition}, border-radius ${mapViewFrameTransition}, border-width ${mapViewFrameTransition}`,
+								willChange: 'top, left, right, bottom, border-radius, border-width',
+							}}
+						/>
+						</div>
+					</div>,
+					document.body
+			  )
+			: null;
+
 	// Return null during initial load to prevent hydration mismatch
 	if (isMobile === null) {
-		return null;
+		return <div className="min-h-screen w-full">{mapPortal}</div>;
 	}
 
 	// Mobile dashboard: show only the campaigns inbox table (no search bar, no tab toggle).
 	if (isMobile) {
 		return (
 			<div className="min-h-screen w-full">
+				{mapPortal}
 				<Link
 					href={urls.home.activeLanding}
 					prefetch
@@ -3294,11 +3794,17 @@ const DashboardContent = () => {
 	const bottomPadding = isMobile && hasSearched ? 'pb-[64px]' : 'pb-0 md:pb-[100px]';
 
 	return (
+		<>
+		{/* Shared Mapbox globe background */}
+		{mapPortal}
+
 		<AppLayout>
 			<Link
 				href={urls.home.activeLanding}
 				prefetch
-				className="fixed left-8 top-6 flex items-center gap-5 text-[15px] font-inter font-normal no-underline hover:no-underline z-[10000] group text-[#060606] hover:text-gray-500"
+				className={`fixed left-8 top-6 flex items-center gap-5 text-[15px] font-inter font-normal no-underline hover:no-underline z-[10000] group text-[#060606] hover:text-gray-500 transition-opacity duration-500 ${
+					isMapView ? 'opacity-0 pointer-events-none' : 'opacity-100'
+				}`}
 				title="Back to Landing"
 				aria-label="Back to Landing"
 				onClick={(e) => {
@@ -3326,9 +3832,9 @@ const DashboardContent = () => {
 
 			<div
 				ref={dashboardContentRef}
-				className={`relative min-h-screen dashboard-main-offset w-full max-w-full ${bottomPadding} ${
+				className={`relative min-h-screen dashboard-main-offset w-full max-w-full transition-opacity duration-500 ${bottomPadding} ${
 					hasSearched ? 'search-active' : ''
-				}`}
+				} ${isMapView ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
 				style={
 					hasSearched
 						? {
@@ -3351,7 +3857,7 @@ const DashboardContent = () => {
 							className="flex justify-center items-center w-full px-4"
 							style={{
 								marginBottom: '0.75rem',
-								marginTop: activeTab === 'inbox' ? '136px' : '50px',
+								marginTop: activeTab === 'inbox' ? '136px' : '320px',
 							}}
 						>
 							<div className="premium-hero-section flex flex-col items-center justify-center w-full max-w-[600px]">
@@ -3930,8 +4436,8 @@ const DashboardContent = () => {
 						)}
 						*/}
 
-						{/* Search/Inbox tab toggle - only shown here for search tab */}
-						{!hasSearched && activeTab === 'search' && (
+						{/* Search/Inbox tab toggle - disabled for now (keep code for later) */}
+						{ENABLE_DASHBOARD_INBOX_TAB && !hasSearched && activeTab === 'search' && (
 							<div className="flex justify-center" style={{ marginTop: '92px' }}>
 								<div
 									ref={tabToggleTrackRef}
@@ -4050,8 +4556,8 @@ const DashboardContent = () => {
 							</div>
 						)}
 
-						{/* Inbox tab: CampaignsInboxView + toggle - inside hero-wrapper for proper positioning */}
-						{!hasSearched && activeTab === 'inbox' && (
+						{/* Inbox tab: CampaignsInboxView + toggle - disabled for now (keep code for later) */}
+						{ENABLE_DASHBOARD_INBOX_TAB && !hasSearched && activeTab === 'inbox' && (
 							<div
 								ref={tabbedLandingBoxRef}
 								style={{
@@ -4300,24 +4806,19 @@ const DashboardContent = () => {
 									icon: whereIconProps?.icon || <NearMeIcon />,
 							  };
 
-						const searchBar = (
+						const searchBarBase = (
 							<div
 					className={`results-search-bar-wrapper w-full max-w-[650px] mx-auto px-4 ${
 							// When the horizontal research strip is active (sm–lg desktop),
 							// hide the mini search bar + helper text so the strip owns this area.
 							showHorizontalResearchStrip ? 'sm:hidden xl:block' : ''
-						} ${isMapView ? '' : 'relative'}`}
+						} relative`}
 							style={
 								isMapView
 									? {
-											position: 'fixed',
-											// Overlay directly on the map (no header band).
-											// Map container is inset 9px from viewport; place bar 24px below map top.
-											top: '33px',
-											left: '50%',
-											transform: 'translateX(-50%)',
-											zIndex: 120,
-											// Leave room for the floating close button on the left.
+											// In fullscreen map view we render this via a portal + outer fixed wrapper,
+											// so keep this inner container relative for absolute children.
+											position: 'relative',
 											width: 'min(440px, calc(100vw - 120px))',
 											maxWidth: '440px',
 											padding: 0,
@@ -5431,32 +5932,62 @@ const DashboardContent = () => {
 						</div>
 						);
 
+						const searchBar = isMapView ? (
+							<div
+								className="fixed left-0 right-0 flex justify-center pointer-events-none"
+								style={{
+									// Overlay directly on the map (no header band).
+									// Map container is inset 9px from viewport; place bar 24px below map top.
+									top: `${MAP_VIEW_SEARCH_BAR_TOP_PX}px`,
+									zIndex: 120,
+								}}
+							>
+								<div
+									className="pointer-events-auto"
+									style={{
+										transform: `scale(${MAP_VIEW_UI_SCALE})`,
+										transformOrigin: 'top center',
+									}}
+								>
+									{searchBarBase}
+								</div>
+							</div>
+						) : (
+							searchBarBase
+						);
+
 						const searchThisAreaCta =
 							isMapView && isSearchThisAreaCtaVisible ? (
 								<div
-									className="fixed z-[9999] pointer-events-none"
+									className="fixed z-[9999] pointer-events-none left-0 right-0 flex justify-center"
 									style={{
 										top: `${SEARCH_THIS_AREA_BUTTON_TOP_PX}px`,
-										left: '50%',
-										transform: 'translateX(-50%)',
 									}}
 								>
-									<button
-										type="button"
-										className="pointer-events-auto flex items-center justify-center font-secondary font-medium text-[17px] leading-none text-black"
+									<div
+										className="pointer-events-auto"
 										style={{
-											width: '212px',
-											height: '39px',
-											opacity: 0.9,
-											backgroundColor: '#AFD6EF',
-											border: '2px solid #347AB3',
-											borderRadius: '11px',
-											boxSizing: 'border-box',
+											transform: `scale(${MAP_VIEW_UI_SCALE})`,
+											transformOrigin: 'top center',
 										}}
-										onClick={handleSearchThisAreaClick}
 									>
-										Search this area
-									</button>
+										<button
+											type="button"
+											className="flex items-center justify-center font-secondary font-medium text-[17px] leading-none text-black"
+											style={{
+												width: '212px',
+												height: '39px',
+												opacity: 0.9,
+												backgroundColor: '#AFD6EF',
+												border: '2px solid #347AB3',
+												borderRadius: '11px',
+												boxSizing: 'border-box',
+											}}
+											onClick={handleSearchThisAreaClick}
+										>
+											Search this area
+										</button>
+									</div>
 								</div>
 							) : null;
 
@@ -5464,7 +5995,7 @@ const DashboardContent = () => {
 							isMapView && isAddToCampaignMode ? (
 								<div
 									data-slot="campaign-map-top-tabs"
-									className="fixed z-[9999] flex items-center justify-center pointer-events-none"
+									className="fixed left-0 right-0 z-[9999] flex items-center justify-center pointer-events-none"
 									style={{
 										// The map search bar is fixed at top: 33px in map view.
 										// The map container is inset 9px from the viewport.
@@ -5472,14 +6003,19 @@ const DashboardContent = () => {
 										// and the search bar top (33px) so they never feel too high/low.
 										top: '9px',
 										height: '24px',
-										left: '50%',
-										// Optical nudge: align the tray with the visible search bar below.
-										transform: 'translateX(-50%) translateX(-5px)',
-										width: 'min(440px, calc(100vw - 120px))',
-										maxWidth: '440px',
 									}}
 								>
-									<div className="pointer-events-auto relative h-full w-full">
+									<div
+										className="pointer-events-auto relative"
+										style={{
+											width: 'min(440px, calc(100vw - 120px))',
+											maxWidth: '440px',
+											height: '24px',
+											// Optical nudge: align the tray with the visible search bar below.
+											transform: `translateX(-5px) scale(${MAP_VIEW_UI_SCALE})`,
+											transformOrigin: 'top center',
+										}}
+									>
 										{/* Background box behind tabs (matches search bar width & centering) */}
 										<div
 											aria-hidden="true"
@@ -5608,18 +6144,22 @@ const DashboardContent = () => {
 													<div
 														style={{
 															position: 'fixed',
-															top: '9px',
-															left: '9px',
-															right: '9px',
-															bottom: '9px',
+															top: 0,
+															left: 0,
+															right: 0,
+															bottom: 0,
 															zIndex: 99,
+															pointerEvents: 'none',
 														}}
 													>
 														<div
-															ref={mapViewContainerRef}
-															className="w-full h-full rounded-[8px] border-[3px] border-[#143883] overflow-hidden relative"
+															// Frame is drawn/animated by the shared map portal.
+															// This wrapper exists only to clip/anchor map-view overlays.
+															className="w-full h-full overflow-hidden relative pointer-events-none"
 														>
-															<SearchResultsMap
+															{/* Map is rendered by the shared portal */}
+															{false && (
+																<SearchResultsMap
 																contacts={
 																	// Show placeholder dots while in fromHome loading state
 																	fromHomeParam && (!isSignedIn || !hasSearched)
@@ -5653,16 +6193,7 @@ const DashboardContent = () => {
 																	}
 																}}
 																activeTool={activeMapTool}
-																selectedAreaBounds={
-																	mapBboxFilter
-																		? {
-																				south: mapBboxFilter.south,
-																				west: mapBboxFilter.west,
-																				north: mapBboxFilter.north,
-																				east: mapBboxFilter.east,
-																		  }
-																		: null
-																}
+																selectedAreaBounds={selectedAreaBoundsForMap}
 																onViewportInteraction={handleMapViewportInteraction}
 																onViewportIdle={handleMapViewportIdle}
 																	onAreaSelect={(bounds, payload) => {
@@ -5836,6 +6367,7 @@ const DashboardContent = () => {
 																	setTimeout(() => tryScroll(0), 0);
 																}}
 															/>
+															)}
 															{hasNoSearchResults && !isError && (
 																<div className="absolute inset-0 z-[120] flex items-start justify-center pt-[120px] pointer-events-none">
 																	<div
@@ -5952,7 +6484,7 @@ const DashboardContent = () => {
 															    so the UI doesn't disappear between state searches. */}
 															{!isNarrowestDesktop && !hasNoSearchResults && (
 																	<div
-																		className="absolute top-[97px] right-[10px] rounded-[12px] flex flex-col"
+																		className="absolute top-[97px] right-[10px] flex flex-col pointer-events-auto"
 																		onMouseEnter={() => {
 																			if (!shouldUseDynamicMapCreateCampaignCta) return;
 																			setIsPointerInMapSidePanel(true);
@@ -5975,6 +6507,8 @@ const DashboardContent = () => {
 																				? '3px solid #000000'
 																				: '3px solid #143883',
 																			overflow: 'hidden',
+																			transform: `scale(${MAP_VIEW_UI_SCALE})`,
+																			transformOrigin: 'top right',
 																		}}
 																	>
 																		{/* Header area for right-hand panel (same color as panel) */}
@@ -6032,7 +6566,8 @@ const DashboardContent = () => {
 																					rows={Math.max(mapPanelContacts.length, 14)}
 																				/>
 																			) : (
-																				mapPanelContacts.map((contact) => {
+																				<div ref={mapPanelRowsDesktopRef} className="space-y-[7px]">
+																				{mapPanelContacts.map((contact) => {
 																				const isSelected = selectedContacts.includes(
 																					contact.id
 																				);
@@ -6374,7 +6909,8 @@ const DashboardContent = () => {
 																						)}
 																					</div>
 																				);
-																				})
+																				})}
+																				</div>
 																			)}
 																		</CustomScrollbar>
 																		{!isMapResultsLoading && isMapPanelCreateCampaignVisible && !fromHomeParam && (
@@ -6520,13 +7056,15 @@ const DashboardContent = () => {
 															{/* Keep mounted during loading so UI doesn't disappear between state searches. */}
 															{isNarrowestDesktop && !hasNoSearchResults && (
 																	<div
-																		className="absolute left-[10px] right-[10px] bottom-[10px] rounded-[12px] shadow-lg flex flex-col"
+																		className="absolute left-[10px] right-[10px] bottom-[10px] shadow-lg flex flex-col"
 																		style={{
 																			height: '45%',
 																			maxHeight: 'calc(100% - 20px)',
 																			backgroundColor: '#AFD6EF',
 																			border: '3px solid #143883',
 																			overflow: 'hidden',
+																			transform: `scale(${MAP_VIEW_UI_SCALE})`,
+																			transformOrigin: 'bottom center',
 																		}}
 																	>
 																		{/* Header area */}
@@ -6582,7 +7120,8 @@ const DashboardContent = () => {
 																			rows={Math.max(mapPanelContacts.length, 8)}
 																		/>
 																	) : (
-																		mapPanelContacts.map((contact) => {
+																		<div ref={mapPanelRowsNarrowRef} className="space-y-[7px]">
+																		{mapPanelContacts.map((contact) => {
 																		const isSelected = selectedContacts.includes(
 																			contact.id
 																		);
@@ -6815,7 +7354,8 @@ const DashboardContent = () => {
 																				</div>
 																			</div>
 																		);
-																		})
+																		})}
+																		</div>
 																	)}
 														</CustomScrollbar>
 															{!isMapResultsLoading && !fromHomeParam && (
@@ -7066,7 +7606,76 @@ const DashboardContent = () => {
 							willChange: 'transform, opacity',
 						}}
 					>
-						<CampaignsTable />
+						{(() => {
+							const panels = [
+								{
+									key: 'new',
+									label: 'New',
+									render: () => (
+										<InboundEmailNotificationList enabled={isSignedIn === true} />
+									),
+								},
+								{
+									key: 'campaigns',
+									label: 'Campaigns',
+									render: () => <CampaignsTable />,
+								},
+								{
+									key: 'responses',
+									label: 'Responses',
+									render: () => (
+										<DashboardResponsesWidget enabled={isSignedIn === true} />
+									),
+								},
+							] as const;
+
+							const activePanel =
+								panels.find((panel) => panel.key === dashboardLandingPanel) ??
+								panels[0];
+							const inactivePanels = panels.filter(
+								(panel) => panel.key !== activePanel.key
+							);
+							// UX tweak: when viewing Responses, show Campaigns above New.
+							const inactivePanelsToRender =
+								activePanel.key === 'responses'
+									? inactivePanels.slice().reverse()
+									: inactivePanels;
+
+							return (
+								<>
+									<div className="mt-[18px] mb-[18px] w-full flex flex-col items-center">
+										{activePanel.render()}
+									</div>
+
+									{inactivePanelsToRender.map((panel) => (
+										<div
+											key={panel.key}
+											className="w-[603px] max-w-full mx-auto"
+										>
+											<button
+												type="button"
+												onClick={() => setDashboardLandingPanel(panel.key)}
+												className="flex items-center justify-center gap-[6px] cursor-pointer opacity-60 hover:opacity-100 transition-opacity"
+												style={{
+													width: '127px',
+													height: '26px',
+													borderRadius: '12px',
+													border: '1px solid #ccc',
+													backgroundColor: '#fff',
+													fontSize: '13px',
+													fontWeight: 500,
+													color: '#333',
+													marginBottom: '12px',
+												}}
+											>
+												<CampaignsDropdownIcon style={{ flexShrink: 0 }} />
+												{panel.label}
+											</button>
+										</div>
+									))}
+								</>
+							);
+						})()}
 					</div>
 				)}
 
@@ -7157,6 +7766,8 @@ const DashboardContent = () => {
 					)}
 			</div>
 		</AppLayout>
+
+		</>
 	);
 };
 
