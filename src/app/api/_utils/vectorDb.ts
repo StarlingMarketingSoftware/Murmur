@@ -876,6 +876,232 @@ export const searchContactsByLocation = async (
 	};
 };
 
+// Curated random sampler: pulls contacts whose title begins with one of the given
+// prefixes, optionally biased toward a geographic centroid, and shuffles them via
+// ES `random_score` so each call returns a different set. Uses no embeddings —
+// pure Elasticsearch, no OpenAI.
+//
+// Live music boost: the candidate pool is also biased toward rows whose
+// title/headline/metadata/companyKeywords mention live music, concerts, gigs,
+// show/set times, or related performance signals. This is layered on top of
+// the random_score so each click still varies, but live-music-mentioning rows
+// are over-represented in the returned candidate pool that feeds the in-memory
+// distribution pipeline. See `LIVE_MUSIC_TERMS` below for the full vocabulary.
+export type CuratedSamplerOptions = {
+	titlePrefixes: string[];
+	limit?: number;
+	candidatePool?: number;
+	center?: { lat: number; lon: number } | null;
+	radiusKm?: number;
+	seed?: number;
+};
+
+// Vocabulary used to detect live-music intent in a contact's text fields. Kept
+// in one place so the ES sampler boost and the in-memory tier in
+// curated-search/distribution.ts can stay in sync. Strong terms (an explicit
+// "live music" / "music venue" / "concert venue" mention) get a much larger
+// boost than weaker hints ("performance", "stage", "shows").
+const LIVE_MUSIC_STRONG_TERMS = [
+	'live music',
+	'live-music',
+	'music venue',
+	'music venues',
+	'concert venue',
+	'concert hall',
+	'music hall',
+	'live performance',
+	'live performances',
+	'show times',
+	'showtimes',
+	'set times',
+	'tour dates',
+	'live entertainment',
+	'live shows',
+	'live acts',
+	'live bands',
+] as const;
+
+const LIVE_MUSIC_WEAK_TERMS = [
+	'concert',
+	'concerts',
+	'gig',
+	'gigs',
+	'jazz',
+	'blues',
+	'band',
+	'bands',
+	'open mic',
+	'singer-songwriter',
+	'songwriter',
+	'performance',
+	'performances',
+	'stage',
+	'shows',
+	'performing arts',
+	'touring',
+] as const;
+
+export const sampleContactsByCategory = async (options: CuratedSamplerOptions) => {
+	const limit = Math.max(1, Math.min(options.limit ?? 50, 2500));
+	const candidatePool = Math.max(limit, Math.min(options.candidatePool ?? 400, 2500));
+	const seed = options.seed ?? Date.now();
+
+	const titleClauses: Record<string, unknown>[] = [];
+	for (const prefix of options.titlePrefixes) {
+		const lc = prefix.trim().toLowerCase();
+		if (!lc) continue;
+		// case_insensitive matches whether or not the keyword normalizer is applied
+		// to the search term — robust against mapping drift.
+		titleClauses.push({
+			prefix: { 'title.keyword': { value: lc, case_insensitive: true } },
+		});
+		// Fall-back match against the analyzed text field too, in case some titles
+		// landed without the keyword sub-field populated.
+		titleClauses.push({
+			match_phrase_prefix: { title: prefix.trim() },
+		});
+	}
+
+	const filter: Record<string, unknown>[] = [];
+	if (titleClauses.length > 0) {
+		filter.push({ bool: { should: titleClauses, minimum_should_match: 1 } });
+	}
+
+	if (options.center) {
+		filter.push({
+			geo_distance: {
+				distance: `${Math.max(1, options.radiusKm ?? 250)}km`,
+				coordinates: {
+					lat: options.center.lat,
+					lon: options.center.lon,
+				},
+			},
+		});
+	}
+
+	const baseQuery =
+		filter.length > 0 ? { bool: { filter } } : { match_all: {} };
+
+	// Live music boost functions. Each `filter` clause matches a live-music
+	// signal in one of the searchable text fields (title/headline/metadata/
+	// companyKeywords/companyIndustry/companyType). When a doc matches, its
+	// `weight` multiplier is added to the random score via `score_mode: sum` —
+	// so a row with several live-music hits across multiple fields lifts much
+	// higher than one with a single weak hit, while non-music rows keep their
+	// raw random score.
+	//
+	// The `match_phrase` clauses are intentionally `match_phrase` rather than
+	// `match` so multi-word phrases like "live music" don't fire on the
+	// individual tokens "live" and "music" appearing anywhere in the doc.
+	const liveMusicFunctions: Record<string, unknown>[] = [];
+	const SEARCHABLE_TEXT_FIELDS = [
+		'title',
+		'headline',
+		'metadata',
+		'companyKeywords',
+		'companyIndustry',
+		'companyType',
+		'company',
+	] as const;
+	const STRONG_WEIGHT = 6;
+	const WEAK_WEIGHT = 1.5;
+	for (const term of LIVE_MUSIC_STRONG_TERMS) {
+		for (const field of SEARCHABLE_TEXT_FIELDS) {
+			liveMusicFunctions.push({
+				filter: { match_phrase: { [field]: term } },
+				weight: STRONG_WEIGHT,
+			});
+		}
+	}
+	for (const term of LIVE_MUSIC_WEAK_TERMS) {
+		for (const field of SEARCHABLE_TEXT_FIELDS) {
+			liveMusicFunctions.push({
+				filter: { match_phrase: { [field]: term } },
+				weight: WEAK_WEIGHT,
+			});
+		}
+	}
+
+	// Layering:
+	//  - random_score establishes a per-call randomized baseline in [0,1).
+	//  - live-music weight functions add fixed bonuses (sum) when any field
+	//    contains a live-music phrase. A non-music row keeps its [0,1) score;
+	//    a row with one strong hit jumps to ~6+, a row with multiple hits jumps
+	//    higher, so live-music rows reliably sort above non-music rows in the
+	//    candidate pool while still varying per click within their own group.
+	const results = await elasticsearch.search<ContactDocument>({
+		index: INDEX_NAME,
+		size: Math.min(candidatePool, 2500),
+		query: {
+			function_score: {
+				query: baseQuery,
+				functions: [
+					{ random_score: { seed, field: '_seq_no' } },
+					...liveMusicFunctions,
+				],
+				score_mode: 'sum',
+				boost_mode: 'replace',
+			},
+		},
+		fields: [
+			'contactId',
+			'email',
+			'firstName',
+			'lastName',
+			'company',
+			'title',
+			'headline',
+			'city',
+			'state',
+			'country',
+			'address',
+			'website',
+			'metadata',
+			'companyFoundedYear',
+			'companyType',
+			'companyTechStack',
+			'companyKeywords',
+			'companyIndustry',
+			'location',
+			'coordinates',
+		],
+		_source: false,
+	});
+
+	const matches = results.hits.hits.slice(0, limit).map((hit) => ({
+		id: hit._id,
+		score: hit._score || 0,
+		metadata: {
+			contactId: hit.fields?.contactId?.[0],
+			email: hit.fields?.email?.[0],
+			firstName: hit.fields?.firstName?.[0] ?? null,
+			lastName: hit.fields?.lastName?.[0] ?? null,
+			company: hit.fields?.company?.[0],
+			title: hit.fields?.title?.[0],
+			headline: hit.fields?.headline?.[0],
+			city: hit.fields?.city?.[0],
+			state: hit.fields?.state?.[0],
+			country: hit.fields?.country?.[0],
+			address: hit.fields?.address?.[0],
+			website: hit.fields?.website?.[0],
+			metadata: hit.fields?.metadata?.[0],
+			companyFoundedYear: hit.fields?.companyFoundedYear?.[0],
+			companyType: hit.fields?.companyType?.[0],
+			companyTechStack: hit.fields?.companyTechStack?.[0],
+			companyKeywords: hit.fields?.companyKeywords?.[0],
+			companyIndustry: hit.fields?.companyIndustry?.[0],
+			location: hit.fields?.location?.[0],
+			coordinates: hit.fields?.coordinates?.[0] || null,
+		},
+	}));
+
+	return {
+		matches,
+		totalFound: matches.length,
+		seed,
+	};
+};
+
 // Debug function - only use in development
 export const debugElasticsearch = async () => {
 	if (process.env.NODE_ENV === 'production') {

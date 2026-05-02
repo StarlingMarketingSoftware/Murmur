@@ -451,6 +451,76 @@ export const useGetContactsMapOverlay = (options: {
 	});
 };
 
+export interface CuratedSearchResult {
+	categoryBreakdown: Record<string, number>;
+	center: { lat: number; lon: number } | null;
+	radiusKm: number | null;
+	city: string | null;
+	region: string | null;
+	contacts: ContactWithName[];
+}
+
+export interface CuratedSearchVariables {
+	lat?: number | null;
+	lon?: number | null;
+	radiusKm?: number | null;
+	category?: string | null;
+	limit?: number;
+}
+
+export const useCuratedContactsSearch = (options: CustomMutationOptions = {}) => {
+	const { suppressToasts = true, onSuccess: onSuccessCallback } = options;
+
+	return useMutation({
+		mutationFn: async (vars: CuratedSearchVariables = {}): Promise<CuratedSearchResult> => {
+			const params: Record<string, string> = {};
+			if (typeof vars.lat === 'number' && Number.isFinite(vars.lat)) {
+				params.lat = String(vars.lat);
+			}
+			if (typeof vars.lon === 'number' && Number.isFinite(vars.lon)) {
+				params.lon = String(vars.lon);
+			}
+			if (typeof vars.radiusKm === 'number' && Number.isFinite(vars.radiusKm)) {
+				params.radiusKm = String(vars.radiusKm);
+			}
+			if (vars.category) params.category = vars.category;
+			if (typeof vars.limit === 'number') params.limit = String(vars.limit);
+			const url = appendQueryParamsToUrl(
+				urls.api.contacts.curatedSearch.index,
+				params
+			);
+			const response = await _fetch(url, undefined, undefined, { timeout: 25000 });
+			if (!response.ok) {
+				let errorMessage = 'Failed to fetch curated picks';
+				try {
+					const errorData = await response.json();
+					errorMessage = errorData.error || errorMessage;
+				} catch {
+					try {
+						const textError = await response.text();
+						errorMessage = textError || `HTTP ${response.status} error`;
+					} catch {
+						errorMessage = `HTTP ${response.status} error`;
+					}
+				}
+				throw new Error(errorMessage);
+			}
+			return response.json() as Promise<CuratedSearchResult>;
+		},
+		onSuccess: (data) => {
+			onSuccessCallback?.();
+			if (!suppressToasts) {
+				toast.success(`Showing ${data.contacts.length} curated picks`);
+			}
+		},
+		onError: (error) => {
+			if (!suppressToasts) {
+				toast.error(error.message || 'Failed to fetch curated picks');
+			}
+		},
+	});
+};
+
 export interface GeocodeContactsResult {
 	message: string;
 	processed: number;

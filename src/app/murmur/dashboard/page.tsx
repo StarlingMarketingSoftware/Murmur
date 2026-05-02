@@ -65,6 +65,7 @@ import { useGlobeNightLighting } from '@/hooks/useGlobeNightLighting';
 import { ContactWithName } from '@/types/contact';
 import { MapResultsPanelSkeleton } from '@/components/molecules/MapResultsPanelSkeleton/MapResultsPanelSkeleton';
 import { buildAllUsStateNames, getNearestUsStateNames, normalizeUsStateName } from '@/utils/usStates';
+import { getApproximateLocation } from '@/utils/approximateLocation';
 import {
 	ContactResearchPanel,
 	ContactResearchHorizontalStrip,
@@ -1518,6 +1519,7 @@ const DashboardContent = () => {
 		isFromHomeDemoMode,
 		mapBboxFilter,
 		setMapBboxFilter,
+		triggerCuratedSearch,
 	} = useDashboard({ derivedTitle: derivedContactTitle, forceApplyDerivedTitle: shouldForceApplyDerivedTitle, fromHome: fromHomeParam });
 
 	// Best-effort: infer the user's US state **without** prompting for geolocation permission.
@@ -3893,10 +3895,9 @@ const DashboardContent = () => {
 										<form
 											onSubmit={async (e) => {
 												e.preventDefault();
-												await ensureNonEmptyDashboardSearchOnBlankSubmit();
+
 												if (!isSignedIn) {
 													if (hasProblematicBrowser) {
-														// For Edge/Safari, navigate to sign-in page
 														console.log(
 															'[Dashboard] Edge/Safari detected, navigating to sign-in page'
 														);
@@ -3910,18 +3911,49 @@ const DashboardContent = () => {
 													} else {
 														openSignIn();
 													}
-												} else {
-													// Switch to search tab when submitting from inbox tab
-													if (activeTab === 'inbox') {
-														transitionToTab('search', {
-															after: () => {
-																form.handleSubmit(onSubmit)();
-															},
-														});
-														return;
-													}
-													form.handleSubmit(onSubmit)(e);
+													return;
 												}
+
+												// Curated path: when why/what/where are all blank, the gradient/search
+												// button surfaces a randomly-curated set of nearby venues/restaurants/
+												// coffee shops/festivals/wineries/breweries via Elasticsearch vector
+												// search. Different every click. No location prompt.
+												const isWhyWhatWhereBlank =
+													!whyValue.trim() &&
+													!whatValue.trim() &&
+													!whereValue.trim();
+												if (isWhyWhatWhereBlank && !isFromHomeDemoMode) {
+													setActiveSection(null);
+													// Resolve coarse lat/lon from the user's IP (cached 24h,
+													// no permission prompt). Works locally and in prod —
+													// covers the gaps where Vercel headers aren't populated.
+													let lat: number | null = null;
+													let lon: number | null = null;
+													try {
+														const loc = await getApproximateLocation();
+														lat = loc.lat;
+														lon = loc.lon;
+													} catch {
+														// Non-fatal — backend still infers from headers if present
+														// and falls back to an unrestricted curated set otherwise.
+													}
+													await triggerCuratedSearch({
+														lat: lat ?? undefined,
+														lon: lon ?? undefined,
+													});
+													return;
+												}
+
+												await ensureNonEmptyDashboardSearchOnBlankSubmit();
+												if (activeTab === 'inbox') {
+													transitionToTab('search', {
+														after: () => {
+															form.handleSubmit(onSubmit)();
+														},
+													});
+													return;
+												}
+												form.handleSubmit(onSubmit)(e);
 											}}
 											className={hasSearched ? 'search-form-active' : ''}
 										>
