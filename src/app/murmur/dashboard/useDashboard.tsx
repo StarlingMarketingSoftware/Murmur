@@ -10,6 +10,7 @@ import { useCreateCampaign } from '@/hooks/queryHooks/useCampaigns';
 import { urls } from '@/constants/urls';
 import {
 	useBatchUpdateContacts,
+	useCuratedContactsSearch,
 	useGetContacts,
 	useGetUsedContactIds,
 } from '@/hooks/queryHooks/useContacts';
@@ -121,12 +122,19 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 	// Immediate search pending state - set true instantly on search click
 	const [isSearchPending, setIsSearchPending] = useState(false);
 
+	// Curated search results: populated by triggerCuratedSearch (gradient/search button click
+	// when the why/what/where fields are blank). When this is set, we surface these contacts
+	// instead of the standard /api/contacts results so the existing map + UI rendering picks
+	// them up without a separate code path.
+	const [curatedContacts, setCuratedContacts] = useState<ContactWithName[] | null>(null);
+	const [isCuratedSearchActive, setIsCuratedSearchActive] = useState(false);
+
 	const {
-		data: contacts,
+		data: rawContacts,
 		isPending: isPendingContacts,
-		isLoading: isLoadingContacts,
+		isLoading: isLoadingRawContacts,
 		error,
-		isRefetching: isRefetchingContacts,
+		isRefetching: isRefetchingRawContacts,
 		isError,
 	} = useGetContacts({
 		filters: {
@@ -143,8 +151,28 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 			bboxTitlePrefix: mapBboxFilter?.titlePrefix ?? undefined,
 			fromHome,
 		},
-		enabled: hasSearched && !!activeSearchQuery && activeSearchQuery.trim().length > 0,
+		enabled:
+			hasSearched &&
+			!isCuratedSearchActive &&
+			!!activeSearchQuery &&
+			activeSearchQuery.trim().length > 0,
 	});
+
+	const contacts = useMemo(
+		() => (isCuratedSearchActive ? curatedContacts ?? [] : rawContacts),
+		[isCuratedSearchActive, curatedContacts, rawContacts]
+	);
+
+	const {
+		mutateAsync: runCuratedSearch,
+		isPending: isPendingCuratedSearch,
+	} = useCuratedContactsSearch({ suppressToasts: true });
+
+	const isLoadingContacts = isCuratedSearchActive
+		? isPendingCuratedSearch
+		: isLoadingRawContacts;
+	const isRefetchingContacts = isCuratedSearchActive ? false : isRefetchingRawContacts;
+
 	const { mutateAsync: importApolloContacts, isPending: isPendingImportApolloContacts } =
 		useCreateApolloContacts({});
 
@@ -239,6 +267,9 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 		setIsSearchPending(true);
 		// New searches clear any prior map selection box filter.
 		setMapBboxFilter(null);
+		// A real query overrides any active curated session.
+		setIsCuratedSearchActive(false);
+		setCuratedContacts(null);
 		// Update search parameters
 		setActiveSearchQuery(data.searchText);
 		setActiveExcludeUsedContacts(data.excludeUsedContacts ?? false);
@@ -251,12 +282,56 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 		setHasSearched(false);
 		setActiveSearchQuery('');
 		setMapBboxFilter(null);
+		setIsCuratedSearchActive(false);
+		setCuratedContacts(null);
 		// Reset selection when leaving the search/results flow (fresh dashboard start should not
 		// carry over prior selections).
 		setSelectedContacts([]);
 		setIsAllSelected(false);
 		form.reset();
 	};
+
+	// Surprise-me curated search: triggered by the gradient/search button when the why/what/where
+	// fields are blank. Picks a random category in the user's general area (no prompt) and shows
+	// ~50 results on the map. Different every click. No OpenAI calls — pure Elasticsearch.
+	const triggerCuratedSearch = useCallback(
+		async (overrides?: {
+			lat?: number | null;
+			lon?: number | null;
+			radiusKm?: number | null;
+			category?: string | null;
+		}) => {
+			setIsSearchPending(true);
+			setMapBboxFilter(null);
+			setIsCuratedSearchActive(true);
+			setHasSearched(true);
+			setIsMapView(true);
+			try {
+				const result = await runCuratedSearch({
+					lat: overrides?.lat ?? undefined,
+					lon: overrides?.lon ?? undefined,
+					radiusKm: overrides?.radiusKm ?? undefined,
+					category: overrides?.category ?? undefined,
+					limit: 50,
+				});
+				setCuratedContacts(result.contacts);
+				const where = result.city ?? result.region ?? 'your area';
+				setActiveSearchQuery(`Curated picks near ${where}`);
+				return result;
+			} catch (err) {
+				toast.error(
+					err instanceof Error ? err.message : 'Failed to load curated picks'
+				);
+				setIsCuratedSearchActive(false);
+				setCuratedContacts(null);
+				setHasSearched(false);
+				throw err;
+			} finally {
+				setIsSearchPending(false);
+			}
+		},
+		[runCuratedSearch]
+	);
 
 	const handleSelectAll = (panelContacts?: ContactWithName[]) => {
 		if (!contacts || contacts.length === 0) return;
@@ -837,5 +912,8 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 		isSearchPending,
 		mapBboxFilter,
 		setMapBboxFilter,
+		triggerCuratedSearch,
+		isCuratedSearchActive,
+		isPendingCuratedSearch,
 	};
 };

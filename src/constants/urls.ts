@@ -81,6 +81,9 @@ export const urls = {
 		},
 		contacts: {
 			index: '/api/contacts',
+			curatedSearch: {
+				index: '/api/contacts/curated-search',
+			},
 			mapOverlay: {
 				index: '/api/contacts/map-overlay',
 			},
