@@ -465,6 +465,7 @@ export interface CuratedSearchVariables {
 	lon?: number | null;
 	radiusKm?: number | null;
 	category?: string | null;
+	state?: string | null;
 	limit?: number;
 }
 
@@ -484,6 +485,7 @@ export const useCuratedContactsSearch = (options: CustomMutationOptions = {}) =>
 				params.radiusKm = String(vars.radiusKm);
 			}
 			if (vars.category) params.category = vars.category;
+			if (vars.state) params.state = vars.state;
 			if (typeof vars.limit === 'number') params.limit = String(vars.limit);
 			const url = appendQueryParamsToUrl(
 				urls.api.contacts.curatedSearch.index,

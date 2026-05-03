@@ -106,6 +106,9 @@ const getContactCategoryDisplaySource = (
 	contact: Pick<ContactWithName, 'curatedDisplayLabel' | 'title'>
 ): string => contact.curatedDisplayLabel || contact.title || '';
 
+const isCuratedPicksSearchQuery = (query: string): boolean =>
+	/^curated picks near\b/i.test(query.trim());
+
 const extractStateAbbrFromSearchQuery = (query: string): string | null => {
 	// Search queries are typically formatted like: "[Promotion] Radio Stations (Maine)"
 	// or "[Booking] Venues (Portland, ME)". We only infer state from the parenthetical
@@ -1524,7 +1527,46 @@ const DashboardContent = () => {
 		mapBboxFilter,
 		setMapBboxFilter,
 		triggerCuratedSearch,
+		isCuratedSearchActive,
 	} = useDashboard({ derivedTitle: derivedContactTitle, forceApplyDerivedTitle: shouldForceApplyDerivedTitle, fromHome: fromHomeParam });
+
+	const handleMapStateSelect = useCallback(
+		(stateName: string) => {
+			// In demo mode, show the free trial prompt instead of searching
+			if (isFromHomeDemoMode) {
+				setShowFreeTrialPrompt(true);
+				return;
+			}
+
+			const nextState = (stateName || '').trim();
+			if (!nextState) return;
+
+			const isCurrentCuratedSearch =
+				isCuratedSearchActive || isCuratedPicksSearchQuery(activeSearchQuery);
+			if (isCurrentCuratedSearch) {
+				setWhereValue(nextState);
+				setIsNearMeLocation(false);
+				setActiveSection(null);
+				triggerCuratedSearch({ state: nextState }).catch(() => undefined);
+				return;
+			}
+
+			// Keep the last executed Why/What (the map is showing results for this query),
+			// and only swap the state for the next search.
+			const baseWhy = (extractWhyFromSearchQuery(activeSearchQuery) || whyValue).trim();
+			const baseWhat = (extractWhatFromSearchQuery(activeSearchQuery) || whatValue).trim();
+			triggerSearchWithWhere(nextState, false, { why: baseWhy, what: baseWhat });
+		},
+		[
+			activeSearchQuery,
+			isCuratedSearchActive,
+			isFromHomeDemoMode,
+			triggerCuratedSearch,
+			triggerSearchWithWhere,
+			whatValue,
+			whyValue,
+		]
+	);
 
 	// Best-effort: infer the user's US state **without** prompting for geolocation permission.
 	// This relies on hosting/proxy geolocation headers (e.g. Vercel). In local dev it returns null.
@@ -3603,26 +3645,7 @@ const DashboardContent = () => {
 								lockedStateName={lockedStateNameForMap}
 								skipAutoFit={skipAutoFitForMap}
 								onStateSelect={
-									isMapView
-										? (stateName) => {
-												// In demo mode, show the free trial prompt instead of searching
-												if (isFromHomeDemoMode) {
-													setShowFreeTrialPrompt(true);
-													return;
-												}
-
-												const nextState = (stateName || '').trim();
-												if (!nextState) return;
-
-												// Keep the last executed Why/What (the map is showing results for this query),
-												// and only swap the state for the next search.
-												const baseWhy =
-													(extractWhyFromSearchQuery(activeSearchQuery) || whyValue).trim();
-												const baseWhat =
-													(extractWhatFromSearchQuery(activeSearchQuery) || whatValue).trim();
-												triggerSearchWithWhere(nextState, false, { why: baseWhy, what: baseWhat });
-										  }
-										: undefined
+									isMapView ? handleMapStateSelect : undefined
 								}
 								isLoading={isSearchPending || isLoadingContacts || isRefetchingContacts}
 								onMarkerClick={
@@ -6338,24 +6361,7 @@ const DashboardContent = () => {
 																	// Prevent zoom for fromHome placeholder - keep map zoomed out over US
 																	(fromHomeParam && (!isSignedIn || !hasSearched)) || Boolean(mapBboxFilter)
 																}
-																onStateSelect={(stateName) => {
-																	// In demo mode, show the free trial prompt instead of searching
-																	if (isFromHomeDemoMode) {
-																		setShowFreeTrialPrompt(true);
-																		return;
-																	}
-
-																	const nextState = (stateName || '').trim();
-																	if (!nextState) return;
-
-																	// Keep the last executed Why/What (the map is showing results for this query),
-																	// and only swap the state for the next search.
-																	const baseWhy =
-																		(extractWhyFromSearchQuery(activeSearchQuery) || whyValue).trim();
-																	const baseWhat =
-																		(extractWhatFromSearchQuery(activeSearchQuery) || whatValue).trim();
-																	triggerSearchWithWhere(nextState, false, { why: baseWhy, what: baseWhat });
-																}}
+																onStateSelect={handleMapStateSelect}
 																isLoading={isSearchPending || isLoadingContacts || isRefetchingContacts}
 																onMarkerClick={(contact) => {
 																	// Ensure map-only overlay markers (e.g. Booking extra pins) can show up as

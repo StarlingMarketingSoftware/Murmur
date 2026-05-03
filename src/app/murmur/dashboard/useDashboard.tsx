@@ -300,6 +300,7 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 			lon?: number | null;
 			radiusKm?: number | null;
 			category?: string | null;
+			state?: string | null;
 		}) => {
 			setIsSearchPending(true);
 			setMapBboxFilter(null);
@@ -312,10 +313,11 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 					lon: overrides?.lon ?? undefined,
 					radiusKm: overrides?.radiusKm ?? undefined,
 					category: overrides?.category ?? undefined,
+					state: overrides?.state ?? undefined,
 					limit: 50,
 				});
 				setCuratedContacts(result.contacts);
-				const where = result.city ?? result.region ?? 'your area';
+				const where = result.city ?? result.region ?? overrides?.state ?? 'your area';
 				setActiveSearchQuery(`Curated picks near ${where}`);
 				return result;
 			} catch (err) {

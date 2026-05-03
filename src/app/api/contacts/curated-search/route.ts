@@ -132,6 +132,24 @@ const parseFloatOrNull = (value: string | null): number | null => {
 	return Number.isFinite(n) ? n : null;
 };
 
+const resolveStateCenter = (
+	value: string | null
+): { lat: number; lon: number; region: string } | null => {
+	const normalized = (value ?? '').trim().toLowerCase();
+	if (!normalized) return null;
+	const state = US_STATES.find(
+		(candidate) =>
+			candidate.name.toLowerCase() === normalized ||
+			candidate.abbr.toLowerCase() === normalized
+	);
+	if (!state) return null;
+	return {
+		lat: state.centroid.lat,
+		lon: state.centroid.lng,
+		region: state.name,
+	};
+};
+
 interface ResolvedCenter {
 	lat: number | null;
 	lon: number | null;
@@ -363,6 +381,7 @@ export async function GET(req: NextRequest) {
 		const overrideLat = parseFloatOrNull(url.searchParams.get('lat'));
 		const overrideLon = parseFloatOrNull(url.searchParams.get('lon'));
 		const overrideRadiusKm = parseFloatOrNull(url.searchParams.get('radiusKm'));
+		const stateCenter = resolveStateCenter(url.searchParams.get('state'));
 		const requestedCategoryPrefixes = resolveRequestedCategoryPrefixes(
 			url.searchParams.get('category')
 		);
@@ -372,7 +391,14 @@ export async function GET(req: NextRequest) {
 			return Math.max(1, Math.min(Math.trunc(parsed), MAX_RESULT_COUNT));
 		})();
 
-		const center = inferCenterFromRequest(req, { lat: overrideLat, lon: overrideLon });
+		const center = stateCenter
+			? {
+					lat: stateCenter.lat,
+					lon: stateCenter.lon,
+					city: null,
+					region: stateCenter.region,
+			  }
+			: inferCenterFromRequest(req, { lat: overrideLat, lon: overrideLon });
 		const hasCenter = center.lat != null && center.lon != null;
 		const requestedRadiusKm = hasCenter
 			? overrideRadiusKm ?? DEFAULT_RADIUS_KM
