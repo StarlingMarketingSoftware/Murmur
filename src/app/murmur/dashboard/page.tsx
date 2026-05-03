@@ -2136,6 +2136,11 @@ const DashboardContent = () => {
 	// 2. We're in fromHome mode and the search hasn't been executed yet (user not signed in or waiting for search trigger)
 	const isMapResultsLoading = isSearchPending || isLoadingContacts || isRefetchingContacts ||
 		(fromHomeParam && isMapView && (!isSignedIn || !hasSearched));
+	const shouldRenderSearchResultsStage =
+		activeTab === 'search' &&
+		(activeSearchQuery.trim().length > 0 ||
+			fromHomeParam ||
+			(isMapView && hasSearched && isMapResultsLoading));
 	const isSelectMapToolActive = activeMapTool === 'select';
 	const isGrabMapToolActive = activeMapTool === 'grab';
 	const hasNoSearchResults =
@@ -6183,7 +6188,7 @@ const DashboardContent = () => {
 						return searchBar;
 					})()}
 
-					{(activeSearchQuery || fromHomeParam) && activeTab === 'search' && (
+					{shouldRenderSearchResultsStage && (
 					<>
 						{isSearchPending ||
 						  isLoadingContacts ||
