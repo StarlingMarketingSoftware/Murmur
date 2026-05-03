@@ -41,6 +41,54 @@ const elasticsearch = new Client({
 	maxRetries: 3,
 });
 
+let contactsIndexHasGeoCoordinatesFieldPromise: Promise<boolean> | null = null;
+let loggedMissingGeoCoordinatesField = false;
+
+const logMissingGeoCoordinatesFieldOnce = (
+	message: string,
+	error?: unknown
+): void => {
+	if (loggedMissingGeoCoordinatesField) return;
+	loggedMissingGeoCoordinatesField = true;
+	if (error) {
+		console.warn(message, error);
+		return;
+	}
+	console.warn(message);
+};
+
+const contactsIndexHasGeoCoordinatesField = async (): Promise<boolean> => {
+	if (!contactsIndexHasGeoCoordinatesFieldPromise) {
+		contactsIndexHasGeoCoordinatesFieldPromise = (async () => {
+			try {
+				const currentMapping = await elasticsearch.indices.getMapping({
+					index: INDEX_NAME,
+				});
+				const indexMappings = Object.values(currentMapping);
+				const hasGeoPoint =
+					indexMappings.length > 0 &&
+					indexMappings.every(
+						(mapping) =>
+							mapping.mappings?.properties?.coordinates?.type === 'geo_point'
+					);
+				if (!hasGeoPoint) {
+					logMissingGeoCoordinatesFieldOnce(
+						'[vectorDb] contacts index is missing geo_point mapping for `coordinates`; curated ES sampling will skip geo_distance and Prisma will enforce locality.'
+					);
+				}
+				return hasGeoPoint;
+			} catch (error) {
+				logMissingGeoCoordinatesFieldOnce(
+					'[vectorDb] unable to inspect contacts index geo mapping; curated ES sampling will skip geo_distance and Prisma will enforce locality.',
+					error
+				);
+				return false;
+			}
+		})();
+	}
+	return contactsIndexHasGeoCoordinatesFieldPromise;
+};
+
 interface ContactDocument {
 	vector_field: number[];
 	contactId: string;
@@ -229,13 +277,15 @@ export const updateWithNewFields = async () => {
 			index: INDEX_NAME,
 		});
 
-		const existingProperties = currentMapping[INDEX_NAME]?.mappings?.properties || {};
+		const existingProperties =
+			Object.values(currentMapping)[0]?.mappings?.properties || {};
 
 		const newFields = {
 			companyType: { type: 'text' },
 			companyTechStack: { type: 'text' },
 			companyKeywords: { type: 'text' },
 			companyIndustry: { type: 'text' },
+			coordinates: { type: 'geo_point' },
 		};
 
 		const fieldsToUpdate: Record<string, MappingProperty> = {};
@@ -945,6 +995,9 @@ export const sampleContactsByCategory = async (options: CuratedSamplerOptions) =
 	const limit = Math.max(1, Math.min(options.limit ?? 50, 2500));
 	const candidatePool = Math.max(limit, Math.min(options.candidatePool ?? 400, 2500));
 	const seed = options.seed ?? Date.now();
+	const canUseGeoDistance = options.center
+		? await contactsIndexHasGeoCoordinatesField()
+		: false;
 
 	const titleClauses: Record<string, unknown>[] = [];
 	for (const prefix of options.titlePrefixes) {
@@ -967,7 +1020,7 @@ export const sampleContactsByCategory = async (options: CuratedSamplerOptions) =
 		filter.push({ bool: { should: titleClauses, minimum_should_match: 1 } });
 	}
 
-	if (options.center) {
+	if (options.center && canUseGeoDistance) {
 		filter.push({
 			geo_distance: {
 				distance: `${Math.max(1, options.radiusKm ?? 250)}km`,

@@ -493,8 +493,17 @@ export async function GET(req: NextRequest) {
 
 		if (esRows.length > 0) {
 			candidateSources.add('es-per-category');
+			const uniqueEsIds = [...new Set(esRows.map((row) => row.id))];
 			const hydrated = await prisma.contact.findMany({
-				where: { id: { in: [...new Set(esRows.map((row) => row.id))] } },
+				where: {
+					AND: [
+						{ id: { in: uniqueEsIds } },
+						{ latitude: { not: null } },
+						{ longitude: { not: null } },
+						{ latitude: { gte: fetchBbox.south, lte: fetchBbox.north } },
+						{ longitude: { gte: fetchBbox.west, lte: fetchBbox.east } },
+					],
+				},
 			});
 			const byId = new Map(hydrated.map((c) => [c.id, c]));
 			for (const row of esRows) {
