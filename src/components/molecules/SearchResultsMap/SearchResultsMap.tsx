@@ -282,6 +282,67 @@ const EMPTY_POLYGON_FC: OutlinePolygonFeatureCollection = {
 	features: [],
 };
 
+const CURATED_BLOB_RADIUS_KM = 95;
+const CURATED_BLOB_CIRCLE_STEPS = 64;
+
+const buildMercatorCircleMultiPolygon = (
+	coords: LatLngLiteral,
+	radiusKm: number,
+	steps: number
+): ClippingMultiPolygon | null => {
+	if (
+		!Number.isFinite(coords.lng) ||
+		!Number.isFinite(coords.lat) ||
+		!Number.isFinite(radiusKm) ||
+		radiusKm <= 0 ||
+		steps < 8
+	) {
+		return null;
+	}
+
+	const center = mapboxgl.MercatorCoordinate.fromLngLat({
+		lng: coords.lng,
+		lat: coords.lat,
+	});
+	const radiusMercator = radiusKm * 1000 * center.meterInMercatorCoordinateUnits();
+	if (!Number.isFinite(radiusMercator) || radiusMercator <= 0) return null;
+
+	const ring: ClippingRing = [];
+	for (let i = 0; i < steps; i++) {
+		const angle = (i / steps) * Math.PI * 2;
+		ring.push([
+			center.x + Math.cos(angle) * radiusMercator,
+			center.y + Math.sin(angle) * radiusMercator,
+		]);
+	}
+
+	const closed = closeRing(ring);
+	return closed.length >= 4 ? [[closed]] : null;
+};
+
+const mercatorMultiPolygonToLngLat = (
+	multiPolygon: ClippingMultiPolygon
+): ClippingMultiPolygon => {
+	const converted: ClippingMultiPolygon = [];
+	for (const polygon of multiPolygon) {
+		const convertedPolygon: ClippingPolygon = [];
+		for (const ring of polygon) {
+			const convertedRing: ClippingRing = [];
+			for (const [x, y] of ring) {
+				if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+				const ll = new mapboxgl.MercatorCoordinate(x, y, 0).toLngLat();
+				if (Number.isFinite(ll.lng) && Number.isFinite(ll.lat)) {
+					convertedRing.push([ll.lng, ll.lat]);
+				}
+			}
+			const closed = closeRing(convertedRing);
+			if (closed.length >= 4) convertedPolygon.push(closed);
+		}
+		if (convertedPolygon.length) converted.push(convertedPolygon);
+	}
+	return converted;
+};
+
 const boundsToPolygonFeatureCollection = (
 	bounds: MapSelectionBounds,
 	properties: Record<string, unknown> = {}
@@ -2590,6 +2651,7 @@ const MAPBOX_SOURCE_IDS = {
 	states: 'murmur-states',
 	resultsOutline: 'murmur-results-outline',
 	lockedOutline: 'murmur-locked-outline',
+	curatedBlob: 'murmur-curated-blob',
 	selectionRect: 'murmur-selection-rect',
 	selectedAreaRect: 'murmur-selected-area-rect',
 	markersBase: 'murmur-markers-base',
@@ -2624,6 +2686,7 @@ const MAPBOX_LAYER_IDS = {
 	// Outlines
 	resultsOutline: 'murmur-results-outline-line',
 	lockedOutline: 'murmur-locked-outline-line',
+	curatedBlobCore: 'murmur-curated-blob-core-line',
 	// Markers (hit layers are used for hover/click priority)
 	markersAllHit: 'murmur-markers-all-hit',
 	markersAllDots: 'murmur-markers-all-dots',
@@ -3817,6 +3880,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const resultsSelectionMultiPolygonRef = useRef<ClippingMultiPolygon | null>(null);
 	const resultsSelectionBboxRef = useRef<BoundingBox | null>(null);
 	const resultsSelectionSignatureRef = useRef<string>('');
+	const curatedBlobSignatureRef = useRef<string>('');
 	const lastVisibleContactsKeyRef = useRef<string>('');
 	const usStatesPolygonsRef = useRef<PreparedClippingPolygon[] | null>(null);
 	const selectedStateKeyRef = useRef<string | null>(null);
@@ -4650,6 +4714,15 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			| mapboxgl.GeoJSONSource
 			| undefined;
 		source?.setData(EMPTY_POLYGON_FC as any);
+	}, [map, isMapLoaded]);
+
+	const clearCuratedBlobOutline = useCallback(() => {
+		curatedBlobSignatureRef.current = '';
+		if (!map || !isMapLoaded) return;
+		const source = map.getSource(MAPBOX_SOURCE_IDS.curatedBlob) as
+			| mapboxgl.GeoJSONSource
+			| undefined;
+		source?.setData(EMPTY_POLYGON_FC as GeoJSON.FeatureCollection);
 	}, [map, isMapLoaded]);
 
 	const clearSearchedStateOutline = useCallback(() => {
@@ -7888,6 +7961,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		}
 		ensureSource(MAPBOX_SOURCE_IDS.resultsOutline);
 		ensureSource(MAPBOX_SOURCE_IDS.lockedOutline);
+		ensureSource(MAPBOX_SOURCE_IDS.curatedBlob);
 		ensureSource(MAPBOX_SOURCE_IDS.selectedAreaRect);
 		ensureSource(MAPBOX_SOURCE_IDS.selectionRect);
 
@@ -8331,6 +8405,40 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		);
 
 		// Search-results outlines (blue + black) intentionally removed.
+
+		// Curated-search blob outline — plain white, behind all dot/pin layers.
+		ensureLayer({
+			id: MAPBOX_LAYER_IDS.curatedBlobCore,
+			type: 'line',
+			source: MAPBOX_SOURCE_IDS.curatedBlob,
+			layout: { 'line-join': 'round', 'line-cap': 'round' },
+			paint: {
+				'line-color': '#FFFFFF',
+				'line-opacity': [
+					'interpolate',
+					['linear'],
+					['zoom'],
+					MAP_MIN_ZOOM,
+					0.86,
+					8,
+					0.78,
+					14,
+					0.68,
+				],
+				'line-width': [
+					'interpolate',
+					['linear'],
+					['zoom'],
+					MAP_MIN_ZOOM,
+					5,
+					8,
+					4,
+					14,
+					3,
+				],
+				'line-blur': 0,
+			},
+		});
 
 		// All-contacts overlay (gray dots) — lowest marker priority
 		ensureLayer({
@@ -9454,6 +9562,122 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			coordsByContactId.get(contact.id) ?? null,
 		[coordsByContactId]
 	);
+
+	useEffect(() => {
+		if (!map || !isMapLoaded) return;
+
+		if (isLoading) {
+			clearCuratedBlobOutline();
+			return;
+		}
+
+		const curatedDots = visibleContacts
+			.map((contact) => ({
+				id: contact.id,
+				isCurated: Boolean(contact.curatedCategory),
+				coords: getContactCoords(contact),
+			}))
+			.filter(
+				(
+					dot
+				): dot is {
+					id: number;
+					isCurated: true;
+					coords: LatLngLiteral;
+				} => dot.isCurated && dot.coords != null
+			)
+			.sort((a, b) => a.id - b.id);
+
+		if (curatedDots.length === 0) {
+			clearCuratedBlobOutline();
+			return;
+		}
+
+		const signature = curatedDots
+			.map(
+				(dot) =>
+					`${dot.id}:${dot.coords.lng.toFixed(5)}:${dot.coords.lat.toFixed(5)}`
+			)
+			.join('|');
+		const nextSignature = `${CURATED_BLOB_RADIUS_KM}:${signature}`;
+		if (nextSignature === curatedBlobSignatureRef.current) return;
+
+		let cancelled = false;
+
+		const updateCuratedBlob = async () => {
+			const circleMultiPolygons = curatedDots
+				.map((dot) =>
+					buildMercatorCircleMultiPolygon(
+						dot.coords,
+						CURATED_BLOB_RADIUS_KM,
+						CURATED_BLOB_CIRCLE_STEPS
+					)
+				)
+				.filter((mp): mp is ClippingMultiPolygon => Boolean(mp?.length));
+
+			if (circleMultiPolygons.length === 0) {
+				if (!cancelled) clearCuratedBlobOutline();
+				return;
+			}
+
+			let unioned: ClippingMultiPolygon | null = null;
+			const wasmGeo = await ensureWasmGeoModuleLoaded();
+			if (cancelled) return;
+
+			if (typeof wasmGeo?.union_multi_polygons === 'function') {
+				try {
+					const out = wasmGeo.union_multi_polygons(circleMultiPolygons);
+					if (Array.isArray(out) && out.length) unioned = out;
+				} catch (err) {
+					logWasmGeoRuntimeError(err);
+				}
+			}
+
+			if (!unioned) {
+				try {
+					const { unionClippingMultiPolygons } = await import(
+						'@/utils/polygonClipping'
+					);
+					if (cancelled) return;
+					unioned = unionClippingMultiPolygons(...circleMultiPolygons);
+				} catch (err) {
+					console.error(
+						'Failed to build curated blob union; falling back to per-dot circles',
+						err
+					);
+				}
+			}
+
+			if (cancelled) return;
+
+			const mercatorMultiPolygon =
+				unioned && Array.isArray(unioned) && unioned.length
+					? unioned
+					: circleMultiPolygons.flat();
+			const lngLatMultiPolygon = mercatorMultiPolygonToLngLat(mercatorMultiPolygon);
+			const outlineFc = createOutlineGeoJsonFromMultiPolygon(lngLatMultiPolygon);
+			const source = map.getSource(MAPBOX_SOURCE_IDS.curatedBlob) as
+				| mapboxgl.GeoJSONSource
+				| undefined;
+			if (!source) return;
+
+			source.setData(outlineFc as GeoJSON.FeatureCollection);
+			curatedBlobSignatureRef.current = nextSignature;
+		};
+
+		void updateCuratedBlob();
+
+		return () => {
+			cancelled = true;
+		};
+	}, [
+		map,
+		isMapLoaded,
+		isLoading,
+		visibleContacts,
+		getContactCoords,
+		clearCuratedBlobOutline,
+	]);
 
 	const handleMapMouseUp = useCallback(
 		(e: mapboxgl.MapMouseEvent) => {
