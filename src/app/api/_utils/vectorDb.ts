@@ -2,6 +2,7 @@ import { Contact } from '@prisma/client';
 import { OpenAI } from 'openai';
 import { Client, estypes } from '@elastic/elasticsearch';
 import prisma from '@/lib/prisma';
+import { fetchOpenRouterEmbedding } from './openrouter';
 
 declare const __non_webpack_require__: NodeRequire | undefined;
 
@@ -11,6 +12,8 @@ const VECTOR_DIMENSION = 1536;
 const INDEX_NAME = 'contacts';
 const QUERY_EMBEDDING_CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
 const QUERY_EMBEDDING_MAX_SIZE = 1000;
+const OPENAI_EMBEDDING_MODEL = 'text-embedding-3-small';
+const OPENROUTER_EMBEDDING_MODEL = 'openai/text-embedding-3-small';
 
 type QueryEmbeddingCacheEntry = {
 	embedding: number[];
@@ -23,10 +26,60 @@ const queryEmbeddingCacheStats = {
 	misses: 0,
 };
 
-const openai = new OpenAI({
-	apiKey: process.env.OPEN_AI_API_KEY!,
-	timeout: 15000, // 15s client timeout so embedding calls fail fast
-});
+let openai: OpenAI | null = null;
+
+const getOpenAiClient = (): OpenAI => {
+	if (!process.env.OPEN_AI_API_KEY) {
+		throw new Error('OPEN_AI_API_KEY environment variable is not set');
+	}
+	if (!openai) {
+		openai = new OpenAI({
+			apiKey: process.env.OPEN_AI_API_KEY,
+			timeout: 15000, // 15s client timeout so embedding calls fail fast
+		});
+	}
+	return openai;
+};
+
+const assertVectorDimension = (embedding: number[], source: string): number[] => {
+	if (embedding.length !== VECTOR_DIMENSION) {
+		throw new Error(
+			`${source} returned ${embedding.length}-dimension embedding; expected ${VECTOR_DIMENSION}`
+		);
+	}
+	return embedding;
+};
+
+const createTextEmbedding = async (input: string): Promise<number[]> => {
+	if (process.env.OPENROUTER_API_KEY) {
+		try {
+			const embedding = await fetchOpenRouterEmbedding(input, {
+				model: OPENROUTER_EMBEDDING_MODEL,
+				timeoutMs: 15000,
+				dimensions: VECTOR_DIMENSION,
+			});
+			return assertVectorDimension(embedding, 'OpenRouter');
+		} catch (error) {
+			if (!process.env.OPEN_AI_API_KEY) {
+				throw error;
+			}
+			console.warn(
+				'[vectorDb] OpenRouter embedding failed, falling back to direct OpenAI.',
+				error
+			);
+		}
+	}
+
+	const response = await getOpenAiClient().embeddings.create({
+		input,
+		model: OPENAI_EMBEDDING_MODEL,
+	});
+	const embedding = response.data[0]?.embedding;
+	if (!embedding) {
+		throw new Error('Invalid embedding response from OpenAI');
+	}
+	return assertVectorDimension(embedding, 'OpenAI');
+};
 
 const elasticsearch = new Client({
 	node: process.env.ELASTICSEARCH_URL || 'http://localhost:9200',
@@ -145,12 +198,7 @@ export const generateContactEmbedding = async (contact: Contact) => {
 		.filter(Boolean)
 		.join('\n');
 
-	const response = await openai.embeddings.create({
-		input: contactText,
-		model: 'text-embedding-3-small',
-	});
-
-	return response.data[0].embedding;
+	return createTextEmbedding(contactText);
 };
 
 export const initializeVectorDb = async () => {
@@ -545,22 +593,14 @@ export const searchSimilarContacts = async (
 		} else {
 			console.log('[vectorDb] query embedding cache miss');
 			const embeddingStartMs = Date.now();
-			const response = await openai.embeddings.create({
-				input: queryJson.restOfQuery,
-				model: 'text-embedding-3-small',
-			});
-			queryEmbedding = response.data[0].embedding;
+			queryEmbedding = await createTextEmbedding(queryJson.restOfQuery);
 			setCachedQueryEmbedding(normalizedQueryEmbeddingKey, queryEmbedding);
 			console.log(
 				`[vectorDb] query embedding generated in ${Date.now() - embeddingStartMs}ms`
 			);
 		}
 	} else {
-		const response = await openai.embeddings.create({
-			input: queryJson.restOfQuery,
-			model: 'text-embedding-3-small',
-		});
-		queryEmbedding = response.data[0].embedding;
+		queryEmbedding = await createTextEmbedding(queryJson.restOfQuery);
 	}
 
 	// Configure location boost strategy for post-processing
