@@ -56,6 +56,45 @@ const hasText = (value: string | null | undefined): boolean =>
 export const contactLooksLikeBusinessEntity = (c: Contact): boolean =>
 	!hasText(c.firstName) && !hasText(c.lastName);
 
+const normalizeContactText = (value: string | null | undefined): string =>
+	String(value ?? '')
+		.toLowerCase()
+		.replace(/\s+/g, ' ')
+		.trim();
+
+/**
+ * Hard blocker for curated venue discovery. Universities and higher-ed records
+ * often look "rich" because they have addresses, websites, and performance
+ * metadata, but they do not fit the clean venue/business tray the curated flow
+ * is trying to build.
+ */
+export const contactLooksLikeEducationInstitution = (c: Contact): boolean => {
+	const company = normalizeContactText(c.company);
+	const title = normalizeContactText(c.title);
+	const website = normalizeContactText(c.website);
+	const industry = normalizeContactText(c.companyIndustry);
+	const type = normalizeContactText(c.companyType);
+	const metadata = normalizeContactText(c.metadata);
+	const keywordBlob = (c.companyKeywords ?? [])
+		.map((k) => normalizeContactText(k))
+		.filter(Boolean)
+		.join(' ');
+
+	if (website.includes('.edu')) return true;
+
+	const orgBlob = `${company} ${title} ${website} ${industry} ${type} ${metadata} ${keywordBlob}`;
+	if (/\b(university|college|community college|campus)\b/.test(orgBlob)) return true;
+	if (
+		/\b(higher education|education management|primary\/secondary education|e-?learning|student affairs)\b/.test(
+			orgBlob
+		)
+	) {
+		return true;
+	}
+
+	return false;
+};
+
 // Pre-compiled US-state suffix matchers. Tested against the *end* of the
 // title (case-insensitive) to detect the canonical "<Prefix> <State>" naming
 // pattern that the map overlay treats as first-class. Sorted longest-first

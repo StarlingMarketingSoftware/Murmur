@@ -102,6 +102,10 @@ const TAB_PILL_COLORS = {
 	inbox: '#CBE7D1',
 } as const;
 
+const getContactCategoryDisplaySource = (
+	contact: Pick<ContactWithName, 'curatedDisplayLabel' | 'title'>
+): string => contact.curatedDisplayLabel || contact.title || '';
+
 const extractStateAbbrFromSearchQuery = (query: string): string | null => {
 	// Search queries are typically formatted like: "[Promotion] Radio Stations (Maine)"
 	// or "[Booking] Venues (Portland, ME)". We only infer state from the parenthetical
@@ -3916,8 +3920,8 @@ const DashboardContent = () => {
 
 												// Curated path: when why/what/where are all blank, the gradient/search
 												// button surfaces a randomly-curated set of nearby venues/restaurants/
-												// coffee shops/festivals/wineries/breweries via Elasticsearch vector
-												// search. Different every click. No location prompt.
+												// coffee shops/festivals/wineries/breweries via the Elasticsearch
+												// category sampler. Different every click. No location prompt.
 												const isWhyWhatWhereBlank =
 													!whyValue.trim() &&
 													!whatValue.trim() &&
@@ -5910,56 +5914,56 @@ const DashboardContent = () => {
 											<div
 												className="inline-flex items-center justify-center h-[19px] rounded-[8px] px-2 gap-1 whitespace-nowrap"
 												style={{
-													backgroundColor: isRestaurantTitle(hoveredContact.title || '')
+													backgroundColor: isRestaurantTitle(getContactCategoryDisplaySource(hoveredContact))
 														? '#C3FBD1'
-														: isCoffeeShopTitle(hoveredContact.title || '')
+														: isCoffeeShopTitle(getContactCategoryDisplaySource(hoveredContact))
 															? '#D6F1BD'
-															: isMusicVenueTitle(hoveredContact.title || '')
+															: isMusicVenueTitle(getContactCategoryDisplaySource(hoveredContact))
 																? '#B7E5FF'
-																: isMusicFestivalTitle(hoveredContact.title || '')
+																: isMusicFestivalTitle(getContactCategoryDisplaySource(hoveredContact))
 																	? '#C1D6FF'
-																	: (isWeddingPlannerTitle(hoveredContact.title || '') || isWeddingVenueTitle(hoveredContact.title || ''))
+																	: (isWeddingPlannerTitle(getContactCategoryDisplaySource(hoveredContact)) || isWeddingVenueTitle(getContactCategoryDisplaySource(hoveredContact)))
 																		? '#FFF8DC'
-																		: isWineBeerSpiritsTitle(hoveredContact.title || '')
+																		: isWineBeerSpiritsTitle(getContactCategoryDisplaySource(hoveredContact))
 																			? '#BFC4FF'
 																			: '#E8EFFF',
 													border: '0.7px solid #000000',
 												}}
 											>
-												{isRestaurantTitle(hoveredContact.title || '') && (
+												{isRestaurantTitle(getContactCategoryDisplaySource(hoveredContact)) && (
 													<RestaurantsIcon size={12} className="flex-shrink-0" />
 												)}
-												{isCoffeeShopTitle(hoveredContact.title || '') && (
+												{isCoffeeShopTitle(getContactCategoryDisplaySource(hoveredContact)) && (
 													<CoffeeShopsIcon size={7} />
 												)}
-												{isMusicVenueTitle(hoveredContact.title || '') && (
+												{isMusicVenueTitle(getContactCategoryDisplaySource(hoveredContact)) && (
 													<MusicVenuesIcon size={12} className="flex-shrink-0" />
 												)}
-												{isMusicFestivalTitle(hoveredContact.title || '') && (
+												{isMusicFestivalTitle(getContactCategoryDisplaySource(hoveredContact)) && (
 													<FestivalsIcon size={12} className="flex-shrink-0" />
 												)}
-												{(isWeddingPlannerTitle(hoveredContact.title || '') || isWeddingVenueTitle(hoveredContact.title || '')) && (
+												{(isWeddingPlannerTitle(getContactCategoryDisplaySource(hoveredContact)) || isWeddingVenueTitle(getContactCategoryDisplaySource(hoveredContact))) && (
 													<WeddingPlannersIcon size={12} />
 												)}
-												{isWineBeerSpiritsTitle(hoveredContact.title || '') && (
+												{isWineBeerSpiritsTitle(getContactCategoryDisplaySource(hoveredContact)) && (
 													<WineBeerSpiritsIcon size={12} className="flex-shrink-0" />
 												)}
 												<span className="text-[14px] leading-none font-secondary font-medium">
-													{isRestaurantTitle(hoveredContact.title || '')
+													{isRestaurantTitle(getContactCategoryDisplaySource(hoveredContact))
 														? 'Restaurant'
-														: isCoffeeShopTitle(hoveredContact.title || '')
+														: isCoffeeShopTitle(getContactCategoryDisplaySource(hoveredContact))
 															? 'Coffee Shop'
-															: isMusicVenueTitle(hoveredContact.title || '')
+															: isMusicVenueTitle(getContactCategoryDisplaySource(hoveredContact))
 																? 'Music Venue'
-																: isMusicFestivalTitle(hoveredContact.title || '')
+																: isMusicFestivalTitle(getContactCategoryDisplaySource(hoveredContact))
 																	? 'Music Festival'
-																	: isWeddingVenueTitle(hoveredContact.title || '')
+																	: isWeddingVenueTitle(getContactCategoryDisplaySource(hoveredContact))
 																		? 'Wedding Venue'
-																		: isWeddingPlannerTitle(hoveredContact.title || '')
+																		: isWeddingPlannerTitle(getContactCategoryDisplaySource(hoveredContact))
 																			? 'Wedding Planner'
-																			: isWineBeerSpiritsTitle(hoveredContact.title || '')
-																				? getWineBeerSpiritsLabel(hoveredContact.title || '')
-																				: (hoveredContact.title || '—')}
+																			: isWineBeerSpiritsTitle(getContactCategoryDisplaySource(hoveredContact))
+																				? getWineBeerSpiritsLabel(getContactCategoryDisplaySource(hoveredContact))
+																				: (getContactCategoryDisplaySource(hoveredContact) || '—')}
 												</span>
 											</div>
 										</div>
@@ -6645,10 +6649,15 @@ const DashboardContent = () => {
 																				const isSpecialCategorySearch =
 																					/^restaurants?$/i.test(whatValue.trim()) ||
 																					/^coffee\s*shops?$/i.test(whatValue.trim());
-																				// For overlay-only contacts (not in base results), prefer the true contact title.
-																				const contactHeadline = isInBaseResults
-																					? contact.headline || contact.title || ''
-																					: contact.title || contact.headline || '';
+																				const curatedDisplayHeadline =
+																					contact.curatedDisplayLabel || '';
+																				// Curated search owns category display explicitly. Do not let
+																				// freeform headlines replace clean SVG/color chips.
+																				const contactHeadline =
+																					curatedDisplayHeadline ||
+																					(isInBaseResults
+																						? contact.headline || contact.title || ''
+																						: contact.title || contact.headline || '');
 																				const computedHeadline = isInBaseResults
 																					? isSpecialCategorySearch
 																						? searchDerivedHeadline
@@ -7197,10 +7206,15 @@ const DashboardContent = () => {
 																				? `${whatValue} ${whereValue}`
 																				: whatValue || '';
 																		const isRestaurantSearch = /^restaurants?$/i.test(whatValue.trim());
-																		// For overlay-only contacts (not in base results), prefer the true contact title.
-																		const contactHeadline = isInBaseResults
-																			? contact.headline || contact.title || ''
-																			: contact.title || contact.headline || '';
+																		const curatedDisplayHeadline =
+																			contact.curatedDisplayLabel || '';
+																		// Curated search owns category display explicitly. Do not let
+																		// freeform headlines replace clean SVG/color chips.
+																		const contactHeadline =
+																			curatedDisplayHeadline ||
+																			(isInBaseResults
+																				? contact.headline || contact.title || ''
+																				: contact.title || contact.headline || '');
 																		const computedHeadline = isInBaseResults
 																			? isRestaurantSearch
 																				? searchDerivedHeadline

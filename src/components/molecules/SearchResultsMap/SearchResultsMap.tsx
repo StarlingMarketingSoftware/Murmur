@@ -12167,15 +12167,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		[]
 	);
 
-	const defaultDotFillColor = useMemo(() => {
-		return getResultDotColorForWhat(searchWhat);
-	}, [searchWhat]);
-
-	const outsideDefaultDotFillColor = useMemo(
-		() => washOutHexColor(defaultDotFillColor, OUTSIDE_LOCKED_STATE_WASHOUT_TO_WHITE),
-		[defaultDotFillColor]
-	);
-
 	// Build fast id->contact lookups for Mapbox interactions/tooltips.
 	const visibleContactsById = useMemo(
 		() => new Map<number, ContactWithName>(visibleContacts.map((c) => [c.id, c])),
@@ -12697,9 +12688,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			const isOutsideLockedState = hasLockedStateSelection
 				? !isCoordsInLockedState(coords)
 				: false;
+			const whatForContact = contact.curatedCategory ?? searchWhat ?? null;
+			const baseFillColor = getResultDotColorForWhat(whatForContact);
 			const fillColor = isOutsideLockedState
-				? outsideDefaultDotFillColor
-				: defaultDotFillColor;
+				? washOutHexColor(baseFillColor, OUTSIDE_LOCKED_STATE_WASHOUT_TO_WHITE)
+				: baseFillColor;
 			dots.push({ id: contact.id, lng: coords.lng, lat: coords.lat, fillColor });
 			minLng = Math.min(minLng, coords.lng);
 			maxLng = Math.max(maxLng, coords.lng);
@@ -12851,8 +12844,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		contacts.length,
 		visibleContacts,
 		getContactCoords,
-		defaultDotFillColor,
-		outsideDefaultDotFillColor,
+		searchWhat,
 		lockedStateKey,
 		isStateLayerReady,
 		isCoordsInLockedState,
@@ -13490,7 +13482,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		const fullName = `${contact.firstName || ''} ${contact.lastName || ''}`.trim();
 		const nameForTooltip = fullName || contact.name || '';
 		const companyForTooltip = contact.company || '';
-		const titleForTooltip = (contact.title || contact.headline || '').trim();
+		const titleForTooltip = (
+			contact.curatedDisplayLabel ||
+			contact.title ||
+			contact.headline ||
+			''
+		).trim();
 
 		if (kind === 'all') {
 			const tooltipFillColor = isSelected
@@ -13518,15 +13515,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 		const whatForMarker =
 			kind === 'base'
-				? (searchWhat ?? null)
+				? (contact.curatedCategory ?? searchWhat ?? null)
 				: kind === 'booking'
 					? (getBookingTitlePrefixFromContactTitle(contact.title) ?? null)
 					: (getPromotionOverlayWhatFromContactTitle(contact.title) ?? null);
 
 		// Even if the marker dot is "washed out" outside the locked/selected state, keep the hover tooltip
 		// using the base category color so it consistently communicates the search intent.
-		const dotFillColor =
-			kind === 'base' ? defaultDotFillColor : getResultDotColorForWhat(whatForMarker);
+		const dotFillColor = getResultDotColorForWhat(whatForMarker);
 
 		const normalizedWhat = whatForMarker ? normalizeWhatKey(whatForMarker) : null;
 		const baseTooltipFillColor = normalizedWhat
@@ -13558,7 +13554,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			height,
 			anchorY,
 		};
-	}, [hoverTooltipEntry, selectedContactIdSet, searchWhat, defaultDotFillColor]);
+	}, [hoverTooltipEntry, selectedContactIdSet, searchWhat]);
 
 	const hoverTooltipOverlayRef = useRef<HTMLDivElement | null>(null);
 	useEffect(() => {
@@ -13995,7 +13991,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 												</span>
 											)}
 										</div>
-										{(selectedMarker.title ||
+										{(selectedMarker.curatedDisplayLabel ||
+											selectedMarker.title ||
 											selectedMarker.headline ||
 											isMusicVenuesSearch ||
 											isRestaurantsSearch ||
@@ -14003,7 +14000,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 											isWeddingPlannersSearch) &&
 											(() => {
 												const titleText =
-													selectedMarker.title || selectedMarker.headline || '';
+													selectedMarker.curatedDisplayLabel ||
+													selectedMarker.title ||
+													selectedMarker.headline ||
+													'';
 												const isRestaurant =
 													isRestaurantsSearch || isRestaurantTitle(titleText);
 												const isCoffeeShop =

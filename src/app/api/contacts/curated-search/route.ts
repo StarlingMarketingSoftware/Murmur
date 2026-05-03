@@ -17,9 +17,11 @@ import { US_STATES } from '@/constants/usStates';
 import {
 	allocateAcrossCategories,
 	contactLooksLikeBusinessEntity,
+	contactLooksLikeEducationInstitution,
 	distributeAcrossBuckets,
 	interleaveByCategory,
 	titleHasStateSuffix,
+	type AllocatedContact,
 	type CategoryPool,
 } from './distribution';
 
@@ -41,22 +43,43 @@ const FETCH_BUFFER = 1.4;
 // data to return a real mix. Better than timing out.
 const FALLBACK_CENTER = { lat: 39.83, lon: -98.58 };
 const FALLBACK_BBOX_RADIUS_KM = 1200;
-// Candidate cap for the bounded query. Sized so an even mix across 10
+// Candidate cap for the bounded query. Sized so an even mix across curated
 // categories has plenty to choose from without pulling more than the planner
 // can handle quickly.
 const CANDIDATE_TAKE = 1500;
+const PER_CATEGORY_ES_TAKE = 200;
+const PER_CATEGORY_PRISMA_TAKE = 300;
+const PER_CATEGORY_FALLBACK_THRESHOLD = 40;
+
+const EXCLUDED_CURATED_CATEGORY_PREFIXES = new Set<BookingContactTitlePrefix>([
+	'Wedding Planners',
+]);
+
+const CURATED_DISPLAY_LABEL_BY_PREFIX: Record<BookingContactTitlePrefix, string> = {
+	'Music Venues': 'Music Venue',
+	Restaurants: 'Restaurant',
+	'Coffee Shops': 'Coffee Shop',
+	'Music Festivals': 'Music Festival',
+	Breweries: 'Brewery',
+	Distilleries: 'Distillery',
+	Wineries: 'Winery',
+	Cideries: 'Cidery',
+	'Wedding Planners': 'Wedding Planner',
+	'Wedding Venues': 'Wedding Venue',
+};
 
 // Curated search intentionally uses the exact same literal booking-category
 // title prefixes as the map overlay. Singular forms are not included here:
 // "Restaurant Manager at ..." and "Coffee Shop Owner" are loose people/job
 // rows and should only appear as fallback tail inventory, not curated pins.
-const CURATED_CATEGORIES = CURATED_BOOKING_CONTACT_TITLE_PREFIXES.map(
-	(titlePrefix) => ({
-		label: titlePrefix.toLowerCase(),
-		titlePrefixes: [titlePrefix] as const,
-		weight: 1,
-	})
-);
+const CURATED_CATEGORIES = CURATED_BOOKING_CONTACT_TITLE_PREFIXES.filter(
+	(titlePrefix) => !EXCLUDED_CURATED_CATEGORY_PREFIXES.has(titlePrefix)
+).map((titlePrefix) => ({
+	label: titlePrefix.toLowerCase(),
+	titlePrefixes: [titlePrefix] as const,
+	weight: 1,
+	displayLabel: CURATED_DISPLAY_LABEL_BY_PREFIX[titlePrefix],
+}));
 
 const normalizeCategoryKey = (value: string | null | undefined): string =>
 	(value ?? '')
@@ -299,13 +322,36 @@ const buildCategoryPool = (
 	return best ?? { contacts: [], radiusUsed: requestedRadiusKm };
 };
 
+type CuratedQualityTier = 'canonical-clean' | 'clean';
+
+export type CuratedSearchContact = Contact & {
+	curatedCategory: BookingContactTitlePrefix;
+	curatedDisplayLabel: string;
+	curatedQualityTier: CuratedQualityTier;
+};
+
+const displayLabelForCategory = (categoryKey: string): string =>
+	CURATED_DISPLAY_LABEL_BY_PREFIX[categoryKey as BookingContactTitlePrefix] ??
+	categoryKey;
+
+const decorateAllocatedContact = (
+	allocated: AllocatedContact
+): CuratedSearchContact => ({
+	...allocated.contact,
+	curatedCategory: allocated.categoryKey as BookingContactTitlePrefix,
+	curatedDisplayLabel: displayLabelForCategory(allocated.categoryKey),
+	curatedQualityTier: titleHasStateSuffix(allocated.contact.title)
+		? 'canonical-clean'
+		: 'clean',
+});
+
 export interface CuratedSearchResponse {
 	categoryBreakdown: Record<string, number>;
 	center: { lat: number; lon: number } | null;
 	radiusKm: number | null;
 	city: string | null;
 	region: string | null;
-	contacts: Contact[];
+	contacts: CuratedSearchContact[];
 }
 
 export async function GET(req: NextRequest) {
@@ -358,6 +404,17 @@ export async function GET(req: NextRequest) {
 			  )
 			: CURATED_CATEGORIES;
 
+		if (activeCategories.length === 0) {
+			return apiResponse({
+				categoryBreakdown: {},
+				center: centerPoint,
+				radiusKm: requestedRadiusKm,
+				city: center.city,
+				region: center.region,
+				contacts: [],
+			} satisfies CuratedSearchResponse);
+		}
+
 		const perCategoryShare = Math.ceil(
 			requestedLimit / Math.max(1, activeCategories.length)
 		);
@@ -366,119 +423,163 @@ export async function GET(req: NextRequest) {
 		const flatPrefixes = activeCategories.flatMap((c) => c.titlePrefixes);
 		const fetchBbox = bboxFromCenter(bboxAnchor, fetchBboxRadiusKm);
 
-		// PRIMARY PATH — Elasticsearch.
-		// `sampleContactsByCategory` runs a single bool query: geo_distance
-		// filter + prefix-OR on title.keyword (case_insensitive) + match_phrase_prefix
-		// on the analysed text field as a backstop. `function_score` with
-		// random_score (reseeded each call) shuffles the candidate pool so each
-		// click hits different canonical/dynamic mixes. ES then returns IDs in
-		// random order; Prisma hydrates them to full Contact records.
-		//
-		// FALLBACK PATH — Prisma direct: if ES returns nothing (index empty
-		// for this region, indexer behind, or ES outage), fall back to a
-		// bbox+ILIKE Prisma query so the user still gets a curated set.
-		// `prisma.contact.findMany()` returns `Contact & { name: string | null }`
-		// because the client is extended with a computed `name` field
-		// (src/lib/prisma.ts). Use the inferred type so the predicate below
-		// keeps the field instead of discarding it.
+		// PRIMARY PATH — Elasticsearch per category.
+		// ES remains the recall engine and live-music booster, but we no longer
+		// ask one global randomized pool to represent every category. Each active
+		// category gets its own ES sample, then Prisma hydrates the combined IDs.
+		// Final cleanliness/balance is enforced in memory below.
 		type HydratedContact = Awaited<
 			ReturnType<typeof prisma.contact.findMany>
 		>[number];
 		const fetchStarted = Date.now();
-		let allCandidates: HydratedContact[] = [];
-		let candidateSource = 'es';
-
-		try {
-			const esResult = await sampleContactsByCategory({
-				titlePrefixes: flatPrefixes,
-				limit: CANDIDATE_TAKE,
-				candidatePool: CANDIDATE_TAKE,
-				center: centerPoint ?? bboxAnchor,
-				radiusKm: fetchBboxRadiusKm,
-				seed: Date.now() + Math.floor(Math.random() * 1_000_000),
-			});
-
-			const esIds: number[] = [];
-			for (const m of esResult.matches) {
-				const id = Number(m.metadata?.contactId ?? m.id);
-				if (Number.isFinite(id)) esIds.push(Math.trunc(id));
-			}
-
-			if (esIds.length > 0) {
-				const hydrated = await prisma.contact.findMany({
-					where: { id: { in: esIds } },
-				});
-				// Re-order Prisma results to match ES random ordering — this is
-				// what makes consecutive clicks return different candidate pools.
-				const byId = new Map(hydrated.map((c) => [c.id, c]));
-				allCandidates = esIds
-					.map((id) => byId.get(id))
-					.filter((c): c is HydratedContact => c !== undefined);
-			}
-		} catch (err) {
-			candidateSource = 'canonical';
-			console.warn('[curated-search] ES sampler failed, falling back to Prisma', err);
+		const candidateSources = new Set<string>();
+		const categoryCandidates = new Map<string, HydratedContact[]>();
+		for (const category of activeCategories) {
+			categoryCandidates.set(category.titlePrefixes[0], []);
 		}
 
-		// Always top up with exact map-overlay category labels, because the ES
-		// sampler intentionally randomizes all prefix matches. In dense regions,
-		// broad titles like "Restaurants with ..." can otherwise crowd the ES
-		// candidate pool before the canonical-first ordering sees the rows it
-		// needs. These exact-title rows are the same shape the overlay pins use.
+		const appendCandidates = (
+			categoryKey: string,
+			contacts: readonly HydratedContact[]
+		) => {
+			const existing = categoryCandidates.get(categoryKey) ?? [];
+			categoryCandidates.set(categoryKey, [...existing, ...contacts]);
+		};
+
+		const prependCandidates = (
+			categoryKey: string,
+			contacts: readonly HydratedContact[]
+		) => {
+			const existing = categoryCandidates.get(categoryKey) ?? [];
+			categoryCandidates.set(categoryKey, [...contacts, ...existing]);
+		};
+
+		const cleanBusinessPredicate = (c: Contact): boolean =>
+			contactLooksLikeBusinessEntity(c) &&
+			!contactLooksLikeEducationInstitution(c);
+
+		const esRows: { categoryKey: string; id: number }[] = [];
+		const esSamples = await Promise.all(
+			activeCategories.map(async (category) => {
+				const categoryKey = category.titlePrefixes[0];
+				try {
+					const esResult = await sampleContactsByCategory({
+						titlePrefixes: [...category.titlePrefixes],
+						limit: PER_CATEGORY_ES_TAKE,
+						candidatePool: PER_CATEGORY_ES_TAKE,
+						center: centerPoint ?? bboxAnchor,
+						radiusKm: fetchBboxRadiusKm,
+						seed: Date.now() + Math.floor(Math.random() * 1_000_000),
+					});
+					return { categoryKey, matches: esResult.matches };
+				} catch (err) {
+					console.warn(
+						`[curated-search] ES sampler failed for ${categoryKey}, falling back to Prisma`,
+						err
+					);
+					return { categoryKey, matches: [] };
+				}
+			})
+		);
+
+		for (const sample of esSamples) {
+			for (const m of sample.matches) {
+				const id = Number(m.metadata?.contactId ?? m.id);
+				if (Number.isFinite(id)) {
+					esRows.push({ categoryKey: sample.categoryKey, id: Math.trunc(id) });
+				}
+			}
+		}
+
+		if (esRows.length > 0) {
+			candidateSources.add('es-per-category');
+			const hydrated = await prisma.contact.findMany({
+				where: { id: { in: [...new Set(esRows.map((row) => row.id))] } },
+			});
+			const byId = new Map(hydrated.map((c) => [c.id, c]));
+			for (const row of esRows) {
+				const contact = byId.get(row.id);
+				if (contact) appendCandidates(row.categoryKey, [contact]);
+			}
+		}
+
+		// Always top up with exact map-overlay category labels. These rows render
+		// as clean SVG/color chips and should lead their category when present.
 		const canonicalCandidates = await prisma.contact.findMany({
 			where: buildCanonicalWhere(flatPrefixes, fetchBbox),
 			take: CANDIDATE_TAKE,
 			orderBy: [{ id: 'asc' }],
 		});
 		if (canonicalCandidates.length > 0) {
-			const canonicalIds = new Set(canonicalCandidates.map((c) => c.id));
-			allCandidates = [
-				...canonicalCandidates,
-				...allCandidates.filter((c) => !canonicalIds.has(c.id)),
-			];
-			candidateSource =
-				candidateSource === 'es'
-					? 'es+canonical'
-					: candidateSource === 'canonical'
-						? 'canonical'
-						: `${candidateSource}+canonical`;
-		}
-
-		// Fall back to Prisma if ES gave us nothing OR a too-sparse pool to feed
-		// the in-memory pipeline (10 categories x ~5 each is the target mix; a pool
-		// under ~100 starves the geographic bucketer + canonical-first ordering).
-		const ES_FALLBACK_THRESHOLD = 100;
-		if (allCandidates.length < ES_FALLBACK_THRESHOLD) {
-			candidateSource =
-				allCandidates.length === 0
-					? 'prisma'
-					: candidateSource.includes('canonical')
-						? `${candidateSource}+prisma`
-						: 'es+prisma';
-			const prismaCandidates = await prisma.contact.findMany({
-				where: buildBoundedWhere(flatPrefixes, fetchBbox),
-				take: CANDIDATE_TAKE,
-			});
-			// Merge: keep ES's randomized order in front, append Prisma rows that
-			// weren't already in the ES set.
-			const seen = new Set(allCandidates.map((c) => c.id));
-			for (const p of prismaCandidates) {
-				if (!seen.has(p.id)) {
-					allCandidates.push(p);
-					seen.add(p.id);
-				}
+			candidateSources.add('canonical');
+			const canonicalByCategory = new Map<string, HydratedContact[]>();
+			for (const contact of canonicalCandidates) {
+				const matched = matchCategory(contact.title, activeCategories);
+				if (!matched) continue;
+				const list = canonicalByCategory.get(matched) ?? [];
+				list.push(contact);
+				canonicalByCategory.set(matched, list);
+			}
+			for (const [categoryKey, contacts] of canonicalByCategory) {
+				prependCandidates(categoryKey, contacts);
 			}
 		}
+
+		// Per-category Prisma top-up keeps sparse categories from being erased by
+		// dense categories. This is the safety net when ES is empty, behind, or
+		// returned too few clean candidates for a category.
+		await Promise.all(
+			activeCategories.map(async (category) => {
+				const categoryKey = category.titlePrefixes[0];
+				const cleanCandidateCount = (
+					categoryCandidates.get(categoryKey) ?? []
+				).filter(cleanBusinessPredicate).length;
+				if (cleanCandidateCount >= PER_CATEGORY_FALLBACK_THRESHOLD) {
+					return;
+				}
+				const prismaCandidates = await prisma.contact.findMany({
+					where: buildBoundedWhere(category.titlePrefixes, fetchBbox),
+					take: PER_CATEGORY_PRISMA_TAKE,
+				});
+				if (prismaCandidates.length > 0) {
+					candidateSources.add('prisma-per-category');
+					appendCandidates(categoryKey, prismaCandidates);
+				}
+			})
+		);
+
+		for (const [categoryKey, contacts] of categoryCandidates) {
+			const seen = new Set<number>();
+			categoryCandidates.set(
+				categoryKey,
+				contacts.filter((contact) => {
+					if (seen.has(contact.id)) return false;
+					seen.add(contact.id);
+					return true;
+				})
+			);
+		}
+
+		const allCandidates = activeCategories.flatMap(
+			(category) => categoryCandidates.get(category.titlePrefixes[0]) ?? []
+		);
+		const candidateSource =
+			candidateSources.size > 0 ? [...candidateSources].join('+') : 'none';
 		const fetchMs = Date.now() - fetchStarted;
 
 		// Group candidates by category in memory. Category key = the literal
-		// map-overlay title prefix.
+		// map-overlay title prefix. We keep the per-category ES/Prisma assignment,
+		// but still verify the title prefix so a stale or malformed row cannot
+		// leak into another category's quota.
 		const byCategory = new Map<string, Contact[]>();
-		for (const c of activeCategories) byCategory.set(c.titlePrefixes[0], []);
-		for (const contact of allCandidates) {
-			const matched = matchCategory(contact.title, activeCategories);
-			if (!matched) continue;
-			byCategory.get(matched)!.push(contact);
+		for (const category of activeCategories) {
+			const categoryKey = category.titlePrefixes[0];
+			byCategory.set(
+				categoryKey,
+				(categoryCandidates.get(categoryKey) ?? []).filter(
+					(contact) => matchCategory(contact.title, [category]) === categoryKey
+				)
+			);
 		}
 
 		const buildPools = (predicate: (contact: Contact) => boolean): CategoryPool[] =>
@@ -501,19 +602,19 @@ export async function GET(req: NextRequest) {
 				};
 			});
 
-		// Three hard phases, not just boosts:
+		// Two hard phases, not just boosts:
 		// 1. Generated map-overlay category rows representing businesses directly
-		//    (`<Category> <State>`, no first/last person name).
+		//    (`<Category> <State>`, no first/last person name, no higher-ed).
 		// 2. Other category-prefix rows that are still business-shaped.
-		// 3. Person-shaped rows (chefs/managers/recruiters/etc.) only as last-resort
-		//    filler when the first two phases cannot fill the requested limit.
+		// Person-shaped rows and university/higher-ed records are intentionally
+		// excluded instead of used as filler; fewer clean rows is better than 50
+		// visually dirty picks.
 		const canonicalBusinessPools = buildPools(
-			(c) => titleHasStateSuffix(c.title) && contactLooksLikeBusinessEntity(c)
+			(c) => titleHasStateSuffix(c.title) && cleanBusinessPredicate(c)
 		);
 		const looseBusinessPools = buildPools(
-			(c) => !titleHasStateSuffix(c.title) && contactLooksLikeBusinessEntity(c)
+			(c) => !titleHasStateSuffix(c.title) && cleanBusinessPredicate(c)
 		);
-		const personPools = buildPools((c) => !contactLooksLikeBusinessEntity(c));
 
 		const canonicalBusinessAllocated = allocateAcrossCategories(
 			canonicalBusinessPools,
@@ -525,25 +626,14 @@ export async function GET(req: NextRequest) {
 			looseBusinessRemainder > 0
 				? allocateAcrossCategories(looseBusinessPools, looseBusinessRemainder)
 				: [];
-		const personRemainder =
-			requestedLimit -
-			canonicalBusinessAllocated.length -
-			looseBusinessAllocated.length;
-		const personAllocated =
-			personRemainder > 0 ? allocateAcrossCategories(personPools, personRemainder) : [];
 
-		const allocated = [
-			...canonicalBusinessAllocated,
-			...looseBusinessAllocated,
-			...personAllocated,
-		];
+		const allocated = [...canonicalBusinessAllocated, ...looseBusinessAllocated];
 
 		const interleaved = [
 			...interleaveByCategory(canonicalBusinessAllocated),
 			...interleaveByCategory(looseBusinessAllocated),
-			...interleaveByCategory(personAllocated),
 		];
-		const finalContacts = interleaved.map((a) => a.contact);
+		const finalContacts = interleaved.map(decorateAllocatedContact);
 
 		const categoryBreakdown: Record<string, number> = {};
 		for (const cat of activeCategories) categoryBreakdown[cat.titlePrefixes[0]] = 0;
@@ -557,7 +647,6 @@ export async function GET(req: NextRequest) {
 				`fetchedCandidates=${allCandidates.length} fetchMs=${fetchMs} ` +
 				`canonicalBusiness=${canonicalBusinessAllocated.length} ` +
 				`looseBusiness=${looseBusinessAllocated.length} ` +
-				`people=${personAllocated.length} ` +
 				`returned=${finalContacts.length} breakdown=` +
 				Object.entries(categoryBreakdown)
 					.filter(([, n]) => n > 0)

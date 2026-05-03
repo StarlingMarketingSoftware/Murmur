@@ -8,6 +8,7 @@ import {
 	allocateAcrossCategories,
 	allocateAcrossCategoriesDeterministic,
 	contactLooksLikeBusinessEntity,
+	contactLooksLikeEducationInstitution,
 	distributeAcrossBuckets,
 	interleaveByCategory,
 	liveMusicSignalScore,
@@ -419,6 +420,49 @@ describe('contactLooksLikeBusinessEntity — business-vs-person detector', () =>
 					lastName: 'Follette',
 					company: 'Sun In Bloom',
 					headline: 'Founder, CEO, and Executive Chef at Sun In Bloom',
+				})
+			),
+			false
+		);
+	});
+});
+
+describe('contactLooksLikeEducationInstitution — hard exclusion detector', () => {
+	test('university company names are excluded even when they look venue-like', () => {
+		assert.equal(
+			contactLooksLikeEducationInstitution(
+				stub(10, {
+					firstName: null,
+					lastName: null,
+					company: 'Adelphi University',
+					title: 'Music Venues PA',
+					headline: 'Home to state-of-the-art performing arts spaces',
+				})
+			),
+			true
+		);
+	});
+
+	test('.edu websites and higher-education industry are excluded', () => {
+		assert.equal(
+			contactLooksLikeEducationInstitution(
+				stub(11, {
+					company: 'Performing Arts Center',
+					website: 'https://arts.example.edu',
+					companyIndustry: 'Higher Education',
+				})
+			),
+			true
+		);
+	});
+
+	test('normal venue rows are not excluded', () => {
+		assert.equal(
+			contactLooksLikeEducationInstitution(
+				stub(12, {
+					company: 'Mermaid Inn',
+					website: 'https://mermaidinn.com',
+					companyIndustry: 'Restaurants',
 				})
 			),
 			false

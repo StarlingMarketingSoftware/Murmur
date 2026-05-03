@@ -292,8 +292,8 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 	};
 
 	// Surprise-me curated search: triggered by the gradient/search button when the why/what/where
-	// fields are blank. Picks a random category in the user's general area (no prompt) and shows
-	// ~50 results on the map. Different every click. No OpenAI calls — pure Elasticsearch.
+	// fields are blank. Builds a balanced nearby tray across clean booking categories.
+	// Different every click. No OpenAI calls — Elasticsearch recall + server cleanup.
 	const triggerCuratedSearch = useCallback(
 		async (overrides?: {
 			lat?: number | null;
