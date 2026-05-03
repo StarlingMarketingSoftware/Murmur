@@ -1840,6 +1840,15 @@ const DashboardContent = () => {
 		if (hasHydratedDashboardUrlRef.current) return;
 		// Don't auto-trigger auth flows; only run if already signed in.
 		if (!isSignedIn) return;
+		// Wait for the mobile/desktop probe to resolve before flipping into map view. Two
+		// dashboard effects co-own `--murmur-dashboard-zoom`: a useLayoutEffect sets it to
+		// '1' on map view, a useEffect on the same commit removes it on desktop. If we set
+		// `isMapView=true` in the very render where `isMobile` first resolves, the desktop
+		// effect runs *after* the layout effect and wipes the var, leaving the page at the
+		// 0.85 default while map-view UI panels still scale themselves 0.85 — net ~0.72 (the
+		// "everything is tiny" bug). Gating on `isMobile !== null` makes the curated path
+		// fire on a later commit so the two effects can't collide.
+		if (isMobile === null) return;
 
 		// Curated rehydration takes precedence: the regular onSubmit path runs a free-text
 		// vector search which has no concept of `curatedCategory` and won't restore the
@@ -1858,8 +1867,6 @@ const DashboardContent = () => {
 			}
 
 			hasHydratedDashboardUrlRef.current = true;
-			// Curated sessions are map-only.
-			setIsMapView(true);
 			rehydrateCuratedSession({
 				lat: curatedLatParam,
 				lon: curatedLonParam,
@@ -1914,6 +1921,7 @@ const DashboardContent = () => {
 		form,
 		hasSearched,
 		isAddToCampaignMode,
+		isMobile,
 		isSignedIn,
 		onSubmit,
 		rehydrateCuratedSession,
@@ -1929,6 +1937,8 @@ const DashboardContent = () => {
 		if (hasHydratedFromCampaignUrlRef.current) return;
 		// Don't auto-trigger auth flows; only run if already signed in.
 		if (!isSignedIn) return;
+		// Same `isMobile` gate as the dashboard rehydration — see comment there for why.
+		if (isMobile === null) return;
 
 		// Same curated-rehydration treatment as the dashboard flow above.
 		const isCuratedRehydration =
@@ -1941,7 +1951,6 @@ const DashboardContent = () => {
 			}
 
 			hasHydratedFromCampaignUrlRef.current = true;
-			setIsMapView(true);
 			rehydrateCuratedSession({
 				lat: curatedLatParam,
 				lon: curatedLonParam,
@@ -1996,6 +2005,7 @@ const DashboardContent = () => {
 		fromCampaignViewParam,
 		hasSearched,
 		isAddToCampaignMode,
+		isMobile,
 		isSignedIn,
 		onSubmit,
 		rehydrateCuratedSession,
