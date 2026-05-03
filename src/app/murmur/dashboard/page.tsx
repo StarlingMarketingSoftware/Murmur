@@ -6571,6 +6571,7 @@ const DashboardContent = () => {
 																			border: mapResearchPanelContact && isMapResearchPanelVisible
 																				? '3px solid #000000'
 																				: '3px solid #143883',
+																			borderRadius: '8px',
 																			overflow: 'hidden',
 																			transform: `scale(${MAP_VIEW_UI_SCALE})`,
 																			transformOrigin: 'top right',
