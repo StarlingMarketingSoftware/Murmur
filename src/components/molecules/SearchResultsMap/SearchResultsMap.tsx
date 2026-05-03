@@ -286,14 +286,85 @@ const CURATED_BLOB_MIN_CLUSTERS = 2;
 const CURATED_BLOB_MAX_CLUSTERS = 4;
 const CURATED_BLOB_SHAPE_STEPS = 96;
 const CURATED_BLOB_OUTLINE_SMOOTHING_PASSES = 1;
-const CURATED_BLOB_FADE_OUT_START_ZOOM = 3.45;
-const CURATED_BLOB_FADE_OUT_END_ZOOM = 2.6;
 const CURATED_STABLE_MARKER_MAX_DOTS = 125;
 const CURATED_BLOB_PADDING_KM = 95;
 const CURATED_BLOB_MIN_AXIS_KM = 60;
 const CURATED_BLOB_MAX_CLUSTER_SPAN_KM = 350;
 const CURATED_BLOB_ELLIPSE_RATIO_THRESHOLD = 1.6;
 const CURATED_BLOB_KMEANS_MAX_ITER = 12;
+
+// Globe-zoom orb transition: a two-phase animation as the user zooms out.
+//
+// Phase 1 (dot ↔ gradient cross-dissolve): the curated contact markers fade
+// out and the orb's radial-gradient bloom fades in. Tuned to start while the
+// cluster still reads as multiple dots at intermediate zoom — by the time
+// the user enters globe-curvature territory the dots are already gone,
+// replaced by the soft glow.
+const CURATED_DOT_FADE_START_ZOOM = 4.2;
+const CURATED_DOT_FADE_END_ZOOM = 3.6;
+//
+// Phase 2 (shape morph): the blob outline's vertices lerp toward a circle of
+// the target radius. Picks up where Phase 1 ends so the user sees the dots
+// dissolve first, then the surrounding outline visibly widen out into a
+// clean circle as zoom continues to decrease.
+const CURATED_ORB_TRANSITION_START_ZOOM = 3.6;
+const CURATED_ORB_TRANSITION_END_ZOOM = 2.9;
+// Sized to match the natural blob's farthest vertex exactly — no extra
+// padding — so the morphed circle hugs the cluster's outer envelope rather
+// than ballooning out past it. The morph still "widens" because inner
+// vertices lerp outward to reach this radius; max-distance vertices stay
+// put. Result: the final circle is snug around the gradient bloom (matches
+// the Figma mock).
+const CURATED_ORB_RADIUS_PADDING_KM = 0;
+// Floor: very tight clusters still need a readable orb, otherwise it shrinks
+// to a dot at the moment the dots themselves are disappearing.
+const CURATED_ORB_MIN_RADIUS_KM = 90;
+const CURATED_ORB_BLUR_PX = 8;
+// Small bright core, then a long soft falloff that extends almost all the
+// way to the outline so the gradient fills the circle (only a thin sliver
+// of map shows between the bloom's outer edge and the stroke).
+const CURATED_ORB_GRADIENT_BG =
+	'radial-gradient(circle at center, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.7) 14%, rgba(255, 255, 255, 0.4) 36%, rgba(255, 255, 255, 0.18) 60%, rgba(255, 255, 255, 0.06) 80%, rgba(255, 255, 255, 0) 92%)';
+// 1° latitude ≈ 110.574 km. Used to convert the orb's km radius into a north
+// offset we can project to pixels for accurate sizing across the globe.
+const KM_PER_DEGREE_LAT = 110.574;
+
+const computeCuratedOrbT = (zoom: number) => {
+	if (zoom >= CURATED_ORB_TRANSITION_START_ZOOM) return 0;
+	if (zoom <= CURATED_ORB_TRANSITION_END_ZOOM) return 1;
+	const raw =
+		(CURATED_ORB_TRANSITION_START_ZOOM - zoom) /
+		(CURATED_ORB_TRANSITION_START_ZOOM - CURATED_ORB_TRANSITION_END_ZOOM);
+	return raw * raw * (3 - 2 * raw);
+};
+
+// Dot ↔ gradient cross-dissolve t. Runs ahead of the morph so by the time
+// the shape transformation starts, the dots have already given way to the
+// gradient bloom.
+const computeCuratedDotFadeT = (zoom: number) => {
+	if (zoom >= CURATED_DOT_FADE_START_ZOOM) return 0;
+	if (zoom <= CURATED_DOT_FADE_END_ZOOM) return 1;
+	const raw =
+		(CURATED_DOT_FADE_START_ZOOM - zoom) /
+		(CURATED_DOT_FADE_START_ZOOM - CURATED_DOT_FADE_END_ZOOM);
+	return raw * raw * (3 - 2 * raw);
+};
+
+// Per-feature opacity for the baseDots layer: curated dots cross-fade out
+// over the dot-fade zoom range (which runs ahead of the shape morph);
+// non-curated dots (isCurated false or missing) are unaffected. Mapbox
+// requires `['zoom']` at the top of an interpolate/step (it can't appear
+// inside `case`), so the per-feature branching lives at the lower stop
+// and the upper stop is a flat 1.
+const CURATED_DOT_ZOOM_FADE_EXPR: any = [
+	'interpolate',
+	['linear'],
+	['zoom'],
+	CURATED_DOT_FADE_END_ZOOM,
+	['case', ['boolean', ['get', 'isCurated'], false], 0, 1],
+	CURATED_DOT_FADE_START_ZOOM,
+	1,
+];
 
 type CuratedBlobMercatorPoint = {
 	id: number;
@@ -4319,6 +4390,24 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const resultsSelectionBboxRef = useRef<BoundingBox | null>(null);
 	const resultsSelectionSignatureRef = useRef<string>('');
 	const curatedBlobSignatureRef = useRef<string>('');
+	const curatedClusterCentroidRef = useRef<LatLngLiteral | null>(null);
+	const curatedClusterRadiusKmRef = useRef<number | null>(null);
+	const curatedOrbRef = useRef<HTMLDivElement | null>(null);
+	// Source-of-truth for the blob outline morph: the natural smoothed cluster
+	// geometry in Mercator space, plus the centroid + circle target radius.
+	// Each zoom event lerps every vertex from its natural position toward a
+	// point on the circle at radiusMerc from centerMerc, parameterized by `t`.
+	const naturalBlobMorphSourceRef = useRef<{
+		mercatorMultiPolygon: ClippingMultiPolygon;
+		centerMerc: { x: number; y: number };
+		radiusMerc: number;
+	} | null>(null);
+	const lastBlobMorphTAppliedRef = useRef<number>(Number.NaN);
+	// Set below from `applyCuratedOrbState` so earlier hooks (e.g. the blob
+	// update effect) can request a one-shot orb refresh after centroid changes
+	// without taking the callback as a dependency.
+	const applyCuratedOrbStateRef = useRef<(() => void) | null>(null);
+	const applyBlobMorphRef = useRef<(() => void) | null>(null);
 	const lastVisibleContactsKeyRef = useRef<string>('');
 	const usStatesPolygonsRef = useRef<PreparedClippingPolygon[] | null>(null);
 	const selectedStateKeyRef = useRef<string | null>(null);
@@ -5156,6 +5245,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 	const clearCuratedBlobOutline = useCallback(() => {
 		curatedBlobSignatureRef.current = '';
+		curatedClusterCentroidRef.current = null;
+		curatedClusterRadiusKmRef.current = null;
+		naturalBlobMorphSourceRef.current = null;
+		lastBlobMorphTAppliedRef.current = Number.NaN;
+		applyCuratedOrbStateRef.current?.();
 		if (!map || !isMapLoaded) return;
 		const source = map.getSource(MAPBOX_SOURCE_IDS.curatedBlob) as
 			| mapboxgl.GeoJSONSource
@@ -8852,20 +8946,27 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			layout: { 'line-join': 'round', 'line-cap': 'round' },
 			paint: {
 				'line-color': '#FFFFFF',
-				'line-opacity': [
+				// The same outline geometry now morphs from natural blob → circle
+				// across the transition zoom range, so opacity stays constant: at
+				// t=1 the blob *is* the circle, and at any intermediate t it's a
+				// continuously-deforming shape — fading it out would defeat the
+				// "shape transforms" effect the user wants to see.
+				'line-opacity': 0.86,
+				// Width tapers down well before the transition window so the
+				// outline already reads as a delicate thin ring by the time the
+				// shape morph starts — and stays that way through the rest of
+				// the zoom-out. Mapbox clamps outside the stops, so above zoom
+				// 5 the line is at full 5px (normal cluster view) and below
+				// 3.4 it holds at 0.75px.
+				'line-width': [
 					'interpolate',
 					['linear'],
 					['zoom'],
-					MAP_MIN_ZOOM,
-					0,
-					CURATED_BLOB_FADE_OUT_END_ZOOM,
-					0,
-					CURATED_BLOB_FADE_OUT_START_ZOOM,
-					0.86,
-					14,
-					0.86,
+					3.4,
+					0.75,
+					5,
+					5,
 				],
-				'line-width': 5,
 				'line-blur': 0,
 			},
 		});
@@ -9035,7 +9136,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			paint: {
 				'circle-radius': resultDotRadiusExpr,
 				'circle-color': ['get', 'fillColor'],
-				'circle-opacity': 1,
+				'circle-opacity': CURATED_DOT_ZOOM_FADE_EXPR,
 				'circle-stroke-color': [
 					'case',
 					['boolean', ['feature-state', 'selected'], false],
@@ -10023,6 +10124,23 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			return;
 		}
 
+		// Capture the visual centroid of the curated cluster (mean lng/lat).
+		// The cluster's bounding radius is computed *after* the natural blob
+		// geometry is built (below) so it's measured against the actual
+		// outline vertices, not just dot positions — this guarantees the
+		// circle target encompasses every blob vertex for the morph.
+		let lngSum = 0;
+		let latSum = 0;
+		for (const dot of curatedDots) {
+			lngSum += dot.coords.lng;
+			latSum += dot.coords.lat;
+		}
+		const centroid: LatLngLiteral = {
+			lng: lngSum / curatedDots.length,
+			lat: latSum / curatedDots.length,
+		};
+		curatedClusterCentroidRef.current = centroid;
+
 		const signature = curatedDots
 			.map(
 				(dot) =>
@@ -10109,17 +10227,59 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				mercatorMultiPolygon,
 				CURATED_BLOB_OUTLINE_SMOOTHING_PASSES
 			);
-			const lngLatMultiPolygon = mercatorMultiPolygonToLngLat(
-				smoothedMercatorMultiPolygon
-			);
-			const outlineFc = createOutlineGeoJsonFromMultiPolygon(lngLatMultiPolygon);
 			const source = map.getSource(MAPBOX_SOURCE_IDS.curatedBlob) as
 				| mapboxgl.GeoJSONSource
 				| undefined;
 			if (!source) return;
 
-			source.setData(outlineFc as GeoJSON.FeatureCollection);
+			// Compute the circle target the morph animates toward: centered at
+			// the cluster's centroid, with a radius that just exceeds the
+			// natural blob's farthest vertex so every vertex moves outward
+			// (widens) into the circle.
+			const centroidMerc = mapboxgl.MercatorCoordinate.fromLngLat(centroid);
+			const meterInMercator = centroidMerc.meterInMercatorCoordinateUnits();
+			const kmPerMercatorUnit =
+				meterInMercator > 0 ? 1 / (1000 * meterInMercator) : 0;
+			let maxVertexDistMerc = 0;
+			for (const polygon of smoothedMercatorMultiPolygon) {
+				for (const ring of polygon) {
+					for (const point of ring) {
+						const dx = point[0] - centroidMerc.x;
+						const dy = point[1] - centroidMerc.y;
+						const d = Math.hypot(dx, dy);
+						if (d > maxVertexDistMerc) maxVertexDistMerc = d;
+					}
+				}
+			}
+			const paddingMerc =
+				kmPerMercatorUnit > 0
+					? CURATED_ORB_RADIUS_PADDING_KM / kmPerMercatorUnit
+					: 0;
+			const minRadiusMerc =
+				kmPerMercatorUnit > 0
+					? CURATED_ORB_MIN_RADIUS_KM / kmPerMercatorUnit
+					: 0;
+			const radiusMerc = Math.max(
+				minRadiusMerc,
+				maxVertexDistMerc + paddingMerc
+			);
+			const radiusKm =
+				kmPerMercatorUnit > 0 ? radiusMerc * kmPerMercatorUnit : 0;
+			curatedClusterRadiusKmRef.current = radiusKm > 0 ? radiusKm : null;
+
+			naturalBlobMorphSourceRef.current = {
+				mercatorMultiPolygon: smoothedMercatorMultiPolygon,
+				centerMerc: { x: centroidMerc.x, y: centroidMerc.y },
+				radiusMerc,
+			};
+			lastBlobMorphTAppliedRef.current = Number.NaN;
 			curatedBlobSignatureRef.current = nextSignature;
+
+			// Apply the current morph state (which depends on current zoom).
+			// At t=0 this writes the natural geometry; otherwise it writes the
+			// vertex-lerped morph toward the circle.
+			applyBlobMorphRef.current?.();
+			applyCuratedOrbStateRef.current?.();
 		};
 
 		void updateCuratedBlob();
@@ -11909,6 +12069,110 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		return getResultDotScaleForZoom(zoomLevel);
 	}, [zoomLevel]);
 
+	// Curated cluster orb: imperative position + size + opacity update driven
+	// by zoom/move. Reads centroid + radius (km) refs and the current zoom so
+	// the orb tracks the cluster geographically as the user pans/zooms the
+	// globe, without forcing React re-renders.
+	const applyCuratedOrbState = useCallback(() => {
+		const m = mapRef.current;
+		const orb = curatedOrbRef.current;
+		if (!m || !orb) return;
+		const zoom = m.getZoom() ?? MAP_DEFAULT_ZOOM;
+		// Opacity follows the (earlier) dot-fade curve so the gradient appears
+		// in step with the dots disappearing — the shape morph that follows
+		// uses its own `computeCuratedOrbT` and can run later/slower.
+		const t = computeCuratedDotFadeT(zoom);
+		const centroid = curatedClusterCentroidRef.current;
+		const radiusKm = curatedClusterRadiusKmRef.current;
+		if (t <= 0 || !centroid || !radiusKm || radiusKm <= 0) {
+			if (orb.style.opacity !== '0') orb.style.opacity = '0';
+			return;
+		}
+		let centerPx: mapboxgl.Point;
+		let northPx: mapboxgl.Point;
+		try {
+			centerPx = m.project([centroid.lng, centroid.lat]);
+			northPx = m.project([
+				centroid.lng,
+				centroid.lat + radiusKm / KM_PER_DEGREE_LAT,
+			]);
+		} catch {
+			orb.style.opacity = '0';
+			return;
+		}
+		if (
+			!Number.isFinite(centerPx.x) ||
+			!Number.isFinite(centerPx.y) ||
+			!Number.isFinite(northPx.x) ||
+			!Number.isFinite(northPx.y)
+		) {
+			orb.style.opacity = '0';
+			return;
+		}
+		const radiusPx = Math.hypot(northPx.x - centerPx.x, northPx.y - centerPx.y);
+		if (!Number.isFinite(radiusPx) || radiusPx <= 0) {
+			orb.style.opacity = '0';
+			return;
+		}
+		const diameter = radiusPx * 2;
+		orb.style.width = `${diameter}px`;
+		orb.style.height = `${diameter}px`;
+		orb.style.transform = `translate3d(${centerPx.x - radiusPx}px, ${
+			centerPx.y - radiusPx
+		}px, 0)`;
+		orb.style.opacity = String(t);
+	}, []);
+	applyCuratedOrbStateRef.current = applyCuratedOrbState;
+
+	// Vertex-by-vertex morph of the curated blob outline toward a circle of
+	// `radiusMerc` around `centerMerc`. Each vertex moves along its own ray
+	// from the centroid, so a non-circular blob smoothly widens out into the
+	// target circle as `t` grows from 0 → 1. Quantizes `t` to 1/100 to avoid
+	// redundant `setData` calls when zoom is idle.
+	const applyBlobMorph = useCallback(() => {
+		const m = mapRef.current;
+		if (!m) return;
+		const morphSource = naturalBlobMorphSourceRef.current;
+		const source = m.getSource(MAPBOX_SOURCE_IDS.curatedBlob) as
+			| mapboxgl.GeoJSONSource
+			| undefined;
+		if (!source) return;
+		if (!morphSource) {
+			lastBlobMorphTAppliedRef.current = Number.NaN;
+			return;
+		}
+		const zoom = m.getZoom() ?? MAP_DEFAULT_ZOOM;
+		const t = computeCuratedOrbT(zoom);
+		const tQuantized = Math.round(t * 100) / 100;
+		if (tQuantized === lastBlobMorphTAppliedRef.current) return;
+		lastBlobMorphTAppliedRef.current = tQuantized;
+
+		const { mercatorMultiPolygon, centerMerc, radiusMerc } = morphSource;
+		const morphed: ClippingMultiPolygon =
+			t <= 0
+				? mercatorMultiPolygon
+				: mercatorMultiPolygon.map((polygon) =>
+						polygon.map((ring) =>
+							ring.map((point): [number, number] => {
+								const dx = point[0] - centerMerc.x;
+								const dy = point[1] - centerMerc.y;
+								if (dx === 0 && dy === 0) return [point[0], point[1]];
+								const angle = Math.atan2(dy, dx);
+								const tx = centerMerc.x + Math.cos(angle) * radiusMerc;
+								const ty = centerMerc.y + Math.sin(angle) * radiusMerc;
+								return [
+									point[0] + (tx - point[0]) * t,
+									point[1] + (ty - point[1]) * t,
+								];
+							})
+						)
+					);
+		const lngLat = mercatorMultiPolygonToLngLat(morphed);
+		const fc = createOutlineGeoJsonFromMultiPolygon(lngLat);
+		source.setData(fc as GeoJSON.FeatureCollection);
+	}, []);
+	applyBlobMorphRef.current = applyBlobMorph;
+
 	// Softbox lighting overlay opacity is owned entirely by `applyLightingOverlayOpacity`
 	// below, which fires on every `zoom` event and on mood changes. We deliberately do
 	// NOT render an `opacity` value into the JSX style: any React re-render during a
@@ -12347,6 +12611,29 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			map.off('zoom', applyLightingOverlayOpacity);
 		};
 	}, [map, isMapLoaded, applyLightingOverlayOpacity]);
+
+	useEffect(() => {
+		if (!map) return;
+		if (!isMapLoaded) return;
+
+		applyCuratedOrbState();
+		// 'move' covers both pan (centroid re-projection) and zoom (t change).
+		map.on('move', applyCuratedOrbState);
+		return () => {
+			map.off('move', applyCuratedOrbState);
+		};
+	}, [map, isMapLoaded, applyCuratedOrbState]);
+
+	useEffect(() => {
+		if (!map) return;
+		if (!isMapLoaded) return;
+
+		applyBlobMorph();
+		map.on('move', applyBlobMorph);
+		return () => {
+			map.off('move', applyBlobMorph);
+		};
+	}, [map, isMapLoaded, applyBlobMorph]);
 
 	// Fade in night lights once their tiles are ready to avoid the initial "patchy" look.
 	useEffect(() => {
@@ -13311,11 +13598,15 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					'circle-stroke-opacity-transition',
 					transition
 				);
-				(map as any).setPaintProperty(MAPBOX_LAYER_IDS.baseDots, 'circle-opacity', 1);
+				(map as any).setPaintProperty(
+					MAPBOX_LAYER_IDS.baseDots,
+					'circle-opacity',
+					CURATED_DOT_ZOOM_FADE_EXPR
+				);
 				(map as any).setPaintProperty(
 					MAPBOX_LAYER_IDS.baseDots,
 					'circle-stroke-opacity',
-					1
+					CURATED_DOT_ZOOM_FADE_EXPR
 				);
 			}
 		} catch {
@@ -13391,7 +13682,13 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			lockedStateKey && lockedStateSelectionKeyRef.current === lockedStateKey
 		);
 
-		type DotSeed = { id: number; lng: number; lat: number; fillColor: string };
+		type DotSeed = {
+			id: number;
+			lng: number;
+			lat: number;
+			fillColor: string;
+			isCurated: boolean;
+		};
 		const dots: DotSeed[] = [];
 		let minLng = Number.POSITIVE_INFINITY;
 		let maxLng = Number.NEGATIVE_INFINITY;
@@ -13409,7 +13706,13 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			const fillColor = isOutsideLockedState
 				? washOutHexColor(baseFillColor, OUTSIDE_LOCKED_STATE_WASHOUT_TO_WHITE)
 				: baseFillColor;
-			dots.push({ id: contact.id, lng: coords.lng, lat: coords.lat, fillColor });
+			dots.push({
+				id: contact.id,
+				lng: coords.lng,
+				lat: coords.lat,
+				fillColor,
+				isCurated: Boolean(contact.curatedCategory),
+			});
 			minLng = Math.min(minLng, coords.lng);
 			maxLng = Math.max(maxLng, coords.lng);
 			minLat = Math.min(minLat, coords.lat);
@@ -13478,6 +13781,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				properties: {
 					fillColor: dot.fillColor,
 					[DOT_WAVE_DELAY_PROP]: delayMs,
+					isCurated: dot.isCurated,
 				},
 				geometry: { type: 'Point', coordinates: [dot.lng, dot.lat] },
 			};
@@ -13622,8 +13926,16 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				'circle-stroke-opacity-transition',
 				transition
 			);
-			safeSetPaint(MAPBOX_LAYER_IDS.baseDots, 'circle-opacity', 1);
-			safeSetPaint(MAPBOX_LAYER_IDS.baseDots, 'circle-stroke-opacity', 1);
+			safeSetPaint(
+				MAPBOX_LAYER_IDS.baseDots,
+				'circle-opacity',
+				CURATED_DOT_ZOOM_FADE_EXPR
+			);
+			safeSetPaint(
+				MAPBOX_LAYER_IDS.baseDots,
+				'circle-stroke-opacity',
+				CURATED_DOT_ZOOM_FADE_EXPR
+			);
 			safeClearFilter(MAPBOX_LAYER_IDS.baseHit);
 		};
 
@@ -14338,6 +14650,35 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				`}</style>
 			)}
 			<div ref={mapContainerRef} style={{ width: '100%', height: '100%' }} />
+			{/*
+			  Curated cluster zoom-out orb — radial-gradient bloom only. The
+			  outline circle that wraps the cluster at globe zoom is the
+			  Mapbox blob layer's morphed geometry (natural cluster shape that
+			  widens out into a circle as zoom decreases), not a separate DOM
+			  ring. This layer just adds the soft white center bloom inside
+			  that circle. Sized to the cluster's geographic radius (km) and
+			  positioned imperatively by `applyCuratedOrbState`; inert
+			  (opacity 0, off-screen) at any zoom above the transition window.
+			*/}
+			<div
+				ref={curatedOrbRef}
+				aria-hidden
+				style={{
+					position: 'absolute',
+					left: 0,
+					top: 0,
+					width: 0,
+					height: 0,
+					pointerEvents: 'none',
+					opacity: 0,
+					transform: 'translate3d(-9999px, -9999px, 0)',
+					willChange: 'transform, opacity, width, height',
+					zIndex: 2,
+					borderRadius: '50%',
+					background: CURATED_ORB_GRADIENT_BG,
+					filter: `blur(${CURATED_ORB_BLUR_PX}px)`,
+				}}
+			/>
 			{/*
 			  Softbox lighting overlay. Two stacked viewport-anchored radial gradients
 			  paint the "lit sphere" feel directly on top of the map. Because these

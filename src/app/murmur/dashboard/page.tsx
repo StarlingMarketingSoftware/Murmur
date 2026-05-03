@@ -109,6 +109,36 @@ const getContactCategoryDisplaySource = (
 const isCuratedPicksSearchQuery = (query: string): boolean =>
 	/^curated picks near\b/i.test(query.trim());
 
+const CURATED_URL_PARAM_KEYS = ['pick', 'state', 'cat', 'lat', 'lon', 'r'] as const;
+
+type CuratedUrlArgs = {
+	lat: number | null;
+	lon: number | null;
+	radiusKm: number | null;
+	category: string | null;
+	state: string | null;
+} | null;
+
+// Serializes curated-mode args onto the given URLSearchParams under short, shared keys.
+// Pass `null` to strip them (e.g. when switching back to a regular text search).
+const writeCuratedParams = (params: URLSearchParams, args: CuratedUrlArgs): void => {
+	if (!args) {
+		for (const key of CURATED_URL_PARAM_KEYS) params.delete(key);
+		return;
+	}
+	params.set('pick', '1');
+	if (args.state) params.set('state', args.state);
+	else params.delete('state');
+	if (args.category) params.set('cat', args.category);
+	else params.delete('cat');
+	if (args.lat != null) params.set('lat', String(args.lat));
+	else params.delete('lat');
+	if (args.lon != null) params.set('lon', String(args.lon));
+	else params.delete('lon');
+	if (args.radiusKm != null) params.set('r', String(args.radiusKm));
+	else params.delete('r');
+};
+
 const extractStateAbbrFromSearchQuery = (query: string): string | null => {
 	// Search queries are typically formatted like: "[Promotion] Radio Stations (Maine)"
 	// or "[Booking] Venues (Portland, ME)". We only infer state from the parenthetical
@@ -394,6 +424,23 @@ const DashboardContent = () => {
 	// in the correct results view without affecting the normal dashboard entry.
 	const fromCampaignViewParam = searchParams.get('fromCampaignView')?.trim() || '';
 	const fromCampaignSearchParam = searchParams.get('fromCampaignSearch')?.trim() || '';
+	// Curated-search rehydration params: a curated session can't be replayed by re-running
+	// the regular text search (the API path is different and curated metadata like
+	// `curatedCategory`/`curatedDisplayLabel` would be lost), so we persist the original args
+	// and restore via triggerCuratedSearch on refresh. The `pick=` flag identifies the mode;
+	// remaining args reuse short keys (state/cat/lat/lon/r) under that namespace.
+	const curatedModeParam = searchParams.get('pick')?.trim() === '1';
+	const curatedStateParam = searchParams.get('state')?.trim() || '';
+	const curatedCategoryParam = searchParams.get('cat')?.trim() || '';
+	const parseFiniteNumberParam = (key: string): number | null => {
+		const raw = searchParams.get(key);
+		if (raw == null) return null;
+		const n = Number(raw);
+		return Number.isFinite(n) ? n : null;
+	};
+	const curatedLatParam = parseFiniteNumberParam('lat');
+	const curatedLonParam = parseFiniteNumberParam('lon');
+	const curatedRadiusKmParam = parseFiniteNumberParam('r');
 	// "From Home" mode: triggered from landing page search button, shows a pre-configured search
 	// with sign-up modal for unauthenticated users.
 	const fromHomeParam = searchParams.get('fromHome') === 'true';
@@ -1527,7 +1574,9 @@ const DashboardContent = () => {
 		mapBboxFilter,
 		setMapBboxFilter,
 		triggerCuratedSearch,
+		rehydrateCuratedSession,
 		isCuratedSearchActive,
+		lastCuratedArgs,
 	} = useDashboard({ derivedTitle: derivedContactTitle, forceApplyDerivedTitle: shouldForceApplyDerivedTitle, fromHome: fromHomeParam });
 
 	const handleMapStateSelect = useCallback(
@@ -1789,9 +1838,39 @@ const DashboardContent = () => {
 	useEffect(() => {
 		if (isAddToCampaignMode) return;
 		if (hasHydratedDashboardUrlRef.current) return;
-		if (!dashboardSearchParam) return;
 		// Don't auto-trigger auth flows; only run if already signed in.
 		if (!isSignedIn) return;
+
+		// Curated rehydration takes precedence: the regular onSubmit path runs a free-text
+		// vector search which has no concept of `curatedCategory` and won't restore the
+		// curated map styling (blob outline, category-coloured markers). When the URL says
+		// we were in a curated session, replay it via triggerCuratedSearch so contacts come
+		// back with the same metadata they had pre-refresh.
+		const isCuratedRehydration =
+			curatedModeParam || isCuratedPicksSearchQuery(dashboardSearchParam);
+
+		if (isCuratedRehydration) {
+			// If we already have curated results in memory (e.g. just navigated back to this
+			// page in-app), don't trigger a duplicate fetch.
+			if (hasSearched && activeSearchQuery.trim().length > 0) {
+				hasHydratedDashboardUrlRef.current = true;
+				return;
+			}
+
+			hasHydratedDashboardUrlRef.current = true;
+			// Curated sessions are map-only.
+			setIsMapView(true);
+			rehydrateCuratedSession({
+				lat: curatedLatParam,
+				lon: curatedLonParam,
+				radiusKm: curatedRadiusKmParam,
+				category: curatedCategoryParam || null,
+				state: curatedStateParam || null,
+			}).catch(() => undefined);
+			return;
+		}
+
+		if (!dashboardSearchParam) return;
 
 		// If we already have results, don't re-run the hydration search.
 		if (hasSearched && activeSearchQuery.trim().length > 0) {
@@ -1824,6 +1903,12 @@ const DashboardContent = () => {
 		}, 100);
 	}, [
 		activeSearchQuery,
+		curatedCategoryParam,
+		curatedLatParam,
+		curatedLonParam,
+		curatedModeParam,
+		curatedRadiusKmParam,
+		curatedStateParam,
 		dashboardSearchParam,
 		dashboardViewParam,
 		form,
@@ -1831,6 +1916,7 @@ const DashboardContent = () => {
 		isAddToCampaignMode,
 		isSignedIn,
 		onSubmit,
+		rehydrateCuratedSession,
 		setIsMapView,
 	]);
 
@@ -1841,9 +1927,32 @@ const DashboardContent = () => {
 	useEffect(() => {
 		if (!isAddToCampaignMode) return;
 		if (hasHydratedFromCampaignUrlRef.current) return;
-		if (!fromCampaignSearchParam) return;
 		// Don't auto-trigger auth flows; only run if already signed in.
 		if (!isSignedIn) return;
+
+		// Same curated-rehydration treatment as the dashboard flow above.
+		const isCuratedRehydration =
+			curatedModeParam || isCuratedPicksSearchQuery(fromCampaignSearchParam);
+
+		if (isCuratedRehydration) {
+			if (hasSearched && activeSearchQuery.trim().length > 0) {
+				hasHydratedFromCampaignUrlRef.current = true;
+				return;
+			}
+
+			hasHydratedFromCampaignUrlRef.current = true;
+			setIsMapView(true);
+			rehydrateCuratedSession({
+				lat: curatedLatParam,
+				lon: curatedLonParam,
+				radiusKm: curatedRadiusKmParam,
+				category: curatedCategoryParam || null,
+				state: curatedStateParam || null,
+			}).catch(() => undefined);
+			return;
+		}
+
+		if (!fromCampaignSearchParam) return;
 
 		// If we already have results, don't re-run the hydration search.
 		if (hasSearched && activeSearchQuery.trim().length > 0) {
@@ -1876,6 +1985,12 @@ const DashboardContent = () => {
 		}, 100);
 	}, [
 		activeSearchQuery,
+		curatedCategoryParam,
+		curatedLatParam,
+		curatedLonParam,
+		curatedModeParam,
+		curatedRadiusKmParam,
+		curatedStateParam,
 		form,
 		fromCampaignSearchParam,
 		fromCampaignViewParam,
@@ -1883,6 +1998,7 @@ const DashboardContent = () => {
 		isAddToCampaignMode,
 		isSignedIn,
 		onSubmit,
+		rehydrateCuratedSession,
 		setIsMapView,
 	]);
 
@@ -1894,22 +2010,28 @@ const DashboardContent = () => {
 		if (!activeSearchQuery || activeSearchQuery.trim().length === 0) return;
 
 		const desiredView = isMapView ? 'map' : 'table';
-		const currentView = dashboardViewParam;
-		const currentSearch = dashboardSearchParam;
-
-		if (currentView === desiredView && currentSearch === activeSearchQuery) return;
-
 		const params = new URLSearchParams(searchParams.toString());
+
 		params.set('view', desiredView);
 		params.set('search', activeSearchQuery);
-		router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+
+		// Curated-search args: persist enough to replay the same call on refresh. When
+		// switching out of curated mode (e.g. user runs a regular search), strip these so
+		// the next reload doesn't get tricked into re-triggering the curated path.
+		writeCuratedParams(params, isCuratedSearchActive ? lastCuratedArgs : null);
+
+		const next = params.toString();
+		const current = searchParams.toString();
+		if (next === current) return;
+
+		router.replace(`${pathname}?${next}`, { scroll: false });
 	}, [
 		activeSearchQuery,
-		dashboardSearchParam,
-		dashboardViewParam,
 		hasSearched,
 		isAddToCampaignMode,
+		isCuratedSearchActive,
 		isMapView,
+		lastCuratedArgs,
 		pathname,
 		router,
 		searchParams,
@@ -1928,11 +2050,13 @@ const DashboardContent = () => {
 		const params = new URLSearchParams(searchParams.toString());
 		const had =
 			params.get('view') !== null ||
-			params.get('search') !== null;
+			params.get('search') !== null ||
+			CURATED_URL_PARAM_KEYS.some((key) => params.get(key) !== null);
 		if (!had) return;
 
 		params.delete('view');
 		params.delete('search');
+		writeCuratedParams(params, null);
 		const qs = params.toString();
 		router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
 	}, [hasSearched, isAddToCampaignMode, pathname, router, searchParams]);
@@ -1946,22 +2070,27 @@ const DashboardContent = () => {
 		if (!activeSearchQuery || activeSearchQuery.trim().length === 0) return;
 
 		const desiredView = isMapView ? 'map' : 'table';
-		const currentView = fromCampaignViewParam;
-		const currentSearch = fromCampaignSearchParam;
-
-		if (currentView === desiredView && currentSearch === activeSearchQuery) return;
-
 		const params = new URLSearchParams(searchParams.toString());
+
 		params.set('fromCampaignView', desiredView);
 		params.set('fromCampaignSearch', activeSearchQuery);
-		router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+
+		// Curated args travel under the same `pick`/short-key namespace as the normal
+		// dashboard flow so the rehydration effect can branch on a single signal.
+		writeCuratedParams(params, isCuratedSearchActive ? lastCuratedArgs : null);
+
+		const next = params.toString();
+		const current = searchParams.toString();
+		if (next === current) return;
+
+		router.replace(`${pathname}?${next}`, { scroll: false });
 	}, [
 		activeSearchQuery,
-		fromCampaignSearchParam,
-		fromCampaignViewParam,
 		hasSearched,
 		isAddToCampaignMode,
+		isCuratedSearchActive,
 		isMapView,
+		lastCuratedArgs,
 		pathname,
 		router,
 		searchParams,

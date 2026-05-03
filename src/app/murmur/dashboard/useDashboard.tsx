@@ -41,6 +41,96 @@ const formSchema = z.object({
 
 type FormData = z.infer<typeof formSchema>;
 
+// Args we ran the most recent curated search with. Stored alongside the result
+// in sessionStorage so a refresh that lands on the same args restores the *same
+// shuffle* the user was looking at instead of generating a fresh one.
+type CuratedSearchArgs = {
+	lat: number | null;
+	lon: number | null;
+	radiusKm: number | null;
+	category: string | null;
+	state: string | null;
+};
+
+type CuratedSessionPayload = {
+	v: 1;
+	ts: number;
+	args: CuratedSearchArgs;
+	query: string;
+	contacts: ContactWithName[];
+};
+
+const CURATED_SESSION_STORAGE_KEY = 'murmur_curated_session_v1';
+// One hour: long enough that "I just refreshed" always hits cache, short enough
+// that walking away and coming back the next morning gets a fresh sample.
+const CURATED_SESSION_MAX_AGE_MS = 60 * 60 * 1000;
+
+// JSON.stringify(new Date()) is an ISO string, JSON.parse leaves it as a string.
+// Contact has Date-typed fields that downstream consumers may treat as Dates, so
+// we revive them on read. Missing/null pass through unchanged.
+const reviveContactDates = (raw: unknown): ContactWithName => {
+	const c = raw as Record<string, unknown>;
+	const reviveOne = (v: unknown): unknown =>
+		typeof v === 'string' ? new Date(v) : v;
+	return {
+		...c,
+		createdAt: reviveOne(c.createdAt),
+		updatedAt: reviveOne(c.updatedAt),
+		lastResearchedDate: c.lastResearchedDate != null ? reviveOne(c.lastResearchedDate) : null,
+		emailValidatedAt: c.emailValidatedAt != null ? reviveOne(c.emailValidatedAt) : null,
+	} as ContactWithName;
+};
+
+const readCuratedSessionStorage = (): CuratedSessionPayload | null => {
+	if (typeof window === 'undefined') return null;
+	try {
+		const raw = window.sessionStorage.getItem(CURATED_SESSION_STORAGE_KEY);
+		if (!raw) return null;
+		const parsed = JSON.parse(raw);
+		if (parsed?.v !== 1) return null;
+		if (typeof parsed.ts !== 'number') return null;
+		if (!Array.isArray(parsed.contacts)) return null;
+		if (Date.now() - parsed.ts > CURATED_SESSION_MAX_AGE_MS) return null;
+		return {
+			v: 1,
+			ts: parsed.ts,
+			args: parsed.args,
+			query: typeof parsed.query === 'string' ? parsed.query : '',
+			contacts: parsed.contacts.map(reviveContactDates),
+		};
+	} catch {
+		return null;
+	}
+};
+
+const writeCuratedSessionStorage = (payload: CuratedSessionPayload): void => {
+	if (typeof window === 'undefined') return;
+	try {
+		window.sessionStorage.setItem(
+			CURATED_SESSION_STORAGE_KEY,
+			JSON.stringify(payload)
+		);
+	} catch {
+		// Quota exceeded or storage disabled — non-fatal, refresh just re-fetches.
+	}
+};
+
+const clearCuratedSessionStorage = (): void => {
+	if (typeof window === 'undefined') return;
+	try {
+		window.sessionStorage.removeItem(CURATED_SESSION_STORAGE_KEY);
+	} catch {
+		// ignore
+	}
+};
+
+const curatedArgsEqual = (a: CuratedSearchArgs, b: CuratedSearchArgs): boolean =>
+	a.lat === b.lat &&
+	a.lon === b.lon &&
+	a.radiusKm === b.radiusKm &&
+	a.category === b.category &&
+	a.state === b.state;
+
 interface UseDashboardOptions {
 	/** Derived title to assign to contacts without a title when creating a campaign */
 	derivedTitle?: string;
@@ -128,6 +218,10 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 	// them up without a separate code path.
 	const [curatedContacts, setCuratedContacts] = useState<ContactWithName[] | null>(null);
 	const [isCuratedSearchActive, setIsCuratedSearchActive] = useState(false);
+	// Snapshot of the args that produced the current curated results. Captured here so the
+	// dashboard URL-mirror can persist them and the page can re-run the same curated search
+	// after a browser refresh. Keys are the exact override fields accepted by triggerCuratedSearch.
+	const [lastCuratedArgs, setLastCuratedArgs] = useState<CuratedSearchArgs | null>(null);
 
 	const {
 		data: rawContacts,
@@ -270,6 +364,8 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 		// A real query overrides any active curated session.
 		setIsCuratedSearchActive(false);
 		setCuratedContacts(null);
+		setLastCuratedArgs(null);
+		clearCuratedSessionStorage();
 		// Update search parameters
 		setActiveSearchQuery(data.searchText);
 		setActiveExcludeUsedContacts(data.excludeUsedContacts ?? false);
@@ -284,6 +380,8 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 		setMapBboxFilter(null);
 		setIsCuratedSearchActive(false);
 		setCuratedContacts(null);
+		setLastCuratedArgs(null);
+		clearCuratedSessionStorage();
 		// Reset selection when leaving the search/results flow (fresh dashboard start should not
 		// carry over prior selections).
 		setSelectedContacts([]);
@@ -307,6 +405,16 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 			setIsCuratedSearchActive(true);
 			setHasSearched(true);
 			setIsMapView(true);
+			// Capture the exact args we ran with so we can replay this curated search after a
+			// browser refresh (the URL-mirror in dashboard/page.tsx serializes these).
+			const capturedArgs: CuratedSearchArgs = {
+				lat: overrides?.lat ?? null,
+				lon: overrides?.lon ?? null,
+				radiusKm: overrides?.radiusKm ?? null,
+				category: overrides?.category ?? null,
+				state: overrides?.state ?? null,
+			};
+			setLastCuratedArgs(capturedArgs);
 			try {
 				const result = await runCuratedSearch({
 					lat: overrides?.lat ?? undefined,
@@ -318,7 +426,18 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 				});
 				setCuratedContacts(result.contacts);
 				const where = result.city ?? result.region ?? overrides?.state ?? 'your area';
-				setActiveSearchQuery(`Curated picks near ${where}`);
+				const query = `Curated picks near ${where}`;
+				setActiveSearchQuery(query);
+				// Snapshot the *exact* contacts we just rendered so a refresh on the same args
+				// restores the same shuffle instead of drawing a new one. The URL persists what
+				// search we ran; sessionStorage persists the result of that run.
+				writeCuratedSessionStorage({
+					v: 1,
+					ts: Date.now(),
+					args: capturedArgs,
+					query,
+					contacts: result.contacts,
+				});
 				return result;
 			} catch (err) {
 				toast.error(
@@ -326,6 +445,8 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 				);
 				setIsCuratedSearchActive(false);
 				setCuratedContacts(null);
+				setLastCuratedArgs(null);
+				clearCuratedSessionStorage();
 				setHasSearched(false);
 				throw err;
 			} finally {
@@ -333,6 +454,28 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 			}
 		},
 		[runCuratedSearch]
+	);
+
+	// Restore a curated session from sessionStorage if the cache key matches the requested
+	// args; otherwise fall through to a fresh server call. Used on browser refresh so the
+	// user sees the *same* shuffle they were just looking at, not a new random one.
+	const rehydrateCuratedSession = useCallback(
+		async (args: CuratedSearchArgs) => {
+			const cached = readCuratedSessionStorage();
+			if (cached && curatedArgsEqual(cached.args, args)) {
+				setMapBboxFilter(null);
+				setIsCuratedSearchActive(true);
+				setHasSearched(true);
+				setIsMapView(true);
+				setLastCuratedArgs(cached.args);
+				setCuratedContacts(cached.contacts);
+				setActiveSearchQuery(cached.query);
+				setIsSearchPending(false);
+				return;
+			}
+			await triggerCuratedSearch(args);
+		},
+		[triggerCuratedSearch]
 	);
 
 	const handleSelectAll = (panelContacts?: ContactWithName[]) => {
@@ -915,7 +1058,9 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 		mapBboxFilter,
 		setMapBboxFilter,
 		triggerCuratedSearch,
+		rehydrateCuratedSession,
 		isCuratedSearchActive,
 		isPendingCuratedSearch,
+		lastCuratedArgs,
 	};
 };
