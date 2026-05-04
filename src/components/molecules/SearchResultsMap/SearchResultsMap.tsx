@@ -1,6 +1,6 @@
 'use client';
 
-import { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { FC, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import { ContactWithName } from '@/types/contact';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
@@ -319,15 +319,22 @@ const CURATED_ORB_RADIUS_PADDING_KM = 0;
 // Floor: very tight clusters still need a readable orb, otherwise it shrinks
 // to a dot at the moment the dots themselves are disappearing.
 const CURATED_ORB_MIN_RADIUS_KM = 90;
-const CURATED_ORB_BLUR_PX = 8;
-// Small bright core, then a long soft falloff that extends almost all the
-// way to the outline so the gradient fills the circle (only a thin sliver
-// of map shows between the bloom's outer edge and the stroke).
-const CURATED_ORB_GRADIENT_BG =
-	'radial-gradient(circle at center, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.7) 14%, rgba(255, 255, 255, 0.4) 36%, rgba(255, 255, 255, 0.18) 60%, rgba(255, 255, 255, 0.06) 80%, rgba(255, 255, 255, 0) 92%)';
-// 1° latitude ≈ 110.574 km. Used to convert the orb's km radius into a north
-// offset we can project to pixels for accurate sizing across the globe.
-const KM_PER_DEGREE_LAT = 110.574;
+const CURATED_ORB_GRADIENT_ROTATION_DEG = -38.746;
+const CURATED_ORB_SOURCE_VIEWBOX_HALF_WIDTH = 778 / 2;
+const CURATED_ORB_SOURCE_VIEWBOX_HALF_HEIGHT = 736 / 2;
+const CURATED_ORB_ELLIPSE_RX_RATIO =
+	607.5 / CURATED_ORB_SOURCE_VIEWBOX_HALF_WIDTH;
+const CURATED_ORB_ELLIPSE_RY_RATIO =
+	503 / CURATED_ORB_SOURCE_VIEWBOX_HALF_HEIGHT;
+// The source SVG's gradient transform is scaled against its viewBox half-size
+// (778x736), not the oversized ellipse axes, so the color band lands near the
+// blob edge instead of collapsing outside the visible shape.
+const CURATED_ORB_GRADIENT_SCALE_X_RATIO =
+	415.423 / CURATED_ORB_SOURCE_VIEWBOX_HALF_WIDTH;
+const CURATED_ORB_GRADIENT_SCALE_Y_RATIO =
+	436.955 / CURATED_ORB_SOURCE_VIEWBOX_HALF_HEIGHT;
+const CURATED_ORB_COLOR_BLEND_OPACITY = 0.38;
+const CURATED_ORB_BLOOM_OPACITY = 1;
 
 const computeCuratedOrbT = (zoom: number) => {
 	if (zoom >= CURATED_ORB_TRANSITION_START_ZOOM) return 0;
@@ -335,18 +342,6 @@ const computeCuratedOrbT = (zoom: number) => {
 	const raw =
 		(CURATED_ORB_TRANSITION_START_ZOOM - zoom) /
 		(CURATED_ORB_TRANSITION_START_ZOOM - CURATED_ORB_TRANSITION_END_ZOOM);
-	return raw * raw * (3 - 2 * raw);
-};
-
-// Dot ↔ gradient cross-dissolve t. Runs ahead of the morph so by the time
-// the shape transformation starts, the dots have already given way to the
-// gradient bloom.
-const computeCuratedDotFadeT = (zoom: number) => {
-	if (zoom >= CURATED_DOT_FADE_START_ZOOM) return 0;
-	if (zoom <= CURATED_DOT_FADE_END_ZOOM) return 1;
-	const raw =
-		(CURATED_DOT_FADE_START_ZOOM - zoom) /
-		(CURATED_DOT_FADE_START_ZOOM - CURATED_DOT_FADE_END_ZOOM);
 	return raw * raw * (3 - 2 * raw);
 };
 
@@ -850,6 +845,58 @@ const mercatorMultiPolygonToLngLat = (
 		if (convertedPolygon.length) converted.push(convertedPolygon);
 	}
 	return converted;
+};
+
+const buildScreenPathFromLngLatMultiPolygon = (
+	mapInstance: mapboxgl.Map,
+	multiPolygon: ClippingMultiPolygon | null
+): {
+	d: string;
+	minX: number;
+	minY: number;
+	maxX: number;
+	maxY: number;
+} | null => {
+	if (!multiPolygon?.length) return null;
+
+	const commands: string[] = [];
+	let minX = Infinity;
+	let minY = Infinity;
+	let maxX = -Infinity;
+	let maxY = -Infinity;
+	for (const polygon of multiPolygon) {
+		for (const ring of polygon) {
+			const projected: Array<[number, number]> = [];
+			for (const [lng, lat] of ring) {
+				if (!Number.isFinite(lng) || !Number.isFinite(lat)) continue;
+				let point: mapboxgl.Point;
+				try {
+					point = mapInstance.project([lng, lat]);
+				} catch {
+					continue;
+				}
+				if (Number.isFinite(point.x) && Number.isFinite(point.y)) {
+					projected.push([point.x, point.y]);
+					minX = Math.min(minX, point.x);
+					minY = Math.min(minY, point.y);
+					maxX = Math.max(maxX, point.x);
+					maxY = Math.max(maxY, point.y);
+				}
+			}
+			if (projected.length < 3) continue;
+			const [firstX, firstY] = projected[0];
+			commands.push(`M ${firstX.toFixed(2)} ${firstY.toFixed(2)}`);
+			for (let i = 1; i < projected.length; i++) {
+				const [x, y] = projected[i];
+				commands.push(`L ${x.toFixed(2)} ${y.toFixed(2)}`);
+			}
+			commands.push('Z');
+		}
+	}
+
+	const d = commands.join(' ');
+	if (!d || !Number.isFinite(minX) || !Number.isFinite(minY)) return null;
+	return { d, minX, minY, maxX, maxY };
 };
 
 const boundsToPolygonFeatureCollection = (
@@ -4097,6 +4144,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	nightLighting = null,
 	nightT: nightTProp = null,
 }) => {
+	const curatedOrbSvgIdPrefix = useId().replace(/:/g, '');
+	const curatedOrbGradientId = `${curatedOrbSvgIdPrefix}-curated-orb-gradient`;
+	const curatedOrbBloomGradientId = `${curatedOrbSvgIdPrefix}-curated-orb-bloom-gradient`;
+	const curatedOrbClipPathId = `${curatedOrbSvgIdPrefix}-curated-orb-clip`;
+
 	const contactLightsTilesEnabled = useMemo(() => {
 		// Enabled by default (it's a lightweight raster overlay), but allow a
 		// URL escape hatch to disable while tuning: `?devContactLights=0`.
@@ -4392,7 +4444,13 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const curatedBlobSignatureRef = useRef<string>('');
 	const curatedClusterCentroidRef = useRef<LatLngLiteral | null>(null);
 	const curatedClusterRadiusKmRef = useRef<number | null>(null);
-	const curatedOrbRef = useRef<HTMLDivElement | null>(null);
+	const curatedOrbRef = useRef<SVGSVGElement | null>(null);
+	const curatedOrbEllipseRef = useRef<SVGEllipseElement | null>(null);
+	const curatedOrbBloomEllipseRef = useRef<SVGEllipseElement | null>(null);
+	const curatedOrbGradientRef = useRef<SVGRadialGradientElement | null>(null);
+	const curatedOrbBloomGradientRef = useRef<SVGRadialGradientElement | null>(null);
+	const curatedOrbClipPathRef = useRef<SVGPathElement | null>(null);
+	const curatedBlobLngLatMultiPolygonRef = useRef<ClippingMultiPolygon | null>(null);
 	// Source-of-truth for the blob outline morph: the natural smoothed cluster
 	// geometry in Mercator space, plus the centroid + circle target radius.
 	// Each zoom event lerps every vertex from its natural position toward a
@@ -5247,6 +5305,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		curatedBlobSignatureRef.current = '';
 		curatedClusterCentroidRef.current = null;
 		curatedClusterRadiusKmRef.current = null;
+		curatedBlobLngLatMultiPolygonRef.current = null;
 		naturalBlobMorphSourceRef.current = null;
 		lastBlobMorphTAppliedRef.current = Number.NaN;
 		applyCuratedOrbStateRef.current?.();
@@ -12069,66 +12128,100 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		return getResultDotScaleForZoom(zoomLevel);
 	}, [zoomLevel]);
 
-	// Curated cluster orb: imperative position + size + opacity update driven
-	// by zoom/move. Reads centroid + radius (km) refs and the current zoom so
-	// the orb tracks the cluster geographically as the user pans/zooms the
-	// globe, without forcing React re-renders.
+	// Curated cluster orb: project the current morphed blob to screen space,
+	// then fit the supplied SVG gradient to that projected blob bounds.
 	const applyCuratedOrbState = useCallback(() => {
 		const m = mapRef.current;
 		const orb = curatedOrbRef.current;
-		if (!m || !orb) return;
-		const zoom = m.getZoom() ?? MAP_DEFAULT_ZOOM;
-		// Opacity follows the (earlier) dot-fade curve so the gradient appears
-		// in step with the dots disappearing — the shape morph that follows
-		// uses its own `computeCuratedOrbT` and can run later/slower.
-		const t = computeCuratedDotFadeT(zoom);
-		const centroid = curatedClusterCentroidRef.current;
-		const radiusKm = curatedClusterRadiusKmRef.current;
-		if (t <= 0 || !centroid || !radiusKm || radiusKm <= 0) {
-			if (orb.style.opacity !== '0') orb.style.opacity = '0';
-			return;
-		}
-		let centerPx: mapboxgl.Point;
-		let northPx: mapboxgl.Point;
-		try {
-			centerPx = m.project([centroid.lng, centroid.lat]);
-			northPx = m.project([
-				centroid.lng,
-				centroid.lat + radiusKm / KM_PER_DEGREE_LAT,
-			]);
-		} catch {
-			orb.style.opacity = '0';
-			return;
-		}
+		const ellipse = curatedOrbEllipseRef.current;
+		const bloomEllipse = curatedOrbBloomEllipseRef.current;
+		const gradient = curatedOrbGradientRef.current;
+		const bloomGradient = curatedOrbBloomGradientRef.current;
+		const clipPath = curatedOrbClipPathRef.current;
 		if (
-			!Number.isFinite(centerPx.x) ||
-			!Number.isFinite(centerPx.y) ||
-			!Number.isFinite(northPx.x) ||
-			!Number.isFinite(northPx.y)
+			!m ||
+			!orb ||
+			!ellipse ||
+			!bloomEllipse ||
+			!gradient ||
+			!bloomGradient ||
+			!clipPath
+		)
+			return;
+		const zoom = m.getZoom() ?? MAP_DEFAULT_ZOOM;
+		const bloomT = computeCuratedOrbT(zoom);
+		const colorOpacity = CURATED_ORB_COLOR_BLEND_OPACITY * (1 - bloomT);
+		const bloomOpacity = CURATED_ORB_BLOOM_OPACITY * bloomT;
+		if (!curatedBlobLngLatMultiPolygonRef.current?.length) {
+			if (orb.style.opacity !== '0') orb.style.opacity = '0';
+			clipPath.setAttribute('d', '');
+			return;
+		}
+		const projectedClip = buildScreenPathFromLngLatMultiPolygon(
+			m,
+			curatedBlobLngLatMultiPolygonRef.current
+		);
+		if (!projectedClip) {
+			orb.style.opacity = '0';
+			clipPath.setAttribute('d', '');
+			return;
+		}
+
+		const width = projectedClip.maxX - projectedClip.minX;
+		const height = projectedClip.maxY - projectedClip.minY;
+		if (
+			!Number.isFinite(width) ||
+			!Number.isFinite(height) ||
+			width <= 0 ||
+			height <= 0
 		) {
 			orb.style.opacity = '0';
+			clipPath.setAttribute('d', '');
 			return;
 		}
-		const radiusPx = Math.hypot(northPx.x - centerPx.x, northPx.y - centerPx.y);
-		if (!Number.isFinite(radiusPx) || radiusPx <= 0) {
-			orb.style.opacity = '0';
-			return;
-		}
-		const diameter = radiusPx * 2;
-		orb.style.width = `${diameter}px`;
-		orb.style.height = `${diameter}px`;
-		orb.style.transform = `translate3d(${centerPx.x - radiusPx}px, ${
-			centerPx.y - radiusPx
-		}px, 0)`;
-		orb.style.opacity = String(t);
+
+		const halfWidth = width / 2;
+		const halfHeight = height / 2;
+		const centerX = projectedClip.minX + halfWidth;
+		const centerY = projectedClip.minY + halfHeight;
+		ellipse.setAttribute('cx', centerX.toFixed(2));
+		ellipse.setAttribute('cy', centerY.toFixed(2));
+		bloomEllipse.setAttribute('cx', centerX.toFixed(2));
+		bloomEllipse.setAttribute('cy', centerY.toFixed(2));
+		ellipse.setAttribute(
+			'rx',
+			(halfWidth * CURATED_ORB_ELLIPSE_RX_RATIO).toFixed(2)
+		);
+		ellipse.setAttribute(
+			'ry',
+			(halfHeight * CURATED_ORB_ELLIPSE_RY_RATIO).toFixed(2)
+		);
+		const bloomRadius = Math.max(halfWidth, halfHeight);
+		bloomEllipse.setAttribute('rx', bloomRadius.toFixed(2));
+		bloomEllipse.setAttribute('ry', bloomRadius.toFixed(2));
+		gradient.setAttribute(
+			'gradientTransform',
+			`translate(${centerX.toFixed(2)} ${centerY.toFixed(2)}) rotate(${CURATED_ORB_GRADIENT_ROTATION_DEG}) scale(${(
+				halfWidth * CURATED_ORB_GRADIENT_SCALE_X_RATIO
+			).toFixed(2)} ${(halfHeight * CURATED_ORB_GRADIENT_SCALE_Y_RATIO).toFixed(2)})`
+		);
+		bloomGradient.setAttribute(
+			'gradientTransform',
+			`translate(${centerX.toFixed(2)} ${centerY.toFixed(2)}) scale(${bloomRadius.toFixed(2)})`
+		);
+		clipPath.setAttribute('d', projectedClip.d);
+		ellipse.setAttribute('opacity', colorOpacity.toFixed(3));
+		bloomEllipse.setAttribute('opacity', bloomOpacity.toFixed(3));
+		orb.style.opacity = '1';
 	}, []);
 	applyCuratedOrbStateRef.current = applyCuratedOrbState;
 
 	// Vertex-by-vertex morph of the curated blob outline toward a circle of
 	// `radiusMerc` around `centerMerc`. Each vertex moves along its own ray
 	// from the centroid, so a non-circular blob smoothly widens out into the
-	// target circle as `t` grows from 0 → 1. Quantizes `t` to 1/100 to avoid
-	// redundant `setData` calls when zoom is idle.
+	// target circle as `t` grows from 0 → 1. Even when the morph geometry
+	// itself is unchanged, the SVG clip must still be reprojected on every
+	// render frame so it stays locked to Mapbox's fast camera transforms.
 	const applyBlobMorph = useCallback(() => {
 		const m = mapRef.current;
 		if (!m) return;
@@ -12139,13 +12232,16 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		if (!source) return;
 		if (!morphSource) {
 			lastBlobMorphTAppliedRef.current = Number.NaN;
+			curatedBlobLngLatMultiPolygonRef.current = null;
 			return;
 		}
 		const zoom = m.getZoom() ?? MAP_DEFAULT_ZOOM;
 		const t = computeCuratedOrbT(zoom);
-		const tQuantized = Math.round(t * 100) / 100;
-		if (tQuantized === lastBlobMorphTAppliedRef.current) return;
-		lastBlobMorphTAppliedRef.current = tQuantized;
+		if (Math.abs(t - lastBlobMorphTAppliedRef.current) < 0.001) {
+			applyCuratedOrbStateRef.current?.();
+			return;
+		}
+		lastBlobMorphTAppliedRef.current = t;
 
 		const { mercatorMultiPolygon, centerMerc, radiusMerc } = morphSource;
 		const morphed: ClippingMultiPolygon =
@@ -12168,8 +12264,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						)
 					);
 		const lngLat = mercatorMultiPolygonToLngLat(morphed);
+		curatedBlobLngLatMultiPolygonRef.current = lngLat;
 		const fc = createOutlineGeoJsonFromMultiPolygon(lngLat);
 		source.setData(fc as GeoJSON.FeatureCollection);
+		applyCuratedOrbStateRef.current?.();
 	}, []);
 	applyBlobMorphRef.current = applyBlobMorph;
 
@@ -12616,22 +12714,13 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		if (!map) return;
 		if (!isMapLoaded) return;
 
-		applyCuratedOrbState();
-		// 'move' covers both pan (centroid re-projection) and zoom (t change).
-		map.on('move', applyCuratedOrbState);
-		return () => {
-			map.off('move', applyCuratedOrbState);
-		};
-	}, [map, isMapLoaded, applyCuratedOrbState]);
-
-	useEffect(() => {
-		if (!map) return;
-		if (!isMapLoaded) return;
-
 		applyBlobMorph();
-		map.on('move', applyBlobMorph);
+		// `render` keeps the DOM SVG clip in the same frame cadence as Mapbox's
+		// camera transform, which prevents the gradient from trailing during
+		// quick pinch/scroll zooms.
+		map.on('render', applyBlobMorph);
 		return () => {
-			map.off('move', applyBlobMorph);
+			map.off('render', applyBlobMorph);
 		};
 	}, [map, isMapLoaded, applyBlobMorph]);
 
@@ -14651,34 +14740,81 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			)}
 			<div ref={mapContainerRef} style={{ width: '100%', height: '100%' }} />
 			{/*
-			  Curated cluster zoom-out orb — radial-gradient bloom only. The
-			  outline circle that wraps the cluster at globe zoom is the
-			  Mapbox blob layer's morphed geometry (natural cluster shape that
-			  widens out into a circle as zoom decreases), not a separate DOM
-			  ring. This layer just adds the soft white center bloom inside
-			  that circle. Sized to the cluster's geographic radius (km) and
-			  positioned imperatively by `applyCuratedOrbState`; inert
-			  (opacity 0, off-screen) at any zoom above the transition window.
+			  Curated cluster zoom-out orb. The SVG ellipse paints the supplied
+			  radial gradient, while the clip path is rebuilt from the same
+			  morphed Mapbox blob geometry that draws the white outline.
 			*/}
-			<div
+			<svg
 				ref={curatedOrbRef}
 				aria-hidden
+				width="100%"
+				height="100%"
 				style={{
 					position: 'absolute',
-					left: 0,
-					top: 0,
-					width: 0,
-					height: 0,
+					inset: 0,
 					pointerEvents: 'none',
 					opacity: 0,
-					transform: 'translate3d(-9999px, -9999px, 0)',
-					willChange: 'transform, opacity, width, height',
+					willChange: 'opacity',
 					zIndex: 2,
-					borderRadius: '50%',
-					background: CURATED_ORB_GRADIENT_BG,
-					filter: `blur(${CURATED_ORB_BLUR_PX}px)`,
+					overflow: 'visible',
 				}}
-			/>
+			>
+				<defs>
+					<radialGradient
+						ref={curatedOrbGradientRef}
+						id={curatedOrbGradientId}
+						cx="0"
+						cy="0"
+						r="1"
+						gradientUnits="userSpaceOnUse"
+					>
+						<stop offset="0.716346" stopColor="#EFE8D8" stopOpacity="0" />
+						<stop offset="0.783654" stopColor="#FFF8E5" stopOpacity="0.55" />
+						<stop offset="0.841346" stopColor="#CAD7FF" />
+						<stop offset="0.884615" stopColor="#CBFFE7" />
+						<stop offset="1" stopColor="#F0EBDE" stopOpacity="0.2" />
+					</radialGradient>
+					<radialGradient
+						ref={curatedOrbBloomGradientRef}
+						id={curatedOrbBloomGradientId}
+						cx="0"
+						cy="0"
+						r="1"
+						gradientUnits="userSpaceOnUse"
+					>
+						<stop offset="0" stopColor="#FFFFFF" stopOpacity="0.95" />
+						<stop offset="0.14" stopColor="#FFFFFF" stopOpacity="0.7" />
+						<stop offset="0.36" stopColor="#FFFFFF" stopOpacity="0.4" />
+						<stop offset="0.6" stopColor="#FFFFFF" stopOpacity="0.18" />
+						<stop offset="0.8" stopColor="#FFFFFF" stopOpacity="0.06" />
+						<stop offset="0.92" stopColor="#FFFFFF" stopOpacity="0" />
+					</radialGradient>
+					<clipPath id={curatedOrbClipPathId} clipPathUnits="userSpaceOnUse">
+						<path ref={curatedOrbClipPathRef} d="" clipRule="evenodd" />
+					</clipPath>
+				</defs>
+				<ellipse
+					ref={curatedOrbBloomEllipseRef}
+					cx="0"
+					cy="0"
+					rx="0"
+					ry="0"
+					opacity="0"
+					fill={`url(#${curatedOrbBloomGradientId})`}
+					clipPath={`url(#${curatedOrbClipPathId})`}
+				/>
+				<ellipse
+					ref={curatedOrbEllipseRef}
+					cx="0"
+					cy="0"
+					rx="0"
+					ry="0"
+					opacity="0"
+					fill={`url(#${curatedOrbGradientId})`}
+					clipPath={`url(#${curatedOrbClipPathId})`}
+					style={{ mixBlendMode: 'color' }}
+				/>
+			</svg>
 			{/*
 			  Softbox lighting overlay. Two stacked viewport-anchored radial gradients
 			  paint the "lit sphere" feel directly on top of the map. Because these
