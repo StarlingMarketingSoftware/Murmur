@@ -1,5 +1,6 @@
 'use client';
 
+import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { isValidMood, SAMPLE_CITIES, WeatherMood } from '@/lib/weather/regions';
 
@@ -87,9 +88,17 @@ export function useGlobeWeatherMood() {
 		retry: 1,
 	});
 
+	const regionKey = query.data?.regionKey;
+	// Memoize so consumers wrapped in React.memo (e.g. SearchResultsMap) don't
+	// re-render every time the parent re-renders for unrelated reasons.
+	const regionCenter = useMemo(
+		() => centerForRegionKey(regionKey),
+		[regionKey]
+	);
+
 	return {
 		mood: query.data?.mood ?? 'normal',
-		regionCenter: centerForRegionKey(query.data?.regionKey),
+		regionCenter,
 		temperatureF: query.data?.temperatureF ?? null,
 		isLoading: query.isLoading,
 	};

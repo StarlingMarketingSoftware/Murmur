@@ -1,6 +1,6 @@
 'use client';
 
-import { FC, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { FC, memo, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import { ContactWithName } from '@/types/contact';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
@@ -15511,4 +15511,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	);
 };
 
-export default SearchResultsMap;
+// Memoized so the heavy Mapbox component does not re-render when the parent
+// (Dashboard) re-renders for unrelated state changes (e.g. the bottom search
+// bar opening/closing dropdowns). Requires that all callback props from the
+// parent are stable (wrapped in useCallback) to take effect.
+const MemoizedSearchResultsMap = memo(SearchResultsMap);
+MemoizedSearchResultsMap.displayName = 'SearchResultsMap';
+export default MemoizedSearchResultsMap;

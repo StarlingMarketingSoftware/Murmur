@@ -2,6 +2,7 @@
 
 import {
 	FC,
+	memo,
 	Suspense,
 	useCallback,
 	useEffect,
@@ -59,7 +60,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { useClerk, useAuth, SignUp } from '@clerk/nextjs';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { useDebounce } from '@/hooks/useDebounce';
-import { useGetLocations, useBatchUpdateContacts } from '@/hooks/queryHooks/useContacts';
+import { useBatchUpdateContacts } from '@/hooks/queryHooks/useContacts';
 import { useMe } from '@/hooks/useMe';
 import { CustomScrollbar } from '@/components/ui/custom-scrollbar';
 import { getStateAbbreviation } from '@/utils/string';
@@ -403,6 +404,23 @@ const MAP_RESULTS_BOTTOM_SEARCH_BOX = {
 	opacity: 0.8,
 } as const;
 
+const MAP_RESULTS_BOTTOM_CATEGORY_SEARCH_BOX = {
+	width: 401,
+	height: 67,
+	innerWidth: 329,
+	innerHeight: 60,
+	submitWidth: 61,
+	submitHeight: 58,
+	borderRadius: 8,
+	borderWidth: 2,
+	borderColor: '#000000',
+	backgroundColor: '#FFFFFF',
+	submitBackgroundColor: '#95CEFF',
+	submitHoverBackgroundColor: '#82C4FA',
+	submitActiveBackgroundColor: '#71B5ED',
+	opacity: 0.9,
+} as const;
+
 const MAP_RESULTS_BOTTOM_SEARCH_FOLLOWUP_BOX = {
 	width: 301,
 	compactWidth: 157,
@@ -422,11 +440,14 @@ const MAP_RESULTS_BOTTOM_SEARCH_FOLLOWUP_SEGMENT_BOX = {
 	borderColor: '#000000',
 	advancedWidth: 49,
 	dividerWidth: 2,
+	internalDividerWidth: 1,
 	segmentWidth: 47,
 	advancedBackgroundColor: '#FD7171',
 	profileBackgroundColor: '#E0F3FE',
 	keywordBackgroundColor: '#EEF5FF',
+	keywordActiveBackgroundColor: '#71A9FD',
 	radiusBackgroundColor: '#FBF5DE',
+	radiusActiveBackgroundColor: '#EED56E',
 } as const;
 
 const MAP_RESULTS_BOTTOM_SEARCH_FOLLOWUP_LEFT_TILE_BOX = {
@@ -497,22 +518,313 @@ type MapBottomSearchBarProps = {
 	isExpanded: boolean;
 	activeHeight: number;
 	inputRef: RefObject<HTMLTextAreaElement | null>;
+	mode?: 'anything' | 'category';
+	categoryWhatValue?: string;
+	categoryWhereValue?: string;
+	activeCategoryField?: 'what' | 'where' | null;
 	onActivate: () => void;
 	onSubmit: () => void;
 	onValueChange: (value: string) => void;
 	onActiveChange: (active: boolean) => void;
+	onCategoryFieldFocus?: (field: 'what' | 'where') => void;
+	onCategoryWhatChange?: (value: string) => void;
+	onCategoryWhereChange?: (value: string) => void;
+	onCategoryWhatEnter?: () => void;
+	onCategorySubmit?: () => void | Promise<void>;
 };
 
-const MapBottomSearchBar = ({
+const MapBottomSearchBar = memo(({
 	value,
 	isExpanded,
 	activeHeight,
 	inputRef,
+	mode = 'anything',
+	categoryWhatValue = '',
+	categoryWhereValue = '',
+	activeCategoryField = null,
 	onActivate,
 	onSubmit,
 	onValueChange,
 	onActiveChange,
+	onCategoryFieldFocus,
+	onCategoryWhatChange,
+	onCategoryWhereChange,
+	onCategoryWhatEnter,
+	onCategorySubmit,
 }: MapBottomSearchBarProps) => {
+	const activeCategoryIndicatorRef = useRef<HTMLDivElement>(null);
+	const prevActiveCategoryFieldRef = useRef<'what' | 'where' | null>(null);
+	const categoryWhatInputRef = useRef<HTMLInputElement>(null);
+	const categoryWhereInputRef = useRef<HTMLInputElement>(null);
+
+	useLayoutEffect(() => {
+		const indicator = activeCategoryIndicatorRef.current;
+		if (!indicator) return;
+
+		gsap.killTweensOf(indicator);
+
+		if (mode !== 'category' || !activeCategoryField) {
+			gsap.set(indicator, {
+				opacity: 0,
+				xPercent: 0,
+				scaleX: 1,
+				transformOrigin: 'center center',
+			});
+			prevActiveCategoryFieldRef.current = null;
+			return;
+		}
+
+		const nextXPercent = activeCategoryField === 'where' ? 100 : 0;
+		const previousField = prevActiveCategoryFieldRef.current;
+
+		if (!previousField) {
+			gsap.set(indicator, {
+				xPercent: nextXPercent,
+				opacity: 1,
+				scaleX: 2,
+				transformOrigin:
+					activeCategoryField === 'where' ? 'right center' : 'left center',
+			});
+			gsap.to(indicator, {
+				scaleX: 1,
+				duration: 0.6,
+				ease: 'power2.out',
+				overwrite: 'auto',
+			});
+			prevActiveCategoryFieldRef.current = activeCategoryField;
+			return;
+		}
+
+		gsap.set(indicator, { scaleX: 1, transformOrigin: 'center center' });
+		gsap.to(indicator, {
+			xPercent: nextXPercent,
+			duration: 0.6,
+			ease: 'power2.out',
+			overwrite: 'auto',
+		});
+		gsap.to(indicator, {
+			opacity: 1,
+			duration: 0.15,
+			ease: 'power2.out',
+			overwrite: 'auto',
+		});
+
+		prevActiveCategoryFieldRef.current = activeCategoryField;
+	}, [activeCategoryField, mode]);
+
+	useEffect(() => {
+		if (mode !== 'category') return;
+
+		if (activeCategoryField === 'what') {
+			categoryWhatInputRef.current?.focus();
+		} else if (activeCategoryField === 'where') {
+			categoryWhereInputRef.current?.focus();
+		}
+	}, [activeCategoryField, mode]);
+
+	if (mode === 'category') {
+		const categoryBox = MAP_RESULTS_BOTTOM_CATEGORY_SEARCH_BOX;
+		const whatLabel = categoryWhatValue.trim() || 'Add Recipients';
+		const whereLabel = categoryWhereValue.trim() || 'Search Destinations';
+		const isWhatActive = activeCategoryField === 'what';
+		const isWhereActive = activeCategoryField === 'where';
+		const hasActiveCategoryField = activeCategoryField !== null;
+
+		return (
+			<div
+				aria-label="Category search on the map"
+				className="map-bottom-category-search relative h-full w-full overflow-hidden pointer-events-auto"
+				style={{
+					borderRadius: `${categoryBox.borderRadius}px`,
+					border: `${categoryBox.borderWidth}px solid ${categoryBox.borderColor}`,
+					backgroundColor: categoryBox.backgroundColor,
+					opacity: categoryBox.opacity,
+					boxSizing: 'border-box',
+				}}
+			>
+				<div
+					className="absolute overflow-hidden"
+					style={{
+						left: '2px',
+						top: '1.5px',
+						width: `${categoryBox.innerWidth}px`,
+						height: `${categoryBox.innerHeight}px`,
+						borderRadius: `${categoryBox.borderRadius}px`,
+						border: 0,
+						backgroundColor: hasActiveCategoryField ? '#EFEFEF' : '#FFFFFF',
+						boxSizing: 'border-box',
+						transition: 'background-color 150ms ease',
+					}}
+				>
+					<div
+						aria-hidden="true"
+						className="absolute inset-0 rounded-[8px] border-2 border-black pointer-events-none"
+						style={{
+							opacity: hasActiveCategoryField ? 0 : 1,
+							zIndex: 1,
+							boxSizing: 'border-box',
+						}}
+					/>
+					<div
+						ref={activeCategoryIndicatorRef}
+						aria-hidden="true"
+						className="absolute top-0 left-0 h-full w-1/2 bg-white border-2 border-black rounded-[8px] pointer-events-none"
+						style={{
+							opacity: 0,
+							zIndex: 1,
+							boxSizing: 'border-box',
+							willChange: 'transform, opacity',
+						}}
+					/>
+					<div
+						className={`absolute top-0 left-0 h-full cursor-pointer overflow-hidden transition-colors duration-150 ${
+							isWhatActive ? '' : 'hover:bg-black/[0.05]'
+						}`}
+						style={{
+							width: '50%',
+							borderTopLeftRadius: `${categoryBox.borderRadius - categoryBox.borderWidth}px`,
+							borderBottomLeftRadius: `${categoryBox.borderRadius - categoryBox.borderWidth}px`,
+							zIndex: 2,
+						}}
+						onMouseDown={(event) => {
+							if ((event.target as HTMLElement).tagName !== 'INPUT') {
+								event.preventDefault();
+							}
+							onCategoryFieldFocus?.('what');
+						}}
+					>
+						<div className="absolute left-[18px] top-[12px] font-medium text-[21px] leading-none text-black font-secondary">
+							What
+						</div>
+						<div className="absolute left-[18px] right-[8px] top-[37px] h-[14px] overflow-hidden">
+							{isWhatActive ? (
+								<input
+									ref={categoryWhatInputRef}
+									value={categoryWhatValue}
+									onChange={(event) => onCategoryWhatChange?.(event.target.value)}
+									onKeyDown={(event) => {
+										event.stopPropagation();
+										if (event.key === 'Enter') {
+											event.preventDefault();
+											onCategoryWhatEnter?.();
+										}
+									}}
+									className="absolute inset-0 w-full bg-transparent border-0 outline-none p-0 font-semibold text-[12px] leading-[14px] text-black font-secondary"
+									placeholder="Add Recipients"
+								/>
+							) : (
+								<div
+									className="absolute inset-0 font-semibold text-[12px] leading-[14px] whitespace-nowrap overflow-hidden font-secondary"
+									style={{
+										color: categoryWhatValue.trim()
+											? '#000000'
+											: 'rgba(0, 0, 0, 0.42)',
+										maskImage: 'linear-gradient(to right, black 82%, transparent 100%)',
+										WebkitMaskImage:
+											'linear-gradient(to right, black 82%, transparent 100%)',
+									}}
+								>
+									{whatLabel}
+								</div>
+							)}
+						</div>
+					</div>
+					<div
+						className={`absolute top-0 right-0 h-full cursor-pointer overflow-hidden transition-colors duration-150 ${
+							isWhereActive ? '' : 'hover:bg-black/[0.05]'
+						}`}
+						style={{
+							width: '50%',
+							borderTopRightRadius: `${categoryBox.borderRadius - categoryBox.borderWidth}px`,
+							borderBottomRightRadius: `${categoryBox.borderRadius - categoryBox.borderWidth}px`,
+							zIndex: 2,
+						}}
+						onMouseDown={(event) => {
+							if ((event.target as HTMLElement).tagName !== 'INPUT') {
+								event.preventDefault();
+							}
+							onCategoryFieldFocus?.('where');
+						}}
+					>
+						<div className="absolute left-[18px] top-[12px] font-medium text-[21px] leading-none text-black font-secondary">
+							Where
+						</div>
+						<div className="absolute left-[18px] right-[8px] top-[37px] h-[14px] overflow-hidden">
+							{isWhereActive ? (
+								<input
+									ref={categoryWhereInputRef}
+									value={categoryWhereValue}
+									onChange={(event) => onCategoryWhereChange?.(event.target.value)}
+									onKeyDown={(event) => {
+										event.stopPropagation();
+										if (event.key === 'Enter') {
+											event.preventDefault();
+											onCategorySubmit?.();
+										}
+									}}
+									className="absolute inset-0 w-full bg-transparent border-0 outline-none p-0 font-semibold text-[12px] leading-[14px] text-black font-secondary"
+									placeholder="Search Destinations"
+								/>
+							) : (
+								<div
+									className="absolute inset-0 font-semibold text-[12px] leading-[14px] whitespace-nowrap overflow-hidden font-secondary"
+									style={{
+										color: categoryWhereValue.trim()
+											? '#000000'
+											: 'rgba(0, 0, 0, 0.42)',
+										maskImage: 'linear-gradient(to right, black 82%, transparent 100%)',
+										WebkitMaskImage:
+											'linear-gradient(to right, black 82%, transparent 100%)',
+									}}
+								>
+									{whereLabel}
+								</div>
+							)}
+						</div>
+					</div>
+				</div>
+				<button
+					type="button"
+					aria-label="Submit category search"
+					className="absolute flex items-center justify-center transition-colors duration-100"
+					style={{
+						right: '2px',
+						top: '50%',
+						width: `${categoryBox.submitWidth}px`,
+						height: `${categoryBox.submitHeight}px`,
+						transform: 'translateY(-50%)',
+						backgroundColor: categoryBox.submitBackgroundColor,
+						borderRadius: `${categoryBox.borderRadius}px`,
+						border: 0,
+						boxSizing: 'border-box',
+						padding: 0,
+						cursor: 'pointer',
+					}}
+					onMouseEnter={(event) => {
+						event.currentTarget.style.backgroundColor =
+							categoryBox.submitHoverBackgroundColor;
+					}}
+					onMouseLeave={(event) => {
+						event.currentTarget.style.backgroundColor =
+							categoryBox.submitBackgroundColor;
+					}}
+					onMouseDown={(event) => {
+						event.stopPropagation();
+						event.currentTarget.style.backgroundColor =
+							categoryBox.submitActiveBackgroundColor;
+					}}
+					onMouseUp={(event) => {
+						event.currentTarget.style.backgroundColor =
+							categoryBox.submitHoverBackgroundColor;
+					}}
+					onClick={() => onCategorySubmit?.()}
+				>
+					<MapBottomSearchArrowIcon aria-hidden="true" />
+				</button>
+			</div>
+		);
+	}
+
 	return (
 		<div
 			aria-label="Search anything on the map"
@@ -627,17 +939,29 @@ const MapBottomSearchBar = ({
 			</button>
 		</div>
 	);
+});
+MapBottomSearchBar.displayName = 'MapBottomSearchBar';
+
+const getCategorySearchWhyForWhat = (what: string) =>
+	what.trim() === 'Radio Stations' ? '[Promotion]' : '[Booking]';
+
+type MapBottomSearchFollowupBoxProps = {
+	selectedSearchFollowup: MapBottomSearchFollowupSelection;
+	onSelectedSearchFollowupChange: (
+		selection: MapBottomSearchFollowupSelection
+	) => void;
 };
 
-const MapBottomSearchFollowupBox = () => {
+const MapBottomSearchFollowupBox = memo(({
+	selectedSearchFollowup,
+	onSelectedSearchFollowupChange,
+}: MapBottomSearchFollowupBoxProps) => {
 	const segmentBox = MAP_RESULTS_BOTTOM_SEARCH_FOLLOWUP_SEGMENT_BOX;
 	const leftTileBox = MAP_RESULTS_BOTTOM_SEARCH_FOLLOWUP_LEFT_TILE_BOX;
 	const iconLayout = MAP_RESULTS_BOTTOM_SEARCH_FOLLOWUP_ICON_LAYOUT;
-	const profileLeft = segmentBox.advancedWidth + segmentBox.dividerWidth;
+	const profileLeft = segmentBox.advancedWidth + segmentBox.internalDividerWidth;
 	const keywordLeft = profileLeft + segmentBox.segmentWidth;
 	const radiusLeft = keywordLeft + segmentBox.segmentWidth;
-	const [selectedSearchFollowup, setSelectedSearchFollowup] =
-		useState<MapBottomSearchFollowupSelection>(null);
 	const [advancedSelections, setAdvancedSelections] =
 		useState<MapBottomSearchAdvancedSelections>({
 			profile: false,
@@ -648,6 +972,8 @@ const MapBottomSearchFollowupBox = () => {
 	const isCategorySelected = selectedSearchFollowup === 'category';
 	const isCompactFollowup = isForYouSelected || isCategorySelected;
 	const isProfileAdvancedSelected = advancedSelections.profile;
+	const isKeywordAdvancedSelected = advancedSelections.keyword;
+	const isRadiusAdvancedSelected = advancedSelections.radius;
 
 	return (
 		<div
@@ -690,9 +1016,7 @@ const MapBottomSearchFollowupBox = () => {
 					cursor: 'pointer',
 				}}
 				onClick={() =>
-					setSelectedSearchFollowup((current) =>
-						current === 'for-you' ? null : 'for-you'
-					)
+					onSelectedSearchFollowupChange(isForYouSelected ? null : 'for-you')
 				}
 			>
 				<MapBottomSearchForYouIcon
@@ -730,9 +1054,7 @@ const MapBottomSearchFollowupBox = () => {
 					cursor: 'pointer',
 				}}
 				onClick={() =>
-					setSelectedSearchFollowup((current) =>
-						current === 'category' ? null : 'category'
-					)
+					onSelectedSearchFollowupChange(isCategorySelected ? null : 'category')
 				}
 			>
 				<MapBottomSearchCategoryIcon
@@ -776,7 +1098,7 @@ const MapBottomSearchFollowupBox = () => {
 						padding: 0,
 						cursor: 'pointer',
 					}}
-					onClick={() => setSelectedSearchFollowup(null)}
+					onClick={() => onSelectedSearchFollowupChange(null)}
 				>
 					<MapBottomSearchAdvancedIcon
 						aria-hidden="true"
@@ -806,6 +1128,7 @@ const MapBottomSearchFollowupBox = () => {
 						border: `${segmentBox.dividerWidth}px solid ${segmentBox.borderColor}`,
 						background: `linear-gradient(to right, ${segmentBox.advancedBackgroundColor} 0 ${segmentBox.advancedWidth}px, ${segmentBox.borderColor} ${segmentBox.advancedWidth}px ${profileLeft}px, ${segmentBox.profileBackgroundColor} ${profileLeft}px ${keywordLeft}px, ${segmentBox.keywordBackgroundColor} ${keywordLeft}px ${radiusLeft}px, ${segmentBox.radiusBackgroundColor} ${radiusLeft}px 100%)`,
 						boxSizing: 'border-box',
+						overflow: 'hidden',
 					}}
 				>
 					<div
@@ -826,20 +1149,18 @@ const MapBottomSearchFollowupBox = () => {
 						aria-pressed={isProfileAdvancedSelected}
 						className="absolute flex items-center justify-center"
 						style={{
-							left: `${isProfileAdvancedSelected ? profileLeft - 1 : profileLeft}px`,
+							left: `${profileLeft}px`,
 							top: 0,
-							width: `${
-								isProfileAdvancedSelected
-									? segmentBox.segmentWidth + 1
-									: segmentBox.segmentWidth
-							}px`,
+							width: `${segmentBox.segmentWidth}px`,
 							height: '100%',
 							backgroundColor: isProfileAdvancedSelected ? '#71C9FD' : 'transparent',
 							border: 0,
 							borderRadius: 0,
+							outline: 'none',
 							appearance: 'none',
 							padding: 0,
 							cursor: 'pointer',
+							zIndex: 1,
 						}}
 						onClick={() =>
 							setAdvancedSelections((current) => ({
@@ -860,16 +1181,39 @@ const MapBottomSearchFollowupBox = () => {
 							}}
 						/>
 					</button>
-					<div
+					<button
+						type="button"
+						aria-label="Toggle Keyword"
+						aria-pressed={isKeywordAdvancedSelected}
 						className="absolute flex items-center justify-center"
 						style={{
 							left: `${keywordLeft}px`,
 							top: 0,
 							width: `${segmentBox.segmentWidth}px`,
 							height: '100%',
+							backgroundColor: isKeywordAdvancedSelected
+								? segmentBox.keywordActiveBackgroundColor
+								: 'transparent',
+							border: 0,
+							borderRadius: 0,
+							outline: 'none',
+							appearance: 'none',
+							padding: 0,
+							cursor: 'pointer',
+							zIndex: 1,
 						}}
+						onClick={() =>
+							setAdvancedSelections((current) => ({
+								...current,
+								keyword: !current.keyword,
+							}))
+						}
 					>
 						<MapBottomSearchKeywordIcon
+							aria-hidden="true"
+							textColor={isKeywordAdvancedSelected ? '#000000' : undefined}
+							iconColor={isKeywordAdvancedSelected ? '#000000' : undefined}
+							innerFill={isKeywordAdvancedSelected ? '#FFFFFF' : undefined}
 							style={{
 								display: 'block',
 								width: `${iconLayout.keyword.width}px`,
@@ -877,17 +1221,41 @@ const MapBottomSearchFollowupBox = () => {
 								transform: `translate(${iconLayout.keyword.translateX}px, ${iconLayout.keyword.translateY}px)`,
 							}}
 						/>
-					</div>
-					<div
+					</button>
+					<button
+						type="button"
+						aria-label="Toggle Radius"
+						aria-pressed={isRadiusAdvancedSelected}
 						className="absolute flex items-center justify-center"
 						style={{
 							left: `${radiusLeft}px`,
 							top: 0,
-							width: `${segmentBox.segmentWidth}px`,
+							width: `${segmentBox.segmentWidth - segmentBox.internalDividerWidth}px`,
 							height: '100%',
+							backgroundColor: isRadiusAdvancedSelected
+								? segmentBox.radiusActiveBackgroundColor
+								: 'transparent',
+							border: 0,
+							borderTopRightRadius: `${segmentBox.borderRadius - segmentBox.dividerWidth}px`,
+							borderBottomRightRadius: `${segmentBox.borderRadius - segmentBox.dividerWidth}px`,
+							outline: 'none',
+							appearance: 'none',
+							padding: 0,
+							cursor: 'pointer',
+							zIndex: 1,
 						}}
+						onClick={() =>
+							setAdvancedSelections((current) => ({
+								...current,
+								radius: !current.radius,
+							}))
+						}
 					>
 						<MapBottomSearchRadiusIcon
+							aria-hidden="true"
+							textColor={isRadiusAdvancedSelected ? '#000000' : undefined}
+							iconColor={isRadiusAdvancedSelected ? '#000000' : undefined}
+							innerFill={isRadiusAdvancedSelected ? '#FFFFFF' : undefined}
 							style={{
 								display: 'block',
 								width: `${iconLayout.radius.width}px`,
@@ -895,12 +1263,25 @@ const MapBottomSearchFollowupBox = () => {
 								transform: `translate(${iconLayout.radius.translateX}px, ${iconLayout.radius.translateY}px)`,
 							}}
 						/>
-					</div>
+					</button>
+					<div
+						aria-hidden="true"
+						className="absolute pointer-events-none"
+						style={{
+							left: `${segmentBox.advancedWidth}px`,
+							top: 0,
+							width: `${segmentBox.internalDividerWidth}px`,
+							height: '100%',
+							backgroundColor: segmentBox.borderColor,
+							zIndex: 2,
+						}}
+					/>
 				</div>
 			)}
 		</div>
 	);
-};
+});
+MapBottomSearchFollowupBox.displayName = 'MapBottomSearchFollowupBox';
 
 const SearchTrayIconTile = ({
 	backgroundColor,
@@ -1171,6 +1552,11 @@ const DashboardContent = () => {
 	const [activeSection, setActiveSection] = useState<'why' | 'what' | 'where' | null>(
 		null
 	);
+	const [mapBottomSearchFollowupSelection, setMapBottomSearchFollowupSelection] =
+		useState<MapBottomSearchFollowupSelection>(null);
+	const [isMapBottomCategoryDropdownActive, setIsMapBottomCategoryDropdownActive] =
+		useState(false);
+	const isMapBottomCategoryMode = mapBottomSearchFollowupSelection === 'category';
 
 	// Close why dropdown when clicking outside
 	useEffect(() => {
@@ -1282,12 +1668,6 @@ const DashboardContent = () => {
 		return () => window.removeEventListener('resize', handleResize);
 	}, []);
 
-	const debouncedWhereValue = useDebounce(whereValue, 300);
-	const { data: locationResults, isLoading: isLoadingLocations } = useGetLocations(
-		debouncedWhereValue,
-		'state'
-	);
-
 	// Helper to trigger search with a specific "where" value (called when clicking state from dropdown)
 	const triggerSearchWithWhere = (
 		newWhereValue: string,
@@ -1369,12 +1749,29 @@ const DashboardContent = () => {
 			`left 0.6s ${dropdownEase}, height 0.6s ${dropdownEase}`;
 		// Slightly faster than the pill, per UX request.
 		const dropdownFadeTransition = `opacity 0.35s ${dropdownEase}`;
+		const isMapBottomCategoryDropdown =
+			isMapBottomCategoryMode && isMapBottomCategoryDropdownActive;
+		const shouldShowPromotionOnlyWhatDropdown =
+			whyValue === '[Promotion]' && !isMapBottomCategoryDropdown;
+		const selectWhatFromDropdown = (nextWhat: string) => {
+			if (isMapBottomCategoryDropdown) {
+				setWhyValue(getCategorySearchWhyForWhat(nextWhat));
+				setWhatValue(nextWhat);
+				setActiveSection('where');
+				return;
+			}
+
+			setWhatValue(nextWhat);
+			// On the results screen, changing "What" should immediately re-search
+			// without auto-advancing the UI to the "Where" (state) step.
+			setActiveSection(isMapView ? null : 'where');
+		};
 
 		const dropdownHeight =
 			activeSection === 'why'
 				? 173
 				: activeSection === 'what'
-					? whyValue === '[Promotion]'
+					? shouldShowPromotionOnlyWhatDropdown
 						? 92
 						: 404
 					: 370;
@@ -1391,48 +1788,32 @@ const DashboardContent = () => {
 					? 176
 					: 98;
 
-		// Map-view UX: if the user already has an exact state selected, show that state first,
-		// then the 4 nearest states (by centroid distance), then continue with the full 50-state list.
 		const canonicalWhereState = normalizeUsStateName(whereValue);
-		const shouldSuggestNearbyStates =
-			activeSection === 'where' &&
-			isMapView &&
-			!!canonicalWhereState &&
-			!!locationResults &&
-			locationResults.length === 1 &&
-			normalizeUsStateName(locationResults[0]?.label) === canonicalWhereState;
-
-		const whereSuggestedStateNames =
-			shouldSuggestNearbyStates && canonicalWhereState
-				? [canonicalWhereState, ...getNearestUsStateNames(canonicalWhereState, 4)]
+		const whereQuery = whereValue.trim().toLowerCase();
+		const allWhereStateNames = buildAllUsStateNames();
+		const matchingWhereStateNames =
+			whereQuery.length > 0
+				? allWhereStateNames.filter((stateName) => {
+						const stateNameLower = stateName.toLowerCase();
+						const stateAbbrLower =
+							getStateAbbreviation(stateName)?.toLowerCase() ?? '';
+						return (
+							stateNameLower.includes(whereQuery) ||
+							stateAbbrLower.includes(whereQuery)
+						);
+				  })
+				: DEFAULT_STATE_SUGGESTIONS.map((suggestion) => suggestion.label);
+		const nearbyWhereStateNames =
+			activeSection === 'where' && isMapView && canonicalWhereState
+				? getNearestUsStateNames(canonicalWhereState, 4)
 				: [];
-
-		const whereDropdownStateNames = (() => {
-			const preferredStateNames =
-				shouldSuggestNearbyStates && canonicalWhereState && locationResults
-					? [
-							...locationResults.map((loc) => loc?.label || loc?.state),
-							...getNearestUsStateNames(canonicalWhereState, 4),
-					  ]
-					: (locationResults ?? []).map((loc) => loc?.label || loc?.state);
-
-			return buildAllUsStateNames(preferredStateNames);
-		})();
+		const whereDropdownStateNames = buildAllUsStateNames([
+			...matchingWhereStateNames,
+			...(canonicalWhereState ? [canonicalWhereState] : []),
+			...nearbyWhereStateNames,
+		]);
 
 		const whereDropdownLocations = whereDropdownStateNames.map((name) => ({
-			city: '',
-			state: name,
-			label: name,
-		}));
-
-		const whereSuggestedLocations = whereSuggestedStateNames.map((name) => ({
-			city: '',
-			state: name,
-			label: name,
-		}));
-
-		// Full canonical 50-state list (alphabetical) used for the "All states" portion.
-		const whereAllStateLocations = buildAllUsStateNames().map((name) => ({
 			city: '',
 			state: name,
 			label: name,
@@ -1442,7 +1823,22 @@ const DashboardContent = () => {
 			<div
 				className="search-dropdown-menu w-[439px] max-w-[calc(100vw-16px)] bg-[#D8E5FB] rounded-[16px] border-2 border-black z-[110] relative overflow-hidden"
 				style={
-					isMapView
+					isMapBottomCategoryDropdown
+						? {
+								position: 'fixed',
+								left: '50%',
+								bottom: `${
+									MAP_RESULTS_BOTTOM_SEARCH_BOX.bottomOffset +
+									MAP_RESULTS_BOTTOM_CATEGORY_SEARCH_BOX.height +
+									14
+								}px`,
+								transform: 'translateX(-50%)',
+								height: dropdownHeight,
+								transition: dropdownTransition,
+								willChange: 'height',
+								zIndex: 140,
+						  }
+						: isMapView
 						? {
 								position: 'fixed',
 								// In map view, the mini search bar is overlaid on the map,
@@ -1531,16 +1927,11 @@ const DashboardContent = () => {
 					}}
 				>
 					{/* What dropdown - Promotion */}
-					{whyValue === '[Promotion]' ? (
+					{shouldShowPromotionOnlyWhatDropdown ? (
 						<div className="flex flex-col items-center justify-start gap-[10px] w-full h-full py-[12px]">
 							<div
 								className="w-[415px] max-w-[calc(100%-24px)] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
-								onClick={() => {
-									setWhatValue('Radio Stations');
-									// On the results screen, changing "What" should immediately re-search
-									// without auto-advancing the UI to the "Where" (state) step.
-									setActiveSection(isMapView ? null : 'where');
-								}}
+								onClick={() => selectWhatFromDropdown('Radio Stations')}
 							>
 								<div className="w-[38px] h-[38px] bg-[#56DA73] rounded-[8px] flex-shrink-0 flex items-center justify-center">
 									<RadioStationsIcon />
@@ -1579,12 +1970,7 @@ const DashboardContent = () => {
 							>
 								<div
 									className="w-[415px] max-w-[calc(100%-24px)] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
-									onClick={() => {
-										setWhatValue('Wine, Beer, and Spirits');
-										// On the results screen, changing "What" should immediately re-search
-										// without auto-advancing the UI to the "Where" (state) step.
-										setActiveSection(isMapView ? null : 'where');
-									}}
+									onClick={() => selectWhatFromDropdown('Wine, Beer, and Spirits')}
 								>
 									<div className="w-[38px] h-[38px] bg-[#80AAFF] rounded-[8px] flex-shrink-0 flex items-center justify-center">
 										<WineBeerSpiritsIcon size={22} />
@@ -1600,12 +1986,7 @@ const DashboardContent = () => {
 								</div>
 								<div
 									className="w-[415px] max-w-[calc(100%-24px)] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
-									onClick={() => {
-										setWhatValue('Restaurants');
-										// On the results screen, changing "What" should immediately re-search
-										// without auto-advancing the UI to the "Where" (state) step.
-										setActiveSection(isMapView ? null : 'where');
-									}}
+									onClick={() => selectWhatFromDropdown('Restaurants')}
 								>
 									<div className="w-[38px] h-[38px] bg-[#77DD91] rounded-[8px] flex-shrink-0 flex items-center justify-center">
 										<RestaurantsIcon />
@@ -1619,14 +2000,27 @@ const DashboardContent = () => {
 										</div>
 									</div>
 								</div>
+								{isMapBottomCategoryDropdown && (
+									<div
+										className="w-[415px] max-w-[calc(100%-24px)] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+										onClick={() => selectWhatFromDropdown('Radio Stations')}
+									>
+										<div className="w-[38px] h-[38px] bg-[#56DA73] rounded-[8px] flex-shrink-0 flex items-center justify-center">
+											<RadioStationsIcon />
+										</div>
+										<div className="ml-[12px] flex flex-col">
+											<div className="text-[20px] font-medium leading-none text-black font-inter">
+												Radio Stations
+											</div>
+											<div className="text-[12px] leading-tight text-black mt-[4px]">
+												Reach out to radio stations
+											</div>
+										</div>
+									</div>
+								)}
 								<div
 									className="w-[415px] max-w-[calc(100%-24px)] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
-									onClick={() => {
-										setWhatValue('Coffee Shops');
-										// On the results screen, changing "What" should immediately re-search
-										// without auto-advancing the UI to the "Where" (state) step.
-										setActiveSection(isMapView ? null : 'where');
-									}}
+									onClick={() => selectWhatFromDropdown('Coffee Shops')}
 								>
 									<div className="w-[38px] h-[38px] bg-[#A9DE78] rounded-[8px] flex-shrink-0 flex items-center justify-center">
 										<CoffeeShopsIcon />
@@ -1642,12 +2036,7 @@ const DashboardContent = () => {
 								</div>
 								<div
 									className="w-[415px] max-w-[calc(100%-24px)] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
-									onClick={() => {
-										setWhatValue('Festivals');
-										// On the results screen, changing "What" should immediately re-search
-										// without auto-advancing the UI to the "Where" (state) step.
-										setActiveSection(isMapView ? null : 'where');
-									}}
+									onClick={() => selectWhatFromDropdown('Festivals')}
 								>
 									<div className="w-[38px] h-[38px] bg-[#80AAFF] rounded-[8px] flex-shrink-0 flex items-center justify-center">
 										<FestivalsIcon />
@@ -1663,12 +2052,7 @@ const DashboardContent = () => {
 								</div>
 								<div
 									className="w-[415px] max-w-[calc(100%-24px)] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
-									onClick={() => {
-										setWhatValue('Wedding Planners');
-										// On the results screen, changing "What" should immediately re-search
-										// without auto-advancing the UI to the "Where" (state) step.
-										setActiveSection(isMapView ? null : 'where');
-									}}
+									onClick={() => selectWhatFromDropdown('Wedding Planners')}
 								>
 									<div className="w-[38px] h-[38px] bg-[#EED56E] rounded-[8px] flex-shrink-0 flex items-center justify-center">
 										<WeddingPlannersIcon size={22} />
@@ -1684,12 +2068,7 @@ const DashboardContent = () => {
 								</div>
 								<div
 									className="w-[415px] max-w-[calc(100%-24px)] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
-									onClick={() => {
-										setWhatValue('Music Venues');
-										// On the results screen, changing "What" should immediately re-search
-										// without auto-advancing the UI to the "Where" (state) step.
-										setActiveSection(isMapView ? null : 'where');
-									}}
+									onClick={() => selectWhatFromDropdown('Music Venues')}
 								>
 									<div className="w-[38px] h-[38px] bg-[#71C9FD] rounded-[8px] flex-shrink-0 flex items-center justify-center">
 										<MusicVenuesIcon />
@@ -1732,69 +2111,15 @@ const DashboardContent = () => {
 								-webkit-appearance: none !important;
 							}
 						`}</style>
-						{whereValue.length >= 1 ? (
-							<CustomScrollbar
-								className="w-full h-full"
-								contentClassName="flex flex-col items-center justify-start gap-[20px] py-4"
-								thumbWidth={2}
-								thumbColor="#000000"
-								trackColor="transparent"
-								offsetRight={-5}
-							>
-								{isLoadingLocations || debouncedWhereValue !== whereValue ? (
-									<div className="flex items-center justify-center h-full">
-										<div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900"></div>
-									</div>
-								) : whereDropdownLocations && whereDropdownLocations.length > 0 ? (
-									(
-										shouldSuggestNearbyStates && whereSuggestedLocations.length > 0
-											? [...whereSuggestedLocations, ...whereAllStateLocations]
-											: whereDropdownLocations
-									).map((loc, idx) => {
-										const { icon, backgroundColor } = getCityIconProps(
-											loc.city,
-											loc.state
-										);
-										return (
-											<div
-												key={`${loc.city}-${loc.state}-${loc.label}-${idx}`}
-												className="w-[415px] max-w-[calc(100%-24px)] min-h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200 mb-2"
-												onClick={() => {
-													triggerSearchWithWhere(loc.label, false);
-												}}
-											>
-												<div
-													className="w-[38px] h-[38px] rounded-[8px] flex-shrink-0 flex items-center justify-center"
-													style={{ backgroundColor }}
-												>
-													{icon}
-												</div>
-												<div className="ml-[12px] flex flex-col">
-													<div className="text-[20px] font-medium leading-none text-black font-inter">
-														{loc.label}
-													</div>
-													<div className="text-[12px] leading-tight text-black mt-[4px]">
-														Search contacts in {loc.city || loc.state}
-													</div>
-												</div>
-											</div>
-										);
-									})
-								) : (
-									<div className="text-black font-medium font-secondary">
-										No locations found
-									</div>
-								)}
-							</CustomScrollbar>
-						) : (
-							<CustomScrollbar
-								className="w-full h-full"
-								contentClassName="flex flex-col items-center justify-start gap-[20px] py-4"
-								thumbWidth={2}
-								thumbColor="#000000"
-								trackColor="transparent"
-								offsetRight={-5}
-							>
+						<CustomScrollbar
+							className="w-full h-full"
+							contentClassName="flex flex-col items-center justify-start gap-[20px] py-4"
+							thumbWidth={2}
+							thumbColor="#000000"
+							trackColor="transparent"
+							offsetRight={-5}
+						>
+							{whereValue.length < 1 && (
 								<div
 									className="w-[415px] max-w-[calc(100%-24px)] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
 									onClick={() => {
@@ -1823,79 +2148,46 @@ const DashboardContent = () => {
 										</div>
 									</div>
 								</div>
+							)}
 
-								{DEFAULT_STATE_SUGGESTIONS.map(
-									({ label, promotionDescription, generalDescription }) => {
-										const { icon, backgroundColor } = getCityIconProps('', label);
-										return (
-											<div
-												key={label}
-												className="w-[415px] max-w-[calc(100%-24px)] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
-												onClick={() => {
-													triggerSearchWithWhere(label, false);
-												}}
-											>
-												<div
-													className="w-[38px] h-[38px] rounded-[8px] flex-shrink-0 flex items-center justify-center"
-													style={{ backgroundColor }}
-												>
-													{icon}
-												</div>
-												<div className="ml-[12px] flex flex-col">
-													<div className="text-[20px] font-medium leading-none text-black font-inter">
-														{label}
-													</div>
-													<div className="text-[12px] leading-tight text-black mt-[4px]">
-														{isPromotion ? promotionDescription : generalDescription}
-													</div>
-												</div>
+							{whereDropdownLocations.map((loc, idx) => {
+								const { icon, backgroundColor } = getCityIconProps(
+									loc.city,
+									loc.state
+								);
+								return (
+									<div
+										key={`${loc.city}-${loc.state}-${loc.label}-${idx}`}
+										className="w-[415px] max-w-[calc(100%-24px)] min-h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
+										onClick={() => {
+											triggerSearchWithWhere(loc.label, false);
+										}}
+									>
+										<div
+											className="w-[38px] h-[38px] rounded-[8px] flex-shrink-0 flex items-center justify-center"
+											style={{ backgroundColor }}
+										>
+											{icon}
+										</div>
+										<div className="ml-[12px] flex flex-col">
+											<div className="text-[20px] font-medium leading-none text-black font-inter">
+												{loc.label}
 											</div>
-										);
-									}
-								)}
-
-								{(() => {
-									const defaultNames = DEFAULT_STATE_SUGGESTIONS.map((s) => s.label);
-									const defaultSet = new Set(defaultNames.map((s) => s.toLowerCase()));
-									return buildAllUsStateNames(defaultNames)
-										.filter((name) => !defaultSet.has(name.toLowerCase()))
-										.map((stateName) => {
-											const { icon, backgroundColor } = getCityIconProps('', stateName);
-											return (
-												<div
-													key={stateName}
-													className="w-[415px] max-w-[calc(100%-24px)] h-[68px] bg-white hover:bg-[#f0f0f0] rounded-[12px] flex-shrink-0 flex items-center px-[15px] cursor-pointer transition-colors duration-200"
-													onClick={() => {
-														triggerSearchWithWhere(stateName, false);
-													}}
-												>
-													<div
-														className="w-[38px] h-[38px] rounded-[8px] flex-shrink-0 flex items-center justify-center"
-														style={{ backgroundColor }}
-													>
-														{icon}
-													</div>
-													<div className="ml-[12px] flex flex-col">
-														<div className="text-[20px] font-medium leading-none text-black font-inter">
-															{stateName}
-														</div>
-														<div className="text-[12px] leading-tight text-black mt-[4px]">
-															Search contacts in {stateName}
-														</div>
-													</div>
-												</div>
-											);
-										});
-								})()}
-							</CustomScrollbar>
-						)}
+											<div className="text-[12px] leading-tight text-black mt-[4px]">
+												Search contacts in {loc.city || loc.state}
+											</div>
+										</div>
+									</div>
+								);
+							})}
+						</CustomScrollbar>
 					</div>
 				</div>
 			</div>
 		);
 
-		// When in map view, render dropdowns via portal to escape the stacking context
-		if (isMapView && typeof window !== 'undefined') {
+		// Map and bottom-category dropdowns render via portal to escape stacking contexts.
+		if ((isMapView || isMapBottomCategoryDropdown) && typeof window !== 'undefined') {
 			return createPortal(dropdownContent, document.body);
 		}
 
@@ -2108,6 +2400,8 @@ const DashboardContent = () => {
 		lastCuratedArgs,
 		triggerFreeTextSearch,
 	} = useDashboard({ derivedTitle: derivedContactTitle, forceApplyDerivedTitle: shouldForceApplyDerivedTitle, fromHome: fromHomeParam });
+	const shouldEnableMapStateCategorySelection =
+		isMapView && isMapBottomCategoryMode;
 
 	const handleMapStateSelect = useCallback(
 		(stateName: string) => {
@@ -3140,6 +3434,106 @@ const DashboardContent = () => {
 		triggerFreeTextSearch,
 	]);
 
+	const handleMapBottomSearchFollowupSelectionChange = useCallback(
+		(selection: MapBottomSearchFollowupSelection) => {
+			setMapBottomSearchFollowupSelection(selection);
+
+			if (selection === 'category') {
+				mapBottomSearchInputRef.current?.blur();
+				setIsMapBottomSearchActive(false);
+				return;
+			}
+
+			if (isMapBottomCategoryDropdownActive) {
+				setActiveSection(null);
+			}
+			setIsMapBottomCategoryDropdownActive(false);
+		},
+		[isMapBottomCategoryDropdownActive]
+	);
+
+	const handleMapBottomCategoryFieldFocus = useCallback(
+		(field: 'what' | 'where') => {
+			if (isFromHomeDemoMode) {
+				setShowFreeTrialPrompt(true);
+				return;
+			}
+
+			setMapBottomSearchFollowupSelection('category');
+			setIsMapBottomSearchActive(false);
+			setIsMapBottomCategoryDropdownActive(true);
+			setWhyValue(getCategorySearchWhyForWhat(whatValue));
+			setActiveSection(field);
+		},
+		[isFromHomeDemoMode, whatValue]
+	);
+
+	const handleMapBottomCategoryWhatChange = useCallback((value: string) => {
+		setWhatValue(value);
+		setWhyValue(getCategorySearchWhyForWhat(value));
+		setIsMapBottomCategoryDropdownActive(true);
+	}, []);
+
+	const handleMapBottomCategoryWhereChange = useCallback((value: string) => {
+		setWhereValue(value);
+		setIsNearMeLocation(false);
+		setIsMapBottomCategoryDropdownActive(true);
+	}, []);
+
+	const handleMapBottomCategoryWhatEnter = useCallback(() => {
+		setIsMapBottomCategoryDropdownActive(true);
+		setWhyValue(getCategorySearchWhyForWhat(whatValue));
+		setActiveSection('where');
+	}, [whatValue]);
+
+	const handleMapBottomCategorySubmit = useCallback(async () => {
+		if (isFromHomeDemoMode) {
+			setShowFreeTrialPrompt(true);
+			return;
+		}
+
+		const trimmedWhat = whatValue.trim();
+		const trimmedWhere = whereValue.trim();
+		const nextWhy = getCategorySearchWhyForWhat(trimmedWhat);
+
+		setWhyValue(nextWhy);
+		setActiveSection(null);
+		setIsMapBottomCategoryDropdownActive(false);
+
+		if (!trimmedWhat && !trimmedWhere) {
+			if (hasSearched) return;
+
+			await ensureNonEmptyDashboardSearchOnBlankSubmit();
+			const currentSearchText = (form.getValues('searchText') ?? '').trim();
+			if (currentSearchText && onSubmit) {
+				form.handleSubmit(onSubmit)();
+			}
+			return;
+		}
+
+		const formattedWhere = trimmedWhere ? `(${trimmedWhere})` : '';
+		const combinedSearch = [nextWhy, trimmedWhat, formattedWhere]
+			.filter(Boolean)
+			.join(' ')
+			.trim();
+
+		if (combinedSearch && form && onSubmit) {
+			form.setValue('searchText', combinedSearch, {
+				shouldValidate: false,
+				shouldDirty: true,
+			});
+			form.handleSubmit(onSubmit)();
+		}
+	}, [
+		ensureNonEmptyDashboardSearchOnBlankSubmit,
+		form,
+		hasSearched,
+		isFromHomeDemoMode,
+		onSubmit,
+		whatValue,
+		whereValue,
+	]);
+
 	const [isPointerInMapSidePanel, setIsPointerInMapSidePanel] = useState(false);
 
 	const shouldUseDynamicMapCreateCampaignCta =
@@ -3924,11 +4318,21 @@ const DashboardContent = () => {
 		const handleClickOutside = (event: MouseEvent) => {
 			const target = event.target as HTMLElement;
 			if (
+				target.closest('.search-sections-container') ||
+				target.closest('.mini-search-section-why') ||
+				target.closest('.mini-search-section-what') ||
+				target.closest('.mini-search-section-where')
+			) {
+				setIsMapBottomCategoryDropdownActive(false);
+			}
+
+			if (
 				!target.closest('.search-sections-container') &&
 				!target.closest('.search-dropdown-menu') &&
 				!target.closest('.mini-search-section-why') &&
 				!target.closest('.mini-search-section-what') &&
-				!target.closest('.mini-search-section-where')
+				!target.closest('.mini-search-section-where') &&
+				!target.closest('.map-bottom-category-search')
 			) {
 				setActiveSection(null);
 			}
@@ -4123,12 +4527,20 @@ const DashboardContent = () => {
 	}, [activeSection]);
 
 	useEffect(() => {
+		if (!activeSection) {
+			setIsMapBottomCategoryDropdownActive(false);
+		}
+	}, [activeSection]);
+
+	useEffect(() => {
+		if (isMapBottomCategoryDropdownActive) return;
+
 		if (activeSection === 'what' && whatInputRef.current) {
 			whatInputRef.current.focus();
 		} else if (activeSection === 'where' && whereInputRef.current) {
 			whereInputRef.current.focus();
 		}
-	}, [activeSection]);
+	}, [activeSection, isMapBottomCategoryDropdownActive]);
 
 	// Enhanced reset search that also clears section values
 	const handleEnhancedResetSearch = () => {
@@ -4179,10 +4591,13 @@ const DashboardContent = () => {
 		!fromHomeParam && !hasSearched ? 'background' : 'interactive';
 	const shouldSpinBackgroundMap = mapPresentation === 'background';
 
-	const contactsForMap =
-		fromHomeParam && (!isSignedIn || !hasSearched)
-			? fromHomePlaceholderContacts
-			: (contacts || []);
+	const contactsForMap = useMemo(
+		() =>
+			fromHomeParam && (!isSignedIn || !hasSearched)
+				? fromHomePlaceholderContacts
+				: contacts || [],
+		[fromHomeParam, isSignedIn, hasSearched, fromHomePlaceholderContacts, contacts]
+	);
 
 	const searchWhatForMap =
 		fromHomeParam && (!isSignedIn || !hasSearched) ? FROM_HOME_WHAT : searchedWhat;
@@ -4201,14 +4616,18 @@ const DashboardContent = () => {
 			? true
 			: (fromHomeParam && (!isSignedIn || !hasSearched)) || Boolean(mapBboxFilter);
 
-	const selectedAreaBoundsForMap = mapBboxFilter
-		? {
-				south: mapBboxFilter.south,
-				west: mapBboxFilter.west,
-				north: mapBboxFilter.north,
-				east: mapBboxFilter.east,
-		  }
-		: null;
+	const selectedAreaBoundsForMap = useMemo(
+		() =>
+			mapBboxFilter
+				? {
+						south: mapBboxFilter.south,
+						west: mapBboxFilter.west,
+						north: mapBboxFilter.north,
+						east: mapBboxFilter.east,
+				  }
+				: null,
+		[mapBboxFilter]
+	);
 
 	// Fullscreen map view "frame" animation.
 	// Key goal: keep the Mapbox container size stable during the transition.
@@ -4223,6 +4642,171 @@ const DashboardContent = () => {
 	const mapViewClip = isMapView
 		? `inset(${mapViewInnerInsetPx}px round ${mapViewInnerRadiusPx}px)`
 		: 'inset(0px round 0px)';
+
+	// Stable callbacks for SearchResultsMap so it can be memoized.
+	// Without stable references, the heavy map component re-renders on every
+	// Dashboard state change (e.g. opening the bottom search bar dropdown),
+	// which causes noticeable click lag.
+	const handleMapVisibleOverlayContactsChange = useCallback(
+		(overlayContacts: ContactWithName[]) => {
+			setMapPanelVisibleOverlayContacts(overlayContacts);
+
+			if (overlayContacts.length > 0) {
+				setMapPanelExtraContacts((prev) => {
+					const byId = new Map<number, ContactWithName>();
+					for (const c of prev) byId.set(c.id, c);
+					for (const c of overlayContacts) {
+						if (!byId.has(c.id)) byId.set(c.id, c);
+					}
+					return Array.from(byId.values());
+				});
+			}
+		},
+		[]
+	);
+
+	const handleMapAreaSelect = useCallback(
+		(
+			_bounds: { south: number; west: number; north: number; east: number },
+			payload?: { contactIds?: number[]; extraContacts?: ContactWithName[] }
+		) => {
+			const ids = payload?.contactIds ?? [];
+			const extraContacts = payload?.extraContacts ?? [];
+
+			if (ids.length > 0) {
+				setSelectedContacts((prev) => {
+					const next = new Set(prev);
+					for (const id of ids) next.add(id);
+					return Array.from(next);
+				});
+			}
+
+			if (extraContacts.length > 0) {
+				setMapPanelExtraContacts((prev) => {
+					const byId = new Map<number, ContactWithName>();
+					for (const c of prev) byId.set(c.id, c);
+					for (const c of extraContacts) {
+						if (!byId.has(c.id)) byId.set(c.id, c);
+					}
+					return Array.from(byId.values());
+				});
+			}
+
+			if (ids.length > 0) {
+				const nextExtraIds: number[] = [];
+				const byId = new Map<number, ContactWithName>();
+				for (const c of contacts || []) byId.set(c.id, c);
+
+				for (const id of ids) {
+					if (!baseContactIdSet.has(id)) {
+						nextExtraIds.push(id);
+						continue;
+					}
+					if (!searchedStateAbbrForMap) continue;
+					const c = byId.get(id);
+					if (!c) continue;
+					const contactStateAbbr = getStateAbbreviation(c.state || '')
+						.trim()
+						.toUpperCase();
+					if (contactStateAbbr && contactStateAbbr !== searchedStateAbbrForMap) {
+						nextExtraIds.push(id);
+					}
+				}
+
+				for (const c of extraContacts) nextExtraIds.push(c.id);
+
+				if (nextExtraIds.length > 0) {
+					setMapPanelExtraContactIds((prev) => {
+						const next = new Set(prev);
+						for (const id of nextExtraIds) next.add(id);
+						return Array.from(next);
+					});
+				}
+			}
+
+			setActiveMapTool('grab');
+		},
+		[contacts, baseContactIdSet, searchedStateAbbrForMap, setSelectedContacts]
+	);
+
+	const handleMapMarkerClick = useCallback(
+		(contact: ContactWithName) => {
+			const isInBaseResults = baseContactIdSet.has(contact.id);
+			if (!isInBaseResults) {
+				setMapPanelExtraContacts((prev) =>
+					prev.some((c) => c.id === contact.id) ? prev : [contact, ...prev]
+				);
+				setMapPanelExtraContactIds((prev) =>
+					prev.includes(contact.id) ? prev : [...prev, contact.id]
+				);
+				return;
+			}
+
+			if (!searchedStateAbbrForMap) return;
+			const contactStateAbbr = getStateAbbreviation(contact.state || '')
+				.trim()
+				.toUpperCase();
+			if (contactStateAbbr === searchedStateAbbrForMap) return;
+			setMapPanelExtraContactIds((prev) =>
+				prev.includes(contact.id) ? prev : [...prev, contact.id]
+			);
+		},
+		[baseContactIdSet, searchedStateAbbrForMap]
+	);
+
+	const handleMapToggleSelection = useCallback(
+		(contactId: number) => {
+			const wasSelected = selectedContacts.includes(contactId);
+
+			if (!wasSelected) {
+				const fromBase = (contacts || []).find((c) => c.id === contactId);
+				const fromOverlay = mapPanelVisibleOverlayContacts.find(
+					(c) => c.id === contactId
+				);
+				const fromExtra = mapPanelExtraContacts.find((c) => c.id === contactId);
+				const selectedContact = fromBase ?? fromOverlay ?? fromExtra;
+				if (selectedContact) {
+					setMapPanelExtraContacts((prev) =>
+						prev.some((c) => c.id === contactId)
+							? prev
+							: [selectedContact, ...prev]
+					);
+				}
+			}
+
+			setSelectedContacts((prev) => {
+				if (prev.includes(contactId)) {
+					return prev.filter((id) => id !== contactId);
+				}
+				return [...prev, contactId];
+			});
+
+			const tryScroll = (attempt = 0) => {
+				const contactElement = document.querySelector(
+					`[data-contact-id="${contactId}"]`
+				);
+				if (contactElement) {
+					contactElement.scrollIntoView({
+						behavior: 'smooth',
+						block: 'center',
+					});
+					return;
+				}
+				if (attempt < 10) {
+					setTimeout(() => tryScroll(attempt + 1), 50);
+				}
+			};
+			setTimeout(() => tryScroll(0), 0);
+		},
+		[
+			selectedContacts,
+			contacts,
+			mapPanelVisibleOverlayContacts,
+			mapPanelExtraContacts,
+			setSelectedContacts,
+		]
+	);
+
 	const mapPortal =
 		typeof window !== 'undefined'
 			? createPortal(
@@ -4272,177 +4856,25 @@ const DashboardContent = () => {
 								disableDotWaveReveal={isMapView}
 								selectAllInViewNonce={isMapView ? selectAllInViewNonce : undefined}
 								onVisibleOverlayContactsChange={
-									isMapView
-										? (overlayContacts) => {
-												setMapPanelVisibleOverlayContacts(overlayContacts);
-
-												// Cache overlay-only contacts so if the user selects one, it can remain
-												// renderable in the side panel even after panning away.
-												if (overlayContacts.length > 0) {
-													setMapPanelExtraContacts((prev) => {
-														const byId = new Map<number, ContactWithName>();
-														for (const c of prev) byId.set(c.id, c);
-														for (const c of overlayContacts) {
-															if (!byId.has(c.id)) byId.set(c.id, c);
-														}
-														return Array.from(byId.values());
-													});
-												}
-										  }
-										: undefined
+									isMapView ? handleMapVisibleOverlayContactsChange : undefined
 								}
 								activeTool={isMapView ? activeMapTool : undefined}
 								selectedAreaBounds={selectedAreaBoundsForMap}
 								onViewportInteraction={isMapView ? handleMapViewportInteraction : undefined}
 								onViewportIdle={isMapView ? handleMapViewportIdle : undefined}
-								onAreaSelect={
-									isMapView
-										? (bounds, payload) => {
-												const ids = payload?.contactIds ?? [];
-												const extraContacts = payload?.extraContacts ?? [];
-
-												if (ids.length > 0) {
-													setSelectedContacts((prev) => {
-														const next = new Set(prev);
-														for (const id of ids) next.add(id);
-														return Array.from(next);
-													});
-												}
-
-												// Ensure overlay-only contacts (booking/promotion map overlays) can appear
-												// as rows in the right-hand panel.
-												if (extraContacts.length > 0) {
-													setMapPanelExtraContacts((prev) => {
-														const byId = new Map<number, ContactWithName>();
-														for (const c of prev) byId.set(c.id, c);
-														for (const c of extraContacts) {
-															if (!byId.has(c.id)) byId.set(c.id, c);
-														}
-														return Array.from(byId.values());
-													});
-												}
-
-												// If selected contacts are outside the searched state (or are overlay-only),
-												// include them in the panel list so the user sees what was selected.
-												if (ids.length > 0) {
-													const nextExtraIds: number[] = [];
-													const byId = new Map<number, ContactWithName>();
-													for (const c of contacts || []) byId.set(c.id, c);
-
-													for (const id of ids) {
-														if (!baseContactIdSet.has(id)) {
-															nextExtraIds.push(id);
-															continue;
-														}
-														if (!searchedStateAbbrForMap) continue;
-														const c = byId.get(id);
-														if (!c) continue;
-														const contactStateAbbr = getStateAbbreviation(c.state || '')
-															.trim()
-															.toUpperCase();
-														if (contactStateAbbr && contactStateAbbr !== searchedStateAbbrForMap) {
-															nextExtraIds.push(id);
-														}
-													}
-
-													for (const c of extraContacts) nextExtraIds.push(c.id);
-
-													if (nextExtraIds.length > 0) {
-														setMapPanelExtraContactIds((prev) => {
-															const next = new Set(prev);
-															for (const id of nextExtraIds) next.add(id);
-															return Array.from(next);
-														});
-													}
-												}
-
-												// After selecting an area, immediately switch back to Grab mode
-												// so the user can pan/zoom without extra clicks.
-												setActiveMapTool('grab');
-										  }
-										: undefined
-								}
+								onAreaSelect={isMapView ? handleMapAreaSelect : undefined}
 								onMarkerHover={isMapView ? handleMapMarkerHover : undefined}
 								lockedStateName={lockedStateNameForMap}
 								skipAutoFit={skipAutoFitForMap}
+								enableStateInteractions={shouldEnableMapStateCategorySelection}
 								onStateSelect={
-									isMapView ? handleMapStateSelect : undefined
+									shouldEnableMapStateCategorySelection
+										? handleMapStateSelect
+										: undefined
 								}
 								isLoading={isSearchPending || isLoadingContacts || isRefetchingContacts}
-								onMarkerClick={
-									isMapView
-										? (contact) => {
-												// Ensure map-only overlay markers (e.g. Booking extra pins) can show up as
-												// rows in the right-hand panel when selected/clicked.
-												const isInBaseResults = baseContactIdSet.has(contact.id);
-												if (!isInBaseResults) {
-													setMapPanelExtraContacts((prev) =>
-														prev.some((c) => c.id === contact.id) ? prev : [contact, ...prev]
-													);
-													setMapPanelExtraContactIds((prev) =>
-														prev.includes(contact.id) ? prev : [...prev, contact.id]
-													);
-													return;
-												}
-
-												// If the marker is outside the searched state, include it in the
-												// right-hand map panel list (without changing what the map shows).
-												if (!searchedStateAbbrForMap) return;
-												const contactStateAbbr = getStateAbbreviation(contact.state || '')
-													.trim()
-													.toUpperCase();
-												if (contactStateAbbr === searchedStateAbbrForMap) return;
-												setMapPanelExtraContactIds((prev) =>
-													prev.includes(contact.id) ? prev : [...prev, contact.id]
-												);
-										  }
-										: undefined
-								}
-								onToggleSelection={
-									isMapView
-										? (contactId) => {
-												const wasSelected = selectedContacts.includes(contactId);
-
-												// Ensure the selected contact stays renderable in the side panel across
-												// subsequent searches by caching the full object.
-												if (!wasSelected) {
-													const fromBase = (contacts || []).find((c) => c.id === contactId);
-													const fromOverlay = mapPanelVisibleOverlayContacts.find((c) => c.id === contactId);
-													const fromExtra = mapPanelExtraContacts.find((c) => c.id === contactId);
-													const selectedContact = fromBase ?? fromOverlay ?? fromExtra;
-													if (selectedContact) {
-														setMapPanelExtraContacts((prev) =>
-															prev.some((c) => c.id === contactId) ? prev : [selectedContact, ...prev]
-														);
-													}
-												}
-
-												setSelectedContacts((prev) => {
-													if (prev.includes(contactId)) {
-														return prev.filter((id) => id !== contactId);
-													}
-													return [...prev, contactId];
-												});
-												// Scroll to the contact in the side panel
-												const tryScroll = (attempt = 0) => {
-													const contactElement = document.querySelector(
-														`[data-contact-id="${contactId}"]`
-													);
-													if (contactElement) {
-														contactElement.scrollIntoView({
-															behavior: 'smooth',
-															block: 'center',
-														});
-														return;
-													}
-													if (attempt < 10) {
-														setTimeout(() => tryScroll(attempt + 1), 50);
-													}
-												};
-												setTimeout(() => tryScroll(0), 0);
-										  }
-										: undefined
-								}
+								onMarkerClick={isMapView ? handleMapMarkerClick : undefined}
+								onToggleSelection={isMapView ? handleMapToggleSelection : undefined}
 							/>
 						</div>
 
@@ -4547,6 +4979,22 @@ const DashboardContent = () => {
 	// Reduce extra white space above the fixed mobile action button by
 	// only adding bottom padding when needed and using a smaller value on mobile
 	const bottomPadding = isMobile && hasSearched ? 'pb-[64px]' : 'pb-0 md:pb-[100px]';
+	const mapBottomSearchShellWidth = isMapBottomCategoryMode
+		? MAP_RESULTS_BOTTOM_CATEGORY_SEARCH_BOX.width
+		: isMapBottomSearchExpanded
+			? MAP_RESULTS_BOTTOM_SEARCH_BOX.activeWidth
+			: MAP_RESULTS_BOTTOM_SEARCH_BOX.width;
+	const mapBottomSearchShellHeight = isMapBottomCategoryMode
+		? MAP_RESULTS_BOTTOM_CATEGORY_SEARCH_BOX.height
+		: isMapBottomSearchExpanded
+			? mapBottomSearchActiveHeight
+			: MAP_RESULTS_BOTTOM_SEARCH_BOX.height;
+	const activeMapBottomCategoryField =
+		isMapBottomCategoryMode &&
+		isMapBottomCategoryDropdownActive &&
+		(activeSection === 'what' || activeSection === 'where')
+			? activeSection
+			: null;
 
 	return (
 		<>
@@ -4557,18 +5005,10 @@ const DashboardContent = () => {
 				className="fixed left-1/2 pointer-events-none"
 				style={{
 					bottom: `${MAP_RESULTS_BOTTOM_SEARCH_BOX.bottomOffset}px`,
-					width: `${
-						isMapBottomSearchExpanded
-							? MAP_RESULTS_BOTTOM_SEARCH_BOX.activeWidth
-							: MAP_RESULTS_BOTTOM_SEARCH_BOX.width
-					}px`,
-					height: `${
-						isMapBottomSearchExpanded
-							? mapBottomSearchActiveHeight
-							: MAP_RESULTS_BOTTOM_SEARCH_BOX.height
-					}px`,
+					width: `${mapBottomSearchShellWidth}px`,
+					height: `${mapBottomSearchShellHeight}px`,
 					transform: 'translateX(-50%)',
-					transition: 'width 160ms ease, height 160ms ease',
+					transition: 'none',
 					zIndex: 70,
 				}}
 			>
@@ -4577,12 +5017,26 @@ const DashboardContent = () => {
 					isExpanded={isMapBottomSearchExpanded}
 					activeHeight={mapBottomSearchActiveHeight}
 					inputRef={mapBottomSearchInputRef}
+					mode={isMapBottomCategoryMode ? 'category' : 'anything'}
+					categoryWhatValue={whatValue}
+					categoryWhereValue={whereValue}
+					activeCategoryField={activeMapBottomCategoryField}
 					onActivate={handleMapBottomSearchActivate}
 					onSubmit={handleMapBottomSearchSubmit}
 					onValueChange={setMapBottomSearchValue}
 					onActiveChange={setIsMapBottomSearchActive}
+					onCategoryFieldFocus={handleMapBottomCategoryFieldFocus}
+					onCategoryWhatChange={handleMapBottomCategoryWhatChange}
+					onCategoryWhereChange={handleMapBottomCategoryWhereChange}
+					onCategoryWhatEnter={handleMapBottomCategoryWhatEnter}
+					onCategorySubmit={handleMapBottomCategorySubmit}
 				/>
-				<MapBottomSearchFollowupBox />
+				<MapBottomSearchFollowupBox
+					selectedSearchFollowup={mapBottomSearchFollowupSelection}
+					onSelectedSearchFollowupChange={
+						handleMapBottomSearchFollowupSelectionChange
+					}
+				/>
 			</div>
 		)}
 
@@ -7829,18 +8283,10 @@ const DashboardContent = () => {
 																		className="absolute left-1/2 pointer-events-none"
 																		style={{
 																			bottom: `${MAP_RESULTS_BOTTOM_SEARCH_BOX.bottomOffset}px`,
-																			width: `${
-																				isMapBottomSearchExpanded
-																					? MAP_RESULTS_BOTTOM_SEARCH_BOX.activeWidth
-																					: MAP_RESULTS_BOTTOM_SEARCH_BOX.width
-																			}px`,
-																			height: `${
-																				isMapBottomSearchExpanded
-																					? mapBottomSearchActiveHeight
-																					: MAP_RESULTS_BOTTOM_SEARCH_BOX.height
-																			}px`,
+																			width: `${mapBottomSearchShellWidth}px`,
+																			height: `${mapBottomSearchShellHeight}px`,
 																			transform: 'translateX(-50%)',
-																			transition: 'width 160ms ease, height 160ms ease',
+																			transition: 'none',
 																			zIndex: 130,
 																		}}
 																	>
@@ -7849,12 +8295,28 @@ const DashboardContent = () => {
 																			isExpanded={isMapBottomSearchExpanded}
 																			activeHeight={mapBottomSearchActiveHeight}
 																			inputRef={mapBottomSearchInputRef}
+																			mode={isMapBottomCategoryMode ? 'category' : 'anything'}
+																			categoryWhatValue={whatValue}
+																			categoryWhereValue={whereValue}
+																			activeCategoryField={activeMapBottomCategoryField}
 																			onActivate={handleMapBottomSearchActivate}
 																			onSubmit={handleMapBottomSearchSubmit}
 																			onValueChange={setMapBottomSearchValue}
 																			onActiveChange={setIsMapBottomSearchActive}
+																			onCategoryFieldFocus={handleMapBottomCategoryFieldFocus}
+																			onCategoryWhatChange={handleMapBottomCategoryWhatChange}
+																			onCategoryWhereChange={handleMapBottomCategoryWhereChange}
+																			onCategoryWhatEnter={handleMapBottomCategoryWhatEnter}
+																			onCategorySubmit={handleMapBottomCategorySubmit}
 																		/>
-																		<MapBottomSearchFollowupBox />
+																		<MapBottomSearchFollowupBox
+																			selectedSearchFollowup={
+																				mapBottomSearchFollowupSelection
+																			}
+																			onSelectedSearchFollowupChange={
+																				handleMapBottomSearchFollowupSelectionChange
+																			}
+																		/>
 																	</div>
 																)}
 															{/* Single column search results panel overlay at bottom - narrowest breakpoint (< 952px) */}
