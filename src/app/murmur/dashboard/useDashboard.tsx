@@ -219,6 +219,7 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 	// them up without a separate code path.
 	const [curatedContacts, setCuratedContacts] = useState<ContactWithName[] | null>(null);
 	const [isCuratedSearchActive, setIsCuratedSearchActive] = useState(false);
+	const [pendingFreeTextQuery, setPendingFreeTextQuery] = useState<string | null>(null);
 	// Snapshot of the args that produced the current curated results. Captured here so the
 	// dashboard URL-mirror can persist them and the page can re-run the same curated search
 	// after a browser refresh. Keys are the exact override fields accepted by triggerCuratedSearch.
@@ -269,7 +270,7 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 	} = useFreeTextContactsSearch({ suppressToasts: true });
 
 	const isLoadingContacts = isCuratedSearchActive
-		? isPendingCuratedSearch
+		? isPendingCuratedSearch || isPendingFreeTextSearch || pendingFreeTextQuery !== null
 		: isLoadingRawContacts;
 	const isRefetchingContacts = isCuratedSearchActive ? false : isRefetchingRawContacts;
 
@@ -367,6 +368,7 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 		setIsSearchPending(true);
 		// New searches clear any prior map selection box filter.
 		setMapBboxFilter(null);
+		setPendingFreeTextQuery(null);
 		// A real query overrides any active curated session.
 		setIsCuratedSearchActive(false);
 		setCuratedContacts(null);
@@ -384,6 +386,7 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 		setHasSearched(false);
 		setActiveSearchQuery('');
 		setMapBboxFilter(null);
+		setPendingFreeTextQuery(null);
 		setIsCuratedSearchActive(false);
 		setCuratedContacts(null);
 		setLastCuratedArgs(null);
@@ -407,6 +410,7 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 			state?: string | null;
 		}) => {
 			setIsSearchPending(true);
+			setPendingFreeTextQuery(null);
 			setMapBboxFilter(null);
 			setIsCuratedSearchActive(true);
 			setHasSearched(true);
@@ -462,6 +466,22 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 		[runCuratedSearch]
 	);
 
+	const primeFreeTextSearch = useCallback((rawQuery: string) => {
+		const q = rawQuery.trim();
+		if (!q) return;
+
+		setIsSearchPending(true);
+		setPendingFreeTextQuery(q);
+		setMapBboxFilter(null);
+		setIsCuratedSearchActive(true);
+		setCuratedContacts(null);
+		setHasSearched(true);
+		setIsMapView(true);
+		setLastCuratedArgs(null);
+		clearCuratedSessionStorage();
+		setActiveSearchQuery(q);
+	}, []);
+
 	// Free-text "Search Anything" entry point. Hits /api/contacts/search which
 	// runs the hybrid retriever (kNN + lexical + optional title-prefix) and the
 	// cleanliness/category/locality multipliers, and surfaces the results
@@ -473,13 +493,7 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 		async (rawQuery: string, overrides?: { lat?: number | null; lon?: number | null; radiusKm?: number | null }) => {
 			const q = rawQuery.trim();
 			if (!q) return;
-			setIsSearchPending(true);
-			setMapBboxFilter(null);
-			setIsCuratedSearchActive(true);
-			setHasSearched(true);
-			setIsMapView(true);
-			setLastCuratedArgs(null);
-			clearCuratedSessionStorage();
+			primeFreeTextSearch(q);
 			try {
 				const result = await runFreeTextSearch({
 					q,
@@ -500,7 +514,6 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 					return { ...c, curatedCategory: match ?? fallbackCategory };
 				});
 				setCuratedContacts(decoratedContacts);
-				setActiveSearchQuery(q);
 				return result;
 			} catch (err) {
 				toast.error(err instanceof Error ? err.message : 'Failed to run search');
@@ -509,10 +522,11 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 				setHasSearched(false);
 				throw err;
 			} finally {
+				setPendingFreeTextQuery(null);
 				setIsSearchPending(false);
 			}
 		},
-		[runFreeTextSearch]
+		[primeFreeTextSearch, runFreeTextSearch]
 	);
 
 	// Restore a curated session from sessionStorage if the cache key matches the requested
@@ -523,6 +537,7 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 			const cached = readCuratedSessionStorage();
 			if (cached && curatedArgsEqual(cached.args, args)) {
 				setMapBboxFilter(null);
+				setPendingFreeTextQuery(null);
 				setIsCuratedSearchActive(true);
 				setHasSearched(true);
 				setIsMapView(true);
@@ -1121,6 +1136,7 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 		isCuratedSearchActive,
 		isPendingCuratedSearch,
 		lastCuratedArgs,
+		primeFreeTextSearch,
 		triggerFreeTextSearch,
 		isPendingFreeTextSearch,
 	};

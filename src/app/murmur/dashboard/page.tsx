@@ -218,6 +218,23 @@ const extractWhyFromSearchQuery = (query: string): string | null => {
 	return tag ? `[${tag}]` : null;
 };
 
+type MapTopSearchDisplay =
+	| { kind: 'curated'; label: string }
+	| { kind: 'freeText'; label: string }
+	| {
+			kind: 'category';
+			what: string;
+			where: string;
+			whereLabel: string;
+			label: string;
+	  };
+
+const formatMapTopSearchWhereLabel = (where: string): string => {
+	const trimmed = where.trim();
+	if (!trimmed) return '';
+	return /^in\s+/i.test(trimmed) ? trimmed : `in ${trimmed}`;
+};
+
 const countParsedResearchSections = (metadata: string | null | undefined): number => {
 	if (!metadata) return 0;
 
@@ -2398,6 +2415,7 @@ const DashboardContent = () => {
 		rehydrateCuratedSession,
 		isCuratedSearchActive,
 		lastCuratedArgs,
+		primeFreeTextSearch,
 		triggerFreeTextSearch,
 	} = useDashboard({ derivedTitle: derivedContactTitle, forceApplyDerivedTitle: shouldForceApplyDerivedTitle, fromHome: fromHomeParam });
 	const shouldEnableMapStateCategorySelection =
@@ -3400,6 +3418,8 @@ const DashboardContent = () => {
 		if (!q) return;
 		mapBottomSearchInputRef.current?.blur();
 		setIsMapBottomSearchActive(false);
+		setMapBottomSearchValue('');
+		primeFreeTextSearch(q);
 
 		let lat: number | null = null;
 		let lon: number | null = null;
@@ -3431,6 +3451,7 @@ const DashboardContent = () => {
 		}).catch(() => undefined);
 	}, [
 		mapBottomSearchValue,
+		primeFreeTextSearch,
 		triggerFreeTextSearch,
 	]);
 
@@ -3694,6 +3715,58 @@ const DashboardContent = () => {
 		() => extractWhereFromSearchQuery(activeSearchQuery),
 		[activeSearchQuery]
 	);
+
+	const mapTopSearchDisplay = useMemo<MapTopSearchDisplay>(() => {
+		if (fromHomeParam && isMapView && !hasSearched) {
+			const whereLabel = formatMapTopSearchWhereLabel(FROM_HOME_WHERE);
+			return {
+				kind: 'category',
+				what: FROM_HOME_WHAT,
+				where: FROM_HOME_WHERE,
+				whereLabel,
+				label: [FROM_HOME_WHAT, whereLabel].filter(Boolean).join(' '),
+			};
+		}
+
+		const committedQuery = activeSearchQuery.trim();
+		if (isCuratedSearchActive && lastCuratedArgs) {
+			return { kind: 'curated', label: 'For You' };
+		}
+
+		if (committedQuery && isCuratedPicksSearchQuery(committedQuery)) {
+			return { kind: 'curated', label: 'For You' };
+		}
+
+		if (committedQuery && isCuratedSearchActive) {
+			return { kind: 'freeText', label: committedQuery };
+		}
+
+		const what = (searchedWhat || '').trim();
+		const where = (searchedWhere || '').trim();
+		const whereLabel = formatMapTopSearchWhereLabel(where);
+		if (what || whereLabel) {
+			return {
+				kind: 'category',
+				what,
+				where,
+				whereLabel,
+				label: [what, whereLabel].filter(Boolean).join(' '),
+			};
+		}
+
+		return { kind: 'freeText', label: committedQuery || 'Search' };
+	}, [
+		FROM_HOME_WHAT,
+		FROM_HOME_WHERE,
+		activeSearchQuery,
+		fromHomeParam,
+		hasSearched,
+		isCuratedSearchActive,
+		isMapView,
+		lastCuratedArgs,
+		searchedWhat,
+		searchedWhere,
+	]);
 
 	// For category-style searches, keep a sticky per-selected-contact headline so selected items
 	// retain their category identity when the user runs another search in the same map session.
@@ -6049,7 +6122,17 @@ const DashboardContent = () => {
 			{((hasSearched && activeTab === 'search') || (fromHomeParam && isMapView)) &&
 				(isMapView || (!isLoadingContacts && !isRefetchingContacts)) &&
 				(() => {
-						const trayWhy = isPromotion
+						const activeWhyForTray = (
+							fromHomeParam && isMapView && !hasSearched
+								? FROM_HOME_WHY
+								: extractWhyFromSearchQuery(activeSearchQuery) ||
+								  (mapTopSearchDisplay.kind === 'category' && mapTopSearchDisplay.what
+										? getCategorySearchWhyForWhat(mapTopSearchDisplay.what)
+										: '') ||
+								  whyValue
+						).trim();
+						const isPromotionForTray = activeWhyForTray === '[Promotion]';
+						const trayWhy = isPromotionForTray
 							? {
 									backgroundColor: MAP_RESULTS_SEARCH_TRAY.whyBackgroundColors.promotion,
 									icon: <PromotionIcon />,
@@ -6059,11 +6142,10 @@ const DashboardContent = () => {
 									icon: <BookingIcon />,
 							  };
 
-						const normalizedWhatKey = whatValue.trim();
-						// If the segmented "What" state isn't populated (e.g. the user searched via raw text),
-						// fall back to the last executed query so the tray doesn't "jump" to a default icon.
-						const searchedWhatKey = (searchedWhat || '').trim();
-						const effectiveWhatKeyForTray = normalizedWhatKey || searchedWhatKey;
+						const effectiveWhatKeyForTray =
+							mapTopSearchDisplay.kind === 'category'
+								? mapTopSearchDisplay.what.trim()
+								: (searchedWhat || '').trim();
 						const whatCfg = MAP_RESULTS_SEARCH_TRAY.whatIconByLabel[effectiveWhatKeyForTray];
 						const TrayWhatIcon = whatCfg?.Icon || MusicVenuesIcon;
 						const trayWhatIconSize =
@@ -6075,7 +6157,10 @@ const DashboardContent = () => {
 							icon: <TrayWhatIcon size={trayWhatIconSize} />,
 						};
 
-						const whereCandidate = (whereValue || userLocationName || '').trim();
+						const whereCandidate =
+							mapTopSearchDisplay.kind === 'category'
+								? mapTopSearchDisplay.where.trim()
+								: (userLocationName || '').trim();
 						const [whereCity, whereState] = (() => {
 							if (!whereCandidate) return ['', ''];
 							if (whereCandidate.includes(',')) {
@@ -6101,6 +6186,11 @@ const DashboardContent = () => {
 										MAP_RESULTS_SEARCH_TRAY.nearMeBackgroundColor,
 									icon: whereIconProps?.icon || <NearMeIcon />,
 							  };
+						const mapTopSearchLabel = mapTopSearchDisplay.label.trim() || 'Search';
+						const isSplitCategoryTopSearch =
+							mapTopSearchDisplay.kind === 'category' &&
+							mapTopSearchDisplay.what.trim().length > 0 &&
+							mapTopSearchDisplay.whereLabel.trim().length > 0;
 
 						const searchBarBase = (
 							<div
@@ -6125,10 +6215,11 @@ const DashboardContent = () => {
 							}
 						>
 							{/* Map view: show the 189x52 icon tray to the left of the search bar */}
-							{isMapView && (
-								<div
-									className="hidden lg:flex items-center justify-between"
-									style={{
+								{isMapView && (
+									<div
+										aria-hidden="true"
+										className="hidden lg:flex items-center justify-between"
+										style={{
 										position: 'absolute',
 										// Map is inset 9px from the viewport; "25px from map top" => 34px viewport.
 										// Search bar wrapper sits at 33px viewport, so this becomes 1px inside the wrapper.
@@ -6140,28 +6231,32 @@ const DashboardContent = () => {
 										width: `${MAP_RESULTS_SEARCH_TRAY.containerWidth}px`,
 										height: `${MAP_RESULTS_SEARCH_TRAY.containerHeight}px`,
 										backgroundColor: MAP_RESULTS_SEARCH_TRAY.backgroundColor,
-										border: `${MAP_RESULTS_SEARCH_TRAY.borderWidth}px solid ${MAP_RESULTS_SEARCH_TRAY.borderColor}`,
-										borderRadius: `${MAP_RESULTS_SEARCH_TRAY.containerRadius}px`,
-										paddingLeft: '6px',
-										paddingRight: '6px',
-									}}
-								>
-									{/* First icon (Why) - clickable with dropdown */}
-									<div ref={whyDropdownRef} className="relative">
-										<button
-											type="button"
-											className="cursor-pointer border-none bg-transparent p-0"
-											onClick={() => setIsWhyDropdownOpen(!isWhyDropdownOpen)}
-											aria-label={isPromotion ? 'Promotion search type' : 'Booking search type'}
-											aria-expanded={isWhyDropdownOpen}
-											aria-haspopup="listbox"
-										>
+											border: `${MAP_RESULTS_SEARCH_TRAY.borderWidth}px solid ${MAP_RESULTS_SEARCH_TRAY.borderColor}`,
+											borderRadius: `${MAP_RESULTS_SEARCH_TRAY.containerRadius}px`,
+											paddingLeft: '6px',
+											paddingRight: '6px',
+											pointerEvents: 'none',
+										}}
+									>
+										{/* First icon (Why) - read-only search context */}
+										<div ref={whyDropdownRef} className="relative">
+											<button
+												type="button"
+												tabIndex={-1}
+												className="cursor-default border-none bg-transparent p-0"
+												onClick={() => setIsWhyDropdownOpen(!isWhyDropdownOpen)}
+												aria-label={
+													isPromotionForTray ? 'Promotion search type' : 'Booking search type'
+												}
+												aria-expanded={isWhyDropdownOpen}
+												aria-haspopup="listbox"
+											>
 											<SearchTrayIconTile backgroundColor={trayWhy.backgroundColor}>
 												{trayWhy.icon}
 											</SearchTrayIconTile>
 										</button>
 										{/* Why dropdown */}
-										{isWhyDropdownOpen && (
+											{!isMapView && isWhyDropdownOpen && (
 											<div
 												role="listbox"
 												aria-label="Search type options"
@@ -6238,22 +6333,23 @@ const DashboardContent = () => {
 											</div>
 										)}
 									</div>
-									{/* Second icon (What) - clickable with dropdown */}
-									<div ref={whatDropdownRef} className="relative">
-										<button
-											type="button"
-											className="cursor-pointer border-none bg-transparent p-0"
-											onClick={() => setIsWhatDropdownOpen(!isWhatDropdownOpen)}
-											aria-label={`${whatValue || 'Category'} search category`}
-											aria-expanded={isWhatDropdownOpen}
-											aria-haspopup="listbox"
-										>
+									{/* Second icon (What) - read-only search context */}
+										<div ref={whatDropdownRef} className="relative">
+											<button
+												type="button"
+												tabIndex={-1}
+												className="cursor-default border-none bg-transparent p-0"
+												onClick={() => setIsWhatDropdownOpen(!isWhatDropdownOpen)}
+												aria-label={`${effectiveWhatKeyForTray || 'Category'} search category`}
+												aria-expanded={isWhatDropdownOpen}
+												aria-haspopup="listbox"
+											>
 											<SearchTrayIconTile backgroundColor={trayWhat.backgroundColor}>
 												{trayWhat.icon}
 											</SearchTrayIconTile>
 										</button>
 										{/* What dropdown */}
-										{isWhatDropdownOpen && (
+											{!isMapView && isWhatDropdownOpen && (
 											<div
 												id="map-search-tray-what-dropdown-container"
 												role="listbox"
@@ -6529,22 +6625,23 @@ const DashboardContent = () => {
 											</div>
 										)}
 									</div>
-									{/* Third icon (Where) - clickable with dropdown */}
-									<div ref={whereDropdownRef} className="relative">
-										<button
-											type="button"
-											className="cursor-pointer border-none bg-transparent p-0"
-											onClick={() => setIsWhereDropdownOpen(!isWhereDropdownOpen)}
-											aria-label={`${whereValue || 'Location'} search location`}
-											aria-expanded={isWhereDropdownOpen}
-											aria-haspopup="listbox"
-										>
+									{/* Third icon (Where) - read-only search context */}
+										<div ref={whereDropdownRef} className="relative">
+											<button
+												type="button"
+												tabIndex={-1}
+												className="cursor-default border-none bg-transparent p-0"
+												onClick={() => setIsWhereDropdownOpen(!isWhereDropdownOpen)}
+												aria-label={`${whereCandidate || 'Location'} search location`}
+												aria-expanded={isWhereDropdownOpen}
+												aria-haspopup="listbox"
+											>
 											<SearchTrayIconTile backgroundColor={trayWhere.backgroundColor}>
 												{trayWhere.icon}
 											</SearchTrayIconTile>
 										</button>
 										{/* Where dropdown */}
-										{isWhereDropdownOpen && (
+											{!isMapView && isWhereDropdownOpen && (
 											<div
 												id="map-search-tray-where-dropdown-container"
 												role="listbox"
@@ -6619,14 +6716,76 @@ const DashboardContent = () => {
 									</div>
 								</div>
 							)}
-							<div
-								className={`results-search-bar-inner ${
-									hoveredContact && !isMapView ? 'invisible' : ''
-								}`}
-							>
-								<Form {...form}>
-									<form
-										onSubmit={async (e) => {
+								<div
+									className={`results-search-bar-inner ${
+										hoveredContact && !isMapView ? 'invisible' : ''
+									}`}
+								>
+									{isMapView ? (
+										<div
+											className="results-search-form"
+											aria-label={`Active search: ${mapTopSearchLabel}`}
+										>
+											<div className="results-search-input-group">
+												<div
+													className="search-wave-container relative"
+													style={{ cursor: 'default' }}
+												>
+													<div
+														className="search-wave-input results-search-input !h-[49px] !border-[3px] !focus-visible:ring-0 !focus-visible:ring-offset-0 !focus:ring-0 !focus:ring-offset-0 !ring-0 !outline-none !accent-transparent !border-black !bg-white !pr-[12px] !text-black"
+														style={{
+															accentColor: 'transparent',
+															cursor: 'default',
+															letterSpacing: 0,
+															padding: 0,
+															userSelect: 'none',
+														}}
+													>
+														<div
+															className="absolute left-[6px] top-1/2 -translate-y-1/2 flex items-center rounded-[6px] z-10 overflow-hidden border border-black"
+															style={{
+																width: 'calc(100% - 12px)',
+																height: '38px',
+																background:
+																	mapTopSearchDisplay.kind === 'curated'
+																		? 'linear-gradient(90deg, #DA29B4 1.69%, #EA1F1F 34.7%, #E122F2 65.83%, #F00404 98.97%)'
+																		: '#FFFFFF',
+															}}
+														>
+															{mapTopSearchDisplay.kind === 'curated' ? (
+																<div className="flex h-full w-full items-center px-[24px] font-secondary text-[13px] font-bold leading-none text-white">
+																	{mapTopSearchDisplay.label}
+																</div>
+															) : isSplitCategoryTopSearch &&
+															  mapTopSearchDisplay.kind === 'category' ? (
+																<div className="flex h-full w-full items-center font-secondary text-[13px] font-bold leading-none text-black">
+																	<div className="flex h-full min-w-0 flex-1 items-center justify-center px-[12px]">
+																		<span className="truncate">
+																			{mapTopSearchDisplay.what}
+																		</span>
+																	</div>
+																	<div className="h-full w-px flex-shrink-0 bg-black/10" />
+																	<div className="flex h-full min-w-0 flex-1 items-center justify-center px-[12px]">
+																		<span className="truncate">
+																			{mapTopSearchDisplay.whereLabel}
+																		</span>
+																	</div>
+																</div>
+															) : (
+																<div className="flex h-full w-full min-w-0 items-center px-[24px] font-secondary text-[13px] font-bold leading-none text-black">
+																	<span className="truncate">{mapTopSearchLabel}</span>
+																</div>
+															)}
+														</div>
+													</div>
+												</div>
+											</div>
+											{renderDesktopSearchDropdowns()}
+										</div>
+									) : (
+									<Form {...form}>
+										<form
+											onSubmit={async (e) => {
 											e.preventDefault();
 											await ensureNonEmptyDashboardSearchOnBlankSubmit();
 											if (!isSignedIn) {
@@ -6861,10 +7020,11 @@ const DashboardContent = () => {
 												/>
 											</div>
 											*/}
-										</div>
+											</div>
+										)}
+									</Form>
 									)}
-								</Form>
-							</div>
+								</div>
 							{isMapView && (
 								<>
 									{/* Box to the left of the Home button */}
