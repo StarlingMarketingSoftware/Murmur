@@ -405,6 +405,7 @@ const MAP_RESULTS_BOTTOM_SEARCH_BOX = {
 
 const MAP_RESULTS_BOTTOM_SEARCH_FOLLOWUP_BOX = {
 	width: 301,
+	compactWidth: 157,
 	height: 55,
 	gapToSearchBar: 20,
 	borderRadius: 6,
@@ -435,20 +436,33 @@ const MAP_RESULTS_BOTTOM_SEARCH_FOLLOWUP_LEFT_TILE_BOX = {
 	borderRadius: 8,
 	dailyMixBackgroundColor: '#15D3344A',
 	categoryBackgroundColor: '#ACE1FF5E',
+	advancedCompactBackgroundColor: 'rgba(253, 113, 113, 0.50)',
+	selectedBackgroundColor: '#EF6F7D',
+	categorySelectedBackgroundColor: '#ACE1FF',
+	selectedBorderColor: '#000000',
+	selectedBorderWidth: 2,
 } as const;
 
 const MAP_RESULTS_BOTTOM_SEARCH_FOLLOWUP_ICON_LAYOUT = {
 	forYou: {
 		width: 29,
 		height: 34,
-		translateX: 0,
+		translateX: 1,
 		translateY: 0.8,
 	},
 	category: {
 		width: 35,
 		height: 34,
 		translateX: 0,
+		activeTranslateX: -0.5,
 		translateY: 2.2,
+		activeTranslateY: 5.2,
+	},
+	advanced: {
+		width: 38,
+		height: 40,
+		translateX: 0,
+		translateY: 3,
 	},
 	profile: {
 		width: 30,
@@ -469,6 +483,14 @@ const MAP_RESULTS_BOTTOM_SEARCH_FOLLOWUP_ICON_LAYOUT = {
 		translateY: 1,
 	},
 } as const;
+
+type MapBottomSearchFollowupSelection = 'for-you' | 'category' | null;
+
+type MapBottomSearchAdvancedSelections = {
+	profile: boolean;
+	keyword: boolean;
+	radius: boolean;
+};
 
 type MapBottomSearchBarProps = {
 	value: string;
@@ -614,13 +636,29 @@ const MapBottomSearchFollowupBox = () => {
 	const profileLeft = segmentBox.advancedWidth + segmentBox.dividerWidth;
 	const keywordLeft = profileLeft + segmentBox.segmentWidth;
 	const radiusLeft = keywordLeft + segmentBox.segmentWidth;
+	const [selectedSearchFollowup, setSelectedSearchFollowup] =
+		useState<MapBottomSearchFollowupSelection>(null);
+	const [advancedSelections, setAdvancedSelections] =
+		useState<MapBottomSearchAdvancedSelections>({
+			profile: false,
+			keyword: false,
+			radius: false,
+		});
+	const isForYouSelected = selectedSearchFollowup === 'for-you';
+	const isCategorySelected = selectedSearchFollowup === 'category';
+	const isCompactFollowup = isForYouSelected || isCategorySelected;
+	const isProfileAdvancedSelected = advancedSelections.profile;
 
 	return (
 		<div
 			className="absolute left-1/2 pointer-events-auto"
 			style={{
 				top: `calc(100% + ${MAP_RESULTS_BOTTOM_SEARCH_FOLLOWUP_BOX.gapToSearchBar}px)`,
-				width: `${MAP_RESULTS_BOTTOM_SEARCH_FOLLOWUP_BOX.width}px`,
+				width: `${
+					isCompactFollowup
+						? MAP_RESULTS_BOTTOM_SEARCH_FOLLOWUP_BOX.compactWidth
+						: MAP_RESULTS_BOTTOM_SEARCH_FOLLOWUP_BOX.width
+				}px`,
 				height: `${MAP_RESULTS_BOTTOM_SEARCH_FOLLOWUP_BOX.height}px`,
 				transform: 'translateX(-50%)',
 				borderRadius: `${MAP_RESULTS_BOTTOM_SEARCH_FOLLOWUP_BOX.borderRadius}px`,
@@ -629,8 +667,10 @@ const MapBottomSearchFollowupBox = () => {
 				boxSizing: 'border-box',
 			}}
 		>
-			<div
-				aria-hidden="true"
+			<button
+				type="button"
+				aria-label="Select For You"
+				aria-pressed={isForYouSelected}
 				className="absolute flex items-center justify-center"
 				style={{
 					left: `${leftTileBox.leftOffset}px`,
@@ -639,10 +679,26 @@ const MapBottomSearchFollowupBox = () => {
 					height: `${leftTileBox.size}px`,
 					transform: 'translateY(-50%)',
 					borderRadius: `${leftTileBox.borderRadius}px`,
-					backgroundColor: leftTileBox.dailyMixBackgroundColor,
+					border: `${leftTileBox.selectedBorderWidth}px solid ${
+						isForYouSelected ? leftTileBox.selectedBorderColor : 'transparent'
+					}`,
+					backgroundColor: isForYouSelected
+						? leftTileBox.selectedBackgroundColor
+						: leftTileBox.dailyMixBackgroundColor,
+					boxSizing: 'border-box',
+					padding: 0,
+					cursor: 'pointer',
 				}}
+				onClick={() =>
+					setSelectedSearchFollowup((current) =>
+						current === 'for-you' ? null : 'for-you'
+					)
+				}
 			>
 				<MapBottomSearchForYouIcon
+					aria-hidden="true"
+					textColor={isForYouSelected ? '#000000' : undefined}
+					waveColor={isForYouSelected ? '#000000' : undefined}
 					style={{
 						display: 'block',
 						width: `${iconLayout.forYou.width}px`,
@@ -650,9 +706,11 @@ const MapBottomSearchFollowupBox = () => {
 						transform: `translate(${iconLayout.forYou.translateX}px, ${iconLayout.forYou.translateY}px)`,
 					}}
 				/>
-			</div>
-			<div
-				aria-hidden="true"
+			</button>
+			<button
+				type="button"
+				aria-label="Select Category"
+				aria-pressed={isCategorySelected}
 				className="absolute flex items-center justify-center"
 				style={{
 					left: `${leftTileBox.leftOffset + leftTileBox.size + leftTileBox.gap}px`,
@@ -661,99 +719,185 @@ const MapBottomSearchFollowupBox = () => {
 					height: `${leftTileBox.size}px`,
 					transform: 'translateY(-50%)',
 					borderRadius: `${leftTileBox.borderRadius}px`,
-					backgroundColor: leftTileBox.categoryBackgroundColor,
+					border: `${leftTileBox.selectedBorderWidth}px solid ${
+						isCategorySelected ? leftTileBox.selectedBorderColor : 'transparent'
+					}`,
+					backgroundColor: isCategorySelected
+						? leftTileBox.categorySelectedBackgroundColor
+						: leftTileBox.categoryBackgroundColor,
+					boxSizing: 'border-box',
+					padding: 0,
+					cursor: 'pointer',
 				}}
+				onClick={() =>
+					setSelectedSearchFollowup((current) =>
+						current === 'category' ? null : 'category'
+					)
+				}
 			>
 				<MapBottomSearchCategoryIcon
+					aria-hidden="true"
+					active={isCategorySelected}
 					style={{
 						display: 'block',
-						width: `${iconLayout.category.width}px`,
-						height: `${iconLayout.category.height}px`,
-						transform: `translate(${iconLayout.category.translateX}px, ${iconLayout.category.translateY}px)`,
+						width: `${isCategorySelected ? 36 : iconLayout.category.width}px`,
+						height: `${isCategorySelected ? 40 : iconLayout.category.height}px`,
+						transform: `translate(${
+							isCategorySelected
+								? iconLayout.category.activeTranslateX
+								: iconLayout.category.translateX
+						}px, ${
+							isCategorySelected
+								? iconLayout.category.activeTranslateY
+								: iconLayout.category.translateY
+						}px)`,
 					}}
 				/>
-			</div>
-			<div
-				aria-hidden="true"
-				className="absolute"
-				style={{
-					right: `${segmentBox.rightOffset}px`,
-					top: '50%',
-					width: `${segmentBox.width}px`,
-					height: `${segmentBox.height}px`,
-					transform: 'translateY(-50%)',
-					borderRadius: `${segmentBox.borderRadius}px`,
-					border: `${segmentBox.dividerWidth}px solid ${segmentBox.borderColor}`,
-					background: `linear-gradient(to right, ${segmentBox.advancedBackgroundColor} 0 ${segmentBox.advancedWidth}px, ${segmentBox.borderColor} ${segmentBox.advancedWidth}px ${profileLeft}px, ${segmentBox.profileBackgroundColor} ${profileLeft}px ${keywordLeft}px, ${segmentBox.keywordBackgroundColor} ${keywordLeft}px ${radiusLeft}px, ${segmentBox.radiusBackgroundColor} ${radiusLeft}px 100%)`,
-					boxSizing: 'border-box',
-				}}
-			>
-				<div
+			</button>
+			{isCompactFollowup ? (
+				<button
+					type="button"
+					aria-label="Open Advanced options"
 					className="absolute flex items-center justify-center"
 					style={{
-						left: 0,
-						top: 0,
-						width: `${segmentBox.advancedWidth}px`,
-						height: '100%',
-						transform: 'translateY(3px)',
+						left: `${
+							leftTileBox.leftOffset +
+							2 * leftTileBox.size +
+							2 * leftTileBox.gap
+						}px`,
+						top: '50%',
+						width: `${leftTileBox.size}px`,
+						height: `${leftTileBox.size}px`,
+						transform: 'translateY(-50%)',
+						borderRadius: `${leftTileBox.borderRadius}px`,
+						backgroundColor: leftTileBox.advancedCompactBackgroundColor,
+						boxSizing: 'border-box',
+						border: 0,
+						padding: 0,
+						cursor: 'pointer',
 					}}
+					onClick={() => setSelectedSearchFollowup(null)}
 				>
-					<MapBottomSearchAdvancedIcon />
-				</div>
-				<div
-					className="absolute flex items-center justify-center"
-					style={{
-						left: `${profileLeft}px`,
-						top: 0,
-						width: `${segmentBox.segmentWidth}px`,
-						height: '100%',
-					}}
-				>
-					<MapBottomSearchProfileIcon
+					<MapBottomSearchAdvancedIcon
+						aria-hidden="true"
+						textColor="#8D8D8D"
+						iconColor="#CA7171"
+						lensFill="transparent"
 						style={{
 							display: 'block',
-							width: `${iconLayout.profile.width}px`,
-							height: `${iconLayout.profile.height}px`,
+							width: `${iconLayout.advanced.width}px`,
+							height: `${iconLayout.advanced.height}px`,
+							transform: `translate(${iconLayout.advanced.translateX}px, ${iconLayout.advanced.translateY}px)`,
 						}}
 					/>
-				</div>
+				</button>
+			) : (
 				<div
-					className="absolute flex items-center justify-center"
+					role="group"
+					aria-label="Advanced filter options"
+					className="absolute"
 					style={{
-						left: `${keywordLeft}px`,
-						top: 0,
-						width: `${segmentBox.segmentWidth}px`,
-						height: '100%',
+						right: `${segmentBox.rightOffset}px`,
+						top: '50%',
+						width: `${segmentBox.width}px`,
+						height: `${segmentBox.height}px`,
+						transform: 'translateY(-50%)',
+						borderRadius: `${segmentBox.borderRadius}px`,
+						border: `${segmentBox.dividerWidth}px solid ${segmentBox.borderColor}`,
+						background: `linear-gradient(to right, ${segmentBox.advancedBackgroundColor} 0 ${segmentBox.advancedWidth}px, ${segmentBox.borderColor} ${segmentBox.advancedWidth}px ${profileLeft}px, ${segmentBox.profileBackgroundColor} ${profileLeft}px ${keywordLeft}px, ${segmentBox.keywordBackgroundColor} ${keywordLeft}px ${radiusLeft}px, ${segmentBox.radiusBackgroundColor} ${radiusLeft}px 100%)`,
+						boxSizing: 'border-box',
 					}}
 				>
-					<MapBottomSearchKeywordIcon
+					<div
+						className="absolute flex items-center justify-center"
 						style={{
-							display: 'block',
-							width: `${iconLayout.keyword.width}px`,
-							height: `${iconLayout.keyword.height}px`,
-							transform: `translate(${iconLayout.keyword.translateX}px, ${iconLayout.keyword.translateY}px)`,
+							left: 0,
+							top: 0,
+							width: `${segmentBox.advancedWidth}px`,
+							height: '100%',
+							transform: 'translateY(3px)',
 						}}
-					/>
-				</div>
-				<div
-					className="absolute flex items-center justify-center"
-					style={{
-						left: `${radiusLeft}px`,
-						top: 0,
-						width: `${segmentBox.segmentWidth}px`,
-						height: '100%',
-					}}
-				>
-					<MapBottomSearchRadiusIcon
+					>
+						<MapBottomSearchAdvancedIcon />
+					</div>
+					<button
+						type="button"
+						aria-label="Toggle Profile"
+						aria-pressed={isProfileAdvancedSelected}
+						className="absolute flex items-center justify-center"
 						style={{
-							display: 'block',
-							width: `${iconLayout.radius.width}px`,
-							height: `${iconLayout.radius.height}px`,
-							transform: `translate(${iconLayout.radius.translateX}px, ${iconLayout.radius.translateY}px)`,
+							left: `${isProfileAdvancedSelected ? profileLeft - 1 : profileLeft}px`,
+							top: 0,
+							width: `${
+								isProfileAdvancedSelected
+									? segmentBox.segmentWidth + 1
+									: segmentBox.segmentWidth
+							}px`,
+							height: '100%',
+							backgroundColor: isProfileAdvancedSelected ? '#71C9FD' : 'transparent',
+							border: 0,
+							borderRadius: 0,
+							appearance: 'none',
+							padding: 0,
+							cursor: 'pointer',
 						}}
-					/>
+						onClick={() =>
+							setAdvancedSelections((current) => ({
+								...current,
+								profile: !current.profile,
+							}))
+						}
+					>
+						<MapBottomSearchProfileIcon
+							aria-hidden="true"
+							textColor={isProfileAdvancedSelected ? '#000000' : undefined}
+							iconColor={isProfileAdvancedSelected ? '#000000' : undefined}
+							avatarFill={isProfileAdvancedSelected ? '#FFFFFF' : undefined}
+							style={{
+								display: 'block',
+								width: `${iconLayout.profile.width}px`,
+								height: `${iconLayout.profile.height}px`,
+							}}
+						/>
+					</button>
+					<div
+						className="absolute flex items-center justify-center"
+						style={{
+							left: `${keywordLeft}px`,
+							top: 0,
+							width: `${segmentBox.segmentWidth}px`,
+							height: '100%',
+						}}
+					>
+						<MapBottomSearchKeywordIcon
+							style={{
+								display: 'block',
+								width: `${iconLayout.keyword.width}px`,
+								height: `${iconLayout.keyword.height}px`,
+								transform: `translate(${iconLayout.keyword.translateX}px, ${iconLayout.keyword.translateY}px)`,
+							}}
+						/>
+					</div>
+					<div
+						className="absolute flex items-center justify-center"
+						style={{
+							left: `${radiusLeft}px`,
+							top: 0,
+							width: `${segmentBox.segmentWidth}px`,
+							height: '100%',
+						}}
+					>
+						<MapBottomSearchRadiusIcon
+							style={{
+								display: 'block',
+								width: `${iconLayout.radius.width}px`,
+								height: `${iconLayout.radius.height}px`,
+								transform: `translate(${iconLayout.radius.translateX}px, ${iconLayout.radius.translateY}px)`,
+							}}
+						/>
+					</div>
 				</div>
-			</div>
+			)}
 		</div>
 	);
 };
