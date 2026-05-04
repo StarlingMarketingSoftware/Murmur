@@ -992,6 +992,59 @@ const smoothstep = (edge0: number, edge1: number, x: number) => {
 const normalizeLngDeg = (lng: number) => ((((lng + 180) % 360) + 360) % 360) - 180;
 const angularLngDistanceDeg = (a: number, b: number) =>
 	Math.abs(normalizeLngDeg(a - b));
+const EARTH_RADIUS_KM = 6371;
+const degreesToRadians = (degrees: number) => (degrees * Math.PI) / 180;
+const latLngToGlobeUnitVector = (coords: LatLngLiteral) => {
+	const latRad = degreesToRadians(coords.lat);
+	const lngRad = degreesToRadians(coords.lng);
+	const cosLat = Math.cos(latRad);
+	return {
+		x: cosLat * Math.cos(lngRad),
+		y: cosLat * Math.sin(lngRad),
+		z: Math.sin(latRad),
+	};
+};
+
+const computeGlobeFrontHemisphereOpacity = (
+	mapInstance: mapboxgl.Map,
+	coords: LatLngLiteral | null,
+	radiusKm: number | null,
+	zoom: number
+) => {
+	if (!coords || zoom > CURATED_DOT_FADE_START_ZOOM) return 1;
+	if (
+		!Number.isFinite(coords.lat) ||
+		!Number.isFinite(coords.lng) ||
+		Math.abs(coords.lat) > 90
+	) {
+		return 1;
+	}
+
+	let center: mapboxgl.LngLat;
+	try {
+		center = mapInstance.getCenter();
+	} catch {
+		return 1;
+	}
+	if (!Number.isFinite(center.lat) || !Number.isFinite(center.lng)) return 1;
+
+	const target = latLngToGlobeUnitVector(coords);
+	const cameraCenter = latLngToGlobeUnitVector({ lat: center.lat, lng: center.lng });
+	const dot =
+		target.x * cameraCenter.x + target.y * cameraCenter.y + target.z * cameraCenter.z;
+	if (!Number.isFinite(dot)) return 1;
+
+	const radiusRad =
+		radiusKm != null && Number.isFinite(radiusKm) && radiusKm > 0
+			? clamp(radiusKm / EARTH_RADIUS_KM, 0, degreesToRadians(12))
+			: 0;
+	// The bloom is a flat DOM SVG, not a Mapbox globe layer. Hide it before the
+	// cluster reaches the limb so it never has to approximate horizon wrapping.
+	const limbTouchDot = Math.sin(radiusRad);
+	const hideAtDot = limbTouchDot + 0.075;
+	const fullAtDot = limbTouchDot + 0.22;
+	return smoothstep(hideAtDot, fullAtDot, dot);
+};
 const computeMoodVisualNightT = (nightT: number, cfg: MoodVisualConfig) =>
 	clamp(Math.max(nightT, cfg.nightVisualBlend), 0, 1);
 
@@ -12160,6 +12213,17 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			clipPath.setAttribute('d', '');
 			return;
 		}
+		const frontHemisphereOpacity = computeGlobeFrontHemisphereOpacity(
+			m,
+			curatedClusterCentroidRef.current,
+			curatedClusterRadiusKmRef.current,
+			zoom
+		);
+		if (frontHemisphereOpacity <= 0.006) {
+			orb.style.opacity = '0';
+			clipPath.setAttribute('d', '');
+			return;
+		}
 		const projectedClip = buildScreenPathFromLngLatMultiPolygon(
 			m,
 			curatedBlobLngLatMultiPolygonRef.current
@@ -12215,7 +12279,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		clipPath.setAttribute('d', projectedClip.d);
 		ellipse.setAttribute('opacity', colorOpacity.toFixed(3));
 		bloomEllipse.setAttribute('opacity', bloomOpacity.toFixed(3));
-		orb.style.opacity = '1';
+		orb.style.opacity = frontHemisphereOpacity.toFixed(3);
 	}, []);
 	applyCuratedOrbStateRef.current = applyCuratedOrbState;
 
