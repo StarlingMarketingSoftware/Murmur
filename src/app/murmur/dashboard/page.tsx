@@ -9,6 +9,7 @@ import {
 	useMemo,
 	useRef,
 	useState,
+	type RefObject,
 	type ReactNode,
 } from 'react';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -39,6 +40,7 @@ import { NearMeIcon } from '@/components/atoms/_svg/NearMeIcon';
 import HomeIcon from '@/components/atoms/_svg/HomeIcon';
 import HomeExpandedIcon from '@/components/atoms/_svg/HomeExpandedIcon';
 import BottomArrowIcon from '@/components/atoms/_svg/BottomArrowIcon';
+import MapBottomSearchArrowIcon from '@/components/atoms/_svg/MapBottomSearchArrowIcon';
 import GrabIcon from '@/components/atoms/svg/GrabIcon';
 import { getCityIconProps } from '@/utils/cityIcons';
 import { Typography } from '@/components/ui/typography';
@@ -372,6 +374,165 @@ const MAP_RESULTS_SEARCH_TRAY = {
 	},
 	whatIconByLabel: MAP_RESULTS_SEARCH_TRAY_WHAT_ICON_BY_LABEL,
 } as const;
+
+const MAP_RESULTS_BOTTOM_SEARCH_BOX = {
+	width: 474,
+	height: 38,
+	activeWidth: 472,
+	activeHeight: 80,
+	activeMaxHeight: 114,
+	borderRadius: 10.863,
+	rightSlotWidth: 57,
+	rightSlotHeight: 36,
+	textRowHeight: 36,
+	textLineHeight: 20,
+	textVerticalPadding: 14,
+	bottomOffset: 89,
+	borderWidth: 2,
+	borderColor: '#000000',
+	backgroundColor: '#FFFFFF',
+	rightSlotBackgroundColor: '#A6C5F3',
+	rightSlotHoverBackgroundColor: '#95B8EA',
+	rightSlotActiveBackgroundColor: '#86A8DB',
+	opacity: 0.8,
+} as const;
+
+type MapBottomSearchBarProps = {
+	value: string;
+	isExpanded: boolean;
+	activeHeight: number;
+	inputRef: RefObject<HTMLTextAreaElement | null>;
+	onActivate: () => void;
+	onSubmit: () => void;
+	onValueChange: (value: string) => void;
+	onActiveChange: (active: boolean) => void;
+};
+
+const MapBottomSearchBar = ({
+	value,
+	isExpanded,
+	activeHeight,
+	inputRef,
+	onActivate,
+	onSubmit,
+	onValueChange,
+	onActiveChange,
+}: MapBottomSearchBarProps) => {
+	return (
+		<div
+			aria-label="Search anything on the map"
+			className="relative h-full w-full overflow-hidden pointer-events-auto"
+			style={{
+				borderRadius: `${MAP_RESULTS_BOTTOM_SEARCH_BOX.borderRadius}px`,
+				border: `${MAP_RESULTS_BOTTOM_SEARCH_BOX.borderWidth}px solid ${MAP_RESULTS_BOTTOM_SEARCH_BOX.borderColor}`,
+				backgroundColor: MAP_RESULTS_BOTTOM_SEARCH_BOX.backgroundColor,
+				opacity: MAP_RESULTS_BOTTOM_SEARCH_BOX.opacity,
+				boxSizing: 'border-box',
+				cursor: 'text',
+			}}
+			onMouseDown={(event) => {
+				if (event.target !== inputRef.current) {
+					event.preventDefault();
+				}
+				onActivate();
+			}}
+		>
+			{value.length === 0 && (
+				<div
+					aria-hidden="true"
+					className="absolute flex items-center gap-[4px] font-inter text-[16px] leading-none text-black pointer-events-none"
+					style={{
+						top: 0,
+						left: '14px',
+						right: `${MAP_RESULTS_BOTTOM_SEARCH_BOX.rightSlotWidth + 14}px`,
+						height: `${MAP_RESULTS_BOTTOM_SEARCH_BOX.textRowHeight}px`,
+					}}
+				>
+					<span className="font-bold">Search</span>
+					<span>Anything</span>
+				</div>
+			)}
+			<textarea
+				ref={inputRef}
+				value={value}
+				onChange={(event) => onValueChange(event.target.value)}
+				onFocus={() => onActiveChange(true)}
+				onBlur={() => onActiveChange(false)}
+				onKeyDown={(event) => {
+					event.stopPropagation();
+					if (event.key === 'Enter' && !event.shiftKey) {
+						event.preventDefault();
+						onSubmit();
+					}
+				}}
+				className="absolute bg-transparent border-0 outline-none font-inter text-[16px] text-black"
+				style={{
+					top: 0,
+					left: '14px',
+					width: `calc(100% - ${MAP_RESULTS_BOTTOM_SEARCH_BOX.rightSlotWidth + 28}px)`,
+					height: `${
+						isExpanded
+							? activeHeight
+							: MAP_RESULTS_BOTTOM_SEARCH_BOX.textRowHeight
+					}px`,
+					padding: '8px 0 6px',
+					opacity: isExpanded || value.length > 0 ? 1 : 0,
+					pointerEvents: isExpanded ? 'auto' : 'none',
+					caretColor: '#000000',
+					lineHeight: `${MAP_RESULTS_BOTTOM_SEARCH_BOX.textLineHeight}px`,
+					resize: 'none',
+					overflow: isExpanded ? 'auto' : 'hidden',
+					whiteSpace: 'pre-wrap',
+					wordBreak: 'break-word',
+					boxSizing: 'border-box',
+				}}
+			/>
+			<button
+				type="button"
+				aria-label="Submit map search"
+				className="absolute right-0 top-0 flex items-center justify-center transition-colors duration-100"
+				style={{
+					width: `${MAP_RESULTS_BOTTOM_SEARCH_BOX.rightSlotWidth}px`,
+					height: `${MAP_RESULTS_BOTTOM_SEARCH_BOX.rightSlotHeight}px`,
+					backgroundColor: MAP_RESULTS_BOTTOM_SEARCH_BOX.rightSlotBackgroundColor,
+					borderLeft: `${MAP_RESULTS_BOTTOM_SEARCH_BOX.borderWidth}px solid ${MAP_RESULTS_BOTTOM_SEARCH_BOX.borderColor}`,
+					borderBottom: isExpanded
+						? `${MAP_RESULTS_BOTTOM_SEARCH_BOX.borderWidth}px solid ${MAP_RESULTS_BOTTOM_SEARCH_BOX.borderColor}`
+						: undefined,
+					boxSizing: 'border-box',
+					cursor: 'pointer',
+					padding: 0,
+				}}
+				onMouseEnter={(event) => {
+					event.currentTarget.style.backgroundColor =
+						MAP_RESULTS_BOTTOM_SEARCH_BOX.rightSlotHoverBackgroundColor;
+				}}
+				onMouseLeave={(event) => {
+					event.currentTarget.style.backgroundColor =
+						MAP_RESULTS_BOTTOM_SEARCH_BOX.rightSlotBackgroundColor;
+				}}
+				onMouseDown={(event) => {
+					event.stopPropagation();
+					event.currentTarget.style.backgroundColor =
+						MAP_RESULTS_BOTTOM_SEARCH_BOX.rightSlotActiveBackgroundColor;
+				}}
+				onMouseUp={(event) => {
+					event.currentTarget.style.backgroundColor =
+						MAP_RESULTS_BOTTOM_SEARCH_BOX.rightSlotHoverBackgroundColor;
+				}}
+				onClick={() => {
+					if (value.trim().length > 0) {
+						onSubmit();
+					} else {
+						onActivate();
+					}
+				}}
+			>
+				<MapBottomSearchArrowIcon aria-hidden="true" />
+			</button>
+		</div>
+	);
+};
 
 const SearchTrayIconTile = ({
 	backgroundColor,
@@ -1577,6 +1738,7 @@ const DashboardContent = () => {
 		rehydrateCuratedSession,
 		isCuratedSearchActive,
 		lastCuratedArgs,
+		triggerFreeTextSearch,
 	} = useDashboard({ derivedTitle: derivedContactTitle, forceApplyDerivedTitle: shouldForceApplyDerivedTitle, fromHome: fromHomeParam });
 
 	const handleMapStateSelect = useCallback(
@@ -2420,6 +2582,7 @@ const DashboardContent = () => {
 
 	type SearchThisAreaViewportIdlePayload = {
 		bounds: { south: number; west: number; north: number; east: number };
+		center: { lat: number; lng: number };
 		zoom: number;
 		isCenterInSearchArea: boolean;
 	};
@@ -2528,8 +2691,88 @@ const DashboardContent = () => {
 		}
 	}, [isMapResultsLoading, isMapView]);
 
+	const [isMapBottomSearchActive, setIsMapBottomSearchActive] = useState(false);
+	const [mapBottomSearchValue, setMapBottomSearchValue] = useState('');
+	const [mapBottomSearchActiveHeight, setMapBottomSearchActiveHeight] = useState<number>(
+		MAP_RESULTS_BOTTOM_SEARCH_BOX.activeHeight
+	);
+	const mapBottomSearchInputRef = useRef<HTMLTextAreaElement | null>(null);
+	const isMapBottomSearchExpanded = isMapBottomSearchActive;
+
+	useLayoutEffect(() => {
+		if (!isMapBottomSearchExpanded) {
+			setMapBottomSearchActiveHeight(MAP_RESULTS_BOTTOM_SEARCH_BOX.activeHeight);
+			return;
+		}
+
+		const input = mapBottomSearchInputRef.current;
+		if (!input) return;
+
+		const previousHeight = input.style.height;
+		input.style.height = 'auto';
+		const nextHeight = Math.min(
+			MAP_RESULTS_BOTTOM_SEARCH_BOX.activeMaxHeight,
+			Math.max(MAP_RESULTS_BOTTOM_SEARCH_BOX.activeHeight, input.scrollHeight)
+		);
+		input.style.height = previousHeight;
+
+		setMapBottomSearchActiveHeight((current) =>
+			current === nextHeight ? current : nextHeight
+		);
+	}, [isMapBottomSearchExpanded, mapBottomSearchValue]);
+
+	const handleMapBottomSearchActivate = useCallback(() => {
+		setIsMapBottomSearchActive(true);
+		window.requestAnimationFrame(() => {
+			mapBottomSearchInputRef.current?.focus();
+		});
+	}, []);
+
+	// Free-text "Search Anything" submit. Runs the hybrid retriever route and
+	// surfaces results through the same curated-results pipe so map pins,
+	// list, and selection just update. Empty input → no-op (don't accidentally
+	// kick off a curated re-roll). Available on the free trial — no demo-mode
+	// gate here.
+	const handleMapBottomSearchSubmit = useCallback(async () => {
+		const q = mapBottomSearchValue.trim();
+		if (!q) return;
+		mapBottomSearchInputRef.current?.blur();
+		setIsMapBottomSearchActive(false);
+
+		let lat: number | null = null;
+		let lon: number | null = null;
+		try {
+			const loc = await Promise.race([
+				getApproximateLocation(),
+				new Promise<null>((resolve) => setTimeout(() => resolve(null), 1200)),
+			]);
+			if (loc) {
+				lat = loc.lat;
+				lon = loc.lon;
+			}
+		} catch {
+			// If the coarse IP lookup fails, fall back to a zoomed-in map viewport.
+		}
+
+		if (lat == null || lon == null) {
+			const viewport = lastSearchThisAreaViewportRef.current;
+			if (viewport && viewport.zoom >= SEARCH_THIS_AREA_MIN_ZOOM) {
+				lat = viewport.center.lat;
+				lon = viewport.center.lng;
+			}
+		}
+
+		triggerFreeTextSearch(q, {
+			lat: lat ?? undefined,
+			lon: lon ?? undefined,
+			radiusKm: lat != null && lon != null ? 250 : undefined,
+		}).catch(() => undefined);
+	}, [
+		mapBottomSearchValue,
+		triggerFreeTextSearch,
+	]);
+
 	const [isPointerInMapSidePanel, setIsPointerInMapSidePanel] = useState(false);
-	const [isPointerInMapBottomHalf, setIsPointerInMapBottomHalf] = useState(false);
 
 	const shouldUseDynamicMapCreateCampaignCta =
 		isMapView &&
@@ -2539,43 +2782,14 @@ const DashboardContent = () => {
 		!hasNoSearchResults &&
 		!isNarrowestDesktop;
 
-	const mapCreateCampaignCtaLocation: 'panel' | 'bottom' | 'none' =
-		!shouldUseDynamicMapCreateCampaignCta
-			? 'panel'
-			: isPointerInMapSidePanel
-				? 'panel'
-				: isPointerInMapBottomHalf
-					? 'bottom'
-					: 'none';
-
 	const isMapPanelCreateCampaignVisible =
-		!shouldUseDynamicMapCreateCampaignCta || mapCreateCampaignCtaLocation === 'panel';
-	const isMapBottomCreateCampaignVisible =
-		!shouldUseDynamicMapCreateCampaignCta || mapCreateCampaignCtaLocation === 'bottom';
+		!shouldUseDynamicMapCreateCampaignCta || isPointerInMapSidePanel;
 
 	useEffect(() => {
-		if (typeof window === 'undefined') return;
-
 		// Reset when dynamic behavior is not active (prevents "stale" cursor state).
 		if (!shouldUseDynamicMapCreateCampaignCta) {
 			setIsPointerInMapSidePanel(false);
-			setIsPointerInMapBottomHalf(false);
-			return;
 		}
-
-		// Default to showing the bottom CTA until we observe the current cursor position.
-		setIsPointerInMapSidePanel(false);
-		setIsPointerInMapBottomHalf(true);
-
-		const handleMouseMove = (e: MouseEvent) => {
-			const nextIsBottomHalf = e.clientY >= window.innerHeight / 2;
-			setIsPointerInMapBottomHalf((prev) =>
-				prev === nextIsBottomHalf ? prev : nextIsBottomHalf
-			);
-		};
-
-		window.addEventListener('mousemove', handleMouseMove, { passive: true });
-		return () => window.removeEventListener('mousemove', handleMouseMove);
 	}, [shouldUseDynamicMapCreateCampaignCta]);
 	// Map hover research overlay behavior:
 	// - Hold briefly after hover ends (prevents flicker)
@@ -3970,6 +4184,38 @@ const DashboardContent = () => {
 		<>
 		{/* Shared Mapbox globe background */}
 		{mapPortal}
+		{!hasSearched && activeTab === 'search' && !fromHomeParam && !isMapView && !isNarrowestDesktop && (
+			<div
+				className="fixed left-1/2 pointer-events-none"
+				style={{
+					bottom: `${MAP_RESULTS_BOTTOM_SEARCH_BOX.bottomOffset}px`,
+					width: `${
+						isMapBottomSearchExpanded
+							? MAP_RESULTS_BOTTOM_SEARCH_BOX.activeWidth
+							: MAP_RESULTS_BOTTOM_SEARCH_BOX.width
+					}px`,
+					height: `${
+						isMapBottomSearchExpanded
+							? mapBottomSearchActiveHeight
+							: MAP_RESULTS_BOTTOM_SEARCH_BOX.height
+					}px`,
+					transform: 'translateX(-50%)',
+					transition: 'width 160ms ease, height 160ms ease',
+					zIndex: 70,
+				}}
+			>
+				<MapBottomSearchBar
+					value={mapBottomSearchValue}
+					isExpanded={isMapBottomSearchExpanded}
+					activeHeight={mapBottomSearchActiveHeight}
+					inputRef={mapBottomSearchInputRef}
+					onActivate={handleMapBottomSearchActivate}
+					onSubmit={handleMapBottomSearchSubmit}
+					onValueChange={setMapBottomSearchValue}
+					onActiveChange={setIsMapBottomSearchActive}
+				/>
+			</div>
+		)}
 
 		<AppLayout>
 			<Link
@@ -7209,65 +7455,38 @@ const DashboardContent = () => {
 																		)}
 																	</div>
 																)}
-																{/* Create Campaign button overlaid on map - only show when not loading */}
-																{/* Hidden below xl (1280px) to prevent overlap with right panel */}
-																{!isMobile &&
-																	!fromHomeParam &&
-																	!(
-																		isSearchPending ||
-																		isLoadingContacts ||
-																		isRefetchingContacts
-																	) &&
-																	!hasNoSearchResults && (
-																		<div
-																			className={`absolute bottom-[10px] left-[10px] right-[10px] hidden xl:flex justify-center transition-opacity duration-150 ${
-																				isMapBottomCreateCampaignVisible
-																					? 'opacity-100'
-																					: 'opacity-0 pointer-events-none'
-																			}`}
-																			aria-hidden={!isMapBottomCreateCampaignVisible}
-																		>
-																			<Button
-																				disabled={primaryCtaPending}
-																				variant="primary-light"
-																				bold
-																				className={`relative w-full max-w-[420px] h-[39px] !bg-[#5DAB68] hover:!bg-[#4e9b5d] !text-white border border-[#000000] overflow-hidden ${
-																					selectedContacts.length === 0
-																						? 'opacity-[0.62]'
-																						: 'opacity-100'
-																				}`}
-																				style={
-																					selectedContacts.length === 0
-																						? { filter: 'grayscale(100%)' }
-																						: undefined
-																				}
-																				onClick={() => {
-																					if (selectedContacts.length === 0) return;
-																					handlePrimaryCta();
-																				}}
-																				tabIndex={isMapBottomCreateCampaignVisible ? 0 : -1}
-																			>
-																				<span className="relative z-20" style={{ fontFamily: 'Inter, sans-serif', fontWeight: 700 }}>
-																					{primaryCtaLabel}
-																				</span>
-																				<div
-																					className="absolute inset-y-0 right-0 w-[65px] z-20 flex items-center justify-center bg-[#74D178] cursor-pointer"
-																					onClick={(e) => {
-																						e.stopPropagation();
-																						handleSelectAll(mapPanelContacts);
-																					}}
-																				>
-																					<span className="text-black text-[14px] font-medium">
-																						All
-																					</span>
-																				</div>
-																				<span
-																					aria-hidden="true"
-																					className="pointer-events-none absolute inset-y-0 right-[65px] w-[2px] bg-[#349A37] z-10"
-																				/>
-																			</Button>
-																		</div>
-																	)}
+																{!isMobile && !isNarrowestDesktop && !hasNoSearchResults && (
+																	<div
+																		className="absolute left-1/2 pointer-events-none"
+																		style={{
+																			bottom: `${MAP_RESULTS_BOTTOM_SEARCH_BOX.bottomOffset}px`,
+																			width: `${
+																				isMapBottomSearchExpanded
+																					? MAP_RESULTS_BOTTOM_SEARCH_BOX.activeWidth
+																					: MAP_RESULTS_BOTTOM_SEARCH_BOX.width
+																			}px`,
+																			height: `${
+																				isMapBottomSearchExpanded
+																					? mapBottomSearchActiveHeight
+																					: MAP_RESULTS_BOTTOM_SEARCH_BOX.height
+																			}px`,
+																			transform: 'translateX(-50%)',
+																			transition: 'width 160ms ease, height 160ms ease',
+																			zIndex: 130,
+																		}}
+																	>
+																		<MapBottomSearchBar
+																			value={mapBottomSearchValue}
+																			isExpanded={isMapBottomSearchExpanded}
+																			activeHeight={mapBottomSearchActiveHeight}
+																			inputRef={mapBottomSearchInputRef}
+																			onActivate={handleMapBottomSearchActivate}
+																			onSubmit={handleMapBottomSearchSubmit}
+																			onValueChange={setMapBottomSearchValue}
+																			onActiveChange={setIsMapBottomSearchActive}
+																		/>
+																	</div>
+																)}
 															{/* Single column search results panel overlay at bottom - narrowest breakpoint (< 952px) */}
 															{/* Keep mounted during loading so UI doesn't disappear between state searches. */}
 															{isNarrowestDesktop && !hasNoSearchResults && (

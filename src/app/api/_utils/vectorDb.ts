@@ -966,6 +966,415 @@ export const searchContactsByLocation = async (
 	};
 };
 
+// Lexical (BM25) full-text search across the contact text fields. This is
+// the keyword-side counterpart to the kNN retriever in `searchSimilarContacts`
+// — kNN handles semantic intent ("places that feel like a basement jazz club"),
+// lexical handles exact and near-exact word matches ("austin", "vegan",
+// "Spotted Pig"). Used by the free-text bottom-box search in
+// /api/contacts/search to feed candidates into rank fusion.
+//
+// Boosts mirror what carries the most discriminative signal in this dataset:
+// title and company name dominate; companyKeywords and headline contribute;
+// metadata is broad context only. City/state, when supplied, are added as
+// soft `should` boosts on `.keyword` so an exact place match outranks
+// semantic-only matches without filtering anything out.
+export type LexicalSearchOptions = {
+	queryText: string;
+	limit?: number;
+	titlePrefixes?: readonly string[]; // optional category prefix bias (not a hard filter)
+	city?: string | null;
+	state?: string | null;
+	country?: string | null;
+	center?: { lat: number; lon: number } | null;
+	radiusKm?: number | null;
+	// When set, results are HARD-filtered to documents whose state.keyword
+	// matches one of these values (lowercased). Use when the user typed an
+	// explicit state — they don't want results in other states no matter how
+	// strong the semantic match is.
+	enforcedStateValues?: readonly string[] | null;
+	// Tightens the multi_match for short, noun-led queries (e.g. "deli",
+	// "bookstore", "italian deli"). Drops headline/metadata/address from the
+	// field list — those are the main source of person-row leakage where a
+	// blurb mentions the noun in passing — and disables fuzziness so a 4-letter
+	// token like "deli" can't edit-distance-1 match surnames like "Dell".
+	shortQueryMode?: boolean;
+	// Widest-possible no-fuzziness retrieval. Used by the search route's
+	// national-fallback stage when the index has no in-domain rows for the
+	// user's noun and we need to find ANY contact whose text fields literally
+	// contain the token — including headline, metadata, address, and the
+	// company-meta fields that shortQueryMode deliberately excludes. Includes
+	// a `phrase_prefix` pass so "plumber" matches tokens like "plumbers"
+	// without the false-positive risk of fuzziness ("plumber" → "lumber").
+	// Takes precedence over shortQueryMode when both are set.
+	literalSweepMode?: boolean;
+};
+
+export const lexicalSearchContacts = async (options: LexicalSearchOptions) => {
+	const limit = Math.max(1, Math.min(options.limit ?? 200, 1000));
+	const queryText = options.queryText.trim();
+	const canUseGeoDistance =
+		options.center && options.radiusKm
+			? await contactsIndexHasGeoCoordinatesField()
+			: false;
+
+	const should: Record<string, unknown>[] = [];
+
+	// Multi-field match on the substantive query text. Boost weights chosen so
+	// title and company dominate; headline and keywords contribute meaningfully;
+	// metadata is broad context.
+	if (queryText) {
+		if (options.literalSweepMode) {
+			// Widest-possible no-fuzziness sweep across every text field that
+			// could plausibly mention the user's noun. fuzziness=0 keeps
+			// "plumber" from drifting to "lumber"; the phrase_prefix pass adds
+			// morphological tolerance ("plumber" → "plumbers"/"plumbery") without
+			// the false-positive risk fuzziness brings.
+			should.push({
+				multi_match: {
+					query: queryText,
+					type: 'best_fields',
+					fields: [
+						'title^6',
+						'company^4',
+						'headline^3',
+						'companyKeywords^2',
+						'companyIndustry^2',
+						'companyType^2',
+						'metadata',
+						'address',
+					],
+					operator: 'or',
+					fuzziness: 0,
+				},
+			});
+			should.push({
+				multi_match: {
+					query: queryText,
+					type: 'phrase',
+					fields: ['title^8', 'company^6', 'headline^4'],
+					slop: 2,
+				},
+			});
+			should.push({
+				multi_match: {
+					query: queryText,
+					type: 'phrase_prefix',
+					fields: ['title^4', 'company^3', 'headline^2'],
+				},
+			});
+		} else if (options.shortQueryMode) {
+			// Short noun-led queries: keep only the high-signal fields. Headline
+			// and metadata are dropped because they leak person rows whose blurbs
+			// happen to mention the noun ("communications director who blogged
+			// about delis"). Fuzziness disabled because edit-distance 1 on a
+			// 4-letter token matches surnames like "Dell" against "deli".
+			should.push({
+				multi_match: {
+					query: queryText,
+					type: 'best_fields',
+					fields: [
+						'title^6',
+						'company^4',
+						'companyKeywords^1',
+						'companyIndustry',
+						'companyType',
+					],
+					operator: 'or',
+					fuzziness: 0,
+				},
+			});
+			// Phrase match on title/company only — useful for 2-token noun
+			// queries like "italian deli" where the in-order phrase is the
+			// strongest signal.
+			should.push({
+				multi_match: {
+					query: queryText,
+					type: 'phrase',
+					fields: ['title^8', 'company^5'],
+					slop: 1,
+				},
+			});
+		} else {
+			should.push({
+				multi_match: {
+					query: queryText,
+					type: 'best_fields',
+					fields: [
+						'title^4',
+						'company^3',
+						'headline^2',
+						'companyKeywords^2',
+						'companyIndustry',
+						'companyType',
+						'metadata',
+						'address',
+						'location',
+					],
+					operator: 'or',
+					fuzziness: 'AUTO',
+				},
+			});
+			// Phrase match for queries containing multi-word concepts ("live
+			// music", "wedding planners"). Cheap insurance — overlaps with
+			// multi_match but strongly rewards the in-order phrase appearing in
+			// the title or company.
+			should.push({
+				multi_match: {
+					query: queryText,
+					type: 'phrase',
+					fields: ['title^6', 'company^4', 'headline^3', 'metadata'],
+					slop: 2,
+				},
+			});
+		}
+	}
+
+	if (options.city) {
+		should.push({
+			term: {
+				'city.keyword': { value: options.city.toLowerCase(), boost: 6 },
+			},
+		});
+	}
+	if (options.state) {
+		should.push({
+			term: {
+				'state.keyword': { value: options.state.toLowerCase(), boost: 4 },
+			},
+		});
+	}
+	if (options.country) {
+		should.push({
+			term: {
+				'country.keyword': { value: options.country.toLowerCase(), boost: 1.5 },
+			},
+		});
+	}
+
+	// Title-prefix bias when a category was parsed. Not a hard filter — we want
+	// "music venues in austin" to lean toward Music Venues canonical rows but
+	// still surface a great non-prefixed venue if relevance dominates.
+	if (options.titlePrefixes && options.titlePrefixes.length > 0) {
+		for (const prefix of options.titlePrefixes) {
+			const lc = prefix.trim().toLowerCase();
+			if (!lc) continue;
+			should.push({
+				prefix: {
+					'title.keyword': { value: lc, case_insensitive: true, boost: 5 },
+				},
+			});
+		}
+	}
+
+	const filter: Record<string, unknown>[] = [];
+	if (options.center && options.radiusKm && canUseGeoDistance) {
+		filter.push({
+			geo_distance: {
+				distance: `${Math.max(1, options.radiusKm)}km`,
+				coordinates: { lat: options.center.lat, lon: options.center.lon },
+			},
+		});
+	}
+	if (options.enforcedStateValues && options.enforcedStateValues.length > 0) {
+		// Permissive state filter — `state.keyword` exact match catches the clean
+		// case ("arkansas" / "ar"), `prefix` catches comma-suffixed dirty values
+		// ("arkansas, usa"), and a `match_phrase` on title catches canonical
+		// "Restaurants Arkansas" rows whose state field is null.
+		const stateClauses: Record<string, unknown>[] = [];
+		for (const v of options.enforcedStateValues) {
+			const lc = v.toLowerCase();
+			stateClauses.push({ term: { 'state.keyword': { value: lc } } });
+			stateClauses.push({
+				prefix: { 'state.keyword': { value: lc, case_insensitive: true } },
+			});
+			stateClauses.push({ match_phrase: { state: v } });
+			stateClauses.push({ match_phrase: { title: v } });
+		}
+		filter.push({ bool: { should: stateClauses, minimum_should_match: 1 } });
+	}
+
+	if (should.length === 0) {
+		return { matches: [], totalFound: 0 };
+	}
+
+	const results = await elasticsearch.search<ContactDocument>({
+		index: INDEX_NAME,
+		size: limit,
+		query: {
+			bool: {
+				should,
+				minimum_should_match: 1,
+				filter,
+			},
+		},
+		fields: [
+			'contactId',
+			'email',
+			'firstName',
+			'lastName',
+			'company',
+			'title',
+			'headline',
+			'city',
+			'state',
+			'country',
+			'address',
+			'website',
+			'metadata',
+			'companyFoundedYear',
+			'companyType',
+			'companyTechStack',
+			'companyKeywords',
+			'companyIndustry',
+			'location',
+			'coordinates',
+		],
+		_source: false,
+	});
+
+	const matches = results.hits.hits.map((hit) => ({
+		id: hit._id,
+		score: hit._score || 0,
+		metadata: {
+			contactId: hit.fields?.contactId?.[0],
+			email: hit.fields?.email?.[0],
+			firstName: hit.fields?.firstName?.[0] ?? null,
+			lastName: hit.fields?.lastName?.[0] ?? null,
+			company: hit.fields?.company?.[0],
+			title: hit.fields?.title?.[0],
+			headline: hit.fields?.headline?.[0],
+			city: hit.fields?.city?.[0],
+			state: hit.fields?.state?.[0],
+			country: hit.fields?.country?.[0],
+			address: hit.fields?.address?.[0],
+			website: hit.fields?.website?.[0],
+			metadata: hit.fields?.metadata?.[0],
+			companyFoundedYear: hit.fields?.companyFoundedYear?.[0],
+			companyType: hit.fields?.companyType?.[0],
+			companyTechStack: hit.fields?.companyTechStack?.[0],
+			companyKeywords: hit.fields?.companyKeywords?.[0],
+			companyIndustry: hit.fields?.companyIndustry?.[0],
+			location: hit.fields?.location?.[0],
+			coordinates: hit.fields?.coordinates?.[0] || null,
+		},
+	}));
+
+	return { matches, totalFound: matches.length };
+};
+
+// Pure title-prefix retriever for free-text search when a category was parsed
+// from the user's query. Returns the highest-quality (canonical-shaped) rows
+// in that category by leaning on a function_score that weights canonical
+// title shape and full address data, with optional geo_distance filtering.
+// No randomness — quality, not vibe rotation.
+export const titlePrefixSearchContacts = async (options: {
+	titlePrefixes: readonly string[];
+	limit?: number;
+	center?: { lat: number; lon: number } | null;
+	radiusKm?: number | null;
+	enforcedStateValues?: readonly string[] | null;
+}) => {
+	const limit = Math.max(1, Math.min(options.limit ?? 200, 1000));
+	const canUseGeoDistance =
+		options.center && options.radiusKm
+			? await contactsIndexHasGeoCoordinatesField()
+			: false;
+
+	const titleClauses: Record<string, unknown>[] = [];
+	for (const prefix of options.titlePrefixes) {
+		const lc = prefix.trim().toLowerCase();
+		if (!lc) continue;
+		titleClauses.push({
+			prefix: { 'title.keyword': { value: lc, case_insensitive: true } },
+		});
+		titleClauses.push({ match_phrase_prefix: { title: prefix.trim() } });
+	}
+	if (titleClauses.length === 0) return { matches: [], totalFound: 0 };
+
+	const filter: Record<string, unknown>[] = [
+		{ bool: { should: titleClauses, minimum_should_match: 1 } },
+	];
+	if (options.center && options.radiusKm && canUseGeoDistance) {
+		filter.push({
+			geo_distance: {
+				distance: `${Math.max(1, options.radiusKm)}km`,
+				coordinates: { lat: options.center.lat, lon: options.center.lon },
+			},
+		});
+	}
+	if (options.enforcedStateValues && options.enforcedStateValues.length > 0) {
+		const stateClauses: Record<string, unknown>[] = [];
+		for (const v of options.enforcedStateValues) {
+			const lc = v.toLowerCase();
+			stateClauses.push({ term: { 'state.keyword': { value: lc } } });
+			stateClauses.push({
+				prefix: { 'state.keyword': { value: lc, case_insensitive: true } },
+			});
+			stateClauses.push({ match_phrase: { state: v } });
+			stateClauses.push({ match_phrase: { title: v } });
+		}
+		filter.push({ bool: { should: stateClauses, minimum_should_match: 1 } });
+	}
+
+	const results = await elasticsearch.search<ContactDocument>({
+		index: INDEX_NAME,
+		size: limit,
+		query: { bool: { filter } },
+		fields: [
+			'contactId',
+			'email',
+			'firstName',
+			'lastName',
+			'company',
+			'title',
+			'headline',
+			'city',
+			'state',
+			'country',
+			'address',
+			'website',
+			'metadata',
+			'companyFoundedYear',
+			'companyType',
+			'companyTechStack',
+			'companyKeywords',
+			'companyIndustry',
+			'location',
+			'coordinates',
+		],
+		_source: false,
+	});
+
+	const matches = results.hits.hits.map((hit) => ({
+		id: hit._id,
+		score: hit._score || 0,
+		metadata: {
+			contactId: hit.fields?.contactId?.[0],
+			email: hit.fields?.email?.[0],
+			firstName: hit.fields?.firstName?.[0] ?? null,
+			lastName: hit.fields?.lastName?.[0] ?? null,
+			company: hit.fields?.company?.[0],
+			title: hit.fields?.title?.[0],
+			headline: hit.fields?.headline?.[0],
+			city: hit.fields?.city?.[0],
+			state: hit.fields?.state?.[0],
+			country: hit.fields?.country?.[0],
+			address: hit.fields?.address?.[0],
+			website: hit.fields?.website?.[0],
+			metadata: hit.fields?.metadata?.[0],
+			companyFoundedYear: hit.fields?.companyFoundedYear?.[0],
+			companyType: hit.fields?.companyType?.[0],
+			companyTechStack: hit.fields?.companyTechStack?.[0],
+			companyKeywords: hit.fields?.companyKeywords?.[0],
+			companyIndustry: hit.fields?.companyIndustry?.[0],
+			location: hit.fields?.location?.[0],
+			coordinates: hit.fields?.coordinates?.[0] || null,
+		},
+	}));
+
+	return { matches, totalFound: matches.length };
+};
+
 // Curated random sampler: pulls contacts whose title begins with one of the given
 // prefixes, optionally biased toward a geographic centroid, and shuffles them via
 // ES `random_score` so each call returns a different set. Uses no embeddings —

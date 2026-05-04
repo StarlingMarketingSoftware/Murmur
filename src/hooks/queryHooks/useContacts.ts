@@ -523,6 +523,79 @@ export const useCuratedContactsSearch = (options: CustomMutationOptions = {}) =>
 	});
 };
 
+export interface FreeTextSearchResult {
+	query: string;
+	parsed: {
+		categories: string[];
+		city: string | null;
+		state: string | null;
+		country: string | null;
+		restOfQuery: string;
+	};
+	center: { lat: number; lon: number } | null;
+	radiusKm: number | null;
+	retrieverBreakdown: Record<string, number>;
+	cleanlinessBreakdown: Record<string, number>;
+	contacts: ContactWithName[];
+}
+
+export interface FreeTextSearchVariables {
+	q: string;
+	lat?: number | null;
+	lon?: number | null;
+	radiusKm?: number | null;
+	limit?: number;
+}
+
+export const useFreeTextContactsSearch = (options: CustomMutationOptions = {}) => {
+	const { suppressToasts = true, onSuccess: onSuccessCallback } = options;
+
+	return useMutation({
+		mutationFn: async (vars: FreeTextSearchVariables): Promise<FreeTextSearchResult> => {
+			const params: Record<string, string> = { q: vars.q };
+			if (typeof vars.lat === 'number' && Number.isFinite(vars.lat)) {
+				params.lat = String(vars.lat);
+			}
+			if (typeof vars.lon === 'number' && Number.isFinite(vars.lon)) {
+				params.lon = String(vars.lon);
+			}
+			if (typeof vars.radiusKm === 'number' && Number.isFinite(vars.radiusKm)) {
+				params.radiusKm = String(vars.radiusKm);
+			}
+			if (typeof vars.limit === 'number') params.limit = String(vars.limit);
+			const url = appendQueryParamsToUrl(urls.api.contacts.search.index, params);
+			const response = await _fetch(url, undefined, undefined, { timeout: 25000 });
+			if (!response.ok) {
+				let errorMessage = 'Failed to run search';
+				try {
+					const errorData = await response.json();
+					errorMessage = errorData.error || errorMessage;
+				} catch {
+					try {
+						const textError = await response.text();
+						errorMessage = textError || `HTTP ${response.status} error`;
+					} catch {
+						errorMessage = `HTTP ${response.status} error`;
+					}
+				}
+				throw new Error(errorMessage);
+			}
+			return response.json() as Promise<FreeTextSearchResult>;
+		},
+		onSuccess: (data) => {
+			onSuccessCallback?.();
+			if (!suppressToasts) {
+				toast.success(`Found ${data.contacts.length} matches`);
+			}
+		},
+		onError: (error) => {
+			if (!suppressToasts) {
+				toast.error(error.message || 'Failed to run search');
+			}
+		},
+	});
+};
+
 export interface GeocodeContactsResult {
 	message: string;
 	processed: number;

@@ -11,6 +11,7 @@ import { urls } from '@/constants/urls';
 import {
 	useBatchUpdateContacts,
 	useCuratedContactsSearch,
+	useFreeTextContactsSearch,
 	useGetContacts,
 	useGetUsedContactIds,
 } from '@/hooks/queryHooks/useContacts';
@@ -262,6 +263,11 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 		isPending: isPendingCuratedSearch,
 	} = useCuratedContactsSearch({ suppressToasts: true });
 
+	const {
+		mutateAsync: runFreeTextSearch,
+		isPending: isPendingFreeTextSearch,
+	} = useFreeTextContactsSearch({ suppressToasts: true });
+
 	const isLoadingContacts = isCuratedSearchActive
 		? isPendingCuratedSearch
 		: isLoadingRawContacts;
@@ -454,6 +460,59 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 			}
 		},
 		[runCuratedSearch]
+	);
+
+	// Free-text "Search Anything" entry point. Hits /api/contacts/search which
+	// runs the hybrid retriever (kNN + lexical + optional title-prefix) and the
+	// cleanliness/category/locality multipliers, and surfaces the results
+	// through the same curated-results state pipe so map pins, list rendering,
+	// and selection all "just work" without a parallel UI path. Treated as a
+	// curated session for state purposes — `isCuratedSearchActive` simply means
+	// "results came from a non-/api/contacts source," which applies here too.
+	const triggerFreeTextSearch = useCallback(
+		async (rawQuery: string, overrides?: { lat?: number | null; lon?: number | null; radiusKm?: number | null }) => {
+			const q = rawQuery.trim();
+			if (!q) return;
+			setIsSearchPending(true);
+			setMapBboxFilter(null);
+			setIsCuratedSearchActive(true);
+			setHasSearched(true);
+			setIsMapView(true);
+			setLastCuratedArgs(null);
+			clearCuratedSessionStorage();
+			try {
+				const result = await runFreeTextSearch({
+					q,
+					lat: overrides?.lat ?? undefined,
+					lon: overrides?.lon ?? undefined,
+					radiusKm: overrides?.radiusKm ?? undefined,
+					limit: 50,
+				});
+				// SearchResultsMap gates its blob/orb UI on `Boolean(curatedCategory)`. Free-text
+				// results don't carry one, so without this decoration they'd render as plain dots
+				// instead of the curated cluster visual. Prefer the per-contact category match,
+				// then the parsed query category, then a neutral sentinel as a last resort.
+				const fallbackCategory = result.parsed.categories[0] ?? '_freetext';
+				const decoratedContacts: ContactWithName[] = result.contacts.map((c) => {
+					if (c.curatedCategory) return c;
+					const match = (c as ContactWithName & { searchCategoryMatch?: string | null })
+						.searchCategoryMatch;
+					return { ...c, curatedCategory: match ?? fallbackCategory };
+				});
+				setCuratedContacts(decoratedContacts);
+				setActiveSearchQuery(q);
+				return result;
+			} catch (err) {
+				toast.error(err instanceof Error ? err.message : 'Failed to run search');
+				setIsCuratedSearchActive(false);
+				setCuratedContacts(null);
+				setHasSearched(false);
+				throw err;
+			} finally {
+				setIsSearchPending(false);
+			}
+		},
+		[runFreeTextSearch]
 	);
 
 	// Restore a curated session from sessionStorage if the cache key matches the requested
@@ -1062,5 +1121,7 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 		isCuratedSearchActive,
 		isPendingCuratedSearch,
 		lastCuratedArgs,
+		triggerFreeTextSearch,
+		isPendingFreeTextSearch,
 	};
 };

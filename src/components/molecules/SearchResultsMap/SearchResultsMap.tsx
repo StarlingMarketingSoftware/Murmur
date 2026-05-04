@@ -1859,12 +1859,14 @@ const stateBadgeColorMap: Record<string, string> = {
 	WI: '#F8BBD9',
 	WY: '#FFCCBC',
 	DC: '#E0E0E0',
+	BC: '#E0E0E0',
 };
 
 // Helper to get state abbreviation
 const getStateAbbreviation = (state: string): string | null => {
 	if (!state) return null;
 	const upper = state.toUpperCase().trim();
+	if (upper === 'BC' || upper === 'B.C.') return 'BC';
 	if (upper.length === 2 && stateBadgeColorMap[upper]) return upper;
 	const stateMap: Record<string, string> = {
 		ALABAMA: 'AL',
@@ -1918,6 +1920,7 @@ const getStateAbbreviation = (state: string): string | null => {
 		WISCONSIN: 'WI',
 		WYOMING: 'WY',
 		'DISTRICT OF COLUMBIA': 'DC',
+		'BRITISH COLUMBIA': 'BC',
 	};
 	return stateMap[upper] || null;
 };
@@ -15172,11 +15175,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 											{(() => {
 												const stateAbbr =
 													getStateAbbreviation(selectedMarker.state || '') || '';
-												if (stateAbbr && stateBadgeColorMap[stateAbbr]) {
+												if (stateAbbr) {
 													return (
 														<span
 															className="inline-flex items-center justify-center h-[14px] px-[5px] rounded-[3px] border border-black text-[10px] font-bold leading-none flex-shrink-0"
-															style={{ backgroundColor: stateBadgeColorMap[stateAbbr] }}
+															style={{
+																backgroundColor:
+																	stateBadgeColorMap[stateAbbr] || '#E0E0E0',
+															}}
 														>
 															{stateAbbr}
 														</span>

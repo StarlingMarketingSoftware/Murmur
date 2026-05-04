@@ -84,6 +84,9 @@ export const urls = {
 			curatedSearch: {
 				index: '/api/contacts/curated-search',
 			},
+			search: {
+				index: '/api/contacts/search',
+			},
 			mapOverlay: {
 				index: '/api/contacts/map-overlay',
 			},

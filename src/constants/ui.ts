@@ -108,4 +108,5 @@ export const stateBadgeColorMap: Record<string, string> = {
 	WV: '#D7F3E8',
 	WI: '#D7D7F3',
 	WY: '#D7F3D7',
+	BC: '#E0E0E0',
 };

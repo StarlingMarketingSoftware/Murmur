@@ -156,7 +156,7 @@ export const titleHasStateSuffix = (title: string | null | undefined): boolean =
 const PERSONAL_TITLE_RE =
 	/\b(owner|manager|director|head|chef|barista|server|bartender|founder|ceo|coo|cto|vp|cmo|host|hostess|sommelier|winemaker|brewer|distiller|booker|booking|talent|promoter|publicist|consultant|representative|coordinator|associate|assistant|musician|singer)\b|\sat\s/i;
 
-const titleLooksPersonal = (title: string | null | undefined): boolean => {
+export const titleLooksPersonal = (title: string | null | undefined): boolean => {
 	if (!title) return false;
 	return PERSONAL_TITLE_RE.test(title);
 };
