@@ -41,6 +41,12 @@ import HomeIcon from '@/components/atoms/_svg/HomeIcon';
 import HomeExpandedIcon from '@/components/atoms/_svg/HomeExpandedIcon';
 import BottomArrowIcon from '@/components/atoms/_svg/BottomArrowIcon';
 import MapBottomSearchArrowIcon from '@/components/atoms/_svg/MapBottomSearchArrowIcon';
+import MapBottomSearchAdvancedIcon from '@/components/atoms/_svg/MapBottomSearchAdvancedIcon';
+import MapBottomSearchCategoryIcon from '@/components/atoms/_svg/MapBottomSearchCategoryIcon';
+import MapBottomSearchForYouIcon from '@/components/atoms/_svg/MapBottomSearchForYouIcon';
+import MapBottomSearchProfileIcon from '@/components/atoms/_svg/MapBottomSearchProfileIcon';
+import MapBottomSearchKeywordIcon from '@/components/atoms/_svg/MapBottomSearchKeywordIcon';
+import MapBottomSearchRadiusIcon from '@/components/atoms/_svg/MapBottomSearchRadiusIcon';
 import GrabIcon from '@/components/atoms/svg/GrabIcon';
 import { getCityIconProps } from '@/utils/cityIcons';
 import { Typography } from '@/components/ui/typography';
@@ -397,6 +403,73 @@ const MAP_RESULTS_BOTTOM_SEARCH_BOX = {
 	opacity: 0.8,
 } as const;
 
+const MAP_RESULTS_BOTTOM_SEARCH_FOLLOWUP_BOX = {
+	width: 301,
+	height: 55,
+	gapToSearchBar: 20,
+	borderRadius: 6,
+	borderWidth: 2,
+	borderColor: '#000000',
+	backgroundColor: '#FFFFFF',
+} as const;
+
+const MAP_RESULTS_BOTTOM_SEARCH_FOLLOWUP_SEGMENT_BOX = {
+	width: 192,
+	height: 45,
+	rightOffset: 3,
+	borderRadius: 8,
+	borderColor: '#000000',
+	advancedWidth: 49,
+	dividerWidth: 2,
+	segmentWidth: 47,
+	advancedBackgroundColor: '#FD7171',
+	profileBackgroundColor: '#E0F3FE',
+	keywordBackgroundColor: '#EEF5FF',
+	radiusBackgroundColor: '#FBF5DE',
+} as const;
+
+const MAP_RESULTS_BOTTOM_SEARCH_FOLLOWUP_LEFT_TILE_BOX = {
+	size: 45,
+	leftOffset: 4,
+	gap: 4,
+	borderRadius: 8,
+	dailyMixBackgroundColor: '#15D3344A',
+	categoryBackgroundColor: '#ACE1FF5E',
+} as const;
+
+const MAP_RESULTS_BOTTOM_SEARCH_FOLLOWUP_ICON_LAYOUT = {
+	forYou: {
+		width: 29,
+		height: 34,
+		translateX: 0,
+		translateY: 0.8,
+	},
+	category: {
+		width: 35,
+		height: 34,
+		translateX: 0,
+		translateY: 2.2,
+	},
+	profile: {
+		width: 30,
+		height: 37,
+		translateX: 0,
+		translateY: 0,
+	},
+	keyword: {
+		width: 39,
+		height: 37,
+		translateX: 0,
+		translateY: 2,
+	},
+	radius: {
+		width: 31,
+		height: 37,
+		translateX: -2,
+		translateY: 1,
+	},
+} as const;
+
 type MapBottomSearchBarProps = {
 	value: string;
 	isExpanded: boolean;
@@ -530,6 +603,157 @@ const MapBottomSearchBar = ({
 			>
 				<MapBottomSearchArrowIcon aria-hidden="true" />
 			</button>
+		</div>
+	);
+};
+
+const MapBottomSearchFollowupBox = () => {
+	const segmentBox = MAP_RESULTS_BOTTOM_SEARCH_FOLLOWUP_SEGMENT_BOX;
+	const leftTileBox = MAP_RESULTS_BOTTOM_SEARCH_FOLLOWUP_LEFT_TILE_BOX;
+	const iconLayout = MAP_RESULTS_BOTTOM_SEARCH_FOLLOWUP_ICON_LAYOUT;
+	const profileLeft = segmentBox.advancedWidth + segmentBox.dividerWidth;
+	const keywordLeft = profileLeft + segmentBox.segmentWidth;
+	const radiusLeft = keywordLeft + segmentBox.segmentWidth;
+
+	return (
+		<div
+			className="absolute left-1/2 pointer-events-auto"
+			style={{
+				top: `calc(100% + ${MAP_RESULTS_BOTTOM_SEARCH_FOLLOWUP_BOX.gapToSearchBar}px)`,
+				width: `${MAP_RESULTS_BOTTOM_SEARCH_FOLLOWUP_BOX.width}px`,
+				height: `${MAP_RESULTS_BOTTOM_SEARCH_FOLLOWUP_BOX.height}px`,
+				transform: 'translateX(-50%)',
+				borderRadius: `${MAP_RESULTS_BOTTOM_SEARCH_FOLLOWUP_BOX.borderRadius}px`,
+				border: `${MAP_RESULTS_BOTTOM_SEARCH_FOLLOWUP_BOX.borderWidth}px solid ${MAP_RESULTS_BOTTOM_SEARCH_FOLLOWUP_BOX.borderColor}`,
+				backgroundColor: MAP_RESULTS_BOTTOM_SEARCH_FOLLOWUP_BOX.backgroundColor,
+				boxSizing: 'border-box',
+			}}
+		>
+			<div
+				aria-hidden="true"
+				className="absolute flex items-center justify-center"
+				style={{
+					left: `${leftTileBox.leftOffset}px`,
+					top: '50%',
+					width: `${leftTileBox.size}px`,
+					height: `${leftTileBox.size}px`,
+					transform: 'translateY(-50%)',
+					borderRadius: `${leftTileBox.borderRadius}px`,
+					backgroundColor: leftTileBox.dailyMixBackgroundColor,
+				}}
+			>
+				<MapBottomSearchForYouIcon
+					style={{
+						display: 'block',
+						width: `${iconLayout.forYou.width}px`,
+						height: `${iconLayout.forYou.height}px`,
+						transform: `translate(${iconLayout.forYou.translateX}px, ${iconLayout.forYou.translateY}px)`,
+					}}
+				/>
+			</div>
+			<div
+				aria-hidden="true"
+				className="absolute flex items-center justify-center"
+				style={{
+					left: `${leftTileBox.leftOffset + leftTileBox.size + leftTileBox.gap}px`,
+					top: '50%',
+					width: `${leftTileBox.size}px`,
+					height: `${leftTileBox.size}px`,
+					transform: 'translateY(-50%)',
+					borderRadius: `${leftTileBox.borderRadius}px`,
+					backgroundColor: leftTileBox.categoryBackgroundColor,
+				}}
+			>
+				<MapBottomSearchCategoryIcon
+					style={{
+						display: 'block',
+						width: `${iconLayout.category.width}px`,
+						height: `${iconLayout.category.height}px`,
+						transform: `translate(${iconLayout.category.translateX}px, ${iconLayout.category.translateY}px)`,
+					}}
+				/>
+			</div>
+			<div
+				aria-hidden="true"
+				className="absolute"
+				style={{
+					right: `${segmentBox.rightOffset}px`,
+					top: '50%',
+					width: `${segmentBox.width}px`,
+					height: `${segmentBox.height}px`,
+					transform: 'translateY(-50%)',
+					borderRadius: `${segmentBox.borderRadius}px`,
+					border: `${segmentBox.dividerWidth}px solid ${segmentBox.borderColor}`,
+					background: `linear-gradient(to right, ${segmentBox.advancedBackgroundColor} 0 ${segmentBox.advancedWidth}px, ${segmentBox.borderColor} ${segmentBox.advancedWidth}px ${profileLeft}px, ${segmentBox.profileBackgroundColor} ${profileLeft}px ${keywordLeft}px, ${segmentBox.keywordBackgroundColor} ${keywordLeft}px ${radiusLeft}px, ${segmentBox.radiusBackgroundColor} ${radiusLeft}px 100%)`,
+					boxSizing: 'border-box',
+				}}
+			>
+				<div
+					className="absolute flex items-center justify-center"
+					style={{
+						left: 0,
+						top: 0,
+						width: `${segmentBox.advancedWidth}px`,
+						height: '100%',
+						transform: 'translateY(3px)',
+					}}
+				>
+					<MapBottomSearchAdvancedIcon />
+				</div>
+				<div
+					className="absolute flex items-center justify-center"
+					style={{
+						left: `${profileLeft}px`,
+						top: 0,
+						width: `${segmentBox.segmentWidth}px`,
+						height: '100%',
+					}}
+				>
+					<MapBottomSearchProfileIcon
+						style={{
+							display: 'block',
+							width: `${iconLayout.profile.width}px`,
+							height: `${iconLayout.profile.height}px`,
+						}}
+					/>
+				</div>
+				<div
+					className="absolute flex items-center justify-center"
+					style={{
+						left: `${keywordLeft}px`,
+						top: 0,
+						width: `${segmentBox.segmentWidth}px`,
+						height: '100%',
+					}}
+				>
+					<MapBottomSearchKeywordIcon
+						style={{
+							display: 'block',
+							width: `${iconLayout.keyword.width}px`,
+							height: `${iconLayout.keyword.height}px`,
+							transform: `translate(${iconLayout.keyword.translateX}px, ${iconLayout.keyword.translateY}px)`,
+						}}
+					/>
+				</div>
+				<div
+					className="absolute flex items-center justify-center"
+					style={{
+						left: `${radiusLeft}px`,
+						top: 0,
+						width: `${segmentBox.segmentWidth}px`,
+						height: '100%',
+					}}
+				>
+					<MapBottomSearchRadiusIcon
+						style={{
+							display: 'block',
+							width: `${iconLayout.radius.width}px`,
+							height: `${iconLayout.radius.height}px`,
+							transform: `translate(${iconLayout.radius.translateX}px, ${iconLayout.radius.translateY}px)`,
+						}}
+					/>
+				</div>
+			</div>
 		</div>
 	);
 };
@@ -4214,6 +4438,7 @@ const DashboardContent = () => {
 					onValueChange={setMapBottomSearchValue}
 					onActiveChange={setIsMapBottomSearchActive}
 				/>
+				<MapBottomSearchFollowupBox />
 			</div>
 		)}
 
@@ -7485,6 +7710,7 @@ const DashboardContent = () => {
 																			onValueChange={setMapBottomSearchValue}
 																			onActiveChange={setIsMapBottomSearchActive}
 																		/>
+																		<MapBottomSearchFollowupBox />
 																	</div>
 																)}
 															{/* Single column search results panel overlay at bottom - narrowest breakpoint (< 952px) */}
