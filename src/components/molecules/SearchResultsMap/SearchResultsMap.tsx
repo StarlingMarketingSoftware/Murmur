@@ -3431,6 +3431,7 @@ const MAPBOX_LAYER_IDS = {
 	curatedBlobCore: 'murmur-curated-blob-core-line',
 	// Markers (hit layers are used for hover/click priority)
 	markersAllHit: 'murmur-markers-all-hit',
+	markersAllGlow: 'murmur-markers-all-glow',
 	markersAllDots: 'murmur-markers-all-dots',
 	promotionPinHit: 'murmur-promo-pin-hit',
 	promotionPinIcons: 'murmur-promo-pin-icons',
@@ -3438,8 +3439,10 @@ const MAPBOX_LAYER_IDS = {
 	bookingPinIcons: 'murmur-booking-pin-icons',
 	bookingPinIconsHover: 'murmur-booking-pin-icons-hover',
 	promotionDotHit: 'murmur-promo-dot-hit',
+	promotionDotGlow: 'murmur-promo-dot-glow',
 	promotionDotDots: 'murmur-promo-dot-dots',
 	baseHit: 'murmur-base-hit',
+	baseGlow: 'murmur-base-glow',
 	baseDots: 'murmur-base-dots',
 	// Rectangles
 	selectedAreaRect: 'murmur-selected-area-rect-line',
@@ -3712,14 +3715,33 @@ const RESULT_DOT_SCALE_MAX = 11;
 // Overlay pins look too small when zoomed out; keep their circle readable without
 // overpowering the search tray/category icons.
 const MIN_OVERLAY_PIN_CIRCLE_DIAMETER_PX = 16;
-// Stroke weight should be thinner when zoomed out and approach ~3px when zoomed in.
+// Selected stroke weight should be thinner when zoomed out and approach ~3px when zoomed in.
 const RESULT_DOT_STROKE_WEIGHT_MIN_PX = 1.5;
 const RESULT_DOT_STROKE_WEIGHT_MAX_PX = 3;
 const RESULT_DOT_STROKE_COLOR_DEFAULT = '#FFFFFF';
 const RESULT_DOT_STROKE_COLOR_SELECTED = '#15C948';
+const RESULT_DOT_GLOW_COLOR = '#FFFFFF';
+const RESULT_DOT_GLOW_RADIUS_MIN_PX = 8;
+const RESULT_DOT_GLOW_RADIUS_MAX_PX = 16;
+const RESULT_DOT_GLOW_OPACITY = 0.72;
+const CURATED_DOT_GLOW_ZOOM_FADE_EXPR: any = [
+	'interpolate',
+	['linear'],
+	['zoom'],
+	CURATED_DOT_FADE_END_ZOOM,
+	['case', ['boolean', ['get', 'isCurated'], false], 0, RESULT_DOT_GLOW_OPACITY],
+	CURATED_DOT_FADE_START_ZOOM,
+	RESULT_DOT_GLOW_OPACITY,
+];
+const ALL_CONTACTS_DOT_GLOW_OPACITY = 0.54;
+const RESULT_DOT_GLOW_BLUR = 0.86;
+const RESULT_DOT_TRANSPARENT_STROKE_COLOR = 'rgba(255, 255, 255, 0)';
 // Fill color for the hover tooltip SVG when the contact is selected.
 const TOOLTIP_FILL_COLOR_SELECTED = '#258530';
 const BOOKING_EXTRA_PIN_HOVER_STROKE_COLOR = '#000000';
+
+const withResultDotGlowOpacity = (dotOpacityExpr: unknown) =>
+	['*', RESULT_DOT_GLOW_OPACITY, dotOpacityExpr] as any;
 
 // Keep hover tooltip above all map markers so it never gets covered.
 const HOVER_TOOLTIP_Z_INDEX = 1_000_000;
@@ -8992,18 +9014,38 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			24,
 			RESULT_DOT_SCALE_MAX,
 		];
-		const resultDotStrokeExpr = [
+		const isSelectedFeatureStateExpr = ['boolean', ['feature-state', 'selected'], false];
+		const resultDotGlowRadiusExpr = [
 			'interpolate',
 			['linear'],
 			['zoom'],
 			0,
-			RESULT_DOT_STROKE_WEIGHT_MIN_PX,
+			RESULT_DOT_GLOW_RADIUS_MIN_PX,
 			RESULT_DOT_ZOOM_MIN,
-			RESULT_DOT_STROKE_WEIGHT_MIN_PX,
+			RESULT_DOT_GLOW_RADIUS_MIN_PX,
 			RESULT_DOT_ZOOM_MAX,
-			RESULT_DOT_STROKE_WEIGHT_MAX_PX,
+			RESULT_DOT_GLOW_RADIUS_MAX_PX,
 			24,
-			RESULT_DOT_STROKE_WEIGHT_MAX_PX,
+			RESULT_DOT_GLOW_RADIUS_MAX_PX,
+		];
+		const resultDotStrokeColorExpr = [
+			'case',
+			['boolean', ['feature-state', 'selected'], false],
+			RESULT_DOT_STROKE_COLOR_SELECTED,
+			RESULT_DOT_TRANSPARENT_STROKE_COLOR,
+		];
+		const resultDotSelectedStrokeExpr = [
+			'interpolate',
+			['linear'],
+			['zoom'],
+			0,
+			['case', isSelectedFeatureStateExpr, RESULT_DOT_STROKE_WEIGHT_MIN_PX, 0],
+			RESULT_DOT_ZOOM_MIN,
+			['case', isSelectedFeatureStateExpr, RESULT_DOT_STROKE_WEIGHT_MIN_PX, 0],
+			RESULT_DOT_ZOOM_MAX,
+			['case', isSelectedFeatureStateExpr, RESULT_DOT_STROKE_WEIGHT_MAX_PX, 0],
+			24,
+			['case', isSelectedFeatureStateExpr, RESULT_DOT_STROKE_WEIGHT_MAX_PX, 0],
 		];
 
 		const allOverlayRadiusLow = RESULT_DOT_SCALE_MIN * 0.72;
@@ -9024,18 +9066,31 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 		const allOverlayStrokeLow = Math.max(1, RESULT_DOT_STROKE_WEIGHT_MIN_PX * 0.85);
 		const allOverlayStrokeHigh = Math.max(1, RESULT_DOT_STROKE_WEIGHT_MAX_PX * 0.85);
-		const allOverlayStrokeExpr = [
+		const allOverlayGlowRadiusExpr = [
 			'interpolate',
 			['linear'],
 			['zoom'],
 			0,
-			allOverlayStrokeLow,
+			RESULT_DOT_GLOW_RADIUS_MIN_PX * 0.82,
 			RESULT_DOT_ZOOM_MIN,
-			allOverlayStrokeLow,
+			RESULT_DOT_GLOW_RADIUS_MIN_PX * 0.82,
 			RESULT_DOT_ZOOM_MAX,
-			allOverlayStrokeHigh,
+			RESULT_DOT_GLOW_RADIUS_MAX_PX * 0.82,
 			24,
-			allOverlayStrokeHigh,
+			RESULT_DOT_GLOW_RADIUS_MAX_PX * 0.82,
+		];
+		const allOverlaySelectedStrokeExpr = [
+			'interpolate',
+			['linear'],
+			['zoom'],
+			0,
+			['case', isSelectedFeatureStateExpr, allOverlayStrokeLow, 0],
+			RESULT_DOT_ZOOM_MIN,
+			['case', isSelectedFeatureStateExpr, allOverlayStrokeLow, 0],
+			RESULT_DOT_ZOOM_MAX,
+			['case', isSelectedFeatureStateExpr, allOverlayStrokeHigh, 0],
+			24,
+			['case', isSelectedFeatureStateExpr, allOverlayStrokeHigh, 0],
 		];
 
 		const pinRadiusLow =
@@ -9234,6 +9289,18 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			},
 		});
 		ensureLayer({
+			id: MAPBOX_LAYER_IDS.markersAllGlow,
+			type: 'circle',
+			source: MAPBOX_SOURCE_IDS.markersAllOverlay,
+			paint: {
+				'circle-radius': allOverlayGlowRadiusExpr,
+				'circle-color': RESULT_DOT_GLOW_COLOR,
+				'circle-opacity': ALL_CONTACTS_DOT_GLOW_OPACITY,
+				'circle-blur': RESULT_DOT_GLOW_BLUR,
+				'circle-stroke-width': 0,
+			},
+		});
+		ensureLayer({
 			id: MAPBOX_LAYER_IDS.markersAllDots,
 			type: 'circle',
 			source: MAPBOX_SOURCE_IDS.markersAllOverlay,
@@ -9241,13 +9308,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				'circle-radius': allOverlayRadiusExpr,
 				'circle-color': ['get', 'fillColor'],
 				'circle-opacity': 1,
-				'circle-stroke-color': [
-					'case',
-					['boolean', ['feature-state', 'selected'], false],
-					RESULT_DOT_STROKE_COLOR_SELECTED,
-					RESULT_DOT_STROKE_COLOR_DEFAULT,
-				],
-				'circle-stroke-width': allOverlayStrokeExpr,
+				'circle-stroke-color': resultDotStrokeColorExpr,
+				'circle-stroke-width': allOverlaySelectedStrokeExpr,
 			},
 		});
 
@@ -9352,6 +9414,18 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			},
 		});
 		ensureLayer({
+			id: MAPBOX_LAYER_IDS.promotionDotGlow,
+			type: 'circle',
+			source: MAPBOX_SOURCE_IDS.markersPromotionDot,
+			paint: {
+				'circle-radius': resultDotGlowRadiusExpr,
+				'circle-color': RESULT_DOT_GLOW_COLOR,
+				'circle-opacity': RESULT_DOT_GLOW_OPACITY,
+				'circle-blur': RESULT_DOT_GLOW_BLUR,
+				'circle-stroke-width': 0,
+			},
+		});
+		ensureLayer({
 			id: MAPBOX_LAYER_IDS.promotionDotDots,
 			type: 'circle',
 			source: MAPBOX_SOURCE_IDS.markersPromotionDot,
@@ -9359,13 +9433,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				'circle-radius': resultDotRadiusExpr,
 				'circle-color': ['get', 'fillColor'],
 				'circle-opacity': 1,
-				'circle-stroke-color': [
-					'case',
-					['boolean', ['feature-state', 'selected'], false],
-					RESULT_DOT_STROKE_COLOR_SELECTED,
-					RESULT_DOT_STROKE_COLOR_DEFAULT,
-				],
-				'circle-stroke-width': resultDotStrokeExpr,
+				'circle-stroke-color': resultDotStrokeColorExpr,
+				'circle-stroke-width': resultDotSelectedStrokeExpr,
 			},
 		});
 
@@ -9381,6 +9450,18 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			},
 		});
 		ensureLayer({
+			id: MAPBOX_LAYER_IDS.baseGlow,
+			type: 'circle',
+			source: MAPBOX_SOURCE_IDS.markersBase,
+			paint: {
+				'circle-radius': resultDotGlowRadiusExpr,
+				'circle-color': RESULT_DOT_GLOW_COLOR,
+				'circle-opacity': CURATED_DOT_GLOW_ZOOM_FADE_EXPR,
+				'circle-blur': RESULT_DOT_GLOW_BLUR,
+				'circle-stroke-width': 0,
+			},
+		});
+		ensureLayer({
 			id: MAPBOX_LAYER_IDS.baseDots,
 			type: 'circle',
 			source: MAPBOX_SOURCE_IDS.markersBase,
@@ -9388,13 +9469,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				'circle-radius': resultDotRadiusExpr,
 				'circle-color': ['get', 'fillColor'],
 				'circle-opacity': CURATED_DOT_ZOOM_FADE_EXPR,
-				'circle-stroke-color': [
-					'case',
-					['boolean', ['feature-state', 'selected'], false],
-					RESULT_DOT_STROKE_COLOR_SELECTED,
-					RESULT_DOT_STROKE_COLOR_DEFAULT,
-				],
-				'circle-stroke-width': resultDotStrokeExpr,
+				'circle-stroke-color': resultDotStrokeColorExpr,
+				'circle-stroke-width': resultDotSelectedStrokeExpr,
 			},
 		});
 
@@ -13871,6 +13947,19 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		}
 
 		try {
+			if (map.getLayer(MAPBOX_LAYER_IDS.baseGlow)) {
+				const transition = { duration: 0, delay: 0 } as any;
+				(map as any).setPaintProperty(
+					MAPBOX_LAYER_IDS.baseGlow,
+					'circle-opacity-transition',
+					transition
+				);
+				(map as any).setPaintProperty(
+					MAPBOX_LAYER_IDS.baseGlow,
+					'circle-opacity',
+					CURATED_DOT_GLOW_ZOOM_FADE_EXPR
+				);
+			}
 			if (map.getLayer(MAPBOX_LAYER_IDS.baseDots)) {
 				const transition = { duration: 0, delay: 0 } as any;
 				(map as any).setPaintProperty(
@@ -14116,6 +14205,13 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				1,
 			] as any;
 			try {
+				if (map.getLayer(MAPBOX_LAYER_IDS.baseGlow)) {
+					(map as any).setPaintProperty(
+						MAPBOX_LAYER_IDS.baseGlow,
+						'circle-opacity',
+						withResultDotGlowOpacity(expr0)
+					);
+				}
 				if (map.getLayer(MAPBOX_LAYER_IDS.baseDots)) {
 					(map as any).setPaintProperty(
 						MAPBOX_LAYER_IDS.baseDots,
@@ -14205,6 +14301,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			// Reset base dots to normal rendering (no animated expression).
 			// IMPORTANT: set transitions *before* opacity changes.
 			const transition = { duration: transitionMs, delay: 0 } as any;
+			safeSetPaint(MAPBOX_LAYER_IDS.baseGlow, 'circle-opacity-transition', transition);
+			safeSetPaint(
+				MAPBOX_LAYER_IDS.baseGlow,
+				'circle-opacity',
+				CURATED_DOT_GLOW_ZOOM_FADE_EXPR
+			);
 			safeSetPaint(MAPBOX_LAYER_IDS.baseDots, 'circle-opacity-transition', transition);
 			safeSetPaint(
 				MAPBOX_LAYER_IDS.baseDots,
@@ -14321,6 +14423,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			duration: DOT_WAVE_SMOOTH_TRANSITION_MS,
 			delay: 0,
 		} as any);
+		safeSetPaint(MAPBOX_LAYER_IDS.baseGlow, 'circle-opacity-transition', {
+			duration: DOT_WAVE_SMOOTH_TRANSITION_MS,
+			delay: 0,
+		} as any);
 		safeSetPaint(MAPBOX_LAYER_IDS.baseDots, 'circle-stroke-opacity-transition', {
 			duration: DOT_WAVE_SMOOTH_TRANSITION_MS,
 			delay: 0,
@@ -14365,6 +14471,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 			if (t - lastPaintUpdateAt >= DOT_WAVE_FRAME_MS) {
 				const expr = buildOpacityExpr(t);
+				safeSetPaint(
+					MAPBOX_LAYER_IDS.baseGlow,
+					'circle-opacity',
+					withResultDotGlowOpacity(expr)
+				);
 				safeSetPaint(MAPBOX_LAYER_IDS.baseDots, 'circle-opacity', expr);
 				safeSetPaint(MAPBOX_LAYER_IDS.baseDots, 'circle-stroke-opacity', expr);
 				lastPaintUpdateAt = t;
@@ -14394,6 +14505,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 		// Prime frame 0 (all hidden) before the first rAF callback.
 		const expr0 = buildOpacityExpr(0);
+		safeSetPaint(
+			MAPBOX_LAYER_IDS.baseGlow,
+			'circle-opacity',
+			withResultDotGlowOpacity(expr0)
+		);
 		safeSetPaint(MAPBOX_LAYER_IDS.baseDots, 'circle-opacity', expr0);
 		safeSetPaint(MAPBOX_LAYER_IDS.baseDots, 'circle-stroke-opacity', expr0);
 

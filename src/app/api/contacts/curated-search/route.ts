@@ -123,6 +123,60 @@ const inferCenterFromRequest = (
 
 const DEFAULT_RESULT_COUNT = 50;
 const MAX_RESULT_COUNT = 100;
+const CURATED_ROUTE_SOFT_BUDGET_MS = 52000;
+const CURATED_ROUTE_SAFETY_MARGIN_MS = 3000;
+
+const getCuratedRouteTimeoutMs = (startedAtMs: number): number =>
+	Math.max(
+		0,
+		CURATED_ROUTE_SOFT_BUDGET_MS -
+			(Date.now() - startedAtMs) -
+			CURATED_ROUTE_SAFETY_MARGIN_MS
+	);
+
+const withBudgetFallback = async <T,>(
+	operation: () => Promise<T>,
+	options: {
+		timeoutMs: number;
+		fallback: T;
+		label: string;
+		requestId: string;
+	}
+): Promise<T> => {
+	if (options.timeoutMs <= 0) {
+		console.warn(
+			`[curated-search][${options.requestId}] ${options.label} skipped because route budget is exhausted`
+		);
+		return options.fallback;
+	}
+
+	let timeoutId: ReturnType<typeof setTimeout> | null = null;
+	let timedOut = false;
+
+	try {
+		const timeoutPromise = new Promise<T>((resolve) => {
+			timeoutId = setTimeout(() => {
+				timedOut = true;
+				resolve(options.fallback);
+			}, options.timeoutMs);
+		});
+		const result = await Promise.race([operation(), timeoutPromise]);
+		if (timedOut) {
+			console.warn(
+				`[curated-search][${options.requestId}] ${options.label} exceeded ${options.timeoutMs}ms; returning fallback response`
+			);
+		}
+		return result;
+	} catch (error) {
+		console.warn(
+			`[curated-search][${options.requestId}] ${options.label} failed; returning fallback response`,
+			error
+		);
+		return options.fallback;
+	} finally {
+		if (timeoutId) clearTimeout(timeoutId);
+	}
+};
 
 export interface CuratedSearchResponse {
 	categoryBreakdown: Record<string, number>;
@@ -179,13 +233,31 @@ export async function GET(req: NextRequest) {
 			? { lat: center.lat as number, lon: center.lon as number }
 			: null;
 
-		const result = await runCuratedNearbyPicks({
-			center: centerPoint,
-			radiusKm: requestedRadiusKm,
-			limit: requestedLimit,
-			requestedCategoryPrefixes,
-			logTag: `[curated-search][${requestId}]`,
-		});
+		const fallbackResult: Awaited<ReturnType<typeof runCuratedNearbyPicks>> = {
+			contacts: [],
+			categoryBreakdown: {},
+			candidateSource: 'timeout',
+			fetchMs: 0,
+			effectiveCenter: centerPoint ?? { lat: 39.83, lon: -98.58 },
+			effectiveRadiusKm: requestedRadiusKm,
+			hasRealCenter: hasCenter,
+		};
+		const result = await withBudgetFallback(
+			() =>
+				runCuratedNearbyPicks({
+					center: centerPoint,
+					radiusKm: requestedRadiusKm,
+					limit: requestedLimit,
+					requestedCategoryPrefixes,
+					logTag: `[curated-search][${requestId}]`,
+				}),
+			{
+				timeoutMs: getCuratedRouteTimeoutMs(requestStartedAt),
+				fallback: fallbackResult,
+				label: 'curated picks pipeline',
+				requestId,
+			}
+		);
 
 		console.log(
 			`[curated-search][${requestId}] returned=${result.contacts.length} totalMs=${

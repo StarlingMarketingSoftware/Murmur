@@ -799,31 +799,36 @@ const MapBottomSearchBar = memo(({
 							if ((event.target as HTMLElement).tagName !== 'INPUT') {
 								event.preventDefault();
 							}
+							categoryWhatInputRef.current?.focus();
 							onCategoryFieldFocus?.('what');
 						}}
 					>
-						<div className="absolute left-[18px] top-[12px] font-medium text-[21px] leading-none text-black font-secondary">
+						<div className="absolute left-[18px] top-[12px] font-medium text-[21px] leading-none text-black font-secondary pointer-events-none">
 							What
 						</div>
 						<div className="absolute left-[18px] right-[8px] top-[37px] h-[14px] overflow-hidden">
-							{isWhatActive ? (
-								<input
-									ref={categoryWhatInputRef}
-									value={categoryWhatValue}
-									onChange={(event) => onCategoryWhatChange?.(event.target.value)}
-									onKeyDown={(event) => {
-										event.stopPropagation();
-										if (event.key === 'Enter') {
-											event.preventDefault();
-											onCategoryWhatEnter?.();
-										}
-									}}
-									className="absolute inset-0 w-full bg-transparent border-0 outline-none p-0 font-semibold text-[12px] leading-[14px] text-black font-secondary"
-									placeholder="Add Recipients"
-								/>
-							) : (
+							<input
+								ref={categoryWhatInputRef}
+								value={categoryWhatValue}
+								onChange={(event) => onCategoryWhatChange?.(event.target.value)}
+								onKeyDown={(event) => {
+									event.stopPropagation();
+									if (event.key === 'Enter') {
+										event.preventDefault();
+										onCategoryWhatEnter?.();
+									}
+								}}
+								className="absolute inset-0 w-full bg-transparent border-0 outline-none p-0 font-semibold text-[12px] leading-[14px] text-black font-secondary"
+								placeholder="Add Recipients"
+								style={{
+									opacity: isWhatActive ? 1 : 0,
+									pointerEvents: isWhatActive ? 'auto' : 'none',
+								}}
+							/>
+							{!isWhatActive && (
 								<div
-									className="absolute inset-0 font-semibold text-[12px] leading-[14px] whitespace-nowrap overflow-hidden font-secondary"
+									aria-hidden="true"
+									className="absolute inset-0 font-semibold text-[12px] leading-[14px] whitespace-nowrap overflow-hidden font-secondary pointer-events-none"
 									style={{
 										color: categoryWhatValue.trim()
 											? '#000000'
@@ -852,31 +857,36 @@ const MapBottomSearchBar = memo(({
 							if ((event.target as HTMLElement).tagName !== 'INPUT') {
 								event.preventDefault();
 							}
+							categoryWhereInputRef.current?.focus();
 							onCategoryFieldFocus?.('where');
 						}}
 					>
-						<div className="absolute left-[18px] top-[12px] font-medium text-[21px] leading-none text-black font-secondary">
+						<div className="absolute left-[18px] top-[12px] font-medium text-[21px] leading-none text-black font-secondary pointer-events-none">
 							Where
 						</div>
 						<div className="absolute left-[18px] right-[8px] top-[37px] h-[14px] overflow-hidden">
-							{isWhereActive ? (
-								<input
-									ref={categoryWhereInputRef}
-									value={categoryWhereValue}
-									onChange={(event) => onCategoryWhereChange?.(event.target.value)}
-									onKeyDown={(event) => {
-										event.stopPropagation();
-										if (event.key === 'Enter') {
-											event.preventDefault();
-											onCategorySubmit?.();
-										}
-									}}
-									className="absolute inset-0 w-full bg-transparent border-0 outline-none p-0 font-semibold text-[12px] leading-[14px] text-black font-secondary"
-									placeholder="Search Destinations"
-								/>
-							) : (
+							<input
+								ref={categoryWhereInputRef}
+								value={categoryWhereValue}
+								onChange={(event) => onCategoryWhereChange?.(event.target.value)}
+								onKeyDown={(event) => {
+									event.stopPropagation();
+									if (event.key === 'Enter') {
+										event.preventDefault();
+										onCategorySubmit?.();
+									}
+								}}
+								className="absolute inset-0 w-full bg-transparent border-0 outline-none p-0 font-semibold text-[12px] leading-[14px] text-black font-secondary"
+								placeholder="Search Destinations"
+								style={{
+									opacity: isWhereActive ? 1 : 0,
+									pointerEvents: isWhereActive ? 'auto' : 'none',
+								}}
+							/>
+							{!isWhereActive && (
 								<div
-									className="absolute inset-0 font-semibold text-[12px] leading-[14px] whitespace-nowrap overflow-hidden font-secondary"
+									aria-hidden="true"
+									className="absolute inset-0 font-semibold text-[12px] leading-[14px] whitespace-nowrap overflow-hidden font-secondary pointer-events-none"
 									style={{
 										color: categoryWhereValue.trim()
 											? '#000000'
@@ -1063,7 +1073,6 @@ type MapBottomSearchFollowupBoxProps = {
 	onPreviewSearchFollowupChange: (
 		selection: MapBottomSearchFollowupPreview
 	) => void;
-	onForYouSubmit: () => void | Promise<void>;
 };
 
 const MapBottomSearchFollowupBox = memo(({
@@ -1071,7 +1080,6 @@ const MapBottomSearchFollowupBox = memo(({
 	previewedSearchFollowup,
 	onSelectedSearchFollowupChange,
 	onPreviewSearchFollowupChange,
-	onForYouSubmit,
 }: MapBottomSearchFollowupBoxProps) => {
 	const segmentBox = MAP_RESULTS_BOTTOM_SEARCH_FOLLOWUP_SEGMENT_BOX;
 	const leftTileBox = MAP_RESULTS_BOTTOM_SEARCH_FOLLOWUP_LEFT_TILE_BOX;
@@ -1141,7 +1149,9 @@ const MapBottomSearchFollowupBox = memo(({
 				}}
 				onMouseEnter={() => onPreviewSearchFollowupChange('for-you')}
 				onFocus={() => onPreviewSearchFollowupChange('for-you')}
-				onClick={() => onForYouSubmit()}
+				onClick={() =>
+					onSelectedSearchFollowupChange(isForYouSelected ? null : 'for-you')
+				}
 			>
 				<MapBottomSearchForYouIcon
 					aria-hidden="true"
@@ -1702,14 +1712,10 @@ const DashboardContent = () => {
 		useRef<ReturnType<typeof setTimeout> | null>(null);
 	const [isMapBottomCategoryDropdownActive, setIsMapBottomCategoryDropdownActive] =
 		useState(false);
-	const effectiveMapBottomSearchFollowupSelection =
-		mapBottomSearchFollowupPreview === 'anything'
-			? null
-			: mapBottomSearchFollowupPreview ?? mapBottomSearchFollowupSelection;
 	const isMapBottomForYouMode =
-		effectiveMapBottomSearchFollowupSelection === 'for-you';
+		mapBottomSearchFollowupSelection === 'for-you';
 	const isMapBottomCategoryMode =
-		effectiveMapBottomSearchFollowupSelection === 'category';
+		mapBottomSearchFollowupSelection === 'category';
 
 	// Close why dropdown when clicking outside
 	useEffect(() => {
@@ -1827,18 +1833,34 @@ const DashboardContent = () => {
 		isNearMe = false,
 		base?: { why?: string; what?: string }
 	) => {
-		const baseWhy = base?.why ?? whyValue;
-		const baseWhat = base?.what ?? whatValue;
+		const trimmedNewWhere = newWhereValue.trim();
+		const initialBaseWhat = base?.what ?? whatValue;
+		// Selecting a Where without a What would otherwise build a query like
+		// "[Booking] (Maine)" — no category to match against. Default to the
+		// Wine/Beer/Spirits category so the curated search returns real results.
+		const shouldAutoFillWhat =
+			trimmedNewWhere.length > 0 && !initialBaseWhat.trim();
+		const baseWhat = shouldAutoFillWhat
+			? DEFAULT_CATEGORY_SEARCH_WHAT
+			: initialBaseWhat;
+		const baseWhy = shouldAutoFillWhat
+			? getCategorySearchWhyForWhat(baseWhat)
+			: (base?.why ?? whyValue);
 
 		// Update the state values
-		if (base?.why !== undefined && base.why !== whyValue) setWhyValue(base.why);
-		if (base?.what !== undefined && base.what !== whatValue) setWhatValue(base.what);
+		if (shouldAutoFillWhat) {
+			if (baseWhy !== whyValue) setWhyValue(baseWhy);
+			if (baseWhat !== whatValue) setWhatValue(baseWhat);
+		} else {
+			if (base?.why !== undefined && base.why !== whyValue) setWhyValue(base.why);
+			if (base?.what !== undefined && base.what !== whatValue) setWhatValue(base.what);
+		}
 		setWhereValue(newWhereValue);
 		setIsNearMeLocation(isNearMe);
 		setActiveSection(null);
 
 		// Build the combined search query with the new where value
-		const formattedWhere = newWhereValue.trim() ? `(${newWhereValue.trim()})` : '';
+		const formattedWhere = trimmedNewWhere ? `(${trimmedNewWhere})` : '';
 		const combinedSearch = [baseWhy, baseWhat, formattedWhere]
 			.filter(Boolean)
 			.join(' ')
@@ -1864,9 +1886,25 @@ const DashboardContent = () => {
 		// If "Where" (or the entire bar) is blank, auto-fill before submitting.
 		await ensureNonEmptyDashboardSearchOnBlankSubmit();
 
+		const trimmedWhere = whereValue.trim();
+		const trimmedWhat = whatValue.trim();
+		// Where without What would build "[Booking] (Maine)" with no category — default
+		// to Wine/Beer/Spirits so the curated search has a real category to filter on.
+		const shouldAutoFillWhat = trimmedWhere.length > 0 && !trimmedWhat;
+		const effectiveWhat = shouldAutoFillWhat
+			? DEFAULT_CATEGORY_SEARCH_WHAT
+			: whatValue;
+		const effectiveWhy = shouldAutoFillWhat
+			? getCategorySearchWhyForWhat(effectiveWhat)
+			: whyValue;
+		if (shouldAutoFillWhat) {
+			if (effectiveWhat !== whatValue) setWhatValue(effectiveWhat);
+			if (effectiveWhy !== whyValue) setWhyValue(effectiveWhy);
+		}
+
 		// Build the combined search query
-		const formattedWhere = whereValue.trim() ? `(${whereValue.trim()})` : '';
-		const combinedSearch = [whyValue, whatValue, formattedWhere].filter(Boolean).join(' ').trim();
+		const formattedWhere = trimmedWhere ? `(${trimmedWhere})` : '';
+		const combinedSearch = [effectiveWhy, effectiveWhat, formattedWhere].filter(Boolean).join(' ').trim();
 
 		// Set form value and submit
 		if (combinedSearch && form && onSubmit) {
@@ -3657,16 +3695,17 @@ const DashboardContent = () => {
 			setMapBottomSearchFollowupPreview(null);
 			setMapBottomSearchFollowupSelection(selection);
 
-			if (selection === 'category') {
+			if (selection === 'category' || selection === 'for-you') {
 				mapBottomSearchInputRef.current?.blur();
 				setIsMapBottomSearchActive(false);
-				return;
 			}
 
-			if (isMapBottomCategoryDropdownActive) {
-				setActiveSection(null);
+			if (selection !== 'category') {
+				if (isMapBottomCategoryDropdownActive) {
+					setActiveSection(null);
+				}
+				setIsMapBottomCategoryDropdownActive(false);
 			}
-			setIsMapBottomCategoryDropdownActive(false);
 		},
 		[cancelMapBottomSearchFollowupPreviewClear, isMapBottomCategoryDropdownActive]
 	);
@@ -3713,10 +3752,19 @@ const DashboardContent = () => {
 			return;
 		}
 
-		const trimmedWhat = whatValue.trim();
+		const initialTrimmedWhat = whatValue.trim();
 		const trimmedWhere = whereValue.trim();
+		// Where without What would build "[Booking] (Maine)" with no category — default
+		// to Wine/Beer/Spirits so the curated search has a real category to filter on.
+		const trimmedWhat =
+			trimmedWhere && !initialTrimmedWhat
+				? DEFAULT_CATEGORY_SEARCH_WHAT
+				: initialTrimmedWhat;
 		const nextWhy = getCategorySearchWhyForWhat(trimmedWhat);
 
+		if (trimmedWhat !== initialTrimmedWhat) {
+			setWhatValue(trimmedWhat);
+		}
 		setWhyValue(nextWhy);
 		setActiveSection(null);
 		setIsMapBottomCategoryDropdownActive(false);
@@ -5336,7 +5384,6 @@ const DashboardContent = () => {
 					onPreviewSearchFollowupChange={
 						handleMapBottomSearchFollowupPreviewChange
 					}
-					onForYouSubmit={handleMapBottomForYouSubmit}
 				/>
 			</div>
 		)}
@@ -8723,7 +8770,6 @@ const DashboardContent = () => {
 																			onPreviewSearchFollowupChange={
 																				handleMapBottomSearchFollowupPreviewChange
 																			}
-																			onForYouSubmit={handleMapBottomForYouSubmit}
 																		/>
 																	</div>
 																)}

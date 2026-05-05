@@ -93,6 +93,59 @@ export type PostContactData = z.infer<typeof createContactSchema>;
 
 export const maxDuration = 60;
 
+const CONTACTS_ROUTE_SOFT_BUDGET_MS = 52000;
+const CONTACTS_ROUTE_SAFETY_MARGIN_MS = 3000;
+const CONTACTS_VECTOR_SEARCH_TIMEOUT_MS = 14000;
+const CONTACTS_SUBSTRING_FALLBACK_TIMEOUT_MS = 8000;
+const CONTACTS_PRISMA_HYDRATION_TIMEOUT_MS = 8000;
+
+const getRouteRemainingMs = (startedAtMs: number): number =>
+	Math.max(0, CONTACTS_ROUTE_SOFT_BUDGET_MS - (Date.now() - startedAtMs));
+
+const getBudgetedTimeoutMs = (startedAtMs: number, maxTimeoutMs: number): number =>
+	Math.max(
+		0,
+		Math.min(maxTimeoutMs, getRouteRemainingMs(startedAtMs) - CONTACTS_ROUTE_SAFETY_MARGIN_MS)
+	);
+
+const withBudgetFallback = async <T,>(
+	operation: () => Promise<T>,
+	options: {
+		timeoutMs: number;
+		fallbackValue: T;
+		label: string;
+	}
+): Promise<T> => {
+	if (options.timeoutMs <= 0) {
+		console.warn(`[contacts] ${options.label} skipped because route budget is exhausted`);
+		return options.fallbackValue;
+	}
+
+	let timeoutId: ReturnType<typeof setTimeout> | null = null;
+	let timedOut = false;
+
+	try {
+		const timeoutPromise = new Promise<T>((resolve) => {
+			timeoutId = setTimeout(() => {
+				timedOut = true;
+				resolve(options.fallbackValue);
+			}, options.timeoutMs);
+		});
+		const result = await Promise.race([operation(), timeoutPromise]);
+		if (timedOut) {
+			console.warn(
+				`[contacts] ${options.label} exceeded ${options.timeoutMs}ms; returning fallback response`
+			);
+		}
+		return result;
+	} catch (error) {
+		console.warn(`[contacts] ${options.label} failed; returning fallback response`, error);
+		return options.fallbackValue;
+	} finally {
+		if (timeoutId) clearTimeout(timeoutId);
+	}
+};
+
 const normalizeSearchText = (value: string | null | undefined): string =>
 	(value ?? '').toLowerCase().replace(/\s+/g, ' ').trim();
 
@@ -1185,6 +1238,7 @@ const extractParentheticalLocation = (query: string): ParentheticalLocation | nu
 };
 
 export async function GET(req: NextRequest) {
+	const requestStartedAtMs = Date.now();
 	try {
 		const { userId } = await auth();
 		if (!userId) {
@@ -4133,6 +4187,16 @@ export async function GET(req: NextRequest) {
 			});
 		};
 
+		const runSubstringSearchWithBudget = (label: string): Promise<Contact[]> =>
+			withBudgetFallback(() => substringSearch(), {
+				timeoutMs: getBudgetedTimeoutMs(
+					requestStartedAtMs,
+					CONTACTS_SUBSTRING_FALLBACK_TIMEOUT_MS
+				),
+				fallbackValue: [],
+				label,
+			});
+
 		// if it's a search by ContactListId, only filter by this ContactList.id and validation status
 		if (numberContactListIds.length > 0) {
 			contacts = await prisma.contact.findMany({
@@ -4165,25 +4229,39 @@ export async function GET(req: NextRequest) {
 				: requestedLimit;
 			// Protect the vector path with a timeout and fallback to substring search
 			const vectorSearchWithTimeout = async () => {
-				const timeoutMs = 14000;
-				return await Promise.race([
-					searchSimilarContacts(
-						queryJson,
-						effectiveVectorLimit,
-						effectiveLocationStrategy,
-						{
-							penaltyCities,
-							forceCityExactCity,
-							forceStateAny,
-							forceCityAny,
-							penaltyTerms,
-							strictPenalty,
-						}
-					),
-					new Promise<never>((_, reject) =>
-						setTimeout(() => reject(new Error('Vector search timed out')), timeoutMs)
-					),
-				]);
+				const timeoutMs = getBudgetedTimeoutMs(
+					requestStartedAtMs,
+					CONTACTS_VECTOR_SEARCH_TIMEOUT_MS
+				);
+				if (timeoutMs <= 0) {
+					throw new Error('Vector search skipped because route budget is exhausted');
+				}
+				let timeoutId: ReturnType<typeof setTimeout> | null = null;
+				try {
+					return await Promise.race([
+						searchSimilarContacts(
+							queryJson,
+							effectiveVectorLimit,
+							effectiveLocationStrategy,
+							{
+								penaltyCities,
+								forceCityExactCity,
+								forceStateAny,
+								forceCityAny,
+								penaltyTerms,
+								strictPenalty,
+							}
+						),
+						new Promise<never>((_, reject) => {
+							timeoutId = setTimeout(
+								() => reject(new Error('Vector search timed out')),
+								timeoutMs
+							);
+						}),
+					]);
+				} finally {
+					if (timeoutId) clearTimeout(timeoutId);
+				}
 			};
 
 			let vectorSearchResults;
@@ -4197,7 +4275,9 @@ export async function GET(req: NextRequest) {
 					'Vector search timed out or failed, falling back to substring search.',
 					e
 				);
-				const fallback = await substringSearch();
+				const fallback = await runSubstringSearchWithBudget(
+					'vector failure substring fallback'
+				);
 				const filteredFallback = shouldFilterBookingTitles
 					? await filterItemsByTitlePrefixes(fallback, [bookingTitlePrefix], {
 							keepNullTitles: false,
@@ -4211,7 +4291,9 @@ export async function GET(req: NextRequest) {
 				console.warn(
 					'Vector search returned no matches, falling back to substring search.'
 				);
-				const fallback = await substringSearch();
+				const fallback = await runSubstringSearchWithBudget(
+					'empty vector substring fallback'
+				);
 				const filteredFallback = shouldFilterBookingTitles
 					? await filterItemsByTitlePrefixes(fallback, [bookingTitlePrefix], {
 							keepNullTitles: false,
@@ -4344,20 +4426,31 @@ export async function GET(req: NextRequest) {
 			let hydratedContacts: PrismaHydrationContact[] = [];
 			if (hydrationIds.length > 0) {
 				const prismaHydrationStartMs = Date.now();
-				hydratedContacts = await prisma.contact.findMany({
-					where: {
-						id: {
-							in: hydrationIds,
-							notIn: addedContactIds,
-						},
-						emailValidationStatus: verificationStatus
-							? {
-									equals: verificationStatus,
-							  }
-							: undefined,
-					},
-					select: VECTOR_PRISMA_HYDRATION_SELECT,
-				});
+				hydratedContacts = await withBudgetFallback(
+					() =>
+						prisma.contact.findMany({
+							where: {
+								id: {
+									in: hydrationIds,
+									notIn: addedContactIds,
+								},
+								emailValidationStatus: verificationStatus
+									? {
+											equals: verificationStatus,
+									  }
+									: undefined,
+							},
+							select: VECTOR_PRISMA_HYDRATION_SELECT,
+						}),
+					{
+						timeoutMs: getBudgetedTimeoutMs(
+							requestStartedAtMs,
+							CONTACTS_PRISMA_HYDRATION_TIMEOUT_MS
+						),
+						fallbackValue: [],
+						label: 'vector Prisma hydration',
+					}
+				);
 				prismaHydrationMs = Date.now() - prismaHydrationStartMs;
 			}
 
@@ -4527,7 +4620,7 @@ export async function GET(req: NextRequest) {
 			return apiResponse(contacts.slice(0, requestedLimit));
 		} else {
 			// Use regular search if vector search is not enabled
-			contacts = await substringSearch();
+			contacts = await runSubstringSearchWithBudget('regular substring search');
 
 			return apiResponse(contacts);
 		}

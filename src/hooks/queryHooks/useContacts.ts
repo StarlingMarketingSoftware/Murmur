@@ -16,6 +16,40 @@ const QUERY_KEYS = {
 	detail: (id: string | number) => [...QUERY_KEYS.all, 'detail', id.toString()] as const,
 } as const;
 
+const CONTACT_SEARCH_TIMEOUT_MS = 65000;
+const TIMEOUT_ERROR_RE = /\b(timeout|timed\s*out)\b/i;
+
+const readResponseErrorMessage = async (
+	response: Response,
+	fallback: string,
+	timeoutMs?: number
+): Promise<string> => {
+	let errorMessage = fallback;
+	try {
+		const rawError = await response.text();
+		if (rawError) {
+			try {
+				const errorData = JSON.parse(rawError);
+				errorMessage = errorData.error || errorData.message || rawError;
+			} catch {
+				errorMessage = rawError;
+			}
+		} else {
+			errorMessage = `HTTP ${response.status} error`;
+		}
+	} catch {
+		errorMessage = `HTTP ${response.status} error`;
+	}
+
+	if (response.status === 504 || TIMEOUT_ERROR_RE.test(errorMessage)) {
+		return timeoutMs
+			? `Request timeout after ${timeoutMs}ms`
+			: 'Request timeout';
+	}
+
+	return errorMessage;
+};
+
 export interface ContactQueryOptions extends CustomQueryOptions {
 	filters?: ContactFilterData;
 }
@@ -30,30 +64,19 @@ export const useGetContacts = (options: ContactQueryOptions) => {
 		queryKey: [...QUERY_KEYS.list(), options.filters],
 		queryFn: async ({ signal }) => {
 			const url = appendQueryParamsToUrl(urls.api.contacts.index, options.filters);
-			// 40s ceiling: the server can spend up to 25s on a Gemini post-training
-			// call and another ~14s on vector search before any fallback runs.
-			// Match the worst case so we don't surface a "timeout" toast right when
-			// the server is about to succeed.
+			// The route's maxDuration is 60s. Give the server enough room to
+			// finish or return its own 504 instead of aborting a slow success.
 			const response = await _fetch(url, undefined, undefined, {
 				signal,
-				timeout: 40000,
+				timeout: CONTACT_SEARCH_TIMEOUT_MS,
 			});
 
 			if (!response.ok) {
-				let errorMessage = 'Failed to fetch contacts';
-				try {
-					const errorData = await response.json();
-					errorMessage = errorData.error || errorMessage;
-				} catch {
-					// If response is not JSON (e.g., plain text "Internal Server Error")
-					// try to get the text content
-					try {
-						const textError = await response.text();
-						errorMessage = textError || `HTTP ${response.status} error`;
-					} catch {
-						errorMessage = `HTTP ${response.status} error`;
-					}
-				}
+				const errorMessage = await readResponseErrorMessage(
+					response,
+					'Failed to fetch contacts',
+					CONTACT_SEARCH_TIMEOUT_MS
+				);
 				throw new Error(errorMessage);
 			}
 
@@ -62,6 +85,11 @@ export const useGetContacts = (options: ContactQueryOptions) => {
 		enabled: options.enabled === undefined ? true : options.enabled,
 		// Keep previous results visible while a new search fetches (prevents UI + map flicker).
 		placeholderData: keepPreviousData,
+		refetchOnMount: false,
+		refetchOnReconnect: false,
+		refetchOnWindowFocus: false,
+		retry: false,
+		staleTime: 1000 * 60 * 60,
 		gcTime: 1000 * 60 * 10, // Keep in cache for 10 minutes
 	});
 };
@@ -423,25 +451,31 @@ export const useGetContactsMapOverlay = (options: {
 		queryFn: async ({ signal }) => {
 			if (!options.filters) return [];
 			const url = appendQueryParamsToUrl(urls.api.contacts.mapOverlay.index, options.filters);
-			const response = await _fetch(url, undefined, undefined, {
-				signal,
-				timeout: 15000,
-			});
+			let response: Response;
+			try {
+				response = await _fetch(url, undefined, undefined, {
+					signal,
+					timeout: 20000,
+				});
+			} catch (error) {
+				if (error instanceof Error && error.name === 'AbortError') {
+					throw error;
+				}
+				console.warn('[contacts-map-overlay] Background overlay fetch failed', error);
+				return [];
+			}
 
 			if (!response.ok) {
-				let errorMessage = 'Failed to fetch map overlay contacts';
-				try {
-					const errorData = await response.json();
-					errorMessage = errorData.error || errorMessage;
-				} catch {
-					try {
-						const textError = await response.text();
-						errorMessage = textError || `HTTP ${response.status} error`;
-					} catch {
-						errorMessage = `HTTP ${response.status} error`;
-					}
-				}
-				throw new Error(errorMessage);
+				const errorMessage = await readResponseErrorMessage(
+					response,
+					'Failed to fetch map overlay contacts',
+					20000
+				);
+				console.warn('[contacts-map-overlay] Background overlay response failed', {
+					status: response.status,
+					errorMessage,
+				});
+				return [];
 			}
 
 			return response.json() as Promise<ContactWithName[]>;
@@ -450,6 +484,10 @@ export const useGetContactsMapOverlay = (options: {
 		// Prevent marker flicker when the bbox/zoom changes by keeping the previous
 		// overlay results visible while the next window refetches.
 		placeholderData: keepPreviousData,
+		refetchOnMount: false,
+		refetchOnReconnect: false,
+		refetchOnWindowFocus: false,
+		retry: false,
 		staleTime: 1000 * 60 * 5, // 5 minutes
 		gcTime: 1000 * 60 * 30, // Keep in cache for 30 minutes
 	});
@@ -499,26 +537,17 @@ export const useCuratedContactsSearch = (options: CustomMutationOptions = {}) =>
 				urls.api.contacts.curatedSearch.index,
 				params
 			);
-			// 40s ceiling — see comment on useGetContacts. Matches the route's
-			// worst-case Gemini + ES budget so a slow-but-succeeding response
-			// doesn't get cut off and toasted as a fake timeout.
+			// The route's maxDuration is 60s; let the server own the deadline.
 			const response = await _fetch(url, undefined, undefined, {
-				timeout: 40000,
+				timeout: CONTACT_SEARCH_TIMEOUT_MS,
 				signal: vars.signal,
 			});
 			if (!response.ok) {
-				let errorMessage = 'Failed to fetch curated picks';
-				try {
-					const errorData = await response.json();
-					errorMessage = errorData.error || errorMessage;
-				} catch {
-					try {
-						const textError = await response.text();
-						errorMessage = textError || `HTTP ${response.status} error`;
-					} catch {
-						errorMessage = `HTTP ${response.status} error`;
-					}
-				}
+				const errorMessage = await readResponseErrorMessage(
+					response,
+					'Failed to fetch curated picks',
+					CONTACT_SEARCH_TIMEOUT_MS
+				);
 				throw new Error(errorMessage);
 			}
 			return response.json() as Promise<CuratedSearchResult>;
@@ -580,24 +609,16 @@ export const useFreeTextContactsSearch = (options: CustomMutationOptions = {}) =
 			}
 			if (typeof vars.limit === 'number') params.limit = String(vars.limit);
 			const url = appendQueryParamsToUrl(urls.api.contacts.search.index, params);
-			// 40s ceiling — see comment on useGetContacts.
 			const response = await _fetch(url, undefined, undefined, {
-				timeout: 40000,
+				timeout: CONTACT_SEARCH_TIMEOUT_MS,
 				signal: vars.signal,
 			});
 			if (!response.ok) {
-				let errorMessage = 'Failed to run search';
-				try {
-					const errorData = await response.json();
-					errorMessage = errorData.error || errorMessage;
-				} catch {
-					try {
-						const textError = await response.text();
-						errorMessage = textError || `HTTP ${response.status} error`;
-					} catch {
-						errorMessage = `HTTP ${response.status} error`;
-					}
-				}
+				const errorMessage = await readResponseErrorMessage(
+					response,
+					'Failed to run search',
+					CONTACT_SEARCH_TIMEOUT_MS
+				);
 				throw new Error(errorMessage);
 			}
 			return response.json() as Promise<FreeTextSearchResult>;

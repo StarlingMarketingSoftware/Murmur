@@ -198,6 +198,9 @@ const clearFreeTextSessionStorage = (): void => {
 	}
 };
 
+const isTimeoutError = (error: unknown): boolean =>
+	error instanceof Error && /\b(timeout|timed\s*out)\b/i.test(error.message);
+
 interface UseDashboardOptions {
 	/** Derived title to assign to contacts without a title when creating a campaign */
 	derivedTitle?: string;
@@ -303,7 +306,8 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 		isLoading: isLoadingRawContacts,
 		error,
 		isRefetching: isRefetchingRawContacts,
-		isError,
+		isError: isRawContactsError,
+		isLoadingError: isRawContactsLoadingError,
 	} = useGetContacts({
 		filters: {
 			query: activeSearchQuery,
@@ -330,6 +334,11 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 		() => (isCuratedSearchActive ? curatedContacts ?? [] : rawContacts),
 		[isCuratedSearchActive, curatedContacts, rawContacts]
 	);
+	const hasRawContacts = Array.isArray(rawContacts) && rawContacts.length > 0;
+	const shouldSurfaceContactSearchError =
+		!isCuratedSearchActive &&
+		isRawContactsError &&
+		(isRawContactsLoadingError || !hasRawContacts || !isTimeoutError(error));
 
 	const {
 		mutateAsync: runCuratedSearch,
@@ -416,7 +425,7 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 	}, [hasSearched, activeSearchQuery, form]);
 
 	useEffect(() => {
-		if (isError && error && hasSearched && activeSearchQuery) {
+		if (shouldSurfaceContactSearchError && error && hasSearched && activeSearchQuery) {
 			console.error('Contact search error details:', {
 				error,
 				message: error instanceof Error ? error.message : 'Unknown error',
@@ -426,9 +435,9 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 					limit,
 				},
 			});
-			if (error instanceof Error && error.message.includes('timeout')) {
+			if (isTimeoutError(error)) {
 				toast.error(
-					'Search timed out after 25 seconds. Please try a more specific search query.'
+					'Search took too long to complete. Existing results were kept where possible; try a more specific query.'
 				);
 			} else if (error instanceof Error) {
 				toast.error(`Search failed: ${error.message}`);
@@ -436,7 +445,14 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 				toast.error('Failed to load contacts. Please try again.');
 			}
 		}
-	}, [isError, error, hasSearched, activeSearchQuery, activeExcludeUsedContacts, limit]);
+	}, [
+		shouldSurfaceContactSearchError,
+		error,
+		hasSearched,
+		activeSearchQuery,
+		activeExcludeUsedContacts,
+		limit,
+	]);
 
 	const { mutateAsync: createContactList, isPending: isPendingCreateContactList } =
 		useCreateUserContactList({
@@ -518,6 +534,14 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 			const myGeneration = ++searchGenerationRef.current;
 			const controller = new AbortController();
 			curatedAbortRef.current = controller;
+			const previousSearchState = {
+				activeSearchQuery,
+				curatedContacts,
+				hasSearched,
+				isCuratedSearchActive,
+				lastCuratedArgs,
+				lastFreeTextArgs,
+			};
 
 			setIsSearchPending(true);
 			setPendingFreeTextQuery(null);
@@ -529,7 +553,6 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 			// clear the free-text snapshot so the URL-mirror doesn't keep tagging the URL with
 			// `ft=1` while we're showing curated picks.
 			setLastFreeTextArgs(null);
-			clearFreeTextSessionStorage();
 			// Capture the exact args we ran with so we can replay this curated search after a
 			// browser refresh (the URL-mirror in dashboard/page.tsx serializes these).
 			const capturedArgs: CuratedSearchArgs = {
@@ -557,6 +580,7 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 				const where = result.city ?? result.region ?? overrides?.state ?? 'your area';
 				const query = `Curated picks near ${where}`;
 				setActiveSearchQuery(query);
+				clearFreeTextSessionStorage();
 				// Snapshot the *exact* contacts we just rendered so a refresh on the same args
 				// restores the same shuffle instead of drawing a new one. The URL persists what
 				// search we ran; sessionStorage persists the result of that run.
@@ -578,14 +602,19 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 					throw err;
 				}
 				toast.error(
-					err instanceof Error ? err.message : 'Failed to load curated picks'
+					isTimeoutError(err)
+						? 'Curated search took too long. Existing results were kept.'
+						: err instanceof Error
+						? err.message
+						: 'Failed to load curated picks'
 				);
 				if (myGeneration === searchGenerationRef.current) {
-					setIsCuratedSearchActive(false);
-					setCuratedContacts(null);
-					setLastCuratedArgs(null);
-					clearCuratedSessionStorage();
-					setHasSearched(false);
+					setActiveSearchQuery(previousSearchState.activeSearchQuery);
+					setCuratedContacts(previousSearchState.curatedContacts);
+					setHasSearched(previousSearchState.hasSearched);
+					setIsCuratedSearchActive(previousSearchState.isCuratedSearchActive);
+					setLastCuratedArgs(previousSearchState.lastCuratedArgs);
+					setLastFreeTextArgs(previousSearchState.lastFreeTextArgs);
 				}
 				throw err;
 			} finally {
@@ -597,7 +626,16 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 				}
 			}
 		},
-		[cancelInFlightSearches, runCuratedSearch]
+		[
+			activeSearchQuery,
+			cancelInFlightSearches,
+			curatedContacts,
+			hasSearched,
+			isCuratedSearchActive,
+			lastCuratedArgs,
+			lastFreeTextArgs,
+			runCuratedSearch,
+		]
 	);
 
 	const primeFreeTextSearch = useCallback((rawQuery: string) => {
@@ -608,17 +646,13 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 		setPendingFreeTextQuery(q);
 		setMapBboxFilter(null);
 		setIsCuratedSearchActive(true);
-		setCuratedContacts(null);
 		setHasSearched(true);
 		setIsMapView(true);
 		setLastCuratedArgs(null);
-		clearCuratedSessionStorage();
-		// Stale free-text caches from a *different* prior query would falsely match a refresh
-		// targeting this run before the awaited result writes the new payload. Drop both the
-		// in-memory args and the storage entry now; `triggerFreeTextSearch` will rewrite both
-		// once the API call resolves.
+		// Drop in-memory args while pending so URL mirroring does not label stale
+		// results as current. Keep contacts and sessionStorage until resolution so
+		// a timeout cannot blank the map.
 		setLastFreeTextArgs(null);
-		clearFreeTextSessionStorage();
 		setActiveSearchQuery(q);
 	}, []);
 
@@ -639,6 +673,14 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 			const myGeneration = ++searchGenerationRef.current;
 			const controller = new AbortController();
 			freeTextAbortRef.current = controller;
+			const previousSearchState = {
+				activeSearchQuery,
+				curatedContacts,
+				hasSearched,
+				isCuratedSearchActive,
+				lastCuratedArgs,
+				lastFreeTextArgs,
+			};
 
 			primeFreeTextSearch(q);
 			const capturedArgs: FreeTextSearchArgs = {
@@ -670,6 +712,7 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 				});
 				setCuratedContacts(decoratedContacts);
 				setLastFreeTextArgs(capturedArgs);
+				clearCuratedSessionStorage();
 				// Snapshot the *exact* contacts we just rendered (with their curatedCategory
 				// decoration intact) so a refresh on the same query restores the same list and
 				// the map's stable curated marker path stays in effect. Without this snapshot,
@@ -691,13 +734,20 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 				if (isAbort) {
 					throw err;
 				}
-				toast.error(err instanceof Error ? err.message : 'Failed to run search');
+				toast.error(
+					isTimeoutError(err)
+						? 'Search took too long to complete. Existing results were kept.'
+						: err instanceof Error
+						? err.message
+						: 'Failed to run search'
+				);
 				if (myGeneration === searchGenerationRef.current) {
-					setIsCuratedSearchActive(false);
-					setCuratedContacts(null);
-					setLastFreeTextArgs(null);
-					clearFreeTextSessionStorage();
-					setHasSearched(false);
+					setActiveSearchQuery(previousSearchState.activeSearchQuery);
+					setCuratedContacts(previousSearchState.curatedContacts);
+					setHasSearched(previousSearchState.hasSearched);
+					setIsCuratedSearchActive(previousSearchState.isCuratedSearchActive);
+					setLastCuratedArgs(previousSearchState.lastCuratedArgs);
+					setLastFreeTextArgs(previousSearchState.lastFreeTextArgs);
 				}
 				throw err;
 			} finally {
@@ -710,7 +760,17 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 				}
 			}
 		},
-		[cancelInFlightSearches, primeFreeTextSearch, runFreeTextSearch]
+		[
+			activeSearchQuery,
+			cancelInFlightSearches,
+			curatedContacts,
+			hasSearched,
+			isCuratedSearchActive,
+			lastCuratedArgs,
+			lastFreeTextArgs,
+			primeFreeTextSearch,
+			runFreeTextSearch,
+		]
 	);
 
 	// Restore a curated session from sessionStorage if the cache key matches the requested
@@ -1322,8 +1382,8 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 		contacts,
 		isPendingContacts,
 		isLoadingContacts,
-		error,
-		isError,
+		error: shouldSurfaceContactSearchError ? error : null,
+		isError: shouldSurfaceContactSearchError,
 		handleImportApolloContacts,
 		setSelectedContactListRows,
 		handleCreateCampaign,

@@ -31,6 +31,37 @@ const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(ma
 
 const DEFAULT_LIMIT = 1200;
 const MAX_LIMIT = 2000;
+const MAP_OVERLAY_QUERY_TIMEOUT_MS = 18000;
+
+const withOverlayBudgetFallback = async <T,>(
+	operation: () => Promise<T>,
+	fallbackValue: T,
+	label: string
+): Promise<T> => {
+	let timeoutId: ReturnType<typeof setTimeout> | null = null;
+	let timedOut = false;
+
+	try {
+		const timeoutPromise = new Promise<T>((resolve) => {
+			timeoutId = setTimeout(() => {
+				timedOut = true;
+				resolve(fallbackValue);
+			}, MAP_OVERLAY_QUERY_TIMEOUT_MS);
+		});
+		const result = await Promise.race([operation(), timeoutPromise]);
+		if (timedOut) {
+			console.warn(
+				`[contacts-map-overlay] ${label} exceeded ${MAP_OVERLAY_QUERY_TIMEOUT_MS}ms; returning fallback response`
+			);
+		}
+		return result;
+	} catch (error) {
+		console.warn(`[contacts-map-overlay] ${label} failed; returning fallback response`, error);
+		return fallbackValue;
+	} finally {
+		if (timeoutId) clearTimeout(timeoutId);
+	}
+};
 
 // Guard rails: prevent accidentally querying an entire region at once.
 // Booking overlays are denser than promotion overlays, but we still want pins to be visible
@@ -140,11 +171,16 @@ export async function GET(req: NextRequest) {
 			};
 		}
 
-		const contacts = await prisma.contact.findMany({
-			where,
-			take,
-			orderBy: [{ id: 'asc' }],
-		});
+		const contacts = await withOverlayBudgetFallback(
+			() =>
+				prisma.contact.findMany({
+					where,
+					take,
+					orderBy: [{ id: 'asc' }],
+				}),
+			[],
+			`${mode} overlay query`
+		);
 
 		return apiResponse(contacts);
 	} catch (error) {

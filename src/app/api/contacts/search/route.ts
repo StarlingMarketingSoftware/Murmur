@@ -60,6 +60,10 @@ const NATIONAL_FALLBACK_LITERAL_MATCH_FLOOR = 1;
 const NATIONAL_FALLBACK_LIMIT_CAP = 18;
 const NATIONAL_FALLBACK_LEXICAL_TIMEOUT_MS = 6000;
 const NATIONAL_FALLBACK_PREFIX_TIMEOUT_MS = 6000;
+const SEARCH_ROUTE_SOFT_BUDGET_MS = 52000;
+const SEARCH_ROUTE_SAFETY_MARGIN_MS = 3000;
+const SEARCH_ROUTE_PATH_TIMEOUT_MS = 45000;
+const SEARCH_ROUTE_PRISMA_TIMEOUT_MS = 8000;
 
 const createRequestId = (): string => Math.random().toString(36).slice(2, 8);
 
@@ -67,6 +71,59 @@ const parseFloatOrNull = (value: string | null): number | null => {
 	if (!value) return null;
 	const n = Number(value);
 	return Number.isFinite(n) ? n : null;
+};
+
+const getSearchRouteRemainingMs = (startedAtMs: number): number =>
+	Math.max(0, SEARCH_ROUTE_SOFT_BUDGET_MS - (Date.now() - startedAtMs));
+
+const getSearchRouteTimeoutMs = (startedAtMs: number, maxTimeoutMs: number): number =>
+	Math.max(
+		0,
+		Math.min(maxTimeoutMs, getSearchRouteRemainingMs(startedAtMs) - SEARCH_ROUTE_SAFETY_MARGIN_MS)
+	);
+
+const withBudgetFallback = async <T,>(
+	operation: () => Promise<T>,
+	options: {
+		timeoutMs: number;
+		fallback: T;
+		tag: string;
+		requestId: string;
+	}
+): Promise<T> => {
+	if (options.timeoutMs <= 0) {
+		console.warn(
+			`[contacts-search][${options.requestId}] ${options.tag} skipped because route budget is exhausted`
+		);
+		return options.fallback;
+	}
+
+	let timeoutId: ReturnType<typeof setTimeout> | null = null;
+	let timedOut = false;
+
+	try {
+		const timeoutPromise = new Promise<T>((resolve) => {
+			timeoutId = setTimeout(() => {
+				timedOut = true;
+				resolve(options.fallback);
+			}, options.timeoutMs);
+		});
+		const result = await Promise.race([operation(), timeoutPromise]);
+		if (timedOut) {
+			console.warn(
+				`[contacts-search][${options.requestId}] ${options.tag} exceeded ${options.timeoutMs}ms; returning fallback response`
+			);
+		}
+		return result;
+	} catch (err) {
+		console.warn(
+			`[contacts-search][${options.requestId}] ${options.tag} failed; returning fallback response`,
+			err
+		);
+		return options.fallback;
+	} finally {
+		if (timeoutId) clearTimeout(timeoutId);
+	}
 };
 
 const withTimeout = async <T,>(
@@ -1232,6 +1289,15 @@ export async function GET(req: NextRequest) {
 		// without hard-filtering — anything beyond the radius can still surface,
 		// just with a smaller locality multiplier.
 		const radiusKm = overrideRadiusKm ?? (parsed.hadExplicitPlace ? 250 : DEFAULT_LOCALITY_RADIUS_KM);
+		const emptyResponse = (
+			retrieverBreakdown: Record<string, number>
+		): FreeTextSearchResponse =>
+			emptyFreeTextSearchResponse({
+				rawQuery,
+				parsed,
+				centerPoint,
+				retrieverBreakdown,
+			});
 
 		// Strict state enforcement. When the user explicitly names a state
 		// (directly via "in arkansas" or transitively via a city in our dictionary
@@ -1295,14 +1361,26 @@ export async function GET(req: NextRequest) {
 
 		const localBusinessIntent = resolveLocalBusinessIntent(parsed.restOfQuery);
 		if (localBusinessIntent) {
-			const localBusinessResponse = await runLocalBusinessSearch({
-				rawQuery,
-				parsed,
-				intent: localBusinessIntent,
-				centerPoint,
-				radiusKm,
-				requestedLimit,
-			});
+			const localBusinessResponse = await withBudgetFallback(
+				() =>
+					runLocalBusinessSearch({
+						rawQuery,
+						parsed,
+						intent: localBusinessIntent,
+						centerPoint,
+						radiusKm,
+						requestedLimit,
+					}),
+				{
+					timeoutMs: getSearchRouteTimeoutMs(
+						requestStartedAt,
+						SEARCH_ROUTE_PATH_TIMEOUT_MS
+					),
+					fallback: emptyResponse({ localBusiness: 0, timedOut: 1 }),
+					tag: 'local-business path',
+					requestId,
+				}
+			);
 			console.info(
 				`[contacts-search][${requestId}] local-business path intent=${localBusinessIntent.key} returned=${localBusinessResponse.contacts.length} candidates=${localBusinessResponse.retrieverBreakdown.localBusiness ?? 0} clean=${localBusinessResponse.retrieverBreakdown.localBusinessClean ?? 0} missingLocalityAnchor=${localBusinessResponse.retrieverBreakdown.missingLocalityAnchor ?? 0} totalMs=${Date.now() - requestStartedAt}`
 			);
@@ -1319,17 +1397,29 @@ export async function GET(req: NextRequest) {
 				? { lat: parsed.city.lat, lon: parsed.city.lon }
 				: { lat: parsed.state!.lat, lon: parsed.state!.lon };
 			const placeRadiusKm = overrideRadiusKm ?? DEFAULT_LOCALITY_RADIUS_KM;
-			const placeResponse = await runPlaceOnlyCuratedSearch({
-				rawQuery,
-				parsed,
-				centerPoint: placeCenter,
-				radiusKm: placeRadiusKm,
-				requestedLimit,
-				enforcedState: parsed.state
-					? { name: parsed.state.name, abbr: parsed.state.abbr }
-					: null,
-				logTag: `[contacts-search][${requestId}][place-only]`,
-			});
+			const placeResponse = await withBudgetFallback(
+				() =>
+					runPlaceOnlyCuratedSearch({
+						rawQuery,
+						parsed,
+						centerPoint: placeCenter,
+						radiusKm: placeRadiusKm,
+						requestedLimit,
+						enforcedState: parsed.state
+							? { name: parsed.state.name, abbr: parsed.state.abbr }
+							: null,
+						logTag: `[contacts-search][${requestId}][place-only]`,
+					}),
+				{
+					timeoutMs: getSearchRouteTimeoutMs(
+						requestStartedAt,
+						SEARCH_ROUTE_PATH_TIMEOUT_MS
+					),
+					fallback: emptyResponse({ curatedNearby: 0, timedOut: 1 }),
+					tag: 'place-only curated path',
+					requestId,
+				}
+			);
 			console.info(
 				`[contacts-search][${requestId}] place-only path place=${
 					parsed.city?.name ?? parsed.state?.name ?? 'unknown'
@@ -1344,13 +1434,25 @@ export async function GET(req: NextRequest) {
 			parsed.categories.length > 0 &&
 			isVagueCategoryRest(parsed.restOfQuery)
 		) {
-			const curatedCategoryResponse = await runCuratedCategorySearch({
-				rawQuery,
-				parsed,
-				centerPoint,
-				radiusKm,
-				requestedLimit,
-			});
+			const curatedCategoryResponse = await withBudgetFallback(
+				() =>
+					runCuratedCategorySearch({
+						rawQuery,
+						parsed,
+						centerPoint,
+						radiusKm,
+						requestedLimit,
+					}),
+				{
+					timeoutMs: getSearchRouteTimeoutMs(
+						requestStartedAt,
+						SEARCH_ROUTE_PATH_TIMEOUT_MS
+					),
+					fallback: emptyResponse({ curatedLocal: 0, timedOut: 1 }),
+					tag: 'curated-local category path',
+					requestId,
+				}
+			);
 			console.info(
 				`[contacts-search][${requestId}] curated-local category path returned=${curatedCategoryResponse.contacts.length} candidates=${curatedCategoryResponse.retrieverBreakdown.curatedLocal ?? 0} missingLocalityAnchor=${curatedCategoryResponse.retrieverBreakdown.missingLocalityAnchor ?? 0} totalMs=${Date.now() - requestStartedAt}`
 			);
@@ -1502,9 +1604,21 @@ export async function GET(req: NextRequest) {
 			.sort((a, b) => (rrfScores.get(b) ?? 0) - (rrfScores.get(a) ?? 0))
 			.slice(0, HYDRATE_CAP);
 
-		const hydrated = await prisma.contact.findMany({
-			where: { id: { in: topIdsForHydration } },
-		});
+		const hydrated = await withBudgetFallback(
+			() =>
+				prisma.contact.findMany({
+					where: { id: { in: topIdsForHydration } },
+				}),
+			{
+				timeoutMs: getSearchRouteTimeoutMs(
+					requestStartedAt,
+					SEARCH_ROUTE_PRISMA_TIMEOUT_MS
+				),
+				fallback: [],
+				tag: 'stage1 Prisma hydration',
+				requestId,
+			}
+		);
 		// `byIdAll` is the unfiltered master map — Stage 2 (national fallback)
 		// reuses it so the implicit-locality drop doesn't leak across stages.
 		// Stage 1 derives `byIdStage1` and applies the locality + state safety
@@ -1603,6 +1717,17 @@ export async function GET(req: NextRequest) {
 		// geo and re-score with locality neutralized.
 		const sparseTrigger: 'countLow' | 'literalLow' | 'both' | null = (() => {
 			if (!useImplicitLocality) return null;
+			if (
+				getSearchRouteTimeoutMs(
+					requestStartedAt,
+					NATIONAL_FALLBACK_LEXICAL_TIMEOUT_MS
+				) <= 0
+			) {
+				console.warn(
+					`[contacts-search][${requestId}] skipping national fallback because route budget is exhausted`
+				);
+				return null;
+			}
 			const countLow =
 				stage1.finalContacts.length < NATIONAL_FALLBACK_SPARSE_THRESHOLD;
 			const literalLow =
@@ -1689,9 +1814,21 @@ export async function GET(req: NextRequest) {
 				(id) => !byIdAll.has(id)
 			);
 			if (newIdsToHydrate.length > 0) {
-				const hydratedNew = await prisma.contact.findMany({
-					where: { id: { in: newIdsToHydrate } },
-				});
+				const hydratedNew = await withBudgetFallback(
+					() =>
+						prisma.contact.findMany({
+							where: { id: { in: newIdsToHydrate } },
+						}),
+					{
+						timeoutMs: getSearchRouteTimeoutMs(
+							requestStartedAt,
+							SEARCH_ROUTE_PRISMA_TIMEOUT_MS
+						),
+						fallback: [],
+						tag: 'national-fallback Prisma hydration',
+						requestId,
+					}
+				);
 				for (const c of hydratedNew) byIdAll.set(c.id, c);
 				stage2HydratedNew = hydratedNew.length;
 			}
