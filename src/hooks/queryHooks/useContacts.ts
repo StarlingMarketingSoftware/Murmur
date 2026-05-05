@@ -30,9 +30,13 @@ export const useGetContacts = (options: ContactQueryOptions) => {
 		queryKey: [...QUERY_KEYS.list(), options.filters],
 		queryFn: async ({ signal }) => {
 			const url = appendQueryParamsToUrl(urls.api.contacts.index, options.filters);
+			// 40s ceiling: the server can spend up to 25s on a Gemini post-training
+			// call and another ~14s on vector search before any fallback runs.
+			// Match the worst case so we don't surface a "timeout" toast right when
+			// the server is about to succeed.
 			const response = await _fetch(url, undefined, undefined, {
 				signal,
-				timeout: 25000,
+				timeout: 40000,
 			});
 
 			if (!response.ok) {
@@ -467,6 +471,10 @@ export interface CuratedSearchVariables {
 	category?: string | null;
 	state?: string | null;
 	limit?: number;
+	// Caller-supplied signal: lets the dashboard cancel an in-flight curated
+	// search when the user fires another one. Without this, rapid-fire searches
+	// stack on the server and contend on ES, making everything slow.
+	signal?: AbortSignal;
 }
 
 export const useCuratedContactsSearch = (options: CustomMutationOptions = {}) => {
@@ -491,7 +499,13 @@ export const useCuratedContactsSearch = (options: CustomMutationOptions = {}) =>
 				urls.api.contacts.curatedSearch.index,
 				params
 			);
-			const response = await _fetch(url, undefined, undefined, { timeout: 25000 });
+			// 40s ceiling — see comment on useGetContacts. Matches the route's
+			// worst-case Gemini + ES budget so a slow-but-succeeding response
+			// doesn't get cut off and toasted as a fake timeout.
+			const response = await _fetch(url, undefined, undefined, {
+				timeout: 40000,
+				signal: vars.signal,
+			});
 			if (!response.ok) {
 				let errorMessage = 'Failed to fetch curated picks';
 				try {
@@ -545,6 +559,8 @@ export interface FreeTextSearchVariables {
 	lon?: number | null;
 	radiusKm?: number | null;
 	limit?: number;
+	// Caller-supplied signal: see CuratedSearchVariables.signal.
+	signal?: AbortSignal;
 }
 
 export const useFreeTextContactsSearch = (options: CustomMutationOptions = {}) => {
@@ -564,7 +580,11 @@ export const useFreeTextContactsSearch = (options: CustomMutationOptions = {}) =
 			}
 			if (typeof vars.limit === 'number') params.limit = String(vars.limit);
 			const url = appendQueryParamsToUrl(urls.api.contacts.search.index, params);
-			const response = await _fetch(url, undefined, undefined, { timeout: 25000 });
+			// 40s ceiling — see comment on useGetContacts.
+			const response = await _fetch(url, undefined, undefined, {
+				timeout: 40000,
+				signal: vars.signal,
+			});
 			if (!response.ok) {
 				let errorMessage = 'Failed to run search';
 				try {

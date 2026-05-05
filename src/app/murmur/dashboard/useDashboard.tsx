@@ -5,7 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { EmailVerificationStatus } from '@/constants/prismaEnums';
 import type { UserContactList } from '@prisma/client';
-import { useEffect, useState, useMemo, useCallback } from 'react';
+import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { useCreateCampaign } from '@/hooks/queryHooks/useCampaigns';
 import { urls } from '@/constants/urls';
 import {
@@ -341,6 +341,33 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 		isPending: isPendingFreeTextSearch,
 	} = useFreeTextContactsSearch({ suppressToasts: true });
 
+	// Cancel-the-previous-search machinery. Curated and free-text are mutually
+	// exclusive flavors of "the search that's currently painting the map," so a
+	// new run of *either* must abort *both* in-flight controllers — otherwise an
+	// older curated request can complete after a newer free-text one and clobber
+	// the rendered results.
+	//
+	// `searchGenerationRef` is belt + suspenders: even if an abort doesn't fully
+	// short-circuit (e.g. response already buffered), we compare the generation
+	// captured at call-time against the latest one and silently drop stale data.
+	const curatedAbortRef = useRef<AbortController | null>(null);
+	const freeTextAbortRef = useRef<AbortController | null>(null);
+	const searchGenerationRef = useRef(0);
+
+	const cancelInFlightSearches = useCallback(() => {
+		curatedAbortRef.current?.abort();
+		curatedAbortRef.current = null;
+		freeTextAbortRef.current?.abort();
+		freeTextAbortRef.current = null;
+	}, []);
+
+	useEffect(() => {
+		return () => {
+			curatedAbortRef.current?.abort();
+			freeTextAbortRef.current?.abort();
+		};
+	}, []);
+
 	const isLoadingContacts = isCuratedSearchActive
 		? isPendingCuratedSearch || isPendingFreeTextSearch || pendingFreeTextQuery !== null
 		: isLoadingRawContacts;
@@ -485,6 +512,13 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 			category?: string | null;
 			state?: string | null;
 		}) => {
+			// Cancel any prior in-flight search (curated *or* free-text). They share
+			// the same on-screen state, so a stale completion would clobber us.
+			cancelInFlightSearches();
+			const myGeneration = ++searchGenerationRef.current;
+			const controller = new AbortController();
+			curatedAbortRef.current = controller;
+
 			setIsSearchPending(true);
 			setPendingFreeTextQuery(null);
 			setMapBboxFilter(null);
@@ -514,7 +548,11 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 					category: overrides?.category ?? undefined,
 					state: overrides?.state ?? undefined,
 					limit: 50,
+					signal: controller.signal,
 				});
+				// A newer search has started since we kicked off — drop this result on
+				// the floor so we don't overwrite whatever the newer call rendered.
+				if (myGeneration !== searchGenerationRef.current) return result;
 				setCuratedContacts(result.contacts);
 				const where = result.city ?? result.region ?? overrides?.state ?? 'your area';
 				const query = `Curated picks near ${where}`;
@@ -531,20 +569,35 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 				});
 				return result;
 			} catch (err) {
+				const isAbort =
+					controller.signal.aborted ||
+					(err instanceof Error && err.name === 'AbortError');
+				if (isAbort) {
+					// User-initiated cancel (newer search took over). Don't toast and
+					// don't reset state — the newer search is already managing it.
+					throw err;
+				}
 				toast.error(
 					err instanceof Error ? err.message : 'Failed to load curated picks'
 				);
-				setIsCuratedSearchActive(false);
-				setCuratedContacts(null);
-				setLastCuratedArgs(null);
-				clearCuratedSessionStorage();
-				setHasSearched(false);
+				if (myGeneration === searchGenerationRef.current) {
+					setIsCuratedSearchActive(false);
+					setCuratedContacts(null);
+					setLastCuratedArgs(null);
+					clearCuratedSessionStorage();
+					setHasSearched(false);
+				}
 				throw err;
 			} finally {
-				setIsSearchPending(false);
+				if (curatedAbortRef.current === controller) {
+					curatedAbortRef.current = null;
+				}
+				if (myGeneration === searchGenerationRef.current) {
+					setIsSearchPending(false);
+				}
 			}
 		},
-		[runCuratedSearch]
+		[cancelInFlightSearches, runCuratedSearch]
 	);
 
 	const primeFreeTextSearch = useCallback((rawQuery: string) => {
@@ -580,6 +633,13 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 		async (rawQuery: string, overrides?: { lat?: number | null; lon?: number | null; radiusKm?: number | null }) => {
 			const q = rawQuery.trim();
 			if (!q) return;
+			// Cancel any prior in-flight search (curated *or* free-text). They share
+			// the same on-screen state, so a stale completion would clobber us.
+			cancelInFlightSearches();
+			const myGeneration = ++searchGenerationRef.current;
+			const controller = new AbortController();
+			freeTextAbortRef.current = controller;
+
 			primeFreeTextSearch(q);
 			const capturedArgs: FreeTextSearchArgs = {
 				q,
@@ -594,7 +654,9 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 					lon: overrides?.lon ?? undefined,
 					radiusKm: overrides?.radiusKm ?? undefined,
 					limit: 50,
+					signal: controller.signal,
 				});
+				if (myGeneration !== searchGenerationRef.current) return result;
 				// SearchResultsMap gates its blob/orb UI on `Boolean(curatedCategory)`. Free-text
 				// results don't carry one, so without this decoration they'd render as plain dots
 				// instead of the curated cluster visual. Prefer the per-contact category match,
@@ -623,19 +685,32 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 				});
 				return result;
 			} catch (err) {
+				const isAbort =
+					controller.signal.aborted ||
+					(err instanceof Error && err.name === 'AbortError');
+				if (isAbort) {
+					throw err;
+				}
 				toast.error(err instanceof Error ? err.message : 'Failed to run search');
-				setIsCuratedSearchActive(false);
-				setCuratedContacts(null);
-				setLastFreeTextArgs(null);
-				clearFreeTextSessionStorage();
-				setHasSearched(false);
+				if (myGeneration === searchGenerationRef.current) {
+					setIsCuratedSearchActive(false);
+					setCuratedContacts(null);
+					setLastFreeTextArgs(null);
+					clearFreeTextSessionStorage();
+					setHasSearched(false);
+				}
 				throw err;
 			} finally {
-				setPendingFreeTextQuery(null);
-				setIsSearchPending(false);
+				if (freeTextAbortRef.current === controller) {
+					freeTextAbortRef.current = null;
+				}
+				if (myGeneration === searchGenerationRef.current) {
+					setPendingFreeTextQuery(null);
+					setIsSearchPending(false);
+				}
 			}
 		},
-		[primeFreeTextSearch, runFreeTextSearch]
+		[cancelInFlightSearches, primeFreeTextSearch, runFreeTextSearch]
 	);
 
 	// Restore a curated session from sessionStorage if the cache key matches the requested

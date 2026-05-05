@@ -118,6 +118,8 @@ const getContactCategoryDisplaySource = (
 const isCuratedPicksSearchQuery = (query: string): boolean =>
 	/^curated picks near\b/i.test(query.trim());
 
+const DEFAULT_CATEGORY_SEARCH_WHAT = 'Wine, Beer, and Spirits';
+
 const CURATED_URL_PARAM_KEYS = ['pick', 'state', 'cat', 'lat', 'lon', 'r'] as const;
 // Distinct from CURATED_URL_PARAM_KEYS so a refresh from a free-text run can't be mistaken
 // for a curated rehydration (which would replay /api/contacts/curated-search instead of
@@ -551,6 +553,7 @@ const MAP_RESULTS_BOTTOM_SEARCH_FOLLOWUP_ICON_LAYOUT = {
 } as const;
 
 type MapBottomSearchFollowupSelection = 'for-you' | 'category' | null;
+type MapBottomSearchFollowupPreview = MapBottomSearchFollowupSelection | 'anything';
 
 type MapBottomSearchAdvancedSelections = {
 	profile: boolean;
@@ -1053,12 +1056,12 @@ const getCategorySearchWhyForWhat = (what: string) =>
 
 type MapBottomSearchFollowupBoxProps = {
 	selectedSearchFollowup: MapBottomSearchFollowupSelection;
-	previewedSearchFollowup: MapBottomSearchFollowupSelection;
+	previewedSearchFollowup: MapBottomSearchFollowupPreview;
 	onSelectedSearchFollowupChange: (
 		selection: MapBottomSearchFollowupSelection
 	) => void;
 	onPreviewSearchFollowupChange: (
-		selection: MapBottomSearchFollowupSelection
+		selection: MapBottomSearchFollowupPreview
 	) => void;
 	onForYouSubmit: () => void | Promise<void>;
 };
@@ -1082,11 +1085,15 @@ const MapBottomSearchFollowupBox = memo(({
 			keyword: false,
 			radius: false,
 		});
-	const visualSearchFollowup = previewedSearchFollowup ?? selectedSearchFollowup;
+	const visualSearchFollowup =
+		previewedSearchFollowup === 'anything'
+			? null
+			: previewedSearchFollowup ?? selectedSearchFollowup;
 	const isForYouSelected = selectedSearchFollowup === 'for-you';
 	const isCategorySelected = selectedSearchFollowup === 'category';
 	const isForYouActive = visualSearchFollowup === 'for-you';
 	const isCategoryActive = visualSearchFollowup === 'category';
+	const isAdvancedActive = previewedSearchFollowup === 'anything';
 	const isCompactFollowup = isForYouSelected || isCategorySelected;
 	const isProfileAdvancedSelected = advancedSelections.profile;
 	const isKeywordAdvancedSelected = advancedSelections.keyword;
@@ -1199,6 +1206,7 @@ const MapBottomSearchFollowupBox = memo(({
 				<button
 					type="button"
 					aria-label="Open Advanced options"
+					aria-pressed={isAdvancedActive}
 					className="absolute flex items-center justify-center"
 					style={{
 						left: `${
@@ -1211,21 +1219,25 @@ const MapBottomSearchFollowupBox = memo(({
 						height: `${leftTileBox.size}px`,
 						transform: 'translateY(-50%)',
 						borderRadius: `${leftTileBox.borderRadius}px`,
-						backgroundColor: leftTileBox.advancedCompactBackgroundColor,
+						backgroundColor: isAdvancedActive
+							? segmentBox.advancedBackgroundColor
+							: leftTileBox.advancedCompactBackgroundColor,
 						boxSizing: 'border-box',
-						border: 0,
+						border: `${leftTileBox.selectedBorderWidth}px solid ${
+							isAdvancedActive ? leftTileBox.selectedBorderColor : 'transparent'
+						}`,
 						padding: 0,
 						cursor: 'pointer',
 					}}
-					onMouseEnter={() => onPreviewSearchFollowupChange(null)}
-					onFocus={() => onPreviewSearchFollowupChange(null)}
+					onMouseEnter={() => onPreviewSearchFollowupChange('anything')}
+					onFocus={() => onPreviewSearchFollowupChange('anything')}
 					onClick={() => onSelectedSearchFollowupChange(null)}
 				>
 					<MapBottomSearchAdvancedIcon
 						aria-hidden="true"
-						textColor="#8D8D8D"
-						iconColor="#CA7171"
-						lensFill="transparent"
+						textColor={isAdvancedActive ? '#000000' : '#8D8D8D'}
+						iconColor={isAdvancedActive ? '#000000' : '#CA7171'}
+						lensFill={isAdvancedActive ? '#FFFFFF' : 'transparent'}
 						style={{
 							display: 'block',
 							width: `${iconLayout.advanced.width}px`,
@@ -1239,7 +1251,7 @@ const MapBottomSearchFollowupBox = memo(({
 					role="group"
 					aria-label="Advanced filter options"
 					className="absolute"
-					onMouseEnter={() => onPreviewSearchFollowupChange(null)}
+					onMouseEnter={() => onPreviewSearchFollowupChange('anything')}
 					style={{
 						right: `${segmentBox.rightOffset}px`,
 						top: '50%',
@@ -1486,7 +1498,7 @@ const DashboardContent = () => {
 	const fromHomeParam = searchParams.get('fromHome') === 'true';
 	const FROM_HOME_SEARCH_QUERY = '[Booking] Wine, Beer, and Spirits (California)';
 	const FROM_HOME_WHY = '[Booking]';
-	const FROM_HOME_WHAT = 'Wine, Beer, and Spirits';
+	const FROM_HOME_WHAT = DEFAULT_CATEGORY_SEARCH_WHAT;
 	const FROM_HOME_WHERE = 'California';
 
 	// Placeholder contacts for fromHome loading state - shows fake dots in California
@@ -1685,13 +1697,15 @@ const DashboardContent = () => {
 	const [mapBottomSearchFollowupSelection, setMapBottomSearchFollowupSelection] =
 		useState<MapBottomSearchFollowupSelection>(null);
 	const [mapBottomSearchFollowupPreview, setMapBottomSearchFollowupPreview] =
-		useState<MapBottomSearchFollowupSelection>(null);
+		useState<MapBottomSearchFollowupPreview>(null);
 	const mapBottomSearchFollowupPreviewClearTimeoutRef =
 		useRef<ReturnType<typeof setTimeout> | null>(null);
 	const [isMapBottomCategoryDropdownActive, setIsMapBottomCategoryDropdownActive] =
 		useState(false);
 	const effectiveMapBottomSearchFollowupSelection =
-		mapBottomSearchFollowupPreview ?? mapBottomSearchFollowupSelection;
+		mapBottomSearchFollowupPreview === 'anything'
+			? null
+			: mapBottomSearchFollowupPreview ?? mapBottomSearchFollowupSelection;
 	const isMapBottomForYouMode =
 		effectiveMapBottomSearchFollowupSelection === 'for-you';
 	const isMapBottomCategoryMode =
@@ -2556,13 +2570,17 @@ const DashboardContent = () => {
 			const nextState = (stateName || '').trim();
 			if (!nextState) return;
 
-			const isCurrentCuratedSearch =
+			const isCurrentNonCategorySearch =
 				isCuratedSearchActive || isCuratedPicksSearchQuery(activeSearchQuery);
-			if (isCurrentCuratedSearch) {
-				setWhereValue(nextState);
-				setIsNearMeLocation(false);
-				setActiveSection(null);
-				triggerCuratedSearch({ state: nextState }).catch(() => undefined);
+			if (isCurrentNonCategorySearch) {
+				// State clicks are a category-search affordance. If the current map came
+				// from For You or Search Anything, seed a real category query instead of
+				// replaying the curated endpoint with only a state.
+				const baseWhat = whatValue.trim() || DEFAULT_CATEGORY_SEARCH_WHAT;
+				triggerSearchWithWhere(nextState, false, {
+					why: getCategorySearchWhyForWhat(baseWhat),
+					what: baseWhat,
+				});
 				return;
 			}
 
@@ -2576,111 +2594,11 @@ const DashboardContent = () => {
 			activeSearchQuery,
 			isCuratedSearchActive,
 			isFromHomeDemoMode,
-			triggerCuratedSearch,
 			triggerSearchWithWhere,
 			whatValue,
 			whyValue,
 		]
 	);
-
-	// Best-effort: infer the user's US state **without** prompting for geolocation permission.
-	// This relies on hosting/proxy geolocation headers (e.g. Vercel). In local dev it returns null.
-	const inferredStateNameRef = useRef<string | null>(null);
-	const inferStatePromiseRef = useRef<Promise<string | null> | null>(null);
-	const inferUserUsStateName = useCallback(async (): Promise<string | null> => {
-		// If we've already inferred a state in this session, reuse it.
-		if (inferredStateNameRef.current) return inferredStateNameRef.current;
-
-		// Prefer a persisted value from a prior visit/session.
-		if (typeof window !== 'undefined') {
-			try {
-				const stored = window.localStorage.getItem('murmur_inferred_us_state');
-				const normalized = normalizeUsStateName(stored);
-				if (normalized) {
-					inferredStateNameRef.current = normalized;
-					return normalized;
-				}
-			} catch {
-				// Ignore storage errors
-			}
-		}
-
-		// If another call is already in-flight, await it.
-		if (inferStatePromiseRef.current) return await inferStatePromiseRef.current;
-
-		const run = (async (): Promise<string | null> => {
-			// Attempt 1: internal endpoint (Vercel/proxy geo headers; no browser prompt)
-			try {
-				const controller = new AbortController();
-				const timeout = setTimeout(() => controller.abort(), 650);
-				try {
-					const res = await fetch('/api/geo/state', {
-						method: 'GET',
-						cache: 'no-store',
-						signal: controller.signal,
-					});
-					if (res.ok) {
-						const json = (await res.json()) as { stateName?: unknown };
-						const stateName = typeof json?.stateName === 'string' ? json.stateName.trim() : '';
-						const normalized = normalizeUsStateName(stateName);
-						if (normalized) return normalized;
-					}
-				} finally {
-					clearTimeout(timeout);
-				}
-			} catch {
-				// ignore and fall through
-			}
-
-			// Attempt 2 (fallback): public IP geolocation (still no browser prompt).
-			// This works in local dev too, but depends on the 3rd-party service availability.
-			try {
-				const controller = new AbortController();
-				const timeout = setTimeout(() => controller.abort(), 900);
-				try {
-					const res = await fetch('https://ipapi.co/json/', {
-						method: 'GET',
-						cache: 'no-store',
-						signal: controller.signal,
-					});
-					if (!res.ok) return null;
-					const json = (await res.json()) as {
-						country_code?: unknown;
-						region?: unknown;
-						region_code?: unknown;
-					};
-
-					const country = typeof json.country_code === 'string' ? json.country_code.trim().toUpperCase() : '';
-					if (country && country !== 'US') return null;
-
-					const regionCode =
-						typeof json.region_code === 'string' ? json.region_code.trim().toUpperCase() : '';
-					const regionName = typeof json.region === 'string' ? json.region.trim() : '';
-
-					return normalizeUsStateName(regionCode) ?? normalizeUsStateName(regionName);
-				} finally {
-					clearTimeout(timeout);
-				}
-			} catch {
-				return null;
-			}
-		})();
-
-		inferStatePromiseRef.current = run;
-		const result = await run;
-		inferStatePromiseRef.current = null;
-
-		inferredStateNameRef.current = result;
-		if (result && typeof window !== 'undefined') {
-			try {
-				window.localStorage.setItem('murmur_inferred_us_state', result);
-			} catch {
-				// Ignore storage errors
-			}
-		}
-
-		return result;
-	}, []);
 
 	// If the user submits with missing segments, auto-fill sensible defaults
 	// and (when Where is blank) best-effort infer a US state so the search always runs.
@@ -2704,9 +2622,25 @@ const DashboardContent = () => {
 			setWhatValue(nextWhat);
 		}
 
-		// If Where is empty, try to infer the user's state (no permission prompt).
+		// If Where is empty, try to infer the user's state from coarse IP geolocation
+		// (no permission prompt). `getApproximateLocation` caches in localStorage for
+		// 24h and falls back through ipapi.co → ipwho.is, so this is essentially free
+		// after the first successful resolution.
 		if (!nextWhere) {
-			const inferredWhere = await inferUserUsStateName();
+			let inferredWhere: string | null = null;
+			try {
+				const loc = await Promise.race([
+					getApproximateLocation(),
+					new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000)),
+				]);
+				if (loc) {
+					inferredWhere =
+						normalizeUsStateName(loc.regionCode) ??
+						normalizeUsStateName(loc.region);
+				}
+			} catch {
+				// Non-fatal — falls through to the random-state fallback below.
+			}
 			if (inferredWhere) {
 				nextWhere = inferredWhere;
 				setWhereValue(inferredWhere);
@@ -2740,7 +2674,7 @@ const DashboardContent = () => {
 			shouldValidate: false,
 			shouldDirty: true,
 		});
-	}, [form, hasSearched, inferUserUsStateName, whatValue, whereValue, whyValue]);
+	}, [form, hasSearched, whatValue, whereValue, whyValue]);
 
 	// Free trial CTA for fromHome demo mode
 	const handleStartFreeTrial = useCallback(() => {
@@ -3625,7 +3559,7 @@ const DashboardContent = () => {
 		try {
 			const loc = await Promise.race([
 				getApproximateLocation(),
-				new Promise<null>((resolve) => setTimeout(() => resolve(null), 1200)),
+				new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000)),
 			]);
 			if (loc) {
 				lat = loc.lat;
@@ -3661,7 +3595,7 @@ const DashboardContent = () => {
 	}, []);
 
 	const handleMapBottomSearchFollowupPreviewChange = useCallback(
-		(selection: MapBottomSearchFollowupSelection) => {
+		(selection: MapBottomSearchFollowupPreview) => {
 			cancelMapBottomSearchFollowupPreviewClear();
 			setMapBottomSearchFollowupPreview(selection);
 		},
@@ -3670,11 +3604,16 @@ const DashboardContent = () => {
 
 	const scheduleMapBottomSearchFollowupPreviewClear = useCallback(() => {
 		cancelMapBottomSearchFollowupPreviewClear();
+		if (mapBottomSearchFollowupPreview !== 'for-you') {
+			setMapBottomSearchFollowupPreview(null);
+			return;
+		}
+
 		mapBottomSearchFollowupPreviewClearTimeoutRef.current = setTimeout(() => {
 			setMapBottomSearchFollowupPreview(null);
 			mapBottomSearchFollowupPreviewClearTimeoutRef.current = null;
 		}, 220);
-	}, [cancelMapBottomSearchFollowupPreviewClear]);
+	}, [cancelMapBottomSearchFollowupPreviewClear, mapBottomSearchFollowupPreview]);
 
 	useEffect(() => cancelMapBottomSearchFollowupPreviewClear, [
 		cancelMapBottomSearchFollowupPreviewClear,
