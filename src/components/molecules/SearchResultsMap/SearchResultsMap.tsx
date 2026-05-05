@@ -3961,6 +3961,19 @@ const MARKER_CONSTELLATION_MAX_EDGE_PX = 185;
 const MARKER_CONSTELLATION_FALLBACK_GROUP_PX = 230;
 const MARKER_CONSTELLATION_SPARSE_FALLBACK_MAX_EDGE_PX = 360;
 const MARKER_CONSTELLATION_POINT_CLEARANCE_PX = 9;
+const getMarkerConstellationZoomFadedOpacity = (opacity: any): any => {
+	if (typeof opacity !== 'number') return opacity;
+	if (opacity <= 0) return 0;
+	return [
+		'interpolate',
+		['linear'],
+		['zoom'],
+		CURATED_DOT_FADE_END_ZOOM,
+		0,
+		CURATED_DOT_FADE_START_ZOOM,
+		opacity,
+	];
+};
 
 type MarkerConstellationPoint = {
 	id: number;
@@ -14645,6 +14658,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	// Tracks the last query key that actually played the base-dot wave animation.
 	const baseDotsWaveLastSearchKeyRef = useRef<string>('');
 	const markerConstellationEdgesRef = useRef<MarkerConstellationEdge[]>([]);
+	const markerConstellationContactsByIdRef = useRef<Map<number, ContactWithName>>(
+		new Map()
+	);
 	const markerConstellationNodeIdsRef = useRef<Set<number>>(new Set());
 	const markerConstellationLastSearchKeyRef = useRef<string>((searchQuery ?? '').trim());
 	const markerConstellationComposedSearchKeyRef = useRef<string>('');
@@ -14760,7 +14776,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					(map as any).setPaintProperty(
 						MAPBOX_LAYER_IDS.markerConstellationCore,
 						'line-opacity',
-						coreOpacity
+						getMarkerConstellationZoomFadedOpacity(coreOpacity)
 					);
 				}
 				if (map.getLayer(MAPBOX_LAYER_IDS.markerConstellationGlow)) {
@@ -14772,7 +14788,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					(map as any).setPaintProperty(
 						MAPBOX_LAYER_IDS.markerConstellationGlow,
 						'line-opacity',
-						glowOpacity
+						getMarkerConstellationZoomFadedOpacity(glowOpacity)
 					);
 				}
 			} catch {
@@ -14785,6 +14801,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const clearMarkerConstellation = useCallback(() => {
 		stopMarkerConstellationReveal();
 		markerConstellationEdgesRef.current = [];
+		markerConstellationContactsByIdRef.current = new Map();
 		markerConstellationNodeIdsRef.current = new Set();
 		markerConstellationComposedSearchKeyRef.current = '';
 		markerConstellationRevealDoneRef.current = true;
@@ -14812,21 +14829,25 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	]);
 
 	const writeMarkerConstellationSourceData = useCallback(
-		(contactsForVisibility: ContactWithName[]): void => {
+		(contactsForVisibility?: ContactWithName[]): void => {
 			if (!map || !isMapLoaded) return;
 			const source = map.getSource(MAPBOX_SOURCE_IDS.markerConstellation) as
 				| mapboxgl.GeoJSONSource
 				| undefined;
 			if (!source) return;
 
-			const visibleById = new Map<number, ContactWithName>();
-			for (const contact of contactsForVisibility) visibleById.set(contact.id, contact);
+			const contactsById =
+				contactsForVisibility != null
+					? new Map<number, ContactWithName>(
+							contactsForVisibility.map((contact) => [contact.id, contact])
+					  )
+					: markerConstellationContactsByIdRef.current;
 
 			const features: any[] = [];
 			const dataKeyParts: string[] = [];
 			for (const edge of markerConstellationEdgesRef.current) {
-				const fromContact = visibleById.get(edge.fromId);
-				const toContact = visibleById.get(edge.toId);
+				const fromContact = contactsById.get(edge.fromId);
+				const toContact = contactsById.get(edge.toId);
 				if (!fromContact || !toContact) continue;
 
 				const fromCoords = getContactCoords(fromContact);
@@ -15450,11 +15471,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		disableDotWaveReveal,
 	]);
 
-	// Keep the frozen constellation's rendered line source synced to currently visible endpoints.
+	// Keep the frozen constellation's rendered line source synced after style/coordinate changes.
 	useEffect(() => {
 		if (!map || !isMapLoaded) return;
 		if (!markerConstellationComposedSearchKeyRef.current) return;
-		writeMarkerConstellationSourceData(visibleContacts);
+		writeMarkerConstellationSourceData();
 		if (markerConstellationRevealDoneRef.current) {
 			setMarkerConstellationLineOpacity(
 				markerConstellationEdgesRef.current.length > 0
@@ -15469,12 +15490,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	}, [
 		map,
 		isMapLoaded,
-		visibleContacts,
 		writeMarkerConstellationSourceData,
 		setMarkerConstellationLineOpacity,
 	]);
 
-	// Compose marker constellations once per search from the visible primary result dots.
+	// Compose marker constellations once per result set from the initial visible primary dots.
 	useEffect(() => {
 		if (!map || !isMapLoaded) return;
 
@@ -15496,10 +15516,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		if (loading) {
 			const composedKey = markerConstellationComposedSearchKeyRef.current;
 			const hasComposedForCurrentSearch =
-				composedKey === searchKey || composedKey.startsWith(`${searchKey}|points:`);
+				composedKey === searchKey || composedKey.startsWith(`${searchKey}|results:`);
 			if (!hasComposedForCurrentSearch) {
 				stopMarkerConstellationReveal();
 				markerConstellationEdgesRef.current = [];
+				markerConstellationContactsByIdRef.current = new Map();
 				markerConstellationComposedSearchKeyRef.current = '';
 				markerConstellationLastDataKeyRef.current = '';
 				setMarkerConstellationLineOpacity(0, 0, 0);
@@ -15507,7 +15528,31 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			return;
 		}
 
-		if (visibleContacts.length < 2 || contactsWithCoords.length < 2) return;
+		if (contactsWithCoords.length < 2) return;
+
+		const resultSignature = contactsWithCoords
+			.map((contact) => {
+				const coords = getContactCoords(contact);
+				if (!coords) return null;
+				return `${contact.id}:${contact.curatedCategory ?? ''}:${coords.lng.toFixed(
+					5
+				)}:${coords.lat.toFixed(5)}`;
+			})
+			.filter((part): part is string => part != null)
+			.sort()
+			.join(',');
+		if (!resultSignature) return;
+
+		const resultKey = `${searchKey}|results:${resultSignature}`;
+		if (
+			markerConstellationComposedSearchKeyRef.current.startsWith(
+				`${resultKey}|formation:`
+			)
+		) {
+			return;
+		}
+
+		if (visibleContacts.length < 2) return;
 
 		let isCameraMoving = false;
 		try {
@@ -15560,6 +15605,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			contactsForConstellation.sort((a, b) => a.id - b.id);
 
 			let points: MarkerConstellationPoint[] = [];
+			const contactsByPointId = new Map<number, ContactWithName>();
 			for (const contact of contactsForConstellation) {
 				const coords = getContactCoords(contact);
 				if (!coords) continue;
@@ -15581,6 +15627,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					y: projected.y,
 					groupKey: curatedGroupKey ?? 'fallback:pending',
 				});
+				contactsByPointId.set(contact.id, contact);
 			}
 
 			if (curatedBlobGroupKeyByContactId.size === 0 && points.length >= 2) {
@@ -15594,20 +15641,23 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			const pointsSignature = points
 				.map(
 					(point) =>
-						`${point.id}:${point.groupKey}:${Math.round(point.x)}:${Math.round(point.y)}`
+						`${point.id}:${point.groupKey}:${point.coords.lng.toFixed(
+							5
+						)}:${point.coords.lat.toFixed(5)}`
 				)
 				.join(',');
-			const compositionKey = `${searchKey}|points:${pointsSignature}`;
+			const compositionKey = `${resultKey}|formation:${pointsSignature}`;
 			if (markerConstellationComposedSearchKeyRef.current === compositionKey) return;
 
 			if (points.length < 2) {
 				stopMarkerConstellationReveal();
 				markerConstellationEdgesRef.current = [];
+				markerConstellationContactsByIdRef.current = new Map();
 				markerConstellationComposedSearchKeyRef.current = compositionKey;
 				markerConstellationRevealDoneRef.current = true;
 				markerConstellationLastDataKeyRef.current = '';
 				setMarkerConstellationLineOpacity(0, 0, 0);
-				writeMarkerConstellationSourceData(visibleContacts);
+				writeMarkerConstellationSourceData();
 				return;
 			}
 
@@ -15619,11 +15669,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 			stopMarkerConstellationReveal();
 			markerConstellationEdgesRef.current = edges;
+			markerConstellationContactsByIdRef.current = contactsByPointId;
 			markerConstellationComposedSearchKeyRef.current = compositionKey;
 			markerConstellationRevealDoneRef.current = false;
 			markerConstellationLastDataKeyRef.current = '';
 			setMarkerConstellationLineOpacity(0, 0, 0);
-			writeMarkerConstellationSourceData(visibleContacts);
+			writeMarkerConstellationSourceData();
 			startMarkerConstellationReveal();
 		}, 90);
 
