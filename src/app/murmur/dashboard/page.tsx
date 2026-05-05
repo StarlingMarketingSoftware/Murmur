@@ -563,7 +563,7 @@ type MapBottomSearchBarProps = {
 	isExpanded: boolean;
 	activeHeight: number;
 	inputRef: RefObject<HTMLTextAreaElement | null>;
-	mode?: 'anything' | 'category';
+	mode?: 'anything' | 'category' | 'for-you';
 	categoryWhatValue?: string;
 	categoryWhereValue?: string;
 	activeCategoryField?: 'what' | 'where' | null;
@@ -576,6 +576,7 @@ type MapBottomSearchBarProps = {
 	onCategoryWhereChange?: (value: string) => void;
 	onCategoryWhatEnter?: () => void;
 	onCategorySubmit?: () => void | Promise<void>;
+	onForYouSubmit?: () => void | Promise<void>;
 };
 
 const MapBottomSearchBar = memo(({
@@ -596,6 +597,7 @@ const MapBottomSearchBar = memo(({
 	onCategoryWhereChange,
 	onCategoryWhatEnter,
 	onCategorySubmit,
+	onForYouSubmit,
 }: MapBottomSearchBarProps) => {
 	const activeCategoryIndicatorRef = useRef<HTMLDivElement>(null);
 	const prevActiveCategoryFieldRef = useRef<'what' | 'where' | null>(null);
@@ -666,6 +668,65 @@ const MapBottomSearchBar = memo(({
 			categoryWhereInputRef.current?.focus();
 		}
 	}, [activeCategoryField, mode]);
+
+	if (mode === 'for-you') {
+		return (
+			<div
+				aria-label="Search For You on the map"
+				className="relative h-full w-full overflow-hidden pointer-events-auto"
+				style={{
+					borderRadius: `${MAP_RESULTS_BOTTOM_SEARCH_BOX.borderRadius}px`,
+					border: `${MAP_RESULTS_BOTTOM_SEARCH_BOX.borderWidth}px solid ${MAP_RESULTS_BOTTOM_SEARCH_BOX.borderColor}`,
+					backgroundColor: '#FFFFFF',
+					boxSizing: 'border-box',
+					cursor: 'pointer',
+				}}
+				onClick={() => onForYouSubmit?.()}
+			>
+				<div
+					className="absolute overflow-hidden"
+					style={{
+						left: '6px',
+						right: '6px',
+						top: '7px',
+						bottom: '7px',
+						borderRadius: '6px',
+						border: '0.75px solid #595959',
+						opacity: 0.65,
+						background:
+							'linear-gradient(90deg, #DA29B4 1.69%, #EA1F1F 34.7%, #E122F2 65.83%, #F00404 98.97%)',
+						boxSizing: 'border-box',
+					}}
+				/>
+				<div className="absolute left-[16px] top-[17px] font-inter text-[17px] leading-none text-white">
+					For You
+				</div>
+				<button
+					type="button"
+					aria-label="Submit For You search"
+					className="absolute flex items-center justify-center"
+					style={{
+						right: '9px',
+						top: '10px',
+						width: '45px',
+						height: '37px',
+						backgroundColor: '#FFFFFF',
+						borderRadius: '8px',
+						border: 0,
+						boxSizing: 'border-box',
+						padding: 0,
+						cursor: 'pointer',
+					}}
+					onClick={(event) => {
+						event.stopPropagation();
+						onForYouSubmit?.();
+					}}
+				>
+					<MapBottomSearchArrowIcon aria-hidden="true" />
+				</button>
+			</div>
+		);
+	}
 
 	if (mode === 'category') {
 		const categoryBox = MAP_RESULTS_BOTTOM_CATEGORY_SEARCH_BOX;
@@ -992,14 +1053,22 @@ const getCategorySearchWhyForWhat = (what: string) =>
 
 type MapBottomSearchFollowupBoxProps = {
 	selectedSearchFollowup: MapBottomSearchFollowupSelection;
+	previewedSearchFollowup: MapBottomSearchFollowupSelection;
 	onSelectedSearchFollowupChange: (
 		selection: MapBottomSearchFollowupSelection
 	) => void;
+	onPreviewSearchFollowupChange: (
+		selection: MapBottomSearchFollowupSelection
+	) => void;
+	onForYouSubmit: () => void | Promise<void>;
 };
 
 const MapBottomSearchFollowupBox = memo(({
 	selectedSearchFollowup,
+	previewedSearchFollowup,
 	onSelectedSearchFollowupChange,
+	onPreviewSearchFollowupChange,
+	onForYouSubmit,
 }: MapBottomSearchFollowupBoxProps) => {
 	const segmentBox = MAP_RESULTS_BOTTOM_SEARCH_FOLLOWUP_SEGMENT_BOX;
 	const leftTileBox = MAP_RESULTS_BOTTOM_SEARCH_FOLLOWUP_LEFT_TILE_BOX;
@@ -1013,8 +1082,11 @@ const MapBottomSearchFollowupBox = memo(({
 			keyword: false,
 			radius: false,
 		});
+	const visualSearchFollowup = previewedSearchFollowup ?? selectedSearchFollowup;
 	const isForYouSelected = selectedSearchFollowup === 'for-you';
 	const isCategorySelected = selectedSearchFollowup === 'category';
+	const isForYouActive = visualSearchFollowup === 'for-you';
+	const isCategoryActive = visualSearchFollowup === 'category';
 	const isCompactFollowup = isForYouSelected || isCategorySelected;
 	const isProfileAdvancedSelected = advancedSelections.profile;
 	const isKeywordAdvancedSelected = advancedSelections.keyword;
@@ -1051,23 +1123,23 @@ const MapBottomSearchFollowupBox = memo(({
 					transform: 'translateY(-50%)',
 					borderRadius: `${leftTileBox.borderRadius}px`,
 					border: `${leftTileBox.selectedBorderWidth}px solid ${
-						isForYouSelected ? leftTileBox.selectedBorderColor : 'transparent'
+						isForYouActive ? leftTileBox.selectedBorderColor : 'transparent'
 					}`,
-					backgroundColor: isForYouSelected
+					backgroundColor: isForYouActive
 						? leftTileBox.selectedBackgroundColor
 						: leftTileBox.dailyMixBackgroundColor,
 					boxSizing: 'border-box',
 					padding: 0,
 					cursor: 'pointer',
 				}}
-				onClick={() =>
-					onSelectedSearchFollowupChange(isForYouSelected ? null : 'for-you')
-				}
+				onMouseEnter={() => onPreviewSearchFollowupChange('for-you')}
+				onFocus={() => onPreviewSearchFollowupChange('for-you')}
+				onClick={() => onForYouSubmit()}
 			>
 				<MapBottomSearchForYouIcon
 					aria-hidden="true"
-					textColor={isForYouSelected ? '#000000' : undefined}
-					waveColor={isForYouSelected ? '#000000' : undefined}
+					textColor={isForYouActive ? '#000000' : undefined}
+					waveColor={isForYouActive ? '#000000' : undefined}
 					style={{
 						display: 'block',
 						width: `${iconLayout.forYou.width}px`,
@@ -1089,32 +1161,34 @@ const MapBottomSearchFollowupBox = memo(({
 					transform: 'translateY(-50%)',
 					borderRadius: `${leftTileBox.borderRadius}px`,
 					border: `${leftTileBox.selectedBorderWidth}px solid ${
-						isCategorySelected ? leftTileBox.selectedBorderColor : 'transparent'
+						isCategoryActive ? leftTileBox.selectedBorderColor : 'transparent'
 					}`,
-					backgroundColor: isCategorySelected
+					backgroundColor: isCategoryActive
 						? leftTileBox.categorySelectedBackgroundColor
 						: leftTileBox.categoryBackgroundColor,
 					boxSizing: 'border-box',
 					padding: 0,
 					cursor: 'pointer',
 				}}
+				onMouseEnter={() => onPreviewSearchFollowupChange('category')}
+				onFocus={() => onPreviewSearchFollowupChange('category')}
 				onClick={() =>
 					onSelectedSearchFollowupChange(isCategorySelected ? null : 'category')
 				}
 			>
 				<MapBottomSearchCategoryIcon
 					aria-hidden="true"
-					active={isCategorySelected}
+					active={isCategoryActive}
 					style={{
 						display: 'block',
-						width: `${isCategorySelected ? 36 : iconLayout.category.width}px`,
-						height: `${isCategorySelected ? 40 : iconLayout.category.height}px`,
+						width: `${isCategoryActive ? 36 : iconLayout.category.width}px`,
+						height: `${isCategoryActive ? 40 : iconLayout.category.height}px`,
 						transform: `translate(${
-							isCategorySelected
+							isCategoryActive
 								? iconLayout.category.activeTranslateX
 								: iconLayout.category.translateX
 						}px, ${
-							isCategorySelected
+							isCategoryActive
 								? iconLayout.category.activeTranslateY
 								: iconLayout.category.translateY
 						}px)`,
@@ -1143,6 +1217,8 @@ const MapBottomSearchFollowupBox = memo(({
 						padding: 0,
 						cursor: 'pointer',
 					}}
+					onMouseEnter={() => onPreviewSearchFollowupChange(null)}
+					onFocus={() => onPreviewSearchFollowupChange(null)}
 					onClick={() => onSelectedSearchFollowupChange(null)}
 				>
 					<MapBottomSearchAdvancedIcon
@@ -1163,6 +1239,7 @@ const MapBottomSearchFollowupBox = memo(({
 					role="group"
 					aria-label="Advanced filter options"
 					className="absolute"
+					onMouseEnter={() => onPreviewSearchFollowupChange(null)}
 					style={{
 						right: `${segmentBox.rightOffset}px`,
 						top: '50%',
@@ -1607,9 +1684,18 @@ const DashboardContent = () => {
 	);
 	const [mapBottomSearchFollowupSelection, setMapBottomSearchFollowupSelection] =
 		useState<MapBottomSearchFollowupSelection>(null);
+	const [mapBottomSearchFollowupPreview, setMapBottomSearchFollowupPreview] =
+		useState<MapBottomSearchFollowupSelection>(null);
+	const mapBottomSearchFollowupPreviewClearTimeoutRef =
+		useRef<ReturnType<typeof setTimeout> | null>(null);
 	const [isMapBottomCategoryDropdownActive, setIsMapBottomCategoryDropdownActive] =
 		useState(false);
-	const isMapBottomCategoryMode = mapBottomSearchFollowupSelection === 'category';
+	const effectiveMapBottomSearchFollowupSelection =
+		mapBottomSearchFollowupPreview ?? mapBottomSearchFollowupSelection;
+	const isMapBottomForYouMode =
+		effectiveMapBottomSearchFollowupSelection === 'for-you';
+	const isMapBottomCategoryMode =
+		effectiveMapBottomSearchFollowupSelection === 'category';
 
 	// Close why dropdown when clicking outside
 	useEffect(() => {
@@ -3568,8 +3654,68 @@ const DashboardContent = () => {
 		triggerFreeTextSearch,
 	]);
 
+	const cancelMapBottomSearchFollowupPreviewClear = useCallback(() => {
+		if (!mapBottomSearchFollowupPreviewClearTimeoutRef.current) return;
+		clearTimeout(mapBottomSearchFollowupPreviewClearTimeoutRef.current);
+		mapBottomSearchFollowupPreviewClearTimeoutRef.current = null;
+	}, []);
+
+	const handleMapBottomSearchFollowupPreviewChange = useCallback(
+		(selection: MapBottomSearchFollowupSelection) => {
+			cancelMapBottomSearchFollowupPreviewClear();
+			setMapBottomSearchFollowupPreview(selection);
+		},
+		[cancelMapBottomSearchFollowupPreviewClear]
+	);
+
+	const scheduleMapBottomSearchFollowupPreviewClear = useCallback(() => {
+		cancelMapBottomSearchFollowupPreviewClear();
+		mapBottomSearchFollowupPreviewClearTimeoutRef.current = setTimeout(() => {
+			setMapBottomSearchFollowupPreview(null);
+			mapBottomSearchFollowupPreviewClearTimeoutRef.current = null;
+		}, 220);
+	}, [cancelMapBottomSearchFollowupPreviewClear]);
+
+	useEffect(() => cancelMapBottomSearchFollowupPreviewClear, [
+		cancelMapBottomSearchFollowupPreviewClear,
+	]);
+
+	const handleMapBottomForYouSubmit = useCallback(async () => {
+		cancelMapBottomSearchFollowupPreviewClear();
+		setMapBottomSearchFollowupPreview(null);
+		setMapBottomSearchFollowupSelection(null);
+		mapBottomSearchInputRef.current?.blur();
+		setIsMapBottomSearchActive(false);
+		setMapBottomSearchValue('');
+		setActiveSection(null);
+
+		let lat: number | null = null;
+		let lon: number | null = null;
+		try {
+			const loc = await getApproximateLocation();
+			lat = loc.lat;
+			lon = loc.lon;
+		} catch {
+			// Non-fatal: the backend can infer from request headers or return an unrestricted sample.
+		}
+
+		try {
+			await triggerCuratedSearch({
+				lat: lat ?? undefined,
+				lon: lon ?? undefined,
+			});
+		} catch {
+			// triggerCuratedSearch owns the user-facing error toast.
+		}
+	}, [
+		cancelMapBottomSearchFollowupPreviewClear,
+		triggerCuratedSearch,
+	]);
+
 	const handleMapBottomSearchFollowupSelectionChange = useCallback(
 		(selection: MapBottomSearchFollowupSelection) => {
+			cancelMapBottomSearchFollowupPreviewClear();
+			setMapBottomSearchFollowupPreview(null);
 			setMapBottomSearchFollowupSelection(selection);
 
 			if (selection === 'category') {
@@ -3583,7 +3729,7 @@ const DashboardContent = () => {
 			}
 			setIsMapBottomCategoryDropdownActive(false);
 		},
-		[isMapBottomCategoryDropdownActive]
+		[cancelMapBottomSearchFollowupPreviewClear, isMapBottomCategoryDropdownActive]
 	);
 
 	const handleMapBottomCategoryFieldFocus = useCallback(
@@ -3593,13 +3739,15 @@ const DashboardContent = () => {
 				return;
 			}
 
+			cancelMapBottomSearchFollowupPreviewClear();
+			setMapBottomSearchFollowupPreview(null);
 			setMapBottomSearchFollowupSelection('category');
 			setIsMapBottomSearchActive(false);
 			setIsMapBottomCategoryDropdownActive(true);
 			setWhyValue(getCategorySearchWhyForWhat(whatValue));
 			setActiveSection(field);
 		},
-		[isFromHomeDemoMode, whatValue]
+		[cancelMapBottomSearchFollowupPreviewClear, isFromHomeDemoMode, whatValue]
 	);
 
 	const handleMapBottomCategoryWhatChange = useCallback((value: string) => {
@@ -5177,11 +5325,15 @@ const DashboardContent = () => {
 	const bottomPadding = isMobile && hasSearched ? 'pb-[64px]' : 'pb-0 md:pb-[100px]';
 	const mapBottomSearchShellWidth = isMapBottomCategoryMode
 		? MAP_RESULTS_BOTTOM_CATEGORY_SEARCH_BOX.width
+		: isMapBottomForYouMode
+			? MAP_RESULTS_BOTTOM_SEARCH_BOX.activeWidth
 		: isMapBottomSearchExpanded
 			? MAP_RESULTS_BOTTOM_SEARCH_BOX.activeWidth
 			: MAP_RESULTS_BOTTOM_SEARCH_BOX.width;
 	const mapBottomSearchShellHeight = isMapBottomCategoryMode
 		? MAP_RESULTS_BOTTOM_CATEGORY_SEARCH_BOX.height
+		: isMapBottomForYouMode
+			? MAP_RESULTS_BOTTOM_SEARCH_BOX.activeHeight
 		: isMapBottomSearchExpanded
 			? mapBottomSearchActiveHeight
 			: MAP_RESULTS_BOTTOM_SEARCH_BOX.height;
@@ -5199,6 +5351,8 @@ const DashboardContent = () => {
 		{!hasSearched && activeTab === 'search' && !fromHomeParam && !isMapView && !isNarrowestDesktop && (
 			<div
 				className="fixed left-1/2 pointer-events-none"
+				onMouseEnter={cancelMapBottomSearchFollowupPreviewClear}
+				onMouseLeave={scheduleMapBottomSearchFollowupPreviewClear}
 				style={{
 					bottom: `${MAP_RESULTS_BOTTOM_SEARCH_BOX.bottomOffset}px`,
 					width: `${mapBottomSearchShellWidth}px`,
@@ -5213,7 +5367,13 @@ const DashboardContent = () => {
 					isExpanded={isMapBottomSearchExpanded}
 					activeHeight={mapBottomSearchActiveHeight}
 					inputRef={mapBottomSearchInputRef}
-					mode={isMapBottomCategoryMode ? 'category' : 'anything'}
+					mode={
+						isMapBottomCategoryMode
+							? 'category'
+							: isMapBottomForYouMode
+								? 'for-you'
+								: 'anything'
+					}
 					categoryWhatValue={whatValue}
 					categoryWhereValue={whereValue}
 					activeCategoryField={activeMapBottomCategoryField}
@@ -5226,12 +5386,18 @@ const DashboardContent = () => {
 					onCategoryWhereChange={handleMapBottomCategoryWhereChange}
 					onCategoryWhatEnter={handleMapBottomCategoryWhatEnter}
 					onCategorySubmit={handleMapBottomCategorySubmit}
+					onForYouSubmit={handleMapBottomForYouSubmit}
 				/>
 				<MapBottomSearchFollowupBox
 					selectedSearchFollowup={mapBottomSearchFollowupSelection}
+					previewedSearchFollowup={mapBottomSearchFollowupPreview}
 					onSelectedSearchFollowupChange={
 						handleMapBottomSearchFollowupSelectionChange
 					}
+					onPreviewSearchFollowupChange={
+						handleMapBottomSearchFollowupPreviewChange
+					}
+					onForYouSubmit={handleMapBottomForYouSubmit}
 				/>
 			</div>
 		)}
@@ -8564,6 +8730,12 @@ const DashboardContent = () => {
 																{!isMobile && !isNarrowestDesktop && !hasNoSearchResults && (
 																	<div
 																		className="absolute left-1/2 pointer-events-none"
+																		onMouseEnter={
+																			cancelMapBottomSearchFollowupPreviewClear
+																		}
+																		onMouseLeave={
+																			scheduleMapBottomSearchFollowupPreviewClear
+																		}
 																		style={{
 																			bottom: `${MAP_RESULTS_BOTTOM_SEARCH_BOX.bottomOffset}px`,
 																			width: `${mapBottomSearchShellWidth}px`,
@@ -8578,7 +8750,13 @@ const DashboardContent = () => {
 																			isExpanded={isMapBottomSearchExpanded}
 																			activeHeight={mapBottomSearchActiveHeight}
 																			inputRef={mapBottomSearchInputRef}
-																			mode={isMapBottomCategoryMode ? 'category' : 'anything'}
+																			mode={
+																				isMapBottomCategoryMode
+																					? 'category'
+																					: isMapBottomForYouMode
+																						? 'for-you'
+																						: 'anything'
+																			}
 																			categoryWhatValue={whatValue}
 																			categoryWhereValue={whereValue}
 																			activeCategoryField={activeMapBottomCategoryField}
@@ -8591,14 +8769,22 @@ const DashboardContent = () => {
 																			onCategoryWhereChange={handleMapBottomCategoryWhereChange}
 																			onCategoryWhatEnter={handleMapBottomCategoryWhatEnter}
 																			onCategorySubmit={handleMapBottomCategorySubmit}
+																			onForYouSubmit={handleMapBottomForYouSubmit}
 																		/>
 																		<MapBottomSearchFollowupBox
 																			selectedSearchFollowup={
 																				mapBottomSearchFollowupSelection
 																			}
+																			previewedSearchFollowup={
+																				mapBottomSearchFollowupPreview
+																			}
 																			onSelectedSearchFollowupChange={
 																				handleMapBottomSearchFollowupSelectionChange
 																			}
+																			onPreviewSearchFollowupChange={
+																				handleMapBottomSearchFollowupPreviewChange
+																			}
+																			onForYouSubmit={handleMapBottomForYouSubmit}
 																		/>
 																	</div>
 																)}
