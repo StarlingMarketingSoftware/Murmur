@@ -4330,9 +4330,19 @@ const DashboardContent = () => {
 		}
 	}, [isMobile, setHoveredContact]);
 
-	// Lock body scroll when in map view
+	const shouldLockLandingDashboardScroll =
+		isMobile === false &&
+		!hasSearched &&
+		activeTab === 'search' &&
+		!fromHomeParam &&
+		!isMapView;
+
+	// Lock body scroll when in map view or on the initial desktop dashboard.
 	useEffect(() => {
-		if (isMapView) {
+		if (isMapView || shouldLockLandingDashboardScroll) {
+			if (shouldLockLandingDashboardScroll) {
+				window.scrollTo({ top: 0, left: 0 });
+			}
 			document.body.style.overflow = 'hidden';
 			document.body.style.height = '100vh';
 		} else {
@@ -4343,7 +4353,7 @@ const DashboardContent = () => {
 			document.body.style.overflow = '';
 			document.body.style.height = '';
 		};
-	}, [isMapView]);
+	}, [isMapView, shouldLockLandingDashboardScroll]);
 
 	// Combine section values into main search field
 	useEffect(() => {

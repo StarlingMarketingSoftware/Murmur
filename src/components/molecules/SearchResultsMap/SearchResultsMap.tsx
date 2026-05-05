@@ -2808,6 +2808,8 @@ const DEFAULT_MAX_ZOOM_FALLBACK = 22;
 export const DASHBOARD_TO_INTERACTIVE_TRANSITION_MS = 7200;
 export const DASHBOARD_TO_INTERACTIVE_TRANSITION_CSS_EASING =
 	'cubic-bezier(0.22, 1, 0.36, 1)';
+const DASHBOARD_TO_INTERACTIVE_HANDOFF_GLIDE_MS = 1800;
+const mapboxEaseOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
 
 const MAPBOX_STYLE = 'mapbox://styles/mapbox/streets-v12';
 
@@ -9855,8 +9857,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 			// Tune these to match the homepage "globe peeking from the top" framing.
 			// Key trick: use `offset` (screen-space pan) rather than changing geo center a lot.
-			const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
-
 			const lockDecorativeZoom = () => {
 				try {
 					map.setMinZoom(DASHBOARD_DECORATIVE_ZOOM);
@@ -9983,7 +9983,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						bearing: 0,
 						offset: DASHBOARD_DECORATIVE_OFFSET_PX,
 						duration: dur,
-						easing: easeOutCubic,
+						easing: mapboxEaseOutCubic,
 					});
 				} catch {
 					// Ignore.
@@ -10063,9 +10063,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			} catch {}
 
 			// Background presentation uses a screen-space offset to create the "globe peeking"
-			// framing on the dashboard. If the user transitions into interactive search before
-			// an auto-fit camera move runs (e.g. hydration races / empty results), that offset
-			// can visually persist and leave the globe too low in the viewport.
+			// framing on the dashboard. Start gliding toward a neutral interactive camera
+			// immediately, then let the search/state auto-fit interrupt and continue from the
+			// current camera position once data is ready. This avoids the old instant reset.
 			try {
 				const container = map.getContainer?.() as HTMLElement | undefined;
 				const w = container?.clientWidth ?? 0;
@@ -10083,7 +10083,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					zoom: MAP_DEFAULT_ZOOM,
 					pitch: 0,
 					bearing: 0,
-					duration: 0,
+					offset: [0, 0],
+					duration: DASHBOARD_TO_INTERACTIVE_HANDOFF_GLIDE_MS,
+					easing: mapboxEaseOutCubic,
 				});
 			} catch {}
 		}
@@ -11735,9 +11737,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			mapInstance.fitBounds(bounds, {
 				padding: { top: 50, right: 50, bottom: 50, left: 50 },
 				maxZoom: AUTO_FIT_CONTACTS_MAX_ZOOM,
+				pitch: 0,
+				bearing: 0,
+				offset: [0, 0],
 				duration: dur,
 				// Smooth ease-out for cinematic transitions (default Mapbox ease is too stiff at long durations).
-				...(dur > 1000 ? { easing: (t: number) => 1 - Math.pow(1 - t, 3) } : {}),
+				...(dur > 1000 ? { easing: mapboxEaseOutCubic } : {}),
 			});
 		},
 		[getContactCoords]
@@ -11765,9 +11770,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				{
 					padding: { top: 100, right: 100, bottom: 100, left: 100 },
 					maxZoom: AUTO_FIT_STATE_MAX_ZOOM,
+					pitch: 0,
+					bearing: 0,
+					offset: [0, 0],
 					duration: dur,
 					// Smooth ease-out for cinematic transitions.
-					...(dur > 1000 ? { easing: (t: number) => 1 - Math.pow(1 - t, 3) } : {}),
+					...(dur > 1000 ? { easing: mapboxEaseOutCubic } : {}),
 				}
 			);
 
@@ -11858,6 +11866,15 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			lockedStateKeyIsUsState && !!lockedStateKey && isStateLayerReady;
 		const canFitToBoundsNow = contactsWithCoords.length > 0;
 		if (!canFitToStateNow && !canFitToBoundsNow) return;
+		// During a fresh dashboard search, React Query may briefly expose the previous result set
+		// while the new request is loading. If we do not have a state target ready yet, wait for
+		// fresh contacts instead of flying toward stale coordinates.
+		const shouldWaitForFreshContactFit =
+			Boolean(isLoading) &&
+			isSearchMode &&
+			!canFitToStateNow &&
+			(isNewSearch || !hasFitBoundsRef.current);
+		if (shouldWaitForFreshContactFit) return;
 
 		// Debounce camera moves so rapid updates don't cause zoom in/out oscillation.
 		if (autoFitTimeoutRef.current) {
@@ -11991,6 +12008,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		fitMapToState,
 		lockedStateKey,
 		isStateLayerReady,
+		isLoading,
 		skipAutoFit,
 		searchQuery,
 	]);
