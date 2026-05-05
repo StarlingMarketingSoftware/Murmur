@@ -292,14 +292,15 @@ const EMPTY_POLYGON_FC: OutlinePolygonFeatureCollection = {
 	features: [],
 };
 
-const CURATED_BLOB_MIN_CLUSTERS = 2;
+const CURATED_BLOB_MIN_CLUSTERS = 1;
 const CURATED_BLOB_MAX_CLUSTERS = 4;
 const CURATED_BLOB_SHAPE_STEPS = 96;
 const CURATED_BLOB_OUTLINE_SMOOTHING_PASSES = 1;
 const CURATED_STABLE_MARKER_MAX_DOTS = 125;
 const CURATED_BLOB_PADDING_KM = 95;
 const CURATED_BLOB_MIN_AXIS_KM = 60;
-const CURATED_BLOB_MAX_CLUSTER_SPAN_KM = 350;
+const CURATED_BLOB_MAX_CLUSTER_SPAN_KM = 900;
+const CURATED_BLOB_MIN_GAP_KM = 35;
 const CURATED_BLOB_ELLIPSE_RATIO_THRESHOLD = 1.6;
 const CURATED_BLOB_KMEANS_MAX_ITER = 12;
 const CURATED_ORB_SLOT_COUNT = CURATED_BLOB_MAX_CLUSTERS;
@@ -382,6 +383,11 @@ type CuratedBlobMercatorPoint = {
 type CuratedBlobCluster = {
 	centroid: { x: number; y: number };
 	points: CuratedBlobMercatorPoint[];
+};
+
+type CuratedBlobClusterEnvelope = {
+	center: { x: number; y: number };
+	radiusMercator: number;
 };
 
 type CuratedBlobShapeSpec =
@@ -673,6 +679,107 @@ const maxCuratedBlobClusterSpanKm = (clusters: CuratedBlobCluster[]): number => 
 	return maxSpanKm;
 };
 
+const minCuratedBlobClusterPointId = (cluster: CuratedBlobCluster): number =>
+	cluster.points.reduce((minId, point) => Math.min(minId, point.id), Infinity);
+
+const sortCuratedBlobClusters = (
+	clusters: CuratedBlobCluster[]
+): CuratedBlobCluster[] =>
+	clusters.slice().sort((a, b) => {
+		const minA = minCuratedBlobClusterPointId(a);
+		const minB = minCuratedBlobClusterPointId(b);
+		return minA - minB || a.centroid.x - b.centroid.x || a.centroid.y - b.centroid.y;
+	});
+
+const getCuratedBlobClusterEnvelope = (
+	cluster: CuratedBlobCluster
+): CuratedBlobClusterEnvelope | null => {
+	if (cluster.points.length === 0) return null;
+	const center = curatedBlobLatLngFromMercator(cluster.centroid);
+	if (!center) return null;
+	const kmPerMercator = curatedBlobKmPerMercatorUnit(center);
+	if (!kmPerMercator) return null;
+
+	let maxDistanceMercator = 0;
+	for (const point of cluster.points) {
+		maxDistanceMercator = Math.max(
+			maxDistanceMercator,
+			Math.hypot(point.x - cluster.centroid.x, point.y - cluster.centroid.y)
+		);
+	}
+
+	const paddingMercator = CURATED_BLOB_PADDING_KM / kmPerMercator;
+	const minRadiusMercator = CURATED_BLOB_MIN_AXIS_KM / kmPerMercator;
+	const radiusMercator = Math.max(
+		maxDistanceMercator + paddingMercator,
+		minRadiusMercator
+	);
+
+	return {
+		center: cluster.centroid,
+		radiusMercator,
+	};
+};
+
+const curatedBlobClusterEnvelopesOverlap = (
+	a: CuratedBlobCluster,
+	b: CuratedBlobCluster
+): boolean => {
+	const envelopeA = getCuratedBlobClusterEnvelope(a);
+	const envelopeB = getCuratedBlobClusterEnvelope(b);
+	if (!envelopeA || !envelopeB) return false;
+	const center = curatedBlobLatLngFromMercator(a.centroid);
+	if (!center) return false;
+	const kmPerMercator = curatedBlobKmPerMercatorUnit(center);
+	if (!kmPerMercator) return false;
+	const minGapMercator = CURATED_BLOB_MIN_GAP_KM / kmPerMercator;
+	const centerDistance = Math.hypot(
+		envelopeA.center.x - envelopeB.center.x,
+		envelopeA.center.y - envelopeB.center.y
+	);
+	return (
+		centerDistance <=
+		envelopeA.radiusMercator + envelopeB.radiusMercator + minGapMercator
+	);
+};
+
+const mergeCuratedBlobClusters = (
+	a: CuratedBlobCluster,
+	b: CuratedBlobCluster
+): CuratedBlobCluster => {
+	const points = [...a.points, ...b.points].sort(
+		(left, right) => left.id - right.id || left.x - right.x || left.y - right.y
+	);
+	return {
+		centroid: averageCuratedBlobCentroid(points),
+		points,
+	};
+};
+
+const mergeOverlappingCuratedBlobClusters = (
+	inputClusters: CuratedBlobCluster[]
+): CuratedBlobCluster[] => {
+	const clusters = sortCuratedBlobClusters(inputClusters);
+	let didMerge = true;
+
+	while (didMerge) {
+		didMerge = false;
+		for (let i = 0; i < clusters.length; i++) {
+			for (let j = i + 1; j < clusters.length; j++) {
+				if (!curatedBlobClusterEnvelopesOverlap(clusters[i], clusters[j])) continue;
+				const merged = mergeCuratedBlobClusters(clusters[i], clusters[j]);
+				clusters.splice(j, 1);
+				clusters.splice(i, 1, merged);
+				didMerge = true;
+				break;
+			}
+			if (didMerge) break;
+		}
+	}
+
+	return sortCuratedBlobClusters(clusters);
+};
+
 const pickAdaptiveCuratedBlobClusters = (
 	points: CuratedBlobMercatorPoint[]
 ): CuratedBlobCluster[] => {
@@ -684,7 +791,9 @@ const pickAdaptiveCuratedBlobClusters = (
 	const maxK = Math.min(CURATED_BLOB_MAX_CLUSTERS, points.length);
 	let bestClusters: CuratedBlobCluster[] = [];
 	for (let k = CURATED_BLOB_MIN_CLUSTERS; k <= maxK; k++) {
-		bestClusters = kMeansClusterMercator(points, k, CURATED_BLOB_KMEANS_MAX_ITER);
+		bestClusters = mergeOverlappingCuratedBlobClusters(
+			kMeansClusterMercator(points, k, CURATED_BLOB_KMEANS_MAX_ITER)
+		);
 		if (k === maxK) break;
 		if (maxCuratedBlobClusterSpanKm(bestClusters) <= CURATED_BLOB_MAX_CLUSTER_SPAN_KM) {
 			break;
@@ -10272,7 +10381,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					`${dot.id}:${dot.coords.lng.toFixed(5)}:${dot.coords.lat.toFixed(5)}`
 			)
 			.join('|');
-		const nextSignature = `v5:${CURATED_BLOB_MIN_CLUSTERS}:${CURATED_BLOB_MAX_CLUSTERS}:${CURATED_BLOB_SHAPE_STEPS}:${CURATED_BLOB_OUTLINE_SMOOTHING_PASSES}:${CURATED_BLOB_PADDING_KM}:${CURATED_BLOB_MIN_AXIS_KM}:${CURATED_BLOB_MAX_CLUSTER_SPAN_KM}:${CURATED_BLOB_ELLIPSE_RATIO_THRESHOLD}:${signature}`;
+		const nextSignature = `v6:${CURATED_BLOB_MIN_CLUSTERS}:${CURATED_BLOB_MAX_CLUSTERS}:${CURATED_BLOB_SHAPE_STEPS}:${CURATED_BLOB_OUTLINE_SMOOTHING_PASSES}:${CURATED_BLOB_PADDING_KM}:${CURATED_BLOB_MIN_AXIS_KM}:${CURATED_BLOB_MAX_CLUSTER_SPAN_KM}:${CURATED_BLOB_MIN_GAP_KM}:${CURATED_BLOB_ELLIPSE_RATIO_THRESHOLD}:${signature}`;
 		if (nextSignature === curatedBlobSignatureRef.current) return;
 
 		let cancelled = false;
