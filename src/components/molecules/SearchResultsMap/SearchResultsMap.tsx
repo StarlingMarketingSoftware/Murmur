@@ -317,6 +317,13 @@ const CURATED_ORB_SLOT_COUNT = CURATED_BLOB_MAX_CLUSTERS;
 // replaced by the soft glow.
 const CURATED_DOT_FADE_START_ZOOM = 4.2;
 const CURATED_DOT_FADE_END_ZOOM = 3.6;
+// Non-constellation marker fade: zooming out from the default US-wide view, dots
+// not connected to the frozen constellation graph fade out so the constellation
+// reads cleanly without crowding from disconnected scattered markers. Members
+// (any contact id present in a constellation edge) stay fully visible until the
+// existing curated fade takes over below 4.2.
+const NON_CONSTELLATION_FADE_START_ZOOM = 6.0;
+const NON_CONSTELLATION_FADE_END_ZOOM = 5.1;
 //
 // Phase 2 (shape morph): the blob outline's vertices lerp toward a circle of
 // the target radius. Picks up where Phase 1 ends so the user sees the dots
@@ -366,13 +373,27 @@ const computeCuratedOrbT = (zoom: number) => {
 // requires `['zoom']` at the top of an interpolate/step (it can't appear
 // inside `case`), so the per-feature branching lives at the lower stop
 // and the upper stop is a flat 1.
+//
+// Non-constellation members additionally fade between
+// NON_CONSTELLATION_FADE_START_ZOOM and NON_CONSTELLATION_FADE_END_ZOOM. The
+// `inConstellation` feature-state defaults to true (visible) when unset so
+// that newly written dots stay visible until the constellation composes.
 const CURATED_DOT_ZOOM_FADE_EXPR: any = [
 	'interpolate',
 	['linear'],
 	['zoom'],
 	CURATED_DOT_FADE_END_ZOOM,
-	['case', ['boolean', ['get', 'isCurated'], false], 0, 1],
+	[
+		'case',
+		['boolean', ['get', 'isCurated'], false],
+		0,
+		['case', ['boolean', ['feature-state', 'inConstellation'], true], 1, 0],
+	],
 	CURATED_DOT_FADE_START_ZOOM,
+	['case', ['boolean', ['feature-state', 'inConstellation'], true], 1, 0],
+	NON_CONSTELLATION_FADE_END_ZOOM,
+	['case', ['boolean', ['feature-state', 'inConstellation'], true], 1, 0],
+	NON_CONSTELLATION_FADE_START_ZOOM,
 	1,
 ];
 
@@ -1523,6 +1544,13 @@ const hashStringToUint32 = (str: string): number => {
 // Rendering more than this tends to overload many machines at low zoom levels.
 const MAX_TOTAL_DOTS = 500;
 
+// Padding applied to the viewport bbox when filtering markers into the source.
+// Off-screen-but-near markers stay in the GeoJSON (clipped invisibly by Mapbox)
+// so small pans and modest zoom changes don't cause `source.setData()` calls
+// that briefly flash the dot layer. Aligned with the booking-extra fetch
+// padding pattern (which already buffers fetch bounds for the same reason).
+const VIEWPORT_BBOX_PAD_FACTOR = 0.5;
+
 const getBackgroundDotsQuantizationDeg = (zoom: number): number => {
 	// Controls when we regenerate dots as the viewport changes.
 	if (zoom <= 4) return 0.75;
@@ -1990,7 +2018,7 @@ const buildMarkerConstellationEdgesForGroup = (
 	points: MarkerConstellationPoint[],
 	seed: string,
 	remainingBudget: number
-): MarkerConstellationEdge[] => {
+): MarkerConstellationEdgeSeed[] => {
 	if (points.length < 2 || remainingBudget <= 0) return [];
 
 	const sorted = points.slice().sort((a, b) => a.id - b.id);
@@ -2177,7 +2205,7 @@ const buildFallbackMarkerConstellationGroupKeys = (
 const buildMarkerConstellationEdges = (
 	points: MarkerConstellationPoint[],
 	seed: string
-): MarkerConstellationEdge[] => {
+): MarkerConstellationEdgeSeed[] => {
 	if (points.length < 2) return [];
 
 	const groups = new Map<string, MarkerConstellationPoint[]>();
@@ -2196,7 +2224,7 @@ const buildMarkerConstellationEdges = (
 		.filter(({ group }) => group.length >= 2)
 		.sort((a, b) => a.minId - b.minId || a.key.localeCompare(b.key));
 
-	const edges: MarkerConstellationEdge[] = [];
+	const edges: MarkerConstellationEdgeSeed[] = [];
 	for (const { key, group } of orderedGroups) {
 		if (edges.length >= MARKER_CONSTELLATION_MAX_EDGES) break;
 		const groupEdges = buildMarkerConstellationEdgesForGroup(
@@ -2212,7 +2240,7 @@ const buildMarkerConstellationEdges = (
 const buildSparseMarkerConstellationEdges = (
 	points: MarkerConstellationPoint[],
 	seed: string
-): MarkerConstellationEdge[] => {
+): MarkerConstellationEdgeSeed[] => {
 	if (points.length < 2) return [];
 
 	const sorted = points.slice().sort((a, b) => a.id - b.id);
@@ -2321,6 +2349,413 @@ const buildSparseMarkerConstellationEdges = (
 		fromId: edge.fromId,
 		toId: edge.toId,
 	}));
+};
+
+type MarkerConstellationPointStats = {
+	minX: number;
+	maxX: number;
+	minY: number;
+	maxY: number;
+	centerX: number;
+	centerY: number;
+	spanX: number;
+	spanY: number;
+	diagonal: number;
+};
+
+const getMarkerConstellationPointStats = (
+	points: MarkerConstellationPoint[]
+): MarkerConstellationPointStats => {
+	if (points.length === 0) {
+		return {
+			minX: 0,
+			maxX: 0,
+			minY: 0,
+			maxY: 0,
+			centerX: 0,
+			centerY: 0,
+			spanX: 0,
+			spanY: 0,
+			diagonal: 0,
+		};
+	}
+
+	let minX = Infinity;
+	let maxX = -Infinity;
+	let minY = Infinity;
+	let maxY = -Infinity;
+	let sumX = 0;
+	let sumY = 0;
+	for (const point of points) {
+		minX = Math.min(minX, point.x);
+		maxX = Math.max(maxX, point.x);
+		minY = Math.min(minY, point.y);
+		maxY = Math.max(maxY, point.y);
+		sumX += point.x;
+		sumY += point.y;
+	}
+	const spanX = Math.max(0, maxX - minX);
+	const spanY = Math.max(0, maxY - minY);
+	return {
+		minX,
+		maxX,
+		minY,
+		maxY,
+		centerX: sumX / points.length,
+		centerY: sumY / points.length,
+		spanX,
+		spanY,
+		diagonal: Math.hypot(spanX, spanY),
+	};
+};
+
+const scaleMarkerConstellationPoints = (
+	points: MarkerConstellationPoint[],
+	scale: number
+): MarkerConstellationPoint[] =>
+	points.map((point) => ({
+		...point,
+		x: point.x * scale,
+		y: point.y * scale,
+	}));
+
+const markerConstellationPointDistance = (
+	a: MarkerConstellationPoint,
+	b: MarkerConstellationPoint
+): number => Math.hypot(a.x - b.x, a.y - b.y);
+
+const markerConstellationAngleDiff = (a: number, b: number): number => {
+	const diff = Math.abs(a - b) % (Math.PI * 2);
+	return diff > Math.PI ? Math.PI * 2 - diff : diff;
+};
+
+const getBeautyConstellationTargetCount = (
+	points: MarkerConstellationPoint[],
+	level: MarkerConstellationLevel
+): number => {
+	const n = points.length;
+	if (n <= 2) return n;
+
+	const stats = getMarkerConstellationPointStats(points);
+	if (level === 'wide') {
+		const base = Math.round(Math.sqrt(n) * 1.15 + 3);
+		const spanCapacity = Math.floor(stats.diagonal / 58) + 3;
+		return Math.min(n, 14, Math.max(Math.min(n, 3), Math.min(base, spanCapacity)));
+	}
+	if (level === 'mid') {
+		const base = Math.round(Math.sqrt(n) * 3.1 + 6);
+		const spanCapacity = Math.floor(stats.diagonal / 34) + 6;
+		return Math.min(n, 54, Math.max(Math.min(n, 5), Math.min(base, spanCapacity)));
+	}
+
+	const base = Math.round(Math.sqrt(n) * 5.5 + 12);
+	const spanCapacity = Math.floor(stats.diagonal / 20) + 16;
+	return Math.min(n, 120, Math.max(Math.min(n, 8), Math.min(base, spanCapacity)));
+};
+
+const selectBeautyConstellationPoints = (
+	points: MarkerConstellationPoint[],
+	seed: string,
+	targetCount: number,
+	minSeparationPx: number
+): MarkerConstellationPoint[] => {
+	if (points.length <= targetCount) return points.slice().sort((a, b) => a.id - b.id);
+	if (targetCount <= 0) return [];
+
+	const stats = getMarkerConstellationPointStats(points);
+	const selected: MarkerConstellationPoint[] = [];
+	const selectedIds = new Set<number>();
+	const sorted = points.slice().sort((a, b) => a.id - b.id);
+
+	const distanceToSelected = (point: MarkerConstellationPoint): number => {
+		if (selected.length === 0) return Infinity;
+		let minDistance = Infinity;
+		for (const existing of selected) {
+			minDistance = Math.min(minDistance, markerConstellationPointDistance(point, existing));
+		}
+		return minDistance;
+	};
+
+	const addPoint = (point: MarkerConstellationPoint): boolean => {
+		if (selectedIds.has(point.id)) return false;
+		selectedIds.add(point.id);
+		selected.push(point);
+		return true;
+	};
+
+	const pointAngle = (point: MarkerConstellationPoint): number => {
+		const raw = Math.atan2(point.y - stats.centerY, point.x - stats.centerX);
+		return raw < 0 ? raw + Math.PI * 2 : raw;
+	};
+
+	const sectorCount = Math.min(
+		targetCount,
+		Math.max(4, Math.round(targetCount * 0.72))
+	);
+	const sectorOrder = Array.from({ length: sectorCount }, (_, index) => index).sort(
+		(a, b) =>
+			hashStringToUint32(`${seed}|sector:${a}`) -
+			hashStringToUint32(`${seed}|sector:${b}`)
+	);
+
+	for (const sector of sectorOrder) {
+		if (selected.length >= targetCount) break;
+		const start = (sector / sectorCount) * Math.PI * 2;
+		const end = ((sector + 1) / sectorCount) * Math.PI * 2;
+		let best: MarkerConstellationPoint | null = null;
+		let bestScore = -Infinity;
+		for (const point of sorted) {
+			if (selectedIds.has(point.id)) continue;
+			const angle = pointAngle(point);
+			if (angle < start || angle >= end) continue;
+			const radial = Math.hypot(point.x - stats.centerX, point.y - stats.centerY);
+			const spacing = distanceToSelected(point);
+			if (selected.length >= 2 && spacing < minSeparationPx * 0.62) continue;
+			const jitter = hashStringToUint32(`${seed}|sector:${sector}|${point.id}`) / 0xffffffff;
+			const score = radial + spacing * 0.24 + jitter * Math.max(8, stats.diagonal * 0.015);
+			if (score > bestScore) {
+				best = point;
+				bestScore = score;
+			}
+		}
+		if (best) addPoint(best);
+	}
+
+	let spacingFloor = minSeparationPx;
+	while (selected.length < targetCount && spacingFloor >= minSeparationPx * 0.34) {
+		let best: MarkerConstellationPoint | null = null;
+		let bestScore = -Infinity;
+		for (const point of sorted) {
+			if (selectedIds.has(point.id)) continue;
+			const minDistance = distanceToSelected(point);
+			if (selected.length >= 2 && minDistance < spacingFloor) continue;
+
+			const radial = Math.hypot(point.x - stats.centerX, point.y - stats.centerY);
+			const angle = pointAngle(point);
+			let minAngle = Math.PI;
+			for (const existing of selected) {
+				minAngle = Math.min(minAngle, markerConstellationAngleDiff(angle, pointAngle(existing)));
+			}
+			const jitter = hashStringToUint32(`${seed}|fill:${point.id}`) / 0xffffffff;
+			const score =
+				minDistance * 1.08 +
+				radial * 0.34 +
+				minAngle * Math.max(24, stats.diagonal * 0.08) +
+				jitter * Math.max(8, stats.diagonal * 0.018);
+			if (score > bestScore) {
+				best = point;
+				bestScore = score;
+			}
+		}
+		if (best) {
+			addPoint(best);
+		} else {
+			spacingFloor *= 0.78;
+		}
+	}
+
+	for (const point of sorted) {
+		if (selected.length >= targetCount) break;
+		addPoint(point);
+	}
+
+	return selected.sort((a, b) => a.id - b.id);
+};
+
+const scoreBeautyConstellationFormation = (
+	allPoints: MarkerConstellationPoint[],
+	selectedPoints: MarkerConstellationPoint[],
+	edges: MarkerConstellationEdgeSeed[]
+): number => {
+	if (selectedPoints.length === 0) return -Infinity;
+	const allStats = getMarkerConstellationPointStats(allPoints);
+	const selectedStats = getMarkerConstellationPointStats(selectedPoints);
+	const coverage =
+		allStats.diagonal > 0 ? clamp(selectedStats.diagonal / allStats.diagonal, 0, 1) : 1;
+
+	const pointById = new Map<number, MarkerConstellationPoint>();
+	for (const point of selectedPoints) pointById.set(point.id, point);
+
+	const edgeLengths: number[] = [];
+	const degree = new Map<number, number>();
+	for (const edge of edges) {
+		const a = pointById.get(edge.fromId);
+		const b = pointById.get(edge.toId);
+		if (!a || !b) continue;
+		edgeLengths.push(markerConstellationPointDistance(a, b));
+		degree.set(edge.fromId, (degree.get(edge.fromId) ?? 0) + 1);
+		degree.set(edge.toId, (degree.get(edge.toId) ?? 0) + 1);
+	}
+
+	const meanLength =
+		edgeLengths.length > 0
+			? edgeLengths.reduce((sum, length) => sum + length, 0) / edgeLengths.length
+			: 0;
+	const lengthVariance =
+		edgeLengths.length > 0
+			? edgeLengths.reduce((sum, length) => sum + Math.pow(length - meanLength, 2), 0) /
+				edgeLengths.length
+			: 0;
+	const lengthRhythmPenalty =
+		meanLength > 0 ? clamp(Math.sqrt(lengthVariance) / meanLength, 0, 2) : 1;
+	let branchPenalty = 0;
+	for (const value of degree.values()) {
+		if (value > 3) branchPenalty += (value - 3) * 0.3;
+	}
+
+	const edgeDensity =
+		selectedPoints.length > 1 ? edges.length / Math.max(1, selectedPoints.length - 1) : 0;
+	const densityBalance = 1 - Math.abs(edgeDensity - 0.78);
+	const linePresence = edges.length > 0 ? 1 : -0.8;
+
+	return (
+		coverage * 3.2 +
+		densityBalance * 0.8 +
+		linePresence -
+		lengthRhythmPenalty * 0.65 -
+		branchPenalty
+	);
+};
+
+const annotateMarkerConstellationEdges = (
+	level: MarkerConstellationLevel,
+	points: MarkerConstellationPoint[],
+	edgeSeeds: MarkerConstellationEdgeSeed[]
+): MarkerConstellationEdge[] => {
+	if (edgeSeeds.length === 0) return [];
+
+	const pointById = new Map<number, MarkerConstellationPoint>();
+	for (const point of points) pointById.set(point.id, point);
+	const ranked = edgeSeeds
+		.map((edge, index) => {
+			const a = pointById.get(edge.fromId);
+			const b = pointById.get(edge.toId);
+			const length = a && b ? markerConstellationPointDistance(a, b) : 0;
+			return { edge, index, length };
+		})
+		.sort((a, b) => a.length - b.length || a.index - b.index);
+
+	const rankByPair = new Map<string, number>();
+	const denom = Math.max(1, ranked.length - 1);
+	ranked.forEach((item, index) => {
+		rankByPair.set(markerConstellationPairKey(item.edge.fromId, item.edge.toId), index / denom);
+	});
+
+	const opacityScale =
+		level === 'wide' ? 1 : level === 'mid' ? 0.92 : edgeSeeds.length > 70 ? 0.72 : 0.82;
+	return edgeSeeds.map((edge) => ({
+		...edge,
+		level,
+		rank: rankByPair.get(markerConstellationPairKey(edge.fromId, edge.toId)) ?? 0,
+		opacityScale,
+	}));
+};
+
+const buildMarkerConstellationNodesForLevel = (
+	level: MarkerConstellationLevel,
+	edges: MarkerConstellationEdge[]
+): MarkerConstellationNode[] => {
+	const rankById = new Map<number, number>();
+	for (const edge of edges) {
+		const existingFrom = rankById.get(edge.fromId);
+		if (existingFrom == null || edge.rank < existingFrom) rankById.set(edge.fromId, edge.rank);
+		const existingTo = rankById.get(edge.toId);
+		if (existingTo == null || edge.rank < existingTo) rankById.set(edge.toId, edge.rank);
+	}
+
+	const opacityScale = level === 'wide' ? 0.88 : level === 'mid' ? 0.78 : 0.62;
+	return Array.from(rankById.entries())
+		.sort((a, b) => a[0] - b[0])
+		.map(([id, rank]) => ({ id, level, rank, opacityScale }));
+};
+
+const buildBeautyConstellationLevel = (
+	allPoints: MarkerConstellationPoint[],
+	seed: string,
+	level: MarkerConstellationLevel,
+	minSeparationPx: number
+): { edges: MarkerConstellationEdge[]; nodes: MarkerConstellationNode[]; score: number } => {
+	if (allPoints.length < 2) return { edges: [], nodes: [], score: -Infinity };
+
+	const targetCount = getBeautyConstellationTargetCount(allPoints, level);
+	const variants = level === 'detail' ? 5 : 7;
+	let bestEdges: MarkerConstellationEdge[] = [];
+	let bestNodes: MarkerConstellationNode[] = [];
+	let bestScore = -Infinity;
+
+	for (let variant = 0; variant < variants; variant++) {
+		const variantSeed = `${seed}|${level}|variant:${variant}`;
+		const selected = selectBeautyConstellationPoints(
+			allPoints,
+			variantSeed,
+			targetCount,
+			minSeparationPx * (1 - variant * 0.035)
+		);
+		if (selected.length < 2) continue;
+
+		let edgeSeeds =
+			level === 'detail'
+				? buildMarkerConstellationEdges(selected, `${variantSeed}|grouped`)
+				: buildSparseMarkerConstellationEdges(selected, `${variantSeed}|sparse`);
+		if (edgeSeeds.length === 0) {
+			edgeSeeds = buildSparseMarkerConstellationEdges(selected, `${variantSeed}|fallback`);
+		}
+
+		const score = scoreBeautyConstellationFormation(allPoints, selected, edgeSeeds);
+		if (score <= bestScore) continue;
+
+		bestScore = score;
+		bestEdges = annotateMarkerConstellationEdges(level, selected, edgeSeeds);
+		bestNodes = buildMarkerConstellationNodesForLevel(level, bestEdges);
+	}
+
+	return { edges: bestEdges, nodes: bestNodes, score: bestScore };
+};
+
+const buildBeautyMarkerConstellationFormation = (
+	points: MarkerConstellationPoint[],
+	seed: string,
+	sourceZoom: number
+): MarkerConstellationFormation => {
+	if (points.length < 2) {
+		return { edges: [], nodes: [], lowZoomNodeIds: new Set() };
+	}
+
+	const scaledForZoom = (zoom: number) =>
+		scaleMarkerConstellationPoints(points, Math.pow(2, zoom - sourceZoom));
+
+	const wide = buildBeautyConstellationLevel(
+		scaledForZoom(MARKER_CONSTELLATION_MIN_COMPOSE_ZOOM),
+		`${seed}|wide`,
+		'wide',
+		58
+	);
+	const mid = buildBeautyConstellationLevel(
+		scaledForZoom(MARKER_CONSTELLATION_MID_COMPOSE_ZOOM),
+		`${seed}|mid`,
+		'mid',
+		38
+	);
+	const detailComposeZoom = Math.max(
+		MARKER_CONSTELLATION_DETAIL_COMPOSE_ZOOM,
+		Math.min(sourceZoom, 10.5)
+	);
+	const detail = buildBeautyConstellationLevel(
+		scaledForZoom(detailComposeZoom),
+		`${seed}|detail`,
+		'detail',
+		24
+	);
+
+	const edges = [...wide.edges, ...mid.edges, ...detail.edges].slice(
+		0,
+		MARKER_CONSTELLATION_MAX_EDGES * 2
+	);
+	const nodes = [...wide.nodes, ...mid.nodes, ...detail.nodes];
+	const lowZoomNodeIds = new Set<number>();
+	for (const node of nodes) lowZoomNodeIds.add(node.id);
+
+	return { edges, nodes, lowZoomNodeIds };
 };
 
 const buildOuterRingWorldSegments = (
@@ -3949,29 +4384,121 @@ type DotWaveMeta = {
 // Delicate background linework that is composed once per search from visible primary dots.
 const MARKER_CONSTELLATION_LINE_COLOR = '#4F555C';
 const MARKER_CONSTELLATION_HALO_COLOR = '#F6FAFC';
-const MARKER_CONSTELLATION_CORE_OPACITY = 0.42;
-const MARKER_CONSTELLATION_GLOW_OPACITY = 0.26;
+const MARKER_CONSTELLATION_CORE_OPACITY = 0.56;
+const MARKER_CONSTELLATION_GLOW_OPACITY = 0.3;
 const MARKER_CONSTELLATION_NODE_OPACITY = 0.76;
 const MARKER_CONSTELLATION_NODE_GLOW_OPACITY = 0.24;
 const MARKER_CONSTELLATION_MAX_POINTS = 180;
 const MARKER_CONSTELLATION_MAX_EDGES = 140;
-const MARKER_CONSTELLATION_CANONICAL_SIZE_PX = 960;
+const MARKER_CONSTELLATION_MIN_COMPOSE_ZOOM = MAP_DEFAULT_ZOOM;
+const MARKER_CONSTELLATION_MID_COMPOSE_ZOOM = 5.8;
+const MARKER_CONSTELLATION_DETAIL_COMPOSE_ZOOM = 7.4;
 const MARKER_CONSTELLATION_MIN_EDGE_PX = 18;
 const MARKER_CONSTELLATION_MAX_EDGE_PX = 185;
 const MARKER_CONSTELLATION_FALLBACK_GROUP_PX = 230;
 const MARKER_CONSTELLATION_SPARSE_FALLBACK_MAX_EDGE_PX = 360;
 const MARKER_CONSTELLATION_POINT_CLEARANCE_PX = 9;
+// Fade-in for the initial reveal so lines materialize over the camera fly-in
+// instead of popping in once it lands.
+const MARKER_CONSTELLATION_REVEAL_FADE_MS = 450;
+
+type MarkerConstellationLevel = 'wide' | 'mid' | 'detail';
+
+const markerConstellationLevelOpacityAtZoomStop = (
+	wide: number,
+	mid: number,
+	detail: number
+): any => [
+	'case',
+	['==', ['get', 'level'], 'wide'],
+	wide,
+	['==', ['get', 'level'], 'mid'],
+	mid,
+	['==', ['get', 'level'], 'detail'],
+	detail,
+	0,
+];
+
+const MARKER_CONSTELLATION_EDGE_RANK_OPACITY_EXPR: any = [
+	'interpolate',
+	['linear'],
+	['coalesce', ['get', 'rank'], 0],
+	0,
+	1,
+	0.6,
+	0.84,
+	1,
+	0.58,
+];
+
+const MARKER_CONSTELLATION_NODE_RANK_OPACITY_EXPR: any = [
+	'interpolate',
+	['linear'],
+	['coalesce', ['get', 'rank'], 0],
+	0,
+	1,
+	0.7,
+	0.86,
+	1,
+	0.68,
+];
+
+const markerConstellationEdgeOpacityAtZoomStop = (
+	opacity: number,
+	wide: number,
+	mid: number,
+	detail: number
+): any => [
+	'*',
+	opacity,
+	markerConstellationLevelOpacityAtZoomStop(wide, mid, detail),
+	MARKER_CONSTELLATION_EDGE_RANK_OPACITY_EXPR,
+	['coalesce', ['get', 'opacityScale'], 1],
+];
+
+const markerConstellationNodeOpacityAtZoomStop = (
+	opacity: number,
+	wide: number,
+	mid: number,
+	detail: number
+): any => [
+	'*',
+	opacity,
+	markerConstellationLevelOpacityAtZoomStop(wide, mid, detail),
+	MARKER_CONSTELLATION_NODE_RANK_OPACITY_EXPR,
+	['coalesce', ['get', 'opacityScale'], 1],
+];
+
 const getMarkerConstellationZoomFadedOpacity = (opacity: any): any => {
 	if (typeof opacity !== 'number') return opacity;
 	if (opacity <= 0) return 0;
+	const unifiedOpacity = markerConstellationEdgeOpacityAtZoomStop(opacity, 1, 1, 1);
 	return [
 		'interpolate',
 		['linear'],
 		['zoom'],
-		CURATED_DOT_FADE_END_ZOOM,
+		3.6,
 		0,
-		CURATED_DOT_FADE_START_ZOOM,
-		opacity,
+		4.2,
+		unifiedOpacity,
+		13,
+		unifiedOpacity,
+	];
+};
+
+const getMarkerConstellationNodeZoomFadedOpacity = (opacity: number): any => {
+	if (opacity <= 0) return 0;
+	const unifiedOpacity = markerConstellationNodeOpacityAtZoomStop(opacity, 1, 1, 1);
+	return [
+		'interpolate',
+		['linear'],
+		['zoom'],
+		3.6,
+		0,
+		4.2,
+		unifiedOpacity,
+		13,
+		unifiedOpacity,
 	];
 };
 
@@ -3983,9 +4510,30 @@ type MarkerConstellationPoint = {
 	groupKey: string;
 };
 
+type MarkerConstellationEdgeSeed = {
+	fromId: number;
+	toId: number;
+};
+
 type MarkerConstellationEdge = {
 	fromId: number;
 	toId: number;
+	level: MarkerConstellationLevel;
+	rank: number;
+	opacityScale: number;
+};
+
+type MarkerConstellationNode = {
+	id: number;
+	level: MarkerConstellationLevel;
+	rank: number;
+	opacityScale: number;
+};
+
+type MarkerConstellationFormation = {
+	edges: MarkerConstellationEdge[];
+	nodes: MarkerConstellationNode[];
+	lowZoomNodeIds: Set<number>;
 };
 
 const computeDotWaveTravelMs = (featureCount: number): number => {
@@ -4107,7 +4655,7 @@ const STATE_OUTLINE_URL = '/geo/us-states-outline.json';
 const STATE_PREPARED_POLYGONS_URL = '/geo/us-states-prepared-polygons.json';
 const STATE_HIGHLIGHT_COLOR = '#5DAB68';
 const STATE_HIGHLIGHT_OPACITY = 0.68;
-const STATE_DIVIDER_COLOR = '#64748B';
+const STATE_DIVIDER_COLOR = '#7A8799';
 const STATE_LABEL_COLOR = '#111827';
 // When zoomed out to a US-wide view, show subtle state divider lines (like Zillow).
 // Keep these behind the blue/black search-area outlines.
@@ -4171,7 +4719,7 @@ const buildStateInteractiveBorderColorExpr = (nightT: number) => {
 
 const applyStateOverlayNightColors = (mapInstance: mapboxgl.Map, nightT: number) => {
 	const darkenT = getNightStateLineDarkenT(nightT);
-	const dividerColor = mixCssRgb([100, 116, 139], [0, 0, 0], darkenT);
+	const dividerColor = mixCssRgb([122, 135, 153], [0, 0, 0], darkenT);
 	const borderColor = buildStateInteractiveBorderColorExpr(nightT);
 	const labelColor = STATE_LABEL_COLOR;
 	const labelHaloOpacity = 0;
@@ -4247,9 +4795,28 @@ const CATEGORIZED_DOT_ZOOM_FADE_EXPR: any = [
 		'case',
 		['boolean', ['get', 'isUncategorized'], false],
 		0,
-		['case', ['boolean', ['get', 'isCurated'], false], 0, 1],
+		[
+			'case',
+			['boolean', ['get', 'isCurated'], false],
+			0,
+			['case', ['boolean', ['feature-state', 'inConstellation'], true], 1, 0],
+		],
 	],
 	CURATED_DOT_FADE_START_ZOOM,
+	[
+		'case',
+		['boolean', ['get', 'isUncategorized'], false],
+		0,
+		['case', ['boolean', ['feature-state', 'inConstellation'], true], 1, 0],
+	],
+	NON_CONSTELLATION_FADE_END_ZOOM,
+	[
+		'case',
+		['boolean', ['get', 'isUncategorized'], false],
+		0,
+		['case', ['boolean', ['feature-state', 'inConstellation'], true], 1, 0],
+	],
+	NON_CONSTELLATION_FADE_START_ZOOM,
 	['case', ['boolean', ['get', 'isUncategorized'], false], 0, 1],
 ];
 const CATEGORIZED_DOT_GLOW_ZOOM_FADE_EXPR: any = [
@@ -4265,10 +4832,39 @@ const CATEGORIZED_DOT_GLOW_ZOOM_FADE_EXPR: any = [
 			'case',
 			['boolean', ['get', 'isCurated'], false],
 			0,
-			RESULT_DOT_GLOW_OPACITY,
+			[
+				'case',
+				['boolean', ['feature-state', 'inConstellation'], true],
+				RESULT_DOT_GLOW_OPACITY,
+				0,
+			],
 		],
 	],
 	CURATED_DOT_FADE_START_ZOOM,
+	[
+		'case',
+		['boolean', ['get', 'isUncategorized'], false],
+		0,
+		[
+			'case',
+			['boolean', ['feature-state', 'inConstellation'], true],
+			RESULT_DOT_GLOW_OPACITY,
+			0,
+		],
+	],
+	NON_CONSTELLATION_FADE_END_ZOOM,
+	[
+		'case',
+		['boolean', ['get', 'isUncategorized'], false],
+		0,
+		[
+			'case',
+			['boolean', ['feature-state', 'inConstellation'], true],
+			RESULT_DOT_GLOW_OPACITY,
+			0,
+		],
+	],
+	NON_CONSTELLATION_FADE_START_ZOOM,
 	[
 		'case',
 		['boolean', ['get', 'isUncategorized'], false],
@@ -9717,11 +10313,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			MAP_MIN_ZOOM,
 			0,
 			MAP_MIN_ZOOM + 1.25,
-			0.6,
+			0.5,
 			5,
-			0.75,
+			0.65,
 			STATE_DIVIDER_LINES_MAX_ZOOM,
-			0.85,
+			0.74,
 		];
 		const stateInteractiveBorderWidthExpr = buildStateInteractiveBorderWidthExpr();
 		const stateInteractiveBorderOpacityExpr = [
@@ -9930,7 +10526,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				paint: {
 					'circle-radius': constellationNodeGlowRadiusExpr,
 					'circle-color': MARKER_CONSTELLATION_HALO_COLOR,
-					'circle-opacity': MARKER_CONSTELLATION_NODE_GLOW_OPACITY,
+					'circle-opacity': getMarkerConstellationNodeZoomFadedOpacity(
+						MARKER_CONSTELLATION_NODE_GLOW_OPACITY
+					),
 					'circle-blur': 0.72,
 					'circle-stroke-width': 0,
 				},
@@ -9942,9 +10540,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				paint: {
 					'circle-radius': constellationNodeRadiusExpr,
 					'circle-color': ['get', 'fillColor'],
-					'circle-opacity': MARKER_CONSTELLATION_NODE_OPACITY,
+					'circle-opacity': getMarkerConstellationNodeZoomFadedOpacity(
+						MARKER_CONSTELLATION_NODE_OPACITY
+					),
 					'circle-stroke-color': MARKER_CONSTELLATION_HALO_COLOR,
-					'circle-stroke-opacity': 0.74,
+					'circle-stroke-opacity': getMarkerConstellationNodeZoomFadedOpacity(0.74),
 					'circle-stroke-width': [
 						'interpolate',
 						['linear'],
@@ -11559,20 +12159,35 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			// Use the same scale so our world-pixel distances match on-screen pixels.
 			const worldSize = 512 * Math.pow(2, zoomRaw);
 
+			// Pad the bbox so off-screen-but-near markers stay in the source. Without
+			// this, fast zoom/pan changes cull edge markers from the source data, and
+			// the resulting `setData()` causes the dot layer to briefly clear before
+			// re-rendering — which reads as the "disappear and reload" flicker.
+			const latSpan = north - south;
+			const lngSpan = east - west;
+			const padLat = latSpan * VIEWPORT_BBOX_PAD_FACTOR;
+			const padLng = lngSpan * VIEWPORT_BBOX_PAD_FACTOR;
+			const paddedSouth = clamp(south - padLat, -90, 90);
+			const paddedNorth = clamp(north + padLat, -90, 90);
+			const paddedWest = clamp(west - padLng, -180, 180);
+			const paddedEast = clamp(east + padLng, -180, 180);
+
 			// Keep the seed quantized so marker sampling stays stable while panning/zooming.
+			// Use the padded bounds so the seed only changes when the user moves outside the
+			// padded buffer — matching the visibility filter below for end-to-end stability.
 			const zoomKey = Math.round(zoomRaw);
 			const quant = getBackgroundDotsQuantizationDeg(zoomKey);
-			const qSouth = Math.round(south / quant);
-			const qWest = Math.round(west / quant);
-			const qNorth = Math.round(north / quant);
-			const qEast = Math.round(east / quant);
+			const qSouth = Math.round(paddedSouth / quant);
+			const qWest = Math.round(paddedWest / quant);
+			const qNorth = Math.round(paddedNorth / quant);
+			const qEast = Math.round(paddedEast / quant);
 			const seed = `${zoomKey}|${qSouth}|${qWest}|${qNorth}|${qEast}`;
 
 			const viewportBbox: BoundingBox = {
-				minLat: south,
-				maxLat: north,
-				minLng: west,
-				maxLng: east,
+				minLat: paddedSouth,
+				maxLat: paddedNorth,
+				minLng: paddedWest,
+				maxLng: paddedEast,
 			};
 
 			// Promotion overlay pins: state-wide "Radio Stations <State>" / "College Radio <State>"
@@ -14658,6 +15273,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	// Tracks the last query key that actually played the base-dot wave animation.
 	const baseDotsWaveLastSearchKeyRef = useRef<string>('');
 	const markerConstellationEdgesRef = useRef<MarkerConstellationEdge[]>([]);
+	const markerConstellationNodesRef = useRef<MarkerConstellationNode[]>([]);
 	const markerConstellationContactsByIdRef = useRef<Map<number, ContactWithName>>(
 		new Map()
 	);
@@ -14667,7 +15283,15 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const markerConstellationRevealCancelRef = useRef<(() => void) | null>(null);
 	const markerConstellationRevealDoneRef = useRef<boolean>(true);
 	const markerConstellationLastDataKeyRef = useRef<string>('');
+	// Tracks a pending moveend listener registered when compose is deferred for a
+	// camera animation (e.g., autoFit fitBounds after a search from far-out zoom).
+	// Stored on a ref so we can keep it idempotent and avoid stacking listeners.
+	const markerConstellationDeferredMoveEndRef = useRef<(() => void) | null>(null);
 	const [markerConstellationIdleNonce, setMarkerConstellationIdleNonce] = useState(0);
+	// Bumped whenever the constellation node set changes (compose, clear, reset),
+	// so the feature-state sync effect re-applies `inConstellation` on the dots.
+	const [markerConstellationCompositionNonce, setMarkerConstellationCompositionNonce] =
+		useState(0);
 	const stopBaseDotsWaveAndRestoreSteadyRendering = useCallback(() => {
 		if (!map || !isMapLoaded) return;
 
@@ -14733,7 +15357,16 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 		try {
 			if (map.getLayer(MAPBOX_LAYER_IDS.baseHit)) {
-				map.setFilter(MAPBOX_LAYER_IDS.baseHit, null as any);
+				// Restore the visibility filter (not `null`) so hit detection
+				// stays scoped to the currently-sampled visibleContacts after
+				// the wave completes. Otherwise off-screen-sampled-out features
+				// would be hit-testable just because they're in the source.
+				const visibleIds = Array.from(visibleContactIdSetRef.current);
+				const visibilityFilter: any =
+					visibleIds.length === 0
+						? ['==', ['id'], -1]
+						: ['match', ['id'], visibleIds, true, false];
+				map.setFilter(MAPBOX_LAYER_IDS.baseHit, visibilityFilter);
 			}
 		} catch {
 			// Ignore style timing races.
@@ -14801,11 +15434,13 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const clearMarkerConstellation = useCallback(() => {
 		stopMarkerConstellationReveal();
 		markerConstellationEdgesRef.current = [];
+		markerConstellationNodesRef.current = [];
 		markerConstellationContactsByIdRef.current = new Map();
 		markerConstellationNodeIdsRef.current = new Set();
 		markerConstellationComposedSearchKeyRef.current = '';
 		markerConstellationRevealDoneRef.current = true;
 		markerConstellationLastDataKeyRef.current = '';
+		setMarkerConstellationCompositionNonce((value) => value + 1);
 		setMarkerConstellationLineOpacity(0, 0, 0);
 		if (!map || !isMapLoaded) return;
 		const lineSource = map.getSource(MAPBOX_SOURCE_IDS.markerConstellation) as
@@ -14834,7 +15469,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			const source = map.getSource(MAPBOX_SOURCE_IDS.markerConstellation) as
 				| mapboxgl.GeoJSONSource
 				| undefined;
-			if (!source) return;
+			const nodeSource = map.getSource(MAPBOX_SOURCE_IDS.markerConstellationNodes) as
+				| mapboxgl.GeoJSONSource
+				| undefined;
+			if (!source && !nodeSource) return;
 
 			const contactsById =
 				contactsForVisibility != null
@@ -14855,11 +15493,18 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				if (!fromCoords || !toCoords) continue;
 
 				const edgeId = markerConstellationPairKey(edge.fromId, edge.toId);
-				dataKeyParts.push(edgeId);
+				const featureId = `${edge.level}:${edgeId}`;
+				dataKeyParts.push(
+					`e:${featureId}:${edge.rank.toFixed(3)}:${edge.opacityScale.toFixed(2)}`
+				);
 				features.push({
 					type: 'Feature',
-					id: edgeId,
-					properties: {},
+					id: featureId,
+					properties: {
+						level: edge.level,
+						rank: edge.rank,
+						opacityScale: edge.opacityScale,
+					},
 					geometry: {
 						type: 'LineString',
 						coordinates: [
@@ -14870,16 +15515,53 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				});
 			}
 
+			const nodeFeatures: any[] = [];
+			const hasLockedStateSelection = Boolean(
+				lockedStateKey && lockedStateSelectionKeyRef.current === lockedStateKey
+			);
+			for (const node of markerConstellationNodesRef.current) {
+				const contact = contactsById.get(node.id);
+				if (!contact) continue;
+				const coords = getContactCoords(contact);
+				if (!coords) continue;
+				const isOutsideLockedState = hasLockedStateSelection
+					? !isCoordsInLockedState(coords)
+					: false;
+				const whatForContact = contact.curatedCategory ?? searchWhat ?? null;
+				const baseFillColor = getResultDotColorForWhat(whatForContact);
+				const fillColor = isOutsideLockedState
+					? washOutHexColor(baseFillColor, OUTSIDE_LOCKED_STATE_WASHOUT_TO_WHITE)
+					: baseFillColor;
+				const featureId = `${node.level}:${node.id}`;
+				dataKeyParts.push(
+					`n:${featureId}:${fillColor}:${node.rank.toFixed(3)}:${node.opacityScale.toFixed(
+						2
+					)}`
+				);
+				nodeFeatures.push({
+					type: 'Feature',
+					id: featureId,
+					properties: {
+						fillColor,
+						level: node.level,
+						rank: node.rank,
+						opacityScale: node.opacityScale,
+					},
+					geometry: { type: 'Point', coordinates: [coords.lng, coords.lat] },
+				});
+			}
+
 			const dataKey = dataKeyParts.join(',');
 			markerConstellationLastDataKeyRef.current = dataKey;
 
 			try {
-				source.setData({ type: 'FeatureCollection', features } as any);
+				source?.setData({ type: 'FeatureCollection', features } as any);
+				nodeSource?.setData({ type: 'FeatureCollection', features: nodeFeatures } as any);
 			} catch {
 				// Ignore style timing races.
 			}
 		},
-		[map, isMapLoaded, getContactCoords]
+		[map, isMapLoaded, getContactCoords, lockedStateKey, isCoordsInLockedState, searchWhat]
 	);
 
 	const startMarkerConstellationReveal = useCallback(
@@ -14897,7 +15579,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			setMarkerConstellationLineOpacity(
 				MARKER_CONSTELLATION_CORE_OPACITY,
 				MARKER_CONSTELLATION_GLOW_OPACITY,
-				0
+				MARKER_CONSTELLATION_REVEAL_FADE_MS
 			);
 			return;
 		},
@@ -14969,7 +15651,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		let minLat = Number.POSITIVE_INFINITY;
 		let maxLat = Number.NEGATIVE_INFINITY;
 
-		for (const contact of visibleContacts) {
+		// Iterate the FULL contacts list (not the viewport-sampled `visibleContacts`)
+		// so the GeoJSON source stays stable across pans/zooms. `setData` only fires
+		// when the underlying contacts (or their fillColor inputs) actually change,
+		// not on every moveend. The sampled viewport subset is enforced by `setFilter`
+		// on the layers (see the visibility-filter useEffect below) — that's cheap
+		// and doesn't trigger a layer rebuild, so fast zoom no longer causes the dot
+		// layer to briefly clear and re-render ("disappear and reload").
+		for (const contact of contactsWithCoords) {
 			const coords = getContactCoords(contact);
 			if (!coords) continue;
 			const isOutsideLockedState = hasLockedStateSelection
@@ -15178,6 +15867,74 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		stopBaseDotsWaveAndRestoreSteadyRendering,
 		uncategorizedContactMarkerImageName,
 	]);
+
+	// Drive base-marker visibility via `setFilter` (cheap, no layer rebuild)
+	// instead of changing source data on every viewport change. The source
+	// above contains the full `contactsWithCoords`; this filter narrows what
+	// renders to the viewport-sampled subset (`visibleContacts`). Together
+	// these eliminate the `setData`-induced layer clear that fast zoom used
+	// to trigger ("disappear and reload").
+	useEffect(() => {
+		if (!map || !isMapLoaded) return;
+		const visibleIds = visibleContacts.map((c) => c.id);
+		const visibilityFilter: any =
+			visibleIds.length === 0
+				? ['==', ['id'], -1]
+				: ['match', ['id'], visibleIds, true, false];
+
+		const safeSet = (layerId: string, filter: any) => {
+			try {
+				if (!map.getLayer(layerId)) return;
+				map.setFilter(layerId, filter);
+			} catch {
+				// Ignore style timing races.
+			}
+		};
+
+		// While a wave reveal is active, leave baseHit's filter alone — the
+		// wave manager owns it and will restore the visibility filter when
+		// the wave completes (see stopBaseDotsWaveAndRestoreSteadyRendering).
+		if (!baseDotsWaveCancelRef.current) {
+			safeSet(MAPBOX_LAYER_IDS.baseHit, visibilityFilter);
+		}
+		safeSet(MAPBOX_LAYER_IDS.baseGlow, visibilityFilter);
+		safeSet(MAPBOX_LAYER_IDS.baseDots, visibilityFilter);
+		// baseFallbackIcons already filters by isUncategorized; AND with visibility.
+		safeSet(MAPBOX_LAYER_IDS.baseFallbackIcons, [
+			'all',
+			['==', ['get', 'isUncategorized'], true],
+			visibilityFilter,
+		]);
+	}, [map, isMapLoaded, visibleContacts]);
+
+	// Sync `inConstellation` feature-state on the base markers source so the
+	// zoom-fade paint expressions can dim non-constellation dots at low zoom.
+	// Default (unset) reads as visible; only contacts NOT in the frozen
+	// constellation node set are explicitly marked false.
+	useEffect(() => {
+		if (!map || !isMapLoaded) return;
+
+		try {
+			map.removeFeatureState({ source: MAPBOX_SOURCE_IDS.markersBase });
+		} catch {
+			// Ignore style timing races.
+		}
+
+		const nodeIds = markerConstellationNodeIdsRef.current;
+		if (nodeIds.size === 0) return;
+
+		for (const contact of visibleContacts) {
+			if (nodeIds.has(contact.id)) continue;
+			try {
+				map.setFeatureState(
+					{ source: MAPBOX_SOURCE_IDS.markersBase, id: contact.id },
+					{ inConstellation: false }
+				);
+			} catch {
+				// Ignore style timing races.
+			}
+		}
+	}, [map, isMapLoaded, visibleContacts, markerConstellationCompositionNonce]);
 
 	// Wave reveal for base dots on each completed search (left → right).
 	useEffect(() => {
@@ -15494,7 +16251,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		setMarkerConstellationLineOpacity,
 	]);
 
-	// Compose marker constellations once per result set from the initial visible primary dots.
+	// Compose marker constellations once per result set from the camera-independent
+	// pool of result contacts so lines can fade in over the autoFit fly-in.
 	useEffect(() => {
 		if (!map || !isMapLoaded) return;
 
@@ -15520,9 +16278,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			if (!hasComposedForCurrentSearch) {
 				stopMarkerConstellationReveal();
 				markerConstellationEdgesRef.current = [];
+				markerConstellationNodesRef.current = [];
 				markerConstellationContactsByIdRef.current = new Map();
+				markerConstellationNodeIdsRef.current = new Set();
 				markerConstellationComposedSearchKeyRef.current = '';
 				markerConstellationLastDataKeyRef.current = '';
+				setMarkerConstellationCompositionNonce((value) => value + 1);
 				setMarkerConstellationLineOpacity(0, 0, 0);
 			}
 			return;
@@ -15546,30 +16307,34 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		const resultKey = `${searchKey}|results:${resultSignature}`;
 		if (
 			markerConstellationComposedSearchKeyRef.current.startsWith(
-				`${resultKey}|formation:`
+				`${resultKey}|beauty-v2:`
 			)
 		) {
 			return;
 		}
 
-		if (visibleContacts.length < 2) return;
-
-		let isCameraMoving = false;
-		try {
-			isCameraMoving = map.isMoving();
-		} catch {
-			isCameraMoving = false;
-		}
-		if (isCameraMoving) {
-			const onMoveEnd = () => setMarkerConstellationIdleNonce((value) => value + 1);
-			map.once('moveend', onMoveEnd);
-			return () => {
-				map.off('moveend', onMoveEnd);
+		// Constellation topology projects to a stable Mercator pixel grid
+		// (MARKER_CONSTELLATION_MIN_COMPOSE_ZOOM), so the graph itself doesn't
+		// depend on the camera. Source from contactsWithCoords (camera-independent)
+		// and compose immediately so the lines fade in over the autoFit fly-in
+		// instead of popping in once it lands. The retry-on-moveend path below is
+		// kept as a safety net for the rare zero-edges fallback.
+		const ensureDeferredMoveEndListener = () => {
+			if (markerConstellationDeferredMoveEndRef.current) return;
+			const onMoveEnd = () => {
+				if (markerConstellationDeferredMoveEndRef.current === onMoveEnd) {
+					markerConstellationDeferredMoveEndRef.current = null;
+				}
+				setMarkerConstellationIdleNonce((value) => value + 1);
 			};
-		}
+			markerConstellationDeferredMoveEndRef.current = onMoveEnd;
+			map.once('moveend', onMoveEnd);
+		};
 
 		let cancelled = false;
-		const timeout = setTimeout(() => {
+		// rAF-defer one frame so the dot first-paint isn't blocked by the
+		// O(N²) edge builder that runs below.
+		const rafId = requestAnimationFrame(() => {
 			if (cancelled) return;
 
 			const curatedBlobGroupKeyByContactId = new Map<number, string>();
@@ -15591,7 +16356,27 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				});
 			}
 
-			let contactsForConstellation = visibleContacts.slice();
+			// When a state is locked, prefer in-state contacts so the 180-point cap
+			// doesn't get dominated by out-of-state contacts at low zoom — this
+			// mirrors the in/out balance that visibleContacts uses.
+			let contactsForConstellation: ContactWithName[];
+			if (lockedStateKey) {
+				const insideState: ContactWithName[] = [];
+				for (const contact of contactsWithCoords) {
+					const contactStateKey = normalizeStateKey(contact.state ?? null);
+					if (contactStateKey === lockedStateKey) {
+						insideState.push(contact);
+					} else if (!contactStateKey) {
+						const coords = getContactCoords(contact);
+						if (coords && isCoordsInLockedState(coords)) insideState.push(contact);
+					}
+				}
+				contactsForConstellation =
+					insideState.length >= 2 ? insideState : contactsWithCoords.slice();
+			} else {
+				contactsForConstellation = contactsWithCoords.slice();
+			}
+
 			if (contactsForConstellation.length > MARKER_CONSTELLATION_MAX_POINTS) {
 				contactsForConstellation = contactsForConstellation
 					.map((contact) => ({
@@ -15604,6 +16389,24 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			}
 			contactsForConstellation.sort((a, b) => a.id - b.id);
 
+			let currentZoom = MAP_DEFAULT_ZOOM;
+			try {
+				currentZoom = map.getZoom() ?? MAP_DEFAULT_ZOOM;
+			} catch {
+				currentZoom = MAP_DEFAULT_ZOOM;
+			}
+			if (!Number.isFinite(currentZoom)) currentZoom = MAP_DEFAULT_ZOOM;
+			// Constellation topology is frozen once per result set. If a search starts
+			// from the low-zoom globe, current screen pixels collapse nearby contacts
+			// enough that the edge builder can cache an empty formation. Compose in a
+			// stable Mercator pixel space with a normal-map zoom floor instead.
+			const constellationComposeZoom = Math.max(
+				MARKER_CONSTELLATION_MIN_COMPOSE_ZOOM,
+				currentZoom
+			);
+			const constellationWorldSize =
+				512 * Math.pow(2, constellationComposeZoom);
+
 			let points: MarkerConstellationPoint[] = [];
 			const contactsByPointId = new Map<number, ContactWithName>();
 			for (const contact of contactsForConstellation) {
@@ -15612,12 +16415,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				const curatedGroupKey = curatedBlobGroupKeyByContactId.get(contact.id);
 				if (curatedBlobGroupKeyByContactId.size > 0 && !curatedGroupKey) continue;
 
-				let projected: mapboxgl.Point;
-				try {
-					projected = map.project([coords.lng, coords.lat]);
-				} catch {
-					continue;
-				}
+				const projected = latLngToWorldPixel(coords, constellationWorldSize);
 				if (!Number.isFinite(projected.x) || !Number.isFinite(projected.y)) continue;
 
 				points.push({
@@ -15646,41 +16444,69 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						)}:${point.coords.lat.toFixed(5)}`
 				)
 				.join(',');
-			const compositionKey = `${resultKey}|formation:${pointsSignature}`;
+			const compositionKey = `${resultKey}|beauty-v2:${pointsSignature}`;
 			if (markerConstellationComposedSearchKeyRef.current === compositionKey) return;
 
 			if (points.length < 2) {
+				// No projectable points. Don't cache — leave composedKey unset so a
+				// later contactsWithCoords update can retry.
 				stopMarkerConstellationReveal();
 				markerConstellationEdgesRef.current = [];
+				markerConstellationNodesRef.current = [];
 				markerConstellationContactsByIdRef.current = new Map();
-				markerConstellationComposedSearchKeyRef.current = compositionKey;
+				markerConstellationNodeIdsRef.current = new Set();
+				markerConstellationComposedSearchKeyRef.current = '';
 				markerConstellationRevealDoneRef.current = true;
 				markerConstellationLastDataKeyRef.current = '';
+				setMarkerConstellationCompositionNonce((value) => value + 1);
 				setMarkerConstellationLineOpacity(0, 0, 0);
 				writeMarkerConstellationSourceData();
+				ensureDeferredMoveEndListener();
 				return;
 			}
 
 			const seed = `${searchKey}|${points.map((point) => point.id).join(',')}`;
-			let edges = buildMarkerConstellationEdges(points, seed);
-			if (edges.length === 0) {
-				edges = buildSparseMarkerConstellationEdges(points, `${seed}|sparse`);
+			const formation = buildBeautyMarkerConstellationFormation(
+				points,
+				seed,
+				constellationComposeZoom
+			);
+
+			if (formation.edges.length === 0 && formation.nodes.length === 0) {
+				// No drawable formation. Leave composedKey unset so the next idle update
+				// can retry after a pan/zoom or a denser coordinate update.
+				stopMarkerConstellationReveal();
+				markerConstellationEdgesRef.current = [];
+				markerConstellationNodesRef.current = [];
+				markerConstellationContactsByIdRef.current = contactsByPointId;
+				markerConstellationNodeIdsRef.current = new Set();
+				markerConstellationComposedSearchKeyRef.current = '';
+				markerConstellationRevealDoneRef.current = true;
+				markerConstellationLastDataKeyRef.current = '';
+				setMarkerConstellationCompositionNonce((value) => value + 1);
+				setMarkerConstellationLineOpacity(0, 0, 0);
+				writeMarkerConstellationSourceData();
+				ensureDeferredMoveEndListener();
+				return;
 			}
 
 			stopMarkerConstellationReveal();
-			markerConstellationEdgesRef.current = edges;
+			markerConstellationEdgesRef.current = formation.edges;
+			markerConstellationNodesRef.current = formation.nodes;
 			markerConstellationContactsByIdRef.current = contactsByPointId;
+			markerConstellationNodeIdsRef.current = formation.lowZoomNodeIds;
 			markerConstellationComposedSearchKeyRef.current = compositionKey;
 			markerConstellationRevealDoneRef.current = false;
 			markerConstellationLastDataKeyRef.current = '';
+			setMarkerConstellationCompositionNonce((value) => value + 1);
 			setMarkerConstellationLineOpacity(0, 0, 0);
 			writeMarkerConstellationSourceData();
 			startMarkerConstellationReveal();
-		}, 90);
+		});
 
 		return () => {
 			cancelled = true;
-			clearTimeout(timeout);
+			cancelAnimationFrame(rafId);
 		};
 	}, [
 		map,
@@ -15688,9 +16514,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		isLoading,
 		isBackgroundPresentation,
 		searchQuery,
-		visibleContacts,
 		contactsWithCoords,
 		getContactCoords,
+		lockedStateKey,
+		isCoordsInLockedState,
 		markerConstellationIdleNonce,
 		clearMarkerConstellation,
 		stopMarkerConstellationReveal,
