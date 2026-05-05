@@ -1604,6 +1604,47 @@ export const sampleContactsByCategory = async (options: CuratedSamplerOptions) =
 	};
 };
 
+// Cheap count of person-shaped (non-canonical-venue) docs whose `title`
+// lexically matches the query. Used by the search route to detect when a
+// short noun-led query like "professor" or "janitor" is actually a role —
+// the noun-led person/loose hard-drop in scoring is too aggressive for
+// those, so the route relaxes it when this count crosses a threshold. We
+// exclude canonical venue titles via must_not prefix on `title.keyword`
+// because docs like "Music Venues Pennsylvania" would otherwise muddy the
+// signal whenever the query token coincidentally appears in metadata-derived
+// title text. `operator: and` keeps multi-token queries strict.
+export const countPersonTitleMatches = async (
+	queryText: string,
+	venueTitlePrefixes: readonly string[]
+): Promise<number> => {
+	const cleaned = queryText.trim();
+	if (cleaned.length === 0) return 0;
+
+	const mustNot = venueTitlePrefixes
+		.map((p) => p.trim().toLowerCase())
+		.filter((p) => p.length > 0)
+		.map((p) => ({
+			prefix: { 'title.keyword': { value: p, case_insensitive: true } },
+		}));
+
+	const result = await elasticsearch.count({
+		index: INDEX_NAME,
+		query: {
+			bool: {
+				must: [
+					{
+						match: {
+							title: { query: cleaned, operator: 'and' },
+						},
+					},
+				],
+				must_not: mustNot,
+			},
+		},
+	});
+	return typeof result.count === 'number' ? result.count : 0;
+};
+
 // Debug function - only use in development
 export const debugElasticsearch = async () => {
 	if (process.env.NODE_ENV === 'production') {

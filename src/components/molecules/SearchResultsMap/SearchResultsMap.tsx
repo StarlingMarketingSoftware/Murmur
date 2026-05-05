@@ -28,12 +28,14 @@ import {
 } from '@/components/atoms/_svg/MapTooltipIcon';
 import {
 	generateMapMarkerPinIconUrl,
+	generateUncategorizedContactMarkerIconUrl,
 	MAP_MARKER_PIN_CIRCLE_CENTER_X,
 	MAP_MARKER_PIN_CIRCLE_CENTER_Y,
 	MAP_MARKER_PIN_CIRCLE_DIAMETER,
 	MAP_MARKER_PIN_VIEWBOX_HEIGHT,
 	MAP_MARKER_PIN_VIEWBOX_WIDTH,
 } from '@/components/atoms/_svg/MapMarkerPinIcon';
+import { isCleanMapMarkerCategory } from '@/components/atoms/_svg/mapTooltipCategoryIcons';
 import { RestaurantsIcon } from '@/components/atoms/_svg/RestaurantsIcon';
 import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
 import { MusicVenuesIcon } from '@/components/atoms/_svg/MusicVenuesIcon';
@@ -1860,6 +1862,341 @@ const distancePointToSegmentSq = (
 	return dx * dx + dy * dy;
 };
 
+type MarkerConstellationCandidate = {
+	fromId: number;
+	toId: number;
+	ax: number;
+	ay: number;
+	bx: number;
+	by: number;
+	length: number;
+	score: number;
+};
+
+const markerConstellationPairKey = (a: number, b: number): string =>
+	a < b ? `${a}:${b}` : `${b}:${a}`;
+
+const markerConstellationOrientation = (
+	ax: number,
+	ay: number,
+	bx: number,
+	by: number,
+	cx: number,
+	cy: number
+): number => {
+	const value = (by - ay) * (cx - bx) - (bx - ax) * (cy - by);
+	if (Math.abs(value) < 1e-9) return 0;
+	return value > 0 ? 1 : 2;
+};
+
+const markerConstellationOnSegment = (
+	ax: number,
+	ay: number,
+	bx: number,
+	by: number,
+	cx: number,
+	cy: number
+): boolean =>
+	bx <= Math.max(ax, cx) + 1e-9 &&
+	bx + 1e-9 >= Math.min(ax, cx) &&
+	by <= Math.max(ay, cy) + 1e-9 &&
+	by + 1e-9 >= Math.min(ay, cy);
+
+const markerConstellationSegmentsIntersect = (
+	a: Pick<MarkerConstellationCandidate, 'ax' | 'ay' | 'bx' | 'by'>,
+	b: Pick<MarkerConstellationCandidate, 'ax' | 'ay' | 'bx' | 'by'>
+): boolean => {
+	const o1 = markerConstellationOrientation(a.ax, a.ay, a.bx, a.by, b.ax, b.ay);
+	const o2 = markerConstellationOrientation(a.ax, a.ay, a.bx, a.by, b.bx, b.by);
+	const o3 = markerConstellationOrientation(b.ax, b.ay, b.bx, b.by, a.ax, a.ay);
+	const o4 = markerConstellationOrientation(b.ax, b.ay, b.bx, b.by, a.bx, a.by);
+
+	if (o1 !== o2 && o3 !== o4) return true;
+	if (
+		o1 === 0 &&
+		markerConstellationOnSegment(a.ax, a.ay, b.ax, b.ay, a.bx, a.by)
+	)
+		return true;
+	if (
+		o2 === 0 &&
+		markerConstellationOnSegment(a.ax, a.ay, b.bx, b.by, a.bx, a.by)
+	)
+		return true;
+	if (
+		o3 === 0 &&
+		markerConstellationOnSegment(b.ax, b.ay, a.ax, a.ay, b.bx, b.by)
+	)
+		return true;
+	if (
+		o4 === 0 &&
+		markerConstellationOnSegment(b.ax, b.ay, a.bx, a.by, b.bx, b.by)
+	)
+		return true;
+	return false;
+};
+
+const markerConstellationCandidateCutsThroughPoint = (
+	candidate: MarkerConstellationCandidate,
+	points: MarkerConstellationPoint[]
+): boolean => {
+	const clearanceSq =
+		MARKER_CONSTELLATION_POINT_CLEARANCE_PX * MARKER_CONSTELLATION_POINT_CLEARANCE_PX;
+	for (const point of points) {
+		if (point.id === candidate.fromId || point.id === candidate.toId) continue;
+		const distSq = distancePointToSegmentSq(
+			point.x,
+			point.y,
+			candidate.ax,
+			candidate.ay,
+			candidate.bx,
+			candidate.by
+		);
+		if (distSq < clearanceSq) return true;
+	}
+	return false;
+};
+
+const markerConstellationWouldCrossExistingEdge = (
+	candidate: MarkerConstellationCandidate,
+	edges: MarkerConstellationCandidate[]
+): boolean => {
+	for (const edge of edges) {
+		if (
+			edge.fromId === candidate.fromId ||
+			edge.fromId === candidate.toId ||
+			edge.toId === candidate.fromId ||
+			edge.toId === candidate.toId
+		) {
+			continue;
+		}
+		if (markerConstellationSegmentsIntersect(candidate, edge)) return true;
+	}
+	return false;
+};
+
+const buildMarkerConstellationEdgesForGroup = (
+	points: MarkerConstellationPoint[],
+	seed: string,
+	remainingBudget: number
+): MarkerConstellationEdge[] => {
+	if (points.length < 2 || remainingBudget <= 0) return [];
+
+	const sorted = points.slice().sort((a, b) => a.id - b.id);
+	const nearestDistances: number[] = [];
+	for (let i = 0; i < sorted.length; i++) {
+		let nearest = Infinity;
+		for (let j = 0; j < sorted.length; j++) {
+			if (i === j) continue;
+			const dx = sorted[i].x - sorted[j].x;
+			const dy = sorted[i].y - sorted[j].y;
+			nearest = Math.min(nearest, Math.hypot(dx, dy));
+		}
+		if (Number.isFinite(nearest)) nearestDistances.push(nearest);
+	}
+
+	nearestDistances.sort((a, b) => a - b);
+	const medianNearest =
+		nearestDistances.length > 0
+			? nearestDistances[Math.floor(nearestDistances.length / 2)]
+			: MARKER_CONSTELLATION_MIN_EDGE_PX;
+	const maxEdgePx = Math.min(
+		MARKER_CONSTELLATION_MAX_EDGE_PX,
+		Math.max(MARKER_CONSTELLATION_MIN_EDGE_PX, medianNearest * 2.65)
+	);
+
+	const candidates: MarkerConstellationCandidate[] = [];
+	for (let i = 0; i < sorted.length; i++) {
+		for (let j = i + 1; j < sorted.length; j++) {
+			const a = sorted[i];
+			const b = sorted[j];
+			const dx = a.x - b.x;
+			const dy = a.y - b.y;
+			const length = Math.hypot(dx, dy);
+			if (
+				!Number.isFinite(length) ||
+				length < MARKER_CONSTELLATION_MIN_EDGE_PX ||
+				length > maxEdgePx
+			) {
+				continue;
+			}
+
+			const pairKey = markerConstellationPairKey(a.id, b.id);
+			const h = hashStringToUint32(`${seed}|${pairKey}`);
+			const candidate: MarkerConstellationCandidate = {
+				fromId: a.id,
+				toId: b.id,
+				ax: a.x,
+				ay: a.y,
+				bx: b.x,
+				by: b.y,
+				length,
+				// A tiny deterministic wobble avoids overly mechanical ties without changing intent.
+				score: length + (h / 0xffffffff) * 8,
+			};
+			if (markerConstellationCandidateCutsThroughPoint(candidate, sorted)) continue;
+			candidates.push(candidate);
+		}
+	}
+
+	if (candidates.length === 0) return [];
+	candidates.sort((a, b) => a.score - b.score);
+
+	const parent = new Map<number, number>();
+	for (const point of sorted) parent.set(point.id, point.id);
+	const find = (id: number): number => {
+		const p = parent.get(id);
+		if (p == null || p === id) return id;
+		const root = find(p);
+		parent.set(id, root);
+		return root;
+	};
+	const union = (a: number, b: number): boolean => {
+		const rootA = find(a);
+		const rootB = find(b);
+		if (rootA === rootB) return false;
+		parent.set(rootB, rootA);
+		return true;
+	};
+
+	const degree = new Map<number, number>();
+	const chosen: MarkerConstellationCandidate[] = [];
+	const chosenKeys = new Set<string>();
+	const maxDegree = sorted.length >= 7 ? 3 : 2;
+	let branchDegreeThreeCount = 0;
+	const maxBranchDegreeThree = sorted.length >= 10 ? 2 : sorted.length >= 7 ? 1 : 0;
+
+	const canUseCandidate = (candidate: MarkerConstellationCandidate): boolean => {
+		const fromDegree = degree.get(candidate.fromId) ?? 0;
+		const toDegree = degree.get(candidate.toId) ?? 0;
+		if (fromDegree >= maxDegree || toDegree >= maxDegree) return false;
+
+		const wouldCreateThird =
+			(maxDegree >= 3 && fromDegree === 2 ? 1 : 0) +
+			(maxDegree >= 3 && toDegree === 2 ? 1 : 0);
+		if (branchDegreeThreeCount + wouldCreateThird > maxBranchDegreeThree) return false;
+		if (markerConstellationWouldCrossExistingEdge(candidate, chosen)) return false;
+		return true;
+	};
+
+	const acceptCandidate = (candidate: MarkerConstellationCandidate) => {
+		chosen.push(candidate);
+		chosenKeys.add(markerConstellationPairKey(candidate.fromId, candidate.toId));
+		const fromDegree = degree.get(candidate.fromId) ?? 0;
+		const toDegree = degree.get(candidate.toId) ?? 0;
+		if (maxDegree >= 3 && fromDegree === 2) branchDegreeThreeCount += 1;
+		if (maxDegree >= 3 && toDegree === 2) branchDegreeThreeCount += 1;
+		degree.set(candidate.fromId, fromDegree + 1);
+		degree.set(candidate.toId, toDegree + 1);
+	};
+
+	const targetTreeEdges = Math.min(sorted.length - 1, remainingBudget);
+	for (const candidate of candidates) {
+		if (chosen.length >= targetTreeEdges) break;
+		if (!canUseCandidate(candidate)) continue;
+		if (!union(candidate.fromId, candidate.toId)) continue;
+		acceptCandidate(candidate);
+	}
+
+	const maxExtraEdges = Math.min(
+		Math.max(0, remainingBudget - chosen.length),
+		Math.max(0, Math.floor(sorted.length * 0.16))
+	);
+	let addedExtra = 0;
+	const extraMaxLength = Math.min(maxEdgePx, medianNearest * 1.9);
+	for (const candidate of candidates) {
+		if (addedExtra >= maxExtraEdges) break;
+		const key = markerConstellationPairKey(candidate.fromId, candidate.toId);
+		if (chosenKeys.has(key)) continue;
+		if (candidate.length > extraMaxLength) continue;
+		if (!canUseCandidate(candidate)) continue;
+		acceptCandidate(candidate);
+		addedExtra += 1;
+	}
+
+	return chosen.slice(0, remainingBudget).map((edge) => ({
+		fromId: edge.fromId,
+		toId: edge.toId,
+	}));
+};
+
+const buildFallbackMarkerConstellationGroupKeys = (
+	points: MarkerConstellationPoint[]
+): Map<number, string> => {
+	const parent = new Map<number, number>();
+	for (const point of points) parent.set(point.id, point.id);
+
+	const find = (id: number): number => {
+		const p = parent.get(id);
+		if (p == null || p === id) return id;
+		const root = find(p);
+		parent.set(id, root);
+		return root;
+	};
+	const union = (a: number, b: number) => {
+		const rootA = find(a);
+		const rootB = find(b);
+		if (rootA !== rootB) parent.set(rootB, rootA);
+	};
+
+	for (let i = 0; i < points.length; i++) {
+		for (let j = i + 1; j < points.length; j++) {
+			const dx = points[i].x - points[j].x;
+			const dy = points[i].y - points[j].y;
+			if (Math.hypot(dx, dy) <= MARKER_CONSTELLATION_FALLBACK_GROUP_PX) {
+				union(points[i].id, points[j].id);
+			}
+		}
+	}
+
+	const rootToGroup = new Map<number, string>();
+	const groupKeyById = new Map<number, string>();
+	for (const point of points) {
+		const root = find(point.id);
+		let key = rootToGroup.get(root);
+		if (!key) {
+			key = `fallback:${rootToGroup.size}`;
+			rootToGroup.set(root, key);
+		}
+		groupKeyById.set(point.id, key);
+	}
+	return groupKeyById;
+};
+
+const buildMarkerConstellationEdges = (
+	points: MarkerConstellationPoint[],
+	seed: string
+): MarkerConstellationEdge[] => {
+	if (points.length < 2) return [];
+
+	const groups = new Map<string, MarkerConstellationPoint[]>();
+	for (const point of points) {
+		const group = groups.get(point.groupKey);
+		if (group) group.push(point);
+		else groups.set(point.groupKey, [point]);
+	}
+
+	const orderedGroups = Array.from(groups.entries())
+		.map(([key, group]) => ({
+			key,
+			group: group.slice().sort((a, b) => a.id - b.id),
+			minId: group.reduce((min, point) => Math.min(min, point.id), Infinity),
+		}))
+		.filter(({ group }) => group.length >= 2)
+		.sort((a, b) => a.minId - b.minId || a.key.localeCompare(b.key));
+
+	const edges: MarkerConstellationEdge[] = [];
+	for (const { key, group } of orderedGroups) {
+		if (edges.length >= MARKER_CONSTELLATION_MAX_EDGES) break;
+		const groupEdges = buildMarkerConstellationEdgesForGroup(
+			group,
+			`${seed}|${key}`,
+			MARKER_CONSTELLATION_MAX_EDGES - edges.length
+		);
+		edges.push(...groupEdges);
+	}
+	return edges;
+};
+
 const buildOuterRingWorldSegments = (
 	multiPolygon: ClippingMultiPolygon,
 	worldSize: number
@@ -3394,6 +3731,7 @@ const MAPBOX_SOURCE_IDS = {
 	resultsOutline: 'murmur-results-outline',
 	lockedOutline: 'murmur-locked-outline',
 	curatedBlob: 'murmur-curated-blob',
+	markerConstellation: 'murmur-marker-constellation',
 	selectionRect: 'murmur-selection-rect',
 	selectedAreaRect: 'murmur-selected-area-rect',
 	markersBase: 'murmur-markers-base',
@@ -3429,6 +3767,8 @@ const MAPBOX_LAYER_IDS = {
 	resultsOutline: 'murmur-results-outline-line',
 	lockedOutline: 'murmur-locked-outline-line',
 	curatedBlobCore: 'murmur-curated-blob-core-line',
+	markerConstellationGlow: 'murmur-marker-constellation-glow-line',
+	markerConstellationCore: 'murmur-marker-constellation-core-line',
 	// Markers (hit layers are used for hover/click priority)
 	markersAllHit: 'murmur-markers-all-hit',
 	markersAllGlow: 'murmur-markers-all-glow',
@@ -3444,6 +3784,7 @@ const MAPBOX_LAYER_IDS = {
 	baseHit: 'murmur-base-hit',
 	baseGlow: 'murmur-base-glow',
 	baseDots: 'murmur-base-dots',
+	baseFallbackIcons: 'murmur-base-fallback-icons',
 	// Rectangles
 	selectedAreaRect: 'murmur-selected-area-rect-line',
 	selectionRectFill: 'murmur-selection-rect-fill',
@@ -3472,6 +3813,32 @@ const DOT_WAVE_EASING: any = ['cubic-bezier', 0.33, 0, 0.2, 1];
 
 type DotWaveMeta = {
 	maxDelayMs: number;
+};
+
+// --- Marker constellations (search results) ---
+// Delicate background linework that is composed once per search from visible primary dots.
+const MARKER_CONSTELLATION_LINE_COLOR = '#4F555C';
+const MARKER_CONSTELLATION_HALO_COLOR = '#F6FAFC';
+const MARKER_CONSTELLATION_CORE_OPACITY = 0.42;
+const MARKER_CONSTELLATION_GLOW_OPACITY = 0.26;
+const MARKER_CONSTELLATION_MAX_POINTS = 180;
+const MARKER_CONSTELLATION_MAX_EDGES = 140;
+const MARKER_CONSTELLATION_MIN_EDGE_PX = 18;
+const MARKER_CONSTELLATION_MAX_EDGE_PX = 185;
+const MARKER_CONSTELLATION_FALLBACK_GROUP_PX = 230;
+const MARKER_CONSTELLATION_POINT_CLEARANCE_PX = 9;
+
+type MarkerConstellationPoint = {
+	id: number;
+	coords: LatLngLiteral;
+	x: number;
+	y: number;
+	groupKey: string;
+};
+
+type MarkerConstellationEdge = {
+	fromId: number;
+	toId: number;
 };
 
 const computeDotWaveTravelMs = (featureCount: number): number => {
@@ -3724,14 +4091,43 @@ const RESULT_DOT_GLOW_COLOR = '#FFFFFF';
 const RESULT_DOT_GLOW_RADIUS_MIN_PX = 8;
 const RESULT_DOT_GLOW_RADIUS_MAX_PX = 16;
 const RESULT_DOT_GLOW_OPACITY = 0.72;
-const CURATED_DOT_GLOW_ZOOM_FADE_EXPR: any = [
+const CATEGORIZED_DOT_ZOOM_FADE_EXPR: any = [
 	'interpolate',
 	['linear'],
 	['zoom'],
 	CURATED_DOT_FADE_END_ZOOM,
-	['case', ['boolean', ['get', 'isCurated'], false], 0, RESULT_DOT_GLOW_OPACITY],
+	[
+		'case',
+		['boolean', ['get', 'isUncategorized'], false],
+		0,
+		['case', ['boolean', ['get', 'isCurated'], false], 0, 1],
+	],
 	CURATED_DOT_FADE_START_ZOOM,
-	RESULT_DOT_GLOW_OPACITY,
+	['case', ['boolean', ['get', 'isUncategorized'], false], 0, 1],
+];
+const CATEGORIZED_DOT_GLOW_ZOOM_FADE_EXPR: any = [
+	'interpolate',
+	['linear'],
+	['zoom'],
+	CURATED_DOT_FADE_END_ZOOM,
+	[
+		'case',
+		['boolean', ['get', 'isUncategorized'], false],
+		0,
+		[
+			'case',
+			['boolean', ['get', 'isCurated'], false],
+			0,
+			RESULT_DOT_GLOW_OPACITY,
+		],
+	],
+	CURATED_DOT_FADE_START_ZOOM,
+	[
+		'case',
+		['boolean', ['get', 'isUncategorized'], false],
+		0,
+		RESULT_DOT_GLOW_OPACITY,
+	],
 ];
 const ALL_CONTACTS_DOT_GLOW_OPACITY = 0.54;
 const RESULT_DOT_GLOW_BLUR = 0.86;
@@ -3742,6 +4138,14 @@ const BOOKING_EXTRA_PIN_HOVER_STROKE_COLOR = '#000000';
 
 const withResultDotGlowOpacity = (dotOpacityExpr: unknown) =>
 	['*', RESULT_DOT_GLOW_OPACITY, dotOpacityExpr] as any;
+
+const withCategorizedDotOpacity = (dotOpacityExpr: unknown) =>
+	[
+		'case',
+		['boolean', ['get', 'isUncategorized'], false],
+		0,
+		dotOpacityExpr,
+	] as any;
 
 // Keep hover tooltip above all map markers so it never gets covered.
 const HOVER_TOOLTIP_Z_INDEX = 1_000_000;
@@ -8767,6 +9171,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		ensureSource(MAPBOX_SOURCE_IDS.resultsOutline);
 		ensureSource(MAPBOX_SOURCE_IDS.lockedOutline);
 		ensureSource(MAPBOX_SOURCE_IDS.curatedBlob);
+		ensureSource(MAPBOX_SOURCE_IDS.markerConstellation);
 		ensureSource(MAPBOX_SOURCE_IDS.selectedAreaRect);
 		ensureSource(MAPBOX_SOURCE_IDS.selectionRect);
 
@@ -9277,6 +9682,53 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			},
 		});
 
+		// Frozen per-search constellation linework — understated background geometry
+		// that sits behind the marker dots and never participates in hit testing.
+		ensureLayer({
+			id: MAPBOX_LAYER_IDS.markerConstellationGlow,
+			type: 'line',
+			source: MAPBOX_SOURCE_IDS.markerConstellation,
+			layout: { 'line-join': 'round', 'line-cap': 'round' },
+			paint: {
+				'line-color': MARKER_CONSTELLATION_HALO_COLOR,
+				'line-opacity': 0,
+				'line-width': [
+					'interpolate',
+					['linear'],
+					['zoom'],
+					3,
+					3.4,
+					7,
+					5.4,
+					13,
+					7.2,
+				],
+				'line-blur': 1.8,
+			},
+		});
+		ensureLayer({
+			id: MAPBOX_LAYER_IDS.markerConstellationCore,
+			type: 'line',
+			source: MAPBOX_SOURCE_IDS.markerConstellation,
+			layout: { 'line-join': 'round', 'line-cap': 'round' },
+			paint: {
+				'line-color': MARKER_CONSTELLATION_LINE_COLOR,
+				'line-opacity': 0,
+				'line-width': [
+					'interpolate',
+					['linear'],
+					['zoom'],
+					3,
+					1.25,
+					7,
+					1.85,
+					13,
+					2.55,
+				],
+				'line-blur': 0,
+			},
+		});
+
 		// All-contacts overlay (gray dots) — lowest marker priority
 		ensureLayer({
 			id: MAPBOX_LAYER_IDS.markersAllHit,
@@ -9456,7 +9908,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			paint: {
 				'circle-radius': resultDotGlowRadiusExpr,
 				'circle-color': RESULT_DOT_GLOW_COLOR,
-				'circle-opacity': CURATED_DOT_GLOW_ZOOM_FADE_EXPR,
+				'circle-opacity': CATEGORIZED_DOT_GLOW_ZOOM_FADE_EXPR,
 				'circle-blur': RESULT_DOT_GLOW_BLUR,
 				'circle-stroke-width': 0,
 			},
@@ -9468,9 +9920,26 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			paint: {
 				'circle-radius': resultDotRadiusExpr,
 				'circle-color': ['get', 'fillColor'],
-				'circle-opacity': CURATED_DOT_ZOOM_FADE_EXPR,
+				'circle-opacity': CATEGORIZED_DOT_ZOOM_FADE_EXPR,
 				'circle-stroke-color': resultDotStrokeColorExpr,
 				'circle-stroke-width': resultDotSelectedStrokeExpr,
+			},
+		});
+		ensureLayer({
+			id: MAPBOX_LAYER_IDS.baseFallbackIcons,
+			type: 'symbol',
+			source: MAPBOX_SOURCE_IDS.markersBase,
+			filter: ['==', ['get', 'isUncategorized'], true],
+			layout: {
+				'icon-image': ['get', 'fallbackIcon'],
+				'icon-size': pinIconSizeExpr,
+				'icon-anchor': 'top-left',
+				'icon-offset': [-MAP_MARKER_PIN_CIRCLE_CENTER_X, -MAP_MARKER_PIN_CIRCLE_CENTER_Y],
+				'icon-allow-overlap': true,
+				'icon-ignore-placement': true,
+			},
+			paint: {
+				'icon-opacity': CURATED_DOT_ZOOM_FADE_EXPR,
 			},
 		});
 
@@ -13918,6 +14387,29 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		[]
 	);
 
+	const uncategorizedContactMarkerUrl = useMemo(
+		() => generateUncategorizedContactMarkerIconUrl(),
+		[]
+	);
+	const uncategorizedContactMarkerImageName = useMemo(
+		() => imageNameFromUrl(uncategorizedContactMarkerUrl),
+		[imageNameFromUrl, uncategorizedContactMarkerUrl]
+	);
+
+	useEffect(() => {
+		if (!map || !isMapLoaded) return;
+		void ensureMapImageFromUrl(
+			uncategorizedContactMarkerImageName,
+			uncategorizedContactMarkerUrl
+		);
+	}, [
+		map,
+		isMapLoaded,
+		ensureMapImageFromUrl,
+		uncategorizedContactMarkerImageName,
+		uncategorizedContactMarkerUrl,
+	]);
+
 	const promotionPinIdsRef = useRef<Set<number>>(new Set());
 	const promotionDotIdsRef = useRef<Set<number>>(new Set());
 	const baseDotsLastDataKeyRef = useRef<string>('');
@@ -13937,6 +14429,13 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const baseDotsWavePendingSearchKeyRef = useRef<string | null>(null);
 	// Tracks the last query key that actually played the base-dot wave animation.
 	const baseDotsWaveLastSearchKeyRef = useRef<string>('');
+	const markerConstellationEdgesRef = useRef<MarkerConstellationEdge[]>([]);
+	const markerConstellationLastSearchKeyRef = useRef<string>((searchQuery ?? '').trim());
+	const markerConstellationComposedSearchKeyRef = useRef<string>('');
+	const markerConstellationRevealCancelRef = useRef<(() => void) | null>(null);
+	const markerConstellationRevealDoneRef = useRef<boolean>(true);
+	const markerConstellationLastDataKeyRef = useRef<string>('');
+	const [markerConstellationIdleNonce, setMarkerConstellationIdleNonce] = useState(0);
 	const stopBaseDotsWaveAndRestoreSteadyRendering = useCallback(() => {
 		if (!map || !isMapLoaded) return;
 
@@ -13957,7 +14456,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				(map as any).setPaintProperty(
 					MAPBOX_LAYER_IDS.baseGlow,
 					'circle-opacity',
-					CURATED_DOT_GLOW_ZOOM_FADE_EXPR
+					CATEGORIZED_DOT_GLOW_ZOOM_FADE_EXPR
 				);
 			}
 			if (map.getLayer(MAPBOX_LAYER_IDS.baseDots)) {
@@ -13975,11 +14474,24 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				(map as any).setPaintProperty(
 					MAPBOX_LAYER_IDS.baseDots,
 					'circle-opacity',
-					CURATED_DOT_ZOOM_FADE_EXPR
+					CATEGORIZED_DOT_ZOOM_FADE_EXPR
 				);
 				(map as any).setPaintProperty(
 					MAPBOX_LAYER_IDS.baseDots,
 					'circle-stroke-opacity',
+					CURATED_DOT_ZOOM_FADE_EXPR
+				);
+			}
+			if (map.getLayer(MAPBOX_LAYER_IDS.baseFallbackIcons)) {
+				const transition = { duration: 0, delay: 0 } as any;
+				(map as any).setPaintProperty(
+					MAPBOX_LAYER_IDS.baseFallbackIcons,
+					'icon-opacity-transition',
+					transition
+				);
+				(map as any).setPaintProperty(
+					MAPBOX_LAYER_IDS.baseFallbackIcons,
+					'icon-opacity',
 					CURATED_DOT_ZOOM_FADE_EXPR
 				);
 			}
@@ -14009,6 +14521,150 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			map.off('movestart', onMoveStart);
 		};
 	}, [map, isMapLoaded, stopBaseDotsWaveAndRestoreSteadyRendering]);
+
+	const stopMarkerConstellationReveal = useCallback(() => {
+		const cancel = markerConstellationRevealCancelRef.current;
+		if (cancel) {
+			cancel();
+			markerConstellationRevealCancelRef.current = null;
+		}
+	}, []);
+
+	const setMarkerConstellationLineOpacity = useCallback(
+		(coreOpacity: any, glowOpacity: any, transitionMs = 0) => {
+			if (!map || !isMapLoaded) return;
+			const transition = { duration: transitionMs, delay: 0 } as any;
+			try {
+				if (map.getLayer(MAPBOX_LAYER_IDS.markerConstellationCore)) {
+					(map as any).setPaintProperty(
+						MAPBOX_LAYER_IDS.markerConstellationCore,
+						'line-opacity-transition',
+						transition
+					);
+					(map as any).setPaintProperty(
+						MAPBOX_LAYER_IDS.markerConstellationCore,
+						'line-opacity',
+						coreOpacity
+					);
+				}
+				if (map.getLayer(MAPBOX_LAYER_IDS.markerConstellationGlow)) {
+					(map as any).setPaintProperty(
+						MAPBOX_LAYER_IDS.markerConstellationGlow,
+						'line-opacity-transition',
+						transition
+					);
+					(map as any).setPaintProperty(
+						MAPBOX_LAYER_IDS.markerConstellationGlow,
+						'line-opacity',
+						glowOpacity
+					);
+				}
+			} catch {
+				// Ignore style timing races.
+			}
+		},
+		[map, isMapLoaded]
+	);
+
+	const clearMarkerConstellation = useCallback(() => {
+		stopMarkerConstellationReveal();
+		markerConstellationEdgesRef.current = [];
+		markerConstellationComposedSearchKeyRef.current = '';
+		markerConstellationRevealDoneRef.current = true;
+		markerConstellationLastDataKeyRef.current = '';
+		setMarkerConstellationLineOpacity(0, 0, 0);
+		if (!map || !isMapLoaded) return;
+		const source = map.getSource(MAPBOX_SOURCE_IDS.markerConstellation) as
+			| mapboxgl.GeoJSONSource
+			| undefined;
+		try {
+			source?.setData({ type: 'FeatureCollection', features: [] } as any);
+		} catch {
+			// Ignore style timing races.
+		}
+	}, [
+		map,
+		isMapLoaded,
+		stopMarkerConstellationReveal,
+		setMarkerConstellationLineOpacity,
+	]);
+
+	const writeMarkerConstellationSourceData = useCallback(
+		(contactsForVisibility: ContactWithName[]): void => {
+			if (!map || !isMapLoaded) return;
+			const source = map.getSource(MAPBOX_SOURCE_IDS.markerConstellation) as
+				| mapboxgl.GeoJSONSource
+				| undefined;
+			if (!source) return;
+
+			const visibleById = new Map<number, ContactWithName>();
+			for (const contact of contactsForVisibility) visibleById.set(contact.id, contact);
+
+			const features: any[] = [];
+			const dataKeyParts: string[] = [];
+			for (const edge of markerConstellationEdgesRef.current) {
+				const fromContact = visibleById.get(edge.fromId);
+				const toContact = visibleById.get(edge.toId);
+				if (!fromContact || !toContact) continue;
+
+				const fromCoords = getContactCoords(fromContact);
+				const toCoords = getContactCoords(toContact);
+				if (!fromCoords || !toCoords) continue;
+
+				const edgeId = markerConstellationPairKey(edge.fromId, edge.toId);
+				dataKeyParts.push(edgeId);
+				features.push({
+					type: 'Feature',
+					id: edgeId,
+					properties: {},
+					geometry: {
+						type: 'LineString',
+						coordinates: [
+							[fromCoords.lng, fromCoords.lat],
+							[toCoords.lng, toCoords.lat],
+						],
+					},
+				});
+			}
+
+			const dataKey = dataKeyParts.join(',');
+			markerConstellationLastDataKeyRef.current = dataKey;
+
+			try {
+				source.setData({ type: 'FeatureCollection', features } as any);
+			} catch {
+				// Ignore style timing races.
+			}
+		},
+		[map, isMapLoaded, getContactCoords]
+	);
+
+	const startMarkerConstellationReveal = useCallback(
+		() => {
+			stopMarkerConstellationReveal();
+
+			if (!map || !isMapLoaded) return;
+			if (markerConstellationEdgesRef.current.length === 0) {
+				markerConstellationRevealDoneRef.current = true;
+				setMarkerConstellationLineOpacity(0, 0, 0);
+				return;
+			}
+
+			markerConstellationRevealDoneRef.current = true;
+			setMarkerConstellationLineOpacity(
+				MARKER_CONSTELLATION_CORE_OPACITY,
+				MARKER_CONSTELLATION_GLOW_OPACITY,
+				0
+			);
+			return;
+		},
+		[
+			map,
+			isMapLoaded,
+			stopMarkerConstellationReveal,
+			setMarkerConstellationLineOpacity,
+		]
+	);
 
 	// Base result dots
 	useEffect(() => {
@@ -14062,6 +14718,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			lat: number;
 			fillColor: string;
 			isCurated: boolean;
+			isUncategorized: boolean;
 		};
 		const dots: DotSeed[] = [];
 		let minLng = Number.POSITIVE_INFINITY;
@@ -14076,6 +14733,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				? !isCoordsInLockedState(coords)
 				: false;
 			const whatForContact = contact.curatedCategory ?? searchWhat ?? null;
+			const isUncategorized = !isCleanMapMarkerCategory(whatForContact);
 			const baseFillColor = getResultDotColorForWhat(whatForContact);
 			const fillColor = isOutsideLockedState
 				? washOutHexColor(baseFillColor, OUTSIDE_LOCKED_STATE_WASHOUT_TO_WHITE)
@@ -14086,6 +14744,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				lat: coords.lat,
 				fillColor,
 				isCurated: Boolean(contact.curatedCategory),
+				isUncategorized,
 			});
 			minLng = Math.min(minLng, coords.lng);
 			maxLng = Math.max(maxLng, coords.lng);
@@ -14117,7 +14776,13 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		let dataKey = '';
 		for (let i = 0; i < dots.length; i++) {
 			const d = dots[i];
-			dataKey += (i > 0 ? ',' : '') + d.id + ':' + d.fillColor;
+			dataKey +=
+				(i > 0 ? ',' : '') +
+				d.id +
+				':' +
+				d.fillColor +
+				':' +
+				(d.isUncategorized ? 'u' : 'c');
 		}
 		if (dataKey === baseDotsLastDataKeyRef.current) {
 			return;
@@ -14156,6 +14821,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					fillColor: dot.fillColor,
 					[DOT_WAVE_DELAY_PROP]: delayMs,
 					isCurated: dot.isCurated,
+					isUncategorized: dot.isUncategorized,
+					fallbackIcon: dot.isUncategorized ? uncategorizedContactMarkerImageName : '',
 				},
 				geometry: { type: 'Point', coordinates: [dot.lng, dot.lat] },
 			};
@@ -14209,18 +14876,25 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					(map as any).setPaintProperty(
 						MAPBOX_LAYER_IDS.baseGlow,
 						'circle-opacity',
-						withResultDotGlowOpacity(expr0)
+						withCategorizedDotOpacity(withResultDotGlowOpacity(expr0))
 					);
 				}
 				if (map.getLayer(MAPBOX_LAYER_IDS.baseDots)) {
 					(map as any).setPaintProperty(
 						MAPBOX_LAYER_IDS.baseDots,
 						'circle-opacity',
-						expr0
+						withCategorizedDotOpacity(expr0)
 					);
 					(map as any).setPaintProperty(
 						MAPBOX_LAYER_IDS.baseDots,
 						'circle-stroke-opacity',
+						expr0
+					);
+				}
+				if (map.getLayer(MAPBOX_LAYER_IDS.baseFallbackIcons)) {
+					(map as any).setPaintProperty(
+						MAPBOX_LAYER_IDS.baseFallbackIcons,
+						'icon-opacity',
 						expr0
 					);
 				}
@@ -14257,7 +14931,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		isCoordsInLockedState,
 		searchQuery,
 		isBackgroundPresentation,
+		disableDotWaveReveal,
 		stopBaseDotsWaveAndRestoreSteadyRendering,
+		uncategorizedContactMarkerImageName,
 	]);
 
 	// Wave reveal for base dots on each completed search (left → right).
@@ -14305,7 +14981,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			safeSetPaint(
 				MAPBOX_LAYER_IDS.baseGlow,
 				'circle-opacity',
-				CURATED_DOT_GLOW_ZOOM_FADE_EXPR
+				CATEGORIZED_DOT_GLOW_ZOOM_FADE_EXPR
 			);
 			safeSetPaint(MAPBOX_LAYER_IDS.baseDots, 'circle-opacity-transition', transition);
 			safeSetPaint(
@@ -14316,11 +14992,21 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			safeSetPaint(
 				MAPBOX_LAYER_IDS.baseDots,
 				'circle-opacity',
-				CURATED_DOT_ZOOM_FADE_EXPR
+				CATEGORIZED_DOT_ZOOM_FADE_EXPR
 			);
 			safeSetPaint(
 				MAPBOX_LAYER_IDS.baseDots,
 				'circle-stroke-opacity',
+				CURATED_DOT_ZOOM_FADE_EXPR
+			);
+			safeSetPaint(
+				MAPBOX_LAYER_IDS.baseFallbackIcons,
+				'icon-opacity-transition',
+				transition
+			);
+			safeSetPaint(
+				MAPBOX_LAYER_IDS.baseFallbackIcons,
+				'icon-opacity',
 				CURATED_DOT_ZOOM_FADE_EXPR
 			);
 			safeClearFilter(MAPBOX_LAYER_IDS.baseHit);
@@ -14431,6 +15117,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			duration: DOT_WAVE_SMOOTH_TRANSITION_MS,
 			delay: 0,
 		} as any);
+		safeSetPaint(MAPBOX_LAYER_IDS.baseFallbackIcons, 'icon-opacity-transition', {
+			duration: DOT_WAVE_SMOOTH_TRANSITION_MS,
+			delay: 0,
+		} as any);
 
 		const buildOpacityExpr = (nowMs: number) => {
 			return [
@@ -14474,10 +15164,15 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				safeSetPaint(
 					MAPBOX_LAYER_IDS.baseGlow,
 					'circle-opacity',
-					withResultDotGlowOpacity(expr)
+					withCategorizedDotOpacity(withResultDotGlowOpacity(expr))
 				);
-				safeSetPaint(MAPBOX_LAYER_IDS.baseDots, 'circle-opacity', expr);
+				safeSetPaint(
+					MAPBOX_LAYER_IDS.baseDots,
+					'circle-opacity',
+					withCategorizedDotOpacity(expr)
+				);
 				safeSetPaint(MAPBOX_LAYER_IDS.baseDots, 'circle-stroke-opacity', expr);
+				safeSetPaint(MAPBOX_LAYER_IDS.baseFallbackIcons, 'icon-opacity', expr);
 				lastPaintUpdateAt = t;
 			}
 
@@ -14508,10 +15203,15 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		safeSetPaint(
 			MAPBOX_LAYER_IDS.baseGlow,
 			'circle-opacity',
-			withResultDotGlowOpacity(expr0)
+			withCategorizedDotOpacity(withResultDotGlowOpacity(expr0))
 		);
-		safeSetPaint(MAPBOX_LAYER_IDS.baseDots, 'circle-opacity', expr0);
+		safeSetPaint(
+			MAPBOX_LAYER_IDS.baseDots,
+			'circle-opacity',
+			withCategorizedDotOpacity(expr0)
+		);
 		safeSetPaint(MAPBOX_LAYER_IDS.baseDots, 'circle-stroke-opacity', expr0);
+		safeSetPaint(MAPBOX_LAYER_IDS.baseFallbackIcons, 'icon-opacity', expr0);
 
 		rafId = requestAnimationFrame(tick);
 
@@ -14519,7 +15219,188 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			cancel();
 			if (baseDotsWaveCancelRef.current === cancel) baseDotsWaveCancelRef.current = null;
 		};
-	}, [map, isMapLoaded, isLoading, isBackgroundPresentation, searchQuery]);
+	}, [
+		map,
+		isMapLoaded,
+		isLoading,
+		isBackgroundPresentation,
+		searchQuery,
+		disableDotWaveReveal,
+	]);
+
+	// Keep the frozen constellation's rendered line source synced to currently visible endpoints.
+	useEffect(() => {
+		if (!map || !isMapLoaded) return;
+		if (!markerConstellationComposedSearchKeyRef.current) return;
+		writeMarkerConstellationSourceData(visibleContacts);
+		if (markerConstellationRevealDoneRef.current) {
+			setMarkerConstellationLineOpacity(
+				markerConstellationEdgesRef.current.length > 0
+					? MARKER_CONSTELLATION_CORE_OPACITY
+					: 0,
+				markerConstellationEdgesRef.current.length > 0
+					? MARKER_CONSTELLATION_GLOW_OPACITY
+					: 0,
+				0
+			);
+		}
+	}, [
+		map,
+		isMapLoaded,
+		visibleContacts,
+		writeMarkerConstellationSourceData,
+		setMarkerConstellationLineOpacity,
+	]);
+
+	// Compose marker constellations once per search from the visible primary result dots.
+	useEffect(() => {
+		if (!map || !isMapLoaded) return;
+
+		const searchKey = (searchQuery ?? '').trim();
+		const isSearchMode = searchKey.length > 0;
+		const loading = Boolean(isLoading);
+
+		if (!isSearchMode || isBackgroundPresentation) {
+			markerConstellationLastSearchKeyRef.current = searchKey;
+			clearMarkerConstellation();
+			return;
+		}
+
+		if (searchKey !== markerConstellationLastSearchKeyRef.current) {
+			markerConstellationLastSearchKeyRef.current = searchKey;
+			clearMarkerConstellation();
+		}
+
+		if (loading) {
+			if (markerConstellationComposedSearchKeyRef.current !== searchKey) {
+				stopMarkerConstellationReveal();
+				markerConstellationEdgesRef.current = [];
+				markerConstellationComposedSearchKeyRef.current = '';
+				markerConstellationLastDataKeyRef.current = '';
+				setMarkerConstellationLineOpacity(0, 0, 0);
+			}
+			return;
+		}
+
+		if (markerConstellationComposedSearchKeyRef.current === searchKey) return;
+		if (visibleContacts.length < 2 || contactsWithCoords.length < 2) return;
+
+		let isCameraMoving = false;
+		try {
+			isCameraMoving = map.isMoving();
+		} catch {
+			isCameraMoving = false;
+		}
+		if (isCameraMoving) {
+			const onMoveEnd = () => setMarkerConstellationIdleNonce((value) => value + 1);
+			map.once('moveend', onMoveEnd);
+			return () => {
+				map.off('moveend', onMoveEnd);
+			};
+		}
+
+		let cancelled = false;
+		const timeout = setTimeout(() => {
+			if (cancelled) return;
+			if (markerConstellationComposedSearchKeyRef.current === searchKey) return;
+
+			const curatedBlobGroupKeyByContactId = new Map<number, string>();
+			const curatedBlobPoints = contactsWithCoords
+				.map((contact) => {
+					if (!contact.curatedCategory) return null;
+					const coords = getContactCoords(contact);
+					if (!coords) return null;
+					return projectCuratedBlobPoint(contact.id, coords);
+				})
+				.filter((point): point is CuratedBlobMercatorPoint => point != null);
+
+			if (curatedBlobPoints.length >= 2) {
+				const clusters = pickAdaptiveCuratedBlobClusters(curatedBlobPoints);
+				clusters.forEach((cluster, index) => {
+					for (const point of cluster.points) {
+						curatedBlobGroupKeyByContactId.set(point.id, `blob:${index}`);
+					}
+				});
+			}
+
+			let contactsForConstellation = visibleContacts.slice();
+			if (contactsForConstellation.length > MARKER_CONSTELLATION_MAX_POINTS) {
+				contactsForConstellation = contactsForConstellation
+					.map((contact) => ({
+						contact,
+						score: hashStringToUint32(`${searchKey}|constellation|${contact.id}`),
+					}))
+					.sort((a, b) => a.score - b.score)
+					.slice(0, MARKER_CONSTELLATION_MAX_POINTS)
+					.map(({ contact }) => contact);
+			}
+			contactsForConstellation.sort((a, b) => a.id - b.id);
+
+			let points: MarkerConstellationPoint[] = [];
+			for (const contact of contactsForConstellation) {
+				const coords = getContactCoords(contact);
+				if (!coords) continue;
+				const curatedGroupKey = curatedBlobGroupKeyByContactId.get(contact.id);
+				if (curatedBlobGroupKeyByContactId.size > 0 && !curatedGroupKey) continue;
+
+				let projected: mapboxgl.Point;
+				try {
+					projected = map.project([coords.lng, coords.lat]);
+				} catch {
+					continue;
+				}
+				if (!Number.isFinite(projected.x) || !Number.isFinite(projected.y)) continue;
+
+				points.push({
+					id: contact.id,
+					coords,
+					x: projected.x,
+					y: projected.y,
+					groupKey: curatedGroupKey ?? 'fallback:pending',
+				});
+			}
+
+			if (curatedBlobGroupKeyByContactId.size === 0 && points.length >= 2) {
+				const fallbackGroupKeyById = buildFallbackMarkerConstellationGroupKeys(points);
+				points = points.map((point) => ({
+					...point,
+					groupKey: fallbackGroupKeyById.get(point.id) ?? `fallback:${point.id}`,
+				}));
+			}
+
+			const seed = `${searchKey}|${points.map((point) => point.id).join(',')}`;
+			const edges = buildMarkerConstellationEdges(points, seed);
+
+			stopMarkerConstellationReveal();
+			markerConstellationEdgesRef.current = edges;
+			markerConstellationComposedSearchKeyRef.current = searchKey;
+			markerConstellationRevealDoneRef.current = false;
+			markerConstellationLastDataKeyRef.current = '';
+			setMarkerConstellationLineOpacity(0, 0, 0);
+			writeMarkerConstellationSourceData(visibleContacts);
+			startMarkerConstellationReveal();
+		}, 90);
+
+		return () => {
+			cancelled = true;
+			clearTimeout(timeout);
+		};
+	}, [
+		map,
+		isMapLoaded,
+		isLoading,
+		isBackgroundPresentation,
+		searchQuery,
+		visibleContacts,
+		contactsWithCoords,
+		getContactCoords,
+		markerConstellationIdleNonce,
+		clearMarkerConstellation,
+		stopMarkerConstellationReveal,
+		setMarkerConstellationLineOpacity,
+		writeMarkerConstellationSourceData,
+		startMarkerConstellationReveal,
+	]);
 
 	// All-contacts overlay (gray dots)
 	useEffect(() => {

@@ -8,6 +8,7 @@ import {
 } from '@/app/api/_utils';
 import prisma from '@/lib/prisma';
 import {
+	countPersonTitleMatches,
 	lexicalSearchContacts,
 	searchSimilarContacts,
 	titlePrefixSearchContacts,
@@ -23,7 +24,10 @@ import {
 	titleLooksPersonal,
 	type CategoryPool,
 } from '@/app/api/contacts/curated-search/distribution';
-import type { BookingContactTitlePrefix } from '@/constants/contactCategories';
+import {
+	BOOKING_CONTACT_TITLE_PREFIXES,
+	type BookingContactTitlePrefix,
+} from '@/constants/contactCategories';
 import { US_STATES } from '@/constants/usStates';
 import { runCuratedNearbyPicks } from '@/app/api/contacts/curated-search/runCuratedNearbyPicks';
 import { parseFreeTextSearchQuery } from './parse';
@@ -196,6 +200,20 @@ const CLEANLINESS_MULTIPLIER: Record<CleanlinessTier, number> = {
 	loose: 1,
 };
 
+// Carve-out for noun-led queries that an ES probe identified as role-shaped
+// ("professor", "janitor", "florist"). The default table puts canonical-clean
+// 3.3× ahead of clean-person, which steamrolls people on these queries even
+// before the noun-led hard-drop fires. Here clean-person rises to parity with
+// canonical-clean so RRF + literal-match decide the order, while
+// clean-business stays near person so an org row can still win when its
+// title/company directly matches the query.
+const PERSON_TARGETED_CLEANLINESS_MULTIPLIER: Record<CleanlinessTier, number> = {
+	'canonical-clean': 2.5,
+	'clean-business': 2,
+	'clean-person': 2.5,
+	loose: 1.5,
+};
+
 const classifyCleanliness = (c: Contact): CleanlinessTier => {
 	// `contactLooksLikeBusinessEntity` only checks for empty firstName/lastName.
 	// A row with empty names but title="Communications Director" is shaped like
@@ -349,6 +367,40 @@ const isNounLedQuery = (
 		.map((t) => t.trim())
 		.filter((t) => t.length > 0 && !NOUN_LED_FILLER_TOKENS.has(t));
 	return tokens.length > 0 && tokens.length <= 2;
+};
+
+// Threshold of person-shaped title matches that flips a noun-led query into
+// "person-targeted" mode. Tuned conservatively: queries like "professor" or
+// "janitor" easily clear this against a real-world index, while plausibly
+// ambiguous business nouns ("deli", "bookstore") stay below it because almost
+// no person-shaped rows have those words in their title.
+const PERSON_TARGET_MATCH_THRESHOLD = 8;
+const PERSON_TARGET_PROBE_TIMEOUT_MS = 2500;
+
+// Detects oddball noun-led queries that should surface people, not just
+// venues. Runs a single ES `count` against the title field with canonical
+// venue prefixes excluded — if enough non-venue rows have the query text in
+// their title, we assume the user is asking about a role/profession and
+// relax the noun-led person-drop further down the pipeline.
+const detectQueryTargetsPerson = async (
+	parsed: ReturnType<typeof parseFreeTextSearchQuery>,
+	isNounLed: boolean,
+	requestId: string
+): Promise<{ targetsPerson: boolean; matchCount: number }> => {
+	if (!isNounLed) return { targetsPerson: false, matchCount: 0 };
+	const probeText = parsed.restOfQuery.trim();
+	if (probeText.length < 3) return { targetsPerson: false, matchCount: 0 };
+	const count = await withTimeout(
+		countPersonTitleMatches(probeText, BOOKING_CONTACT_TITLE_PREFIXES),
+		PERSON_TARGET_PROBE_TIMEOUT_MS,
+		0,
+		'person-target probe',
+		requestId
+	);
+	return {
+		targetsPerson: count >= PERSON_TARGET_MATCH_THRESHOLD,
+		matchCount: count,
+	};
 };
 
 const resolveLocalBusinessIntent = (rawQuery: string): LocalBusinessIntent | null => {
@@ -983,6 +1035,11 @@ interface ScoreAndInterleaveOptions {
 	// fallback stage relaxes this so person/loose can ride through scaled by
 	// their cleanliness multiplier (1.2 / 1.0) when they're the only matches.
 	dropPersonOrLoose: boolean;
+	// When true, the noun-led probe found enough non-venue title matches that
+	// the query likely refers to a role (e.g. "professor"). Skips the noun-led
+	// person/loose drop and switches to the person-targeted multiplier table
+	// so people can compete with venues on lexical/RRF score.
+	queryTargetsPerson: boolean;
 	// When true, the literal-match check uses a prefix-aware regex (so
 	// "plumber" boosts contacts whose title says "Plumbers" or "Plumbery")
 	// and additionally tests `headline` for the literal token with a moderate
@@ -1020,9 +1077,13 @@ const scoreAndInterleave = (
 		isNounLed,
 		neutralizeLocality,
 		dropPersonOrLoose,
+		queryTargetsPerson,
 		literalSweepMode,
 		limit,
 	} = opts;
+	const cleanlinessTable = queryTargetsPerson
+		? PERSON_TARGETED_CLEANLINESS_MULTIPLIER
+		: CLEANLINESS_MULTIPLIER;
 
 	const explicitPlace = parsed.hadExplicitPlace;
 	const onlyOneCategory = parsed.categories.length === 1;
@@ -1055,13 +1116,14 @@ const scoreAndInterleave = (
 		if (
 			dropPersonOrLoose &&
 			isNounLed &&
+			!queryTargetsPerson &&
 			(cleanliness === 'clean-person' || cleanliness === 'loose')
 		) {
 			droppedPersonOrLoose++;
 			continue;
 		}
 
-		let multiplier = CLEANLINESS_MULTIPLIER[cleanliness];
+		let multiplier = cleanlinessTable[cleanliness];
 
 		let categoryMatch: BookingContactTitlePrefix | null = null;
 		if (parsed.categories.length > 0) {
@@ -1359,6 +1421,11 @@ export async function GET(req: NextRequest) {
 			`[contacts-search][${requestId}] start q="${rawQuery}" categories=${parsed.categories.join(',') || 'none'} city=${parsed.city?.name ?? 'none'} state=${parsed.state?.abbr ?? 'none'} enforcedState=${enforcedState?.abbr ?? 'none'} implicitLocality=${useImplicitLocality ? `center=${implicitLocalityCenter?.lat},${implicitLocalityCenter?.lon} r=${implicitLocalityRadiusKm}km` : 'no'} restOfQuery="${parsed.restOfQuery}" nounLed=${isNounLed} centerSource=${center.source} radiusKm=${radiusKm} limit=${requestedLimit}`
 		);
 
+		// Person-target probe runs only on noun-led queries. The other routing
+		// branches (local-business intent, place-only, curated-category) all
+		// short-circuit before we need this flag, so we hold off issuing the ES
+		// count until we know we're on the hybrid path.
+
 		const localBusinessIntent = resolveLocalBusinessIntent(parsed.restOfQuery);
 		if (localBusinessIntent) {
 			const localBusinessResponse = await withBudgetFallback(
@@ -1477,64 +1544,67 @@ export async function GET(req: NextRequest) {
 		const emptyLexical: LexicalResult = { matches: [], totalFound: 0 };
 		const emptyPrefix: PrefixResult = { matches: [], totalFound: 0 };
 
-		const [knnResult, lexicalResult, prefixResult] = await Promise.all([
-			shouldRunKnn
-				? withTimeout(
-						searchSimilarContacts(
-							{
-								city: parsed.city?.name ?? null,
-								state: enforcedState?.name ?? null,
-								country: parsed.country,
-								restOfQuery: knnText,
-							},
-							PER_RETRIEVER_TAKE,
-							// Always 'flexible'. kNN's state.keyword strict filter is too
-							// brittle against the wild variants present in production data
-							// (e.g. "Arkansas, USA"). We enforce state at the lexical/prefix
-							// retriever level and again as a post-hydration safety net,
-							// where matching is permissive enough to handle dirty values.
-							'flexible'
-						),
-						KNN_TIMEOUT_MS,
-						emptyKnn,
-						'kNN retriever',
-						requestId
-				  )
-				: Promise.resolve(emptyKnn),
-			withTimeout(
-				lexicalSearchContacts({
-					queryText: rawQuery,
-					limit: PER_RETRIEVER_TAKE,
-					titlePrefixes: parsed.categories.length > 0 ? parsed.categories : undefined,
-					city: parsed.city?.name ?? null,
-					state: enforcedState?.abbr ?? null,
-					country: parsed.country,
-					center: retrieverCenter,
-					radiusKm: retrieverRadiusKm,
-					enforcedStateValues,
-					shortQueryMode: isNounLed,
-				}),
-				LEXICAL_TIMEOUT_MS,
-				emptyLexical,
-				'lexical retriever',
-				requestId
-			),
-			parsed.categories.length > 0
-				? withTimeout(
-						titlePrefixSearchContacts({
-							titlePrefixes: parsed.categories,
-							limit: PER_RETRIEVER_TAKE,
-							center: retrieverCenter,
-							radiusKm: retrieverRadiusKm,
-							enforcedStateValues,
-						}),
-						PREFIX_TIMEOUT_MS,
-						emptyPrefix,
-						'prefix retriever',
-						requestId
-				  )
-				: Promise.resolve(emptyPrefix),
-		]);
+		const [knnResult, lexicalResult, prefixResult, personTargetProbe] =
+			await Promise.all([
+				shouldRunKnn
+					? withTimeout(
+							searchSimilarContacts(
+								{
+									city: parsed.city?.name ?? null,
+									state: enforcedState?.name ?? null,
+									country: parsed.country,
+									restOfQuery: knnText,
+								},
+								PER_RETRIEVER_TAKE,
+								// Always 'flexible'. kNN's state.keyword strict filter is too
+								// brittle against the wild variants present in production data
+								// (e.g. "Arkansas, USA"). We enforce state at the lexical/prefix
+								// retriever level and again as a post-hydration safety net,
+								// where matching is permissive enough to handle dirty values.
+								'flexible'
+							),
+							KNN_TIMEOUT_MS,
+							emptyKnn,
+							'kNN retriever',
+							requestId
+					  )
+					: Promise.resolve(emptyKnn),
+				withTimeout(
+					lexicalSearchContacts({
+						queryText: rawQuery,
+						limit: PER_RETRIEVER_TAKE,
+						titlePrefixes: parsed.categories.length > 0 ? parsed.categories : undefined,
+						city: parsed.city?.name ?? null,
+						state: enforcedState?.abbr ?? null,
+						country: parsed.country,
+						center: retrieverCenter,
+						radiusKm: retrieverRadiusKm,
+						enforcedStateValues,
+						shortQueryMode: isNounLed,
+					}),
+					LEXICAL_TIMEOUT_MS,
+					emptyLexical,
+					'lexical retriever',
+					requestId
+				),
+				parsed.categories.length > 0
+					? withTimeout(
+							titlePrefixSearchContacts({
+								titlePrefixes: parsed.categories,
+								limit: PER_RETRIEVER_TAKE,
+								center: retrieverCenter,
+								radiusKm: retrieverRadiusKm,
+								enforcedStateValues,
+							}),
+							PREFIX_TIMEOUT_MS,
+							emptyPrefix,
+							'prefix retriever',
+							requestId
+					  )
+					: Promise.resolve(emptyPrefix),
+				detectQueryTargetsPerson(parsed, isNounLed, requestId),
+			]);
+		const queryTargetsPerson = personTargetProbe.targetsPerson;
 
 		const collectIds = (matches: { id: string | undefined }[]): number[] => {
 			const out: number[] = [];
@@ -1696,6 +1766,7 @@ export async function GET(req: NextRequest) {
 			isNounLed,
 			neutralizeLocality: false,
 			dropPersonOrLoose: true,
+			queryTargetsPerson,
 			literalSweepMode: false,
 			limit: requestedLimit,
 		});
@@ -1844,6 +1915,7 @@ export async function GET(req: NextRequest) {
 				isNounLed,
 				neutralizeLocality: true,
 				dropPersonOrLoose: false,
+				queryTargetsPerson,
 				literalSweepMode: true,
 				limit: Math.min(requestedLimit, NATIONAL_FALLBACK_LIMIT_CAP),
 			});
@@ -1863,7 +1935,7 @@ export async function GET(req: NextRequest) {
 
 		const fetchMs = Date.now() - fetchStarted;
 		console.info(
-			`[contacts-search][${requestId}] q="${rawQuery}" knn=${knnIds.length} lex=${lexicalIds.length} prefix=${prefixIds.length} hydrated=${hydrated.length} nounLed=${isNounLed} droppedPersonOrLoose=${stage1.droppedPersonOrLoose} stage1Returned=${stage1.finalContacts.length} stage1LiteralMatches=${stage1.literalMatchCount} expansionMode=${expansionMode}` +
+			`[contacts-search][${requestId}] q="${rawQuery}" knn=${knnIds.length} lex=${lexicalIds.length} prefix=${prefixIds.length} hydrated=${hydrated.length} nounLed=${isNounLed} personTarget=${queryTargetsPerson}(matches=${personTargetProbe.matchCount}) droppedPersonOrLoose=${stage1.droppedPersonOrLoose} stage1Returned=${stage1.finalContacts.length} stage1LiteralMatches=${stage1.literalMatchCount} expansionMode=${expansionMode}` +
 				(expansionMode === 'national-fallback'
 					? ` sparseTrigger=${sparseTrigger} stage2Lex=${stage2Lex} stage2Prefix=${stage2Prefix} stage2HydratedNew=${stage2HydratedNew} stage2LiteralMatches=${stage2LiteralMatchCount} stage2Ms=${stage2Ms}`
 					: '') +
