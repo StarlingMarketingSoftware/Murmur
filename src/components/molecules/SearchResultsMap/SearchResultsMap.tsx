@@ -2197,6 +2197,120 @@ const buildMarkerConstellationEdges = (
 	return edges;
 };
 
+const buildSparseMarkerConstellationEdges = (
+	points: MarkerConstellationPoint[],
+	seed: string
+): MarkerConstellationEdge[] => {
+	if (points.length < 2) return [];
+
+	const sorted = points.slice().sort((a, b) => a.id - b.id);
+	const nearestDistances: number[] = [];
+	for (let i = 0; i < sorted.length; i++) {
+		let nearest = Infinity;
+		for (let j = 0; j < sorted.length; j++) {
+			if (i === j) continue;
+			const dx = sorted[i].x - sorted[j].x;
+			const dy = sorted[i].y - sorted[j].y;
+			nearest = Math.min(nearest, Math.hypot(dx, dy));
+		}
+		if (Number.isFinite(nearest)) nearestDistances.push(nearest);
+	}
+
+	nearestDistances.sort((a, b) => a - b);
+	const medianNearest =
+		nearestDistances.length > 0
+			? nearestDistances[Math.floor(nearestDistances.length / 2)]
+			: MARKER_CONSTELLATION_MAX_EDGE_PX;
+	const upperNearest =
+		nearestDistances.length > 0
+			? nearestDistances[Math.floor(nearestDistances.length * 0.75)]
+			: MARKER_CONSTELLATION_MAX_EDGE_PX;
+	const maxEdgePx = Math.min(
+		MARKER_CONSTELLATION_SPARSE_FALLBACK_MAX_EDGE_PX,
+		Math.max(MARKER_CONSTELLATION_MAX_EDGE_PX, medianNearest * 2.5, upperNearest * 1.35)
+	);
+
+	const candidates: MarkerConstellationCandidate[] = [];
+	for (let i = 0; i < sorted.length; i++) {
+		for (let j = i + 1; j < sorted.length; j++) {
+			const a = sorted[i];
+			const b = sorted[j];
+			const dx = a.x - b.x;
+			const dy = a.y - b.y;
+			const length = Math.hypot(dx, dy);
+			if (
+				!Number.isFinite(length) ||
+				length < MARKER_CONSTELLATION_MIN_EDGE_PX ||
+				length > maxEdgePx
+			) {
+				continue;
+			}
+
+			const pairKey = markerConstellationPairKey(a.id, b.id);
+			const h = hashStringToUint32(`${seed}|${pairKey}`);
+			const candidate: MarkerConstellationCandidate = {
+				fromId: a.id,
+				toId: b.id,
+				ax: a.x,
+				ay: a.y,
+				bx: b.x,
+				by: b.y,
+				length,
+				score: length + (h / 0xffffffff) * 14,
+			};
+			if (markerConstellationCandidateCutsThroughPoint(candidate, sorted)) continue;
+			candidates.push(candidate);
+		}
+	}
+
+	if (candidates.length === 0) return [];
+	candidates.sort((a, b) => a.score - b.score);
+
+	const parent = new Map<number, number>();
+	for (const point of sorted) parent.set(point.id, point.id);
+	const find = (id: number): number => {
+		const p = parent.get(id);
+		if (p == null || p === id) return id;
+		const root = find(p);
+		parent.set(id, root);
+		return root;
+	};
+	const union = (a: number, b: number): boolean => {
+		const rootA = find(a);
+		const rootB = find(b);
+		if (rootA === rootB) return false;
+		parent.set(rootB, rootA);
+		return true;
+	};
+
+	const degree = new Map<number, number>();
+	const chosen: MarkerConstellationCandidate[] = [];
+	const maxDegree = sorted.length >= 9 ? 3 : 2;
+	const targetEdges = Math.min(
+		MARKER_CONSTELLATION_MAX_EDGES,
+		sorted.length - 1,
+		Math.max(1, Math.floor(sorted.length * 0.7))
+	);
+
+	for (const candidate of candidates) {
+		if (chosen.length >= targetEdges) break;
+		const fromDegree = degree.get(candidate.fromId) ?? 0;
+		const toDegree = degree.get(candidate.toId) ?? 0;
+		if (fromDegree >= maxDegree || toDegree >= maxDegree) continue;
+		if (markerConstellationWouldCrossExistingEdge(candidate, chosen)) continue;
+		if (!union(candidate.fromId, candidate.toId)) continue;
+
+		chosen.push(candidate);
+		degree.set(candidate.fromId, fromDegree + 1);
+		degree.set(candidate.toId, toDegree + 1);
+	}
+
+	return chosen.map((edge) => ({
+		fromId: edge.fromId,
+		toId: edge.toId,
+	}));
+};
+
 const buildOuterRingWorldSegments = (
 	multiPolygon: ClippingMultiPolygon,
 	worldSize: number
@@ -3826,6 +3940,7 @@ const MARKER_CONSTELLATION_MAX_EDGES = 140;
 const MARKER_CONSTELLATION_MIN_EDGE_PX = 18;
 const MARKER_CONSTELLATION_MAX_EDGE_PX = 185;
 const MARKER_CONSTELLATION_FALLBACK_GROUP_PX = 230;
+const MARKER_CONSTELLATION_SPARSE_FALLBACK_MAX_EDGE_PX = 360;
 const MARKER_CONSTELLATION_POINT_CLEARANCE_PX = 9;
 
 type MarkerConstellationPoint = {
@@ -15272,7 +15387,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		}
 
 		if (loading) {
-			if (markerConstellationComposedSearchKeyRef.current !== searchKey) {
+			const composedKey = markerConstellationComposedSearchKeyRef.current;
+			const hasComposedForCurrentSearch =
+				composedKey === searchKey || composedKey.startsWith(`${searchKey}|points:`);
+			if (!hasComposedForCurrentSearch) {
 				stopMarkerConstellationReveal();
 				markerConstellationEdgesRef.current = [];
 				markerConstellationComposedSearchKeyRef.current = '';
@@ -15282,7 +15400,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			return;
 		}
 
-		if (markerConstellationComposedSearchKeyRef.current === searchKey) return;
 		if (visibleContacts.length < 2 || contactsWithCoords.length < 2) return;
 
 		let isCameraMoving = false;
@@ -15302,7 +15419,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		let cancelled = false;
 		const timeout = setTimeout(() => {
 			if (cancelled) return;
-			if (markerConstellationComposedSearchKeyRef.current === searchKey) return;
 
 			const curatedBlobGroupKeyByContactId = new Map<number, string>();
 			const curatedBlobPoints = contactsWithCoords
@@ -15368,12 +15484,35 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				}));
 			}
 
+			const pointsSignature = points
+				.map(
+					(point) =>
+						`${point.id}:${point.groupKey}:${Math.round(point.x)}:${Math.round(point.y)}`
+				)
+				.join(',');
+			const compositionKey = `${searchKey}|points:${pointsSignature}`;
+			if (markerConstellationComposedSearchKeyRef.current === compositionKey) return;
+
+			if (points.length < 2) {
+				stopMarkerConstellationReveal();
+				markerConstellationEdgesRef.current = [];
+				markerConstellationComposedSearchKeyRef.current = compositionKey;
+				markerConstellationRevealDoneRef.current = true;
+				markerConstellationLastDataKeyRef.current = '';
+				setMarkerConstellationLineOpacity(0, 0, 0);
+				writeMarkerConstellationSourceData(visibleContacts);
+				return;
+			}
+
 			const seed = `${searchKey}|${points.map((point) => point.id).join(',')}`;
-			const edges = buildMarkerConstellationEdges(points, seed);
+			let edges = buildMarkerConstellationEdges(points, seed);
+			if (edges.length === 0) {
+				edges = buildSparseMarkerConstellationEdges(points, `${seed}|sparse`);
+			}
 
 			stopMarkerConstellationReveal();
 			markerConstellationEdgesRef.current = edges;
-			markerConstellationComposedSearchKeyRef.current = searchKey;
+			markerConstellationComposedSearchKeyRef.current = compositionKey;
 			markerConstellationRevealDoneRef.current = false;
 			markerConstellationLastDataKeyRef.current = '';
 			setMarkerConstellationLineOpacity(0, 0, 0);

@@ -72,6 +72,9 @@ const contactFilterSchema = z.object({
 	useVectorSearch: z.boolean().optional(),
 	location: z.string().optional(),
 	excludeUsedContacts: z.boolean().optional(),
+	// Client-side cache buster so repeating the exact same dashboard search
+	// requests a fresh randomized sample.
+	searchRunId: z.coerce.number().optional(),
 	// Optional bounding-box override (used by map rectangle selection).
 	// When present, the API will return contacts inside this box, optionally filtered by `bboxTitlePrefix`.
 	bboxSouth: z.coerce.number().optional(),
@@ -148,6 +151,18 @@ const withBudgetFallback = async <T,>(
 
 const normalizeSearchText = (value: string | null | undefined): string =>
 	(value ?? '').toLowerCase().replace(/\s+/g, ' ').trim();
+
+const shuffleItems = <T,>(items: readonly T[]): T[] => {
+	const shuffled = [...items];
+	for (let i = shuffled.length - 1; i > 0; i--) {
+		const j = Math.floor(Math.random() * (i + 1));
+		[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+	}
+	return shuffled;
+};
+
+const takeRandomized = <T,>(items: readonly T[], limit: number): T[] =>
+	shuffleItems(items).slice(0, Math.max(0, limit));
 
 type ContactSearchMode = 'booking' | 'promotion';
 
@@ -3236,7 +3251,16 @@ export async function GET(req: NextRequest) {
 						return (a.contact.company || '').localeCompare(b.contact.company || '');
 					});
 
-					return apiResponse(scored.map((x) => x.contact).slice(0, finalLimit));
+					const randomizedPool = scored.slice(
+						0,
+						Math.min(scored.length, Math.max(finalLimit * 4, finalLimit))
+					);
+					return apiResponse(
+						takeRandomized(
+							randomizedPool.map((x) => x.contact),
+							finalLimit
+						)
+					);
 				}
 				// If still empty and vector requested, let vector path try below
 			}
@@ -3245,6 +3269,7 @@ export async function GET(req: NextRequest) {
 		// Special-case: wine/beer/spirits queries - return only beverage venue titles
 		if (isWineBeerSpiritsQuery) {
 			const finalLimit = Math.max(1, Math.min(limit ?? VECTOR_SEARCH_LIMIT_DEFAULT, 500));
+			const fetchTake = Math.min(finalLimit * 6, 500);
 			const beveragePrefixes = ['Wineries', 'Distilleries', 'Breweries', 'Cideries'];
 
 			const baseWhere: Prisma.ContactWhereInput = {
@@ -3301,7 +3326,7 @@ export async function GET(req: NextRequest) {
 					],
 				},
 				orderBy: [{ state: 'asc' }, { city: 'asc' }, { company: 'asc' }],
-				take: finalLimit,
+				take: fetchTake,
 			});
 
 			const results = primary.slice();
@@ -3311,7 +3336,6 @@ export async function GET(req: NextRequest) {
 					if (seen.has(c.id)) continue;
 					results.push(c);
 					seen.add(c.id);
-					if (results.length >= finalLimit) break;
 				}
 			};
 			const buildSeenExclusion = (): Prisma.ContactWhereInput =>
@@ -3480,7 +3504,7 @@ export async function GET(req: NextRequest) {
 
 			// Do not apply booking title-prefix filtering here; this flow enforces the
 			// beverage categories directly.
-			return apiResponse(results.slice(0, finalLimit));
+			return apiResponse(takeRandomized(results, finalLimit));
 		}
 
 		// Special-case: Wedding planner searches - more lenient matching for wedding-related contacts
@@ -3839,6 +3863,7 @@ export async function GET(req: NextRequest) {
 		// Special-case: Promotion searches prioritize Radio Stations across all states
 		if (isPromotionSearch) {
 			const finalLimit = Math.max(1, Math.min(limit ?? VECTOR_SEARCH_LIMIT_DEFAULT, 500));
+			const fetchTake = Math.min(finalLimit * 6, 500);
 			const radioTitleWhere: Prisma.StringFilter = {
 				mode: 'insensitive',
 				contains: 'radio station',
@@ -3900,7 +3925,7 @@ export async function GET(req: NextRequest) {
 					],
 				},
 				orderBy: [{ state: 'asc' }, { city: 'asc' }, { company: 'asc' }],
-				take: finalLimit,
+				take: fetchTake,
 			});
 
 			const results = primary;
@@ -4058,7 +4083,7 @@ export async function GET(req: NextRequest) {
 				}
 			}
 
-			return apiResponse(results.slice(0, finalLimit));
+			return apiResponse(takeRandomized(results, finalLimit));
 		}
 
 		const substringSearch = async (): Promise<Contact[]> => {

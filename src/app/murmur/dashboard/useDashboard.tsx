@@ -42,6 +42,9 @@ const formSchema = z.object({
 
 type FormData = z.infer<typeof formSchema>;
 
+const getRandomSearchResultLimit = (): number =>
+	Math.floor(Math.random() * 21) + 30;
+
 // Args we ran the most recent curated search with. Stored alongside the result
 // in sessionStorage so a refresh that lands on the same args restores the *same
 // shuffle* the user was looking at instead of generating a fresh one.
@@ -263,6 +266,7 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 	const [isAllSelected, setIsAllSelected] = useState(false);
 	const [activeSearchQuery, setActiveSearchQuery] = useState('');
 	const [activeExcludeUsedContacts, setActiveExcludeUsedContacts] = useState(false);
+	const [searchRunId, setSearchRunId] = useState(0);
 	// Optional map-driven bounding box filter (rectangle selection tool in map view).
 	const [mapBboxFilter, setMapBboxFilter] = useState<{
 		south: number;
@@ -315,6 +319,7 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 				process.env.NODE_ENV === 'production' ? EmailVerificationStatus.valid : undefined,
 			useVectorSearch: true,
 			limit,
+			searchRunId,
 			excludeUsedContacts: activeExcludeUsedContacts,
 			bboxSouth: mapBboxFilter?.south,
 			bboxWest: mapBboxFilter?.west,
@@ -494,7 +499,8 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 		// Update search parameters
 		setActiveSearchQuery(data.searchText);
 		setActiveExcludeUsedContacts(data.excludeUsedContacts ?? false);
-		setLimit(500);
+		setLimit(getRandomSearchResultLimit());
+		setSearchRunId((runId) => runId + 1);
 		setHasSearched(true);
 		setIsMapView(true);
 	};
@@ -502,6 +508,7 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 	const handleResetSearch = () => {
 		setHasSearched(false);
 		setActiveSearchQuery('');
+		setSearchRunId(0);
 		setMapBboxFilter(null);
 		setPendingFreeTextQuery(null);
 		setIsCuratedSearchActive(false);
