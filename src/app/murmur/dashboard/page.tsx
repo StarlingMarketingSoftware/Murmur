@@ -119,6 +119,10 @@ const isCuratedPicksSearchQuery = (query: string): boolean =>
 	/^curated picks near\b/i.test(query.trim());
 
 const CURATED_URL_PARAM_KEYS = ['pick', 'state', 'cat', 'lat', 'lon', 'r'] as const;
+// Distinct from CURATED_URL_PARAM_KEYS so a refresh from a free-text run can't be mistaken
+// for a curated rehydration (which would replay /api/contacts/curated-search instead of
+// restoring the cached free-text results from sessionStorage).
+const FREETEXT_URL_PARAM_KEYS = ['ft', 'ftLat', 'ftLon', 'ftR'] as const;
 
 type CuratedUrlArgs = {
 	lat: number | null;
@@ -126,6 +130,12 @@ type CuratedUrlArgs = {
 	radiusKm: number | null;
 	category: string | null;
 	state: string | null;
+} | null;
+
+type FreeTextUrlArgs = {
+	lat: number | null;
+	lon: number | null;
+	radiusKm: number | null;
 } | null;
 
 // Serializes curated-mode args onto the given URLSearchParams under short, shared keys.
@@ -146,6 +156,24 @@ const writeCuratedParams = (params: URLSearchParams, args: CuratedUrlArgs): void
 	else params.delete('lon');
 	if (args.radiusKm != null) params.set('r', String(args.radiusKm));
 	else params.delete('r');
+};
+
+// Same shape as writeCuratedParams but for free-text "Search Anything" runs. The query string
+// itself already lives in `search`; these extra params just flag the URL so the rehydration
+// path knows to look in the free-text session cache (instead of falling through to the
+// regular /api/contacts vector search, which is a different endpoint with different scoring).
+const writeFreeTextParams = (params: URLSearchParams, args: FreeTextUrlArgs): void => {
+	if (!args) {
+		for (const key of FREETEXT_URL_PARAM_KEYS) params.delete(key);
+		return;
+	}
+	params.set('ft', '1');
+	if (args.lat != null) params.set('ftLat', String(args.lat));
+	else params.delete('ftLat');
+	if (args.lon != null) params.set('ftLon', String(args.lon));
+	else params.delete('ftLon');
+	if (args.radiusKm != null) params.set('ftR', String(args.radiusKm));
+	else params.delete('ftR');
 };
 
 const extractStateAbbrFromSearchQuery = (query: string): string | null => {
@@ -1368,6 +1396,14 @@ const DashboardContent = () => {
 	const curatedLatParam = parseFiniteNumberParam('lat');
 	const curatedLonParam = parseFiniteNumberParam('lon');
 	const curatedRadiusKmParam = parseFiniteNumberParam('r');
+	// Free-text "Search Anything" rehydration flag. The query itself is in `search`; the bias
+	// args (lat/lon/r) live under `ftLat`/`ftLon`/`ftR` so they don't clash with the curated
+	// short-key namespace. Presence of `ft=1` is what tells rehydration to look in the
+	// free-text session cache before falling through to the regular onSubmit.
+	const freeTextModeParam = searchParams.get('ft')?.trim() === '1';
+	const freeTextLatParam = parseFiniteNumberParam('ftLat');
+	const freeTextLonParam = parseFiniteNumberParam('ftLon');
+	const freeTextRadiusKmParam = parseFiniteNumberParam('ftR');
 	// "From Home" mode: triggered from landing page search button, shows a pre-configured search
 	// with sign-up modal for unauthenticated users.
 	const fromHomeParam = searchParams.get('fromHome') === 'true';
@@ -2417,6 +2453,8 @@ const DashboardContent = () => {
 		lastCuratedArgs,
 		primeFreeTextSearch,
 		triggerFreeTextSearch,
+		rehydrateFreeTextSession,
+		lastFreeTextArgs,
 	} = useDashboard({ derivedTitle: derivedContactTitle, forceApplyDerivedTitle: shouldForceApplyDerivedTitle, fromHome: fromHomeParam });
 	const shouldEnableMapStateCategorySelection =
 		isMapView && isMapBottomCategoryMode;
@@ -2727,6 +2765,28 @@ const DashboardContent = () => {
 			return;
 		}
 
+		// Free-text "Search Anything" rehydration. The URL flag `ft=1` (set by the URL-mirror
+		// when a free-text search is active) tells us to look in the free-text session cache
+		// before falling through to the regular onSubmit path. We need this branch because the
+		// regular vector search at /api/contacts is a *different endpoint* with different
+		// scoring than /api/contacts/search; running it would give the user a different
+		// result set and — because it doesn't decorate contacts with `curatedCategory` — also
+		// breaks the map's stable curated marker rendering, leaving the panel populated but
+		// the map empty until auto-fit + moveend reseed the viewport sample (the original bug).
+		if (freeTextModeParam) {
+			hasHydratedDashboardUrlRef.current = true;
+			rehydrateFreeTextSession({
+				q: dashboardSearchParam,
+				lat: freeTextLatParam,
+				lon: freeTextLonParam,
+				radiusKm: freeTextRadiusKmParam,
+			}).catch(() => undefined);
+			if (dashboardViewParam === 'table') {
+				setTimeout(() => setIsMapView(false), 0);
+			}
+			return;
+		}
+
 		hasHydratedDashboardUrlRef.current = true;
 
 		// Keep the segmented UI in sync with the restored query (best-effort).
@@ -2761,12 +2821,17 @@ const DashboardContent = () => {
 		dashboardSearchParam,
 		dashboardViewParam,
 		form,
+		freeTextLatParam,
+		freeTextLonParam,
+		freeTextModeParam,
+		freeTextRadiusKmParam,
 		hasSearched,
 		isAddToCampaignMode,
 		isMobile,
 		isSignedIn,
 		onSubmit,
 		rehydrateCuratedSession,
+		rehydrateFreeTextSession,
 		setIsMapView,
 	]);
 
@@ -2811,6 +2876,21 @@ const DashboardContent = () => {
 			return;
 		}
 
+		// Free-text "Search Anything" rehydration — same treatment as the dashboard flow.
+		if (freeTextModeParam) {
+			hasHydratedFromCampaignUrlRef.current = true;
+			rehydrateFreeTextSession({
+				q: fromCampaignSearchParam,
+				lat: freeTextLatParam,
+				lon: freeTextLonParam,
+				radiusKm: freeTextRadiusKmParam,
+			}).catch(() => undefined);
+			if (fromCampaignViewParam === 'table') {
+				setTimeout(() => setIsMapView(false), 0);
+			}
+			return;
+		}
+
 		hasHydratedFromCampaignUrlRef.current = true;
 
 		// Keep the segmented UI in sync with the restored query (best-effort).
@@ -2843,6 +2923,10 @@ const DashboardContent = () => {
 		curatedRadiusKmParam,
 		curatedStateParam,
 		form,
+		freeTextLatParam,
+		freeTextLonParam,
+		freeTextModeParam,
+		freeTextRadiusKmParam,
 		fromCampaignSearchParam,
 		fromCampaignViewParam,
 		hasSearched,
@@ -2851,6 +2935,7 @@ const DashboardContent = () => {
 		isSignedIn,
 		onSubmit,
 		rehydrateCuratedSession,
+		rehydrateFreeTextSession,
 		setIsMapView,
 	]);
 
@@ -2867,10 +2952,22 @@ const DashboardContent = () => {
 		params.set('view', desiredView);
 		params.set('search', activeSearchQuery);
 
-		// Curated-search args: persist enough to replay the same call on refresh. When
-		// switching out of curated mode (e.g. user runs a regular search), strip these so
-		// the next reload doesn't get tricked into re-triggering the curated path.
-		writeCuratedParams(params, isCuratedSearchActive ? lastCuratedArgs : null);
+		// Curated and free-text both surface results through `isCuratedSearchActive`, but
+		// they're distinguished by which `lastXxxArgs` snapshot is set. Persist whichever
+		// mode is active and strip the other so a refresh can't accidentally cross-replay.
+		const inCuratedMode = isCuratedSearchActive && lastCuratedArgs != null;
+		const inFreeTextMode = isCuratedSearchActive && lastFreeTextArgs != null && !inCuratedMode;
+		writeCuratedParams(params, inCuratedMode ? lastCuratedArgs : null);
+		writeFreeTextParams(
+			params,
+			inFreeTextMode
+				? {
+						lat: lastFreeTextArgs?.lat ?? null,
+						lon: lastFreeTextArgs?.lon ?? null,
+						radiusKm: lastFreeTextArgs?.radiusKm ?? null,
+				  }
+				: null
+		);
 
 		const next = params.toString();
 		const current = searchParams.toString();
@@ -2884,6 +2981,7 @@ const DashboardContent = () => {
 		isCuratedSearchActive,
 		isMapView,
 		lastCuratedArgs,
+		lastFreeTextArgs,
 		pathname,
 		router,
 		searchParams,
@@ -2903,12 +3001,14 @@ const DashboardContent = () => {
 		const had =
 			params.get('view') !== null ||
 			params.get('search') !== null ||
-			CURATED_URL_PARAM_KEYS.some((key) => params.get(key) !== null);
+			CURATED_URL_PARAM_KEYS.some((key) => params.get(key) !== null) ||
+			FREETEXT_URL_PARAM_KEYS.some((key) => params.get(key) !== null);
 		if (!had) return;
 
 		params.delete('view');
 		params.delete('search');
 		writeCuratedParams(params, null);
+		writeFreeTextParams(params, null);
 		const qs = params.toString();
 		router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
 	}, [hasSearched, isAddToCampaignMode, pathname, router, searchParams]);
@@ -2927,9 +3027,21 @@ const DashboardContent = () => {
 		params.set('fromCampaignView', desiredView);
 		params.set('fromCampaignSearch', activeSearchQuery);
 
-		// Curated args travel under the same `pick`/short-key namespace as the normal
-		// dashboard flow so the rehydration effect can branch on a single signal.
-		writeCuratedParams(params, isCuratedSearchActive ? lastCuratedArgs : null);
+		// Curated and free-text travel under their own short-key namespaces so the rehydration
+		// effect can branch on whichever flag is present.
+		const inCuratedMode = isCuratedSearchActive && lastCuratedArgs != null;
+		const inFreeTextMode = isCuratedSearchActive && lastFreeTextArgs != null && !inCuratedMode;
+		writeCuratedParams(params, inCuratedMode ? lastCuratedArgs : null);
+		writeFreeTextParams(
+			params,
+			inFreeTextMode
+				? {
+						lat: lastFreeTextArgs?.lat ?? null,
+						lon: lastFreeTextArgs?.lon ?? null,
+						radiusKm: lastFreeTextArgs?.radiusKm ?? null,
+				  }
+				: null
+		);
 
 		const next = params.toString();
 		const current = searchParams.toString();
@@ -2943,6 +3055,7 @@ const DashboardContent = () => {
 		isCuratedSearchActive,
 		isMapView,
 		lastCuratedArgs,
+		lastFreeTextArgs,
 		pathname,
 		router,
 		searchParams,

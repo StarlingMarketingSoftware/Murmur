@@ -132,6 +132,72 @@ const curatedArgsEqual = (a: CuratedSearchArgs, b: CuratedSearchArgs): boolean =
 	a.category === b.category &&
 	a.state === b.state;
 
+// Args we ran the most recent free-text "Search Anything" search with. Stored alongside
+// the decorated result so a refresh on the same query restores the same hybrid-retriever
+// result set (and its `curatedCategory` decoration) instead of falling back to the regular
+// /api/contacts vector search — which returns differently-scored data and breaks the map's
+// stable curated marker rendering.
+type FreeTextSearchArgs = {
+	q: string;
+	lat: number | null;
+	lon: number | null;
+	radiusKm: number | null;
+};
+
+type FreeTextSessionPayload = {
+	v: 1;
+	ts: number;
+	args: FreeTextSearchArgs;
+	query: string;
+	contacts: ContactWithName[];
+};
+
+const FREETEXT_SESSION_STORAGE_KEY = 'murmur_freetext_session_v1';
+const FREETEXT_SESSION_MAX_AGE_MS = 60 * 60 * 1000;
+
+const readFreeTextSessionStorage = (): FreeTextSessionPayload | null => {
+	if (typeof window === 'undefined') return null;
+	try {
+		const raw = window.sessionStorage.getItem(FREETEXT_SESSION_STORAGE_KEY);
+		if (!raw) return null;
+		const parsed = JSON.parse(raw);
+		if (parsed?.v !== 1) return null;
+		if (typeof parsed.ts !== 'number') return null;
+		if (!Array.isArray(parsed.contacts)) return null;
+		if (Date.now() - parsed.ts > FREETEXT_SESSION_MAX_AGE_MS) return null;
+		return {
+			v: 1,
+			ts: parsed.ts,
+			args: parsed.args,
+			query: typeof parsed.query === 'string' ? parsed.query : '',
+			contacts: parsed.contacts.map(reviveContactDates),
+		};
+	} catch {
+		return null;
+	}
+};
+
+const writeFreeTextSessionStorage = (payload: FreeTextSessionPayload): void => {
+	if (typeof window === 'undefined') return;
+	try {
+		window.sessionStorage.setItem(
+			FREETEXT_SESSION_STORAGE_KEY,
+			JSON.stringify(payload)
+		);
+	} catch {
+		// Quota exceeded or storage disabled — non-fatal, refresh just re-fetches.
+	}
+};
+
+const clearFreeTextSessionStorage = (): void => {
+	if (typeof window === 'undefined') return;
+	try {
+		window.sessionStorage.removeItem(FREETEXT_SESSION_STORAGE_KEY);
+	} catch {
+		// ignore
+	}
+};
+
 interface UseDashboardOptions {
 	/** Derived title to assign to contacts without a title when creating a campaign */
 	derivedTitle?: string;
@@ -224,6 +290,12 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 	// dashboard URL-mirror can persist them and the page can re-run the same curated search
 	// after a browser refresh. Keys are the exact override fields accepted by triggerCuratedSearch.
 	const [lastCuratedArgs, setLastCuratedArgs] = useState<CuratedSearchArgs | null>(null);
+	// Same idea as lastCuratedArgs, but for free-text "Search Anything" runs. The URL alone
+	// can't distinguish a free-text result from the regular vector search (the query string is
+	// the only signal), so this flag is what lets the URL-mirror tag the URL with `ft=1` and
+	// the rehydration path know to restore from the free-text session cache instead of
+	// kicking off a regular onSubmit.
+	const [lastFreeTextArgs, setLastFreeTextArgs] = useState<FreeTextSearchArgs | null>(null);
 
 	const {
 		data: rawContacts,
@@ -373,7 +445,9 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 		setIsCuratedSearchActive(false);
 		setCuratedContacts(null);
 		setLastCuratedArgs(null);
+		setLastFreeTextArgs(null);
 		clearCuratedSessionStorage();
+		clearFreeTextSessionStorage();
 		// Update search parameters
 		setActiveSearchQuery(data.searchText);
 		setActiveExcludeUsedContacts(data.excludeUsedContacts ?? false);
@@ -390,7 +464,9 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 		setIsCuratedSearchActive(false);
 		setCuratedContacts(null);
 		setLastCuratedArgs(null);
+		setLastFreeTextArgs(null);
 		clearCuratedSessionStorage();
+		clearFreeTextSessionStorage();
 		// Reset selection when leaving the search/results flow (fresh dashboard start should not
 		// carry over prior selections).
 		setSelectedContacts([]);
@@ -415,6 +491,11 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 			setIsCuratedSearchActive(true);
 			setHasSearched(true);
 			setIsMapView(true);
+			// Curated and free-text are mutually exclusive flavours of `isCuratedSearchActive`;
+			// clear the free-text snapshot so the URL-mirror doesn't keep tagging the URL with
+			// `ft=1` while we're showing curated picks.
+			setLastFreeTextArgs(null);
+			clearFreeTextSessionStorage();
 			// Capture the exact args we ran with so we can replay this curated search after a
 			// browser refresh (the URL-mirror in dashboard/page.tsx serializes these).
 			const capturedArgs: CuratedSearchArgs = {
@@ -479,6 +560,12 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 		setIsMapView(true);
 		setLastCuratedArgs(null);
 		clearCuratedSessionStorage();
+		// Stale free-text caches from a *different* prior query would falsely match a refresh
+		// targeting this run before the awaited result writes the new payload. Drop both the
+		// in-memory args and the storage entry now; `triggerFreeTextSearch` will rewrite both
+		// once the API call resolves.
+		setLastFreeTextArgs(null);
+		clearFreeTextSessionStorage();
 		setActiveSearchQuery(q);
 	}, []);
 
@@ -494,6 +581,12 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 			const q = rawQuery.trim();
 			if (!q) return;
 			primeFreeTextSearch(q);
+			const capturedArgs: FreeTextSearchArgs = {
+				q,
+				lat: overrides?.lat ?? null,
+				lon: overrides?.lon ?? null,
+				radiusKm: overrides?.radiusKm ?? null,
+			};
 			try {
 				const result = await runFreeTextSearch({
 					q,
@@ -514,11 +607,27 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 					return { ...c, curatedCategory: match ?? fallbackCategory };
 				});
 				setCuratedContacts(decoratedContacts);
+				setLastFreeTextArgs(capturedArgs);
+				// Snapshot the *exact* contacts we just rendered (with their curatedCategory
+				// decoration intact) so a refresh on the same query restores the same list and
+				// the map's stable curated marker path stays in effect. Without this snapshot,
+				// the rehydration path falls through to /api/contacts and contacts come back
+				// without curatedCategory — markers regress to viewport sampling and don't
+				// render until after auto-fit + moveend, which is the bug we're fixing.
+				writeFreeTextSessionStorage({
+					v: 1,
+					ts: Date.now(),
+					args: capturedArgs,
+					query: q,
+					contacts: decoratedContacts,
+				});
 				return result;
 			} catch (err) {
 				toast.error(err instanceof Error ? err.message : 'Failed to run search');
 				setIsCuratedSearchActive(false);
 				setCuratedContacts(null);
+				setLastFreeTextArgs(null);
+				clearFreeTextSessionStorage();
 				setHasSearched(false);
 				throw err;
 			} finally {
@@ -542,6 +651,8 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 				setHasSearched(true);
 				setIsMapView(true);
 				setLastCuratedArgs(cached.args);
+				setLastFreeTextArgs(null);
+				clearFreeTextSessionStorage();
 				setCuratedContacts(cached.contacts);
 				setActiveSearchQuery(cached.query);
 				setIsSearchPending(false);
@@ -550,6 +661,49 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 			await triggerCuratedSearch(args);
 		},
 		[triggerCuratedSearch]
+	);
+
+	// Restore a free-text "Search Anything" session. If sessionStorage holds the same query
+	// the URL is asking for, restore in-memory immediately (no network). Otherwise — typically
+	// a refresh in a fresh tab where sessionStorage didn't carry over — replay the search
+	// via the canonical `triggerFreeTextSearch` so the result still comes back with
+	// `curatedCategory` decoration and the map's stable curated marker path stays in effect.
+	// Either way, on success the caller knows it can skip the regular onSubmit fallback.
+	const rehydrateFreeTextSession = useCallback(
+		async (args: FreeTextSearchArgs): Promise<boolean> => {
+			const trimmedQuery = args.q.trim();
+			if (!trimmedQuery) return false;
+
+			const cached = readFreeTextSessionStorage();
+			if (cached && cached.query.trim() === trimmedQuery) {
+				setMapBboxFilter(null);
+				setPendingFreeTextQuery(null);
+				setIsCuratedSearchActive(true);
+				setHasSearched(true);
+				setIsMapView(true);
+				setLastCuratedArgs(null);
+				clearCuratedSessionStorage();
+				setLastFreeTextArgs(cached.args);
+				setCuratedContacts(cached.contacts);
+				setActiveSearchQuery(cached.query);
+				setIsSearchPending(false);
+				return true;
+			}
+
+			// Cache miss: replay the search using the URL-encoded args so we end up with the
+			// same shape of state we'd have post-search (decorated contacts, curated path).
+			try {
+				await triggerFreeTextSearch(trimmedQuery, {
+					lat: args.lat,
+					lon: args.lon,
+					radiusKm: args.radiusKm,
+				});
+				return true;
+			} catch {
+				return false;
+			}
+		},
+		[triggerFreeTextSearch]
 	);
 
 	const handleSelectAll = (panelContacts?: ContactWithName[]) => {
@@ -1138,6 +1292,8 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 		lastCuratedArgs,
 		primeFreeTextSearch,
 		triggerFreeTextSearch,
+		rehydrateFreeTextSession,
 		isPendingFreeTextSearch,
+		lastFreeTextArgs,
 	};
 };
