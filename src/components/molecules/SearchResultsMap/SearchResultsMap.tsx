@@ -294,19 +294,25 @@ const EMPTY_POLYGON_FC: OutlinePolygonFeatureCollection = {
 	features: [],
 };
 
-const CURATED_BLOB_MIN_CLUSTERS = 2;
-const CURATED_BLOB_MAX_CLUSTERS = 3;
+const CURATED_BLOB_MIN_REGION_POINTS = 2;
+const CURATED_BLOB_MAX_REGIONS = 8;
+const CURATED_BLOB_MAX_REGION_SPAN_KM = 650;
 const CURATED_BLOB_SHAPE_STEPS = 96;
 const CURATED_BLOB_OUTLINE_SMOOTHING_PASSES = 2;
 const CURATED_STABLE_MARKER_MAX_DOTS = 125;
-const CURATED_BLOB_PADDING_KM = 58;
-const CURATED_BLOB_MIN_AXIS_KM = 44;
-const CURATED_BLOB_MAX_CLUSTER_SPAN_KM = 520;
-const CURATED_BLOB_ELLIPSE_RATIO_THRESHOLD = 1.75;
-const CURATED_BLOB_MAX_ELLIPSE_RATIO = 1.85;
 const CURATED_BLOB_KMEANS_MAX_ITER = 12;
-const CURATED_BLOB_ORGANIC_WOBBLE = 0.015;
-const CURATED_ORB_SLOT_COUNT = CURATED_BLOB_MAX_CLUSTERS;
+const CURATED_BLOB_LOBE_MIN_COUNT = 2;
+const CURATED_BLOB_LOBE_MAX_COUNT = 4;
+const CURATED_BLOB_LOBE_PADDING_KM = 36;
+const CURATED_BLOB_LOBE_MIN_RADIUS_KM = 52;
+const CURATED_BLOB_LOBE_MAX_RADIUS_KM = 240;
+const CURATED_BLOB_LOBE_OVERLAP_RADIUS_RATIO = 0.55;
+const CURATED_BLOB_LOBE_RADIUS_JITTER = 0.065;
+const CURATED_BLOB_SINGLETON_LOBE_RADIUS_KM = 26;
+const CURATED_BLOB_SINGLETON_LOBE_OFFSET_KM = 7;
+const CURATED_BLOB_ORGANIC_WOBBLE = 0.028;
+const CURATED_ORB_SLOT_COUNT =
+	CURATED_BLOB_MAX_REGIONS * CURATED_BLOB_LOBE_MAX_COUNT;
 
 // Globe-zoom orb transition: a two-phase animation as the user zooms out.
 //
@@ -341,6 +347,8 @@ const CURATED_ORB_RADIUS_PADDING_KM = 0;
 // Floor: very tight clusters still need a readable orb, otherwise it shrinks
 // to a dot at the moment the dots themselves are disappearing.
 const CURATED_ORB_MIN_RADIUS_KM = 90;
+const CURATED_ORB_SMALL_SHAPE_MIN_RADIUS_KM = 38;
+const CURATED_ORB_SMALL_SHAPE_THRESHOLD_KM = 72;
 const CURATED_ORB_GRADIENT_ROTATION_DEG = -38.746;
 const CURATED_ORB_SOURCE_VIEWBOX_HALF_WIDTH = 778 / 2;
 const CURATED_ORB_SOURCE_VIEWBOX_HALF_HEIGHT = 736 / 2;
@@ -409,16 +417,6 @@ type CuratedBlobCluster = {
 	points: CuratedBlobMercatorPoint[];
 };
 
-type CuratedBlobShapeSpec =
-	| { kind: 'circle'; center: LatLngLiteral; radiusKm: number }
-	| {
-			kind: 'ellipse';
-			center: LatLngLiteral;
-			semiMajorKm: number;
-			semiMinorKm: number;
-			angleRad: number;
-	  };
-
 type CuratedBlobMorphSource = {
 	mercatorMultiPolygon: ClippingMultiPolygon;
 	center: LatLngLiteral;
@@ -441,6 +439,11 @@ const curatedBlobOrganicRadiusScale = (
 		Math.sin(angleRad * 3 - phaseB) * 0.32 +
 		Math.sin(angleRad * 5 + phaseC) * 0.18;
 	return clamp(1 + wave * wobble, 1 - wobble * 1.35, 1 + wobble * 1.35);
+};
+
+const curatedBlobDeterministicUnit = (seed: number): number => {
+	const x = Math.sin(seed * 12.9898 + 78.233) * 43758.5453;
+	return x - Math.floor(x);
 };
 
 const buildMercatorCircleMultiPolygon = (
@@ -478,66 +481,6 @@ const buildMercatorCircleMultiPolygon = (
 		ring.push([
 			center.x + Math.cos(angle) * radiusMercator * organicScale,
 			center.y + Math.sin(angle) * radiusMercator * organicScale,
-		]);
-	}
-
-	const closed = closeRing(ring);
-	return closed.length >= 4 ? [[closed]] : null;
-};
-
-const buildMercatorEllipseMultiPolygon = (
-	coords: LatLngLiteral,
-	semiMajorKm: number,
-	semiMinorKm: number,
-	angleRad: number,
-	steps: number,
-	organicSeed = 0,
-	organicWobble = 0
-): ClippingMultiPolygon | null => {
-	if (
-		!Number.isFinite(coords.lng) ||
-		!Number.isFinite(coords.lat) ||
-		!Number.isFinite(semiMajorKm) ||
-		!Number.isFinite(semiMinorKm) ||
-		semiMajorKm <= 0 ||
-		semiMinorKm <= 0 ||
-		!Number.isFinite(angleRad) ||
-		steps < 8
-	) {
-		return null;
-	}
-
-	const center = mapboxgl.MercatorCoordinate.fromLngLat({
-		lng: coords.lng,
-		lat: coords.lat,
-	});
-	const mercatorPerKm = 1000 * center.meterInMercatorCoordinateUnits();
-	const semiMajorMercator = semiMajorKm * mercatorPerKm;
-	const semiMinorMercator = semiMinorKm * mercatorPerKm;
-	if (
-		!Number.isFinite(semiMajorMercator) ||
-		!Number.isFinite(semiMinorMercator) ||
-		semiMajorMercator <= 0 ||
-		semiMinorMercator <= 0
-	) {
-		return null;
-	}
-
-	const cosA = Math.cos(angleRad);
-	const sinA = Math.sin(angleRad);
-	const ring: ClippingRing = [];
-	for (let i = 0; i < steps; i++) {
-		const angle = (i / steps) * Math.PI * 2;
-		const organicScale = curatedBlobOrganicRadiusScale(
-			angle,
-			organicSeed,
-			organicWobble
-		);
-		const localX = Math.cos(angle) * semiMajorMercator * organicScale;
-		const localY = Math.sin(angle) * semiMinorMercator * organicScale;
-		ring.push([
-			center.x + localX * cosA - localY * sinA,
-			center.y + localX * sinA + localY * cosA,
 		]);
 	}
 
@@ -707,27 +650,6 @@ const kMeansClusterMercator = (
 	return clusters.filter((cluster) => cluster.points.length > 0);
 };
 
-const maxCuratedBlobClusterSpanKm = (clusters: CuratedBlobCluster[]): number => {
-	let maxSpanKm = 0;
-	for (const cluster of clusters) {
-		if (cluster.points.length < 2) continue;
-		const center = curatedBlobLatLngFromMercator(cluster.centroid);
-		if (!center) continue;
-		const kmPerMercator = curatedBlobKmPerMercatorUnit(center);
-		if (!kmPerMercator) continue;
-
-		let maxDistance = 0;
-		for (const point of cluster.points) {
-			maxDistance = Math.max(
-				maxDistance,
-				Math.hypot(point.x - cluster.centroid.x, point.y - cluster.centroid.y)
-			);
-		}
-		maxSpanKm = Math.max(maxSpanKm, maxDistance * 2 * kmPerMercator);
-	}
-	return maxSpanKm;
-};
-
 const minCuratedBlobClusterPointId = (cluster: CuratedBlobCluster): number =>
 	cluster.points.reduce((minId, point) => Math.min(minId, point.id), Infinity);
 
@@ -740,134 +662,271 @@ const sortCuratedBlobClusters = (
 		return minA - minB || a.centroid.x - b.centroid.x || a.centroid.y - b.centroid.y;
 	});
 
+const curatedBlobMercatorDistanceKm = (
+	a: { x: number; y: number },
+	b: { x: number; y: number }
+): number | null => {
+	const center = curatedBlobLatLngFromMercator({
+		x: (a.x + b.x) / 2,
+		y: (a.y + b.y) / 2,
+	});
+	if (!center) return null;
+	const kmPerMercator = curatedBlobKmPerMercatorUnit(center);
+	if (!kmPerMercator) return null;
+	const distanceMercator = Math.hypot(a.x - b.x, a.y - b.y);
+	if (!Number.isFinite(distanceMercator)) return null;
+	return distanceMercator * kmPerMercator;
+};
+
+const offsetCuratedBlobPointByKm = (
+	point: CuratedBlobMercatorPoint,
+	offsetKm: number,
+	angleRad: number
+): LatLngLiteral | null => {
+	const center = mapboxgl.MercatorCoordinate.fromLngLat({
+		lng: point.coords.lng,
+		lat: point.coords.lat,
+	});
+	const offsetMercator = offsetKm * 1000 * center.meterInMercatorCoordinateUnits();
+	if (!Number.isFinite(offsetMercator)) return null;
+	return curatedBlobLatLngFromMercator({
+		x: point.x + Math.cos(angleRad) * offsetMercator,
+		y: point.y + Math.sin(angleRad) * offsetMercator,
+	});
+};
+
+const curatedBlobClusterSpanKm = (cluster: CuratedBlobCluster): number => {
+	if (cluster.points.length < 2) return 0;
+	const center = curatedBlobLatLngFromMercator(cluster.centroid);
+	if (!center) return 0;
+	const kmPerMercator = curatedBlobKmPerMercatorUnit(center);
+	if (!kmPerMercator) return 0;
+
+	let maxDistance = 0;
+	for (const point of cluster.points) {
+		maxDistance = Math.max(
+			maxDistance,
+			Math.hypot(point.x - cluster.centroid.x, point.y - cluster.centroid.y)
+		);
+	}
+	return maxDistance * 2 * kmPerMercator;
+};
+
 const pickAdaptiveCuratedBlobClusters = (
 	points: CuratedBlobMercatorPoint[]
 ): CuratedBlobCluster[] => {
 	if (points.length === 0) return [];
-	if (points.length <= CURATED_BLOB_MIN_CLUSTERS) {
-		return kMeansClusterMercator(points, points.length, CURATED_BLOB_KMEANS_MAX_ITER);
+	if (points.length === 1) {
+		return [
+			{
+				centroid: { x: points[0].x, y: points[0].y },
+				points: points.slice(),
+			},
+		];
 	}
 
-	const maxK = Math.min(CURATED_BLOB_MAX_CLUSTERS, points.length);
-	let bestClusters: CuratedBlobCluster[] = [];
-	for (let k = CURATED_BLOB_MIN_CLUSTERS; k <= maxK; k++) {
-		bestClusters = kMeansClusterMercator(points, k, CURATED_BLOB_KMEANS_MAX_ITER);
-		if (k === maxK) break;
-		if (maxCuratedBlobClusterSpanKm(bestClusters) <= CURATED_BLOB_MAX_CLUSTER_SPAN_KM) {
-			break;
+	if (points.length === CURATED_BLOB_MIN_REGION_POINTS) {
+		const distanceKm = curatedBlobMercatorDistanceKm(points[0], points[1]);
+		if (distanceKm == null || distanceKm > CURATED_BLOB_MAX_REGION_SPAN_KM) {
+			return points.map((point) => ({
+				centroid: { x: point.x, y: point.y },
+				points: [point],
+			}));
 		}
+		return [
+			{
+				centroid: averageCuratedBlobCentroid(points),
+				points: points.slice(),
+			},
+		];
 	}
-	return sortCuratedBlobClusters(bestClusters);
+
+	const sortedPoints = points
+		.slice()
+		.sort((a, b) => a.id - b.id || a.x - b.x || a.y - b.y);
+	let clusters: CuratedBlobCluster[] = [
+		{
+			centroid: averageCuratedBlobCentroid(sortedPoints),
+			points: sortedPoints,
+		},
+	];
+
+	while (clusters.length < CURATED_BLOB_MAX_REGIONS) {
+		let splitIndex = -1;
+		let splitSpanKm = -Infinity;
+		for (let i = 0; i < clusters.length; i++) {
+			const cluster = clusters[i];
+			if (cluster.points.length < 2) continue;
+			const spanKm = curatedBlobClusterSpanKm(cluster);
+			if (spanKm > CURATED_BLOB_MAX_REGION_SPAN_KM && spanKm > splitSpanKm) {
+				splitIndex = i;
+				splitSpanKm = spanKm;
+			}
+		}
+
+		if (splitIndex < 0) break;
+
+		const target = clusters[splitIndex];
+		const split = kMeansClusterMercator(
+			target.points,
+			2,
+			CURATED_BLOB_KMEANS_MAX_ITER
+		);
+		if (split.length < 2) break;
+
+		clusters = [
+			...clusters.slice(0, splitIndex),
+			...split,
+			...clusters.slice(splitIndex + 1),
+		];
+	}
+
+	return sortCuratedBlobClusters(clusters).slice(0, CURATED_BLOB_MAX_REGIONS);
 };
 
-const analyzeCuratedBlobClusterShape = (
+const pickCuratedBlobLobeClusters = (
 	cluster: CuratedBlobCluster
-): CuratedBlobShapeSpec | null => {
-	if (cluster.points.length === 0) return null;
-	const center = curatedBlobLatLngFromMercator(cluster.centroid);
+): CuratedBlobCluster[] => {
+	if (cluster.points.length < CURATED_BLOB_MIN_REGION_POINTS) return [];
+	const lobeCount = Math.min(
+		CURATED_BLOB_LOBE_MAX_COUNT,
+		Math.max(
+			CURATED_BLOB_LOBE_MIN_COUNT,
+			Math.ceil(Math.sqrt(cluster.points.length))
+		),
+		cluster.points.length
+	);
+	return sortCuratedBlobClusters(
+		kMeansClusterMercator(
+			cluster.points,
+			lobeCount,
+			CURATED_BLOB_KMEANS_MAX_ITER
+		)
+	);
+};
+
+const curatedBlobLobeRadiusKm = (
+	lobe: CuratedBlobCluster,
+	allLobes: CuratedBlobCluster[],
+	seed: number
+): number | null => {
+	const center = curatedBlobLatLngFromMercator(lobe.centroid);
 	if (!center) return null;
 	const kmPerMercator = curatedBlobKmPerMercatorUnit(center);
 	if (!kmPerMercator) return null;
 
+	let maxPointDistanceKm = 0;
+	for (const point of lobe.points) {
+		maxPointDistanceKm = Math.max(
+			maxPointDistanceKm,
+			Math.hypot(point.x - lobe.centroid.x, point.y - lobe.centroid.y) *
+				kmPerMercator
+		);
+	}
+
+	let nearestLobeDistanceKm = Infinity;
+	for (const other of allLobes) {
+		if (other === lobe) continue;
+		const distanceKm = curatedBlobMercatorDistanceKm(lobe.centroid, other.centroid);
+		if (distanceKm != null) {
+			nearestLobeDistanceKm = Math.min(nearestLobeDistanceKm, distanceKm);
+		}
+	}
+
+	const overlapRadiusKm = Number.isFinite(nearestLobeDistanceKm)
+		? nearestLobeDistanceKm * CURATED_BLOB_LOBE_OVERLAP_RADIUS_RATIO
+		: 0;
+	const coverageRadiusKm = Math.max(
+		CURATED_BLOB_LOBE_MIN_RADIUS_KM,
+		maxPointDistanceKm + CURATED_BLOB_LOBE_PADDING_KM,
+		overlapRadiusKm
+	);
+	const jitter =
+		1 +
+		(curatedBlobDeterministicUnit(seed) * 2 - 1) *
+			CURATED_BLOB_LOBE_RADIUS_JITTER;
+	return Math.max(
+		maxPointDistanceKm + CURATED_BLOB_LOBE_PADDING_KM,
+		clamp(
+			coverageRadiusKm * jitter,
+			CURATED_BLOB_LOBE_MIN_RADIUS_KM,
+			CURATED_BLOB_LOBE_MAX_RADIUS_KM
+		)
+	);
+};
+
+const buildCuratedBlobSingletonLobeMultiPolygons = (
+	point: CuratedBlobMercatorPoint,
+	clusterIndex: number
+): ClippingMultiPolygon[] => {
+	const baseSeed = point.id + clusterIndex * 997;
+	const angle = curatedBlobDeterministicUnit(baseSeed) * Math.PI * 2;
+	const centers = [
+		offsetCuratedBlobPointByKm(
+			point,
+			CURATED_BLOB_SINGLETON_LOBE_OFFSET_KM,
+			angle
+		),
+		offsetCuratedBlobPointByKm(
+			point,
+			CURATED_BLOB_SINGLETON_LOBE_OFFSET_KM,
+			angle + Math.PI
+		),
+	];
+
+	return centers
+		.map((center, index): ClippingMultiPolygon | null => {
+			if (!center) return null;
+			const radiusKm =
+				CURATED_BLOB_SINGLETON_LOBE_RADIUS_KM *
+				(1 +
+					(index === 0
+						? CURATED_BLOB_LOBE_RADIUS_JITTER
+						: -CURATED_BLOB_LOBE_RADIUS_JITTER));
+			return buildMercatorCircleMultiPolygon(
+				center,
+				radiusKm,
+				CURATED_BLOB_SHAPE_STEPS,
+				baseSeed + index * 131,
+				CURATED_BLOB_ORGANIC_WOBBLE
+			);
+		})
+		.filter((source): source is ClippingMultiPolygon => source != null);
+};
+
+const buildCuratedBlobClusterLobeMultiPolygons = (
+	cluster: CuratedBlobCluster,
+	clusterIndex: number
+): ClippingMultiPolygon[] => {
 	if (cluster.points.length === 1) {
-		return { kind: 'circle', center, radiusKm: CURATED_BLOB_PADDING_KM };
+		return buildCuratedBlobSingletonLobeMultiPolygons(
+			cluster.points[0],
+			clusterIndex
+		);
 	}
 
-	let xx = 0;
-	let yy = 0;
-	let xy = 0;
-	for (const point of cluster.points) {
-		const dx = point.x - cluster.centroid.x;
-		const dy = point.y - cluster.centroid.y;
-		xx += dx * dx;
-		yy += dy * dy;
-		xy += dx * dy;
-	}
+	const lobes = pickCuratedBlobLobeClusters(cluster);
+	if (lobes.length < CURATED_BLOB_LOBE_MIN_COUNT) return [];
 
-	const count = cluster.points.length;
-	const a = xx / count;
-	const b = yy / count;
-	const c = xy / count;
-	const trace = a + b;
-	const discriminant = Math.sqrt(Math.max(0, (a - b) * (a - b) + 4 * c * c));
-	const majorEigenvalue = (trace + discriminant) / 2;
-
-	let majorX: number;
-	let majorY: number;
-	if (Math.abs(c) > 1e-18) {
-		majorX = majorEigenvalue - b;
-		majorY = c;
-	} else if (a >= b) {
-		majorX = 1;
-		majorY = 0;
-	} else {
-		majorX = 0;
-		majorY = 1;
-	}
-
-	const majorLength = Math.hypot(majorX, majorY) || 1;
-	majorX /= majorLength;
-	majorY /= majorLength;
-	const minorX = -majorY;
-	const minorY = majorX;
-
-	let maxMajorKm = 0;
-	let maxMinorKm = 0;
-	let maxDistanceKm = 0;
-	for (const point of cluster.points) {
-		const dx = point.x - cluster.centroid.x;
-		const dy = point.y - cluster.centroid.y;
-		const majorKm = Math.abs(dx * majorX + dy * majorY) * kmPerMercator;
-		const minorKm = Math.abs(dx * minorX + dy * minorY) * kmPerMercator;
-		maxMajorKm = Math.max(maxMajorKm, majorKm);
-		maxMinorKm = Math.max(maxMinorKm, minorKm);
-		maxDistanceKm = Math.max(maxDistanceKm, Math.hypot(dx, dy) * kmPerMercator);
-	}
-
-	const paddedMajorKm = Math.max(
-		maxMajorKm + CURATED_BLOB_PADDING_KM,
-		CURATED_BLOB_MIN_AXIS_KM
-	);
-	const paddedMinorKm = Math.max(
-		maxMinorKm + CURATED_BLOB_PADDING_KM,
-		CURATED_BLOB_MIN_AXIS_KM
-	);
-	const ratio =
-		paddedMinorKm > 0 && Number.isFinite(paddedMinorKm)
-			? paddedMajorKm / paddedMinorKm
-			: Infinity;
-
-	if (!Number.isFinite(ratio) || ratio < CURATED_BLOB_ELLIPSE_RATIO_THRESHOLD) {
-		return {
-			kind: 'circle',
+	const multiPolygons: ClippingMultiPolygon[] = [];
+	for (let i = 0; i < lobes.length; i++) {
+		const lobe = lobes[i];
+		const center = curatedBlobLatLngFromMercator(lobe.centroid);
+		const organicSeed =
+			minCuratedBlobClusterPointId(lobe) + clusterIndex * 997 + i * 131;
+		const radiusKm = curatedBlobLobeRadiusKm(lobe, lobes, organicSeed);
+		if (!center || radiusKm == null) continue;
+		const mercatorMultiPolygon = buildMercatorCircleMultiPolygon(
 			center,
-			radiusKm: Math.max(maxDistanceKm + CURATED_BLOB_PADDING_KM, CURATED_BLOB_MIN_AXIS_KM),
-		};
+			radiusKm,
+			CURATED_BLOB_SHAPE_STEPS,
+			organicSeed,
+			CURATED_BLOB_ORGANIC_WOBBLE
+		);
+		if (mercatorMultiPolygon?.length) multiPolygons.push(mercatorMultiPolygon);
 	}
 
-	let scale = 1;
-	for (const point of cluster.points) {
-		const dx = point.x - cluster.centroid.x;
-		const dy = point.y - cluster.centroid.y;
-		const majorKm = Math.abs(dx * majorX + dy * majorY) * kmPerMercator;
-		const minorKm = Math.abs(dx * minorX + dy * minorY) * kmPerMercator;
-		const normalized = Math.hypot(majorKm / paddedMajorKm, minorKm / paddedMinorKm);
-		if (Number.isFinite(normalized)) scale = Math.max(scale, normalized);
-	}
-
-	const semiMajorKm = paddedMajorKm * scale;
-	const semiMinorKm = Math.max(
-		paddedMinorKm * scale,
-		semiMajorKm / CURATED_BLOB_MAX_ELLIPSE_RATIO
-	);
-
-	return {
-		kind: 'ellipse',
-		center,
-		semiMajorKm,
-		semiMinorKm,
-		angleRad: Math.atan2(majorY, majorX),
-	};
+	return multiPolygons;
 };
 
 const smoothClosedCuratedBlobRing = (
@@ -996,7 +1055,12 @@ const createCuratedBlobMorphSourcesFromMercatorMultiPolygon = (
 			}
 		}
 
-		const minRadiusMerc = CURATED_ORB_MIN_RADIUS_KM / kmPerMercatorUnit;
+		const maxVertexDistKm = maxVertexDistMerc * kmPerMercatorUnit;
+		const minRadiusKm =
+			maxVertexDistKm <= CURATED_ORB_SMALL_SHAPE_THRESHOLD_KM
+				? CURATED_ORB_SMALL_SHAPE_MIN_RADIUS_KM
+				: CURATED_ORB_MIN_RADIUS_KM;
+		const minRadiusMerc = minRadiusKm / kmPerMercatorUnit;
 		const paddingMerc = CURATED_ORB_RADIUS_PADDING_KM / kmPerMercatorUnit;
 		const radiusMerc = Math.max(maxVertexDistMerc + paddingMerc, minRadiusMerc);
 		sources.push({
@@ -2939,6 +3003,7 @@ const stateBadgeColorMap: Record<string, string> = {
 	WY: '#FFCCBC',
 	DC: '#E0E0E0',
 	BC: '#E0E0E0',
+	YT: '#E0E0E0',
 };
 
 // Helper to get state abbreviation
@@ -2946,6 +3011,7 @@ const getStateAbbreviation = (state: string): string | null => {
 	if (!state) return null;
 	const upper = state.toUpperCase().trim();
 	if (upper === 'BC' || upper === 'B.C.') return 'BC';
+	if (upper === 'YT' || upper === 'Y.T.') return 'YT';
 	if (upper.length === 2 && stateBadgeColorMap[upper]) return upper;
 	const stateMap: Record<string, string> = {
 		ALABAMA: 'AL',
@@ -3000,6 +3066,8 @@ const getStateAbbreviation = (state: string): string | null => {
 		WYOMING: 'WY',
 		'DISTRICT OF COLUMBIA': 'DC',
 		'BRITISH COLUMBIA': 'BC',
+		YUKON: 'YT',
+		'YUKON TERRITORY': 'YT',
 	};
 	return stateMap[upper] || null;
 };
@@ -5803,6 +5871,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const resultsSelectionBboxRef = useRef<BoundingBox | null>(null);
 	const resultsSelectionSignatureRef = useRef<string>('');
 	const curatedBlobSignatureRef = useRef<string>('');
+	const curatedBlobProtectedMarkerIdsRef = useRef<Set<number>>(new Set());
+	const curatedBlobProtectedMarkerIdsKeyRef = useRef<string>('');
+	const [curatedBlobProtectedMarkerIdsNonce, setCuratedBlobProtectedMarkerIdsNonce] =
+		useState(0);
 	const curatedBlobOrbTargetsRef = useRef<
 		Array<{ center: LatLngLiteral; radiusKm: number | null }>
 	>([]);
@@ -6662,8 +6734,17 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		source?.setData(EMPTY_POLYGON_FC as any);
 	}, [map, isMapLoaded]);
 
+	const updateCuratedBlobProtectedMarkerIds = useCallback((ids: Set<number>) => {
+		const key = Array.from(ids).sort((a, b) => a - b).join(',');
+		if (key === curatedBlobProtectedMarkerIdsKeyRef.current) return;
+		curatedBlobProtectedMarkerIdsKeyRef.current = key;
+		curatedBlobProtectedMarkerIdsRef.current = ids;
+		setCuratedBlobProtectedMarkerIdsNonce((value) => value + 1);
+	}, []);
+
 	const clearCuratedBlobOutline = useCallback(() => {
 		curatedBlobSignatureRef.current = '';
+		updateCuratedBlobProtectedMarkerIds(new Set());
 		curatedBlobOrbTargetsRef.current = [];
 		curatedBlobLngLatMultiPolygonRef.current = null;
 		curatedBlobLngLatShapeMultiPolygonsRef.current = [];
@@ -6675,7 +6756,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			| mapboxgl.GeoJSONSource
 			| undefined;
 		source?.setData(EMPTY_POLYGON_FC as GeoJSON.FeatureCollection);
-	}, [map, isMapLoaded]);
+	}, [map, isMapLoaded, updateCuratedBlobProtectedMarkerIds]);
 
 	const clearSearchedStateOutline = useCallback(() => {
 		if (!map || !isMapLoaded) return;
@@ -10415,7 +10496,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 		// Search-results outlines (blue + black) intentionally removed.
 
-		// Curated-search blob body — one unioned shape, behind all dot/pin layers.
+		// Curated-search blob body — unioned regional circle-lobes, behind all dot/pin layers.
 		ensureLayer(
 			{
 				id: MAPBOX_LAYER_IDS.curatedBlobFill,
@@ -11756,7 +11837,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					`${dot.id}:${dot.coords.lng.toFixed(5)}:${dot.coords.lat.toFixed(5)}`
 			)
 			.join('|');
-		const nextSignature = `v8:${CURATED_BLOB_MIN_CLUSTERS}:${CURATED_BLOB_MAX_CLUSTERS}:${CURATED_BLOB_SHAPE_STEPS}:${CURATED_BLOB_OUTLINE_SMOOTHING_PASSES}:${CURATED_BLOB_PADDING_KM}:${CURATED_BLOB_MIN_AXIS_KM}:${CURATED_BLOB_MAX_CLUSTER_SPAN_KM}:${CURATED_BLOB_ELLIPSE_RATIO_THRESHOLD}:${CURATED_BLOB_MAX_ELLIPSE_RATIO}:${CURATED_BLOB_ORGANIC_WOBBLE}:${signature}`;
+		const nextSignature = `v12:${CURATED_BLOB_MIN_REGION_POINTS}:${CURATED_BLOB_MAX_REGIONS}:${CURATED_BLOB_MAX_REGION_SPAN_KM}:${CURATED_BLOB_SHAPE_STEPS}:${CURATED_BLOB_OUTLINE_SMOOTHING_PASSES}:${CURATED_BLOB_LOBE_MIN_COUNT}:${CURATED_BLOB_LOBE_MAX_COUNT}:${CURATED_BLOB_LOBE_PADDING_KM}:${CURATED_BLOB_LOBE_MIN_RADIUS_KM}:${CURATED_BLOB_LOBE_MAX_RADIUS_KM}:${CURATED_BLOB_LOBE_OVERLAP_RADIUS_RATIO}:${CURATED_BLOB_LOBE_RADIUS_JITTER}:${CURATED_BLOB_SINGLETON_LOBE_RADIUS_KM}:${CURATED_BLOB_SINGLETON_LOBE_OFFSET_KM}:${CURATED_ORB_SMALL_SHAPE_MIN_RADIUS_KM}:${CURATED_ORB_SMALL_SHAPE_THRESHOLD_KM}:${CURATED_BLOB_ORGANIC_WOBBLE}:${signature}`;
 		if (nextSignature === curatedBlobSignatureRef.current) return;
 
 		let cancelled = false;
@@ -11772,32 +11853,15 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			}
 
 			const clusters = pickAdaptiveCuratedBlobClusters(mercatorPoints);
-			const lobeMultiPolygons = clusters
-				.map((cluster, index): ClippingMultiPolygon | null => {
-					const shape = analyzeCuratedBlobClusterShape(cluster);
-					if (!shape) return null;
-					const organicSeed = minCuratedBlobClusterPointId(cluster) + index * 997;
-					const mercatorMultiPolygon =
-						shape.kind === 'circle'
-							? buildMercatorCircleMultiPolygon(
-									shape.center,
-									shape.radiusKm,
-									CURATED_BLOB_SHAPE_STEPS,
-									organicSeed,
-									CURATED_BLOB_ORGANIC_WOBBLE
-							  )
-							: buildMercatorEllipseMultiPolygon(
-									shape.center,
-									shape.semiMajorKm,
-									shape.semiMinorKm,
-									shape.angleRad,
-									CURATED_BLOB_SHAPE_STEPS,
-									organicSeed,
-									CURATED_BLOB_ORGANIC_WOBBLE
-							  );
-					return mercatorMultiPolygon?.length ? mercatorMultiPolygon : null;
-				})
-				.filter((source): source is ClippingMultiPolygon => source != null);
+			const protectedMarkerIds = new Set<number>();
+			for (const cluster of clusters) {
+				for (const point of cluster.points) {
+					protectedMarkerIds.add(point.id);
+				}
+			}
+			const lobeMultiPolygons = clusters.flatMap((cluster, index) =>
+				buildCuratedBlobClusterLobeMultiPolygons(cluster, index)
+			);
 
 			if (lobeMultiPolygons.length === 0) {
 				if (!cancelled) clearCuratedBlobOutline();
@@ -11854,6 +11918,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				center: shapeSource.center,
 				radiusKm: shapeSource.radiusKm,
 			}));
+			updateCuratedBlobProtectedMarkerIds(protectedMarkerIds);
 			naturalBlobMorphSourceRef.current = morphSources;
 			lastBlobMorphTAppliedRef.current = Number.NaN;
 			curatedBlobSignatureRef.current = nextSignature;
@@ -11877,6 +11942,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		contactsWithCoords,
 		getContactCoords,
 		clearCuratedBlobOutline,
+		updateCuratedBlobProtectedMarkerIds,
 	]);
 
 	const handleMapMouseUp = useCallback(
@@ -15921,10 +15987,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		}
 
 		const nodeIds = markerConstellationNodeIdsRef.current;
-		if (nodeIds.size === 0) return;
+		const blobProtectedIds = curatedBlobProtectedMarkerIdsRef.current;
+		if (nodeIds.size === 0 && blobProtectedIds.size === 0) return;
 
 		for (const contact of visibleContacts) {
 			if (nodeIds.has(contact.id)) continue;
+			if (blobProtectedIds.has(contact.id)) continue;
 			try {
 				map.setFeatureState(
 					{ source: MAPBOX_SOURCE_IDS.markersBase, id: contact.id },
@@ -15934,7 +16002,13 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				// Ignore style timing races.
 			}
 		}
-	}, [map, isMapLoaded, visibleContacts, markerConstellationCompositionNonce]);
+	}, [
+		map,
+		isMapLoaded,
+		visibleContacts,
+		markerConstellationCompositionNonce,
+		curatedBlobProtectedMarkerIdsNonce,
+	]);
 
 	// Wave reveal for base dots on each completed search (left → right).
 	useEffect(() => {

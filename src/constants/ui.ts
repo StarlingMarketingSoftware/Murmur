@@ -41,6 +41,7 @@ export const canadianProvinceNames = [
 	'Prince Edward Island',
 	'Quebec',
 	'Saskatchewan',
+	'Yukon',
 	'Edmonton',
 ];
 
@@ -55,6 +56,7 @@ export const canadianProvinceAbbreviations = [
 	'PE',
 	'QC',
 	'SK',
+	'YT',
 ];
 
 export const stateBadgeColorMap: Record<string, string> = {
@@ -109,4 +111,5 @@ export const stateBadgeColorMap: Record<string, string> = {
 	WI: '#D7D7F3',
 	WY: '#D7F3D7',
 	BC: '#E0E0E0',
+	YT: '#E0E0E0',
 };

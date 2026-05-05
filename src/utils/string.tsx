@@ -313,10 +313,14 @@ export const getStateAbbreviation = (stateName: string | null | undefined): stri
 		'puerto rico': 'PR',
 		'u.s. virgin islands': 'VI',
 		'virgin islands': 'VI',
-		// Canadian provinces used by contact location cards
+		// Canadian provinces and territories used by contact location cards
 		bc: 'BC',
 		'b.c.': 'BC',
 		'british columbia': 'BC',
+		yt: 'YT',
+		'y.t.': 'YT',
+		yukon: 'YT',
+		'yukon territory': 'YT',
 	};
 
 	// Clean and normalize the input
