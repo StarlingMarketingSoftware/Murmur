@@ -646,9 +646,19 @@ const getCategorizedDotGlowZoomFadedOpacity = (opacityMultiplier?: any): any => 
 	];
 };
 
+const getSelectedMarkerZoomFadedOpacity = (opacityMultiplier?: any): any => [
+	'interpolate',
+	['linear'],
+	['zoom'],
+	CURATED_DOT_FADE_END_ZOOM,
+	0,
+	CURATED_DOT_FADE_START_ZOOM,
+	multiplyOpacityExpr(1, opacityMultiplier),
+];
+
 const getSelectedMarkerIconOpacityExpr = (): any => {
 	const markerFadeOpacity = ['coalesce', ['get', 'selectedMarkerOpacity'], 1];
-	return getSelectedStateOrbZoomFadedOpacity(1, markerFadeOpacity);
+	return getSelectedMarkerZoomFadedOpacity(markerFadeOpacity);
 };
 
 const MARKER_HOVER_DARKEN_AMOUNT = 0.14;
@@ -686,7 +696,7 @@ const getMarkerHoverOpacityExpr = (): any => [
 
 const getSelectedMarkerHoverIconOpacityExpr = (): any => {
 	const markerFadeOpacity = ['coalesce', ['get', 'selectedMarkerOpacity'], 1];
-	return getSelectedStateOrbZoomFadedOpacity(1, [
+	return getSelectedMarkerZoomFadedOpacity([
 		'*',
 		markerFadeOpacity,
 		getMarkerHoverOpacityExpr(),
@@ -695,8 +705,8 @@ const getSelectedMarkerHoverIconOpacityExpr = (): any => {
 
 const SELECTED_MARKER_FADE_MS = 115;
 const SELECTED_MARKER_ENTRY_OPACITY = 0.58;
-const SELECTED_MARKER_SCALE_MULTIPLIER = 1.45;
-const SELECTED_MARKER_INITIAL_TRANSFORM_SCALE = 0.78;
+const SELECTED_MARKER_SCALE_MULTIPLIER = 1.78;
+const SELECTED_MARKER_INITIAL_TRANSFORM_SCALE = 0.7;
 
 const curatedBlobOrganicRadiusScale = (
 	angleRad: number,
@@ -9164,18 +9174,16 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			1,
 		];
 		const selectedMarkerIconSizeLow =
-			(SELECTED_MARKER_SCALE_MULTIPLIER *
-				Math.max(MIN_OVERLAY_PIN_CIRCLE_DIAMETER_PX, 2 * RESULT_DOT_SCALE_MIN)) /
+			(SELECTED_MARKER_SCALE_MULTIPLIER * 2 * RESULT_DOT_SCALE_MIN) /
 			SELECTED_CONTACT_MARKER_CENTER_OUTER_DIAMETER;
 		const selectedMarkerIconSizeHigh =
-			(SELECTED_MARKER_SCALE_MULTIPLIER *
-				Math.max(MIN_OVERLAY_PIN_CIRCLE_DIAMETER_PX, 2 * RESULT_DOT_SCALE_MAX)) /
+			(SELECTED_MARKER_SCALE_MULTIPLIER * 2 * RESULT_DOT_SCALE_MAX) /
 			SELECTED_CONTACT_MARKER_CENTER_OUTER_DIAMETER;
 		const selectedMarkerIconSizeExpr = [
 			'interpolate',
 			['linear'],
 			['zoom'],
-			0,
+			CURATED_DOT_FADE_END_ZOOM,
 			['*', selectedMarkerIconSizeLow, selectedMarkerTransformScaleExpr],
 			RESULT_DOT_ZOOM_MIN,
 			['*', selectedMarkerIconSizeLow, selectedMarkerTransformScaleExpr],
@@ -9804,6 +9812,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			id: MAPBOX_LAYER_IDS.selectedMarkerIcons,
 			type: 'symbol',
 			source: MAPBOX_SOURCE_IDS.markersSelected,
+			minzoom: CURATED_DOT_FADE_END_ZOOM,
 			layout: {
 				'icon-image': ['get', 'selectedIcon'],
 				'icon-size': selectedMarkerIconSizeExpr,
@@ -9823,6 +9832,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			id: MAPBOX_LAYER_IDS.selectedMarkerIconsHover,
 			type: 'symbol',
 			source: MAPBOX_SOURCE_IDS.markersSelected,
+			minzoom: CURATED_DOT_FADE_END_ZOOM,
 			layout: {
 				'icon-image': [
 					'coalesce',
