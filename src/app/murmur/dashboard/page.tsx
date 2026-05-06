@@ -248,6 +248,26 @@ const extractWhyFromSearchQuery = (query: string): string | null => {
 	return tag ? `[${tag}]` : null;
 };
 
+const parseCategorySearchQuery = (
+	query: string
+): {
+	why: string;
+	what: string;
+	where: string;
+	isCategorySearch: boolean;
+} => {
+	const why = extractWhyFromSearchQuery(query) || '';
+	const what = extractWhatFromSearchQuery(query) || '';
+	const where = extractWhereFromSearchQuery(query) || '';
+
+	return {
+		why,
+		what,
+		where,
+		isCategorySearch: Boolean(why && (what || where)),
+	};
+};
+
 type MapTopSearchDisplay =
 	| { kind: 'curated'; label: string }
 	| { kind: 'freeText'; label: string }
@@ -2817,8 +2837,17 @@ const DashboardContent = () => {
 
 		if (!dashboardSearchParam) return;
 
+		const restoredCategorySearch =
+			parseCategorySearchQuery(dashboardSearchParam);
+
 		// If we already have results, don't re-run the hydration search.
 		if (hasSearched && activeSearchQuery.trim().length > 0) {
+			if (restoredCategorySearch.isCategorySearch) {
+				setMapBottomSearchFollowupSelection('category');
+				setMapBottomSearchFollowupPreview(null);
+				setIsMapBottomCategoryDropdownActive(false);
+				setActiveSection(null);
+			}
 			hasHydratedDashboardUrlRef.current = true;
 			return;
 		}
@@ -2848,14 +2877,17 @@ const DashboardContent = () => {
 		hasHydratedDashboardUrlRef.current = true;
 
 		// Keep the segmented UI in sync with the restored query (best-effort).
-		const inferredWhy = extractWhyFromSearchQuery(dashboardSearchParam) || '';
-		const inferredWhat = extractWhatFromSearchQuery(dashboardSearchParam) || '';
-		const inferredWhere = extractWhereFromSearchQuery(dashboardSearchParam) || '';
-		if (inferredWhy) setWhyValue(inferredWhy);
-		if (inferredWhat) setWhatValue(inferredWhat);
-		if (inferredWhere) {
-			setWhereValue(inferredWhere);
+		if (restoredCategorySearch.why) setWhyValue(restoredCategorySearch.why);
+		if (restoredCategorySearch.what) setWhatValue(restoredCategorySearch.what);
+		if (restoredCategorySearch.where) {
+			setWhereValue(restoredCategorySearch.where);
 			setIsNearMeLocation(false);
+		}
+		if (restoredCategorySearch.isCategorySearch) {
+			setMapBottomSearchFollowupSelection('category');
+			setMapBottomSearchFollowupPreview(null);
+			setIsMapBottomCategoryDropdownActive(false);
+			setActiveSection(null);
 		}
 
 		// Submit after a short delay to allow state to update.
@@ -2928,8 +2960,17 @@ const DashboardContent = () => {
 
 		if (!fromCampaignSearchParam) return;
 
+		const restoredCategorySearch =
+			parseCategorySearchQuery(fromCampaignSearchParam);
+
 		// If we already have results, don't re-run the hydration search.
 		if (hasSearched && activeSearchQuery.trim().length > 0) {
+			if (restoredCategorySearch.isCategorySearch) {
+				setMapBottomSearchFollowupSelection('category');
+				setMapBottomSearchFollowupPreview(null);
+				setIsMapBottomCategoryDropdownActive(false);
+				setActiveSection(null);
+			}
 			hasHydratedFromCampaignUrlRef.current = true;
 			return;
 		}
@@ -2952,14 +2993,17 @@ const DashboardContent = () => {
 		hasHydratedFromCampaignUrlRef.current = true;
 
 		// Keep the segmented UI in sync with the restored query (best-effort).
-		const inferredWhy = extractWhyFromSearchQuery(fromCampaignSearchParam) || '';
-		const inferredWhat = extractWhatFromSearchQuery(fromCampaignSearchParam) || '';
-		const inferredWhere = extractWhereFromSearchQuery(fromCampaignSearchParam) || '';
-		if (inferredWhy) setWhyValue(inferredWhy);
-		if (inferredWhat) setWhatValue(inferredWhat);
-		if (inferredWhere) {
-			setWhereValue(inferredWhere);
+		if (restoredCategorySearch.why) setWhyValue(restoredCategorySearch.why);
+		if (restoredCategorySearch.what) setWhatValue(restoredCategorySearch.what);
+		if (restoredCategorySearch.where) {
+			setWhereValue(restoredCategorySearch.where);
 			setIsNearMeLocation(false);
+		}
+		if (restoredCategorySearch.isCategorySearch) {
+			setMapBottomSearchFollowupSelection('category');
+			setMapBottomSearchFollowupPreview(null);
+			setIsMapBottomCategoryDropdownActive(false);
+			setActiveSection(null);
 		}
 
 		// Submit after a short delay to allow state to update.
