@@ -57,139 +57,396 @@ import {
 	SOFTBOX_DARK_POOL_BG,
 	SOFTBOX_WARM_KEY_BG,
 } from '@/lib/weather/moodConfig';
+import type {
+	AreaSelectPayload,
+	BasemapCartographyClipState,
+	BoundingBox,
+	ClippingCoord,
+	ClippingMultiPolygon,
+	ClippingPolygon,
+	ClippingRing,
+	CuratedBlobCluster,
+	CuratedBlobMercatorPoint,
+	CuratedBlobMorphSource,
+	DotWaveMeta,
+	GeoJsonFeatureCollection,
+	GeoJsonGeometry,
+	GlobeNightLightingLike,
+	GlobeSunPhase,
+	LatLngLiteral,
+	MapSelectionBounds,
+	MarkerConstellationCandidate,
+	MarkerConstellationEdge,
+	MarkerConstellationEdgeSeed,
+	MarkerConstellationFormation,
+	MarkerConstellationLevel,
+	MarkerConstellationNode,
+	MarkerConstellationPoint,
+	MarkerConstellationPointStats,
+	MarkerHoverMeta,
+	OutlinePolygonFeatureCollection,
+	ParsedCssColor,
+	PreparedClippingPolygon,
+	RgbColor,
+	RuntimeMoodVisualConfig,
+	ScoredContact,
+	SearchMode,
+	SnowCloudInteractionImpact,
+	SnowParticle,
+	StormLightningCell,
+	StormLightningEvent,
+	StormLightningEventKind,
+	StormLightningPulse,
+	SunTransitionVisualState,
+	WasmGeoModule,
+	WorldSegment,
+} from './types';
+import {
+	ALL_CONTACTS_DOT_GLOW_OPACITY,
+	ALL_CONTACTS_OVERLAY_DOT_FILL_COLOR,
+	ALL_CONTACTS_OVERLAY_LIMIT,
+	ALL_CONTACTS_OVERLAY_MARKERS_MIN_ZOOM,
+	ALL_CONTACTS_OVERLAY_TOOLTIP_FILL_COLOR,
+	AUTO_FIT_CONTACTS_MAX_ZOOM,
+	AUTO_FIT_STATE_MAX_ZOOM,
+	BOOKING_EXTRA_MARKERS_MAX_DOTS,
+	BOOKING_EXTRA_MARKERS_MIN_ZOOM,
+	BOOKING_EXTRA_PIN_HOVER_STROKE_COLOR,
+	BOOKING_EXTRA_TITLE_PREFIXES,
+	CATEGORIZED_DOT_GLOW_ZOOM_FADE_EXPR,
+	CATEGORIZED_DOT_ZOOM_FADE_EXPR,
+	CLOUDS_CANVAS_COORDINATES,
+	CLOUDS_CANVAS_SIZE_PX,
+	CLOUDS_CANVAS_TEXTURE_URL,
+	CLOUDS_DRIFT_AMPLITUDE_X_PX,
+	CLOUDS_DRIFT_AMPLITUDE_Y_PX,
+	CLOUDS_DRIFT_BASE_ZOOM,
+	CLOUDS_DRIFT_LOOP_MS,
+	CLOUDS_DRIFT_SPEED_X_PX_PER_S,
+	CLOUDS_DRIFT_SPEED_Y_PX_PER_S,
+	CLOUDS_DRIFT_TIME_SCALE,
+	CLOUDS_DRIFT_UPDATE_MS,
+	CLOUDS_DRIFT_ZOOM_SCALE_EXP,
+	CLOUDS_DRIFT_ZOOM_SCALE_MAX,
+	CLOUDS_DRIFT_ZOOM_SCALE_MIN,
+	CLOUDS_EXTRA_PASS_OFFSETS,
+	CLOUDS_OVERLAY_FADE_OUT_END_ZOOM,
+	CLOUDS_OVERLAY_FADE_OUT_START_ZOOM,
+	CLOUDS_POLAR_TAPER_END_DEG,
+	CLOUDS_POLAR_TAPER_START_DEG,
+	CLOUDS_SNOW_INTERACTION_MAX_REFRACT_SHIFT_PX,
+	CLOUDS_SNOW_INTERACTION_STAMP_SIZE_PX,
+	CLOUDS_SNOW_INTERACTION_TARGET_IMPACTS,
+	CLOUDS_SNOW_INTERACTION_TARGET_IMPACTS_REDUCED,
+	CLOUDS_TILES_MAX_ZOOM,
+	CLOUDS_TILES_URL_TEMPLATE,
+	CLOUDS_TURBULENCE_AMPLITUDE_X_PX,
+	CLOUDS_TURBULENCE_LOOP_MS,
+	CLOUDS_TURBULENCE_STRIP_PX,
+	CONTACT_LIGHTS_REVEAL_TILES_URL_TEMPLATE,
+	CONTACT_LIGHTS_TILES_BOUNDS,
+	CONTACT_LIGHTS_TILES_MAX_ZOOM,
+	CONTACT_LIGHTS_TILES_URL_TEMPLATE,
+	CURATED_BLOB_KMEANS_MAX_ITER,
+	CURATED_BLOB_LOBE_MAX_COUNT,
+	CURATED_BLOB_LOBE_MAX_RADIUS_KM,
+	CURATED_BLOB_LOBE_MIN_COUNT,
+	CURATED_BLOB_LOBE_MIN_RADIUS_KM,
+	CURATED_BLOB_LOBE_OVERLAP_RADIUS_RATIO,
+	CURATED_BLOB_LOBE_PADDING_KM,
+	CURATED_BLOB_LOBE_RADIUS_JITTER,
+	CURATED_BLOB_MAX_REGIONS,
+	CURATED_BLOB_MAX_REGION_SPAN_KM,
+	CURATED_BLOB_MIN_REGION_POINTS,
+	CURATED_BLOB_ORGANIC_WOBBLE,
+	CURATED_BLOB_OUTLINE_SMOOTHING_PASSES,
+	CURATED_BLOB_SHAPE_STEPS,
+	CURATED_BLOB_SINGLETON_LOBE_OFFSET_KM,
+	CURATED_BLOB_SINGLETON_LOBE_RADIUS_KM,
+	CURATED_DOT_FADE_END_ZOOM,
+	CURATED_DOT_FADE_START_ZOOM,
+	CURATED_DOT_ZOOM_FADE_EXPR,
+	CURATED_ORB_BLOOM_OPACITY,
+	CURATED_ORB_COLOR_BLEND_OPACITY,
+	CURATED_ORB_ELLIPSE_RX_RATIO,
+	CURATED_ORB_ELLIPSE_RY_RATIO,
+	CURATED_ORB_GRADIENT_ROTATION_DEG,
+	CURATED_ORB_GRADIENT_SCALE_X_RATIO,
+	CURATED_ORB_GRADIENT_SCALE_Y_RATIO,
+	CURATED_ORB_MIN_RADIUS_KM,
+	CURATED_ORB_RADIUS_PADDING_KM,
+	CURATED_ORB_SLOT_COUNT,
+	CURATED_ORB_SMALL_SHAPE_MIN_RADIUS_KM,
+	CURATED_ORB_SMALL_SHAPE_THRESHOLD_KM,
+	CURATED_ORB_SOURCE_VIEWBOX_HALF_HEIGHT,
+	CURATED_ORB_SOURCE_VIEWBOX_HALF_WIDTH,
+	CURATED_ORB_TRANSITION_END_ZOOM,
+	CURATED_ORB_TRANSITION_START_ZOOM,
+	CURATED_STABLE_MARKER_MAX_DOTS,
+	DASHBOARD_DECORATIVE_CENTER,
+	DASHBOARD_DECORATIVE_OFFSET_PX,
+	DASHBOARD_DECORATIVE_PITCH,
+	DASHBOARD_DECORATIVE_ZOOM,
+	DASHBOARD_TO_INTERACTIVE_HANDOFF_GLIDE_MS,
+	DASHBOARD_TO_INTERACTIVE_TRANSITION_CSS_EASING,
+	DASHBOARD_TO_INTERACTIVE_TRANSITION_MS,
+	DAY_FAR_SIDE_SHADE_CANVAS_SIZE_PX,
+	DAY_FAR_SIDE_SHADE_DAYTIME_DRIFT_DEG,
+	DAY_FAR_SIDE_SHADE_FADE_END_DEG,
+	DAY_FAR_SIDE_SHADE_FADE_POWER,
+	DAY_FAR_SIDE_SHADE_FADE_START_DEG,
+	DAY_FAR_SIDE_SHADE_MAX_ALPHA,
+	DAY_FAR_SIDE_SHADE_MIN_REPAINT_DELTA_DEG,
+	DAY_FAR_SIDE_SHADE_OPACITY_MULTIPLIER,
+	DAY_FAR_SIDE_SHADE_REPAINT_MS,
+	DEFAULT_MAX_ZOOM_FALLBACK,
+	DEFAULT_RESULT_DOT_COLOR,
+	DOT_WAVE_DELAY_PROP,
+	DOT_WAVE_EASING,
+	DOT_WAVE_FADE_MS,
+	DOT_WAVE_FRAME_MS,
+	DOT_WAVE_JITTER_MS,
+	DOT_WAVE_SMOOTH_TRANSITION_MS,
+	DOT_WAVE_TRAVEL_MS_MAX,
+	DOT_WAVE_TRAVEL_MS_MIN,
+	DUPLICATE_JITTER_BASE_DEG,
+	EARTH_RADIUS_KM,
+	EMPTY_POLYGON_FC,
+	GLOOM_WASH_FADE_END_ZOOM,
+	GLOOM_WASH_FADE_START_ZOOM,
+	GOLDEN_ANGLE,
+	HOT_TEMPERATURE_THRESHOLD_F,
+	HOT_WASH_OPACITY,
+	HOVER_INTERACTION_MIN_ZOOM,
+	HOVER_TOOLTIP_Z_INDEX,
+	LIGHTING_OVERLAY_FADE_END_ZOOM,
+	LIGHTING_OVERLAY_FADE_START_ZOOM,
+	LIGHTNING_ALTITUDE_CLOSE_PX,
+	LIGHTNING_ALTITUDE_GLOBE_PX,
+	LIGHTNING_CANVAS_COORDINATES,
+	LIGHTNING_CANVAS_HEIGHT_PX,
+	LIGHTNING_CANVAS_WIDTH_PX,
+	LIGHTNING_CATCHLIGHT_OPACITY,
+	LIGHTNING_CELL_RADIUS_CLOSE_PX,
+	LIGHTNING_CELL_RADIUS_GLOBE_PX,
+	LIGHTNING_CLUSTER_CHANCE_MAX,
+	LIGHTNING_CLUSTER_CHANCE_MIN,
+	LIGHTNING_DRAMATIC_STRIKE_CHANCE,
+	LIGHTNING_FIRST_FLASH_MAX_INTERVAL_MS,
+	LIGHTNING_FIRST_FLASH_MIN_INTERVAL_MS,
+	LIGHTNING_HIDE_AT_OR_ABOVE_ZOOM,
+	LIGHTNING_LAYER_OPACITY,
+	LIGHTNING_MAX_ACTIVE_EVENTS,
+	LIGHTNING_MAX_INTERVAL_MS,
+	LIGHTNING_MERCATOR_MAX_LAT,
+	LIGHTNING_MIN_INTERVAL_MS,
+	LIGHTNING_OPACITY_MULTIPLIER,
+	LIGHTNING_POTENTIAL_TEXTURE_URL,
+	LIGHTNING_POTENTIAL_VERSION,
+	LIGHTNING_REGION_BIAS_CHANCE,
+	LIGHTNING_RESTRIKE_MAX_INTERVAL_MS,
+	LIGHTNING_RESTRIKE_MAX_REMAINING_FLASHES,
+	LIGHTNING_RESTRIKE_MIN_INTERVAL_MS,
+	LIGHTNING_RESTRIKE_MIN_REMAINING_FLASHES,
+	LIGHTNING_SCALE_CLOSE_MAX,
+	LIGHTNING_SCALE_CLOSE_MIN,
+	LIGHTNING_SCALE_GLOBE_MAX,
+	LIGHTNING_SCALE_GLOBE_MIN,
+	LIGHTNING_SCALE_ZOOM_END,
+	LIGHTNING_SCALE_ZOOM_START,
+	LIGHTNING_SHEET_FLASH_CHANCE,
+	LIGHTNING_STAMPS_COUNT,
+	LIGHTNING_STAMPS_VERSION,
+	LIGHTNING_STORM_CELL_COUNT,
+	LIGHTNING_US_BOUNDS,
+	LIGHTNING_US_POSITION_TRIES,
+	LIGHTNING_ZOOMED_OUT_BOOST_END_ZOOM,
+	LIGHTNING_ZOOMED_OUT_BOOST_FULL_ZOOM,
+	LIGHTNING_ZOOMED_OUT_MAX_ACTIVE_EVENTS,
+	LIGHTNING_ZOOMED_OUT_MAX_INTERVAL_MS,
+	LIGHTNING_ZOOMED_OUT_MIN_INTERVAL_MS,
+	LOCKED_STATE_MARKER_BIAS_SHARE_MAX,
+	LOCKED_STATE_MARKER_BIAS_SHARE_MIN,
+	LOCKED_STATE_MARKER_BIAS_ZOOM_END,
+	LOCKED_STATE_MARKER_BIAS_ZOOM_START,
+	MANUAL_NIGHT_T_OVERRIDE,
+	MANUAL_WEATHER_MOOD_OVERRIDE,
+	MANUAL_WEATHER_TEMPERATURE_OVERRIDE_F,
+	MAPBOX_LAYER_IDS,
+	MAPBOX_SOURCE_IDS,
+	MAPBOX_STYLE,
+	MAP_DEFAULT_ZOOM,
+	MAP_LANDCOVER_GREEN,
+	MAP_LAND_CREAM,
+	MAP_MIN_ZOOM,
+	MAP_OCEAN_BLUE,
+	MAP_WORLD_LAND_LAYER_ID,
+	MAP_WORLD_LAND_SOURCE_ID,
+	MAP_WORLD_LAND_SOURCE_LAYER,
+	MAP_WORLD_LAND_TILESET_URL,
+	MARKER_CONSTELLATION_CORE_OPACITY,
+	MARKER_CONSTELLATION_DETAIL_COMPOSE_ZOOM,
+	MARKER_CONSTELLATION_EDGE_RANK_OPACITY_EXPR,
+	MARKER_CONSTELLATION_FALLBACK_GROUP_PX,
+	MARKER_CONSTELLATION_GLOW_OPACITY,
+	MARKER_CONSTELLATION_HALO_COLOR,
+	MARKER_CONSTELLATION_LINE_COLOR,
+	MARKER_CONSTELLATION_MAX_EDGES,
+	MARKER_CONSTELLATION_MAX_EDGE_PX,
+	MARKER_CONSTELLATION_MAX_POINTS,
+	MARKER_CONSTELLATION_MID_COMPOSE_ZOOM,
+	MARKER_CONSTELLATION_MIN_COMPOSE_ZOOM,
+	MARKER_CONSTELLATION_MIN_EDGE_PX,
+	MARKER_CONSTELLATION_NODE_GLOW_OPACITY,
+	MARKER_CONSTELLATION_NODE_OPACITY,
+	MARKER_CONSTELLATION_NODE_RANK_OPACITY_EXPR,
+	MARKER_CONSTELLATION_POINT_CLEARANCE_PX,
+	MARKER_CONSTELLATION_REVEAL_FADE_MS,
+	MARKER_CONSTELLATION_SPARSE_FALLBACK_MAX_EDGE_PX,
+	MAX_TOTAL_DOTS,
+	MIN_OVERLAY_PIN_CIRCLE_DIAMETER_PX,
+	MOOD_CONTINUOUS_TRANSITION_MS,
+	MOOD_DISCRETE_EFFECT_FADE_MS,
+	MOOD_TRANSITION_PAINT_FRAME_MS,
+	MURMUR_GLOBE_LIGHT_POLAR_DEG,
+	MURMUR_GLOBE_LIGHT_VIEWER_AZIMUTH_OFFSET_DEG,
+	NIGHT_CLOSE_FOG_ALPHA_DAY,
+	NIGHT_CLOSE_FOG_ALPHA_NIGHT,
+	NIGHT_DARK_WASH_OPACITY,
+	NIGHT_FACE_SHADE_BG,
+	NIGHT_FACE_SHADE_OPACITY,
+	NIGHT_GLOOM_WASH_OPACITY,
+	NIGHT_HIDE_ROADS_END_T,
+	NIGHT_HIDE_ROADS_RESTORE_END_ZOOM,
+	NIGHT_HIDE_ROADS_RESTORE_START_ZOOM,
+	NIGHT_HIDE_ROADS_START_T,
+	NIGHT_LIGHTS_CLOSE_GLOW_FADE_IN_END_ZOOM,
+	NIGHT_LIGHTS_CLOSE_GLOW_FADE_IN_START_ZOOM,
+	NIGHT_LIGHTS_CLOSE_GLOW_OPACITY_MULT,
+	NIGHT_LIGHTS_CRISP_FADE_OUT_END_ZOOM,
+	NIGHT_LIGHTS_CRISP_FADE_OUT_START_ZOOM,
+	NIGHT_LIGHTS_FADE_END_ZOOM,
+	NIGHT_LIGHTS_FADE_START_ZOOM,
+	NIGHT_LIGHTS_GLOW_FADE_END_ZOOM,
+	NIGHT_LIGHTS_GLOW_FADE_START_ZOOM,
+	NIGHT_LIGHTS_GLOW_OPACITY_MULT,
+	NIGHT_LIGHTS_INTRO_CROSSFADE_MS,
+	NIGHT_LIGHTS_INTRO_REVEAL_MS,
+	NIGHT_LIGHTS_LOAD_FADE_MS,
+	NIGHT_LIGHTS_LOAD_POLL_MS,
+	NIGHT_LIGHTS_SPACE_GLOW_EXTRA_PASS_OPACITY_MUL,
+	NIGHT_LIGHTS_SPACE_GLOW_FADE_END_ZOOM,
+	NIGHT_LIGHTS_SPACE_GLOW_FADE_START_ZOOM,
+	NIGHT_LIGHTS_SPACE_GLOW_OPACITY_MULT,
+	NIGHT_LIGHTS_ZOOM_LOAD_DIM_FLOOR,
+	NIGHT_LIGHTS_ZOOM_LOAD_FADE_MS,
+	NIGHT_LIGHTS_ZOOM_LOAD_OUT_FADE_MS,
+	NIGHT_LIGHTS_ZOOM_LOAD_POLL_MS,
+	NIGHT_LIGHTS_ZOOM_OUT_LIFT_END_ZOOM,
+	NIGHT_LIGHTS_ZOOM_OUT_LIFT_MAX,
+	NIGHT_LIGHTS_ZOOM_OUT_LIFT_START_ZOOM,
+	NIGHT_LOWER_LEFT_SHADOW_BG,
+	NIGHT_LOWER_LEFT_SHADOW_OPACITY,
+	NIGHT_MOONLIGHT_KEY_BG,
+	NIGHT_MOONLIGHT_KEY_OPACITY,
+	NIGHT_MOON_RIM_BG,
+	NIGHT_MOON_RIM_OPACITY,
+	NIGHT_SHADOW_OVERLAY_MUL_MIN,
+	NIGHT_SPACE_COLOR_DAY,
+	NIGHT_SPACE_COLOR_NIGHT,
+	NIGHT_STAR_INTENSITY_DAY,
+	NIGHT_STAR_INTENSITY_NIGHT,
+	NIGHT_STATE_LINE_DARKEN_MAX,
+	NIGHT_STATE_LINE_OPACITY_MUL_MIN,
+	NIGHT_US_LIGHTS_OPACITY,
+	NIGHT_VIGNETTE_BG,
+	NIGHT_VIGNETTE_OPACITY,
+	NIGHT_WARM_KEY_MIN_MUL,
+	NON_CONSTELLATION_FADE_END_ZOOM,
+	NON_CONSTELLATION_FADE_START_ZOOM,
+	ORB_FADE_MARKER_FEATURE_EXPR,
+	OUTSIDE_LOCKED_STATE_WASHOUT_TO_WHITE,
+	PROMOTION_OVERLAY_MARKERS_MAX_PINS,
+	PROMOTION_OVERLAY_MARKERS_MIN_ZOOM,
+	PROMOTION_OVERLAY_TITLE_PREFIXES,
+	RESULT_DOT_GLOW_BLUR,
+	RESULT_DOT_GLOW_COLOR,
+	RESULT_DOT_GLOW_OPACITY,
+	RESULT_DOT_GLOW_RADIUS_MAX_PX,
+	RESULT_DOT_GLOW_RADIUS_MIN_PX,
+	RESULT_DOT_SCALE_MAX,
+	RESULT_DOT_SCALE_MIN,
+	RESULT_DOT_STROKE_COLOR_DEFAULT,
+	RESULT_DOT_STROKE_COLOR_SELECTED,
+	RESULT_DOT_STROKE_WEIGHT_MAX_PX,
+	RESULT_DOT_STROKE_WEIGHT_MIN_PX,
+	RESULT_DOT_TRANSPARENT_STROKE_COLOR,
+	RESULT_DOT_ZOOM_MAX,
+	RESULT_DOT_ZOOM_MIN,
+	SELECTED_STATE_GRADIENT_BLOOM_OPACITY,
+	SELECTED_STATE_GRADIENT_COLOR_OPACITY,
+	SELECTED_STATE_ORB_FADE_MARKER_FEATURE_EXPR,
+	SNOWFLAKE_STAMPS_COUNT,
+	SNOWFLAKE_STAMPS_VERSION,
+	SNOW_BASE_FALL_PX_PER_S,
+	SNOW_BASE_WIND_PX_PER_S,
+	SNOW_CANVAS_SIZE_PX,
+	SNOW_DENSITY_BAND_LOOP_MS,
+	SNOW_EDDY_DRIFT_BASE_PX,
+	SNOW_GUST_BAND_LOOP_MS,
+	SNOW_GUST_PUSH_BASE_PX,
+	SNOW_HIDE_AT_OR_ABOVE_ZOOM,
+	SNOW_LAYER_OPACITY,
+	SNOW_MAX_PARTICLES,
+	SNOW_ROTATED_PARTICLE_DEPTH_MIN,
+	SNOW_STAMP_ALPHA_MULTIPLIER,
+	SNOW_STAMP_MAX_ALPHA,
+	SNOW_STAMP_MAX_SIZE_PX,
+	SNOW_STAMP_MIN_SIZE_PX,
+	SNOW_TURBULENCE_LOOP_MS,
+	SNOW_US_SIDE_CENTER_LNG,
+	SNOW_US_SIDE_FADE_END_DEG,
+	SNOW_US_SIDE_FADE_START_DEG,
+	SNOW_WIND_SWAY_BASE_PX,
+	STATE_DIVIDER_COLOR,
+	STATE_DIVIDER_LINES_MAX_ZOOM,
+	STATE_HIGHLIGHT_COLOR,
+	STATE_HIGHLIGHT_OPACITY,
+	STATE_HOVER_HIGHLIGHT_MAX_ZOOM,
+	STATE_LABELS_URL,
+	STATE_LABEL_COLOR,
+	STATE_META_URL,
+	STATE_OUTLINE_URL,
+	STATE_PREPARED_POLYGONS_URL,
+	STATE_PROCESSED_GEOJSON_URL,
+	SUN_TRANSITION_CANVAS_SIZE_PX,
+	SUN_TRANSITION_CLOSE_FADE_END_ZOOM,
+	SUN_TRANSITION_CLOSE_FADE_START_ZOOM,
+	SUN_TRANSITION_CLOUD_CATCHLIGHT_OPACITY_MULT,
+	SUN_TRANSITION_COLOR_ALPHA_MULT,
+	SUN_TRANSITION_LAYER_MAX_OPACITY,
+	SUN_TRANSITION_MAX_PIXEL_ALPHA,
+	SUN_TRANSITION_PROGRESS_PAINT_STEPS,
+	SUN_TRANSITION_SPACE_GLOW_BG,
+	SUN_TRANSITION_SPACE_GLOW_OPACITY_MULT,
+	SUN_TRANSITION_SUNRISE_END_OFFSET_DEG,
+	SUN_TRANSITION_SUNRISE_START_OFFSET_DEG,
+	SUN_TRANSITION_SUNSET_END_OFFSET_DEG,
+	SUN_TRANSITION_SUNSET_START_OFFSET_DEG,
+	TOOLTIP_FILL_COLOR_SELECTED,
+	US_ONLY_BASEMAP_CLIP_MAX_ZOOM,
+	VIEWPORT_BBOX_PAD_FACTOR,
+	WEB_MERCATOR_MAX_LAT,
+	defaultCenter,
+	stateBadgeColorMap,
+} from './constants';
 
-type LatLngLiteral = { lat: number; lng: number };
-type MarkerHoverMeta = { clientX: number; clientY: number };
-type GlobeSunPhase = 'night' | 'sunrise' | 'day' | 'sunset';
-type GlobeNightLightingLike = {
-	nightT?: number | null;
-	phase: GlobeSunPhase;
-	phaseStartMs: number;
-	phaseEndMs: number;
-	transitionMs?: number;
-	isLoading?: boolean;
-};
-
-type ClippingCoord = [number, number]; // [lng, lat]
-type ClippingRing = ClippingCoord[];
-type ClippingPolygon = ClippingRing[];
-type ClippingMultiPolygon = ClippingPolygon[];
-
-type BoundingBox = { minLat: number; maxLat: number; minLng: number; maxLng: number };
-type PreparedClippingPolygon = { polygon: ClippingPolygon; bbox: BoundingBox };
-
-type MapSelectionBounds = { south: number; west: number; north: number; east: number };
-type AreaSelectPayload = {
-	/** Contact ids inside the rectangle selection (primary results + matching overlay markers). */
-	contactIds: number[];
-	/**
-	 * Overlay contacts (not part of the primary `contacts` prop) that were selected, so the
-	 * parent can render them in a side panel list.
-	 */
-	extraContacts: ContactWithName[];
-};
-
-type GeoJsonGeometry =
-	| {
-			type: 'Polygon';
-			// GeoJSON coords: [lng, lat]
-			coordinates: number[][][];
-	  }
-	| {
-			type: 'MultiPolygon';
-			// GeoJSON coords: [lng, lat]
-			coordinates: number[][][][];
-	  };
-
-type GeoJsonFeatureCollection = {
-	type: 'FeatureCollection';
-	features: Array<{
-		type: 'Feature';
-		id?: string | number;
-		properties?: Record<string, unknown>;
-		geometry: GeoJsonGeometry;
-	}>;
-};
-
-type StormLightningPulse = {
-	offsetMs: number;
-	peakOpacity: number;
-	rampUpMs: number;
-	holdMs: number;
-	rampDownMs: number;
-	glowOpacityMultiplier: number;
-};
-
-type StormLightningEventKind = 'sheet' | 'strike' | 'dramatic';
-
-type StormLightningEvent = {
-	id: number;
-	startMs: number;
-	endMs: number;
-	kind: StormLightningEventKind;
-	// Position in the dedicated lightning canvas coordinate system.
-	x: number;
-	y: number;
-	coreScale: number;
-	glowScale: number;
-	sheetScaleX: number;
-	sheetScaleY: number;
-	rotationRad: number;
-	sheetRotationRad: number;
-	stampIndex: number;
-	cellIndex: number;
-	jitterX: number;
-	jitterY: number;
-	altitudePx: number;
-	parallaxPhase: number;
-	cloudOcclusion: number;
-	sheetDriftX: number;
-	sheetDriftY: number;
-	pulses: StormLightningPulse[];
-};
-
-type StormLightningCell = {
-	x: number;
-	y: number;
-	weight: number;
-	radiusPx: number;
-};
-
-type SnowParticle = {
-	x: number;
-	y: number;
-	depth: number;
-	size: number;
-	opacity: number;
-	fallSpeed: number;
-	windSpeed: number;
-	windSway: number;
-	windPhase: number;
-	gustResponsiveness: number;
-	wobble: number;
-	wobblePhase: number;
-	stampIndex: number;
-	turbulenceSeed: number;
-	gustSeed: number;
-	densitySeed: number;
-	scaleJitter: number;
-	stretch: number;
-	rotation: number;
-	rotationSpeed: number;
-};
-
-type SnowCloudInteractionImpact = {
-	// Snow-canvas coordinate system (full-world Mercator, SNOW_CANVAS_SIZE_PX²).
-	x: number;
-	y: number;
-	// Radius in snow-canvas pixels (converted to clouds-canvas pixels at draw time).
-	radiusPx: number;
-	// 0..1 normalized strength derived from particle alpha.
-	alpha01: number;
-	// Horizontal drift proxy (snow-canvas px). Used to bias the refraction direction.
-	driftXPx: number;
-	depth: number;
-};
+// Re-export externally-consumed constants for callers that import from this file
+// (e.g. dashboard/page.tsx). The values themselves now live in `./constants`.
+export {
+	DASHBOARD_TO_INTERACTIVE_TRANSITION_CSS_EASING,
+	DASHBOARD_TO_INTERACTIVE_TRANSITION_MS,
+} from './constants';
 
 const closeRing = (ring: ClippingRing): ClippingRing => {
 	if (ring.length === 0) return ring;
@@ -208,19 +465,6 @@ const absRingArea = (ring: ClippingRing): number => {
 		area2 += x1 * y2 - x2 * y1;
 	}
 	return Math.abs(area2 / 2);
-};
-
-type OutlinePolygonFeatureCollection = {
-	type: 'FeatureCollection';
-	features: Array<{
-		type: 'Feature';
-		properties: Record<string, unknown>;
-		geometry: {
-			type: 'Polygon';
-			// GeoJSON coords: [lng, lat]
-			coordinates: number[][][];
-		};
-	}>;
 };
 
 const createOutlineGeoJsonFromMultiPolygon = (
@@ -289,83 +533,6 @@ const geoJsonGeometryToClippingMultiPolygon = (
 	return null;
 };
 
-const EMPTY_POLYGON_FC: OutlinePolygonFeatureCollection = {
-	type: 'FeatureCollection',
-	features: [],
-};
-
-const CURATED_BLOB_MIN_REGION_POINTS = 2;
-const CURATED_BLOB_MAX_REGIONS = 8;
-const CURATED_BLOB_MAX_REGION_SPAN_KM = 650;
-const CURATED_BLOB_SHAPE_STEPS = 96;
-const CURATED_BLOB_OUTLINE_SMOOTHING_PASSES = 2;
-const CURATED_STABLE_MARKER_MAX_DOTS = 125;
-const CURATED_BLOB_KMEANS_MAX_ITER = 12;
-const CURATED_BLOB_LOBE_MIN_COUNT = 2;
-const CURATED_BLOB_LOBE_MAX_COUNT = 4;
-const CURATED_BLOB_LOBE_PADDING_KM = 36;
-const CURATED_BLOB_LOBE_MIN_RADIUS_KM = 52;
-const CURATED_BLOB_LOBE_MAX_RADIUS_KM = 240;
-const CURATED_BLOB_LOBE_OVERLAP_RADIUS_RATIO = 0.55;
-const CURATED_BLOB_LOBE_RADIUS_JITTER = 0.065;
-const CURATED_BLOB_SINGLETON_LOBE_RADIUS_KM = 26;
-const CURATED_BLOB_SINGLETON_LOBE_OFFSET_KM = 7;
-const CURATED_BLOB_ORGANIC_WOBBLE = 0.028;
-const CURATED_ORB_SLOT_COUNT =
-	CURATED_BLOB_MAX_REGIONS * CURATED_BLOB_LOBE_MAX_COUNT;
-
-// Globe-zoom orb transition: a two-phase animation as the user zooms out.
-//
-// Phase 1 (dot ↔ gradient cross-dissolve): the curated contact markers fade
-// out and the orb's radial-gradient bloom fades in. Tuned to start while the
-// cluster still reads as multiple dots at intermediate zoom — by the time
-// the user enters globe-curvature territory the dots are already gone,
-// replaced by the soft glow.
-const CURATED_DOT_FADE_START_ZOOM = 4.2;
-const CURATED_DOT_FADE_END_ZOOM = 3.6;
-// Non-constellation marker fade: zooming out from the default US-wide view, dots
-// not connected to the frozen constellation graph fade out so the constellation
-// reads cleanly without crowding from disconnected scattered markers. Members
-// (any contact id present in a constellation edge) stay fully visible until the
-// existing curated fade takes over below 4.2.
-const NON_CONSTELLATION_FADE_START_ZOOM = 6.0;
-const NON_CONSTELLATION_FADE_END_ZOOM = 5.1;
-//
-// Phase 2 (shape morph): the blob outline's vertices lerp toward a circle of
-// the target radius. Picks up where Phase 1 ends so the user sees the dots
-// dissolve first, then the surrounding outline visibly widen out into a
-// clean circle as zoom continues to decrease.
-const CURATED_ORB_TRANSITION_START_ZOOM = 3.6;
-const CURATED_ORB_TRANSITION_END_ZOOM = 2.9;
-// Sized to match the natural blob's farthest vertex exactly — no extra
-// padding — so the morphed circle hugs the cluster's outer envelope rather
-// than ballooning out past it. The morph still "widens" because inner
-// vertices lerp outward to reach this radius; max-distance vertices stay
-// put. Result: the final circle is snug around the gradient bloom (matches
-// the Figma mock).
-const CURATED_ORB_RADIUS_PADDING_KM = 0;
-// Floor: very tight clusters still need a readable orb, otherwise it shrinks
-// to a dot at the moment the dots themselves are disappearing.
-const CURATED_ORB_MIN_RADIUS_KM = 90;
-const CURATED_ORB_SMALL_SHAPE_MIN_RADIUS_KM = 38;
-const CURATED_ORB_SMALL_SHAPE_THRESHOLD_KM = 72;
-const CURATED_ORB_GRADIENT_ROTATION_DEG = -38.746;
-const CURATED_ORB_SOURCE_VIEWBOX_HALF_WIDTH = 778 / 2;
-const CURATED_ORB_SOURCE_VIEWBOX_HALF_HEIGHT = 736 / 2;
-const CURATED_ORB_ELLIPSE_RX_RATIO =
-	607.5 / CURATED_ORB_SOURCE_VIEWBOX_HALF_WIDTH;
-const CURATED_ORB_ELLIPSE_RY_RATIO =
-	503 / CURATED_ORB_SOURCE_VIEWBOX_HALF_HEIGHT;
-// The source SVG's gradient transform is scaled against its viewBox half-size
-// (778x736), not the oversized ellipse axes, so the color band lands near the
-// blob edge instead of collapsing outside the visible shape.
-const CURATED_ORB_GRADIENT_SCALE_X_RATIO =
-	415.423 / CURATED_ORB_SOURCE_VIEWBOX_HALF_WIDTH;
-const CURATED_ORB_GRADIENT_SCALE_Y_RATIO =
-	436.955 / CURATED_ORB_SOURCE_VIEWBOX_HALF_HEIGHT;
-const CURATED_ORB_COLOR_BLEND_OPACITY = 0.38;
-const CURATED_ORB_BLOOM_OPACITY = 1;
-
 const computeCuratedOrbT = (zoom: number) => {
 	if (zoom >= CURATED_ORB_TRANSITION_START_ZOOM) return 0;
 	if (zoom <= CURATED_ORB_TRANSITION_END_ZOOM) return 1;
@@ -374,48 +541,6 @@ const computeCuratedOrbT = (zoom: number) => {
 		(CURATED_ORB_TRANSITION_START_ZOOM - CURATED_ORB_TRANSITION_END_ZOOM);
 	return raw * raw * (3 - 2 * raw);
 };
-
-const ORB_FADE_MARKER_FEATURE_EXPR: any = [
-	'any',
-	['boolean', ['get', 'isCurated'], false],
-	['boolean', ['get', 'fadeWithSelectedStateOrb'], false],
-];
-
-const SELECTED_STATE_ORB_FADE_MARKER_FEATURE_EXPR: any = [
-	'boolean',
-	['get', 'fadeWithSelectedStateOrb'],
-	false,
-];
-
-// Per-feature opacity for the baseDots layer: curated dots and selected-state
-// orb dots cross-fade out over the dot-fade zoom range (which runs ahead of the
-// shape morph); other non-curated dots are unaffected. Mapbox
-// requires `['zoom']` at the top of an interpolate/step (it can't appear
-// inside `case`), so the per-feature branching lives at the lower stop
-// and the upper stop is a flat 1.
-//
-// Non-constellation members additionally fade between
-// NON_CONSTELLATION_FADE_START_ZOOM and NON_CONSTELLATION_FADE_END_ZOOM. The
-// `inConstellation` feature-state defaults to true (visible) when unset so
-// that newly written dots stay visible until the constellation composes.
-const CURATED_DOT_ZOOM_FADE_EXPR: any = [
-	'interpolate',
-	['linear'],
-	['zoom'],
-	CURATED_DOT_FADE_END_ZOOM,
-	[
-		'case',
-		ORB_FADE_MARKER_FEATURE_EXPR,
-		0,
-		['case', ['boolean', ['feature-state', 'inConstellation'], true], 1, 0],
-	],
-	CURATED_DOT_FADE_START_ZOOM,
-	['case', ['boolean', ['feature-state', 'inConstellation'], true], 1, 0],
-	NON_CONSTELLATION_FADE_END_ZOOM,
-	['case', ['boolean', ['feature-state', 'inConstellation'], true], 1, 0],
-	NON_CONSTELLATION_FADE_START_ZOOM,
-	1,
-];
 
 const getSelectedStateOrbZoomFadedOpacity = (opacity: number): any => [
 	'interpolate',
@@ -426,26 +551,6 @@ const getSelectedStateOrbZoomFadedOpacity = (opacity: number): any => [
 	CURATED_DOT_FADE_START_ZOOM,
 	opacity,
 ];
-
-type CuratedBlobMercatorPoint = {
-	id: number;
-	coords: LatLngLiteral;
-	x: number;
-	y: number;
-};
-
-type CuratedBlobCluster = {
-	centroid: { x: number; y: number };
-	points: CuratedBlobMercatorPoint[];
-};
-
-type CuratedBlobMorphSource = {
-	mercatorMultiPolygon: ClippingMultiPolygon;
-	center: LatLngLiteral;
-	centerMerc: { x: number; y: number };
-	radiusMerc: number;
-	radiusKm: number | null;
-};
 
 const curatedBlobOrganicRadiusScale = (
 	angleRad: number,
@@ -1280,8 +1385,6 @@ const coordinateKey = (coords: LatLngLiteral) =>
 	`${coords.lat.toFixed(5)},${coords.lng.toFixed(5)}`;
 
 // Deterministic "spiderfy" offset for exact/near-exact duplicate coordinates so markers don't fully overlap.
-const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5)); // ~2.399963...
-const DUPLICATE_JITTER_BASE_DEG = 0.0015; // ~167m latitude; visible at mid zoom levels
 const jitterDuplicateCoords = (base: LatLngLiteral, index: number): LatLngLiteral => {
 	const angle = index * GOLDEN_ANGLE;
 	const radius = DUPLICATE_JITTER_BASE_DEG * Math.sqrt(index);
@@ -1304,7 +1407,6 @@ const smoothstep = (edge0: number, edge1: number, x: number) => {
 const normalizeLngDeg = (lng: number) => ((((lng + 180) % 360) + 360) % 360) - 180;
 const angularLngDistanceDeg = (a: number, b: number) =>
 	Math.abs(normalizeLngDeg(a - b));
-const EARTH_RADIUS_KM = 6371;
 const degreesToRadians = (degrees: number) => (degrees * Math.PI) / 180;
 const latLngToGlobeUnitVector = (coords: LatLngLiteral) => {
 	const latRad = degreesToRadians(coords.lat);
@@ -1359,14 +1461,6 @@ const computeGlobeFrontHemisphereOpacity = (
 };
 const computeMoodVisualNightT = (nightT: number, cfg: MoodVisualConfig) =>
 	clamp(Math.max(nightT, cfg.nightVisualBlend), 0, 1);
-
-type RuntimeMoodVisualConfig = MoodVisualConfig & {
-	warmSoftboxOpacityMultiplier: number;
-	darkSoftboxOpacityMultiplier: number;
-	lightningIntensity: number;
-};
-
-type ParsedCssColor = [number, number, number, number];
 
 const parseCssColor = (value: string): ParsedCssColor | null => {
 	const match = value
@@ -1505,56 +1599,6 @@ const blendRuntimeMoodConfig = (
 	};
 };
 
-type WasmGeoModule = {
-	lat_lng_to_world_pixel: (
-		lat: number,
-		lng: number,
-		worldSize: number
-	) => Float64Array | ArrayLike<number>;
-	distance_point_to_segment_sq: (
-		px: number,
-		py: number,
-		ax: number,
-		ay: number,
-		bx: number,
-		by: number
-	) => number;
-	point_in_ring: (px: number, py: number, ring: Float64Array) => boolean;
-	is_point_near_segments: (
-		x: number,
-		y: number,
-		segments: Float64Array,
-		thresholdPx: number
-	) => boolean;
-	batch_lat_lng_to_world_pixel: (
-		coords: Float64Array,
-		worldSize: number
-	) => Float64Array | ArrayLike<number>;
-	pick_non_overlapping_indices: (
-		xy: Float64Array,
-		priority_order: Uint32Array,
-		in_locked_order: Uint32Array,
-		out_locked_order: Uint32Array,
-		in_locked_mask: Uint8Array,
-		max_primary_dots: number,
-		in_locked_share: number,
-		hard_cap_outside_by_in_locked: boolean,
-		min_separation_sq: number,
-		cell_size: number
-	) => Uint32Array;
-	stable_viewport_sample: (
-		coords: Float64Array,
-		ids: Uint32Array,
-		minLat: number,
-		maxLat: number,
-		minLng: number,
-		maxLng: number,
-		slots: number,
-		seed: number
-	) => Uint32Array;
-	union_multi_polygons?: (multiPolygons: ClippingMultiPolygon[]) => ClippingMultiPolygon;
-};
-
 const USE_WASM_GEO = process.env.NEXT_PUBLIC_USE_WASM_GEO === 'true';
 
 let cachedWasmGeoModule: WasmGeoModule | null = null;
@@ -1689,17 +1733,6 @@ const hashStringToUint32 = (str: string): number => {
 	return h >>> 0;
 };
 
-// Hard cap for total dots rendered in the viewport (contacts + background dots).
-// Rendering more than this tends to overload many machines at low zoom levels.
-const MAX_TOTAL_DOTS = 500;
-
-// Padding applied to the viewport bbox when filtering markers into the source.
-// Off-screen-but-near markers stay in the GeoJSON (clipped invisibly by Mapbox)
-// so small pans and modest zoom changes don't cause `source.setData()` calls
-// that briefly flash the dot layer. Aligned with the booking-extra fetch
-// padding pattern (which already buffers fetch bounds for the same reason).
-const VIEWPORT_BBOX_PAD_FACTOR = 0.5;
-
 const getBackgroundDotsQuantizationDeg = (zoom: number): number => {
 	// Controls when we regenerate dots as the viewport changes.
 	if (zoom <= 4) return 0.75;
@@ -1739,8 +1772,6 @@ const bboxFromMultiPolygon = (multiPolygon: ClippingMultiPolygon): BoundingBox |
 
 const isLatLngInBbox = (lat: number, lng: number, bbox: BoundingBox): boolean =>
 	lat >= bbox.minLat && lat <= bbox.maxLat && lng >= bbox.minLng && lng <= bbox.maxLng;
-
-type ScoredContact = { contact: ContactWithName; score: number };
 
 const stableViewportSampleContacts = (
 	contacts: ContactWithName[],
@@ -1923,17 +1954,6 @@ const stableViewportSampleContacts = (
 	return picked.slice(0, slots);
 };
 
-type WorldSegment = {
-	ax: number;
-	ay: number;
-	bx: number;
-	by: number;
-	minX: number;
-	maxX: number;
-	minY: number;
-	maxY: number;
-};
-
 const worldSegmentsFlatCache = new WeakMap<WorldSegment[], Float64Array>();
 
 const flattenWorldSegments = (segments: WorldSegment[]): Float64Array => {
@@ -2049,17 +2069,6 @@ const distancePointToSegmentSq = (
 	const dx = px - cx;
 	const dy = py - cy;
 	return dx * dx + dy * dy;
-};
-
-type MarkerConstellationCandidate = {
-	fromId: number;
-	toId: number;
-	ax: number;
-	ay: number;
-	bx: number;
-	by: number;
-	length: number;
-	score: number;
 };
 
 const markerConstellationPairKey = (a: number, b: number): string =>
@@ -2498,18 +2507,6 @@ const buildSparseMarkerConstellationEdges = (
 		fromId: edge.fromId,
 		toId: edge.toId,
 	}));
-};
-
-type MarkerConstellationPointStats = {
-	minX: number;
-	maxX: number;
-	minY: number;
-	maxY: number;
-	centerX: number;
-	centerY: number;
-	spanX: number;
-	spanY: number;
-	diagonal: number;
 };
 
 const getMarkerConstellationPointStats = (
@@ -3034,63 +3031,6 @@ const pointInMultiPolygon = (
 	return false;
 };
 
-// State badge colors matching dashboard
-const stateBadgeColorMap: Record<string, string> = {
-	AL: '#E57373',
-	AK: '#64B5F6',
-	AZ: '#FFD54F',
-	AR: '#81C784',
-	CA: '#BA68C8',
-	CO: '#4DD0E1',
-	CT: '#FF8A65',
-	DE: '#A1887F',
-	FL: '#4DB6AC',
-	GA: '#7986CB',
-	HI: '#F06292',
-	ID: '#AED581',
-	IL: '#FFB74D',
-	IN: '#90A4AE',
-	IA: '#DCE775',
-	KS: '#FFF176',
-	KY: '#4FC3F7',
-	LA: '#CE93D8',
-	ME: '#80CBC4',
-	MD: '#FFCC80',
-	MA: '#B39DDB',
-	MI: '#80DEEA',
-	MN: '#C5E1A5',
-	MS: '#EF9A9A',
-	MO: '#BCAAA4',
-	MT: '#B0BEC5',
-	NE: '#E6EE9C',
-	NV: '#FFE082',
-	NH: '#81D4FA',
-	NJ: '#F48FB1',
-	NM: '#FFAB91',
-	NY: '#9FA8DA',
-	NC: '#A5D6A7',
-	ND: '#CFD8DC',
-	OH: '#FFF59D',
-	OK: '#FF8A80',
-	OR: '#80CBC4',
-	PA: '#EA80FC',
-	RI: '#8C9EFF',
-	SC: '#FFCDD2',
-	SD: '#E1BEE7',
-	TN: '#DCEDC8',
-	TX: '#FFE0B2',
-	UT: '#B2EBF2',
-	VT: '#C8E6C9',
-	VA: '#D1C4E9',
-	WA: '#B2DFDB',
-	WV: '#FFE57F',
-	WI: '#F8BBD9',
-	WY: '#FFCCBC',
-	DC: '#E0E0E0',
-	BC: '#E0E0E0',
-	YT: '#E0E0E0',
-};
-
 // Helper to get state abbreviation
 const getStateAbbreviation = (state: string): string | null => {
 	if (!state) return null;
@@ -3266,35 +3206,6 @@ interface SearchResultsMapProps {
 	nightLighting?: GlobeNightLightingLike | null;
 }
 
-const defaultCenter = {
-	lat: 39.8283, // Center of US
-	lng: -98.5795,
-};
-
-const MAP_DEFAULT_ZOOM = 5;
-// Let users zoom out further than the default US-wide view.
-const MAP_MIN_ZOOM = 2.25;
-// Dashboard UX: allow state hover highlight one zoom step past the default zoom.
-const STATE_HOVER_HIGHLIGHT_MAX_ZOOM = MAP_DEFAULT_ZOOM + 1;
-
-// Decorative dashboard background framing. Keep these in sync with the background-mode
-// camera settings so the initial mount doesn't "pop" after the map loads.
-const DASHBOARD_DECORATIVE_ZOOM = 4.0;
-const DASHBOARD_DECORATIVE_PITCH = 15;
-const DASHBOARD_DECORATIVE_OFFSET_PX: [number, number] = [0, 140]; // push center down -> see more top/horizon
-const DASHBOARD_DECORATIVE_CENTER: [number, number] = [
-	defaultCenter.lng,
-	defaultCenter.lat,
-];
-
-// Softbox lighting overlay fades out as the user zooms in — the "lit sphere"
-// read only makes sense at globe/continent distance. Fully on at globe zoom,
-// linearly off by the time we're into state-level detail.
-// Anchor the fade to the globe→flat-map transition: full at globe zoom, gone
-// by the time the viewport is filled with flat map (no visible curvature).
-const LIGHTING_OVERLAY_FADE_START_ZOOM = 2.5;
-const LIGHTING_OVERLAY_FADE_END_ZOOM = 5;
-
 const computeLightingOverlayOpacity = (zoom: number) => {
 	if (zoom <= LIGHTING_OVERLAY_FADE_START_ZOOM) return 1;
 	if (zoom >= LIGHTING_OVERLAY_FADE_END_ZOOM) return 0;
@@ -3305,12 +3216,6 @@ const computeLightingOverlayOpacity = (zoom: number) => {
 	return 1 - t * t * t;
 };
 
-// Dark "gloom wash" persists much further than the softbox/shadow overlays so
-// stormy still feels overcast when the user zooms in to city detail.
-// Held at full strength through country zoom, then linearly fades out as the
-// clouds themselves disappear.
-const GLOOM_WASH_FADE_START_ZOOM = 8;
-const GLOOM_WASH_FADE_END_ZOOM = 10.5;
 const computeGloomWashFade = (zoom: number) => {
 	if (zoom <= GLOOM_WASH_FADE_START_ZOOM) return 1;
 	if (zoom >= GLOOM_WASH_FADE_END_ZOOM) return 0;
@@ -3321,118 +3226,10 @@ const computeGloomWashFade = (zoom: number) => {
 	);
 };
 
-// Clouds overlay: subtle patchy clouds for the zoomed-out globe view.
-// Implemented as a local raster tile source so it stays glued to the globe as it rotates.
-// NOTE: include a version query param to bust browser caches when we regenerate tiles.
-const CLOUDS_TILES_URL_TEMPLATE = '/maps/clouds/{z}/{x}/{y}.png?v=23';
-const CLOUDS_TILES_MAX_ZOOM = 3;
-// Tune for "satellite-read" clarity without becoming a weather overlay.
-// (Per-mood opacities now live in src/lib/weather/moodConfig.ts; the `normal`
-// mood preserves the historical 0.78 / 0.66 values.)
-// Keep clouds around slightly past the initial interactive view; fade by state-level zoom.
-const CLOUDS_OVERLAY_FADE_OUT_START_ZOOM = 8.0;
-const CLOUDS_OVERLAY_FADE_OUT_END_ZOOM = 10.5;
-const CLOUDS_CANVAS_TEXTURE_URL = '/maps/clouds/0/0/0.png?v=23';
-const CLOUDS_CANVAS_SIZE_PX = 512;
-// Storm lightning assets: flash stamps + a low-res potential mask to bias
-// flashes toward storm cores.
-const LIGHTNING_STAMPS_COUNT = 24;
-const LIGHTNING_STAMPS_VERSION = 5;
-const LIGHTNING_POTENTIAL_VERSION = 1;
 const LIGHTNING_STAMPS_URL = (i: number) =>
 	`/maps/lightning_stamps/flash_${String(i).padStart(2, '0')}.png?v=${LIGHTNING_STAMPS_VERSION}`;
-const LIGHTNING_POTENTIAL_TEXTURE_URL = `/maps/lightning_potential/0/0/0.png?v=${LIGHTNING_POTENTIAL_VERSION}`;
-const LIGHTNING_CANVAS_WIDTH_PX = 1024;
-const LIGHTNING_CANVAS_HEIGHT_PX = 1024;
-// Keep lightning visible through the full clouds fade-out band so it's still present
-// in typical "interactive" zoom ranges (it will naturally dim with raster-opacity).
-const LIGHTNING_HIDE_AT_OR_ABOVE_ZOOM = CLOUDS_OVERLAY_FADE_OUT_END_ZOOM;
-// Show a first flash quickly when stormy lightning turns on so it reads as "connected".
-const LIGHTNING_FIRST_FLASH_MIN_INTERVAL_MS = 180;
-const LIGHTNING_FIRST_FLASH_MAX_INTERVAL_MS = 950;
-const LIGHTNING_MIN_INTERVAL_MS = 1400;
-const LIGHTNING_MAX_INTERVAL_MS = 4200;
-const LIGHTNING_MAX_ACTIVE_EVENTS = 10;
-const LIGHTNING_ZOOMED_OUT_MAX_ACTIVE_EVENTS = 14;
-const LIGHTNING_MERCATOR_MAX_LAT = 85.051129;
-const LIGHTNING_ZOOMED_OUT_BOOST_FULL_ZOOM = MAP_MIN_ZOOM + 0.35;
-const LIGHTNING_ZOOMED_OUT_BOOST_END_ZOOM = 4.35;
-const LIGHTNING_ZOOMED_OUT_MIN_INTERVAL_MS = 900;
-const LIGHTNING_ZOOMED_OUT_MAX_INTERVAL_MS = 2600;
-const LIGHTNING_CLUSTER_CHANCE_MIN = 0.08;
-const LIGHTNING_CLUSTER_CHANCE_MAX = 0.18;
-const LIGHTNING_RESTRIKE_MIN_INTERVAL_MS = 95;
-const LIGHTNING_RESTRIKE_MAX_INTERVAL_MS = 320;
-const LIGHTNING_RESTRIKE_MIN_REMAINING_FLASHES = 1;
-const LIGHTNING_RESTRIKE_MAX_REMAINING_FLASHES = 2;
-const LIGHTNING_SCALE_ZOOM_START = 5.2;
-const LIGHTNING_SCALE_ZOOM_END = CLOUDS_OVERLAY_FADE_OUT_END_ZOOM;
-const LIGHTNING_US_BOUNDS: [number, number, number, number] = [-125.5, 24.0, -66.0, 50.0];
-// Use the same world-Mercator geometry as the clouds canvas. Canvas sources only
-// reliably render in this map when they span the full Mercator world (small
-// regional canvases can fall out of the globe-projection sample path).
-const LIGHTNING_CANVAS_COORDINATES: [
-	[number, number],
-	[number, number],
-	[number, number],
-	[number, number],
-] = [
-	[-180, 85.051129],
-	[180, 85.051129],
-	[180, -85.051129],
-	[-180, -85.051129],
-];
-const LIGHTNING_STORM_CELL_COUNT = 6;
-const LIGHTNING_REGION_BIAS_CHANCE = 0.34;
-// Cell radii in lightning-canvas pixels. The lightning canvas is full-world
-// Mercator (LIGHTNING_CANVAS_WIDTH_PX × LIGHTNING_CANVAS_HEIGHT_PX), so CONUS
-// occupies roughly 165 px wide × 80 px tall at 1024×1024.
-const LIGHTNING_CELL_RADIUS_GLOBE_PX = 28;
-const LIGHTNING_CELL_RADIUS_CLOSE_PX = 9;
-const LIGHTNING_DRAMATIC_STRIKE_CHANCE = 0.08;
-const LIGHTNING_SHEET_FLASH_CHANCE = 0.68;
-const LIGHTNING_ALTITUDE_GLOBE_PX = 13;
-const LIGHTNING_ALTITUDE_CLOSE_PX = 4;
-const LIGHTNING_CATCHLIGHT_OPACITY = 0.22;
-// Stamp scale is relative to the full lightning canvas. The new stamps are 320 px
-// wide; with these values a globe-zoom dramatic strike paints ~80 px wide across
-// the whole world canvas — roughly half the CONUS footprint.
-const LIGHTNING_SCALE_GLOBE_MIN = 0.16;
-const LIGHTNING_SCALE_GLOBE_MAX = 0.32;
-const LIGHTNING_SCALE_CLOSE_MIN = 0.05;
-const LIGHTNING_SCALE_CLOSE_MAX = 0.11;
-const LIGHTNING_US_POSITION_TRIES = 72;
-const LIGHTNING_OPACITY_MULTIPLIER = 1.08;
-const LIGHTNING_LAYER_OPACITY = 0.92;
-const SNOWFLAKE_STAMPS_COUNT = 20;
-const SNOWFLAKE_STAMPS_VERSION = 7;
 const SNOWFLAKE_STAMPS_URL = (i: number) =>
 	`/maps/snowflake_stamps/drop_${String(i).padStart(2, '0')}.png?v=${SNOWFLAKE_STAMPS_VERSION}`;
-const SNOW_CANVAS_SIZE_PX = 1024;
-const SNOW_MAX_PARTICLES = 1800;
-const SNOW_LAYER_OPACITY = 1.0;
-const SNOW_HIDE_AT_OR_ABOVE_ZOOM = CLOUDS_OVERLAY_FADE_OUT_END_ZOOM;
-const SNOW_BASE_FALL_PX_PER_S = 9.2;
-const SNOW_BASE_WIND_PX_PER_S = 1.2;
-const SNOW_WIND_SWAY_BASE_PX = 3.4;
-const SNOW_GUST_PUSH_BASE_PX = 4.8;
-const SNOW_EDDY_DRIFT_BASE_PX = 2.2;
-const SNOW_TURBULENCE_LOOP_MS = 37_000;
-const SNOW_GUST_BAND_LOOP_MS = 29_000;
-const SNOW_DENSITY_BAND_LOOP_MS = 46_000;
-const SNOW_STAMP_MIN_SIZE_PX = 12;
-const SNOW_STAMP_MAX_SIZE_PX = 34;
-const SNOW_STAMP_ALPHA_MULTIPLIER = 1.72;
-const SNOW_STAMP_MAX_ALPHA = 0.96;
-const SNOW_ROTATED_PARTICLE_DEPTH_MIN = 0.82;
-const SNOW_US_SIDE_CENTER_LNG = defaultCenter.lng;
-const SNOW_US_SIDE_FADE_START_DEG = 78;
-const SNOW_US_SIDE_FADE_END_DEG = 94;
-// Snow→cloud interaction: keep subtle (reads as atmospheric refraction, not holes).
-const CLOUDS_SNOW_INTERACTION_STAMP_SIZE_PX = 96;
-const CLOUDS_SNOW_INTERACTION_TARGET_IMPACTS = 360;
-const CLOUDS_SNOW_INTERACTION_TARGET_IMPACTS_REDUCED = 140;
-const CLOUDS_SNOW_INTERACTION_MAX_REFRACT_SHIFT_PX = 3.2;
 
 const getLightningZoomedOutBoostT = (zoom: number) => {
 	if (zoom <= LIGHTNING_ZOOMED_OUT_BOOST_FULL_ZOOM) return 1;
@@ -3454,55 +3251,11 @@ const getLightningZoomedInT = (zoom: number) => {
 	return clamped * clamped * (3 - 2 * clamped);
 };
 
-// Contact-lights overlay: dot-only night lights derived from contact coordinates.
-// Implemented as local raster tiles (like clouds) so it stays glued to the globe.
-// NOTE: include a version query param to bust browser caches when tiles regenerate.
-const CONTACT_LIGHTS_TILES_URL_TEMPLATE = '/maps/contact_lights/{z}/{x}/{y}.png?v=9';
-// "Intro reveal" tiles: same dots, but alpha is biased west->east so a global fade-in reads
-// like dots revealing left-to-right. We crossfade to the real tiles after the intro.
-const CONTACT_LIGHTS_REVEAL_TILES_URL_TEMPLATE =
-	'/maps/contact_lights_reveal/{z}/{x}/{y}.png?v=9';
-const CONTACT_LIGHTS_TILES_MAX_ZOOM = 6;
-// CONUS-ish bounds (limits Mapbox tile requests).
-const CONTACT_LIGHTS_TILES_BOUNDS: [number, number, number, number] = [
-	-125.5, // lon min
-	24.0, // lat min
-	-66.0, // lon max
-	50.0, // lat max
-];
-const WEB_MERCATOR_MAX_LAT = 85.051129;
-// Full WebMercator bounds (lat clamp) so the texture maps cleanly across the globe.
-const CLOUDS_CANVAS_COORDINATES: [
-	[number, number],
-	[number, number],
-	[number, number],
-	[number, number],
-] = [
-	[-180, WEB_MERCATOR_MAX_LAT],
-	[180, WEB_MERCATOR_MAX_LAT],
-	[180, -WEB_MERCATOR_MAX_LAT],
-	[-180, -WEB_MERCATOR_MAX_LAT],
-];
-// Latitude band over which the cloud/snow canvas alpha tapers to zero. Hides
-// the Mercator-vs-globe distortion that otherwise smears the polar rows of the
-// flat canvas into a visible ring around each pole. Mirrors the day-shade
-// `polarTaperT` (see paintDayFarSideShadeCanvas) but starts a little earlier,
-// since cloud texture detail makes the smear more visible than the shade's
-// flat fill does.
-const CLOUDS_POLAR_TAPER_START_DEG = 55;
-const CLOUDS_POLAR_TAPER_END_DEG = 82;
-const DAY_FAR_SIDE_SHADE_CANVAS_SIZE_PX = 512;
-// Stored in the texture alpha; tuned to read as a clear "this side is in shadow"
-// without becoming a night-mode look. The opacity multiplier below stacks on top.
-const DAY_FAR_SIDE_SHADE_MAX_ALPHA = 0.32;
-const DAY_FAR_SIDE_SHADE_OPACITY_MULTIPLIER = 1.0;
+// `DAY_FAR_SIDE_SHADE_CENTER_LNG` depends on `normalizeLngDeg` so it stays in this
+// module (the rest of the day-far-side / clouds polar / contact-lights / sun-transition
+// constants live in `./constants`).
 const DAY_FAR_SIDE_SHADE_CENTER_LNG = normalizeLngDeg(defaultCenter.lng + 180);
-const DAY_FAR_SIDE_SHADE_DAYTIME_DRIFT_DEG = 76;
-const DAY_FAR_SIDE_SHADE_FADE_START_DEG = 24;
-const DAY_FAR_SIDE_SHADE_FADE_END_DEG = 154;
-const DAY_FAR_SIDE_SHADE_FADE_POWER = 1.32;
-const DAY_FAR_SIDE_SHADE_REPAINT_MS = 4_000;
-const DAY_FAR_SIDE_SHADE_MIN_REPAINT_DELTA_DEG = 0.02;
+
 const getDayFarSideShadeDayProgress = (
 	nightLighting: GlobeNightLightingLike | null | undefined,
 	nowMs: number
@@ -3637,28 +3390,6 @@ const getCloudsPolarFadeMask = (sizePx: number): HTMLCanvasElement | null => {
 	cloudsPolarFadeMaskCanvas = next;
 	return next;
 };
-
-type SunTransitionVisualState = {
-	phase: 'sunrise' | 'sunset';
-	progress: number;
-	intensity: number;
-	centerLng: number;
-	direction: 1 | -1;
-};
-
-const SUN_TRANSITION_CANVAS_SIZE_PX = 512;
-const SUN_TRANSITION_LAYER_MAX_OPACITY = 0.96;
-const SUN_TRANSITION_CLOUD_CATCHLIGHT_OPACITY_MULT = 0.28;
-const SUN_TRANSITION_SPACE_GLOW_OPACITY_MULT = 0.16;
-const SUN_TRANSITION_MAX_PIXEL_ALPHA = 0.62;
-const SUN_TRANSITION_COLOR_ALPHA_MULT = 1.42;
-const SUN_TRANSITION_CLOSE_FADE_START_ZOOM = 4.8;
-const SUN_TRANSITION_CLOSE_FADE_END_ZOOM = 6.1;
-const SUN_TRANSITION_PROGRESS_PAINT_STEPS = 520;
-const SUN_TRANSITION_SUNRISE_START_OFFSET_DEG = 54;
-const SUN_TRANSITION_SUNRISE_END_OFFSET_DEG = -48;
-const SUN_TRANSITION_SUNSET_START_OFFSET_DEG = -48;
-const SUN_TRANSITION_SUNSET_END_OFFSET_DEG = 54;
 
 const getSunTransitionVisualState = (
 	nightLighting: GlobeNightLightingLike | null | undefined,
@@ -3831,43 +3562,6 @@ const createSunTransitionCanvas = (): HTMLCanvasElement | null => {
 	if (!paintSunTransitionCanvas(canvas, null)) return null;
 	return canvas;
 };
-// Clouds drift animation parameters.
-// We animate the *canvas source* (not Mapbox raster paint), so units are in the canvas'
-// pixel grid. We apply a light zoom-based scale so drift stays noticeable while clouds
-// are still visible, without getting overly fast near fade-out.
-// Target frame cadence for the clouds canvas animation. Keeping this near ~60fps
-// helps the drift feel smooth without forcing Mapbox to repaint at very high rates.
-const CLOUDS_DRIFT_UPDATE_MS = 16;
-const CLOUDS_DRIFT_LOOP_MS = 180_000;
-const CLOUDS_DRIFT_BASE_ZOOM = 4.0;
-const CLOUDS_DRIFT_AMPLITUDE_X_PX = 12;
-const CLOUDS_DRIFT_AMPLITUDE_Y_PX = 4;
-const CLOUDS_DRIFT_SPEED_X_PX_PER_S = 0.35;
-const CLOUDS_DRIFT_SPEED_Y_PX_PER_S = 0.0;
-// Global tuning knob: < 1 = slower clouds, > 1 = faster clouds.
-const CLOUDS_DRIFT_TIME_SCALE = 0.8;
-// Inverse zoom scaling: at higher zoom levels the same world-distance covers more
-// screen pixels, so we slow the underlying texture drift so on-screen speed stays
-// roughly consistent (and doesn't feel "too fast" when zoomed in).
-const CLOUDS_DRIFT_ZOOM_SCALE_EXP = 1.0;
-const CLOUDS_DRIFT_ZOOM_SCALE_MIN = 0.01;
-const CLOUDS_DRIFT_ZOOM_SCALE_MAX = 4.0;
-// Adds subtle "alive" motion within the cloud shapes by warping the texture slightly as
-// it drifts. Keep extremely small so this reads as atmospheric turbulence (not pulsing).
-const CLOUDS_TURBULENCE_STRIP_PX = 32;
-const CLOUDS_TURBULENCE_LOOP_MS = 90_000;
-const CLOUDS_TURBULENCE_AMPLITUDE_X_PX = 1.3;
-const CLOUDS_EXTRA_PASS_OFFSETS: Array<[number, number]> = [
-	[0.5, 0.5],
-	[-0.31, 0.37],
-	[0.18, -0.29],
-	[-0.58, -0.14],
-	[0.36, -0.47],
-	[-0.12, 0.72],
-	[0.64, -0.18],
-	[-0.42, -0.54],
-];
-
 const drawCloudExtraPasses = (
 	ctx: CanvasRenderingContext2D,
 	w: number,
@@ -3961,38 +3655,7 @@ const buildLightningOpacityExpr = (intensity: number) => [
 	0,
 ];
 
-const AUTO_FIT_CONTACTS_MAX_ZOOM = 10;
-const AUTO_FIT_STATE_MAX_ZOOM = 5;
-const DEFAULT_MAX_ZOOM_FALLBACK = 22;
-
-export const DASHBOARD_TO_INTERACTIVE_TRANSITION_MS = 7200;
-export const DASHBOARD_TO_INTERACTIVE_TRANSITION_CSS_EASING =
-	'cubic-bezier(0.22, 1, 0.36, 1)';
-const DASHBOARD_TO_INTERACTIVE_HANDOFF_GLIDE_MS = 1800;
 const mapboxEaseOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
-
-const MAPBOX_STYLE = 'mapbox://styles/mapbox/streets-v12';
-
-// Viewer-anchored softbox lighting for the globe.
-//
-// Mapbox directional-light `direction: [azimuth, polar]` is defined in WORLD space
-// (azimuth 0 = north, 90 = east, 180 = south, 270 = west). If we leave it static,
-// rotating the camera's bearing makes the lit hemisphere drift across the screen.
-//
-// To make the "softbox" feel like it lives in the viewer's room (upper-left, slightly
-// behind the viewer) instead of bolted to the Earth, we re-derive the world azimuth
-// each time the camera bearing changes. At bearing 0, viewer-left = world-west (270°).
-// When bearing rotates clockwise by B degrees, viewer-left in world space rotates by
-// +B, so: azimuth = (270 + bearing) mod 360.
-//
-// Panning (changing center lat/lng) in globe projection doesn't rotate the viewport's
-// up-axis relative to world-north, so no compensation is needed there — the light
-// already stays on the viewer's left for free.
-const MURMUR_GLOBE_LIGHT_VIEWER_AZIMUTH_OFFSET_DEG = 270;
-// Polar is measured from straight-up (0 = overhead). 75° sits the softbox low
-// and side-on — this is what creates a clearly visible terminator across the
-// globe rather than a flat, evenly-lit disc.
-const MURMUR_GLOBE_LIGHT_POLAR_DEG = 75;
 
 const applyMurmurGlobeLighting = (mapInstance: mapboxgl.Map) => {
 	try {
@@ -4040,17 +3703,6 @@ const applyMurmurGlobeLighting = (mapInstance: mapboxgl.Map) => {
 // Antarctica) and is extremely lightweight. Country tiles cache at all zooms, so after
 // the first paint the continents stay cream through every subsequent zoom/pan; water
 // fills still draw blue on top, so lakes/rivers inside countries look right.
-const MAP_OCEAN_BLUE = '#62C7E3';
-const MAP_LAND_CREAM = '#F1EDE2';
-const MAP_LANDCOVER_GREEN = '#B3E6D7';
-
-const NIGHT_HIDE_ROADS_START_T = 0.18;
-const NIGHT_HIDE_ROADS_END_T = 0.42;
-// Roads compete with the contact-lights overlay at globe zoom, but they matter for
-// legibility at city zoom. Fade the road-hiding back out as the user zooms in.
-const NIGHT_HIDE_ROADS_RESTORE_START_ZOOM = 5.5;
-const NIGHT_HIDE_ROADS_RESTORE_END_ZOOM = 9.0;
-
 const mixCssRgb = (
 	from: [number, number, number],
 	to: [number, number, number],
@@ -4128,13 +3780,6 @@ const getBasemapRoadOpacityBase = (mapInstance: mapboxgl.Map, layerId: string) =
 //     around the globe (driven by Mapbox's camera/projection, so it adapts
 //     to zoom and panning automatically — not an overlay we'd have to mask
 //     against the earth).
-const NIGHT_STAR_INTENSITY_DAY = 0.85;
-const NIGHT_STAR_INTENSITY_NIGHT = 1.0;
-const NIGHT_SPACE_COLOR_DAY: ParsedCssColor = [0, 0, 0, 1];
-const NIGHT_SPACE_COLOR_NIGHT: ParsedCssColor = [7, 13, 24, 1];
-const NIGHT_CLOSE_FOG_ALPHA_DAY = 1.0;
-const NIGHT_CLOSE_FOG_ALPHA_NIGHT = 0.42;
-
 const applyMapboxFogForMoodAndNight = (
 	mapInstance: mapboxgl.Map,
 	cfg: { fogColor: string; fogHighColor: string; fogHorizonBlend: number },
@@ -4364,16 +4009,6 @@ const applyFreeTrialMapVisualTuning = (mapInstance: mapboxgl.Map) => {
 	}
 };
 
-// IDs for the world-land fill layer (cream land coverage) sourced from Mapbox's
-// free `country-boundaries-v1` tileset. Adding this layer means the background
-// layer can stay permanently ocean-blue without blue leaking through in "bare
-// land" areas between landuse/landcover polygons — on initial load, during
-// zoom-outs, and during pans into untiled territory.
-const MAP_WORLD_LAND_SOURCE_ID = 'murmur-world-land';
-const MAP_WORLD_LAND_LAYER_ID = 'murmur-world-land-fill';
-const MAP_WORLD_LAND_TILESET_URL = 'mapbox://mapbox.country-boundaries-v1';
-const MAP_WORLD_LAND_SOURCE_LAYER = 'country_boundaries';
-
 const ensureWorldLandFill = (mapInstance: mapboxgl.Map) => {
 	try {
 		if (!mapInstance.getSource(MAP_WORLD_LAND_SOURCE_ID)) {
@@ -4428,135 +4063,6 @@ const ensureWorldLandFill = (mapInstance: mapboxgl.Map) => {
 	}
 };
 
-// Performance: the `within` filter is helpful when zoomed out (to hide Canada/Mexico labels/roads),
-// but it adds overhead at high zoom where there are many more road/label features.
-// Only apply the US-only basemap clipping up to this zoom level.
-const US_ONLY_BASEMAP_CLIP_MAX_ZOOM = 7;
-
-const MAPBOX_SOURCE_IDS = {
-	clouds: 'murmur-clouds',
-	lightning: 'murmur-lightning',
-	snow: 'murmur-snow',
-	dayFarSideShade: 'murmur-day-far-side-shade',
-	sunTransition: 'murmur-sun-transition',
-	nightLights: 'murmur-night-lights',
-	nightLightsReveal: 'murmur-night-lights-reveal',
-	states: 'murmur-states',
-	resultsOutline: 'murmur-results-outline',
-	lockedOutline: 'murmur-locked-outline',
-	curatedBlob: 'murmur-curated-blob',
-	markerConstellation: 'murmur-marker-constellation',
-	markerConstellationNodes: 'murmur-marker-constellation-nodes',
-	selectionRect: 'murmur-selection-rect',
-	selectedAreaRect: 'murmur-selected-area-rect',
-	markersBase: 'murmur-markers-base',
-	markersPromotionDot: 'murmur-markers-promo-dot',
-	markersAllOverlay: 'murmur-markers-all-overlay',
-	markersPromotionPin: 'murmur-markers-promo-pin',
-	markersBookingPin: 'murmur-markers-booking-pin',
-	stateLabels: 'murmur-state-labels',
-} as const;
-
-const MAPBOX_LAYER_IDS = {
-	// Globe overlays
-	clouds: 'murmur-clouds-raster',
-	lightning: 'murmur-lightning-raster',
-	snow: 'murmur-snow-raster',
-	dayFarSideShade: 'murmur-day-far-side-shade-raster',
-	sunTransition: 'murmur-sun-transition-raster',
-	sunTransitionCloudCatchlight: 'murmur-sun-transition-cloud-catchlight-raster',
-	nightLightsSpaceGlow: 'murmur-night-lights-space-glow',
-	nightLightsSpaceGlow2: 'murmur-night-lights-space-glow-2',
-	nightLightsGlow: 'murmur-night-lights-glow',
-	nightLightsCloseGlow: 'murmur-night-lights-close-glow',
-	nightLights: 'murmur-night-lights-raster',
-	nightLightsRevealGlow: 'murmur-night-lights-reveal-glow',
-	nightLightsReveal: 'murmur-night-lights-reveal-raster',
-	// States
-	statesFillHit: 'murmur-states-fill-hit',
-	statesFillHover: 'murmur-states-fill-hover',
-	statesDividers: 'murmur-states-dividers',
-	statesBordersInteractive: 'murmur-states-borders-interactive',
-	statesLabels: 'murmur-states-labels',
-	// Outlines
-	resultsOutline: 'murmur-results-outline-line',
-	lockedOutline: 'murmur-locked-outline-line',
-	curatedBlobFill: 'murmur-curated-blob-fill',
-	curatedBlobCore: 'murmur-curated-blob-core-line',
-	markerConstellationGlow: 'murmur-marker-constellation-glow-line',
-	markerConstellationCore: 'murmur-marker-constellation-core-line',
-	markerConstellationNodeGlow: 'murmur-marker-constellation-node-glow',
-	markerConstellationNodeDots: 'murmur-marker-constellation-node-dots',
-	// Markers (hit layers are used for hover/click priority)
-	markersAllHit: 'murmur-markers-all-hit',
-	markersAllGlow: 'murmur-markers-all-glow',
-	markersAllDots: 'murmur-markers-all-dots',
-	promotionPinHit: 'murmur-promo-pin-hit',
-	promotionPinIcons: 'murmur-promo-pin-icons',
-	bookingPinHit: 'murmur-booking-pin-hit',
-	bookingPinIcons: 'murmur-booking-pin-icons',
-	bookingPinIconsHover: 'murmur-booking-pin-icons-hover',
-	promotionDotHit: 'murmur-promo-dot-hit',
-	promotionDotGlow: 'murmur-promo-dot-glow',
-	promotionDotDots: 'murmur-promo-dot-dots',
-	baseHit: 'murmur-base-hit',
-	baseGlow: 'murmur-base-glow',
-	baseDots: 'murmur-base-dots',
-	baseFallbackIcons: 'murmur-base-fallback-icons',
-	// Rectangles
-	selectedAreaRect: 'murmur-selected-area-rect-line',
-	selectionRectFill: 'murmur-selection-rect-fill',
-	selectionRectLine: 'murmur-selection-rect-line',
-} as const;
-
-// --- Dot reveal animation (search results) ---
-// Compute a per-dot reveal delay (ms) based on longitude so dots fade in as a smooth left→right wave.
-// We drive the animation by updating a single paint expression over time.
-const DOT_WAVE_DELAY_PROP = '__murmurWaveDelayMs';
-const DOT_WAVE_TRAVEL_MS_MIN = 900;
-const DOT_WAVE_TRAVEL_MS_MAX = 1600;
-// Each dot fades up over this duration once the wave reaches it.
-// A wide band means many dots coexist at different partial opacities, so no visible "edge".
-const DOT_WAVE_FADE_MS = 1200;
-// Per-dot jitter range (ms). Large enough to separate dots at the same longitude into
-// individually-timed reveals rather than batches that pop in together.
-const DOT_WAVE_JITTER_MS = 350;
-// Throttle paint updates (~60fps) for smoothness.
-const DOT_WAVE_FRAME_MS = 16;
-// Mapbox transition duration between throttled paint updates. Keep short so individual dot
-// timings stay crisp rather than being temporally blurred into batches.
-const DOT_WAVE_SMOOTH_TRANSITION_MS = 25;
-// Ease-out curve for per-dot opacity ramp. Dots gently emerge then settle into full opacity.
-const DOT_WAVE_EASING: any = ['cubic-bezier', 0.33, 0, 0.2, 1];
-
-type DotWaveMeta = {
-	maxDelayMs: number;
-};
-
-// --- Marker constellations (search results) ---
-// Delicate background linework that is composed once per search from visible primary dots.
-const MARKER_CONSTELLATION_LINE_COLOR = '#4F555C';
-const MARKER_CONSTELLATION_HALO_COLOR = '#F6FAFC';
-const MARKER_CONSTELLATION_CORE_OPACITY = 0.56;
-const MARKER_CONSTELLATION_GLOW_OPACITY = 0.3;
-const MARKER_CONSTELLATION_NODE_OPACITY = 0.76;
-const MARKER_CONSTELLATION_NODE_GLOW_OPACITY = 0.24;
-const MARKER_CONSTELLATION_MAX_POINTS = 180;
-const MARKER_CONSTELLATION_MAX_EDGES = 140;
-const MARKER_CONSTELLATION_MIN_COMPOSE_ZOOM = MAP_DEFAULT_ZOOM;
-const MARKER_CONSTELLATION_MID_COMPOSE_ZOOM = 5.8;
-const MARKER_CONSTELLATION_DETAIL_COMPOSE_ZOOM = 7.4;
-const MARKER_CONSTELLATION_MIN_EDGE_PX = 18;
-const MARKER_CONSTELLATION_MAX_EDGE_PX = 185;
-const MARKER_CONSTELLATION_FALLBACK_GROUP_PX = 230;
-const MARKER_CONSTELLATION_SPARSE_FALLBACK_MAX_EDGE_PX = 360;
-const MARKER_CONSTELLATION_POINT_CLEARANCE_PX = 9;
-// Fade-in for the initial reveal so lines materialize over the camera fly-in
-// instead of popping in once it lands.
-const MARKER_CONSTELLATION_REVEAL_FADE_MS = 450;
-
-type MarkerConstellationLevel = 'wide' | 'mid' | 'detail';
-
 const markerConstellationLevelOpacityAtZoomStop = (
 	wide: number,
 	mid: number,
@@ -4570,30 +4076,6 @@ const markerConstellationLevelOpacityAtZoomStop = (
 	['==', ['get', 'level'], 'detail'],
 	detail,
 	0,
-];
-
-const MARKER_CONSTELLATION_EDGE_RANK_OPACITY_EXPR: any = [
-	'interpolate',
-	['linear'],
-	['coalesce', ['get', 'rank'], 0],
-	0,
-	1,
-	0.6,
-	0.84,
-	1,
-	0.58,
-];
-
-const MARKER_CONSTELLATION_NODE_RANK_OPACITY_EXPR: any = [
-	'interpolate',
-	['linear'],
-	['coalesce', ['get', 'rank'], 0],
-	0,
-	1,
-	0.7,
-	0.86,
-	1,
-	0.68,
 ];
 
 const markerConstellationEdgeOpacityAtZoomStop = (
@@ -4655,40 +4137,6 @@ const getMarkerConstellationNodeZoomFadedOpacity = (opacity: number): any => {
 	];
 };
 
-type MarkerConstellationPoint = {
-	id: number;
-	coords: LatLngLiteral;
-	x: number;
-	y: number;
-	groupKey: string;
-};
-
-type MarkerConstellationEdgeSeed = {
-	fromId: number;
-	toId: number;
-};
-
-type MarkerConstellationEdge = {
-	fromId: number;
-	toId: number;
-	level: MarkerConstellationLevel;
-	rank: number;
-	opacityScale: number;
-};
-
-type MarkerConstellationNode = {
-	id: number;
-	level: MarkerConstellationLevel;
-	rank: number;
-	opacityScale: number;
-};
-
-type MarkerConstellationFormation = {
-	edges: MarkerConstellationEdge[];
-	nodes: MarkerConstellationNode[];
-	lowZoomNodeIds: Set<number>;
-};
-
 const computeDotWaveTravelMs = (featureCount: number): number => {
 	if (!Number.isFinite(featureCount) || featureCount <= 0) return DOT_WAVE_TRAVEL_MS_MIN;
 	const raw = 800 + Math.sqrt(featureCount) * 22;
@@ -4723,11 +4171,6 @@ const computeDotWaveDelayMs = (
 		DOT_WAVE_JITTER_MS > 0 ? ((h & 0xffff) / 0x10000) * DOT_WAVE_JITTER_MS : 0;
 
 	return Math.max(0, tLng * travelMs + latUndulation + jitter);
-};
-
-type BasemapCartographyClipState = {
-	layerIds: string[];
-	originalFilters: Map<string, any | null>;
 };
 
 const getBasemapCartographyLayerIds = (mapInstance: mapboxgl.Map): string[] => {
@@ -4800,24 +4243,6 @@ const restoreBasemapCartography = (
 		}
 	}
 };
-
-const STATE_PROCESSED_GEOJSON_URL = '/geo/us-states-processed.json';
-const STATE_META_URL = '/geo/us-states-meta.json';
-const STATE_LABELS_URL = '/geo/us-states-labels.json';
-const STATE_OUTLINE_URL = '/geo/us-states-outline.json';
-const STATE_PREPARED_POLYGONS_URL = '/geo/us-states-prepared-polygons.json';
-const STATE_HIGHLIGHT_COLOR = '#5DAB68';
-const STATE_HIGHLIGHT_OPACITY = 0.68;
-const STATE_DIVIDER_COLOR = '#7A8799';
-const STATE_LABEL_COLOR = '#111827';
-const SELECTED_STATE_GRADIENT_COLOR_OPACITY = CURATED_ORB_COLOR_BLEND_OPACITY;
-const SELECTED_STATE_GRADIENT_BLOOM_OPACITY = 0.5;
-// When zoomed out to a US-wide view, show subtle state divider lines (like Zillow).
-// Keep these behind the blue/black search-area outlines.
-const STATE_DIVIDER_LINES_MAX_ZOOM = 8;
-// Night mode keeps the same map palette as day, so state boundaries keep day contrast.
-const NIGHT_STATE_LINE_OPACITY_MUL_MIN = 1;
-const NIGHT_STATE_LINE_DARKEN_MAX = 0;
 
 const getNightStateLineDarkenT = (nightT: number) => {
 	const night = clamp(nightT, 0, 1);
@@ -4935,117 +4360,6 @@ const applyStateOverlayNightColors = (mapInstance: mapboxgl.Map, nightT: number)
 	}
 };
 
-// Marker dot colors by search "What" value (dashboard/drafting search).
-const DEFAULT_RESULT_DOT_COLOR = '#D21E1F';
-const RESULT_DOT_ZOOM_MIN = 4;
-const RESULT_DOT_ZOOM_MAX = 14;
-const RESULT_DOT_SCALE_MIN = 3;
-const RESULT_DOT_SCALE_MAX = 11;
-// Overlay pins look too small when zoomed out; keep their circle readable without
-// overpowering the search tray/category icons.
-const MIN_OVERLAY_PIN_CIRCLE_DIAMETER_PX = 16;
-// Selected stroke weight should be thinner when zoomed out and approach ~3px when zoomed in.
-const RESULT_DOT_STROKE_WEIGHT_MIN_PX = 1.5;
-const RESULT_DOT_STROKE_WEIGHT_MAX_PX = 3;
-const RESULT_DOT_STROKE_COLOR_DEFAULT = '#FFFFFF';
-const RESULT_DOT_STROKE_COLOR_SELECTED = '#15C948';
-const RESULT_DOT_GLOW_COLOR = '#FFFFFF';
-const RESULT_DOT_GLOW_RADIUS_MIN_PX = 8;
-const RESULT_DOT_GLOW_RADIUS_MAX_PX = 16;
-const RESULT_DOT_GLOW_OPACITY = 0.72;
-const CATEGORIZED_DOT_ZOOM_FADE_EXPR: any = [
-	'interpolate',
-	['linear'],
-	['zoom'],
-	CURATED_DOT_FADE_END_ZOOM,
-	[
-		'case',
-		['boolean', ['get', 'isUncategorized'], false],
-		0,
-			[
-				'case',
-				ORB_FADE_MARKER_FEATURE_EXPR,
-				0,
-				['case', ['boolean', ['feature-state', 'inConstellation'], true], 1, 0],
-			],
-	],
-	CURATED_DOT_FADE_START_ZOOM,
-	[
-		'case',
-		['boolean', ['get', 'isUncategorized'], false],
-		0,
-		['case', ['boolean', ['feature-state', 'inConstellation'], true], 1, 0],
-	],
-	NON_CONSTELLATION_FADE_END_ZOOM,
-	[
-		'case',
-		['boolean', ['get', 'isUncategorized'], false],
-		0,
-		['case', ['boolean', ['feature-state', 'inConstellation'], true], 1, 0],
-	],
-	NON_CONSTELLATION_FADE_START_ZOOM,
-	['case', ['boolean', ['get', 'isUncategorized'], false], 0, 1],
-];
-const CATEGORIZED_DOT_GLOW_ZOOM_FADE_EXPR: any = [
-	'interpolate',
-	['linear'],
-	['zoom'],
-	CURATED_DOT_FADE_END_ZOOM,
-	[
-		'case',
-		['boolean', ['get', 'isUncategorized'], false],
-		0,
-			[
-				'case',
-				ORB_FADE_MARKER_FEATURE_EXPR,
-				0,
-				[
-					'case',
-				['boolean', ['feature-state', 'inConstellation'], true],
-				RESULT_DOT_GLOW_OPACITY,
-				0,
-			],
-		],
-	],
-	CURATED_DOT_FADE_START_ZOOM,
-	[
-		'case',
-		['boolean', ['get', 'isUncategorized'], false],
-		0,
-		[
-			'case',
-			['boolean', ['feature-state', 'inConstellation'], true],
-			RESULT_DOT_GLOW_OPACITY,
-			0,
-		],
-	],
-	NON_CONSTELLATION_FADE_END_ZOOM,
-	[
-		'case',
-		['boolean', ['get', 'isUncategorized'], false],
-		0,
-		[
-			'case',
-			['boolean', ['feature-state', 'inConstellation'], true],
-			RESULT_DOT_GLOW_OPACITY,
-			0,
-		],
-	],
-	NON_CONSTELLATION_FADE_START_ZOOM,
-	[
-		'case',
-		['boolean', ['get', 'isUncategorized'], false],
-		0,
-		RESULT_DOT_GLOW_OPACITY,
-	],
-];
-const ALL_CONTACTS_DOT_GLOW_OPACITY = 0.54;
-const RESULT_DOT_GLOW_BLUR = 0.86;
-const RESULT_DOT_TRANSPARENT_STROKE_COLOR = 'rgba(255, 255, 255, 0)';
-// Fill color for the hover tooltip SVG when the contact is selected.
-const TOOLTIP_FILL_COLOR_SELECTED = '#258530';
-const BOOKING_EXTRA_PIN_HOVER_STROKE_COLOR = '#000000';
-
 const withResultDotGlowOpacity = (dotOpacityExpr: unknown) =>
 	['*', RESULT_DOT_GLOW_OPACITY, dotOpacityExpr] as any;
 
@@ -5056,30 +4370,6 @@ const withCategorizedDotOpacity = (dotOpacityExpr: unknown) =>
 		0,
 		dotOpacityExpr,
 	] as any;
-
-// Keep hover tooltip above all map markers so it never gets covered.
-const HOVER_TOOLTIP_Z_INDEX = 1_000_000;
-// Minimum zoom level required to trigger hover tooltips and research highlights on markers.
-// Below this zoom level, markers are too dense and small for hover interactions to be useful.
-const HOVER_INTERACTION_MIN_ZOOM = 8;
-const BOOKING_EXTRA_MARKERS_MIN_ZOOM = 8;
-// Keep extra markers capped so map remains responsive.
-const BOOKING_EXTRA_MARKERS_MAX_DOTS = 160;
-// Promotion searches: show state-wide radio list pins as overlay markers.
-// Match booking's zoom threshold for consistent UX across modes.
-const PROMOTION_OVERLAY_MARKERS_MIN_ZOOM = 8;
-// Defensive cap; expected to be ~2 per state.
-const PROMOTION_OVERLAY_MARKERS_MAX_PINS = 220;
-
-// "All contacts" gray-dot overlay: only show when zoomed in *extremely* close.
-const ALL_CONTACTS_OVERLAY_MARKERS_MIN_ZOOM = 18;
-const ALL_CONTACTS_OVERLAY_LIMIT = 2000;
-const ALL_CONTACTS_OVERLAY_DOT_FILL_COLOR = '#9CA3AF';
-const ALL_CONTACTS_OVERLAY_TOOLTIP_FILL_COLOR = '#6B7280';
-
-const BOOKING_EXTRA_TITLE_PREFIXES = BOOKING_CONTACT_TITLE_PREFIXES;
-
-const PROMOTION_OVERLAY_TITLE_PREFIXES = PROMOTION_CONTACT_TITLE_PREFIXES;
 
 const startsWithCaseInsensitive = (
 	value: string | null | undefined,
@@ -5112,8 +4402,6 @@ const isPromotionOverlayListTitle = (title: string | null | undefined): boolean 
 const getPromotionOverlayWhatFromContactTitle = (
 	title: string | null | undefined
 ): string | null => (isPromotionOverlayListTitle(title) ? 'Radio Stations' : null);
-
-type SearchMode = 'booking' | 'promotion';
 
 const extractSearchModeFromQueryPrefix = (
 	query: string | null | undefined
@@ -5271,14 +4559,6 @@ const getResultDotStrokeWeightForZoom = (zoom: number): number => {
 	);
 };
 
-// When very zoomed out, we want the searched/locked state to visually "win" so the user
-// can understand where the bulk of results are. As you zoom in, we ease back toward a
-// more natural distribution.
-const LOCKED_STATE_MARKER_BIAS_ZOOM_START = RESULT_DOT_ZOOM_MIN; // 4
-const LOCKED_STATE_MARKER_BIAS_ZOOM_END = STATE_DIVIDER_LINES_MAX_ZOOM; // 8
-const LOCKED_STATE_MARKER_BIAS_SHARE_MAX = 0.92; // at zoom ~4
-const LOCKED_STATE_MARKER_BIAS_SHARE_MIN = 0.6; // by zoom ~8
-
 const getLockedStateMarkerShareForZoom = (zoom: number): number => {
 	const denom = LOCKED_STATE_MARKER_BIAS_ZOOM_END - LOCKED_STATE_MARKER_BIAS_ZOOM_START;
 	if (!Number.isFinite(denom) || denom <= 0) return LOCKED_STATE_MARKER_BIAS_SHARE_MIN;
@@ -5288,12 +4568,6 @@ const getLockedStateMarkerShareForZoom = (zoom: number): number => {
 		t * (LOCKED_STATE_MARKER_BIAS_SHARE_MIN - LOCKED_STATE_MARKER_BIAS_SHARE_MAX)
 	);
 };
-
-// When a search/locked state is active, de-emphasize out-of-state markers by making them
-// look like they'd be at 50% opacity on a white background (but keep fillOpacity=1).
-const OUTSIDE_LOCKED_STATE_WASHOUT_TO_WHITE = 0.5;
-
-type RgbColor = { r: number; g: number; b: number };
 
 const parseHexColor = (hex: string): RgbColor | null => {
 	const trimmed = hex.trim();
@@ -5388,25 +4662,6 @@ const normalizeStateKey = (state?: string | null): string | null => {
 	return state.trim().toUpperCase();
 };
 
-// MANUAL WEATHER MOOD OVERRIDE FOR TESTING.
-// Set to one of: 'sunny' | 'normal' | 'cloudy' | 'stormy' | 'snowy'
-// Set back to null to use the real weather mood from the user's region.
-const MANUAL_WEATHER_MOOD_OVERRIDE: WeatherMood | null = null;
-
-// MANUAL TEMPERATURE OVERRIDE FOR TESTING (Fahrenheit).
-// Set to a number (e.g. 92) to test the > 80°F brightness lift.
-// Set back to null to use the real temperature from the user's region.
-const MANUAL_WEATHER_TEMPERATURE_OVERRIDE_F: number | null = null;
-
-// MANUAL NIGHT OVERRIDE FOR TESTING.
-// Set to a number between 0 and 1 (e.g. 1 for deep night, 0 for full day).
-// Set back to null to use the real regional day/night cycle.
-const MANUAL_NIGHT_T_OVERRIDE: number | null = null;
-
-const MOOD_CONTINUOUS_TRANSITION_MS = 90_000;
-const MOOD_DISCRETE_EFFECT_FADE_MS = 8_000;
-const MOOD_TRANSITION_PAINT_FRAME_MS = 16;
-
 const getDevMoodTransitionMs = (): number | null => {
 	if (typeof window === 'undefined') return null;
 	try {
@@ -5445,55 +4700,6 @@ const computeRuntimeNightT = (
 	return clamp(nightLighting.nightT ?? fallbackNightT, 0, 1);
 };
 
-// Threshold above which the globe gets a uniform warm brightness lift on top
-// of the active mood (only applies when the mood uses a bright screen-blend
-// softbox — applying a brightening wash to the dark-pool moods would defeat
-// the stormy gloom).
-const HOT_TEMPERATURE_THRESHOLD_F = 80;
-// Uniform warm-white wash opacity when "hot". Multiplied by the same zoom
-// fade as the other lighting overlays so the wash disappears at city zoom.
-const HOT_WASH_OPACITY = 0.13;
-
-// Night lighting (moon backlight).
-// Implemented as DOM overlays (screen + multiply) so the lighting stays viewer-anchored
-// and can be art-directed independently of the basemap.
-const NIGHT_GLOOM_WASH_OPACITY = 0;
-const NIGHT_MOONLIGHT_KEY_OPACITY = 0.48;
-const NIGHT_LOWER_LEFT_SHADOW_OPACITY = 0.94;
-const NIGHT_WARM_KEY_MIN_MUL = 0.04;
-// Neutral night-only dimmer. This darkens the normal day-colored basemap without
-// shifting land/ocean hues back toward a separate night palette.
-const NIGHT_DARK_WASH_OPACITY = 0.17;
-// Keep the night basemap visually matched to the normal day map.
-const NIGHT_FACE_SHADE_OPACITY = 0;
-// US night visibility: dot-only contact-lights tiles (not a heatmap). Kept
-// well below 1 so the lights read as a soft glow rather than a stark
-// NASA-earth-at-night photo (which feels eerie/lonely on its own).
-const NIGHT_US_LIGHTS_OPACITY = 0.55;
-const NIGHT_MOON_RIM_OPACITY = 0;
-const NIGHT_SHADOW_OVERLAY_MUL_MIN = 0.18;
-
-// City-lights persistence: this is primarily a "zoomed out / from space" aesthetic.
-// Fade out aggressively as we approach state/city zoom so it doesn't compete with markers.
-const NIGHT_LIGHTS_FADE_START_ZOOM = 3.7;
-// Keep visible through a "medium" multi-state view, then drop off quickly before city-level zoom.
-const NIGHT_LIGHTS_FADE_END_ZOOM = 6.65;
-// When the map first mounts, the lights tiles can appear in patches as they stream
-// in. We keep the overlay hidden until the raster source reports "loaded", then
-// fade it in so the first impression feels deliberate.
-const NIGHT_LIGHTS_LOAD_POLL_MS = 120;
-const NIGHT_LIGHTS_LOAD_FADE_MS = 750;
-// Zoom interaction: hide while tiles stream, then fade back in quickly.
-const NIGHT_LIGHTS_ZOOM_LOAD_POLL_MS = 90;
-const NIGHT_LIGHTS_ZOOM_LOAD_FADE_MS = 320;
-const NIGHT_LIGHTS_ZOOM_LOAD_OUT_FADE_MS = 140;
-// Keep lights present during zoom gestures (no "blink"), but dim slightly so
-// intermediate overzoomed raster state is less noticeable.
-const NIGHT_LIGHTS_ZOOM_LOAD_DIM_FLOOR = 0.72;
-// Intro animation: reveal left-to-right, then crossfade to the real tiles.
-const NIGHT_LIGHTS_INTRO_REVEAL_MS = 900;
-const NIGHT_LIGHTS_INTRO_CROSSFADE_MS = 260;
-
 const computeNightLightsFade = (zoom: number) => {
 	if (zoom <= NIGHT_LIGHTS_FADE_START_ZOOM) return 1;
 	if (zoom >= NIGHT_LIGHTS_FADE_END_ZOOM) return 0;
@@ -5504,35 +4710,6 @@ const computeNightLightsFade = (zoom: number) => {
 	// Steep fade: drops quickly after the start zoom so the overlay doesn't read as texture.
 	return Math.pow(inv, 2.25);
 };
-
-// Zoomed-out visibility: at the minimum zoom the US is only a few screen pixels wide,
-// so we apply a small opacity lift so the dots still read as a faint glow.
-const NIGHT_LIGHTS_ZOOM_OUT_LIFT_START_ZOOM = MAP_MIN_ZOOM;
-const NIGHT_LIGHTS_ZOOM_OUT_LIFT_END_ZOOM = NIGHT_LIGHTS_FADE_START_ZOOM;
-const NIGHT_LIGHTS_ZOOM_OUT_LIFT_MAX = 0.62;
-// Extra "bloom" pass: a low-zoom glow layer that makes the US read as sparkling
-// from far zoom without turning the crisp dot layer into a blur.
-const NIGHT_LIGHTS_GLOW_OPACITY_MULT = 0.75;
-// Fade the glow out by "medium" zoom so the pattern reads as city clusters, not
-// a noisy texture. (We still keep the crisp dot layer.)
-const NIGHT_LIGHTS_GLOW_FADE_START_ZOOM = 3.2;
-const NIGHT_LIGHTS_GLOW_FADE_END_ZOOM = 4.2;
-// Extra "space" glow: a short-lived boost that makes the US read from fully zoomed-out
-// view, then disappears before any state-level interaction.
-const NIGHT_LIGHTS_SPACE_GLOW_OPACITY_MULT = 1.55;
-// A second space-only pass (same tiles) to push the glow to be visible from "space"
-// without changing the dot tile generation.
-const NIGHT_LIGHTS_SPACE_GLOW_EXTRA_PASS_OPACITY_MUL = 0.85;
-const NIGHT_LIGHTS_SPACE_GLOW_FADE_START_ZOOM = MAP_MIN_ZOOM;
-const NIGHT_LIGHTS_SPACE_GLOW_FADE_END_ZOOM = 3.55;
-
-// Zoomed-in behavior: instead of many crisp points at mid zoom (which can read as "hair"),
-// crossfade toward a very subtle, local glow pass.
-const NIGHT_LIGHTS_CRISP_FADE_OUT_START_ZOOM = 4.05;
-const NIGHT_LIGHTS_CRISP_FADE_OUT_END_ZOOM = 4.55;
-const NIGHT_LIGHTS_CLOSE_GLOW_FADE_IN_START_ZOOM = 4.05;
-const NIGHT_LIGHTS_CLOSE_GLOW_FADE_IN_END_ZOOM = 4.35;
-const NIGHT_LIGHTS_CLOSE_GLOW_OPACITY_MULT = 0.55;
 
 const computeNightLightsZoomOutLift = (zoom: number) => {
 	if (zoom <= NIGHT_LIGHTS_ZOOM_OUT_LIFT_START_ZOOM) {
@@ -5591,48 +4768,6 @@ const computeNightLightsCloseGlowMul = (zoom: number) => {
 	// Ease-in: let dots dominate, then let glow take over smoothly.
 	return clamp(t, 0, 1) * clamp(t, 0, 1);
 };
-
-// Night key light: a cool, white-blue ambient wash from the upper-right so full
-// night has its own moonlit direction instead of borrowing the daytime sun wash.
-const NIGHT_MOONLIGHT_KEY_BG = [
-	'radial-gradient(ellipse 178% 150% at 112% -18%, rgba(255, 255, 255, 0.20) 0%, rgba(240, 250, 255, 0.15) 28%, rgba(219, 237, 255, 0.09) 55%, rgba(191, 216, 244, 0.035) 84%, rgba(191, 216, 244, 0) 100%)',
-	'radial-gradient(ellipse 124% 104% at 86% 8%, rgba(247, 252, 255, 0.07) 0%, rgba(224, 240, 255, 0.052) 46%, rgba(206, 226, 248, 0.024) 78%, rgba(206, 226, 248, 0) 100%)',
-	'radial-gradient(ellipse 152% 112% at 74% 30%, rgba(214, 231, 255, 0.034) 0%, rgba(186, 210, 238, 0.02) 58%, rgba(186, 210, 238, 0) 92%)',
-].join(', ');
-
-// Night counter-shade: a broad lower-left dark pool, opposite the daytime
-// upper-left key / lower-right shadow so night reads as a distinct composition.
-const NIGHT_LOWER_LEFT_SHADOW_BG = [
-	'radial-gradient(ellipse 162% 154% at -20% 114%, rgba(0, 3, 14, 0.80) 0%, rgba(2, 8, 26, 0.61) 28%, rgba(6, 15, 38, 0.38) 54%, rgba(10, 22, 50, 0.15) 78%, rgba(10, 22, 50, 0) 100%)',
-	'radial-gradient(ellipse 100% 86% at 14% 80%, rgba(1, 5, 18, 0.32) 0%, rgba(5, 13, 34, 0.18) 48%, rgba(5, 13, 34, 0) 84%)',
-].join(', ');
-
-// Standby shade paint for the night overlay. The overlay opacity is kept at 0 so
-// the visible night map stays matched to the normal daytime palette.
-const NIGHT_FACE_SHADE_BG =
-	'radial-gradient(ellipse 145% 145% at 58% 60%, rgba(14, 22, 42, 0.32) 0%, rgba(14, 22, 42, 0.27) 30%, rgba(14, 22, 42, 0.17) 54%, rgba(14, 22, 42, 0.07) 70%, rgba(14, 22, 42, 0) 84%, rgba(14, 22, 42, 0) 100%)';
-
-// Cinematic vignette: a viewport-anchored darkening at the corners that pulls the
-// eye toward the globe at night. Multiplied so it composites with the deep-space
-// color and the night map without crushing to pure black. The center is fully
-// transparent for ~40% of the radius so the globe itself stays untouched.
-const NIGHT_VIGNETTE_OPACITY = 0.95;
-const NIGHT_VIGNETTE_BG =
-	'radial-gradient(ellipse 110% 110% at 50% 50%, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0) 38%, rgba(2, 6, 16, 0.10) 58%, rgba(1, 4, 12, 0.26) 78%, rgba(0, 2, 8, 0.46) 92%, rgba(0, 1, 5, 0.58) 100%)';
-
-// Rear rim light: edge-weighted cool-white glow that reads as the moon sitting
-// behind the Earth (not perfectly centered, shifted toward upper-left bias).
-const NIGHT_MOON_RIM_BG = [
-	'radial-gradient(ellipse 178% 178% at 58% 60%, rgba(235, 248, 255, 0) 0%, rgba(235, 248, 255, 0) 62%, rgba(225, 242, 255, 0.05) 76%, rgba(232, 247, 255, 0.18) 86%, rgba(248, 253, 255, 0.62) 94%, rgba(248, 253, 255, 0.14) 100%)',
-	'radial-gradient(ellipse 128% 128% at 58% 60%, rgba(235, 248, 255, 0) 0%, rgba(235, 248, 255, 0) 72%, rgba(226, 244, 255, 0.08) 82%, rgba(242, 251, 255, 0.50) 91%, rgba(255, 255, 255, 0.06) 97%, rgba(235, 248, 255, 0) 100%)',
-	'radial-gradient(ellipse 78% 78% at 14% 14%, rgba(255, 255, 255, 0.14) 0%, rgba(230, 246, 255, 0.06) 26%, rgba(255, 255, 255, 0) 48%)',
-].join(', ');
-
-const SUN_TRANSITION_SPACE_GLOW_BG = [
-	'radial-gradient(ellipse 78% 58% at 8% 6%, rgba(255, 198, 116, 0.34) 0%, rgba(255, 162, 102, 0.18) 28%, rgba(255, 162, 102, 0.06) 54%, rgba(255, 162, 102, 0) 76%)',
-	'radial-gradient(ellipse 58% 44% at 18% 14%, rgba(217, 86, 184, 0.18) 0%, rgba(142, 88, 210, 0.09) 42%, rgba(142, 88, 210, 0) 78%)',
-	'radial-gradient(ellipse 120% 84% at -18% -14%, rgba(255, 238, 182, 0.13) 0%, rgba(255, 210, 150, 0.06) 48%, rgba(255, 210, 150, 0) 82%)',
-].join(', ');
 
 // NOTE: Night lights are generated offline as raster dot tiles (see scripts/generate_contact_lights_tiles.py).
 
