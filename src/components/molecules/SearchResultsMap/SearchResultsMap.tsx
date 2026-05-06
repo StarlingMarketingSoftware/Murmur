@@ -375,9 +375,21 @@ const computeCuratedOrbT = (zoom: number) => {
 	return raw * raw * (3 - 2 * raw);
 };
 
-// Per-feature opacity for the baseDots layer: curated dots cross-fade out
-// over the dot-fade zoom range (which runs ahead of the shape morph);
-// non-curated dots (isCurated false or missing) are unaffected. Mapbox
+const ORB_FADE_MARKER_FEATURE_EXPR: any = [
+	'any',
+	['boolean', ['get', 'isCurated'], false],
+	['boolean', ['get', 'fadeWithSelectedStateOrb'], false],
+];
+
+const SELECTED_STATE_ORB_FADE_MARKER_FEATURE_EXPR: any = [
+	'boolean',
+	['get', 'fadeWithSelectedStateOrb'],
+	false,
+];
+
+// Per-feature opacity for the baseDots layer: curated dots and selected-state
+// orb dots cross-fade out over the dot-fade zoom range (which runs ahead of the
+// shape morph); other non-curated dots are unaffected. Mapbox
 // requires `['zoom']` at the top of an interpolate/step (it can't appear
 // inside `case`), so the per-feature branching lives at the lower stop
 // and the upper stop is a flat 1.
@@ -393,7 +405,7 @@ const CURATED_DOT_ZOOM_FADE_EXPR: any = [
 	CURATED_DOT_FADE_END_ZOOM,
 	[
 		'case',
-		['boolean', ['get', 'isCurated'], false],
+		ORB_FADE_MARKER_FEATURE_EXPR,
 		0,
 		['case', ['boolean', ['feature-state', 'inConstellation'], true], 1, 0],
 	],
@@ -403,6 +415,16 @@ const CURATED_DOT_ZOOM_FADE_EXPR: any = [
 	['case', ['boolean', ['feature-state', 'inConstellation'], true], 1, 0],
 	NON_CONSTELLATION_FADE_START_ZOOM,
 	1,
+];
+
+const getSelectedStateOrbZoomFadedOpacity = (opacity: number): any => [
+	'interpolate',
+	['linear'],
+	['zoom'],
+	CURATED_DOT_FADE_END_ZOOM,
+	['case', SELECTED_STATE_ORB_FADE_MARKER_FEATURE_EXPR, 0, opacity],
+	CURATED_DOT_FADE_START_ZOOM,
+	opacity,
 ];
 
 type CuratedBlobMercatorPoint = {
@@ -998,6 +1020,29 @@ const mercatorMultiPolygonToLngLat = (
 	return converted;
 };
 
+const lngLatMultiPolygonToMercator = (
+	multiPolygon: ClippingMultiPolygon
+): ClippingMultiPolygon => {
+	const converted: ClippingMultiPolygon = [];
+	for (const polygon of multiPolygon) {
+		const convertedPolygon: ClippingPolygon = [];
+		for (const ring of polygon) {
+			const convertedRing: ClippingRing = [];
+			for (const [lng, lat] of ring) {
+				if (!Number.isFinite(lng) || !Number.isFinite(lat)) continue;
+				const mercator = mapboxgl.MercatorCoordinate.fromLngLat({ lng, lat });
+				if (Number.isFinite(mercator.x) && Number.isFinite(mercator.y)) {
+					convertedRing.push([mercator.x, mercator.y]);
+				}
+			}
+			const closed = closeRing(convertedRing);
+			if (closed.length >= 4) convertedPolygon.push(closed);
+		}
+		if (convertedPolygon.length) converted.push(convertedPolygon);
+	}
+	return converted;
+};
+
 const createCuratedBlobMorphSourcesFromMercatorMultiPolygon = (
 	multiPolygon: ClippingMultiPolygon
 ): CuratedBlobMorphSource[] => {
@@ -1072,6 +1117,46 @@ const createCuratedBlobMorphSourcesFromMercatorMultiPolygon = (
 		});
 	}
 	return sources;
+};
+
+const createSelectedStateMorphSource = (
+	multiPolygon: ClippingMultiPolygon
+): CuratedBlobMorphSource | null => {
+	const mercatorMultiPolygon = lngLatMultiPolygonToMercator(multiPolygon);
+	const sources = createCuratedBlobMorphSourcesFromMercatorMultiPolygon(
+		mercatorMultiPolygon
+	);
+	if (sources.length === 0) return null;
+	return sources.reduce((largest, source) =>
+		source.radiusMerc > largest.radiusMerc ? source : largest
+	);
+};
+
+const morphCuratedBlobSourceToLngLat = (
+	source: CuratedBlobMorphSource,
+	t: number
+): ClippingMultiPolygon => {
+	const morphT = clamp(t, 0, 1);
+	const morphed =
+		morphT <= 0
+			? source.mercatorMultiPolygon
+			: source.mercatorMultiPolygon.map((polygon) =>
+					polygon.map((ring) =>
+						ring.map((point): [number, number] => {
+							const dx = point[0] - source.centerMerc.x;
+							const dy = point[1] - source.centerMerc.y;
+							if (dx === 0 && dy === 0) return [point[0], point[1]];
+							const angle = Math.atan2(dy, dx);
+							const tx = source.centerMerc.x + Math.cos(angle) * source.radiusMerc;
+							const ty = source.centerMerc.y + Math.sin(angle) * source.radiusMerc;
+							return [
+								point[0] + (tx - point[0]) * morphT,
+								point[1] + (ty - point[1]) * morphT,
+							];
+						})
+					)
+			  );
+	return mercatorMultiPolygonToLngLat(morphed);
 };
 
 const buildScreenPathFromLngLatMultiPolygon = (
@@ -4725,6 +4810,8 @@ const STATE_HIGHLIGHT_COLOR = '#5DAB68';
 const STATE_HIGHLIGHT_OPACITY = 0.68;
 const STATE_DIVIDER_COLOR = '#7A8799';
 const STATE_LABEL_COLOR = '#111827';
+const SELECTED_STATE_GRADIENT_COLOR_OPACITY = CURATED_ORB_COLOR_BLEND_OPACITY;
+const SELECTED_STATE_GRADIENT_BLOOM_OPACITY = 0.5;
 // When zoomed out to a US-wide view, show subtle state divider lines (like Zillow).
 // Keep these behind the blue/black search-area outlines.
 const STATE_DIVIDER_LINES_MAX_ZOOM = 8;
@@ -4755,18 +4842,18 @@ const buildStateInteractiveBorderWidthExpr = () => {
 	return [
 		'interpolate',
 		['linear'],
-		['zoom'],
-		MAP_MIN_ZOOM,
-		// Selected state should be only subtly emphasized.
-		['case', isSelected, 1.2, 0.7],
-		5,
-		['case', isSelected, 1.4, 0.85],
-		9,
-		['case', isSelected, 1.4, 0.85],
-		14,
-		['case', isSelected, 1.2, 0.6],
-	];
-};
+			['zoom'],
+			MAP_MIN_ZOOM,
+			// Selected state should be only subtly emphasized.
+			['case', isSelected, 0.9, 0.7],
+			5,
+			['case', isSelected, 1.05, 0.85],
+			9,
+			['case', isSelected, 1.05, 0.85],
+			14,
+			['case', isSelected, 0.9, 0.6],
+		];
+	};
 
 const buildStateInteractiveBorderColorExpr = (nightT: number) => {
 	const darkenT = getNightStateLineDarkenT(nightT);
@@ -4777,13 +4864,25 @@ const buildStateInteractiveBorderColorExpr = (nightT: number) => {
 		['linear'],
 		['zoom'],
 		MAP_MIN_ZOOM,
-		['case', isSelected, darken([136, 150, 171]), darken([148, 163, 184])],
+		['case', isSelected, darken([255, 255, 255]), darken([148, 163, 184])],
 		6,
-		['case', isSelected, darken([136, 150, 171]), darken([148, 163, 184])],
+		['case', isSelected, darken([255, 255, 255]), darken([148, 163, 184])],
 		14,
-		['case', isSelected, darken([195, 206, 211]), darken([207, 216, 220])],
+		['case', isSelected, darken([255, 255, 255]), darken([207, 216, 220])],
 	];
 };
+
+const buildLockedStateOutlineWidthExpr = () => [
+	'interpolate',
+	['linear'],
+	['zoom'],
+	3.4,
+	1.7,
+	5,
+	4.1,
+	12,
+	3,
+];
 
 const applyStateOverlayNightColors = (mapInstance: mapboxgl.Map, nightT: number) => {
 	const darkenT = getNightStateLineDarkenT(nightT);
@@ -4863,12 +4962,12 @@ const CATEGORIZED_DOT_ZOOM_FADE_EXPR: any = [
 		'case',
 		['boolean', ['get', 'isUncategorized'], false],
 		0,
-		[
-			'case',
-			['boolean', ['get', 'isCurated'], false],
-			0,
-			['case', ['boolean', ['feature-state', 'inConstellation'], true], 1, 0],
-		],
+			[
+				'case',
+				ORB_FADE_MARKER_FEATURE_EXPR,
+				0,
+				['case', ['boolean', ['feature-state', 'inConstellation'], true], 1, 0],
+			],
 	],
 	CURATED_DOT_FADE_START_ZOOM,
 	[
@@ -4896,12 +4995,12 @@ const CATEGORIZED_DOT_GLOW_ZOOM_FADE_EXPR: any = [
 		'case',
 		['boolean', ['get', 'isUncategorized'], false],
 		0,
-		[
-			'case',
-			['boolean', ['get', 'isCurated'], false],
-			0,
 			[
 				'case',
+				ORB_FADE_MARKER_FEATURE_EXPR,
+				0,
+				[
+					'case',
 				['boolean', ['feature-state', 'inConstellation'], true],
 				RESULT_DOT_GLOW_OPACITY,
 				0,
@@ -5577,6 +5676,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			})),
 		[curatedOrbSvgIdPrefix]
 	);
+	const selectedStateGradientIds = useMemo(
+		() => ({
+			gradient: `${curatedOrbSvgIdPrefix}-selected-state-gradient`,
+			bloomGradient: `${curatedOrbSvgIdPrefix}-selected-state-bloom-gradient`,
+			clipPath: `${curatedOrbSvgIdPrefix}-selected-state-clip`,
+		}),
+		[curatedOrbSvgIdPrefix]
+	);
 
 	const contactLightsTilesEnabled = useMemo(() => {
 		// Enabled by default (it's a lightweight raster overlay), but allow a
@@ -5886,6 +5993,16 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		Array<SVGRadialGradientElement | null>
 	>([]);
 	const curatedOrbClipPathRefs = useRef<Array<SVGPathElement | null>>([]);
+	const selectedStateGradientSvgRef = useRef<SVGSVGElement | null>(null);
+	const selectedStateGradientEllipseRef = useRef<SVGEllipseElement | null>(null);
+	const selectedStateGradientBloomEllipseRef = useRef<SVGEllipseElement | null>(null);
+	const selectedStateGradientRef = useRef<SVGRadialGradientElement | null>(null);
+	const selectedStateGradientBloomRef = useRef<SVGRadialGradientElement | null>(null);
+	const selectedStateGradientClipPathRef = useRef<SVGPathElement | null>(null);
+	const selectedStateMorphSourceRef = useRef<CuratedBlobMorphSource | null>(null);
+	const selectedStateDisplayMultiPolygonRef = useRef<ClippingMultiPolygon | null>(null);
+	const selectedStateLastMorphTAppliedRef = useRef<number>(Number.NaN);
+	const selectedStateOutlineSourceKeyRef = useRef<string>('');
 	const curatedBlobLngLatMultiPolygonRef = useRef<ClippingMultiPolygon | null>(null);
 	const curatedBlobLngLatShapeMultiPolygonsRef = useRef<ClippingMultiPolygon[]>([]);
 	// Source-of-truth for the blob outline morph: the natural smoothed cluster
@@ -5898,6 +6015,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	// update effect) can request a one-shot orb refresh after centroid changes
 	// without taking the callback as a dependency.
 	const applyCuratedOrbStateRef = useRef<(() => void) | null>(null);
+	const applySelectedStateGradientStateRef = useRef<(() => void) | null>(null);
 	const applyBlobMorphRef = useRef<(() => void) | null>(null);
 	const lastVisibleContactsKeyRef = useRef<string>('');
 	const usStatesPolygonsRef = useRef<PreparedClippingPolygon[] | null>(null);
@@ -6759,6 +6877,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	}, [map, isMapLoaded, updateCuratedBlobProtectedMarkerIds]);
 
 	const clearSearchedStateOutline = useCallback(() => {
+		selectedStateMorphSourceRef.current = null;
+		selectedStateDisplayMultiPolygonRef.current = null;
+		selectedStateLastMorphTAppliedRef.current = Number.NaN;
+		selectedStateOutlineSourceKeyRef.current = '';
 		if (!map || !isMapLoaded) return;
 		const source = map.getSource(MAPBOX_SOURCE_IDS.lockedOutline) as
 			| mapboxgl.GeoJSONSource
@@ -10494,10 +10616,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			computeMoodVisualNightT(nightTRef.current, weatherMoodConfigRef.current)
 		);
 
-		// Search-results outlines (blue + black) intentionally removed.
+			// Search-results outlines (blue + black) intentionally removed.
 
-		// Curated-search blob body — unioned regional circle-lobes, behind all dot/pin layers.
-		ensureLayer(
+			// Curated-search blob body — unioned regional circle-lobes, behind all dot/pin layers.
+			ensureLayer(
 			{
 				id: MAPBOX_LAYER_IDS.curatedBlobFill,
 				type: 'fill',
@@ -10549,14 +10671,32 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					0.75,
 					5,
 					5,
-				],
-				'line-blur': 0,
-			},
-		});
+					],
+					'line-blur': 0,
+				},
+			});
 
-		// Frozen per-search constellation linework — understated background geometry
-		// that sits behind the marker dots and never participates in hit testing.
-		ensureLayer({
+			// Locked searched-state border. This is Mapbox-owned, so contact marker
+			// layers render above it when they overlap the selected state's edge.
+			ensureLayer(
+				{
+					id: MAPBOX_LAYER_IDS.lockedOutline,
+					type: 'line',
+					source: MAPBOX_SOURCE_IDS.lockedOutline,
+					layout: { 'line-join': 'round', 'line-cap': 'round' },
+					paint: {
+						'line-color': '#FFFFFF',
+						'line-opacity': 0.98,
+						'line-width': buildLockedStateOutlineWidthExpr(),
+						'line-blur': 0,
+					},
+				},
+				MAPBOX_LAYER_IDS.markerConstellationGlow
+			);
+
+			// Frozen per-search constellation linework — understated background geometry
+			// that sits behind the marker dots and never participates in hit testing.
+			ensureLayer({
 			id: MAPBOX_LAYER_IDS.markerConstellationGlow,
 			type: 'line',
 			source: MAPBOX_SOURCE_IDS.markerConstellation,
@@ -10656,24 +10796,26 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			type: 'circle',
 			source: MAPBOX_SOURCE_IDS.markersAllOverlay,
 			paint: {
-				'circle-radius': allOverlayGlowRadiusExpr,
-				'circle-color': RESULT_DOT_GLOW_COLOR,
-				'circle-opacity': ALL_CONTACTS_DOT_GLOW_OPACITY,
-				'circle-blur': RESULT_DOT_GLOW_BLUR,
-				'circle-stroke-width': 0,
-			},
+					'circle-radius': allOverlayGlowRadiusExpr,
+					'circle-color': RESULT_DOT_GLOW_COLOR,
+					'circle-opacity': getSelectedStateOrbZoomFadedOpacity(
+						ALL_CONTACTS_DOT_GLOW_OPACITY
+					),
+					'circle-blur': RESULT_DOT_GLOW_BLUR,
+					'circle-stroke-width': 0,
+				},
 		});
 		ensureLayer({
 			id: MAPBOX_LAYER_IDS.markersAllDots,
 			type: 'circle',
 			source: MAPBOX_SOURCE_IDS.markersAllOverlay,
 			paint: {
-				'circle-radius': allOverlayRadiusExpr,
-				'circle-color': ['get', 'fillColor'],
-				'circle-opacity': 1,
-				'circle-stroke-color': resultDotStrokeColorExpr,
-				'circle-stroke-width': allOverlaySelectedStrokeExpr,
-			},
+					'circle-radius': allOverlayRadiusExpr,
+					'circle-color': ['get', 'fillColor'],
+					'circle-opacity': getSelectedStateOrbZoomFadedOpacity(1),
+					'circle-stroke-color': resultDotStrokeColorExpr,
+					'circle-stroke-width': allOverlaySelectedStrokeExpr,
+				},
 		});
 
 		// Promotion overlay pins (outside locked state / no locked state) — behind primary dots
@@ -10707,11 +10849,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				'icon-image': ['get', 'iconDefault'],
 				'icon-size': pinIconSizeExpr,
 				'icon-anchor': 'top-left',
-				'icon-offset': [-MAP_MARKER_PIN_CIRCLE_CENTER_X, -MAP_MARKER_PIN_CIRCLE_CENTER_Y],
-				'icon-allow-overlap': true,
-				'icon-ignore-placement': true,
-			},
-		});
+					'icon-offset': [-MAP_MARKER_PIN_CIRCLE_CENTER_X, -MAP_MARKER_PIN_CIRCLE_CENTER_Y],
+					'icon-allow-overlap': true,
+					'icon-ignore-placement': true,
+				},
+				paint: {
+					'icon-opacity': getSelectedStateOrbZoomFadedOpacity(1),
+				},
+			});
 
 		// Booking extra pins — behind primary dots
 		// The circle layer doubles as hit area AND visual ring for selection.
@@ -10744,11 +10889,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				'icon-image': ['get', 'iconDefault'],
 				'icon-size': pinIconSizeExpr,
 				'icon-anchor': 'top-left',
-				'icon-offset': [-MAP_MARKER_PIN_CIRCLE_CENTER_X, -MAP_MARKER_PIN_CIRCLE_CENTER_Y],
-				'icon-allow-overlap': true,
-				'icon-ignore-placement': true,
-			},
-		});
+					'icon-offset': [-MAP_MARKER_PIN_CIRCLE_CENTER_X, -MAP_MARKER_PIN_CIRCLE_CENTER_Y],
+					'icon-allow-overlap': true,
+					'icon-ignore-placement': true,
+				},
+				paint: {
+					'icon-opacity': getSelectedStateOrbZoomFadedOpacity(1),
+				},
+			});
 
 		ensureLayer({
 			id: MAPBOX_LAYER_IDS.bookingPinIconsHover,
@@ -10759,11 +10907,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				'icon-image': ['get', 'iconHover'],
 				'icon-size': pinIconSizeExpr,
 				'icon-anchor': 'top-left',
-				'icon-offset': [-MAP_MARKER_PIN_CIRCLE_CENTER_X, -MAP_MARKER_PIN_CIRCLE_CENTER_Y],
-				'icon-allow-overlap': true,
-				'icon-ignore-placement': true,
-			},
-		});
+					'icon-offset': [-MAP_MARKER_PIN_CIRCLE_CENTER_X, -MAP_MARKER_PIN_CIRCLE_CENTER_Y],
+					'icon-allow-overlap': true,
+					'icon-ignore-placement': true,
+				},
+				paint: {
+					'icon-opacity': getSelectedStateOrbZoomFadedOpacity(1),
+				},
+			});
 
 		// Promotion overlay dots (inside locked state) — below primary dots
 		ensureLayer({
@@ -10781,24 +10932,26 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			type: 'circle',
 			source: MAPBOX_SOURCE_IDS.markersPromotionDot,
 			paint: {
-				'circle-radius': resultDotGlowRadiusExpr,
-				'circle-color': RESULT_DOT_GLOW_COLOR,
-				'circle-opacity': RESULT_DOT_GLOW_OPACITY,
-				'circle-blur': RESULT_DOT_GLOW_BLUR,
-				'circle-stroke-width': 0,
-			},
+					'circle-radius': resultDotGlowRadiusExpr,
+					'circle-color': RESULT_DOT_GLOW_COLOR,
+					'circle-opacity': getSelectedStateOrbZoomFadedOpacity(
+						RESULT_DOT_GLOW_OPACITY
+					),
+					'circle-blur': RESULT_DOT_GLOW_BLUR,
+					'circle-stroke-width': 0,
+				},
 		});
 		ensureLayer({
 			id: MAPBOX_LAYER_IDS.promotionDotDots,
 			type: 'circle',
 			source: MAPBOX_SOURCE_IDS.markersPromotionDot,
 			paint: {
-				'circle-radius': resultDotRadiusExpr,
-				'circle-color': ['get', 'fillColor'],
-				'circle-opacity': 1,
-				'circle-stroke-color': resultDotStrokeColorExpr,
-				'circle-stroke-width': resultDotSelectedStrokeExpr,
-			},
+					'circle-radius': resultDotRadiusExpr,
+					'circle-color': ['get', 'fillColor'],
+					'circle-opacity': getSelectedStateOrbZoomFadedOpacity(1),
+					'circle-stroke-color': resultDotStrokeColorExpr,
+					'circle-stroke-width': resultDotSelectedStrokeExpr,
+				},
 		});
 
 		// Primary result dots — top marker priority
@@ -13203,8 +13356,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		selectedAreaBounds,
 	]);
 
-	// Draw a black outline around the searched/locked state (even when state interactions are off).
-	// When state interactions are enabled, our interactive borders layer renders the selected state border.
+	// Track the searched/locked state polygon for marker styling and the clipped state overlay.
 	useEffect(() => {
 		if (!map || !isMapLoaded || !isStateLayerReady) return;
 
@@ -13214,6 +13366,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			lockedStateSelectionMultiPolygonRef.current = null;
 			lockedStateSelectionBboxRef.current = null;
 			lockedStateSelectionKeyRef.current = null;
+			selectedStateMorphSourceRef.current = null;
+			selectedStateDisplayMultiPolygonRef.current = null;
+			selectedStateLastMorphTAppliedRef.current = Number.NaN;
+			selectedStateOutlineSourceKeyRef.current = '';
+			applySelectedStateGradientStateRef.current?.();
 			recomputeViewportDots(map);
 			return;
 		}
@@ -13223,28 +13380,42 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			lockedStateSelectionMultiPolygonRef.current = null;
 			lockedStateSelectionBboxRef.current = null;
 			lockedStateSelectionKeyRef.current = null;
+			selectedStateMorphSourceRef.current = null;
+			selectedStateDisplayMultiPolygonRef.current = null;
+			selectedStateLastMorphTAppliedRef.current = Number.NaN;
+			selectedStateOutlineSourceKeyRef.current = '';
+			applySelectedStateGradientStateRef.current?.();
 			recomputeViewportDots(map);
 			return;
 		}
 
 		const found = usStatesByKeyRef.current.get(lockedStateKey)?.multiPolygon ?? null;
+		if (!found) {
+			clearSearchedStateOutline();
+			lockedStateSelectionMultiPolygonRef.current = null;
+			lockedStateSelectionBboxRef.current = null;
+			lockedStateSelectionKeyRef.current = null;
+			selectedStateMorphSourceRef.current = null;
+			selectedStateDisplayMultiPolygonRef.current = null;
+			selectedStateLastMorphTAppliedRef.current = Number.NaN;
+			selectedStateOutlineSourceKeyRef.current = '';
+			applySelectedStateGradientStateRef.current?.();
+			recomputeViewportDots(map);
+			return;
+		}
 
 		// Store polygon selection for marker "inside/outside" styling (even if we don't draw the outline).
 		lockedStateSelectionMultiPolygonRef.current = found;
 		lockedStateSelectionBboxRef.current = found ? bboxFromMultiPolygon(found) : null;
 		lockedStateSelectionKeyRef.current = lockedStateKey;
+		selectedStateMorphSourceRef.current = createSelectedStateMorphSource(found);
+		selectedStateDisplayMultiPolygonRef.current = null;
+		selectedStateLastMorphTAppliedRef.current = Number.NaN;
+		selectedStateOutlineSourceKeyRef.current = '';
 		// The locked-state polygon is stored in refs (no rerender) — force a marker recompute
 		// so low-zoom bias toward the locked state applies immediately.
 		recomputeViewportDots(map);
-
-		clearSearchedStateOutline();
-		if (stateInteractionsEnabled || !found) return;
-
-		const outlineFc = createOutlineGeoJsonFromMultiPolygon(found);
-		const source = map.getSource(MAPBOX_SOURCE_IDS.lockedOutline) as
-			| mapboxgl.GeoJSONSource
-			| undefined;
-		source?.setData(outlineFc as any);
+		applySelectedStateGradientStateRef.current?.();
 	}, [
 		map,
 		isMapLoaded,
@@ -14689,6 +14860,209 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		applyStateOverlayOpacity,
 	]);
 
+	const getSelectedStateDisplayMultiPolygon = useCallback(
+		(mapInstance: mapboxgl.Map): ClippingMultiPolygon | null => {
+			const selection = lockedStateSelectionMultiPolygonRef.current;
+			if (!selection?.length) return null;
+
+			const zoom = mapInstance.getZoom() ?? MAP_DEFAULT_ZOOM;
+			const t = computeCuratedOrbT(zoom);
+			const morphSource = selectedStateMorphSourceRef.current;
+			const shouldUseCircleMorph = Boolean(morphSource && t > 0.001);
+
+			let displayMultiPolygon: ClippingMultiPolygon | null = null;
+			if (!shouldUseCircleMorph) {
+				displayMultiPolygon = selection;
+			} else if (
+				Number.isFinite(selectedStateLastMorphTAppliedRef.current) &&
+				Math.abs(t - selectedStateLastMorphTAppliedRef.current) < 0.001 &&
+				selectedStateDisplayMultiPolygonRef.current
+			) {
+				displayMultiPolygon = selectedStateDisplayMultiPolygonRef.current;
+			} else if (morphSource) {
+				displayMultiPolygon = morphCuratedBlobSourceToLngLat(morphSource, t);
+				selectedStateDisplayMultiPolygonRef.current = displayMultiPolygon;
+				selectedStateLastMorphTAppliedRef.current = t;
+			}
+
+			if (!displayMultiPolygon?.length) return null;
+
+			const source = mapInstance.getSource(MAPBOX_SOURCE_IDS.lockedOutline) as
+				| mapboxgl.GeoJSONSource
+				| undefined;
+			const outlineKey = `${selectedStateKeyRef.current ?? ''}:${
+				shouldUseCircleMorph ? t.toFixed(3) : 'state'
+			}`;
+			if (source && selectedStateOutlineSourceKeyRef.current !== outlineKey) {
+				selectedStateOutlineSourceKeyRef.current = outlineKey;
+				source.setData(
+					createOutlineGeoJsonFromMultiPolygon(displayMultiPolygon) as any
+				);
+			}
+
+			return displayMultiPolygon;
+		},
+		[]
+	);
+
+	const applySelectedStateGradientState = useCallback(() => {
+		const m = mapRef.current;
+		const overlay = selectedStateGradientSvgRef.current;
+		if (!overlay) return;
+
+		const ellipse = selectedStateGradientEllipseRef.current;
+		const bloomEllipse = selectedStateGradientBloomEllipseRef.current;
+		const gradient = selectedStateGradientRef.current;
+		const bloomGradient = selectedStateGradientBloomRef.current;
+		const clipPath = selectedStateGradientClipPathRef.current;
+
+		const hide = () => {
+			overlay.style.opacity = '0';
+			clipPath?.setAttribute('d', '');
+			ellipse?.setAttribute('opacity', '0');
+			bloomEllipse?.setAttribute('opacity', '0');
+		};
+
+		if (
+			!m ||
+			!ellipse ||
+			!bloomEllipse ||
+			!gradient ||
+			!bloomGradient ||
+			!clipPath
+		) {
+			hide();
+			return;
+		}
+
+		if (presentationRef.current === 'background' || isLoadingRef.current) {
+			hide();
+			return;
+		}
+
+		const selectedKey = selectedStateKeyRef.current;
+		const lockedKey = lockedStateSelectionKeyRef.current;
+		const selection = lockedStateSelectionMultiPolygonRef.current;
+		if (!selectedKey || selectedKey !== lockedKey || !selection?.length) {
+			hide();
+			return;
+		}
+
+		const displayMultiPolygon = getSelectedStateDisplayMultiPolygon(m);
+		if (!displayMultiPolygon?.length) {
+			hide();
+			return;
+		}
+
+		const projectedClip = buildScreenPathFromLngLatMultiPolygon(m, displayMultiPolygon);
+		if (!projectedClip) {
+			hide();
+			return;
+		}
+
+		const width = projectedClip.maxX - projectedClip.minX;
+		const height = projectedClip.maxY - projectedClip.minY;
+		if (
+			!Number.isFinite(width) ||
+			!Number.isFinite(height) ||
+			width <= 0 ||
+			height <= 0
+		) {
+			hide();
+			return;
+		}
+
+		const zoom = m.getZoom() ?? MAP_DEFAULT_ZOOM;
+		const morphSource = selectedStateMorphSourceRef.current;
+		const bbox = lockedStateSelectionBboxRef.current;
+		const stateCenter =
+			morphSource?.center ??
+			(bbox
+				? {
+						lat: (bbox.minLat + bbox.maxLat) / 2,
+						lng: (bbox.minLng + bbox.maxLng) / 2,
+				  }
+				: null);
+		const frontHemisphereOpacity = computeGlobeFrontHemisphereOpacity(
+			m,
+			stateCenter,
+			morphSource?.radiusKm ?? null,
+			zoom
+		);
+		if (frontHemisphereOpacity <= 0.006) {
+			hide();
+			return;
+		}
+		const bloomT = computeCuratedOrbT(zoom);
+		const colorOpacity =
+			SELECTED_STATE_GRADIENT_COLOR_OPACITY * (1 - bloomT) * frontHemisphereOpacity;
+		const bloomOpacity =
+			SELECTED_STATE_GRADIENT_BLOOM_OPACITY * bloomT * frontHemisphereOpacity;
+
+		const halfWidth = width / 2;
+		const halfHeight = height / 2;
+		const centerX = projectedClip.minX + halfWidth;
+		const centerY = projectedClip.minY + halfHeight;
+		const bloomRadius = Math.max(halfWidth, halfHeight);
+
+		ellipse.setAttribute('cx', centerX.toFixed(2));
+		ellipse.setAttribute('cy', centerY.toFixed(2));
+		bloomEllipse.setAttribute('cx', centerX.toFixed(2));
+		bloomEllipse.setAttribute('cy', centerY.toFixed(2));
+		ellipse.setAttribute(
+			'rx',
+			(halfWidth * CURATED_ORB_ELLIPSE_RX_RATIO).toFixed(2)
+		);
+		ellipse.setAttribute(
+			'ry',
+			(halfHeight * CURATED_ORB_ELLIPSE_RY_RATIO).toFixed(2)
+		);
+		bloomEllipse.setAttribute('rx', bloomRadius.toFixed(2));
+		bloomEllipse.setAttribute('ry', bloomRadius.toFixed(2));
+		gradient.setAttribute(
+			'gradientTransform',
+			`translate(${centerX.toFixed(2)} ${centerY.toFixed(2)}) rotate(${CURATED_ORB_GRADIENT_ROTATION_DEG}) scale(${(
+				halfWidth * CURATED_ORB_GRADIENT_SCALE_X_RATIO
+			).toFixed(2)} ${(halfHeight * CURATED_ORB_GRADIENT_SCALE_Y_RATIO).toFixed(2)})`
+		);
+		bloomGradient.setAttribute(
+			'gradientTransform',
+			`translate(${centerX.toFixed(2)} ${centerY.toFixed(2)}) scale(${bloomRadius.toFixed(2)})`
+		);
+		clipPath.setAttribute('d', projectedClip.d);
+		ellipse.setAttribute(
+			'opacity',
+			colorOpacity.toFixed(3)
+		);
+		bloomEllipse.setAttribute(
+			'opacity',
+			bloomOpacity.toFixed(3)
+		);
+		overlay.style.opacity = '1';
+	}, [getSelectedStateDisplayMultiPolygon]);
+	applySelectedStateGradientStateRef.current = applySelectedStateGradientState;
+
+	useEffect(() => {
+		if (!map) return;
+		if (!isMapLoaded) return;
+
+		applySelectedStateGradientState();
+		map.on('render', applySelectedStateGradientState);
+		return () => {
+			map.off('render', applySelectedStateGradientState);
+		};
+	}, [map, isMapLoaded, applySelectedStateGradientState]);
+
+	useEffect(() => {
+		applySelectedStateGradientState();
+	}, [
+		applySelectedStateGradientState,
+		presentation,
+		isLoading,
+		lockedStateKey,
+		isStateLayerReady,
+	]);
+
 	// Re-apply the night palette when zoom changes so the "zoomed in" view can be
 	// slightly brighter without changing the low-zoom globe read.
 	useEffect(() => {
@@ -15699,18 +16073,22 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			return;
 		}
 
-		const hasLockedStateSelection = Boolean(
-			lockedStateKey && lockedStateSelectionKeyRef.current === lockedStateKey
-		);
+			const hasLockedStateSelection = Boolean(
+				lockedStateKey && lockedStateSelectionKeyRef.current === lockedStateKey
+			);
+			const fadeWithSelectedStateOrb = Boolean(
+				hasLockedStateSelection && selectedStateMorphSourceRef.current
+			);
 
-		type DotSeed = {
-			id: number;
-			lng: number;
-			lat: number;
-			fillColor: string;
-			isCurated: boolean;
-			isUncategorized: boolean;
-		};
+			type DotSeed = {
+				id: number;
+				lng: number;
+				lat: number;
+				fillColor: string;
+				isCurated: boolean;
+				isUncategorized: boolean;
+				fadeWithSelectedStateOrb: boolean;
+			};
 		const dots: DotSeed[] = [];
 		let minLng = Number.POSITIVE_INFINITY;
 		let maxLng = Number.NEGATIVE_INFINITY;
@@ -15740,10 +16118,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				id: contact.id,
 				lng: coords.lng,
 				lat: coords.lat,
-				fillColor,
-				isCurated: Boolean(contact.curatedCategory),
-				isUncategorized,
-			});
+					fillColor,
+					isCurated: Boolean(contact.curatedCategory),
+					isUncategorized,
+					fadeWithSelectedStateOrb,
+				});
 			minLng = Math.min(minLng, coords.lng);
 			maxLng = Math.max(maxLng, coords.lng);
 			minLat = Math.min(minLat, coords.lat);
@@ -15778,9 +16157,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				(i > 0 ? ',' : '') +
 				d.id +
 				':' +
-				d.fillColor +
-				':' +
-				(d.isUncategorized ? 'u' : 'c');
+					d.fillColor +
+					':' +
+					(d.isUncategorized ? 'u' : 'c') +
+					':' +
+					(d.fadeWithSelectedStateOrb ? 'f' : 'n');
 		}
 		if (dataKey === baseDotsLastDataKeyRef.current) {
 			return;
@@ -15817,11 +16198,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				id: dot.id,
 				properties: {
 					fillColor: dot.fillColor,
-					[DOT_WAVE_DELAY_PROP]: delayMs,
-					isCurated: dot.isCurated,
-					isUncategorized: dot.isUncategorized,
-					fallbackIcon: dot.isUncategorized ? uncategorizedContactMarkerImageName : '',
-				},
+						[DOT_WAVE_DELAY_PROP]: delayMs,
+						isCurated: dot.isCurated,
+						isUncategorized: dot.isUncategorized,
+						fadeWithSelectedStateOrb: dot.fadeWithSelectedStateOrb,
+						fallbackIcon: dot.isUncategorized ? uncategorizedContactMarkerImageName : '',
+					},
 				geometry: { type: 'Point', coordinates: [dot.lng, dot.lat] },
 			};
 		});
@@ -16611,28 +16993,38 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		if (isLoading) {
 			// Preserve existing overlay dots while parent data is refetching.
 			return;
-		}
+			}
 
-		const features: any[] = [];
-		for (const contact of allContactsOverlayVisibleContacts) {
-			const coords = getAllContactsOverlayContactCoords(contact);
-			if (!coords) continue;
-			features.push({
-				type: 'Feature',
-				id: contact.id,
-				properties: { fillColor: ALL_CONTACTS_OVERLAY_DOT_FILL_COLOR },
-				geometry: { type: 'Point', coordinates: [coords.lng, coords.lat] },
-			});
-		}
+			const fadeWithSelectedStateOrb = Boolean(
+				lockedStateKey &&
+					lockedStateSelectionKeyRef.current === lockedStateKey &&
+					selectedStateMorphSourceRef.current
+			);
+			const features: any[] = [];
+			for (const contact of allContactsOverlayVisibleContacts) {
+				const coords = getAllContactsOverlayContactCoords(contact);
+				if (!coords) continue;
+				features.push({
+					type: 'Feature',
+					id: contact.id,
+					properties: {
+						fillColor: ALL_CONTACTS_OVERLAY_DOT_FILL_COLOR,
+						fadeWithSelectedStateOrb,
+					},
+					geometry: { type: 'Point', coordinates: [coords.lng, coords.lat] },
+				});
+			}
 
 		source.setData({ type: 'FeatureCollection', features } as any);
 	}, [
 		map,
 		isMapLoaded,
 		isLoading,
-		allContactsOverlayVisibleContacts,
-		getAllContactsOverlayContactCoords,
-	]);
+			allContactsOverlayVisibleContacts,
+			getAllContactsOverlayContactCoords,
+			lockedStateKey,
+			isStateLayerReady,
+		]);
 
 	// Promotion overlay: split into in-state dots vs out-of-state pins
 	useEffect(() => {
@@ -16653,9 +17045,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		let cancelled = false;
 
 		const run = async () => {
-			const hasLockedStateSelection = Boolean(
-				lockedStateKey && lockedStateSelectionKeyRef.current === lockedStateKey
-			);
+				const hasLockedStateSelection = Boolean(
+					lockedStateKey && lockedStateSelectionKeyRef.current === lockedStateKey
+				);
+				const fadeWithSelectedStateOrb = Boolean(
+					hasLockedStateSelection && selectedStateMorphSourceRef.current
+				);
 
 			const dotFeatures: any[] = [];
 			const pinFeatures: any[] = [];
@@ -16683,12 +17078,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 				if (!shouldUsePinStyle) {
 					dotIds.add(contact.id);
-					dotFeatures.push({
-						type: 'Feature',
-						id: contact.id,
-						properties: { fillColor: dotFillColor },
-						geometry: { type: 'Point', coordinates: [coords.lng, coords.lat] },
-					});
+						dotFeatures.push({
+							type: 'Feature',
+							id: contact.id,
+							properties: { fillColor: dotFillColor, fadeWithSelectedStateOrb },
+							geometry: { type: 'Point', coordinates: [coords.lng, coords.lat] },
+						});
 					continue;
 				}
 
@@ -16708,12 +17103,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				imagesToEnsure.set(iconDefault, defaultUrl);
 				imagesToEnsure.set(iconSelected, selectedUrl);
 
-				pinFeatures.push({
-					type: 'Feature',
-					id: contact.id,
-					properties: { iconDefault, iconSelected },
-					geometry: { type: 'Point', coordinates: [coords.lng, coords.lat] },
-				});
+					pinFeatures.push({
+						type: 'Feature',
+						id: contact.id,
+						properties: { iconDefault, iconSelected, fadeWithSelectedStateOrb },
+						geometry: { type: 'Point', coordinates: [coords.lng, coords.lat] },
+					});
 			}
 
 			await Promise.all(
@@ -16765,9 +17160,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		let cancelled = false;
 
 		const run = async () => {
-			const hasLockedStateSelection = Boolean(
-				lockedStateKey && lockedStateSelectionKeyRef.current === lockedStateKey
-			);
+				const hasLockedStateSelection = Boolean(
+					lockedStateKey && lockedStateSelectionKeyRef.current === lockedStateKey
+				);
+				const fadeWithSelectedStateOrb = Boolean(
+					hasLockedStateSelection && selectedStateMorphSourceRef.current
+				);
 
 			const features: any[] = [];
 			const imagesToEnsure = new Map<string, string>(); // name -> url
@@ -16817,12 +17215,13 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				features.push({
 					type: 'Feature',
 					id: contact.id,
-					properties: {
-						iconDefault,
-						iconHover,
-						iconSelected,
-						category: whatForMarker ?? '',
-					},
+						properties: {
+							iconDefault,
+							iconHover,
+							iconSelected,
+							category: whatForMarker ?? '',
+							fadeWithSelectedStateOrb,
+						},
 					geometry: { type: 'Point', coordinates: [coords.lng, coords.lat] },
 				});
 			}
@@ -17130,6 +17529,89 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				`}</style>
 			)}
 			<div ref={mapContainerRef} style={{ width: '100%', height: '100%' }} />
+			{/*
+			  Selected state wash. This reuses the curated blob gradient language,
+			  but clips it to the searched state's projected polygon. The white
+			  border is a Mapbox layer so markers always render above it.
+			*/}
+			<svg
+				ref={selectedStateGradientSvgRef}
+				aria-hidden
+				width="100%"
+				height="100%"
+				style={{
+					position: 'absolute',
+					inset: 0,
+					pointerEvents: 'none',
+					opacity: 0,
+					willChange: 'opacity',
+					zIndex: 2,
+					overflow: 'visible',
+				}}
+			>
+				<defs>
+					<radialGradient
+						ref={selectedStateGradientRef}
+						id={selectedStateGradientIds.gradient}
+						cx="0"
+						cy="0"
+						r="1"
+						gradientUnits="userSpaceOnUse"
+					>
+						<stop offset="0.716346" stopColor="#EFE8D8" stopOpacity="0" />
+						<stop offset="0.783654" stopColor="#FFF8E5" stopOpacity="0.55" />
+						<stop offset="0.841346" stopColor="#CAD7FF" />
+						<stop offset="0.884615" stopColor="#CBFFE7" />
+						<stop offset="1" stopColor="#F0EBDE" stopOpacity="0.2" />
+					</radialGradient>
+					<radialGradient
+						ref={selectedStateGradientBloomRef}
+						id={selectedStateGradientIds.bloomGradient}
+						cx="0"
+						cy="0"
+						r="1"
+						gradientUnits="userSpaceOnUse"
+					>
+						<stop offset="0" stopColor="#FFFFFF" stopOpacity="0.95" />
+						<stop offset="0.14" stopColor="#FFFFFF" stopOpacity="0.7" />
+						<stop offset="0.36" stopColor="#FFFFFF" stopOpacity="0.4" />
+						<stop offset="0.6" stopColor="#FFFFFF" stopOpacity="0.18" />
+						<stop offset="0.8" stopColor="#FFFFFF" stopOpacity="0.06" />
+						<stop offset="0.92" stopColor="#FFFFFF" stopOpacity="0" />
+					</radialGradient>
+					<clipPath
+						id={selectedStateGradientIds.clipPath}
+						clipPathUnits="userSpaceOnUse"
+					>
+						<path
+							ref={selectedStateGradientClipPathRef}
+							d=""
+							clipRule="evenodd"
+						/>
+					</clipPath>
+				</defs>
+				<ellipse
+					ref={selectedStateGradientBloomEllipseRef}
+					cx="0"
+					cy="0"
+					rx="0"
+					ry="0"
+					opacity="0"
+					fill={`url(#${selectedStateGradientIds.bloomGradient})`}
+					clipPath={`url(#${selectedStateGradientIds.clipPath})`}
+				/>
+				<ellipse
+					ref={selectedStateGradientEllipseRef}
+					cx="0"
+					cy="0"
+					rx="0"
+					ry="0"
+					opacity="0"
+					fill={`url(#${selectedStateGradientIds.gradient})`}
+					clipPath={`url(#${selectedStateGradientIds.clipPath})`}
+					style={{ mixBlendMode: 'color' }}
+				/>
+			</svg>
 			{/*
 			  Curated cluster zoom-out orbs. Each SVG ellipse paints its own
 			  radial gradient, while the clip paths are rebuilt from the same
