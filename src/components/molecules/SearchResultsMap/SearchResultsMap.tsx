@@ -440,6 +440,72 @@ import {
 	defaultCenter,
 	stateBadgeColorMap,
 } from './constants';
+import {
+	absRingArea,
+	bboxFromMultiPolygon,
+	boundsToPolygonFeatureCollection,
+	closeRing,
+	createOutlineGeoJsonFromMultiPolygon,
+	geoJsonGeometryToClippingMultiPolygon,
+	geoJsonPolygonToClippingPolygon,
+	geoJsonRingToClippingRing,
+	isLatLngInBbox,
+} from './geometry';
+import {
+	angularLngDistanceDeg,
+	clamp,
+	degreesToRadians,
+	easeInOutCubic,
+	lerp,
+	mapboxEaseOutCubic,
+	normalizeLngDeg,
+	smoothstep,
+} from './math';
+import {
+	formatCssColor,
+	hashStringToStableKey,
+	mixCssColorString,
+	mixCssRgb,
+	parseCssColor,
+	parseHexColor,
+	toHexByte,
+	washOutHexColor,
+} from './color';
+import {
+	coerceFiniteNumber,
+	computeGlobeFrontHemisphereOpacity,
+	coordinateKey,
+	getLatLngFromContact,
+	jitterDuplicateCoords,
+	latLngToGlobeUnitVector,
+} from './coordinates';
+import {
+	getStateAbbreviation,
+	normalizeStateKey,
+	parseMetadataSections,
+} from './metadata';
+import {
+	WHAT_TO_HOVER_TOOLTIP_FILL_COLOR,
+	WHAT_TO_RESULT_DOT_COLOR,
+	WINE_BEER_SPIRITS_BOOKING_PREFIX_KEYS,
+	WINE_BEER_SPIRITS_WHAT_KEY,
+	bookingTitlePrefixMatchesSearchWhatKey,
+	extractSearchModeFromQueryPrefix,
+	getBookingTitlePrefixFromContactTitle,
+	getLockedStateMarkerShareForZoom,
+	getPromotionOverlayWhatFromContactTitle,
+	getResultDotColorForWhat,
+	getResultDotScaleForZoom,
+	getResultDotStrokeWeightForZoom,
+	getResultDotTForZoom,
+	inferSearchModeFromSearchWhat,
+	isPromotionOverlayListTitle,
+	normalizeWhatKey,
+	scaleMapboxOpacityExpr,
+	startsWithCaseInsensitive,
+	withCategorizedDotOpacity,
+	withResultDotGlowOpacity,
+} from './searchMode';
 
 // Re-export externally-consumed constants for callers that import from this file
 // (e.g. dashboard/page.tsx). The values themselves now live in `./constants`.
@@ -447,91 +513,6 @@ export {
 	DASHBOARD_TO_INTERACTIVE_TRANSITION_CSS_EASING,
 	DASHBOARD_TO_INTERACTIVE_TRANSITION_MS,
 } from './constants';
-
-const closeRing = (ring: ClippingRing): ClippingRing => {
-	if (ring.length === 0) return ring;
-	const first = ring[0];
-	const last = ring[ring.length - 1];
-	if (first[0] === last[0] && first[1] === last[1]) return ring;
-	return [...ring, first];
-};
-
-const absRingArea = (ring: ClippingRing): number => {
-	if (ring.length < 3) return 0;
-	let area2 = 0;
-	for (let i = 0; i < ring.length; i++) {
-		const [x1, y1] = ring[i];
-		const [x2, y2] = ring[(i + 1) % ring.length];
-		area2 += x1 * y2 - x2 * y1;
-	}
-	return Math.abs(area2 / 2);
-};
-
-const createOutlineGeoJsonFromMultiPolygon = (
-	multiPolygon: ClippingMultiPolygon
-): OutlinePolygonFeatureCollection => {
-	const features: OutlinePolygonFeatureCollection['features'] = [];
-	for (const clippingPolygon of multiPolygon) {
-		if (!clippingPolygon?.length) continue;
-
-		const outerRing = clippingPolygon.reduce<ClippingRing | null>((best, ring) => {
-			if (!ring?.length) return best;
-			if (!best) return ring;
-			return absRingArea(ring) > absRingArea(best) ? ring : best;
-		}, null);
-
-		if (!outerRing) continue;
-
-		const coords = closeRing(
-			outerRing.filter(([lng, lat]) => Number.isFinite(lng) && Number.isFinite(lat))
-		);
-		if (coords.length < 4) continue;
-
-		features.push({
-			type: 'Feature',
-			properties: {},
-			geometry: {
-				type: 'Polygon',
-				coordinates: [coords.map(([lng, lat]) => [lng, lat])],
-			},
-		});
-	}
-	return { type: 'FeatureCollection', features };
-};
-
-const geoJsonRingToClippingRing = (ring: number[][]): ClippingRing => {
-	const coords = ring
-		.map((pair): ClippingCoord => [pair?.[0] as number, pair?.[1] as number])
-		.filter(([lng, lat]) => Number.isFinite(lng) && Number.isFinite(lat));
-	if (coords.length < 3) return [];
-	return closeRing(coords);
-};
-
-const geoJsonPolygonToClippingPolygon = (
-	polygonCoords: number[][][]
-): ClippingPolygon => {
-	const rings = (polygonCoords ?? [])
-		.map((ring) => geoJsonRingToClippingRing(ring))
-		.filter((ring) => ring.length >= 4);
-	return rings;
-};
-
-const geoJsonGeometryToClippingMultiPolygon = (
-	geometry: GeoJsonGeometry | null | undefined
-): ClippingMultiPolygon | null => {
-	if (!geometry) return null;
-	if (geometry.type === 'Polygon') {
-		const poly = geoJsonPolygonToClippingPolygon(geometry.coordinates);
-		return poly.length ? [poly] : null;
-	}
-	if (geometry.type === 'MultiPolygon') {
-		const polys = (geometry.coordinates ?? [])
-			.map((polyCoords) => geoJsonPolygonToClippingPolygon(polyCoords))
-			.filter((poly) => poly.length);
-		return polys.length ? polys : null;
-	}
-	return null;
-};
 
 const computeCuratedOrbT = (zoom: number) => {
 	if (zoom >= CURATED_ORB_TRANSITION_START_ZOOM) return 0;
@@ -1316,182 +1297,8 @@ const buildScreenPathFromLngLatMultiPolygon = (
 	return { d, minX, minY, maxX, maxY };
 };
 
-const boundsToPolygonFeatureCollection = (
-	bounds: MapSelectionBounds,
-	properties: Record<string, unknown> = {}
-): OutlinePolygonFeatureCollection => {
-	const ring: number[][] = [
-		[bounds.west, bounds.south],
-		[bounds.east, bounds.south],
-		[bounds.east, bounds.north],
-		[bounds.west, bounds.north],
-		[bounds.west, bounds.south],
-	];
-	return {
-		type: 'FeatureCollection',
-		features: [
-			{
-				type: 'Feature',
-				properties,
-				geometry: { type: 'Polygon', coordinates: [ring] },
-			},
-		],
-	};
-};
-
-const coerceFiniteNumber = (value: unknown): number | null => {
-	if (value == null) return null;
-	if (typeof value === 'number') return Number.isFinite(value) ? value : null;
-	if (typeof value === 'string') {
-		const trimmed = value.trim();
-		if (!trimmed) return null;
-		// Handle common "decimal comma" formats (e.g. "39,1234")
-		const normalized =
-			trimmed.includes(',') && !trimmed.includes('.')
-				? trimmed.replace(',', '.')
-				: trimmed;
-		const n = Number(normalized);
-		return Number.isFinite(n) ? n : null;
-	}
-
-	// Prisma can sometimes surface numeric-like objects; Number(...) is a safe coercion attempt.
-	const n = Number((value as { valueOf?: () => unknown })?.valueOf?.() ?? value);
-	return Number.isFinite(n) ? n : null;
-};
-
-const getLatLngFromContact = (contact: ContactWithName): LatLngLiteral | null => {
-	const anyContact = contact as unknown as Record<string, unknown>;
-	const lat = coerceFiniteNumber(
-		anyContact.latitude ?? anyContact.lat ?? anyContact.Latitude ?? anyContact.LATITUDE
-	);
-	const lng = coerceFiniteNumber(
-		anyContact.longitude ??
-			anyContact.lng ??
-			anyContact.lon ??
-			anyContact.Longitude ??
-			anyContact.LONGITUDE
-	);
-
-	if (lat == null || lng == null) return null;
-	// Treat (0,0) as "unknown" coordinates (common placeholder) to avoid the map jumping to Africa.
-	// This product is US-focused; a true (0,0) contact would be in the Gulf of Guinea.
-	if (Math.abs(lat) < 1e-9 && Math.abs(lng) < 1e-9) return null;
-	// Defensive sanity bounds: out-of-range coords render unpredictably.
-	if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
-	return { lat, lng };
-};
-
-const coordinateKey = (coords: LatLngLiteral) =>
-	`${coords.lat.toFixed(5)},${coords.lng.toFixed(5)}`;
-
-// Deterministic "spiderfy" offset for exact/near-exact duplicate coordinates so markers don't fully overlap.
-const jitterDuplicateCoords = (base: LatLngLiteral, index: number): LatLngLiteral => {
-	const angle = index * GOLDEN_ANGLE;
-	const radius = DUPLICATE_JITTER_BASE_DEG * Math.sqrt(index);
-	const dx = radius * Math.cos(angle);
-	const dy = radius * Math.sin(angle);
-	const latRad = (base.lat * Math.PI) / 180;
-	const lngScale = Math.max(0.2, Math.cos(latRad));
-	return {
-		lat: base.lat + dy,
-		lng: base.lng + dx / lngScale,
-	};
-};
-
-const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n));
-const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
-const smoothstep = (edge0: number, edge1: number, x: number) => {
-	const t = clamp((x - edge0) / (edge1 - edge0), 0, 1);
-	return t * t * (3 - 2 * t);
-};
-const normalizeLngDeg = (lng: number) => ((((lng + 180) % 360) + 360) % 360) - 180;
-const angularLngDistanceDeg = (a: number, b: number) =>
-	Math.abs(normalizeLngDeg(a - b));
-const degreesToRadians = (degrees: number) => (degrees * Math.PI) / 180;
-const latLngToGlobeUnitVector = (coords: LatLngLiteral) => {
-	const latRad = degreesToRadians(coords.lat);
-	const lngRad = degreesToRadians(coords.lng);
-	const cosLat = Math.cos(latRad);
-	return {
-		x: cosLat * Math.cos(lngRad),
-		y: cosLat * Math.sin(lngRad),
-		z: Math.sin(latRad),
-	};
-};
-
-const computeGlobeFrontHemisphereOpacity = (
-	mapInstance: mapboxgl.Map,
-	coords: LatLngLiteral | null,
-	radiusKm: number | null,
-	zoom: number
-) => {
-	if (!coords || zoom > CURATED_DOT_FADE_START_ZOOM) return 1;
-	if (
-		!Number.isFinite(coords.lat) ||
-		!Number.isFinite(coords.lng) ||
-		Math.abs(coords.lat) > 90
-	) {
-		return 1;
-	}
-
-	let center: mapboxgl.LngLat;
-	try {
-		center = mapInstance.getCenter();
-	} catch {
-		return 1;
-	}
-	if (!Number.isFinite(center.lat) || !Number.isFinite(center.lng)) return 1;
-
-	const target = latLngToGlobeUnitVector(coords);
-	const cameraCenter = latLngToGlobeUnitVector({ lat: center.lat, lng: center.lng });
-	const dot =
-		target.x * cameraCenter.x + target.y * cameraCenter.y + target.z * cameraCenter.z;
-	if (!Number.isFinite(dot)) return 1;
-
-	const radiusRad =
-		radiusKm != null && Number.isFinite(radiusKm) && radiusKm > 0
-			? clamp(radiusKm / EARTH_RADIUS_KM, 0, degreesToRadians(12))
-			: 0;
-	// The bloom is a flat DOM SVG, not a Mapbox globe layer. Hide it before the
-	// cluster reaches the limb so it never has to approximate horizon wrapping.
-	const limbTouchDot = Math.sin(radiusRad);
-	const hideAtDot = limbTouchDot + 0.075;
-	const fullAtDot = limbTouchDot + 0.22;
-	return smoothstep(hideAtDot, fullAtDot, dot);
-};
 const computeMoodVisualNightT = (nightT: number, cfg: MoodVisualConfig) =>
 	clamp(Math.max(nightT, cfg.nightVisualBlend), 0, 1);
-
-const parseCssColor = (value: string): ParsedCssColor | null => {
-	const match = value
-		.trim()
-		.match(/^rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)(?:\s*,\s*([\d.]+))?\s*\)$/i);
-	if (!match) return null;
-	const r = clamp(Number(match[1]), 0, 255);
-	const g = clamp(Number(match[2]), 0, 255);
-	const b = clamp(Number(match[3]), 0, 255);
-	const a = match[4] == null ? 1 : clamp(Number(match[4]), 0, 1);
-	if (![r, g, b, a].every(Number.isFinite)) return null;
-	return [r, g, b, a];
-};
-
-const formatCssColor = ([r, g, b, a]: ParsedCssColor) =>
-	a >= 0.999
-		? `rgb(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)})`
-		: `rgba(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)}, ${Number(a.toFixed(3))})`;
-
-const mixCssColorString = (from: string, to: string, t: number) => {
-	const a = parseCssColor(from);
-	const b = parseCssColor(to);
-	if (!a || !b) return t < 0.5 ? from : to;
-	const p = clamp(t, 0, 1);
-	return formatCssColor([
-		lerp(a[0], b[0], p),
-		lerp(a[1], b[1], p),
-		lerp(a[2], b[2], p),
-		lerp(a[3], b[3], p),
-	]);
-};
 
 const toRuntimeMoodConfig = (cfg: MoodVisualConfig): RuntimeMoodVisualConfig => ({
 	...cfg,
@@ -1742,36 +1549,6 @@ const getBackgroundDotsQuantizationDeg = (zoom: number): number => {
 	if (zoom <= 12) return 0.08;
 	return 0.05;
 };
-
-const bboxFromMultiPolygon = (multiPolygon: ClippingMultiPolygon): BoundingBox | null => {
-	let minLat = Infinity;
-	let maxLat = -Infinity;
-	let minLng = Infinity;
-	let maxLng = -Infinity;
-	for (const poly of multiPolygon) {
-		for (const ring of poly) {
-			for (const [lng, lat] of ring) {
-				if (!Number.isFinite(lng) || !Number.isFinite(lat)) continue;
-				minLat = Math.min(minLat, lat);
-				maxLat = Math.max(maxLat, lat);
-				minLng = Math.min(minLng, lng);
-				maxLng = Math.max(maxLng, lng);
-			}
-		}
-	}
-	if (
-		!Number.isFinite(minLat) ||
-		!Number.isFinite(maxLat) ||
-		!Number.isFinite(minLng) ||
-		!Number.isFinite(maxLng)
-	) {
-		return null;
-	}
-	return { minLat, maxLat, minLng, maxLng };
-};
-
-const isLatLngInBbox = (lat: number, lng: number, bbox: BoundingBox): boolean =>
-	lat >= bbox.minLat && lat <= bbox.maxLat && lng >= bbox.minLng && lng <= bbox.maxLng;
 
 const stableViewportSampleContacts = (
 	contacts: ContactWithName[],
@@ -3031,97 +2808,6 @@ const pointInMultiPolygon = (
 	return false;
 };
 
-// Helper to get state abbreviation
-const getStateAbbreviation = (state: string): string | null => {
-	if (!state) return null;
-	const upper = state.toUpperCase().trim();
-	if (upper === 'BC' || upper === 'B.C.') return 'BC';
-	if (upper === 'YT' || upper === 'Y.T.') return 'YT';
-	if (upper.length === 2 && stateBadgeColorMap[upper]) return upper;
-	const stateMap: Record<string, string> = {
-		ALABAMA: 'AL',
-		ALASKA: 'AK',
-		ARIZONA: 'AZ',
-		ARKANSAS: 'AR',
-		CALIFORNIA: 'CA',
-		COLORADO: 'CO',
-		CONNECTICUT: 'CT',
-		DELAWARE: 'DE',
-		FLORIDA: 'FL',
-		GEORGIA: 'GA',
-		HAWAII: 'HI',
-		IDAHO: 'ID',
-		ILLINOIS: 'IL',
-		INDIANA: 'IN',
-		IOWA: 'IA',
-		KANSAS: 'KS',
-		KENTUCKY: 'KY',
-		LOUISIANA: 'LA',
-		MAINE: 'ME',
-		MARYLAND: 'MD',
-		MASSACHUSETTS: 'MA',
-		MICHIGAN: 'MI',
-		MINNESOTA: 'MN',
-		MISSISSIPPI: 'MS',
-		MISSOURI: 'MO',
-		MONTANA: 'MT',
-		NEBRASKA: 'NE',
-		NEVADA: 'NV',
-		'NEW HAMPSHIRE': 'NH',
-		'NEW JERSEY': 'NJ',
-		'NEW MEXICO': 'NM',
-		'NEW YORK': 'NY',
-		'NORTH CAROLINA': 'NC',
-		'NORTH DAKOTA': 'ND',
-		OHIO: 'OH',
-		OKLAHOMA: 'OK',
-		OREGON: 'OR',
-		PENNSYLVANIA: 'PA',
-		'RHODE ISLAND': 'RI',
-		'SOUTH CAROLINA': 'SC',
-		'SOUTH DAKOTA': 'SD',
-		TENNESSEE: 'TN',
-		TEXAS: 'TX',
-		UTAH: 'UT',
-		VERMONT: 'VT',
-		VIRGINIA: 'VA',
-		WASHINGTON: 'WA',
-		'WEST VIRGINIA': 'WV',
-		WISCONSIN: 'WI',
-		WYOMING: 'WY',
-		'DISTRICT OF COLUMBIA': 'DC',
-		'BRITISH COLUMBIA': 'BC',
-		YUKON: 'YT',
-		'YUKON TERRITORY': 'YT',
-	};
-	return stateMap[upper] || null;
-};
-
-// Parse metadata sections [1], [2], etc.
-// Returns sections if at least 1 valid section exists (more lenient than dashboard's 3)
-const parseMetadataSections = (
-	metadata: string | null | undefined
-): Record<string, string> => {
-	if (!metadata) return {};
-	const allSections: Record<string, string> = {};
-	const regex = /\[(\d+)\]\s*([\s\S]*?)(?=\[\d+\]|$)/g;
-	let match;
-	while ((match = regex.exec(metadata)) !== null) {
-		allSections[match[1]] = match[2].trim();
-	}
-	const sections: Record<string, string> = {};
-	let expectedNum = 1;
-	while (allSections[String(expectedNum)]) {
-		const content = allSections[String(expectedNum)];
-		const meaningfulContent = content.replace(/[.\s,;:!?'"()\-–—]/g, '').trim();
-		if (meaningfulContent.length < 5) break;
-		sections[String(expectedNum)] = content;
-		expectedNum++;
-	}
-	// Return sections if we have at least 1 valid section
-	return Object.keys(sections).length >= 1 ? sections : {};
-};
-
 interface SearchResultsMapProps {
 	contacts: ContactWithName[];
 	selectedContacts: number[];
@@ -3655,8 +3341,6 @@ const buildLightningOpacityExpr = (intensity: number) => [
 	0,
 ];
 
-const mapboxEaseOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
-
 const applyMurmurGlobeLighting = (mapInstance: mapboxgl.Map) => {
 	try {
 		const bearing =
@@ -3703,17 +3387,6 @@ const applyMurmurGlobeLighting = (mapInstance: mapboxgl.Map) => {
 // Antarctica) and is extremely lightweight. Country tiles cache at all zooms, so after
 // the first paint the continents stay cream through every subsequent zoom/pan; water
 // fills still draw blue on top, so lakes/rivers inside countries look right.
-const mixCssRgb = (
-	from: [number, number, number],
-	to: [number, number, number],
-	t: number
-) => {
-	const p = clamp(t, 0, 1);
-	return `rgb(${Math.round(from[0] + (to[0] - from[0]) * p)}, ${Math.round(
-		from[1] + (to[1] - from[1]) * p
-	)}, ${Math.round(from[2] + (to[2] - from[2]) * p)})`;
-};
-
 // Visual night intentionally keeps the day basemap palette — the night look is
 // driven by DOM overlays + globe lighting, not by recoloring tiles. This getter
 // stays as a single source of truth for the basemap colors.
@@ -4360,308 +4033,6 @@ const applyStateOverlayNightColors = (mapInstance: mapboxgl.Map, nightT: number)
 	}
 };
 
-const withResultDotGlowOpacity = (dotOpacityExpr: unknown) =>
-	['*', RESULT_DOT_GLOW_OPACITY, dotOpacityExpr] as any;
-
-const withCategorizedDotOpacity = (dotOpacityExpr: unknown) =>
-	[
-		'case',
-		['boolean', ['get', 'isUncategorized'], false],
-		0,
-		dotOpacityExpr,
-	] as any;
-
-const startsWithCaseInsensitive = (
-	value: string | null | undefined,
-	prefix: string
-): boolean => {
-	if (!value) return false;
-	const p = prefix.trim().toLowerCase();
-	if (!p) return false;
-	return value.trim().toLowerCase().startsWith(p);
-};
-
-const getBookingTitlePrefixFromContactTitle = (
-	title: string | null | undefined
-): string | null => {
-	if (!title) return null;
-	for (const prefix of BOOKING_EXTRA_TITLE_PREFIXES) {
-		if (startsWithCaseInsensitive(title, prefix)) return prefix;
-	}
-	return null;
-};
-
-const isPromotionOverlayListTitle = (title: string | null | undefined): boolean => {
-	if (!title) return false;
-	return PROMOTION_OVERLAY_TITLE_PREFIXES.some((p) =>
-		startsWithCaseInsensitive(title, p)
-	);
-};
-
-// Promotion overlay pins should use the Radio Stations visual language (icon + color).
-const getPromotionOverlayWhatFromContactTitle = (
-	title: string | null | undefined
-): string | null => (isPromotionOverlayListTitle(title) ? 'Radio Stations' : null);
-
-const extractSearchModeFromQueryPrefix = (
-	query: string | null | undefined
-): SearchMode | null => {
-	const s = (query ?? '').trim().toLowerCase();
-	if (s.startsWith('[booking]')) return 'booking';
-	if (s.startsWith('[promotion]')) return 'promotion';
-	return null;
-};
-
-// When the query string no longer embeds "[Booking]"/"[Promotion]", infer mode from the
-// dashboard's structured "What" input so overlays + pin styling behave the same.
-const inferSearchModeFromSearchWhat = (
-	searchWhat: string | null | undefined
-): SearchMode | null => {
-	const w = (searchWhat ?? '').trim().toLowerCase();
-	if (!w) return null;
-
-	// Promotion modes (radio outreach)
-	if (
-		w.includes('radio station') ||
-		w.includes('radio stations') ||
-		w.includes('college radio')
-	) {
-		return 'promotion';
-	}
-
-	// Booking modes (venues/restaurants/etc.)
-	if (
-		w === 'venues' ||
-		w === 'venue' ||
-		w.includes('music venue') ||
-		w.includes('restaurant') ||
-		w.includes('coffee shop') ||
-		w === 'festivals' ||
-		w === 'festival' ||
-		w.includes('music festival') ||
-		w.includes('brewery') ||
-		w.includes('winery') ||
-		w.includes('distillery') ||
-		w.includes('cidery') ||
-		w.includes('wedding planner') ||
-		w.includes('wedding venue') ||
-		w.includes('wine, beer') ||
-		w.includes('wine beer')
-	) {
-		return 'booking';
-	}
-
-	return null;
-};
-const normalizeWhatKey = (value: string): string =>
-	value
-		.trim()
-		.toLowerCase()
-		.replace(/&/g, 'and')
-		.replace(/[^a-z0-9]+/g, ' ')
-		.trim()
-		.replace(/\s+/g, ' ');
-
-// Booking overlay "alcohol" subcategories should be treated as part of the broader
-// "Wine, Beer, and Spirits" search "What" (even though the overlay titles are
-// "Wineries <state>", "Breweries <state>", etc).
-const WINE_BEER_SPIRITS_WHAT_KEY = normalizeWhatKey('Wine, Beer, and Spirits');
-const WINE_BEER_SPIRITS_BOOKING_PREFIX_KEYS = new Set<string>([
-	normalizeWhatKey('Wineries'),
-	normalizeWhatKey('Breweries'),
-	normalizeWhatKey('Distilleries'),
-	normalizeWhatKey('Cideries'),
-]);
-
-const bookingTitlePrefixMatchesSearchWhatKey = (
-	prefix: string,
-	normalizedSearchWhatKey: string
-): boolean => {
-	const prefixKey = normalizeWhatKey(prefix);
-	if (prefixKey === normalizedSearchWhatKey) return true;
-	if (
-		normalizedSearchWhatKey === WINE_BEER_SPIRITS_WHAT_KEY &&
-		WINE_BEER_SPIRITS_BOOKING_PREFIX_KEYS.has(prefixKey)
-	) {
-		return true;
-	}
-	return false;
-};
-
-const WHAT_TO_RESULT_DOT_COLOR: Record<string, string> = {
-	[normalizeWhatKey('Radio Stations')]: '#56DA73',
-	[normalizeWhatKey('Venues')]: '#00CBFB',
-	[normalizeWhatKey('Music Venues')]: '#00CBFB',
-	[normalizeWhatKey('Festivals')]: '#2D27DC',
-	[normalizeWhatKey('Music Festivals')]: '#2D27DC',
-	[normalizeWhatKey('Restaurants')]: '#1EA300',
-	[normalizeWhatKey('Coffee Shops')]: '#8BD003',
-	[normalizeWhatKey('Wedding Planners')]: '#D6990A',
-	[normalizeWhatKey('Wine Beer and spirits')]: '#981AEC',
-	[normalizeWhatKey('Wine, Beer, and Spirits')]: '#981AEC',
-	[normalizeWhatKey('Wine, Beer, Spirits')]: '#981AEC',
-	// Booking extras: map alcohol-related categories to the Wine/Beer/Spirits palette.
-	[normalizeWhatKey('Breweries')]: '#981AEC',
-	[normalizeWhatKey('Wineries')]: '#981AEC',
-	[normalizeWhatKey('Distilleries')]: '#981AEC',
-	[normalizeWhatKey('Cideries')]: '#981AEC',
-	// Booking extras: show wedding venues with the same palette as wedding planners.
-	[normalizeWhatKey('Wedding Venues')]: '#D6990A',
-};
-
-// Hover tooltip (SVG bubble) fill colors by search "What" value.
-// These are intentionally allowed to differ from the dot colors.
-const WHAT_TO_HOVER_TOOLTIP_FILL_COLOR: Record<string, string> = {
-	// Promotion: match the search tray palette.
-	[normalizeWhatKey('Radio Stations')]: '#56DA73',
-	// Music venues should be a lighter blue on hover.
-	[normalizeWhatKey('Venues')]: '#71C9FD',
-	[normalizeWhatKey('Music Venues')]: '#71C9FD',
-
-	// Wine/beer/spirits should be periwinkle on hover.
-	[normalizeWhatKey('Wine, Beer, and Spirits')]: '#80AAFF',
-	[normalizeWhatKey('Wine, Beer, Spirits')]: '#80AAFF',
-	[normalizeWhatKey('Wine Beer and Spirits')]: '#80AAFF',
-	[normalizeWhatKey('Wine Beer Spirits')]: '#80AAFF',
-	// Defensive: handle a misspelling we've seen in copy.
-	[normalizeWhatKey('Wine, Beer, and Spiriti')]: '#80AAFF',
-	[normalizeWhatKey('Wine Beer and Spiriti')]: '#80AAFF',
-	[normalizeWhatKey('Wine Beer Spiriti')]: '#80AAFF',
-
-	// Keep existing behavior for festivals.
-	[normalizeWhatKey('Festivals')]: '#80AAFF',
-	[normalizeWhatKey('Music Festivals')]: '#80AAFF',
-};
-
-const getResultDotColorForWhat = (searchWhat?: string | null): string => {
-	if (!searchWhat) return DEFAULT_RESULT_DOT_COLOR;
-	const key = normalizeWhatKey(searchWhat);
-	return WHAT_TO_RESULT_DOT_COLOR[key] ?? DEFAULT_RESULT_DOT_COLOR;
-};
-
-const getResultDotTForZoom = (zoom: number): number => {
-	const clampedZoom = clamp(zoom, RESULT_DOT_ZOOM_MIN, RESULT_DOT_ZOOM_MAX);
-	return (
-		(clampedZoom - RESULT_DOT_ZOOM_MIN) / (RESULT_DOT_ZOOM_MAX - RESULT_DOT_ZOOM_MIN)
-	);
-};
-
-const getResultDotScaleForZoom = (zoom: number): number => {
-	const t = getResultDotTForZoom(zoom);
-	return RESULT_DOT_SCALE_MIN + t * (RESULT_DOT_SCALE_MAX - RESULT_DOT_SCALE_MIN);
-};
-
-const getResultDotStrokeWeightForZoom = (zoom: number): number => {
-	const t = getResultDotTForZoom(zoom);
-	return (
-		RESULT_DOT_STROKE_WEIGHT_MIN_PX +
-		t * (RESULT_DOT_STROKE_WEIGHT_MAX_PX - RESULT_DOT_STROKE_WEIGHT_MIN_PX)
-	);
-};
-
-const getLockedStateMarkerShareForZoom = (zoom: number): number => {
-	const denom = LOCKED_STATE_MARKER_BIAS_ZOOM_END - LOCKED_STATE_MARKER_BIAS_ZOOM_START;
-	if (!Number.isFinite(denom) || denom <= 0) return LOCKED_STATE_MARKER_BIAS_SHARE_MIN;
-	const t = clamp((zoom - LOCKED_STATE_MARKER_BIAS_ZOOM_START) / denom, 0, 1);
-	return (
-		LOCKED_STATE_MARKER_BIAS_SHARE_MAX +
-		t * (LOCKED_STATE_MARKER_BIAS_SHARE_MIN - LOCKED_STATE_MARKER_BIAS_SHARE_MAX)
-	);
-};
-
-const parseHexColor = (hex: string): RgbColor | null => {
-	const trimmed = hex.trim();
-	if (!trimmed.startsWith('#')) return null;
-	const raw = trimmed.slice(1);
-	const isShort = raw.length === 3;
-	const isLong = raw.length === 6;
-	if (!isShort && !isLong) return null;
-
-	const expand = (c: string) => `${c}${c}`;
-	const rHex = isShort ? expand(raw[0]!) : raw.slice(0, 2);
-	const gHex = isShort ? expand(raw[1]!) : raw.slice(2, 4);
-	const bHex = isShort ? expand(raw[2]!) : raw.slice(4, 6);
-
-	const r = Number.parseInt(rHex, 16);
-	const g = Number.parseInt(gHex, 16);
-	const b = Number.parseInt(bHex, 16);
-	if (!Number.isFinite(r) || !Number.isFinite(g) || !Number.isFinite(b)) return null;
-	return { r, g, b };
-};
-
-const toHexByte = (n: number): string => {
-	const clamped = clamp(Math.round(n), 0, 255);
-	return clamped.toString(16).padStart(2, '0').toUpperCase();
-};
-
-const washOutHexColor = (hex: string, mixToWhite: number): string => {
-	const rgb = parseHexColor(hex);
-	if (!rgb) return hex;
-	const t = clamp(mixToWhite, 0, 1);
-
-	// Blend toward white → lighter and less saturated (pastel).
-	const r = rgb.r + (255 - rgb.r) * t;
-	const g = rgb.g + (255 - rgb.g) * t;
-	const b = rgb.b + (255 - rgb.b) * t;
-
-	return `#${toHexByte(r)}${toHexByte(g)}${toHexByte(b)}`;
-};
-
-const hashStringToStableKey = (input: string): string => {
-	// Small deterministic hash for cache keys / image ids.
-	// (Not cryptographically secure; just stable and fast.)
-	let hash = 5381;
-	for (let i = 0; i < input.length; i++) {
-		hash = (hash * 33) ^ input.charCodeAt(i);
-	}
-	return (hash >>> 0).toString(36);
-};
-
-const scaleMapboxOpacityExpr = (expr: any, mul: number): any => {
-	if (typeof expr === 'number') return expr * mul;
-	if (!Array.isArray(expr) || expr.length === 0) return expr;
-
-	const op = expr[0];
-
-	if (op === 'interpolate') {
-		// ['interpolate', method, input, z1, v1, z2, v2, ...]
-		const result = [...expr];
-		for (let i = 4; i < result.length; i += 2) {
-			result[i] = scaleMapboxOpacityExpr(result[i], mul);
-		}
-		return result;
-	}
-
-	if (op === 'step') {
-		// ['step', input, defaultVal, z1, v1, z2, v2, ...]
-		const result = [...expr];
-		result[2] = scaleMapboxOpacityExpr(result[2], mul);
-		for (let i = 4; i < result.length; i += 2) {
-			result[i] = scaleMapboxOpacityExpr(result[i], mul);
-		}
-		return result;
-	}
-
-	if (op === 'case') {
-		// ['case', cond1, val1, cond2, val2, ..., fallback]
-		const result = [...expr];
-		for (let i = 2; i < result.length - 1; i += 2) {
-			result[i] = scaleMapboxOpacityExpr(result[i], mul);
-		}
-		result[result.length - 1] = scaleMapboxOpacityExpr(result[result.length - 1], mul);
-		return result;
-	}
-
-	return expr;
-};
-
-const normalizeStateKey = (state?: string | null): string | null => {
-	if (!state) return null;
-	const abbr = getStateAbbreviation(state);
-	if (abbr) return abbr;
-	return state.trim().toUpperCase();
-};
-
 const getDevMoodTransitionMs = (): number | null => {
 	if (typeof window === 'undefined') return null;
 	try {
@@ -4675,10 +4046,6 @@ const getDevMoodTransitionMs = (): number | null => {
 	}
 };
 
-const easeInOutCubic = (t: number): number => {
-	const x = clamp(t, 0, 1);
-	return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
-};
 
 const computeRuntimeNightT = (
 	nightLighting: GlobeNightLightingLike | null | undefined,
