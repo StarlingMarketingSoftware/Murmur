@@ -35,6 +35,15 @@ import {
 	MAP_MARKER_PIN_VIEWBOX_HEIGHT,
 	MAP_MARKER_PIN_VIEWBOX_WIDTH,
 } from '@/components/atoms/_svg/MapMarkerPinIcon';
+import { generateSelectedCategorizedContactMarkerIconUrl } from '@/components/atoms/_svg/SelectedCategorizedContactMarkerIcon';
+import {
+	SELECTED_CONTACT_MARKER_CENTER_OUTER_DIAMETER,
+	SELECTED_CONTACT_MARKER_CENTER_X,
+	SELECTED_CONTACT_MARKER_CENTER_Y,
+	SELECTED_CONTACT_MARKER_VIEWBOX_HEIGHT,
+	SELECTED_CONTACT_MARKER_VIEWBOX_WIDTH,
+} from '@/components/atoms/_svg/SelectedContactMarkerIcon';
+import { generateSelectedUncategorizedContactMarkerIconUrl } from '@/components/atoms/_svg/SelectedUncategorizedContactMarkerIcon';
 import { isCleanMapMarkerCategory } from '@/components/atoms/_svg/mapTooltipCategoryIcons';
 import { RestaurantsIcon } from '@/components/atoms/_svg/RestaurantsIcon';
 import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
@@ -113,8 +122,6 @@ import {
 	BOOKING_EXTRA_MARKERS_MIN_ZOOM,
 	BOOKING_EXTRA_PIN_HOVER_STROKE_COLOR,
 	BOOKING_EXTRA_TITLE_PREFIXES,
-	CATEGORIZED_DOT_GLOW_ZOOM_FADE_EXPR,
-	CATEGORIZED_DOT_ZOOM_FADE_EXPR,
 	CLOUDS_CANVAS_COORDINATES,
 	CLOUDS_CANVAS_SIZE_PX,
 	CLOUDS_CANVAS_TEXTURE_URL,
@@ -165,7 +172,6 @@ import {
 	CURATED_BLOB_SINGLETON_LOBE_RADIUS_KM,
 	CURATED_DOT_FADE_END_ZOOM,
 	CURATED_DOT_FADE_START_ZOOM,
-	CURATED_DOT_ZOOM_FADE_EXPR,
 	CURATED_ORB_BLOOM_OPACITY,
 	CURATED_ORB_COLOR_BLEND_OPACITY,
 	CURATED_ORB_ELLIPSE_RX_RATIO,
@@ -302,6 +308,10 @@ import {
 	MARKER_CONSTELLATION_NODE_RANK_OPACITY_EXPR,
 	MARKER_CONSTELLATION_POINT_CLEARANCE_PX,
 	MARKER_CONSTELLATION_REVEAL_FADE_MS,
+	MARKER_CONSTELLATION_SELECTED_CORE_OPACITY,
+	MARKER_CONSTELLATION_SELECTED_GLOW_OPACITY,
+	MARKER_CONSTELLATION_SELECTED_HALO_COLOR,
+	MARKER_CONSTELLATION_SELECTED_LINE_COLOR,
 	MARKER_CONSTELLATION_SPARSE_FALLBACK_MAX_EDGE_PX,
 	MAX_TOTAL_DOTS,
 	MIN_OVERLAY_PIN_CIRCLE_DIAMETER_PX,
@@ -377,9 +387,6 @@ import {
 	RESULT_DOT_SCALE_MAX,
 	RESULT_DOT_SCALE_MIN,
 	RESULT_DOT_STROKE_COLOR_DEFAULT,
-	RESULT_DOT_STROKE_COLOR_SELECTED,
-	RESULT_DOT_STROKE_WEIGHT_MAX_PX,
-	RESULT_DOT_STROKE_WEIGHT_MIN_PX,
 	RESULT_DOT_TRANSPARENT_STROKE_COLOR,
 	RESULT_DOT_ZOOM_MAX,
 	RESULT_DOT_ZOOM_MIN,
@@ -523,15 +530,173 @@ const computeCuratedOrbT = (zoom: number) => {
 	return raw * raw * (3 - 2 * raw);
 };
 
-const getSelectedStateOrbZoomFadedOpacity = (opacity: number): any => [
+const multiplyOpacityExpr = (opacity: any, multiplier?: any): any =>
+	multiplier == null ? opacity : ['*', opacity, multiplier];
+
+const getNormalMarkerFadeOpacityExpr = (): any => [
+	'-',
+	1,
+	['coalesce', ['feature-state', 'selectedMarkerT'], 0],
+];
+
+const getSelectedStateOrbZoomFadedOpacity = (
+	opacity: number,
+	opacityMultiplier?: any
+): any => [
 	'interpolate',
 	['linear'],
 	['zoom'],
 	CURATED_DOT_FADE_END_ZOOM,
-	['case', SELECTED_STATE_ORB_FADE_MARKER_FEATURE_EXPR, 0, opacity],
+	multiplyOpacityExpr(
+		['case', SELECTED_STATE_ORB_FADE_MARKER_FEATURE_EXPR, 0, opacity],
+		opacityMultiplier
+	),
 	CURATED_DOT_FADE_START_ZOOM,
-	opacity,
+	multiplyOpacityExpr(opacity, opacityMultiplier),
 ];
+
+const getCategorizedDotZoomFadedOpacity = (opacityMultiplier?: any): any => {
+	const nonUncategorizedVisible = [
+		'case',
+		['boolean', ['get', 'isUncategorized'], false],
+		0,
+		['case', ['boolean', ['feature-state', 'inConstellation'], true], 1, 0],
+	];
+	return [
+		'interpolate',
+		['linear'],
+		['zoom'],
+		CURATED_DOT_FADE_END_ZOOM,
+		multiplyOpacityExpr(
+			[
+				'case',
+				['boolean', ['get', 'isUncategorized'], false],
+				0,
+				[
+					'case',
+					ORB_FADE_MARKER_FEATURE_EXPR,
+					0,
+					['case', ['boolean', ['feature-state', 'inConstellation'], true], 1, 0],
+				],
+			],
+			opacityMultiplier
+		),
+		CURATED_DOT_FADE_START_ZOOM,
+		multiplyOpacityExpr(nonUncategorizedVisible, opacityMultiplier),
+		NON_CONSTELLATION_FADE_END_ZOOM,
+		multiplyOpacityExpr(nonUncategorizedVisible, opacityMultiplier),
+		NON_CONSTELLATION_FADE_START_ZOOM,
+		multiplyOpacityExpr(
+			['case', ['boolean', ['get', 'isUncategorized'], false], 0, 1],
+			opacityMultiplier
+		),
+	];
+};
+
+const getCategorizedDotGlowZoomFadedOpacity = (opacityMultiplier?: any): any => {
+	const nonUncategorizedGlowVisible = [
+		'case',
+		['boolean', ['get', 'isUncategorized'], false],
+		0,
+		[
+			'case',
+			['boolean', ['feature-state', 'inConstellation'], true],
+			RESULT_DOT_GLOW_OPACITY,
+			0,
+		],
+	];
+	return [
+		'interpolate',
+		['linear'],
+		['zoom'],
+		CURATED_DOT_FADE_END_ZOOM,
+		multiplyOpacityExpr(
+			[
+				'case',
+				['boolean', ['get', 'isUncategorized'], false],
+				0,
+				[
+					'case',
+					ORB_FADE_MARKER_FEATURE_EXPR,
+					0,
+					[
+						'case',
+						['boolean', ['feature-state', 'inConstellation'], true],
+						RESULT_DOT_GLOW_OPACITY,
+						0,
+					],
+				],
+			],
+			opacityMultiplier
+		),
+		CURATED_DOT_FADE_START_ZOOM,
+		multiplyOpacityExpr(nonUncategorizedGlowVisible, opacityMultiplier),
+		NON_CONSTELLATION_FADE_END_ZOOM,
+		multiplyOpacityExpr(nonUncategorizedGlowVisible, opacityMultiplier),
+		NON_CONSTELLATION_FADE_START_ZOOM,
+		multiplyOpacityExpr(
+			[
+				'case',
+				['boolean', ['get', 'isUncategorized'], false],
+				0,
+				RESULT_DOT_GLOW_OPACITY,
+			],
+			opacityMultiplier
+		),
+	];
+};
+
+const getSelectedMarkerIconOpacityExpr = (): any => {
+	const markerFadeOpacity = ['coalesce', ['get', 'selectedMarkerOpacity'], 1];
+	return getSelectedStateOrbZoomFadedOpacity(1, markerFadeOpacity);
+};
+
+const MARKER_HOVER_DARKEN_AMOUNT = 0.14;
+const MARKER_HOVER_FEATURE_STATE_EXPR: any = [
+	'boolean',
+	['feature-state', 'markerHover'],
+	false,
+];
+
+const darkenHexColor = (
+	hex: string,
+	amount = MARKER_HOVER_DARKEN_AMOUNT
+): string => {
+	const rgb = parseHexColor(hex);
+	if (!rgb) return hex;
+	const t = clamp(amount, 0, 1);
+	return `#${toHexByte(rgb.r * (1 - t))}${toHexByte(rgb.g * (1 - t))}${toHexByte(
+		rgb.b * (1 - t)
+	)}`;
+};
+
+const getMarkerHoverFillColorExpr = (): any => [
+	'case',
+	MARKER_HOVER_FEATURE_STATE_EXPR,
+	['coalesce', ['get', 'hoverFillColor'], ['get', 'fillColor']],
+	['get', 'fillColor'],
+];
+
+const getMarkerHoverOpacityExpr = (): any => [
+	'case',
+	MARKER_HOVER_FEATURE_STATE_EXPR,
+	1,
+	0,
+];
+
+const getSelectedMarkerHoverIconOpacityExpr = (): any => {
+	const markerFadeOpacity = ['coalesce', ['get', 'selectedMarkerOpacity'], 1];
+	return getSelectedStateOrbZoomFadedOpacity(1, [
+		'*',
+		markerFadeOpacity,
+		getMarkerHoverOpacityExpr(),
+	]);
+};
+
+const SELECTED_MARKER_FADE_MS = 115;
+const SELECTED_MARKER_ENTRY_OPACITY = 0.58;
+const SELECTED_MARKER_SCALE_MULTIPLIER = 1.45;
+const SELECTED_MARKER_INITIAL_TRANSFORM_SCALE = 0.78;
 
 const curatedBlobOrganicRadiusScale = (
 	angleRad: number,
@@ -3781,6 +3946,26 @@ const getMarkerConstellationZoomFadedOpacity = (opacity: any): any => {
 	if (typeof opacity !== 'number') return opacity;
 	if (opacity <= 0) return 0;
 	const unifiedOpacity = markerConstellationEdgeOpacityAtZoomStop(opacity, 1, 1, 1);
+	return [
+		'interpolate',
+		['linear'],
+		['zoom'],
+		3.6,
+		0,
+		4.2,
+		unifiedOpacity,
+		13,
+		unifiedOpacity,
+	];
+};
+
+const getSelectedMarkerConstellationZoomFadedOpacity = (opacity: number): any => {
+	if (opacity <= 0) return 0;
+	const unifiedOpacity = [
+		'*',
+		opacity,
+		['coalesce', ['get', 'selectedLineOpacity'], 1],
+	];
 	return [
 		'interpolate',
 		['linear'],
@@ -8620,6 +8805,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			ensureSource(MAPBOX_SOURCE_IDS.lockedOutline);
 			ensureSource(MAPBOX_SOURCE_IDS.curatedBlob);
 			ensureSource(MAPBOX_SOURCE_IDS.markerConstellation);
+			ensureSource(MAPBOX_SOURCE_IDS.markerConstellationSelected);
 			ensureSource(MAPBOX_SOURCE_IDS.markerConstellationNodes);
 			ensureSource(MAPBOX_SOURCE_IDS.selectedAreaRect);
 			ensureSource(MAPBOX_SOURCE_IDS.selectionRect);
@@ -8633,6 +8819,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		ensureSource(MAPBOX_SOURCE_IDS.markersBookingPin);
 		ensureSource(MAPBOX_SOURCE_IDS.markersPromotionDot);
 		ensureSource(MAPBOX_SOURCE_IDS.markersBase);
+		ensureSource(MAPBOX_SOURCE_IDS.markersSelected);
 
 		const ensureLayer = (layer: any, beforeId?: string) => {
 			if (mapInstance.getLayer(layer.id)) {
@@ -8868,7 +9055,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			24,
 			RESULT_DOT_SCALE_MAX,
 		];
-		const isSelectedFeatureStateExpr = ['boolean', ['feature-state', 'selected'], false];
 		const resultDotGlowRadiusExpr = [
 			'interpolate',
 			['linear'],
@@ -8881,25 +9067,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			RESULT_DOT_GLOW_RADIUS_MAX_PX,
 			24,
 			RESULT_DOT_GLOW_RADIUS_MAX_PX,
-		];
-		const resultDotStrokeColorExpr = [
-			'case',
-			['boolean', ['feature-state', 'selected'], false],
-			RESULT_DOT_STROKE_COLOR_SELECTED,
-			RESULT_DOT_TRANSPARENT_STROKE_COLOR,
-		];
-		const resultDotSelectedStrokeExpr = [
-			'interpolate',
-			['linear'],
-			['zoom'],
-			0,
-			['case', isSelectedFeatureStateExpr, RESULT_DOT_STROKE_WEIGHT_MIN_PX, 0],
-			RESULT_DOT_ZOOM_MIN,
-			['case', isSelectedFeatureStateExpr, RESULT_DOT_STROKE_WEIGHT_MIN_PX, 0],
-			RESULT_DOT_ZOOM_MAX,
-			['case', isSelectedFeatureStateExpr, RESULT_DOT_STROKE_WEIGHT_MAX_PX, 0],
-			24,
-			['case', isSelectedFeatureStateExpr, RESULT_DOT_STROKE_WEIGHT_MAX_PX, 0],
 		];
 
 		const allOverlayRadiusLow = RESULT_DOT_SCALE_MIN * 0.72;
@@ -8918,8 +9085,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			allOverlayRadiusHigh,
 		];
 
-		const allOverlayStrokeLow = Math.max(1, RESULT_DOT_STROKE_WEIGHT_MIN_PX * 0.85);
-		const allOverlayStrokeHigh = Math.max(1, RESULT_DOT_STROKE_WEIGHT_MAX_PX * 0.85);
 			const allOverlayGlowRadiusExpr = [
 				'interpolate',
 				['linear'],
@@ -8955,19 +9120,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				13,
 				11,
 			];
-			const allOverlaySelectedStrokeExpr = [
-				'interpolate',
-				['linear'],
-			['zoom'],
-			0,
-			['case', isSelectedFeatureStateExpr, allOverlayStrokeLow, 0],
-			RESULT_DOT_ZOOM_MIN,
-			['case', isSelectedFeatureStateExpr, allOverlayStrokeLow, 0],
-			RESULT_DOT_ZOOM_MAX,
-			['case', isSelectedFeatureStateExpr, allOverlayStrokeHigh, 0],
-			24,
-			['case', isSelectedFeatureStateExpr, allOverlayStrokeHigh, 0],
-		];
 
 		const pinRadiusLow =
 			Math.max(MIN_OVERLAY_PIN_CIRCLE_DIAMETER_PX, 2 * RESULT_DOT_SCALE_MIN) / 2;
@@ -9005,6 +9157,32 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			pinIconSizeHigh,
 			24,
 			pinIconSizeHigh,
+		];
+		const selectedMarkerTransformScaleExpr = [
+			'coalesce',
+			['get', 'selectedMarkerScale'],
+			1,
+		];
+		const selectedMarkerIconSizeLow =
+			(SELECTED_MARKER_SCALE_MULTIPLIER *
+				Math.max(MIN_OVERLAY_PIN_CIRCLE_DIAMETER_PX, 2 * RESULT_DOT_SCALE_MIN)) /
+			SELECTED_CONTACT_MARKER_CENTER_OUTER_DIAMETER;
+		const selectedMarkerIconSizeHigh =
+			(SELECTED_MARKER_SCALE_MULTIPLIER *
+				Math.max(MIN_OVERLAY_PIN_CIRCLE_DIAMETER_PX, 2 * RESULT_DOT_SCALE_MAX)) /
+			SELECTED_CONTACT_MARKER_CENTER_OUTER_DIAMETER;
+		const selectedMarkerIconSizeExpr = [
+			'interpolate',
+			['linear'],
+			['zoom'],
+			0,
+			['*', selectedMarkerIconSizeLow, selectedMarkerTransformScaleExpr],
+			RESULT_DOT_ZOOM_MIN,
+			['*', selectedMarkerIconSizeLow, selectedMarkerTransformScaleExpr],
+			RESULT_DOT_ZOOM_MAX,
+			['*', selectedMarkerIconSizeHigh, selectedMarkerTransformScaleExpr],
+			24,
+			['*', selectedMarkerIconSizeHigh, selectedMarkerTransformScaleExpr],
 		];
 
 		// States: hover fill + hit fill (transparent) + divider lines + interactive borders
@@ -9243,6 +9421,54 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				},
 			});
 			ensureLayer({
+				id: MAPBOX_LAYER_IDS.markerConstellationSelectedGlow,
+				type: 'line',
+				source: MAPBOX_SOURCE_IDS.markerConstellationSelected,
+			layout: { 'line-join': 'round', 'line-cap': 'round' },
+			paint: {
+				'line-color': MARKER_CONSTELLATION_SELECTED_HALO_COLOR,
+				'line-opacity': getSelectedMarkerConstellationZoomFadedOpacity(
+					MARKER_CONSTELLATION_SELECTED_GLOW_OPACITY
+				),
+				'line-width': [
+					'interpolate',
+					['linear'],
+					['zoom'],
+					3,
+					8,
+					7,
+					11,
+					13,
+					15,
+				],
+				'line-blur': 1.6,
+			},
+		});
+			ensureLayer({
+				id: MAPBOX_LAYER_IDS.markerConstellationSelectedCore,
+				type: 'line',
+				source: MAPBOX_SOURCE_IDS.markerConstellationSelected,
+			layout: { 'line-join': 'round', 'line-cap': 'round' },
+			paint: {
+				'line-color': MARKER_CONSTELLATION_SELECTED_LINE_COLOR,
+				'line-opacity': getSelectedMarkerConstellationZoomFadedOpacity(
+					MARKER_CONSTELLATION_SELECTED_CORE_OPACITY
+				),
+				'line-width': [
+					'interpolate',
+					['linear'],
+					['zoom'],
+					3,
+					4.8,
+					7,
+					6.8,
+					13,
+					9.4,
+				],
+				'line-blur': 0,
+			},
+		});
+			ensureLayer({
 				id: MAPBOX_LAYER_IDS.markerConstellationNodeGlow,
 				type: 'circle',
 				source: MAPBOX_SOURCE_IDS.markerConstellationNodes,
@@ -9301,7 +9527,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					'circle-radius': allOverlayGlowRadiusExpr,
 					'circle-color': RESULT_DOT_GLOW_COLOR,
 					'circle-opacity': getSelectedStateOrbZoomFadedOpacity(
-						ALL_CONTACTS_DOT_GLOW_OPACITY
+						ALL_CONTACTS_DOT_GLOW_OPACITY,
+						getNormalMarkerFadeOpacityExpr()
 					),
 					'circle-blur': RESULT_DOT_GLOW_BLUR,
 					'circle-stroke-width': 0,
@@ -9311,12 +9538,15 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			id: MAPBOX_LAYER_IDS.markersAllDots,
 			type: 'circle',
 			source: MAPBOX_SOURCE_IDS.markersAllOverlay,
-			paint: {
+				paint: {
 					'circle-radius': allOverlayRadiusExpr,
-					'circle-color': ['get', 'fillColor'],
-					'circle-opacity': getSelectedStateOrbZoomFadedOpacity(1),
-					'circle-stroke-color': resultDotStrokeColorExpr,
-					'circle-stroke-width': allOverlaySelectedStrokeExpr,
+					'circle-color': getMarkerHoverFillColorExpr(),
+					'circle-opacity': getSelectedStateOrbZoomFadedOpacity(
+						1,
+						getNormalMarkerFadeOpacityExpr()
+					),
+					'circle-stroke-color': RESULT_DOT_TRANSPARENT_STROKE_COLOR,
+					'circle-stroke-width': 0,
 				},
 		});
 
@@ -9329,18 +9559,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			paint: {
 				'circle-radius': pinRadiusExpr,
 				'circle-opacity': 0,
-				'circle-stroke-width': [
-					'case',
-					['boolean', ['feature-state', 'selected'], false],
-					2.5,
-					0,
-				],
-				'circle-stroke-color': [
-					'case',
-					['boolean', ['feature-state', 'selected'], false],
-					RESULT_DOT_STROKE_COLOR_SELECTED,
-					'transparent',
-				],
+				'circle-stroke-width': 0,
+				'circle-stroke-color': 'transparent',
 			},
 		});
 		ensureLayer({
@@ -9356,7 +9576,29 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					'icon-ignore-placement': true,
 				},
 				paint: {
-					'icon-opacity': getSelectedStateOrbZoomFadedOpacity(1),
+					'icon-opacity': getSelectedStateOrbZoomFadedOpacity(
+						1,
+						getNormalMarkerFadeOpacityExpr()
+					),
+				},
+			});
+		ensureLayer({
+			id: MAPBOX_LAYER_IDS.promotionPinIconsHover,
+			type: 'symbol',
+			source: MAPBOX_SOURCE_IDS.markersPromotionPin,
+			layout: {
+				'icon-image': ['coalesce', ['get', 'iconHover'], ['get', 'iconDefault']],
+				'icon-size': pinIconSizeExpr,
+				'icon-anchor': 'top-left',
+					'icon-offset': [-MAP_MARKER_PIN_CIRCLE_CENTER_X, -MAP_MARKER_PIN_CIRCLE_CENTER_Y],
+					'icon-allow-overlap': true,
+					'icon-ignore-placement': true,
+				},
+				paint: {
+					'icon-opacity': getSelectedStateOrbZoomFadedOpacity(
+						1,
+						['*', getNormalMarkerFadeOpacityExpr(), getMarkerHoverOpacityExpr()]
+					),
 				},
 			});
 
@@ -9369,18 +9611,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			paint: {
 				'circle-radius': pinRadiusExpr,
 				'circle-opacity': 0,
-				'circle-stroke-width': [
-					'case',
-					['boolean', ['feature-state', 'selected'], false],
-					2.5,
-					0,
-				],
-				'circle-stroke-color': [
-					'case',
-					['boolean', ['feature-state', 'selected'], false],
-					RESULT_DOT_STROKE_COLOR_SELECTED,
-					'transparent',
-				],
+				'circle-stroke-width': 0,
+				'circle-stroke-color': 'transparent',
 			},
 		});
 		ensureLayer({
@@ -9396,7 +9628,29 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					'icon-ignore-placement': true,
 				},
 				paint: {
-					'icon-opacity': getSelectedStateOrbZoomFadedOpacity(1),
+					'icon-opacity': getSelectedStateOrbZoomFadedOpacity(
+						1,
+						getNormalMarkerFadeOpacityExpr()
+					),
+				},
+			});
+		ensureLayer({
+			id: MAPBOX_LAYER_IDS.bookingPinIconsMarkerHover,
+			type: 'symbol',
+			source: MAPBOX_SOURCE_IDS.markersBookingPin,
+			layout: {
+				'icon-image': ['coalesce', ['get', 'iconHover'], ['get', 'iconDefault']],
+				'icon-size': pinIconSizeExpr,
+				'icon-anchor': 'top-left',
+					'icon-offset': [-MAP_MARKER_PIN_CIRCLE_CENTER_X, -MAP_MARKER_PIN_CIRCLE_CENTER_Y],
+					'icon-allow-overlap': true,
+					'icon-ignore-placement': true,
+				},
+				paint: {
+					'icon-opacity': getSelectedStateOrbZoomFadedOpacity(
+						1,
+						['*', getNormalMarkerFadeOpacityExpr(), getMarkerHoverOpacityExpr()]
+					),
 				},
 			});
 
@@ -9414,7 +9668,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					'icon-ignore-placement': true,
 				},
 				paint: {
-					'icon-opacity': getSelectedStateOrbZoomFadedOpacity(1),
+					'icon-opacity': getSelectedStateOrbZoomFadedOpacity(
+						1,
+						getNormalMarkerFadeOpacityExpr()
+					),
 				},
 			});
 
@@ -9437,7 +9694,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					'circle-radius': resultDotGlowRadiusExpr,
 					'circle-color': RESULT_DOT_GLOW_COLOR,
 					'circle-opacity': getSelectedStateOrbZoomFadedOpacity(
-						RESULT_DOT_GLOW_OPACITY
+						RESULT_DOT_GLOW_OPACITY,
+						getNormalMarkerFadeOpacityExpr()
 					),
 					'circle-blur': RESULT_DOT_GLOW_BLUR,
 					'circle-stroke-width': 0,
@@ -9449,10 +9707,13 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			source: MAPBOX_SOURCE_IDS.markersPromotionDot,
 			paint: {
 					'circle-radius': resultDotRadiusExpr,
-					'circle-color': ['get', 'fillColor'],
-					'circle-opacity': getSelectedStateOrbZoomFadedOpacity(1),
-					'circle-stroke-color': resultDotStrokeColorExpr,
-					'circle-stroke-width': resultDotSelectedStrokeExpr,
+					'circle-color': getMarkerHoverFillColorExpr(),
+					'circle-opacity': getSelectedStateOrbZoomFadedOpacity(
+						1,
+						getNormalMarkerFadeOpacityExpr()
+					),
+					'circle-stroke-color': RESULT_DOT_TRANSPARENT_STROKE_COLOR,
+					'circle-stroke-width': 0,
 				},
 		});
 
@@ -9474,7 +9735,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			paint: {
 				'circle-radius': resultDotGlowRadiusExpr,
 				'circle-color': RESULT_DOT_GLOW_COLOR,
-				'circle-opacity': CATEGORIZED_DOT_GLOW_ZOOM_FADE_EXPR,
+				'circle-opacity': getCategorizedDotGlowZoomFadedOpacity(
+					getNormalMarkerFadeOpacityExpr()
+				),
 				'circle-blur': RESULT_DOT_GLOW_BLUR,
 				'circle-stroke-width': 0,
 			},
@@ -9485,10 +9748,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			source: MAPBOX_SOURCE_IDS.markersBase,
 			paint: {
 				'circle-radius': resultDotRadiusExpr,
-				'circle-color': ['get', 'fillColor'],
-				'circle-opacity': CATEGORIZED_DOT_ZOOM_FADE_EXPR,
-				'circle-stroke-color': resultDotStrokeColorExpr,
-				'circle-stroke-width': resultDotSelectedStrokeExpr,
+				'circle-color': getMarkerHoverFillColorExpr(),
+				'circle-opacity': getCategorizedDotZoomFadedOpacity(
+					getNormalMarkerFadeOpacityExpr()
+				),
+				'circle-stroke-color': RESULT_DOT_TRANSPARENT_STROKE_COLOR,
+				'circle-stroke-width': 0,
 			},
 		});
 		ensureLayer({
@@ -9505,7 +9770,76 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				'icon-ignore-placement': true,
 			},
 			paint: {
-				'icon-opacity': CURATED_DOT_ZOOM_FADE_EXPR,
+				'icon-opacity': getSelectedStateOrbZoomFadedOpacity(
+					1,
+					getNormalMarkerFadeOpacityExpr()
+				),
+			},
+		});
+		ensureLayer({
+			id: MAPBOX_LAYER_IDS.baseFallbackIconsHover,
+			type: 'symbol',
+			source: MAPBOX_SOURCE_IDS.markersBase,
+			filter: ['==', ['get', 'isUncategorized'], true],
+			layout: {
+				'icon-image': [
+					'coalesce',
+					['get', 'fallbackIconHover'],
+					['get', 'fallbackIcon'],
+				],
+				'icon-size': pinIconSizeExpr,
+				'icon-anchor': 'top-left',
+				'icon-offset': [-MAP_MARKER_PIN_CIRCLE_CENTER_X, -MAP_MARKER_PIN_CIRCLE_CENTER_Y],
+				'icon-allow-overlap': true,
+				'icon-ignore-placement': true,
+			},
+			paint: {
+				'icon-opacity': getSelectedStateOrbZoomFadedOpacity(
+					1,
+					['*', getNormalMarkerFadeOpacityExpr(), getMarkerHoverOpacityExpr()]
+				),
+			},
+		});
+		ensureLayer({
+			id: MAPBOX_LAYER_IDS.selectedMarkerIcons,
+			type: 'symbol',
+			source: MAPBOX_SOURCE_IDS.markersSelected,
+			layout: {
+				'icon-image': ['get', 'selectedIcon'],
+				'icon-size': selectedMarkerIconSizeExpr,
+				'icon-anchor': 'top-left',
+				'icon-offset': [
+					-SELECTED_CONTACT_MARKER_CENTER_X,
+					-SELECTED_CONTACT_MARKER_CENTER_Y,
+				],
+				'icon-allow-overlap': true,
+				'icon-ignore-placement': true,
+			},
+			paint: {
+				'icon-opacity': getSelectedMarkerIconOpacityExpr(),
+			},
+		});
+		ensureLayer({
+			id: MAPBOX_LAYER_IDS.selectedMarkerIconsHover,
+			type: 'symbol',
+			source: MAPBOX_SOURCE_IDS.markersSelected,
+			layout: {
+				'icon-image': [
+					'coalesce',
+					['get', 'selectedIconHover'],
+					['get', 'selectedIcon'],
+				],
+				'icon-size': selectedMarkerIconSizeExpr,
+				'icon-anchor': 'top-left',
+				'icon-offset': [
+					-SELECTED_CONTACT_MARKER_CENTER_X,
+					-SELECTED_CONTACT_MARKER_CENTER_Y,
+				],
+				'icon-allow-overlap': true,
+				'icon-ignore-placement': true,
+			},
+			paint: {
+				'icon-opacity': getSelectedMarkerHoverIconOpacityExpr(),
 			},
 		});
 
@@ -13790,6 +14124,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		() => new Map<number, ContactWithName>(visibleContacts.map((c) => [c.id, c])),
 		[visibleContacts]
 	);
+	const contactsWithCoordsById = useMemo(
+		() => new Map<number, ContactWithName>(contactsWithCoords.map((c) => [c.id, c])),
+		[contactsWithCoords]
+	);
 	const bookingExtraContactsById = useMemo(
 		() =>
 			new Map<number, ContactWithName>(bookingExtraVisibleContacts.map((c) => [c.id, c])),
@@ -13815,6 +14153,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		if (!map || !isMapLoaded) return;
 
 		const markerHitLayers = [
+			MAPBOX_LAYER_IDS.selectedMarkerIcons,
 			MAPBOX_LAYER_IDS.baseHit,
 			MAPBOX_LAYER_IDS.promotionDotHit,
 			MAPBOX_LAYER_IDS.bookingPinHit,
@@ -13823,6 +14162,16 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		];
 
 		const getContactForHit = (layerId: string, id: number): ContactWithName | null => {
+			if (layerId === MAPBOX_LAYER_IDS.selectedMarkerIcons) {
+				return (
+					contactsWithCoordsById.get(id) ??
+					bookingExtraContactsById.get(id) ??
+					promotionOverlayContactsById.get(id) ??
+					allOverlayContactsById.get(id) ??
+					visibleContactsById.get(id) ??
+					null
+				);
+			}
 			if (layerId === MAPBOX_LAYER_IDS.baseHit)
 				return visibleContactsById.get(id) ?? null;
 			if (layerId === MAPBOX_LAYER_IDS.bookingPinHit)
@@ -13838,10 +14187,51 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			return null;
 		};
 
+		const getSourceForHitLayer = (layerId: string): string | null => {
+			if (layerId === MAPBOX_LAYER_IDS.selectedMarkerIcons)
+				return MAPBOX_SOURCE_IDS.markersSelected;
+			if (layerId === MAPBOX_LAYER_IDS.baseHit) return MAPBOX_SOURCE_IDS.markersBase;
+			if (layerId === MAPBOX_LAYER_IDS.bookingPinHit)
+				return MAPBOX_SOURCE_IDS.markersBookingPin;
+			if (layerId === MAPBOX_LAYER_IDS.promotionDotHit)
+				return MAPBOX_SOURCE_IDS.markersPromotionDot;
+			if (layerId === MAPBOX_LAYER_IDS.promotionPinHit)
+				return MAPBOX_SOURCE_IDS.markersPromotionPin;
+			if (layerId === MAPBOX_LAYER_IDS.markersAllHit)
+				return MAPBOX_SOURCE_IDS.markersAllOverlay;
+			return null;
+		};
+
 		const setCursor = (cursor: string) => {
 			// Avoid fighting the rectangle-selection cursor.
 			if (areaSelectionEnabled || isAreaSelecting) return;
 			map.getCanvas().style.cursor = cursor;
+		};
+
+		const clearMarkerVisualHover = () => {
+			const prev = hoveredMarkerVisualRef.current;
+			if (!prev) return;
+			try {
+				map.setFeatureState(
+					{ source: prev.sourceId, id: prev.id },
+					{ markerHover: false }
+				);
+			} catch {
+				// Ignore.
+			}
+			hoveredMarkerVisualRef.current = null;
+		};
+
+		const setMarkerVisualHover = (sourceId: string, id: number) => {
+			const prev = hoveredMarkerVisualRef.current;
+			if (prev?.sourceId === sourceId && prev.id === id) return;
+			clearMarkerVisualHover();
+			try {
+				map.setFeatureState({ source: sourceId, id }, { markerHover: true });
+				hoveredMarkerVisualRef.current = { sourceId, id };
+			} catch {
+				// Ignore.
+			}
 		};
 
 		const clearStateHover = () => {
@@ -13861,51 +14251,46 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		const onMouseMove = (e: mapboxgl.MapMouseEvent) => {
 			if (areaSelectionEnabled || isAreaSelecting) return;
 
-			// Marker hover interactions only at sufficiently high zoom.
 			const zoom = map.getZoom() ?? MAP_DEFAULT_ZOOM;
-			if (zoom < HOVER_INTERACTION_MIN_ZOOM) {
-				const prevHovered = hoveredMarkerIdRef.current;
-				if (hoverSourceRef.current === 'map' && prevHovered != null) {
-					handleMarkerMouseOut(prevHovered);
-				}
-				setCursor('');
-			} else {
-				const features = map.queryRenderedFeatures(e.point, { layers: markerHitLayers });
-				const top = features[0];
-				const layerId = top?.layer?.id;
-				const rawId = top?.id;
-				const id =
-					typeof rawId === 'number'
-						? rawId
-						: typeof rawId === 'string'
-							? Number.parseInt(rawId, 10)
-							: NaN;
 
-				if (layerId && Number.isFinite(id)) {
-					const contact = getContactForHit(layerId, id);
-					if (contact) {
-						setCursor('pointer');
-						if (hoverSourceRef.current !== 'map' || hoveredMarkerIdRef.current !== id) {
-							handleMarkerMouseOver(
-								contact,
-								e.originalEvent as unknown as MouseEvent | TouchEvent
-							);
-						}
-					} else {
-						const prevHovered = hoveredMarkerIdRef.current;
-						if (hoverSourceRef.current === 'map' && prevHovered != null) {
-							handleMarkerMouseOut(prevHovered);
-						}
-						setCursor('');
+			const markerFeatures = map.queryRenderedFeatures(e.point, { layers: markerHitLayers });
+			const topMarker = markerFeatures[0];
+			const markerLayerId = topMarker?.layer?.id;
+			const rawMarkerId = topMarker?.id;
+			const markerId =
+				typeof rawMarkerId === 'number'
+					? rawMarkerId
+					: typeof rawMarkerId === 'string'
+						? Number.parseInt(rawMarkerId, 10)
+						: NaN;
+
+			if (markerLayerId && Number.isFinite(markerId)) {
+				const contact = getContactForHit(markerLayerId, markerId);
+				const sourceId = getSourceForHitLayer(markerLayerId);
+				if (contact && sourceId) {
+					setCursor('pointer');
+					setMarkerVisualHover(sourceId, markerId);
+					clearStateHover();
+					if (
+						zoom >= HOVER_INTERACTION_MIN_ZOOM &&
+						(hoverSourceRef.current !== 'map' ||
+							hoveredMarkerIdRef.current !== markerId)
+					) {
+						handleMarkerMouseOver(
+							contact,
+							e.originalEvent as unknown as MouseEvent | TouchEvent
+						);
 					}
-				} else {
-					const prevHovered = hoveredMarkerIdRef.current;
-					if (hoverSourceRef.current === 'map' && prevHovered != null) {
-						handleMarkerMouseOut(prevHovered);
-					}
-					setCursor('');
+					return;
 				}
 			}
+
+			clearMarkerVisualHover();
+			const prevHovered = hoveredMarkerIdRef.current;
+			if (hoverSourceRef.current === 'map' && prevHovered != null) {
+				handleMarkerMouseOut(prevHovered);
+			}
+			setCursor('');
 
 			// Optional state hover highlight (only when state interactions are enabled).
 			if (!stateInteractionsEnabled || !isStateLayerReady) {
@@ -14045,15 +14430,27 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 
 		map.on('mousemove', onMouseMove);
 		map.on('click', onClick);
+		const canvas = map.getCanvas();
+		const onCanvasMouseLeave = () => {
+			clearMarkerVisualHover();
+			const prevHovered = hoveredMarkerIdRef.current;
+			if (hoverSourceRef.current === 'map' && prevHovered != null) {
+				handleMarkerMouseOut(prevHovered);
+			}
+			setCursor('');
+		};
+		canvas.addEventListener('mouseleave', onCanvasMouseLeave);
 
 		return () => {
 			map.off('mousemove', onMouseMove);
 			map.off('click', onClick);
+			canvas.removeEventListener('mouseleave', onCanvasMouseLeave);
 			try {
 				map.getCanvas().style.cursor = '';
 			} catch {
 				// Ignore.
 			}
+			clearMarkerVisualHover();
 			clearStateHover();
 		};
 	}, [
@@ -14064,6 +14461,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		stateInteractionsEnabled,
 		isStateLayerReady,
 		visibleContactsById,
+		contactsWithCoordsById,
 		bookingExtraContactsById,
 		promotionOverlayContactsById,
 		allOverlayContactsById,
@@ -14107,7 +14505,14 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	);
 
 	const ensureMapImageFromUrl = useCallback(
-		(imageName: string, url: string): Promise<void> => {
+		(
+			imageName: string,
+			url: string,
+			dimensions: { width: number; height: number } = {
+				width: MAP_MARKER_PIN_VIEWBOX_WIDTH,
+				height: MAP_MARKER_PIN_VIEWBOX_HEIGHT,
+			}
+		): Promise<void> => {
 			const mapInstance = mapRef.current;
 			if (!mapInstance || !isMapLoaded) return Promise.resolve();
 			if (mapInstance.hasImage(imageName)) return Promise.resolve();
@@ -14123,8 +14528,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						try {
 							// Render at 2× for retina crispness.
 							const scale = 2;
-							const w = MAP_MARKER_PIN_VIEWBOX_WIDTH * scale;
-							const h = MAP_MARKER_PIN_VIEWBOX_HEIGHT * scale;
+							const w = dimensions.width * scale;
+							const h = dimensions.height * scale;
 							const imgData = await rasterizeSvgDataUri(url, w, h);
 							const latestMap = mapRef.current;
 							if (!latestMap || latestMap !== mapInstance) return;
@@ -14176,9 +14581,58 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		() => generateUncategorizedContactMarkerIconUrl(),
 		[]
 	);
+	const uncategorizedContactMarkerHoverUrl = useMemo(
+		() =>
+			generateUncategorizedContactMarkerIconUrl(
+				darkenHexColor('#5BB6DD', MARKER_HOVER_DARKEN_AMOUNT)
+			),
+		[]
+	);
 	const uncategorizedContactMarkerImageName = useMemo(
 		() => imageNameFromUrl(uncategorizedContactMarkerUrl),
 		[imageNameFromUrl, uncategorizedContactMarkerUrl]
+	);
+	const uncategorizedContactMarkerHoverImageName = useMemo(
+		() => imageNameFromUrl(uncategorizedContactMarkerHoverUrl),
+		[imageNameFromUrl, uncategorizedContactMarkerHoverUrl]
+	);
+	const selectedCategorizedContactMarkerUrl = useMemo(
+		() => generateSelectedCategorizedContactMarkerIconUrl(),
+		[]
+	);
+	const selectedCategorizedContactMarkerHoverUrl = useMemo(
+		() =>
+			generateSelectedCategorizedContactMarkerIconUrl(
+				darkenHexColor('#739EE8', MARKER_HOVER_DARKEN_AMOUNT)
+			),
+		[]
+	);
+	const selectedUncategorizedContactMarkerUrl = useMemo(
+		() => generateSelectedUncategorizedContactMarkerIconUrl(),
+		[]
+	);
+	const selectedUncategorizedContactMarkerHoverUrl = useMemo(
+		() =>
+			generateSelectedUncategorizedContactMarkerIconUrl(
+				darkenHexColor('#50A5C9', MARKER_HOVER_DARKEN_AMOUNT)
+			),
+		[]
+	);
+	const selectedCategorizedContactMarkerImageName = useMemo(
+		() => imageNameFromUrl(selectedCategorizedContactMarkerUrl),
+		[imageNameFromUrl, selectedCategorizedContactMarkerUrl]
+	);
+	const selectedCategorizedContactMarkerHoverImageName = useMemo(
+		() => imageNameFromUrl(selectedCategorizedContactMarkerHoverUrl),
+		[imageNameFromUrl, selectedCategorizedContactMarkerHoverUrl]
+	);
+	const selectedUncategorizedContactMarkerImageName = useMemo(
+		() => imageNameFromUrl(selectedUncategorizedContactMarkerUrl),
+		[imageNameFromUrl, selectedUncategorizedContactMarkerUrl]
+	);
+	const selectedUncategorizedContactMarkerHoverImageName = useMemo(
+		() => imageNameFromUrl(selectedUncategorizedContactMarkerHoverUrl),
+		[imageNameFromUrl, selectedUncategorizedContactMarkerHoverUrl]
 	);
 
 	useEffect(() => {
@@ -14187,12 +14641,58 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			uncategorizedContactMarkerImageName,
 			uncategorizedContactMarkerUrl
 		);
+		void ensureMapImageFromUrl(
+			uncategorizedContactMarkerHoverImageName,
+			uncategorizedContactMarkerHoverUrl
+		);
 	}, [
 		map,
 		isMapLoaded,
 		ensureMapImageFromUrl,
 		uncategorizedContactMarkerImageName,
 		uncategorizedContactMarkerUrl,
+		uncategorizedContactMarkerHoverImageName,
+		uncategorizedContactMarkerHoverUrl,
+	]);
+
+	useEffect(() => {
+		if (!map || !isMapLoaded) return;
+		const selectedMarkerDimensions = {
+			width: SELECTED_CONTACT_MARKER_VIEWBOX_WIDTH,
+			height: SELECTED_CONTACT_MARKER_VIEWBOX_HEIGHT,
+		};
+		void ensureMapImageFromUrl(
+			selectedCategorizedContactMarkerImageName,
+			selectedCategorizedContactMarkerUrl,
+			selectedMarkerDimensions
+		);
+		void ensureMapImageFromUrl(
+			selectedCategorizedContactMarkerHoverImageName,
+			selectedCategorizedContactMarkerHoverUrl,
+			selectedMarkerDimensions
+		);
+		void ensureMapImageFromUrl(
+			selectedUncategorizedContactMarkerImageName,
+			selectedUncategorizedContactMarkerUrl,
+			selectedMarkerDimensions
+		);
+		void ensureMapImageFromUrl(
+			selectedUncategorizedContactMarkerHoverImageName,
+			selectedUncategorizedContactMarkerHoverUrl,
+			selectedMarkerDimensions
+		);
+	}, [
+		map,
+		isMapLoaded,
+		ensureMapImageFromUrl,
+		selectedCategorizedContactMarkerImageName,
+		selectedCategorizedContactMarkerUrl,
+		selectedCategorizedContactMarkerHoverImageName,
+		selectedCategorizedContactMarkerHoverUrl,
+		selectedUncategorizedContactMarkerImageName,
+		selectedUncategorizedContactMarkerUrl,
+		selectedUncategorizedContactMarkerHoverImageName,
+		selectedUncategorizedContactMarkerHoverUrl,
 	]);
 
 	const promotionPinIdsRef = useRef<Set<number>>(new Set());
@@ -14214,11 +14714,21 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const baseDotsWavePendingSearchKeyRef = useRef<string | null>(null);
 	// Tracks the last query key that actually played the base-dot wave animation.
 	const baseDotsWaveLastSearchKeyRef = useRef<string>('');
+	const hoveredMarkerVisualRef = useRef<{ sourceId: string; id: number } | null>(
+		null
+	);
 	const markerConstellationEdgesRef = useRef<MarkerConstellationEdge[]>([]);
 	const markerConstellationNodesRef = useRef<MarkerConstellationNode[]>([]);
 	const markerConstellationContactsByIdRef = useRef<Map<number, ContactWithName>>(
 		new Map()
 	);
+	const selectedMarkerFadeRafRef = useRef<number | null>(null);
+	const selectedMarkerFadeByIdRef = useRef<Map<number, number>>(new Map());
+	const selectedMarkerScaleByIdRef = useRef<Map<number, number>>(new Map());
+	const selectedMarkerFeatureByIdRef = useRef<Map<number, any>>(new Map());
+	const selectedConstellationLineFadeRafRef = useRef<number | null>(null);
+	const selectedConstellationLineOpacityRef = useRef<number>(1);
+	const selectedConstellationHadPathRef = useRef<boolean>(false);
 	const markerConstellationNodeIdsRef = useRef<Set<number>>(new Set());
 	const markerConstellationLastSearchKeyRef = useRef<string>((searchQuery ?? '').trim());
 	const markerConstellationComposedSearchKeyRef = useRef<string>('');
@@ -14254,7 +14764,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				(map as any).setPaintProperty(
 					MAPBOX_LAYER_IDS.baseGlow,
 					'circle-opacity',
-					CATEGORIZED_DOT_GLOW_ZOOM_FADE_EXPR
+					getCategorizedDotGlowZoomFadedOpacity(getNormalMarkerFadeOpacityExpr())
 				);
 			}
 			if (map.getLayer(MAPBOX_LAYER_IDS.baseDots)) {
@@ -14272,12 +14782,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				(map as any).setPaintProperty(
 					MAPBOX_LAYER_IDS.baseDots,
 					'circle-opacity',
-					CATEGORIZED_DOT_ZOOM_FADE_EXPR
+					getCategorizedDotZoomFadedOpacity(getNormalMarkerFadeOpacityExpr())
 				);
 				(map as any).setPaintProperty(
 					MAPBOX_LAYER_IDS.baseDots,
 					'circle-stroke-opacity',
-					CURATED_DOT_ZOOM_FADE_EXPR
+					0
 				);
 			}
 			if (map.getLayer(MAPBOX_LAYER_IDS.baseFallbackIcons)) {
@@ -14290,7 +14800,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				(map as any).setPaintProperty(
 					MAPBOX_LAYER_IDS.baseFallbackIcons,
 					'icon-opacity',
-					CURATED_DOT_ZOOM_FADE_EXPR
+					getSelectedStateOrbZoomFadedOpacity(1, getNormalMarkerFadeOpacityExpr())
 				);
 			}
 		} catch {
@@ -14388,12 +14898,16 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		const lineSource = map.getSource(MAPBOX_SOURCE_IDS.markerConstellation) as
 			| mapboxgl.GeoJSONSource
 			| undefined;
+		const selectedLineSource = map.getSource(
+			MAPBOX_SOURCE_IDS.markerConstellationSelected
+		) as mapboxgl.GeoJSONSource | undefined;
 		const nodeSource = map.getSource(MAPBOX_SOURCE_IDS.markerConstellationNodes) as
 			| mapboxgl.GeoJSONSource
 			| undefined;
 		try {
 			const empty = { type: 'FeatureCollection', features: [] } as any;
 			lineSource?.setData(empty);
+			selectedLineSource?.setData(empty);
 			nodeSource?.setData(empty);
 		} catch {
 			// Ignore style timing races.
@@ -14411,10 +14925,13 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			const source = map.getSource(MAPBOX_SOURCE_IDS.markerConstellation) as
 				| mapboxgl.GeoJSONSource
 				| undefined;
+			const selectedLineSource = map.getSource(
+				MAPBOX_SOURCE_IDS.markerConstellationSelected
+			) as mapboxgl.GeoJSONSource | undefined;
 			const nodeSource = map.getSource(MAPBOX_SOURCE_IDS.markerConstellationNodes) as
 				| mapboxgl.GeoJSONSource
 				| undefined;
-			if (!source && !nodeSource) return;
+			if (!source && !selectedLineSource && !nodeSource) return;
 
 			const contactsById =
 				contactsForVisibility != null
@@ -14422,10 +14939,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 							contactsForVisibility.map((contact) => [contact.id, contact])
 					  )
 					: markerConstellationContactsByIdRef.current;
+			const selectedSet = new Set<number>(selectedContacts);
 
 			const features: any[] = [];
 			const dataKeyParts: string[] = [];
 			for (const edge of markerConstellationEdgesRef.current) {
+				if (selectedSet.has(edge.fromId) || selectedSet.has(edge.toId)) continue;
 				const fromContact = contactsById.get(edge.fromId);
 				const toContact = contactsById.get(edge.toId);
 				if (!fromContact || !toContact) continue;
@@ -14462,6 +14981,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				lockedStateKey && lockedStateSelectionKeyRef.current === lockedStateKey
 			);
 			for (const node of markerConstellationNodesRef.current) {
+				if (selectedSet.has(node.id)) continue;
 				const contact = contactsById.get(node.id);
 				if (!contact) continue;
 				const coords = getContactCoords(contact);
@@ -14493,18 +15013,157 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				});
 			}
 
+			const selectedPointById = new Map<number, LatLngLiteral>();
+			const addSelectedPoint = (
+				contact: ContactWithName,
+				coords: LatLngLiteral | null
+			) => {
+				if (!selectedSet.has(contact.id)) return;
+				if (!coords) return;
+				if (selectedPointById.has(contact.id)) return;
+				selectedPointById.set(contact.id, coords);
+			};
+			if (selectedSet.size >= 2) {
+				for (const contact of contactsById.values()) {
+					addSelectedPoint(contact, getContactCoords(contact));
+				}
+				for (const contact of contactsWithCoords) {
+					addSelectedPoint(contact, getContactCoords(contact));
+				}
+				for (const contact of bookingExtraVisibleContacts) {
+					addSelectedPoint(contact, getBookingExtraContactCoords(contact));
+				}
+				for (const contact of promotionOverlayVisibleContacts) {
+					addSelectedPoint(contact, getPromotionOverlayContactCoords(contact));
+				}
+				for (const contact of allContactsOverlayVisibleContacts) {
+					addSelectedPoint(contact, getAllContactsOverlayContactCoords(contact));
+				}
+			}
+
+			const selectedLineFeatures: any[] = [];
+			const seenSelectedIds = new Set<number>();
+			let previousSelectedPoint: { id: number; coords: LatLngLiteral } | null = null;
+			for (const id of selectedContacts) {
+				if (seenSelectedIds.has(id)) continue;
+				seenSelectedIds.add(id);
+				const selectedCoords = selectedPointById.get(id);
+				if (!selectedCoords) continue;
+
+				if (previousSelectedPoint) {
+					const edgeIndex = selectedLineFeatures.length;
+					const featureId = `selected:${edgeIndex}:${previousSelectedPoint.id}:${id}`;
+					dataKeyParts.push(`s:${featureId}`);
+					selectedLineFeatures.push({
+						type: 'Feature',
+						id: featureId,
+						properties: {
+							selectedLineOpacity: selectedConstellationLineOpacityRef.current,
+							fromId: previousSelectedPoint.id,
+							toId: id,
+						},
+						geometry: {
+							type: 'LineString',
+							coordinates: [
+								[
+									previousSelectedPoint.coords.lng,
+									previousSelectedPoint.coords.lat,
+								],
+								[selectedCoords.lng, selectedCoords.lat],
+							],
+						},
+					});
+				}
+
+				previousSelectedPoint = { id, coords: selectedCoords };
+			}
+
 			const dataKey = dataKeyParts.join(',');
 			markerConstellationLastDataKeyRef.current = dataKey;
 
 			try {
 				source?.setData({ type: 'FeatureCollection', features } as any);
+				selectedLineSource?.setData({
+					type: 'FeatureCollection',
+					features: selectedLineFeatures,
+				} as any);
 				nodeSource?.setData({ type: 'FeatureCollection', features: nodeFeatures } as any);
 			} catch {
 				// Ignore style timing races.
 			}
 		},
-		[map, isMapLoaded, getContactCoords, lockedStateKey, isCoordsInLockedState, searchWhat]
+		[
+			map,
+			isMapLoaded,
+			selectedContacts,
+			contactsWithCoords,
+			bookingExtraVisibleContacts,
+			promotionOverlayVisibleContacts,
+			allContactsOverlayVisibleContacts,
+			getContactCoords,
+			getBookingExtraContactCoords,
+			getPromotionOverlayContactCoords,
+			getAllContactsOverlayContactCoords,
+			lockedStateKey,
+			isCoordsInLockedState,
+			searchWhat,
+		]
 	);
+
+	useEffect(() => {
+		if (!map || !isMapLoaded) return;
+
+		if (selectedConstellationLineFadeRafRef.current != null) {
+			cancelAnimationFrame(selectedConstellationLineFadeRafRef.current);
+			selectedConstellationLineFadeRafRef.current = null;
+		}
+
+		const hasSelectedPath = selectedContacts.length >= 2;
+		const hadSelectedPath = selectedConstellationHadPathRef.current;
+		selectedConstellationHadPathRef.current = hasSelectedPath;
+
+		if (!hasSelectedPath) {
+			selectedConstellationLineOpacityRef.current = 0;
+			writeMarkerConstellationSourceData();
+			return;
+		}
+
+		if (hadSelectedPath) {
+			selectedConstellationLineOpacityRef.current = 1;
+			writeMarkerConstellationSourceData();
+			return;
+		}
+
+		let cancelled = false;
+		const start = performance.now();
+		const durationMs = 220;
+
+		const tick = (now: number) => {
+			if (cancelled) return;
+			const rawT = clamp((now - start) / durationMs, 0, 1);
+			const easedT = 1 - Math.pow(1 - rawT, 3);
+			selectedConstellationLineOpacityRef.current = easedT;
+			writeMarkerConstellationSourceData();
+
+			if (rawT < 1) {
+				selectedConstellationLineFadeRafRef.current = requestAnimationFrame(tick);
+			} else {
+				selectedConstellationLineFadeRafRef.current = null;
+			}
+		};
+
+		selectedConstellationLineOpacityRef.current = 0;
+		writeMarkerConstellationSourceData();
+		selectedConstellationLineFadeRafRef.current = requestAnimationFrame(tick);
+
+		return () => {
+			cancelled = true;
+			if (selectedConstellationLineFadeRafRef.current != null) {
+				cancelAnimationFrame(selectedConstellationLineFadeRafRef.current);
+				selectedConstellationLineFadeRafRef.current = null;
+			}
+		};
+	}, [map, isMapLoaded, selectedContacts, writeMarkerConstellationSourceData]);
 
 	const startMarkerConstellationReveal = useCallback(
 		() => {
@@ -14587,6 +15246,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				lng: number;
 				lat: number;
 				fillColor: string;
+				hoverFillColor: string;
 				isCurated: boolean;
 				isUncategorized: boolean;
 				fadeWithSelectedStateOrb: boolean;
@@ -14621,6 +15281,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				lng: coords.lng,
 				lat: coords.lat,
 					fillColor,
+					hoverFillColor: darkenHexColor(fillColor),
 					isCurated: Boolean(contact.curatedCategory),
 					isUncategorized,
 					fadeWithSelectedStateOrb,
@@ -14698,13 +15359,17 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			return {
 				type: 'Feature',
 				id: dot.id,
-				properties: {
+					properties: {
 					fillColor: dot.fillColor,
+					hoverFillColor: dot.hoverFillColor,
 						[DOT_WAVE_DELAY_PROP]: delayMs,
 						isCurated: dot.isCurated,
 						isUncategorized: dot.isUncategorized,
 						fadeWithSelectedStateOrb: dot.fadeWithSelectedStateOrb,
 						fallbackIcon: dot.isUncategorized ? uncategorizedContactMarkerImageName : '',
+						fallbackIconHover: dot.isUncategorized
+							? uncategorizedContactMarkerHoverImageName
+							: '',
 					},
 				geometry: { type: 'Point', coordinates: [dot.lng, dot.lat] },
 			};
@@ -14816,6 +15481,269 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		disableDotWaveReveal,
 		stopBaseDotsWaveAndRestoreSteadyRendering,
 		uncategorizedContactMarkerImageName,
+		uncategorizedContactMarkerHoverImageName,
+	]);
+
+	// Selected marker artwork. This source is separate from the normal dot/pin sources so
+	// selected contacts can swap to the bespoke halo markers without rebuilding every marker.
+	useEffect(() => {
+		if (!map || !isMapLoaded) return;
+		const source = map.getSource(MAPBOX_SOURCE_IDS.markersSelected) as
+			| mapboxgl.GeoJSONSource
+			| undefined;
+		if (!source) return;
+
+		if (isLoading) {
+			// Preserve existing selected markers while parent data is refetching.
+			return;
+		}
+
+		let cancelled = false;
+
+		const run = async () => {
+			const selectedSet = new Set<number>(selectedContacts);
+			const seenIds = new Set<number>();
+			const nextSelectedFeaturesById = new Map<number, any>();
+			const fadeWithSelectedStateOrb = Boolean(
+				lockedStateKey &&
+					lockedStateSelectionKeyRef.current === lockedStateKey &&
+					selectedStateMorphSourceRef.current
+			);
+
+			const addSelectedMarker = (
+				contact: ContactWithName,
+				coords: LatLngLiteral | null,
+				whatForMarker?: string | null
+			) => {
+				if (!selectedSet.has(contact.id)) return;
+				if (seenIds.has(contact.id)) return;
+				if (!coords) return;
+
+				const isUncategorized = !isCleanMapMarkerCategory(whatForMarker);
+				seenIds.add(contact.id);
+				nextSelectedFeaturesById.set(contact.id, {
+					type: 'Feature',
+					id: contact.id,
+					properties: {
+						selectedIcon: isUncategorized
+							? selectedUncategorizedContactMarkerImageName
+							: selectedCategorizedContactMarkerImageName,
+						selectedIconHover: isUncategorized
+							? selectedUncategorizedContactMarkerHoverImageName
+							: selectedCategorizedContactMarkerHoverImageName,
+						isUncategorized,
+						fadeWithSelectedStateOrb,
+					},
+					geometry: { type: 'Point', coordinates: [coords.lng, coords.lat] },
+				});
+			};
+
+			for (const contact of contactsWithCoords) {
+				addSelectedMarker(
+					contact,
+					getContactCoords(contact),
+					contact.curatedCategory ?? searchWhat ?? null
+				);
+			}
+
+			for (const contact of bookingExtraVisibleContacts) {
+				addSelectedMarker(
+					contact,
+					getBookingExtraContactCoords(contact),
+					getBookingTitlePrefixFromContactTitle(contact.title) ?? null
+				);
+			}
+
+			for (const contact of promotionOverlayVisibleContacts) {
+				addSelectedMarker(
+					contact,
+					getPromotionOverlayContactCoords(contact),
+					getPromotionOverlayWhatFromContactTitle(contact.title) ?? null
+				);
+			}
+
+			for (const contact of allContactsOverlayVisibleContacts) {
+				addSelectedMarker(contact, getAllContactsOverlayContactCoords(contact), null);
+			}
+
+			const selectedMarkerDimensions = {
+				width: SELECTED_CONTACT_MARKER_VIEWBOX_WIDTH,
+				height: SELECTED_CONTACT_MARKER_VIEWBOX_HEIGHT,
+			};
+			void Promise.all([
+				ensureMapImageFromUrl(
+					selectedCategorizedContactMarkerImageName,
+					selectedCategorizedContactMarkerUrl,
+					selectedMarkerDimensions
+				),
+				ensureMapImageFromUrl(
+					selectedCategorizedContactMarkerHoverImageName,
+					selectedCategorizedContactMarkerHoverUrl,
+					selectedMarkerDimensions
+				),
+				ensureMapImageFromUrl(
+					selectedUncategorizedContactMarkerImageName,
+					selectedUncategorizedContactMarkerUrl,
+					selectedMarkerDimensions
+				),
+				ensureMapImageFromUrl(
+					selectedUncategorizedContactMarkerHoverImageName,
+					selectedUncategorizedContactMarkerHoverUrl,
+					selectedMarkerDimensions
+				),
+			]);
+			if (cancelled) return;
+
+			if (selectedMarkerFadeRafRef.current != null) {
+				cancelAnimationFrame(selectedMarkerFadeRafRef.current);
+				selectedMarkerFadeRafRef.current = null;
+			}
+
+			const featureById = new Map<number, any>(selectedMarkerFeatureByIdRef.current);
+			for (const [id, feature] of nextSelectedFeaturesById) {
+				featureById.set(id, feature);
+			}
+
+			const fadeById = selectedMarkerFadeByIdRef.current;
+			const scaleById = selectedMarkerScaleByIdRef.current;
+			const targets = new Map<number, number>();
+			for (const id of featureById.keys()) {
+				targets.set(id, nextSelectedFeaturesById.has(id) ? 1 : 0);
+			}
+
+			if (targets.size === 0) {
+				fadeById.clear();
+				scaleById.clear();
+				selectedMarkerFeatureByIdRef.current = new Map();
+				source.setData({ type: 'FeatureCollection', features: [] } as any);
+				return;
+			}
+
+			const startFadeById = new Map<number, number>();
+			const startScaleById = new Map<number, number>();
+			for (const id of targets.keys()) {
+				const isSelecting = nextSelectedFeaturesById.has(id);
+				startFadeById.set(
+					id,
+					fadeById.get(id) ?? (isSelecting ? SELECTED_MARKER_ENTRY_OPACITY : 1)
+				);
+				startScaleById.set(
+					id,
+					scaleById.get(id) ??
+						(isSelecting ? SELECTED_MARKER_INITIAL_TRANSFORM_SCALE : 1)
+				);
+			}
+
+			const setNormalMarkerAnimationState = (id: number, t: number) => {
+				for (const sourceId of [
+					MAPBOX_SOURCE_IDS.markersBase,
+					MAPBOX_SOURCE_IDS.markersBookingPin,
+					MAPBOX_SOURCE_IDS.markersPromotionDot,
+					MAPBOX_SOURCE_IDS.markersPromotionPin,
+					MAPBOX_SOURCE_IDS.markersAllOverlay,
+				]) {
+					try {
+						map.setFeatureState({ source: sourceId, id }, { selectedMarkerT: t });
+					} catch {
+						// Feature may not be present in this source.
+					}
+				}
+			};
+
+			const writeFrame = (progress: number) => {
+				const eased = 1 - Math.pow(1 - progress, 3);
+				const features: any[] = [];
+
+				for (const [id, target] of targets) {
+					const feature = featureById.get(id);
+					if (!feature) continue;
+					const start = startFadeById.get(id) ?? target;
+					const opacity = start + (target - start) * eased;
+					const startScale = startScaleById.get(id) ?? 1;
+					const targetScale =
+						target > 0 ? 1 : SELECTED_MARKER_INITIAL_TRANSFORM_SCALE;
+					const scale = startScale + (targetScale - startScale) * eased;
+
+					if (progress >= 1 && target <= 0) {
+						fadeById.delete(id);
+						scaleById.delete(id);
+						featureById.delete(id);
+						setNormalMarkerAnimationState(id, 0);
+						continue;
+					}
+
+					fadeById.set(id, opacity);
+					scaleById.set(id, scale);
+					setNormalMarkerAnimationState(id, opacity);
+					features.push({
+						...feature,
+						properties: {
+							...(feature.properties ?? {}),
+							selectedMarkerOpacity: opacity,
+							selectedMarkerScale: scale,
+						},
+					});
+				}
+
+				selectedMarkerFeatureByIdRef.current = featureById;
+				source.setData({ type: 'FeatureCollection', features } as any);
+			};
+
+			const startMs = performance.now();
+			writeFrame(0);
+
+			const tick = () => {
+				const progress = Math.min(
+					1,
+					(performance.now() - startMs) / SELECTED_MARKER_FADE_MS
+				);
+				writeFrame(progress);
+
+				if (progress < 1) {
+					selectedMarkerFadeRafRef.current = requestAnimationFrame(tick);
+					return;
+				}
+
+				selectedMarkerFadeRafRef.current = null;
+			};
+
+			selectedMarkerFadeRafRef.current = requestAnimationFrame(tick);
+		};
+
+		void run();
+
+		return () => {
+			cancelled = true;
+			if (selectedMarkerFadeRafRef.current != null) {
+				cancelAnimationFrame(selectedMarkerFadeRafRef.current);
+				selectedMarkerFadeRafRef.current = null;
+			}
+		};
+	}, [
+		map,
+		isMapLoaded,
+		isLoading,
+		selectedContacts,
+		contactsWithCoords,
+		getContactCoords,
+		searchWhat,
+		bookingExtraVisibleContacts,
+		getBookingExtraContactCoords,
+		promotionOverlayVisibleContacts,
+		getPromotionOverlayContactCoords,
+		allContactsOverlayVisibleContacts,
+		getAllContactsOverlayContactCoords,
+		lockedStateKey,
+		isStateLayerReady,
+		ensureMapImageFromUrl,
+		selectedCategorizedContactMarkerImageName,
+		selectedCategorizedContactMarkerUrl,
+		selectedCategorizedContactMarkerHoverImageName,
+		selectedCategorizedContactMarkerHoverUrl,
+		selectedUncategorizedContactMarkerImageName,
+		selectedUncategorizedContactMarkerUrl,
+		selectedUncategorizedContactMarkerHoverImageName,
+		selectedUncategorizedContactMarkerHoverUrl,
 	]);
 
 	// Drive base-marker visibility via `setFilter` (cheap, no layer rebuild)
@@ -14851,6 +15779,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		safeSet(MAPBOX_LAYER_IDS.baseDots, visibilityFilter);
 		// baseFallbackIcons already filters by isUncategorized; AND with visibility.
 		safeSet(MAPBOX_LAYER_IDS.baseFallbackIcons, [
+			'all',
+			['==', ['get', 'isUncategorized'], true],
+			visibilityFilter,
+		]);
+		safeSet(MAPBOX_LAYER_IDS.baseFallbackIconsHover, [
 			'all',
 			['==', ['get', 'isUncategorized'], true],
 			visibilityFilter,
@@ -14939,7 +15872,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			safeSetPaint(
 				MAPBOX_LAYER_IDS.baseGlow,
 				'circle-opacity',
-				CATEGORIZED_DOT_GLOW_ZOOM_FADE_EXPR
+				getCategorizedDotGlowZoomFadedOpacity(getNormalMarkerFadeOpacityExpr())
 			);
 			safeSetPaint(MAPBOX_LAYER_IDS.baseDots, 'circle-opacity-transition', transition);
 			safeSetPaint(
@@ -14950,12 +15883,12 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			safeSetPaint(
 				MAPBOX_LAYER_IDS.baseDots,
 				'circle-opacity',
-				CATEGORIZED_DOT_ZOOM_FADE_EXPR
+				getCategorizedDotZoomFadedOpacity(getNormalMarkerFadeOpacityExpr())
 			);
 			safeSetPaint(
 				MAPBOX_LAYER_IDS.baseDots,
 				'circle-stroke-opacity',
-				CURATED_DOT_ZOOM_FADE_EXPR
+				0
 			);
 			safeSetPaint(
 				MAPBOX_LAYER_IDS.baseFallbackIcons,
@@ -14965,7 +15898,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			safeSetPaint(
 				MAPBOX_LAYER_IDS.baseFallbackIcons,
 				'icon-opacity',
-				CURATED_DOT_ZOOM_FADE_EXPR
+				getSelectedStateOrbZoomFadedOpacity(1, getNormalMarkerFadeOpacityExpr())
 			);
 			safeClearFilter(MAPBOX_LAYER_IDS.baseHit);
 		};
@@ -15511,6 +16444,7 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					id: contact.id,
 					properties: {
 						fillColor: ALL_CONTACTS_OVERLAY_DOT_FILL_COLOR,
+						hoverFillColor: darkenHexColor(ALL_CONTACTS_OVERLAY_DOT_FILL_COLOR),
 						fadeWithSelectedStateOrb,
 					},
 					geometry: { type: 'Point', coordinates: [coords.lng, coords.lat] },
@@ -15583,7 +16517,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						dotFeatures.push({
 							type: 'Feature',
 							id: contact.id,
-							properties: { fillColor: dotFillColor, fadeWithSelectedStateOrb },
+							properties: {
+								fillColor: dotFillColor,
+								hoverFillColor: darkenHexColor(dotFillColor),
+								fadeWithSelectedStateOrb,
+							},
 							geometry: { type: 'Point', coordinates: [coords.lng, coords.lat] },
 						});
 					continue;
@@ -15595,20 +16533,20 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					RESULT_DOT_STROKE_COLOR_DEFAULT,
 					whatForMarker
 				);
-				const selectedUrl = getMarkerPinUrl(
-					pinFillColor,
-					RESULT_DOT_STROKE_COLOR_SELECTED,
+				const hoverUrl = getMarkerPinUrl(
+					darkenHexColor(pinFillColor),
+					RESULT_DOT_STROKE_COLOR_DEFAULT,
 					whatForMarker
 				);
 				const iconDefault = imageNameFromUrl(defaultUrl);
-				const iconSelected = imageNameFromUrl(selectedUrl);
+				const iconHover = imageNameFromUrl(hoverUrl);
 				imagesToEnsure.set(iconDefault, defaultUrl);
-				imagesToEnsure.set(iconSelected, selectedUrl);
+				imagesToEnsure.set(iconHover, hoverUrl);
 
 					pinFeatures.push({
 						type: 'Feature',
 						id: contact.id,
-						properties: { iconDefault, iconSelected, fadeWithSelectedStateOrb },
+						properties: { iconDefault, iconHover, fadeWithSelectedStateOrb },
 						geometry: { type: 'Point', coordinates: [coords.lng, coords.lat] },
 					});
 			}
@@ -15695,24 +16633,16 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 					RESULT_DOT_STROKE_COLOR_DEFAULT
 				);
 				const hoverUrl = getMarkerPinUrl(
-					pinFillColor,
+					darkenHexColor(pinFillColor),
 					BOOKING_EXTRA_PIN_HOVER_STROKE_COLOR,
 					whatForMarker,
 					BOOKING_EXTRA_PIN_HOVER_STROKE_COLOR
 				);
-				const selectedUrl = getMarkerPinUrl(
-					pinFillColor,
-					RESULT_DOT_STROKE_COLOR_SELECTED,
-					whatForMarker,
-					RESULT_DOT_STROKE_COLOR_SELECTED
-				);
 
 				const iconDefault = imageNameFromUrl(defaultUrl);
 				const iconHover = imageNameFromUrl(hoverUrl);
-				const iconSelected = imageNameFromUrl(selectedUrl);
 				imagesToEnsure.set(iconDefault, defaultUrl);
 				imagesToEnsure.set(iconHover, hoverUrl);
-				imagesToEnsure.set(iconSelected, selectedUrl);
 
 				features.push({
 					type: 'Feature',
@@ -15720,7 +16650,6 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 						properties: {
 							iconDefault,
 							iconHover,
-							iconSelected,
 							category: whatForMarker ?? '',
 							fadeWithSelectedStateOrb,
 						},
@@ -15803,9 +16732,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		const layer = MAPBOX_LAYER_IDS.bookingPinIconsHover;
 		if (!map.getLayer(layer)) return;
 		const cat = hoveredBookingExtraCategory;
+		const categoryFilter: any = ['==', ['get', 'category'], cat ?? ''];
 		// Match features whose `category` property equals the hovered category.
 		// When no category is hovered, match nothing (empty string never stored as a real category).
-		map.setFilter(layer, ['==', ['get', 'category'], cat ?? '']);
+		map.setFilter(layer, categoryFilter);
 	}, [map, isMapLoaded, hoveredBookingExtraCategory]);
 
 	// Larger leave buffer zone - how much extra padding below the tooltip for hysteresis

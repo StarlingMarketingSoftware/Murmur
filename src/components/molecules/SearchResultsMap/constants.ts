@@ -638,6 +638,7 @@ export const MAPBOX_SOURCE_IDS = {
 	lockedOutline: 'murmur-locked-outline',
 	curatedBlob: 'murmur-curated-blob',
 	markerConstellation: 'murmur-marker-constellation',
+	markerConstellationSelected: 'murmur-marker-constellation-selected',
 	markerConstellationNodes: 'murmur-marker-constellation-nodes',
 	selectionRect: 'murmur-selection-rect',
 	selectedAreaRect: 'murmur-selected-area-rect',
@@ -646,6 +647,7 @@ export const MAPBOX_SOURCE_IDS = {
 	markersAllOverlay: 'murmur-markers-all-overlay',
 	markersPromotionPin: 'murmur-markers-promo-pin',
 	markersBookingPin: 'murmur-markers-booking-pin',
+	markersSelected: 'murmur-markers-selected',
 	stateLabels: 'murmur-state-labels',
 } as const;
 
@@ -677,6 +679,8 @@ export const MAPBOX_LAYER_IDS = {
 	curatedBlobCore: 'murmur-curated-blob-core-line',
 	markerConstellationGlow: 'murmur-marker-constellation-glow-line',
 	markerConstellationCore: 'murmur-marker-constellation-core-line',
+	markerConstellationSelectedGlow: 'murmur-marker-constellation-selected-glow-line',
+	markerConstellationSelectedCore: 'murmur-marker-constellation-selected-core-line',
 	markerConstellationNodeGlow: 'murmur-marker-constellation-node-glow',
 	markerConstellationNodeDots: 'murmur-marker-constellation-node-dots',
 	// Markers (hit layers are used for hover/click priority)
@@ -685,8 +689,10 @@ export const MAPBOX_LAYER_IDS = {
 	markersAllDots: 'murmur-markers-all-dots',
 	promotionPinHit: 'murmur-promo-pin-hit',
 	promotionPinIcons: 'murmur-promo-pin-icons',
+	promotionPinIconsHover: 'murmur-promo-pin-icons-hover',
 	bookingPinHit: 'murmur-booking-pin-hit',
 	bookingPinIcons: 'murmur-booking-pin-icons',
+	bookingPinIconsMarkerHover: 'murmur-booking-pin-icons-marker-hover',
 	bookingPinIconsHover: 'murmur-booking-pin-icons-hover',
 	promotionDotHit: 'murmur-promo-dot-hit',
 	promotionDotGlow: 'murmur-promo-dot-glow',
@@ -695,6 +701,9 @@ export const MAPBOX_LAYER_IDS = {
 	baseGlow: 'murmur-base-glow',
 	baseDots: 'murmur-base-dots',
 	baseFallbackIcons: 'murmur-base-fallback-icons',
+	baseFallbackIconsHover: 'murmur-base-fallback-icons-hover',
+	selectedMarkerIcons: 'murmur-selected-marker-icons',
+	selectedMarkerIconsHover: 'murmur-selected-marker-icons-hover',
 	// Rectangles
 	selectedAreaRect: 'murmur-selected-area-rect-line',
 	selectionRectFill: 'murmur-selection-rect-fill',
@@ -735,6 +744,10 @@ export const MARKER_CONSTELLATION_LINE_COLOR = '#4F555C';
 export const MARKER_CONSTELLATION_HALO_COLOR = '#F6FAFC';
 export const MARKER_CONSTELLATION_CORE_OPACITY = 0.56;
 export const MARKER_CONSTELLATION_GLOW_OPACITY = 0.3;
+export const MARKER_CONSTELLATION_SELECTED_LINE_COLOR = '#FFFFFF';
+export const MARKER_CONSTELLATION_SELECTED_HALO_COLOR = '#E8F7FF';
+export const MARKER_CONSTELLATION_SELECTED_CORE_OPACITY = 0.98;
+export const MARKER_CONSTELLATION_SELECTED_GLOW_OPACITY = 0.34;
 export const MARKER_CONSTELLATION_NODE_OPACITY = 0.76;
 export const MARKER_CONSTELLATION_NODE_GLOW_OPACITY = 0.24;
 export const MARKER_CONSTELLATION_MAX_POINTS = 180;

@@ -16,12 +16,14 @@ export const MAP_MARKER_PIN_CIRCLE_CENTER_Y = 19.5;
 // Category icon sizing inside the colored circle of the pin.
 const MARKER_CATEGORY_ICON_SIZE = 24;
 
-export const generateUncategorizedContactMarkerSvg = (): string => {
+export const generateUncategorizedContactMarkerSvg = (
+	accentColor = '#5BB6DD'
+): string => {
 	// Keep the supplied 32x31 artwork centered on the existing pin anchor.
 	return `<svg width="39" height="44" viewBox="0 0 39 44" fill="none" xmlns="http://www.w3.org/2000/svg">
 <g transform="translate(3.5 4)">
   <ellipse cx="16" cy="15.5" rx="16" ry="15.5" fill="url(#paint0_radial_uncategorized_contact_marker)"/>
-  <path d="M13.6465 4.43848C14.0364 3.80011 14.9636 3.80011 15.3535 4.43848L19.6016 11.3984L26.5615 15.6465C27.1999 16.0364 27.1999 16.9636 26.5615 17.3535L19.6016 21.6016L15.3535 28.5615C14.9636 29.1999 14.0364 29.1999 13.6465 28.5615L9.39844 21.6016L2.43848 17.3535C1.80011 16.9636 1.80011 16.0364 2.43848 15.6465L9.39844 11.3984L13.6465 4.43848Z" fill="#5BB6DD" stroke="white"/>
+  <path d="M13.6465 4.43848C14.0364 3.80011 14.9636 3.80011 15.3535 4.43848L19.6016 11.3984L26.5615 15.6465C27.1999 16.0364 27.1999 16.9636 26.5615 17.3535L19.6016 21.6016L15.3535 28.5615C14.9636 29.1999 14.0364 29.1999 13.6465 28.5615L9.39844 21.6016L2.43848 17.3535C1.80011 16.9636 1.80011 16.0364 2.43848 15.6465L9.39844 11.3984L13.6465 4.43848Z" fill="${accentColor}" stroke="white"/>
   <defs>
     <radialGradient id="paint0_radial_uncategorized_contact_marker" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(16 15.5) rotate(90) scale(15.5 16)">
       <stop offset="0.3125" stop-color="white"/>
@@ -32,9 +34,11 @@ export const generateUncategorizedContactMarkerSvg = (): string => {
 </svg>`;
 };
 
-export const generateUncategorizedContactMarkerIconUrl = (): string =>
+export const generateUncategorizedContactMarkerIconUrl = (
+	accentColor?: string
+): string =>
 	`data:image/svg+xml;charset=UTF-8,${encodeURIComponent(
-		generateUncategorizedContactMarkerSvg()
+		generateUncategorizedContactMarkerSvg(accentColor)
 	)}`;
 
 const isValidHexColor = (value: string): boolean => {
