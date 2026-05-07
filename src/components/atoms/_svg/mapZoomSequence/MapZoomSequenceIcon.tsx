@@ -1,4 +1,13 @@
 import * as React from 'react';
+import Frame00World from './frame00World';
+import Frame01WorldLarge from './frame01WorldLarge';
+import Frame02WorldCircle24 from './frame02WorldCircle24';
+import Frame03WorldCircle28 from './frame03WorldCircle28';
+import Frame04WorldCircle33 from './frame04WorldCircle33';
+import Frame05WorldCircle37 from './frame05WorldCircle37';
+import Frame06Us from './frame06Us';
+import Frame07UsBridgeOne from './frame07UsBridgeOne';
+import Frame08UsBridgeTwo from './frame08UsBridgeTwo';
 import {
 	ZOOMED_OUT_WORLD_ICON_PATH,
 	ZOOM_LEVEL_FOUR_FOCUS_ICON_PATH,
@@ -13,6 +22,21 @@ type MapZoomSequenceIconProps = React.SVGProps<SVGSVGElement> & {
 
 const MIN_LEVEL = 0;
 const MAX_LEVEL = 20;
+// Preserve the hand-authored globe-to-U.S. frames before the procedural zoom takes over.
+const LAST_RESTORED_EARLY_FRAME_INDEX = 8;
+const RESTORED_EARLY_FRAME_EXIT_LEVEL = LAST_RESTORED_EARLY_FRAME_INDEX + 0.5;
+
+const RESTORED_EARLY_FRAMES = [
+	Frame00World,
+	Frame01WorldLarge,
+	Frame02WorldCircle24,
+	Frame03WorldCircle28,
+	Frame04WorldCircle33,
+	Frame05WorldCircle37,
+	Frame06Us,
+	Frame07UsBridgeOne,
+	Frame08UsBridgeTwo,
+] as const;
 
 const clamp = (value: number, min = 0, max = 1) => {
 	if (!Number.isFinite(value)) return min;
@@ -125,11 +149,24 @@ export default function MapZoomSequenceIcon({
 	...props
 }: MapZoomSequenceIconProps) {
 	const rawId = React.useId().replace(/:/g, '');
+	const level = clamp(levelValue, MIN_LEVEL, MAX_LEVEL);
+	const earlyFrameIndex = Math.min(
+		Math.max(Math.round(level), 0),
+		LAST_RESTORED_EARLY_FRAME_INDEX
+	);
+	const RestoredEarlyFrame =
+		level < RESTORED_EARLY_FRAME_EXIT_LEVEL
+			? RESTORED_EARLY_FRAMES[earlyFrameIndex] ?? null
+			: null;
+
+	if (RestoredEarlyFrame) {
+		return <RestoredEarlyFrame {...props} />;
+	}
+
 	const roundedClipId = `${rawId}-map-zoom-rounded`;
 	const globeClipId = `${rawId}-map-zoom-globe`;
 	const usRevealClipId = `${rawId}-map-zoom-us-reveal`;
 	const tileRevealClipId = `${rawId}-map-zoom-tile-reveal`;
-	const level = clamp(levelValue, MIN_LEVEL, MAX_LEVEL);
 
 	const worldGrowT = smoothStep(progressBetween(level, 0, 2));
 	const globeT = smoothStep(progressBetween(level, 2, 5.85));
