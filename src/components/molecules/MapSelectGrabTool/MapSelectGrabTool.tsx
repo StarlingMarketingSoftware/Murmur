@@ -660,9 +660,11 @@ export function MapSelectGrabStackTile({
 export function MapSelectGrabTallStackBox({
 	className,
 	style,
+	dividerColor = '#ECECEC',
 }: {
 	className?: string;
 	style?: CSSProperties;
+	dividerColor?: string;
 }) {
 	return (
 		<div
@@ -686,7 +688,7 @@ export function MapSelectGrabTallStackBox({
 						right: 0,
 						bottom: `${TALL_STACK_DIVIDER_BOTTOM_PX}px`,
 						height: `${TALL_STACK_DIVIDER_HEIGHT_PX}px`,
-						backgroundColor: '#ECECEC',
+						backgroundColor: dividerColor,
 					}}
 				/>
 				<div

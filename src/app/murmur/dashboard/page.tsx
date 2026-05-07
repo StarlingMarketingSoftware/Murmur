@@ -7694,6 +7694,7 @@ const DashboardContent = () => {
 								>
 									<MapSelectGrabTallStackBox
 										className="absolute pointer-events-none"
+										dividerColor={isSelectMapToolActive ? '#FFFFFF' : undefined}
 										style={{
 											left: '-0.5px',
 											top: `-${
@@ -7706,6 +7707,12 @@ const DashboardContent = () => {
 												MAP_SELECT_GRAB_TALL_STACK_BOX_GAP_PX +
 												MAP_SELECT_GRAB_TALL_STACK_BOX_HEIGHT_PX
 											}px`,
+											...(isSelectMapToolActive
+												? {
+														backgroundColor: '#A6DCB3',
+														opacity: 0.9,
+												  }
+												: {}),
 										}}
 									/>
 									<MapSelectGrabStackBox
