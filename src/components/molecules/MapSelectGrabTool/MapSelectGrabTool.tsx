@@ -9,7 +9,7 @@ import type {
 	ReactNode,
 } from 'react';
 import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
-import { MAP_ZOOM_SEQUENCE_ICON_COMPONENTS } from '@/components/atoms/_svg/mapZoomSequence';
+import MapZoomSequenceIcon from '@/components/atoms/_svg/mapZoomSequence/MapZoomSequenceIcon';
 import { MusicVenuesIcon } from '@/components/atoms/_svg/MusicVenuesIcon';
 import { RadioStationsIcon } from '@/components/atoms/_svg/RadioStationsIcon';
 import { RestaurantsIcon } from '@/components/atoms/_svg/RestaurantsIcon';
@@ -214,11 +214,6 @@ const getLevelValueForThumbTop = (thumbTop: number) => {
 	return ZOOM_THUMB_MAX_INDEX;
 };
 
-const getDefaultZoomLevelIcon = (levelIndex: number): ReactNode => {
-	const Icon = MAP_ZOOM_SEQUENCE_ICON_COMPONENTS[levelIndex];
-	return Icon ? <Icon aria-hidden="true" focusable="false" /> : null;
-};
-
 const getTallStackInnerBoxContent = (index: number): ReactNode => {
 	switch (index) {
 		case 0:
@@ -285,25 +280,44 @@ export function MapSelectGrabStarterBox({
 		ZOOM_THUMB_MAX_INDEX
 	);
 	const safeZoomLevelValue = clampZoomLevelValue(zoomLevelValue ?? safeZoomLevelIndex);
+	const [liveZoomLevelValue, setLiveZoomLevelValue] = useState(safeZoomLevelValue);
 	const isInteractive =
 		typeof onZoomLevelIndexChange === 'function' ||
 		typeof onZoomLevelValueChange === 'function';
 	const zoomIcons = useMemo(
 		() =>
-			ZOOM_THUMB_TOP_POSITIONS_PX.map(
-				(_, index) => zoomLevelIcons?.[index] ?? getDefaultZoomLevelIcon(index)
-			),
+			zoomLevelIcons?.some(Boolean)
+				? ZOOM_THUMB_TOP_POSITIONS_PX.map((_, index) => zoomLevelIcons[index] ?? null)
+				: [],
 		[zoomLevelIcons]
 	);
-	const thumbTopPx = getThumbTopForLevelValue(safeZoomLevelValue);
+	const hasCustomZoomIcons = zoomIcons.length > 0;
+	const safeLiveZoomLevelValue = clampZoomLevelValue(liveZoomLevelValue);
+	const thumbTopPx = getThumbTopForLevelValue(safeLiveZoomLevelValue);
 	const activeIconIndex = Math.min(
-		Math.max(Math.round(safeZoomLevelValue), 0),
+		Math.max(Math.round(safeLiveZoomLevelValue), 0),
 		ZOOM_THUMB_MAX_INDEX
 	);
-	const thumbBackgroundColor = getZoomThumbBackgroundColor(safeZoomLevelValue);
+	const thumbBackgroundColor = getZoomThumbBackgroundColor(safeLiveZoomLevelValue);
+	const zoomControlCursor = isDragging
+		? 'grabbing'
+		: isInteractive
+			? 'grab'
+			: 'default';
+	const zoomControlCursorClassName = isInteractive
+		? isDragging
+			? '!cursor-grabbing [&_*]:!cursor-grabbing'
+			: '!cursor-grab [&_*]:!cursor-grab'
+		: '';
+	const starterBoxClassName = [className, zoomControlCursorClassName]
+		.filter(Boolean)
+		.join(' ');
 
 	const applyLevelValueToDom = useCallback((levelValue: number) => {
 		const safeValue = clampZoomLevelValue(levelValue);
+		setLiveZoomLevelValue((current) =>
+			Math.abs(current - safeValue) < 0.005 ? current : safeValue
+		);
 		const thumb = thumbRef.current;
 		if (!thumb) return;
 
@@ -346,7 +360,9 @@ export function MapSelectGrabStarterBox({
 	const getLevelValueForClientY = useCallback((clientY: number) => {
 		const rect = trackRef.current?.getBoundingClientRect();
 		if (!rect) return safeZoomLevelValue;
-		const thumbTop = clientY - rect.top - ZOOM_THUMB_SIZE_PX / 2;
+		const localScaleY = rect.height > 0 ? STARTER_BOX_HEIGHT_PX / rect.height : 1;
+		const localY = (clientY - rect.top) * localScaleY;
+		const thumbTop = localY - ZOOM_THUMB_SIZE_PX / 2;
 		return getLevelValueForThumbTop(thumbTop);
 	}, [safeZoomLevelValue]);
 
@@ -452,7 +468,7 @@ export function MapSelectGrabStarterBox({
 			display: 'flex',
 			alignItems: 'center',
 			justifyContent: 'center',
-			cursor: isDragging ? 'grabbing' : isInteractive ? 'grab' : 'default',
+			cursor: zoomControlCursor,
 			overflow: 'hidden',
 			touchAction: 'none',
 			outline: 'none',
@@ -461,14 +477,14 @@ export function MapSelectGrabStarterBox({
 			willChange: 'transform, background-color',
 			transition: 'none',
 		}),
-		[isDragging, isInteractive, thumbBackgroundColor, thumbTopPx]
+		[thumbBackgroundColor, thumbTopPx, zoomControlCursor]
 	);
 
 	return (
 		<div
 			ref={trackRef}
 			aria-hidden={isInteractive ? undefined : true}
-			className={className}
+			className={starterBoxClassName || undefined}
 			onPointerDown={handlePointerDown}
 			onPointerMove={handlePointerMove}
 			onPointerUp={stopDragging}
@@ -481,16 +497,18 @@ export function MapSelectGrabStarterBox({
 				backgroundColor: '#FFFFFF',
 				touchAction: 'none',
 				...style,
+				cursor: zoomControlCursor,
 			}}
 		>
 			<button
 				ref={thumbRef}
 				type="button"
 				aria-label="Map zoom level"
+				className={zoomControlCursorClassName || undefined}
 				aria-valuemin={0}
 				aria-valuemax={ZOOM_THUMB_MAX_INDEX}
-				aria-valuenow={Number(safeZoomLevelValue.toFixed(2))}
-				aria-valuetext={`Zoom level ${Number(safeZoomLevelValue.toFixed(1))} of ${ZOOM_THUMB_MAX_INDEX}`}
+				aria-valuenow={Number(safeLiveZoomLevelValue.toFixed(2))}
+				aria-valuetext={`Zoom level ${Number(safeLiveZoomLevelValue.toFixed(1))} of ${ZOOM_THUMB_MAX_INDEX}`}
 				role="slider"
 				tabIndex={isInteractive ? 0 : -1}
 				onKeyDown={handleKeyDown}
@@ -505,40 +523,55 @@ export function MapSelectGrabStarterBox({
 						display: 'flex',
 						alignItems: 'center',
 						justifyContent: 'center',
+						cursor: zoomControlCursor,
 					}}
 				>
-					{zoomIcons.map((icon, index) => {
-						return (
-							<span
-								key={index}
-								ref={(element) => {
-									iconRefs.current[index] = element;
-								}}
-								style={{
-									position: 'absolute',
-									inset: 0,
-									display: 'flex',
-									alignItems: 'center',
-									justifyContent: 'center',
-									opacity: index === activeIconIndex ? 1 : 0,
-									pointerEvents: 'none',
-									transition: 'none',
-								}}
-							>
+					{hasCustomZoomIcons ? (
+						zoomIcons.map((icon, index) => {
+							return (
 								<span
+									key={index}
+									ref={(element) => {
+										iconRefs.current[index] = element;
+									}}
 									style={{
+										position: 'absolute',
+										inset: 0,
 										display: 'flex',
 										alignItems: 'center',
 										justifyContent: 'center',
-										width: '100%',
-										height: '100%',
+										opacity: index === activeIconIndex ? 1 : 0,
+										pointerEvents: 'none',
+										transition: 'none',
+										cursor: zoomControlCursor,
 									}}
 								>
-									{icon}
+									<span
+										style={{
+											display: 'flex',
+											alignItems: 'center',
+											justifyContent: 'center',
+											width: '100%',
+											height: '100%',
+											cursor: zoomControlCursor,
+										}}
+									>
+										{icon}
+									</span>
 								</span>
-							</span>
-						);
-					})}
+							);
+						})
+					) : (
+						<MapZoomSequenceIcon
+							levelValue={safeLiveZoomLevelValue}
+							aria-hidden="true"
+							focusable="false"
+							style={{
+								display: 'block',
+								cursor: zoomControlCursor,
+							}}
+						/>
+					)}
 				</div>
 			</button>
 		</div>
