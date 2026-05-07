@@ -1,13 +1,53 @@
 import * as React from 'react';
-import Frame00World from './frame00World';
-import Frame01WorldLarge from './frame01WorldLarge';
-import Frame02WorldCircle24 from './frame02WorldCircle24';
-import Frame03WorldCircle28 from './frame03WorldCircle28';
-import Frame04WorldCircle33 from './frame04WorldCircle33';
-import Frame05WorldCircle37 from './frame05WorldCircle37';
-import Frame06Us from './frame06Us';
-import Frame07UsBridgeOne from './frame07UsBridgeOne';
-import Frame08UsBridgeTwo from './frame08UsBridgeTwo';
+import {
+	CONTINENT_COLOR_LEVELS,
+	CONTINENT_COLORS,
+	CONTINENT_KEYFRAME_COORDS,
+	CONTINENT_LEVELS,
+	CONTINENT_TEMPLATE,
+	DETAIL_ONE_KEYFRAME_COORDS,
+	DETAIL_ONE_LEVELS,
+	DETAIL_ONE_TEMPLATE,
+	DETAIL_THREE_KEYFRAME_COORDS,
+	DETAIL_THREE_LEVELS,
+	DETAIL_THREE_TEMPLATE,
+	DETAIL_TWO_KEYFRAME_COORDS,
+	DETAIL_TWO_LEVELS,
+	DETAIL_TWO_TEMPLATE,
+	FOCUS_ENTRY_LEVELS,
+	FOCUS_ENTRY_SCALES,
+	FOCUS_INSET_COLOR,
+	FOCUS_INSET_KEYFRAME_COORDS,
+	FOCUS_INSET_LEVELS,
+	FOCUS_INSET_TEMPLATE,
+	GLOBE_MASK_CX,
+	GLOBE_MASK_CY,
+	GLOBE_MASK_LEVELS,
+	GLOBE_MASK_RADII,
+	GLOBE_OUTLINE_COLOR,
+	GLOBE_OUTLINE_LEVELS,
+	GLOBE_OUTLINE_RADII,
+	GLOBE_OUTLINE_STROKE_WIDTHS,
+	SURFACE_EXIT_LEVELS,
+	SURFACE_EXIT_SCALES,
+	US_ANCHOR_LEVELS,
+	US_ANCHOR_X,
+	US_ANCHOR_Y,
+	US_HANDOFF_SCALE_LEVELS,
+	US_HANDOFF_SCALES,
+	US_SHAPE_COLOR_LEVELS,
+	US_SHAPE_COLORS,
+	US_SHAPE_KEYFRAME_CENTER_X,
+	US_SHAPE_KEYFRAME_CENTER_Y,
+	US_SHAPE_KEYFRAME_COORDS,
+	US_SHAPE_LEVELS,
+	US_SHAPE_TEMPLATE,
+	WORLD_ICON_LEVELS,
+	WORLD_ICON_SCALES,
+	resolveColor,
+	resolveMorphedPath,
+	resolveScalar,
+} from './earlyFrameTracks';
 import {
 	ZOOMED_OUT_WORLD_ICON_PATH,
 	ZOOM_LEVEL_FOUR_FOCUS_ICON_PATH,
@@ -22,21 +62,9 @@ type MapZoomSequenceIconProps = React.SVGProps<SVGSVGElement> & {
 
 const MIN_LEVEL = 0;
 const MAX_LEVEL = 20;
-// Preserve the hand-authored globe-to-U.S. frames before the procedural zoom takes over.
-const LAST_RESTORED_EARLY_FRAME_INDEX = 8;
-const RESTORED_EARLY_FRAME_EXIT_LEVEL = LAST_RESTORED_EARLY_FRAME_INDEX + 0.5;
-
-const RESTORED_EARLY_FRAMES = [
-	Frame00World,
-	Frame01WorldLarge,
-	Frame02WorldCircle24,
-	Frame03WorldCircle28,
-	Frame04WorldCircle33,
-	Frame05WorldCircle37,
-	Frame06Us,
-	Frame07UsBridgeOne,
-	Frame08UsBridgeTwo,
-] as const;
+// At levels below this threshold the continuously-morphed early-frame stage runs.
+// At and above it, the existing procedural zoom takes over without modification.
+const EARLY_STAGE_EXIT_LEVEL = 8.5;
 
 const clamp = (value: number, min = 0, max = 1) => {
 	if (!Number.isFinite(value)) return min;
@@ -144,37 +172,205 @@ const StreetGrid = ({
 	);
 };
 
+type EarlyZoomStageProps = React.SVGProps<SVGSVGElement> & {
+	rawId: string;
+	level: number;
+};
+
+/** Continuously-morphed render of the original frame00..frame08 artwork.
+ *
+ * Every recurring element in those nine static frames (world icon, globe outline,
+ * globe mask, hand-drawn continent, three detail noise paths, US silhouette, focus
+ * inset) becomes a track here. At any non-integer \`level\` the track's two adjacent
+ * keyframes are linearly interpolated, including per-coordinate path morphing where
+ * the keyframes share an SVG command topology. Disappearance is geometric — strokes
+ * thin to zero, scales collapse, the globe-mask radius grows past the viewport — so
+ * we never reach for opacity to mask the seams. */
+const EarlyZoomStage = ({ rawId, level, ...props }: EarlyZoomStageProps) => {
+	const roundedClipId = `${rawId}-map-zoom-rounded`;
+	const globeMaskId = `${rawId}-early-globe-mask`;
+
+	const worldIconScale = resolveScalar(level, WORLD_ICON_LEVELS, WORLD_ICON_SCALES);
+	const globeOutlineRadius = resolveScalar(
+		level,
+		GLOBE_OUTLINE_LEVELS,
+		GLOBE_OUTLINE_RADII
+	);
+	const globeOutlineStrokeWidth = resolveScalar(
+		level,
+		GLOBE_OUTLINE_LEVELS,
+		GLOBE_OUTLINE_STROKE_WIDTHS
+	);
+	const globeMaskRadius = resolveScalar(level, GLOBE_MASK_LEVELS, GLOBE_MASK_RADII);
+	const globeMaskCx = resolveScalar(level, GLOBE_MASK_LEVELS, GLOBE_MASK_CX);
+	const globeMaskCy = resolveScalar(level, GLOBE_MASK_LEVELS, GLOBE_MASK_CY);
+	const surfaceExitScale = resolveScalar(level, SURFACE_EXIT_LEVELS, SURFACE_EXIT_SCALES);
+	const focusEntryScale = resolveScalar(level, FOCUS_ENTRY_LEVELS, FOCUS_ENTRY_SCALES);
+	const continentColor = resolveColor(level, CONTINENT_COLOR_LEVELS, CONTINENT_COLORS);
+	const usShapeColor = resolveColor(level, US_SHAPE_COLOR_LEVELS, US_SHAPE_COLORS);
+
+	// Anchor the lerped US bounding-box center at the active anchor target. For
+	// levels 3..7 the anchor is canvas center (pure zoom, no drift). Over levels
+	// 7..8 the anchor lerps to procedural's L8.5 visible center and the handoff
+	// scale boosts the US to procedural's L8.5 visible size, so the level 8 → 8.5
+	// boundary is seamless.
+	const usCenterX = resolveScalar(level, US_SHAPE_LEVELS, US_SHAPE_KEYFRAME_CENTER_X);
+	const usCenterY = resolveScalar(level, US_SHAPE_LEVELS, US_SHAPE_KEYFRAME_CENTER_Y);
+	const usAnchorX = resolveScalar(level, US_ANCHOR_LEVELS, US_ANCHOR_X);
+	const usAnchorY = resolveScalar(level, US_ANCHOR_LEVELS, US_ANCHOR_Y);
+	const usHandoffScale = resolveScalar(
+		level,
+		US_HANDOFF_SCALE_LEVELS,
+		US_HANDOFF_SCALES
+	);
+
+	const continentD = resolveMorphedPath(
+		level,
+		CONTINENT_LEVELS,
+		CONTINENT_KEYFRAME_COORDS,
+		CONTINENT_TEMPLATE
+	);
+	const detail1D = resolveMorphedPath(
+		level,
+		DETAIL_ONE_LEVELS,
+		DETAIL_ONE_KEYFRAME_COORDS,
+		DETAIL_ONE_TEMPLATE
+	);
+	const detail2D = resolveMorphedPath(
+		level,
+		DETAIL_TWO_LEVELS,
+		DETAIL_TWO_KEYFRAME_COORDS,
+		DETAIL_TWO_TEMPLATE
+	);
+	const detail3D = resolveMorphedPath(
+		level,
+		DETAIL_THREE_LEVELS,
+		DETAIL_THREE_KEYFRAME_COORDS,
+		DETAIL_THREE_TEMPLATE
+	);
+	const usShapeD = resolveMorphedPath(
+		level,
+		US_SHAPE_LEVELS,
+		US_SHAPE_KEYFRAME_COORDS,
+		US_SHAPE_TEMPLATE
+	);
+	const focusD = resolveMorphedPath(
+		level,
+		FOCUS_INSET_LEVELS,
+		FOCUS_INSET_KEYFRAME_COORDS,
+		FOCUS_INSET_TEMPLATE
+	);
+
+	// The world icon owns levels 0 → 2 only — at exactly level 2 the planet view
+	// takes over and the world icon hard-cuts. The world icon's scale 1.37 at L2
+	// matches the planet-circle stroke radius (23.29), so the *outer* boundary
+	// stays put across the boundary; only the *interior* changes (Earth-icon
+	// continents → hand-drawn continent + planet outline). No circle expands.
+	//
+	// Surface/outline gating is keyed off `level >= 2` so that at any L<2 they
+	// stay completely hidden — even though resolveScalar returns the first
+	// keyframe's value (radius 24, strokeWidth 1.41) at sub-keyframe levels.
+	const showWorldIcon = level < WORLD_ICON_LEVELS[WORLD_ICON_LEVELS.length - 1] && worldIconScale > 0.001;
+	const showGlobeOutline = level >= 2 && globeOutlineStrokeWidth > 0.001 && globeOutlineRadius > 0;
+	const showGlobeMask = level >= 2 && globeMaskRadius > 0;
+	const showSurface = showGlobeMask && surfaceExitScale > 0.001;
+	const showUsShape = level >= US_SHAPE_LEVELS[0];
+	const showFocus = level >= FOCUS_ENTRY_LEVELS[0] && focusEntryScale > 0.001;
+
+	return (
+		<svg
+			xmlns="http://www.w3.org/2000/svg"
+			width={45}
+			height={45}
+			viewBox="0 0 45 45"
+			fill="none"
+			style={{ display: 'block' }}
+			{...props}
+		>
+			<defs>
+				<clipPath id={roundedClipId}>
+					<rect width={45} height={45} rx={9} />
+				</clipPath>
+				{showSurface ? (
+					<clipPath id={globeMaskId}>
+						<circle cx={globeMaskCx} cy={globeMaskCy} r={globeMaskRadius} />
+					</clipPath>
+				) : null}
+			</defs>
+
+			<g clipPath={`url(#${roundedClipId})`}>
+				{showWorldIcon ? (
+					<path
+						d={ZOOMED_OUT_WORLD_ICON_PATH}
+						fill="black"
+						transform={transformForCenteredWorld(worldIconScale)}
+					/>
+				) : null}
+
+				{showGlobeOutline ? (
+					<circle
+						cx={globeMaskCx}
+						cy={globeMaskCy}
+						r={globeOutlineRadius}
+						fill="none"
+						stroke={GLOBE_OUTLINE_COLOR}
+						strokeWidth={globeOutlineStrokeWidth}
+					/>
+				) : null}
+
+				{showSurface ? (
+					<g clipPath={`url(#${globeMaskId})`}>
+						<g
+							transform={`translate(22.5 22.5) scale(${surfaceExitScale}) translate(-22.5 -22.5)`}
+						>
+							<path d={continentD} fill={continentColor} />
+							<path d={detail1D} fill={continentColor} />
+							<path d={detail2D} fill={continentColor} />
+							<path d={detail3D} fill={continentColor} />
+						</g>
+					</g>
+				) : null}
+
+				{showUsShape ? (
+					<g
+						transform={`translate(${usAnchorX} ${usAnchorY}) scale(${usHandoffScale}) translate(${-usCenterX} ${-usCenterY})`}
+					>
+						<path d={usShapeD} fill={usShapeColor} />
+						{showFocus ? (
+							<g
+								transform={`translate(${usCenterX} ${usCenterY}) scale(${focusEntryScale}) translate(${-usCenterX} ${-usCenterY})`}
+							>
+								<path d={focusD} fill={FOCUS_INSET_COLOR} />
+							</g>
+						) : null}
+					</g>
+				) : null}
+			</g>
+		</svg>
+	);
+};
+
 export default function MapZoomSequenceIcon({
 	levelValue,
 	...props
 }: MapZoomSequenceIconProps) {
 	const rawId = React.useId().replace(/:/g, '');
 	const level = clamp(levelValue, MIN_LEVEL, MAX_LEVEL);
-	const earlyFrameIndex = Math.min(
-		Math.max(Math.round(level), 0),
-		LAST_RESTORED_EARLY_FRAME_INDEX
-	);
-	const RestoredEarlyFrame =
-		level < RESTORED_EARLY_FRAME_EXIT_LEVEL
-			? RESTORED_EARLY_FRAMES[earlyFrameIndex] ?? null
-			: null;
 
-	if (RestoredEarlyFrame) {
-		return <RestoredEarlyFrame {...props} />;
+	if (level < EARLY_STAGE_EXIT_LEVEL) {
+		return <EarlyZoomStage rawId={rawId} level={level} {...props} />;
 	}
 
 	const roundedClipId = `${rawId}-map-zoom-rounded`;
 	const globeClipId = `${rawId}-map-zoom-globe`;
 	const usRevealClipId = `${rawId}-map-zoom-us-reveal`;
-	const tileRevealClipId = `${rawId}-map-zoom-tile-reveal`;
 
 	const worldGrowT = smoothStep(progressBetween(level, 0, 2));
 	const globeT = smoothStep(progressBetween(level, 2, 5.85));
 	const worldExitT = smoothStep(progressBetween(level, 5.1, 6.15));
 	const usRevealT = smoothStep(progressBetween(level, 5.35, 6.2));
 	const usZoomT = smoothStep(progressBetween(level, 6, 13));
-	const tileRevealT = smoothStep(progressBetween(level, 13, 14.35));
-	const tileT = smoothStep(progressBetween(level, 14, 17));
+	const tileT = smoothStep(progressBetween(level, 13, 17));
 	const streetT = smoothStep(progressBetween(level, 15.35, 17));
 	const focusToTileT = smoothStep(progressBetween(level, 13, 15));
 	const stickmanOpacity = getStickmanOpacity(level);
@@ -194,14 +390,21 @@ export default function MapZoomSequenceIcon({
 	const focusFill = '#454545';
 
 	const tileBg = mixColor('#E2E2E2', '#3F3F3F', progressBetween(level, 15.1, 17));
-	const tileLand = mixColor('#D0D0D0', '#454545', progressBetween(level, 14, 16.6));
+	// Tile-mode US params are seeded with the US-in-air values at level 13 so the
+	// L13 boundary is visually continuous (no "different content reveal" inside a
+	// growing rect). The tile rendering takes over at L13 with the US in the same
+	// place and color it just was, then evolves to its end state by L17. Streets
+	// draw on between L15.35 and L17 (existing animation), then the stickman
+	// fades in from L17 — the user's preferred "zoom into Texas, then road
+	// texture, then stickman" sequence.
+	const tileLand = mixColor('#E0E0E0', '#454545', progressBetween(level, 13, 16.6));
 	const tileRegion = mixColor('#454545', '#303030', progressBetween(level, 15, 17));
 	const tileFocusScale = mix(1.04, 1.58, focusToTileT);
 	const tileFocusX = mix(1.6, -12.5, focusToTileT);
 	const tileFocusY = mix(3, -7, focusToTileT);
-	const tileMapScale = mix(0.72, 1.25, tileT);
-	const tileMapX = mix(-11, -54, tileT);
-	const tileMapY = mix(24, -2, tileT);
+	const tileMapScale = mix(1.04, 1.25, tileT);
+	const tileMapX = mix(1.6, -54, tileT);
+	const tileMapY = mix(3, -2, tileT);
 
 	return (
 		<svg
@@ -223,15 +426,6 @@ export default function MapZoomSequenceIcon({
 				<clipPath id={usRevealClipId}>
 					<circle cx={22.5} cy={22.5} r={mix(0, 33, usRevealT)} />
 				</clipPath>
-				<clipPath id={tileRevealClipId}>
-					<rect
-						x={mix(22.5, 0, tileRevealT)}
-						y={mix(22.5, 0, tileRevealT)}
-						width={mix(0, 45, tileRevealT)}
-						height={mix(0, 45, tileRevealT)}
-						rx={mix(2, 9, tileRevealT)}
-					/>
-				</clipPath>
 			</defs>
 
 			<g clipPath={`url(#${roundedClipId})`}>
@@ -251,7 +445,7 @@ export default function MapZoomSequenceIcon({
 					</g>
 				) : null}
 
-				{level >= 5.35 && level < 14.35 ? (
+				{level >= 5.35 && level < 13 ? (
 					<g clipPath={level < 6.2 ? `url(#${usRevealClipId})` : undefined}>
 						<g transform={`translate(${usTranslateX} ${usTranslateY}) scale(${usScale})`}>
 							<path d={ZOOM_LEVEL_FOUR_US_ICON_PATH} fill={usFill} />
@@ -261,7 +455,7 @@ export default function MapZoomSequenceIcon({
 				) : null}
 
 				{level >= 13 ? (
-					<g clipPath={level < 14.35 ? `url(#${tileRevealClipId})` : undefined}>
+					<g>
 						<rect width={45} height={45} fill={tileBg} />
 						{level < 16.85 ? (
 							<g>

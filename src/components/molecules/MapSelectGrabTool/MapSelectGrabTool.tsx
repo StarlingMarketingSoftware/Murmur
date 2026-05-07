@@ -71,36 +71,62 @@ const STACK_BOX_TILE_RADIUS_PX = 10.658;
 const STACK_BOX_FIRST_GAP_PX = 21;
 const STACK_BOX_SECOND_GAP_PX = 12;
 const TALL_STACK_BOX_WIDTH_PX = 56;
-const TALL_STACK_BOX_HEIGHT_PX = 456;
+const TALL_STACK_BOX_HEIGHT_PX = 462;
 const TALL_STACK_BOX_RADIUS_PX = 17;
 const TALL_STACK_BOX_GAP_PX = 19;
+const TALL_STACK_DIVIDER_BOTTOM_PX = 61;
+const TALL_STACK_DIVIDER_HEIGHT_PX = 6;
+const TALL_STACK_ALL_LABEL_GAP_ABOVE_DIVIDER_PX = 3;
+const TALL_STACK_ALL_LABEL_WIDTH_PX = 9;
+const TALL_STACK_ALL_LABEL_HEIGHT_PX = 44;
+const TALL_STACK_ALL_LABEL_VISUAL_HEIGHT_PX = TALL_STACK_ALL_LABEL_WIDTH_PX;
+const TALL_STACK_ALL_LABEL_BOTTOM_PX =
+	TALL_STACK_DIVIDER_BOTTOM_PX +
+	TALL_STACK_DIVIDER_HEIGHT_PX +
+	TALL_STACK_ALL_LABEL_GAP_ABOVE_DIVIDER_PX +
+	TALL_STACK_ALL_LABEL_VISUAL_HEIGHT_PX / 2 -
+	TALL_STACK_ALL_LABEL_HEIGHT_PX / 2;
+const TALL_STACK_UPPER_ICON_GAP_ABOVE_ALL_LABEL_PX = 4;
+const TALL_STACK_FIRST_UPPER_ICON_BOTTOM_PX =
+	TALL_STACK_DIVIDER_BOTTOM_PX +
+	TALL_STACK_DIVIDER_HEIGHT_PX +
+	TALL_STACK_ALL_LABEL_GAP_ABOVE_DIVIDER_PX +
+	TALL_STACK_ALL_LABEL_VISUAL_HEIGHT_PX +
+	TALL_STACK_UPPER_ICON_GAP_ABOVE_ALL_LABEL_PX;
 const TALL_STACK_INNER_BOX_SIZE_PX = 44;
-const TALL_STACK_INNER_BOX_RADIUS_PX = 17;
+const TALL_STACK_INNER_BOX_RADIUS_PX = 10.9;
 const TALL_STACK_INNER_BOX_LEFT_PX =
 	(TALL_STACK_BOX_WIDTH_PX - TALL_STACK_INNER_BOX_SIZE_PX) / 2;
+const TALL_STACK_BOTTOM_ICON_BOTTOM_PX = 6;
+const TALL_STACK_UPPER_ICON_COUNT = 6;
+const TALL_STACK_LAST_UPPER_ICON_BOTTOM_PX =
+	TALL_STACK_BOX_HEIGHT_PX -
+	TALL_STACK_INNER_BOX_SIZE_PX -
+	TALL_STACK_BOTTOM_ICON_BOTTOM_PX;
+const TALL_STACK_UPPER_ICON_SPACING_PX =
+	(TALL_STACK_LAST_UPPER_ICON_BOTTOM_PX - TALL_STACK_FIRST_UPPER_ICON_BOTTOM_PX) /
+	(TALL_STACK_UPPER_ICON_COUNT - 1);
 const TALL_STACK_INNER_BOX_BOTTOM_POSITIONS_PX = [
-	6,
-	78,
-	144,
-	210,
-	276,
-	342,
-	408,
+	TALL_STACK_BOTTOM_ICON_BOTTOM_PX,
+	TALL_STACK_FIRST_UPPER_ICON_BOTTOM_PX,
+	TALL_STACK_FIRST_UPPER_ICON_BOTTOM_PX + TALL_STACK_UPPER_ICON_SPACING_PX,
+	TALL_STACK_FIRST_UPPER_ICON_BOTTOM_PX + TALL_STACK_UPPER_ICON_SPACING_PX * 2,
+	TALL_STACK_FIRST_UPPER_ICON_BOTTOM_PX + TALL_STACK_UPPER_ICON_SPACING_PX * 3,
+	TALL_STACK_FIRST_UPPER_ICON_BOTTOM_PX + TALL_STACK_UPPER_ICON_SPACING_PX * 4,
+	TALL_STACK_FIRST_UPPER_ICON_BOTTOM_PX + TALL_STACK_UPPER_ICON_SPACING_PX * 5,
 ] as const;
 const TALL_STACK_INNER_BOX_STYLES = [
 	{ backgroundColor: '#EFEFEF' },
-	{ backgroundColor: '#80AAFF' },
 	{ backgroundColor: '#F0E0A15C' },
 	{ backgroundColor: '#C5EDA05C' },
+	{ backgroundColor: '#80AAFF' },
 	{
 		backgroundColor: 'rgba(165, 195, 255, 0.36)',
 		opacity: 0.43,
-		borderRadius: '10.941px',
 	},
 	{
 		backgroundColor: 'rgba(155, 218, 255, 0.36)',
 		opacity: 0.5,
-		borderRadius: '10.941px',
 	},
 	{ backgroundColor: 'rgba(119, 221, 145, 0.77)' },
 ] as const satisfies readonly CSSProperties[];
@@ -220,11 +246,11 @@ const getTallStackInnerBoxContent = (index: number): ReactNode => {
 		case 0:
 			return <RadioStationsIcon size={32} innerFill="#EFEFEF" />;
 		case 1:
-			return <FestivalsIcon size={28} />;
-		case 2:
 			return <WeddingPlannersIcon size={32} innerFill="#F0E0A1" />;
-		case 3:
+		case 2:
 			return <CoffeeShopsIcon size={20} innerFill="#C5EDA0" />;
+		case 3:
+			return <FestivalsIcon size={28} />;
 		case 4:
 			return <WineBeerSpiritsIcon size={32} innerFill="#A5C3FF" />;
 		case 5:
@@ -654,6 +680,54 @@ export function MapSelectGrabTallStackBox({
 			}}
 		>
 			<div style={{ position: 'relative', width: '100%', height: '100%' }}>
+				<div
+					aria-hidden="true"
+					style={{
+						position: 'absolute',
+						left: 0,
+						right: 0,
+						bottom: `${TALL_STACK_DIVIDER_BOTTOM_PX}px`,
+						height: `${TALL_STACK_DIVIDER_HEIGHT_PX}px`,
+						backgroundColor: '#ECECEC',
+					}}
+				/>
+				<div
+					aria-hidden="true"
+					style={{
+						position: 'absolute',
+						left: `${(TALL_STACK_BOX_WIDTH_PX - TALL_STACK_ALL_LABEL_WIDTH_PX) / 2}px`,
+						bottom: `${TALL_STACK_ALL_LABEL_BOTTOM_PX}px`,
+						width: `${TALL_STACK_ALL_LABEL_WIDTH_PX}px`,
+						height: `${TALL_STACK_ALL_LABEL_HEIGHT_PX}px`,
+						borderRadius: `${TALL_STACK_INNER_BOX_RADIUS_PX}px`,
+						backgroundColor: '#F4F4F4',
+						display: 'flex',
+						alignItems: 'center',
+						justifyContent: 'center',
+						transform: 'rotate(90deg)',
+						transformOrigin: 'center',
+					}}
+				>
+					<span
+						style={{
+							display: 'flex',
+							width: '11.5px',
+							height: '8px',
+							flexDirection: 'column',
+							justifyContent: 'center',
+							color: '#000000',
+							textAlign: 'center',
+							fontFamily: 'Inter, sans-serif',
+							fontSize: '9.868px',
+							fontStyle: 'normal',
+							fontWeight: 400,
+							lineHeight: '19.737px',
+							transform: 'rotate(-90deg)',
+						}}
+					>
+						All
+					</span>
+				</div>
 				{TALL_STACK_INNER_BOX_BOTTOM_POSITIONS_PX.map((bottomPx, index) => {
 					const tileBackgroundStyle: CSSProperties =
 						TALL_STACK_INNER_BOX_STYLES[index] ?? {};

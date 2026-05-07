@@ -1,13 +1,4 @@
 import type { ComponentType, SVGProps } from 'react';
-import Frame00 from './frame00World';
-import Frame01 from './frame01WorldLarge';
-import Frame02 from './frame02WorldCircle24';
-import Frame03 from './frame03WorldCircle28';
-import Frame04 from './frame04WorldCircle33';
-import Frame05 from './frame05WorldCircle37';
-import Frame06 from './frame06Us';
-import Frame07 from './frame07UsBridgeOne';
-import Frame08 from './frame08UsBridgeTwo';
 import Frame09 from './frame09UsFocus';
 import Frame10 from './frame10UsFocusBridgeOne';
 import Frame11 from './frame11UsFocusBridgeTwo';
@@ -21,16 +12,12 @@ import Frame18 from './frame18StreetStickmanFade35';
 import Frame19 from './frame19StreetStickmanFade70';
 import Frame20 from './frame20MapZoomFinal';
 
+// Frames 00..08 used to live here as discrete React components, then were swapped
+// frame-by-frame at integer levels. They are now produced as a single continuous
+// morph by EarlyZoomStage in MapZoomSequenceIcon.tsx, so only frames 09..20 remain
+// as standalone components. This list is kept for any tooling that still wants the
+// per-frame catalog; nothing in the runtime uses it today.
 export const MAP_ZOOM_SEQUENCE_ICON_COMPONENTS = [
-	Frame00,
-	Frame01,
-	Frame02,
-	Frame03,
-	Frame04,
-	Frame05,
-	Frame06,
-	Frame07,
-	Frame08,
 	Frame09,
 	Frame10,
 	Frame11,
