@@ -9,6 +9,7 @@ import type {
 	ReactNode,
 } from 'react';
 import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
+import { FestivalsIcon } from '@/components/atoms/_svg/FestivalsIcon';
 import MapZoomSequenceIcon from '@/components/atoms/_svg/mapZoomSequence/MapZoomSequenceIcon';
 import { MusicVenuesIcon } from '@/components/atoms/_svg/MusicVenuesIcon';
 import { RadioStationsIcon } from '@/components/atoms/_svg/RadioStationsIcon';
@@ -88,7 +89,7 @@ const TALL_STACK_INNER_BOX_BOTTOM_POSITIONS_PX = [
 ] as const;
 const TALL_STACK_INNER_BOX_STYLES = [
 	{ backgroundColor: '#EFEFEF' },
-	{ backgroundColor: '#E0E0E0' },
+	{ backgroundColor: '#80AAFF' },
 	{ backgroundColor: '#F0E0A15C' },
 	{ backgroundColor: '#C5EDA05C' },
 	{
@@ -219,21 +220,7 @@ const getTallStackInnerBoxContent = (index: number): ReactNode => {
 		case 0:
 			return <RadioStationsIcon size={32} innerFill="#EFEFEF" />;
 		case 1:
-			return (
-				<span
-					style={{
-						color: '#000000',
-						textAlign: 'center',
-						fontFamily: 'Inter, sans-serif',
-						fontSize: '19.737px',
-						fontStyle: 'normal',
-						fontWeight: 400,
-						lineHeight: '39.473px',
-					}}
-				>
-					All
-				</span>
-			);
+			return <FestivalsIcon size={28} />;
 		case 2:
 			return <WeddingPlannersIcon size={32} innerFill="#F0E0A1" />;
 		case 3:
