@@ -1,6 +1,6 @@
 'use client';
 import { GoogleMap, MarkerF, useJsApiLoader } from '@react-google-maps/api';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
 	generateMapMarkerPinIconUrl,
 	MAP_MARKER_PIN_CIRCLE_CENTER_X,
@@ -14,7 +14,24 @@ import {
 	type LandingMapPanelContact,
 } from './LandingPageMapResultsSidePanel';
 import { LandingPageMapSearchTray } from './LandingPageMapSearchTray';
-import { LandingPageMapSearchTools } from './LandingPageMapSearchTools';
+import { LandingPageMapSelectGrabTool } from './LandingPageMapSearchTools';
+import { MapStackBlueSparkIcon } from '@/components/atoms/_svg/MapStackBlueSparkIcon';
+import { MapStackStarIcon } from '@/components/atoms/_svg/MapStackStarIcon';
+import {
+	MapSelectGrabStarterBox,
+	MapSelectGrabStackBox,
+	MapSelectGrabStackTile,
+	MapSelectGrabTallStackBox,
+	MAP_SELECT_GRAB_STARTER_BOX_GAP_PX,
+	MAP_SELECT_GRAB_STARTER_BOX_HEIGHT_PX,
+	MAP_SELECT_GRAB_STACK_BOX_FIRST_GAP_PX,
+	MAP_SELECT_GRAB_STACK_BOX_SECOND_GAP_PX,
+	MAP_SELECT_GRAB_STACK_BOX_SIZE_PX,
+	MAP_SELECT_GRAB_TALL_STACK_BOX_GAP_PX,
+	MAP_SELECT_GRAB_TALL_STACK_BOX_HEIGHT_PX,
+	MAP_SELECT_GRAB_TOOL_COLLAPSED_HEIGHT_PX,
+	type MapZoomControlIndexChangeMeta,
+} from '@/components/molecules/MapSelectGrabTool/MapSelectGrabTool';
 
 type Props = {
 	className?: string;
@@ -35,6 +52,48 @@ const CALIFORNIA_PAN_BOUNDS: google.maps.LatLngBoundsLiteral = {
 // Demo pins for the landing page map.
 const LANDING_DEMO_MARKER_COUNT = 560;
 const LANDING_DEMO_MARKER_WIDTH_PX = 16; // smaller pins for dense, marketing-map view
+const LANDING_MAP_SELECT_GRAB_LEFT_PX = 26;
+const LANDING_MAP_SELECT_GRAB_COLLAPSED_BOTTOM_PX = 83;
+const LANDING_MAP_ZOOM_CONTROL_LEVELS = [
+	4,
+	4.17,
+	4.33,
+	4.5,
+	4.67,
+	4.83,
+	5,
+	5.33,
+	5.67,
+	6,
+	6.33,
+	6.67,
+	7,
+	7.25,
+	7.5,
+	7.75,
+	8,
+	8.25,
+	8.5,
+	8.75,
+	9,
+] as const;
+const LANDING_MAP_ZOOM_CONTROL_MAX_INDEX = LANDING_MAP_ZOOM_CONTROL_LEVELS.length - 1;
+
+const clampLandingMapZoomControlValue = (levelValue: number) => {
+	if (!Number.isFinite(levelValue)) return 0;
+	return Math.min(Math.max(levelValue, 0), LANDING_MAP_ZOOM_CONTROL_MAX_INDEX);
+};
+
+const getLandingMapZoomForControlValue = (levelValue: number) => {
+	const safeValue = clampLandingMapZoomControlValue(levelValue);
+	const lowerIndex = Math.floor(safeValue);
+	const upperIndex = Math.min(lowerIndex + 1, LANDING_MAP_ZOOM_CONTROL_MAX_INDEX);
+	const progress = safeValue - lowerIndex;
+	const lowerZoom =
+		LANDING_MAP_ZOOM_CONTROL_LEVELS[lowerIndex] ?? LANDING_MAP_ZOOM_CONTROL_LEVELS[0];
+	const upperZoom = LANDING_MAP_ZOOM_CONTROL_LEVELS[upperIndex] ?? lowerZoom;
+	return lowerZoom + (upperZoom - lowerZoom) * progress;
+};
 
 type DemoCategory =
 	| 'Restaurants'
@@ -616,6 +675,14 @@ const generateDemoMarkersInCalifornia = (
 };
 
 export function LandingPageGoogleMapBackground({ className, onReady }: Props) {
+	const [activeMapTool, setActiveMapTool] = useState<'select' | 'grab'>('grab');
+	const [mapZoomControlIndex, setMapZoomControlIndex] = useState(1);
+	const [mapZoomControlDragValue, setMapZoomControlDragValue] = useState<number | null>(null);
+	const [landingMapZoom, setLandingMapZoom] = useState(DEFAULT_ZOOM);
+	const [, setSelectAllInViewNonce] = useState(0);
+	const googleMapRef = useRef<google.maps.Map | null>(null);
+	const pendingLandingMapZoomRef = useRef<number | null>(null);
+	const landingMapZoomRafRef = useRef<number | null>(null);
 	const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
 
 	const { isLoaded, loadError } = useJsApiLoader({
@@ -712,6 +779,84 @@ export function LandingPageGoogleMapBackground({ className, onReady }: Props) {
 		return map;
 	}, [markerSizing, isLoaded]);
 
+	const pushLandingMapZoom = useCallback((zoom: number) => {
+		setLandingMapZoom(zoom);
+		try {
+			googleMapRef.current?.moveCamera({ zoom });
+		} catch {
+			try {
+				googleMapRef.current?.setZoom(zoom);
+			} catch {
+				// Non-fatal for the marketing demo chrome.
+			}
+		}
+	}, []);
+
+	const scheduleLandingMapZoom = useCallback(
+		(zoom: number) => {
+			pendingLandingMapZoomRef.current = zoom;
+			if (landingMapZoomRafRef.current != null) return;
+			landingMapZoomRafRef.current = window.requestAnimationFrame(() => {
+				landingMapZoomRafRef.current = null;
+				const pendingZoom = pendingLandingMapZoomRef.current;
+				pendingLandingMapZoomRef.current = null;
+				if (typeof pendingZoom !== 'number') return;
+				pushLandingMapZoom(pendingZoom);
+			});
+		},
+		[pushLandingMapZoom]
+	);
+
+	useEffect(() => {
+		return () => {
+			if (landingMapZoomRafRef.current != null) {
+				window.cancelAnimationFrame(landingMapZoomRafRef.current);
+				landingMapZoomRafRef.current = null;
+			}
+			pendingLandingMapZoomRef.current = null;
+		};
+	}, []);
+
+	const mapZoomControlDisplayValue = mapZoomControlDragValue ?? mapZoomControlIndex;
+	const isSelectMapToolActive = activeMapTool === 'select';
+	const handleMapZoomControlValueChange = useCallback(
+		(levelValue: number) => {
+			const safeLevelValue = clampLandingMapZoomControlValue(levelValue);
+			setMapZoomControlDragValue(safeLevelValue);
+			scheduleLandingMapZoom(getLandingMapZoomForControlValue(safeLevelValue));
+		},
+		[scheduleLandingMapZoom]
+	);
+	const handleMapZoomControlInteractionChange = useCallback((isDragging: boolean) => {
+		if (!isDragging) {
+			setMapZoomControlDragValue(null);
+		}
+	}, []);
+	const handleMapZoomControlIndexChange = useCallback(
+		(levelIndex: number, meta?: MapZoomControlIndexChangeMeta) => {
+			const safeLevelIndex = Math.min(
+				Math.max(Math.round(levelIndex), 0),
+				LANDING_MAP_ZOOM_CONTROL_MAX_INDEX
+			);
+			setMapZoomControlIndex(safeLevelIndex);
+			setMapZoomControlDragValue(null);
+			if (meta?.source === 'drag-release') return;
+			pushLandingMapZoom(getLandingMapZoomForControlValue(safeLevelIndex));
+		},
+		[pushLandingMapZoom]
+	);
+	const handleSelectMapToolClick = useCallback(() => {
+		if (!isSelectMapToolActive) {
+			setActiveMapTool('select');
+			return;
+		}
+		setSelectAllInViewNonce((n) => n + 1);
+	}, [isSelectMapToolActive]);
+
+	const handleGrabMapToolClick = useCallback(() => {
+		setActiveMapTool('grab');
+	}, []);
+
 	if (!apiKey || loadError || !isLoaded) return null;
 
 	const containerClassName = className ?? 'w-full h-full';
@@ -723,8 +868,14 @@ export function LandingPageGoogleMapBackground({ className, onReady }: Props) {
 				<GoogleMap
 					mapContainerClassName="w-full h-full"
 					center={DEFAULT_CENTER}
-					zoom={DEFAULT_ZOOM}
-					onLoad={() => onReady?.()}
+					zoom={landingMapZoom}
+					onLoad={(map) => {
+						googleMapRef.current = map;
+						onReady?.();
+					}}
+					onUnmount={() => {
+						googleMapRef.current = null;
+					}}
 					options={{
 						disableDefaultUI: true,
 						clickableIcons: false,
@@ -734,9 +885,9 @@ export function LandingPageGoogleMapBackground({ className, onReady }: Props) {
 						draggable: true,
 						scrollwheel: false,
 						disableDoubleClickZoom: true,
-						// Lock the zoom level so users can't zoom in/out.
-						minZoom: DEFAULT_ZOOM,
-						maxZoom: DEFAULT_ZOOM,
+						minZoom: LANDING_MAP_ZOOM_CONTROL_LEVELS[0],
+						maxZoom: LANDING_MAP_ZOOM_CONTROL_LEVELS[LANDING_MAP_ZOOM_CONTROL_MAX_INDEX],
+						isFractionalZoomEnabled: true,
 						// Limit how far the map can be panned.
 						restriction: {
 							latLngBounds: CALIFORNIA_PAN_BOUNDS,
@@ -773,10 +924,89 @@ export function LandingPageGoogleMapBackground({ className, onReady }: Props) {
 						initialWhat="Music Venues"
 						initialWhere="California"
 					/>
-					{/* Dashboard map-view tools (Select / Grab / Home) to the right of the search bar (desktop only). */}
-					<div className="hidden lg:block">
-						<LandingPageMapSearchTools />
-					</div>
+				</div>
+			</div>
+
+			<div
+				className="absolute z-[85] pointer-events-none"
+				style={{
+					left: `${LANDING_MAP_SELECT_GRAB_LEFT_PX}px`,
+					top: `calc(100% - ${
+						MAP_SELECT_GRAB_TOOL_COLLAPSED_HEIGHT_PX +
+						LANDING_MAP_SELECT_GRAB_COLLAPSED_BOTTOM_PX
+					}px)`,
+				}}
+			>
+				<MapSelectGrabTallStackBox
+					className="absolute pointer-events-none"
+					style={{
+						left: '-0.5px',
+						top: `-${
+							MAP_SELECT_GRAB_STARTER_BOX_HEIGHT_PX +
+							MAP_SELECT_GRAB_STARTER_BOX_GAP_PX +
+							MAP_SELECT_GRAB_STACK_BOX_FIRST_GAP_PX +
+							MAP_SELECT_GRAB_STACK_BOX_SIZE_PX +
+							MAP_SELECT_GRAB_STACK_BOX_SECOND_GAP_PX +
+							MAP_SELECT_GRAB_STACK_BOX_SIZE_PX +
+							MAP_SELECT_GRAB_TALL_STACK_BOX_GAP_PX +
+							MAP_SELECT_GRAB_TALL_STACK_BOX_HEIGHT_PX
+						}px`,
+					}}
+				/>
+				<MapSelectGrabStackBox
+					className="absolute left-0 pointer-events-none"
+					style={{
+						top: `-${
+							MAP_SELECT_GRAB_STARTER_BOX_HEIGHT_PX +
+							MAP_SELECT_GRAB_STARTER_BOX_GAP_PX +
+							MAP_SELECT_GRAB_STACK_BOX_FIRST_GAP_PX +
+							MAP_SELECT_GRAB_STACK_BOX_SIZE_PX
+						}px`,
+					}}
+				>
+					<MapSelectGrabStackTile backgroundColor="#FFBDBD">
+						<MapStackStarIcon />
+					</MapSelectGrabStackTile>
+				</MapSelectGrabStackBox>
+				<MapSelectGrabStackBox
+					className="absolute left-0 pointer-events-none"
+					style={{
+						top: `-${
+							MAP_SELECT_GRAB_STARTER_BOX_HEIGHT_PX +
+							MAP_SELECT_GRAB_STARTER_BOX_GAP_PX +
+							MAP_SELECT_GRAB_STACK_BOX_FIRST_GAP_PX +
+							MAP_SELECT_GRAB_STACK_BOX_SIZE_PX +
+							MAP_SELECT_GRAB_STACK_BOX_SECOND_GAP_PX +
+							MAP_SELECT_GRAB_STACK_BOX_SIZE_PX
+						}px`,
+					}}
+				>
+					<MapSelectGrabStackTile backgroundColor="#50A5C970">
+						<MapStackBlueSparkIcon />
+					</MapSelectGrabStackTile>
+				</MapSelectGrabStackBox>
+				<MapSelectGrabStarterBox
+					className="absolute left-0 pointer-events-auto"
+					zoomLevelIndex={mapZoomControlIndex}
+					zoomLevelValue={mapZoomControlDisplayValue}
+					onZoomLevelIndexChange={handleMapZoomControlIndexChange}
+					onZoomLevelValueChange={handleMapZoomControlValueChange}
+					onZoomLevelInteractionChange={handleMapZoomControlInteractionChange}
+					style={{
+						position: 'absolute',
+						left: 0,
+						top: `-${
+							MAP_SELECT_GRAB_STARTER_BOX_HEIGHT_PX +
+							MAP_SELECT_GRAB_STARTER_BOX_GAP_PX
+						}px`,
+					}}
+				/>
+				<div className="pointer-events-auto">
+					<LandingPageMapSelectGrabTool
+						activeMapTool={activeMapTool}
+						onSelectMapToolClick={handleSelectMapToolClick}
+						onGrabMapToolClick={handleGrabMapToolClick}
+					/>
 				</div>
 			</div>
 
@@ -785,4 +1015,3 @@ export function LandingPageGoogleMapBackground({ className, onReady }: Props) {
 		</div>
 	);
 }
-

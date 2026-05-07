@@ -38,8 +38,6 @@ import { WeddingPlannersIcon } from '@/components/atoms/_svg/WeddingPlannersIcon
 import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
 import { RadioStationsIcon } from '@/components/atoms/_svg/RadioStationsIcon';
 import { NearMeIcon } from '@/components/atoms/_svg/NearMeIcon';
-import HomeIcon from '@/components/atoms/_svg/HomeIcon';
-import HomeExpandedIcon from '@/components/atoms/_svg/HomeExpandedIcon';
 import BottomArrowIcon from '@/components/atoms/_svg/BottomArrowIcon';
 import MapBottomSearchArrowIcon from '@/components/atoms/_svg/MapBottomSearchArrowIcon';
 import MapBottomSearchAdvancedIcon from '@/components/atoms/_svg/MapBottomSearchAdvancedIcon';
@@ -48,7 +46,25 @@ import MapBottomSearchForYouIcon from '@/components/atoms/_svg/MapBottomSearchFo
 import MapBottomSearchProfileIcon from '@/components/atoms/_svg/MapBottomSearchProfileIcon';
 import MapBottomSearchKeywordIcon from '@/components/atoms/_svg/MapBottomSearchKeywordIcon';
 import MapBottomSearchRadiusIcon from '@/components/atoms/_svg/MapBottomSearchRadiusIcon';
-import GrabIcon from '@/components/atoms/svg/GrabIcon';
+import { MapStackBlueSparkIcon } from '@/components/atoms/_svg/MapStackBlueSparkIcon';
+import { MapStackStarIcon } from '@/components/atoms/_svg/MapStackStarIcon';
+import {
+	MapSelectGrabStarterBox,
+	MapSelectGrabStackBox,
+	MapSelectGrabStackTile,
+	MapSelectGrabTallStackBox,
+	MapSelectGrabTool,
+	MAP_SELECT_GRAB_STARTER_BOX_GAP_PX,
+	MAP_SELECT_GRAB_STARTER_BOX_HEIGHT_PX,
+	MAP_SELECT_GRAB_STACK_BOX_FIRST_GAP_PX,
+	MAP_SELECT_GRAB_STACK_BOX_SECOND_GAP_PX,
+	MAP_SELECT_GRAB_STACK_BOX_SIZE_PX,
+	MAP_SELECT_GRAB_TALL_STACK_BOX_GAP_PX,
+	MAP_SELECT_GRAB_TALL_STACK_BOX_HEIGHT_PX,
+	MAP_SELECT_GRAB_TOOL_EXPANDED_HEIGHT_PX,
+	type MapZoomControlIndexChangeMeta,
+	type MapZoomControlLiveHandle,
+} from '@/components/molecules/MapSelectGrabTool/MapSelectGrabTool';
 import { getCityIconProps } from '@/utils/cityIcons';
 import { Typography } from '@/components/ui/typography';
 import { Input } from '@/components/ui/input';
@@ -470,6 +486,86 @@ const MAP_RESULTS_BOTTOM_SEARCH_BOX = {
 	rightSlotActiveBackgroundColor: '#86A8DB',
 	opacity: 0.8,
 } as const;
+
+const MAP_SELECT_GRAB_LEFT_PX = 26;
+const MAP_SELECT_GRAB_MIN_VIEW_SCALE = 0.72;
+const MAP_SELECT_GRAB_DEFAULT_VIEW_SCALE = 0.74;
+const MAP_SELECT_GRAB_MAX_VIEW_SCALE = 0.85;
+const MAP_SELECT_GRAB_SCALE_GROW_START_HEIGHT_PX = 1180;
+const MAP_SELECT_GRAB_SCALE_GROW_END_HEIGHT_PX = 1480;
+const MAP_SELECT_GRAB_VIEWPORT_INSET_PX = 16;
+const MAP_SELECT_GRAB_TOP_EXTENT_PX =
+	MAP_SELECT_GRAB_STARTER_BOX_HEIGHT_PX +
+	MAP_SELECT_GRAB_STARTER_BOX_GAP_PX +
+	MAP_SELECT_GRAB_STACK_BOX_FIRST_GAP_PX +
+	MAP_SELECT_GRAB_STACK_BOX_SIZE_PX +
+	MAP_SELECT_GRAB_STACK_BOX_SECOND_GAP_PX +
+	MAP_SELECT_GRAB_STACK_BOX_SIZE_PX +
+	MAP_SELECT_GRAB_TALL_STACK_BOX_GAP_PX +
+	MAP_SELECT_GRAB_TALL_STACK_BOX_HEIGHT_PX;
+const MAP_SELECT_GRAB_TOTAL_HEIGHT_PX =
+	MAP_SELECT_GRAB_TOP_EXTENT_PX + MAP_SELECT_GRAB_TOOL_EXPANDED_HEIGHT_PX;
+const MAP_ZOOM_CONTROL_LEVELS = [
+	2.25,
+	2.41,
+	2.57,
+	2.73,
+	2.88,
+	3.04,
+	3.2,
+	3.52,
+	3.83,
+	4.15,
+	4.47,
+	4.78,
+	5.1,
+	5.34,
+	5.58,
+	5.81,
+	6.05,
+	6.29,
+	6.52,
+	6.76,
+	7,
+] as const;
+const MAP_ZOOM_CONTROL_MAX_INDEX = MAP_ZOOM_CONTROL_LEVELS.length - 1;
+type MapZoomControlRequest = { zoom: number; nonce: number; isDragging?: boolean };
+
+const clampMapZoomControlValue = (levelValue: number) => {
+	if (!Number.isFinite(levelValue)) return 0;
+	return Math.min(Math.max(levelValue, 0), MAP_ZOOM_CONTROL_MAX_INDEX);
+};
+
+const getMapZoomForControlValue = (levelValue: number) => {
+	const safeValue = clampMapZoomControlValue(levelValue);
+	const lowerIndex = Math.floor(safeValue);
+	const upperIndex = Math.min(lowerIndex + 1, MAP_ZOOM_CONTROL_MAX_INDEX);
+	const progress = safeValue - lowerIndex;
+	const lowerZoom = MAP_ZOOM_CONTROL_LEVELS[lowerIndex] ?? MAP_ZOOM_CONTROL_LEVELS[0];
+	const upperZoom = MAP_ZOOM_CONTROL_LEVELS[upperIndex] ?? lowerZoom;
+	return lowerZoom + (upperZoom - lowerZoom) * progress;
+};
+
+const getMapZoomControlValueForZoom = (zoom: number) => {
+	if (!Number.isFinite(zoom)) return 0;
+	const minZoom = MAP_ZOOM_CONTROL_LEVELS[0] ?? 0;
+	const maxZoom =
+		MAP_ZOOM_CONTROL_LEVELS[MAP_ZOOM_CONTROL_MAX_INDEX] ?? minZoom;
+	if (zoom <= minZoom) return 0;
+	if (zoom >= maxZoom) return MAP_ZOOM_CONTROL_MAX_INDEX;
+
+	for (let index = 0; index < MAP_ZOOM_CONTROL_MAX_INDEX; index += 1) {
+		const lowerZoom = MAP_ZOOM_CONTROL_LEVELS[index] ?? minZoom;
+		const upperZoom = MAP_ZOOM_CONTROL_LEVELS[index + 1] ?? lowerZoom;
+		if (zoom <= upperZoom) {
+			const span = upperZoom - lowerZoom;
+			if (span <= 0) return index;
+			return index + (zoom - lowerZoom) / span;
+		}
+	}
+
+	return MAP_ZOOM_CONTROL_MAX_INDEX;
+};
 
 const MAP_RESULTS_BOTTOM_CATEGORY_SEARCH_BOX = {
 	width: 401,
@@ -1830,6 +1926,7 @@ const DashboardContent = () => {
 	const [isBelowMd, setIsBelowMd] = useState(false);
 	const [isNarrowestDesktop, setIsNarrowestDesktop] = useState(false);
 	const [isXlDesktop, setIsXlDesktop] = useState(false);
+	const [viewportHeight, setViewportHeight] = useState(0);
 
 	// Detect narrow desktop breakpoint
 	useEffect(() => {
@@ -1840,6 +1937,7 @@ const DashboardContent = () => {
 			setIsBelowMd(width < 768);
 			setIsNarrowestDesktop(width < 952);
 			setIsXlDesktop(width >= 1280);
+			setViewportHeight(window.innerHeight);
 		};
 
 		handleResize();
@@ -3363,6 +3461,17 @@ const DashboardContent = () => {
 		Record<number, string>
 	>({});
 	const [activeMapTool, setActiveMapTool] = useState<'select' | 'grab'>('grab');
+	const [mapZoomControlIndex, setMapZoomControlIndex] = useState(1);
+	const [isMapZoomControlDragging, setIsMapZoomControlDragging] = useState(false);
+	const [mapZoomControlRequest, setMapZoomControlRequest] =
+		useState<MapZoomControlRequest | null>(null);
+	const mapZoomControlLiveRef = useRef<MapZoomControlLiveHandle | null>(null);
+	const mapZoomControlRequestNonceRef = useRef(0);
+	const pendingMapZoomControlRequestRef = useRef<{
+		zoom: number;
+		isDragging: boolean;
+	} | null>(null);
+	const mapZoomControlRequestRafRef = useRef<number | null>(null);
 	const [selectAllInViewNonce, setSelectAllInViewNonce] = useState(0);
 	const [hoveredMapMarkerContact, setHoveredMapMarkerContact] = useState<ContactWithName | null>(
 		null
@@ -3380,9 +3489,78 @@ const DashboardContent = () => {
 			fromHomeParam ||
 			(isMapView && hasSearched && isMapResultsLoading));
 	const isSelectMapToolActive = activeMapTool === 'select';
-	const isGrabMapToolActive = activeMapTool === 'grab';
 	const hasNoSearchResults =
 		hasSearched && !isMapResultsLoading && (contacts?.length ?? 0) === 0;
+	const mapZoomControlDisplayValue = mapZoomControlIndex;
+	const pushMapZoomControlRequest = useCallback((zoom: number, isDragging = false) => {
+		mapZoomControlRequestNonceRef.current += 1;
+		setMapZoomControlRequest({
+			zoom,
+			nonce: mapZoomControlRequestNonceRef.current,
+			isDragging,
+		});
+	}, []);
+	const scheduleMapZoomControlRequest = useCallback(
+		(zoom: number, isDragging = false) => {
+			pendingMapZoomControlRequestRef.current = { zoom, isDragging };
+			if (mapZoomControlRequestRafRef.current != null) return;
+			mapZoomControlRequestRafRef.current = window.requestAnimationFrame(() => {
+				mapZoomControlRequestRafRef.current = null;
+				const pendingRequest = pendingMapZoomControlRequestRef.current;
+				pendingMapZoomControlRequestRef.current = null;
+				if (!pendingRequest) return;
+				pushMapZoomControlRequest(pendingRequest.zoom, pendingRequest.isDragging);
+			});
+		},
+		[pushMapZoomControlRequest]
+	);
+	const handleMapZoomControlValueChange = useCallback(
+		(levelValue: number) => {
+			const safeLevelValue = clampMapZoomControlValue(levelValue);
+			scheduleMapZoomControlRequest(getMapZoomForControlValue(safeLevelValue), true);
+		},
+		[scheduleMapZoomControlRequest]
+	);
+	const handleMapZoomControlInteractionChange = useCallback((isDragging: boolean) => {
+		setIsMapZoomControlDragging(isDragging);
+	}, []);
+	const handleMapZoomControlChange = useCallback(
+		(levelIndex: number, meta?: MapZoomControlIndexChangeMeta) => {
+			const safeLevelIndex = Math.min(
+				Math.max(Math.round(levelIndex), 0),
+				MAP_ZOOM_CONTROL_MAX_INDEX
+			);
+			const nextControlValue =
+				meta?.source === 'drag-release'
+					? clampMapZoomControlValue(meta.levelValue)
+					: safeLevelIndex;
+			setMapZoomControlIndex(nextControlValue);
+			if (meta?.source === 'drag-release') {
+				if (mapZoomControlRequestRafRef.current != null) {
+					window.cancelAnimationFrame(mapZoomControlRequestRafRef.current);
+					mapZoomControlRequestRafRef.current = null;
+				}
+				pendingMapZoomControlRequestRef.current = null;
+				pushMapZoomControlRequest(getMapZoomForControlValue(nextControlValue), true);
+				return;
+			}
+			pushMapZoomControlRequest(
+				MAP_ZOOM_CONTROL_LEVELS[safeLevelIndex] ?? MAP_ZOOM_CONTROL_LEVELS[0],
+				false
+			);
+		},
+		[pushMapZoomControlRequest]
+	);
+
+	useEffect(() => {
+		return () => {
+			if (mapZoomControlRequestRafRef.current != null) {
+				window.cancelAnimationFrame(mapZoomControlRequestRafRef.current);
+				mapZoomControlRequestRafRef.current = null;
+			}
+			pendingMapZoomControlRequestRef.current = null;
+		};
+	}, []);
 
 	// ── Search-results row cascade animation ─────────────────────────────────
 	// Rows start as placeholder-coloured rectangles (matching the panel bg).
@@ -3487,6 +3665,34 @@ const DashboardContent = () => {
 	const SEARCH_THIS_AREA_DELAY_MS = 2000;
 	// Scale down fullscreen map UI chrome (buttons/panels) without scaling the Mapbox canvas.
 	const MAP_VIEW_UI_SCALE = isMobile ? 1 : 0.85;
+	const mapSelectGrabViewScale = useMemo(() => {
+		if (isMobile) return 1;
+		const availableHeight =
+			viewportHeight > 0
+				? viewportHeight - MAP_SELECT_GRAB_VIEWPORT_INSET_PX * 2
+				: MAP_SELECT_GRAB_TOTAL_HEIGHT_PX * MAP_SELECT_GRAB_DEFAULT_VIEW_SCALE;
+		const fitScale = availableHeight / MAP_SELECT_GRAB_TOTAL_HEIGHT_PX;
+		const tallViewportProgress = clampNumber(
+			(viewportHeight - MAP_SELECT_GRAB_SCALE_GROW_START_HEIGHT_PX) /
+				(MAP_SELECT_GRAB_SCALE_GROW_END_HEIGHT_PX -
+					MAP_SELECT_GRAB_SCALE_GROW_START_HEIGHT_PX),
+			0,
+			1
+		);
+		const preferredScale =
+			MAP_SELECT_GRAB_DEFAULT_VIEW_SCALE +
+			(MAP_SELECT_GRAB_MAX_VIEW_SCALE - MAP_SELECT_GRAB_DEFAULT_VIEW_SCALE) *
+				tallViewportProgress;
+		return clampNumber(
+			Math.min(fitScale, preferredScale),
+			MAP_SELECT_GRAB_MIN_VIEW_SCALE,
+			MAP_SELECT_GRAB_MAX_VIEW_SCALE
+		);
+	}, [isMobile, viewportHeight]);
+	const mapSelectGrabVisualHeightPx =
+		MAP_SELECT_GRAB_TOTAL_HEIGHT_PX * mapSelectGrabViewScale;
+	const mapSelectGrabOriginOffsetPx =
+		MAP_SELECT_GRAB_TOP_EXTENT_PX * mapSelectGrabViewScale;
 	const MAP_VIEW_SEARCH_BAR_TOP_PX = 33;
 	const MAP_VIEW_SEARCH_BAR_INPUT_HEIGHT_PX = 49;
 	const SEARCH_THIS_AREA_GAP_PX = 45;
@@ -3512,9 +3718,24 @@ const DashboardContent = () => {
 		hideSearchThisAreaCta();
 	}, [hideSearchThisAreaCta]);
 
+	const handleMapViewportZoom = useCallback(
+		(zoom: number) => {
+			if (isMapZoomControlDragging) return;
+			const nextControlValue = getMapZoomControlValueForZoom(zoom);
+			mapZoomControlLiveRef.current?.setLevelValue(nextControlValue);
+		},
+		[isMapZoomControlDragging]
+	);
+
 	const handleMapViewportIdle = useCallback(
 		(payload: SearchThisAreaViewportIdlePayload) => {
 			lastSearchThisAreaViewportRef.current = payload;
+			if (!isMapZoomControlDragging) {
+				const nextControlValue = getMapZoomControlValueForZoom(payload.zoom);
+				setMapZoomControlIndex((current) =>
+					Math.abs(current - nextControlValue) < 0.005 ? current : nextControlValue
+				);
+			}
 			hideSearchThisAreaCta();
 
 			// Only show in fullscreen map view when we have an active executed search.
@@ -3532,7 +3753,14 @@ const DashboardContent = () => {
 				setIsSearchThisAreaCtaVisible(true);
 			}, SEARCH_THIS_AREA_DELAY_MS);
 		},
-		[activeSearchQuery, hasSearched, hideSearchThisAreaCta, isMapResultsLoading, isMapView]
+		[
+			activeSearchQuery,
+			hasSearched,
+			hideSearchThisAreaCta,
+			isMapResultsLoading,
+			isMapView,
+			isMapZoomControlDragging,
+		]
 	);
 
 	const handleSearchThisAreaClick = useCallback(() => {
@@ -5234,8 +5462,10 @@ const DashboardContent = () => {
 									isMapView ? handleMapVisibleOverlayContactsChange : undefined
 								}
 								activeTool={isMapView ? activeMapTool : undefined}
+								requestedZoom={isMapView ? mapZoomControlRequest : null}
 								selectedAreaBounds={selectedAreaBoundsForMap}
 								onViewportInteraction={isMapView ? handleMapViewportInteraction : undefined}
+								onViewportZoom={isMapView ? handleMapViewportZoom : undefined}
 								onViewportIdle={isMapView ? handleMapViewportIdle : undefined}
 								onAreaSelect={isMapView ? handleMapAreaSelect : undefined}
 								onMarkerHover={isMapView ? handleMapMarkerHover : undefined}
@@ -5377,6 +5607,20 @@ const DashboardContent = () => {
 
 	return (
 		<>
+		<style jsx global>{`
+			#map-search-tray-what-dropdown-container .scrollbar-hide,
+			#map-search-tray-where-dropdown-container .scrollbar-hide {
+				scrollbar-width: none !important;
+				scrollbar-color: transparent transparent !important;
+				-ms-overflow-style: none !important;
+			}
+			#map-search-tray-what-dropdown-container .scrollbar-hide::-webkit-scrollbar,
+			#map-search-tray-where-dropdown-container .scrollbar-hide::-webkit-scrollbar {
+				display: none !important;
+				width: 0 !important;
+				height: 0 !important;
+			}
+		`}</style>
 		{/* Shared Mapbox globe background */}
 		{mapPortal}
 		{!hasSearched && activeTab === 'search' && !fromHomeParam && !isMapView && !isNarrowestDesktop && (
@@ -6680,18 +6924,6 @@ const DashboardContent = () => {
 													backgroundColor: 'rgba(216, 229, 251, 0.9)',
 												}}
 											>
-												<style jsx global>{`
-													#map-search-tray-what-dropdown-container .scrollbar-hide {
-														scrollbar-width: none !important;
-														scrollbar-color: transparent transparent !important;
-														-ms-overflow-style: none !important;
-													}
-													#map-search-tray-what-dropdown-container .scrollbar-hide::-webkit-scrollbar {
-														display: none !important;
-														width: 0 !important;
-														height: 0 !important;
-													}
-												`}</style>
 												{isPromotion ? (
 													/* Promotion: only Radio Stations - centered in compact container */
 													<div className="flex items-center justify-center h-full w-full">
@@ -6972,18 +7204,6 @@ const DashboardContent = () => {
 													backgroundColor: 'rgba(216, 229, 251, 0.9)',
 												}}
 											>
-												<style jsx global>{`
-													#map-search-tray-where-dropdown-container .scrollbar-hide {
-														scrollbar-width: none !important;
-														scrollbar-color: transparent transparent !important;
-														-ms-overflow-style: none !important;
-													}
-													#map-search-tray-where-dropdown-container .scrollbar-hide::-webkit-scrollbar {
-														display: none !important;
-														width: 0 !important;
-														height: 0 !important;
-													}
-												`}</style>
 												<CustomScrollbar
 													className="h-full"
 													contentClassName="flex flex-col items-center gap-[10px] py-[10px] pl-[6px] pr-[26px] -mr-[20px]"
@@ -7344,276 +7564,6 @@ const DashboardContent = () => {
 									</Form>
 									)}
 								</div>
-							{isMapView && (
-								<>
-									{/* Box to the left of the Home button */}
-									<div
-										className="group relative h-[52px] hover:h-[80px]"
-										style={{
-											...(() => {
-												const buttonSize = 43;
-												const gap = isSelectMapToolActive ? 8 : 20;
-												// Existing collapsed design: 2 buttons + 20px gap inside a 130px wrapper.
-												// That leaves ~12px padding on each side (24px total).
-												const horizontalPadding = 24;
-												const innerWidth = isSelectMapToolActive
-													? buttonSize * 3 + gap * 2
-													: buttonSize * 2 + gap;
-												const wrapperWidth = innerWidth + horizontalPadding;
-												const gapToHomeButton = 10;
-												return {
-													width: `${wrapperWidth}px`,
-													left: `calc(100% + 179px - ${wrapperWidth + gapToHomeButton}px)`,
-												};
-											})(),
-											position: 'absolute',
-											// Map is inset 9px from the viewport; "25px from map top" => 34px viewport.
-											// Search bar wrapper sits at 33px viewport, so this becomes 1px inside the wrapper.
-											top: '1px',
-											// Home button is at: calc(100% + 179px). This box should be 10px to its left.
-											borderRadius: '6px',
-											backgroundColor: 'rgba(255, 255, 255, 0.9)', // #FFFFFF @ 90%
-											border: '3px solid #000000',
-										}}
-									>
-										{/* Keep the buttons pinned to the collapsed center so expanding height doesn't move them */}
-										<div
-											className={`absolute left-1/2 top-[24px] -translate-x-1/2 -translate-y-1/2 flex items-center justify-center ${
-												isSelectMapToolActive ? 'gap-[8px]' : 'gap-[20px]'
-											}`}
-										>
-											{isSelectMapToolActive ? (
-												<>
-													{/* Left: active "What" category icon from the current search */}
-													<div className="relative">
-														<div
-															aria-label={`Active category: ${effectiveWhatKeyForTray || 'Music Venues'}`}
-															className="flex items-center justify-center"
-															style={{
-																width: '43px',
-																height: '43px',
-																borderRadius: '9px',
-																backgroundColor: trayWhat.backgroundColor,
-															}}
-														>
-															<TrayWhatIcon size={trayWhatIconSize} />
-														</div>
-													</div>
-
-													{/* Center: Select tool */}
-													<div className="relative">
-														<button
-															type="button"
-															onClick={handleSelectMapToolClick}
-															aria-label="Select tool"
-															aria-pressed={isSelectMapToolActive}
-															className="flex items-center justify-center font-inter text-[16px] font-semibold leading-none text-black"
-															style={{
-																width: '43px',
-																height: '43px',
-																borderRadius: '9px',
-																backgroundColor:
-																	isSelectMapToolActive
-																		? '#999999'
-																		: 'rgba(153, 153, 153, 0.3)', // #999999 @ 30%
-																cursor: 'pointer',
-																padding: 0,
-																border: 'none',
-															}}
-														>
-															<div
-																aria-hidden="true"
-																style={{
-																	width: '24px',
-																	height: '24px',
-																	backgroundColor:
-																		isSelectMapToolActive ? '#999999' : 'transparent',
-																	border: '2px solid #000000',
-																	boxSizing: 'border-box',
-																	display: 'flex',
-																	alignItems: 'center',
-																	justifyContent: 'center',
-																}}
-															>
-																{isSelectMapToolActive && (
-																	<span
-																		className="font-inter"
-																		style={{
-																			fontSize: '8px',
-																			fontWeight: 500,
-																			color: '#000000',
-																			lineHeight: 1,
-																		}}
-																	>
-																		All
-																	</span>
-																)}
-															</div>
-														</button>
-														{isSelectMapToolActive && (
-															<div className="pointer-events-none absolute left-1/2 top-[51px] -translate-x-1/2 opacity-0 group-hover:opacity-100 font-inter text-[16px] font-semibold leading-none text-black select-none whitespace-nowrap">
-																Select
-															</div>
-														)}
-													</div>
-
-													{/* Right: Grab tool */}
-													<div className="relative">
-														<button
-															type="button"
-															onClick={() => setActiveMapTool('grab')}
-															aria-label="Grab tool"
-															aria-pressed={isGrabMapToolActive}
-															className="flex items-center justify-center"
-															style={{
-																width: '43px',
-																height: '43px',
-																borderRadius: '9px',
-																backgroundColor:
-																	isGrabMapToolActive
-																		? '#4CDE71'
-																		: '#999999',
-																cursor: 'pointer',
-																padding: 0,
-																border: 'none',
-															}}
-														>
-															<GrabIcon
-																innerFill="#FFFFFF"
-															/>
-														</button>
-													</div>
-												</>
-											) : (
-												<>
-													<div className="relative">
-														<button
-															type="button"
-															onClick={handleSelectMapToolClick}
-															aria-label="Select tool"
-															aria-pressed={isSelectMapToolActive}
-															className="flex items-center justify-center"
-															style={{
-																width: '43px',
-																height: '43px',
-																borderRadius: '9px',
-																backgroundColor:
-																	isSelectMapToolActive
-																		? '#999999'
-																		: 'rgba(153, 153, 153, 0.3)', // #999999 @ 30%
-																cursor: 'pointer',
-																padding: 0,
-																border: 'none',
-															}}
-														>
-															<div
-																aria-hidden="true"
-																style={{
-																	width: '24px',
-																	height: '24px',
-																	backgroundColor:
-																		isSelectMapToolActive
-																			? '#999999'
-																			: 'transparent',
-																	border: '2px solid #000000',
-																	boxSizing: 'border-box',
-																	display: 'flex',
-																	alignItems: 'center',
-																	justifyContent: 'center',
-																}}
-															>
-																{isSelectMapToolActive && (
-																	<span
-																		className="font-inter"
-																		style={{
-																			fontSize: '8px',
-																			fontWeight: 500,
-																			color: '#000000',
-																			lineHeight: 1,
-																		}}
-																	>
-																		All
-																	</span>
-																)}
-															</div>
-														</button>
-														{isSelectMapToolActive && (
-															<div className="pointer-events-none absolute left-1/2 top-[51px] -translate-x-1/2 opacity-0 group-hover:opacity-100 font-inter text-[16px] font-semibold leading-none text-black select-none whitespace-nowrap">
-																Select
-															</div>
-														)}
-													</div>
-													<div className="relative">
-														<button
-															type="button"
-															onClick={() => setActiveMapTool('grab')}
-															aria-label="Grab tool"
-															aria-pressed={isGrabMapToolActive}
-															className="flex items-center justify-center"
-															style={{
-																width: '43px',
-																height: '43px',
-																borderRadius: '9px',
-																backgroundColor:
-																	isGrabMapToolActive
-																		? '#4CDE71'
-																		: '#999999',
-																cursor: 'pointer',
-																padding: 0,
-																border: 'none',
-															}}
-														>
-															<GrabIcon
-																innerFill="#FFFFFF"
-															/>
-														</button>
-														{isGrabMapToolActive && (
-															<div className="pointer-events-none absolute left-1/2 top-[51px] -translate-x-1/2 opacity-0 group-hover:opacity-100 font-inter text-[16px] font-semibold leading-none text-black select-none whitespace-nowrap">
-																Grab
-															</div>
-														)}
-													</div>
-												</>
-											)}
-										</div>
-									</div>
-									<button
-										type="button"
-										onClick={handleCloseMapView}
-										aria-label="Home"
-										className="group flex items-center justify-center cursor-pointer w-[52px] hover:w-[155px]"
-										style={{
-											position: 'absolute',
-											// Map is inset 9px from the viewport; "25px from map top" => 34px viewport.
-											// Search bar wrapper sits at 33px viewport, so this becomes 1px inside the wrapper.
-											top: '1px',
-											// "179px to the right of the searchbar" => from wrapper's right edge.
-											left: 'calc(100% + 179px)',
-											height: '52px',
-											borderRadius: '9px',
-											backgroundColor: '#D6D6D6',
-											border: '3px solid #000000',
-											padding: '2px',
-										}}
-									>
-										<div
-											className="flex items-center justify-center w-[42px] group-hover:w-[143px]"
-											style={{
-												height: '42px',
-												borderRadius: '9px',
-												backgroundColor: '#EAEAEA',
-											}}
-										>
-											{/* Default: show house icon */}
-											<span className="group-hover:hidden flex items-center justify-center">
-												<HomeIcon width={20} height={17} />
-											</span>
-											{/* Hover: show "Home" text SVG */}
-											<HomeExpandedIcon className="hidden group-hover:block" width={80} height={21} />
-										</div>
-									</button>
-								</>
-							)}
 							{hoveredContact && !isMobile && !isMapView && (
 								<div className="absolute inset-0 z-[90] pointer-events-none bg-white hidden xl:flex items-start justify-center">
 									<div className="w-full max-w-[1132px] mx-auto px-4 py-3 text-center">
@@ -7730,6 +7680,97 @@ const DashboardContent = () => {
 						) : (
 							searchBarBase
 						);
+
+						const mapSelectGrabberTool =
+							isMapView && !isMobile ? (
+								<div
+									className="fixed z-[130] pointer-events-none"
+									style={{
+										left: `${MAP_SELECT_GRAB_LEFT_PX}px`,
+										top: `calc(clamp(${MAP_SELECT_GRAB_VIEWPORT_INSET_PX}px, calc((100dvh - ${mapSelectGrabVisualHeightPx}px) / 2), calc(100dvh - ${mapSelectGrabVisualHeightPx}px - ${MAP_SELECT_GRAB_VIEWPORT_INSET_PX}px)) + ${mapSelectGrabOriginOffsetPx}px)`,
+										transform: `scale(${mapSelectGrabViewScale})`,
+										transformOrigin: 'top left',
+									}}
+								>
+									<MapSelectGrabTallStackBox
+										className="absolute pointer-events-none"
+										style={{
+											left: '-0.5px',
+											top: `-${
+												MAP_SELECT_GRAB_STARTER_BOX_HEIGHT_PX +
+												MAP_SELECT_GRAB_STARTER_BOX_GAP_PX +
+												MAP_SELECT_GRAB_STACK_BOX_FIRST_GAP_PX +
+												MAP_SELECT_GRAB_STACK_BOX_SIZE_PX +
+												MAP_SELECT_GRAB_STACK_BOX_SECOND_GAP_PX +
+												MAP_SELECT_GRAB_STACK_BOX_SIZE_PX +
+												MAP_SELECT_GRAB_TALL_STACK_BOX_GAP_PX +
+												MAP_SELECT_GRAB_TALL_STACK_BOX_HEIGHT_PX
+											}px`,
+										}}
+									/>
+									<MapSelectGrabStackBox
+										className="absolute left-0 pointer-events-none"
+										style={{
+											top: `-${
+												MAP_SELECT_GRAB_STARTER_BOX_HEIGHT_PX +
+												MAP_SELECT_GRAB_STARTER_BOX_GAP_PX +
+												MAP_SELECT_GRAB_STACK_BOX_FIRST_GAP_PX +
+												MAP_SELECT_GRAB_STACK_BOX_SIZE_PX
+											}px`,
+										}}
+									>
+										<MapSelectGrabStackTile backgroundColor="#FFBDBD">
+											<MapStackStarIcon />
+										</MapSelectGrabStackTile>
+									</MapSelectGrabStackBox>
+									<MapSelectGrabStackBox
+										className="absolute left-0 pointer-events-none"
+										style={{
+											top: `-${
+												MAP_SELECT_GRAB_STARTER_BOX_HEIGHT_PX +
+												MAP_SELECT_GRAB_STARTER_BOX_GAP_PX +
+												MAP_SELECT_GRAB_STACK_BOX_FIRST_GAP_PX +
+												MAP_SELECT_GRAB_STACK_BOX_SIZE_PX +
+												MAP_SELECT_GRAB_STACK_BOX_SECOND_GAP_PX +
+												MAP_SELECT_GRAB_STACK_BOX_SIZE_PX
+											}px`,
+										}}
+									>
+										<MapSelectGrabStackTile backgroundColor="#50A5C970">
+											<MapStackBlueSparkIcon />
+										</MapSelectGrabStackTile>
+									</MapSelectGrabStackBox>
+									<MapSelectGrabStarterBox
+										className="absolute left-0 pointer-events-auto"
+										zoomLevelIndex={mapZoomControlIndex}
+										zoomLevelValue={mapZoomControlDisplayValue}
+										zoomLevelLiveControlRef={mapZoomControlLiveRef}
+										onZoomLevelIndexChange={handleMapZoomControlChange}
+										onZoomLevelValueChange={handleMapZoomControlValueChange}
+										onZoomLevelInteractionChange={
+											handleMapZoomControlInteractionChange
+										}
+										style={{
+											position: 'absolute',
+											left: 0,
+											top: `-${
+												MAP_SELECT_GRAB_STARTER_BOX_HEIGHT_PX +
+												MAP_SELECT_GRAB_STARTER_BOX_GAP_PX
+											}px`,
+										}}
+									/>
+									<MapSelectGrabTool
+										activeTool={activeMapTool}
+										onSelectClick={handleSelectMapToolClick}
+										onGrabClick={() => setActiveMapTool('grab')}
+										categoryIcon={<TrayWhatIcon size={trayWhatIconSize} />}
+										categoryLabel={`Active category: ${effectiveWhatKeyForTray || 'Music Venues'}`}
+										categoryBackgroundColor={trayWhat.backgroundColor}
+										showCategoryWhenSelectActive
+										className="pointer-events-auto"
+									/>
+								</div>
+							) : null;
 
 						const searchThisAreaCta =
 							isMapView && isSearchThisAreaCtaVisible ? (
@@ -7890,6 +7931,7 @@ const DashboardContent = () => {
 								<>
 									{campaignMapTopTabs}
 									{searchBar}
+									{mapSelectGrabberTool}
 									{searchThisAreaCta}
 								</>,
 								document.body
@@ -7968,8 +8010,10 @@ const DashboardContent = () => {
 																	}
 																}}
 																activeTool={activeMapTool}
+																requestedZoom={mapZoomControlRequest}
 																selectedAreaBounds={selectedAreaBoundsForMap}
 																onViewportInteraction={handleMapViewportInteraction}
+																onViewportZoom={handleMapViewportZoom}
 																onViewportIdle={handleMapViewportIdle}
 																	onAreaSelect={(bounds, payload) => {
 																		const ids = payload?.contactIds ?? [];

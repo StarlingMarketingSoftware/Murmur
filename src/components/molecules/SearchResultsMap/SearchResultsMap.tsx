@@ -222,6 +222,8 @@ import {
 	MAPBOX_STYLE,
 	MAP_DEFAULT_ZOOM,
 	MAP_MIN_ZOOM,
+	MAP_PINCH_ZOOM_RATE,
+	MAP_WHEEL_ZOOM_RATE,
 	MARKER_CONSTELLATION_CORE_OPACITY,
 	MARKER_CONSTELLATION_GLOW_OPACITY,
 	MARKER_CONSTELLATION_HALO_COLOR,
@@ -512,6 +514,11 @@ interface SearchResultsMapProps {
 	 */
 	onViewportInteraction?: () => void;
 	/**
+	 * Called during live zoom gestures so parent UI can track the camera without
+	 * waiting for Mapbox's `moveend`.
+	 */
+	onViewportZoom?: (zoom: number) => void;
+	/**
 	 * Called when the viewport becomes idle after panning/zooming (Mapbox `moveend`).
 	 * Useful for syncing viewport-derived state in the parent.
 	 */
@@ -523,6 +530,8 @@ interface SearchResultsMapProps {
 	}) => void;
 	/** Dashboard/tooling mode (e.g. `"select"` enables rectangle selection). */
 	activeTool?: string | null;
+	/** Imperative zoom request from dashboard map chrome. */
+	requestedZoom?: { zoom: number; nonce: number; isDragging?: boolean } | null;
 	/** Changes when the dashboard triggers "select all in view". */
 	selectAllInViewNonce?: number;
 
@@ -589,8 +598,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	searchWhat,
 	selectedAreaBounds,
 	onViewportInteraction,
+	onViewportZoom,
 	onViewportIdle,
 	activeTool,
+	requestedZoom,
 	selectAllInViewNonce,
 	onAreaSelect,
 	onVisibleOverlayContactsChange,
@@ -1058,11 +1069,15 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 	const onViewportInteractionRef = useRef<
 		SearchResultsMapProps['onViewportInteraction'] | null
 	>(null);
+	const onViewportZoomRef = useRef<SearchResultsMapProps['onViewportZoom'] | null>(null);
 	const onViewportIdleRef = useRef<SearchResultsMapProps['onViewportIdle'] | null>(null);
 	const selectedAreaBoundsRef = useRef<MapSelectionBounds | null>(null);
 	useEffect(() => {
 		onViewportInteractionRef.current = onViewportInteraction ?? null;
 	}, [onViewportInteraction]);
+	useEffect(() => {
+		onViewportZoomRef.current = onViewportZoom ?? null;
+	}, [onViewportZoom]);
 	useEffect(() => {
 		onViewportIdleRef.current = onViewportIdle ?? null;
 	}, [onViewportIdle]);
@@ -6219,6 +6234,9 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			bearing: 0,
 			minZoom: MAP_MIN_ZOOM,
 			attributionControl: true,
+			dragRotate: false,
+			pitchWithRotate: false,
+			touchPitch: false,
 			...(contactLightsDebugEnabled ? { showTileBoundaries: true } : {}),
 		});
 
@@ -6231,6 +6249,15 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 			};
 		} catch {
 			// Non-fatal.
+		}
+
+		// Soften scroll/pinch zoom for a smoother, more premium feel. Persists
+		// across scrollZoom enable/disable cycles since rates live on the handler.
+		try {
+			mapInstance.scrollZoom.setWheelZoomRate(MAP_WHEEL_ZOOM_RATE);
+			mapInstance.scrollZoom.setZoomRate(MAP_PINCH_ZOOM_RATE);
+		} catch {
+			// Non-fatal — older Mapbox builds may not expose these setters.
 		}
 
 		const onStyleLoad = () => {
@@ -6629,13 +6656,11 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 				map.dragPan.enable();
 			} catch {}
 			try {
-				map.dragRotate.enable();
-			} catch {}
-			try {
 				map.keyboard.enable();
 			} catch {}
 			try {
 				map.touchZoomRotate.enable();
+				map.touchZoomRotate.disableRotation();
 			} catch {}
 		};
 
@@ -8245,6 +8270,40 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		if (!map) return;
 		if (!isMapLoaded) return;
 		if (isBackgroundPresentation) return;
+		const requestedZoomValue = requestedZoom?.zoom;
+		if (typeof requestedZoomValue !== 'number' || !Number.isFinite(requestedZoomValue)) return;
+
+		try {
+			const minZoom = map.getMinZoom();
+			const maxZoom = map.getMaxZoom();
+			const targetZoom = clamp(requestedZoomValue, minZoom, maxZoom);
+			const currentZoom = map.getZoom() ?? MAP_DEFAULT_ZOOM;
+			if (Math.abs(currentZoom - targetZoom) < 0.03) return;
+			if (requestedZoom?.isDragging) {
+				map.jumpTo({ zoom: targetZoom });
+				return;
+			}
+			map.easeTo({
+				zoom: targetZoom,
+				duration: 180,
+				essential: true,
+			});
+		} catch {
+			// Non-fatal; the slider will sync again on the next map idle event.
+		}
+	}, [
+		map,
+		isMapLoaded,
+		isBackgroundPresentation,
+		requestedZoom?.isDragging,
+		requestedZoom?.nonce,
+		requestedZoom?.zoom,
+	]);
+
+	useEffect(() => {
+		if (!map) return;
+		if (!isMapLoaded) return;
+		if (isBackgroundPresentation) return;
 		const onMoveEnd = () => {
 			const zoom = map.getZoom() ?? MAP_DEFAULT_ZOOM;
 			setZoomLevel(zoom);
@@ -8308,6 +8367,22 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		updateAllContactsOverlayFetchBbox,
 	]);
 
+	useEffect(() => {
+		if (!map) return;
+		if (!isMapLoaded) return;
+		if (isBackgroundPresentation) return;
+
+		const onZoom = () => {
+			onViewportZoomRef.current?.(map.getZoom() ?? MAP_DEFAULT_ZOOM);
+		};
+
+		onZoom();
+		map.on('zoom', onZoom);
+		return () => {
+			map.off('zoom', onZoom);
+		};
+	}, [map, isMapLoaded, isBackgroundPresentation]);
+
 	// Notify the parent as soon as the user starts interacting with the viewport.
 	useEffect(() => {
 		if (!map || !isMapLoaded) return;
@@ -8350,10 +8425,8 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 		try {
 			if (selecting) {
 				map.dragPan.disable();
-				map.dragRotate.disable();
 			} else {
 				map.dragPan.enable();
-				map.dragRotate.enable();
 			}
 		} catch {
 			// Ignore (handlers may not be ready yet).

@@ -3,9 +3,14 @@ import React, { FC } from 'react';
 interface MusicVenuesIconProps {
 	size?: number;
 	className?: string;
+	innerFill?: string;
 }
 
-export const MusicVenuesIcon: FC<MusicVenuesIconProps> = ({ size = 29, className }) => {
+export const MusicVenuesIcon: FC<MusicVenuesIconProps> = ({
+	size = 29,
+	className,
+	innerFill = 'white',
+}) => {
 	// Original aspect ratio is 29:23, so height = size * (23/29)
 	const height = size * (23 / 29);
 	return (
@@ -22,7 +27,7 @@ export const MusicVenuesIcon: FC<MusicVenuesIconProps> = ({ size = 29, className
 				y="0.37"
 				width="11.6808"
 				height="21.6174"
-				fill="white"
+				fill={innerFill}
 				stroke="black"
 				strokeWidth="0.74"
 			/>
@@ -30,7 +35,7 @@ export const MusicVenuesIcon: FC<MusicVenuesIconProps> = ({ size = 29, className
 				cx="22.7898"
 				cy="4.95974"
 				r="2.11415"
-				fill="white"
+				fill={innerFill}
 				stroke="black"
 				strokeWidth="0.74"
 			/>
@@ -38,7 +43,7 @@ export const MusicVenuesIcon: FC<MusicVenuesIconProps> = ({ size = 29, className
 				cx="22.7896"
 				cy="16.7672"
 				r="3.97727"
-				fill="white"
+				fill={innerFill}
 				stroke="black"
 				strokeWidth="0.74"
 			/>
@@ -47,7 +52,7 @@ export const MusicVenuesIcon: FC<MusicVenuesIconProps> = ({ size = 29, className
 				y="0.37"
 				width="11.6808"
 				height="21.6174"
-				fill="white"
+				fill={innerFill}
 				stroke="black"
 				strokeWidth="0.74"
 			/>
@@ -55,7 +60,7 @@ export const MusicVenuesIcon: FC<MusicVenuesIconProps> = ({ size = 29, className
 				cx="6.21071"
 				cy="4.95974"
 				r="2.11415"
-				fill="white"
+				fill={innerFill}
 				stroke="black"
 				strokeWidth="0.74"
 			/>
@@ -63,11 +68,10 @@ export const MusicVenuesIcon: FC<MusicVenuesIconProps> = ({ size = 29, className
 				cx="6.21055"
 				cy="16.7672"
 				r="3.97727"
-				fill="white"
+				fill={innerFill}
 				stroke="black"
 				strokeWidth="0.74"
 			/>
 		</svg>
 	);
 };
-

@@ -232,6 +232,14 @@ export const MAP_MIN_ZOOM = 2.25;
 // Dashboard UX: allow state hover highlight one zoom step past the default zoom.
 export const STATE_HOVER_HIGHLIGHT_MAX_ZOOM = MAP_DEFAULT_ZOOM + 1;
 
+// Scroll/pinch zoom feel. Mapbox defaults (wheel 1/450, pinch 1/100) feel
+// jumpy on a Mac trackpad — each tick traverses a lot of zoom, which reads
+// as "aggressive." Lowering both rates produces a slower, more gradual,
+// Apple-Maps-style glide. Mapbox's internal easing handles the in-between
+// smoothing once each tick is small enough.
+export const MAP_WHEEL_ZOOM_RATE = 1 / 700;
+export const MAP_PINCH_ZOOM_RATE = 1 / 200;
+
 // Decorative dashboard background framing. Keep these in sync with the background-mode
 // camera settings so the initial mount doesn't "pop" after the map loads.
 export const DASHBOARD_DECORATIVE_ZOOM = 4.0;
