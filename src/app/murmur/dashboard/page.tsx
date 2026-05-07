@@ -61,7 +61,7 @@ import {
 	MAP_SELECT_GRAB_STACK_BOX_SIZE_PX,
 	MAP_SELECT_GRAB_TALL_STACK_BOX_GAP_PX,
 	MAP_SELECT_GRAB_TALL_STACK_BOX_HEIGHT_PX,
-	MAP_SELECT_GRAB_TOOL_EXPANDED_HEIGHT_PX,
+	MAP_SELECT_GRAB_TOOL_COLLAPSED_HEIGHT_PX,
 	type MapZoomControlIndexChangeMeta,
 	type MapZoomControlLiveHandle,
 } from '@/components/molecules/MapSelectGrabTool/MapSelectGrabTool';
@@ -504,7 +504,7 @@ const MAP_SELECT_GRAB_TOP_EXTENT_PX =
 	MAP_SELECT_GRAB_TALL_STACK_BOX_GAP_PX +
 	MAP_SELECT_GRAB_TALL_STACK_BOX_HEIGHT_PX;
 const MAP_SELECT_GRAB_TOTAL_HEIGHT_PX =
-	MAP_SELECT_GRAB_TOP_EXTENT_PX + MAP_SELECT_GRAB_TOOL_EXPANDED_HEIGHT_PX;
+	MAP_SELECT_GRAB_TOP_EXTENT_PX + MAP_SELECT_GRAB_TOOL_COLLAPSED_HEIGHT_PX;
 const MAP_ZOOM_CONTROL_LEVELS = [
 	2.25,
 	2.41,
@@ -7763,10 +7763,6 @@ const DashboardContent = () => {
 										activeTool={activeMapTool}
 										onSelectClick={handleSelectMapToolClick}
 										onGrabClick={() => setActiveMapTool('grab')}
-										categoryIcon={<TrayWhatIcon size={trayWhatIconSize} />}
-										categoryLabel={`Active category: ${effectiveWhatKeyForTray || 'Music Venues'}`}
-										categoryBackgroundColor={trayWhat.backgroundColor}
-										showCategoryWhenSelectActive
 										className="pointer-events-auto"
 									/>
 								</div>

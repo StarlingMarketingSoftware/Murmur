@@ -22,19 +22,18 @@ type MapSelectGrabToolProps = {
 	activeTool: 'select' | 'grab';
 	onSelectClick: () => void;
 	onGrabClick: () => void;
-	categoryIcon?: ReactNode;
-	categoryLabel?: string;
-	categoryBackgroundColor?: string;
-	showCategoryWhenSelectActive?: boolean;
 	className?: string;
 	style?: CSSProperties;
 };
 
 const TOOL_WIDTH_PX = 55;
 const TOOL_COLLAPSED_HEIGHT_PX = 114;
-const TOOL_EXPANDED_HEIGHT_PX = 165;
 const BUTTON_SIZE_PX = 43;
 const BUTTON_GAP_PX = 8;
+const TOOL_ACTIVE_BACKGROUND_COLOR = '#4CDE71';
+const TOOL_INACTIVE_BACKGROUND_COLOR = 'rgba(153, 153, 153, 0.3)';
+const TOOL_BUTTON_BORDER = '3px solid #000000';
+const TOOL_BUTTON_INACTIVE_BORDER = '3px solid transparent';
 const STARTER_BOX_WIDTH_PX = 55;
 const STARTER_BOX_HEIGHT_PX = 144;
 const STARTER_BOX_GAP_PX = 23;
@@ -119,7 +118,7 @@ const TALL_STACK_INNER_BOX_STYLES = [
 	{ backgroundColor: '#EFEFEF' },
 	{ backgroundColor: '#F0E0A15C' },
 	{ backgroundColor: '#C5EDA05C' },
-	{ backgroundColor: '#80AAFF' },
+	{ backgroundColor: '#C0D5FF' },
 	{
 		backgroundColor: 'rgba(165, 195, 255, 0.36)',
 		opacity: 0.43,
@@ -164,7 +163,6 @@ export type MapZoomControlLiveHandle = {
 };
 
 export const MAP_SELECT_GRAB_TOOL_COLLAPSED_HEIGHT_PX = TOOL_COLLAPSED_HEIGHT_PX;
-export const MAP_SELECT_GRAB_TOOL_EXPANDED_HEIGHT_PX = TOOL_EXPANDED_HEIGHT_PX;
 export const MAP_SELECT_GRAB_STARTER_BOX_HEIGHT_PX = STARTER_BOX_HEIGHT_PX;
 export const MAP_SELECT_GRAB_STARTER_BOX_GAP_PX = STARTER_BOX_GAP_PX;
 export const MAP_SELECT_GRAB_ZOOM_LEVEL_COUNT = ZOOM_THUMB_TOP_POSITIONS_PX.length;
@@ -250,7 +248,7 @@ const getTallStackInnerBoxContent = (index: number): ReactNode => {
 		case 2:
 			return <CoffeeShopsIcon size={20} innerFill="#C5EDA0" />;
 		case 3:
-			return <FestivalsIcon size={28} />;
+			return <FestivalsIcon size={28} innerFill="#B9D0FF" />;
 		case 4:
 			return <WineBeerSpiritsIcon size={32} innerFill="#A5C3FF" />;
 		case 5:
@@ -788,24 +786,18 @@ export function MapSelectGrabTool({
 	activeTool,
 	onSelectClick,
 	onGrabClick,
-	categoryIcon,
-	categoryLabel = 'Active category',
-	categoryBackgroundColor = '#71C9FD',
-	showCategoryWhenSelectActive = false,
 	className,
 	style,
 }: MapSelectGrabToolProps) {
 	const isSelectActive = activeTool === 'select';
 	const isGrabActive = activeTool === 'grab';
-	const shouldShowCategory =
-		showCategoryWhenSelectActive && isSelectActive && Boolean(categoryIcon);
 
 	return (
 		<div
 			className={className}
 			style={{
 				width: `${TOOL_WIDTH_PX}px`,
-				height: `${shouldShowCategory ? TOOL_EXPANDED_HEIGHT_PX : TOOL_COLLAPSED_HEIGHT_PX}px`,
+				height: `${TOOL_COLLAPSED_HEIGHT_PX}px`,
 				borderRadius: '18px',
 				backgroundColor: '#FFFFFF',
 				border: '2px solid #000000',
@@ -818,7 +810,6 @@ export function MapSelectGrabTool({
 				alignItems: 'center',
 				gap: `${BUTTON_GAP_PX}px`,
 				overflow: 'hidden',
-				transition: 'height 160ms ease',
 				...style,
 			}}
 		>
@@ -832,10 +823,13 @@ export function MapSelectGrabTool({
 					width: `${BUTTON_SIZE_PX}px`,
 					height: `${BUTTON_SIZE_PX}px`,
 					borderRadius: '9px',
-					backgroundColor: isSelectActive ? '#999999' : 'rgba(153, 153, 153, 0.3)',
+					backgroundColor: isSelectActive
+						? TOOL_ACTIVE_BACKGROUND_COLOR
+						: TOOL_INACTIVE_BACKGROUND_COLOR,
 					cursor: 'pointer',
 					padding: 0,
-					border: 'none',
+					border: isSelectActive ? TOOL_BUTTON_BORDER : TOOL_BUTTON_INACTIVE_BORDER,
+					boxSizing: 'border-box',
 					flexShrink: 0,
 				}}
 			>
@@ -844,28 +838,14 @@ export function MapSelectGrabTool({
 					style={{
 						width: '24px',
 						height: '24px',
-						backgroundColor: isSelectActive ? '#999999' : 'transparent',
+						backgroundColor: '#FFFFFF',
 						border: '2px solid #000000',
 						boxSizing: 'border-box',
 						display: 'flex',
 						alignItems: 'center',
 						justifyContent: 'center',
 					}}
-				>
-					{isSelectActive && (
-						<span
-							className="font-inter"
-							style={{
-								fontSize: '8px',
-								fontWeight: 500,
-								color: '#000000',
-								lineHeight: 1,
-							}}
-						>
-							All
-						</span>
-					)}
-				</div>
+				/>
 			</button>
 
 			<button
@@ -878,31 +858,18 @@ export function MapSelectGrabTool({
 					width: `${BUTTON_SIZE_PX}px`,
 					height: `${BUTTON_SIZE_PX}px`,
 					borderRadius: '9px',
-					backgroundColor: isGrabActive ? '#4CDE71' : '#999999',
+					backgroundColor: isGrabActive
+						? TOOL_ACTIVE_BACKGROUND_COLOR
+						: TOOL_INACTIVE_BACKGROUND_COLOR,
 					cursor: 'pointer',
 					padding: 0,
-					border: 'none',
+					border: isGrabActive ? TOOL_BUTTON_BORDER : TOOL_BUTTON_INACTIVE_BORDER,
+					boxSizing: 'border-box',
 					flexShrink: 0,
 				}}
 			>
 				<GrabIcon innerFill="#FFFFFF" />
 			</button>
-
-			{shouldShowCategory && (
-				<div
-					aria-label={categoryLabel}
-					className="flex items-center justify-center"
-					style={{
-						width: `${BUTTON_SIZE_PX}px`,
-						height: `${BUTTON_SIZE_PX}px`,
-						borderRadius: '9px',
-						backgroundColor: categoryBackgroundColor,
-						flexShrink: 0,
-					}}
-				>
-					{categoryIcon}
-				</div>
-			)}
 		</div>
 	);
 }
