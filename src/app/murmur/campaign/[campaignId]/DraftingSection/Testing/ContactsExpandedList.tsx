@@ -962,7 +962,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 							Boolean(hoveredUsedContactCampaigns?.length);
 						const contactTitle = contact.title || contact.headline || '';
 						// Left padding: 12px base + 16px dot + 8px gap = 36px when used, else 12px
-						const leftPadding = isUsed ? 'pl-[36px]' : 'pl-3';
+						const leftPadding = 'pl-3';
 						// Keyboard focus shows hover UI independently of mouse hover
 						const isKeyboardFocused = hoveredContactIndex === contactIndex;
 						// Final background: actively drafting > selected > keyboard focus > white (mouse hover handled by CSS)
@@ -1018,138 +1018,13 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 									onContactClick?.(contact);
 								}}
 							>
-									{/* Used contact indicator - absolutely positioned, vertically centered */}
-									{isUsed && (enableUsedContactTooltip ? (() => {
-										const isMultiCampaignIndicator =
-											isUsedContactHoverCardVisible && resolvedUsedContactCampaigns.length > 1;
-										const isSingleCampaignIndicator =
-											isUsedContactHoverCardVisible && resolvedUsedContactCampaigns.length === 1;
-										// For multi-campaign: #A0C0FF with sliding dot
-										// For single-campaign: #B0EAA4 (green, no dot)
-										// For default (not hovered): #DAE6FE
-										const pillBg = isMultiCampaignIndicator
-											? '#A0C0FF'
-											: isSingleCampaignIndicator
-												? '#B0EAA4'
-												: '#DAE6FE';
-
-										const DEFAULT_SIZE = isBottomView ? 12 : 16;
-										const PILL_WIDTH = isBottomView ? 10 : 14;
-										const PILL_HEIGHT = isBottomView ? 24 : 37;
-
-										// Handle mouse move on the pill to drive campaign selection
-										const handlePillMouseMove = isMultiCampaignIndicator
-											? (e: MouseEvent<HTMLSpanElement>) => {
-													// We render a thin stroke via box-shadow (doesn't affect box-model), so the
-													// interactive area is the full pill rect.
-													const PILL_BORDER = 0;
-													const rect = e.currentTarget.getBoundingClientRect();
-													const actualHeight = rect.height;
-													const offsetY = e.clientY - rect.top;
-													const innerHeight = Math.max(1, actualHeight - PILL_BORDER * 2);
-													const innerOffsetY = offsetY - PILL_BORDER;
-													const campaignCount = resolvedUsedContactCampaigns.length;
-													if (campaignCount <= 1) return;
-													// Map cursor Y position to campaign index (0 at top, max at bottom)
-													const ratio = Math.max(0, Math.min(1, innerOffsetY / innerHeight));
-													const idx = Math.round(ratio * (campaignCount - 1));
-													const clampedIdx = Math.max(0, Math.min(campaignCount - 1, idx));
-													setActiveUsedContactCampaignIndex((prev) =>
-														prev === clampedIdx ? prev : clampedIdx
-													);
-												}
-											: undefined;
-
-										return (
-											<span
-												className="z-10 cursor-pointer transition-all duration-150 ease-out"
-												style={{
-													position: 'absolute',
-													left: isBottomView ? '8px' : '12px',
-													top: indicatorTop,
-													transform: 'translateY(-50%)',
-													boxSizing: 'border-box',
-													// Default state: circle. Hover state (single/multi): pill.
-													width: isUsedContactHoverCardVisible ? `${PILL_WIDTH}px` : `${DEFAULT_SIZE}px`,
-													height: isUsedContactHoverCardVisible ? `${PILL_HEIGHT}px` : `${DEFAULT_SIZE}px`,
-													borderRadius: isUsedContactHoverCardVisible ? '9999px' : '50%',
-													// Thin stroke: use box-shadow so sizes stay exact (per design spec).
-													border: isUsedContactHoverCardVisible ? 'none' : '1px solid #000000',
-													boxShadow: isUsedContactHoverCardVisible
-														? '0 0 0 1px #000000'
-														: undefined,
-													backgroundColor: pillBg,
-													overflow: 'hidden',
-												}}
-												onMouseEnter={() => openUsedContactTooltip(contact.id)}
-												onMouseLeave={() => scheduleCloseUsedContactTooltip(contact.id)}
-												onMouseMove={handlePillMouseMove}
-												onClick={(e) => {
-													// Only hijack click when the hover card is visible (prevents breaking normal
-													// contact selection clicks on the indicator in its default state).
-													if (!isUsedContactHoverCardVisible) return;
-													e.stopPropagation();
-													goToUsedContactCampaign(contact.id);
-												}}
-												aria-label="Used in a previous campaign"
-											>
-												{/* Sliding dot for multi-campaign */}
-												{isMultiCampaignIndicator && (
-													<span
-														className="rounded-full bg-[#DAE6FE] pointer-events-none transition-all duration-150 ease-out"
-														style={(() => {
-															const maxTop = Math.max(0, PILL_HEIGHT - PILL_WIDTH);
-															const campaignCount = resolvedUsedContactCampaigns.length;
-															const clampedIdx =
-																typeof activeUsedContactCampaignIndex === 'number' && campaignCount > 0
-																	? Math.min(
-																			campaignCount - 1,
-																			Math.max(0, activeUsedContactCampaignIndex)
-																		)
-																	: 0;
-															// Position dot based on active index
-															const top =
-																campaignCount > 1
-																	? (maxTop * clampedIdx) / (campaignCount - 1)
-																	: maxTop / 2;
-															return {
-																position: 'absolute' as const,
-																left: '0px',
-																top: `${top}px`,
-																width: `${PILL_WIDTH}px`,
-																height: `${PILL_WIDTH}px`,
-																// Thin stroke without changing geometry.
-																boxShadow: '0 0 0 1px #000000',
-															};
-														})()}
-													/>
-												)}
-											</span>
-										);
-									})() : (
-										<span
-											className={cn(
-												"absolute -translate-y-1/2",
-												isBottomView ? "left-2" : "left-3"
-											)}
-											aria-label="Used in a previous campaign"
-											style={{
-												top: indicatorTop,
-												width: isBottomView ? '12px' : '16px',
-												height: isBottomView ? '12px' : '16px',
-												borderRadius: '50%',
-												border: '1px solid #000000',
-												backgroundColor: '#DAE6FE',
-											}}
-										/>
-									))}
 									{/* Bottom view - compact 2-row layout */}
 									{isBottomView ? (
 										<>
 											{fullName ? (
 												<>
 													{/* Top Left - Name */}
-													<div className={cn(isUsed ? 'pl-[22px]' : 'pl-2', 'pr-1 flex items-center h-[12px] overflow-hidden')}>
+													<div className={cn('pl-2', 'pr-1 flex items-center h-[12px] overflow-hidden')}>
 														<div className="font-bold text-[9px] w-full truncate leading-none">
 															{fullName}
 														</div>
@@ -1207,7 +1082,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 														) : null}
 													</div>
 								{/* Bottom Left - Company */}
-								<div className={cn(isUsed ? 'pl-[22px]' : 'pl-2', 'pr-1 flex items-center h-[12px] overflow-hidden')}>
+								<div className={cn('pl-2', 'pr-1 flex items-center h-[12px] overflow-hidden')}>
 									{contact.company && (
 										<div
 											className="text-[8px] text-black w-full overflow-hidden whitespace-nowrap leading-none"
@@ -1280,7 +1155,7 @@ export const ContactsExpandedList: FC<ContactsExpandedListProps> = ({
 											) : (
 												<>
 								{/* Left - Company only, centered vertically across both rows */}
-								<div className={cn(isUsed ? 'pl-[22px]' : 'pl-2', 'pr-1 row-span-2 flex items-center overflow-hidden')}>
+								<div className={cn('pl-2', 'pr-1 row-span-2 flex items-center overflow-hidden')}>
 									<div
 										className="font-bold text-[9px] w-full overflow-hidden whitespace-nowrap leading-none"
 										style={{

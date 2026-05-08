@@ -2199,130 +2199,7 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 											className="absolute left-[156px] right-0 top-0 h-[5px] bg-[#FFDE97] pointer-events-none rounded-tr-[6px]"
 										/>
 									)}
-									{/* Used-contact indicator - morphs circle -> pill (expands downward) when hover card is active */}
-									{isUsedContact &&
-										(() => {
-											const isMultiCampaignIndicator =
-												isUsedContactHoverCardVisible &&
-												resolvedUsedContactCampaigns.length > 1;
-											const isSingleCampaignIndicator =
-												isUsedContactHoverCardVisible &&
-												resolvedUsedContactCampaigns.length === 1;
-											// For multi-campaign: #A0C0FF with sliding dot
-											// For single-campaign: #B0EAA4 (green, no dot)
-											// For default (not hovered): #DAE6FE
-											const pillBg =
-												hoveredRegion === 'right'
-													? '#F78989'
-													: isMultiCampaignIndicator
-														? '#A0C0FF'
-														: isSingleCampaignIndicator
-															? '#B0EAA4'
-															: '#DAE6FE';
-
-											// Handle mouse move on the pill to drive campaign selection
-											const handlePillMouseMove = isMultiCampaignIndicator
-												? (e: React.MouseEvent<HTMLSpanElement>) => {
-														// We render a thin stroke via box-shadow (doesn't affect box-model), so the
-														// interactive area is the full pill rect.
-														const PILL_BORDER = 0;
-														const rect = e.currentTarget.getBoundingClientRect();
-														const actualHeight = rect.height;
-														const offsetY = e.clientY - rect.top;
-														const innerHeight = Math.max(1, actualHeight - PILL_BORDER * 2);
-														const innerOffsetY = offsetY - PILL_BORDER;
-														const campaignCount = resolvedUsedContactCampaigns.length;
-														if (campaignCount <= 1) return;
-														// Map cursor Y position to campaign index (0 at top, max at bottom)
-														const ratio = Math.max(0, Math.min(1, innerOffsetY / innerHeight));
-														const idx = Math.round(ratio * (campaignCount - 1));
-														const clampedIdx = Math.max(0, Math.min(campaignCount - 1, idx));
-														setActiveUsedContactCampaignIndex((prev) =>
-															prev === clampedIdx ? prev : clampedIdx
-														);
-												  }
-												: undefined;
-
-											return (
-												<span
-													className="absolute z-10 cursor-pointer transition-all duration-200 ease-in-out"
-													style={{
-														left: '8px',
-														top: '11px',
-														boxSizing: 'border-box',
-														// Default state: 16×16 circle. Hover state (single/multi): 14×37 pill.
-														// Anchor top stays fixed so it expands downward (not centered).
-														width: isUsedContactHoverCardVisible ? '14px' : '16px',
-														height: isUsedContactHoverCardVisible ? '37px' : '16px',
-														borderRadius: isUsedContactHoverCardVisible ? '9999px' : '50%',
-														// Thin stroke: use box-shadow so sizes stay exact (per design spec).
-														border: isUsedContactHoverCardVisible
-															? 'none'
-															: '1px solid #000000',
-														boxShadow: isUsedContactHoverCardVisible
-															? '0 0 0 1px #000000'
-															: undefined,
-														backgroundColor: pillBg,
-														overflow: 'hidden',
-													}}
-													onMouseEnter={(e) =>
-														openUsedContactTooltip(draft.contactId, e.currentTarget)
-													}
-													onMouseLeave={() =>
-														scheduleCloseUsedContactTooltip(draft.contactId)
-													}
-													onMouseMove={handlePillMouseMove}
-													onClick={(e) => {
-														// Only hijack click when the hover card is visible (prevents breaking
-														// draft row click behavior on the indicator in its default state).
-														if (!isUsedContactHoverCardVisible) return;
-														e.preventDefault();
-														e.stopPropagation();
-														goToUsedContactCampaign(draft.contactId);
-													}}
-												>
-													{/* Sliding dot for multi-campaign */}
-													{isMultiCampaignIndicator && (
-														<span
-															className={cn(
-																'rounded-full pointer-events-none transition-all duration-200 ease-in-out',
-																hoveredRegion === 'right' ? 'bg-[#F78989]' : 'bg-[#DAE6FE]'
-															)}
-															style={(() => {
-																// Spec: 14×37 pill, 14×14 circle, thin stroke.
-																const PILL_HEIGHT = 37;
-																const DOT_SIZE = 14;
-																const maxTop = Math.max(0, PILL_HEIGHT - DOT_SIZE);
-																const campaignCount = resolvedUsedContactCampaigns.length;
-																const clampedIdx =
-																	typeof activeUsedContactCampaignIndex === 'number' &&
-																	campaignCount > 0
-																		? Math.min(
-																				campaignCount - 1,
-																				Math.max(0, activeUsedContactCampaignIndex)
-																		  )
-																		: 0;
-																// Position dot based on active index
-																const top =
-																	campaignCount > 1
-																		? (maxTop * clampedIdx) / (campaignCount - 1)
-																		: maxTop / 2;
-																return {
-																	position: 'absolute' as const,
-																	left: '0px',
-																	top: `${top}px`,
-																	width: `${DOT_SIZE}px`,
-																	height: `${DOT_SIZE}px`,
-																	// Thin stroke without changing geometry.
-																	boxShadow: '0 0 0 1px #000000',
-																};
-															})()}
-														/>
-													)}
-												</span>
-											);
-										})()}
-									{/* Rejected indicator - stacked below used-contact when present */}
+									{/* Rejected indicator */}
 									{isRejected && (
 										<span
 											className="absolute z-10 transition-all duration-150 ease-out"
@@ -2330,12 +2207,7 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 											aria-label="Rejected draft"
 											style={{
 												left: '8px',
-												// When the used-contact dot expands into the pill, push status dots DOWN (not right).
-												top: isUsedContactHoverCardVisible
-													? '53px'
-													: isUsedContact
-														? '33px'
-														: '11px',
+												top: '11px',
 												width: '16px',
 												height: '16px',
 												borderRadius: '50%',
@@ -2344,7 +2216,7 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 											}}
 										/>
 									)}
-									{/* Approved indicator - stacked below used-contact when present */}
+									{/* Approved indicator */}
 									{isApproved && (
 										<span
 											className="absolute z-10 transition-all duration-150 ease-out"
@@ -2352,12 +2224,7 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 											aria-label="Approved draft"
 											style={{
 												left: '8px',
-												// When the used-contact dot expands into the pill, push status dots DOWN (not right).
-												top: isUsedContactHoverCardVisible
-													? '53px'
-													: isUsedContact
-														? '33px'
-														: '11px',
+												top: '11px',
 												width: '16px',
 												height: '16px',
 												borderRadius: '50%',
@@ -2370,9 +2237,7 @@ export const DraftedEmails = forwardRef<DraftedEmailsHandle, DraftedEmailsProps>
 									<div
 										className={cn(
 											'absolute left-[10px] bottom-[4px] z-0 w-[9px] h-[36px] rounded-[11px] border-2 border-black bg-white overflow-hidden pointer-events-none',
-											// Hide the selection switch when the used-contact indicator is expanded into the pill
-											// (keeps the left edge uncluttered while hovering "Appears in").
-											isUsedContactHoverCardVisible ? 'hidden' : 'hidden group-hover/draft:block'
+											'hidden group-hover/draft:block'
 										)}
 									>
 										<div

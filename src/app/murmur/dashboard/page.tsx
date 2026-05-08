@@ -5660,7 +5660,6 @@ const DashboardContent = () => {
 	const renderMapPanelDesktopRow = (contact: ContactWithName) => {
 		const isSelected = selectedContacts.includes(contact.id);
 		const isHovered = hoveredMapPanelContactId === contact.id;
-		const isUsed = usedContactIdsSet.has(contact.id);
 		const isInBaseResults = baseContactIdSet.has(contact.id);
 		const firstName = contact.firstName || '';
 		const lastName = contact.lastName || '';
@@ -5736,30 +5735,9 @@ const DashboardContent = () => {
 					)
 				}
 			>
-				{fullName && isUsed && (
-					<span
-						className="absolute shrink-0"
-						style={{
-							width: '16px',
-							height: '16px',
-							borderRadius: '50%',
-							border: '1px solid #000000',
-							backgroundColor: '#DAE6FE',
-							left: '12px',
-							top: '50%',
-							transform: 'translateY(-50%)',
-						}}
-					/>
-				)}
 				{fullName ? (
 					<>
 						<div className="pl-3 pr-1 flex items-center h-[23px]">
-							{isUsed && (
-								<span
-									className="inline-block shrink-0 mr-2"
-									style={{ width: '16px', height: '16px' }}
-								/>
-							)}
 							<div className="font-bold text-[11px] w-full truncate leading-tight">
 								{fullName}
 							</div>
@@ -5825,12 +5803,6 @@ const DashboardContent = () => {
 							)}
 						</div>
 						<div className="pl-3 pr-1 flex items-center h-[22px]">
-							{isUsed && (
-								<span
-									className="inline-block shrink-0 mr-2"
-									style={{ width: '16px', height: '16px' }}
-								/>
-							)}
 							<div className="text-[11px] text-black w-full truncate leading-tight">
 								{company}
 							</div>
@@ -5864,18 +5836,6 @@ const DashboardContent = () => {
 				) : (
 					<>
 						<div className="row-span-2 pl-3 pr-1 flex items-center h-full">
-							{isUsed && (
-								<span
-									className="inline-block shrink-0 mr-2"
-									style={{
-										width: '16px',
-										height: '16px',
-										borderRadius: '50%',
-										border: '1px solid #000000',
-										backgroundColor: '#DAE6FE',
-									}}
-								/>
-							)}
 							<div className="font-bold text-[11px] w-full truncate leading-tight">
 								{company || '—'}
 							</div>
@@ -7652,7 +7612,7 @@ const DashboardContent = () => {
 								>
 									<MapSelectGrabTallStackBox
 										className="absolute pointer-events-none"
-										dividerColor={isSelectMapToolActive ? '#FFFFFF' : undefined}
+										isSelectActive={isSelectMapToolActive}
 										style={{
 											left: '-0.5px',
 											top: `-${
@@ -8592,7 +8552,6 @@ const DashboardContent = () => {
 																			contact.id
 																		);
 																		const isHovered = hoveredMapPanelContactId === contact.id;
-																		const isUsed = usedContactIdsSet.has(contact.id);
 																		const isInBaseResults = baseContactIdSet.has(contact.id);
 																		const firstName = contact.firstName || '';
 																		const lastName = contact.lastName || '';
@@ -8686,32 +8645,11 @@ const DashboardContent = () => {
 																					{fullName ? (
 																						<>
 																							<div className="flex items-center">
-																								{isUsed && (
-																									<span
-																										className="inline-block shrink-0 mr-2"
-																										style={{
-																											width: '16px',
-																											height: '16px',
-																											borderRadius: '50%',
-																											border: '1px solid #000000',
-																											backgroundColor: '#DAE6FE',
-																										}}
-																									/>
-																								)}
 																								<div className="font-bold text-[11px] truncate leading-tight">
 																									{fullName}
 																								</div>
 																							</div>
 																							<div className="flex items-center mt-[2px]">
-																								{isUsed && (
-																									<span
-																										className="inline-block shrink-0 mr-2"
-																										style={{
-																											width: '16px',
-																											height: '16px',
-																										}}
-																									/>
-																								)}
 																								<div className="text-[11px] text-black truncate leading-tight">
 																									{company}
 																								</div>
@@ -8719,18 +8657,6 @@ const DashboardContent = () => {
 																						</>
 																					) : (
 																						<div className="flex items-center">
-																							{isUsed && (
-																								<span
-																									className="inline-block shrink-0 mr-2"
-																									style={{
-																										width: '16px',
-																										height: '16px',
-																										borderRadius: '50%',
-																										border: '1px solid #000000',
-																										backgroundColor: '#DAE6FE',
-																									}}
-																								/>
-																							)}
 																							<div className="font-bold text-[11px] truncate leading-tight">
 																								{company || '—'}
 																							</div>

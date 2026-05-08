@@ -916,27 +916,6 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 												handleDraftClick(draft, e);
 											}}
 										>
-											{/* Used-contact indicator - stacked above reject/approve when both present */}
-											{usedContactIdsSet.has(draft.contactId) && (
-												<span
-													className={cn('absolute', indicatorLeftClass)}
-													style={{
-														// Align used-contact dot with the Company line.
-														// Different positioning for Drafts tab vs All tab vs bottom view.
-														top: isBottomView
-															? '50%'
-															: isAllTab
-																? 'calc(50% - 16px)'
-																: 'calc(50% - 32px)', // Drafts tab - higher
-														transform: isBottomView ? 'translateY(-50%)' : 'none',
-														width: isBottomView ? '12px' : '13px',
-														height: isBottomView ? '12px' : '13px',
-														borderRadius: '50%',
-														border: '1px solid #000000',
-														backgroundColor: '#DAE6FE',
-													}}
-												/>
-											)}
 											{/* Rejected indicator - stacked below used-contact when both present */}
 											{isRejected && (
 												<span
@@ -944,18 +923,8 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 													title="Marked for rejection"
 													aria-label="Rejected draft"
 													style={{
-														// When stacked under the used-contact dot, align with the Subject line.
-														// Different positioning for Drafts tab vs All tab vs bottom view.
-														top: usedContactIdsSet.has(draft.contactId)
-															? (isBottomView
-																? 'calc(50% + 3px)'
-																: isAllTab
-																	? 'calc(50% + 6px)'
-																	: 'calc(50% - 10px)') // Drafts tab - higher
-															: '50%',
-														transform: usedContactIdsSet.has(draft.contactId)
-															? 'none'
-															: 'translateY(-50%)',
+														top: '50%',
+														transform: 'translateY(-50%)',
 														width: isBottomView ? '12px' : '13px',
 														height: isBottomView ? '12px' : '13px',
 														borderRadius: '50%',
@@ -970,18 +939,8 @@ export const DraftsExpandedList: FC<DraftsExpandedListProps> = ({
 													title="Marked for approval"
 													aria-label="Approved draft"
 													style={{
-														// When stacked under the used-contact dot, align with the Subject line.
-														// Different positioning for Drafts tab vs All tab vs bottom view.
-														top: usedContactIdsSet.has(draft.contactId)
-															? (isBottomView
-																? 'calc(50% + 3px)'
-																: isAllTab
-																	? 'calc(50% + 6px)'
-																	: 'calc(50% - 10px)') // Drafts tab - higher
-															: '50%',
-														transform: usedContactIdsSet.has(draft.contactId)
-															? 'none'
-															: 'translateY(-50%)',
+														top: '50%',
+														transform: 'translateY(-50%)',
 														width: isBottomView ? '12px' : '13px',
 														height: isBottomView ? '12px' : '13px',
 														borderRadius: '50%',

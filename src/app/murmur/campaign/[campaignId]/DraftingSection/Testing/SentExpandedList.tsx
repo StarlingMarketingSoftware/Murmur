@@ -568,24 +568,6 @@ export const SentExpandedList: FC<SentExpandedListProps> = ({
 										handleSentClick(email.id as number, e);
 									}}
 								>
-									{/* Used-contact indicator - vertically centered */}
-									{usedContactIdsSet.has(email.contactId) && (
-										<span
-											className={cn(
-												"absolute left-[8px]",
-												isBottomView ? "left-[6px]" : "left-[8px]"
-											)}
-											style={{
-												top: '50%',
-												transform: 'translateY(-50%)',
-												width: isBottomView ? '12px' : isAllTab ? '13px' : '16px',
-												height: isBottomView ? '12px' : isAllTab ? '13px' : '16px',
-												borderRadius: '50%',
-												border: '1px solid #000000',
-												backgroundColor: '#DAE6FE',
-											}}
-										/>
-									)}
 
 									{/* Fixed top-right info (Title + Location) */}
 									<div

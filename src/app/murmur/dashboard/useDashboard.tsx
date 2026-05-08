@@ -1022,21 +1022,6 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 				header: () => <span className="sr-only">Name</span>,
 				cell: ({ row }) => {
 					const contact = row.original as ContactWithName;
-					const isUsed = usedContactIdsSet.has(contact.id);
-					const renderUsedIndicator = () => (
-						<span
-							className="inline-block shrink-0 mr-2"
-							title={isUsed ? 'Used in a previous campaign' : undefined}
-							style={{
-								width: '16px',
-								height: '16px',
-								borderRadius: '50%',
-								border: '1px solid #000000',
-								backgroundColor: '#DAE6FE',
-								visibility: isUsed ? 'visible' : 'hidden',
-							}}
-						/>
-					);
 					// Compute name from firstName and lastName fields
 					const hasName = contactHasName(contact);
 					const nameValue = hasName ? computeName(contact) : '';
@@ -1060,7 +1045,6 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 					if (!hasName && !hasCompany) {
 						return (
 							<div className="flex items-start gap-2">
-								{renderUsedIndicator()}
 								<div className="flex flex-col gap-0.5 py-1">
 									<div className="truncate">
 										<span className="select-none text-gray-300 dark:text-gray-700">
@@ -1080,7 +1064,6 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 						if (!hasName && hasCompany) {
 							return (
 								<div className="flex items-center gap-2">
-									{renderUsedIndicator()}
 									<div className="flex flex-col justify-center py-1 h-[2.75rem]">
 										<div className="truncate font-bold font-inter text-[15px]">
 											<TableCellTooltip
@@ -1096,7 +1079,6 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 						}
 						return (
 							<div className="flex items-start gap-2">
-								{renderUsedIndicator()}
 								<div className="flex flex-col gap-0.5 py-1">
 									<div className="truncate font-bold font-inter text-[15px]">
 										<TableCellTooltip
@@ -1116,7 +1098,6 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 
 					return (
 						<div className="flex items-center gap-2">
-							{renderUsedIndicator()}
 							<div className="flex flex-col gap-0.5 py-1">
 								<div className="truncate font-bold font-inter text-[15px]">
 									<TableCellTooltip
