@@ -3693,8 +3693,48 @@ const DashboardContent = () => {
 		MAP_SELECT_GRAB_TOTAL_HEIGHT_PX * mapSelectGrabViewScale;
 	const mapSelectGrabOriginOffsetPx =
 		MAP_SELECT_GRAB_TOP_EXTENT_PX * mapSelectGrabViewScale;
-	const MAP_VIEW_SEARCH_BAR_TOP_PX = 33;
+	const MAP_VIEW_TOP_BACKDROP_BOX_TOP_PX = 9;
+	const MAP_VIEW_SEARCH_BAR_BOTTOM_INSET_PX = 4;
 	const MAP_VIEW_SEARCH_BAR_INPUT_HEIGHT_PX = 49;
+	const MAP_VIEW_SEARCH_BAR_OUTER_WIDTH_PX = 440;
+	// Box sized using Figma's box-to-bar ratio (804×102 around a 488×54 bar),
+	// applied to our actual bar (440×49) so the visual proportions match.
+	const MAP_VIEW_TOP_BACKDROP_BOX_WIDTH_PX = Math.round(
+		MAP_VIEW_SEARCH_BAR_OUTER_WIDTH_PX * (804 / 488.204)
+	);
+	const MAP_VIEW_TOP_BACKDROP_BOX_HEIGHT_PX = Math.round(
+		MAP_VIEW_SEARCH_BAR_INPUT_HEIGHT_PX * (102 / 54)
+	);
+	// Outline-only stroke box positioned to the left of the search bar.
+	// Figma: 124×42 box (post rotate(-90)), 23px gap from the bar — sized
+	// against the same 488×54 Figma bar reference and converted to our bar.
+	const MAP_VIEW_TOP_OUTLINE_BOX_WIDTH_PX = Math.round(
+		124 * (MAP_VIEW_SEARCH_BAR_OUTER_WIDTH_PX / 488.204)
+	);
+	const MAP_VIEW_TOP_OUTLINE_BOX_HEIGHT_PX = Math.round(
+		42 * (MAP_VIEW_SEARCH_BAR_OUTER_WIDTH_PX / 488.204)
+	);
+	const MAP_VIEW_TOP_OUTLINE_BOX_LEFT_GAP_PX = Math.round(
+		23 * (MAP_VIEW_SEARCH_BAR_OUTER_WIDTH_PX / 488.204)
+	);
+	// Right-side outline-only box. Figma: 105×42 box, 31px gap from the bar.
+	const MAP_VIEW_TOP_OUTLINE_BOX_RIGHT_WIDTH_PX = Math.round(
+		105 * (MAP_VIEW_SEARCH_BAR_OUTER_WIDTH_PX / 488.204)
+	);
+	const MAP_VIEW_TOP_OUTLINE_BOX_RIGHT_HEIGHT_PX = Math.round(
+		42 * (MAP_VIEW_SEARCH_BAR_OUTER_WIDTH_PX / 488.204)
+	);
+	const MAP_VIEW_TOP_OUTLINE_BOX_RIGHT_GAP_PX = Math.round(
+		31 * (MAP_VIEW_SEARCH_BAR_OUTER_WIDTH_PX / 488.204)
+	);
+	// Bar sits 4px above the bottom of the top backdrop box. Both the box and
+	// the bar are rendered with `scale(MAP_VIEW_UI_SCALE)` and
+	// `transformOrigin: top center`, so visual heights are `unscaled * scale`.
+	const MAP_VIEW_SEARCH_BAR_TOP_PX =
+		MAP_VIEW_TOP_BACKDROP_BOX_TOP_PX +
+		MAP_VIEW_TOP_BACKDROP_BOX_HEIGHT_PX * MAP_VIEW_UI_SCALE -
+		MAP_VIEW_SEARCH_BAR_BOTTOM_INSET_PX -
+		MAP_VIEW_SEARCH_BAR_INPUT_HEIGHT_PX * MAP_VIEW_UI_SCALE;
 	const SEARCH_THIS_AREA_GAP_PX = 45;
 	const SEARCH_THIS_AREA_BUTTON_TOP_PX =
 		MAP_VIEW_SEARCH_BAR_TOP_PX + MAP_VIEW_SEARCH_BAR_INPUT_HEIGHT_PX + SEARCH_THIS_AREA_GAP_PX;
@@ -7103,484 +7143,6 @@ const DashboardContent = () => {
 									: undefined
 							}
 						>
-							{/* Map view: show the 189x52 icon tray to the left of the search bar */}
-								{isMapView && (
-									<div
-										aria-hidden="true"
-										className="hidden lg:flex items-center justify-between"
-										style={{
-										position: 'absolute',
-										// Map is inset 9px from the viewport; "25px from map top" => 34px viewport.
-										// Search bar wrapper sits at 33px viewport, so this becomes 1px inside the wrapper.
-										top: '1px',
-										left: `-${
-											MAP_RESULTS_SEARCH_TRAY.containerWidth +
-											MAP_RESULTS_SEARCH_TRAY.gapToSearchBar
-										}px`,
-										width: `${MAP_RESULTS_SEARCH_TRAY.containerWidth}px`,
-										height: `${MAP_RESULTS_SEARCH_TRAY.containerHeight}px`,
-										backgroundColor: MAP_RESULTS_SEARCH_TRAY.backgroundColor,
-											border: `${MAP_RESULTS_SEARCH_TRAY.borderWidth}px solid ${MAP_RESULTS_SEARCH_TRAY.borderColor}`,
-											borderRadius: `${MAP_RESULTS_SEARCH_TRAY.containerRadius}px`,
-											paddingLeft: '6px',
-											paddingRight: '6px',
-											pointerEvents: 'none',
-										}}
-									>
-										{/* First icon (Why) - read-only search context */}
-										<div ref={whyDropdownRef} className="relative">
-											<button
-												type="button"
-												tabIndex={-1}
-												className="cursor-default border-none bg-transparent p-0"
-												onClick={() => setIsWhyDropdownOpen(!isWhyDropdownOpen)}
-												aria-label={
-													isPromotionForTray ? 'Promotion search type' : 'Booking search type'
-												}
-												aria-expanded={isWhyDropdownOpen}
-												aria-haspopup="listbox"
-											>
-											<SearchTrayIconTile backgroundColor={trayWhy.backgroundColor}>
-												{trayWhy.icon}
-											</SearchTrayIconTile>
-										</button>
-										{/* Why dropdown */}
-											{!isMapView && isWhyDropdownOpen && (
-											<div
-												role="listbox"
-												aria-label="Search type options"
-												className="absolute top-[calc(100%+8px)] left-0 border-[3px] border-black rounded-[12px] z-50"
-												style={{
-													width: '171px',
-													height: '110px',
-													backgroundColor: 'rgba(216, 229, 251, 0.9)',
-													padding: '6px',
-												}}
-											>
-												<div className="flex flex-col gap-[6px] h-full items-center">
-													{/* Promotion option */}
-													<div
-														role="option"
-														aria-selected={isPromotion}
-														className="flex items-center gap-3 cursor-pointer bg-white rounded-[8px] hover:bg-gray-50 transition-colors"
-														style={{
-															width: '160px',
-															height: '46px',
-															paddingLeft: '4px',
-															paddingRight: '12px',
-														}}
-														onClick={() => {
-															setWhyValue('[Promotion]');
-															setIsWhyDropdownOpen(false);
-															setIsWhatDropdownOpen(true);
-														}}
-													>
-														<div
-															className="flex items-center justify-center flex-shrink-0"
-															style={{
-																width: '38px',
-																height: '38px',
-																backgroundColor: MAP_RESULTS_SEARCH_TRAY.whyBackgroundColors.promotion,
-																borderRadius: '10px',
-															}}
-														>
-															<PromotionIcon />
-														</div>
-														<span className="text-[15px] font-medium text-black font-inter">Promotion</span>
-													</div>
-													{/* Booking option */}
-													<div
-														role="option"
-														aria-selected={!isPromotion}
-														className="flex items-center gap-3 cursor-pointer bg-white rounded-[8px] hover:bg-gray-50 transition-colors"
-														style={{
-															width: '160px',
-															height: '46px',
-															paddingLeft: '4px',
-															paddingRight: '12px',
-														}}
-														onClick={() => {
-															setWhyValue('[Booking]');
-															setIsWhyDropdownOpen(false);
-															setIsWhatDropdownOpen(true);
-														}}
-													>
-														<div
-															className="flex items-center justify-center flex-shrink-0"
-															style={{
-																width: '38px',
-																height: '38px',
-																backgroundColor: MAP_RESULTS_SEARCH_TRAY.whyBackgroundColors.booking,
-																borderRadius: '10px',
-															}}
-														>
-															<BookingIcon />
-														</div>
-														<span className="text-[15px] font-medium text-black font-inter">Booking</span>
-													</div>
-												</div>
-											</div>
-										)}
-									</div>
-									{/* Second icon (What) - read-only search context */}
-										<div ref={whatDropdownRef} className="relative">
-											<button
-												type="button"
-												tabIndex={-1}
-												className="cursor-default border-none bg-transparent p-0"
-												onClick={() => setIsWhatDropdownOpen(!isWhatDropdownOpen)}
-												aria-label={`${effectiveWhatKeyForTray || 'Category'} search category`}
-												aria-expanded={isWhatDropdownOpen}
-												aria-haspopup="listbox"
-											>
-											<SearchTrayIconTile backgroundColor={trayWhat.backgroundColor}>
-												{trayWhat.icon}
-											</SearchTrayIconTile>
-										</button>
-										{/* What dropdown */}
-											{!isMapView && isWhatDropdownOpen && (
-											<div
-												id="map-search-tray-what-dropdown-container"
-												role="listbox"
-												aria-label="Search category options"
-												className="absolute top-[calc(100%+8px)] left-0 border-[3px] border-black rounded-[12px] z-50"
-												style={{
-													width: '249px',
-													height: isPromotion ? '66px' : '277px',
-													backgroundColor: 'rgba(216, 229, 251, 0.9)',
-												}}
-											>
-												{isPromotion ? (
-													/* Promotion: only Radio Stations - centered in compact container */
-													<div className="flex items-center justify-center h-full w-full">
-														<div
-															role="option"
-															aria-selected={whatValue === 'Radio Stations'}
-															className="flex items-center gap-3 cursor-pointer bg-white rounded-[8px] hover:bg-gray-50 transition-colors flex-shrink-0"
-															style={{
-																width: '237px',
-																height: '46px',
-																paddingLeft: '4px',
-																paddingRight: '12px',
-															}}
-															onClick={() => {
-																setWhatValue('Radio Stations');
-																setIsWhatDropdownOpen(false);
-															}}
-														>
-															<div
-																className="flex items-center justify-center flex-shrink-0"
-																style={{
-																	width: '38px',
-																	height: '38px',
-																	backgroundColor:
-																		MAP_RESULTS_SEARCH_TRAY.whatIconByLabel['Radio Stations']
-																			.backgroundColor,
-																	borderRadius: '10px',
-																}}
-															>
-																<RadioStationsIcon />
-															</div>
-															<span className="text-[15px] font-medium text-black font-inter">
-																Radio Stations
-															</span>
-														</div>
-													</div>
-												) : (
-													<CustomScrollbar
-														className="h-full"
-														contentClassName="flex flex-col items-center gap-[10px] py-[10px] pl-[6px] pr-[26px] -mr-[20px]"
-														thumbWidth={2}
-														thumbColor="#000000"
-														offsetRight={-5}
-														lockHorizontalScroll
-													>
-														<>
-															{/* 1. Wine, Beer, and Spirits option */}
-															<div
-																role="option"
-																aria-selected={whatValue === 'Wine, Beer, and Spirits'}
-																className="flex items-center gap-3 cursor-pointer bg-white rounded-[8px] hover:bg-gray-50 transition-colors flex-shrink-0"
-																style={{
-																	width: '237px',
-																	height: '46px',
-																	paddingLeft: '4px',
-																	paddingRight: '12px',
-																}}
-																onClick={() => {
-																	setWhatValue('Wine, Beer, and Spirits');
-																	setIsWhatDropdownOpen(false);
-																}}
-															>
-																<div
-																	className="flex items-center justify-center flex-shrink-0"
-																	style={{
-																		width: '38px',
-																		height: '38px',
-																		backgroundColor:
-																			MAP_RESULTS_SEARCH_TRAY.whatIconByLabel[
-																				'Wine, Beer, and Spirits'
-																			].backgroundColor,
-																		borderRadius: '10px',
-																	}}
-																>
-																	<WineBeerSpiritsIcon size={22} />
-																</div>
-																<span className="text-[15px] font-medium text-black font-inter flex-1 min-w-0 truncate">
-																	Wine, Beer, and Spirits
-																</span>
-															</div>
-															{/* 2. Restaurants option */}
-															<div
-																role="option"
-																aria-selected={whatValue === 'Restaurants'}
-																className="flex items-center gap-3 cursor-pointer bg-white rounded-[8px] hover:bg-gray-50 transition-colors flex-shrink-0"
-																style={{
-																	width: '237px',
-																	height: '46px',
-																	paddingLeft: '4px',
-																	paddingRight: '12px',
-																}}
-																onClick={() => {
-																	setWhatValue('Restaurants');
-																	setIsWhatDropdownOpen(false);
-																}}
-															>
-																<div
-																	className="flex items-center justify-center flex-shrink-0"
-																	style={{
-																		width: '38px',
-																		height: '38px',
-																		backgroundColor:
-																			MAP_RESULTS_SEARCH_TRAY.whatIconByLabel['Restaurants']
-																				.backgroundColor,
-																		borderRadius: '10px',
-																	}}
-																>
-																	<RestaurantsIcon />
-																</div>
-																<span className="text-[15px] font-medium text-black font-inter">
-																	Restaurants
-																</span>
-															</div>
-															{/* 3. Coffee Shops option */}
-															<div
-																role="option"
-																aria-selected={whatValue === 'Coffee Shops'}
-																className="flex items-center gap-3 cursor-pointer bg-white rounded-[8px] hover:bg-gray-50 transition-colors flex-shrink-0"
-																style={{
-																	width: '237px',
-																	height: '46px',
-																	paddingLeft: '4px',
-																	paddingRight: '12px',
-																}}
-																onClick={() => {
-																	setWhatValue('Coffee Shops');
-																	setIsWhatDropdownOpen(false);
-																}}
-															>
-																<div
-																	className="flex items-center justify-center flex-shrink-0"
-																	style={{
-																		width: '38px',
-																		height: '38px',
-																		backgroundColor:
-																			MAP_RESULTS_SEARCH_TRAY.whatIconByLabel['Coffee Shops']
-																				.backgroundColor,
-																		borderRadius: '10px',
-																	}}
-																>
-																	<CoffeeShopsIcon />
-																</div>
-																<span className="text-[15px] font-medium text-black font-inter">
-																	Coffee Shops
-																</span>
-															</div>
-															{/* 4. Festivals option */}
-															<div
-																role="option"
-																aria-selected={whatValue === 'Festivals'}
-																className="flex items-center gap-3 cursor-pointer bg-white rounded-[8px] hover:bg-gray-50 transition-colors flex-shrink-0"
-																style={{
-																	width: '237px',
-																	height: '46px',
-																	paddingLeft: '4px',
-																	paddingRight: '12px',
-																}}
-																onClick={() => {
-																	setWhatValue('Festivals');
-																	setIsWhatDropdownOpen(false);
-																}}
-															>
-																<div
-																	className="flex items-center justify-center flex-shrink-0"
-																	style={{
-																		width: '38px',
-																		height: '38px',
-																		backgroundColor:
-																			MAP_RESULTS_SEARCH_TRAY.whatIconByLabel['Festivals']
-																				.backgroundColor,
-																		borderRadius: '10px',
-																	}}
-																>
-																	<FestivalsIcon />
-																</div>
-																<span className="text-[15px] font-medium text-black font-inter">
-																	Festivals
-																</span>
-															</div>
-															{/* 5. Wedding Planners option */}
-															<div
-																role="option"
-																aria-selected={whatValue === 'Wedding Planners'}
-																className="flex items-center gap-3 cursor-pointer bg-white rounded-[8px] hover:bg-gray-50 transition-colors flex-shrink-0"
-																style={{
-																	width: '237px',
-																	height: '46px',
-																	paddingLeft: '4px',
-																	paddingRight: '12px',
-																}}
-																onClick={() => {
-																	setWhatValue('Wedding Planners');
-																	setIsWhatDropdownOpen(false);
-																}}
-															>
-																<div
-																	className="flex items-center justify-center flex-shrink-0"
-																	style={{
-																		width: '38px',
-																		height: '38px',
-																		backgroundColor:
-																			MAP_RESULTS_SEARCH_TRAY.whatIconByLabel[
-																				'Wedding Planners'
-																			].backgroundColor,
-																		borderRadius: '10px',
-																	}}
-																>
-																	<WeddingPlannersIcon />
-																</div>
-																<span className="text-[15px] font-medium text-black font-inter">
-																	Wedding Planners
-																</span>
-															</div>
-															{/* 6. Music Venues option */}
-															<div
-																role="option"
-																aria-selected={whatValue === 'Music Venues'}
-																className="flex items-center gap-3 cursor-pointer bg-white rounded-[8px] hover:bg-gray-50 transition-colors flex-shrink-0"
-																style={{
-																	width: '237px',
-																	height: '46px',
-																	paddingLeft: '4px',
-																	paddingRight: '12px',
-																}}
-																onClick={() => {
-																	setWhatValue('Music Venues');
-																	setIsWhatDropdownOpen(false);
-																}}
-															>
-																<div
-																	className="flex items-center justify-center flex-shrink-0"
-																	style={{
-																		width: '38px',
-																		height: '38px',
-																		backgroundColor:
-																			MAP_RESULTS_SEARCH_TRAY.whatIconByLabel['Music Venues']
-																				.backgroundColor,
-																		borderRadius: '10px',
-																	}}
-																>
-																	<MusicVenuesIcon />
-																</div>
-																<span className="text-[15px] font-medium text-black font-inter">
-																	Music Venues
-																</span>
-															</div>
-														</>
-													</CustomScrollbar>
-												)}
-											</div>
-										)}
-									</div>
-									{/* Third icon (Where) - read-only search context */}
-										<div ref={whereDropdownRef} className="relative">
-											<button
-												type="button"
-												tabIndex={-1}
-												className="cursor-default border-none bg-transparent p-0"
-												onClick={() => setIsWhereDropdownOpen(!isWhereDropdownOpen)}
-												aria-label={`${whereCandidate || 'Location'} search location`}
-												aria-expanded={isWhereDropdownOpen}
-												aria-haspopup="listbox"
-											>
-											<SearchTrayIconTile backgroundColor={trayWhere.backgroundColor}>
-												{trayWhere.icon}
-											</SearchTrayIconTile>
-										</button>
-										{/* Where dropdown */}
-											{!isMapView && isWhereDropdownOpen && (
-											<div
-												id="map-search-tray-where-dropdown-container"
-												role="listbox"
-												aria-label="Search location options"
-												className="absolute top-[calc(100%+8px)] right-0 border-[3px] border-black rounded-[12px] z-50"
-												style={{
-													width: '206px',
-													height: '277px',
-													backgroundColor: 'rgba(216, 229, 251, 0.9)',
-												}}
-											>
-												<CustomScrollbar
-													className="h-full"
-													contentClassName="flex flex-col items-center gap-[10px] py-[10px] pl-[6px] pr-[26px] -mr-[20px]"
-													thumbWidth={2}
-													thumbColor="#000000"
-													offsetRight={-5}
-													lockHorizontalScroll
-												>
-													{buildAllUsStateNames().map((stateName) => {
-														const { icon, backgroundColor } = getCityIconProps('', stateName);
-														return (
-															<div
-																key={stateName}
-																role="option"
-																aria-selected={whereValue === stateName}
-																className="flex items-center gap-3 cursor-pointer bg-white rounded-[8px] hover:bg-gray-50 transition-colors flex-shrink-0"
-																style={{
-																	width: '194px',
-																	height: '46px',
-																	paddingLeft: '4px',
-																	paddingRight: '12px',
-																}}
-																onClick={() => {
-																	setIsWhereDropdownOpen(false);
-																	setIsNearMeLocation(false);
-																	triggerSearchWithWhere(stateName, false);
-																}}
-															>
-																<div
-																	className="flex items-center justify-center flex-shrink-0"
-																	style={{
-																		width: '38px',
-																		height: '38px',
-																		backgroundColor,
-																		borderRadius: '10px',
-																	}}
-																>
-																	{icon}
-																</div>
-																<span className="text-[15px] font-medium text-black font-inter">
-																	{stateName}
-																</span>
-															</div>
-														);
-													})}
-												</CustomScrollbar>
-											</div>
-										)}
-									</div>
-								</div>
-							)}
 								<div
 									className={`results-search-bar-inner ${
 										hoveredContact && !isMapView ? 'invisible' : ''
@@ -7983,12 +7545,82 @@ const DashboardContent = () => {
 						</div>
 						);
 
+						const mapTopBackdropBox = isMapView ? (
+							<div
+								aria-hidden="true"
+								className="fixed left-0 right-0 flex justify-center pointer-events-none"
+								style={{
+									top: `${MAP_VIEW_TOP_BACKDROP_BOX_TOP_PX}px`,
+									zIndex: 110,
+								}}
+							>
+								<div
+									style={{
+										transform: `scale(${MAP_VIEW_UI_SCALE})`,
+										transformOrigin: 'top center',
+										width: `${MAP_VIEW_TOP_BACKDROP_BOX_WIDTH_PX}px`,
+										height: `${MAP_VIEW_TOP_BACKDROP_BOX_HEIGHT_PX}px`,
+										borderRadius: '8px',
+										backgroundColor: '#B9EAF1',
+										opacity: 0.9,
+									}}
+								/>
+							</div>
+						) : null;
+
+						const mapTopOutlineBox = isMapView ? (
+							<div
+								aria-hidden="true"
+								className="fixed left-0 right-0 flex justify-center pointer-events-none"
+								style={{
+									top: `${MAP_VIEW_SEARCH_BAR_TOP_PX}px`,
+									zIndex: 115,
+								}}
+							>
+								<div
+									className="relative"
+									style={{
+										transform: `scale(${MAP_VIEW_UI_SCALE})`,
+										transformOrigin: 'top center',
+										width: `${MAP_VIEW_SEARCH_BAR_OUTER_WIDTH_PX}px`,
+										maxWidth: `${MAP_VIEW_SEARCH_BAR_OUTER_WIDTH_PX}px`,
+										height: `${MAP_VIEW_SEARCH_BAR_INPUT_HEIGHT_PX}px`,
+									}}
+								>
+									<div
+										style={{
+											position: 'absolute',
+											right: `calc(100% + ${MAP_VIEW_TOP_OUTLINE_BOX_LEFT_GAP_PX}px)`,
+											top: '50%',
+											transform: 'translateY(-50%)',
+											width: `${MAP_VIEW_TOP_OUTLINE_BOX_WIDTH_PX}px`,
+											height: `${MAP_VIEW_TOP_OUTLINE_BOX_HEIGHT_PX}px`,
+											border: '1px solid #000',
+											borderRadius: '8px',
+											boxSizing: 'border-box',
+										}}
+									/>
+									<div
+										style={{
+											position: 'absolute',
+											left: `calc(100% + ${MAP_VIEW_TOP_OUTLINE_BOX_RIGHT_GAP_PX}px)`,
+											top: '50%',
+											transform: 'translateY(-50%)',
+											width: `${MAP_VIEW_TOP_OUTLINE_BOX_RIGHT_WIDTH_PX}px`,
+											height: `${MAP_VIEW_TOP_OUTLINE_BOX_RIGHT_HEIGHT_PX}px`,
+											border: '1px solid #000',
+											borderRadius: '8px',
+											boxSizing: 'border-box',
+										}}
+									/>
+								</div>
+							</div>
+						) : null;
+
 						const searchBar = isMapView ? (
 							<div
 								className="fixed left-0 right-0 flex justify-center pointer-events-none"
 								style={{
-									// Overlay directly on the map (no header band).
-									// Map container is inset 9px from viewport; place bar 24px below map top.
 									top: `${MAP_VIEW_SEARCH_BAR_TOP_PX}px`,
 									zIndex: 120,
 								}}
@@ -8258,6 +7890,8 @@ const DashboardContent = () => {
 						if (isMapView && typeof window !== 'undefined') {
 							return createPortal(
 								<>
+									{mapTopBackdropBox}
+									{mapTopOutlineBox}
 									{campaignMapTopTabs}
 									{searchBar}
 									{mapSelectGrabberTool}
