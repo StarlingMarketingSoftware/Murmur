@@ -4521,6 +4521,15 @@ const DashboardContent = () => {
 		return mapPanelContacts.every((contact) => selectedContacts.includes(contact.id));
 	}, [mapPanelContacts, selectedContacts]);
 
+	const mapPanelSelectedContacts = useMemo(
+		() => mapPanelContacts.filter((c) => selectedContacts.includes(c.id)),
+		[mapPanelContacts, selectedContacts]
+	);
+	const mapPanelUnselectedContacts = useMemo(
+		() => mapPanelContacts.filter((c) => !selectedContacts.includes(c.id)),
+		[mapPanelContacts, selectedContacts]
+	);
+
 	const getTabPillXFor = (tab: 'search' | 'inbox') => {
 		const track = tabToggleTrackRef.current;
 		const pill = tabTogglePillRef.current;
@@ -5604,6 +5613,323 @@ const DashboardContent = () => {
 		(activeSection === 'what' || activeSection === 'where')
 			? activeSection
 			: null;
+
+	// Renders one contact row in the map-view right-side panel (desktop variant).
+	// Used by both the "Selection" and "Search Results" sub-panels — they differ
+	// only in which slice of `mapPanelContacts` they iterate over.
+	const renderMapPanelDesktopRow = (contact: ContactWithName) => {
+		const isSelected = selectedContacts.includes(contact.id);
+		const isHovered = hoveredMapPanelContactId === contact.id;
+		const isUsed = usedContactIdsSet.has(contact.id);
+		const isInBaseResults = baseContactIdSet.has(contact.id);
+		const firstName = contact.firstName || '';
+		const lastName = contact.lastName || '';
+		const fullName = contact.name || `${firstName} ${lastName}`.trim();
+		const company = contact.company || '';
+		const searchDerivedHeadline =
+			whatValue && whereValue
+				? `${whatValue} ${whereValue}`
+				: whatValue || '';
+		const isSpecialCategorySearch =
+			/^restaurants?$/i.test(whatValue.trim()) ||
+			/^coffee\s*shops?$/i.test(whatValue.trim());
+		const curatedDisplayHeadline = contact.curatedDisplayLabel || '';
+		const contactHeadline =
+			curatedDisplayHeadline ||
+			(isInBaseResults
+				? contact.headline || contact.title || ''
+				: contact.title || contact.headline || '');
+		const computedHeadline = isInBaseResults
+			? isSpecialCategorySearch
+				? searchDerivedHeadline
+				: contactHeadline || searchDerivedHeadline
+			: contactHeadline;
+		const stickyHeadline =
+			selectedContactStickyHeadlineById[contact.id] || '';
+		const headline =
+			isSelected && stickyHeadline ? stickyHeadline : computedHeadline;
+		const isRestaurantsSearchForContact = isRestaurantsSearch && isInBaseResults;
+		const isCoffeeShopsSearchForContact = isCoffeeShopsSearch && isInBaseResults;
+		const isMusicVenuesSearchForContact = isMusicVenuesSearch && isInBaseResults;
+		const isMusicFestivalsSearchForContact = isMusicFestivalsSearch && isInBaseResults;
+		const isWeddingPlannersSearchForContact = isWeddingPlannersSearch && isInBaseResults;
+		const stateAbbr = getStateAbbreviation(contact.state || '') || '';
+		const city = contact.city || '';
+
+		return (
+			<div
+				key={contact.id}
+				data-contact-id={contact.id}
+				className="cursor-pointer transition-colors grid grid-cols-2 grid-rows-2 w-full h-[49px] overflow-hidden rounded-[8px] border-[3px] border-[#ABABAB] select-none relative"
+				style={{
+					backgroundColor: isSelected
+						? (isRestaurantsSearchForContact || isRestaurantTitle(headline))
+							? isHovered ? '#C5F5D1' : '#D7FFE1'
+							: (isCoffeeShopsSearchForContact || isCoffeeShopTitle(headline))
+								? isHovered ? '#DDF4CC' : '#EDFEDC'
+								: (isMusicVenuesSearchForContact || isMusicVenueTitle(headline))
+									? isHovered ? '#C5E8FF' : '#D7F0FF'
+									: (isMusicFestivalsSearchForContact || isMusicFestivalTitle(headline))
+										? isHovered ? '#ADD4FF' : '#BFDCFF'
+										: (isWeddingPlannersSearchForContact || isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline))
+											? isHovered ? '#F5EDCE' : '#FFF8DC'
+											: isWineBeerSpiritsTitle(headline)
+												? isHovered ? '#C8CBFF' : '#DADDFF'
+												: isHovered ? '#BFE3FF' : '#C9EAFF'
+						: isHovered
+							? '#F3F4F6'
+							: '#FFFFFF',
+				}}
+				onClick={() => {
+					if (isSelected) {
+						setSelectedContacts(
+							selectedContacts.filter((id) => id !== contact.id)
+						);
+					} else {
+						setSelectedContacts([...selectedContacts, contact.id]);
+					}
+				}}
+				onMouseEnter={() => setHoveredMapPanelContactId(contact.id)}
+				onMouseLeave={() =>
+					setHoveredMapPanelContactId((prev) =>
+						prev === contact.id ? null : prev
+					)
+				}
+			>
+				{fullName && isUsed && (
+					<span
+						className="absolute shrink-0"
+						style={{
+							width: '16px',
+							height: '16px',
+							borderRadius: '50%',
+							border: '1px solid #000000',
+							backgroundColor: '#DAE6FE',
+							left: '12px',
+							top: '50%',
+							transform: 'translateY(-50%)',
+						}}
+					/>
+				)}
+				{fullName ? (
+					<>
+						<div className="pl-3 pr-1 flex items-center h-[23px]">
+							{isUsed && (
+								<span
+									className="inline-block shrink-0 mr-2"
+									style={{ width: '16px', height: '16px' }}
+								/>
+							)}
+							<div className="font-bold text-[11px] w-full truncate leading-tight">
+								{fullName}
+							</div>
+						</div>
+						<div className="pr-2 pl-1 flex items-center h-[23px]">
+							{(headline || isMusicVenuesSearchForContact || isRestaurantsSearchForContact || isCoffeeShopsSearchForContact || isMusicFestivalsSearchForContact || isWeddingPlannersSearchForContact) ? (
+								<div
+									className="h-[17px] rounded-[6px] px-2 flex items-center gap-1 w-full border border-black overflow-hidden"
+									style={{
+										backgroundColor: (isRestaurantsSearchForContact || isRestaurantTitle(headline))
+											? '#C3FBD1'
+											: (isCoffeeShopsSearchForContact || isCoffeeShopTitle(headline))
+												? '#D6F1BD'
+												: (isMusicVenuesSearchForContact || isMusicVenueTitle(headline))
+													? '#B7E5FF'
+													: (isMusicFestivalsSearchForContact || isMusicFestivalTitle(headline))
+														? '#C1D6FF'
+														: (isWeddingPlannersSearchForContact || isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline))
+															? '#FFF8DC'
+															: isWineBeerSpiritsTitle(headline)
+																? '#BFC4FF'
+																: '#E8EFFF',
+									}}
+								>
+									{(isRestaurantsSearchForContact || isRestaurantTitle(headline)) && (
+										<RestaurantsIcon size={12} className="flex-shrink-0" />
+									)}
+									{(isCoffeeShopsSearchForContact || isCoffeeShopTitle(headline)) && (
+										<CoffeeShopsIcon size={7} />
+									)}
+									{(isMusicVenuesSearchForContact || isMusicVenueTitle(headline)) && (
+										<MusicVenuesIcon size={12} className="flex-shrink-0" />
+									)}
+									{(isMusicFestivalsSearchForContact || isMusicFestivalTitle(headline)) && (
+										<FestivalsIcon size={12} className="flex-shrink-0" />
+									)}
+									{(isWeddingPlannersSearchForContact || isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline)) && (
+										<WeddingPlannersIcon size={12} />
+									)}
+									{isWineBeerSpiritsTitle(headline) && (
+										<WineBeerSpiritsIcon size={12} className="flex-shrink-0" />
+									)}
+									<span className="text-[10px] text-black leading-none truncate">
+										{(isRestaurantsSearchForContact || isRestaurantTitle(headline))
+											? 'Restaurant'
+											: (isCoffeeShopsSearchForContact || isCoffeeShopTitle(headline))
+												? 'Coffee Shop'
+												: (isMusicVenuesSearchForContact || isMusicVenueTitle(headline))
+													? 'Music Venue'
+													: (isMusicFestivalsSearchForContact || isMusicFestivalTitle(headline))
+														? 'Music Festival'
+														: isWeddingVenueTitle(headline)
+															? 'Wedding Venue'
+															: (isWeddingPlannersSearchForContact || isWeddingPlannerTitle(headline))
+																? 'Wedding Planner'
+																: isWineBeerSpiritsTitle(headline)
+																	? getWineBeerSpiritsLabel(headline)
+																	: headline}
+									</span>
+								</div>
+							) : (
+								<div className="w-full" />
+							)}
+						</div>
+						<div className="pl-3 pr-1 flex items-center h-[22px]">
+							{isUsed && (
+								<span
+									className="inline-block shrink-0 mr-2"
+									style={{ width: '16px', height: '16px' }}
+								/>
+							)}
+							<div className="text-[11px] text-black w-full truncate leading-tight">
+								{company}
+							</div>
+						</div>
+						<div className="pr-2 pl-1 flex items-center h-[22px]">
+							{city || stateAbbr ? (
+								<div className="flex items-center gap-1 w-full">
+									{stateAbbr && (
+										<span
+											className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border text-[12px] leading-none font-bold flex-shrink-0"
+											style={{
+												backgroundColor:
+													stateBadgeColorMap[stateAbbr] || 'transparent',
+												borderColor: '#000000',
+											}}
+										>
+											{stateAbbr}
+										</span>
+									)}
+									{city && (
+										<span className="text-[10px] text-black leading-none truncate">
+											{city}
+										</span>
+									)}
+								</div>
+							) : (
+								<div className="w-full" />
+							)}
+						</div>
+					</>
+				) : (
+					<>
+						<div className="row-span-2 pl-3 pr-1 flex items-center h-full">
+							{isUsed && (
+								<span
+									className="inline-block shrink-0 mr-2"
+									style={{
+										width: '16px',
+										height: '16px',
+										borderRadius: '50%',
+										border: '1px solid #000000',
+										backgroundColor: '#DAE6FE',
+									}}
+								/>
+							)}
+							<div className="font-bold text-[11px] w-full truncate leading-tight">
+								{company || '—'}
+							</div>
+						</div>
+						<div className="pr-2 pl-1 flex items-center h-[23px]">
+							{(headline || isMusicVenuesSearchForContact || isRestaurantsSearchForContact || isCoffeeShopsSearchForContact || isMusicFestivalsSearchForContact || isWeddingPlannersSearchForContact) ? (
+								<div
+									className="h-[17px] rounded-[6px] px-2 flex items-center gap-1 w-full border border-black overflow-hidden"
+									style={{
+										backgroundColor: (isRestaurantsSearchForContact || isRestaurantTitle(headline))
+											? '#C3FBD1'
+											: (isCoffeeShopsSearchForContact || isCoffeeShopTitle(headline))
+												? '#D6F1BD'
+												: (isMusicVenuesSearchForContact || isMusicVenueTitle(headline))
+													? '#B7E5FF'
+													: (isMusicFestivalsSearchForContact || isMusicFestivalTitle(headline))
+														? '#C1D6FF'
+														: (isWeddingPlannersSearchForContact || isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline))
+															? '#FFF8DC'
+															: isWineBeerSpiritsTitle(headline)
+																? '#BFC4FF'
+																: '#E8EFFF',
+									}}
+								>
+									{(isRestaurantsSearchForContact || isRestaurantTitle(headline)) && (
+										<RestaurantsIcon size={12} className="flex-shrink-0" />
+									)}
+									{(isCoffeeShopsSearchForContact || isCoffeeShopTitle(headline)) && (
+										<CoffeeShopsIcon size={7} />
+									)}
+									{(isMusicVenuesSearchForContact || isMusicVenueTitle(headline)) && (
+										<MusicVenuesIcon size={12} className="flex-shrink-0" />
+									)}
+									{(isMusicFestivalsSearchForContact || isMusicFestivalTitle(headline)) && (
+										<FestivalsIcon size={12} className="flex-shrink-0" />
+									)}
+									{(isWeddingPlannersSearchForContact || isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline)) && (
+										<WeddingPlannersIcon size={12} />
+									)}
+									{isWineBeerSpiritsTitle(headline) && (
+										<WineBeerSpiritsIcon size={12} className="flex-shrink-0" />
+									)}
+									<span className="text-[10px] text-black leading-none truncate">
+										{(isRestaurantsSearchForContact || isRestaurantTitle(headline))
+											? 'Restaurant'
+											: (isCoffeeShopsSearchForContact || isCoffeeShopTitle(headline))
+												? 'Coffee Shop'
+												: (isMusicVenuesSearchForContact || isMusicVenueTitle(headline))
+													? 'Music Venue'
+													: (isMusicFestivalsSearchForContact || isMusicFestivalTitle(headline))
+														? 'Music Festival'
+														: isWeddingVenueTitle(headline)
+															? 'Wedding Venue'
+															: (isWeddingPlannersSearchForContact || isWeddingPlannerTitle(headline))
+																? 'Wedding Planner'
+																: isWineBeerSpiritsTitle(headline)
+																	? getWineBeerSpiritsLabel(headline)
+																	: headline}
+									</span>
+								</div>
+							) : (
+								<div className="w-full" />
+							)}
+						</div>
+						<div className="pr-2 pl-1 flex items-center h-[22px]">
+							{city || stateAbbr ? (
+								<div className="flex items-center gap-1 w-full">
+									{stateAbbr && (
+										<span
+											className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border text-[12px] leading-none font-bold flex-shrink-0"
+											style={{
+												backgroundColor:
+													stateBadgeColorMap[stateAbbr] || 'transparent',
+												borderColor: '#000000',
+											}}
+										>
+											{stateAbbr}
+										</span>
+									)}
+									{city && (
+										<span className="text-[10px] text-black leading-none truncate">
+											{city}
+										</span>
+									)}
+								</div>
+							) : (
+								<div className="w-full" />
+							)}
+						</div>
+					</>
+				)}
+			</div>
+		);
+	};
 
 	return (
 		<>
@@ -8289,7 +8615,7 @@ const DashboardContent = () => {
 															    so the UI doesn't disappear between state searches. */}
 															{!isNarrowestDesktop && !hasNoSearchResults && (
 																	<div
-																		className="absolute top-[97px] right-[10px] flex flex-col pointer-events-auto"
+																		className="absolute top-[97px] right-[10px] flex flex-col gap-[10px] pointer-events-auto"
 																		onMouseEnter={() => {
 																			if (!shouldUseDynamicMapCreateCampaignCta) return;
 																			setIsPointerInMapSidePanel(true);
@@ -8304,474 +8630,169 @@ const DashboardContent = () => {
 																				? mapResearchPanelCompactHeightPx
 																				: 800,
 																			maxHeight: 'calc(100% - 117px)',
-																			backgroundColor:
-																				mapResearchPanelContact && isMapResearchPanelVisible
-																				? '#D8E5FB'
-																				: 'rgba(175, 214, 239, 0.8)',
-																			border: mapResearchPanelContact && isMapResearchPanelVisible
-																				? '3px solid #000000'
-																				: '3px solid #143883',
-																			borderRadius: '8px',
 																			overflow: 'hidden',
 																			transform: `scale(${MAP_VIEW_UI_SCALE})`,
 																			transformOrigin: 'top right',
 																		}}
 																	>
-																		{/* Header area for right-hand panel (same color as panel) */}
-																		<div
-																			className="w-full h-[49px] flex-shrink-0 flex items-center justify-center px-4 relative"
-																		>
-																			{/* Map label button in top-left of panel header */}
-																			<button
-																				type="button"
-																				onClick={() => setIsMapView(false)}
-																				className="absolute left-[10px] top-[7px] flex items-center justify-center cursor-pointer"
+																		{/* Selection sub-panel — appears once at least one contact is selected. */}
+																		{selectedContacts.length > 0 && (
+																			<div
+																				className="flex flex-col flex-shrink-0"
 																				style={{
-																					width: '53px',
-																					height: '19px',
-																					backgroundColor: '#CDEFC3',
-																					borderRadius: '4px',
-																					border: '2px solid #000000',
-																					fontFamily:
-																						'var(--font-secondary), Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
-																					fontSize: '13px',
-																					fontWeight: 600,
-																					lineHeight: '1',
+																					maxHeight: '342px',
+																					backgroundColor: 'rgba(175, 214, 239, 0.8)',
+																					border: '3px solid #143883',
+																					borderRadius: '8px',
+																					overflow: 'hidden',
 																				}}
 																			>
-																				Map
-																			</button>
-																			<span className="font-inter text-[13px] font-medium text-black relative -translate-y-[2px]">
-																				{selectedContacts.length} selected
-																			</span>
-																			<button
-																				type="button"
-																				onClick={() => handleSelectAll(mapPanelContacts)}
-																				disabled={isMapResultsLoading}
-																				className={`font-secondary text-[12px] font-medium text-black absolute right-[10px] top-1/2 translate-y-[4px] ${
-																					isMapResultsLoading
-																						? 'opacity-60 pointer-events-none'
-																						: 'hover:underline'
-																				}`}
-																			>
-																				{isAllPanelContactsSelected ? 'Deselect All' : 'Select all'}
-																			</button>
-																		</div>
-																		<CustomScrollbar
-																			className="flex-1 min-h-0"
-																			contentClassName="p-[6px] pb-[14px] space-y-[7px]"
-																			thumbWidth={2}
-																			thumbColor="#000000"
-																			trackColor="transparent"
-																			offsetRight={-6}
-																			disableOverflowClass
-																		>
-																			{isMapResultsLoading ? (
-																				<MapResultsPanelSkeleton
-																					variant="desktop"
-																					rows={Math.max(mapPanelContacts.length, 14)}
-																				/>
-																			) : (
-																				<div ref={mapPanelRowsDesktopRef} className="space-y-[7px]">
-																				{mapPanelContacts.map((contact) => {
-																				const isSelected = selectedContacts.includes(
-																					contact.id
-																				);
-																				const isHovered = hoveredMapPanelContactId === contact.id;
-																				const isUsed = usedContactIdsSet.has(contact.id);
-																				const isInBaseResults = baseContactIdSet.has(contact.id);
-																				const firstName = contact.firstName || '';
-																				const lastName = contact.lastName || '';
-																				const fullName =
-																					contact.name ||
-																					`${firstName} ${lastName}`.trim();
-																				const company = contact.company || '';
-																				// For restaurant/coffee shop searches, always use the search-derived headline
-																				// Otherwise, use contact's headline or fall back to search What + Where
-																				const searchDerivedHeadline =
-																					whatValue && whereValue
-																						? `${whatValue} ${whereValue}`
-																						: whatValue || '';
-																				const isSpecialCategorySearch =
-																					/^restaurants?$/i.test(whatValue.trim()) ||
-																					/^coffee\s*shops?$/i.test(whatValue.trim());
-																				const curatedDisplayHeadline =
-																					contact.curatedDisplayLabel || '';
-																				// Curated search owns category display explicitly. Do not let
-																				// freeform headlines replace clean SVG/color chips.
-																				const contactHeadline =
-																					curatedDisplayHeadline ||
-																					(isInBaseResults
-																						? contact.headline || contact.title || ''
-																						: contact.title || contact.headline || '');
-																				const computedHeadline = isInBaseResults
-																					? isSpecialCategorySearch
-																						? searchDerivedHeadline
-																						: contactHeadline || searchDerivedHeadline
-																					: contactHeadline;
-																				const stickyHeadline =
-																					selectedContactStickyHeadlineById[contact.id] || '';
-																				const headline =
-																					isSelected && stickyHeadline ? stickyHeadline : computedHeadline;
-																				const isRestaurantsSearchForContact = isRestaurantsSearch && isInBaseResults;
-																				const isCoffeeShopsSearchForContact = isCoffeeShopsSearch && isInBaseResults;
-																				const isMusicVenuesSearchForContact = isMusicVenuesSearch && isInBaseResults;
-																				const isMusicFestivalsSearchForContact = isMusicFestivalsSearch && isInBaseResults;
-																				const isWeddingPlannersSearchForContact = isWeddingPlannersSearch && isInBaseResults;
-																				const stateAbbr =
-																					getStateAbbreviation(contact.state || '') || '';
-																				const city = contact.city || '';
-
-																				return (
-																					<div
-																						key={contact.id}
-																						data-contact-id={contact.id}
-																						className="cursor-pointer transition-colors grid grid-cols-2 grid-rows-2 w-full h-[49px] overflow-hidden rounded-[8px] border-[3px] border-[#ABABAB] select-none relative"
-																						style={{
-																							// Hover should be a subtle darken, not "selected" blue.
-																							// Category-specific selection colors.
-																							backgroundColor: isSelected
-																								? (isRestaurantsSearchForContact || isRestaurantTitle(headline))
-																									? isHovered ? '#C5F5D1' : '#D7FFE1'
-																									: (isCoffeeShopsSearchForContact || isCoffeeShopTitle(headline))
-																										? isHovered ? '#DDF4CC' : '#EDFEDC'
-																										: (isMusicVenuesSearchForContact || isMusicVenueTitle(headline))
-																											? isHovered ? '#C5E8FF' : '#D7F0FF'
-																											: (isMusicFestivalsSearchForContact || isMusicFestivalTitle(headline))
-																												? isHovered ? '#ADD4FF' : '#BFDCFF'
-																												: (isWeddingPlannersSearchForContact || isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline))
-																													? isHovered ? '#F5EDCE' : '#FFF8DC'
-																													: isWineBeerSpiritsTitle(headline)
-																														? isHovered ? '#C8CBFF' : '#DADDFF'
-																														: isHovered ? '#BFE3FF' : '#C9EAFF'
-																								: isHovered
-																									? '#F3F4F6'
-																									: '#FFFFFF',
-																						}}
-																						onClick={() => {
-																							if (isSelected) {
-																								setSelectedContacts(
-																									selectedContacts.filter(
-																										(id) => id !== contact.id
-																									)
-																								);
-																							} else {
-																								setSelectedContacts([
-																									...selectedContacts,
-																									contact.id,
-																								]);
-																							}
-																						}}
-																						onMouseEnter={() => setHoveredMapPanelContactId(contact.id)}
-																						onMouseLeave={() =>
-																							setHoveredMapPanelContactId((prev) =>
-																								prev === contact.id ? null : prev
-																							)
-																						}
+																				<div className="w-full h-[49px] flex-shrink-0 flex items-center justify-center px-4 relative">
+																					<span className="absolute left-[10px] top-1/2 -translate-y-1/2 font-secondary text-[13px] font-medium text-black">
+																						Selection
+																					</span>
+																					<span className="font-inter text-[13px] font-medium text-black relative -translate-y-[2px]">
+																						{selectedContacts.length}/{mapPanelContacts.length} selected
+																					</span>
+																					<button
+																						type="button"
+																						onClick={() => handleSelectAll(mapPanelContacts)}
+																						disabled={isMapResultsLoading}
+																						className={`font-secondary text-[12px] font-medium text-black absolute right-[10px] top-1/2 translate-y-[4px] ${
+																							isMapResultsLoading
+																								? 'opacity-60 pointer-events-none'
+																								: 'hover:underline'
+																						}`}
 																					>
-																						{/* Centered used contact dot */}
-																						{fullName && isUsed && (
-																							<span
-																								className="absolute shrink-0"
-																								style={{
-																									width: '16px',
-																									height: '16px',
-																									borderRadius: '50%',
-																									border: '1px solid #000000',
-																									backgroundColor: '#DAE6FE',
-																									left: '12px',
-																									top: '50%',
-																									transform: 'translateY(-50%)',
-																								}}
-																							/>
-																						)}
-																						{fullName ? (
-																							<>
-																								{/* Top Left - Name */}
-																								<div className="pl-3 pr-1 flex items-center h-[23px]">
-																									{isUsed && (
-																										<span
-																											className="inline-block shrink-0 mr-2"
-																											style={{
-																												width: '16px',
-																												height: '16px',
-																											}}
-																										/>
-																									)}
-																									<div className="font-bold text-[11px] w-full truncate leading-tight">
-																										{fullName}
-																									</div>
-																								</div>
-																								{/* Top Right - Title/Headline */}
-																								<div className="pr-2 pl-1 flex items-center h-[23px]">
-																									{(headline || isMusicVenuesSearchForContact || isRestaurantsSearchForContact || isCoffeeShopsSearchForContact || isMusicFestivalsSearchForContact || isWeddingPlannersSearchForContact) ? (
-																										<div
-																											className="h-[17px] rounded-[6px] px-2 flex items-center gap-1 w-full border border-black overflow-hidden"
-																											style={{
-																												backgroundColor: (isRestaurantsSearchForContact || isRestaurantTitle(headline))
-																													? '#C3FBD1'
-																													: (isCoffeeShopsSearchForContact || isCoffeeShopTitle(headline))
-																														? '#D6F1BD'
-																														: (isMusicVenuesSearchForContact || isMusicVenueTitle(headline))
-																															? '#B7E5FF'
-																															: (isMusicFestivalsSearchForContact || isMusicFestivalTitle(headline))
-																																? '#C1D6FF'
-																																: (isWeddingPlannersSearchForContact || isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline))
-																																	? '#FFF8DC'
-																																	: isWineBeerSpiritsTitle(headline)
-																																		? '#BFC4FF'
-																																		: '#E8EFFF',
-																											}}
-																										>
-																											{(isRestaurantsSearchForContact || isRestaurantTitle(headline)) && (
-																												<RestaurantsIcon size={12} className="flex-shrink-0" />
-																											)}
-																											{(isCoffeeShopsSearchForContact || isCoffeeShopTitle(headline)) && (
-																												<CoffeeShopsIcon size={7} />
-																											)}
-																											{(isMusicVenuesSearchForContact || isMusicVenueTitle(headline)) && (
-																												<MusicVenuesIcon size={12} className="flex-shrink-0" />
-																											)}
-																											{(isMusicFestivalsSearchForContact || isMusicFestivalTitle(headline)) && (
-																												<FestivalsIcon size={12} className="flex-shrink-0" />
-																											)}
-																											{(isWeddingPlannersSearchForContact || isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline)) && (
-																												<WeddingPlannersIcon size={12} />
-																											)}
-																											{isWineBeerSpiritsTitle(headline) && (
-																												<WineBeerSpiritsIcon size={12} className="flex-shrink-0" />
-																											)}
-																											<span className="text-[10px] text-black leading-none truncate">
-																												{(isRestaurantsSearchForContact || isRestaurantTitle(headline))
-																													? 'Restaurant'
-																													: (isCoffeeShopsSearchForContact || isCoffeeShopTitle(headline))
-																														? 'Coffee Shop'
-																														: (isMusicVenuesSearchForContact || isMusicVenueTitle(headline))
-																															? 'Music Venue'
-																															: (isMusicFestivalsSearchForContact || isMusicFestivalTitle(headline))
-																																? 'Music Festival'
-																																: isWeddingVenueTitle(headline)
-																																	? 'Wedding Venue'
-																																	: (isWeddingPlannersSearchForContact || isWeddingPlannerTitle(headline))
-																																		? 'Wedding Planner'
-																																		: isWineBeerSpiritsTitle(headline)
-																																			? getWineBeerSpiritsLabel(headline)
-																																			: headline}
-																											</span>
-																										</div>
-																									) : (
-																										<div className="w-full" />
-																									)}
-																								</div>
-																								{/* Bottom Left - Company */}
-																								<div className="pl-3 pr-1 flex items-center h-[22px]">
-																									{isUsed && (
-																										<span
-																											className="inline-block shrink-0 mr-2"
-																											style={{
-																												width: '16px',
-																												height: '16px',
-																											}}
-																										/>
-																									)}
-																									<div className="text-[11px] text-black w-full truncate leading-tight">
-																										{company}
-																									</div>
-																								</div>
-																								{/* Bottom Right - Location */}
-																								<div className="pr-2 pl-1 flex items-center h-[22px]">
-																									{city || stateAbbr ? (
-																										<div className="flex items-center gap-1 w-full">
-																											{stateAbbr && (
-																												<span
-																													className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border text-[12px] leading-none font-bold flex-shrink-0"
-																													style={{
-																														backgroundColor:
-																															stateBadgeColorMap[
-																																stateAbbr
-																															] || 'transparent',
-																														borderColor: '#000000',
-																													}}
-																												>
-																													{stateAbbr}
-																												</span>
-																											)}
-																											{city && (
-																												<span className="text-[10px] text-black leading-none truncate">
-																													{city}
-																												</span>
-																											)}
-																										</div>
-																									) : (
-																										<div className="w-full" />
-																									)}
-																								</div>
-																							</>
-																						) : (
-																							<>
-																								{/* No name - Company spans left column */}
-																								<div className="row-span-2 pl-3 pr-1 flex items-center h-full">
-																									{isUsed && (
-																										<span
-																											className="inline-block shrink-0 mr-2"
-																											style={{
-																												width: '16px',
-																												height: '16px',
-																												borderRadius: '50%',
-																												border: '1px solid #000000',
-																												backgroundColor: '#DAE6FE',
-																											}}
-																										/>
-																									)}
-																									<div className="font-bold text-[11px] w-full truncate leading-tight">
-																										{company || '—'}
-																									</div>
-																								</div>
-																								{/* Top Right - Title/Headline */}
-																								<div className="pr-2 pl-1 flex items-center h-[23px]">
-																									{(headline || isMusicVenuesSearchForContact || isRestaurantsSearchForContact || isCoffeeShopsSearchForContact || isMusicFestivalsSearchForContact || isWeddingPlannersSearchForContact) ? (
-																										<div
-																											className="h-[17px] rounded-[6px] px-2 flex items-center gap-1 w-full border border-black overflow-hidden"
-																											style={{
-																												backgroundColor: (isRestaurantsSearchForContact || isRestaurantTitle(headline))
-																													? '#C3FBD1'
-																													: (isCoffeeShopsSearchForContact || isCoffeeShopTitle(headline))
-																														? '#D6F1BD'
-																														: (isMusicVenuesSearchForContact || isMusicVenueTitle(headline))
-																															? '#B7E5FF'
-																															: (isMusicFestivalsSearchForContact || isMusicFestivalTitle(headline))
-																																? '#C1D6FF'
-																																: (isWeddingPlannersSearchForContact || isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline))
-																																	? '#FFF8DC'
-																																	: isWineBeerSpiritsTitle(headline)
-																																		? '#BFC4FF'
-																																		: '#E8EFFF',
-																											}}
-																										>
-																											{(isRestaurantsSearchForContact || isRestaurantTitle(headline)) && (
-																												<RestaurantsIcon size={12} className="flex-shrink-0" />
-																											)}
-																											{(isCoffeeShopsSearchForContact || isCoffeeShopTitle(headline)) && (
-																												<CoffeeShopsIcon size={7} />
-																											)}
-																											{(isMusicVenuesSearchForContact || isMusicVenueTitle(headline)) && (
-																												<MusicVenuesIcon size={12} className="flex-shrink-0" />
-																											)}
-																											{(isMusicFestivalsSearchForContact || isMusicFestivalTitle(headline)) && (
-																												<FestivalsIcon size={12} className="flex-shrink-0" />
-																											)}
-																											{(isWeddingPlannersSearchForContact || isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline)) && (
-																												<WeddingPlannersIcon size={12} />
-																											)}
-																											{isWineBeerSpiritsTitle(headline) && (
-																												<WineBeerSpiritsIcon size={12} className="flex-shrink-0" />
-																											)}
-																											<span className="text-[10px] text-black leading-none truncate">
-																												{(isRestaurantsSearchForContact || isRestaurantTitle(headline))
-																													? 'Restaurant'
-																													: (isCoffeeShopsSearchForContact || isCoffeeShopTitle(headline))
-																														? 'Coffee Shop'
-																														: (isMusicVenuesSearchForContact || isMusicVenueTitle(headline))
-																															? 'Music Venue'
-																															: (isMusicFestivalsSearchForContact || isMusicFestivalTitle(headline))
-																																? 'Music Festival'
-																																: isWeddingVenueTitle(headline)
-																																	? 'Wedding Venue'
-																																	: (isWeddingPlannersSearchForContact || isWeddingPlannerTitle(headline))
-																																		? 'Wedding Planner'
-																																		: isWineBeerSpiritsTitle(headline)
-																																			? getWineBeerSpiritsLabel(headline)
-																																			: headline}
-																											</span>
-																										</div>
-																									) : (
-																										<div className="w-full" />
-																									)}
-																								</div>
-																								{/* Bottom Right - Location */}
-																								<div className="pr-2 pl-1 flex items-center h-[22px]">
-																									{city || stateAbbr ? (
-																										<div className="flex items-center gap-1 w-full">
-																											{stateAbbr && (
-																												<span
-																													className="inline-flex items-center justify-center w-[35px] h-[19px] rounded-[5.6px] border text-[12px] leading-none font-bold flex-shrink-0"
-																													style={{
-																														backgroundColor:
-																															stateBadgeColorMap[
-																																stateAbbr
-																															] || 'transparent',
-																														borderColor: '#000000',
-																													}}
-																												>
-																													{stateAbbr}
-																												</span>
-																											)}
-																											{city && (
-																												<span className="text-[10px] text-black leading-none truncate">
-																													{city}
-																												</span>
-																											)}
-																										</div>
-																									) : (
-																										<div className="w-full" />
-																									)}
-																								</div>
-																							</>
-																						)}
-																					</div>
-																				);
-																				})}
+																						{isAllPanelContactsSelected ? 'Deselect All' : 'Select all'}
+																					</button>
 																				</div>
-																			)}
-																		</CustomScrollbar>
-																		{!isMapResultsLoading && isMapPanelCreateCampaignVisible && !fromHomeParam && (
-																			<div className="flex-shrink-0 w-full px-[10px] pb-[10px]">
-																				<Button
-																					disabled={primaryCtaPending}
-																					variant="primary-light"
-																					bold
-																					className={`relative w-full h-[39px] !bg-[#5DAB68] hover:!bg-[#4e9b5d] !text-white border border-[#000000] overflow-hidden ${
-																						selectedContacts.length === 0
-																							? 'opacity-[0.62]'
-																							: 'opacity-100'
-																					}`}
-																					style={
-																						selectedContacts.length === 0
-																							? {
+																				<CustomScrollbar
+																					className="flex-1 min-h-0"
+																					contentClassName="p-[6px] pb-[14px] space-y-[7px]"
+																					thumbWidth={2}
+																					thumbColor="#000000"
+																					trackColor="transparent"
+																					offsetRight={-6}
+																					disableOverflowClass
+																				>
+																					<div className="space-y-[7px]">
+																						{mapPanelSelectedContacts.map(renderMapPanelDesktopRow)}
+																					</div>
+																				</CustomScrollbar>
+																			</div>
+																		)}
+																		{/* Search Results sub-panel — always present; flexes to fill remaining height. */}
+																		<div
+																			className="flex flex-col flex-1 min-h-0"
+																			style={{
+																				backgroundColor:
+																					mapResearchPanelContact && isMapResearchPanelVisible
+																						? '#D8E5FB'
+																						: 'rgba(175, 214, 239, 0.8)',
+																				border: mapResearchPanelContact && isMapResearchPanelVisible
+																					? '3px solid #000000'
+																					: '3px solid #143883',
+																				borderRadius: '8px',
+																				overflow: 'hidden',
+																			}}
+																		>
+																			<div className="w-full h-[49px] flex-shrink-0 flex items-center justify-center px-4 relative">
+																				<button
+																					type="button"
+																					onClick={() => setIsMapView(false)}
+																					className="absolute left-[10px] top-[7px] flex items-center justify-center cursor-pointer"
+																					style={{
+																						width: '53px',
+																						height: '19px',
+																						backgroundColor: '#CDEFC3',
+																						borderRadius: '4px',
+																						border: '2px solid #000000',
+																						fontFamily:
+																							'var(--font-secondary), Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
+																						fontSize: '13px',
+																						fontWeight: 600,
+																						lineHeight: '1',
+																					}}
+																				>
+																					Map
+																				</button>
+																				<span className="absolute left-[72px] top-1/2 -translate-y-1/2 font-secondary text-[13px] font-medium text-black">
+																					Search Results
+																				</span>
+																				<span className="font-inter text-[12px] font-medium text-black absolute right-[10px] top-1/2 -translate-y-1/2">
+																					Showing {mapPanelContacts.length} Results
+																				</span>
+																			</div>
+																			<CustomScrollbar
+																				className="flex-1 min-h-0"
+																				contentClassName="p-[6px] pb-[14px] space-y-[7px]"
+																				thumbWidth={2}
+																				thumbColor="#000000"
+																				trackColor="transparent"
+																				offsetRight={-6}
+																				disableOverflowClass
+																			>
+																				{isMapResultsLoading ? (
+																					<MapResultsPanelSkeleton
+																						variant="desktop"
+																						rows={Math.max(mapPanelUnselectedContacts.length, 14)}
+																					/>
+																				) : (
+																					<div ref={mapPanelRowsDesktopRef} className="space-y-[7px]">
+																						{mapPanelUnselectedContacts.map(renderMapPanelDesktopRow)}
+																					</div>
+																				)}
+																			</CustomScrollbar>
+																			{!isMapResultsLoading && isMapPanelCreateCampaignVisible && !fromHomeParam && (
+																				<div className="flex-shrink-0 w-full px-[10px] pb-[10px]">
+																					<Button
+																						disabled={primaryCtaPending}
+																						variant="primary-light"
+																						bold
+																						className={`relative w-full h-[39px] !bg-[#5DAB68] hover:!bg-[#4e9b5d] !text-white border border-[#000000] overflow-hidden ${
+																							selectedContacts.length === 0
+																								? 'opacity-[0.62]'
+																								: 'opacity-100'
+																						}`}
+																						style={
+																							selectedContacts.length === 0
+																								? {
 																									height: '39px',
 																									filter: 'grayscale(100%)',
 																								}
-																							: { height: '39px' }
-																					}
-																					onClick={() => {
-																						if (selectedContacts.length === 0) return;
-																						handlePrimaryCta();
-																					}}
-																				>
-																					<span
-																						className="relative z-20"
-																						style={{ fontFamily: 'Inter, sans-serif', fontWeight: 700 }}
-																					>
-																						{primaryCtaLabel}
-																					</span>
-																					<div
-																						className="absolute inset-y-0 right-0 w-[65px] z-20 flex items-center justify-center bg-[#74D178] cursor-pointer"
-																						onClick={(e) => {
-																							e.stopPropagation();
-																							handleSelectAll(mapPanelContacts);
+																								: { height: '39px' }
+																						}
+																						onClick={() => {
+																							if (selectedContacts.length === 0) return;
+																							handlePrimaryCta();
 																						}}
 																					>
-																						<span className="text-black text-[14px] font-medium">
-																							All
+																						<span
+																							className="relative z-20"
+																							style={{ fontFamily: 'Inter, sans-serif', fontWeight: 700 }}
+																						>
+																							{primaryCtaLabel}
 																						</span>
-																					</div>
-																					<span
-																						aria-hidden="true"
-																						className="pointer-events-none absolute inset-y-0 right-[65px] w-[2px] bg-[#349A37] z-10"
-																					/>
-																				</Button>
-																			</div>
-																		)}
+																						<div
+																							className="absolute inset-y-0 right-0 w-[65px] z-20 flex items-center justify-center bg-[#74D178] cursor-pointer"
+																							onClick={(e) => {
+																								e.stopPropagation();
+																								handleSelectAll(mapPanelContacts);
+																							}}
+																						>
+																							<span className="text-black text-[14px] font-medium">
+																								All
+																							</span>
+																						</div>
+																						<span
+																							aria-hidden="true"
+																							className="pointer-events-none absolute inset-y-0 right-[65px] w-[2px] bg-[#349A37] z-10"
+																						/>
+																					</Button>
+																				</div>
+																			)}
+																		</div>
 																		{mapResearchPanelContact && (
 																			<div
 																				className="absolute inset-0 z-50"
@@ -8786,7 +8807,6 @@ const DashboardContent = () => {
 																					contact={mapResearchPanelContact}
 																					className="!block !border-0 !bg-transparent !rounded-none"
 																					style={{ width: '100%', height: '100%' }}
-																					// Tune box width for the 433px side panel
 																					boxWidth={405}
 																					height={mapResearchPanelCompactHeightPx ?? undefined}
 																					fixedHeightBoxSpacingPx={
