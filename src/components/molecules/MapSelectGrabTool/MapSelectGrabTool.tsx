@@ -1103,10 +1103,12 @@ export function MapSelectGrabStackBox({
 	className,
 	style,
 	children,
+	isSelectActive = false,
 }: {
 	className?: string;
 	style?: CSSProperties;
 	children?: ReactNode;
+	isSelectActive?: boolean;
 }) {
 	return (
 		<div
@@ -1116,7 +1118,7 @@ export function MapSelectGrabStackBox({
 				width: `${STACK_BOX_SIZE_PX}px`,
 				height: `${STACK_BOX_SIZE_PX}px`,
 				borderRadius: `${STACK_BOX_RADIUS_PX}px`,
-				backgroundColor: '#FFFFFF',
+				backgroundColor: isSelectActive ? '#ADDDB8' : '#FFFFFF',
 				display: 'flex',
 				alignItems: 'center',
 				justifyContent: 'center',

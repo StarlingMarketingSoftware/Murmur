@@ -7636,6 +7636,7 @@ const DashboardContent = () => {
 									/>
 									<MapSelectGrabStackBox
 										className="absolute left-0 pointer-events-none"
+										isSelectActive={isSelectMapToolActive}
 										style={{
 											top: `-${
 												MAP_SELECT_GRAB_STARTER_BOX_HEIGHT_PX +
@@ -7651,6 +7652,7 @@ const DashboardContent = () => {
 									</MapSelectGrabStackBox>
 									<MapSelectGrabStackBox
 										className="absolute left-0 pointer-events-none"
+										isSelectActive={isSelectMapToolActive}
 										style={{
 											top: `-${
 												MAP_SELECT_GRAB_STARTER_BOX_HEIGHT_PX +
