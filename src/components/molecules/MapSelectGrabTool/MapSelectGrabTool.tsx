@@ -134,6 +134,13 @@ const TALL_STACK_SELECT_INNER_BOX_LEFT_PX =
 // the user's "45×45 when one selected" spec.
 const TALL_STACK_SELECT_INNER_BOX_TILE_PADDING_PX = 0.5;
 const TALL_STACK_CATEGORY_COUNT = 7;
+// "All" pill in select-mode (auto-selected) form. Pre-rotation dimensions —
+// after the 90° rotation the visual pill is 50 wide × 13 tall, slightly bulkier
+// than the unselected 44 × 9.
+const TALL_STACK_ALL_LABEL_SELECTED_WIDTH_PX = 13;
+const TALL_STACK_ALL_LABEL_SELECTED_HEIGHT_PX = 42;
+const TALL_STACK_ALL_LABEL_SELECTED_RADIUS_PX = 10.658;
+const TALL_STACK_ALL_LABEL_SELECTED_BORDER_PX = 2.368;
 
 function TallStackSelectRadioIcon() {
 	return (
@@ -1220,43 +1227,65 @@ export function MapSelectGrabTallStackBox({
 			}}
 		>
 			<div style={{ position: 'relative', width: '100%', height: '100%' }}>
-				<div
-					aria-hidden="true"
-					style={{
-						position: 'absolute',
-						left: `${(TALL_STACK_BOX_WIDTH_PX - TALL_STACK_ALL_LABEL_WIDTH_PX) / 2}px`,
-						bottom: `${TALL_STACK_ALL_LABEL_BOTTOM_PX}px`,
-						width: `${TALL_STACK_ALL_LABEL_WIDTH_PX}px`,
-						height: `${TALL_STACK_ALL_LABEL_HEIGHT_PX}px`,
-						borderRadius: `${TALL_STACK_INNER_BOX_RADIUS_PX}px`,
-						backgroundColor: '#F4F4F4',
-						display: 'flex',
-						alignItems: 'center',
-						justifyContent: 'center',
-						transform: 'rotate(90deg)',
-						transformOrigin: 'center',
-					}}
-				>
-					<span
-						style={{
-							display: 'flex',
-							width: '11.5px',
-							height: '8px',
-							flexDirection: 'column',
-							justifyContent: 'center',
-							color: '#000000',
-							textAlign: 'center',
-							fontFamily: 'Inter, sans-serif',
-							fontSize: '9.868px',
-							fontStyle: 'normal',
-							fontWeight: 400,
-							lineHeight: '19.737px',
-							transform: 'rotate(-90deg)',
-						}}
-					>
-						All
-					</span>
-				</div>
+				{(() => {
+					const allLabelWidthPx = isSelectActive
+						? TALL_STACK_ALL_LABEL_SELECTED_WIDTH_PX
+						: TALL_STACK_ALL_LABEL_WIDTH_PX;
+					const allLabelHeightPx = isSelectActive
+						? TALL_STACK_ALL_LABEL_SELECTED_HEIGHT_PX
+						: TALL_STACK_ALL_LABEL_HEIGHT_PX;
+					// Pre-rotation `width` becomes the visual height after rotate(90deg).
+					// We want the visual bottom of the rotated pill to stay anchored at
+					// TALL_STACK_ALL_LABEL_GAP_FROM_BOTTOM_PX from the panel bottom.
+					const allLabelBottomPx =
+						TALL_STACK_ALL_LABEL_GAP_FROM_BOTTOM_PX -
+						(allLabelHeightPx - allLabelWidthPx) / 2;
+					return (
+						<div
+							aria-hidden="true"
+							style={{
+								position: 'absolute',
+								left: `${(TALL_STACK_BOX_WIDTH_PX - allLabelWidthPx) / 2}px`,
+								bottom: `${allLabelBottomPx}px`,
+								width: `${allLabelWidthPx}px`,
+								height: `${allLabelHeightPx}px`,
+								borderRadius: isSelectActive
+									? `${TALL_STACK_ALL_LABEL_SELECTED_RADIUS_PX}px`
+									: `${TALL_STACK_INNER_BOX_RADIUS_PX}px`,
+								backgroundColor: isSelectActive ? '#4CDE71' : '#F4F4F4',
+								border: isSelectActive
+									? `${TALL_STACK_ALL_LABEL_SELECTED_BORDER_PX}px solid #000000`
+									: undefined,
+								boxSizing: 'border-box',
+								display: 'flex',
+								alignItems: 'center',
+								justifyContent: 'center',
+								transform: 'rotate(90deg)',
+								transformOrigin: 'center',
+							}}
+						>
+							<span
+								style={{
+									display: 'flex',
+									width: '11.5px',
+									height: '8px',
+									flexDirection: 'column',
+									justifyContent: 'center',
+									color: '#000000',
+									textAlign: 'center',
+									fontFamily: 'Inter, sans-serif',
+									fontSize: '9.868px',
+									fontStyle: 'normal',
+									fontWeight: isSelectActive ? 700 : 400,
+									lineHeight: '19.737px',
+									transform: 'rotate(-90deg)',
+								}}
+							>
+								All
+							</span>
+						</div>
+					);
+				})()}
 				{selectedRuns.map(([startIdx, endIdx]) => {
 					const runBottomPx =
 						TALL_STACK_INNER_BOX_BOTTOM_POSITIONS_PX[startIdx] -
