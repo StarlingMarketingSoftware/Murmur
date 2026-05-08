@@ -749,22 +749,46 @@ const getLevelValueForThumbTop = (thumbTop: number) => {
 	return ZOOM_THUMB_MAX_INDEX;
 };
 
-const getTallStackInnerBoxContent = (index: number): ReactNode => {
+const TALL_STACK_INNER_BOX_INACTIVE_TILE_FILL = '#EDF2F0';
+const TALL_STACK_INNER_BOX_INACTIVE_INNER_FILL = '#EDF2F0';
+const TALL_STACK_INNER_BOX_INACTIVE_OUTLINE_FILL = '#9E9E9E';
+const TALL_STACK_INNER_BOX_INACTIVE_TILE_STYLE: CSSProperties = {
+	backgroundColor: TALL_STACK_INNER_BOX_INACTIVE_TILE_FILL,
+};
+const TALL_STACK_INNER_BOX_INNER_FILLS = [
+	'#EFEFEF',
+	'#F0E0A1',
+	'#C5EDA0',
+	'#B9D0FF',
+	'#A5C3FF',
+	'#9BDAFF',
+	'#81D697',
+] as const;
+
+const getTallStackInnerBoxContent = (index: number, isActive: boolean): ReactNode => {
+	const innerFill = isActive
+		? TALL_STACK_INNER_BOX_INNER_FILLS[index] ?? TALL_STACK_INNER_BOX_INACTIVE_INNER_FILL
+		: TALL_STACK_INNER_BOX_INACTIVE_INNER_FILL;
+	const outlineFill = isActive ? 'black' : TALL_STACK_INNER_BOX_INACTIVE_OUTLINE_FILL;
 	switch (index) {
 		case 0:
-			return <RadioStationsIcon size={32} innerFill="#EFEFEF" />;
+			return <RadioStationsIcon size={32} innerFill={innerFill} outlineFill={outlineFill} />;
 		case 1:
-			return <WeddingPlannersIcon size={32} innerFill="#F0E0A1" />;
+			return (
+				<WeddingPlannersIcon size={32} innerFill={innerFill} outlineFill={outlineFill} />
+			);
 		case 2:
-			return <CoffeeShopsIcon size={20} innerFill="#C5EDA0" />;
+			return <CoffeeShopsIcon size={20} innerFill={innerFill} outlineFill={outlineFill} />;
 		case 3:
-			return <FestivalsIcon size={28} innerFill="#B9D0FF" />;
+			return <FestivalsIcon size={28} innerFill={innerFill} outlineFill={outlineFill} />;
 		case 4:
-			return <WineBeerSpiritsIcon size={32} innerFill="#A5C3FF" />;
+			return (
+				<WineBeerSpiritsIcon size={32} innerFill={innerFill} outlineFill={outlineFill} />
+			);
 		case 5:
-			return <MusicVenuesIcon size={32} innerFill="#9BDAFF" />;
+			return <MusicVenuesIcon size={32} innerFill={innerFill} outlineFill={outlineFill} />;
 		case 6:
-			return <RestaurantsIcon size={33} innerFill="#81D697" />;
+			return <RestaurantsIcon size={33} innerFill={innerFill} outlineFill={outlineFill} />;
 		default:
 			return null;
 	}
@@ -1183,9 +1207,22 @@ export function MapSelectGrabTallStackBox({
 	const [selectedCategories, setSelectedCategories] = useState<boolean[]>(() =>
 		new Array(TALL_STACK_CATEGORY_COUNT).fill(true)
 	);
+	// Per-category "active" state for the default grabber view. Active = colored
+	// tile + colored inner-fill; inactive = #EFEFEF tile + #EFEFEF inner-fill.
+	const [grabberActiveCategories, setGrabberActiveCategories] = useState<boolean[]>(
+		() => new Array(TALL_STACK_CATEGORY_COUNT).fill(true)
+	);
 
 	const handleToggleCategory = useCallback((index: number) => {
 		setSelectedCategories((prev) => {
+			const next = prev.slice();
+			next[index] = !next[index];
+			return next;
+		});
+	}, []);
+
+	const handleToggleGrabberActive = useCallback((index: number) => {
+		setGrabberActiveCategories((prev) => {
 			const next = prev.slice();
 			next[index] = !next[index];
 			return next;
@@ -1231,7 +1268,6 @@ export function MapSelectGrabTallStackBox({
 
 	return (
 		<div
-			aria-hidden={isSelectActive ? undefined : true}
 			className={className}
 			style={{
 				width: `${TALL_STACK_BOX_WIDTH_PX}px`,
@@ -1383,12 +1419,19 @@ export function MapSelectGrabTallStackBox({
 						);
 					}
 
-					const tileBackgroundStyle: CSSProperties =
-						TALL_STACK_INNER_BOX_STYLES[index] ?? {};
+					// In grabber mode each tile can be toggled "inactive" (gray fill +
+					// gray inner-fill). In select mode the deselected tiles always show
+					// their original colored style.
+					const isTileActive = isSelectActive
+						? true
+						: grabberActiveCategories[index] === true;
+					const tileBackgroundStyle: CSSProperties = isTileActive
+						? TALL_STACK_INNER_BOX_STYLES[index] ?? {}
+						: TALL_STACK_INNER_BOX_INACTIVE_TILE_STYLE;
 					const tileBorderRadius =
 						tileBackgroundStyle.borderRadius ??
 						`${TALL_STACK_INNER_BOX_RADIUS_PX}px`;
-					const content = getTallStackInnerBoxContent(index);
+					const content = getTallStackInnerBoxContent(index, isTileActive);
 					const sharedTileStyle: CSSProperties = {
 						position: 'absolute',
 						left: `${TALL_STACK_INNER_BOX_LEFT_PX}px`,
@@ -1454,9 +1497,23 @@ export function MapSelectGrabTallStackBox({
 					}
 
 					return (
-						<div key={index} style={sharedTileStyle}>
+						<button
+							key={index}
+							type="button"
+							onClick={() => handleToggleGrabberActive(index)}
+							aria-label={isTileActive ? 'Deactivate category' : 'Activate category'}
+							style={{
+								...sharedTileStyle,
+								background: 'transparent',
+								border: 0,
+								padding: 0,
+								margin: 0,
+								cursor: 'pointer',
+								pointerEvents: 'auto',
+							}}
+						>
 							{tileChildren}
-						</div>
+						</button>
 					);
 				})}
 			</div>

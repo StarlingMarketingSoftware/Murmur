@@ -3839,13 +3839,9 @@ const DashboardContent = () => {
 	}, [activeSearchQuery, hideSearchThisAreaCta, isMapResultsLoading, isMapView, mapBboxFilter]);
 
 	const handleSelectMapToolClick = useCallback(() => {
-		// First click: activate Select tool. Second click (while active): select all visible.
-		if (!isSelectMapToolActive) {
-			setActiveMapTool('select');
-			return;
-		}
-		setSelectAllInViewNonce((n) => n + 1);
-	}, [isSelectMapToolActive]);
+		// First click: activate Select tool. Second click: toggle back to grab.
+		setActiveMapTool((prev) => (prev === 'select' ? 'grab' : 'select'));
+	}, []);
 
 	useEffect(() => {
 		// Prevent stale hover state when leaving map view or while results are transitioning.
@@ -8286,11 +8282,19 @@ const DashboardContent = () => {
 																				backgroundColor:
 																					mapResearchPanelContact && isMapResearchPanelVisible
 																						? '#D8E5FB'
-																						: 'rgba(175, 214, 239, 0.8)',
-																				border: mapResearchPanelContact && isMapResearchPanelVisible
-																					? '3px solid #000000'
-																					: '3px solid #143883',
-																				borderRadius: '8px',
+																						: 'rgba(99, 155, 244, 0.5)',
+																				...(mapResearchPanelContact && isMapResearchPanelVisible
+																					? {
+																						border: '3px solid #000000',
+																						borderRadius: '8px',
+																					}
+																					: {
+																						borderTop: '2px solid #000',
+																						borderRight: '3px solid #000',
+																						borderBottom: '3px solid #000',
+																						borderLeft: '3px solid #000',
+																						borderRadius: '0 0 8px 8px',
+																					}),
 																				overflow: 'hidden',
 																			}}
 																		>

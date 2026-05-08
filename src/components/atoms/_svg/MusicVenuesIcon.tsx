@@ -4,12 +4,14 @@ interface MusicVenuesIconProps {
 	size?: number;
 	className?: string;
 	innerFill?: string;
+	outlineFill?: string;
 }
 
 export const MusicVenuesIcon: FC<MusicVenuesIconProps> = ({
 	size = 29,
 	className,
 	innerFill = 'white',
+	outlineFill = 'black',
 }) => {
 	// Original aspect ratio is 29:23, so height = size * (23/29)
 	const height = size * (23 / 29);
@@ -28,7 +30,7 @@ export const MusicVenuesIcon: FC<MusicVenuesIconProps> = ({
 				width="11.6808"
 				height="21.6174"
 				fill={innerFill}
-				stroke="black"
+				stroke={outlineFill}
 				strokeWidth="0.74"
 			/>
 			<circle
@@ -36,7 +38,7 @@ export const MusicVenuesIcon: FC<MusicVenuesIconProps> = ({
 				cy="4.95974"
 				r="2.11415"
 				fill={innerFill}
-				stroke="black"
+				stroke={outlineFill}
 				strokeWidth="0.74"
 			/>
 			<circle
@@ -44,7 +46,7 @@ export const MusicVenuesIcon: FC<MusicVenuesIconProps> = ({
 				cy="16.7672"
 				r="3.97727"
 				fill={innerFill}
-				stroke="black"
+				stroke={outlineFill}
 				strokeWidth="0.74"
 			/>
 			<rect
@@ -53,7 +55,7 @@ export const MusicVenuesIcon: FC<MusicVenuesIconProps> = ({
 				width="11.6808"
 				height="21.6174"
 				fill={innerFill}
-				stroke="black"
+				stroke={outlineFill}
 				strokeWidth="0.74"
 			/>
 			<circle
@@ -61,7 +63,7 @@ export const MusicVenuesIcon: FC<MusicVenuesIconProps> = ({
 				cy="4.95974"
 				r="2.11415"
 				fill={innerFill}
-				stroke="black"
+				stroke={outlineFill}
 				strokeWidth="0.74"
 			/>
 			<circle
@@ -69,7 +71,7 @@ export const MusicVenuesIcon: FC<MusicVenuesIconProps> = ({
 				cy="16.7672"
 				r="3.97727"
 				fill={innerFill}
-				stroke="black"
+				stroke={outlineFill}
 				strokeWidth="0.74"
 			/>
 		</svg>
