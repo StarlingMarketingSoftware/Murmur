@@ -7613,6 +7613,7 @@ const DashboardContent = () => {
 									<MapSelectGrabTallStackBox
 										className="absolute pointer-events-none"
 										isSelectActive={isSelectMapToolActive}
+										onAllDeselected={() => setActiveMapTool('grab')}
 										style={{
 											left: '-0.5px',
 											top: `-${

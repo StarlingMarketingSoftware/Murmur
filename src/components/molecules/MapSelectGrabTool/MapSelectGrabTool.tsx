@@ -1171,10 +1171,12 @@ export function MapSelectGrabTallStackBox({
 	className,
 	style,
 	isSelectActive = false,
+	onAllDeselected,
 }: {
 	className?: string;
 	style?: CSSProperties;
 	isSelectActive?: boolean;
+	onAllDeselected?: () => void;
 }) {
 	const [selectedCategories, setSelectedCategories] = useState<boolean[]>(() =>
 		new Array(TALL_STACK_CATEGORY_COUNT).fill(true)
@@ -1188,12 +1190,24 @@ export function MapSelectGrabTallStackBox({
 		});
 	}, []);
 
+	const handleClickAll = useCallback(() => {
+		setSelectedCategories(new Array(TALL_STACK_CATEGORY_COUNT).fill(false));
+	}, []);
+
 	// Each time the select tool is (re-)activated, reset all categories to selected.
 	useEffect(() => {
 		if (isSelectActive) {
 			setSelectedCategories(new Array(TALL_STACK_CATEGORY_COUNT).fill(true));
 		}
 	}, [isSelectActive]);
+
+	// When the user deselects every category in select mode, exit back to grab.
+	const allCategoriesDeselected = selectedCategories.every((sel) => !sel);
+	useEffect(() => {
+		if (isSelectActive && allCategoriesDeselected) {
+			onAllDeselected?.();
+		}
+	}, [isSelectActive, allCategoriesDeselected, onAllDeselected]);
 
 	// Group selected indices into contiguous runs so a deselected category in
 	// the middle splits the green inner box into separate top/bottom halves.
@@ -1240,49 +1254,68 @@ export function MapSelectGrabTallStackBox({
 					const allLabelBottomPx =
 						TALL_STACK_ALL_LABEL_GAP_FROM_BOTTOM_PX -
 						(allLabelHeightPx - allLabelWidthPx) / 2;
-					return (
-						<div
-							aria-hidden="true"
+					const sharedAllLabelStyle: CSSProperties = {
+						position: 'absolute',
+						left: `${(TALL_STACK_BOX_WIDTH_PX - allLabelWidthPx) / 2}px`,
+						bottom: `${allLabelBottomPx}px`,
+						width: `${allLabelWidthPx}px`,
+						height: `${allLabelHeightPx}px`,
+						borderRadius: isSelectActive
+							? `${TALL_STACK_ALL_LABEL_SELECTED_RADIUS_PX}px`
+							: `${TALL_STACK_INNER_BOX_RADIUS_PX}px`,
+						backgroundColor: isSelectActive ? '#4CDE71' : '#F4F4F4',
+						border: isSelectActive
+							? `${TALL_STACK_ALL_LABEL_SELECTED_BORDER_PX}px solid #000000`
+							: 'none',
+						boxSizing: 'border-box',
+						display: 'flex',
+						alignItems: 'center',
+						justifyContent: 'center',
+						transform: 'rotate(90deg)',
+						transformOrigin: 'center',
+					};
+					const allLabelChildren = (
+						<span
 							style={{
-								position: 'absolute',
-								left: `${(TALL_STACK_BOX_WIDTH_PX - allLabelWidthPx) / 2}px`,
-								bottom: `${allLabelBottomPx}px`,
-								width: `${allLabelWidthPx}px`,
-								height: `${allLabelHeightPx}px`,
-								borderRadius: isSelectActive
-									? `${TALL_STACK_ALL_LABEL_SELECTED_RADIUS_PX}px`
-									: `${TALL_STACK_INNER_BOX_RADIUS_PX}px`,
-								backgroundColor: isSelectActive ? '#4CDE71' : '#F4F4F4',
-								border: isSelectActive
-									? `${TALL_STACK_ALL_LABEL_SELECTED_BORDER_PX}px solid #000000`
-									: undefined,
-								boxSizing: 'border-box',
 								display: 'flex',
-								alignItems: 'center',
+								width: '11.5px',
+								height: '8px',
+								flexDirection: 'column',
 								justifyContent: 'center',
-								transform: 'rotate(90deg)',
-								transformOrigin: 'center',
+								color: '#000000',
+								textAlign: 'center',
+								fontFamily: 'Inter, sans-serif',
+								fontSize: '9.868px',
+								fontStyle: 'normal',
+								fontWeight: isSelectActive ? 700 : 400,
+								lineHeight: '19.737px',
+								transform: 'rotate(-90deg)',
 							}}
 						>
-							<span
+							All
+						</span>
+					);
+					if (isSelectActive) {
+						return (
+							<button
+								type="button"
+								onClick={handleClickAll}
+								aria-label="Deselect all categories"
 								style={{
-									display: 'flex',
-									width: '11.5px',
-									height: '8px',
-									flexDirection: 'column',
-									justifyContent: 'center',
-									color: '#000000',
-									textAlign: 'center',
-									fontFamily: 'Inter, sans-serif',
-									fontSize: '9.868px',
-									fontStyle: 'normal',
-									fontWeight: isSelectActive ? 700 : 400,
-									lineHeight: '19.737px',
-									transform: 'rotate(-90deg)',
+									...sharedAllLabelStyle,
+									padding: 0,
+									margin: 0,
+									cursor: 'pointer',
+									pointerEvents: 'auto',
 								}}
 							>
-								All
-							</span>
+								{allLabelChildren}
+							</button>
+						);
+					}
+					return (
+						<div aria-hidden="true" style={sharedAllLabelStyle}>
+							{allLabelChildren}
 						</div>
 					);
 				})()}
