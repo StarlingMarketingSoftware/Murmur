@@ -119,38 +119,21 @@ const TALL_STACK_INNER_BOX_STYLES = [
 	{ backgroundColor: 'rgba(119, 221, 145, 0.77)' },
 ] as const satisfies readonly CSSProperties[];
 
-// Selected (square-select tool active) inner-box overlay
+// Selected (square-select tool active) inner-box overlay. The box is sized
+// dynamically to wrap the contiguous span of currently-selected categories,
+// so its bottom/height are computed at render time.
 const TALL_STACK_SELECT_INNER_BOX_WIDTH_PX = 45;
-const TALL_STACK_SELECT_INNER_BOX_HEIGHT_PX = 437;
 const TALL_STACK_SELECT_INNER_BOX_RADIUS_PX = 9;
 const TALL_STACK_SELECT_INNER_BOX_BORDER_PX = 2.308;
 const TALL_STACK_SELECT_INNER_BOX_FILL = '#4CDE71';
 const TALL_STACK_SELECT_INNER_BOX_STROKE = '#131912';
 const TALL_STACK_SELECT_INNER_BOX_LEFT_PX =
 	(TALL_STACK_BOX_WIDTH_PX - TALL_STACK_SELECT_INNER_BOX_WIDTH_PX) / 2;
-// 7px from the outer panel top: 473 - 437 - 7 = 29
-const TALL_STACK_SELECT_INNER_BOX_BOTTOM_PX = 29;
-
-const TALL_STACK_SELECT_TILE_WIDTH_PX = 25;
-const TALL_STACK_SELECT_TILE_HEIGHT_PX = 26;
-const TALL_STACK_SELECT_TILE_BOTTOM_INSET_PX = 10;
-const TALL_STACK_SELECT_TILE_TOP_INSET_PX = 10;
-const TALL_STACK_SELECT_BOTTOM_TILE_BOTTOM_PX = TALL_STACK_SELECT_TILE_BOTTOM_INSET_PX;
-const TALL_STACK_SELECT_TOP_TILE_BOTTOM_PX =
-	TALL_STACK_SELECT_INNER_BOX_HEIGHT_PX -
-	TALL_STACK_SELECT_TILE_TOP_INSET_PX -
-	TALL_STACK_SELECT_TILE_HEIGHT_PX;
-const TALL_STACK_SELECT_TILE_PITCH_PX =
-	(TALL_STACK_SELECT_TOP_TILE_BOTTOM_PX - TALL_STACK_SELECT_BOTTOM_TILE_BOTTOM_PX) / 6;
-const TALL_STACK_SELECT_TILE_BOTTOM_POSITIONS_PX = [
-	TALL_STACK_SELECT_BOTTOM_TILE_BOTTOM_PX,
-	TALL_STACK_SELECT_BOTTOM_TILE_BOTTOM_PX + TALL_STACK_SELECT_TILE_PITCH_PX,
-	TALL_STACK_SELECT_BOTTOM_TILE_BOTTOM_PX + TALL_STACK_SELECT_TILE_PITCH_PX * 2,
-	TALL_STACK_SELECT_BOTTOM_TILE_BOTTOM_PX + TALL_STACK_SELECT_TILE_PITCH_PX * 3,
-	TALL_STACK_SELECT_BOTTOM_TILE_BOTTOM_PX + TALL_STACK_SELECT_TILE_PITCH_PX * 4,
-	TALL_STACK_SELECT_BOTTOM_TILE_BOTTOM_PX + TALL_STACK_SELECT_TILE_PITCH_PX * 5,
-	TALL_STACK_SELECT_TOP_TILE_BOTTOM_PX,
-] as const;
+// Padding between the inner-box edge and the outermost selected tile (top + bottom).
+// 0.5 px on each side gives the box a 1px halo around the 44px tile, matching
+// the user's "45×45 when one selected" spec.
+const TALL_STACK_SELECT_INNER_BOX_TILE_PADDING_PX = 0.5;
+const TALL_STACK_CATEGORY_COUNT = 7;
 
 function TallStackSelectRadioIcon() {
 	return (
@@ -1186,9 +1169,46 @@ export function MapSelectGrabTallStackBox({
 	style?: CSSProperties;
 	isSelectActive?: boolean;
 }) {
+	const [selectedCategories, setSelectedCategories] = useState<boolean[]>(() =>
+		new Array(TALL_STACK_CATEGORY_COUNT).fill(true)
+	);
+
+	const handleToggleCategory = useCallback((index: number) => {
+		setSelectedCategories((prev) => {
+			const next = prev.slice();
+			next[index] = !next[index];
+			return next;
+		});
+	}, []);
+
+	// Each time the select tool is (re-)activated, reset all categories to selected.
+	useEffect(() => {
+		if (isSelectActive) {
+			setSelectedCategories(new Array(TALL_STACK_CATEGORY_COUNT).fill(true));
+		}
+	}, [isSelectActive]);
+
+	// Group selected indices into contiguous runs so a deselected category in
+	// the middle splits the green inner box into separate top/bottom halves.
+	const selectedRuns: Array<readonly [number, number]> = [];
+	if (isSelectActive) {
+		let runStart = -1;
+		for (let i = 0; i < selectedCategories.length; i += 1) {
+			if (selectedCategories[i]) {
+				if (runStart < 0) runStart = i;
+			} else if (runStart >= 0) {
+				selectedRuns.push([runStart, i - 1]);
+				runStart = -1;
+			}
+		}
+		if (runStart >= 0) {
+			selectedRuns.push([runStart, selectedCategories.length - 1]);
+		}
+	}
+
 	return (
 		<div
-			aria-hidden="true"
+			aria-hidden={isSelectActive ? undefined : true}
 			className={className}
 			style={{
 				width: `${TALL_STACK_BOX_WIDTH_PX}px`,
@@ -1237,85 +1257,104 @@ export function MapSelectGrabTallStackBox({
 						All
 					</span>
 				</div>
-				{!isSelectActive &&
-					TALL_STACK_INNER_BOX_BOTTOM_POSITIONS_PX.map((bottomPx, index) => {
-						const tileBackgroundStyle: CSSProperties =
-							TALL_STACK_INNER_BOX_STYLES[index] ?? {};
-						const tileBorderRadius =
-							tileBackgroundStyle.borderRadius ??
-							`${TALL_STACK_INNER_BOX_RADIUS_PX}px`;
-						const content = getTallStackInnerBoxContent(index);
+				{selectedRuns.map(([startIdx, endIdx]) => {
+					const runBottomPx =
+						TALL_STACK_INNER_BOX_BOTTOM_POSITIONS_PX[startIdx] -
+						TALL_STACK_SELECT_INNER_BOX_TILE_PADDING_PX;
+					const runTopFromPanelBottomPx =
+						TALL_STACK_INNER_BOX_BOTTOM_POSITIONS_PX[endIdx] +
+						TALL_STACK_INNER_BOX_SIZE_PX +
+						TALL_STACK_SELECT_INNER_BOX_TILE_PADDING_PX;
+					const runHeightPx = runTopFromPanelBottomPx - runBottomPx;
+					return (
+						<div
+							key={`run-${startIdx}-${endIdx}`}
+							aria-hidden="true"
+							style={{
+								position: 'absolute',
+								left: `${TALL_STACK_SELECT_INNER_BOX_LEFT_PX}px`,
+								bottom: `${runBottomPx}px`,
+								width: `${TALL_STACK_SELECT_INNER_BOX_WIDTH_PX}px`,
+								height: `${runHeightPx}px`,
+								borderRadius: `${TALL_STACK_SELECT_INNER_BOX_RADIUS_PX}px`,
+								backgroundColor: TALL_STACK_SELECT_INNER_BOX_FILL,
+								border: `${TALL_STACK_SELECT_INNER_BOX_BORDER_PX}px solid ${TALL_STACK_SELECT_INNER_BOX_STROKE}`,
+								boxSizing: 'border-box',
+							}}
+						/>
+					);
+				})}
+				{TALL_STACK_INNER_BOX_BOTTOM_POSITIONS_PX.map((bottomPx, index) => {
+					const isCategorySelected =
+						isSelectActive && selectedCategories[index] === true;
 
+					if (isCategorySelected) {
+						const greenContent = getTallStackSelectTileContent(index);
 						return (
-							<div
+							<button
 								key={index}
+								type="button"
+								onClick={() => handleToggleCategory(index)}
+								aria-label="Deselect category"
 								style={{
 									position: 'absolute',
 									left: `${TALL_STACK_INNER_BOX_LEFT_PX}px`,
 									bottom: `${bottomPx}px`,
 									width: `${TALL_STACK_INNER_BOX_SIZE_PX}px`,
 									height: `${TALL_STACK_INNER_BOX_SIZE_PX}px`,
-									borderRadius: tileBorderRadius,
 									display: 'flex',
 									alignItems: 'center',
 									justifyContent: 'center',
-									overflow: 'hidden',
+									background: 'transparent',
+									border: 0,
+									padding: 0,
+									margin: 0,
+									cursor: 'pointer',
+									pointerEvents: 'auto',
 									lineHeight: 0,
 								}}
 							>
+								{greenContent}
+							</button>
+						);
+					}
+
+					const tileBackgroundStyle: CSSProperties =
+						TALL_STACK_INNER_BOX_STYLES[index] ?? {};
+					const tileBorderRadius =
+						tileBackgroundStyle.borderRadius ??
+						`${TALL_STACK_INNER_BOX_RADIUS_PX}px`;
+					const content = getTallStackInnerBoxContent(index);
+					const sharedTileStyle: CSSProperties = {
+						position: 'absolute',
+						left: `${TALL_STACK_INNER_BOX_LEFT_PX}px`,
+						bottom: `${bottomPx}px`,
+						width: `${TALL_STACK_INNER_BOX_SIZE_PX}px`,
+						height: `${TALL_STACK_INNER_BOX_SIZE_PX}px`,
+						borderRadius: tileBorderRadius,
+						display: 'flex',
+						alignItems: 'center',
+						justifyContent: 'center',
+						overflow: 'hidden',
+						lineHeight: 0,
+					};
+					const tileChildren = (
+						<>
+							<span
+								style={{
+									position: 'absolute',
+									inset: 0,
+									borderRadius: 'inherit',
+									...tileBackgroundStyle,
+								}}
+							/>
+							{content ? (
 								<span
 									style={{
-										position: 'absolute',
-										inset: 0,
-										borderRadius: 'inherit',
-										...tileBackgroundStyle,
-									}}
-								/>
-								{content ? (
-									<span
-										style={{
-											position: 'relative',
-											zIndex: 1,
-											width: '100%',
-											height: '100%',
-											display: 'flex',
-											alignItems: 'center',
-											justifyContent: 'center',
-											lineHeight: 0,
-										}}
-									>
-										{content}
-									</span>
-								) : null}
-							</div>
-						);
-					})}
-				{isSelectActive ? (
-					<div
-						style={{
-							position: 'absolute',
-							left: `${TALL_STACK_SELECT_INNER_BOX_LEFT_PX}px`,
-							bottom: `${TALL_STACK_SELECT_INNER_BOX_BOTTOM_PX}px`,
-							width: `${TALL_STACK_SELECT_INNER_BOX_WIDTH_PX}px`,
-							height: `${TALL_STACK_SELECT_INNER_BOX_HEIGHT_PX}px`,
-							borderRadius: `${TALL_STACK_SELECT_INNER_BOX_RADIUS_PX}px`,
-							backgroundColor: TALL_STACK_SELECT_INNER_BOX_FILL,
-							border: `${TALL_STACK_SELECT_INNER_BOX_BORDER_PX}px solid ${TALL_STACK_SELECT_INNER_BOX_STROKE}`,
-							boxSizing: 'border-box',
-						}}
-					>
-						{TALL_STACK_SELECT_TILE_BOTTOM_POSITIONS_PX.map((bottomPx, index) => {
-							const content = getTallStackSelectTileContent(index);
-							return (
-								<div
-									key={index}
-									style={{
-										position: 'absolute',
-										left: '50%',
-										bottom: `${bottomPx}px`,
-										transform: 'translateX(-50%)',
-										width: `${TALL_STACK_SELECT_TILE_WIDTH_PX}px`,
-										height: `${TALL_STACK_SELECT_TILE_HEIGHT_PX}px`,
+										position: 'relative',
+										zIndex: 1,
+										width: '100%',
+										height: '100%',
 										display: 'flex',
 										alignItems: 'center',
 										justifyContent: 'center',
@@ -1323,11 +1362,39 @@ export function MapSelectGrabTallStackBox({
 									}}
 								>
 									{content}
-								</div>
-							);
-						})}
-					</div>
-				) : null}
+								</span>
+							) : null}
+						</>
+					);
+
+					if (isSelectActive) {
+						return (
+							<button
+								key={index}
+								type="button"
+								onClick={() => handleToggleCategory(index)}
+								aria-label="Select category"
+								style={{
+									...sharedTileStyle,
+									background: 'transparent',
+									border: 0,
+									padding: 0,
+									margin: 0,
+									cursor: 'pointer',
+									pointerEvents: 'auto',
+								}}
+							>
+								{tileChildren}
+							</button>
+						);
+					}
+
+					return (
+						<div key={index} style={sharedTileStyle}>
+							{tileChildren}
+						</div>
+					);
+				})}
 			</div>
 		</div>
 	);
