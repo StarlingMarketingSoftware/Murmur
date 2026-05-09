@@ -54,6 +54,8 @@ import {
 	MapSelectGrabStackTile,
 	MapSelectGrabTallStackBox,
 	MapSelectGrabTool,
+	StackBoxSelectBlueSparkIcon,
+	StackBoxSelectStarIcon,
 	MAP_SELECT_GRAB_STARTER_BOX_GAP_PX,
 	MAP_SELECT_GRAB_STARTER_BOX_HEIGHT_PX,
 	MAP_SELECT_GRAB_STACK_BOX_FIRST_GAP_PX,
@@ -7633,6 +7635,7 @@ const DashboardContent = () => {
 									<MapSelectGrabStackBox
 										className="absolute left-0 pointer-events-none"
 										isSelectActive={isSelectMapToolActive}
+										selectedContent={<StackBoxSelectStarIcon />}
 										style={{
 											top: `-${
 												MAP_SELECT_GRAB_STARTER_BOX_HEIGHT_PX +
@@ -7649,6 +7652,7 @@ const DashboardContent = () => {
 									<MapSelectGrabStackBox
 										className="absolute left-0 pointer-events-none"
 										isSelectActive={isSelectMapToolActive}
+										selectedContent={<StackBoxSelectBlueSparkIcon />}
 										style={{
 											top: `-${
 												MAP_SELECT_GRAB_STARTER_BOX_HEIGHT_PX +
@@ -8283,22 +8287,18 @@ const DashboardContent = () => {
 																					mapResearchPanelContact && isMapResearchPanelVisible
 																						? '#D8E5FB'
 																						: 'rgba(99, 155, 244, 0.5)',
-																				...(mapResearchPanelContact && isMapResearchPanelVisible
-																					? {
-																						border: '3px solid #000000',
-																						borderRadius: '8px',
-																					}
-																					: {
-																						borderTop: '2px solid #000',
-																						borderRight: '3px solid #000',
-																						borderBottom: '3px solid #000',
-																						borderLeft: '3px solid #000',
-																						borderRadius: '0 0 8px 8px',
-																					}),
+																				borderRadius: '8px',
 																				overflow: 'hidden',
 																			}}
 																		>
-																			<div className="w-full h-[49px] flex-shrink-0 flex items-center justify-center px-4 relative">
+																			<div
+																				className="w-full h-[50px] flex-shrink-0 flex items-center justify-center px-4 relative"
+																				style={{
+																					backgroundColor: '#CBF0FF',
+																					border: '2px solid #000',
+																					borderRadius: '8px 8px 0 0',
+																				}}
+																			>
 																				<button
 																					type="button"
 																					onClick={() => setIsMapView(false)}
@@ -8325,74 +8325,84 @@ const DashboardContent = () => {
 																					Showing {mapPanelContacts.length} Results
 																				</span>
 																			</div>
-																			<CustomScrollbar
-																				className="flex-1 min-h-0"
-																				contentClassName="p-[6px] pb-[14px] space-y-[7px]"
-																				thumbWidth={2}
-																				thumbColor="#000000"
-																				trackColor="transparent"
-																				offsetRight={-6}
-																				disableOverflowClass
+																			<div
+																				className="flex flex-col flex-1 min-h-0"
+																				style={{
+																					borderLeft: '3px solid #5B7469',
+																					borderRight: '3px solid #5B7469',
+																					borderBottom: '3px solid #5B7469',
+																					borderRadius: '0 0 8px 8px',
+																				}}
 																			>
-																				{isMapResultsLoading ? (
-																					<MapResultsPanelSkeleton
-																						variant="desktop"
-																						rows={Math.max(mapPanelUnselectedContacts.length, 14)}
-																					/>
-																				) : (
-																					<div ref={mapPanelRowsDesktopRef} className="space-y-[7px]">
-																						{mapPanelUnselectedContacts.map(renderMapPanelDesktopRow)}
-																					</div>
-																				)}
-																			</CustomScrollbar>
-																			{!isMapResultsLoading && isMapPanelCreateCampaignVisible && !fromHomeParam && (
-																				<div className="flex-shrink-0 w-full px-[10px] pb-[10px]">
-																					<Button
-																						disabled={primaryCtaPending}
-																						variant="primary-light"
-																						bold
-																						className={`relative w-full h-[39px] !bg-[#5DAB68] hover:!bg-[#4e9b5d] !text-white border border-[#000000] overflow-hidden ${
-																							selectedContacts.length === 0
-																								? 'opacity-[0.62]'
-																								: 'opacity-100'
-																						}`}
-																						style={
-																							selectedContacts.length === 0
-																								? {
-																									height: '39px',
-																									filter: 'grayscale(100%)',
-																								}
-																								: { height: '39px' }
-																						}
-																						onClick={() => {
-																							if (selectedContacts.length === 0) return;
-																							handlePrimaryCta();
-																						}}
-																					>
-																						<span
-																							className="relative z-20"
-																							style={{ fontFamily: 'Inter, sans-serif', fontWeight: 700 }}
-																						>
-																							{primaryCtaLabel}
-																						</span>
-																						<div
-																							className="absolute inset-y-0 right-0 w-[65px] z-20 flex items-center justify-center bg-[#74D178] cursor-pointer"
-																							onClick={(e) => {
-																								e.stopPropagation();
-																								handleSelectAll(mapPanelContacts);
+																				<CustomScrollbar
+																					className="flex-1 min-h-0"
+																					contentClassName="p-[6px] pb-[14px] space-y-[7px]"
+																					thumbWidth={2}
+																					thumbColor="#000000"
+																					trackColor="transparent"
+																					offsetRight={-6}
+																					disableOverflowClass
+																				>
+																					{isMapResultsLoading ? (
+																						<MapResultsPanelSkeleton
+																							variant="desktop"
+																							rows={Math.max(mapPanelUnselectedContacts.length, 14)}
+																						/>
+																					) : (
+																						<div ref={mapPanelRowsDesktopRef} className="space-y-[7px]">
+																							{mapPanelUnselectedContacts.map(renderMapPanelDesktopRow)}
+																						</div>
+																					)}
+																				</CustomScrollbar>
+																				{!isMapResultsLoading && isMapPanelCreateCampaignVisible && !fromHomeParam && (
+																					<div className="flex-shrink-0 w-full px-[10px] pb-[10px]">
+																						<Button
+																							disabled={primaryCtaPending}
+																							variant="primary-light"
+																							bold
+																							className={`relative w-full h-[39px] !bg-[#5DAB68] hover:!bg-[#4e9b5d] !text-white border border-[#000000] overflow-hidden ${
+																								selectedContacts.length === 0
+																									? 'opacity-[0.62]'
+																									: 'opacity-100'
+																							}`}
+																							style={
+																								selectedContacts.length === 0
+																									? {
+																										height: '39px',
+																										filter: 'grayscale(100%)',
+																									}
+																									: { height: '39px' }
+																							}
+																							onClick={() => {
+																								if (selectedContacts.length === 0) return;
+																								handlePrimaryCta();
 																							}}
 																						>
-																							<span className="text-black text-[14px] font-medium">
-																								All
+																							<span
+																								className="relative z-20"
+																								style={{ fontFamily: 'Inter, sans-serif', fontWeight: 700 }}
+																							>
+																								{primaryCtaLabel}
 																							</span>
-																						</div>
-																						<span
-																							aria-hidden="true"
-																							className="pointer-events-none absolute inset-y-0 right-[65px] w-[2px] bg-[#349A37] z-10"
-																						/>
-																					</Button>
-																				</div>
-																			)}
+																							<div
+																								className="absolute inset-y-0 right-0 w-[65px] z-20 flex items-center justify-center bg-[#74D178] cursor-pointer"
+																								onClick={(e) => {
+																									e.stopPropagation();
+																									handleSelectAll(mapPanelContacts);
+																								}}
+																							>
+																								<span className="text-black text-[14px] font-medium">
+																									All
+																								</span>
+																							</div>
+																							<span
+																								aria-hidden="true"
+																								className="pointer-events-none absolute inset-y-0 right-[65px] w-[2px] bg-[#349A37] z-10"
+																							/>
+																						</Button>
+																					</div>
+																				)}
+																			</div>
 																		</div>
 																		{mapResearchPanelContact && (
 																			<div

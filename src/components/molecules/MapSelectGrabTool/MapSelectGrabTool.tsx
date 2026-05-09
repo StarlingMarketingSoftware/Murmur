@@ -639,6 +639,61 @@ const getTallStackSelectTileContent = (index: number): ReactNode => {
 			return null;
 	}
 };
+
+export function StackBoxSelectBlueSparkIcon() {
+	return (
+		<svg
+			width="25"
+			height="25"
+			viewBox="0 0 25 25"
+			fill="none"
+			xmlns="http://www.w3.org/2000/svg"
+		>
+			<rect
+				x="24"
+				y="1"
+				width="23"
+				height="23"
+				transform="rotate(90 24 1)"
+				stroke="black"
+				strokeWidth="2"
+			/>
+			<path
+				d="M12.1581 3.53145C12.3062 3.28874 12.6586 3.28874 12.8068 3.53145L16.0351 8.82092C16.0666 8.8725 16.1099 8.91583 16.1615 8.94732L21.451 12.1756C21.6937 12.3238 21.6937 12.6762 21.451 12.8244L16.1615 16.0527C16.1099 16.0842 16.0666 16.1275 16.0351 16.1791L12.8068 21.4685C12.6586 21.7113 12.3062 21.7113 12.1581 21.4685L8.92974 16.1791C8.89826 16.1275 8.85493 16.0842 8.80334 16.0527L3.51387 12.8244C3.27116 12.6762 3.27116 12.3238 3.51387 12.1756L8.80335 8.94732C8.85493 8.91583 8.89826 8.8725 8.92974 8.82092L12.1581 3.53145Z"
+				fill="black"
+			/>
+		</svg>
+	);
+}
+
+export function StackBoxSelectStarIcon() {
+	return (
+		<svg
+			width="25"
+			height="25"
+			viewBox="0 0 25 25"
+			fill="none"
+			xmlns="http://www.w3.org/2000/svg"
+		>
+			<rect
+				x="24"
+				y="1"
+				width="23"
+				height="23"
+				transform="rotate(90 24 1)"
+				stroke="black"
+				strokeWidth="2"
+			/>
+			<path
+				d="M8.73262 9.79222L9.1426 9.73553L9.10861 9.32277L8.68616 4.22402L12.3929 7.75177L12.6929 8.03654L12.9939 7.75322L16.7176 4.24409L16.2704 9.34153L16.2345 9.75318L16.6439 9.81163L21.7096 10.5351L17.4446 13.3631L17.1001 13.5922L17.3095 13.9482L19.903 18.3605L15.033 16.7892L14.6394 16.6623L14.491 17.0489L12.6581 21.8275L10.8498 17.0402L10.7037 16.6527L10.309 16.778L5.43074 18.3248L8.04602 13.9253L8.2573 13.5702L7.91366 13.3395L3.66348 10.4901L8.73262 9.79222Z"
+				fill="black"
+				stroke="black"
+				strokeWidth="0.873559"
+			/>
+		</svg>
+	);
+}
+
 const ZOOM_THUMB_MAX_INDEX = ZOOM_THUMB_TOP_POSITIONS_PX.length - 1;
 const ZOOM_THUMB_BACKGROUND_COLORS = [
 	'#E0E0E0',
@@ -1128,27 +1183,88 @@ export function MapSelectGrabStackBox({
 	style,
 	children,
 	isSelectActive = false,
+	selectedContent,
 }: {
 	className?: string;
 	style?: CSSProperties;
 	children?: ReactNode;
 	isSelectActive?: boolean;
+	selectedContent?: ReactNode;
 }) {
-	return (
+	const [isSelected, setIsSelected] = useState(false);
+	const isInteractive = isSelectActive && Boolean(selectedContent);
+
+	useEffect(() => {
+		if (isSelectActive) setIsSelected(false);
+	}, [isSelectActive]);
+
+	const handleClick = useCallback(() => {
+		setIsSelected((prev) => !prev);
+	}, []);
+
+	const containerStyle: CSSProperties = {
+		width: `${STACK_BOX_SIZE_PX}px`,
+		height: `${STACK_BOX_SIZE_PX}px`,
+		borderRadius: `${STACK_BOX_RADIUS_PX}px`,
+		backgroundColor: isSelectActive ? '#ADDDB8' : '#FFFFFF',
+		display: 'flex',
+		alignItems: 'center',
+		justifyContent: 'center',
+		...style,
+	};
+
+	const selectedOverlay = (
 		<div
 			aria-hidden="true"
-			className={className}
 			style={{
-				width: `${STACK_BOX_SIZE_PX}px`,
-				height: `${STACK_BOX_SIZE_PX}px`,
-				borderRadius: `${STACK_BOX_RADIUS_PX}px`,
-				backgroundColor: isSelectActive ? '#ADDDB8' : '#FFFFFF',
+				width: `${TALL_STACK_SELECT_INNER_BOX_WIDTH_PX}px`,
+				height: `${TALL_STACK_SELECT_INNER_BOX_WIDTH_PX}px`,
+				borderRadius: `${TALL_STACK_SELECT_INNER_BOX_RADIUS_PX}px`,
+				backgroundColor: TALL_STACK_SELECT_INNER_BOX_FILL,
+				border: `${TALL_STACK_SELECT_INNER_BOX_BORDER_PX}px solid ${TALL_STACK_SELECT_INNER_BOX_STROKE}`,
+				boxSizing: 'border-box',
 				display: 'flex',
 				alignItems: 'center',
 				justifyContent: 'center',
-				...style,
+				lineHeight: 0,
 			}}
 		>
+			{selectedContent}
+		</div>
+	);
+
+	if (isInteractive) {
+		return (
+			<div className={className} style={containerStyle}>
+				<button
+					type="button"
+					onClick={handleClick}
+					aria-pressed={isSelected}
+					aria-label={isSelected ? 'Deselect category' : 'Select category'}
+					style={{
+						width: '100%',
+						height: '100%',
+						background: 'transparent',
+						border: 0,
+						padding: 0,
+						margin: 0,
+						borderRadius: `${STACK_BOX_RADIUS_PX}px`,
+						display: 'flex',
+						alignItems: 'center',
+						justifyContent: 'center',
+						cursor: 'pointer',
+						pointerEvents: 'auto',
+						lineHeight: 0,
+					}}
+				>
+					{isSelected ? selectedOverlay : children}
+				</button>
+			</div>
+		);
+	}
+
+	return (
+		<div aria-hidden="true" className={className} style={containerStyle}>
 			{children}
 		</div>
 	);
