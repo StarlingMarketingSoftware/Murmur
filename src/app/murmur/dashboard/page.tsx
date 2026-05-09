@@ -8299,30 +8299,8 @@ const DashboardContent = () => {
 																					borderRadius: '8px 8px 0 0',
 																				}}
 																			>
-																				<button
-																					type="button"
-																					onClick={() => setIsMapView(false)}
-																					className="absolute left-[10px] top-[7px] flex items-center justify-center cursor-pointer"
-																					style={{
-																						width: '53px',
-																						height: '19px',
-																						backgroundColor: '#CDEFC3',
-																						borderRadius: '4px',
-																						border: '2px solid #000000',
-																						fontFamily:
-																							'var(--font-secondary), Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
-																						fontSize: '13px',
-																						fontWeight: 600,
-																						lineHeight: '1',
-																					}}
-																				>
-																					Map
-																				</button>
-																				<span className="absolute left-[72px] top-1/2 -translate-y-1/2 font-secondary text-[13px] font-medium text-black">
+																				<span className="absolute left-[13px] top-[6px] font-inter text-[15px] font-semibold leading-[20px] text-center text-black">
 																					Search Results
-																				</span>
-																				<span className="font-inter text-[12px] font-medium text-black absolute right-[10px] top-1/2 -translate-y-1/2">
-																					Showing {mapPanelContacts.length} Results
 																				</span>
 																			</div>
 																			<div
