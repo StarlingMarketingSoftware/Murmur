@@ -4114,6 +4114,7 @@ const DashboardContent = () => {
 	]);
 
 	const [isPointerInMapSidePanel, setIsPointerInMapSidePanel] = useState(false);
+	const [selectedCategoryChips, setSelectedCategoryChips] = useState<Set<string>>(new Set());
 
 	const shouldUseDynamicMapCreateCampaignCta =
 		isMapView &&
@@ -4567,6 +4568,38 @@ const DashboardContent = () => {
 		() => mapPanelContacts.filter((c) => !selectedContacts.includes(c.id)),
 		[mapPanelContacts, selectedContacts]
 	);
+
+	// Maps a contact to one of the chip keys (or null) — mirrors the row renderer's category pill priority.
+	const getChipKeyForContact = useCallback((contact: ContactWithName): string | null => {
+		const isInBase = baseContactIdSet.has(contact.id);
+		const headline = contact.curatedDisplayLabel || contact.headline || contact.title || '';
+		if ((isInBase && isRestaurantsSearch) || isRestaurantTitle(headline)) return 'restaurants';
+		if ((isInBase && isCoffeeShopsSearch) || isCoffeeShopTitle(headline)) return 'coffee-shops';
+		if ((isInBase && isMusicVenuesSearch) || isMusicVenueTitle(headline)) return 'music-venues';
+		if ((isInBase && isMusicFestivalsSearch) || isMusicFestivalTitle(headline)) return 'festivals';
+		if ((isInBase && isWeddingPlannersSearch) || isWeddingPlannerTitle(headline) || isWeddingVenueTitle(headline)) return 'wedding-planners';
+		if (isWineBeerSpiritsTitle(headline)) return 'wine-beer-spirits';
+		return null;
+	}, [baseContactIdSet, isRestaurantsSearch, isCoffeeShopsSearch, isMusicVenuesSearch, isMusicFestivalsSearch, isWeddingPlannersSearch]);
+
+	// Set of chip keys present in the panel results — drives which chips are visible at the bottom.
+	const mapPanelCategoryKeys = useMemo(() => {
+		const set = new Set<string>();
+		for (const c of mapPanelContacts) {
+			const key = getChipKeyForContact(c);
+			if (key) set.add(key);
+		}
+		return set;
+	}, [mapPanelContacts, getChipKeyForContact]);
+
+	// Unselected contacts with the chip-bar category filter applied.
+	const mapPanelUnselectedContactsFiltered = useMemo(() => {
+		if (selectedCategoryChips.size === 0) return mapPanelUnselectedContacts;
+		return mapPanelUnselectedContacts.filter((c) => {
+			const key = getChipKeyForContact(c);
+			return !key || !selectedCategoryChips.has(key);
+		});
+	}, [mapPanelUnselectedContacts, selectedCategoryChips, getChipKeyForContact]);
 
 	const getTabPillXFor = (tab: 'search' | 'inbox') => {
 		const track = tabToggleTrackRef.current;
@@ -8299,9 +8332,29 @@ const DashboardContent = () => {
 																					borderRadius: '8px 8px 0 0',
 																				}}
 																			>
-																				<span className="absolute left-[13px] top-[6px] font-inter text-[15px] font-semibold leading-[20px] text-center text-black">
+																				<span className="absolute left-[13px] top-[2px] font-inter text-[15px] font-semibold leading-[20px] text-center text-black">
 																					Search Results
 																				</span>
+																				<div className="absolute left-[14px] bottom-[7px] flex items-center gap-[12px] pointer-events-none">
+																					{[
+																						{ key: 'restaurants', pillColor: '#C3FBD1', label: 'Restaurants', Icon: RestaurantsIcon, iconSize: 11 },
+																						{ key: 'coffee-shops', pillColor: '#D6F1BD', label: 'Coffee', Icon: CoffeeShopsIcon, iconSize: 6 },
+																						{ key: 'music-venues', pillColor: '#B7E5FF', label: 'Music Venues', Icon: MusicVenuesIcon, iconSize: 11 },
+																						{ key: 'festivals', pillColor: '#C1D6FF', label: 'Festivals', Icon: FestivalsIcon, iconSize: 11 },
+																						{ key: 'wedding-planners', pillColor: '#FFF8DC', label: 'Weddings', Icon: WeddingPlannersIcon, iconSize: 11 },
+																						{ key: 'wine-beer-spirits', pillColor: '#BFC4FF', label: 'Wineries', Icon: WineBeerSpiritsIcon, iconSize: 11 },
+																						{ key: 'radio-stations', pillColor: '#C5F0CC', label: 'Radio', Icon: RadioStationsIcon, iconSize: 11 },
+																					].filter(({ key }) => mapPanelCategoryKeys.has(key)).map(({ key, pillColor, label, Icon, iconSize }) => (
+																						<div
+																							key={key}
+																							className="h-[15px] rounded-[7px] px-2 flex items-center gap-1 border border-black flex-shrink-0"
+																							style={{ backgroundColor: pillColor }}
+																						>
+																							<Icon size={iconSize} className="flex-shrink-0" />
+																							<span className="text-[10px] text-black leading-none whitespace-nowrap">{label}</span>
+																						</div>
+																					))}
+																				</div>
 																			</div>
 																			<div
 																				className="flex flex-col flex-1 min-h-0 relative"
@@ -8328,12 +8381,12 @@ const DashboardContent = () => {
 																						/>
 																					) : (
 																						<div ref={mapPanelRowsDesktopRef} className="space-y-[7px]">
-																							{mapPanelUnselectedContacts.map(renderMapPanelDesktopRow)}
+																							{mapPanelUnselectedContactsFiltered.map(renderMapPanelDesktopRow)}
 																						</div>
 																					)}
 																				</CustomScrollbar>
 																				<div
-																					className="absolute left-1/2 -translate-x-1/2 bottom-[9px]"
+																					className="absolute left-1/2 -translate-x-1/2 bottom-[9px] flex items-center gap-[2px] pl-[4px]"
 																					style={{
 																						width: '420px',
 																						height: '55px',
@@ -8341,7 +8394,42 @@ const DashboardContent = () => {
 																						border: '1.446px solid #000',
 																						backgroundColor: '#65A1B9',
 																					}}
-																				/>
+																				>
+																					{[
+																						{ key: 'music-venues', color: '#71C9FD', Icon: MusicVenuesIcon, size: 32 },
+																						{ key: 'wine-beer-spirits', color: '#80AAFF', Icon: WineBeerSpiritsIcon, size: 25 },
+																						{ key: 'restaurants', color: '#77DD91', Icon: RestaurantsIcon, size: 32 },
+																						{ key: 'coffee-shops', color: '#A9DE78', Icon: CoffeeShopsIcon, size: 18 },
+																						{ key: 'wedding-planners', color: '#EED56E', Icon: WeddingPlannersIcon, size: 30 },
+																						{ key: 'festivals', color: '#80AAFF', Icon: FestivalsIcon, size: 32 },
+																						{ key: 'radio-stations', color: '#56DA73', Icon: RadioStationsIcon, size: 32 },
+																					].filter(({ key }) => mapPanelCategoryKeys.has(key)).map(({ key, color, Icon, size }) => {
+																						const isSelected = selectedCategoryChips.has(key);
+																						return (
+																							<div
+																								key={key}
+																								className="flex items-center justify-center flex-shrink-0 cursor-pointer"
+																								style={{
+																									width: 45,
+																									height: 45,
+																									backgroundColor: isSelected ? 'transparent' : color,
+																									borderRadius: 6,
+																									border: isSelected ? `2px solid ${color}` : '1px solid #000',
+																								}}
+																								onClick={() => {
+																									setSelectedCategoryChips((prev) => {
+																										const next = new Set(prev);
+																										if (next.has(key)) next.delete(key);
+																										else next.add(key);
+																										return next;
+																									});
+																								}}
+																							>
+																								<Icon size={size} innerFill={isSelected ? color : 'white'} />
+																							</div>
+																						);
+																					})}
+																				</div>
 																			</div>
 																		</div>
 																		{!isMapResultsLoading && !fromHomeParam && (
