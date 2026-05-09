@@ -8212,7 +8212,7 @@ const DashboardContent = () => {
 															    so the UI doesn't disappear between state searches. */}
 															{!isNarrowestDesktop && !hasNoSearchResults && (
 																	<div
-																		className="absolute top-[97px] right-[10px] flex flex-col gap-[10px] pointer-events-auto"
+																		className="absolute top-[97px] right-[10px] flex flex-col gap-[9px] pointer-events-auto"
 																		onMouseEnter={() => {
 																			if (!shouldUseDynamicMapCreateCampaignCta) return;
 																			setIsPointerInMapSidePanel(true);
@@ -8304,7 +8304,7 @@ const DashboardContent = () => {
 																				</span>
 																			</div>
 																			<div
-																				className="flex flex-col flex-1 min-h-0"
+																				className="flex flex-col flex-1 min-h-0 relative"
 																				style={{
 																					borderLeft: '3px solid #5B7469',
 																					borderRight: '3px solid #5B7469',
@@ -8314,7 +8314,7 @@ const DashboardContent = () => {
 																			>
 																				<CustomScrollbar
 																					className="flex-1 min-h-0"
-																					contentClassName="p-[6px] pb-[14px] space-y-[7px]"
+																					contentClassName="p-[6px] pb-[78px] space-y-[7px]"
 																					thumbWidth={2}
 																					thumbColor="#000000"
 																					trackColor="transparent"
@@ -8332,56 +8332,48 @@ const DashboardContent = () => {
 																						</div>
 																					)}
 																				</CustomScrollbar>
-																				{!isMapResultsLoading && isMapPanelCreateCampaignVisible && !fromHomeParam && (
-																					<div className="flex-shrink-0 w-full px-[10px] pb-[10px]">
-																						<Button
-																							disabled={primaryCtaPending}
-																							variant="primary-light"
-																							bold
-																							className={`relative w-full h-[39px] !bg-[#5DAB68] hover:!bg-[#4e9b5d] !text-white border border-[#000000] overflow-hidden ${
-																								selectedContacts.length === 0
-																									? 'opacity-[0.62]'
-																									: 'opacity-100'
-																							}`}
-																							style={
-																								selectedContacts.length === 0
-																									? {
-																										height: '39px',
-																										filter: 'grayscale(100%)',
-																									}
-																									: { height: '39px' }
-																							}
-																							onClick={() => {
-																								if (selectedContacts.length === 0) return;
-																								handlePrimaryCta();
-																							}}
-																						>
-																							<span
-																								className="relative z-20"
-																								style={{ fontFamily: 'Inter, sans-serif', fontWeight: 700 }}
-																							>
-																								{primaryCtaLabel}
-																							</span>
-																							<div
-																								className="absolute inset-y-0 right-0 w-[65px] z-20 flex items-center justify-center bg-[#74D178] cursor-pointer"
-																								onClick={(e) => {
-																									e.stopPropagation();
-																									handleSelectAll(mapPanelContacts);
-																								}}
-																							>
-																								<span className="text-black text-[14px] font-medium">
-																									All
-																								</span>
-																							</div>
-																							<span
-																								aria-hidden="true"
-																								className="pointer-events-none absolute inset-y-0 right-[65px] w-[2px] bg-[#349A37] z-10"
-																							/>
-																						</Button>
-																					</div>
-																				)}
+																				<div
+																					className="absolute left-1/2 -translate-x-1/2 bottom-[9px]"
+																					style={{
+																						width: '420px',
+																						height: '55px',
+																						borderRadius: '9.86px',
+																						border: '1.446px solid #000',
+																						backgroundColor: '#65A1B9',
+																					}}
+																				/>
 																			</div>
 																		</div>
+																		{!isMapResultsLoading && !fromHomeParam && (
+																			<div className="flex-shrink-0 w-full px-[10px]">
+																				<Button
+																					disabled={primaryCtaPending}
+																					variant="primary-light"
+																					bold
+																					className={`relative w-full h-[39px] !bg-[#5DAB68] hover:!bg-[#5DAB68] !text-white border border-[#000000] overflow-hidden ${
+																						selectedContacts.length === 0
+																							? 'opacity-[0.62]'
+																							: 'opacity-100'
+																					}`}
+																					style={
+																						selectedContacts.length === 0
+																							? { height: '39px' }
+																							: { height: '39px' }
+																					}
+																					onClick={() => {
+																						if (selectedContacts.length === 0) return;
+																						handlePrimaryCta();
+																					}}
+																				>
+																					<span
+																						className="relative z-20"
+																						style={{ fontFamily: 'Inter, sans-serif', fontWeight: 700 }}
+																					>
+																						Add Contacts
+																					</span>
+																				</Button>
+																			</div>
+																		)}
 																		{mapResearchPanelContact && (
 																			<div
 																				className="absolute inset-0 z-50"
@@ -8756,14 +8748,14 @@ const DashboardContent = () => {
 																			disabled={primaryCtaPending}
 																			variant="primary-light"
 																			bold
-																			className={`relative w-full h-[39px] !bg-[#5DAB68] hover:!bg-[#4e9b5d] !text-white border border-[#000000] overflow-hidden ${
+																			className={`relative w-full h-[39px] !bg-[#5DAB68] hover:!bg-[#5DAB68] !text-white border border-[#000000] overflow-hidden ${
 																				selectedContacts.length === 0
 																					? 'opacity-[0.62]'
 																					: 'opacity-100'
 																			}`}
 																			style={
 																				selectedContacts.length === 0
-																					? { height: '39px', filter: 'grayscale(100%)' }
+																					? { height: '39px' }
 																					: { height: '39px' }
 																			}
 																			onClick={() => {
@@ -8903,7 +8895,7 @@ const DashboardContent = () => {
 														isLoading={primaryCtaPending}
 														variant="primary-light"
 														bold
-														className="relative w-full max-w-[984px] h-[39px] mx-auto mt-[20px] !bg-[#5DAB68] hover:!bg-[#4e9b5d] !text-white border border-[#000000] overflow-hidden"
+														className="relative w-full max-w-[984px] h-[39px] mx-auto mt-[20px] !bg-[#5DAB68] hover:!bg-[#5DAB68] !text-white border border-[#000000] overflow-hidden"
 														onClick={() => {
 															if (selectedContacts.length === 0) return;
 															handlePrimaryCta();
@@ -8942,7 +8934,7 @@ const DashboardContent = () => {
 															isLoading={primaryCtaPending}
 															variant="primary-light"
 															bold
-															className="w-full h-[54px] min-h-[54px] !rounded-none !bg-[#5dab68] hover:!bg-[#4e9b5d] !text-white border border-[#000000] transition-colors !opacity-100 disabled:!opacity-100"
+															className="w-full h-[54px] min-h-[54px] !rounded-none !bg-[#5dab68] hover:!bg-[#5DAB68] !text-white border border-[#000000] transition-colors !opacity-100 disabled:!opacity-100"
 															disabled={selectedContacts.length === 0 || primaryCtaPending}
 														>
 															<span style={{ fontFamily: 'Inter, sans-serif', fontWeight: 700 }}>
