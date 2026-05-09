@@ -6,7 +6,12 @@ import { z } from 'zod';
 import { EmailVerificationStatus } from '@/constants/prismaEnums';
 import type { UserContactList } from '@prisma/client';
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
-import { useCreateCampaign } from '@/hooks/queryHooks/useCampaigns';
+import {
+	CampaignApiError,
+	useActiveCampaign,
+	useCreateCampaign,
+	useGetCampaigns,
+} from '@/hooks/queryHooks/useCampaigns';
 import { urls } from '@/constants/urls';
 import {
 	useBatchUpdateContacts,
@@ -21,7 +26,7 @@ import { useCreateApolloContacts } from '@/hooks/queryHooks/useApollo';
 import { useCreateUserContactList } from '@/hooks/queryHooks/useUserContactLists';
 import { toast } from 'sonner';
 
-import { capitalize, getStateAbbreviation } from '@/utils/string';
+import { getStateAbbreviation } from '@/utils/string';
 import { TableCellTooltip } from '@/components/molecules/TableCellTooltip/TableCellTooltip';
 import { ScrollableText } from '@/components/atoms/ScrollableText/ScrollableText';
 import { CanadianFlag } from '@/components/atoms/_svg/CanadianFlag';
@@ -204,6 +209,91 @@ const clearFreeTextSessionStorage = (): void => {
 const isTimeoutError = (error: unknown): boolean =>
 	error instanceof Error && /\b(timeout|timed\s*out)\b/i.test(error.message);
 
+// Constellation-based naming. The zodiac for the user's current calendar date
+// is always the first choice; when that's taken, cycle through the supplementary
+// constellation list, then through other zodiacs, before falling back to the
+// server's numeric-suffix logic ("Taurus 2", etc.). Encoded as [fromMonth,
+// fromDay]-[toMonth,toDay] using traditional Western tropical zodiac dates.
+type ZodiacRange = {
+	name: string;
+	from: readonly [number, number];
+	to: readonly [number, number];
+};
+
+const ZODIAC_DATE_RANGES: readonly ZodiacRange[] = [
+	{ name: 'Capricornus', from: [12, 22], to: [1, 19] },
+	{ name: 'Aquarius', from: [1, 20], to: [2, 18] },
+	{ name: 'Pisces', from: [2, 19], to: [3, 20] },
+	{ name: 'Aries', from: [3, 21], to: [4, 19] },
+	{ name: 'Taurus', from: [4, 20], to: [5, 20] },
+	{ name: 'Gemini', from: [5, 21], to: [6, 20] },
+	{ name: 'Cancer', from: [6, 21], to: [7, 22] },
+	{ name: 'Leo', from: [7, 23], to: [8, 22] },
+	{ name: 'Virgo', from: [8, 23], to: [9, 22] },
+	{ name: 'Libra', from: [9, 23], to: [10, 22] },
+	{ name: 'Scorpius', from: [10, 23], to: [11, 21] },
+	{ name: 'Sagittarius', from: [11, 22], to: [12, 21] },
+];
+
+// Non-zodiac constellations. Order matters: this is the cycle preference when
+// the date's zodiac has already been used.
+const SUPPLEMENTARY_CONSTELLATIONS = [
+	'Lyra',
+	'Orion',
+	'Ursa',
+	'Cassiopeia',
+	'Aquila',
+	'Canis',
+] as const;
+
+export const getZodiacForDate = (date: Date): string => {
+	const month = date.getMonth() + 1;
+	const day = date.getDate();
+	for (const z of ZODIAC_DATE_RANGES) {
+		const [fm, fd] = z.from;
+		const [tm, td] = z.to;
+		if (fm <= tm) {
+			if (
+				(month === fm && day >= fd) ||
+				(month === tm && day <= td) ||
+				(month > fm && month < tm)
+			) {
+				return z.name;
+			}
+		} else {
+			// Range crosses year boundary (Capricornus: Dec 22 → Jan 19).
+			if (
+				(month === fm && day >= fd) ||
+				(month === tm && day <= td) ||
+				month > fm ||
+				month < tm
+			) {
+				return z.name;
+			}
+		}
+	}
+	return 'Aquarius'; // Unreachable — every day falls in exactly one range.
+};
+
+const generateCampaignName = (
+	existingNames: readonly string[] = [],
+	date: Date = new Date()
+): string => {
+	const primary = getZodiacForDate(date);
+	const otherZodiacs = ZODIAC_DATE_RANGES.map((z) => z.name).filter(
+		(n) => n !== primary
+	);
+	const candidates = [primary, ...SUPPLEMENTARY_CONSTELLATIONS, ...otherZodiacs];
+
+	const taken = new Set(existingNames.map((n) => n.trim().toLowerCase()));
+	for (const candidate of candidates) {
+		if (!taken.has(candidate.toLowerCase())) return candidate;
+	}
+	// All 18 unique names taken — fall back to the date's primary zodiac and
+	// let the server's getUniqueCampaignName append a numeric suffix.
+	return primary;
+};
+
 interface UseDashboardOptions {
 	/** Derived title to assign to contacts without a title when creating a campaign */
 	derivedTitle?: string;
@@ -211,10 +301,19 @@ interface UseDashboardOptions {
 	forceApplyDerivedTitle?: boolean;
 	/** If true, indicates user came from landing page and is in demo mode (allows one specific search without subscription) */
 	fromHome?: boolean;
+	/** When true, search submissions skip the implicit-campaign auto-create path
+	 * (e.g., the user is in URL-pinned add-to-campaign mode and is explicitly
+	 * searching to find more contacts for a specific other campaign). */
+	disableAutoCreateCampaign?: boolean;
 }
 
 export const useDashboard = (options: UseDashboardOptions = {}) => {
-	const { derivedTitle, forceApplyDerivedTitle = false, fromHome = false } = options;
+	const {
+		derivedTitle,
+		forceApplyDerivedTitle = false,
+		fromHome = false,
+		disableAutoCreateCampaign = false,
+	} = options;
 	/* UI */
 	const [hasSearched, setHasSearched] = useState(false);
 
@@ -474,7 +573,69 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 			suppressToasts: true,
 		});
 
+	const {
+		activeCampaignId,
+		activeCampaign,
+		isResolving: isResolvingActiveCampaign,
+		setActiveCampaignId,
+	} = useActiveCampaign();
+
+	const { data: existingCampaigns } = useGetCampaigns();
+
+	const existingCampaignNames = useMemo<string[]>(() => {
+		const list = (existingCampaigns ?? []) as Array<{ name?: string }>;
+		return list
+			.map((c) => c.name)
+			.filter((n): n is string => typeof n === 'string' && n.length > 0);
+	}, [existingCampaigns]);
+
 	const { data: usedContactIds } = useGetUsedContactIds();
+
+	const creatingCampaignRef = useRef<Promise<number> | null>(null);
+
+	const ensureActiveCampaign = useCallback(
+		async (searchQuery: string): Promise<number | null> => {
+			void searchQuery;
+			if (activeCampaignId != null) return activeCampaignId;
+			if (creatingCampaignRef.current) return creatingCampaignRef.current;
+
+			const promise = (async () => {
+				const name = generateCampaignName(existingCampaignNames);
+				const newUcl = await createContactList({ name, contactIds: [] });
+				const campaign = await createCampaign({
+					name,
+					userContactLists: [newUcl.id],
+				});
+				setActiveCampaignId(campaign.id);
+				return campaign.id as number;
+			})();
+
+			creatingCampaignRef.current = promise;
+			try {
+				const id = await promise;
+				return id;
+			} catch (err) {
+				if (err instanceof CampaignApiError && err.code === 'CAMPAIGN_CAP_REACHED') {
+					toast.error(
+						err.message ||
+							'You have reached the maximum of 5 active campaigns. Delete one to create a new one.'
+					);
+				} else {
+					toast.error('Could not start a campaign for this search.');
+				}
+				return null;
+			} finally {
+				creatingCampaignRef.current = null;
+			}
+		},
+		[
+			activeCampaignId,
+			createContactList,
+			createCampaign,
+			existingCampaignNames,
+			setActiveCampaignId,
+		]
+	);
 
 	/* HANDLERS */
 	const onSubmit = async (data: FormData) => {
@@ -503,6 +664,15 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 		setSearchRunId((runId) => runId + 1);
 		setHasSearched(true);
 		setIsMapView(true);
+
+		// Demo users (no subscription, came from landing page) shouldn't materialize
+		// a real campaign. The URL-pinned add-to-campaign flow targets a specific
+		// other campaign and must not touch the active one. Everyone else's first
+		// search lands inside their active campaign, auto-creating one in parallel
+		// with the search if none exists.
+		if (!isFromHomeDemoMode && !disableAutoCreateCampaign) {
+			void ensureActiveCampaign(data.searchText);
+		}
 	};
 
 	const handleResetSearch = () => {
@@ -933,22 +1103,7 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 			await batchUpdateContacts({ updates });
 		}
 
-		const generateCampaignName = (searchQuery: string): string => {
-			let cleanedQuery = searchQuery.replace(/^\[(booking|promotion)\]\s*/i, '');
-
-			const locationMatch = cleanedQuery.match(/\(([^)]+)\)\s*$/);
-			const location = locationMatch ? locationMatch[1] : null;
-
-			cleanedQuery = cleanedQuery.replace(/\s*\([^)]+\)\s*$/, '').trim();
-
-			if (location) {
-				return capitalize(`${cleanedQuery} in ${location}`);
-			}
-
-			return capitalize(cleanedQuery);
-		};
-
-		const defaultName = generateCampaignName(activeSearchQuery);
+		const defaultName = generateCampaignName(existingCampaignNames);
 		if (currentTab === 'search') {
 			const newUserContactList = await createContactList({
 				name: defaultName,
@@ -1418,5 +1573,10 @@ export const useDashboard = (options: UseDashboardOptions = {}) => {
 		rehydrateFreeTextSession,
 		isPendingFreeTextSearch,
 		lastFreeTextArgs,
+		activeCampaignId,
+		activeCampaign,
+		isResolvingActiveCampaign,
+		setActiveCampaignId,
+		ensureActiveCampaign,
 	};
 };

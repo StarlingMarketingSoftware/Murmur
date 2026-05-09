@@ -736,6 +736,40 @@ export const MAP_SELECT_GRAB_STACK_BOX_FIRST_GAP_PX = STACK_BOX_FIRST_GAP_PX;
 export const MAP_SELECT_GRAB_STACK_BOX_SECOND_GAP_PX = STACK_BOX_SECOND_GAP_PX;
 export const MAP_SELECT_GRAB_TALL_STACK_BOX_HEIGHT_PX = TALL_STACK_BOX_HEIGHT_PX;
 export const MAP_SELECT_GRAB_TALL_STACK_BOX_GAP_PX = TALL_STACK_BOX_GAP_PX;
+export const MAP_SELECT_GRAB_CATEGORY_COUNT = TALL_STACK_CATEGORY_COUNT;
+
+// Tile-index → contact-title prefixes that represent that category in the
+// data. Order MUST match the visual stack from bottom (index 0) to top
+// (index 6): Radio, Wedding Planners, Coffee, Festivals, Wine/Beer/Spirits,
+// Music Venues, Restaurants. Used to filter map markers when a tile is
+// toggled inactive in grab mode.
+export const MAP_SELECT_GRAB_CATEGORY_TITLE_PREFIXES: readonly (readonly string[])[] = [
+	['Radio Stations', 'College Radio'],
+	['Wedding Planners', 'Wedding Venues'],
+	['Coffee Shops'],
+	['Music Festivals'],
+	['Breweries', 'Distilleries', 'Wineries', 'Cideries'],
+	['Music Venues'],
+	['Restaurants'],
+] as const;
+
+// Returns the tile index (0..6) whose category prefixes match the given
+// contact title, or -1 when the title doesn't map to any tracked category.
+// Untracked contacts are passed through unchanged by category filters.
+export const getMapSelectGrabCategoryIndexFromContactTitle = (
+	title: string | null | undefined
+): number => {
+	if (!title) return -1;
+	const normalized = title.trim().toLowerCase();
+	if (!normalized) return -1;
+	for (let i = 0; i < MAP_SELECT_GRAB_CATEGORY_TITLE_PREFIXES.length; i += 1) {
+		const prefixes = MAP_SELECT_GRAB_CATEGORY_TITLE_PREFIXES[i];
+		for (const prefix of prefixes) {
+			if (normalized.startsWith(prefix.toLowerCase())) return i;
+		}
+	}
+	return -1;
+};
 
 const clampZoomLevelValue = (levelValue: number) => {
 	if (!Number.isFinite(levelValue)) return 0;
@@ -1182,24 +1216,44 @@ export function MapSelectGrabStackBox({
 	className,
 	style,
 	children,
+	inactiveContent,
 	isSelectActive = false,
 	selectedContent,
+	onActiveChange,
 }: {
 	className?: string;
 	style?: CSSProperties;
 	children?: ReactNode;
+	// Rendered in grab mode when the user has clicked the box to gray it out.
+	// Providing this prop also makes the box clickable in grab mode; omitting
+	// it preserves the previous non-interactive behavior.
+	inactiveContent?: ReactNode;
 	isSelectActive?: boolean;
 	selectedContent?: ReactNode;
+	// Fires whenever the user toggles the grab-mode active state. Also fires
+	// once on mount with the initial active=true state. Consumers use this to
+	// drive map-marker visibility for the data this box represents.
+	onActiveChange?: (isActive: boolean) => void;
 }) {
 	const [isSelected, setIsSelected] = useState(false);
-	const isInteractive = isSelectActive && Boolean(selectedContent);
+	const [isGrabActive, setIsGrabActive] = useState(true);
+	const isSelectInteractive = isSelectActive && Boolean(selectedContent);
+	const isGrabInteractive = !isSelectActive && Boolean(inactiveContent);
 
 	useEffect(() => {
 		if (isSelectActive) setIsSelected(false);
 	}, [isSelectActive]);
 
-	const handleClick = useCallback(() => {
+	useEffect(() => {
+		onActiveChange?.(isGrabActive);
+	}, [isGrabActive, onActiveChange]);
+
+	const handleSelectClick = useCallback(() => {
 		setIsSelected((prev) => !prev);
+	}, []);
+
+	const handleGrabClick = useCallback(() => {
+		setIsGrabActive((prev) => !prev);
 	}, []);
 
 	const containerStyle: CSSProperties = {
@@ -1233,12 +1287,12 @@ export function MapSelectGrabStackBox({
 		</div>
 	);
 
-	if (isInteractive) {
+	if (isSelectInteractive) {
 		return (
 			<div className={className} style={containerStyle}>
 				<button
 					type="button"
-					onClick={handleClick}
+					onClick={handleSelectClick}
 					aria-pressed={isSelected}
 					aria-label={isSelected ? 'Deselect category' : 'Select category'}
 					style={{
@@ -1258,6 +1312,36 @@ export function MapSelectGrabStackBox({
 					}}
 				>
 					{isSelected ? selectedOverlay : children}
+				</button>
+			</div>
+		);
+	}
+
+	if (isGrabInteractive) {
+		return (
+			<div className={className} style={containerStyle}>
+				<button
+					type="button"
+					onClick={handleGrabClick}
+					aria-pressed={!isGrabActive}
+					aria-label={isGrabActive ? 'Deactivate' : 'Activate'}
+					style={{
+						width: '100%',
+						height: '100%',
+						background: 'transparent',
+						border: 0,
+						padding: 0,
+						margin: 0,
+						borderRadius: `${STACK_BOX_RADIUS_PX}px`,
+						display: 'flex',
+						alignItems: 'center',
+						justifyContent: 'center',
+						cursor: 'pointer',
+						pointerEvents: 'auto',
+						lineHeight: 0,
+					}}
+				>
+					{isGrabActive ? children : inactiveContent}
 				</button>
 			</div>
 		);
@@ -1314,11 +1398,18 @@ export function MapSelectGrabTallStackBox({
 	style,
 	isSelectActive = false,
 	onAllDeselected,
+	onActiveCategoriesChange,
 }: {
 	className?: string;
 	style?: CSSProperties;
 	isSelectActive?: boolean;
 	onAllDeselected?: () => void;
+	// Fires whenever the user toggles a grab-mode tile, with the full active-by-
+	// index boolean array (length TALL_STACK_CATEGORY_COUNT). Also fires once on
+	// mount with the initial all-active state. Consumers use this to filter
+	// map markers by category. Note: select-mode selections are independent and
+	// not propagated here.
+	onActiveCategoriesChange?: (activeCategories: readonly boolean[]) => void;
 }) {
 	const [selectedCategories, setSelectedCategories] = useState<boolean[]>(() =>
 		new Array(TALL_STACK_CATEGORY_COUNT).fill(true)
@@ -1328,6 +1419,10 @@ export function MapSelectGrabTallStackBox({
 	const [grabberActiveCategories, setGrabberActiveCategories] = useState<boolean[]>(
 		() => new Array(TALL_STACK_CATEGORY_COUNT).fill(true)
 	);
+
+	useEffect(() => {
+		onActiveCategoriesChange?.(grabberActiveCategories);
+	}, [grabberActiveCategories, onActiveCategoriesChange]);
 
 	const handleToggleCategory = useCallback((index: number) => {
 		setSelectedCategories((prev) => {

@@ -80,6 +80,17 @@ export const apiNotFound = (
 	return NextResponse.json({ success: false, error: message }, { status: 404 });
 };
 
+export const apiConflict = (
+	payload: Record<string, unknown> | string = 'Conflict'
+): NextResponse => {
+	const body =
+		typeof payload === 'string'
+			? { success: false, error: payload }
+			: { success: false, ...payload };
+	console.error(body);
+	return NextResponse.json(body, { status: 409 });
+};
+
 export const apiServerError = (
 	message: string = API_MESSAGES.ERROR.DEFAULT
 ): NextResponse => {

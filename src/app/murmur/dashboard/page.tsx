@@ -56,6 +56,7 @@ import {
 	MapSelectGrabTool,
 	StackBoxSelectBlueSparkIcon,
 	StackBoxSelectStarIcon,
+	MAP_SELECT_GRAB_CATEGORY_COUNT,
 	MAP_SELECT_GRAB_STARTER_BOX_GAP_PX,
 	MAP_SELECT_GRAB_STARTER_BOX_HEIGHT_PX,
 	MAP_SELECT_GRAB_STACK_BOX_FIRST_GAP_PX,
@@ -64,6 +65,7 @@ import {
 	MAP_SELECT_GRAB_TALL_STACK_BOX_GAP_PX,
 	MAP_SELECT_GRAB_TALL_STACK_BOX_HEIGHT_PX,
 	MAP_SELECT_GRAB_TOOL_COLLAPSED_HEIGHT_PX,
+	getMapSelectGrabCategoryIndexFromContactTitle,
 	type MapZoomControlIndexChangeMeta,
 	type MapZoomControlLiveHandle,
 } from '@/components/molecules/MapSelectGrabTool/MapSelectGrabTool';
@@ -2713,7 +2715,15 @@ const DashboardContent = () => {
 		triggerFreeTextSearch,
 		rehydrateFreeTextSession,
 		lastFreeTextArgs,
-	} = useDashboard({ derivedTitle: derivedContactTitle, forceApplyDerivedTitle: shouldForceApplyDerivedTitle, fromHome: fromHomeParam });
+		activeCampaignId,
+		activeCampaign,
+		ensureActiveCampaign,
+	} = useDashboard({
+		derivedTitle: derivedContactTitle,
+		forceApplyDerivedTitle: shouldForceApplyDerivedTitle,
+		fromHome: fromHomeParam,
+		disableAutoCreateCampaign: isAddToCampaignMode,
+	});
 	const shouldEnableMapStateCategorySelection =
 		isMapView && isMapBottomCategoryMode;
 
@@ -3440,11 +3450,102 @@ const DashboardContent = () => {
 		setSelectedContacts,
 	]);
 
-	const primaryCtaLabel = isAddToCampaignMode ? 'Add to Campaign' : 'Create Campaign';
+	const activeCampaignUserContactListId =
+		activeCampaign?.userContactLists?.[0]?.id;
+
+	const handleAddSelectedToActiveCampaign = useCallback(async () => {
+		if (selectedContacts.length === 0) {
+			toast.error('Please select contacts to add');
+			return;
+		}
+
+		if (activeCampaignId == null || !activeCampaign) {
+			toast.error('No active campaign yet — search to start one.');
+			return;
+		}
+
+		if (!activeCampaignUserContactListId) {
+			toast.error('Active campaign has no contact list yet — try again in a moment.');
+			return;
+		}
+
+		try {
+			if (derivedContactTitle && contacts) {
+				const contactsToUpdate = contacts.filter(
+					(c) =>
+						selectedContacts.includes(c.id) &&
+						(shouldForceApplyDerivedTitle || (!c.title && !c.headline))
+				);
+				if (contactsToUpdate.length > 0) {
+					await batchUpdateContacts({
+						updates: contactsToUpdate.map((c) => ({
+							id: c.id,
+							data: { title: derivedContactTitle },
+						})),
+					});
+				}
+			}
+
+			await editUserContactList({
+				id: activeCampaignUserContactListId,
+				data: {
+					contactOperation: {
+						action: 'connect',
+						contactIds: selectedContacts,
+					},
+				},
+			});
+
+			const addedCount = selectedContacts.length;
+			setSelectedContacts([]);
+
+			await Promise.all([
+				queryClient.invalidateQueries({ queryKey: ['campaigns'] }),
+				queryClient.invalidateQueries({ queryKey: ['contacts'] }),
+				queryClient.invalidateQueries({ queryKey: ['userContactLists'] }),
+			]);
+
+			toast.success(
+				`${addedCount} contact${addedCount === 1 ? '' : 's'} added to ${activeCampaign.name}`
+			);
+
+			router.push(
+				`${urls.murmur.campaign.detail(activeCampaignId)}?origin=search`
+			);
+		} catch (error) {
+			console.error('Error adding contacts to active campaign:', error);
+			toast.error('Failed to add contacts to campaign');
+		}
+	}, [
+		activeCampaign,
+		activeCampaignId,
+		activeCampaignUserContactListId,
+		batchUpdateContacts,
+		contacts,
+		derivedContactTitle,
+		editUserContactList,
+		queryClient,
+		router,
+		selectedContacts,
+		setSelectedContacts,
+		shouldForceApplyDerivedTitle,
+	]);
+
+	const primaryCtaLabel = isAddToCampaignMode
+		? 'Add to Campaign'
+		: activeCampaignId
+			? `Add to ${activeCampaign?.name ?? 'Campaign'}`
+			: 'Create Campaign';
 	const primaryCtaPending = isAddToCampaignMode
 		? isPendingAddToCampaign || isPendingFromCampaign
-		: isPendingCreateCampaign || isPendingBatchUpdateContacts;
-	const handlePrimaryCta = isAddToCampaignMode ? handleAddSelectedToCampaign : handleCreateCampaign;
+		: activeCampaignId
+			? isPendingAddToCampaign || isPendingBatchUpdateContacts
+			: isPendingCreateCampaign || isPendingBatchUpdateContacts;
+	const handlePrimaryCta = isAddToCampaignMode
+		? handleAddSelectedToCampaign
+		: activeCampaignId
+			? handleAddSelectedToActiveCampaign
+			: handleCreateCampaign;
 
 	// Map-side panel should default to only the searched state, while the map itself keeps
 	// showing all results. Clicking an out-of-state marker adds it to this panel list.
@@ -3463,6 +3564,33 @@ const DashboardContent = () => {
 		Record<number, string>
 	>({});
 	const [activeMapTool, setActiveMapTool] = useState<'select' | 'grab'>('grab');
+	// Per-category visibility driven by the tall-stack tile toggles in grab mode.
+	// True = tile is colored (visible on map); false = tile is gray (hidden).
+	// Indexes follow MAP_SELECT_GRAB_CATEGORY_TITLE_PREFIXES order.
+	const [mapGrabActiveCategories, setMapGrabActiveCategories] = useState<readonly boolean[]>(
+		() => new Array(MAP_SELECT_GRAB_CATEGORY_COUNT).fill(true)
+	);
+	const handleMapGrabActiveCategoriesChange = useCallback(
+		(active: readonly boolean[]) => {
+			setMapGrabActiveCategories((prev) => {
+				if (
+					prev.length === active.length &&
+					prev.every((value, index) => value === active[index])
+				) {
+					return prev;
+				}
+				return active.slice();
+			});
+		},
+		[]
+	);
+	// Visibility for "uncategorized" contacts (people not matched by any tall-
+	// stack category prefix — they render as the blue diamond marker on the map).
+	// Driven by the blue-spark stack box's grab-mode toggle.
+	const [mapGrabUncategorizedActive, setMapGrabUncategorizedActive] = useState(true);
+	const handleMapGrabUncategorizedActiveChange = useCallback((isActive: boolean) => {
+		setMapGrabUncategorizedActive(isActive);
+	}, []);
 	const [mapZoomControlIndex, setMapZoomControlIndex] = useState(1);
 	const [isMapZoomControlDragging, setIsMapZoomControlDragging] = useState(false);
 	const [mapZoomControlRequest, setMapZoomControlRequest] =
@@ -3902,6 +4030,13 @@ const DashboardContent = () => {
 		setMapBottomSearchValue('');
 		primeFreeTextSearch(q);
 
+		// First search of the session creates the active campaign (in parallel
+		// with the actual search). Skip in URL-pinned add-to-campaign mode and
+		// in fromHome demo mode; in either case there's nothing to materialize.
+		if (!isAddToCampaignMode && !isFromHomeDemoMode) {
+			void ensureActiveCampaign(q);
+		}
+
 		let lat: number | null = null;
 		let lon: number | null = null;
 		try {
@@ -3934,6 +4069,9 @@ const DashboardContent = () => {
 		mapBottomSearchValue,
 		primeFreeTextSearch,
 		triggerFreeTextSearch,
+		ensureActiveCampaign,
+		isAddToCampaignMode,
+		isFromHomeDemoMode,
 	]);
 
 	const cancelMapBottomSearchFollowupPreviewClear = useCallback(() => {
@@ -3976,6 +4114,13 @@ const DashboardContent = () => {
 		setMapBottomSearchValue('');
 		setActiveSection(null);
 
+		// "For You" has no user-typed query — pass an empty string and let
+		// generateCampaignName fall back to the "Untitled Campaign" default
+		// (the user's forthcoming naming scheme can refine this).
+		if (!isAddToCampaignMode && !isFromHomeDemoMode) {
+			void ensureActiveCampaign('');
+		}
+
 		let lat: number | null = null;
 		let lon: number | null = null;
 		try {
@@ -3997,6 +4142,9 @@ const DashboardContent = () => {
 	}, [
 		cancelMapBottomSearchFollowupPreviewClear,
 		triggerCuratedSearch,
+		ensureActiveCampaign,
+		isAddToCampaignMode,
+		isFromHomeDemoMode,
 	]);
 
 	const handleMapBottomSearchFollowupSelectionChange = useCallback(
@@ -4600,6 +4748,16 @@ const DashboardContent = () => {
 			return !key || !selectedCategoryChips.has(key);
 		});
 	}, [mapPanelUnselectedContacts, selectedCategoryChips, getChipKeyForContact]);
+
+	// Chip keys actually present in the FILTERED visible list — drives the header pill row.
+	const mapPanelVisibleCategoryKeys = useMemo(() => {
+		const set = new Set<string>();
+		for (const c of mapPanelUnselectedContactsFiltered) {
+			const key = getChipKeyForContact(c);
+			if (key) set.add(key);
+		}
+		return set;
+	}, [mapPanelUnselectedContactsFiltered, getChipKeyForContact]);
 
 	const getTabPillXFor = (tab: 'search' | 'inbox') => {
 		const track = tabToggleTrackRef.current;
@@ -5274,13 +5432,27 @@ const DashboardContent = () => {
 		!fromHomeParam && !hasSearched ? 'background' : 'interactive';
 	const shouldSpinBackgroundMap = mapPresentation === 'background';
 
-	const contactsForMap = useMemo(
-		() =>
+	const contactsForMap = useMemo(() => {
+		const sourceContacts =
 			fromHomeParam && (!isSignedIn || !hasSearched)
 				? fromHomePlaceholderContacts
-				: contacts || [],
-		[fromHomeParam, isSignedIn, hasSearched, fromHomePlaceholderContacts, contacts]
-	);
+				: contacts || [];
+		const allCategoriesActive = mapGrabActiveCategories.every(Boolean);
+		if (allCategoriesActive && mapGrabUncategorizedActive) return sourceContacts;
+		return sourceContacts.filter((contact) => {
+			const categoryIndex = getMapSelectGrabCategoryIndexFromContactTitle(contact.title);
+			if (categoryIndex < 0) return mapGrabUncategorizedActive;
+			return mapGrabActiveCategories[categoryIndex] === true;
+		});
+	}, [
+		fromHomeParam,
+		isSignedIn,
+		hasSearched,
+		fromHomePlaceholderContacts,
+		contacts,
+		mapGrabActiveCategories,
+		mapGrabUncategorizedActive,
+	]);
 
 	const searchWhatForMap =
 		fromHomeParam && (!isSignedIn || !hasSearched) ? FROM_HOME_WHAT : searchedWhat;
@@ -7645,6 +7817,7 @@ const DashboardContent = () => {
 										className="absolute pointer-events-none"
 										isSelectActive={isSelectMapToolActive}
 										onAllDeselected={() => setActiveMapTool('grab')}
+										onActiveCategoriesChange={handleMapGrabActiveCategoriesChange}
 										style={{
 											left: '-0.5px',
 											top: `-${
@@ -7669,6 +7842,11 @@ const DashboardContent = () => {
 										className="absolute left-0 pointer-events-none"
 										isSelectActive={isSelectMapToolActive}
 										selectedContent={<StackBoxSelectStarIcon />}
+										inactiveContent={
+											<MapSelectGrabStackTile backgroundColor="#EDF2F0">
+												<MapStackStarIcon fill="#EDF2F0" stroke="#9E9E9E" />
+											</MapSelectGrabStackTile>
+										}
 										style={{
 											top: `-${
 												MAP_SELECT_GRAB_STARTER_BOX_HEIGHT_PX +
@@ -7686,6 +7864,12 @@ const DashboardContent = () => {
 										className="absolute left-0 pointer-events-none"
 										isSelectActive={isSelectMapToolActive}
 										selectedContent={<StackBoxSelectBlueSparkIcon />}
+										inactiveContent={
+											<MapSelectGrabStackTile backgroundColor="#EDF2F0">
+												<MapStackBlueSparkIcon fill="#9E9E9E" stroke="#EDF2F0" />
+											</MapSelectGrabStackTile>
+										}
+										onActiveChange={handleMapGrabUncategorizedActiveChange}
 										style={{
 											top: `-${
 												MAP_SELECT_GRAB_STARTER_BOX_HEIGHT_PX +
@@ -8335,7 +8519,13 @@ const DashboardContent = () => {
 																				<span className="absolute left-[13px] top-[2px] font-inter text-[15px] font-semibold leading-[20px] text-center text-black">
 																					Search Results
 																				</span>
-																				<div className="absolute left-[14px] bottom-[7px] flex items-center gap-[12px] pointer-events-none">
+																				<div
+																					className="absolute left-[14px] right-[10px] bottom-[7px] flex items-center gap-[12px] overflow-hidden"
+																					style={{
+																						maskImage: 'linear-gradient(to right, black 0, black calc(100% - 40px), transparent 100%)',
+																						WebkitMaskImage: 'linear-gradient(to right, black 0, black calc(100% - 40px), transparent 100%)',
+																					}}
+																				>
 																					{[
 																						{ key: 'restaurants', pillColor: '#C3FBD1', label: 'Restaurants', Icon: RestaurantsIcon, iconSize: 11 },
 																						{ key: 'coffee-shops', pillColor: '#D6F1BD', label: 'Coffee', Icon: CoffeeShopsIcon, iconSize: 6 },
@@ -8344,11 +8534,19 @@ const DashboardContent = () => {
 																						{ key: 'wedding-planners', pillColor: '#FFF8DC', label: 'Weddings', Icon: WeddingPlannersIcon, iconSize: 11 },
 																						{ key: 'wine-beer-spirits', pillColor: '#BFC4FF', label: 'Wineries', Icon: WineBeerSpiritsIcon, iconSize: 11 },
 																						{ key: 'radio-stations', pillColor: '#C5F0CC', label: 'Radio', Icon: RadioStationsIcon, iconSize: 11 },
-																					].filter(({ key }) => mapPanelCategoryKeys.has(key)).map(({ key, pillColor, label, Icon, iconSize }) => (
+																					].filter(({ key }) => mapPanelVisibleCategoryKeys.has(key)).map(({ key, pillColor, label, Icon, iconSize }) => (
 																						<div
 																							key={key}
-																							className="h-[15px] rounded-[7px] px-2 flex items-center gap-1 border border-black flex-shrink-0"
+																							className="h-[15px] rounded-[7px] px-2 flex items-center gap-1 border border-black flex-shrink-0 cursor-pointer"
 																							style={{ backgroundColor: pillColor }}
+																							onClick={() => {
+																								setSelectedCategoryChips((prev) => {
+																									const next = new Set(prev);
+																									if (next.has(key)) next.delete(key);
+																									else next.add(key);
+																									return next;
+																								});
+																							}}
 																						>
 																							<Icon size={iconSize} className="flex-shrink-0" />
 																							<span className="text-[10px] text-black leading-none whitespace-nowrap">{label}</span>

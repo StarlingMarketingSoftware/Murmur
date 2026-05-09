@@ -4,12 +4,16 @@ import prisma from '@/lib/prisma';
 import { AiModel, Prisma, Status } from '@prisma/client';
 import {
 	apiBadRequest,
+	apiConflict,
 	apiCreated,
 	apiResponse,
 	apiUnauthorized,
 	handleApiError,
 } from '@/app/api/_utils';
 import { z } from 'zod';
+
+const ACTIVE_CAMPAIGN_CAP = 5;
+const CAMPAIGN_CAP_REACHED_ERROR = 'CAMPAIGN_CAP_REACHED';
 
 const getCampaignContactsCount = async (campaignId: number) => {
 	return prisma.contact.count({
@@ -138,6 +142,19 @@ export async function POST(req: NextRequest) {
 			return apiBadRequest(validatedData.error);
 		}
 		const { contacts, contactLists, userContactLists, name } = validatedData.data;
+
+		const activeCount = await prisma.campaign.count({
+			where: { userId, status: Status.active },
+		});
+		if (activeCount >= ACTIVE_CAMPAIGN_CAP) {
+			return apiConflict({
+				error: CAMPAIGN_CAP_REACHED_ERROR,
+				message: `You have reached the maximum of ${ACTIVE_CAMPAIGN_CAP} active campaigns. Delete one to create a new one.`,
+				cap: ACTIVE_CAMPAIGN_CAP,
+				activeCount,
+			});
+		}
+
 		const uniqueName = await getUniqueCampaignName({ userId, desiredName: name });
 
 		const campaign = await prisma.campaign.create({

@@ -5,6 +5,21 @@ import { CampaignWithRelations, CustomMutationOptions } from '@/types';
 import { urls } from '@/constants/urls';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCreateUserContactList } from '@/hooks/queryHooks/useUserContactLists';
+
+export type CampaignApiErrorCode = 'CAMPAIGN_CAP_REACHED' | string;
+
+export class CampaignApiError extends Error {
+	code?: CampaignApiErrorCode;
+	status?: number;
+	constructor(message: string, code?: CampaignApiErrorCode, status?: number) {
+		super(message);
+		this.name = 'CampaignApiError';
+		this.code = code;
+		this.status = status;
+	}
+}
 
 const QUERY_KEYS = {
 	all: ['campaigns'] as const,
@@ -91,8 +106,14 @@ export const useCreateCampaign = (options: CustomMutationOptions = {}) => {
 		mutationFn: async (data: PostCampaignData) => {
 			const response = await _fetch(urls.api.campaigns.index, 'POST', data);
 			if (!response.ok) {
-				const errorData = await response.json();
-				throw new Error(errorData.error || 'Failed to create campaign');
+				const errorData = await response.json().catch(() => ({}));
+				const code =
+					typeof errorData?.error === 'string' ? errorData.error : undefined;
+				const message =
+					typeof errorData?.message === 'string'
+						? errorData.message
+						: code || 'Failed to create campaign';
+				throw new CampaignApiError(message, code, response.status);
 			}
 
 			return response.json();
@@ -148,6 +169,142 @@ export const useEditCampaign = (options: CustomMutationOptions = {}) => {
 			}
 		},
 	});
+};
+
+export const ACTIVE_CAMPAIGN_STORAGE_KEY = 'murmur_active_campaign_v1';
+
+type ActiveCampaignStorage = { v: 1; ts: number; id: number };
+
+const readActiveCampaignStorage = (): number | null => {
+	if (typeof window === 'undefined') return null;
+	try {
+		const raw = window.localStorage.getItem(ACTIVE_CAMPAIGN_STORAGE_KEY);
+		if (!raw) return null;
+		const parsed = JSON.parse(raw) as Partial<ActiveCampaignStorage>;
+		if (parsed?.v !== 1) return null;
+		if (typeof parsed.id !== 'number') return null;
+		return parsed.id;
+	} catch {
+		return null;
+	}
+};
+
+const writeActiveCampaignStorage = (id: number | null): void => {
+	if (typeof window === 'undefined') return;
+	try {
+		if (id == null) {
+			window.localStorage.removeItem(ACTIVE_CAMPAIGN_STORAGE_KEY);
+			return;
+		}
+		const payload: ActiveCampaignStorage = { v: 1, ts: Date.now(), id };
+		window.localStorage.setItem(
+			ACTIVE_CAMPAIGN_STORAGE_KEY,
+			JSON.stringify(payload)
+		);
+	} catch {
+		// Quota exceeded or storage disabled — non-fatal.
+	}
+};
+
+type CampaignListItem = { id: number; updatedAt: string | Date; name?: string };
+
+export interface UseActiveCampaignResult {
+	activeCampaignId: number | null;
+	activeCampaign: CampaignWithRelations | null;
+	isResolving: boolean;
+	setActiveCampaignId: (id: number | null) => void;
+}
+
+export const useActiveCampaign = (): UseActiveCampaignResult => {
+	const { data: campaigns, isLoading: isLoadingList } = useGetCampaigns();
+	const [storedId, setStoredId] = useState<number | null>(() =>
+		readActiveCampaignStorage()
+	);
+
+	const resolvedId = useMemo<number | null>(() => {
+		if (!campaigns) return storedId;
+		const list = campaigns as CampaignListItem[];
+		if (storedId && list.some((c) => c.id === storedId)) return storedId;
+		if (list.length === 0) return null;
+		const mostRecent = [...list].sort(
+			(a, b) =>
+				new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+		)[0];
+		return mostRecent?.id ?? null;
+	}, [campaigns, storedId]);
+
+	useEffect(() => {
+		if (resolvedId !== storedId) {
+			writeActiveCampaignStorage(resolvedId);
+			setStoredId(resolvedId);
+		}
+	}, [resolvedId, storedId]);
+
+	useEffect(() => {
+		if (typeof window === 'undefined') return;
+		const onStorage = (e: StorageEvent) => {
+			if (e.key !== ACTIVE_CAMPAIGN_STORAGE_KEY) return;
+			setStoredId(readActiveCampaignStorage());
+		};
+		window.addEventListener('storage', onStorage);
+		return () => window.removeEventListener('storage', onStorage);
+	}, []);
+
+	const setActiveCampaignId = useCallback((id: number | null) => {
+		writeActiveCampaignStorage(id);
+		setStoredId(id);
+	}, []);
+
+	const { data: activeCampaign } = useGetCampaign(
+		resolvedId != null ? String(resolvedId) : ''
+	);
+
+	const { mutateAsync: createUserContactList } = useCreateUserContactList({
+		suppressToasts: true,
+	});
+	const { mutateAsync: editCampaign } = useEditCampaign({ suppressToasts: true });
+	const backfillInFlightForId = useRef<number | null>(null);
+
+	useEffect(() => {
+		if (!activeCampaign) return;
+		if (activeCampaign.id !== resolvedId) return;
+		const ucls = activeCampaign.userContactLists ?? [];
+		if (ucls.length > 0) return;
+		if (backfillInFlightForId.current === activeCampaign.id) return;
+		backfillInFlightForId.current = activeCampaign.id;
+		(async () => {
+			try {
+				const newUcl = await createUserContactList({
+					name: activeCampaign.name,
+					contactIds: [],
+				});
+				await editCampaign({
+					id: activeCampaign.id,
+					data: {
+						userContactListOperation: {
+							action: 'connect',
+							userContactListIds: [newUcl.id],
+						},
+					},
+				});
+			} catch {
+				// Best-effort: a failed backfill leaves the campaign without a UCL,
+				// and the next add-contacts attempt will surface the existing
+				// "Campaign has no contact list" toast.
+			} finally {
+				backfillInFlightForId.current = null;
+			}
+		})();
+	}, [activeCampaign, resolvedId, createUserContactList, editCampaign]);
+
+	const isResolving = isLoadingList && resolvedId == null;
+
+	return {
+		activeCampaignId: resolvedId,
+		activeCampaign: activeCampaign ?? null,
+		isResolving,
+		setActiveCampaignId,
+	};
 };
 
 export const useDeleteCampaign = (options: CustomMutationOptions = {}) => {
