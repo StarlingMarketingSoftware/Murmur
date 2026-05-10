@@ -108,14 +108,6 @@ const IdentityDialog = nextDynamic(
 	{}
 );
 
-const CampaignRightPanel = nextDynamic(
-	() =>
-		import('@/components/organisms/CampaignRightPanel/CampaignRightPanel').then(
-			(mod) => mod.CampaignRightPanel
-		),
-	{}
-);
-
 // Dashboard inbox popover content (opened from the envelope icon in the campaign header)
 const DashboardInboxSection = nextDynamic(
 	() => import('@/components/molecules/InboxSection/InboxSection'),
@@ -1950,29 +1942,8 @@ const Murmur = () => {
 		};
 	}, []);
 
-	// Narrow desktop detection for Writing tab compact layout.
-	// Note: widened upper bound from 1280 -> 1317 so the left pinned panel never clips
-	// when campaign zoom / browser zoom reduces available space.
-	const [isNarrowDesktop, setIsNarrowDesktop] = useState(false);
 	// Narrowest desktop detection (< 952px) - header box above tabs
 	const [isNarrowestDesktop, setIsNarrowestDesktop] = useState(false);
-	// Hide right panel when arrows would overlap with it (below 1522px)
-	const [hideRightPanel, setHideRightPanel] = useState(false);
-	// Hide right panel on all tab at breakpoint (below 1665px)
-	const [hideRightPanelOnAll, setHideRightPanelOnAll] = useState(false);
-	// Hide right panel on inbox tab at breakpoint (below 1681px)
-	const [hideRightPanelOnInbox, setHideRightPanelOnInbox] = useState(false);
-	// Hide arrows when they would overlap with content boxes (below 1317px)
-	const [hideArrowsAtBreakpoint, setHideArrowsAtBreakpoint] = useState(false);
-	// Hide arrows on all tab at breakpoint (at or below 1396px)
-	const [hideArrowsOnAll, setHideArrowsOnAll] = useState(false);
-	// Hide arrows on inbox tab at breakpoint (below 1476px)
-	const [hideArrowsOnInbox, setHideArrowsOnInbox] = useState(false);
-	// Fixed nav arrow refs + overlap-driven hiding (prevents arrows from sitting on top of right SVG panel)
-	const leftFixedNavArrowButtonRef = useRef<HTMLButtonElement | null>(null);
-	const rightFixedNavArrowButtonRef = useRef<HTMLButtonElement | null>(null);
-	const [hideFixedNavArrowsBecauseOverlappingRightPanel, setHideFixedNavArrowsBecauseOverlappingRightPanel] =
-		useState(false);
 	useEffect(() => {
 		if (typeof window === 'undefined') return;
 		const checkBreakpoints = () => {
@@ -1989,14 +1960,7 @@ const Murmur = () => {
 						: DEFAULT_CAMPAIGN_ZOOM;
 			const effectiveWidth = window.innerWidth / (z || 1);
 
-			setIsNarrowDesktop(effectiveWidth >= 952 && effectiveWidth < 1317);
 			setIsNarrowestDesktop(effectiveWidth < 952);
-			setHideRightPanel(effectiveWidth < 1522);
-			setHideRightPanelOnAll(effectiveWidth <= 1665);
-			setHideRightPanelOnInbox(effectiveWidth < 1681);
-			setHideArrowsAtBreakpoint(effectiveWidth < 1317);
-			setHideArrowsOnAll(effectiveWidth <= 1396);
-			setHideArrowsOnInbox(effectiveWidth < 1476);
 		};
 		checkBreakpoints();
 		window.addEventListener('resize', checkBreakpoints);
@@ -2025,155 +1989,7 @@ const Murmur = () => {
 	const headerToListNames = campaign?.userContactLists?.map((list) => list.name).join(', ') || '';
 	const headerFromName = campaign?.identity?.name || '';
 
-	// Hide fixed arrows when in narrow desktop + testing view (arrows show next to draft button instead)
-	// or when width < 1317px to prevent overlap with content boxes
-	// or when on all tab and width <= 1396px
-	// or when on inbox/sent tab and width < 1476px
-	const baseHideFixedArrows =
-		(activeView === 'testing' && isNarrowDesktop) ||
-		hideArrowsAtBreakpoint ||
-		(activeView === 'all' && hideArrowsOnAll) ||
-		((activeView === 'inbox' || activeView === 'sent') && hideArrowsOnInbox);
-	
-	const isRightPanelRendered =
-		!isMobile &&
-		!hideRightPanel &&
-		!(activeView === 'all' && hideRightPanelOnAll) &&
-		!(activeView === 'inbox' && hideRightPanelOnInbox);
-	
-	const getIsFixedNavArrowsOverlappingRightPanel = useCallback(() => {
-		if (typeof document === 'undefined') return { overlapping: false, panelFound: false };
-		if (!isRightPanelRendered) return { overlapping: false, panelFound: false };
-		
-		const panelEl = document.querySelector('[data-slot="campaign-right-panel"]') as HTMLElement | null;
-		if (!panelEl) return { overlapping: false, panelFound: false };
-		
-		const leftEl = leftFixedNavArrowButtonRef.current;
-		const rightEl = rightFixedNavArrowButtonRef.current;
-		if (!leftEl || !rightEl) return { overlapping: false, panelFound: true };
-		
-		// Treat "near touch" as overlap so we never visually collide.
-		const paddingPx = 12;
-		const panelRect = panelEl.getBoundingClientRect();
-		
-		const overlaps = (a: DOMRect, b: DOMRect) =>
-			a.left < b.right + paddingPx &&
-			a.right > b.left - paddingPx &&
-			a.top < b.bottom + paddingPx &&
-			a.bottom > b.top - paddingPx;
-		
-		const isOverlapping =
-			overlaps(panelRect, leftEl.getBoundingClientRect()) ||
-			overlaps(panelRect, rightEl.getBoundingClientRect());
-		
-		return { overlapping: isOverlapping, panelFound: true };
-	}, [isRightPanelRendered]);
-	
-	useLayoutEffect(() => {
-		if (typeof window === 'undefined') return;
-		
-		let raf = 0;
-		let retryInterval: number | null = null;
-		let observedPanelEl: HTMLElement | null = null;
-		let mutationObserver: MutationObserver | null = null;
-		let resizeObserver: ResizeObserver | null = null;
-
-		const disconnectObservers = () => {
-			if (mutationObserver) mutationObserver.disconnect();
-			mutationObserver = null;
-			if (resizeObserver) resizeObserver.disconnect();
-			resizeObserver = null;
-			observedPanelEl = null;
-		};
-		
-		// Schedule a single overlap check on the next animation frame.
-		// This lets us coalesce repeated layout/transform changes (GSAP updates) into a single measurement per frame.
-		function schedule() {
-			window.cancelAnimationFrame(raf);
-			raf = window.requestAnimationFrame(run);
-		}
-
-		// Attach observers to the right panel so we react to GSAP transforms, class changes, and resizes.
-		// This is the key to making the chevron hiding logic work across all screen sizes and during transitions.
-		function ensurePanelObservers() {
-			if (!isRightPanelRendered) {
-				disconnectObservers();
-				return;
-			}
-
-			const panelEl = document.querySelector(
-				'[data-slot="campaign-right-panel"]'
-			) as HTMLElement | null;
-			if (!panelEl) return;
-			if (panelEl === observedPanelEl) return;
-
-			disconnectObservers();
-			observedPanelEl = panelEl;
-
-			// GSAP updates transforms via inline style; observe style/class to catch motion and layout shifts.
-			mutationObserver = new MutationObserver(() => schedule());
-			mutationObserver.observe(panelEl, {
-				attributes: true,
-				attributeFilter: ['style', 'class'],
-			});
-
-			// ResizeObserver catches cases where the panel's box changes (e.g. font load/layout shift).
-			if (typeof ResizeObserver !== 'undefined') {
-				resizeObserver = new ResizeObserver(() => schedule());
-				resizeObserver.observe(panelEl);
-			}
-		}
-
-		function run() {
-			ensurePanelObservers();
-			const { overlapping, panelFound } = getIsFixedNavArrowsOverlappingRightPanel();
-			setHideFixedNavArrowsBecauseOverlappingRightPanel(overlapping);
-			
-			// `CampaignRightPanel` is dynamically imported; on first paint the DOM node can be missing.
-			// If we're supposed to render it, retry briefly so the arrows hide as soon as it mounts.
-			if (isRightPanelRendered && !panelFound && retryInterval == null) {
-				let attempts = 0;
-				retryInterval = window.setInterval(() => {
-					attempts += 1;
-					const { overlapping, panelFound } = getIsFixedNavArrowsOverlappingRightPanel();
-					setHideFixedNavArrowsBecauseOverlappingRightPanel(overlapping);
-					// If the panel appears during retries, attach observers immediately so we track its animations.
-					if (panelFound) ensurePanelObservers();
-					
-					if (panelFound || !isRightPanelRendered || attempts >= 20) {
-						if (retryInterval != null) window.clearInterval(retryInterval);
-						retryInterval = null;
-					}
-				}, 100);
-			}
-			
-			if (!isRightPanelRendered && retryInterval != null) {
-				window.clearInterval(retryInterval);
-				retryInterval = null;
-			}
-		}
-		
-		schedule();
-		window.addEventListener('resize', schedule);
-		window.addEventListener(CAMPAIGN_ZOOM_EVENT, schedule as EventListener);
-		
-		return () => {
-			window.cancelAnimationFrame(raf);
-			window.removeEventListener('resize', schedule);
-			window.removeEventListener(CAMPAIGN_ZOOM_EVENT, schedule as EventListener);
-			if (retryInterval != null) window.clearInterval(retryInterval);
-			disconnectObservers();
-		};
-	}, [activeView, getIsFixedNavArrowsOverlappingRightPanel, isRightPanelRendered]);
-
 	const usePersistentCampaignMapBackground = !isMobile;
-
-	// If the right SVG panel is hidden (breakpoint/mobile), don't let the fixed chevrons reappear.
-	const hideFixedArrows =
-		baseHideFixedArrows ||
-		hideFixedNavArrowsBecauseOverlappingRightPanel ||
-		!isRightPanelRendered ||
-		usePersistentCampaignMapBackground;
 
 	// Tab navigation order (excludes 'all' tab from arrow navigation)
 	const tabOrder: ViewType[] = [
@@ -2353,14 +2169,11 @@ const Murmur = () => {
 	// Notes:
 	// - The campaign header row is a fixed 50px tall.
 	// - DraftingSection contains a small 4px spacer div at the very top (mb-[4px]).
-	// - The default content spacing below the header is mt-6 (24px).
 	const WRITING_BOX_TOP_PX = 159;
 	const CAMPAIGN_HEADER_HEIGHT_PX = 50;
 	const DRAFTING_SECTION_TOP_SPACER_PX = 4;
-	const DEFAULT_CONTENT_TOP_MARGIN_PX = 24;
 	const writingContentTopMarginPx =
 		WRITING_BOX_TOP_PX - CAMPAIGN_HEADER_HEIGHT_PX - DRAFTING_SECTION_TOP_SPACER_PX; // 105px
-	const writingTabShiftPx = writingContentTopMarginPx - DEFAULT_CONTENT_TOP_MARGIN_PX; // 81px
 	const shouldApplyWritingTopShift =
 		(activeView === 'testing' ||
 			activeView === 'contacts' ||
@@ -2370,7 +2183,6 @@ const Murmur = () => {
 			activeView === 'all') &&
 		!isMobile &&
 		!isNarrowestDesktop;
-	const fixedNavArrowsTopPx = 355 + (shouldApplyWritingTopShift ? writingTabShiftPx : 0);
 	return (
 		<CampaignDeviceProvider isMobile={isMobile} activeView={activeView}>
 			<HoverDescriptionProvider enabled={selectedRightBoxIcon === 'info'}>
@@ -2384,46 +2196,6 @@ const Murmur = () => {
 					{usePersistentCampaignMapBackground && (
 						<div className="campaign-map-split-overlay" aria-hidden="true" />
 					)}
-			{/* Left navigation arrow - absolute position (hidden in narrow desktop + testing) */}
-				<button
-					ref={leftFixedNavArrowButtonRef}
-					type="button"
-					onClick={goToPreviousTab}
-					className={cn(
-						"absolute z-50 bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity",
-						hideFixedArrows && "opacity-0 pointer-events-none"
-					)}
-					style={{
-						left: '33px',
-						top: `${fixedNavArrowsTopPx}px`,
-					}}
-					aria-label="Previous tab"
-					aria-hidden={hideFixedArrows}
-					tabIndex={hideFixedArrows ? -1 : 0}
-				>
-					<LeftArrow />
-				</button>
-
-			{/* Right navigation arrow - absolute position (hidden in narrow desktop + testing) */}
-				<button
-					ref={rightFixedNavArrowButtonRef}
-					type="button"
-					onClick={goToNextTab}
-					className={cn(
-						"absolute z-50 bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity",
-						hideFixedArrows && "opacity-0 pointer-events-none"
-					)}
-					style={{
-						right: '33px',
-						top: `${fixedNavArrowsTopPx}px`,
-					}}
-					aria-label="Next tab"
-					aria-hidden={hideFixedArrows}
-					tabIndex={hideFixedArrows ? -1 : 0}
-				>
-					<RightArrow />
-				</button>
-
 			{/* Desktop top box (477 x 42, 1px stroke #929292, 10px radius) */}
 			{!isMobile && !isNarrowestDesktop && (
 				<div
@@ -3583,23 +3355,6 @@ const Murmur = () => {
 					`}</style>
 				</div>
 			</div>
-
-			{/* Right side panel - hidden on mobile, when width < 1522px, on all tab when width <= 1665px, or on inbox tab when width < 1681px */}
-			{!isMobile && !hideRightPanel && !(activeView === 'all' && hideRightPanelOnAll) && !(activeView === 'inbox' && hideRightPanelOnInbox) && (
-				<CampaignRightPanel
-					view={activeView}
-					activeTab={activeView === 'inbox' ? (inboxSentTab === 'sent' ? 'sent' : 'inbox') : undefined}
-					onTabChange={(tab) => {
-						// If the user explicitly clicks the Inbox icon, force the Inbox sub-tab.
-						// (Otherwise InboxSection can auto-default to "Sent" when there are no inbound replies yet.)
-						if (tab === 'inbox') requestInboxSentTab('inbox');
-						setActiveView(tab);
-					}}
-					transitionDurationMs={TRANSITION_DURATION}
-					isViewTransitionFading={isFadingOutPreviousView}
-					className={shouldApplyWritingTopShift ? 'translate-y-[81px]' : undefined}
-				/>
-			)}
 
 			{/* Mobile bottom navigation panel */}
 			{isMobile && (
