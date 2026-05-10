@@ -2165,10 +2165,15 @@ const Murmur = () => {
 			disconnectObservers();
 		};
 	}, [activeView, getIsFixedNavArrowsOverlappingRightPanel, isRightPanelRendered]);
-	
+
+	const usePersistentCampaignMapBackground = !isMobile;
+
 	// If the right SVG panel is hidden (breakpoint/mobile), don't let the fixed chevrons reappear.
 	const hideFixedArrows =
-		baseHideFixedArrows || hideFixedNavArrowsBecauseOverlappingRightPanel || !isRightPanelRendered;
+		baseHideFixedArrows ||
+		hideFixedNavArrowsBecauseOverlappingRightPanel ||
+		!isRightPanelRendered ||
+		usePersistentCampaignMapBackground;
 
 	// Tab navigation order (excludes 'all' tab from arrow navigation)
 	const tabOrder: ViewType[] = [
@@ -2370,7 +2375,15 @@ const Murmur = () => {
 		<CampaignDeviceProvider isMobile={isMobile} activeView={activeView}>
 			<HoverDescriptionProvider enabled={selectedRightBoxIcon === 'info'}>
 				<CampaignTopSearchHighlightProvider value={topSearchHighlightCtx}>
-				<div className="min-h-screen relative">
+				<div
+					className={cn(
+						'min-h-screen relative',
+						usePersistentCampaignMapBackground && 'campaign-persistent-map-page'
+					)}
+				>
+					{usePersistentCampaignMapBackground && (
+						<div className="campaign-map-split-overlay" aria-hidden="true" />
+					)}
 			{/* Left navigation arrow - absolute position (hidden in narrow desktop + testing) */}
 				<button
 					ref={leftFixedNavArrowButtonRef}
@@ -3102,6 +3115,32 @@ const Murmur = () => {
 					</div>
 				{/* Crossfade transition animations and mobile-specific styles */}
 					<style jsx global>{`
+						.campaign-persistent-map-page {
+							isolation: isolate;
+							background: transparent;
+						}
+
+						.campaign-map-split-overlay {
+							position: fixed;
+							inset: 0;
+							z-index: 0;
+							pointer-events: none;
+							background: linear-gradient(
+								to right,
+								rgba(136, 136, 136, 0) 0%,
+								rgba(136, 136, 136, 0) 43%,
+								rgba(136, 136, 136, 0.1) 43%,
+								rgba(136, 136, 136, 0.1) 100%
+							);
+						}
+
+						.campaign-persistent-map-page [data-slot='campaign-top-box-wrapper'],
+						.campaign-persistent-map-page [data-slot='campaign-header'],
+						.campaign-persistent-map-page [data-slot='campaign-content'] {
+							transform: translateX(88px) scale(0.94);
+							transform-origin: top center;
+						}
+
 						/* View transition animations - smooth, clean crossfade */
 						@keyframes viewFadeIn {
 							0% {

@@ -497,7 +497,7 @@ export {
 	DASHBOARD_TO_INTERACTIVE_TRANSITION_MS,
 } from './constants';
 
-interface SearchResultsMapProps {
+export interface SearchResultsMapProps {
 	contacts: ContactWithName[];
 	selectedContacts: number[];
 	/** When set, highlights the corresponding marker as hovered (e.g. hovering a row in the map results panel). */

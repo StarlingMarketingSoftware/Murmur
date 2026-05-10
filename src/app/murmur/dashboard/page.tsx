@@ -88,7 +88,12 @@ import { stateBadgeColorMap } from '@/constants/ui';
 import SearchResultsMap, {
 	DASHBOARD_TO_INTERACTIVE_TRANSITION_CSS_EASING,
 	DASHBOARD_TO_INTERACTIVE_TRANSITION_MS,
+	type SearchResultsMapProps,
 } from '@/components/molecules/SearchResultsMap/SearchResultsMap';
+import {
+	type PersistentDashboardMapConfig,
+	usePersistentMapSetter,
+} from '@/contexts/PersistentMapContext';
 import { useGlobeWeatherMood } from '@/hooks/useGlobeWeatherMood';
 import { useGlobeNightLighting } from '@/hooks/useGlobeNightLighting';
 import { ContactWithName } from '@/types/contact';
@@ -1579,6 +1584,7 @@ const DashboardContent = () => {
 	const { data: campaigns } = useGetCampaigns();
 	const hasCampaigns = campaigns && campaigns.length > 0;
 	const queryClient = useQueryClient();
+	const setPersistentMapConfig = usePersistentMapSetter();
 	const {
 		mood: globeWeatherMood,
 		temperatureF: globeWeatherTemperatureF,
@@ -5662,105 +5668,93 @@ const DashboardContent = () => {
 		]
 	);
 
-	const mapPortal =
-		typeof window !== 'undefined'
-			? createPortal(
-					<div
-						className="dashboard-globe-bg"
-						style={{
-							position: 'fixed',
-							inset: 0,
-							// Important: this portal is appended to <body>, so with zIndex 0 it can paint
-							// above the dashboard content. Keep it behind the normal dashboard UI, and
-							// raise it only when entering fullscreen map view.
-							zIndex: isMapView ? 98 : -1,
-							pointerEvents: isMapView ? 'auto' : 'none',
-						}}
-					>
-					<div
-						style={{
-							width: '100%',
-							height: '100%',
-							position: 'relative',
-						}}
-					>
-						{/* Map viewport (clipped; animates insets without resizing the map container) */}
-						<div
-							style={{
-								width: '100%',
-								height: '100%',
-								WebkitClipPath: mapViewClip,
-								clipPath: mapViewClip,
-								transition: `-webkit-clip-path ${mapViewFrameTransition}, clip-path ${mapViewFrameTransition}`,
-								willChange: 'clip-path',
-								overflow: 'hidden',
-							}}
-						>
-							<SearchResultsMap
-								weatherMood={globeWeatherMood}
-								weatherRegionCenter={globeWeatherRegionCenter}
-								weatherTemperatureF={globeWeatherTemperatureF}
-								nightLighting={globeNightLighting}
-								presentation={mapPresentation}
-								autoSpin={shouldSpinBackgroundMap}
-								contacts={contactsForMap}
-								selectedContacts={selectedContacts}
-								externallyHoveredContactId={hoveredMapPanelContactId}
-								searchQuery={activeSearchQuery}
-								searchWhat={searchWhatForMap}
-								disableDotWaveReveal={isMapView}
-								selectAllInViewNonce={isMapView ? selectAllInViewNonce : undefined}
-								onVisibleOverlayContactsChange={
-									isMapView ? handleMapVisibleOverlayContactsChange : undefined
-								}
-								activeTool={isMapView ? activeMapTool : undefined}
-								requestedZoom={isMapView ? mapZoomControlRequest : null}
-								selectedAreaBounds={selectedAreaBoundsForMap}
-								onViewportInteraction={isMapView ? handleMapViewportInteraction : undefined}
-								onViewportZoom={isMapView ? handleMapViewportZoom : undefined}
-								onViewportIdle={isMapView ? handleMapViewportIdle : undefined}
-								onAreaSelect={isMapView ? handleMapAreaSelect : undefined}
-								onMarkerHover={isMapView ? handleMapMarkerHover : undefined}
-								lockedStateName={lockedStateNameForMap}
-								skipAutoFit={skipAutoFitForMap}
-								enableStateInteractions={shouldEnableMapStateCategorySelection}
-								onStateSelect={
-									shouldEnableMapStateCategorySelection
-										? handleMapStateSelect
-										: undefined
-								}
-								isLoading={isSearchPending || isLoadingContacts || isRefetchingContacts}
-								onMarkerClick={isMapView ? handleMapMarkerClick : undefined}
-								onToggleSelection={isMapView ? handleMapToggleSelection : undefined}
-							/>
-						</div>
+	const persistentMapProps = useMemo<SearchResultsMapProps>(
+		() => ({
+			weatherMood: globeWeatherMood,
+			weatherRegionCenter: globeWeatherRegionCenter,
+			weatherTemperatureF: globeWeatherTemperatureF,
+			nightLighting: globeNightLighting,
+			presentation: mapPresentation,
+			autoSpin: shouldSpinBackgroundMap,
+			contacts: contactsForMap,
+			selectedContacts,
+			externallyHoveredContactId: hoveredMapPanelContactId,
+			searchQuery: activeSearchQuery,
+			searchWhat: searchWhatForMap,
+			disableDotWaveReveal: isMapView,
+			selectAllInViewNonce: isMapView ? selectAllInViewNonce : undefined,
+			onVisibleOverlayContactsChange: isMapView
+				? handleMapVisibleOverlayContactsChange
+				: undefined,
+			activeTool: isMapView ? activeMapTool : undefined,
+			requestedZoom: isMapView ? mapZoomControlRequest : null,
+			selectedAreaBounds: selectedAreaBoundsForMap,
+			onViewportInteraction: isMapView ? handleMapViewportInteraction : undefined,
+			onViewportZoom: isMapView ? handleMapViewportZoom : undefined,
+			onViewportIdle: isMapView ? handleMapViewportIdle : undefined,
+			onAreaSelect: isMapView ? handleMapAreaSelect : undefined,
+			onMarkerHover: isMapView ? handleMapMarkerHover : undefined,
+			lockedStateName: lockedStateNameForMap,
+			skipAutoFit: skipAutoFitForMap,
+			enableStateInteractions: shouldEnableMapStateCategorySelection,
+			onStateSelect: shouldEnableMapStateCategorySelection ? handleMapStateSelect : undefined,
+			isLoading: isSearchPending || isLoadingContacts || isRefetchingContacts,
+			onMarkerClick: isMapView ? handleMapMarkerClick : undefined,
+			onToggleSelection: isMapView ? handleMapToggleSelection : undefined,
+		}),
+		[
+			activeMapTool,
+			activeSearchQuery,
+			contactsForMap,
+			globeNightLighting,
+			globeWeatherMood,
+			globeWeatherRegionCenter,
+			globeWeatherTemperatureF,
+			handleMapAreaSelect,
+			handleMapMarkerClick,
+			handleMapMarkerHover,
+			handleMapStateSelect,
+			handleMapToggleSelection,
+			handleMapViewportIdle,
+			handleMapViewportInteraction,
+			handleMapViewportZoom,
+			handleMapVisibleOverlayContactsChange,
+			hoveredMapPanelContactId,
+			isLoadingContacts,
+			isMapView,
+			isRefetchingContacts,
+			isSearchPending,
+			lockedStateNameForMap,
+			mapPresentation,
+			mapZoomControlRequest,
+			searchWhatForMap,
+			selectedAreaBoundsForMap,
+			selectedContacts,
+			selectAllInViewNonce,
+			shouldEnableMapStateCategorySelection,
+			shouldSpinBackgroundMap,
+			skipAutoFitForMap,
+		]
+	);
 
-						{/* Decorative frame (slides in; does not affect map layout) */}
-						<div
-							aria-hidden="true"
-							style={{
-								position: 'absolute',
-								top: isMapView ? MAP_VIEW_FRAME_INSET_PX : 0,
-								left: isMapView ? MAP_VIEW_FRAME_INSET_PX : 0,
-								right: isMapView ? MAP_VIEW_FRAME_INSET_PX : 0,
-								bottom: isMapView ? MAP_VIEW_FRAME_INSET_PX : 0,
-								// Animate radius + width together so the inner edge stays perfectly aligned
-								// with the clipped map viewport throughout the transition.
-								borderRadius: isMapView ? MAP_VIEW_FRAME_RADIUS_PX : 0,
-								borderStyle: 'solid',
-								borderColor: '#143883',
-								borderWidth: isMapView ? MAP_VIEW_FRAME_BORDER_PX : 0,
-								boxSizing: 'border-box',
-								pointerEvents: 'none',
-								transition: `top ${mapViewFrameTransition}, left ${mapViewFrameTransition}, right ${mapViewFrameTransition}, bottom ${mapViewFrameTransition}, border-radius ${mapViewFrameTransition}, border-width ${mapViewFrameTransition}`,
-								willChange: 'top, left, right, bottom, border-radius, border-width',
-							}}
-						/>
-						</div>
-					</div>,
-					document.body
-			  )
-			: null;
+	const persistentMapConfig = useMemo<PersistentDashboardMapConfig>(
+		() => ({
+			isMapView,
+			mapViewClip,
+			mapViewFrameTransition,
+			mapViewFrameInsetPx: MAP_VIEW_FRAME_INSET_PX,
+			mapViewFrameRadiusPx: MAP_VIEW_FRAME_RADIUS_PX,
+			mapViewFrameBorderPx: MAP_VIEW_FRAME_BORDER_PX,
+			mapProps: persistentMapProps,
+		}),
+		[isMapView, mapViewClip, mapViewFrameTransition, persistentMapProps]
+	);
+
+	useLayoutEffect(() => {
+		setPersistentMapConfig(persistentMapConfig);
+	}, [persistentMapConfig, setPersistentMapConfig]);
+
+	const mapPortal = null;
 
 	// Return null during initial load to prevent hydration mismatch
 	if (isMobile === null) {
