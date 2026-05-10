@@ -12,7 +12,6 @@ import type {
 import { CampaignPageSkeleton } from '@/components/molecules/CampaignPageSkeleton/CampaignPageSkeleton';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { urls } from '@/constants/urls';
-import Link from 'next/link';
 import { cn } from '@/utils';
 import { isSafariBrowser } from '@/utils/browserDetection';
 import { useIsMobile } from '@/hooks/useIsMobile';
@@ -45,6 +44,18 @@ type ViewType = 'contacts' | 'testing' | 'drafting' | 'sent' | 'inbox' | 'all';
 const TRANSITION_DURATION = 180;
 // Safety valve: if a destination view is unusually slow to paint, don't block the transition forever.
 const MAX_TRANSITION_WAIT_MS = 650;
+
+const CAMPAIGN_MAP_SHIFT_X_VAR = '--murmur-campaign-map-shift-x';
+const CAMPAIGN_MAP_BACKDROP_START_VAR = '--murmur-campaign-map-backdrop-start';
+const CAMPAIGN_MAP_CONTENT_SCALE = 0.94;
+const CAMPAIGN_MAP_FALLBACK_SHIFT_X_PX = 160;
+const CAMPAIGN_MAP_MIN_SHIFT_X_PX = 88;
+const CAMPAIGN_MAP_MAX_SHIFT_X_PX = 900;
+const CAMPAIGN_STANDARD_RESEARCH_RIGHT_FROM_CENTER_PX = 657;
+const CAMPAIGN_STANDARD_LEFT_PANEL_LEFT_FROM_CENTER_PX = -657;
+const CAMPAIGN_RESEARCH_RIGHT_GAP_PX = 52;
+const CAMPAIGN_BACKDROP_CONTENT_GUTTER_PX = 52;
+const CAMPAIGN_BACKDROP_TARGET_START_RATIO = 1 / 3;
 
 const SIXTEEN_BY_TEN_ZOOM_MATCH_TOLERANCE_PX = 50;
 	
@@ -448,6 +459,8 @@ const Murmur = () => {
 			html.classList.remove(CAMPAIGN_COMPACT_CLASS);
 			html.classList.remove(CAMPAIGN_FORCE_TRANSFORM_CLASS);
 			html.style.removeProperty(CAMPAIGN_ZOOM_VAR);
+			html.style.removeProperty(CAMPAIGN_MAP_SHIFT_X_VAR);
+			html.style.removeProperty(CAMPAIGN_MAP_BACKDROP_START_VAR);
 			// Clear any inline scroll locks that could prevent scrolling (defensive).
 			try {
 				document.body.style.overflow = '';
@@ -471,6 +484,8 @@ const Murmur = () => {
 			html.classList.remove(CAMPAIGN_COMPACT_CLASS);
 			html.classList.remove(CAMPAIGN_FORCE_TRANSFORM_CLASS);
 			html.style.removeProperty(CAMPAIGN_ZOOM_VAR);
+			html.style.removeProperty(CAMPAIGN_MAP_SHIFT_X_VAR);
+			html.style.removeProperty(CAMPAIGN_MAP_BACKDROP_START_VAR);
 			return;
 		}
 
@@ -766,6 +781,39 @@ const Murmur = () => {
 			// no-op
 		}
 
+		const campaignZoom = targetZoom > 0 ? targetZoom : DEFAULT_CAMPAIGN_ZOOM;
+		const layoutViewportW = viewportW / campaignZoom;
+		const targetResearchRightCss =
+			(viewportW - CAMPAIGN_RESEARCH_RIGHT_GAP_PX) / campaignZoom;
+		const calculatedShiftX =
+			targetResearchRightCss -
+			layoutViewportW / 2 -
+			CAMPAIGN_MAP_CONTENT_SCALE * CAMPAIGN_STANDARD_RESEARCH_RIGHT_FROM_CENTER_PX;
+		const campaignMapShiftX = clampZoom(
+			calculatedShiftX,
+			CAMPAIGN_MAP_MIN_SHIFT_X_PX,
+			CAMPAIGN_MAP_MAX_SHIFT_X_PX
+		);
+		const leftContentClusterLeftCss =
+			layoutViewportW / 2 +
+			CAMPAIGN_MAP_CONTENT_SCALE * CAMPAIGN_STANDARD_LEFT_PANEL_LEFT_FROM_CENTER_PX +
+			campaignMapShiftX;
+		const contentAlignedBackdropStartCss =
+			leftContentClusterLeftCss - CAMPAIGN_BACKDROP_CONTENT_GUTTER_PX / campaignZoom;
+		const twoThirdsBackdropStartCss =
+			layoutViewportW * CAMPAIGN_BACKDROP_TARGET_START_RATIO;
+		const campaignBackdropStartCss = clampZoom(
+			Math.min(contentAlignedBackdropStartCss, twoThirdsBackdropStartCss),
+			0,
+			layoutViewportW
+		);
+
+		html.style.setProperty(CAMPAIGN_MAP_SHIFT_X_VAR, `${campaignMapShiftX.toFixed(2)}px`);
+		html.style.setProperty(
+			CAMPAIGN_MAP_BACKDROP_START_VAR,
+			`${campaignBackdropStartCss.toFixed(2)}px`
+		);
+
 		const existingOverrideStr = html.style.getPropertyValue(CAMPAIGN_ZOOM_VAR);
 		const existingOverride = existingOverrideStr ? parseFloat(existingOverrideStr) : NaN;
 		const existingZoom =
@@ -903,6 +951,8 @@ const Murmur = () => {
 		// Defensive: clear any stale campaign zoom (e.g. Safari BFCache restores).
 		try {
 			document.documentElement.style.removeProperty(CAMPAIGN_ZOOM_VAR);
+			document.documentElement.style.removeProperty(CAMPAIGN_MAP_SHIFT_X_VAR);
+			document.documentElement.style.removeProperty(CAMPAIGN_MAP_BACKDROP_START_VAR);
 		} catch {
 			// ignore
 		}
@@ -971,6 +1021,8 @@ const Murmur = () => {
 			document.documentElement.classList.remove(CAMPAIGN_SCROLLABLE_CLASS);
 			document.documentElement.classList.remove(CAMPAIGN_FORCE_TRANSFORM_CLASS);
 			document.documentElement.style.removeProperty(CAMPAIGN_ZOOM_VAR);
+			document.documentElement.style.removeProperty(CAMPAIGN_MAP_SHIFT_X_VAR);
+			document.documentElement.style.removeProperty(CAMPAIGN_MAP_BACKDROP_START_VAR);
 			if (scheduledRaf !== null) window.cancelAnimationFrame(scheduledRaf);
 			io?.disconnect();
 			mo?.disconnect();
@@ -2391,46 +2443,9 @@ const Murmur = () => {
 				</div>
 			)}
 
-			{/* Header row with Back to Home link, centered tabs, and Clerk icon (from layout) */}
+			{/* Header row with centered tabs and Clerk icon (from layout) */}
 			<div data-slot="campaign-header">
 				<div className="relative h-[50px] flex items-center justify-center">
-					{/* Back to Home link - left side */}
-					<Link
-						href={urls.murmur.dashboard.index}
-						prefetch
-						className={cn(
-							'absolute left-8 flex items-center text-[15px] font-inter font-normal no-underline hover:no-underline z-[100] group text-[#060606] hover:text-gray-500',
-							isMobile && 'hidden'
-						)}
-						title="Back to Home"
-						onClick={(e) => {
-							e.preventDefault();
-							if (typeof window !== 'undefined') {
-								window.location.assign(urls.murmur.dashboard.index);
-							}
-						}}
-						style={{
-							gap: '20px',
-							fontWeight: 400,
-							transform: 'translateY(13px)',
-						}}
-					>
-						<svg
-							width="16"
-							height="10"
-							viewBox="0 0 27 16"
-							fill="none"
-							xmlns="http://www.w3.org/2000/svg"
-							className="inline-block align-middle"
-						>
-							<path
-								d="M0.292892 7.29289C-0.0976315 7.68342 -0.0976315 8.31658 0.292892 8.70711L6.65685 15.0711C7.04738 15.4616 7.68054 15.4616 8.07107 15.0711C8.46159 14.6805 8.46159 14.0474 8.07107 13.6569L2.41421 8L8.07107 2.34315C8.46159 1.95262 8.46159 1.31946 8.07107 0.928932C7.68054 0.538408 7.04738 0.538408 6.65685 0.928932L0.292892 7.29289ZM27 8V7L1 7V8V9L27 9V8Z"
-								fill="currentColor"
-							/>
-						</svg>
-						<span>Back to Home</span>
-					</Link>
-
 					{/* View tabs - centered in header (hidden at narrowest breakpoint and on mobile) */}
 					<div
 						className={cn(
@@ -2900,8 +2915,10 @@ const Murmur = () => {
 							background: linear-gradient(
 								to right,
 								rgba(136, 136, 136, 0) 0%,
-								rgba(136, 136, 136, 0) 43%,
-								rgba(136, 136, 136, 0.1) 43%,
+								rgba(136, 136, 136, 0)
+									var(${CAMPAIGN_MAP_BACKDROP_START_VAR}, 33.333%),
+								rgba(136, 136, 136, 0.1)
+									var(${CAMPAIGN_MAP_BACKDROP_START_VAR}, 33.333%),
 								rgba(136, 136, 136, 0.1) 100%
 							);
 						}
@@ -2909,7 +2926,10 @@ const Murmur = () => {
 						.campaign-persistent-map-page [data-slot='campaign-top-box-wrapper'],
 						.campaign-persistent-map-page [data-slot='campaign-header'],
 						.campaign-persistent-map-page [data-slot='campaign-content'] {
-							transform: translateX(88px) scale(0.94);
+							transform: translateX(
+									var(${CAMPAIGN_MAP_SHIFT_X_VAR}, ${CAMPAIGN_MAP_FALLBACK_SHIFT_X_PX}px)
+								)
+								scale(${CAMPAIGN_MAP_CONTENT_SCALE});
 							transform-origin: top center;
 						}
 
