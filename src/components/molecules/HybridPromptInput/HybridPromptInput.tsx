@@ -3028,7 +3028,9 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 	// Reset hybrid-only UI when switching modes
 	useEffect(() => {
 		if (selectedModeKey !== 'hybrid') {
-			setHybridStructureSelection({ kind: 'none' });
+			setHybridStructureSelection((prev) =>
+				prev.kind === 'none' ? prev : { kind: 'none' }
+			);
 			setExpandedHybridTextBlockId(null);
 			setExpandedHybridCoreBlockId(null);
 			closeHybridBookingForDropdown();
@@ -3692,19 +3694,41 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 		bandName?: string | null;
 		bio?: string | null;
 	};
+	type ProfileFieldsSnapshot = {
+		name: string;
+		genre: string;
+		area: string;
+		band: string;
+		bio: string;
+		links: string;
+	};
 	const identityProfile = identity as IdentityProfileFields | null | undefined;
+	const getProfileFieldsFromIdentity = (
+		profile: IdentityProfileFields | null | undefined
+	): ProfileFieldsSnapshot => ({
+		name: profile?.name || '',
+		genre: profile?.genre || '',
+		area: profile?.area || '',
+		band: profile?.bandName || '',
+		bio: profile?.bio || '',
+		links: profile?.website || '',
+	});
+	const areProfileFieldsEqual = (
+		a: ProfileFieldsSnapshot,
+		b: ProfileFieldsSnapshot
+	) =>
+		a.name === b.name &&
+		a.genre === b.genre &&
+		a.area === b.area &&
+		a.band === b.band &&
+		a.bio === b.bio &&
+		a.links === b.links;
 
 	// Profile field values - initialized from identity
-	const [profileFields, setProfileFields] = useState({
-		name: identityProfile?.name || '',
-		genre: identityProfile?.genre || '',
-		area: identityProfile?.area || '',
-		band: identityProfile?.bandName || '',
-		bio: identityProfile?.bio || '',
-		links: identityProfile?.website || '',
-	});
+	const [profileFields, setProfileFields] = useState<ProfileFieldsSnapshot>(() =>
+		getProfileFieldsFromIdentity(identityProfile)
+	);
 
-	type ProfileFieldsSnapshot = Record<ProfileField, string>;
 	type ProfileUndoSnapshot = { fields: ProfileFieldsSnapshot; hasLeftProfileTab: boolean };
 
 	// Profile undo should be "commit-based" (blur/enter/toggle/clear-all), not per-keystroke.
@@ -3727,19 +3751,20 @@ export const HybridPromptInput: FC<HybridPromptInputProps> = (props) => {
 
 	// Sync profileFields when identity changes
 	useEffect(() => {
-		if (identityProfile) {
-			const nextProfileFields = {
-				name: identityProfile.name || '',
-				genre: identityProfile.genre || '',
-				area: identityProfile.area || '',
-				band: identityProfile.bandName || '',
-				bio: identityProfile.bio || '',
-				links: identityProfile.website || '',
-			};
-			setProfileFields(nextProfileFields);
-			profileCommittedFieldsRef.current = nextProfileFields;
-		}
-	}, [identityProfile]);
+		if (!identityProfile) return;
+		const nextProfileFields = getProfileFieldsFromIdentity(identityProfile);
+		setProfileFields((prev) =>
+			areProfileFieldsEqual(prev, nextProfileFields) ? prev : nextProfileFields
+		);
+		profileCommittedFieldsRef.current = nextProfileFields;
+	}, [
+		identityProfile?.area,
+		identityProfile?.bandName,
+		identityProfile?.bio,
+		identityProfile?.genre,
+		identityProfile?.name,
+		identityProfile?.website,
+	]);
 
 	// Hybrid: profile chips (match Full Auto Profile section formatting)
 	type HybridProfileChipItem = {

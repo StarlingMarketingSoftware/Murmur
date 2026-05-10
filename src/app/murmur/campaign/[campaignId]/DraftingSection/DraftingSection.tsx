@@ -39,7 +39,6 @@ import { useEditUserContactList } from '@/hooks/queryHooks/useUserContactLists';
 import { useCreateEmail, useEditEmail, useGetEmails } from '@/hooks/queryHooks/useEmails';
 import { EmailStatus, EmailVerificationStatus, DraftingMode, ReviewStatus } from '@/constants/prismaEnums';
 import { resolveAutoSignatureText } from '@/constants/autoSignatures';
-import { ContactsSelection } from './EmailGeneration/ContactsSelection/ContactsSelection';
 import { SentEmails } from './EmailGeneration/SentEmails/SentEmails';
 import { DraftedEmails, type DraftedEmailsHandle } from './EmailGeneration/DraftedEmails/DraftedEmails';
 import { EmailWithRelations, StripeSubscriptionStatus } from '@/types';
@@ -198,13 +197,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		renderGlobalOverlays = true,
 		onViewReady,
 		goToDrafting,
-		// eslint-disable-next-line @typescript-eslint/no-unused-vars
-		goToAll: _goToAll,
 		goToWriting,
 		onOpenIdentityDialog,
 		onGoToSearch,
 		goToInbox,
-		goToContacts,
 		goToSent,
 		inboxSentTabRequest,
 		onInboxSentTabChange,
@@ -490,71 +486,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		return miniProfileFields;
 	}, [isDraftingView, isSentView, draftProfileFieldsForSettings, sentProfileFieldsForSettings, miniProfileFields]);
 
-	// All tab hover states
-	type AllTabBox =
-		| 'header'
-		| 'contacts'
-		| 'writing'
-		| 'drafts'
-		| 'sent'
-		| 'research'
-		| 'suggestion'
-		| 'preview'
-		| 'inbox';
-	const [hoveredAllTabBox, setHoveredAllTabBox] = useState<AllTabBox | null>(null);
-	const isContactsHovered = hoveredAllTabBox === 'contacts';
-	// All tab: hovered email drives preview + research (hover-only, no row highlighting)
-	const [allTabHoveredEmailPreview, setAllTabHoveredEmailPreview] = useState<{
-		contactId: number;
-		subject?: string | null;
-		message?: string | null;
-	} | null>(null);
-	const shouldDimAllTabBoxes = view === 'all' && hoveredAllTabBox !== null;
-	const getAllTabBoxOpacityClassName = useCallback(
-		(box: AllTabBox) =>
-			cn(
-				'transition-opacity duration-150 ease-out all-tab-box',
-				box !== 'research' && box !== 'suggestion' && box !== 'preview' && 'all-tab-box--scale',
-				shouldDimAllTabBoxes && hoveredAllTabBox !== box && 'opacity-90'
-			),
-		[hoveredAllTabBox, shouldDimAllTabBoxes]
-	);
-	const allTabHoverClearTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-	const allTabContainerRef = useRef<HTMLDivElement>(null);
-	const clearAllTabHoverClearTimeout = useCallback(() => {
-		if (!allTabHoverClearTimeoutRef.current) return;
-		clearTimeout(allTabHoverClearTimeoutRef.current);
-		allTabHoverClearTimeoutRef.current = null;
-	}, []);
-	const handleAllTabBoxMouseEnter = useCallback(
-		(box: AllTabBox) => {
-			// Cancel any pending "unhover" so moving between boxes doesn't flash.
-			clearAllTabHoverClearTimeout();
-			setHoveredAllTabBox(box);
-		},
-		[clearAllTabHoverClearTimeout]
-	);
-	const handleAllTabBoxMouseLeave = useCallback(
-		(box: AllTabBox) => {
-			// Keep the last-hovered box active briefly so gaps between panels don't
-			// cause a jarring fade-out/fade-in flash when moving to another box.
-			clearAllTabHoverClearTimeout();
-			allTabHoverClearTimeoutRef.current = setTimeout(() => {
-				setHoveredAllTabBox((prev) => (prev === box ? null : prev));
-				allTabHoverClearTimeoutRef.current = null;
-			}, 180);
-		},
-		[clearAllTabHoverClearTimeout]
-	);
-	useEffect(() => {
-		if (view === 'all') return;
-		clearAllTabHoverClearTimeout();
-		if (hoveredAllTabBox !== null) setHoveredAllTabBox(null);
-	}, [clearAllTabHoverClearTimeout, hoveredAllTabBox, view]);
-	useEffect(() => {
-		return () => clearAllTabHoverClearTimeout();
-	}, [clearAllTabHoverClearTimeout]);
-
 	// Narrow desktop detection for Writing tab compact layout.
 	// Note: widened upper bound from 1280 -> 1317 so the left pinned panel never clips
 	// when campaign zoom / browser zoom reduces available space.
@@ -563,8 +494,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const [isNarrowestDesktop, setIsNarrowestDesktop] = useState(false);
 	// Search tab narrow detection (< 1414px) - reduces map box width
 	const [isSearchTabNarrow, setIsSearchTabNarrow] = useState(false);
-	// All tab narrow detection (<= 1269px) - switches from 4x2 to 2x4 grid
-	const [isAllTabNarrow, setIsAllTabNarrow] = useState(false);
 	// Inbox tab narrow detection (<= 1520px) - reduces inbox box width to 516px
 	const [isInboxTabNarrow, setIsInboxTabNarrow] = useState(false);
 	// Inbox tab stacked layout detection (<= 1279px) - moves research panel below header box on the left
@@ -598,7 +527,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 			setIsNarrowDesktop(effectiveWidth >= 952 && effectiveWidth < 1317);
 			setIsNarrowestDesktop(effectiveWidth < 952);
 			setIsSearchTabNarrow(effectiveWidth < 1414);
-			setIsAllTabNarrow(effectiveWidth <= 1269);
 			setIsInboxTabNarrow(effectiveWidth <= 1520);
 			setIsInboxTabStacked(effectiveWidth <= 1279);
 
@@ -644,45 +572,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		};
 	}, [isMobile]);
 
-	useEffect(() => {
-		if (view !== 'all' || !allTabContainerRef.current) return;
-
-		const container = allTabContainerRef.current;
-		const allBoxes = Array.from(container.querySelectorAll<HTMLElement>('.all-tab-box'));
-
-		// Reset scale in case it was stuck from prior hovers.
-		allBoxes.forEach((box) => {
-			gsap.killTweensOf(box);
-			gsap.set(box, { scale: 1 });
-		});
-
-		// Only these boxes should scale on hover (exclude research/suggestion/preview).
-		const scaleBoxes = Array.from(container.querySelectorAll<HTMLElement>('.all-tab-box--scale'));
-		const listeners = scaleBoxes.map((box) => {
-			const onEnter = () => {
-				gsap.to(box, { scale: 1.02, duration: 0.7, ease: 'power3.out' });
-			};
-			const onLeave = () => {
-				gsap.to(box, { scale: 1, duration: 0.7, ease: 'power3.out' });
-			};
-			box.addEventListener('mouseenter', onEnter);
-			box.addEventListener('mouseleave', onLeave);
-			return { box, onEnter, onLeave };
-		});
-
-		return () => {
-			listeners.forEach(({ box, onEnter, onLeave }) => {
-				box.removeEventListener('mouseenter', onEnter);
-				box.removeEventListener('mouseleave', onLeave);
-			});
-
-			allBoxes.forEach((box) => {
-				gsap.killTweensOf(box);
-				gsap.set(box, { scale: 1 });
-			});
-		};
-	}, [view, isAllTabNarrow, isNarrowestDesktop]);
-
 	const bottomPanelBoxHeightPx = areBottomPanelsCollapsedAtCompactBreakpoint ? 40 : 117;
 	const bottomPanelCollapsed = areBottomPanelsCollapsedAtCompactBreakpoint;
 
@@ -691,6 +580,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	// because the panel heights are now kept in sync across tabs.
 	type PinnedLeftPanelVariant = 'contacts' | 'mini';
 	const pinnedLeftPanelVariant: PinnedLeftPanelVariant = useMemo(() => {
+		// 'contacts' here refers to the *variant* of the pinned left column
+		// (the ContactsExpandedList shown on the Write tab) — not to a Contacts view.
 		if (view === 'testing' || view === 'search') return 'contacts';
 		return 'mini';
 	}, [view]);
@@ -704,9 +595,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		const prevView = prevViewForPinnedPanelRef.current;
 		prevViewForPinnedPanelRef.current = view;
 		// Detect transition from inbox/search to tabs that show the pinned left panel.
-		// This includes: testing (ContactsExpandedList), contacts/drafting/sent (MiniEmailStructure)
+		// This includes: testing (ContactsExpandedList), drafting/sent (MiniEmailStructure)
 		const isMorphOrigin = prevView === 'search' || (prevView === 'inbox' && !isSafari);
-		const showsPinnedPanel = view === 'testing' || view === 'contacts' || view === 'drafting' || view === 'sent';
+		const showsPinnedPanel = view === 'testing' || view === 'drafting' || view === 'sent';
 		if (isMorphOrigin && showsPinnedPanel) {
 			setIsEnteringFromMorphView(true);
 			// Clear the flag after the morph animation completes (~350ms)
@@ -720,9 +611,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	const shouldRenderAbsolutePinnedLeftColumn =
 		!isMobile &&
 		!hideHeaderBox &&
-		['testing', 'contacts', 'drafting', 'sent', 'search', 'inbox'].includes(view) &&
+		['testing', 'drafting', 'sent', 'search', 'inbox'].includes(view) &&
 		!(view === 'testing' && isNarrowDesktop) &&
-		!(view === 'contacts' && isNarrowDesktop) &&
 		!(view === 'drafting' && isNarrowDesktop) &&
 		!(view === 'sent' && isNarrowDesktop) &&
 		!(view === 'search' && isSearchTabNarrow) &&
@@ -730,11 +620,10 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 
 	// (No pinned-left-panel morph animation)
 
-	// --- Main box morph transition (Contacts/Writing/Drafts/Sent <-> Search/Inbox) ---
-	type CampaignMainBoxKey = 'writing' | 'contacts' | 'drafts' | 'sent' | 'search' | 'inbox';
+	// --- Main box morph transition (Writing/Drafts/Sent <-> Search/Inbox) ---
+	type CampaignMainBoxKey = 'writing' | 'drafts' | 'sent' | 'search' | 'inbox';
 	const getCampaignMainBoxKey = useCallback((v: typeof view): CampaignMainBoxKey | null => {
 		if (v === 'testing') return 'writing';
-		if (v === 'contacts') return 'contacts';
 		if (v === 'drafting') return 'drafts';
 		if (v === 'sent') return 'sent';
 		if (v === 'search') return 'search';
@@ -748,7 +637,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		(v: typeof view): CampaignResearchPanelKey | null => {
 			if (v === 'search') return 'search';
 			if (v === 'inbox') return 'inbox';
-			if (v === 'testing' || v === 'contacts' || v === 'drafting' || v === 'sent') return 'standard';
+			if (v === 'testing' || v === 'drafting' || v === 'sent') return 'standard';
 			return null;
 		},
 		[]
@@ -760,7 +649,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	> = useMemo(
 		() => ({
 			writing: { borderWidthPx: 3, radiusPx: 6, borderColor: '#000000' },
-			contacts: { borderWidthPx: 2, radiusPx: 8, borderColor: '#000000' },
 			drafts: { borderWidthPx: 3, radiusPx: 8, borderColor: '#000000' },
 			sent: { borderWidthPx: 2, radiusPx: 8, borderColor: '#19670F' },
 			search: { borderWidthPx: 3, radiusPx: 12, borderColor: '#143883' },
@@ -1801,18 +1689,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 	// Ref for the draft button container to detect outside clicks
 	const draftButtonContainerRef = useRef<HTMLDivElement>(null);
 
-	const handleContactsTabSelection = (contactId: number) => {
-		setContactsTabSelectedIds((prev) => {
-			const next = new Set(prev);
-			if (next.has(contactId)) {
-				next.delete(contactId);
-			} else {
-				next.add(contactId);
-			}
-			return next;
-		});
-	};
-
 	const [searchTabSelectedContacts, setSearchTabSelectedContacts] = useState<number[]>(
 		[]
 	);
@@ -2826,27 +2702,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 		}
 	};
 
-	// --- All tab: hover over Draft/Sent rows updates Research + Preview ---
-	const handleAllTabEmailHover = useCallback(
-		(email: EmailWithRelations | null) => {
-			if (!email) {
-				setAllTabHoveredEmailPreview(null);
-				handleResearchContactHover(null);
-				return;
-			}
-
-			setAllTabHoveredEmailPreview({
-				contactId: email.contactId,
-				subject: email.subject,
-				message: email.message,
-			});
-
-			const contactFromList = contacts?.find((c) => c.id === email.contactId) ?? null;
-			handleResearchContactHover(contactFromList);
-		},
-		[contacts, handleResearchContactHover]
-	);
-
 	const handleSendDrafts = async (draftIds?: Iterable<number>) => {
 		// If draftIds is provided, ONLY send those drafts (used by draft-review "Send" button).
 		// Otherwise, send the current selection (and never default to "all drafts" when selection is empty).
@@ -3423,7 +3278,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 										sentCount={sentCount}
 										draftingProgress={draftingProgressForHeader}
 										onFromClick={onOpenIdentityDialog}
-										onContactsClick={goToContacts}
 										onDraftsClick={goToDrafting}
 										onSentClick={goToSent}
 									/>
@@ -3477,7 +3331,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														onContactHover={handleResearchContactHover}
 														onDraftHover={setHoveredDraftForSettings}
 														goToWriting={goToWriting}
-														goToContacts={goToContacts}
 														goToSearch={onGoToSearch}
 														goToSent={goToSent}
 														goToInbox={goToInbox}
@@ -3613,9 +3466,9 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 															fullWidthMobile
 															hideAddTextButtons
 															// Match the Writing tab contacts list height (557px) so the left panel stays consistent.
-															// Applies on tabs where this pinned panel renders the MiniEmailStructure (Contacts + Drafts + Sent).
+															// Applies on tabs where this pinned panel renders the MiniEmailStructure (Drafts + Sent).
 															height={
-																view === 'contacts' || view === 'drafting' || view === 'sent'
+																view === 'drafting' || view === 'sent'
 																	? 557
 																	: undefined
 															}
@@ -3626,11 +3479,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 																// Hide all structure text to show chrome-only skeleton:
 																// - When the Drafts tab has no drafts
 																// - When the Sent tab is in its empty state
-																// - When the Contacts tab has no contacts to show
 																(view === 'drafting' && draftCount === 0) ||
-																(view === 'sent' && sentCount === 0) ||
-																(view === 'contacts' &&
-																	contactsAvailableForDrafting.length === 0)
+																(view === 'sent' && sentCount === 0)
 															}
 															onOpenWriting={goToWriting}
 														/>
@@ -4010,11 +3860,11 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 							// rather than Tailwind's `xl:` media query which ignores CSS zoom.
 							!isNarrowDesktop &&
 							!isNarrowestDesktop &&
-							['testing', 'contacts', 'drafting', 'sent', 'search', 'inbox'].includes(view) &&
+							['testing', 'drafting', 'sent', 'search', 'inbox'].includes(view) &&
 							!(view === 'search' && hasCampaignSearched) &&
 							!(view === 'search' && isSearchTabNarrow) &&
 							!(view === 'inbox' && isInboxTabStacked) &&
-							!(isTransitioningOut && ['testing', 'contacts', 'drafting', 'sent'].includes(view)) && (
+							!(isTransitioningOut && ['testing', 'drafting', 'sent'].includes(view)) && (
 							<div
 								className="absolute"
 								data-research-panel-container
@@ -4032,7 +3882,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												: 'calc(50% + 453.5px + 32px)'
 											: 'calc(50% + 250px + 32px)',
 									// Counter-animate when transitioning in to keep research panel stable
-									...(isTransitioningIn && ['testing', 'contacts', 'drafting', 'sent'].includes(view) ? {
+									...(isTransitioningIn && ['testing', 'drafting', 'sent'].includes(view) ? {
 										animation: 'researchPanelStable 180ms ease-out forwards',
 									} : {}),
 								}}
@@ -4128,10 +3978,8 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												// Hide all research text to show a chrome-only skeleton:
 												// - When the Drafts tab has no drafts
 												// - When the Sent tab is in its empty state
-												// - When the Contacts tab has no contacts to show
 												(view === 'drafting' && draftCount === 0) ||
-												(view === 'sent' && sentCount === 0) ||
-												(view === 'contacts' && contactsAvailableForDrafting.length === 0)
+												(view === 'sent' && sentCount === 0)
 											}
 											style={view === 'inbox' ? { width: 259 } : undefined}
 											boxWidth={view === 'inbox' ? 247 : undefined}
@@ -4510,7 +4358,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													sentCount={sentCount}
 													draftingProgress={draftingProgressForHeader}
 													onFromClick={onOpenIdentityDialog}
-													onContactsClick={goToContacts}
 													onDraftsClick={goToDrafting}
 													onSentClick={goToSent}
 													width={330}
@@ -4544,7 +4391,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														height={263}
 														minRows={5}
 														onSearchFromMiniBar={handleMiniContactsSearch}
-														onOpenContacts={goToContacts}
 													/>
 												</div>
 												{/* Compact Research panel */}
@@ -4580,7 +4426,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													isTest={isTest}
 													contact={contacts?.[0]}
 													onGoToDrafting={goToDrafting}
-													onGoToContacts={goToContacts}
 													onGoToInbox={goToInbox}
 													onTestPreviewToggle={setShowTestPreview}
 													onKeepTestDraft={() => handleKeepTestDraft(contacts?.[0] || null)}
@@ -4758,7 +4603,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											isTest={isTest}
 											contact={contacts?.[0]}
 											onGoToDrafting={goToDrafting}
-											onGoToContacts={goToContacts}
 											onGoToInbox={goToInbox}
 											onTestPreviewToggle={setShowTestPreview}
 											draftCount={contactsTabSelectedIds.size}
@@ -4943,7 +4787,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													height={349}
 													minRows={5}
 													onSearchFromMiniBar={handleMiniContactsSearch}
-													onOpenContacts={goToContacts}
 												/>
 											</div>
 										)}
@@ -5078,7 +4921,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												onContactHover={handleResearchContactHover}
 												onDraftHover={setHoveredDraftForSettings}
 												goToWriting={goToWriting}
-												goToContacts={goToContacts}
 												goToSearch={onGoToSearch}
 												goToSent={goToSent}
 												goToInbox={goToInbox}
@@ -5115,7 +4957,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														sentCount={sentCount}
 														draftingProgress={draftingProgressForHeader}
 														onFromClick={onOpenIdentityDialog}
-														onContactsClick={goToContacts}
 														onDraftsClick={goToDrafting}
 														onSentClick={goToSent}
 														width={330}
@@ -5202,7 +5043,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 														onContactHover={handleResearchContactHover}
 														onDraftHover={setHoveredDraftForSettings}
 														goToWriting={goToWriting}
-														goToContacts={goToContacts}
 														goToSearch={onGoToSearch}
 														goToSent={goToSent}
 														goToInbox={goToInbox}
@@ -5312,7 +5152,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													whiteSectionHeight={15}
 													collapsed={bottomPanelCollapsed}
 													showSearchBar={false}
-													onOpenContacts={goToContacts}
 												/>
 												<SentExpandedList
 													sent={sentEmails}
@@ -5361,7 +5200,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												onContactHover={handleResearchContactHover}
 												onDraftHover={setHoveredDraftForSettings}
 												goToWriting={goToWriting}
-												goToContacts={goToContacts}
 												goToSearch={onGoToSearch}
 												goToSent={goToSent}
 												goToInbox={goToInbox}
@@ -5534,7 +5372,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													whiteSectionHeight={15}
 													collapsed={bottomPanelCollapsed}
 													showSearchBar={false}
-													onOpenContacts={goToContacts}
 												/>
 												<SentExpandedList
 													sent={sentEmails}
@@ -5561,567 +5398,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 						)}
 					</div>
 
-				{/* Contacts tab - show the contacts table */}
-					{view === 'contacts' && (
-						<div className={`w-full ${isMobile ? 'mt-6' : 'min-h-[300px]'}`}>
-							{isMobile ? (
-								// Mobile layout: Full-width contacts, no side panels
-								<div className="flex flex-col items-center w-full px-1">
-									<ContactsSelection
-										mainBoxId="contacts"
-										isLoading={isContactsLoading}
-										contacts={contactsAvailableForDrafting}
-										allContacts={contacts}
-										isDraftQueueActive={isDraftQueueActive}
-										activelyDraftingContactIds={activelyDraftingContactIds}
-										selectedContactIds={contactsTabSelectedIds}
-										setSelectedContactIds={setContactsTabSelectedIds}
-										handleContactSelection={handleContactsTabSelection}
-										generationProgress={generationProgress}
-										generationTotal={generationTotal}
-										campaign={campaign}
-										showSearchBar={false}
-										onDraftEmails={async (ids) => {
-											await handleGenerateDrafts(ids);
-										}}
-										isDraftingDisabled={isGenerationDisabled()}
-										onContactClick={handleResearchContactClick}
-										onContactHover={handleResearchContactHover}
-										onSearchFromMiniBar={handleMiniContactsSearch}
-										goToSearch={onGoToSearch}
-										goToDrafts={goToDrafting}
-										goToInbox={goToInbox}
-										goToSent={goToSent}
-										goToWriting={goToWriting}
-										bottomPanelHeightPx={bottomPanelBoxHeightPx}
-										bottomPanelCollapsed={bottomPanelCollapsed}
-										hideBottomPanels
-										hideButton
-										isAllContactsSelected={areAllContactsSelected}
-										onSelectAllContacts={handleSelectAllContacts}
-									/>
-								</div>
-							) : isNarrowDesktop ? (
-									// Narrow desktop (952px - 1279px): center BOTH the left panel and contacts table together
-									// Fixed width container: left (330) + gap (35) + right (499) = 864px, centered with mx-auto
-									// Bottom panels are rendered separately and centered relative to the full container
-									<div className="flex flex-col items-center mx-auto" style={{ width: '839px' }}>
-										<div className="flex flex-row items-start gap-[10px] w-full">
-											{/* Left column: Campaign Header + Email Structure + Research - fixed 330px */}
-											<div className="flex flex-col flex-shrink-0" style={{ gap: '10px', width: '330px' }}>
-												<CampaignHeaderBox
-													campaignId={campaign?.id}
-													campaignName={campaign?.name || 'Untitled Campaign'}
-													toListNames={toListNames}
-													fromName={fromName}
-													contactsCount={contactsCount}
-													draftCount={draftCount}
-													sentCount={sentCount}
-													draftingProgress={draftingProgressForHeader}
-													onFromClick={onOpenIdentityDialog}
-													onContactsClick={goToContacts}
-													onDraftsClick={goToDrafting}
-													onSentClick={goToSent}
-													width={330}
-												/>
-												{/* Mini Email Structure panel */}
-												<div style={{ width: '330px' }}>
-													<MiniEmailStructure
-														form={
-															isDraftingView
-																? draftsSettingsPreviewForm
-																: isSentView
-																	? sentSettingsPreviewForm
-																	: form
-														}
-														readOnly={isDraftingView || isSentView}
-														variant={draftsMiniEmailTopHeaderHeight ? 'settings' : undefined}
-														settingsPrimaryLabel={draftsMiniEmailSettingsLabels.primary}
-														settingsSecondaryLabel={draftsMiniEmailSettingsLabels.secondary}
-														settingsNameCompanyBgColor={draftsMiniEmailSettingsNameCompanyBgColor}
-														profileFields={profileFieldsForSettings}
-														identityProfile={campaign?.identity as IdentityProfileFields | null}
-														onIdentityUpdate={handleIdentityUpdate}
-														onDraft={() =>
-															handleGenerateDrafts(
-																contactsAvailableForDrafting.map((c) => c.id)
-															)
-														}
-														isDraftDisabled={isGenerationDisabled()}
-														isPendingGeneration={isPendingGeneration}
-														generationProgress={generationProgress}
-														generationTotal={generationTotal}
-														hideTopChrome
-														hideFooter
-														fullWidthMobile
-														hideAddTextButtons
-														fitToHeight
-														lockFitToHeightScale
-														height={316}
-														pageFillColor={draftsMiniEmailFillColor}
-														topHeaderHeight={draftsMiniEmailTopHeaderHeight}
-														topHeaderLabel={draftsMiniEmailTopHeaderLabel}
-														onOpenWriting={goToWriting}
-													/>
-												</div>
-												{/* Research panel - height set so bottom aligns with contacts table (703px) */}
-												{isBatchDraftingInProgress ? (
-													<DraftPreviewExpandedList
-														contacts={contacts || []}
-														livePreview={liveDraftPreview}
-														fallbackDraft={draftPreviewFallbackDraft}
-														width={330}
-														height={296}
-													/>
-												) : (
-													<ContactResearchPanel
-														contact={displayedContactForResearch}
-														hideAllText={contactsAvailableForDrafting.length === 0}
-														hideSummaryIfBullets={true}
-														height={296}
-														width={330}
-														boxWidth={315}
-														compactHeader
-														style={{ display: 'block' }}
-													/>
-												)}
-											</div>
-											{/* Right column: Contacts table - fixed 499px, overflow visible for bottom panels */}
-											<div className="flex-shrink-0 [&>*]:!items-start" style={{ width: '499px', overflow: 'visible' }}>
-												<ContactsSelection
-													mainBoxId="contacts"
-													isLoading={isContactsLoading}
-													contacts={contactsAvailableForDrafting}
-													allContacts={contacts}
-													isDraftQueueActive={isDraftQueueActive}
-													activelyDraftingContactIds={activelyDraftingContactIds}
-													selectedContactIds={contactsTabSelectedIds}
-													setSelectedContactIds={setContactsTabSelectedIds}
-													handleContactSelection={handleContactsTabSelection}
-													generationProgress={generationProgress}
-													generationTotal={generationTotal}
-													campaign={campaign}
-													showSearchBar={false}
-													onDraftEmails={async (ids) => {
-														await handleGenerateDrafts(ids);
-													}}
-													isDraftingDisabled={isGenerationDisabled()}
-													onContactClick={handleResearchContactClick}
-													onContactHover={handleResearchContactHover}
-													onSearchFromMiniBar={handleMiniContactsSearch}
-													goToSearch={onGoToSearch}
-													goToDrafts={goToDrafting}
-													goToInbox={goToInbox}
-													goToSent={goToSent}
-													goToWriting={goToWriting}
-													bottomPanelHeightPx={bottomPanelBoxHeightPx}
-													bottomPanelCollapsed={bottomPanelCollapsed}
-													hideBottomPanels
-													hideButton
-													isAllContactsSelected={areAllContactsSelected}
-													onSelectAllContacts={handleSelectAllContacts}
-												/>
-											</div>
-										</div>
-										{/* Draft Button with arrows - centered relative to full container width */}
-										<div className="flex items-center justify-center gap-[29px] mt-4 w-full">
-											{/* Left arrow */}
-											<button
-												type="button"
-												onClick={goToPreviousTab}
-												className="bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0"
-												aria-label="Previous tab"
-											>
-												<LeftArrow width="20" height="39" />
-											</button>
-											{/* Draft button container */}
-											<div
-												data-draft-button-container
-												className="group relative h-[40px] flex-1"
-												style={{ maxWidth: '691px' }}
-											>
-												{contactsTabSelectedIds.size > 0 || areAllContactsSelected ? (
-													// Animated draft button with expanding "All" state
-													<button
-														type="button"
-														onClick={() => {
-															if (contactsTabSelectedIds.size === 0) {
-																return;
-															}
-															handleGenerateDrafts(
-																Array.from(contactsTabSelectedIds.values())
-															);
-														}}
-														disabled={contactsTabSelectedIds.size === 0}
-														className={cn(
-															'w-full h-full rounded-[4px] border-[3px] text-black font-inter font-normal text-[17px] relative overflow-hidden transition-colors duration-300',
-															contactsTabSelectedIds.size === 0
-																? 'bg-[#E0E0E0] border-[#A0A0A0] cursor-not-allowed opacity-60'
-																: areAllContactsSelected
-																	? 'bg-[#4DC669] border-black hover:bg-[#45B85F] cursor-pointer'
-																	: 'bg-[#F2C7C7] border-[#9A3434] hover:bg-[#E6B9B9] cursor-pointer'
-														)}
-													>
-														{/* Normal text - fades out when All selected */}
-														<span
-															className={cn(
-																'transition-opacity duration-300',
-																areAllContactsSelected ? 'opacity-0' : 'opacity-100'
-															)}
-														>
-															{isDraftQueueActive
-																? 'Add Emails to Queue'
-																: `Draft ${contactsTabSelectedIds.size} ${
-																		contactsTabSelectedIds.size === 1 ? 'Contact' : 'Contacts'
-																  }`}
-														</span>
-														{/* "All" text - fades in when All selected */}
-														<span
-															className={cn(
-																'absolute inset-0 flex items-center justify-center transition-opacity duration-300',
-																areAllContactsSelected ? 'opacity-100' : 'opacity-0'
-															)}
-														>
-															{isDraftQueueActive ? (
-																'Add Emails to Queue'
-															) : (
-																<>
-																	Draft <span className="font-bold mx-1">All</span>{' '}
-																	{contactsAvailableForDrafting.length} Contacts
-																</>
-															)}
-														</span>
-														{/* Expanding green overlay from right */}
-														<div
-															className={cn(
-																'absolute top-0 bottom-0 right-0 bg-[#4DC669] transition-all duration-300 ease-out',
-																areAllContactsSelected
-																	? 'w-full rounded-[1px]'
-																	: 'w-[62px] rounded-r-[1px]'
-															)}
-															style={{
-																opacity: areAllContactsSelected ? 0 : 1,
-																transitionProperty: 'width, opacity',
-															}}
-														/>
-													</button>
-												) : (
-													<div className="relative w-full h-full rounded-[4px] border-[3px] border-transparent overflow-hidden transition-colors group-hover:bg-[#EEF5EF] group-hover:border-black">
-														<div className="w-full h-full flex items-center justify-center text-black font-inter font-normal text-[17px] cursor-default">
-															Select Contacts and Draft Emails
-														</div>
-														<button
-															type="button"
-															aria-label="Select all contacts"
-															className="absolute right-0 top-0 bottom-0 w-[62px] bg-[#D17474] rounded-r-[1px] rounded-l-none flex items-center justify-center font-inter font-normal text-[17px] text-black hover:bg-[#C26666] cursor-pointer z-10 opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto"
-															onClick={(e) => {
-																e.stopPropagation();
-																handleSelectAllContacts();
-															}}
-														>
-															<div className="absolute left-0 top-0 bottom-0 w-[3px] bg-black" />
-															All
-														</button>
-													</div>
-												)}
-												{/* "All" button overlay - only visible when not all selected */}
-												{(contactsTabSelectedIds.size > 0 || areAllContactsSelected) && !areAllContactsSelected && (
-													<button
-														type="button"
-														className="absolute right-[3px] top-[2.5px] bottom-[2.5px] w-[62px] bg-[#D17474] rounded-r-[1px] rounded-l-none flex items-center justify-center font-inter font-normal text-[17px] text-black hover:bg-[#C26666] cursor-pointer z-10"
-														onClick={(e) => {
-															e.stopPropagation();
-															handleSelectAllContacts();
-														}}
-													>
-														{/* Vertical divider line */}
-														<div className="absolute left-0 -top-[0.5px] -bottom-[0.5px] w-[2px] bg-[#9A3434]" />
-														All
-													</button>
-												)}
-											</div>
-											{/* Right arrow */}
-											<button
-												type="button"
-												onClick={goToNextTab}
-												className="bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0"
-												aria-label="Next tab"
-											>
-												<RightArrow width="20" height="39" />
-											</button>
-										</div>
-										{/* Bottom Panels: Drafts, Sent, and Inbox - centered relative to 864px container */}
-										<BottomPanelsContainer
-											className="mt-[35px] pb-[8px] flex justify-center gap-[15px]"
-											data-campaign-bottom-anchor
-											collapsed={bottomPanelCollapsed}
-											historyActions={historyActions}
-										>
-											<DraftsExpandedList
-												drafts={draftEmails}
-												contacts={contacts || []}
-												generationProgress={generationProgress}
-												generationTotal={generationTotal}
-												width={233}
-												height={bottomPanelBoxHeightPx}
-												whiteSectionHeight={15}
-												collapsed={bottomPanelCollapsed}
-												hideSendButton={true}
-											/>
-											<SentExpandedList
-												sent={sentEmails}
-												contacts={contacts || []}
-												width={233}
-												height={bottomPanelBoxHeightPx}
-												whiteSectionHeight={15}
-												collapsed={bottomPanelCollapsed}
-											/>
-											<InboxExpandedList
-												contacts={contacts || []}
-												width={233}
-												height={bottomPanelBoxHeightPx}
-												whiteSectionHeight={15}
-												collapsed={bottomPanelCollapsed}
-											/>
-										</BottomPanelsContainer>
-									</div>
-								) : (
-									/* Regular centered layout for wider viewports, hide bottom panels at narrowest breakpoint */
-									<div className="flex flex-col items-center">
-										<ContactsSelection
-										mainBoxId="contacts"
-											isLoading={isContactsLoading}
-											contacts={contactsAvailableForDrafting}
-											allContacts={contacts}
-											isDraftQueueActive={isDraftQueueActive}
-											activelyDraftingContactIds={activelyDraftingContactIds}
-											selectedContactIds={contactsTabSelectedIds}
-											setSelectedContactIds={setContactsTabSelectedIds}
-											handleContactSelection={handleContactsTabSelection}
-											generationProgress={generationProgress}
-											generationTotal={generationTotal}
-											campaign={campaign}
-											showSearchBar={false}
-											onDraftEmails={async (ids) => {
-												await handleGenerateDrafts(ids);
-											}}
-											isDraftingDisabled={isGenerationDisabled()}
-											onContactClick={handleResearchContactClick}
-											onContactHover={handleResearchContactHover}
-											onSearchFromMiniBar={handleMiniContactsSearch}
-											goToSearch={onGoToSearch}
-											goToDrafts={goToDrafting}
-											goToInbox={goToInbox}
-											goToSent={goToSent}
-											goToWriting={goToWriting}
-											bottomPanelHeightPx={bottomPanelBoxHeightPx}
-											bottomPanelCollapsed={bottomPanelCollapsed}
-											hideBottomPanels={isNarrowestDesktop}
-											hideButton={isNarrowestDesktop}
-											isAllContactsSelected={areAllContactsSelected}
-											onSelectAllContacts={handleSelectAllContacts}
-											historyActions={historyActions}
-										/>
-										{/* Navigation arrows with draft button at narrowest breakpoint */}
-										{isNarrowestDesktop && (
-											<div className="flex items-center justify-center gap-[20px] mt-4 w-full px-4">
-												{/* Left arrow */}
-												<button
-													type="button"
-													onClick={goToPreviousTab}
-													className="bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0"
-													aria-label="Previous tab"
-												>
-													<LeftArrow width="14" height="27" />
-												</button>
-												{/* Draft button container */}
-												<div
-													data-draft-button-container
-													className="group relative h-[36px] flex-1"
-													style={{ maxWidth: '400px' }}
-												>
-													{contactsTabSelectedIds.size > 0 || areAllContactsSelected ? (
-														// Animated draft button with expanding "All" state
-														<button
-															type="button"
-															onClick={() => {
-																if (contactsTabSelectedIds.size === 0) {
-																	return;
-																}
-																handleGenerateDrafts(
-																	Array.from(contactsTabSelectedIds.values())
-																);
-															}}
-															disabled={contactsTabSelectedIds.size === 0}
-															className={cn(
-																'w-full h-full rounded-[4px] border-[3px] text-black font-inter font-normal text-[15px] relative overflow-hidden transition-colors duration-300',
-																contactsTabSelectedIds.size === 0
-																	? 'bg-[#E0E0E0] border-[#A0A0A0] cursor-not-allowed opacity-60'
-																	: areAllContactsSelected
-																		? 'bg-[#4DC669] border-black hover:bg-[#45B85F] cursor-pointer'
-																		: 'bg-[#F2C7C7] border-[#9A3434] hover:bg-[#E6B9B9] cursor-pointer'
-															)}
-														>
-															{/* Normal text - fades out when All selected */}
-															<span
-																className={cn(
-																	'transition-opacity duration-300',
-																	areAllContactsSelected ? 'opacity-0' : 'opacity-100'
-																)}
-															>
-																{isDraftQueueActive
-																	? 'Add Emails to Queue'
-																	: `Draft ${contactsTabSelectedIds.size} ${
-																			contactsTabSelectedIds.size === 1 ? 'Contact' : 'Contacts'
-																	  }`}
-															</span>
-															{/* "All" text - fades in when All selected */}
-															<span
-																className={cn(
-																	'absolute inset-0 flex items-center justify-center transition-opacity duration-300',
-																	areAllContactsSelected ? 'opacity-100' : 'opacity-0'
-																)}
-															>
-																{isDraftQueueActive ? (
-																	'Add Emails to Queue'
-																) : (
-																	<>
-																		Draft <span className="font-bold mx-1">All</span>{' '}
-																		{contactsAvailableForDrafting.length} Contacts
-																	</>
-																)}
-															</span>
-															{/* Expanding green overlay from right */}
-															<div
-																className={cn(
-																	'absolute top-0 bottom-0 right-0 bg-[#4DC669] transition-all duration-300 ease-out',
-																	areAllContactsSelected
-																		? 'w-full rounded-[1px]'
-																		: 'w-[52px] rounded-r-[1px]'
-																)}
-																style={{
-																	opacity: areAllContactsSelected ? 0 : 1,
-																	transitionProperty: 'width, opacity',
-																}}
-															/>
-														</button>
-													) : (
-														<div className="relative w-full h-full rounded-[4px] border-[3px] border-transparent overflow-hidden transition-colors group-hover:bg-[#EEF5EF] group-hover:border-black">
-															<div className="w-full h-full flex items-center justify-center text-black font-inter font-normal text-[15px] cursor-default">
-																Select Contacts and Draft Emails
-															</div>
-															<button
-																type="button"
-																aria-label="Select all contacts"
-																className="absolute right-0 top-0 bottom-0 w-[52px] bg-[#D17474] rounded-r-[1px] rounded-l-none flex items-center justify-center font-inter font-normal text-[15px] text-black hover:bg-[#C26666] cursor-pointer z-10 opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto"
-																onClick={(e) => {
-																	e.stopPropagation();
-																	handleSelectAllContacts();
-																}}
-															>
-																<div className="absolute left-0 top-0 bottom-0 w-[3px] bg-black" />
-																All
-															</button>
-														</div>
-													)}
-													{/* "All" button overlay - only visible when not all selected */}
-													{(contactsTabSelectedIds.size > 0 || areAllContactsSelected) && !areAllContactsSelected && (
-														<button
-															type="button"
-															className="absolute right-[3px] top-[2.5px] bottom-[2.5px] w-[52px] bg-[#D17474] rounded-r-[1px] rounded-l-none flex items-center justify-center font-inter font-normal text-[15px] text-black hover:bg-[#C26666] cursor-pointer z-10"
-															onClick={(e) => {
-																e.stopPropagation();
-																handleSelectAllContacts();
-															}}
-														>
-															{/* Vertical divider line */}
-															<div className="absolute left-0 -top-[0.5px] -bottom-[0.5px] w-[2px] bg-[#9A3434]" />
-															All
-														</button>
-													)}
-												</div>
-												{/* Right arrow */}
-												<button
-													type="button"
-													onClick={goToNextTab}
-													className="bg-transparent border-0 p-0 cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0"
-													aria-label="Next tab"
-												>
-													<RightArrow width="14" height="27" />
-												</button>
-											</div>
-										)}
-										{/* Research panel below draft button at narrowest breakpoint */}
-										{isNarrowestDesktop && (
-											<div className="mt-[20px] w-full flex justify-center">
-												{isBatchDraftingInProgress ? (
-													<DraftPreviewExpandedList
-														contacts={contacts || []}
-														livePreview={liveDraftPreview}
-														fallbackDraft={draftPreviewFallbackDraft}
-														width={489}
-														height={400}
-													/>
-												) : (
-													<ContactResearchPanel
-														contact={displayedContactForResearch}
-														hideAllText={contactsAvailableForDrafting.length === 0}
-														hideSummaryIfBullets={true}
-														height={400}
-														width={489}
-														boxWidth={474}
-														compactHeader
-														style={{ display: 'block' }}
-													/>
-												)}
-											</div>
-										)}
-										{/* MiniEmailStructure below research panel at narrowest breakpoint (< 952px) */}
-										{isNarrowestDesktop && (
-											<div className="mt-[10px] w-full flex justify-center">
-												<div style={{ width: '489px' }}>
-													<MiniEmailStructure
-														form={
-															isDraftingView
-																? draftsSettingsPreviewForm
-																: isSentView
-																	? sentSettingsPreviewForm
-																	: form
-														}
-														readOnly={isDraftingView || isSentView}
-														variant={draftsMiniEmailTopHeaderHeight ? 'settings' : undefined}
-														settingsPrimaryLabel={draftsMiniEmailSettingsLabels.primary}
-														settingsSecondaryLabel={draftsMiniEmailSettingsLabels.secondary}
-														settingsNameCompanyBgColor={draftsMiniEmailSettingsNameCompanyBgColor}
-														profileFields={profileFieldsForSettings}
-														identityProfile={campaign?.identity as IdentityProfileFields | null}
-														onIdentityUpdate={handleIdentityUpdate}
-														onDraft={() =>
-															handleGenerateDrafts(
-																contactsAvailableForDrafting.map((c) => c.id)
-															)
-														}
-														isDraftDisabled={isGenerationDisabled()}
-														isPendingGeneration={isPendingGeneration}
-														generationProgress={generationProgress}
-														generationTotal={generationTotal}
-														hideTopChrome
-														hideFooter
-														fullWidthMobile
-														hideAddTextButtons
-														pageFillColor={draftsMiniEmailFillColor}
-														topHeaderHeight={draftsMiniEmailTopHeaderHeight}
-														topHeaderLabel={draftsMiniEmailTopHeaderLabel}
-														onOpenWriting={goToWriting}
-													/>
-												</div>
-											</div>
-										)}
-									</div>
-								)}
-							</div>
-						)}
-
 						{/* Sent tab - show the sent emails table */}
 						{view === 'sent' && (
 							<div className={`w-full ${isMobile ? 'mt-6' : 'min-h-[300px]'}`}>
@@ -6135,7 +5411,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											onContactClick={handleResearchContactClick}
 											onContactHover={handleResearchContactHover}
 											onEmailHover={setHoveredSentForSettings}
-											goToContacts={goToContacts}
 											goToDrafts={goToDrafting}
 											goToWriting={goToWriting}
 											goToSearch={onGoToSearch}
@@ -6159,7 +5434,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													sentCount={sentCount}
 													draftingProgress={draftingProgressForHeader}
 													onFromClick={onOpenIdentityDialog}
-													onContactsClick={goToContacts}
 													onDraftsClick={goToDrafting}
 													onSentClick={goToSent}
 													width={330}
@@ -6235,7 +5509,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													onContactClick={handleResearchContactClick}
 													onContactHover={handleResearchContactHover}
 													onEmailHover={setHoveredSentForSettings}
-													goToContacts={goToContacts}
 													goToDrafts={goToDrafting}
 													goToWriting={goToWriting}
 													goToSearch={onGoToSearch}
@@ -6260,7 +5533,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												whiteSectionHeight={15}
 												collapsed={bottomPanelCollapsed}
 												showSearchBar={false}
-												onOpenContacts={goToContacts}
 											/>
 											<DraftsExpandedList
 												drafts={draftEmails}
@@ -6294,7 +5566,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											onContactClick={handleResearchContactClick}
 											onContactHover={handleResearchContactHover}
 											onEmailHover={setHoveredSentForSettings}
-											goToContacts={goToContacts}
 											goToDrafts={goToDrafting}
 											goToWriting={goToWriting}
 											goToSearch={onGoToSearch}
@@ -6382,7 +5653,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													whiteSectionHeight={15}
 													collapsed={bottomPanelCollapsed}
 													showSearchBar={false}
-													onOpenContacts={goToContacts}
 												/>
 												<DraftsExpandedList
 													drafts={draftEmails}
@@ -6429,7 +5699,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												sentCount={sentCount}
 												draftingProgress={draftingProgressForHeader}
 												onFromClick={onOpenIdentityDialog}
-												onContactsClick={goToContacts}
 												onDraftsClick={goToDrafting}
 												onSentClick={goToSent}
 											/>
@@ -7543,7 +6812,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											campaignId={campaign.id}
 											onGoToDrafting={goToDrafting}
 											onGoToWriting={goToWriting}
-											onGoToContacts={goToContacts}
 											onGoToSearch={onGoToSearch}
 											inboxSentTabRequest={inboxSentTabRequest}
 											onInboxSentTabChange={onInboxSentTabChange}
@@ -7599,7 +6867,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													sentCount={sentCount}
 													draftingProgress={draftingProgressForHeader}
 													onFromClick={onOpenIdentityDialog}
-													onContactsClick={goToContacts}
 													onDraftsClick={goToDrafting}
 													onSentClick={goToSent}
 													width={375}
@@ -7631,7 +6898,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													campaignId={campaign.id}
 													onGoToDrafting={goToDrafting}
 													onGoToWriting={goToWriting}
-													onGoToContacts={goToContacts}
 													onGoToSearch={onGoToSearch}
 													inboxSentTabRequest={inboxSentTabRequest}
 													onInboxSentTabChange={onInboxSentTabChange}
@@ -7659,7 +6925,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 												whiteSectionHeight={15}
 												collapsed={bottomPanelCollapsed}
 												showSearchBar={false}
-												onOpenContacts={goToContacts}
 											/>
 											<DraftsExpandedList
 												drafts={draftEmails}
@@ -7693,7 +6958,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											campaignId={campaign.id}
 											onGoToDrafting={goToDrafting}
 											onGoToWriting={goToWriting}
-											onGoToContacts={goToContacts}
 											onGoToSearch={onGoToSearch}
 											inboxSentTabRequest={inboxSentTabRequest}
 											onInboxSentTabChange={onInboxSentTabChange}
@@ -7726,7 +6990,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 													whiteSectionHeight={15}
 													collapsed={bottomPanelCollapsed}
 													showSearchBar={false}
-													onOpenContacts={goToContacts}
 												/>
 												<DraftsExpandedList
 													drafts={draftEmails}
@@ -7752,1508 +7015,6 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 											</BottomPanelsContainer>
 										)}
 									</>
-								)}
-							</div>
-						)}
-
-						{/* All tab */}
-						{view === 'all' && (
-							<div
-								ref={allTabContainerRef}
-								className="mt-6 flex justify-center murmur-all-tab-dashboard"
-							>
-								<style jsx global>{`
-									/* --- Campaign "All" tab: hover should NOT tint rows --- */
-									.murmur-all-tab-dashboard .bg-\\[\\#F5DADA\\],
-									.murmur-all-tab-dashboard .bg-\\[\\#EAAEAE\\],
-									.murmur-all-tab-dashboard .bg-\\[\\#F9E5BA\\],
-									.murmur-all-tab-dashboard .bg-\\[\\#FFDF9F\\],
-									.murmur-all-tab-dashboard .bg-\\[\\#FDDEA5\\],
-									.murmur-all-tab-dashboard .bg-\\[\\#A8E6A8\\] {
-										background-color: #ffffff !important;
-									}
-
-									.murmur-all-tab-dashboard .hover\\:bg-\\[\\#F5DADA\\]:hover,
-									.murmur-all-tab-dashboard .hover\\:bg-\\[\\#F9E5BA\\]:hover {
-										background-color: #ffffff !important;
-									}
-
-									/* Remove “this is clickable” affordance inside tiles (tiles themselves still navigate). */
-									.murmur-all-tab-dashboard .cursor-pointer {
-										cursor: default !important;
-									}
-								`}</style>
-								{/* Single column layout at narrowest breakpoint (< 952px) */}
-								{isNarrowestDesktop ? (
-									<div className="flex flex-col items-center" style={{ gap: '39px' }}>
-										{/* 1. Campaign Header */}
-										<div className={getAllTabBoxOpacityClassName('header')}>
-											<CampaignHeaderBox
-												campaignId={campaign?.id}
-												campaignName={campaign?.name || 'Untitled Campaign'}
-												toListNames={toListNames}
-												fromName={fromName}
-												contactsCount={contactsCount}
-												draftCount={draftCount}
-												sentCount={sentCount}
-												draftingProgress={draftingProgressForHeader}
-												onFromClick={onOpenIdentityDialog}
-												onContactsClick={goToContacts}
-												onDraftsClick={goToDrafting}
-												onSentClick={goToSent}
-												width={330}
-											/>
-										</div>
-										{/* 2. Contacts */}
-										<div
-											className={getAllTabBoxOpacityClassName('contacts')}
-											style={{
-												width: '330px',
-												height: '263px',
-												overflow: 'visible',
-												position: 'relative',
-												cursor: 'pointer',
-											}}
-											onMouseEnter={() => handleAllTabBoxMouseEnter('contacts')}
-											onMouseLeave={() => handleAllTabBoxMouseLeave('contacts')}
-											onClickCapture={(e) => {
-												// In the All tab, clicks inside the tile should *only* navigate
-												// (disable internal list actions like Select All / row selection).
-												if (e.target === e.currentTarget) return;
-												e.preventDefault();
-												e.stopPropagation();
-												setHoveredAllTabBox(null);
-												goToContacts?.();
-											}}
-											onClick={() => {
-												setHoveredAllTabBox(null);
-												goToContacts?.();
-											}}
-										>
-											{isContactsHovered && (
-												<div
-													style={{
-														position: 'absolute',
-														top: '50%',
-														left: '50%',
-														transform: 'translate(-50%, -50%)',
-														width: '364px',
-														height: '278px',
-														backgroundColor: 'transparent',
-														border: 'none',
-														borderRadius: '0px',
-														zIndex: 10,
-														pointerEvents: 'none',
-													}}
-												/>
-											)}
-											<div style={{ position: 'relative', zIndex: 20 }}>
-												<ContactsExpandedList
-													contacts={contactsForContactsExpandedList}
-													isLoading={isContactsLoading}
-													campaign={campaign}
-													activelyDraftingContactIds={activelyDraftingContactIdsForContactsExpandedList}
-													interactionMode="allTab"
-													selectedContactIds={contactsTabSelectedIds}
-													onContactSelectionChange={(updater) =>
-														setContactsTabSelectedIds((prev) => updater(new Set(prev)))
-													}
-													onContactClick={handleResearchContactClick}
-													onContactHover={handleResearchContactHover}
-													onDraftSelected={async (ids) => {
-														await handleGenerateDrafts(ids);
-													}}
-													isDraftDisabled={isGenerationDisabled()}
-													isPendingGeneration={isPendingGeneration}
-													width={330}
-													height={263}
-													minRows={5}
-													onSearchFromMiniBar={handleMiniContactsSearch}
-													onOpenContacts={goToContacts}
-												/>
-											</div>
-										</div>
-										{/* 3. Writing */}
-										<div
-											className={getAllTabBoxOpacityClassName('writing')}
-											style={{
-												width: '330px',
-												height: '349px',
-												overflow: 'visible',
-												position: 'relative',
-												cursor: 'pointer',
-											}}
-											onMouseEnter={() => handleAllTabBoxMouseEnter('writing')}
-											onMouseLeave={() => handleAllTabBoxMouseLeave('writing')}
-											onClickCapture={(e) => {
-												// All tab: disable interactions inside MiniEmailStructure (tile click navigates).
-												if (e.target === e.currentTarget) return;
-												e.preventDefault();
-												e.stopPropagation();
-												setHoveredAllTabBox(null);
-												goToWriting?.();
-											}}
-											onClick={() => {
-												setHoveredAllTabBox(null);
-												goToWriting?.();
-											}}
-										>
-											<div style={{ position: 'relative', zIndex: 20 }}>
-												<MiniEmailStructure
-													form={
-														isDraftingView
-															? draftsSettingsPreviewForm
-															: isSentView
-																? sentSettingsPreviewForm
-																: form
-													}
-													readOnly={true}
-													variant={draftsMiniEmailTopHeaderHeight ? 'settings' : undefined}
-													settingsPrimaryLabel={draftsMiniEmailSettingsLabels.primary}
-													settingsSecondaryLabel={draftsMiniEmailSettingsLabels.secondary}
-													settingsNameCompanyBgColor={draftsMiniEmailSettingsNameCompanyBgColor}
-													profileFields={profileFieldsForSettings}
-													identityProfile={campaign?.identity as IdentityProfileFields | null}
-													onIdentityUpdate={handleIdentityUpdate}
-													onDraft={() =>
-														handleGenerateDrafts(
-															contactsAvailableForDrafting.map((c) => c.id)
-														)
-													}
-													isDraftDisabled={isGenerationDisabled()}
-													isPendingGeneration={isPendingGeneration}
-													generationProgress={generationProgress}
-													generationTotal={generationTotal}
-													hideTopChrome
-													hideFooter
-													fullWidthMobile
-													hideAddTextButtons
-													fitToHeight
-													height={349}
-													pageFillColor={draftsMiniEmailFillColor}
-													topHeaderHeight={draftsMiniEmailTopHeaderHeight}
-													topHeaderLabel={draftsMiniEmailTopHeaderLabel}
-													onOpenWriting={goToWriting}
-												/>
-											</div>
-										</div>
-										{/* 4. Drafts */}
-										<div
-											className={getAllTabBoxOpacityClassName('drafts')}
-											style={{
-												width: '330px',
-												height: '347px',
-												overflow: 'visible',
-												position: 'relative',
-												cursor: 'pointer',
-											}}
-											onMouseEnter={() => handleAllTabBoxMouseEnter('drafts')}
-											onMouseLeave={() => handleAllTabBoxMouseLeave('drafts')}
-											onClickCapture={(e) => {
-												if (e.target === e.currentTarget) return;
-												e.preventDefault();
-												e.stopPropagation();
-												setHoveredAllTabBox(null);
-												goToDrafting?.();
-											}}
-											onClick={() => {
-												setHoveredAllTabBox(null);
-												goToDrafting?.();
-											}}
-										>
-											<div style={{ position: 'relative', zIndex: 20 }}>
-												<DraftsExpandedList
-													drafts={draftEmails}
-													contacts={contacts || []}
-													onDraftHover={handleAllTabEmailHover}
-													interactionMode="allTab"
-													width={330}
-													height={347}
-													hideSendButton
-													onOpenDrafts={goToDrafting}
-												/>
-											</div>
-										</div>
-										{/* 5. Sent */}
-										<div
-											className={getAllTabBoxOpacityClassName('sent')}
-											style={{
-												width: '330px',
-												height: '347px',
-												overflow: 'visible',
-												position: 'relative',
-												cursor: 'pointer',
-											}}
-											onMouseEnter={() => handleAllTabBoxMouseEnter('sent')}
-											onMouseLeave={() => handleAllTabBoxMouseLeave('sent')}
-											onClickCapture={(e) => {
-												if (e.target === e.currentTarget) return;
-												e.preventDefault();
-												e.stopPropagation();
-												setHoveredAllTabBox(null);
-												goToSent?.();
-											}}
-											onClick={() => {
-												setHoveredAllTabBox(null);
-												goToSent?.();
-											}}
-										>
-											<div style={{ position: 'relative', zIndex: 20 }}>
-												<SentExpandedList
-													sent={sentEmails}
-													contacts={contacts || []}
-													onEmailHover={handleAllTabEmailHover}
-													interactionMode="allTab"
-													width={330}
-													height={347}
-													onOpenSent={goToSent}
-												/>
-											</div>
-										</div>
-										{/* 6. Research Panel */}
-										<div
-											className={getAllTabBoxOpacityClassName('research')}
-											onMouseEnter={() => handleAllTabBoxMouseEnter('research')}
-											onMouseLeave={() => handleAllTabBoxMouseLeave('research')}
-										>
-											<ContactResearchPanel
-												contact={displayedContactForResearch}
-												hideAllText={contactsAvailableForDrafting.length === 0}
-												hideSummaryIfBullets={true}
-												height={347}
-												width={330}
-												boxWidth={315}
-												compactHeader
-												className="!block"
-											/>
-										</div>
-										{/* 7. Suggestion Box */}
-										<div
-											className={getAllTabBoxOpacityClassName('suggestion')}
-											style={{
-												width: '330px',
-												height: '347px',
-												backgroundColor: '#D6EEEF',
-												border: '3px solid #000000',
-												borderRadius: '7px',
-												position: 'relative',
-											}}
-											onMouseEnter={() => handleAllTabBoxMouseEnter('suggestion')}
-											onMouseLeave={() => handleAllTabBoxMouseLeave('suggestion')}
-											onClickCapture={(e) => {
-												// All tab: suggestion tile is display-only (no clicks).
-												e.preventDefault();
-												e.stopPropagation();
-											}}
-										>
-											<div
-												style={{
-													height: '28px',
-													display: 'flex',
-													alignItems: 'center',
-													paddingLeft: '9px',
-												}}
-											>
-												<span className="font-inter font-bold text-[12px] leading-none text-black">
-													Suggestion
-												</span>
-											</div>
-											<div
-												style={{
-													position: 'absolute',
-													top: '26px',
-													left: '50%',
-													transform: 'translateX(-50%)',
-													width: '322px',
-													height: '25px',
-													backgroundColor: '#FFFFFF',
-													border: '2px solid #000000',
-													borderRadius: '5px',
-													boxSizing: 'border-box',
-													display: 'flex',
-													alignItems: 'center',
-													gap: '10px',
-													paddingLeft: '8px',
-													paddingRight: '8px',
-												}}
-											>
-												<div
-													style={{
-														width: '223px',
-														height: '12px',
-														backgroundColor: '#FFFFFF',
-														border: '2px solid #000000',
-														borderRadius: '8px',
-														overflow: 'hidden',
-														flexShrink: 0,
-														boxSizing: 'border-box',
-														position: 'relative',
-													}}
-												>
-													<div
-														style={{
-															height: '100%',
-															borderRadius: '999px',
-															backgroundColor: '#36B24A',
-															width: `${promptScoreFillPercent}%`,
-															maxWidth: '100%',
-															transition: 'width 250ms ease-out',
-														}}
-													/>
-												</div>
-												<div
-													style={{
-														fontFamily: 'Inter, system-ui, sans-serif',
-														fontWeight: 700,
-														fontSize: '12px',
-														lineHeight: '14px',
-														color: '#000000',
-														whiteSpace: 'nowrap',
-														overflow: 'hidden',
-														textOverflow: 'ellipsis',
-														flex: 1,
-														minWidth: 0,
-														textAlign: 'right',
-													}}
-												>
-													{promptScoreDisplayLabel}
-												</div>
-											</div>
-											<div
-												onClick={() => {
-													if (hasPreviousPrompt) {
-														undoUpscalePrompt();
-													}
-												}}
-												style={{
-													position: 'absolute',
-													top: '61px',
-													left: '6px',
-													width: '39px',
-													height: '32px',
-													backgroundColor: '#C2C2C2',
-													border: '2px solid #000000',
-													borderRadius: '8px',
-													display: 'flex',
-													alignItems: 'center',
-													justifyContent: 'center',
-													cursor: hasPreviousPrompt ? 'pointer' : 'not-allowed',
-												}}
-											>
-												{clampedPromptScore != null && <UndoIcon width="24" height="24" />}
-											</div>
-											<div
-												onClick={() => {
-													if (!isUpscalingPrompt) {
-														upscalePrompt();
-													}
-												}}
-												style={{
-													position: 'absolute',
-													top: '61px',
-													left: '50px',
-													width: '233px',
-													height: '32px',
-													backgroundColor: '#D7F0FF',
-													border: '2px solid #000000',
-													borderRadius: '8px',
-													display: 'flex',
-													alignItems: 'center',
-													justifyContent: 'space-between',
-													paddingLeft: '10px',
-													paddingRight: '10px',
-													cursor: isUpscalingPrompt ? 'wait' : 'pointer',
-												}}
-											>
-												{(clampedPromptScore != null || isUpscalingPrompt) && (
-													<>
-														<span
-															style={{
-																fontFamily: 'Inter, system-ui, sans-serif',
-																fontSize: '13px',
-																fontWeight: 500,
-																color: '#000000',
-																lineHeight: '1',
-															}}
-														>
-															{isUpscalingPrompt ? 'Upscaling...' : 'Upscale Instructions'}
-														</span>
-														<div style={{ flexShrink: 0 }}>
-															<UpscaleIcon width="20" height="20" />
-														</div>
-													</>
-												)}
-											</div>
-											<div
-												style={{
-													position: 'absolute',
-													top: '139px',
-													left: '8px',
-													fontFamily: 'Inter, system-ui, sans-serif',
-													fontWeight: 500,
-													fontSize: '17px',
-													lineHeight: '20px',
-													color: '#000000',
-												}}
-											>
-												Custom Instructions
-											</div>
-											{/* Suggestion 1 */}
-											<div
-												style={{
-													position: 'absolute',
-													top: '176px',
-													left: '50%',
-													transform: 'translateX(-50%)',
-													width: '315px',
-													height: '46px',
-													backgroundColor: '#A6DDE0',
-													border: '2px solid #000000',
-													borderRadius: '8px',
-													overflow: 'hidden',
-												}}
-											>
-												<div
-													className="absolute font-inter font-bold tabular-nums"
-													style={{
-														top: '4.5px',
-														left: '5px',
-														fontSize: '11.5px',
-														color: '#000000',
-													}}
-												>
-													[1]
-												</div>
-												<div
-													style={{
-														position: 'absolute',
-														top: '0',
-														bottom: '0',
-														margin: 'auto',
-														right: '6px',
-														width: '260px',
-														height: '39px',
-														backgroundColor: clampedPromptScore == null ? '#A6DDE0' : '#FFFFFF',
-														border: '2px solid #000000',
-														borderRadius: '8px',
-														display: 'flex',
-														alignItems: 'center',
-														padding: '4px 6px',
-														overflow: 'hidden',
-													}}
-												>
-													<div
-														style={{
-															fontFamily: 'Inter, system-ui, sans-serif',
-															fontSize: '10px',
-															lineHeight: '1.3',
-															color: suggestionText1 ? '#000000' : '#888888',
-															wordBreak: 'break-word',
-															whiteSpace: 'normal',
-															overflow: 'hidden',
-															textOverflow: 'ellipsis',
-															display: '-webkit-box',
-															WebkitLineClamp: 2,
-															WebkitBoxOrient: 'vertical',
-														}}
-													>
-														{suggestionText1 || (clampedPromptScore != null ? 'Add your prompt to get suggestions' : '')}
-													</div>
-												</div>
-											</div>
-											{/* Suggestion 2 */}
-											<div
-												style={{
-													position: 'absolute',
-													top: '230px',
-													left: '50%',
-													transform: 'translateX(-50%)',
-													width: '315px',
-													height: '46px',
-													backgroundColor: '#5BB9CB',
-													border: '2px solid #000000',
-													borderRadius: '8px',
-													overflow: 'hidden',
-												}}
-											>
-												<div
-													className="absolute font-inter font-bold tabular-nums"
-													style={{
-														top: '4.5px',
-														left: '5px',
-														fontSize: '11.5px',
-														color: '#000000',
-													}}
-												>
-													[2]
-												</div>
-												<div
-													style={{
-														position: 'absolute',
-														top: '0',
-														bottom: '0',
-														margin: 'auto',
-														right: '6px',
-														width: '260px',
-														height: '39px',
-														backgroundColor: clampedPromptScore == null ? '#5BB9CB' : '#FFFFFF',
-														border: '2px solid #000000',
-														borderRadius: '8px',
-														display: 'flex',
-														alignItems: 'center',
-														padding: '4px 6px',
-														overflow: 'hidden',
-													}}
-												>
-													<div
-														style={{
-															fontFamily: 'Inter, system-ui, sans-serif',
-															fontSize: '10px',
-															lineHeight: '1.3',
-															color: suggestionText2 ? '#000000' : '#888888',
-															wordBreak: 'break-word',
-															whiteSpace: 'normal',
-															overflow: 'hidden',
-															textOverflow: 'ellipsis',
-															display: '-webkit-box',
-															WebkitLineClamp: 2,
-															WebkitBoxOrient: 'vertical',
-														}}
-													>
-														{suggestionText2 || (clampedPromptScore != null ? 'More suggestions will appear here' : '')}
-													</div>
-												</div>
-											</div>
-											{/* Suggestion 3 */}
-											<div
-												style={{
-													position: 'absolute',
-													top: '284px',
-													left: '50%',
-													transform: 'translateX(-50%)',
-													width: '315px',
-													height: '46px',
-													backgroundColor: '#35859D',
-													border: '2px solid #000000',
-													borderRadius: '8px',
-													overflow: 'hidden',
-												}}
-											>
-												<div
-													className="absolute font-inter font-bold tabular-nums"
-													style={{
-														top: '4.5px',
-														left: '5px',
-														fontSize: '11.5px',
-														color: '#000000',
-													}}
-												>
-													[3]
-												</div>
-												<div
-													style={{
-														position: 'absolute',
-														top: '0',
-														bottom: '0',
-														margin: 'auto',
-														right: '6px',
-														width: '260px',
-														height: '39px',
-														backgroundColor: clampedPromptScore == null ? '#35859D' : '#FFFFFF',
-														border: '2px solid #000000',
-														borderRadius: '8px',
-														display: 'flex',
-														alignItems: 'center',
-														padding: '4px 6px',
-														overflow: 'hidden',
-													}}
-												>
-													<div
-														style={{
-															fontFamily: 'Inter, system-ui, sans-serif',
-															fontSize: '10px',
-															lineHeight: '1.3',
-															color: suggestionText3 ? '#000000' : '#888888',
-															wordBreak: 'break-word',
-															whiteSpace: 'normal',
-															overflow: 'hidden',
-															textOverflow: 'ellipsis',
-															display: '-webkit-box',
-															WebkitLineClamp: 2,
-															WebkitBoxOrient: 'vertical',
-														}}
-													>
-														{suggestionText3 || (clampedPromptScore != null ? 'Additional suggestions here' : '')}
-													</div>
-												</div>
-											</div>
-										</div>
-										{/* 8. Draft Preview */}
-										<div
-											className={getAllTabBoxOpacityClassName('preview')}
-											onMouseEnter={() => handleAllTabBoxMouseEnter('preview')}
-											onMouseLeave={() => handleAllTabBoxMouseLeave('preview')}
-										>
-											<DraftPreviewExpandedList
-												contacts={contacts || []}
-												livePreview={
-													allTabHoveredEmailPreview
-														? { ...liveDraftPreview, visible: false }
-														: liveDraftPreview
-												}
-												fallbackDraft={allTabHoveredEmailPreview ?? draftPreviewFallbackDraft}
-												width={330}
-												height={347}
-											/>
-										</div>
-										{/* 9. Inbox */}
-										<div
-											className={getAllTabBoxOpacityClassName('inbox')}
-											style={{
-												width: '330px',
-												height: '347px',
-												overflow: 'visible',
-												position: 'relative',
-												cursor: 'pointer',
-											}}
-											onMouseEnter={() => handleAllTabBoxMouseEnter('inbox')}
-											onMouseLeave={() => handleAllTabBoxMouseLeave('inbox')}
-											onClickCapture={(e) => {
-												if (e.target === e.currentTarget) return;
-												e.preventDefault();
-												e.stopPropagation();
-												setHoveredAllTabBox(null);
-												goToInbox?.();
-											}}
-											onClick={() => {
-												setHoveredAllTabBox(null);
-												goToInbox?.();
-											}}
-										>
-											<div style={{ position: 'relative', zIndex: 20 }}>
-												<InboxExpandedList
-													contacts={contacts || []}
-													allowedSenderEmails={campaignContactEmails}
-													contactByEmail={campaignContactsByEmail}
-													width={330}
-													height={347}
-													onOpenInbox={goToInbox}
-												/>
-											</div>
-										</div>
-									</div>
-								) : (
-								<div
-									className={cn('flex flex-row items-start', !isAllTabNarrow && 'pb-[14px]')}
-									style={{ gap: '30px' }}
-								>
-									{/* Left column: Campaign Header + Contacts + Research (+ Preview in narrow mode) */}
-									<div className="flex flex-col items-center" style={{ gap: '39px' }}>
-										<div className={getAllTabBoxOpacityClassName('header')}>
-											<CampaignHeaderBox
-												campaignId={campaign?.id}
-												campaignName={campaign?.name || 'Untitled Campaign'}
-												toListNames={toListNames}
-												fromName={fromName}
-												contactsCount={contactsCount}
-												draftCount={draftCount}
-												sentCount={sentCount}
-												draftingProgress={draftingProgressForHeader}
-												onFromClick={onOpenIdentityDialog}
-												onContactsClick={goToContacts}
-												onDraftsClick={goToDrafting}
-												onSentClick={goToSent}
-												width={330}
-											/>
-										</div>
-										<div
-											className={getAllTabBoxOpacityClassName('contacts')}
-											style={{
-												width: '330px',
-												height: '263px',
-												overflow: 'visible',
-												marginTop: '-24px', // Align bottom with MiniEmailStructure (349px): Header 71px + Gap 39px - 24px + Contacts 263px = 349px
-												position: 'relative',
-												cursor: 'pointer',
-											}}
-											onMouseEnter={() => handleAllTabBoxMouseEnter('contacts')}
-											onMouseLeave={() => handleAllTabBoxMouseLeave('contacts')}
-											onClickCapture={(e) => {
-												if (e.target === e.currentTarget) return;
-												e.preventDefault();
-												e.stopPropagation();
-												setHoveredAllTabBox(null);
-												goToContacts?.();
-											}}
-											onClick={() => {
-												setHoveredAllTabBox(null);
-												goToContacts?.();
-											}}
-										>
-											{/* Hover box */}
-											{isContactsHovered && (
-												<div
-													style={{
-														position: 'absolute',
-														top: '50%',
-														left: '50%',
-														transform: 'translate(-50%, -50%)',
-														width: '364px',
-														height: '278px',
-														backgroundColor: 'transparent',
-														border: 'none',
-														borderRadius: '0px',
-														zIndex: 10,
-														pointerEvents: 'none',
-													}}
-												/>
-											)}
-											<div style={{ position: 'relative', zIndex: 20 }}>
-												<ContactsExpandedList
-													contacts={contactsForContactsExpandedList}
-													isLoading={isContactsLoading}
-													campaign={campaign}
-													activelyDraftingContactIds={activelyDraftingContactIdsForContactsExpandedList}
-													interactionMode="allTab"
-													selectedContactIds={contactsTabSelectedIds}
-													onContactSelectionChange={(updater) =>
-														setContactsTabSelectedIds((prev) => updater(new Set(prev)))
-													}
-													onContactClick={handleResearchContactClick}
-													onContactHover={handleResearchContactHover}
-													onDraftSelected={async (ids) => {
-														await handleGenerateDrafts(ids);
-													}}
-													isDraftDisabled={isGenerationDisabled()}
-													isPendingGeneration={isPendingGeneration}
-													width={330}
-													height={263}
-													minRows={5}
-													onSearchFromMiniBar={handleMiniContactsSearch}
-													onOpenContacts={goToContacts}
-												/>
-											</div>
-										</div>
-										{/* In narrow mode (2x4 grid), add Drafts here after Contacts */}
-										{isAllTabNarrow && (
-											<div
-												className={getAllTabBoxOpacityClassName('drafts')}
-												style={{
-													width: '330px',
-													height: '347px',
-													overflow: 'visible',
-													position: 'relative',
-													cursor: 'pointer',
-												}}
-												onMouseEnter={() => handleAllTabBoxMouseEnter('drafts')}
-												onMouseLeave={() => handleAllTabBoxMouseLeave('drafts')}
-												onClickCapture={(e) => {
-													if (e.target === e.currentTarget) return;
-													e.preventDefault();
-													e.stopPropagation();
-													setHoveredAllTabBox(null);
-													goToDrafting?.();
-												}}
-												onClick={() => {
-													setHoveredAllTabBox(null);
-													goToDrafting?.();
-												}}
-											>
-												{/* Hover box */}
-												<div style={{ position: 'relative', zIndex: 20 }}>
-													<DraftsExpandedList
-														drafts={draftEmails}
-														contacts={contacts || []}
-														onDraftHover={handleAllTabEmailHover}
-														interactionMode="allTab"
-														width={330}
-														height={347}
-														hideSendButton
-														onOpenDrafts={goToDrafting}
-													/>
-												</div>
-											</div>
-										)}
-										{/* Research Panel */}
-										<div
-											className={getAllTabBoxOpacityClassName('research')}
-											onMouseEnter={() => handleAllTabBoxMouseEnter('research')}
-											onMouseLeave={() => handleAllTabBoxMouseLeave('research')}
-										>
-											<ContactResearchPanel
-												contact={displayedContactForResearch}
-												hideAllText={contactsAvailableForDrafting.length === 0}
-												hideSummaryIfBullets={true}
-												height={347}
-												width={330}
-												boxWidth={315}
-												compactHeader
-												className="!block"
-											/>
-										</div>
-										{/* In narrow mode (2x4 grid), move Preview here */}
-										{isAllTabNarrow && (
-											<div
-												className={getAllTabBoxOpacityClassName('preview')}
-												onMouseEnter={() => handleAllTabBoxMouseEnter('preview')}
-												onMouseLeave={() => handleAllTabBoxMouseLeave('preview')}
-											>
-												<DraftPreviewExpandedList
-													contacts={contacts || []}
-													livePreview={
-														allTabHoveredEmailPreview
-															? { ...liveDraftPreview, visible: false }
-															: liveDraftPreview
-													}
-													fallbackDraft={allTabHoveredEmailPreview ?? draftPreviewFallbackDraft}
-													width={330}
-													height={347}
-												/>
-											</div>
-										)}
-									</div>
-									{/* Column 2: Writing (Row 1) + Suggestion (Row 2) */}
-									<div className="flex flex-col items-center" style={{ gap: '39px' }}>
-										{/* Row 1: Mini Email Structure */}
-										<div
-											className={getAllTabBoxOpacityClassName('writing')}
-											style={{
-												width: '330px',
-												height: '349px',
-												overflow: 'visible',
-												position: 'relative',
-												cursor: 'pointer',
-											}}
-											onMouseEnter={() => handleAllTabBoxMouseEnter('writing')}
-											onMouseLeave={() => handleAllTabBoxMouseLeave('writing')}
-											onClickCapture={(e) => {
-												if (e.target === e.currentTarget) return;
-												e.preventDefault();
-												e.stopPropagation();
-												setHoveredAllTabBox(null);
-												goToWriting?.();
-											}}
-											onClick={() => {
-												setHoveredAllTabBox(null);
-												goToWriting?.();
-											}}
-										>
-											{/* Hover box */}
-											<div style={{ position: 'relative', zIndex: 20 }}>
-												<MiniEmailStructure
-													form={
-														isDraftingView
-															? draftsSettingsPreviewForm
-															: isSentView
-																? sentSettingsPreviewForm
-																: form
-													}
-													readOnly={true}
-													variant={draftsMiniEmailTopHeaderHeight ? 'settings' : undefined}
-													settingsPrimaryLabel={draftsMiniEmailSettingsLabels.primary}
-													settingsSecondaryLabel={draftsMiniEmailSettingsLabels.secondary}
-													settingsNameCompanyBgColor={draftsMiniEmailSettingsNameCompanyBgColor}
-													profileFields={profileFieldsForSettings}
-													identityProfile={campaign?.identity as IdentityProfileFields | null}
-													onIdentityUpdate={handleIdentityUpdate}
-													onDraft={() =>
-														handleGenerateDrafts(
-															contactsAvailableForDrafting.map((c) => c.id)
-														)
-													}
-													isDraftDisabled={isGenerationDisabled()}
-													isPendingGeneration={isPendingGeneration}
-													generationProgress={generationProgress}
-													generationTotal={generationTotal}
-													hideTopChrome
-													hideFooter
-													fullWidthMobile
-													hideAddTextButtons
-													fitToHeight
-													height={349}
-													pageFillColor={draftsMiniEmailFillColor}
-													topHeaderHeight={draftsMiniEmailTopHeaderHeight}
-													topHeaderLabel={draftsMiniEmailTopHeaderLabel}
-													onOpenWriting={goToWriting}
-												/>
-											</div>
-										</div>
-										{/* In narrow mode, add Sent here (after Writing, before Suggestion) */}
-										{isAllTabNarrow && (
-											<div
-												className={getAllTabBoxOpacityClassName('sent')}
-												style={{
-													width: '330px',
-													height: '347px',
-													overflow: 'visible',
-													position: 'relative',
-													cursor: 'pointer',
-												}}
-												onMouseEnter={() => handleAllTabBoxMouseEnter('sent')}
-												onMouseLeave={() => handleAllTabBoxMouseLeave('sent')}
-												onClickCapture={(e) => {
-													if (e.target === e.currentTarget) return;
-													e.preventDefault();
-													e.stopPropagation();
-													setHoveredAllTabBox(null);
-													goToSent?.();
-												}}
-												onClick={() => {
-													setHoveredAllTabBox(null);
-													goToSent?.();
-												}}
-											>
-												{/* Hover box */}
-												<div style={{ position: 'relative', zIndex: 20 }}>
-													<SentExpandedList
-														sent={sentEmails}
-														contacts={contacts || []}
-														onEmailHover={handleAllTabEmailHover}
-														interactionMode="allTab"
-														width={330}
-														height={347}
-														onOpenSent={goToSent}
-													/>
-												</div>
-											</div>
-										)}
-										{/* Row 2: Suggestion Box */}
-										<div
-											className={getAllTabBoxOpacityClassName('suggestion')}
-											style={{
-												width: '330px',
-												height: '347px',
-												backgroundColor: '#D6EEEF',
-												border: '3px solid #000000',
-												borderRadius: '7px',
-												position: 'relative',
-											}}
-											onMouseEnter={() => handleAllTabBoxMouseEnter('suggestion')}
-											onMouseLeave={() => handleAllTabBoxMouseLeave('suggestion')}
-										>
-											<div
-												style={{
-													height: '28px',
-													display: 'flex',
-													alignItems: 'center',
-													paddingLeft: '9px',
-												}}
-											>
-												<span className="font-inter font-bold text-[12px] leading-none text-black">
-													Suggestion
-												</span>
-											</div>
-											{/* Inner box */}
-											<div
-												style={{
-													position: 'absolute',
-													top: '26px',
-													left: '50%',
-													transform: 'translateX(-50%)',
-													width: '322px',
-													height: '25px',
-													backgroundColor: '#FFFFFF',
-													border: '2px solid #000000',
-													borderRadius: '5px',
-													boxSizing: 'border-box',
-													display: 'flex',
-													alignItems: 'center',
-													gap: '10px',
-													paddingLeft: '8px',
-													paddingRight: '8px',
-												}}
-											>
-												<div
-													style={{
-														width: '223px',
-														height: '12px',
-														backgroundColor: '#FFFFFF',
-														border: '2px solid #000000',
-														borderRadius: '8px',
-														overflow: 'hidden',
-														flexShrink: 0,
-														boxSizing: 'border-box',
-														position: 'relative',
-													}}
-												>
-													<div
-														style={{
-															height: '100%',
-															borderRadius: '999px',
-															backgroundColor: '#36B24A',
-															width: `${promptScoreFillPercent}%`,
-															maxWidth: '100%',
-															transition: 'width 250ms ease-out',
-														}}
-													/>
-												</div>
-												<div
-													style={{
-														fontFamily: 'Inter, system-ui, sans-serif',
-														fontWeight: 700,
-														fontSize: '12px',
-														lineHeight: '14px',
-														color: '#000000',
-														whiteSpace: 'nowrap',
-														overflow: 'hidden',
-														textOverflow: 'ellipsis',
-														flex: 1,
-														minWidth: 0,
-														textAlign: 'right',
-													}}
-												>
-													{promptScoreDisplayLabel}
-												</div>
-											</div>
-											{/* Undo button */}
-											<div
-												onClick={() => {
-													if (hasPreviousPrompt) {
-														undoUpscalePrompt();
-													}
-												}}
-												style={{
-													position: 'absolute',
-													top: '61px',
-													left: '6px',
-													width: '39px',
-													height: '32px',
-													backgroundColor: '#C2C2C2',
-													border: '2px solid #000000',
-													borderRadius: '8px',
-													display: 'flex',
-													alignItems: 'center',
-													justifyContent: 'center',
-													cursor: hasPreviousPrompt ? 'pointer' : 'not-allowed',
-												}}
-											>
-												{clampedPromptScore != null && <UndoIcon width="24" height="24" />}
-											</div>
-											{/* Upscale Prompt button */}
-											<div
-												onClick={() => {
-													if (!isUpscalingPrompt) {
-														upscalePrompt();
-													}
-												}}
-												style={{
-													position: 'absolute',
-													top: '61px',
-													left: '50px',
-													width: '233px',
-													height: '32px',
-													backgroundColor: '#D7F0FF',
-													border: '2px solid #000000',
-													borderRadius: '8px',
-													display: 'flex',
-													alignItems: 'center',
-													justifyContent: 'space-between',
-													paddingLeft: '10px',
-													paddingRight: '10px',
-													cursor: isUpscalingPrompt ? 'wait' : 'pointer',
-												}}
-											>
-												{(clampedPromptScore != null || isUpscalingPrompt) && (
-													<>
-														<span
-															style={{
-																fontFamily: 'Inter, system-ui, sans-serif',
-																fontSize: '13px',
-																fontWeight: 500,
-																color: '#000000',
-																lineHeight: '1',
-															}}
-														>
-															{isUpscalingPrompt ? 'Upscaling...' : 'Upscale Instructions'}
-														</span>
-														<div style={{ flexShrink: 0 }}>
-															<UpscaleIcon width="20" height="20" />
-														</div>
-													</>
-												)}
-											</div>
-											<div
-												style={{
-													position: 'absolute',
-													top: '139px',
-													left: '8px',
-													fontFamily: 'Inter, system-ui, sans-serif',
-													fontWeight: 500,
-													fontSize: '17px',
-													lineHeight: '20px',
-													color: '#000000',
-												}}
-											>
-												Custom Instructions
-											</div>
-											{/* Suggestion 1 */}
-											<div
-												style={{
-													position: 'absolute',
-													top: '176px',
-													left: '50%',
-													transform: 'translateX(-50%)',
-													width: '315px',
-													height: '46px',
-													backgroundColor: '#A6DDE0',
-													border: '2px solid #000000',
-													borderRadius: '8px',
-													overflow: 'hidden',
-												}}
-											>
-												<div
-													className="absolute font-inter font-bold tabular-nums"
-													style={{
-														top: '4.5px',
-														left: '5px',
-														fontSize: '11.5px',
-														color: '#000000',
-													}}
-												>
-													[1]
-												</div>
-												<div
-													style={{
-														position: 'absolute',
-														top: '0',
-														bottom: '0',
-														margin: 'auto',
-														right: '6px',
-														width: '260px',
-														height: '39px',
-														backgroundColor: clampedPromptScore == null ? '#A6DDE0' : '#FFFFFF',
-														border: '2px solid #000000',
-														borderRadius: '8px',
-														display: 'flex',
-														alignItems: 'center',
-														padding: '4px 6px',
-														overflow: 'hidden',
-													}}
-												>
-													<div
-														style={{
-															fontFamily: 'Inter, system-ui, sans-serif',
-															fontSize: '10px',
-															lineHeight: '1.3',
-															color: suggestionText1 ? '#000000' : '#888888',
-															wordBreak: 'break-word',
-															whiteSpace: 'normal',
-															overflow: 'hidden',
-															textOverflow: 'ellipsis',
-															display: '-webkit-box',
-															WebkitLineClamp: 2,
-															WebkitBoxOrient: 'vertical',
-														}}
-													>
-														{suggestionText1 || (clampedPromptScore != null ? 'Add your prompt to get suggestions' : '')}
-													</div>
-												</div>
-											</div>
-											{/* Suggestion 2 */}
-											<div
-												style={{
-													position: 'absolute',
-													top: '230px',
-													left: '50%',
-													transform: 'translateX(-50%)',
-													width: '315px',
-													height: '46px',
-													backgroundColor: '#5BB9CB',
-													border: '2px solid #000000',
-													borderRadius: '8px',
-													overflow: 'hidden',
-												}}
-											>
-												<div
-													className="absolute font-inter font-bold tabular-nums"
-													style={{
-														top: '4.5px',
-														left: '5px',
-														fontSize: '11.5px',
-														color: '#000000',
-													}}
-												>
-													[2]
-												</div>
-												<div
-													style={{
-														position: 'absolute',
-														top: '0',
-														bottom: '0',
-														margin: 'auto',
-														right: '6px',
-														width: '260px',
-														height: '39px',
-														backgroundColor: clampedPromptScore == null ? '#5BB9CB' : '#FFFFFF',
-														border: '2px solid #000000',
-														borderRadius: '8px',
-														display: 'flex',
-														alignItems: 'center',
-														padding: '4px 6px',
-														overflow: 'hidden',
-													}}
-												>
-													<div
-														style={{
-															fontFamily: 'Inter, system-ui, sans-serif',
-															fontSize: '10px',
-															lineHeight: '1.3',
-															color: suggestionText2 ? '#000000' : '#888888',
-															wordBreak: 'break-word',
-															whiteSpace: 'normal',
-															overflow: 'hidden',
-															textOverflow: 'ellipsis',
-															display: '-webkit-box',
-															WebkitLineClamp: 2,
-															WebkitBoxOrient: 'vertical',
-														}}
-													>
-														{suggestionText2 || (clampedPromptScore != null ? 'More suggestions will appear here' : '')}
-													</div>
-												</div>
-											</div>
-											{/* Suggestion 3 */}
-											<div
-												style={{
-													position: 'absolute',
-													top: '284px',
-													left: '50%',
-													transform: 'translateX(-50%)',
-													width: '315px',
-													height: '46px',
-													backgroundColor: '#35859D',
-													border: '2px solid #000000',
-													borderRadius: '8px',
-													overflow: 'hidden',
-												}}
-											>
-												<div
-													className="absolute font-inter font-bold tabular-nums"
-													style={{
-														top: '4.5px',
-														left: '5px',
-														fontSize: '11.5px',
-														color: '#000000',
-													}}
-												>
-													[3]
-												</div>
-												<div
-													style={{
-														position: 'absolute',
-														top: '0',
-														bottom: '0',
-														margin: 'auto',
-														right: '6px',
-														width: '260px',
-														height: '39px',
-														backgroundColor: clampedPromptScore == null ? '#35859D' : '#FFFFFF',
-														border: '2px solid #000000',
-														borderRadius: '8px',
-														display: 'flex',
-														alignItems: 'center',
-														padding: '4px 6px',
-														overflow: 'hidden',
-													}}
-												>
-													<div
-														style={{
-															fontFamily: 'Inter, system-ui, sans-serif',
-															fontSize: '10px',
-															lineHeight: '1.3',
-															color: suggestionText3 ? '#000000' : '#888888',
-															wordBreak: 'break-word',
-															whiteSpace: 'normal',
-															overflow: 'hidden',
-															textOverflow: 'ellipsis',
-															display: '-webkit-box',
-															WebkitLineClamp: 2,
-															WebkitBoxOrient: 'vertical',
-														}}
-													>
-														{suggestionText3 || (clampedPromptScore != null ? 'Additional suggestions here' : '')}
-													</div>
-												</div>
-											</div>
-										</div>
-										{/* In narrow mode (2x4 grid), add Inbox here (after Suggestion) */}
-										{isAllTabNarrow && (
-											<>
-												{/* Inbox */}
-												<div
-													className={getAllTabBoxOpacityClassName('inbox')}
-													style={{
-														width: '330px',
-														height: '347px',
-														overflow: 'visible',
-														position: 'relative',
-														cursor: 'pointer',
-													}}
-													onMouseEnter={() => handleAllTabBoxMouseEnter('inbox')}
-													onMouseLeave={() => handleAllTabBoxMouseLeave('inbox')}
-													onClick={() => {
-														setHoveredAllTabBox(null);
-														goToInbox?.();
-													}}
-												>
-													{/* Hover box */}
-													<div style={{ position: 'relative', zIndex: 20 }}>
-														<InboxExpandedList
-															contacts={contacts || []}
-															allowedSenderEmails={campaignContactEmails}
-															contactByEmail={campaignContactsByEmail}
-															width={330}
-															height={347}
-															onOpenInbox={goToInbox}
-														/>
-													</div>
-												</div>
-											</>
-										)}
-									</div>
-
-									{/* Column 3 & 4: hidden in narrow mode (2x4 grid) */}
-									{!isAllTabNarrow && (
-									<>
-									{/* Column 3: Drafts (Row 1) + Preview (Row 2) */}
-									<div className="flex flex-col items-center" style={{ gap: '39px' }}>
-										{/* Row 1: Drafts */}
-										<div
-											className={getAllTabBoxOpacityClassName('drafts')}
-											style={{
-												width: '330px',
-												height: '347px',
-												overflow: 'visible',
-												position: 'relative',
-												cursor: 'pointer',
-											}}
-											onMouseEnter={() => handleAllTabBoxMouseEnter('drafts')}
-											onMouseLeave={() => handleAllTabBoxMouseLeave('drafts')}
-											onClickCapture={(e) => {
-												if (e.target === e.currentTarget) return;
-												e.preventDefault();
-												e.stopPropagation();
-												setHoveredAllTabBox(null);
-												goToDrafting?.();
-											}}
-											onClick={() => {
-												setHoveredAllTabBox(null);
-												goToDrafting?.();
-											}}
-										>
-											{/* Hover box */}
-											<div style={{ position: 'relative', zIndex: 20 }}>
-												<DraftsExpandedList
-													drafts={draftEmails}
-													contacts={contacts || []}
-													onDraftHover={handleAllTabEmailHover}
-													interactionMode="allTab"
-													width={330}
-													height={347}
-													hideSendButton
-													onOpenDrafts={goToDrafting}
-												/>
-											</div>
-										</div>
-										{/* Row 2: Draft Preview */}
-										<div
-											className={getAllTabBoxOpacityClassName('preview')}
-											onMouseEnter={() => handleAllTabBoxMouseEnter('preview')}
-											onMouseLeave={() => handleAllTabBoxMouseLeave('preview')}
-										>
-											<DraftPreviewExpandedList
-												contacts={contacts || []}
-												livePreview={
-													allTabHoveredEmailPreview
-														? { ...liveDraftPreview, visible: false }
-														: liveDraftPreview
-												}
-												fallbackDraft={allTabHoveredEmailPreview ?? draftPreviewFallbackDraft}
-												width={330}
-												height={347}
-											/>
-										</div>
-									</div>
-
-									{/* Column 4: Sent (Row 1) + Inbox (Row 2) */}
-									<div className="flex flex-col items-center" style={{ gap: '39px' }}>
-										{/* Row 1: Sent */}
-										<div
-											className={getAllTabBoxOpacityClassName('sent')}
-											style={{
-												width: '330px',
-												height: '347px',
-												overflow: 'visible',
-												position: 'relative',
-												cursor: 'pointer',
-											}}
-											onMouseEnter={() => handleAllTabBoxMouseEnter('sent')}
-											onMouseLeave={() => handleAllTabBoxMouseLeave('sent')}
-											onClickCapture={(e) => {
-												if (e.target === e.currentTarget) return;
-												e.preventDefault();
-												e.stopPropagation();
-												setHoveredAllTabBox(null);
-												goToSent?.();
-											}}
-											onClick={() => {
-												setHoveredAllTabBox(null);
-												goToSent?.();
-											}}
-										>
-											{/* Hover box */}
-											<div style={{ position: 'relative', zIndex: 20 }}>
-												<SentExpandedList
-													sent={sentEmails}
-													contacts={contacts || []}
-													onEmailHover={handleAllTabEmailHover}
-													interactionMode="allTab"
-													width={330}
-													height={347}
-													onOpenSent={goToSent}
-												/>
-											</div>
-										</div>
-										{/* Row 2: Inbox */}
-										<div
-											className={getAllTabBoxOpacityClassName('inbox')}
-											style={{
-												width: '330px',
-												height: '347px',
-												overflow: 'visible',
-												position: 'relative',
-												cursor: 'pointer',
-											}}
-											onMouseEnter={() => handleAllTabBoxMouseEnter('inbox')}
-											onMouseLeave={() => handleAllTabBoxMouseLeave('inbox')}
-											onClickCapture={(e) => {
-												if (e.target === e.currentTarget) return;
-												e.preventDefault();
-												e.stopPropagation();
-												setHoveredAllTabBox(null);
-												goToInbox?.();
-											}}
-											onClick={() => {
-												setHoveredAllTabBox(null);
-												goToInbox?.();
-											}}
-										>
-											{/* Hover box */}
-											<div style={{ position: 'relative', zIndex: 20 }}>
-												<InboxExpandedList
-													contacts={contacts || []}
-													allowedSenderEmails={campaignContactEmails}
-													contactByEmail={campaignContactsByEmail}
-													width={330}
-													height={347}
-													onOpenInbox={goToInbox}
-												/>
-											</div>
-										</div>
-									</div>
-									</>
-									)}
-								</div>
 								)}
 							</div>
 						)}

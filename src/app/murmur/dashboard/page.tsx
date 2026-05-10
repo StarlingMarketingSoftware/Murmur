@@ -38,7 +38,6 @@ import { WeddingPlannersIcon } from '@/components/atoms/_svg/WeddingPlannersIcon
 import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
 import { RadioStationsIcon } from '@/components/atoms/_svg/RadioStationsIcon';
 import { NearMeIcon } from '@/components/atoms/_svg/NearMeIcon';
-import BottomArrowIcon from '@/components/atoms/_svg/BottomArrowIcon';
 import MapBottomSearchArrowIcon from '@/components/atoms/_svg/MapBottomSearchArrowIcon';
 import MapBottomSearchAdvancedIcon from '@/components/atoms/_svg/MapBottomSearchAdvancedIcon';
 import MapBottomSearchCategoryIcon from '@/components/atoms/_svg/MapBottomSearchCategoryIcon';
@@ -2941,13 +2940,32 @@ const DashboardContent = () => {
 			}
 
 			hasHydratedDashboardUrlRef.current = true;
-			rehydrateCuratedSession({
-				lat: curatedLatParam,
-				lon: curatedLonParam,
-				radiusKm: curatedRadiusKmParam,
-				category: curatedCategoryParam || null,
-				state: curatedStateParam || null,
-			}).catch(() => undefined);
+			// Fresh curated entry (e.g. arriving via the campaign "Search" tab with just `?pick=1`)
+			// won't have captured lat/lon in the URL the way a refresh-resume does. Match the
+			// "For You" submit by trying `getApproximateLocation` so the curated picks are
+			// location-aware instead of falling back to an unrestricted sample.
+			const hasCapturedCoords =
+				curatedLatParam != null && curatedLonParam != null;
+			void (async () => {
+				let lat = curatedLatParam;
+				let lon = curatedLonParam;
+				if (!hasCapturedCoords) {
+					try {
+						const loc = await getApproximateLocation();
+						lat = loc.lat;
+						lon = loc.lon;
+					} catch {
+						// Non-fatal: backend can infer from request headers.
+					}
+				}
+				await rehydrateCuratedSession({
+					lat,
+					lon,
+					radiusKm: curatedRadiusKmParam,
+					category: curatedCategoryParam || null,
+					state: curatedStateParam || null,
+				}).catch(() => undefined);
+			})();
 			return;
 		}
 
@@ -3205,6 +3223,27 @@ const DashboardContent = () => {
 		searchParams,
 	]);
 
+	// Persist the last NORMAL-mode (not add-to-campaign) dashboard search URL to localStorage.
+	// The campaign page's "Search" tab reads this so we can drop the user back into the same
+	// map view + search they were last looking at, falling back to a curated default if missing.
+	useEffect(() => {
+		if (typeof window === 'undefined') return;
+		if (isAddToCampaignMode) return;
+		if (!hasSearched) return;
+		if (!activeSearchQuery || activeSearchQuery.trim().length === 0) return;
+
+		const params = new URLSearchParams(searchParams.toString());
+		// Drop fromCampaign-mode keys before persisting so the saved URL is purely a normal search.
+		params.delete('fromCampaignId');
+		params.delete('fromCampaignView');
+		params.delete('fromCampaignSearch');
+		try {
+			localStorage.setItem('murmur_dashboard_last_search', params.toString());
+		} catch {
+			// localStorage may be unavailable (private mode, quota) — non-fatal.
+		}
+	}, [activeSearchQuery, hasSearched, isAddToCampaignMode, searchParams]);
+
 	// When leaving the results view, clear the persisted normal-dashboard search/view params
 	// so we don't unexpectedly re-hydrate a stale search after the user has reset.
 	const prevHasSearchedRef = useRef(hasSearched);
@@ -3214,6 +3253,14 @@ const DashboardContent = () => {
 
 		if (isAddToCampaignMode) return;
 		if (!prev || hasSearched) return;
+
+		if (typeof window !== 'undefined') {
+			try {
+				localStorage.removeItem('murmur_dashboard_last_search');
+			} catch {
+				// non-fatal
+			}
+		}
 
 		const params = new URLSearchParams(searchParams.toString());
 		const had =
@@ -3833,6 +3880,10 @@ const DashboardContent = () => {
 	const MAP_VIEW_SEARCH_BAR_BOTTOM_INSET_PX = 4;
 	const MAP_VIEW_SEARCH_BAR_INPUT_HEIGHT_PX = 49;
 	const MAP_VIEW_SEARCH_BAR_OUTER_WIDTH_PX = 440;
+	const CAMPAIGN_MAP_TOP_TABS_VISUAL_WIDTH_PX = 560;
+	const CAMPAIGN_MAP_TOP_TABS_WIDTH_PX = Math.round(
+		CAMPAIGN_MAP_TOP_TABS_VISUAL_WIDTH_PX / MAP_VIEW_UI_SCALE
+	);
 	// Box sized using Figma's box-to-bar ratio (804×102 around a 488×54 bar),
 	// applied to our actual bar (440×49) so the visual proportions match.
 	const MAP_VIEW_TOP_BACKDROP_BOX_WIDTH_PX = Math.round(
@@ -7942,116 +7993,153 @@ const DashboardContent = () => {
 								</div>
 							) : null;
 
+						const mapCampaignId =
+							fromCampaignIdParam || (activeCampaignId != null ? String(activeCampaignId) : '');
+						const mapCampaignName =
+							fromCampaign?.name || activeCampaign?.name || 'Campaign';
+
 						const campaignMapTopTabs =
-							isMapView && isAddToCampaignMode ? (
+							isMapView ? (
 								<div
 									data-slot="campaign-map-top-tabs"
 									className="fixed left-0 right-0 z-[9999] flex items-center justify-center pointer-events-none"
 									style={{
-										// The map search bar is fixed at top: 33px in map view.
-										// The map container is inset 9px from the viewport.
-										// Center the tabs within the 24px band between the map top (9px)
-										// and the search bar top (33px) so they never feel too high/low.
-										top: '9px',
+										top: '12px',
 										height: '24px',
 									}}
 								>
 									<div
 										className="pointer-events-auto relative"
 										style={{
-											width: 'min(440px, calc(100vw - 120px))',
-											maxWidth: '440px',
+											width: `${CAMPAIGN_MAP_TOP_TABS_WIDTH_PX}px`,
+											maxWidth: 'calc(100vw - 64px)',
 											height: '24px',
-											// Optical nudge: align the tray with the visible search bar below.
-											transform: `translateX(-5px) scale(${MAP_VIEW_UI_SCALE})`,
+											transform: `scale(${MAP_VIEW_UI_SCALE})`,
 											transformOrigin: 'top center',
 										}}
 									>
-										{/* Background box behind tabs (matches search bar width & centering) */}
 										<div
-											aria-hidden="true"
+											className="relative z-[1] grid h-full w-full items-center justify-items-center"
 											style={{
-												position: 'absolute',
-												// Keep the map's 3px black border visible above this box.
-												top: '3px',
-												left: 0,
-												right: 0,
-												// Leave a small gap so it doesn't press against the search bar.
-												bottom: '3px',
-												backgroundColor: 'rgba(238, 237, 237, 0.8)', // #EEEDED @ 80%
-												border: '1px solid rgba(173, 173, 173, 0.8)', // #ADADAD @ 80%
-												borderTopLeftRadius: 0,
-												borderTopRightRadius: 0,
-												borderBottomLeftRadius: '8px',
-												borderBottomRightRadius: '8px',
-												boxSizing: 'border-box',
-												pointerEvents: 'none',
+												gridTemplateColumns: 'repeat(5, minmax(0, 1fr))',
 											}}
-										/>
-
-										<div className="relative z-[1] flex h-full w-full items-center justify-between px-4 pt-[3px] pb-[3px]">
+										>
 											<button
 												type="button"
-												className="font-inter text-[14px] font-medium leading-none bg-transparent p-0 m-0 border-0 cursor-pointer text-[#A0A0A0] inline-flex items-center h-full"
-												onClick={() =>
-													router.push(
-														`${urls.murmur.campaign.detail(fromCampaignIdParam)}?origin=search&tab=contacts`
-													)
-												}
+												className="bg-transparent p-0 m-0 border-0 cursor-default inline-flex items-center justify-center h-full"
+												style={{
+													color: '#1F1F1F',
+													fontFamily: 'Inter, sans-serif',
+													fontSize: '17px',
+													fontStyle: 'normal',
+													fontWeight: 600,
+													lineHeight: '14px',
+												}}
 											>
-												Contacts
+												Search
 											</button>
 											<button
 												type="button"
-												className="font-inter text-[14px] font-medium leading-none bg-transparent p-0 m-0 border-0 cursor-pointer text-[#A0A0A0] inline-flex items-center h-full"
-												onClick={() =>
+												className="bg-transparent p-0 m-0 border-0 cursor-pointer inline-flex items-center justify-center h-full translate-y-[2px]"
+												style={{
+													color: '#2C2C2C',
+													fontFamily: 'Inter, sans-serif',
+													fontSize: '17px',
+													fontStyle: 'normal',
+													fontWeight: 500,
+													lineHeight: '14px',
+													opacity: 0.5,
+												}}
+												onClick={() => {
+													if (!mapCampaignId) return;
 													router.push(
-														`${urls.murmur.campaign.detail(fromCampaignIdParam)}?origin=search&tab=testing`
-													)
-												}
+														`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=testing`
+													);
+												}}
 											>
 												Write
 											</button>
 											<button
 												type="button"
-												aria-label="All"
-												title="All"
-												className="bg-transparent p-0 m-0 border-0 cursor-pointer text-[#A0A0A0] inline-flex items-center justify-center h-full"
-												onClick={() =>
+												aria-label={`Open ${mapCampaignName}`}
+												title={mapCampaignName}
+												className="bg-transparent p-0 m-0 border-0 cursor-pointer inline-flex min-w-0 items-center justify-center gap-[7px] h-full"
+												style={{
+													color: '#000',
+													fontFamily: 'Inter, sans-serif',
+													fontSize: '20.719px',
+													fontStyle: 'normal',
+													fontWeight: 500,
+													lineHeight: '17.063px',
+												}}
+												onClick={() => {
+													if (!mapCampaignId) return;
 													router.push(
-														`${urls.murmur.campaign.detail(fromCampaignIdParam)}?origin=search&tab=all`
-													)
-												}
+														`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search`
+													);
+												}}
 											>
-												<BottomArrowIcon
+												<svg
 													aria-hidden="true"
 													focusable="false"
-													width={18}
-													height={12}
-													className="block translate-y-[1px]"
-												/>
+													width="23"
+													height="13"
+													viewBox="0 0 30 17"
+													fill="none"
+													xmlns="http://www.w3.org/2000/svg"
+													className="block flex-shrink-0"
+												>
+													<rect y="2" width="30" height="15" rx="1" fill="#B43A35" />
+													<path
+														d="M0 2C0 0.89543 0.895431 0 2 0H13C14.1046 0 15 0.895431 15 2V4C15 4.55228 14.5523 5 14 5H1C0.447715 5 0 4.55228 0 4V2Z"
+														fill="#B43A35"
+													/>
+												</svg>
+												<span className="min-w-0 truncate">
+													{mapCampaignName}
+												</span>
 											</button>
 											<button
 												type="button"
-												className="font-inter text-[14px] font-medium leading-none bg-transparent p-0 m-0 border-0 cursor-pointer text-[#A0A0A0] inline-flex items-center h-full"
-												onClick={() =>
+												className="bg-transparent p-0 m-0 border-0 cursor-pointer inline-flex items-center justify-center h-full translate-y-[2px]"
+												style={{
+													color: '#2C2C2C',
+													fontFamily: 'Inter, sans-serif',
+													fontSize: '17px',
+													fontStyle: 'normal',
+													fontWeight: 500,
+													lineHeight: '14px',
+													opacity: 0.5,
+												}}
+												onClick={() => {
+													if (!mapCampaignId) return;
 													router.push(
-														`${urls.murmur.campaign.detail(fromCampaignIdParam)}?origin=search&tab=drafting`
-													)
-												}
-											>
-												Drafts
-											</button>
-											<button
-												type="button"
-												className="font-inter text-[14px] font-medium leading-none bg-transparent p-0 m-0 border-0 cursor-pointer text-[#A0A0A0] inline-flex items-center h-full"
-												onClick={() =>
-													router.push(
-														`${urls.murmur.campaign.detail(fromCampaignIdParam)}?origin=search&tab=inbox`
-													)
-												}
+														`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=inbox`
+													);
+												}}
 											>
 												Inbox
+											</button>
+											<button
+												type="button"
+												className="bg-transparent p-0 m-0 border-0 cursor-pointer inline-flex items-center justify-center h-full translate-y-[2px]"
+												style={{
+													color: '#2C2C2C',
+													fontFamily: 'Inter, sans-serif',
+													fontSize: '17px',
+													fontStyle: 'normal',
+													fontWeight: 500,
+													lineHeight: '14px',
+													opacity: 0.5,
+												}}
+												onClick={() => {
+													if (!mapCampaignId) return;
+													router.push(
+														`${urls.murmur.campaign.detail(mapCampaignId)}?origin=search&tab=drafting`
+													);
+												}}
+											>
+												Drafts
 											</button>
 										</div>
 									</div>

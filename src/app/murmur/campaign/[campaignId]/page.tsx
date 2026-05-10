@@ -10,7 +10,7 @@ import type {
 	InboxSentTabRequest,
 } from './DraftingSection/useDraftingSection';
 import { CampaignPageSkeleton } from '@/components/molecules/CampaignPageSkeleton/CampaignPageSkeleton';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { urls } from '@/constants/urls';
 import { cn } from '@/utils';
 import { isSafariBrowser } from '@/utils/browserDetection';
@@ -19,7 +19,6 @@ import { useMe } from '@/hooks/useMe';
 import { useState, useEffect, useRef, useCallback, useMemo, useLayoutEffect } from 'react';
 import LeftArrow from '@/components/atoms/_svg/LeftArrow';
 import RightArrow from '@/components/atoms/_svg/RightArrow';
-import BottomArrowIcon from '@/components/atoms/_svg/BottomArrowIcon';
 import { SearchIconDesktop } from '@/components/atoms/_svg/SearchIconDesktop';
 import SearchMap from '@/components/atoms/_svg/SearchMap';
 import BottomFolderIcon from '@/components/atoms/_svg/BottomFolderIcon';
@@ -38,7 +37,7 @@ import { HoverDescriptionProvider } from '@/contexts/HoverDescriptionContext';
 import { CampaignTopSearchHighlightProvider } from '@/contexts/CampaignTopSearchHighlightContext';
 import { CampaignDeviceProvider } from '@/contexts/CampaignDeviceContext';
 
-type ViewType = 'contacts' | 'testing' | 'drafting' | 'sent' | 'inbox' | 'all';
+type ViewType = 'testing' | 'drafting' | 'sent' | 'inbox';
 
 // Transition duration in ms - fast enough to feel instant, still smooth
 const TRANSITION_DURATION = 180;
@@ -403,7 +402,6 @@ const Murmur = () => {
 	}, []);
 	const { campaign, isPendingCampaign, setIsIdentityDialogOpen, isIdentityDialogOpen } =
 		useCampaignDetail();
-	const router = useRouter();
 	const isMobile = useIsMobile();
 	const CAMPAIGN_COMPACT_CLASS = 'murmur-campaign-compact';
 	const CAMPAIGN_ZOOM_VAR = '--murmur-campaign-zoom';
@@ -1073,15 +1071,39 @@ const Murmur = () => {
 	// Moved here to be accessible by the keydown listener
 	const handleOpenDashboardSearchForCampaign = useCallback(() => {
 		if (!campaign) return;
+		if (typeof window === 'undefined') return;
 
 		const searchName = campaign?.userContactLists?.[0]?.name || campaign?.name || '';
 		const pendingSearch = searchName ? `[Booking] ${searchName}`.trim() : '';
-		if (pendingSearch && typeof window !== 'undefined') {
+		if (pendingSearch) {
 			sessionStorage.setItem('murmur_pending_search', pendingSearch);
 		}
 
-		router.push(`${urls.murmur.dashboard.index}?fromCampaignId=${campaign.id}`);
-	}, [campaign, router]);
+		// Hard navigation: a soft router.push sometimes doesn't fully re-mount the
+		// dashboard's map-search mode (especially mid-transition or with cached state),
+		// so use window.location.assign for a reliable, fresh dashboard load.
+		window.location.assign(
+			`${urls.murmur.dashboard.index}?fromCampaignId=${campaign.id}`
+		);
+	}, [campaign]);
+
+	// Navigation back to the dashboard's map/search view. Restores the user's last search
+	// if we persisted one (see the URL-mirror effect in dashboard/page.tsx), otherwise drops
+	// them into a default curated map view via the `pick=1` flag. Does NOT enter
+	// "fromCampaign" / add-to-campaign mode and does NOT prefill any search query.
+	const handleGoToDashboardSearch = useCallback(() => {
+		if (typeof window === 'undefined') return;
+
+		let lastSearch = '';
+		try {
+			lastSearch = localStorage.getItem('murmur_dashboard_last_search') || '';
+		} catch {
+			// localStorage may be unavailable — fall through to the curated default.
+		}
+
+		const query = lastSearch || 'pick=1';
+		window.location.assign(`${urls.murmur.dashboard.index}?${query}`);
+	}, []);
 
 	// Track highlight state in a ref so the event listener has fresh access without re-binding constantly
 	const isTopSearchHighlightedRef = useRef(isTopSearchHighlighted);
@@ -1228,14 +1250,12 @@ const Murmur = () => {
 	// Determine initial view based on tab query parameter
 	const getInitialView = (): ViewType => {
 		if (tabParam === 'inbox') return 'inbox';
-		if (tabParam === 'contacts') return 'contacts';
 		if (tabParam === 'drafting') return 'drafting';
 		// Sent is now a sub-view of Inbox (Inbox -> Sent)
 		if (tabParam === 'sent') return 'inbox';
-		// Legacy/deeplink support: the campaign no longer has an in-page Search tab.
-		// If someone lands on ?tab=search, fall back to Contacts.
-		if (tabParam === 'search') return 'contacts';
-		if (tabParam === 'all') return 'all';
+		// Legacy/deeplink support: the campaign no longer has in-page Contacts, Search, or All tabs.
+		// The Write tab covers contact management; fall back there.
+		if (tabParam === 'contacts' || tabParam === 'search' || tabParam === 'all') return 'testing';
 		return 'testing';
 	};
 	
@@ -1264,8 +1284,6 @@ const Murmur = () => {
 			requestId: (prev?.requestId ?? 0) + 1,
 		}));
 	}, []);
-	// Track the tab we were on before pressing up arrow to go to "all" (so down arrow can return)
-	const [tabBeforeAll, setTabBeforeAll] = useState<ViewType | null>(null);
 	// Track if we navigated from inbox to sent via down arrow (so up arrow can return to inbox)
 	const [cameToSentFromInbox, setCameToSentFromInbox] = useState(false);
 	// Track the latest requested view so rapid tab flips don't get dropped due to stale closures.
@@ -1506,10 +1524,9 @@ const Murmur = () => {
 	const contactsDraftsPillMoveCleanupRef = useRef<(() => void) | null>(null);
 	const isSafari = useMemo(() => isSafariBrowser(), []);
 
-	// Mobile never supports the Writing ("testing") or All tabs. Clamp immediately so we never mount
+	// Mobile never supports the Writing ("testing") tab. Clamp immediately so we never mount
 	// HybridPromptInput on mobile (and never transition through it).
-	const MOBILE_ALLOWED_VIEWS: Array<'contacts' | 'drafting' | 'inbox'> = [
-		'contacts',
+	const MOBILE_ALLOWED_VIEWS: Array<'drafting' | 'inbox'> = [
 		'drafting',
 		'inbox',
 	];
@@ -1530,8 +1547,8 @@ const Murmur = () => {
 		setPreviousView(null);
 		setIsTransitioning(false);
 		setIsFadingOutPreviousView(false);
-		requestedViewRef.current = 'contacts';
-		setActiveViewInternal('contacts');
+		requestedViewRef.current = 'drafting';
+		setActiveViewInternal('drafting');
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [isMobile, activeView]);
 	
@@ -1547,7 +1564,7 @@ const Murmur = () => {
 			isMobile === true &&
 			!MOBILE_ALLOWED_VIEWS.includes(newView as (typeof MOBILE_ALLOWED_VIEWS)[number])
 		) {
-			newView = 'contacts';
+			newView = 'drafting';
 		}
 		// Dedupe against the *latest requested* view (not just the last committed render) so
 		// rapid flips like A -> B -> A still enqueue the final A update and don't get dropped.
@@ -1673,10 +1690,6 @@ const Murmur = () => {
 			headerBoxMoveCleanupRef.current = null;
 		}
 
-		// The All tab should crossfade (opacity-only) rather than sliding/moving the header box.
-		// Skip the shared-element "ghost move" when entering or leaving All.
-		if (activeView === 'all' || previousView === 'all') return;
-
 		// Respect reduced motion.
 		if (window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches) return;
 
@@ -1794,7 +1807,7 @@ const Murmur = () => {
 		return cleanup;
 	}, [activeView, isFadingOutPreviousView, previousView]);
 
-	// Shared-element move for the Contacts/Drafts table header pill when switching between those tabs.
+	// Shared-element move for the Drafts/Sent table header pill when switching between those tabs.
 	// This uses the same fade-start signal and duration so the slide is perfectly synced to the tab fade.
 	useLayoutEffect(() => {
 		if (!isFadingOutPreviousView) return;
@@ -1807,7 +1820,7 @@ const Murmur = () => {
 			contactsDraftsPillMoveCleanupRef.current = null;
 		}
 
-		const pillViews: ViewType[] = ['contacts', 'drafting', 'sent'];
+		const pillViews: ViewType[] = ['drafting', 'sent'];
 		const shouldAnimatePill =
 			pillViews.includes(previousView) &&
 			pillViews.includes(activeView) &&
@@ -2043,20 +2056,14 @@ const Murmur = () => {
 
 	const usePersistentCampaignMapBackground = !isMobile;
 
-	// Tab navigation order (excludes 'all' tab from arrow navigation)
+	// Tab navigation order
 	const tabOrder: ViewType[] = [
-		'contacts',
 		'testing',
 		'drafting',
 		'inbox',
 	];
 
 	const goToPreviousTab = () => {
-		// Special case: when on 'all' tab, left arrow goes to 'testing' (Writing tab)
-		if (activeView === 'all') {
-			setActiveView('testing');
-			return;
-		}
 		const currentIndex = tabOrder.indexOf(activeView);
 		if (currentIndex > 0) {
 			setActiveView(tabOrder[currentIndex - 1]);
@@ -2067,11 +2074,6 @@ const Murmur = () => {
 	};
 
 	const goToNextTab = () => {
-		// Special case: when on 'all' tab, right arrow goes to 'drafting' (Drafts tab)
-		if (activeView === 'all') {
-			setActiveView('drafting');
-			return;
-		}
 		const currentIndex = tabOrder.indexOf(activeView);
 		if (currentIndex < tabOrder.length - 1) {
 			setActiveView(tabOrder[currentIndex + 1]);
@@ -2081,15 +2083,14 @@ const Murmur = () => {
 		}
 	};
 
-	// Mobile-specific tab navigation (only the 4 visible tabs on mobile)
-	const mobileTabOrder: Array<'contacts' | 'drafting' | 'inbox'> = [
-		'contacts',
+	// Mobile-specific tab navigation (only the visible tabs on mobile)
+	const mobileTabOrder: Array<'drafting' | 'inbox'> = [
 		'drafting',
 		'inbox',
 	];
 
 	const goToPreviousMobileTab = () => {
-		const currentIndex = mobileTabOrder.indexOf(activeView as 'contacts' | 'drafting' | 'inbox');
+		const currentIndex = mobileTabOrder.indexOf(activeView as 'drafting' | 'inbox');
 		if (currentIndex > 0) {
 			setActiveView(mobileTabOrder[currentIndex - 1]);
 		} else {
@@ -2099,7 +2100,7 @@ const Murmur = () => {
 	};
 
 	const goToNextMobileTab = () => {
-		const currentIndex = mobileTabOrder.indexOf(activeView as 'contacts' | 'drafting' | 'inbox');
+		const currentIndex = mobileTabOrder.indexOf(activeView as 'drafting' | 'inbox');
 		if (currentIndex >= 0 && currentIndex < mobileTabOrder.length - 1) {
 			setActiveView(mobileTabOrder[currentIndex + 1]);
 		} else {
@@ -2109,7 +2110,7 @@ const Murmur = () => {
 	};
 
 	// Keyboard navigation: arrow keys to switch tabs when no text input is focused
-	// Left/Right: cycle through tabs, Up: go to "all" tab, Down: return from "all" tab
+	// Left/Right: cycle through tabs. Up/Down: toggle the Inbox <-> Sent sub-view.
 	useEffect(() => {
 		const handleKeyDown = (e: KeyboardEvent) => {
 			// Only handle arrow keys
@@ -2132,33 +2133,19 @@ const Murmur = () => {
 			// Prevent default scrolling behavior
 			e.preventDefault();
 
-			// Handle up/down arrows for vertical tab navigation
+			// Handle up/down arrows: only used to toggle the Inbox -> Sent sub-view.
 			if (e.key === 'ArrowUp') {
-				// Special case: if on Inbox->Sent (entered via down arrow), go back to Inbox
 				if (activeView === 'inbox' && inboxSentTab === 'sent' && cameToSentFromInbox) {
 					setCameToSentFromInbox(false);
 					requestInboxSentTab('inbox');
-					return;
-				}
-				// Go to "all" tab and remember current tab (unless already on "all")
-				if (activeView !== 'all') {
-					setTabBeforeAll(activeView);
-					setActiveView('all');
 				}
 				return;
 			}
 
 			if (e.key === 'ArrowDown') {
-				// Special case: Inbox -> Sent (as an inbox sub-view)
 				if (activeView === 'inbox') {
 					setCameToSentFromInbox(true);
 					requestInboxSentTab('sent');
-					return;
-				}
-				// Return to the tab we were on before going to "all"
-				if (tabBeforeAll) {
-					setActiveView(tabBeforeAll);
-					setTabBeforeAll(null);
 				}
 				return;
 			}
@@ -2186,7 +2173,6 @@ const Murmur = () => {
 		goToPreviousTab,
 		goToNextTab,
 		activeView,
-		tabBeforeAll,
 		cameToSentFromInbox,
 		setActiveView,
 		inboxSentTab,
@@ -2214,7 +2200,7 @@ const Murmur = () => {
 	// ensures a premium, smooth transition with no scale effects.
 	const shouldHideContent = isIdentityDialogOpen || !campaign.identityId;
 
-	// Writing + Contacts + Drafts + Sent + Inbox + All tab vertical alignment:
+	// Writing + Drafts + Sent + Inbox tab vertical alignment:
 	// Place the top of the main content box exactly 159px from the top of the page
 	// (only in the standard desktop header layout).
 	//
@@ -2228,11 +2214,9 @@ const Murmur = () => {
 		WRITING_BOX_TOP_PX - CAMPAIGN_HEADER_HEIGHT_PX - DRAFTING_SECTION_TOP_SPACER_PX; // 105px
 	const shouldApplyWritingTopShift =
 		(activeView === 'testing' ||
-			activeView === 'contacts' ||
 			activeView === 'drafting' ||
 			activeView === 'sent' ||
-			activeView === 'inbox' ||
-			activeView === 'all') &&
+			activeView === 'inbox') &&
 		!isMobile &&
 		!isNarrowestDesktop;
 	return (
@@ -2248,343 +2232,260 @@ const Murmur = () => {
 					{usePersistentCampaignMapBackground && (
 						<div className="campaign-map-split-overlay" aria-hidden="true" />
 					)}
-			{/* Desktop top box (477 x 42, 1px stroke #929292, 10px radius) */}
-			{!isMobile && !isNarrowestDesktop && (
-				<div
-					data-slot="campaign-top-box-wrapper"
-					className="absolute inset-x-0 top-16 flex justify-center pointer-events-none"
-				>
-					<div className="relative">
-						{/* Left box - 124 x 42px, 30px to the left of search box */}
+			{/* Top navigation box (ported from dashboard map view).
+			    Translucent backdrop + 5-tab row (Search / Write / [campaign chip] / Inbox / Drafts)
+			    + empty outline boxes flanking a center search pill. Desktop only. */}
+			{!isMobile && (() => {
+				// Constants mirror dashboard/page.tsx:3879-3924 so visual proportions match.
+				const MAP_VIEW_UI_SCALE = 0.85;
+				const MAP_VIEW_SEARCH_BAR_INPUT_HEIGHT_PX = 49;
+				const MAP_VIEW_SEARCH_BAR_OUTER_WIDTH_PX = 440;
+				const MAP_VIEW_TOP_BACKDROP_BOX_TOP_PX = 9;
+				const MAP_VIEW_TOP_BACKDROP_BOX_WIDTH_PX = Math.round(
+					MAP_VIEW_SEARCH_BAR_OUTER_WIDTH_PX * (804 / 488.204)
+				);
+				const MAP_VIEW_TOP_BACKDROP_BOX_HEIGHT_PX = Math.round(
+					MAP_VIEW_SEARCH_BAR_INPUT_HEIGHT_PX * (102 / 54)
+				);
+				const MAP_VIEW_TOP_OUTLINE_BOX_WIDTH_PX = Math.round(
+					124 * (MAP_VIEW_SEARCH_BAR_OUTER_WIDTH_PX / 488.204)
+				);
+				const MAP_VIEW_TOP_OUTLINE_BOX_HEIGHT_PX = Math.round(
+					42 * (MAP_VIEW_SEARCH_BAR_OUTER_WIDTH_PX / 488.204)
+				);
+				const MAP_VIEW_TOP_OUTLINE_BOX_LEFT_GAP_PX = Math.round(
+					23 * (MAP_VIEW_SEARCH_BAR_OUTER_WIDTH_PX / 488.204)
+				);
+				const MAP_VIEW_TOP_OUTLINE_BOX_RIGHT_WIDTH_PX = Math.round(
+					105 * (MAP_VIEW_SEARCH_BAR_OUTER_WIDTH_PX / 488.204)
+				);
+				const MAP_VIEW_TOP_OUTLINE_BOX_RIGHT_HEIGHT_PX = Math.round(
+					42 * (MAP_VIEW_SEARCH_BAR_OUTER_WIDTH_PX / 488.204)
+				);
+				const MAP_VIEW_TOP_OUTLINE_BOX_RIGHT_GAP_PX = Math.round(
+					31 * (MAP_VIEW_SEARCH_BAR_OUTER_WIDTH_PX / 488.204)
+				);
+				const MAP_VIEW_SEARCH_BAR_BOTTOM_INSET_PX = 4;
+				const MAP_VIEW_SEARCH_BAR_TOP_PX =
+					MAP_VIEW_TOP_BACKDROP_BOX_TOP_PX +
+					MAP_VIEW_TOP_BACKDROP_BOX_HEIGHT_PX * MAP_VIEW_UI_SCALE -
+					MAP_VIEW_SEARCH_BAR_BOTTOM_INSET_PX -
+					MAP_VIEW_SEARCH_BAR_INPUT_HEIGHT_PX * MAP_VIEW_UI_SCALE;
+				const CAMPAIGN_MAP_TOP_TABS_VISUAL_WIDTH_PX = 560;
+				const CAMPAIGN_MAP_TOP_TABS_WIDTH_PX = Math.round(
+					CAMPAIGN_MAP_TOP_TABS_VISUAL_WIDTH_PX / MAP_VIEW_UI_SCALE
+				);
+
+				const campaignName = campaign?.name || 'Campaign';
+
+				const inactiveTabStyle = (isActive: boolean) => ({
+					color: '#2C2C2C',
+					fontFamily: 'Inter, sans-serif',
+					fontSize: '17px',
+					fontStyle: 'normal' as const,
+					fontWeight: isActive ? 600 : 500,
+					lineHeight: '14px',
+					opacity: isActive ? 1 : 0.5,
+				});
+
+				return (
+					<>
+						{/* Translucent sky-blue backdrop */}
 						<div
-							data-slot="campaign-left-box"
-							className="pointer-events-auto absolute right-full top-0 mr-[30px] w-[124px] h-[42px] box-border border border-[#929292] hover:border-black focus-within:border-black rounded-[10px] overflow-hidden flex items-center justify-center gap-[33px] transition-colors duration-150"
+							aria-hidden="true"
+							data-slot="campaign-top-backdrop"
+							className="fixed left-0 right-0 flex justify-center pointer-events-none"
+							style={{
+								top: `${MAP_VIEW_TOP_BACKDROP_BOX_TOP_PX}px`,
+								zIndex: 110,
+							}}
 						>
-							<button
-								ref={topCampaignsFolderButtonRef}
-								type="button"
-								onClick={() => setShowTopCampaignsDropdown((prev) => !prev)}
-								className={cn(
-									"flex items-center justify-center bg-transparent border-0 p-0 cursor-pointer transition-opacity",
-									showTopCampaignsDropdown ? "opacity-100" : "opacity-40 hover:opacity-100"
-								)}
-								aria-label="Toggle campaigns dropdown"
-							>
-								<BottomFolderIcon width={30} height={15} className="text-black" />
-							</button>
-							<button
-								type="button"
-								data-hover-description="Back to Home Button"
-								onClick={() => {
-									if (typeof window !== 'undefined') {
-										window.location.assign(urls.murmur.dashboard.index);
-									}
-								}}
-								className="group relative w-[35px] h-[35px] flex items-center justify-center bg-transparent border-0 p-0 cursor-pointer"
-								aria-label="Go to dashboard"
-							>
-								<div
-									aria-hidden="true"
-									className={cn(
-										'pointer-events-none absolute inset-0 box-border rounded-[8px] bg-[#FFFFFF] border-[3px] border-[#000000] transition-opacity duration-150',
-										isHomeButtonHighlighted ? 'opacity-100' : 'opacity-0'
-									)}
-								/>
-								<BottomHomeIcon
-									width={20}
-									height={19}
-									className={cn(
-										'relative z-10 transition-opacity duration-150',
-										isHomeButtonHighlighted
-											? 'opacity-100'
-											: 'opacity-40 group-hover:opacity-100 group-active:opacity-100'
-									)}
-								/>
-							</button>
-						</div>
-						{/* Campaigns dropdown positioned below the left box, left-aligned with content */}
-						{showTopCampaignsDropdown && (
 							<div
-								ref={topCampaignsDropdownRef}
-								data-slot="campaign-top-dropdown"
-								className="pointer-events-auto fixed top-[116px] left-[300px] z-[60] animate-inbox-pop-in"
-								style={{ transformOrigin: 'top left' }}
-							>
-								<div className="bg-[#EDEDED] rounded-[12px] overflow-hidden w-[895px] h-[242px] border-2 border-[#8C8C8C]">
-									<CampaignsTable />
-								</div>
-							</div>
-						)}
-						<button
-							type="button"
-							data-slot="campaign-top-box"
-							ref={dashboardInboxSearchbarRef}
-							aria-label="Open dashboard search for this campaign"
-							title="Search for more contacts"
-							data-hover-description="Hop back in to the map, Add some more contacts to your campaign"
-							onClick={handleOpenDashboardSearchForCampaign}
-							className={cn(
-								"group relative pointer-events-auto w-[477px] max-w-[calc(100vw-32px)] h-[42px] box-border border border-[#929292] hover:border-black hover:border-2 rounded-[10px] overflow-hidden transition-[color,border-color,border-width] duration-150 cursor-pointer",
-								isTopSearchHighlighted && "border-black border-2"
-							)}
-						>
-							<SearchMap
-								aria-hidden="true"
-								width="100%"
-								height="100%"
-								viewBox="1 1 475.184 39.877"
-								preserveAspectRatio="none"
-								rectStroke="none"
-								rectStrokeWidth={0}
-								rectRx={10}
-								className={cn(
-									"absolute inset-0 w-full h-full opacity-40 group-hover:opacity-100 transition-opacity duration-150",
-									isTopSearchHighlighted && "opacity-100"
-								)}
+								style={{
+									transform: `scale(${MAP_VIEW_UI_SCALE})`,
+									transformOrigin: 'top center',
+									width: `${MAP_VIEW_TOP_BACKDROP_BOX_WIDTH_PX}px`,
+									height: `${MAP_VIEW_TOP_BACKDROP_BOX_HEIGHT_PX}px`,
+									borderRadius: '8px',
+									backgroundColor: '#B9EAF1',
+									opacity: 0.9,
+								}}
 							/>
-							<div
-								className={cn(
-									"absolute right-3 top-1/2 -translate-y-1/2 flex text-[#929292] group-hover:text-black transition-colors duration-150",
-									isTopSearchHighlighted && "text-black"
-								)}
-							>
-								<SearchIconDesktop stroke="currentColor" />
-							</div>
-						</button>
-						{/* Right box - 105 x 42px, 36px to the right of search box */}
-						<div
-							data-slot="campaign-right-box"
-							className="pointer-events-auto absolute left-full top-0 ml-[36px] w-[105px] h-[42px] box-border border border-[#929292] hover:border-black rounded-[10px] overflow-hidden flex items-center justify-center gap-[14px] transition-colors"
-						>
-							{/* Left icon - italic "i" in circle (toggles info on/off) */}
-							<button
-								type="button"
-								onClick={() => setSelectedRightBoxIcon(selectedRightBoxIcon === 'info' ? 'circle' : 'info')}
-								className="group w-[35px] h-[35px] flex items-center justify-center bg-transparent border border-transparent hover:border-[#929292] rounded-[8px] cursor-pointer transition-all"
-								aria-label={selectedRightBoxIcon === 'info' ? "Turn info off" : "Turn info on"}
-							>
-								<svg width="17" height="17" viewBox="0 0 13 13" fill="none" xmlns="http://www.w3.org/2000/svg" className={cn("transition-opacity", selectedRightBoxIcon === 'info' ? "opacity-100" : "opacity-40 group-hover:opacity-100")}>
-									<g>
-										<circle cx="6.22656" cy="6.05078" r="5.80078" fill={selectedRightBoxIcon === 'info' ? "#ADADAD" : "none"} stroke="black" strokeWidth="0.5"/>
-										<path d="M8.05656 2.82696C7.8419 2.82696 7.68856 2.75796 7.59656 2.61996C7.53523 2.54329 7.50456 2.44363 7.50456 2.32096C7.50456 2.07563 7.61956 1.87629 7.84956 1.72296C8.01823 1.63096 8.17156 1.58496 8.30956 1.58496C8.53956 1.58496 8.70056 1.65396 8.79256 1.79196C8.8539 1.86863 8.88456 1.96829 8.88456 2.09096C8.88456 2.33629 8.7619 2.53563 8.51656 2.68896C8.37856 2.78096 8.22523 2.82696 8.05656 2.82696ZM4.05456 11.682C3.90123 11.682 3.7709 11.6513 3.66356 11.59C3.57156 11.5286 3.52556 11.4136 3.52556 11.245C3.52556 11.0303 3.57923 10.7773 3.68656 10.486C3.80923 10.1946 3.93956 9.90329 4.07756 9.61196C4.2309 9.32063 4.3459 9.08296 4.42256 8.89896C4.5299 8.68429 4.66023 8.40829 4.81356 8.07096C4.98223 7.71829 5.13556 7.38863 5.27356 7.08196C5.4269 6.75996 5.53423 6.53763 5.59556 6.41496C5.3809 6.64496 5.12023 6.93629 4.81356 7.28896C4.52223 7.62629 4.24623 7.95596 3.98556 8.27796C3.7249 8.59996 3.52556 8.85296 3.38756 9.03696C3.34156 9.09829 3.30323 9.12896 3.27256 9.12896C3.2419 9.12896 3.22656 9.09063 3.22656 9.01396C3.22656 8.89129 3.2649 8.77629 3.34156 8.66896C3.6329 8.30096 3.9549 7.88696 4.30756 7.42696C4.67556 6.96696 5.00523 6.54529 5.29656 6.16196C5.5879 5.76329 5.7719 5.50263 5.84856 5.37996C6.01723 5.34929 6.26256 5.30329 6.58456 5.24196C6.9219 5.18063 7.1519 5.09629 7.27456 4.98896C7.32056 4.94296 7.36656 4.91996 7.41256 4.91996C7.44323 4.91996 7.45856 4.95063 7.45856 5.01196C7.4739 5.05796 7.45856 5.11163 7.41256 5.17296C7.32056 5.28029 7.15956 5.54096 6.92956 5.95496C6.69956 6.36896 6.45423 6.82896 6.19356 7.33496C5.94823 7.82563 5.71823 8.27029 5.50356 8.66896C5.2889 9.08296 5.1049 9.48163 4.95156 9.86496C4.79823 10.2483 4.72156 10.5243 4.72156 10.693C4.72156 10.9076 4.8289 11.015 5.04356 11.015C5.2429 11.015 5.4959 10.8923 5.80256 10.647C6.12456 10.4016 6.44656 10.1103 6.76856 9.77296C7.09056 9.42029 7.37423 9.09829 7.61956 8.80696C7.69623 8.71496 7.78823 8.60763 7.89556 8.48496C8.01823 8.34696 8.0949 8.26263 8.12556 8.23196C8.15623 8.26263 8.17156 8.31629 8.17156 8.39296C8.15623 8.50029 8.1179 8.60763 8.05656 8.71496C7.99523 8.80696 7.9339 8.89129 7.87256 8.96796C7.55056 9.36663 7.1979 9.78063 6.81456 10.21C6.43123 10.624 6.00956 10.9766 5.54956 11.268C5.08956 11.544 4.59123 11.682 4.05456 11.682Z" fill="black"/>
-									</g>
-								</svg>
-							</button>
-							{/* Right icon - envelope (opens dashboard inbox popup) */}
-							<button
-								type="button"
-								ref={dashboardInboxTriggerRef}
-								onClick={() => {
-									setIsDashboardInboxOpen((prev) => {
-										const next = !prev;
-										if (next) {
-											setDashboardInboxSubtab('messages');
-										} else {
-											setDashboardInboxPosition(null);
-										}
-										return next;
-									});
-								}}
-								className="group w-[35px] h-[35px] flex items-center justify-center bg-transparent cursor-pointer transition-all"
-								aria-label={isDashboardInboxOpen ? 'Close inbox' : 'Open inbox'}
-								title={isDashboardInboxOpen ? 'Close inbox' : 'Open inbox'}
-							>
-								<EnvelopeIcon
-									width={27}
-									height={18}
-									className={cn(
-										"transition-opacity flex-shrink-0 -translate-y-[2px]",
-										isDashboardInboxOpen ? "opacity-100" : "opacity-40 group-hover:opacity-100"
-									)}
-									opacity={1}
-								/>
-							</button>
 						</div>
 
-						{/* Dashboard Inbox popup (625 x 561) */}
-						{isDashboardInboxOpen && dashboardInboxPosition && (
+						{/* Empty stroked outline boxes flanking the search pill */}
+						<div
+							aria-hidden="true"
+							data-slot="campaign-top-outline-boxes"
+							className="fixed left-0 right-0 flex justify-center pointer-events-none"
+							style={{
+								top: `${MAP_VIEW_SEARCH_BAR_TOP_PX}px`,
+								zIndex: 115,
+							}}
+						>
 							<div
-								ref={dashboardInboxPopupRef}
-								className="pointer-events-auto fixed z-[120] animate-inbox-pop-in"
+								className="relative"
 								style={{
-									top: `${dashboardInboxPosition.top}px`,
-									left: `${dashboardInboxPosition.left}px`,
-									width: `${DASHBOARD_INBOX_POPUP_WIDTH_PX}px`,
-									height: `${DASHBOARD_INBOX_POPUP_HEIGHT_PX}px`,
+									transform: `scale(${MAP_VIEW_UI_SCALE})`,
+									transformOrigin: 'top center',
+									width: `${MAP_VIEW_SEARCH_BAR_OUTER_WIDTH_PX}px`,
+									maxWidth: `${MAP_VIEW_SEARCH_BAR_OUTER_WIDTH_PX}px`,
+									height: `${MAP_VIEW_SEARCH_BAR_INPUT_HEIGHT_PX}px`,
+								}}
+							>
+								<div
+									style={{
+										position: 'absolute',
+										right: `calc(100% + ${MAP_VIEW_TOP_OUTLINE_BOX_LEFT_GAP_PX}px)`,
+										top: '50%',
+										transform: 'translateY(-50%)',
+										width: `${MAP_VIEW_TOP_OUTLINE_BOX_WIDTH_PX}px`,
+										height: `${MAP_VIEW_TOP_OUTLINE_BOX_HEIGHT_PX}px`,
+										border: '1px solid #000',
+										borderRadius: '8px',
+										boxSizing: 'border-box',
+									}}
+								/>
+								<div
+									style={{
+										position: 'absolute',
+										left: `calc(100% + ${MAP_VIEW_TOP_OUTLINE_BOX_RIGHT_GAP_PX}px)`,
+										top: '50%',
+										transform: 'translateY(-50%)',
+										width: `${MAP_VIEW_TOP_OUTLINE_BOX_RIGHT_WIDTH_PX}px`,
+										height: `${MAP_VIEW_TOP_OUTLINE_BOX_RIGHT_HEIGHT_PX}px`,
+										border: '1px solid #000',
+										borderRadius: '8px',
+										boxSizing: 'border-box',
+									}}
+								/>
+							</div>
+						</div>
+
+						{/* Tabs row: Search / Write / [campaign chip] / Inbox / Drafts */}
+						<div
+							data-slot="campaign-top-tabs"
+							data-hover-description-suppress="true"
+							className="fixed left-0 right-0 z-[9999] flex items-center justify-center pointer-events-none"
+							style={{ top: '12px', height: '24px' }}
+						>
+							<div
+								className="pointer-events-auto relative"
+								style={{
+									width: `${CAMPAIGN_MAP_TOP_TABS_WIDTH_PX}px`,
+									maxWidth: 'calc(100vw - 64px)',
+									height: '24px',
+									transform: `scale(${MAP_VIEW_UI_SCALE})`,
 									transformOrigin: 'top center',
 								}}
 							>
-								{dashboardInboxSubtab === 'messages' ? (
-									<DashboardInboxSection
-										desktopWidth={DASHBOARD_INBOX_POPUP_WIDTH_PX}
-										desktopHeight={DASHBOARD_INBOX_POPUP_HEIGHT_PX}
-										noOuterPadding
-										dashboardMode
-										scrollbarThumbColor="#FFFFFF"
-										scrollbarOffsetRight={8}
-										scrollbarAlignTrackToScrollContainer
-										emailRowHoverClassName="hover:bg-[#E8E8E8]"
-										inboxSubtab={dashboardInboxSubtab}
-										onInboxSubtabChange={setDashboardInboxSubtab}
-									/>
-								) : (
-									<DashboardCampaignsInboxView
-										variant="campaignPageInbox"
-										containerHeight={`${DASHBOARD_INBOX_POPUP_HEIGHT_PX}px`}
-										containerWidthPx={DASHBOARD_INBOX_POPUP_WIDTH_PX}
-										noOuterPadding
-										inboxSubtab={dashboardInboxSubtab}
-										onInboxSubtabChange={setDashboardInboxSubtab}
-									/>
-								)}
-							</div>
-						)}
-					</div>
-				</div>
-			)}
-
-			{/* Header row with centered tabs and Clerk icon (from layout) */}
-			<div data-slot="campaign-header">
-				<div className="relative h-[50px] flex items-center justify-center">
-					{/* View tabs - centered in header (hidden at narrowest breakpoint and on mobile) */}
-					<div
-						className={cn(
-							'absolute inset-0 flex items-center justify-center pointer-events-none mobile-landscape-hide',
-							(isMobile || isNarrowestDesktop) && 'hidden'
-						)}
-					>
-						<div
-							className="pointer-events-auto grid w-[560px] max-w-full grid-cols-5 items-center justify-items-center"
-							data-hover-description-suppress="true"
-							style={{ transform: 'translateY(13px)' }}
-						>
-							<button
-							type="button"
-							className={cn(
-								'font-inter text-[17px] font-medium max-[480px]:text-[12px] leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
-								activeView === 'contacts'
-									? 'text-black'
-									: 'text-[#6B6B6B] hover:text-black'
-							)}
-							onClick={() => setActiveView('contacts')}
-						>
-							Contacts
-							</button>
-							<button
-							type="button"
-							className={cn(
-								'font-inter text-[17px] font-medium max-[480px]:text-[12px] leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
-								activeView === 'testing'
-									? 'text-black'
-									: 'text-[#6B6B6B] hover:text-black'
-							)}
-							onClick={() => setActiveView('testing')}
-						>
-							<div className="relative inline-flex items-center justify-center w-[62px] h-[27px]">
 								<div
-									aria-hidden="true"
-									className={cn(
-										'absolute inset-0 pointer-events-none',
-										'rounded-[8px] border-2 border-[#000000] bg-[#A6E2A8]',
-										'transition-opacity duration-150',
-										isWriteTabHighlighted ? 'opacity-100' : 'opacity-0'
-									)}
-								/>
-								<span
-									className={cn(
-										'relative z-10',
-										isWriteTabHighlighted && 'text-black'
-									)}
+									className="relative z-[1] grid h-full w-full items-center justify-items-center"
+									style={{
+										gridTemplateColumns: 'repeat(5, minmax(0, 1fr))',
+									}}
 								>
-									Write
-								</span>
-							</div>
-							</button>
-							<button
-							type="button"
-							aria-label="All"
-							title="All"
-							className={cn(
-								'font-inter text-[17px] font-medium max-[480px]:text-[12px] leading-none bg-transparent p-0 m-0 border-0 cursor-pointer inline-flex items-center justify-center',
-								activeView === 'all'
-									? 'text-black'
-									: 'text-[#6B6B6B] hover:text-black'
-							)}
-							onClick={() => setActiveView('all')}
-						>
-							<BottomArrowIcon
-								aria-hidden="true"
-								focusable="false"
-								width={26}
-								height={18}
-								className="block translate-y-[1px]"
-							/>
-							</button>
-							<button
-							type="button"
-							className={cn(
-								'font-inter text-[17px] font-medium max-[480px]:text-[12px] leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
-								activeView === 'drafting'
-									? 'text-black'
-									: 'text-[#6B6B6B] hover:text-black'
-							)}
-							onClick={() => setActiveView('drafting')}
-						>
-							<div className="relative inline-flex items-center justify-center w-[64px] h-[28px]">
-								<div
-									aria-hidden="true"
-									className={cn(
-										'absolute inset-0 pointer-events-none',
-										'rounded-[8px] border-2 border-[#000000] bg-[#EFDAAF]',
-										'transition-opacity duration-150',
-										isDraftsTabHighlighted ? 'opacity-100' : 'opacity-0'
-									)}
-								/>
-								<span
-									className={cn(
-										'relative z-10',
-										isDraftsTabHighlighted && 'text-black'
-									)}
-								>
-									Drafts
-								</span>
-							</div>
-							</button>
-							<div className="relative group">
-								<button
-								type="button"
-								className={cn(
-									'font-inter text-[17px] font-medium max-[480px]:text-[12px] leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
-									activeView === 'inbox'
-										? 'text-black'
-										: 'text-[#6B6B6B] hover:text-black'
-								)}
-								onClick={() => setActiveView('inbox')}
-							>
-								<div className="relative inline-flex items-center justify-center w-[62px] h-[27px]">
-									<div
-										aria-hidden="true"
-										className={cn(
-											'absolute inset-0 pointer-events-none',
-											'rounded-[8px] border-2 border-[#000000] bg-[#84B9F5]',
-											'transition-opacity duration-150',
-											isInboxTabHighlighted ? 'opacity-100' : 'opacity-0'
-										)}
-									/>
-									<span
-										className={cn(
-											'relative z-10',
-											isInboxTabHighlighted && 'text-black'
-										)}
+									<button
+										type="button"
+										className="bg-transparent p-0 m-0 border-0 cursor-pointer inline-flex items-center justify-center h-full translate-y-[2px]"
+										style={inactiveTabStyle(false)}
+										onClick={handleGoToDashboardSearch}
+									>
+										Search
+									</button>
+									<button
+										type="button"
+										className="bg-transparent p-0 m-0 border-0 cursor-pointer inline-flex items-center justify-center h-full translate-y-[2px]"
+										style={inactiveTabStyle(activeView === 'testing')}
+										onClick={() => setActiveView('testing')}
+									>
+										Write
+									</button>
+									<button
+										type="button"
+										aria-label={campaignName}
+										title={campaignName}
+										className="bg-transparent p-0 m-0 border-0 cursor-default inline-flex min-w-0 items-center justify-center gap-[7px] h-full"
+										style={{
+											color: '#000',
+											fontFamily: 'Inter, sans-serif',
+											fontSize: '20.719px',
+											fontStyle: 'normal',
+											fontWeight: 500,
+											lineHeight: '17.063px',
+										}}
+									>
+										<svg
+											aria-hidden="true"
+											focusable="false"
+											width="23"
+											height="13"
+											viewBox="0 0 30 17"
+											fill="none"
+											xmlns="http://www.w3.org/2000/svg"
+											className="block flex-shrink-0"
+										>
+											<rect y="2" width="30" height="15" rx="1" fill="#B43A35" />
+											<path
+												d="M0 2C0 0.89543 0.895431 0 2 0H13C14.1046 0 15 0.895431 15 2V4C15 4.55228 14.5523 5 14 5H1C0.447715 5 0 4.55228 0 4V2Z"
+												fill="#B43A35"
+											/>
+										</svg>
+										<span className="min-w-0 truncate">{campaignName}</span>
+									</button>
+									<button
+										type="button"
+										className="bg-transparent p-0 m-0 border-0 cursor-pointer inline-flex items-center justify-center h-full translate-y-[2px]"
+										style={inactiveTabStyle(activeView === 'inbox')}
+										onClick={() => setActiveView('inbox')}
 									>
 										Inbox
-									</span>
+									</button>
+									<button
+										type="button"
+										className="bg-transparent p-0 m-0 border-0 cursor-pointer inline-flex items-center justify-center h-full translate-y-[2px]"
+										style={inactiveTabStyle(activeView === 'drafting')}
+										onClick={() => setActiveView('drafting')}
+									>
+										Drafts
+									</button>
 								</div>
-								</button>
 							</div>
 						</div>
-					</div>
 
+						{/* Center search pill — click opens dashboard search seeded with this campaign */}
+						<div
+							data-slot="campaign-top-search-bar"
+							className="fixed left-0 right-0 flex justify-center pointer-events-none"
+							style={{
+								top: `${MAP_VIEW_SEARCH_BAR_TOP_PX}px`,
+								zIndex: 120,
+							}}
+						>
+							<div
+								aria-hidden="true"
+								style={{
+									transform: `scale(${MAP_VIEW_UI_SCALE})`,
+									transformOrigin: 'top center',
+									width: `${MAP_VIEW_SEARCH_BAR_OUTER_WIDTH_PX}px`,
+									maxWidth: `${MAP_VIEW_SEARCH_BAR_OUTER_WIDTH_PX}px`,
+									height: `${MAP_VIEW_SEARCH_BAR_INPUT_HEIGHT_PX}px`,
+									borderRadius: '8px',
+									border: '3px solid #000',
+									backgroundColor: '#FFFFFF',
+									boxSizing: 'border-box',
+								}}
+							/>
+						</div>
+					</>
+				);
+			})()}
+
+			{/* Header row with centered tabs and Clerk icon (from layout).
+			    Desktop tabs are now rendered inside the top nav box above.
+			    The h-[50px] wrapper remains for spacing and to host the mobile header below. */}
+			<div data-slot="campaign-header">
+				<div className="relative h-[50px] flex items-center justify-center">
 				{/* Mobile header - campaign title and tabs */}
 				{isMobile && (
 					<div className="absolute inset-x-0 top-0 flex flex-col mt-3">
@@ -2605,15 +2506,10 @@ const Murmur = () => {
 						<div className="flex gap-3 justify-center mt-4">
 							<button
 								type="button"
-								className={cn(
-									'font-inter text-[13px] font-medium leading-none bg-[#F5DADA] border cursor-pointer rounded-full px-3 py-1',
-									activeView === 'contacts'
-										? 'text-black border-black'
-										: 'text-[#6B6B6B] border-transparent hover:text-black hover:border-black'
-								)}
-								onClick={() => setActiveView('contacts')}
+								className="font-inter text-[13px] font-medium leading-none bg-[#F5DADA] border border-transparent text-[#6B6B6B] hover:text-black hover:border-black cursor-pointer rounded-full px-3 py-1"
+								onClick={handleGoToDashboardSearch}
 							>
-								{headerContactsCount.toString().padStart(2, '0')} Contacts
+								Search
 							</button>
 							<button
 								type="button"
@@ -2707,7 +2603,6 @@ const Murmur = () => {
 									setIdentityDialogOrigin('campaign');
 									setIsIdentityDialogOpen(true);
 								}}
-								onContactsClick={() => setActiveView('contacts')}
 								onDraftsClick={() => setActiveView('drafting')}
 								onSentClick={() => setActiveView('sent')}
 								fullWidth
@@ -2715,86 +2610,6 @@ const Murmur = () => {
 						</div>
 					)}
 
-					{/* View tabs - shown below header box at narrowest breakpoint (< 952px) */}
-					{!isMobile && isNarrowestDesktop && (
-						<div className="flex justify-center mb-4">
-						<div
-							className="grid w-[560px] max-w-full grid-cols-5 items-center justify-items-center"
-							data-hover-description-suppress="true"
-						>
-								<button
-									type="button"
-									className={cn(
-										'font-inter text-[14px] font-medium leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
-										activeView === 'contacts'
-											? 'text-black'
-											: 'text-[#6B6B6B] hover:text-black'
-									)}
-									onClick={() => setActiveView('contacts')}
-								>
-									Contacts
-								</button>
-								<button
-									type="button"
-									className={cn(
-										'font-inter text-[14px] font-medium leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
-										activeView === 'testing'
-											? 'text-black'
-											: 'text-[#6B6B6B] hover:text-black'
-									)}
-									onClick={() => setActiveView('testing')}
-								>
-									Writing
-								</button>
-								<button
-									type="button"
-									aria-label="All"
-									title="All"
-									className={cn(
-										'font-inter text-[14px] font-medium leading-none bg-transparent p-0 m-0 border-0 cursor-pointer inline-flex items-center justify-center',
-										activeView === 'all'
-											? 'text-black'
-											: 'text-[#6B6B6B] hover:text-black'
-									)}
-									onClick={() => setActiveView('all')}
-								>
-									<BottomArrowIcon
-										aria-hidden="true"
-										focusable="false"
-										width={18}
-										height={12}
-										className="block translate-y-[1px]"
-									/>
-								</button>
-								<button
-									type="button"
-									className={cn(
-										'font-inter text-[14px] font-medium leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
-										activeView === 'drafting'
-											? 'text-black'
-											: 'text-[#6B6B6B] hover:text-black'
-									)}
-									onClick={() => setActiveView('drafting')}
-								>
-									Drafts
-								</button>
-								<div className="relative group">
-									<button
-										type="button"
-										className={cn(
-											'font-inter text-[14px] font-medium leading-none bg-transparent p-0 m-0 border-0 cursor-pointer',
-											activeView === 'inbox'
-												? 'text-black'
-												: 'text-[#6B6B6B] hover:text-black'
-										)}
-										onClick={() => setActiveView('inbox')}
-									>
-										Inbox
-									</button>
-								</div>
-							</div>
-						</div>
-					)}
 
 					<div
 						className={cn('flex justify-center', !shouldApplyWritingTopShift && 'mt-6')}
@@ -2808,7 +2623,7 @@ const Murmur = () => {
 						<div ref={crossfadeContainerRef} className="relative w-full isolate">
 							{/* Determine if both views share the same research panel position */}
 							{(() => {
-								const standardPositionTabs: ViewType[] = ['testing', 'contacts', 'drafting', 'sent'];
+								const standardPositionTabs: ViewType[] = ['testing', 'drafting', 'sent'];
 								// Only apply the "stable research panel" treatment during the actual fade,
 								// not while we're waiting for the destination view to paint.
 								const bothSharePosition = isFadingOutPreviousView && previousView && 
@@ -2837,10 +2652,8 @@ const Murmur = () => {
 												inboxSentTabRequest={inboxSentTabRequest}
 												onInboxSentTabChange={setInboxSentTab}
 												goToDrafting={() => setActiveView('drafting')}
-												goToAll={() => setActiveView('all')}
 												goToWriting={() => setActiveView('testing')}
 												onGoToSearch={handleOpenDashboardSearchForCampaign}
-												goToContacts={() => setActiveView('contacts')}
 												goToInbox={() => setActiveView('inbox')}
 												goToSent={() => setActiveView('sent')}
 												onOpenIdentityDialog={() => {
@@ -2878,10 +2691,8 @@ const Murmur = () => {
 													inboxSentTabRequest={inboxSentTabRequest}
 													onInboxSentTabChange={setInboxSentTab}
 													goToDrafting={() => setActiveView('drafting')}
-													goToAll={() => setActiveView('all')}
 													goToWriting={() => setActiveView('testing')}
 													onGoToSearch={handleOpenDashboardSearchForCampaign}
-													goToContacts={() => setActiveView('contacts')}
 													goToInbox={() => setActiveView('inbox')}
 													goToSent={() => setActiveView('sent')}
 													onOpenIdentityDialog={() => {
@@ -2931,6 +2742,18 @@ const Murmur = () => {
 								)
 								scale(${CAMPAIGN_MAP_CONTENT_SCALE});
 							transform-origin: top center;
+						}
+
+						/* New top nav: shift right to center over the main box.
+						   Uses the same shift variable as the rest of campaign content, but no
+						   scale — the new nav has its own internal scale (MAP_VIEW_UI_SCALE). */
+						.campaign-persistent-map-page [data-slot='campaign-top-backdrop'],
+						.campaign-persistent-map-page [data-slot='campaign-top-outline-boxes'],
+						.campaign-persistent-map-page [data-slot='campaign-top-tabs'],
+						.campaign-persistent-map-page [data-slot='campaign-top-search-bar'] {
+							transform: translateX(
+								var(${CAMPAIGN_MAP_SHIFT_X_VAR}, ${CAMPAIGN_MAP_FALLBACK_SHIFT_X_PX}px)
+							);
 						}
 
 						/* View transition animations - smooth, clean crossfade */

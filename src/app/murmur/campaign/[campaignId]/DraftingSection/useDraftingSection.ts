@@ -45,12 +45,10 @@ import { ContactWithName } from '@/types/contact';
 
 export type DraftingSectionView =
 	| 'search'
-	| 'contacts'
 	| 'testing'
 	| 'drafting'
 	| 'sent'
-	| 'inbox'
-	| 'all';
+	| 'inbox';
 
 export type InboxSentTab = 'inbox' | 'sent';
 export type InboxSentTabRequest = { tab: InboxSentTab; requestId: number };
@@ -70,7 +68,6 @@ export interface DraftingSectionProps {
 	 */
 	renderGlobalOverlays?: boolean;
 	goToDrafting?: () => void;
-	goToAll?: () => void;
 	/**
 	 * Optional callback to switch the campaign page into the Writing tab.
 	 */
@@ -79,10 +76,6 @@ export interface DraftingSectionProps {
 	 * Optional callback to switch the campaign page into the Search tab.
 	 */
 	onGoToSearch?: () => void;
-	/**
-	 * Optional callback to switch the campaign page into the Contacts tab.
-	 */
-	goToContacts?: () => void;
 	/**
 	 * Optional callback to switch the campaign page into the Inbox tab.
 	 */
