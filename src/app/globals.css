@@ -546,35 +546,389 @@ body {
 	}
 }
 
-@keyframes gradient-breathe {
-	0%, 100% {
-		background-position: 0% 50%;
-		filter: brightness(1) saturate(1);
+	@keyframes gradient-breathe {
+		0%, 100% {
+			background-position: 0% 50%;
+			filter: brightness(1) saturate(1);
+		}
+		50% {
+			background-position: 100% 50%;
+			filter: brightness(1.08) saturate(1.05);
+		}
 	}
-	50% {
-		background-position: 100% 50%;
-		filter: brightness(1.08) saturate(1.05);
-	}
-}
 
-.search-gradient-button {
-	background: linear-gradient(
-		90deg,
-		#DA29B4 1.69%,
-		#EA1F1F 34.7%,
-		#E122F2 65.83%,
-		#F00404 98.97%
-	);
-	background-size: 250% 100%;
-	animation: gradient-breathe 16s ease-in-out infinite;
-}
-
-@media (prefers-reduced-motion: reduce) {
-	.search-gradient-button {
-		animation: none;
-		background: linear-gradient(90deg, #DA29B4 1.69%, #EA1F1F 34.7%, #E122F2 65.83%, #F00404 98.97%);
+	/* Hover-only "pond" shimmer: slow caustics drift (subtle, meant for tiny surfaces). */
+	@keyframes pond-caustics-drift {
+		0% {
+			background-position: 0 0, 0px 0px, 0px 0px, 0px 0px;
+		}
+		50% {
+			background-position: 0 0, 70px -34px, -44px 62px, 58px 42px;
+		}
+		100% {
+			background-position: 0 0, 140px -68px, -88px 124px, 116px 84px;
+		}
 	}
-}
+
+	/* Premium prismatic refraction animation: gentle waves of light distortion. */
+	@keyframes prismatic-flow {
+		0% {
+			background-position: 0% 50%, 100% 50%, 50% 0%, 50% 100%;
+		}
+		50% {
+			background-position: 100% 50%, 0% 50%, 50% 100%, 50% 0%;
+		}
+		100% {
+			background-position: 0% 50%, 100% 50%, 50% 0%, 50% 100%;
+		}
+	}
+
+	/* Micro-shimmer: tiny specular beads drifting along the gradient direction. */
+	@keyframes micro-shimmer-drift {
+		0% {
+			background-position: 0% 0%, 40% 20%, 80% 60%, 20% 80%;
+		}
+		33% {
+			background-position: 30% 40%, 70% 10%, 10% 80%, 60% 50%;
+		}
+		66% {
+			background-position: 60% 20%, 10% 70%, 50% 30%, 90% 10%;
+		}
+		100% {
+			background-position: 0% 0%, 40% 20%, 80% 60%, 20% 80%;
+		}
+	}
+
+	/* Specular pulse: very slow brightening / dimming of the refraction core. */
+	@keyframes specular-breathe {
+		0%, 100% {
+			opacity: 0.35;
+			transform: scale(1);
+		}
+		50% {
+			opacity: 0.55;
+			transform: scale(1.04);
+		}
+	}
+
+	/* Anisotropic streak drift: soft horizontal flares that follow gradient flow. */
+	@keyframes streak-drift {
+		0% {
+			background-position: -120% 50%, 220% 50%;
+		}
+		50% {
+			background-position: 20% 50%, 80% 50%;
+		}
+		100% {
+			background-position: -120% 50%, 220% 50%;
+		}
+	}
+
+		.search-gradient-button {
+			background: var(
+				--search-gradient,
+				linear-gradient(
+					90deg,
+					#DA29B4 1.69%,
+					#EA1F1F 34.7%,
+					#E122F2 65.83%,
+					#F00404 98.97%
+				)
+			);
+			background-size: 250% 100%;
+			animation: gradient-breathe 16s ease-in-out infinite;
+		}
+
+		/* Hero searchbar: cursor-follow spotlight overlay (opt-in via extra class) */
+		@media (hover: hover) and (pointer: fine) {
+			.search-spotlight-zone {
+				overflow: hidden;
+				isolation: isolate; /* keep blend effects self-contained */
+				--spotlight-x: 50%;
+				--spotlight-y: 50%;
+				--spotlight-size: 260px;
+				--pond-mask-size: 220px;
+				/* Add smooth transitions for the CSS variables themselves */
+				transition: 
+					--spotlight-x 160ms ease-out,
+					--spotlight-y 160ms ease-out;
+				/* Vendor prefixes for broader browser support */
+				-webkit-transition: 
+					--spotlight-x 160ms ease-out,
+					--spotlight-y 160ms ease-out;
+				-moz-transition: 
+					--spotlight-x 160ms ease-out,
+					--spotlight-y 160ms ease-out;
+				-o-transition: 
+					--spotlight-x 160ms ease-out,
+					--spotlight-y 160ms ease-out;
+			}
+
+			.search-spotlight-zone-sm {
+				--spotlight-size: 170px;
+				--pond-mask-size: 140px;
+			}
+
+			/*
+			 * LAYER 1 — Soft volumetric glow
+			 * A wide, diffused radial glow that follows the cursor. Very subtle, sets the stage.
+			 */
+			.search-spotlight-zone::before {
+				content: '';
+				position: absolute;
+				inset: 0;
+				border-radius: inherit;
+				pointer-events: none;
+				z-index: 0;
+				opacity: 0;
+				background: radial-gradient(
+					ellipse var(--spotlight-size) calc(var(--spotlight-size) * 0.6) at var(--spotlight-x) var(--spotlight-y),
+					rgba(255, 255, 255, 0.14) 0%,
+					rgba(255, 255, 255, 0.06) 35%,
+					rgba(255, 255, 255, 0.00) 65%
+				);
+				mix-blend-mode: screen;
+				filter: blur(18px);
+				/* Slower, more fluid transition for the base glow */
+				transition: opacity 480ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
+			}
+
+			/*
+			 * LAYER 2 — Prismatic light refraction (cursor-follow)
+			 * Chromatic dispersion: slightly offset warm/cool cores that split light
+			 * like a prism. Feels like studio light hitting polished glass.
+			 */
+			.search-spotlight-zone::after {
+				content: '';
+				position: absolute;
+				inset: 0;
+				border-radius: inherit;
+				pointer-events: none;
+				z-index: 1;
+				opacity: 0;
+				background:
+					/* Warm core (amber/pink) — trails cursor slightly */
+					radial-gradient(
+						ellipse calc(var(--spotlight-size) * 0.55) calc(var(--spotlight-size) * 0.35)
+						at calc(var(--spotlight-x) - 18px) calc(var(--spotlight-y) + 6px),
+						rgba(255, 210, 160, 0.22) 0%,
+						rgba(255, 180, 140, 0.08) 45%,
+						transparent 72%
+					),
+					/* Cool core (cyan/white) — leads cursor slightly */
+					radial-gradient(
+						ellipse calc(var(--spotlight-size) * 0.45) calc(var(--spotlight-size) * 0.3)
+						at calc(var(--spotlight-x) + 14px) calc(var(--spotlight-y) - 4px),
+						rgba(200, 240, 255, 0.18) 0%,
+						rgba(180, 220, 255, 0.06) 50%,
+						transparent 78%
+					),
+					/* Specular micro-beads — tiny bright spots that drift with the gradient flow */
+					radial-gradient(
+						ellipse 6px 3px at calc(var(--spotlight-x) + 40px) calc(var(--spotlight-y) - 20px),
+						rgba(255, 255, 255, 0.55) 0%,
+						transparent 100%
+					),
+					radial-gradient(
+						ellipse 4px 2px at calc(var(--spotlight-x) - 30px) calc(var(--spotlight-y) + 14px),
+						rgba(255, 255, 255, 0.4) 0%,
+						transparent 100%
+					),
+					radial-gradient(
+						ellipse 8px 4px at calc(var(--spotlight-x) + 12px) calc(var(--spotlight-y) + 28px),
+						rgba(255, 255, 255, 0.3) 0%,
+						transparent 100%
+					);
+				mix-blend-mode: soft-light;
+				filter: blur(0px);
+				/* Medium speed transition for the prismatic layer */
+				transition: opacity 420ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
+				animation: specular-breathe 8s ease-in-out infinite;
+			}
+
+			/*
+			 * LAYER 3 — Anisotropic streak field (pond zone only)
+			 * Soft horizontal light streaks that mimic the gradient's linear flow.
+			 * They drift gently and create that "light brushing across satin" feel.
+			 */
+			.search-pond-zone .search-refraction-streaks {
+				position: absolute;
+				inset: 0;
+				border-radius: inherit;
+				pointer-events: none;
+				z-index: 0;
+				opacity: 0;
+				background:
+					linear-gradient(
+						90deg,
+						transparent 0%,
+						rgba(255, 255, 255, 0.035) 18%,
+						rgba(255, 255, 255, 0.08) 32%,
+						rgba(255, 255, 255, 0.035) 46%,
+						transparent 58%,
+						rgba(255, 255, 255, 0.045) 72%,
+						rgba(255, 255, 255, 0.09) 84%,
+						rgba(255, 255, 255, 0.03) 94%,
+						transparent 100%
+					),
+					linear-gradient(
+						90deg,
+						transparent 0%,
+						rgba(255, 240, 220, 0.025) 25%,
+						rgba(255, 255, 255, 0.055) 50%,
+						rgba(220, 240, 255, 0.025) 75%,
+						transparent 100%
+					);
+				background-size: 240% 100%, 180% 100%;
+				background-position: -120% 50%, 220% 50%;
+				mix-blend-mode: overlay;
+				-webkit-mask-image: radial-gradient(
+					ellipse calc(var(--pond-mask-size) * 1.1) calc(var(--pond-mask-size) * 0.65)
+					at var(--spotlight-x) var(--spotlight-y),
+					rgba(0, 0, 0, 1) 0%,
+					rgba(0, 0, 0, 0.6) 45%,
+					transparent 72%
+				);
+				mask-image: radial-gradient(
+					ellipse calc(var(--pond-mask-size) * 1.1) calc(var(--pond-mask-size) * 0.65)
+					at var(--spotlight-x) var(--spotlight-y),
+					rgba(0, 0, 0, 1) 0%,
+					rgba(0, 0, 0, 0.6) 45%,
+					transparent 72%
+				);
+				-webkit-mask-repeat: no-repeat;
+				mask-repeat: no-repeat;
+				-webkit-mask-size: 100% 100%;
+				mask-size: 100% 100%;
+				/* Slower transition for streaks to create a "dragging through water" effect */
+				transition: opacity 520ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
+				animation: streak-drift 12s ease-in-out infinite;
+			}
+
+			/*
+			 * LAYER 4 — Micro caustics (pond zone only)
+			 * A scaled-down, more refined version of the original caustics.
+			 * Much subtler, acts like tiny light ripples moving across the surface.
+			 */
+			.search-pond-zone .search-refraction-caustics {
+				position: absolute;
+				inset: 1px;
+				border-radius: inherit;
+				pointer-events: none;
+				z-index: 0;
+				opacity: 0;
+				background-image:
+					radial-gradient(
+						ellipse 140px 90px at var(--spotlight-x) var(--spotlight-y),
+						rgba(255, 255, 255, 0.16) 0%,
+						rgba(255, 255, 255, 0.06) 40%,
+						transparent 68%
+					),
+					radial-gradient(
+						ellipse 50% 40% at 22% 32%,
+						rgba(255, 255, 255, 0.10) 0%,
+						transparent 55%
+					),
+					radial-gradient(
+						ellipse 55% 35% at 78% 64%,
+						rgba(255, 255, 255, 0.08) 0%,
+						transparent 52%
+					),
+					radial-gradient(
+						ellipse 35% 45% at 44% 14%,
+						rgba(255, 255, 255, 0.07) 0%,
+						transparent 48%
+					);
+				background-repeat: no-repeat, repeat, repeat, repeat;
+				background-size: 100% 100%, 200px 130px, 240px 180px, 180px 130px;
+				background-position: 0 0, 0px 0px, 0px 0px, 0px 0px;
+				background-blend-mode: normal;
+				mix-blend-mode: screen;
+				filter: blur(8px) contrast(1.15) saturate(1.05);
+				-webkit-mask-image: radial-gradient(
+					ellipse calc(var(--pond-mask-size) * 0.9) calc(var(--pond-mask-size) * 0.55)
+					at var(--spotlight-x) var(--spotlight-y),
+					rgba(0, 0, 0, 1) 0%,
+						rgba(0, 0, 0, 0.5) 55%,
+						transparent 78%
+				);
+				mask-image: radial-gradient(
+					ellipse calc(var(--pond-mask-size) * 0.9) calc(var(--pond-mask-size) * 0.55)
+					at var(--spotlight-x) var(--spotlight-y),
+					rgba(0, 0, 0, 1) 0%,
+						rgba(0, 0, 0, 0.5) 55%,
+						transparent 78%
+				);
+				-webkit-mask-repeat: no-repeat;
+				mask-repeat: no-repeat;
+				-webkit-mask-size: 100% 100%;
+				mask-size: 100% 100%;
+				/* Fastest transition for micro-caustics to respond quickly to cursor */
+				transition: opacity 380ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
+				animation: pond-caustics-drift 16s ease-in-out infinite;
+			}
+
+			/*
+			 * HOVER STATES
+			 * We reveal layers progressively for a richer, more premium feel.
+			 * Staggered timing creates a "liquid displacement" effect.
+			 */
+			.search-spotlight-zone:hover::before,
+			.search-spotlight-zone:focus-visible::before {
+				opacity: 1;
+			}
+
+			.search-spotlight-zone:hover::after,
+			.search-spotlight-zone:focus-visible::after {
+				opacity: 1;
+			}
+
+			.search-pond-zone:hover .search-refraction-streaks,
+			.search-pond-zone:focus-visible .search-refraction-streaks {
+				/* Slightly delayed entrance for streaks to create water-like displacement */
+				transition-delay: 80ms;
+				opacity: 0.45;
+			}
+
+			.search-pond-zone:hover .search-refraction-caustics,
+			.search-pond-zone:focus-visible .search-refraction-caustics {
+				/* Fast response for micro-caustics */
+				opacity: 0.32;
+			}
+
+			/* Exit animations with staggered delays for a smooth "settling" effect */
+			.search-pond-zone:not(:hover):not(:focus-visible) .search-refraction-streaks {
+				transition-delay: 0ms;
+			}
+
+			.search-pond-zone:not(:hover):not(:focus-visible) .search-refraction-caustics {
+				transition-delay: 40ms;
+			}
+
+			.search-spotlight-zone > .search-spotlight-content {
+				position: relative;
+				z-index: 2;
+			}
+		}
+
+		@media (prefers-reduced-motion: reduce) {
+			.search-gradient-button {
+				animation: none;
+				background: var(
+					--search-gradient,
+					linear-gradient(90deg, #DA29B4 1.69%, #EA1F1F 34.7%, #E122F2 65.83%, #F00404 98.97%)
+				);
+			}
+
+			.search-spotlight-zone::after {
+				animation: none;
+			}
+
+			.search-pond-zone .search-refraction-streaks,
+			.search-pond-zone .search-refraction-caustics {
+				animation: none;
+			}
+		}
 
 .search-wave-container {
 	position: relative;
@@ -6125,5 +6479,3 @@ body.murmur-mobile .search-input-icon-btn {
 		font-size: 8px !important;
 	}
 }
-
-

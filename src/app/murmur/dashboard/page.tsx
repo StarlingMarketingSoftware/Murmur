@@ -10,6 +10,7 @@ import {
 	useMemo,
 	useRef,
 	useState,
+	type PointerEvent as ReactPointerEvent,
 	type RefObject,
 	type ReactNode,
 } from 'react';
@@ -20,6 +21,10 @@ import { createPortal, flushSync } from 'react-dom';
 import { CampaignsTable } from '../../../components/organisms/_tables/CampaignsTable/CampaignsTable';
 import { useDashboard } from './useDashboard';
 import { urls } from '@/constants/urls';
+import {
+	getMsUntilNextSearchGradientBucket,
+	getSearchGradientForDate,
+} from '@/constants/searchGradients';
 import { isProblematicBrowser } from '@/utils/browserDetection';
 import { AppLayout } from '@/components/molecules/_layouts/AppLayout/AppLayout';
 import MurmurLogoNew from '@/components/atoms/_svg/MurmurLogoNew';
@@ -1896,6 +1901,30 @@ const DashboardContent = () => {
 			document.body.classList.remove('murmur-mobile-empty');
 		};
 	}, [isMobile, hasCampaigns]);
+
+	// Pick the hero search-bar gradient for the current AM/PM bucket and publish it
+	// as `--search-gradient` on the document root. `.search-gradient-button` reads
+	// this var (with the original magenta/red as fallback). Re-pick at the next
+	// bucket boundary so a user sitting on the dashboard across noon/midnight gets
+	// the swap without a reload.
+	useEffect(() => {
+		const root = document.documentElement;
+		let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+		const applyForNow = () => {
+			const now = new Date();
+			root.style.setProperty('--search-gradient', getSearchGradientForDate(now));
+			// +1s margin so we land cleanly inside the next bucket rather than racing the boundary.
+			timeoutId = setTimeout(applyForNow, getMsUntilNextSearchGradientBucket(now) + 1000);
+		};
+
+		applyForNow();
+
+		return () => {
+			if (timeoutId !== undefined) clearTimeout(timeoutId);
+			root.style.removeProperty('--search-gradient');
+		};
+	}, []);
 	const [isMobileLandscape, setIsMobileLandscape] = useState(false);
 	const [whyValue, setWhyValue] = useState('');
 	const [whatValue, setWhatValue] = useState('');
@@ -2738,6 +2767,9 @@ const DashboardContent = () => {
 	const isTabSwitchAnimatingRef = useRef(false);
 	const tabSwitchTimelineRef = useRef<gsap.core.Timeline | null>(null);
 	const searchContainerRef = useRef<HTMLDivElement>(null);
+	const heroSearchGradientButtonRef = useRef<HTMLButtonElement>(null);
+	const heroSearchIconButtonRef = useRef<HTMLButtonElement>(null);
+	const heroSearchGradientAnimRestoreRef = useRef<Map<Animation, number> | null>(null);
 	const whatInputRef = useRef<HTMLInputElement>(null);
 	const whereInputRef = useRef<HTMLInputElement>(null);
 	const activeSectionIndicatorRef = useRef<HTMLDivElement>(null);
@@ -2745,6 +2777,62 @@ const DashboardContent = () => {
 	// Mini search bar (map view results) indicator refs
 	const miniActiveSectionIndicatorRef = useRef<HTMLDivElement>(null);
 	const prevMiniActiveSectionRef = useRef<'why' | 'what' | 'where' | null>(null);
+
+	const updateSpotlightVarsFromPointer = useCallback(
+		(event: ReactPointerEvent<HTMLElement>) => {
+			// Avoid sticky hover behavior on touch devices (pointerenter can be fired on pointerdown).
+			if (event.pointerType !== 'mouse' && event.pointerType !== 'pen') return;
+			const el = event.currentTarget;
+			const rect = el.getBoundingClientRect();
+			const x = event.clientX - rect.left;
+			// Keep the glow vertically centered while the horizontal position follows the pointer.
+			const y = rect.height / 2;
+			el.style.setProperty('--spotlight-x', `${x}px`);
+			el.style.setProperty('--spotlight-y', `${y}px`);
+		},
+		[]
+	);
+
+	const setHeroSearchGradientPlaybackRate = useCallback((nextPlaybackRate: number | null) => {
+		const gradientEl = heroSearchGradientButtonRef.current;
+		if (!gradientEl) return;
+
+		if (typeof window !== 'undefined') {
+			if (window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches) return;
+		}
+
+		const animations = gradientEl.getAnimations();
+		if (animations.length === 0) return;
+
+		if (typeof nextPlaybackRate === 'number') {
+			// Capture original rates on first hover so we can restore precisely.
+			if (!heroSearchGradientAnimRestoreRef.current) {
+				heroSearchGradientAnimRestoreRef.current = new Map(
+					animations.map((anim) => [anim, anim.playbackRate])
+				);
+			}
+			animations.forEach((anim) => {
+				try {
+					anim.updatePlaybackRate(nextPlaybackRate);
+				} catch {
+					// Fallback: set synchronously if updatePlaybackRate isn't available for some reason.
+					anim.playbackRate = nextPlaybackRate;
+				}
+			});
+			return;
+		}
+
+		const restoreMap = heroSearchGradientAnimRestoreRef.current;
+		if (!restoreMap) return;
+		restoreMap.forEach((rate, anim) => {
+			try {
+				anim.updatePlaybackRate(rate);
+			} catch {
+				anim.playbackRate = rate;
+			}
+		});
+		heroSearchGradientAnimRestoreRef.current = null;
+	}, []);
 	// Derive title for contacts without one (e.g., "Restaurants New York")
 	const derivedContactTitle = useMemo(() => {
 		if (!whatValue) return undefined;
@@ -6464,12 +6552,23 @@ const DashboardContent = () => {
 														<FormControl>
 															{/* Keep the hero search bar from stretching full-width at narrower widths. */}
 															<div className="mx-auto w-full max-w-[603px]">
-															<div
-																ref={searchContainerRef}
-																className={`search-input-group relative ${
-																	hasSearched ? 'search-input-group-active' : ''
-																}`}
-															>
+																<div
+																	ref={searchContainerRef}
+																	className={`search-input-group relative ${
+																		hasSearched ? 'search-input-group-active' : ''
+																	}`}
+																	onPointerEnter={(event) => {
+																		if (event.pointerType !== 'mouse' && event.pointerType !== 'pen')
+																			return;
+																		// "Almost halt" the animated gradient while hovered.
+																		setHeroSearchGradientPlaybackRate(0.08);
+																	}}
+																	onPointerLeave={(event) => {
+																		if (event.pointerType !== 'mouse' && event.pointerType !== 'pen')
+																			return;
+																		setHeroSearchGradientPlaybackRate(null);
+																	}}
+																>
 																<div
 																	className={`search-wave-container ${
 																		isSearchPending ||
@@ -6795,47 +6894,59 @@ const DashboardContent = () => {
 																			)}
 																		</div>
 																	</div>
-																	{!inboxView && (
+																		{!inboxView && (
+																			<button
+																				type="submit"
+																				aria-label="Search"
+																				ref={heroSearchGradientButtonRef}
+																		className="search-gradient-button search-spotlight-zone search-pond-zone absolute left-[4px] right-[68px] max-[480px]:right-[56px] top-1/2 -translate-y-1/2 h-[64px] max-[480px]:h-[52px] rounded-[8px] z-30 cursor-pointer"
+																		style={{
+																			border: '1px solid #000000',
+																			color: '#FFFFFF',
+																			fontFamily:
+																			'var(--font-secondary), Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
+																			fontSize: '25px',
+																			fontWeight: 600,
+																			lineHeight: 1,
+																		}}
+																		onClick={() => setActiveSection(null)}
+																		onPointerEnter={updateSpotlightVarsFromPointer}
+																		onPointerMove={updateSpotlightVarsFromPointer}
+																	>
+																		{/* Anisotropic streak field — follows gradient flow */}
+																		<div className="search-refraction-streaks" aria-hidden="true" />
+																		{/* Micro caustics ripple layer */}
+																		<div className="search-refraction-caustics" aria-hidden="true" />
+																		<span className="search-spotlight-content" style={{ position: 'absolute', left: 'calc(50% + 32px)', top: '50%', transform: 'translate(-50%, -50%)' }}>Search</span>
+																	</button>
+																		)}
+																	{/* Desktop Search Button */}
 																		<button
 																			type="submit"
-																			aria-label="Search"
-																			className="search-gradient-button absolute left-[4px] right-[68px] max-[480px]:right-[56px] top-1/2 -translate-y-1/2 h-[64px] max-[480px]:h-[52px] rounded-[8px] z-30 flex items-center justify-center cursor-pointer"
+																			ref={heroSearchIconButtonRef}
+																			className={`dashboard-search-button search-spotlight-zone search-spotlight-zone-sm flex absolute right-[6px] items-center justify-center w-[58px] ${
+																				inboxView
+																					? 'h-[31px]'
+																					: 'h-[62px] max-[480px]:h-[50px] max-[480px]:w-[46px]'
+																			} z-40 cursor-pointer group`}
 																			style={{
-																				border: '1px solid #000000',
-																				color: '#FFFFFF',
-																				fontFamily:
-																					'var(--font-secondary), Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
-																				fontSize: '25px',
-																				fontWeight: 600,
-																				lineHeight: 1,
+																				top: '50%',
+																				transform: 'translateY(-50%)',
+																				backgroundColor: 'rgba(93, 171, 104, 0.49)',
+																				borderTopRightRadius: '7px',
+																				borderBottomRightRadius: '7px',
+																				borderTopLeftRadius: '0',
+																				borderBottomLeftRadius: '0',
+																				border: '1px solid #5DAB68',
+																				borderLeft: '1px solid #5DAB68',
 																			}}
-																			onClick={() => setActiveSection(null)}
+																			onPointerEnter={updateSpotlightVarsFromPointer}
+																			onPointerMove={updateSpotlightVarsFromPointer}
 																		>
-																			Search
+																			<span className="search-spotlight-content">
+																				<SearchIconDesktop width={inboxView ? 25 : 26} height={inboxView ? 25 : 28} />
+																			</span>
 																		</button>
-																	)}
-																	{/* Desktop Search Button */}
-																	<button
-																		type="submit"
-																		className={`dashboard-search-button flex absolute right-[6px] items-center justify-center w-[58px] ${
-																			inboxView
-																				? 'h-[31px]'
-																				: 'h-[62px] max-[480px]:h-[50px] max-[480px]:w-[46px]'
-																		} z-40 cursor-pointer group`}
-																		style={{
-																			top: '50%',
-																			transform: 'translateY(-50%)',
-																			backgroundColor: 'rgba(93, 171, 104, 0.49)',
-																			borderTopRightRadius: '7px',
-																			borderBottomRightRadius: '7px',
-																			borderTopLeftRadius: '0',
-																			borderBottomLeftRadius: '0',
-																			border: '1px solid #5DAB68',
-																			borderLeft: '1px solid #5DAB68',
-																		}}
-																	>
-																		<SearchIconDesktop width={inboxView ? 25 : 26} height={inboxView ? 25 : 28} />
-																	</button>
 																	{/* Mobile-only submit icon inside input */}
 																	<button
 																		type="submit"
@@ -6847,6 +6958,19 @@ const DashboardContent = () => {
 																</div>
 																{renderDesktopSearchDropdowns()}
 															</div>
+															{!hasSearched && !inboxView && (
+																<div
+																	style={{
+																		borderRadius: 8,
+																		opacity: 0.8,
+																		background: 'rgba(242, 242, 242, 0.20)',
+																		width: 601,
+																		height: 43,
+																		marginTop: 9,
+																		border: '1px solid white',
+																	}}
+																/>
+															)}
 															</div>
 														</FormControl>
 													</FormItem>
