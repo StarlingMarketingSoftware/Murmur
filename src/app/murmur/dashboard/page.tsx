@@ -6515,7 +6515,7 @@ const DashboardContent = () => {
 																				: activeSection
 																					? 'bg-[#EFEFEF] border border-transparent'
 																					: 'bg-white border border-black'
-																		}`}
+																		} ${inboxView ? '' : 'invisible pointer-events-none'}`}
 																		style={{ transition: 'none' }}
 																	>
 																	{/* Sliding active tab indicator */}
