@@ -546,6 +546,36 @@ body {
 	}
 }
 
+@keyframes gradient-breathe {
+	0%, 100% {
+		background-position: 0% 50%;
+		filter: brightness(1) saturate(1);
+	}
+	50% {
+		background-position: 100% 50%;
+		filter: brightness(1.08) saturate(1.05);
+	}
+}
+
+.search-gradient-button {
+	background: linear-gradient(
+		90deg,
+		#DA29B4 1.69%,
+		#EA1F1F 34.7%,
+		#E122F2 65.83%,
+		#F00404 98.97%
+	);
+	background-size: 250% 100%;
+	animation: gradient-breathe 16s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.search-gradient-button {
+		animation: none;
+		background: linear-gradient(90deg, #DA29B4 1.69%, #EA1F1F 34.7%, #E122F2 65.83%, #F00404 98.97%);
+	}
+}
+
 .search-wave-container {
 	position: relative;
 	overflow: hidden;

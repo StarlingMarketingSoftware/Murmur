@@ -832,7 +832,7 @@ const MapBottomSearchBar = memo(({
 				onClick={() => onForYouSubmit?.()}
 			>
 				<div
-					className="absolute overflow-hidden"
+					className="search-gradient-button absolute overflow-hidden"
 					style={{
 						left: '6px',
 						right: '6px',
@@ -841,8 +841,6 @@ const MapBottomSearchBar = memo(({
 						borderRadius: '6px',
 						border: '0.75px solid #595959',
 						opacity: 0.65,
-						background:
-							'linear-gradient(90deg, #DA29B4 1.69%, #EA1F1F 34.7%, #E122F2 65.83%, #F00404 98.97%)',
 						boxSizing: 'border-box',
 					}}
 				/>
@@ -6801,10 +6799,8 @@ const DashboardContent = () => {
 																		<button
 																			type="submit"
 																			aria-label="Search"
-																			className="absolute left-[4px] right-[68px] max-[480px]:right-[56px] top-1/2 -translate-y-1/2 h-[64px] max-[480px]:h-[52px] rounded-[8px] z-30 flex items-center justify-center cursor-pointer"
+																			className="search-gradient-button absolute left-[4px] right-[68px] max-[480px]:right-[56px] top-1/2 -translate-y-1/2 h-[64px] max-[480px]:h-[52px] rounded-[8px] z-30 flex items-center justify-center cursor-pointer"
 																			style={{
-																				background:
-																					'linear-gradient(90deg, #DA29B4 1.69%, #EA1F1F 34.7%, #E122F2 65.83%, #F00404 98.97%)',
 																				border: '1px solid #000000',
 																				color: '#FFFFFF',
 																				fontFamily:
@@ -7428,13 +7424,15 @@ const DashboardContent = () => {
 														}}
 													>
 														<div
-															className="absolute left-[6px] top-1/2 -translate-y-1/2 flex items-center rounded-[6px] z-10 overflow-hidden border border-black"
+															className={`absolute left-[6px] top-1/2 -translate-y-1/2 flex items-center rounded-[6px] z-10 overflow-hidden border border-black ${
+																mapTopSearchDisplay.kind === 'curated' ? 'search-gradient-button' : ''
+															}`}
 															style={{
 																width: 'calc(100% - 12px)',
 																height: '38px',
 																background:
 																	mapTopSearchDisplay.kind === 'curated'
-																		? 'linear-gradient(90deg, #DA29B4 1.69%, #EA1F1F 34.7%, #E122F2 65.83%, #F00404 98.97%)'
+																		? undefined
 																		: '#FFFFFF',
 															}}
 														>
