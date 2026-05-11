@@ -15,7 +15,6 @@ import {
 } from 'react';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { gsap } from 'gsap';
-import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { createPortal, flushSync } from 'react-dom';
 import { CampaignsTable } from '../../../components/organisms/_tables/CampaignsTable/CampaignsTable';
@@ -495,6 +494,23 @@ const MAP_RESULTS_BOTTOM_SEARCH_BOX = {
 	opacity: 0.8,
 } as const;
 
+const INITIAL_DASHBOARD_BOTTOM_SEARCH_BOX = {
+	width: 418,
+	height: 39,
+	borderRadius: 26,
+	borderWidth: 2,
+	borderColor: '#000000',
+	backgroundColor: 'rgba(254, 254, 254, 0.74)',
+	buttonSize: 31,
+	buttonInset: 4,
+	buttonRadius: 264,
+	buttonBackgroundColor: '#368FED',
+	buttonIconColor: '#9AE4FF',
+	restingOpacity: 0.2,
+	activeOpacity: 1,
+	bottomOffset: 14,
+} as const;
+
 const MAP_SELECT_GRAB_LEFT_PX = 26;
 const MAP_SELECT_GRAB_MIN_VIEW_SCALE = 0.72;
 const MAP_SELECT_GRAB_DEFAULT_VIEW_SCALE = 0.74;
@@ -691,6 +707,7 @@ type MapBottomSearchBarProps = {
 	activeHeight: number;
 	inputRef: RefObject<HTMLTextAreaElement | null>;
 	mode?: 'anything' | 'category' | 'for-you';
+	appearance?: 'default' | 'initial-dashboard';
 	categoryWhatValue?: string;
 	categoryWhereValue?: string;
 	activeCategoryField?: 'what' | 'where' | null;
@@ -712,6 +729,7 @@ const MapBottomSearchBar = memo(({
 	activeHeight,
 	inputRef,
 	mode = 'anything',
+	appearance = 'default',
 	categoryWhatValue = '',
 	categoryWhereValue = '',
 	activeCategoryField = null,
@@ -730,6 +748,9 @@ const MapBottomSearchBar = memo(({
 	const prevActiveCategoryFieldRef = useRef<'what' | 'where' | null>(null);
 	const categoryWhatInputRef = useRef<HTMLInputElement>(null);
 	const categoryWhereInputRef = useRef<HTMLInputElement>(null);
+	const [isInitialDashboardSearchHovered, setIsInitialDashboardSearchHovered] =
+		useState(false);
+	const isInitialDashboardSearch = appearance === 'initial-dashboard';
 
 	useLayoutEffect(() => {
 		const indicator = activeCategoryIndicatorRef.current;
@@ -1068,17 +1089,44 @@ const MapBottomSearchBar = memo(({
 		);
 	}
 
+	const anythingSearchBox = isInitialDashboardSearch
+		? INITIAL_DASHBOARD_BOTTOM_SEARCH_BOX
+		: MAP_RESULTS_BOTTOM_SEARCH_BOX;
+	const anythingRightReservedWidth = isInitialDashboardSearch
+		? INITIAL_DASHBOARD_BOTTOM_SEARCH_BOX.buttonSize +
+			INITIAL_DASHBOARD_BOTTOM_SEARCH_BOX.buttonInset +
+			20
+		: MAP_RESULTS_BOTTOM_SEARCH_BOX.rightSlotWidth + 28;
+	const isInitialDashboardSearchActive =
+		isInitialDashboardSearch &&
+		(isInitialDashboardSearchHovered || isExpanded || value.trim().length > 0);
+
 	return (
 		<div
 			aria-label="Search anything on the map"
 			className="relative h-full w-full overflow-hidden pointer-events-auto"
 			style={{
-				borderRadius: `${MAP_RESULTS_BOTTOM_SEARCH_BOX.borderRadius}px`,
-				border: `${MAP_RESULTS_BOTTOM_SEARCH_BOX.borderWidth}px solid ${MAP_RESULTS_BOTTOM_SEARCH_BOX.borderColor}`,
-				backgroundColor: MAP_RESULTS_BOTTOM_SEARCH_BOX.backgroundColor,
-				opacity: MAP_RESULTS_BOTTOM_SEARCH_BOX.opacity,
+				borderRadius: `${anythingSearchBox.borderRadius}px`,
+				border: `${anythingSearchBox.borderWidth}px solid ${anythingSearchBox.borderColor}`,
+				backgroundColor: anythingSearchBox.backgroundColor,
+				opacity: isInitialDashboardSearch
+					? isInitialDashboardSearchActive
+						? INITIAL_DASHBOARD_BOTTOM_SEARCH_BOX.activeOpacity
+						: INITIAL_DASHBOARD_BOTTOM_SEARCH_BOX.restingOpacity
+					: MAP_RESULTS_BOTTOM_SEARCH_BOX.opacity,
 				boxSizing: 'border-box',
 				cursor: 'text',
+				transition: isInitialDashboardSearch ? 'opacity 150ms ease' : undefined,
+			}}
+			onMouseEnter={() => {
+				if (isInitialDashboardSearch) {
+					setIsInitialDashboardSearchHovered(true);
+				}
+			}}
+			onMouseLeave={() => {
+				if (isInitialDashboardSearch) {
+					setIsInitialDashboardSearchHovered(false);
+				}
 			}}
 			onMouseDown={(event) => {
 				if (event.target !== inputRef.current) {
@@ -1093,13 +1141,23 @@ const MapBottomSearchBar = memo(({
 					className="absolute flex items-center gap-[4px] font-inter text-[16px] leading-none text-black pointer-events-none"
 					style={{
 						top: 0,
-						left: '14px',
-						right: `${MAP_RESULTS_BOTTOM_SEARCH_BOX.rightSlotWidth + 14}px`,
-						height: `${MAP_RESULTS_BOTTOM_SEARCH_BOX.textRowHeight}px`,
+						left: isInitialDashboardSearch ? '24px' : '14px',
+						right: `${anythingRightReservedWidth}px`,
+						height: isInitialDashboardSearch
+							? `${INITIAL_DASHBOARD_BOTTOM_SEARCH_BOX.height - 4}px`
+							: `${MAP_RESULTS_BOTTOM_SEARCH_BOX.textRowHeight}px`,
+						fontSize: isInitialDashboardSearch ? '16px' : undefined,
+						fontWeight: isInitialDashboardSearch ? 500 : undefined,
 					}}
 				>
-					<span className="font-bold">Search</span>
-					<span>Anything</span>
+					{isInitialDashboardSearch ? (
+						<span>Ask Anything</span>
+					) : (
+						<>
+							<span className="font-bold">Search</span>
+							<span>Anything</span>
+						</>
+					)}
 				</div>
 			)}
 			<textarea
@@ -1118,14 +1176,16 @@ const MapBottomSearchBar = memo(({
 				className="absolute bg-transparent border-0 outline-none font-inter text-[16px] text-black"
 				style={{
 					top: 0,
-					left: '14px',
-					width: `calc(100% - ${MAP_RESULTS_BOTTOM_SEARCH_BOX.rightSlotWidth + 28}px)`,
+					left: isInitialDashboardSearch ? '24px' : '14px',
+					width: `calc(100% - ${anythingRightReservedWidth + (isInitialDashboardSearch ? 24 : 0)}px)`,
 					height: `${
 						isExpanded
 							? activeHeight
-							: MAP_RESULTS_BOTTOM_SEARCH_BOX.textRowHeight
+							: isInitialDashboardSearch
+								? INITIAL_DASHBOARD_BOTTOM_SEARCH_BOX.height - 4
+								: MAP_RESULTS_BOTTOM_SEARCH_BOX.textRowHeight
 					}px`,
-					padding: '8px 0 6px',
+					padding: isInitialDashboardSearch ? '8px 0 7px' : '8px 0 6px',
 					opacity: isExpanded || value.length > 0 ? 1 : 0,
 					pointerEvents: isExpanded ? 'auto' : 'none',
 					caretColor: '#000000',
@@ -1140,33 +1200,58 @@ const MapBottomSearchBar = memo(({
 			<button
 				type="button"
 				aria-label="Submit map search"
-				className="absolute right-0 top-0 flex items-center justify-center transition-colors duration-100"
+				className="absolute flex items-center justify-center transition-colors duration-100"
 				style={{
-					width: `${MAP_RESULTS_BOTTOM_SEARCH_BOX.rightSlotWidth}px`,
-					height: `${MAP_RESULTS_BOTTOM_SEARCH_BOX.rightSlotHeight}px`,
-					backgroundColor: MAP_RESULTS_BOTTOM_SEARCH_BOX.rightSlotBackgroundColor,
-					borderLeft: `${MAP_RESULTS_BOTTOM_SEARCH_BOX.borderWidth}px solid ${MAP_RESULTS_BOTTOM_SEARCH_BOX.borderColor}`,
-					borderBottom: isExpanded
-						? `${MAP_RESULTS_BOTTOM_SEARCH_BOX.borderWidth}px solid ${MAP_RESULTS_BOTTOM_SEARCH_BOX.borderColor}`
+					right: isInitialDashboardSearch
+						? `${INITIAL_DASHBOARD_BOTTOM_SEARCH_BOX.buttonInset}px`
+						: 0,
+					top: isInitialDashboardSearch ? '50%' : 0,
+					width: isInitialDashboardSearch
+						? `${INITIAL_DASHBOARD_BOTTOM_SEARCH_BOX.buttonSize}px`
+						: `${MAP_RESULTS_BOTTOM_SEARCH_BOX.rightSlotWidth}px`,
+					height: isInitialDashboardSearch
+						? `${INITIAL_DASHBOARD_BOTTOM_SEARCH_BOX.buttonSize}px`
+						: `${MAP_RESULTS_BOTTOM_SEARCH_BOX.rightSlotHeight}px`,
+					transform: isInitialDashboardSearch ? 'translateY(-50%)' : undefined,
+					backgroundColor: isInitialDashboardSearch
+						? INITIAL_DASHBOARD_BOTTOM_SEARCH_BOX.buttonBackgroundColor
+						: MAP_RESULTS_BOTTOM_SEARCH_BOX.rightSlotBackgroundColor,
+					color: isInitialDashboardSearch
+						? INITIAL_DASHBOARD_BOTTOM_SEARCH_BOX.buttonIconColor
 						: undefined,
+					borderRadius: isInitialDashboardSearch
+						? `${INITIAL_DASHBOARD_BOTTOM_SEARCH_BOX.buttonRadius}px`
+						: undefined,
+					border: 0,
+					borderLeft: isInitialDashboardSearch
+						? undefined
+						: `${MAP_RESULTS_BOTTOM_SEARCH_BOX.borderWidth}px solid ${MAP_RESULTS_BOTTOM_SEARCH_BOX.borderColor}`,
+					borderBottom:
+						!isInitialDashboardSearch && isExpanded
+							? `${MAP_RESULTS_BOTTOM_SEARCH_BOX.borderWidth}px solid ${MAP_RESULTS_BOTTOM_SEARCH_BOX.borderColor}`
+							: undefined,
 					boxSizing: 'border-box',
 					cursor: 'pointer',
 					padding: 0,
 				}}
 				onMouseEnter={(event) => {
+					if (isInitialDashboardSearch) return;
 					event.currentTarget.style.backgroundColor =
 						MAP_RESULTS_BOTTOM_SEARCH_BOX.rightSlotHoverBackgroundColor;
 				}}
 				onMouseLeave={(event) => {
+					if (isInitialDashboardSearch) return;
 					event.currentTarget.style.backgroundColor =
 						MAP_RESULTS_BOTTOM_SEARCH_BOX.rightSlotBackgroundColor;
 				}}
 				onMouseDown={(event) => {
 					event.stopPropagation();
+					if (isInitialDashboardSearch) return;
 					event.currentTarget.style.backgroundColor =
 						MAP_RESULTS_BOTTOM_SEARCH_BOX.rightSlotActiveBackgroundColor;
 				}}
 				onMouseUp={(event) => {
+					if (isInitialDashboardSearch) return;
 					event.currentTarget.style.backgroundColor =
 						MAP_RESULTS_BOTTOM_SEARCH_BOX.rightSlotHoverBackgroundColor;
 				}}
@@ -5038,24 +5123,44 @@ const DashboardContent = () => {
 		activeTab === 'search' &&
 		!fromHomeParam &&
 		!isMapView;
+	const shouldLockDashboardPageScroll =
+		isMapView || shouldLockLandingDashboardScroll;
 
 	// Lock body scroll when in map view or on the initial desktop dashboard.
-	useEffect(() => {
-		if (isMapView || shouldLockLandingDashboardScroll) {
+	useLayoutEffect(() => {
+		if (shouldLockDashboardPageScroll) {
+			const root = document.documentElement;
+			const body = document.body;
+			const previousRootOverflow = root.style.overflow;
+			const previousRootHeight = root.style.height;
+			const previousRootOverscrollBehavior = root.style.overscrollBehavior;
+			const previousBodyOverflow = body.style.overflow;
+			const previousBodyHeight = body.style.height;
+			const previousBodyOverscrollBehavior = body.style.overscrollBehavior;
+
 			if (shouldLockLandingDashboardScroll) {
 				window.scrollTo({ top: 0, left: 0 });
 			}
-			document.body.style.overflow = 'hidden';
-			document.body.style.height = '100vh';
-		} else {
-			document.body.style.overflow = '';
-			document.body.style.height = '';
+
+			root.style.overflow = 'hidden';
+			root.style.height = '100vh';
+			root.style.overscrollBehavior = 'none';
+			body.style.overflow = 'hidden';
+			body.style.height = '100vh';
+			body.style.overscrollBehavior = 'none';
+
+			return () => {
+				root.style.overflow = previousRootOverflow;
+				root.style.height = previousRootHeight;
+				root.style.overscrollBehavior = previousRootOverscrollBehavior;
+				body.style.overflow = previousBodyOverflow;
+				body.style.height = previousBodyHeight;
+				body.style.overscrollBehavior = previousBodyOverscrollBehavior;
+			};
 		}
-		return () => {
-			document.body.style.overflow = '';
-			document.body.style.height = '';
-		};
-	}, [isMapView, shouldLockLandingDashboardScroll]);
+
+		return undefined;
+	}, [shouldLockDashboardPageScroll, shouldLockLandingDashboardScroll]);
 
 	// Combine section values into main search field
 	useEffect(() => {
@@ -5817,34 +5922,6 @@ const DashboardContent = () => {
 		return (
 			<div className="min-h-screen w-full">
 				{mapPortal}
-				<Link
-					href={urls.home.activeLanding}
-					prefetch
-					className="fixed left-8 top-6 flex items-center gap-5 text-[15px] font-inter font-normal no-underline hover:no-underline z-[10000] group text-[#060606] hover:text-gray-500"
-					title="Back to Landing"
-					aria-label="Back to Landing"
-					onClick={(e) => {
-						e.preventDefault();
-						if (typeof window !== 'undefined') {
-							window.location.assign(urls.home.activeLanding);
-						}
-					}}
-				>
-					<svg
-						width="16"
-						height="10"
-						viewBox="0 0 27 16"
-						fill="none"
-						xmlns="http://www.w3.org/2000/svg"
-						className="inline-block align-middle"
-					>
-						<path
-							d="M0.292892 7.29289C-0.0976315 7.68342 -0.0976315 8.31658 0.292892 8.70711L6.65685 15.0711C7.04738 15.4616 7.68054 15.4616 8.07107 15.0711C8.46159 14.6805 8.46159 14.0474 8.07107 13.6569L2.41421 8L8.07107 2.34315C8.46159 1.95262 8.46159 1.31946 8.07107 0.928932C7.68054 0.538408 7.04738 0.538408 6.65685 0.928932L0.292892 7.29289ZM27 8V7L1 7V8V9L27 9V8Z"
-							fill="currentColor"
-						/>
-					</svg>
-					<span className="hidden md:inline">to Landing</span>
-				</Link>
 
 				{/* Only show logo above box when there are campaigns */}
 				{hasCampaigns && (
@@ -6181,107 +6258,81 @@ const DashboardContent = () => {
 
 	return (
 		<>
-		<style jsx global>{`
-			#map-search-tray-what-dropdown-container .scrollbar-hide,
-			#map-search-tray-where-dropdown-container .scrollbar-hide {
-				scrollbar-width: none !important;
-				scrollbar-color: transparent transparent !important;
-				-ms-overflow-style: none !important;
-			}
-			#map-search-tray-what-dropdown-container .scrollbar-hide::-webkit-scrollbar,
-			#map-search-tray-where-dropdown-container .scrollbar-hide::-webkit-scrollbar {
-				display: none !important;
-				width: 0 !important;
-				height: 0 !important;
-			}
-		`}</style>
-		{/* Shared Mapbox globe background */}
-		{mapPortal}
-		{!hasSearched && activeTab === 'search' && !fromHomeParam && !isMapView && !isNarrowestDesktop && (
-			<div
-				className="fixed left-1/2 pointer-events-none"
-				onMouseEnter={cancelMapBottomSearchFollowupPreviewClear}
-				onMouseLeave={scheduleMapBottomSearchFollowupPreviewClear}
-				style={{
-					bottom: `${MAP_RESULTS_BOTTOM_SEARCH_BOX.bottomOffset}px`,
-					width: `${mapBottomSearchShellWidth}px`,
-					height: `${mapBottomSearchShellHeight}px`,
-					transform: 'translateX(-50%)',
-					transition: 'none',
-					zIndex: 70,
-				}}
-			>
-				<MapBottomSearchBar
-					value={mapBottomSearchValue}
-					isExpanded={isMapBottomSearchExpanded}
-					activeHeight={mapBottomSearchActiveHeight}
-					inputRef={mapBottomSearchInputRef}
-					mode={
-						isMapBottomCategoryMode
-							? 'category'
-							: isMapBottomForYouMode
-								? 'for-you'
-								: 'anything'
-					}
-					categoryWhatValue={whatValue}
-					categoryWhereValue={whereValue}
-					activeCategoryField={activeMapBottomCategoryField}
-					onActivate={handleMapBottomSearchActivate}
-					onSubmit={handleMapBottomSearchSubmit}
-					onValueChange={setMapBottomSearchValue}
-					onActiveChange={setIsMapBottomSearchActive}
-					onCategoryFieldFocus={handleMapBottomCategoryFieldFocus}
-					onCategoryWhatChange={handleMapBottomCategoryWhatChange}
-					onCategoryWhereChange={handleMapBottomCategoryWhereChange}
-					onCategoryWhatEnter={handleMapBottomCategoryWhatEnter}
-					onCategorySubmit={handleMapBottomCategorySubmit}
-					onForYouSubmit={handleMapBottomForYouSubmit}
-				/>
-				<MapBottomSearchFollowupBox
-					selectedSearchFollowup={mapBottomSearchFollowupSelection}
-					previewedSearchFollowup={mapBottomSearchFollowupPreview}
-					onSelectedSearchFollowupChange={
-						handleMapBottomSearchFollowupSelectionChange
-					}
-					onPreviewSearchFollowupChange={
-						handleMapBottomSearchFollowupPreviewChange
-					}
-				/>
-			</div>
-		)}
-
-		<AppLayout>
-			<Link
-				href={urls.home.activeLanding}
-				prefetch
-				className={`fixed left-8 top-6 flex items-center gap-5 text-[15px] font-inter font-normal no-underline hover:no-underline z-[10000] group text-[#060606] hover:text-gray-500 transition-opacity duration-500 ${
-					isMapView ? 'opacity-0 pointer-events-none' : 'opacity-100'
-				}`}
-				title="Back to Landing"
-				aria-label="Back to Landing"
-				onClick={(e) => {
-					e.preventDefault();
-					if (typeof window !== 'undefined') {
-						window.location.assign(urls.home.activeLanding);
-					}
-				}}
-			>
-				<svg
-					width="16"
-					height="10"
-					viewBox="0 0 27 16"
-					fill="none"
-					xmlns="http://www.w3.org/2000/svg"
-					className="inline-block align-middle"
+			<style jsx global>{`
+				html:has([data-dashboard-scroll-lock='true']),
+				body:has([data-dashboard-scroll-lock='true']) {
+					overflow: hidden !important;
+					height: 100vh !important;
+					overscroll-behavior: none !important;
+				}
+				#map-search-tray-what-dropdown-container .scrollbar-hide,
+				#map-search-tray-where-dropdown-container .scrollbar-hide {
+					scrollbar-width: none !important;
+					scrollbar-color: transparent transparent !important;
+					-ms-overflow-style: none !important;
+				}
+				#map-search-tray-what-dropdown-container .scrollbar-hide::-webkit-scrollbar,
+				#map-search-tray-where-dropdown-container .scrollbar-hide::-webkit-scrollbar {
+					display: none !important;
+					width: 0 !important;
+					height: 0 !important;
+				}
+			`}</style>
+			{/* Shared Mapbox globe background */}
+			{mapPortal}
+			{!hasSearched && activeTab === 'search' && !fromHomeParam && !isMapView && !isNarrowestDesktop && (
+				<div
+					className="fixed left-1/2 pointer-events-none"
+					onMouseEnter={cancelMapBottomSearchFollowupPreviewClear}
+					onMouseLeave={scheduleMapBottomSearchFollowupPreviewClear}
+					style={{
+						bottom: `${INITIAL_DASHBOARD_BOTTOM_SEARCH_BOX.bottomOffset}px`,
+						width: `${INITIAL_DASHBOARD_BOTTOM_SEARCH_BOX.width}px`,
+						height: `${INITIAL_DASHBOARD_BOTTOM_SEARCH_BOX.height}px`,
+						transform: 'translateX(-50%)',
+						transition: 'none',
+						zIndex: 70,
+					}}
 				>
-					<path
-						d="M0.292892 7.29289C-0.0976315 7.68342 -0.0976315 8.31658 0.292892 8.70711L6.65685 15.0711C7.04738 15.4616 7.68054 15.4616 8.07107 15.0711C8.46159 14.6805 8.46159 14.0474 8.07107 13.6569L2.41421 8L8.07107 2.34315C8.46159 1.95262 8.46159 1.31946 8.07107 0.928932C7.68054 0.538408 7.04738 0.538408 6.65685 0.928932L0.292892 7.29289ZM27 8V7L1 7V8V9L27 9V8Z"
-						fill="currentColor"
+					<MapBottomSearchBar
+						value={mapBottomSearchValue}
+						isExpanded={isMapBottomSearchExpanded}
+						activeHeight={INITIAL_DASHBOARD_BOTTOM_SEARCH_BOX.height}
+						inputRef={mapBottomSearchInputRef}
+						appearance="initial-dashboard"
+						mode={
+							isMapBottomCategoryMode
+								? 'category'
+								: isMapBottomForYouMode
+									? 'for-you'
+									: 'anything'
+						}
+						categoryWhatValue={whatValue}
+						categoryWhereValue={whereValue}
+						activeCategoryField={activeMapBottomCategoryField}
+						onActivate={handleMapBottomSearchActivate}
+						onSubmit={handleMapBottomSearchSubmit}
+						onValueChange={setMapBottomSearchValue}
+						onActiveChange={setIsMapBottomSearchActive}
+						onCategoryFieldFocus={handleMapBottomCategoryFieldFocus}
+						onCategoryWhatChange={handleMapBottomCategoryWhatChange}
+						onCategoryWhereChange={handleMapBottomCategoryWhereChange}
+						onCategoryWhatEnter={handleMapBottomCategoryWhatEnter}
+						onCategorySubmit={handleMapBottomCategorySubmit}
+						onForYouSubmit={handleMapBottomForYouSubmit}
 					/>
-				</svg>
-				<span className="hidden md:inline">to Landing</span>
-			</Link>
+				</div>
+			)}
 
+			<div
+				data-dashboard-scroll-lock={
+					shouldLockDashboardPageScroll ? 'true' : undefined
+				}
+				className={
+					shouldLockDashboardPageScroll ? 'h-screen overflow-hidden' : undefined
+				}
+			>
+				<AppLayout>
 			<div
 				ref={dashboardContentRef}
 				className={`relative min-h-screen dashboard-main-offset w-full max-w-full transition-opacity duration-500 ${bottomPadding} ${
@@ -9517,7 +9568,8 @@ const DashboardContent = () => {
 						document.body
 					)}
 			</div>
-		</AppLayout>
+				</AppLayout>
+			</div>
 
 		</>
 	);
