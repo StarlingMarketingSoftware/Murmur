@@ -19,6 +19,11 @@ import { gsap } from 'gsap';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { createPortal, flushSync } from 'react-dom';
 import { CampaignsTable } from '../../../components/organisms/_tables/CampaignsTable/CampaignsTable';
+import {
+	DashboardStrategyBox,
+	type StrategyMockState,
+} from '@/components/molecules/DashboardStrategyBox/DashboardStrategyBox';
+import { DashboardStrategyBoxDebugPanel } from '@/components/molecules/DashboardStrategyBox/DashboardStrategyBoxDebugPanel';
 import { useDashboard } from './useDashboard';
 import { urls } from '@/constants/urls';
 import {
@@ -28,7 +33,6 @@ import {
 import { isProblematicBrowser } from '@/utils/browserDetection';
 import { AppLayout } from '@/components/molecules/_layouts/AppLayout/AppLayout';
 import MurmurLogoNew from '@/components/atoms/_svg/MurmurLogoNew';
-import CampaignsDropdownIcon from '@/components/atoms/_svg/CampaignsDropdownIcon';
 import { PromotionIcon } from '@/components/atoms/_svg/PromotionIcon';
 import { BookingIcon } from '@/components/atoms/_svg/BookingIcon';
 import { SearchIconDesktop } from '@/components/atoms/_svg/SearchIconDesktop';
@@ -114,7 +118,6 @@ import {
 } from '@/components/molecules/ContactResearchPanel/ContactResearchPanel';
 import { CampaignsInboxView } from '@/components/molecules/CampaignsInboxView/CampaignsInboxView';
 import InboxSection from '@/components/molecules/InboxSection/InboxSection';
-import { InboundEmailNotificationList } from '@/components/molecules/InboundEmailNotificationList/InboundEmailNotificationList';
 import DashboardResponsesWidget from '@/components/molecules/DashboardResponsesWidget/DashboardResponsesWidget';
 import { useGetCampaign, useGetCampaigns } from '@/hooks/queryHooks/useCampaigns';
 import { useEditUserContactList } from '@/hooks/queryHooks/useUserContactLists';
@@ -2193,13 +2196,13 @@ const DashboardContent = () => {
 	type DashboardActionBarKey = 'playbook' | 'folder' | 'calendar' | 'star' | 'envelope';
 	const [selectedActionBarIcon, setSelectedActionBarIcon] =
 		useState<DashboardActionBarKey>('playbook');
+	const strategyDebugEnabled = searchParams.get('strategyDebug') === '1';
+	const [strategyMockState, setStrategyMockState] = useState<StrategyMockState | undefined>(
+		undefined
+	);
 	const isTabPreviewingOther = hoveredTab != null && hoveredTab !== activeTab;
 	// Dashboard inbox deep-link (`?tab=inbox`) should land on the Campaigns sub-tab.
 	const [inboxSubtab, setInboxSubtab] = useState<'messages' | 'campaigns'>('campaigns');
-	const [dashboardLandingPanel, setDashboardLandingPanel] = useState<
-		'new' | 'campaigns' | 'responses'
-	>('new');
-
 	// Handle tab query parameter
 	// Only react to *URL changes*. If we also depend on `activeTab`, this effect can run
 	// immediately after a click-driven tab switch (before `router.replace` updates the URL),
@@ -9855,7 +9858,7 @@ const DashboardContent = () => {
 					</>
 				)}
 
-				{/* CampaignsTable for search tab - rendered outside hero-wrapper */}
+				{/* Panel content for search tab - driven by the action bar icon selection */}
 				{!hasSearched && activeTab === 'search' && (
 					<div
 						ref={tabbedLandingBoxRef}
@@ -9864,77 +9867,23 @@ const DashboardContent = () => {
 							willChange: 'transform, opacity',
 						}}
 					>
-						{(() => {
-							const panels = [
-								{
-									key: 'new',
-									label: 'New',
-									render: () => (
-										<InboundEmailNotificationList enabled={isSignedIn === true} />
-									),
-								},
-								{
-									key: 'campaigns',
-									label: 'Campaigns',
-									render: () => <CampaignsTable />,
-								},
-								{
-									key: 'responses',
-									label: 'Responses',
-									render: () => (
-										<DashboardResponsesWidget enabled={isSignedIn === true} />
-									),
-								},
-							] as const;
-
-							const activePanel =
-								panels.find((panel) => panel.key === dashboardLandingPanel) ??
-								panels[0];
-							const inactivePanels = panels.filter(
-								(panel) => panel.key !== activePanel.key
-							);
-							// UX tweak: when viewing Responses, show Campaigns above New.
-							const inactivePanelsToRender =
-								activePanel.key === 'responses'
-									? inactivePanels.slice().reverse()
-									: inactivePanels;
-
-							return (
-								<>
-									<div className="mt-[18px] mb-[18px] w-full flex flex-col items-center">
-										{activePanel.render()}
-									</div>
-
-									{inactivePanelsToRender.map((panel) => (
-										<div
-											key={panel.key}
-											className="w-[603px] max-w-full mx-auto"
-										>
-											<button
-												type="button"
-												onClick={() => setDashboardLandingPanel(panel.key)}
-												className="flex items-center justify-center gap-[6px] cursor-pointer opacity-60 hover:opacity-100 transition-opacity"
-												style={{
-													width: '127px',
-													height: '26px',
-													borderRadius: '12px',
-													border: '1px solid #ccc',
-													backgroundColor: '#fff',
-													fontSize: '13px',
-													fontWeight: 500,
-													color: '#333',
-													marginBottom: '12px',
-												}}
-											>
-												<CampaignsDropdownIcon style={{ flexShrink: 0 }} />
-												{panel.label}
-											</button>
-										</div>
-									))}
-								</>
-							);
-						})()}
+						<div className="mt-[18px] mb-[18px] w-full flex flex-col items-center">
+							{selectedActionBarIcon === 'playbook' && (
+								<DashboardStrategyBox mockState={strategyMockState} />
+							)}
+							{selectedActionBarIcon === 'folder' && <CampaignsTable />}
+							{selectedActionBarIcon === 'envelope' && (
+								<DashboardResponsesWidget enabled={isSignedIn === true} />
+							)}
+						</div>
 					</div>
+				)}
+
+				{strategyDebugEnabled && (
+					<DashboardStrategyBoxDebugPanel
+						value={strategyMockState}
+						onChange={setStrategyMockState}
+					/>
 				)}
 
 				{/* Sign-up overlay for "from home" mode when user is not authenticated */}
