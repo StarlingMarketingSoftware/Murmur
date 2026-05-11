@@ -49,6 +49,11 @@ import MapBottomSearchForYouIcon from '@/components/atoms/_svg/MapBottomSearchFo
 import MapBottomSearchProfileIcon from '@/components/atoms/_svg/MapBottomSearchProfileIcon';
 import MapBottomSearchKeywordIcon from '@/components/atoms/_svg/MapBottomSearchKeywordIcon';
 import MapBottomSearchRadiusIcon from '@/components/atoms/_svg/MapBottomSearchRadiusIcon';
+import DashboardActionBarPlaybookIcon from '@/components/atoms/_svg/DashboardActionBarPlaybookIcon';
+import DashboardActionBarFolderIcon from '@/components/atoms/_svg/DashboardActionBarFolderIcon';
+import DashboardActionBarCalendarIcon from '@/components/atoms/_svg/DashboardActionBarCalendarIcon';
+import DashboardActionBarStarIcon from '@/components/atoms/_svg/DashboardActionBarStarIcon';
+import DashboardActionBarEnvelopeIcon from '@/components/atoms/_svg/DashboardActionBarEnvelopeIcon';
 import { MapStackBlueSparkIcon } from '@/components/atoms/_svg/MapStackBlueSparkIcon';
 import { MapStackStarIcon } from '@/components/atoms/_svg/MapStackStarIcon';
 import {
@@ -2007,6 +2012,9 @@ const DashboardContent = () => {
 	const [activeTab, setActiveTab] = useState<'search' | 'inbox'>(initialTabFromQuery);
 	const [hoveredTab, setHoveredTab] = useState<'search' | 'inbox' | null>(null);
 	const inboxView = activeTab === 'inbox';
+	type DashboardActionBarKey = 'playbook' | 'folder' | 'calendar' | 'star' | 'envelope';
+	const [selectedActionBarIcon, setSelectedActionBarIcon] =
+		useState<DashboardActionBarKey>('playbook');
 	const isTabPreviewingOther = hoveredTab != null && hoveredTab !== activeTab;
 	// Dashboard inbox deep-link (`?tab=inbox`) should land on the Campaigns sub-tab.
 	const [inboxSubtab, setInboxSubtab] = useState<'messages' | 'campaigns'>('campaigns');
@@ -6968,8 +6976,49 @@ const DashboardContent = () => {
 																		height: 43,
 																		marginTop: 9,
 																		border: '1px solid white',
+																		display: 'flex',
+																		alignItems: 'center',
+																		justifyContent: 'space-around',
+																		padding: '0 24px',
+																		color: '#050505',
 																	}}
-																/>
+																>
+																	{(
+																		[
+																			{ key: 'playbook', Icon: DashboardActionBarPlaybookIcon, label: 'Playbook' },
+																			{ key: 'folder', Icon: DashboardActionBarFolderIcon, label: 'Folder' },
+																			{ key: 'calendar', Icon: DashboardActionBarCalendarIcon, label: 'Calendar' },
+																			{ key: 'star', Icon: DashboardActionBarStarIcon, label: 'Starred' },
+																			{ key: 'envelope', Icon: DashboardActionBarEnvelopeIcon, label: 'Messages' },
+																		] as const
+																	).map(({ key, Icon, label }) => {
+																		const isSelected = selectedActionBarIcon === key;
+																		return (
+																			<button
+																				key={key}
+																				type="button"
+																				aria-label={label}
+																				aria-pressed={isSelected}
+																				onClick={() => setSelectedActionBarIcon(key)}
+																				style={{
+																					background: 'none',
+																					border: 'none',
+																					padding: '4px 8px',
+																					margin: 0,
+																					display: 'flex',
+																					alignItems: 'center',
+																					justifyContent: 'center',
+																					cursor: 'pointer',
+																					color: '#050505',
+																					opacity: isSelected ? 1 : 0.3,
+																					transition: 'opacity 150ms ease',
+																				}}
+																			>
+																				<Icon />
+																			</button>
+																		);
+																	})}
+																</div>
 															)}
 															</div>
 														</FormControl>
