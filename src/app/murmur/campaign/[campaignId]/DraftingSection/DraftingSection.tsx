@@ -3252,6 +3252,7 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 						{/* Also hide when hideHeaderBox is true (header rendered at page level for narrowest breakpoint) */}
 						{shouldRenderAbsolutePinnedLeftColumn && (
 							<div
+								data-campaign-interactive-surface
 								className="absolute hidden lg:flex flex-col"
 								style={{
 									right:
@@ -4338,6 +4339,77 @@ export const DraftingSection: FC<ExtendedDraftingSectionProps> = (props) => {
 									</div>
 								</div>
 							)}
+
+						{view === 'overview' && (
+							<div className="relative w-full min-h-[720px]">
+								<div
+									data-campaign-interactive-surface
+									className={cn(
+										'flex flex-col',
+										!isNarrowDesktop && !isNarrowestDesktop && 'absolute'
+									)}
+									style={{
+										...(isNarrowDesktop || isNarrowestDesktop
+											? {
+													margin: '0 auto',
+													width: '375px',
+											  }
+											: {
+													left: '96px',
+													top: '0',
+													width: '375px',
+											  }),
+										gap: '16px',
+									}}
+								>
+									{!hideHeaderBox && (
+										<CampaignHeaderBox
+											campaignId={campaign?.id}
+											campaignName={campaign?.name || 'Untitled Campaign'}
+											toListNames={toListNames}
+											fromName={fromName}
+											contactsCount={contactsCount}
+											draftCount={draftCount}
+											sentCount={sentCount}
+											draftingProgress={draftingProgressForHeader}
+											onFromClick={onOpenIdentityDialog}
+											onDraftsClick={goToDrafting}
+											onSentClick={goToSent}
+										/>
+									)}
+									<div
+										style={{
+											width: '375px',
+											height: '557px',
+											overflow: 'visible',
+										}}
+									>
+										<ContactsExpandedList
+											contacts={contactsForContactsExpandedList}
+											isLoading={isContactsLoading}
+											campaign={campaign}
+											enableUsedContactTooltip={false}
+											selectedContactIds={contactsTabSelectedIds}
+											activelyDraftingContactIds={activelyDraftingContactIdsForContactsExpandedList}
+											onContactSelectionChange={(updater) =>
+												setContactsTabSelectedIds((prev) => updater(new Set(prev)))
+											}
+											onContactClick={handleResearchContactClick}
+											onContactHover={handleResearchContactHover}
+											onDraftSelected={async (ids) => {
+												await handleGenerateDrafts(ids);
+											}}
+											isDraftDisabled={isGenerationDisabled()}
+											isPendingGeneration={isPendingGeneration}
+											width={375}
+											height={557}
+											minRows={8}
+											onSearchFromMiniBar={handleMiniContactsSearch}
+										/>
+									</div>
+								</div>
+							</div>
+						)}
 
 						{view === 'testing' && (
 							<div className="relative">

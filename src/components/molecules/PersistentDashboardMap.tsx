@@ -14,8 +14,8 @@ const IDLE_FRAME_TRANSITION = '0ms ease';
 const FALLBACK_MAP_PROPS: SearchResultsMapProps = {
 	contacts: [],
 	selectedContacts: [],
-	presentation: 'background',
-	autoSpin: true,
+	presentation: 'interactive',
+	autoSpin: false,
 	skipAutoFit: true,
 };
 
@@ -35,10 +35,21 @@ export function PersistentDashboardMap() {
 
 	const shouldRenderMap = mounted && (Boolean(mapConfig) || isCampaignRoute);
 	const isInteractiveDashboardMap = isDashboardRoute && Boolean(mapConfig?.isMapView);
+	const isInteractiveCampaignMap = isCampaignRoute;
+	const isInteractiveMap = isInteractiveDashboardMap || isInteractiveCampaignMap;
 
 	const mapProps = useMemo<SearchResultsMapProps>(
-		() => mapConfig?.mapProps ?? FALLBACK_MAP_PROPS,
-		[mapConfig?.mapProps]
+		() => {
+			const props = mapConfig?.mapProps ?? FALLBACK_MAP_PROPS;
+			if (!isInteractiveCampaignMap) return props;
+
+			return {
+				...props,
+				presentation: 'interactive',
+				autoSpin: false,
+			};
+		},
+		[isInteractiveCampaignMap, mapConfig?.mapProps]
 	);
 
 	if (!shouldRenderMap) return null;
@@ -59,8 +70,8 @@ export function PersistentDashboardMap() {
 				style={{
 					position: 'fixed',
 					inset: 0,
-					zIndex: isInteractiveDashboardMap ? 98 : -1,
-					pointerEvents: isInteractiveDashboardMap ? 'auto' : 'none',
+					zIndex: isInteractiveDashboardMap ? 98 : isInteractiveCampaignMap ? 0 : -1,
+					pointerEvents: isInteractiveMap ? 'auto' : 'none',
 				}}
 			>
 				<div

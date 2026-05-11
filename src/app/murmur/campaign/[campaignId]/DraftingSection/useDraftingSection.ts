@@ -45,6 +45,7 @@ import { ContactWithName } from '@/types/contact';
 
 export type DraftingSectionView =
 	| 'search'
+	| 'overview'
 	| 'testing'
 	| 'drafting'
 	| 'sent'
