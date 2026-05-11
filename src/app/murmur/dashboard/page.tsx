@@ -521,13 +521,191 @@ const INITIAL_DASHBOARD_BOTTOM_SEARCH_BOX = {
 	bottomOffset: 14,
 } as const;
 
+// Resolution-aware zoom for the fullscreen map view. Mirrors the campaign page's tuned
+// `SIXTEEN_BY_TEN_ZOOM_MAP` / `SIXTEEN_BY_NINE_ZOOM_MAP` tables so the dashboard map-view
+// chrome lands at the same physical size as the campaign chrome on every monitor.
+const DASHBOARD_MAP_ZOOM_DEFAULT = 0.85;
+const DASHBOARD_MAP_ZOOM_MATCH_TOLERANCE_PX = 50;
+const DASHBOARD_MAP_ZOOM_MIN = 0.5;
+const DASHBOARD_MAP_ZOOM_MAX = 1.6;
+const DASHBOARD_MAP_SIXTEEN_BY_TEN_ZOOM_MAP: Array<{ w: number; h: number; zoom: number }> = [
+	{ w: 1152, h: 720, zoom: 0.52 },
+	{ w: 1280, h: 800, zoom: 0.6 },
+	{ w: 1440, h: 900, zoom: 0.7 },
+	{ w: 1504, h: 940, zoom: 0.84 },
+	{ w: 1664, h: 1040, zoom: 0.77 },
+	{ w: 1920, h: 1200, zoom: 0.95 },
+	{ w: 2048, h: 1280, zoom: 0.95 },
+	{ w: 2304, h: 1440, zoom: 1.1 },
+	{ w: 2592, h: 1620, zoom: 1.2 },
+	{ w: 2880, h: 1800, zoom: 1.2 },
+	{ w: 2976, h: 1860, zoom: 1.45 },
+	{ w: 4608, h: 2880, zoom: 1.6 },
+];
+const DASHBOARD_MAP_SIXTEEN_BY_TEN_FALLBACK_ZOOM = 0.8;
+type DashboardMapZoomPoint = { w: number; h: number; zoom: number; metric: number };
+const DASHBOARD_MAP_SIXTEEN_BY_TEN_ZOOM_POINTS: DashboardMapZoomPoint[] =
+	DASHBOARD_MAP_SIXTEEN_BY_TEN_ZOOM_MAP.map((entry) => ({
+		...entry,
+		metric: Math.hypot(entry.w, entry.h),
+	})).sort((a, b) => a.metric - b.metric);
+const DASHBOARD_MAP_SIXTEEN_BY_NINE_ZOOM_MAP: Array<{ w: number; h: number; zoom: number }> = [
+	{ w: 1280, h: 720, zoom: 0.52 },
+	{ w: 1344, h: 756, zoom: 0.55 },
+	{ w: 1600, h: 900, zoom: 0.68 },
+	{ w: 1920, h: 1080, zoom: 0.83 },
+];
+const DASHBOARD_MAP_SIXTEEN_BY_NINE_FALLBACK_ZOOM = 0.85;
+const DASHBOARD_MAP_SIXTEEN_BY_NINE_ZOOM_POINTS: DashboardMapZoomPoint[] =
+	DASHBOARD_MAP_SIXTEEN_BY_NINE_ZOOM_MAP.map((entry) => ({
+		...entry,
+		metric: Math.hypot(entry.w, entry.h),
+	})).sort((a, b) => a.metric - b.metric);
+
+const clampDashboardMapZoom = (
+	z: number,
+	min = DASHBOARD_MAP_ZOOM_MIN,
+	max = DASHBOARD_MAP_ZOOM_MAX
+) => Math.min(max, Math.max(min, z));
+
+const computeDashboardMapZoomForViewport = (
+	viewportW: number,
+	viewportH: number
+): number => {
+	if (!Number.isFinite(viewportW) || !Number.isFinite(viewportH)) {
+		return DASHBOARD_MAP_ZOOM_DEFAULT;
+	}
+	if (viewportW <= 0 || viewportH <= 0) return DASHBOARD_MAP_ZOOM_DEFAULT;
+
+	const ratio = viewportW / viewportH;
+	const IDEAL_16X10 = 16 / 10;
+	const IDEAL_16X9 = 16 / 9;
+	const viewportDelta16x10 = Math.abs(ratio - IDEAL_16X10);
+	const viewportDelta16x9 = Math.abs(ratio - IDEAL_16X9);
+	const screenW =
+		(typeof window !== 'undefined' &&
+			(window.screen?.availWidth ?? window.screen?.width)) ||
+		viewportW;
+	const screenH =
+		(typeof window !== 'undefined' &&
+			(window.screen?.availHeight ?? window.screen?.height)) ||
+		viewportH;
+	const screenRatio = screenW > 0 && screenH > 0 ? screenW / screenH : ratio;
+	const screenDelta16x10 = Math.abs(screenRatio - IDEAL_16X10);
+	const screenDelta16x9 = Math.abs(screenRatio - IDEAL_16X9);
+	const isSixteenByTenish = viewportDelta16x10 <= 0.14 || screenDelta16x10 <= 0.14;
+	const isSixteenByNineish = viewportDelta16x9 <= 0.08 || screenDelta16x9 <= 0.08;
+
+	let targetZoom = DASHBOARD_MAP_ZOOM_DEFAULT;
+
+	const pickFromTable = (
+		table: Array<{ w: number; h: number; zoom: number }>,
+		points: DashboardMapZoomPoint[],
+		fallback: number
+	) => {
+		const matchScreenW = screenW || viewportW;
+		const matchScreenH = screenH || viewportH;
+
+		const findNearMatch = (w: number, h: number) =>
+			table.find(
+				(entry) =>
+					Math.abs(w - entry.w) <= DASHBOARD_MAP_ZOOM_MATCH_TOLERANCE_PX &&
+					Math.abs(h - entry.h) <= DASHBOARD_MAP_ZOOM_MATCH_TOLERANCE_PX
+			);
+
+		const interpolateZoom = (w: number, h: number) => {
+			const metric = Math.hypot(w, h);
+			if (!Number.isFinite(metric) || metric <= 0 || points.length === 0) {
+				return fallback;
+			}
+			const first = points[0];
+			const last = points[points.length - 1];
+			if (metric <= first.metric) return first.zoom;
+			if (metric >= last.metric) return last.zoom;
+			for (let i = 0; i < points.length - 1; i++) {
+				const a = points[i];
+				const b = points[i + 1];
+				if (metric < a.metric || metric > b.metric) continue;
+				const denom = b.metric - a.metric;
+				const t = denom > 0 ? (metric - a.metric) / denom : 0;
+				return a.zoom + (b.zoom - a.zoom) * t;
+			}
+			return fallback;
+		};
+
+		const distanceToMap = (w: number, h: number) => {
+			let best = Number.POSITIVE_INFINITY;
+			for (const entry of points) {
+				best = Math.min(best, Math.hypot(w - entry.w, h - entry.h));
+			}
+			return best;
+		};
+
+		const screenNearMatch = findNearMatch(matchScreenW, matchScreenH);
+		if (screenNearMatch) return screenNearMatch.zoom;
+		const viewportNearMatch = findNearMatch(viewportW, viewportH);
+		if (viewportNearMatch) return viewportNearMatch.zoom;
+		const screenDistance = distanceToMap(matchScreenW, matchScreenH);
+		const viewportDistance = distanceToMap(viewportW, viewportH);
+		const useViewportDims = viewportDistance + 0.5 < screenDistance;
+		const w = useViewportDims ? viewportW : matchScreenW;
+		const h = useViewportDims ? viewportH : matchScreenH;
+		return interpolateZoom(w, h);
+	};
+
+	if (isSixteenByTenish) {
+		targetZoom = pickFromTable(
+			DASHBOARD_MAP_SIXTEEN_BY_TEN_ZOOM_MAP,
+			DASHBOARD_MAP_SIXTEEN_BY_TEN_ZOOM_POINTS,
+			DASHBOARD_MAP_SIXTEEN_BY_TEN_FALLBACK_ZOOM
+		);
+	} else if (isSixteenByNineish) {
+		targetZoom = pickFromTable(
+			DASHBOARD_MAP_SIXTEEN_BY_NINE_ZOOM_MAP,
+			DASHBOARD_MAP_SIXTEEN_BY_NINE_ZOOM_POINTS,
+			DASHBOARD_MAP_SIXTEEN_BY_NINE_FALLBACK_ZOOM
+		);
+	}
+
+	// Dock / windowed overrides, mirrored from the campaign page so behaviour matches when
+	// the macOS Dock is visible or the browser window is not maximized.
+	if (viewportW >= 1400 && viewportH <= 780) {
+		targetZoom = clampDashboardMapZoom(targetZoom, 0.7);
+	}
+	if (
+		viewportW >= 1900 &&
+		viewportW <= 2050 &&
+		viewportH >= 1180 &&
+		viewportH <= 1245
+	) {
+		targetZoom = clampDashboardMapZoom(targetZoom, undefined, 0.93);
+	}
+	if (
+		viewportW >= 2100 &&
+		viewportW <= 2200 &&
+		viewportH >= 1320 &&
+		viewportH <= 1380
+	) {
+		targetZoom = clampDashboardMapZoom(targetZoom, 1.2);
+	}
+
+	return clampDashboardMapZoom(targetZoom);
+};
+
 const MAP_SELECT_GRAB_LEFT_PX = 26;
-const MAP_SELECT_GRAB_MIN_VIEW_SCALE = 0.72;
-const MAP_SELECT_GRAB_DEFAULT_VIEW_SCALE = 0.74;
-const MAP_SELECT_GRAB_MAX_VIEW_SCALE = 0.85;
+// Base scales for the left-side map tools. Slightly higher than the chrome's 0.85 so they
+// don't shrink too far under the resolution-aware root zoom.
+const MAP_SELECT_GRAB_MIN_VIEW_SCALE = 0.8;
+const MAP_SELECT_GRAB_DEFAULT_VIEW_SCALE = 0.84;
+const MAP_SELECT_GRAB_MAX_VIEW_SCALE = 0.95;
 const MAP_SELECT_GRAB_SCALE_GROW_START_HEIGHT_PX = 1180;
 const MAP_SELECT_GRAB_SCALE_GROW_END_HEIGHT_PX = 1480;
 const MAP_SELECT_GRAB_VIEWPORT_INSET_PX = 16;
+const MAP_VIEW_SIDE_PANEL_VISUAL_TOP_PX = 106;
+const MAP_VIEW_SIDE_PANEL_BOTTOM_GAP_PX = 20;
+// Keep both map side panels visually pinned after the dashboard root zoom is applied.
+const MAP_VIEW_SIDE_PANEL_TOP_CSS = `calc(${MAP_VIEW_SIDE_PANEL_VISUAL_TOP_PX}px / var(--murmur-dashboard-zoom, ${DASHBOARD_MAP_ZOOM_DEFAULT}))`;
+const MAP_SELECT_GRAB_VISUAL_TOP_NUDGE_UP_CSS = `calc(4px / var(--murmur-dashboard-zoom, ${DASHBOARD_MAP_ZOOM_DEFAULT}))`;
 const MAP_SELECT_GRAB_TOP_EXTENT_PX =
 	MAP_SELECT_GRAB_STARTER_BOX_HEIGHT_PX +
 	MAP_SELECT_GRAB_STARTER_BOX_GAP_PX +
@@ -3055,8 +3233,10 @@ const DashboardContent = () => {
 		};
 	}, [isMobile]);
 
-	// Mapbox GL doesn't reliably size/position its WebGL canvas under CSS zoom/transform scaling.
-	// While in fullscreen map view, force 1x scaling so the map always fills the stroked container.
+	// Apply a resolution-aware zoom to the fullscreen map view so the dashboard's map-view
+	// chrome (top tabs, search bar, side panels, bottom search) scales like the campaign page
+	// across monitor sizes. The shared map portal counter-applies `zoom: 1 / dashboard-zoom`
+	// to `.dashboard-globe-bg`, so the Mapbox canvas keeps filling the viewport at 1x.
 	useLayoutEffect(() => {
 		// Avoid running until we know whether this is a real mobile device.
 		if (isMobile === null) return;
@@ -3068,17 +3248,36 @@ const DashboardContent = () => {
 			return;
 		}
 
-		if (isMapView) {
-			document.documentElement.classList.add(DASHBOARD_MAP_COMPACT_CLASS);
-			// Force 1x scaling to avoid Mapbox canvas layout drift (especially in browsers that
-			// fall back to transform-based scaling when CSS `zoom` is unsupported).
-			document.documentElement.style.setProperty(DASHBOARD_ZOOM_VAR, '1');
-		} else {
+		if (!isMapView) {
 			document.documentElement.classList.remove(DASHBOARD_MAP_COMPACT_CLASS);
 			document.documentElement.style.removeProperty(DASHBOARD_ZOOM_VAR);
+			return;
 		}
 
+		document.documentElement.classList.add(DASHBOARD_MAP_COMPACT_CLASS);
+
+		const applyMapViewZoom = () => {
+			if (typeof window === 'undefined') return;
+			const w = window.innerWidth;
+			const h = window.innerHeight;
+			const zoom = computeDashboardMapZoomForViewport(w, h);
+			// Match the campaign behaviour: when the computed zoom equals the CSS default, remove the
+			// inline override so the value reverts cleanly instead of paving over the default.
+			if (Math.abs(zoom - DASHBOARD_MAP_ZOOM_DEFAULT) < 0.002) {
+				document.documentElement.style.removeProperty(DASHBOARD_ZOOM_VAR);
+			} else {
+				document.documentElement.style.setProperty(
+					DASHBOARD_ZOOM_VAR,
+					zoom.toFixed(3)
+				);
+			}
+		};
+
+		applyMapViewZoom();
+		window.addEventListener('resize', applyMapViewZoom);
+
 		return () => {
+			window.removeEventListener('resize', applyMapViewZoom);
 			document.documentElement.classList.remove(DASHBOARD_MAP_COMPACT_CLASS);
 			document.documentElement.style.removeProperty(DASHBOARD_ZOOM_VAR);
 		};
@@ -4025,8 +4224,14 @@ const DashboardContent = () => {
 	// "Search this area" CTA timing + placement (map view).
 	const SEARCH_THIS_AREA_MIN_ZOOM = 8;
 	const SEARCH_THIS_AREA_DELAY_MS = 2000;
-	// Scale down fullscreen map UI chrome (buttons/panels) without scaling the Mapbox canvas.
+	// Map-view chrome transforms (applied on top of the resolution-aware root zoom).
+	// Top-bar / search-bar match the campaign page's 0.85 transform so they land at the same
+	// visual size as the campaign chrome on every monitor. Side panels use a slightly larger
+	// transform so they don't shrink too far under the root zoom. The bottom search
+	// apparatus mirrors the top bar's 0.85 to balance the top↔bottom chrome.
 	const MAP_VIEW_UI_SCALE = isMobile ? 1 : 0.85;
+	const MAP_VIEW_PANEL_SCALE = isMobile ? 1 : 0.95;
+	const MAP_VIEW_BOTTOM_SEARCH_SCALE = isMobile ? 1 : 0.85;
 	const mapSelectGrabViewScale = useMemo(() => {
 		if (isMobile) return 1;
 		const availableHeight =
@@ -4051,8 +4256,6 @@ const DashboardContent = () => {
 			MAP_SELECT_GRAB_MAX_VIEW_SCALE
 		);
 	}, [isMobile, viewportHeight]);
-	const mapSelectGrabVisualHeightPx =
-		MAP_SELECT_GRAB_TOTAL_HEIGHT_PX * mapSelectGrabViewScale;
 	const mapSelectGrabOriginOffsetPx =
 		MAP_SELECT_GRAB_TOP_EXTENT_PX * mapSelectGrabViewScale;
 	const MAP_VIEW_TOP_BACKDROP_BOX_TOP_PX = 9;
@@ -8000,7 +8203,6 @@ const DashboardContent = () => {
 
 						const mapTopOutlineBox = isMapView ? (
 							<div
-								aria-hidden="true"
 								className="fixed left-0 right-0 flex justify-center pointer-events-none"
 								style={{
 									top: `${MAP_VIEW_SEARCH_BAR_TOP_PX}px`,
@@ -8018,6 +8220,7 @@ const DashboardContent = () => {
 									}}
 								>
 									<div
+										className="pointer-events-auto"
 										style={{
 											position: 'absolute',
 											right: `calc(100% + ${MAP_VIEW_TOP_OUTLINE_BOX_LEFT_GAP_PX}px)`,
@@ -8028,9 +8231,48 @@ const DashboardContent = () => {
 											border: '1px solid #000',
 											borderRadius: '8px',
 											boxSizing: 'border-box',
+											display: 'flex',
+											alignItems: 'center',
+											justifyContent: 'space-around',
+											padding: '0 6px',
+											color: '#050505',
 										}}
-									/>
+									>
+										{(
+											[
+												{ key: 'playbook', Icon: DashboardActionBarPlaybookIcon, label: 'Playbook', width: 22, height: 18 },
+												{ key: 'folder', Icon: DashboardActionBarFolderIcon, label: 'Folder', width: 22, height: 13 },
+											] as const
+										).map(({ key, Icon, label, width, height }) => {
+											const isSelected = selectedActionBarIcon === key;
+											return (
+												<button
+													key={key}
+													type="button"
+													aria-label={label}
+													aria-pressed={isSelected}
+													onClick={() => setSelectedActionBarIcon(key)}
+													style={{
+														background: 'none',
+														border: 'none',
+														padding: '2px 4px',
+														margin: 0,
+														display: 'flex',
+														alignItems: 'center',
+														justifyContent: 'center',
+														cursor: 'pointer',
+														color: '#050505',
+														opacity: isSelected ? 1 : 0.3,
+														transition: 'opacity 150ms ease',
+													}}
+												>
+													<Icon width={width} height={height} />
+												</button>
+											);
+										})}
+									</div>
 									<div
+										className="pointer-events-auto"
 										style={{
 											position: 'absolute',
 											left: `calc(100% + ${MAP_VIEW_TOP_OUTLINE_BOX_RIGHT_GAP_PX}px)`,
@@ -8041,8 +8283,46 @@ const DashboardContent = () => {
 											border: '1px solid #000',
 											borderRadius: '8px',
 											boxSizing: 'border-box',
+											display: 'flex',
+											alignItems: 'center',
+											justifyContent: 'space-around',
+											padding: '0 8px',
+											color: '#050505',
 										}}
-									/>
+									>
+										{(
+											[
+												{ key: 'star', Icon: DashboardActionBarStarIcon, label: 'Starred', width: 21, height: 20 },
+												{ key: 'envelope', Icon: DashboardActionBarEnvelopeIcon, label: 'Messages', width: 22, height: 13 },
+											] as const
+										).map(({ key, Icon, label, width, height }) => {
+											const isSelected = selectedActionBarIcon === key;
+											return (
+												<button
+													key={key}
+													type="button"
+													aria-label={label}
+													aria-pressed={isSelected}
+													onClick={() => setSelectedActionBarIcon(key)}
+													style={{
+														background: 'none',
+														border: 'none',
+														padding: '2px 4px',
+														margin: 0,
+														display: 'flex',
+														alignItems: 'center',
+														justifyContent: 'center',
+														cursor: 'pointer',
+														color: '#050505',
+														opacity: isSelected ? 1 : 0.3,
+														transition: 'opacity 150ms ease',
+													}}
+												>
+													<Icon width={width} height={height} />
+												</button>
+											);
+										})}
+									</div>
 								</div>
 							</div>
 						) : null;
@@ -8074,11 +8354,13 @@ const DashboardContent = () => {
 								<div
 									className="fixed z-[130] pointer-events-none"
 									style={{
-										left: `${MAP_SELECT_GRAB_LEFT_PX}px`,
-										top: `calc(clamp(${MAP_SELECT_GRAB_VIEWPORT_INSET_PX}px, calc((100dvh - ${mapSelectGrabVisualHeightPx}px) / 2), calc(100dvh - ${mapSelectGrabVisualHeightPx}px - ${MAP_SELECT_GRAB_VIEWPORT_INSET_PX}px)) + ${mapSelectGrabOriginOffsetPx}px)`,
-										transform: `scale(${mapSelectGrabViewScale})`,
-										transformOrigin: 'top left',
-									}}
+											left: `${MAP_SELECT_GRAB_LEFT_PX}px`,
+											// The visible column starts `TOP_EXTENT * scale` above this origin.
+											// Pin that visual top to the same zoom-adjusted Y as the right panel.
+											top: `calc(${MAP_VIEW_SIDE_PANEL_TOP_CSS} + ${mapSelectGrabOriginOffsetPx}px - ${MAP_SELECT_GRAB_VISUAL_TOP_NUDGE_UP_CSS})`,
+											transform: `scale(${mapSelectGrabViewScale})`,
+											transformOrigin: 'top left',
+										}}
 								>
 									<MapSelectGrabTallStackBox
 										className="absolute pointer-events-none"
@@ -8733,7 +9015,7 @@ const DashboardContent = () => {
 															    so the UI doesn't disappear between state searches. */}
 															{!isNarrowestDesktop && !hasNoSearchResults && (
 																	<div
-																		className="absolute top-[97px] right-[10px] flex flex-col gap-[9px] pointer-events-auto"
+																		className="absolute right-[10px] flex flex-col gap-[9px] pointer-events-auto"
 																		onMouseEnter={() => {
 																			if (!shouldUseDynamicMapCreateCampaignCta) return;
 																			setIsPointerInMapSidePanel(true);
@@ -8743,13 +9025,14 @@ const DashboardContent = () => {
 																			setIsPointerInMapSidePanel(false);
 																		}}
 																		style={{
+																			top: MAP_VIEW_SIDE_PANEL_TOP_CSS,
 																			width: '433px',
 																			height: mapResearchPanelContact && mapResearchPanelCompactHeightPx
 																				? mapResearchPanelCompactHeightPx
 																				: 800,
-																			maxHeight: 'calc(100% - 117px)',
+																			maxHeight: `calc(100% - ${MAP_VIEW_SIDE_PANEL_TOP_CSS} - ${MAP_VIEW_SIDE_PANEL_BOTTOM_GAP_PX}px)`,
 																			overflow: 'hidden',
-																			transform: `scale(${MAP_VIEW_UI_SCALE})`,
+																			transform: `scale(${MAP_VIEW_PANEL_SCALE})`,
 																			transformOrigin: 'top right',
 																		}}
 																	>
@@ -9008,7 +9291,8 @@ const DashboardContent = () => {
 																			bottom: `${MAP_RESULTS_BOTTOM_SEARCH_BOX.bottomOffset}px`,
 																			width: `${mapBottomSearchShellWidth}px`,
 																			height: `${mapBottomSearchShellHeight}px`,
-																			transform: 'translateX(-50%)',
+																			transform: `translateX(-50%) scale(${MAP_VIEW_BOTTOM_SEARCH_SCALE})`,
+																			transformOrigin: 'bottom center',
 																			transition: 'none',
 																			zIndex: 130,
 																		}}
@@ -9066,7 +9350,7 @@ const DashboardContent = () => {
 																			backgroundColor: '#AFD6EF',
 																			border: '3px solid #143883',
 																			overflow: 'hidden',
-																			transform: `scale(${MAP_VIEW_UI_SCALE})`,
+																			transform: `scale(${MAP_VIEW_PANEL_SCALE})`,
 																			transformOrigin: 'bottom center',
 																		}}
 																	>

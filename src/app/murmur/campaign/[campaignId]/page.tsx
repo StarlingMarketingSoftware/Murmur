@@ -20,6 +20,10 @@ import { useState, useEffect, useRef, useCallback, useMemo, useLayoutEffect } fr
 import LeftArrow from '@/components/atoms/_svg/LeftArrow';
 import RightArrow from '@/components/atoms/_svg/RightArrow';
 import { SearchIconDesktop } from '@/components/atoms/_svg/SearchIconDesktop';
+import DashboardActionBarPlaybookIcon from '@/components/atoms/_svg/DashboardActionBarPlaybookIcon';
+import DashboardActionBarFolderIcon from '@/components/atoms/_svg/DashboardActionBarFolderIcon';
+import DashboardActionBarStarIcon from '@/components/atoms/_svg/DashboardActionBarStarIcon';
+import DashboardActionBarEnvelopeIcon from '@/components/atoms/_svg/DashboardActionBarEnvelopeIcon';
 import SearchMap from '@/components/atoms/_svg/SearchMap';
 import BottomFolderIcon from '@/components/atoms/_svg/BottomFolderIcon';
 import BottomHomeIcon from '@/components/atoms/_svg/BottomHomeIcon';
@@ -2613,55 +2617,6 @@ const Murmur = () => {
 							/>
 						</div>
 
-						{/* Empty stroked outline boxes flanking the search pill */}
-						<div
-							aria-hidden="true"
-							data-slot="campaign-top-outline-boxes"
-							className="fixed left-0 right-0 flex justify-center pointer-events-none"
-							style={{
-								top: `${MAP_VIEW_SEARCH_BAR_TOP_PX}px`,
-								zIndex: 115,
-							}}
-						>
-							<div
-								className="relative"
-								style={{
-									transform: `scale(${MAP_VIEW_UI_SCALE})`,
-									transformOrigin: 'top center',
-									width: `${MAP_VIEW_SEARCH_BAR_OUTER_WIDTH_PX}px`,
-									maxWidth: `${MAP_VIEW_SEARCH_BAR_OUTER_WIDTH_PX}px`,
-									height: `${MAP_VIEW_SEARCH_BAR_INPUT_HEIGHT_PX}px`,
-								}}
-							>
-								<div
-									style={{
-										position: 'absolute',
-										right: `calc(100% + ${MAP_VIEW_TOP_OUTLINE_BOX_LEFT_GAP_PX}px)`,
-										top: '50%',
-										transform: 'translateY(-50%)',
-										width: `${MAP_VIEW_TOP_OUTLINE_BOX_WIDTH_PX}px`,
-										height: `${MAP_VIEW_TOP_OUTLINE_BOX_HEIGHT_PX}px`,
-										border: '1px solid #000',
-										borderRadius: '8px',
-										boxSizing: 'border-box',
-									}}
-								/>
-								<div
-									style={{
-										position: 'absolute',
-										left: `calc(100% + ${MAP_VIEW_TOP_OUTLINE_BOX_RIGHT_GAP_PX}px)`,
-										top: '50%',
-										transform: 'translateY(-50%)',
-										width: `${MAP_VIEW_TOP_OUTLINE_BOX_RIGHT_WIDTH_PX}px`,
-										height: `${MAP_VIEW_TOP_OUTLINE_BOX_RIGHT_HEIGHT_PX}px`,
-										border: '1px solid #000',
-										borderRadius: '8px',
-										boxSizing: 'border-box',
-									}}
-								/>
-							</div>
-						</div>
-
 						{/* Tabs row: Search / Write / [campaign chip] / Inbox / Drafts */}
 						<div
 							data-slot="campaign-top-tabs"
@@ -2755,7 +2710,7 @@ const Murmur = () => {
 							</div>
 						</div>
 
-						{/* Center search pill — click opens dashboard search seeded with this campaign */}
+						{/* Center pill — 5-icon action row (campaign view variant) */}
 						<div
 							data-slot="campaign-top-search-bar"
 							className="fixed left-0 right-0 flex justify-center pointer-events-none"
@@ -2765,7 +2720,7 @@ const Murmur = () => {
 							}}
 						>
 							<div
-								aria-hidden="true"
+								className="pointer-events-auto"
 								style={{
 									transform: `scale(${MAP_VIEW_UI_SCALE})`,
 									transformOrigin: 'top center',
@@ -2776,8 +2731,44 @@ const Murmur = () => {
 									border: '3px solid #000',
 									backgroundColor: '#FFFFFF',
 									boxSizing: 'border-box',
+									display: 'flex',
+									alignItems: 'center',
+									justifyContent: 'space-around',
+									padding: '0 32px',
+									color: '#050505',
 								}}
-							/>
+							>
+								{(
+									[
+										{ key: 'playbook', Icon: DashboardActionBarPlaybookIcon, label: 'Playbook', width: 24, height: 20 },
+										{ key: 'folder', Icon: DashboardActionBarFolderIcon, label: 'Folder', width: 24, height: 14 },
+										{ key: 'search', Icon: SearchIconDesktop, label: 'Search', width: 22, height: 22 },
+										{ key: 'star', Icon: DashboardActionBarStarIcon, label: 'Starred', width: 22, height: 21 },
+										{ key: 'envelope', Icon: DashboardActionBarEnvelopeIcon, label: 'Messages', width: 22, height: 14 },
+									] as const
+								).map(({ key, Icon, label, width, height }) => (
+									<button
+										key={key}
+										type="button"
+										aria-label={label}
+										style={{
+											background: 'none',
+											border: 'none',
+											padding: '4px 6px',
+											margin: 0,
+											display: 'flex',
+											alignItems: 'center',
+											justifyContent: 'center',
+											cursor: 'pointer',
+											color: '#050505',
+											opacity: 0.55,
+											transition: 'opacity 150ms ease',
+										}}
+									>
+										<Icon width={width} height={height} />
+									</button>
+								))}
+							</div>
 						</div>
 					</>
 				);
