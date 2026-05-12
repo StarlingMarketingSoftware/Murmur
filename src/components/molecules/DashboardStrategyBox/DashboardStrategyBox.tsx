@@ -1,4 +1,6 @@
 import { FC, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { NewEmailHoverPreview } from './NewEmailHoverPreview';
 import mapboxgl from 'mapbox-gl';
 import { useRouter } from 'next/navigation';
 import { useGetCampaigns } from '@/hooks/queryHooks/useCampaigns';
@@ -165,7 +167,7 @@ const actionLabel = (action: StrategyAction): string => {
 		case 'reviewDrafts':
 			return `Review and Send ${action.count} Draft${action.count === 1 ? '' : 's'} in`;
 		case 'replyEmails':
-			return `Reply to ${action.count} New Email${action.count === 1 ? '' : 's'}`;
+			return `Reply to ${action.count} New Message${action.count === 1 ? '' : 's'}`;
 		case 'searchContacts':
 			return 'Search for new contacts';
 	}
@@ -642,7 +644,7 @@ type CategoryPillSpec = {
 	icon: React.ReactNode;
 };
 
-const getContactCategoryPill = (
+export const getContactCategoryPill = (
 	contact: EmailWithRelations['contact']
 ): CategoryPillSpec | null => {
 	const c = contact as unknown as { headline?: string; title?: string } | null;
@@ -1513,7 +1515,9 @@ const ReplyEmailsTopCard: FC<{
 	count: number;
 	realEmails?: InboundEmailWithRelations[];
 	onClick?: () => void;
-}> = ({ count, realEmails, onClick }) => {
+	onHoverChange?: (hovered: boolean) => void;
+	isPreviewOpen?: boolean;
+}> = ({ count, realEmails, onClick, onHoverChange, isPreviewOpen }) => {
 	const [isHovered, setIsHovered] = useState(false);
 	const emails: MockEmail[] = realEmails && realEmails.length > 0
 		? realEmails.slice(0, 4).map((e, i) => inboundToMockEmail(e, i + 1))
@@ -1527,8 +1531,14 @@ const ReplyEmailsTopCard: FC<{
 
 	return (
 		<div
-			onMouseEnter={() => setIsHovered(true)}
-			onMouseLeave={() => setIsHovered(false)}
+			onMouseEnter={() => {
+				setIsHovered(true);
+				onHoverChange?.(true);
+			}}
+			onMouseLeave={() => {
+				setIsHovered(false);
+				onHoverChange?.(false);
+			}}
 			onClick={onClick}
 			onKeyDown={(e) => {
 				if (!onClick) return;
@@ -1569,7 +1579,7 @@ const ReplyEmailsTopCard: FC<{
 			<div
 				style={{
 					position: 'absolute',
-					top: '8px',
+					top: '4px',
 					left: '50%',
 					transform: 'translateX(-50%)',
 					width: '603px',
@@ -1585,7 +1595,7 @@ const ReplyEmailsTopCard: FC<{
 					boxSizing: 'border-box',
 				}}
 			>
-				Reply to {count} New Email{count === 1 ? '' : 's'}
+				Reply to {count} New Message{count === 1 ? '' : 's'}
 			</div>
 
 			{isStacked ? (
@@ -1602,6 +1612,7 @@ const ReplyEmailsTopCard: FC<{
 				>
 					{emails.map((email, i) => {
 						const top = i * (48 + 6);
+						const isTopHighlighted = i === 0 && isPreviewOpen;
 						return (
 							<div
 								key={`${email.sender}-${i}`}
@@ -1614,7 +1625,7 @@ const ReplyEmailsTopCard: FC<{
 									maxWidth: 'calc(100% - 12px)',
 									height: '48px',
 									borderRadius: '6.389px',
-									background: '#F6F6F6',
+									background: isTopHighlighted ? '#CBECFF' : '#F6F6F6',
 									display: 'grid',
 									gridTemplateColumns: '110px 1fr auto',
 									gridTemplateRows: 'auto auto',
@@ -2019,11 +2030,91 @@ const StrategyActionButton: FC<{
 	);
 };
 
+const REPLY_PREVIEW_HOVER_DELAY_MS = 1000;
+const REPLY_PREVIEW_WIDTH_PX = 654;
+const REPLY_PREVIEW_HEIGHT_PX = 374;
+const REPLY_PREVIEW_GAP_PX = 13;
+
+const getRootZoom = (): number => {
+	if (typeof window === 'undefined') return 1;
+	const zoomStr = window.getComputedStyle(document.documentElement).zoom;
+	const parsed = zoomStr ? parseFloat(zoomStr) : NaN;
+	return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+};
+
+const computePreviewPosition = (
+	rect: DOMRect
+): { top: number; left: number } => {
+	// `getBoundingClientRect()` returns visual (post-zoom) coordinates on the
+	// murmur route (html has `zoom: 0.9`), but the portal's `top`/`left` are CSS
+	// pixels that get scaled by the same zoom when rendered. Divide the rect by
+	// zoom to convert visual → CSS so the preview lines up on screen.
+	const z = getRootZoom();
+	const cssTop = rect.top / z;
+	const cssLeft = rect.left / z;
+	const cssWidth = rect.width / z;
+	return {
+		top: cssTop - REPLY_PREVIEW_HEIGHT_PX - REPLY_PREVIEW_GAP_PX,
+		left: cssLeft + (cssWidth - REPLY_PREVIEW_WIDTH_PX) / 2,
+	};
+};
+
 export const DashboardStrategyBox: FC<Props> = ({ className, mockState }) => {
 	const router = useRouter();
 	const { data: realCampaigns } = useGetCampaigns();
 	const { data: inboundEmails } = useGetInboundEmails({ enabled: true });
 	const realNewEmailCount = inboundEmails?.length ?? 0;
+
+	const strategyBoxRef = useRef<HTMLDivElement>(null);
+	const [showReplyPreview, setShowReplyPreview] = useState(false);
+	const [previewPosition, setPreviewPosition] = useState<{
+		top: number;
+		left: number;
+	} | null>(null);
+	const replyHoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+	useEffect(() => {
+		return () => {
+			if (replyHoverTimerRef.current) {
+				clearTimeout(replyHoverTimerRef.current);
+			}
+		};
+	}, []);
+
+	useEffect(() => {
+		if (!showReplyPreview) return;
+		const update = () => {
+			const rect = strategyBoxRef.current?.getBoundingClientRect();
+			if (rect && rect.width > 0) {
+				setPreviewPosition(computePreviewPosition(rect));
+			}
+		};
+		window.addEventListener('scroll', update, true);
+		window.addEventListener('resize', update);
+		return () => {
+			window.removeEventListener('scroll', update, true);
+			window.removeEventListener('resize', update);
+		};
+	}, [showReplyPreview]);
+
+	const handleReplyHoverChange = (hovered: boolean) => {
+		if (hovered) {
+			if (replyHoverTimerRef.current) clearTimeout(replyHoverTimerRef.current);
+			replyHoverTimerRef.current = setTimeout(() => {
+				const rect = strategyBoxRef.current?.getBoundingClientRect();
+				if (rect && rect.width > 0) {
+					setPreviewPosition(computePreviewPosition(rect));
+				}
+				setShowReplyPreview(true);
+			}, REPLY_PREVIEW_HOVER_DELAY_MS);
+		} else {
+			if (replyHoverTimerRef.current) {
+				clearTimeout(replyHoverTimerRef.current);
+				replyHoverTimerRef.current = null;
+			}
+			setShowReplyPreview(false);
+		}
+	};
 
 	const { campaigns, newEmailCount } = useMemo(() => {
 		if (mockState?.campaigns && mockState.campaigns.length > 0) {
@@ -2075,8 +2166,14 @@ export const DashboardStrategyBox: FC<Props> = ({ className, mockState }) => {
 		}
 	};
 
+	const useRealForPreview =
+		!(mockState?.campaigns && mockState.campaigns.length > 0) &&
+		mockState?.newEmailCount == null;
+	const previewEmail = useRealForPreview ? inboundEmails?.[0] : undefined;
+
 	return (
 		<div
+			ref={strategyBoxRef}
 			className={className}
 			style={{
 				width: '631px',
@@ -2087,9 +2184,29 @@ export const DashboardStrategyBox: FC<Props> = ({ className, mockState }) => {
 				flexDirection: 'column',
 				gap: '5px',
 				boxSizing: 'border-box',
-				overflow: 'hidden',
+				overflow: 'visible',
 			}}
 		>
+			{showReplyPreview &&
+				previewPosition &&
+				typeof document !== 'undefined' &&
+				createPortal(
+					<div
+						style={{
+							position: 'fixed',
+							top: `${previewPosition.top}px`,
+							left: `${previewPosition.left}px`,
+							zIndex: 10000,
+							pointerEvents: 'none',
+						}}
+					>
+						<NewEmailHoverPreview email={previewEmail} />
+					</div>,
+					// Portal to <html> rather than <body>: on browsers that fall back to
+					// `transform: scale(...)` on body (e.g. Firefox), a transformed body
+					// would offset `position: fixed` children and break rect alignment.
+					document.documentElement
+				)}
 			<div
 				style={{
 					fontFamily: 'Inter, sans-serif',
@@ -2129,6 +2246,8 @@ export const DashboardStrategyBox: FC<Props> = ({ className, mockState }) => {
 									count={action.count}
 									realEmails={useReal ? inboundEmails : undefined}
 									onClick={() => handleActionClick(action)}
+									onHoverChange={handleReplyHoverChange}
+									isPreviewOpen={showReplyPreview}
 								/>
 							</div>
 						);
