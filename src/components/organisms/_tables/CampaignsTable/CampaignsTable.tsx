@@ -1,10 +1,8 @@
-import { FC, type CSSProperties, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { FC, type CSSProperties, useEffect, useRef, useState } from 'react';
 import { Card, CardHeader, CardContent, CardTitle } from '@/components/ui/card';
 import { Spinner } from '@/components/atoms/Spinner/Spinner';
 import CustomTable from '../../../molecules/CustomTable/CustomTable';
 import { useCampaignsTable } from './useCampaignsTable';
-import { X } from 'lucide-react';
-import { Campaign } from '@prisma/client';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { cn } from '@/utils';
 
@@ -27,20 +25,13 @@ type CampaignsTableProps = {
 export const CampaignsTable: FC<CampaignsTableProps> = ({ mockState }) => {
 	// Treat all mobile orientations (portrait and landscape) as mobile for this table
 	const isMobile = useIsMobile();
-	const mobileTableWrapperRef = useRef<HTMLDivElement | null>(null);
-	const mobileScrollWrapperRef = useRef<HTMLDivElement | null>(null);
-	const mobileDeleteButtonsRef = useRef<HTMLDivElement | null>(null);
 	const desktopMeasureRef = useRef<HTMLDivElement | null>(null);
-	const [rowHeightsById, setRowHeightsById] = useState<Record<string | number, number>>(
-		{}
-	);
 	const [desktopScale, setDesktopScale] = useState<number>(1);
 	const [shouldScaleDesktopTable, setShouldScaleDesktopTable] = useState<boolean>(false);
 	const [mobileScale, setMobileScale] = useState<number>(1);
 	const [shouldScaleMobileTable, setShouldScaleMobileTable] = useState<boolean>(false);
 
 	const shouldShowMobileFeatures = isMobile === true;
-	// Detect landscape to decide whether to embed delete buttons back into rows
 	const [isLandscape, setIsLandscape] = useState<boolean>(false);
 	// Detect narrow desktop viewport (<=960px) for compact mode on desktop
 	const [isNarrowDesktop, setIsNarrowDesktop] = useState<boolean>(false);
@@ -76,9 +67,6 @@ export const CampaignsTable: FC<CampaignsTableProps> = ({ mockState }) => {
 		return () => window.removeEventListener('resize', checkNarrowDesktop);
 	}, []);
 
-	// Only use the external delete overlay in portrait; in landscape place delete inside each row
-	const shouldUseExternalDeleteColumn = shouldShowMobileFeatures && !isLandscape;
-
 	// Use compact metrics on mobile OR on narrow desktop (<=960px)
 	const shouldUseCompactMetrics = shouldShowMobileFeatures || (!isMobile && isNarrowDesktop);
 
@@ -87,8 +75,6 @@ export const CampaignsTable: FC<CampaignsTableProps> = ({ mockState }) => {
 		isPending,
 		columns,
 		handleRowClick,
-		handleDeleteClick,
-		confirmingCampaignId,
 	} = useCampaignsTable({ compactMetrics: shouldUseCompactMetrics, mockState });
 
 	const metricsSkeletonContainerClassName = cn(
@@ -174,172 +160,6 @@ export const CampaignsTable: FC<CampaignsTableProps> = ({ mockState }) => {
 		};
 	}, [shouldShowMobileFeatures]);
 
-	useLayoutEffect(() => {
-		if (typeof window === 'undefined' || !shouldUseExternalDeleteColumn) {
-			return;
-		}
-
-		const containerEl = mobileTableWrapperRef.current;
-		if (!containerEl) {
-			return;
-		}
-
-		// If the entire table is being scaled down, measurements from getBoundingClientRect()
-		// are also scaled. We store unscaled measurements so the delete buttons remain aligned
-		// after the same scale is applied to them.
-		const measurementScale = shouldScaleMobileTable ? mobileScale : 1;
-
-		let resizeObserver: ResizeObserver | null = null;
-		let frameId: number | null = null;
-
-		const updateMeasurements = () => {
-			if (frameId !== null) {
-				window.cancelAnimationFrame(frameId);
-			}
-			frameId = window.requestAnimationFrame(() => {
-				const firstRow = containerEl.querySelector('.my-campaigns-table tbody tr');
-				if (!firstRow) {
-					containerEl.style.removeProperty('--delete-column-top');
-					return;
-				}
-
-				const containerRect = containerEl.getBoundingClientRect();
-				const rowRect = (firstRow as HTMLElement).getBoundingClientRect();
-				const offset = Math.max(rowRect.top - containerRect.top, 0);
-				const unscaledOffset =
-					measurementScale !== 1 ? offset / measurementScale : offset;
-				containerEl.style.setProperty('--delete-column-top', `${unscaledOffset}px`);
-
-				// Measure each row height and store by campaign id for per-button height
-				const rows = containerEl.querySelectorAll('.my-campaigns-table tbody tr');
-				const nextHeights: Record<string | number, number> = {};
-				rows.forEach((r) => {
-					const el = r as HTMLElement;
-					const idAttr = el.getAttribute('data-campaign-id');
-					if (!idAttr) return;
-					const rect = el.getBoundingClientRect();
-					const unscaledHeight =
-						measurementScale !== 1 ? rect.height / measurementScale : rect.height;
-					nextHeights[idAttr] = Math.max(Math.round(unscaledHeight), 44);
-				});
-
-				// Shallow compare before updating state to avoid loops
-				let changed = false;
-				const keys = Object.keys(nextHeights);
-				if (keys.length !== Object.keys(rowHeightsById).length) {
-					changed = true;
-				} else {
-					for (const k of keys) {
-						if (rowHeightsById[k as unknown as string] !== nextHeights[k]) {
-							changed = true;
-							break;
-						}
-					}
-				}
-				if (changed) {
-					setRowHeightsById(nextHeights);
-				}
-			});
-		};
-
-		const handleResize = () => {
-			updateMeasurements();
-		};
-
-		updateMeasurements();
-
-		window.addEventListener('resize', handleResize);
-		window.addEventListener('orientationchange', handleResize);
-
-		const tableBody = containerEl.querySelector('.my-campaigns-table tbody');
-		if (tableBody && 'ResizeObserver' in window) {
-			resizeObserver = new ResizeObserver(() => updateMeasurements());
-			resizeObserver.observe(tableBody);
-		}
-
-		return () => {
-			window.removeEventListener('resize', handleResize);
-			window.removeEventListener('orientationchange', handleResize);
-			if (frameId !== null) {
-				window.cancelAnimationFrame(frameId);
-			}
-			if (resizeObserver) {
-				resizeObserver.disconnect();
-			}
-			containerEl.style.removeProperty('--delete-column-top');
-		};
-	}, [
-		shouldUseExternalDeleteColumn,
-		data?.length,
-		rowHeightsById,
-		shouldScaleMobileTable,
-		mobileScale,
-	]);
-
-	// Synchronize scrolling between table wrapper and delete buttons
-	useEffect(() => {
-		if (!shouldUseExternalDeleteColumn) return;
-
-		const scrollWrapper = mobileScrollWrapperRef.current;
-		const deleteButtons = mobileDeleteButtonsRef.current;
-
-		if (!scrollWrapper || !deleteButtons) return;
-
-		let rafId: number | null = null;
-		let isUpdating = false;
-
-		const handleScrollWrapperScroll = () => {
-			if (isUpdating) return;
-
-			// Cancel any pending animation frame
-			if (rafId !== null) {
-				cancelAnimationFrame(rafId);
-			}
-
-			// Immediately update the delete buttons position
-			deleteButtons.scrollTop = scrollWrapper.scrollTop;
-
-			// Use RAF to prevent recursive updates
-			isUpdating = true;
-			rafId = requestAnimationFrame(() => {
-				isUpdating = false;
-			});
-		};
-
-		const handleDeleteButtonsScroll = () => {
-			if (isUpdating) return;
-
-			// Cancel any pending animation frame
-			if (rafId !== null) {
-				cancelAnimationFrame(rafId);
-			}
-
-			// Immediately update the scroll wrapper position
-			scrollWrapper.scrollTop = deleteButtons.scrollTop;
-
-			// Use RAF to prevent recursive updates
-			isUpdating = true;
-			rafId = requestAnimationFrame(() => {
-				isUpdating = false;
-			});
-		};
-
-		scrollWrapper.addEventListener('scroll', handleScrollWrapperScroll, {
-			passive: true,
-		});
-		deleteButtons.addEventListener('scroll', handleDeleteButtonsScroll, {
-			passive: true,
-		});
-
-		return () => {
-			if (rafId !== null) {
-				cancelAnimationFrame(rafId);
-			}
-			scrollWrapper.removeEventListener('scroll', handleScrollWrapperScroll);
-			deleteButtons.removeEventListener('scroll', handleDeleteButtonsScroll);
-		};
-	}, [shouldUseExternalDeleteColumn, data?.length]);
-
 	if (isMobile === null) {
 		return null;
 	}
@@ -359,7 +179,7 @@ export const CampaignsTable: FC<CampaignsTableProps> = ({ mockState }) => {
 						className="text-left text-[10px] font-secondary font-medium"
 						variant="secondary"
 					>
-						Campaigns
+						Folders
 					</CardTitle>
 				</CardHeader>
 			)}
@@ -386,15 +206,14 @@ export const CampaignsTable: FC<CampaignsTableProps> = ({ mockState }) => {
 						}
 					>
 						{shouldShowMobileFeatures ? (
-							// Mobile portrait mode: wrapper scroll container with table, and delete buttons outside
 							<div className="mobile-campaigns-outer-container">
-								<div className="mobile-scroll-wrapper" ref={mobileScrollWrapperRef}>
-									<div className="mobile-table-wrapper" ref={mobileTableWrapperRef}>
-							<CustomTable
-								variant="secondary"
-								containerClassName="my-campaigns-table mobile-table-no-scroll !bg-[#F8F8F8]"
-								headerClassName="!bg-white [&_tr]:!bg-white [&_th]:!bg-white [&_th]:!border-b-[#F8F8F8] [&_th]:relative [&_th]:!overflow-visible"
-								rowClassName="!bg-transparent !border-b-[#F8F8F8] hover:!bg-[#F0F0F0] transition-colors duration-200 group"
+								<div className="mobile-scroll-wrapper">
+									<div className="mobile-table-wrapper">
+										<CustomTable
+											variant="secondary"
+											containerClassName="my-campaigns-table mobile-table-no-scroll !bg-[#F8F8F8]"
+											headerClassName="!bg-white [&_tr]:!bg-white [&_th]:!bg-white [&_th]:!border-b-[#F8F8F8] [&_th]:relative [&_th]:!overflow-visible"
+											rowClassName="!bg-transparent !border-b-[#F8F8F8] hover:!bg-[#F0F0F0] transition-colors duration-200 group"
 											renderLoadingCell={({ column }) => {
 												if (column.id === 'metrics') {
 													return (
@@ -402,6 +221,12 @@ export const CampaignsTable: FC<CampaignsTableProps> = ({ mockState }) => {
 															className={metricsSkeletonContainerClassName}
 															style={metricsSkeletonContainerStyle}
 														>
+															<div className={metricSlotClassName}>
+																<div
+																	data-new-fill="skeleton"
+																	className={metricBoxSkeletonClassName}
+																/>
+															</div>
 															<div className={metricSlotClassName}>
 																<div
 																	data-draft-fill="skeleton"
@@ -424,14 +249,6 @@ export const CampaignsTable: FC<CampaignsTableProps> = ({ mockState }) => {
 													);
 												}
 
-												if (column.id === 'delete') {
-													return (
-														<div className="flex justify-end">
-															<div className="h-[20px] w-[20px] rounded-[4px] bg-black/10 animate-pulse" />
-														</div>
-													);
-												}
-
 												return (
 													<div className="flex items-center">
 														<div className="h-[16px] w-[70%] rounded bg-black/10 animate-pulse" />
@@ -439,11 +256,7 @@ export const CampaignsTable: FC<CampaignsTableProps> = ({ mockState }) => {
 												);
 											}}
 											handleRowClick={handleRowClick}
-											columns={
-												shouldUseExternalDeleteColumn
-													? columns.filter((col) => col.id !== 'delete')
-													: columns
-											}
+											columns={columns}
 											data={data}
 											isLoading={isPending}
 											loadingRowCount={6}
@@ -461,41 +274,8 @@ export const CampaignsTable: FC<CampaignsTableProps> = ({ mockState }) => {
 										/>
 									</div>
 								</div>
-								{shouldUseExternalDeleteColumn && data && data.length > 0 && (
-									<div
-										className="mobile-delete-buttons-external"
-										ref={mobileDeleteButtonsRef}
-									>
-										{data.map((campaign: Campaign) => (
-											<button
-												key={campaign.id}
-												type="button"
-												aria-label="Delete campaign"
-												className="mobile-delete-btn"
-												style={{
-													height: rowHeightsById[campaign.id]
-														? `${rowHeightsById[campaign.id]}px`
-														: undefined,
-												}}
-												data-campaign-id={campaign.id}
-												onClick={(e) => handleDeleteClick(e, campaign.id)}
-											>
-												<X
-													className="w-[20px] h-[20px]"
-													style={{
-														color:
-															campaign.id === confirmingCampaignId
-																? '#FFFFFF'
-																: '#000000',
-													}}
-												/>
-											</button>
-										))}
-									</div>
-								)}
 							</div>
 						) : (
-							// Desktop mode: normal table with delete column
 							<CustomTable
 								variant="secondary"
 								containerClassName={`border-none rounded-[12px] my-campaigns-table !bg-[#F8F8F8] !mx-auto !p-[8px] ${
@@ -510,6 +290,12 @@ export const CampaignsTable: FC<CampaignsTableProps> = ({ mockState }) => {
 												className={metricsSkeletonContainerClassName}
 												style={metricsSkeletonContainerStyle}
 											>
+												<div className={metricSlotClassName}>
+													<div
+														data-new-fill="skeleton"
+														className={metricBoxSkeletonClassName}
+													/>
+												</div>
 												<div className={metricSlotClassName}>
 													<div
 														data-draft-fill="skeleton"
@@ -528,14 +314,6 @@ export const CampaignsTable: FC<CampaignsTableProps> = ({ mockState }) => {
 														className={metricBoxSkeletonClassName}
 													/>
 												</div>
-											</div>
-										);
-									}
-
-									if (column.id === 'delete') {
-										return (
-											<div className="flex justify-end">
-												<div className="h-[20px] w-[20px] rounded-[4px] bg-black/10 animate-pulse" />
 											</div>
 										);
 									}

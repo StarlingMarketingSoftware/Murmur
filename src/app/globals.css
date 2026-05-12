@@ -4055,13 +4055,13 @@ body.murmur-mobile .results-align {
 	z-index: 30; /* Ensure table is above other elements */
 }
 
-/* Dashboard: show only 3 visible rows, but keep internal scroll + custom scrollbar */
+/* Dashboard: show only 3 visible rows, but keep internal scroll + custom scrollbar. */
 .dashboard-recent-campaigns .campaigns-table-container .my-campaigns-table {
 	height: 184px !important;
 	max-height: 184px !important;
 	min-height: 184px !important;
 	width: 100% !important;
-	max-width: 654px !important;
+	max-width: 655px !important;
 	margin-left: auto !important;
 	margin-right: auto !important;
 }
@@ -4079,8 +4079,27 @@ body.murmur-mobile .results-align {
 	.mobile-campaigns-wrapper:not(.mobile-portrait-mode)
 	.campaigns-table-container
 	.my-campaigns-table {
-	/* Slightly more spread than the default clamp */
-	--campaign-metric-gap: 44px;
+	--campaign-metric-gap: 26px;
+}
+
+/* Dashboard Campaigns table metric column padding.
+   - padding-left 8px: places the leftmost (New) pill 8px to the right of the folder pill.
+   - padding-right 5px: combined with the container's 8px !p-[8px] gives the rightmost
+     (Updated) pill an exact 13px gap from the container's right wall. */
+.dashboard-recent-campaigns
+	.mobile-campaigns-wrapper:not(.mobile-portrait-mode)
+	.campaigns-table-container
+	.my-campaigns-table
+	thead
+	th:nth-child(2),
+.dashboard-recent-campaigns
+	.mobile-campaigns-wrapper:not(.mobile-portrait-mode)
+	.campaigns-table-container
+	.my-campaigns-table
+	tbody
+	td:nth-child(2) {
+	padding-left: 8px !important;
+	padding-right: 5px !important;
 }
 .dashboard-recent-campaigns
 	.mobile-campaigns-wrapper:not(.mobile-portrait-mode)
@@ -4094,7 +4113,9 @@ body.murmur-mobile .results-align {
 	.my-campaigns-table
 	tbody
 	td:first-child {
-	width: 240px !important;
+	width: 228px !important;
+	padding-left: 9px !important;
+	padding-right: 0 !important;
 }
 
 /* Mobile landscape: scale campaigns table wrapper width proportionally
@@ -6303,7 +6324,7 @@ body.murmur-mobile .search-input-icon-btn {
 		padding-right: 8px !important;
 	}
 
-	/* Compact metrics: distribute the 3 boxes across the available space (and scale down cleanly). */
+	/* Compact metrics: distribute the 4 boxes across the available space (and scale down cleanly). */
 	.narrow-desktop-table .metrics-grid-container,
 	.narrow-desktop-table .metrics-header-grid {
 		gap: var(--narrow-metric-gap) !important;
@@ -6313,7 +6334,7 @@ body.murmur-mobile .search-input-icon-btn {
 		/* Per-slot width derived from the available column width (clamped to a sensible range). */
 		--narrow-metric-slot: clamp(
 			40px,
-			calc((100% - (2 * var(--narrow-metric-gap))) / 3),
+			calc((100% - (3 * var(--narrow-metric-gap))) / 4),
 			80px
 		);
 	}

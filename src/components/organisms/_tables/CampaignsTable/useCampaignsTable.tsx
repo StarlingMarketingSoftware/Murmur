@@ -1,14 +1,13 @@
 import { Campaign } from '@prisma/client';
 import { ColumnDef } from '@tanstack/react-table';
 import { Typography } from '@/components/ui/typography';
-import { CampaignTitlePills } from '@/components/molecules/CampaignTitlePills/CampaignTitlePills';
 import { useDeleteCampaign, useGetCampaigns } from '@/hooks/queryHooks/useCampaigns';
 import { useRouter } from 'next/navigation';
 import { urls } from '@/constants/urls';
 import { useState, useEffect, useLayoutEffect, useMemo, useRef, useCallback } from 'react';
 import { cn, mmdd } from '@/utils';
 import { useRowConfirmationAnimation } from '@/hooks/useRowConfirmationAnimation';
-import DeleteXIcon from '@/components/atoms/svg/DeleteXIcon';
+import DashboardActionBarFolderIcon from '@/components/atoms/_svg/DashboardActionBarFolderIcon';
 import type { CampaignsMockState } from './CampaignsTable';
 
 type CampaignWithCounts = Campaign & {
@@ -317,35 +316,63 @@ export const useCampaignsTable = (options?: {
 			accessorKey: 'name',
 			header: () => (
 				<div className="text-left pl-0 font-inter font-medium text-[13px] text-black">
-					Campaigns
+					Folders
 				</div>
 			),
 			cell: ({ row }) => {
 				const name: string = row.getValue('name');
 				const isConfirming = row.original.id === confirmingCampaignId;
-				return name ? (
-					<div className="text-left pr-2">
+				if (!name) {
+					return (
+						<Typography variant="muted" className="text-sm">
+							No Data
+						</Typography>
+					);
+				}
+				return (
+					<div className="text-left">
 						<div
-							className={cn(
-								'inline-flex box-border h-[20px] w-[204px] items-center rounded-[6px] pl-0 pr-[8px] campaign-name-text text-[15px] leading-[20px] font-normal text-black bg-white truncate',
-								isConfirming && 'bg-transparent text-white'
-							)}
-							style={{ fontFamily: '"Times New Roman", Times, serif' }}
+							className="folder-pill inline-flex items-center box-border flex-none"
+							style={{
+								width: 219,
+								height: 20,
+								borderRadius: 6.389,
+								border: '0.799px solid #000',
+								background: isConfirming ? 'transparent' : '#EEFFF0',
+								paddingLeft: 7,
+							}}
 						>
-							{isConfirming ? (
-								<span className="truncate">{name}</span>
-							) : (
-								<CampaignTitlePills title={name} size="table" />
-							)}
+							<div
+								className="inline-flex items-center box-border flex-none overflow-hidden"
+								style={{
+									width: 130,
+									height: 15,
+									borderRadius: 3,
+									background: isConfirming ? 'transparent' : '#EEC7F7',
+									paddingLeft: 2,
+									paddingRight: 6,
+								}}
+							>
+								<span
+									className="inline-flex items-center justify-center flex-none"
+									style={{ color: '#E89A3F' }}
+								>
+									<DashboardActionBarFolderIcon width={16} height={10} />
+								</span>
+								<span
+									className={cn(
+										'ml-[7px] truncate text-[13px] leading-none font-inter font-normal',
+										isConfirming ? 'text-white' : 'text-black'
+									)}
+								>
+									{name}
+								</span>
+							</div>
 						</div>
 					</div>
-				) : (
-					<Typography variant="muted" className="text-sm">
-						No Data
-					</Typography>
 				);
 			},
-			size: 350,
+			size: 228,
 		},
 		{
 			id: 'metrics',
@@ -414,6 +441,18 @@ export const useCampaignsTable = (options?: {
 								: ({ gap: 'var(--campaign-metric-gap, 32px)' } as React.CSSProperties)
 						}
 					>
+					<span
+						className={cn(
+							'metrics-header-label relative z-[1] select-none',
+							!compactMetrics &&
+								'flex w-[80px] min-w-[80px] max-w-[80px] items-center justify-start pl-2 text-left text-[13px] font-inter font-medium',
+							compactMetrics &&
+								'flex metric-width-short items-center justify-center text-[10px] font-medium tracking-[0.01em] metrics-header-label-compact'
+						)}
+						data-label="new"
+					>
+						New
+					</span>
 					<button
 						type="button"
 						ref={setDraftsHeaderButtonRef}
@@ -544,7 +583,7 @@ export const useCampaignsTable = (options?: {
 									? undefined
 									: {
 											gridTemplateColumns:
-												'minmax(0,1fr) minmax(0,1fr) minmax(0,1fr)',
+												'minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr)',
 									  }
 							}
 						>
@@ -565,7 +604,7 @@ export const useCampaignsTable = (options?: {
 									Click to confirm <span className="ml-2">{countdown}</span>
 								</div>
 							</div>
-							{[0, 1].map((index) => (
+							{[0, 1, 2].map((index) => (
 								<div
 									key={index}
 									className={cn(
@@ -582,12 +621,14 @@ export const useCampaignsTable = (options?: {
 
 				const draftCount = campaign.draftCount ?? 0;
 				const sentCount = campaign.sentCount ?? 0;
+				const newCount = campaign.newEmailCount ?? 0;
 				const updatedAt = new Date(campaign.updatedAt);
 
 				const draftLabel =
 					draftCount.toString().padStart(2, '0') +
 					(draftCount === 1 ? ' draft' : ' drafts');
 				const sentLabel = sentCount.toString().padStart(2, '0') + ' sent';
+				const newLabel = newCount.toString().padStart(2, '0') + ' new';
 
 				const draftDisplay = compactMetrics
 					? draftCount.toString().padStart(2, '0')
@@ -595,10 +636,14 @@ export const useCampaignsTable = (options?: {
 				const sentDisplay = compactMetrics
 					? sentCount.toString().padStart(2, '0')
 					: sentLabel;
+				const newDisplay = newCount > 0
+					? (compactMetrics ? newCount.toString().padStart(2, '0') : newLabel)
+					: '';
 				const draftFill = getDraftFillColor(draftCount);
 				const sentFill = getSentFillColor(sentCount);
 				const updatedFill = getUpdatedFillColor(updatedAt);
 				const updatedLabel = getUpdatedLabel(updatedAt);
+				const newFill = '#FFFFFF';
 
 				return (
 					<div
@@ -615,6 +660,11 @@ export const useCampaignsTable = (options?: {
 						}
 					>
 						{[
+							{
+								label: newDisplay,
+								fill: newFill,
+								dataAttr: { 'data-new-fill': newFill } as Record<string, string>,
+							},
 							{
 								label: draftDisplay,
 								fill: draftFill,
@@ -665,60 +715,6 @@ export const useCampaignsTable = (options?: {
 					</div>
 				);
 			},
-		},
-		{
-			id: 'delete',
-			header: () => <div className="text-right"></div>,
-			cell: ({ row }) => {
-				const isConfirming = row.original.id === confirmingCampaignId;
-				return (
-				<div className={cn("flex justify-end transition-opacity duration-75", !isConfirming && "opacity-0 group-hover:opacity-100")}>
-					<button
-						className="campaign-delete-btn w-[20px] h-[20px] flex items-center justify-center hover:opacity-70 transition-opacity"
-							style={{
-								background: 'transparent',
-								border: 'none',
-								padding: 0,
-								cursor: 'pointer',
-							}}
-							onClick={(e) => {
-								e.stopPropagation();
-
-								// Clear any existing timeout
-								if (confirmationTimeoutRef.current) {
-									clearTimeout(confirmationTimeoutRef.current);
-								}
-
-								// If clicking the same campaign that's confirming, execute delete
-								if (row.original.id === confirmingCampaignId) {
-									// Execute deletion
-									deleteCampaign(row.original.id);
-									setConfirmingCampaignId(null);
-									setCurrentRow(null);
-								} else {
-									// Set confirming state for new campaign
-									setConfirmingCampaignId(row.original.id);
-									setCurrentRow(row.original);
-
-									// Set timeout to revert after 5 seconds
-									confirmationTimeoutRef.current = setTimeout(() => {
-										setConfirmingCampaignId(null);
-										setCurrentRow(null);
-									}, 5000);
-								}
-							}}
-							aria-label="Delete campaign"
-						>
-							<DeleteXIcon
-								style={{ color: isConfirming ? 'white' : '#000000' }}
-							/>
-						</button>
-					</div>
-				);
-			},
-			size: 60,
-			minSize: 60,
-			maxSize: 60,
 		},
 	];
 
