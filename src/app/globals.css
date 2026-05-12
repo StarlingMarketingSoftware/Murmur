@@ -2319,8 +2319,8 @@ body {
 }
 
 /* Desktop campaigns table: ticks centered between 80px metric pills.
-   Keep the left and middle/right separators on the same height rule so
-   rows with a combined "new" folder pill do not render a shorter first tick. */
+   Use transform to center the 1px tick, ensuring consistent width rendering
+   without subpixel antialiasing differences. */
 .my-campaigns-table:not(.narrow-desktop-table):not(.mobile-table-no-scroll)
 	.campaign-metric-slot:not(:last-child)::after,
 .my-campaigns-table:not(.narrow-desktop-table):not(.mobile-table-no-scroll)
@@ -2332,12 +2332,15 @@ body {
 	width: 1px;
 	background-color: #000000;
 	pointer-events: none;
+	transform: translateX(-0.5px);
+	backface-visibility: hidden;
+	will-change: transform;
 }
 
 .my-campaigns-table:not(.narrow-desktop-table):not(.mobile-table-no-scroll)
 	.campaign-metric-slot:not(:last-child)::after {
 	/* Center a 1px tick in the middle of the inter-pill gap */
-	left: calc(100% + (var(--campaign-metric-gap, 32px) / 2) - 0.5px);
+	left: calc(100% + (var(--campaign-metric-gap, 32px) / 2));
 }
 
 /* Tick separating the combined folder pill from the first metric slot.
@@ -2348,7 +2351,15 @@ body {
    between the folder pill and the empty New pill is not wanted. */
 .my-campaigns-table:not(.narrow-desktop-table):not(.mobile-table-no-scroll)
 	.campaign-metric-slot:first-child:has(.metric-box[data-draft-fill])::before {
-	left: calc(0px - (var(--campaign-metric-gap, 32px) / 2) - 0.5px);
+	left: calc(0px - (var(--campaign-metric-gap, 32px) / 2));
+}
+
+/* All rows have 0 new messages: the New pill/header are hidden, so keep separators
+   only between the three visible metric pills. */
+.my-campaigns-table:not(.narrow-desktop-table):not(.mobile-table-no-scroll)
+	.campaign-metrics-no-new-layout
+	.campaign-metric-slot:first-child:has(.metric-box[data-draft-fill])::before {
+	content: none;
 }
 
 /* Keep exclude contacts box consistent on smaller screens */

@@ -4,7 +4,15 @@ import { Typography } from '@/components/ui/typography';
 import { useDeleteCampaign, useGetCampaigns } from '@/hooks/queryHooks/useCampaigns';
 import { useRouter } from 'next/navigation';
 import { urls } from '@/constants/urls';
-import { useState, useEffect, useLayoutEffect, useMemo, useRef, useCallback } from 'react';
+import {
+	useState,
+	useEffect,
+	useLayoutEffect,
+	useMemo,
+	useRef,
+	useCallback,
+	type CSSProperties,
+} from 'react';
 import { cn, mmdd } from '@/utils';
 import { useRowConfirmationAnimation } from '@/hooks/useRowConfirmationAnimation';
 import DashboardActionBarFolderIcon from '@/components/atoms/_svg/DashboardActionBarFolderIcon';
@@ -311,6 +319,26 @@ export const useCampaignsTable = (options?: {
 		};
 	}, [isMetricSortActive, metricSortKey, metricSortMode, compactMetrics]);
 
+	const { data: realData, isPending: realIsPending } = useGetCampaigns();
+	const mockData = useMemo(
+		() => (mockState ? buildMockCampaignRows(mockState) : null),
+		[mockState]
+	);
+	const data = mockData ?? realData;
+	const isPending = isMockActive ? false : realIsPending;
+	const shouldShowNewMetricSlot = useMemo(() => {
+		if (data == null) return true;
+		return data.some(
+			(campaign: CampaignWithCounts) => (campaign.newEmailCount ?? 0) >= 1
+		);
+	}, [data]);
+	const desktopMetricsStyle = compactMetrics
+		? undefined
+		: ({
+				gap: 'var(--campaign-metric-gap, 32px)',
+				...(shouldShowNewMetricSlot ? {} : { '--campaign-metric-gap': '62px' }),
+		  } as CSSProperties);
+
 	const columns: ColumnDef<CampaignWithCounts>[] = [
 		{
 			accessorKey: 'name',
@@ -336,7 +364,7 @@ export const useCampaignsTable = (options?: {
 						<div
 							className="folder-pill inline-flex items-center box-border flex-none"
 							style={{
-								width: hasNew ? 307 : 219,
+								width: hasNew ? 307 : shouldShowNewMetricSlot ? 219 : 222,
 								height: 20,
 								borderRadius: 6.389,
 								border: '0.799px solid #000',
@@ -349,49 +377,47 @@ export const useCampaignsTable = (options?: {
 							}}
 						>
 							<div
-								className="inline-flex items-center box-border flex-none overflow-hidden"
-								style={{
-									width: 130,
-									height: 15,
-									borderRadius: 3,
-									background: isConfirming ? 'transparent' : '#EEC7F7',
-									paddingLeft: 2,
-									paddingRight: 6,
-								}}
+							className="inline-flex items-center box-border flex-none overflow-hidden"
+							style={{
+								width: 112,
+								height: 15,
+								borderRadius: 3,
+								background: isConfirming ? 'transparent' : '#EEC7F7',
+								paddingLeft: 2,
+								paddingRight: 6,
+							}}
+						>
+							<span
+								className="inline-flex items-center justify-center flex-none"
+								style={{ color: '#E89A3F' }}
 							>
-								<span
-									className="inline-flex items-center justify-center flex-none"
-									style={{ color: '#E89A3F' }}
-								>
-									<DashboardActionBarFolderIcon width={16} height={10} />
-								</span>
+								<DashboardActionBarFolderIcon width={16} height={10} />
+							</span>
+							<span
+								className={cn(
+									'ml-[7px] truncate text-[13.854px] leading-[17.186px] font-inter font-medium',
+									isConfirming ? 'text-white' : 'text-black'
+								)}
+							>
+								{name}
+							</span>
+						</div>
+						{hasNew && (
+							<>
+								<div
+									className="folder-icon-strip flex-1 mx-2 h-[15px]"
+									aria-hidden="true"
+								/>
 								<span
 									className={cn(
-										'ml-[7px] truncate text-[13px] leading-none font-inter font-normal',
+										'flex-none text-[13.854px] leading-[17.186px] font-inter font-medium whitespace-nowrap',
 										isConfirming ? 'text-white' : 'text-black'
 									)}
 								>
-									{name}
+									{newCount.toString().padStart(2, '0')} new
 								</span>
-							</div>
-							{hasNew && (
-								<>
-									{/* Icon strip placeholder — reserves the slot for upcoming
-									    contact preview icons (~3 icons + +N badge). */}
-									<div
-										className="folder-icon-strip flex-1 mx-2 h-[15px]"
-										aria-hidden="true"
-									/>
-									<span
-										className={cn(
-											'flex-none text-[13px] leading-none font-inter font-normal whitespace-nowrap',
-											isConfirming ? 'text-white' : 'text-black'
-										)}
-									>
-										{newCount.toString().padStart(2, '0')} new
-									</span>
-								</>
-							)}
+							</>
+						)}
 						</div>
 					</div>
 				);
@@ -455,28 +481,27 @@ export const useCampaignsTable = (options?: {
 					<div
 						className={cn(
 							'metrics-header-grid w-full h-full items-center relative z-[1]',
+							!shouldShowNewMetricSlot && 'campaign-metrics-no-new-layout',
 							compactMetrics
 								? 'flex flex-nowrap gap-[7px] justify-start'
 								: 'flex flex-nowrap justify-end'
 						)}
-						style={
-							compactMetrics
-								? undefined
-								: ({ gap: 'var(--campaign-metric-gap, 32px)' } as React.CSSProperties)
-						}
+						style={desktopMetricsStyle}
 					>
-					<span
-						className={cn(
-							'metrics-header-label relative z-[1] select-none',
-							!compactMetrics &&
-								'flex w-[80px] min-w-[80px] max-w-[80px] items-center justify-start pl-3 text-left text-[13px] font-inter font-medium',
-							compactMetrics &&
-								'flex metric-width-short items-center justify-center text-[10px] font-medium tracking-[0.01em] metrics-header-label-compact'
-						)}
-						data-label="new"
-					>
-						New
-					</span>
+					{shouldShowNewMetricSlot && (
+						<span
+							className={cn(
+								'metrics-header-label relative z-[1] select-none',
+								!compactMetrics &&
+									'flex w-[80px] min-w-[80px] max-w-[80px] items-center justify-start pl-3 text-left text-[13px] font-inter font-medium',
+								compactMetrics &&
+									'flex metric-width-short items-center justify-center text-[10px] font-medium tracking-[0.01em] metrics-header-label-compact'
+							)}
+							data-label="new"
+						>
+							New
+						</span>
+					)}
 					<button
 						type="button"
 						ref={setDraftsHeaderButtonRef}
@@ -667,21 +692,19 @@ export const useCampaignsTable = (options?: {
 				// the row matches the original layout. For 1+ new rows we skip it —
 				// the combined 307 pill in the first cell already displays the count
 				// and extends past the first-cell boundary into this area visually.
-				const showEmptyNewSlot = newCount === 0;
+				// When every campaign has 0 new emails, the New column disappears entirely.
+				const showEmptyNewSlot = shouldShowNewMetricSlot && newCount === 0;
 
 				return (
 					<div
 						className={cn(
 							'metrics-grid-container w-full items-center text-left',
+							!shouldShowNewMetricSlot && 'campaign-metrics-no-new-layout',
 							compactMetrics
 								? 'flex flex-nowrap gap-[7px] justify-start'
 								: 'flex flex-nowrap justify-end'
 						)}
-						style={
-							compactMetrics
-								? undefined
-								: ({ gap: 'var(--campaign-metric-gap, 32px)' } as React.CSSProperties)
-						}
+						style={desktopMetricsStyle}
 					>
 						{[
 							...(showEmptyNewSlot
@@ -721,25 +744,22 @@ export const useCampaignsTable = (options?: {
 								)}
 							>
 								<div
-									{...dataAttr}
-									className={cn(
-										'metric-box inline-flex box-border items-center justify-center border-[0.799px] border-black leading-none truncate h-[20px] w-[80px] min-w-[80px] max-w-[80px] rounded-[6.389px] px-0 flex-none'
-									)}
-									style={
-										{
-											backgroundColor: isConfirming ? 'transparent' : fill,
-											color: isConfirming ? 'white' : 'inherit',
-											borderColor: isConfirming
-												? '#A20000'
-												: '#000000',
-											...(compactMetrics
-												? ({ fontSize: '12px' } as React.CSSProperties)
-												: {}),
-										} as React.CSSProperties
-									}
-								>
-									{label}
-								</div>
+								{...dataAttr}
+								className={cn(
+									'metric-box inline-flex box-border items-center justify-center border-[0.799px] border-black truncate h-[20px] w-[80px] min-w-[80px] max-w-[80px] rounded-[6.389px] px-0 flex-none font-inter font-medium text-[13.854px] leading-[17.186px]'
+								)}
+								style={
+									{
+										backgroundColor: isConfirming ? 'transparent' : fill,
+										color: isConfirming ? 'white' : '#000000',
+										borderColor: isConfirming
+											? '#A20000'
+											: '#000000',
+									} as React.CSSProperties
+								}
+							>
+								{label}
+							</div>
 							</div>
 						))}
 					</div>
@@ -748,13 +768,6 @@ export const useCampaignsTable = (options?: {
 		},
 	];
 
-	const { data: realData, isPending: realIsPending } = useGetCampaigns();
-	const mockData = useMemo(
-		() => (mockState ? buildMockCampaignRows(mockState) : null),
-		[mockState]
-	);
-	const data = mockData ?? realData;
-	const isPending = isMockActive ? false : realIsPending;
 	const router = useRouter();
 	const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
 	const [currentRow, setCurrentRow] = useState<Campaign | null>(null);
