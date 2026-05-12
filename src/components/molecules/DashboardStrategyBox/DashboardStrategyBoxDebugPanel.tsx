@@ -56,6 +56,43 @@ const labelStyle: React.CSSProperties = {
 	fontWeight: 500,
 };
 
+const adjustValue = (current: number, delta: number) => Math.max(0, current + delta);
+
+const Field: FC<{
+	label: string;
+	value: number;
+	onChangeValue: (n: number) => void;
+}> = ({ label, value: v, onChangeValue }) => (
+	<div style={rowStyle}>
+		<span style={labelStyle}>{label}</span>
+		<div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+			<button
+				type="button"
+				style={buttonStyle}
+				onClick={() => onChangeValue(adjustValue(v, -1))}
+			>
+				−
+			</button>
+			<input
+				type="number"
+				min={0}
+				value={v}
+				onChange={(e) =>
+					onChangeValue(Math.max(0, Number(e.target.value) || 0))
+				}
+				style={numberInputStyle}
+			/>
+			<button
+				type="button"
+				style={buttonStyle}
+				onClick={() => onChangeValue(adjustValue(v, 1))}
+			>
+				+
+			</button>
+		</div>
+	</div>
+);
+
 export const DashboardStrategyBoxDebugPanel: FC<Props> = ({ value, onChange }) => {
 	const [collapsed, setCollapsed] = useState(false);
 
@@ -68,7 +105,8 @@ export const DashboardStrategyBoxDebugPanel: FC<Props> = ({ value, onChange }) =
 	const overrideActive = value != null;
 
 	useEffect(() => {
-		if (!overrideActive) return;
+		// Always propagate field edits — auto-enable the override when the user
+		// touches any number so they don't have to click "Enable override" first.
 		onChange(buildState(contacts, drafts, sent, newEmails));
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [contacts, drafts, sent, newEmails]);
@@ -84,43 +122,6 @@ export const DashboardStrategyBoxDebugPanel: FC<Props> = ({ value, onChange }) =
 		setNewEmails(0);
 		onChange(undefined);
 	};
-
-	const adjust = (
-		setter: (n: number) => void,
-		current: number,
-		delta: number
-	) => {
-		setter(Math.max(0, current + delta));
-	};
-
-	const Field = ({
-		label,
-		value: v,
-		onChangeValue,
-	}: {
-		label: string;
-		value: number;
-		onChangeValue: (n: number) => void;
-	}) => (
-		<div style={rowStyle}>
-			<span style={labelStyle}>{label}</span>
-			<div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-				<button type="button" style={buttonStyle} onClick={() => adjust(onChangeValue, v, -1)}>
-					−
-				</button>
-				<input
-					type="number"
-					min={0}
-					value={v}
-					onChange={(e) => onChangeValue(Math.max(0, Number(e.target.value) || 0))}
-					style={numberInputStyle}
-				/>
-				<button type="button" style={buttonStyle} onClick={() => adjust(onChangeValue, v, 1)}>
-					+
-				</button>
-			</div>
-		</div>
-	);
 
 	return (
 		<div

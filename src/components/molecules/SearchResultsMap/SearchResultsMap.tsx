@@ -330,6 +330,7 @@ import {
 	defaultCenter,
 	stateBadgeColorMap,
 } from './constants';
+import { setDashboardGlobeSpinLng } from './dashboardGlobeSpinState';
 import {
 	bboxFromMultiPolygon,
 	boundsToPolygonFeatureCollection,
@@ -6728,6 +6729,10 @@ export const SearchResultsMap: FC<SearchResultsMapProps> = ({
 							currentLng = normalizeLng(baseLng - maxDriftDeg);
 							direction = 1;
 						}
+
+						// Publish the new target longitude so the strategy-card decorative
+						// globe can ease alongside us in lock-step.
+						setDashboardGlobeSpinLng(currentLng);
 
 						map.easeTo({
 							center: [currentLng, DASHBOARD_DECORATIVE_CENTER[1]],
