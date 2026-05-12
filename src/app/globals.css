@@ -4569,6 +4569,10 @@ main {
 	border: none !important;
 	box-shadow: none !important;
 	--campaign-metric-tick-height: 20px;
+	--campaign-row-left-hover-left-offset: 9px;
+	--campaign-row-left-hover-width: 228px;
+	--campaign-row-hover-fill-height: 22px;
+	--campaign-row-hover-fill-color: #d2e7f6;
 }
 
 .my-campaigns-table.desktop-campaigns-table::before {
@@ -4587,10 +4591,97 @@ main {
 .my-campaigns-table:not(.mobile-table-no-scroll) tbody td {
 	padding-top: 6.5px !important;
 	padding-bottom: 6.5px !important;
+	transition: none !important;
+}
+
+.my-campaigns-table:not(.mobile-table-no-scroll) tbody tr {
+	transition: none !important;
+}
+
+.my-campaigns-table tbody td:first-child {
+	overflow: visible !important;
 }
 
 .my-campaigns-table:not(.mobile-table-no-scroll) tbody tr:first-child > td {
-	padding-top: 13px !important;
+	padding-top: 8px !important;
+}
+
+.my-campaigns-table:not(.mobile-table-no-scroll) tbody tr:hover {
+	background-color: transparent !important;
+}
+
+.my-campaigns-table .campaign-row-left-hover-surface,
+.my-campaigns-table .campaign-folder-show-content {
+	display: none;
+}
+
+.my-campaigns-table:not(.mobile-table-no-scroll) .campaign-row-left-hover-surface {
+	display: block;
+	position: absolute;
+	z-index: 4;
+	top: -6.5px;
+	left: calc(-1 * var(--campaign-row-left-hover-left-offset, 9px));
+	width: var(--campaign-row-left-hover-width, 228px);
+	height: 33px;
+	background: transparent;
+	cursor: pointer;
+}
+
+.my-campaigns-table:not(.mobile-table-no-scroll)
+	tbody
+	tr:has(.campaign-row-left-hover-surface:hover)
+	> td {
+	background-color: transparent !important;
+	background-image: linear-gradient(
+		var(--campaign-row-hover-fill-color, #d2e7f6),
+		var(--campaign-row-hover-fill-color, #d2e7f6)
+	) !important;
+	background-position: center !important;
+	background-repeat: no-repeat !important;
+	background-size: 100% var(--campaign-row-hover-fill-height, 22px) !important;
+}
+
+.my-campaigns-table:not(.mobile-table-no-scroll)
+	tbody
+	tr:first-child:has(.campaign-row-left-hover-surface:hover)
+	> td {
+	background-position: center top 8px !important;
+}
+
+.my-campaigns-table:not(.mobile-table-no-scroll)
+	tbody
+	tr:has(.campaign-row-left-hover-surface:hover)
+	.folder-pill,
+.my-campaigns-table:not(.mobile-table-no-scroll)
+	tbody
+	tr:has(.campaign-row-left-hover-surface:hover)
+	.campaign-folder-name-box {
+	background: transparent !important;
+}
+
+.my-campaigns-table:not(.mobile-table-no-scroll)
+	tbody
+	tr:has(.campaign-row-left-hover-surface:hover)
+	.campaign-folder-name-content {
+	display: none !important;
+}
+
+.my-campaigns-table:not(.mobile-table-no-scroll)
+	tbody
+	tr:has(.campaign-row-left-hover-surface:hover)
+	.campaign-folder-show-content {
+	display: inline-flex !important;
+}
+
+.my-campaigns-table:not(.mobile-table-no-scroll) .campaign-folder-show-caret {
+	width: 10px;
+	height: 10px;
+	margin-left: 7px;
+	border-right: 2px solid currentColor;
+	border-bottom: 2px solid currentColor;
+	transform: translateY(-2px) rotate(45deg);
+	color: #000000;
+	flex: none;
 }
 
 .my-campaigns-table:not(.mobile-table-no-scroll) .folder-pill,
@@ -4598,6 +4689,14 @@ main {
 .my-campaigns-table:not(.mobile-table-no-scroll) .campaign-metric-slot {
 	height: 20px !important;
 	min-height: 20px !important;
+}
+
+.my-campaigns-table:not(.mobile-table-no-scroll) .folder-pill,
+.my-campaigns-table:not(.mobile-table-no-scroll) .metric-box,
+.my-campaigns-table:not(.mobile-table-no-scroll) .campaign-folder-name-box,
+.my-campaigns-table:not(.mobile-table-no-scroll) .campaign-folder-show-icon {
+	transition: none !important;
+	transform: none !important;
 }
 
 /* Campaigns table: keep body on the container fill (#F8F8F8)
@@ -6409,6 +6508,8 @@ body.murmur-mobile .search-input-icon-btn {
 		max-width: clamp(460px, calc(100vw - 210px), 750px) !important;
 		/* Shared gap used by the compact metrics layout */
 		--narrow-metric-gap: clamp(6px, calc(0px + 1vw), 12px);
+		--campaign-row-left-hover-left-offset: 8px;
+		--campaign-row-left-hover-width: 100%;
 	}
 
 	/* Give the metrics column a couple extra pixels so the last box never gets clipped */

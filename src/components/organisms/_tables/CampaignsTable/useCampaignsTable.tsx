@@ -16,6 +16,7 @@ import {
 import { cn, mmdd } from '@/utils';
 import { useRowConfirmationAnimation } from '@/hooks/useRowConfirmationAnimation';
 import DashboardActionBarFolderIcon from '@/components/atoms/_svg/DashboardActionBarFolderIcon';
+import CampaignRowChevronIcon from '@/components/atoms/_svg/CampaignRowChevronIcon';
 import type { CampaignsMockState } from './CampaignsTable';
 import {
 	type CampaignDataTypeCategoryKey,
@@ -541,7 +542,16 @@ export const useCampaignsTable = (options?: {
 					);
 				}
 				return (
-					<div className="text-left">
+					<div className="campaign-row-folder-cell relative text-left">
+						{!isConfirming && (
+							<span className="campaign-row-left-hover-surface" aria-hidden="true" />
+						)}
+						<CampaignRowChevronIcon
+							className={cn(
+								'campaign-row-chevron pointer-events-none absolute left-[-19px] top-1/2 h-[14px] w-[14px] -translate-y-1/2',
+								isConfirming ? 'text-white' : 'text-black'
+							)}
+						/>
 						<div
 							className="folder-pill inline-flex items-center box-border flex-none"
 							style={{
@@ -558,7 +568,7 @@ export const useCampaignsTable = (options?: {
 							}}
 						>
 							<div
-								className="inline-flex items-center box-border flex-none overflow-hidden"
+								className="campaign-folder-name-box inline-flex items-center box-border flex-none overflow-hidden"
 								style={{
 									width: 112,
 									height: 15,
@@ -569,18 +579,43 @@ export const useCampaignsTable = (options?: {
 								}}
 							>
 								<span
-									className="inline-flex items-center justify-center flex-none"
-									style={{ color: isConfirming ? '#FFFFFF' : folderIconColor }}
+									className="campaign-folder-name-content inline-flex min-w-0 items-center"
 								>
-									<DashboardActionBarFolderIcon width={16} height={10} />
+									<span
+										className="inline-flex items-center justify-center flex-none"
+										style={{ color: isConfirming ? '#FFFFFF' : folderIconColor }}
+									>
+										<DashboardActionBarFolderIcon width={16} height={10} />
+									</span>
+									<span
+										className={cn(
+											'ml-[7px] truncate text-[13.854px] leading-[15px] font-inter font-medium',
+											isConfirming ? 'text-white' : 'text-black'
+										)}
+									>
+										{name}
+									</span>
 								</span>
-								<span
-									className={cn(
-										'ml-[7px] truncate text-[13.854px] leading-[15px] font-inter font-medium',
-										isConfirming ? 'text-white' : 'text-black'
-									)}
-								>
-									{name}
+								<span className="campaign-folder-show-content min-w-0 items-center">
+									<span
+										className="inline-flex items-center justify-center flex-none"
+										style={{ color: isConfirming ? '#FFFFFF' : folderIconColor }}
+									>
+										<DashboardActionBarFolderIcon
+											className="campaign-folder-show-icon"
+											width={16}
+											height={10}
+										/>
+									</span>
+									<span
+										className={cn(
+											'ml-[9px] text-[13.854px] leading-[15px] font-inter font-medium',
+											isConfirming ? 'text-white' : 'text-black'
+										)}
+									>
+										Show
+									</span>
+									<span className="campaign-folder-show-caret" aria-hidden="true" />
 								</span>
 							</div>
 							<CampaignDataTypeIconStrip
