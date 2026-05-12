@@ -17,14 +17,42 @@ import { cn, mmdd } from '@/utils';
 import { useRowConfirmationAnimation } from '@/hooks/useRowConfirmationAnimation';
 import DashboardActionBarFolderIcon from '@/components/atoms/_svg/DashboardActionBarFolderIcon';
 import type { CampaignsMockState } from './CampaignsTable';
+import {
+	type CampaignDataTypeCategoryKey,
+	type CampaignDataTypeSummary,
+	getCampaignDataCategoryLabel,
+} from '@/utils/campaignDataTypes';
+import { WineBeerSpiritsIcon } from '@/components/atoms/_svg/WineBeerSpiritsIcon';
+import { RestaurantsIcon } from '@/components/atoms/_svg/RestaurantsIcon';
+import { CoffeeShopsIcon } from '@/components/atoms/_svg/CoffeeShopsIcon';
+import { MusicVenuesIcon } from '@/components/atoms/_svg/MusicVenuesIcon';
+import { FestivalsIcon } from '@/components/atoms/_svg/FestivalsIcon';
+import { WeddingPlannersIcon } from '@/components/atoms/_svg/WeddingPlannersIcon';
+import { RadioStationsIcon } from '@/components/atoms/_svg/RadioStationsIcon';
+import { getCityIconProps } from '@/utils/cityIcons';
 
 type CampaignWithCounts = Campaign & {
 	draftCount?: number;
 	sentCount?: number;
 	newEmailCount?: number;
+	campaignDataTypes?: CampaignDataTypeSummary[];
 };
 
 const DEFAULT_MOCK_FOLDER_NAMES = ['Orion', 'Leo', 'Pieces', 'Capricorn', 'Sagittarius'];
+const DEFAULT_MOCK_CAMPAIGN_DATA_TYPES: CampaignDataTypeSummary[] = [
+	{
+		kind: 'category',
+		key: 'wine_beer_spirits',
+		label: getCampaignDataCategoryLabel('wine_beer_spirits'),
+		count: 8,
+	},
+	{ kind: 'state', key: 'NY', label: 'NY', count: 4 },
+	{ kind: 'state', key: 'PA', label: 'PA', count: 3 },
+	{ kind: 'state', key: 'IL', label: 'IL', count: 2 },
+	{ kind: 'state', key: 'TN', label: 'TN', count: 2 },
+	{ kind: 'state', key: 'TX', label: 'TX', count: 1 },
+	{ kind: 'state', key: 'CA', label: 'CA', count: 1 },
+];
 
 const buildMockCampaignRows = (mockState: CampaignsMockState): CampaignWithCounts[] => {
 	const folders = mockState.folders ?? [];
@@ -43,6 +71,7 @@ const buildMockCampaignRows = (mockState: CampaignsMockState): CampaignWithCount
 			draftCount: Math.max(0, folder.draftCount ?? 0),
 			sentCount: Math.max(0, folder.sentCount ?? 0),
 			newEmailCount: Math.max(0, folder.newEmailCount ?? 0),
+			campaignDataTypes: folder.campaignDataTypes ?? DEFAULT_MOCK_CAMPAIGN_DATA_TYPES,
 			updatedAt,
 		} as unknown as CampaignWithCounts;
 	});
@@ -100,6 +129,114 @@ const getUpdatedLabel = (updatedAt: Date): string => {
 	const now = startOfDay(new Date());
 	const then = startOfDay(updatedAt);
 	return now.getTime() === then.getTime() ? 'Today' : mmdd(updatedAt);
+};
+
+const CAMPAIGN_DATA_CATEGORY_BACKGROUND: Record<CampaignDataTypeCategoryKey, string> = {
+	wine_beer_spirits: '#BFC4FF',
+	restaurants: '#C3FBD1',
+	coffee_shops: '#D6F1BD',
+	music_venues: '#B7E5FF',
+	music_festivals: '#C1D6FF',
+	wedding: '#FFF2BC',
+	radio: '#E8EFFF',
+};
+
+const renderCampaignDataCategoryIcon = (key: CampaignDataTypeCategoryKey) => {
+	switch (key) {
+		case 'wine_beer_spirits':
+			return <WineBeerSpiritsIcon size={11} className="flex-shrink-0" />;
+		case 'restaurants':
+			return <RestaurantsIcon size={12} className="flex-shrink-0" />;
+		case 'coffee_shops':
+			return <CoffeeShopsIcon size={7} className="flex-shrink-0" />;
+		case 'music_venues':
+			return <MusicVenuesIcon size={13} className="flex-shrink-0" />;
+		case 'music_festivals':
+			return <FestivalsIcon size={12} className="flex-shrink-0" />;
+		case 'wedding':
+			return <WeddingPlannersIcon size={12} className="flex-shrink-0" />;
+		case 'radio':
+			return <RadioStationsIcon size={13} className="flex-shrink-0" />;
+	}
+};
+
+const CampaignDataTypeBadge = ({ dataType }: { dataType: CampaignDataTypeSummary }) => {
+	if (dataType.kind === 'category') {
+		return (
+			<span
+				className="inline-flex h-[15px] w-[15px] flex-none items-center justify-center overflow-hidden rounded-[4px]"
+				style={{ backgroundColor: CAMPAIGN_DATA_CATEGORY_BACKGROUND[dataType.key] }}
+				title={dataType.label}
+			>
+				{renderCampaignDataCategoryIcon(dataType.key)}
+			</span>
+		);
+	}
+
+	const { icon, backgroundColor } = getCityIconProps('', dataType.key);
+	return (
+		<span
+			className="inline-flex h-[15px] w-[15px] flex-none items-center justify-center overflow-hidden rounded-[4px]"
+			style={{ backgroundColor }}
+			title={dataType.label}
+		>
+			<span className="inline-flex h-full w-full items-center justify-center [&>svg]:block [&>svg]:h-auto [&>svg]:max-h-[10px] [&>svg]:max-w-[11px] [&>svg]:w-auto">
+				{icon}
+			</span>
+		</span>
+	);
+};
+
+const CampaignDataTypeIconStrip = ({
+	dataTypes,
+	isConfirming,
+	hasNew,
+}: {
+	dataTypes: CampaignDataTypeSummary[];
+	isConfirming: boolean;
+	hasNew: boolean;
+}) => {
+	const stripSpacingClassName = hasNew ? 'ml-[23px] mr-2' : 'ml-[8px] mr-1';
+
+	if (isConfirming || dataTypes.length === 0) {
+		return (
+			<div
+				className={cn('folder-icon-strip h-[15px] flex-1', stripSpacingClassName)}
+				aria-hidden="true"
+			/>
+		);
+	}
+
+	const visibleDataTypes = dataTypes.slice(0, 3);
+	const overflowCount = Math.max(0, dataTypes.length - visibleDataTypes.length);
+	const label = dataTypes.map((dataType) => dataType.label).join(', ');
+
+	return (
+		<div
+			className={cn(
+				'folder-icon-strip flex h-[15px] min-w-0 flex-1 items-center justify-start gap-[4px] overflow-hidden',
+				stripSpacingClassName
+			)}
+			aria-label={`Campaign data types: ${label}`}
+		>
+			{visibleDataTypes.map((dataType) => (
+				<CampaignDataTypeBadge
+					key={`${dataType.kind}-${dataType.key}`}
+					dataType={dataType}
+				/>
+			))}
+			{overflowCount > 0 ? (
+				<span
+					className={cn(
+						'flex-none font-inter text-[8.021px] font-medium not-italic leading-[9.95px]',
+						isConfirming ? 'text-white' : 'text-black'
+					)}
+				>
+					+{overflowCount}
+				</span>
+			) : null}
+		</div>
+	);
 };
 
 export const useCampaignsTable = (options?: {
@@ -349,8 +486,10 @@ export const useCampaignsTable = (options?: {
 			),
 			cell: ({ row }) => {
 				const name: string = row.getValue('name');
-				const isConfirming = row.original.id === confirmingCampaignId;
-				const newCount = (row.original as CampaignWithCounts).newEmailCount ?? 0;
+				const campaign = row.original as CampaignWithCounts;
+				const isConfirming = campaign.id === confirmingCampaignId;
+				const newCount = campaign.newEmailCount ?? 0;
+				const campaignDataTypes = campaign.campaignDataTypes ?? [];
 				const hasNew = newCount >= 1;
 				if (!name) {
 					return (
@@ -373,41 +512,41 @@ export const useCampaignsTable = (options?: {
 								/* paddingRight 26 (1+ new) shifts "X new" text ~14px left so it
 								   sits visually under the "New" column header rather than
 								   against the pill's right edge. */
-								paddingRight: hasNew ? 26 : 0,
+								paddingRight: hasNew ? 26 : 7,
 							}}
 						>
 							<div
-							className="inline-flex items-center box-border flex-none overflow-hidden"
-							style={{
-								width: 112,
-								height: 15,
-								borderRadius: 3,
-								background: isConfirming ? 'transparent' : '#EEC7F7',
-								paddingLeft: 2,
-								paddingRight: 6,
-							}}
-						>
-							<span
-								className="inline-flex items-center justify-center flex-none"
-								style={{ color: '#E89A3F' }}
+								className="inline-flex items-center box-border flex-none overflow-hidden"
+								style={{
+									width: 112,
+									height: 15,
+									borderRadius: 3,
+									background: isConfirming ? 'transparent' : '#EEC7F7',
+									paddingLeft: 2,
+									paddingRight: 6,
+								}}
 							>
-								<DashboardActionBarFolderIcon width={16} height={10} />
-							</span>
-							<span
-								className={cn(
-									'ml-[7px] truncate text-[13.854px] leading-[17.186px] font-inter font-medium',
-									isConfirming ? 'text-white' : 'text-black'
-								)}
-							>
-								{name}
-							</span>
-						</div>
-						{hasNew && (
-							<>
-								<div
-									className="folder-icon-strip flex-1 mx-2 h-[15px]"
-									aria-hidden="true"
-								/>
+								<span
+									className="inline-flex items-center justify-center flex-none"
+									style={{ color: '#E89A3F' }}
+								>
+									<DashboardActionBarFolderIcon width={16} height={10} />
+								</span>
+								<span
+									className={cn(
+										'ml-[7px] truncate text-[13.854px] leading-[17.186px] font-inter font-medium',
+										isConfirming ? 'text-white' : 'text-black'
+									)}
+								>
+									{name}
+								</span>
+							</div>
+							<CampaignDataTypeIconStrip
+								dataTypes={campaignDataTypes}
+								isConfirming={isConfirming}
+								hasNew={hasNew}
+							/>
+							{hasNew && (
 								<span
 									className={cn(
 										'flex-none text-[13.854px] leading-[17.186px] font-inter font-medium whitespace-nowrap',
@@ -416,8 +555,7 @@ export const useCampaignsTable = (options?: {
 								>
 									{newCount.toString().padStart(2, '0')} new
 								</span>
-							</>
-						)}
+							)}
 						</div>
 					</div>
 				);

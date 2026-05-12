@@ -11,6 +11,10 @@ import {
 	handleApiError,
 } from '@/app/api/_utils';
 import { z } from 'zod';
+import {
+	summarizeCampaignDataTypes,
+	type CampaignDataTypeContactSource,
+} from '@/utils/campaignDataTypes';
 
 const ACTIVE_CAMPAIGN_CAP = 5;
 const CAMPAIGN_CAP_REACHED_ERROR = 'CAMPAIGN_CAP_REACHED';
@@ -129,6 +133,14 @@ const postCampaignSchema = z.object({
 });
 export type PostCampaignData = z.infer<typeof postCampaignSchema>;
 
+const campaignDataTypeContactSelect = {
+	id: true,
+	email: true,
+	title: true,
+	headline: true,
+	state: true,
+} satisfies Prisma.ContactSelect;
+
 export async function POST(req: NextRequest) {
 	try {
 		const { userId } = await auth();
@@ -218,17 +230,28 @@ export async function GET() {
 						emails: true,
 					},
 				},
+				contacts: {
+					select: campaignDataTypeContactSelect,
+				},
+				contactLists: {
+					select: {
+						name: true,
+						title: true,
+						contacts: {
+							select: campaignDataTypeContactSelect,
+						},
+					},
+				},
 				emails: {
 					select: {
 						status: true,
 					},
 				},
 				userContactLists: {
-					include: {
+					select: {
+						name: true,
 						contacts: {
-							select: {
-								email: true,
-							},
+							select: campaignDataTypeContactSelect,
 						},
 					},
 				},
@@ -250,17 +273,49 @@ export async function GET() {
 			const contactEmails = campaign.userContactLists
 				.flatMap((list) => list.contacts.map((c) => c.email))
 				.filter((email): email is string => Boolean(email));
+			const campaignContactsById = new Map<number, CampaignDataTypeContactSource>();
+			const addCampaignContacts = (
+				contacts: Array<
+					CampaignDataTypeContactSource & {
+						id: number;
+					}
+				>
+			) => {
+				for (const contact of contacts) {
+					if (campaignContactsById.has(contact.id)) continue;
+					campaignContactsById.set(contact.id, contact);
+				}
+			};
+
+			addCampaignContacts(campaign.contacts);
+			for (const list of campaign.userContactLists) {
+				addCampaignContacts(list.contacts);
+			}
+			for (const list of campaign.contactLists) {
+				addCampaignContacts(list.contacts);
+			}
+
+			const campaignDataTypes = summarizeCampaignDataTypes({
+				contacts: Array.from(campaignContactsById.values()),
+				extraTexts: [
+					campaign.name,
+					...campaign.userContactLists.map((list) => list.name),
+					...campaign.contactLists.flatMap((list) => [list.name, list.title]),
+				],
+			});
 
 			// Remove the emails and userContactLists arrays from the response, keep only counts and contactEmails
 
 			// eslint-disable-next-line @typescript-eslint/no-unused-vars
-			const { emails, userContactLists, ...campaignWithoutEmails } = campaign;
+			const { emails, userContactLists, contacts, contactLists, ...campaignWithoutEmails } =
+				campaign;
 
 			return {
 				...campaignWithoutEmails,
 				draftCount,
 				sentCount,
 				contactEmails,
+				campaignDataTypes,
 			};
 		});
 

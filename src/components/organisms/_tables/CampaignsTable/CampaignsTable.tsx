@@ -5,6 +5,7 @@ import CustomTable from '../../../molecules/CustomTable/CustomTable';
 import { useCampaignsTable } from './useCampaignsTable';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { cn } from '@/utils';
+import type { CampaignDataTypeSummary } from '@/utils/campaignDataTypes';
 
 export type CampaignsMockFolder = {
 	name?: string;
@@ -12,6 +13,7 @@ export type CampaignsMockFolder = {
 	sentCount?: number;
 	updatedDaysAgo?: number;
 	newEmailCount?: number;
+	campaignDataTypes?: CampaignDataTypeSummary[];
 };
 
 export type CampaignsMockState = {
