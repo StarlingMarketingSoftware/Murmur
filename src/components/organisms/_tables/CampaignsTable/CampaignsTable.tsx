@@ -93,7 +93,7 @@ export const CampaignsTable: FC<CampaignsTableProps> = ({ mockState }) => {
 			: 'h-[20px] w-[80px] flex-none justify-center'
 	);
 	const metricBoxSkeletonClassName =
-		'metric-box inline-flex box-border items-center justify-center border border-black leading-none truncate h-[20px] w-[80px] min-w-[80px] max-w-[80px] rounded-[6.5px] px-0 flex-none bg-black/10 animate-pulse';
+		'metric-box inline-flex box-border items-center justify-center border-[0.799px] border-black leading-none truncate h-[20px] w-[80px] min-w-[80px] max-w-[80px] rounded-[6.389px] px-0 flex-none bg-black/10 animate-pulse';
 
 	// No orientation gating; we rely on device detection so landscape uses mobile layout too
 
@@ -278,7 +278,7 @@ export const CampaignsTable: FC<CampaignsTableProps> = ({ mockState }) => {
 						) : (
 							<CustomTable
 								variant="secondary"
-								containerClassName={`border-none rounded-[12px] my-campaigns-table !bg-[#F8F8F8] !mx-auto !p-[8px] ${
+								containerClassName={`border-none rounded-[8px] my-campaigns-table !bg-[#F8F8F8] !mx-auto !p-[8px] w-[654px] h-[253px] ${
 									isNarrowDesktop ? 'narrow-desktop-table' : ''
 								}`}
 								headerClassName="!bg-white [&_tr]:!bg-white [&_th]:!bg-white [&_th]:!border-0 [&_th]:!h-[28px] [&_tr]:!h-[28px] [&_th:first-child]:rounded-tl-[8px] [&_th:last-child]:rounded-tr-[8px] [&_th]:relative [&_th]:!overflow-visible"

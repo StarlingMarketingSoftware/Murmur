@@ -322,6 +322,8 @@ export const useCampaignsTable = (options?: {
 			cell: ({ row }) => {
 				const name: string = row.getValue('name');
 				const isConfirming = row.original.id === confirmingCampaignId;
+				const newCount = (row.original as CampaignWithCounts).newEmailCount ?? 0;
+				const hasNew = newCount >= 1;
 				if (!name) {
 					return (
 						<Typography variant="muted" className="text-sm">
@@ -334,12 +336,16 @@ export const useCampaignsTable = (options?: {
 						<div
 							className="folder-pill inline-flex items-center box-border flex-none"
 							style={{
-								width: 219,
+								width: hasNew ? 307 : 219,
 								height: 20,
 								borderRadius: 6.389,
 								border: '0.799px solid #000',
 								background: isConfirming ? 'transparent' : '#EEFFF0',
 								paddingLeft: 7,
+								/* paddingRight 26 (1+ new) shifts "X new" text ~14px left so it
+								   sits visually under the "New" column header rather than
+								   against the pill's right edge. */
+								paddingRight: hasNew ? 26 : 0,
 							}}
 						>
 							<div
@@ -368,11 +374,29 @@ export const useCampaignsTable = (options?: {
 									{name}
 								</span>
 							</div>
+							{hasNew && (
+								<>
+									{/* Icon strip placeholder — reserves the slot for upcoming
+									    contact preview icons (~3 icons + +N badge). */}
+									<div
+										className="folder-icon-strip flex-1 mx-2 h-[15px]"
+										aria-hidden="true"
+									/>
+									<span
+										className={cn(
+											'flex-none text-[13px] leading-none font-inter font-normal whitespace-nowrap',
+											isConfirming ? 'text-white' : 'text-black'
+										)}
+									>
+										{newCount.toString().padStart(2, '0')} new
+									</span>
+								</>
+							)}
 						</div>
 					</div>
 				);
 			},
-			size: 228,
+			size: 315,
 		},
 		{
 			id: 'metrics',
@@ -445,7 +469,7 @@ export const useCampaignsTable = (options?: {
 						className={cn(
 							'metrics-header-label relative z-[1] select-none',
 							!compactMetrics &&
-								'flex w-[80px] min-w-[80px] max-w-[80px] items-center justify-start pl-2 text-left text-[13px] font-inter font-medium',
+								'flex w-[80px] min-w-[80px] max-w-[80px] items-center justify-start pl-3 text-left text-[13px] font-inter font-medium',
 							compactMetrics &&
 								'flex metric-width-short items-center justify-center text-[10px] font-medium tracking-[0.01em] metrics-header-label-compact'
 						)}
@@ -628,7 +652,6 @@ export const useCampaignsTable = (options?: {
 					draftCount.toString().padStart(2, '0') +
 					(draftCount === 1 ? ' draft' : ' drafts');
 				const sentLabel = sentCount.toString().padStart(2, '0') + ' sent';
-				const newLabel = newCount.toString().padStart(2, '0') + ' new';
 
 				const draftDisplay = compactMetrics
 					? draftCount.toString().padStart(2, '0')
@@ -636,14 +659,15 @@ export const useCampaignsTable = (options?: {
 				const sentDisplay = compactMetrics
 					? sentCount.toString().padStart(2, '0')
 					: sentLabel;
-				const newDisplay = newCount > 0
-					? (compactMetrics ? newCount.toString().padStart(2, '0') : newLabel)
-					: '';
 				const draftFill = getDraftFillColor(draftCount);
 				const sentFill = getSentFillColor(sentCount);
 				const updatedFill = getUpdatedFillColor(updatedAt);
 				const updatedLabel = getUpdatedLabel(updatedAt);
-				const newFill = '#FFFFFF';
+				// For 0-new rows we render an empty New pill in the metrics column so
+				// the row matches the original layout. For 1+ new rows we skip it —
+				// the combined 307 pill in the first cell already displays the count
+				// and extends past the first-cell boundary into this area visually.
+				const showEmptyNewSlot = newCount === 0;
 
 				return (
 					<div
@@ -660,11 +684,17 @@ export const useCampaignsTable = (options?: {
 						}
 					>
 						{[
-							{
-								label: newDisplay,
-								fill: newFill,
-								dataAttr: { 'data-new-fill': newFill } as Record<string, string>,
-							},
+							...(showEmptyNewSlot
+								? [
+										{
+											label: '',
+											fill: '#FFFFFF',
+											dataAttr: {
+												'data-new-fill': '#FFFFFF',
+											} as Record<string, string>,
+										},
+									]
+								: []),
 							{
 								label: draftDisplay,
 								fill: draftFill,
@@ -693,7 +723,7 @@ export const useCampaignsTable = (options?: {
 								<div
 									{...dataAttr}
 									className={cn(
-										'metric-box inline-flex box-border items-center justify-center border border-black leading-none truncate h-[20px] w-[80px] min-w-[80px] max-w-[80px] rounded-[6.5px] px-0 flex-none'
+										'metric-box inline-flex box-border items-center justify-center border-[0.799px] border-black leading-none truncate h-[20px] w-[80px] min-w-[80px] max-w-[80px] rounded-[6.389px] px-0 flex-none'
 									)}
 									style={
 										{

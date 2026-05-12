@@ -2298,8 +2298,10 @@ body {
 
 /* Desktop campaigns table: keep ticks centered and ensure the 4-pill block fits (no right-side clipping) */
 .my-campaigns-table {
-	/* Responsive but capped so 4x92px pills never overflow the metrics column */
-	--campaign-metric-gap: clamp(18px, 2.5vw, 31px);
+	/* Fixed-width container (654px) — integer gap so the 1px tick separators
+	   land on whole pixels and antialias uniformly across all 3 ticks. */
+	--campaign-metric-gap: 30px;
+	--campaign-metric-tick-height: 20px;
 }
 
 /* Give the metrics column a touch more usable width on desktop by reducing cell padding.
@@ -2316,19 +2318,37 @@ body {
 	text-overflow: unset !important;
 }
 
-/* Desktop campaigns table: ticks centered between 92px metric pills */
+/* Desktop campaigns table: ticks centered between 80px metric pills.
+   Keep the left and middle/right separators on the same height rule so
+   rows with a combined "new" folder pill do not render a shorter first tick. */
 .my-campaigns-table:not(.narrow-desktop-table):not(.mobile-table-no-scroll)
-	.campaign-metric-slot:not(:last-child)::after {
+	.campaign-metric-slot:not(:last-child)::after,
+.my-campaigns-table:not(.narrow-desktop-table):not(.mobile-table-no-scroll)
+	.campaign-metric-slot:first-child:has(.metric-box[data-draft-fill])::before {
 	content: '';
 	position: absolute;
-	top: 50%;
-	/* Center a 1px tick in the middle of the inter-pill gap */
-	left: calc(100% + (var(--campaign-metric-gap, 32px) / 2) - 0.5px);
-	transform: translateY(-50%);
+	top: 0;
+	height: var(--campaign-metric-tick-height, 20px);
 	width: 1px;
-	height: 20px;
 	background-color: #000000;
 	pointer-events: none;
+}
+
+.my-campaigns-table:not(.narrow-desktop-table):not(.mobile-table-no-scroll)
+	.campaign-metric-slot:not(:last-child)::after {
+	/* Center a 1px tick in the middle of the inter-pill gap */
+	left: calc(100% + (var(--campaign-metric-gap, 32px) / 2) - 0.5px);
+}
+
+/* Tick separating the combined folder pill from the first metric slot.
+   Only applies when Drafts is the first slot (i.e., 1+ new rows where the
+   metrics row has 3 slots and the combined 307 pill sits to the left).
+   For 0-new rows the first slot is the empty New pill — the inter-pill
+   ticks from :not(:last-child)::after already cover that case, and a tick
+   between the folder pill and the empty New pill is not wanted. */
+.my-campaigns-table:not(.narrow-desktop-table):not(.mobile-table-no-scroll)
+	.campaign-metric-slot:first-child:has(.metric-box[data-draft-fill])::before {
+	left: calc(0px - (var(--campaign-metric-gap, 32px) / 2) - 0.5px);
 }
 
 /* Keep exclude contacts box consistent on smaller screens */
@@ -4083,9 +4103,9 @@ body.murmur-mobile .results-align {
 }
 
 /* Dashboard Campaigns table metric column padding.
-   - padding-left 8px: places the leftmost (New) pill 8px to the right of the folder pill.
-   - padding-right 5px: combined with the container's 8px !p-[8px] gives the rightmost
-     (Updated) pill an exact 13px gap from the container's right wall. */
+   - padding-left 8px: places the leftmost pill 8px to the right of the folder pill.
+   - padding-right 5px: combined with the container's 8px !p-[8px] gives the
+     rightmost (Updated) pill an exact 13px gap from the container's right wall. */
 .dashboard-recent-campaigns
 	.mobile-campaigns-wrapper:not(.mobile-portrait-mode)
 	.campaigns-table-container
@@ -4101,6 +4121,10 @@ body.murmur-mobile .results-align {
 	padding-left: 8px !important;
 	padding-right: 5px !important;
 }
+/* First column fits the original 219px folder pill. For 1+ new rows the wider
+   307px combined pill extends past this boundary into the metrics column area
+   (where the empty New pill would otherwise sit); first cell must allow
+   overflow so the combined pill can paint through. */
 .dashboard-recent-campaigns
 	.mobile-campaigns-wrapper:not(.mobile-portrait-mode)
 	.campaigns-table-container
@@ -4116,6 +4140,7 @@ body.murmur-mobile .results-align {
 	width: 228px !important;
 	padding-left: 9px !important;
 	padding-right: 0 !important;
+	overflow: visible !important;
 }
 
 /* Mobile landscape: scale campaigns table wrapper width proportionally
@@ -6259,26 +6284,29 @@ body.murmur-mobile .search-input-icon-btn {
 	.mobile-landscape-mode
 		.my-campaigns-table
 		.metrics-grid-container
+		> div:not(:first-child) {
+		margin-left: 0 !important;
+		border-left: 0 !important;
+		padding-left: 0 !important;
+	}
+	.mobile-landscape-mode
+		.my-campaigns-table
+		.metrics-grid-container
 		> div:not(:first-child)::before {
 		content: '';
 		position: absolute;
 		left: -4.5px; /* center within 8px column gap, adjusted for pixel alignment */
-		top: 50%;
-		transform: translateY(-50%) translateZ(0); /* force GPU rendering */
+		top: 0;
 		width: 1px;
-		height: 17px;
+		height: var(--campaign-metric-tick-height, 20px);
 		background-color: #000000;
 		pointer-events: none;
 		z-index: 1;
-		/* Prevent sub-pixel rendering issues */
-		will-change: transform;
 		backface-visibility: hidden;
 		-webkit-backface-visibility: hidden;
 		/* Force crisp edges */
 		image-rendering: -webkit-optimize-contrast;
 		image-rendering: crisp-edges;
-		/* Ensure pixel-perfect rendering */
-		transform-origin: center center;
 	}
 
 	/* Additional fixes for specific breakpoints where dividers appear thick */
@@ -6290,7 +6318,6 @@ body.murmur-mobile .search-input-icon-btn {
 			> div:not(:first-child)::before {
 			/* Force exact pixel alignment at problematic breakpoints */
 			left: -4px;
-			transform: translateY(-8.5px) translateZ(0); /* exact pixel position */
 		}
 	}
 }
