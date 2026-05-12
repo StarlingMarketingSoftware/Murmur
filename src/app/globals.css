@@ -4114,9 +4114,8 @@ body.murmur-mobile .results-align {
 }
 
 /* Dashboard Campaigns table metric column padding.
-   - padding-left 8px: places the leftmost pill 8px to the right of the folder pill.
-   - padding-right 5px: combined with the container's 8px !p-[8px] gives the
-     rightmost (Updated) pill an exact 13px gap from the container's right wall. */
+   Horizontal table padding is pushed into the cells so row hover fills can reach
+   the full outer box width while the pills keep their original placement. */
 .dashboard-recent-campaigns
 	.mobile-campaigns-wrapper:not(.mobile-portrait-mode)
 	.campaigns-table-container
@@ -4129,8 +4128,8 @@ body.murmur-mobile .results-align {
 	.my-campaigns-table
 	tbody
 	td:nth-child(2) {
-	padding-left: 8px !important;
-	padding-right: 5px !important;
+	padding-left: 16px !important;
+	padding-right: 13px !important;
 }
 /* First column fits the original 219px folder pill. For 1+ new rows the wider
    307px combined pill extends past this boundary into the metrics column area
@@ -4149,7 +4148,7 @@ body.murmur-mobile .results-align {
 	tbody
 	td:first-child {
 	width: 228px !important;
-	padding-left: 9px !important;
+	padding-left: 17px !important;
 	padding-right: 0 !important;
 	overflow: visible !important;
 }
@@ -4569,8 +4568,8 @@ main {
 	border: none !important;
 	box-shadow: none !important;
 	--campaign-metric-tick-height: 20px;
-	--campaign-row-left-hover-left-offset: 9px;
-	--campaign-row-left-hover-width: 228px;
+	--campaign-row-left-hover-left-offset: 17px;
+	--campaign-row-left-hover-width: 236px;
 	--campaign-row-hover-fill-height: 22px;
 	--campaign-row-hover-fill-color: #d2e7f6;
 }
