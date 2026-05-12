@@ -18,12 +18,12 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 import { gsap } from 'gsap';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { createPortal, flushSync } from 'react-dom';
-import { CampaignsTable } from '../../../components/organisms/_tables/CampaignsTable/CampaignsTable';
 import {
-	DashboardStrategyBox,
-	type StrategyMockState,
-} from '@/components/molecules/DashboardStrategyBox/DashboardStrategyBox';
-import { DashboardStrategyBoxDebugPanel } from '@/components/molecules/DashboardStrategyBox/DashboardStrategyBoxDebugPanel';
+	CampaignsTable,
+	type CampaignsMockState,
+} from '../../../components/organisms/_tables/CampaignsTable/CampaignsTable';
+import { CampaignsTableDebugPanel } from '../../../components/organisms/_tables/CampaignsTable/CampaignsTableDebugPanel';
+import { DashboardStrategyBox } from '@/components/molecules/DashboardStrategyBox/DashboardStrategyBox';
 import { useDashboard } from './useDashboard';
 import { urls } from '@/constants/urls';
 import {
@@ -2196,10 +2196,10 @@ const DashboardContent = () => {
 	type DashboardActionBarKey = 'playbook' | 'folder' | 'calendar' | 'star' | 'envelope';
 	const [selectedActionBarIcon, setSelectedActionBarIcon] =
 		useState<DashboardActionBarKey>('playbook');
-	const strategyDebugEnabled = searchParams.get('strategyDebug') === '1';
-	const [strategyMockState, setStrategyMockState] = useState<StrategyMockState | undefined>(
-		undefined
-	);
+	const campaignsDebugEnabled = searchParams.get('campaignsDebug') === '1';
+	const [campaignsMockState, setCampaignsMockState] = useState<
+		CampaignsMockState | undefined
+	>(undefined);
 	const isTabPreviewingOther = hoveredTab != null && hoveredTab !== activeTab;
 	// Dashboard inbox deep-link (`?tab=inbox`) should land on the Campaigns sub-tab.
 	const [inboxSubtab, setInboxSubtab] = useState<'messages' | 'campaigns'>('campaigns');
@@ -9869,9 +9869,11 @@ const DashboardContent = () => {
 					>
 						<div className="mt-[18px] mb-[18px] w-full flex flex-col items-center">
 							{selectedActionBarIcon === 'playbook' && (
-								<DashboardStrategyBox mockState={strategyMockState} />
+								<DashboardStrategyBox />
 							)}
-							{selectedActionBarIcon === 'folder' && <CampaignsTable />}
+							{selectedActionBarIcon === 'folder' && (
+								<CampaignsTable mockState={campaignsMockState} />
+							)}
 							{selectedActionBarIcon === 'envelope' && (
 								<DashboardResponsesWidget enabled={isSignedIn === true} />
 							)}
@@ -9879,10 +9881,10 @@ const DashboardContent = () => {
 					</div>
 				)}
 
-				{strategyDebugEnabled && (
-					<DashboardStrategyBoxDebugPanel
-						value={strategyMockState}
-						onChange={setStrategyMockState}
+				{campaignsDebugEnabled && (
+					<CampaignsTableDebugPanel
+						value={campaignsMockState}
+						onChange={setCampaignsMockState}
 					/>
 				)}
 

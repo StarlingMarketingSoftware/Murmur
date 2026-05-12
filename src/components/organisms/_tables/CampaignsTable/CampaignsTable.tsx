@@ -8,7 +8,23 @@ import { Campaign } from '@prisma/client';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { cn } from '@/utils';
 
-export const CampaignsTable: FC = () => {
+export type CampaignsMockFolder = {
+	name?: string;
+	draftCount?: number;
+	sentCount?: number;
+	updatedDaysAgo?: number;
+	newEmailCount?: number;
+};
+
+export type CampaignsMockState = {
+	folders?: CampaignsMockFolder[];
+};
+
+type CampaignsTableProps = {
+	mockState?: CampaignsMockState;
+};
+
+export const CampaignsTable: FC<CampaignsTableProps> = ({ mockState }) => {
 	// Treat all mobile orientations (portrait and landscape) as mobile for this table
 	const isMobile = useIsMobile();
 	const mobileTableWrapperRef = useRef<HTMLDivElement | null>(null);
@@ -73,7 +89,7 @@ export const CampaignsTable: FC = () => {
 		handleRowClick,
 		handleDeleteClick,
 		confirmingCampaignId,
-	} = useCampaignsTable({ compactMetrics: shouldUseCompactMetrics });
+	} = useCampaignsTable({ compactMetrics: shouldUseCompactMetrics, mockState });
 
 	const metricsSkeletonContainerClassName = cn(
 		'metrics-grid-container w-full items-center text-left',

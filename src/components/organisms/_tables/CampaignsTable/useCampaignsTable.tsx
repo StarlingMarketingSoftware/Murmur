@@ -5,14 +5,40 @@ import { CampaignTitlePills } from '@/components/molecules/CampaignTitlePills/Ca
 import { useDeleteCampaign, useGetCampaigns } from '@/hooks/queryHooks/useCampaigns';
 import { useRouter } from 'next/navigation';
 import { urls } from '@/constants/urls';
-import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useLayoutEffect, useMemo, useRef, useCallback } from 'react';
 import { cn, mmdd } from '@/utils';
 import { useRowConfirmationAnimation } from '@/hooks/useRowConfirmationAnimation';
 import DeleteXIcon from '@/components/atoms/svg/DeleteXIcon';
+import type { CampaignsMockState } from './CampaignsTable';
 
 type CampaignWithCounts = Campaign & {
 	draftCount?: number;
 	sentCount?: number;
+	newEmailCount?: number;
+};
+
+const DEFAULT_MOCK_FOLDER_NAMES = ['Orion', 'Leo', 'Pieces', 'Capricorn', 'Sagittarius'];
+
+const buildMockCampaignRows = (mockState: CampaignsMockState): CampaignWithCounts[] => {
+	const folders = mockState.folders ?? [];
+	const limited = folders.slice(0, 5);
+	const now = Date.now();
+	const msInDay = 24 * 60 * 60 * 1000;
+	return limited.map((folder, index) => {
+		const updatedDaysAgo = Math.max(0, folder.updatedDaysAgo ?? 0);
+		const updatedAt = new Date(now - updatedDaysAgo * msInDay);
+		// Cast to Campaign — cell renderers only read id/name/draftCount/sentCount/
+		// updatedAt, and handleRowClick is short-circuited while mock data is active,
+		// so the rest of the prisma Campaign columns aren't needed.
+		return {
+			id: -1000 - index,
+			name: folder.name?.trim() || DEFAULT_MOCK_FOLDER_NAMES[index] || `Folder ${index + 1}`,
+			draftCount: Math.max(0, folder.draftCount ?? 0),
+			sentCount: Math.max(0, folder.sentCount ?? 0),
+			newEmailCount: Math.max(0, folder.newEmailCount ?? 0),
+			updatedAt,
+		} as unknown as CampaignWithCounts;
+	});
 };
 
 const useIsomorphicLayoutEffect =
@@ -69,8 +95,13 @@ const getUpdatedLabel = (updatedAt: Date): string => {
 	return now.getTime() === then.getTime() ? 'Today' : mmdd(updatedAt);
 };
 
-export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
+export const useCampaignsTable = (options?: {
+	compactMetrics?: boolean;
+	mockState?: CampaignsMockState;
+}) => {
 	const compactMetrics = options?.compactMetrics ?? false;
+	const mockState = options?.mockState;
+	const isMockActive = mockState != null;
 	const [confirmingCampaignId, setConfirmingCampaignId] = useState<number | null>(null);
 	const [countdown, setCountdown] = useState<number>(5);
 	const confirmationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -691,7 +722,13 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 		},
 	];
 
-	const { data, isPending } = useGetCampaigns();
+	const { data: realData, isPending: realIsPending } = useGetCampaigns();
+	const mockData = useMemo(
+		() => (mockState ? buildMockCampaignRows(mockState) : null),
+		[mockState]
+	);
+	const data = mockData ?? realData;
+	const isPending = isMockActive ? false : realIsPending;
 	const router = useRouter();
 	const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
 	const [currentRow, setCurrentRow] = useState<Campaign | null>(null);
@@ -699,6 +736,11 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 	const { mutateAsync: deleteCampaign, isPending: isPendingDelete } = useDeleteCampaign();
 
 	const handleRowClick = (rowData: Campaign) => {
+		// While mock data is active, the row IDs are synthetic (negative) and
+		// would route to a nonexistent campaign detail page. Eat the click so the
+		// debug session stays on the dashboard.
+		if (isMockActive) return;
+
 		// If clicking on the confirming row, execute deletion
 		if (rowData.id === confirmingCampaignId) {
 			// Clear any existing timeout
@@ -718,6 +760,27 @@ export const useCampaignsTable = (options?: { compactMetrics?: boolean }) => {
 
 	const handleDeleteClick = (e: React.MouseEvent, campaignId: number) => {
 		e.stopPropagation();
+
+		// Mock data is read-only — show the confirming animation but skip the
+		// real delete mutation.
+		if (isMockActive) {
+			if (confirmationTimeoutRef.current) {
+				clearTimeout(confirmationTimeoutRef.current);
+			}
+			if (campaignId === confirmingCampaignId) {
+				setConfirmingCampaignId(null);
+				setCurrentRow(null);
+			} else {
+				setConfirmingCampaignId(campaignId);
+				const campaign = data?.find((c: Campaign) => c.id === campaignId);
+				if (campaign) setCurrentRow(campaign);
+				confirmationTimeoutRef.current = setTimeout(() => {
+					setConfirmingCampaignId(null);
+					setCurrentRow(null);
+				}, 5000);
+			}
+			return;
+		}
 
 		// Clear any existing timeout
 		if (confirmationTimeoutRef.current) {

@@ -45,19 +45,6 @@ import { computeMoodVisualNightT } from '@/components/molecules/SearchResultsMap
 import { getMoodConfig } from '@/lib/weather/moodConfig';
 import { urls } from '@/constants/urls';
 
-export type StrategyMockCampaign = {
-	id: number;
-	name: string;
-	draftCount?: number;
-	sentCount?: number;
-	contactCount?: number;
-};
-
-export type StrategyMockState = {
-	campaigns?: StrategyMockCampaign[];
-	newEmailCount?: number;
-};
-
 type CampaignWithCounts = {
 	id: number;
 	name: string;
@@ -78,14 +65,6 @@ type StrategyAction = {
 	campaign?: CampaignWithCounts;
 	weight: number;
 };
-
-const mockToCampaign = (mock: StrategyMockCampaign): CampaignWithCounts => ({
-	id: mock.id,
-	name: mock.name,
-	draftCount: mock.draftCount ?? 0,
-	sentCount: mock.sentCount ?? 0,
-	contactEmails: new Array(mock.contactCount ?? 0).fill('mock@example.com'),
-});
 
 const buildCampaignActionCandidates = (
 	campaigns: CampaignWithCounts[] | undefined
@@ -1961,7 +1940,6 @@ const computeItemMarginTops = (actions: StrategyAction[]): number[] => {
 
 type Props = {
 	className?: string;
-	mockState?: StrategyMockState;
 };
 
 const StrategyActionButton: FC<{
@@ -2059,7 +2037,7 @@ const computePreviewPosition = (
 	};
 };
 
-export const DashboardStrategyBox: FC<Props> = ({ className, mockState }) => {
+export const DashboardStrategyBox: FC<Props> = ({ className }) => {
 	const router = useRouter();
 	const { data: realCampaigns } = useGetCampaigns();
 	const { data: inboundEmails } = useGetInboundEmails({ enabled: true });
@@ -2116,18 +2094,11 @@ export const DashboardStrategyBox: FC<Props> = ({ className, mockState }) => {
 		}
 	};
 
-	const { campaigns, newEmailCount } = useMemo(() => {
-		if (mockState?.campaigns && mockState.campaigns.length > 0) {
-			return {
-				campaigns: mockState.campaigns.map(mockToCampaign),
-				newEmailCount: mockState.newEmailCount ?? 0,
-			};
-		}
-		return {
-			campaigns: (realCampaigns as CampaignWithCounts[] | undefined) ?? [],
-			newEmailCount: mockState?.newEmailCount ?? realNewEmailCount,
-		};
-	}, [mockState, realCampaigns, realNewEmailCount]);
+	const campaigns = useMemo(
+		() => (realCampaigns as CampaignWithCounts[] | undefined) ?? [],
+		[realCampaigns]
+	);
+	const newEmailCount = realNewEmailCount;
 
 	const actions = useMemo(
 		() => pickTopActions(campaigns, newEmailCount),
@@ -2166,10 +2137,7 @@ export const DashboardStrategyBox: FC<Props> = ({ className, mockState }) => {
 		}
 	};
 
-	const useRealForPreview =
-		!(mockState?.campaigns && mockState.campaigns.length > 0) &&
-		mockState?.newEmailCount == null;
-	const previewEmail = useRealForPreview ? inboundEmails?.[0] : undefined;
+	const previewEmail = inboundEmails?.[0];
 
 	return (
 		<div
@@ -2237,14 +2205,11 @@ export const DashboardStrategyBox: FC<Props> = ({ className, mockState }) => {
 					};
 
 					if (isTop && action.kind === 'replyEmails') {
-						const useReal =
-							!(mockState?.campaigns && mockState.campaigns.length > 0) &&
-							mockState?.newEmailCount == null;
 						return (
 							<div key={`replyEmails-top-${index}`} style={wrapperStyle}>
 								<ReplyEmailsTopCard
 									count={action.count}
-									realEmails={useReal ? inboundEmails : undefined}
+									realEmails={inboundEmails}
 									onClick={() => handleActionClick(action)}
 									onHoverChange={handleReplyHoverChange}
 									isPreviewOpen={showReplyPreview}
