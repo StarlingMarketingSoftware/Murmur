@@ -39,6 +39,20 @@ type CampaignWithCounts = Campaign & {
 };
 
 const DEFAULT_MOCK_FOLDER_NAMES = ['Orion', 'Leo', 'Pieces', 'Capricorn', 'Sagittarius'];
+const CAMPAIGN_FOLDER_NAME_BOX_COLORS = [
+	'#B9EAF1',
+	'#CDCFF9',
+	'#D0FFEA',
+	'#F7EBC0',
+	'#EEC7F7',
+] as const;
+const CAMPAIGN_FOLDER_ICON_COLORS = [
+	'#B84A4A',
+	'#CB56D1',
+	'#A256D1',
+	'#56BFD1',
+	'#DDA544',
+] as const;
 const DEFAULT_MOCK_CAMPAIGN_DATA_TYPES: CampaignDataTypeSummary[] = [
 	{
 		kind: 'category',
@@ -53,6 +67,11 @@ const DEFAULT_MOCK_CAMPAIGN_DATA_TYPES: CampaignDataTypeSummary[] = [
 	{ kind: 'state', key: 'TX', label: 'TX', count: 1 },
 	{ kind: 'state', key: 'CA', label: 'CA', count: 1 },
 ];
+
+const getCampaignFolderPaletteIndex = (rowIndex: number) => {
+	const paletteLength = CAMPAIGN_FOLDER_NAME_BOX_COLORS.length;
+	return ((rowIndex % paletteLength) + paletteLength) % paletteLength;
+};
 
 const buildMockCampaignRows = (mockState: CampaignsMockState): CampaignWithCounts[] => {
 	const folders = mockState.folders ?? [];
@@ -79,6 +98,21 @@ const buildMockCampaignRows = (mockState: CampaignsMockState): CampaignWithCount
 
 const useIsomorphicLayoutEffect =
 	typeof window !== 'undefined' ? useLayoutEffect : useEffect;
+
+const LARGE_METRIC_COUNT_THRESHOLD = 1000;
+const largeMetricCountFormatter = new Intl.NumberFormat('de-DE', {
+	maximumFractionDigits: 0,
+});
+
+const formatMetricCount = (value: number) =>
+	value >= LARGE_METRIC_COUNT_THRESHOLD
+		? largeMetricCountFormatter.format(value)
+		: value.toString().padStart(2, '0');
+
+const formatMetricPillLabel = (value: number, suffix: string) =>
+	value >= LARGE_METRIC_COUNT_THRESHOLD
+		? formatMetricCount(value)
+		: `${formatMetricCount(value)} ${suffix}`;
 
 type MetricSortKey = 'drafts' | 'sent' | 'updated';
 type MetricSortMode = 'desc' | 'asc';
@@ -484,13 +518,21 @@ export const useCampaignsTable = (options?: {
 					Folders
 				</div>
 			),
-			cell: ({ row }) => {
+			cell: ({ row, table }) => {
 				const name: string = row.getValue('name');
 				const campaign = row.original as CampaignWithCounts;
 				const isConfirming = campaign.id === confirmingCampaignId;
 				const newCount = campaign.newEmailCount ?? 0;
 				const campaignDataTypes = campaign.campaignDataTypes ?? [];
 				const hasNew = newCount >= 1;
+				const visibleRowIndex = table
+					.getRowModel()
+					.rows.findIndex((visibleRow) => visibleRow.id === row.id);
+				const paletteIndex = getCampaignFolderPaletteIndex(
+					visibleRowIndex >= 0 ? visibleRowIndex : row.index
+				);
+				const nameBoxColor = CAMPAIGN_FOLDER_NAME_BOX_COLORS[paletteIndex];
+				const folderIconColor = CAMPAIGN_FOLDER_ICON_COLORS[paletteIndex];
 				if (!name) {
 					return (
 						<Typography variant="muted" className="text-sm">
@@ -509,7 +551,7 @@ export const useCampaignsTable = (options?: {
 								border: '0.799px solid #000',
 								background: isConfirming ? 'transparent' : '#EEFFF0',
 								paddingLeft: 7,
-								/* paddingRight 26 (1+ new) shifts "X new" text ~14px left so it
+								/* paddingRight 26 (1+ new) shifts the new-count text ~14px left so it
 								   sits visually under the "New" column header rather than
 								   against the pill's right edge. */
 								paddingRight: hasNew ? 26 : 7,
@@ -521,20 +563,20 @@ export const useCampaignsTable = (options?: {
 									width: 112,
 									height: 15,
 									borderRadius: 3,
-									background: isConfirming ? 'transparent' : '#EEC7F7',
+									background: isConfirming ? 'transparent' : nameBoxColor,
 									paddingLeft: 2,
 									paddingRight: 6,
 								}}
 							>
 								<span
 									className="inline-flex items-center justify-center flex-none"
-									style={{ color: '#E89A3F' }}
+									style={{ color: isConfirming ? '#FFFFFF' : folderIconColor }}
 								>
 									<DashboardActionBarFolderIcon width={16} height={10} />
 								</span>
 								<span
 									className={cn(
-										'ml-[7px] truncate text-[13.854px] leading-[17.186px] font-inter font-medium',
+										'ml-[7px] truncate text-[13.854px] leading-[15px] font-inter font-medium',
 										isConfirming ? 'text-white' : 'text-black'
 									)}
 								>
@@ -553,7 +595,7 @@ export const useCampaignsTable = (options?: {
 										isConfirming ? 'text-white' : 'text-black'
 									)}
 								>
-									{newCount.toString().padStart(2, '0')} new
+									{formatMetricPillLabel(newCount, 'new')}
 								</span>
 							)}
 						</div>
@@ -811,17 +853,15 @@ export const useCampaignsTable = (options?: {
 				const newCount = campaign.newEmailCount ?? 0;
 				const updatedAt = new Date(campaign.updatedAt);
 
-				const draftLabel =
-					draftCount.toString().padStart(2, '0') +
-					(draftCount === 1 ? ' draft' : ' drafts');
-				const sentLabel = sentCount.toString().padStart(2, '0') + ' sent';
-
 				const draftDisplay = compactMetrics
-					? draftCount.toString().padStart(2, '0')
-					: draftLabel;
+					? formatMetricCount(draftCount)
+					: formatMetricPillLabel(
+							draftCount,
+							draftCount === 1 ? 'draft' : 'drafts'
+						);
 				const sentDisplay = compactMetrics
-					? sentCount.toString().padStart(2, '0')
-					: sentLabel;
+					? formatMetricCount(sentCount)
+					: formatMetricPillLabel(sentCount, 'sent');
 				const draftFill = getDraftFillColor(draftCount);
 				const sentFill = getSentFillColor(sentCount);
 				const updatedFill = getUpdatedFillColor(updatedAt);

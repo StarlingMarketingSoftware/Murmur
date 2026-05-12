@@ -280,7 +280,7 @@ export const CampaignsTable: FC<CampaignsTableProps> = ({ mockState }) => {
 						) : (
 							<CustomTable
 								variant="secondary"
-								containerClassName={`border-none rounded-[8px] my-campaigns-table !bg-[#F8F8F8] !mx-auto !p-[8px] w-[654px] h-[253px] ${
+								containerClassName={`border-none rounded-[8px] my-campaigns-table desktop-campaigns-table !bg-[#F8F8F8] !mx-auto !p-[8px] w-[654px] h-[253px] ${
 									isNarrowDesktop ? 'narrow-desktop-table' : ''
 								}`}
 								headerClassName="!bg-white [&_tr]:!bg-white [&_th]:!bg-white [&_th]:!border-0 [&_th]:!h-[28px] [&_tr]:!h-[28px] [&_th:first-child]:rounded-tl-[8px] [&_th:last-child]:rounded-tr-[8px] [&_th]:relative [&_th]:!overflow-visible"

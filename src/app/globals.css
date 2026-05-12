@@ -4552,6 +4552,54 @@ main {
 	background-color: #ffffff !important;
 }
 
+.my-campaigns-table thead,
+.my-campaigns-table thead tr,
+.my-campaigns-table thead th {
+	height: 28px !important;
+	max-height: 28px !important;
+}
+
+.my-campaigns-table thead th {
+	padding-top: 0 !important;
+	padding-bottom: 0 !important;
+	vertical-align: middle !important;
+}
+
+.my-campaigns-table:not(.mobile-table-no-scroll) {
+	border: none !important;
+	box-shadow: none !important;
+	--campaign-metric-tick-height: 20px;
+}
+
+.my-campaigns-table.desktop-campaigns-table::before {
+	content: '';
+	position: absolute;
+	top: 6px;
+	left: 4px;
+	right: 4px;
+	height: 30px;
+	background: #ffffff;
+	border-radius: 4px 4px 0 0;
+	pointer-events: none;
+	z-index: 1;
+}
+
+.my-campaigns-table:not(.mobile-table-no-scroll) tbody td {
+	padding-top: 6.5px !important;
+	padding-bottom: 6.5px !important;
+}
+
+.my-campaigns-table:not(.mobile-table-no-scroll) tbody tr:first-child > td {
+	padding-top: 13px !important;
+}
+
+.my-campaigns-table:not(.mobile-table-no-scroll) .folder-pill,
+.my-campaigns-table:not(.mobile-table-no-scroll) .metric-box,
+.my-campaigns-table:not(.mobile-table-no-scroll) .campaign-metric-slot {
+	height: 20px !important;
+	min-height: 20px !important;
+}
+
 /* Campaigns table: keep body on the container fill (#F8F8F8)
    The shared "secondary" table styles give tbody a white background; for this table we want
    the wrapper/container background to show through behind rows. */
@@ -4781,6 +4829,14 @@ html.murmur-compact.murmur-dashboard-map-compact {
 .my-campaigns-table {
 	height: 172px !important;
 	max-height: 172px !important;
+}
+
+.campaigns-table-container .my-campaigns-table.desktop-campaigns-table {
+	width: 654px !important;
+	max-width: 654px !important;
+	height: 253px !important;
+	max-height: 253px !important;
+	min-height: 253px !important;
 }
 
 .my-campaigns-table .scrollbar-hide {
