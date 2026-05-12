@@ -9869,7 +9869,9 @@ const DashboardContent = () => {
 					>
 						<div className="mt-[18px] mb-[18px] w-full flex flex-col items-center">
 							{selectedActionBarIcon === 'playbook' && (
-								<DashboardStrategyBox />
+								<DashboardStrategyBox
+									onSearchContacts={handleMapBottomForYouSubmit}
+								/>
 							)}
 							{selectedActionBarIcon === 'folder' && (
 								<CampaignsTable mockState={campaignsMockState} />

@@ -4572,6 +4572,8 @@ main {
 	--campaign-row-left-hover-width: 236px;
 	--campaign-row-hover-fill-height: 22px;
 	--campaign-row-hover-fill-color: #d2e7f6;
+	--campaign-row-right-hover-fill-color: #D6F7DD;
+	--campaign-row-right-hover-box-color: #A0F2B2;
 }
 
 .my-campaigns-table.desktop-campaigns-table::before {
@@ -4610,7 +4612,9 @@ main {
 }
 
 .my-campaigns-table .campaign-row-left-hover-surface,
-.my-campaigns-table .campaign-folder-show-content {
+.my-campaigns-table .campaign-folder-show-content,
+.my-campaigns-table .campaign-folder-goto-content,
+.my-campaigns-table .metric-box-goto-label {
 	display: none;
 }
 
@@ -4645,6 +4649,112 @@ main {
 	tr:first-child:has(.campaign-row-left-hover-surface:hover)
 	> td {
 	background-position: center top 8px !important;
+}
+
+.my-campaigns-table:not(.mobile-table-no-scroll)
+	tbody
+	tr:has(td:nth-child(2):hover)
+	> td,
+.my-campaigns-table:not(.mobile-table-no-scroll)
+	tbody
+	tr:has(.campaign-folder-new-count:hover)
+	> td {
+	background-color: transparent !important;
+	background-image: linear-gradient(
+		var(--campaign-row-right-hover-fill-color, #D6F7DD),
+		var(--campaign-row-right-hover-fill-color, #D6F7DD)
+	) !important;
+	background-position: center !important;
+	background-repeat: no-repeat !important;
+	background-size: 100% var(--campaign-row-hover-fill-height, 22px) !important;
+}
+
+.my-campaigns-table:not(.mobile-table-no-scroll)
+	tbody
+	tr:first-child:has(td:nth-child(2):hover)
+	> td,
+.my-campaigns-table:not(.mobile-table-no-scroll)
+	tbody
+	tr:first-child:has(.campaign-folder-new-count:hover)
+	> td {
+	background-position: center top 8px !important;
+}
+
+.my-campaigns-table:not(.mobile-table-no-scroll)
+	tbody
+	tr:has(td:nth-child(2):hover)
+	.folder-pill,
+.my-campaigns-table:not(.mobile-table-no-scroll)
+	tbody
+	tr:has(.campaign-folder-new-count:hover)
+	.folder-pill,
+.my-campaigns-table:not(.mobile-table-no-scroll)
+	tbody
+	tr:has(td:nth-child(2):hover)
+	.metric-box,
+.my-campaigns-table:not(.mobile-table-no-scroll)
+	tbody
+	tr:has(.campaign-folder-new-count:hover)
+	.metric-box {
+	background: var(--campaign-row-right-hover-box-color, #A0F2B2) !important;
+	background-color: var(--campaign-row-right-hover-box-color, #A0F2B2) !important;
+}
+
+.my-campaigns-table:not(.mobile-table-no-scroll)
+	tbody
+	tr:has(td:nth-child(2):hover)
+	.campaign-folder-name-box,
+.my-campaigns-table:not(.mobile-table-no-scroll)
+	tbody
+	tr:has(.campaign-folder-new-count:hover)
+	.campaign-folder-name-box {
+	background: transparent !important;
+}
+
+.my-campaigns-table:not(.mobile-table-no-scroll)
+	tbody
+	tr:has(td:nth-child(2):hover)
+	.campaign-folder-name-content,
+.my-campaigns-table:not(.mobile-table-no-scroll)
+	tbody
+	tr:has(.campaign-folder-new-count:hover)
+	.campaign-folder-name-content {
+	display: none !important;
+}
+
+.my-campaigns-table:not(.mobile-table-no-scroll)
+	tbody
+	tr:has(td:nth-child(2):hover)
+	.campaign-folder-goto-content,
+.my-campaigns-table:not(.mobile-table-no-scroll)
+	tbody
+	tr:has(.campaign-folder-new-count:hover)
+	.campaign-folder-goto-content {
+	display: inline-flex !important;
+}
+
+.my-campaigns-table:not(.mobile-table-no-scroll)
+	.metric-box[data-draft-fill]:hover
+	.metric-box-label,
+.my-campaigns-table:not(.mobile-table-no-scroll)
+	.metric-box[data-sent-fill]:hover
+	.metric-box-label,
+.my-campaigns-table:not(.mobile-table-no-scroll)
+	.metric-box[data-updated-fill]:hover
+	.metric-box-label {
+	display: none !important;
+}
+
+.my-campaigns-table:not(.mobile-table-no-scroll)
+	.metric-box[data-draft-fill]:hover
+	.metric-box-goto-label,
+.my-campaigns-table:not(.mobile-table-no-scroll)
+	.metric-box[data-sent-fill]:hover
+	.metric-box-goto-label,
+.my-campaigns-table:not(.mobile-table-no-scroll)
+	.metric-box[data-updated-fill]:hover
+	.metric-box-goto-label {
+	display: inline !important;
 }
 
 .my-campaigns-table:not(.mobile-table-no-scroll)
@@ -4693,7 +4803,8 @@ main {
 .my-campaigns-table:not(.mobile-table-no-scroll) .folder-pill,
 .my-campaigns-table:not(.mobile-table-no-scroll) .metric-box,
 .my-campaigns-table:not(.mobile-table-no-scroll) .campaign-folder-name-box,
-.my-campaigns-table:not(.mobile-table-no-scroll) .campaign-folder-show-icon {
+.my-campaigns-table:not(.mobile-table-no-scroll) .campaign-folder-show-icon,
+.my-campaigns-table:not(.mobile-table-no-scroll) .campaign-folder-goto-icon {
 	transition: none !important;
 	transform: none !important;
 }

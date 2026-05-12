@@ -1940,6 +1940,7 @@ const computeItemMarginTops = (actions: StrategyAction[]): number[] => {
 
 type Props = {
 	className?: string;
+	onSearchContacts?: () => void;
 };
 
 const StrategyActionButton: FC<{
@@ -2037,7 +2038,7 @@ const computePreviewPosition = (
 	};
 };
 
-export const DashboardStrategyBox: FC<Props> = ({ className }) => {
+export const DashboardStrategyBox: FC<Props> = ({ className, onSearchContacts }) => {
 	const router = useRouter();
 	const { data: realCampaigns } = useGetCampaigns();
 	const { data: inboundEmails } = useGetInboundEmails({ enabled: true });
@@ -2109,7 +2110,7 @@ export const DashboardStrategyBox: FC<Props> = ({ className }) => {
 
 	const handleActionClick = (action: StrategyAction) => {
 		if (action.kind === 'searchContacts') {
-			// search-focus isn't wired up yet
+			onSearchContacts?.();
 			return;
 		}
 

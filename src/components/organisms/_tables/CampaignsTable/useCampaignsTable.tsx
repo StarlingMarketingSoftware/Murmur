@@ -617,6 +617,26 @@ export const useCampaignsTable = (options?: {
 									</span>
 									<span className="campaign-folder-show-caret" aria-hidden="true" />
 								</span>
+								<span className="campaign-folder-goto-content min-w-0 items-center">
+									<span
+										className="inline-flex items-center justify-center flex-none"
+										style={{ color: isConfirming ? '#FFFFFF' : folderIconColor }}
+									>
+										<DashboardActionBarFolderIcon
+											className="campaign-folder-goto-icon"
+											width={16}
+											height={10}
+										/>
+									</span>
+									<span
+										className={cn(
+											'ml-[9px] text-[13.854px] leading-[15px] font-inter font-medium',
+											isConfirming ? 'text-white' : 'text-black'
+										)}
+									>
+										Go To
+									</span>
+								</span>
 							</div>
 							<CampaignDataTypeIconStrip
 								dataTypes={campaignDataTypes}
@@ -626,7 +646,7 @@ export const useCampaignsTable = (options?: {
 							{hasNew && (
 								<span
 									className={cn(
-										'flex-none text-[13.854px] leading-[17.186px] font-inter font-medium whitespace-nowrap',
+										'campaign-folder-new-count flex-none text-[13.854px] leading-[17.186px] font-inter font-medium whitespace-nowrap',
 										isConfirming ? 'text-white' : 'text-black'
 									)}
 								>
@@ -928,25 +948,29 @@ export const useCampaignsTable = (options?: {
 											dataAttr: {
 												'data-new-fill': '#FFFFFF',
 											} as Record<string, string>,
+											showGoToOnHover: false,
 										},
-									]
+								  ]
 								: []),
 							{
 								label: draftDisplay,
 								fill: draftFill,
 								dataAttr: { 'data-draft-fill': draftFill } as Record<string, string>,
+								showGoToOnHover: true,
 							},
 							{
 								label: sentDisplay,
 								fill: sentFill,
 								dataAttr: { 'data-sent-fill': sentFill } as Record<string, string>,
+								showGoToOnHover: true,
 							},
 							{
 								label: updatedLabel,
 								fill: updatedFill,
 								dataAttr: { 'data-updated-fill': updatedFill } as Record<string, string>,
+								showGoToOnHover: true,
 							},
-						].map(({ label, fill, dataAttr }, index) => (
+						].map(({ label, fill, dataAttr, showGoToOnHover }, index) => (
 							<div
 								key={index}
 								className={cn(
@@ -968,11 +992,14 @@ export const useCampaignsTable = (options?: {
 										borderColor: isConfirming
 											? '#A20000'
 											: '#000000',
-									} as React.CSSProperties
-								}
-							>
-								{label}
-							</div>
+										} as React.CSSProperties
+									}
+								>
+									<span className="metric-box-label">{label}</span>
+									{showGoToOnHover && (
+										<span className="metric-box-goto-label">Go To</span>
+									)}
+								</div>
 							</div>
 						))}
 					</div>
