@@ -1,4 +1,4 @@
-import { FC, useEffect, useMemo, useRef } from 'react';
+import { FC, useEffect, useMemo, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import { useRouter } from 'next/navigation';
 import { useGetCampaigns } from '@/hooks/queryHooks/useCampaigns';
@@ -510,27 +510,61 @@ const DraftMessagesTopCard: FC<{
 	campaignName?: string;
 }> = ({ count, campaignName }) => {
 	const slots = buildDraftSlots(count);
+	const [isHovered, setIsHovered] = useState(false);
 
 	const containerMask =
 		'linear-gradient(180deg, #000 0%, #000 70%, rgba(0,0,0,0) 86%)';
 
 	return (
 		<div
+			onMouseEnter={() => setIsHovered(true)}
+			onMouseLeave={() => setIsHovered(false)}
 			style={{
 				position: 'relative',
 				width: '622px',
 				maxWidth: '100%',
 				height: '113px',
 				borderRadius: '6.389px',
-				opacity: 0.8,
+				opacity: isHovered ? 1 : 0.8,
 				background:
 					'linear-gradient(179deg, #BEA9ED 62.44%, rgba(169, 218, 237, 0.00) 120.01%)',
 				overflow: 'hidden',
 				flexShrink: 0,
+				transform: isHovered ? 'translateY(-1px)' : 'translateY(0)',
+				boxShadow: isHovered
+					? '0 14px 34px rgba(99, 74, 149, 0.22), inset 0 1px 0 rgba(255,255,255,0.42)'
+					: '0 0 0 rgba(99, 74, 149, 0)',
+				transition:
+					'opacity 240ms ease, transform 240ms cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 240ms ease',
+				willChange: 'opacity, transform',
 				WebkitMaskImage: containerMask,
 				maskImage: containerMask,
 			}}
 		>
+			<div
+				aria-hidden="true"
+				style={{
+					position: 'absolute',
+					inset: 0,
+					background: '#BEA9ED',
+					opacity: isHovered ? 1 : 0,
+					transition: 'opacity 260ms ease',
+					pointerEvents: 'none',
+				}}
+			/>
+			<div
+				aria-hidden="true"
+				style={{
+					position: 'absolute',
+					inset: 0,
+					background:
+						'linear-gradient(90deg, rgba(255,255,255,0.28) 0%, rgba(255,255,255,0.08) 45%, rgba(255,255,255,0) 100%)',
+					opacity: isHovered ? 1 : 0,
+					transform: isHovered ? 'translateX(0)' : 'translateX(-18px)',
+					transition: 'opacity 260ms ease, transform 320ms cubic-bezier(0.2, 0.8, 0.2, 1)',
+					pointerEvents: 'none',
+				}}
+			/>
 			<div
 				style={{
 					position: 'absolute',
@@ -546,6 +580,7 @@ const DraftMessagesTopCard: FC<{
 					fontStyle: 'normal',
 					fontWeight: 500,
 					lineHeight: '20.728px',
+					zIndex: 1,
 				}}
 			>
 				<span>
@@ -575,6 +610,13 @@ const DraftMessagesTopCard: FC<{
 							gap: '2px',
 							fontFamily: 'Inter, sans-serif',
 							color: '#000',
+							zIndex: 1,
+							transform: isHovered ? 'translateY(-1px)' : 'translateY(0)',
+							boxShadow: isHovered
+								? '0 7px 18px rgba(81, 58, 132, 0.14)'
+								: '0 0 0 rgba(81, 58, 132, 0)',
+							transition:
+								'transform 240ms cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 240ms ease',
 						}}
 					>
 						<div
@@ -1896,10 +1938,10 @@ export const DashboardStrategyBox: FC<Props> = ({ className, mockState }) => {
 				width: '631px',
 				borderRadius: '6px',
 				background: 'rgba(254, 254, 254, 0.74)',
-				padding: '14px 4px',
+				padding: '2px 4px 14px',
 				display: 'flex',
 				flexDirection: 'column',
-				gap: '10px',
+				gap: '5px',
 				boxSizing: 'border-box',
 				overflow: 'hidden',
 			}}
@@ -1907,10 +1949,11 @@ export const DashboardStrategyBox: FC<Props> = ({ className, mockState }) => {
 			<div
 				style={{
 					fontFamily: 'Inter, sans-serif',
-					fontSize: '13px',
+					fontSize: '12.809px',
+					fontStyle: 'normal',
 					fontWeight: 500,
-					lineHeight: '20px',
-					color: '#1A1A1A',
+					lineHeight: '20.199px',
+					color: '#000',
 					paddingLeft: '12px',
 				}}
 			>
